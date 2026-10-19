@@ -1,0 +1,564 @@
+import { useCallback, useRef, useState } from 'react';
+import { App, Modal, Spin } from 'antd';
+import { useNavigate } from 'react-router-dom';
+import { ImagePlus, Maximize2, Plus, RefreshCw, Sparkles, X } from 'lucide-react';
+import { assetsApi, generateApi, toAbsoluteUrl } from '../lib/api';
+import { languageOptions, platformOptions } from '../lib/optionSets';
+
+import { ToolEmptyState, ToolWorkflowSteps } from '../components/ToolEmptyState';
+import { ToolSubmitBar } from '../components/ToolSubmitBar';
+import { ToolHistoryPanel } from '../components/ToolHistoryPanel';
+import { ToolSettingsPopover } from '../components/ToolSettingsPopover';
+import { AssetLibraryModal, useAssetLibrary } from '../components/AssetLibraryModal';
+import { useProject } from '../hooks/useProject';
+import { usePollAbort } from '../hooks/usePollAbort';
+import { usePasteUpload } from '../hooks/usePasteUpload';
+import { pollToResult } from '../lib/poll';
+import type { Asset, TaskStatus } from '../types/api';
+
+/**
+ * 商品详情图工作台 —— 1:1 复刻参考站 https://ijihua.cn/product-detail。
+ *
+ * 版面数值来自参考站 computed styles 实拍 (1920×1080):
+ *   主区/输入栏/卡片/上传区/生成设置/商品描述与 product-kit 完全一致 (同类 class)
+ *   包含模块卡: 白底 radius 16 padding 16; 标题行 400x20 space-between, 计数器 12px #EB5757
+ *   模块选择器: 2 列 x 192 gap 16; 选项 192x66, 底 #F2F4F7, radius 8,
+ *              padding 8 8 8 16, flex gap 8; 复选框 14x14 accent #625DF5
+ *              标题 14px #333 lh22 / 说明 12px #86909C lh20; 上限 10 个 (已选 N/10)
+ *   高级设置: 仅"画质"chip (无比例); 提交按钮与 product-kit 同款紫色渐变
+ *
+ * 接线: 上传 → assets API; 包含模块 → detail_image 任务的 sections 参数
+ * (逗号分隔模块键, 后端按键渲染长图区块, 选不同模块产出不同版面);
+ * 画质 → size 参数 (1K/2K; 4K 超出本地算法上限, 如实禁用)。
+ */
+
+// ───────────────── 常量 (参考站实拍) ─────────────────
+
+const MAX_IMAGES = 5;
+const MAX_IMAGE_MB = 10;
+const MAX_NAME_LEN = 100;
+const MAX_DESC_LEN = 5000;
+const MAX_SECTIONS = 10;
+
+/** 参考站"包含模块"16 项 (value 与后端 registry DETAIL_SECTIONS 一致) */
+const SECTION_MODULES = [
+  { value: 'hero', label: '首屏主视觉', desc: '传递核心价值' },
+  { value: 'selling_points', label: '核心卖点图', desc: '突出差异优势' },
+  { value: 'usage_scene', label: '使用场景图', desc: '呈现真实使用场景' },
+  { value: 'multi_angle', label: '多角度图', desc: '多角度呈现外观' },
+  { value: 'scene_atmosphere', label: '场景氛围图', desc: '展示使用场景' },
+  { value: 'product_detail', label: '商品细节图', desc: '放大材质与工艺' },
+  { value: 'brand_story', label: '品牌故事图', desc: '传达品牌理念' },
+  { value: 'size_spec', label: '尺寸/容量/尺码图', desc: '展示规格信息' },
+  { value: 'effect_compare', label: '效果对比图', desc: '使用前后效果对比' },
+  { value: 'spec_table', label: '详细规格/参数表', desc: '展示详细商品数据' },
+  { value: 'craft_process', label: '工艺制作图', desc: '展示工艺制作过程' },
+  { value: 'accessories', label: '配件/随箱物品图', desc: '明确收到的配件、零配件和随购赠送物品' },
+  { value: 'series_display', label: '系列展示图', desc: '多色或多SKU展示' },
+  { value: 'ingredients', label: '商品成分图', desc: '展示配方/材质/成分' },
+  { value: 'after_sale', label: '售后保障图', desc: '说明质保退换政策' },
+  { value: 'usage_tips', label: '使用建议图', desc: '商品使用的注意事项' },
+];
+
+/** 默认勾选前 6 项 (参考站初始状态 已选 6/10) */
+const DEFAULT_SECTIONS = SECTION_MODULES.slice(0, 6).map((s) => s.value);
+
+interface PkAsset {
+  id: string;
+  url: string;
+  name: string;
+}
+
+interface PkResult {
+  status: TaskStatus;
+  url?: string;
+  width?: number;
+  height?: number;
+  errorCode?: string | null;
+}
+
+export function ProductDetailPage() {
+  const { message } = App.useApp();
+  const navigate = useNavigate();
+  const { ensureProject } = useProject();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── 表单状态 ──
+  const [images, setImages] = useState<PkAsset[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [productName, setProductName] = useState('');
+  const [brand, setBrand] = useState('');
+  const [platform, setPlatform] = useState('taobao');
+  const [language, setLanguage] = useState('zh-CN');
+  const [description, setDescription] = useState('');
+  const [sections, setSections] = useState<string[]>(DEFAULT_SECTIONS);
+  const [resolution, setResolution] = useState('1k');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // ── 弹窗状态 ──
+  const [expandOpen, setExpandOpen] = useState(false);
+
+  // ── 任务状态 ──
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<PkResult | null>(null);
+  const pollSignal = usePollAbort();
+
+  const formValid =
+    images.length > 0 && productName.trim().length > 0 && description.trim().length > 0 && sections.length > 0;
+
+  // ── 上传 ──
+  const uploadFiles = useCallback(
+    async (files: FileList | File[]) => {
+      const list = Array.from(files).filter((f) => f.type.startsWith('image/'));
+      if (list.length === 0) {
+        message.warning('请选择图片文件（PNG / JPG / WebP / GIF）');
+        return;
+      }
+      const room = MAX_IMAGES - images.length;
+      if (room <= 0) {
+        message.warning(`最多上传 ${MAX_IMAGES} 张商品图片`);
+        return;
+      }
+      const accepted = list.slice(0, room);
+      if (list.length > room) message.warning(`超出数量限制，仅取前 ${room} 张`);
+      const oversize = accepted.filter((f) => f.size > MAX_IMAGE_MB * 1024 * 1024);
+      if (oversize.length > 0) {
+        message.error(`单张不超过 ${MAX_IMAGE_MB}MB：${oversize.map((f) => f.name).join('、')}`);
+        return;
+      }
+
+      setUploading(true);
+      try {
+        const projectId = await ensureProject();
+        const uploaded: PkAsset[] = [];
+        for (const file of accepted) {
+          const asset = await assetsApi.upload(file, projectId);
+          uploaded.push({ id: asset.id, url: toAbsoluteUrl(asset.sourceUrl) ?? '', name: file.name });
+        }
+        setImages((prev) => [...prev, ...uploaded]);
+        message.success(`已上传 ${uploaded.length} 张商品图片`);
+      } catch (e) {
+        message.error((e as Error).message || '上传失败');
+      } finally {
+        setUploading(false);
+      }
+    },
+    [images.length, ensureProject, message],
+  );
+
+  const removeImage = (id: string) => setImages((prev) => prev.filter((x) => x.id !== id));
+
+  // 拖拽 & 粘贴 (参考站支持三种上传方式)
+  const [dragging, setDragging] = useState(false);
+  usePasteUpload(uploadFiles);
+
+  // ── 素材库导入 ──
+
+  const pickFromLibrary = (asset: Asset) => {
+    if (images.length >= MAX_IMAGES) {
+      message.warning(`最多上传 ${MAX_IMAGES} 张商品图片`);
+      return;
+    }
+    if (images.some((x) => x.id === asset.id)) {
+      message.info('该素材已在列表中');
+      return;
+    }
+    setImages((prev) => [
+      ...prev,
+      { id: asset.id, url: toAbsoluteUrl(asset.sourceUrl) ?? '', name: asset.sourceUrl.split('/').pop() ?? '素材' },
+    ]);
+  };
+
+  // 素材库弹窗 (通用组件, 2026-10-19 抽取; 各页只提供点选回填逻辑)
+  const { open: libraryOpen, loading: libraryLoading, items: libraryItems, openLibrary, closeLibrary, pick } =
+    useAssetLibrary(pickFromLibrary);
+
+  // ── AI分析: 只填素材真实元数据, 不编造视觉识别结果 ──
+  const runAiAnalyze = () => {
+    if (images.length === 0) {
+      message.warning('请先上传商品图片');
+      return;
+    }
+    const lines = images.map((img, i) => `商品图${i + 1}：${img.name}`);
+    setDescription(lines.join('\n'));
+    message.success('已填入上传素材的真实文件名；本地演示未接入视觉模型，暂不能识别商品内容');
+  };
+
+  // ── 模块选择 (上限 10, 与参考站"已选 N/10"一致) ──
+  const toggleSection = (value: string) => {
+    setSections((prev) => {
+      if (prev.includes(value)) return prev.filter((v) => v !== value);
+      if (prev.length >= MAX_SECTIONS) {
+        message.warning(`最多选择 ${MAX_SECTIONS} 个模块`);
+        return prev;
+      }
+      // 保持参考站模块固定顺序 (不按点击顺序重排)
+      return SECTION_MODULES.map((s) => s.value).filter((v) => v === value || prev.includes(v));
+    });
+  };
+
+  // ── 生成 ──
+  const pollTask = useCallback(
+    (taskId: string) => pollToResult(taskId, { signal: pollSignal }),
+    [pollSignal],
+  );
+
+  const submit = async () => {
+    if (!formValid || submitting) return;
+    setSubmitting(true);
+    setResult(null);
+    try {
+      const projectId = await ensureProject();
+      const { taskId } = await generateApi.start({
+        projectId,
+        capability: 'detail_image',
+        inputAssetIds: images.map((x) => x.id),
+        params: {
+          productName: productName.trim(),
+          brand: brand.trim(),
+          platform,
+          language,
+          description: description.trim(),
+          sections: sections.join(','),
+          size: resolution,
+        },
+      });
+      const done = await pollTask(taskId);
+      setResult(done);
+      if (done.status === 'failed') message.error(`生成失败（${done.errorCode ?? '未知错误'}）`);
+      else message.success('商品详情图已生成');
+    } catch (e) {
+      message.error((e as Error).message || '生成失败');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="pk-workspace">
+      {/* ── 左: 输入栏 ── */}
+      <aside className="pk-input-pane">
+        <div className="pk-form-card">
+          {/* 业务类型 tab: 参考站仅窄屏显示 (桌面端 display:none 实拍确认) */}
+          <div className="pk-editor-tabs" role="tablist" aria-label="业务类型">
+            <button type="button" role="tab" aria-selected={false} className="pk-editor-tab" onClick={() => navigate('/product-kit')}>
+              商品主图
+            </button>
+            <button type="button" role="tab" aria-selected className="pk-editor-tab pk-editor-tab-active">
+              商品详情
+            </button>
+            <button type="button" role="tab" aria-selected={false} className="pk-editor-tab" onClick={() => navigate('/viral-clone')}>
+              爆款复刻
+            </button>
+          </div>
+
+          <div className="pk-form-scroll">
+            {/* 上传商品图 + 生成设置 + 商品描述 (参考站同一张卡片) */}
+            <section className="pk-config-card">
+              <div className="pk-section">
+                <div className="pk-upload-title-row">
+                  <strong className="pk-section-title">
+                    <i className="pk-required-mark">*</i>上传商品图
+                  </strong>
+                  <div className="pk-upload-title-actions">
+                    <button type="button" className="pk-text-link" onClick={() => openLibrary()}>
+                      从素材库导入
+                    </button>
+                    <button
+                      type="button"
+                      className="pk-text-link"
+                      title="本地演示环境暂不支持手机上传"
+                      onClick={() => message.info('本地演示环境暂不支持手机上传，可直接拖拽或粘贴上传')}
+                    >
+                      手机上传
+                    </button>
+                    <span className="pk-upload-count">
+                      {images.length}/{MAX_IMAGES}
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  className={`pk-dropzone${dragging ? ' pk-dropzone-dragging' : ''}${images.length > 0 ? ' pk-dropzone-filled' : ''}`}
+                  onClick={() => images.length < MAX_IMAGES && fileInputRef.current?.click()}
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragging(true);
+                  }}
+                  onDragLeave={() => setDragging(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragging(false);
+                    void uploadFiles(e.dataTransfer.files);
+                  }}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    multiple
+                    hidden
+                    onChange={(e) => {
+                      if (e.target.files) void uploadFiles(e.target.files);
+                      e.target.value = '';
+                    }}
+                  />
+                  {uploading && (
+                    <div className="pk-dropzone-loading">
+                      <Spin size="small" />
+                    </div>
+                  )}
+                  {images.length === 0 ? (
+                    <label className="pk-upload-prompt">
+                      <ImagePlus size={14} />
+                      <span>点击、拖拽或粘贴商品图片到此处上传</span>
+                      <small>最多可上传 {MAX_IMAGES} 张商品图片，单张不超过 {MAX_IMAGE_MB}MB</small>
+                    </label>
+                  ) : (
+                    <div className="pk-thumb-grid">
+                      {images.map((img) => (
+                        <div key={img.id} className="pk-thumb">
+                          <img src={img.url} alt={img.name} loading="lazy" decoding="async" />
+                          <button
+                            type="button"
+                            className="pk-thumb-remove"
+                            aria-label={`移除 ${img.name}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeImage(img.id);
+                            }}
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ))}
+                      {images.length < MAX_IMAGES && (
+                        <button type="button" className="pk-thumb-add" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
+                          <Plus size={18} />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="pk-section">
+                <strong className="pk-section-title">
+                  <i className="pk-required-mark">*</i>生成设置
+                </strong>
+                <div className="pk-form-grid">
+                  <label className="pk-field">
+                    <span className="pk-field-label">
+                      <i className="pk-required-mark">*</i>商品名称
+                    </span>
+                    <input
+                      value={productName}
+                      maxLength={MAX_NAME_LEN}
+                      placeholder="* 请输入商品名称"
+                      onChange={(e) => setProductName(e.target.value)}
+                    />
+                  </label>
+                  <label className="pk-field">
+                    <span className="pk-field-label">品牌（选填）</span>
+                    <input
+                      value={brand}
+                      maxLength={MAX_NAME_LEN}
+                      placeholder="请输入品牌（选填）"
+                      onChange={(e) => setBrand(e.target.value)}
+                    />
+                  </label>
+                  <label className="pk-field">
+                    <span className="pk-field-label">平台</span>
+                    <select value={platform} onChange={(e) => setPlatform(e.target.value)}>
+                      {platformOptions().map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="pk-field">
+                    <span className="pk-field-label">语言</span>
+                    <select value={language} onChange={(e) => setLanguage(e.target.value)}>
+                      {languageOptions().map((o) => (
+                        <option key={o.value} value={o.value}>
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </div>
+
+              <div className="pk-section">
+                <div className="pk-field-label-row">
+                  <span className="pk-section-title">
+                    <i className="pk-required-mark">*</i>商品描述
+                  </span>
+                  <div className="pk-desc-actions">
+                    <button type="button" className="pk-ai-btn" onClick={runAiAnalyze}>
+                      <Sparkles size={12} />
+                      <span>AI分析</span>
+                    </button>
+                  </div>
+                </div>
+                <div className="pk-desc-editor">
+                  <textarea
+                    rows={3}
+                    maxLength={MAX_DESC_LEN}
+                    value={description}
+                    placeholder="* 请输入商品描述"
+                    onChange={(e) => setDescription(e.target.value)}
+                  />
+                  <button
+                    type="button"
+                    className="pk-desc-expand"
+                    aria-label="放大编辑商品描述"
+                    title="放大编辑"
+                    onClick={() => setExpandOpen(true)}
+                  >
+                    <Maximize2 size={14} />
+                  </button>
+                </div>
+              </div>
+            </section>
+
+            {/* 包含模块（多选） */}
+            <section className="pk-config-card pk-detail-card">
+              <div className="pk-section">
+                <div className="pk-section-title-row">
+                  <strong className="pk-section-title">包含模块（多选）</strong>
+                  <span className="pk-section-counter">
+                    已选 {sections.length}/{MAX_SECTIONS}
+                  </span>
+                </div>
+                <div className="pk-section-picker">
+                  {SECTION_MODULES.map((m) => {
+                    const checked = sections.includes(m.value);
+                    const atLimit = !checked && sections.length >= MAX_SECTIONS;
+                    return (
+                      <label
+                        key={m.value}
+                        className={`pk-section-option${checked ? ' pk-section-option-selected' : ''}${atLimit ? ' pk-section-option-limit' : ''}`}
+                        title={atLimit ? `最多选择 ${MAX_SECTIONS} 个模块` : undefined}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          disabled={atLimit}
+                          onChange={() => toggleSection(m.value)}
+                        />
+                        <span>
+                          <strong>{m.label}</strong>
+                          <small>{m.desc}</small>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+          </div>
+
+          {/* 历史记录 (2026-10-19 接入通用组件; 此前本页无此功能) */}
+          <ToolHistoryPanel capability="detail_image" refreshKey={result} />
+
+          {/* 高级设置 + 提交 (sticky 底部) */}
+          {/* 高级设置 + 提交 (sticky 底部) */}
+          <ToolSubmitBar
+            submitting={submitting}
+            disabled={!formValid}
+            label="免费生图"
+            settings={
+              <ToolSettingsPopover
+                open={settingsOpen}
+                onToggle={() => setSettingsOpen((v) => !v)}
+                resolution={resolution}
+                onResolutionChange={setResolution}
+                showRatio={false}
+              />
+            }
+            onSubmit={() => void submit()}
+          />
+        </div>
+      </aside>
+
+      {/* ── 右: 结果栏 ── */}
+      <section className="pk-result-pane">
+        {!result ? (
+          <ToolEmptyState title="效果图预览" desc="提交任务后，生成结果将在此处展示">
+            <ToolWorkflowSteps />
+          </ToolEmptyState>
+        ) : (
+          <div className="pk-result-body">
+            <div className="pk-result-toolbar">
+              <div className="pk-result-title">
+                生成结果
+                <span className="pk-result-count">{sections.length} 个模块</span>
+              </div>
+              <button type="button" className="pk-result-regen" disabled={submitting} onClick={() => void submit()}>
+                <RefreshCw size={13} />
+                重新生成
+              </button>
+            </div>
+            <div className="pk-result-detail-scroll">
+              {result.status === 'succeeded' && result.url ? (
+                <div className="pk-result-card pk-result-card-detail">
+                  <div className="pk-result-detail-media">
+                    <img src={result.url} alt="商品详情图" />
+                  </div>
+                  <div className="pk-result-meta">
+                    <span className="pk-result-variant">商品详情长图</span>
+                    <span className="pk-result-params">
+                      {platform} · {resolution.toUpperCase()}
+                      {result.width && result.height ? ` · ${result.width}×${result.height}` : ''}
+                    </span>
+                  </div>
+                  <a className="pk-result-download" href={result.url} download target="_blank" rel="noreferrer">
+                    下载原图
+                  </a>
+                </div>
+              ) : (
+                <div className="pk-result-card pk-result-card-detail">
+                  <div className="pk-result-detail-media pk-result-failed">
+                    <X size={20} />
+                    <span>生成失败（{result.errorCode ?? '未知错误'}）</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* 素材库选择弹窗 (真实数据) */}
+      <AssetLibraryModal
+        open={libraryOpen}
+        loading={libraryLoading}
+        items={libraryItems}
+        onCancel={closeLibrary}
+        onPick={pickFromLibrary}
+      />
+
+      {/* 商品描述放大编辑 */}
+      <Modal
+        open={expandOpen}
+        title="编辑商品描述"
+        okText="确定"
+        cancelText="取消"
+        onOk={() => setExpandOpen(false)}
+        onCancel={() => setExpandOpen(false)}
+      >
+        <textarea
+          className="pk-expand-textarea"
+          rows={10}
+          maxLength={MAX_DESC_LEN}
+          value={description}
+          placeholder="* 请输入商品描述"
+          onChange={(e) => setDescription(e.target.value)}
+        />
+      </Modal>
+    </div>
+  );
+}
+
