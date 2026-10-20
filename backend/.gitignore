@@ -1,0 +1,35 @@
+node_modules/
+dist/
+*.log
+.DS_Store
+
+# ── SQLite 库文件 ────────────────────────────────────────────────────────────
+# 三环境各一个库 (dev.db / test.db / data/prod.db), 通配入库避免漏网。
+# 生产库在容器卷或 /var/lib 下, 不在本仓; 但本地裸机部署时可能落在这里。
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# ── 运行期目录 ───────────────────────────────────────────────────────────────
+uploads/
+uploads-test/
+backups-test/
+logs/test/
+# 容器数据卷在宿主机上的落地目录
+data/
+
+# 数据备份文件 (M16): 备份产物不入库, 由 seed:backup 重新生成
+backups/
+
+# ── 环境变量分档 (三环境体系, 见 docs/environments.md)────────────────────────
+#   入库   .env.development / .env.test / .env.production.example / .env.example
+#          —— 只含非敏感共享配置
+#   不入库 .env.production (生产凭据) / .env.*.local (个人私有覆盖)
+.env
+.env.local
+.env.production
+.env.*.local
+
+# 应用层文件日志 (AppFileLogger, 默认 backend/logs/): 运行时产物, 由保留期策略自行老化
+logs/

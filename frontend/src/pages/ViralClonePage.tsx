@@ -1,13 +1,13 @@
 import { useCallback, useRef, useState } from 'react';
-import { App, Modal, Spin } from 'antd';
+import { App, Modal } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { ImagePlus, Maximize2, Plus, RefreshCw, X } from 'lucide-react';
+import { Maximize2, RefreshCw, X } from 'lucide-react';
 import { assetsApi, generateApi, toAbsoluteUrl } from '../lib/api';
 import { languageOptions, platformOptions } from '../lib/optionSets';
 
-import { ToolEmptyState, ToolWorkflowSteps } from '../components/ToolEmptyState';
+import { ToolEmptyState, ToolGeneratingState, ToolWorkflowSteps } from '../components/ToolEmptyState';
 import { ToolSubmitBar } from '../components/ToolSubmitBar';
-import { ToolHistoryPanel } from '../components/ToolHistoryPanel';
+import { ToolImageDropzone } from '../components/ToolImageDropzone';
 import { ToolSettingsPopover } from '../components/ToolSettingsPopover';
 import { AssetLibraryModal, useAssetLibrary } from '../components/AssetLibraryModal';
 import { useProject } from '../hooks/useProject';
@@ -178,8 +178,7 @@ export function ViralClonePage() {
   const removeImage = (id: string) => setImages((prev) => prev.filter((x) => x.id !== id));
 
   // 拖拽 & 粘贴 (粘贴走商品图区, 与参考站主路径一致; 参考图支持点击/拖拽)
-  const [dragging, setDragging] = useState(false);
-  const [refDragging, setRefDragging] = useState(false);
+  // 两个拖拽高亮态均已下沉到 ToolImageDropzone 内部, 页面不再持有
   usePasteUpload(uploadFiles);
 
   // ── 素材库导入 (商品图 / 参考图共用) ──
@@ -204,8 +203,15 @@ export function ViralClonePage() {
   };
 
   // 素材库弹窗 (通用组件, 2026-10-19 抽取; 双通道: 商品图 / 参考图)
-  const { open: libraryOpen, loading: libraryLoading, items: libraryItems, openLibrary, closeLibrary, pick } =
-    useAssetLibrary(pickFromLibrary);
+  const {
+    open: libraryOpen,
+    loading: libraryLoading,
+    items: libraryItems,
+    error: libraryError,
+    openLibrary,
+    closeLibrary,
+    pick,
+  } = useAssetLibrary(pickFromLibrary);
   const openLibraryFor = (target: 'product' | 'reference') => {
     setLibraryTarget(target);
     openLibrary();
@@ -271,169 +277,38 @@ export function ViralClonePage() {
           <div className="pk-form-scroll">
             {/* 上传商品图 + 上传参考图 + 生成设置 (参考站同一张卡片) */}
             <section className="pk-config-card">
-              <div className="pk-section">
-                <div className="pk-upload-title-row">
-                  <strong className="pk-section-title">
-                    <i className="pk-required-mark">*</i>上传商品图
-                  </strong>
-                  <div className="pk-upload-title-actions">
-                    <button type="button" className="pk-text-link" onClick={() => openLibraryFor('product')}>
-                      从素材库导入
-                    </button>
-                    <button
-                      type="button"
-                      className="pk-text-link"
-                      title="本地演示环境暂不支持手机上传"
-                      onClick={() => message.info('本地演示环境暂不支持手机上传，可直接拖拽或粘贴上传')}
-                    >
-                      手机上传
-                    </button>
-                    <span className="pk-upload-count">
-                      {images.length}/{MAX_IMAGES}
-                    </span>
-                  </div>
-                </div>
-
-                <div
-                  className={`pk-dropzone${dragging ? ' pk-dropzone-dragging' : ''}${images.length > 0 ? ' pk-dropzone-filled' : ''}`}
-                  onClick={() => images.length < MAX_IMAGES && fileInputRef.current?.click()}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragging(true);
-                  }}
-                  onDragLeave={() => setDragging(false)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setDragging(false);
-                    void uploadFiles(e.dataTransfer.files);
-                  }}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,image/gif"
-                    multiple
-                    hidden
-                    onChange={(e) => {
-                      if (e.target.files) void uploadFiles(e.target.files);
-                      e.target.value = '';
-                    }}
-                  />
-                  {uploading && (
-                    <div className="pk-dropzone-loading">
-                      <Spin size="small" />
-                    </div>
-                  )}
-                  {images.length === 0 ? (
-                    <label className="pk-upload-prompt">
-                      <ImagePlus size={14} />
-                      <span>点击、拖拽或粘贴商品图片到此处上传</span>
-                      <small>最多可上传 {MAX_IMAGES} 张商品图片，单张不超过 {MAX_IMAGE_MB}MB</small>
-                    </label>
-                  ) : (
-                    <div className="pk-thumb-grid">
-                      {images.map((img) => (
-                        <div key={img.id} className="pk-thumb">
-                          <img src={img.url} alt={img.name} loading="lazy" decoding="async" />
-                          <button
-                            type="button"
-                            className="pk-thumb-remove"
-                            aria-label={`移除 ${img.name}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeImage(img.id);
-                            }}
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      ))}
-                      {images.length < MAX_IMAGES && (
-                        <button type="button" className="pk-thumb-add" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
-                          <Plus size={18} />
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <ToolImageDropzone
+                title="上传商品图"
+                images={images}
+                max={MAX_IMAGES}
+                maxMb={MAX_IMAGE_MB}
+                uploading={uploading}
+                fileInputRef={fileInputRef}
+                onFiles={(f) => void uploadFiles(f)}
+                onRemove={removeImage}
+                onOpenLibrary={() => openLibrary()}
+                noun="商品图片"
+              />
 
               {/* 上传参考图（爆款图）: 独立 section, 单张上传, 标题行无计数器 */}
-              <div className="pk-section vc-reference-section">
-                <div className="pk-upload-title-row">
-                  <strong className="pk-section-title">
-                    <i className="pk-required-mark">*</i>上传参考图（爆款图）
-                  </strong>
-                  <div className="pk-upload-title-actions">
-                    <button type="button" className="pk-text-link" onClick={() => openLibraryFor('reference')}>
-                      从素材库导入
-                    </button>
-                    <button
-                      type="button"
-                      className="pk-text-link"
-                      title="本地演示环境暂不支持手机上传"
-                      onClick={() => message.info('本地演示环境暂不支持手机上传，可直接拖拽上传')}
-                    >
-                      手机上传
-                    </button>
-                  </div>
-                </div>
-
-                <div
-                  className={`pk-dropzone pk-dropzone-reference${refDragging ? ' pk-dropzone-dragging' : ''}${reference ? ' pk-dropzone-filled' : ''}`}
-                  onClick={() => referenceInputRef.current?.click()}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setRefDragging(true);
-                  }}
-                  onDragLeave={() => setRefDragging(false)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setRefDragging(false);
-                    void uploadReference(e.dataTransfer.files);
-                  }}
-                >
-                  <input
-                    ref={referenceInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,image/gif"
-                    hidden
-                    onChange={(e) => {
-                      if (e.target.files) void uploadReference(e.target.files);
-                      e.target.value = '';
-                    }}
-                  />
-                  {uploading && (
-                    <div className="pk-dropzone-loading">
-                      <Spin size="small" />
-                    </div>
-                  )}
-                  {reference ? (
-                    <div className="pk-thumb-grid pk-thumb-grid-single">
-                      <div className="pk-thumb">
-                        <img src={reference.url} alt={reference.name} loading="lazy" decoding="async" />
-                        <button
-                          type="button"
-                          className="pk-thumb-remove"
-                          aria-label={`移除 ${reference.name}`}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setReference(null);
-                          }}
-                        >
-                          <X size={12} />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <label className="pk-upload-prompt">
-                      <ImagePlus size={14} />
-                      <span>点击、拖拽或粘贴参考图片到此处上传</span>
-                      <small>上传或粘贴要复刻风格的参考图，最多 1 张，单张不超过 {MAX_IMAGE_MB}MB</small>
-                    </label>
-                  )}
-                </div>
-              </div>
+              {/* 上传参考图（爆款图）: 独立 section, 单张上传, 标题行无计数器 */}
+              <ToolImageDropzone
+                title="上传参考图（爆款图）"
+                images={reference ? [reference] : []}
+                max={1}
+                maxMb={MAX_IMAGE_MB}
+                uploading={uploading}
+                fileInputRef={referenceInputRef}
+                onFiles={(f) => void uploadReference(f)}
+                onRemove={() => setReference(null)}
+                onOpenLibrary={() => openLibraryFor('reference')}
+                noun="参考图片"
+                sectionClassName="vc-reference-section"
+                dropzoneClassName="pk-dropzone-reference"
+                single
+                showCount={false}
+                emptyHint={`上传或粘贴要复刻风格的参考图，最多 1 张，单张不超过 ${MAX_IMAGE_MB}MB`}
+              />
 
               <div className="pk-section">
                 <strong className="pk-section-title">生成设置</strong>
@@ -535,8 +410,6 @@ export function ViralClonePage() {
             </section>
           </div>
 
-          {/* 历史记录 (2026-10-19 接入通用组件; 此前本页无此功能) */}
-          <ToolHistoryPanel capability="hot_remake" refreshKey={result} />
 
           {/* 高级设置 + 提交 (sticky 底部) */}
           {/* 高级设置 + 提交 (sticky 底部) */}
@@ -561,7 +434,10 @@ export function ViralClonePage() {
 
       {/* ── 右: 结果栏 ── */}
       <section className="pk-result-pane">
-        {!result ? (
+        {submitting && !result ? (
+          /* 生成中 → 骨架占位, 不退回空态 (见 ToolGeneratingState 注释) */
+          <ToolGeneratingState />
+        ) : !result ? (
           <ToolEmptyState title="效果图预览" desc="提交任务后，生成结果将在此处展示">
             <ToolWorkflowSteps />
             <p className="vc-mock-note">
@@ -611,13 +487,17 @@ export function ViralClonePage() {
         )}
       </section>
 
-      {/* 素材库选择弹窗 (真实数据; 按 libraryTarget 决定写入商品图还是参考图) */}
+      {/* 素材库选择弹窗 (真实数据; 按 libraryTarget 决定写入商品图还是参考图)
+          参考图是**单张位** → maxSelectable=1, 选择器自动退化为单选语义;
+          商品图是多张位 → 上限 MAX_IMAGES。 */}
       <AssetLibraryModal
         open={libraryOpen}
         loading={libraryLoading}
         items={libraryItems}
+        error={libraryError}
         onCancel={closeLibrary}
         onPick={pick}
+        maxSelectable={libraryTarget === 'reference' ? 1 : MAX_IMAGES}
       />
 
       {/* 复刻要求放大编辑 */}

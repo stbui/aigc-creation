@@ -1,0 +1,135 @@
+import { useCallback, useRef, useState } from 'react';
+import { App } from 'antd';
+import { assetsApi, toAbsoluteUrl } from '../lib/api';
+import { useProject } from './useProject';
+import { usePasteUpload } from './usePasteUpload';
+import { useAssetLibrary } from '../components/AssetLibraryModal';
+import type { Asset } from '../types/api';
+
+export interface UploadedImage {
+  id: string;
+  url: string;
+  name: string;
+}
+
+interface Options {
+  /** 数量上限 */
+  max: number;
+  /** 单张体积上限 (MB) */
+  maxMb: number;
+  /** 提示文案里的名词, 如「商品图片」/「参考图片」 */
+  noun?: string;
+  /** 初始已有素材 (从历史记录恢复时用) */
+  initial?: UploadedImage[];
+}
+
+/**
+ * 工具页图片上传逻辑 —— 2026-10-19 从 4 个大页面抽出。
+ *
+ * 抽出前的事实（ProductKitPage:112-176 与 ProductDetailPage:110-174 **逐字节相同**，
+ * 前 41 行在 ViralClonePage:110-150 也相同）：三页各自复制了
+ * 「类型/数量/体积三重校验 → ensureProject → 逐张上传 → 追加 → toast」+「素材库回填」
+ * +「粘贴上传」共 79 行。
+ *
+ * 与既有 `useToolTask` 的分工：那个 hook 收口的是「提交 → 轮询 → 结果」，
+ * 并明确写了「多任务/多结果页面仍各自维护提交流程」。本 hook 只管**输入侧**，
+ * 不碰提交流程，两者在 `hooks/` 下并列。
+ */
+export function useImageUpload({ max, maxMb, noun = '商品图片', initial = [] }: Options) {
+  const { message } = App.useApp();
+  const { ensureProject } = useProject();
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [images, setImages] = useState<UploadedImage[]>(initial);
+  const [uploading, setUploading] = useState(false);
+
+  const uploadFiles = useCallback(
+    async (files: FileList | File[]) => {
+      const list = Array.from(files).filter((f) => f.type.startsWith('image/'));
+      if (list.length === 0) {
+        message.warning('请选择图片文件（PNG / JPG / WebP / GIF）');
+        return;
+      }
+      const room = max - images.length;
+      if (room <= 0) {
+        message.warning(`最多上传 ${max} 张${noun}`);
+        return;
+      }
+      const accepted = list.slice(0, room);
+      if (list.length > room) message.warning(`超出数量限制，仅取前 ${room} 张`);
+      const oversize = accepted.filter((f) => f.size > maxMb * 1024 * 1024);
+      if (oversize.length > 0) {
+        message.error(`单张不超过 ${maxMb}MB：${oversize.map((f) => f.name).join('、')}`);
+        return;
+      }
+
+      setUploading(true);
+      try {
+        const projectId = await ensureProject();
+        const uploaded: UploadedImage[] = [];
+        for (const file of accepted) {
+          const asset = await assetsApi.upload(file, projectId);
+          uploaded.push({ id: asset.id, url: toAbsoluteUrl(asset.sourceUrl) ?? '', name: file.name });
+        }
+        setImages((prev) => [...prev, ...uploaded]);
+        message.success(`已上传 ${uploaded.length} 张${noun}`);
+      } catch (e) {
+        message.error((e as Error).message || '上传失败');
+      } finally {
+        setUploading(false);
+      }
+    },
+    [images.length, max, maxMb, noun, ensureProject, message],
+  );
+
+  const removeImage = useCallback(
+    (id: string) => setImages((prev) => prev.filter((x) => x.id !== id)),
+    [],
+  );
+
+  // 参考站支持点击 / 拖拽 / 粘贴三种上传方式（拖拽高亮态在 ToolImageDropzone 内部）
+  usePasteUpload(uploadFiles);
+
+  /**
+   * 素材库点选回填。
+   *
+   * ⚠️ **必须返回 false 表示拒绝** (不是 undefined):
+   * 素材库选择器是**多选**的, 「确定」时逐个调用本回调;
+   * 只有显式返回 false 才能让选择器中止整批并保持弹窗打开。
+   * 返回 undefined 会被当成"接受" —— 超额的那张会静默进入, 上限失效。
+   */
+  const pickFromLibrary = useCallback(
+    (asset: Asset): boolean => {
+      if (images.length >= max) {
+        message.warning(`最多上传 ${max} 张${noun}`);
+        return false;
+      }
+      if (images.some((x) => x.id === asset.id)) {
+        message.info('该素材已在列表中');
+        return false;
+      }
+      setImages((prev) => [
+        ...prev,
+        {
+          id: asset.id,
+          url: toAbsoluteUrl(asset.sourceUrl) ?? '',
+          name: asset.sourceUrl.split('/').pop() ?? '素材',
+        },
+      ]);
+      return true;
+    },
+    [images.length, max, noun, message],
+  );
+
+  const library = useAssetLibrary(pickFromLibrary);
+
+  return {
+    images,
+    uploading,
+    fileInputRef,
+    uploadFiles,
+    removeImage,
+    /** 素材库弹窗状态 (openLibrary / closeLibrary / pick) */
+    library,
+  };
+}

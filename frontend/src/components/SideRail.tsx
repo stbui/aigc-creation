@@ -35,9 +35,11 @@ import { toolPath } from '../lib/capabilities';
  *   list grid gap4 padding-top4 / 按钮 45px 高 padding 8 4 / gap12 / 13px / radius8 / #333
  *   hover #5546d8 on #f7f6ff / active(#5546d8 on #f1efff) / [aria-current=page] 同 active
  *   折叠态(side-menu-collapsed): list 3 列 gap8 / 按钮居中 / 文字 10px lh14
+ * <1400px 参考站自动切 100px 垂直轨 (aside pad 8 8 20 / 条目 77×60 图标置顶 / 标签 10px,
+ *   active #f1efff+#5546d8) —— 该态由 global.css @media (max-width: 1399px) 以
+ *   .app-sider-wrap 作用域实现 (容器宽度亦由 CSS 托管, 不再由 JSX inline 注入)。
  * 本地自有功能 (参考站无对应, 已登记): hover 产出预览卡 / 作品数徽标 / mock·免费圆点
  */
-export const SIDEBAR_WIDTH = 176;
 
 const ICONS: Record<string, LucideIcon> = {
   main_image: LayoutGrid,

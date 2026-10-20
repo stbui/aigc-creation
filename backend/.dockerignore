@@ -1,0 +1,49 @@
+# ── 依赖与构建产物：镜像内会重新安装/构建，带着走只是浪费体积 ──────────────
+node_modules
+dist
+*.tsbuildinfo
+
+# ── 运行期数据：绝不能进镜像 ──────────────────────────────────────────────────
+# 三环境的 SQLite 库（dev.db / test.db / prod.db）
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+data/
+# 上传图 / 备份 / 日志
+uploads
+uploads-test
+backups
+backups-test
+logs
+*.log
+.run
+
+# ── 环境变量 ────────────────────────────────────────────────────────────────
+# 只放行**样例**与**非敏感的共享档位**；真实 .env.production 与个人 .local 绝不入镜像。
+# 凭据应由 compose environment / K8s Secret 注入，而不是烤进镜像层
+# （烤进去的层即使后续删文件也仍在历史里，等于永久泄露）。
+.env
+.env.local
+.env.production
+.env.*.local
+!.env.example
+!.env.development
+!.env.test
+!.env.production.example
+
+# ── 开发工具与文档 ───────────────────────────────────────────────────────────
+.git
+.github
+.gitignore
+.vscode
+.idea
+.DS_Store
+*.md
+!../README.md
+
+# ── 测试产物 ────────────────────────────────────────────────────────────────
+coverage
+test-results
+playwright-report
+blob-report

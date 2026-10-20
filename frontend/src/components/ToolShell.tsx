@@ -6,13 +6,14 @@ import { assetsApi, toAbsoluteUrl } from '../lib/api';
 import { useProject } from '../hooks/useProject';
 import { usePollAbort } from '../hooks/usePollAbort';
 import { usePasteUpload } from '../hooks/usePasteUpload';
+import { useCreditLabel } from '../hooks/useCreditLabel';
 import { AssetLibraryModal } from './AssetLibraryModal';
-import { ToolHistoryPanel } from './ToolHistoryPanel';
 import { ToolSettingsPopover } from './ToolSettingsPopover';
 import { ToolSubmitBar } from './ToolSubmitBar';
-import { ToolEmptyState } from './ToolEmptyState';
+import { ToolEmptyState, ToolGeneratingState } from './ToolEmptyState';
+import { ResultMedia, formatDuration } from './ResultMedia';
 import { pollToResult } from '../lib/poll';
-import type { Asset, Task, TaskStatus } from '../types/api';
+import type { Asset, Modality, Task, TaskStatus } from '../types/api';
 
 /**
  * 修图系工具页共享骨架 —— 1:1 复刻参考站 local-redraw / background-remove 等页的公共结构:
@@ -36,6 +37,16 @@ export interface ToolResult {
   width?: number;
   height?: number;
   errorCode?: string | null;
+  /**
+   * 产出模态 (2026-10-20 视频通道落地)。
+   *
+   * ⚠️ 可选: 后端在视频通道落地前只返回图像产出, 没有该字段。
+   * 故渲染时按「有值且为 video」判定, 缺省按图片处理 ——
+   * 不能反过来 (缺省当视频会让存量产出全变白屏)。
+   */
+  modality?: Modality;
+  /** 视频时长 (毫秒); 仅 video 模态有值 */
+  durationMs?: number | null;
 }
 
 export interface ToolSettings {
@@ -74,7 +85,13 @@ interface Props {
   settings?: SettingsSpec;
   /** 提交按钮主文案 */
   submitLabel: string;
-  /** 按钮内积分/免费角标 */
+  /**
+   * 按钮内积分/免费角标 (**留空即由 ToolShell 按能力自动解析**)。
+   *
+   * 2026-10-20 起不再要求各页硬编码 —— 硬编码那份是纯文案, 与实际扣费无关,
+   * 后台改价后 8 个页面会集体说谎。自动解析读的是后端下发的 creditCost。
+   * 仍保留此 prop 只为个别页覆写 (如 SKU 图需显示与 registry 不同的口径)。
+   */
   creditLabel?: string;
   /** 提交按钮上方的提示行 (参考站部分页有 '* 确认素材和参数后提交…') */
   hint?: string;
@@ -99,6 +116,11 @@ interface Props {
 const RATIO_LABEL: Record<string, string> = { original: '原比例' };
 
 export function ToolShell(props: Props) {
+  /**
+   * 自动消耗价。capability 已由本组件持有, 无需各页再传一遍 ——
+   * 让「价格跟着能力走」而不是「跟着页面记忆走」。
+   */
+  const autoCreditLabel = useCreditLabel(props.capability);
   const {
     capability,
     title,
@@ -134,6 +156,12 @@ export function ToolShell(props: Props) {
   const [libraryOpen, setLibraryOpen] = useState(false);
   const [libraryItems, setLibraryItems] = useState<Asset[]>([]);
   const [libraryLoading, setLibraryLoading] = useState(false);
+  /**
+   * 素材库加载失败必须与「无素材」分开 (2026-10-20 修)。
+   * 此前失败只弹 message.error, 弹窗内照常渲染「素材库暂无原始图片」——
+   * 用户以为是自己没上传过, 真相是接口没连上。
+   */
+  const [libraryError, setLibraryError] = useState<string | null>(null);
 
   const uploadFiles = useCallback(
     async (files: FileList | File[]) => {
@@ -206,10 +234,14 @@ export function ToolShell(props: Props) {
                         onClick={() => {
                           setLibraryOpen(true);
                           setLibraryLoading(true);
+                          setLibraryError(null);
                           assetsApi
                             .list({ kind: 'original', limit: 60 })
                             .then((res) => setLibraryItems(res.items ?? []))
-                            .catch(() => message.error('素材库加载失败'))
+                            .catch((e: unknown) => {
+                              setLibraryError(e instanceof Error ? e.message : '素材库加载失败');
+                              message.error('素材库加载失败');
+                            })
                             .finally(() => setLibraryLoading(false));
                         }}
                       >
@@ -307,7 +339,6 @@ export function ToolShell(props: Props) {
             {/* 业务卡 */}
             {children}
 
-                        <ToolHistoryPanel capability={capability} refreshKey={result} />
           </div>
 
           {/* 提交区 (sticky 底部) */}
@@ -315,7 +346,7 @@ export function ToolShell(props: Props) {
             submitting={submitting}
             disabled={!formValid}
             label={submitLabel}
-            creditLabel={creditLabel}
+            creditLabel={creditLabel ?? autoCreditLabel ?? undefined}
             desc={desc}
             hint={hint}
             settings={
@@ -340,7 +371,20 @@ export function ToolShell(props: Props) {
 
       {/* ── 右: 结果栏 ── */}
       <section className="pk-result-pane">
-        {!showResult ? (
+        {/*
+          三态必须分开 (2026-10-20 修)。
+
+          此前只有「有结果 / 没结果」两态, 而提交任务时 `useToolTask.run` 会先
+          `setResult(null)`, 于是结果栏在生成期间整块退回空态插画,
+          文案还写着「提交任务后，生成结果将在此处展示」—— 用户明明已经点了生成,
+          却看到"你还没提交"。这是**欺骗性 UI**: 慢模型(数秒到数十秒)下尤其刺眼,
+          用户会以为按钮没生效而重复点击。
+
+          现在: 生成中 → 骨架占位; 失败 → 失败卡; 成功 → 结果图; 都没发生 → 空态。
+        */}
+        {submitting && !showResult ? (
+          <ToolGeneratingState />
+        ) : !showResult ? (
           <ToolEmptyState title={title} desc={emptyDesc}>
               {mockNote && <p className="tool-mock-note">{mockNote}</p>}
             </ToolEmptyState>
@@ -365,13 +409,19 @@ export function ToolShell(props: Props) {
                   r.status === 'succeeded' && r.url ? (
                     <div key={i} className="pk-result-card pk-result-card-detail">
                       <div className="pk-result-detail-media">
-                        <img src={r.url} alt={`${title}结果 ${i + 1}`} />
+                        <ResultMedia
+                          url={r.url}
+                          modality={r.modality}
+                          alt={`${title}结果 ${i + 1}`}
+                        />
                       </div>
                       <div className="pk-result-meta">
                         <span className="pk-result-variant">{title}结果</span>
                         {mockNote && <span className="pk-result-mock-badge">本地占位渲染</span>}
                         <span className="pk-result-params">
                           {r.width && r.height ? `${r.width}×${r.height}` : ''}
+                          {/* 视频没有宽高可显示 (Jimp 不解视频), 故显示时长 */}
+                          {formatDuration(r.durationMs) ? ` · ${formatDuration(r.durationMs)}` : ''}
                         </span>
                       </div>
                       <a className="pk-result-download" href={r.url} download target="_blank" rel="noreferrer">
@@ -398,6 +448,7 @@ export function ToolShell(props: Props) {
         open={libraryOpen}
         loading={libraryLoading}
         items={libraryItems}
+        error={libraryError}
         onCancel={() => setLibraryOpen(false)}
         onPick={() => undefined}
         readOnly
@@ -407,21 +458,7 @@ export function ToolShell(props: Props) {
 }
 
 /** 空态插画: 与 pk/vc/fc 同一张内联 SVG (不使用参考站图片资源) */
-export function ToolEmptyIllustration() {
-  return (
-    <svg className="pk-empty-illustration" width="160" height="160" viewBox="0 0 160 160" fill="none" aria-hidden>
-      <rect x="18" y="30" width="112" height="96" rx="12" fill="#F1EFFF" />
-      <rect x="30" y="42" width="88" height="72" rx="8" fill="#ffffff" stroke="#E4E7EF" />
-      <circle cx="58" cy="66" r="8" fill="#C7D2FE" />
-      <path d="M40 106 L66 78 L86 100 L100 86 L118 106 V110 H40 Z" fill="#A5B4FC" opacity="0.85" />
-      <circle cx="118" cy="46" r="16" fill="#5546D8" />
-      <path d="M118 39 v14 M111 46 h14" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
-      <circle cx="34" cy="38" r="2.5" fill="#8064F6" />
-      <circle cx="126" cy="112" r="2.5" fill="#8064F6" />
-      <circle cx="24" cy="86" r="2" fill="#8064F6" />
-    </svg>
-  );
-}
+export { ToolEmptyIllustration } from './illustrations';
 
 /** 任务轮询工具: 各页提交后复用 (薄封装, 轮询实现统一在 lib/poll.ts) */
 export function useTaskPoller() {

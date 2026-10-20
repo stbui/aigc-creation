@@ -6,6 +6,8 @@
   --color-bg: #f6f7fb;
   --color-card: #ffffff;
   --color-border: #e2e8f0;
+  /* 参考站外壳描边实测 #f2f3f5, 比全局边框色更浅 —— 仅用于顶栏/侧栏等外壳分隔线 */
+  --color-border-soft: #f2f3f5;
   --color-text: #0f172a;
   --color-text-secondary: #475569;
   /* 参考站实测文本色: hero 副标题 #667085 / 卡片描述 #86909C */
@@ -82,16 +84,23 @@
   --danger-soft-text: #ef4444;
   --danger-text: #e11d48;
   --success-soft-bg: #eaf7f2;
+  --success-text: #2f8f6b;
+  /* 成功态描边 (2026-10-20 新增, 供产出来源徽标等场景;
+     色相取 success-text 的浅调, 与 success-soft-bg 搭配不刺眼) */
+  --success-border: #bfe6d6;
+
+  /* 插画专用色 (2026-10-20 新增)
+     此前 ToolEmptyIllustration 内联 7 处裸 hex, 违反「不写裸 hex」。
+     这两个淡紫没有语义等价 token (不是品牌色, 也不是中性色),
+     故单列插画专用 token; 字面值与原图一致 —— 换 token 不改视觉。 */
+  --illus-sun: #c7d2fe; /* 插画里的"太阳"圆点 */
+  --illus-mountain: #a5b4fc; /* 插画里的山峦 */
   --info-soft-bg: #93c5fd;
   --border-dot: #c9cdd4;
   --border-row: #eff0f4;
   --hero-grad-1: #dcecff;
   --hero-grad-2: #e2edff;
   --hero-grad-3: #eaf3ff;
-
-  --success-text: #2f8f6b;
-
-  --success-text: #2f8f6b;
 
 
   /* ────────────────────────────────────────────────────────────────
@@ -349,9 +358,18 @@
   --mif-scrollbar-thumb-hover: #9ca3af;
   --mif-scrollbar-width: 6px;
 
-  /* 参考站顶栏高度变量（.workspace-view-root 定义: calc(64px + 推广条)）。
-     本地顶栏 = 64px app-header + 40px app-promo，与参考站一致。 */
-  --mif-workspace-topbar-height: calc(64px + var(--mif-promo-topbar-height));
+  /* 外壳 chrome 高度 (参考站 .workspace-view-root 同口径: calc(64px + 推广条))。
+     本地顶栏 = 64px app-header + 40px app-promo, 与参考站一致。
+     2026-10-19 修正: 原先 --mif-workspace-topbar-height 依赖一个**从未定义**的
+     --mif-promo-topbar-height → 自定义属性在计算值阶段失效, 整条 calc(100vh - …) 全部作废
+     (实测 mif min-height 计算值 0px); 素材库页的 --workspace-topbar-height 则压根没定义,
+     靠 64px fallback 顶着, promo 开启时 chrome 实为 104 → 恒定 40px 死滚动。
+     促销条开关由 PromoBar 用 JS 置 html[data-promo] (不能用 CSS display:none, 见 PromoBar 注释)。*/
+  --promo-topbar-height: 40px;
+  --workspace-topbar-height: calc(64px + var(--promo-topbar-height));
+  /* mif 页沿用同一口径 (保留旧变量名, 其 5 处 calc 引用不动) */
+  --mif-promo-topbar-height: var(--promo-topbar-height);
+  --mif-workspace-topbar-height: var(--workspace-topbar-height);
 
   --radius-tag: 4px; /* 小标签 */
   --radius-control: 8px; /* 输入框 / chip / 小按钮 */
@@ -382,70 +400,344 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ───────── 登录页 ───────── */
+/* ───────── 登录页 (1:1 复刻参考站登录弹窗 auth-card-split, 2026-10-19 实拍 1280×900) ─────────
+   偏差与证据: docs/login-design.md。字面值全部来自参考站 computed styles 实拍:
+   卡 840x478 / radius 32 / shadow 0 20px 60px rgba(0,0,0,.18) / grid 420 420;
+   右栏 padding 32px 40px / 内层 340; tab 81.3x63; input 340x48 radius 8 bg #f2f3f5;
+   submit 340x48 渐变 90deg #8064f6→#5546d8 14px/600; 协议行 12px #86909c。
+   诚实差异: 扫码/短信 tab 置灰 (无通道), 左栏插画为自绘内联 SVG (不引参考站位图)。 */
 .login-page {
-  min-height: 100%;
+  min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(180deg, var(--surface-soft) 0%, var(--surface-soft) 100%);
+  background: var(--surface-soft);
   padding: 24px;
+  box-sizing: border-box;
 }
-.login-card-wrap {
-  width: 100%;
-  max-width: 400px;
+.login-split {
+  display: grid;
+  grid-template-columns: 420px 420px;
+  width: 840px;
+  height: 478px;
+  background: #fff;
+  border-radius: 32px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+  position: relative;
 }
-.login-brand {
+
+/* ── 左栏礼宾面板 (参考站 .auth-showcase / .auth-showcase-bg) ── */
+.login-showcase {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
   justify-content: center;
-  margin-bottom: 6px;
+  overflow: hidden;
 }
-.login-logo {
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-card);
-  background: #5546d8;
-  color: #fff;
-  display: inline-flex;
+/* 参考站用位图 static/login/leftbg.png (底色 #a5dffc); 本地不引第三方图片, 改用品牌紫渐变 */
+.login-showcase-bg {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(160deg, #efeaff 0%, #f6f2ff 46%, #e6e0ff 100%);
+}
+.login-showcase-gift {
+  position: absolute;
+  top: -38px;
+  left: -14px;
+  width: 200px;
+  height: 194px;
+  pointer-events: none;
+}
+.login-showcase-content {
+  position: relative;
+  width: 340px;
+  /* 标题要避开左上角的礼盒插画 (参考站 H1 实测 144x63 @panel内 x236, 即右对齐到内容块右缘) */
+  padding-top: 74px;
+}
+.login-showcase-title {
+  margin: 0 0 22px;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 34px;
+  color: var(--text-strong);
+  text-align: right;
+}
+.login-showcase-benefits {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+/* 玻璃拟态卡: 参考站 radial-gradient + 双层阴影 (0 6px 20px rgba(85,70,216,.24) + inset 白光) */
+.login-benefit {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 16px;
+  padding: 16px 24px;
+  border-radius: 16px;
+  background: radial-gradient(
+    at 46% 36%,
+    rgba(255, 255, 255, 0.95),
+    rgba(255, 255, 255, 0.48) 62%,
+    rgba(228, 219, 255, 0.42)
+  );
+  box-shadow:
+    0 6px 20px rgba(85, 70, 216, 0.24),
+    inset 0 0 24px rgba(255, 255, 255, 0.7);
+}
+.login-benefit-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  height: 25px;
+  font-size: 16px;
+  line-height: 25px;
+  color: #333;
+}
+.login-benefit-value {
+  font-weight: 700;
+  color: var(--brand);
+  white-space: nowrap;
+}
+
+/* ── 右栏表单面板 (参考站 .auth-form-panel) ── */
+.login-form-panel {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 32px 40px;
+  background: #fff;
+}
+.login-close {
+  position: absolute;
+  top: 32px;
+  right: 40px;
+  width: 16px;
+  height: 16px;
+  display: flex;
   align-items: center;
   justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 2px;
+  background: transparent;
+  color: #475467;
+  cursor: pointer;
 }
-.login-brand-name {
+.login-close:hover {
+  color: var(--brand);
+}
+/* 参考站 .auth-form-panel-inner @ (680,243) 但 tabs @ (680,267) → 内层有 24px 顶部留白;
+   子项间距统一 8px (tabs 底 330 → form 338 → 596 → footer 604)。本地照此对齐。 */
+.login-panel-inner {
+  width: 340px;
+  padding-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* tab 组: 参考站 .auth-login-tabs (340x63 / padding 0 24 / gap 24 / align stretch) */
+.login-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 24px;
+  height: 63px;
+  padding: 0 24px;
+}
+.login-tab {
+  flex: 1;
+  padding: 0;
+  border: 0;
+  background: transparent;
   font-size: 16px;
+  line-height: 22px;
+  color: #333;
+  cursor: pointer;
+  position: relative;
+}
+.login-tab.is-active {
   font-weight: 600;
 }
-.login-subtitle {
-  text-align: center;
-  color: var(--color-text-secondary);
-  margin: 0 0 20px;
+.login-tab.is-active::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 24px;
+  height: 3px;
+  border-radius: 2px;
+  transform: translateX(-50%);
+  background: var(--brand);
 }
-.login-card {
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-card);
+.login-tab.is-disabled {
+  color: #b6bcc8;
+  cursor: not-allowed;
 }
+/* 弹窗打开时焦点落在激活 tab 上, 浏览器默认 outline 是蓝色框, 与品牌紫冲突。
+   参照站态只有紫色下划线 → 默认态去 outline, 键盘可达时给品牌紫描边。 */
+.login-tab:focus {
+  outline: none;
+}
+/* tab 的激活态已有紫色下划线, 键盘用户同样能识别, 故不额外描边 */
+.login-tab:focus-visible {
+  outline: none;
+}
+
+/* 参考站 .auth-form @ (680,338) 但首个 .auth-field @ (680,350) → 12px 上间距 */
+.login-form {
+  display: flex;
+  flex-direction: column;
+  margin-top: 12px;
+}
+/* 参考站 .auth-field 340x48, 无 label 行 (只有 placeholder), 两框间距 18px (350→416) */
+.login-field {
+  margin-bottom: 18px;
+}
+.login-field .ant-form-item-label {
+  display: none;
+}
+/* 校验错误文案占位: 参考站无红字校验(前端校验在提交时), 本地保留 antd 默认行高 */
+.login-field .ant-form-item-explain-error {
+  font-size: 12px;
+  line-height: 18px;
+  padding-top: 4px;
+}
+.login-field .ant-input-affix-wrapper {
+  height: 48px;
+  padding: 0 20px;
+  border-radius: 8px;
+  background: #f2f3f5;
+  border: 1px solid #e5e7ef;
+  box-shadow: none;
+  font-size: 14px;
+  line-height: 22px;
+}
+.login-field .ant-input-affix-wrapper:hover {
+  border-color: #c3bdf5;
+}
+.login-field .ant-input-affix-wrapper-focused {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(98, 93, 245, 0.1);
+}
+.login-field .ant-input {
+  background: transparent;
+  font-size: 14px;
+  color: #1d2129;
+}
+.login-field .ant-input-prefix {
+  color: #86909c;
+  margin-right: 10px;
+}
+
+/* 参考站 .auth-submit: 340x48 / linear-gradient(90deg,#8064f6,#5546d8) / 14px 600 / radius 8 */
+.login-submit {
+  height: 48px;
+  border-radius: 8px;
+  border: 0;
+  background: linear-gradient(90deg, #8064f6, #5546d8);
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+}
+.login-submit:hover {
+  background: linear-gradient(90deg, #6c5ce7, #4a3ac0);
+}
+.login-submit:disabled {
+  background: linear-gradient(90deg, #b9b2f7, #a49ee6);
+}
+
+/* 「填充演示账号」占据参考站第三方登录钮 (.auth-google-button 340x48) 的位置:
+   本地无第三方通道, 该位置留给演示自有的诚实功能。
+   颜色必须显式覆盖 —— antd 6 的 Button type="link" 默认取运行时注入的 #1677ff。 */
+.login-demo-fill {
+  margin-top: 18px;
+  height: 48px;
+  border-radius: 8px;
+  border: 1px solid #e5e7ef;
+  background: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  color: #475467;
+}
+.login-demo-fill:hover,
+.login-demo-fill:focus-visible {
+  background: #f2f3f5;
+  color: var(--brand);
+  border-color: #c3bdf5;
+}
+
+/* 参考站 .auth-agreement: 12px/400/lh18 #86909c, 内嵌 3 段链接 */
+.login-agreement {
+  margin: 0;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+  color: #86909c;
+}
+.login-agreement a {
+  color: var(--brand);
+  margin: 0 4px;
+  cursor: pointer;
+  text-decoration: none;
+}
+.login-agreement a:hover {
+  color: var(--brand-hover);
+}
+.login-agreement-note {
+  color: #86909c;
+  margin: 0 4px;
+  cursor: pointer;
+}
+/* 注册入口: 参考站无 (走短信/扫码), 本地演示账号体系需要 → 保留文字链接 */
 .login-switch {
-  margin-top: 14px;
+  margin-top: 0;
   text-align: center;
-  color: var(--color-text-secondary);
   font-size: 13px;
+  color: var(--text-muted);
 }
 .login-switch a {
   color: var(--brand);
   cursor: pointer;
 }
-/* 2026-10-19 修 antd 蓝泄漏: 「填充演示账号」是 antd Button type="link",
-   默认取 antd 6 主题链接色 #1677ff (CSS 无该字面值 = 运行时注入), 与紫系冲突。
-   用 class 覆盖而非 inline style, 保证 hover/active 各态一起归位。 */
-.login-demo-fill,
-.login-demo-fill:hover,
-.login-demo-fill:active,
-.login-demo-fill:focus-visible {
-  color: var(--brand);
+
+/* 窄屏: 左侧礼宾面板隐藏, 表单面板通栏 (参考站移动态同理) */
+@media (max-width: 860px) {
+  .login-split {
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+    max-width: 420px;
+    height: auto;
+  }
+  .login-showcase {
+    display: none;
+  }
+  .login-form-panel {
+    padding: 32px 24px;
+  }
+  .login-close {
+    right: 24px;
+  }
 }
-.login-demo-fill:hover {
-  color: var(--brand-hover);
+
+/* 登录弹窗遮罩容器: antd Modal 只负责遮罩与居中, 内容区完全透明,
+   卡片本体 (840x478 / radius 32 / 阴影) 由 .login-split 承担, 与独立页同一套样式。 */
+.login-modal .ant-modal-container {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.login-modal .ant-modal-content {
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.login-modal .ant-modal-close {
+  display: none;
 }
 
 /* ───────── 顶部推广条 (复刻参考站工作台通栏促销位, 内容为自有真实卖点) ───────── */
@@ -535,9 +827,13 @@ body {
   align-items: center;
   gap: 24px;
   background: var(--color-card);
-  border-bottom: 1px solid var(--color-border);
-  padding: 0 20px;
+  /* 参考站实拍 border-bottom 1px #f2f3f5 —— 比全局 --color-border(#e2e8f0) 更浅 */
+  border-bottom: 1px solid var(--color-border-soft);
+  padding: 0 24px; /* 参考站 padding 0 24 (原 0 20, 品牌块 x 差 4px) */
   height: 64px;
+  /* antd <Header> 默认 line-height:64px 会被子元素继承, 使 .app-quota / .app-user 的
+     行盒撑到 64px (再加 padding 即 72px), 溢出 64px 顶栏上下各 4px —— 2026-10-19 实测复现, 此处归零 */
+  line-height: normal;
   position: sticky;
   top: 0;
   z-index: 20;
@@ -550,16 +846,25 @@ body {
   color: #171a2b;
   flex-shrink: 0;
 }
-/* brand 图标块 36x36 (对齐参考站 workspace-brand-logo 尺寸), 底色品牌紫 (2026-10-18 去蓝: 原 var(--color-primary)=#2563eb) */
+/* brand 图标块 36x36 (对齐参考站 workspace-brand-logo 尺寸);
+   2026-10-19 换货觉AI「觉眼」logo (SVG 自带渐变容器, 此处不再铺底色) */
 .app-brand-mark {
   width: 36px;
   height: 36px;
-  border-radius: var(--radius-control);
-  background: #5546d8;
-  color: #fff;
+  flex: none;
   display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+.app-brand-mark-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+/* AI 后缀: 品牌紫, 与主名「货觉」深色形成层级 */
+.app-brand-ai {
+  color: var(--brand);
+  font-weight: 700;
 }
 .app-brand-text {
   font-weight: 700;
@@ -583,6 +888,8 @@ body {
   align-items: center;
   gap: 4px;
   border-radius: var(--radius-control);
+  white-space: nowrap;
+  flex: none;
 }
 .app-topnav-item:hover {
   color: #5546d8;
@@ -591,7 +898,54 @@ body {
 .app-topnav-item-row {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px; /* 参考站下拉条目 gap 10 (icon 20 ↔ 文字) */
+}
+/* 下拉菜单皮肤: 逐值对齐参考站 .workspace-nav-menu
+   (实测 1280: 宽 137 / radius 12 / border 1px #e5e7f0 / shadow 0 18px 42px rgba(31,41,55,.14) /
+    pad 10 8 / 条目 119x36 radius 9 pad 0 12 / 文字 13px 600 #475467 / icon 20 /
+    条目 hover #f2efff + #5b4df5) —— antd 默认皮肤全部不符, 见 docs/topnav-design.md P2-1 */
+.app-topnav-dropdown .ant-dropdown-menu {
+  min-width: 137px;
+  padding: 10px 8px;
+  border-radius: 12px;
+  border: 1px solid #e5e7f0;
+  background: #fff;
+  box-shadow: 0 18px 42px rgba(31, 41, 55, 0.14);
+}
+/* 选择器必须比 antd 运行时注入的 `.ant-dropdown .ant-dropdown-menu-item` (0,2,0) 更specific ——
+   媒体查询不增加特异性、同特异性靠源码顺序, 而 antd cssinjs 的style 标签是运行时插入的,
+   顺序不可控。故这里补一层 .ant-dropdown-menu 提到 (0,3,0)。 */
+.app-topnav-dropdown .ant-dropdown-menu .ant-dropdown-menu-item {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 9px;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475467;
+}
+.app-topnav-dropdown .ant-dropdown-menu .ant-dropdown-menu-item:not(.ant-dropdown-menu-item-disabled):hover {
+  background: #f2efff;
+  color: #5b4df5;
+}
+.app-topnav-dropdown .ant-dropdown-menu .ant-dropdown-menu-item-disabled {
+  color: #98a2b3;
+}
+/* guest「登录/注册」纯文字钮: 参考站 #workspace-logout (68x32 / pad 8 / radius 6 / 13-700 #667085) */
+.app-guest-login {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  color: #667085;
+  padding: 8px;
+  height: 32px;
+  border-radius: 6px;
+}
+.app-guest-login:hover {
+  color: #5546d8;
+  background: #f1efff;
 }
 .app-header-right {
   display: flex;
@@ -605,7 +959,7 @@ body {
   gap: 5px;
   font-size: 12px;
   color: #667085;
-  background: var(--color-slate-100);
+  background: var(--color-bg); /* 原 --color-slate-100 (#f1f5f9, Tailwind 遗留色, 不在品牌色板) → 云白 */
   padding: 4px 10px;
   border-radius: var(--radius-pill);
 }
@@ -630,6 +984,25 @@ body {
   font-size: 13px;
   color: #667085;
 }
+/* 移动端汉堡按钮: 仅 ≤900px 显示 (桌面隐藏), 点击开 Drawer 承载侧栏 */
+.app-mobile-toggle {
+  display: none;
+}
+
+/* 顶导补齐 7 项后的窄档收敛 (2026-10-19, docs/topnav-design.md P1-2 连带处理):
+   7 项导航实测总宽 629px。1280 及以上右侧仍余 163px; 逐档收窄后 ≤980 会
+   header scrollWidth 1023 > 980 → 文档级横向滚动 42px。故按「先减右侧、次减胶囊」
+   两档收敛, 不隐藏导航项 (参考站在 900 档仍显示全部 8 项)。 */
+@media (max-width: 1199px) {
+  .app-user-email {
+    display: none;
+  }
+}
+@media (max-width: 1099px) {
+  .app-quota {
+    display: none;
+  }
+}
 
 /* antd Layout 默认 flex-direction: column, 这里必须显式改 row,
    否则侧栏与内容会上下堆叠 (内容区被推到侧栏下方, 视觉上像"主区空白") */
@@ -638,11 +1011,14 @@ body {
   min-height: calc(100vh - 64px);
   align-items: stretch;
 }
-/* 侧栏外壳: 宽度由 JSX SIDEBAR_WIDTH (176px) 注入; 边框由内层 .workspace-side-menu-v2 自带 (#f2f3f5), 此处不重复描边 */
+/* 侧栏外壳: 宽度由 CSS 托管 —— 桌面 176px 横排 / <1400px 自动塌缩 100px 垂直轨 /
+   ≤900px display:none (响应式规则见文件末尾「响应式外壳」块)。
+   曾经由 JSX inline width 注入, inline 会压过媒体查询导致 <1400 塌缩失效 (2026-10-19 修正)。
+   边框由内层 .workspace-side-menu-v2 自带 (#f2f3f5), 此处不重复描边 */
 .app-sider-wrap {
   background: var(--color-card);
   flex: 0 0 auto;
-  width: 100px;
+  width: 176px;
   position: sticky;
   top: 64px;
   height: calc(100vh - 64px);
@@ -866,16 +1242,162 @@ body {
   overflow: auto;
 }
 
-/* ───────── 工作台 (对齐参考站视觉, 数值来自实拍 computed styles) ───────── */
-.workbench {
-  max-width: 1142px;
-  margin: 0 auto;
+/* 页面级 padding 与外壳 padding 的叠加治理 (2026-10-19)
+   参考站 .workspace-route-content **无内边距**, 页面自带 padding, 内容列从 route 边缘起算;
+   本地父级 .app-content 带 24px/24px/32px, 页面再带一层就右移 24px、窄 48px。
+   实测 @1280 (参考站目标: 内容列 x=108 / 宽 1148):
+     library   x=132 / 1100   ← 双重padding
+     my-works  x=136 / 1092   ← 双重 padding
+     invite    x=108 / 1148   ✅ 自身横向 0, 无需动
+     pkg-shop  x=108 / 1148   ✅ 自身无 padding, 无需动
+     mif       x=108 / 1141   ✅ 已有逃逸规则
+   修法沿用 mif 的既有范式 (.app-content > X { margin:0 -24px -32px }): 页面盒逃到
+   app-content 的 padding 之外, 再由页面自身 padding 定位 —— 页面级 padding 语义不被破坏,
+   底部 -32 同时抵消 app-content 的 32, 使总下边距等于参考站的页面级值。
+   仅对 ≥901px 生效: ≤900px 时 .app-content padding 变成 16px 10px 24px, 固定 -24 会反冲。 */
+@media (min-width: 901px) {
+  .app-content > .asset-library-page,
+  .app-content > .my-works-page {
+    margin: 0 -24px -32px;
+    width: auto;
+  }
 }
 
-/* hero: 参考站 .wb-workflow-banner — 实拍 1142x212 / radius 16 / padding 0 100px /
+/* 促销条关闭 (PromoBar JS 置位) / 窄屏隐藏时, chrome 只剩顶栏 */
+html[data-promo='off'] {
+  --promo-topbar-height: 0px;
+}
+/* ≤900px 移动态: 顶栏 54px, 且 PromoBar 在此断点下必然置 data-promo=off (双重保险) */
+@media (max-width: 900px) {
+  :root {
+    --workspace-topbar-height: 54px;
+    --mif-workspace-topbar-height: 54px;
+  }
+}
+
+/* ── 响应式外壳 (2026-10-19, 参考站双断点实测, 详见 docs/workbench-design.md §4/§6) ──
+   参考站侧栏为视口响应式双态: <1400 → 100px 垂直轨 / ≥1400 → 176px 横排列表。
+   断点实测: 1360 → 100px 轨 / 1400 → 176px 横排 (落在 1360–1400 之间, 取 1400 落地)。
+   ≤900 → 参考站移动态: 侧栏 display:none + 54px 顶栏 + 汉堡抽屉 (促销条由 PromoBar
+   matchMedia 同步隐藏并置 html[data-promo='off'], 保住 pk/mif 的高度 calc 契约)。
+   注意层级: 1399 块在前、900 块在后 —— 两者同为 (0,1,0) 特异性, .app-content 的
+   margin-left 需要 900 块覆盖 1399 块的 -16px。 */
+@media (max-width: 1399px) {
+  /* 100px 垂直轨: 复刻参考站 1280 实测 (aside pad 8 8 20 / 条目 77×60 / 标签 10px) */
+  .app-sider-wrap {
+    width: 100px;
+  }
+  /* 参考站内容列 x=108 = 侧栏 100 − 16 重叠 + padding 24 (其 route content x=84 实测);
+     负 16px 复刻该重叠量, 配合 hero padding 100px 使标题落 x=208 (参考站 1280 实测值) */
+  .app-content {
+    margin-left: -16px;
+  }
+  /* 参考站内容宽 = 视口 − 侧栏 − 48 且无 max-width (1280 实测 1148);
+     本页已整页取消 max-width 上限 (docs/workbench-design.md §6 P1-2 选项 B),
+     此处无需再覆盖 */
+  .app-sider-wrap .workspace-side-menu-v2 {
+    padding: 8px 8px 20px;
+  }
+  /* 参考站垂直轨无 head (无 collapse 按钮, 该态不可手动折叠) */
+  .app-sider-wrap .workspace-side-menu-head {
+    display: none;
+  }
+  .app-sider-wrap .workspace-side-menu-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-right: 0;
+  }
+  .app-sider-wrap .workspace-side-menu-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-top: 0;
+  }
+  /* 与 .side-menu-collapsed .workspace-side-menu-btn 同为 (0,2,0), 本块在文件中更靠后 ⇒ 胜出,
+     保证「横排态手动折叠过再缩窄到 <1400」时仍渲染为参考站垂直轨而非 3 列小格 */
+  .app-sider-wrap .workspace-side-menu-btn,
+  .app-sider-wrap .side-menu-disabled {
+    width: 77px;
+    height: 60px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    padding: 5px 2px;
+  }
+  .app-sider-wrap .side-menu-label {
+    font-size: 10px;
+    line-height: 14px;
+  }
+  .app-sider-wrap .side-menu-dot,
+  .app-sider-wrap .side-menu-badge {
+    display: none;
+  }
+}
+@media (max-width: 900px) {
+  /* 参考站移动态 390 实测: 无促销条 / 顶栏 54px (pad 0 14) / 侧栏 display:none / 2 列网格 */
+  .app-header {
+    height: 54px;
+    padding: 0 14px;
+    gap: 12px;
+  }
+  .app-topnav,
+  .app-quota,
+  .app-user-email,
+  .app-sider-wrap {
+    display: none;
+  }
+  .app-body {
+    min-height: calc(100vh - 54px);
+  }
+  /* 侧栏已隐藏, 撤销 1399 块的 -16px 重叠, 否则内容会向左溢出 16px。
+     左右 10px: 参考站 390 实测 hero 宽 370 (= 390 − 20), 卡片 2 列 181 */
+  .app-content {
+    margin-left: 0;
+    padding: 16px 10px 24px;
+  }
+  .app-mobile-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: transparent;
+    border-radius: var(--radius-control);
+    color: #333;
+    cursor: pointer;
+  }
+  .app-mobile-toggle:hover {
+    background: #f1efff;
+    color: #5546d8;
+  }
+  /* Drawer 内的侧栏: 去掉右边线 (抽屉自身即容器), 分组列表不内部滚动 (随抽屉高度流式) */
+  .app-mobile-drawer .workspace-side-menu-v2 {
+    border-right: none;
+  }
+  .app-mobile-drawer .workspace-side-menu-sections {
+    overflow: visible;
+  }
+  /* 注意: .wb-* 的移动栅格规则不放在本块 —— 媒体查询不增特异性, 后方第一套
+     base 规则会反压; 已改放到 wb 区块 base 规则之后 (见「工作台数据区移动适配」) */
+}
+
+/* ───────── 工作台 (对齐参考站视觉, 数值来自实拍 computed styles) ───────── */
+/* 内容宽 = 视口 − 侧栏 − 48, 不设 max-width (2026-10-19 修正, 原 1142 上限):
+   参考站实测无上限 (1280→1148 / 1440→1216 / 1920→1696 全宽), 且本页有「不偏移、
+   没有差异」的硬要求 (见下方 hero 注释)。1142 上限会在 ≥1400 档把 hero 标题
+   挤到 x=337 (参考站 300, 偏 37px), 故整页跟随参考站全宽。 */
+.workbench {
+  margin: 0;
+}
+
+/* hero: 参考站 .wb-workflow-banner — 实拍 1148x212 (1280) / radius 16 / padding 0 100px /
    bg var(--hero-grad-1) + bannerbg.png cover。本项目不引用第三方图片资源 → 渐变背景 + 真实产出拼贴（诚实替代）。
-   padding 用 84px 而非参考站 100px: 本地内容区起点比参考站右移 16px (侧栏 99 vs 84 + 滚动条),
-   84px 补偿后 hero 文案与参考站落在同一绝对 x=208。 */
+   padding 用参考站字面值 100px (2026-10-19 修正, 原 84px 是按 ~100px 侧栏的补偿值):
+   侧栏改 <1400 自动塌缩为 100px 轨后双态均自然对齐参考站实测 —— 轨态 (侧栏 100 + 重叠 16
+   + padding 24 + 100) 标题落 x=208 (= 参考站 1280 实测); 横排态 (176 + 24 + 100) 落
+   x=300 (= 参考站 1440 实测)。84px 在 176px 侧栏下反而偏 16px (321 vs 300)。 */
 .wb-hero {
   position: relative;
   display: flex;
@@ -883,7 +1405,7 @@ body {
   justify-content: space-between;
   gap: 24px;
   height: 212px;
-  padding: 0 84px;
+  padding: 0 100px;
   margin-bottom: 16px;
   border-radius: var(--radius-panel);
   background: linear-gradient(90deg, var(--hero-grad-1) 0%, var(--hero-grad-2) 55%, var(--hero-grad-3) 100%);
@@ -1037,7 +1559,7 @@ body {
   }
 }
 
-/* 工具网格: 参考站 6 列 x 177px, gap 16 (1142 = 6*177 + 5*16), 区块间距统一 16 */
+/* 工具网格: 参考站 6 列, gap 16 (1280 实测卡 178 = (1148-5*16)/6), 区块间距统一 16 */
 .wb-tools {
   display: grid;
   grid-template-columns: repeat(6, minmax(0, 1fr));
@@ -1057,6 +1579,8 @@ body {
 @media (max-width: 520px) {
   .wb-tools {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* 参考站 390 实测 gap 8 (卡 181 = (370-8)/2), 桌面 16 在 2 列下过疏 */
+    gap: 8px;
   }
 }
 
@@ -1064,6 +1588,11 @@ body {
 .wb-card {
   display: flex;
   flex-direction: column;
+  /* 关键: Chrome UA 样式给 <button> 设了 `align-items: center`, column flex 子项因此不 stretch,
+     .wb-card-body 会按 min-content(= nowrap 描述整句宽度, 实测 224px) 定宽并冲出 178px 栅格轨。
+     显式 stretch 后子项由轨道宽度决定, 描述才真正走 ellipsis。
+     配合下面的 min-width: 0(覆盖 grid item 自动最小尺寸) 两条一起才彻底封住。 */
+  align-items: stretch;
   padding: 0;
   text-align: left;
   background: var(--wb-card, #ffffff);
@@ -1072,6 +1601,10 @@ body {
   cursor: pointer;
   font: inherit;
   color: inherit;
+  /* <button> 作为 grid item 的自动最小尺寸 (min-width:auto) 会解析成 min-content,
+     而卡片里的描述是 nowrap → min-content = 整句描述宽 (实测 224px) 冲出 178px 栅格轨。
+     置 0 后由栅格轨决定宽度, 描述才真正走 ellipsis。与 .wb-card-body 的 min-width:0 同源。 */
+  min-width: 0;
   transition: box-shadow 0.18s ease, transform 0.18s ease;
 }
 /* hover 与参考站 .wb-tool-card:hover 一致: 仅阴影 0 7 20 #21234114, 无上浮 (2026-10-18 交互态对拍修正) */
@@ -1153,6 +1686,11 @@ body {
   box-sizing: border-box;
   height: 108px;
   padding: 40px 16px 24px;
+  /* 关键: .wb-card 是 column flex 容器, body 作为 flex item 的自动最小尺寸 (min-width:auto)
+     会解析成 min-content —— 而里面的 .wb-card-desc 是 nowrap, min-content 就是整句描述宽度。
+     不置 0 的话 body 撑到 min-content (实测 200px) 冲出 178px 卡片, ellipsis 形同虚设。
+     这是 flexbox 的经典陷阱, 与字体无关, 换 PingFang 时同样溢出、只是不明显。 */
+  min-width: 0;
 }
 .wb-card-title {
   display: block;
@@ -1173,10 +1711,12 @@ body {
 }
 
 /* 数据区: 参考站 .wb-data-layout — 2:1 双面板 + 通栏, 白底 padding 24, 高 268,
-   margin-top 16 (实拍); 面板圆角: 账号/创作数据 12, 最近任务 16 */
+   margin-top 16 (实拍); 面板圆角: 账号/创作数据 12, 最近任务 16。
+   grid 列取参考站字面值 minmax(0,2fr) minmax(300px,1fr) (2026-10-19 从覆盖层并入,
+   原 2fr 1fr 与实拍 754.66/377.34 差 ~10px); ≤900px 堆叠为 1fr */
 .wb-panels {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
   gap: 16px;
   margin-top: 16px;
   margin-bottom: 16px;
@@ -1237,14 +1777,8 @@ body {
 .wb-panel-link:hover {
   color: var(--wb-brand);
 }
-.wb-panel-loading {
-  flex: 1;
-  display: grid;
-  place-items: center;
-  min-height: 180px;
-  font-size: 13px;
-  color: var(--wb-text-muted);
-}
+/* .wb-panel-loading 已移除 (2026-10-20): 面板加载态改用 StateSkeleton 骨架屏,
+   由 .state-skeleton 自带脉动动画, 不再需要单独的居中转圈容器。 */
 
 /* 指标块: 灰底卡片 (账号面板 padding 20 24, 数据面板 padding 24) */
 .wb-account-metrics {
@@ -1609,11 +2143,7 @@ body {
   background: var(--color-cta-hover) !important;
   border-color: var(--color-cta-hover) !important;
 }
-.tool-result-loading {
-  padding: 48px 0;
-  display: flex;
-  justify-content: center;
-}
+/* .tool-result-loading 的定义已移至文件末尾「通用工具页结果卡『生成中』骨架」小节 */
 .tool-result-img {
   width: 100%;
   border-radius: var(--radius-control);
@@ -1647,6 +2177,14 @@ body {
 }
 html[data-promo='off'] .pk-workspace {
   height: calc(100vh - 64px);
+}
+/* ≤900px 撤销逃逸 margin: 该断点下 .app-content padding 已变成 16px 10px 24px,
+   写死的 -24 会让页面左右各溢出 14px 被裁掉 (实测 390: x=-14 / w=418 / right=404)。
+   与 .asset-library-page / .my-works-page 的 @media (min-width:901px) 守卫同源。 */
+@media (max-width: 900px) {
+  .pk-workspace {
+    margin: 0;
+  }
 }
 
 .pk-input-pane {
@@ -2060,30 +2598,36 @@ html[data-promo='off'] .pk-workspace {
   width: 100%;
   height: 34px;
   border: none;
-  border-radius: var(--radius-control);
+  /* 参考站 .image-output-settings-summary 实拍: radius 7px (非 --radius-control 8px) + padding 0 10px
+     (非 0 12px) —— 差值 2px 会让两个 chip 横向左移 2px, 对拍 @2026-10-19 */
+  border-radius: 7px;
   background: #fff;
-  padding: 0 12px;
+  padding: 0 10px;
   display: flex;
   align-items: center;
   gap: 8px;
   cursor: pointer;
   font-size: 11px;
+  /* 参考站实拍 rgb(104,113,130) ≈ --text-muted #667085 (差 2 个色阶, 肉眼不可辨, 沿用 token) */
   color: var(--text-muted);
 }
 .pk-settings-summary:hover {
   background: var(--surface-soft);
 }
+/* 参考站 .image-output-settings-summary-label 实拍 rgb(69,76,89), 比 --text-body #4e5969 更深一档 */
 .pk-settings-label {
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-body);
+  color: #454c59;
   margin-right: auto;
 }
 .pk-settings-chip {
   font-size: 11px;
-  color: var(--text-body);
+  /* 参考站 .image-output-settings-chip 实拍 rgb(72,80,94) + radius 5px
+     (token --text-body #4e5969 / --radius-tag 4px 各差一档) @2026-10-19 */
+  color: #48505e;
   border: 1px solid var(--border-soft);
-  border-radius: var(--radius-tag);
+  border-radius: 5px;
   padding: 0 9px;
   height: 28px;
   display: inline-flex;
@@ -2143,6 +2687,14 @@ html[data-promo='off'] .pk-workspace {
 .pk-ratio-option:hover {
   border-color: var(--brand-light);
   color: var(--brand);
+}
+/* 参考站 .image-output-ratio-option 同样用 <small> 承载比例文字且实测 13px,
+   即其 CSS 显式写了 font-size —— 本项目只在 button 上设 13px, <small> 吃到浏览器
+   默认 `font-size: smaller` 被缩成 0.8 倍 (实测 10.4px), 比例格子文字明显偏小。
+   @2026-10-19 对拍补充 */
+.pk-ratio-option small {
+  font-size: 13px;
+  line-height: 13px;
 }
 /* disabled/选中态 disabled: 对齐参考站 .image-output-ratio-option (cursor not-allowed / opacity .56; .active:disabled opacity 1) (2026-10-18 对拍补充) */
 .pk-ratio-option:disabled {
@@ -2417,12 +2969,7 @@ html[data-promo='off'] .pk-workspace {
   display: grid;
   place-items: center;
 }
-.pk-library-empty {
-  padding: 48px;
-  text-align: center;
-  color: var(--text-desc);
-  font-size: 13px;
-}
+/* .pk-library-empty 已移除 (2026-10-20): 弹窗空态改用 StateEmpty (带插画 + 描述) */
 .pk-library-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -2593,12 +3140,6 @@ html[data-promo='off'] .pk-workspace {
     padding: 12px 16px 0;
     gap: 8px;
   }
-  .fc-secondary-actions {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .fc-secondary-actions .fc-ghost-btn {
-    height: 36px;
-  }
 }
 
 /* ───────── 爆款复刻页 (1:1 复刻 ijihua.cn/viral-clone, 数值来自实拍 computed styles) ───────── */
@@ -2704,6 +3245,31 @@ html[data-promo='off'] .pk-workspace {
   font-size: 12px;
   line-height: 20px;
   font-weight: 400;
+}
+
+/* 产出来源徽标 (2026-10-20, free-creation)
+   按每单真实的 task.provider 着色, 取代原先硬编码的「本地占位渲染」警示徽标:
+     gateway → 成功色 (模型真出图)
+     local   → 警示色 (网关不可用已回落本地算法, 不是模型结果)
+   盒模型与 .pk-result-mock-badge 完全一致(0 6px / radius-tag / 12px/20px),
+   视觉替换不产生布局跳动。 */
+.pk-result-source {
+  flex-shrink: 0;
+  padding: 0 6px;
+  border-radius: var(--radius-tag);
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 400;
+}
+.pk-result-source-gateway {
+  background: var(--success-soft-bg);
+  border: 1px solid var(--success-border);
+  color: var(--success-text);
+}
+.pk-result-source-local {
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  color: var(--warn-text);
 }
 
 /* ───────── 自由创作页 (1:1 复刻 ijihua.cn/free-creation, 数值来自实拍 computed styles) ───────── */
@@ -2885,47 +3451,19 @@ html[data-promo='off'] .pk-workspace {
   resize: vertical;
 }
 
-/* 提交区: actions flex column gap16 margin-top auto (sticky 底部);
-   次要按钮 grid 2 列 gap8, ghost 32px 白底 border var(--border) radius8 13px var(--text-muted) */
+/* 提交区: actions flex column gap16 margin-top auto (sticky 底部)
+   2026-10-19 移除次要按钮行(「重置」/「清空结果」) 及 .fc-secondary-actions/.fc-ghost-btn 样式 ——
+   用户要求不要这两个按钮, 且它们在 900 高视口下被挤到首屏外(实测 y=844, 页面总高 940)。 */
 .fc-actions {
   margin-top: auto;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
-/* disabled 分化 (2026-10-18): 参考站 .free-actions .primary-btn:disabled → opacity 1 (自由创作页提交禁用不淡出),
-   其他工具页 .pk-primary-btn:disabled 维持 .55 (对齐参考站 redraw-submit:disabled) */
-.fc-actions .pk-primary-btn:disabled {
-  opacity: 1;
-}
-/* 次要按钮 grid 2 列 gap8 (实拍 ghost 192x32 白底 border var(--border) radius8 13px var(--text-muted)) */
-.fc-secondary-actions {
-  display: grid;
-  grid-template-columns: repeat(2, 192px);
-  gap: 8px;
-}
-.fc-ghost-btn {
-  width: 100%;
-  height: 32px;
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  color: var(--text-muted);
-  font-size: 13px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  cursor: pointer;
-}
-.fc-ghost-btn:hover:not(:disabled) {
-  border-color: var(--border-hover);
-  color: var(--brand);
-}
-.fc-ghost-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+/* disabled 态说明: 曾有一条 `.fc-actions .pk-primary-btn:disabled { opacity: 1 }` 覆盖
+   （据称对齐参考站 .free-actions .primary-btn:disabled 不淡出），结果按钮功能上被 disabled、
+   视觉上毫无变化（computed opacity 恒为 1），用户看不出「没填提示词不能提交」。
+   2026-10-19 删除该覆盖，统一继承 .pk-primary-btn:disabled 的 opacity .55 + not-allowed。 */
 
 /* 高级设置 popover: 在 pk-settings-popover 基础上增加头部 (实拍: head flex
    space-between min-height20 margin-bottom16; h2 16px/20 var(--text-strong); close 24x24 #526077) */
@@ -2941,8 +3479,10 @@ html[data-promo='off'] .pk-workspace {
   margin: 0;
   font-size: 16px;
   line-height: 20px;
-  color: var(--text-strong);
-  font-weight: 600;
+  /* 参考站 .image-output-settings-popover-head h2 实拍 fw 700 + rgb(41,40,57)
+     (原为 600 + var(--text-strong) #171a2b, 字重与色阶各差一档) @2026-10-19 */
+  color: #292839;
+  font-weight: 700;
 }
 .fc-settings-close {
   width: 24px;
@@ -3235,62 +3775,6 @@ html[data-promo='off'] .pk-workspace {
 }
 .tool-result-grid-multi .pk-result-card-detail {
   width: 100%;
-}
-
-/* 历史记录 (参考站: 可折叠, ⌃ 图标) */
-.tool-history-card {
-  gap: 0;
-}
-.tool-history-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-}
-.tool-history-chevron {
-  color: var(--text-muted);
-  transition: transform 0.15s;
-}
-.tool-history-chevron-open {
-  transform: rotate(180deg);
-}
-.tool-history-body {
-  padding-top: 12px;
-}
-.tool-history-empty {
-  font-size: 12px;
-  color: var(--text-desc);
-  margin: 0;
-}
-.tool-history-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
-  gap: 8px;
-}
-.tool-history-item {
-  aspect-ratio: 1;
-  border-radius: var(--radius-control);
-  overflow: hidden;
-  background: var(--surface);
-  border: 1px solid var(--surface);
-}
-.tool-history-item img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-.tool-history-failed {
-  width: 100%;
-  height: 100%;
-  display: grid;
-  place-items: center;
-  font-size: 11px;
-  color: var(--text-desc);
 }
 
 /* 修图系业务卡 (参考站 local-redraw-card: 白底圆角 + 标题行) */
@@ -6144,21 +6628,22 @@ html[data-promo='off'] .multi-image-fusion-page {
   /* 同 .sitemap-item: <Link> 未设 color 会继承 antd 默认链接蓝 #1677ff */
   color: inherit;
 }
+/* 2026-10-19: 「EV」文字块 → 货觉AI「觉眼」SVG 标记 (品牌统一, 见 docs/brand/brand-basics.md) */
 .landing-brand-mark {
   width: 36px;
   height: 36px;
-  border-radius: var(--radius-card);
-  background: linear-gradient(135deg, var(--brand-light), var(--brand));
-  color: #fff;
-  font-size: 14px;
-  font-weight: 700;
-  display: grid;
-  place-items: center;
+  flex: none;
+  display: block;
 }
 .landing-brand-text {
   font-size: 16px;
   color: var(--text-strong);
   white-space: nowrap;
+  font-weight: 700;
+}
+/* AI 后缀: 品牌紫, 与主名「货觉」深色形成层级 (同 .app-brand-ai) */
+.landing-brand-ai {
+  color: var(--brand);
 }
 .landing-nav {
   display: flex;
@@ -6260,6 +6745,10 @@ html[data-promo='off'] .multi-image-fusion-page {
   background: var(--surface);
   color: var(--text-strong);
 }
+/* 移动端汉堡: 桌面隐藏, ≤900px 显示 (与 .app-mobile-toggle 同一套断点) */
+.landing-mobile-toggle {
+  display: none;
+}
 @media (max-width: 1024px) {
   .landing-topbar {
     grid-template-columns: auto 1fr;
@@ -6273,6 +6762,77 @@ html[data-promo='off'] .multi-image-fusion-page {
   .landing-topbar-right {
     grid-column: 1 / -1;
     flex-wrap: wrap;
+  }
+}
+
+/* ───────── 落地页移动态 (≤900px): 复刻参考站 390「品牌 + 汉堡」单行顶栏 ─────────
+   2026-10-19 修: 上面那条 1024 断点把顶栏改成两行换行, 390 下品牌 + 5 导航项 + 算力胶囊
+   + 登录 挤成 4 行 (无横向溢出但观感破碎)。参考站 390 实测是 54px 单行、导航全进抽屉,
+   这里同构。本块必须排在 1024 块之后 —— 媒体查询不增加特异性, 同特异性靠源码顺序取胜。 */
+@media (max-width: 900px) {
+  .landing-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 54px;
+    padding: 0 14px;
+    gap: 10px;
+    background: #fff;
+    border-bottom: 1px solid var(--color-border-soft);
+  }
+  .landing-nav,
+  .landing-topbar-right {
+    display: none;
+  }
+  .landing-mobile-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 36px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--text-strong);
+    cursor: pointer;
+  }
+  .landing-mobile-toggle:hover {
+    background: var(--surface);
+  }
+  /* 抽屉内导航: 分组标题 + 条目, 复用侧栏的字号/间距语言 */
+  .landing-mobile-nav {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 0 16px;
+  }
+  .landing-mobile-group {
+    display: flex;
+    flex-direction: column;
+    padding: 8px 0 4px;
+  }
+  .landing-mobile-group-title {
+    padding: 6px 16px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-desc);
+    letter-spacing: 0.4px;
+  }
+  .landing-mobile-item {
+    display: flex;
+    align-items: center;
+    height: 40px;
+    padding: 0 16px;
+    border: 0;
+    background: transparent;
+    text-align: start;
+    font-size: 14px;
+    color: var(--text-body);
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .landing-mobile-item:hover {
+    background: var(--brand-bg);
+    color: var(--brand);
   }
 }
 
@@ -6292,10 +6852,23 @@ html[data-promo='off'] .multi-image-fusion-page {
   border-bottom: 1px solid var(--surface);
 }
 .sitemap-topbar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-size: 16px;
   color: var(--text-strong);
   text-decoration: none;
-  font-weight: 600;
+  font-weight: 700;
+}
+/* 2026-10-19: 站点索引顶栏加货觉AI 标记 (24px, 小于主顶栏 36px 以匹配本页轻顶栏) */
+.sitemap-topbar-brand-mark {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  display: block;
+}
+.sitemap-topbar-brand-ai {
+  color: var(--brand);
 }
 .sitemap-topbar-right {
   display: flex;
@@ -6482,6 +7055,11 @@ html[data-promo='off'] .multi-image-fusion-page {
   font-size: 16px;
   font-weight: 600;
   color: var(--text-strong);
+  /* 签到块标题内嵌 lucide 图标 (M11), 需 flex 对齐;
+     未内嵌图标的标题同样适用, 故不另开类名 */
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 .invite-steps {
   margin: 0;
@@ -6729,6 +7307,14 @@ html[data-promo='off'] .multi-image-fusion-page {
   border-radius: var(--radius-panel);
   padding: 12px 14px;
   box-shadow: 0 12px 30px rgba(41, 33, 22, 0.04);
+}
+/* 窄屏换行: 4 个筛选 chip + 右侧操作在 390 下排成549px (实测 toolbar scrollWidth 549 vs 宽 314),
+   撑出 .app-content 197px 横向滚动条, 右半截要横滑才够得到。筛选弹层锚在 wrap 上(relative),
+   换行不影响定位。 */
+@media (max-width: 700px) {
+  .my-works-toolbar {
+    flex-wrap: wrap;
+  }
 }
 .my-works-filter-wrap {
   position: relative;
@@ -7273,13 +7859,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   font-size: 12px;
   color: var(--text-muted);
 }
-.my-works-loading {
-  min-height: 300px;
-  display: grid;
-  place-items: center;
-  color: var(--text-muted);
-}
-.my-works-spin,
+/* .my-works-loading 已移除 (2026-10-20): 作品网格加载态改用 StateSkeleton 骨架屏 */
 .my-work-generating-spinner {
   animation: my-works-spin 1s linear infinite;
 }
@@ -7291,7 +7871,7 @@ html[data-promo='off'] .multi-image-fusion-page {
 
 /* ───────── 素材库 (复刻参考站 asset-library-*: 5 列方形卡 / radius14 / 批量条 / 分组面板) ───────── */
 .asset-library-page {
-  min-height: calc(100vh - var(--workspace-topbar-height, 64px));
+  min-height: calc(100vh - var(--workspace-topbar-height));
   box-sizing: border-box;
   color: var(--text-strong);
   padding: 24px 24px 56px;
@@ -7307,8 +7887,10 @@ html[data-promo='off'] .multi-image-fusion-page {
 }
 .asset-library-title {
   margin: 0;
-  font-size: 24px;
-  font-weight: 600;
+  /* 参考站 #asset-library-title 实测 28px/700/lh40 (原 24px/600, 2026-10-19 修正) */
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 40px;
   color: var(--text-strong);
 }
 .asset-library-sub {
@@ -7456,7 +8038,15 @@ html[data-promo='off'] .multi-image-fusion-page {
   background: none;
   color: inherit;
 }
-/* 网格: repeat(5, minmax(0,1fr)) gap 16 (断点对齐参考站: ≤1200 4 列 / ≤380 1 列) */
+/* 网格: 参考站 .asset-library-grid 为 fluid (卡片无固定宽度, 只有 min-width:0),
+   断点全部来自参考站 CSS 产物字面值 (2026-10-19 从 /tmp/ref-app.css 提取, 原审计
+   「参考站 populated 态被登录墙挡住取不到」不成立 —— 产物里有全套媒体查询):
+     ≤1200 → 4 列
+     ≤980  → page padding 24px 20px 44px + 3 列
+     ≤640  → page padding 18px 12px 36px + 2 列 + gap 10
+     ≤380  → 1 列
+   注: 10-17 审计记录的「卡 207×273」并非参考站字面值, 而是 fluid 卡片在本地**双重 padding
+   bug**(内容列 1100)下的测量结果 —— 容器纠正为 1148 后卡片自然是 216.8。 */
 .asset-library-grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -7465,6 +8055,45 @@ html[data-promo='off'] .multi-image-fusion-page {
 @media (max-width: 1200px) {
   .asset-library-grid {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (max-width: 980px) {
+  .asset-library-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .asset-library-page {
+    padding: 24px 20px 44px;
+  }
+}
+@media (max-width: 640px) {
+  .asset-library-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+  /* 参考站 .asset-library-page 移动变体实测 padding 18px 12px 36px */
+  .asset-library-page {
+    padding: 18px 12px 36px;
+  }
+  .asset-library-title {
+    font-size: 24px;
+    line-height: 34px;
+  }
+  .asset-library-header {
+    gap: 12px;
+  }
+  .asset-library-header-actions {
+    flex-wrap: wrap;
+  }
+  /* 两列卡 (≤165px) 下 meta 两段会各自折行 (实测卡高被撑高 17px):
+     左段允许截断、右段(kind)保持整词, 与 title 的 ellipsis 策略一致 */
+  .asset-library-card-meta > *:first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .asset-library-card-meta > *:last-child {
+    white-space: nowrap;
   }
 }
 @media (max-width: 380px) {
@@ -7620,8 +8249,8 @@ html[data-promo='off'] .multi-image-fusion-page {
   line-height: 17px;
   color: #a0a7b6;
 }
-/* 状态与空态: strong 14/16 #333 */
-.asset-library-state,
+/* 状态与空态: strong 14/16 #333
+   .asset-library-state 已移除 (2026-10-20): 素材库加载态改用 StateSkeleton 骨架屏 */
 .asset-library-empty {
   min-height: 260px;
   display: flex;
@@ -7657,14 +8286,7 @@ html[data-promo='off'] .multi-image-fusion-page {
 .asset-library-load-more:hover {
   color: var(--brand-hover);
 }
-.asset-library-load-more-spinner {
-  animation: asset-library-spin 1s linear infinite;
-}
-@keyframes asset-library-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
+/* .asset-library-load-more-spinner 已移除 (2026-10-20): 加载态改用 StateSkeleton */
 
 /* ── 参考站交互态对齐 (2026-10-17 偏差普查, 取参考站产物 CSS 字面值) ── */
 /* 我的作品: 展开态是「蓝色系」(hover 才是紫), 参考 .my-works-filter-wrap.is-open */
@@ -7672,19 +8294,6 @@ html[data-promo='off'] .multi-image-fusion-page {
   color: #24211e;
   background: #f7fcff;
   border-color: #399de8;
-}
-/* 素材库: 卡片 hover 与选中同款 (参考 .asset-library-card:hover / .is-selected) */
-.asset-library-card:hover,
-.asset-library-card.is-selected {
-  border-color: #8275ef;
-  transform: translateY(-2px);
-  box-shadow: 0 10px 25px rgba(77, 64, 183, 0.11);
-}
-.asset-library-card:hover .asset-library-cover > img {
-  transform: scale(1.035);
-}
-.asset-library-card.is-selected {
-  box-shadow: 0 10px 25px rgba(77, 64, 183, 0.11);
 }
 /* landing 业务卡 CTA hover (参考 .home-v2-business-card button:hover) */
 .home-v2-business-card button:hover {
@@ -7708,6 +8317,18 @@ html[data-promo='off'] .multi-image-fusion-page {
   color: #5546d8;
   font-weight: 400;
 }
+/* ── 工作台数据区移动适配 (2026-10-19; 参考站登录后移动态未取到, 本地决策) ──
+   放在全部 wb base 规则之后: 媒体查询不增特异性, 必须靠源顺序压过 base 的
+   repeat(6) / 1fr 1fr 1.35fr, 否则 390px 下指标块被压成 40px 级 */
+@media (max-width: 900px) {
+  .wb-dashboard-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .wb-account-metrics {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ── 工作台严格 1:1 覆盖层 (参考站 wb-* 规则字面值, 2026-10-17)
    置于工作台区块之后, 覆盖前面为通用 token 写的值, 保证逐条对齐参考站产物 CSS ── */
 .wb-workflow-banner .wb-hero-title,
@@ -7723,11 +8344,9 @@ html[data-promo='off'] .multi-image-fusion-page {
   line-height: 31px;
   margin: 24px 0 0;
 }
-/* 工具卡: 参考 .wb-tool-card / .wb-tool-visual / .wb-tool-copy / .wb-tool-icon */
-.wb-tools {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 16px;
-}
+/* 工具卡: 参考 .wb-tool-card / .wb-tool-visual / .wb-tool-copy / .wb-tool-icon。
+   ⚠️ 网格列数由第一套规则 (.wb-tools + 1100/760/520 断点) 统一管辖,
+   此处曾静态重复 repeat(6,...) 把响应式断点全部压死 (2026-10-19 拆除) */
 .wb-card {
   color: var(--wb-text);
   border-radius: var(--radius-panel);
@@ -7758,12 +8377,13 @@ html[data-promo='off'] .multi-image-fusion-page {
   background: #fff;
   box-shadow: var(--wb-icon-shadow);
 }
-.wb-card-title {
-  color: var(--wb-text-strong);
-  font-size: 14px;
-  font-weight: 600;
-  line-height: 16px;
-}
+/* 2026-10-19 删除本覆盖层里对 .wb-card-title / .wb-card-desc 的静态重述:
+   两者与基座 (global.css:1360 / 1367) 逐值同值 (--wb-text-strong=#171a2b、
+   --wb-text-desc=#86909c, 其余字面值一致), 重述毫无收益, 却把基座里
+   `.wb-card-desc` 的 `white-space/overflow/text-overflow: ellipsis` 三件套丢掉了
+   —— 结构属性被覆盖会让文字直接溢出卡片 (实测 1280 下描述右缘 1302 > 卡片右缘 1256,
+   溢出 46px)。与本项目 10-19 修过的「覆盖层静态重述 grid-template-columns 压死响应式断点」
+   是同一类错误: 媒体查询不增加特异性, 覆盖层只能加不能减。 */
 .wb-card:hover .wb-card-title {
   color: var(--wb-brand);
 }
@@ -7771,12 +8391,6 @@ html[data-promo='off'] .multi-image-fusion-page {
    本地为单层 lucide SVG (currentColor), 无法 1:1 复刻双层切换, 用 hover 变品牌紫模拟"灰图标→彩图标" */
 .wb-card:hover .wb-card-icon svg {
   color: #5546d8;
-}
-.wb-card-desc {
-  color: var(--wb-text-desc);
-  font-size: 12px;
-  line-height: 20px;
-  margin-top: 8px;
 }
 /* 角标: 参考 .wb-tool-title em → #FFF on #F00024 */
 .wb-card-badge {
@@ -7789,12 +8403,8 @@ html[data-promo='off'] .multi-image-fusion-page {
   background: var(--wb-badge-bg);
   color: #fff;
 }
-/* 数据区: 参考 .wb-data-layout = minmax(0,2fr) minmax(300px,1fr), margin 16px 0 */
-.wb-panels {
-  grid-template-columns: minmax(0, 2fr) minmax(300px, 1fr);
-  gap: 16px;
-  margin: 16px 0;
-}
+/* 数据区列宽已并入第一套 .wb-panels 规则 (含 ≤900px 堆叠断点),
+   此处曾静态重复 minmax(0,2fr) minmax(300px,1fr) 把堆叠断点压死 (2026-10-19 拆除) */
 .wb-panel {
   background: #fff;
   border-radius: var(--radius-card);
@@ -7829,11 +8439,9 @@ html[data-promo='off'] .multi-image-fusion-page {
 .wb-panel-link:hover {
   color: var(--wb-brand);
 }
-/* 账号指标: 参考 .wb-account-metrics span/b/a */
-.wb-account-metrics {
-  grid-template-columns: 1fr 1fr 1.35fr;
-  gap: 16px;
-}
+/* 账号指标: 参考 .wb-account-metrics span/b/a。
+   ⚠️ grid 列由第一套 .wb-account-metrics 规则管辖 (含 ≤900px 堆叠断点),
+   此处曾静态重复 1fr 1fr 1.35fr 把堆叠断点压死 (2026-10-19 拆除) */
 .wb-metric-block {
   background: var(--wb-surface);
   border-radius: var(--radius-control);
@@ -7943,12 +8551,9 @@ html[data-promo='off'] .multi-image-fusion-page {
   padding: 100px 0;
   font-size: 13px;
 }
-/* 数据面板: 参考 .wb-dashboard-* / .wb-chart-title / .wb-trend-chart */
-.wb-dashboard-stats {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 16px;
-  margin-top: 24px;
-}
+/* 数据面板: 参考 .wb-dashboard-* / .wb-chart-title / .wb-trend-chart。
+   ⚠️ 网格列由第一套 .wb-dashboard-stats 规则管辖 (含 ≤900px 两列断点),
+   此处曾静态重复 repeat(6,...) 把断点压死 (2026-10-19 拆除) */
 .wb-dashboard-stats .wb-metric-block {
   padding: 24px;
 }
@@ -8127,6 +8732,15 @@ html[data-promo='off'] .multi-image-fusion-page {
   background: #c9cddb;
   cursor: not-allowed;
 }
+/* 落地页套餐区空态 (接口未就绪/无在售商品时如实显示, 不回落硬编码价) */
+.home-v2-addon-empty {
+  grid-column: 1 / -1;
+  padding: 28px 12px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted, #667085);
+}
+
 .pkg-shop-disclosure {
   margin: 24px 0 8px;
   padding: 12px 14px;
@@ -8151,9 +8765,496 @@ html[data-promo='off'] .multi-image-fusion-page {
   }
 }
 
-/* 未复刻: .pkg-confirm-* / .pkg-payment-option*(支付宝 #009FE8 · 微信 #24B340) / .pkg-pay-btn /
-   .pkg-result-card / .pkg-wechat-qr —— 下单确认与支付结果态, 需真实订单与支付回调,
-   本地无计费系统, 不做假支付流程 */
+/* ════════════════════════════════════════════════════════════════════════════
+   支付态 (2026-10-20 接入真实订单与沙箱支付后补齐)
+   此前标注「未复刻」的 confirm / pay-btn / result-card 现已落地 ——
+   订单与沙箱支付链路已通, 这些版式有了真实数据可承载。
+   渠道配色沿用参考站实拍: 支付宝 #009FE8 / 微信 #24B340。
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 下单确认 (CheckoutPage) ────────────────────────────────────────── */
+
+.pkg-checkout-page {
+  --pkg-alipay: #009fe8;
+  --pkg-wechat: #24b340;
+  min-height: 100vh;
+  background: var(--surface);
+  padding: 24px;
+}
+.pkg-checkout-container {
+  max-width: 560px;
+  margin: 0 auto;
+}
+.pkg-confirm-card {
+  background: #fff;
+  border: 1px solid var(--pkg-line, #e6e8ef);
+  border-radius: var(--radius-panel, 16px);
+  padding: 24px;
+  margin-bottom: 16px;
+}
+.pkg-confirm-title {
+  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--pkg-text, #182033);
+}
+.pkg-confirm-sub {
+  margin: 0 0 20px;
+  font-size: 13px;
+  color: var(--pkg-muted, #7d8596);
+}
+.pkg-confirm-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px dashed var(--pkg-line, #e6e8ef);
+  font-size: 14px;
+}
+.pkg-confirm-row:last-of-type {
+  border-bottom: 0;
+}
+.pkg-confirm-row span {
+  color: var(--pkg-muted, #7d8596);
+}
+.pkg-confirm-row strong {
+  color: var(--pkg-text, #182033);
+  font-weight: 600;
+}
+.pkg-confirm-total {
+  margin-top: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--pkg-line, #e6e8ef);
+}
+.pkg-confirm-total strong {
+  font-size: 22px;
+  color: var(--pkg-alipay);
+}
+.pkg-confirm-offline {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--pkg-muted, #7d8596);
+  margin-top: 6px;
+}
+
+/* ── 支付方式选择 ──────────────────────────────────────────────────────── */
+
+.pkg-payment-title {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--pkg-text, #182033);
+}
+.pkg-payment-options {
+  display: grid;
+  gap: 10px;
+}
+.pkg-payment-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid var(--pkg-line, #e6e8ef);
+  border-radius: var(--radius-card, 12px);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.pkg-payment-option:hover {
+  border-color: #d4d2f8;
+}
+.pkg-payment-option.is-active {
+  border-color: var(--pkg-primary, #625df5);
+  box-shadow: 0 0 0 2px rgba(98, 93, 245, 0.1);
+}
+.pkg-payment-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.pkg-payment-icon.is-sandbox {
+  background: var(--pkg-primary, #625df5);
+}
+.pkg-payment-icon.is-alipay {
+  background: var(--pkg-alipay);
+}
+.pkg-payment-icon.is-wechat {
+  background: var(--pkg-wechat);
+}
+.pkg-payment-body {
+  flex: 1;
+  min-width: 0;
+}
+.pkg-payment-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--pkg-text, #182033);
+}
+.pkg-payment-desc {
+  font-size: 12px;
+  color: var(--pkg-muted, #7d8596);
+  margin-top: 2px;
+}
+
+/* ── 支付按钮 ──────────────────────────────────────────────────────────── */
+
+.pkg-pay-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 16px;
+  padding: 13px 20px;
+  border: 0;
+  border-radius: var(--radius-control, 8px);
+  background: var(--pkg-primary, #625df5);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.pkg-pay-btn:disabled {
+  background: #c9cddb;
+  cursor: not-allowed;
+}
+.pkg-pay-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--pkg-muted, #7d8596);
+  text-align: center;
+}
+
+/* ── 沙箱三态演示按钮 ──────────────────────────────────────────────────── */
+
+.pkg-sandbox-actions {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+.pkg-sandbox-btn {
+  padding: 9px 8px;
+  border: 1px solid var(--pkg-line, #e6e8ef);
+  border-radius: var(--radius-control, 8px);
+  background: #fff;
+  font-size: 13px;
+  color: var(--pkg-text, #182033);
+  cursor: pointer;
+}
+.pkg-sandbox-btn:hover {
+  border-color: var(--pkg-primary, #625df5);
+  color: var(--pkg-primary, #625df5);
+}
+.pkg-sandbox-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ⚠ 沙箱声明: 不做「假支付蒙混」。真实通道接入前必须让用户清楚
+   这里不产生真实扣款, 否则截图外流会被误认为已接通支付。 */
+.pkg-sandbox-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid #f5d9a8;
+  border-radius: var(--radius-control, 8px);
+  background: #fffaeb;
+  font-size: 12px;
+  line-height: 18px;
+  color: #8a5a00;
+}
+
+/* ── 支付结果 ──────────────────────────────────────────────────────────── */
+
+.pkg-result-card {
+  background: #fff;
+  border: 1px solid var(--pkg-line, #e6e8ef);
+  border-radius: var(--radius-panel, 16px);
+  padding: 32px 24px;
+  text-align: center;
+}
+.pkg-result-icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  color: #fff;
+}
+.pkg-result-icon.is-success {
+  background: var(--pkg-success, #18a875);
+}
+.pkg-result-icon.is-failed {
+  background: #e5484d;
+}
+.pkg-result-icon.is-pending {
+  background: var(--pkg-warn, #d97706);
+}
+.pkg-result-title {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--pkg-text, #182033);
+}
+.pkg-result-desc {
+  margin: 0 0 20px;
+  font-size: 13px;
+  color: var(--pkg-muted, #7d8596);
+}
+.pkg-result-detail {
+  display: grid;
+  gap: 1px;
+  background: var(--pkg-line, #e6e8ef);
+  border: 1px solid var(--pkg-line, #e6e8ef);
+  border-radius: var(--radius-card, 12px);
+  overflow: hidden;
+  text-align: left;
+}
+.pkg-result-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  background: #fff;
+  font-size: 13px;
+}
+.pkg-result-row span {
+  color: var(--pkg-muted, #7d8596);
+}
+.pkg-result-row strong {
+  color: var(--pkg-text, #182033);
+  font-weight: 600;
+}
+.pkg-result-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 20px;
+}
+.pkg-result-btn {
+  padding: 10px 22px;
+  border: 1px solid var(--pkg-line, #e6e8ef);
+  border-radius: var(--radius-control, 8px);
+  background: #fff;
+  font-size: 14px;
+  color: var(--pkg-text, #182033);
+  cursor: pointer;
+}
+.pkg-result-btn.is-primary {
+  background: var(--pkg-primary, #625df5);
+  border-color: var(--pkg-primary, #625df5);
+  color: #fff;
+}
+
+/* ── 积分明细页 ────────────────────────────────────────────────────────── */
+
+.credits-page {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 24px;
+}
+.credits-balance-card {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card, 12px);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.credits-stat {
+  background: #fff;
+  padding: 18px;
+}
+.credits-stat-label {
+  font-size: 12px;
+  color: var(--text-muted, #667085);
+  margin-bottom: 6px;
+}
+.credits-stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-strong, #171a2b);
+}
+.credits-stat-value.is-warn {
+  color: #d97706;
+}
+.credits-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.credits-tab {
+  padding: 10px 16px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font-size: 14px;
+  color: var(--text-muted, #667085);
+  cursor: pointer;
+}
+.credits-tab.is-active {
+  color: var(--brand);
+  border-bottom-color: var(--brand);
+  font-weight: 600;
+}
+.credits-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card, 12px);
+  overflow: hidden;
+}
+.credits-table th,
+.credits-table td {
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.credits-table th {
+  background: var(--surface);
+  color: var(--text-muted, #667085);
+  font-weight: 500;
+  font-size: 12px;
+}
+.credits-amount.is-plus {
+  color: #18a875;
+  font-weight: 600;
+}
+.credits-amount.is-minus {
+  color: #e5484d;
+  font-weight: 600;
+}
+.credits-list-empty {
+  padding: 48px 16px;
+  text-align: center;
+  color: var(--text-muted, #667085);
+  font-size: 14px;
+}
+
+/* ── 我的订单 ──────────────────────────────────────────────────────────── */
+
+.orders-page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+}
+.orders-title {
+  margin: 0 0 4px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-strong, #171a2b);
+}
+.orders-sub {
+  margin: 0 0 20px;
+  font-size: 13px;
+  color: var(--text-muted, #667085);
+}
+.order-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card, 12px);
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.order-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--border);
+  margin-bottom: 12px;
+}
+.order-no {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+  color: var(--text-muted, #667085);
+}
+.order-status {
+  padding: 3px 10px;
+  border-radius: var(--radius-pill, 999px);
+  font-size: 12px;
+  font-weight: 600;
+}
+.order-status.is-pending {
+  background: #fffaeb;
+  color: #8a5a00;
+}
+.order-status.is-paid {
+  background: #e7f8f1;
+  color: #0f7a55;
+}
+.order-status.is-cancelled,
+.order-status.is-expired {
+  background: var(--surface);
+  color: var(--text-muted, #667085);
+}
+.order-status.is-refunded,
+.order-status.is-partial_refunded {
+  background: #fdeeee;
+  color: #a32d2d;
+}
+.order-items {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.order-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+}
+.order-item-name {
+  color: var(--text-strong, #171a2b);
+}
+.order-item-meta {
+  color: var(--text-muted, #667085);
+  font-size: 12px;
+}
+.order-card-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+  font-size: 13px;
+}
+.order-amount {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-strong, #171a2b);
+}
+
+@media (max-width: 768px) {
+  .credits-balance-card {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .pkg-sandbox-actions {
+    grid-template-columns: 1fr;
+  }
+}
 
 /* landing 套餐区入口 → /packages (参考站该区 CTA 进入积分商城) */
 .home-v2-packages-entry {
@@ -8184,4 +9285,4545 @@ html[data-promo='off'] .multi-image-fusion-page {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   后台管理系统 (admin) — docs/admin-ui-design.md
+   规则: 只用既有 token, 禁止裸 hex; 前缀 adm- 避免与 C 端类冲突。
+   后台是工具不是营销页: 密度优先, 无渐变无插画, 阴影仅用于浮层。
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 骨架 ──────────────────────────────────────────────────────────────── */
+
+.adm-layout {
+  min-height: 100vh;
+  background: var(--surface);
+}
+
+.adm-header {
+  height: 56px;
+  line-height: normal;
+  padding: 0 16px;
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
+.adm-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.adm-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.adm-collapse-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-control);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.adm-collapse-btn:hover {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+
+.adm-brand {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.adm-brand span {
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 6px;
+}
+
+/* 环境标识: 仅非生产显示, 防止误在生产执行测试操作 (安全设计非装饰) */
+.adm-env-tag {
+  font-size: 12px;
+  line-height: 20px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  color: var(--warn-text);
+  white-space: nowrap;
+}
+
+.adm-search {
+  width: 240px;
+}
+.adm-search.ant-input-affix-wrapper {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.adm-icon-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-control);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.adm-icon-btn:hover:not(:disabled) {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+.adm-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.adm-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-control);
+  color: var(--text-body);
+  cursor: pointer;
+}
+.adm-user:hover {
+  background: var(--surface);
+}
+.adm-user-name {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* ── 侧栏 ──────────────────────────────────────────────────────────────── */
+
+/*
+ * 后台主区: 侧栏 + 内容的水平容器。
+ *
+ * ⚠ antd 的 Layout 默认 flex-direction: column (含 HasSider 时才是 row)。
+ * 这里用了 <Layout className="adm-body"> 但没有 HasSider 子组件, antd 不会
+ * 自动切换到 row —— 结果侧栏与内容竖排, 内容被压到侧栏下方并与之重叠。
+ * 必须显式声明 row, 这是本项目唯一的非默认 antd 布局假设。
+ */
+.adm-body {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  min-height: calc(100vh - 56px);
+}
+
+/* 侧栏吸顶: Header 是 sticky, 内容区过长时侧栏需独立滚动 */
+.adm-sider {
+  position: sticky;
+  top: 56px;
+  height: calc(100vh - 56px);
+  align-self: flex-start;
+  width: 240px;
+  flex: 0 0 240px;
+  background: #fff;
+  border-right: 1px solid var(--border);
+  padding: 12px 8px 24px;
+  overflow-y: auto;
+  transition: width 0.18s ease, flex-basis 0.18s ease;
+}
+.adm-sider.is-collapsed {
+  width: 64px;
+  flex-basis: 64px;
+}
+.adm-sider.is-mobile {
+  width: 100%;
+  border-right: none;
+  padding: 0;
+}
+
+.adm-sider-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.adm-sider-group + .adm-sider-group {
+  margin-top: 12px;
+}
+
+.adm-sider-group-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-desc);
+  padding: 8px 12px 4px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.adm-sider-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 40px;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-control);
+  color: var(--text-body);
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+}
+.adm-sider-item:hover:not(:disabled) {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+.adm-sider-item.is-active {
+  background: var(--brand-bg);
+  color: var(--brand);
+  font-weight: 600;
+}
+/* 选中态左侧指示条 */
+.adm-sider-item.is-active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
+  border-radius: 0 2px 2px 0;
+  background: var(--brand);
+}
+/* 折叠态: 居中显示图标 */
+.adm-sider.is-collapsed .adm-sider-item {
+  justify-content: center;
+  padding: 0;
+}
+
+.adm-sider-item.is-planned,
+.adm-sider-item:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.adm-sider-item-tag {
+  margin-left: auto;
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-desc);
+}
+
+.adm-sider-item-icon {
+  flex: 0 0 auto;
+}
+
+/* ── 内容区 ────────────────────────────────────────────────────────────── */
+
+.adm-content {
+  padding: 24px;
+  /* flex:1 + min-width:0 —— 缺 min-width 时长表格会撑破容器, 把整个布局顶宽 */
+  flex: 1 1 auto;
+  min-width: 0;
+  align-self: flex-start;
+  overflow-x: auto;
+}
+
+.adm-page-loading {
+  min-height: 60vh;
+  display: flex;
+  /* 2026-10-20: 内容由 antd Spin 换成骨架屏 + 提示文字, 需竖排 */
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+.adm-page-loading .state-skeleton {
+  width: 100%;
+  max-width: 960px;
+}
+.adm-page-loading-tip {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* ── 页头 ──────────────────────────────────────────────────────────────── */
+
+.adm-page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.adm-page-head h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-strong);
+  line-height: 28px;
+}
+.adm-page-head p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.adm-page-head-actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* ── 统计卡 ────────────────────────────────────────────────────────────── */
+
+.adm-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+@media (max-width: 1439px) {
+  .adm-stat-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* ── 面板 ──────────────────────────────────────────────────────────────── */
+
+.adm-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+  margin-bottom: 16px;
+}
+.adm-panel-note {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-desc);
+}
+
+.adm-empty {
+  padding: 32px 0;
+  text-align: center;
+  color: var(--text-desc);
+  font-size: 13px;
+}
+
+/* ── 趋势柱状图 (纯 CSS, 无图表库依赖) ─────────────────────────────────── */
+
+/* ── 抽屉 ──────────────────────────────────────────────────────────────── */
+
+.adm-drawer .ant-drawer-header {
+  border-bottom: 1px solid var(--border);
+}
+.adm-drawer-section + .adm-drawer-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-row);
+}
+.adm-drawer-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+  margin-bottom: 12px;
+}
+
+/* ── 筛选条 ────────────────────────────────────────────────────────────── */
+
+.adm-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  margin-bottom: 12px;
+}
+.adm-filter-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+/* ── 高危确认 ──────────────────────────────────────────────────────────── */
+
+.adm-confirm-impact {
+  background: var(--danger-soft-bg);
+  border: 1px solid var(--warn-border);
+  border-radius: var(--radius-control);
+  padding: 12px;
+  margin: 12px 0;
+  font-size: 13px;
+  color: var(--text-body);
+}
+.adm-confirm-warn {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 13px;
+  color: var(--warn-text);
+  margin-top: 12px;
+}
+
+/* ── 通用控件 ──────────────────────────────────────────────────────────── */
+
+.adm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: var(--radius-control);
+  color: var(--text-body);
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  white-space: nowrap;
+}
+.adm-btn:hover:not(:disabled) {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+.adm-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.adm-btn.is-primary {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: #fff;
+}
+.adm-btn.is-primary:hover:not(:disabled) {
+  background: var(--brand-hover);
+  border-color: var(--brand-hover);
+  color: #fff;
+}
+.adm-btn.is-danger {
+  background: var(--danger-text);
+  border-color: var(--danger-text);
+  color: #fff;
+}
+.adm-btn.is-danger:hover:not(:disabled) {
+  opacity: 0.88;
+  color: #fff;
+}
+
+.adm-link {
+  border: none;
+  background: transparent;
+  padding: 0;
+  color: var(--brand);
+  font-size: 13px;
+  cursor: pointer;
+}
+.adm-link:hover:not(:disabled) {
+  color: var(--brand-hover);
+  text-decoration: underline;
+}
+.adm-link.is-danger {
+  color: var(--danger-text);
+}
+.adm-link:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+.adm-input {
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: #fff;
+  color: var(--text-strong);
+  font-size: 13px;
+  outline: none;
+  min-width: 180px;
+}
+.adm-input:focus {
+  border-color: var(--brand);
+}
+.adm-input:disabled {
+  background: var(--surface);
+  cursor: not-allowed;
+}
+.adm-input-number {
+  min-width: 140px;
+  width: 140px;
+}
+
+.adm-field {
+  margin-top: 12px;
+}
+.adm-field label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-body);
+  margin-bottom: 6px;
+}
+.adm-field input,
+.adm-field select {
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: #fff;
+  color: var(--text-strong);
+  font-size: 13px;
+  outline: none;
+}
+.adm-field input:focus,
+.adm-field select:focus {
+  border-color: var(--brand);
+}
+
+.adm-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-body);
+  cursor: pointer;
+  user-select: none;
+}
+.adm-checkbox input {
+  cursor: pointer;
+  accent-color: var(--brand);
+}
+
+/*
+ * 自绘开关: 裸 checkbox 在后台里过于简陋, 且与输入框视觉重量不匹配。
+ * 隐藏原生 input 保留可访问性, 用 :checked 驱动轨道与滑块。
+ */
+.adm-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-body);
+  cursor: pointer;
+  user-select: none;
+}
+.adm-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.adm-switch-track {
+  position: relative;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--border-dot);
+  transition: background 0.18s;
+  flex: 0 0 36px;
+}
+.adm-switch-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.18s;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.2);
+}
+.adm-switch input:checked + .adm-switch-track {
+  background: var(--brand);
+}
+.adm-switch input:checked + .adm-switch-track::after {
+  transform: translateX(16px);
+}
+.adm-switch input:focus-visible + .adm-switch-track {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+.adm-switch-text {
+  color: var(--text-strong);
+  min-width: 44px;
+}
+.adm-switch input:disabled + .adm-switch-track {
+  opacity: 0.5;
+}
+/* .adm-retry-btn 已于 2026-10-20 删除 —— AdminListError 改用 ExceptionPage 的
+   .exc-btn.is-primary, 不留同义簇 (CLAUDE.md「样式: 语义化 token」)。 */
+
+.adm-filter-input {
+  width: 220px;
+}
+.adm-filter-select {
+  width: 140px;
+}
+
+.adm-row-actions {
+  display: flex;
+  /* 不换行: 换行会把行高从 44 撑到 51+, 整表节奏被打乱 */
+  flex-wrap: nowrap;
+  gap: 12px;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.adm-cell-sub {
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+/* ── 统计卡紧凑变体 (抽屉内用) ─────────────────────────────────────────── */
+
+.adm-stat-grid.is-compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 0;
+}
+/* 抽屉内的紧凑变体: 3 列, 数字小一号 */
+.adm-stat-grid.is-compact .adm-stat {
+  min-height: 76px;
+  padding: 12px 14px;
+}
+.adm-stat-grid.is-compact .adm-stat-value {
+  font-size: 20px;
+  line-height: 26px;
+}
+.adm-stat.is-warn {
+  background: var(--warn-bg);
+  border-color: var(--warn-border);
+}
+
+/* ── 抽屉 ──────────────────────────────────────────────────────────────── */
+
+.adm-drawer-loading {
+  display: flex;
+  justify-content: center;
+  padding: 48px 0;
+}
+.adm-drawer-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.adm-section + .adm-section {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border-row);
+}
+.adm-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+  margin-bottom: 12px;
+}
+
+.adm-desc {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 8px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+.adm-desc dt {
+  color: var(--text-muted);
+}
+.adm-desc dd {
+  margin: 0;
+  color: var(--text-strong);
+}
+
+.adm-reason-box {
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--text-body);
+}
+
+.adm-secret-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  padding: 12px 14px;
+  margin: 12px 0;
+}
+.adm-secret-box code {
+  flex: 1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 16px;
+  color: var(--text-strong);
+  letter-spacing: 1px;
+  word-break: break-all;
+}
+
+.adm-mini-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.adm-mini-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border-row);
+  font-size: 13px;
+}
+.adm-mini-item:last-child {
+  border-bottom: none;
+}
+.adm-mini-thumb {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: var(--radius-control);
+  object-fit: cover;
+  background: var(--surface);
+}
+.adm-mini-thumb.is-empty {
+  border: 1px solid var(--border);
+}
+.adm-mini-name {
+  flex: 1;
+  color: var(--text-strong);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.adm-mini-time {
+  font-size: 12px;
+  color: var(--text-desc);
+  white-space: nowrap;
+}
+
+.adm-thumb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+}
+.adm-thumb-cell {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.adm-diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.adm-diff-table th,
+.adm-diff-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-row);
+  text-align: left;
+  vertical-align: top;
+}
+.adm-diff-table th {
+  color: var(--text-muted);
+  font-weight: 500;
+  font-size: 12px;
+}
+.adm-diff-table td {
+  color: var(--text-strong);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+}
+
+/* ── 确认弹窗 (自绘, 不依赖 antd Modal 以便控制样式) ──────────────────── */
+
+.adm-modal-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(23, 26, 43, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 24px;
+}
+.adm-modal {
+  width: 100%;
+  max-width: 520px;
+  background: #fff;
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-card);
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+.adm-modal-title {
+  padding: 20px 24px 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.adm-modal-body {
+  padding: 12px 24px 4px;
+  font-size: 13px;
+  color: var(--text-body);
+  overflow-y: auto;
+  flex: 1;
+}
+.adm-modal-body p {
+  margin: 0 0 8px;
+}
+.adm-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 24px 20px;
+}
+.adm-confirm-impact-title {
+  font-weight: 600;
+  color: var(--text-strong);
+  margin-bottom: 6px;
+}
+.adm-confirm-impact ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.adm-confirm-impact li {
+  margin: 2px 0;
+}
+.adm-confirm-typing {
+  margin-top: 12px;
+}
+.adm-confirm-typing label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-body);
+  margin-bottom: 6px;
+}
+.adm-confirm-typing input {
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  font-size: 14px;
+  outline: none;
+}
+.adm-confirm-typing input:focus {
+  border-color: var(--brand);
+}
+
+/* ── 角色权限 ──────────────────────────────────────────────────────────── */
+
+.adm-legend {
+  display: flex;
+  gap: 16px;
+  padding: 8px 12px;
+  margin-bottom: 16px;
+  background: var(--surface);
+  border-radius: var(--radius-control);
+  font-size: 13px;
+  color: var(--text-body);
+}
+.adm-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.adm-legend-item em {
+  font-style: normal;
+  color: var(--text-desc);
+  font-size: 12px;
+}
+
+.adm-perm-module {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+.adm-perm-module-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: var(--surface);
+  font-size: 13px;
+}
+.adm-perm-module-actions {
+  display: flex;
+  gap: 6px;
+}
+.adm-perm-all-btn {
+  height: 24px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.adm-perm-all-btn:hover:not(:disabled) {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+.adm-perm-all-btn.is-on {
+  background: var(--brand-bg);
+  border-color: var(--brand);
+  color: var(--brand);
+}
+.adm-perm-all-btn.is-off {
+  color: var(--text-desc);
+}
+.adm-perm-all-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.adm-perm-list {
+  padding: 4px 0;
+}
+.adm-perm-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 14px;
+  border-bottom: 1px solid var(--border-row);
+}
+.adm-perm-row:last-child {
+  border-bottom: none;
+}
+/* 高危权限点左侧标红, 收窄时要能一眼看到 */
+.adm-perm-row.is-high-risk {
+  background: var(--danger-soft-bg);
+}
+.adm-perm-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-strong);
+  min-width: 0;
+}
+.adm-perm-code {
+  font-size: 11px;
+  color: var(--text-desc);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.adm-perm-risk {
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--danger-text);
+  color: #fff;
+}
+.adm-perm-roles {
+  display: flex;
+  gap: 14px;
+  flex-shrink: 0;
+}
+
+/* ── 系统设置 ──────────────────────────────────────────────────────────── */
+
+.adm-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  max-width: 760px;
+}
+.adm-tab {
+  height: 36px;
+  padding: 0 16px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color 0.15s;
+}
+.adm-tab:hover {
+  color: var(--brand);
+}
+.adm-tab.is-active {
+  color: var(--brand);
+  font-weight: 600;
+  border-bottom-color: var(--brand);
+}
+
+/*
+ * 设置页与角色页限制内容宽度。
+ * 宽屏下"标签 ←→ 控件"横跨 1200px 时视线要扫过半个屏幕, 极易串行。
+ * 限制在 720px 内让标签与控件保持在一眼可及的范围。
+ */
+.adm-narrow {
+  max-width: 760px;
+}
+
+.adm-setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-row);
+}
+.adm-setting-row:last-child {
+  border-bottom: none;
+}
+.adm-setting-row:last-child {
+  border-bottom: none;
+}
+/* 有未保存变更的行给左侧标记 */
+.adm-setting-row.is-dirty {
+  background: var(--warn-bg);
+  margin: 0 -12px;
+  padding: 14px 12px;
+  border-radius: var(--radius-control);
+}
+.adm-setting-label {
+  flex: 1;
+  min-width: 0;
+}
+.adm-setting-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-strong);
+  margin-bottom: 4px;
+}
+.adm-setting-tag {
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+.adm-setting-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+.adm-setting-range {
+  font-size: 12px;
+  color: var(--text-desc);
+}
+.adm-setting-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.adm-action-bar {
+  /* 跟随 .adm-narrow 的宽度, 否则窄内容配宽操作条会显得断裂 */
+  max-width: 760px;
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  margin-top: 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+.adm-action-hint {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.adm-action-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+/* ── 无后台权限页 ──────────────────────────────────────────────────────── */
+
+.adm-noaccess {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  padding: 24px;
+}
+.adm-noaccess-card {
+  width: 100%;
+  max-width: 560px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: 32px;
+  box-shadow: var(--shadow-card);
+}
+.adm-noaccess-card h1 {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.adm-noaccess-desc {
+  margin: 0 0 20px;
+  font-size: 14px;
+  color: var(--text-body);
+}
+.adm-noaccess-reasons {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.adm-noaccess-reason {
+  background: var(--surface);
+  border-radius: var(--radius-control);
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--text-body);
+}
+.adm-noaccess-reason strong {
+  display: block;
+  color: var(--text-strong);
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+.adm-noaccess-reason ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.adm-noaccess-reason li {
+  margin: 3px 0;
+}
+.adm-noaccess-reason code {
+  font-size: 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.adm-noaccess-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   后台视觉打磨 (docs/admin-ui-design.md §0 设计原则)
+   ────────────────────────────────────────────────────────────────────────────
+   改动动机: 首版"能用但粗糙" —— 六卡同权重、趋势图无基准、状态标签透出英文。
+   打磨原则 (与 §0 一致, 不引入渐变/插画/大圆角):
+     · 建立主次: 主指标卡加底色与图标, 次级卡弱化
+     · 提供基准: 图表加网格线, 让高度可目测
+     · 分层承载: 数字加重、标签次级、辅助信息最弱
+   ════════════════════════════════════════════════════════════════════════════ */
+
+/* ── 分段控件 (替代 3 个独立按钮, 时间范围是一个整体) ──────────────────── */
+
+.adm-segmented {
+  display: inline-flex;
+  padding: 2px;
+  background: var(--surface);
+  border-radius: var(--radius-control);
+  gap: 2px;
+}
+.adm-segmented-item {
+  height: 28px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+.adm-segmented-item:hover {
+  color: var(--brand);
+}
+.adm-segmented-item.is-active {
+  background: #fff;
+  color: var(--brand);
+  font-weight: 500;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+/* ── 统计卡: 建立主次 ───────────────────────────────────────────────────── */
+
+.adm-stat {
+  position: relative;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 16px 18px;
+  min-height: 96px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.adm-stat:hover {
+  border-color: #d4d7e4;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+/* 主指标: 品牌浅底 + 左侧色条, 视线先落在这里 */
+.adm-stat.is-primary {
+  background: linear-gradient(180deg, #fbfaff 0%, #fff 62%);
+  border-color: #ddd9f5;
+}
+.adm-stat.is-primary::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 14px;
+  bottom: 14px;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--brand);
+}
+
+.adm-stat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.adm-stat-icon {
+  color: var(--brand);
+  opacity: 0.55;
+}
+
+.adm-stat-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.adm-stat-value {
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--text-strong);
+  line-height: 32px;
+  /* 数字对齐: 等宽数字避免数值变动时左右跳动 */
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+}
+.adm-stat-value.is-danger {
+  color: var(--danger-text);
+}
+.adm-stat-hint {
+  font-size: 12px;
+  color: var(--text-desc);
+  margin-top: 3px;
+}
+
+/* ── 状态标签: 色点 + 中文文字 ──────────────────────────────────────────── */
+
+.adm-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 8px 0 6px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 20px;
+  background: var(--surface);
+  color: var(--text-muted);
+  white-space: nowrap;
+  border: 1px solid transparent;
+}
+.adm-tag-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: 0 0 5px;
+}
+.adm-tag.is-success {
+  background: var(--success-soft-bg);
+  color: var(--success-text);
+}
+.adm-tag.is-danger {
+  background: var(--danger-soft-bg);
+  color: var(--danger-text);
+}
+.adm-tag.is-warn {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+.adm-tag.is-brand {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+.adm-tag.is-muted {
+  background: var(--surface);
+  color: var(--text-muted);
+}
+/* 运行中: 色点呼吸, 暗示"未结束" */
+.adm-tag.is-brand .adm-tag-dot {
+  animation: adm-pulse 1.6s ease-in-out infinite;
+}
+@keyframes adm-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .adm-tag.is-brand .adm-tag-dot {
+    animation: none;
+  }
+}
+
+/* ── 趋势图: 网格基准 + 数值标注 ───────────────────────────────────────── */
+
+.adm-trend {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 180px;
+  padding-top: 20px;
+}
+.adm-trend-grid {
+  position: absolute;
+  inset: 20px 0 24px 0;
+  pointer-events: none;
+}
+.adm-trend-gridline {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--border-row);
+}
+/* 零基线加重: 与网格线区分, 表明"起点" */
+.adm-trend-gridline:last-child {
+  background: var(--border);
+}
+.adm-trend-col {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  height: 100%;
+  min-width: 0;
+}
+.adm-trend-bar-wrap {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.adm-trend-bar {
+  position: relative;
+  width: 100%;
+  max-width: 30px;
+  background: var(--brand);
+  /* 只圆顶部: 柱状图贴基线, 底部圆角会显得浮空 */
+  border-radius: 4px 4px 0 0;
+  min-height: 0;
+  transition: filter 0.15s;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+.adm-trend-bar:hover {
+  filter: brightness(1.12);
+}
+/* 该日有失败任务: 用警示色, 趋势图不能只展示成功的一面 */
+.adm-trend-bar.has-failed {
+  background: var(--accent-orange);
+}
+.adm-trend-value {
+  position: absolute;
+  top: -18px;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.adm-trend-label {
+  font-size: 11px;
+  color: var(--text-desc);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── 任务列表: 分层承载 ─────────────────────────────────────────────────── */
+
+.adm-task-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  margin: 0 -12px;
+  border-radius: var(--radius-control);
+  border-bottom: 1px solid var(--border-row);
+  transition: background 0.15s;
+}
+.adm-task-item:last-child {
+  border-bottom: none;
+}
+.adm-task-item:hover {
+  background: var(--surface);
+}
+.adm-task-thumb {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border-radius: var(--radius-control);
+  object-fit: cover;
+  background: var(--surface);
+  border: 1px solid var(--border-row);
+}
+.adm-task-thumb.is-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-desc);
+}
+.adm-task-main {
+  flex: 1;
+  min-width: 0;
+}
+/* 能力名是主信息: 加重 + 深色 */
+.adm-task-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-strong);
+  margin-bottom: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* 次要信息降级 */
+.adm-task-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+.adm-task-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+.adm-task-provider {
+  /* 通道名: mock/local 加浅底, gateway 走真实模型, 需要一眼区分 */
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text-muted);
+}
+.adm-task-time {
+  font-size: 12px;
+  color: var(--text-desc);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── 面板: hover 与留白节奏 ─────────────────────────────────────────────── */
+
+.adm-panel {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 20px 22px;
+  margin-bottom: 12px;
+  transition: border-color 0.15s;
+}
+.adm-panel:hover {
+  border-color: #d4d7e4;
+}
+/* 窄版: 设置/角色等表单型页面, 限制宽度避免视线横跨半个屏幕 */
+.adm-panel.is-narrow {
+  max-width: 760px;
+}
+
+/* ── 侧栏: 待建标签弱化 ─────────────────────────────────────────────────── */
+
+.adm-sider-item.is-planned .adm-sider-item-label {
+  color: var(--text-desc);
+}
+/* 待建项整体更弱: 侧栏不该有一半"待建"标签在抢注意力 */
+.adm-sider-item.is-planned {
+  opacity: 0.6;
+}
+.adm-sider-item.is-planned:hover {
+  opacity: 1;
+}
+.adm-sider-item-tag {
+  font-size: 11px;
+  line-height: 17px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-desc);
+  border: 1px solid var(--border);
+}
+
+/* ── 表格细化 ──────────────────────────────────────────────────────────── */
+
+/*
+ * 表头排序箭头与标题间距不足时会"贴"在文字上, 读起来像挤在一起。
+ * antd 把排序器渲染成 th 内的独立 span, 这里统一留出间距并降低箭头对比度。
+ */
+.adm-panel .ant-table-thead > tr > th {
+  background: #fafbfd;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+  padding: 10px 12px;
+  white-space: nowrap;
+}
+.adm-panel .ant-table-thead > tr > th .ant-table-column-sorters {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.adm-panel .ant-table-thead .ant-table-column-sorter {
+  color: var(--border-dot);
+  transition: color 0.15s;
+}
+.adm-panel .ant-table-thead .ant-table-column-sorter:hover,
+.adm-panel .ant-table-thead .ant-table-column-sorter-up.active,
+.adm-panel .ant-table-thead .ant-table-column-sorter-down.active {
+  color: var(--brand);
+}
+
+/* 表体: 行高固定 44px, 与设计文档 §2.3 一致 */
+.adm-panel .ant-table-tbody > tr > td {
+  padding: 11px 12px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border-row);
+}
+/* 悬停整行: 便于横向扫读时定位当前行 */
+.adm-panel .ant-table-tbody > tr:hover > td {
+  background: #fafbfd;
+}
+.adm-panel .ant-table-tbody > tr.ant-table-row-selected > td {
+  background: var(--brand-bg);
+}
+
+/* 数值列右对齐, 便于比较大小 */
+.adm-panel .ant-table-cell-align-right {
+  font-variant-numeric: tabular-nums;
+}
+
+/* 空态: 给居中图标与文案留呼吸空间 */
+.adm-panel .ant-table-placeholder .ant-table-cell {
+  border-bottom: none;
+  padding: 48px 0;
+}
+
+/* 分页: 数量摘要与页码分开更易扫读 */
+.adm-panel .ant-pagination {
+  margin: 14px 0 0;
+}
+.adm-panel .ant-pagination-total-text {
+  margin-right: auto;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.adm-panel .ant-pagination .ant-select-selector {
+  border-radius: var(--radius-control) !important;
+}
+
+/* ── 待开放模块占位 ────────────────────────────────────────────────────── */
+
+/*
+ * 内容少的页面(如设置页仅 9 项)下方会大片留白。
+ * 留白本身不可解释, 与其留白不如明确列出"还有哪些即将到来"——
+ * 这既填补了视觉空缺, 又回答了运营的真实疑问。
+ */
+.adm-planned {
+  background: transparent;
+  border-style: dashed;
+  border-color: var(--border);
+}
+.adm-planned:hover {
+  border-color: var(--border);
+}
+.adm-planned-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-desc);
+  margin-bottom: 10px;
+}
+.adm-planned-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.adm-planned-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 13px;
+}
+.adm-planned-list strong {
+  color: var(--text-body);
+  font-weight: 500;
+  flex: 0 0 auto;
+}
+.adm-planned-list span {
+  color: var(--text-desc);
+  font-size: 12px;
+}
+
+/* ── 数据备份 ──────────────────────────────────────────────────────────── */
+
+/* 健康度告警条: 备份过期/存在未验证副本时置顶提醒 —— 这两项直接对应"出事时能不能用" */
+.adm-alert {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  margin-bottom: 16px;
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  border-radius: var(--radius-card);
+  font-size: 13px;
+  color: var(--warn-text);
+  line-height: 1.6;
+}
+.adm-alert svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.adm-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: var(--text-body);
+}
+
+.adm-text-warn {
+  color: var(--warn-text);
+}
+.adm-text-danger {
+  color: var(--danger-text);
+}
+
+/* 禁用态链接: 未验证备份的「下载」用它 —— 保留可见性说明"有这个动作但当前不可用" */
+.adm-link.is-disabled {
+  color: var(--text-desc);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.adm-link.is-disabled:hover {
+  text-decoration: none;
+}
+
+.adm-expand {
+  padding: 4px 0 8px;
+}
+
+/* ── 素材管理 ──────────────────────────────────────────────────────────── */
+
+/* 4 列统计卡变体 */
+.adm-stat-grid.is-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+/* 缩略图网格 (B-25): 看图用网格, 查属性用表格 */
+.adm-asset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+.adm-asset-cell {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.adm-asset-cell:hover {
+  border-color: var(--brand);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+.adm-asset-cell.is-selected {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 2px var(--brand-bg);
+}
+.adm-asset-cell img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+  background: var(--surface);
+}
+/* 已下架角标: 叠加在缩略图上, 不遮挡浏览 */
+.adm-asset-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(23, 26, 43, 0.72);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+}
+.adm-asset-info {
+  padding: 8px 10px 10px;
+}
+.adm-asset-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 3px;
+}
+.adm-asset-meta {
+  font-size: 11px;
+  color: var(--text-desc);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adm-asset-thumb-sm {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  border: 1px solid var(--border-row);
+}
+
+.adm-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-row);
+}
+
+/* ── 存储配置 ──────────────────────────────────────────────────────────── */
+
+.adm-alert.is-info {
+  background: var(--brand-bg);
+  border-color: transparent;
+  color: var(--text-body);
+}
+.adm-alert.is-info svg {
+  color: var(--brand);
+}
+
+.adm-storage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+.adm-storage-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.adm-storage-card:hover {
+  border-color: #d4d7e4;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
+}
+.adm-storage-card.is-active {
+  border-color: var(--brand);
+  background: linear-gradient(180deg, #fbfaff 0%, #fff 40%);
+}
+.adm-storage-card.is-disabled {
+  background: var(--surface);
+  opacity: 0.75;
+}
+
+.adm-storage-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.adm-storage-icon {
+  color: var(--brand);
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+.adm-storage-title {
+  min-width: 0;
+}
+.adm-storage-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+  margin-bottom: 3px;
+}
+.adm-storage-badge {
+  font-size: 11px;
+  line-height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--brand);
+  color: #fff;
+  font-weight: 400;
+}
+.adm-storage-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.adm-storage-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.adm-storage-probe {
+  font-size: 12px;
+  color: var(--text-desc);
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.adm-storage-meta {
+  display: grid;
+  grid-template-columns: 48px 1fr;
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 12px;
+}
+.adm-storage-meta dt {
+  color: var(--text-muted);
+}
+.adm-storage-meta dd {
+  margin: 0;
+  min-width: 0;
+  word-break: break-all;
+}
+
+/* 未启用时列出需要补齐的环境变量 —— 比「未启用」三个字有用得多 */
+.adm-storage-env {
+  background: var(--surface);
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+  font-size: 12px;
+}
+.adm-storage-env-title {
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.adm-storage-env code {
+  display: block;
+  color: var(--text-body);
+  line-height: 1.8;
+  word-break: break-all;
+}
+
+.adm-storage-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+/* ────────────────────────────────────────────────────────────────
+   模型配置 / 模型调用记录 (2026-10-20)
+   ──────────────────────────────────────────────────────────────── */
+
+/* 只读权限提示: 与错误态区分开 —— 这是权限边界, 不是故障 */
+.adm-notice {
+  background: var(--info-soft-bg);
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+  border-radius: var(--radius-card);
+  padding: 10px 14px;
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+/* 表格单元纵向堆叠 (通道标签 + 副信息) */
+.adm-cell-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  align-items: flex-start;
+}
+
+/* 详情抽屉里的提示词原文 */
+.adm-pre {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow: auto;
+  margin: 0;
+  color: var(--text-body);
+}
+
+/* ── 模型配置: 表格式布局 ──────────────────────────────────────────
+   两列 (标签 | 控件) 而非上下堆叠: 配置项有 20+ 条, 上下堆叠会让
+   「这项是什么」与「这项的值」隔得太远, 逐行扫视时难以对应。 */
+.adm-cfg-list {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── 厂商预设选择 (2026-10-20, 模型配置页) ────────────────────────────
+   换厂商时最容易错的是「基址 + 协议 + 模型」三项的组合, 而配错的表现是
+   **静默回落到本地占位图** —— 页面上看不出配置错了。故把厂商选择放在配置
+   分组之前, 选中后自动填三项, 并把该协议的尺寸写法/参考图限制如实展示。 */
+.adm-vendor-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 12px;
+}
+@media (max-width: 860px) {
+  .adm-vendor-picker {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.adm-vendor-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.adm-vendor-select {
+  width: 100%;
+}
+.adm-vendor-desc {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-muted);
+}
+.adm-vendor-card {
+  margin-top: 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+.adm-vendor-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: var(--text-strong);
+}
+.adm-vendor-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.adm-vendor-models {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.adm-vendor-model {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 5px 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-tag);
+  background: var(--card-bg);
+  color: var(--text-body);
+  font-size: 12px;
+  line-height: 16px;
+  cursor: pointer;
+  text-align: left;
+}
+.adm-vendor-model:hover:not(:disabled) {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+.adm-vendor-model.is-active {
+  border-color: var(--brand);
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+.adm-vendor-model:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+.adm-vendor-model em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--text-desc);
+}
+
+.adm-cfg-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 20px;
+  align-items: start;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border-row);
+}
+.adm-cfg-row:last-child {
+  border-bottom: none;
+}
+
+.adm-cfg-label-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.adm-cfg-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.adm-cfg-desc {
+  font-size: 12px;
+  color: var(--text-desc);
+  margin-top: 4px;
+  line-height: 1.6;
+}
+/* 环境变量名: 让运营知道「这条还能被谁覆盖」 */
+.adm-cfg-env {
+  display: inline-block;
+  margin-top: 5px;
+  font-size: 11px;
+  color: var(--text-desc);
+  background: var(--surface);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+
+.adm-cfg-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+}
+.adm-cfg-input,
+.adm-cfg-select {
+  width: 100%;
+}
+.adm-cfg-number {
+  width: 100%;
+}
+.adm-cfg-secret {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.adm-cfg-cleared {
+  font-size: 12px;
+  color: var(--warn-text);
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  border-radius: 6px;
+  padding: 4px 10px;
+}
+
+.adm-confirm-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: var(--text-body);
+  background: #fff;
+}
+.adm-confirm-input:focus {
+  outline: none;
+  border-color: var(--brand);
+}
+
+.adm-link-sm {
+  font-size: 12px;
+}
+
+/* ── 通道状态条 ──────────────────────────────────────────────────── */
+.adm-cfg-status {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.adm-cfg-status-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px 20px;
+  margin: 0;
+}
+.adm-cfg-status-list > div {
+  min-width: 0;
+}
+.adm-cfg-status-list dt {
+  font-size: 11px;
+  color: var(--text-desc);
+  margin-bottom: 3px;
+}
+.adm-cfg-status-list dd {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-body);
+  word-break: break-all;
+}
+
+/* 连通性测试结果: 成功/失败双态 + 真实报错原文 */
+.adm-cfg-test {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.adm-cfg-test.is-ok {
+  background: var(--success-soft-bg);
+  border: 1px solid #a7e3cd;
+  color: #0f7a5a;
+}
+.adm-cfg-test.is-fail {
+  background: var(--danger-soft-bg);
+  border: 1px solid #fecdd3;
+  color: var(--danger-soft-text);
+}
+.adm-cfg-test code {
+  font-size: 11px;
+  opacity: 0.85;
+  word-break: break-all;
+}
+
+/* ── 逐能力路由总览: 15 条路由做成网格, 一屏看完分布 ─────────────── */
+.adm-route-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 10px;
+}
+.adm-route-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: #fff;
+}
+.adm-route-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.adm-route-cap {
+  font-size: 11px;
+  color: var(--text-desc);
+}
+.adm-route-tags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+
+/* 窄屏: 配置行退化为单列, 控件不再被挤压 */
+@media (max-width: 900px) {
+  .adm-cfg-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .adm-cfg-control {
+    min-height: 0;
+  }
+}
+
+/* ── 营销中心 ──────────────────────────────────────────────────────────── */
+
+/* 表单: 用于抽屉内的新建/编辑 */
+.adm-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.adm-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.adm-field-hint {
+  font-size: 12px;
+  color: var(--text-desc);
+  margin-top: 4px;
+  line-height: 1.5;
+}
+.adm-field textarea {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: #fff;
+  color: var(--text-strong);
+  font-size: 13px;
+  font-family: inherit;
+  resize: vertical;
+  outline: none;
+}
+.adm-field textarea:focus {
+  border-color: var(--brand);
+}
+.adm-field input:disabled,
+.adm-field select:disabled {
+  background: var(--surface);
+  cursor: not-allowed;
+  color: var(--text-muted);
+}
+
+/* 表单级错误: 放在抽屉顶部, 不用 toast —— 用户改了多处后错误可能被滚动遮住 */
+.adm-form-error {
+  background: var(--danger-soft-bg);
+  border: 1px solid var(--warn-border);
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: var(--danger-text);
+}
+
+/* 券核销进度条 */
+.adm-progress {
+  width: 100%;
+  height: 3px;
+  background: var(--border-row);
+  border-radius: 999px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+.adm-progress-bar {
+  height: 100%;
+  background: var(--brand);
+  border-radius: 999px;
+  transition: width 0.2s;
+}
+
+/* 签到加成档位 */
+.adm-bonus-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+.adm-bonus-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.adm-bonus-row input {
+  width: 88px;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: #fff;
+  font-size: 13px;
+  text-align: center;
+  outline: none;
+}
+.adm-bonus-row input:focus {
+  border-color: var(--brand);
+}
+
+/* ── 定时任务 ──────────────────────────────────────────────────────────── */
+
+.adm-alert.is-danger {
+  background: var(--danger-soft-bg);
+  border-color: var(--warn-border);
+  color: var(--danger-text);
+}
+.adm-alert.is-danger svg {
+  color: var(--danger-text);
+}
+
+.adm-task-list {
+  display: flex;
+  flex-direction: column;
+}
+.adm-task-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 4px;
+  border-bottom: 1px solid var(--border-row);
+}
+.adm-task-row:last-child {
+  border-bottom: none;
+}
+/* 状态色只标在图标上 —— 整行染色太吵, 反而看不出哪个出了问题 */
+.adm-task-row.is-ok .adm-task-icon {
+  color: var(--success-text);
+}
+.adm-task-row.is-failed .adm-task-icon {
+  color: var(--danger-text);
+}
+.adm-task-row.is-never .adm-task-icon {
+  color: var(--text-desc);
+}
+
+.adm-task-icon {
+  flex: 0 0 auto;
+}
+
+.adm-task-main {
+  flex: 1;
+  min-width: 0;
+}
+.adm-task-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-strong);
+}
+.adm-task-code {
+  font-size: 11px;
+  color: var(--text-desc);
+  font-weight: 400;
+}
+.adm-task-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+.adm-task-error {
+  font-size: 12px;
+  color: var(--danger-text);
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.adm-task-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.adm-note-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--text-body);
+}
+.adm-note-list li {
+  margin-bottom: 4px;
+}
+.adm-note-list strong {
+  color: var(--text-strong);
+}
+
+/* ───────── 统一异常页 (2026-10-20) ─────────
+   收敛此前散落 7 处的 antd <Result>: 全站只剩 .exc-* 一套。
+   色值全部引用既有语义 token, 不新增硬编码 hex (CLAUDE.md「样式: 语义化 token」)。
+   两种容器: .exc.is-full 撑满视口 (路由级), .exc 嵌内容区 (局部失败态)。 */
+.exc {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  min-height: 60vh;
+}
+.exc.is-full {
+  min-height: 100vh;
+  padding: 80px 24px;
+  /* 极浅品牌紫晕染: 整屏异常页需要一点色彩锚点, 否则纯白底显得像没加载出来 */
+  background:
+    radial-gradient(120% 80% at 50% 0%, var(--brand-bg) 0%, var(--page-bg) 62%);
+}
+.exc-inner {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+/* 404 大字: 字重压低 + 字距拉开, 做背景层而非抢眼的主视觉 */
+.exc-code {
+  font-size: 76px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 6px;
+  color: var(--brand);
+  opacity: 0.16;
+  margin-bottom: 4px;
+  user-select: none;
+}
+.exc-code-mark {
+  color: var(--brand-light);
+  opacity: 0.55;
+}
+
+.exc-title {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 28px;
+  color: var(--text-strong);
+}
+.exc-desc {
+  margin: 0 0 24px;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--text-muted);
+  /* 描述常含路径/标识符, 长串不应把卡片撑变形 */
+  overflow-wrap: anywhere;
+}
+
+.exc-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+.exc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 20px;
+  border-radius: var(--radius-control);
+  border: 1px solid transparent;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.exc-btn.is-primary {
+  background: var(--brand);
+  color: #fff;
+}
+.exc-btn.is-primary:hover {
+  background: var(--brand-hover);
+}
+.exc-btn.is-ghost {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-body);
+}
+.exc-btn.is-ghost:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+/* 键盘可达性: 按钮是原生 <button>/<a>, 但视觉去掉了 outline —— 焦点环需补回 */
+.exc-btn:focus-visible,
+.exc-detail-toggle:focus-visible,
+.exc-detail-copy:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.exc-home-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--text-desc);
+  text-decoration: none;
+}
+.exc-home-link:hover {
+  color: var(--brand);
+}
+
+/* 技术详情: 默认收起, 展开后限高可滚 —— componentStack 可能几十行, 不限高会顶穿整屏 */
+.exc-detail {
+  width: 100%;
+  margin-top: 4px;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  overflow: hidden;
+}
+.exc-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+}
+.exc-detail-toggle,
+.exc-detail-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.exc-detail-toggle:hover,
+.exc-detail-copy:hover {
+  color: var(--brand);
+}
+.exc-detail-caret {
+  transition: transform 0.2s;
+}
+.exc-detail-caret.is-open {
+  transform: rotate(180deg);
+}
+.exc-detail-body {
+  margin: 0;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  background: var(--card-bg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--text-body);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 240px;
+  overflow: auto;
+}
+.exc-footnote {
+  margin: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-desc);
+}
+
+/* 404 兜底时列出真实可选文档 —— 与其让用户猜有哪些页面, 不如直接给全 */
+.legal-missing-list {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.legal-missing-list a {
+  font-size: 14px;
+  color: var(--text-body);
+  text-decoration: none;
+  padding: 0 12px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+.legal-missing-list a:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+/* ── 任务监控 (admin-prd.md B-28~B-33) ──────────────────────────
+   监控页的核心诉求是「快速认出问题任务」, 因此缩略图进表格单元格,
+   时间线用竖线连接的点序列 —— 两者都是为了扫视速度, 不是为了排版好看。 */
+
+/* 表格内的操作按钮组: 横向排列并留出间距 */
+.adm-ops {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* 缩略图 + 短 id 并排 */
+.adm-task-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.adm-task-mini {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-tag);
+  object-fit: cover;
+  background: var(--surface);
+  border: 1px solid var(--border-row);
+  flex: none;
+}
+.adm-task-mini.is-empty {
+  /* 无产出图时留一个空占位, 而非不渲染 ——
+     否则有图/无图的行高不一致, 表格出现锯齿状跳动 */
+  display: block;
+}
+
+/* 详情抽屉里的状态流转时间线 */
+.adm-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.adm-timeline-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0 6px 18px;
+  font-size: 13px;
+  color: var(--text-body);
+}
+/* 竖线连接相邻节点, 让"流转"在视觉上成立 */
+.adm-timeline-item:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 22px;
+  bottom: -4px;
+  width: 1px;
+  background: var(--border-row);
+}
+.adm-timeline-dot {
+  position: absolute;
+  left: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.adm-timeline-item.is-done .adm-timeline-dot {
+  border-color: var(--brand);
+  background: var(--brand);
+}
+.adm-timeline-label {
+  min-width: 56px;
+  color: var(--text-strong);
+}
+
+/* 产出图: 限高避免撑爆抽屉, 点击可看原图 (antd Image 自带预览) */
+.adm-output-img {
+  max-width: 100%;
+  object-fit: contain;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border-row);
+  background: var(--surface);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   全站统一状态组件 (2026-10-20)
+   StateSkeleton / StateLoading / StateEmpty / StateError
+   组件: frontend/src/components/StateViews.tsx
+
+   设计要点:
+   - 骨架屏占住最终布局形状, 内容到达时零位移 (转圈会让区域塌陷再撑开)
+   - 空态与失败态视觉可区分: 空态品牌紫, 失败态红色
+   - 色值全部 var(--token), 不写裸 hex
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── 骨架屏 ────────────────────────────────────────────────────── */
+.state-skeleton {
+  display: grid;
+  gap: 16px;
+  width: 100%;
+}
+.state-skeleton.is-card {
+  grid-template-columns: repeat(var(--skeleton-columns, 6), minmax(0, 1fr));
+}
+.state-skeleton.is-row,
+.state-skeleton.is-panel {
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+.state-skeleton.is-block {
+  grid-template-columns: 1fr;
+  gap: 0;
+  min-height: 180px;
+}
+.state-skeleton-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+.state-skeleton-thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+.state-skeleton-line {
+  display: block;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+.state-skeleton-line.is-wide {
+  height: 14px;
+  width: 60%;
+}
+.state-skeleton-line.is-short {
+  width: 40%;
+}
+/* 脉动: 用 opacity 而非位移, 位移在网格里会带动周围元素抖动 */
+.state-skeleton-item > * {
+  animation: state-skeleton-pulse 1.4s ease-in-out infinite;
+}
+.state-skeleton-item:nth-child(2n) > * {
+  animation-delay: 0.2s;
+}
+.state-skeleton-item:nth-child(3n) > * {
+  animation-delay: 0.4s;
+}
+@keyframes state-skeleton-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* ── 行内加载 ──────────────────────────────────────────────────── */
+.state-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 16px;
+  min-height: 180px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.state-loading.is-full {
+  min-height: 100vh;
+}
+.state-loading-tip {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.state-spinner {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  border-top-color: var(--brand);
+  animation: state-spinner-rotate 0.8s linear infinite;
+}
+.state-spinner.is-small {
+  width: 18px;
+  height: 18px;
+  border-width: 2px;
+}
+@keyframes state-spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── 空态 ──────────────────────────────────────────────────────── */
+.state-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-muted);
+}
+.state-empty.is-compact {
+  padding: 32px 16px;
+  gap: 8px;
+}
+.state-empty-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+  color: var(--text-strong);
+}
+.state-empty-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-muted);
+  max-width: 420px;
+}
+.state-empty-action {
+  margin-top: 6px;
+}
+
+/* ── 失败态 ────────────────────────────────────────────────────── */
+.state-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 48px 24px;
+  text-align: center;
+}
+.state-error.is-compact {
+  padding: 32px 16px;
+  gap: 8px;
+}
+.state-error-title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 22px;
+  color: var(--text-strong);
+}
+.state-error-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-muted);
+  max-width: 420px;
+}
+.state-error-detail {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-control);
+  background: var(--danger-soft-bg);
+  color: var(--danger-soft-text);
+  font-size: 12px;
+  line-height: 18px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.state-error-action {
+  margin-top: 6px;
+}
+
+/* ── 状态按钮 (与 .exc-btn 同一套视觉) ────────────────────────── */
+.state-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 20px;
+  border-radius: var(--radius-control);
+  border: 1px solid transparent;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.state-btn.is-primary {
+  background: var(--brand);
+  color: #fff;
+}
+.state-btn.is-primary:hover {
+  background: var(--brand-hover);
+}
+.state-btn.is-ghost {
+  background: #fff;
+  border-color: var(--border);
+  color: var(--text-body);
+}
+.state-btn.is-ghost:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+.state-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.state-btn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* ── 动效降级: 尊重系统「减少动态效果」偏好 ───────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .state-skeleton-item > *,
+  .state-spinner {
+    animation: none;
+  }
+}
+
+/* ── 工具页结果栏「生成中」骨架 (2026-10-20) ──────────────────────
+   贴齐 .pk-result-body 的白底卡片视觉 (radius-panel / padding 16),
+   使生成中 → 出图 之间不发生形态跳变。
+   此前生成期间整块退回空态插画, 文案还写「提交任务后，生成结果将在此处展示」,
+   用户明明已点生成却看到"你还没提交" —— 欺骗性 UI。 */
+.pk-result-generating {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: var(--radius-panel);
+  padding: 16px;
+  gap: 12px;
+}
+.pk-result-generating .state-skeleton.is-block {
+  flex: 1;
+  min-height: 0;
+}
+.pk-result-generating .state-skeleton.is-block .state-skeleton-item {
+  flex: 1;
+}
+.pk-result-generating .state-skeleton.is-block .state-skeleton-item > * {
+  height: 100%;
+}
+.pk-result-generating-tip {
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--text-desc);
+}
+
+/* 通用工具页结果卡「生成中」骨架 (2026-10-20) */
+.tool-result-loading {
+  /* 2026-10-20: 原为 `padding: 48px 0; justify-content: center` 配 antd Spin。
+     改用骨架屏占位后, 块内是骨架 + 提示文字的竖排, 需 flex-column。 */
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tool-result-loading .state-skeleton.is-block {
+  min-height: 220px;
+}
+.tool-result-loading .state-skeleton.is-block .state-skeleton-item > * {
+  height: 100%;
+}
+.tool-result-loading-tip {
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--text-desc);
+}
+
+/* ── 整页状态容器 (2026-10-20) ────────────────────────────────────
+   加载 / 失败 / 空 三种整页态的统一容器。
+   此前各页各写 wrapper (list-page / list-page-empty / pkg-checkout-container …),
+   宽度与内边距不一致, 同一套状态组件在不同页呈现不同宽度。 */
+.state-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+  box-sizing: border-box;
+}
+.state-page .state-skeleton {
+  max-width: 100%;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   提示词工具弹窗 (AI润色 / 图片转提示词) + 手机上传 (2026-10-20)
+   ───────────────────────────────────────────────────────────────────
+   参考站实拍 (ijihua.cn/free-creation, 2026-10-20 浏览器实测 + 截图):
+     弹窗宽 ~600, 圆角 12, 白底; 眉标「创意生图」12px 灰, 标题 18px/700 深色
+     原始提示词区: 浅灰底 #F7F8FA 圆角 8, 标题行左「原始提示词」右「仅润色文字」
+     输出区: 白底带边框 圆角 8, 最小高 180
+     底部: 左「0 字」12px 灰, 右 [开始润色] 描边 + [应用] 品牌紫实心
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* 弹窗头部: 眉标 + 标题 */
+.pt-modal-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pt-modal-eyebrow {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-desc);
+}
+.pt-modal-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 24px;
+  color: var(--text-strong);
+}
+
+/* 原始提示词区 (只读, 供对照) */
+.pt-polish-source {
+  margin-top: 4px;
+  background: var(--surface);
+  border-radius: var(--radius-control);
+  padding: 12px;
+}
+.pt-polish-source-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.pt-polish-source-label {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 18px;
+  color: var(--text-strong);
+}
+/* 「仅润色文字」开关: 参考站是一个可点文字, 选中态用品牌色 + 下划线提示 */
+.pt-polish-textonly {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-body);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.pt-polish-textonly:hover {
+  color: var(--brand);
+}
+.pt-polish-textonly.is-on {
+  color: var(--brand);
+  font-weight: 600;
+}
+.pt-polish-source-body {
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-body);
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 96px;
+  overflow: auto;
+}
+
+/* 输出区 */
+.pt-polish-output {
+  position: relative;
+  margin-top: 12px;
+}
+.pt-polish-textarea {
+  width: 100%;
+  min-height: 180px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+  font-size: 13px;
+  font-family: inherit;
+  line-height: 21px;
+  color: var(--text-strong);
+  background: #fff;
+  resize: vertical;
+  outline: none;
+  display: block;
+}
+.pt-polish-textarea:focus {
+  border-color: var(--brand-light);
+}
+.pt-polish-textarea::placeholder {
+  color: var(--border-dot);
+}
+.pt-polish-loading {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+}
+
+/* 底部: 字数 + 按钮 */
+.pt-polish-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+.pt-polish-count {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-desc);
+}
+.pt-polish-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--radius-control);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.pt-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+/* 描边次要按钮 (「开始润色」/「提交解析」) */
+.pt-btn-ghost {
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--text-body);
+}
+.pt-btn-ghost:hover:not(:disabled) {
+  border-color: var(--brand-light);
+  color: var(--brand);
+}
+/* 品牌紫主按钮 (「应用」) */
+.pt-btn-primary {
+  background: var(--brand);
+  border: 1px solid var(--brand);
+  color: #fff;
+}
+.pt-btn-primary:hover:not(:disabled) {
+  background: var(--brand-hover);
+  border-color: var(--brand-hover);
+}
+
+/* 产出来源披露: 文本无本地兜底, 输出必来自真实模型 —— 说清是哪个模型 */
+.pt-polish-source-note {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--text-desc);
+  text-align: right;
+}
+
+/* ── 图片转提示词: 上传区 (参考站: 左侧方块按钮 + 右侧说明) ── */
+.pt-i2p-upload {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 4px;
+  background: var(--surface);
+  border-radius: var(--radius-control);
+  padding: 12px;
+}
+.pt-i2p-upload-btn {
+  width: 72px;
+  height: 72px;
+  flex: none;
+  border: 1px dashed var(--border-dot);
+  border-radius: var(--radius-control);
+  background: #fff;
+  color: var(--text-desc);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0;
+  overflow: hidden;
+}
+.pt-i2p-upload-btn:hover {
+  border-color: var(--brand-light);
+  color: var(--brand);
+}
+.pt-i2p-upload-btn.is-filled {
+  border-style: solid;
+  border-color: var(--border);
+}
+.pt-i2p-upload-btn img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pt-i2p-upload-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.pt-i2p-upload-text strong {
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 18px;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pt-i2p-upload-text span {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-desc);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   手机上传弹窗 (二维码方案)
+   ═══════════════════════════════════════════════════════════════════ */
+.pt-mu-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0 8px;
+}
+.pt-mu-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 220px;
+  font-size: 13px;
+  color: var(--text-desc);
+}
+.pt-mu-qr {
+  width: 220px;
+  height: 220px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: #fff;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.pt-mu-qr img {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.pt-mu-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-body);
+  text-align: center;
+}
+.pt-mu-countdown {
+  margin: 0;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--text-desc);
+}
+.pt-mu-expired {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  height: 220px;
+  justify-content: center;
+}
+.pt-mu-expired p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-body);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   手机端上传页 (扫码后打开的独立落地页)
+   ═══════════════════════════════════════════════════════════════════ */
+.mu-page {
+  min-height: 100vh;
+  background: var(--page-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+.mu-card {
+  width: 100%;
+  max-width: 420px;
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.mu-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 24px;
+  color: var(--text-strong);
+}
+.mu-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-desc);
+}
+.mu-pick {
+  width: 160px;
+  height: 160px;
+  border: 1px dashed var(--border-dot);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text-desc);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 0;
+  overflow: hidden;
+}
+.mu-pick:hover {
+  border-color: var(--brand-light);
+  color: var(--brand);
+}
+.mu-pick.is-filled {
+  border-style: solid;
+  border-color: var(--border);
+}
+.mu-pick img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.mu-file-name {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-body);
+  word-break: break-all;
+}
+.mu-error {
+  margin: 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--danger-ref);
+}
+.mu-submit {
+  width: 100%;
+  height: 44px;
+  border: none;
+  border-radius: var(--radius-control);
+  background: linear-gradient(90deg, var(--brand-light), var(--brand));
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.mu-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.mu-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 0;
+  color: var(--color-success);
+}
+.mu-done-text {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-body);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   素材库导入选择器 (asset-library-picker)
+   ───────────────────────────────────────────────────────────────────
+   数值全部抄自参考站线上样式表 index-glaqVozH.css 的
+   .asset-library-picker-* 规则 (2026-10-20 取证)。
+   ═══════════════════════════════════════════════════════════════════ */
+
+.alp-modal .ant-modal-content {
+  padding: 0 !important;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 24px 80px #282b4c33;
+  border: 1px solid #e5e8f0;
+  color: #171a2b;
+}
+.alp-modal .ant-modal-header {
+  padding: 0;
+  margin: 0;
+  border-bottom: 1px solid #eef0f5;
+}
+.alp-modal .ant-modal-body {
+  padding: 0;
+}
+
+/* 头部 */
+.alp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 26px 18px;
+}
+.alp-header-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.alp-eyebrow {
+  display: block;
+  font-size: 12px;
+  line-height: 18px;
+  color: #8d95a8;
+}
+.alp-title {
+  margin: 0;
+  font-size: 22px;
+  line-height: 30px;
+  font-weight: 700;
+  color: #171a2b;
+}
+.alp-close {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #f3f4f7;
+  color: #7b8498;
+  cursor: pointer;
+  padding: 0;
+}
+.alp-close:hover {
+  background: #e9eaf0;
+  color: #4d5568;
+}
+
+/* 工具栏 */
+.alp-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  align-items: stretch;
+  padding: 14px 26px;
+  background: #fbfcfe;
+  border-bottom: 1px solid #eef0f5;
+}
+.alp-groups {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.alp-groups::-webkit-scrollbar {
+  display: none;
+}
+.alp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  flex: none;
+  font-size: 13px;
+  font-family: inherit;
+  color: #69748a;
+  background: #fff;
+  border: 1px solid #e4e7ef;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.alp-chip:hover {
+  color: #5546d8;
+  border-color: #cfc8ff;
+}
+.alp-chip.is-active {
+  color: #5546d8;
+  background: #f1efff;
+  border-color: #d8d1ff;
+  font-weight: 600;
+}
+.alp-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+}
+
+/* 日期筛选: 参考站是 popover, 本站用 hover 展开的下拉 (交互等价, 视觉同源) */
+.alp-date-filter {
+  position: relative;
+}
+.alp-date-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #69748a;
+  background: #fff;
+  border: 1px solid #e2e5ed;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.alp-date-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 5;
+  display: none;
+  min-width: 112px;
+  padding: 5px;
+  background: #fff;
+  border: 1px solid #e4e5ee;
+  border-radius: 9px;
+  box-shadow: 0 12px 28px #282b4c1f;
+}
+.alp-date-filter:hover .alp-date-menu,
+.alp-date-filter:focus-within .alp-date-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.alp-date-item {
+  text-align: left;
+  border: 0;
+  background: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  color: #5f687b;
+  cursor: pointer;
+}
+.alp-date-item:hover {
+  background: #f5f4ff;
+  color: #5546d8;
+}
+.alp-date-item.is-active {
+  color: #5546d8;
+  background: #f1efff;
+  font-weight: 600;
+}
+
+/* 搜索 */
+.alp-search {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 250px;
+  height: 34px;
+  padding: 0 10px;
+  box-sizing: border-box;
+  color: #9ca4b4;
+  background: #fff;
+  border: 1px solid #e2e5ed;
+  border-radius: 9px;
+}
+.alp-search:focus-within {
+  border-color: #9c91f1;
+  box-shadow: 0 0 0 3px #5546d81a;
+}
+.alp-search input {
+  width: 100%;
+  min-width: 0;
+  font: inherit;
+  font-size: 12px;
+  color: #30364a;
+  background: none;
+  border: 0;
+  outline: 0;
+}
+.alp-search input::placeholder {
+  color: #a8afbd;
+}
+.alp-search-clear {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: #8f98a8;
+  cursor: pointer;
+  padding: 0;
+}
+
+/* 主体布局 */
+.alp-layout {
+  display: flex;
+  min-height: 0;
+  height: min(560px, calc(100vh - 260px));
+}
+.alp-sidebar {
+  flex: 0 0 184px;
+  width: 184px;
+  box-sizing: border-box;
+  padding: 18px 12px 20px;
+  background: #f7f8fd;
+  border-right: 1px solid #eef0f5;
+  overflow: auto;
+}
+.alp-sidebar > strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px 14px;
+  font-size: 14px;
+  line-height: 20px;
+  color: #343b50;
+}
+.alp-sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.alp-sidebar nav button {
+  min-height: 38px;
+  padding: 0 12px;
+  text-align: left;
+  font-size: 13px;
+  font-family: inherit;
+  color: #8d95a8;
+  background: none;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.alp-sidebar nav button:hover {
+  color: #5546d8;
+  background: #efeffa;
+}
+.alp-sidebar nav button.is-active {
+  color: #5546d8;
+  background: #fff;
+  font-weight: 600;
+  box-shadow: 0 4px 14px #2b2d5312;
+}
+.alp-main {
+  flex: auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.alp-content {
+  flex: auto;
+  min-height: 280px;
+  padding: 20px 26px 24px;
+  overflow: auto;
+}
+.alp-state {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  min-height: 280px;
+  color: #8d95a8;
+  font-size: 13px;
+}
+
+/* 网格与卡片 */
+.alp-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: 14px;
+}
+.alp-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+  color: #4b556a;
+  background: #fff;
+  border: 1px solid #e3e6ee;
+  border-radius: 12px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: border-color 0.18s, box-shadow 0.18s, transform 0.18s;
+}
+.alp-card:hover {
+  border-color: #a69bef;
+  transform: translateY(-2px);
+  box-shadow: 0 7px 18px #5546d81f;
+}
+.alp-card.is-selected {
+  border: 2px solid #5546d8;
+  box-shadow: 0 0 0 3px #5546d81c;
+}
+.alp-card:disabled {
+  cursor: default;
+}
+.alp-cover {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  background: #f4f5f8;
+  overflow: hidden;
+}
+.alp-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.alp-check {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #5546d8;
+  color: #fff;
+  font-size: 13px;
+  line-height: 1;
+  box-shadow: 0 2px 8px #261f7540;
+}
+.alp-name {
+  display: block;
+  padding: 0 10px 10px;
+  font-size: 12px;
+  line-height: 18px;
+  color: #4e5969;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+/* 底部 */
+.alp-footer {
+  flex: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 26px 18px;
+  font-size: 12px;
+  color: #8d95a8;
+  border-top: 1px solid #eef0f5;
+}
+.alp-footer-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.alp-clear {
+  border: 0;
+  background: none;
+  padding: 0;
+  font-size: 12px;
+  font-family: inherit;
+  color: #5546d8;
+  cursor: pointer;
+}
+.alp-clear:hover {
+  text-decoration: underline;
+}
+.alp-footer-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.alp-btn {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 9px;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.alp-btn-cancel {
+  color: #5f687b;
+  background: #fff;
+  border-color: #dfe3eb;
+}
+.alp-btn-cancel:hover {
+  background: #fafbfc;
+  border-color: #c7cbd8;
+}
+.alp-btn-confirm {
+  color: #fff;
+  background: #5546d8;
+  border-color: #5546d8;
+}
+.alp-btn-confirm:hover:not(:disabled) {
+  background: #4738c5;
+}
+.alp-btn-confirm:disabled {
+  color: #a4aab8;
+  cursor: not-allowed;
+  background: #e7e9ef;
+  border-color: #d8dbe5;
+}
+
+/* 窄屏: 参考站同款降级 (侧栏收窄, 工具栏纵向) */
+@media (max-width: 760px) {
+  .alp-header,
+  .alp-toolbar,
+  .alp-content,
+  .alp-footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .alp-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .alp-search {
+    width: 100%;
+  }
+  .alp-sidebar {
+    flex-basis: 124px;
+    width: 124px;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+  .alp-sidebar > strong {
+    padding-left: 6px;
+    padding-right: 6px;
+    font-size: 12px;
+  }
+  .alp-sidebar nav button {
+    padding-left: 8px;
+    padding-right: 8px;
+    font-size: 12px;
+  }
+  .alp-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .alp-footer-actions {
+    width: 100%;
+  }
+  .alp-btn {
+    flex: 1;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   手机上传 (参考站 mobile-upload-modal / mobile-upload-page)
+   ───────────────────────────────────────────────────────────────────
+   数值全部抄自参考站线上样式表 index-glaqVozH.css (2026-10-20 取证)。
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── 桌面端: 二维码弹窗 ── */
+.mum-modal .ant-modal-content {
+  padding: 0 !important;
+  border-radius: 20px;
+  overflow: visible;
+  box-shadow: 0 24px 80px #1c163b3d;
+}
+.mum-modal .ant-modal-body {
+  padding: 0;
+}
+.mum {
+  position: relative;
+  text-align: center;
+  background: #fff;
+  border-radius: 20px;
+  padding: 30px 30px 26px;
+  width: min(440px, 100vw - 40px);
+}
+.mum-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #f4f4f7;
+  color: #666;
+  cursor: pointer;
+  padding: 0;
+}
+.mum-close:hover {
+  background: #e9eaf0;
+}
+.mum-title {
+  margin: 10px 0 8px;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 700;
+  color: #24212f;
+}
+.mum-desc {
+  margin: 0 auto 18px;
+  max-width: 300px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: #777181;
+}
+.mum-qr-box {
+  width: 250px;
+  height: 250px;
+  margin: 0 auto;
+  display: grid;
+  place-items: center;
+  background: #faf9fd;
+  border: 1px solid #ebe8f4;
+  border-radius: 14px;
+}
+.mum-qr-box img {
+  width: 240px;
+  height: 240px;
+  display: block;
+}
+.mum-qr-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #777181;
+}
+.mum-qr-state.is-error {
+  color: #c33c45;
+  max-width: 210px;
+  line-height: 1.5;
+  text-align: center;
+}
+.mum-waiting {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  margin-top: 14px;
+  font-size: 13px;
+  color: #6550c9;
+}
+.mum-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 14px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: #765ce7;
+  color: #fff;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.mum-refresh:hover {
+  background: #6849d8;
+}
+.mum-expiry {
+  display: block;
+  margin-top: 12px;
+  font-size: 12px;
+  color: #9893a3;
+}
+
+/* ── 手机端: 落地页 ── */
+.mup {
+  min-height: 100vh;
+  min-height: 100dvh;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  color: #282431;
+  background: linear-gradient(150deg, #f1edff 0%, #faf9ff 44%, #eef7ff 100%);
+  font-family: Inter, 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+}
+.mup-card {
+  box-sizing: border-box;
+  width: min(520px, 100%);
+  padding: 24px;
+  border-radius: 22px;
+  background: #fffffff5;
+  border: 1px solid #fffc;
+  box-shadow: 0 24px 70px #46378224;
+}
+.mup-card > header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #6d55dc;
+}
+.mup-icon {
+  box-sizing: border-box;
+  width: 44px;
+  height: 44px;
+  padding: 9px;
+  border-radius: 12px;
+  background: #eeeaff;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+.mup-card header small {
+  display: block;
+  font-size: 12px;
+  line-height: 16px;
+  color: #9993a5;
+}
+.mup-card h1 {
+  margin: 2px 0 0;
+  font-size: 22px;
+  line-height: 28px;
+  color: #292533;
+}
+.mup-tip {
+  margin: 18px 0;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: #f6f4fb;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #706b78;
+}
+.mup-message,
+.mup-error {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.mup-message {
+  color: #24824b;
+  background: #edf8f1;
+}
+.mup-error {
+  color: #bd3540;
+  background: #fff0f1;
+}
+.mup-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.mup-preview,
+.mup-picker {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.mup-preview {
+  background: #f3f2f6;
+}
+.mup-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.mup-preview > span {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #14121eb3;
+  color: #fff;
+  font-size: 11px;
+}
+.mup-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #14121eb3;
+  color: #fff;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+.mup-order {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  display: flex;
+  overflow: hidden;
+  border-radius: 7px;
+  background: #14121eb8;
+}
+.mup-order button {
+  width: 29px;
+  height: 27px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  color: #fff;
+  cursor: pointer;
+  padding: 0;
+}
+.mup-order button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.mup-picker {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  color: #715cd2;
+  background: #f8f6ff;
+  border: 1.5px dashed #bdb4e8;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0;
+}
+.mup-picker strong {
+  font-size: 13px;
+}
+.mup-picker small {
+  font-size: 11px;
+  color: #948ca9;
+}
+.mup-summary {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: #9993a5;
+  text-align: center;
+}
+.mup-submit {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 46px;
+  margin-top: 20px;
+  border: 0;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #765ce7, #5e48c7);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+.mup-submit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* 成功 / 失败 / 参数缺失态: 居中列 */
+.mup-card.is-success,
+.mup-card.is-error {
+  min-height: 280px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+.mup-card.is-success > svg {
+  color: #2fad63;
+}
+.mup-card.is-error > svg {
+  color: #c34b57;
+}
+.mup-card.is-success p,
+.mup-card.is-error p {
+  margin: 0;
+  font-size: 14px;
+  color: #777181;
+}
+
+/* 窄屏降级 (参考站同款: 2 列 + 贴顶) */
+@media (max-width: 520px) {
+  .mup {
+    place-items: start center;
+    padding: 12px;
+  }
+  .mup-card {
+    margin-top: 8px;
+    padding: 18px;
+    border-radius: 18px;
+  }
+  .mup-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   模型配置页 · 通道总览卡片 (2026-10-20 重设计)
+
+   设计动因: 改造前用 Segmented 切换模态, 页面上永远只看得见一个模态 ——
+   「文生图配好了 / 视频根本没配」这件事完全看不出来, 而视频无本地兜底,
+   没配就是必然失败。故把三个模态并排成三张卡, 既作总览也作入口。
+   ═══════════════════════════════════════════════════════════════ */
+
+.adm-chgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.adm-chcard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  text-align: left;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.adm-chcard:hover {
+  border-color: var(--color-primary);
+}
+
+.adm-chcard.is-active {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary);
+}
+
+.adm-chcard:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.adm-chcard-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.adm-chcard-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.adm-chcard-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+
+.adm-chcard-body > div {
+  display: grid;
+  grid-template-columns: 44px 1fr;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.adm-chcard-body dt {
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+.adm-chcard-body dd {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+
+.adm-cell-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+}
+
+/* 「配了却必然失败」单独成行, 不塞进 tooltip —— 那是本页最该被看见的状态 */
+.adm-chcard-alert {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--danger-text);
+  background: var(--danger-soft-bg);
+  border-radius: 8px;
+}
+
+.adm-chcard-alert.is-soft {
+  color: var(--text-desc);
+  background: var(--color-slate-100);
+}
+
+.adm-chcard-foot {
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.adm-chcard-hint {
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   路由总览 · 按模态分组 (2026-10-20 重设计)
+
+   改造前 16 张卡平铺, 看不出「哪些能力没兜底」—— 而图像失败会回落本地
+   (体验降级), 文本/视频失败是**直接报错**。两类混平铺时, 最重要的区别
+   就看不见了。故按模态分组, 并把「无兜底」计数前置。
+   ═══════════════════════════════════════════════════════════════ */
+
+.adm-route-group {
+  margin-bottom: 18px;
+}
+
+.adm-route-group:last-child {
+  margin-bottom: 0;
+}
+
+.adm-route-group-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border-soft);
+}
+
+.adm-route-group-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   通道卡 · 测试结论 (2026-10-20 批量测试)
+
+   与「通道状态」分开显示: 状态说「配没配」, 测试说「配的这份能不能通」。
+   两者是**两件事**, 合并成一个标签会让人分不清是哪种问题。
+   ═══════════════════════════════════════════════════════════════ */
+
+.adm-chcard-test {
+  margin: 0;
+  padding: 6px 9px;
+  font-size: 12px;
+  line-height: 1.45;
+  border-radius: 8px;
+  /* 断行友好: 测试消息可能较长 (如「模型 X 不在该厂商的可用模型列表中」) */
+  overflow-wrap: anywhere;
+}
+
+.adm-chcard-test.is-ok {
+  color: var(--success-text, #166534);
+  background: var(--success-soft-bg, #dcfce7);
+}
+
+.adm-chcard-test.is-fail {
+  color: var(--danger-text);
+  background: var(--danger-soft-bg);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   可折叠面板 (2026-10-20 抄 New API 的高级项折叠)
+
+   53 个配置项同权重平铺时, 必填项 (基址/令牌/模型) 会被低频的
+   「超时与轮询」9 项淹没。故高级项默认折叠, 必填项保持展开。
+   ═══════════════════════════════════════════════════════════════ */
+
+.adm-panel-collapsible {
+  /* 折叠时不需要标题下方的 16px 间距 (标题即折叠按钮) */
+  padding-bottom: 0;
+}
+
+.adm-panel-collapsible.is-open {
+  padding-bottom: 16px;
+}
+
+.adm-panel-title-btn {
+  width: 100%;
+  margin-bottom: 0;
+  padding: 0;
+  font-family: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+}
+
+.adm-panel-collapsible.is-open .adm-panel-title-btn {
+  margin-bottom: 16px;
+}
+
+.adm-panel-title-btn:hover .adm-panel-caret {
+  color: var(--color-primary);
+}
+
+.adm-panel-caret {
+  display: inline-block;
+  width: 14px;
+  font-size: 11px;
+  color: var(--text-desc);
+  transition: color 0.15s ease;
+}
+
+/* 折叠摘要 (如「3 项 · 全部默认值」) —— 让运营知道里面还有内容 */
+.adm-panel-collapsed-hint {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   可折叠面板 (2026-10-20 抄 New API 的高级项折叠)
+
+   53 个配置项同权重平铺时, 必填项 (基址/令牌/模型) 会被低频的
+   「超时与轮询」9 项淹没。故高级项默认折叠, 必填项保持展开。
+   ═══════════════════════════════════════════════════════════════ */
+
+.adm-panel-collapsible {
+  /* 折叠时不需要标题下方的 16px 间距 (标题即折叠按钮) */
+  padding-bottom: 0;
+}
+
+.adm-panel-collapsible.is-open {
+  padding-bottom: 16px;
+}
+
+.adm-panel-title-btn {
+  width: 100%;
+  margin-bottom: 0;
+  padding: 0;
+  font-family: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+}
+
+.adm-panel-collapsible.is-open .adm-panel-title-btn {
+  margin-bottom: 16px;
+}
+
+.adm-panel-title-btn:hover .adm-panel-caret {
+  color: var(--color-primary);
+}
+
+.adm-panel-caret {
+  display: inline-block;
+  width: 14px;
+  font-size: 11px;
+  color: var(--text-desc);
+  transition: color 0.15s ease;
+}
+
+/* 折叠摘要 (如「3 项 · 全部默认值」) —— 让运营知道里面还有内容 */
+.adm-panel-collapsed-hint {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
 }

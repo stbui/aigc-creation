@@ -13,7 +13,10 @@ import { useNavigate } from 'react-router-dom';
 import { assetsApi, toAbsoluteUrl } from '../lib/api';
 import { capabilityName, toolPath } from '../lib/capabilities';
 import { useProject } from '../hooks/useProject';
+import { ResultMedia, modalityOfFormat } from '../components/ResultMedia';
 import { useCapabilities } from '../hooks/useCapabilities';
+import { ToolEmptyIllustration } from '../components/illustrations';
+import { StateError, StateSkeleton } from '../components/StateViews';
 import type { Asset } from '../types/api';
 
 /**
@@ -63,11 +66,18 @@ export function LibraryPage() {
   const [capability, setCapability] = useState('all');
   const [visible, setVisible] = useState(PAGE_SIZE);
   const [loading, setLoading] = useState(true);
+  /**
+   * 加载失败与「素材库为空」必须分开 (2026-10-20 修)。
+   * 此前失败只弹 message.error, 随后照样渲染「素材库还是空的」——
+   * 用户以为没上传过素材, 真相是接口没连上。
+   */
+  const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       const res = await assetsApi.list({
         kind: kind === 'all' ? undefined : kind,
@@ -78,11 +88,12 @@ export function LibraryPage() {
       setTotal(res.total);
       setVisible(PAGE_SIZE);
     } catch (e) {
-      message.error((e as Error).message || '素材加载失败');
+      // 保留上一次数据: 刷新失败不该把已看到的素材清空
+      setError((e as Error).message || '素材加载失败');
     } finally {
       setLoading(false);
     }
-  }, [kind, capability, message]);
+  }, [kind, capability]);
 
   useEffect(() => {
     void load();
@@ -234,12 +245,22 @@ export function LibraryPage() {
       />
 
       {loading ? (
-        <div className="asset-library-state">
-          <Loader2 size={20} className="asset-library-load-more-spinner" />
-          <strong>正在加载素材…</strong>
-        </div>
+        /* 骨架屏占住 5 列卡片网格的形状, 内容到达时零位移 */
+        <StateSkeleton variant="card" count={10} columns={5} />
+      ) : error ? (
+        /* 「没连上」不是「没素材」 */
+        <StateError
+          title="素材加载失败"
+          desc="没能取回素材列表。可能是后端未启动或网络异常，重试一次即可。"
+          detail={error}
+          onRetry={() => void load()}
+        />
       ) : items.length === 0 ? (
         <div className="asset-library-empty">
+          {/* 参考站空态 = 160×160 插画 + strong + span（实测 160px yqempty-*.svg）。
+              本地不引参考站图片资源, 复用工具页同一张内联 SVG (ToolEmptyIllustration,
+              与 pk/vc/fc 同款), 文案保留本地产品语义。2026-10-19 */}
+          <ToolEmptyIllustration />
           <strong>素材库还是空的</strong>
           <span>上传商品图或完成一次生成后，素材会出现在这里</span>
           <button type="button" className="asset-library-button" onClick={() => fileRef.current?.click()}>
@@ -260,7 +281,13 @@ export function LibraryPage() {
                   }`}
                 >
                   <div className="asset-library-cover">
-                    {url && <img src={url} alt={a.sourceUrl} loading="lazy" />}
+                    {url && (
+                      <ResultMedia
+                        url={url}
+                        modality={modalityOfFormat(a.format)}
+                        alt={a.sourceUrl}
+                      />
+                    )}
                     <span className="asset-library-card-overlay" />
                     <button
                       type="button"

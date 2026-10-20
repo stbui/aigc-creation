@@ -13,7 +13,7 @@ import { ToolCard } from '../components/ToolWidgets';
  *   重绘区域卡: 参考站在画布上涂抹圈选, 本地以位置枚举代替 (后端 region 参数)
  *   描述卡: "这个区域改成什么？" textarea + 放大编辑
  *   高级设置: 比例 原比例 / 画质 1K (提交区汇总 chip)
- *   提交: 开始重绘 本次消耗5积分; 描述: 只想修改局部？圈出来写描述就行，适合去掉瑕疵、更换图案、修改画面中的元素
+ *   提交: 开始重绘 (消耗价由后端下发); 描述: 只想修改局部？圈出来写描述就行，适合去掉瑕疵、更换图案、修改画面中的元素
  *
  * 诚实披露: local_redraw 为 mock 能力 (依赖真实 inpainting 模型), 本地渲染以区域框 +
  * 描述文案占位, 参考图真实参与构图; 中文原文完整记录在任务参数中。
@@ -45,7 +45,6 @@ export function LocalRedrawPage() {
       upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
       settings={{ ratio: true, resolution: true }}
       submitLabel="开始重绘"
-      creditLabel="本次消耗5积分"
       mockNote="本地演示：重绘结果为区域框 + 描述占位渲染（真实重绘需接入 AI 模型），原图会真实参与构图"
       emptyDesc="上传图片并框选区域、写下描述后，重绘结果将在此处展示"
       formValid

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96">
+  <title>货觉AI 主标记</title>
+  <desc>品牌紫渐变圆角方形内的白色「觉眼」: 杏仁形眼廓 + 四角星瞳孔, 寓意 AI 对商品的感知</desc>
+  <defs>
+    <linearGradient id="hj-g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8064f6"/>
+      <stop offset="1" stop-color="#5546d8"/>
+    </linearGradient>
+  </defs>
+  <rect x="0" y="0" width="96" height="96" rx="22" fill="url(#hj-g)"/>
+  <path d="M 23 48 Q 48 28 73 48 Q 48 68 23 48 Z" fill="none" stroke="#ffffff" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 48 37 Q 50 46 59 48 Q 50 50 48 59 Q 46 50 37 48 Q 46 46 48 37 Z" fill="#ffffff"/>
+</svg>

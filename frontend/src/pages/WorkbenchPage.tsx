@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Empty, Spin } from 'antd';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, TrendingUp, Images, BarChart3, CheckCircle2 } from 'lucide-react';
 import { toAbsoluteUrl, statsApi } from '../lib/api';
@@ -7,6 +6,7 @@ import { capabilityById, toolPath } from '../lib/capabilities';
 import { CapabilityIcon } from '../components/AppLayout';
 import { HeroArt } from '../components/HeroArt';
 import { SafeThumb } from '../components/RailPreview';
+import { StateError, StateSkeleton } from '../components/StateViews';
 import type { CapabilityGroup, StatsOverview } from '../types/api';
 
 /**
@@ -37,10 +37,12 @@ const DASH_TILES: {
 /**
  * 工作台: 视觉与信息结构对齐参考站 (ijihua.cn/workbench)。
  *
- * 版面数值来自参考站 computed styles 实拍 (2026-10-17 于 1280x577 视口重拍校正):
- *   内容宽 1142 / hero 1142x212 radius 16 padding 0 100px, 标题 32px/500 #000 lh20,
- *   副标题 17px/400 #667085 lh31 (文案块总高 75 = 20 + margin 24 + 31)
- *   工具网格 6 列 x 177px gap 16 / 卡片 177x197 radius 16 / 缩略图 2:1
+ * 版面数值来自参考站 computed styles 实拍 (2026-10-17 于 1280x577 视口重拍校正,
+ * 2026-10-19 于 1280x800 复验一致):
+ *   内容宽 = 视口 − 侧栏 − 48 全宽无上限 (参考站同构, 2026-10-19 取消 1142 上限),
+ *   hero 212 高 radius 16 padding 0 100px, 标题 32px/500 #000 lh20, 副标题 17px/400 #667085 lh31
+ *   (文案块总高 75 = 20 + margin 24 + 31)
+ *   工具网格 6 列 x 178px gap 16 / 卡片 178x197 radius 16 / 缩略图 2:1
  *   图标块 40x40 白底 radius 8 阴影, 跨在缩略图与文字区分界线上 (left 15 / top 69)
  *   标题 14px/600 #171A2B lh16 (旧基准 16px/#333 已按 10-17 实拍修正) / 描述 12px #86909C
  *   数据区 .wb-data-layout: 2:1 双面板 + 通栏, 白底 padding 24 高 268, margin-top 16,
@@ -49,9 +51,11 @@ const DASH_TILES: {
  * 诚实差异:
  *   - 参考站 hero 右侧插画在 bannerbg.png 背景图内; 本项目不引用第三方图片资源, 改为渐变背景
  *     + 用户真实产出拼贴 (绝对定位, 不撑高 hero), 无产出时回退原创 SVG
- *   - 参考站主区是内部滚动容器 (.workspace-route-content), 本地用 window 滚动,
- *     内容区比参考站窄 ~25px (侧栏 99 vs 84 + 滚动条), 故 hero padding 用 84px 补偿,
- *     使文案与参考站落在同一绝对 x=208; 卡片宽度随容器浮动 (173 vs 177)
+ *   - 参考站主区是内部滚动容器 (.workspace-route-content), 本地用 window 滚动
+ *   - 2026-10-19: 侧栏改 <1400px 自动塌缩为参考站 100px 垂直轨 (原写死 176px),
+ *     hero padding 同步回归参考站字面值 100px (原 84px 是按 ~100px 侧栏的补偿值,
+ *     在 176px 侧栏下反而偏 16px); 轨态标题 x=208 / 横排态 x=300, 与参考站
+ *     1280/1440 实测一致; 卡片宽随容器浮动, 1280 下 178 与参考站相同
  *
  * 卡片数据全部来自后端能力清单 (workbenchIds + registry items) 与真实产出
  * (byCapability.thumbnailUrl 取每项能力最近一次成功结果), 前端不硬编码任何能力。
@@ -66,14 +70,30 @@ export function WorkbenchPage({
   const navigate = useNavigate();
   const [stats, setStats] = useState<StatsOverview | null>(null);
   const [loading, setLoading] = useState(true);
+  /**
+   * 加载失败必须单独记录 (2026-10-20 修)。
+   * 此前 `catch(() => setStats(null))` 把失败与"没数据"压成同一个 null,
+   * 渲染时只能给一句「数据加载失败」, 但没有重试入口, 也没有区分
+   * "接口没连上"与"确实还没有记录"。
+   */
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
     statsApi
       .overview()
-      .then(setStats)
-      .catch(() => setStats(null))
+      .then((s) => setStats(s))
+      .catch((e: unknown) => {
+        setError(e instanceof Error ? e.message : '统计数据加载失败');
+        setStats(null);
+      })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   // 类型守卫: filter(Boolean) 不会收窄 undefined, 这里显式过滤
   const cards = useMemo(
@@ -187,9 +207,15 @@ export function WorkbenchPage({
             </button>
           </div>
           {loading ? (
-            <div className="wb-panel-loading">
-              <Spin size="small" />
-            </div>
+            <StateSkeleton variant="panel" count={3} />
+          ) : error ? (
+            <StateError
+              title="数据加载失败"
+              desc="没能取回账号与作品数据。可能是后端未启动或网络异常，重试一次即可。"
+              detail={error}
+              onRetry={load}
+              compact
+            />
           ) : stats ? (
             <>
               <div className="wb-account-metrics">
@@ -270,7 +296,13 @@ export function WorkbenchPage({
               </p>
             </>
           ) : (
-            <Empty description="数据加载失败，请确认后端已启动" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            <StateError
+              title="数据加载失败"
+              desc="没能取回账号与作品数据。可能是后端未启动或网络异常，重试一次即可。"
+              detail={error ?? undefined}
+              onRetry={load}
+              compact
+            />
           )}
         </div>
 
@@ -282,9 +314,15 @@ export function WorkbenchPage({
             </button>
           </div>
           {loading ? (
-            <div className="wb-panel-loading">
-              <Spin size="small" />
-            </div>
+            <StateSkeleton variant="row" count={3} />
+          ) : error ? (
+            <StateError
+              title="加载失败"
+              desc="没能取回最近任务列表。"
+              detail={error}
+              onRetry={load}
+              compact
+            />
           ) : stats && stats.recentTasks.length > 0 ? (
             <div className="wb-jobs-list">
               {stats.recentTasks.slice(0, 4).map((t) => (
@@ -331,9 +369,15 @@ export function WorkbenchPage({
           <span className="wb-dashboard-chip">近 7 天</span>
         </div>
         {loading ? (
-          <div className="wb-panel-loading">
-            <Spin size="small" />
-          </div>
+          <StateSkeleton variant="panel" count={4} />
+        ) : error ? (
+          <StateError
+            title="数据加载失败"
+            desc="没能取回创作数据。可能是后端未启动或网络异常，重试一次即可。"
+            detail={error}
+            onRetry={load}
+            compact
+          />
         ) : stats ? (
           <>
             <div className="wb-dashboard-stats">
@@ -362,7 +406,13 @@ export function WorkbenchPage({
             </div>
           </>
         ) : (
-          <Empty description="数据加载失败" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+          <StateError
+            title="数据加载失败"
+            desc="没能取回创作数据。"
+            detail={error ?? undefined}
+            onRetry={load}
+            compact
+          />
         )}
       </section>
     </div>

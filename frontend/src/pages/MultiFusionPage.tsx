@@ -7,7 +7,8 @@ import { useProject } from '../hooks/useProject';
 import { usePollAbort } from '../hooks/usePollAbort';
 import { pollToResult } from '../lib/poll';
 import type { ToolAsset, ToolResult } from '../components/ToolShell';
-import { ToolHistoryPanel } from '../components/ToolHistoryPanel';
+import { useCreditLabel } from '../hooks/useCreditLabel';
+import { ToolGeneratingState } from '../components/ToolEmptyState';
 
 /**
  * 多图融合 —— 严格 1:1 复刻参考站 https://ijihua.cn/multi-image-fusion。
@@ -72,13 +73,14 @@ const VARIANT_COUNTS = ['4', '3', '2', '1'];
 
 const MAX_TOTAL = 6; // §4.1 计数器「0 / 6」(主体 1 + 搭配 1-5)
 const MAX_ACCENTS = 5; // §4.1 字段标签「必传 · 1-5 张」
-const CREDIT_PER_RUN = 40; // §4.1 提交按钮「本次消耗40积分」
 
 const EMPTY_TITLE = '等待你的第一组融合创意';
 const EMPTY_HINT = '上传图片并提交生成，预览会出现在这里';
 const UPLOAD_SUBJECT_HINT = '支持 JPG、PNG，单张不超过 10MB，可直接粘贴';
 
 export function MultiFusionPage() {
+  // 消耗价读后端下发的 creditCost, 不再写死 40
+  const creditLabel = useCreditLabel('multi_fusion');
   const { message } = App.useApp();
   const { ensureProject } = useProject();
   const subjectInputRef = useRef<HTMLInputElement>(null);
@@ -556,15 +558,16 @@ export function MultiFusionPage() {
               ) : (
                 <>
                   <span>立即生成</span>
-                  <small>本次消耗{CREDIT_PER_RUN}积分</small>
+                  {/* creditLabel 为 null = 能力清单未到 (加载中)。
+                      此时不显示任何价格占位 —— "加载中…"放在价格位上会被读成价格文案,
+                      且用户点下按钮前看不到扣费提示。空着即可, 清单到达后会补上。 */}
+                  {creditLabel && <small>{creditLabel}</small>}
                 </>
               )}
             </button>
           </div>
         </section>
 
-        {/* 历史记录 (2026-10-19 接入通用组件; 此前本页无此功能) */}
-        <ToolHistoryPanel capability="multi_fusion" refreshKey={result} />
 
         {/* ── 结果面板 ── */}
         <section className="multi-image-fusion-result-panel">
@@ -589,7 +592,11 @@ export function MultiFusionPage() {
             </div>
           </div>
 
-          {!result ? (
+          {submitting && !result ? (
+            /* 生成中 → 骨架占位, 不退回空态 (见 ToolGeneratingState 注释)。
+               本页空态是参考站专属版式 (D-84 三卡片斜叠插画), 故只加生成中分支, 不动空态。 */
+            <ToolGeneratingState />
+          ) : !result ? (
             <>
               <div className="multi-image-fusion-result-empty">
                 {/* D-84: 参考站是 96x78 三卡片斜叠插画 (-9deg / 0 / +9deg), 非共用插画组件 */}

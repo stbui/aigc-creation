@@ -1,0 +1,187 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# 本地开发用的容器编排（**不是**生产编排）。
+#
+# 为什么本地要用 compose
+# ----------------------
+# 本机 3001 常年被 aigc 网关占着，且三条环境需要并行跑（开发常驻 + 测试随时起）。
+# compose 用不同的端口映射与数据卷把两者隔开，且复现的就是生产的镜像形态 ——
+# 「本地 compose 跑通」比「本地 npm 跑通」更接近上线后的真实行为。
+#
+# 两个 profile，对应两种起法
+# -------------------------
+#   开发（默认）:  docker compose up -d
+#   测试:  docker compose --profile test up -d
+#
+# 三者互不干扰：端口不同、库文件不同、上传目录不同（见下方 volumes）。
+#
+# ⚠ 生产部署**不要**用这个文件。生产形态与生产注意事项见
+#   docs/environments.md「生产部署」一节；那份编排涉及 TLS、域名、
+#   密钥来源与滚动更新，与本地诉求不是一回事。
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: huojue
+
+services:
+  # ── 后端 ──────────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: huojue-backend:local
+    container_name: huojue-backend-dev
+    restart: unless-stopped
+    environment:
+      # ---- 环境标识：这一项决定读哪一档 env 文件，改错就连错库 ----
+      NODE_ENV: ${NODE_ENV:-development}
+      HOST: 0.0.0.0          # 容器内必须对外监听（不能是 127.0.0.1）
+      PORT: 3001
+
+      # ---- 数据库 ----
+      # 开发：卷里的 dev.db；测试：卷里的 test.db。两者不同文件。
+      DATABASE_URL: ${DATABASE_URL:-file:./data/dev.db}
+
+      # ---- 运行期目录（都在卷里，容器重建不丢）----
+      UPLOAD_DIR: /app/data/uploads
+      BACKUP_DIR: /app/data/backups
+      LOG_DIR: /app/data/logs
+
+      # ---- CORS ----
+      # 走前端容器的 nginx 同源反代时其实用不到 CORS；这里放行本机端口，
+      # 是为了「绕过 nginx 直连后端调试」的场景（如 curl / 打断点）。
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      CORS_ALLOW_PRIVATE_LAN: ${CORS_ALLOW_PRIVATE_LAN:-1}
+
+      # ---- 鉴权 ----
+      # 本地不设 JWT_SECRET → 走内置开发默认密钥（仅限本地）。
+      # 生产必须显式设置，否则 validateEnv 会拒绝启动。
+      JWT_SECRET: ${JWT_SECRET:-}
+      JWT_TTL: ${JWT_TTL:-7d}
+
+      # ---- 日志 ----
+      LOG_LEVEL: ${LOG_LEVEL:-log}
+      LOG_RETENTION_DAYS: ${LOG_RETENTION_DAYS:-14}
+      LOG_CONSOLE: "1"
+      LOG_ERROR_FILE: "1"
+
+      # ---- 图像网关（不配则全走本地 Jimp）----
+      GATEWAY_BASE_URL: ${GATEWAY_BASE_URL:-}
+      GATEWAY_TOKEN: ${GATEWAY_TOKEN:-}
+      GATEWAY_MODEL: ${GATEWAY_MODEL:-}
+      GATEWAY_ENABLED: ${GATEWAY_ENABLED:-}
+
+      # ---- 存储后端 ----
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      OSS_REGION: ${OSS_REGION:-}
+      OSS_BUCKET: ${OSS_BUCKET:-}
+      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID:-}
+      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET:-}
+      OSS_ENDPOINT: ${OSS_ENDPOINT:-}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-}
+      MINIO_BUCKET: ${MINIO_BUCKET:-huojue}
+
+    ports:
+      # 宿主机 3001 常被其他项目占；映射到 13001 避开，冲突面小得多
+      - "${BACKEND_HOST_PORT:-13001}:3001"
+    volumes:
+      # 具名卷：库文件、上传图、备份、日志全在里面，
+      # `docker compose down` 不删（要删得显式 down -v）
+      - huojue-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3001/api/v1/capabilities"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+
+  # ── 前端 ──────────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # 留空 → 产物走同源 /api，由 nginx 反代（零 CORS）
+        VITE_API_BASE: ${VITE_API_BASE:-}
+        VITE_ENV_LABEL: ${VITE_ENV_LABEL:-}
+    image: huojue-frontend:local
+    container_name: huojue-frontend-dev
+    restart: unless-stopped
+    environment:
+      # nginx 模板里 ${BACKEND_UPSTREAM} 的取值。**必须与下方 depends_on
+      # 的服务名一致** —— 写错不会报错，只会让前端静默代理到另一套环境。
+      BACKEND_UPSTREAM: backend:3001
+    ports:
+      - "${FRONTEND_HOST_PORT:-15173}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── 测试环境（--profile test 才起）────────────────────────────────────────
+  backend-test:
+    profiles: ["test"]
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: huojue-backend:test
+    container_name: huojue-backend-test
+    restart: unless-stopped
+    environment:
+      NODE_ENV: test
+      HOST: 0.0.0.0
+      PORT: 3001
+      # 测试库与开发库不同文件 —— compose 内已分卷
+      DATABASE_URL: file:./data/test.db
+      UPLOAD_DIR: /app/data/uploads-test
+      BACKUP_DIR: /app/data/backups-test
+      LOG_DIR: /app/data/logs-test
+      CORS_ORIGINS: http://localhost:15174,http://127.0.0.1:15174
+      # 测试用独立密钥：顺手验证「换密钥后旧 token 失效」
+      JWT_SECRET: test-only-secret-do-not-reuse-in-prod
+      JWT_TTL: 1h
+      LOG_LEVEL: log
+      LOG_RETENTION_DAYS: 3
+      LOG_CONSOLE: "1"
+      LOG_ERROR_FILE: "1"
+      STORAGE_BACKEND: local
+    ports:
+      - "${BACKEND_TEST_HOST_PORT:-13101}:3001"
+    volumes:
+      # 独立卷：测试库与测试上传图都不与开发环境混用
+      - huojue-test-data:/app/data
+
+  frontend-test:
+    profiles: ["test"]
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: runtime
+      args:
+        VITE_API_BASE: ""
+        VITE_ENV_LABEL: 测试
+    image: huojue-frontend:test
+    container_name: huojue-frontend-test
+    restart: unless-stopped
+    environment:
+      # 指向**测试**后端。写成 backend:3001 的话，测试前端会把请求
+      # 代理到开发后端上 —— 不报错，只是数据全错。
+      BACKEND_UPSTREAM: backend-test:3001
+    ports:
+      - "${FRONTEND_TEST_HOST_PORT:-15273}:80"
+    depends_on:
+      backend-test:
+        condition: service_started
+
+volumes:
+  # 开发数据（dev.db + uploads + backups + logs）
+  huojue-data:
+    name: huojue-data
+  # 测试数据（test.db + uploads-test + ...），与开发完全隔离
+  huojue-test-data:
+    name: huojue-test-data

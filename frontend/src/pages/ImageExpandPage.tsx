@@ -11,7 +11,7 @@ import { PositionGrid, ToolCard } from '../components/ToolWidgets';
  *   原图占比卡: 快捷按钮 100% / 80%(默认) / 60% / 50% + 自由输入 (placeholder 1-99%)
  *   原图位置卡: 3x3 九宫格 ↖↑↗ / ←⊙→ / ↙↓↘ (center 默认)
  *   高级设置: 比例 原比例 / 画质 1K
- *   提交: 立即扩图 本次消耗5积分; 提示行 "*确认素材和参数后提交，右侧会展示生成结果。"
+ *   提交: 立即扩图 (消耗价由后端下发, 见 hooks/useCreditLabel); 提示行 "*确认素材和参数后提交，右侧会展示生成结果。"
  *   描述: 智能扩展画面尺寸，快速适配不同平台展示需求
  *
  * 诚实披露: expand 为 real 能力 —— 边缘延展 (clamp 采样) + 羽化过渡,
@@ -53,7 +53,6 @@ export function ImageExpandPage() {
       upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
       settings={{ ratio: true, resolution: true }}
       submitLabel="立即扩图"
-      creditLabel="本次消耗5积分"
       hint="*确认素材和参数后提交，右侧会展示生成结果。"
       emptyDesc="上传图片后，扩展构图的结果将在此处展示"
       formValid

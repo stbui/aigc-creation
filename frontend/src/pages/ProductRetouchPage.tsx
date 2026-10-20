@@ -13,7 +13,7 @@ import { PillOptions, ToolCard } from '../components/ToolWidgets';
  *     综合精修 / 质感增强 / 瑕疵修复 / 色彩校正 / 提升清晰度 / 材质强化
  *   补充要求卡: textarea, placeholder "如：去掉电镀件上的指纹，让皮革看起来更有光泽", maxlength 200
  *   高级设置: 比例 原比例 / 画质 1K
- *   提交: 立即生成 本次消耗5积分; 描述: 商品图去瑕疵，提高清晰度
+ *   提交: 立即生成 (消耗价由后端下发); 描述: 商品图去瑕疵，提高清晰度
  *
  * 诚实披露: enhance 为 real 能力 —— 6 模式各自映射真实像素管线
  * (亮度/对比度/饱和度/模糊去噪/unsharp 锐化), 补充要求中文原文记录于任务参数。
@@ -45,7 +45,6 @@ export function ProductRetouchPage() {
       upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
       settings={{ ratio: true, resolution: true }}
       submitLabel="立即生成"
-      creditLabel="本次消耗5积分"
       emptyDesc="上传图片并选择精修模式后，结果将在此处展示"
       formValid
       submitting={submitting}

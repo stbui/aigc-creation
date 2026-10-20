@@ -3,16 +3,20 @@ import { App, Modal, Spin } from 'antd';
 import { ChevronLeft, ChevronRight, ImagePlus, Maximize2, Plus, RefreshCw, Sparkles, X } from 'lucide-react';
 import { assetsApi, generateApi, toAbsoluteUrl } from '../lib/api';
 
-import { ToolEmptyState } from '../components/ToolEmptyState';
+import { ToolEmptyState, ToolGeneratingState } from '../components/ToolEmptyState';
 import { ToolSubmitBar } from '../components/ToolSubmitBar';
-import { ToolHistoryPanel } from '../components/ToolHistoryPanel';
+import { useCreditLabel } from '../hooks/useCreditLabel';
 import { ToolSettingsPopover } from '../components/ToolSettingsPopover';
 import { AssetLibraryModal, useAssetLibrary } from '../components/AssetLibraryModal';
+import { PromptPolishModal } from '../components/PromptPolishModal';
+import { ImageToPromptModal } from '../components/ImageToPromptModal';
+import { MobileUploadModal } from '../components/MobileUploadModal';
+import { useAuth } from '../context/AuthContext';
 import { useProject } from '../hooks/useProject';
 import { usePollAbort } from '../hooks/usePollAbort';
 import { usePasteUpload } from '../hooks/usePasteUpload';
 import { pollToResult } from '../lib/poll';
-import type { Asset, TaskStatus } from '../types/api';
+import type { Asset, MobileUploadAsset, TaskStatus } from '../types/api';
 
 /**
  * 自由创作工作台 —— 1:1 复刻参考站 https://ijihua.cn/free-creation。
@@ -36,19 +40,33 @@ import type { Asset, TaskStatus } from '../types/api';
  *             radius16 padding 17px 16px shadow rgba(61,66,86,.2) 0 8px 24px;
  *             比例 4 列 gap10 option 84.5x39 (激活 #F1EFFF/#5D47EA);
  *             分辨率 3 列 option 116x62 (strong 13px/500, span 11px)
- *   提交区: actions flex column gap16 margin-top auto; primary 400x40 radius8 渐变;
- *           secondary grid 2 列 gap8, ghost 192x32 白底 border #E5E7EF radius8 13px #667085
+ *   提交区: actions flex column gap16 margin-top auto; primary 400x40 radius8 渐变
+ *           (2026-10-19 移除 secondary「重置」/「清空结果」行 —— 用户要求不要, 且实测在 900 高
+ *            视口下溢出首屏)
  *   窄屏: section-head 显示 (span 14px/700 #333 lh13 + h1 16px/700 #333 lh22 margin-top 8);
- *         actions 变 grid 1 列 bg #F6F7FB padding 12px 16px 0 gap8, 按钮 100% 宽
+ *         actions 变 1 列 bg #F6F7FB padding 12px 16px 0 gap8, 按钮 100% 宽
  *   结果栏: 空态 160x160 插画 + h3 14px/700 #333 + p 12px #86909C
  *
  * 接线: 参考图 (0~4 张, 顺序保留) + 提示词 → free_create 任务 (参考图为选填,
  * 后端 inputs=0 不强制张数); 比例/画质 → ratio / size 参数; 张数与顺序直达 provider
  * (顶部条带横排参考图, 真实参与构图)。
  *
- * 诚实披露: free_create 为 mock 能力 (依赖真实 AI 模型), 本地为参数化占位渲染 ——
- * 空态小字 + 结果卡徽标明示; AI润色/图片转提示词未接入语言/视觉模型, 点击如实提示;
- * 4K 超出本地算法上限如实禁用 (参考站为积分倍率制, 本站无积分概念故不显示"倍消耗")。
+ * 产出来源如实披露 (2026-10-20): 结果卡徽标按**每单真实的 task.provider** 显示,
+ * 不再硬编码「本地占位渲染」——
+ *   gateway → 绿徽标「真实模型」; local → 琥珀徽标「本地算法」(网关不可用已回落)。
+ * 同一能力在两条通道下产出不同, 界面据实区分, 不用假效果冒充模型能力。
+ * 徽标取色: .pk-result-source-gateway 用成功色, .pk-result-source-local 用警示色。
+ *空态说明改为中性描述 —— 用户尚未提交时无 provider 可言, 不预告通道结论。
+ *
+ * AI润色/图片转提示词仍未接入语言/视觉模型, 点击如实提示。
+ * 4K 超出本地算法上限如实禁用 (参考站为积分倍率制, 本站无积分账户故不显示"倍消耗")。
+ *
+ * 提交按钮登录墙 (2026-10-19, 对齐参考站该页):
+ *   未登录 → 主文案「登录免费生成」, 不显示积分角标, 点击唤起登录弹窗 (ToolSubmitBar 内部判定
+ *   useAuth().token), 登录后停在原页不跳转;
+ *   已登录 → 主文案「立即生成」+ 角标「本次消耗 10 积分」(10 积分/张 与 AuthCard 文案同口径);
+ *   提示词为空时按钮 disabled 且视觉置灰 (opacity .55 + not-allowed, 曾被 .fc-actions 覆盖成
+ *   opacity 1 导致看不出禁用, 已修正)。
  */
 
 // ───────────────── 常量 (参考站实拍) ─────────────────
@@ -69,12 +87,34 @@ interface PkResult {
   width?: number;
   height?: number;
   errorCode?: string | null;
+  /** 产出来源: gateway=真实模型 / local=本地算法回落 / null=未知 */
+  provider?: string | null;
+}
+
+/**
+ * 产出来源 → 徽标文案与样式。
+ *
+ * 按**这一单实际走的通道**显示, 不按能力清单的静态 mode 猜:
+ *   gateway → 「真实模型」(绿)  模型真出图
+ *   local   → 「本地算法」(琥珀) 网关不可用已回落, 仍是本地算法不是模型结果
+ *   null    → 「来源未知」(琥珀) 任务未落provider 字段, 不猜测
+ *
+ * 这是诚实披露的落点: 网关接通后徽标自动变绿, 网关故障变琥珀,
+ * 两种情况都不把本地算法的产出说成模型结果。
+ */
+function sourceBadge(provider?: string | null): { text: string; cls: string } {
+  if (provider === 'gateway') return { text: '真实模型', cls: 'pk-result-source-gateway' };
+  if (provider === 'local') return { text: '本地算法', cls: 'pk-result-source-local' };
+  return { text: '来源未知', cls: 'pk-result-source-local' };
 }
 
 export function FreeCreationPage() {
   const { message } = App.useApp();
   const { ensureProject } = useProject();
+  const { token, openLogin } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // 消耗价读后端下发的 creditCost, 不再在本页写死「10 积分」
+  const creditLabel = useCreditLabel('free_create');
 
   // ── 表单状态 ──
   const [images, setImages] = useState<PkAsset[]>([]);
@@ -86,6 +126,9 @@ export function FreeCreationPage() {
 
   // ── 弹窗状态 ──
   const [expandOpen, setExpandOpen] = useState(false);
+  const [polishOpen, setPolishOpen] = useState(false);
+  const [i2pOpen, setI2pOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   // ── 任务状态 ──
   const [submitting, setSubmitting] = useState(false);
@@ -153,38 +196,103 @@ export function FreeCreationPage() {
   usePasteUpload(uploadFiles);
 
   // ── 素材库导入 (真实数据) ──
-
-  const pickFromLibrary = (asset: Asset) => {
+  //
+  // ⚠️ **必须返回 false 表示拒绝** (不是 undefined):
+  // 素材库选择器是**多选**的, 「确定」时逐个调用本函数;
+  // 只有显式返回 false 才能让选择器知道"这张没进", 从而中止整批并保持弹窗打开。
+  // 返回 undefined 会被当成"接受" —— 超额的那张会静默进入, 上限失效。
+  const pickFromLibrary = (asset: Asset): boolean => {
     if (images.length >= MAX_REF_IMAGES) {
       message.warning(`最多上传 ${MAX_REF_IMAGES} 张参考图片`);
-      return;
+      return false;
     }
     if (images.some((x) => x.id === asset.id)) {
       message.info('该素材已在列表中');
-      return;
+      return false;
     }
     setImages((prev) => [
       ...prev,
       { id: asset.id, url: toAbsoluteUrl(asset.sourceUrl) ?? '', name: asset.sourceUrl.split('/').pop() ?? '素材' },
     ]);
+    return true;
   };
 
   // 素材库弹窗 (通用组件, 2026-10-19 抽取; 各页只提供点选回填逻辑)
-  const { open: libraryOpen, loading: libraryLoading, items: libraryItems, openLibrary, closeLibrary, pick } =
-    useAssetLibrary(pickFromLibrary);
+  const {
+    open: libraryOpen,
+    loading: libraryLoading,
+    items: libraryItems,
+    error: libraryError,
+    openLibrary,
+    closeLibrary,
+  } = useAssetLibrary(pickFromLibrary);
 
-  // ── AI润色 / 图片转提示词: 未接入语言/视觉模型, 如实提示 ──
+  // ── AI润色 / 图片转提示词 / 手机上传: 三个真实入口 (2026-10-20) ──
+  //
+  // 均需登录 (参考站实拍: 未登录点这些按钮先弹登录框)。
+  // 路由已对外开放, 故未登录时调 openLogin() 而不是跳登录页。
+  const requireLogin = (): boolean => {
+    if (token) return true;
+    openLogin();
+    return false;
+  };
+
   const runPolish = () => {
+    if (!requireLogin()) return;
     if (!prompt.trim()) {
       message.warning('请先输入创作提示词');
       return;
     }
-    message.info('本地演示未接入语言模型，暂不支持 AI 润色；提示词会原样参与生成');
+    setPolishOpen(true);
   };
 
   const runImageToPrompt = () => {
-    message.info('本地演示未接入视觉模型，暂不支持图片反推提示词；可手动描述画面内容');
+    if (!requireLogin()) return;
+    setI2pOpen(true);
   };
+
+  const runMobileUpload = () => {
+    if (!requireLogin()) return;
+    setMobileOpen(true);
+  };
+
+  /**
+   * 手机端传回图片 → 进入参考图位 (与网页上传同构, 走同一份图片数组)。
+   *
+   * 支持一次多张 (参考站手机端可多选), **顺序即构图顺序** ——
+   * 手机端排的序就是电脑端参考图位的先后。
+   *
+   * ⚠️ 超出位数的部分**如实告知被截断**, 不静默丢弃:
+   * 用户在手机上精心排了 5 张, 电脑端只进 2 张却不说, 是最难受的一种失败。
+   */
+  const addMobileAssets = useCallback(
+    (assets: MobileUploadAsset[]) => {
+      setImages((prev) => {
+        const room = MAX_REF_IMAGES - prev.length;
+        if (room <= 0) {
+          message.warning(`参考图位已满 (${MAX_REF_IMAGES} 张), 手机上传的图片未加入`);
+          return prev;
+        }
+        const fresh = assets.filter((a) => !prev.some((x) => x.id === a.id));
+        const accepted = fresh.slice(0, room);
+        const dropped = fresh.length - accepted.length;
+        if (dropped > 0) {
+          message.warning(`参考图位只剩 ${room} 个, ${dropped} 张未加入`);
+        }
+        return [
+          ...prev,
+          ...accepted.map((a) => ({
+            id: a.id,
+            url: toAbsoluteUrl(a.url) ?? '',
+            name: a.filename,
+          })),
+        ];
+      });
+      setMobileOpen(false);
+      message.success(`已从手机接收 ${assets.length} 张图片`);
+    },
+    [message],
+  );
 
   // ── 生成 ──
   const pollTask = useCallback(
@@ -220,16 +328,6 @@ export function FreeCreationPage() {
     }
   };
 
-  /** 重置: 清空表单与结果, 参数回默认值 (参考站 ghost 按钮「重置」) */
-  const resetAll = () => {
-    setImages([]);
-    setPrompt('');
-    setRatio('1:1');
-    setResolution('1k');
-    setResult(null);
-    message.success('已重置');
-  };
-
   return (
     <div className="pk-workspace">
       {/* ── 左: 输入栏 ── */}
@@ -248,14 +346,24 @@ export function FreeCreationPage() {
                 <div className="pk-upload-title-row">
                   <strong className="pk-section-title">上传参考图</strong>
                   <div className="pk-upload-title-actions">
-                    <button type="button" className="pk-text-link" onClick={() => openLibrary()}>
+                    <button
+                      type="button"
+                      className="pk-text-link"
+                      onClick={() => {
+                        // 素材库内容是登录用户的私有数据, 未登录时先弹登录框
+                        // (参考站该按钮在未登录态是 disabled, 本项目路由已对外开放,
+                        //  故改为点按弹登录框, 登录后停在原页)
+                        if (!requireLogin()) return;
+                        openLibrary();
+                      }}
+                    >
                       从素材库导入
                     </button>
                     <button
                       type="button"
                       className="pk-text-link"
-                      title="本地演示环境暂不支持手机上传"
-                      onClick={() => message.info('本地演示环境暂不支持手机上传，可直接拖拽或粘贴上传')}
+                      title="扫码在手机上选择图片，接收后自动进入参考图位"
+                      onClick={runMobileUpload}
                     >
                       手机上传
                     </button>
@@ -402,15 +510,14 @@ export function FreeCreationPage() {
             </section>
           </div>
 
-          {/* 历史记录 (2026-10-19 接入通用组件; 此前本页无此功能) */}
-          <ToolHistoryPanel capability="free_create" refreshKey={result} />
-
-          {/* 高级设置 + 提交 + 次要按钮 (sticky 底部) */}
+          {/* 高级设置 + 提交 (sticky 底部) */}
           <div className="fc-actions">
             <ToolSubmitBar
               submitting={submitting}
               disabled={!formValid}
-              label="免费生图"
+              label="立即生成"
+              guestLabel="登录免费生成"
+              creditLabel={creditLabel ?? undefined}
               settings={
                 <ToolSettingsPopover
                   open={settingsOpen}
@@ -440,29 +547,19 @@ export function FreeCreationPage() {
               }
               onSubmit={() => void submit()}
             />
-            <div className="fc-secondary-actions">
-              <button type="button" className="fc-ghost-btn" onClick={resetAll}>
-                重置
-              </button>
-              <button
-                type="button"
-                className="fc-ghost-btn"
-                disabled={!result}
-                onClick={() => setResult(null)}
-              >
-                清空结果
-              </button>
-            </div>
           </div>
         </div>
       </aside>
 
       {/* ── 右: 结果栏 ── */}
       <section className="pk-result-pane">
-        {!result ? (
+        {submitting && !result ? (
+          /* 生成中 → 骨架占位, 不退回空态 (见 ToolGeneratingState 注释) */
+          <ToolGeneratingState />
+        ) : !result ? (
           <ToolEmptyState title="效果图预览" desc="提交任务后，生成结果将在此处展示">
             <p className="vc-mock-note">
-              本地演示：创作结果为参数化占位渲染（真实生成需接入 AI 模型），参考图会真实进入构图
+              参考图与提示词会一并送入生成通道；结果卡上的徽标会如实标明本次产出来自真实模型还是本地算法
             </p>
           </ToolEmptyState>
         ) : (
@@ -486,7 +583,9 @@ export function FreeCreationPage() {
                   <div className="pk-result-meta">
                     <span className="pk-result-variant">
                       自由创作结果
-                      <span className="pk-result-mock-badge">本地占位渲染</span>
+                      <span className={`pk-result-source ${sourceBadge(result.provider).cls}`}>
+                        {sourceBadge(result.provider).text}
+                      </span>
                     </span>
                     <span className="pk-result-params">
                       {ratio} · {resolution.toUpperCase()}
@@ -510,14 +609,42 @@ export function FreeCreationPage() {
         )}
       </section>
 
-      {/* 素材库选择弹窗 (真实数据) */}
+      {/* 素材库选择弹窗 (真实数据; 多选, 上限与参考图位一致) */}
       <AssetLibraryModal
         open={libraryOpen}
         loading={libraryLoading}
         items={libraryItems}
+        error={libraryError}
         onCancel={closeLibrary}
         onPick={pickFromLibrary}
+        maxSelectable={MAX_REF_IMAGES}
       />
+
+      {/* AI润色弹窗 (1:1 复刻参考站) —— 应用后回填主提示词框 */}
+      <PromptPolishModal
+        open={polishOpen}
+        value={prompt}
+        onApply={(text) => {
+          setPrompt(text);
+          setPolishOpen(false);
+          message.success('润色结果已应用');
+        }}
+        onCancel={() => setPolishOpen(false)}
+      />
+
+      {/* 图片转提示词弹窗 (1:1 复刻参考站) */}
+      <ImageToPromptModal
+        open={i2pOpen}
+        onApply={(text) => {
+          setPrompt(text);
+          setI2pOpen(false);
+          message.success('解析结果已应用');
+        }}
+        onCancel={() => setI2pOpen(false)}
+      />
+
+      {/* 手机上传弹窗 (二维码方案) —— 手机端传回后进入参考图位 */}
+      <MobileUploadModal open={mobileOpen} onReceived={addMobileAssets} onCancel={() => setMobileOpen(false)} />
 
       {/* 创作提示词放大编辑 */}
       <Modal

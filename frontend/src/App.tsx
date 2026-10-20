@@ -1,12 +1,22 @@
-import { lazy, Suspense, useEffect, useMemo, useState, type ComponentType, type ReactNode } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useMemo, useState, type ComponentType } from 'react';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { AdminProvider } from './context/AdminContext';
+import { CreditsProvider } from './context/CreditsContext';
 import { AppLayout } from './components/AppLayout';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { ExceptionPage, NotFoundPage } from './components/ExceptionPage';
 import { useCapabilities } from './hooks/useCapabilities';
-import { Spin, Result, Button } from 'antd';
+import { StateLoading } from './components/StateViews';
 import { statsApi, toAbsoluteUrl } from './lib/api';
 import type { StatsOverview } from './types/api';
+
+/**
+ * 2026-10-19「路由对外开放」: 移除 RequireAuth 包裹 —— 未登录用户可直接浏览
+ * 工作台/工具页/素材库等壳内页面, 需要身份的动作一律唤起登录弹窗
+ * (`useAuth().openLogin()`), 与参考站的「顶栏按钮 → 遮罩弹窗」同构。
+ * `/login` 独立页保留为深链接兜底。
+ */
 
 /**
  * 路由级代码分割: 页面组件按需加载, 首屏只打入外壳 + 当前页。
@@ -28,6 +38,7 @@ const ProductKitPage = lazyNamed(() => import('./pages/ProductKitPage'), 'Produc
 const ProductDetailPage = lazyNamed(() => import('./pages/ProductDetailPage'), 'ProductDetailPage');
 const ViralClonePage = lazyNamed(() => import('./pages/ViralClonePage'), 'ViralClonePage');
 const FreeCreationPage = lazyNamed(() => import('./pages/FreeCreationPage'), 'FreeCreationPage');
+const MobileUploadPage = lazyNamed(() => import('./pages/MobileUploadPage'), 'MobileUploadPage');
 const MultiFusionPage = lazyNamed(() => import('./pages/MultiFusionPage'), 'MultiFusionPage');
 const ProductSkuPage = lazyNamed(() => import('./pages/ProductSkuPage'), 'ProductSkuPage');
 const LocalRedrawPage = lazyNamed(() => import('./pages/LocalRedrawPage'), 'LocalRedrawPage');
@@ -44,26 +55,24 @@ const LibraryPage = lazyNamed(() => import('./pages/LibraryPage'), 'LibraryPage'
 const StatsPage = lazyNamed(() => import('./pages/StatsPage'), 'StatsPage');
 const InvitationsPage = lazyNamed(() => import('./pages/InvitationsPage'), 'InvitationsPage');
 const PackagesPage = lazyNamed(() => import('./pages/PackagesPage'), 'PackagesPage');
+const CheckoutPage = lazyNamed(() => import('./pages/CheckoutPage'), 'CheckoutPage');
+const CreditsPage = lazyNamed(() => import('./pages/CreditsPage'), 'CreditsPage');
+const OrdersPage = lazyNamed(() => import('./pages/OrdersPage'), 'OrdersPage');
+
+// 后台管理端: 独立外壳与鉴权, 不走 C 端 Shell (侧栏/顶导/促销条均为 C 端语义)
+const AdminShell = lazyNamed(() => import('./pages/admin/AdminDashboardPage'), 'AdminShell');
 
 /** 懒加载页面的统一兜底 (与 app-boot 同款居中骨架, 避免切页时闪烁空白) */
 function RouteFallback() {
   return (
     <div className="app-boot">
-      <Spin size="large" tip="加载页面…">
-        <div style={{ width: 120, height: 120 }} />
-      </Spin>
+      <StateLoading tip="加载页面…" full />
     </div>
   );
 }
 
-function RequireAuth({ children }: { children: ReactNode }) {
-  const { token } = useAuth();
-  const location = useLocation();
-  if (!token) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
-  return <>{children}</>;
-}
-
 function Shell() {
+  const { token } = useAuth();
   const { data, loading, error } = useCapabilities();
   // 侧栏 hover 预览图与角标数量都来自真实的统计数据
   const [stats, setStats] = useState<StatsOverview | null>(null);
@@ -77,6 +86,11 @@ function Shell() {
   useEffect(() => {
     // 无侧栏的裸页面不消费统计 (侧栏预览/作品数), 无需发起这次请求
     if (isBare) return;
+    // guest 不发: 统计接口需鉴权, 未登录时侧栏预览/作品数天然为空 (路由已对外开放)
+    if (!token) {
+      setStats(null);
+      return;
+    }
     let alive = true;
     statsApi
       .overview()
@@ -91,7 +105,7 @@ function Shell() {
     return () => {
       alive = false;
     };
-  }, [isBare]);
+  }, [isBare, token]); // token 变化 = 登录成功/退出, 此时重新拉取统计
 
   const thumbs = useMemo(() => {
     const map: Record<string, string | null> = {};
@@ -117,27 +131,26 @@ function Shell() {
   if (loading) {
     return (
       <div className="app-boot">
-        <Spin size="large" tip="加载能力清单…">
-          <div style={{ width: 120, height: 120 }} />
-        </Spin>
+        <StateLoading tip="加载能力清单…" full />
       </div>
     );
   }
 
   if (error || !data) {
     return (
-      <div className="app-boot">
-        <Result
-          status="warning"
-          title="能力清单加载失败"
-          subTitle={error ?? '无法连接后端服务，请确认 http://localhost:3001 已启动'}
-          extra={
-            <Button type="primary" onClick={() => window.location.reload()}>
-              重新加载
-            </Button>
-          }
-        />
-      </div>
+      <ExceptionPage
+        kind="warning"
+        fullScreen
+        title="无法连接服务"
+        desc="能力清单加载失败，工具暂时不可用。请确认后端已启动；若持续失败，可能是网络或服务状态异常。"
+        detail={error ?? undefined}
+        footnote={`默认后端地址 http://localhost:3001，如已改端口请检查 .env 的 VITE_API_BASE 配置。`}
+        action={
+          <button type="button" className="exc-btn is-primary" onClick={() => window.location.reload()}>
+            重新加载
+          </button>
+        }
+      />
     );
   }
 
@@ -154,182 +167,161 @@ function Shell() {
             <Route
               path="/workbench"
               element={
-                <RequireAuth>
                   <WorkbenchPage workbenchIds={data.workbenchIds} groups={data.groups} />
-                </RequireAuth>
               }
             />
             <Route
               path="/product-kit"
               element={
-                <RequireAuth>
                   <ProductKitPage />
-                </RequireAuth>
               }
             />
             <Route
               path="/product-detail"
               element={
-                <RequireAuth>
                   <ProductDetailPage />
-                </RequireAuth>
               }
             />
             <Route
               path="/viral-clone"
               element={
-                <RequireAuth>
                   <ViralClonePage />
-                </RequireAuth>
               }
             />
             <Route
               path="/free-creation"
               element={
-                <RequireAuth>
                   <FreeCreationPage />
-                </RequireAuth>
               }
             />
             <Route
               path="/multi-image-fusion"
               element={
-                <RequireAuth>
                   <MultiFusionPage />
-                </RequireAuth>
               }
             />
             <Route
               path="/product-sku"
               element={
-                <RequireAuth>
                   <ProductSkuPage />
-                </RequireAuth>
               }
             />
             <Route
               path="/local-redraw"
               element={
-                <RequireAuth>
                   <LocalRedrawPage />
-                </RequireAuth>
               }
             />
             <Route
               path="/background-remove"
               element={
-                <RequireAuth>
                   <BackgroundRemovePage />
-                </RequireAuth>
               }
             />
             <Route
               path="/watermark-remove"
               element={
-                <RequireAuth>
                   <WatermarkRemovePage />
-                </RequireAuth>
               }
             />
             <Route
               path="/product-retouch"
               element={
-                <RequireAuth>
                   <ProductRetouchPage />
-                </RequireAuth>
               }
             />
             <Route
               path="/image-translate"
               element={
-                <RequireAuth>
                   <ImageTranslatePage />
-                </RequireAuth>
               }
             />
             <Route
               path="/image-expand"
               element={
-                <RequireAuth>
                   <ImageExpandPage />
-                </RequireAuth>
               }
             />
             <Route
               path="/product-recolor"
               element={
-                <RequireAuth>
                   <ProductRecolorPage />
-                </RequireAuth>
               }
             />
             <Route
               path="/rotate-angle"
               element={
-                <RequireAuth>
                   <RotateAnglePage />
-                </RequireAuth>
               }
             />
             <Route
               path="/tools/:capability"
               element={
-                <RequireAuth>
                   <ToolPage />
-                </RequireAuth>
               }
             />
             <Route
               path="/works"
               element={
-                <RequireAuth>
                   <WorksPage />
-                </RequireAuth>
               }
             />
             <Route
               path="/library"
               element={
-                <RequireAuth>
                   <LibraryPage />
-                </RequireAuth>
               }
             />
             <Route
               path="/stats"
               element={
-                <RequireAuth>
                   <StatsPage />
-                </RequireAuth>
               }
             />
             <Route
               path="/invitations"
               element={
-                <RequireAuth>
                   <InvitationsPage />
-                </RequireAuth>
               }
             />
             {/* 积分商城: 参考站 /packages 挂在 workspace 外壳内, 需登录 */}
             <Route
               path="/packages"
               element={
-                <RequireAuth>
                   <PackagesPage />
-                </RequireAuth>
+              }
+            />
+            {/* 交易链路: 结算 → 沙箱支付 → 积分明细 / 我的订单 */}
+            <Route
+              path="/checkout/:sku"
+              element={
+                  <CheckoutPage />
+              }
+            />
+            <Route
+              path="/credits"
+              element={
+                  <CreditsPage />
+              }
+            />
+            <Route
+              path="/orders"
+              element={
+                  <OrdersPage />
               }
             />
             {/* 参考站路径为 /my-works; /works 保留为等价别名, 两边都可直达 */}
             <Route
               path="/my-works"
               element={
-                <RequireAuth>
                   <WorksPage />
-                </RequireAuth>
               }
             />
-            <Route path="*" element={<Navigate to="/workbench" replace />} />
+            {/* 2026-10-20: 此前是 <Navigate to="/workbench" replace />, 未知 URL 被静默
+                弹回工作台 —— 用户输错路径时分不清是「页面不存在」还是「页面坏了」。
+                这与 AdminDashboardPage.tsx:288 自定的原则相悖, 现改为显式 404。
+                已核对 tests/ 与 e2e/: 无任何用例依赖 catch-all 跳工作台。 */}
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
       </ErrorBoundary>
@@ -340,16 +332,31 @@ function Shell() {
 export default function App() {
   return (
     <AuthProvider>
+      {/* CreditsProvider 依赖 useAuth 的 token, 故必须包在 AuthProvider 内 */}
+      <CreditsProvider>
       <BrowserRouter>
-        <ErrorBoundary>
-          <Suspense fallback={<RouteFallback />}>
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="*" element={<Shell />} />
-            </Routes>
-          </Suspense>
-        </ErrorBoundary>
+        {/* AdminProvider 包在 BrowserRouter 内: useAdmin 依赖 useAuth 的 token,
+            路由切到 /admin 时才加载身份, 不影响 C 端首屏 */}
+        <AdminProvider>
+          <ErrorBoundary>
+            <Suspense fallback={<RouteFallback />}>
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                {/* 手机端上传页: 扫码后打开的独立落地页。
+                    ⚠️ 走**裸外壳**而非 AppLayout —— 手机屏幕窄, 且用户此刻
+                    的任务只有"选一张图传回去"; 更重要的是它不该依赖能力清单
+                    (useCapabilities), 否则后端未起时连传图都传不了。 */}
+                <Route path="/mobile-upload" element={<MobileUploadPage />} />
+                {/* ⚠ /admin/* 必须注册在下面那条 catch-all 之前,
+                    否则会被 `path="*"` 吞进 C 端 Shell */}
+                <Route path="/admin/*" element={<AdminShell />} />
+                <Route path="*" element={<Shell />} />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
+        </AdminProvider>
       </BrowserRouter>
-    </AuthProvider>
+          </CreditsProvider>
+</AuthProvider>
   );
 }

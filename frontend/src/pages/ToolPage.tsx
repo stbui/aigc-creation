@@ -6,16 +6,13 @@ import {
   Input,
   InputNumber,
   Radio,
-  Result,
   Select,
   Slider,
   Switch,
   Typography,
   Upload,
   App,
-  Spin,
   Tag,
-  Empty,
 } from 'antd';
 import type { UploadFile } from 'antd';
 import { ArrowLeft, Upload as UploadIcon, Trash2, RefreshCw, Check, X } from 'lucide-react';
@@ -27,6 +24,9 @@ import { usePollAbort } from '../hooks/usePollAbort';
 import { waitForTask } from '../lib/poll';
 import { MODE_LABELS, MOCK_NOTICE } from '../lib/constants';
 import { CapabilityIcon } from '../components/AppLayout';
+import { ExceptionPage } from '../components/ExceptionPage';
+import { ResultMedia, formatDuration } from '../components/ResultMedia';
+import { StateEmpty, StateSkeleton } from '../components/StateViews';
 import type { Asset, CapabilityParam, Task } from '../types/api';
 
 const { Title, Paragraph, Text } = Typography;
@@ -65,20 +65,24 @@ export function ToolPage() {
   const originalThumb = assets[0] ? toAbsoluteUrl(assets[0].sourceUrl) : undefined;
 
   if (!def) {
-    return <Result status="404" title="能力不存在" subTitle={`未找到能力: ${capability}`} />;
+    return (
+      <ExceptionPage
+        kind="not-found"
+        title="工具不存在"
+        desc={`没有找到标识为 ${capability} 的能力，可能是链接已失效，或后端尚未下发该能力。`}
+        detail={`requested capability: ${capability}`}
+        action={{ to: '/workbench', label: '返回工作台' }}
+      />
+    );
   }
 
   if (def.mode === 'planned') {
     return (
-      <Result
-        status="info"
+      <ExceptionPage
+        kind="info"
         title={`${def.name} 规划中`}
-        subTitle="该能力已在产品路线中占位，尚未接入实现"
-        extra={
-          <Button type="primary" onClick={() => navigate('/workbench')}>
-            返回工作台
-          </Button>
-        }
+        desc="该能力已在产品路线中占位，尚未接入实现。可以先回工作台看看其他已可用的工具。"
+        action={{ to: '/workbench', label: '返回工作台' }}
       />
     );
   }
@@ -213,15 +217,27 @@ export function ToolPage() {
 
         <Card className="tool-result-card" title="生成结果">
           {submitting && !resultUrl ? (
+            /* 生成中 → 骨架占位 (与工具页结果栏同构), 不退回空态 */
             <div className="tool-result-loading">
-              <Spin tip="生成中…" />
+              <StateSkeleton variant="block" count={1} />
+              <p className="tool-result-loading-tip">正在生成，请稍候…</p>
             </div>
           ) : resultUrl ? (
             <>
-              <img className="tool-result-img" src={resultUrl} alt={def.name} />
+              {/* 视频产出必须用 <video> —— 浏览器会把 mp4 当图片解码, 表现为空白预览 */}
+              <ResultMedia
+                className="tool-result-img"
+                url={resultUrl}
+                modality={task?.outputAsset?.modality}
+                alt={def.name}
+              />
               <div className="tool-result-meta">
                 <Text type="secondary">
                   {task?.outputAsset?.width}×{task?.outputAsset?.height} · {task?.outputAsset?.format}
+                  {/* 视频没有宽高 (Jimp 不解视频), 补一个时长 */}
+                  {formatDuration(task?.outputAsset?.durationMs)
+                    ? ` · ${formatDuration(task?.outputAsset?.durationMs)}`
+                    : ''}
                 </Text>
                 <div className="tool-result-actions">
                   <Button
@@ -246,7 +262,11 @@ export function ToolPage() {
               </div>
             </>
           ) : (
-            <Empty description="上传素材并点击生成后，结果会显示在这里" />
+            <StateEmpty
+              compact
+              title="还没有生成结果"
+              desc="上传素材并点击生成后，结果会显示在这里。"
+            />
           )}
         </Card>
       </div>

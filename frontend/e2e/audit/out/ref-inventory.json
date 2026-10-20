@@ -1,0 +1,1481 @@
+{
+  "texts": [
+    "极画",
+    "· AI 电商图",
+    "首页",
+    "电商都在用",
+    "广大卖家优选",
+    "商品主图",
+    "商品详情",
+    "爆款复刻",
+    "创意生图",
+    "多图融合",
+    "商品SKU图",
+    "AI修图",
+    "局部重绘",
+    "一键抠图",
+    "去除水印",
+    "产品精修",
+    "图片翻译",
+    "智能扩图",
+    "商品换色",
+    "旋转角度",
+    "自由创作",
+    "我的作品",
+    "购买套餐",
+    "限时加赠500",
+    "联系客服",
+    "新人免费生图10张",
+    "签到得积分",
+    "工作台",
+    "登录/注册",
+    "AI视频",
+    "电商生图",
+    "上传商品图，即可生成完整套图",
+    "上传商品图，即可生成全套详情图",
+    "上传想参考的爆款图，即刻生成同款",
+    "上传参考图、描述你的想法，即可开始创作",
+    "局部涂抹后，通过文字描述重绘指定区域",
+    "智能识别主体，一键去除图片背景",
+    "智能去除图片中的水印与遮挡文字",
+    "优化商品质感与画面细节，提升展示效果",
+    "保留原有版式，将图片文字翻译为目标语言",
+    "智能补全画面边缘，扩展图片构图",
+    "保持商品结构不变，快速替换主体颜色",
+    "调整商品展示视角，生成新的观察角度",
+    "数据中心",
+    "素材库",
+    "产品建议",
+    "上传参考图",
+    "从素材库导入",
+    "手机上传",
+    "0/4",
+    "点击、拖拽或粘贴参考图片到此处上传",
+    "最多可上传 4 张参考图片，单张不超过 10MB",
+    "创作提示词",
+    "高级设置",
+    "比例 1:1",
+    "画质 1K",
+    "登录免费生图",
+    "效果图预览",
+    "提交任务后，生成结果将在此处展示",
+    "|",
+    "倒计时",
+    "4",
+    "天",
+    ":",
+    "00",
+    "时",
+    "38",
+    "分",
+    "22",
+    "秒",
+    "下架"
+  ],
+  "buttons": [
+    {
+      "text": "极画· AI 电商图",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        32,
+        53,
+        266,
+        38
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(23, 26, 43)",
+      "radius": "0px"
+    },
+    {
+      "text": "首页",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        298,
+        56,
+        54,
+        32
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(102, 112, 133)",
+      "radius": "8px"
+    },
+    {
+      "text": "电商生图电商都在用广大卖家优选电商都在用",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        362,
+        56,
+        97,
+        32
+      ],
+      "bg": "rgb(241, 239, 255)",
+      "color": "rgb(85, 70, 216)",
+      "radius": "8px"
+    },
+    {
+      "text": "商品主图",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        351,
+        105,
+        119,
+        36
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(71, 84, 103)",
+      "radius": "9px"
+    },
+    {
+      "text": "商品详情",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        351,
+        143,
+        119,
+        36
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(71, 84, 103)",
+      "radius": "9px"
+    },
+    {
+      "text": "爆款复刻",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        351,
+        181,
+        119,
+        36
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(71, 84, 103)",
+      "radius": "9px"
+    },
+    {
+      "text": "创意生图",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        351,
+        219,
+        119,
+        36
+      ],
+      "bg": "rgb(242, 239, 255)",
+      "color": "rgb(91, 77, 245)",
+      "radius": "9px"
+    },
+    {
+      "text": "多图融合",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        351,
+        257,
+        119,
+        36
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(71, 84, 103)",
+      "radius": "9px"
+    },
+    {
+      "text": "商品SKU图",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        351,
+        295,
+        119,
+        36
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(71, 84, 103)",
+      "radius": "9px"
+    },
+    {
+      "text": "AI修图",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        469,
+        56,
+        84,
+        32
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(102, 112, 133)",
+      "radius": "8px"
+    },
+    {
+      "text": "局部重绘",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        458,
+        105,
+        106,
+        36
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(71, 84, 103)",
+      "radius": "9px"
+    },
+    {
+      "text": "一键抠图",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        458,
+        143,
+        106,
+        36
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(71, 84, 103)",
+      "radius": "9px"
+    },
+    {
+      "text": "去除水印",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        458,
+        181,
+        106,
+        36
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(71, 84, 103)",
+      "radius": "9px"
+    },
+    {
+      "text": "产品精修",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        458,
+        219,
+        106,
+        36
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(71, 84, 103)",
+      "radius": "9px"
+    },
+    {
+      "text": "图片翻译",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        458,
+        257,
+        106,
+        36
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(71, 84, 103)",
+      "radius": "9px"
+    },
+    {
+      "text": "智能扩图",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        458,
+        295,
+        106,
+        36
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(71, 84, 103)",
+      "radius": "9px"
+    },
+    {
+      "text": "商品换色",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        458,
+        333,
+        106,
+        36
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(71, 84, 103)",
+      "radius": "9px"
+    },
+    {
+      "text": "旋转角度",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        458,
+        371,
+        106,
+        36
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(71, 84, 103)",
+      "radius": "9px"
+    },
+    {
+      "text": "AI视频NEW",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        563,
+        56,
+        84,
+        32
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(102, 112, 133)",
+      "radius": "8px"
+    },
+    {
+      "text": "自由创作",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        551,
+        105,
+        106,
+        36
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(71, 84, 103)",
+      "radius": "9px"
+    },
+    {
+      "text": "我的作品",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        656,
+        56,
+        80,
+        32
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(102, 112, 133)",
+      "radius": "8px"
+    },
+    {
+      "text": "购买套餐",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        746,
+        56,
+        80,
+        32
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(102, 112, 133)",
+      "radius": "8px"
+    },
+    {
+      "text": "邀请有奖限时加赠500",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        836,
+        56,
+        80,
+        32
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(102, 112, 133)",
+      "radius": "8px"
+    },
+    {
+      "text": "联系客服",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        926,
+        56,
+        80,
+        32
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(102, 112, 133)",
+      "radius": "8px"
+    },
+    {
+      "text": "新人免费生图10张",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        953,
+        57,
+        148,
+        30
+      ],
+      "bg": "rgb(255, 227, 227)",
+      "color": "rgb(102, 112, 133)",
+      "radius": "16px"
+    },
+    {
+      "text": "签到得积分",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        1125,
+        56,
+        112,
+        32
+      ],
+      "bg": "rgb(241, 239, 255)",
+      "color": "rgb(85, 70, 216)",
+      "radius": "999px"
+    },
+    {
+      "text": "工作台",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        1261,
+        56,
+        55,
+        32
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(102, 112, 133)",
+      "radius": "6px"
+    },
+    {
+      "text": "登录/注册",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        1340,
+        56,
+        68,
+        32
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(102, 112, 133)",
+      "radius": "6px"
+    },
+    {
+      "text": "工作台",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        132,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "我的作品",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        181,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "AI视频",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        242,
+        133,
+        28
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "6px"
+    },
+    {
+      "text": "自由创作",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        274,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "电商生图",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        335,
+        133,
+        28
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "6px"
+    },
+    {
+      "text": "商品主图",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        367,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "商品详情",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        416,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "爆款复刻",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        465,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "创意生图",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        514,
+        133,
+        45
+      ],
+      "bg": "rgb(241, 239, 255)",
+      "color": "rgb(85, 70, 216)",
+      "radius": "8px"
+    },
+    {
+      "text": "多图融合",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        563,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "商品SKU图",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        612,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "AI修图",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        673,
+        133,
+        28
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "6px"
+    },
+    {
+      "text": "局部重绘",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        705,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "一键抠图",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        754,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "去除水印",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        803,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "产品精修",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        852,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "图片翻译",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        901,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "智能扩图",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        950,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "商品换色",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        999,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "旋转角度",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        1048,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "数据中心",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        1109,
+        133,
+        28
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "6px"
+    },
+    {
+      "text": "素材库",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        1141,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "产品建议",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        784,
+        139,
+        44
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "联系客服",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        24,
+        832,
+        139,
+        44
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "从素材库导入",
+      "tag": "button",
+      "disabled": true,
+      "box": [
+        448,
+        137,
+        72,
+        13
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(78, 89, 105)",
+      "radius": "0px"
+    },
+    {
+      "text": "手机上传",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        528,
+        137,
+        48,
+        13
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(78, 89, 105)",
+      "radius": "0px"
+    },
+    {
+      "text": "AI润色",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        455,
+        343,
+        52,
+        16
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(85, 70, 216)",
+      "radius": "0px"
+    },
+    {
+      "text": "图片转提示词",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        519,
+        343,
+        89,
+        16
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(85, 70, 216)",
+      "radius": "0px"
+    },
+    {
+      "text": "",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        572,
+        424,
+        28,
+        28
+      ],
+      "bg": "rgb(255, 255, 255)",
+      "color": "rgb(152, 162, 179)",
+      "radius": "8px"
+    },
+    {
+      "text": "高级设置比例 1:1画质 1K",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        208,
+        780,
+        400,
+        34
+      ],
+      "bg": "rgb(255, 255, 255)",
+      "color": "rgb(104, 113, 130)",
+      "radius": "7px"
+    },
+    {
+      "text": "登录免费生图",
+      "tag": "button",
+      "disabled": true,
+      "box": [
+        208,
+        828,
+        400,
+        40
+      ],
+      "bg": "rgb(197, 185, 246)",
+      "color": "rgb(255, 255, 255)",
+      "radius": "8px"
+    },
+    {
+      "text": "",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        1114,
+        6,
+        93,
+        28
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(0, 0, 0)",
+      "radius": "0px"
+    },
+    {
+      "text": "",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        1394,
+        8,
+        24,
+        24
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(255, 255, 255)",
+      "radius": "0px"
+    }
+  ],
+  "inputs": [
+    {
+      "tag": "textarea",
+      "type": "",
+      "placeholder": "例如：把这款产品放在未来感厨房场景中，清晨自然光，干净高级，电商广告质感",
+      "maxlength": "4000",
+      "rows": "8",
+      "box": [
+        208,
+        375,
+        400,
+        80
+      ]
+    }
+  ],
+  "imgs": [
+    {
+      "src": "/logo.png",
+      "alt": "",
+      "box": [
+        38,
+        54,
+        36,
+        36
+      ]
+    },
+    {
+      "src": "/static/menu/m_spzt.svg",
+      "alt": "",
+      "box": [
+        363,
+        113,
+        20,
+        20
+      ]
+    },
+    {
+      "src": "/static/menu/m_spxq.svg",
+      "alt": "",
+      "box": [
+        363,
+        151,
+        20,
+        20
+      ]
+    },
+    {
+      "src": "/static/menu/m_bkfk.svg",
+      "alt": "",
+      "box": [
+        363,
+        189,
+        20,
+        20
+      ]
+    },
+    {
+      "src": "/static/menu/m_cyst.svg",
+      "alt": "",
+      "box": [
+        363,
+        227,
+        20,
+        20
+      ]
+    },
+    {
+      "src": "/static/menu/m_dtrh.svg",
+      "alt": "",
+      "box": [
+        363,
+        265,
+        20,
+        20
+      ]
+    },
+    {
+      "src": "/static/menu/m_sku.svg",
+      "alt": "",
+      "box": [
+        363,
+        303,
+        20,
+        20
+      ]
+    },
+    {
+      "src": "/static/menu/m_jbch.svg",
+      "alt": "",
+      "box": [
+        470,
+        113,
+        20,
+        20
+      ]
+    },
+    {
+      "src": "/static/menu/m_bjxc.svg",
+      "alt": "",
+      "box": [
+        470,
+        151,
+        20,
+        20
+      ]
+    },
+    {
+      "src": "/static/menu/m_qcsy.svg",
+      "alt": "",
+      "box": [
+        470,
+        189,
+        20,
+        20
+      ]
+    },
+    {
+      "src": "/static/menu/m_cpjx.svg",
+      "alt": "",
+      "box": [
+        470,
+        227,
+        20,
+        20
+      ]
+    },
+    {
+      "src": "/static/menu/m_tpfy.svg",
+      "alt": "",
+      "box": [
+        470,
+        265,
+        20,
+        20
+      ]
+    },
+    {
+      "src": "/static/menu/m_znkt.svg",
+      "alt": "",
+      "box": [
+        470,
+        303,
+        20,
+        20
+      ]
+    },
+    {
+      "src": "/static/menu/m_sphs.svg",
+      "alt": "",
+      "box": [
+        470,
+        341,
+        20,
+        20
+      ]
+    },
+    {
+      "src": "/static/menu/m_jdxz.svg",
+      "alt": "",
+      "box": [
+        470,
+        379,
+        20,
+        20
+      ]
+    },
+    {
+      "src": "/static/menu/m_cyst.svg",
+      "alt": "",
+      "box": [
+        563,
+        113,
+        20,
+        20
+      ]
+    },
+    {
+      "src": "/assets/nav-promo-hand-C_TCONR3.png",
+      "alt": "",
+      "box": [
+        957,
+        53,
+        24,
+        34
+      ]
+    },
+    {
+      "src": "data:image/svg+xml,%3csvg%20width='24'%20height='24'%20viewBox='0%200%2024%2024'%20fill='none'%20xmlns='http://www.w3.org/2000/svg'%3e%3cdef",
+      "alt": "",
+      "box": [
+        1138,
+        64,
+        16,
+        16
+      ]
+    },
+    {
+      "src": "/static/menu/m_gzt.svg",
+      "alt": "",
+      "box": [
+        31,
+        146,
+        19,
+        17
+      ]
+    },
+    {
+      "src": "/static/menu/m_wdrw.svg",
+      "alt": "",
+      "box": [
+        28,
+        192,
+        24,
+        24
+      ]
+    },
+    {
+      "src": "/static/menu/m_cyst.svg",
+      "alt": "",
+      "box": [
+        28,
+        285,
+        24,
+        24
+      ]
+    },
+    {
+      "src": "/static/menu/m_spzt.svg",
+      "alt": "",
+      "box": [
+        28,
+        378,
+        24,
+        24
+      ]
+    },
+    {
+      "src": "/static/work/spzt.webp",
+      "alt": "商品主图示例",
+      "box": [
+        193,
+        320,
+        344,
+        172
+      ]
+    },
+    {
+      "src": "/static/menu/m_spxq.svg",
+      "alt": "",
+      "box": [
+        28,
+        427,
+        24,
+        24
+      ]
+    },
+    {
+      "src": "/static/work/spxq.webp",
+      "alt": "商品详情示例",
+      "box": [
+        193,
+        369,
+        344,
+        172
+      ]
+    },
+    {
+      "src": "/static/menu/m_bkfk.svg",
+      "alt": "",
+      "box": [
+        28,
+        476,
+        24,
+        24
+      ]
+    },
+    {
+      "src": "/static/work/bkfk.webp",
+      "alt": "爆款复刻示例",
+      "box": [
+        193,
+        418,
+        344,
+        172
+      ]
+    },
+    {
+      "src": "/static/menu/m_cyst.svg",
+      "alt": "",
+      "box": [
+        28,
+        525,
+        24,
+        24
+      ]
+    },
+    {
+      "src": "/static/work/cyst.webp",
+      "alt": "创意生图示例",
+      "box": [
+        193,
+        467,
+        344,
+        172
+      ]
+    },
+    {
+      "src": "/static/menu/m_dtrh.svg",
+      "alt": "",
+      "box": [
+        28,
+        574,
+        24,
+        24
+      ]
+    },
+    {
+      "src": "/static/menu/m_sku.svg",
+      "alt": "",
+      "box": [
+        28,
+        623,
+        24,
+        24
+      ]
+    },
+    {
+      "src": "/static/menu/m_jbch.svg",
+      "alt": "",
+      "box": [
+        28,
+        716,
+        24,
+        24
+      ]
+    },
+    {
+      "src": "/static/work/jbch.webp",
+      "alt": "局部重绘示例",
+      "box": [
+        193,
+        658,
+        344,
+        172
+      ]
+    },
+    {
+      "src": "/static/menu/m_bjxc.svg",
+      "alt": "",
+      "box": [
+        28,
+        765,
+        24,
+        24
+      ]
+    },
+    {
+      "src": "/static/work/bjxc.webp",
+      "alt": "背景消除示例",
+      "box": [
+        193,
+        707,
+        344,
+        172
+      ]
+    },
+    {
+      "src": "/static/menu/m_qcsy.svg",
+      "alt": "",
+      "box": [
+        30,
+        816,
+        21,
+        19
+      ]
+    },
+    {
+      "src": "/static/work/qcsy.webp",
+      "alt": "去除水印示例",
+      "box": [
+        193,
+        756,
+        344,
+        172
+      ]
+    },
+    {
+      "src": "/static/menu/m_cpjx.svg",
+      "alt": "",
+      "box": [
+        28,
+        863,
+        24,
+        24
+      ]
+    },
+    {
+      "src": "/static/work/cpjx.webp",
+      "alt": "产品精修示例",
+      "box": [
+        193,
+        805,
+        344,
+        172
+      ]
+    },
+    {
+      "src": "/static/menu/m_tpfy.svg",
+      "alt": "",
+      "box": [
+        28,
+        912,
+        24,
+        24
+      ]
+    },
+    {
+      "src": "/static/menu/m_znkt.svg",
+      "alt": "",
+      "box": [
+        28,
+        961,
+        24,
+        24
+      ]
+    },
+    {
+      "src": "/static/work/znkt.webp",
+      "alt": "智能扩图示例",
+      "box": [
+        193,
+        903,
+        344,
+        172
+      ]
+    },
+    {
+      "src": "/static/menu/m_sphs.svg",
+      "alt": "",
+      "box": [
+        28,
+        1010,
+        24,
+        24
+      ]
+    },
+    {
+      "src": "/static/work/sphs.webp",
+      "alt": "商品换色示例",
+      "box": [
+        193,
+        952,
+        344,
+        172
+      ]
+    },
+    {
+      "src": "/static/menu/m_jdxz.svg",
+      "alt": "",
+      "box": [
+        28,
+        1059,
+        24,
+        24
+      ]
+    },
+    {
+      "src": "/static/work/xzjd.webp",
+      "alt": "旋转角度示例",
+      "box": [
+        193,
+        1001,
+        344,
+        172
+      ]
+    },
+    {
+      "src": "/static/menu/m_xck.svg",
+      "alt": "",
+      "box": [
+        30,
+        1155,
+        20,
+        18
+      ]
+    },
+    {
+      "src": "/static/menu/m_kf.svg",
+      "alt": "",
+      "box": [
+        31,
+        845,
+        19,
+        19
+      ]
+    },
+    {
+      "src": "data:image/svg+xml,%3csvg%20preserveAspectRatio='none'%20width='100%25'%20height='100%25'%20overflow='visible'%20style='display:%20block;'%2",
+      "alt": "",
+      "box": [
+        401,
+        205,
+        14,
+        14
+      ]
+    },
+    {
+      "src": "/static/home_status/7.png",
+      "alt": "",
+      "box": [
+        952,
+        372,
+        160,
+        160
+      ]
+    },
+    {
+      "src": "/static/topjyb/t_y01.png",
+      "alt": "双节爆单加油包",
+      "box": [
+        209,
+        0,
+        190,
+        40
+      ]
+    },
+    {
+      "src": "/static/topjyb/t_y02.png",
+      "alt": "限时6折特惠",
+      "box": [
+        407,
+        1,
+        160,
+        38
+      ]
+    },
+    {
+      "src": "/static/topjyb/t_y03.png",
+      "alt": "",
+      "box": [
+        1114,
+        6,
+        93,
+        28
+      ]
+    }
+  ],
+  "svgCount": 30,
+  "title": "极画AI｜智能电商图片与商品视觉生成平台",
+  "url": "https://ijihua.cn/free-creation"
+}

@@ -15,6 +15,8 @@ import { useNavigate } from 'react-router-dom';
 import { generateApi, toAbsoluteUrl } from '../lib/api';
 import { capabilityById, capabilityName, toolPath } from '../lib/capabilities';
 import { useCapabilities } from '../hooks/useCapabilities';
+import { StateError, StateSkeleton } from '../components/StateViews';
+import { ResultMedia } from '../components/ResultMedia';
 import type { Task } from '../types/api';
 
 /**
@@ -67,6 +69,14 @@ export function WorksPage() {
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  /**
+   * 加载失败必须与「没有作品」分开存。
+   *
+   * 2026-10-20 修: 此前失败只 `message.error` 弹一下, 然后照样落进空态分支
+   * 渲染「还没有作品」—— 用户看到的是"你还没有作品", 而真相是"接口没连上"。
+   * 这会让人以为作品丢了而反复重试, 属于**谎报状态**。
+   */
+  const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<'image' | 'video'>('image');
 
   // 四个筛选器（与参考站一致的多选/单选语义）
@@ -86,14 +96,16 @@ export function WorksPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    setError(null);
     try {
       setTasks(await generateApi.list());
     } catch (e) {
-      message.error((e as Error).message || '作品列表加载失败');
+      // 保留上一次数据: 刷新失败不该把已看到的作品清空
+      setError((e as Error).message || '作品列表加载失败');
     } finally {
       setLoading(false);
     }
-  }, [message]);
+  }, []);
 
   useEffect(() => {
     void load();
@@ -480,9 +492,17 @@ export function WorksPage() {
       </div>
 
       {loading ? (
-        <div className="my-works-loading">
-          <Loader2 size={20} className="my-works-spin" />
-        </div>
+        /* 骨架屏占住卡片网格的形状 —— 内容到达时零位移;
+           此前是居中一个转圈, 网格区域整块塌陷再撑开, 页面明显跳动。 */
+        <StateSkeleton variant="card" count={12} columns={6} />
+      ) : error ? (
+        /* 失败态与空态必须分开: 「没连上」不是「没有作品」 */
+        <StateError
+          title="作品列表加载失败"
+          desc="没能取回你的作品列表。可能是后端未启动或网络异常，重试一次即可。"
+          detail={error}
+          onRetry={() => void load()}
+        />
       ) : visible.length === 0 ? (
         <div className="my-works-empty">
           <h2>{activeFilterCount > 0 ? '没有符合条件的作品' : '还没有作品'}</h2>
@@ -509,7 +529,11 @@ export function WorksPage() {
                     }}
                   >
                     {url ? (
-                      <img src={url} alt={capabilityName(t.capability)} loading="lazy" />
+                      <ResultMedia
+                        url={url}
+                        modality={t.outputAsset?.modality}
+                        alt={capabilityName(t.capability)}
+                      />
                     ) : (
                       <span className="my-work-image-placeholder">
                         {t.status === 'failed' ? (

@@ -1,10 +1,14 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Menu } from 'lucide-react';
+import { Drawer } from 'antd';
 import { capabilityById, toolPath } from '../lib/capabilities';
 import { useCapabilities } from '../hooks/useCapabilities';
 import { PromoBar } from '../components/PromoBar';
 import { useAuth } from '../context/AuthContext';
+import { productsApi, membershipApi } from '../lib/api';
+import type { Product, MembershipPlan } from '../types/api';
+import { useEffect } from 'react';
 
 /**
  * 营销首页 —— 1:1 复刻参考站 https://ijihua.cn/ (landing-page)。
@@ -33,7 +37,7 @@ import { useAuth } from '../context/AuthContext';
  * 路由对齐: 参考站 `/` 是营销首页、工作台在 `/workbench`; 本项目同步该结构。
  * 商业内容 (套餐价目 / 案例图 / 客户 logo / 营销文案) 按用户 2026-10-17 决策「完全照搬」,
  * 资源已下载到 `frontend/public/landing/` 自托管 (不热链第三方 CDN)。
- * 品牌标识保留本项目自有 (电商视觉工坊), 不替换为参考站商标。
+ * 品牌标识保留本项目自有 (货觉AI, 2026-10-19 定名), 不替换为参考站商标。
  */
 
 /** 资源前缀: 全部落在 public/landing 下, 由 vite 原样拷贝 */
@@ -88,65 +92,42 @@ const TOOL_ENTRIES: ToolEntry[] = [
   { label: '旋转角度', icon: 'm_jdxz', to: '/rotate-angle' },
 ];
 
-/** 订阅套餐: 参考站真实价目 (用户决策「完全照搬」) */
-const PACKAGES = [
-  {
-    tag: '体验尝鲜',
-    name: '周卡',
-    price: '9.90',
-    origin: '29.90',
-    credits: '100 订阅积分',
-    features: ['可生成10张图片', '送70次AI修图', '有效期7天'],
-    extras: ['专享快速生成通道 2K/4K', '同时处理多个任务', '加油包会员专享95折'],
-    recommended: false,
-  },
-  {
-    tag: '月卡',
-    name: '月卡',
-    price: '39.90',
-    origin: '139.90',
-    credits: '260 订阅积分',
-    features: ['可生成26张图片', '送320次AI修图', '有效期30天'],
-    extras: ['专享快速生成通道 2K/4K', '同时处理多个任务', '加油包会员专享95折'],
-    recommended: false,
-  },
-  {
-    tag: '推荐',
-    name: '季卡',
-    price: '109.00',
-    origin: '379.90',
-    credits: '1100 订阅积分',
-    features: ['可生成110张图片', '送850次AI修图', '有效期90天（每月发放）'],
-    extras: ['专享快速生成通道 2K/4K', '同时处理多个任务', '加油包会员专享95折'],
-    recommended: true,
-  },
-  {
-    tag: '年卡',
-    name: '年卡',
-    price: '359.00',
-    origin: '1249.90',
-    credits: '4880 订阅积分',
-    features: ['可生成488张图片', '送1900次AI修图', '有效期365天（每月发放）'],
-    extras: ['专享快速生成通道 2K/4K', '同时处理多个任务', '加油包会员专享95折'],
-    recommended: false,
-  },
+/**
+ * 订阅套餐静态描述 (**仅视觉, 不含价格**)。
+ *
+ * ⚠ 2026-10-20 重大变更: 订阅卡价格与积分数改为读后端 `/membership/plans`。
+ * 此前整组价目写死在本页 (周卡 9.90 / 月卡 39.90 / 季卡 109 / 年卡 359),
+ * 与商品表完全是两套事实源 —— 改价要同时改两处, 漏一处就展示与实付不一致。
+ *
+ * 「推荐 / 标签 / 副标题」属视觉资产, 留在前端; **价格与积分一律读接口**。
+ */
+/**
+ * 订阅套餐的**视觉**信息 (标签 / 推荐位), 按 sortOrder 顺序与后端套餐一一对应。
+ *
+ * ⚠ 2026-10-20 重大变更: 订阅卡价格与积分数改为读后端 `/membership/plans`。
+ * 此前整组价目写死在本页 (周卡 9.90 / 月卡 39.90 / 季卡 109 / 年卡 359),
+ * 与会员表完全是两套事实源 —— 改价要同时改两处, 漏一处就展示与实付不一致。
+ *
+ * 刻意**不按 code 匹配**: 后端套餐 code 由 seed 定义 (basic/pro/studio),
+ * 前端硬编码 code 等于把后端标识抄一份, 后台改了 code 这边就静默错位。
+ * 只保留视觉顺序, 内容一律取接口值。
+ */
+const PACKAGE_VISUALS = [
+  { tag: '体验尝鲜', recommended: false },
+  { tag: '热门', recommended: false },
+  { tag: '推荐', recommended: true },
+  { tag: '年卡', recommended: false },
 ];
 
-interface AddonPack {
-  icon: string;
-  name: string;
-  price: string;
-  origin: string;
-  desc: string;
-}
-
-/** 加油包 tab 内容 */
-const ADDON_PACKS: AddonPack[] = [
-  { icon: 'icon_jcb', name: '基础加油包', price: '19.90', origin: '29.90', desc: '100 积分 · 可生成 10 张图片' },
-  { icon: 'icon_bzb', name: '进阶加油包', price: '69.90', origin: '99.90', desc: '400 积分 · 可生成 40 张图片' },
-  { icon: 'icon_zyb', name: '全站加油包', price: '129.90', origin: '199.90', desc: '800 积分 · 可生成 80 张图片' },
-  { icon: 'icon_qjb', name: '全量加油包', price: '299.90', origin: '459.90', desc: '2000 积分 · 可生成 200 张图片' },
-];
+/**
+ * 加油包卡片图标。图标是**视觉资产**, 与定价无关, 故仍在前端按位置取 ——
+ * 价目与积分数一律读 GET /products。
+ *
+ * ⚠ 2026-10-20 起本页不再硬编码加油包价目。此前写死的一组价
+ * (¥19.90/100 积分) 与后台 seed-commerce 的 (¥9.90/500 积分) 单位成本差 10 倍,
+ * 两套并存会让用户看到的价格与实付对不上。现在只认后端这一套。
+ */
+const ADDON_ICONS = ['icon_jcb', 'icon_bzb', 'icon_zyb', 'icon_qjb'];
 
 /** 案例 tab: key → 图片前缀与文件名列表 (实拍自参考站 case-tab 切换) */
 const CASE_TABS = [
@@ -196,21 +177,26 @@ function LandingHeader() {
   const navigate = useNavigate();
   const [open, setOpen] = useState<string | null>(null);
 
-  // 落地页工具区只展示「电商生图 / AI修图」两组, 与 AppLayout 顶导口径一致
-  // (参考站这两处都只有两个下拉)。写死 id 而非 slice 是因为落地页要显式排除
-  // ai_video —— 它是倒序第三组, slice 会随registry 调序而误纳。
-  const navGroups = useMemo(
-    () => (data?.groups ?? []).filter((g) => g.id === 'ecommerce_gen' || g.id === 'ai_retouch'),
-    [data],
-  );
+  // 落地页顶导与应用外壳同口径: 参考站 landing/workspace 共用同一套外壳, 3 个分组下拉齐全。
+  // (旧注释「只展示两组 / 显式排除 ai_video」依据的是 10-17 旧快照, 已被 2026-10-19 实拍推翻)
+  const navGroups = data?.groups ?? [];
+
+  // 移动端 (≤900px) 导航抽屉: 落地页顶栏是自有实现, 不走应用外壳那套断点,
+  // 390 实测原本把品牌+导航+算力胶囊+登录挤成 4 行。参考站 390 是「品牌 + 汉堡」,
+  // 导航全进抽屉 —— 这里同构。
+  const [menuOpen, setMenuOpen] = useState(false);
+  const closeMenu = () => setMenuOpen(false);
 
   return (
     <>
       <PromoBar />
       <header className="landing-topbar">
         <Link to="/" className="landing-brand">
-          <span className="landing-brand-mark">EV</span>
-          <span className="landing-brand-text">电商视觉工坊</span>
+          {/* 品牌标记: 货觉AI「觉眼」logo (2026-10-19, 见 docs/brand/brand-basics.md) */}
+          <img src="/brand/huojue-mark.svg" alt="货觉AI" className="landing-brand-mark" />
+          <span className="landing-brand-text">
+            货觉<span className="landing-brand-ai">AI</span>
+          </span>
         </Link>
         <nav className="landing-nav">
           <Link to="/" className="landing-nav-item is-active">
@@ -276,7 +262,70 @@ function LandingHeader() {
             </Link>
           )}
         </div>
+        {/* 汉堡必须是 header 的直系子元素: 放在 .landing-topbar-right 里会随该容器
+            在 ≤900px 一起 display:none, 按钮永远点不到 (2026-10-19 实测踩到) */}
+        <button
+          type="button"
+          className="landing-mobile-toggle"
+          aria-label="打开导航菜单"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen(true)}
+        >
+          <Menu size={20} />
+        </button>
       </header>
+
+      {/* 移动端导航抽屉 (≤900px 顶栏只留品牌 + 汉堡, 参考站 390 同构) */}
+      <Drawer
+        title="导航菜单"
+        placement="right"
+        size={300}
+        open={menuOpen}
+        onClose={closeMenu}
+        className="landing-mobile-drawer"
+        styles={{ body: { padding: 0 } }}
+      >
+        <nav className="landing-mobile-nav" aria-label="移动端导航">
+          <Link to="/" className="landing-mobile-item" onClick={closeMenu}>
+            首页
+          </Link>
+          {navGroups.map((g) => (
+            <div key={g.id} className="landing-mobile-group">
+              <span className="landing-mobile-group-title">{g.name}</span>
+              {(data?.items ?? [])
+                .filter((i) => i.group === g.id)
+                .map((i) => (
+                  <button
+                    key={i.id}
+                    type="button"
+                    className="landing-mobile-item"
+                    onClick={() => {
+                      closeMenu();
+                      navigate(toolPath(i.id));
+                    }}
+                  >
+                    {i.name}
+                  </button>
+                ))}
+            </div>
+          ))}
+          <div className="landing-mobile-group">
+            <span className="landing-mobile-group-title">账户与工具</span>
+            <Link to="/works" className="landing-mobile-item" onClick={closeMenu}>
+              我的作品
+            </Link>
+            <Link to="/packages" className="landing-mobile-item" onClick={closeMenu}>
+              购买套餐
+            </Link>
+            <Link to="/invitations" className="landing-mobile-item" onClick={closeMenu}>
+              邀请有奖
+            </Link>
+            <Link to="/stats" className="landing-mobile-item" onClick={closeMenu}>
+              数据中心
+            </Link>
+          </div>
+        </nav>
+      </Drawer>
     </>
   );
 }
@@ -284,7 +333,54 @@ function LandingHeader() {
 export function LandingPage() {
   const navigate = useNavigate();
   const [pkgTab, setPkgTab] = useState<'sub' | 'addon'>('sub');
+  /** 加油包: 读后端 SKU。拉不到时如实留空, 不回落硬编码价 */
+  const [addons, setAddons] = useState<Product[]>([]);
+  /** 订阅套餐: 读后端 MembershipPlan, 同样不回落硬编码 */
+  const [plans, setPlans] = useState<MembershipPlan[]>([]);
+  /**
+   * 两个价目接口各自的加载/失败状态 (2026-10-20 修)。
+   *
+   * 此前失败与"加载中"共用 `length === 0` 一个判断, 失败后页面会**永久**
+   * 显示「套餐加载中…」—— 接口早就挂了, 用户看到的却是一个永远转不完的等待。
+   * 加载中 / 加载失败 / 没有该商品 三者必须分开。
+   */
+  const [plansState, setPlansState] = useState<'loading' | 'error' | 'ready'>('loading');
+  const [addonsState, setAddonsState] = useState<'loading' | 'error' | 'ready'>('loading');
   const [caseTab, setCaseTab] = useState<string>(CASE_TABS[0].key);
+
+  useEffect(() => {
+    let alive = true;
+    // 两个价目接口互不依赖, 一个失败不该拖垮另一个
+    productsApi
+      .list()
+      .then((list) => {
+        if (!alive) return;
+        setAddons(list);
+        setAddonsState('ready');
+      })
+      .catch(() => {
+        // 拉不到就显示为空态 —— 落地页不该因为一个接口挂了就整页崩掉,
+        // 也不该回落硬编码价 (那正是本次要消灭的第二套价目)
+        if (!alive) return;
+        setAddons([]);
+        setAddonsState('error');
+      });
+    membershipApi
+      .plans()
+      .then((list) => {
+        if (!alive) return;
+        setPlans(list);
+        setPlansState('ready');
+      })
+      .catch(() => {
+        if (!alive) return;
+        setPlans([]);
+        setPlansState('error');
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const activeCase = useMemo(
     () => CASE_TABS.find((t) => t.key === caseTab) ?? CASE_TABS[0],
@@ -312,7 +408,10 @@ export function LandingPage() {
 
       {/* ── 1. hero ── */}
       <section className="home-v2-hero">
-        <h1>极画AI电商图 上新快10倍 拍图成本直降90%</h1>
+        {/* 营销文案按 2026-10-17「完全照搬」决策保留, 但品牌名必须是自有品牌:
+            原标题带参考站商标「极画AI」, 与 README「保留本项目自有品牌标识, 不替换为参考站商标」冲突,
+            2026-10-19 统一为货觉AI (见 docs/brand/brand-basics.md) */}
+        <h1>货觉AI电商图 上新快10倍 拍图成本直降90%</h1>
         <p>上传商品图，一键生成白底图、场景图、卖点图、详情页全套电商图</p>
       </section>
 
@@ -391,48 +490,96 @@ export function LandingPage() {
         <div className="home-v2-package-scroller">
           {pkgTab === 'sub' ? (
             <div className="home-v2-package-row">
-              {PACKAGES.map((p) => (
-                <article
-                  key={p.name}
-                  className={`home-v2-package-card${p.recommended ? ' is-recommended' : ''}`}
-                >
-                  {p.tag && <span className="home-v2-package-tag">{p.tag}</span>}
-                  <h3>{p.name}</h3>
-                  <div className="home-v2-package-price">
-                    <span className="cur">￥</span>
-                    <span className="num">{p.price}</span>
-                    <del>原价￥{p.origin}</del>
-                  </div>
-                  <p className="home-v2-package-credits">✦ {p.credits}</p>
-                  <ul className="home-v2-package-list">
-                    {p.features.map((f) => (
-                      <li key={f}>{f}</li>
-                    ))}
-                  </ul>
-                  <ul className="home-v2-package-extras">
-                    {p.extras.map((f) => (
-                      <li key={f}>{f}</li>
-                    ))}
-                  </ul>
-                  <button type="button" className="home-v2-package-buy">
-                    立即购买
-                  </button>
-                </article>
-              ))}
+              {plansState === 'loading' && (
+                <p className="home-v2-addon-empty">套餐加载中…</p>
+              )}
+              {plansState === 'error' && (
+                <p className="home-v2-addon-empty">套餐暂时加载失败，请稍后刷新查看</p>
+              )}
+              {plansState === 'ready' && plans.length === 0 && (
+                <p className="home-v2-addon-empty">暂无可用套餐</p>
+              )}
+              {plans.map((plan, i) => {
+                const visual = PACKAGE_VISUALS[i];
+                // free 档无 durationDays, 不作为可购买的订阅卡
+                if (plan.durationDays <= 0) return null;
+                return (
+                  <article
+                    key={plan.id}
+                    className={`home-v2-package-card${visual?.recommended ? ' is-recommended' : ''}`}
+                  >
+                    {visual?.tag && <span className="home-v2-package-tag">{visual.tag}</span>}
+                    <h3>{plan.name}</h3>
+                    <div className="home-v2-package-price">
+                      <span className="cur">￥</span>
+                      <span className="num">{(plan.priceCents / 100).toFixed(2)}</span>
+                    </div>
+                    <p className="home-v2-package-credits">✦ {plan.monthlyCredits} 积分 / 月</p>
+                    {/* 权益文案由后端 buildPerkLabels 生成 —— 改权益只需改一处,
+                        不会出现「宣传页写的和实际给的不一样」 */}
+                    <ul className="home-v2-package-list">
+                      {plan.perkLabels.map((f) => (
+                        <li key={f}>{f}</li>
+                      ))}
+                    </ul>
+                    {/*
+                     * 订阅购买尚未接入订单+支付链路 (MembershipPlan 不在 Product 表里,
+                     * 走的是另一套 subscribe 端点)。与其放一个点了没反应的死按钮,
+                     * 不如明说未开放 —— 死按钮会被当成 bug 报上来。
+                     */}
+                    <button
+                      type="button"
+                      className="home-v2-package-buy"
+                      disabled
+                      title="订阅购买链路尚未接入订单与支付, 加油包已可购买"
+                    >
+                      即将开放
+                    </button>
+                  </article>
+                );
+              })}
             </div>
           ) : (
             <div className="home-v2-addon-row">
-              {ADDON_PACKS.map((p) => (
-                <article key={p.name} className="home-v2-addon-card">
-                  <img src={`${A}/icons/${p.icon}.svg`} alt="" aria-hidden loading="lazy" decoding="async" />
+              {addonsState === 'loading' && (
+                <p className="home-v2-addon-empty">积分包加载中…</p>
+              )}
+              {addonsState === 'error' && (
+                <p className="home-v2-addon-empty">积分包暂时加载失败，请稍后刷新查看</p>
+              )}
+              {addonsState === 'ready' && addons.length === 0 && (
+                <p className="home-v2-addon-empty">暂无可用积分包</p>
+              )}
+              {addons.map((p, i) => (
+                <article key={p.id} className="home-v2-addon-card">
+                  {ADDON_ICONS[i] && (
+                    <img
+                      src={`${A}/icons/${ADDON_ICONS[i]}.svg`}
+                      alt=""
+                      aria-hidden
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  )}
                   <h3>{p.name}</h3>
                   <div className="home-v2-addon-price">
                     <span className="cur">￥</span>
-                    <span className="num">{p.price}</span>
-                    <del>原价￥{p.origin}</del>
+                    <span className="num">{(p.priceCents / 100).toFixed(2)}</span>
+                    {p.originalPriceCents && p.originalPriceCents > p.priceCents && (
+                      <del>原价￥{(p.originalPriceCents / 100).toFixed(2)}</del>
+                    )}
                   </div>
-                  <p>{p.desc}</p>
-                  <button type="button" className="home-v2-package-buy">
+                  {/*可生成张数不再写死「积分 ÷ 10」—— 实际每次扣多少以能力消耗价为准,
+                      与生成页显示的同一个数, 免得两处算法漂移 */}
+                  <p>
+                    {p.credits} 积分
+                    {p.creditsValidDays > 0 ? ` · ${p.creditsValidDays} 天内有效` : ' · 永久有效'}
+                  </p>
+                  <button
+                    type="button"
+                    className="home-v2-package-buy"
+                    onClick={() => navigate('/packages')}
+                  >
                     立即购买
                   </button>
                 </article>
@@ -532,8 +679,8 @@ export function LandingPage() {
       <footer className="landing-footer">
         <div className="landing-footer-inner">
           <div className="landing-footer-brand">
-            <strong>电商视觉工坊 · AI 电商图</strong>
-            <p>让每一张商品图，都更快抵达高转化。</p>
+            <strong>货觉AI · 电商视觉创作平台</strong>
+            <p>好图，好卖 —— 商品图 · 详情页 · 营销视觉，一站生成</p>
             <div className="landing-footer-logos">
               <img src={`${A}/logos/t_y01.png`} alt="客户 logo" loading="lazy" />
               <img src={`${A}/logos/t_y02.png`} alt="客户 logo" loading="lazy" />
@@ -560,7 +707,7 @@ export function LandingPage() {
           </div>
         </div>
         <p className="landing-footer-copy">
-          © 2026 电商视觉工坊. 本地演示项目 · 商业内容与案例素材按参考站设计复刻，仅用于设计对齐演示。
+          © 2026 货觉AI. 本地演示项目 · 商业内容与案例素材按参考站设计复刻，仅用于设计对齐演示。
         </p>
       </footer>
     </div>

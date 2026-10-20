@@ -21,7 +21,7 @@ import { BG_COLOR_SWATCHES, ColorSwatchGrid, CustomColorInput } from '../compone
  *     2 框选要变化的区域 — 框选可变内容区域，精准控制生成范围
  *     3 编辑SKU清单 — 录入商品 SKU 信息，配置每个 SKU 的变化内容
  *     4 批量输出SKU图 — 一键生成多款 SKU 图，高效完成批量出图
- *   高级设置: 比例 1:1 / 画质 1K; 提交: 立即生成 本次消耗0积分
+ *   高级设置: 比例 1:1 / 画质 1K; 提交: 立即生成 (消耗价由后端下发, 当前为 0)
  *   结果面板: 商品SKU图 — 一张图，批量套出版式完全一致的整组 SKU 图。
  *
  * 本地适配: 参考站的画布框选 (最多 3 个区域) 以位置枚举代替; SKU 清单每行提交
@@ -151,7 +151,6 @@ export function ProductSkuPage() {
       upload={null}
       settings={{ ratio: true, resolution: true }}
       submitLabel="立即生成"
-      creditLabel="本次消耗0积分"
       emptyDesc="上传模板图并编辑 SKU 清单后，批量结果会显示在这里"
       formValid={template !== null && rows.length > 0}
       submitting={submitting}

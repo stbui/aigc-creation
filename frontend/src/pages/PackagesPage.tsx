@@ -1,43 +1,69 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Gem } from 'lucide-react';
+import { productsApi } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
+import { StateError, StateSkeleton } from '../components/StateViews';
+import type { Product } from '../types/api';
 
 /**
- * 积分商城（1:1 复刻参考站 https://ijihua.cn/packages）
+ * 积分商城 (1:1 复刻参考站版式, 数据已接真实接口)。
  *
- * 版式证据：参考站产物 CSS 的 `pkg-*` 族共 91 条规则（`.pkg-shop-page` / `.pkg-shop-container` /
- * `.pkg-back-btn` / `.pkg-shop-hero` / `.pkg-grid` / `.pkg-card*` / `.pkg-select-btn` /
- * `.pkg-confirm-*` / `.pkg-result-*`）。本页只落**选包态**（`.pkg-grid` 一层）；
- * 确认弹层与支付结果态依赖登录墙后的真实订单数据，参考站无可见证据，未复刻（见文件末尾说明）。
+ * 版式沿用参考站 `pkg-*` 族 (选包态), 但**价目与积分数一律读 `GET /products`**:
+ * 此前此页是硬编码「版式示例数据」+ 按钮禁用, 现已换成后端 SKU 单一事实源。
+ * 新增/改价只动后台, 本页自动跟随。
  *
- * 诚实披露（重要）：
- *   参考站的套餐名称 / 积分数 / 价格都在登录墙之后，本地无证据，**未编造**。
- *   `PACKAGES` 是**版式示例数据**（注释已标注），用于呈现 1:1 版式；
- *   本项目没有积分账户与计费系统，购买按钮一律禁用并明示原因，不做假支付。
+ * 金额一律整数分由后端下发, 本页只做展示层格式化 (¥ + 分/100) ——
+ * 边界转换只在一处发生, 避免各处四舍五入不一致。
  */
 
-interface PackageItem {
-  id: string;
-  name: string;
-  badge?: string;
-  points: string;
-  unit: string;
-  bonus?: string;
-  price: string;
-  oldPrice?: string;
+/** 分 → 「¥39.00」。整数分不该出现小数抖动, 故先转元再保留两位 */
+function formatYuan(cents: number): string {
+  return `¥${(cents / 100).toFixed(2)}`;
 }
 
-// ── 版式示例数据：非真实定价，仅用于呈现参考站的选包版式 ──
-const PACKAGES: PackageItem[] = [
-  { id: 'starter', name: '入门包', badge: '新客首选', points: '1,000', unit: '积分', bonus: '额外赠送 100 积分', price: '¥39', oldPrice: '¥59' },
-  { id: 'growth', name: '成长包', points: '5,000', unit: '积分', bonus: '额外赠送 800 积分', price: '¥169', oldPrice: '¥199' },
-  { id: 'pro', name: '专业包', badge: '高性价比', points: '20,000', unit: '积分', bonus: '额外赠送 4,000 积分', price: '¥599' },
-  { id: 'custom', name: '企业定制', points: '面议', unit: '积分', bonus: '按团队规模定制额度', price: '联系顾问' },
-];
+/** 积分千分位 */
+function formatCredits(n: number): string {
+  return n.toLocaleString('zh-CN');
+}
 
 export function PackagesPage() {
   const navigate = useNavigate();
-  const [selected, setSelected] = useState<string | null>(null);
+  const { token, openLogin } = useAuth();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setProducts(await productsApi.list());
+    } catch (e) {
+      // 拉不到价目就如实说, 不用硬编码兜底 —— 那正是本次要消灭的东西
+      setError((e as Error).message || '商品加载失败');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const buy = (p: Product) => {
+    if (!token) {
+      /*
+       * 未登录不跳走 —— 用 openLogin() 弹登录遮罩, 登录成功留在商城。
+       * 与参考站「点购买 → 弹登录框」同构; 直接 navigate('/login')
+       * 会把用户送离商城, 转化链路断在这里。
+       */
+      openLogin();
+      return;
+    }
+    // 结算页自己生成并持有幂等键 —— 同一笔下单重试必须复用同一个 key
+    navigate(`/checkout/${p.sku}`);
+  };
 
   return (
     <div className="pkg-shop-page">
@@ -51,58 +77,69 @@ export function PackagesPage() {
             <Gem size={22} />
             积分商城
           </h1>
-          <p>积分可用于解锁全部 AI 创作能力，按需购买、长期有效</p>
+          <p>积分可用于解锁全部 AI 创作能力，按需购买</p>
         </div>
 
+        {/*
+          加载 / 失败 / 空 三态分开 (2026-10-20 修)。
+
+          此前失败态复用了 `.pkg-sandbox-notice` —— 那个 class 的语义是
+          "沙箱支付说明", 拿来渲染"商品加载失败"会把一条环境说明
+          和一条错误混在同一视觉里, 用户以为这是正常提示的一部分。
+        */}
+        {loading && <StateSkeleton variant="card" count={3} columns={3} />}
+
+        {!loading && error && (
+          <StateError
+            title="商品加载失败"
+            desc="没能取回积分包价目。可能是后端未启动或网络异常，重试一次即可。"
+            detail={error}
+            onRetry={() => void load()}
+          />
+        )}
+
+        {!loading && !error && products.length === 0 && (
+          <p className="pkg-shop-disclosure">当前没有在售积分包</p>
+        )}
+
         <div className="pkg-grid">
-          {PACKAGES.map((p) => (
-            <article
-              key={p.id}
-              className={`pkg-card${selected === p.id ? ' is-selected' : ''}`}
-              onClick={() => setSelected(p.id)}
-            >
+          {products.map((p) => (
+            <article key={p.id} className="pkg-card">
               <div className="pkg-card-top">
                 <span className="pkg-card-name">{p.name}</span>
-                {p.badge && <span className="pkg-card-badge">{p.badge}</span>}
+                {p.isFree && <span className="pkg-card-badge">免费</span>}
               </div>
 
               <div className="pkg-card-points">
-                <strong>{p.points}</strong>
-                <span>{p.unit}</span>
+                <strong>{formatCredits(p.credits)}</strong>
+                <span>积分</span>
               </div>
 
-              {p.bonus && <span className="pkg-card-bonus">{p.bonus}</span>}
+              {/* 有效期来自 SKU 而非写死: 加油包永久、订阅卡有期限 */}
+              <span className="pkg-card-bonus">
+                {p.creditsValidDays > 0 ? `${p.creditsValidDays} 天内有效` : '永久有效'}
+              </span>
 
               <div className="pkg-card-price">
-                <strong>{p.price}</strong>
-                {p.oldPrice && <span className="pkg-card-price-old">{p.oldPrice}</span>}
+                <strong>{p.isFree ? '免费' : formatYuan(p.priceCents)}</strong>
+                {p.originalPriceCents && p.originalPriceCents > p.priceCents && (
+                  <span className="pkg-card-price-old">{formatYuan(p.originalPriceCents)}</span>
+                )}
               </div>
 
-              {/* 本地无计费系统：按钮禁用并明示，不做假支付 */}
-              <button
-                type="button"
-                className="pkg-select-btn"
-                disabled
-                title="本地未接入积分账户与计费，购买流程不可用"
-              >
-                立即购买
+              <button type="button" className="pkg-select-btn" onClick={() => buy(p)}>
+                {p.isFree ? '免费领取' : '立即购买'}
               </button>
             </article>
           ))}
         </div>
 
         <p className="pkg-shop-disclosure">
-          本地版未接入积分账户与支付，套餐名称 / 积分数 / 价格均为<strong>版式示例数据</strong>
-          （参考站对应内容在登录墙之后，无可见证据，未复制），购买按钮已禁用。接入真实计费后此处即为下单入口。
+          积分包价目与积分数均来自后台商品配置，<strong>非本页硬编码</strong>；生成每次实际扣除的积分
+          以能力消耗价为准（同样由后台配置，可在「商品管理 → 能力消耗价」调整）。
+          当前支付通道为<strong>沙箱模式，不产生真实扣款</strong>。
         </p>
       </div>
     </div>
   );
 }
-
-/**
- * 未复刻清单（参考站有规则但本地无证据/无功能）：
- *   .pkg-confirm-card / .pkg-payment-options(支付宝 #009FE8 · 微信 #24B340) / .pkg-pay-btn
- *   .pkg-result-card / .pkg-wechat-qr / .pkg-result-detail —— 均为下单确认与支付结果态，
- *   需要真实订单/支付回调，本项目无计费系统，不做假流程，故不实现。
- */

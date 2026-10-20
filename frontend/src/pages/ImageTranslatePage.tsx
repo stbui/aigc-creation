@@ -14,7 +14,7 @@ import { languageOptions } from '../lib/optionSets';
  *       Deutsch/日本語/한국어/Português/Bahasa Indonesia/ไทย
  *     保护商品主体: role=switch, 默认开 (aria-checked=true)
  *   高级设置: 仅"画质 1K" (参考站该页无比例档位, 翻译保持原图比例)
- *   提交: 立即翻译 本次消耗5积分; 提示行 "* 确认素材和参数后提交，右侧会展示翻译结果。"
+ *   提交: 立即翻译 (消耗价由后端下发); 提示行 "* 确认素材和参数后提交，右侧会展示翻译结果。"
  *   描述: 智能翻译图片文字，保留原版式快速本地化
  *
  * 诚实披露: image_translate 为 mock 能力 (需 OCR + 翻译模型), 本地以
@@ -35,7 +35,6 @@ export function ImageTranslatePage() {
       upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
       settings={{ resolution: true }}
       submitLabel="立即翻译"
-      creditLabel="本次消耗5积分"
       hint="* 确认素材和参数后提交，右侧会展示翻译结果。"
       mockNote="本地演示：以目标语言文本块占位（真实翻译需接入 OCR + 翻译模型），保护商品主体开关真实生效"
       emptyDesc="上传图片后，翻译结果将在此处展示"

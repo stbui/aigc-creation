@@ -1,0 +1,93 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# 前端容器内的 Nginx 配置（模板）。
+#
+# 文件名带 .template 是关键：nginx 官方镜像启动时会把
+# /etc/nginx/templates/*.template 经 envsubst 渲染到 /etc/nginx/conf.d/。
+# 于是上游地址可以由环境变量决定 —— 否则测试环境的前端容器会把
+# 请求代理到**开发**后端（服务名 backend）而不是 backend-test，
+# 表现为「测试前端连着开发库」，且没有任何报错。
+# ─────────────────────────────────────────────────────────────────────────────
+
+upstream huojue_backend {
+    # 由环境变量 BACKEND_UPSTREAM 注入，默认 compose 的 backend:3001
+    server ${BACKEND_UPSTREAM} keepalive 32;
+}
+
+server {
+    listen       80;
+    server_name  _;
+
+    root  /usr/share/nginx/html;
+    index index.html;
+
+    # ── 安全响应头 ─────────────────────────────────────────────────────────
+    # CSP 暂不启用：Vite 产物会内联 style，开了 strict CSP 得逐条调内联资源，
+    # 收益与成本不成比例。
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options        "SAMEORIGIN" always;
+    add_header Referrer-Policy        "strict-origin-when-cross-origin" always;
+
+    # ── 压缩 ───────────────────────────────────────────────────────────────
+    gzip              on;
+    gzip_vary         on;
+    gzip_min_length   1024;
+    gzip_comp_level   6;
+    gzip_types        text/plain text/css application/javascript application/json
+                      image/svg+xml application/xml font/woff2;
+
+    client_max_body_size 25m;   # 与后端 multer 的 20MB + 余量对齐
+
+    # ── API 反代 ───────────────────────────────────────────────────────────
+    location /api/ {
+        proxy_pass         http://huojue_backend;
+        proxy_http_version 1.1;
+        proxy_set_header   Connection "";
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   X-Forwarded-Proto $scheme;
+
+        # 生成任务是长轮询（前端每 1.2s 查一次，最长 60 次），
+        # 导出/备份类请求更久 —— 放宽到 300s。
+        proxy_read_timeout    300s;
+        proxy_send_timeout    300s;
+        proxy_connect_timeout 10s;
+    }
+
+    # ── 上传图静态直出 ─────────────────────────────────────────────────────
+    # 后端也提供 /uploads（useStaticAssets），这里直出省一次 Node 往返。
+    # ⚠ 若生产把 STORAGE_BACKEND 换成 OSS/MinIO，本段应删除，
+    #   让请求走 /api 的签名 URL 逻辑。
+    location /uploads/ {
+        proxy_pass       http://huojue_backend;
+        proxy_set_header Host $host;
+        expires 30d;
+        add_header Cache-Control "public, max-age=2592000";
+    }
+
+    # ── 静态资源 ───────────────────────────────────────────────────────────
+    # 带 hash 的产物可长期强缓存；index.html 绝不能缓存，
+    # 否则发版后用户拿到旧壳子去请求已被清掉 hash 的文件 → 白屏。
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
+
+    location = /index.html {
+        add_header Cache-Control "no-store, no-cache, must-revalidate";
+        expires 0;
+    }
+
+    # ── SPA 回退 ───────────────────────────────────────────────────────────
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # 健康检查：不落 access_log，避免刷爆日志
+    location = /healthz {
+        access_log off;
+        add_header Content-Type text/plain;
+        return 200 "ok\n";
+    }
+}

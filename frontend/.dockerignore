@@ -1,0 +1,33 @@
+# ── 依赖与构建产物 ───────────────────────────────────────────────────────────
+node_modules
+dist
+*.tsbuildinfo
+
+# ── 测试产物 ────────────────────────────────────────────────────────────────
+test-results
+playwright-report
+blob-report
+playwright/.cache
+playwright/.auth
+coverage
+
+# ── 环境变量 ────────────────────────────────────────────────────────────────
+# 与后端同规则：真实 .env.production 不入镜像，凭据靠 compose/K8s 注入
+.env
+.env.local
+.env.production
+.env.*.local
+!.env.example
+!.env.development
+!.env.test
+!.env.production.example
+
+# ── 开发工具 ────────────────────────────────────────────────────────────────
+.git
+.github
+.gitignore
+.vscode
+.idea
+.DS_Store
+*.log
+*.md

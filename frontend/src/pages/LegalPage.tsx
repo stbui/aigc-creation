@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
+import { ExceptionPage } from '../components/ExceptionPage';
 
 /**
  * 法务文本页 —— 复刻参考站 /legal/*.html 的**文档版式**（数据驱动，三份文档共用一套渲染）。
@@ -25,7 +26,7 @@ const DOCS: Record<string, LegalDoc> = {
   'user-agreement': {
     slug: 'user-agreement',
     title: '用户协议',
-    lead: '本协议是电商视觉工坊（本地演示项目）与使用者之间的使用约定模板。',
+    lead: '本协议是货觉AI（本地演示项目）与使用者之间的使用约定模板。',
     sections: [
       {
         heading: '第一条 协议主体与效力',
@@ -60,7 +61,7 @@ const DOCS: Record<string, LegalDoc> = {
   'privacy-policy': {
     slug: 'privacy-policy',
     title: '个人信息保护政策',
-    lead: '本政策说明电商视觉工坊（本地演示项目）如何处理使用者提供的信息。',
+    lead: '本政策说明货觉AI（本地演示项目）如何处理使用者提供的信息。',
     sections: [
       {
         heading: '第一条 我们收集的信息',
@@ -120,14 +121,42 @@ const DOCS: Record<string, LegalDoc> = {
 };
 
 /** 从路径解析 slug: /legal/privacy-policy.html → privacy-policy */
-function slugFromPath(pathname: string): string {
+function slugFromPath(pathname: string): string | null {
   const m = pathname.match(/legal\/([a-z-]+)/);
-  return m ? m[1] : 'user-agreement';
+  return m ? m[1] : null;
 }
 
 export function LegalPage() {
   const { pathname } = useLocation();
-  const doc = DOCS[slugFromPath(pathname)] ?? DOCS['user-agreement'];
+  const slug = slugFromPath(pathname);
+  const doc = slug ? DOCS[slug] : undefined;
+
+  /*
+   * ⚠ 2026-10-20 行为变更: 此前是 `DOCS[slug] ?? DOCS['user-agreement']` ——
+   * 访问 /legal/typo.html 会静默显示**用户协议**。用户点的是别的文档,
+   * 却读到一份没点过的法律文本, 这是误导而非兜底。现改为显式 404 并列出真实可选文档。
+   */
+  if (!doc) {
+    return (
+      <ExceptionPage
+        kind="not-found"
+        fullScreen
+        title="文档不存在"
+        desc={`没有找到这份协议文本。${slug ? `当前路径为 ${pathname}。` : ''}可能是地址输入有误，或该文档已调整。`}
+        detail={slug ? `requested legal slug: ${slug}` : `无法从路径解析 slug: ${pathname}`}
+        action={{ to: '/sitemap.html', label: '查看网站地图' }}
+        secondaryAction={
+          <div className="legal-missing-list">
+            {Object.values(DOCS).map((d) => (
+              <Link key={d.slug} to={`/legal/${d.slug}.html`}>
+                {d.title}
+              </Link>
+            ))}
+          </div>
+        }
+      />
+    );
+  }
 
   return (
     <div className="legal-page">

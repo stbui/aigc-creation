@@ -1,20 +1,20 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
-import { App, Modal, Spin } from 'antd';
+import { useCallback, useMemo, useState } from 'react';
+import { App, Modal } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { ImagePlus, Maximize2, Minus, Plus, RefreshCw, Sparkles, X } from 'lucide-react';
-import { assetsApi, generateApi, toAbsoluteUrl } from '../lib/api';
+import { Maximize2, Minus, Plus, RefreshCw, Sparkles, X } from 'lucide-react';
+import { generateApi } from '../lib/api';
 import { languageOptions, platformOptions } from '../lib/optionSets';
 
-import { ToolEmptyState, ToolWorkflowSteps } from '../components/ToolEmptyState';
+import { ToolEmptyState, ToolGeneratingState, ToolWorkflowSteps } from '../components/ToolEmptyState';
 import { ToolSubmitBar } from '../components/ToolSubmitBar';
-import { ToolHistoryPanel } from '../components/ToolHistoryPanel';
+import { ToolImageDropzone } from '../components/ToolImageDropzone';
 import { ToolSettingsPopover } from '../components/ToolSettingsPopover';
-import { AssetLibraryModal, useAssetLibrary } from '../components/AssetLibraryModal';
+import { AssetLibraryModal } from '../components/AssetLibraryModal';
+import { useImageUpload } from '../hooks/useImageUpload';
 import { useProject } from '../hooks/useProject';
 import { usePollAbort } from '../hooks/usePollAbort';
-import { usePasteUpload } from '../hooks/usePasteUpload';
 import { pollToResult } from '../lib/poll';
-import type { Asset, TaskStatus } from '../types/api';
+import type { TaskStatus } from '../types/api';
 
 /**
  * 商品主图工作台 —— 1:1 复刻参考站 https://ijihua.cn/product-kit。
@@ -57,12 +57,6 @@ const VARIANT_LABELS: Record<string, string> = {
   other: '其他图',
 };
 
-interface PkAsset {
-  id: string;
-  url: string;
-  name: string;
-}
-
 interface PkResult {
   taskId: string;
   variant: string;
@@ -77,11 +71,22 @@ export function ProductKitPage() {
   const { message } = App.useApp();
   const navigate = useNavigate();
   const { ensureProject } = useProject();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // 上传 (三重校验 / 素材库回填 / 粘贴) 已收口到 useImageUpload, 2026-10-19
+  const { images, uploading, fileInputRef, uploadFiles, removeImage, library } = useImageUpload({
+    max: MAX_IMAGES,
+    maxMb: MAX_IMAGE_MB,
+  });
+  const {
+    open: libraryOpen,
+    loading: libraryLoading,
+    items: libraryItems,
+    error: libraryError,
+    openLibrary,
+    closeLibrary,
+    pick,
+  } = library;
 
   // ── 表单状态 ──
-  const [images, setImages] = useState<PkAsset[]>([]);
-  const [uploading, setUploading] = useState(false);
   const [productName, setProductName] = useState('');
   const [brand, setBrand] = useState('');
   const [platform, setPlatform] = useState('taobao');
@@ -107,73 +112,6 @@ export function ProductKitPage() {
     [counts],
   );
   const formValid = images.length > 0 && productName.trim().length > 0 && description.trim().length > 0 && totalCount > 0;
-
-  // ── 上传 ──
-  const uploadFiles = useCallback(
-    async (files: FileList | File[]) => {
-      const list = Array.from(files).filter((f) => f.type.startsWith('image/'));
-      if (list.length === 0) {
-        message.warning('请选择图片文件（PNG / JPG / WebP / GIF）');
-        return;
-      }
-      const room = MAX_IMAGES - images.length;
-      if (room <= 0) {
-        message.warning(`最多上传 ${MAX_IMAGES} 张商品图片`);
-        return;
-      }
-      const accepted = list.slice(0, room);
-      if (list.length > room) message.warning(`超出数量限制，仅取前 ${room} 张`);
-      const oversize = accepted.filter((f) => f.size > MAX_IMAGE_MB * 1024 * 1024);
-      if (oversize.length > 0) {
-        message.error(`单张不超过 ${MAX_IMAGE_MB}MB：${oversize.map((f) => f.name).join('、')}`);
-        return;
-      }
-
-      setUploading(true);
-      try {
-        const projectId = await ensureProject();
-        const uploaded: PkAsset[] = [];
-        for (const file of accepted) {
-          const asset = await assetsApi.upload(file, projectId);
-          uploaded.push({ id: asset.id, url: toAbsoluteUrl(asset.sourceUrl) ?? '', name: file.name });
-        }
-        setImages((prev) => [...prev, ...uploaded]);
-        message.success(`已上传 ${uploaded.length} 张商品图片`);
-      } catch (e) {
-        message.error((e as Error).message || '上传失败');
-      } finally {
-        setUploading(false);
-      }
-    },
-    [images.length, ensureProject, message],
-  );
-
-  const removeImage = (id: string) => setImages((prev) => prev.filter((x) => x.id !== id));
-
-  // 拖拽 & 粘贴 (参考站支持三种上传方式)
-  const [dragging, setDragging] = useState(false);
-  usePasteUpload(uploadFiles);
-
-  // ── 素材库导入 ──
-
-  const pickFromLibrary = (asset: Asset) => {
-    if (images.length >= MAX_IMAGES) {
-      message.warning(`最多上传 ${MAX_IMAGES} 张商品图片`);
-      return;
-    }
-    if (images.some((x) => x.id === asset.id)) {
-      message.info('该素材已在列表中');
-      return;
-    }
-    setImages((prev) => [
-      ...prev,
-      { id: asset.id, url: toAbsoluteUrl(asset.sourceUrl) ?? '', name: asset.sourceUrl.split('/').pop() ?? '素材' },
-    ]);
-  };
-
-  // 素材库弹窗 (通用组件, 2026-10-19 抽取; 各页只提供点选回填逻辑)
-  const { open: libraryOpen, loading: libraryLoading, items: libraryItems, openLibrary, closeLibrary, pick } =
-    useAssetLibrary(pickFromLibrary);
 
   // ── AI分析: 只填素材真实元数据, 不编造视觉识别结果 ──
   const runAiAnalyze = () => {
@@ -266,92 +204,18 @@ export function ProductKitPage() {
           <div className="pk-form-scroll">
             {/* 上传商品图 + 生成设置 + 商品描述 (参考站同一张卡片) */}
             <section className="pk-config-card">
-              <div className="pk-section">
-                <div className="pk-upload-title-row">
-                  <strong className="pk-section-title">
-                    <i className="pk-required-mark">*</i>上传商品图
-                  </strong>
-                  <div className="pk-upload-title-actions">
-                    <button type="button" className="pk-text-link" onClick={() => openLibrary()}>
-                      从素材库导入
-                    </button>
-                    <button
-                      type="button"
-                      className="pk-text-link"
-                      title="本地演示环境暂不支持手机上传"
-                      onClick={() => message.info('本地演示环境暂不支持手机上传，可直接拖拽或粘贴上传')}
-                    >
-                      手机上传
-                    </button>
-                    <span className="pk-upload-count">
-                      {images.length}/{MAX_IMAGES}
-                    </span>
-                  </div>
-                </div>
-
-                <div
-                  className={`pk-dropzone${dragging ? ' pk-dropzone-dragging' : ''}${images.length > 0 ? ' pk-dropzone-filled' : ''}`}
-                  onClick={() => images.length < MAX_IMAGES && fileInputRef.current?.click()}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragging(true);
-                  }}
-                  onDragLeave={() => setDragging(false)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setDragging(false);
-                    void uploadFiles(e.dataTransfer.files);
-                  }}
-                >
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,image/gif"
-                    multiple
-                    hidden
-                    onChange={(e) => {
-                      if (e.target.files) void uploadFiles(e.target.files);
-                      e.target.value = '';
-                    }}
-                  />
-                  {uploading && (
-                    <div className="pk-dropzone-loading">
-                      <Spin size="small" />
-                    </div>
-                  )}
-                  {images.length === 0 ? (
-                    <label className="pk-upload-prompt">
-                      <ImagePlus size={14} />
-                      <span>点击、拖拽或粘贴商品图片到此处上传</span>
-                      <small>最多可上传 {MAX_IMAGES} 张商品图片，单张不超过 {MAX_IMAGE_MB}MB</small>
-                    </label>
-                  ) : (
-                    <div className="pk-thumb-grid">
-                      {images.map((img) => (
-                        <div key={img.id} className="pk-thumb">
-                          <img src={img.url} alt={img.name} loading="lazy" decoding="async" />
-                          <button
-                            type="button"
-                            className="pk-thumb-remove"
-                            aria-label={`移除 ${img.name}`}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeImage(img.id);
-                            }}
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      ))}
-                      {images.length < MAX_IMAGES && (
-                        <button type="button" className="pk-thumb-add" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
-                          <Plus size={18} />
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
+              <ToolImageDropzone
+                title="上传商品图"
+                images={images}
+                max={MAX_IMAGES}
+                maxMb={MAX_IMAGE_MB}
+                uploading={uploading}
+                fileInputRef={fileInputRef}
+                onFiles={(f) => void uploadFiles(f)}
+                onRemove={removeImage}
+                onOpenLibrary={openLibrary}
+                noun="商品图片"
+              />
 
               <div className="pk-section">
                 <strong className="pk-section-title">
@@ -475,8 +339,6 @@ export function ProductKitPage() {
             </section>
           </div>
 
-          {/* 历史记录 (2026-10-19 接入通用组件; 此前本页无此功能) */}
-          <ToolHistoryPanel capability="main_image" refreshKey={results} />
 
           {/* 高级设置 + 提交 (sticky 底部) */}
           {/* 高级设置 + 提交 (sticky 底部) */}
@@ -501,7 +363,10 @@ export function ProductKitPage() {
 
       {/* ── 右: 结果栏 ── */}
       <section className="pk-result-pane">
-        {results.length === 0 ? (
+        {submitting && results.length === 0 ? (
+          /* 生成中 → 骨架占位, 不退回空态 (见 ToolGeneratingState 注释) */
+          <ToolGeneratingState />
+        ) : results.length === 0 ? (
           <ToolEmptyState title="效果图预览" desc="提交任务后，生成结果将在此处展示">
             <ToolWorkflowSteps />
           </ToolEmptyState>
@@ -556,8 +421,10 @@ export function ProductKitPage() {
         open={libraryOpen}
         loading={libraryLoading}
         items={libraryItems}
+        error={libraryError}
         onCancel={closeLibrary}
-        onPick={pickFromLibrary}
+        onPick={pick}
+        maxSelectable={MAX_IMAGES}
       />
 
       {/* 商品描述放大编辑 */}

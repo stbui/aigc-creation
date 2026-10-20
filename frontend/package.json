@@ -4,20 +4,30 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "dev": "vite --mode development",
+    "dev:test": "vite --mode test",
+    "build": "npm run build:prod",
+    "build:dev": "tsc --noEmit && vite build --mode development",
+    "build:test": "tsc --noEmit && vite build --mode test",
+    "build:prod": "tsc --noEmit && vite build --mode production",
+    "preview": "vite preview --mode production",
+    "preview:test": "vite preview --mode test",
+    "typecheck": "tsc --noEmit",
+    "e2e": "playwright test --config playwright.admin.config.ts"
   },
   "//": "版本为实际安装并验证通过的版本 (精确锁定), 避免安装器解析漂移",
   "dependencies": {
     "antd": "6.6.6",
     "lucide-react": "1.57.0",
+    "qrcode": "1.5.4",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-router-dom": "7.18.4"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^26.6.5",
+    "@types/qrcode": "1.5.5",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@vitejs/plugin-react": "6.1.2",

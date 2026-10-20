@@ -1,12 +1,14 @@
-import { useMemo, useState, type ReactNode } from 'react';
-import { Layout, Button, Avatar, Dropdown } from 'antd';
-import { Sparkles, ChevronDown, LogOut, User as UserIcon, Wallet } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import { Layout, Button, Avatar, Dropdown, Drawer } from 'antd';
+import { ChevronDown, LogOut, Menu, ShieldCheck, User as UserIcon, Wallet } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { CapabilityDef, CapabilityGroup } from '../types/api';
 import { MODE_LABELS } from '../lib/constants';
 import { toolPath } from '../lib/capabilities';
 import { useAuth } from '../context/AuthContext';
-import { SideRail, SIDEBAR_WIDTH } from './SideRail';
+import { useAdmin } from '../context/AdminContext';
+import { useCredits } from '../context/CreditsContext';
+import { SideRail } from './SideRail';
 import { CapabilityIcon } from './SideRail';
 import { PromoBar } from './PromoBar';
 
@@ -26,29 +28,39 @@ interface Props {
 export function AppLayout({ groups, items, thumbs, statsTotal, children }: Props) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { token, email, logout } = useAuth();
+  const { token, email, logout, openLogin } = useAuth();
+  const { me, loading: adminLoading } = useAdmin();
+  const { balance } = useCredits();
   const [navOpen, setNavOpen] = useState<string | null>(null);
+  // 移动端导航抽屉 (≤900px 侧栏 display:none, 参考站 390 实测同构)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  /** 是否展示后台入口: 身份已加载且为后台角色 */
+  const isAdminRole = !adminLoading && me !== null;
 
   const go = (to: string) => {
     if (to === '#') return;
     navigate(to);
   };
 
-  // 参考站顶导只有「电商生图▾ / AI修图▾」两项（README 页面结构表已登记）,
-  // registry 里的第三组 ai_video（自由创作）在参考站无对应顶导入口, 只走侧栏与落地页。
-  // 故这里按顺序取前两组 —— 是有意的信息架构裁剪, 不是遗漏; 若参考站新增顶导分组,
-  // 改 registry 顺序即可自动生效, 不要在前端写死组名。
-  const topGroups = useMemo(() => groups.slice(0, 2), [groups]);
+  // 参考站顶导实拍 (1280, 2026-10-19) 共 8 项: 首页 + 3 个分组下拉 (电商生图/AI修图/AI视频)
+  // + 5 个直链 (我的作品/购买套餐/邀请有奖/联系客服 + 首页本身)。
+  // registry 下发的 3 组顺序与参考站顶导一致, 故此处直接渲染全部组、不做 slice 截断 ——
+  // 旧注释「参考站只有两个下拉」是 10-17 旧快照, 已被实拍推翻 (docs/topnav-design.md §2.3/P1-1)。
+  // 联系客服本地无客服体系, 暂不补 (诚实差异, 见 docs/topnav-design.md §5-2)。
+  const topGroups = groups;
 
   return (
     <Layout className="app-layout">
       <PromoBar />
       <Header className="app-header">
         <Link to="/workbench" className="app-brand">
+          {/* 品牌标记: 货觉AI「觉眼」logo (2026-10-19, 见 docs/brand/brand-basics.md) */}
           <span className="app-brand-mark">
-            <Sparkles size={18} />
+            <img src="/brand/huojue-mark.svg" alt="货觉AI" className="app-brand-mark-img" />
           </span>
-          <span className="app-brand-text">电商视觉工坊</span>
+          <span className="app-brand-text">货觉</span>
+          <span className="app-brand-ai">AI</span>
         </Link>
 
         <nav className="app-topnav">
@@ -60,6 +72,9 @@ export function AppLayout({ groups, items, thumbs, statsTotal, children }: Props
               key={g.id}
               open={navOpen === g.id}
               onOpenChange={(v) => setNavOpen(v ? g.id : null)}
+              /* 下拉皮肤按参考站规格覆写 (radius 12 / 描边 #e5e7f0 / shadow 0 18 42 / pad 10 8 /
+                 条目 36 r9 / 13-600 #475467 / icon 20 / hover #f2efff-#5b4df5), 见 global.css */
+              classNames={{ root: 'app-topnav-dropdown' }}
               menu={{
                 items: items
                   .filter((c) => c.group === g.id)
@@ -67,7 +82,7 @@ export function AppLayout({ groups, items, thumbs, statsTotal, children }: Props
                     key: c.id,
                     label: (
                       <span className="app-topnav-item-row">
-                        <CapabilityIcon id={c.id} size={14} />
+                        <CapabilityIcon id={c.id} size={20} />
                         {c.name}
                         {c.mode === 'planned' && <span className="app-mode-tag">{MODE_LABELS.planned}</span>}
                       </span>
@@ -86,22 +101,53 @@ export function AppLayout({ groups, items, thumbs, statsTotal, children }: Props
           <Link to="/works" className="app-topnav-item">
             我的作品
           </Link>
-          <Link to="/stats" className="app-topnav-item">
-            数据中心
+          {/* 参考站顶导第 6/7 项 (80px 直链)。本地 /packages、/invitations 路由早已存在却无顶导入口,
+              补齐后与参考站同为 7 项 (联系客服无对应体系未补) */}
+          <Link to="/packages" className="app-topnav-item">
+            购买套餐
           </Link>
+          <Link to="/invitations" className="app-topnav-item">
+            邀请有奖
+          </Link>
+          {/* 数据中心不进顶导: 参考站仅侧栏分组, 本地侧栏已有 (SideRail.tsx「数据中心」),
+              顶导再放一份是重复入口。见 docs/topnav-design.md P1-3 */}
         </nav>
 
         <div className="app-header-right">
-          <span className="app-quota">
-            <Wallet size={14} />
-            本地算力 · 不限次数
-          </span>
+          {/*
+           * 顶导余额。
+           *
+           * 此前此处是写死的「本地算力 · 不限次数」—— 在真实计费上线后
+           * 那句话与「生成要扣积分」直接矛盾, 用户照着它预期会以为生成免费。
+           * 现改为读 /credits/balance 的真实余额, 点击进积分明细。
+           *
+           * 未登录不显示余额数字 (拉不到, 也不该显示一个假的 0)。
+           */}
+          {token && (
+            <Link to="/credits" className="app-quota">
+              <Wallet size={14} />
+              {balance ? `${balance.balance} 积分` : '积分'}
+            </Link>
+          )}
           {token ? (
             <Dropdown
               menu={{
                 items: [
                   { key: 'email', label: email ?? '', icon: <UserIcon size={14} />, disabled: true },
                   { type: 'divider' as const },
+                  // 后台入口仅对后台角色显示。角色来自 /admin/me, 普通用户不请求该端点,
+                  // 因此这里用 isAdminRole 静态判断而非读异步状态 —— 未加载时先不显示。
+                  ...(isAdminRole
+                    ? [
+                        {
+                          key: 'admin',
+                          label: '进入运营后台',
+                          icon: <ShieldCheck size={14} />,
+                          onClick: () => navigate('/admin'),
+                        },
+                        { type: 'divider' as const },
+                      ]
+                    : []),
                   {
                     key: 'logout',
                     label: '退出登录',
@@ -122,15 +168,29 @@ export function AppLayout({ groups, items, thumbs, statsTotal, children }: Props
               </button>
             </Dropdown>
           ) : (
-            <Button type="primary" size="small" onClick={() => navigate('/login')}>
+            /* 参考站 #workspace-logout「登录/注册」是纯文字钮 (13/700 #667085, pad 8, radius 6),
+               点开遮罩登录弹窗; 本地原为 antd Button type="primary" → 见 docs/topnav-design.md P2-3。
+               2026-10-19「路由对外开放」后改为唤起弹窗, 不再跳独立页。 */
+            <button type="button" className="app-guest-login" onClick={openLogin}>
               登录/注册
-            </Button>
+            </button>
           )}
+          <button
+            type="button"
+            className="app-mobile-toggle"
+            aria-label="打开导航菜单"
+            aria-expanded={mobileNavOpen}
+            onClick={() => setMobileNavOpen(true)}
+          >
+            <Menu size={20} />
+          </button>
         </div>
       </Header>
 
       <Layout className="app-body">
-        <div className="app-sider-wrap" style={{ width: SIDEBAR_WIDTH }}>
+        {/* 宽度由 CSS 托管: 桌面 176px 横排 / <1400px 自动塌缩 100px 垂直轨 / ≤900px 隐藏。
+            曾经由 JSX inline width 注入, 会压过媒体查询导致响应式失效 (2026-10-19 修正) */}
+        <div className="app-sider-wrap">
           <SideRail
             groups={groups}
             items={items}
@@ -142,6 +202,25 @@ export function AppLayout({ groups, items, thumbs, statsTotal, children }: Props
         </div>
         <Content className="app-content">{children}</Content>
       </Layout>
+
+      <Drawer
+        title="导航菜单"
+        placement="left"
+        width={280}
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+        className="app-mobile-drawer"
+        styles={{ body: { padding: 0 } }}
+      >
+        <SideRail
+          groups={groups}
+          items={items}
+          thumbs={thumbs}
+          activePath={location.pathname}
+          statsTotal={statsTotal}
+          onNavigate={() => setMobileNavOpen(false)}
+        />
+      </Drawer>
     </Layout>
   );
 }

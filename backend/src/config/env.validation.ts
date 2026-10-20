@@ -1,0 +1,299 @@
+/**
+ * 环境变量校验与配置树装配（@nestjs/config 的 `validate` 钩子）。
+ *
+ * 为什么不用 validationSchema（Joi / class-validator）
+ * --------------------------------------------------
+ * @nestjs/config 官方校验方案需要额外引入 joi，本项目的依赖纪律是
+ * 「版本精确锁定 + 手工直装 + verify-deps 审计」，多一棵依赖树就多一份
+ * 漂移风险（README「环境注意事项」第 4 条记录的历史踩坑都源于此）。
+ * 因此这里用声明式 schema + 手写 resolver 实现等价的 validate 函数：
+ * **零新增依赖**，且错误信息比 Joi 更直指「哪个变量填错了、期望什么」。
+ *
+ * 本文件的三条硬约束
+ * ------------------
+ * 1. **绝不改写 process.env。** validate 只产出配置树，现有 5 处直接读
+ *    `process.env.X` 的代码（jwt.service / gateway.config / storage.service /
+ *    model-config.service / main.ts）行为保持 1:1 不变，不因引入配置层被改语义。
+ * 2. **类型错误即启动失败。** `PORT=abc` 这类值在旧代码里会变成 NaN 传给
+ *    app.listen()，静默绑到随机端口且极难排查；这里直接抛错并指名变量。
+ * 3. **默认值与现有代码逐项一致。** 表中的 default 必须与各处硬编码的兜底
+ *    值完全相同，否则等于偷偷改了默认行为。
+ */
+
+/** 日志级别，映射到 NestJS LoggerService 的方法优先级 */
+export type LogLevel = 'error' | 'warn' | 'log' | 'debug' | 'verbose';
+
+export const LOG_LEVELS: readonly LogLevel[] = ['error', 'warn', 'log', 'debug', 'verbose'];
+
+/** 声明式配置项。env 为空表示「仅代码内常量，不来自环境变量」 */
+interface Spec {
+  /** 配置树路径，点号分隔（如 `app.port`），即 ConfigService.get 的入参 */
+  key: string;
+  /** 环境变量名 */
+  env: string;
+  type: 'string' | 'number' | 'boolean' | 'csv';
+  /** 默认值，必须与现有代码的兜底值逐字一致 */
+  def: string | number | boolean | string[];
+  /** 允许值白名单（仅对 string 生效） */
+  oneOf?: readonly string[];
+  /** 数值下界（闭区间），越界视为配置错误 */
+  min?: number;
+  /** 数值上界（闭区间） */
+  max?: number;
+}
+
+/**
+ * 全部环境变量 —— `.env.example` 的唯一事实源。
+ *
+ * 新增变量必须同时加到这里，否则它不在配置树里（仍可被 process.env 读到，
+ * 但拿不到类型保证，也进不了启动自检摘要）。
+ */
+export const ENV_SPECS: readonly Spec[] = [
+  // ── 应用 ──────────────────────────────────────────────────────────────
+  { key: 'app.port', env: 'PORT', type: 'number', def: 3001, min: 1, max: 65535 },
+  { key: 'app.host', env: 'HOST', type: 'string', def: '127.0.0.1' },
+  { key: 'app.prefix', env: 'API_PREFIX', type: 'string', def: 'api/v1' },
+  { key: 'app.env', env: 'NODE_ENV', type: 'string', def: 'development', oneOf: ['development', 'production', 'test'] },
+
+  // ── 数据库（SQLite 文件路径，三环境必须各指各的库）────────────────────
+  // 形如 file:./dev.db，相对路径相对进程 cwd（backend/）。默认值与迁移前
+  // PrismaService / prisma.config.ts 里硬编码的 'file:./dev.db' 逐字一致。
+  { key: 'db.url', env: 'DATABASE_URL', type: 'string', def: 'file:./dev.db' },
+
+  // ── 运行期目录（相对路径相对进程 cwd，绝对路径原样使用）───────────────
+  { key: 'path.uploads', env: 'UPLOAD_DIR', type: 'string', def: 'uploads' },
+  { key: 'path.backups', env: 'BACKUP_DIR', type: 'string', def: 'backups' },
+
+  // ── CORS（现有 buildCorsAllowList 的默认值，此处只做类型化不参与判定）────
+  { key: 'cors.origins', env: 'CORS_ORIGINS', type: 'csv', def: [] },
+  { key: 'cors.allowPrivateLan', env: 'CORS_ALLOW_PRIVATE_LAN', type: 'boolean', def: false },
+
+  // ── 鉴权 ──────────────────────────────────────────────────────────────
+  { key: 'jwt.secret', env: 'JWT_SECRET', type: 'string', def: 'dev-ecom-vision-secret-2024-do-not-use-in-prod' },
+  { key: 'jwt.ttl', env: 'JWT_TTL', type: 'string', def: '7d' },
+
+  // ── 日志（本文件引入的新配置面）────────────────────────────────────────
+  { key: 'log.level', env: 'LOG_LEVEL', type: 'string', def: 'log', oneOf: LOG_LEVELS },
+  { key: 'log.dir', env: 'LOG_DIR', type: 'string', def: 'logs' },
+  { key: 'log.retentionDays', env: 'LOG_RETENTION_DAYS', type: 'number', def: 14, min: 1, max: 3650 },
+  { key: 'log.maxFileMb', env: 'LOG_MAX_FILE_MB', type: 'number', def: 20, min: 1, max: 1024 },
+  { key: 'log.maxFilesPerDay', env: 'LOG_MAX_FILES_PER_DAY', type: 'number', def: 5, min: 1, max: 99 },
+  { key: 'log.console', env: 'LOG_CONSOLE', type: 'boolean', def: true },
+  { key: 'log.errorFile', env: 'LOG_ERROR_FILE', type: 'boolean', def: true },
+
+  // ── 图像生成网关（默认值取自 providers/gateway.config.ts）──────────────
+  { key: 'gateway.baseUrl', env: 'GATEWAY_BASE_URL', type: 'string', def: '' },
+  { key: 'gateway.token', env: 'GATEWAY_TOKEN', type: 'string', def: '' },
+  { key: 'gateway.model', env: 'GATEWAY_MODEL', type: 'string', def: '' },
+  {
+    key: 'gateway.provider',
+    env: 'GATEWAY_PROVIDER',
+    type: 'string',
+    // 默认 openai 而非 aigc: 新部署应走主流协议; 存量 modelverse 值已在
+    // CapabilityRouterProvider.pickProtocol 里作为 openai 的历史别名兼容。
+    // oneOf 把取值锁死 —— 填错协议的表现是 404 + 静默回落本地占位图,
+    // 在启动时就拒掉比在生成时才暴露好得多。
+    def: 'openai',
+    oneOf: ['aigc', 'openai', 'modelverse', 'volcengine', 'minimax'],
+  },
+  { key: 'gateway.vendor', env: 'GATEWAY_VENDOR', type: 'string', def: '' },
+  { key: 'gateway.enabled', env: 'GATEWAY_ENABLED', type: 'boolean', def: false },
+  { key: 'gateway.timeoutMs', env: 'GATEWAY_TIMEOUT_MS', type: 'number', def: 120000, min: 1000 },
+  { key: 'gateway.pollMs', env: 'GATEWAY_POLL_MS', type: 'number', def: 2000, min: 100 },
+  { key: 'gateway.maxPolls', env: 'GATEWAY_MAX_POLLS', type: 'number', def: 60, min: 1 },
+  { key: 'asset.publicBase', env: 'ASSET_PUBLIC_BASE', type: 'string', def: '' },
+
+  // ── 存储（默认值取自 storage/storage.service.ts）──────────────────────
+  { key: 'storage.backend', env: 'STORAGE_BACKEND', type: 'string', def: 'local', oneOf: ['local', 'oss', 'minio'] },
+  { key: 'storage.ossRegion', env: 'OSS_REGION', type: 'string', def: '' },
+  { key: 'storage.ossBucket', env: 'OSS_BUCKET', type: 'string', def: '' },
+  { key: 'storage.ossAccessKeyId', env: 'OSS_ACCESS_KEY_ID', type: 'string', def: '' },
+  { key: 'storage.ossAccessKeySecret', env: 'OSS_ACCESS_KEY_SECRET', type: 'string', def: '' },
+  { key: 'storage.ossEndpoint', env: 'OSS_ENDPOINT', type: 'string', def: '' },
+  { key: 'storage.minioEndpoint', env: 'MINIO_ENDPOINT', type: 'string', def: '' },
+  { key: 'storage.minioPort', env: 'MINIO_PORT', type: 'number', def: 9000, min: 1, max: 65535 },
+  { key: 'storage.minioUseSsl', env: 'MINIO_USE_SSL', type: 'boolean', def: false },
+  { key: 'storage.minioAccessKey', env: 'MINIO_ACCESS_KEY', type: 'string', def: '' },
+  { key: 'storage.minioSecretKey', env: 'MINIO_SECRET_KEY', type: 'string', def: '' },
+  { key: 'storage.minioBucket', env: 'MINIO_BUCKET', type: 'string', def: 'huojue' },
+];
+
+/** 配置树（ConfigService.get('app.port') 等的载体） */
+export interface AppConfigTree {
+  app: { port: number; host: string; prefix: string; env: string };
+  db: { url: string };
+  path: { uploads: string; backups: string };
+  cors: { origins: string[]; allowPrivateLan: boolean };
+  jwt: { secret: string; ttl: string };
+  log: {
+    level: LogLevel;
+    dir: string;
+    retentionDays: number;
+    maxFileMb: number;
+    maxFilesPerDay: number;
+    console: boolean;
+    errorFile: boolean;
+  };
+  gateway: {
+    baseUrl: string;
+    token: string;
+    model: string;
+    enabled: boolean;
+    timeoutMs: number;
+    pollMs: number;
+    maxPolls: number;
+  };
+  asset: { publicBase: string };
+  storage: {
+    backend: string;
+    ossRegion: string;
+    ossBucket: string;
+    ossAccessKeyId: string;
+    ossAccessKeySecret: string;
+    ossEndpoint: string;
+    minioEndpoint: string;
+    minioPort: number;
+    minioUseSsl: boolean;
+    minioAccessKey: string;
+    minioSecretKey: string;
+    minioBucket: string;
+  };
+}
+
+/** 真值判定，与 gateway.config.ts 的 bool() 保持同义 */
+function parseBool(raw: string): boolean {
+  const v = raw.trim().toLowerCase();
+  return v === '1' || v === 'true' || v === 'yes' || v === 'on';
+}
+
+export class EnvValidationError extends Error {
+  constructor(public readonly problems: string[]) {
+    super(
+      `环境变量校验未通过（${problems.length} 项）:\n  - ${problems.join('\n  - ')}\n` +
+        `请修正 .env 后重启；可对照 backend/.env.example。`,
+    );
+    this.name = 'EnvValidationError';
+  }
+}
+
+/** 单项解析。返回字符串表示的值，出错则 push 到 problems */
+function resolveOne(spec: Spec, env: NodeJS.ProcessEnv, problems: string[]): string | number | boolean | string[] {
+  const raw = env[spec.env];
+  const isEmpty = raw === undefined || raw.trim() === '';
+
+  switch (spec.type) {
+    case 'string': {
+      if (isEmpty) return spec.def as string;
+      const value = raw.trim();
+      if (spec.oneOf && !spec.oneOf.includes(value)) {
+        problems.push(`${spec.env}="${value}" 不是合法取值，允许: ${spec.oneOf.join(' | ')}`);
+        return spec.def;
+      }
+      return value;
+    }
+    case 'csv': {
+      if (isEmpty) return spec.def as string[];
+      return raw
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
+    }
+    case 'boolean': {
+      if (isEmpty) return spec.def as boolean;
+      return parseBool(raw);
+    }
+    case 'number': {
+      if (isEmpty) return spec.def as number;
+      const n = Number(raw.trim());
+      if (!Number.isFinite(n)) {
+        problems.push(`${spec.env}="${raw}" 不是合法数字（期望如 ${spec.def}）`);
+        return spec.def as number;
+      }
+      if (spec.min !== undefined && n < spec.min) {
+        problems.push(`${spec.env}=${n} 小于允许下限 ${spec.min}`);
+        return spec.def as number;
+      }
+      if (spec.max !== undefined && n > spec.max) {
+        problems.push(`${spec.env}=${n} 超过允许上限 ${spec.max}`);
+        return spec.def as number;
+      }
+      return n;
+    }
+  }
+}
+
+/** 按点号路径写入嵌套对象 */
+function assign(tree: Record<string, any>, dottedKey: string, value: unknown): void {
+  const parts = dottedKey.split('.');
+  let cursor = tree;
+  for (let i = 0; i < parts.length - 1; i += 1) {
+    if (typeof cursor[parts[i]] !== 'object' || cursor[parts[i]] === null) cursor[parts[i]] = {};
+    cursor = cursor[parts[i]];
+  }
+  cursor[parts[parts.length - 1]] = value;
+}
+
+/**
+ * 校验期间收集到的非致命告警。
+ *
+ * 为什么用模块级数组而不是塞进配置树：validateEnv 的契约是「要么返回一个
+ * 干净的对象，要么抛错」，往返回值里塞 `__warnings` 会污染 ConfigService
+ * 的命名空间。FileLogger 启动时 flush 这份列表，把告警既写控制台也落盘，
+ * 于是「启动期发现问题」和「落盘后能复盘」是同一份证据。
+ */
+export const startupWarnings: string[] = [];
+
+/**
+ * @nestjs/config 的 validate 钩子。
+ *
+ * 返回值即 ConfigService 的 internal config，故 `config.get('log.level')` 可用。
+ * **不修改传入的 env 对象，也不修改 process.env。**
+ */
+export function validateEnv(env: NodeJS.ProcessEnv = process.env): AppConfigTree {
+  const problems: string[] = [];
+  const tree: Record<string, any> = {};
+
+  for (const spec of ENV_SPECS) {
+    assign(tree, spec.key, resolveOne(spec, env, problems));
+  }
+
+  // 生产环境的默认密钥兜底是一道真实的门禁：dev 常量一旦带到线上，
+  // 任何人都能自签 token。开发/测试只告警，避免打断本地零配置启动。
+  const usingDevJwtSecret = env.JWT_SECRET === undefined || env.JWT_SECRET.trim() === '';
+  if (usingDevJwtSecret && tree.app.env === 'production') {
+    problems.push('JWT_SECRET 未设置：生产环境禁止使用内置开发默认密钥，请显式配置一个强随机值');
+  }
+
+  // 生产环境连开发库 = 直接污染演示数据，且线上数据落到本地文件上无法备份。
+  // 这条同样做成启动失败：拼错一个路径的代价远大于启动多问一句。
+  if (tree.app.env === 'production' && tree.db.url === 'file:./dev.db') {
+    problems.push(
+      'DATABASE_URL 仍是开发库默认值 file:./dev.db：生产环境必须指向独立库文件（如 file:./data/prod.db 或挂载卷）',
+    );
+  }
+
+  // 演示账号的宽松 TTL 只作为告警，不阻断启动。
+  const usingDemoTtl = tree.jwt.ttl === '7d';
+
+  // ⚠️ 必须先抛错再入队警告。顺序反了的话, 一次**校验失败**的调用也会把告警
+  // 塞进模块级队列, 而那次调用的产物根本不会被使用 —— 于是同一条告警会被
+  // AppFileLogger 重复 flush, 且永远对不上是哪次配置触发的。
+  if (problems.length > 0) throw new EnvValidationError(problems);
+
+  if (usingDevJwtSecret) {
+    startupWarnings.push('JWT_SECRET 未设置，正在使用内置开发默认密钥（生产环境必须显式配置）');
+  }
+  if (tree.app.env === 'production' && usingDemoTtl) {
+    startupWarnings.push(
+      'JWT_TTL=7d 是演示环境的宽松取值：生产建议改短（如 2h/1d）并配套 refresh token',
+    );
+  }
+  // 生产环境若沿用开发库的库名之外、但仍是相对路径，需提醒数据不在挂载卷上
+  if (tree.app.env === 'production' && !tree.path.uploads.startsWith('/')) {
+    startupWarnings.push(
+      `UPLOAD_DIR="${tree.path.uploads}" 是相对路径：容器部署时须挂载持久卷，否则重建镜像即丢全部上传图`,
+    );
+  }
+
+  return tree as AppConfigTree;
+}

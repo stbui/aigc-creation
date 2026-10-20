@@ -12,7 +12,7 @@ import { BG_COLOR_SWATCHES, ColorSwatchGrid, CustomColorInput, ToolCard } from '
  *     透明底(棋盘格, 默认) / 白色 / 浅蓝 #82CEF3 / 蓝色 #3988E9 /
  *     红色 #FF0B22 / 深红 #A8001B / 自定义颜色 (调色盘图标 + HEX 输入)
  *   高级设置: 仅"比例 原比例" (参考站该页无画质档位, 输出保持输入分辨率)
- *   提交: 开始抠图 限时免费; 描述: 上传图片后，自动去除图片背景
+ *   提交: 开始抠图 (creditCost=0, 即「限时免费」的价格语义); 描述: 上传图片后，自动去除图片背景
  *
  * 诚实披露: matting 为 real 能力 —— 四角采样估计底色 + 距离阈值抠除 (本地算法),
  * 非 AI 语义分割; 换底色为真实像素合成。
@@ -42,7 +42,6 @@ export function BackgroundRemovePage() {
       upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
       settings={{ ratio: true }}
       submitLabel="开始抠图"
-      creditLabel="限时免费"
       emptyDesc="上传图片后，抠除背景的结果将在此处展示"
       formValid
       submitting={submitting}

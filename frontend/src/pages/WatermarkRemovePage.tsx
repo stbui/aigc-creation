@@ -9,7 +9,7 @@ import { ToolCard } from '../components/ToolWidgets';
  * 实拍结构 (watermark-removal-page, 全站最简工具页):
  *   上传卡: * 上传图片 (同款 dropzone)
  *   无高级设置 (提交区只有主按钮)
- *   提交: 开始去除 限时免费; 描述: 框选、圈选或涂抹水印区域，即可去除图片中的水印
+ *   提交: 开始去除 (creditCost=0, 即「限时免费」的价格语义); 描述: 框选、圈选或涂抹水印区域，即可去除图片中的水印
  *
  * 处理方式卡: 参考站上传后提供框选/圈选/涂抹画布操作, 本地以
  * "处理方式 (自动识别/指定区域) + 区域位置 (五宫格)" 枚举代替。
@@ -44,7 +44,6 @@ export function WatermarkRemovePage() {
       desc="框选、圈选或涂抹水印区域，即可去除图片中的水印"
       upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
       submitLabel="开始去除"
-      creditLabel="限时免费"
       mockNote="本地演示：以指定区域模糊修补占位（真实去水印需接入 AI 模型）"
       emptyDesc="上传图片后，处理结果将在此处展示"
       formValid

@@ -89,7 +89,11 @@ export function SitemapPage() {
     <div className="sitemap-page">
       <header className="sitemap-topbar">
         <Link to="/" className="sitemap-topbar-brand">
-          电商视觉工坊
+          {/* 品牌标记: 货觉AI「觉眼」logo (2026-10-19, 见 docs/brand/brand-basics.md) */}
+          <img src="/brand/huojue-mark.svg" alt="货觉AI" className="sitemap-topbar-brand-mark" />
+          <span>
+            货觉<span className="sitemap-topbar-brand-ai">AI</span>
+          </span>
         </Link>
         <div className="sitemap-topbar-right">
           <span className="sitemap-topbar-note">本页即站点索引，无需 XML</span>
@@ -101,10 +105,10 @@ export function SitemapPage() {
 
       <main className="sitemap-main">
         <section className="sitemap-hero">
-          <span className="sitemap-eyebrow">EV VISION / SITE INDEX</span>
+          <span className="sitemap-eyebrow">HUOJUE AI / SITE INDEX</span>
           <h1>网站地图.</h1>
           <p>
-            这里汇总电商视觉工坊当前网站的页面地址，按创作入口、AI 工具、账户内容和站点页面分组，
+            这里汇总货觉AI当前网站的页面地址，按创作入口、AI 工具、账户内容和站点页面分组，
             方便快速找到需要的功能。
           </p>
         </section>
@@ -135,7 +139,7 @@ export function SitemapPage() {
       </main>
 
       <footer className="sitemap-footer">
-        <span>© 2026 电商视觉工坊</span>
+        <span>© 2026 货觉AI</span>
         <span className="sitemap-footer-note">
           路由结构对齐参考站设计；条目为本站真实路由
         </span>

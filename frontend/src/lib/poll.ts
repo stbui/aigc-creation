@@ -1,6 +1,6 @@
 import { generateApi, toAbsoluteUrl } from './api';
 import { POLL_INTERVAL_MS, POLL_MAX_TRIES } from './constants';
-import type { Task, TaskStatus } from '../types/api';
+import type { Modality, Task, TaskStatus } from '../types/api';
 
 /**
  * 任务轮询。
@@ -19,6 +19,24 @@ export interface PolledResult {
   width?: number;
   height?: number;
   errorCode?: string | null;
+  /**
+   * 产出的真实来源: gateway=真实模型通道 / local=本地算法回落。
+   *
+   * 必须透出给结果卡 —— 页面要按**这一单实际走了哪条通道**显示徽标,
+   * 而不是按能力清单的静态 mode 猜。同一能力在网关可用时是模型产出、
+   * 网关故障时是本地回落, 两者都必须如实呈现, 否则等于用假效果冒充模型能力。
+   */
+  provider?: string | null;
+  /**
+   * 产出模态 (2026-10-20 视频通道落地) —— 'image' | 'video'。
+   *
+   * 必须透出到结果卡: 视频**不能**用 `<img>` 渲染 (浏览器会当图片解码,
+   * 表现为"生成成功但预览空白")。缺省按 image 处理, 不能反过来 ——
+   * 反过来会让存量图像产出全变白屏。
+   */
+  modality?: Modality;
+  /** 视频时长 (毫秒); 仅视频产出有值 */
+  durationMs?: number | null;
 }
 
 export type PollOutcome = { ok: true; task: Task } | { ok: false; errorCode: string };
@@ -70,5 +88,8 @@ export async function pollToResult(taskId: string, options: PollOptions = {}): P
     width: task.outputAsset?.width ?? undefined,
     height: task.outputAsset?.height ?? undefined,
     errorCode: task.errorCode ?? null,
+    provider: task.provider ?? null,
+    modality: task.outputAsset?.modality,
+    durationMs: task.outputAsset?.durationMs ?? undefined,
   };
 }

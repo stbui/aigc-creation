@@ -1,0 +1,614 @@
+{
+  "texts": [
+    "本地算法不限次数，12 项电商视觉能力全部可试",
+    "立即体验",
+    "货觉",
+    "AI",
+    "首页",
+    "电商生图",
+    "AI修图",
+    "AI视频",
+    "我的作品",
+    "购买套餐",
+    "邀请有奖",
+    "登录/注册",
+    "工作台",
+    "商品主图",
+    "商品详情图",
+    "爆款复刻",
+    "创意生图",
+    "多图融合",
+    "商品SKU图",
+    "局部重绘",
+    "智能扩图",
+    "一键抠图",
+    "去除水印",
+    "图片翻译",
+    "产品精修",
+    "商品换色",
+    "旋转角度",
+    "自由创作",
+    "数据中心",
+    "素材库",
+    "上传参考图",
+    "从素材库导入",
+    "手机上传",
+    "0/4",
+    "点击、拖拽或粘贴参考图片到此处上传",
+    "最多可上传 4 张参考图片，单张不超过 10MB",
+    "创作提示词",
+    "AI润色",
+    "图片转提示词",
+    "高级设置",
+    "比例 1:1",
+    "画质 1K",
+    "登录免费生成",
+    "效果图预览",
+    "提交任务后，生成结果将在此处展示",
+    "本地演示：创作结果为参数化占位渲染（真实生成需接入 AI 模型），参考图会真实进入构图"
+  ],
+  "buttons": [
+    {
+      "text": "立即体验",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        874,
+        7,
+        76,
+        27
+      ],
+      "bg": "rgb(255, 255, 255)",
+      "color": "rgb(225, 29, 72)",
+      "radius": "999px"
+    },
+    {
+      "text": "",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        1406,
+        9,
+        22,
+        22
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgba(255, 255, 255, 0.85)",
+      "radius": "8px"
+    },
+    {
+      "text": "货觉AI",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        24,
+        54,
+        102,
+        36
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(23, 26, 43)",
+      "radius": "0px"
+    },
+    {
+      "text": "首页",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        150,
+        56,
+        54,
+        32
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(102, 112, 133)",
+      "radius": "8px"
+    },
+    {
+      "text": "电商生图",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        214,
+        56,
+        100,
+        32
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(102, 112, 133)",
+      "radius": "8px"
+    },
+    {
+      "text": "AI修图",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        324,
+        56,
+        87,
+        32
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(102, 112, 133)",
+      "radius": "8px"
+    },
+    {
+      "text": "AI视频",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        420,
+        56,
+        87,
+        32
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(102, 112, 133)",
+      "radius": "8px"
+    },
+    {
+      "text": "我的作品",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        517,
+        56,
+        80,
+        32
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(102, 112, 133)",
+      "radius": "8px"
+    },
+    {
+      "text": "购买套餐",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        607,
+        56,
+        80,
+        32
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(102, 112, 133)",
+      "radius": "8px"
+    },
+    {
+      "text": "邀请有奖",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        697,
+        56,
+        80,
+        32
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(102, 112, 133)",
+      "radius": "8px"
+    },
+    {
+      "text": "登录/注册",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        1343,
+        56,
+        73,
+        32
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(102, 112, 133)",
+      "radius": "6px"
+    },
+    {
+      "text": "",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        135,
+        124,
+        24,
+        24
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(102, 112, 133)",
+      "radius": "8px"
+    },
+    {
+      "text": "工作台",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        24,
+        156,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "我的作品",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        24,
+        205,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "商品主图",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        24,
+        270,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "商品详情图",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        24,
+        319,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "爆款复刻",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        24,
+        368,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "创意生图",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        24,
+        417,
+        133,
+        45
+      ],
+      "bg": "rgb(241, 239, 255)",
+      "color": "rgb(85, 70, 216)",
+      "radius": "8px"
+    },
+    {
+      "text": "多图融合",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        24,
+        466,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "商品SKU图",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        24,
+        515,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "局部重绘",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        24,
+        580,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "智能扩图",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        24,
+        629,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "一键抠图",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        24,
+        678,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "去除水印",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        24,
+        727,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "图片翻译",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        24,
+        776,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "产品精修",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        24,
+        825,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "商品换色",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        24,
+        874,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "旋转角度",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        24,
+        923,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "自由创作",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        24,
+        988,
+        133,
+        45
+      ],
+      "bg": "rgb(241, 239, 255)",
+      "color": "rgb(85, 70, 216)",
+      "radius": "8px"
+    },
+    {
+      "text": "数据中心",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        24,
+        1053,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "素材库",
+      "tag": "a",
+      "disabled": false,
+      "box": [
+        24,
+        1102,
+        133,
+        45
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(51, 51, 51)",
+      "radius": "8px"
+    },
+    {
+      "text": "从素材库导入",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        444,
+        150,
+        72,
+        13
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(78, 89, 105)",
+      "radius": "0px"
+    },
+    {
+      "text": "手机上传",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        526,
+        150,
+        48,
+        13
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(78, 89, 105)",
+      "radius": "0px"
+    },
+    {
+      "text": "AI润色",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        455,
+        368,
+        52,
+        16
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(85, 70, 216)",
+      "radius": "0px"
+    },
+    {
+      "text": "图片转提示词",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        519,
+        368,
+        89,
+        16
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(85, 70, 216)",
+      "radius": "0px"
+    },
+    {
+      "text": "",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        572,
+        408,
+        28,
+        28
+      ],
+      "bg": "rgb(255, 255, 255)",
+      "color": "rgb(134, 144, 156)",
+      "radius": "8px"
+    },
+    {
+      "text": "高级设置比例 1:1画质 1K",
+      "tag": "button",
+      "disabled": false,
+      "box": [
+        208,
+        772,
+        400,
+        34
+      ],
+      "bg": "rgb(255, 255, 255)",
+      "color": "rgb(102, 112, 133)",
+      "radius": "8px"
+    },
+    {
+      "text": "登录免费生成",
+      "tag": "button",
+      "disabled": true,
+      "box": [
+        208,
+        820,
+        400,
+        40
+      ],
+      "bg": "rgba(0, 0, 0, 0)",
+      "color": "rgb(255, 255, 255)",
+      "radius": "8px"
+    }
+  ],
+  "inputs": [
+    {
+      "tag": "textarea",
+      "type": "",
+      "placeholder": "例如：把这款产品放在未来感厨房场景中，清晨自然光，干净高级，电商广告质感",
+      "maxlength": "4000",
+      "rows": "8",
+      "box": [
+        208,
+        400,
+        400,
+        80
+      ]
+    }
+  ],
+  "imgs": [
+    {
+      "src": "/brand/huojue-mark.svg",
+      "alt": "货觉AI",
+      "box": [
+        24,
+        54,
+        36,
+        36
+      ]
+    }
+  ],
+  "svgCount": 33,
+  "title": "货觉AI · 电商视觉创作平台",
+  "url": "http://localhost:5173/free-creation"
+}

@@ -1,0 +1,923 @@
+// Prisma schema for ecom-vision-mvp backend.
+// 说明: SQLite provider 不支持 Prisma enum 类型, 因此 capability / status / kind
+// 使用 String 存储, 取值范围在 DTO / service 层通过白名单强制约束。
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+
+  // ── 后台权限与账号状态 (admin-prd.md §5.3) ──────────────────────
+  // SQLite 无 enum, 取值由 DTO/service 层白名单约束:
+  //   role:   'user' | 'admin' | 'operator' | 'finance'
+  //   status: 'active' | 'disabled' | 'deleted'
+  // role 不写入 JWT: AdminGuard 每次请求查库, 保证降权/禁用后旧 token 立即失效。
+  role        String    @default("user")
+  status      String    @default("active")
+  lastLoginAt DateTime?
+
+  // ── 邀请分销 (M11) ────────────────────────────────────────────────
+  // 本人的邀请码, unique。**邀请码 → 邀请人的唯一索引**。
+  // 必须落在 User 而非只存 InviteRelation: 只存关系表的话, 一个从未成功
+  // 邀请过他人的用户没有任何码可被查到, 就无法生成属于自己的邀请链接 ——
+  // "我邀请了 0 人"与"我没有邀请码"是两回事, 只有前者允许码不存在。
+  inviteCode String? @unique
+
+  projects Project[]
+  assets   Asset[]
+  tasks    GenerationTask[]
+
+  // 交易域关系
+  orders   Order[]
+  payments Payment[]
+  refunds  Refund[]
+  lots     CreditLot[]
+  ledger   CreditLedger[]
+
+  // 会员体系关系
+  memberships  Membership[]
+  membershipUsage MembershipUsage[]
+
+  // 营销域关系 (M11)。命名区分: 一个人既是别人的邀请人, 也是别人的被邀请人
+  inviteRelationsAsInviter InviteRelation[] @relation("InviterRelations")
+  inviteRelationAsInvitee  InviteRelation?  @relation("InviteeRelation")
+  checkins                 CheckinRecord[]
+
+  @@index([role])
+  @@index([status])
+}
+
+// ── 后台角色与权限点 (admin-detailed-design.md §0.3) ──────────────
+// permissions 存 JSON 数组字符串, 形如 ["user.write","order.refund"]。
+// builtIn=true 的内置角色不可删除, 仅可调整权限点。
+model AdminRole {
+  id          String   @id @default(cuid())
+  code        String   @unique // 'admin' | 'operator' | 'finance'
+  name        String
+  permissions String   @default("[]") // JSON 数组
+  builtIn     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ── 操作审计 (admin-detailed-design.md §16.2) ─────────────────────
+// 只允许 INSERT: 后端不提供删除接口, 表设计上亦不设 updatedAt。
+// 已知限制: 管理员仍可直接操作数据库删除, 彻底解决需独立存储或哈希链。
+// ── 运行时配置 (admin-detailed-design.md §0.7) ──────────────────────
+// 站点名/上传上限/生成参数/安全策略等可后台调整项。
+// 优先级链: 代码默认值 (settings.dto.ts 的 SETTING_DEFS) → 本表的运行时覆盖。
+// key 必须是 SETTING_DEFS 中登记过的项, service 层会拒绝未登记的键。
+// ════════════════════════════════════════════════════════════════════════════
+// 交易域 (admin-prd.md §3.6~3.9)
+//
+// 口径决策 (2026-07-20, 用户确认):
+//   · **只做积分消耗制** —— 按能力逐项配置消耗积分, 无次数包/订阅包。
+//     Product 只承载「积分数 + 有效期 + 发放方式」。
+//   · **沙箱支付** —— M8 提供 /pay/sandbox 模拟成功/失败/超时,
+//     真实通道留待 M15(需商户号)。
+//
+// 四条不可动摇的约定 (PRD §5):
+//   1. 余额唯一由 CreditLot 汇总推导, **不存冗余余额字段** ——
+//      冗余余额必然与批次不一致, 对账时无从判断该信哪个。
+//   2. 金额一律整数分, 不用浮点 —— 浮点累加会产生分位误差。
+//   3. OrderItem 全字段快照 —— 商品改价不影响历史订单。
+//   4. 订单与交易信息保存≥3 年 (《电子商务法》), **不参与数据清理**。
+// ════════════════════════════════════════════════════════════════════════════
+
+/// 商品 (SKU)。
+/// type: 'credits' 积分包。当前只支持这一类, 但保留字段便于后续扩展。
+model Product {
+  id          String @id @default(cuid())
+  sku         String @unique
+  name        String
+  description String @default("")
+  type        String @default("credits")
+
+  /// 价格, 整数分。0 表示免费发放
+  priceCents         Int
+  /// 划线价, 整数分。用于展示优惠; 不参与任何计算
+  originalPriceCents Int?
+  /// 购买后获得的积分数
+  credits            Int
+  /// 积分有效期天数。0 = 永久有效(expireAt 为空, FEFO 视为最晚)
+  creditsValidDays   Int    @default(0)
+  /// 发放方式: 'immediate' 支付成功即发 | 'manual' 后台手动发放
+  grantType          String @default("immediate")
+
+  /// 'active' 上架 | 'offline' 下架。下架后 C 端不可购买, 历史订单不受影响
+  status    String @default("active")
+  /// 排序权重, 小的靠前
+  sortOrder Int    @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orderItems OrderItem[]
+
+  @@index([status, sortOrder])
+}
+
+/// 订单。
+/// status 状态机 (PRD §5: 不可跳跃):
+///   pending → paid → (refunded | partial_refunded)
+///   pending → cancelled (超时未支付)
+model Order {
+  id             String @id @default(cuid())
+  orderNo        String @unique
+  userId         String
+  /// 幂等键。同一用户重复提交返回同一订单, 不重复创建
+  idempotencyKey String
+
+  /// 订单应付总额, 整数分。由 OrderItem 汇总, 不随商品改价变化
+  totalCents     Int
+  /// 优惠金额, 整数分。= 券优惠 + 活动优惠。**下单时确定并写入快照**,
+  /// 之后券规则/活动改价都不追溯 (admin-detailed-design.md §12.6)
+  discountCents  Int @default(0)
+  /// 实付金额, 整数分。= totalCents - discountCents
+  /// 退款上限以此为准 (而非 totalCents), 否则用券订单会多退
+  paidCents      Int @default(0)
+  /// 已退款金额, 整数分。支持部分退款
+  refundedCents  Int @default(0)
+  /// 本单发放的积分数 (可能因退款回收而变化)
+  grantedCredits Int @default(0)
+
+  /// 核销的优惠券。规则以 CouponSnapshot 为准, 本字段仅作关联与统计
+  couponId       String?
+  /// 命中的限时活动 (限时价/限时免费)
+  campaignId     String?
+  /// **优惠规则快照** (JSON)。券或活动事后被改/删, 历史订单仍可还原当时规则 ——
+  /// 不存快照的话改一次券价, 所有历史订单的优惠金额就都解释不清了
+  couponSnapshot String  @default("{}")
+
+  /// 'pending' | 'paid' | 'cancelled' | 'refunded' | 'partial_refunded'
+  status  String @default("pending")
+  /// 'sandbox' 沙箱 | 后续 'alipay' | 'wechat' | 'stripe'
+  channel String @default("sandbox")
+
+  paidAt    DateTime?
+  /// 超时未支付自动关闭的时间点
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user     User        @relation(fields: [userId], references: [id])
+  items    OrderItem[]
+  payments Payment[]
+  refunds  Refund[]
+  coupon   Coupon?     @relation(fields: [couponId], references: [id])
+  campaign Campaign?   @relation(fields: [campaignId], references: [id])
+
+  // 会员体系: 一个订单可同时是"购买会员的订单"(SubscriptionOrder) 与
+  // "使用会员折扣的商品订单"(PlanOrders)
+  membership      Membership?     @relation("SubscriptionOrder")
+  membershipPlanId String?
+  membershipPlan  MembershipPlan? @relation("PlanOrders", fields: [membershipPlanId], references: [id])
+  membershipUsage MembershipUsage[]
+
+  @@unique([userId, idempotencyKey])
+  @@index([membershipPlanId])
+  @@index([userId, status])
+  @@index([status, createdAt])
+  @@index([createdAt])
+  @@index([couponId])
+  @@index([campaignId])
+}
+
+/// 订单项 —— **全字段快照**。
+/// 商品改价 / 改名 / 下架都不影响历史订单的展示与退款计算。
+model OrderItem {
+  id        String @id @default(cuid())
+  orderId   String
+  productId String
+
+  // ── 快照字段 (下单时刻的值, 之后不再变化) ──
+  skuSnapshot        String
+  nameSnapshot       String
+  priceCentsSnapshot Int
+  creditsSnapshot    Int
+  validDaysSnapshot  Int
+
+  quantity Int @default(1)
+
+  order   Order   @relation(fields: [orderId], references: [id])
+  product Product @relation(fields: [productId], references: [id])
+
+  @@index([orderId])
+}
+
+/// 支付流水。
+/// 每次支付尝试一条, 失败的也留痕 —— 对账时"发起过但没成功"是必须可见的事实。
+model Payment {
+  id      String @id @default(cuid())
+  orderId String
+  userId  String
+
+  /// 渠道交易号。**幂等去重键**: 已支付订单收到重复回调不重复发积分
+  payTransactionId String? @unique
+  channel          String  @default("sandbox")
+  amountCents      Int
+
+  /// 'pending' | 'succeeded' | 'failed' | 'closed'
+  status          String  @default("pending")
+  /// 失败原因 / 沙箱场景标记
+  message         String?
+  /// 沙箱特有: 模拟的场景标识, 真实通道为 null
+  sandboxScenario String?
+
+  paidAt    DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  order   Order    @relation(fields: [orderId], references: [id])
+  user    User     @relation(fields: [userId], references: [id])
+  refunds Refund[]
+
+  @@index([orderId])
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
+/// 退款单。
+/// 退款按 CreditLot.remaining 逐批扣回 —— 退的是"还没花掉的部分"。
+model Refund {
+  id        String @id @default(cuid())
+  orderId   String
+  paymentId String
+  userId    String
+
+  amountCents          Int
+  /// 扣回的积分数(可能小于发放数 —— 已消耗的部分无法扣回)
+  creditsReclaimed     Int @default(0)
+  /// 因已消耗而无法扣回的积分数。必须如实记录, 否则对账会以为系统丢积分
+  creditsUnreclaimable Int @default(0)
+
+  status     String   @default("succeeded")
+  reason     String
+  operatorId String
+  /// 逐批次扣回明细, JSON: [{lotId, taken, ...}]
+  detail     String   @default("{}")
+  createdAt  DateTime @default(now())
+
+  order   Order   @relation(fields: [orderId], references: [id])
+  payment Payment @relation(fields: [paymentId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@index([orderId])
+  @@index([createdAt])
+}
+
+/// 积分批次。
+/// **可用余额 = Σ remainingCredits (未过期的批次)**, 不存冗余余额字段。
+model CreditLot {
+  id     String @id @default(cuid())
+  userId String
+
+  /// 批次来源: 'purchase' 购买 | 'grant' 发放 | 'admin_adjust' 人工 | 'refund_reclaim' 退款扣回
+  source  String
+  /// 关联订单 (购买来源时)
+  orderId String?
+
+  totalCredits     Int
+  remainingCredits Int
+  /// 到期时间。**为空视为最晚到期** (FEFO 排序时排最后)
+  expireAt         DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User           @relation(fields: [userId], references: [id])
+  ledger CreditLedger[]
+
+  @@index([userId, expireAt])
+  @@index([expireAt])
+}
+
+/// 积分流水 —— **只追加, 不可修改删除**。
+/// 是积分变动的唯一事实来源, 对账以此为准。
+model CreditLedger {
+  id     String @id @default(cuid())
+  userId String
+
+  /// 'consume' 消耗 | 'purchase' 购买获得 | 'grant' 发放
+  /// | 'admin_adjust' 人工增减 | 'refund_reclaim' 退款扣回 | 'expire' 到期回收
+  type         String
+  /// 变动量。消耗为负, 获得为正 —— 单一符号约定避免正负混淆
+  amount       Int
+  /// 变动后的可用余额快照。仅用于流水展示与快速核对,
+  /// **不作为余额来源** (余额永远从 CreditLot 推导), 出现不一致时以批次为准
+  balanceAfter Int
+
+  /// 关联批次
+  lotId   String?
+  orderId String?
+  taskId  String?
+
+  /// 人工调整的原因。强制填写 (PRD B-52)
+  reason     String?
+  operatorId String?
+
+  createdAt DateTime @default(now())
+
+  user User       @relation(fields: [userId], references: [id])
+  lot  CreditLot? @relation(fields: [lotId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([type])
+  @@index([orderId])
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 会员体系 (落地页订阅卡兑现)
+//
+// 口径决策 (2026-07-20, 用户确认):
+//   · **订阅制会员** —— 按周期生效, 独立于「积分消耗制」商品。
+//     Product 仍只承载积分 (PRD §3.6 约束不变), 会员另走一套表。
+//   · 落地页承诺的 4 项权益全部实现: 快速通道 / 并发上限 / 加油包 95 折 / 订阅积分。
+//
+// 设计取舍:
+//   · **perks 存 JSON 而非拆表** —— 权益是可变的运营配置, 拆表会让
+//     "加一种权益"变成改表 + 加关联 + 改查询。JSON 单字段便于整体读写,
+//     代价是失去 DB 层校验 —— 故在 service 层做严格校验。
+//   · **权益快照落在 Membership 上**: 续期/降级只改 expiresAt 与 planId,
+//     不动 perks; 若运营改了套餐权益, 存量会员不受影响 (已付的钱要对得起)。
+// ════════════════════════════════════════════════════════════════════════════
+
+/// 会员套餐(等级定义)。
+model MembershipPlan {
+  id          String   @id @default(cuid())
+  code        String   @unique // 'free' | 'basic' | 'pro' | 'studio'
+  name        String
+  description String   @default("")
+  /// 价格, 整数分。free 为 0
+  priceCents  Int      @default(0)
+  /// 周期天数。0 = 永久(free)
+  durationDays Int     @default(0)
+  /// 每月发放的订阅积分
+  monthlyCredits Int   @default(0)
+
+  /// 权益(JSON)。字段定义见 MembershipService.PERKS_SCHEMA:
+  ///   fastChannel: bool              是否走快速通道
+  ///   maxConcurrent: number          同时进行中任务上限 (0 = 不限)
+  ///   addonDiscountBps: number       加油包折扣万分比 (9500 = 95 折, 10000 = 无折扣)
+  perks       String   @default("{}")
+
+  /// 'active' 上架 | 'offline' 下架。下架不影响存量会员
+  status      String   @default("active")
+  sortOrder   Int      @default(0)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  memberships Membership[]
+  /// 指向本套餐的订单。显式命名, 因为 Order 同时还通过 Membership 关联本套餐
+  orders      Order[]        @relation("PlanOrders")
+
+  @@index([status, sortOrder])
+}
+
+/// 用户当前订阅。
+/// 一个用户同时最多一条 status ∈ ('active','grace') 的订阅 (service 层保证)。
+model Membership {
+  id     String @id @default(cuid())
+  userId String
+  planId String
+
+  /// 权益快照。下单时从 plan.perks 复制 —— 运营改套餐不影响存量会员
+  perksSnapshot String @default("{}")
+  monthlyCreditsSnapshot Int @default(0)
+
+  startAt   DateTime
+  expiresAt DateTime
+  /// 'active' 生效中 | 'grace' 已过期但仍在宽限期 | 'expired' 已失效 | 'cancelled' 已取消
+  status    String   @default("active")
+  /// 关联的支付订单 (订阅购买)。一订单最多生成一条订阅 —— unique 是 Prisma 一对一关系的必需项
+  orderId   String?  @unique
+
+  /// 下次发放订阅积分的时间。调度器据此每月发积分
+  nextCreditAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User           @relation(fields: [userId], references: [id])
+  plan MembershipPlan @relation(fields: [planId], references: [id])
+  order Order?        @relation("SubscriptionOrder", fields: [orderId], references: [id])
+
+  @@index([userId, status])
+  @@index([status, expiresAt])
+  @@index([nextCreditAt])
+}
+
+/// 会员权益使用记录 (会员消费额)。
+/// 用于会员页展示「累计省了多少」, 也是后续等级制的升级依据。
+model MembershipUsage {
+  id      String @id @default(cuid())
+  userId  String
+  /// 一订单最多一条使用记录 —— 一个订单只能享受一次会员折扣
+  orderId String? @unique
+  /// 本单因会员折扣节省的金额(分)
+  savedCents Int  @default(0)
+  /// 使用的套餐 code 快照
+  planCode   String @default("")
+
+  createdAt DateTime @default(now())
+
+  user  User   @relation(fields: [userId], references: [id])
+  order Order? @relation(fields: [orderId], references: [id])
+
+  @@index([userId, createdAt])
+}
+
+model SystemSetting {
+  key       String   @id
+  value     String // 统一以字符串存储, 读取时按 SettingDef.type 解析
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+}
+
+// ── 数据备份 (admin-prd.md B-96/97/98) ──────────────────────────────
+// 备份文件落盘在 backend/backups/, 本表只存元数据。
+//
+// status 的意义: B-97 要求"每份备份须有恢复验证记录, 无验证记录的备份视为无效"。
+// 因此 verified=false 的记录在 UI 上必须显式标为「未验证」, 且不提供下载入口 ——
+// 未经校验的文件在事故时才发现损坏就晚了。
+model BackupRecord {
+  id              String  @id @default(cuid())
+  filename        String  @unique
+  /// 字节数。用于保留份数清理时估算磁盘占用
+  sizeBytes       Int
+  /// SHA-256 十六进制。事故恢复时用于确认文件未被篡改/损坏
+  sha256          String
+  /// 'manual' | 'scheduled'
+  trigger         String  @default("scheduled")
+  /// 'pending' | 'succeeded' | 'failed'
+  status          String  @default("pending")
+  errorMessage    String?
+  /// 备份来源库的大小, 用于确认快照确实落下了数据
+  sourceSizeBytes Int?
+
+  // ── 恢复验证 (B-97) ─────────────────────────────────────────────
+  /// 是否已通过恢复验证。B-97: 无验证记录的备份视为无效
+  verified       Boolean   @default(false)
+  verifiedAt     DateTime?
+  /// 验证结论摘要, 如 "integrity_check=ok; 表计数一致"
+  verifyReport   String?
+  /// 验证器给出的警告 (如缺少索引), 不阻断验证通过但需人工判断
+  verifyWarnings String?
+
+  createdAt DateTime @default(now())
+
+  @@index([status])
+  @@index([verified])
+  @@index([createdAt])
+}
+
+// ── 到期数据清理留痕 (B-100) ──────────────────────────────────────
+// 清理是不可逆操作, 必须留痕: 删了什么、删了多少、谁触发。
+// 同时用于回答"某条数据是什么时候没的"。
+model CleanupLog {
+  id            String   @id @default(cuid())
+  /// 被清理的数据类别, 见 RETENTION_TARGETS
+  target        String
+  /// 本次删除的条数
+  deletedCount  Int
+  /// 清理依据的保留天数 (便于事后核对配置是否被改过)
+  retentionDays Int
+  /// 'scheduled' | 'manual'
+  trigger       String   @default("scheduled")
+  /// 跳过条数: 满足清理条件但被保护规则豁免的 (如订单受法定留存约束)
+  skippedCount  Int      @default(0)
+  detail        String   @default("{}")
+  success       Boolean  @default(true)
+  errorMessage  String?
+  createdAt     DateTime @default(now())
+
+  @@index([target])
+  @@index([createdAt])
+}
+
+// ── 模型通道配置 (admin-prd.md「模型配置」) ──────────────────────────
+// 把原先只存在于 GATEWAY_* 环境变量的通道路由下沉到库, 使后台可编辑、
+// 改完即时生效 (无需重启), 与 SystemSetting 的优先级链同构:
+//
+//   环境变量 (GATEWAY_*, 部署期固化) → 本表 (后台运行时) → 代码默认值
+//
+// ⚠️ 凭据类字段 (apiKey / token) 是**只写不回显**的:
+// 后台读取时永远返回 null, 前端只拿到 hasValue + 脱敏尾巴,
+// 避免明文经由接口外泄 (与 admin-detailed-design.md 的凭据展示口径一致)。
+// 留空提交 = 保持原值不变, 不覆盖; 要清除需显式清空开关。
+// ── 多渠道调度 (2026-10-20) ─────────────────────────────────────────
+// 一张表存同一模态下的多家厂商通道, 由 ChannelScheduler 按 priority 顺序调度。
+//
+// ## 为什么不复用 ModelChannelConfig (key-value 表)
+//
+// 那张表是「一个配置项一行」的形状 (key 唯一)。多渠道需要「一家厂商一行」,
+// 且每行自带健康状态 (连续失败数、冷却至)。塞进 key-value 意味着
+// 造出 `gateway.image.priority.2` 这类拼接键, 还要另存健康状态 ——
+// 两种语义挤在一张表里, 查询与维护都会变成灾难。
+//
+// ## 与单通道配置的关系
+//
+// 存量部署只有 `gateway.<模态>.*` 一套配置 (即当前唯一通道)。本表上线后
+// 由 ChannelRepository.readChannels 做**惰性迁移**: 表里没行时, 用旧的单通道
+// 配置合成一条 priority=0 的通道。故存量部署无需改任何配置即获得多渠道能力,
+// 在后台加第二条通道时旧配置才被固化下来。
+//
+// ⚠️ token 只写不回显 (与 ModelChannelConfig 同约定), 前端拿到的
+// tokenMasked 是脱敏值, 更新时留空 = 保持原值。
+model ModelChannel {
+  id        String  @id @default(cuid())
+  /// 该通道服务哪个模态 —— 决定它能不能被某模态的调度器选中
+  modality  String
+  /// 运营给这条通道起的名字 (如「硅基流动·备用」), 便于在列表里认出来
+  name      String
+  /// 协议标识 (与 ProtocolSpec.protocol 对应), 决定请求形状
+  protocol  String
+  baseUrl   String  @default("")
+  /// 厂商 API 令牌 (凭据, 只写不回显)
+  token     String  @default("")
+  model     String  @default("")
+  /// 选中顺序: 数字越小越先被尝试。同一模态内唯一 (调度语义要求可预测)
+  priority  Int     @default(0)
+  /// 是否参与调度。false = 保留配置但跳过 (手动停用单条通道)
+  enabled   Boolean @default(true)
+
+  // ── 健康状态 (由 ChannelScheduler 维护, 后台只读展示) ────────────
+  // 连续失败次数。达到 consecutiveFailures 阈值即进入冷却
+  failCount Int     @default(0)
+  // 冷却截止时间; 到达前该通道被跳过 (熔断)。null = 未在冷却
+  cooldownUntil DateTime?
+  // 最近一次成功/失败时间, 用于后台展示「最近可用」
+  lastSuccessAt DateTime?
+  lastFailureAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 同一模态内 priority 唯一: 两条同为 0 的通道会让调度顺序不确定,
+  // 而「不确定的调度」是排障时最麻烦的那类问题。
+  @@unique([modality, priority])
+  @@index([modality])
+  @@index([enabled])
+}
+
+model ModelChannelConfig {
+  /// 配置项键, 与 channel-config.defs.ts 的 CONFIG_DEFS.key 一一对应
+  key        String   @id
+  /// 统一以字符串存储, 读取时按 ConfigDef.type 解析
+  value      String   @default("")
+  /// 凭据类字段: 是否已配置。前端据此显示「已配置/未配置」, 不回显明文
+  hasValue   Boolean  @default(false)
+  /// 是否已被后台显式改过 (与代码默认值区分, 便于「恢复默认」)
+  overridden Boolean  @default(false)
+  updatedBy  String?
+  updatedAt  DateTime @updatedAt
+
+  @@index([overridden])
+}
+
+// ── 模型调用记录 (admin-prd.md「模型调用记录」) ────────────────────────
+// 与 AdminAuditLog 的分工: 审计日志记「谁在后台做了什么操作」(只 INSERT, 无删除),
+// 本表记「生成链路每次调模型的明细」(耗时/成败/回落原因), 用于通道健康度与成本对账。
+//
+// source 字段是本表存在的核心理由 —— gateway=真实模型通道, local=本地 Jimp 兜底。
+// 没有它, 占位图会被误认为模型产出 (这正是前端必须如实显示来源的原因)。
+//
+// 只允许 INSERT: 后端不提供删除接口。已知不足同审计日志 ——
+// 库管理员仍可直接删库, 彻底解决需独立存储或哈希链。
+model ModelCallLog {
+  id          String   @id @default(cuid())
+  /// 关联的生成任务; 网关提交失败等场景下可能为空 (taskId 由业务侧后填, 允许空)
+  taskId      String?
+  /// 触发本次调用的能力, 如 'free_create' | 'main_image'
+  capability  String
+  /// 用户 id (裸 String 无外键: 用户注销后调用记录仍应保留)
+  ownerId     String?
+  /// 路由决策: 'auto' | 'local' | 'remote'
+  route       String   @default("auto")
+  /// 实际生效通道: 'gateway' | 'local'
+  source      String
+  /// 是否发生回落 (网关失败后改走本地算法) —— source=local 且 route!=local 即回落
+  fallback    Boolean  @default(false)
+  /// 回落/失败原因, 如 "网关不可用: 轮询超时"
+  reason      String?
+  /// 实际使用的模型名 (网关回报优先, 否则为配置值)
+  model       String?
+  /// 产出模态: 'image' | 'text' | 'video' (2026-10-20)
+  ///
+  /// ⚠️ **必填语义, 但列可空**: 历史记录没有该值 (迁移前产生)。
+  /// 故列允许 null, 而**新写入必须填** —— 写入侧由 image-call-logger 保证。
+  /// 为什么不设默认值 'image': 那样会把「历史文本/视频调用」误标成图像,
+  /// 而这正是本字段要消除的歧义; null 表示"未知/历史", 是诚实的表达。
+  modality    String?
+  /// 送出给模型的提示词 (截断存储, 避免长文本撑爆记录表)
+  prompt      String?
+  /// 本次调用耗时 (毫秒), 含网关轮询全过程
+  durationMs  Int      @default(0)
+  /// 是否成功产出图片
+  success     Boolean  @default(true)
+  /// 产出图片字节数, 用于成本核算
+  outputBytes Int      @default(0)
+  /// 输出尺寸
+  width       Int?
+  height      Int?
+  /// 错误码 (本地算法失败时为 '42201', 与 GenerationTask.errorCode 同码表)
+  errorCode   String?
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([capability])
+  @@index([source])
+  @@index([success])
+  @@index([taskId])
+  @@index([ownerId])
+}
+
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  actorId    String
+  actorRole  String
+  action     String // 'user.disable' | 'order.refund' | 'credit.adjust' ...
+  targetType String
+  targetId   String
+  detail     String   @default("{}") // JSON: 操作前后的关键字段
+  reason     String? // 高危动作的操作原因
+  ip         String
+  success    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+
+  @@index([actorId])
+  @@index([action])
+  @@index([targetType, targetId])
+  @@index([createdAt])
+}
+
+model Project {
+  id        String   @id @default(cuid())
+  ownerId   String
+  name      String
+  createdAt DateTime @default(now())
+
+  owner  User             @relation(fields: [ownerId], references: [id])
+  assets Asset[]
+  tasks  GenerationTask[]
+
+  @@index([ownerId])
+}
+
+model Asset {
+  id         String   @id @default(cuid())
+  projectId  String
+  ownerId    String
+  kind       String // 'original' | 'generated'
+  capability String? // 仅 generated: 'main_image' | 'detail_image' | 'matting'
+  sourceUrl  String
+  width      Int?
+  height     Int?
+  format     String // mime, e.g. image/jpeg
+  sizeBytes  Int
+  /// 视频时长 (毫秒) —— 仅 video 模态有值 (2026-10-20)
+  ///
+  /// ⚠️ 可空而非默认 0: 0 与"未记录"语义不同 (0 长的视频不存在)。
+  /// 图像/文本产出该字段恒为 null, 调用方按模态判断是否读它。
+  durationMs Int?
+  createdAt  DateTime @default(now())
+
+  // ── 素材管理 (admin-prd.md §3.4 B-23~B-27) ───────────────────────
+  // status: 'visible' | 'hidden'。下架后用户端列表不再展示, 但文件与记录保留 ——
+  // 误下架可恢复, 删除则不可逆, 两者必须区分。
+  status String @default("visible")
+
+  // ── 存储后端 (src/storage) ───────────────────────────────────────
+  // storageBackend: 'local' | 'oss' | 'minio'
+  // 素材记录**必须记住写入时的后端**: 默认后端切换后, 老素材仍要从原后端读。
+  // 不加这个字段, 切换 STORAGE_BACKEND 会让全部历史素材 404。
+  storageBackend String  @default("local")
+  // storageKey 是唯一真相 (如 original/202610/abc123.jpg);
+  // sourceUrl 保留为可访问路径, 但切换域名/CDN 时只需改配置, 不必刷库。
+  storageKey     String?
+
+  project Project @relation(fields: [projectId], references: [id])
+  owner   User    @relation(fields: [ownerId], references: [id])
+
+  // 1:1 反向关系: 该 Asset 是某个 GenerationTask 的输出
+  outputOfTask GenerationTask? @relation("TaskOutputAsset")
+
+  @@index([projectId])
+  @@index([ownerId])
+  @@index([status])
+  @@index([storageBackend])
+  @@index([capability])
+  @@index([createdAt])
+}
+
+model GenerationTask {
+  id            String   @id @default(cuid())
+  projectId     String
+  ownerId       String
+  capability    String // 'main_image' | 'detail_image' | 'matting'
+  status        String // 'pending' | 'running' | 'succeeded' | 'failed'
+  inputAssetIds String // JSON 数组字符串
+  outputAssetId String?  @unique // 1:1, 需 unique 约束
+  params        String // JSON 对象字符串
+  provider      String?
+  errorCode     String?
+  // 本次实际扣掉的积分数快照 (0 = 免费)。用于后台展示与退款核算
+  creditCost    Int      @default(0)
+
+  // ── 任务监控 (admin-prd.md B-32 重试) ────────────────────────────
+  // 本任务由哪个失败任务重试而来 (null = 用户首次发起)。
+  //
+  // ⚠ 重试**必须新建任务而不是原地复活**:
+  // outputAssetId 上有 @unique 的 1:1 约束, 原地复活会让新的产出图
+  // 与旧的产出图抢同一个唯一键。此字段只作来源追溯, 不建外键 ——
+  // 来源任务被清理后重试链仍要能读, 加 FK 会让来源一删就连带失败。
+  retriedFromId String?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  project     Project @relation(fields: [projectId], references: [id])
+  owner       User    @relation(fields: [ownerId], references: [id])
+  // outputAsset 为 1:1 关系, 反向字段声明在 Asset 侧
+  outputAsset Asset?  @relation("TaskOutputAsset", fields: [outputAssetId], references: [id])
+
+  @@index([projectId])
+  @@index([ownerId])
+  @@index([status])
+  @@index([capability])
+  @@index([createdAt])
+}
+
+// ════════════════════════════════════════════════════════════════════
+// 营销中心 (M11 · admin-prd.md B-64~B-67 / admin-detailed-design.md §12)
+//
+// 四张表: Coupon 优惠券 / Campaign 限时活动 / InviteRelation 邀请关系
+//        + InviteRewardRule 邀请奖励规则 (单行配置)
+// ════════════════════════════════════════════════════════════════════
+
+/// 优惠券。
+///
+/// ⚠ **金额一律整数**: 满减/固定额用 `value`(分), 折扣用 `value`(万分比, 8500 = 85折)。
+/// 浮点会在累加时产生分位误差 —— 与 Order/Payment 同一约定。
+///
+/// `usedCount` 只在**支付成功**时 +1, 下单占用不算: 下单可超时取消,
+/// 若下单即计数, 用户反复下单不付款就能把券耗光。
+model Coupon {
+  id   String @id @default(cuid())
+  /// 券码。用户手动输入, 大写规范化后唯一
+  code String @unique
+  name String
+
+  /// 'full_cut' 满减 | 'discount' 折扣 | 'fixed' 固定额减免
+  type           String
+  /// full_cut/fixed: 减免分。discount: 折扣万分比 (8500 = 85折, 9000 = 9折)
+  value          Int
+  /// 使用门槛, 整数分。0 = 无门槛
+  thresholdCents Int    @default(0)
+
+  /// 适用范围: 'all' 全站 | 'product' 指定商品 | 'new_user' 仅新用户首单
+  scope      String @default("all")
+  /// scope='product' 时的商品 id 数组 (JSON)。scope≠product 时为空数组
+  productIds String @default("[]")
+  /// scope='new_user' 时定义「新用户」: 有过 paid 订单即非新用户。
+  /// 判定走Order 表实时查询, 不额外打标 —— 打标会被历史数据修正搞脏
+
+  /// 发行总量。0 = 不限量
+  totalCount   Int @default(0)
+  /// 已核销数量 (支付成功口径, 与 totalCount 同增同减)
+  usedCount    Int @default(0)
+  /// 每人限用。0 = 不限
+  perUserLimit Int @default(1)
+
+  validFrom DateTime
+  validTo   DateTime
+  /// 'on' 启用 | 'off' 停用。停用不影响已核销订单
+  status    String   @default("on")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  orders Order[]
+
+  @@index([status, validFrom, validTo])
+  @@index([type])
+}
+
+/// 限时活动。
+///
+/// payload 按 type 约定 (JSON):
+///   limited_price: { productId, priceCents }     —— 覆盖 Product.priceCents
+///   limited_free:  { capabilityIds[] }            —— 指定能力限时免费
+///   popup:         { title, body, ctaText, ctaUrl }
+///
+/// ⚠ **不落 Product 表**: 限时价只在结算时作为覆盖值参与计算, 不改商品本体价格。
+/// 改本体价格会让活动到期后无法还原基准价, 且历史订单价格来源不可追。
+model Campaign {
+  id      String @id @default(cuid())
+  name    String
+  /// 'limited_price' 限时价 | 'limited_free' 限时免费 | 'popup' 弹窗位
+  type    String
+  payload String @default("{}")
+
+  startAt  DateTime
+  endAt    DateTime
+  /// 'draft' 草稿 | 'active' 进行中 | 'ended' 已结束 | 'off' 已下线
+  /// active 不代表生效 —— 是否命中仍看时间窗与 payload (草稿态 active 是允许的编辑中间态)
+  status   String   @default("draft")
+  /// 投放人群。空对象 = 全站。{ onlyNewUsers: true } = 仅新用户
+  audience String   @default("{}")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  orders Order[]
+
+  @@index([status, startAt, endAt])
+  @@index([type])
+}
+
+/// 邀请关系 (邀请分销)。
+///
+/// inviteeId 唯一: 一个用户只能被一个邀请人绑定, 重复注册不覆盖 ——
+/// 覆盖会让先到的邀请人丢失已发放的奖励归属, 对账无从归因。
+model InviteRelation {
+  id           String   @id @default(cuid())
+  /// 被邀请人注册时携带的邀请码
+  inviteCode   String
+  inviterId    String
+  /// 被邀请人。unique 保证一人只被绑定一次
+  inviteeId    String   @unique
+  boundAt      DateTime @default(now())
+  /// 'pending' 待发放 | 'granted' 已发放 | 'rejected' 已拒绝(如自邀请)
+  rewardStatus String   @default("pending")
+
+  inviter User @relation("InviterRelations", fields: [inviterId], references: [id])
+  invitee User @relation("InviteeRelation", fields: [inviteeId], references: [id])
+
+  @@index([inviterId, rewardStatus])
+  @@index([inviteCode])
+  @@index([rewardStatus])
+}
+
+/// 邀请奖励规则 —— **单行配置**, 固定 id='default'。
+/// 设计为单行而非多行: 奖励规则全局唯一, 多行只会带来「哪行生效」的歧义。
+model InviteRewardRule {
+  id             String   @id @default("default")
+  /// 邀请人获得的积分数。0 = 不奖励
+  inviterCredits Int      @default(0)
+  /// 被邀请人获得的积分数
+  inviteeCredits Int      @default(0)
+  /// 触发时机: 'first_pay' 被邀请人首次付费 | 'register' 注册即发
+  triggerOn      String   @default("first_pay")
+  /// 关闭后新绑定不发放; **已发放的不回收**
+  valid          Boolean  @default(true)
+  updatedAt      DateTime @default(now())
+}
+
+/// 每日签到。
+///
+/// 连续天数由「该用户全部 CheckinRecord 的连续日期段」推导, 不存 streak 字段 ——
+/// 存冗余streak 迟早会与记录不一致 (漏记/补记/跨时区), 而 streak 是唯一可推导值。
+model CheckinRecord {
+  id        String   @id @default(cuid())
+  userId    String
+  /// 签到日 (本地日期 YYYY-MM-DD)。与 userId 组成唯一键, 天然防重复签到
+  day       String
+  /// 本次实际发放积分 (含连签加成), 快照值
+  credits   Int
+  /// 当时的连续天数快照, 便于回溯当时的加成判定
+  streak    Int      @default(1)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, day])
+  @@index([userId, createdAt])
+}
+
+/// 签到规则 —— 单行配置, 固定 id='default'。
+model CheckinRule {
+  id          String   @id @default("default")
+  /// 每日基础积分
+  baseCredits Int      @default(5)
+  /// 连签加成: JSON 数组, 形如 [{"day":3,"bonus":10},{"day":7,"bonus":30}]
+  /// 用数组而非 map: 连续天数是无序的整数键, JSON 对象键必须是字符串
+  bonusRules  String   @default("[]")
+  /// 周期上限。0 = 连签奖励无限累积 (不推荐, 长签到用户成本不可控)
+  maxStreak   Int      @default(0)
+  /// 周期内每日可得积分上限。0 = 不限
+  dailyCap    Int      @default(0)
+  enabled     Boolean  @default(true)
+  updatedAt   DateTime @default(now())
+}

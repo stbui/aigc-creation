@@ -1,31 +1,92 @@
-import { useEffect, useState } from 'react';
-import { Card, Col, Empty, Row, Spin, Table, Tag, Typography } from 'antd';
+import { useCallback, useEffect, useState } from 'react';
+import { Card, Col, Row, Table, Tag, Typography } from 'antd';
 import { toAbsoluteUrl, statsApi } from '../lib/api';
+import { MODE_LABELS } from '../lib/constants';
+import { useAuth } from '../context/AuthContext';
+import { StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
 import type { StatsOverview } from '../types/api';
 
 const { Title, Text } = Typography;
 
 /** 数据中心: 全部来自真实表统计, 不编造积分/消耗类尚不存在的指标 */
 export function StatsPage() {
+  const { token, openLogin } = useAuth();
   const [stats, setStats] = useState<StatsOverview | null>(null);
   const [loading, setLoading] = useState(true);
+  /**
+   * 加载失败与「没有统计数据」必须分开 (2026-10-20 修)。
+   * 此前两者共用 `!stats` 一个判断, 失败时渲染成 antd Empty「统计数据加载失败」,
+   * 没有重试入口, 用户只能刷新页面。
+   */
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const load = useCallback(() => {
+    setLoading(true);
+    setError(null);
     statsApi
       .overview()
-      .then(setStats)
+      .then((s) => setStats(s))
+      .catch((e: unknown) => {
+        // 不静默吞错: 下方失败态会给出可操作的下一步
+        console.warn('[stats] 统计数据加载失败', e);
+        setError(e instanceof Error ? e.message : '统计数据加载失败');
+        setStats(null);
+      })
       .finally(() => setLoading(false));
   }, []);
 
+  // 依赖 token: 登录成功/退出都会触发重新拉取, 无需额外的事件桥
+  useEffect(() => {
+    if (!token) {
+      // guest: 统计接口需鉴权, 不发无谓请求 (路由已对外开放, 见 App.tsx 顶部说明)
+      setStats(null);
+      setLoading(false);
+      return;
+    }
+    load();
+  }, [token, load]);
+
+  if (!token) {
+    return (
+      <div className="state-page">
+        <StateEmpty
+          title="登录后查看你的创作数据"
+          desc="创作数据与账号绑定，登录后即可查看累计生成、成功率与近 7 天产出。"
+          action={
+            <button type="button" className="state-btn is-primary" onClick={openLogin}>
+              登录/注册
+            </button>
+          }
+        />
+      </div>
+    );
+  }
+
   if (loading) {
     return (
-      <div className="list-page-loading">
-        <Spin />
+      <div className="state-page">
+        <StateSkeleton variant="panel" count={5} />
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="state-page">
+        <StateError
+          title="统计数据加载失败"
+          desc="没能取回你的创作数据。可能是后端未启动或网络异常，重试一次即可。"
+          detail={error}
+          onRetry={load}
+        />
       </div>
     );
   }
   if (!stats) {
-    return <Empty description="统计数据加载失败" />;
+    return (
+      <div className="state-page">
+        <StateEmpty title="暂无统计数据" desc="完成一次创作后，这里会出现你的数据分布。" />
+      </div>
+    );
   }
 
   const maxDay = Math.max(1, ...stats.last7Days.map((d) => d.count));
@@ -87,7 +148,11 @@ export function StatsPage() {
           columns={[
             { title: '能力', dataIndex: 'name', render: (v: string, r) => (
               <span>
-                {v} <Tag className={`tool-tag-mode tool-tag-${r.mode}`}>{r.mode === 'real' ? '本地算法' : r.mode === 'mock' ? '占位' : '规划中'}</Tag>
+                {v}{' '}
+                <Tag className={`tool-tag-mode tool-tag-${r.mode}`}>
+                  {/* 走 MODE_LABELS 而非内联三元: 文案只此一处, 避免两处漂移 */}
+                  {MODE_LABELS[r.mode] ?? r.mode}
+                </Tag>
               </span>
             ) },
             { title: '任务数', dataIndex: 'total', width: 100 },
@@ -113,7 +178,7 @@ export function StatsPage() {
 
       <Card size="small" title="最近任务" className="stats-card">
         {stats.recentTasks.length === 0 ? (
-          <Empty description="暂无任务" />
+          <StateEmpty compact title="暂无任务" desc="完成一次创作后，最近的任务会出现在这里。" />
         ) : (
           <div className="recent-tasks">
             {stats.recentTasks.map((t) => (

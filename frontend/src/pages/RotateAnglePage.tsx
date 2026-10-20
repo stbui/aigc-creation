@@ -21,7 +21,7 @@ import { RangeRow, ToolCard } from '../components/ToolWidgets';
  *            缩放 zoom 0.8..1.2 step0.01 (默认1, 标签显示"特写")
  *     提示: 相机保持静止，生成时按主体旋转角度重建商品展示。
  *   高级设置: 比例 原比例 / 画质 1K
- *   提交: 立即生成 本次消耗5积分; 提示行 "确认素材和参数后提交，右侧会展示生成结果。"
+ *   提交: 立即生成 (消耗价由后端下发); 提示行 "确认素材和参数后提交，右侧会展示生成结果。"
  *   描述: 视角平滑旋转，细节立体呈现
  *
  * 诚实披露: rotate 为 real 能力 —— yaw 平面旋转 + pitch 逐行剪切 + zoom 缩放的
@@ -64,7 +64,6 @@ export function RotateAnglePage() {
       upload={{ title: '上传图片', required: true, max: 1, hint: '支持 JPG、PNG、WebP，最多 1 张' }}
       settings={{ ratio: true, resolution: true }}
       submitLabel="立即生成"
-      creditLabel="本次消耗5积分"
       hint="确认素材和参数后提交，右侧会展示生成结果。"
       mockNote=""
       emptyDesc="上传图片并调整角度后，结果将在此处展示"

@@ -1,8 +1,10 @@
 import { useCallback, useState } from 'react';
 import { App } from 'antd';
-import { generateApi } from '../lib/api';
+import { generateApi, ApiError } from '../lib/api';
+import { useNavigate } from 'react-router-dom';
 import { useProject } from './useProject';
 import { useTaskPoller, type ToolAsset, type ToolResult } from '../components/ToolShell';
+import { notifyCreditsChanged } from '../context/CreditsContext';
 
 interface UseToolTaskOptions {
   /** 能力 id (与后端 capability.registry 一致) */
@@ -24,7 +26,8 @@ interface UseToolTaskOptions {
  * 仍各自维护提交流程, 不复用此 hook。
  */
 export function useToolTask({ capability, successMessage, minInputs = 1 }: UseToolTaskOptions) {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
+  const navigate = useNavigate();
   const { ensureProject } = useProject();
   const poll = useTaskPoller();
 
@@ -52,9 +55,35 @@ export function useToolTask({ capability, successMessage, minInputs = 1 }: UseTo
           message.success(successMessage);
         }
       } catch (e) {
-        message.error((e as Error).message || '生成失败');
+        /*
+         * 402 = 积分不足 (后端 generate.service 转的 40201)。
+         *
+         * 刻意给「去充值」的行动入口而不是干巴巴一句报错 ——
+         * 用户看到「积分不足: 需要 10, 可用 3」时不知道下一步做什么,
+         * 只告知不给出路是最容易催生客服工单的交互。
+         */
+        if (e instanceof ApiError && e.status === 402) {
+          modal.confirm({
+            title: '积分不足',
+            content: `${e.message}。充值后可继续生成。`,
+            okText: '去充值',
+            cancelText: '知道了',
+            onOk: () => navigate('/packages'),
+          });
+        } else {
+          message.error((e as Error).message || '生成失败');
+        }
       } finally {
         setSubmitting(false);
+        /*
+         * 无论成功失败都要刷新余额。
+         *
+         * 扣费发生在**建任务时**而非成功时, 而失败时后端会自动退还 ——
+         * 两个方向都改变了余额。放在 finally 里是刻意的:
+         * 只在成功分支刷新会让用户「失败之后余额还是扣掉的数字」,
+         * 看起来像吞了积分。
+         */
+        notifyCreditsChanged();
       }
     },
     [capability, successMessage, minInputs, ensureProject, message, poll],
