@@ -37,6 +37,7 @@ import {
   specOf,
   type Modality,
 } from '../providers/provider-presets';
+import { baseUrlIssue, normalizeBaseUrl } from '../providers/base-url';
 import { CapabilityRouterProvider } from '../providers/capability-router.provider';
 
 /** 连通性测试的草稿覆盖值 —— 不落库，仅本次探测使用 */
@@ -518,7 +519,7 @@ export class ModelConfigService {
   }> {
     const base = gatewayConfigOf(modality);
     const token = overrides?.token !== undefined ? overrides.token : base.token;
-    const baseUrl = (overrides?.baseUrl ?? base.baseUrl).replace(/\/+$/, '');
+    const baseUrl = normalizeBaseUrl(overrides?.baseUrl ?? base.baseUrl);
     const cfg = {
       /*
        * 有 overrides 时按「当前草稿」判定是否可测：只要填了基址或令牌就尝试，
@@ -567,7 +568,7 @@ export class ModelConfigService {
   ): Promise<{ endpoints: string[]; ids: string[] | null; message: string }> {
     const base = gatewayConfigOf(modality);
     const token = overrides?.token !== undefined ? overrides.token : base.token;
-    const baseUrl = (overrides?.baseUrl ?? base.baseUrl).replace(/\/+$/, '');
+    const baseUrl = normalizeBaseUrl(overrides?.baseUrl ?? base.baseUrl);
     const provider = (overrides?.protocol ?? base.provider).trim().toLowerCase();
 
     if (!baseUrl) {
@@ -1138,6 +1139,20 @@ function validate(def: ConfigDef, raw: unknown): string {
   const s = String(raw ?? '').trim();
   if (def.maxLength !== undefined && s.length > def.maxLength) {
     throw new AppError(40001, `${def.label} 长度不得超过 ${def.maxLength}`, 400);
+  }
+  /*
+   * 网关基址: 只存厂商根域, /v1 由协议层补 (2026-10-23 补)。
+   *
+   * 照抄厂商文档的 `https://api.x.com/v1` 会让协议层拼出 /v1/v1/...,
+   * 上游回 404 api_route_not_found, 而生成侧只能报「通道全部失败」——
+   * 2026-10-23 的 a6api 线路就是这么挂的。这里**归一化后落库**并回给调用方,
+   * 运营在页面上看到的地址与实际生效的地址始终是同一个值。
+   * 规则与模型线路共用 providers/base-url.ts, 不在这里另写一份。
+   */
+  if (def.key.endsWith('.baseUrl')) {
+    const issue = baseUrlIssue(s, { required: false });
+    if (issue) throw new AppError(40001, `${def.label}: ${issue}`, 400);
+    return normalizeBaseUrl(s);
   }
   if (def.key.startsWith('gateway.route.')) {
     if (!(ROUTE_VALUES as readonly string[]).includes(s)) {

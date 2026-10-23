@@ -241,6 +241,69 @@ async function main() {
     ok('routes[].localAvailable 与 allowsLocalFallback 同源', mismatched.length === 0, mismatched.map((r) => r.capability));
   }
 
+  /*
+   * ── 6. 全局设置里的 baseUrl 必须归一化到根域 (2026-10-23) ────────
+   *
+   * 线上实证: 运营照抄厂商文档填 `https://api.a6api.com/v1`, 协议层再补
+   * `/v1/images/generations` → `/v1/v1/...` → 上游 404 api_route_not_found,
+   * 而生成侧只看到「通道全部失败」。
+   *
+   * 断言打在**写入路径**上: 只测展示层等于「如实显示配错了」,
+   * 写入时归一化才叫「不让它发生」。
+   */
+  {
+    const writable = () => {
+      const calls: string[] = [];
+      const prisma = {
+        modelChannelConfig: {
+          findMany: async () => [] as Array<{ key: string; value: string }>,
+          findUnique: async () => null,
+          update: async () => ({}),
+          create: async ({ data }: { data: { key: string; value: string } }) => {
+            calls.push(`${data.key}=${data.value}`);
+          },
+          upsert: async () => ({}),
+        },
+      } as never;
+      return { prisma, calls };
+    };
+
+    const cases: Array<[string, string]> = [
+      ['https://api.a6api.com/v1', 'https://api.a6api.com'],
+      ['https://api.a6api.com/v1/', 'https://api.a6api.com'],
+      ['https://api.a6api.com/V1', 'https://api.a6api.com'],
+      // 火山方舟的 /api/v3 是真实前缀, 不能被当成版本段剥掉
+      ['https://ark.cn-beijing.volces.com/api/v3', 'https://ark.cn-beijing.volces.com/api/v3'],
+      // 路径中段的 v1 可能是网关真实前缀, 不动
+      ['https://gw.example.com/v1/gw', 'https://gw.example.com/v1/gw'],
+      ['https://api.example.com', 'https://api.example.com'],
+    ];
+    for (const [input, expect] of cases) {
+      const w = writable();
+      const svc = new ModelConfigService(w.prisma, { invalidate: () => {} } as never);
+      await svc.updateAll({ 'gateway.image.baseUrl': input }, [], 'verify');
+      ok(
+        `写入 gateway.image.baseUrl=${input} → ${expect}`,
+        w.calls.length === 1 && w.calls[0] === `gateway.image.baseUrl=${expect}`,
+        w.calls,
+      );
+    }
+
+    // 归一化只治「多写一段」; 填错了仍然拒绝, 且不产生写入
+    for (const bad of ['not-a-url', 'ftp://api.example.com']) {
+      const w = writable();
+      const svc = new ModelConfigService(w.prisma, { invalidate: () => {} } as never);
+      let code = 0;
+      try {
+        await svc.updateAll({ 'gateway.image.baseUrl': bad }, [], 'verify');
+      } catch (e) {
+        code = (e as { code?: number }).code ?? -1;
+      }
+      ok(`非法基址 ${bad} 被拒 (40001)`, code === 40001, code);
+      ok(`非法基址 ${bad} 不产生写入`, w.calls.length === 0, w.calls);
+    }
+  }
+
   console.log(`\n通过 ${pass} 项`);
   if (fails.length) {
     console.error(`\n失败 ${fails.length} 项:`);

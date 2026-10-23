@@ -212,6 +212,7 @@ env（非空才生效） > ModelChannelConfig（overridden=true） > CONFIG_DEFS
 - **存量键回落**：image 模态的新键全空时，读旧单前缀 `gateway.baseUrl` / `GATEWAY_BASE_URL` 等。旧键只在 image 上存在，且 `hidden=true` 不可写。
 - **开启判定**：`ENABLED` 强制开 > 基址或令牌非空即视为开启。零配置 = 全部走本地/未接入。
 - **凭据**：读取只给 `hasValue` + 脱敏尾巴；写入空串 = 保持原值，清空需显式 `clears`。
+- **基址只存厂商根域**：`/v1` 一律由协议层补（`openai` → `/v1/images/generations`，`openai-chat` → `/v1/chat/completions`），运营照抄厂商文档填 `https://api.x.com/v1` 会拼成 `/v1/v1/...` → 上游 404 `api_route_not_found`，而生成侧只报「通道全部失败」。归一化在 `providers/base-url.ts` 的 `normalizeBaseUrl()`，**每个读写边界都调用**（env 注入、`ModelChannel` 读写、`ModelChannelConfig` 全局设置、草稿测试/模型清单），只剥尾部一整段 `/v1`（`/api/v3` 与路径中段 `/v1/gw` 保留）；格式错误（非 URL / 非 http(s)）仍拒绝。厂商目录内置基址另有装配期 `assertCatalogIntegrity()` 拦截。
 - **热生效**：保存后 `reloadRuntime()` 重拉 DB 覆盖并失效缓存；另有 3s TTL 兜底。
 
 ### 8.3 后台接口

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { normalizeBaseUrl } from './base-url';
 import { gatewayConfigOf } from './gateway.config';
 import { findVendor } from './vendors/vendor.catalog';
 import type { Modality } from './modality';
@@ -290,7 +291,8 @@ export class ChannelScheduler {
       id: r.id,
       name: r.name,
       protocol: r.protocol,
-      baseUrl: r.baseUrl,
+      // 读侧归一化: 存量行若存成 `https://api.x.com/v1`, 协议层再补 /v1 就是必然 404
+      baseUrl: normalizeBaseUrl(r.baseUrl),
       token: r.token,
       model: r.model,
       priority: r.priority,

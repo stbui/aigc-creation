@@ -26,6 +26,7 @@
  * 后台保存时会主动 invalidate, 那条路径即时生效。
  */
 import { CONFIG_DEFS, ROUTE_VALUES, findConfigDef, modalityPrefix, type CapabilityId } from './channel-config.defs';
+import { normalizeBaseUrl } from './base-url';
 import type { Modality } from './modality';
 import type { CapabilityRoute } from './gateway.types';
 
@@ -205,7 +206,9 @@ export function resolveGatewayConfig(): RawConfig {
   const modalities = {} as Record<Modality, RawModality>;
   for (const modality of ['text', 'image', 'video'] as Modality[]) {
     const p = modalityPrefix(modality);
-    const baseUrl = String(value(`${p}.baseUrl`)).replace(/\/+$/, '');
+    // 基址归一到厂商根域: 尾部 /v1 会被协议层再补一次, 拼成 /v1/v1/... (必然 404)。
+    // 环境变量注入的值不经过后台校验, 故归一化必须在这里兜底。
+    const baseUrl = normalizeBaseUrl(String(value(`${p}.baseUrl`)));
 
     // 开启判定: env 强制开 > DB 显式开 > (配了基址或令牌即视为开启)
     const envForced = bool(`GATEWAY_${modality.toUpperCase()}_ENABLED`);

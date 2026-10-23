@@ -20,7 +20,6 @@ import { ToolEmptyState } from '../components/ToolEmptyState';
 import { ToolSubmitBar } from '../components/ToolSubmitBar';
 import { ImageLightbox } from '../components/ImageLightbox';
 import { ImageContextMenu } from '../components/ImageContextMenu';
-import { ProviderBadge } from '../components/ProviderBadge';
 import { useCreditLabel } from '../hooks/useCreditLabel';
 import { ToolSettingsPopover } from '../components/ToolSettingsPopover';
 import { AssetLibraryModal, useAssetLibrary } from '../components/AssetLibraryModal';
@@ -136,8 +135,6 @@ interface PkResult {
   width?: number;
   height?: number;
   errorCode?: string | null;
-  /** 本次实际通道: gateway=真实模型 / local=本地算法 (来自 pollToResult) */
-  provider?: string | null;
 }
 
 /**
@@ -157,8 +154,6 @@ interface GalleryItem {
   width?: number | null;
   height?: number | null;
   createdAt?: string;
-  /** 本次实际通道: gateway=真实模型 / local=本地算法 (任务表里的 provider) */
-  provider?: string | null;
 }
 
 /**
@@ -206,8 +201,6 @@ function GalleryThumb({
           加载失败
         </span>
       )}
-      {/* 自由创作既有云端模型也有本地兜底, 每张图必须说清这一张是谁产的 */}
-      <ProviderBadge provider={item.provider} className="fc-result-provider" />
       <span className="fc-result-item-mask">
         <Maximize2 size={16} />
       </span>
@@ -484,7 +477,6 @@ export function FreeCreationPage() {
           width: t.outputAsset?.width ?? null,
           height: t.outputAsset?.height ?? null,
           createdAt: t.createdAt,
-          provider: t.provider ?? null,
         });
       }
       setGallery(items);
@@ -626,8 +618,6 @@ export function FreeCreationPage() {
           width: done.width ?? null,
           height: done.height ?? null,
           createdAt: new Date().toISOString(),
-          // 这一单实际走的通道, 直接来自轮询结果 (不是能力 mode)
-          provider: done.provider ?? null,
         };
         setGallery((prev) => [fresh, ...prev.filter((x) => x.id !== taskId)]);
       } else if (done.status === 'failed') {

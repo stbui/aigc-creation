@@ -210,6 +210,17 @@ export function ChannelEditDrawer({
     if (!form.protocol) return '请选择对接协议';
     if (form.enabled && !form.baseUrl.trim()) return '启用线路时必须填写接入地址';
     if (form.baseUrl && !/^https?:\/\//i.test(form.baseUrl.trim())) return '接入地址需以 http:// 或 https:// 开头';
+    /*
+     * 末尾 /v1 必须当场拦下 (2026-10-23)。
+     *
+     * 服务端也会归一化, 但运营需要在这一刻就知道「照抄厂商文档是错的」——
+     * 否则他保存后看到地址变了, 会以为自己填错了别的地方。真正的后果是
+     * 协议层再补一次 /v1 → 上游 404 api_route_not_found, 而生成侧只报
+     * 「通道全部失败」, 根因藏在 404 正文里。
+     */
+    if (/\/v1\/?$/i.test(form.baseUrl.trim())) {
+      return '接入地址不要带 /v1：/v1 由协议层自动补全，填了会拼成 /v1/v1/...（上游 404）。请删掉末尾的 /v1';
+    }
     if (form.clearToken && form.token) return '不能同时输入新令牌与清除令牌';
     return null;
   };
@@ -451,7 +462,7 @@ export function ChannelEditDrawer({
                 接入地址 <span style={{ color: 'var(--danger-text)' }}>*</span>
               </span>
             }
-            extra="填厂商根地址，/v1 等路径由协议自动补全。"
+            extra="填厂商根地址（如 https://api.example.com），/v1 等路径由协议自动补全，请不要带 /v1。"
           >
             <Input
               id="mc-baseurl"

@@ -3862,15 +3862,6 @@ html[data-promo='off'] .pk-workspace {
 .fc-result-item:focus-visible .fc-result-item-mask {
   opacity: 1;
 }
-/* 缩略图上的来源角标: 压在图左上角, 恒显 (z-index 高于 hover 遮罩) */
-.fc-result-provider {
-  position: absolute;
-  top: 6px;
-  left: 6px;
-  z-index: 2;
-  margin-left: 0;
-  pointer-events: none;
-}
 
 /* ── 生成图大图查看器 (2026-10-21 重做, 组件 components/ImageLightbox.tsx) ──
    旧的 860px 弹窗把图压在 62vh 以内, 2K 图只能看个大概。现改为整屏暗色:

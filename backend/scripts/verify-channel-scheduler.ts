@@ -19,6 +19,7 @@
 
 import { ChannelScheduler, type Channel } from '../src/providers/channel-scheduler';
 import { ChannelRepository } from '../src/providers/channel-repository';
+import { baseUrlIssue, normalizeBaseUrl } from '../src/providers/base-url';
 
 let pass = 0;
 const fails: string[] = [];
@@ -459,6 +460,53 @@ async function main() {
     ok('availableCount 只数启用+未冷却+协议已实现', snap.availableCount === 1, snap.availableCount);
     ok('coolingCount 正确', snap.coolingCount === 1, snap.coolingCount);
     ok('unsupportedCount 正确', snap.unsupportedCount === 1, snap.unsupportedCount);
+  }
+
+  // ── 16. 基址归一化: 尾部 /v1 必须在读侧剥掉 ──────────────────────
+  /*
+   * 2026-10-23 线上实证: 一条 baseUrl = `https://api.a6api.com/v1` 的图像线路
+   * 被协议层拼成 `/v1/v1/images/generations`, 上游回 404 api_route_not_found,
+   * 而生成侧只看到「通道全部失败」—— 根因埋在 404 正文里。
+   *
+   * 断言打在**调度器实际拿到的通道对象**上, 而不是只测 normalizeBaseUrl:
+   * 归一化函数写对了、但某条读路径忘了调用, 正是这类缺陷最常见的形态。
+   */
+  {
+    const cases: Array<[string, string]> = [
+      ['https://api.a6api.com/v1', 'https://api.a6api.com'],
+      ['https://api.a6api.com/v1/', 'https://api.a6api.com'],
+      ['https://api.a6api.com/V1', 'https://api.a6api.com'],
+      ['  https://api.a6api.com/v1  ', 'https://api.a6api.com'],
+      // 火山方舟的 /api/v3 是真实前缀, 必须原样保留
+      ['https://ark.cn-beijing.volces.com/api/v3', 'https://ark.cn-beijing.volces.com/api/v3'],
+      // 路径中段的 v1 可能是网关真实前缀, 不动
+      ['https://gw.example.com/v1/gw', 'https://gw.example.com/v1/gw'],
+      // `/openai-v1` 是一整段, 不匹配
+      ['https://api.example.com/openai-v1', 'https://api.example.com/openai-v1'],
+      ['', ''],
+    ];
+    for (const [input, expect] of cases) {
+      ok(`normalizeBaseUrl(${JSON.stringify(input)})`, normalizeBaseUrl(input) === expect, normalizeBaseUrl(input));
+    }
+
+    // 格式错误仍然拒绝 (归一化不是「什么都放行」)
+    ok('非 URL 被拒', baseUrlIssue('not-a-url', { required: true }) !== null);
+    ok('ftp 被拒', baseUrlIssue('ftp://x.example.com', { required: true }) !== null);
+    ok('启用时必填', baseUrlIssue('', { required: true }) !== null);
+    ok('停用时可不填', baseUrlIssue('', { required: false }) === null);
+
+    const { scheduler } = makeScheduler([ch({ id: 'a', baseUrl: 'https://api.a6api.com/v1' })]);
+    let seen = '';
+    await scheduler.dispatch('image', async (c) => {
+      seen = c.baseUrl;
+      return 'ok';
+    });
+    ok('调度器拿到的基址已剥掉尾部 /v1', seen === 'https://api.a6api.com', seen);
+
+    const prisma = new FakePrisma();
+    prisma.rows = [ch({ id: 'a', baseUrl: 'https://api.a6api.com/v1' })];
+    const view = (await new ChannelRepository(prisma as never).list('image'))[0];
+    ok('列表视图的基址已剥掉尾部 /v1', view.baseUrl === 'https://api.a6api.com', view.baseUrl);
   }
 
   console.log(`\n通过 ${pass} 项`);

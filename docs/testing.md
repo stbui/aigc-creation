@@ -48,10 +48,10 @@ cd frontend && npm run build:prod
 | `verify-credit-price.ts` | 后台改价 → `/capabilities` 与生成扣费同步生效 |
 | `verify-modality-config.ts` | 三模态配置解析与存量键回落方向 |
 | `verify-vendor-aggregation.ts` | 厂商目录 → 模态视图的派生等价性 |
-| `verify-channel-scheduler.ts` | 多渠道调度：优先级、冷却、失败切换 |
+| `verify-channel-scheduler.ts` | 多渠道调度：优先级、冷却、失败切换；**基址归一化**（尾部 `/v1` 在调度器与列表视图两条读路径都剥掉，`/api/v3` 与 `/v1/gw` 保留） |
 | `verify-channel-test.ts` | 连通性测试路径按模态构造（缺陷回归防护） |
 | `verify-failover.ts` | 故障转移时**真的**换上备用通道的 baseUrl / token / model |
-| `verify-model-config-fixes.ts` | 模型配置页 `effective` 三态回归 |
+| `verify-model-config-fixes.ts` | 模型配置页 `effective` 三态回归；**全局设置 `gateway.*.baseUrl` 写入归一化**（只剥尾部 `/v1`，非法 URL 仍 40001 且不落库） |
 | `verify-image-pipeline.ts` | 图像产出链路（`kind: 'image'` 判别式、11 项本地算法均产出合法图片） |
 | `verify-video-pipeline.ts` | 视频四段式异步契约 |
 | `verify-payment-signatures.ts` | 支付宝 RSA2 / 微信 v3 AES-GCM 按公开规范**独立复算**（防「自己签自己验」） |

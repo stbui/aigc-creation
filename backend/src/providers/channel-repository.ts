@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { normalizeBaseUrl } from './base-url';
 import { gatewayConfigOf } from './gateway.config';
 import { protocolSupports } from './vendors/vendor.presets';
 import type { Modality } from './modality';
@@ -205,7 +206,8 @@ export class ChannelRepository {
               modality,
               name: input.name,
               protocol: input.protocol,
-              baseUrl: input.baseUrl ?? '',
+              // 写侧统一归一化: 尾部 /v1 会被协议层再补一次, 拼成 /v1/v1/... (必然 404)
+              baseUrl: normalizeBaseUrl(input.baseUrl ?? ''),
               token: input.token ?? '',
               model: input.model ?? '',
               priority,
@@ -231,7 +233,7 @@ export class ChannelRepository {
     const data: Record<string, unknown> = {};
     if (input.name !== undefined) data.name = input.name;
     if (input.protocol !== undefined) data.protocol = input.protocol;
-    if (input.baseUrl !== undefined) data.baseUrl = input.baseUrl;
+    if (input.baseUrl !== undefined) data.baseUrl = normalizeBaseUrl(input.baseUrl);
     if (input.model !== undefined) data.model = input.model;
     if (input.priority !== undefined) data.priority = input.priority;
     if (input.enabled !== undefined) data.enabled = input.enabled;
@@ -399,12 +401,19 @@ export class ChannelRepository {
     },
     synthetic: boolean,
   ): ChannelView {
+    /*
+     * 读侧归一化: 存量行可能把厂商文档里的 `/v1` 一起存了进来,
+     * 协议层再补一次就是 /v1/v1/... (必然 404)。这里剥掉尾部 /v1,
+     * 让这些行不必等人工重存就能恢复; 页面显示的是**实际生效**的地址,
+     * 运营下次保存时会把这个值写回库里。
+     */
+    const baseUrl = normalizeBaseUrl(r.baseUrl);
     return {
       id: r.id,
       modality: r.modality as Modality,
       name: r.name,
       protocol: r.protocol,
-      baseUrl: r.baseUrl,
+      baseUrl,
       model: r.model,
       priority: r.priority,
       enabled: r.enabled,

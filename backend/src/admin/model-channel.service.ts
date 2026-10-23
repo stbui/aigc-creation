@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { AppError } from '../common/app.exception';
+import { baseUrlIssue } from '../providers/base-url';
 import { ChannelRepository, type ChannelSnapshot } from '../providers/channel-repository';
 import { gatewayConfigOf } from '../providers/gateway.config';
 import { presetsFor, protocolSupports } from '../providers/provider-presets';
@@ -370,22 +371,17 @@ export class ModelChannelService {
     }
   }
 
+  /**
+   * 接入地址校验 —— 规则本身在 `providers/base-url.ts`（与全局设置的
+   * `gateway.*.baseUrl` 共用同一份，避免两处口径分叉）。
+   *
+   * ⚠️ 停用的线路不强制填写，但**填了就照样校验**：一条带 `/v1` 的停用线路
+   * 一旦被启用就是必然 404，而启用动作不会重新走这里。
+   */
   private assertEnabledBaseUrl(enabled: boolean, baseUrl?: string): void {
-    if (!enabled) return;
-    if (!baseUrl || !baseUrl.trim()) {
-      throw new AppError(40001, '启用线路时必须填写接入地址', 400);
-    }
-    let url: URL;
-    try {
-      url = new URL(baseUrl);
-    } catch {
-      throw new AppError(40001, '接入地址必须是合法的 URL', 400);
-    }
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
-      throw new AppError(40001, '接入地址只支持 http / https', 400);
-    }
-  }
-}
+    const issue = baseUrlIssue(baseUrl, { required: enabled });
+    if (issue) throw new AppError(40001, issue, 400);
+  }}
 
 /** 简单并发池：不引入依赖，保证最多 limit 个任务同时执行 */
 async function mapWithConcurrency<T, R>(
