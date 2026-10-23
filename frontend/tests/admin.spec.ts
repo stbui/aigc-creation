@@ -10,15 +10,7 @@ import { test, expect, type Page } from '@playwright/test';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'admin@huojue.local';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? '';
 
-const UI = process.env.ADMIN_UI ?? 'http://localhost:5173';
-
-/** 登录并落token 到 localStorage, 供后续页面直接使用 */
-async function login(page: Page, email: string, password: string) {
-  const res = await page.request.post(`${UI.replace(/\/$/, '')}/../api/v1/auth/login`, {
-    // 占位, 实际走下面的真实请求
-  }).catch(() => null);
-  void res;
-}
+const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
 
 /** 通过 UI 登录页登录 */
 async function loginViaUi(page: Page) {
@@ -77,19 +69,53 @@ test.describe('后台管理端', () => {
     await expect(page.getByRole('heading', { name: '操作审计' })).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.adm-filter').first()).toBeVisible();
   });
+
+  /*
+   * 常驻确认弹窗回归 (2026-10-21)。
+   *
+   * `ConfirmAction` 曾忽略 `open` 参数、无条件渲染遮罩: 这两页把弹窗常挂载并用
+   * `open={state}` 控制可见性, 于是**一进页面就被一个关不掉的弹窗挡住整页**
+   * (法务页「发布该版本」、消息页「确认发送全站广播」)。只渲染不交互的页面巡检
+   * 发现不了 —— 文本和表格都在, 只是被遮罩盖住。这里断言首屏无遮罩 + 表单可交互。
+   */
+  for (const [path, heading] of [
+    ['/admin/legal', '法务文档'],
+    ['/admin/notifications', '站内消息'],
+  ] as const) {
+    test(`${heading}页不得常驻确认弹窗`, async ({ page }) => {
+      await loginViaUi(page);
+      await page.goto(`${UI}${path}`);
+      await expect(page.getByRole('heading', { name: heading })).toBeVisible({ timeout: 15000 });
+      await expect(page.locator('.adm-modal-mask')).toHaveCount(0);
+      // 遮罩不在 = 页面真的可点: 抓一个首屏按钮验证可交互
+      await expect(page.locator('.adm-btn, .ant-btn').first()).toBeEnabled();
+    });
+  }
 });
 
 test.describe('越权拦截', () => {
   test('C端用户访问后台显示无权限页并说明原因', async ({ page }) => {
-    // 演示账号是普通用户(role='user'), 缓存里没有后台角色 -> 不请求后台身份
+    /*
+     * 现场注册一个普通账号（role='user'）—— 项目不再内置演示账号，
+     * 也不再假设"库里某个账号的密码是什么"。
+     */
+    const stamp = Date.now().toString(36);
+    const email = `e2e-admin-${stamp}@test.local`;
+    const password = 'test123456';
+
     await page.goto(`${UI}/login`);
     await page.waitForLoadState('domcontentloaded');
 
     const emailInput = page.locator('input[type="email"], input#email, input[name="email"]').first();
     await emailInput.waitFor({ state: 'visible', timeout: 15000 });
-    await emailInput.fill('admin@demo.com');
+    // 登录页默认是登录态，先切到注册
+    await page.getByText('立即注册').click();
+    await page.getByPlaceholder('展示名称').fill(`E2E${stamp.slice(-4)}`);
+    await emailInput.fill(email);
     const pwdInput = page.locator('input[type="password"]').first();
-    await pwdInput.fill('demo1234');
+    await pwdInput.fill(password);
+    // 注册需勾选协议
+    await page.getByRole('checkbox').check();
     await pwdInput.press('Enter');
 
     await page.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 15000 });

@@ -1,11 +1,13 @@
 /**
- * 全能力冒烟: registry 里每个可提交能力都用真实输入跑一遍, 校验产出的 magic bytes。
+ * 全能力冒烟: registry 里有**本地实现**的图像能力都用真实输入跑一遍, 校验产出的 magic bytes。
+ * 仅云端的能力 (创意生图 / 局部重绘 / 图片翻译 / 自由创作) 与视频模态跳过 —— 本地无实现,
+ * 它们的正确行为是「没通道即 42204 退款」, 由 smoke-gateway-channel.js 覆盖。
  * 用法: node scripts/smoke-capabilities.js
  */
 const fs = require('fs');
 const path = require('path');
 const { Jimp, JimpMime } = require('jimp');
-const { MockImageProvider } = require('../dist/providers/mock-image.provider');
+const { LocalImageProvider } = require('../dist/providers/local-image.provider');
 const registry = require('../dist/capabilities/capability.registry');
 
 const OUT = '/tmp/cap-smoke';
@@ -28,12 +30,12 @@ async function makeInput() {
   const input = await makeInput();
   const ref = `${OUT}/ref.png`;
   fs.writeFileSync(ref, fs.readFileSync(input));
-  const provider = new MockImageProvider();
+  const provider = new LocalImageProvider();
 
   const defs = registry.CAPABILITIES;
   let fail = 0;
-  let real = 0;
-  let mock = 0;
+  let localDone = 0;
+  let cloudOnly = 0;
 
   for (const def of defs) {
     if (def.mode === 'planned') {
@@ -41,14 +43,24 @@ async function makeInput() {
       continue;
     }
     // ⚠️ **只冒烟图像模态** (2026-10-20)。
-    // 本脚本用 MockImageProvider (Jimp 本地算法) 跑能力, 产出必须是图片字节。
+    // 本脚本用 LocalImageProvider (Jimp 本地算法) 跑能力, 产出必须是图片字节。
     // 视频能力 (modality='video', 如 image_to_video) **按设计没有 localImpl** ——
     // 本地不存在「本地算法生成视频」, 编一段占位素材当视频会欺骗用户。
     // 故视频能力不走本冒烟, 它由视频通道的独立冒烟覆盖。
-    // (此前未按模态过滤 → 视频能力落到 MockImageProvider → 报
+    // (此前未按模态过滤 → 视频能力落到 LocalImageProvider → 报
     //  「未声明 localImpl」, 看起来像能力定义坏了, 实为冒烟脚本与能力模型不同步。)
     if (def.modality && def.modality !== 'image') {
       console.log(`⏭  ${def.name.padEnd(12)} ${def.modality} 模态 (无本地算法兜底, 不走本冒烟)`);
+      continue;
+    }
+    /*
+     * 2026-10-22: 没有本地实现的能力 (创意生图 / 局部重绘 / 图片翻译 / 自由创作)
+     * 本地路径上**必然失败** —— 它们的设计就是「没通道即 42204 失败并退款」。
+     * 跳过而不是记失败, 否则这条冒烟会把正确行为报成回归。
+     */
+    if (!def.localImpl) {
+      console.log(`⏭  ${def.name.padEnd(12)} 无本地实现 (仅云端, 不走本冒烟)`);
+      cloudOnly++;
       continue;
     }
     const inputs = def.inputs === 2 ? [input, ref] : [input];
@@ -63,11 +75,9 @@ async function makeInput() {
       const out = `${OUT}/${def.id}.${ext}`;
       fs.writeFileSync(out, buffer);
       const { width, height } = (await Jimp.read(out)).bitmap;
-      const label = def.mode === 'real' ? '真做' : 'mock';
-      if (def.mode === 'real') real++;
-      else mock++;
+      localDone++;
       console.log(
-        `${magicOk ? '✅' : '❌'} ${def.name.padEnd(12)} ${label} ${String(width).padStart(4)}x${String(height).padEnd(4)} ${String(buffer.length).padStart(7)}B ${format.padEnd(10)} ${Date.now() - t0}ms`,
+        `${magicOk ? '✅' : '❌'} ${def.name.padEnd(12)} 本地真做 ${String(width).padStart(4)}x${String(height).padEnd(4)} ${String(buffer.length).padStart(7)}B ${format.padEnd(10)} ${Date.now() - t0}ms`,
       );
       if (!magicOk) fail++;
     } catch (e) {
@@ -88,7 +98,9 @@ async function makeInput() {
   console.log(`${origOk ? '✅' : '❌'} 修图默认原比例: ${JSON.stringify(orig)}`);
   if (!origOk) fail++;
 
-  console.log(`\n真做 ${real} 项 / mock ${mock} 项 / 失败 ${fail} 项 → ${fail === 0 ? 'ALL PASS' : 'FAIL'}`);
+  console.log(
+    `\n本地真实算法 ${localDone} 项 / 仅云端 ${cloudOnly} 项 / 失败 ${fail} 项 → ${fail === 0 ? 'ALL PASS' : 'FAIL'}`,
+  );
   process.exit(fail === 0 ? 0 : 1);
 })().catch((e) => {
   console.error('SMOKE FAIL:', e);

@@ -9,7 +9,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Jimp, JimpMime } = require('jimp');
-const { MockImageProvider } = require('../dist/providers/mock-image.provider');
+const { LocalImageProvider } = require('../dist/providers/local-image.provider');
 
 const OUT = '/tmp/vc-variants';
 fs.mkdirSync(OUT, { recursive: true });
@@ -61,7 +61,7 @@ function stripStddev(img, yFrac, xFromFrac, xToFrac) {
   const refPath = path.join(OUT, 'reference.png');
   fs.writeFileSync(refPath, await ref.getBuffer(JimpMime.png));
 
-  const provider = new MockImageProvider();
+  const provider = new LocalImageProvider();
   const base = {
     productName: 'Summer Fan',
     brand: 'ACME',

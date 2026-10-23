@@ -4,8 +4,13 @@ import { AppError } from '../common/app.exception';
 import { SchedulerService } from './scheduler.service';
 import { PERMISSIONS } from './permissions';
 
-/** 允许手动触发的任务 —— 只开放幂等且低风险的,备份/清理不在此列 */
-const MANUALLY_RUNNABLE = ['order-expire', 'credit-expire', 'membership'];
+/**
+ * 允许手动触发的任务 —— 只开放幂等且低风险的,备份/清理不在此列。
+ *
+ * `task-recover` 也在白名单里: 它把心跳超时的 running 任务判失败并退款,
+ * 两条路径都以条件更新抢占, 重复触发不会重复退款, 排在人工排障时的第一选择。
+ */
+const MANUALLY_RUNNABLE = ['order-expire', 'credit-expire', 'membership', 'task-recover'];
 
 /**
  * 调度器可观测 (admin-prd.md §3.18 B-90 / M9.5)。

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { getCapability } from '../capabilities/capability.registry';
+import { SignedUrlService } from '../common/signed-url.service';
 
 /**
  * 数据中心聚合。
@@ -10,7 +11,10 @@ import { getCapability } from '../capabilities/capability.registry';
  */
 @Injectable()
 export class StatsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly signedUrl: SignedUrlService,
+  ) {}
 
   async overview(ownerId: string) {
     const now = new Date();
@@ -19,7 +23,14 @@ export class StatsService {
 
     const [taskGroups, assetGroups, projectCount, recentTasks, weekTasks] = await Promise.all([
       this.prisma.generationTask.groupBy({ by: ['capability', 'status'], where: { ownerId }, _count: { _all: true } }),
-      this.prisma.asset.groupBy({ by: ['kind'], where: { ownerId }, _count: { _all: true } }),
+      // 素材统计与素材库同口径: 只算 status='visible'。
+      // 若把后台已下架的也算进来, 数据中心「素材总量 / 生成图」会比素材库
+      // 的「共 N 个素材」多出看不见的条目, 用户无法核对。
+      this.prisma.asset.groupBy({
+        by: ['kind'],
+        where: { ownerId, status: 'visible' },
+        _count: { _all: true },
+      }),
       this.prisma.project.count({ where: { ownerId } }),
       this.prisma.generationTask.findMany({
         where: { ownerId },
@@ -30,7 +41,7 @@ export class StatsService {
           capability: true,
           status: true,
           createdAt: true,
-          outputAsset: { select: { id: true, sourceUrl: true } },
+          outputAsset: { select: { id: true, sourceUrl: true, status: true } },
         },
       }),
       this.prisma.generationTask.findMany({
@@ -76,9 +87,14 @@ export class StatsService {
     for (const t of await this.prisma.generationTask.findMany({
       where: { ownerId, status: 'succeeded', outputAssetId: { not: null } },
       orderBy: { createdAt: 'desc' },
-      select: { capability: true, createdAt: true, outputAsset: { select: { sourceUrl: true } } },
+      select: {
+        capability: true,
+        createdAt: true,
+        outputAsset: { select: { sourceUrl: true, status: true } },
+      },
     })) {
-      const url = t.outputAsset?.sourceUrl;
+      // 下架产出不拿来当示例图: 素材库看不到它, 这里却展示会让用户点开 404
+      const url = t.outputAsset?.status === 'visible' ? t.outputAsset.sourceUrl : null;
       if (url && !capabilityThumbs.has(t.capability)) {
         capabilityThumbs.set(t.capability, { url, createdAt: t.createdAt });
       }
@@ -103,7 +119,8 @@ export class StatsService {
           mode: getCapability(capability)?.mode ?? 'planned',
           total: v.total,
           succeeded: v.succeeded,
-          thumbnailUrl: capabilityThumbs.get(capability)?.url ?? null,
+          // 展示专用: 开启 ASSET_SIGNING_SECRET 后必须签名, 否则 <img> 403
+          thumbnailUrl: this.signedUrl.displayUrl(capabilityThumbs.get(capability)?.url),
         }))
         .sort((a, b) => b.total - a.total),
       last7Days: [...dailyMap.entries()].map(([date, count]) => ({ date, count })),
@@ -113,7 +130,10 @@ export class StatsService {
         name: getCapability(t.capability)?.name ?? t.capability,
         status: t.status,
         createdAt: t.createdAt,
-        thumbnailUrl: t.outputAsset?.sourceUrl ?? null,
+        // 下架产出不给缩略图 (与素材库同口径: 用户看不到它)
+        thumbnailUrl: this.signedUrl.displayUrl(
+          t.outputAsset?.status === 'visible' ? t.outputAsset.sourceUrl : null,
+        ),
       })),
     };
   }

@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { AdminProvider } from './context/AdminContext';
 import { CreditsProvider } from './context/CreditsContext';
 import { AppLayout } from './components/AppLayout';
+import { LoginModalHost } from './components/LoginModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ExceptionPage, NotFoundPage } from './components/ExceptionPage';
 import { useCapabilities } from './hooks/useCapabilities';
@@ -30,6 +31,19 @@ function lazyNamed<T extends Record<string, ComponentType<any>>>(
 }
 
 const LoginPage = lazyNamed(() => import('./pages/LoginPage'), 'LoginPage');
+// 通用 OAuth 回调完成页：provider 授权后回跳，用短时 ticket 换正式会话
+const OAuthCallbackPage = lazyNamed(() => import('./pages/OAuthCallbackPage'), 'OAuthCallbackPage');
+// 扫码登录确认页 (B8): 手机相机扫开二维码即进入, 裸外壳
+const QrLoginPage = lazyNamed(() => import('./pages/QrLoginPage'), 'QrLoginPage');
+// 找回/重置密码 (B2): 独立页, 与登录页同为裸卡布局
+const ForgotPasswordPage = lazyNamed(
+  () => import('./pages/ForgotPasswordPage'),
+  'ForgotPasswordPage',
+);
+const ResetPasswordPage = lazyNamed(
+  () => import('./pages/ResetPasswordPage'),
+  'ResetPasswordPage',
+);
 const LandingPage = lazyNamed(() => import('./pages/LandingPage'), 'LandingPage');
 const SitemapPage = lazyNamed(() => import('./pages/SitemapPage'), 'SitemapPage');
 const LegalPage = lazyNamed(() => import('./pages/LegalPage'), 'LegalPage');
@@ -58,6 +72,8 @@ const PackagesPage = lazyNamed(() => import('./pages/PackagesPage'), 'PackagesPa
 const CheckoutPage = lazyNamed(() => import('./pages/CheckoutPage'), 'CheckoutPage');
 const CreditsPage = lazyNamed(() => import('./pages/CreditsPage'), 'CreditsPage');
 const OrdersPage = lazyNamed(() => import('./pages/OrdersPage'), 'OrdersPage');
+const AccountPage = lazyNamed(() => import('./pages/AccountPage'), 'AccountPage');
+const TicketsPage = lazyNamed(() => import('./pages/TicketsPage'), 'TicketsPage');
 
 // 后台管理端: 独立外壳与鉴权, 不走 C 端 Shell (侧栏/顶导/促销条均为 C 端语义)
 const AdminShell = lazyNamed(() => import('./pages/admin/AdminDashboardPage'), 'AdminShell');
@@ -128,7 +144,14 @@ function Shell() {
     );
   }
 
-  if (loading) {
+  /*
+   * 能力清单只驱动导航与创作工具。账户/积分/订单/工单/套餐/结算这些页面
+   * 不依赖它 —— 清单接口挂了不能让它们一起白屏 (曾整壳拦截)。
+   */
+  const capabilityIndependent =
+    /^\/(account|credits|orders|tickets|packages|checkout)(\/|$)/.test(location.pathname);
+
+  if (loading && !capabilityIndependent) {
     return (
       <div className="app-boot">
         <StateLoading tip="加载能力清单…" full />
@@ -136,7 +159,7 @@ function Shell() {
     );
   }
 
-  if (error || !data) {
+  if ((error || !data) && !capabilityIndependent) {
     return (
       <ExceptionPage
         kind="warning"
@@ -144,7 +167,7 @@ function Shell() {
         title="无法连接服务"
         desc="能力清单加载失败，工具暂时不可用。请确认后端已启动；若持续失败，可能是网络或服务状态异常。"
         detail={error ?? undefined}
-        footnote={`默认后端地址 http://localhost:3001，如已改端口请检查 .env 的 VITE_API_BASE 配置。`}
+        footnote={`默认后端地址 http://localhost:4100，如已改端口请检查 .env 的 VITE_API_BASE 配置。`}
         action={
           <button type="button" className="exc-btn is-primary" onClick={() => window.location.reload()}>
             重新加载
@@ -154,10 +177,18 @@ function Shell() {
     );
   }
 
+  if ((error || !data) && capabilityIndependent) {
+    console.warn('[shell] 能力清单加载失败，账户/交易页以无导航降级模式渲染', error);
+  }
+
+  const groups = data?.groups ?? [];
+  const items = data?.items ?? [];
+  const workbenchIds = data?.workbenchIds ?? [];
+
   return (
     <AppLayout
-      groups={data.groups}
-      items={data.items}
+      groups={groups}
+      items={items}
       thumbs={thumbs}
       statsTotal={stats?.totals.tasks ?? 0}
     >
@@ -167,7 +198,7 @@ function Shell() {
             <Route
               path="/workbench"
               element={
-                  <WorkbenchPage workbenchIds={data.workbenchIds} groups={data.groups} />
+                  <WorkbenchPage workbenchIds={workbenchIds} groups={groups} />
               }
             />
             <Route
@@ -310,6 +341,20 @@ function Shell() {
                   <OrdersPage />
               }
             />
+            {/* 账户自助: 资料 / 改密 / 数据导出 / 注销 (B4) */}
+            <Route
+              path="/account"
+              element={
+                  <AccountPage />
+              }
+            />
+            {/* 我的工单 (B7): 站内消息里的 ticket_reply 通知直接链到这里 */}
+            <Route
+              path="/tickets"
+              element={
+                  <TicketsPage />
+              }
+            />
             {/* 参考站路径为 /my-works; /works 保留为等价别名, 两边都可直达 */}
             <Route
               path="/my-works"
@@ -335,6 +380,9 @@ export default function App() {
       {/* CreditsProvider 依赖 useAuth 的 token, 故必须包在 AuthProvider 内 */}
       <CreditsProvider>
       <BrowserRouter>
+        {/* 登录弹窗宿主必须在 Router 之内: 卡片里的 useNavigate 依赖路由上下文。
+            放在 AuthProvider 里 (Router 之外) 会让弹窗渲染即抛错、点登录毫无反应。 */}
+        <LoginModalHost />
         {/* AdminProvider 包在 BrowserRouter 内: useAdmin 依赖 useAuth 的 token,
             路由切到 /admin 时才加载身份, 不影响 C 端首屏 */}
         <AdminProvider>
@@ -342,6 +390,13 @@ export default function App() {
             <Suspense fallback={<RouteFallback />}>
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
+                {/* OAuth provider 回调后的落地页（不经过 AppLayout） */}
+                <Route path="/auth/oauth/callback" element={<OAuthCallbackPage />} />
+                {/* 扫码登录的手机侧确认页 (B8): 二维码内容指向这里 */}
+                <Route path="/qr-login" element={<QrLoginPage />} />
+                {/* 找回 / 重置密码: 邮件链接直达, 不经过 AppLayout */}
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
                 {/* 手机端上传页: 扫码后打开的独立落地页。
                     ⚠️ 走**裸外壳**而非 AppLayout —— 手机屏幕窄, 且用户此刻
                     的任务只有"选一张图传回去"; 更重要的是它不该依赖能力清单

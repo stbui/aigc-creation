@@ -15,11 +15,21 @@ export interface CapabilitiesData {
   workbenchIds: string[];
 }
 
+/**
+ * 客户端缓存有效期。
+ *
+ * 后端 availability 缓存是 3s（后台下线/调价后立即 invalidate），前端若永久缓存，
+ * 运营改完配置、用户已打开的页面却一直显示旧状态与旧价格，只能整页刷新。
+ * 这里给 5s 的短 TTL：正常浏览几乎不增加请求，后台变更又能很快反映到 C 端。
+ */
+const CACHE_TTL_MS = 5_000;
+
 let cache: CapabilitiesData | null = null;
+let cachedAt = 0;
 let inflight: Promise<CapabilitiesData> | null = null;
 
 export async function loadCapabilities(force = false): Promise<CapabilitiesData> {
-  if (cache && !force) return cache;
+  if (cache && !force && Date.now() - cachedAt < CACHE_TTL_MS) return cache;
   if (inflight && !force) return inflight;
 
   inflight = (async () => {
@@ -27,6 +37,7 @@ export async function loadCapabilities(force = false): Promise<CapabilitiesData>
     if (!res.ok) throw new Error(`能力清单加载失败（${res.status}）`);
     const data = unwrapEnvelope<CapabilitiesData>(await res.json());
     cache = data;
+    cachedAt = Date.now();
     return cache;
   })();
 

@@ -10,12 +10,19 @@ const ACCESS_TOKEN_TTL = process.env.JWT_TTL || '7d';
 export interface JwtPayload {
   sub: string; // userId
   email: string;
+  /**
+   * 令牌版本 (User.tokenVersion 的快照)。
+   *
+   * 改密 / 重置密码 / 注销时用户表自增, 守卫逐请求比对, 旧 token 立即失效。
+   * 缺省按 0 处理 —— 与 `tokenVersion @default(0)` 一致, 存量 token 不受影响。
+   */
+  tv?: number;
 }
 
 export class JwtService {
   static sign(payload: JwtPayload): string {
     return jwt.sign(
-      { sub: payload.sub, email: payload.email },
+      { sub: payload.sub, email: payload.email, tv: payload.tv ?? 0 },
       JWT_SECRET,
       { expiresIn: ACCESS_TOKEN_TTL, algorithm: 'HS256' },
     );
@@ -23,6 +30,7 @@ export class JwtService {
 
   static verify(token: string): JwtPayload {
     const decoded = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as jwt.JwtPayload;
-    return { sub: String(decoded.sub), email: String(decoded.email) };
+    const tv = decoded.tv == null ? 0 : Number(decoded.tv);
+    return { sub: String(decoded.sub), email: String(decoded.email), tv: Number.isFinite(tv) ? tv : 0 };
   }
 }

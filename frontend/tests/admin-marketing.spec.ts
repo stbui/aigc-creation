@@ -9,7 +9,7 @@ import { test, expect, type Page } from '@playwright/test';
  *   3. 无 marketing.write 权限时只读 (财务角色看不到写入口)
  */
 
-const UI = process.env.ADMIN_UI ?? 'http://localhost:5173';
+const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
 
 async function login(page: Page, email = 'admin@huojue.local') {
   await page.setViewportSize({ width: 1600, height: 1000 });

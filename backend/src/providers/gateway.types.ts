@@ -27,3 +27,45 @@ export class GatewayUnavailableError extends Error {
     this.reason = reason;
   }
 }
+
+/**
+ * 没有可用的真实模型通道, 且该能力**不允许**交付本地产物。
+ *
+ * 与 GatewayUnavailableError 的区别: 后者是可降级的一次通道故障 (图像能力回落本地);
+ * 本错误是**终局** —— 该能力本地没有实现 (占位算法已于 2026-10-22 全部删除),
+ * 除了真实模型没有别的产出路径。
+ * 由 generate.service 转成任务失败 `42204` 并退款, 不落任何产出图。
+ */
+export class NoModelChannelError extends Error {
+  readonly reason: string;
+  constructor(reason: string) {
+    super(`无可用模型通道: ${reason}`);
+    this.name = 'NoModelChannelError';
+    this.reason = reason;
+  }
+}
+
+/**
+ * 请求带了遮罩, 但当前通道的协议不接受遮罩 (2026-10-22)。
+ *
+ * ## 为什么单独一个错误类型
+ *
+ * 遮罩被忽略的下场不是「重绘范围不准」, 而是**整张图被重绘** ——
+ * 用户涂的是包装盒, 模型改的是全图。这必须是一次可见的失败, 而不是
+ * 一次看起来成功、结果却对不上的交付。
+ *
+ * 因此它不能与「通道故障」混为一谈:
+ *   · 通道故障 → 试下一条通道 / 回落本地;
+ *   · 协议不支持 → 该通道无论重试多少次都不会支持, 只能换一条声明了
+ *     `maskSupport: 'edits'` 的通道; 全部通道都不支持时判任务失败 `42205` 并退款。
+ *
+ * 由 generate.service 转成 `42205`, 与 `42204`(没通道) / `42201`(生成异常) 区分。
+ */
+export class MaskUnsupportedError extends Error {
+  readonly reason: string;
+  constructor(reason: string) {
+    super(`通道不支持遮罩重绘: ${reason}`);
+    this.name = 'MaskUnsupportedError';
+    this.reason = reason;
+  }
+}

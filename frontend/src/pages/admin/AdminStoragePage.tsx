@@ -1,11 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
-import { App } from 'antd';
+import { useState } from 'react';
+import { App, Button } from 'antd';
 import { CheckCircle2, Cloud, HardDrive, Lock, Server, XCircle } from 'lucide-react';
 import { adminStorageApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
-import { AdminListError, AdminListLoading, ConfirmAction } from '../../components/admin/AdminWidgets';
-import { AdminEmpty, PageHeader, Panel } from '../../components/admin/PageHeader';
-import type { AdminStorageStatus, StorageBackendId } from '../../types/api';
+import {
+  AdminListError,
+  AdminListLoading,
+  AdminStaleError,
+  ConfirmAction,
+  useAdminResource,
+} from '../../components/admin/AdminWidgets';
+import { AdminEmpty, PageHeader } from '../../components/admin/PageHeader';
+import type { StorageBackendId } from '../../types/api';
 
 const META: Record<StorageBackendId, { label: string; desc: string; icon: typeof HardDrive; envKeys: string[] }> = {
   local: {
@@ -39,28 +45,11 @@ export function AdminStoragePage() {
   const { message } = App.useApp();
   const { can } = useAdmin();
 
-  const [data, setData] = useState<AdminStorageStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [probing, setProbing] = useState<string | null>(null);
   const [switchTarget, setSwitchTarget] = useState<StorageBackendId | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      setData(await adminStorageApi.status());
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '加载失败');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const { data, loading, error, reload } = useAdminResource(() => adminStorageApi.status());
 
   const probe = async (backend: StorageBackendId) => {
     setProbing(backend);
@@ -71,7 +60,7 @@ export function AdminStoragePage() {
       } else {
         void message.error(res.message);
       }
-      await load();
+      await reload();
     } catch (e) {
       void message.error((e as Error).message);
     } finally {
@@ -86,7 +75,7 @@ export function AdminStoragePage() {
       const res = await adminStorageApi.setActive(switchTarget);
       setSwitchTarget(null);
       void message.success(`默认后端已切到 ${META[switchTarget].label} — ${res.note}`);
-      await load();
+      await reload();
     } catch (e) {
       void message.error((e as Error).message);
     } finally {
@@ -94,8 +83,13 @@ export function AdminStoragePage() {
     }
   };
 
-  if (loading) return <AdminListLoading tip="加载存储配置…" />;
-  if (error) return <AdminListError error={error} onRetry={() => void load()} />;
+  /*
+   * 2026-10-23: 守卫从「无条件替换整页」收窄成「还没有数据时才替换」。
+   * 探测/切换后端之后要重拉状态 —— 用旧写法整页先塌成骨架屏再弹回来,
+   * 用户刚点的那个后端卡片会闪一下消失, 很像操作失败重载。
+   */
+  if (loading && !data) return <AdminListLoading tip="加载存储配置…" />;
+  if (error && !data) return <AdminListError error={error} onRetry={() => void reload()} />;
   if (!data) return <AdminEmpty description="暂无存储后端信息" />;
 
   return (
@@ -104,11 +98,13 @@ export function AdminStoragePage() {
         title="存储配置"
         description="素材文件的存放位置。切换只影响新上传，已写入的素材仍按原后端读取。"
         actions={
-          <button type="button" className="adm-btn" onClick={() => void load()}>
+          <Button type="default" className="adm-btn" loading={loading} onClick={() => void reload()}>
             刷新
-          </button>
+          </Button>
         }
       />
+
+      {error && <AdminStaleError error={error} onRetry={() => void reload()} />}
 
       <div className="adm-alert is-info">
         <Lock size={16} />
@@ -188,23 +184,23 @@ export function AdminStoragePage() {
 
               <div className="adm-storage-actions">
                 {b.configured && (
-                  <button
-                    type="button"
+                  <Button
+                    type="default"
                     className="adm-btn"
                     onClick={() => void probe(b.backend as StorageBackendId)}
                     disabled={probing === b.backend}
                   >
                     {probing === b.backend ? '测试中…' : '连通性测试'}
-                  </button>
+                  </Button>
                 )}
                 {can('setting.write') && b.configured && !b.active && (
-                  <button
-                    type="button"
+                  <Button
+                    type="primary"
                     className="adm-btn is-primary"
                     onClick={() => setSwitchTarget(b.backend as StorageBackendId)}
                   >
                     设为默认
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>

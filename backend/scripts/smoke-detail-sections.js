@@ -2,8 +2,11 @@
 const fs = require('fs');
 const path = require('path');
 const { Jimp, JimpMime } = require('jimp');
-const { MockImageProvider } = require('../dist/providers/mock-image.provider');
+const { LocalImageProvider } = require('../dist/providers/local-image.provider');
 const registry = require('../dist/capabilities/capability.registry');
+// 详情图模块常量在 2026-10-20 的拆文件中移到了 param-options，
+// registry 只再导出 parseDetailSections —— 这里直接取事实源，别再依赖门面透传。
+const { DETAIL_SECTIONS, DETAIL_SECTION_DEFAULTS } = require('../dist/capabilities/definitions/param-options');
 
 const OUT = '/tmp/pd-variants';
 fs.mkdirSync(OUT, { recursive: true });
@@ -15,7 +18,7 @@ fs.mkdirSync(OUT, { recursive: true });
   const input = path.join(OUT, 'input.png');
   fs.writeFileSync(input, await img.getBuffer(JimpMime.png));
 
-  const provider = new MockImageProvider();
+  const provider = new LocalImageProvider();
   const base = {
     productName: 'Summer Fan',
     brand: 'ACME',
@@ -26,9 +29,9 @@ fs.mkdirSync(OUT, { recursive: true });
     size: '1k',
   };
   const cases = [
-    ['default-6', registry.DETAIL_SECTION_DEFAULTS.join(',')],
+    ['default-6', DETAIL_SECTION_DEFAULTS.join(',')],
     ['single-hero', 'hero'],
-    ['ten-modules', registry.DETAIL_SECTIONS.slice(0, 10).map((s) => s.value).join(',')],
+    ['ten-modules', DETAIL_SECTIONS.slice(0, 10).map((s) => s.value).join(',')],
     ['unknown-filtered', 'hero,bogus_key,after_sale'],
   ];
   for (const [label, sections] of cases) {

@@ -27,6 +27,8 @@ export class CreditPriceService {
 
   /** key: `creditPrice.<capabilityId>` → 积分数 */
   private cache = new Map<string, number>();
+  /** 进行中的限时免费活动覆盖的能力 id（命中即 0 积分） */
+  private freeIds = new Set<string>();
   private cacheAt = 0;
 
   constructor(private readonly prisma: PrismaService) {}
@@ -34,6 +36,7 @@ export class CreditPriceService {
   /** 后台改价后立即失效缓存。不调也能等 TTL, 但改价应即时生效。 */
   invalidate(): void {
     this.cache.clear();
+    this.freeIds.clear();
     this.cacheAt = 0;
   }
 
@@ -52,6 +55,15 @@ export class CreditPriceService {
     if (Date.now() - this.cacheAt > CACHE_TTL_MS) {
       await this.refresh();
     }
+    /*
+     * 限时免费优先于一切定价来源：活动期内这项能力就是 0 积分。
+     *
+     * 放在「后台覆盖价」之前是有意的 —— 运营把价从 10 改成 8、同时开了
+     * 限时免费，用户端只能是 0；若反过来先取覆盖价，活动就会静默失效。
+     * 缓存 TTL 同时管住活动起止：到点后最多 3 秒自动恢复原价，
+     * 不需要调度任务去「把价格改回来」（那类补偿逻辑最容易漏）。
+     */
+    if (this.freeIds.has(capabilityId)) return 0;
     return this.cache.get(CreditPriceService.keyOf(capabilityId)) ?? defaultCreditCostOf(capabilityId);
   }
 
@@ -60,7 +72,9 @@ export class CreditPriceService {
     await this.refresh();
     const out: Record<string, number> = {};
     for (const c of CAPABILITIES) {
-      out[c.id] = this.cache.get(CreditPriceService.keyOf(c.id)) ?? defaultCreditCostOf(c.id);
+      out[c.id] = this.freeIds.has(c.id)
+        ? 0
+        : this.cache.get(CreditPriceService.keyOf(c.id)) ?? defaultCreditCostOf(c.id);
     }
     return out;
   }
@@ -76,9 +90,11 @@ export class CreditPriceService {
       capabilityId: string;
       capabilityName: string;
       cost: number;
-      source: 'setting' | 'registry';
+      source: 'setting' | 'registry' | 'campaign';
       overridden: boolean;
       registryDefault: number;
+      /** 是否被进行中的限时免费活动覆盖 */
+      freeCampaign: boolean;
     }>
   > {
     await this.refresh();
@@ -86,13 +102,20 @@ export class CreditPriceService {
       const key = CreditPriceService.keyOf(c.id);
       const settingValue = this.cache.get(key);
       const overridden = settingValue !== undefined;
+      const free = this.freeIds.has(c.id);
       return {
         capabilityId: c.id,
         capabilityName: c.name,
-        cost: overridden ? settingValue : defaultCreditCostOf(c.id),
-        source: overridden ? 'setting' : 'registry',
+        // 生效价 = 用户此刻实扣的价，活动命中即为 0
+        cost: free ? 0 : overridden ? settingValue : defaultCreditCostOf(c.id),
+        /*
+         * source 必须能区分 campaign：运营看到「生效价 0 / 来源 registry」
+         * 会以为代码写错了，而真相是一个进行中的限时免费活动。
+         */
+        source: free ? 'campaign' : overridden ? 'setting' : 'registry',
         overridden,
         registryDefault: defaultCreditCostOf(c.id),
+        freeCampaign: free,
       };
     });
   }
@@ -154,7 +177,27 @@ export class CreditPriceService {
       if (Number.isFinite(n) && n >= 0) next.set(r.key, Math.floor(n));
     }
 
+    /*
+     * 限时免费活动与覆盖价在**同一次刷新**里取，保证两者不会出现
+     * 「价格刷新了、免费名单还是上一轮」的半新半旧状态。
+     */
+    const now = new Date();
+    const campaigns = await this.prisma.campaign.findMany({
+      where: { type: 'limited_free', status: 'active', startAt: { lte: now }, endAt: { gte: now } },
+      select: { payload: true },
+    });
+    const free = new Set<string>();
+    for (const c of campaigns) {
+      try {
+        const payload = JSON.parse(c.payload || '{}') as { capabilityIds?: string[] };
+        for (const id of payload.capabilityIds ?? []) free.add(id);
+      } catch {
+        // 手的 payload 解析失败不能拖垮定价 —— 跳过这一个活动
+      }
+    }
+
     this.cache = next;
+    this.freeIds = free;
     this.cacheAt = Date.now();
   }
 }

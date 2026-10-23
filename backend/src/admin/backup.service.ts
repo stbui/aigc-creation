@@ -20,7 +20,15 @@ const FILE_SUFFIX = '.db';
  * 用户的原始上传素材属个人数据, 需走注销流程匿名化, 不能按时间批量清。
  * 本期只清理「运行痕迹」类数据 —— 它们不影响业务连续性但会无限增长。
  */
-const CLEANUP_TABLES = ['AdminAuditLog', 'CleanupLog', 'BackupRecord'] as const;
+const CLEANUP_TABLES = [
+  'AdminAuditLog',
+  'CleanupLog',
+  'BackupRecord',
+  // 模型调用记录是排障数据, 不承载交易事实, 故可按时间清理。
+  // 加入时须同步 admin/retention.controller.ts 的 TARGETS —— 两处不一致
+  // 会让界面上能选的表被后端拒绝 (或被后端接受却不在界面里)。
+  'ModelCallLog',
+] as const;
 
 export interface BackupRow {
   id: string;

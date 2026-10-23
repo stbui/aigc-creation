@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { adminApi } from '../lib/api';
+import { adminApi, ApiError } from '../lib/api';
 import { mayBeAdmin } from '../lib/auth';
 import type { AdminMe } from '../types/api';
 import { useAuth } from './AuthContext';
@@ -9,6 +9,13 @@ interface AdminContextValue {
   me: AdminMe | null;
   loading: boolean;
   error: string | null;
+  /**
+   * 失败时的 HTTP 状态码 (0 = 网络中断 / 非 HTTP 错误)。
+   *
+   * 路由层要靠它区分「你没有后台权限」(401/403) 与「后台没连上」(0/5xx)，
+   * 只看 error 文案会把断网也渲染成「需要后台权限」。
+   */
+  errorStatus: number | null;
   /**
    * 权限判定。
    *
@@ -29,6 +36,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
   const [me, setMe] = useState<AdminMe | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [errorStatus, setErrorStatus] = useState<number | null>(null);
   const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
@@ -37,6 +45,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       setMe(null);
       setLoading(false);
       setError(null);
+      setErrorStatus(null);
       return;
     }
 
@@ -48,6 +57,7 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       setMe(null);
       setLoading(false);
       setError(null);
+      setErrorStatus(null);
       return;
     }
 
@@ -59,12 +69,14 @@ export function AdminProvider({ children }: { children: ReactNode }) {
         if (!alive) return;
         setMe(data);
         setError(null);
+        setErrorStatus(null);
       })
       .catch((e: unknown) => {
         if (!alive) return;
         // 不静默: 非管理员访问后台时需要明确的失败原因用于路由决策
         setMe(null);
         setError(e instanceof Error ? e.message : '无法获取后台身份');
+        setErrorStatus(e instanceof ApiError ? e.status : 0);
       })
       .finally(() => {
         if (alive) setLoading(false);
@@ -85,12 +97,13 @@ export function AdminProvider({ children }: { children: ReactNode }) {
       me,
       loading,
       error,
+      errorStatus,
       can: (p) => permissionSet.has(p),
       canAny: (...ps) => ps.some((p) => permissionSet.has(p)),
       isHighRisk: (p) => highRiskSet.has(p),
       refresh,
     }),
-    [me, loading, error, permissionSet, highRiskSet, refresh],
+    [me, loading, error, errorStatus, permissionSet, highRiskSet, refresh],
   );
 
   return <AdminContext.Provider value={value}>{children}</AdminContext.Provider>;

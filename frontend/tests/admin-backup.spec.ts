@@ -7,7 +7,7 @@ import { test, expect, type Page } from '@playwright/test';
  * 这条如果失效, 运维会在事故时拿到一份损坏的备份却毫不知情。
  */
 
-const UI = process.env.ADMIN_UI ?? 'http://localhost:5173';
+const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
 
 async function login(page: Page) {
   // 侧栏在 ≤1280px 折叠, 分组标题按设计隐藏 —— 用例需断言侧栏结构时用宽视口

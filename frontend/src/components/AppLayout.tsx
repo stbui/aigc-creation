@@ -1,6 +1,15 @@
 import { useState, type ReactNode } from 'react';
 import { Layout, Button, Avatar, Dropdown, Drawer } from 'antd';
-import { ChevronDown, LogOut, Menu, ShieldCheck, User as UserIcon, Wallet } from 'lucide-react';
+import {
+  ChevronDown,
+  LifeBuoy,
+  LogOut,
+  Menu,
+  Settings,
+  ShieldCheck,
+  User as UserIcon,
+  Wallet,
+} from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { CapabilityDef, CapabilityGroup } from '../types/api';
 import { MODE_LABELS } from '../lib/constants';
@@ -11,6 +20,7 @@ import { useCredits } from '../context/CreditsContext';
 import { SideRail } from './SideRail';
 import { CapabilityIcon } from './SideRail';
 import { PromoBar } from './PromoBar';
+import { NotificationBell } from './NotificationBell';
 
 export { CapabilityIcon };
 
@@ -123,6 +133,8 @@ export function AppLayout({ groups, items, thumbs, statsTotal, children }: Props
            *
            * 未登录不显示余额数字 (拉不到, 也不该显示一个假的 0)。
            */}
+          {/* 消息铃铛: 未登录时组件自身返回 null */}
+          <NotificationBell />
           {token && (
             <Link to="/credits" className="app-quota">
               <Wallet size={14} />
@@ -134,6 +146,20 @@ export function AppLayout({ groups, items, thumbs, statsTotal, children }: Props
               menu={{
                 items: [
                   { key: 'email', label: email ?? '', icon: <UserIcon size={14} />, disabled: true },
+                  {
+                    key: 'account',
+                    label: '账户设置',
+                    icon: <Settings size={14} />,
+                    onClick: () => navigate('/account'),
+                  },
+                  // 工单入口放在账户菜单里: 它不是高频创作动作, 但报障时必须找得到。
+                  // 站内消息里的 ticket_reply 通知也直接链到 /tickets。
+                  {
+                    key: 'tickets',
+                    label: '我的工单',
+                    icon: <LifeBuoy size={14} />,
+                    onClick: () => navigate('/tickets'),
+                  },
                   { type: 'divider' as const },
                   // 后台入口仅对后台角色显示。角色来自 /admin/me, 普通用户不请求该端点,
                   // 因此这里用 isAdminRole 静态判断而非读异步状态 —— 未加载时先不显示。

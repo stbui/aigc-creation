@@ -1,8 +1,12 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
-import { AuditAction, RequirePermission } from './admin.decorator';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
+import { ArrayMaxSize, IsArray, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { AdminUser, AuditAction, RequirePermission, type AdminUser as AdminUserType } from './admin.decorator';
+import { AdminRoleService } from './admin-role.service';
 import { AdminAssetsService } from './assets-admin.service';
 import { PERMISSIONS } from './permissions';
-import { IsIn, IsString } from 'class-validator';
+import { AppError } from '../common/app.exception';
+import { csvFilename } from '../common/csv';
 import type { AssetListQueryDto, ProjectListQueryDto } from './dto/asset.dto';
 
 /** 下架/恢复 */
@@ -19,6 +23,22 @@ export class AssetBatchStatusDto {
   status!: 'visible' | 'hidden';
 }
 
+/** 批量动作 */
+export class AssetBatchDto {
+  @IsArray()
+  @ArrayMaxSize(100, { message: '单次批量最多 100 条' })
+  @IsString({ each: true })
+  ids!: string[];
+
+  @IsIn(['hide', 'show', 'delete'], { message: 'action 只能是 hide / show / delete' })
+  action!: 'hide' | 'show' | 'delete';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  reason?: string;
+}
+
 /**
  * 项目与素材管理 (admin-prd.md §3.4 B-21~B-27)。
  *
@@ -26,7 +46,10 @@ export class AssetBatchStatusDto {
  */
 @Controller('admin')
 export class AdminAssetsController {
-  constructor(private readonly assets: AdminAssetsService) {}
+  constructor(
+    private readonly assets: AdminAssetsService,
+    private readonly roles: AdminRoleService,
+  ) {}
 
   // ── 项目 ──────────────────────────────────────────────────────────
 
@@ -85,6 +108,34 @@ export class AdminAssetsController {
   @AuditAction('asset.batch_status')
   batchStatus(@Body() dto: AssetBatchStatusDto) {
     return this.assets.setStatusMany(dto.ids ?? [], dto.status);
+  }
+
+  /**
+   * 批量动作（B7）：下架 / 恢复 / 删除，逐条返回结果。
+   *
+   * 权限按 action 单独判定：`asset.hide` 管下架/恢复，`asset.delete` 管删除。
+   * 删除是资产级不可逆动作，不能因为"路由上挂了 hide 权限"就被顺带放开。
+   */
+  @Post('assets/batch')
+  @RequirePermission(PERMISSIONS.assetRead)
+  @AuditAction('asset.batch')
+  async batch(@Body() dto: AssetBatchDto, @AdminUser() actor: AdminUserType) {
+    const needed = dto.action === 'delete' ? PERMISSIONS.assetDelete : PERMISSIONS.assetHide;
+    if (!(await this.roles.hasPermission(actor.id, needed))) {
+      throw new AppError(40301, `没有执行该批量动作的权限（${needed}）`, 403);
+    }
+    return this.assets.batchAction(dto.ids, dto.action);
+  }
+
+  /** 素材导出 (CSV) */
+  @Get('assets/export')
+  @RequirePermission(PERMISSIONS.dataExport)
+  @AuditAction('data.export')
+  async export(@Query() query: AssetListQueryDto, @Res() res: Response) {
+    const csv = await this.assets.exportCsv(query);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${csvFilename('assets')}"`);
+    res.send(csv);
   }
 
   /** 删除素材 (B-27): 连带磁盘文件与产出任务, 不可逆 */

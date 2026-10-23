@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Drawer, Input, Select, Table } from 'antd';
+import { useCallback, useMemo, useState } from 'react';
+import { App, Button, Drawer, Input, Select, Switch, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { marketingApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import {
   AdminListError,
   AdminListLoading,
+  AdminStaleError,
   ConfirmAction,
+  adminPagination,
   useAdminList,
 } from '../../components/admin/AdminWidgets';
 import { AdminEmpty, PageHeader, Panel, StatusTag } from '../../components/admin/PageHeader';
@@ -294,12 +296,12 @@ export function AdminCampaignsPage() {
           <div className="adm-row-actions">
             {writable && (
               <>
-                <button type="button" className="adm-link" onClick={() => openEdit(row)}>
+                <Button type="link" className="adm-link" onClick={() => openEdit(row)}>
                   编辑
-                </button>
-                <button type="button" className="adm-link" onClick={() => setToggleTarget(row)}>
+                </Button>
+                <Button type="link" className="adm-link" onClick={() => setToggleTarget(row)}>
                   切换
-                </button>
+                </Button>
               </>
             )}
           </div>
@@ -311,7 +313,7 @@ export function AdminCampaignsPage() {
   );
 
   if (loading && !data) return <AdminListLoading tip="加载活动…" />;
-  if (error) return <AdminListError error={error} onRetry={reload} />;
+  if (error && !data) return <AdminListError error={error} onRetry={reload} />;
 
   return (
     <>
@@ -320,14 +322,17 @@ export function AdminCampaignsPage() {
         description="限时价 / 限时免费 / 弹窗位。状态为「进行中」但不在时间窗内，活动不会展示。"
         actions={
           writable ? (
-            <button type="button" className="adm-btn is-primary" onClick={openCreate}>
+            <Button type="primary" className="adm-btn is-primary" onClick={openCreate}>
               新建活动
-            </button>
+            </Button>
           ) : (
             <span className="adm-cell-sub">当前账号无 marketing.write 权限，仅可查看</span>
           )
         }
       />
+
+      {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
+      {error && <AdminStaleError error={error} onRetry={reload} />}
 
       <div className="adm-filter">
         <Input
@@ -347,15 +352,15 @@ export function AdminCampaignsPage() {
           allowClear
         />
         <div className="adm-filter-actions">
-          <button
-            type="button"
+          <Button
+            type="primary"
             className="adm-btn is-primary"
             onClick={() => setQuery({ keyword: keyword || undefined, status })}
           >
             查询
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            type="default"
             className="adm-btn"
             onClick={() => {
               setKeyword(''); setStatus(undefined);
@@ -363,7 +368,7 @@ export function AdminCampaignsPage() {
             }}
           >
             重置
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -373,9 +378,9 @@ export function AdminCampaignsPage() {
             description="还没有活动"
             action={
               writable ? (
-                <button type="button" className="adm-btn is-primary" onClick={openCreate}>
+                <Button type="primary" className="adm-btn is-primary" onClick={openCreate}>
                   创建第一个活动
-                </button>
+                </Button>
               ) : undefined
             }
           />
@@ -387,13 +392,13 @@ export function AdminCampaignsPage() {
             dataSource={data?.items ?? []}
             loading={loading}
             scroll={{ x: 1000 }}
-            pagination={{
+            pagination={adminPagination({
               current: data?.page ?? 1,
               pageSize: data?.pageSize ?? 20,
               total: data?.total ?? 0,
-              showTotal: (t) => `共 ${t} 个`,
+              unit: '个',
               onChange: setPage,
-            }}
+            })}
           />
         )}
       </Panel>
@@ -406,10 +411,10 @@ export function AdminCampaignsPage() {
         className="adm-drawer"
         footer={
           <div className="adm-drawer-footer">
-            <button type="button" className="adm-btn" onClick={() => setFormOpen(false)}>取消</button>
-            <button type="button" className="adm-btn is-primary" onClick={() => void save()} disabled={busy}>
+            <Button type="default" className="adm-btn" onClick={() => setFormOpen(false)}>取消</Button>
+            <Button type="primary" className="adm-btn is-primary" onClick={() => void save()} disabled={busy}>
               {busy ? '保存中…' : '保存'}
-            </button>
+            </Button>
           </div>
         }
       >
@@ -418,7 +423,7 @@ export function AdminCampaignsPage() {
         <div className="adm-form">
           <div className="adm-field">
             <label htmlFor="k-name">活动名称</label>
-            <input
+            <Input
               id="k-name"
               type="text"
               value={form.name}
@@ -429,15 +434,12 @@ export function AdminCampaignsPage() {
 
           <div className="adm-field">
             <label htmlFor="k-type">类型</label>
-            <select
+            <Select
               id="k-type"
               value={form.type}
-              onChange={(e) => setForm({ ...form, type: e.target.value as CampaignType })}
-            >
-              {Object.entries(TYPE_LABEL).map(([v, l]) => (
-                <option key={v} value={v}>{l}</option>
-              ))}
-            </select>
+              onChange={(value) => setForm({ ...form, type: value as CampaignType })}
+              options={Object.entries(TYPE_LABEL).map(([value, label]) => ({ value, label }))}
+            />
           </div>
 
           {/* payload 字段随类型切换, 避免看到不相关的输入框 */}
@@ -445,7 +447,7 @@ export function AdminCampaignsPage() {
             <>
               <div className="adm-field">
                 <label htmlFor="k-pid">目标商品 ID</label>
-                <input
+                <Input
                   id="k-pid"
                   type="text"
                   value={form.productId}
@@ -455,7 +457,7 @@ export function AdminCampaignsPage() {
               </div>
               <div className="adm-field">
                 <label htmlFor="k-price">活动价 (元)</label>
-                <input
+                <Input
                   id="k-price"
                   type="number"
                   value={form.priceCents}
@@ -469,7 +471,7 @@ export function AdminCampaignsPage() {
           {form.type === 'limited_free' && (
             <div className="adm-field">
               <label htmlFor="k-caps">能力 ID (逗号分隔)</label>
-              <input
+              <Input
                 id="k-caps"
                 type="text"
                 value={form.capabilityIds}
@@ -484,7 +486,7 @@ export function AdminCampaignsPage() {
             <>
               <div className="adm-field">
                 <label htmlFor="k-title">弹窗标题</label>
-                <input
+                <Input
                   id="k-title"
                   type="text"
                   value={form.title}
@@ -493,7 +495,7 @@ export function AdminCampaignsPage() {
               </div>
               <div className="adm-field">
                 <label htmlFor="k-body">正文</label>
-                <textarea
+                <Input.TextArea
                   id="k-body"
                   rows={3}
                   value={form.body}
@@ -503,7 +505,7 @@ export function AdminCampaignsPage() {
               <div className="adm-form-row">
                 <div className="adm-field">
                   <label htmlFor="k-cta">按钮文案</label>
-                  <input
+                  <Input
                     id="k-cta"
                     type="text"
                     value={form.ctaText}
@@ -512,7 +514,7 @@ export function AdminCampaignsPage() {
                 </div>
                 <div className="adm-field">
                   <label htmlFor="k-url">跳转地址</label>
-                  <input
+                  <Input
                     id="k-url"
                     type="text"
                     value={form.ctaUrl}
@@ -528,7 +530,7 @@ export function AdminCampaignsPage() {
           <div className="adm-form-row">
             <div className="adm-field">
               <label htmlFor="k-from">开始时间</label>
-              <input
+              <Input
                 id="k-from"
                 type="datetime-local"
                 value={form.startAt}
@@ -537,7 +539,7 @@ export function AdminCampaignsPage() {
             </div>
             <div className="adm-field">
               <label htmlFor="k-to">结束时间</label>
-              <input
+              <Input
                 id="k-to"
                 type="datetime-local"
                 value={form.endAt}
@@ -549,26 +551,22 @@ export function AdminCampaignsPage() {
           <div className="adm-form-row">
             <div className="adm-field">
               <label htmlFor="k-status">状态</label>
-              <select
+              <Select
                 id="k-status"
                 value={form.status}
-                onChange={(e) => setForm({ ...form, status: e.target.value as CampaignStatus })}
-              >
-                {Object.entries(STATUS_LABEL).map(([v, m]) => (
-                  <option key={v} value={v}>{m.label}</option>
-                ))}
-              </select>
+                onChange={(value) => setForm({ ...form, status: value as CampaignStatus })}
+                options={Object.entries(STATUS_LABEL).map(([value, item]) => ({
+                  value,
+                  label: item.label,
+                }))}
+              />
             </div>
             <div className="adm-field">
-              <label className="adm-switch">
-                <input
-                  type="checkbox"
-                  checked={form.onlyNewUsers}
-                  onChange={(e) => setForm({ ...form, onlyNewUsers: e.target.checked })}
-                />
-                <span className="adm-switch-track" aria-hidden="true" />
-                <span className="adm-switch-text">仅投放新用户</span>
-              </label>
+              <Switch
+                checked={form.onlyNewUsers}
+                checkedChildren="仅投放新用户"
+                onChange={(checked) => setForm({ ...form, onlyNewUsers: checked })}
+              />
             </div>
           </div>
         </div>

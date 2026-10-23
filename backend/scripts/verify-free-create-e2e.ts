@@ -14,6 +14,9 @@
  * 只挂本链路真正需要的模块, 既避开无关的在建代码, 也让验证范围更收敛。
  *
  * 校验项(对应验收口径):
+ *   0. 前置: 必须配好可用的图像模型通道。2026-10-21 起 free_create 的
+ *      localFallback=false —— 没通道时任务直接 failed/42204 并退款,
+ *      不会再拿本地产物凑一个"成功"给这个脚本看。
  *   1. task.provider === 'gateway'(真实模型通道, 非本地回落)
  *   2. ModelCallLog.source === 'gateway' && fallback === false
  *   3. outputAsset 宽高与 format 与真实产出一致
@@ -21,56 +24,66 @@
  */
 import { writeFile, mkdir, readFile } from 'fs/promises';
 import { join } from 'path';
+import { mkdirSync } from 'fs';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import { ConfigService } from '@nestjs/config';
 import { Module, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { ConfigModule } from '@nestjs/config';
+/*
+ * 必须用项目自己的 ConfigModule, 不能裸 ConfigModule.forRoot:
+ * 前者按 NODE_ENV 选 env 档 (test → .env.test → test.db), 后者只会找 `.env`,
+ * 找不到就让 DATABASE_URL 回落 dev.db —— 于是「测试档」实际读写开发库,
+ * 还会拿 dev 库里配的真实厂商线路去发请求 (实测烧掉一次真实调用才暴露)。
+ */
+import { ConfigModule } from '../src/config/config.module';
 import { Jimp } from 'jimp';
 import { PrismaModule } from '../src/prisma/prisma.module';
+import { PrismaService } from '../src/prisma/prisma.service';
 import { ProvidersModule } from '../src/providers/providers.module';
 import { CapabilitiesModule } from '../src/capabilities/capabilities.module';
 import { AuthModule } from '../src/auth/auth.module';
 import { ProjectsModule } from '../src/projects/projects.module';
 import { AssetsModule } from '../src/assets/assets.module';
 import { StorageModule } from '../src/storage/storage.module';
-import { MembershipModule } from '../src/membership/membership.module';
-import { GenerateService } from '../src/generate/generate.service';
-import { GenerateController } from '../src/generate/generate.controller';
-import { TasksController } from '../src/generate/tasks.controller';
+// 两个 @Global 基础设施模块: AuthService 依赖 EmailService/SmsService,
+// GenerateService 与 MembershipService 依赖 NotificationsService。
+// 全局模块也必须被根模块 import 一次才可见, 少了 Nest 装配直接抛 UnknownDependencies。
+import { ChannelsModule } from '../src/channels/channels.module';
+import { NotificationsModule } from '../src/notifications/notifications.module';
+// SignedUrlService（AssetsService 依赖）由 CommonModule 提供，不是全局模块
+import { CommonModule } from '../src/common/common.module';
+import { GenerateModule } from '../src/generate/generate.module';
 
 const PORT = 39777;
 const BASE = `http://127.0.0.1:${PORT}/api/v1`;
 const OUT = join(process.cwd(), 'uploads', 'verify');
 
 /**
- * 生成模块的本地等价组装。
+ * 最小可运行应用: 只装配 free_create 链路依赖的模块
  *
- * 不用 src/generate/generate.module.ts: 它第 4-5 行有**重复 import**
- * (MembershipModule 写了两遍, 另一会话在建功能的遗留), ts-node 类型校验会直接失败。
- * 这里按其真实内容(controllers/providers/imports)等价重建。
- *
- * MembershipModule 仍需引入: 另一会话正在给 GenerateService 加会员校验
- * (构造器多出 MembershipService 依赖), 少了它Nest 装配直接失败。
- * 引用的是 membership.module.ts 本身(内容干净), 不是那个重复 import 的 generate.module.ts。
+ * 早先这里手抄过一份生成模块 —— 当时 generate.module.ts 有重复 import，
+ * 抄一份能绕开编译错。但抄件不会跟着 GenerateService 的构造器一起长：
+ * 每次新增依赖（CreditsModule / CapabilitiesModule / AigcLabelModule …）
+ * 都得手动补，漏一次就报 UnknownDependencies。重复 import 早已修掉，
+ * 故直接装配真实 GenerateModule，让 Nest 自己校验接线。
  */
 @Module({
-  imports: [PrismaModule, ProvidersModule, StorageModule, MembershipModule],
-  controllers: [GenerateController, TasksController],
-  providers: [GenerateService],
-})
-class VerifyGenerateModule {}
-
-/** 最小可运行应用: 只装配 free_create 链路依赖的模块 */
-@Module({
   imports: [
-    // ConfigModule 必须在前: StorageService 依赖 ConfigService, 且是全局模块
-    ConfigModule.forRoot({ isGlobal: true, ignoreEnvFile: false }),
+    // ConfigModule 必须在前: 它在 import 时把 .env.<NODE_ENV> 灌进 process.env,
+    // 后续 PrismaService 才连对库
+    ConfigModule,
     PrismaModule,
     ProvidersModule,
+    // StorageModule 是 @Global, 但全局模块也要在根模块 import 一次才可见
+    StorageModule,
+    CommonModule,
+    ChannelsModule,
+    NotificationsModule,
     CapabilitiesModule,
     AuthModule,
     ProjectsModule,
     AssetsModule,
-    VerifyGenerateModule,
+    GenerateModule,
   ],
 })
 class VerifyAppModule {}
@@ -94,23 +107,30 @@ async function json(res: Response) {
 async function main() {
   await mkdir(OUT, { recursive: true });
 
-  const app = await NestFactory.create(VerifyAppModule, { logger: ['error', 'warn'] });
+  const app = await NestFactory.create<NestExpressApplication>(VerifyAppModule, {
+    logger: ['error', 'warn'],
+  });
   // 与 main.ts 同形:全局前缀 + ValidationPipe(白名单+转换)
   app.setGlobalPrefix('api/v1');
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
   app.enableCors({ origin: true });
+  /*
+   * /uploads 静态直出也要照搬: 少了它, 脚本按 outputAsset.sourceUrl 取图画会拿到
+   * 404 的 JSON 体, Jimp 解码报 "Could not find MIME for Buffer" —— 看起来像
+   * 生成失败, 实际只是这个最小装配没挂静态服务。
+   */
+  const config = app.get(ConfigService);
+  const uploadsDir = join(process.cwd(), config.get<string>('path.uploads') ?? 'uploads');
+  mkdirSync(join(uploadsDir, 'original'), { recursive: true });
+  mkdirSync(join(uploadsDir, 'generated'), { recursive: true });
+  app.useStaticAssets(uploadsDir, { prefix: '/uploads' });
   await app.listen(PORT, '127.0.0.1');
   console.log(`[boot] Nest 已监听 ${PORT}`);
 
-  // ── 登录 ──
-  const login = await json(
-    await fetch(`${BASE}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@demo.com', password: 'demo1234' }),
-    }),
-  );
-  const token = login?.accessToken ?? login?.data?.accessToken;
+  // ── 登录（现场注册一个新账号, 不依赖预置的演示账号）──
+  const { ensureTestUser } = require('./lib/test-user');
+  const account = await ensureTestUser(BASE, { prefix: 'free-create' });
+  const token = account.token;
   ok(Boolean(token), '登录拿到 accessToken');
   if (!token) return void (await app.close());
   const H = { Authorization: `Bearer ${token}` };
@@ -166,7 +186,9 @@ async function main() {
   if (oa1?.sourceUrl) {
     const buf = Buffer.from(await (await fetch(`http://127.0.0.1:${PORT}${oa1.sourceUrl}`)).arrayBuffer());
     await writeFile(join(OUT, 'e2e-t2i.png'), buf);
-    const im = await Jimp.read(buf);
+    // Jimp 1.x 的 read() 只吃路径; 从内存字节解码要用 fromBuffer,
+    // 否则报 "Could not find MIME for Buffer" 并被误当成生成失败
+    const im = await Jimp.fromBuffer(buf);
     console.log(`   产出落盘 ${buf.length} bytes, 实际尺寸 ${im.bitmap.width}x${im.bitmap.height}`);
     ok(buf.length > 50000, '产出是真实图片(非占位小图)', `${buf.length} bytes`);
   }
@@ -197,7 +219,8 @@ async function main() {
   }
 
   // ── 埋点校验 ──
-  const prisma = (app as any).get('PrismaService');
+  // 按类 token 取: 传字符串 'PrismaService' 在 Nest 10+ 解析不到 provider
+  const prisma = app.get(PrismaService);
   const logs = await prisma.modelCallLog.findMany({ orderBy: { createdAt: 'desc' }, take: 5 });
   const gw = logs.filter((l: any) => l.capability === 'free_create');
   ok(gw.length > 0, 'ModelCallLog 有 free_create 调用记录', `${gw.length} 条`);
@@ -213,4 +236,6 @@ async function main() {
 main().catch(async (e) => {
   console.error('[FATAL]', e?.message ?? e);
   process.exitCode = 1;
+  // 异常时 app 仍在 listen, 不显式退出的话进程会一直挂着, 只能等外层超时
+  process.exit(1);
 });

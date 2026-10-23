@@ -62,6 +62,17 @@ export class MarketingPublicController {
   popup(@Req() req: { user?: { id: string } }) {
     return this.marketing.activePopupCampaign(req.user?.id);
   }
+
+  /**
+   * 进行中的限时活动（落地页「限时活动」页签）。
+   *
+   * 匿名可访问：促销信息本身不是隐私，而且这是首屏转化位。只读、无身份维度，
+   * 因此不需要 OptionalJwtAuthGuard 之外的任何判断。
+   */
+  @Get('campaigns')
+  campaigns() {
+    return this.marketing.activeCampaigns();
+  }
 }
 
 /**

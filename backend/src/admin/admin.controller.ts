@@ -1,5 +1,5 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { AdminUser, RequirePermission } from './admin.decorator';
+import { AdminIdentityOnly, AdminUser, RequirePermission } from './admin.decorator';
 import { AdminRoleService } from './admin-role.service';
 import { AdminOverviewService } from './overview.service';
 import {
@@ -33,6 +33,8 @@ export class AdminController {
    * 因为后端是实时查库的, 权限变更后前端下一次刷新即生效。
    */
   @Get('me')
+  // 身份自省: 每个后台角色都必须能问"我是谁、我能做什么", 不设权限点
+  @AdminIdentityOnly()
   async me(@AdminUser() user: AdminUser) {
     const permissions = await this.roles.getPermissions(user.role);
     return {
@@ -60,6 +62,8 @@ export class AdminController {
    * 只读: 角色权限的实际生效值走 /admin/roles (M10)。
    */
   @Get('permissions')
+  // 权限目录是只读元数据 (角色页据此渲染), 与「我是谁」同属自省端点
+  @AdminIdentityOnly()
   async permissionCatalog() {
     return {
       permissions: ALL_PERMISSIONS,

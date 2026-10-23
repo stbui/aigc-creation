@@ -1,5 +1,5 @@
 import { useState, type RefObject } from 'react';
-import { App, Spin } from 'antd';
+import { Spin } from 'antd';
 import { ImagePlus, Plus, X } from 'lucide-react';
 
 /**
@@ -40,6 +40,8 @@ interface Props {
   onFiles: (files: FileList | File[]) => void;
   onRemove: (id: string) => void;
   onOpenLibrary: () => void;
+  /** 打开手机上传弹窗 (二维码方案; 弹窗由页面渲染) */
+  onOpenMobile: () => void;
   /** 空态文案里的名词, 如「商品图片」/「参考图片」 */
   noun?: string;
   /** file input 的 accept, 缺省与参考站一致 */
@@ -68,6 +70,7 @@ export function ToolImageDropzone({
   onFiles,
   onRemove,
   onOpenLibrary,
+  onOpenMobile,
   noun = '商品图片',
   accept = 'image/png,image/jpeg,image/webp,image/gif',
   sectionClassName,
@@ -76,7 +79,6 @@ export function ToolImageDropzone({
   showCount = true,
   emptyHint,
 }: Props) {
-  const { message } = App.useApp();
   const [dragging, setDragging] = useState(false);
 
   return (
@@ -93,14 +95,8 @@ export function ToolImageDropzone({
           <button
             type="button"
             className="pk-text-link"
-            title="本地演示环境暂不支持手机上传"
-            onClick={() =>
-              message.info(
-                single
-                  ? '本地演示环境暂不支持手机上传，可直接拖拽上传'
-                  : '本地演示环境暂不支持手机上传，可直接拖拽或粘贴上传',
-              )
-            }
+            title="用手机扫码上传，图片回填到上方"
+            onClick={onOpenMobile}
           >
             手机上传
           </button>

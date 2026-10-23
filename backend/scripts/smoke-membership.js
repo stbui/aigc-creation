@@ -7,10 +7,22 @@
  *   3. 加油包 95 折: 会员有折扣, 买会员本身不吃折扣
  *   4. 权益快照: 运营改套餐不影响存量会员
  */
-const BASE = 'http://127.0.0.1:3001/api/v1';
+/**
+ * 接口与库都可覆盖 —— 与 smoke-model-channels.js 同一套约定。
+ *   API_BASE        后端地址 (默认 http://127.0.0.1:4100)
+ *   NODE_ENV        决定连哪个库 (走 scripts/db-url.js, 与后端同源)
+ *   ADMIN_EMAIL / ADMIN_PASSWORD  后台账号 (seed:admin 只打印一次)
+ *
+ * 不写死 `file:./dev.db` 的原因: 测试档跑本脚本必须连 test.db,
+ * 否则会在开发库留下测试账号。
+ */
+const BASE = (process.env.API_BASE || 'http://127.0.0.1:4100').replace(/\/$/, '') + '/api/v1';
 const { PrismaClient } = require('@prisma/client');
 const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
-const prisma = new PrismaClient({ adapter: new NodeSQLiteDriverAdapterFactory({ url: 'file:./dev.db' }) });
+const { resolveDbUrl } = require('./db-url');
+const prisma = new PrismaClient({ adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }) });
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@huojue.local';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
 
 /** SQLite 单写者: 调度/下单写库期间紧随其后读会撞锁 */
 async function readWithRetry(fn, attempts = 6) {
@@ -53,6 +65,30 @@ async function call(method, path, token, body) {
   throw lastErr;
 }
 
+/**
+ * 走「下单 → 支付」开通会员 —— 2026-10-21 起这是**唯一合法路径**。
+ *
+ * 订阅接口不再支持无订单开通 (此前任何人调一次就能白拿会员与月度积分),
+ * 故测试也必须复现真实链路: 下会员单 → 沙箱支付 → 支付成功时自动激活。
+ */
+async function subscribeViaOrder(token, planId, tag = 'mem') {
+  const order = await call('POST', '/orders', token, {
+    idempotencyKey: `${tag}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    membershipPlanId: planId,
+  });
+  if (order.status !== 200 && order.status !== 201) {
+    return { status: order.status, message: order.message, data: null };
+  }
+  const pay = await call('POST', `/orders/${order.data.id}/pay`, token, { scenario: 'success' });
+  return {
+    status: pay.status,
+    message: pay.message,
+    // 会员到期时间由 /membership/me 读取, 这里只回传订单与支付结果
+    orderId: order.data.id,
+    order: pay.order,
+  };
+}
+
 let pass = 0, fail = 0;
 function check(name, ok, detail = '') {
   if (ok) { pass++; console.log(`  PASS  ${name}${detail ? ' — ' + detail : ''}`); }
@@ -91,9 +127,9 @@ function check(name, ok, detail = '') {
 
   console.log('\n【开通会员】');
   const pro = planOf('pro');
-  const sub = await call('POST', '/membership/subscribe', T, { planId: pro.id });
-  check('开通成功', sub.status === 200 || sub.status === 201,
-    `到期 ${sub.data?.expiresAt?.slice(0, 10)}`);
+  const sub = await subscribeViaOrder(T, pro.id, 'open');
+  check('下单支付后开通成功', sub.status === 200 || sub.status === 201,
+    `订单 ${sub.orderId} 已支付`);
 
   const me1 = await call('GET', '/membership/me', T);
   check('已是会员', me1.data?.isMember === true, `${me1.data?.planName}`);
@@ -121,7 +157,7 @@ function check(name, ok, detail = '') {
       data: {
         projectId: project.id, ownerId: user.id, capability: 'main_image',
         status: 'running', inputAssetIds: JSON.stringify([asset.id]),
-        params: '{}', provider: 'mock',
+        params: '{}', provider: 'pending',
       },
     });
   }
@@ -179,7 +215,7 @@ function check(name, ok, detail = '') {
       data: { email: email2, passwordHash: await bcrypt.hash('test123456', 10), name: '会员测试2' },
     });
     t2 = (await call('POST', '/auth/login', null, { email: email2, password: 'test123456' })).data.accessToken;
-    await call('POST', '/membership/subscribe', t2, { planId: pro.id });
+    await subscribeViaOrder(t2, pro.id, 'open2');
     const me3 = await call('GET', '/membership/me', t2);
     check('新会员用新权益', me3.data?.perks?.maxConcurrent === 99,
       `新用户并发 ${me3.data?.perks?.maxConcurrent}`);
@@ -189,7 +225,7 @@ function check(name, ok, detail = '') {
 
   console.log('\n【续期顺延】');
   const before2 = (await prisma.membership.findFirst({ where: { userId: user.id } })).expiresAt;
-  await call('POST', '/membership/subscribe', T, { planId: pro.id });
+  await subscribeViaOrder(T, pro.id, 'renew');
   const after2 = (await prisma.membership.findFirst({ where: { userId: user.id } })).expiresAt;
   check('续期从原到期时间顺延', after2.getTime() > before2.getTime(),
     `${before2.toISOString().slice(0, 10)} → ${after2.toISOString().slice(0, 10)}`);
@@ -206,10 +242,16 @@ function check(name, ok, detail = '') {
     where: { userId: user2.id },
     data: { expiresAt: new Date(Date.now() - 1000) },
   });
-  const sched = await call('POST', '/admin/scheduler/run?task=membership', (await call('POST', '/auth/login', null, {
-    email: 'admin@huojue.local', password: 'wQFFfQA8rXHKwSuLPpBz',
-  })).data.accessToken);
-  check('会员调度任务可触发', sched.status === 200 || sched.status === 201, sched.data?.reason ?? '已执行');
+  if (ADMIN_PASSWORD) {
+    const adminLogin = await call('POST', '/auth/login', null, {
+      email: ADMIN_EMAIL, password: ADMIN_PASSWORD,
+    });
+    const sched = await call('POST', '/admin/scheduler/run?task=membership', adminLogin.data?.accessToken);
+    check('会员调度任务可触发', sched.status === 200 || sched.status === 201, sched.data?.reason ?? '已执行');
+  } else {
+    // 不静默跳过: 明确写出来, 免得「全绿」被误读成这条也验过了
+    console.log('  SKIP  会员调度任务 — 未提供 ADMIN_PASSWORD (npm run seed:admin 会打印一次性密码)');
+  }
 
   const expired = await readWithRetry(() =>
     prisma.membership.findFirst({ where: { userId: user2.id } }));
@@ -230,10 +272,15 @@ function check(name, ok, detail = '') {
     prisma.orderItem.deleteMany({ where: { order: { userId: { in: uids } } } }),
     prisma.payment.deleteMany({ where: { userId: { in: uids } } }),
     prisma.order.deleteMany({ where: { userId: { in: uids } } }),
+    // B4 的表挂 userId 外键：漏删会让整笔清理事务回滚, 且被 .catch 吞掉
+    prisma.notification.deleteMany({ where: { userId: { in: uids } } }),
+    prisma.accountToken.deleteMany({ where: { userId: { in: uids } } }),
+    prisma.loginLog.deleteMany({ where: { userId: { in: uids } } }),
+    prisma.consentRecord.deleteMany({ where: { userId: { in: uids } } }),
     prisma.asset.deleteMany({ where: { ownerId: { in: uids } } }),
     prisma.project.deleteMany({ where: { ownerId: { in: uids } } }),
     prisma.user.deleteMany({ where: { id: { in: uids } } }),
-  ]).catch(() => undefined);
+  ]).catch((e) => console.warn('  WARN  清理失败(不影响断言):', e.message.slice(0, 120)));
 
   console.log(`\n${'='.repeat(52)}`);
   console.log(`  通过 ${pass} 项，失败 ${fail} 项`);

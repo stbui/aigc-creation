@@ -3,10 +3,8 @@
  *
  * ## 背景: 两个静默不实的缺陷
  *
- * ① **探测路径按模态硬编码** —— `probePath(modality)` 让 image 恒打
- *    `/generation/tasks`, 那是 **aigc 自研网关**的路径。而 5 个图像协议
- *    的真实端点各不相同:
- *      aigc → /generation/tasks
+ * ① **探测路径按模态硬编码** —— 改造前 `probePath(modality)` 让 image 恒打
+ *    **某一条**路径, 而各图像协议的真实端点各不相同 (据 `PROTOCOL_SPECS`):
  *      openai → /v1/images/generations
  *      volcengine → /images/generations
  *      minimax → /v1/image_generation
@@ -28,7 +26,7 @@
  * 打到了**正确的路径**。
  *
  * ⚠️ 关键: 桩服务器**记录被打到的路径**, 断言「打的是 /v1/images/generations
- * 而不是 /generation/tasks」。若只断言「结果为 ok」, 缺陷照样漏过 ——
+ * 而不是别的协议的端点」。若只断言「结果为 ok」, 缺陷照样漏过 ——
  * 因为 4xx 也算 ok (那正是缺陷本身)。
  */
 
@@ -140,13 +138,14 @@ async function main() {
   // ── 3. 打错路径时, 不能报「通过」 ─────────────────────────────────
   {
     /*
-     * 桩服务器**只认 aigc 的路径**, 而通道配的是 openai 协议。
-     * 此时探测必然打错 → 404。
+     * 桩服务器**只认火山方舟的路径** `/images/generations`, 而通道配的是
+     * openai 协议 (探测会打 `/v1/images/generations`)。此时探测必然打错 → 404。
+     * 两个路径确实不同, 才能构成「配错协议」的诱饵。
      *
      * ⚠️ 改造前 4xx 被当作「网络可达」→ ok:true → **显示通过**。
      * 现在必须**不报 ok**, 因为路径不对 = 生成必然失败。
      */
-    await withStub(['/generation/tasks'], async (port) => {
+    await withStub(['/images/generations'], async (port) => {
       setGatewayConfigOverrides({
         'gateway.image.baseUrl': `http://127.0.0.1:${port}`,
         'gateway.image.token': 'test-token',
@@ -279,7 +278,9 @@ async function main() {
       const path = (req.url ?? '').split('?')[0];
       // 三个模态的探测路径各不相同, 一律延迟相同时间
       setTimeout(() => {
-        res.writeHead(path.includes('/v1/models') ? 200 : 404, { 'Content-Type': 'application/json' });
+        // 405 = 端点存在但方法不对，避免触发「OPTIONS→GET→POST」三段探测链，
+        // 本用例只测批量调用是否并发，不测探测链路本身。
+        res.writeHead(path.includes('/v1/models') ? 200 : 405, { 'Content-Type': 'application/json' });
         res.end(path.includes('/v1/models') ? JSON.stringify({ data: [{ id: 'x' }] }) : '{}');
       }, delays.text);
     });
@@ -319,13 +320,161 @@ async function main() {
     }
   }
 
+  // ── 6. 草稿测试: override 生效、令牌语义、来源标记 ────────────────
+  {
+    const seen: Array<{ path: string; auth?: string }> = [];
+    const server: Server = createServer((req, res) => {
+      seen.push({
+        path: (req.url ?? '').split('?')[0],
+        auth: req.headers.authorization as string | undefined,
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end('{}');
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    const port = (server.address() as AddressInfo).port;
+    const baseUrl = `http://127.0.0.1:${port}`;
+
+    try {
+      // 全局配置指向一个不可达地址, 证明 override 的 baseUrl 确实生效
+      setGatewayConfigOverrides({
+        'gateway.image.baseUrl': 'http://127.0.0.1:1',
+        'gateway.image.token': 'saved-token',
+        'gateway.image.enabled': 'true',
+        'gateway.image.provider': 'openai',
+      });
+      invalidateGatewayConfigCache();
+
+      const r1 = await svc.testConnection('image', {
+        protocol: 'openai',
+        baseUrl,
+        token: 'draft-token',
+        enabled: true,
+      });
+      ok('草稿测试使用 override 的地址', seen.some((s) => s.path === '/v1/images/generations'), seen);
+      ok('草稿测试标记为 draft', r1.target === 'draft', r1);
+      ok('草稿测试带 testedAt', Boolean(r1.testedAt), r1);
+      ok('草稿令牌进入 Authorization', seen[0]?.auth === 'Bearer draft-token', seen[0]);
+
+      seen.length = 0;
+      const r2 = await svc.testConnection('image', {
+        protocol: 'openai',
+        baseUrl,
+        // token 不传 → 用已保存令牌
+        enabled: true,
+      });
+      ok('未传 token 时使用已保存令牌', seen[0]?.auth === 'Bearer saved-token', seen[0]);
+      ok('使用已保存令牌仍标记 draft', r2.target === 'draft', r2);
+
+      seen.length = 0;
+      await svc.testConnection('image', {
+        protocol: 'openai',
+        baseUrl,
+        token: '',
+        enabled: true,
+      });
+      ok('token 传空串时不带 Authorization', seen[0]?.auth === undefined, seen[0]);
+
+      // 不传 override: 全局配置本身要指向桩服务, 才能验证「读的是全局」
+      setGatewayConfigOverrides({
+        'gateway.image.baseUrl': baseUrl,
+        'gateway.image.token': 'saved-token',
+        'gateway.image.enabled': 'true',
+        'gateway.image.provider': 'openai',
+      });
+      invalidateGatewayConfigCache();
+      seen.length = 0;
+      const r4 = await svc.testConnection('image');
+      ok('不传 override 时标记 saved', r4.target === 'saved', r4);
+      ok('不传 override 时仍读全局配置', seen[0]?.auth === 'Bearer saved-token', seen[0]);
+    } finally {
+      server.close();
+      setGatewayConfigOverrides({});
+      invalidateGatewayConfigCache();
+    }
+  }
+
+  // ── 7. POST-only 生成端点不能被误判为「不存在」 ──────────────────
+  {
+    /*
+     * 实测 api.modelverse.cn:
+     *   OPTIONS /v1/images/generations → 404
+     *   GET     /v1/images/generations → 404
+     *   POST    /v1/images/generations → 401/400  ← 端点存在
+     * 生成接口通常只注册 POST。若只凭 OPTIONS/GET 的 404 就报「端点不存在」，
+     * 会把可用配置误判成坏的。故增加空 body POST 兜底探测。
+     */
+    const seen: string[] = [];
+    const server: Server = createServer((req, res) => {
+      seen.push(`${req.method} ${(req.url ?? '').split('?')[0]}`);
+      const path = (req.url ?? '').split('?')[0];
+      if (path === '/v1/models') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end('{"data":[{"id":"gpt-image-2"}]}');
+        return;
+      }
+      if (path === '/v1/images/generations') {
+        if (req.method === 'POST') {
+          // 空 body 缺少 prompt —— 端点存在，但请求不合法
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end('{"error":{"message":"prompt is required"}}');
+        } else {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end('{"error":{"message":"not found"}}');
+        }
+        return;
+      }
+      res.writeHead(404);
+      res.end();
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    const port = (server.address() as AddressInfo).port;
+
+    try {
+      const r = await svc.testConnection('image', {
+        protocol: 'openai',
+        baseUrl: `http://127.0.0.1:${port}`,
+        token: 'sk-probe',
+        model: 'gpt-image-2',
+        enabled: true,
+      });
+      ok('OPTIONS/GET 404 但 POST 存在 → 判定端点存在', r.ok === true, r);
+      ok('结果不再谎报「端点不存在」', !String(r.message).includes('端点不存在'), r.message);
+      ok('确实补发了 POST 探测', seen.includes('POST /v1/images/generations'), seen);
+    } finally {
+      server.close();
+    }
+  }
+
+  // ── 8. 三种方法都 404 才能判定端点不存在 ─────────────────────────
+  {
+    const server: Server = createServer((req, res) => {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end('{"error":{"message":"not found"}}');
+    });
+    await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
+    const port = (server.address() as AddressInfo).port;
+    try {
+      const r = await svc.testConnection('image', {
+        protocol: 'openai',
+        baseUrl: `http://127.0.0.1:${port}`,
+        token: 'sk-probe',
+        model: '',
+        enabled: true,
+      });
+      ok('三种方法都 404 → 判定端点不存在', r.ok === false && String(r.message).includes('端点不存在'), r);
+    } finally {
+      server.close();
+    }
+  }
+
   console.log(`\n通过 ${pass} 项`);
   if (fails.length) {
     console.error(`\n失败 ${fails.length} 项:`);
     for (const f of fails) console.error('  ✗ ' + f);
     process.exit(1);
   }
-  console.log('连通性测试断言通过（探测路径由协议层派生 · 模型名可校验 · 不谎报可用）');
+  console.log('连通性测试断言通过（探测路径由协议层派生 · 模型名可校验 · 草稿 override · POST-only 端点 · 不谎报可用）');
 }
 
 void main();

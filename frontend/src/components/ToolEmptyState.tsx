@@ -7,7 +7,7 @@ import { StateSkeleton } from './StateViews';
  * 结果栏空态 —— 工具页通用能力。
  *
  * 2026-10-19 抽取。此前 ToolShell 与 5 个自建页各写一遍
- * 「插画 + 标题 + 描述 (+ 流程步骤 / mock 披露)」。
+ * 「插画 + 标题 + 描述 (+ 流程步骤 / 来源披露)」。
  *
  * 只抽空态，**结果栏本体不抽**：各页的结果网格 class（`pk-result-grid` /
  * `tool-result-grid` 等）是参考站逐页 1:1 实拍值，强行统一会破坏复刻。

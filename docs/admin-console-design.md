@@ -1,6 +1,6 @@
 # 后台管理端 · 功能设计
 
-货觉AI · MVP ｜ 2026-10-19 ｜ 状态：待裁定（未动代码）
+货觉AI · MVP ｜ 2026-10-19 ｜ 状态：**设计已落地**（B0–B8，2026-10-21；正文「15 项能力 / 无后台」等表述为当时快照，当前以代码与 [`CLAUDE.md`](../CLAUDE.md) 为准）
 
 > **本文是分域附件，层级低于后台 PRD** `docs/admin-prd.md`（后台管理系统需求）；实现细节见 `docs/admin-detailed-design.md`。整站产品需求见 `docs/prd.md`。
 > 本文 §0-5 的「两级 role」已被总纲 §2 改判为 **RBAC 三角色**（admin/operator/finance）；批次编号 A1-C1 已被总纲 §12 的 M1-M16 取代。实现时以 PRD 与总纲为准。

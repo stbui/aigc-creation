@@ -12,7 +12,7 @@
 const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
-const { resolveDbUrl, BACKEND_ROOT } = require('./db-url');
+const { BACKEND_ROOT } = require('./db-url');
 
 const TARGET_ENV = 'test';
 
@@ -106,7 +106,10 @@ function main() {
     env: { ...process.env, NODE_ENV: TARGET_ENV },
   });
 
-  console.log(`\n[done] 测试环境已重置。启动: npm run start:test  （库=${resolveDbUrl()}）`);
+  // 不能调 resolveDbUrl()：它按 process.env.NODE_ENV 选档，而本脚本没设
+  // NODE_ENV=test，会回落成 file:./dev.db —— 日志印着开发库、实际重置的是测试库。
+  const dbLabel = (vars.DATABASE_URL || 'file:./test.db').trim();
+  console.log(`\n[done] 测试环境已重置。启动: npm run start:test  （库=${dbLabel}）`);
 }
 
 try {

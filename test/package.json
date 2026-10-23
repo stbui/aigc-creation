@@ -1,0 +1,16 @@
+{
+  "name": "mock-model-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "description": "仿真模型网关：OpenAI 兼容的文生文 / 文生图 / 文生视频，供本项目渠道配置与链路联调使用",
+  "type": "module",
+  "engines": {
+    "node": ">=22.5"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js",
+    "smoke": "node scripts/smoke.js",
+    "smoke:spawn": "node scripts/smoke.js --spawn"
+  }
+}

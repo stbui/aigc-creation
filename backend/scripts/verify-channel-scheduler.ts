@@ -69,6 +69,23 @@ class FakePrisma {
     update: async (args: any) => {
       const row = this.rows.find((r) => r.id === args.where.id);
       if (!row) throw new Error('not found');
+      /*
+       * 真实表上有 `@@unique([modality, priority])`，SQLite 逐语句立即检查、
+       * 事务不能推迟。桩必须照抄这条约束，否则「两条 update 直接互换 priority」
+       * 这种必然 P2002 的写法在闸口里永远是绿的 —— 2026-10-21 线上即因此漏网。
+       */
+      const next = args.data?.priority;
+      if (next !== undefined) {
+        const clash = this.rows.find(
+          (r) => r.id !== row.id && r.modality === row.modality && r.priority === next,
+        );
+        if (clash) {
+          throw Object.assign(
+            new Error('Unique constraint failed on the fields: (`modality`, `priority`)'),
+            { code: 'P2002' },
+          );
+        }
+      }
       Object.assign(row, args.data);
       return row;
     },
@@ -85,8 +102,11 @@ class FakePrisma {
    * 真实签名是 `$transaction(promises[])` —— 参数是**已创建的 promise**,
    * 不是函数。桩这里按同样契约 await 它们。
    */
-  $transaction = async (promises: Promise<unknown>[]) => {
-    for (const p of promises) await p;
+  $transaction = async (arg: Promise<unknown>[] | ((tx: unknown) => Promise<unknown>)) => {
+    // 真实 Prisma 两种形态都支持：数组（批量）与回调（交互式事务）。
+    // 桩必须同时支持，否则 createWithMaterialize 这类交互式事务会被误测成「不支持」。
+    if (typeof arg === 'function') return arg(this);
+    for (const p of arg) await p;
   };
 }
 
@@ -365,6 +385,80 @@ async function main() {
       threw = true;
     }
     ok('已在最前时上移报错', threw);
+  }
+
+  // ── 12. 停用线路不参与调度 ───────────────────────────────────────
+  {
+    const { scheduler } = makeScheduler([
+      ch({ id: 'off', priority: 0, name: '停用', enabled: false }),
+      ch({ id: 'on', priority: 1, name: '启用', enabled: true }),
+    ]);
+    const tried: string[] = [];
+    const r = await scheduler.dispatch('image', async (c) => {
+      tried.push(c.name);
+      return 'ok';
+    });
+    ok('停用线路被跳过', tried.join(',') === '启用', tried);
+    ok('启用线路成功返回', r.ok === true && r.channel?.id === 'on', r.channel);
+  }
+
+  // ── 13. 全部停用不得回落到旧版合成通道 ───────────────────────────
+  {
+    const { setGatewayConfigOverrides, invalidateGatewayConfigCache } = await import(
+      '../src/providers/gateway.config'
+    );
+    // 旧配置是启用的 —— 如果实现先去 where 过滤 enabled, 就会误判「表空」并合成旧配置
+    setGatewayConfigOverrides({
+      'gateway.image.baseUrl': 'https://api.siliconflow.cn',
+      'gateway.image.token': 'sk-test',
+      'gateway.image.enabled': 'true',
+    });
+    invalidateGatewayConfigCache();
+
+    const { scheduler } = makeScheduler([ch({ id: 'off', enabled: false, name: '停用' })]);
+    let called = false;
+    const r = await scheduler.dispatch('image', async () => {
+      called = true;
+      return '不该走到这里';
+    });
+    ok('全部停用时不尝试任何线路', called === false);
+    ok('全部停用时明确失败', r.ok === false, r);
+    ok('不可用原因说明全部停用', String(r.unavailableReason ?? '').includes('均已停用'), r.unavailableReason);
+    ok('全部停用不合成旧版配置', (r.attempts ?? []).length === 0, r.attempts);
+
+    setGatewayConfigOverrides({});
+    invalidateGatewayConfigCache();
+  }
+
+  // ── 14. 未配置且无线路 → 原因区分「未配置」 ─────────────────────
+  {
+    const { setGatewayConfigOverrides, invalidateGatewayConfigCache } = await import(
+      '../src/providers/gateway.config'
+    );
+    setGatewayConfigOverrides({});
+    invalidateGatewayConfigCache();
+    const { scheduler } = makeScheduler([]);
+    const r = await scheduler.dispatch('text', async () => 'ok');
+    ok('未配置时明确失败', r.ok === false, r);
+    ok('原因说明未配置而非全部失败', String(r.unavailableReason ?? '').includes('未配置'), r.unavailableReason);
+  }
+
+  // ── 15. snapshot: 可用数/冷却数/协议未接入 ───────────────────────
+  {
+    const prisma = new FakePrisma();
+    prisma.rows = [
+      ch({ id: 'a', enabled: true, failCount: 0, protocol: 'openai' }),
+      ch({ id: 'b', priority: 1, enabled: false }),
+      ch({ id: 'c', priority: 2, enabled: true, cooldownUntil: new Date(Date.now() + 60_000) }),
+      ch({ id: 'd', priority: 3, enabled: true, protocol: 'not-a-protocol' }),
+    ];
+    const repo = new ChannelRepository(prisma as never);
+    const snap = await repo.snapshot('image');
+    ok('snapshot 来源为 channels', snap.source === 'channels', snap.source);
+    ok('snapshot 总数正确', snap.total === 4, snap.total);
+    ok('availableCount 只数启用+未冷却+协议已实现', snap.availableCount === 1, snap.availableCount);
+    ok('coolingCount 正确', snap.coolingCount === 1, snap.coolingCount);
+    ok('unsupportedCount 正确', snap.unsupportedCount === 1, snap.unsupportedCount);
   }
 
   console.log(`\n通过 ${pass} 项`);

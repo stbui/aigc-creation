@@ -1,12 +1,19 @@
 /**
- * 商品SKU图冒烟: 模板图 + 变体区域 + SKU 颜色/名称 → 参数化批量渲染。
- * 验证: 区域填充色真实生效 / 位置差异 (center vs top vs bottom) /
- *       参考站色板 (白/浅蓝/蓝/红/深红) / 比例与画质 / 参数收敛。
- * 用法: node scripts/smoke-sku.js
+ * 商品SKU图冒烟: 模板图 + 变体区域 + SKU 颜色/名称 → 参数化渲染。
+ *
+ * 断言的是**当前实现**（2026-10-21 升级后的版式）：
+ *   · 规格区色卡真实取 SKU 颜色，5 色板逐个生效；
+ *   · 变体条按基色 / 提亮 / 压暗三档真实改变像素；
+ *   · region 的五个位置**都能区分**（水平与垂直分别验证）——
+ *     此前垂直位置被写死，选「画面上方」与「画面下方」产出完全一样；
+ *   · 比例与画质、非法参数收敛。
+ *
+ * 旧版断言的是「区域被 SKU 色实底填充」，那套版式已被模板版式取代，
+ * 故此脚本随实现一并更新；断言仍打在用户可见的像素结果上，不看内部变量。
  */
 const fs = require('fs');
 const { Jimp, JimpMime } = require('jimp');
-const { MockImageProvider } = require('../dist/providers/mock-image.provider');
+const { LocalImageProvider } = require('../dist/providers/local-image.provider');
 const registry = require('../dist/capabilities/capability.registry');
 
 const OUT = '/tmp/sku-smoke';
@@ -30,8 +37,26 @@ const REF = {
   darkRed: { r: 168, g: 0, b: 27 },
 };
 
+/** 找出内容带内接近某颜色的像素包围盒; 找不到返回 null */
+function bbox(img, target, tol, y0, y1) {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, n = 0;
+  for (let y = Math.max(0, y0); y < Math.min(img.bitmap.height, y1); y += 2) {
+    for (let x = 0; x < img.bitmap.width; x += 2) {
+      if (dist(px(img, x, y), target) <= tol) {
+        n++;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (!n) return null;
+  return { minX, maxX, minY, maxY, cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, n };
+}
+
 (async () => {
-  const provider = new MockImageProvider();
+  const provider = new LocalImageProvider();
   let fail = 0;
   const check = (ok, label, extra = '') => {
     console.log(`${ok ? '✅' : '❌'} ${label}${extra ? ' — ' + extra : ''}`);
@@ -44,18 +69,37 @@ const REF = {
   const tplPath = `${OUT}/template.png`;
   fs.writeFileSync(tplPath, await tpl.getBuffer(JimpMime.png));
 
-  // ── 1. center 区域 + 红色 SKU ──
-  const base = registry.defaultParamsFor('sku_image');
-  const r1 = await provider.generate('sku_image', [tplPath], { ...base, region: 'center', skuColor: '#FF0B22', skuName: 'CLASSIC RED / M' });
-  const p1 = `${OUT}/sku-red.jpg`;
-  fs.writeFileSync(p1, r1.buffer);
-  const img1 = await Jimp.read(p1);
-  const center = px(img1, 512, 512);
-  check(img1.bitmap.width === 1024 && img1.bitmap.height === 1024, '默认 1K 输出 1024x1024', `${img1.bitmap.width}x${img1.bitmap.height}`);
-  // 区域填充 alpha=235 叠加在白底上: 期望接近参考红 (允许混合偏差)
-  check(dist(center, REF.red) < 60, 'center 区域填充为参考红色', JSON.stringify(center));
+  // 版式几何（与实现同源的公开常量）: 内容带之外是标题条与规格区
+  const W = 1024;
+  const H = 1024;
+  const pad = Math.round(W * 0.05);
+  const headH = Math.round(H * 0.09);
+  const footH = Math.round(H * 0.34);
+  const contentY = headH + pad;
+  const contentY1 = H - footH;
+  const chip = Math.round(W * 0.07);
+  const chipX = pad;
+  const chipY = H - footH + Math.round(footH * 0.14);
+  const chipCenter = () => [chipX + chip / 2, chipY + chip / 2];
+  const sw = Math.round(W * 0.035);
+  const swGap = Math.round(W * 0.012);
+  const swatchCenter = (i) => [W - pad - (3 - i) * (sw + swGap) + sw / 2, chipY + sw / 2];
+  const TEMPLATE_BLUE = { r: 30, g: 58, b: 138 };
 
-  // ── 2. 色板遍历: 每个颜色都真实改变区域像素 ──
+  const base = registry.defaultParamsFor('sku_image');
+  const gen = async (params, name) => {
+    const r = await provider.generate('sku_image', [tplPath], { ...base, ...params });
+    const p = `${OUT}/${name}.jpg`;
+    fs.writeFileSync(p, r.buffer);
+    return Jimp.read(p);
+  };
+
+  // ── 1. center 区域 + 红色 SKU: 尺寸与色卡 ──
+  const img1 = await gen({ region: 'center', skuColor: '#FF0B22', skuName: 'CLASSIC RED / M' }, 'sku-red');
+  check(img1.bitmap.width === 1024 && img1.bitmap.height === 1024, '默认 1K 输出 1024x1024',
+    `${img1.bitmap.width}x${img1.bitmap.height}`);
+
+  // ── 2. 色板遍历: 色卡像素逐个等于所选 SKU 色 ──
   const swatches = [
     ['#FFFFFF', REF.white],
     ['#82CEF3', REF.lightBlue],
@@ -63,40 +107,58 @@ const REF = {
     ['#FF0B22', REF.red],
     ['#A8001B', REF.darkRed],
   ];
+  const [ccx, ccy] = chipCenter();
   let colorOk = 0;
   for (const [hex, ref] of swatches) {
-    const r = await provider.generate('sku_image', [tplPath], { ...base, region: 'center', skuColor: hex });
-    const p = `${OUT}/sku-${hex.slice(1)}.jpg`;
-    fs.writeFileSync(p, r.buffer);
-    const c = px(await Jimp.read(p), 512, 512);
-    if (dist(c, ref) < 60) colorOk++;
+    const img = await gen({ region: 'center', skuColor: hex }, `sku-${hex.slice(1)}`);
+    const c = px(img, ccx, ccy);
+    if (dist(c, ref) < 45) colorOk++;
+    else console.log(`   ! ${hex} → ${JSON.stringify(c)}`);
   }
-  check(colorOk === swatches.length, '参考站 5 色板全部真实填充', `${colorOk}/${swatches.length}`);
+  check(colorOk === swatches.length, '色卡 5 色板逐个生效', `${colorOk}/${swatches.length}`);
 
-  // ── 3. 位置差异: top / bottom / center 填充区不同 ──
-  const gen = async (region) => {
-    const r = await provider.generate('sku_image', [tplPath], { ...base, region });
-    const p = `${OUT}/sku-pos-${region}.jpg`;
-    fs.writeFileSync(p, r.buffer);
-    return Jimp.read(p);
-  };
-  const imgTop = await gen('top');
-  const imgBottom = await gen('bottom');
-  const topZone = px(imgTop, 512, 1024 * 0.23); // top 区域中心 (fy 0.08 + fh 0.3/2)
-  const bottomZone = px(imgBottom, 512, 1024 * 0.77); // bottom 区域中心 (fy 0.62 + fh 0.3/2)
-  const topCenterUntouched = px(imgTop, 512, 512); // top 模式下 center 应保持模板深蓝
-  check(dist(topZone, REF.white) < 70, 'top 位置: 填充出现在画面上方', JSON.stringify(topZone));
-  check(dist(bottomZone, REF.white) < 70, 'bottom 位置: 填充出现在画面下方', JSON.stringify(bottomZone));
-  check(dist(topCenterUntouched, { r: 30, g: 58, b: 138 }) < 70, 'top 位置: 中心区域保持模板原色', JSON.stringify(topCenterUntouched));
+  // ── 3. 变体条: 基色 / 提亮 / 压暗 三档 ──
+  const imgR = await gen({ region: 'center', skuColor: '#FF0B22' }, 'sku-variants');
+  const v0 = px(imgR, ...swatchCenter(0));
+  const v1 = px(imgR, ...swatchCenter(1));
+  const v2 = px(imgR, ...swatchCenter(2));
+  const lum = (c) => 0.299 * c.r + 0.587 * c.g + 0.114 * c.b;
+  check(lum(v1) > lum(v0) && lum(v0) > lum(v2), '变体条三档明度: 基色 / 提亮 / 压暗',
+    `${Math.round(lum(v1))} > ${Math.round(lum(v0))} > ${Math.round(lum(v2))}`);
+  check(dist(v0, REF.red) < 45, '变体条第 1 档为 SKU 基色', JSON.stringify(v0));
 
-  // ── 4. 16:9 比例 ──
-  const r4 = await provider.generate('sku_image', [tplPath], { ...base, ratio: '16:9' });
-  const p4 = `${OUT}/sku-169.jpg`;
-  fs.writeFileSync(p4, r4.buffer);
-  const img4 = await Jimp.read(p4);
-  check(img4.bitmap.width === 1024 && img4.bitmap.height === 576, '16:9 → 1024x576', `${img4.bitmap.width}x${img4.bitmap.height}`);
+  // ── 4. region 位置真实生效: 垂直 (top / center / bottom) ──
+  const vertical = {};
+  for (const region of ['top', 'center', 'bottom']) {
+    const img = await gen({ region, skuColor: '#FFFFFF' }, `sku-pos-${region}`);
+    vertical[region] = bbox(img, TEMPLATE_BLUE, 50, contentY, contentY1);
+  }
+  const vy = (r) => (vertical[r] ? vertical[r].cy : NaN);
+  check(
+    vy('top') < vy('center') && vy('center') < vy('bottom'),
+    '垂直位置: 上方 / 居中 / 下方依次下移',
+    `top=${Math.round(vy('top'))} center=${Math.round(vy('center'))} bottom=${Math.round(vy('bottom'))}`,
+  );
 
-  // ── 5. 参数收敛: 非法区域回落 center, 非法画质回落 1k ──
+  // ── 5. region 位置真实生效: 水平 (left / center / right) ──
+  const horizontal = {};
+  for (const region of ['left', 'center', 'right']) {
+    const img = await gen({ region, skuColor: '#FFFFFF' }, `sku-pos-${region}`);
+    horizontal[region] = bbox(img, TEMPLATE_BLUE, 50, contentY, contentY1);
+  }
+  const vx = (r) => (horizontal[r] ? horizontal[r].cx : NaN);
+  check(
+    vx('left') < vx('center') && vx('center') < vx('right'),
+    '水平位置: 左侧 / 居中 / 右侧依次右移',
+    `left=${Math.round(vx('left'))} center=${Math.round(vx('center'))} right=${Math.round(vx('right'))}`,
+  );
+
+  // ── 6. 16:9 比例 ──
+  const img4 = await gen({ ratio: '16:9' }, 'sku-169');
+  check(img4.bitmap.width === 1024 && img4.bitmap.height === 576, '16:9 → 1024x576',
+    `${img4.bitmap.width}x${img4.bitmap.height}`);
+
+  // ── 7. 参数收敛: 非法区域回落 center, 非法画质回落 1k ──
   const bad = registry.sanitizeParams('sku_image', { region: 'hacked', size: 99999, skuColor: 'nope' });
   check(bad.region === 'center' && bad.size === '1k' && bad.skuColor === '#FFFFFF', '参数收敛', JSON.stringify(bad));
 

@@ -65,7 +65,6 @@ export function RotateAnglePage() {
       settings={{ ratio: true, resolution: true }}
       submitLabel="立即生成"
       hint="确认素材和参数后提交，右侧会展示生成结果。"
-      mockNote=""
       emptyDesc="上传图片并调整角度后，结果将在此处展示"
       formValid
       submitting={submitting}

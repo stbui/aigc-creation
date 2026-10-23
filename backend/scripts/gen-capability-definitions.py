@@ -29,7 +29,7 @@ SRC = 'src/capabilities/capability.registry.ts'
 PROMPT_SRC = 'src/providers/gateway-prompt.ts'
 OUT = 'src/capabilities/definitions'
 
-# 能力 id → MockImageProvider 上的本地实现方法名
+# 能力 id → LocalImageProvider 上的本地实现方法名
 LOCAL_IMPL = {
     'main_image': 'makeMainImage',
     'detail_image': 'makeDetailImage',

@@ -20,7 +20,7 @@ export default defineConfig({
   reporter: [['list']],
   timeout: 60000,
   use: {
-    baseURL: process.env.ADMIN_UI ?? 'http://localhost:5173',
+    baseURL: process.env.ADMIN_UI ?? 'http://localhost:5100',
     trace: 'off',
     launchOptions: { executablePath: CHROMIUM_PATH },
   },

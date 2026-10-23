@@ -1,9 +1,14 @@
-import { useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { App, Spin } from 'antd';
 import { Download, ImagePlus, Plus, X } from 'lucide-react';
-import { assetsApi, generateApi, toAbsoluteUrl } from '../lib/api';
+import { assetsApi, generateApi, assetSrc, toAbsoluteUrl } from '../lib/api';
+import { AssetLibraryModal, useAssetLibrary } from '../components/AssetLibraryModal';
+import { MobileUploadModal } from '../components/MobileUploadModal';
+import type { Asset, MobileUploadAsset } from '../types/api';
 import { useProject } from '../hooks/useProject';
 import { usePollAbort } from '../hooks/usePollAbort';
+import { useGenerateError } from '../hooks/useGenerateError';
+import { notifyCreditsChanged } from '../context/CreditsContext';
 import { pollToResult } from '../lib/poll';
 import { ToolShell, type ToolAsset, type ToolResult, type ToolSettings } from '../components/ToolShell';
 import { BG_COLOR_SWATCHES, ColorSwatchGrid, CustomColorInput } from '../components/ToolWidgets';
@@ -13,7 +18,7 @@ import { BG_COLOR_SWATCHES, ColorSwatchGrid, CustomColorInput } from '../compone
  *
  * 实拍结构 (product-sku-control-column):
  *   SKU模板图卡 (product-sku-template-card):
- *     标题行: 从素材库导入(disabled) / 手机上传
+ *     标题行: 从素材库导入 / 手机上传
  *     copy: 选一张结构最完整的成品图作为模板，框选要跟随SKU变动的区域，最多支持3个SKU变体区域
  *     dropzone (复用 local-redraw-source-upload): 点击或拖拽图片到此处上传 / 最多 1 张
  *   使用步骤卡 (product-sku-steps-card): 4 步
@@ -27,8 +32,8 @@ import { BG_COLOR_SWATCHES, ColorSwatchGrid, CustomColorInput } from '../compone
  * 本地适配: 参考站的画布框选 (最多 3 个区域) 以位置枚举代替; SKU 清单每行提交
  * 一次任务 (sku_image), 结果栏并列展示, 支持一键下载。
  *
- * 诚实披露: sku_image 为 mock 能力 (依赖真实 AI 套版), 本地为模板 + 区域填充的
- * 参数化批量渲染。
+ * 诚实披露: sku_image 本地是真实算法 (模板 + 区域填充的版式渲染), 无云端通道时
+ * 由本地兜底出图。
  */
 
 const REGION_OPTIONS = [
@@ -61,6 +66,7 @@ const newRow = (): SkuRow => ({ key: ++rowSeq, name: '', color: '#FFFFFF', custo
 
 export function ProductSkuPage() {
   const { message } = App.useApp();
+  const reportError = useGenerateError();
   const { ensureProject } = useProject();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -81,7 +87,7 @@ export function ProductSkuPage() {
     try {
       const projectId = await ensureProject();
       const asset = await assetsApi.upload(file, projectId);
-      setTemplate({ id: asset.id, url: toAbsoluteUrl(asset.sourceUrl) ?? '', name: file.name });
+      setTemplate({ id: asset.id, url: assetSrc(asset) ?? '', name: file.name });
       message.success('模板图已上传（最多 1 张，新上传将替换原模板）');
     } catch (e) {
       message.error((e as Error).message || '上传失败');
@@ -89,6 +95,43 @@ export function ProductSkuPage() {
       setUploading(false);
     }
   };
+
+  // ── 模板图来源: 素材库 / 手机上传 (模板位只有 1 个, 选中即替换) ──
+  const pickTemplate = (asset: Asset): boolean => {
+    setTemplate({
+      id: asset.id,
+      url: assetSrc(asset) ?? toAbsoluteUrl(asset.sourceUrl) ?? '',
+      name: asset.sourceUrl.split('/').pop() ?? '素材',
+    });
+    message.success('已从素材库设为模板图');
+    return true;
+  };
+  const {
+    open: libraryOpen,
+    loading: libraryLoading,
+    items: libraryItems,
+    error: libraryError,
+    openLibrary,
+    closeLibrary,
+    pick,
+  } = useAssetLibrary(pickTemplate);
+
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const addMobileTemplate = useCallback(
+    (assets: MobileUploadAsset[]) => {
+      setMobileOpen(false);
+      const first = assets[0];
+      if (!first) return;
+      if (assets.length > 1) message.warning('模板位只有 1 个，仅取第 1 张');
+      setTemplate({
+        id: first.id,
+        url: toAbsoluteUrl(first.signedUrl || first.url) ?? '',
+        name: first.filename,
+      });
+      message.success('已从手机接收模板图');
+    },
+    [message],
+  );
 
   const pollOne = (taskId: string) => pollToResult(taskId, { signal: pollSignal });
 
@@ -122,9 +165,11 @@ export function ProductSkuPage() {
       if (failed > 0) message.error(`${done.length} 张中 ${failed} 张生成失败`);
       else message.success(`已批量生成 ${done.length} 张 SKU 图`);
     } catch (e) {
-      message.error((e as Error).message || '生成失败');
+      reportError(e);
     } finally {
       setSubmitting(false);
+      // 扣费在建任务时发生、失败会自动退还，两个方向都改了余额
+      notifyCreditsChanged();
     }
   };
 
@@ -144,6 +189,7 @@ export function ProductSkuPage() {
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
 
   return (
+    <>
     <ToolShell
       capability="sku_image"
       title="商品SKU图"
@@ -175,14 +221,18 @@ export function ProductSkuPage() {
           <div className="product-sku-card-heading-top">
             <h2>SKU模板图</h2>
             <div className="product-sku-card-heading-actions">
-              <button type="button" className="workspace-material-library-trigger" disabled title="本地演示环境暂不支持素材库导入">
+              <button
+                type="button"
+                className="workspace-material-library-trigger"
+                onClick={openLibrary}
+              >
                 从素材库导入
               </button>
               <button
                 type="button"
                 className="mobile-upload-trigger mobile-upload-qr-trigger"
-                title="本地演示环境暂不支持手机上传"
-                onClick={() => message.info('本地演示环境暂不支持手机上传，可直接拖拽上传')}
+                title="用手机扫码上传，图片作为模板图"
+                onClick={() => setMobileOpen(true)}
               >
                 <span>手机上传</span>
               </button>
@@ -341,5 +391,18 @@ export function ProductSkuPage() {
         </div>
       </section>
     </ToolShell>
+
+      {/* 素材库 / 手机上传: 模板位单张, 选中即替换 */}
+      <AssetLibraryModal
+        open={libraryOpen}
+        loading={libraryLoading}
+        items={libraryItems}
+        error={libraryError}
+        onCancel={closeLibrary}
+        onPick={pick}
+        maxSelectable={1}
+      />
+      <MobileUploadModal open={mobileOpen} onReceived={addMobileTemplate} onCancel={() => setMobileOpen(false)} />
+    </>
   );
 }

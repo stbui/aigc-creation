@@ -11,7 +11,7 @@ import { test, expect } from '@playwright/test';
  * 而"内容区宽度 =视口 -侧栏" 与 "行高 ≤ 46" 是硬约束, 不会因视觉微调而失效。
  */
 
-const UI = process.env.ADMIN_UI ?? 'http://localhost:5173';
+const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
 
 async function login(page: import('@playwright/test').Page) {
   await page.goto(`${UI}/login`);

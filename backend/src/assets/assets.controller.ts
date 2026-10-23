@@ -10,6 +10,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { RateLimit } from '../common/rate-limit.guard';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { extname } from 'path';
@@ -24,6 +25,9 @@ import { AssetsService } from './assets.service';
 export class AssetsController {
   constructor(private readonly assetsService: AssetsService) {}
 
+  // 上传按用户计 30 次/分钟：单次上传是磁盘 + 尺寸探测（Jimp 解码），
+  // 批量拖拽 20 张是正常场景，留足余量
+  @RateLimit({ name: 'asset-upload', limit: 30, windowSec: 60, scope: 'user' })
   @Post('upload')
   @UseInterceptors(
     FileInterceptor('file', {

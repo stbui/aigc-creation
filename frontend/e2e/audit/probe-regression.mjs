@@ -46,7 +46,7 @@ for (const path of PATHS) {
   p.on('pageerror', (e) => errs.push('pageerror: ' + e.message.split('\n')[0]));
   p.on('console', (m) => { if (m.type() === 'error' && !m.text().includes('[antd:')) errs.push('console: ' + m.text().slice(0, 120)); });
 
-  await p.goto(`http://localhost:5173${path}`, { waitUntil: 'networkidle' });
+  await p.goto(`http://localhost:5100${path}`, { waitUntil: 'networkidle' });
   await p.waitForTimeout(3500);
 
   // ① 页面基本结构

@@ -1,10 +1,26 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { App, Modal, Spin } from 'antd';
-import { ChevronLeft, ChevronRight, ImagePlus, Maximize2, Plus, RefreshCw, Sparkles, X } from 'lucide-react';
-import { assetsApi, generateApi, toAbsoluteUrl } from '../lib/api';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Download,
+  ExternalLink,
+  ImagePlus,
+  Maximize2,
+  Plus,
+  RefreshCw,
+  Sparkles,
+  Trash2,
+  X,
+} from 'lucide-react';
+import { assetSrc, assetsApi, generateApi, toAbsoluteUrl } from '../lib/api';
 
-import { ToolEmptyState, ToolGeneratingState } from '../components/ToolEmptyState';
+import { ToolEmptyState } from '../components/ToolEmptyState';
 import { ToolSubmitBar } from '../components/ToolSubmitBar';
+import { ImageLightbox } from '../components/ImageLightbox';
+import { ImageContextMenu } from '../components/ImageContextMenu';
+import { ProviderBadge } from '../components/ProviderBadge';
 import { useCreditLabel } from '../hooks/useCreditLabel';
 import { ToolSettingsPopover } from '../components/ToolSettingsPopover';
 import { AssetLibraryModal, useAssetLibrary } from '../components/AssetLibraryModal';
@@ -14,8 +30,12 @@ import { MobileUploadModal } from '../components/MobileUploadModal';
 import { useAuth } from '../context/AuthContext';
 import { useProject } from '../hooks/useProject';
 import { usePollAbort } from '../hooks/usePollAbort';
+import { useGenerateError } from '../hooks/useGenerateError';
+import { notifyCreditsChanged } from '../context/CreditsContext';
 import { usePasteUpload } from '../hooks/usePasteUpload';
 import { pollToResult } from '../lib/poll';
+import { MAX_IMAGE_MB, taskErrorText } from '../lib/constants';
+import { useCapabilities } from '../hooks/useCapabilities';
 import type { Asset, MobileUploadAsset, TaskStatus } from '../types/api';
 
 /**
@@ -47,19 +67,27 @@ import type { Asset, MobileUploadAsset, TaskStatus } from '../types/api';
  *         actions 变 1 列 bg #F6F7FB padding 12px 16px 0 gap8, 按钮 100% 宽
  *   结果栏: 空态 160x160 插画 + h3 14px/700 #333 + p 12px #86909C
  *
+ * 结果栏展示「全部生成图」(2026-10-21): 不再是只留最近一单的单张大图,
+ * 而是本页能力 (free_create) 全部成功产出的网格, 数据取自 /tasks。
+ * 新图由轮询结果**当场插入榜首** (不重拉列表, 避免占位撤下后旧图回弹的闪烁);
+ * 点缩略图开大图预览 (原始比例 + 下载原图)。
+ *
  * 接线: 参考图 (0~4 张, 顺序保留) + 提示词 → free_create 任务 (参考图为选填,
  * 后端 inputs=0 不强制张数); 比例/画质 → ratio / size 参数; 张数与顺序直达 provider
  * (顶部条带横排参考图, 真实参与构图)。
  *
- * 产出来源如实披露 (2026-10-20): 结果卡徽标按**每单真实的 task.provider** 显示,
- * 不再硬编码「本地占位渲染」——
- *   gateway → 绿徽标「真实模型」; local → 琥珀徽标「本地算法」(网关不可用已回落)。
- * 同一能力在两条通道下产出不同, 界面据实区分, 不用假效果冒充模型能力。
- * 徽标取色: .pk-result-source-gateway 用成功色, .pk-result-source-local 用警示色。
- *空态说明改为中性描述 —— 用户尚未提交时无 provider 可言, 不预告通道结论。
+ * 产出来源不向用户展示 (2026-10-21): 创作统一走 API 调用模型, 界面不再
+ * 标「真实模型 / 本地算法」——这套标签只描述后端通道实现, 对用户没有意义。
  *
- * AI润色/图片转提示词仍未接入语言/视觉模型, 点击如实提示。
- * 4K 超出本地算法上限如实禁用 (参考站为积分倍率制, 本站无积分账户故不显示"倍消耗")。
+ * 没通道就失败 (2026-10-21): free_create 本地没有实现 (能力定义里
+ * localFallback: false)。后端无可用模型通道时任务按 42204 失败并退款;
+ * 本页据此在 /capabilities 报 unavailable 时直接禁用提交并写明原因 ——
+ * 不让用户点下去才失败, 也不交付任何冒充创作结果的东西。
+ *
+ * AI润色/图片转提示词走文本通道 (2026-10-20 起是真实入口); 文本通道未配置时
+ * 后端 502, 界面如实报错, 不编造润色结果。
+ * 4K 只有云端通道能兑现: 选不了时由 lib/optionSets 置灰并说明 (参考站为积分倍率制,
+ * 本站无积分账户故不显示"倍消耗")。
  *
  * 提交按钮登录墙 (2026-10-19, 对齐参考站该页):
  *   未登录 → 主文案「登录免费生成」, 不显示积分角标, 点击唤起登录弹窗 (ToolSubmitBar 内部判定
@@ -72,8 +100,29 @@ import type { Asset, MobileUploadAsset, TaskStatus } from '../types/api';
 // ───────────────── 常量 (参考站实拍) ─────────────────
 
 const MAX_REF_IMAGES = 4;
-const MAX_IMAGE_MB = 10;
 const MAX_PROMPT_LEN = 4000;
+
+/*
+ * 右侧结果网格每行几张 (2026-10-21 用户要求"一行显示图片数量可调")。
+ *
+ * 参考站是固定 auto-fill(minmax(180px)) —— 窗口越宽一行塞得越多, 用户控制不了。
+ * 出图比例不一, 有时想一行少看几张细节、有时想一眼扫完, 固定列数才符合预期。
+ * 默认 4 张, 选择记在 localStorage (纯本机偏好, 不进后端)。
+ * 窄屏 (<720px) 一律降为 2 列, 见 global.css 的 .fc-result-gallery 覆盖。
+ */
+const GRID_COL_OPTIONS = [3, 4, 5, 6] as const;
+const DEFAULT_GRID_COLS = 4;
+const GRID_COLS_STORAGE_KEY = 'fc.resultCols';
+
+function readGridCols(): number {
+  try {
+    const saved = Number(window.localStorage.getItem(GRID_COLS_STORAGE_KEY));
+    if ((GRID_COL_OPTIONS as readonly number[]).includes(saved)) return saved;
+  } catch {
+    // 私密窗口 / 存储被禁用: 用默认值, 不影响页面渲染
+  }
+  return DEFAULT_GRID_COLS;
+}
 
 interface PkAsset {
   id: string;
@@ -87,29 +136,88 @@ interface PkResult {
   width?: number;
   height?: number;
   errorCode?: string | null;
-  /** 产出来源: gateway=真实模型 / local=本地算法回落 / null=未知 */
+  /** 本次实际通道: gateway=真实模型 / local=本地算法 (来自 pollToResult) */
   provider?: string | null;
 }
 
 /**
- * 产出来源 → 徽标文案与样式。
+ * 右侧「全部生成图」的一张图。
  *
- * 按**这一单实际走的通道**显示, 不按能力清单的静态 mode 猜:
- *   gateway → 「真实模型」(绿)  模型真出图
- *   local   → 「本地算法」(琥珀) 网关不可用已回落, 仍是本地算法不是模型结果
- *   null    → 「来源未知」(琥珀) 任务未落provider 字段, 不猜测
- *
- * 这是诚实披露的落点: 网关接通后徽标自动变绿, 网关故障变琥珀,
- * 两种情况都不把本地算法的产出说成模型结果。
+ * 取自**任务列表**而非素材列表: 素材列表不带任务上下文 (创建时间、尺寸口径),
+ * 任务列表才是「生成记录」这本账的权威来源。
  */
-function sourceBadge(provider?: string | null): { text: string; cls: string } {
-  if (provider === 'gateway') return { text: '真实模型', cls: 'pk-result-source-gateway' };
-  if (provider === 'local') return { text: '本地算法', cls: 'pk-result-source-local' };
-  return { text: '来源未知', cls: 'pk-result-source-local' };
+interface GalleryItem {
+  /** 任务 id (稳定且唯一) */
+  id: string;
+  url: string;
+  /** 产出素材 id — 右键「用作参考图」要凭它进参考图位 (参考图位存的是素材 id, 不是任务 id) */
+  assetId?: string;
+  /** 真实格式 (png/jpeg/webp), 下载时决定扩展名; 猜后缀会把 PNG 存成 .jpg */
+  format?: string;
+  width?: number | null;
+  height?: number | null;
+  createdAt?: string;
+  /** 本次实际通道: gateway=真实模型 / local=本地算法 (任务表里的 provider) */
+  provider?: string | null;
+}
+
+/**
+ * 结果网格中的一张图卡。
+ *
+ * 图片解码完成前保持与「生成中占位」**完全一致的 shimmer 底**, 加载完成后再淡入 ——
+ * 否则占位撤下的瞬间会先露出一块空白底色, 图片随后突然跳出, 形成一次闪白。
+ * 首次进入页面时同理: 每张缩略图都是「shimmer → 淡入」, 而不是「空白 → 跳出」。
+ */
+function GalleryThumb({
+  item,
+  onOpen,
+  onContextMenu,
+}: {
+  item: GalleryItem;
+  onOpen: () => void;
+  /** 右键: 由调用方决定打开哪个菜单; 这里只负责接管系统菜单 */
+  onContextMenu: (e: ReactMouseEvent) => void;
+}) {
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  return (
+    <button
+      type="button"
+      className={`fc-result-item${loaded ? ' is-loaded' : ''}${failed ? ' is-failed' : ''}`}
+      title="点击查看大图，右键更多操作"
+      aria-label="查看生成图大图"
+      onClick={onOpen}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        onContextMenu(e);
+      }}
+    >
+      <img
+        src={item.url}
+        alt="生成图"
+        loading="lazy"
+        decoding="async"
+        onLoad={() => setLoaded(true)}
+        onError={() => setFailed(true)}
+      />
+      {failed && (
+        <span className="fc-result-item-error">
+          <X size={18} />
+          加载失败
+        </span>
+      )}
+      {/* 自由创作既有云端模型也有本地兜底, 每张图必须说清这一张是谁产的 */}
+      <ProviderBadge provider={item.provider} className="fc-result-provider" />
+      <span className="fc-result-item-mask">
+        <Maximize2 size={16} />
+      </span>
+    </button>
+  );
 }
 
 export function FreeCreationPage() {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
+  const reportError = useGenerateError();
   const { ensureProject } = useProject();
   const { token, openLogin } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -118,6 +226,16 @@ export function FreeCreationPage() {
 
   // ── 表单状态 ──
   const [images, setImages] = useState<PkAsset[]>([]);
+  /**
+   * 参考图位的同步镜像。
+   *
+   * 素材库「确定」是同步 for 循环逐个调 onPick, 期间不重渲染 —— 只读 state
+   * 会让一次勾选超过剩余位数的图全部进列表 (每张都读到同一份旧值)。
+   */
+  const imagesRef = useRef<PkAsset[]>(images);
+  useEffect(() => {
+    imagesRef.current = images;
+  }, [images]);
   const [uploading, setUploading] = useState(false);
   const [prompt, setPrompt] = useState('');
   const [ratio, setRatio] = useState('1:1');
@@ -135,8 +253,50 @@ export function FreeCreationPage() {
   const [result, setResult] = useState<PkResult | null>(null);
   const pollSignal = usePollAbort();
 
+  // ── 右侧「全部生成图」(本页能力的历史产出) ──
+  const [gallery, setGallery] = useState<GalleryItem[]>([]);
+  const [galleryLoading, setGalleryLoading] = useState(false);
+  const [galleryError, setGalleryError] = useState<string | null>(null);
+  /*
+   * 大图预览按**索引**保存, 而不是按对象: 查看器要支持 ←/→ 翻页,
+   * 索引天然跟随同一个列表; 按对象保存翻页时还得反查下标, 列表刷新后
+   * 还可能指向一个已经不在页面上的旧对象。
+   */
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  /** 每行显示几张 (3~6, 默认 4, 记 localStorage) */
+  const [cols, setCols] = useState<number>(readGridCols);
+
+  const changeCols = useCallback((next: number) => {
+    setCols(next);
+    try {
+      window.localStorage.setItem(GRID_COLS_STORAGE_KEY, String(next));
+    } catch {
+      // 存不了只影响"下次打开还记得", 本次切换照常生效
+    }
+  }, []);
+
+  /** 右键菜单的锚点与目标图 (index 指向 gallery) */
+  const [menu, setMenu] = useState<{ index: number; x: number; y: number } | null>(null);
+  const openMenu = useCallback((x: number, y: number, index: number) => {
+    setMenu({ index, x, y });
+  }, []);
+
   // 参考站该页: 参考图选填 (标题无必填星号), 提示词必填 (label ::before 星)
   const formValid = prompt.trim().length > 0;
+
+  /*
+   * 运行时可用性 (2026-10-21): 本能力本地没有实现, 没有云端模型通道时
+   * 后端一定会判失败并退款。与其让用户等一次注定失败的任务, 不如提前拦住并说明原因。
+   * 只在后端明确报 unavailable/disabled 时拦 —— 清单还没加载完 (或加载失败) 不拦,
+   * 否则一次网络抖动就会让整页不可用。
+   */
+  const { data: capData } = useCapabilities();
+  const freeCreateRuntime = capData?.items.find((c) => c.id === 'free_create')?.runtime;
+  const unavailableReason =
+    freeCreateRuntime &&
+    (freeCreateRuntime.effective === 'unavailable' || freeCreateRuntime.effective === 'disabled')
+      ? freeCreateRuntime.reason || '该能力当前不可提交，请稍后再试或联系客服。'
+      : null;
 
   // ── 上传: 参考图 (点击/拖拽/粘贴, 最多 4 张, 顺序保留) ──
   const uploadFiles = useCallback(
@@ -165,7 +325,7 @@ export function FreeCreationPage() {
         const uploaded: PkAsset[] = [];
         for (const file of accepted) {
           const asset = await assetsApi.upload(file, projectId);
-          uploaded.push({ id: asset.id, url: toAbsoluteUrl(asset.sourceUrl) ?? '', name: file.name });
+          uploaded.push({ id: asset.id, url: assetSrc(asset) ?? '', name: file.name });
         }
         setImages((prev) => [...prev, ...uploaded]);
         message.success(`已上传 ${uploaded.length} 张参考图片`);
@@ -202,18 +362,22 @@ export function FreeCreationPage() {
   // 只有显式返回 false 才能让选择器知道"这张没进", 从而中止整批并保持弹窗打开。
   // 返回 undefined 会被当成"接受" —— 超额的那张会静默进入, 上限失效。
   const pickFromLibrary = (asset: Asset): boolean => {
-    if (images.length >= MAX_REF_IMAGES) {
+    const current = imagesRef.current;
+    if (current.length >= MAX_REF_IMAGES) {
       message.warning(`最多上传 ${MAX_REF_IMAGES} 张参考图片`);
       return false;
     }
-    if (images.some((x) => x.id === asset.id)) {
+    if (current.some((x) => x.id === asset.id)) {
       message.info('该素材已在列表中');
       return false;
     }
-    setImages((prev) => [
-      ...prev,
-      { id: asset.id, url: toAbsoluteUrl(asset.sourceUrl) ?? '', name: asset.sourceUrl.split('/').pop() ?? '素材' },
-    ]);
+    const next: PkAsset = {
+      id: asset.id,
+      url: assetSrc(asset) ?? toAbsoluteUrl(asset.sourceUrl) ?? '',
+      name: asset.sourceUrl.split('/').pop() ?? '素材',
+    };
+    imagesRef.current = [...current, next];
+    setImages((prev) => (prev.some((x) => x.id === next.id) ? prev : [...prev, next]));
     return true;
   };
 
@@ -283,7 +447,7 @@ export function FreeCreationPage() {
           ...prev,
           ...accepted.map((a) => ({
             id: a.id,
-            url: toAbsoluteUrl(a.url) ?? '',
+            url: toAbsoluteUrl(a.signedUrl || a.url) ?? '',
             name: a.filename,
           })),
         ];
@@ -294,6 +458,129 @@ export function FreeCreationPage() {
     [message],
   );
 
+  // ── 右侧「全部生成图」: 本页能力的全部成功产出 ──
+  //
+  // 数据源是 /tasks 而不是 /assets: 生成记录以任务为准 (创作时间、尺寸口径都在任务上)。
+  const loadGallery = useCallback(async () => {
+    if (!token) {
+      // 未登录不请求: /tasks 需鉴权, 右侧回到空态并提示登录
+      setGallery([]);
+      setGalleryError(null);
+      return;
+    }
+    setGalleryLoading(true);
+    try {
+      const tasks = await generateApi.list();
+      const items: GalleryItem[] = [];
+      for (const t of tasks) {
+        if (t.capability !== 'free_create' || t.status !== 'succeeded') continue;
+        const url = assetSrc(t.outputAsset);
+        if (!url) continue;
+        items.push({
+          id: t.id,
+          url,
+          assetId: t.outputAsset?.id,
+          format: t.outputAsset?.format,
+          width: t.outputAsset?.width ?? null,
+          height: t.outputAsset?.height ?? null,
+          createdAt: t.createdAt,
+          provider: t.provider ?? null,
+        });
+      }
+      setGallery(items);
+      setGalleryError(null);
+    } catch (e) {
+      // 保留上一次结果: 刷新失败不该把已看到的图清空
+      setGalleryError((e as Error).message || '历史生成图加载失败');
+    } finally {
+      setGalleryLoading(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    void loadGallery();
+  }, [loadGallery]);
+
+  // ── 结果图右键操作 (2026-10-22) ──
+  //
+  // 右键让「看完一张图, 接下来想做什么」一步到位: 不必先点开大图再找按钮。
+  // 每个动作都用已有接口与状态, 不新增后端能力:
+  //   用作参考图 → 把产出**素材 id** 放进左侧参考图位 (下一轮真实参与构图)
+  //   删除        → DELETE /tasks/:id (连同产出与磁盘文件)
+
+  /** 把这张生成图放进左侧参考图位 */
+  const useAsReference = (item: GalleryItem) => {
+    const assetId = item.assetId;
+    if (images.length >= MAX_REF_IMAGES) {
+      message.warning(`最多上传 ${MAX_REF_IMAGES} 张参考图片`);
+      return;
+    }
+    if (!assetId) {
+      // 任务还在但素材已被清理 (后台删过素材): 不能拿一个空 id 去提交
+      message.error('这张图片的素材已不存在，无法用作参考图');
+      return;
+    }
+    if (images.some((x) => x.id === assetId)) {
+      message.info('该图片已在参考图位');
+      return;
+    }
+    setImages((prev) => [...prev, { id: assetId, url: item.url, name: `生成图-${item.id.slice(-6)}` }]);
+    message.success('已加入参考图位，下一轮生成会带上它');
+  };
+
+  const copyImageUrl = async (item: GalleryItem) => {
+    // 复制绝对地址: 站内的相对路径 (/uploads/...) 贴到别处打不开
+    const url = toAbsoluteUrl(item.url) || item.url;
+    try {
+      await navigator.clipboard.writeText(url);
+      message.success('图片地址已复制');
+    } catch {
+      // 非安全上下文 (局域网 http) 或用户拒绝授权时 clipboard 会失败
+      message.warning(`复制失败，请手动复制：${url}`);
+    }
+  };
+
+  const downloadImage = (item: GalleryItem) => {
+    // 扩展名跟真实格式走: 厂商返回的链接常常没有后缀, 猜后缀会把 PNG 存成 .jpg
+    const ext = (item.format || 'png').toLowerCase().replace(/^\./, '') || 'png';
+    const a = document.createElement('a');
+    a.href = item.url;
+    a.download = `free-create-${item.id.slice(-6)}.${ext}`;
+    a.click();
+  };
+
+  const deleteImage = (index: number) => {
+    const item = gallery[index];
+    if (!item) return;
+    modal.confirm({
+      title: '删除这张作品？',
+      content: '生成图与本地文件会一并删除，不可恢复。',
+      okText: '删除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await generateApi.remove(item.id);
+          setGallery((prev) => prev.filter((x) => x.id !== item.id));
+          /*
+           * 产出素材随之被删, 若它已被「用作参考图」放进左侧参考图位,
+           * 必须同步摘掉 —— 否则下一次生成会带着一个已不存在的 assetId 提交。
+           */
+          if (item.assetId) setImages((prev) => prev.filter((x) => x.id !== item.assetId));
+          // 大图查看器按索引跟随: 删的是当前张就关掉, 删的是前面那张就整体前移一位
+          setPreviewIndex((prev) => {
+            if (prev === null) return null;
+            if (prev === index) return null;
+            return prev > index ? prev - 1 : prev;
+          });
+          message.success('已删除作品及其生成图');
+        } catch (e) {
+          message.error((e as Error).message || '删除失败');
+        }
+      },
+    });
+  };
+
   // ── 生成 ──
   const pollTask = useCallback(
     (taskId: string) => pollToResult(taskId, { signal: pollSignal }),
@@ -302,6 +589,11 @@ export function FreeCreationPage() {
 
   const submit = async () => {
     if (!formValid || submitting) return;
+    // 没有可用模型通道: 后端必定 42204 并退款, 不发起这次注定失败的任务
+    if (unavailableReason) {
+      message.warning(unavailableReason);
+      return;
+    }
     setSubmitting(true);
     setResult(null);
     try {
@@ -319,17 +611,41 @@ export function FreeCreationPage() {
       });
       const done = await pollTask(taskId);
       setResult(done);
-      if (done.status === 'failed') message.error(`生成失败（${done.errorCode ?? '未知错误'}）`);
-      else message.success('创作图已生成');
+      /*
+       * 新图**直接插到列表首位**, 不再回头重拉列表。
+       *
+       * 重拉会等一次网络往返: 占位卡已撤、新图还没到, 网格先缩回旧图再弹回新图 ——
+       * 正是用户看到的「切换出图闪烁」。这里用轮询结果当场替换占位,
+       * 与 setSubmitting(false) 同一批提交, 占位卡与新图卡在同一帧交接。
+       * 列表以本页状态为准, 需要对齐服务端时用手动「刷新」。
+       */
+      if (done.status === 'succeeded' && done.url) {
+        const fresh: GalleryItem = {
+          id: taskId,
+          url: done.url,
+          width: done.width ?? null,
+          height: done.height ?? null,
+          createdAt: new Date().toISOString(),
+          // 这一单实际走的通道, 直接来自轮询结果 (不是能力 mode)
+          provider: done.provider ?? null,
+        };
+        setGallery((prev) => [fresh, ...prev.filter((x) => x.id !== taskId)]);
+      } else if (done.status === 'failed') {
+        message.error(`生成失败：${taskErrorText(done.errorCode)}`);
+      } else {
+        message.success('创作图已生成');
+      }
     } catch (e) {
-      message.error((e as Error).message || '生成失败');
+      reportError(e);
     } finally {
       setSubmitting(false);
+      // 扣费在建任务时发生、失败会自动退还，两个方向都改了余额
+      notifyCreditsChanged();
     }
   };
 
   return (
-    <div className="pk-workspace">
+    <div className="pk-workspace fc-workspace">
       {/* ── 左: 输入栏 ── */}
       <aside className="pk-input-pane">
         <div className="pk-form-card">
@@ -342,7 +658,7 @@ export function FreeCreationPage() {
           <div className="pk-form-scroll">
             <section className="pk-config-card">
               {/* 上传参考图 (选填, 无必填星号) */}
-              <div className="pk-section">
+              <div className="pk-section fc-upload-section">
                 <div className="pk-upload-title-row">
                   <strong className="pk-section-title">上传参考图</strong>
                   <div className="pk-upload-title-actions">
@@ -512,9 +828,18 @@ export function FreeCreationPage() {
 
           {/* 高级设置 + 提交 (sticky 底部) */}
           <div className="fc-actions">
+            {/* 无可用模型通道: 提前说明, 而不是让用户点下去等一次 42204 */}
+            {unavailableReason && !submitting && (
+              <p className="tool-submit-notice tool-submit-notice-error">{unavailableReason}</p>
+            )}
             <ToolSubmitBar
               submitting={submitting}
-              disabled={!formValid}
+              /*
+               * 不可用的置灰**只对已登录生效**: guest 点按钮的职责是弹登录框
+               * (见 free-creation-submit.spec.ts 的登录墙契约), 置灰会把它挡掉。
+               * 已登录时置灰 + 上方说明, 避免发起一次注定 42204 的请求。
+               */
+              disabled={!formValid || (Boolean(token) && Boolean(unavailableReason))}
               label="立即生成"
               guestLabel="登录免费生成"
               creditLabel={creditLabel ?? undefined}
@@ -526,6 +851,7 @@ export function FreeCreationPage() {
                   onRatioChange={setRatio}
                   resolution={resolution}
                   onResolutionChange={setResolution}
+                  capabilityId="free_create"
                   popoverClassName="fc-settings-popover"
                   popoverRole="dialog"
                   popoverAriaLabel="高级设置"
@@ -551,59 +877,83 @@ export function FreeCreationPage() {
         </div>
       </aside>
 
-      {/* ── 右: 结果栏 ── */}
+      {/* ── 右: 结果栏 (本页全部生成图) ──
+          2026-10-21: 从「只展示最近一单」改为网格展示本页能力的全部成功产出。
+          生成中在榜首画 shimmer 占位, 出图后由轮询结果当场顶替; 点击缩略图看大图。 */}
       <section className="pk-result-pane">
-        {submitting && !result ? (
-          /* 生成中 → 骨架占位, 不退回空态 (见 ToolGeneratingState 注释) */
-          <ToolGeneratingState />
-        ) : !result ? (
-          <ToolEmptyState title="效果图预览" desc="提交任务后，生成结果将在此处展示">
-            <p className="vc-mock-note">
-              参考图与提示词会一并送入生成通道；结果卡上的徽标会如实标明本次产出来自真实模型还是本地算法
-            </p>
-          </ToolEmptyState>
+        {!submitting && galleryLoading && gallery.length === 0 ? (
+          <div className="fc-result-loading">
+            <Spin />
+          </div>
+        ) : !submitting && gallery.length === 0 ? (
+          <ToolEmptyState
+            title="效果图预览"
+            desc={
+              token
+                ? '提交任务后，生成结果将在此处展示，本页生成过的图片都会保留在这里'
+                : '登录后，你在这个页面生成过的图片都会显示在这里'
+            }
+          />
         ) : (
           <div className="pk-result-body">
             <div className="pk-result-toolbar">
               <div className="pk-result-title">
-                生成结果
-                <span className="pk-result-count">{images.length} 张参考</span>
+                {submitting ? '生成中…' : '全部生成图'}
+                {gallery.length > 0 && <span className="pk-result-count">{gallery.length} 张</span>}
               </div>
-              <button type="button" className="pk-result-regen" disabled={submitting} onClick={() => void submit()}>
-                <RefreshCw size={13} />
-                重新生成
-              </button>
-            </div>
-            <div className="pk-result-detail-scroll">
-              {result.status === 'succeeded' && result.url ? (
-                <div className="pk-result-card pk-result-card-detail">
-                  <div className="pk-result-detail-media">
-                    <img src={result.url} alt="自由创作图" />
-                  </div>
-                  <div className="pk-result-meta">
-                    <span className="pk-result-variant">
-                      自由创作结果
-                      <span className={`pk-result-source ${sourceBadge(result.provider).cls}`}>
-                        {sourceBadge(result.provider).text}
-                      </span>
-                    </span>
-                    <span className="pk-result-params">
-                      {ratio} · {resolution.toUpperCase()}
-                      {result.width && result.height ? ` · ${result.width}×${result.height}` : ''}
-                    </span>
-                  </div>
-                  <a className="pk-result-download" href={result.url} download target="_blank" rel="noreferrer">
-                    下载原图
-                  </a>
+              <div className="fc-result-actions">
+                {/* 每行张数: 3~6 可选, 选择记在本机 —— 出图比例不一时用户可以自己决定看几张 */}
+                <div className="fc-grid-size" role="group" aria-label="每行显示图片数量">
+                  <span className="fc-grid-size-label">每行</span>
+                  {GRID_COL_OPTIONS.map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      className={`fc-grid-size-btn${cols === n ? ' is-active' : ''}`}
+                      aria-pressed={cols === n}
+                      title={`每行显示 ${n} 张`}
+                      onClick={() => changeCols(n)}
+                    >
+                      {n}
+                    </button>
+                  ))}
                 </div>
-              ) : (
-                <div className="pk-result-card pk-result-card-detail">
-                  <div className="pk-result-detail-media pk-result-failed">
-                    <X size={20} />
-                    <span>生成失败（{result.errorCode ?? '未知错误'}）</span>
-                  </div>
+                <button
+                  type="button"
+                  className="pk-result-regen"
+                  disabled={galleryLoading}
+                  onClick={() => void loadGallery()}
+                >
+                  <RefreshCw size={13} />
+                  {galleryLoading ? '刷新中' : '刷新'}
+                </button>
+              </div>
+            </div>
+            {galleryError && (
+              <p className="tool-submit-notice tool-submit-notice-error">历史生成图加载失败：{galleryError}</p>
+            )}
+            {result?.status === 'failed' && (
+              <p className="tool-submit-notice tool-submit-notice-error">
+                最近一次生成失败：{taskErrorText(result.errorCode)}
+              </p>
+            )}
+            <div className={`fc-result-gallery fc-cols-${cols}`}>
+              {/* 生成中占位: 点击生成后立刻出现在网格首位, 与真实图同尺寸,
+                  出图后由新图顶替 —— 不让「已提交 → 出图」之间出现空窗。 */}
+              {submitting && (
+                <div className="fc-result-item fc-result-item-loading" role="status" aria-label="正在生成">
+                  <ImagePlus size={22} />
+                  <span className="fc-result-item-loading-tip">正在生成…</span>
                 </div>
               )}
+              {gallery.map((item, i) => (
+                <GalleryThumb
+                  key={item.id}
+                  item={item}
+                  onOpen={() => setPreviewIndex(i)}
+                  onContextMenu={(e) => openMenu(e.clientX, e.clientY, i)}
+                />
+              ))}
             </div>
           </div>
         )}
@@ -645,6 +995,69 @@ export function FreeCreationPage() {
 
       {/* 手机上传弹窗 (二维码方案) —— 手机端传回后进入参考图位 */}
       <MobileUploadModal open={mobileOpen} onReceived={addMobileAssets} onCancel={() => setMobileOpen(false)} />
+
+      {/* 生成图大图查看器 (点右侧缩略图打开; 整屏、可缩放、可翻页) */}
+      {previewIndex !== null && gallery[previewIndex] && (
+        <ImageLightbox
+          items={gallery}
+          index={previewIndex}
+          onIndexChange={setPreviewIndex}
+          onClose={() => setPreviewIndex(null)}
+          onItemContextMenu={(pos, i) => openMenu(pos.x, pos.y, i)}
+        />
+      )}
+
+      {/* 结果图右键菜单 (缩略图与查看器共用同一套动作) */}
+      {menu && gallery[menu.index] && (
+        <ImageContextMenu
+          x={menu.x}
+          y={menu.y}
+          onClose={() => setMenu(null)}
+          items={[
+            {
+              key: 'view',
+              label: '查看大图',
+              icon: Maximize2,
+              onSelect: () => setPreviewIndex(menu.index),
+            },
+            {
+              key: 'reference',
+              label: '用作参考图',
+              icon: ImagePlus,
+              onSelect: () => useAsReference(gallery[menu.index]),
+            },
+            {
+              key: 'open',
+              label: '在新标签页打开',
+              icon: ExternalLink,
+              onSelect: () => {
+                const url = toAbsoluteUrl(gallery[menu.index].url) || gallery[menu.index].url;
+                window.open(url, '_blank', 'noopener');
+              },
+            },
+            {
+              key: 'copy',
+              label: '复制图片地址',
+              icon: Copy,
+              onSelect: () => void copyImageUrl(gallery[menu.index]),
+            },
+            {
+              key: 'download',
+              label: '下载原图',
+              icon: Download,
+              onSelect: () => downloadImage(gallery[menu.index]),
+            },
+            {
+              key: 'delete',
+              label: '删除这张作品',
+              icon: Trash2,
+              danger: true,
+              divider: true,
+              onSelect: () => deleteImage(menu.index),
+            },
+          ]}
+        />
+      )}
 
       {/* 创作提示词放大编辑 */}
       <Modal

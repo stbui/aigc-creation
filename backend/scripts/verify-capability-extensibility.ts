@@ -54,7 +54,7 @@ const newCapability = {
   name: '扩展性验证能力',
   group: 'ai_video' as const,
   summary: '用于验证新增能力是否只需一处改动。',
-  mode: 'mock' as const,
+  mode: 'real' as const,
   creditCost: 3,
   modality: 'text' as const, // 故意用非 image 模态, 验证不强制要求本地兜底
   buildPrompt: (p: Record<string, any>) => `验证提示词：${p.prompt ?? ''}`,

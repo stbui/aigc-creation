@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
 import { CreditService } from '../credits/credit.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 /**
  * 会员体系 (落地页订阅卡兑现)。
@@ -87,6 +88,7 @@ export class MembershipService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly credit: CreditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   /**
@@ -217,83 +219,161 @@ export class MembershipService {
    * 开通或续期订阅。
    *
    * 续期语义: 从 `max(当前到期时间, 现在)` 起顺延 —— 用户提前续费不会损失剩余天数。
+   *
+   * ## 权益只能由「已支付订单」触发 (2026-10-21 修)
+   *
+   * 此前本方法不校验任何订单, 任何登录用户直接调用订阅接口就能白拿会员与月度积分。
+   * 现在 `orderId` **必填**, 并且逐项核对: 订单存在 → 属于本人 → 已支付 →
+   * 买的就是这个套餐。
+   *
+   * ## 一次性闸门 (`Order.membershipAppliedAt`)
+   *
+   * 同一笔订单只能兑换一次。闸门放在订单上而不是 `Membership.orderId`:
+   * 续费会复用同一行会员并覆盖 orderId, 旧订单因此"看起来没被用过"。
+   *
+   * 抢占、延期、发积分在**同一事务**内完成, 任何一步失败整体回滚 (闸门一并回滚),
+   * 重试是安全的 —— 不会出现"会员延了两期"或"积分发了两遍"。
    */
   async subscribe(params: {
     userId: string;
     planId: string;
-    orderId?: string;
-  }) {
+    /** 触发本次开通的已支付订单 id。必填 —— 没有订单就没有权益 */
+    orderId: string;
+  }): Promise<{
+    membershipId: string | null;
+    expiresAt: string | null;
+    planCode: string;
+    /** true = 该订单此前已兑换过, 本次未重复发放 */
+    alreadyApplied: boolean;
+  }> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: params.orderId },
+      select: { id: true, userId: true, status: true, membershipPlanId: true, orderNo: true },
+    });
+    if (!order) throw new AppError(40400, '订单不存在', 404);
+    if (order.userId !== params.userId) {
+      throw new AppError(40301, '无权使用该订单', 403);
+    }
+    if (order.status !== 'paid') {
+      throw new AppError(40901, '订单未支付, 不能开通会员', 409);
+    }
+    if (order.membershipPlanId !== params.planId) {
+      throw new AppError(40001, '订单与会员套餐不匹配', 400);
+    }
+
     const plan = await this.prisma.membershipPlan.findUnique({ where: { id: params.planId } });
     if (!plan) throw new AppError(40400, '会员套餐不存在', 404);
-    if (plan.status !== 'active') throw new AppError(40001, '该套餐已下架', 400);
+    /*
+     * ⚠ 这里**不校验 plan.status** —— 用户付款时套餐是可售的, 之后运营下架
+     * 不该让已付款的订单永远开通不了。"是否可购买"是下单时的判定 (OrderService.create)。
+     */
     if (plan.durationDays <= 0) {
       throw new AppError(40001, '默认套餐不支持购买', 400);
     }
 
-    const now = new Date();
-    const current = await this.prisma.membership.findFirst({
-      where: { userId: params.userId, status: { in: ['active', 'grace'] } },
-      orderBy: { expiresAt: 'desc' },
+    const result = await this.prisma.$transaction(async (tx) => {
+      // 一次性闸门: 只有闸门从 null 变成时间戳的那次调用能继续往下走
+      const claim = await tx.order.updateMany({
+        where: { id: order.id, status: 'paid', membershipAppliedAt: null },
+        data: { membershipAppliedAt: new Date() },
+      });
+      if (claim.count === 0) return { claimed: false as const };
+
+      const now = new Date();
+      const current = await tx.membership.findFirst({
+        where: { userId: params.userId, status: { in: ['active', 'grace'] } },
+        orderBy: { expiresAt: 'desc' },
+      });
+
+      // 从当前到期时间顺延, 已过期则从现在开始
+      const base = current && current.expiresAt > now ? current.expiresAt : now;
+      const expiresAt = new Date(base.getTime() + plan.durationDays * 24 * 3600 * 1000);
+
+      const perksSnapshot = JSON.stringify(parsePerks(plan.perks));
+      const nextCreditAt = new Date(
+        Math.min(expiresAt.getTime(), now.getTime() + plan.durationDays * 24 * 3600 * 1000),
+      );
+
+      const membership = current
+        ? await tx.membership.update({
+            where: { id: current.id },
+            data: {
+              planId: plan.id,
+              status: 'active',
+              // 换套餐时刷新快照; 同套餐续期则保留原权益 (用户已付费)
+              perksSnapshot: current.planId === plan.id ? current.perksSnapshot : perksSnapshot,
+              monthlyCreditsSnapshot: plan.monthlyCredits,
+              startAt: current.startAt,
+              expiresAt,
+              nextCreditAt,
+              orderId: params.orderId,
+            },
+          })
+        : await tx.membership.create({
+            data: {
+              userId: params.userId,
+              planId: plan.id,
+              status: 'active',
+              perksSnapshot,
+              monthlyCreditsSnapshot: plan.monthlyCredits,
+              startAt: now,
+              expiresAt,
+              nextCreditAt,
+              orderId: params.orderId,
+            },
+          });
+
+      // 首期订阅积分立即发放 (与订单同 orderId, 退款回收按此批次扣回)
+      if (plan.monthlyCredits > 0) {
+        await this.credit.grant(
+          {
+            userId: params.userId,
+            credits: plan.monthlyCredits,
+            source: 'grant',
+            // 会员积分与订阅同周期到期
+            validDays: plan.durationDays,
+            orderId: params.orderId,
+            reason: `会员订阅积分 (${plan.name})`,
+          },
+          tx,
+        );
+        // 下期发放时间 = 一个月后
+        await tx.membership.update({
+          where: { id: membership.id },
+          data: { nextCreditAt: new Date(now.getTime() + 30 * 24 * 3600 * 1000) },
+        });
+      }
+
+      return { claimed: true as const, membershipId: membership.id, expiresAt };
     });
 
-    // 从当前到期时间顺延, 已过期则从现在开始
-    const base = current && current.expiresAt > now ? current.expiresAt : now;
-    const expiresAt = new Date(base.getTime() + plan.durationDays * 24 * 3600 * 1000);
-
-    const perksSnapshot = JSON.stringify(parsePerks(plan.perks));
-    const nextCreditAt = new Date(
-      Math.min(expiresAt.getTime(), now.getTime() + plan.durationDays * 24 * 3600 * 1000),
-    );
-
-    const membership = current
-      ? await this.prisma.membership.update({
-          where: { id: current.id },
-          data: {
-            planId: plan.id,
-            status: 'active',
-            // 换套餐时刷新快照; 同套餐续期则保留原权益 (用户已付费)
-            perksSnapshot: current.planId === plan.id ? current.perksSnapshot : perksSnapshot,
-            monthlyCreditsSnapshot: plan.monthlyCredits,
-            startAt: current.startAt,
-            expiresAt,
-            nextCreditAt,
-            orderId: params.orderId,
-          },
-        })
-      : await this.prisma.membership.create({
-          data: {
-            userId: params.userId,
-            planId: plan.id,
-            status: 'active',
-            perksSnapshot,
-            monthlyCreditsSnapshot: plan.monthlyCredits,
-            startAt: now,
-            expiresAt,
-            nextCreditAt,
-            orderId: params.orderId,
-          },
-        });
-
-    // 首期订阅积分立即发放
-    if (plan.monthlyCredits > 0) {
-      await this.credit.grant({
-        userId: params.userId,
-        credits: plan.monthlyCredits,
-        source: 'grant',
-        // 会员积分与订阅同周期到期
-        validDays: plan.durationDays,
-        orderId: params.orderId,
-        reason: `会员订阅积分 (${plan.name})`,
+    if (!result.claimed) {
+      /*
+       * 已被兑换过: 幂等返回当前会员状态, **不重复发权益**。
+       * 重复回调、前端重复提交、调度重试都会走到这里。
+       */
+      const current = await this.prisma.membership.findFirst({
+        where: { userId: params.userId },
+        orderBy: { expiresAt: 'desc' },
       });
-      // 下期发放时间 = 一个月后
-      await this.prisma.membership.update({
-        where: { id: membership.id },
-        data: { nextCreditAt: new Date(now.getTime() + 30 * 24 * 3600 * 1000) },
-      });
+      this.logger.log(`会员订单重复兑换已忽略: order=${order.orderNo} user=${params.userId}`);
+      return {
+        membershipId: current?.id ?? null,
+        expiresAt: current?.expiresAt.toISOString() ?? null,
+        planCode: plan.code,
+        alreadyApplied: true,
+      };
     }
 
-    this.logger.log(`会员开通/续期: user=${params.userId} plan=${plan.code} 到期=${expiresAt.toISOString()}`);
-    return { membershipId: membership.id, expiresAt, planCode: plan.code };
+    this.logger.log(
+      `会员开通/续期: user=${params.userId} plan=${plan.code} 到期=${result.expiresAt.toISOString()} order=${order.orderNo}`,
+    );
+    return {
+      membershipId: result.membershipId,
+      expiresAt: result.expiresAt.toISOString(),
+      planCode: plan.code,
+      alreadyApplied: false,
+    };
   }
 
   /**
@@ -345,8 +425,14 @@ export class MembershipService {
     const now = new Date();
 
     // 1) 到期转expired
-    const expiredRes = await this.prisma.membership.updateMany({
+    //    先查出到期的是哪些人, 再条件更新: 通知需要一个 userId, 而 updateMany
+    //    只回 count。条件里带上 status/expiresAt 保证并发下不会重复通知。
+    const expiring = await this.prisma.membership.findMany({
       where: { status: { in: ['active', 'grace'] }, expiresAt: { lte: now } },
+      select: { id: true, userId: true, expiresAt: true },
+    });
+    const expiredRes = await this.prisma.membership.updateMany({
+      where: { id: { in: expiring.map((m) => m.id) } },
       data: { status: 'expired', nextCreditAt: null },
     });
 
@@ -379,6 +465,19 @@ export class MembershipService {
           this.logger.warn(`会员月度积分发放失败 user=${m.userId}: ${(e as Error).message}`);
         }
       }
+    }
+
+    // 到期通知 (B4)。只在真的由 active/grace 改为 expired 时发,
+    // updateMany 的 count 与 expiring 长度一致才算全部改写成功。
+    for (const m of expiring) {
+      await this.notifications.notify({
+        userId: m.userId,
+        type: 'membership_expired',
+        vars: { date: m.expiresAt.toISOString().slice(0, 10) },
+        fallbackTitle: '会员已到期',
+        fallbackBody: `你的会员已于 ${m.expiresAt.toISOString().slice(0, 10)} 到期。`,
+        link: '/packages',
+      });
     }
 
     if (expiredRes.count > 0 || due.length > 0) {

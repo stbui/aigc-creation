@@ -4,10 +4,10 @@
  * 为什么需要: AdminGuard 实时读 AdminRole.permissions, 表为空时所有后台
  * 请求都会被兜底默认拒拦下, 管理员无法进入后台配置权限 —— 形成死锁。
  *
- * 与 seed-demo-user.ts 的区别 (重要):
- *   演示账号 admin@demo.com 的凭据硬编码在前端产物 lib/constants.ts,
- *   **不得**给它 admin 角色 —— 等于把后台入口挂在公开可见的位置。
- *   管理员由本脚本 seed-admin.ts 生成, 密码随机且只在本次输出一次。
+ * 与 seed-dev-user.ts 的区别 (重要):
+ *   后者 provision 的是 C 端普通账号, **不得**给它 admin 角色 ——
+ *   C 端注册入口谁都能用, 把后台入口挂在那里等于不设防。
+ *   管理员由 seed-admin.ts 生成, 密码随机且只在本次输出一次。
  *
  * 运行: npm run seed          (角色与权限点)
  *      npm run seed:admin     (管理员账号, 可重复运行)

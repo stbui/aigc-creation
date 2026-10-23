@@ -581,5 +581,13 @@ export class NodeSQLiteDriverAdapterFactory
 
 function createClient(url: string): DatabaseSync {
   const dbPath = url.replace(/^file:/, '');
-  return new DatabaseSync(dbPath);
+  const db = new DatabaseSync(dbPath);
+  /*
+   * 默认 busy timeout 是 0：只要另一条连接正在写（后端服务与冒烟脚本、
+   * 或两个 Node 进程共用一个库），读/写就立刻抛 `database is locked`，
+   * 而不是等一小会儿。5s 是 SQLite 官方推荐量级，足以覆盖正常的短事务；
+   * 真的死锁时仍然会超时报错，不会静默挂起。
+   */
+  db.exec('PRAGMA busy_timeout = 5000');
+  return db;
 }

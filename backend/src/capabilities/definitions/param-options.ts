@@ -169,10 +169,23 @@ export function parseDetailSections(raw: unknown): string[] {
   return out.length > 0 ? out.slice(0, 10) : [...DETAIL_SECTION_DEFAULTS];
 }
 
-/** 画质枚举 (参考站高级设置 1K/2K; 本地算法上限 2048, 4K 不提供) */
+/**
+ * 画质枚举 (参考站高级设置 1K/2K/4K)。
+ *
+ * 2026-10-22 起 4K 由后端声明 —— 原先只声明 1K/2K, 前端再按运行时补一档,
+ * 结果是「后端不认的档位靠前端兜」: 直接调接口传 `size=4k` 会被 sanitizeParams
+ * 静默回落成默认值, 而界面上那一档看起来是可用的。
+ *
+ * 三档的实际兑现能力不同, 且**这一点不能靠隐藏档位来表达**:
+ *   - 1K / 2K: 本地 Jimp 算法与云端通道都能兑现
+ *   - 4K: 只有云端通道能兑现; 本地回落时硬上限 2048px, 由
+ *     `local-image.provider.ts` 打 WARN 说明实际边长, 不谎报 4096
+ * 前端据 `runtime.remoteAvailable` 决定 4K 可否选中 (见 `lib/optionSets.ts`)。
+ */
 export const QUALITY_OPTIONS: ParamOption[] = [
   { value: '1k', label: '1K (1024px)' },
   { value: '2k', label: '2K (2048px)' },
+  { value: '4k', label: '4K (4096px)' },
 ];
 
 // ───────────────── 提示词公用片段 ─────────────────

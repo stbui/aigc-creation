@@ -24,12 +24,20 @@
 import { Module, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { APP_GUARD } from '@nestjs/core';
-import { ConfigModule } from '@nestjs/config';
+// 用项目自己的 ConfigModule（按 NODE_ENV 选 env 档），原因同 verify-free-create-e2e：
+// 裸 ConfigModule.forRoot 只找 .env，找不到就回落 dev.db，测试会打真实库。
+import { ConfigModule } from '../src/config/config.module';
 import { ResponseInterceptor } from '../src/common/response.interceptor';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { ProvidersModule } from '../src/providers/providers.module';
 import { StorageModule } from '../src/storage/storage.module';
 import { MembershipModule } from '../src/membership/membership.module';
+// @Global 模块也要在根模块 import 一次: MembershipService 依赖 NotificationsService,
+// AuthService 链路依赖 Email/Sms —— 缺任一项 Nest 装配即抛 UnknownDependencies。
+import { ChannelsModule } from '../src/channels/channels.module';
+import { NotificationsModule } from '../src/notifications/notifications.module';
+// CommonModule 提供 SignedUrlService（素材/任务输出地址签名），非 @Global
+import { CommonModule } from '../src/common/common.module';
 import { GenerateModule } from '../src/generate/generate.module';
 import { AdminTasksController } from '../src/admin/tasks-admin.controller';
 import { TasksAdminService } from '../src/admin/tasks-admin.service';
@@ -68,10 +76,13 @@ function check(label: string, ok: boolean, detail?: unknown) {
   imports: [
     // isGlobal: 与 src/app.module.ts 一致 —— StorageService 依赖 ConfigService,
     // 而 ConfigModule 只在 isGlobal 时对未直接 import 它的模块可见
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule,
     PrismaModule,
     ProvidersModule,
     StorageModule,
+    CommonModule,
+    ChannelsModule,
+    NotificationsModule,
     MembershipModule,
     GenerateModule,
   ],
@@ -115,13 +126,23 @@ async function main() {
   }
   const AUTH = { authorization: `Bearer ${JwtService.sign({ sub: admin.id, email: admin.email })}` };
 
-  // 直接构造一个已完成任务, 避免依赖真实生成链路(耗时且依赖素材文件)
-  const user = await prisma.user.findFirst({ orderBy: { createdAt: 'asc' } });
-  const project = await prisma.project.findFirst({ orderBy: { createdAt: 'asc' } });
-  if (!user || !project) {
-    console.error('缺少测试所需的 user/project, 请先执行 npm run seed');
-    process.exit(1);
-  }
+  /*
+   * 自建「任务属主 + 项目」而不是取库里最早的那条。
+   * 取最旧数据会让断言取决于历史遗留，且项目已无内置演示账号，
+   * 「库里一定有一个 user/project」这条前提不再成立。
+   * 跑完在清理阶段一并删掉。
+   */
+  const stamp = Date.now().toString(36);
+  const user = await prisma.user.create({
+    data: {
+      email: `admin-tasks-${stamp}@test.local`,
+      passwordHash: 'x',
+      name: `任务验证${stamp.slice(-4)}`,
+    },
+  });
+  const project = await prisma.project.create({
+    data: { name: `任务验证-${stamp}`, ownerId: user.id },
+  });
 
   /*
    * 前置清理: 上一轮若中途失败会残留测试任务, 让"列表只含 failed"等
@@ -152,20 +173,13 @@ async function main() {
   const noAuthRes = await fetch(`${BASE}/admin/tasks`);
   check('无 token 返回 401', noAuthRes.status === 401, noAuthRes.status);
 
-  // C 端用户访问后台: 守卫须拦(403), 否则任何注册用户都能看全站任务
-  const cUser = await prisma.user.findFirst({
-    where: { role: 'user', status: 'active' },
-    orderBy: { createdAt: 'asc' },
-  });
-  if (cUser) {
-    const cAuth = {
-      authorization: `Bearer ${JwtService.sign({ sub: cUser.id, email: cUser.email })}`,
-    };
-    const cRes = await fetch(`${BASE}/admin/tasks`, { headers: cAuth });
-    check('C 端用户访问返回 403', cRes.status === 403, cRes.status);
-  } else {
-    check('C 端用户访问返回 403 (跳过: 无 C 端账号)', true);
-  }
+  // C 端用户访问后台: 守卫须拦(403), 否则任何注册用户都能看全站任务。
+  // 用上面自建的任务属主 (role='user') 当这个"C 端用户"。
+  const cAuth = {
+    authorization: `Bearer ${JwtService.sign({ sub: user.id, email: user.email })}`,
+  };
+  const cRes = await fetch(`${BASE}/admin/tasks`, { headers: cAuth });
+  check('C 端用户访问返回 403', cRes.status === 403, cRes.status);
 
   // ── 1. 列表 ──────────────────────────────────────────────────────
   console.log('1. GET /admin/tasks');
@@ -279,7 +293,7 @@ async function main() {
       status: 'running',
       inputAssetIds: JSON.stringify([]),
       params: '{}',
-      provider: 'mock',
+      provider: 'pending',
     },
   });
   const cancelRes = await fetch(`${BASE}/admin/tasks/${cancelTarget.id}/cancel`, {
@@ -317,6 +331,10 @@ async function main() {
       id: { in: [failed.id, newTaskId, okTask.id, cancelTarget.id].filter(Boolean) as string[] },
     },
   });
+  // 连带清掉自建的 project / user，不给库里留垃圾
+  await prisma.generationTask.deleteMany({ where: { ownerId: user.id } });
+  await prisma.project.deleteMany({ where: { ownerId: user.id } });
+  await prisma.user.delete({ where: { id: user.id } });
 
   console.log(`\n═══ 通过 ${pass} / 失败 ${fail} ═══\n`);
   await app.close();

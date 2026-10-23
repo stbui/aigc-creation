@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
 /**
@@ -13,26 +13,40 @@ import react from '@vitejs/plugin-react';
  * 是**靠前优先**。两套规则各自内部一致即可，跨端不要互相推断。
  *
  * 各档位的端口与代理目标从 env 文件读，命令行可用同名变量覆盖：
- *   VITE_PORT=5174 VITE_API_PROXY=http://localhost:3002 npx vite --mode development
+ *   VITE_PORT=5101 VITE_API_PROXY=http://localhost:4101 npx vite --mode development
  */
 export default defineConfig(({ mode }) => {
   const isProd = mode === 'production';
 
+  /*
+   * 端口与代理目标必须从**当前 mode 的 env 文件**读。
+   *
+   * Vite 只把 env 文件里的变量注入客户端 (import.meta.env), 不会写进
+   * process.env —— 直接读 process.env.VITE_PORT 永远拿不到 `.env.test` 里的值,
+   * 于是 `npm run dev:test` 会静默跑在 5100、代理到开发库的 4100:
+   * 症状是「测试档登录不上」，而没有任何一处报错。
+   *
+   * 优先级: 命令行显式给的同名变量 > env 文件 > 兜底默认值。
+   */
+  const fileEnv = loadEnv(mode, process.cwd(), 'VITE_');
+  const port = Number(process.env.VITE_PORT || fileEnv.VITE_PORT || (isProd ? 4173 : 5100));
+  const apiProxy = process.env.VITE_API_PROXY || fileEnv.VITE_API_PROXY || 'http://localhost:4100';
+
   return {
     plugins: [react()],
     server: {
-      port: Number(process.env.VITE_PORT ?? 5173),
+      port,
       strictPort: false,
       proxy: {
         '/api': {
-          target: process.env.VITE_API_PROXY ?? 'http://localhost:3001',
+          target: apiProxy,
           changeOrigin: true,
         },
         /**
          * ⚠️ **必须代理 /uploads** (2026-10-20 修)。
          *
          * 素材的 sourceUrl 是 `/uploads/<key>` 形态 (后端 main.ts 的静态服务直出)。
-         * 开发态前端跑在 5173、后端在 3001, 不代理的话 Vite 会把 `/uploads/...`
+         * 开发态前端跑在 5100、后端在 4100, 不代理的话 Vite 会把 `/uploads/...`
          * 当成前端路由 → 返回 index.html (HTTP 200, 但 Content-Type 是 text/html)。
          *
          * 症状极隐蔽: **状态码是 200**, 看起来"请求成功", 但 <img> 拿到 HTML
@@ -42,13 +56,13 @@ export default defineConfig(({ mode }) => {
          * 生产由 Nginx 反代 /uploads (见 nginx.conf.template), 不受此影响。
          */
         '/uploads': {
-          target: process.env.VITE_API_PROXY ?? 'http://localhost:3001',
+          target: apiProxy,
           changeOrigin: true,
         },
       },
     },
     preview: {
-      port: Number(process.env.VITE_PORT ?? 4173),
+      port,
       strictPort: false,
     },
     build: {

@@ -19,8 +19,8 @@ import { test, expect, type Page, type APIRequestContext } from '@playwright/tes
  * 未提供则用 API 现注册一个一次性账号 (test 结束不回滚库, 只在本地 dev.db 留一行 User)。
  */
 
-const UI = process.env.ADMIN_UI ?? 'http://localhost:5173';
-const API = process.env.E2E_API ?? 'http://localhost:3001';
+const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
+const API = process.env.E2E_API ?? 'http://localhost:4100';
 
 const E2E_EMAIL = process.env.E2E_USER_EMAIL ?? '';
 const E2E_PASSWORD = process.env.E2E_USER_PASSWORD ?? '';
@@ -80,6 +80,21 @@ async function submitState(page: Page) {
   };
 }
 
+/**
+ * 自由创作此刻能不能真的提交 —— 读 `/capabilities` 的 `runtime.effective`。
+ *
+ * 2026-10-21 起 free_create 是 `localFallback: false` 的能力: 没有可用模型通道时
+ * 后端判 failed/42204 并退款, 前端也把提交按钮置灰(仅登录态)并给出原因。
+ * 本机是否配了图像通道是**环境事实**, 不该让按钮契约随它飘 —— 故按实际结论分支断言。
+ */
+async function freeCreateCanSubmit(request: APIRequestContext): Promise<boolean> {
+  const res = await request.get(`${API}/api/v1/capabilities`);
+  if (!res.ok()) return true; // 清单拿不到时不把用例判死, 交给按钮原有契约
+  const body = await res.json();
+  const runtime = (body.data?.items ?? []).find((c: { id: string }) => c.id === 'free_create')?.runtime;
+  return runtime?.effective !== 'unavailable' && runtime?.effective !== 'disabled';
+}
+
 const PROMPT = page => page.locator('textarea.fc-prompt-textarea').first();
 
 test.describe('自由创作 · 提交按钮登录墙', () => {
@@ -131,13 +146,23 @@ test.describe('自由创作 · 提交按钮登录态', () => {
     expect(empty.opacity).toBeLessThan(1);
     expect(empty.cursor).toBe('not-allowed');
 
+    const canSubmit = await freeCreateCanSubmit(request);
     await PROMPT(page).fill('赛博朋克城市夜景，霓虹灯');
     const filled = await submitState(page);
     expect(filled.text).toContain('立即生成');
     expect(filled.text).toContain('本次消耗 10 积分');
-    expect(filled.disabled).toBe(false);
-    expect(filled.opacity).toBe(1);
-    expect(filled.cursor).toBe('pointer');
+    /*
+     * 有通道: 可提交。没通道 (本机未配图像线路): 按钮置灰, 并在提交区给出原因 ——
+     * 后者正是「绝不交占位图」在界面上的落点, 不是缺陷。
+     */
+    expect(filled.disabled).toBe(!canSubmit);
+    if (canSubmit) {
+      expect(filled.opacity).toBe(1);
+      expect(filled.cursor).toBe('pointer');
+    } else {
+      expect(filled.opacity).toBeLessThan(1);
+      await expect(page.locator('.tool-submit-notice-error')).toBeVisible();
+    }
   });
 });
 
@@ -163,4 +188,27 @@ test.describe('防回归: guest 不被动弹登录', () => {
       '未登录进页面即弹登录框 —— 检查是否有只读接口在无 token 时触发 auth:required',
     ).toBeHidden({ timeout: 5000 });
   });
+
+  /*
+   * 数据页同样适用 (2026-10-21 补)。
+   *
+   * 登录弹窗此前因「宿主渲染在 Router 之外」整体挂不上, 这条契约在数据页上
+   * 是**空过**的: 弹窗根本不存在, toBeHidden 恒真。修好宿主后立刻暴露 ——
+   * guest 进 /workbench 会被 stats/overview 的 401 自动弹出登录墙 (/credits
+   * 同屏三组接口各弹一次)。api.ts 已改为只有写动作 (非 GET) 才广播
+   * auth:required, 这里逐页守住, 防止哪天又把只读接口的 401 接到弹窗上。
+   */
+  for (const path of ['/workbench', '/works', '/credits', '/invitations']) {
+    test(`未登录访问 ${path} 不应自动弹登录框`, async ({ page }) => {
+      await page.goto(`${UI}${path}`);
+      await page.evaluate(() => localStorage.clear());
+      await page.reload({ waitUntil: 'networkidle' });
+      await page.waitForTimeout(2500);
+
+      await expect(
+        page.locator('.login-modal'),
+        `${path} 的只读接口在无 token 时触发了 auth:required`,
+      ).toBeHidden({ timeout: 5000 });
+    });
+  }
 });

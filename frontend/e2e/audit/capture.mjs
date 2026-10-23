@@ -3,7 +3,7 @@
  *
  * 用法: node capture.mjs [ref|local|diff]
  *   - ref:   抓 https://ijihua.cn/free-creation → out/ref.json + out/ref.png
- *   - local: 抓 http://localhost:5173/free-creation → out/local.json + out/local.png
+ *   - local: 抓 http://localhost:5100/free-creation → out/local.json + out/local.png
  *   - diff:  读两份 json 输出结构/文案/尺寸差异
  *
  * 采集口径: 只取"树形骨架 + 关键节点 computed style", 不做像素比对。
@@ -21,7 +21,7 @@ const EXEC = '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-ma
 
 const TARGETS = {
   ref: 'https://ijihua.cn/free-creation',
-  local: 'http://localhost:5173/free-creation',
+  local: 'http://localhost:5100/free-creation',
 };
 
 const PROPS = [

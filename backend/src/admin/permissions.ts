@@ -68,6 +68,8 @@ export const PERMISSIONS = {
   paymentRead: 'payment.read',
   financeDashboard: 'finance.dashboard',
   invoiceWrite: 'invoice.write',
+  /** 渠道对账导入与差异处置。只给财务: 处置会让「账对不上」从看板上消失 */
+  financeReconcile: 'finance.reconcile',
 
   // 积分
   creditRead: 'credit.read',
@@ -96,6 +98,13 @@ export const PERMISSIONS = {
   marketingWrite: 'marketing.write',
   messageWrite: 'message.write',
   ticketHandle: 'ticket.handle',
+
+  // 合规文本 (B4)。法务正文是用户要举证的文本, 改动必须与内容运营分开授权
+  legalRead: 'legal.read',
+  legalWrite: 'legal.write',
+
+  // 工单 (B7 预留; B4 先把权限点落定, 避免角色矩阵二次迁移)
+  ticketRead: 'ticket.read',
 
   // 系统
   settingRead: 'setting.read',
@@ -146,9 +155,13 @@ export const ROLE_PERMISSIONS: Record<AdminRoleCode, Permission[]> = {
     PERMISSIONS.capabilityRead,
     PERMISSIONS.modelConfigRead,
     PERMISSIONS.modelCallRead,
+    // 只读排障：允许发起连通性测试（只探测，不写配置、不改健康状态）
+    PERMISSIONS.channelTest,
     PERMISSIONS.marketingWrite,
     PERMISSIONS.messageWrite,
+    PERMISSIONS.ticketRead,
     PERMISSIONS.ticketHandle,
+    PERMISSIONS.legalRead,
     PERMISSIONS.auditRead,
     PERMISSIONS.settingRead,
     PERMISSIONS.dataExport,
@@ -167,9 +180,12 @@ export const ROLE_PERMISSIONS: Record<AdminRoleCode, Permission[]> = {
     PERMISSIONS.paymentRead,
     PERMISSIONS.financeDashboard,
     PERMISSIONS.invoiceWrite,
+    PERMISSIONS.financeReconcile,
     PERMISSIONS.creditRead,
     PERMISSIONS.creditAdjust,
+    PERMISSIONS.ticketRead,
     PERMISSIONS.ticketHandle,
+    PERMISSIONS.legalRead,
     PERMISSIONS.auditRead,
     PERMISSIONS.dataExport,
     PERMISSIONS.dataSearch,
@@ -189,8 +205,10 @@ export const HIGH_RISK_PERMISSIONS: Permission[] = [
   PERMISSIONS.creditAdjust,
   PERMISSIONS.complianceTakedown,
   PERMISSIONS.capabilityWrite,
+  PERMISSIONS.channelRoute,
   PERMISSIONS.modelConfigWrite,
   PERMISSIONS.settingWrite,
+  PERMISSIONS.legalWrite,
   PERMISSIONS.roleWrite,
   PERMISSIONS.backupRun,
 ];

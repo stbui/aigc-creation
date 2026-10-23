@@ -2,7 +2,7 @@
  * 端到端验证: 三个新功能的真实链路 (2026-10-20)
  *
  * 跑法: cd backend && node scripts/verify-prompt-tools.js
- * 前置: 后端已在 3001 端口运行
+ * 前置: 后端已在 4100 端口运行
  *
  * 验证项:
  *   1. AI润色        POST /api/v1/prompt-tools/polish
@@ -12,9 +12,11 @@
  *
  * ⚠️ 断言要独立于实现: 期望值来自"接口契约 + 参考站实拍文案", 不是从代码反推。
  */
-const BASE = process.env.VERIFY_BASE || 'http://localhost:3001/api/v1';
-const EMAIL = 'admin@demo.com';
-const PASSWORD = 'demo1234';
+const BASE = process.env.VERIFY_BASE || 'http://localhost:4100/api/v1';
+// 素材地址要打回**同一个实例**：硬写开发档端口会让脚本在测试档 4200 上跑时
+// 一律 404，看起来像上传失败，实际只是问错了端口。
+const ORIGIN = BASE.replace(/\/api\/v1\/?$/, '');
+const { ensureTestUser } = require('./lib/test-user');
 
 let pass = 0;
 let fail = 0;
@@ -53,20 +55,15 @@ async function fetchRetry(url, options, tries = 3) {
   throw lastErr;
 }
 
+/**
+ * 现场注册一个账号（不再依赖库里预置的演示账号），见 lib/test-user.js。
+ *
+ * ⚠️ 断言必须写死 accessToken 字段名（与前端 AuthResponse 一致）,
+ * 否则字段改名了脚本还"通过", 就抓不到真实回归 —— test-user 里已按此校验。
+ */
 async function login() {
-  const res = await fetchRetry(`${BASE}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
-  });
-  if (!res.ok) throw new Error(`登录失败 HTTP ${res.status}: ${await res.text()}`);
-  const json = await res.json();
-  const data = json.data ?? json;
-  // ⚠️ 登录响应的字段名是 accessToken (与前端 AuthResponse 类型一致),
-  // 这里兼容 token 作为别名 —— 但**断言必须写死 accessToken**,
-  // 否则字段改名了脚本还"通过", 就抓不到真实回归。
-  if (!data.accessToken) throw new Error(`登录响应无 accessToken: ${JSON.stringify(json).slice(0, 200)}`);
-  return data.accessToken;
+  const { token } = await ensureTestUser(BASE, { prefix: 'prompt-tools' });
+  return token;
 }
 
 async function main() {
@@ -131,7 +128,18 @@ async function main() {
   // 这个坑很隐蔽: 字节头是对的 (魔数 \\x89PNG), 但流不完整。
   const { Jimp: JimpCtor } = require('jimp');
   const png = await new JimpCtor({ width: 64, height: 64, color: 0xff0000ff }).getBuffer('image/png');
-  const projectId = (await (await fetchRetry(`${BASE}/projects`, { headers: auth })).json()).data?.[0]?.id;
+  // 新注册账号没有项目 —— 没有就建一个（上传必须挂项目）
+  let projectId = (await (await fetchRetry(`${BASE}/projects`, { headers: auth })).json()).data?.[0]?.id;
+  if (!projectId) {
+    const created = await (
+      await fetchRetry(`${BASE}/projects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...auth },
+        body: JSON.stringify({ name: '验证项目' }),
+      })
+    ).json();
+    projectId = (created.data ?? created).id;
+  }
   check('取到项目 id', !!projectId);
 
   // 先上传图片成素材
@@ -225,7 +233,7 @@ async function main() {
   check('两张素材都在素材库里', s1.assets?.every((a) => items.some((x) => x.id === a.id)), `素材数 ${items.length}`);
 
   // assetUrl 应可访问
-  const imgRes = await fetchRetry(`http://localhost:3001${s1.assetUrl}`);
+  const imgRes = await fetchRetry(`${ORIGIN}${s1.assetUrl}`);
   check('素材地址可访问 (200)', imgRes.status === 200, `实际 ${imgRes.status}`);
 
   console.log('\n═══ 8. 取消会话 ═══');

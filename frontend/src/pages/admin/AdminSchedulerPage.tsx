@@ -1,11 +1,17 @@
-import { useCallback, useEffect, useState } from 'react';
-import { App } from 'antd';
+import { useEffect, useState } from 'react';
+import { App, Button } from 'antd';
 import { AlertTriangle, CalendarClock, CheckCircle2, Clock, Play, RefreshCw, XCircle } from 'lucide-react';
 import { adminSchedulerApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
-import { AdminListError, AdminListLoading, ConfirmAction } from '../../components/admin/AdminWidgets';
+import {
+  AdminListError,
+  AdminListLoading,
+  AdminStaleError,
+  ConfirmAction,
+  useAdminResource,
+} from '../../components/admin/AdminWidgets';
 import { AdminEmpty, PageHeader, Panel } from '../../components/admin/PageHeader';
-import type { AdminSchedulerStatus, AdminSchedulerTask } from '../../types/api';
+import type { AdminSchedulerTask } from '../../types/api';
 
 /** 相对时间 —— 运维看的是"多久没跑了", 不是绝对时间 */
 function since(iso: string | null): string {
@@ -38,29 +44,24 @@ export function AdminSchedulerPage() {
   const { can } = useAdmin();
   const writable = can('setting.write');
 
-  const [data, setData] = useState<AdminSchedulerStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [runTarget, setRunTarget] = useState<AdminSchedulerTask | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      setData(await adminSchedulerApi.status());
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '加载失败');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  /*
+   * 2026-10-23: 原来手写的 `load()` 只在 finally 里置 false、从不置 true ——
+   * 失败后点「重试」/「刷新」页面毫无反馈, 用户无法判断按钮是否生效
+   * (数据没变也可能只是这次返回的还是旧值)。改用 useAdminResource,
+   * 它同时带来竞态保护 (轮询与手动刷新撞车时不会让旧响应盖掉新响应)。
+   */
+  const { data, loading, error, reload } = useAdminResource(() => adminSchedulerApi.status());
 
   useEffect(() => {
-    void load();
-    // 每 30 秒轮询: 调度器是分钟级节奏, 太频繁没意义, 太稀疏会漏看故障
-    const t = setInterval(() => void load(), 30_000);
+    // 每 30 秒轮询: 调度器是分钟级节奏, 太频繁没意义, 太稀疏会漏看故障。
+    // 轮询走 silent —— 否则「刷新」按钮每 30 秒自己闪一次转圈, 时间久了
+    // 没人再把它当操作反馈。
+    const t = setInterval(() => void reload({ silent: true }), 30_000);
     return () => clearInterval(t);
-  }, [load]);
+  }, [reload]);
 
   const runNow = async () => {
     if (!runTarget) return;
@@ -69,7 +70,7 @@ export function AdminSchedulerPage() {
       await adminSchedulerApi.run(runTarget.name);
       setRunTarget(null);
       void message.success(`「${runTarget.label}」已手动执行`);
-      await load();
+      await reload();
     } catch (e) {
       void message.error((e as Error).message);
     } finally {
@@ -78,7 +79,7 @@ export function AdminSchedulerPage() {
   };
 
   if (loading && !data) return <AdminListLoading tip="加载定时任务状态…" />;
-  if (error) return <AdminListError error={error} onRetry={() => void load()} />;
+  if (error && !data) return <AdminListError error={error} onRetry={() => void reload()} />;
   if (!data) return <AdminEmpty description="暂无调度信息" />;
 
   const failing = data.failing;
@@ -89,12 +90,16 @@ export function AdminSchedulerPage() {
         title="定时任务"
         description="订单超时关闭、积分到期回收、备份与保留期清理的统一调度"
         actions={
-          <button type="button" className="adm-btn" onClick={() => void load()}>
+          <Button type="default" className="adm-btn" loading={loading} onClick={() => void reload()}>
             <RefreshCw size={14} style={{ marginRight: 6 }} />
             刷新
-          </button>
+          </Button>
         }
       />
+
+      {/* 刷新失败但手上有旧数据: 保留内容, 但必须明说"这是上次的" ——
+          静默展示过期状态正是本页最需要防的事 */}
+      {error && <AdminStaleError error={error} onRetry={() => void reload()} />}
 
       {/* 连续失败置顶告警: 这正是"没人看出调度已挂"的解药 */}
       {failing.length > 0 && (
@@ -156,15 +161,15 @@ export function AdminSchedulerPage() {
                   )}
                   {data.manuallyRunnable.includes(t.name) &&
                     (writable ? (
-                      <button
-                        type="button"
+                      <Button
+                        type="default"
                         className="adm-btn"
                         onClick={() => setRunTarget(t)}
                         disabled={busy}
                       >
                         <Play size={13} style={{ marginRight: 4 }} />
                         立即执行
-                      </button>
+                      </Button>
                     ) : (
                       <span className="adm-cell-sub">仅查看</span>
                     ))}

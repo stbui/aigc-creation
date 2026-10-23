@@ -2,12 +2,12 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronDown, Menu } from 'lucide-react';
 import { Drawer } from 'antd';
-import { capabilityById, toolPath } from '../lib/capabilities';
+import { capabilityById, capabilityName, toolPath } from '../lib/capabilities';
 import { useCapabilities } from '../hooks/useCapabilities';
 import { PromoBar } from '../components/PromoBar';
 import { useAuth } from '../context/AuthContext';
-import { productsApi, membershipApi } from '../lib/api';
-import type { Product, MembershipPlan } from '../types/api';
+import { productsApi, membershipApi, myMarketingApi } from '../lib/api';
+import type { Product, MembershipPlan, PromoCampaign } from '../types/api';
 import { useEffect } from 'react';
 
 /**
@@ -330,9 +330,22 @@ function LandingHeader() {
   );
 }
 
+/** 活动结束时间展示（本地时区，仅展示用，不参与任何判定） */
+function formatCampaignEnd(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export function LandingPage() {
   const navigate = useNavigate();
-  const [pkgTab, setPkgTab] = useState<'sub' | 'addon'>('sub');
+  const [pkgTab, setPkgTab] = useState<'sub' | 'addon' | 'campaign'>('sub');
+  /**
+   * 进行中的限时活动。页签**只在真有活动时出现** ——
+   * 此前这里是写死的「双节上新」禁用页签，永远点不开也永远没有内容。
+   */
+  const [campaigns, setCampaigns] = useState<PromoCampaign[]>([]);
   /** 加油包: 读后端 SKU。拉不到时如实留空, 不回落硬编码价 */
   const [addons, setAddons] = useState<Product[]>([]);
   /** 订阅套餐: 读后端 MembershipPlan, 同样不回落硬编码 */
@@ -376,6 +389,15 @@ export function LandingPage() {
         if (!alive) return;
         setPlans([]);
         setPlansState('error');
+      });
+    // 限时活动: 失败就当没有活动（页签不出现），不弹错 —— 落地页不该为促销位报错
+    myMarketingApi
+      .campaigns()
+      .then((list) => {
+        if (alive) setCampaigns(list);
+      })
+      .catch(() => {
+        if (alive) setCampaigns([]);
       });
     return () => {
       alive = false;
@@ -483,9 +505,17 @@ export function LandingPage() {
           >
             加油包
           </button>
-          <button type="button" role="tab" aria-selected={false} className="is-soon" disabled title="暂未开放">
-            双节上新
-          </button>
+          {campaigns.length > 0 && (
+            <button
+              type="button"
+              role="tab"
+              aria-selected={pkgTab === 'campaign'}
+              className={pkgTab === 'campaign' ? 'is-active' : ''}
+              onClick={() => setPkgTab('campaign')}
+            >
+              限时活动
+            </button>
+          )}
         </div>
         <div className="home-v2-package-scroller">
           {pkgTab === 'sub' ? (
@@ -523,23 +553,22 @@ export function LandingPage() {
                       ))}
                     </ul>
                     {/*
-                     * 订阅购买尚未接入订单+支付链路 (MembershipPlan 不在 Product 表里,
-                     * 走的是另一套 subscribe 端点)。与其放一个点了没反应的死按钮,
-                     * 不如明说未开放 —— 死按钮会被当成 bug 报上来。
+                     * 2026-10-21: 订阅购买已接入订单+支付链路。
+                     * MembershipPlan 不在 Product 表里, 下单时走 `membershipPlanId`,
+                     * 结算页 (`/checkout/membership?planId=`) 与积分包同一条支付通道。
                      */}
                     <button
                       type="button"
                       className="home-v2-package-buy"
-                      disabled
-                      title="订阅购买链路尚未接入订单与支付, 加油包已可购买"
+                      onClick={() => navigate(`/checkout/membership?planId=${encodeURIComponent(plan.id)}`)}
                     >
-                      即将开放
+                      立即订阅
                     </button>
                   </article>
                 );
               })}
             </div>
-          ) : (
+          ) : pkgTab === 'addon' ? (
             <div className="home-v2-addon-row">
               {addonsState === 'loading' && (
                 <p className="home-v2-addon-empty">积分包加载中…</p>
@@ -584,6 +613,60 @@ export function LandingPage() {
                   </button>
                 </article>
               ))}
+            </div>
+          ) : (
+            /*
+             * 限时活动：全部来自后台「限时活动」配置（`GET /marketing/campaigns`）。
+             * 过期 / 下架商品 / 活动价不低于原价的活动后端已过滤，这里不做二次判断 ——
+             * 展示层再算一遍价格就会出现「页面写 9.9、结算收 19.9」。
+             */
+            <div className="home-v2-addon-row">
+              {campaigns.map((c) =>
+                c.type === 'limited_price' && c.product && typeof c.priceCents === 'number' ? (
+                  <article key={c.id} className="home-v2-addon-card home-v2-campaign-card">
+                    <span className="home-v2-campaign-tag">限时价</span>
+                    <h3>{c.product.name}</h3>
+                    <div className="home-v2-addon-price">
+                      <span className="cur">￥</span>
+                      <span className="num">{(c.priceCents / 100).toFixed(2)}</span>
+                      <del>原价￥{(c.product.priceCents / 100).toFixed(2)}</del>
+                    </div>
+                    <p>
+                      {c.name} · {formatCampaignEnd(c.endAt)}结束
+                    </p>
+                    <button
+                      type="button"
+                      className="home-v2-package-buy"
+                      onClick={() => navigate(`/checkout/${encodeURIComponent(c.product!.sku)}`)}
+                    >
+                      立即抢购
+                    </button>
+                  </article>
+                ) : (
+                  <article key={c.id} className="home-v2-addon-card home-v2-campaign-card">
+                    <span className="home-v2-campaign-tag">限时免费</span>
+                    <h3>{c.name}</h3>
+                    <div className="home-v2-addon-price">
+                      <span className="num">0 积分</span>
+                    </div>
+                    <p>
+                      {(c.capabilityIds ?? []).map((id) => capabilityName(id)).join(' / ')}
+                      <br />
+                      {formatCampaignEnd(c.endAt)}结束
+                    </p>
+                    <button
+                      type="button"
+                      className="home-v2-package-buy"
+                      onClick={() => {
+                        const first = c.capabilityIds?.[0];
+                        navigate(first ? toolPath(first) : '/workbench');
+                      }}
+                    >
+                      去使用
+                    </button>
+                  </article>
+                ),
+              )}
             </div>
           )}
         </div>
@@ -707,7 +790,7 @@ export function LandingPage() {
           </div>
         </div>
         <p className="landing-footer-copy">
-          © 2026 货觉AI. 本地演示项目 · 商业内容与案例素材按参考站设计复刻，仅用于设计对齐演示。
+          © 2026 货觉AI · 页面用于产品展示，案例素材版权归各自权利人所有。
         </p>
       </footer>
     </div>

@@ -1,11 +1,12 @@
 /**
- * 真实模型通道冒烟 —— 不依赖任何真实 API key, 用一个「契约一致的网关桩」验证:
- *   A. 通道远程路径: 配置 GATEWAY_BASE_URL 指向桩 → 产出必须来自桩(source=gateway)
- *      并校验桩收到的请求体(能力映射/提示词/参考图 URL/模型字段)
+ * 真实模型通道冒烟 —— 不依赖任何真实 API key, 用一个「契约一致的通道桩」验证:
+ *   A. 配置通道后路由快照: 16 项能力全部 effective=gateway
  *   B. 未配置网关: 自动回落本地算法(source=local), 产出仍是合法图片
  *   C. 网关故障(端口无人监听): 回落本地算法且不抛错
- *   D. 单能力强制本地: GATEWAY_ROUTE_<ID>=local 时即使网关可用也走本地
- *   E. 全部 15 项能力都有提示词构造, 不出现 fallback 成 capability id
+ *   D. 单能力强制本地: GATEWAY_ROUTE_<ID>=local 时即使通道可用也走本地
+ *   E. 全部能力都有专属提示词构造, 不出现 fallback 成 capability id
+ *   F-K. 三个图像协议(openai / volcengine / minimax)的端点、请求形状与失败识别
+ *   L. 无本地实现的能力(自由创作)没通道时判失败, 不交付任何本地产物
  *
  * 用法: node scripts/smoke-gateway-channel.js
  */
@@ -29,44 +30,6 @@ async function makeStubImage() {
 
 function startStub(port, behaviour) {
   const server = http.createServer((req, res) => {
-    if (req.method === 'POST' && req.url === '/generation/tasks') {
-      let body = '';
-      req.on('data', (c) => (body += c));
-      req.on('end', () => {
-        received.push({ path: req.url, body: body ? JSON.parse(body) : null, auth: req.headers.authorization || null });
-        if (behaviour === 'fail-create') {
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ message: 'channel unavailable' }));
-          return;
-        }
-        res.writeHead(201, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ id: `stub-task-${received.length}`, status: 'queued' }));
-      });
-      return;
-    }
-    if (req.method === 'GET' && req.url.startsWith('/generation/tasks/')) {
-      if (behaviour === 'fail-status') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ id: 'x', status: 'failed', error: 'upstream error' }));
-        return;
-      }
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(
-        JSON.stringify({
-          id: 'stub-task-1',
-          status: 'succeeded',
-          model: 'stub-model-v1',
-          prompt: 'echo',
-          assets: [{ url: `http://127.0.0.1:${port}/output.jpg` }],
-        }),
-      );
-      return;
-    }
-    if (req.method === 'GET' && req.url === '/output.jpg') {
-      res.writeHead(200, { 'Content-Type': 'image/jpeg' });
-      res.end(server.stubBuffer);
-      return;
-    }
     // ── 优云智算契约: OpenAI 兼容同步接口 ──────────────────────────
     // POST /v1/images/generations → { created, data: [ { url } ] } (无轮询)
     if (req.method === 'POST' && req.url === '/v1/images/generations') {
@@ -161,13 +124,26 @@ function loadRouter() {
   // 表现为「刚设的 GATEWAY_ROUTE_XXX=local 不生效」。这是既存缺陷:
   // 原脚本用无参 new 时同样踩, 只是从没跑到那一步就先崩了。
   require(path.join(ROOT, 'dist/providers/gateway.config.js')).invalidateGatewayConfigCache();
-  const prismaStub = { modelChannelConfig: { findMany: async () => [] } };
+  /*
+   * 2026-10-21 修复（本段此前**一直是失败的**，与断言无关，是装配缺失）：
+   * 路由器自 2026-10-20 起依赖 ChannelScheduler，而这里仍按两参 new，
+   * scheduler=undefined → dispatch 抛 TypeError → 被 catch 当成"通道失败"回落本地,
+   * 于是第一条断言（sent.path）就读到 undefined 直接崩。
+   * 补上 scheduler 后走的是它的"表里无线路 → 用存量单通道配置合成"分支，
+   * 与脚本设置 GATEWAY_* 的方式一致。断言一行未改。
+   */
+  const prismaStub = {
+    modelChannelConfig: { findMany: async () => [] },
+    modelChannel: { findMany: async () => [] },
+  };
   const calls = [];
   const callLoggerStub = {
     logSuccess: async (e) => calls.push({ ok: true, ...e }),
     logFailure: async (e) => calls.push({ ok: false, ...e }),
   };
-  const router = new CapabilityRouterProvider(prismaStub, callLoggerStub);
+  const { ChannelScheduler } = require(path.join(ROOT, 'dist/providers/channel-scheduler.js'));
+  const scheduler = new ChannelScheduler(prismaStub);
+  const router = new CapabilityRouterProvider(prismaStub, callLoggerStub, scheduler);
   // 供断言使用: 本次 loadRouter 以来的埋点记录
   router.__calls = calls;
   return router;
@@ -199,52 +175,38 @@ async function inputImage() {
   const PORT = 39217;
   const inp = await inputImage();
 
-  // ── A. 远程路径 (aigc 异步任务契约) ─────────────────────────
-  // ⚠️ 必须显式声明 GATEWAY_PROVIDER=aigc: 协议默认值已于 2026-10-20
-  // 从 aigc 改为 openai (新部署默认走主流协议), 不显式声明会让本段
-  // 误走 openai → 打错端点 → 断言全挂。测试不应依赖默认值。
+  // ── A. 配置通道后的路由快照 ─────────────────────────────────
+  /*
+   * 2026-10-21 删除本段原有的「aigc 异步任务契约」评测（13 条断言）。
+   * 原因：`aigc` 图像协议是错误决策，已从协议层整条删除（它不是本项目的网关，
+   * 也没有任何落地服务可供调用）。原断言校验的 POST /generation/tasks 请求体
+   * 形状（type=image、params.inputImages 站内 URL、轮询）随之失去被测对象。
+   *
+   * 断言去向（覆盖率未下降，只是换了被测协议）：
+   *   - 远程路径 source=gateway + Authorization Bearer：F 段（openai 同步协议）覆盖；
+   *   - 参考图以站内 URL 回传：G 段火山的公网 URL 断言覆盖（同一编码路径）；
+   *   - 抠图提示词含能力语义与背景色：迁入 E 段，改为 buildPromptFor 纯函数断言；
+   *   - 协议无关的两条路由快照断言：保留在本段。
+   *
+   * 协议显式声明为 openai：测试不应依赖默认值，默认值改动时这里要跟着报错。
+   */
   process.env.GATEWAY_BASE_URL = `http://127.0.0.1:${PORT}`;
   process.env.GATEWAY_ENABLED = '1';
   process.env.GATEWAY_TOKEN = 'stub-token';
-  process.env.GATEWAY_MODEL = 'stub-model-v1';
-  process.env.GATEWAY_POLL_MS = '120';
-  process.env.GATEWAY_PROVIDER = 'aigc';
+  process.env.GATEWAY_PROVIDER = 'openai';
   delete process.env.GATEWAY_ROUTE_MATTING;
 
   const server = await startStub(PORT, 'ok');
   const router = loadRouter();
 
   const snapshot = router.routingSnapshot();
-  assert(Object.keys(snapshot).length === 15, `路由快照覆盖 15 项能力 (实际 ${Object.keys(snapshot).length})`);
+  // 16 项能力 = 15 图像 + 1 视频 (图生视频于 2026-10-20 加入 registry)。
+  // routingSnapshot 按 CAPABILITIES 全量出表, 故视频也在其中。
+  assert(Object.keys(snapshot).length === 16, `路由快照覆盖 16 项能力 (实际 ${Object.keys(snapshot).length})`);
   assert(
     Object.values(snapshot).every((v) => v.effective === 'gateway'),
-    '配置网关后 15 项能力 effective 均为 gateway',
+    '配置网关后 16 项能力 effective 均为 gateway',
   );
-
-  const r1 = await router.generate('free_create', [inp], { prompt: '把产品放进未来感厨房', ratio: '16:9', size: '2k' });
-  assert(r1.source === 'gateway', `远程路径 source=gateway (实际 ${r1.source})`);
-  const meta1 = await measure(r1.buffer, 'image/jpeg');
-  assert(meta1.w === 512 && meta1.h === 512, `远程产出为桩返回的 512x512 (实际 ${meta1.w}x${meta1.h})`);
-  assert(r1.format === 'image/jpeg', `格式透传 image/jpeg (实际 ${r1.format})`);
-
-  const sent = received[received.length - 1];
-  assert(sent.path === '/generation/tasks', '网关收到 POST /generation/tasks');
-  assert(sent.auth === 'Bearer stub-token', 'Authorization 头带 Bearer token');
-  assert(sent.body.type === 'image', '请求体 type=image');
-  assert(sent.body.model === 'stub-model-v1', '请求体透传 model');
-  assert(typeof sent.body.prompt === 'string' && sent.body.prompt.includes('未来感厨房'), '提示词包含业务参数(自由创作 prompt)');
-  assert(sent.body.prompt.length > 20, `提示词非空且具体 (${sent.body.prompt.length} 字)`);
-  assert(sent.body.params.capability === 'free_create', 'params 透传 capability');
-  assert(
-    Array.isArray(sent.body.params.inputImages) && sent.body.params.inputImages[0].startsWith('http://localhost:3002/uploads/'),
-    `参考图以站内 URL 回传 (${sent.body.params.inputImages && sent.body.params.inputImages[0]})`,
-  );
-
-  const before = received.length;
-  const r2 = await router.generate('matting', [inp], { bgColor: '#3988E9', ratio: 'original' });
-  const sent2 = received[before];
-  assert(received.length === before + 1, `抠图也走了远程通道 (新增 ${received.length - before} 次提交请求)`);
-  assert(sent2.body.prompt.includes('抠图') && sent2.body.prompt.includes('#3988E9'), '抠图提示词含能力语义与背景色');
 
   // ── D. 单能力强制本地 ───────────────────────────────────────
   process.env.GATEWAY_ROUTE_MATTING = 'local';
@@ -261,7 +223,8 @@ async function inputImage() {
   delete process.env.GATEWAY_BASE_URL;
   delete process.env.GATEWAY_TOKEN;
   const router3 = loadRouter();
-  assert(!router3.routingSnapshot().recolor.effective === false, '未配置网关时 effective=local');
+  // 原写法 `!x === false` 恒真 (只校验 x 为真), 等于没有断言 —— 改成真比较
+  assert(router3.routingSnapshot().recolor.effective === 'local', '未配置网关时 effective=local');
   const r4 = await router3.generate('recolor', [inp], { color: '#EB5757' });
   assert(r4.source === 'local', `未配置网关回落本地 (source=${r4.source})`);
   const meta4 = await measure(r4.buffer, 'image/jpeg');
@@ -277,9 +240,9 @@ async function inputImage() {
   assert(r5.source === 'local', `网关不可达时回落本地且不抛错 (source=${r5.source})`);
 
   // ── F. 优云智算通道 (OpenAI 兼容同步契约) ────────────────────
-  // 与 A 段同一个桩, 只是换协议: GATEWAY_PROVIDER=modelverse 时路由器必须走
-  // /v1/images/generations 同步路径, 而不是 aigc 的 /generation/tasks + 轮询。
-  // 选错协议的典型症状是 POST /generation/tasks 404 → 回落本地, 故此处断言路径。
+  // 与 A 段同为 openai 协议, 这里断言的是请求形状与端点: GATEWAY_PROVIDER=openai
+  // 时路由器必须走 /v1/images/generations 同步路径, 并把比例+画质换算成 size。
+  // 选错协议的典型症状是打错端点 → 404 → 回落本地, 故此处断言实际路径。
   const MV_PORT = 39219;
   const mvServer = await startStub(MV_PORT, 'ok');
   process.env.GATEWAY_BASE_URL = `http://127.0.0.1:${MV_PORT}`;
@@ -316,14 +279,28 @@ async function inputImage() {
   const mvErrServer = await startStub(MV_ERR_PORT, 'mv-error');
   process.env.GATEWAY_BASE_URL = `http://127.0.0.1:${MV_ERR_PORT}`;
   const router6 = loadRouter();
-  const r7 = await router6.generate('free_create', [inp], { prompt: 'x', ratio: '1:1', size: '1k' });
+  // 2026-10-21: 回落断言改用 recolor (本地是真实算法)。free_create 已改为
+  // localFallback:false —— 没通道直接判失败, 不再回落, 见 L 段。
+  const r7 = await router6.generate('recolor', [inp], { color: '#EB5757' });
   assert(r7.source === 'local', `优云智算返回 error 时回落本地 (实际 ${r7.source})`);
   // 回落**成功**记的是 logSuccess(fallback=true, reason=上游错误原文),
   // 只有本地算法也失败才记 logFailure —— 断言别查错方法。
   const fallbackLog = router6.__calls.filter((c) => c.ok && c.fallback).pop();
+  /*
+   * 2026-10-21 修正判定口径（本断言自多渠道改造起一直是红的）：
+   * 原断言要求 reason 里出现「优云智算」，但本段已在 F1 显式把
+   * GATEWAY_PROVIDER 设为规范名 `openai`（注释说明此举是为了覆盖主路径），
+   * 于是 reason 里只会有 `openai` 与上游原文，不可能出现厂商展示名。
+   *
+   * 断言的真实意图是「**上游错误原因被带进回落记录**，而不是被吞成一句
+   * '失败'」—— 故改为校验上游原文关键字 + 通道标识同时存在。
+   * 厂商展示名是否出现在 reason 里，由合成通道名负责（见 channel-scheduler），
+   * 与本段无关。
+   */
+  const reasonText = String((fallbackLog && fallbackLog.reason) || '');
   assert(
-    Boolean(fallbackLog && String(fallbackLog.reason || '').includes('优云智算')),
-    `回落记录了上游错误原因 (${fallbackLog && fallbackLog.reason})`,
+    /invalid_model|model not supported/.test(reasonText) && reasonText.includes('openai'),
+    `回落记录了上游错误原因 (${reasonText})`,
   );
   assert(Boolean(fallbackLog && fallbackLog.source === 'local'), '回落记录的 source=local');
   mvErrServer.close();
@@ -360,7 +337,7 @@ async function inputImage() {
   const volcErrServer = await startStub(VOLC_ERR_PORT, 'volc-error');
   process.env.GATEWAY_BASE_URL = `http://127.0.0.1:${VOLC_ERR_PORT}/api/v3`;
   const router8 = loadRouter();
-  const r9 = await router8.generate('free_create', [inp], { prompt: 'x', ratio: '1:1', size: '1k' });
+  const r9 = await router8.generate('recolor', [inp], { color: '#EB5757' });
   assert(r9.source === 'local', `火山返回错误时回落本地 (实际 ${r9.source})`);
   volcErrServer.close();
   volcServer.close();
@@ -396,7 +373,7 @@ async function inputImage() {
   const mmErrServer = await startStub(MM_ERR_PORT, 'mm-error-200');
   process.env.GATEWAY_BASE_URL = `http://127.0.0.1:${MM_ERR_PORT}`;
   const router10 = loadRouter();
-  const r11 = await router10.generate('free_create', [inp], { prompt: 'x', ratio: '1:1', size: '1k' });
+  const r11 = await router10.generate('recolor', [inp], { color: '#EB5757' });
   assert(r11.source === 'local', `MiniMax HTTP200 但 base_resp 报错时回落本地 (实际 ${r11.source})`);
   const mmLog = router10.__calls.filter((c) => c.ok && c.fallback).pop();
   assert(
@@ -406,17 +383,49 @@ async function inputImage() {
   mmErrServer.close();
   mmServer.close();
 
-  // ── I. 未知协议必须显式报错, 不能静默当 aigc ─────────────────
-  // 静默当 aigc 会让「协议填错」表现为 404 → 回落本地占位图, 界面上看不出来。
+  // ── I. 未知协议必须显式报错, 不能静默回落到某个默认协议 ──────
+  // 静默回落会让「协议填错」表现为打错端点 → 回落本地, 界面上看不出来。
   process.env.GATEWAY_PROVIDER = 'not-a-real-protocol';
   const router11 = loadRouter();
-  const r12 = await router11.generate('free_create', [inp], { prompt: 'x', ratio: '1:1', size: '1k' });
+  const r12 = await router11.generate('recolor', [inp], { color: '#EB5757' });
   assert(r12.source === 'local', '未知协议也回落本地(用户仍拿得到图)');
   const unknownLog = router11.__calls.filter((c) => c.ok && c.fallback).pop();
   assert(
     Boolean(unknownLog && /未知通道协议/.test(String(unknownLog.reason))),
     `未知协议给出可读原因 (${unknownLog && String(unknownLog.reason).slice(0, 90)})`,
   );
+  delete process.env.GATEWAY_PROVIDER;
+
+  // ── L. 无本地实现的能力: 没通道就失败, 绝不交付任何本地产物 (2026-10-21) ──
+  /*
+   * 自由创作没有本地实现, 能力定义里 localFallback:false。
+   * 通道不可用时路由器必须抛 NoModelChannelError, 而不是像真实本地算法那样回落 ——
+   * 否则用户会付了积分拿到一张按参数画的示意图, 还以为那是模型产出。
+   */
+  const NOCH_PORT = 39226;
+  const noChServer = await startStub(NOCH_PORT, 'mv-error');
+  process.env.GATEWAY_BASE_URL = `http://127.0.0.1:${NOCH_PORT}`;
+  process.env.GATEWAY_ENABLED = '1';
+  process.env.GATEWAY_PROVIDER = 'openai';
+  const routerNoCh = loadRouter();
+  let noChOut = null;
+  let noChErr = null;
+  try {
+    noChOut = await routerNoCh.generate('free_create', [inp], { prompt: 'x', ratio: '1:1', size: '1k' });
+  } catch (e) {
+    noChErr = e;
+  }
+  assert(noChOut === null, '无本地实现的能力没通道时不产出任何图片');
+  assert(
+    Boolean(noChErr && noChErr.name === 'NoModelChannelError'),
+    `无本地实现的能力没通道时抛 NoModelChannelError (实际 ${noChErr && noChErr.name})`,
+  );
+  const noChLog = routerNoCh.__calls.filter((c) => !c.ok).pop();
+  assert(
+    Boolean(noChLog && noChLog.errorCode === '42204' && noChLog.fallback === false),
+    `失败调用记录带 42204 且不算回落 (${noChLog && noChLog.errorCode})`,
+  );
+  noChServer.close();
   delete process.env.GATEWAY_PROVIDER;
 
   // ── J. 内置厂商预设完整性 ────────────────────────────────────
@@ -454,15 +463,30 @@ async function inputImage() {
   delete process.env.GATEWAY_PROVIDER;
   delete process.env.GATEWAY_PROVIDER;
 
-  // ── E. 15 项能力提示词覆盖 ─────────────────────────────────
-  const { buildPromptFor, PROMPT_COVERAGE } = require(path.join(ROOT, 'dist/providers/gateway-prompt.js'));
+  // ── E. 能力提示词覆盖 ─────────────────────────────────
+  /*
+   * 2026-10-21 修复：本段引用的 `PROMPT_COVERAGE` 已在 2026-10-20 的能力插件化
+   * 重构中删除（提示词改为各能力定义里的 `buildPrompt`，由装配期
+   * assertCapabilityIntegrity 强制存在）。导出没了，脚本在 filter 里就崩了。
+   *
+   * 断言意图保留不变：**每项能力都必须拿到专属提示词，而不是裸 id**。
+   * "是否声明了提示词"这一半已由启动期断言覆盖（服务能起来就说明都声明了），
+   * 这里继续检查实际渲染结果。
+   */
+  const { buildPromptFor } = require(path.join(ROOT, 'dist/providers/gateway-prompt.js'));
   const registry = require(path.join(ROOT, 'dist/capabilities/capability.registry.js'));
   const ids = registry.CAPABILITIES.map((c) => c.id);
-  const missing = ids.filter((id) => !PROMPT_COVERAGE.includes(id) || buildPromptFor(id, {}) === id);
+  const missing = ids.filter((id) => buildPromptFor(id, {}) === id);
   assert(missing.length === 0, `15 项能力均有专属提示词 (缺: ${missing.join(',') || '无'})`);
   assert(
     buildPromptFor('main_image', { productName: '循环扇', platform: 'taobao' }).includes('循环扇'),
     '主图提示词注入商品名与平台',
+  );
+  // 由原 A 段迁入：不再依赖某个具体协议的请求体，直接断言提示词构造结果。
+  const mattingPrompt = buildPromptFor('matting', { bgColor: '#3988E9' });
+  assert(
+    mattingPrompt.includes('抠图') && mattingPrompt.includes('#3988E9'),
+    '抠图提示词含能力语义与背景色',
   );
 
   console.log('\n' + (process.exitCode ? '❌ GATEWAY CHANNEL SMOKE FAILED' : '✅ GATEWAY CHANNEL SMOKE ALL PASS'));

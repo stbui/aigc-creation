@@ -12,12 +12,14 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { generateApi, toAbsoluteUrl } from '../lib/api';
+import { generateApi, assetSrc } from '../lib/api';
 import { capabilityById, capabilityName, toolPath } from '../lib/capabilities';
 import { useCapabilities } from '../hooks/useCapabilities';
-import { StateError, StateSkeleton } from '../components/StateViews';
+import { useAuth } from '../context/AuthContext';
+import { StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
 import { ResultMedia } from '../components/ResultMedia';
-import type { Task } from '../types/api';
+import { ProviderBadge } from '../components/ProviderBadge';
+import type { Modality, Task } from '../types/api';
 
 /**
  * 我的作品 —— 1:1 复刻参考站 https://ijihua.cn/my-works。
@@ -41,7 +43,8 @@ import type { Task } from '../types/api';
  *      业务类型 330×318（分组多选）· 日期 308×229 · 状态 214×167 · 所属任务 318×159
  *
  * 诚实差异:
- *   - 「视频作品」页签保留但如实标注本地无视频能力（点击提示），不渲染假内容
+ *   - 「视频作品」页签按**产出模态**真实过滤（图生视频落地的产物），
+ *     没有视频作品时说明视频来自哪项能力，不再弹「未接入视频」的假提示
  *   - 浮层内「重绘」工具列本地真实可跳转的工具页；未实现的项不出现
  *   - 所属任务筛选按**任务 ID / 能力名**检索本地真实任务（参考站为云端任务 ID）
  */
@@ -62,9 +65,21 @@ function startOfDay(d: Date): number {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 }
 
+/**
+ * 任务产出的模态。
+ *
+ * 优先取产出文件自己的 `modality`（后端按产出的 mime 推导，是文件的真实形态）；
+ * 还没产出（生成中 / 失败）时回落能力注册表里的 `modality` —— 否则视频任务在
+ * 生成完成前会掉进「图片作品」，用户刚提交完就找不到它了。
+ */
+function taskModality(t: Task): Modality {
+  return t.outputAsset?.modality ?? capabilityById(t.capability)?.modality ?? 'image';
+}
+
 export function WorksPage() {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const navigate = useNavigate();
+  const { token, openLogin } = useAuth();
   const { data: caps } = useCapabilities();
 
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -107,9 +122,16 @@ export function WorksPage() {
     }
   }, []);
 
+  // 依赖 token: 登录 / 退出都要重新拉取 (与 StatsPage 同构)
   useEffect(() => {
+    if (!token) {
+      // guest: 作品接口需鉴权, 不发无谓请求 —— 否则首屏会先闪一次「加载失败」
+      setTasks([]);
+      setLoading(false);
+      return;
+    }
     void load();
-  }, [load]);
+  }, [token, load]);
 
   const closeAll = () => {
     setBizOpen(false);
@@ -122,6 +144,8 @@ export function WorksPage() {
   const filtered = useMemo(() => {
     const now = new Date();
     return tasks.filter((t) => {
+      // 页签是第一道切分: 图片 / 视频互不混排
+      if ((tab === 'video') !== (taskModality(t) === 'video')) return false;
       if (biz.length > 0 && !biz.includes(t.capability)) return false;
       if (status.length > 0) {
         const bucket = t.status === 'succeeded' ? 'succeeded' : t.status === 'failed' ? 'failed' : 'running';
@@ -142,7 +166,7 @@ export function WorksPage() {
       }
       return true;
     });
-  }, [tasks, biz, status, taskPick, datePreset, customRange]);
+  }, [tasks, tab, biz, status, taskPick, datePreset, customRange]);
 
   const sorted = useMemo(
     () =>
@@ -153,6 +177,14 @@ export function WorksPage() {
   );
 
   const visible = sorted.slice(0, visibleCount);
+  /**
+   * 「张作品」只数有产出的卡片。
+   *
+   * 失败 / 生成中的任务仍在网格里 (用占位卡如实说明状态, 也能被「状态」筛选到),
+   * 但它们不是作品 —— 此前计数直接用 `sorted.length`, 于是一个失败任务就让
+   * 我的作品显示「8 张作品」, 而素材库只有 7 张生成图, 两个页面永远对不上。
+   */
+  const worksCount = useMemo(() => sorted.filter((t) => t.outputAsset).length, [sorted]);
   const activeFilterCount =
     biz.length + status.length + taskPick.length + (datePreset === 'all' ? 0 : 1);
 
@@ -161,40 +193,70 @@ export function WorksPage() {
 
   const cardOf = (t: Task) => capabilityById(t.capability);
 
-  const removeTask = async (id: string) => {
-    try {
-      await generateApi.remove(id);
-      setTasks((prev) => prev.filter((t) => t.id !== id));
-      setSelected((prev) => prev.filter((x) => x !== id));
-      message.success('已删除作品及其生成图');
-    } catch (e) {
-      message.error((e as Error).message || '删除失败');
-    }
+  /**
+   * 删除作品。产出图与磁盘文件会一并删除且不可恢复，故必须二次确认 ——
+   * hover 浮层里「下载」与「删除」相邻，误点一次就永久丢掉产出。
+   */
+  const removeTask = (id: string) => {
+    modal.confirm({
+      title: '删除这个作品？',
+      content: '生成图与本地文件会一并删除，不可恢复。',
+      okText: '删除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await generateApi.remove(id);
+          setTasks((prev) => prev.filter((t) => t.id !== id));
+          setSelected((prev) => prev.filter((x) => x !== id));
+          message.success('已删除作品及其生成图');
+        } catch (e) {
+          message.error((e as Error).message || '删除失败');
+        }
+      },
+    });
   };
 
   const downloadSelected = () => {
     const list = tasks.filter((t) => selected.includes(t.id) && t.outputAsset);
     list.forEach((t, i) => {
-      const url = toAbsoluteUrl(t.outputAsset!.sourceUrl);
+      const url = assetSrc(t.outputAsset)!;
       if (!url) return;
+      // 扩展名跟着产出的真实格式走: 视频是 mp4/webm, 写死 jpg 会让下载的文件打不开
+      const ext = (t.outputAsset!.format || '').toLowerCase().replace(/^\./, '') || 'jpg';
       window.setTimeout(() => {
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${t.capability}-${t.id.slice(-6)}.${t.outputAsset!.format === 'png' ? 'png' : 'jpg'}`;
+        a.download = `${t.capability}-${t.id.slice(-6)}.${ext}`;
         a.click();
       }, i * 220);
     });
-    message.success(`已下载 ${list.length} 张作品`);
+    message.success(`已下载 ${list.length} 个文件`);
   };
 
   // 作品页只按「电商生图 / AI修图」分组, 与顶导/落地页口径一致 (参考站这两处均两组)。
     // 分组名直接取后端下发的 g.name, 不在前端硬编码中文名。
+    // 业务类型随页签走: 图片页列出「电商生图 / AI修图」两组 (参考站口径),
+    // 视频页列「AI视频」。不跟着切会让用户在视频页勾「商品主图」后永远筛出空。
     const bizGroups = useMemo(() => {
       const items = caps?.items ?? [];
+      const groupIds =
+        tab === 'video' ? ['ai_video'] : ['ecommerce_gen', 'ai_retouch'];
       return (caps?.groups ?? [])
-        .filter((g) => g.id === 'ecommerce_gen' || g.id === 'ai_retouch')
-        .map((g) => ({ name: g.name, items: items.filter((i) => i.group === g.id) }));
-    }, [caps]);
+        .filter((g) => groupIds.includes(g.id))
+        .map((g) => ({ name: g.name, items: items.filter((i) => i.group === g.id) }))
+        .filter((g) => g.items.length > 0);
+    }, [caps, tab]);
+
+  /**
+   * 切页签要清掉业务类型筛选: 两个页签的能力集合不相交, 留着上一页的选择
+   * 只会得到「没有符合条件」的空网格, 而用户刚点的只是一个页签。
+   */
+  const switchTab = (next: 'image' | 'video') => {
+    setTab(next);
+    setBiz([]);
+    setVisibleCount(PAGE_SIZE);
+  };
 
   const matchedTasks = useMemo(() => {
     const q = taskQuery.trim();
@@ -203,6 +265,31 @@ export function WorksPage() {
       .filter((t) => capabilityName(t.capability).includes(q) || t.id.includes(q))
       .slice(0, 20);
   }, [tasks, taskQuery]);
+
+  /*
+   * guest 态: 路由对外开放, 未登录也能进来。
+   * 不误报「作品列表加载失败」(那是接口 401 的文案), 而是给登录入口。
+   */
+  if (!token) {
+    return (
+      <div className="my-works-page">
+        <div className="my-works-head">
+          <h1>我的作品</h1>
+        </div>
+        <div className="state-page">
+          <StateEmpty
+            title="登录后查看你的作品"
+            desc="作品与账号绑定，登录后这里会列出你生成过的图片与视频。"
+            action={
+              <button type="button" className="state-btn is-primary" onClick={openLogin}>
+                登录/注册
+              </button>
+            }
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="my-works-page">
@@ -214,7 +301,7 @@ export function WorksPage() {
             role="tab"
             aria-selected={tab === 'image'}
             className={tab === 'image' ? 'is-active' : ''}
-            onClick={() => setTab('image')}
+            onClick={() => switchTab('image')}
           >
             图片作品
           </button>
@@ -223,9 +310,7 @@ export function WorksPage() {
             role="tab"
             aria-selected={tab === 'video'}
             className={tab === 'video' ? 'is-active' : ''}
-            onClick={() =>
-              message.info('本地演示未接入视频生成能力，暂只提供图片作品')
-            }
+            onClick={() => switchTab('video')}
           >
             视频作品
           </button>
@@ -469,7 +554,7 @@ export function WorksPage() {
       {/* 多选操作条（选择任一卡片后出现，实测 spec: #5B4BD7 on #F1EFFF） */}
       {selected.length > 0 && (
         <div className="my-works-selection-bar">
-          <span>已选 {selected.length} 张作品</span>
+          <span>已选 {selected.length} 个作品</span>
           <button type="button" onClick={downloadSelected}>
             <Download size={11} /> 下载所选
           </button>
@@ -484,7 +569,17 @@ export function WorksPage() {
       )}
 
       <div className="my-works-count-row">
-        <span>{sorted.length} 张作品</span>
+        <span>
+          {worksCount} {tab === 'video' ? '个视频' : '张作品'}
+          {sorted.length > worksCount && (
+            <em className="my-works-count-extra">
+              {/* 失败 / 生成中的任务仍在网格里, 但不算作品 —— 在这里说清楚, 不藏 */}
+              {' · 另有 '}
+              {sorted.length - worksCount}
+              {' 个未出图任务'}
+            </em>
+          )}
+        </span>
         <span className="my-works-sort-label">按创作日期倒序</span>
         <button type="button" className="my-works-refresh" onClick={() => void load()}>
           <RefreshCw size={13} /> 刷新
@@ -505,18 +600,28 @@ export function WorksPage() {
         />
       ) : visible.length === 0 ? (
         <div className="my-works-empty">
-          <h2>{activeFilterCount > 0 ? '没有符合条件的作品' : '还没有作品'}</h2>
+          <h2>
+            {activeFilterCount === 0
+              ? tab === 'video'
+                ? '还没有视频作品'
+                : '还没有作品'
+              : tab === 'video'
+                ? '没有符合条件的视频'
+                : '没有符合条件的作品'}
+          </h2>
           <p>
             {activeFilterCount > 0
               ? '试试放宽筛选条件，或清除全部筛选。'
-              : '完成一次创作后，作品会出现在这里。'}
+              : tab === 'video'
+                ? '视频作品来自「图生视频」能力，完成后会出现在这里。'
+                : '完成一次创作后，作品会出现在这里。'}
           </p>
         </div>
       ) : (
         <>
           <div className="my-works-grid">
             {visible.map((t) => {
-              const url = t.outputAsset ? toAbsoluteUrl(t.outputAsset.sourceUrl) : undefined;
+              const url = t.outputAsset ? assetSrc(t.outputAsset) : undefined;
               const isSel = selected.includes(t.id);
               return (
                 <article key={t.id} className={`my-work-card${isSel ? ' selected' : ''}`}>
@@ -532,6 +637,8 @@ export function WorksPage() {
                       <ResultMedia
                         url={url}
                         modality={t.outputAsset?.modality}
+                        // 视频没有容器元数据可写, 显式标识只能由播放器侧补 (图片已烙进像素)
+                        aigc={t.outputAsset?.aigc}
                         alt={capabilityName(t.capability)}
                       />
                     ) : (
@@ -556,6 +663,8 @@ export function WorksPage() {
                         {STATUS_LABEL[t.status] ?? t.status}
                       </span>
                       <span className="my-work-tag">{capabilityName(t.capability)}</span>
+                      {/* 真实模型 / 本地回落如实标注 (来自任务的 provider, 不按能力 mode 猜) */}
+                      <ProviderBadge provider={t.provider} className="my-work-provider" />
                     </span>
 
                     {/* hover 浮层: 顶部再来一张 / 底部操作 */}
@@ -589,7 +698,7 @@ export function WorksPage() {
                           tabIndex={0}
                           onClick={(e) => {
                             e.stopPropagation();
-                            void removeTask(t.id);
+                            removeTask(t.id);
                           }}
                         >
                           <Trash2 size={12} /> 删除
@@ -634,7 +743,7 @@ export function WorksPage() {
               className="my-works-load-more"
               onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
             >
-              <ChevronDown size={14} /> 加载更多（剩余 {sorted.length - visibleCount} 张）
+              <ChevronDown size={14} /> 加载更多（剩余 {sorted.length - visibleCount} 个）
             </button>
           )}
         </>

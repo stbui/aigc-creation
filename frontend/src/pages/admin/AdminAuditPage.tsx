@@ -1,11 +1,13 @@
 import { useCallback, useMemo, useState } from 'react';
-import { App, Input, Select, Table } from 'antd';
+import { App, Button, Input, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { adminAuditApi } from '../../lib/api';
 import {
   AdminDrawer,
   AdminListError,
+  AdminStaleError,
   AdminListLoading,
+  adminPagination,
   useAdminList,
 } from '../../components/admin/AdminWidgets';
 import {
@@ -98,7 +100,7 @@ export function AdminAuditPage() {
         key: 'action',
         width: 150,
         render: (a: string, row) => (
-          <span className={`adm-tag ${row.success ? 'is-succeeded' : 'is-failed'}`}>
+          <span className={`adm-tag ${row.success ? 'is-success' : 'is-danger'}`}>
             {ACTION_LABELS[a] ?? a}
           </span>
         ),
@@ -127,16 +129,16 @@ export function AdminAuditPage() {
         dataIndex: 'success',
         key: 'success',
         width: 70,
-        render: (ok: boolean) => <span className={`adm-tag ${ok ? 'is-succeeded' : 'is-failed'}`}>{ok ? '成功' : '失败'}</span>,
+        render: (ok: boolean) => <span className={`adm-tag ${ok ? 'is-success' : 'is-danger'}`}>{ok ? '成功' : '失败'}</span>,
       },
       {
         title: '',
         key: 'detail',
         width: 60,
         render: (_: unknown, row) => (
-          <button type="button" className="adm-link" onClick={() => setDetailId(row.id)}>
+          <Button type="link" className="adm-link" onClick={() => setDetailId(row.id)}>
             详情
-          </button>
+          </Button>
         ),
       },
     ],
@@ -188,8 +190,8 @@ export function AdminAuditPage() {
           allowClear
         />
         <FilterActions>
-          <button
-            type="button"
+          <Button
+            type="primary"
             className="adm-btn is-primary"
             onClick={() =>
               setQuery({
@@ -200,9 +202,9 @@ export function AdminAuditPage() {
             }
           >
             查询
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            type="default"
             className="adm-btn"
             onClick={() => {
               setAction(undefined);
@@ -212,14 +214,17 @@ export function AdminAuditPage() {
             }}
           >
             重置
-          </button>
+          </Button>
         </FilterActions>
       </FilterBar>
+
+      {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
+      {error && data && <AdminStaleError error={error} onRetry={reload} />}
 
       <Panel>
         {loading && !data ? (
           <AdminListLoading tip="加载审计记录…" />
-        ) : error ? (
+        ) : error && !data ? (
           <AdminListError error={error} onRetry={reload} />
         ) : (list?.items.length ?? 0) === 0 ? (
           <AdminEmpty
@@ -239,15 +244,12 @@ export function AdminAuditPage() {
               void message.info('审计记录按时间倒序展示，不支持改序');
               void s;
             }}
-            pagination={{
+            pagination={adminPagination({
               current: list?.page ?? 1,
               pageSize: list?.pageSize ?? 20,
               total: list?.total ?? 0,
-              showSizeChanger: true,
-              pageSizeOptions: [20, 50, 100],
-              showTotal: (t) => `共 ${t} 条`,
               onChange: setPage,
-            }}
+            })}
           />
         )}
       </Panel>
@@ -281,7 +283,7 @@ export function AdminAuditPage() {
                 </dd>
                 <dt>结果</dt>
                 <dd>
-                  <span className={`adm-tag ${row.success ? 'is-succeeded' : 'is-failed'}`}>
+                  <span className={`adm-tag ${row.success ? 'is-success' : 'is-danger'}`}>
                     {row.success ? '成功' : '失败'}
                   </span>
                 </dd>

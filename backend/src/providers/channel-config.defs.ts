@@ -171,10 +171,10 @@ function modalityBaseDefs(modality: Modality): ConfigDef[] {
         modality === 'text'
           ? 'openai-chat=OpenAI 兼容对话补全 (POST {base}/v1/chat/completions), DeepSeek/Moonshot/硅基流动/OpenAI 官方'
           : modality === 'video'
-            ? '文生视频协议尚未取证, 当前无可选协议。填入任何值都会在生成时报错并回落'
-            : 'openai=OpenAI兼容同步(POST {base}/v1/images/generations); volcengine=火山方舟(size 用 1K/2K 档位); minimax=MiniMax(用 aspect_ratio); aigc=自研异步任务契约。建议在页面顶部用「厂商预设」选择, 自动填好本项',
+            ? 'minimax-video=MiniMax 四段式异步(提交 → 轮询 → 取文件 → 下载)。文生视频没有本地兜底, 未配置时调用会直接失败'
+            : 'openai=OpenAI兼容同步(POST {base}/v1/images/generations); volcengine=火山方舟(size 用 1K/2K 档位); minimax=MiniMax(用 aspect_ratio)。建议在页面顶部用「厂商预设」选择, 自动填好本项',
       type: 'string',
-      default: modality === 'text' ? 'openai-chat' : 'openai',
+      default: modality === 'text' ? 'openai-chat' : modality === 'video' ? 'minimax-video' : 'openai',
       group: 'base',
       envName: `GATEWAY_${modality.toUpperCase()}_PROVIDER`,
       legacyKey: oldKey('provider'),

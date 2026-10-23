@@ -3,7 +3,7 @@
 # ecom-vision-mvp 一键启动脚本
 # =============================
 # 按项目既有约定拉起「后端 (NestJS/dist) + 前端 (Vite)」，并处理本机已记录的坑：
-#   1. 3001 端口可能被另一个项目 (aigc 网关) 占用 → 自动回退到 3002/3003
+#   1. 4100 可能已被其它进程占用 → 自动回退到 4101/4102
 #   2. 前端必须落在后端 CORS 放行的来源上 → 前端换端口时自动注入 CORS_ORIGINS
 #   3. 不能用 `nest start`（会触发安全守卫拒绝清空 dist）→ 只跑 node dist/main.js
 #   4. 首次运行自动建表 (prisma db push) 并 provision 演示账号 (seed，幂等)
@@ -11,8 +11,8 @@
 #
 # 三环境（2026-10-20 起）
 # ---------------------
-#   ./start.sh# 开发：库 dev.db  目录 uploads      前端 5173/后端 3001
-#   ./start.sh --env test     测试：库 test.db 目录 uploads-test  前端 5273/后端 3101
+#   ./start.sh               开发：库 dev.db  目录 uploads      前端 5100/后端 4100
+#   ./start.sh --env test     测试：库 test.db 目录 uploads-test  前端 5200/后端 4200
 #   ./start.sh --env prod     生产：读 .env.production，端口与库全由该文件决定
 #
 # 各环境的库/目录/密钥差异由 backend/.env.{env} 与 frontend/.env.{env} 承载
@@ -30,13 +30,15 @@
 #   ./start.sh --backend-only # 只起后端
 #   ./start.sh --frontend-only# 只起前端（要求后端已在运行）
 #   ./start.sh --no-follow    # 不实时跟随日志（仅打印日志路径）
+#   ./start.sh --daemon       # 后台运行（nohup 脱离终端，PID 记于 .run/start.pids，脚本随即返回）
+#   ./start.sh --stop         # 停止 --daemon 起的进程（按 PID 记录 + 端口兜底，只动本仓库的进程）
 #   ./start.sh -h | --help    # 查看帮助
 #
 # 端口可用环境变量覆盖（不设则按环境默认，开发态仍自动挑选空闲端口）:
-#   BACKEND_PORT   开发默认 3001→3002→3003 取第一个空闲；test/prod 用 env 文件值
-#   FRONTEND_PORT  开发默认 5173→5174→5175；test 默认 5273
+#   BACKEND_PORT   开发默认 4100→4101→4102 取第一个空闲；test/prod 用 env 文件值
+#   FRONTEND_PORT  开发默认 5100→5101→5102；test 默认 5200
 #
-# 停止: 前台按 Ctrl+C 即会同时关闭前后端。
+# 停止: 前台按 Ctrl+C 即会同时关闭前后端；后台用 ./start.sh --stop。
 
 set -euo pipefail
 
@@ -47,6 +49,12 @@ FRONTEND_DIR="$ROOT/frontend"
 LOG_DIR="$ROOT/.run"
 BACKEND_LOG="$LOG_DIR/backend.log"
 FRONTEND_LOG="$LOG_DIR/frontend.log"
+# 后台模式的 PID 记录：一行一个 pid（后端、前端）。
+# 放 .run/ 是因为它已进 .gitignore，且与日志同处一地，排障时只看一个目录。
+PID_FILE="$LOG_DIR/start.pids"
+
+# foreground = 前台（默认，Ctrl+C 全停）；daemon = nohup 脱离；stop = 只停
+MODE=foreground
 
 # ── 环境选择 ──
 # APP_ENV 同时决定三件事：env 文件档位（backend/.env.{APP_ENV}）、
@@ -93,6 +101,8 @@ for arg in "$@"; do
     --backend-only)RUN_FRONTEND=0 ;;
     --frontend-only) RUN_BACKEND=0 ;;
     --no-follow)   FOLLOW=0 ;;
+    --daemon)      MODE=daemon ;;
+    --stop)        MODE=stop ;;
     -h|--help)     usage ;;
     *) c_err "未知参数: $arg（用 --help 查看用法）"; exit 2 ;;
   esac
@@ -131,10 +141,60 @@ cleanup() {
     [ -n "$FRONT_PID" ] && kill_tree "$FRONT_PID"
     [ -n "$BACK_PID" ]  && kill_tree "$BACK_PID"
   fi
+  rm -f "$PID_FILE"
   wait 2>/dev/null || true
   c_ok '已退出。'
 }
-trap cleanup EXIT INT TERM
+
+# 只回收「工作目录属于本仓库」的监听进程 —— 4100 上可能跑着别人的服务，
+# 按端口无条件 kill -9 会误伤，所以必须再确认一次 cwd。
+# 注意：macOS 的 lsof -p 不一定能读到 cwd，读不到就一律跳过（宁可留进程，不可杀错）。
+kill_repo_listener() {
+  local port="$1" pid
+  for pid in $(lsof -ti :"$port" 2>/dev/null || true); do
+    if lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | grep -q "$ROOT"; then
+      kill_tree "$pid" && c_info "  释放端口 $port (PID $pid)"
+    fi
+  done
+}
+
+# ── --stop：停掉上一轮 --daemon（或遗留的）进程，不做别的 ──
+if [ "$MODE" = stop ]; then
+  step '停止后台服务'
+  if [ -f "$PID_FILE" ]; then
+    while read -r pid; do
+      [ -n "$pid" ] && kill_tree "$pid"
+    done < "$PID_FILE"
+    rm -f "$PID_FILE"
+    c_ok "已停止 $(basename "$PID_FILE") 记录的进程"
+  else
+    c_warn "没有 $PID_FILE，改为按端口回收本仓库进程"
+  fi
+  # 兜底：PID 记录丢失（换终端/manual kill）时，按各环境默认端口清一遍。
+  # 后四个旧端口（3001/3101/5173/5273）一并保留，用于回收本次改端口前遗留的实例。
+  for p in 4100 4101 4102 4200 5100 5101 5102 5200 3001 3101 5173 5273; do
+    kill_repo_listener "$p"
+  done
+  c_ok '已停止。'
+  exit 0
+fi
+
+# background 模式不注册 trap：脚本退出即返回，服务由 nohup 守护。
+# 若这里照旧 trap EXIT cleanup，脚本一退出就会把刚起的服务杀干净。
+if [ "$MODE" = foreground ]; then
+  trap cleanup EXIT INT TERM
+fi
+
+# 上一轮起的进程还在（常见于 --daemon 忘了停）：先停掉再起。
+# 不停的话端口被占，脚本会按候选序列悄悄落到 4101/5101 —— 前端代理也跟着变，
+# 看起来「启动了」，但你访问的旧实例还在，改的代码像没生效。
+if [ -f "$PID_FILE" ]; then
+  c_info '发现上一轮记录的服务，先停止…'
+  while read -r pid; do
+    [ -n "$pid" ] && kill_tree "$pid"
+  done < "$PID_FILE"
+  rm -f "$PID_FILE"
+fi
 
 # ────────────────────────────── 端口探测 ──────────────────────────────
 port_in_use() {
@@ -161,7 +221,7 @@ if [ "$APP_ENV" = production ]; then
     c_err "  cp backend/.env.production.example backend/.env.production 后填写 JWT_SECRET / DATABASE_URL / CORS_ORIGINS"
     exit 1
   fi
-  c_ok'.env.production 已就位'
+  c_ok '.env.production 已就位'
 fi
 
 if ! command -v node >/dev/null 2>&1; then
@@ -198,14 +258,14 @@ mkdir -p "$LOG_DIR"
 
 # ────────────────────────────── 选择端口 ──────────────────────────────
 # 各环境的默认端口与候选序列不同：
-#   development 3001-3003 / 5173-5175（开发态要能绕开本机端口占用）
-#   test        3101 / 5273（固定 —— 与开发并行是常态，且 env 文件里已写死）
+#   development 4100-4102 / 5100-5102（开发态要能绕开本机端口占用）
+#   test        4200 / 5200（固定 —— 与开发并行是常态，且 env 文件里已写死）
 #   production  只认 env 文件，不回退（端口被占就该起不来）
 BACKEND_CANDIDATES=""
 FRONTEND_CANDIDATES=""
 case "$APP_ENV" in
-  development) BACKEND_CANDIDATES="3001 3002 3003"; FRONTEND_CANDIDATES="5173 5174 5175" ;;
-  test)        BACKEND_CANDIDATES="3101";           FRONTEND_CANDIDATES="5273" ;;
+  development) BACKEND_CANDIDATES="4100 4101 4102"; FRONTEND_CANDIDATES="5100 5101 5102" ;;
+  test)        BACKEND_CANDIDATES="4200";           FRONTEND_CANDIDATES="5200" ;;
   production)  BACKEND_CANDIDATES="";               FRONTEND_CANDIDATES="" ;;
 esac
 
@@ -221,7 +281,7 @@ read_env_port() {
   [ -n "$val" ] && printf '%s' "$val" || printf '%s' "$fallback"
 }
 
-ENV_BACKEND_PORT="$(read_env_port PORT "$( [ -n "$BACKEND_CANDIDATES" ] && printf '%s' "${BACKEND_CANDIDATES%% *}" || printf '%s' 3001 )")"
+ENV_BACKEND_PORT="$(read_env_port PORT "$( [ -n "$BACKEND_CANDIDATES" ] && printf '%s' "${BACKEND_CANDIDATES%% *}" || printf '%s' 4100 )")"
 ENV_FRONTEND_PORT="$(read_env_port VITE_PORT "$( [ -n "$FRONTEND_CANDIDATES" ] && printf '%s' "${FRONTEND_CANDIDATES%% *}" || printf '%s' 4173 )")"
 
 step '分配端口'
@@ -270,7 +330,7 @@ fi
 #   而线上真实来源应该在 .env.production 的 CORS_ORIGINS 里写死。
 CORS_ORIGINS_VAL=""
 if [ "$APP_ENV" = development ] && [ "$RUN_FRONTEND" -eq 1 ]; then
-  if [ "$FRONTEND_PORT" != "5173" ] && [ "$FRONTEND_PORT" != "4173" ]; then
+  if [ "$FRONTEND_PORT" != "5100" ] && [ "$FRONTEND_PORT" != "4173" ]; then
     CORS_ORIGINS_VAL="http://localhost:$FRONTEND_PORT,http://127.0.0.1:$FRONTEND_PORT"
   fi
 fi
@@ -285,20 +345,41 @@ c_ok "后端端口: $BACKEND_PORT"
 #   .env.{env} 来决定打哪个库的（见 backend/src/config/env-files.ts）。
 #   漏传就会用兜底的 dev.db —— 这正是「以为在测、实际改了开发库」的成因。
 if [ "$RUN_BACKEND" -eq 1 ] && [ "$SKIP_DB" -eq 0 ]; then
-  step '初始化数据库（建表 + 演示账号，幂等）'
+  step '初始化数据库（建表 + 账号 + 商品/会员/营销，幂等）'
   ( cd "$BACKEND_DIR" && NODE_ENV="$NODE_ENV" npm run --silent prisma:push )
-  ( cd "$BACKEND_DIR" && NODE_ENV="$NODE_ENV" npm run --silent seed )
-  c_ok "数据库就绪（$APP_ENV 库 · admin@demo.com / demo1234）"
+  # 只跑 seed 会得到一个「有账号但没有任何在售商品」的库：积分商城空、首页
+  # 套餐空、会员买不到。购买链路的种子是 commerce/membership/marketing 三份。
+  # 刻意不跑 seed:admin（会生成随机密码并打印一次），后台账号由用户按需建。
+  ( cd "$BACKEND_DIR" && NODE_ENV="$NODE_ENV" npm run --silent seed \
+    && NODE_ENV="$NODE_ENV" npm run --silent seed:commerce \
+    && NODE_ENV="$NODE_ENV" npm run --silent seed:membership \
+    && NODE_ENV="$NODE_ENV" npm run --silent seed:marketing )
+  # seed 已改成环境驱动：未设 SEED_USER_EMAIL 时什么都不建，不再有内置演示凭据。
+  c_ok "数据库就绪（$APP_ENV 库）"
+  c_info '预置 C 端账号：SEED_USER_EMAIL=you@example.com ./start.sh（密码随机并打印一次，或加 SEED_USER_PASSWORD 指定）'
 fi
 
 # ────────────────────────────── 后端：构建 ──────────────────────────────
+# dist 存在就跳过构建曾经踩过坑：改了 src 但没重建，起的仍是旧代码，
+# 表现为「新接口 404 / Cannot POST」，而后端日志一切正常。
+# 现在按 mtime 判断：src 或 prisma 里有比 dist/main.js 更新的文件就自动重建。
+dist_is_stale() {
+  [ -f "$BACKEND_DIR/dist/main.js" ] || return 0
+  [ -n "$(find "$BACKEND_DIR/src" "$BACKEND_DIR/prisma" \
+            -type f -newer "$BACKEND_DIR/dist/main.js" -print -quit 2>/dev/null)" ]
+}
+
 if [ "$RUN_BACKEND" -eq 1 ]; then
-  if [ "$DO_BUILD" -eq 1 ] || [ ! -f "$BACKEND_DIR/dist/main.js" ]; then
-    step '构建后端 (nest build)'
+  if [ "$DO_BUILD" -eq 1 ]; then
+    step '构建后端 (nest build，--build 强制)'
+    ( cd "$BACKEND_DIR" && npm run --silent build )
+    c_ok '构建完成'
+  elif dist_is_stale; then
+    step '构建后端 (nest build，源码比 dist 新)'
     ( cd "$BACKEND_DIR" && npm run --silent build )
     c_ok '构建完成'
   else
-    c_info '已有 dist/main.js，跳过构建（如需重建加 --build）'
+    c_info 'dist/main.js 已是最新，跳过构建（如需强制重建加 --build）'
   fi
 fi
 
@@ -314,10 +395,15 @@ if [ "$RUN_BACKEND" -eq 1 ]; then
   [ -n "$CORS_ORIGINS_VAL" ] && BACK_ENV+=("CORS_ORIGINS=$CORS_ORIGINS_VAL")
   [ -n "${CORS_ALLOW_PRIVATE_LAN:-}" ] && BACK_ENV+=("CORS_ALLOW_PRIVATE_LAN=$CORS_ALLOW_PRIVATE_LAN")
   (
-    cd "$BACKEND_DIR"
-    env "${BACK_ENV[@]}" node dist/main.js
-  ) >>"$BACKEND_LOG" 2>&1 &
+    cd "$BACKEND_DIR" && exec env "${BACK_ENV[@]}" node dist/main.js
+  ) >>"$BACKEND_LOG" 2>&1 < /dev/null &
   BACK_PID=$!
+  # exec 让 $! 就是 node 本身（不是子 shell），kill_tree 才不会漏掉真正的服务进程。
+  # daemon 模式再把作业从作业表摘掉：脚本退出时不随 SIGHUP 一起被带走。
+  if [ "$MODE" = daemon ]; then
+    disown "$BACK_PID" 2>/dev/null || true
+  fi
+  printf '%s\n' "$BACK_PID" >> "$PID_FILE"
 
   c_info '等待后端就绪…'
   READY=0
@@ -355,13 +441,16 @@ if [ "$RUN_FRONTEND" -eq 1 ]; then
   # 于是全程不产生跨域，端口变化也不必改前端代码。
   # 只有跨域部署（前端挂 CDN）才需要填绝对地址，那是 .env.production 的事。
   (
-    cd "$FRONTEND_DIR"
-    env NODE_ENV="$NODE_ENV" \
+    cd "$FRONTEND_DIR" && exec env NODE_ENV="$NODE_ENV" \
         VITE_PORT="$FRONTEND_PORT" \
         VITE_API_PROXY="http://localhost:$BACKEND_PORT" \
       npx vite --mode "$VITE_MODE" --port "$FRONTEND_PORT" --strictPort
-  ) >>"$FRONTEND_LOG" 2>&1 &
+  ) >>"$FRONTEND_LOG" 2>&1 < /dev/null &
   FRONT_PID=$!
+  if [ "$MODE" = daemon ]; then
+    disown "$FRONT_PID" 2>/dev/null || true
+  fi
+  printf '%s\n' "$FRONT_PID" >> "$PID_FILE"
 
   c_info '等待前端就绪…'
   READY=0
@@ -392,13 +481,23 @@ c_info "环境  NODE_ENV=$NODE_ENV · 前端 mode=$VITE_MODE"
 # 界面角标可能看漏，后端启动日志第一屏一定有「运行环境 + 数据库路径」。
 c_info "数据  见后端启动日志首行的「运行环境 / 数据库 / 上传目录」"
 if [ "$APP_ENV" != production ]; then
-  c_info '演示账号  admin@demo.com / demo1234'
+  c_info 'C 端账号  自行注册，或 SEED_USER_EMAIL=… ./start.sh 预置'
+  c_info '后台账号  cd backend && npm run seed:admin（密码随机，仅打印一次）'
 fi
 c_info "日志  backend: $BACKEND_LOG"
 c_info "日志  frontend: $FRONTEND_LOG"
 # : > "$BACKEND_LOG" 每次启动清空的只是 stdout 镜像; 应用层的历史日志由
 # AppFileLogger 自行管理, 按天分文件 + 保留 LOG_RETENTION_DAYS 天, 重启不丢
 c_info "日志  落盘归档: $BACKEND_DIR/logs/（app-<日期>.log + .error.log, 按天轮转）"
+
+# ── 后台模式：就绪即返回，不进入前台等待 ──
+if [ "$MODE" = daemon ]; then
+  c_info "PID  记录于 $PID_FILE"
+  printf '\033[1m\n./start.sh --stop 停止所有服务\033[0m\n\n'
+  c_ok '已在后台运行。'
+  exit 0
+fi
+
 printf '\033[1m\nCtrl+C 停止所有服务\033[0m\n\n'
 
 # ────────────────────────────── 跟随日志 / 等待 ──────────────────────────────

@@ -2,13 +2,28 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { GenerateService } from '../generate/generate.service';
 import { AppError } from '../common/app.exception';
+import { runBatch } from '../common/batch';
 import { getCapability } from '../capabilities/capability.registry';
 import { CAPABILITY_IDS } from '../providers/channel-config.defs';
 import { buildPage, paginate, type PageResult } from './dto/page-query.dto';
 import type { TaskListQueryDto } from './dto/task.dto';
+import { SignedUrlService } from '../common/signed-url.service';
 
 /** 可排序列白名单: status/createdAt/updatedAt 都是 SQLite 上的真实列 */
 const SORTABLE = ['createdAt', 'updatedAt', 'status', 'capability'] as const;
+
+/**
+ * provider 的历史初始值 `mock` 与现在的 `pending` 同义 (2026-10-22 更名)。
+ *
+ * 迁移脚本 `db:migrate:provider` 会把存量行改写, 但**读取侧仍要归一**:
+ * 迁移可能还没跑, 且用户可能拿旧库连新代码。筛选要覆盖两种写法,
+ * 展示与分组只出 `pending` —— 否则后台「待执行」那一档在迁移前会是空的。
+ */
+const LEGACY_PENDING_PROVIDER = 'mock';
+function normalizeProvider(value: string | null | undefined): string | null {
+  if (!value) return null;
+  return value === LEGACY_PENDING_PROVIDER ? 'pending' : value;
+}
 
 /**
  * 拥堵告警阈值 (admin-prd.md B-31)。
@@ -43,6 +58,7 @@ export class TasksAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly generate: GenerateService,
+    private readonly signedUrl: SignedUrlService,
   ) {}
 
   /**
@@ -68,7 +84,13 @@ export class TasksAdminService {
     const where: Record<string, unknown> = {};
     if (query.status) where['status'] = query.status;
     if (query.capability) where['capability'] = query.capability;
-    if (query.provider) where['provider'] = query.provider;
+    // 筛「待执行」要同时命中迁移前后的两种写法, 否则旧数据一个也筛不出来
+    if (query.provider) {
+      where['provider'] =
+        query.provider === 'pending'
+          ? { in: ['pending', LEGACY_PENDING_PROVIDER] }
+          : query.provider;
+    }
     if (query.userId) where['ownerId'] = query.userId;
     if (query.projectId) where['projectId'] = query.projectId;
     if (query.from || query.to) {
@@ -118,7 +140,7 @@ export class TasksAdminService {
             capability: t.capability,
             capabilityName: def?.name ?? t.capability,
             status: t.status,
-            provider: t.provider,
+            provider: normalizeProvider(t.provider),
             errorCode: t.errorCode,
             creditCost: t.creditCost,
             retriedFromId: t.retriedFromId,
@@ -130,7 +152,7 @@ export class TasksAdminService {
             createdAt: t.createdAt,
             updatedAt: t.updatedAt,
             // 缩略图: 排障时一眼认出是哪个任务, 比读 id 快得多
-            thumbnailUrl: t.outputAsset?.sourceUrl ?? null,
+            thumbnailUrl: this.signedUrl.displayUrl(t.outputAsset?.sourceUrl),
           };
         }),
         total,
@@ -140,10 +162,14 @@ export class TasksAdminService {
       capabilities: capGroups
         .map((g) => ({ capability: g.capability, count: g._count._all }))
         .sort((a, b) => b.count - a.count),
-      providers: providerGroups.map((g) => ({
-        provider: g.provider ?? 'unknown',
-        count: g._count._all,
-      })),
+      // 归一后再合并: 迁移前 pending 与 mock 会各占一行, 前端筛选器里出现两个「待执行」
+      providers: Object.entries(
+        providerGroups.reduce<Record<string, number>>((acc, g) => {
+          const key = normalizeProvider(g.provider) ?? 'unknown';
+          acc[key] = (acc[key] ?? 0) + g._count._all;
+          return acc;
+        }, {}),
+      ).map(([provider, count]) => ({ provider, count })),
     };
   }
 
@@ -203,7 +229,7 @@ export class TasksAdminService {
       capability: task.capability,
       capabilityName: def?.name ?? task.capability,
       status: task.status,
-      provider: task.provider,
+      provider: normalizeProvider(task.provider),
       errorCode: task.errorCode,
       creditCost: task.creditCost,
       retriedFromId: task.retriedFromId,
@@ -241,7 +267,7 @@ export class TasksAdminService {
       outputAsset: output
         ? {
             id: output.id,
-            sourceUrl: output.sourceUrl,
+            sourceUrl: this.signedUrl.displayUrl(output.sourceUrl),
             width: output.width,
             height: output.height,
             format: output.format,
@@ -257,10 +283,11 @@ export class TasksAdminService {
    * **新建任务而非原地复活**: outputAssetId 有 @unique 的 1:1 约束,
    * 原地复活会让新产出图与旧产出图抢同一个唯一键, 必然冲突。
    *
-   * ⚠ creditCost 沿用原任务的扣费快照, 但**不会二次扣用户积分** ——
-   * 原始失败已扣过一次, 后台重试是运维动作不是用户发起的再次消费。
-   * 此字段仅供后台展示与退款核算参考; 若将来改为「重试即再扣」,
-   * 必须同步改这里并接入 credits 服务, 否则核算会双计。
+   * ⚠ 重试**不二次扣费**, 因此新任务的 `creditCost` 必须记 0。
+   *
+   * 原任务失败时已按快照退款, 若这里沿用原值, 新任务再失败会触发
+   * `refundForFailure` 第二次退款 —— 用户没有为这次重试付过钱, 等于白送。
+   * `retriedFromId` 保留可追溯性; 后台展示原价请查原任务。
    */
   async retry(id: string) {
     const origin = await this.prisma.generationTask.findUnique({ where: { id } });
@@ -277,10 +304,10 @@ export class TasksAdminService {
         status: 'running',
         inputAssetIds: origin.inputAssetIds,
         params: origin.params,
-        // 与 generate.service.createTask 一致: 建任务时写 mock,
+        // 与 generate.service.createTask 一致: 建任务时写 pending,
         // 跑完后由 processTask 改写成实际通道
-        provider: 'mock',
-        creditCost: origin.creditCost,
+        provider: 'pending',
+        creditCost: 0,
         retriedFromId: origin.id,
       },
     });
@@ -315,6 +342,19 @@ export class TasksAdminService {
 
     this.logger.warn(`任务 ${id} 被后台终止 (原状态 ${task.status})`);
     return { id, status: updated.status, errorCode: updated.errorCode };
+  }
+
+  /**
+   * 批量重试 / 终止（B7）。
+   *
+   * 逐条复用单条实现，所以「仅失败任务可重试」「仅排队/执行中可终止」
+   * 这些状态限制对批量同样生效 —— 批量失败往往是选了不同状态的任务，
+   * 逐条原因正好把这件事讲清楚。
+   */
+  async batchAction(ids: string[], action: 'retry' | 'cancel') {
+    // 显式给 unknown: 两个动作的返回形状不同 (retry 回新任务 id, cancel 回状态),
+    // 让 TS 从第一个分支推断会把 cancel 判成类型不符
+    return runBatch<unknown>(ids, (id) => (action === 'retry' ? this.retry(id) : this.cancel(id)));
   }
 
   /** 已知能力 id 全集 (供前端筛选下拉, 与后端校验口径一致) */

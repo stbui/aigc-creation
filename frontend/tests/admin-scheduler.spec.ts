@@ -9,7 +9,7 @@ import { test, expect, type Page } from '@playwright/test';
  *   3. 手动执行走二次确认
  */
 
-const UI = process.env.ADMIN_UI ?? 'http://localhost:5173';
+const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
 
 async function login(page: Page) {
   await page.setViewportSize({ width: 1600, height: 1000 });
@@ -28,9 +28,23 @@ test.describe('定时任务', () => {
     await page.goto(`${UI}/admin/scheduler`);
     await expect(page.getByRole('heading', { name: '定时任务' })).toBeVisible({ timeout: 20000 });
 
-    await expect(page.locator('.adm-task-row')).toHaveCount(5, { timeout: 10000 });
-    // B-90 的三项必须都在
-    for (const label of ['订单超时关闭', '积分到期回收', '数据备份']) {
+    /*
+     * 行数必须与 `backend/src/admin/scheduler.service.ts` 的 TASK_LABELS 一致。
+     * 这里曾写死 5 —— 后来补了 campaign-expire / membership / task-recover 三项,
+     * 页面渲染 7 行而断言仍要 5, 红的是断言不是产品。新增任务时同步改这里。
+     */
+    const TASKS = [
+      '订单超时关闭',
+      '积分到期回收',
+      '数据备份',
+      '数据保留期清理',
+      '活动到期收尾',
+      '会员到期与月度积分',
+      '中断任务与会员补发',
+    ];
+    await expect(page.locator('.adm-task-row')).toHaveCount(TASKS.length, { timeout: 10000 });
+    // B-90 的三项必须都在, 其余任务同样不得漏渲染
+    for (const label of TASKS) {
       await expect(page.locator('.adm-task-row', { hasText: label })).toBeVisible();
     }
   });

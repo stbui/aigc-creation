@@ -3,20 +3,39 @@ import { UseGuards } from '@nestjs/common';
 import { ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/current-user.decorator';
+import { AppError } from '../common/app.exception';
 import { OrderService } from './order.service';
 
+/**
+ * 下单入参。
+ *
+ * `productId` 与 `membershipPlanId` **二选一** (服务层强校验, 不靠前端):
+ *   - productId        → 积分包/套餐商品, 走 OrderItem 快照与积分发放
+ *   - membershipPlanId → 会员订阅, 金额取套餐价, 支付成功后激活会员
+ *
+ * 为什么不做成"商品表里加一类会员商品": 会员是**权益**而非一次性积分,
+ * 它的金额、周期、发放时机都与商品不同, 混进 Product 会让
+ * 「买完发多少积分」这条规则出现两套真相。
+ */
 export class CreateOrderDto {
   /** 幂等键。客户端生成 (建议 UUID), 重复提交返回同一订单 */
   @IsString()
   @MaxLength(64)
   idempotencyKey!: string;
 
+  @IsOptional()
   @IsString()
-  productId!: string;
+  productId?: string;
 
+  @IsOptional()
   @IsInt()
   @Min(1)
-  quantity!: number;
+  quantity?: number;
+
+  /** 会员套餐 id。与 productId 互斥 */
+  @IsOptional()
+  @IsString()
+  membershipPlanId?: string;
 
   /**
    * 优惠券码 (可选)。
@@ -56,10 +75,19 @@ export class OrdersController {
   /** 幂等下单。券与活动不叠加, 取更优者 (admin-detailed-design.md §12.6) */
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateOrderDto) {
+    if (!dto.productId && !dto.membershipPlanId) {
+      throw new AppError(40001, '请选择积分商品或会员套餐', 400);
+    }
+    // 二选一必须是真互斥: 否则会员单会静默丢掉 productId, 用户以为两样都买了
+    if (dto.productId && dto.membershipPlanId) {
+      throw new AppError(40001, '会员套餐与积分商品不能混在同一订单中购买', 400);
+    }
     return this.orders.create({
       userId: user.id,
       idempotencyKey: dto.idempotencyKey,
-      items: [{ productId: dto.productId, quantity: dto.quantity }],
+      ...(dto.membershipPlanId
+        ? { membershipPlanId: dto.membershipPlanId }
+        : { items: [{ productId: dto.productId!, quantity: dto.quantity ?? 1 }] }),
       couponCode: dto.couponCode ?? null,
       campaignIds: dto.campaignIds,
     });

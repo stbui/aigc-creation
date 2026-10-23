@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Gem } from 'lucide-react';
-import { productsApi } from '../lib/api';
+import { membershipApi, productsApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { StateError, StateSkeleton } from '../components/StateViews';
-import type { Product } from '../types/api';
+import type { MembershipPlan, Product } from '../types/api';
 
 /**
  * 积分商城 (1:1 复刻参考站版式, 数据已接真实接口)。
@@ -31,20 +31,33 @@ export function PackagesPage() {
   const navigate = useNavigate();
   const { token, openLogin } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
+  /**
+   * 会员套餐也在这里卖。
+   *
+   * 此前账户页「开通/续费会员」跳 `/packages`，但本页只拉积分包 —— 用户点进
+   * 来买不到会员，链路就断在最后一步。会员与积分包是两种商品，但同属「购买
+   * 入口」，放在同一页比再开一个会员页更少绕路。
+   */
+  const [plans, setPlans] = useState<MembershipPlan[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
-    try {
-      setProducts(await productsApi.list());
-    } catch (e) {
+    const [productRes, planRes] = await Promise.allSettled([
+      productsApi.list(),
+      membershipApi.plans(),
+    ]);
+    if (productRes.status === 'fulfilled') {
+      setProducts(productRes.value);
+    } else {
       // 拉不到价目就如实说, 不用硬编码兜底 —— 那正是本次要消灭的东西
-      setError((e as Error).message || '商品加载失败');
-    } finally {
-      setLoading(false);
+      setError((productRes.reason as Error)?.message || '商品加载失败');
     }
+    // 会员套餐拉不到不阻断积分包：两者是独立商品，各自失败各自空
+    setPlans(planRes.status === 'fulfilled' ? planRes.value : []);
+    setLoading(false);
   }, []);
 
   useEffect(() => {
@@ -63,6 +76,14 @@ export function PackagesPage() {
     }
     // 结算页自己生成并持有幂等键 —— 同一笔下单重试必须复用同一个 key
     navigate(`/checkout/${p.sku}`);
+  };
+
+  const subscribe = (plan: MembershipPlan) => {
+    if (!token) {
+      openLogin();
+      return;
+    }
+    navigate(`/checkout/membership?planId=${encodeURIComponent(plan.id)}`);
   };
 
   return (
@@ -98,8 +119,44 @@ export function PackagesPage() {
           />
         )}
 
-        {!loading && !error && products.length === 0 && (
-          <p className="pkg-shop-disclosure">当前没有在售积分包</p>
+        {!loading && plans.length > 0 && (
+          <section className="pkg-section">
+            <div className="pkg-section-head">
+              <h2>会员套餐</h2>
+              <p>订阅后每月自动发放积分，享专属权益</p>
+            </div>
+            <div className="pkg-grid">
+              {plans.map((plan) => (
+                <article key={plan.id} className="pkg-card">
+                  <div className="pkg-card-top">
+                    <span className="pkg-card-name">{plan.name}</span>
+                    <span className="pkg-card-badge">{plan.durationDays} 天</span>
+                  </div>
+                  <div className="pkg-card-points">
+                    <strong>{formatCredits(plan.monthlyCredits)}</strong>
+                    <span>积分 / 月</span>
+                  </div>
+                  <span className="pkg-card-bonus">
+                    {plan.description || `订阅 ${plan.durationDays} 天，每月发放积分`}
+                  </span>
+                  <div className="pkg-card-price">
+                    <strong>{formatYuan(plan.priceCents)}</strong>
+                  </div>
+                  <button
+                    type="button"
+                    className="pkg-select-btn"
+                    onClick={() => subscribe(plan)}
+                  >
+                    立即订阅
+                  </button>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {!loading && !error && products.length === 0 && plans.length === 0 && (
+          <p className="pkg-shop-disclosure">当前没有在售积分包或会员套餐</p>
         )}
 
         <div className="pkg-grid">

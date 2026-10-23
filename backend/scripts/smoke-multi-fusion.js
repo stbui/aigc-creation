@@ -7,7 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Jimp, JimpMime, rgbaToInt } = require('jimp');
-const { MockImageProvider } = require('../dist/providers/mock-image.provider');
+const { LocalImageProvider } = require('../dist/providers/local-image.provider');
 const registry = require('../dist/capabilities/capability.registry');
 
 const OUT = '/tmp/fusion-smoke';
@@ -24,7 +24,7 @@ function dist(a, b) {
 }
 
 (async () => {
-  const provider = new MockImageProvider();
+  const provider = new LocalImageProvider();
   let fail = 0;
   const check = (ok, label, extra = '') => {
     console.log(`${ok ? '✅' : '❌'} ${label}${extra ? ' — ' + extra : ''}`);

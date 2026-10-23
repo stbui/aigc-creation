@@ -19,7 +19,7 @@ import type { Modality } from '../providers/modality';
  * 改造前能力定义**本体**在这里 (791 行, 15 项)。它的问题是: 一项能力的信息
  * 还散落在另外三处 ——
  *   - 提示词在 `providers/gateway-prompt.ts` 的 PROMPTS 字典
- *   - 本地像素算法分派在 `mock-image.provider.ts` 的两处 switch
+ *   - 本地像素算法分派在 `local-image.provider.ts` 的两处 switch
  *   - 路由配置项的 id 列表在 `providers/channel-config.defs.ts` 的 CAPABILITY_IDS
  *
  * 于是新增一项能力要改四个文件, 而**漏改不报错**:
@@ -39,7 +39,7 @@ import type { Modality } from '../providers/modality';
  *              以及已接云端模型的能力 (自由创作 → 优云智算 qwen-image-3.0)。
  *              ⚠️ real ≠「本地算法」: 具体走哪条通道以**每单真实的 task.provider**
  *              为准, 前端结果卡按它显示, 不靠 mode 猜。
- *   mock    —— 依赖真实 AI 模型, 本地生成参数化占位图 (界面标注「占位」)
+ *   mock    —— (2026-10-22 已移除) 过去表示「本地只画占位图」; 占位实现已全部删除
  *   planned —— 参考站有、本项目暂未实现, 界面标「规划中」且不可提交
  *
  * modality (2026-10-20) 与 mode **正交**: mode 回答「实现到什么程度」,
@@ -107,7 +107,7 @@ export function assertCreditCostDeclared(): void {
   assertCapabilityIntegrity(CAPABILITIES);
 }
 
-/** DTO 白名单用: 允许提交的能力 = real + mock (planned 不可提交) */
+/** DTO 白名单用: 允许提交的能力 = 所有非 planned 的能力 */
 export const SUBMITTABLE_CAPABILITY_IDS: string[] = CAPABILITIES.filter(
   (c) => c.mode !== 'planned',
 ).map((c) => c.id);

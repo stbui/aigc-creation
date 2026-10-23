@@ -7,6 +7,7 @@ import { CapabilityIcon } from '../components/AppLayout';
 import { HeroArt } from '../components/HeroArt';
 import { SafeThumb } from '../components/RailPreview';
 import { StateError, StateSkeleton } from '../components/StateViews';
+import { runtimeOf } from '../lib/constants';
 import type { CapabilityGroup, StatsOverview } from '../types/api';
 
 /**
@@ -143,13 +144,17 @@ export function WorkbenchPage({
       <section className="wb-tools">
         {cards.map((c) => {
           const thumb = thumbOf(c.id);
+          // 运行时结论：运营下线的能力不可点，占位只在「确实走占位」时才标
+          const rt = runtimeOf(c);
+          const closed = c.mode === 'planned' || rt.effective === 'disabled';
           return (
             <button
               key={c.id}
               type="button"
               className={`wb-card wb-card-${c.mode}`}
-              onClick={() => (c.mode === 'planned' ? undefined : navigate(toolPath(c.id)))}
-              disabled={c.mode === 'planned'}
+              onClick={() => (closed ? undefined : navigate(toolPath(c.id)))}
+              disabled={closed}
+              title={rt.effective === 'disabled' ? rt.reason || '该能力已下线' : undefined}
             >
               <span className="wb-card-thumb">
                 <span className="wb-card-thumb-clip">
@@ -165,7 +170,9 @@ export function WorkbenchPage({
                 </span>
                 {c.badge && <span className="wb-card-badge">{c.badge}</span>}
                 {c.mode === 'planned' && <span className="wb-card-badge wb-card-badge-planned">规划中</span>}
-                {c.mode === 'mock' && <span className="wb-card-badge wb-card-badge-mock">占位</span>}
+                {c.mode !== 'planned' && rt.effective === 'disabled' && (
+                  <span className="wb-card-badge wb-card-badge-planned">已下线</span>
+                )}
               </span>
               {/* 参考 .wb-tool-icon 是 .wb-tool-card 的直接子节点 (定位基准=卡片, bottom 88 / left 15),
                   故不放进 .wb-card-thumb, 否则会以缩略图为基准溢出卡片 */}

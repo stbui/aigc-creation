@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App } from 'antd';
+import { useEffect, useMemo, useState } from 'react';
+import { App, Button, Input, InputNumber, Switch, Tabs } from 'antd';
 import { adminSettingsApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import {
   AdminListError,
   AdminListLoading,
+  AdminStaleError,
   ConfirmAction,
+  useAdminResource,
 } from '../../components/admin/AdminWidgets';
 import { AdminEmpty, PageHeader } from '../../components/admin/PageHeader';
 import type { AdminSettingField, AdminSettings } from '../../types/api';
@@ -17,33 +19,24 @@ export function AdminSettingsPage() {
   const { can } = useAdmin();
   const editable = can('setting.write');
 
-  const [settings, setSettings] = useState<AdminSettings | null>(null);
   const [activeGroup, setActiveGroup] = useState<string>('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   // 草稿: key -> value。仅存被改动过的项, 避免每次输入都发请求
   const [draft, setDraft] = useState<Partial<Record<AdminSettingField, string | number | boolean>>>({});
   const [confirming, setConfirming] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await adminSettingsApi.read();
-      setSettings(data);
-      setActiveGroup((prev) => prev || data.groups[0]?.key || '');
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '加载失败');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const { data: settings, loading, error, reload } = useAdminResource(() => adminSettingsApi.read());
 
+  /*
+   * 首次拿到配置后落到第一个分组。必须放 effect 而不能塞进 fetcher:
+   * 保存后 `reload()` 会重新拉一次, 塞进 fetcher 就会把用户当前停留的
+   * 分页签冲回第一组 (保存的是「退款」却跳回「通用」, 得重新找一遍)。
+   */
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!settings) return;
+    setActiveGroup((prev) => prev || settings.groups[0]?.key || '');
+  }, [settings]);
 
   const group = useMemo(
     () => settings?.groups.find((g) => g.key === activeGroup),
@@ -70,7 +63,7 @@ export function AdminSettingsPage() {
     try {
       const res = await adminSettingsApi.update({ ...draft, reason: '后台修改系统设置' });
       setDraft({});
-      await load();
+      await reload();
       setConfirming(false);
       void message.success(`已保存 ${res.updated.length} 项配置`);
     } catch (e) {
@@ -85,7 +78,7 @@ export function AdminSettingsPage() {
     if (!settings) return [];
     const all = settings.groups.flatMap((g) => g.items);
     return changed.map((key) => {
-      const item = all.find((i) => i.key === key);
+      const item = all.find((i) => i.field === key);
       return {
         label: item?.label ?? key,
         from: item ? String(item.value) : '—',
@@ -94,48 +87,47 @@ export function AdminSettingsPage() {
     });
   }, [settings, draft, changed]);
 
-  if (loading) return <AdminListLoading tip="加载系统设置…" />;
-  if (error) return <AdminListError error={error} onRetry={() => void load()} />;
+  /*
+   * 2026-10-23: 保存成功后要重拉配置 (校验并回填服务端归一化后的值)。
+   * 守卫从无条件的 `if (loading)` 收窄成「还没有数据时才塌」, 否则整页
+   * 先塌成骨架屏再弹回来 —— 分页签与草稿都还在 state 里, 视觉上却像
+   * "保存把页面弄崩了重载"。加载过之后刷新只换内容。
+   */
+  if (loading && !settings) return <AdminListLoading tip="加载系统设置…" />;
+  if (error && !settings) return <AdminListError error={error} onRetry={() => void reload()} />;
   if (!settings) return <AdminEmpty description="暂无配置项" />;
 
   const renderControl = (item: SettingItem) => {
-    const value = keyIn(item.key) in draft ? draft[keyIn(item.key)] : item.value;
+    const value = item.field in draft ? draft[item.field] : item.value;
 
     if (item.type === 'boolean') {
       return (
-        <label className="adm-switch">
-          <input
-            type="checkbox"
-            checked={Boolean(value)}
-            onChange={(e) => setValue(item.key, e.target.checked)}
-            disabled={!editable}
-          />
-          <span className="adm-switch-track" aria-hidden="true" />
-          <span className="adm-switch-text">{Boolean(value) ? '已开启' : '已关闭'}</span>
-        </label>
+        <Switch
+          checked={Boolean(value)}
+          checkedChildren="已开启"
+          unCheckedChildren="已关闭"
+          onChange={(checked) => setValue(item.field, checked)}
+          disabled={!editable}
+        />
       );
     }
 
     if (item.type === 'number') {
       return (
-        <input
-          type="number"
-          className="adm-input adm-input-number"
+        <InputNumber
           value={Number(value)}
           min={item.min}
           max={item.max}
-          onChange={(e) => setValue(item.key, Number(e.target.value))}
+          onChange={(next) => setValue(item.field, Number(next))}
           disabled={!editable}
         />
       );
     }
 
     return (
-      <input
-        type="text"
-        className="adm-input"
+      <Input
         value={String(value)}
-        onChange={(e) => setValue(item.key, e.target.value)}
+        onChange={(e) => setValue(item.field, e.target.value)}
         disabled={!editable}
       />
     );
@@ -152,22 +144,22 @@ export function AdminSettingsPage() {
         }
       />
 
-      <div className="adm-tabs">
-        {settings.groups.map((g) => (
-          <button
-            key={g.key}
-            type="button"
-            className={`adm-tab${activeGroup === g.key ? ' is-active' : ''}`}
-            onClick={() => setActiveGroup(g.key)}
-          >
-            {g.label}
-          </button>
-        ))}
-      </div>
+      {/* 刷新失败但配置还在: 页面必须让用户知道「屏幕上这份可能已过期」——
+          系统设置里改错一个退款窗口或存储后端都不是小事 */}
+      {error && <AdminStaleError error={error} onRetry={() => void reload()} />}
+
+      <Tabs
+        activeKey={activeGroup}
+        onChange={setActiveGroup}
+        items={settings.groups.map((g) => ({
+          key: g.key,
+          label: <span className="adm-tab">{g.label}</span>,
+        }))}
+      />
 
       <div className="adm-panel is-narrow">
         {group?.items.map((item) => {
-          const dirty = item.key in draft;
+          const dirty = item.field in draft;
           return (
             <div key={item.key} className={`adm-setting-row${dirty ? ' is-dirty' : ''}`}>
               <div className="adm-setting-label">
@@ -190,14 +182,14 @@ export function AdminSettingsPage() {
               <div className="adm-setting-control">
                 {renderControl(item)}
                 {dirty && (
-                  <button
-                    type="button"
+                  <Button
+                    type="link"
                     className="adm-link"
-                    onClick={() => revert(item.key)}
+                    onClick={() => revert(item.field)}
                     disabled={!editable}
                   >
                     撤销
-                  </button>
+                  </Button>
                 )}
               </div>
             </div>
@@ -230,22 +222,22 @@ export function AdminSettingsPage() {
             {changed.length === 0 ? '无未保存的变更' : `有 ${changed.length} 项未保存的变更`}
           </span>
           <div className="adm-action-buttons">
-            <button
-              type="button"
+            <Button
+              type="default"
               className="adm-btn"
               disabled={changed.length === 0 || busy}
               onClick={() => setDraft({})}
             >
               放弃变更
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              type="primary"
               className="adm-btn is-primary"
               disabled={changed.length === 0 || busy}
               onClick={() => setConfirming(true)}
             >
               保存变更
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -264,9 +256,4 @@ export function AdminSettingsPage() {
       )}
     </>
   );
-}
-
-/** 后端 key 已是扁平字段名 (siteName 等), 直接作AdminSettingField 用 */
-function keyIn(key: AdminSettingField): AdminSettingField {
-  return key;
 }

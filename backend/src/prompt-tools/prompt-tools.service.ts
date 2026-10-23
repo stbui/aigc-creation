@@ -90,7 +90,7 @@ export class PromptToolsService {
    * ## 图片怎么传给模型
    *
    * 走 **base64 data URL 内联**, 不传公网 URL:
-   *   网关要回拉 URL 时, 本站素材地址在本地开发是 `http://localhost:3001/...`,
+   *   网关要回拉 URL 时, 本站素材地址在本地开发是 `http://localhost:4100/...`,
    *   网关服务器根本拉不到 —— 会静默超时或返回"图里没有内容"。
    *   base64 内联没有回拉环节, 是开发与生产都成立的唯一稳法。
    *   (已在 modelverse + gpt-4o-mini 实测: base64 图被正确识别。)

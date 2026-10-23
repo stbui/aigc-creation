@@ -23,6 +23,16 @@ export class RunBackupDto {
   @IsString()
   @MaxLength(64)
   idempotencyKey?: string;
+
+  /**
+   * 操作原因。手动备份在高危权限清单 (HIGH_RISK_PERMISSIONS) 内,
+   * AuditInterceptor 只从 body.reason 取值 —— 不声明这个字段会被
+   * 全局 ValidationPipe(whitelist) 剥掉, 审计里永远记 null。
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  reason?: string;
 }
 
 /** 保留份数清理 */

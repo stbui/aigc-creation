@@ -52,8 +52,8 @@ export type ProduceSource = 'gateway' | 'local';
  *
  * ⚠️ `source` 保持**可选**, 与改造前的 ImageProviderResult 一致:
  * 本地算法 provider 直接返回字节, 由路由器补上 `source: 'local'`。
- * 改成必填会迫使 14 处 mock 产出点全部改写, 而收益仅是让类型更严 ——
- * 不值得。真正需要区分来源的只有路由器出口, 那里的 source 必定有值。
+ * 改成必填会迫使本地算法 provider 里 11 处产出点全部改写, 而收益仅是让
+ * 类型更严 —— 不值得。真正需要区分来源的只有路由器出口, 那里的 source 必定有值。
  */
 export interface ImageOutcome {
   /** 模态判别式 —— 让 ModelOutcome 联合类型可被收窄 */
@@ -87,8 +87,8 @@ export interface TextOutcome {
 /**
  * 统一的视频产出。
  *
- * 首批**无任何厂商实现** (端点未取证) —— 但类型先立好, 让上层
- * (应用层 / 能力注册表) 能按模态统一处理, 不必等接厂商时再改结构。
+ * 视频走 MiniMax 的 `minimax-video` 四段式异步契约（2026-10-20 已落地）；
+ * 类型在这里独立声明，让应用层按模态统一处理，不必关心厂商与协议。
  */
 export interface VideoOutcome {
   kind: 'video';
@@ -114,10 +114,19 @@ export type ModelOutcome = ImageOutcome | TextOutcome | VideoOutcome;
  * 提示词与参数。provider 层不该知道能力这个词。
  */
 export interface ImageProvider {
+  /**
+   * @param maskPath 遮罩 PNG 的本地路径（可选）。
+   *
+   * 局部重绘用它圈定「只改这里」。**不允许**不支持遮罩的通道忽略它：
+   * 忽略的后果是整图重绘，用户涂 A 区域却看到 B 区域被改，
+   * 且界面上毫无异常。故通道不接受遮罩时抛 `MaskUnsupportedError`，
+   * 由应用层判 `42205` 并退款（见 providers/gateway.types.ts）。
+   */
   generate(
     capability: string,
     inputPaths: string[],
     params: Record<string, any>,
+    maskPath?: string,
   ): Promise<ImageOutcome>;
 }
 
@@ -154,7 +163,7 @@ export type TextContentPart =
  *
  * ⚠️ **图片优先用 data: base64 直传, 不用公网 URL**:
  * 网关服务器要回拉本站的 URL, 而本站素材地址在本地开发时是
- * `http://localhost:3001/...` —— 网关根本拉不到, 会静默失败或超时。
+ * `http://localhost:4100/...` —— 网关根本拉不到, 会静默失败或超时。
  * base64 直传没有回拉环节, 是唯一在开发环境也稳的传法。
  * (已在 modelverse + gpt-4o-mini 上实测: base64 图片被正确识别。)
  */

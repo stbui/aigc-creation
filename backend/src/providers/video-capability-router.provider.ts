@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MinimaxVideoProvider } from './minimax-video.provider';
-import { gatewayConfigOf, setGatewayConfigOverrides, invalidateGatewayConfigCache } from './gateway.config';
+import { setGatewayConfigOverrides, invalidateGatewayConfigCache } from './gateway.config';
 import { buildPromptFor } from './gateway-prompt';
 import { PrismaService } from '../prisma/prisma.service';
 import { ImageCallLogger } from './image-call-logger';
-import { GatewayUnavailableError } from './gateway.types';
+import { ChannelScheduler } from './channel-scheduler';
 import type { VideoProvider, VideoOutcome } from './unified/unified.provider';
 
 /**
@@ -29,11 +29,11 @@ import type { VideoProvider, VideoOutcome } from './unified/unified.provider';
 @Injectable()
 export class VideoCapabilityRouter implements VideoProvider {
   private readonly log = new Logger(VideoCapabilityRouter.name);
-  private readonly minimax = new MinimaxVideoProvider();
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly callLogger: ImageCallLogger,
+    private readonly scheduler: ChannelScheduler,
   ) {
     // 启动时先拉一次, 让首个请求不必等这次查询
     void this.refreshConfig();
@@ -46,39 +46,49 @@ export class VideoCapabilityRouter implements VideoProvider {
   ): Promise<VideoOutcome> {
     await this.refreshConfig();
 
-    const cfg = gatewayConfigOf('video');
     const startedAt = Date.now();
     const prompt = buildPromptFor(capability, params);
 
-    if (!cfg.enabled) {
-      // ⚠️ 明确失败而非回落: 视频没有本地兜底, 编一段占位物比失败更糟
-      await this.callLogger.logFailure({
-        capability,
-        params,
-        prompt,
-        route: 'auto',
-        source: 'gateway',
-        modality: 'video',
-        durationMs: Date.now() - startedAt,
-        reason: '视频通道未配置（基址与令牌均为空）',
-      });
-      throw new GatewayUnavailableError(
-        '视频通道未配置',
-        '请在后台「模型配置」页选择视频通道的厂商并填写基址与令牌',
-      );
-    }
-
+    /*
+     * 不用全局 `cfg.enabled` 拦截：线路表里有通道时，旧 gateway.video.* 为空
+     * 也必须走线路。没有可用线路由调度器返回原因，再如实失败（无本地兜底）。
+     */
     try {
-      const provider = this.pickProtocol(cfg.provider);
-      const r = await provider.generate(capability, inputPaths, params, prompt);
-      this.log.log(`${capability}: 视频通道成功 (${cfg.provider} ${r.taskId ?? '-'} ${r.model ?? ''})`);
+      /*
+       * 多渠道调度 (2026-10-20): 视频是**最需要**多渠道的模态 ——
+       * 它既没有本地兜底, 单次生成又要 1~2 分钟, 唯一那家一挂用户就彻底拿不到片。
+       * 现在可按 priority 依次尝试多家 (如 MiniMax 主 + 火山方舟备)。
+       */
+      const dispatch = await this.scheduler.dispatch('video', async (channel) => {
+        const provider = this.pickProtocol(channel.protocol);
+        // 注入通道凭据 (含 baseUrl) —— 视频 provider 正是靠它取各家地址
+        if ('withChannel' in provider && typeof provider.withChannel === 'function') {
+          provider.withChannel({
+            baseUrl: channel.baseUrl,
+            token: channel.token,
+            model: channel.model,
+          });
+        }
+        return provider.generate(capability, inputPaths, params, prompt);
+      });
+
+      if (!dispatch.ok || !dispatch.value) {
+        const summary = dispatch.attempts
+          .map((a) => `${a.channelName}(${a.protocol}): ${a.reason ?? (a.ok ? '成功' : '失败')}`)
+          .join('; ');
+        throw new Error([dispatch.unavailableReason, summary].filter(Boolean).join(' — '));
+      }
+
+      const r = dispatch.value;
+      const used = dispatch.channel!;
+      this.log.log(`${capability}: 视频通道成功 (${used.name}/${used.protocol} ${r.taskId ?? '-'} ${r.model ?? ''})`);
       await this.callLogger.logSuccess({
         capability,
         params,
         prompt,
         route: 'remote',
         source: 'gateway',
-        model: r.model ?? cfg.model,
+        model: r.model ?? used.protocol,
         gatewayTaskId: r.taskId,
         durationMs: Date.now() - startedAt,
         modality: 'video',
@@ -112,7 +122,15 @@ export class VideoCapabilityRouter implements VideoProvider {
   private pickProtocol(protocol: string) {
     switch (protocol) {
       case 'minimax-video':
-        return this.minimax;
+        /*
+         * 每次调度都新建实例, **不能复用单例**。
+         *
+         * 视频单次要跑 1~2 分钟, 期间会持续用实例上的 channelCreds 发查询/取文件请求;
+         * 若共享实例, 任务 A 轮询中途任务 B 切到备用通道 (withChannel 改写同一份凭据),
+         * A 后续请求就会带 B 的 token/baseUrl —— 既查不到自己的任务, 也可能把
+         * 凭据发到另一家。图像侧本来就是每次 createImageProvider() 新建, 这里对齐。
+         */
+        return new MinimaxVideoProvider();
       default:
         throw new Error(
           `未知视频通道协议 "${protocol}"。可用: minimax-video` +

@@ -17,15 +17,28 @@ import {
 import type { UploadFile } from 'antd';
 import { ArrowLeft, Upload as UploadIcon, Trash2, RefreshCw, Check, X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { assetsApi, generateApi, toAbsoluteUrl } from '../lib/api';
+import { assetsApi, generateApi, assetSrc } from '../lib/api';
 import { capabilityById } from '../lib/capabilities';
 import { useProject } from '../hooks/useProject';
 import { usePollAbort } from '../hooks/usePollAbort';
+import { useGenerateError } from '../hooks/useGenerateError';
+import { notifyCreditsChanged } from '../context/CreditsContext';
 import { waitForTask } from '../lib/poll';
-import { MODE_LABELS, MOCK_NOTICE } from '../lib/constants';
+import {
+  IS_PROD,
+  MAX_IMAGE_MB,
+  MAX_IMAGE_BYTES,
+  MODE_LABELS,
+  RUNTIME_LABELS,
+  runtimeOf,
+  taskErrorText,
+} from '../lib/constants';
+import { useCreditLabel } from '../hooks/useCreditLabel';
+import { AssetLibraryModal, useAssetLibrary } from '../components/AssetLibraryModal';
 import { CapabilityIcon } from '../components/AppLayout';
 import { ExceptionPage } from '../components/ExceptionPage';
 import { ResultMedia, formatDuration } from '../components/ResultMedia';
+import { ProviderBadge } from '../components/ProviderBadge';
 import { StateEmpty, StateSkeleton } from '../components/StateViews';
 import type { Asset, CapabilityParam, Task } from '../types/api';
 
@@ -41,6 +54,7 @@ export function ToolPage() {
   const { capability = '' } = useParams();
   const navigate = useNavigate();
   const { message } = App.useApp();
+  const reportError = useGenerateError();
   const def = capabilityById(capability);
   const { ensureProject } = useProject();
   const [form] = Form.useForm();
@@ -52,6 +66,38 @@ export function ToolPage() {
   const pollSignal = usePollAbort();
 
   const inputs = def?.inputs ?? 1;
+  /*
+   * 消耗价文案与定制工具页同源。此前通用页**完全不提积分**, 用户点下去
+   * 才发现余额少了 —— 同一个能力从不同入口进来, 说辞必须一致。
+   */
+  const creditLabel = useCreditLabel(capability);
+
+  /*
+   * 「从素材库导入」。定制页早就有这个入口, 通用页没有, 于是同一个能力
+   * 换个入口就得多走一趟本地文件。onPick 返回 false 表示额度不足,
+   * 弹窗保持打开让用户改选。
+   */
+  const library = useAssetLibrary((asset) => {
+    if (assets.length >= inputs) {
+      message.warning(`最多 ${inputs} 张`);
+      return false;
+    }
+    if (assets.some((a) => a.id === asset.id)) {
+      message.warning('这张素材已经在列表里了');
+      return false;
+    }
+    setAssets((prev) => [...prev, asset]);
+    setFileList((prev) => [
+      ...prev,
+      {
+        uid: asset.id,
+        name: `素材-${asset.id.slice(0, 6)}.${asset.format}`,
+        status: 'done',
+        url: assetSrc(asset),
+      } as UploadFile,
+    ]);
+    return true;
+  });
 
   // 切换能力时重置表单与状态 (默认值来自后端声明)
   useEffect(() => {
@@ -62,7 +108,7 @@ export function ToolPage() {
     setTask(null);
   }, [def?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const originalThumb = assets[0] ? toAbsoluteUrl(assets[0].sourceUrl) : undefined;
+  const originalThumb = assets[0] ? assetSrc(assets[0]) : undefined;
 
   if (!def) {
     return (
@@ -82,6 +128,37 @@ export function ToolPage() {
         kind="info"
         title={`${def.name} 规划中`}
         desc="该能力已在产品路线中占位，尚未接入实现。可以先回工作台看看其他已可用的工具。"
+        action={{ to: '/workbench', label: '返回工作台' }}
+      />
+    );
+  }
+
+  /*
+   * 运行时结论（2026-10-21）。`planned` 已在上方拦掉，这里处理运营侧的
+   * 下线与「云端通道没配且本地也没有实现」两种情况 —— 两者的共同点是
+   * **按下去必然失败**，所以直接换成说明页，而不是让用户上传完图才收到报错。
+   */
+  const runtime = runtimeOf(def);
+  const blocked = runtime.effective === 'disabled' || runtime.effective === 'unavailable';
+  if (blocked) {
+    return (
+      <ExceptionPage
+        kind="info"
+        title={`${def.name}${runtime.effective === 'disabled' ? ' 已下线' : ' 暂不可用'}`}
+        desc={runtime.reason || '该能力当前不可提交，请稍后再试或联系客服。'}
+        /*
+         * 诊断串只在非生产环境露出（2026-10-22 改）。
+         *
+         * 原来无条件渲染 `runtime: … · route=… · remoteAvailable=…` ——
+         * 那是给排障的开发者看的内部配置回显（运营侧的 `gateway.route.<id>`
+         * 取值、云端通道是否可用），对终端用户是纯黑话，还把通道部署情况
+         * 泄露给了客户。生产环境直接不给；本地/测试档留着自己排查。
+         */
+        detail={
+          IS_PROD
+            ? undefined
+            : `runtime: ${runtime.effective} · route=${runtime.route} · remoteAvailable=${runtime.remoteAvailable}`
+        }
         action={{ to: '/workbench', label: '返回工作台' }}
       />
     );
@@ -117,18 +194,20 @@ export function ToolPage() {
       });
       const done = await pollTask(taskId);
       if (done.status === 'failed') {
-        message.error(`生成失败（${done.errorCode ?? '未知错误'}）`);
+        message.error(`生成失败：${taskErrorText(done.errorCode)}`);
       } else {
         message.success(`${def!.name} 已完成`);
       }
     } catch (e) {
-      message.error((e as Error).message || '生成失败');
+      reportError(e);
     } finally {
       setSubmitting(false);
+      // 扣费在建任务时发生、失败会自动退还，两个方向都改了余额
+      notifyCreditsChanged();
     }
   }
 
-  const resultUrl = task?.outputAsset ? toAbsoluteUrl(task.outputAsset.sourceUrl) : undefined;
+  const resultUrl = task?.outputAsset ? assetSrc(task.outputAsset) : undefined;
 
   return (
     <div className="tool-page">
@@ -144,17 +223,19 @@ export function ToolPage() {
           <Title level={3} className="tool-header-title">
             {def.name}
             {def.badge && <Tag className="tool-tag-free">{def.badge}</Tag>}
-            <Tag className={`tool-tag-mode tool-tag-${def.mode}`}>{MODE_LABELS[def.mode]}</Tag>
+            {/*
+              标注以**运行时结论**为准（云端模型 / 本地算法 / 不可用），
+              mode 只在后端未下发 runtime 时兜底 —— 同一项能力在不同部署下
+              按下去走的路不同，标 mode 会把「没配通道的 real」说成「已接入」。
+            */}
+            <Tag className={`tool-tag-mode tool-tag-${runtime.effective === 'remote' ? 'real' : runtime.effective}`}>
+              {RUNTIME_LABELS[runtime.effective] ?? MODE_LABELS[def.mode]}
+            </Tag>
           </Title>
           <Paragraph className="tool-header-sub">{def.summary}</Paragraph>
         </div>
       </div>
 
-      {def.mode === 'mock' && (
-        <div className="tool-notice">
-          <Text>{MOCK_NOTICE}</Text>
-        </div>
-      )}
       {def.help && (
         <div className="tool-notice tool-notice-help">
           <Text type="secondary">{def.help}</Text>
@@ -170,6 +251,11 @@ export function ToolPage() {
             multiple={inputs > 1}
             maxCount={inputs}
             beforeUpload={(file) => {
+              // 体积上限与定制工具页同源; 超限直接拦下, 不再"传上去再说"
+              if (file.size > MAX_IMAGE_BYTES) {
+                message.error(`单张不超过 ${MAX_IMAGE_MB}MB：${file.name}`);
+                return Upload.LIST_IGNORE;
+              }
               setSubmitting(true);
               doUpload(file)
                 .then((asset) => {
@@ -191,15 +277,22 @@ export function ToolPage() {
               <UploadIcon size={20} />
               <span>上传图片</span>
               <Text type="secondary" className="tool-upload-hint">
-                ≤ 20MB
+                ≤ {MAX_IMAGE_MB}MB
               </Text>
             </div>
           </Upload>
 
+          <Button type="link" size="small" onClick={library.openLibrary} disabled={submitting}>
+            从素材库导入
+          </Button>
+
           <Form form={form} layout="vertical" className="tool-form">
-            {def.params.map((p) => (
-              <ParamField key={p.key} param={p} />
-            ))}
+            {/* hidden 的参数由具体页面代填（如遮罩素材 id），通用表单不渲染 */}
+            {def.params
+              .filter((p) => !p.hidden)
+              .map((p) => (
+                <ParamField key={p.key} param={p} />
+              ))}
           </Form>
 
           <Button
@@ -211,8 +304,9 @@ export function ToolPage() {
             onClick={onSubmit}
             className="tool-submit"
           >
-            {submitting ? '生成中…' : '生 成'}
+            {submitting ? '生成中…' : '立即生成'}
           </Button>
+          {creditLabel && <Text type="secondary" className="tool-credit-hint">{creditLabel}</Text>}
         </Card>
 
         <Card className="tool-result-card" title="生成结果">
@@ -229,16 +323,21 @@ export function ToolPage() {
                 className="tool-result-img"
                 url={resultUrl}
                 modality={task?.outputAsset?.modality}
+                aigc={task?.outputAsset?.aigc}
                 alt={def.name}
               />
               <div className="tool-result-meta">
-                <Text type="secondary">
-                  {task?.outputAsset?.width}×{task?.outputAsset?.height} · {task?.outputAsset?.format}
-                  {/* 视频没有宽高 (Jimp 不解视频), 补一个时长 */}
-                  {formatDuration(task?.outputAsset?.durationMs)
-                    ? ` · ${formatDuration(task?.outputAsset?.durationMs)}`
-                    : ''}
-                </Text>
+                <div>
+                  <Text type="secondary">
+                    {task?.outputAsset?.width}×{task?.outputAsset?.height} · {task?.outputAsset?.format}
+                    {/* 视频没有宽高 (Jimp 不解视频), 补一个时长 */}
+                    {formatDuration(task?.outputAsset?.durationMs)
+                      ? ` · ${formatDuration(task?.outputAsset?.durationMs)}`
+                      : ''}
+                  </Text>
+                  {/* 这一单实际走云端还是本地回落, 以 task.provider 为准 */}
+                  <ProviderBadge provider={task?.provider} />
+                </div>
                 <div className="tool-result-actions">
                   <Button
                     size="small"
@@ -270,6 +369,16 @@ export function ToolPage() {
           )}
         </Card>
       </div>
+
+      <AssetLibraryModal
+        open={library.open}
+        loading={library.loading}
+        items={library.items}
+        error={library.error}
+        onCancel={library.closeLibrary}
+        onPick={library.pick}
+        maxSelectable={inputs}
+      />
     </div>
   );
 }

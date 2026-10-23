@@ -3,6 +3,9 @@ import { SetMetadata, createParamDecorator, ExecutionContext } from '@nestjs/com
 /** 权限点元数据键 */
 export const PERMISSION_KEY = 'admin:permission';
 
+/** 「只要求后台身份」标记的元数据键 */
+export const IDENTITY_ONLY_KEY = 'admin:identityOnly';
+
 /** 审计动作元数据键 */
 export const AUDIT_ACTION_KEY = 'admin:auditAction';
 
@@ -15,6 +18,16 @@ export const AUDIT_ACTION_KEY = 'admin:auditAction';
  * 故在 PermissionGuard 中对无元数据的路由直接放行并在日志中可见。
  */
 export const RequirePermission = (permission: string) => SetMetadata(PERMISSION_KEY, permission);
+
+/**
+ * 声明该端点**只需后台身份, 不需要权限点**。
+ *
+ * 只有确实对全体后台角色开放的自省类端点才该用 (当前登录者是谁、
+ * 自己能做什么、平台概览)。加这个标记的唯一作用是让 PermissionGuard
+ * 不再为它打「未声明权限点」的告警 —— 告警必须保持稀缺,
+ * 否则真正的漏声明会被淹没在一片噪音里。
+ */
+export const AdminIdentityOnly = () => SetMetadata(IDENTITY_ONLY_KEY, true);
 
 /**
  * 声明该端点产生的审计动作名。
@@ -30,7 +43,13 @@ export const RequirePermission = (permission: string) => SetMetadata(PERMISSION_
  */
 export const AuditAction = (action: string) => SetMetadata(AUDIT_ACTION_KEY, action);
 
-/** 取声明的权限点, 未声明返回 null */
+/**
+ * 取本次请求实际生效的权限点, 未声明返回 null。
+ *
+ * 值由 PermissionGuard 在放行时写入 `request.requiredPermission` ——
+ * 守卫之外拿不到 Reflector, 直接用反射查会漏掉类级声明。
+ * 未经过 PermissionGuard 的请求 (非 /admin 路径) 恒返回 null。
+ */
 export function getRequiredPermission(ctx: ExecutionContext): string | null {
   return ctx.switchToHttp().getRequest().requiredPermission ?? null;
 }

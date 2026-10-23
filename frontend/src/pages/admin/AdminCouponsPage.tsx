@@ -1,12 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Drawer, Input, Select, Table } from 'antd';
+import { useCallback, useMemo, useState } from 'react';
+import { App, Button, Drawer, Input, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { marketingApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import {
   AdminListError,
   AdminListLoading,
+  AdminStaleError,
   ConfirmAction,
+  adminPagination,
   useAdminList,
 } from '../../components/admin/AdminWidgets';
 import { AdminEmpty, PageHeader, Panel, StatusTag } from '../../components/admin/PageHeader';
@@ -243,9 +245,9 @@ export function AdminCouponsPage() {
         key: 'code',
         width: 130,
         render: (_: unknown, row) => (
-          <button type="button" className="adm-link adm-mono" onClick={() => openEdit(row)}>
+          <Button type="link" className="adm-link adm-mono" onClick={() => openEdit(row)}>
             {row.code}
-          </button>
+          </Button>
         ),
       },
       { title: '名称', dataIndex: 'name', key: 'name', width: 140 },
@@ -325,12 +327,12 @@ export function AdminCouponsPage() {
           <div className="adm-row-actions">
             {writable && (
               <>
-                <button type="button" className="adm-link" onClick={() => openEdit(row)}>
+                <Button type="link" className="adm-link" onClick={() => openEdit(row)}>
                   编辑
-                </button>
-                <button type="button" className="adm-link" onClick={() => setToggleTarget(row)}>
+                </Button>
+                <Button type="link" className="adm-link" onClick={() => setToggleTarget(row)}>
                   {row.status === 'on' ? '停用' : '启用'}
-                </button>
+                </Button>
               </>
             )}
           </div>
@@ -342,7 +344,7 @@ export function AdminCouponsPage() {
   );
 
   if (loading && !data) return <AdminListLoading tip="加载优惠券…" />;
-  if (error) return <AdminListError error={error} onRetry={reload} />;
+  if (error && !data) return <AdminListError error={error} onRetry={reload} />;
 
   return (
     <>
@@ -351,14 +353,17 @@ export function AdminCouponsPage() {
         description="发放范围、使用条件、有效期与限用。券不提供删除 —— 已核销订单仍引用它，只能停用。"
         actions={
           writable ? (
-            <button type="button" className="adm-btn is-primary" onClick={openCreate}>
+            <Button type="primary" className="adm-btn is-primary" onClick={openCreate}>
               新建优惠券
-            </button>
+            </Button>
           ) : (
             <span className="adm-cell-sub">当前账号无 marketing.write 权限，仅可查看</span>
           )
         }
       />
+
+      {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
+      {error && <AdminStaleError error={error} onRetry={reload} />}
 
       <div className="adm-filter">
         <Input
@@ -389,15 +394,15 @@ export function AdminCouponsPage() {
           allowClear
         />
         <div className="adm-filter-actions">
-          <button
-            type="button"
+          <Button
+            type="primary"
             className="adm-btn is-primary"
             onClick={() => setQuery({ keyword: keyword || undefined, type, status })}
           >
             查询
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            type="default"
             className="adm-btn"
             onClick={() => {
               setKeyword(''); setType(undefined); setStatus(undefined);
@@ -405,7 +410,7 @@ export function AdminCouponsPage() {
             }}
           >
             重置
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -415,9 +420,9 @@ export function AdminCouponsPage() {
             description="还没有优惠券"
             action={
               writable ? (
-                <button type="button" className="adm-btn is-primary" onClick={openCreate}>
+                <Button type="primary" className="adm-btn is-primary" onClick={openCreate}>
                   创建第一张券
-                </button>
+                </Button>
               ) : undefined
             }
           />
@@ -429,14 +434,13 @@ export function AdminCouponsPage() {
             dataSource={data?.items ?? []}
             loading={loading}
             scroll={{ x: 1200 }}
-            pagination={{
+            pagination={adminPagination({
               current: data?.page ?? 1,
               pageSize: data?.pageSize ?? 20,
               total: data?.total ?? 0,
-              showSizeChanger: true,
-              showTotal: (t) => `共 ${t} 张`,
+              unit: '张',
               onChange: setPage,
-            }}
+            })}
           />
         )}
       </Panel>
@@ -450,17 +454,17 @@ export function AdminCouponsPage() {
         className="adm-drawer"
         footer={
           <div className="adm-drawer-footer">
-            <button type="button" className="adm-btn" onClick={() => setFormOpen(false)}>
+            <Button type="default" className="adm-btn" onClick={() => setFormOpen(false)}>
               取消
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              type="primary"
               className="adm-btn is-primary"
               onClick={() => void save()}
               disabled={busy}
             >
               {busy ? '保存中…' : '保存'}
-            </button>
+            </Button>
           </div>
         }
       >
@@ -470,7 +474,7 @@ export function AdminCouponsPage() {
           {!editing && (
             <div className="adm-field">
               <label htmlFor="c-code">券码</label>
-              <input
+              <Input
                 id="c-code"
                 type="text"
                 value={form.code}
@@ -483,7 +487,7 @@ export function AdminCouponsPage() {
 
           <div className="adm-field">
             <label htmlFor="c-name">券名称</label>
-            <input
+            <Input
               id="c-name"
               type="text"
               value={form.name}
@@ -495,21 +499,20 @@ export function AdminCouponsPage() {
           <div className="adm-form-row">
             <div className="adm-field">
               <label htmlFor="c-type">类型</label>
-              <select
+              <Select
                 id="c-type"
                 value={form.type}
-                onChange={(e) => setForm({ ...form, type: e.target.value as CouponType, value: '' })}
-              >
-                {Object.entries(TYPE_LABEL).map(([v, l]) => (
-                  <option key={v} value={v}>{l}</option>
-                ))}
-              </select>
+                onChange={(value) =>
+                  setForm({ ...form, type: value as CouponType, value: '' })
+                }
+                options={Object.entries(TYPE_LABEL).map(([value, label]) => ({ value, label }))}
+              />
             </div>
             <div className="adm-field">
               <label htmlFor="c-value">
                 {form.type === 'discount' ? '折扣 (万分比)' : '减免金额 (元)'}
               </label>
-              <input
+              <Input
                 id="c-value"
                 type="number"
                 /* 折扣存的是万分比(原样显示); 满减/固定额存的是分(除 100 显示为元) */
@@ -527,7 +530,7 @@ export function AdminCouponsPage() {
           <div className="adm-form-row">
             <div className="adm-field">
               <label htmlFor="c-threshold">使用门槛 (元)</label>
-              <input
+              <Input
                 id="c-threshold"
                 type="number"
                 /* form 内存的是**分**(与后端一致), 这里除 100 显示为元 ——
@@ -541,15 +544,12 @@ export function AdminCouponsPage() {
             </div>
             <div className="adm-field">
               <label htmlFor="c-scope">适用范围</label>
-              <select
+              <Select
                 id="c-scope"
                 value={form.scope}
-                onChange={(e) => setForm({ ...form, scope: e.target.value as CouponScope })}
-              >
-                {Object.entries(SCOPE_LABEL).map(([v, l]) => (
-                  <option key={v} value={v}>{l}</option>
-                ))}
-              </select>
+                onChange={(value) => setForm({ ...form, scope: value as CouponScope })}
+                options={Object.entries(SCOPE_LABEL).map(([value, label]) => ({ value, label }))}
+              />
             </div>
           </div>
 
@@ -565,7 +565,7 @@ export function AdminCouponsPage() {
           <div className="adm-form-row">
             <div className="adm-field">
               <label htmlFor="c-total">发行总量</label>
-              <input
+              <Input
                 id="c-total"
                 type="number"
                 value={form.totalCount}
@@ -575,7 +575,7 @@ export function AdminCouponsPage() {
             </div>
             <div className="adm-field">
               <label htmlFor="c-limit">每人限用</label>
-              <input
+              <Input
                 id="c-limit"
                 type="number"
                 value={form.perUserLimit}
@@ -588,7 +588,7 @@ export function AdminCouponsPage() {
           <div className="adm-form-row">
             <div className="adm-field">
               <label htmlFor="c-from">生效时间</label>
-              <input
+              <Input
                 id="c-from"
                 type="datetime-local"
                 value={form.validFrom}
@@ -597,7 +597,7 @@ export function AdminCouponsPage() {
             </div>
             <div className="adm-field">
               <label htmlFor="c-to">失效时间</label>
-              <input
+              <Input
                 id="c-to"
                 type="datetime-local"
                 value={form.validTo}
@@ -608,14 +608,15 @@ export function AdminCouponsPage() {
 
           <div className="adm-field">
             <label htmlFor="c-status">状态</label>
-            <select
+            <Select
               id="c-status"
               value={form.status}
-              onChange={(e) => setForm({ ...form, status: e.target.value as CouponStatus })}
-            >
-              <option value="on">启用</option>
-              <option value="off">停用</option>
-            </select>
+              onChange={(value) => setForm({ ...form, status: value as CouponStatus })}
+              options={[
+                { value: 'on', label: '启用' },
+                { value: 'off', label: '停用' },
+              ]}
+            />
           </div>
         </div>
       </Drawer>

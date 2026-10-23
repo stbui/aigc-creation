@@ -7,7 +7,16 @@
  *   3. 幂等: 重复下单返回同一订单, 重复回调不重复发积分
  *   4. 状态机不可跳跃
  */
-const BASE = 'http://localhost:3001/api/v1';
+// 可用 API_BASE 覆盖: 端口被其它进程占用时, 冒烟必须能指向目标实例
+const BASE = (process.env.API_BASE || 'http://localhost:4100').replace(/\/$/, '') + '/api/v1';
+// 后台凭据: seed:admin 只在首次运行打印一次性密码, 故允许环境变量覆盖
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@huojue.local';
+// 密码没有默认值: seed:admin 只打印一次, 硬编码等于把后台口令写进仓库
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+if (!ADMIN_PASSWORD) {
+  console.error('缺少 ADMIN_PASSWORD: 先 npm run seed:admin, 再用它打印的一次性密码运行本脚本。');
+  process.exit(1);
+}
 const { PrismaClient } = require('@prisma/client');
 const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
 const { resolveDbUrl } = require('./db-url');
@@ -41,8 +50,16 @@ function check(name, ok, detail = '') {
   const login = await call('POST', '/auth/login', null, { email, password: 'test123456' });
   const T = login.data.accessToken;
 
+  // 越权用例需要「另一个真实用户」—— 不能再借用预置账号（项目已无内置演示账号）
+  const otherEmail = `pay-other-${Date.now()}@test.com`;
+  const otherUser = await prisma.user.create({
+    data: { email: otherEmail, passwordHash: await bcrypt.hash('test123456', 10), name: '越权测试' },
+  });
+  const otherLogin = await call('POST', '/auth/login', null, { email: otherEmail, password: 'test123456' });
+  const OT = otherLogin.data.accessToken;
+
   const admin = await call('POST', '/auth/login', null, {
-    email: 'admin@huojue.local', password: 'wQFFfQA8rXHKwSuLPpBz',
+    email: ADMIN_EMAIL, password: ADMIN_PASSWORD,
   });
   const AT = admin.data.accessToken;
 
@@ -132,10 +149,17 @@ function check(name, ok, detail = '') {
   check('扣减后余额减半', halfRemaining === starter.credits - Math.floor(starter.credits / 2),
     `余额 ${halfRemaining}`);
 
+  /*
+   * 退款金额取**订单实付**, 不是商品标价 —— 限时价/会员折扣下单后
+   * 两者本来就不相等 (入门积分包标价 9.9 元, 限时价实付 6.93 元)。
+   * 用标价退款会被「超出可退」正确拒绝, 错的是测试不是实现。
+   */
+  const paidCents = (await call('GET', `/orders/${o1.data.id}`, T)).data?.paidCents;
   const refund = await call('POST', `/admin/orders/${o1.data.id}/refund`, AT, {
-    amountCents: starter.priceCents, reason: '冒烟测试退款',
+    amountCents: paidCents, reason: '冒烟测试退款',
   });
-  check('退款成功', refund.status === 200 || refund.status === 201);
+  check('退款成功', refund.status === 200 || refund.status === 201,
+    `实付 ${paidCents} 分 / ${refund.message ?? ''}`);
   check('记录扣回积分数', refund.data?.creditsReclaimed === halfRemaining,
     `扣回 ${refund.data?.creditsReclaimed}`);
   check('如实记录不可追回部分', refund.data?.creditsUnreclaimable === starter.credits - halfRemaining,
@@ -167,9 +191,7 @@ function check(name, ok, detail = '') {
   check('超时后订单已关闭', cancelled.data?.status === 'cancelled', cancelled.data?.status);
 
   console.log('\n【越权】');
-  const otherOrder = await call('GET', `/orders/${o1.data.id}`, (await call('POST', '/auth/login', null, {
-    email: 'admin@demo.com', password: 'demo1234',
-  })).data.accessToken);
+  const otherOrder = await call('GET', `/orders/${o1.data.id}`, OT);
   check('他人订单不可见', otherOrder.status === 403, otherOrder.message);
 
   console.log('\n【审计留痕】');
@@ -187,6 +209,7 @@ function check(name, ok, detail = '') {
     prisma.orderItem.deleteMany({ where: { order: { userId: user.id } } }),
     prisma.order.deleteMany({ where: { userId: user.id } }),
     prisma.user.delete({ where: { id: user.id } }),
+    prisma.user.delete({ where: { id: otherUser.id } }),
   ]).catch(() => undefined);
 
   console.log(`\n${'='.repeat(52)}`);

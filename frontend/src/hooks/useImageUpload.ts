@@ -1,10 +1,10 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { App } from 'antd';
-import { assetsApi, toAbsoluteUrl } from '../lib/api';
+import { assetsApi, assetSrc, toAbsoluteUrl } from '../lib/api';
 import { useProject } from './useProject';
 import { usePasteUpload } from './usePasteUpload';
 import { useAssetLibrary } from '../components/AssetLibraryModal';
-import type { Asset } from '../types/api';
+import type { Asset, MobileUploadAsset } from '../types/api';
 
 export interface UploadedImage {
   id: string;
@@ -42,6 +42,19 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<UploadedImage[]>(initial);
   const [uploading, setUploading] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  /**
+   * 图片位的同步镜像。
+   *
+   * 素材库弹窗「确定」时是**同步 for 循环**逐个调 onPick, 期间不会重渲染 ——
+   * 只读 state 会让「最多 1 张」的页面把一次勾选的 3 张全部收下。手机上传的
+   * 回调同理 (可能在一次事件里连加多张)。故用 ref 记本轮已接受的结果。
+   */
+  const imagesRef = useRef<UploadedImage[]>(images);
+  useEffect(() => {
+    imagesRef.current = images;
+  }, [images]);
 
   const uploadFiles = useCallback(
     async (files: FileList | File[]) => {
@@ -69,7 +82,7 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
         const uploaded: UploadedImage[] = [];
         for (const file of accepted) {
           const asset = await assetsApi.upload(file, projectId);
-          uploaded.push({ id: asset.id, url: toAbsoluteUrl(asset.sourceUrl) ?? '', name: file.name });
+          uploaded.push({ id: asset.id, url: assetSrc(asset) ?? '', name: file.name });
         }
         setImages((prev) => [...prev, ...uploaded]);
         message.success(`已上传 ${uploaded.length} 张${noun}`);
@@ -100,28 +113,60 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
    */
   const pickFromLibrary = useCallback(
     (asset: Asset): boolean => {
-      if (images.length >= max) {
+      const current = imagesRef.current;
+      if (current.length >= max) {
         message.warning(`最多上传 ${max} 张${noun}`);
         return false;
       }
-      if (images.some((x) => x.id === asset.id)) {
+      if (current.some((x) => x.id === asset.id)) {
         message.info('该素材已在列表中');
         return false;
       }
-      setImages((prev) => [
-        ...prev,
-        {
-          id: asset.id,
-          url: toAbsoluteUrl(asset.sourceUrl) ?? '',
-          name: asset.sourceUrl.split('/').pop() ?? '素材',
-        },
-      ]);
+      const next: UploadedImage = {
+        id: asset.id,
+        url: assetSrc(asset) ?? toAbsoluteUrl(asset.sourceUrl) ?? '',
+        name: asset.sourceUrl.split('/').pop() ?? '素材',
+      };
+      imagesRef.current = [...current, next];
+      setImages((prev) => (prev.some((x) => x.id === next.id) ? prev : [...prev, next]));
       return true;
     },
-    [images.length, max, noun, message],
+    [max, noun, message],
   );
 
   const library = useAssetLibrary(pickFromLibrary);
+
+  /**
+   * 手机端传回图片 → 进入图片位。
+   *
+   * 超出位数的部分**如实告知被截断**, 不静默丢弃 (FreeCreationPage 同款语义)。
+   */
+  const addMobileAssets = useCallback(
+    (assets: MobileUploadAsset[]) => {
+      const current = imagesRef.current;
+      const room = max - current.length;
+      if (room <= 0) {
+        message.warning(`图片位已满 (${max} 张${noun}), 手机上传的图片未加入`);
+        setMobileOpen(false);
+        return;
+      }
+      const fresh = assets.filter((a) => !current.some((x) => x.id === a.id));
+      const accepted = fresh.slice(0, room);
+      const dropped = fresh.length - accepted.length;
+      if (dropped > 0) message.warning(`图片位只剩 ${room} 个, ${dropped} 张未加入`);
+
+      const added: UploadedImage[] = accepted.map((a) => ({
+        id: a.id,
+        url: toAbsoluteUrl(a.signedUrl || a.url) ?? '',
+        name: a.filename,
+      }));
+      imagesRef.current = [...current, ...added];
+      setImages((prev) => [...prev, ...added.filter((a) => !prev.some((x) => x.id === a.id))]);
+      setMobileOpen(false);
+      if (added.length > 0) message.success(`已从手机接收 ${added.length} 张${noun}`);
+    },
+    [max, noun, message],
+  );
 
   return {
     images,
@@ -131,5 +176,12 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
     removeImage,
     /** 素材库弹窗状态 (openLibrary / closeLibrary / pick) */
     library,
+    /** 手机上传弹窗: 状态 + 打开 + 接收回调 (弹窗由页面渲染) */
+    mobile: {
+      open: mobileOpen,
+      openMobile: () => setMobileOpen(true),
+      closeMobile: () => setMobileOpen(false),
+      addAssets: addMobileAssets,
+    },
   };
 }

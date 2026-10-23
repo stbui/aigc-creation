@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { App, Modal } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { Maximize2, RefreshCw, X } from 'lucide-react';
-import { assetsApi, generateApi, toAbsoluteUrl } from '../lib/api';
+import { assetsApi, generateApi, assetSrc, toAbsoluteUrl } from '../lib/api';
 import { languageOptions, platformOptions } from '../lib/optionSets';
 
 import { ToolEmptyState, ToolGeneratingState, ToolWorkflowSteps } from '../components/ToolEmptyState';
@@ -10,11 +10,18 @@ import { ToolSubmitBar } from '../components/ToolSubmitBar';
 import { ToolImageDropzone } from '../components/ToolImageDropzone';
 import { ToolSettingsPopover } from '../components/ToolSettingsPopover';
 import { AssetLibraryModal, useAssetLibrary } from '../components/AssetLibraryModal';
+import { MobileUploadModal } from '../components/MobileUploadModal';
+import { ProviderBadge } from '../components/ProviderBadge';
 import { useProject } from '../hooks/useProject';
 import { usePollAbort } from '../hooks/usePollAbort';
 import { usePasteUpload } from '../hooks/usePasteUpload';
+import { useCapabilities } from '../hooks/useCapabilities';
+import { useCreditLabel } from '../hooks/useCreditLabel';
+import { useGenerateError } from '../hooks/useGenerateError';
+import { notifyCreditsChanged } from '../context/CreditsContext';
 import { pollToResult } from '../lib/poll';
-import type { Asset, TaskStatus } from '../types/api';
+import { MAX_IMAGE_MB, taskErrorText } from '../lib/constants';
+import type { Asset, MobileUploadAsset, TaskStatus } from '../types/api';
 
 /**
  * 爆款复刻工作台 —— 1:1 复刻参考站 https://ijihua.cn/viral-clone。
@@ -34,17 +41,17 @@ import type { Asset, TaskStatus } from '../types/api';
  * 接线: 商品图 + 参考图 → hot_remake 任务 (inputAssetIds 顺序即上传顺序,
  * 后端保序: [0]=商品图 [1]=参考图); 复刻程度 → degree 参数
  * (high_replica=参考图为底替换商品 / reference_style=提取参考图布局重建场景);
- * 复刻要求/名称/品牌 → 任务参数 (中文原文完整记录, 图内仅绘制 ASCII 部分);
+ * 复刻要求/名称/品牌 → 任务参数 (中文原文完整下发; 不再有"图内只画 ASCII"的本地兜底);
  * 比例/画质 → ratio / size 参数。
  *
- * 诚实披露: hot_remake 为 mock 能力 (依赖真实 AI 模型), 本地为参数化占位渲染 ——
- * 空态与结果卡均有明示, 不用假效果冒充模型能力。
+ * 2026-10-22 起本地实现是**真实算法** (makeClone: 提取参考图布局签名与调色板 →
+ * 按两档复刻程度重建场景 / 换主体), 不再是占位图。云端通道不可用时由本地兜底出图,
+ * 保底有产出; 只有能力被后台下线时才置灰提交。
  */
 
 // ───────────────── 常量 (参考站实拍) ─────────────────
 
 const MAX_IMAGES = 5;
-const MAX_IMAGE_MB = 10;
 const MAX_NAME_LEN = 100;
 const MAX_REQUIREMENT_LEN = 1000;
 
@@ -71,10 +78,13 @@ interface PkResult {
   width?: number;
   height?: number;
   errorCode?: string | null;
+  /** 本次实际通道: gateway=真实模型 / local=本地算法 (来自 pollToResult) */
+  provider?: string | null;
 }
 
 export function ViralClonePage() {
   const { message } = App.useApp();
+  const reportError = useGenerateError();
   const navigate = useNavigate();
   const { ensureProject } = useProject();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -98,14 +108,33 @@ export function ViralClonePage() {
   const [expandOpen, setExpandOpen] = useState(false);
   /** 素材库双通道: 本次导入写入商品图还是参考图（由触发按钮决定） */
   const [libraryTarget, setLibraryTarget] = useState<'product' | 'reference'>('product');
+  /** 手机上传双通道: 与素材库同理, 由触发按钮决定回填到哪一栏 */
+  const [mobileTarget, setMobileTarget] = useState<'product' | 'reference'>('product');
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   // ── 任务状态 ──
   const [submitting, setSubmitting] = useState(false);
+  // 实时价来自能力清单（后台可调价），按钮文案不能再写死「免费生图」
+  const creditLabel = useCreditLabel('hot_remake');
   const [result, setResult] = useState<PkResult | null>(null);
   const pollSignal = usePollAbort();
 
   // 参考站本页名称/品牌/复刻要求均为选填, 提交条件 = 商品图 ≥1 + 参考图 =1
   const formValid = images.length > 0 && reference !== null;
+
+  /*
+   * 该能力此刻能不能生成 (2026-10-21, 2026-10-22 修订)。
+   *
+   * hot_remake 有真实本地算法, 没通道会回落本地而非失败; 只有被后台下线
+   * (`disabled`) 或能力状态异常 (`unavailable`) 时才需要提前拦住提交。
+   */
+  const { data: capData } = useCapabilities();
+  const hotRemakeRuntime = capData?.items.find((c) => c.id === 'hot_remake')?.runtime;
+  const unavailableReason =
+    hotRemakeRuntime &&
+    (hotRemakeRuntime.effective === 'unavailable' || hotRemakeRuntime.effective === 'disabled')
+      ? hotRemakeRuntime.reason || '该能力当前不可提交，请稍后再试或联系客服。'
+      : null;
 
   // ── 上传: 商品图 (点击/拖拽/粘贴, 最多 5 张) ──
   const uploadFiles = useCallback(
@@ -134,7 +163,7 @@ export function ViralClonePage() {
         const uploaded: PkAsset[] = [];
         for (const file of accepted) {
           const asset = await assetsApi.upload(file, projectId);
-          uploaded.push({ id: asset.id, url: toAbsoluteUrl(asset.sourceUrl) ?? '', name: file.name });
+          uploaded.push({ id: asset.id, url: assetSrc(asset) ?? '', name: file.name });
         }
         setImages((prev) => [...prev, ...uploaded]);
         message.success(`已上传 ${uploaded.length} 张商品图片`);
@@ -164,7 +193,7 @@ export function ViralClonePage() {
       try {
         const projectId = await ensureProject();
         const asset = await assetsApi.upload(file, projectId);
-        setReference({ id: asset.id, url: toAbsoluteUrl(asset.sourceUrl) ?? '', name: file.name });
+        setReference({ id: asset.id, url: assetSrc(asset) ?? '', name: file.name });
         message.success('参考图已上传（最多 1 张，新上传将替换原参考图）');
       } catch (e) {
         message.error((e as Error).message || '上传失败');
@@ -187,7 +216,7 @@ export function ViralClonePage() {
   const pickFromLibrary = (asset: Asset): boolean => {
     const name = asset.sourceUrl.split('/').pop() ?? '素材';
     if (libraryTarget === 'reference') {
-      setReference({ id: asset.id, url: toAbsoluteUrl(asset.sourceUrl) ?? '', name });
+      setReference({ id: asset.id, url: assetSrc(asset) ?? '', name });
       return true;
     }
     if (images.length >= MAX_IMAGES) {
@@ -198,7 +227,7 @@ export function ViralClonePage() {
       message.info('该素材已在列表中');
       return false;
     }
-    setImages((prev) => [...prev, { id: asset.id, url: toAbsoluteUrl(asset.sourceUrl) ?? '', name }]);
+    setImages((prev) => [...prev, { id: asset.id, url: assetSrc(asset) ?? '', name }]);
     return true;
   };
 
@@ -217,6 +246,52 @@ export function ViralClonePage() {
     openLibrary();
   };
 
+  // ── 手机上传 (与素材库同一套双通道语义) ──
+  const openMobileFor = (target: 'product' | 'reference') => {
+    setMobileTarget(target);
+    setMobileOpen(true);
+  };
+
+  /**
+   * 手机端传回图片 → 按本次触发按钮决定写入商品图还是参考图。
+   *
+   * 参考图位只有 1 个: 多传的部分如实告知被丢弃 (不静默截断)。
+   */
+  const addMobileAssets = useCallback(
+    (assets: MobileUploadAsset[]) => {
+      const toAsset = (a: MobileUploadAsset) => ({
+        id: a.id,
+        url: toAbsoluteUrl(a.signedUrl || a.url) ?? '',
+        name: a.filename,
+      });
+      if (mobileTarget === 'reference') {
+        const first = assets[0];
+        setMobileOpen(false);
+        if (!first) return;
+        if (assets.length > 1) message.warning('参考图位只有 1 个，仅取第 1 张');
+        setReference(toAsset(first));
+        message.success('已从手机接收参考图');
+        return;
+      }
+      // 额度判定放在 setState 外: 在 updater 里弹 toast 会被 StrictMode 跑两遍
+      const room = MAX_IMAGES - images.length;
+      if (room <= 0) {
+        message.warning(`商品图位已满 (${MAX_IMAGES} 张), 手机上传的图片未加入`);
+        setMobileOpen(false);
+        return;
+      }
+      const fresh = assets.filter((a) => !images.some((x) => x.id === a.id));
+      const accepted = fresh.slice(0, room);
+      if (fresh.length > accepted.length) {
+        message.warning(`商品图位只剩 ${room} 个, ${fresh.length - accepted.length} 张未加入`);
+      }
+      setImages((prev) => [...prev, ...accepted.map(toAsset)]);
+      setMobileOpen(false);
+      if (accepted.length > 0) message.success(`已从手机接收 ${accepted.length} 张图片`);
+    },
+    [images, message, mobileTarget],
+  );
+
   // ── 生成 ──
   const pollTask = useCallback(
     (taskId: string) => pollToResult(taskId, { signal: pollSignal }),
@@ -225,6 +300,11 @@ export function ViralClonePage() {
 
   const submit = async () => {
     if (!formValid || !reference || submitting) return;
+    // 没有可用模型通道: 后端必定 42204 并退款, 不发起这次注定失败的任务
+    if (unavailableReason) {
+      message.warning(unavailableReason);
+      return;
+    }
     setSubmitting(true);
     setResult(null);
     try {
@@ -247,12 +327,14 @@ export function ViralClonePage() {
       });
       const done = await pollTask(taskId);
       setResult(done);
-      if (done.status === 'failed') message.error(`生成失败（${done.errorCode ?? '未知错误'}）`);
+      if (done.status === 'failed') message.error(`生成失败：${taskErrorText(done.errorCode)}`);
       else message.success('爆款复刻图已生成');
     } catch (e) {
-      message.error((e as Error).message || '生成失败');
+      reportError(e);
     } finally {
       setSubmitting(false);
+      // 扣费在建任务时发生、失败会自动退还，两个方向都改了余额
+      notifyCreditsChanged();
     }
   };
 
@@ -286,7 +368,8 @@ export function ViralClonePage() {
                 fileInputRef={fileInputRef}
                 onFiles={(f) => void uploadFiles(f)}
                 onRemove={removeImage}
-                onOpenLibrary={() => openLibrary()}
+                onOpenLibrary={() => openLibraryFor('product')}
+                onOpenMobile={() => openMobileFor('product')}
                 noun="商品图片"
               />
 
@@ -302,6 +385,7 @@ export function ViralClonePage() {
                 onFiles={(f) => void uploadReference(f)}
                 onRemove={() => setReference(null)}
                 onOpenLibrary={() => openLibraryFor('reference')}
+                onOpenMobile={() => openMobileFor('reference')}
                 noun="参考图片"
                 sectionClassName="vc-reference-section"
                 dropzoneClassName="pk-dropzone-reference"
@@ -412,11 +496,15 @@ export function ViralClonePage() {
 
 
           {/* 高级设置 + 提交 (sticky 底部) */}
-          {/* 高级设置 + 提交 (sticky 底部) */}
+          {/* 无可用模型通道: 提前说明, 而不是让用户点下去等一次 42204 */}
+          {unavailableReason && !submitting && (
+            <p className="tool-submit-notice tool-submit-notice-error">{unavailableReason}</p>
+          )}
           <ToolSubmitBar
             submitting={submitting}
-            disabled={!formValid}
-            label="免费生图"
+            disabled={!formValid || Boolean(unavailableReason)}
+            label="立即生成"
+            creditLabel={creditLabel ?? undefined}
             settings={
               <ToolSettingsPopover
                 open={settingsOpen}
@@ -425,6 +513,7 @@ export function ViralClonePage() {
                 onRatioChange={setRatio}
                 resolution={resolution}
                 onResolutionChange={setResolution}
+                capabilityId="hot_remake"
               />
             }
             onSubmit={() => void submit()}
@@ -440,9 +529,6 @@ export function ViralClonePage() {
         ) : !result ? (
           <ToolEmptyState title="效果图预览" desc="提交任务后，生成结果将在此处展示">
             <ToolWorkflowSteps />
-            <p className="vc-mock-note">
-                本地演示：复刻结果为参数化占位渲染（真实复刻需接入 AI 模型），参考图会真实参与构图与配色
-              </p>
           </ToolEmptyState>
         ) : (
           <div className="pk-result-body">
@@ -463,8 +549,10 @@ export function ViralClonePage() {
                     <img src={result.url} alt="爆款复刻图" />
                   </div>
                   <div className="pk-result-meta">
-                    <span className="pk-result-variant">爆款复刻结果</span>
-                    <span className="pk-result-mock-badge">本地占位渲染</span>
+                    <span className="pk-result-variant">
+                      爆款复刻结果
+                      <ProviderBadge provider={result.provider} />
+                    </span>
                     <span className="pk-result-params">
                       {DEGREE_LABEL[degree]} · {platform} · {ratio} · {resolution.toUpperCase()}
                       {result.width && result.height ? ` · ${result.width}×${result.height}` : ''}
@@ -478,7 +566,7 @@ export function ViralClonePage() {
                 <div className="pk-result-card pk-result-card-detail">
                   <div className="pk-result-detail-media pk-result-failed">
                     <X size={20} />
-                    <span>生成失败（{result.errorCode ?? '未知错误'}）</span>
+                    <span>生成失败：{taskErrorText(result.errorCode)}</span>
                   </div>
                 </div>
               )}
@@ -499,6 +587,9 @@ export function ViralClonePage() {
         onPick={pick}
         maxSelectable={libraryTarget === 'reference' ? 1 : MAX_IMAGES}
       />
+
+      {/* 手机上传弹窗 (二维码方案; 按 mobileTarget 决定写入商品图还是参考图) */}
+      <MobileUploadModal open={mobileOpen} onReceived={addMobileAssets} onCancel={() => setMobileOpen(false)} />
 
       {/* 复刻要求放大编辑 */}
       <Modal

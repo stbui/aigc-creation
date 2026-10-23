@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { gatewayConfigOf } from './gateway.config';
+import { protocolSupports } from './vendors/vendor.presets';
 import type { Modality } from './modality';
 
 /**
@@ -41,8 +42,28 @@ export interface ChannelView {
   cooldownUntil: string | null;
   lastSuccessAt: string | null;
   lastFailureAt: string | null;
+  /** 该 (模态, 协议) 在本项目是否有实现; false 的线路一旦启用就会必然失败 */
+  protocolKnown: boolean;
+  /** 最近一次配置更新时间; 合成通道为 null */
+  updatedAt: string | null;
   /** true = 这条是**未落库**的合成通道 (迁移自单通道配置) */
   synthetic: boolean;
+}
+
+/** 某模态的调度来源与线路汇总 */
+export type ChannelDispatchSource = 'channels' | 'legacy' | 'none';
+
+export interface ChannelSnapshot {
+  modality: Modality;
+  /** channels=按线路表调度 / legacy=沿用旧版单通道配置 / none=未接入 */
+  source: ChannelDispatchSource;
+  total: number;
+  enabledCount: number;
+  /** 启用 + 不在冷却 + 协议已实现 */
+  availableCount: number;
+  coolingCount: number;
+  unsupportedCount: number;
+  channels: ChannelView[];
 }
 
 /** 新增/更新通道的入参 */
@@ -54,6 +75,8 @@ export interface ChannelInput {
   model?: string;
   priority?: number;
   enabled?: boolean;
+  /** 显式清除凭据 (与 token 互斥) */
+  clearToken?: boolean;
 }
 
 @Injectable()
@@ -76,34 +99,126 @@ export class ChannelRepository {
   }
 
   /**
+   * 某模态的完整调度快照 —— 页面「我在按什么调度」的唯一事实源。
+   *
+   * ⚠️ `source` 的判定顺序不能颠倒: 表里有行就是 `channels`，
+   * **即使全部停用也不能回落成 legacy**。否则运营停用全部线路后，
+   * 旧配置会悄悄复活 —— 那是最难察觉的一类配置事故。
+   */
+  async snapshot(modality: Modality): Promise<ChannelSnapshot> {
+    const rows = await this.prisma.modelChannel.findMany({
+      where: { modality },
+      orderBy: { priority: 'asc' },
+    });
+
+    if (rows.length > 0) {
+      return this.summarize(modality, 'channels', rows.map((r) => this.toView(r, false)));
+    }
+
+    const synthetic = this.synthesize(modality);
+    return this.summarize(modality, synthetic ? 'legacy' : 'none', synthetic ? [synthetic] : []);
+  }
+
+  private summarize(
+    modality: Modality,
+    source: ChannelDispatchSource,
+    channels: ChannelView[],
+  ): ChannelSnapshot {
+    const now = Date.now();
+    const cooling = (c: ChannelView) => Boolean(c.cooldownUntil && Date.parse(c.cooldownUntil) > now);
+    return {
+      modality,
+      source,
+      total: channels.length,
+      enabledCount: channels.filter((c) => c.enabled).length,
+      // 没有 baseUrl 的线路即使启用也不可能调用成功，不计入可用
+      availableCount: channels.filter(
+        (c) => c.enabled && !cooling(c) && c.protocolKnown && Boolean(c.baseUrl),
+      ).length,
+      coolingCount: channels.filter(cooling).length,
+      unsupportedCount: channels.filter((c) => !c.protocolKnown).length,
+      channels,
+    };
+  }
+
+  /**
    * 新增通道。
    *
    * ⚠️ **首次新增会先固化合成通道** —— 否则合成通道 (priority=0) 与
    * 新通道的 priority 会撞车, 且运营会发现自己改旧配置不再生效却不知为何。
    */
   async create(modality: Modality, input: ChannelInput): Promise<ChannelView> {
-    await this.materializeIfSynthetic(modality);
-    // priority 缺省 = 当前最大 + 1 (追加到末尾), 不占用已有的 0
-    const max = await this.prisma.modelChannel.findFirst({
-      where: { modality },
-      orderBy: { priority: 'desc' },
-      select: { priority: true },
-    });
-    const priority = input.priority ?? (max ? max.priority + 1 : 0);
+    const { channel } = await this.createWithMaterialize(modality, input);
+    return channel;
+  }
 
-    const row = await this.prisma.modelChannel.create({
-      data: {
-        modality,
-        name: input.name,
-        protocol: input.protocol,
-        baseUrl: input.baseUrl ?? '',
-        token: input.token ?? '',
-        model: input.model ?? '',
-        priority,
-        enabled: input.enabled ?? true,
-      },
+  /**
+   * 创建线路，并把「首次新增前固化旧配置」与「创建新线路」放在同一事务里。
+   *
+   * 不做事务的话，创建失败会留下一条已固化的旧配置 —— 调度来源从
+   * legacy 悄悄变成 channels，而运营什么也没保存成功。行为上数据没丢，
+   * 但页面会显示「已切换」，是最难解释的那类半成功。
+   */
+  async createWithMaterialize(
+    modality: Modality,
+    input: ChannelInput,
+  ): Promise<{ channel: ChannelView; materialized: boolean }> {
+    return this.prisma.$transaction(async (tx) => {
+      let materialized = false;
+      const count = await tx.modelChannel.count({ where: { modality } });
+      if (count === 0) {
+        const synthetic = this.synthesize(modality);
+        if (synthetic) {
+          const cfg = gatewayConfigOf(modality);
+          await tx.modelChannel.create({
+            data: {
+              modality,
+              name: `${modality} 通道 (迁移自单通道配置)`,
+              protocol: cfg.provider,
+              baseUrl: cfg.baseUrl,
+              token: cfg.token,
+              model: cfg.model,
+              priority: 0,
+              enabled: true,
+            },
+          });
+          materialized = true;
+          this.log.log(`${modality} 模态的存量单通道配置已固化为多渠道首条`);
+        }
+      }
+
+      /*
+       * priority 缺省 = 当前最大 + 1（追加到末尾）。
+       * 并发新增可能撞 (modality, priority) 唯一约束，故冲突时重算一次再试；
+       * 重试仍失败就向上抛，由 service 转成 409，而不是返回一个「看起来成功」的假通道。
+       */
+      for (let attempt = 0; attempt < 3; attempt += 1) {
+        const max = await tx.modelChannel.findFirst({
+          where: { modality },
+          orderBy: { priority: 'desc' },
+          select: { priority: true },
+        });
+        const priority = input.priority ?? (max ? max.priority + 1 : 0);
+        try {
+          const row = await tx.modelChannel.create({
+            data: {
+              modality,
+              name: input.name,
+              protocol: input.protocol,
+              baseUrl: input.baseUrl ?? '',
+              token: input.token ?? '',
+              model: input.model ?? '',
+              priority,
+              enabled: input.enabled ?? true,
+            },
+          });
+          return { channel: this.toView(row, false), materialized };
+        } catch (e) {
+          if ((e as { code?: string }).code !== 'P2002' || attempt === 2) throw e;
+        }
+      }
+      throw new Error('创建通道失败：优先级冲突');
     });
-    return this.toView(row, false);
   }
 
   /**
@@ -120,11 +235,22 @@ export class ChannelRepository {
     if (input.model !== undefined) data.model = input.model;
     if (input.priority !== undefined) data.priority = input.priority;
     if (input.enabled !== undefined) data.enabled = input.enabled;
-    // 仅当显式传入非空 token 才更新凭据
-    if (input.token !== undefined && input.token !== '') data.token = input.token;
+    /*
+     * 凭据语义（与 ModelChannelConfig 一致）：
+     *   未传 / 空串 → 保持原值（运营改个名字不该把密钥抹掉）
+     *   非空        → 更新
+     *   clearToken  → 显式清空（与上面两条互斥，由 service 校验）
+     */
+    if (input.clearToken) data.token = '';
+    else if (input.token !== undefined && input.token !== '') data.token = input.token;
 
     const row = await this.prisma.modelChannel.update({ where: { id }, data });
     return this.toView(row, false);
+  }
+
+  /** 取原始行（含明文令牌）—— 仅供服务端测试与内部逻辑，绝不直接下发前端 */
+  async getRaw(id: string) {
+    return this.prisma.modelChannel.findUnique({ where: { id } });
   }
 
   /** 删除通道 */
@@ -174,9 +300,23 @@ export class ChannelRepository {
      */
     const selfPriority = self.priority;
     const otherPriority = other.priority;
+    /*
+     * ⚠️ 交换必须**三段式**：借一个临时 priority 中转。
+     *
+     * `@@unique([modality, priority])` 是立即生效的唯一索引，SQLite 逐语句检查、
+     * 不能延迟到事务提交时。因此「两条 update 直接互换」的第一步就会与还没让位的
+     * 另一条撞车（P2002，2026-10-21 线上实证）。事务包起来也没用 ——
+     * 被推迟的不是约束检查，而是提交。
+     *
+     * 临时值取「本模态最小 priority - 1」：`rows` 已包含该模态全部行，故必空闲；
+     * 不用 0 / -1 这类固定值，避免与真实数据撞车。临时值只在事务内存在，
+     * 结束时 self 落在 otherPriority，库里不会留下它。
+     */
+    const tempPriority = rows.reduce((min, r) => Math.min(min, r.priority), selfPriority) - 1;
     await this.prisma.$transaction([
-      this.prisma.modelChannel.update({ where: { id: self.id }, data: { priority: otherPriority } }),
+      this.prisma.modelChannel.update({ where: { id: self.id }, data: { priority: tempPriority } }),
       this.prisma.modelChannel.update({ where: { id: other.id }, data: { priority: selfPriority } }),
+      this.prisma.modelChannel.update({ where: { id: self.id }, data: { priority: otherPriority } }),
     ]);
     return this.list(target.modality as Modality);
   }
@@ -184,14 +324,18 @@ export class ChannelRepository {
   /**
    * 固化合成通道 (把存量单通道配置变成真行)。
    *
-   * 仅在运营首次新增通道时调用 —— 见 create 的注释。
+   * 只在运营显式动作时调用（新增线路 / 页面点「转为可管理线路」）。
+   * 返回 false 表示该模态已有真行、无需固化（幂等）。
+   *
+   * ⚠️ 固化会把当时生效的 token（可能来自环境变量）复制进 DB ——
+   * 这是旧配置在固化后仍能工作的必要条件，但确认弹窗必须向运营说明。
    */
-  private async materializeIfSynthetic(modality: Modality): Promise<void> {
+  async materialize(modality: Modality): Promise<boolean> {
     const count = await this.prisma.modelChannel.count({ where: { modality } });
-    if (count > 0) return;
+    if (count > 0) return false;
 
     const synthetic = this.synthesize(modality);
-    if (!synthetic) return;
+    if (!synthetic) return false;
 
     const cfg = gatewayConfigOf(modality);
     await this.prisma.modelChannel.create({
@@ -207,6 +351,7 @@ export class ChannelRepository {
       },
     });
     this.log.log(`${modality} 模态的存量单通道配置已固化为多渠道首条`);
+    return true;
   }
 
   /** 用存量单通道配置合成一条通道 (不落库) */
@@ -228,6 +373,8 @@ export class ChannelRepository {
       cooldownUntil: null,
       lastSuccessAt: null,
       lastFailureAt: null,
+      protocolKnown: protocolSupports(modality, cfg.provider),
+      updatedAt: null,
       synthetic: true,
     };
   }
@@ -247,6 +394,8 @@ export class ChannelRepository {
       cooldownUntil: Date | null;
       lastSuccessAt: Date | null;
       lastFailureAt: Date | null;
+      /** 桩 Prisma（验证脚本）可能不提供该字段；缺失时按 null 处理 */
+      updatedAt?: Date | null;
     },
     synthetic: boolean,
   ): ChannelView {
@@ -265,6 +414,8 @@ export class ChannelRepository {
       cooldownUntil: r.cooldownUntil?.toISOString() ?? null,
       lastSuccessAt: r.lastSuccessAt?.toISOString() ?? null,
       lastFailureAt: r.lastFailureAt?.toISOString() ?? null,
+      protocolKnown: protocolSupports(r.modality as Modality, r.protocol),
+      updatedAt: r.updatedAt?.toISOString() ?? null,
       synthetic,
     };
   }

@@ -11,6 +11,8 @@ import { ResponseInterceptor } from './common/response.interceptor';
 import { AppError } from './common/app.exception';
 import { buildCorsAllowList } from './common/cors-allow-list';
 import { AppFileLogger } from './common/logger/file-logger';
+import { requestContextMiddleware } from './common/request-context';
+import { createSignedAssetMiddleware } from './common/signed-asset.middleware';
 
 function flattenValidationErrors(errors: any[]): string {
   for (const error of errors) {
@@ -28,10 +30,36 @@ function flattenValidationErrors(errors: any[]): string {
 async function bootstrap(): Promise<void> {
   // bufferLogs: DI 初始化期间的启动日志先缓存, 待 useLogger 换成落盘logger后
   // 一次性 flush —— 否则那批最关键的「谁在启动时失败了」会丢在默认 logger 里
-  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
+  //
+  // rawBody: 支付渠道回调必须基于**原始报文字节**验签 (微信 v3 的签名串里
+  // 直接拼 body 字节)。用 JSON.stringify(parsed) 重新序列化会因为键顺序、
+  // 空格、数字格式的差异得到不同字节, 表现为「签名永远验不过」。
+  // 该选项不会影响上传: multipart 由 multer 处理, 与 bodyParser 无关。
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    bufferLogs: true,
+    rawBody: true,
+  });
   const config = app.get(ConfigService);
   const logger = app.get(AppFileLogger);
   app.useLogger(logger);
+
+  /*
+   * 请求上下文必须最先注册: 它开 AsyncLocalStorage, 后续任何中间件、
+   * 守卫、业务代码里的 currentRequestId() 都依赖这个上下文。
+   * 注册在静态资源之前, /uploads 的 403 响应同样带 X-Request-Id。
+   */
+  app.use(requestContextMiddleware);
+
+  /*
+   * 是否信任反向代理的 X-Forwarded-For。
+   * 默认 false: 直接暴露的实例若信任该头, 任何人伪造一个 IP 就能绕开
+   * 全部按 IP 的限流 (登录爆破、短信刷量)。只有确实部署在 Nginx/LB 之后
+   * 才打开 RATE_LIMIT_TRUST_PROXY=1, 且必须保证只有代理能连到本端口。
+   */
+  if (config.get<boolean>('rateLimit.trustProxy')) {
+    app.set('trust proxy', 1);
+    logger.warn('已信任 X-Forwarded-For（RATE_LIMIT_TRUST_PROXY=1）：仅当本服务位于可信代理之后时才可开启', 'Bootstrap');
+  }
 
   // 上传目录必须在 useStaticAssets 之前就位, 否则首次上传会 404。
   // 取自配置层 UPLOAD_DIR (三环境各写各的目录) —— 在此之前 mkdir 是不行的,
@@ -45,14 +73,27 @@ async function bootstrap(): Promise<void> {
   app.setGlobalPrefix(config.get<string>('app.prefix') ?? 'api/v1');
 
   // CORS: 来源由 buildCorsAllowList 决定 (CORS_ORIGINS 显式白名单优先,
-  // 默认放行本机 5173/4173, 私有网段需显式开启) —— 见 src/common/cors-allow-list.ts
+  // 默认放行本机 5100/4173, 私有网段需显式开启) —— 见 src/common/cors-allow-list.ts
   const cors = buildCorsAllowList();
   app.enableCors({
     origin: cors.origin,
     credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    /*
+     * ⚠ 必须包含 PUT: `PUT /api/v1/admin/credit-prices` 与营销规则更新
+     * (`PUT /admin/invites/rules`、`PUT /admin/checkin/rules`) 都是 PUT。
+     * 缺少它时浏览器预检直接失败, 表现为"跨域部署下这两页保存不生效",
+     * 而本地同源开发 (Vite 代理) 一切正常 —— 典型的只在部署后复现的缺陷。
+     */
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   });
+
+  /*
+   * 素材签名校验必须在 useStaticAssets **之前**:
+   * 静态中间件命中即响应, 注册在后面等于完全不校验。
+   * ASSET_SIGNING_SECRET 为空时该中间件直接放行（保持原有公开行为）。
+   */
+  app.use(createSignedAssetMiddleware(config.get<string>('asset.signingSecret') ?? ''));
 
   // 静态服务: GET /uploads/* 直接返回图片
   app.useStaticAssets(uploadsDir, { prefix: '/uploads' });
@@ -73,11 +114,11 @@ async function bootstrap(): Promise<void> {
   // 此处不得再 useGlobalFilters —— 并存会导致过滤器执行两次
   app.useGlobalInterceptors(new ResponseInterceptor());
 
-  // 端口来自配置层 (PORT, 默认 3001); 监听地址来自 HOST (默认 127.0.0.1)。
+  // 端口来自配置层 (PORT, 默认 4100); 监听地址来自 HOST (默认 127.0.0.1)。
   // ⚠ 生产/容器必须 HOST=0.0.0.0: 只绑回环的话容器外根本连不上,
   // 且 compose 里 service 之间的互通同样失败。开发态保持 127.0.0.1 是有意的 ——
   // 不把调试端口暴露到局域网。
-  const port = config.get<number>('app.port') ?? 3001;
+  const port = config.get<number>('app.port') ?? 4100;
   const host = config.get<string>('app.host') ?? '127.0.0.1';
 
   await app.listen(port, host);
@@ -106,6 +147,13 @@ async function bootstrap(): Promise<void> {
   );
   logger.log(
     `日志落盘: ${logger.logDir || '(不可用, 已降级为仅控制台)'} · LOG_LEVEL=${config.get('log.level')} · 保留 ${config.get('log.retentionDays')} 天`,
+    'Bootstrap',
+  );
+  // 安全面横切开关放在启动日志里回显: 「以为开了签名其实没配密钥」是最难查的一类问题
+  const rateLimitOn = (process.env.RATE_LIMIT_ENABLED ?? 'true').toLowerCase() !== 'false';
+  const signingOn = (config.get<string>('asset.signingSecret') ?? '').trim().length > 0;
+  logger.log(
+    `限流 ${rateLimitOn ? '开启' : '已关闭'} · 素材签名 ${signingOn ? '开启(/uploads 需 sig)' : '关闭(公开)'} · 健康检查 /api/v1/health`,
     'Bootstrap',
   );
 }

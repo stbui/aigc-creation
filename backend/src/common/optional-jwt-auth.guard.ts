@@ -1,5 +1,6 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
-import { JwtService } from './jwt.service';
+import { JwtPayload, JwtService } from './jwt.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 /**
  * **可选**鉴权守卫。
@@ -16,21 +17,41 @@ import { JwtService } from './jwt.service';
  */
 @Injectable()
 export class OptionalJwtAuthGuard implements CanActivate {
-  canActivate(context: ExecutionContext): boolean {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const authHeader: string | undefined = request.headers['authorization'];
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) return true;
 
     const token = authHeader.slice('Bearer '.length).trim();
+    let payload: JwtPayload;
     try {
-      const payload = JwtService.verify(token);
-      request.user = { id: payload.sub, email: payload.email };
+      payload = JwtService.verify(token);
     } catch {
       // 令牌无效按未登录处理: 公开接口不该因过期 token 而 401,
       // 那会让用户刷新页面就白屏, 且掩盖了"这个接口本来就不需要登录"的事实
       request.user = undefined;
+      return true;
     }
+
+    /*
+     * 与 JwtAuthGuard 同源地校验账号状态: 被禁用/注销的账号在公开接口上
+     * 按**未登录**处理。不能沿用签名有效就认身份的做法 —— 否则禁用账号
+     * 仍能通过人群定向拿到"仅登录可见"的内容。
+     *
+     * ⚠ 查库异常不在此 catch: 数据库故障时静默降级为"匿名"会把一个
+     * 基础设施故障伪装成"这个人没登录", 排障时无从发现。
+     */
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+      select: { id: true, email: true, status: true, tokenVersion: true },
+    });
+    request.user =
+      user && user.status === 'active' && (payload.tv ?? 0) === user.tokenVersion
+        ? { id: user.id, email: user.email }
+        : undefined;
     return true;
   }
 }

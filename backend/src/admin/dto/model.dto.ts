@@ -83,6 +83,23 @@ export class TestChannelDto {
   @IsOptional()
   @IsIn(['text', 'image', 'video'], { message: 'modality 取值非法' })
   modality?: 'text' | 'image' | 'video';
+
+  /**
+   * 草稿覆盖值 (2026-10-20)。
+   *
+   * 不传 = 按已保存配置测试（旧行为完全不变）；传了 = 用当前表单值测试，
+   * 运营不必先保存就能验证「这份配置能不能通」。
+   */
+  @IsOptional()
+  @IsObject({ message: 'overrides 必须是对象' })
+  @Transform(({ value }) => (value && typeof value === 'object' && !Array.isArray(value) ? value : undefined))
+  overrides?: {
+    protocol?: string;
+    baseUrl?: string;
+    token?: string;
+    model?: string;
+    enabled?: boolean;
+  };
 }
 
 function toBool({ value }: { value: unknown }): unknown {

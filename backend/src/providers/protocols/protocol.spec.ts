@@ -53,7 +53,6 @@ export { MODALITIES } from '../modality';
 
 /** 通道协议标识。**跨模态复用同一名字**, 故必须与模态组合才唯一。 */
 export type GatewayProtocol =
-  | 'aigc' // 自研异步任务契约 (POST /generation/tasks + 轮询)
   | 'openai' // OpenAI 兼容生图 (同步): POST {base}/v1/images/generations
   | 'volcengine' // 火山方舟: POST {base}/images/generations, size 用档位
   | 'minimax' // MiniMax: POST {base}/v1/image_generation, 用 aspect_ratio
@@ -84,7 +83,9 @@ export interface ProtocolSpec {
    * 「提交任务 → 轮询 → 下载」三段式, 轮询参数与超时策略完全不同。
    * 把两者塞进同一形状会导致实现里出现 `if (mode === 'async')` 的分支蔓延。
    *
-   * 首批只有 aigc 自研网关是异步的 —— 它是本项目原协议, 保留兼容。
+   * 当前图像/文本协议都是同步的; 该字段保留是因为协议形状跨模态复用,
+   * 未来接入异步图像协议时仍需显式声明 (视频走独立的 VideoProtocolSpec,
+   * 不在本接口里)。
    */
   mode: 'sync' | 'async';
   /**
@@ -99,6 +100,7 @@ export interface ProtocolSpec {
    * 异步协议的轮询端点 (仅 mode='async' 需要)。
    *
    * 传 taskId 返回查询该任务的完整 URL。
+   * 当前图像/文本协议均为同步, 没有实现用到它; 作为通用异步契约字段保留。
    */
   pollEndpoint?(baseUrl: string, taskId: string): string;
   /** 尺寸参数的表达方式 —— 各家对「多大」的写法完全不同 */
@@ -116,21 +118,50 @@ export interface ProtocolSpec {
   /** 参考图字段名: 单张/多张/该协议特有结构 */
   buildRefField(refs: string[]): Record<string, unknown>;
   /**
+   * 遮罩 (inpainting) 支持 (2026-10-22)。
+   *
+   * ## 为什么必须显式声明而不是「有就发」
+   *
+   * 只有 OpenAI 兼容的 `/v1/images/edits` 接受 mask。火山方舟与 MiniMax 的
+   * 生图端点**没有遮罩字段** —— 把 mask 塞进它们的请求体只会被忽略,
+   * 模型照样整图重绘: 用户涂抹了区域、付了积分, 拿到的却是整张图变了样,
+   * 界面上看不出任何异常。这是本项目最忌的静默不实。
+   *
+   * 故：声明 `none` 的通道**收到遮罩时必须报错**（42205），不得忽略。
+   *
+   * ## `edits` 的语义 (按 OpenAI 官方文档)
+   *
+   *   POST {base}/v1/images/edits, multipart: image / mask / prompt / size / n
+   *   mask 的**全透明区域**表示要重绘的位置 (alpha=0 → 重绘)。
+   *
+   * 其它厂商若采用相反的约定 (白=重绘), 需要另立取值并在实现里显式转换 ——
+   * **不要在这里猜**, 猜错的表现是「涂了 A 区域, B 区域被改」。
+   */
+  maskSupport: 'edits' | 'none';
+  /**
+   * 遮罩重绘端点 (仅 `maskSupport === 'edits'` 需要)。
+   *
+   * 与 `endpoint` 分开声明: 生成与编辑是两条不同的路径, 合成一个函数
+   * 会让「有没有遮罩」这个分支渗进所有协议实现。
+   */
+  maskEndpoint?(baseUrl: string): string;
+  /**
    * 连通性探测的路径 (2026-10-20)。
    *
    * ## 为什么要有它
    *
    * 改造前后台「测试连通性」按**模态**硬编码探测路径:
-   *   image → /generation/tasks   ← 这是 aigc 自研网关的路径!
+   *   image → 一条固定的自研异步路径 (早已删除)
    *   text  → /v1/chat/completions
    *   video → /v1/videos
    *
-   * 而 5 个图像协议的真实端点各不相同:
-   *   aigc → /generation/tasks    openai → /v1/images/generations
-   *   volcengine → /images/generations   minimax → /v1/image_generation
+   * 而三个图像协议的真实端点各不相同:
+   *   openai → /v1/images/generations
+   *   volcengine → /images/generations
+   *   minimax → /v1/image_generation
    *
-   * 于是配了 `openai` 协议时, 探测打的是 `/generation/tasks` —— 那个路径在
-   * 优云智算/硅基流动/OpenAI 官方**根本不存在**。更糟的是探测把 4xx
+   * 于是配了 `openai` 协议时, 探测打的是一条并不存在的固定路径 ——
+   * 优云智算/硅基流动/OpenAI 官方**根本没有那个端点**。更糟的是探测把 4xx
    * 当作「网络可达」→ **测试显示通过, 但生成必然 404**。
    *
    * 这正是「探测通过 ≠ 实际能调通」的根源, 也是本项目最忌讳的静默不实。
@@ -327,46 +358,6 @@ export function videoProtocolSpec(protocol: string): VideoProtocolSpec | undefin
  */
 export const PROTOCOL_SPECS: ProtocolSpec[] = [
   {
-    protocol: 'aigc',
-    modality: 'image',
-    label: 'aigc 自研网关（异步轮询）',
-    mode: 'async',
-    endpoint: (baseUrl) => `${baseUrl.replace(/\/+$/, '')}/generation/tasks`,
-    pollEndpoint: (baseUrl, taskId) =>
-      `${baseUrl.replace(/\/+$/, '')}/generation/tasks/${encodeURIComponent(taskId)}`,
-    sizeStyle: 'openai-wh',
-    maxRefImages: 10,
-    refStyle: 'url',
-    defaultModel: '',
-    // 异步协议的产出在**轮询终态**的响应里, 字段别名极多 (见 gateway-image.provider)
-    extract: (json) => {
-      const pick = (o: any, keys: string[]): string | undefined => {
-        for (const k of keys) {
-          if (o && typeof o[k] === 'string' && o[k].startsWith('http')) return o[k];
-        }
-        return undefined;
-      };
-      const direct = pick(json, ['outputUrl', 'resultUrl', 'imageUrl', 'url', 'sourceUrl']);
-      if (direct) return { url: direct };
-      for (const key of ['outputs', 'assets', 'images', 'files', 'results']) {
-        const arr = json?.[key];
-        if (Array.isArray(arr) && arr.length > 0) {
-          const first = arr[0];
-          const u = typeof first === 'string' ? first : pick(first, ['url', 'sourceUrl', 'imageUrl']);
-          if (u) return { url: u };
-        }
-      }
-      return {};
-    },
-    extractError: (json) => {
-      const e = json?.error;
-      if (!e) return null;
-      return `${e.code ?? e.type ?? 'unknown'}: ${String(e.message ?? '').slice(0, 250)}`;
-    },
-    buildRefField: (refs) => (refs.length ? { inputImages: refs } : {}),
-    // 自研网关没有「模型列表」概念 (模型由本项目能力层定义), 故不声明
-  },
-  {
     protocol: 'openai',
     modality: 'image',
     label: 'OpenAI 兼容（生图）',
@@ -396,6 +387,9 @@ export const PROTOCOL_SPECS: ProtocolSpec[] = [
       if (!refs.length) return {};
       return refs.length === 1 ? { image: refs[0] } : { images: refs };
     },
+    // OpenAI 官方的图像编辑端点: multipart, mask 透明区 = 重绘区
+    maskSupport: 'edits',
+    maskEndpoint: (baseUrl) => `${baseUrl.replace(/\/+$/, '')}/v1/images/edits`,
     // 模型列表候选: OpenAI 兼容标准形状 {base}/v1/models (取证: OpenAI 官方 / 硅基流动官方文档)
     // 次选 /models: 兼容部分厂商把列表挂在根路径
     modelListEndpoints: (baseUrl) => {
@@ -432,6 +426,8 @@ export const PROTOCOL_SPECS: ProtocolSpec[] = [
     },
     // 单张用 image, 多张用 image 数组 (Ark 支持数组形式的多图输入)
     buildRefField: (refs) => (refs.length ? { image: refs.length === 1 ? refs[0] : refs } : {}),
+    // Ark 的 images/generations 没有 mask 字段: 收到遮罩必须报错, 不能默默整图重绘
+    maskSupport: 'none',
     // 模型列表: {base}/models (取证: 火山官方 GET /api/v3/models, baseUrl 已含 /api/v3)
     modelListEndpoints: (baseUrl) => [`${baseUrl.replace(/\/+$/, '')}/models`],
   },
@@ -473,6 +469,8 @@ export const PROTOCOL_SPECS: ProtocolSpec[] = [
     },
     buildRefField: (refs) =>
       refs.length ? { subject_reference: [{ type: 'character', image_file: refs[0] }] } : {},
+    // MiniMax 的 image_generation 同样没有遮罩字段, 且官方文档明确「失败也可能 HTTP 200」
+    maskSupport: 'none',
   },
   {
     protocol: 'openai-chat',
@@ -493,6 +491,8 @@ export const PROTOCOL_SPECS: ProtocolSpec[] = [
       return `${e.code ?? e.type ?? 'unknown'}: ${String(e.message ?? '').slice(0, 250)}`;
     },
     buildRefField: () => ({}),
+    // 文本协议没有像素可涂 —— 声明 none 是为了让「每个协议都要想一次」成为编译期约束
+    maskSupport: 'none',
     /*
      * 模型列表候选 (取证):
      *   openai / 硅基流动 / 优云智算 → {base}/v1/models
@@ -507,9 +507,20 @@ export const PROTOCOL_SPECS: ProtocolSpec[] = [
   },
 ];
 
-/** 按标识取协议形状 */
+/**
+ * 历史协议别名 → 现行协议标识。
+ *
+ * `modelverse` 是 `openai` 的早期名字（第一阶段只支持优云智算，协议名跟着
+ * 厂商叫）。存量 `ModelChannel.protocol` 里可能还存着旧值，故别名解析
+ * **收敛在取形状这一处** —— 否则每个用 `protocolSpec` 判断能力的地方
+ * （如遮罩支持）都要自己记一遍别名，漏一处就是「老通道突然不支持某特性」。
+ */
+const PROTOCOL_ALIASES: Record<string, GatewayProtocol> = { modelverse: 'openai' };
+
+/** 按标识取协议形状（接受历史别名） */
 export function protocolSpec(protocol: string): ProtocolSpec | undefined {
-  return PROTOCOL_SPECS.find((p) => p.protocol === protocol);
+  const id = PROTOCOL_ALIASES[protocol] ?? protocol;
+  return PROTOCOL_SPECS.find((p) => p.protocol === id);
 }
 
 /**

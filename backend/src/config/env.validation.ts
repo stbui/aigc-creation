@@ -50,7 +50,7 @@ interface Spec {
  */
 export const ENV_SPECS: readonly Spec[] = [
   // ── 应用 ──────────────────────────────────────────────────────────────
-  { key: 'app.port', env: 'PORT', type: 'number', def: 3001, min: 1, max: 65535 },
+  { key: 'app.port', env: 'PORT', type: 'number', def: 4100, min: 1, max: 65535 },
   { key: 'app.host', env: 'HOST', type: 'string', def: '127.0.0.1' },
   { key: 'app.prefix', env: 'API_PREFIX', type: 'string', def: 'api/v1' },
   { key: 'app.env', env: 'NODE_ENV', type: 'string', def: 'development', oneOf: ['development', 'production', 'test'] },
@@ -71,6 +71,114 @@ export const ENV_SPECS: readonly Spec[] = [
   // ── 鉴权 ──────────────────────────────────────────────────────────────
   { key: 'jwt.secret', env: 'JWT_SECRET', type: 'string', def: 'dev-ecom-vision-secret-2024-do-not-use-in-prod' },
   { key: 'jwt.ttl', env: 'JWT_TTL', type: 'string', def: '7d' },
+  // 前端站点基址 —— 邮件里的「重置密码」链接用它拼绝对地址。
+  // 与 ASSET_PUBLIC_BASE 分开：后者是给**外部模型网关**拉参考图用的，
+  // 需要公网可达；这里只需要用户浏览器能打开。
+  { key: 'app.webBase', env: 'WEB_BASE_URL', type: 'string', def: 'http://localhost:5100' },
+
+  // ── 通用 OAuth（第三方登录）───────────────────────────────────────
+  // 未配 OAUTH_ENABLED 时，只要凭据齐全就启用；配置后则只放行列出的 provider。
+  { key: 'oauth.enabled', env: 'OAUTH_ENABLED', type: 'csv', def: [] },
+  // OAuth 回调基址。留空用 WEB_BASE_URL + /api/v1（本地经 Vite 反代可用）。
+  { key: 'oauth.callbackBase', env: 'OAUTH_CALLBACK_BASE', type: 'string', def: '' },
+  { key: 'oauth.google.clientId', env: 'OAUTH_GOOGLE_CLIENT_ID', type: 'string', def: '' },
+  { key: 'oauth.google.clientSecret', env: 'OAUTH_GOOGLE_CLIENT_SECRET', type: 'string', def: '' },
+  { key: 'oauth.google.redirectUri', env: 'OAUTH_GOOGLE_REDIRECT_URI', type: 'string', def: '' },
+  { key: 'oauth.google.authorizationEndpoint', env: 'OAUTH_GOOGLE_AUTHORIZATION_ENDPOINT', type: 'string', def: '' },
+  { key: 'oauth.google.tokenEndpoint', env: 'OAUTH_GOOGLE_TOKEN_ENDPOINT', type: 'string', def: '' },
+  { key: 'oauth.google.userinfoEndpoint', env: 'OAUTH_GOOGLE_USERINFO_ENDPOINT', type: 'string', def: '' },
+  { key: 'oauth.google.scopes', env: 'OAUTH_GOOGLE_SCOPES', type: 'csv', def: ['openid', 'email', 'profile'] },
+  { key: 'oauth.github.clientId', env: 'OAUTH_GITHUB_CLIENT_ID', type: 'string', def: '' },
+  { key: 'oauth.github.clientSecret', env: 'OAUTH_GITHUB_CLIENT_SECRET', type: 'string', def: '' },
+  { key: 'oauth.github.redirectUri', env: 'OAUTH_GITHUB_REDIRECT_URI', type: 'string', def: '' },
+  { key: 'oauth.github.authorizationEndpoint', env: 'OAUTH_GITHUB_AUTHORIZATION_ENDPOINT', type: 'string', def: '' },
+  { key: 'oauth.github.tokenEndpoint', env: 'OAUTH_GITHUB_TOKEN_ENDPOINT', type: 'string', def: '' },
+  { key: 'oauth.github.scopes', env: 'OAUTH_GITHUB_SCOPES', type: 'csv', def: ['read:user', 'user:email'] },
+  { key: 'oauth.generic.name', env: 'OAUTH_GENERIC_NAME', type: 'string', def: 'OAuth 2.0' },
+  { key: 'oauth.generic.clientId', env: 'OAUTH_GENERIC_CLIENT_ID', type: 'string', def: '' },
+  { key: 'oauth.generic.clientSecret', env: 'OAUTH_GENERIC_CLIENT_SECRET', type: 'string', def: '' },
+  { key: 'oauth.generic.redirectUri', env: 'OAUTH_GENERIC_REDIRECT_URI', type: 'string', def: '' },
+  { key: 'oauth.generic.authorizationEndpoint', env: 'OAUTH_GENERIC_AUTHORIZATION_ENDPOINT', type: 'string', def: '' },
+  { key: 'oauth.generic.tokenEndpoint', env: 'OAUTH_GENERIC_TOKEN_ENDPOINT', type: 'string', def: '' },
+  { key: 'oauth.generic.userinfoEndpoint', env: 'OAUTH_GENERIC_USERINFO_ENDPOINT', type: 'string', def: '' },
+  { key: 'oauth.generic.scopes', env: 'OAUTH_GENERIC_SCOPES', type: 'csv', def: ['openid', 'email', 'profile'] },
+
+  // ── 外部消息通道（邮件 / 短信）────────────────────────────────────────
+  // 默认 console：不发网络请求，正文写入 logs/outbox/（见 channels/）。
+  // 三档实现：console / http（通用网关）/ aliyun（阿里云 SendSms、SingleSendMail）。
+  // 填了真实通道却缺凭据会回落 console 并告警，`status().delivers` 如实报 false。
+  {
+    key: 'channel.email.provider',
+    env: 'EMAIL_PROVIDER',
+    type: 'string',
+    def: 'console',
+    oneOf: ['console', 'http', 'aliyun'],
+  },
+  { key: 'channel.email.apiUrl', env: 'EMAIL_API_URL', type: 'string', def: '' },
+  { key: 'channel.email.apiKey', env: 'EMAIL_API_KEY', type: 'string', def: '' },
+  { key: 'channel.email.from', env: 'EMAIL_FROM', type: 'string', def: 'noreply@huojue.local' },
+  {
+    key: 'channel.sms.provider',
+    env: 'SMS_PROVIDER',
+    type: 'string',
+    def: 'console',
+    oneOf: ['console', 'http', 'aliyun'],
+  },
+  { key: 'channel.sms.apiUrl', env: 'SMS_API_URL', type: 'string', def: '' },
+  { key: 'channel.sms.apiKey', env: 'SMS_API_KEY', type: 'string', def: '' },
+  { key: 'channel.sms.sign', env: 'SMS_SIGN', type: 'string', def: '货觉AI' },
+  { key: 'channel.sms.template', env: 'SMS_TEMPLATE', type: 'string', def: '' },
+
+  // 阿里云短信 / 邮件凭据（SMS_PROVIDER=aliyun / EMAIL_PROVIDER=aliyun 时才必需）。
+  // AccessKeySecret 只在签名时使用，不落日志、不进审计、不入库。
+  { key: 'channel.aliyun.accessKeyId', env: 'ALIYUN_ACCESS_KEY_ID', type: 'string', def: '' },
+  { key: 'channel.aliyun.accessKeySecret', env: 'ALIYUN_ACCESS_KEY_SECRET', type: 'string', def: '' },
+  /** 短信签名（控制台已审核通过的签名名，不是「短信标题」） */
+  { key: 'channel.aliyun.smsSignName', env: 'ALIYUN_SMS_SIGN_NAME', type: 'string', def: '' },
+  /** 模板号（SMS_xxxxxxx），模板变量名必须是 code */
+  { key: 'channel.aliyun.smsTemplateCode', env: 'ALIYUN_SMS_TEMPLATE_CODE', type: 'string', def: '' },
+  /** 地域 id；留空或 cn-hangzhou 走中心域名，其他地域用 dysmsapi.<region>.aliyuncs.com */
+  { key: 'channel.aliyun.smsRegion', env: 'ALIYUN_SMS_REGION', type: 'string', def: '' },
+  /** 阿里云邮件的发信地址（控制台已配置的那个），缺失即回落 console */
+  { key: 'channel.aliyun.dmAccountName', env: 'ALIYUN_DM_ACCOUNT_NAME', type: 'string', def: '' },
+  /** 发件人别名（收件箱里显示的名称），留空用发信地址 */
+  { key: 'channel.aliyun.dmFromAlias', env: 'ALIYUN_DM_FROM_ALIAS', type: 'string', def: '' },
+  /** 1 = 随机账号（发信地址），0 = 批量发信 */
+  {
+    key: 'channel.aliyun.dmAddressType',
+    env: 'ALIYUN_DM_ADDRESS_TYPE',
+    type: 'string',
+    def: '1',
+    oneOf: ['0', '1'],
+  },
+
+  // ── 支付通道（B3）──────────────────────────────────────────────────
+  // 默认 sandbox：不产生真实资金流转。
+  // ⚠ 与邮件/短信不同，支付**不会**在凭据缺失时回落沙箱：
+  //   生产环境静默降级的表现是「支付一直成功、账上一分钱没有」。
+  //   缺凭据时发起支付返回 503（见 payments/payment.factory.ts）。
+  {
+    key: 'payment.provider',
+    env: 'PAYMENT_PROVIDER',
+    type: 'string',
+    def: 'sandbox',
+    oneOf: ['sandbox', 'alipay', 'wechat'],
+  },
+  /** 渠道异步通知的基址（渠道能访问到的公网地址）；留空用 HOST:PORT */
+  { key: 'payment.notifyBase', env: 'PAYMENT_NOTIFY_BASE', type: 'string', def: '' },
+  // 支付宝（网页支付, RSA2）
+  { key: 'payment.alipay.appId', env: 'ALIPAY_APP_ID', type: 'string', def: '' },
+  { key: 'payment.alipay.privateKey', env: 'ALIPAY_PRIVATE_KEY', type: 'string', def: '' },
+  { key: 'payment.alipay.publicKey', env: 'ALIPAY_PUBLIC_KEY', type: 'string', def: '' },
+  { key: 'payment.alipay.gateway', env: 'ALIPAY_GATEWAY', type: 'string', def: '' },
+  // 微信支付 API v3（Native 扫码）
+  { key: 'payment.wechat.mchId', env: 'WECHAT_MCH_ID', type: 'string', def: '' },
+  { key: 'payment.wechat.appId', env: 'WECHAT_APP_ID', type: 'string', def: '' },
+  { key: 'payment.wechat.apiV3Key', env: 'WECHAT_API_V3_KEY', type: 'string', def: '' },
+  { key: 'payment.wechat.serialNo', env: 'WECHAT_SERIAL_NO', type: 'string', def: '' },
+  { key: 'payment.wechat.privateKey', env: 'WECHAT_PRIVATE_KEY', type: 'string', def: '' },
+  // 回调验签用的是**微信支付平台证书公钥**，不是商户私钥
+  { key: 'payment.wechat.platformPublicKey', env: 'WECHAT_PLATFORM_PUBLIC_KEY', type: 'string', def: '' },
 
   // ── 日志（本文件引入的新配置面）────────────────────────────────────────
   { key: 'log.level', env: 'LOG_LEVEL', type: 'string', def: 'log', oneOf: LOG_LEVELS },
@@ -89,12 +197,12 @@ export const ENV_SPECS: readonly Spec[] = [
     key: 'gateway.provider',
     env: 'GATEWAY_PROVIDER',
     type: 'string',
-    // 默认 openai 而非 aigc: 新部署应走主流协议; 存量 modelverse 值已在
+    // 默认 openai: 新部署应走主流协议; 存量 modelverse 值已在
     // CapabilityRouterProvider.pickProtocol 里作为 openai 的历史别名兼容。
-    // oneOf 把取值锁死 —— 填错协议的表现是 404 + 静默回落本地占位图,
+    // oneOf 把取值锁死 —— 填错协议的表现是 404 + 静默回落本地算法,
     // 在启动时就拒掉比在生成时才暴露好得多。
     def: 'openai',
-    oneOf: ['aigc', 'openai', 'modelverse', 'volcengine', 'minimax'],
+    oneOf: ['openai', 'modelverse', 'volcengine', 'minimax'],
   },
   { key: 'gateway.vendor', env: 'GATEWAY_VENDOR', type: 'string', def: '' },
   { key: 'gateway.enabled', env: 'GATEWAY_ENABLED', type: 'boolean', def: false },
@@ -102,6 +210,18 @@ export const ENV_SPECS: readonly Spec[] = [
   { key: 'gateway.pollMs', env: 'GATEWAY_POLL_MS', type: 'number', def: 2000, min: 100 },
   { key: 'gateway.maxPolls', env: 'GATEWAY_MAX_POLLS', type: 'number', def: 60, min: 1 },
   { key: 'asset.publicBase', env: 'ASSET_PUBLIC_BASE', type: 'string', def: '' },
+
+  // ── 安全与可观测（B5, 2026-10-21）──────────────────────────────────────
+  // 限流默认开启：登录/短信/生成/上传都有真实成本，默认关等于默认不设防。
+  // 本地压测可临时 RATE_LIMIT_ENABLED=false，生产禁止。
+  { key: 'rateLimit.enabled', env: 'RATE_LIMIT_ENABLED', type: 'boolean', def: true },
+  // 是否信任反向代理传来的 X-Forwarded-For。默认 false —— 直接暴露的实例
+  // 若信任该头，任何人伪造它即可绕开全部按 IP 的限流。
+  { key: 'rateLimit.trustProxy', env: 'RATE_LIMIT_TRUST_PROXY', type: 'boolean', def: false },
+  // 素材签名密钥。留空 = /uploads 保持公开（默认行为）；设置后要求 HMAC 签名。
+  { key: 'asset.signingSecret', env: 'ASSET_SIGNING_SECRET', type: 'string', def: '' },
+  // 未处理异常的告警 webhook（可选）。留空则只落盘，不发外部请求。
+  { key: 'observability.errorWebhookUrl', env: 'ERROR_WEBHOOK_URL', type: 'string', def: '' },
 
   // ── 存储（默认值取自 storage/storage.service.ts）──────────────────────
   { key: 'storage.backend', env: 'STORAGE_BACKEND', type: 'string', def: 'local', oneOf: ['local', 'oss', 'minio'] },
@@ -143,7 +263,9 @@ export interface AppConfigTree {
     pollMs: number;
     maxPolls: number;
   };
-  asset: { publicBase: string };
+  asset: { publicBase: string; signingSecret: string };
+  rateLimit: { enabled: boolean; trustProxy: boolean };
+  observability: { errorWebhookUrl: string };
   storage: {
     backend: string;
     ossRegion: string;
@@ -272,6 +394,18 @@ export function validateEnv(env: NodeJS.ProcessEnv = process.env): AppConfigTree
     );
   }
 
+  /*
+   * 签名密钥太短等于没设：HMAC 的安全性完全取决于密钥熵。
+   * 生产要求 ≥ 32 字符（推荐 `openssl rand -base64 32`）；开发/测试只告警。
+   */
+  const signingSecret = String(tree.asset?.signingSecret ?? '').trim();
+  const weakSigningSecret = signingSecret.length > 0 && signingSecret.length < 32;
+  if (weakSigningSecret && tree.app.env === 'production') {
+    problems.push(
+      'ASSET_SIGNING_SECRET 长度不足 32 字符：过短的密钥可被暴力穷举，等价于没有签名（可用 openssl rand -base64 32 生成）',
+    );
+  }
+
   // 演示账号的宽松 TTL 只作为告警，不阻断启动。
   const usingDemoTtl = tree.jwt.ttl === '7d';
 
@@ -282,6 +416,14 @@ export function validateEnv(env: NodeJS.ProcessEnv = process.env): AppConfigTree
 
   if (usingDevJwtSecret) {
     startupWarnings.push('JWT_SECRET 未设置，正在使用内置开发默认密钥（生产环境必须显式配置）');
+  }
+  if (weakSigningSecret) {
+    startupWarnings.push('ASSET_SIGNING_SECRET 长度不足 32 字符，签名强度不足（生产环境会拒绝启动）');
+  }
+  if (signingSecret.length === 0 && tree.app.env === 'production') {
+    startupWarnings.push(
+      'ASSET_SIGNING_SECRET 未设置：/uploads/* 在生产环境仍公开可访问，任何拿到路径的人都能下载素材',
+    );
   }
   if (tree.app.env === 'production' && usingDemoTtl) {
     startupWarnings.push(

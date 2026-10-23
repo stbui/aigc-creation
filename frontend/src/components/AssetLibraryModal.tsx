@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { App, Modal } from 'antd';
 import { ChevronDown, Search, X } from 'lucide-react';
-import { assetsApi, toAbsoluteUrl } from '../lib/api';
+import { assetSrc, assetsApi } from '../lib/api';
 import { StateEmpty, StateError, StateLoading } from './StateViews';
 import { ResultMedia, modalityOfFormat } from './ResultMedia';
 import type { Asset } from '../types/api';
@@ -137,8 +137,6 @@ export interface AssetLibraryModalProps {
    * 于是超额的素材静默进入, 上限形同虚设。
    */
   onPick: (asset: Asset) => void | boolean;
-  /** 只读模式：点击不触发回填（ToolShell 的导入按钮为诚实禁用态，用它做只读展示） */
-  readOnly?: boolean;
   /**
    * 最多可选张数 —— 参考站的 maxSelectable 语义。
    * 不传则不限（可勾选任意张）。传入时超出即禁止勾选并提示。
@@ -172,7 +170,6 @@ export function AssetLibraryModal({
   error = null,
   onCancel,
   onPick,
-  readOnly = false,
   maxSelectable,
 }: AssetLibraryModalProps) {
   const { message } = App.useApp();
@@ -221,7 +218,6 @@ export function AssetLibraryModal({
   }, [items, kind, dateFilter, keyword]);
 
   const toggle = (asset: Asset) => {
-    if (readOnly) return;
     setSelected((prev) => {
       if (prev.includes(asset.id)) {
         return prev.filter((id) => id !== asset.id);
@@ -272,7 +268,12 @@ export function AssetLibraryModal({
       centered
       className="alp-modal"
       closeIcon={null}
-      styles={{ body: { padding: 0 } }}
+      styles={{
+        body: { padding: 0 },
+        // 参考站 backdrop: 背景 #1c1e2d75 + blur(3px)。antd 默认遮罩是 45% 纯黑,
+        // 既更深又没有毛玻璃 —— 一眼能看出是两个站点的弹层。
+        mask: { background: '#1c1e2d75', backdropFilter: 'blur(3px)' },
+      }}
       title={
         <div className="alp-header">
           <div className="alp-header-main">
@@ -394,13 +395,12 @@ export function AssetLibraryModal({
                         type="button"
                         className={`alp-card${on ? ' is-selected' : ''}`}
                         aria-pressed={on}
-                        disabled={readOnly}
                         onClick={() => toggle(a)}
                       >
                         <div className="alp-cover">
                           {/* 视频素材用 <video> —— 浏览器会把 mp4 当图片解码, 表现为空白缩略图 */}
                           <ResultMedia
-                            url={a.sourceUrl}
+                            url={assetSrc(a) ?? ''}
                             modality={modalityOfFormat(a.format)}
                             alt={a.sourceUrl}
                           />
@@ -419,34 +419,39 @@ export function AssetLibraryModal({
                 </div>
               )}
             </div>
+          </div>
+        </div>
 
-            {/* ── 底部: 已选计数 + 清除选择 + 取消/确定 ── */}
-            <div className="alp-footer">
-              <div className="alp-footer-info">
-                <span>
-                  已选 {selected.length}
-                  {maxSelectable !== undefined ? ` / 最多选择 ${maxSelectable} 张` : ' 张'}
-                </span>
-                {selected.length > 0 && (
-                  <button type="button" className="alp-clear" onClick={() => setSelected([])}>
-                    清除选择
-                  </button>
-                )}
-              </div>
-              <div className="alp-footer-actions">
-                <button type="button" className="alp-btn alp-btn-cancel" onClick={onCancel}>
-                  取消
-                </button>
-                <button
-                  type="button"
-                  className="alp-btn alp-btn-confirm"
-                  disabled={readOnly || selected.length === 0}
-                  onClick={confirm}
-                >
-                  可多选 · 选择
-                </button>
-              </div>
-            </div>
+        {/*
+          ── 底部: 已选计数 + 清除选择 + 取消/确定 ──
+          参考站 .asset-library-picker-footer 是 dialog 的**直接子元素**(与 layout 平级),
+          横跨整个弹窗宽度, 而不是缩在内容列里 —— 放进 .alp-main 会让「已选 N」从
+          侧栏右边 26px 处才开始, 与参考站差 184px。
+        */}
+        <div className="alp-footer">
+          <div className="alp-footer-info">
+            <span>
+              已选 {selected.length}
+              {maxSelectable !== undefined ? ` / 最多选择 ${maxSelectable} 张` : ' 张'}
+            </span>
+            {selected.length > 0 && (
+              <button type="button" className="alp-clear" onClick={() => setSelected([])}>
+                清除选择
+              </button>
+            )}
+          </div>
+          <div className="alp-footer-actions">
+            <button type="button" className="alp-btn alp-btn-cancel" onClick={onCancel}>
+              取消
+            </button>
+            <button
+              type="button"
+              className="alp-btn alp-btn-confirm"
+              disabled={selected.length === 0}
+              onClick={confirm}
+            >
+              可多选 · 选择
+            </button>
           </div>
         </div>
       </div>

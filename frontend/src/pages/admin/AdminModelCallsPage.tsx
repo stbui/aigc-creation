@@ -1,11 +1,13 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Select, Table } from 'antd';
+import { Button, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { adminModelApi } from '../../lib/api';
 import {
   AdminDrawer,
   AdminListError,
+  AdminStaleError,
   AdminListLoading,
+  adminPagination,
   useAdminList,
 } from '../../components/admin/AdminWidgets';
 import {
@@ -125,7 +127,7 @@ export function AdminModelCallsPage() {
         width: 120,
         render: (v: string, row) => (
           <div className="adm-cell-stack">
-            <span className={`adm-tag ${v === 'gateway' ? 'is-succeeded' : 'is-muted'}`}>
+            <span className={`adm-tag ${v === 'gateway' ? 'is-success' : 'is-muted'}`}>
               {SOURCE_LABELS[v] ?? v}
             </span>
             {row.fallback && <span className="adm-tag is-danger">已回落</span>}
@@ -163,7 +165,7 @@ export function AdminModelCallsPage() {
         key: 'success',
         width: 70,
         render: (ok: boolean) => (
-          <span className={`adm-tag ${ok ? 'is-succeeded' : 'is-failed'}`}>{ok ? '成功' : '失败'}</span>
+          <span className={`adm-tag ${ok ? 'is-success' : 'is-danger'}`}>{ok ? '成功' : '失败'}</span>
         ),
       },
       {
@@ -171,9 +173,9 @@ export function AdminModelCallsPage() {
         key: 'detail',
         width: 60,
         render: (_: unknown, row) => (
-          <button type="button" className="adm-link" onClick={() => setDetailId(row.id)}>
+          <Button type="link" className="adm-link" onClick={() => setDetailId(row.id)}>
             详情
-          </button>
+          </Button>
         ),
       },
     ],
@@ -272,8 +274,8 @@ export function AdminModelCallsPage() {
           allowClear
         />
         <FilterActions>
-          <button
-            type="button"
+          <Button
+            type="primary"
             className="adm-btn is-primary"
             onClick={() =>
               setQuery({
@@ -285,17 +287,20 @@ export function AdminModelCallsPage() {
             }
           >
             查询
-          </button>
-          <button type="button" className="adm-btn" onClick={reset}>
+          </Button>
+          <Button type="default" className="adm-btn" onClick={reset}>
             重置
-          </button>
+          </Button>
         </FilterActions>
       </FilterBar>
+
+      {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
+      {error && data && <AdminStaleError error={error} onRetry={reload} />}
 
       <Panel>
         {loading && !data ? (
           <AdminListLoading tip="加载调用记录…" />
-        ) : error ? (
+        ) : error && !data ? (
           <AdminListError error={error} onRetry={reload} />
         ) : (list?.items.length ?? 0) === 0 ? (
           <AdminEmpty description="暂无调用记录。在前台任意生成一次（如下「自由创作」页），这里就会出现明细。" />
@@ -307,15 +312,12 @@ export function AdminModelCallsPage() {
             dataSource={list?.items ?? []}
             loading={loading}
             scroll={{ x: 1080 }}
-            pagination={{
+            pagination={adminPagination({
               current: list?.page ?? 1,
               pageSize: list?.pageSize ?? 20,
               total: list?.total ?? 0,
-              showSizeChanger: true,
-              pageSizeOptions: [20, 50, 100],
-              showTotal: (t) => `共 ${t} 条`,
               onChange: setPage,
-            }}
+            })}
           />
         )}
       </Panel>
@@ -355,7 +357,7 @@ export function AdminModelCallsPage() {
                 </dd>
                 <dt>结果</dt>
                 <dd>
-                  <span className={`adm-tag ${row.success ? 'is-succeeded' : 'is-failed'}`}>
+                  <span className={`adm-tag ${row.success ? 'is-success' : 'is-danger'}`}>
                     {row.success ? '成功' : '失败'}
                   </span>
                   {row.errorCode && <code className="adm-cell-sub"> {row.errorCode}</code>}

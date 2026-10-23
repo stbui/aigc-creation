@@ -36,7 +36,8 @@ const BASELINE: Array<{
   id: string;
   creditCost: number;
   modality: string;
-  localImpl: string;
+  /** 2026-10-22: 无本地实现的能力为 null (改为 localFallback: false, 仅云端) */
+  localImpl: string | null;
   paramKeys: string[];
   options: Record<string, string[]>; // paramKey → 选项 value 列表
 }> = [
@@ -72,7 +73,7 @@ const BASELINE: Array<{
     },
   },
   {
-    id: 'creative_image', creditCost: 10, modality: 'image', localImpl: 'makePlaceholder',
+    id: 'creative_image', creditCost: 10, modality: 'image', localImpl: null,
     paramKeys: ['prompt', 'ratio'],
     options: { ratio: ['1:1', '4:3', '3:4', '16:9', '9:16', '2:3', '3:2', '21:9'] },
   },
@@ -102,7 +103,7 @@ const BASELINE: Array<{
     },
   },
   {
-    id: 'local_redraw', creditCost: 5, modality: 'image', localImpl: 'makeLocalRedraw',
+    id: 'local_redraw', creditCost: 5, modality: 'image', localImpl: null,
     paramKeys: ['region', 'prompt', 'ratio', 'size'],
     options: {
       region: ['center', 'top', 'bottom', 'left', 'right', 'full'],
@@ -128,7 +129,8 @@ const BASELINE: Array<{
     },
   },
   {
-    id: 'remove_watermark', creditCost: 0, modality: 'image', localImpl: 'makePlaceholder',
+    // 2026-10-21 去除水印从占位升级为镜像修补 + 羽化融合的真实算法
+    id: 'remove_watermark', creditCost: 0, modality: 'image', localImpl: 'makeRemoveWatermark',
     paramKeys: ['mode', 'region'],
     options: {
       mode: ['auto', 'region'],
@@ -136,7 +138,7 @@ const BASELINE: Array<{
     },
   },
   {
-    id: 'image_translate', creditCost: 5, modality: 'image', localImpl: 'makeImageTranslate',
+    id: 'image_translate', creditCost: 5, modality: 'image', localImpl: null,
     paramKeys: ['targetLang', 'protectSubject', 'size'],
     options: {
       targetLang: ['zh-CN', 'en-US', 'ru-RU', 'es-ES', 'de-DE', 'ja-JP', 'ko-KR', 'pt-PT', 'id-ID', 'th-TH'],
@@ -170,7 +172,7 @@ const BASELINE: Array<{
     },
   },
   {
-    id: 'free_create', creditCost: 10, modality: 'image', localImpl: 'makeFreeCreation',
+    id: 'free_create', creditCost: 10, modality: 'image', localImpl: null,
     paramKeys: ['prompt', 'ratio', 'size'],
     options: {
       ratio: ['1:1', '4:3', '3:4', '16:9', '9:16', '2:3', '3:2', '21:9'],
@@ -210,7 +212,7 @@ for (const base of BASELINE) {
   }
   eq(`${base.id}.creditCost`, def.creditCost, base.creditCost);
   eq(`${base.id}.modality`, def.modality, base.modality);
-  eq(`${base.id}.localImpl`, def.localImpl, base.localImpl);
+  eq(`${base.id}.localImpl`, def.localImpl ?? null, base.localImpl);
   eq(
     `${base.id} 参数键序`,
     def.params.map((p) => p.key).join(','),

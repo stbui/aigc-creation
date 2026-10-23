@@ -1,6 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
+import {
+  ChannelRepository,
+  type ChannelSnapshot,
+} from '../providers/channel-repository';
 import {
   CONFIG_DEFS,
   CONFIG_GROUPS,
@@ -16,6 +20,10 @@ import {
 } from '../providers/gateway.config';
 import { CAPABILITIES } from '../capabilities/capability.registry';
 import {
+  allowsLocalFallback,
+  type CapabilityPlugin,
+} from '../capabilities/capability-plugin.type';
+import {
   MODALITIES,
   PROTOCOL_OPTIONS_BY_MODALITY,
   protocolSpec,
@@ -30,6 +38,15 @@ import {
   type Modality,
 } from '../providers/provider-presets';
 import { CapabilityRouterProvider } from '../providers/capability-router.provider';
+
+/** 连通性测试的草稿覆盖值 —— 不落库，仅本次探测使用 */
+export interface ConnectionOverrides {
+  protocol?: string;
+  baseUrl?: string;
+  token?: string;
+  model?: string;
+  enabled?: boolean;
+}
 
 /**
  * 模型通道配置 (后台「模型配置」页)。
@@ -54,6 +71,11 @@ export class ModelConfigService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly router: CapabilityRouterProvider,
+    /*
+     * 可选注入：既有验证脚本直接用两个参数 new ModelConfigService(...)，
+     * 没有该依赖时回落到「只看全局配置」的旧算法，脚本不必跟着改。
+     */
+    @Optional() private readonly channelRepo?: ChannelRepository,
   ) {}
 
   /**
@@ -67,6 +89,7 @@ export class ModelConfigService {
     const byKey = new Map(rows.map((r) => [r.key, r]));
     const imageCfg = gatewayConfig();
     const sources = imageCfg.sourcesOf();
+    const snapshots = await this.loadSnapshots();
 
     const groups = CONFIG_GROUPS.map((g) => {
       // ⚠️ 必须过滤 hidden: 存量键与新键在界面上语义重叠, 同时展示会让运营
@@ -83,7 +106,7 @@ export class ModelConfigService {
     return {
       groups,
       // 逐模态通道快照: 基址脱敏、协议是否已实现、各自的厂商与协议下拉
-      channels: this.readChannels(byKey),
+      channels: this.readChannels(byKey, snapshots),
       modalities: MODALITIES,
       // ⚠️ 兼容字段: 恒等于 channels.image, 不是「默认模态」。
       // 保留它是因为存量前端与外部脚本按 channel.* 读取; 删掉会让它们静默拿到 undefined。
@@ -97,7 +120,7 @@ export class ModelConfigService {
         pollMs: imageCfg.pollMs,
         maxPolls: imageCfg.maxPolls,
         assetBase: imageCfg.assetBase,
-        effective: imageCfg.enabled ? 'gateway' : 'local',
+        effective: this.effectiveOf('image', snapshots),
       },
       /** @deprecated 用 channels.image; 保留仅为兼容 */
       vendors: presetsFor('image'),
@@ -139,12 +162,21 @@ export class ModelConfigService {
            * 反过来同样错误: 不该把「无兜底」伪装成「有本地兜底」)。
            *
            * 故三态: gateway=真实模型 / local=本地算法 / none=无兜底(会失败)。
+           *
+           * 2026-10-22 补充: 图像里也有**无兜底**的能力 —— 本地根本没有实现
+           * (创意生图 / 局部重绘 / 图片翻译 / 自由创作, 见 allowsLocalFallback)。
+           * 它们没通道时会判 failed/42204, 这里若照旧报 local, 就与 C 端 runtime 打架。
+           * 判定与路由器共用 allowsLocalFallback(), 不在本文件另写一份。
            */
-          effective: route === 'local' || !cfgOfModality.enabled
-            ? c.modality === 'image'
-              ? 'local'
-              : 'none'
-            : 'gateway',
+          effective: this.routeEffectiveOf(c, route, snapshots),
+          /*
+           * 该能力「能不能被压到本地」—— 供前端把 local 这个选项置灰。
+           *
+           * 不能靠 `effective` 反推: route=auto 且通道已配时 effective 是
+           * gateway, 看不出本地是否可用。判定与路由器共用 allowsLocalFallback(),
+           * 与上面的 routeEffectiveOf 同源。
+           */
+          localAvailable: Boolean(c.localImpl) && allowsLocalFallback(c),
         };
       }),
     };
@@ -157,11 +189,15 @@ export class ModelConfigService {
    * @param byKey 已加载的 ModelChannelConfig 行, 用于读出「当前选了哪个厂商」
    *              —— ModalityConfig 只描述「怎么调」不含厂商选择态 (2026-10-20)
    */
-  private readChannels(byKey: Map<string, { value: string }>) {
+  private readChannels(
+    byKey: Map<string, { value: string }>,
+    snapshots: Partial<Record<Modality, ChannelSnapshot | null>>,
+  ) {
     const out: Record<string, unknown> = {};
     for (const m of MODALITIES) {
       const modality = m.value;
       const cfg = gatewayConfigOf(modality);
+      const snap = snapshots[modality] ?? null;
       out[modality] = {
         modality,
         label: m.label,
@@ -192,8 +228,18 @@ export class ModelConfigService {
          * 标成 local 会在后台显示「本地算法」, 而实际调用会直接失败。
          * 那等于谎报可用性, 与「不把本地伪装成模型」是同一类错误的反向版本。
          */
-        effective: cfg.enabled ? 'gateway' : m.value === 'image' ? 'local' : 'none',
-        // 该模态可选项; video 首批为空数组 = 「尚未取证」, 前端据此显示提示
+        effective: this.effectiveOf(modality, snapshots),
+        /*
+         * 调度来源 —— 页面必须如实告诉运营「现在到底按什么在调度」：
+         *   channels = 线路表 / legacy = 旧版单通道配置 / none = 未接入
+         * 没有 repository（验证脚本）时按全局配置推断。
+         */
+        dispatchSource: snap?.source ?? (cfg.enabled ? 'legacy' : 'none'),
+        channelCount: snap?.total ?? (cfg.enabled ? 1 : 0),
+        availableCount: snap?.availableCount ?? (cfg.enabled ? 1 : 0),
+        coolingCount: snap?.coolingCount ?? 0,
+        unsupportedCount: snap?.unsupportedCount ?? 0,
+        // 该模态可选项
         vendors: presetsFor(modality),
         protocolOptions: PROTOCOL_OPTIONS_BY_MODALITY[modality],
         // 配了却因协议未实现而必然失败的尴尬态, 前端据此显式警告而非静默
@@ -201,6 +247,54 @@ export class ModelConfigService {
       };
     }
     return out;
+  }
+
+  /** 三模态调度快照；没有 ChannelRepository（脚本直连服务）时返回空表 */
+  private async loadSnapshots(): Promise<Partial<Record<Modality, ChannelSnapshot | null>>> {
+    const out: Partial<Record<Modality, ChannelSnapshot | null>> = {};
+    if (!this.channelRepo) return out;
+    await Promise.all(
+      MODALITIES.map(async (m) => {
+        out[m.value] = await this.channelRepo!.snapshot(m.value);
+      }),
+    );
+    return out;
+  }
+
+  /**
+   * 单项能力的生效来源 (后台「逐能力路由」用)。
+   *
+   * 与 `effectiveOf` 只差在**无本地实现的能力**: 模态级快照只能说
+   * 「图像通道没配 → 本地」, 但这类能力此时不会回落, 而是判 failed/42204。
+   * 后台若照旧显示 local, 就是「界面预告有图、点下去失败」——
+   * 与 C 端 runtime 打架。判定与路由器共用 allowsLocalFallback()。
+   */
+  private routeEffectiveOf(
+    def: CapabilityPlugin,
+    route: string,
+    snapshots: Partial<Record<Modality, ChannelSnapshot | null>>,
+  ): 'gateway' | 'local' | 'none' {
+    const allowLocal = Boolean(def.localImpl) && allowsLocalFallback(def);
+    if (route === 'local') return allowLocal ? 'local' : 'none';
+    const effective = this.effectiveOf(def.modality, snapshots);
+    // 通道没配时 effectiveOf 对图像一律报 local —— 无兜底的能力要降级为 none
+    return effective === 'local' && !allowLocal ? 'none' : effective;
+  }
+
+  /**
+   * 该模态当前的实际生效来源。
+   *
+   * 「有可用线路」才算 gateway —— 只看全局 `cfg.enabled` 会在多渠道下说谎：
+   * 表里有线路但旧基址为空时，旧算法会误报 local/none。
+   */
+  private effectiveOf(
+    modality: Modality,
+    snapshots: Partial<Record<Modality, ChannelSnapshot | null>>,
+  ): 'gateway' | 'local' | 'none' {
+    const snap = snapshots[modality];
+    const available = snap ? snap.availableCount > 0 : gatewayConfigOf(modality).enabled;
+    if (available) return 'gateway';
+    return modality === 'image' ? 'local' : 'none';
   }
 
   /**
@@ -288,9 +382,22 @@ export class ModelConfigService {
         value: null,
         hasValue: Boolean(raw) || Boolean(process.env[def.envName ?? '']),
         masked: raw ? mask(raw) : null,
+        // env 覆盖时仍让运营看到「后台曾保存过什么」—— 只给脱敏尾巴
+        dbHasValue: Boolean(raw),
+        dbMasked: raw ? mask(raw) : null,
+        dbValue: null,
       };
     }
-    return { ...base, value: effective(def, source, row?.value), hasValue: true, masked: null };
+    return {
+      ...base,
+      value: effective(def, source, row?.value),
+      hasValue: true,
+      masked: null,
+      // 仅当后台显式改过（overridden）才展示，避免把代码默认值当成「保存过的值」
+      dbValue: row?.overridden ? effective(def, 'db', row.value) : null,
+      dbHasValue: null,
+      dbMasked: null,
+    };
   }
 
   /**
@@ -395,16 +502,119 @@ export class ModelConfigService {
    * 界面上看不出是配置错了还是网关挂了。
    *
    * 按模态分流 (2026-10-20): 三种模态的探测端点完全不同
-   * (图 → /generation/tasks; 文 → /v1/chat/completions; 视频 → 尚无契约),
+   * (图 → 协议层声明的图像端点; 文 → /v1/chat/completions; 视频 → 尚无契约),
    * 用错端点探测会得到「网络可达但方法不被接受」这种无法区分真伪的结论。
    */
-  async testConnection(modality: Modality = 'image'): Promise<{
+  async testConnection(
+    modality: Modality = 'image',
+    overrides?: ConnectionOverrides,
+  ): Promise<{
     ok: boolean;
     latencyMs: number;
     message: string;
     detail?: string;
+    testedAt: string;
+    target: 'draft' | 'saved';
   }> {
-    const cfg = gatewayConfigOf(modality);
+    const base = gatewayConfigOf(modality);
+    const token = overrides?.token !== undefined ? overrides.token : base.token;
+    const baseUrl = (overrides?.baseUrl ?? base.baseUrl).replace(/\/+$/, '');
+    const cfg = {
+      /*
+       * 有 overrides 时按「当前草稿」判定是否可测：只要填了基址或令牌就尝试，
+       * 不要求先保存（这正是本次改版要解决的体验问题）。
+       */
+      enabled: overrides
+        ? (overrides.enabled ?? Boolean(baseUrl || token))
+        : base.enabled,
+      baseUrl,
+      token,
+      model: overrides?.model ?? base.model,
+      provider: (overrides?.protocol ?? base.provider).trim().toLowerCase(),
+      timeoutMs: base.timeoutMs,
+    };
+    const result = await this.probe(modality, cfg);
+    return {
+      ...result,
+      testedAt: new Date().toISOString(),
+      target: overrides ? 'draft' : 'saved',
+    };
+  }
+
+  /**
+   * 拉取某模态当前配置（或草稿）对应的厂商模型清单。
+   *
+   * ## 为什么需要
+   *
+   * 模型名是**手填**的, 而运营通常不知道该厂商到底提供哪些模型 ——
+   * 只能翻厂商控制台或抄旧教程, 抄错的表现是「连通测试通过、生成永远 404」。
+   * 本方法把连通性测试里已经在用的 `modelListEndpoints` + `fetchModelIds`
+   * 单独暴露出来, 让后台页面能把真实模型清单**列出来给运营选**。
+   *
+   * ## 为什么返回 null 而不抛错
+   *
+   * 「拉不到清单」与「清单是空的」是两件事:
+   *   - 接口不可达/未开放 → null, 页面继续用内置预设, 不影响手填;
+   *   - 拉到空数组       → 确定该厂商当前没有可用模型, 需要提示。
+   * 抛错会把「无法验证」渲染成「配置错误」, 反而误导排障。
+   *
+   * @param modality 目标模态（各模态基址/令牌/协议独立）
+   * @param overrides 草稿覆盖值；未传则读当前生效配置
+   */
+  async listModels(
+    modality: Modality,
+    overrides?: ConnectionOverrides,
+  ): Promise<{ endpoints: string[]; ids: string[] | null; message: string }> {
+    const base = gatewayConfigOf(modality);
+    const token = overrides?.token !== undefined ? overrides.token : base.token;
+    const baseUrl = (overrides?.baseUrl ?? base.baseUrl).replace(/\/+$/, '');
+    const provider = (overrides?.protocol ?? base.provider).trim().toLowerCase();
+
+    if (!baseUrl) {
+      return { endpoints: [], ids: null, message: '缺少接入地址，无法拉取厂商模型清单' };
+    }
+    if (!protocolSupports(modality, provider)) {
+      return { endpoints: [], ids: null, message: `协议 "${provider}" 尚未接入本项目，无法拉取模型清单` };
+    }
+
+    const spec = protocolSpec(provider);
+    const videoSpec = videoProtocolSpec(provider);
+    const endpoints = spec?.modelListEndpoints?.(baseUrl) ?? videoSpec?.modelListEndpoints?.(baseUrl) ?? [];
+    if (endpoints.length === 0) {
+      return {
+        endpoints,
+        ids: null,
+        message: '该厂商未提供模型列表接口，只能手填模型名（可先用「测试这条草稿」校验）',
+      };
+    }
+
+    const ids = await this.fetchModelIds(endpoints, token, Math.min(base.timeoutMs, 15000));
+    if (!ids) {
+      return {
+        endpoints,
+        ids: null,
+        message: '模型列表接口不可达 —— 可能是令牌无效、无该接口权限，或需要先保存线路',
+      };
+    }
+    return {
+      endpoints,
+      ids,
+      message: ids.length > 0 ? `已拉取 ${ids.length} 个模型` : '接口返回了空列表，请确认该账号下是否有可用模型',
+    };
+  }
+
+  /** 实际探测逻辑（不关心来源是已保存配置还是草稿） */
+  private async probe(
+    modality: Modality,
+    cfg: {
+      enabled: boolean;
+      baseUrl: string;
+      token: string;
+      model: string;
+      provider: string;
+      timeoutMs: number;
+    },
+  ): Promise<{ ok: boolean; latencyMs: number; message: string; detail?: string }> {
     const startedAt = Date.now();
 
     if (!cfg.enabled) {
@@ -430,15 +640,14 @@ export class ModelConfigService {
     /*
      * ⚠️ 探测路径必须**由协议层派生**, 不能按模态硬编码 (2026-10-20 修)。
      *
-     * 改造前这里是 `probePath(modality)`: image 恒打 /generation/tasks ——
-     * 那是 **aigc 自研网关**的路径。而 5 个图像协议的真实端点各不相同:
-     *   aigc → /generation/tasks
+     * 改造前这里是 `probePath(modality)`: image 恒打一条硬编码的固定路径 ——
+     * 而三个图像协议的真实端点各不相同:
      *   openai → /v1/images/generations
      *   volcengine → /images/generations
      *   minimax → /v1/image_generation
      *
      * 于是配了 openai 协议时, 探测打的是优云智算/硅基流动**根本不存在**的
-     * /generation/tasks, 拿到 404, 而探测把 4xx 当作「网络可达」→
+     * 固定路径, 拿到 404, 而探测把 4xx 当作「网络可达」→
      * **测试显示通过, 但生成必然 404**。
      *
      * 症状与本项目最忌讳的「静默不实」完全一致: 运营看到绿色对勾,
@@ -523,11 +732,60 @@ export class ModelConfigService {
               detail: `${path} 已确认存在, 实际生成将走 POST ${path}`,
             };
           } else if (viaGet === 404) {
+            /*
+             * ⚠️ OPTIONS + GET 都 404 **仍不能判定端点不存在**。
+             *
+             * 实测 (2026-10-20, api.modelverse.cn):
+             *   OPTIONS /v1/images/generations → 404
+             *   GET     /v1/images/generations → 404
+             *   POST    /v1/images/generations → 401  ← 端点真实存在
+             * 生成接口常常只注册 POST，服务器对其它方法直接 404。
+             * 故补一次**空请求体 POST**：不会带上图片/提示词，不会触发生成；
+             * 404 才是真不存在，400/401/403/405/422 都说明路径存在。
+             */
+            const viaPost = await probeWithPost(url, cfg.token, Math.min(cfg.timeoutMs, 15000));
+            if (viaPost === 404) {
+              reachable = {
+                ok: false,
+                latencyMs: Date.now() - startedAt,
+                message: `端点不存在 (HTTP ${viaPost})`,
+                detail: `${path} 用 OPTIONS、GET、POST 三种方法探测都是 404 —— 该路径在服务器上不存在。可能是基址填错 (本项目只存根域, 别带 /v1), 或该厂商的端点与所选协议不匹配。生成时必然 404。`,
+              };
+            } else if (viaPost === 401 || viaPost === 403) {
+              reachable = {
+                ok: false,
+                latencyMs: Date.now() - startedAt,
+                message: `令牌被拒绝 (HTTP ${viaPost})`,
+                detail: `${path} 已确认存在（只接受 POST），但拒绝当前令牌。生成时必然失败。`,
+              };
+            } else if (viaPost >= 500) {
+              reachable = {
+                ok: false,
+                latencyMs: Date.now() - startedAt,
+                message: `网关返回 HTTP ${viaPost}`,
+                detail: `端点存在，但服务器自身故障。${path}`,
+              };
+            } else if (viaPost === 0) {
+              reachable = {
+                ok: false,
+                latencyMs: Date.now() - startedAt,
+                message: '无法连接网关',
+                detail: `${path} 的 POST 探测没有响应（超时或网络错误）。`,
+              };
+            } else {
+              reachable = {
+                ok: true,
+                latencyMs: Date.now() - startedAt,
+                message: `端点存在 (只有 POST 被接受, 探测得到 HTTP ${viaPost})`,
+                detail: `${path} 已确认存在；该接口只注册了 POST，空请求体探测返回 ${viaPost}，不会触发一次生成。`,
+              };
+            }
+          } else if (viaGet === 401 || viaGet === 403) {
             reachable = {
               ok: false,
               latencyMs: Date.now() - startedAt,
-              message: `端点不存在 (HTTP ${viaGet})`,
-              detail: `${path} 用 OPTIONS 与 GET 两种方法探测都是 404 —— 该路径在服务器上不存在。可能是基址填错 (本项目只存根域, 别带 /v1), 或该厂商的端点与所选协议不匹配。生成时必然 404。`,
+              message: `令牌被拒绝 (HTTP ${viaGet})`,
+              detail: `${path} 已确认存在, 但拒绝当前令牌 —— 令牌无效、已过期, 或无该模型的权限。生成时必然失败。`,
             };
           } else {
             reachable = {
@@ -724,7 +982,9 @@ function probePath(modality: Modality): string {
     case 'video':
       return '/v1/videos';
     default:
-      return '/generation/tasks';
+      // 图像协议都能在协议层查到 spec, 本分支实际不可达;
+      // 取默认协议 (openai) 的端点, 与 gateway.config 的默认值保持一致。
+      return '/v1/images/generations';
   }
 }
 
@@ -744,6 +1004,35 @@ async function probeWithGet(url: string, token: string | undefined, timeoutMs: n
         Accept: 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
+      signal: ctrl.signal,
+    });
+    return res.status;
+  } catch {
+    return 0;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * 用**空请求体 POST** 再探一次，返回状态码（网络错误返回 0）。
+ *
+ * 仅当 OPTIONS 与 GET 都是 404 时使用。生成接口常只注册 POST，
+ * 服务器对其它方法一律 404；空 body 缺少提示词/图片，正常厂商会以
+ * 400/401/403/405/422 拒绝，而不会真的生成一次。
+ */
+async function probeWithPost(url: string, token: string | undefined, timeoutMs: number): Promise<number> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: '{}',
       signal: ctrl.signal,
     });
     return res.status;
@@ -853,6 +1142,29 @@ function validate(def: ConfigDef, raw: unknown): string {
   if (def.key.startsWith('gateway.route.')) {
     if (!(ROUTE_VALUES as readonly string[]).includes(s)) {
       throw new AppError(40001, `${def.label} 只能是 auto / local / remote`, 400);
+    }
+    /*
+     * 「强制本地」只对**本地真有实现**的能力成立 (2026-10-22 补)。
+     *
+     * 本地没有实现的能力 (创意生图 / 局部重绘 / 图片翻译 / 自由创作, 即
+     * allowsLocalFallback() 为 false 或压根没有 localImpl) 压到 local 是
+     * 一个**不可能成立**的配置: 路由器对这种组合直接判 no-channel → 42204 + 退款,
+     * C 端 /capabilities 则报 effective=unavailable。而运营在后台看到的只是一句
+     * 「保存成功」, 随后用户点进去才发现按钮是死的 —— 这正是本项目最忌讳的
+     * 「保存了但静默失效」。
+     *
+     * 判定与路由器、availability、routeEffectiveOf 共用 allowsLocalFallback(),
+     * 不在这里另写一份, 否则四处口径迟早分叉。
+     */
+    if (s === 'local') {
+      const cap = CAPABILITIES.find((c) => c.id === def.key.slice('gateway.route.'.length));
+      if (cap && !(cap.localImpl && allowsLocalFallback(cap))) {
+        throw new AppError(
+          40001,
+          `${cap.name} 本地没有实现，不能强制本地（按下去会直接失败并退款），请改为 auto 或 remote`,
+          400,
+        );
+      }
     }
   }
   // 通道协议必须在本模态的已接入白名单内。

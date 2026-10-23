@@ -48,7 +48,7 @@
         "width": "1440px",
         "height": "900px",
         "minHeight": "0px",
-        "padding": "104px 0px 0px",
+        "padding": "64px 0px 0px",
         "margin": "0px",
         "flexDirection": "row",
         "flexWrap": "nowrap",
@@ -73,7 +73,7 @@
           "cls": "landing-topbar workspace-app-header top-navigation",
           "box": [
             0,
-            40,
+            0,
             1440,
             64
           ],
@@ -112,7 +112,7 @@
               "cls": "brand workspace-brand",
               "box": [
                 32,
-                53,
+                13,
                 266,
                 38
               ],
@@ -151,7 +151,7 @@
                   "text": "",
                   "box": [
                     38,
-                    54,
+                    14,
                     36,
                     36
                   ],
@@ -190,7 +190,7 @@
                   "cls": "workspace-brand-copy",
                   "box": [
                     84,
-                    63,
+                    23,
                     117,
                     19
                   ],
@@ -227,7 +227,7 @@
                       "text": "极画",
                       "box": [
                         84,
-                        61,
+                        21,
                         32,
                         23
                       ],
@@ -264,7 +264,7 @@
                       "text": "· AI 电商图",
                       "box": [
                         116,
-                        61,
+                        21,
                         85,
                         23
                       ],
@@ -304,7 +304,7 @@
               "cls": "workspace-nav-shell",
               "box": [
                 298,
-                42,
+                2,
                 928,
                 60
               ],
@@ -339,7 +339,7 @@
                   "cls": "workspace-auth-nav",
                   "box": [
                     298,
-                    42,
+                    2,
                     928,
                     60
                   ],
@@ -378,7 +378,7 @@
                       "text": "首页",
                       "box": [
                         298,
-                        56,
+                        16,
                         54,
                         32
                       ],
@@ -415,7 +415,7 @@
                       "cls": "workspace-nav-dropdown workspace-nav-dropdown--has-badge",
                       "box": [
                         362,
-                        56,
+                        16,
                         97,
                         32
                       ],
@@ -451,7 +451,7 @@
                           "cls": "workspace-nav-dropdown-trigger active",
                           "box": [
                             362,
-                            56,
+                            16,
                             97,
                             32
                           ],
@@ -489,7 +489,7 @@
                               "cls": "workspace-nav-dropdown-label",
                               "box": [
                                 376,
-                                56,
+                                16,
                                 52,
                                 32
                               ],
@@ -524,7 +524,7 @@
                                   "cls": "live-user-count-badge live-rotator-badge",
                                   "box": [
                                     415,
-                                    45,
+                                    5,
                                     70,
                                     18
                                   ],
@@ -565,7 +565,7 @@
                                       "cls": "live-rotator-track",
                                       "box": [
                                         420,
-                                        46,
+                                        -12,
                                         60,
                                         54
                                       ],
@@ -594,7 +594,7 @@
                                         "overflow": "visible",
                                         "overflowY": "visible",
                                         "objectFit": "fill",
-                                        "transform": "matrix(1, 0, 0, 1, 0, 0)"
+                                        "transform": "matrix(1, 0, 0, 1, 0, -18)"
                                       },
                                       "kids": [
                                         {
@@ -603,7 +603,7 @@
                                           "text": "电商都在用",
                                           "box": [
                                             425,
-                                            46,
+                                            -12,
                                             50,
                                             18
                                           ],
@@ -640,7 +640,7 @@
                                           "text": "广大卖家优选",
                                           "box": [
                                             420,
-                                            64,
+                                            6,
                                             60,
                                             18
                                           ],
@@ -677,7 +677,7 @@
                                           "text": "电商都在用",
                                           "box": [
                                             425,
-                                            82,
+                                            24,
                                             50,
                                             18
                                           ],
@@ -719,7 +719,7 @@
                               "cls": "lucide lucide-chevron-down workspace-nav-dropdown-chevron",
                               "box": [
                                 432,
-                                66,
+                                26,
                                 13,
                                 13
                               ],
@@ -756,7 +756,7 @@
                                   "text": "",
                                   "box": [
                                     435,
-                                    70,
+                                    30,
                                     7,
                                     3
                                   ],
@@ -795,7 +795,7 @@
                           "cls": "workspace-nav-menu",
                           "box": [
                             342,
-                            94,
+                            54,
                             137,
                             248
                           ],
@@ -835,7 +835,7 @@
                               "cls": "",
                               "box": [
                                 351,
-                                105,
+                                65,
                                 119,
                                 36
                               ],
@@ -874,7 +874,7 @@
                                   "text": "",
                                   "box": [
                                     363,
-                                    113,
+                                    73,
                                     20,
                                     20
                                   ],
@@ -912,7 +912,7 @@
                                   "text": "商品主图",
                                   "box": [
                                     393,
-                                    113,
+                                    73,
                                     52,
                                     20
                                   ],
@@ -950,7 +950,7 @@
                               "cls": "",
                               "box": [
                                 351,
-                                143,
+                                103,
                                 119,
                                 36
                               ],
@@ -989,7 +989,7 @@
                                   "text": "",
                                   "box": [
                                     363,
-                                    151,
+                                    111,
                                     20,
                                     20
                                   ],
@@ -1027,7 +1027,7 @@
                                   "text": "商品详情",
                                   "box": [
                                     393,
-                                    151,
+                                    111,
                                     52,
                                     20
                                   ],
@@ -1065,7 +1065,7 @@
                               "cls": "",
                               "box": [
                                 351,
-                                181,
+                                141,
                                 119,
                                 36
                               ],
@@ -1104,7 +1104,7 @@
                                   "text": "",
                                   "box": [
                                     363,
-                                    189,
+                                    149,
                                     20,
                                     20
                                   ],
@@ -1142,7 +1142,7 @@
                                   "text": "爆款复刻",
                                   "box": [
                                     393,
-                                    189,
+                                    149,
                                     52,
                                     20
                                   ],
@@ -1180,7 +1180,7 @@
                               "cls": "is-active",
                               "box": [
                                 351,
-                                219,
+                                179,
                                 119,
                                 36
                               ],
@@ -1219,7 +1219,7 @@
                                   "text": "",
                                   "box": [
                                     363,
-                                    227,
+                                    187,
                                     20,
                                     20
                                   ],
@@ -1257,7 +1257,7 @@
                                   "text": "创意生图",
                                   "box": [
                                     393,
-                                    227,
+                                    187,
                                     52,
                                     20
                                   ],
@@ -1295,7 +1295,7 @@
                               "cls": "",
                               "box": [
                                 351,
-                                257,
+                                217,
                                 119,
                                 36
                               ],
@@ -1334,7 +1334,7 @@
                                   "text": "",
                                   "box": [
                                     363,
-                                    265,
+                                    225,
                                     20,
                                     20
                                   ],
@@ -1372,7 +1372,7 @@
                                   "text": "多图融合",
                                   "box": [
                                     393,
-                                    265,
+                                    225,
                                     52,
                                     20
                                   ],
@@ -1410,7 +1410,7 @@
                               "cls": "",
                               "box": [
                                 351,
-                                295,
+                                255,
                                 119,
                                 36
                               ],
@@ -1449,7 +1449,7 @@
                                   "text": "",
                                   "box": [
                                     363,
-                                    303,
+                                    263,
                                     20,
                                     20
                                   ],
@@ -1487,7 +1487,7 @@
                                   "text": "商品SKU图",
                                   "box": [
                                     393,
-                                    303,
+                                    263,
                                     65,
                                     20
                                   ],
@@ -1529,7 +1529,7 @@
                       "cls": "workspace-nav-dropdown",
                       "box": [
                         469,
-                        56,
+                        16,
                         84,
                         32
                       ],
@@ -1564,7 +1564,7 @@
                           "cls": "workspace-nav-dropdown-trigger",
                           "box": [
                             469,
-                            56,
+                            16,
                             84,
                             32
                           ],
@@ -1603,7 +1603,7 @@
                               "text": "AI修图",
                               "box": [
                                 483,
-                                56,
+                                16,
                                 39,
                                 32
                               ],
@@ -1639,7 +1639,7 @@
                               "cls": "lucide lucide-chevron-down workspace-nav-dropdown-chevron",
                               "box": [
                                 526,
-                                66,
+                                26,
                                 13,
                                 13
                               ],
@@ -1676,7 +1676,7 @@
                                   "text": "",
                                   "box": [
                                     529,
-                                    70,
+                                    30,
                                     7,
                                     3
                                   ],
@@ -1715,7 +1715,7 @@
                           "cls": "workspace-nav-menu",
                           "box": [
                             449,
-                            94,
+                            54,
                             124,
                             324
                           ],
@@ -1755,7 +1755,7 @@
                               "cls": "",
                               "box": [
                                 458,
-                                105,
+                                65,
                                 106,
                                 36
                               ],
@@ -1794,7 +1794,7 @@
                                   "text": "",
                                   "box": [
                                     470,
-                                    113,
+                                    73,
                                     20,
                                     20
                                   ],
@@ -1832,7 +1832,7 @@
                                   "text": "局部重绘",
                                   "box": [
                                     500,
-                                    113,
+                                    73,
                                     52,
                                     20
                                   ],
@@ -1870,7 +1870,7 @@
                               "cls": "",
                               "box": [
                                 458,
-                                143,
+                                103,
                                 106,
                                 36
                               ],
@@ -1909,7 +1909,7 @@
                                   "text": "",
                                   "box": [
                                     470,
-                                    151,
+                                    111,
                                     20,
                                     20
                                   ],
@@ -1947,7 +1947,7 @@
                                   "text": "一键抠图",
                                   "box": [
                                     500,
-                                    151,
+                                    111,
                                     52,
                                     20
                                   ],
@@ -1985,7 +1985,7 @@
                               "cls": "",
                               "box": [
                                 458,
-                                181,
+                                141,
                                 106,
                                 36
                               ],
@@ -2024,7 +2024,7 @@
                                   "text": "",
                                   "box": [
                                     470,
-                                    189,
+                                    149,
                                     20,
                                     20
                                   ],
@@ -2062,7 +2062,7 @@
                                   "text": "去除水印",
                                   "box": [
                                     500,
-                                    189,
+                                    149,
                                     52,
                                     20
                                   ],
@@ -2100,7 +2100,7 @@
                               "cls": "",
                               "box": [
                                 458,
-                                219,
+                                179,
                                 106,
                                 36
                               ],
@@ -2139,7 +2139,7 @@
                                   "text": "",
                                   "box": [
                                     470,
-                                    227,
+                                    187,
                                     20,
                                     20
                                   ],
@@ -2177,7 +2177,7 @@
                                   "text": "产品精修",
                                   "box": [
                                     500,
-                                    227,
+                                    187,
                                     52,
                                     20
                                   ],
@@ -2215,7 +2215,7 @@
                               "cls": "",
                               "box": [
                                 458,
-                                257,
+                                217,
                                 106,
                                 36
                               ],
@@ -2254,7 +2254,7 @@
                                   "text": "",
                                   "box": [
                                     470,
-                                    265,
+                                    225,
                                     20,
                                     20
                                   ],
@@ -2292,7 +2292,7 @@
                                   "text": "图片翻译",
                                   "box": [
                                     500,
-                                    265,
+                                    225,
                                     52,
                                     20
                                   ],
@@ -2330,7 +2330,7 @@
                               "cls": "",
                               "box": [
                                 458,
-                                295,
+                                255,
                                 106,
                                 36
                               ],
@@ -2369,7 +2369,7 @@
                                   "text": "",
                                   "box": [
                                     470,
-                                    303,
+                                    263,
                                     20,
                                     20
                                   ],
@@ -2407,7 +2407,7 @@
                                   "text": "智能扩图",
                                   "box": [
                                     500,
-                                    303,
+                                    263,
                                     52,
                                     20
                                   ],
@@ -2445,7 +2445,7 @@
                               "cls": "",
                               "box": [
                                 458,
-                                333,
+                                293,
                                 106,
                                 36
                               ],
@@ -2484,7 +2484,7 @@
                                   "text": "",
                                   "box": [
                                     470,
-                                    341,
+                                    301,
                                     20,
                                     20
                                   ],
@@ -2522,7 +2522,7 @@
                                   "text": "商品换色",
                                   "box": [
                                     500,
-                                    341,
+                                    301,
                                     52,
                                     20
                                   ],
@@ -2560,7 +2560,7 @@
                               "cls": "",
                               "box": [
                                 458,
-                                371,
+                                331,
                                 106,
                                 36
                               ],
@@ -2599,7 +2599,7 @@
                                   "text": "",
                                   "box": [
                                     470,
-                                    379,
+                                    339,
                                     20,
                                     20
                                   ],
@@ -2637,352 +2637,7 @@
                                   "text": "旋转角度",
                                   "box": [
                                     500,
-                                    379,
-                                    52,
-                                    20
-                                  ],
-                                  "style": {
-                                    "display": "block",
-                                    "position": "static",
-                                    "width": "52px",
-                                    "height": "20px",
-                                    "padding": "0px",
-                                    "margin": "0px",
-                                    "flexDirection": "row",
-                                    "flexWrap": "nowrap",
-                                    "backgroundColor": "rgba(0, 0, 0, 0)",
-                                    "color": "rgb(71, 84, 103)",
-                                    "fontSize": "13px",
-                                    "fontWeight": "600",
-                                    "lineHeight": "20px",
-                                    "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                    "textAlign": "left",
-                                    "borderRadius": "0px",
-                                    "border": "0px none rgb(71, 84, 103)",
-                                    "borderColor": "rgb(71, 84, 103)",
-                                    "borderWidth": "0px",
-                                    "opacity": "1",
-                                    "overflow": "visible",
-                                    "overflowY": "visible",
-                                    "objectFit": "fill"
-                                  },
-                                  "kids": []
-                                }
-                              ]
-                            }
-                          ]
-                        }
-                      ]
-                    },
-                    {
-                      "tag": "div",
-                      "cls": "workspace-nav-dropdown workspace-nav-dropdown--has-badge",
-                      "box": [
-                        563,
-                        56,
-                        84,
-                        32
-                      ],
-                      "style": {
-                        "display": "flex",
-                        "position": "relative",
-                        "width": "83.625px",
-                        "height": "32px",
-                        "padding": "0px",
-                        "margin": "0px",
-                        "flexDirection": "row",
-                        "flexWrap": "nowrap",
-                        "alignItems": "center",
-                        "backgroundColor": "rgba(0, 0, 0, 0)",
-                        "color": "rgb(24, 32, 51)",
-                        "fontSize": "16px",
-                        "fontWeight": "400",
-                        "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                        "textAlign": "start",
-                        "borderRadius": "0px",
-                        "border": "0px none rgb(24, 32, 51)",
-                        "borderColor": "rgb(24, 32, 51)",
-                        "borderWidth": "0px",
-                        "opacity": "1",
-                        "overflow": "visible",
-                        "overflowY": "visible",
-                        "objectFit": "fill",
-                        "zIndex": "3"
-                      },
-                      "kids": [
-                        {
-                          "tag": "button",
-                          "cls": "workspace-nav-dropdown-trigger",
-                          "box": [
-                            563,
-                            56,
-                            84,
-                            32
-                          ],
-                          "style": {
-                            "display": "flex",
-                            "position": "relative",
-                            "width": "83.625px",
-                            "height": "32px",
-                            "padding": "0px 14px",
-                            "margin": "0px",
-                            "gap": "4px",
-                            "flexDirection": "row",
-                            "flexWrap": "nowrap",
-                            "alignItems": "center",
-                            "backgroundColor": "rgba(0, 0, 0, 0)",
-                            "color": "rgb(102, 112, 133)",
-                            "fontSize": "13px",
-                            "fontWeight": "700",
-                            "lineHeight": "32px",
-                            "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                            "textAlign": "center",
-                            "borderRadius": "8px",
-                            "border": "0px none rgb(102, 112, 133)",
-                            "borderColor": "rgb(102, 112, 133)",
-                            "borderWidth": "0px",
-                            "opacity": "1",
-                            "overflow": "visible",
-                            "overflowY": "visible",
-                            "objectFit": "fill",
-                            "zIndex": "2"
-                          },
-                          "kids": [
-                            {
-                              "tag": "span",
-                              "cls": "workspace-nav-dropdown-label",
-                              "box": [
-                                577,
-                                56,
-                                39,
-                                32
-                              ],
-                              "style": {
-                                "display": "block",
-                                "position": "relative",
-                                "width": "38.625px",
-                                "height": "32px",
-                                "padding": "0px",
-                                "margin": "0px",
-                                "flexDirection": "row",
-                                "flexWrap": "nowrap",
-                                "backgroundColor": "rgba(0, 0, 0, 0)",
-                                "color": "rgb(102, 112, 133)",
-                                "fontSize": "13px",
-                                "fontWeight": "700",
-                                "lineHeight": "32px",
-                                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                "textAlign": "center",
-                                "borderRadius": "0px",
-                                "border": "0px none rgb(102, 112, 133)",
-                                "borderColor": "rgb(102, 112, 133)",
-                                "borderWidth": "0px",
-                                "opacity": "1",
-                                "overflow": "visible",
-                                "overflowY": "visible",
-                                "objectFit": "fill"
-                              },
-                              "kids": []
-                            },
-                            {
-                              "tag": "svg",
-                              "cls": "lucide lucide-chevron-down workspace-nav-dropdown-chevron",
-                              "box": [
-                                619,
-                                66,
-                                13,
-                                13
-                              ],
-                              "style": {
-                                "display": "block",
-                                "position": "static",
-                                "width": "13px",
-                                "height": "13px",
-                                "maxWidth": "100%",
-                                "padding": "0px",
-                                "margin": "0px",
-                                "flexDirection": "row",
-                                "flexWrap": "nowrap",
-                                "backgroundColor": "rgba(0, 0, 0, 0)",
-                                "color": "rgb(102, 112, 133)",
-                                "fontSize": "13px",
-                                "fontWeight": "700",
-                                "lineHeight": "32px",
-                                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                "textAlign": "center",
-                                "borderRadius": "0px",
-                                "border": "0px none rgb(102, 112, 133)",
-                                "borderColor": "rgb(102, 112, 133)",
-                                "borderWidth": "0px",
-                                "opacity": "1",
-                                "overflow": "hidden",
-                                "overflowY": "hidden",
-                                "objectFit": "fill"
-                              },
-                              "kids": [
-                                {
-                                  "tag": "path",
-                                  "cls": "",
-                                  "text": "",
-                                  "box": [
-                                    623,
-                                    70,
-                                    7,
-                                    3
-                                  ],
-                                  "style": {
-                                    "display": "inline",
-                                    "position": "static",
-                                    "minHeight": "0px",
-                                    "padding": "0px",
-                                    "margin": "0px",
-                                    "flexDirection": "row",
-                                    "flexWrap": "nowrap",
-                                    "backgroundColor": "rgba(0, 0, 0, 0)",
-                                    "color": "rgb(102, 112, 133)",
-                                    "fontSize": "13px",
-                                    "fontWeight": "700",
-                                    "lineHeight": "32px",
-                                    "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                    "textAlign": "center",
-                                    "borderRadius": "0px",
-                                    "border": "0px none rgb(102, 112, 133)",
-                                    "borderColor": "rgb(102, 112, 133)",
-                                    "borderWidth": "0px",
-                                    "opacity": "1",
-                                    "overflow": "visible",
-                                    "overflowY": "visible",
-                                    "objectFit": "fill"
-                                  },
-                                  "kids": []
-                                }
-                              ]
-                            }
-                          ]
-                        },
-                        {
-                          "tag": "div",
-                          "cls": "workspace-nav-menu",
-                          "box": [
-                            542,
-                            94,
-                            124,
-                            58
-                          ],
-                          "style": {
-                            "display": "grid",
-                            "position": "absolute",
-                            "width": "124px",
-                            "height": "58px",
-                            "minHeight": "0px",
-                            "maxWidth": "1408px",
-                            "padding": "10px 8px",
-                            "margin": "0px",
-                            "gap": "2px",
-                            "flexDirection": "row",
-                            "flexWrap": "nowrap",
-                            "backgroundColor": "rgb(255, 255, 255)",
-                            "color": "rgb(24, 32, 51)",
-                            "fontSize": "16px",
-                            "fontWeight": "400",
-                            "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                            "textAlign": "start",
-                            "borderRadius": "12px",
-                            "border": "1px solid rgb(229, 231, 240)",
-                            "borderColor": "rgb(229, 231, 240)",
-                            "borderWidth": "1px",
-                            "boxShadow": "rgba(31, 41, 55, 0.14) 0px 18px 42px 0px",
-                            "opacity": "0",
-                            "overflow": "visible",
-                            "overflowY": "visible",
-                            "objectFit": "fill",
-                            "zIndex": "120",
-                            "transform": "matrix(1, 0, 0, 1, -62, -4)"
-                          },
-                          "kids": [
-                            {
-                              "tag": "button",
-                              "cls": "",
-                              "box": [
-                                551,
-                                105,
-                                106,
-                                36
-                              ],
-                              "style": {
-                                "display": "flex",
-                                "position": "static",
-                                "width": "106px",
-                                "height": "36px",
-                                "minHeight": "36px",
-                                "padding": "0px 12px",
-                                "margin": "0px",
-                                "gap": "10px",
-                                "flexDirection": "row",
-                                "flexWrap": "nowrap",
-                                "alignItems": "center",
-                                "backgroundColor": "rgba(0, 0, 0, 0)",
-                                "color": "rgb(71, 84, 103)",
-                                "fontSize": "13px",
-                                "fontWeight": "600",
-                                "lineHeight": "20px",
-                                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                "textAlign": "left",
-                                "borderRadius": "9px",
-                                "border": "0px none rgb(71, 84, 103)",
-                                "borderColor": "rgb(71, 84, 103)",
-                                "borderWidth": "0px",
-                                "opacity": "1",
-                                "overflow": "visible",
-                                "overflowY": "visible",
-                                "objectFit": "fill"
-                              },
-                              "kids": [
-                                {
-                                  "tag": "img",
-                                  "cls": "",
-                                  "text": "",
-                                  "box": [
-                                    563,
-                                    113,
-                                    20,
-                                    20
-                                  ],
-                                  "style": {
-                                    "display": "block",
-                                    "position": "static",
-                                    "width": "20px",
-                                    "height": "20px",
-                                    "maxWidth": "100%",
-                                    "padding": "0px",
-                                    "margin": "0px",
-                                    "flexDirection": "row",
-                                    "flexWrap": "nowrap",
-                                    "backgroundColor": "rgba(0, 0, 0, 0)",
-                                    "color": "rgb(71, 84, 103)",
-                                    "fontSize": "13px",
-                                    "fontWeight": "600",
-                                    "lineHeight": "20px",
-                                    "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                    "textAlign": "left",
-                                    "borderRadius": "0px",
-                                    "border": "0px none rgb(71, 84, 103)",
-                                    "borderColor": "rgb(71, 84, 103)",
-                                    "borderWidth": "0px",
-                                    "opacity": "1",
-                                    "overflow": "clip",
-                                    "overflowY": "clip",
-                                    "objectFit": "contain"
-                                  },
-                                  "kids": []
-                                },
-                                {
-                                  "tag": "span",
-                                  "cls": "",
-                                  "text": "自由创作",
-                                  "box": [
-                                    593,
-                                    113,
+                                    339,
                                     52,
                                     20
                                   ],
@@ -3024,8 +2679,8 @@
                       "cls": "",
                       "text": "我的作品",
                       "box": [
-                        656,
-                        56,
+                        563,
+                        16,
                         80,
                         32
                       ],
@@ -3062,8 +2717,8 @@
                       "cls": "",
                       "text": "购买套餐",
                       "box": [
-                        746,
-                        56,
+                        653,
+                        16,
                         80,
                         32
                       ],
@@ -3099,8 +2754,8 @@
                       "tag": "button",
                       "cls": "workspace-nav-invitations",
                       "box": [
-                        836,
-                        56,
+                        743,
+                        16,
                         80,
                         32
                       ],
@@ -3135,9 +2790,10 @@
                         {
                           "tag": "span",
                           "cls": "invitation-nav-label",
+                          "text": "邀请好友",
                           "box": [
-                            850,
-                            56,
+                            757,
+                            16,
                             52,
                             32
                           ],
@@ -3166,48 +2822,7 @@
                             "overflowY": "visible",
                             "objectFit": "fill"
                           },
-                          "kids": [
-                            {
-                              "tag": "em",
-                              "cls": "invitation-nav-promo-badge",
-                              "text": "限时加赠500",
-                              "box": [
-                                888,
-                                43,
-                                67,
-                                18
-                              ],
-                              "style": {
-                                "display": "block",
-                                "position": "absolute",
-                                "width": "67.1094px",
-                                "height": "18px",
-                                "minHeight": "0px",
-                                "padding": "0px 4px",
-                                "margin": "0px",
-                                "flexDirection": "row",
-                                "flexWrap": "nowrap",
-                                "backgroundColor": "rgba(0, 0, 0, 0)",
-                                "backgroundImage": "linear-gradient(270deg, rgb(247, 0, 23) 0%, rgb(247, 111, 0) 100%)",
-                                "color": "rgb(255, 255, 255)",
-                                "fontSize": "10px",
-                                "fontWeight": "500",
-                                "lineHeight": "16px",
-                                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                "textAlign": "center",
-                                "borderRadius": "10px 10px 10px 2px",
-                                "border": "1px solid rgb(255, 255, 255)",
-                                "borderColor": "rgb(255, 255, 255)",
-                                "borderWidth": "1px",
-                                "opacity": "1",
-                                "overflow": "visible",
-                                "overflowY": "visible",
-                                "objectFit": "fill",
-                                "zIndex": "3"
-                              },
-                              "kids": []
-                            }
-                          ]
+                          "kids": []
                         }
                       ]
                     },
@@ -3216,8 +2831,8 @@
                       "cls": "workspace-nav-customer-service",
                       "text": "联系客服",
                       "box": [
-                        926,
-                        56,
+                        833,
+                        16,
                         80,
                         32
                       ],
@@ -3258,7 +2873,7 @@
               "cls": "landing-top-actions workspace-user-actions",
               "box": [
                 963,
-                56,
+                16,
                 445,
                 32
               ],
@@ -3296,7 +2911,7 @@
                   "cls": "workspace-nav-promo",
                   "box": [
                     953,
-                    57,
+                    17,
                     148,
                     30
                   ],
@@ -3335,7 +2950,7 @@
                       "text": "",
                       "box": [
                         957,
-                        53,
+                        13,
                         24,
                         34
                       ],
@@ -3374,7 +2989,7 @@
                       "text": "新人免费生图10张",
                       "box": [
                         989,
-                        61,
+                        21,
                         96,
                         22
                       ],
@@ -3412,7 +3027,7 @@
                   "cls": "workspace-checkin-btn",
                   "box": [
                     1125,
-                    56,
+                    16,
                     112,
                     32
                   ],
@@ -3451,7 +3066,7 @@
                       "text": "",
                       "box": [
                         1138,
-                        64,
+                        24,
                         16,
                         16
                       ],
@@ -3489,7 +3104,7 @@
                       "text": "签到得积分",
                       "box": [
                         1159,
-                        64,
+                        24,
                         65,
                         16
                       ],
@@ -3528,7 +3143,7 @@
                   "text": "工作台",
                   "box": [
                     1261,
-                    56,
+                    16,
                     55,
                     32
                   ],
@@ -3566,7 +3181,7 @@
                   "text": "登录/注册",
                   "box": [
                     1340,
-                    56,
+                    16,
                     68,
                     32
                   ],
@@ -3607,15 +3222,15 @@
           "cls": "app  workspace-app",
           "box": [
             0,
-            104,
+            64,
             1440,
-            796
+            836
           ],
           "style": {
             "display": "block",
             "position": "static",
             "width": "1440px",
-            "height": "796px",
+            "height": "836px",
             "minHeight": "0px",
             "padding": "0px",
             "margin": "0px",
@@ -3642,15 +3257,15 @@
               "cls": "workspace visible with-side-menu-v2",
               "box": [
                 0,
-                104,
+                64,
                 1440,
-                796
+                836
               ],
               "style": {
                 "display": "grid",
                 "position": "static",
                 "width": "1440px",
-                "height": "796px",
+                "height": "836px",
                 "minHeight": "0px",
                 "padding": "0px",
                 "margin": "0px",
@@ -3679,15 +3294,15 @@
                   "cls": "workspace-side-menu workspace-side-menu-v2",
                   "box": [
                     0,
-                    104,
+                    64,
                     176,
-                    796
+                    836
                   ],
                   "style": {
                     "display": "flex",
                     "position": "fixed",
                     "width": "176px",
-                    "height": "796px",
+                    "height": "836px",
                     "minHeight": "0px",
                     "padding": "16px 12px 24px 24px",
                     "margin": "0px",
@@ -3714,15 +3329,15 @@
                       "cls": "workspace-side-menu-sections",
                       "box": [
                         24,
-                        120,
+                        80,
                         139,
-                        652
+                        692
                       ],
                       "style": {
                         "display": "grid",
                         "position": "static",
                         "width": "139px",
-                        "height": "652px",
+                        "height": "692px",
                         "minHeight": "0px",
                         "padding": "8px 6px 0px 0px",
                         "margin": "0px",
@@ -3749,7 +3364,7 @@
                           "cls": "workspace-menu-section open workspace-menu-root-items",
                           "box": [
                             24,
-                            128,
+                            88,
                             133,
                             98
                           ],
@@ -3783,7 +3398,7 @@
                               "cls": "workspace-side-menu-list",
                               "box": [
                                 24,
-                                128,
+                                88,
                                 133,
                                 98
                               ],
@@ -3819,7 +3434,7 @@
                                   "cls": "",
                                   "box": [
                                     24,
-                                    132,
+                                    92,
                                     133,
                                     45
                                   ],
@@ -3857,7 +3472,7 @@
                                       "cls": "workspace-side-icon workspace-menu-icon",
                                       "box": [
                                         28,
-                                        143,
+                                        103,
                                         24,
                                         24
                                       ],
@@ -3894,7 +3509,7 @@
                                           "text": "",
                                           "box": [
                                             31,
-                                            146,
+                                            106,
                                             19,
                                             17
                                           ],
@@ -3934,7 +3549,7 @@
                                       "text": "工作台",
                                       "box": [
                                         64,
-                                        145,
+                                        105,
                                         39,
                                         20
                                       ],
@@ -3972,7 +3587,7 @@
                                   "cls": "",
                                   "box": [
                                     24,
-                                    181,
+                                    141,
                                     133,
                                     45
                                   ],
@@ -4010,7 +3625,7 @@
                                       "cls": "workspace-side-icon workspace-menu-icon",
                                       "box": [
                                         28,
-                                        192,
+                                        152,
                                         24,
                                         24
                                       ],
@@ -4047,7 +3662,7 @@
                                           "text": "",
                                           "box": [
                                             28,
-                                            192,
+                                            152,
                                             24,
                                             24
                                           ],
@@ -4087,7 +3702,7 @@
                                       "text": "我的作品",
                                       "box": [
                                         64,
-                                        194,
+                                        154,
                                         52,
                                         20
                                       ],
@@ -4129,385 +3744,7 @@
                           "cls": "workspace-menu-section open",
                           "box": [
                             24,
-                            242,
-                            133,
-                            77
-                          ],
-                          "style": {
-                            "display": "block",
-                            "position": "static",
-                            "width": "133px",
-                            "height": "77px",
-                            "padding": "0px",
-                            "margin": "0px",
-                            "flexDirection": "row",
-                            "flexWrap": "nowrap",
-                            "backgroundColor": "rgba(0, 0, 0, 0)",
-                            "color": "rgb(51, 51, 51)",
-                            "fontSize": "16px",
-                            "fontWeight": "400",
-                            "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                            "textAlign": "start",
-                            "borderRadius": "0px",
-                            "border": "0px none rgb(51, 51, 51)",
-                            "borderColor": "rgb(51, 51, 51)",
-                            "borderWidth": "0px",
-                            "opacity": "1",
-                            "overflow": "visible",
-                            "overflowY": "visible",
-                            "objectFit": "fill"
-                          },
-                          "kids": [
-                            {
-                              "tag": "button",
-                              "cls": "workspace-menu-section-toggle",
-                              "box": [
-                                24,
-                                242,
-                                133,
-                                28
-                              ],
-                              "style": {
-                                "display": "flex",
-                                "position": "static",
-                                "width": "133px",
-                                "height": "28px",
-                                "minHeight": "0px",
-                                "padding": "0px 4px",
-                                "margin": "0px",
-                                "flexDirection": "row",
-                                "flexWrap": "nowrap",
-                                "justifyContent": "space-between",
-                                "alignItems": "center",
-                                "backgroundColor": "rgba(0, 0, 0, 0)",
-                                "color": "rgb(51, 51, 51)",
-                                "fontSize": "14px",
-                                "fontWeight": "400",
-                                "lineHeight": "20px",
-                                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                "textAlign": "left",
-                                "borderRadius": "6px",
-                                "border": "0px none rgb(51, 51, 51)",
-                                "borderColor": "rgb(51, 51, 51)",
-                                "borderWidth": "0px",
-                                "opacity": "1",
-                                "overflow": "visible",
-                                "overflowY": "visible",
-                                "objectFit": "fill"
-                              },
-                              "kids": [
-                                {
-                                  "tag": "span",
-                                  "cls": "workspace-menu-section-label",
-                                  "text": "AI视频",
-                                  "box": [
-                                    28,
-                                    246,
-                                    41,
-                                    20
-                                  ],
-                                  "style": {
-                                    "display": "block",
-                                    "position": "static",
-                                    "width": "40.6172px",
-                                    "height": "20px",
-                                    "padding": "0px",
-                                    "margin": "0px",
-                                    "flexDirection": "row",
-                                    "flexWrap": "nowrap",
-                                    "backgroundColor": "rgba(0, 0, 0, 0)",
-                                    "color": "rgb(51, 51, 51)",
-                                    "fontSize": "14px",
-                                    "fontWeight": "400",
-                                    "lineHeight": "20px",
-                                    "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                    "textAlign": "left",
-                                    "borderRadius": "0px",
-                                    "border": "0px none rgb(51, 51, 51)",
-                                    "borderColor": "rgb(51, 51, 51)",
-                                    "borderWidth": "0px",
-                                    "opacity": "1",
-                                    "overflow": "visible",
-                                    "overflowY": "visible",
-                                    "objectFit": "fill"
-                                  },
-                                  "kids": []
-                                },
-                                {
-                                  "tag": "svg",
-                                  "cls": "lucide lucide-chevron-up",
-                                  "box": [
-                                    139,
-                                    249,
-                                    14,
-                                    14
-                                  ],
-                                  "style": {
-                                    "display": "block",
-                                    "position": "static",
-                                    "width": "14px",
-                                    "height": "14px",
-                                    "maxWidth": "100%",
-                                    "padding": "0px",
-                                    "margin": "0px",
-                                    "flexDirection": "row",
-                                    "flexWrap": "nowrap",
-                                    "backgroundColor": "rgba(0, 0, 0, 0)",
-                                    "color": "rgb(78, 89, 105)",
-                                    "fontSize": "14px",
-                                    "fontWeight": "400",
-                                    "lineHeight": "20px",
-                                    "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                    "textAlign": "left",
-                                    "borderRadius": "0px",
-                                    "border": "0px none rgb(78, 89, 105)",
-                                    "borderColor": "rgb(78, 89, 105)",
-                                    "borderWidth": "0px",
-                                    "opacity": "1",
-                                    "overflow": "hidden",
-                                    "overflowY": "hidden",
-                                    "objectFit": "fill"
-                                  },
-                                  "kids": [
-                                    {
-                                      "tag": "path",
-                                      "cls": "",
-                                      "text": "",
-                                      "box": [
-                                        143,
-                                        254,
-                                        7,
-                                        4
-                                      ],
-                                      "style": {
-                                        "display": "inline",
-                                        "position": "static",
-                                        "minHeight": "0px",
-                                        "padding": "0px",
-                                        "margin": "0px",
-                                        "flexDirection": "row",
-                                        "flexWrap": "nowrap",
-                                        "backgroundColor": "rgba(0, 0, 0, 0)",
-                                        "color": "rgb(78, 89, 105)",
-                                        "fontSize": "14px",
-                                        "fontWeight": "400",
-                                        "lineHeight": "20px",
-                                        "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                        "textAlign": "left",
-                                        "borderRadius": "0px",
-                                        "border": "0px none rgb(78, 89, 105)",
-                                        "borderColor": "rgb(78, 89, 105)",
-                                        "borderWidth": "0px",
-                                        "opacity": "1",
-                                        "overflow": "visible",
-                                        "overflowY": "visible",
-                                        "objectFit": "fill"
-                                      },
-                                      "kids": []
-                                    }
-                                  ]
-                                }
-                              ]
-                            },
-                            {
-                              "tag": "div",
-                              "cls": "workspace-side-menu-list",
-                              "box": [
-                                24,
-                                270,
-                                133,
-                                49
-                              ],
-                              "style": {
-                                "display": "grid",
-                                "position": "static",
-                                "width": "133px",
-                                "height": "49px",
-                                "minHeight": "0px",
-                                "padding": "4px 0px 0px",
-                                "margin": "0px",
-                                "gap": "4px",
-                                "flexDirection": "row",
-                                "flexWrap": "nowrap",
-                                "backgroundColor": "rgba(0, 0, 0, 0)",
-                                "color": "rgb(51, 51, 51)",
-                                "fontSize": "16px",
-                                "fontWeight": "400",
-                                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                "textAlign": "start",
-                                "borderRadius": "0px",
-                                "border": "0px none rgb(51, 51, 51)",
-                                "borderColor": "rgb(51, 51, 51)",
-                                "borderWidth": "0px",
-                                "opacity": "1",
-                                "overflow": "visible",
-                                "overflowY": "visible",
-                                "objectFit": "fill"
-                              },
-                              "kids": [
-                                {
-                                  "tag": "button",
-                                  "cls": "",
-                                  "box": [
-                                    24,
-                                    274,
-                                    133,
-                                    45
-                                  ],
-                                  "style": {
-                                    "display": "flex",
-                                    "position": "static",
-                                    "width": "133px",
-                                    "height": "45px",
-                                    "padding": "8px 4px",
-                                    "margin": "0px",
-                                    "gap": "12px",
-                                    "flexDirection": "row",
-                                    "flexWrap": "nowrap",
-                                    "justifyContent": "flex-start",
-                                    "alignItems": "center",
-                                    "backgroundColor": "rgba(0, 0, 0, 0)",
-                                    "color": "rgb(51, 51, 51)",
-                                    "fontSize": "13px",
-                                    "fontWeight": "400",
-                                    "lineHeight": "20px",
-                                    "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                    "textAlign": "left",
-                                    "borderRadius": "8px",
-                                    "border": "0px none rgb(51, 51, 51)",
-                                    "borderColor": "rgb(51, 51, 51)",
-                                    "borderWidth": "0px",
-                                    "opacity": "1",
-                                    "overflow": "visible",
-                                    "overflowY": "visible",
-                                    "objectFit": "fill"
-                                  },
-                                  "kids": [
-                                    {
-                                      "tag": "span",
-                                      "cls": "workspace-side-icon workspace-menu-icon",
-                                      "box": [
-                                        28,
-                                        285,
-                                        24,
-                                        24
-                                      ],
-                                      "style": {
-                                        "display": "grid",
-                                        "position": "static",
-                                        "width": "24px",
-                                        "height": "24px",
-                                        "padding": "0px",
-                                        "margin": "0px",
-                                        "flexDirection": "row",
-                                        "flexWrap": "nowrap",
-                                        "alignItems": "center",
-                                        "backgroundColor": "rgba(0, 0, 0, 0)",
-                                        "color": "rgb(51, 51, 51)",
-                                        "fontSize": "13px",
-                                        "fontWeight": "400",
-                                        "lineHeight": "20px",
-                                        "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                        "textAlign": "left",
-                                        "borderRadius": "0px",
-                                        "border": "0px none rgb(51, 51, 51)",
-                                        "borderColor": "rgb(51, 51, 51)",
-                                        "borderWidth": "0px",
-                                        "opacity": "1",
-                                        "overflow": "visible",
-                                        "overflowY": "visible",
-                                        "objectFit": "contain"
-                                      },
-                                      "kids": [
-                                        {
-                                          "tag": "img",
-                                          "cls": "",
-                                          "text": "",
-                                          "box": [
-                                            28,
-                                            285,
-                                            24,
-                                            24
-                                          ],
-                                          "style": {
-                                            "display": "block",
-                                            "position": "static",
-                                            "width": "24px",
-                                            "height": "24px",
-                                            "maxWidth": "24px",
-                                            "padding": "0px",
-                                            "margin": "0px",
-                                            "flexDirection": "row",
-                                            "flexWrap": "nowrap",
-                                            "backgroundColor": "rgba(0, 0, 0, 0)",
-                                            "color": "rgb(51, 51, 51)",
-                                            "fontSize": "13px",
-                                            "fontWeight": "400",
-                                            "lineHeight": "20px",
-                                            "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                            "textAlign": "left",
-                                            "borderRadius": "0px",
-                                            "border": "0px none rgb(51, 51, 51)",
-                                            "borderColor": "rgb(51, 51, 51)",
-                                            "borderWidth": "0px",
-                                            "opacity": "1",
-                                            "overflow": "clip",
-                                            "overflowY": "clip",
-                                            "objectFit": "fill"
-                                          },
-                                          "kids": []
-                                        }
-                                      ]
-                                    },
-                                    {
-                                      "tag": "span",
-                                      "cls": "",
-                                      "text": "自由创作",
-                                      "box": [
-                                        64,
-                                        287,
-                                        52,
-                                        20
-                                      ],
-                                      "style": {
-                                        "display": "block",
-                                        "position": "static",
-                                        "width": "52px",
-                                        "height": "20px",
-                                        "padding": "0px",
-                                        "margin": "0px",
-                                        "flexDirection": "row",
-                                        "flexWrap": "nowrap",
-                                        "backgroundColor": "rgba(0, 0, 0, 0)",
-                                        "color": "rgb(51, 51, 51)",
-                                        "fontSize": "13px",
-                                        "fontWeight": "400",
-                                        "lineHeight": "20px",
-                                        "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                        "textAlign": "left",
-                                        "borderRadius": "0px",
-                                        "border": "0px none rgb(51, 51, 51)",
-                                        "borderColor": "rgb(51, 51, 51)",
-                                        "borderWidth": "0px",
-                                        "opacity": "1",
-                                        "overflow": "hidden",
-                                        "overflowY": "hidden",
-                                        "objectFit": "fill"
-                                      },
-                                      "kids": []
-                                    }
-                                  ]
-                                }
-                              ]
-                            }
-                          ]
-                        },
-                        {
-                          "tag": "section",
-                          "cls": "workspace-menu-section open",
-                          "box": [
-                            24,
-                            335,
+                            202,
                             133,
                             322
                           ],
@@ -4541,7 +3778,7 @@
                               "cls": "workspace-menu-section-toggle",
                               "box": [
                                 24,
-                                335,
+                                202,
                                 133,
                                 28
                               ],
@@ -4580,7 +3817,7 @@
                                   "text": "电商生图",
                                   "box": [
                                     28,
-                                    339,
+                                    206,
                                     56,
                                     20
                                   ],
@@ -4616,7 +3853,7 @@
                                   "cls": "lucide lucide-chevron-up",
                                   "box": [
                                     139,
-                                    342,
+                                    209,
                                     14,
                                     14
                                   ],
@@ -4653,7 +3890,7 @@
                                       "text": "",
                                       "box": [
                                         143,
-                                        347,
+                                        214,
                                         7,
                                         4
                                       ],
@@ -4692,7 +3929,7 @@
                               "cls": "workspace-side-menu-list",
                               "box": [
                                 24,
-                                363,
+                                230,
                                 133,
                                 294
                               ],
@@ -4728,7 +3965,7 @@
                                   "cls": "workspace-menu-guide-item",
                                   "box": [
                                     24,
-                                    367,
+                                    234,
                                     133,
                                     45
                                   ],
@@ -4763,7 +4000,7 @@
                                       "cls": "",
                                       "box": [
                                         24,
-                                        367,
+                                        234,
                                         133,
                                         45
                                       ],
@@ -4802,7 +4039,7 @@
                                           "cls": "workspace-side-icon workspace-menu-icon",
                                           "box": [
                                             28,
-                                            378,
+                                            245,
                                             24,
                                             24
                                           ],
@@ -4839,7 +4076,7 @@
                                               "text": "",
                                               "box": [
                                                 28,
-                                                378,
+                                                245,
                                                 24,
                                                 24
                                               ],
@@ -4879,7 +4116,7 @@
                                           "text": "商品主图",
                                           "box": [
                                             64,
-                                            380,
+                                            247,
                                             52,
                                             20
                                           ],
@@ -4917,7 +4154,7 @@
                                       "cls": "workspace-menu-guide-popover",
                                       "box": [
                                         177,
-                                        272,
+                                        139,
                                         376,
                                         236
                                       ],
@@ -4959,7 +4196,7 @@
                                           "text": "上传商品图，即可生成完整套图",
                                           "box": [
                                             193,
-                                            286,
+                                            153,
                                             344,
                                             22
                                           ],
@@ -4996,7 +4233,7 @@
                                           "text": "",
                                           "box": [
                                             193,
-                                            320,
+                                            187,
                                             344,
                                             172
                                           ],
@@ -5037,7 +4274,7 @@
                                   "cls": "workspace-menu-guide-item",
                                   "box": [
                                     24,
-                                    416,
+                                    283,
                                     133,
                                     45
                                   ],
@@ -5072,7 +4309,7 @@
                                       "cls": "",
                                       "box": [
                                         24,
-                                        416,
+                                        283,
                                         133,
                                         45
                                       ],
@@ -5111,7 +4348,7 @@
                                           "cls": "workspace-side-icon workspace-menu-icon",
                                           "box": [
                                             28,
-                                            427,
+                                            294,
                                             24,
                                             24
                                           ],
@@ -5148,7 +4385,7 @@
                                               "text": "",
                                               "box": [
                                                 28,
-                                                427,
+                                                294,
                                                 24,
                                                 24
                                               ],
@@ -5188,7 +4425,7 @@
                                           "text": "商品详情",
                                           "box": [
                                             64,
-                                            429,
+                                            296,
                                             52,
                                             20
                                           ],
@@ -5226,7 +4463,7 @@
                                       "cls": "workspace-menu-guide-popover",
                                       "box": [
                                         177,
-                                        321,
+                                        188,
                                         376,
                                         236
                                       ],
@@ -5268,7 +4505,7 @@
                                           "text": "上传商品图，即可生成全套详情图",
                                           "box": [
                                             193,
-                                            335,
+                                            202,
                                             344,
                                             22
                                           ],
@@ -5305,7 +4542,7 @@
                                           "text": "",
                                           "box": [
                                             193,
-                                            369,
+                                            236,
                                             344,
                                             172
                                           ],
@@ -5346,7 +4583,7 @@
                                   "cls": "workspace-menu-guide-item",
                                   "box": [
                                     24,
-                                    465,
+                                    332,
                                     133,
                                     45
                                   ],
@@ -5381,7 +4618,7 @@
                                       "cls": "",
                                       "box": [
                                         24,
-                                        465,
+                                        332,
                                         133,
                                         45
                                       ],
@@ -5420,7 +4657,7 @@
                                           "cls": "workspace-side-icon workspace-menu-icon",
                                           "box": [
                                             28,
-                                            476,
+                                            343,
                                             24,
                                             24
                                           ],
@@ -5457,7 +4694,7 @@
                                               "text": "",
                                               "box": [
                                                 28,
-                                                476,
+                                                343,
                                                 24,
                                                 24
                                               ],
@@ -5497,7 +4734,7 @@
                                           "text": "爆款复刻",
                                           "box": [
                                             64,
-                                            478,
+                                            345,
                                             52,
                                             20
                                           ],
@@ -5535,7 +4772,7 @@
                                       "cls": "workspace-menu-guide-popover",
                                       "box": [
                                         177,
-                                        370,
+                                        237,
                                         376,
                                         236
                                       ],
@@ -5577,7 +4814,7 @@
                                           "text": "上传想参考的爆款图，即刻生成同款",
                                           "box": [
                                             193,
-                                            384,
+                                            251,
                                             344,
                                             22
                                           ],
@@ -5614,7 +4851,7 @@
                                           "text": "",
                                           "box": [
                                             193,
-                                            418,
+                                            285,
                                             344,
                                             172
                                           ],
@@ -5655,7 +4892,7 @@
                                   "cls": "workspace-menu-guide-item",
                                   "box": [
                                     24,
-                                    514,
+                                    381,
                                     133,
                                     45
                                   ],
@@ -5690,7 +4927,7 @@
                                       "cls": "active",
                                       "box": [
                                         24,
-                                        514,
+                                        381,
                                         133,
                                         45
                                       ],
@@ -5729,7 +4966,7 @@
                                           "cls": "workspace-side-icon workspace-menu-icon is-active",
                                           "box": [
                                             28,
-                                            525,
+                                            392,
                                             24,
                                             24
                                           ],
@@ -5766,7 +5003,7 @@
                                               "text": "",
                                               "box": [
                                                 28,
-                                                525,
+                                                392,
                                                 24,
                                                 24
                                               ],
@@ -5806,7 +5043,7 @@
                                           "text": "创意生图",
                                           "box": [
                                             64,
-                                            527,
+                                            394,
                                             52,
                                             20
                                           ],
@@ -5844,7 +5081,7 @@
                                       "cls": "workspace-menu-guide-popover",
                                       "box": [
                                         177,
-                                        419,
+                                        286,
                                         376,
                                         236
                                       ],
@@ -5886,7 +5123,7 @@
                                           "text": "上传参考图、描述你的想法，即可开始创作",
                                           "box": [
                                             193,
-                                            433,
+                                            300,
                                             344,
                                             22
                                           ],
@@ -5923,7 +5160,7 @@
                                           "text": "",
                                           "box": [
                                             193,
-                                            467,
+                                            334,
                                             344,
                                             172
                                           ],
@@ -5964,7 +5201,7 @@
                                   "cls": "",
                                   "box": [
                                     24,
-                                    563,
+                                    430,
                                     133,
                                     45
                                   ],
@@ -6002,7 +5239,7 @@
                                       "cls": "workspace-side-icon workspace-menu-icon",
                                       "box": [
                                         28,
-                                        574,
+                                        441,
                                         24,
                                         24
                                       ],
@@ -6039,7 +5276,7 @@
                                           "text": "",
                                           "box": [
                                             28,
-                                            574,
+                                            441,
                                             24,
                                             24
                                           ],
@@ -6079,7 +5316,7 @@
                                       "text": "多图融合",
                                       "box": [
                                         64,
-                                        576,
+                                        443,
                                         52,
                                         20
                                       ],
@@ -6117,7 +5354,7 @@
                                   "cls": "",
                                   "box": [
                                     24,
-                                    612,
+                                    479,
                                     133,
                                     45
                                   ],
@@ -6155,7 +5392,7 @@
                                       "cls": "workspace-side-icon workspace-menu-icon",
                                       "box": [
                                         28,
-                                        623,
+                                        490,
                                         24,
                                         24
                                       ],
@@ -6192,7 +5429,7 @@
                                           "text": "",
                                           "box": [
                                             28,
-                                            623,
+                                            490,
                                             24,
                                             24
                                           ],
@@ -6232,7 +5469,7 @@
                                       "text": "商品SKU图",
                                       "box": [
                                         64,
-                                        625,
+                                        492,
                                         64,
                                         20
                                       ],
@@ -6274,7 +5511,7 @@
                           "cls": "workspace-menu-section open",
                           "box": [
                             24,
-                            673,
+                            540,
                             133,
                             420
                           ],
@@ -6308,7 +5545,7 @@
                               "cls": "workspace-menu-section-toggle",
                               "box": [
                                 24,
-                                673,
+                                540,
                                 133,
                                 28
                               ],
@@ -6347,7 +5584,7 @@
                                   "text": "AI修图",
                                   "box": [
                                     28,
-                                    677,
+                                    544,
                                     41,
                                     20
                                   ],
@@ -6383,7 +5620,7 @@
                                   "cls": "lucide lucide-chevron-up",
                                   "box": [
                                     139,
-                                    680,
+                                    547,
                                     14,
                                     14
                                   ],
@@ -6420,7 +5657,7 @@
                                       "text": "",
                                       "box": [
                                         143,
-                                        685,
+                                        552,
                                         7,
                                         4
                                       ],
@@ -6459,7 +5696,7 @@
                               "cls": "workspace-side-menu-list",
                               "box": [
                                 24,
-                                701,
+                                568,
                                 133,
                                 392
                               ],
@@ -6495,7 +5732,7 @@
                                   "cls": "workspace-menu-guide-item",
                                   "box": [
                                     24,
-                                    705,
+                                    572,
                                     133,
                                     45
                                   ],
@@ -6530,7 +5767,7 @@
                                       "cls": "",
                                       "box": [
                                         24,
-                                        705,
+                                        572,
                                         133,
                                         45
                                       ],
@@ -6569,7 +5806,7 @@
                                           "cls": "workspace-side-icon workspace-menu-icon",
                                           "box": [
                                             28,
-                                            716,
+                                            583,
                                             24,
                                             24
                                           ],
@@ -6606,7 +5843,7 @@
                                               "text": "",
                                               "box": [
                                                 28,
-                                                716,
+                                                583,
                                                 24,
                                                 24
                                               ],
@@ -6646,7 +5883,7 @@
                                           "text": "局部重绘",
                                           "box": [
                                             64,
-                                            718,
+                                            585,
                                             52,
                                             20
                                           ],
@@ -6684,7 +5921,7 @@
                                       "cls": "workspace-menu-guide-popover",
                                       "box": [
                                         177,
-                                        610,
+                                        477,
                                         376,
                                         236
                                       ],
@@ -6726,7 +5963,7 @@
                                           "text": "局部涂抹后，通过文字描述重绘指定区域",
                                           "box": [
                                             193,
-                                            624,
+                                            491,
                                             344,
                                             22
                                           ],
@@ -6763,7 +6000,7 @@
                                           "text": "",
                                           "box": [
                                             193,
-                                            658,
+                                            525,
                                             344,
                                             172
                                           ],
@@ -6804,7 +6041,7 @@
                                   "cls": "workspace-menu-guide-item",
                                   "box": [
                                     24,
-                                    754,
+                                    621,
                                     133,
                                     45
                                   ],
@@ -6839,7 +6076,7 @@
                                       "cls": "",
                                       "box": [
                                         24,
-                                        754,
+                                        621,
                                         133,
                                         45
                                       ],
@@ -6878,7 +6115,7 @@
                                           "cls": "workspace-side-icon workspace-menu-icon",
                                           "box": [
                                             28,
-                                            765,
+                                            632,
                                             24,
                                             24
                                           ],
@@ -6915,7 +6152,7 @@
                                               "text": "",
                                               "box": [
                                                 28,
-                                                765,
+                                                632,
                                                 24,
                                                 24
                                               ],
@@ -6955,7 +6192,7 @@
                                           "text": "一键抠图",
                                           "box": [
                                             64,
-                                            767,
+                                            634,
                                             52,
                                             20
                                           ],
@@ -6993,7 +6230,7 @@
                                       "cls": "workspace-menu-guide-popover",
                                       "box": [
                                         177,
-                                        659,
+                                        526,
                                         376,
                                         236
                                       ],
@@ -7035,7 +6272,7 @@
                                           "text": "智能识别主体，一键去除图片背景",
                                           "box": [
                                             193,
-                                            673,
+                                            540,
                                             344,
                                             22
                                           ],
@@ -7072,7 +6309,7 @@
                                           "text": "",
                                           "box": [
                                             193,
-                                            707,
+                                            574,
                                             344,
                                             172
                                           ],
@@ -7113,7 +6350,7 @@
                                   "cls": "workspace-menu-guide-item",
                                   "box": [
                                     24,
-                                    803,
+                                    670,
                                     133,
                                     45
                                   ],
@@ -7148,7 +6385,7 @@
                                       "cls": "",
                                       "box": [
                                         24,
-                                        803,
+                                        670,
                                         133,
                                         45
                                       ],
@@ -7187,7 +6424,7 @@
                                           "cls": "workspace-side-icon workspace-menu-icon",
                                           "box": [
                                             28,
-                                            814,
+                                            681,
                                             24,
                                             24
                                           ],
@@ -7224,7 +6461,7 @@
                                               "text": "",
                                               "box": [
                                                 30,
-                                                816,
+                                                683,
                                                 21,
                                                 19
                                               ],
@@ -7264,7 +6501,7 @@
                                           "text": "去除水印",
                                           "box": [
                                             64,
-                                            816,
+                                            683,
                                             52,
                                             20
                                           ],
@@ -7302,7 +6539,7 @@
                                       "cls": "workspace-menu-guide-popover",
                                       "box": [
                                         177,
-                                        708,
+                                        575,
                                         376,
                                         236
                                       ],
@@ -7344,7 +6581,7 @@
                                           "text": "智能去除图片中的水印与遮挡文字",
                                           "box": [
                                             193,
-                                            722,
+                                            589,
                                             344,
                                             22
                                           ],
@@ -7381,7 +6618,7 @@
                                           "text": "",
                                           "box": [
                                             193,
-                                            756,
+                                            623,
                                             344,
                                             172
                                           ],
@@ -7422,7 +6659,7 @@
                                   "cls": "workspace-menu-guide-item",
                                   "box": [
                                     24,
-                                    852,
+                                    719,
                                     133,
                                     45
                                   ],
@@ -7457,7 +6694,7 @@
                                       "cls": "",
                                       "box": [
                                         24,
-                                        852,
+                                        719,
                                         133,
                                         45
                                       ],
@@ -7496,7 +6733,7 @@
                                           "cls": "workspace-side-icon workspace-menu-icon",
                                           "box": [
                                             28,
-                                            863,
+                                            730,
                                             24,
                                             24
                                           ],
@@ -7533,7 +6770,7 @@
                                               "text": "",
                                               "box": [
                                                 28,
-                                                863,
+                                                730,
                                                 24,
                                                 24
                                               ],
@@ -7573,7 +6810,7 @@
                                           "text": "产品精修",
                                           "box": [
                                             64,
-                                            865,
+                                            732,
                                             52,
                                             20
                                           ],
@@ -7611,7 +6848,7 @@
                                       "cls": "workspace-menu-guide-popover",
                                       "box": [
                                         177,
-                                        757,
+                                        624,
                                         376,
                                         236
                                       ],
@@ -7653,7 +6890,7 @@
                                           "text": "优化商品质感与画面细节，提升展示效果",
                                           "box": [
                                             193,
-                                            771,
+                                            638,
                                             344,
                                             22
                                           ],
@@ -7690,7 +6927,7 @@
                                           "text": "",
                                           "box": [
                                             193,
-                                            805,
+                                            672,
                                             344,
                                             172
                                           ],
@@ -7731,7 +6968,7 @@
                                   "cls": "workspace-menu-guide-item",
                                   "box": [
                                     24,
-                                    901,
+                                    768,
                                     133,
                                     45
                                   ],
@@ -7766,7 +7003,7 @@
                                       "cls": "",
                                       "box": [
                                         24,
-                                        901,
+                                        768,
                                         133,
                                         45
                                       ],
@@ -7805,7 +7042,7 @@
                                           "cls": "workspace-side-icon workspace-menu-icon",
                                           "box": [
                                             28,
-                                            912,
+                                            779,
                                             24,
                                             24
                                           ],
@@ -7842,7 +7079,7 @@
                                               "text": "",
                                               "box": [
                                                 28,
-                                                912,
+                                                779,
                                                 24,
                                                 24
                                               ],
@@ -7882,7 +7119,7 @@
                                           "text": "图片翻译",
                                           "box": [
                                             64,
-                                            914,
+                                            781,
                                             52,
                                             20
                                           ],
@@ -7920,7 +7157,7 @@
                                       "cls": "workspace-menu-guide-popover",
                                       "box": [
                                         177,
-                                        806,
+                                        673,
                                         376,
                                         236
                                       ],
@@ -7962,7 +7199,7 @@
                                           "text": "保留原有版式，将图片文字翻译为目标语言",
                                           "box": [
                                             193,
-                                            820,
+                                            687,
                                             344,
                                             22
                                           ],
@@ -7999,7 +7236,7 @@
                                           "text": "",
                                           "box": [
                                             193,
-                                            854,
+                                            721,
                                             344,
                                             172
                                           ],
@@ -8040,7 +7277,7 @@
                                   "cls": "workspace-menu-guide-item",
                                   "box": [
                                     24,
-                                    950,
+                                    817,
                                     133,
                                     45
                                   ],
@@ -8075,7 +7312,7 @@
                                       "cls": "",
                                       "box": [
                                         24,
-                                        950,
+                                        817,
                                         133,
                                         45
                                       ],
@@ -8114,7 +7351,7 @@
                                           "cls": "workspace-side-icon workspace-menu-icon",
                                           "box": [
                                             28,
-                                            961,
+                                            828,
                                             24,
                                             24
                                           ],
@@ -8151,7 +7388,7 @@
                                               "text": "",
                                               "box": [
                                                 28,
-                                                961,
+                                                828,
                                                 24,
                                                 24
                                               ],
@@ -8191,7 +7428,7 @@
                                           "text": "智能扩图",
                                           "box": [
                                             64,
-                                            963,
+                                            830,
                                             52,
                                             20
                                           ],
@@ -8229,7 +7466,7 @@
                                       "cls": "workspace-menu-guide-popover",
                                       "box": [
                                         177,
-                                        855,
+                                        722,
                                         376,
                                         236
                                       ],
@@ -8271,7 +7508,7 @@
                                           "text": "智能补全画面边缘，扩展图片构图",
                                           "box": [
                                             193,
-                                            869,
+                                            736,
                                             344,
                                             22
                                           ],
@@ -8308,7 +7545,7 @@
                                           "text": "",
                                           "box": [
                                             193,
-                                            903,
+                                            770,
                                             344,
                                             172
                                           ],
@@ -8349,7 +7586,7 @@
                                   "cls": "workspace-menu-guide-item",
                                   "box": [
                                     24,
-                                    999,
+                                    866,
                                     133,
                                     45
                                   ],
@@ -8384,7 +7621,7 @@
                                       "cls": "",
                                       "box": [
                                         24,
-                                        999,
+                                        866,
                                         133,
                                         45
                                       ],
@@ -8423,7 +7660,7 @@
                                           "cls": "workspace-side-icon workspace-menu-icon",
                                           "box": [
                                             28,
-                                            1010,
+                                            877,
                                             24,
                                             24
                                           ],
@@ -8460,7 +7697,7 @@
                                               "text": "",
                                               "box": [
                                                 28,
-                                                1010,
+                                                877,
                                                 24,
                                                 24
                                               ],
@@ -8500,7 +7737,7 @@
                                           "text": "商品换色",
                                           "box": [
                                             64,
-                                            1012,
+                                            879,
                                             52,
                                             20
                                           ],
@@ -8538,7 +7775,7 @@
                                       "cls": "workspace-menu-guide-popover",
                                       "box": [
                                         177,
-                                        904,
+                                        771,
                                         376,
                                         236
                                       ],
@@ -8580,7 +7817,7 @@
                                           "text": "保持商品结构不变，快速替换主体颜色",
                                           "box": [
                                             193,
-                                            918,
+                                            785,
                                             344,
                                             22
                                           ],
@@ -8617,7 +7854,7 @@
                                           "text": "",
                                           "box": [
                                             193,
-                                            952,
+                                            819,
                                             344,
                                             172
                                           ],
@@ -8658,7 +7895,7 @@
                                   "cls": "workspace-menu-guide-item",
                                   "box": [
                                     24,
-                                    1048,
+                                    915,
                                     133,
                                     45
                                   ],
@@ -8693,7 +7930,7 @@
                                       "cls": "",
                                       "box": [
                                         24,
-                                        1048,
+                                        915,
                                         133,
                                         45
                                       ],
@@ -8732,7 +7969,7 @@
                                           "cls": "workspace-side-icon workspace-menu-icon",
                                           "box": [
                                             28,
-                                            1059,
+                                            926,
                                             24,
                                             24
                                           ],
@@ -8769,7 +8006,7 @@
                                               "text": "",
                                               "box": [
                                                 28,
-                                                1059,
+                                                926,
                                                 24,
                                                 24
                                               ],
@@ -8809,7 +8046,7 @@
                                           "text": "旋转角度",
                                           "box": [
                                             64,
-                                            1061,
+                                            928,
                                             52,
                                             20
                                           ],
@@ -8847,7 +8084,7 @@
                                       "cls": "workspace-menu-guide-popover",
                                       "box": [
                                         177,
-                                        953,
+                                        820,
                                         376,
                                         236
                                       ],
@@ -8889,7 +8126,7 @@
                                           "text": "调整商品展示视角，生成新的观察角度",
                                           "box": [
                                             193,
-                                            967,
+                                            834,
                                             344,
                                             22
                                           ],
@@ -8926,7 +8163,7 @@
                                           "text": "",
                                           "box": [
                                             193,
-                                            1001,
+                                            868,
                                             344,
                                             172
                                           ],
@@ -8971,7 +8208,7 @@
                           "cls": "workspace-menu-section open",
                           "box": [
                             24,
-                            1109,
+                            976,
                             133,
                             77
                           ],
@@ -9005,7 +8242,7 @@
                               "cls": "workspace-menu-section-toggle",
                               "box": [
                                 24,
-                                1109,
+                                976,
                                 133,
                                 28
                               ],
@@ -9044,7 +8281,7 @@
                                   "text": "数据中心",
                                   "box": [
                                     28,
-                                    1113,
+                                    980,
                                     56,
                                     20
                                   ],
@@ -9080,7 +8317,7 @@
                                   "cls": "lucide lucide-chevron-up",
                                   "box": [
                                     139,
-                                    1116,
+                                    983,
                                     14,
                                     14
                                   ],
@@ -9117,7 +8354,7 @@
                                       "text": "",
                                       "box": [
                                         143,
-                                        1121,
+                                        988,
                                         7,
                                         4
                                       ],
@@ -9156,7 +8393,7 @@
                               "cls": "workspace-side-menu-list",
                               "box": [
                                 24,
-                                1137,
+                                1004,
                                 133,
                                 49
                               ],
@@ -9192,7 +8429,7 @@
                                   "cls": "",
                                   "box": [
                                     24,
-                                    1141,
+                                    1008,
                                     133,
                                     45
                                   ],
@@ -9230,7 +8467,7 @@
                                       "cls": "workspace-side-icon workspace-menu-icon",
                                       "box": [
                                         28,
-                                        1152,
+                                        1019,
                                         24,
                                         24
                                       ],
@@ -9267,7 +8504,7 @@
                                           "text": "",
                                           "box": [
                                             30,
-                                            1155,
+                                            1022,
                                             20,
                                             18
                                           ],
@@ -9307,7 +8544,7 @@
                                       "text": "素材库",
                                       "box": [
                                         64,
-                                        1154,
+                                        1021,
                                         39,
                                         20
                                       ],
@@ -9770,15 +9007,15 @@
                   "cls": "workspace-route-content",
                   "box": [
                     176,
-                    104,
+                    64,
                     1264,
-                    796
+                    836
                   ],
                   "style": {
                     "display": "block",
                     "position": "static",
                     "width": "1264px",
-                    "height": "796px",
+                    "height": "836px",
                     "minHeight": "0px",
                     "padding": "0px",
                     "margin": "0px",
@@ -9805,15 +9042,15 @@
                       "cls": "free-creation-page",
                       "box": [
                         176,
-                        104,
+                        64,
                         1264,
-                        796
+                        836
                       ],
                       "style": {
                         "display": "block",
                         "position": "static",
                         "width": "1264px",
-                        "height": "796px",
+                        "height": "836px",
                         "minHeight": "0px",
                         "padding": "16px",
                         "margin": "0px",
@@ -9840,15 +9077,15 @@
                           "cls": "free-creation-layout",
                           "box": [
                             192,
-                            120,
+                            80,
                             1232,
-                            764
+                            804
                           ],
                           "style": {
                             "display": "grid",
                             "position": "static",
                             "width": "1232px",
-                            "height": "764px",
+                            "height": "804px",
                             "minHeight": "0px",
                             "padding": "0px",
                             "margin": "0px",
@@ -9877,15 +9114,15 @@
                               "cls": "free-creation-form",
                               "box": [
                                 192,
-                                120,
+                                80,
                                 432,
-                                764
+                                804
                               ],
                               "style": {
                                 "display": "flex",
                                 "position": "static",
                                 "width": "432px",
-                                "height": "764px",
+                                "height": "804px",
                                 "minHeight": "0px",
                                 "maxWidth": "432px",
                                 "padding": "0px",
@@ -9913,15 +9150,15 @@
                                   "cls": "free-form-scroll",
                                   "box": [
                                     192,
-                                    120,
+                                    80,
                                     432,
-                                    630
+                                    670
                                   ],
                                   "style": {
                                     "display": "flex",
                                     "position": "static",
                                     "width": "432px",
-                                    "height": "630px",
+                                    "height": "670px",
                                     "minHeight": "0px",
                                     "padding": "0px",
                                     "margin": "0px",
@@ -9948,7 +9185,7 @@
                                       "cls": "free-main-card",
                                       "box": [
                                         192,
-                                        120,
+                                        80,
                                         432,
                                         352
                                       ],
@@ -9983,7 +9220,7 @@
                                           "cls": "workspace-section free-upload-section",
                                           "box": [
                                             208,
-                                            132,
+                                            92,
                                             400,
                                             195
                                           ],
@@ -10018,7 +9255,7 @@
                                               "cls": "workspace-upload-title-row free-upload-title-row",
                                               "box": [
                                                 208,
-                                                132,
+                                                92,
                                                 400,
                                                 23
                                               ],
@@ -10056,7 +9293,7 @@
                                                   "text": "上传参考图",
                                                   "box": [
                                                     208,
-                                                    137,
+                                                    97,
                                                     70,
                                                     13
                                                   ],
@@ -10092,7 +9329,7 @@
                                                   "cls": "workspace-upload-title-actions",
                                                   "box": [
                                                     448,
-                                                    132,
+                                                    92,
                                                     160,
                                                     23
                                                   ],
@@ -10129,7 +9366,7 @@
                                                       "text": "从素材库导入",
                                                       "box": [
                                                         448,
-                                                        137,
+                                                        97,
                                                         72,
                                                         13
                                                       ],
@@ -10167,7 +9404,7 @@
                                                       "cls": "mobile-upload-trigger mobile-upload-qr-trigger",
                                                       "box": [
                                                         528,
-                                                        137,
+                                                        97,
                                                         48,
                                                         13
                                                       ],
@@ -10205,7 +9442,7 @@
                                                           "text": "手机上传",
                                                           "box": [
                                                             528,
-                                                            137,
+                                                            97,
                                                             48,
                                                             13
                                                           ],
@@ -10244,7 +9481,7 @@
                                                       "text": "0/4",
                                                       "box": [
                                                         584,
-                                                        132,
+                                                        92,
                                                         24,
                                                         23
                                                       ],
@@ -10283,7 +9520,7 @@
                                               "cls": "workspace-upload-guide-anchor",
                                               "box": [
                                                 208,
-                                                167,
+                                                127,
                                                 400,
                                                 160
                                               ],
@@ -10318,7 +9555,7 @@
                                                   "cls": "workspace-upload-dropzone upload-slot upload-slot-multiple free-upload-zone",
                                                   "box": [
                                                     208,
-                                                    167,
+                                                    127,
                                                     400,
                                                     160
                                                   ],
@@ -10356,7 +9593,7 @@
                                                       "cls": "upload-thumb-grid free-thumb-grid",
                                                       "box": [
                                                         225,
-                                                        184,
+                                                        144,
                                                         366,
                                                         126
                                                       ],
@@ -10394,7 +9631,7 @@
                                                           "cls": "workspace-upload-prompt free-upload-add",
                                                           "box": [
                                                             225,
-                                                            184,
+                                                            144,
                                                             366,
                                                             126
                                                           ],
@@ -10434,7 +9671,7 @@
                                                               "text": "",
                                                               "box": [
                                                                 401,
-                                                                205,
+                                                                165,
                                                                 14,
                                                                 14
                                                               ],
@@ -10472,7 +9709,7 @@
                                                               "text": "点击、拖拽或粘贴参考图片到此处上传",
                                                               "box": [
                                                                 289,
-                                                                243,
+                                                                203,
                                                                 238,
                                                                 22
                                                               ],
@@ -10510,7 +9747,7 @@
                                                               "text": "最多可上传 4 张参考图片，单张不超过 10MB",
                                                               "box": [
                                                                 289,
-                                                                269,
+                                                                229,
                                                                 238,
                                                                 20
                                                               ],
@@ -10556,7 +9793,7 @@
                                           "cls": "field free-prompt-field",
                                           "box": [
                                             208,
-                                            343,
+                                            303,
                                             400,
                                             117
                                           ],
@@ -10591,7 +9828,7 @@
                                               "cls": "field-label-row free-prompt-label-row",
                                               "box": [
                                                 208,
-                                                343,
+                                                303,
                                                 400,
                                                 16
                                               ],
@@ -10630,7 +9867,7 @@
                                                   "text": "创作提示词",
                                                   "box": [
                                                     208,
-                                                    345,
+                                                    305,
                                                     81,
                                                     13
                                                   ],
@@ -10666,7 +9903,7 @@
                                                   "cls": "free-prompt-tools",
                                                   "box": [
                                                     455,
-                                                    343,
+                                                    303,
                                                     153,
                                                     16
                                                   ],
@@ -10703,7 +9940,7 @@
                                                       "cls": "free-prompt-tool-btn",
                                                       "box": [
                                                         455,
-                                                        343,
+                                                        303,
                                                         52,
                                                         16
                                                       ],
@@ -10742,7 +9979,7 @@
                                                           "cls": "lucide lucide-sparkles",
                                                           "box": [
                                                             455,
-                                                            345,
+                                                            305,
                                                             13,
                                                             13
                                                           ],
@@ -10779,7 +10016,7 @@
                                                               "text": "",
                                                               "box": [
                                                                 456,
-                                                                346,
+                                                                306,
                                                                 11,
                                                                 11
                                                               ],
@@ -10815,7 +10052,7 @@
                                                               "text": "",
                                                               "box": [
                                                                 456,
-                                                                354,
+                                                                314,
                                                                 2,
                                                                 2
                                                               ],
@@ -10854,7 +10091,7 @@
                                                       "cls": "free-prompt-tool-btn",
                                                       "box": [
                                                         519,
-                                                        343,
+                                                        303,
                                                         89,
                                                         16
                                                       ],
@@ -10893,7 +10130,7 @@
                                                           "cls": "lucide lucide-sparkles",
                                                           "box": [
                                                             519,
-                                                            345,
+                                                            305,
                                                             13,
                                                             13
                                                           ],
@@ -10930,7 +10167,7 @@
                                                               "text": "",
                                                               "box": [
                                                                 520,
-                                                                346,
+                                                                306,
                                                                 11,
                                                                 11
                                                               ],
@@ -10966,7 +10203,7 @@
                                                               "text": "",
                                                               "box": [
                                                                 520,
-                                                                354,
+                                                                314,
                                                                 2,
                                                                 2
                                                               ],
@@ -11009,7 +10246,7 @@
                                               "cls": "description-editor",
                                               "box": [
                                                 208,
-                                                375,
+                                                335,
                                                 400,
                                                 85
                                               ],
@@ -11044,7 +10281,7 @@
                                                   "text": "",
                                                   "box": [
                                                     208,
-                                                    375,
+                                                    335,
                                                     400,
                                                     80
                                                   ],
@@ -11079,7 +10316,7 @@
                                                   "cls": "description-expand-btn",
                                                   "box": [
                                                     572,
-                                                    424,
+                                                    384,
                                                     28,
                                                     28
                                                   ],
@@ -11115,7 +10352,7 @@
                                                       "cls": "lucide lucide-maximize2 lucide-maximize-2",
                                                       "box": [
                                                         579,
-                                                        430,
+                                                        390,
                                                         14,
                                                         15
                                                       ],
@@ -11151,7 +10388,7 @@
                                                           "text": "",
                                                           "box": [
                                                             588,
-                                                            432,
+                                                            392,
                                                             4,
                                                             4
                                                           ],
@@ -11186,7 +10423,7 @@
                                                           "text": "",
                                                           "box": [
                                                             587,
-                                                            432,
+                                                            392,
                                                             4,
                                                             4
                                                           ],
@@ -11221,7 +10458,7 @@
                                                           "text": "",
                                                           "box": [
                                                             581,
-                                                            439,
+                                                            399,
                                                             4,
                                                             4
                                                           ],
@@ -11256,7 +10493,7 @@
                                                           "text": "",
                                                           "box": [
                                                             581,
-                                                            439,
+                                                            399,
                                                             4,
                                                             4
                                                           ],
@@ -11457,7 +10694,7 @@
                                                     "width": "48px",
                                                     "height": "17.5px",
                                                     "padding": "0px",
-                                                    "margin": "0px 175.578px 0px 0px",
+                                                    "margin": "0px 241.266px 0px 0px",
                                                     "flexDirection": "row",
                                                     "flexWrap": "nowrap",
                                                     "backgroundColor": "rgba(0, 0, 0, 0)",
@@ -11482,7 +10719,7 @@
                                                   "cls": "image-output-settings-chip",
                                                   "text": "比例 1:1",
                                                   "box": [
-                                                    450,
+                                                    515,
                                                     783,
                                                     60,
                                                     28
@@ -11491,45 +10728,6 @@
                                                     "display": "flex",
                                                     "position": "static",
                                                     "width": "59.7344px",
-                                                    "height": "28px",
-                                                    "minHeight": "28px",
-                                                    "padding": "0px 9px",
-                                                    "margin": "0px",
-                                                    "flexDirection": "row",
-                                                    "flexWrap": "nowrap",
-                                                    "justifyContent": "center",
-                                                    "alignItems": "center",
-                                                    "backgroundColor": "rgb(255, 255, 255)",
-                                                    "color": "rgb(72, 80, 94)",
-                                                    "fontSize": "11px",
-                                                    "fontWeight": "400",
-                                                    "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                                    "textAlign": "center",
-                                                    "borderRadius": "5px",
-                                                    "border": "1px solid rgb(228, 231, 239)",
-                                                    "borderColor": "rgb(228, 231, 239)",
-                                                    "borderWidth": "1px",
-                                                    "opacity": "1",
-                                                    "overflow": "visible",
-                                                    "overflowY": "visible",
-                                                    "objectFit": "fill"
-                                                  },
-                                                  "kids": []
-                                                },
-                                                {
-                                                  "tag": "span",
-                                                  "cls": "image-output-settings-chip",
-                                                  "text": "画质 1K",
-                                                  "box": [
-                                                    517,
-                                                    783,
-                                                    58,
-                                                    28
-                                                  ],
-                                                  "style": {
-                                                    "display": "flex",
-                                                    "position": "static",
-                                                    "width": "57.6875px",
                                                     "height": "28px",
                                                     "minHeight": "28px",
                                                     "padding": "0px 9px",
@@ -11718,15 +10916,15 @@
                               "cls": "free-result-panel free-result-panel-empty",
                               "box": [
                                 640,
-                                120,
+                                80,
                                 784,
-                                764
+                                804
                               ],
                               "style": {
                                 "display": "flex",
                                 "position": "static",
                                 "width": "784px",
-                                "height": "764px",
+                                "height": "804px",
                                 "padding": "0px",
                                 "margin": "0px",
                                 "gap": "16px",
@@ -11754,15 +10952,15 @@
                                   "cls": "preview-placeholder free-empty-preview",
                                   "box": [
                                     640,
-                                    120,
+                                    80,
                                     784,
-                                    764
+                                    804
                                   ],
                                   "style": {
                                     "display": "flex",
                                     "position": "static",
                                     "width": "784px",
-                                    "height": "764px",
+                                    "height": "804px",
                                     "minHeight": "0px",
                                     "padding": "0px",
                                     "margin": "0px",
@@ -11793,7 +10991,7 @@
                                       "cls": "preview-placeholder-inner free-empty-preview-inner",
                                       "box": [
                                         852,
-                                        372,
+                                        352,
                                         360,
                                         260
                                       ],
@@ -11831,7 +11029,7 @@
                                           "text": "",
                                           "box": [
                                             952,
-                                            372,
+                                            352,
                                             160,
                                             160
                                           ],
@@ -11868,7 +11066,7 @@
                                           "text": "效果图预览",
                                           "box": [
                                             997,
-                                            540,
+                                            520,
                                             70,
                                             22
                                           ],
@@ -11905,7 +11103,7 @@
                                           "text": "提交任务后，生成结果将在此处展示",
                                           "box": [
                                             936,
-                                            570,
+                                            550,
                                             192,
                                             20
                                           ],
@@ -11947,1130 +11145,6 @@
                       ]
                     }
                   ]
-                }
-              ]
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "tag": "div",
-      "cls": "promo-topbar",
-      "box": [
-        0,
-        0,
-        1440,
-        40
-      ],
-      "style": {
-        "display": "flex",
-        "position": "fixed",
-        "width": "1440px",
-        "height": "40px",
-        "minHeight": "0px",
-        "padding": "0px 56px 0px 32px",
-        "margin": "0px",
-        "gap": "24px",
-        "flexDirection": "row",
-        "flexWrap": "nowrap",
-        "justifyContent": "center",
-        "alignItems": "center",
-        "backgroundColor": "rgba(0, 0, 0, 0)",
-        "backgroundImage": "linear-gradient(90deg, rgb(247, 96, 135) 0%, rgb(250, 115, 142) 8%, rgb(252, 157, 159) 15%, rgb(249, 181, 171) 25%, rgb(249, 166, 157) 35%, rgb(248, 135, 144) 45%, rgb(248, 106, 134) 55%, rgb(247, 68, 106) 65%, rgb(245, 44, 92) 75%, rgb(245, 29, 81) 85%, rgb(240, 29, 80) 100%)",
-        "color": "rgb(255, 255, 255)",
-        "fontSize": "16px",
-        "fontWeight": "400",
-        "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-        "textAlign": "start",
-        "borderRadius": "0px",
-        "border": "0px none rgb(255, 255, 255)",
-        "borderColor": "rgb(255, 255, 255)",
-        "borderWidth": "0px",
-        "opacity": "1",
-        "overflow": "hidden",
-        "overflowY": "hidden",
-        "objectFit": "fill",
-        "zIndex": "1010"
-      },
-      "kids": [
-        {
-          "tag": "span",
-          "cls": "promo-topbar-brand",
-          "box": [
-            209,
-            0,
-            358,
-            40
-          ],
-          "style": {
-            "display": "flex",
-            "position": "static",
-            "width": "358px",
-            "height": "40px",
-            "padding": "0px",
-            "margin": "0px",
-            "gap": "8px",
-            "flexDirection": "row",
-            "flexWrap": "nowrap",
-            "alignItems": "center",
-            "backgroundColor": "rgba(0, 0, 0, 0)",
-            "color": "rgb(255, 255, 255)",
-            "fontSize": "16px",
-            "fontWeight": "400",
-            "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-            "textAlign": "start",
-            "borderRadius": "0px",
-            "border": "0px none rgb(255, 255, 255)",
-            "borderColor": "rgb(255, 255, 255)",
-            "borderWidth": "0px",
-            "opacity": "1",
-            "overflow": "visible",
-            "overflowY": "visible",
-            "objectFit": "fill"
-          },
-          "kids": [
-            {
-              "tag": "img",
-              "cls": "promo-topbar-title",
-              "text": "",
-              "box": [
-                209,
-                0,
-                190,
-                40
-              ],
-              "style": {
-                "display": "block",
-                "position": "static",
-                "width": "190px",
-                "height": "40px",
-                "maxWidth": "100%",
-                "padding": "0px",
-                "margin": "0px",
-                "flexDirection": "row",
-                "flexWrap": "nowrap",
-                "backgroundColor": "rgba(0, 0, 0, 0)",
-                "color": "rgb(255, 255, 255)",
-                "fontSize": "16px",
-                "fontWeight": "400",
-                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                "textAlign": "start",
-                "borderRadius": "0px",
-                "border": "0px none rgb(255, 255, 255)",
-                "borderColor": "rgb(255, 255, 255)",
-                "borderWidth": "0px",
-                "opacity": "1",
-                "overflow": "clip",
-                "overflowY": "clip",
-                "objectFit": "fill"
-              },
-              "kids": []
-            },
-            {
-              "tag": "img",
-              "cls": "promo-topbar-badge",
-              "text": "",
-              "box": [
-                407,
-                1,
-                160,
-                38
-              ],
-              "style": {
-                "display": "block",
-                "position": "static",
-                "width": "160px",
-                "height": "38px",
-                "maxWidth": "100%",
-                "padding": "0px",
-                "margin": "0px",
-                "flexDirection": "row",
-                "flexWrap": "nowrap",
-                "backgroundColor": "rgba(0, 0, 0, 0)",
-                "color": "rgb(255, 255, 255)",
-                "fontSize": "16px",
-                "fontWeight": "400",
-                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                "textAlign": "start",
-                "borderRadius": "0px",
-                "border": "0px none rgb(255, 255, 255)",
-                "borderColor": "rgb(255, 255, 255)",
-                "borderWidth": "0px",
-                "opacity": "1",
-                "overflow": "clip",
-                "overflowY": "clip",
-                "objectFit": "fill"
-              },
-              "kids": []
-            }
-          ]
-        },
-        {
-          "tag": "span",
-          "cls": "promo-topbar-slogan",
-          "box": [
-            591,
-            5,
-            166,
-            31
-          ],
-          "style": {
-            "display": "block",
-            "position": "static",
-            "width": "165.758px",
-            "height": "31px",
-            "padding": "0px",
-            "margin": "0px",
-            "flexDirection": "row",
-            "flexWrap": "nowrap",
-            "backgroundColor": "rgba(0, 0, 0, 0)",
-            "color": "rgb(255, 255, 255)",
-            "fontSize": "14px",
-            "fontWeight": "500",
-            "lineHeight": "31px",
-            "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-            "textAlign": "start",
-            "borderRadius": "0px",
-            "border": "0px none rgb(255, 255, 255)",
-            "borderColor": "rgb(255, 255, 255)",
-            "borderWidth": "0px",
-            "opacity": "1",
-            "overflow": "visible",
-            "overflowY": "visible",
-            "objectFit": "fill"
-          },
-          "kids": [
-            {
-              "tag": "i",
-              "cls": "promo-topbar-divider",
-              "text": "|",
-              "box": [
-                683,
-                10,
-                4,
-                20
-              ],
-              "style": {
-                "display": "inline",
-                "position": "static",
-                "minHeight": "0px",
-                "padding": "0px",
-                "margin": "0px 14px",
-                "flexDirection": "row",
-                "flexWrap": "nowrap",
-                "backgroundColor": "rgba(0, 0, 0, 0)",
-                "color": "rgb(255, 255, 255)",
-                "fontSize": "14px",
-                "fontWeight": "400",
-                "lineHeight": "31px",
-                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                "textAlign": "start",
-                "borderRadius": "0px",
-                "border": "0px none rgb(255, 255, 255)",
-                "borderColor": "rgb(255, 255, 255)",
-                "borderWidth": "0px",
-                "opacity": "1",
-                "overflow": "visible",
-                "overflowY": "visible",
-                "objectFit": "fill"
-              },
-              "kids": []
-            }
-          ]
-        },
-        {
-          "tag": "span",
-          "cls": "promo-topbar-countdown",
-          "box": [
-            780,
-            5,
-            310,
-            31
-          ],
-          "style": {
-            "display": "flex",
-            "position": "static",
-            "width": "310.008px",
-            "height": "31px",
-            "padding": "0px 8px",
-            "margin": "0px",
-            "gap": "8px",
-            "flexDirection": "row",
-            "flexWrap": "nowrap",
-            "alignItems": "center",
-            "backgroundColor": "rgba(144, 0, 0, 0.2)",
-            "color": "rgb(255, 255, 255)",
-            "fontSize": "12px",
-            "fontWeight": "400",
-            "lineHeight": "25px",
-            "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-            "textAlign": "start",
-            "borderRadius": "8px",
-            "border": "0px none rgb(255, 255, 255)",
-            "borderColor": "rgb(255, 255, 255)",
-            "borderWidth": "0px",
-            "opacity": "1",
-            "overflow": "visible",
-            "overflowY": "visible",
-            "objectFit": "fill"
-          },
-          "kids": [
-            {
-              "tag": "em",
-              "cls": "",
-              "text": "倒计时",
-              "box": [
-                788,
-                8,
-                36,
-                25
-              ],
-              "style": {
-                "display": "block",
-                "position": "static",
-                "width": "36px",
-                "height": "25px",
-                "padding": "0px",
-                "margin": "0px",
-                "flexDirection": "row",
-                "flexWrap": "nowrap",
-                "backgroundColor": "rgba(0, 0, 0, 0)",
-                "color": "rgb(255, 255, 255)",
-                "fontSize": "12px",
-                "fontWeight": "400",
-                "lineHeight": "25px",
-                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                "textAlign": "start",
-                "borderRadius": "0px",
-                "border": "0px none rgb(255, 255, 255)",
-                "borderColor": "rgb(255, 255, 255)",
-                "borderWidth": "0px",
-                "opacity": "1",
-                "overflow": "visible",
-                "overflowY": "visible",
-                "objectFit": "fill"
-              },
-              "kids": []
-            },
-            {
-              "tag": "span",
-              "cls": "promo-topbar-cd-group",
-              "box": [
-                832,
-                8,
-                40,
-                25
-              ],
-              "style": {
-                "display": "flex",
-                "position": "static",
-                "width": "40px",
-                "height": "25px",
-                "padding": "0px",
-                "margin": "0px",
-                "gap": "4px",
-                "flexDirection": "row",
-                "flexWrap": "nowrap",
-                "alignItems": "center",
-                "backgroundColor": "rgba(0, 0, 0, 0)",
-                "color": "rgb(255, 255, 255)",
-                "fontSize": "12px",
-                "fontWeight": "400",
-                "lineHeight": "25px",
-                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                "textAlign": "start",
-                "borderRadius": "0px",
-                "border": "0px none rgb(255, 255, 255)",
-                "borderColor": "rgb(255, 255, 255)",
-                "borderWidth": "0px",
-                "opacity": "1",
-                "overflow": "visible",
-                "overflowY": "visible",
-                "objectFit": "fill"
-              },
-              "kids": [
-                {
-                  "tag": "strong",
-                  "cls": "",
-                  "text": "4",
-                  "box": [
-                    832,
-                    8,
-                    24,
-                    24
-                  ],
-                  "style": {
-                    "display": "block",
-                    "position": "static",
-                    "width": "24px",
-                    "height": "24px",
-                    "padding": "0px 2px",
-                    "margin": "0px",
-                    "flexDirection": "row",
-                    "flexWrap": "nowrap",
-                    "backgroundColor": "rgba(0, 0, 0, 0.1)",
-                    "color": "rgb(255, 246, 151)",
-                    "fontSize": "14px",
-                    "fontWeight": "500",
-                    "lineHeight": "24px",
-                    "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                    "textAlign": "center",
-                    "borderRadius": "4px",
-                    "border": "0px none rgb(255, 246, 151)",
-                    "borderColor": "rgb(255, 246, 151)",
-                    "borderWidth": "0px",
-                    "opacity": "1",
-                    "overflow": "visible",
-                    "overflowY": "visible",
-                    "objectFit": "fill"
-                  },
-                  "kids": []
-                },
-                {
-                  "tag": "i",
-                  "cls": "",
-                  "text": "天",
-                  "box": [
-                    860,
-                    8,
-                    12,
-                    25
-                  ],
-                  "style": {
-                    "display": "block",
-                    "position": "static",
-                    "width": "12px",
-                    "height": "25px",
-                    "padding": "0px",
-                    "margin": "0px",
-                    "flexDirection": "row",
-                    "flexWrap": "nowrap",
-                    "backgroundColor": "rgba(0, 0, 0, 0)",
-                    "color": "rgb(255, 255, 255)",
-                    "fontSize": "12px",
-                    "fontWeight": "400",
-                    "lineHeight": "25px",
-                    "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                    "textAlign": "start",
-                    "borderRadius": "0px",
-                    "border": "0px none rgb(255, 255, 255)",
-                    "borderColor": "rgb(255, 255, 255)",
-                    "borderWidth": "0px",
-                    "opacity": "1",
-                    "overflow": "visible",
-                    "overflowY": "visible",
-                    "objectFit": "fill"
-                  },
-                  "kids": []
-                }
-              ]
-            },
-            {
-              "tag": "b",
-              "cls": "",
-              "text": ":",
-              "box": [
-                880,
-                8,
-                3,
-                25
-              ],
-              "style": {
-                "display": "block",
-                "position": "static",
-                "width": "3.33594px",
-                "height": "25px",
-                "padding": "0px",
-                "margin": "0px",
-                "flexDirection": "row",
-                "flexWrap": "nowrap",
-                "backgroundColor": "rgba(0, 0, 0, 0)",
-                "color": "rgb(255, 255, 255)",
-                "fontSize": "12px",
-                "fontWeight": "400",
-                "lineHeight": "25px",
-                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                "textAlign": "start",
-                "borderRadius": "0px",
-                "border": "0px none rgb(255, 255, 255)",
-                "borderColor": "rgb(255, 255, 255)",
-                "borderWidth": "0px",
-                "opacity": "1",
-                "overflow": "visible",
-                "overflowY": "visible",
-                "objectFit": "fill"
-              },
-              "kids": []
-            },
-            {
-              "tag": "span",
-              "cls": "promo-topbar-cd-group",
-              "box": [
-                892,
-                8,
-                40,
-                25
-              ],
-              "style": {
-                "display": "flex",
-                "position": "static",
-                "width": "40px",
-                "height": "25px",
-                "padding": "0px",
-                "margin": "0px",
-                "gap": "4px",
-                "flexDirection": "row",
-                "flexWrap": "nowrap",
-                "alignItems": "center",
-                "backgroundColor": "rgba(0, 0, 0, 0)",
-                "color": "rgb(255, 255, 255)",
-                "fontSize": "12px",
-                "fontWeight": "400",
-                "lineHeight": "25px",
-                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                "textAlign": "start",
-                "borderRadius": "0px",
-                "border": "0px none rgb(255, 255, 255)",
-                "borderColor": "rgb(255, 255, 255)",
-                "borderWidth": "0px",
-                "opacity": "1",
-                "overflow": "visible",
-                "overflowY": "visible",
-                "objectFit": "fill"
-              },
-              "kids": [
-                {
-                  "tag": "strong",
-                  "cls": "",
-                  "text": "00",
-                  "box": [
-                    892,
-                    8,
-                    24,
-                    24
-                  ],
-                  "style": {
-                    "display": "block",
-                    "position": "static",
-                    "width": "24px",
-                    "height": "24px",
-                    "padding": "0px 2px",
-                    "margin": "0px",
-                    "flexDirection": "row",
-                    "flexWrap": "nowrap",
-                    "backgroundColor": "rgba(0, 0, 0, 0.1)",
-                    "color": "rgb(255, 246, 151)",
-                    "fontSize": "14px",
-                    "fontWeight": "500",
-                    "lineHeight": "24px",
-                    "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                    "textAlign": "center",
-                    "borderRadius": "4px",
-                    "border": "0px none rgb(255, 246, 151)",
-                    "borderColor": "rgb(255, 246, 151)",
-                    "borderWidth": "0px",
-                    "opacity": "1",
-                    "overflow": "visible",
-                    "overflowY": "visible",
-                    "objectFit": "fill"
-                  },
-                  "kids": []
-                },
-                {
-                  "tag": "i",
-                  "cls": "",
-                  "text": "时",
-                  "box": [
-                    920,
-                    8,
-                    12,
-                    25
-                  ],
-                  "style": {
-                    "display": "block",
-                    "position": "static",
-                    "width": "12px",
-                    "height": "25px",
-                    "padding": "0px",
-                    "margin": "0px",
-                    "flexDirection": "row",
-                    "flexWrap": "nowrap",
-                    "backgroundColor": "rgba(0, 0, 0, 0)",
-                    "color": "rgb(255, 255, 255)",
-                    "fontSize": "12px",
-                    "fontWeight": "400",
-                    "lineHeight": "25px",
-                    "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                    "textAlign": "start",
-                    "borderRadius": "0px",
-                    "border": "0px none rgb(255, 255, 255)",
-                    "borderColor": "rgb(255, 255, 255)",
-                    "borderWidth": "0px",
-                    "opacity": "1",
-                    "overflow": "visible",
-                    "overflowY": "visible",
-                    "objectFit": "fill"
-                  },
-                  "kids": []
-                }
-              ]
-            },
-            {
-              "tag": "b",
-              "cls": "",
-              "text": ":",
-              "box": [
-                940,
-                8,
-                3,
-                25
-              ],
-              "style": {
-                "display": "block",
-                "position": "static",
-                "width": "3.33594px",
-                "height": "25px",
-                "padding": "0px",
-                "margin": "0px",
-                "flexDirection": "row",
-                "flexWrap": "nowrap",
-                "backgroundColor": "rgba(0, 0, 0, 0)",
-                "color": "rgb(255, 255, 255)",
-                "fontSize": "12px",
-                "fontWeight": "400",
-                "lineHeight": "25px",
-                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                "textAlign": "start",
-                "borderRadius": "0px",
-                "border": "0px none rgb(255, 255, 255)",
-                "borderColor": "rgb(255, 255, 255)",
-                "borderWidth": "0px",
-                "opacity": "1",
-                "overflow": "visible",
-                "overflowY": "visible",
-                "objectFit": "fill"
-              },
-              "kids": []
-            },
-            {
-              "tag": "span",
-              "cls": "promo-topbar-cd-group",
-              "box": [
-                951,
-                8,
-                40,
-                25
-              ],
-              "style": {
-                "display": "flex",
-                "position": "static",
-                "width": "40px",
-                "height": "25px",
-                "padding": "0px",
-                "margin": "0px",
-                "gap": "4px",
-                "flexDirection": "row",
-                "flexWrap": "nowrap",
-                "alignItems": "center",
-                "backgroundColor": "rgba(0, 0, 0, 0)",
-                "color": "rgb(255, 255, 255)",
-                "fontSize": "12px",
-                "fontWeight": "400",
-                "lineHeight": "25px",
-                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                "textAlign": "start",
-                "borderRadius": "0px",
-                "border": "0px none rgb(255, 255, 255)",
-                "borderColor": "rgb(255, 255, 255)",
-                "borderWidth": "0px",
-                "opacity": "1",
-                "overflow": "visible",
-                "overflowY": "visible",
-                "objectFit": "fill"
-              },
-              "kids": [
-                {
-                  "tag": "strong",
-                  "cls": "",
-                  "text": "38",
-                  "box": [
-                    951,
-                    8,
-                    24,
-                    24
-                  ],
-                  "style": {
-                    "display": "block",
-                    "position": "static",
-                    "width": "24px",
-                    "height": "24px",
-                    "padding": "0px 2px",
-                    "margin": "0px",
-                    "flexDirection": "row",
-                    "flexWrap": "nowrap",
-                    "backgroundColor": "rgba(0, 0, 0, 0.1)",
-                    "color": "rgb(255, 246, 151)",
-                    "fontSize": "14px",
-                    "fontWeight": "500",
-                    "lineHeight": "24px",
-                    "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                    "textAlign": "center",
-                    "borderRadius": "4px",
-                    "border": "0px none rgb(255, 246, 151)",
-                    "borderColor": "rgb(255, 246, 151)",
-                    "borderWidth": "0px",
-                    "opacity": "1",
-                    "overflow": "visible",
-                    "overflowY": "visible",
-                    "objectFit": "fill"
-                  },
-                  "kids": []
-                },
-                {
-                  "tag": "i",
-                  "cls": "",
-                  "text": "分",
-                  "box": [
-                    979,
-                    8,
-                    12,
-                    25
-                  ],
-                  "style": {
-                    "display": "block",
-                    "position": "static",
-                    "width": "12px",
-                    "height": "25px",
-                    "padding": "0px",
-                    "margin": "0px",
-                    "flexDirection": "row",
-                    "flexWrap": "nowrap",
-                    "backgroundColor": "rgba(0, 0, 0, 0)",
-                    "color": "rgb(255, 255, 255)",
-                    "fontSize": "12px",
-                    "fontWeight": "400",
-                    "lineHeight": "25px",
-                    "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                    "textAlign": "start",
-                    "borderRadius": "0px",
-                    "border": "0px none rgb(255, 255, 255)",
-                    "borderColor": "rgb(255, 255, 255)",
-                    "borderWidth": "0px",
-                    "opacity": "1",
-                    "overflow": "visible",
-                    "overflowY": "visible",
-                    "objectFit": "fill"
-                  },
-                  "kids": []
-                }
-              ]
-            },
-            {
-              "tag": "b",
-              "cls": "",
-              "text": ":",
-              "box": [
-                999,
-                8,
-                3,
-                25
-              ],
-              "style": {
-                "display": "block",
-                "position": "static",
-                "width": "3.33594px",
-                "height": "25px",
-                "padding": "0px",
-                "margin": "0px",
-                "flexDirection": "row",
-                "flexWrap": "nowrap",
-                "backgroundColor": "rgba(0, 0, 0, 0)",
-                "color": "rgb(255, 255, 255)",
-                "fontSize": "12px",
-                "fontWeight": "400",
-                "lineHeight": "25px",
-                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                "textAlign": "start",
-                "borderRadius": "0px",
-                "border": "0px none rgb(255, 255, 255)",
-                "borderColor": "rgb(255, 255, 255)",
-                "borderWidth": "0px",
-                "opacity": "1",
-                "overflow": "visible",
-                "overflowY": "visible",
-                "objectFit": "fill"
-              },
-              "kids": []
-            },
-            {
-              "tag": "span",
-              "cls": "promo-topbar-cd-group",
-              "box": [
-                1010,
-                8,
-                40,
-                25
-              ],
-              "style": {
-                "display": "flex",
-                "position": "static",
-                "width": "40px",
-                "height": "25px",
-                "padding": "0px",
-                "margin": "0px",
-                "gap": "4px",
-                "flexDirection": "row",
-                "flexWrap": "nowrap",
-                "alignItems": "center",
-                "backgroundColor": "rgba(0, 0, 0, 0)",
-                "color": "rgb(255, 255, 255)",
-                "fontSize": "12px",
-                "fontWeight": "400",
-                "lineHeight": "25px",
-                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                "textAlign": "start",
-                "borderRadius": "0px",
-                "border": "0px none rgb(255, 255, 255)",
-                "borderColor": "rgb(255, 255, 255)",
-                "borderWidth": "0px",
-                "opacity": "1",
-                "overflow": "visible",
-                "overflowY": "visible",
-                "objectFit": "fill"
-              },
-              "kids": [
-                {
-                  "tag": "strong",
-                  "cls": "",
-                  "text": "22",
-                  "box": [
-                    1010,
-                    8,
-                    24,
-                    24
-                  ],
-                  "style": {
-                    "display": "block",
-                    "position": "static",
-                    "width": "24px",
-                    "height": "24px",
-                    "padding": "0px 2px",
-                    "margin": "0px",
-                    "flexDirection": "row",
-                    "flexWrap": "nowrap",
-                    "backgroundColor": "rgba(0, 0, 0, 0.1)",
-                    "color": "rgb(255, 246, 151)",
-                    "fontSize": "14px",
-                    "fontWeight": "500",
-                    "lineHeight": "24px",
-                    "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                    "textAlign": "center",
-                    "borderRadius": "4px",
-                    "border": "0px none rgb(255, 246, 151)",
-                    "borderColor": "rgb(255, 246, 151)",
-                    "borderWidth": "0px",
-                    "opacity": "1",
-                    "overflow": "visible",
-                    "overflowY": "visible",
-                    "objectFit": "fill"
-                  },
-                  "kids": []
-                },
-                {
-                  "tag": "i",
-                  "cls": "",
-                  "text": "秒",
-                  "box": [
-                    1038,
-                    8,
-                    12,
-                    25
-                  ],
-                  "style": {
-                    "display": "block",
-                    "position": "static",
-                    "width": "12px",
-                    "height": "25px",
-                    "padding": "0px",
-                    "margin": "0px",
-                    "flexDirection": "row",
-                    "flexWrap": "nowrap",
-                    "backgroundColor": "rgba(0, 0, 0, 0)",
-                    "color": "rgb(255, 255, 255)",
-                    "fontSize": "12px",
-                    "fontWeight": "400",
-                    "lineHeight": "25px",
-                    "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                    "textAlign": "start",
-                    "borderRadius": "0px",
-                    "border": "0px none rgb(255, 255, 255)",
-                    "borderColor": "rgb(255, 255, 255)",
-                    "borderWidth": "0px",
-                    "opacity": "1",
-                    "overflow": "visible",
-                    "overflowY": "visible",
-                    "objectFit": "fill"
-                  },
-                  "kids": []
-                }
-              ]
-            },
-            {
-              "tag": "em",
-              "cls": "",
-              "text": "下架",
-              "box": [
-                1058,
-                8,
-                24,
-                25
-              ],
-              "style": {
-                "display": "block",
-                "position": "static",
-                "width": "24px",
-                "height": "25px",
-                "padding": "0px",
-                "margin": "0px",
-                "flexDirection": "row",
-                "flexWrap": "nowrap",
-                "backgroundColor": "rgba(0, 0, 0, 0)",
-                "color": "rgb(255, 255, 255)",
-                "fontSize": "12px",
-                "fontWeight": "400",
-                "lineHeight": "25px",
-                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                "textAlign": "start",
-                "borderRadius": "0px",
-                "border": "0px none rgb(255, 255, 255)",
-                "borderColor": "rgb(255, 255, 255)",
-                "borderWidth": "0px",
-                "opacity": "1",
-                "overflow": "visible",
-                "overflowY": "visible",
-                "objectFit": "fill"
-              },
-              "kids": []
-            }
-          ]
-        },
-        {
-          "tag": "button",
-          "cls": "promo-topbar-buy",
-          "box": [
-            1114,
-            6,
-            93,
-            28
-          ],
-          "style": {
-            "display": "flex",
-            "position": "static",
-            "width": "93px",
-            "height": "28px",
-            "padding": "0px",
-            "margin": "0px",
-            "flexDirection": "row",
-            "flexWrap": "nowrap",
-            "alignItems": "center",
-            "backgroundColor": "rgba(0, 0, 0, 0)",
-            "color": "rgb(0, 0, 0)",
-            "fontSize": "16px",
-            "fontWeight": "400",
-            "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-            "textAlign": "center",
-            "borderRadius": "0px",
-            "border": "0px none rgb(0, 0, 0)",
-            "borderColor": "rgb(0, 0, 0)",
-            "borderWidth": "0px",
-            "opacity": "1",
-            "overflow": "visible",
-            "overflowY": "visible",
-            "objectFit": "fill"
-          },
-          "kids": [
-            {
-              "tag": "img",
-              "cls": "",
-              "text": "",
-              "box": [
-                1114,
-                6,
-                93,
-                28
-              ],
-              "style": {
-                "display": "block",
-                "position": "static",
-                "width": "93px",
-                "height": "28px",
-                "maxWidth": "100%",
-                "padding": "0px",
-                "margin": "0px",
-                "flexDirection": "row",
-                "flexWrap": "nowrap",
-                "backgroundColor": "rgba(0, 0, 0, 0)",
-                "color": "rgb(0, 0, 0)",
-                "fontSize": "16px",
-                "fontWeight": "400",
-                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                "textAlign": "center",
-                "borderRadius": "0px",
-                "border": "0px none rgb(0, 0, 0)",
-                "borderColor": "rgb(0, 0, 0)",
-                "borderWidth": "0px",
-                "opacity": "1",
-                "overflow": "clip",
-                "overflowY": "clip",
-                "objectFit": "fill"
-              },
-              "kids": []
-            }
-          ]
-        },
-        {
-          "tag": "button",
-          "cls": "promo-topbar-close",
-          "box": [
-            1394,
-            8,
-            24,
-            24
-          ],
-          "style": {
-            "display": "flex",
-            "position": "absolute",
-            "width": "24px",
-            "height": "24px",
-            "minHeight": "0px",
-            "padding": "0px",
-            "margin": "0px",
-            "flexDirection": "row",
-            "flexWrap": "nowrap",
-            "justifyContent": "center",
-            "alignItems": "center",
-            "backgroundColor": "rgba(0, 0, 0, 0)",
-            "color": "rgb(255, 255, 255)",
-            "fontSize": "16px",
-            "fontWeight": "400",
-            "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-            "textAlign": "center",
-            "borderRadius": "0px",
-            "border": "0px none rgb(255, 255, 255)",
-            "borderColor": "rgb(255, 255, 255)",
-            "borderWidth": "0px",
-            "opacity": "0.95",
-            "overflow": "visible",
-            "overflowY": "visible",
-            "objectFit": "fill",
-            "transform": "matrix(1, 0, 0, 1, 0, -12)"
-          },
-          "kids": [
-            {
-              "tag": "svg",
-              "cls": "lucide lucide-x",
-              "box": [
-                1399,
-                13,
-                15,
-                15
-              ],
-              "style": {
-                "display": "block",
-                "position": "static",
-                "width": "15px",
-                "height": "15px",
-                "maxWidth": "100%",
-                "padding": "0px",
-                "margin": "0px",
-                "flexDirection": "row",
-                "flexWrap": "nowrap",
-                "backgroundColor": "rgba(0, 0, 0, 0)",
-                "color": "rgb(255, 255, 255)",
-                "fontSize": "16px",
-                "fontWeight": "400",
-                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                "textAlign": "center",
-                "borderRadius": "0px",
-                "border": "0px none rgb(255, 255, 255)",
-                "borderColor": "rgb(255, 255, 255)",
-                "borderWidth": "0px",
-                "opacity": "1",
-                "overflow": "hidden",
-                "overflowY": "hidden",
-                "objectFit": "fill"
-              },
-              "kids": [
-                {
-                  "tag": "path",
-                  "cls": "",
-                  "text": "",
-                  "box": [
-                    1402,
-                    16,
-                    8,
-                    8
-                  ],
-                  "style": {
-                    "display": "inline",
-                    "position": "static",
-                    "minHeight": "0px",
-                    "padding": "0px",
-                    "margin": "0px",
-                    "flexDirection": "row",
-                    "flexWrap": "nowrap",
-                    "backgroundColor": "rgba(0, 0, 0, 0)",
-                    "color": "rgb(255, 255, 255)",
-                    "fontSize": "16px",
-                    "fontWeight": "400",
-                    "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                    "textAlign": "center",
-                    "borderRadius": "0px",
-                    "border": "0px none rgb(255, 255, 255)",
-                    "borderColor": "rgb(255, 255, 255)",
-                    "borderWidth": "0px",
-                    "opacity": "1",
-                    "overflow": "visible",
-                    "overflowY": "visible",
-                    "objectFit": "fill"
-                  },
-                  "kids": []
-                },
-                {
-                  "tag": "path",
-                  "cls": "",
-                  "text": "",
-                  "box": [
-                    1402,
-                    16,
-                    8,
-                    8
-                  ],
-                  "style": {
-                    "display": "inline",
-                    "position": "static",
-                    "minHeight": "0px",
-                    "padding": "0px",
-                    "margin": "0px",
-                    "flexDirection": "row",
-                    "flexWrap": "nowrap",
-                    "backgroundColor": "rgba(0, 0, 0, 0)",
-                    "color": "rgb(255, 255, 255)",
-                    "fontSize": "16px",
-                    "fontWeight": "400",
-                    "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                    "textAlign": "center",
-                    "borderRadius": "0px",
-                    "border": "0px none rgb(255, 255, 255)",
-                    "borderColor": "rgb(255, 255, 255)",
-                    "borderWidth": "0px",
-                    "opacity": "1",
-                    "overflow": "visible",
-                    "overflowY": "visible",
-                    "objectFit": "fill"
-                  },
-                  "kids": []
                 }
               ]
             }

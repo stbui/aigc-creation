@@ -49,6 +49,24 @@ export class OpenAiChatTextProvider implements TextProvider {
     return gatewayConfigOf('text');
   }
 
+  /**
+   * 通道级凭据 (2026-10-20 多渠道) —— 与图像 provider 的同名机制对称。
+   *
+   * 未注入时读全局 `gateway.text.*`; 调度器选中某条通道时注入它的
+   * baseUrl/token/model, 否则「切通道」是假的 (发的还是第一家的地址)。
+   */
+  private channelCreds?: { baseUrl: string; token: string; model: string };
+
+  withChannel(creds: { baseUrl: string; token: string; model: string }): this {
+    this.channelCreds = creds;
+    return this;
+  }
+
+  clearChannel(): this {
+    this.channelCreds = undefined;
+    return this;
+  }
+
   get enabled(): boolean {
     return gatewayConfigOf('text').enabled;
   }
@@ -58,8 +76,9 @@ export class OpenAiChatTextProvider implements TextProvider {
     messages: TextMessage[],
     params: Record<string, any>,
   ): Promise<TextProviderResult> {
-    const cfg = this.cfg;
-    if (!cfg.enabled) {
+    const global = this.cfg;
+    const cfg = this.channelCreds ?? global;
+    if (!cfg.baseUrl && !cfg.token) {
       throw new GatewayUnavailableError(
         '未配置文生文网关',
         '文生文基址与令牌均为空, 或该通道被显式关闭',

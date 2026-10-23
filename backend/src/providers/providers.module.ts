@@ -3,6 +3,8 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { CapabilityRouterProvider } from './capability-router.provider';
 import { TextCapabilityRouter } from './text-capability-router.provider';
 import { VideoCapabilityRouter } from './video-capability-router.provider';
+import { ChannelScheduler } from './channel-scheduler';
+import { ChannelRepository } from './channel-repository';
 import { ImageCallLogger } from './image-call-logger';
 import { ImageProvider } from './image-provider.interface';
 import { TextProvider } from './text-provider.interface';
@@ -43,6 +45,12 @@ export const VIDEO_PROVIDER = 'VIDEO_PROVIDER';
     CapabilityRouterProvider,
     TextCapabilityRouter,
     VideoCapabilityRouter,
+    // 多渠道调度器 (2026-10-20): 三个路由器共用, 由 Nest 统一注入。
+    // ⚠️ 必须显式注册: 只 import 不写 providers 会导致
+    // "Nest can't resolve dependencies of the CapabilityRouterProvider"
+    ChannelScheduler,
+    // 多渠道仓库: 后台线路 CRUD 与调度快照的唯一入口。
+    ChannelRepository,
     { provide: IMAGE_PROVIDER, useExisting: CapabilityRouterProvider },
     { provide: TEXT_PROVIDER, useExisting: TextCapabilityRouter },
     { provide: VIDEO_PROVIDER, useExisting: VideoCapabilityRouter },
@@ -56,6 +64,8 @@ export const VIDEO_PROVIDER = 'VIDEO_PROVIDER';
     CapabilityRouterProvider,
     TextCapabilityRouter,
     VideoCapabilityRouter,
+    ChannelScheduler,
+    ChannelRepository,
   ],
 })
 export class ProvidersModule {}

@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
 
@@ -128,18 +129,29 @@ export class CreditService {
    *
    * 每次发放创建**独立批次** —— 不合并已有批次。
    * 合并会让"这笔积分什么时候过期"变得无法回答, 而退款必须按批次精确扣回。
+   *
+   * @param tx 可选事务客户端。会员开通等「一次性权益」场景需要把
+   *           「抢占订单 + 延期会员 + 发积分」放进同一个事务, 否则中途失败会
+   *           留下"会员已延期但积分没发"或重试后"积分发两遍"的半成品状态。
+   *           给了 tx 就在该事务内读写, 不另开连接。
    */
-  async grant(params: {
-    userId: string;
-    credits: number;
-    source: 'purchase' | 'grant' | 'admin_adjust';
-    validDays?: number;
-    orderId?: string;
-    reason?: string;
-    operatorId?: string;
-  }): Promise<{ lotId: string; balance: number }> {
+  async grant(
+    params: {
+      userId: string;
+      credits: number;
+      source: 'purchase' | 'grant' | 'admin_adjust';
+      validDays?: number;
+      orderId?: string;
+      reason?: string;
+      operatorId?: string;
+    },
+    tx?: Prisma.TransactionClient,
+  ): Promise<{ lotId: string; balance: number }> {
     const { userId, credits, source } = params;
     if (credits <= 0) throw new AppError(40001, '发放积分数必须大于 0', 400);
+
+    // 事务内必须用 tx 的客户端, 另开连接会读不到未提交的行(并在 SQLite 上等写锁)
+    const db: any = tx ?? this.prisma;
 
     // validDays=0 或未指定 → 永久有效(expireAt 为空, FEFO 排最后)
     const expireAt =
@@ -147,7 +159,7 @@ export class CreditService {
         ? new Date(Date.now() + params.validDays * 24 * 3600 * 1000)
         : null;
 
-    const lot = await this.prisma.creditLot.create({
+    const lot = await db.creditLot.create({
       data: {
         userId,
         source,
@@ -158,15 +170,17 @@ export class CreditService {
       },
     });
 
-    const summary = await this.balanceOf(userId);
-    await this.prisma.creditLedger.create({
+    const balance = tx
+      ? await this.balanceWithin(db, userId)
+      : (await this.balanceOf(userId)).balance;
+    await db.creditLedger.create({
       data: {
         userId,
         type: source === 'purchase' ? 'purchase' : source === 'grant' ? 'grant' : 'admin_adjust',
         amount: credits,
         // balanceAfter 是**快照**, 仅供流水展示与快速核对;
         // 余额永远从 CreditLot 推导, 两者不一致时以批次为准
-        balanceAfter: summary.balance,
+        balanceAfter: balance,
         lotId: lot.id,
         orderId: params.orderId,
         reason: params.reason,
@@ -174,7 +188,20 @@ export class CreditService {
       },
     });
 
-    return { lotId: lot.id, balance: summary.balance };
+    return { lotId: lot.id, balance };
+  }
+
+  /** 与 balanceOf 同口径的余额计算, 但在给定客户端(通常是事务)内执行 */
+  private async balanceWithin(db: any, userId: string): Promise<number> {
+    const lots = await db.creditLot.findMany({
+      where: { userId, remainingCredits: { gt: 0 } },
+      select: { remainingCredits: true, expireAt: true },
+    });
+    const now = new Date();
+    return lots.reduce(
+      (sum: number, l: any) => sum + (!l.expireAt || l.expireAt > now ? l.remainingCredits : 0),
+      0,
+    );
   }
 
   // ── 扣减 ──────────────────────────────────────────────────────────
@@ -195,6 +222,14 @@ export class CreditService {
     orderId?: string;
     /** 允许透支时为 true (如新用户赠送)。默认 false */
     allowNegative?: boolean;
+    /**
+     * 流水的业务类型。人工扣减必须传 `admin_adjust` —— 否则账本上会出现一条
+     * 没有原因的「生成消耗」，与真实任务消耗混在一起无法对账。
+     */
+    ledgerType?: 'consume' | 'admin_adjust';
+    /** 写进流水的说明（人工调整必填） */
+    reason?: string;
+    operatorId?: string;
   }): Promise<{ consumed: number; balance: number; lotId: string | null }> {
     const { userId, credits } = params;
     if (credits <= 0) return { consumed: 0, balance: (await this.balanceOf(userId)).balance, lotId: null };
@@ -254,12 +289,14 @@ export class CreditService {
         await tx.creditLedger.create({
           data: {
             userId,
-            type: 'consume',
+            type: params.ledgerType ?? 'consume',
             amount: -credits, // 消耗记负, 与获得记正形成单一符号约定
             balanceAfter: balance,
             lotId: lastLotId,
             orderId: params.orderId,
             taskId: params.taskId,
+            reason: params.reason,
+            operatorId: params.operatorId,
           },
         });
       }
@@ -309,20 +346,19 @@ export class CreditService {
         operatorId: params.operatorId,
       });
     } else {
-      // 扣减走同一套 FEFO, 保证人工扣减与消耗的口径一致
-      await this.consume({ userId: params.userId, credits: -params.delta });
-      const balance = (await this.balanceOf(params.userId)).balance;
-      // consume 里已记流水, 这里补一条带原因的说明流水:
-      // 无原因的人工扣减无法追责
-      await this.prisma.creditLedger.create({
-        data: {
-          userId: params.userId,
-          type: 'admin_adjust',
-          amount: params.delta, // 负数
-          balanceAfter: balance,
-          reason,
-          operatorId: params.operatorId,
-        },
+      /*
+       * 扣减走同一套 FEFO, 保证人工扣减与消耗的口径一致。
+       *
+       * 流水**只记一条** `admin_adjust`：此前先 consume 写一条 `consume -N`，
+       * 再补一条 `admin_adjust -N`，账本合计是 -2N，余额却只减 N —— 用户会看到
+       * 一条无原因的「生成消耗」，`totalConsumed` 也被放大一倍。
+       */
+      await this.consume({
+        userId: params.userId,
+        credits: -params.delta,
+        ledgerType: 'admin_adjust',
+        reason,
+        operatorId: params.operatorId,
       });
     }
 

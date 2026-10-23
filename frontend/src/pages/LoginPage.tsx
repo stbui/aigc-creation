@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthCard } from '../components/AuthCard';
 
 /**
@@ -12,13 +12,25 @@ import { AuthCard } from '../components/AuthCard';
  */
 export function LoginPage() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+
+  /**
+   * 登录后回到哪儿。
+   *
+   * `redirect` 来自查询串（如扫码确认页 `/qr-login?ticket=...`）。只接受站内
+   * **绝对路径**：`//evil.com` 会被浏览器当成协议相对 URL 跳走，是开放重定向的
+   * 经典写法，必须挡掉。非法值一律回落工作台。
+   */
+  const redirect = params.get('redirect') ?? '';
+  const target = redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/workbench';
+
   return (
     <div className="login-page">
       <AuthCard
         onSuccess={() => {
           // 独立页不在 AuthContext 的弹窗体系内, 登录成功由 AuthCard 内部写入 token,
-          // 这里只负责导航到工作台 (AuthCard 已在成功后回调)。
-          navigate('/workbench', { replace: true });
+          // 这里只负责导航 (AuthCard 已在成功后回调)。
+          navigate(target, { replace: true });
         }}
         onCancel={() => navigate(-1)}
       />

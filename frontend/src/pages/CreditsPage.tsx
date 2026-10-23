@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { creditsApi } from '../lib/api';
-import { StateError, StateSkeleton } from '../components/StateViews';
+import { useAuth } from '../context/AuthContext';
+import { StateButton, StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
 import type { CreditBalance, CreditLedgerEntry, CreditLot } from '../types/api';
 
 /**
@@ -60,6 +61,7 @@ const LOT_STATUS: Record<CreditLot['status'], { label: string; color: string }> 
 
 export function CreditsPage() {
   const navigate = useNavigate();
+  const { token, openLogin } = useAuth();
   const [tab, setTab] = useState<Tab>('ledger');
   const [balance, setBalance] = useState<CreditBalance | null>(null);
   const [ledger, setLedger] = useState<CreditLedgerEntry[]>([]);
@@ -89,9 +91,43 @@ export function CreditsPage() {
     }
   }, []);
 
+  // 依赖 token: 登录 / 退出都要重取 (与 StatsPage 同构)
   useEffect(() => {
+    if (!token) {
+      // guest: 三个积分接口都要鉴权, 不发就会连着 401 且渲染成「加载失败」
+      setBalance(null);
+      setLedger([]);
+      setLots([]);
+      setLoading(false);
+      return;
+    }
     void load();
-  }, [load]);
+  }, [token, load]);
+
+  /*
+   * guest 态: 路由对外开放, 未登录进 /credits 时此前会把三个接口的 401
+   * 渲染成「积分数据加载失败」—— 用户以为系统坏了, 实际只是没登录。
+   */
+  if (!token) {
+    return (
+      <div className="credits-page">
+        <button type="button" className="pkg-back-btn" onClick={() => navigate(-1)}>
+          <ArrowLeft size={14} /> 返回
+        </button>
+        <div className="state-page">
+          <StateEmpty
+            title="登录后查看积分明细"
+            desc="积分余额、批次与流水均与账号绑定，登录后即可查看。"
+            action={
+              <button type="button" className="state-btn is-primary" onClick={openLogin}>
+                登录/注册
+              </button>
+            }
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="credits-page">
@@ -119,6 +155,18 @@ export function CreditsPage() {
             {balance?.expiringSoon ?? '—'}
           </div>
         </div>
+      </div>
+
+      {/*
+        购买入口（2026-10-22 补）。
+        积分页是「积分用完了」时用户最先到的地方 —— 此前这里只有余额与流水，
+        没有任何出口：用户知道缺积分，却不知道去哪买，只能自己猜积分商城在哪。
+      */}
+      <div className="credits-actions">
+        <StateButton onClick={() => navigate('/packages')}>购买积分 / 开通会员</StateButton>
+        <span className="credits-actions-hint">
+          积分包与会员套餐都在积分商城，支付成功后积分立即到账
+        </span>
       </div>
 
       {balance && balance.expiringSoon > 0 && balance.nearestExpiry && (
@@ -164,7 +212,10 @@ export function CreditsPage() {
 
       {!loading && !error && tab === 'ledger' && (
         ledger.length === 0 ? (
-          <p className="credits-list-empty">还没有积分流水</p>
+          <div className="credits-list-empty">
+            <p className="credits-empty-text">还没有积分流水</p>
+            <StateButton onClick={() => navigate('/packages')}>去获取积分</StateButton>
+          </div>
         ) : (
           <table className="credits-table">
             <thead>
@@ -198,7 +249,10 @@ export function CreditsPage() {
 
       {!loading && !error && tab === 'lots' && (
         lots.length === 0 ? (
-          <p className="credits-list-empty">还没有积分批次</p>
+          <div className="credits-list-empty">
+            <p className="credits-empty-text">还没有积分批次</p>
+            <StateButton onClick={() => navigate('/packages')}>去获取积分</StateButton>
+          </div>
         ) : (
           <table className="credits-table">
             <thead>

@@ -10,7 +10,7 @@ import { ratioOptions, resolutionOptions } from '../lib/optionSets';
  *
  * 各页差异用 props 表达，而不是各写一份 JSX：
  * - `showRatio` / `showResolution`  —— 参考站部分页面该页无某组（如 product-detail 只有画质）
- * - `resolutionTitle`              —— 参考站该处文案（"分辨率" / "分辨率（积分/权益消耗）"）
+ * - `resolutionTitle`              —— 分组标题，默认即参考站唯一取值（"分辨率（积分/权益消耗）"）
  * - `withHeader`                   —— 参考站 free-creation 的浮层带头部与关闭按钮
  */
 
@@ -22,11 +22,15 @@ export interface ToolSettingsPopoverProps {
   onRatioChange?: (v: string) => void;
   resolution: string;
   onResolutionChange: (v: string) => void;
+  /**
+   * 当前能力 id。用于判断 4K 档位是否可选 —— 只有该能力此刻有云端通道
+   * （`runtime.remoteAvailable`）才放开；不传按不可用处理。
+   */
+  capabilityId?: string;
   showRatio?: boolean;
   showResolution?: boolean;
+  /** 分组标题（默认即参考站取值）。副文由 `lib/optionSets.resolutionOptions()` 统一给出，不另开覆盖口子 */
   resolutionTitle?: string;
-  /** 画质项的副标题（如 4K 的"本地算法暂不支持"），缺省用通用文案 */
-  resolutionSub?: (value: string) => string;
   /**
    * 浮层容器追加的类名。参考站 free-creation 用 `fc-settings-popover` + 专属头部
    * （1:1 实拍值，不并入通用头部），故头部做成可覆盖而非开关。
@@ -47,9 +51,12 @@ export function ToolSettingsPopover({
   onRatioChange,
   resolution,
   onResolutionChange,
+  capabilityId,
   showRatio = true,
   showResolution = true,
-  resolutionTitle = '分辨率',
+  // 参考站该分组标题的唯一取值（bundle: `resolutionLabel:'分辨率（积分/权益消耗）'`），
+  // 各页不再各自传值 —— 单处定义，避免出现一半页面短标题、一半长标题。
+  resolutionTitle = '分辨率（积分/权益消耗）',
   popoverClassName,
   header,
   popoverRole,
@@ -104,17 +111,20 @@ export function ToolSettingsPopover({
             <div className="pk-settings-group">
               <strong className="pk-settings-group-label">{resolutionTitle}</strong>
               <div className="pk-resolution-grid">
-                {resolutionOptions().map((o) => (
+                {resolutionOptions(capabilityId).map((o) => (
                   <button
                     key={String(o.value)}
                     type="button"
                     className={`pk-resolution-option${o.value === resolution ? ' pk-option-active' : ''}`}
                     aria-pressed={o.value === resolution}
                     disabled={o.disabled}
-                    title={o.disabled ? o.sub : undefined}
+                    title={o.disabled ? o.disabledReason : undefined}
                     onClick={() => onResolutionChange(String(o.value))}
                   >
-                    <strong>{o.label}</strong>
+                    {/* 参考站卡片主文是短档位 1K/2K/4K (后端 label 是 "1K (1024px)",
+                        放进 116px 宽的卡片里会在中间折行), 具体像素值放副文。
+                        非 "1k/2k/4k" 形态的取值仍回落到后端 label, 不硬造缩写。 */}
+                    <strong>{shortResolutionLabel(o.value, o.label)}</strong>
                     <span>{o.sub}</span>
                   </button>
                 ))}
@@ -125,4 +135,17 @@ export function ToolSettingsPopover({
       )}
     </div>
   );
+}
+
+/**
+ * 分辨率卡的短档位文案。
+ *
+ * 参考站 `.image-output-resolution-option strong` 里只有 `1K` / `2K` / `4K`，
+ * 尺寸说明在 `span`（11px 灰字）。后端 `QUALITY_OPTIONS` 的 label 是
+ * `1K (1024px)` —— 直接塞进 116px 宽的卡片会折行，故这里按取值缩写；
+ * 取值不是 `Nk` 形态时原样回落到 label，不臆造缩写。
+ */
+function shortResolutionLabel(value: unknown, fallback: string): string {
+  const v = String(value);
+  return /^\d+k$/i.test(v) ? v.toUpperCase() : fallback;
 }

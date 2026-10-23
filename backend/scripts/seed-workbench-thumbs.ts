@@ -5,13 +5,17 @@
  * (不再是"暂无示例"空态)。全部走真实 API: 登录 -> 选项目 -> 选输入图 -> 提交 -> 轮询。
  *
  * 幂等: 已有 succeeded 任务的能力会跳过, 不会重复生成。
- * 用法: API=http://localhost:3002 npx ts-node -T scripts/seed-workbench-thumbs.ts
+ *
+ * 用法: SEED_EMAIL=you@example.com SEED_PASSWORD='…' \
+ *         API=http://localhost:4100 npx ts-node -T scripts/seed-workbench-thumbs.ts
+ * 凭据没有默认值 —— 2026-10-22 起项目不再内置演示账号，缺凭据直接报错退出，
+ * 否则会静默打到一个不存在的账号上，报出一串看不懂的 401。
  */
 import { SUBMITTABLE_CAPABILITY_IDS } from '../src/capabilities/capability.registry';
 
-const API = process.env.API ?? 'http://localhost:3002';
-const EMAIL = process.env.SEED_EMAIL ?? 'admin@demo.com';
-const PASSWORD = process.env.SEED_PASSWORD ?? 'demo1234';
+const API = process.env.API ?? 'http://localhost:4100';
+const EMAIL = process.env.SEED_EMAIL ?? process.env.SEED_USER_EMAIL ?? '';
+const PASSWORD = process.env.SEED_PASSWORD ?? process.env.SEED_USER_PASSWORD ?? '';
 
 interface Json {
   code: number;
@@ -34,6 +38,10 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 async function main() {
+  if (!EMAIL || !PASSWORD) {
+    throw new Error('缺少凭据：请设置 SEED_EMAIL / SEED_PASSWORD（或 SEED_USER_EMAIL / SEED_USER_PASSWORD）');
+  }
+
   // 1. 登录
   const auth = await req<{ accessToken: string }>('/api/v1/auth/login', {
     method: 'POST',

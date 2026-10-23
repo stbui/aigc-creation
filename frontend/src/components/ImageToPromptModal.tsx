@@ -1,3 +1,4 @@
+import { MAX_IMAGE_MB } from '../lib/constants';
 import { useEffect, useRef, useState } from 'react';
 import { App, Modal, Spin } from 'antd';
 import { ImagePlus, X } from 'lucide-react';
@@ -41,7 +42,6 @@ export interface ImageToPromptModalProps {
 }
 
 /** 单张上限 —— 与参考站文案一致 (10MB) */
-const MAX_IMAGE_MB = 10;
 
 export function ImageToPromptModal({ open, onApply, onCancel }: ImageToPromptModalProps) {
   const { message } = App.useApp();

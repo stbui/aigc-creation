@@ -16,7 +16,7 @@ export const HotRemake: CapabilityPlugin = {
   group: 'ecommerce_gen',
   summary: '参考爆款风格生成商品内容图。',
   sidebarHint: '上传想参考的爆款图，即刻生成同款',
-  mode: 'mock',
+  mode: 'real',
   creditCost: 10, // 无既有展示价，取基准 10
   params: [
     { key: 'productName', label: '商品名称（选填）', type: 'text', placeholder: '请输入商品名称（选填）' },
@@ -47,6 +47,7 @@ export const HotRemake: CapabilityPlugin = {
   buildPrompt: (p) =>
     `爆款风格复刻：参考上传的爆款图的构图、配色与氛围，替换主体为上传的商品，保持整体风格一致。` +
     `${p.degree === 'reference_style' ? '偏重保留参考图版式' : '偏重高度还原参考图'}${ratioText(p.ratio)}${sizeText(p.size)}`,
+  /** 本地是真实的版式重建算法 (提取参考图配色/结构 → 重绘 → 换主体), 不是占位图 */
   localImpl: 'makeClone',
   modality: 'image',
   inputs: 2,

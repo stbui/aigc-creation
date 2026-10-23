@@ -379,6 +379,17 @@
   --radius-pill: 999px;
   --border-hover: #c9cddb;
   --surface-soft: #f7f8fa; /* 胶囊 (筛选器/状态) */
+
+  /* ── 后台补白的语义 token (2026-10-23) ────────────────────────────────
+     后台段 (.adm-* / .exc-*) 此前有 44 处裸 hex, 其中的 #fff / #fafbfd /
+     #fbfaff 各自重复十几次, 想调一次后台底色就得全文搜 hex。
+     下面五个是这几处裸 hex 的语义归属, 页面仍只引用 token。 */
+  --on-brand: #ffffff; /* 实心色块 (品牌紫/危险红) 上的文字与图标 */
+  --surface-tint: #fafbfd; /* 表头底 / 表格行悬停底 (比 --surface 更浅一档) */
+  --brand-bg-tint: #fbfaff; /* 极浅品牌底: 主指标卡与选中卡片的渐变浅端 */
+  --brand-border-soft: #ddd9f5; /* 品牌浅底块的描边 */
+  --info-text: #1e40af; /* 只读 / 权限提示的文字 */
+  --info-border: #bfdbfe; /* 只读 / 权限提示的描边 */
 }
 
 * {
@@ -419,7 +430,13 @@ body {
   display: grid;
   grid-template-columns: 420px 420px;
   width: 840px;
-  height: 478px;
+  /*
+   * 高度改为「最小 478px」而非固定值 (2026-10-21, B2):
+   * 注册态多了「手机号 + 验证码 + 协议勾选」三行, 固定高度会把提交按钮挤出卡片。
+   * 登录/短信态仍恰好是 478px, 与参考站实拍一致。
+   */
+  min-height: 478px;
+  height: auto;
   background: #fff;
   border-radius: 32px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.18);
@@ -650,26 +667,6 @@ body {
   background: linear-gradient(90deg, #b9b2f7, #a49ee6);
 }
 
-/* 「填充演示账号」占据参考站第三方登录钮 (.auth-google-button 340x48) 的位置:
-   本地无第三方通道, 该位置留给演示自有的诚实功能。
-   颜色必须显式覆盖 —— antd 6 的 Button type="link" 默认取运行时注入的 #1677ff。 */
-.login-demo-fill {
-  margin-top: 18px;
-  height: 48px;
-  border-radius: 8px;
-  border: 1px solid #e5e7ef;
-  background: #fff;
-  font-size: 14px;
-  font-weight: 600;
-  color: #475467;
-}
-.login-demo-fill:hover,
-.login-demo-fill:focus-visible {
-  background: #f2f3f5;
-  color: var(--brand);
-  border-color: #c3bdf5;
-}
-
 /* 参考站 .auth-agreement: 12px/400/lh18 #86909c, 内嵌 3 段链接 */
 .login-agreement {
   margin: 0;
@@ -688,12 +685,12 @@ body {
 .login-agreement a:hover {
   color: var(--brand-hover);
 }
-.login-agreement-note {
-  color: #86909c;
-  margin: 0 4px;
-  cursor: pointer;
-}
-/* 注册入口: 参考站无 (走短信/扫码), 本地演示账号体系需要 → 保留文字链接 */
+/*
+ * `.login-agreement-note` 于 2026-10-21 删除: 第三个协议 (账号规则)
+ * 已改为真实链接, 且 /legal/privacy 这类不存在的 slug 链接一并修正。
+ * 留着一个没有任何使用方的选择器, 下次改版会误以为是活代码。
+ */
+/* 注册入口: 参考站无 (走短信/扫码), 本项目邮箱注册体系需要 → 保留文字链接 */
 .login-switch {
   margin-top: 0;
   text-align: center;
@@ -703,6 +700,234 @@ body {
 .login-switch a {
   color: var(--brand);
   cursor: pointer;
+}
+
+/* ── 通用 OAuth 登录按钮 ─────────────────────────────────────────────── */
+.login-oauth {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin: 14px 0 0;
+}
+.login-oauth-divider {
+  font-size: 12px;
+  color: #86909c;
+  text-align: center;
+}
+.login-oauth-btn {
+  height: 44px;
+  border-radius: 8px;
+  border: 1px solid #e5e7ef;
+  background: #fff;
+  color: #1d2129;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.login-oauth-btn:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.oauth-callback-card {
+  width: min(480px, calc(100vw - 32px));
+  margin: 12vh auto 0;
+  padding: 40px 32px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(35, 39, 74, 0.12);
+  text-align: center;
+}
+.oauth-callback-card h1 {
+  margin: 0 0 12px;
+  font-size: 20px;
+  font-weight: 600;
+  color: #171a2b;
+}
+.oauth-callback-card p {
+  margin: 16px 0;
+  color: #667085;
+}
+
+/* ── 扫码登录面板 (B8) ────────────────────────────────────────────────
+   二维码固定 220×220 留白 (quiet zone 由 qrcode 的 margin 生成, CSS 不再加内边距,
+   否则同一码在不同位置看起来大小不一)。过期时给一层遮罩而不是隐藏二维码 ——
+   用户看到「还是这张码」比看到空白更容易理解发生了什么。 */
+.qr-login-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 20px;
+}
+.qr-login-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 220px;
+  height: 220px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: #fff;
+  overflow: hidden;
+}
+.qr-login-image {
+  width: 220px;
+  height: 220px;
+  display: block;
+}
+.qr-login-image.is-stale {
+  opacity: 0.25;
+}
+.qr-login-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.qr-login-placeholder {
+  padding: 0 20px;
+  text-align: center;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-muted);
+}
+.qr-login-hint {
+  margin: 16px 0 0;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.qr-login-hint.is-active {
+  color: var(--brand);
+  font-weight: 600;
+}
+.qr-login-countdown {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+.qr-login-error {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--danger-text);
+}
+.qr-login-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: #fff;
+  color: var(--text-body);
+  font-size: 12px;
+  cursor: pointer;
+}
+.qr-login-refresh:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+.qr-login-refresh:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ── 扫码确认页 (手机端, B8) ──────────────────────────────────────────
+   独立页无侧栏顶导: 手机上的唯一任务是「看一眼设备信息, 点确认」。
+   卡片窄 (max 380) 且按钮通栏, 拇指可达。 */
+.qr-confirm-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px 16px;
+  background: var(--surface);
+}
+.qr-confirm-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  max-width: 380px;
+  padding: 32px 24px;
+  background: #fff;
+  border-radius: var(--radius-panel);
+  box-shadow: 0 20px 60px rgba(23, 26, 43, 0.08);
+  text-align: center;
+}
+.qr-confirm-icon {
+  color: var(--brand);
+  margin-bottom: 12px;
+}
+.qr-confirm-icon.is-ok {
+  color: var(--success-text, #16a34a);
+}
+.qr-confirm-icon.is-warn {
+  color: var(--danger-text);
+}
+.qr-confirm-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.qr-confirm-desc {
+  margin: 0 0 20px;
+  font-size: 13px;
+  line-height: 21px;
+  color: var(--text-muted);
+}
+.qr-confirm-desc.is-warn {
+  color: var(--danger-text);
+}
+.qr-confirm-device {
+  width: 100%;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border-radius: var(--radius-control);
+  text-align: left;
+}
+.qr-confirm-device-row {
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--text-desc);
+}
+.qr-confirm-device-row + .qr-confirm-device-row {
+  margin-top: 6px;
+}
+.qr-confirm-device-row strong {
+  font-weight: 600;
+  color: var(--text-body);
+}
+/* UA 可能很长: 允许换行而不是撑破卡片 */
+.qr-confirm-ua {
+  max-width: 220px;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+.qr-confirm-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  margin-top: auto;
 }
 
 /* 窄屏: 左侧礼宾面板隐藏, 表单面板通栏 (参考站移动态同理) */
@@ -1138,7 +1363,7 @@ body {
   background: none;
   color: #333;
 }
-/* 角标: 免费(橙点) / mock(琥珀点) —— 本地自有功能 (参考站无对应) */
+/* 角标: 免费(橙点) —— 本地自有功能 (参考站无对应) */
 .side-menu-dot {
   position: absolute;
   top: 8px;
@@ -1150,9 +1375,6 @@ body {
 }
 .side-menu-dot-cta {
   background: var(--color-cta);
-}
-.side-menu-dot-mock {
-  background: var(--accent-amber);
 }
 /* 作品数徽标 —— 本地自有功能 (参考站无对应) */
 .side-menu-badge {
@@ -1677,9 +1899,6 @@ html[data-promo='off'] {
 .wb-card-badge-planned {
   background: var(--wb-text-desc);
 }
-.wb-card-badge-mock {
-  background: var(--accent-amber);
-}
 /* 文字区: padding 40px 16px 20px (顶部让位图标块);
    实拍标题 14px/600 var(--wb-text-strong) lh16 (2026-10-17 重拍修正, 旧基准 16px/#333 已过时) */
 .wb-card-body {
@@ -2081,10 +2300,6 @@ html[data-promo='off'] {
   background: rgba(22, 163, 74, 0.12);
   color: var(--color-success);
 }
-.tool-tag-mock {
-  background: rgba(234, 88, 12, 0.12);
-  color: var(--color-cta);
-}
 .tool-tag-planned {
   background: var(--color-slate-100);
   color: var(--color-text-secondary);
@@ -2164,9 +2379,11 @@ html[data-promo='off'] {
 
 /* ───────── 商品主图工作台 (1:1 复刻 ijihua.cn/product-kit, 数值来自实拍 computed styles) ───────── */
 .pk-workspace {
-  /* 抵消 app-content 内边距后套用参考站主区内边距 24 24 24 16 */
+  /* 抵消 app-content 内边距后套用参考站主区内边距 16 24 16 16
+     (参考站 workspace-main-content 实测 padding:16px 24px 16px 16px;
+      上下原为 24 会整体下移 8px —— free-creation 对拍 2026-10-21) */
   margin: -24px -24px -32px;
-  padding: 24px 24px 24px 16px;
+  padding: 16px 24px 16px 16px;
   /* 64 头部 + 40 推广条; 推广条关闭后由 html[data-promo="off"] 修正 */
   height: calc(100vh - 104px);
   min-height: 620px;
@@ -2177,6 +2394,11 @@ html[data-promo='off'] {
 }
 html[data-promo='off'] .pk-workspace {
   height: calc(100vh - 64px);
+}
+/* 自由创作页: 参考站 .free-creation-page 内边距四边均为 16 (其余能力页右侧为 24,
+   故右内边距单独收紧, 结果栏因此 784 宽而非 776 —— 实拍 [640,80,784,804]) */
+.pk-workspace.fc-workspace {
+  padding-right: 16px;
 }
 /* ≤900px 撤销逃逸 margin: 该断点下 .app-content padding 已变成 16px 10px 24px,
    写死的 -24 会让页面左右各溢出 14px 被裁掉 (实测 390: x=-14 / w=418 / right=404)。
@@ -2730,6 +2952,9 @@ html[data-promo='off'] .pk-workspace {
 .pk-resolution-option span {
   font-size: 11px;
   line-height: 16px;
+  /* 参考站 .image-output-resolution-option span: rgb(124,132,147)
+     (此前继承 strong 的 --text-body, 副文与主文同色, 卡片看起来是一整块) @2026-10-21 */
+  color: #7c8493;
 }
 .pk-resolution-option:hover:not(:disabled) {
   border-color: var(--brand-light);
@@ -2909,6 +3134,65 @@ html[data-promo='off'] .pk-workspace {
   display: flex;
   flex-direction: column;
 }
+/* ── AIGC 显式标识（视频播放器角标，B5）─────────────────────────────
+ * 图像角标由后端合成进像素（下载/转发也带着），故这里只服务视频：
+ * 没有 ffmpeg 落不了容器元数据，只能由播放器侧补一个可感知的标识。
+ * 尺寸/位置刻意与后端合成的「AI 生成」角标一致（右下、深底白字）。
+ * ────────────────────────────────────────────────────────────────── */
+.result-media-aigc {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+}
+
+.aigc-badge {
+  position: absolute;
+  right: 8px;
+  bottom: 44px; /* 让开原生播放控件条 */
+  padding: 2px 8px;
+  border-radius: var(--radius-tag);
+  background: rgba(23, 26, 43, 0.72);
+  color: #fff;
+  font-size: 12px;
+  line-height: 18px;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ── 产出来源徽标 (components/ProviderBadge.tsx) ────────────────────
+ * 绿 = 真实模型通道, 琥珀 = 本地算法回落。两档都表示"产出是真的",
+ * 区别只在来源; 未产出 / 未知来源不渲染, 刻意不留第三种颜色 ——
+ * 灰标会被读成"第三种质量", 而它其实只是"还没结果"。
+ * ────────────────────────────────────────────────────────────────── */
+.provider-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 6px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-tag);
+  font-size: 11px;
+  line-height: 18px;
+  font-weight: 600;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.provider-badge.is-remote {
+  color: var(--success-text);
+  background: var(--success-soft-bg);
+  border-color: var(--success-border);
+}
+.provider-badge.is-local {
+  color: var(--warn-text);
+  background: var(--warn-bg);
+  border-color: var(--warn-border);
+}
+/* 在已有 gap 的 flex 行里 (结果卡标题行) 不再叠外边距 */
+.pk-result-variant .provider-badge {
+  margin-left: 0;
+}
+
 .pk-result-media {
   aspect-ratio: var(--pk-aspect, 1 / 1);
   background: var(--page-bg);
@@ -3226,52 +3510,6 @@ html[data-promo='off'] .pk-workspace {
   line-height: 20px;
 }
 
-/* mock 能力诚实披露 (hot_remake 为 mock: 本地参数化占位渲染, 不用假效果冒充模型) */
-.vc-mock-note {
-  margin: 12px 0 0;
-  font-size: 12px;
-  line-height: 20px;
-  color: var(--text-desc);
-  text-align: center;
-  max-width: 320px;
-}
-.pk-result-mock-badge {
-  flex-shrink: 0;
-  padding: 0 6px;
-  border-radius: var(--radius-tag);
-  background: var(--warn-bg);
-  border: 1px solid var(--warn-border);
-  color: var(--warn-text);
-  font-size: 12px;
-  line-height: 20px;
-  font-weight: 400;
-}
-
-/* 产出来源徽标 (2026-10-20, free-creation)
-   按每单真实的 task.provider 着色, 取代原先硬编码的「本地占位渲染」警示徽标:
-     gateway → 成功色 (模型真出图)
-     local   → 警示色 (网关不可用已回落本地算法, 不是模型结果)
-   盒模型与 .pk-result-mock-badge 完全一致(0 6px / radius-tag / 12px/20px),
-   视觉替换不产生布局跳动。 */
-.pk-result-source {
-  flex-shrink: 0;
-  padding: 0 6px;
-  border-radius: var(--radius-tag);
-  font-size: 12px;
-  line-height: 20px;
-  font-weight: 400;
-}
-.pk-result-source-gateway {
-  background: var(--success-soft-bg);
-  border: 1px solid var(--success-border);
-  color: var(--success-text);
-}
-.pk-result-source-local {
-  background: var(--warn-bg);
-  border: 1px solid var(--warn-border);
-  color: var(--warn-text);
-}
-
 /* ───────── 自由创作页 (1:1 复刻 ijihua.cn/free-creation, 数值来自实拍 computed styles) ───────── */
 
 /* 窄屏标题头 (桌面 display:none 实拍确认; span 14px/700 #333 lh13 + h1 16px/700 #333 lh22) */
@@ -3290,6 +3528,31 @@ html[data-promo='off'] .pk-workspace {
   font-weight: 700;
   color: #333;
   line-height: 22px;
+}
+
+/* 自由创作主卡: 实拍 .free-main-card padding 12px 16px / gap 16px
+   (共用 .pk-config-card 的其他能力页仍是 16 / 24, 故按页作用域覆盖) */
+.pk-workspace.fc-workspace .pk-config-card {
+  padding: 12px 16px;
+  gap: 16px;
+}
+/* 上传 section: 实拍 .free-upload-section gap 12 (提示词 section 仍为 16) */
+.fc-upload-section {
+  gap: 12px;
+}
+/* 上传占位块: 实拍 .free-upload-add 366x126 / padding 8 / radius 8 / 12px 20 #1D2129,
+   铺满 dropzone 内区 (原为 238x126 居中块, 无圆角无内边距) */
+.pk-dropzone.fc-dropzone .fc-upload-prompt {
+  width: 100%;
+  min-height: 126px;
+  padding: 8px;
+  border-radius: var(--radius-control);
+  font-size: 12px;
+  line-height: 20px;
+  color: #1d2129;
+}
+.pk-dropzone.fc-dropzone .fc-upload-prompt span {
+  color: #1d2129;
 }
 
 /* 上传区 ready 态 (实拍: 有图后去边框/底色/padding, min-height 80, display block) */
@@ -3401,6 +3664,486 @@ html[data-promo='off'] .pk-workspace {
   color: var(--text-desc);
 }
 
+/* ── 自由创作: 右侧「全部生成图」(2026-10-21) ──────────────────────
+   结果栏从「只展示最近一单」改为网格展示本页能力的全部成功产出。
+   缩略图统一方形裁切（生成图比例不一, 方形网格最整齐）, 点开预览看原始比例。 */
+.fc-result-loading {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+  background: #fff;
+  border-radius: var(--radius-panel);
+}
+.fc-result-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tool-submit-notice {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: var(--radius-control);
+  font-size: 12px;
+  line-height: 20px;
+}
+.tool-submit-notice-error {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+.fc-result-gallery {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  /* 列数由「每行」按钮决定 (2026-10-21): 用户显式选择了每行几张, 就不再 auto-fill。
+     minmax(0, 1fr) 保证窄容器下图片能收缩, 不会被内容撑出横向滚动。 */
+  --fc-cols: 4;
+  grid-template-columns: repeat(var(--fc-cols), minmax(0, 1fr));
+  gap: 12px;
+  align-content: start;
+  padding: 0 4px 4px;
+}
+.fc-result-gallery.fc-cols-3 {
+  --fc-cols: 3;
+}
+.fc-result-gallery.fc-cols-4 {
+  --fc-cols: 4;
+}
+.fc-result-gallery.fc-cols-5 {
+  --fc-cols: 5;
+}
+.fc-result-gallery.fc-cols-6 {
+  --fc-cols: 6;
+}
+/* 窄屏一刀切 2 列: 432px 输入栏 + 结果栏在手机/小窗口下本来就挤,
+   再按用户选的 5~6 列, 单张只剩几十像素, 等于没法看。 */
+@media (max-width: 720px) {
+  .fc-result-gallery {
+    --fc-cols: 2;
+  }
+}
+/* 每行张数选择器: 与「刷新」同一排, 视觉上沿用 28px 控件高度 */
+.fc-grid-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 0 4px 0 10px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-control);
+}
+.fc-grid-size-label {
+  margin-right: 4px;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+.fc-grid-size-btn {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: var(--radius-tag);
+  background: transparent;
+  font-size: 12px;
+  color: var(--text-body);
+  cursor: pointer;
+}
+.fc-grid-size-btn:hover {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+.fc-grid-size-btn.is-active {
+  background: var(--brand-bg);
+  color: var(--brand);
+  font-weight: 600;
+}
+.fc-grid-size-btn:focus-visible {
+  outline: 2px solid var(--brand-light);
+  outline-offset: 0;
+}
+.fc-result-item {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid #f0f1f5;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  background: var(--page-bg);
+  cursor: zoom-in;
+}
+/* 图片解码完成前保持与「生成中占位」同款 shimmer 底, 完成后淡入 ——
+   占位撤下的瞬间不会先露出空白底再突然跳出图片 (淡入 240ms, 与 shimmer 同色系)。 */
+.fc-result-item:not(.is-loaded):not(.is-failed) {
+  background: linear-gradient(100deg, #f5f6fa 20%, #eceef5 40%, #f5f6fa 60%);
+  background-size: 200% 100%;
+  animation: fc-result-shimmer 1.4s ease-in-out infinite;
+}
+.fc-result-item img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.24s ease;
+}
+.fc-result-item.is-loaded img {
+  opacity: 1;
+}
+.fc-result-item.is-failed {
+  cursor: default;
+}
+.fc-result-item-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-desc);
+  background: var(--page-bg);
+}
+/* 生成中占位卡: 点击生成后立刻出现在网格首位, 尺寸与真实图一致,
+   出图后由新图顶替。虚线边框 + 流动高光表明「这里会有一张图」。 */
+.fc-result-item-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  aspect-ratio: 1 / 1;
+  border-style: dashed;
+  border-color: var(--border);
+  color: var(--text-desc);
+  cursor: default;
+  background: linear-gradient(100deg, #f5f6fa 20%, #eceef5 40%, #f5f6fa 60%);
+  background-size: 200% 100%;
+  animation: fc-result-shimmer 1.4s ease-in-out infinite;
+}
+.fc-result-item-loading-tip {
+  font-size: 12px;
+  line-height: 18px;
+}
+@keyframes fc-result-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+/* 减弱动效偏好: 保留占位底色, 只停掉流动高光与淡入, 不影响可读性 */
+@media (prefers-reduced-motion: reduce) {
+  .fc-result-item:not(.is-loaded):not(.is-failed),
+  .fc-result-item-loading {
+    animation: none;
+  }
+  .fc-result-item img {
+    transition: none;
+  }
+}
+.fc-result-item-mask {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background: rgba(23, 26, 43, 0.32);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.fc-result-item:hover .fc-result-item-mask,
+.fc-result-item:focus-visible .fc-result-item-mask {
+  opacity: 1;
+}
+/* 缩略图上的来源角标: 压在图左上角, 恒显 (z-index 高于 hover 遮罩) */
+.fc-result-provider {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 2;
+  margin-left: 0;
+  pointer-events: none;
+}
+
+/* ── 生成图大图查看器 (2026-10-21 重做, 组件 components/ImageLightbox.tsx) ──
+   旧的 860px 弹窗把图压在 62vh 以内, 2K 图只能看个大概。现改为整屏暗色:
+   图按原始比例完整显示 (object-fit: contain), 点击/滚轮/工具条放大到 4x,
+   放大后可拖拽查看局部, ←/→ 翻页, Esc 关闭, 底部常驻尺寸/时间/下载。
+   暗底刻意不取页面令牌 —— 浅色主题的 --page-bg 会把暗色查看器衬成一块灰,
+   与全屏遮罩的视觉意图相反; 这里统一用半透明黑 + 半透明白的阶。 */
+.img-viewer {
+  position: fixed;
+  inset: 0;
+  /*
+   * 刻意低于 antd 的浮层 (Modal 1000 / message 1010 / popup 1050):
+   * 查看器里的右键「删除」要弹出确认框、「用作参考图」失败要弹提示 ——
+   * 若查看器压在它们上面, 用户按了删除会「什么都没发生」(确认框被盖住)。
+   * 页面内容最高约 40, 900 足够盖住整页。
+   */
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  background: rgba(10, 12, 20, 0.92);
+  animation: img-viewer-fade 160ms ease-out;
+}
+@keyframes img-viewer-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.img-viewer-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+}
+.img-viewer-close:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+/* 翻页按钮: 垂直居中, 左右各一, 不挡图的中部 */
+.img-viewer-nav {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+.img-viewer-nav:hover {
+  background: rgba(255, 255, 255, 0.22);
+}
+.img-viewer-nav.is-prev {
+  left: 20px;
+}
+.img-viewer-nav.is-next {
+  right: 20px;
+}
+/* 舞台: 铺满查看器, 图居中完整显示; 放大后由 transform 平移, 不改变布局 */
+.img-viewer-stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 56px 84px 72px;
+  overflow: hidden;
+  cursor: zoom-in;
+}
+.img-viewer-stage.is-zoomed {
+  cursor: grab;
+}
+.img-viewer-stage.is-dragging {
+  cursor: grabbing;
+}
+.img-viewer-stage img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+  border-radius: var(--radius-card);
+  /* 缩放/拖拽只动 transform (合成层), 不触发布局重排 —— 大图拖动也不掉帧 */
+  transform-origin: center center;
+  will-change: transform;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.img-viewer-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: calc(100% - 32px);
+  padding: 6px 8px 6px 16px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 12px;
+}
+.img-viewer-meta {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.img-viewer-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 4px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+}
+.img-viewer-zoom button {
+  display: grid;
+  place-items: center;
+  height: 26px;
+  min-width: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.img-viewer-zoom button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+.img-viewer-zoom button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+/* 百分比数字宽度固定, 缩放时工具条不左右跳动 (选择器带上 button 提权) */
+.img-viewer-zoom button.img-viewer-zoom-value {
+  min-width: 46px;
+  font-variant-numeric: tabular-nums;
+}
+.img-viewer-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  color: #fff;
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.img-viewer-download:hover {
+  background: var(--brand-hover);
+}
+/* 窄屏: 左右翻页按钮收进底栏上方, 舞台左右留白减小 */
+@media (max-width: 720px) {
+  .img-viewer-stage {
+    padding: 52px 12px 88px;
+  }
+  .img-viewer-nav {
+    top: auto;
+    bottom: 64px;
+    transform: none;
+    width: 38px;
+    height: 38px;
+  }
+  .img-viewer-nav.is-prev {
+    left: 12px;
+  }
+  .img-viewer-nav.is-next {
+    right: 12px;
+  }
+  .img-viewer-bar {
+    gap: 10px;
+    padding-left: 12px;
+  }
+  .img-viewer-meta {
+    display: none;
+  }
+}
+
+/* ── 结果图右键菜单 (2026-10-22, 组件 components/ImageContextMenu.tsx) ──
+   右键缩略图或查看器里的图弹出; portal 到 body 并用 position: fixed 定位,
+   所以层级要高于查看器 (900), 否则在整屏查看器里右键会看不见菜单。 */
+.img-context-menu {
+  position: fixed;
+  z-index: 1300;
+  min-width: 196px;
+  padding: 6px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-control);
+  box-shadow: 0 12px 32px rgba(23, 26, 43, 0.16);
+  outline: none;
+  user-select: none;
+  animation: img-context-in 120ms ease-out;
+}
+@keyframes img-context-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.img-context-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-tag);
+  background: transparent;
+  font-size: 13px;
+  color: var(--text-body);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.img-context-item:hover,
+.img-context-item.is-active {
+  background: var(--surface);
+  color: var(--text-strong);
+}
+.img-context-item.is-danger {
+  color: var(--danger-text);
+}
+.img-context-item.is-danger:hover,
+.img-context-item.is-danger.is-active {
+  background: var(--danger-soft-bg);
+  color: var(--danger-text);
+}
+.img-context-item svg {
+  flex: none;
+  color: var(--text-desc);
+}
+.img-context-item.is-danger svg {
+  color: currentColor;
+}
+/* 无图标的项留出同宽占位, 让文字左对齐 */
+.img-context-icon-gap {
+  width: 15px;
+  flex: none;
+}
+.img-context-sep {
+  height: 1px;
+  margin: 6px 4px;
+  background: var(--border-soft);
+}
+
 /* 创作提示词: 必填星 + 工具按钮 (实拍 label 14px/700 #333 lh13, ::before * var(--danger-ref);
    工具按钮 12px var(--brand) h16 gap4, 组 gap12) */
 .fc-prompt-field {
@@ -3450,6 +4193,60 @@ html[data-promo='off'] .pk-workspace {
 .pk-desc-editor .fc-prompt-textarea {
   resize: vertical;
 }
+/* 参考站 textarea 为默认 inline-block, 父级 .description-editor 实测 84.5 高 (80 + 基线间隙);
+   本站 .pk-desc-editor textarea 统一 display:block 会矮 4.5px, 导致提示词组 112 vs 117。
+   仅本页恢复 inline-block 以对齐 (实拍 [208,335,400,84.5])。 */
+.fc-prompt-field .pk-desc-editor {
+  line-height: normal;
+}
+.fc-prompt-field .fc-prompt-textarea {
+  display: inline-block;
+  vertical-align: baseline;
+}
+/* 提示词框撑满左栏剩余高度 (2026-10-22 用户反馈"高度靠近底部区域", 选定"再拉高填满下方空白")。
+   2026-10-21 先是从实拍 80px 加到固定 140px("高度不够"), 但 1440×900 实测:
+   卡片内容到 y=532 就结束, 提交区从 y=750 起 —— 中间 200 多像素是纯灰底空白,
+   和输入框抢的正是同一块视觉重心。固定高度解决不了它, 只会让空白随视口忽大忽小。
+   改为让输入框吃掉这块空间:
+     · 滚动区不再 align-content: start (那会让卡片按内容高度收缩);
+     · 卡片 / 提示词分组 / 编辑框容器逐层改 flex 纵向, 由 textarea 承接剩余高度;
+     · min-height 140px 保底 —— 窄屏(≤1024 视口高度 auto)或上传多张参考图导致内容超高时,
+       输入框仍有可用高度, 其余照旧滚动。
+   此处**有意偏离**参考站实拍的 80px, 与 140px 那次的取舍同源。 */
+.fc-workspace .pk-form-scroll {
+  align-content: stretch;
+}
+/* 输入框吃满剩余高度后, 左栏内容可能比视口高 (上传多张参考图时)。grid 项的
+   min-height 默认是 auto(=内容高度), 会把 .pk-input-pane 顶高、连带把提交区
+   推出视口 —— 实测 1440×620 加 420px 参考图内容时卡片涨到 888 而视口只有 620。
+   归零后回到设计意图: 左栏固定视口高, 内容在 .pk-form-scroll 里滚。
+   只在桌面断点生效: ≤1024 左栏本就是 auto 高 + 不滚动, 归零会把卡片压塌
+   (实测 390×844 滚动区只剩 118px, 提示词框被挤到 774)。 */
+@media (min-width: 1025px) {
+  .fc-workspace .pk-input-pane {
+    min-height: 0;
+  }
+}
+.fc-workspace .pk-config-card {
+  display: flex;
+  flex-direction: column;
+}
+.fc-workspace .fc-prompt-field {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.fc-workspace .fc-prompt-field .pk-desc-editor {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 140px;
+}
+.fc-workspace .fc-prompt-field .pk-desc-editor textarea.fc-prompt-textarea {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 140px;
+}
 
 /* 提交区: actions flex column gap16 margin-top auto (sticky 底部)
    2026-10-19 移除次要按钮行(「重置」/「清空结果」) 及 .fc-secondary-actions/.fc-ghost-btn 样式 ——
@@ -3459,6 +4256,10 @@ html[data-promo='off'] .pk-workspace {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  /* 实拍 .free-actions: bg #F6F7FB + padding 16px 0 0 (灰底过渡带),
+     下方 .pk-submit-actions 为白色提交卡 432x118 padding 14px 16px 16px */
+  background: var(--page-bg);
+  padding: 16px 0 0;
 }
 /* disabled 态说明: 曾有一条 `.fc-actions .pk-primary-btn:disabled { opacity: 1 }` 覆盖
    （据称对齐参考站 .free-actions .primary-btn:disabled 不淡出），结果按钮功能上被 disabled、
@@ -3467,6 +4268,16 @@ html[data-promo='off'] .pk-workspace {
 
 /* 高级设置 popover: 在 pk-settings-popover 基础上增加头部 (实拍: head flex
    space-between min-height20 margin-bottom16; h2 16px/20 var(--text-strong); close 24x24 #526077) */
+/* 头部与内容间距: 参考站是 head margin-bottom 16px + 内容容器自身无外间距 =
+   16px; 本仓 .pk-settings-popover 是 `display:grid; gap:19px`, 会在这 16px 之外
+   再加 19px → 实测 35px, 分组整体下移半行。@2026-10-21 对拍修复 */
+.fc-settings-popover {
+  row-gap: 0;
+}
+/* 组与组之间仍是 19px (参考站 .image-output-settings 的 grid gap) */
+.fc-settings-popover .pk-settings-group + .pk-settings-group {
+  margin-top: 19px;
+}
 .fc-settings-popover-head {
   display: flex;
   justify-content: space-between;
@@ -3731,7 +4542,7 @@ html[data-promo='off'] .pk-workspace {
 /* ───────── 修图系工具页共享 (local-redraw / background-remove / watermark-remove /
    product-retouch / image-translate / image-expand / product-recolor / rotate-angle) ───────── */
 
-/* 主按钮积分角标 + 提交区提示/描述 + mock 披露 */
+/* 主按钮积分角标 + 提交区提示/描述 */
 .pk-primary-credit {
   font-size: 11px;
   font-weight: 500;
@@ -3751,16 +4562,6 @@ html[data-promo='off'] .pk-workspace {
   color: var(--text-desc);
   text-align: center;
   margin: 0;
-}
-.tool-mock-note {
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--text-muted);
-  background: var(--surface-soft);
-  border-radius: var(--radius-control);
-  padding: 8px 10px;
-  margin: 4px 0 0;
-  text-align: left;
 }
 
 /* 结果网格 (SKU 批量多图并列) */
@@ -3833,6 +4634,66 @@ html[data-promo='off'] .pk-workspace {
   background: var(--brand-bg);
   border-color: var(--brand-active);
   color: var(--brand-active);
+}
+
+/*
+ * 局部重绘的遮罩画布 (2026-10-22)。
+ *
+ * 底图与涂抹层叠在一起: <img> 决定尺寸, 画布绝对定位铺满 ——
+ * 两者必须严格重合, 否则用户涂的位置和真正送去重绘的位置会差一截。
+ * 因此这里**不给底图设 max-height / object-fit**: 任何缩放都会让
+ * 「显示尺寸 ≠ 布局尺寸」, 画布坐标换算就失去基准。
+ */
+.redraw-mask-stage {
+  position: relative;
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  background: var(--surface);
+  line-height: 0;
+}
+.redraw-mask-bg {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.redraw-mask-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none; /* 触屏上涂抹时不要触发页面滚动 */
+  cursor: crosshair;
+}
+.redraw-mask-hidden {
+  display: none;
+}
+.redraw-mask-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+.redraw-mask-brush {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-body);
+}
+.redraw-mask-brush input[type='range'] {
+  width: 96px;
+  accent-color: var(--brand);
+}
+.redraw-mask-hint {
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--text-muted);
+  margin: 8px 0 0;
 }
 
 /* 下拉字段 (处理方式/区域位置/SKU 区域) */
@@ -4963,6 +5824,40 @@ ol.product-sku-steps {
   opacity: 0.55;
   cursor: not-allowed;
 }
+/*
+ * AI 分析的可编辑描述框 (2026-10-22 新增)。
+ *
+ * 参考站本页没有这一块 (它的分析结果直接进提示词), 这里多出的 textarea
+ * 是本地实现: 识图结果必须可改 —— 模型对商品的理解不一定符合卖家口径。
+ * 取值全部复用本页 --mif-* token, 不引入新色值。
+ */
+.multi-image-fusion-analysis-input {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: var(--mif-sub-size);
+  line-height: 1.5;
+  color: var(--mif-text-label);
+  background: var(--mif-surface-panel);
+  border: 1px solid var(--mif-border-option);
+  border-radius: var(--mif-radius-option);
+  resize: vertical;
+}
+.multi-image-fusion-analysis-input::placeholder {
+  color: var(--mif-text-dim-4);
+}
+.multi-image-fusion-analysis-input:focus {
+  border-color: var(--mif-border-option-hover);
+  outline: none;
+}
+.multi-image-fusion-analysis-hint {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--mif-text-sub);
+}
 
 /* ══ H. 输出参数（比例 / 变体） ══ */
 .multi-image-fusion-analysis-card,
@@ -5401,6 +6296,14 @@ ol.product-sku-steps {
 .multi-image-fusion-generating-state > strong {
   font-size: var(--mif-body-size);
   font-weight: 600;
+}
+/* 来源徽标: 舞台左上角, 与右下角的尺寸标分居两角, 互不遮挡 */
+.mif-provider {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+  margin-left: 0;
 }
 .multi-image-fusion-preview-size {
   color: #fff;
@@ -6333,6 +7236,23 @@ html[data-promo='off'] .multi-image-fusion-page {
   height: 40px;
   object-fit: contain;
 }
+/* 限时活动卡 (2026-10-21): 复用加油包卡形制, 只加类型角标 —— 活动内容是真实配置, 不另做皮肤 */
+.home-v2-campaign-card {
+  position: relative;
+}
+.home-v2-campaign-tag {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
 .home-v2-addon-card h3 {
   margin: 10px 0 0;
   font-size: 16px;
@@ -7045,6 +7965,26 @@ html[data-promo='off'] .multi-image-fusion-page {
   background: #fff;
   color: var(--text-body);
 }
+/* 邀请海报弹窗 (B8): 图片按弹窗宽度等比展示, 下载按钮通栏 */
+.invite-poster-image {
+  display: block;
+  width: 100%;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border);
+}
+.invite-poster-download {
+  width: 100%;
+  height: 40px;
+  justify-content: center;
+  margin-top: 16px;
+}
+.invite-poster-note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-desc);
+  text-align: center;
+}
 .invite-block {
   background: #fff;
   border-radius: var(--radius-panel);
@@ -7625,6 +8565,13 @@ html[data-promo='off'] .multi-image-fusion-page {
   font-size: 12px;
   color: var(--text-desc);
 }
+/* 计数行里「另有 N 个未出图任务」—— 弱化, 不与作品数抢同一层级 */
+.my-works-count-extra {
+  margin-left: 6px;
+  font-size: 12px;
+  font-style: normal;
+  color: var(--text-desc);
+}
 .my-works-refresh {
   margin-left: auto;
   display: inline-flex;
@@ -7719,6 +8666,10 @@ html[data-promo='off'] .multi-image-fusion-page {
   font-size: 11px;
   line-height: 20px;
   backdrop-filter: blur(2px);
+}
+/* 来源徽标在 .my-work-meta 的 flex 里, 间距由容器的 gap 给, 不再叠一层外边距 */
+.my-work-provider {
+  margin-left: 0;
 }
 .my-work-tag.status-failed {
   background: rgba(235, 87, 87, 0.9);
@@ -7981,10 +8932,35 @@ html[data-promo='off'] .multi-image-fusion-page {
   padding: 0 14px;
   display: inline-flex;
   align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
   border-radius: var(--radius-pill);
   background: var(--surface);
   color: var(--text-strong);
   font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+/* 分组选中态: 与批量条同一套品牌紫浅底, 不引入新色 */
+.asset-library-group-item.is-active {
+  background: var(--brand-bg);
+  border-color: var(--brand);
+  color: var(--brand-hover);
+}
+.asset-library-group-count {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--text-desc);
+}
+.asset-library-group-item.is-active .asset-library-group-count {
+  color: var(--brand-hover);
+}
+/* 分组依据切换器 (2026-10-21): 未选中是虚线灰, 选中填实底 */
+.asset-library-new-group.is-active {
+  border-style: solid;
+  border-color: var(--brand);
+  background: var(--brand-bg);
+  color: var(--brand-hover);
 }
 .asset-library-new-group {
   height: 32px;
@@ -8633,6 +9609,28 @@ html[data-promo='off'] .multi-image-fusion-page {
   font-size: 14px;
   color: var(--pkg-muted);
 }
+/* 会员套餐区（与积分包同页，用一条分隔标题区分两类商品） */
+.pkg-section {
+  margin-bottom: 32px;
+}
+.pkg-section-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 16px;
+}
+.pkg-section-head h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--pkg-text);
+}
+.pkg-section-head p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--pkg-muted);
+}
 .pkg-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -9095,6 +10093,22 @@ html[data-promo='off'] .multi-image-fusion-page {
 .credits-stat-value.is-warn {
   color: #d97706;
 }
+/* 购买入口: 积分页要能通向积分商城, 否则「没积分了」在这里是死路 */
+.credits-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: -4px 0 16px;
+}
+.credits-actions-hint {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-muted);
+}
+.credits-empty-text {
+  margin: 0 0 12px;
+}
 .credits-tabs {
   display: flex;
   gap: 4px;
@@ -9304,7 +10318,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   height: 56px;
   line-height: normal;
   padding: 0 16px;
-  background: #fff;
+  background: var(--card-bg);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
@@ -9379,6 +10393,77 @@ html[data-promo='off'] .multi-image-fusion-page {
   border-color: var(--border);
 }
 
+/* ── 顶栏全局搜索下拉 (B7) ─────────────────────────────────────────── */
+.adm-search-wrap {
+  position: relative;
+}
+.adm-search-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 420px;
+  max-height: 460px;
+  overflow-y: auto;
+  padding: 6px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: 0 12px 32px rgba(23, 26, 43, 0.14);
+  z-index: 60;
+}
+.adm-search-hint {
+  padding: 16px 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.adm-search-hint.is-error {
+  color: var(--danger-soft-text);
+}
+.adm-search-group + .adm-search-group {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border);
+}
+.adm-search-group-title {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+.adm-search-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.adm-search-item:hover,
+.adm-search-item:focus-visible {
+  background: var(--surface);
+  outline: none;
+}
+.adm-search-item-title {
+  font-size: 13px;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.adm-search-item-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .adm-icon-btn {
   width: 32px;
   height: 32px;
@@ -9445,7 +10530,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   align-self: flex-start;
   width: 240px;
   flex: 0 0 240px;
-  background: #fff;
+  background: var(--card-bg);
   border-right: 1px solid var(--border);
   padding: 12px 8px 24px;
   overflow-y: auto;
@@ -9665,7 +10750,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
-  background: #fff;
+  background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   margin-bottom: 12px;
@@ -9674,6 +10759,32 @@ html[data-promo='off'] .multi-image-fusion-page {
   margin-left: auto;
   display: flex;
   gap: 8px;
+}
+
+/*
+ * 批量操作条。
+ *
+ * 只在该页有选中项时出现 —— 常驻会占掉一行高度, 而绝大多数操作是单条的。
+ * 用品牌淡紫底而不是灰色: 它不是又一条筛选栏, 而是「你正在对 N 条记录动手」
+ * 的状态提示, 需要比表格背景更醒目。
+ */
+.adm-bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  background: var(--brand-bg);
+  border-radius: var(--radius-control);
+}
+.adm-bulk-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--brand);
+  margin-right: 4px;
+}
+.adm-bulk-bar .adm-link {
+  margin-left: auto;
 }
 
 /* ── 高危确认 ──────────────────────────────────────────────────────────── */
@@ -9705,7 +10816,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   height: 32px;
   padding: 0 14px;
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--card-bg);
   border-radius: var(--radius-control);
   color: var(--text-body);
   font-size: 13px;
@@ -9724,21 +10835,21 @@ html[data-promo='off'] .multi-image-fusion-page {
 .adm-btn.is-primary {
   background: var(--brand);
   border-color: var(--brand);
-  color: #fff;
+  color: var(--on-brand);
 }
 .adm-btn.is-primary:hover:not(:disabled) {
   background: var(--brand-hover);
   border-color: var(--brand-hover);
-  color: #fff;
+  color: var(--on-brand);
 }
 .adm-btn.is-danger {
   background: var(--danger-text);
   border-color: var(--danger-text);
-  color: #fff;
+  color: var(--on-brand);
 }
 .adm-btn.is-danger:hover:not(:disabled) {
   opacity: 0.88;
-  color: #fff;
+  color: var(--on-brand);
 }
 
 .adm-link {
@@ -9767,7 +10878,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
-  background: #fff;
+  background: var(--card-bg);
   color: var(--text-strong);
   font-size: 13px;
   outline: none;
@@ -9801,7 +10912,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
-  background: #fff;
+  background: var(--card-bg);
   color: var(--text-strong);
   font-size: 13px;
   outline: none;
@@ -9861,7 +10972,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #fff;
+  background: var(--card-bg);
   transition: transform 0.18s;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.2);
 }
@@ -9904,6 +11015,14 @@ html[data-promo='off'] .multi-image-fusion-page {
 .adm-cell-sub {
   font-size: 12px;
   color: var(--text-desc);
+}
+
+/*
+ * 整行可点 (点行打开详情抽屉)。鼠标形态必须跟着变 —— 行可点是隐藏约定,
+ * 不给抓手用户不会去试, 只会继续去挤那一列窄窄的「详情」按钮。
+ */
+.adm-row-clickable {
+  cursor: pointer;
 }
 
 /* ── 统计卡紧凑变体 (抽屉内用) ─────────────────────────────────────────── */
@@ -9960,6 +11079,45 @@ html[data-promo='off'] .multi-image-fusion-page {
   gap: 8px 12px;
   margin: 0;
   font-size: 13px;
+}
+
+/* ── 工单对话 (B7) ────────────────────────────────────────────────────
+ * 两侧气泡靠底色区分而不是靠左右对齐: 抽屉宽度有限, 左右交错会把长文本
+ * 挤成很窄的一列, 客服读起来反而更慢。
+ */
+.adm-ticket-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.adm-ticket-msg {
+  padding: 10px 12px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  max-width: 100%;
+}
+.adm-ticket-msg.is-user {
+  background: var(--surface);
+}
+.adm-ticket-msg.is-admin {
+  background: var(--brand-bg);
+  border-color: var(--brand-bg);
+}
+.adm-ticket-msg-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.adm-ticket-msg-body {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-body);
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 .adm-desc dt {
   color: var(--text-muted);
@@ -10090,7 +11248,7 @@ html[data-promo='off'] .multi-image-fusion-page {
 .adm-modal {
   width: 100%;
   max-width: 520px;
-  background: #fff;
+  background: var(--card-bg);
   border-radius: var(--radius-panel);
   box-shadow: var(--shadow-card);
   max-height: 85vh;
@@ -10199,7 +11357,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   padding: 0 10px;
   border: 1px solid var(--border);
   border-radius: 999px;
-  background: #fff;
+  background: var(--card-bg);
   color: var(--text-muted);
   font-size: 12px;
   cursor: pointer;
@@ -10259,7 +11417,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   padding: 0 6px;
   border-radius: 999px;
   background: var(--danger-text);
-  color: #fff;
+  color: var(--on-brand);
 }
 .adm-perm-roles {
   display: flex;
@@ -10375,7 +11533,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   gap: 16px;
   padding: 12px 16px;
   margin-top: 12px;
-  background: #fff;
+  background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-card);
@@ -10402,7 +11560,7 @@ html[data-promo='off'] .multi-image-fusion-page {
 .adm-noaccess-card {
   width: 100%;
   max-width: 560px;
-  background: #fff;
+  background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-panel);
   padding: 32px;
@@ -10447,7 +11605,7 @@ html[data-promo='off'] .multi-image-fusion-page {
 }
 .adm-noaccess-reason code {
   font-size: 12px;
-  background: #fff;
+  background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 1px 5px;
@@ -10493,7 +11651,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   color: var(--brand);
 }
 .adm-segmented-item.is-active {
-  background: #fff;
+  background: var(--card-bg);
   color: var(--brand);
   font-weight: 500;
   box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
@@ -10503,7 +11661,7 @@ html[data-promo='off'] .multi-image-fusion-page {
 
 .adm-stat {
   position: relative;
-  background: #fff;
+  background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   padding: 16px 18px;
@@ -10514,14 +11672,14 @@ html[data-promo='off'] .multi-image-fusion-page {
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .adm-stat:hover {
-  border-color: #d4d7e4;
+  border-color: var(--border-hover);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
 /* 主指标: 品牌浅底 + 左侧色条, 视线先落在这里 */
 .adm-stat.is-primary {
-  background: linear-gradient(180deg, #fbfaff 0%, #fff 62%);
-  border-color: #ddd9f5;
+  background: linear-gradient(180deg, var(--brand-bg-tint) 0%, var(--card-bg) 62%);
+  border-color: var(--brand-border-soft);
 }
 .adm-stat.is-primary::before {
   content: '';
@@ -10631,6 +11789,20 @@ html[data-promo='off'] .multi-image-fusion-page {
 }
 
 /* ── 趋势图: 网格基准 + 数值标注 ───────────────────────────────────────── */
+
+/*
+ * 面板内的副标题 (2026-10-21 交易概览): 与 .adm-panel-title 同级但更轻,
+ * 用于在同一个面板里放"第二块图表", 不必为了一个标题再开一个面板。
+ */
+.adm-trend-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-body);
+}
 
 .adm-trend {
   position: relative;
@@ -10768,7 +11940,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   font-size: 11px;
 }
 .adm-task-provider {
-  /* 通道名: mock/local 加浅底, gateway 走真实模型, 需要一眼区分 */
+  /* 通道名: pending/local 加浅底, gateway 走真实模型, 需要一眼区分 */
   padding: 0 6px;
   border-radius: 4px;
   background: var(--surface);
@@ -10784,7 +11956,7 @@ html[data-promo='off'] .multi-image-fusion-page {
 /* ── 面板: hover 与留白节奏 ─────────────────────────────────────────────── */
 
 .adm-panel {
-  background: #fff;
+  background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   padding: 20px 22px;
@@ -10792,7 +11964,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   transition: border-color 0.15s;
 }
 .adm-panel:hover {
-  border-color: #d4d7e4;
+  border-color: var(--border-hover);
 }
 /* 窄版: 设置/角色等表单型页面, 限制宽度避免视线横跨半个屏幕 */
 .adm-panel.is-narrow {
@@ -10828,7 +12000,7 @@ html[data-promo='off'] .multi-image-fusion-page {
  * antd 把排序器渲染成 th 内的独立 span, 这里统一留出间距并降低箭头对比度。
  */
 .adm-panel .ant-table-thead > tr > th {
-  background: #fafbfd;
+  background: var(--surface-tint);
   color: var(--text-muted);
   font-size: 12px;
   font-weight: 600;
@@ -10859,7 +12031,7 @@ html[data-promo='off'] .multi-image-fusion-page {
 }
 /* 悬停整行: 便于横向扫读时定位当前行 */
 .adm-panel .ant-table-tbody > tr:hover > td {
-  background: #fafbfd;
+  background: var(--surface-tint);
 }
 .adm-panel .ant-table-tbody > tr.ant-table-row-selected > td {
   background: var(--brand-bg);
@@ -10961,11 +12133,19 @@ html[data-promo='off'] .multi-image-fusion-page {
   color: var(--text-body);
 }
 
+/* 语义文字色工具类。
+   2026-10-23: 此前后台页面直接写 `var(--danger, #d4380d)` / `var(--success, #389e0d)`,
+   而 :root 里根本没有 --danger / --success 这两个令牌 —— 于是全部落到裸 hex 兜底,
+   实际渲染出的是 #d4380d / #389e0d, 与全站 --danger-text #e11d48 / --success-text #2f8f6b
+   不是同一个红/绿。这里补齐 success 档, 三档统一走令牌, 页面改引用工具类。 */
 .adm-text-warn {
   color: var(--warn-text);
 }
 .adm-text-danger {
   color: var(--danger-text);
+}
+.adm-text-success {
+  color: var(--success-text);
 }
 
 /* 禁用态链接: 未验证备份的「下载」用它 —— 保留可见性说明"有这个动作但当前不可用" */
@@ -11000,7 +12180,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   overflow: hidden;
-  background: #fff;
+  background: var(--card-bg);
   cursor: pointer;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -11027,7 +12207,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   padding: 2px 8px;
   border-radius: 999px;
   background: rgba(23, 26, 43, 0.72);
-  color: #fff;
+  color: var(--on-brand);
   font-size: 11px;
   line-height: 18px;
 }
@@ -11087,7 +12267,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   gap: 16px;
 }
 .adm-storage-card {
-  background: #fff;
+  background: var(--card-bg);
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   padding: 18px 20px;
@@ -11097,12 +12277,12 @@ html[data-promo='off'] .multi-image-fusion-page {
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .adm-storage-card:hover {
-  border-color: #d4d7e4;
+  border-color: var(--border-hover);
   box-shadow: 0 1px 4px rgba(15, 23, 42, 0.06);
 }
 .adm-storage-card.is-active {
   border-color: var(--brand);
-  background: linear-gradient(180deg, #fbfaff 0%, #fff 40%);
+  background: linear-gradient(180deg, var(--brand-bg-tint) 0%, var(--card-bg) 40%);
 }
 .adm-storage-card.is-disabled {
   background: var(--surface);
@@ -11137,7 +12317,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   padding: 0 7px;
   border-radius: 999px;
   background: var(--brand);
-  color: #fff;
+  color: var(--on-brand);
   font-weight: 400;
 }
 .adm-storage-desc {
@@ -11206,12 +12386,40 @@ html[data-promo='off'] .multi-image-fusion-page {
 /* 只读权限提示: 与错误态区分开 —— 这是权限边界, 不是故障 */
 .adm-notice {
   background: var(--info-soft-bg);
-  color: #1e40af;
-  border: 1px solid #bfdbfe;
+  color: var(--info-text);
+  border: 1px solid var(--info-border);
   border-radius: var(--radius-card);
   padding: 10px 14px;
   font-size: 13px;
   margin-bottom: 12px;
+}
+
+/* 线路编辑抽屉 · 协议说明 (2026-10-21)
+   端点 / 尺寸写法 / 参考图回传原先只在 hover tooltip 里, 选协议时看不到 ——
+   而这三项决定通道能不能配通。现改为常驻说明块。 */
+.mc-protocol-note {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-body);
+}
+.mc-protocol-note-title {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.mc-protocol-note-tech {
+  color: var(--text-desc);
+  word-break: break-word;
 }
 
 /* 表格单元纵向堆叠 (通道标签 + 副信息) */
@@ -11238,287 +12446,6 @@ html[data-promo='off'] .multi-image-fusion-page {
   color: var(--text-body);
 }
 
-/* ── 模型配置: 表格式布局 ──────────────────────────────────────────
-   两列 (标签 | 控件) 而非上下堆叠: 配置项有 20+ 条, 上下堆叠会让
-   「这项是什么」与「这项的值」隔得太远, 逐行扫视时难以对应。 */
-.adm-cfg-list {
-  display: flex;
-  flex-direction: column;
-}
-
-/* ── 厂商预设选择 (2026-10-20, 模型配置页) ────────────────────────────
-   换厂商时最容易错的是「基址 + 协议 + 模型」三项的组合, 而配错的表现是
-   **静默回落到本地占位图** —— 页面上看不出配置错了。故把厂商选择放在配置
-   分组之前, 选中后自动填三项, 并把该协议的尺寸写法/参考图限制如实展示。 */
-.adm-vendor-picker {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-  margin-bottom: 12px;
-}
-@media (max-width: 860px) {
-  .adm-vendor-picker {
-    grid-template-columns: minmax(0, 1fr);
-  }
-}
-.adm-vendor-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.adm-vendor-select {
-  width: 100%;
-}
-.adm-vendor-desc {
-  margin: 0 0 10px;
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--text-muted);
-}
-.adm-vendor-card {
-  margin-top: 4px;
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface);
-}
-.adm-vendor-card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 8px;
-  font-size: 13px;
-  color: var(--text-strong);
-}
-.adm-vendor-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-.adm-vendor-models {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 10px;
-}
-.adm-vendor-model {
-  display: inline-flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 5px 9px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-tag);
-  background: var(--card-bg);
-  color: var(--text-body);
-  font-size: 12px;
-  line-height: 16px;
-  cursor: pointer;
-  text-align: left;
-}
-.adm-vendor-model:hover:not(:disabled) {
-  border-color: var(--brand);
-  color: var(--brand);
-}
-.adm-vendor-model.is-active {
-  border-color: var(--brand);
-  background: var(--brand-bg);
-  color: var(--brand);
-}
-.adm-vendor-model:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-.adm-vendor-model em {
-  font-style: normal;
-  font-size: 11px;
-  color: var(--text-desc);
-}
-
-.adm-cfg-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 20px;
-  align-items: start;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--border-row);
-}
-.adm-cfg-row:last-child {
-  border-bottom: none;
-}
-
-.adm-cfg-label-top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.adm-cfg-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-strong);
-}
-.adm-cfg-desc {
-  font-size: 12px;
-  color: var(--text-desc);
-  margin-top: 4px;
-  line-height: 1.6;
-}
-/* 环境变量名: 让运营知道「这条还能被谁覆盖」 */
-.adm-cfg-env {
-  display: inline-block;
-  margin-top: 5px;
-  font-size: 11px;
-  color: var(--text-desc);
-  background: var(--surface);
-  border-radius: 4px;
-  padding: 1px 6px;
-}
-
-.adm-cfg-control {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 32px;
-}
-.adm-cfg-input,
-.adm-cfg-select {
-  width: 100%;
-}
-.adm-cfg-number {
-  width: 100%;
-}
-.adm-cfg-secret {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-}
-.adm-cfg-cleared {
-  font-size: 12px;
-  color: var(--warn-text);
-  background: var(--warn-bg);
-  border: 1px solid var(--warn-border);
-  border-radius: 6px;
-  padding: 4px 10px;
-}
-
-.adm-confirm-input {
-  width: 100%;
-  box-sizing: border-box;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  font-size: 13px;
-  color: var(--text-body);
-  background: #fff;
-}
-.adm-confirm-input:focus {
-  outline: none;
-  border-color: var(--brand);
-}
-
-.adm-link-sm {
-  font-size: 12px;
-}
-
-/* ── 通道状态条 ──────────────────────────────────────────────────── */
-.adm-cfg-status {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-.adm-cfg-status-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: 12px 20px;
-  margin: 0;
-}
-.adm-cfg-status-list > div {
-  min-width: 0;
-}
-.adm-cfg-status-list dt {
-  font-size: 11px;
-  color: var(--text-desc);
-  margin-bottom: 3px;
-}
-.adm-cfg-status-list dd {
-  margin: 0;
-  font-size: 13px;
-  color: var(--text-body);
-  word-break: break-all;
-}
-
-/* 连通性测试结果: 成功/失败双态 + 真实报错原文 */
-.adm-cfg-test {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  border-radius: 8px;
-  padding: 10px 14px;
-  font-size: 12px;
-  line-height: 1.6;
-}
-.adm-cfg-test.is-ok {
-  background: var(--success-soft-bg);
-  border: 1px solid #a7e3cd;
-  color: #0f7a5a;
-}
-.adm-cfg-test.is-fail {
-  background: var(--danger-soft-bg);
-  border: 1px solid #fecdd3;
-  color: var(--danger-soft-text);
-}
-.adm-cfg-test code {
-  font-size: 11px;
-  opacity: 0.85;
-  word-break: break-all;
-}
-
-/* ── 逐能力路由总览: 15 条路由做成网格, 一屏看完分布 ─────────────── */
-.adm-route-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
-  gap: 10px;
-}
-.adm-route-item {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  background: #fff;
-}
-.adm-route-name {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-strong);
-}
-.adm-route-cap {
-  font-size: 11px;
-  color: var(--text-desc);
-}
-.adm-route-tags {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-top: 2px;
-}
-
-/* 窄屏: 配置行退化为单列, 控件不再被挤压 */
-@media (max-width: 900px) {
-  .adm-cfg-row {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-  .adm-cfg-control {
-    min-height: 0;
-  }
-}
-
 /* ── 营销中心 ──────────────────────────────────────────────────────────── */
 
 /* 表单: 用于抽屉内的新建/编辑 */
@@ -11543,7 +12470,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   padding: 8px 10px;
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
-  background: #fff;
+  background: var(--card-bg);
   color: var(--text-strong);
   font-size: 13px;
   font-family: inherit;
@@ -11605,7 +12532,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   padding: 0 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius-control);
-  background: #fff;
+  background: var(--card-bg);
   font-size: 13px;
   text-align: center;
   outline: none;
@@ -11790,7 +12717,7 @@ html[data-promo='off'] .multi-image-fusion-page {
 }
 .exc-btn.is-primary {
   background: var(--brand);
-  color: #fff;
+  color: var(--on-brand);
 }
 .exc-btn.is-primary:hover {
   background: var(--brand-hover);
@@ -12723,13 +13650,36 @@ html[data-promo='off'] .multi-image-fusion-page {
    .asset-library-picker-* 规则 (2026-10-20 取证)。
    ═══════════════════════════════════════════════════════════════════ */
 
-.alp-modal .ant-modal-content {
+/* ⚠️ antd 6 把弹窗外壳类名从 .ant-modal-content 改成了 .ant-modal-container。
+   旧选择器在这套依赖下**完全不命中**, 于是参考站实测的 padding 0 / radius 20 /
+   1px #e5e8f0 边框 / 阴影全部失效, 弹窗退回 antd 默认 (padding 20px 24px /
+   radius 10 / 无边框) —— 表现为标题与工具栏整体内缩 24px、圆角不对、四周少一圈描边。
+   @2026-10-21 对拍修复 */
+.alp-modal .ant-modal-container {
   padding: 0 !important;
   border-radius: 20px;
   overflow: hidden;
   box-shadow: 0 24px 80px #282b4c33;
   border: 1px solid #e5e8f0;
   color: #171a2b;
+  /* 参考站 .asset-library-picker-dialog: 纵向 flex + max-height min(760px, 100vh - 40px) */
+  display: flex;
+  flex-direction: column;
+  max-height: min(760px, calc(100vh - 40px));
+}
+.alp-modal .ant-modal-header {
+  flex: none;
+}
+.alp-modal .ant-modal-body {
+  flex: auto;
+  min-height: 0;
+}
+/* 参考站 dialog 的三段: header(固定) / toolbar+layout(自适应) / footer(固定) */
+.alp-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
 }
 .alp-modal .ant-modal-header {
   padding: 0;
@@ -12757,6 +13707,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   display: block;
   font-size: 12px;
   line-height: 18px;
+  font-weight: 400;
   color: #8d95a8;
 }
 .alp-title {
@@ -12793,7 +13744,8 @@ html[data-promo='off'] .multi-image-fusion-page {
   align-items: stretch;
   padding: 14px 26px;
   background: #fbfcfe;
-  border-bottom: 1px solid #eef0f5;
+  /* 参考站 .asset-library-picker-toolbar **无**下边框 (只有 #fbfcfe 底)",
+     此前多画了一条 #eef0f5 分隔线 @2026-10-21 */
 }
 .alp-groups {
   display: flex;
@@ -12943,9 +13895,9 @@ html[data-promo='off'] .multi-image-fusion-page {
 
 /* 主体布局 */
 .alp-layout {
+  flex: auto;
   display: flex;
   min-height: 0;
-  height: min(560px, calc(100vh - 260px));
 }
 .alp-sidebar {
   flex: 0 0 184px;
@@ -12995,6 +13947,7 @@ html[data-promo='off'] .multi-image-fusion-page {
 .alp-main {
   flex: auto;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -13169,8 +14122,18 @@ html[data-promo='off'] .multi-image-fusion-page {
     flex-direction: column;
     align-items: stretch;
   }
-  .alp-search {
+  /* 参考站窄屏把「日期筛选 / 搜索」拆成两行各自撑满; 本仓两者包在
+     .alp-toolbar-right 里, 故让它占满一行, 日期保留自身宽(不折行)、搜索吃掉剩余 */
+  .alp-toolbar-right {
     width: 100%;
+  }
+  .alp-date-trigger {
+    white-space: nowrap;
+  }
+  .alp-search {
+    width: auto;
+    flex: 1 1 auto;
+    min-width: 0;
   }
   .alp-sidebar {
     flex-basis: 124px;
@@ -13206,8 +14169,16 @@ html[data-promo='off'] .multi-image-fusion-page {
    数值全部抄自参考站线上样式表 index-glaqVozH.css (2026-10-20 取证)。
    ═══════════════════════════════════════════════════════════════════ */
 
-/* ── 桌面端: 二维码弹窗 ── */
-.mum-modal .ant-modal-content {
+/* ── 桌面端: 二维码弹窗 ──
+   ⚠️ antd 6 的弹窗外壳是 .ant-modal-container (旧 .ant-modal-content 不命中),
+   失效时容器自带 padding 20px 24px + radius 10 → .mum 被挤成 392 宽却按 440 排版,
+   内容横向溢出 48px、圆角与阴影也不对。@2026-10-21 对拍修复 */
+/* 窄屏: antd 的 max-width 是 calc(100vw - 16px), 比参考站的 100vw - 40px 宽 24px,
+   .mum 按 350 排版而容器仍是 374 → 右侧露出一条白色空带 */
+.ant-modal.mum-modal {
+  max-width: calc(100vw - 40px) !important;
+}
+.mum-modal .ant-modal-container {
   padding: 0 !important;
   border-radius: 20px;
   overflow: visible;
@@ -13250,8 +14221,8 @@ html[data-promo='off'] .multi-image-fusion-page {
   color: #24212f;
 }
 .mum-desc {
+  /* 参考站 .mobile-upload-modal > p 无 max-width, 撑满内容宽后居中 */
   margin: 0 auto 18px;
-  max-width: 300px;
   font-size: 13px;
   line-height: 1.65;
   color: #777181;
@@ -13557,273 +14528,1057 @@ html[data-promo='off'] .multi-image-fusion-page {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   模型配置页 · 通道总览卡片 (2026-10-20 重设计)
+   可折叠面板 (2026-10-20 抄 New API 的高级项折叠)
 
-   设计动因: 改造前用 Segmented 切换模态, 页面上永远只看得见一个模态 ——
-   「文生图配好了 / 视频根本没配」这件事完全看不出来, 而视频无本地兜底,
-   没配就是必然失败。故把三个模态并排成三张卡, 既作总览也作入口。
+   53 个配置项同权重平铺时, 必填项 (基址/令牌/模型) 会被低频的
+   「超时与轮询」9 项淹没。故高级项默认折叠, 必填项保持展开。
    ═══════════════════════════════════════════════════════════════ */
 
-.adm-chgrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 12px;
+.adm-panel-collapsible {
+  /* 折叠时不需要标题下方的 16px 间距 (标题即折叠按钮) */
+  padding-bottom: 0;
+}
+
+.adm-panel-collapsible.is-open {
+  padding-bottom: 16px;
+}
+
+.adm-panel-title-btn {
+  width: 100%;
+  margin-bottom: 0;
+  padding: 0;
+  font-family: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: inherit;
+}
+
+.adm-panel-collapsible.is-open .adm-panel-title-btn {
   margin-bottom: 16px;
 }
 
-.adm-chcard {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px 16px;
+.adm-panel-title-btn:hover .adm-panel-caret {
+  color: var(--color-primary);
+}
+
+.adm-panel-caret {
+  display: inline-block;
+  width: 14px;
+  font-size: 11px;
+  color: var(--text-desc);
+  transition: color 0.15s ease;
+}
+
+/* 折叠摘要 (如「3 项 · 全部默认值」) —— 让运营知道里面还有内容 */
+.adm-panel-collapsed-hint {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   可折叠面板 (2026-10-20 抄 New API 的高级项折叠)
+
+   53 个配置项同权重平铺时, 必填项 (基址/令牌/模型) 会被低频的
+   「超时与轮询」9 项淹没。故高级项默认折叠, 必填项保持展开。
+   ═══════════════════════════════════════════════════════════════ */
+
+.adm-panel-collapsible {
+  /* 折叠时不需要标题下方的 16px 间距 (标题即折叠按钮) */
+  padding-bottom: 0;
+}
+
+.adm-panel-collapsible.is-open {
+  padding-bottom: 16px;
+}
+
+.adm-panel-title-btn {
+  width: 100%;
+  margin-bottom: 0;
+  padding: 0;
+  font-family: inherit;
   text-align: left;
-  background: var(--color-card);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
+  background: none;
+  border: none;
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  color: inherit;
 }
 
-.adm-chcard:hover {
-  border-color: var(--color-primary);
+.adm-panel-collapsible.is-open .adm-panel-title-btn {
+  margin-bottom: 16px;
 }
 
-.adm-chcard.is-active {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 1px var(--color-primary);
+.adm-panel-title-btn:hover .adm-panel-caret {
+  color: var(--color-primary);
 }
 
-.adm-chcard:focus-visible {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 2px;
+.adm-panel-caret {
+  display: inline-block;
+  width: 14px;
+  font-size: 11px;
+  color: var(--text-desc);
+  transition: color 0.15s ease;
 }
 
-.adm-chcard-head {
+/* 折叠摘要 (如「3 项 · 全部默认值」) —— 让运营知道里面还有内容 */
+.adm-panel-collapsed-hint {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+}
+
+
+/* ── 后台通用修补 (2026-10-20) ─────────────────────────────────────────── */
+
+/* 确认弹窗必须盖在 antd Drawer 之上 */
+.adm-modal-mask {
+  z-index: 1100;
+}
+
+/* 抽屉底部: 提示靠左, 按钮靠右 */
+.adm-drawer-footer .adm-action-hint {
+  margin-right: auto;
+}
+
+/* 页头操作在窄屏换行, 不挤压描述 */
+.adm-page-head-actions {
+  flex-wrap: wrap;
+}
+
+@media (max-width: 900px) {
+  .adm-page-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  .adm-page-head-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* ── 登录卡新增块 (B2: 忘记密码 / 短信验证码 / 注册协议) ─────────────────── */
+/* 「忘记密码？」—— 右对齐的单行文字链接, 与提交按钮同宽 */
+.login-links {
+  text-align: right;
+  font-size: 13px;
+  line-height: 18px;
+}
+.login-links a {
+  color: var(--brand);
+  cursor: pointer;
+  text-decoration: none;
+}
+.login-links a:hover {
+  color: var(--brand-hover);
+}
+
+/* 验证码行: 输入框自适应 + 固定宽度的「获取验证码」按钮 */
+.login-code-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.login-code-row .ant-input-affix-wrapper {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.login-code-btn {
+  flex: 0 0 auto;
+  width: 108px;
+  height: 48px;
+  border-radius: 8px;
+  border: 1px solid #c3bdf5;
+  background: #fff;
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0;
+}
+.login-code-btn:hover:not(:disabled),
+.login-code-btn:focus-visible:not(:disabled) {
+  background: var(--brand-bg);
+  color: var(--brand-hover);
+  border-color: var(--brand);
+}
+.login-code-btn:disabled {
+  color: var(--text-desc);
+  border-color: var(--border);
+  background: #fff;
+}
+
+/* 注册协议勾选: 文案较长, 必须允许换行 (父级 login-agreement 是 nowrap) */
+.login-agree-field .ant-form-item-control-input {
+  min-height: 0;
+}
+.login-agree-field .ant-checkbox-wrapper {
+  align-items: flex-start;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-desc);
+  white-space: normal;
+}
+.login-agree-field .ant-checkbox {
+  margin-top: 3px;
+}
+.login-agree-field a {
+  color: var(--brand);
+  margin: 0 2px;
+}
+
+/* ── 找回 / 重置密码独立页 (无左栏礼宾面板) ──────────────────────────────── */
+.auth-plain-card {
+  width: 420px;
+  max-width: 100%;
+  padding: 40px;
+  background: #fff;
+  border-radius: var(--radius-hero);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.12);
+}
+.auth-plain-card h1 {
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+.auth-plain-card .auth-plain-desc {
+  margin: 0 0 24px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-desc);
+}
+.auth-plain-card .login-field .ant-form-item-label {
+  display: block;
+}
+.auth-plain-card .login-field .ant-form-item-label > label {
+  font-size: 13px;
+  color: var(--text-body);
+}
+.auth-plain-card .auth-plain-actions {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.auth-plain-card .auth-plain-actions a {
+  color: var(--brand);
+  cursor: pointer;
+  text-decoration: none;
+}
+.auth-plain-result {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 16px;
+  border-radius: var(--radius-card);
+  background: var(--brand-bg);
+  color: var(--text-body);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   顶导消息铃铛 (B4, 2026-10-21)
+   与 .app-quota 同一视觉尺度: 32px 高、12px 字号、中性色, 避免在 64px 顶栏里
+   抢过品牌与导航。未读角标由 antd Badge 托管, 不自定义。
+   ───────────────────────────────────────────────────────────────────────────── */
+.app-notif-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-control);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.app-notif-trigger:hover {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+.app-notif-trigger .ant-badge {
+  display: inline-flex;
+}
+.app-notif-panel {
+  width: 320px;
+  max-width: calc(100vw - 32px);
+}
+.app-notif-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 4px 4px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+  border-bottom: 1px solid var(--border);
+}
+.app-notif-body {
+  max-height: 360px;
+  overflow-y: auto;
+  padding-top: 4px;
+}
+.app-notif-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 0;
+}
+.app-notif-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: var(--radius-control);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+.app-notif-item:hover {
+  background: var(--surface);
+}
+/* 未读用左侧圆点而非整行底色: 底色会让列表看起来每一行都是"选中的" */
+.app-notif-item.is-unread .app-notif-title::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  vertical-align: middle;
+}
+.app-notif-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.app-notif-text {
+  font-size: 12px;
+  color: var(--text-body);
+  line-height: 1.5;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.app-notif-time {
+  font-size: 11px;
+  color: var(--text-desc);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   账户中心 / 个人主页 (B4, 2026-10-21 扩充)
+   单列卡片流: 每个卡片一个可独立理解的动作域
+   (概览 / 资料 / 积分与会员 / 我的数据 / 消息 / 安全 / 导出 / 注销)。
+   ───────────────────────────────────────────────────────────────────────────── */
+.account-page {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 24px 24px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.account-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  padding: 20px 24px;
+}
+.account-card.is-danger {
+  border-color: var(--danger-ref);
+}
+.account-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-strong);
+  margin-bottom: 12px;
+}
+.account-card-head h2 {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+}
+/* 卡片头右侧的次要动作 (查看明细 / 全部已读), 推到最右 */
+.account-card-more {
+  margin-left: auto;
+  padding: 0;
+}
+.account-card.is-danger .account-card-head {
+  color: var(--danger-ref);
+}
+
+/* 概览卡: 头像 + 身份 + 快捷入口 */
+.account-hero-main {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.account-avatar {
+  flex: none;
+  background: var(--brand);
+  color: #fff;
+  font-size: 22px;
+  font-weight: 600;
+}
+.account-hero-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.account-hero-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.account-status {
+  margin-inline-end: 0;
+}
+.account-hero-email {
+  font-size: 13px;
+  color: var(--text-muted);
+  word-break: break-all;
+}
+.account-hero-meta {
+  display: flex;
+  gap: 4px 14px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+.account-quick {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.account-field {
+  display: flex;
+  gap: 16px;
+  padding: 8px 0;
+  font-size: 13px;
+}
+.account-field > label {
+  flex: 0 0 72px;
+  color: var(--text-muted);
+}
+.account-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  color: var(--text-body);
+}
+.account-hint {
+  font-size: 12px;
+  color: var(--text-desc);
+}
+.account-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.7;
+  margin: 0 0 12px;
+}
+/* 积分与会员: 两栏并列, 窄屏堆叠 */
+.account-assets {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.account-asset {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 16px;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--text-desc);
+}
+.account-asset b {
+  font-size: 22px;
+  line-height: 1.2;
+  color: var(--text-strong);
+}
+.account-asset small {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+.account-asset .ant-btn {
+  margin-top: 4px;
+}
+
+/* 我的数据: 每格都是入口, 所以是 button 而不是 div */
+.account-stats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
   gap: 8px;
 }
-
-.adm-chcard-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text);
+.account-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: none;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--text-desc);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.account-stat:hover {
+  background: var(--brand-bg);
+  border-color: var(--border);
+}
+.account-stat:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+.account-stat b {
+  font-size: 18px;
+  color: var(--text-strong);
 }
 
-.adm-chcard-body {
+/* 最近订单 */
+.account-order-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin: 0;
 }
-
-.adm-chcard-body > div {
-  display: grid;
-  grid-template-columns: 44px 1fr;
-  gap: 8px;
-  align-items: baseline;
-}
-
-.adm-chcard-body dt {
-  font-size: 12px;
-  color: var(--text-desc);
-}
-
-.adm-chcard-body dd {
-  margin: 0;
-  font-size: 13px;
-  color: var(--color-text);
-  overflow-wrap: anywhere;
-}
-
-.adm-cell-mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px;
-}
-
-/* 「配了却必然失败」单独成行, 不塞进 tooltip —— 那是本页最该被看见的状态 */
-.adm-chcard-alert {
-  margin: 0;
-  padding: 8px 10px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--danger-text);
-  background: var(--danger-soft-bg);
-  border-radius: 8px;
-}
-
-.adm-chcard-alert.is-soft {
-  color: var(--text-desc);
-  background: var(--color-slate-100);
-}
-
-.adm-chcard-foot {
-  margin-top: auto;
-  padding-top: 4px;
-}
-
-.adm-chcard-hint {
-  font-size: 12px;
-  color: var(--text-desc);
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   路由总览 · 按模态分组 (2026-10-20 重设计)
-
-   改造前 16 张卡平铺, 看不出「哪些能力没兜底」—— 而图像失败会回落本地
-   (体验降级), 文本/视频失败是**直接报错**。两类混平铺时, 最重要的区别
-   就看不见了。故按模态分组, 并把「无兜底」计数前置。
-   ═══════════════════════════════════════════════════════════════ */
-
-.adm-route-group {
-  margin-bottom: 18px;
-}
-
-.adm-route-group:last-child {
-  margin-bottom: 0;
-}
-
-.adm-route-group-head {
+.account-order {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--color-border-soft);
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-row);
+  border-radius: var(--radius-control);
+  background: var(--card-bg);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
 }
-
-.adm-route-group-name {
+.account-order:hover {
+  border-color: var(--brand);
+  background: var(--brand-bg);
+}
+.account-order-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.account-order-title {
   font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text);
+  color: var(--text-body);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-
-/* ═══════════════════════════════════════════════════════════════
-   通道卡 · 测试结论 (2026-10-20 批量测试)
-
-   与「通道状态」分开显示: 状态说「配没配」, 测试说「配的这份能不能通」。
-   两者是**两件事**, 合并成一个标签会让人分不清是哪种问题。
-   ═══════════════════════════════════════════════════════════════ */
-
-.adm-chcard-test {
-  margin: 0;
-  padding: 6px 9px;
+.account-order-meta {
   font-size: 12px;
-  line-height: 1.45;
-  border-radius: 8px;
-  /* 断行友好: 测试消息可能较长 (如「模型 X 不在该厂商的可用模型列表中」) */
-  overflow-wrap: anywhere;
+  color: var(--text-desc);
 }
-
-.adm-chcard-test.is-ok {
-  color: var(--success-text, #166534);
-  background: var(--success-soft-bg, #dcfce7);
+.account-order-amount {
+  flex: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
 }
-
-.adm-chcard-test.is-fail {
-  color: var(--danger-text);
+.account-order-status {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--radius-tag);
+  font-size: 12px;
+  background: var(--surface);
+  color: var(--text-muted);
+}
+.account-order-status.is-paid {
+  background: var(--success-soft-bg);
+  color: var(--success-text);
+}
+.account-order-status.is-pending {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+.account-order-status.is-cancelled,
+.account-order-status.is-refunded,
+.account-order-status.is-partial_refunded {
   background: var(--danger-soft-bg);
+  color: var(--danger-soft-text);
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   可折叠面板 (2026-10-20 抄 New API 的高级项折叠)
-
-   53 个配置项同权重平铺时, 必填项 (基址/令牌/模型) 会被低频的
-   「超时与轮询」9 项淹没。故高级项默认折叠, 必填项保持展开。
-   ═══════════════════════════════════════════════════════════════ */
-
-.adm-panel-collapsible {
-  /* 折叠时不需要标题下方的 16px 间距 (标题即折叠按钮) */
-  padding-bottom: 0;
-}
-
-.adm-panel-collapsible.is-open {
-  padding-bottom: 16px;
-}
-
-.adm-panel-title-btn {
-  width: 100%;
-  margin-bottom: 0;
+/* 最近消息 */
+.account-msg-list {
+  list-style: none;
+  margin: 0;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.account-msg {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-row);
+  border-radius: var(--radius-control);
+  background: var(--card-bg);
   font-family: inherit;
   text-align: left;
-  background: none;
-  border: none;
   cursor: pointer;
-  color: inherit;
+  transition: border-color 0.15s, background 0.15s;
+}
+.account-msg:hover {
+  border-color: var(--brand);
+  background: var(--brand-bg);
+}
+.account-msg-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: transparent;
+}
+.account-msg.is-unread .account-msg-dot {
+  background: var(--brand);
+}
+.account-msg-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.account-msg-title {
+  font-size: 13px;
+  color: var(--text-body);
+}
+.account-msg.is-unread .account-msg-title {
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.account-msg-body {
+  font-size: 12px;
+  color: var(--text-desc);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.account-msg-time {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-desc);
+  padding-top: 1px;
+}
+.account-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-desc);
+}
+.account-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 360px;
+}
+.account-delete-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+@media (max-width: 640px) {
+  .account-page {
+    padding: 16px 16px 48px;
+  }
+  .account-assets {
+    grid-template-columns: 1fr;
+  }
+  .account-stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
-.adm-panel-collapsible.is-open .adm-panel-title-btn {
+/* ─────────────────────────────────────────────────────────────────────────────
+   后台 · 法务文档 / 站内消息 (B4, 2026-10-21)
+   ───────────────────────────────────────────────────────────────────────────── */
+.adm-legal-preview pre {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  max-height: 60vh;
+  overflow: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--text-body);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.adm-legal-meta {
+  font-size: 12px;
+  color: var(--text-desc);
+}
+.adm-msg-broadcast {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 640px;
+}
+/* 邮件 / 短信通道生效状态（只读） */
+.adm-channel-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+}
+.adm-channel-status-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+}
+.adm-channel-status-name {
+  min-width: 32px;
+  color: var(--text-body);
+}
+.adm-channel-status-target {
+  color: var(--text-desc);
+  font-variant-numeric: tabular-nums;
+}
+.adm-channel-status-warn {
+  color: var(--warn-text);
+}
+.adm-msg-preview {
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  font-size: 13px;
+  color: var(--text-body);
+}
+.adm-msg-preview strong {
+  display: block;
+  color: var(--text-strong);
+  margin-bottom: 4px;
+}
+
+/* ───────── 我的工单 (B7) ───────── */
+.ticket-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ticket-status {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  background: var(--surface);
+  color: var(--text-muted);
+}
+.ticket-status.is-open {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+.ticket-status.is-processing {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+.ticket-status.is-resolved {
+  background: var(--success-soft-bg);
+  color: var(--success-text);
+}
+.ticket-status.is-closed {
+  background: var(--surface);
+  color: var(--text-desc);
+}
+
+.ticket-new-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   margin-bottom: 16px;
 }
 
-.adm-panel-title-btn:hover .adm-panel-caret {
-  color: var(--color-primary);
-}
-
-.adm-panel-caret {
-  display: inline-block;
-  width: 14px;
-  font-size: 11px;
-  color: var(--text-desc);
-  transition: color 0.15s ease;
-}
-
-/* 折叠摘要 (如「3 项 · 全部默认值」) —— 让运营知道里面还有内容 */
-.adm-panel-collapsed-hint {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   可折叠面板 (2026-10-20 抄 New API 的高级项折叠)
-
-   53 个配置项同权重平铺时, 必填项 (基址/令牌/模型) 会被低频的
-   「超时与轮询」9 项淹没。故高级项默认折叠, 必填项保持展开。
-   ═══════════════════════════════════════════════════════════════ */
-
-.adm-panel-collapsible {
-  /* 折叠时不需要标题下方的 16px 间距 (标题即折叠按钮) */
-  padding-bottom: 0;
-}
-
-.adm-panel-collapsible.is-open {
-  padding-bottom: 16px;
-}
-
-.adm-panel-title-btn {
-  width: 100%;
-  margin-bottom: 0;
-  padding: 0;
-  font-family: inherit;
-  text-align: left;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: inherit;
-}
-
-.adm-panel-collapsible.is-open .adm-panel-title-btn {
+.ticket-compose {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 16px;
   margin-bottom: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card-bg);
+}
+.ticket-compose label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.ticket-compose label.is-full {
+  grid-column: 1 / -1;
+}
+.ticket-compose input,
+.ticket-compose select,
+.ticket-compose textarea,
+.ticket-reply textarea {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text-body);
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  outline: none;
+  resize: vertical;
+}
+.ticket-compose input:focus,
+.ticket-compose select:focus,
+.ticket-compose textarea:focus,
+.ticket-reply textarea:focus {
+  border-color: var(--brand);
+}
+.ticket-compose-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
-.adm-panel-title-btn:hover .adm-panel-caret {
-  color: var(--color-primary);
+.ticket-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  text-align: left;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  cursor: pointer;
+  transition: border-color 0.15s ease;
 }
-
-.adm-panel-caret {
-  display: inline-block;
-  width: 14px;
-  font-size: 11px;
+.ticket-card:hover,
+.ticket-card.is-active {
+  border-color: var(--brand);
+}
+.ticket-card-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+.ticket-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ticket-card-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.ticket-card-arrow {
   color: var(--text-desc);
-  transition: color 0.15s ease;
+  transform: rotate(-90deg);
 }
 
-/* 折叠摘要 (如「3 项 · 全部默认值」) —— 让运营知道里面还有内容 */
-.adm-panel-collapsed-hint {
-  margin-left: auto;
+.ticket-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 16px 0;
+}
+.ticket-msg {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+.ticket-msg.is-admin {
+  background: var(--brand-bg);
+  border-color: var(--brand-bg);
+}
+.ticket-msg-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.ticket-msg-body {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-body);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ticket-reply {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card-bg);
+}
+.ticket-reply-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.ticket-reply-actions .pkg-pay-btn,
+.ticket-reply-actions .pkg-ghost-btn {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
+}
+
+.ticket-error {
+  margin: 8px 0;
+  font-size: 13px;
+  color: var(--danger-soft-text);
+}
+
+/* ── 后台窄屏适配 (2026-10-22) ────────────────────────────────────────────
+ *
+ * 实测 390×844: 文档宽 431px, 比视口多出 41px —— 溢出源是 `.adm-header-right`
+ * (宽 399px: 搜索框 240 + 公告铃 + 用户菜单)。后果是每个后台页都能左右晃、
+ * 右侧内容被切。这里在窄屏逐步收起次要控件, + 把侧栏让位给抽屉导航。
+ *
+ * 同屏还修了「固定宽度抽屉」: 新增线路的抽屉写死 720px, 在 390 屏上
+ * 右侧输入框与保存按钮被切到屏幕外, 操作根本没法完成。
+ */
+@media (max-width: 900px) {
+  .adm-header {
+    padding: 0 10px;
+    gap: 8px;
+  }
+  .adm-header-left {
+    gap: 6px;
+  }
+  .adm-header-left .adm-brand span,
+  .adm-env-tag {
+    display: none;
+  }
+  .adm-header-right {
+    gap: 4px;
+    min-width: 0;
+  }
+  .adm-search {
+    width: clamp(88px, 34vw, 180px);
+  }
+  .adm-user-name {
+    display: none;
+  }
+  /* 侧栏改由抽屉承载, 图标轨道在窄屏只会挤占内容宽度 */
+  .adm-layout .adm-sider {
+    display: none;
+  }
+  .adm-content {
+    padding: 16px 12px;
+  }
+  /* 统计卡在 900 以下继续降档: 3 列时每张约 110px, 标题会被压成两行,
+     数字与单位挤在一起。4 列变体 (.is-4, 素材管理页) 此前没有任何响应式规则,
+     一直硬撑 4 列, 在 390 屏上每张卡片只剩 88px —— 数字直接溢出卡片。 */
+  .adm-stat-grid,
+  .adm-stat-grid.is-4,
+  .adm-stat-grid.is-compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* 面板内边距同步收一档, 否则窄屏里表格可用宽度被 padding 吃掉 44px */
+  .adm-panel {
+    padding: 16px 14px;
+  }
+  .adm-filter {
+    padding: 10px 12px;
+  }
+  /* 筛选条右侧动作在窄屏独占一行, 不与输入框抢同一行剩余空间 */
+  .adm-filter-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 520px) {
+  /* 手机上主区统计卡一律单列: 双列时数字 "1,234" 与「较昨日」副标题会重叠。
+     抽屉内的紧凑卡 (.is-compact) 不进这条 —— 它本来就是 3 列小卡, 挤在大抽屉里
+     反而是「一眼看全」的用途, 保持 900 档的 2 列即可。 */
+  .adm-stat-grid,
+  .adm-stat-grid.is-4 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* 抽屉宽度不得超过视口: antd Drawer 的 width/size 是固定像素, 不会自动收缩 */
+@media (max-width: 760px) {
+  .ant-drawer-right > .ant-drawer-content-wrapper,
+  .ant-drawer-left > .ant-drawer-content-wrapper {
+    max-width: 100vw !important;
+  }
+}
+
+/* 素材卡片操作区: 键盘聚焦与触屏也要能看见 (2026-10-22)
+ *
+ * 之前只在 :hover 时出现, 触屏设备永远没有 hover —— 删除/查看/再做一张
+ * 在手机上根本摸不到; 键盘 Tab 到按钮时也看不见它。 */
+.asset-library-card:focus-within .asset-library-hover-actions {
+  opacity: 1;
+}
+@media (hover: none) {
+  .asset-library-hover-actions {
+    opacity: 1;
+  }
+}
+
+/* 工具页提交栏的消耗价提示 (通用 ToolPage) */
+.tool-credit-hint {
+  display: block;
+  margin-top: 8px;
+  text-align: center;
+  font-size: 12px;
 }

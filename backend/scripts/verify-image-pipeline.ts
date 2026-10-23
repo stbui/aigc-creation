@@ -12,7 +12,7 @@
  * 故本脚本实际跑一遍本地算法, 验证产出是真的图片字节。
  */
 
-import { MockImageProvider } from '../src/providers/mock-image.provider';
+import { LocalImageProvider } from '../src/providers/local-image.provider';
 import { Jimp } from 'jimp';
 
 let pass = 0;
@@ -38,25 +38,24 @@ function isJpeg(buf: Buffer): boolean {
   return buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
 }
 
-const provider = new MockImageProvider();
+const provider = new LocalImageProvider();
 
-// ── 1. 全部 15 项能力都能真的产出图片字节 ─────────────────────────
+// ── 1. 全部 11 项**有本地实现**的图像能力都能真的产出图片字节 ──────
+//
+// 2026-10-22: 创意生图 / 局部重绘 / 图片翻译 / 自由创作 已删除本地占位实现,
+// 它们没有本地路径可验 (无通道即 42204 退款, 由 smoke-gateway-channel.js 覆盖)。
 const CAPS: Array<{ id: string; inputs: number; params: Record<string, any> }> = [
   { id: 'main_image', inputs: 1, params: { productName: 'Test', ratio: '1:1', size: '1k' } },
   { id: 'detail_image', inputs: 1, params: { productName: 'Test', ratio: '1:1', size: '1k' } },
   { id: 'hot_remake', inputs: 2, params: { ratio: '1:1', size: '1k' } },
-  { id: 'creative_image', inputs: 1, params: { prompt: 'hello', ratio: '4:3' } },
   { id: 'multi_fusion', inputs: 2, params: { scene: 'texture', ratio: '1:1', size: '1k' } },
   { id: 'sku_image', inputs: 1, params: { skuName: 'S1', skuColor: '#FFFFFF', ratio: '1:1', size: '1k' } },
-  { id: 'local_redraw', inputs: 1, params: { region: 'center', prompt: 'x', ratio: 'original', size: '1k' } },
   { id: 'expand', inputs: 1, params: { occupy: 80, position: 'center', ratio: 'original', size: '1k' } },
   { id: 'matting', inputs: 1, params: { bgColor: 'transparent', ratio: 'original' } },
   { id: 'remove_watermark', inputs: 1, params: { mode: 'auto', region: 'bottom_right' } },
-  { id: 'image_translate', inputs: 1, params: { targetLang: 'zh-CN', protectSubject: true, size: '1k' } },
   { id: 'enhance', inputs: 1, params: { mode: 'comprehensive', ratio: 'original', size: '1k' } },
   { id: 'recolor', inputs: 1, params: { color: '#FFFFFF', ratio: 'original', size: '1k' } },
   { id: 'rotate', inputs: 1, params: { yaw: 10, pitch: 5, zoom: 1, ratio: 'original', size: '1k' } },
-  { id: 'free_create', inputs: 0, params: { prompt: 'scene', ratio: '1:1', size: '1k' } },
 ];
 
 async function main() {
@@ -104,7 +103,7 @@ ok('未知能力显式抛错', threw);
 {
   let plannedThrew = false;
   try {
-    // 当前无 planned 能力, 用 mock provider 的 mode 判定路径验证:
+    // 当前无 planned 能力, 用本地 provider 的 mode 判定路径验证:
     // 传一个真实但未在 registry 的 id 应当抛错
     await provider.generate('planned_test', [input], {});
   } catch {
@@ -119,7 +118,7 @@ if (fails.length) {
   for (const f of fails) console.error('  ✗ ' + f);
   process.exit(1);
 }
-console.log('图像产出链路冒烟测试通过：15 项能力的本地算法均产出合法图片');
+console.log('图像产出链路冒烟测试通过：11 项能力的本地算法均产出合法图片');
 }
 
 void main();

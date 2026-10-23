@@ -24,8 +24,8 @@ import { test, expect, type Page, type APIRequestContext } from '@playwright/tes
  * 前置: 前端 dev server 与后端已运行 (baseURL + /api 代理可用)。
  */
 
-const UI = process.env.ADMIN_UI ?? 'http://localhost:5173';
-const API = process.env.E2E_API ?? 'http://localhost:3001';
+const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
+const API = process.env.E2E_API ?? 'http://localhost:4100';
 
 const E2E_EMAIL = process.env.E2E_USER_EMAIL ?? '';
 const E2E_PASSWORD = process.env.E2E_USER_PASSWORD ?? '';
@@ -145,7 +145,16 @@ test.describe('状态契约 · 加载中必须有指示', () => {
 test.describe('状态契约 · 生成中不得显示空态', () => {
   test('工具页: 提交后结果栏显示生成中骨架, 不显示「提交任务后…」空态', async ({ page, request }) => {
     const { token, email } = await fetchToken(request);
-    await gotoAsAuthed(page, '/local-redraw', token, email);
+    /*
+     * 2026-10-21 改打 /background-remove (matting)。
+     *
+     * 原来用 /local-redraw —— 它本地没有实现, 按
+     * `localFallback: false` 处理: 没有模型通道时 runtime=unavailable, 工具页
+     * 直接渲染「暂不可用」, 根本到不了"生成中"。本用例测的是提交后的状态交接,
+     * 与环境里配没配通道无关, 故换一项有**真实本地兜底**的能力 (matting),
+     * 无通道时 runtime=local 仍可提交。
+     */
+    await gotoAsAuthed(page, '/background-remove', token, email);
 
     // 拦截 /generate 让它挂住, 使 "生成中" 状态可持续观察
     // ⚠ 正则不能写成 `(\?|$)` —— 实际 URL 是 /api/v1/generate (无 query),

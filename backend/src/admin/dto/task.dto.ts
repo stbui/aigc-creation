@@ -23,13 +23,16 @@ export class TaskListQueryDto extends PageQueryDto {
   capability?: string;
 
   /**
-   * 通道。落库值是 `gateway`(真实模型) / `local`(本地算法) / `mock`(未回落前),
-   * 前端按 gateway|local 二值筛选 —— `mock` 是任务的初始值, 任务跑完后
-   * processTask 会把它改写成实际通道, 因此它只在"刚建、还没跑完"时可见。
+   * 通道。落库值是 `gateway`(真实模型) / `local`(本地算法) / `pending`(尚未执行),
+   * `pending` 是任务的初始值, 任务跑完后 processTask 会把它改写成实际通道,
+   * 因此它只在「刚建、还没跑完」时可见。
+   *
+   * 历史值 `mock` 与 `pending` 同义 (2026-10-22 前的初始值), 查询时在 service
+   * 层归一成 `pending`, 否则旧数据按「待执行」筛不到。
    */
   @IsOptional()
-  @IsIn(['gateway', 'local', 'mock'], { message: 'provider 取值非法' })
-  provider?: 'gateway' | 'local' | 'mock';
+  @IsIn(['gateway', 'local', 'pending'], { message: 'provider 取值非法' })
+  provider?: 'gateway' | 'local' | 'pending';
 
   @IsOptional()
   @IsString()

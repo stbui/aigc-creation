@@ -2,7 +2,8 @@ import { useCallback, useState } from 'react';
 import { App, Modal } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { Maximize2, RefreshCw, Sparkles, X } from 'lucide-react';
-import { generateApi } from '../lib/api';
+import { generateApi, promptToolsApi } from '../lib/api';
+import { MAX_IMAGE_MB } from '../lib/constants';
 import { languageOptions, platformOptions } from '../lib/optionSets';
 
 import { ToolEmptyState, ToolGeneratingState, ToolWorkflowSteps } from '../components/ToolEmptyState';
@@ -10,9 +11,14 @@ import { ToolSubmitBar } from '../components/ToolSubmitBar';
 import { ToolImageDropzone } from '../components/ToolImageDropzone';
 import { ToolSettingsPopover } from '../components/ToolSettingsPopover';
 import { AssetLibraryModal } from '../components/AssetLibraryModal';
+import { MobileUploadModal } from '../components/MobileUploadModal';
+import { ProviderBadge } from '../components/ProviderBadge';
 import { useImageUpload } from '../hooks/useImageUpload';
 import { useProject } from '../hooks/useProject';
 import { usePollAbort } from '../hooks/usePollAbort';
+import { useCreditLabel } from '../hooks/useCreditLabel';
+import { useGenerateError } from '../hooks/useGenerateError';
+import { notifyCreditsChanged } from '../context/CreditsContext';
 import { pollToResult } from '../lib/poll';
 import type { TaskStatus } from '../types/api';
 
@@ -29,13 +35,12 @@ import type { TaskStatus } from '../types/api';
  *
  * 接线: 上传 → assets API; 包含模块 → detail_image 任务的 sections 参数
  * (逗号分隔模块键, 后端按键渲染长图区块, 选不同模块产出不同版面);
- * 画质 → size 参数 (1K/2K; 4K 超出本地算法上限, 如实禁用)。
+ * 画质 → size 参数 (1K/2K/4K; 4K 只有云端通道能兑现, 本地时置灰并说明)。
  */
 
 // ───────────────── 常量 (参考站实拍) ─────────────────
 
 const MAX_IMAGES = 5;
-const MAX_IMAGE_MB = 10;
 const MAX_NAME_LEN = 100;
 const MAX_DESC_LEN = 5000;
 const MAX_SECTIONS = 10;
@@ -69,14 +74,17 @@ interface PkResult {
   width?: number;
   height?: number;
   errorCode?: string | null;
+  /** 本次实际通道: gateway=真实模型 / local=本地算法 (来自 pollToResult) */
+  provider?: string | null;
 }
 
 export function ProductDetailPage() {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
+  const reportError = useGenerateError();
   const navigate = useNavigate();
   const { ensureProject } = useProject();
   // 上传 (三重校验 / 素材库回填 / 粘贴) 已收口到 useImageUpload, 2026-10-19
-  const { images, uploading, fileInputRef, uploadFiles, removeImage, library } = useImageUpload({
+  const { images, uploading, fileInputRef, uploadFiles, removeImage, library, mobile } = useImageUpload({
     max: MAX_IMAGES,
     maxMb: MAX_IMAGE_MB,
   });
@@ -99,27 +107,62 @@ export function ProductDetailPage() {
   const [sections, setSections] = useState<string[]>(DEFAULT_SECTIONS);
   const [resolution, setResolution] = useState('1k');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  /** AI 分析进行中 (按钮禁用 + 文案切换, 防止连点时重复请求文本通道) */
+  const [analyzing, setAnalyzing] = useState(false);
 
   // ── 弹窗状态 ──
   const [expandOpen, setExpandOpen] = useState(false);
 
   // ── 任务状态 ──
   const [submitting, setSubmitting] = useState(false);
+  // 实时价来自能力清单（后台可调价），按钮文案不能再写死「免费生图」
+  const creditLabel = useCreditLabel('detail_image');
   const [result, setResult] = useState<PkResult | null>(null);
   const pollSignal = usePollAbort();
 
   const formValid =
     images.length > 0 && productName.trim().length > 0 && description.trim().length > 0 && sections.length > 0;
 
-  // ── AI分析: 只填素材真实元数据, 不编造视觉识别结果 ──
-  const runAiAnalyze = () => {
+  // ── AI分析: 走文本通道的「图片转提示词」, 对首张商品图做真实识别 ──
+  //
+  // 失败语义: 文本通道没配时后端返回 502, 如实把原因抛给用户;
+  // 绝不退回「用文件名拼一段描述」—— 那会让用户以为模型看过图。
+  const runAiAnalyze = async () => {
     if (images.length === 0) {
       message.warning('请先上传商品图片');
       return;
     }
-    const lines = images.map((img, i) => `商品图${i + 1}：${img.name}`);
-    setDescription(lines.join('\n'));
-    message.success('已填入上传素材的真实文件名；本地演示未接入视觉模型，暂不能识别商品内容');
+    const first = images[0];
+    if (!first?.id) {
+      message.warning('首张图缺少素材 id，请重新上传后再分析');
+      return;
+    }
+    setAnalyzing(true);
+    try {
+      const { text } = await promptToolsApi.imageToPrompt(first.id);
+      const content = text?.trim();
+      if (!content) {
+        message.warning('模型没有返回内容，请重试');
+        return;
+      }
+      // 已填过描述时不静默覆盖, 先问一句
+      if (description.trim()) {
+        modal.confirm({
+          title: '替换商品描述？',
+          content: 'AI 分析会覆盖当前已填写的描述。',
+          okText: '替换',
+          cancelText: '取消',
+          onOk: () => setDescription(content),
+        });
+        return;
+      }
+      setDescription(content);
+      message.success('已按首张商品图生成描述，可继续编辑');
+    } catch (e) {
+      message.error((e as Error).message || '识图失败：文本通道未配置');
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   // ── 模块选择 (上限 10, 与参考站"已选 N/10"一致) ──
@@ -166,9 +209,11 @@ export function ProductDetailPage() {
       if (done.status === 'failed') message.error(`生成失败（${done.errorCode ?? '未知错误'}）`);
       else message.success('商品详情图已生成');
     } catch (e) {
-      message.error((e as Error).message || '生成失败');
+      reportError(e);
     } finally {
       setSubmitting(false);
+      // 扣费在建任务时发生、失败会自动退还，两个方向都改了余额
+      notifyCreditsChanged();
     }
   };
 
@@ -203,6 +248,7 @@ export function ProductDetailPage() {
                 onFiles={(f) => void uploadFiles(f)}
                 onRemove={removeImage}
                 onOpenLibrary={openLibrary}
+                onOpenMobile={mobile.openMobile}
                 noun="商品图片"
               />
 
@@ -260,9 +306,14 @@ export function ProductDetailPage() {
                     <i className="pk-required-mark">*</i>商品描述
                   </span>
                   <div className="pk-desc-actions">
-                    <button type="button" className="pk-ai-btn" onClick={runAiAnalyze}>
+                    <button
+                      type="button"
+                      className="pk-ai-btn"
+                      disabled={analyzing}
+                      onClick={() => void runAiAnalyze()}
+                    >
                       <Sparkles size={12} />
-                      <span>AI分析</span>
+                      <span>{analyzing ? '分析中…' : 'AI分析'}</span>
                     </button>
                   </div>
                 </div>
@@ -330,13 +381,15 @@ export function ProductDetailPage() {
           <ToolSubmitBar
             submitting={submitting}
             disabled={!formValid}
-            label="免费生图"
+            label="立即生成"
+            creditLabel={creditLabel ?? undefined}
             settings={
               <ToolSettingsPopover
                 open={settingsOpen}
                 onToggle={() => setSettingsOpen((v) => !v)}
                 resolution={resolution}
                 onResolutionChange={setResolution}
+                capabilityId="detail_image"
                 showRatio={false}
               />
             }
@@ -373,7 +426,10 @@ export function ProductDetailPage() {
                     <img src={result.url} alt="商品详情图" />
                   </div>
                   <div className="pk-result-meta">
-                    <span className="pk-result-variant">商品详情长图</span>
+                    <span className="pk-result-variant">
+                      商品详情长图
+                      <ProviderBadge provider={result.provider} />
+                    </span>
                     <span className="pk-result-params">
                       {platform} · {resolution.toUpperCase()}
                       {result.width && result.height ? ` · ${result.width}×${result.height}` : ''}
@@ -406,6 +462,9 @@ export function ProductDetailPage() {
         onPick={pick}
         maxSelectable={MAX_IMAGES}
       />
+
+      {/* 手机上传弹窗 (二维码方案) */}
+      <MobileUploadModal open={mobile.open} onReceived={mobile.addAssets} onCancel={mobile.closeMobile} />
 
       {/* 商品描述放大编辑 */}
       <Modal

@@ -16,9 +16,9 @@ export const SkuImage: CapabilityPlugin = {
   group: 'ecommerce_gen',
   summary: '按 SKU 批量出图。',
   sidebarHint: '批量生成同款不同规格图',
-  mode: 'mock',
+  mode: 'real',
   creditCost: 0, // 原页面标注「本次消耗0积分」
-  help: '本地为模板 + 区域填充的参数化批量渲染, 非 AI 套版',
+  help: '本地按 SKU 版式合成（商品区 + 色卡 + 规格表 + 变体条）；云端通道可套用你的模板图',
   params: [
     {
       key: 'region',

@@ -2,16 +2,15 @@
  * 素材库筛选能力验证 (2026-10-20)
  *
  * 跑法: cd backend && node scripts/verify-asset-filters.js
- * 前置: 后端已在 3001 端口运行
+ * 前置: 后端已在 4100 端口运行
  *
  * 覆盖 assets 列表的 keyword / from / to 三个新增筛选维度。
  *
  * ⚠️ 断言基线独立于实现: 期望值来自「接口契约 + HTTP 语义」,
  * 不是从实现反推 (项目记忆里的老坑: 基线同源推导就抓不出真实回归)。
  */
-const BASE = process.env.VERIFY_BASE || 'http://localhost:3001/api/v1';
-const EMAIL = 'admin@demo.com';
-const PASSWORD = 'demo1234';
+const { ensureTestUser } = require('./lib/test-user');
+const BASE = process.env.VERIFY_BASE || 'http://localhost:4100/api/v1';
 
 let pass = 0;
 let fail = 0;
@@ -43,16 +42,10 @@ async function fetchRetry(url, options, tries = 3) {
   throw lastErr;
 }
 
+/** 现场注册一个账号（不再依赖库里预置的演示账号），见 lib/test-user.js */
 async function login() {
-  const res = await fetchRetry(`${BASE}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
-  });
-  const json = await res.json();
-  const data = json.data ?? json;
-  if (!data.accessToken) throw new Error(`登录失败: ${JSON.stringify(json).slice(0, 200)}`);
-  return data.accessToken;
+  const { token } = await ensureTestUser(BASE, { prefix: 'asset-filters' });
+  return token;
 }
 
 /** 造一张纯色 PNG (用 Jimp 生成 —— 手写 base64 可能是残缺流, 网关会拒收) */
@@ -67,10 +60,21 @@ async function main() {
   const auth = { Authorization: `Bearer ${token}` };
   check('登录拿到 token', !!token);
 
+  // 新注册的账号没有项目 —— 没有就建一个（上传必须挂项目）
   const projects = await (await fetchRetry(`${BASE}/projects`, { headers: auth })).json();
-  const projectId = (projects.data ?? projects)[0]?.id;
+  let projectId = (projects.data ?? projects)[0]?.id;
+  if (!projectId) {
+    const created = await (
+      await fetchRetry(`${BASE}/projects`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...auth },
+        body: JSON.stringify({ name: '验证项目' }),
+      })
+    ).json();
+    projectId = (created.data ?? created).id;
+  }
   check('取到项目 id', !!projectId);
-  if (!projectId) throw new Error('无项目, 无法上传');
+  if (!projectId) throw new Error('建项目失败, 无法上传');
 
   console.log('\n═══ 2. 上传带可辨识名字的素材 ═══');
   const png = await makePng();

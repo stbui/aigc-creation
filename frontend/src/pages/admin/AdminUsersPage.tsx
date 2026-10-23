@@ -1,14 +1,17 @@
-import { useCallback, useMemo, useState } from 'react';
-import { App, Dropdown, Input, Select, Table } from 'antd';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { App, Button, Dropdown, Input, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import { useSearchParams } from 'react-router-dom';
 import { adminUsersApi } from '../../lib/api';
 import { toAbsoluteUrl } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import {
   AdminDrawer,
   AdminListError,
+  AdminStaleError,
   AdminListLoading,
   ConfirmAction,
+  adminPagination,
   useAdminList,
 } from '../../components/admin/AdminWidgets';
 import {
@@ -19,10 +22,13 @@ import {
   Panel,
   StatusTag,
 } from '../../components/admin/PageHeader';
+import { BatchResultModal } from '../../components/admin/BatchResultModal';
 import type {
+  AdminLoginLogResult,
   AdminUserDetail,
   AdminUserImpact,
   AdminUserListResult,
+  BatchSummary,
 } from '../../types/api';
 
 type Row = AdminUserListResult['items'][number];
@@ -65,8 +71,37 @@ export function AdminUsersPage() {
     fetcher,
   );
 
+  /*
+   * 顶栏全局搜索带 `?q=` 跳过来时自动套用筛选。
+   * 用 ref 记录"已应用过哪一个值"而不是直接比较 state —— 用户在页内改筛选后
+   * URL 不变, 若每次渲染都按 URL 覆盖, 页内筛选会被打回原样。
+   */
+  const [searchParams] = useSearchParams();
+  const urlQ = searchParams.get('q') ?? '';
+  const appliedQ = useRef('');
+  useEffect(() => {
+    if (!urlQ || urlQ === appliedQ.current) return;
+    appliedQ.current = urlQ;
+    setKeyword(urlQ);
+    setQuery({ keyword: urlQ });
+  }, [urlQ, setQuery]);
+
   // 详情抽屉
   const [detailId, setDetailId] = useState<string | null>(null);
+
+  /*
+   * 批量选择。
+   *
+   * 选择状态**不跨翻页/筛选保留**: 运营切到另一页继续选时, 上一页选中的账号
+   * 仍在选中集里 —— 但界面上看不见它们, 此时点「批量禁用」会禁用一批
+   * 肉眼不可见的账号。每次重新查询就清空, 是更安全的默认。
+   */
+  const [selected, setSelected] = useState<string[]>([]);
+  const [batchSummary, setBatchSummary] = useState<BatchSummary<{
+    id: string;
+    status: string;
+  }> | null>(null);
+  const [batchTitle, setBatchTitle] = useState('');
 
   // 高危操作
   const [statusTarget, setStatusTarget] = useState<Row | null>(null);
@@ -84,6 +119,43 @@ export function AdminUsersPage() {
   const refresh = () => {
     reload();
     void message.success('操作完成');
+  };
+
+  /** 翻页 / 改筛选都会清空选择, 避免对不可见的行下手 */
+  const queryAndClear = useCallback(
+    (next: Record<string, unknown>, resetPage = true) => {
+      setSelected([]);
+      setQuery(next, resetPage);
+    },
+    [setQuery],
+  );
+
+  const runBatch = async (action: 'disable' | 'enable') => {
+    if (selected.length === 0) return;
+    setBusy(true);
+    try {
+      const summary = await adminUsersApi.batch(selected, action);
+      setBatchTitle(action === 'disable' ? '批量禁用结果' : '批量启用结果');
+      setBatchSummary(summary);
+      setSelected([]);
+      reload();
+    } catch (e) {
+      void message.error((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const exportUsers = async () => {
+    try {
+      await adminUsersApi.exportCsv({
+        keyword: keyword || undefined,
+        role,
+        status,
+      });
+    } catch (e) {
+      void message.error((e as Error).message);
+    }
   };
 
   const changeStatus = async (target: Row, next: 'active' | 'disabled', reason: string) => {
@@ -157,9 +229,9 @@ export function AdminUsersPage() {
         key: 'email',
         sorter: true,
         render: (email: string, row) => (
-          <button type="button" className="adm-link" onClick={() => setDetailId(row.id)}>
+          <Button type="link" className="adm-link" onClick={() => setDetailId(row.id)}>
             {email}
-          </button>
+          </Button>
         ),
       },
       {
@@ -240,9 +312,9 @@ export function AdminUsersPage() {
 
           return (
             <div className="adm-row-actions">
-              <button type="button" className="adm-link" onClick={() => setDetailId(row.id)}>
+              <Button type="link" className="adm-link" onClick={() => setDetailId(row.id)}>
                 详情
-              </button>
+              </Button>
               {menuItems.length > 0 && (
                 <Dropdown
                   trigger={['click']}
@@ -252,9 +324,9 @@ export function AdminUsersPage() {
                   }}
                   disabled={busy}
                 >
-                  <button type="button" className="adm-link">
+                  <Button type="link" className="adm-link">
                     更多
-                  </button>
+                  </Button>
                 </Dropdown>
               )}
             </div>
@@ -268,7 +340,17 @@ export function AdminUsersPage() {
 
   return (
     <>
-      <PageHeader title="用户管理" description="管理注册用户的账号状态、角色与资源" />
+      <PageHeader
+        title="用户管理"
+        description="管理注册用户的账号状态、角色与资源"
+        actions={
+          can('data.export') ? (
+            <Button type="default" className="adm-btn" onClick={() => void exportUsers()}>
+              导出 CSV
+            </Button>
+          ) : undefined
+        }
+      />
 
       <FilterBar>
         <Input
@@ -276,7 +358,7 @@ export function AdminUsersPage() {
           placeholder="邮箱关键词"
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
-          onPressEnter={() => setQuery({ keyword: keyword || undefined })}
+          onPressEnter={() => queryAndClear({ keyword: keyword || undefined })}
           allowClear
         />
         <Select
@@ -296,58 +378,98 @@ export function AdminUsersPage() {
           allowClear
         />
         <FilterActions>
-          <button
-            type="button"
+          <Button
+            type="primary"
             className="adm-btn is-primary"
-            onClick={() => setQuery({ keyword: keyword || undefined, role, status })}
+            onClick={() => queryAndClear({ keyword: keyword || undefined, role, status })}
           >
             查询
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            type="default"
             className="adm-btn"
             onClick={() => {
               setKeyword('');
               setRole(undefined);
               setStatus(undefined);
-              setQuery({ keyword: undefined, role: undefined, status: undefined });
+              queryAndClear({ keyword: undefined, role: undefined, status: undefined });
             }}
           >
             重置
-          </button>
+          </Button>
         </FilterActions>
       </FilterBar>
+
+      {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
+      {error && data && <AdminStaleError error={error} onRetry={reload} />}
 
       <Panel>
         {loading && !data ? (
           <AdminListLoading tip="加载用户列表…" />
-        ) : error ? (
+        ) : error && !data ? (
           <AdminListError error={error} onRetry={reload} />
         ) : (
-          <Table<Row>
-            rowKey="id"
-            size="small"
-            columns={columns}
-            dataSource={data?.items ?? []}
-            loading={loading}
-            scroll={{ x: 1000 }}
-            onChange={(_p, _f, sorter) => {
-              const s = Array.isArray(sorter) ? sorter[0] : sorter;
-              const field = s?.columnKey;
-              if (typeof field === 'string') {
-                setQuery({ sort: `${field}:${s?.order === 'ascend' ? 'asc' : 'desc'}` }, false);
-              }
-            }}
-            pagination={{
-              current: data?.page ?? 1,
-              pageSize: data?.pageSize ?? 20,
-              total: data?.total ?? 0,
-              showSizeChanger: true,
-              pageSizeOptions: [20, 50, 100],
-              showTotal: (t) => `共 ${t} 条`,
-              onChange: setPage,
-            }}
-          />
+          <>
+            {selected.length > 0 && (
+              <div className="adm-bulk-bar">
+                <span className="adm-bulk-count">已选 {selected.length} 项</span>
+                {can('user.disable') && (
+                  <>
+                    <Button
+                      type="primary" danger
+                      className="adm-btn is-danger"
+                      disabled={busy}
+                      onClick={() => void runBatch('disable')}
+                    >
+                      批量禁用
+                    </Button>
+                    <Button
+                      type="default"
+                      className="adm-btn"
+                      disabled={busy}
+                      onClick={() => void runBatch('enable')}
+                    >
+                      批量启用
+                    </Button>
+                  </>
+                )}
+                <Button type="link" className="adm-link" onClick={() => setSelected([])}>
+                  清空选择
+                </Button>
+              </div>
+            )}
+            <Table<Row>
+              rowKey="id"
+              size="small"
+              columns={columns}
+              dataSource={data?.items ?? []}
+              loading={loading}
+              scroll={{ x: 1000 }}
+              rowSelection={{
+                selectedRowKeys: selected,
+                onChange: (keys) => setSelected(keys as string[]),
+                // 已注销账号不能再改状态, 但仍允许选中 (批量启用会逐条返回失败原因)
+                getCheckboxProps: (row) => ({ disabled: row.status === 'deleted' }),
+              }}
+              onChange={(_p, _f, sorter) => {
+                const s = Array.isArray(sorter) ? sorter[0] : sorter;
+                const field = s?.columnKey;
+                if (typeof field === 'string') {
+                  setQuery({ sort: `${field}:${s?.order === 'ascend' ? 'asc' : 'desc'}` }, false);
+                }
+              }}
+              pagination={adminPagination({
+                current: data?.page ?? 1,
+                pageSize: data?.pageSize ?? 20,
+                total: data?.total ?? 0,
+                // 翻页时清空选择 (见 selected 处的说明)
+                onChange: (page, size) => {
+                  setSelected([]);
+                  setPage(page, size);
+                },
+              })}
+            />
+          </>
         )}
       </Panel>
 
@@ -375,12 +497,28 @@ export function AdminUsersPage() {
                 <dd>
                   <StatusTag status={d.status} />
                 </dd>
+                <dt>手机号</dt>
+                <dd>
+                  {d.phone ? (
+                    <>
+                      {d.phone}
+                      <span className="adm-field-hint" style={{ marginLeft: 8 }}>
+                        {d.phoneVerifiedAt ? '已验证' : '未验证'}
+                      </span>
+                    </>
+                  ) : (
+                    '未绑定'
+                  )}
+                </dd>
                 <dt>注册时间</dt>
                 <dd>{new Date(d.createdAt).toLocaleString('zh-CN')}</dd>
                 <dt>最近登录</dt>
                 <dd>{d.lastLoginAt ? new Date(d.lastLoginAt).toLocaleString('zh-CN') : '从未登录'}</dd>
               </dl>
             </div>
+
+            {/* 登录审计：权限点 audit.read，无权限时静默显示说明而非报错 */}
+            <RecentLoginsSection userId={d.id} />
 
             <div className="adm-section">
               <div className="adm-section-title">资源统计</div>
@@ -479,17 +617,20 @@ export function AdminUsersPage() {
           requireTyping
           typingText="删除"
           loading={busy}
-          description={<p>即将永久删除账号及其数据，用户邮箱将被匿名化。</p>}
+          description={<p>即将永久删除该账号及其全部数据，不可恢复。</p>}
           impact={[
             deleteImpact
               ? `${deleteImpact.projects} 个项目`
               : '正在统计项目数量…',
             deleteImpact ? `${deleteImpact.tasks} 条任务记录` : '正在统计任务数量…',
-            deleteImpact ? `${deleteImpact.assets} 张素材（含磁盘文件）` : '正在统计素材数量…',
+            deleteImpact ? `${deleteImpact.assets} 张素材（含磁盘与对象存储文件）` : '正在统计素材数量…',
           ]}
           extra={
             <div className="adm-confirm-warn">
-              订单与支付记录将保留（《电子商务法》要求保存 3 年），但用户信息将被匿名化。
+              {/* 有资金记录的账号后端会直接拒绝 —— 提前说清, 免得运营输完确认词才发现删不掉 */}
+              仅对<strong>没有订单 / 支付 / 退款 / 发票 / 积分流水</strong>的账号可用。
+              有资金记录的账号请改用「注销」：保留资金记录并匿名化账号，符合《电子商务法》留存要求。
+              工单、登录会话、站内消息、邀请与签到记录会一并删除。
             </div>
           }
           onCancel={() => setDeleteTarget(null)}
@@ -509,8 +650,8 @@ export function AdminUsersPage() {
               <p>请立即复制并安全转交给用户，此密码关闭后无法再次查看。</p>
               <div className="adm-secret-box">
                 <code>{tempPassword}</code>
-                <button
-                  type="button"
+                <Button
+                  type="default"
                   className="adm-btn"
                   onClick={() => {
                     void navigator.clipboard?.writeText(tempPassword);
@@ -518,7 +659,7 @@ export function AdminUsersPage() {
                   }}
                 >
                   复制
-                </button>
+                </Button>
               </div>
             </>
           }
@@ -526,6 +667,13 @@ export function AdminUsersPage() {
           onConfirm={() => setTempPassword(null)}
         />
       )}
+
+      <BatchResultModal
+        open={batchSummary !== null}
+        title={batchTitle}
+        summary={batchSummary}
+        onClose={() => setBatchSummary(null)}
+      />
     </>
   );
 }
@@ -567,7 +715,7 @@ function StatusDialog({
       extra={
         <div className="adm-field">
           <label htmlFor="adm-status-reason">操作原因（建议填写）</label>
-          <input
+          <Input
             id="adm-status-reason"
             type="text"
             placeholder="如：违规使用"
@@ -621,19 +769,20 @@ function RoleDialog({
         <>
           <div className="adm-field">
             <label htmlFor="adm-role-select">目标角色</label>
-            <select
+            <Select
               id="adm-role-select"
               value={next}
-              onChange={(e) => setNext(e.target.value)}
-            >
-              <option value="operator">运营</option>
-              <option value="finance">财务</option>
-              <option value="admin">管理员</option>
-            </select>
+              onChange={(value) => setNext(value)}
+              options={[
+                { value: 'operator', label: '运营' },
+                { value: 'finance', label: '财务' },
+                { value: 'admin', label: '管理员' },
+              ]}
+            />
           </div>
           <div className="adm-field">
             <label htmlFor="adm-role-reason">操作原因</label>
-            <input
+            <Input
               id="adm-role-reason"
               type="text"
               placeholder="如：岗位调整"
@@ -646,5 +795,85 @@ function RoleDialog({
       onCancel={onCancel}
       onConfirm={() => onConfirm(next, reason)}
     />
+  );
+}
+
+/** 失败原因 -> 中文。未知值原样展示，免得新原因被吞成「其他」 */
+const LOGIN_REASON_LABEL: Record<string, string> = {
+  password: '密码登录',
+  sms: '短信登录',
+  bad_credentials: '邮箱或密码错误',
+  sms_code: '短信验证码错误',
+  disabled: '账号已禁用',
+  deleted: '账号已注销',
+};
+
+/**
+ * 详情抽屉里的「最近登录」区块。
+ *
+ * 单独取数（GET /admin/users/:id/logins，权限 audit.read）而不是并进 detail：
+ * 只有运营/管理员持有 audit.read，塞进详情会让其他角色顺带看到全站登录 IP。
+ * 403 时按「不可见」渲染说明 —— 这是权限边界，不是错误。
+ */
+function RecentLoginsSection({ userId }: { userId: string }) {
+  const [data, setData] = useState<AdminLoginLogResult | null>(null);
+  const [state, setState] = useState<'loading' | 'ready' | 'forbidden' | 'error'>('loading');
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    let alive = true;
+    setState('loading');
+    adminUsersApi
+      .logins(userId, 20)
+      .then((res) => {
+        if (!alive) return;
+        setData(res);
+        setState('ready');
+      })
+      .catch((e: unknown) => {
+        if (!alive) return;
+        // 403 = 没有 audit.read；其余错误如实标为加载失败，不伪装成空列表
+        const status = (e as { status?: number }).status;
+        setState(status === 403 ? 'forbidden' : 'error');
+      });
+    return () => {
+      alive = false;
+    };
+  }, [userId, reloadKey]);
+
+  return (
+    <div className="adm-section">
+      <div className="adm-section-title">
+        最近登录
+        {state === 'ready' && data ? (
+          <span className="adm-field-hint" style={{ marginLeft: 8 }}>
+            共 {data.total} 次 · 近 30 天失败 {data.failedLast30Days} 次
+          </span>
+        ) : null}
+      </div>
+      {state === 'loading' ? <AdminListLoading /> : null}
+      {state === 'forbidden' ? (
+        <div className="adm-field-hint">当前角色没有审计权限（audit.read），无法查看登录记录。</div>
+      ) : null}
+      {state === 'error' ? (
+        <AdminListError error="登录记录加载失败" onRetry={() => setReloadKey((n) => n + 1)} />
+      ) : null}
+      {state === 'ready' && data ? (
+        data.items.length === 0 ? (
+          <AdminEmpty description="暂无登录记录" />
+        ) : (
+          <ul className="adm-mini-list">
+            {data.items.map((item) => (
+              <li key={item.id} className="adm-mini-item">
+                <StatusTag status={item.success ? 'success' : 'failed'} label={item.success ? '成功' : '失败'} />
+                <span className="adm-mini-name">{LOGIN_REASON_LABEL[item.reason] ?? item.reason}</span>
+                <span className="adm-mini-time">{item.ip || '未知 IP'}</span>
+                <span className="adm-mini-time">{new Date(item.createdAt).toLocaleString('zh-CN')}</span>
+              </li>
+            ))}
+          </ul>
+        )
+      ) : null}
+    </div>
   );
 }

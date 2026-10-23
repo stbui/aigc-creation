@@ -53,7 +53,7 @@ export class AdminModelConfigController {
   @RequirePermission(PERMISSIONS.channelTest)
   @AuditAction('model.config_test')
   test(@Body() dto: TestChannelDto) {
-    return this.config.testConnection(dto?.modality ?? 'image');
+    return this.config.testConnection(dto?.modality ?? 'image', dto?.overrides);
   }
 
   /**

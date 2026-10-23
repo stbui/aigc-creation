@@ -11,7 +11,7 @@
  * 前置: 后端已启动 (npm start), 且已 npm run seed:marketing。
  * 运行: npm run smoke:marketing
  */
-const BASE = process.env.MARKETING_API_BASE || 'http://localhost:3001/api/v1';
+const BASE = process.env.MARKETING_API_BASE || 'http://localhost:4100/api/v1';
 const { PrismaClient } = require('@prisma/client');
 const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
 const { resolveDbUrl } = require('./db-url');
@@ -156,7 +156,7 @@ async function seedPriorDays(userId, n) {
   /*
    * 后台身份: 现场建临时管理员。
    * 不复用 seed:admin 建的角色 —— 它的随机密码不可从库里反推, 拿不到 token;
-   * 也不复用 admin@demo.com —— 那是 C 端 user 角色, 没有后台权限。
+   * 也不用任何 C 端注册账号 —— 它们的 role 是 user, 没有后台权限。
    */
   const adminUser = await makeUser('admin');
   const adminToken = adminUser.token;
@@ -608,15 +608,27 @@ async function seedPriorDays(userId, n) {
     ).map((u) => u.id);
     if (emails.length) {
       // 删除顺序必须**子表先于父表**, 否则触发 FOREIGN KEY constraint failed。
-      // Order 的子表是 OrderItem / Payment / Refund; Payment 的子表是 Refund。
+      // 直接引用 Order 的表全部要先清: OrderItem / Payment / Refund /
+      // Invoice(一单一票) / Membership(订阅单) / MembershipUsage(会员折扣记录)。
+      // 少清其中任意一张, 卡住的是 order.deleteMany —— 后续清理全被跳过,
+      // 账号留在库里把后面用例与后台列表一起带脏。
       await db(() =>  prisma.refund.deleteMany({ where: { userId: { in: emails } } }));
       await db(() =>  prisma.payment.deleteMany({ where: { userId: { in: emails } } }));
+      await db(() =>  prisma.invoice.deleteMany({ where: { order: { userId: { in: emails } } } }));
+      await db(() =>  prisma.membershipUsage.deleteMany({ where: { userId: { in: emails } } }));
+      await db(() =>  prisma.membership.deleteMany({ where: { userId: { in: emails } } }));
       await db(() =>  prisma.orderItem.deleteMany({ where: { order: { userId: { in: emails } } } }));
       await db(() =>  prisma.order.deleteMany({ where: { userId: { in: emails } } }));
       await db(() =>  prisma.creditLedger.deleteMany({ where: { userId: { in: emails } } }));
       await db(() =>  prisma.creditLot.deleteMany({ where: { userId: { in: emails } } }));
       await db(() =>  prisma.checkinRecord.deleteMany({ where: { userId: { in: emails } } }));
       await db(() =>  prisma.inviteRelation.deleteMany({ where: { OR: [{ inviterId: { in: emails } }, { inviteeId: { in: emails } }] } }));
+      // B4 引入的表同样挂 userId 外键：不先清掉, 删用户必然 FOREIGN KEY failed,
+      // 而失败被 catch 吞掉 → 残留账号把后续用例(与后台素材列表)一起带脏
+      await db(() =>  prisma.notification.deleteMany({ where: { userId: { in: emails } } }));
+      await db(() =>  prisma.accountToken.deleteMany({ where: { userId: { in: emails } } }));
+      await db(() =>  prisma.loginLog.deleteMany({ where: { userId: { in: emails } } }));
+      await db(() =>  prisma.consentRecord.deleteMany({ where: { userId: { in: emails } } }));
       await db(() =>  prisma.user.deleteMany({ where: { id: { in: emails } } }));
     }
     // 清理测试券与活动

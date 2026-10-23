@@ -1,5 +1,9 @@
 /**
- * 去除水印 —— 参考站 watermark-remove。清除水印与遮挡文字 (本地为模糊占位)。
+ * 去除水印 —— 参考站 watermark-remove。
+ *
+ * 本地实现已从「模糊占位」升级为**镜像修补 + 羽化融合**的真实算法 (2026-10-21),
+ * 故 mode 置 real。能力边界写在 localImpl 的注释里: 压在商品主体上的水印
+ * 本地去不掉, 那种情况需要走云端生成式重绘。
  *
  * 2026-10-20 从 capability.registry.ts 抽离为独立文件。
  * 抽离的意义: 能力定义此前散在 registry / gateway-prompt / mock provider /
@@ -16,9 +20,9 @@ export const RemoveWatermark: CapabilityPlugin = {
   summary: '清理图片中的水印与干扰标记。',
   sidebarHint: '智能去除图片中的水印与遮挡文字',
   badge: '免费',
-  mode: 'mock',
+  mode: 'real',
   creditCost: 0, // 原页面标注「限时免费」，0 保留该语义
-  help: '请仅处理你拥有版权或已获授权的图片',
+  help: '请仅处理你拥有版权或已获授权的图片；压在商品主体上的水印建议走云端通道',
   params: [
     {
       key: 'mode',
@@ -41,7 +45,7 @@ export const RemoveWatermark: CapabilityPlugin = {
   buildPrompt: (p) =>
     `去除图片水印：${p.mode === 'auto' ? '自动识别并清除水印区域' : `清除${p.region || '指定区域'}的水印/遮挡文字`}，` +
     `修补处与周围质感一致，不留痕迹`,
-  localImpl: 'makePlaceholder',
+  localImpl: 'makeRemoveWatermark',
   modality: 'image',
   inputs: 1,
   inWorkbench: true,

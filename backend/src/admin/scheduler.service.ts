@@ -5,6 +5,7 @@ import { MarketingService } from '../marketing/marketing.service';
 import { OrderService } from '../orders/order.service';
 import { CreditService } from '../credits/credit.service';
 import { MembershipService } from '../membership/membership.service';
+import { GenerateService } from '../generate/generate.service';
 
 /** 调度检查间隔: 10 分钟 */
 const TICK_MS = 10 * 60 * 1000;
@@ -35,6 +36,7 @@ const TASK_LABELS: Record<string, string> = {
   backup: '数据备份',
   cleanup: '数据保留期清理',
   'campaign-expire': '活动到期收尾',
+  'task-recover': '中断任务与会员补发',
 };
 
 interface TaskState {
@@ -74,6 +76,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly orders: OrderService,
     private readonly credit: CreditService,
     private readonly membership: MembershipService,
+    private readonly generate: GenerateService,
   ) {}
 
   onModuleInit(): void {
@@ -119,6 +122,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
       await this.runTask('cleanup', () => this.maybeCleanup());
       await this.runTask('campaign-expire', () => this.maybeExpireCampaigns());
       await this.runTask('membership', () => this.maybeRunMembership());
+      await this.runTask('task-recover', () => this.maybeRecoverInterrupted());
     } finally {
       this.running = false;
     }
@@ -205,6 +209,9 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
             await this.membership.runSchedulerTasks();
           });
           break;
+        case 'task-recover':
+          await this.runTask(name, () => this.maybeRecoverInterrupted(true));
+          break;
         default:
           throw new Error(`不支持的任务: ${name}`);
       }
@@ -265,6 +272,25 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   private async maybeRunMembership(): Promise<void> {
     if (!this.shouldRun('membership', 30 * 60 * 1000)) return;
     await this.membership.runSchedulerTasks();
+  }
+
+  // ── 中断补偿: 孤儿任务 + 会员未发放 ───────────────────────────────
+
+  /**
+   * 回收心跳已停的孤儿生成任务, 并补发「已支付但会员未激活」的订单。
+   *
+   * 两者同属**中断补偿**: 都是"一次本该完成的动作因为进程/网络中断掉了"。
+   * 放在同一个任务里, 是因为它们都需要在故障恢复后尽快跑一轮, 且都必须幂等。
+   *
+   * 节流 5 分钟: 孤儿判定本身有 10 分钟心跳阈值, 5 分钟粒度足够及时;
+   * 会员补发同样几秒内就会重试。
+   *
+   * @param force 手动触发时跳过节流 —— 运维点「立即执行」就是想马上看到结果
+   */
+  private async maybeRecoverInterrupted(force = false): Promise<void> {
+    if (!force && !this.shouldRun('task-recover', 5 * 60 * 1000)) return;
+    await this.generate.recoverOrphanTasks();
+    await this.orders.retryPendingMembershipActivation();
   }
 
   /** 节流判定: 距上次执行是否已超过最小间隔 */

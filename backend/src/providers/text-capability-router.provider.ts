@@ -3,6 +3,7 @@ import { OpenAiChatTextProvider } from './openai-chat-text.provider';
 import { gatewayConfigOf, setGatewayConfigOverrides, invalidateGatewayConfigCache } from './gateway.config';
 import { PrismaService } from '../prisma/prisma.service';
 import { ImageCallLogger } from './image-call-logger';
+import { ChannelScheduler } from './channel-scheduler';
 import type { TextMessage, TextProvider, TextProviderResult } from './text-provider.interface';
 import type { Modality } from './modality';
 
@@ -30,6 +31,7 @@ export class TextCapabilityRouter implements TextProvider {
   constructor(
     private readonly prisma: PrismaService,
     private readonly callLogger: ImageCallLogger,
+    private readonly scheduler: ChannelScheduler,
   ) {
     // 启动时先拉一次, 让首个请求不必等这次查询
     void this.refreshConfig();
@@ -41,29 +43,41 @@ export class TextCapabilityRouter implements TextProvider {
     params: Record<string, any>,
   ): Promise<TextProviderResult> {
     await this.refreshConfig();
-    const cfg = gatewayConfigOf('text');
     const startedAt = Date.now();
     const prompt = messages.map((m) => m.content).join('\n').slice(0, 500);
 
-    if (!cfg.enabled) {
-      // ⚠️ 明确失败而非编造模板文案: 文本没有本地兜底 (与图像侧不同)
-      await this.callLogger.logFailure({
-        capability,
-        params,
-        prompt,
-        route: 'auto',
-        source: 'gateway',
-        modality: 'text',
-        durationMs: Date.now() - startedAt,
-        reason: '文生文通道未配置（基址与令牌均为空）',
-      });
-      throw new Error('文生文通道未配置（基址与令牌均为空）');
-    }
-
+    /*
+     * 不用全局 `cfg.enabled` 拦截：表里有线路时，旧的 gateway.text.* 为空
+     * 也要走线路。没有可用线路由调度器返回 unavailableReason，下面统一失败。
+     */
     try {
-      const provider = this.pickProtocol(cfg.provider);
-      const r = await provider.generate(capability, messages, params);
-      this.log.log(`${capability}: 文生文通道成功 (${cfg.provider} ${r.model ?? ''})`);
+      /*
+       * 多渠道调度 (2026-10-20): 文本**没有本地兜底**, 故多渠道对它尤其重要 ——
+       * 单通道时唯一那家挂了就是彻底失败。现在可按 priority 依次尝试多家。
+       */
+      const dispatch = await this.scheduler.dispatch('text', async (channel) => {
+        const provider = this.pickProtocol(channel.protocol);
+        // 注入通道凭据 —— 少了这步, 切到第二条通道仍用第一家的地址, 照样失败
+        if ('withChannel' in provider && typeof provider.withChannel === 'function') {
+          provider.withChannel({
+            baseUrl: channel.baseUrl,
+            token: channel.token,
+            model: channel.model,
+          });
+        }
+        return provider.generate(capability, messages, params);
+      });
+
+      if (!dispatch.ok || !dispatch.value) {
+        const summary = dispatch.attempts
+          .map((a) => `${a.channelName}(${a.protocol}): ${a.reason ?? (a.ok ? '成功' : '失败')}`)
+          .join('; ');
+        throw new Error([dispatch.unavailableReason, summary].filter(Boolean).join(' — '));
+      }
+
+      const r = dispatch.value;
+      const used = dispatch.channel!;
+      this.log.log(`${capability}: 文生文通道成功 (${used.name}/${used.protocol} ${r.model ?? ''})`);
       // ⚠️ 埋点: 2026-10-20 之前文本通道**不写** ModelCallLog ——
       // 那意味着「文本调用在记录页完全不可见」, 排障时无法区分
       // 「没调用过」与「调用了但没记录」。现在补上, modality 标 'text'。
@@ -74,7 +88,8 @@ export class TextCapabilityRouter implements TextProvider {
         route: 'remote',
         source: 'gateway',
         modality: 'text',
-        model: r.model ?? cfg.model,
+        // 模型名取实际走通的那条通道 (多渠道下各家模型名不同)
+        model: r.model ?? used.protocol,
         gatewayTaskId: r.taskId,
         durationMs: Date.now() - startedAt,
         // 文本产出无字节, 用文本长度近似 outputBytes (该列语义是产出大小)

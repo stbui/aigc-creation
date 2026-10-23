@@ -663,6 +663,98 @@ export class MarketingService {
     return null;
   }
 
+  /**
+   * 进行中的促销活动（C 端落地页「限时活动」页签）。
+   *
+   * 只回两种真正影响价格的类型：
+   *   - `limited_price` —— 带上目标商品与**实际生效的活动价**（取与原价的较小值，
+   *     与 `findLimitedPriceCampaign` 同一口径，不在展示层另算一套）
+   *   - `limited_free`  —— 带上免费覆盖的能力 id
+   *
+   * 商品已下架、或活动价并不低于原价的，一律不展示：对外宣传一个点进去
+   * 并不存在的优惠，比不展示更糟。`popup` 走 `activePopupCampaign`（带人群定向），
+   * 不进这个列表 —— 弹窗位不是「套餐区的一个页签」。
+   */
+  async activeCampaigns(): Promise<
+    Array<{
+      id: string;
+      name: string;
+      type: 'limited_price' | 'limited_free';
+      startAt: string;
+      endAt: string;
+      product?: { id: string; sku: string; name: string; priceCents: number };
+      priceCents?: number;
+      capabilityIds?: string[];
+    }>
+  > {
+    const now = new Date();
+    const rows = await this.prisma.campaign.findMany({
+      where: {
+        type: { in: ['limited_price', 'limited_free'] },
+        status: 'active',
+        startAt: { lte: now },
+        endAt: { gte: now },
+      },
+      orderBy: { startAt: 'asc' },
+    });
+    if (rows.length === 0) return [];
+
+    const productIds = rows
+      .map((c) => this.parseJson<{ productId?: string }>(c.payload, {}).productId)
+      .filter((id): id is string => Boolean(id));
+    const products =
+      productIds.length > 0
+        ? await this.prisma.product.findMany({
+            where: { id: { in: productIds }, status: 'active' },
+            select: { id: true, sku: true, name: true, priceCents: true },
+          })
+        : [];
+    const productById = new Map(products.map((p) => [p.id, p]));
+
+    const out: Array<{
+      id: string;
+      name: string;
+      type: 'limited_price' | 'limited_free';
+      startAt: string;
+      endAt: string;
+      product?: { id: string; sku: string; name: string; priceCents: number };
+      priceCents?: number;
+      capabilityIds?: string[];
+    }> = [];
+
+    for (const c of rows) {
+      if (c.type === 'limited_price') {
+        const payload = this.parseJson<{ productId?: string; priceCents?: number }>(c.payload, {});
+        const product = payload.productId ? productById.get(payload.productId) : undefined;
+        if (!product || !Number.isInteger(payload.priceCents)) continue;
+        const priceCents = Math.min(payload.priceCents as number, product.priceCents);
+        if (priceCents >= product.priceCents) continue;
+        out.push({
+          id: c.id,
+          name: c.name,
+          type: 'limited_price',
+          startAt: c.startAt.toISOString(),
+          endAt: c.endAt.toISOString(),
+          product,
+          priceCents,
+        });
+      } else {
+        const payload = this.parseJson<{ capabilityIds?: string[] }>(c.payload, {});
+        const capabilityIds = Array.isArray(payload.capabilityIds) ? payload.capabilityIds : [];
+        if (capabilityIds.length === 0) continue;
+        out.push({
+          id: c.id,
+          name: c.name,
+          type: 'limited_free',
+          startAt: c.startAt.toISOString(),
+          endAt: c.endAt.toISOString(),
+          capabilityIds,
+        });
+      }
+    }
+    return out;
+  }
+
   /** 限时免费当前覆盖的能力 id 集合 (供生成链路判定免积分) */
   async freeCapabilityIds(): Promise<Set<string>> {
     const now = new Date();

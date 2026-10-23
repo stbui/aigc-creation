@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App } from 'antd';
+import { useEffect, useMemo, useState } from 'react';
+import { App, Button, Checkbox } from 'antd';
 import { adminApi, adminRolesApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import {
   AdminListError,
   AdminListLoading,
+  AdminStaleError,
   ConfirmAction,
+  useAdminResource,
 } from '../../components/admin/AdminWidgets';
 import { AdminEmpty, PageHeader, Panel } from '../../components/admin/PageHeader';
-import type { AdminRoleItem } from '../../types/api';
 
 /** 权限点 → 中文说明。未登记的权限点原样显示 id, 不静默消失 */
 const PERMISSION_LABELS: Record<string, string> = {
@@ -35,6 +36,7 @@ const PERMISSION_LABELS: Record<string, string> = {
   'order.refund': '订单退款',
   'payment.read': '查看支付流水',
   'finance.dashboard': '查看财务概览',
+  'finance.reconcile': '渠道对账',
   'invoice.write': '开具发票',
   'credit.read': '查看积分',
   'credit.adjust': '人工增减积分',
@@ -46,8 +48,14 @@ const PERMISSION_LABELS: Record<string, string> = {
   'capability.write': '调整能力配置',
   'channel.route': '配置通道路由',
   'channel.test': '通道连通性测试',
+  'model.config_read': '查看模型配置',
+  'model.config_write': '修改模型配置',
+  'model.call_read': '查看调用记录',
   'marketing.write': '管理营销活动',
   'message.write': '发送站内信与公告',
+  'legal.read': '查看法务文档',
+  'legal.write': '编辑/发布法务文档',
+  'ticket.read': '查看工单',
   'ticket.handle': '处理工单',
   'setting.read': '查看系统设置',
   'setting.write': '修改系统设置',
@@ -77,6 +85,8 @@ const MODULE_LABELS: Record<string, string> = {
   content: '内容',
   capability: '能力',
   channel: '通道',
+  model: '模型',
+  legal: '法务',
   marketing: '营销',
   message: '消息',
   ticket: '工单',
@@ -110,13 +120,9 @@ interface PermModule {
 
 export function AdminRolesPage() {
   const { message } = App.useApp();
-  const { can, me } = useAdmin();
+  const { can, me, refresh } = useAdmin();
   const editable = can('role.write');
 
-  const [roles, setRoles] = useState<AdminRoleItem[]>([]);
-  const [allPermissions, setAllPermissions] = useState<string[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   // 草稿为 roleCode -> Set<permission>; 直接改库会导致每次勾选都发一次请求
@@ -128,38 +134,43 @@ export function AdminRolesPage() {
     after: Set<string>;
   } | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [roleRes, permRes] = await Promise.all([adminRolesApi.list(), adminApi.permissions()]);
-      setRoles(roleRes.items);
-      setAllPermissions(permRes.permissions);
-      const next: Record<string, Set<string>> = {};
-      for (const r of roleRes.items) next[r.code] = new Set(r.permissions);
-      setDraft(next);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '加载失败');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  /*
+   * 角色清单与权限点清单必然一起用 (勾选框由后者铺开), 分两次拉会出现
+   * 「角色有了但权限点还没到」的空树。一个 fetcher 拉齐。
+   */
+  const { data, loading, error, reload } = useAdminResource(async () => {
+    const [roleRes, permRes] = await Promise.all([adminRolesApi.list(), adminApi.permissions()]);
+    return { roles: roleRes.items, allPermissions: permRes.permissions };
+  });
+  const roles = data?.roles ?? [];
+  const allPermissions = data?.allPermissions ?? [];
 
+  /*
+   * 草稿按服务端的权限重置: 拉到新数据即重建「已保存态」。
+   * 依赖写 `data` 而不是 `roles`(每次渲染都是新数组), 否则每渲染都 setDraft 一次。
+   */
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (!data) return;
+    const next: Record<string, Set<string>> = {};
+    for (const r of data.roles) next[r.code] = new Set(r.permissions);
+    setDraft(next);
+  }, [data]);
 
-  /** 权限点按模块分组, 树状比平铺 47 行可读 */
+  /*
+   * 权限点按模块分组, 树状比平铺 54 行可读。
+   * 依赖写 `data?.allPermissions` 而不是上面的 `allPermissions` —— 后者是
+   * `?? []` 兜出来的新数组, 每渲染都变, 会让这个 useMemo 白算一遍。
+   */
   const modules: PermModule[] = useMemo(() => {
     const map = new Map<string, PermModule>();
-    for (const code of allPermissions) {
+    for (const code of data?.allPermissions ?? []) {
       const m = code.split('.')[0];
       const entry = map.get(m) ?? { module: m, label: MODULE_LABELS[m] ?? m, codes: [] };
       entry.codes.push(code);
       map.set(m, entry);
     }
     return Array.from(map.values());
-  }, [allPermissions]);
+  }, [data?.allPermissions]);
 
   const toggle = (roleCode: string, permission: string) => {
     if (!editable) return;
@@ -188,9 +199,14 @@ export function AdminRolesPage() {
     setBusy(true);
     try {
       await adminRolesApi.updatePermissions(code, Array.from(after), '后台角色权限调整');
-      await load();
-      // 若改的是自己的角色, 刷新本地权限清单
-      if (me?.role === code) await load();
+      await reload();
+      /*
+       * 2026-10-23 修: 原写法是 `if (me?.role === code) await load();` 再调一次
+       * load —— 注释写的是「刷新本地权限清单」, 但 load 只重拉本页的角色列表,
+       * **根本没有更新 AdminContext 里那份生效权限**, 于是自己的角色被降权后,
+       * 侧栏与按钮权限要等整页刷新才变。这里改调 context 的 refresh()。
+       */
+      if (me?.role === code) refresh();
       void message.success('权限已保存，立即生效');
     } catch (e) {
       void message.error((e as Error).message);
@@ -199,8 +215,8 @@ export function AdminRolesPage() {
     }
   };
 
-  if (loading) return <AdminListLoading tip="加载角色权限…" />;
-  if (error) return <AdminListError error={error} onRetry={() => void load()} />;
+  if (loading && !data) return <AdminListLoading tip="加载角色权限…" />;
+  if (error && !data) return <AdminListError error={error} onRetry={() => void reload()} />;
   if (roles.length === 0) return <AdminEmpty description="未配置任何后台角色" />;
 
   return (
@@ -221,9 +237,9 @@ export function AdminRolesPage() {
                   current.size !== original.size ||
                   Array.from(current).some((p) => !original.has(p));
                 return (
-                  <button
+                  <Button
                     key={r.code}
-                    type="button"
+                    type="primary"
                     className="adm-btn is-primary"
                     disabled={!changed || busy}
                     onClick={() =>
@@ -237,12 +253,15 @@ export function AdminRolesPage() {
                   >
                     保存{r.label}权限
                     {changed ? ' *' : ''}
-                  </button>
+                  </Button>
                 );
               })
             : undefined
         }
       />
+
+      {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
+      {error && <AdminStaleError error={error} onRetry={reload} />}
 
       <Panel isNarrow note={`共 ${allPermissions.length} 个权限点，内置角色不可删除，仅可调整权限`}>
         <div className="adm-legend">
@@ -264,16 +283,16 @@ export function AdminRolesPage() {
                   const all = mod.codes.every((c) => set.has(c));
                   const none = mod.codes.every((c) => !set.has(c));
                   return (
-                    <button
+                    <Button
                       key={r.code}
-                      type="button"
+                      type="text"
                       className={`adm-perm-all-btn${all ? ' is-on' : ''}${none ? ' is-off' : ''}`}
                       onClick={() => toggleModule(r.code, mod.codes)}
                       disabled={!editable}
                       title={`${r.label}：全选/全不选`}
                     >
                       {r.label}
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -292,15 +311,14 @@ export function AdminRolesPage() {
                   </div>
                   <div className="adm-perm-roles">
                     {roles.map((r) => (
-                      <label key={r.code} className="adm-checkbox">
-                        <input
-                          type="checkbox"
-                          checked={(draft[r.code] ?? new Set()).has(code)}
-                          onChange={() => toggle(r.code, code)}
-                          disabled={!editable}
-                        />
-                        <span>{r.label}</span>
-                      </label>
+                      <Checkbox
+                        key={r.code}
+                        checked={(draft[r.code] ?? new Set()).has(code)}
+                        onChange={() => toggle(r.code, code)}
+                        disabled={!editable}
+                      >
+                        {r.label}
+                      </Checkbox>
                     ))}
                   </div>
                 </div>

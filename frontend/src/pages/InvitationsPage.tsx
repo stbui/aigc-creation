@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { App } from 'antd';
-import { Link2, Image as ImageIcon, Sparkles, CalendarCheck, Gift } from 'lucide-react';
+import { App, Modal } from 'antd';
+import QRCode from 'qrcode';
+import { Link2, Image as ImageIcon, Sparkles, CalendarCheck, Gift, Download } from 'lucide-react';
 import { myMarketingApi } from '../lib/api';
-import { StateError, StateSkeleton } from '../components/StateViews';
+import { useAuth } from '../context/AuthContext';
+import { StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
 import type { CheckinStatus, MyInvites } from '../types/api';
 
 /**
@@ -19,6 +21,7 @@ import type { CheckinStatus, MyInvites } from '../types/api';
  */
 export function InvitationsPage() {
   const { message } = App.useApp();
+  const { token, openLogin } = useAuth();
   const [data, setData] = useState<MyInvites | null>(null);
   const [loading, setLoading] = useState(true);
   /**
@@ -29,8 +32,19 @@ export function InvitationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [checkin, setCheckin] = useState<CheckinStatus | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // 邀请海报: 生成结果与弹窗开关。state 必须声明在早退分支之前 (Rules of Hooks)
+  const [posterUrl, setPosterUrl] = useState<string | null>(null);
+  const [posterOpen, setPosterOpen] = useState(false);
+  const [posterBusy, setPosterBusy] = useState(false);
 
   const load = useCallback(() => {
+    // guest 不发请求: 邀请码与签到状态都要鉴权, 401 会被渲染成「加载失败」。
+    // 不动 loading: 登录后直接进骨架屏, 不会先闪一下「加载失败」
+    if (!token) {
+      setData(null);
+      setCheckin(null);
+      return;
+    }
     setLoading(true);
     setError(null);
     Promise.all([myMarketingApi.invites(), myMarketingApi.checkinStatus()])
@@ -44,7 +58,7 @@ export function InvitationsPage() {
         setError(e instanceof Error ? e.message : '邀请数据加载失败');
       })
       .finally(() => setLoading(false));
-  }, []);
+  }, [token]);
 
   useEffect(() => {
     load();
@@ -57,6 +71,8 @@ export function InvitationsPage() {
    * 自邀请在服务端被拒 (bindInvite 返回 bound:false), 前端不提示也不阻断。
    */
   useEffect(() => {
+    // 未登录先不绑: 带 ?inv= 的访客注册/登录后 token 到位, 这个 effect 会再跑一次
+    if (!token) return;
     const code = new URLSearchParams(window.location.search).get('inv');
     if (!code) return;
     let alive = true;
@@ -76,17 +92,62 @@ export function InvitationsPage() {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [token]);
+
+  const inviteUrl = data?.inviteCode
+    ? `${window.location.origin}/invitations?inv=${data.inviteCode}`
+    : '';
 
   const copyLink = async () => {
     if (!data?.inviteCode) return;
-    const url = `${window.location.origin}/invitations?inv=${data.inviteCode}`;
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(inviteUrl);
       message.success('邀请链接已复制到剪贴板');
     } catch {
-      message.info(`复制失败，请手动复制：${url}`);
+      message.info(`复制失败，请手动复制：${inviteUrl}`);
     }
+  };
+
+  /**
+   * 邀请海报 (B8)。
+   *
+   * 用 `qrcode` 出二维码 + canvas 合成, 不引图片素材也不走后端渲染:
+   * 海报是纯展示物, 服务端生成只会多一次往返和一堆字体依赖。二维码内容
+   * 就是邀请链接本身, 好友扫码进站后仍走 `bindInvite` 的绑定流程。
+   *
+   * 文案随规则变化: 奖励关闭时不写「立赚 N 积分」—— 与页面其余部分同一
+   * 条诚实性约束 (管理端没配规则就不许承诺积分)。
+   */
+  const openPoster = async () => {
+    if (!data || !inviteUrl) return;
+    setPosterBusy(true);
+    try {
+      const qr = await QRCode.toDataURL(inviteUrl, {
+        width: 520,
+        margin: 1,
+        color: { dark: '#171a2b', light: '#ffffff' },
+      });
+      const url = await buildInvitePoster({
+        qrDataUrl: qr,
+        code: data.inviteCode,
+        claim: enabled && rule.inviterCredits > 0 ? `邀请好友，立赚 ${rule.inviterCredits} 积分` : '邀请好友一起用货觉AI',
+      });
+      setPosterUrl(url);
+      setPosterOpen(true);
+    } catch {
+      message.error('海报生成失败，请稍后重试');
+    } finally {
+      setPosterBusy(false);
+    }
+  };
+
+  const downloadPoster = () => {
+    if (!posterUrl || !data) return;
+    const a = document.createElement('a');
+    a.href = posterUrl;
+    a.download = `货觉AI-邀请海报-${data.inviteCode}.png`;
+    a.rel = 'noopener';
+    a.click();
   };
 
   const doCheckin = async () => {
@@ -103,6 +164,28 @@ export function InvitationsPage() {
       setSubmitting(false);
     }
   };
+
+  /*
+   * guest 态: 顶导对未登录用户也展示本站入口, 进来后此前会直接请求两次
+   * 需鉴权的接口并把 401 渲染成「邀请数据加载失败」。
+   */
+  if (!token) {
+    return (
+      <div className="invite-page">
+        <div className="state-page">
+          <StateEmpty
+            title="登录后查看邀请与签到"
+            desc="邀请链接、邀请人数与每日签到都与账号绑定；带邀请码进入的新用户注册后会自动绑定。"
+            action={
+              <button type="button" className="state-btn is-primary" onClick={openLogin}>
+                登录/注册
+              </button>
+            }
+          />
+        </div>
+      </div>
+    );
+  }
 
   /*
    * 加载态此前直接渲染 `<h2>加载中…</h2>` —— 拿标题当加载指示器,
@@ -181,9 +264,10 @@ export function InvitationsPage() {
             <button
               type="button"
               className="invite-btn-ghost"
-              onClick={() => message.info('邀请海报生成未实现，可直接把上方链接发给好友')}
+              onClick={() => void openPoster()}
+              disabled={posterBusy}
             >
-              <ImageIcon size={15} /> 查看邀请海报
+              <ImageIcon size={15} /> {posterBusy ? '生成中…' : '查看邀请海报'}
             </button>
           </div>
         </div>
@@ -296,6 +380,122 @@ export function InvitationsPage() {
           </ul>
         </section>
       )}
+
+      <Modal
+        open={posterOpen}
+        onCancel={() => setPosterOpen(false)}
+        footer={null}
+        width={420}
+        centered
+        title="邀请海报"
+        destroyOnHidden
+      >
+        {posterUrl && (
+          <img src={posterUrl} alt="邀请海报" className="invite-poster-image" />
+        )}
+        <button type="button" className="invite-btn-primary invite-poster-download" onClick={downloadPoster}>
+          <Download size={15} /> 下载海报
+        </button>
+        <p className="invite-poster-note">海报含你的专属邀请码，好友扫码注册后自动绑定邀请关系。</p>
+      </Modal>
     </div>
   );
+}
+
+/**
+ * 合成邀请海报 (640×880 PNG data URL)。
+ *
+ * 用 canvas 手绘而不是拼模板图: 文案随奖励规则变化 (规则关闭时不能承诺积分),
+ * 拼图就得为每种状态准备一张模板。字体用系统栈, 中文在各平台都不会缺字。
+ */
+async function buildInvitePoster(opts: {
+  qrDataUrl: string;
+  code: string;
+  claim: string;
+}): Promise<string> {
+  const W = 640;
+  const H = 880;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('当前浏览器不支持 canvas');
+
+  const font = (size: number, weight = '400') =>
+    `${weight} ${size}px system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif`;
+
+  // 背景: 品牌紫渐变
+  const grad = ctx.createLinearGradient(0, 0, W, H);
+  grad.addColorStop(0, '#5546d8');
+  grad.addColorStop(1, '#8064f6');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#ffffff';
+  ctx.font = font(44, '700');
+  ctx.fillText('货觉AI', W / 2, 88);
+  ctx.font = font(18);
+  ctx.fillStyle = 'rgba(255,255,255,0.88)';
+  ctx.fillText('电商智能视觉创作平台', W / 2, 124);
+
+  // 白色主卡
+  roundRect(ctx, 40, 160, W - 80, H - 240, 28);
+  ctx.fillStyle = '#ffffff';
+  ctx.fill();
+
+  ctx.fillStyle = '#171a2b';
+  ctx.font = font(28, '700');
+  ctx.fillText(opts.claim, W / 2, 246);
+
+  // 二维码 (520px 源图缩到 260, 保证高清屏不糊)
+  const img = await loadImage(opts.qrDataUrl);
+  const qrSize = 260;
+  ctx.drawImage(img, (W - qrSize) / 2, 292, qrSize, qrSize);
+
+  ctx.fillStyle = '#4e5969';
+  ctx.font = font(18);
+  ctx.fillText('用手机扫码注册，自动绑定邀请关系', W / 2, 596);
+
+  // 邀请码胶囊
+  roundRect(ctx, 120, 626, W - 240, 78, 18);
+  ctx.fillStyle = '#f2f4f7';
+  ctx.fill();
+  ctx.fillStyle = '#5546d8';
+  ctx.font = font(26, '700');
+  ctx.fillText(`邀请码 ${opts.code}`, W / 2, 676);
+
+  ctx.fillStyle = '#86909c';
+  ctx.font = font(15);
+  ctx.fillText('货觉AI · 商品主图 / 详情图 / 抠图 / 精修，一站式完成', W / 2, 762);
+
+  return canvas.toDataURL('image/png');
+}
+
+/** 圆角矩形路径。不用 ctx.roundRect: 老版本 Safari 没有这个方法 */
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+): void {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.arcTo(x + w, y, x + w, y + h, radius);
+  ctx.arcTo(x + w, y + h, x, y + h, radius);
+  ctx.arcTo(x, y + h, x, y, radius);
+  ctx.arcTo(x, y, x + w, y, radius);
+  ctx.closePath();
+}
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('二维码图片加载失败'));
+    img.src = src;
+  });
 }

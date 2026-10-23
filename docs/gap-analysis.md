@@ -1,6 +1,6 @@
 # 功能缺口清单 · 全量审计
 
-货觉AI ｜ 2026-10-19 ｜ 状态：待裁定（未动代码）
+货觉AI ｜ 2026-10-19 ｜ 状态：**已于 2026-10-21 由 B0–B8 补齐**（快照保留作取证索引；当前状态见 [`CLAUDE.md`](../CLAUDE.md) 与 [`docs/README.md`](README.md)）
 审计对象：`docs/admin-prd.md`（后台管理系统需求）+ `docs/prd.md`（整站产品需求）+ `admin-suite-design.md` + `admin-console-design.md` + `commerce-design.md` 的覆盖度，与实际代码的差距。
 
 > 本文的 30 项缺口已并入两份 PRD 的功能清单，缺口编号 GAP-xx 保留作为取证索引。

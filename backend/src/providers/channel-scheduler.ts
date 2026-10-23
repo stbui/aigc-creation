@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { gatewayConfigOf } from './gateway.config';
+import { findVendor } from './vendors/vendor.catalog';
 import type { Modality } from './modality';
 
 /**
@@ -9,7 +10,7 @@ import type { Modality } from './modality';
  * ## 它解决什么问题
  *
  * 改造前每个模态只能配**一家**厂商。那家一旦限流/挂掉/欠费, 该模态整体不可用:
- *   - 图像还能回落本地 Jimp 占位图 (体验降级)
+ *   - 图像还能回落本地真实算法 (体验降级)
  *   - 文本与视频**没有本地兜底** → 直接失败, 用户拿不到任何东西
  *
  * 而本项目已接 5 家厂商 (优云智算/硅基流动/OpenAI/火山/MiniMax),
@@ -89,12 +90,12 @@ export class ChannelScheduler {
     modality: Modality,
     run: (channel: Channel) => Promise<T>,
   ): Promise<ChannelDispatch<T>> {
-    const channels = await this.readChannels(modality);
+    const { channels, unavailableReason } = await this.readChannels(modality);
     if (channels.length === 0) {
       return {
         ok: false,
         attempts: [],
-        unavailableReason: `${modality} 模态未配置任何模型通道`,
+        unavailableReason: unavailableReason ?? `${modality} 模态未配置任何模型通道`,
       };
     }
 
@@ -180,28 +181,58 @@ export class ChannelScheduler {
    * (见 ChannelRepository.materialize)。这样未使用多渠道的部署不会
    * 因为读一次就多出一行。
    */
-  private async readChannels(modality: Modality): Promise<Channel[]> {
+  private async readChannels(
+    modality: Modality,
+  ): Promise<{ channels: Channel[]; unavailableReason?: string }> {
     const rows = await this.prisma.modelChannel.findMany({
       where: { modality },
       orderBy: { priority: 'asc' },
     });
-    if (rows.length > 0) return rows.map((r) => this.toChannel(r));
+
+    if (rows.length > 0) {
+      /*
+       * ⚠️ 必须在**查到全量行之后**再过滤 enabled，不能把 enabled 写进 where：
+       * 全部停用时 where 会返回空数组，下面的合成分支就会被误触发，
+       * 于是「停用全部线路」反而让旧单通道配置复活 —— 最难察觉的一类事故。
+       */
+      const enabled = rows.filter((r) => r.enabled);
+      if (enabled.length === 0) {
+        return {
+          channels: [],
+          unavailableReason: `${modality} 模态的 ${rows.length} 条通道均已停用`,
+        };
+      }
+      return { channels: enabled.map((r) => this.toChannel(r)) };
+    }
 
     // 表里没有 → 用存量单通道配置合成
     const cfg = gatewayConfigOf(modality);
-    if (!cfg.enabled) return [];
-    return [
-      {
-        id: `synthetic:${modality}`,
-        name: `${modality} 通道 (迁移自单通道配置)`,
-        protocol: cfg.provider,
-        baseUrl: cfg.baseUrl,
-        token: cfg.token,
-        model: cfg.model,
-        priority: 0,
-        enabled: true,
-      },
-    ];
+    if (!cfg.enabled) {
+      return { channels: [], unavailableReason: `${modality} 模态未配置任何模型通道` };
+    }
+    /*
+     * 合成通道的名字带上**厂商展示名**（2026-10-21）。
+     *
+     * 名字会进入每一次失败的 reason（`${channelName}(${protocol}): ...`），而
+     * 排障时要回答的正是「刚才走的是哪一家」。只写 `image 通道` 时，运营
+     * 拿到的错误里没有厂商身份，只能再去翻环境变量才知道配的是谁。
+     * cfg.provider 存的是厂商标识（历史别名 modelverse 也能查到目录项）。
+     */
+    const vendorLabel = findVendor(cfg.provider)?.label;
+    return {
+      channels: [
+        {
+          id: `synthetic:${modality}`,
+          name: `${vendorLabel ? `${vendorLabel} · ` : ''}${modality} 通道 (迁移自单通道配置)`,
+          protocol: cfg.provider,
+          baseUrl: cfg.baseUrl,
+          token: cfg.token,
+          model: cfg.model,
+          priority: 0,
+          enabled: true,
+        },
+      ],
+    };
   }
 
   /** 成功: 清零失败计数, 退出冷却 */

@@ -2,6 +2,8 @@
 
 版本 v1.0 ｜ 2026-10-19 ｜ 上游：`docs/admin-prd.md`（需求）· `docs/admin-detailed-design.md`（逻辑）
 
+> **文档状态**：视觉与布局依据。页面数量与分组已随 B1–B8 扩展（当前 28 页），模型配置页改版为 antd 原生组件；当前清单见 [`CLAUDE.md`](../CLAUDE.md)「后台管理端」。
+
 本文描述**页面长什么样**。逻辑与接口见详细设计。
 
 ---
@@ -932,6 +934,14 @@
 
 ## 12. 能力与通道 `/admin/capabilities`
 
+> **2026-10-20 实现变更（本节以下内容已过时）**
+> 实际页面为 `/admin/model-config`，分为「线路管理 / 逐能力路由 / 全局设置」三个页签：
+> 线路管理按模态展示线路表（厂商、协议、模型、地址、健康、顺序），编辑走右侧抽屉；
+> 支持新增/删除/排序/启停、测草稿（未保存也能测）、多渠道主备。
+> 某模态一旦有线路，旧版 `gateway.<modality>.*` 的 baseUrl/token/model/provider 不再参与调度。
+> 权限：读 `model.config_read`、写 `channel.route`、测试 `channel.test`。
+> 请以 `frontend/src/pages/admin/AdminModelConfigPage.tsx` 与 `docs/model-architecture.md` 为准。
+
 ### 12.1 通道配置
 
 ```
@@ -961,7 +971,7 @@
 ┌──────────────────────────────────────────┐
 │ 通道连通性测试                        [×]  │
 ├──────────────────────────────────────────┤
-│ 目标地址  http://localhost:3001/api/v1    │
+│ 目标地址  http://localhost:4100/api/v1    │
 │ 令牌      abcd****wxyz      ⓘ 部署期配置，不可编辑│
 │ 超时      [3000] ms                        │
 │                                          │

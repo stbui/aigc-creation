@@ -9,7 +9,7 @@ import { test, expect, type Page } from '@playwright/test';
  *   3. 凭据只读: 界面不提供任何写凭据的输入框
  */
 
-const UI = process.env.ADMIN_UI ?? 'http://localhost:5173';
+const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
 
 async function login(page: Page) {
   // 侧栏在 ≤1280px 折叠, 分组标题按设计隐藏

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { mkdirSync } from 'fs';
 
 /** 截图取证: 登录后台后逐页截图, 作为交付证据 */
-const UI = process.env.ADMIN_UI ?? 'http://localhost:5173';
+const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
 const EMAIL = process.env.ADMIN_EMAIL ?? 'admin@huojue.local';
 const PASSWORD = process.env.ADMIN_PASSWORD ?? '';
 const OUT = '../docs/screenshots/admin';

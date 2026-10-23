@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
+import { runBatch } from '../common/batch';
+import { toCsv } from '../common/csv';
 import { StorageService } from '../storage/storage.service';
+import { SignedUrlService } from '../common/signed-url.service';
 import { buildPage, paginate, type PageResult } from './dto/page-query.dto';
 import type { AssetListQueryDto, ProjectListQueryDto } from './dto/asset.dto';
 import type { StorageBackend } from '../storage/storage.provider';
@@ -12,6 +15,7 @@ export class AdminAssetsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly signedUrl: SignedUrlService,
   ) {}
 
   // ── 项目 (B-21/B-22) ────────────────────────────────────────────────
@@ -119,26 +123,7 @@ export class AdminAssetsService {
    */
   async list(query: AssetListQueryDto): Promise<PageResult<unknown>> {
     const page = buildPage(query, ['createdAt', 'sizeBytes'], 'createdAt:desc');
-
-    const where: Record<string, unknown> = {};
-    if (query.keyword) {
-      where['OR'] = [{ id: { contains: query.keyword } }, { capability: { contains: query.keyword } }];
-    }
-    if (query.kind) where.kind = query.kind;
-    if (query.capability) where.capability = query.capability;
-    if (query.status) where.status = query.status;
-    if (query.ownerId) where.ownerId = query.ownerId;
-    if (query.projectId) where.projectId = query.projectId;
-    if (query.backend) where.storageBackend = query.backend;
-
-    const from = query.from;
-    const to = query.to;
-    if (from || to) {
-      const createdAt: Record<string, Date> = {};
-      if (from) createdAt['gte'] = from;
-      if (to) createdAt['lte'] = to;
-      where['createdAt'] = createdAt;
-    }
+    const where = this.listWhere(query);
 
     const [items, total] = await Promise.all([
       this.prisma.asset.findMany({
@@ -164,7 +149,7 @@ export class AdminAssetsService {
         format: a.format,
         sizeBytes: a.sizeBytes,
         status: a.status,
-        sourceUrl: a.sourceUrl,
+        sourceUrl: this.signedUrl.displayUrl(a.sourceUrl),
         storageBackend: a.storageBackend,
         storageKey: a.storageKey,
         ownerId: a.ownerId,
@@ -176,6 +161,79 @@ export class AdminAssetsService {
       total,
       page,
     );
+  }
+
+  /**
+   * 导出素材 (CSV)。
+   *
+   * sourceUrl 用 displayUrl（签名开启时带签）—— 导出的表格里如果只有
+   * 裸路径，打开就是 403，运营会以为"素材丢了"。
+   */
+  async exportCsv(query: AssetListQueryDto): Promise<string> {
+    const rows = await this.prisma.asset.findMany({
+      where: this.listWhere(query),
+      orderBy: { createdAt: 'desc' },
+      take: 5000,
+      include: {
+        owner: { select: { email: true } },
+        project: { select: { name: true } },
+      },
+    });
+    return toCsv(
+      [
+        { label: '素材 ID', value: (a) => a.id },
+        { label: '类型', value: (a) => a.kind },
+        { label: '能力', value: (a) => a.capability ?? '' },
+        { label: '状态', value: (a) => a.status },
+        { label: '宽', value: (a) => a.width ?? '' },
+        { label: '高', value: (a) => a.height ?? '' },
+        { label: '格式', value: (a) => a.format },
+        { label: '大小(字节)', value: (a) => a.sizeBytes },
+        { label: '存储后端', value: (a) => a.storageBackend },
+        { label: '存储键', value: (a) => a.storageKey ?? '' },
+        { label: '用户', value: (a) => a.owner.email },
+        { label: '项目', value: (a) => a.project.name },
+        { label: '地址', value: (a) => this.signedUrl.displayUrl(a.sourceUrl) },
+        { label: '创建时间', value: (a) => a.createdAt },
+      ],
+      rows,
+    );
+  }
+
+  /**
+   * 批量下架 / 恢复 / 删除（B7）。
+   *
+   * 与 `setStatusMany` 的区别：后者用一条 `updateMany`，快但只有总数、
+   * 说不出哪条没成（比如 id 已不存在）；本方法逐条给出结果与原因。
+   * 批量删除尤其需要逐条反馈 —— 用户要知道具体哪些删掉了。
+   */
+  async batchAction(ids: string[], action: 'hide' | 'show' | 'delete') {
+    return runBatch(ids, async (id) => {
+      if (action === 'delete') return this.remove(id);
+      return this.setStatus(id, action === 'hide' ? 'hidden' : 'visible');
+    });
+  }
+
+  /** 列表 / 导出共用的素材筛选条件 */
+  private listWhere(query: AssetListQueryDto): Record<string, unknown> {
+    const where: Record<string, unknown> = {};
+    if (query.keyword) {
+      where['OR'] = [{ id: { contains: query.keyword } }, { capability: { contains: query.keyword } }];
+    }
+    if (query.kind) where.kind = query.kind;
+    if (query.capability) where.capability = query.capability;
+    if (query.status) where.status = query.status;
+    if (query.ownerId) where.ownerId = query.ownerId;
+    if (query.projectId) where.projectId = query.projectId;
+    if (query.backend) where.storageBackend = query.backend;
+
+    if (query.from || query.to) {
+      const createdAt: Record<string, Date> = {};
+      if (query.from) createdAt['gte'] = query.from;
+      if (query.to) createdAt['lte'] = query.to;
+      where['createdAt'] = createdAt;
+    }
+    return where;
   }
 
   /** 素材统计: 按状态/后端/类型分组, 供列表页顶部展示 */

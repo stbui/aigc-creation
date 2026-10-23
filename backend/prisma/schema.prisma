@@ -41,11 +41,12 @@ model User {
   orders   Order[]
   payments Payment[]
   refunds  Refund[]
+  invoices Invoice[]
   lots     CreditLot[]
   ledger   CreditLedger[]
 
   // 会员体系关系
-  memberships  Membership[]
+  memberships     Membership[]
   membershipUsage MembershipUsage[]
 
   // 营销域关系 (M11)。命名区分: 一个人既是别人的邀请人, 也是别人的被邀请人
@@ -53,8 +54,50 @@ model User {
   inviteRelationAsInvitee  InviteRelation?  @relation("InviteeRelation")
   checkins                 CheckinRecord[]
 
+  // ── 账号安全 (B2) ────────────────────────────────────────────────────
+  // 令牌版本: 改密 / 重置密码 / 注销时 +1, JwtAuthGuard 逐请求比对签发时的版本。
+  // 不存「已失效 token 黑名单」: 黑名单需要按 TTL 清理且体积不可控, 而
+  // 「一次性作废该用户的全部旧会话」用单调递增的版本号即可, O(1) 判定。
+  tokenVersion    Int       @default(0)
+  /// 手机号 —— 短信登录用。可空(存量账号无手机号), 非空时必须唯一
+  phone           String?   @unique
+  phoneVerifiedAt DateTime?
+
+  /// 第三方 OAuth 身份（通用 OAuth 登录用，一个账号可绑定多个 provider）
+  oauthIdentities OAuthIdentity[]
+
+  accountTokens AccountToken[]
+  loginLogs     LoginLog[]
+  /// 扫码登录会话 (B8)
+  loginSessions LoginSession[]
+
+  consents      ConsentRecord[]
+  notifications Notification[]
+
+  /// 用户提交的工单 (B7)
+  tickets Ticket[]
+
   @@index([role])
   @@index([status])
+}
+
+// ── 通用 OAuth 身份（第三方登录）────────────────────────────────────
+// provider 如 'google' | 'github' | 'generic'，subject 为 provider 侧用户唯一 id。
+// (provider, subject) 唯一：防止同一第三方账号被同时建出两个本地账号。
+model OAuthIdentity {
+  id          String   @id @default(cuid())
+  userId      String
+  /// 'google' | 'github' | 'generic' —— 取值由 OAuth registry 白名单约束
+  provider    String
+  /// provider 侧唯一 id（Google/GitHub 的数字 id 也按字符串存，避免跨平台溢出）
+  subject     String
+  createdAt   DateTime @default(now())
+  lastLoginAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, subject])
+  @@index([userId])
 }
 
 // ── 后台角色与权限点 (admin-detailed-design.md §0.3) ──────────────
@@ -179,10 +222,18 @@ model Order {
 
   // 会员体系: 一个订单可同时是"购买会员的订单"(SubscriptionOrder) 与
   // "使用会员折扣的商品订单"(PlanOrders)
-  membership      Membership?     @relation("SubscriptionOrder")
-  membershipPlanId String?
-  membershipPlan  MembershipPlan? @relation("PlanOrders", fields: [membershipPlanId], references: [id])
-  membershipUsage MembershipUsage[]
+  membership          Membership?       @relation("SubscriptionOrder")
+  membershipPlanId    String?
+  membershipPlan      MembershipPlan?   @relation("PlanOrders", fields: [membershipPlanId], references: [id])
+  membershipUsage     MembershipUsage[]
+  /// 发票: 一单一票 (orderId 在 Invoice 侧 unique)
+  invoice             Invoice?
+  /// 会员权益开始发放的时刻。**该订单是否已兑换会员的唯一凭据**。
+  ///
+  /// 不能靠 Membership.orderId 判断: 同一用户续费时复用同一条 Membership 行,
+  /// orderId 会被后一笔订单覆盖 —— 旧订单因此"看起来没被用过", 重放它就能
+  /// 再白拿一期会员与月度积分。此字段与订单同生命周期, 不会被覆盖。
+  membershipAppliedAt DateTime?
 
   @@unique([userId, idempotencyKey])
   @@index([membershipPlanId])
@@ -233,6 +284,12 @@ model Payment {
   message         String?
   /// 沙箱特有: 模拟的场景标识, 真实通道为 null
   sandboxScenario String?
+  /// 渠道原始回调报文 (JSON 字符串, 已验签)。
+  ///
+  /// 对账差异申诉时, 这是唯一能自证的原始凭据 —— 事后渠道侧改口径、
+  /// 或本地订单被误改, 都只能靠它还原「当时收到的到底是什么」。
+  /// 报文里可能含渠道侧的敏感字段, 故**只落库, 不进审计 detail 与接口响应**。
+  rawPayload      String  @default("")
 
   paidAt    DateTime?
   createdAt DateTime  @default(now())
@@ -261,12 +318,15 @@ model Refund {
   /// 因已消耗而无法扣回的积分数。必须如实记录, 否则对账会以为系统丢积分
   creditsUnreclaimable Int @default(0)
 
-  status     String   @default("succeeded")
-  reason     String
-  operatorId String
+  status           String   @default("succeeded")
+  reason           String
+  operatorId       String
+  /// 渠道退款单号。沙箱退款为空 —— 它与 payTransactionId 一起构成
+  /// 「这笔钱确实原路退回」的外部证据, 本地状态机无法自证。
+  providerRefundId String?
   /// 逐批次扣回明细, JSON: [{lotId, taken, ...}]
-  detail     String   @default("{}")
-  createdAt  DateTime @default(now())
+  detail           String   @default("{}")
+  createdAt        DateTime @default(now())
 
   order   Order   @relation(fields: [orderId], references: [id])
   payment Payment @relation(fields: [paymentId], references: [id])
@@ -354,33 +414,33 @@ model CreditLedger {
 
 /// 会员套餐(等级定义)。
 model MembershipPlan {
-  id          String   @id @default(cuid())
-  code        String   @unique // 'free' | 'basic' | 'pro' | 'studio'
-  name        String
-  description String   @default("")
+  id             String @id @default(cuid())
+  code           String @unique // 'free' | 'basic' | 'pro' | 'studio'
+  name           String
+  description    String @default("")
   /// 价格, 整数分。free 为 0
-  priceCents  Int      @default(0)
+  priceCents     Int    @default(0)
   /// 周期天数。0 = 永久(free)
-  durationDays Int     @default(0)
+  durationDays   Int    @default(0)
   /// 每月发放的订阅积分
-  monthlyCredits Int   @default(0)
+  monthlyCredits Int    @default(0)
 
   /// 权益(JSON)。字段定义见 MembershipService.PERKS_SCHEMA:
   ///   fastChannel: bool              是否走快速通道
   ///   maxConcurrent: number          同时进行中任务上限 (0 = 不限)
   ///   addonDiscountBps: number       加油包折扣万分比 (9500 = 95 折, 10000 = 无折扣)
-  perks       String   @default("{}")
+  perks String @default("{}")
 
   /// 'active' 上架 | 'offline' 下架。下架不影响存量会员
-  status      String   @default("active")
-  sortOrder   Int      @default(0)
+  status    String @default("active")
+  sortOrder Int    @default(0)
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   memberships Membership[]
   /// 指向本套餐的订单。显式命名, 因为 Order 同时还通过 Membership 关联本套餐
-  orders      Order[]        @relation("PlanOrders")
+  orders      Order[]      @relation("PlanOrders")
 
   @@index([status, sortOrder])
 }
@@ -393,8 +453,8 @@ model Membership {
   planId String
 
   /// 权益快照。下单时从 plan.perks 复制 —— 运营改套餐不影响存量会员
-  perksSnapshot String @default("{}")
-  monthlyCreditsSnapshot Int @default(0)
+  perksSnapshot          String @default("{}")
+  monthlyCreditsSnapshot Int    @default(0)
 
   startAt   DateTime
   expiresAt DateTime
@@ -409,9 +469,9 @@ model Membership {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user User           @relation(fields: [userId], references: [id])
-  plan MembershipPlan @relation(fields: [planId], references: [id])
-  order Order?        @relation("SubscriptionOrder", fields: [orderId], references: [id])
+  user  User           @relation(fields: [userId], references: [id])
+  plan  MembershipPlan @relation(fields: [planId], references: [id])
+  order Order?         @relation("SubscriptionOrder", fields: [orderId], references: [id])
 
   @@index([userId, status])
   @@index([status, expiresAt])
@@ -421,14 +481,14 @@ model Membership {
 /// 会员权益使用记录 (会员消费额)。
 /// 用于会员页展示「累计省了多少」, 也是后续等级制的升级依据。
 model MembershipUsage {
-  id      String @id @default(cuid())
-  userId  String
+  id         String  @id @default(cuid())
+  userId     String
   /// 一订单最多一条使用记录 —— 一个订单只能享受一次会员折扣
-  orderId String? @unique
+  orderId    String? @unique
   /// 本单因会员折扣节省的金额(分)
-  savedCents Int  @default(0)
+  savedCents Int     @default(0)
   /// 使用的套餐 code 快照
-  planCode   String @default("")
+  planCode   String  @default("")
 
   createdAt DateTime @default(now())
 
@@ -536,25 +596,25 @@ model CleanupLog {
 // ⚠️ token 只写不回显 (与 ModelChannelConfig 同约定), 前端拿到的
 // tokenMasked 是脱敏值, 更新时留空 = 保持原值。
 model ModelChannel {
-  id        String  @id @default(cuid())
+  id       String  @id @default(cuid())
   /// 该通道服务哪个模态 —— 决定它能不能被某模态的调度器选中
-  modality  String
+  modality String
   /// 运营给这条通道起的名字 (如「硅基流动·备用」), 便于在列表里认出来
-  name      String
+  name     String
   /// 协议标识 (与 ProtocolSpec.protocol 对应), 决定请求形状
-  protocol  String
-  baseUrl   String  @default("")
+  protocol String
+  baseUrl  String  @default("")
   /// 厂商 API 令牌 (凭据, 只写不回显)
-  token     String  @default("")
-  model     String  @default("")
+  token    String  @default("")
+  model    String  @default("")
   /// 选中顺序: 数字越小越先被尝试。同一模态内唯一 (调度语义要求可预测)
-  priority  Int     @default(0)
+  priority Int     @default(0)
   /// 是否参与调度。false = 保留配置但跳过 (手动停用单条通道)
-  enabled   Boolean @default(true)
+  enabled  Boolean @default(true)
 
   // ── 健康状态 (由 ChannelScheduler 维护, 后台只读展示) ────────────
   // 连续失败次数。达到 consecutiveFailures 阈值即进入冷却
-  failCount Int     @default(0)
+  failCount     Int       @default(0)
   // 冷却截止时间; 到达前该通道被跳过 (熔断)。null = 未在冷却
   cooldownUntil DateTime?
   // 最近一次成功/失败时间, 用于后台展示「最近可用」
@@ -707,6 +767,16 @@ model Asset {
   // sourceUrl 保留为可访问路径, 但切换域名/CDN 时只需改配置, 不必刷库。
   storageKey     String?
 
+  // ── AIGC 内容标识 (B5, 2026-10-21) ──────────────────────────────
+  /// 生成式合成标识落盘结果 (JSON 字符串)。
+  ///
+  /// 形如 `{ labeled: true, method: 'png-text+xmp', metadata: true, visible: true }`。
+  /// 只对 **generated** 素材写入; original (用户上传) 恒为 `{}` ——
+  /// 给用户上传的图打 AI 标识等于诬告, 比不标更糟。
+  aigcMeta      String    @default("{}")
+  /// 标识写入完成时刻 (null = 未标注或标注失败)
+  aigcLabeledAt DateTime?
+
   project Project @relation(fields: [projectId], references: [id])
   owner   User    @relation(fields: [ownerId], references: [id])
 
@@ -722,18 +792,18 @@ model Asset {
 }
 
 model GenerationTask {
-  id            String   @id @default(cuid())
+  id            String  @id @default(cuid())
   projectId     String
   ownerId       String
   capability    String // 'main_image' | 'detail_image' | 'matting'
   status        String // 'pending' | 'running' | 'succeeded' | 'failed'
   inputAssetIds String // JSON 数组字符串
-  outputAssetId String?  @unique // 1:1, 需 unique 约束
+  outputAssetId String? @unique // 1:1, 需 unique 约束
   params        String // JSON 对象字符串
   provider      String?
   errorCode     String?
   // 本次实际扣掉的积分数快照 (0 = 免费)。用于后台展示与退款核算
-  creditCost    Int      @default(0)
+  creditCost    Int     @default(0)
 
   // ── 任务监控 (admin-prd.md B-32 重试) ────────────────────────────
   // 本任务由哪个失败任务重试而来 (null = 用户首次发起)。
@@ -744,8 +814,22 @@ model GenerationTask {
   // 来源任务被清理后重试链仍要能读, 加 FK 会让来源一删就连带失败。
   retriedFromId String?
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  /// 执行期存活心跳。任务运行期间每 30s 写一次。
+  ///
+  /// 进程崩溃/重启后, 没有任何内存标记能告诉你"哪些任务已经死了" ——
+  /// 它们会永远停在 running 占着并发额度, 而用户既没拿到图也拿不回积分。
+  /// 调度任务 `task-recover` 依据它判定孤儿任务并回收退款。
+  /// 不用 `updatedAt` 代替: 它会被任何无关的字段更新刷新, 无法区分
+  /// "任务还在跑" 与 "有人改了一下这行"。
+  heartbeatAt DateTime?
+
+  /// AIGC 标识执行结果 (JSON 字符串)。与 Asset.aigcMeta 分开保存:
+  /// 任务侧记的是「这次生成做了什么标识动作、失败原因」, 素材侧记的是
+  /// 「这份文件最终带着什么标识」—— 两者在失败路径上会不一致, 合并就丢了现场。
+  aigcMeta String @default("{}")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   project     Project @relation(fields: [projectId], references: [id])
   owner       User    @relation(fields: [ownerId], references: [id])
@@ -757,6 +841,8 @@ model GenerationTask {
   @@index([status])
   @@index([capability])
   @@index([createdAt])
+  // 孤儿任务回收按 (status, heartbeatAt) 扫描
+  @@index([status, heartbeatAt])
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -920,4 +1006,439 @@ model CheckinRule {
   dailyCap    Int      @default(0)
   enabled     Boolean  @default(true)
   updatedAt   DateTime @default(now())
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// 账号安全域 (B2 · 2026-10-21)
+// ════════════════════════════════════════════════════════════════════════════
+
+/// 一次性账号令牌 —— 目前用于「忘记密码」重置。
+///
+/// 三条设计约束:
+/// 1. **明文不落库**。库里只存 sha256(token), 库文件/备份泄露时拿到哈希也
+///    无法反推出可用令牌; 邮件里飞的是明文, 只在发信那一刻存在于内存。
+/// 2. **一次性**。`usedAt` 非空即作废, 判定与消费在同一次 updateMany 里完成,
+///    避免「两个并发请求都用同一令牌改密成功」。
+/// 3. **短时效**。默认 30 分钟 (见 AuthService.RESET_TOKEN_TTL_MS), 过期即拒。
+model AccountToken {
+  id          String    @id @default(cuid())
+  /// 已注册用户发起的令牌; 注册前的手机号验证还没有 user, 故可空
+  userId      String?
+  /// 未注册场景(注册时的手机号验证)按手机号归属
+  phone       String?
+  /// 'password_reset' | 'sms_login' | 'sms_verify' —— 取值由 service 常量约束
+  type        String
+  /// HMAC-SHA256(raw, JWT_SECRET)。6 位验证码的可枚举空间只有 100 万,
+  /// 裸 sha256 在库泄露后可被离线穷举, 故用带密钥的 HMAC。
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  usedAt      DateTime?
+  /// 校验失败次数。达到上限即作废, 防止在线穷举验证码
+  attempts    Int       @default(0)
+  /// 申请时的来源 IP, 仅用于安全审计与排障
+  requestedIp String?
+  createdAt   DateTime  @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId, type])
+  @@index([phone, type])
+  @@index([expiresAt])
+}
+
+/// 登录审计 —— 成功与失败都记。
+///
+/// 为什么失败也要记: 「密码错误」与「账号被禁用」在接口返回上是刻意区分的,
+/// 但在审计里必须能回答「这个账号今晚被撞了多少次库」。成功记录另供后台
+/// 用户详情展示「最近登录」。
+model LoginLog {
+  id        String   @id @default(cuid())
+  /// 账号不存在时为空 (查不到 userId 也要留痕)
+  userId    String?
+  email     String
+  ip        String?
+  ua        String?
+  success   Boolean  @default(true)
+  /// 'password' | 'sms' 成功渠道; 'bad_credentials' | 'disabled' | 'deleted' 失败原因
+  reason    String   @default("password")
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([email, createdAt])
+  @@index([createdAt])
+}
+
+/// 扫码登录会话 (B8)。
+///
+/// 状态机: `pending → scanned → confirmed → consumed`, 旁路 `cancelled` / `expired`。
+///
+/// 为什么库里只存 `tokenHash` 而不是票据本身: 二维码会被截图、被投屏、被
+/// 转发进群。票据一旦落库, 任何能读库的人 (或备份文件) 都能拿它换取会话;
+/// 存哈希则泄漏者拿到的只是一串无法反推的摘要。票据本身足够随机 (256 bit),
+/// 不需要加盐, 但必须一次性 —— 兑换成功即 `consumed`。
+///
+/// 为什么确认这一步绑在**已登录的手机**上: 桌面端拿到的会话属于「在手机上
+/// 按下确认的那个人」。若攻击者把自己的票据发给你, 你确认后桌面拿到的是
+/// **你的**会话 —— 这正是扫码登录的预期语义, 因此手机端必须先展示
+/// 「哪台设备在请求登录」(ip / ua), 由人判断是否自己发起。
+model LoginSession {
+  id String @id @default(cuid())
+
+  /// 票据明文的 SHA-256, 唯一
+  tokenHash String @unique
+
+  /// pending | scanned | confirmed | consumed | expired | cancelled
+  status String @default("pending")
+
+  /// 确认登录的账号。扫码阶段为空 —— 扫码只是「有人看到了」, 不是授权
+  userId String?
+
+  /// 发起端来源, 供手机端展示
+  ip String?
+  ua String?
+
+  createdAt   DateTime  @default(now())
+  /// 票据有效期。短到「截图转发也来不及用」, 长到够扫 + 确认两步
+  expiresAt   DateTime
+  scannedAt   DateTime?
+  confirmedAt DateTime?
+  consumedAt  DateTime?
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([status, expiresAt])
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// 财务: 发票 / 对账 (B3)
+// ══════════════════════════════════════════════════════════════════════
+
+/// 发票。
+///
+/// 一单一票 (`orderId @unique`): 拆票会让「本单已开多少」需要汇总计算,
+/// 而退款冲红又要按票逐张处理 —— MVP 阶段收益远小于复杂度。
+///
+/// 金额取**开票时的可开票余额快照** (`paidCents - refundedCents`),
+/// 不按当前订单金额重算: 开票之后再退款, 票面金额必须还是当时那个数。
+model Invoice {
+  id        String @id @default(cuid())
+  /// 发票号, 后台开具时生成 (前缀 + 日期 + 序号), 全局唯一
+  invoiceNo String @unique
+  /// 一单一票
+  orderId   String @unique
+  userId    String
+
+  /// 开票金额 (整数分), 开具时的快照
+  amountCents Int
+  /// 'personal' 个人 | 'company' 企业
+  kind        String  @default("personal")
+  /// 发票抬头
+  title       String
+  /// 纳税人识别号 (企业必填, 服务层校验)
+  taxNo       String?
+  /// 接收邮箱 (开具后由邮件通道投递)
+  email       String?
+  /// 开票内容
+  content     String  @default("技术服务费")
+
+  /// 'pending' 待开具 | 'issued' 已开具 | 'rejected' 已驳回
+  status       String    @default("pending")
+  rejectReason String?
+  /// 可打印 HTML 文件在存储后端里的 key (开具时生成)
+  fileKey      String?
+  issuedAt     DateTime?
+  /// 开具人 (后台管理员 id)
+  issuedBy     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order Order @relation(fields: [orderId], references: [id])
+  user  User  @relation(fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+/// 一次对账导入。
+///
+/// 对账的本质是「拿渠道账单和本地支付流水对一遍」。批次把一次导入的
+/// 全部差异封在一起 —— 只存差异行、不存批次, 就无法回答「这批是谁导的、
+/// 什么时候、针对哪一天」, 差异也就失去了上下文。
+model ReconciliationBatch {
+  id       String  @id @default(cuid())
+  /// 'alipay' | 'wechat' | 'sandbox'
+  channel  String
+  /// 账单日期 (YYYY-MM-DD), 渠道账单针对的营业日
+  billDate String
+  /// 导入文件名 (仅留痕)
+  fileName String?
+
+  /// 渠道侧汇总: 文件里的总笔数与总金额 (分)
+  channelCount       Int @default(0)
+  channelAmountCents Int @default(0)
+  /// 本地汇总: 该渠道该日已成功支付的笔数与金额 (分)
+  localCount         Int @default(0)
+  localAmountCents   Int @default(0)
+
+  matchedCount Int @default(0)
+  diffCount    Int @default(0)
+
+  /// 'imported' 已导入 | 'resolved' 差异已处置完毕
+  status     String  @default("imported")
+  operatorId String?
+
+  createdAt DateTime @default(now())
+
+  items ReconciliationItem[]
+
+  @@index([channel, billDate])
+  @@index([createdAt])
+}
+
+/// 对账差异明细。
+///
+/// `diffType` 取值 (service 层白名单):
+///   matched          金额与状态都一致
+///   amount_mismatch  渠道金额 ≠ 本地金额
+///   missing_local    渠道有、本地没有这笔支付 (最严重: 钱收了但订单没置 paid)
+///   missing_channel  本地有、渠道账单没有 (本地记了未到账, 或渠道漏单)
+///   duplicate        同一交易号在账单里出现多次
+///
+/// 处置**只标记不改钱** (`status`), 退款/补单仍回订单模块走各自的审计链路 ——
+/// 对账工具直接改资金状态会让「谁改的、为什么」失去唯一入口。
+model ReconciliationItem {
+  id      String @id @default(cuid())
+  batchId String
+  tradeNo String
+
+  /// 本地按 payTransactionId 命中的支付与订单
+  paymentId String?
+  orderId   String?
+
+  diffType           String
+  channelAmountCents Int
+  localAmountCents   Int    @default(0)
+
+  /// 'open' 待处置 | 'resolved' 已处置 | 'ignored' 已确认无需处置
+  status     String    @default("open")
+  note       String?
+  resolvedBy String?
+  resolvedAt DateTime?
+
+  batch ReconciliationBatch @relation(fields: [batchId], references: [id])
+
+  @@unique([batchId, tradeNo])
+  @@index([diffType, status])
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 账户自助 / 法务 / 站内消息 (B4)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// 法务文档（用户协议 / 隐私政策 / 未成年人保护）。
+///
+/// 版本化而不是覆盖：用户同意的是**某个版本的某一条款**，覆盖会让
+/// 「他到底同意了哪一版」失去证据。发布新版本 = 新增一行 + 旧行置 archived。
+model LegalDocument {
+  id          String    @id @default(cuid())
+  /// privacy-policy | user-agreement | minors-policy（slug 白名单在 service 层）
+  slug        String
+  /// 语义化版本，如 2026-10-21 或 v2
+  version     String
+  title       String
+  /// 正文（Markdown 子集：`## 标题` 与空行分段，前端按此渲染）
+  content     String
+  /// 'draft' 草稿 | 'published' 已发布 | 'archived' 历史版本
+  status      String    @default("draft")
+  publishedAt DateTime?
+  /// 发布人（后台账号 id）
+  publishedBy String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([slug, version])
+  @@index([slug, status])
+}
+
+/// 同意记录 —— 注册 / 下单时勾选的那一份条款。
+///
+/// 只记「谁同意了哪个 slug 的哪个 version」，不存正文快照：
+/// 正文在 LegalDocument 里按 (slug, version) 唯一，重复存储只会让两份数据打架。
+model ConsentRecord {
+  id        String   @id @default(cuid())
+  userId    String?
+  /// register | order | legal_update
+  kind      String
+  slug      String
+  version   String
+  ip        String?
+  ua        String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId, kind])
+  @@index([slug, version])
+}
+
+/// 站内消息。
+///
+/// 与邮件/短信是**并行的通道**，不是替代：邮件会丢在垃圾箱、短信有成本，
+/// 「支付成功」「任务失败已退款」这类与钱相关的通知必须在站内也能查到。
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  /// payment_success | credit_granted | task_failed | membership_expired | ticket_reply | broadcast
+  type      String
+  title     String
+  body      String?
+  /// 站内相对路径，如 /orders
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}
+
+/// 消息模板（后台可改的文案）。
+///
+/// 代码里按 `code` 取模板并做变量替换，取不到即用代码内置兜底文案 ——
+/// 「模板表为空」不能让支付成功的通知消失。
+model MessageTemplate {
+  id        String   @id @default(cuid())
+  /// 唯一编码，如 payment_success / task_failed_refund
+  code      String   @unique
+  /// inapp | email | sms
+  channel   String
+  subject   String?
+  /// 支持 {orderNo} 这类占位符，白名单变量
+  body      String
+  enabled   Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@index([channel, enabled])
+}
+
+/// 能力上下线管控（后台可关停单项能力）。
+///
+/// 为什么不复用 `SystemSetting`：能力的开关是**每项一行**的结构化状态，
+/// 存成 JSON 会让「当前哪些能力被下线、因为什么、谁改的」在数据库里不可查询，
+/// 排障时只能捞一整条大 JSON 比对。单独建表也让审计与唯一约束落在能力 id 上。
+///
+/// 语义：**没有行 = 启用**（默认全开），只有显式关停才落行。这样新增能力
+/// 无需先插一行，也不会因为漏插而「新能力默认不可用」。
+model CapabilityControl {
+  capabilityId String   @id
+  enabled      Boolean  @default(true)
+  /// 对用户展示的原因（关停时必填）
+  reason       String?
+  /// 操作人（管理员 id / 邮箱），审计日志另有完整一份
+  updatedBy    String?
+  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now())
+
+  @@index([enabled])
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// 工单与反馈 (B7)
+// ═══════════════════════════════════════════════════════════════════════
+
+/// 用户工单 / 反馈。
+///
+/// 为什么单独建表而不是复用站内消息: 消息是**单向广播** (平台 → 用户),
+/// 工单是**双向会话 + 有状态流转 + 有归属**。塞进 Notification 会同时失去
+/// 「谁在处理」「处理到哪一步」「用户回了什么」三件事, 而这三件事才是
+/// 客服排障的全部依据。
+///
+/// `orderId` / `assetId` 只存字符串不建外键: 素材可能被删, 而工单是用户
+/// 举证过的记录 —— 建级联外键会让「素材被删」把工单一起带走。订单本就不
+/// 物理删除, 但同理不引外键, 避免删除顺序耦合。
+model Ticket {
+  id       String @id @default(cuid())
+  /// 对用户可见的工单号，形如 T20261021A1B2C3
+  ticketNo String @unique
+  userId   String
+  /// bug | complaint | consultation | invoice | other
+  type     String
+  subject  String
+  content  String
+  /// 流转: open → processing → resolved → closed
+  /// SQLite 无 enum, 取值由 service 的状态机约束 (见 ticket.service.ts)
+  status   String @default("open")
+  /// low | normal | high
+  priority String @default("normal")
+  /// 关联订单 / 素材（可空）。只存 id 不建外键，理由见模型注释
+  orderId  String?
+  assetId  String?
+  /// 指派的后台账号 id（null = 未指派，谁先处理谁认领）
+  assigneeId String?
+  resolvedAt DateTime?
+  closedAt   DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user    User          @relation(fields: [userId], references: [id])
+  replies TicketReply[]
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+  @@index([assigneeId])
+  @@index([type, createdAt])
+}
+
+/// 工单回复。用户与客服共用一张表，靠 authorType 区分 ——
+/// 分成两张表会让「按时间顺序拼出会话」变成一次内存归并，而且
+/// 分页时两条流的时间线无法对齐。
+model TicketReply {
+  id         String   @id @default(cuid())
+  ticketId   String
+  /// user | admin
+  authorType String
+  authorId   String
+  /// 冗余当时的展示名：用户改昵称后，历史工单里客服看到的名字应保持原样
+  authorName String
+  content    String
+  createdAt  DateTime @default(now())
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
+}
+
+// ── AIGC 可见标识样式 (2026-10-21) ──────────────────────────────────
+// 单行结构化文档 (id 恒为 'default'), 不走 SystemSetting 的 kv 形状:
+// 一个角标由「文案 + 字体 + 配色 + 几何 + 一张预渲染位图」共同决定,
+// 拆成十几个 kv 行只会让「哪一组值属于同一次保存」无法保证。
+//
+// ## 为什么存的是渲染好的 PNG, 而不是运行时按 spec 画字
+//
+// 中文无法在服务端零依赖地栅格化: Jimp 内置字体只有 ASCII, 引字体引擎
+// 又会破坏「精确锁定 + 手工直装」的依赖纪律。因此**文字由后台页面用
+// 浏览器 Canvas 渲染成 PNG**, 服务端只负责缩放、定位与合成。
+// 好处是字体/字重/字距/颜色/中文全部可配且所见即所得; 代价是改文案或
+// 字体后必须从后台页面再保存一次 (specKey 用来标记位图是否已过期)。
+model AigcLabelConfig {
+  id        String   @id @default("default")
+  /// 结构化样式 JSON (AigcLabelSpec)。见 src/common/aigc-label.config.ts
+  specJson  String
+  /// 渲染相关字段的指纹。与当前 spec 不一致 = 位图过期 (后台页面会提示)
+  specKey   String
+  /// 浏览器按 spec 渲染的角标 PNG (base64, 无 data: 前缀); null = 用内置默认角标
+  pngBase64 String?
+  pngWidth  Int?
+  pngHeight Int?
+  updatedBy String?
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
 }

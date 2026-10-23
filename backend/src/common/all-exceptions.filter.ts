@@ -6,8 +6,9 @@ import {
   HttpStatus,
   Injectable,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { AppError } from './app.exception';
+import { currentRequestId } from './request-context';
 import { AppFileLogger } from './logger/file-logger';
 
 /**
@@ -27,6 +28,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
+    // requestId 由 requestContextMiddleware 生成, 响应体与日志用同一个值 ——
+    // 用户截图里的 id 必须能在日志里 grep 到这一条
+    const requestId = currentRequestId();
+    // 不要再往消息里拼 [rid=...]：AppFileLogger.emit 已经按请求上下文统一加前缀，
+    // 两处都加会落成 `[rid=x] [AllExceptionsFilter] [rid=x] [...]`，grep 时噪声翻倍
 
     let code = 50001;
     let message = 'Internal server error';
@@ -56,7 +63,45 @@ export class AllExceptionsFilter implements ExceptionFilter {
       );
     }
 
-    response.status(status).json({ code, data: null, message });
+    // 5xx 才外发告警: 4xx 是用户输入问题, 打给值班群里只会淹没真正的故障
+    if (status >= 500) {
+      void notifyErrorWebhook({
+        requestId,
+        status,
+        code,
+        message,
+        path: request?.originalUrl,
+        method: request?.method,
+        stack: (exception as Error)?.stack?.split('\n').slice(0, 8).join('\n'),
+      });
+    }
+
+    response.status(status).json({ code, data: null, message, requestId: requestId ?? null });
+  }
+}
+
+/**
+ * 未处理异常外发（可选, ERROR_WEBHOOK_URL 为空则不做事）。
+ *
+ * 只发**摘要**: 完整堆栈里可能夹带凭据与用户数据, 外发前不做脱敏就是
+ * 一次数据出境。这里只带 message 与堆栈前 8 行, 且整体 3s 超时 ——
+ * 告警链路绝不能反过来拖住错误响应。
+ */
+async function notifyErrorWebhook(payload: Record<string, unknown>): Promise<void> {
+  const url = (process.env.ERROR_WEBHOOK_URL ?? '').trim();
+  if (!url) return;
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3000);
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ service: 'huojue-ai', at: new Date().toISOString(), ...payload }),
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
+  } catch {
+    // 告警失败只能咽下: 再抛异常就变成"错误处理里的错误"
   }
 }
 

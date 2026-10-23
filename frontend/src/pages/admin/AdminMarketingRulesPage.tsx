@@ -1,10 +1,16 @@
 import { useEffect, useState } from 'react';
-import { App } from 'antd';
+import { App, Button, Input, Select, Switch } from 'antd';
 import { Gift, Plus, Trash2 } from 'lucide-react';
 import { marketingApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
-import { AdminListError, AdminListLoading, ConfirmAction } from '../../components/admin/AdminWidgets';
-import { PageHeader, Panel, StatusTag } from '../../components/admin/PageHeader';
+import {
+  AdminListError,
+  AdminListLoading,
+  AdminStaleError,
+  ConfirmAction,
+  useAdminResource,
+} from '../../components/admin/AdminWidgets';
+import { PageHeader, Panel } from '../../components/admin/PageHeader';
 import type { CheckinRule, InviteRule } from '../../types/api';
 
 /**
@@ -19,24 +25,32 @@ export function AdminMarketingRulesPage() {
 
   const [invite, setInvite] = useState<InviteRule | null>(null);
   const [checkin, setCheckin] = useState<CheckinRule | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState<'invite' | 'checkin' | null>(null);
 
-  useEffect(() => {
-    Promise.all([marketingApi.inviteRule(), marketingApi.checkinRule()])
-      .then(([i, c]) => {
-        setInvite(i);
-        setCheckin(c);
-        setError(null);
-      })
-      .catch((e) => setError(e instanceof Error ? e.message : '加载失败'))
-      .finally(() => setLoading(false));
-  }, []);
+  /*
+   * 两条规则是同一次加载: 表单里常在两块之间来回对照(邀请奖励 vs 签到奖励),
+   * 分开加载会让其中一块停留在旧值上, 而用户以为看到的是同一时刻的配置。
+   */
+  const { data, loading, error, reload } = useAdminResource(
+    () => Promise.all([marketingApi.inviteRule(), marketingApi.checkinRule()]),
+    [],
+  );
 
-  if (loading) return <AdminListLoading tip="加载营销规则…" />;
-  if (error) return <AdminListError error={error} onRetry={() => window.location.reload()} />;
+  /*
+   * 草稿依赖 data 而不是 invite/checkin: 后者是本页可编辑的副本,
+   * 把同步逻辑挂在自己的 state 上会边打字边被覆盖。
+   */
+  useEffect(() => {
+    if (!data) return;
+    setInvite(data[0]);
+    setCheckin(data[1]);
+  }, [data]);
+
+  // 只有完全没有数据时才塌整页; 已有草稿时保留表单, 由下方 stale 提示交代刷新失败
+  if (loading && !data) return <AdminListLoading tip="加载营销规则…" />;
+  // 重试只重跑本页的两次请求, 不整页刷新 —— reload 会丢掉 C 端的路由参数与滚动位置
+  if (error && !data) return <AdminListError error={error} onRetry={() => void reload()} />;
 
   const saveInvite = async () => {
     if (!invite) return;
@@ -76,6 +90,8 @@ export function AdminMarketingRulesPage() {
         }
       />
 
+      {error && <AdminStaleError error={error} onRetry={() => void reload()} />}
+
       {/* 邀请规则 */}
       <Panel title="邀请分销规则" note="奖励在触发条件满足时自动发放">
         {invite && (
@@ -83,7 +99,7 @@ export function AdminMarketingRulesPage() {
             <div className="adm-form-row">
               <div className="adm-field">
                 <label htmlFor="i-inviter">邀请人奖励 (积分)</label>
-                <input
+                <Input
                   id="i-inviter"
                   type="number"
                   value={invite.inviterCredits}
@@ -93,7 +109,7 @@ export function AdminMarketingRulesPage() {
               </div>
               <div className="adm-field">
                 <label htmlFor="i-invitee">被邀请人奖励 (积分)</label>
-                <input
+                <Input
                   id="i-invitee"
                   type="number"
                   value={invite.inviteeCredits}
@@ -106,32 +122,29 @@ export function AdminMarketingRulesPage() {
             <div className="adm-form-row">
               <div className="adm-field">
                 <label htmlFor="i-trigger">发放时机</label>
-                <select
+                <Select
                   id="i-trigger"
                   value={invite.triggerOn}
                   disabled={!writable}
-                  onChange={(e) =>
-                    setInvite({ ...invite, triggerOn: e.target.value as 'first_pay' | 'register' })
+                  onChange={(value) =>
+                    setInvite({ ...invite, triggerOn: value as 'first_pay' | 'register' })
                   }
-                >
-                  <option value="first_pay">被邀请人首次支付后</option>
-                  <option value="register">被邀请人注册后</option>
-                </select>
+                  options={[
+                    { value: 'first_pay', label: '被邀请人首次支付后' },
+                    { value: 'register', label: '被邀请人注册后' },
+                  ]}
+                />
                 <div className="adm-field-hint">
                   选「注册后」奖励门槛低但易被刷，选「首次支付」更稳妥
                 </div>
               </div>
               <div className="adm-field">
-                <label className="adm-switch">
-                  <input
-                    type="checkbox"
-                    checked={invite.valid}
-                    disabled={!writable}
-                    onChange={(e) => setInvite({ ...invite, valid: e.target.checked })}
-                  />
-                  <span className="adm-switch-track" aria-hidden="true" />
-                  <span className="adm-switch-text">启用邀请奖励</span>
-                </label>
+                <Switch
+                  checked={invite.valid}
+                  disabled={!writable}
+                  checkedChildren="启用邀请奖励"
+                  onChange={(checked) => setInvite({ ...invite, valid: checked })}
+                />
               </div>
             </div>
 
@@ -140,14 +153,14 @@ export function AdminMarketingRulesPage() {
                 <span className="adm-action-hint">
                   邀请人得 {invite.inviterCredits} 分，被邀请人得 {invite.inviteeCredits} 分
                 </span>
-                <button
-                  type="button"
+                <Button
+                  type="primary"
                   className="adm-btn is-primary"
                   onClick={() => setConfirming('invite')}
                   disabled={busy}
                 >
                   保存邀请规则
-                </button>
+                </Button>
               </div>
             )}
           </div>
@@ -160,7 +173,7 @@ export function AdminMarketingRulesPage() {
           <div className="adm-form">
             <div className="adm-field">
               <label htmlFor="c-base">每日基础积分</label>
-              <input
+              <Input
                 id="c-base"
                 type="number"
                 value={checkin.baseCredits}
@@ -176,7 +189,7 @@ export function AdminMarketingRulesPage() {
                 {checkin.bonusRules.map((b, i) => (
                   <div key={i} className="adm-bonus-row">
                     <span className="adm-cell-sub">连续</span>
-                    <input
+                    <Input
                       type="number"
                       value={b.day}
                       disabled={!writable}
@@ -187,7 +200,7 @@ export function AdminMarketingRulesPage() {
                       }}
                     />
                     <span className="adm-cell-sub">天，加成</span>
-                    <input
+                    <Input
                       type="number"
                       value={b.bonus}
                       disabled={!writable}
@@ -199,8 +212,8 @@ export function AdminMarketingRulesPage() {
                     />
                     <span className="adm-cell-sub">积分</span>
                     {writable && (
-                      <button
-                        type="button"
+                      <Button
+                        type="link" danger
                         className="adm-link is-danger"
                         onClick={() =>
                           setCheckin({
@@ -210,14 +223,14 @@ export function AdminMarketingRulesPage() {
                         }
                       >
                         <Trash2 size={13} />
-                      </button>
+                      </Button>
                     )}
                   </div>
                 ))}
               </div>
               {writable && (
-                <button
-                  type="button"
+                <Button
+                  type="default"
                   className="adm-btn"
                   style={{ marginTop: 8 }}
                   onClick={() =>
@@ -229,21 +242,17 @@ export function AdminMarketingRulesPage() {
                 >
                   <Plus size={13} style={{ marginRight: 4 }} />
                   添加加成档位
-                </button>
+                </Button>
               )}
             </div>
 
             <div className="adm-field">
-              <label className="adm-switch">
-                <input
-                  type="checkbox"
-                  checked={checkin.enabled}
-                  disabled={!writable}
-                  onChange={(e) => setCheckin({ ...checkin, enabled: e.target.checked })}
-                />
-                <span className="adm-switch-track" aria-hidden="true" />
-                <span className="adm-switch-text">启用签到</span>
-              </label>
+              <Switch
+                checked={checkin.enabled}
+                disabled={!writable}
+                checkedChildren="启用签到"
+                onChange={(checked) => setCheckin({ ...checkin, enabled: checked })}
+              />
             </div>
 
             {writable && (
@@ -251,14 +260,14 @@ export function AdminMarketingRulesPage() {
                 <span className="adm-action-hint">
                   基础 {checkin.baseCredits} 分/天 · {checkin.bonusRules.length} 个加成档位
                 </span>
-                <button
-                  type="button"
+                <Button
+                  type="primary"
                   className="adm-btn is-primary"
                   onClick={() => setConfirming('checkin')}
                   disabled={busy}
                 >
                   保存签到规则
-                </button>
+                </Button>
               </div>
             )}
           </div>

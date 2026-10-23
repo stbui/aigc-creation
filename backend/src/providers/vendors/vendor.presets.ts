@@ -182,6 +182,34 @@ export function protocolSupportsImage(protocol: string): boolean {
  * 该组此前是「取证未完成」的诚实信号, 现在是「已取证」的正常列表 ——
  * 二者不可混淆: 前者说明"还没做", 后者说明"有但只有这些"。
  */
+/** 尺寸写法的中文说明 —— 后台「协议说明」直接展示, 不让运营去猜 `openai-wh` 是什么 */
+const SIZE_STYLE_HINT: Record<SizeStyle, string> = {
+  'openai-wh': '尺寸按像素（size: "1024x1024"）',
+  'volc-tier': '尺寸按档位（size: "1K"/"2K"，不接受像素）',
+  'ratio-only': '只给比例（aspect_ratio: "16:9"，像素由服务端定）',
+};
+
+/** 参考图能力的一句话说明; 0 张要明说「不支持」, 否则界面等于什么都没讲 */
+function refHint(p: { maxRefImages: number; refStyle: 'base64' | 'url' }): string {
+  if (p.maxRefImages <= 0) return '不支持参考图';
+  return `参考图最多 ${p.maxRefImages} 张，以 ${p.refStyle === 'base64' ? 'base64' : '公网 URL'} 回传`;
+}
+
+/** 默认模型可能为空 —— 空值时整句省略, 不留「默认模型 」尾巴 */
+function modelHint(defaultModel: string): string[] {
+  return defaultModel ? ['默认模型 ' + defaultModel] : [];
+}
+
+/**
+ * 协议的完整说明 —— **全部字段从协议层派生, 不在这里另写一份**。
+ *
+ * 2026-10-21 修正: 旧描述给每个图像协议都挂同一串厂商名
+ * （`优云智算/硅基流动/OpenAI 官方/火山方舟/MiniMax`），
+ * 读起来像「这些厂商都支持该协议」，实际是错的 —— 火山方舟用
+ * volcengine、MiniMax 用 minimax, 各自协议不同。运营照这句选协议,
+ * 配出来的通道必然 404 回落本地。现在改为描述协议本身的形状:
+ * 同步/异步、端点、尺寸写法、参考图、默认模型。
+ */
 export const PROTOCOL_OPTIONS_BY_MODALITY: Record<
   Modality,
   Array<{ value: GatewayProtocol; label: string; desc: string }>
@@ -189,24 +217,50 @@ export const PROTOCOL_OPTIONS_BY_MODALITY: Record<
   text: PROTOCOL_SPECS.filter((p) => p.modality === 'text').map((p) => ({
     value: p.protocol,
     label: p.label,
-    desc: `${p.endpoint('{base}')}, DeepSeek / Moonshot / 硅基流动 / OpenAI 官方`,
+    desc: [
+      '同步·一次请求出结果',
+      `POST ${p.endpoint('{base}')}`,
+      ...modelHint(p.defaultModel),
+    ].join(' · '),
   })),
   image: PROTOCOL_SPECS.filter((p) => p.modality === 'image').map((p) => ({
     value: p.protocol,
     label: p.label,
-    desc: `${p.endpoint('{base}')}, 优云智算/硅基流动/OpenAI 官方/火山方舟/MiniMax`,
+    desc: [
+      p.mode === 'async' ? '异步·提交后轮询' : '同步·一次请求出图',
+      `POST ${p.endpoint('{base}')}`,
+      SIZE_STYLE_HINT[p.sizeStyle],
+      refHint(p),
+      ...modelHint(p.defaultModel),
+    ].join(' · '),
   })),
   video: VIDEO_PROTOCOL_SPECS.map((p) => ({
     value: p.protocol as GatewayProtocol,
     label: p.label,
-    desc: `${p.submitEndpoint('{base}')} + 轮询 + 取文件, 异步任务制`,
+    desc: [
+      '异步·四段式',
+      `POST ${p.submitEndpoint('{base}')}`,
+      '轮询 → 取文件 → 下载',
+      ...modelHint(p.defaultModel),
+    ].join(' · '),
   })),
 };
 
-/** 兼容旧调用点: 全模态协议下拉的扁平并集 */
+/**
+ * 兼容旧调用点: 全模态协议下拉的扁平并集。
+ *
+ * ⚠️ **必须包含 video**（2026-10-21 修正）：此前漏了视频协议，于是
+ * 「厂商预设里的协议是否都在可选项里」这条完整性检查会把 `minimax-video`
+ * 报成孤儿 —— 而它其实是合法的视频协议。真实后果是任何按这份并集
+ * 渲染下拉的地方，选 MiniMax 视频通道时看不到自己的协议。
+ *
+ * 后台页面用的是按模态分组的 PROTOCOL_OPTIONS_BY_MODALITY，所以界面没暴露；
+ * 但「全量并集漏一个模态」本身就是一处会静默漂移的真相源。
+ */
 export const PROTOCOL_OPTIONS: Array<{ value: GatewayProtocol; label: string; desc: string }> = [
   ...PROTOCOL_OPTIONS_BY_MODALITY.text,
   ...PROTOCOL_OPTIONS_BY_MODALITY.image,
+  ...PROTOCOL_OPTIONS_BY_MODALITY.video,
 ];
 
 export { VENDOR_CATALOG, findVendor, channelOf, vendorsFor, baseUrlOf, specOf };

@@ -42,17 +42,41 @@ export function qualityOptions(): ParamOption[] {
   return optionsOf('main_image', 'size');
 }
 
+export type ResolutionOption = ParamOption & {
+  /** 卡片副文。参考站是 `{multiplier}倍消耗`（bundle 字符串表 index 0x4ab4） */
+  sub: string;
+  disabled?: boolean;
+  /** 不可选原因。参考站卡片不显示原因，只作 hover 提示 */
+  disabledReason?: string;
+};
+
 /**
- * 画质档位 + 本地能力覆盖。
+ * 画质档位 + 档位可用性。
  *
- * 参考站是 1K/2K/4K 三档，本地 Jimp 算法上限 2048px，故 4K 在界面上**如实禁用**
- * （不是隐藏 —— 隐藏会让用户以为项目没这个档位）。此项是本地诚实差异，
- * 不由后端下发：后端 registry 只声明可用的 1K/2K。
+ * 档位清单**只来自后端**（能力的 `size` 参数枚举，2026-10-22 起后端已声明
+ * 1K/2K/4K 三档）。此前是后端只给两档、前端按运行时补第三档，那是错的：
+ * 后端不认的档位靠前端兜，直接调接口传 `size=4k` 会被 sanitizeParams
+ * 静默回落成默认值，而界面看起来是可选的。
+ *
+ * 可用性由该能力此刻的实际路由决定（`runtime.remoteAvailable`）：
+ *   - 4K 档：有云端通道 → 可选；只有本地 → 禁用并说明（本地 Jimp 上限 2048px）
+ *     不隐藏 —— 隐藏会让用户以为没这个档位
+ *   - 其余档位：本地与云端都能兑现，恒可选
+ * 不传 capabilityId 时按「拿不到证据就不放开」处理：4K 禁用。
+ *
+ * 副文（2026-10-21 改）：参考站卡片副文是 `{multiplier}倍消耗`
+ * （`.image-output-resolution-option span`，文案取自 bundle 字符串表 0x4ab4「倍消耗」）。
+ * `multiplier` 由参考站的 `billing-config` 下发，本站没有分辨率倍率 ——
+ * `generate.service` 的扣费只取能力价，与 size 无关，故三档一律 1 倍，
+ * 这正是本站的真实计费，不跟随参考站的档位倍率臆造 2 倍/4 倍。
  */
-export function resolutionOptions(): Array<ParamOption & { sub: string; disabled?: boolean }> {
-  const base = qualityOptions();
-  return [
-    ...base.map((o) => ({ ...o, sub: o.value === '1k' ? '1024px' : '2048px' })),
-    { value: '4k', label: '4K', sub: '本地算法暂不支持', disabled: true },
-  ];
+export function resolutionOptions(capabilityId?: string): ResolutionOption[] {
+  const remote = capabilityId
+    ? capabilityById(capabilityId)?.runtime?.remoteAvailable === true
+    : false;
+  return qualityOptions().map((o) => {
+    const base: ResolutionOption = { ...o, sub: '1倍消耗' };
+    if (o.value !== '4k' || remote) return base;
+    return { ...base, disabled: true, disabledReason: '本地算法上限 2048px，需配置云端通道' };
+  });
 }

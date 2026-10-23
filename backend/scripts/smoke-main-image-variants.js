@@ -2,7 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Jimp, JimpMime } = require('jimp');
-const { MockImageProvider } = require('../dist/providers/mock-image.provider');
+const { LocalImageProvider } = require('../dist/providers/local-image.provider');
 
 const OUT = '/tmp/pk-variants';
 fs.mkdirSync(OUT, { recursive: true });
@@ -16,7 +16,7 @@ fs.mkdirSync(OUT, { recursive: true });
   const input = path.join(OUT, 'input.png');
   fs.writeFileSync(input, await img.getBuffer(JimpMime.png));
 
-  const provider = new MockImageProvider();
+  const provider = new LocalImageProvider();
   const base = {
     productName: 'Summer Fan', brand: 'ACME', platform: 'taobao',
     language: 'zh-CN', description: '3 speed quiet USB powered', ratio: '1:1', size: '1k',

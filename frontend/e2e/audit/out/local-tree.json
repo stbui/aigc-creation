@@ -148,15 +148,15 @@
                   "tag": "div",
                   "cls": "app-promo-inner",
                   "box": [
-                    470,
+                    449,
                     7,
-                    479,
+                    522,
                     27
                   ],
                   "style": {
                     "display": "flex",
                     "position": "static",
-                    "width": "479.359px",
+                    "width": "521.945px",
                     "height": "26.8516px",
                     "padding": "0px",
                     "margin": "0px",
@@ -185,15 +185,15 @@
                       "tag": "span",
                       "cls": "app-promo-badge",
                       "box": [
-                        470,
+                        449,
                         9,
-                        97,
+                        85,
                         23
                       ],
                       "style": {
                         "display": "flex",
                         "position": "static",
-                        "width": "97px",
+                        "width": "85px",
                         "height": "22.8516px",
                         "padding": "2px 10px",
                         "margin": "0px",
@@ -222,7 +222,7 @@
                           "tag": "svg",
                           "cls": "lucide lucide-gift",
                           "box": [
-                            480,
+                            459,
                             13,
                             13,
                             13
@@ -258,7 +258,7 @@
                               "cls": "",
                               "text": "",
                               "box": [
-                                482,
+                                461,
                                 19,
                                 9,
                                 5
@@ -294,7 +294,7 @@
                               "cls": "",
                               "text": "",
                               "box": [
-                                483,
+                                462,
                                 15,
                                 8,
                                 3
@@ -330,7 +330,7 @@
                               "cls": "",
                               "text": "",
                               "box": [
-                                482,
+                                461,
                                 17,
                                 10,
                                 2
@@ -370,17 +370,17 @@
                     {
                       "tag": "span",
                       "cls": "app-promo-text",
-                      "text": "本地算法不限次数，12 项电商视觉能力全部可试",
+                      "text": "新人首单立减 · 限时活动, 数量有限 · 剩余 13 天 02:13:33",
                       "box": [
-                        579,
+                        546,
                         10,
-                        282,
+                        349,
                         20
                       ],
                       "style": {
                         "display": "block",
                         "position": "static",
-                        "width": "282.359px",
+                        "width": "348.945px",
                         "height": "20.4219px",
                         "padding": "0px",
                         "margin": "0px",
@@ -408,17 +408,17 @@
                     {
                       "tag": "button",
                       "cls": "app-promo-cta",
-                      "text": "立即体验",
+                      "text": "去使用",
                       "box": [
-                        874,
+                        907,
                         7,
-                        76,
+                        64,
                         27
                       ],
                       "style": {
                         "display": "block",
                         "position": "static",
-                        "width": "76px",
+                        "width": "64px",
                         "height": "26.8516px",
                         "padding": "4px 14px",
                         "margin": "0px",
@@ -820,13 +820,13 @@
                   "box": [
                     150,
                     56,
-                    1007,
+                    1169,
                     32
                   ],
                   "style": {
                     "display": "flex",
                     "position": "static",
-                    "width": "1007px",
+                    "width": "1169.37px",
                     "height": "32px",
                     "padding": "0px",
                     "margin": "0px",
@@ -1563,15 +1563,15 @@
                   "tag": "div",
                   "cls": "app-header-right",
                   "box": [
-                    1181,
+                    1343,
                     56,
-                    235,
+                    73,
                     32
                   ],
                   "style": {
                     "display": "flex",
                     "position": "static",
-                    "width": "235.406px",
+                    "width": "73.0391px",
                     "height": "32px",
                     "padding": "0px",
                     "margin": "0px",
@@ -1595,150 +1595,6 @@
                     "objectFit": "fill"
                   },
                   "kids": [
-                    {
-                      "tag": "span",
-                      "cls": "app-quota",
-                      "box": [
-                        1181,
-                        59,
-                        152,
-                        26
-                      ],
-                      "style": {
-                        "display": "flex",
-                        "position": "static",
-                        "width": "152.367px",
-                        "height": "25.5px",
-                        "padding": "4px 10px",
-                        "margin": "0px",
-                        "gap": "5px",
-                        "flexDirection": "row",
-                        "flexWrap": "nowrap",
-                        "alignItems": "center",
-                        "backgroundColor": "rgb(246, 247, 251)",
-                        "color": "rgb(102, 112, 133)",
-                        "fontSize": "12px",
-                        "fontWeight": "400",
-                        "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                        "textAlign": "start",
-                        "borderRadius": "999px",
-                        "border": "0px none rgb(102, 112, 133)",
-                        "borderColor": "rgb(102, 112, 133)",
-                        "borderWidth": "0px",
-                        "opacity": "1",
-                        "overflow": "visible",
-                        "overflowY": "visible",
-                        "objectFit": "fill"
-                      },
-                      "kids": [
-                        {
-                          "tag": "svg",
-                          "cls": "lucide lucide-wallet",
-                          "box": [
-                            1191,
-                            65,
-                            14,
-                            14
-                          ],
-                          "style": {
-                            "display": "block",
-                            "position": "static",
-                            "width": "14px",
-                            "height": "14px",
-                            "padding": "0px",
-                            "margin": "0px",
-                            "flexDirection": "row",
-                            "flexWrap": "nowrap",
-                            "backgroundColor": "rgba(0, 0, 0, 0)",
-                            "color": "rgb(102, 112, 133)",
-                            "fontSize": "12px",
-                            "fontWeight": "400",
-                            "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                            "textAlign": "start",
-                            "borderRadius": "0px",
-                            "border": "0px none rgb(102, 112, 133)",
-                            "borderColor": "rgb(102, 112, 133)",
-                            "borderWidth": "0px",
-                            "opacity": "1",
-                            "overflow": "hidden",
-                            "overflowY": "hidden",
-                            "objectFit": "fill"
-                          },
-                          "kids": [
-                            {
-                              "tag": "path",
-                              "cls": "",
-                              "text": "",
-                              "box": [
-                                1192,
-                                66,
-                                11,
-                                8
-                              ],
-                              "style": {
-                                "display": "inline",
-                                "position": "static",
-                                "minHeight": "0px",
-                                "padding": "0px",
-                                "margin": "0px",
-                                "flexDirection": "row",
-                                "flexWrap": "nowrap",
-                                "backgroundColor": "rgba(0, 0, 0, 0)",
-                                "color": "rgb(102, 112, 133)",
-                                "fontSize": "12px",
-                                "fontWeight": "400",
-                                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                "textAlign": "start",
-                                "borderRadius": "0px",
-                                "border": "0px none rgb(102, 112, 133)",
-                                "borderColor": "rgb(102, 112, 133)",
-                                "borderWidth": "0px",
-                                "opacity": "1",
-                                "overflow": "visible",
-                                "overflowY": "visible",
-                                "objectFit": "fill"
-                              },
-                              "kids": []
-                            },
-                            {
-                              "tag": "path",
-                              "cls": "",
-                              "text": "",
-                              "box": [
-                                1192,
-                                67,
-                                11,
-                                9
-                              ],
-                              "style": {
-                                "display": "inline",
-                                "position": "static",
-                                "minHeight": "0px",
-                                "padding": "0px",
-                                "margin": "0px",
-                                "flexDirection": "row",
-                                "flexWrap": "nowrap",
-                                "backgroundColor": "rgba(0, 0, 0, 0)",
-                                "color": "rgb(102, 112, 133)",
-                                "fontSize": "12px",
-                                "fontWeight": "400",
-                                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                "textAlign": "start",
-                                "borderRadius": "0px",
-                                "border": "0px none rgb(102, 112, 133)",
-                                "borderColor": "rgb(102, 112, 133)",
-                                "borderWidth": "0px",
-                                "opacity": "1",
-                                "overflow": "visible",
-                                "overflowY": "visible",
-                                "objectFit": "fill"
-                              },
-                              "kids": []
-                            }
-                          ]
-                        }
-                      ]
-                    },
                     {
                       "tag": "button",
                       "cls": "app-guest-login",
@@ -4409,44 +4265,6 @@
                                                 "objectFit": "fill"
                                               },
                                               "kids": []
-                                            },
-                                            {
-                                              "tag": "span",
-                                              "cls": "side-menu-dot side-menu-dot-mock",
-                                              "text": "",
-                                              "box": [
-                                                143,
-                                                474,
-                                                6,
-                                                6
-                                              ],
-                                              "style": {
-                                                "display": "block",
-                                                "position": "absolute",
-                                                "width": "6px",
-                                                "height": "6px",
-                                                "minHeight": "0px",
-                                                "padding": "0px",
-                                                "margin": "0px",
-                                                "flexDirection": "row",
-                                                "flexWrap": "nowrap",
-                                                "backgroundColor": "rgb(245, 158, 11)",
-                                                "color": "rgb(51, 51, 51)",
-                                                "fontSize": "13px",
-                                                "fontWeight": "400",
-                                                "lineHeight": "20.4286px",
-                                                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                                "textAlign": "left",
-                                                "borderRadius": "50%",
-                                                "border": "0px none rgb(51, 51, 51)",
-                                                "borderColor": "rgb(51, 51, 51)",
-                                                "borderWidth": "0px",
-                                                "opacity": "1",
-                                                "overflow": "visible",
-                                                "overflowY": "visible",
-                                                "objectFit": "fill"
-                                              },
-                                              "kids": []
                                             }
                                           ]
                                         }
@@ -4959,44 +4777,6 @@
                                                 "opacity": "1",
                                                 "overflow": "hidden",
                                                 "overflowY": "hidden",
-                                                "objectFit": "fill"
-                                              },
-                                              "kids": []
-                                            },
-                                            {
-                                              "tag": "span",
-                                              "cls": "side-menu-dot side-menu-dot-mock",
-                                              "text": "",
-                                              "box": [
-                                                143,
-                                                523,
-                                                6,
-                                                6
-                                              ],
-                                              "style": {
-                                                "display": "block",
-                                                "position": "absolute",
-                                                "width": "6px",
-                                                "height": "6px",
-                                                "minHeight": "0px",
-                                                "padding": "0px",
-                                                "margin": "0px",
-                                                "flexDirection": "row",
-                                                "flexWrap": "nowrap",
-                                                "backgroundColor": "rgb(245, 158, 11)",
-                                                "color": "rgb(51, 51, 51)",
-                                                "fontSize": "13px",
-                                                "fontWeight": "400",
-                                                "lineHeight": "20.4286px",
-                                                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                                "textAlign": "left",
-                                                "borderRadius": "50%",
-                                                "border": "0px none rgb(51, 51, 51)",
-                                                "borderColor": "rgb(51, 51, 51)",
-                                                "borderWidth": "0px",
-                                                "opacity": "1",
-                                                "overflow": "visible",
-                                                "overflowY": "visible",
                                                 "objectFit": "fill"
                                               },
                                               "kids": []
@@ -6567,7 +6347,7 @@
                                             },
                                             {
                                               "tag": "span",
-                                              "cls": "side-menu-dot side-menu-dot-cta side-menu-dot-mock",
+                                              "cls": "side-menu-dot side-menu-dot-cta",
                                               "text": "",
                                               "box": [
                                                 143,
@@ -6585,7 +6365,7 @@
                                                 "margin": "0px",
                                                 "flexDirection": "row",
                                                 "flexWrap": "nowrap",
-                                                "backgroundColor": "rgb(245, 158, 11)",
+                                                "backgroundColor": "rgb(234, 88, 12)",
                                                 "color": "rgb(51, 51, 51)",
                                                 "fontSize": "13px",
                                                 "fontWeight": "400",
@@ -7852,13 +7632,13 @@
                                 24,
                                 984,
                                 133,
-                                49
+                                98
                               ],
                               "style": {
                                 "display": "block",
                                 "position": "static",
                                 "width": "133px",
-                                "height": "49px",
+                                "height": "98px",
                                 "padding": "0px",
                                 "margin": "0px",
                                 "flexDirection": "row",
@@ -7887,13 +7667,13 @@
                                     24,
                                     984,
                                     133,
-                                    49
+                                    98
                                   ],
                                   "style": {
                                     "display": "grid",
                                     "position": "static",
                                     "width": "133px",
-                                    "height": "49px",
+                                    "height": "98px",
                                     "minHeight": "0px",
                                     "padding": "4px 0px 0px",
                                     "margin": "0px",
@@ -8177,41 +7957,266 @@
                                                 "objectFit": "fill"
                                               },
                                               "kids": []
-                                            },
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    {
+                                      "tag": "div",
+                                      "cls": "side-menu-btn-wrap",
+                                      "box": [
+                                        24,
+                                        1037,
+                                        133,
+                                        45
+                                      ],
+                                      "style": {
+                                        "display": "block",
+                                        "position": "relative",
+                                        "width": "133px",
+                                        "height": "45px",
+                                        "padding": "0px",
+                                        "margin": "0px",
+                                        "flexDirection": "row",
+                                        "flexWrap": "nowrap",
+                                        "backgroundColor": "rgba(0, 0, 0, 0)",
+                                        "color": "rgb(24, 32, 51)",
+                                        "fontSize": "14px",
+                                        "fontWeight": "400",
+                                        "lineHeight": "22px",
+                                        "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
+                                        "textAlign": "start",
+                                        "borderRadius": "0px",
+                                        "border": "0px none rgb(24, 32, 51)",
+                                        "borderColor": "rgb(24, 32, 51)",
+                                        "borderWidth": "0px",
+                                        "opacity": "1",
+                                        "overflow": "visible",
+                                        "overflowY": "visible",
+                                        "objectFit": "fill"
+                                      },
+                                      "kids": [
+                                        {
+                                          "tag": "a",
+                                          "cls": "workspace-side-menu-btn",
+                                          "box": [
+                                            24,
+                                            1037,
+                                            133,
+                                            45
+                                          ],
+                                          "style": {
+                                            "display": "flex",
+                                            "position": "relative",
+                                            "width": "133px",
+                                            "height": "45px",
+                                            "minHeight": "0px",
+                                            "padding": "8px 4px",
+                                            "margin": "0px",
+                                            "gap": "12px",
+                                            "flexDirection": "row",
+                                            "flexWrap": "nowrap",
+                                            "justifyContent": "flex-start",
+                                            "alignItems": "center",
+                                            "backgroundColor": "rgba(0, 0, 0, 0)",
+                                            "color": "rgb(51, 51, 51)",
+                                            "fontSize": "13px",
+                                            "fontWeight": "400",
+                                            "lineHeight": "20.4286px",
+                                            "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
+                                            "textAlign": "left",
+                                            "borderRadius": "8px",
+                                            "border": "0px none rgb(51, 51, 51)",
+                                            "borderColor": "rgb(51, 51, 51)",
+                                            "borderWidth": "0px",
+                                            "opacity": "1",
+                                            "overflow": "visible",
+                                            "overflowY": "visible",
+                                            "objectFit": "fill"
+                                          },
+                                          "kids": [
                                             {
                                               "tag": "span",
-                                              "cls": "side-menu-dot side-menu-dot-mock",
-                                              "text": "",
+                                              "cls": "side-menu-icon",
                                               "box": [
-                                                143,
-                                                996,
-                                                6,
-                                                6
+                                                28,
+                                                1050,
+                                                20,
+                                                20
                                               ],
                                               "style": {
-                                                "display": "block",
-                                                "position": "absolute",
-                                                "width": "6px",
-                                                "height": "6px",
-                                                "minHeight": "0px",
+                                                "display": "flex",
+                                                "position": "static",
+                                                "width": "20px",
+                                                "height": "20px",
                                                 "padding": "0px",
                                                 "margin": "0px",
                                                 "flexDirection": "row",
                                                 "flexWrap": "nowrap",
-                                                "backgroundColor": "rgb(245, 158, 11)",
-                                                "color": "rgb(85, 70, 216)",
+                                                "justifyContent": "center",
+                                                "alignItems": "center",
+                                                "backgroundColor": "rgba(0, 0, 0, 0)",
+                                                "color": "rgb(51, 51, 51)",
                                                 "fontSize": "13px",
                                                 "fontWeight": "400",
                                                 "lineHeight": "20.4286px",
                                                 "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
                                                 "textAlign": "left",
-                                                "borderRadius": "50%",
-                                                "border": "0px none rgb(85, 70, 216)",
-                                                "borderColor": "rgb(85, 70, 216)",
+                                                "borderRadius": "0px",
+                                                "border": "0px none rgb(51, 51, 51)",
+                                                "borderColor": "rgb(51, 51, 51)",
                                                 "borderWidth": "0px",
                                                 "opacity": "1",
                                                 "overflow": "visible",
                                                 "overflowY": "visible",
+                                                "objectFit": "fill"
+                                              },
+                                              "kids": [
+                                                {
+                                                  "tag": "svg",
+                                                  "cls": "lucide lucide-sparkles lucide-stars",
+                                                  "box": [
+                                                    28,
+                                                    1050,
+                                                    20,
+                                                    20
+                                                  ],
+                                                  "style": {
+                                                    "display": "block",
+                                                    "position": "static",
+                                                    "width": "20px",
+                                                    "height": "20px",
+                                                    "padding": "0px",
+                                                    "margin": "0px",
+                                                    "flexDirection": "row",
+                                                    "flexWrap": "nowrap",
+                                                    "backgroundColor": "rgba(0, 0, 0, 0)",
+                                                    "color": "rgb(51, 51, 51)",
+                                                    "fontSize": "13px",
+                                                    "fontWeight": "400",
+                                                    "lineHeight": "20.4286px",
+                                                    "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
+                                                    "textAlign": "left",
+                                                    "borderRadius": "0px",
+                                                    "border": "0px none rgb(51, 51, 51)",
+                                                    "borderColor": "rgb(51, 51, 51)",
+                                                    "borderWidth": "0px",
+                                                    "opacity": "1",
+                                                    "overflow": "hidden",
+                                                    "overflowY": "hidden",
+                                                    "objectFit": "fill"
+                                                  },
+                                                  "kids": [
+                                                    {
+                                                      "tag": "path",
+                                                      "cls": "",
+                                                      "text": "",
+                                                      "box": [
+                                                        30,
+                                                        1051,
+                                                        17,
+                                                        17
+                                                      ],
+                                                      "style": {
+                                                        "display": "inline",
+                                                        "position": "static",
+                                                        "minHeight": "0px",
+                                                        "padding": "0px",
+                                                        "margin": "0px",
+                                                        "flexDirection": "row",
+                                                        "flexWrap": "nowrap",
+                                                        "backgroundColor": "rgba(0, 0, 0, 0)",
+                                                        "color": "rgb(51, 51, 51)",
+                                                        "fontSize": "13px",
+                                                        "fontWeight": "400",
+                                                        "lineHeight": "20.4286px",
+                                                        "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
+                                                        "textAlign": "left",
+                                                        "borderRadius": "0px",
+                                                        "border": "0px none rgb(51, 51, 51)",
+                                                        "borderColor": "rgb(51, 51, 51)",
+                                                        "borderWidth": "0px",
+                                                        "opacity": "1",
+                                                        "overflow": "visible",
+                                                        "overflowY": "visible",
+                                                        "objectFit": "fill"
+                                                      },
+                                                      "kids": []
+                                                    },
+                                                    {
+                                                      "tag": "circle",
+                                                      "cls": "",
+                                                      "text": "",
+                                                      "box": [
+                                                        30,
+                                                        1065,
+                                                        3,
+                                                        3
+                                                      ],
+                                                      "style": {
+                                                        "display": "inline",
+                                                        "position": "static",
+                                                        "minHeight": "0px",
+                                                        "padding": "0px",
+                                                        "margin": "0px",
+                                                        "flexDirection": "row",
+                                                        "flexWrap": "nowrap",
+                                                        "backgroundColor": "rgba(0, 0, 0, 0)",
+                                                        "color": "rgb(51, 51, 51)",
+                                                        "fontSize": "13px",
+                                                        "fontWeight": "400",
+                                                        "lineHeight": "20.4286px",
+                                                        "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
+                                                        "textAlign": "left",
+                                                        "borderRadius": "0px",
+                                                        "border": "0px none rgb(51, 51, 51)",
+                                                        "borderColor": "rgb(51, 51, 51)",
+                                                        "borderWidth": "0px",
+                                                        "opacity": "1",
+                                                        "overflow": "visible",
+                                                        "overflowY": "visible",
+                                                        "objectFit": "fill"
+                                                      },
+                                                      "kids": []
+                                                    }
+                                                  ]
+                                                }
+                                              ]
+                                            },
+                                            {
+                                              "tag": "span",
+                                              "cls": "side-menu-label",
+                                              "text": "图生视频",
+                                              "box": [
+                                                60,
+                                                1049,
+                                                52,
+                                                20
+                                              ],
+                                              "style": {
+                                                "display": "block",
+                                                "position": "static",
+                                                "width": "52px",
+                                                "height": "20.4219px",
+                                                "padding": "0px",
+                                                "margin": "0px",
+                                                "flexDirection": "row",
+                                                "flexWrap": "nowrap",
+                                                "backgroundColor": "rgba(0, 0, 0, 0)",
+                                                "color": "rgb(51, 51, 51)",
+                                                "fontSize": "13px",
+                                                "fontWeight": "400",
+                                                "lineHeight": "20.4286px",
+                                                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
+                                                "textAlign": "left",
+                                                "borderRadius": "0px",
+                                                "border": "0px none rgb(51, 51, 51)",
+                                                "borderColor": "rgb(51, 51, 51)",
+                                                "borderWidth": "0px",
+                                                "opacity": "1",
+                                                "overflow": "hidden",
+                                                "overflowY": "hidden",
                                                 "objectFit": "fill"
                                               },
                                               "kids": []
@@ -8229,7 +8234,7 @@
                               "cls": "workspace-side-menu-list",
                               "box": [
                                 24,
-                                1049,
+                                1098,
                                 133,
                                 98
                               ],
@@ -8260,233 +8265,6 @@
                                 "objectFit": "fill"
                               },
                               "kids": [
-                                {
-                                  "tag": "div",
-                                  "cls": "side-menu-btn-wrap",
-                                  "box": [
-                                    24,
-                                    1053,
-                                    133,
-                                    45
-                                  ],
-                                  "style": {
-                                    "display": "block",
-                                    "position": "relative",
-                                    "width": "133px",
-                                    "height": "45px",
-                                    "padding": "0px",
-                                    "margin": "0px",
-                                    "flexDirection": "row",
-                                    "flexWrap": "nowrap",
-                                    "backgroundColor": "rgba(0, 0, 0, 0)",
-                                    "color": "rgb(24, 32, 51)",
-                                    "fontSize": "14px",
-                                    "fontWeight": "400",
-                                    "lineHeight": "22px",
-                                    "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                    "textAlign": "start",
-                                    "borderRadius": "0px",
-                                    "border": "0px none rgb(24, 32, 51)",
-                                    "borderColor": "rgb(24, 32, 51)",
-                                    "borderWidth": "0px",
-                                    "opacity": "1",
-                                    "overflow": "visible",
-                                    "overflowY": "visible",
-                                    "objectFit": "fill"
-                                  },
-                                  "kids": [
-                                    {
-                                      "tag": "a",
-                                      "cls": "workspace-side-menu-btn",
-                                      "box": [
-                                        24,
-                                        1053,
-                                        133,
-                                        45
-                                      ],
-                                      "style": {
-                                        "display": "flex",
-                                        "position": "relative",
-                                        "width": "133px",
-                                        "height": "45px",
-                                        "minHeight": "0px",
-                                        "padding": "8px 4px",
-                                        "margin": "0px",
-                                        "gap": "12px",
-                                        "flexDirection": "row",
-                                        "flexWrap": "nowrap",
-                                        "justifyContent": "flex-start",
-                                        "alignItems": "center",
-                                        "backgroundColor": "rgba(0, 0, 0, 0)",
-                                        "color": "rgb(51, 51, 51)",
-                                        "fontSize": "13px",
-                                        "fontWeight": "400",
-                                        "lineHeight": "20.4286px",
-                                        "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                        "textAlign": "left",
-                                        "borderRadius": "8px",
-                                        "border": "0px none rgb(51, 51, 51)",
-                                        "borderColor": "rgb(51, 51, 51)",
-                                        "borderWidth": "0px",
-                                        "opacity": "1",
-                                        "overflow": "visible",
-                                        "overflowY": "visible",
-                                        "objectFit": "fill"
-                                      },
-                                      "kids": [
-                                        {
-                                          "tag": "span",
-                                          "cls": "side-menu-icon",
-                                          "box": [
-                                            28,
-                                            1066,
-                                            20,
-                                            20
-                                          ],
-                                          "style": {
-                                            "display": "flex",
-                                            "position": "static",
-                                            "width": "20px",
-                                            "height": "20px",
-                                            "padding": "0px",
-                                            "margin": "0px",
-                                            "flexDirection": "row",
-                                            "flexWrap": "nowrap",
-                                            "justifyContent": "center",
-                                            "alignItems": "center",
-                                            "backgroundColor": "rgba(0, 0, 0, 0)",
-                                            "color": "rgb(51, 51, 51)",
-                                            "fontSize": "13px",
-                                            "fontWeight": "400",
-                                            "lineHeight": "20.4286px",
-                                            "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                            "textAlign": "left",
-                                            "borderRadius": "0px",
-                                            "border": "0px none rgb(51, 51, 51)",
-                                            "borderColor": "rgb(51, 51, 51)",
-                                            "borderWidth": "0px",
-                                            "opacity": "1",
-                                            "overflow": "visible",
-                                            "overflowY": "visible",
-                                            "objectFit": "fill"
-                                          },
-                                          "kids": [
-                                            {
-                                              "tag": "svg",
-                                              "cls": "lucide lucide-chart-column lucide-bar-chart-3",
-                                              "box": [
-                                                28,
-                                                1066,
-                                                20,
-                                                20
-                                              ],
-                                              "style": {
-                                                "display": "block",
-                                                "position": "static",
-                                                "width": "20px",
-                                                "height": "20px",
-                                                "padding": "0px",
-                                                "margin": "0px",
-                                                "flexDirection": "row",
-                                                "flexWrap": "nowrap",
-                                                "backgroundColor": "rgba(0, 0, 0, 0)",
-                                                "color": "rgb(51, 51, 51)",
-                                                "fontSize": "13px",
-                                                "fontWeight": "400",
-                                                "lineHeight": "20.4286px",
-                                                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                                "textAlign": "left",
-                                                "borderRadius": "0px",
-                                                "border": "0px none rgb(51, 51, 51)",
-                                                "borderColor": "rgb(51, 51, 51)",
-                                                "borderWidth": "0px",
-                                                "opacity": "1",
-                                                "overflow": "hidden",
-                                                "overflowY": "hidden",
-                                                "objectFit": "fill"
-                                              },
-                                              "kids": [
-                                                {
-                                                  "tag": "path",
-                                                  "cls": "",
-                                                  "text": "",
-                                                  "box": [
-                                                    31,
-                                                    1068,
-                                                    15,
-                                                    15
-                                                  ],
-                                                  "style": {
-                                                    "display": "inline",
-                                                    "position": "static",
-                                                    "minHeight": "0px",
-                                                    "padding": "0px",
-                                                    "margin": "0px",
-                                                    "flexDirection": "row",
-                                                    "flexWrap": "nowrap",
-                                                    "backgroundColor": "rgba(0, 0, 0, 0)",
-                                                    "color": "rgb(51, 51, 51)",
-                                                    "fontSize": "13px",
-                                                    "fontWeight": "400",
-                                                    "lineHeight": "20.4286px",
-                                                    "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                                    "textAlign": "left",
-                                                    "borderRadius": "0px",
-                                                    "border": "0px none rgb(51, 51, 51)",
-                                                    "borderColor": "rgb(51, 51, 51)",
-                                                    "borderWidth": "0px",
-                                                    "opacity": "1",
-                                                    "overflow": "visible",
-                                                    "overflowY": "visible",
-                                                    "objectFit": "fill"
-                                                  },
-                                                  "kids": []
-                                                }
-                                              ]
-                                            }
-                                          ]
-                                        },
-                                        {
-                                          "tag": "span",
-                                          "cls": "side-menu-label",
-                                          "text": "数据中心",
-                                          "box": [
-                                            60,
-                                            1065,
-                                            52,
-                                            20
-                                          ],
-                                          "style": {
-                                            "display": "block",
-                                            "position": "static",
-                                            "width": "52px",
-                                            "height": "20.4219px",
-                                            "padding": "0px",
-                                            "margin": "0px",
-                                            "flexDirection": "row",
-                                            "flexWrap": "nowrap",
-                                            "backgroundColor": "rgba(0, 0, 0, 0)",
-                                            "color": "rgb(51, 51, 51)",
-                                            "fontSize": "13px",
-                                            "fontWeight": "400",
-                                            "lineHeight": "20.4286px",
-                                            "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
-                                            "textAlign": "left",
-                                            "borderRadius": "0px",
-                                            "border": "0px none rgb(51, 51, 51)",
-                                            "borderColor": "rgb(51, 51, 51)",
-                                            "borderWidth": "0px",
-                                            "opacity": "1",
-                                            "overflow": "hidden",
-                                            "overflowY": "hidden",
-                                            "objectFit": "fill"
-                                          },
-                                          "kids": []
-                                        }
-                                      ]
-                                    }
-                                  ]
-                                },
                                 {
                                   "tag": "div",
                                   "cls": "side-menu-btn-wrap",
@@ -8600,7 +8378,7 @@
                                           "kids": [
                                             {
                                               "tag": "svg",
-                                              "cls": "lucide lucide-library",
+                                              "cls": "lucide lucide-chart-column lucide-bar-chart-3",
                                               "box": [
                                                 28,
                                                 1115,
@@ -8638,8 +8416,235 @@
                                                   "cls": "",
                                                   "text": "",
                                                   "box": [
+                                                    31,
+                                                    1117,
+                                                    15,
+                                                    15
+                                                  ],
+                                                  "style": {
+                                                    "display": "inline",
+                                                    "position": "static",
+                                                    "minHeight": "0px",
+                                                    "padding": "0px",
+                                                    "margin": "0px",
+                                                    "flexDirection": "row",
+                                                    "flexWrap": "nowrap",
+                                                    "backgroundColor": "rgba(0, 0, 0, 0)",
+                                                    "color": "rgb(51, 51, 51)",
+                                                    "fontSize": "13px",
+                                                    "fontWeight": "400",
+                                                    "lineHeight": "20.4286px",
+                                                    "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
+                                                    "textAlign": "left",
+                                                    "borderRadius": "0px",
+                                                    "border": "0px none rgb(51, 51, 51)",
+                                                    "borderColor": "rgb(51, 51, 51)",
+                                                    "borderWidth": "0px",
+                                                    "opacity": "1",
+                                                    "overflow": "visible",
+                                                    "overflowY": "visible",
+                                                    "objectFit": "fill"
+                                                  },
+                                                  "kids": []
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        },
+                                        {
+                                          "tag": "span",
+                                          "cls": "side-menu-label",
+                                          "text": "数据中心",
+                                          "box": [
+                                            60,
+                                            1114,
+                                            52,
+                                            20
+                                          ],
+                                          "style": {
+                                            "display": "block",
+                                            "position": "static",
+                                            "width": "52px",
+                                            "height": "20.4219px",
+                                            "padding": "0px",
+                                            "margin": "0px",
+                                            "flexDirection": "row",
+                                            "flexWrap": "nowrap",
+                                            "backgroundColor": "rgba(0, 0, 0, 0)",
+                                            "color": "rgb(51, 51, 51)",
+                                            "fontSize": "13px",
+                                            "fontWeight": "400",
+                                            "lineHeight": "20.4286px",
+                                            "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
+                                            "textAlign": "left",
+                                            "borderRadius": "0px",
+                                            "border": "0px none rgb(51, 51, 51)",
+                                            "borderColor": "rgb(51, 51, 51)",
+                                            "borderWidth": "0px",
+                                            "opacity": "1",
+                                            "overflow": "hidden",
+                                            "overflowY": "hidden",
+                                            "objectFit": "fill"
+                                          },
+                                          "kids": []
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                },
+                                {
+                                  "tag": "div",
+                                  "cls": "side-menu-btn-wrap",
+                                  "box": [
+                                    24,
+                                    1151,
+                                    133,
+                                    45
+                                  ],
+                                  "style": {
+                                    "display": "block",
+                                    "position": "relative",
+                                    "width": "133px",
+                                    "height": "45px",
+                                    "padding": "0px",
+                                    "margin": "0px",
+                                    "flexDirection": "row",
+                                    "flexWrap": "nowrap",
+                                    "backgroundColor": "rgba(0, 0, 0, 0)",
+                                    "color": "rgb(24, 32, 51)",
+                                    "fontSize": "14px",
+                                    "fontWeight": "400",
+                                    "lineHeight": "22px",
+                                    "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
+                                    "textAlign": "start",
+                                    "borderRadius": "0px",
+                                    "border": "0px none rgb(24, 32, 51)",
+                                    "borderColor": "rgb(24, 32, 51)",
+                                    "borderWidth": "0px",
+                                    "opacity": "1",
+                                    "overflow": "visible",
+                                    "overflowY": "visible",
+                                    "objectFit": "fill"
+                                  },
+                                  "kids": [
+                                    {
+                                      "tag": "a",
+                                      "cls": "workspace-side-menu-btn",
+                                      "box": [
+                                        24,
+                                        1151,
+                                        133,
+                                        45
+                                      ],
+                                      "style": {
+                                        "display": "flex",
+                                        "position": "relative",
+                                        "width": "133px",
+                                        "height": "45px",
+                                        "minHeight": "0px",
+                                        "padding": "8px 4px",
+                                        "margin": "0px",
+                                        "gap": "12px",
+                                        "flexDirection": "row",
+                                        "flexWrap": "nowrap",
+                                        "justifyContent": "flex-start",
+                                        "alignItems": "center",
+                                        "backgroundColor": "rgba(0, 0, 0, 0)",
+                                        "color": "rgb(51, 51, 51)",
+                                        "fontSize": "13px",
+                                        "fontWeight": "400",
+                                        "lineHeight": "20.4286px",
+                                        "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
+                                        "textAlign": "left",
+                                        "borderRadius": "8px",
+                                        "border": "0px none rgb(51, 51, 51)",
+                                        "borderColor": "rgb(51, 51, 51)",
+                                        "borderWidth": "0px",
+                                        "opacity": "1",
+                                        "overflow": "visible",
+                                        "overflowY": "visible",
+                                        "objectFit": "fill"
+                                      },
+                                      "kids": [
+                                        {
+                                          "tag": "span",
+                                          "cls": "side-menu-icon",
+                                          "box": [
+                                            28,
+                                            1164,
+                                            20,
+                                            20
+                                          ],
+                                          "style": {
+                                            "display": "flex",
+                                            "position": "static",
+                                            "width": "20px",
+                                            "height": "20px",
+                                            "padding": "0px",
+                                            "margin": "0px",
+                                            "flexDirection": "row",
+                                            "flexWrap": "nowrap",
+                                            "justifyContent": "center",
+                                            "alignItems": "center",
+                                            "backgroundColor": "rgba(0, 0, 0, 0)",
+                                            "color": "rgb(51, 51, 51)",
+                                            "fontSize": "13px",
+                                            "fontWeight": "400",
+                                            "lineHeight": "20.4286px",
+                                            "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
+                                            "textAlign": "left",
+                                            "borderRadius": "0px",
+                                            "border": "0px none rgb(51, 51, 51)",
+                                            "borderColor": "rgb(51, 51, 51)",
+                                            "borderWidth": "0px",
+                                            "opacity": "1",
+                                            "overflow": "visible",
+                                            "overflowY": "visible",
+                                            "objectFit": "fill"
+                                          },
+                                          "kids": [
+                                            {
+                                              "tag": "svg",
+                                              "cls": "lucide lucide-library",
+                                              "box": [
+                                                28,
+                                                1164,
+                                                20,
+                                                20
+                                              ],
+                                              "style": {
+                                                "display": "block",
+                                                "position": "static",
+                                                "width": "20px",
+                                                "height": "20px",
+                                                "padding": "0px",
+                                                "margin": "0px",
+                                                "flexDirection": "row",
+                                                "flexWrap": "nowrap",
+                                                "backgroundColor": "rgba(0, 0, 0, 0)",
+                                                "color": "rgb(51, 51, 51)",
+                                                "fontSize": "13px",
+                                                "fontWeight": "400",
+                                                "lineHeight": "20.4286px",
+                                                "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
+                                                "textAlign": "left",
+                                                "borderRadius": "0px",
+                                                "border": "0px none rgb(51, 51, 51)",
+                                                "borderColor": "rgb(51, 51, 51)",
+                                                "borderWidth": "0px",
+                                                "opacity": "1",
+                                                "overflow": "hidden",
+                                                "overflowY": "hidden",
+                                                "objectFit": "fill"
+                                              },
+                                              "kids": [
+                                                {
+                                                  "tag": "path",
+                                                  "cls": "",
+                                                  "text": "",
+                                                  "box": [
                                                     41,
-                                                    1120,
+                                                    1169,
                                                     3,
                                                     12
                                                   ],
@@ -8679,7 +8684,7 @@
                                           "text": "素材库",
                                           "box": [
                                             60,
-                                            1114,
+                                            1163,
                                             39,
                                             20
                                           ],
@@ -8758,7 +8763,7 @@
                   "kids": [
                     {
                       "tag": "div",
-                      "cls": "pk-workspace",
+                      "cls": "pk-workspace fc-workspace",
                       "box": [
                         176,
                         104,
@@ -8771,7 +8776,7 @@
                         "width": "1264px",
                         "height": "796px",
                         "minHeight": "620px",
-                        "padding": "24px 24px 24px 16px",
+                        "padding": "16px",
                         "margin": "-24px -24px -32px",
                         "gap": "16px",
                         "flexDirection": "row",
@@ -8799,15 +8804,15 @@
                           "cls": "pk-input-pane",
                           "box": [
                             192,
-                            128,
+                            120,
                             432,
-                            748
+                            764
                           ],
                           "style": {
                             "display": "flex",
                             "position": "static",
                             "width": "432px",
-                            "height": "748px",
+                            "height": "764px",
                             "padding": "0px",
                             "margin": "0px",
                             "gap": "10px",
@@ -8835,15 +8840,15 @@
                               "cls": "pk-form-card",
                               "box": [
                                 192,
-                                128,
+                                120,
                                 432,
-                                748
+                                764
                               ],
                               "style": {
                                 "display": "flex",
                                 "position": "static",
                                 "width": "432px",
-                                "height": "748px",
+                                "height": "764px",
                                 "minHeight": "0px",
                                 "padding": "0px",
                                 "margin": "0px",
@@ -8871,7 +8876,7 @@
                                   "cls": "pk-form-scroll",
                                   "box": [
                                     192,
-                                    128,
+                                    120,
                                     432,
                                     630
                                   ],
@@ -8906,18 +8911,18 @@
                                       "cls": "pk-config-card",
                                       "box": [
                                         192,
-                                        128,
+                                        120,
                                         432,
-                                        368
+                                        348
                                       ],
                                       "style": {
                                         "display": "grid",
                                         "position": "static",
                                         "width": "432px",
-                                        "height": "368px",
-                                        "padding": "16px",
+                                        "height": "348px",
+                                        "padding": "12px 16px",
                                         "margin": "0px",
-                                        "gap": "24px",
+                                        "gap": "16px",
                                         "flexDirection": "row",
                                         "flexWrap": "nowrap",
                                         "backgroundColor": "rgb(255, 255, 255)",
@@ -8939,21 +8944,21 @@
                                       "kids": [
                                         {
                                           "tag": "div",
-                                          "cls": "pk-section",
+                                          "cls": "pk-section fc-upload-section",
                                           "box": [
                                             208,
-                                            144,
+                                            132,
                                             400,
-                                            200
+                                            196
                                           ],
                                           "style": {
                                             "display": "grid",
                                             "position": "static",
                                             "width": "400px",
-                                            "height": "200px",
+                                            "height": "196px",
                                             "padding": "0px",
                                             "margin": "0px",
-                                            "gap": "16px",
+                                            "gap": "12px",
                                             "flexDirection": "row",
                                             "flexWrap": "nowrap",
                                             "backgroundColor": "rgba(0, 0, 0, 0)",
@@ -8978,7 +8983,7 @@
                                               "cls": "pk-upload-title-row",
                                               "box": [
                                                 208,
-                                                144,
+                                                132,
                                                 400,
                                                 24
                                               ],
@@ -9017,7 +9022,7 @@
                                                   "text": "上传参考图",
                                                   "box": [
                                                     208,
-                                                    150,
+                                                    138,
                                                     70,
                                                     13
                                                   ],
@@ -9053,7 +9058,7 @@
                                                   "cls": "pk-upload-title-actions",
                                                   "box": [
                                                     444,
-                                                    144,
+                                                    132,
                                                     164,
                                                     24
                                                   ],
@@ -9091,7 +9096,7 @@
                                                       "text": "从素材库导入",
                                                       "box": [
                                                         444,
-                                                        150,
+                                                        138,
                                                         72,
                                                         13
                                                       ],
@@ -9129,7 +9134,7 @@
                                                       "text": "手机上传",
                                                       "box": [
                                                         526,
-                                                        150,
+                                                        138,
                                                         48,
                                                         13
                                                       ],
@@ -9167,7 +9172,7 @@
                                                       "text": "0/4",
                                                       "box": [
                                                         584,
-                                                        144,
+                                                        132,
                                                         24,
                                                         24
                                                       ],
@@ -9207,7 +9212,7 @@
                                               "cls": "pk-dropzone fc-dropzone",
                                               "box": [
                                                 208,
-                                                184,
+                                                168,
                                                 400,
                                                 160
                                               ],
@@ -9243,18 +9248,18 @@
                                                   "tag": "label",
                                                   "cls": "pk-upload-prompt fc-upload-prompt",
                                                   "box": [
-                                                    289,
-                                                    201,
-                                                    238,
+                                                    225,
+                                                    185,
+                                                    366,
                                                     126
                                                   ],
                                                   "style": {
                                                     "display": "flex",
                                                     "position": "static",
-                                                    "width": "238px",
+                                                    "width": "366px",
                                                     "height": "126px",
                                                     "minHeight": "126px",
-                                                    "padding": "0px",
+                                                    "padding": "8px",
                                                     "margin": "0px",
                                                     "gap": "4px",
                                                     "flexDirection": "column",
@@ -9262,15 +9267,15 @@
                                                     "justifyContent": "center",
                                                     "alignItems": "center",
                                                     "backgroundColor": "rgba(0, 0, 0, 0)",
-                                                    "color": "rgb(78, 89, 105)",
-                                                    "fontSize": "14px",
+                                                    "color": "rgb(29, 33, 41)",
+                                                    "fontSize": "12px",
                                                     "fontWeight": "400",
-                                                    "lineHeight": "22px",
+                                                    "lineHeight": "20px",
                                                     "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
                                                     "textAlign": "start",
-                                                    "borderRadius": "0px",
-                                                    "border": "0px none rgb(78, 89, 105)",
-                                                    "borderColor": "rgb(78, 89, 105)",
+                                                    "borderRadius": "8px",
+                                                    "border": "0px none rgb(29, 33, 41)",
+                                                    "borderColor": "rgb(29, 33, 41)",
                                                     "borderWidth": "0px",
                                                     "opacity": "1",
                                                     "overflow": "visible",
@@ -9283,7 +9288,7 @@
                                                       "cls": "lucide lucide-image-plus",
                                                       "box": [
                                                         401,
-                                                        222,
+                                                        206,
                                                         14,
                                                         14
                                                       ],
@@ -9297,15 +9302,15 @@
                                                         "flexDirection": "row",
                                                         "flexWrap": "nowrap",
                                                         "backgroundColor": "rgba(0, 0, 0, 0)",
-                                                        "color": "rgb(78, 89, 105)",
-                                                        "fontSize": "14px",
+                                                        "color": "rgb(29, 33, 41)",
+                                                        "fontSize": "12px",
                                                         "fontWeight": "400",
-                                                        "lineHeight": "22px",
+                                                        "lineHeight": "20px",
                                                         "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
                                                         "textAlign": "start",
                                                         "borderRadius": "0px",
-                                                        "border": "0px none rgb(78, 89, 105)",
-                                                        "borderColor": "rgb(78, 89, 105)",
+                                                        "border": "0px none rgb(29, 33, 41)",
+                                                        "borderColor": "rgb(29, 33, 41)",
                                                         "borderWidth": "0px",
                                                         "opacity": "1",
                                                         "overflow": "hidden",
@@ -9319,7 +9324,7 @@
                                                           "text": "",
                                                           "box": [
                                                             403,
-                                                            224,
+                                                            208,
                                                             11,
                                                             11
                                                           ],
@@ -9332,15 +9337,15 @@
                                                             "flexDirection": "row",
                                                             "flexWrap": "nowrap",
                                                             "backgroundColor": "rgba(0, 0, 0, 0)",
-                                                            "color": "rgb(78, 89, 105)",
-                                                            "fontSize": "14px",
+                                                            "color": "rgb(29, 33, 41)",
+                                                            "fontSize": "12px",
                                                             "fontWeight": "400",
-                                                            "lineHeight": "22px",
+                                                            "lineHeight": "20px",
                                                             "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
                                                             "textAlign": "start",
                                                             "borderRadius": "0px",
-                                                            "border": "0px none rgb(78, 89, 105)",
-                                                            "borderColor": "rgb(78, 89, 105)",
+                                                            "border": "0px none rgb(29, 33, 41)",
+                                                            "borderColor": "rgb(29, 33, 41)",
                                                             "borderWidth": "0px",
                                                             "opacity": "1",
                                                             "overflow": "visible",
@@ -9355,7 +9360,7 @@
                                                           "text": "",
                                                           "box": [
                                                             405,
-                                                            229,
+                                                            213,
                                                             9,
                                                             6
                                                           ],
@@ -9368,15 +9373,15 @@
                                                             "flexDirection": "row",
                                                             "flexWrap": "nowrap",
                                                             "backgroundColor": "rgba(0, 0, 0, 0)",
-                                                            "color": "rgb(78, 89, 105)",
-                                                            "fontSize": "14px",
+                                                            "color": "rgb(29, 33, 41)",
+                                                            "fontSize": "12px",
                                                             "fontWeight": "400",
-                                                            "lineHeight": "22px",
+                                                            "lineHeight": "20px",
                                                             "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
                                                             "textAlign": "start",
                                                             "borderRadius": "0px",
-                                                            "border": "0px none rgb(78, 89, 105)",
-                                                            "borderColor": "rgb(78, 89, 105)",
+                                                            "border": "0px none rgb(29, 33, 41)",
+                                                            "borderColor": "rgb(29, 33, 41)",
                                                             "borderWidth": "0px",
                                                             "opacity": "1",
                                                             "overflow": "visible",
@@ -9391,7 +9396,7 @@
                                                           "text": "",
                                                           "box": [
                                                             405,
-                                                            226,
+                                                            210,
                                                             2,
                                                             2
                                                           ],
@@ -9404,15 +9409,15 @@
                                                             "flexDirection": "row",
                                                             "flexWrap": "nowrap",
                                                             "backgroundColor": "rgba(0, 0, 0, 0)",
-                                                            "color": "rgb(78, 89, 105)",
-                                                            "fontSize": "14px",
+                                                            "color": "rgb(29, 33, 41)",
+                                                            "fontSize": "12px",
                                                             "fontWeight": "400",
-                                                            "lineHeight": "22px",
+                                                            "lineHeight": "20px",
                                                             "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
                                                             "textAlign": "start",
                                                             "borderRadius": "0px",
-                                                            "border": "0px none rgb(78, 89, 105)",
-                                                            "borderColor": "rgb(78, 89, 105)",
+                                                            "border": "0px none rgb(29, 33, 41)",
+                                                            "borderColor": "rgb(29, 33, 41)",
                                                             "borderWidth": "0px",
                                                             "opacity": "1",
                                                             "overflow": "visible",
@@ -9429,7 +9434,7 @@
                                                       "text": "点击、拖拽或粘贴参考图片到此处上传",
                                                       "box": [
                                                         289,
-                                                        260,
+                                                        244,
                                                         238,
                                                         22
                                                       ],
@@ -9443,15 +9448,15 @@
                                                         "flexDirection": "row",
                                                         "flexWrap": "nowrap",
                                                         "backgroundColor": "rgba(0, 0, 0, 0)",
-                                                        "color": "rgb(23, 26, 43)",
+                                                        "color": "rgb(29, 33, 41)",
                                                         "fontSize": "14px",
                                                         "fontWeight": "400",
                                                         "lineHeight": "22px",
                                                         "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
                                                         "textAlign": "center",
                                                         "borderRadius": "0px",
-                                                        "border": "0px none rgb(23, 26, 43)",
-                                                        "borderColor": "rgb(23, 26, 43)",
+                                                        "border": "0px none rgb(29, 33, 41)",
+                                                        "borderColor": "rgb(29, 33, 41)",
                                                         "borderWidth": "0px",
                                                         "opacity": "1",
                                                         "overflow": "visible",
@@ -9466,7 +9471,7 @@
                                                       "text": "最多可上传 4 张参考图片，单张不超过 10MB",
                                                       "box": [
                                                         289,
-                                                        286,
+                                                        270,
                                                         238,
                                                         20
                                                       ],
@@ -9508,7 +9513,7 @@
                                           "cls": "pk-section fc-prompt-field",
                                           "box": [
                                             208,
-                                            368,
+                                            344,
                                             400,
                                             112
                                           ],
@@ -9544,7 +9549,7 @@
                                               "cls": "fc-prompt-label-row",
                                               "box": [
                                                 208,
-                                                368,
+                                                344,
                                                 400,
                                                 16
                                               ],
@@ -9584,7 +9589,7 @@
                                                   "text": "创作提示词",
                                                   "box": [
                                                     208,
-                                                    370,
+                                                    346,
                                                     79,
                                                     13
                                                   ],
@@ -9620,7 +9625,7 @@
                                                   "cls": "fc-prompt-tools",
                                                   "box": [
                                                     455,
-                                                    368,
+                                                    344,
                                                     153,
                                                     16
                                                   ],
@@ -9657,7 +9662,7 @@
                                                       "cls": "fc-prompt-tool-btn",
                                                       "box": [
                                                         455,
-                                                        368,
+                                                        344,
                                                         52,
                                                         16
                                                       ],
@@ -9694,7 +9699,7 @@
                                                           "cls": "lucide lucide-sparkles lucide-stars",
                                                           "box": [
                                                             455,
-                                                            370,
+                                                            346,
                                                             13,
                                                             13
                                                           ],
@@ -9730,7 +9735,7 @@
                                                               "text": "",
                                                               "box": [
                                                                 456,
-                                                                371,
+                                                                347,
                                                                 11,
                                                                 11
                                                               ],
@@ -9766,7 +9771,7 @@
                                                               "text": "",
                                                               "box": [
                                                                 456,
-                                                                379,
+                                                                355,
                                                                 2,
                                                                 2
                                                               ],
@@ -9804,7 +9809,7 @@
                                                           "text": "AI润色",
                                                           "box": [
                                                             472,
-                                                            367,
+                                                            343,
                                                             35,
                                                             19
                                                           ],
@@ -9842,7 +9847,7 @@
                                                       "cls": "fc-prompt-tool-btn",
                                                       "box": [
                                                         519,
-                                                        368,
+                                                        344,
                                                         89,
                                                         16
                                                       ],
@@ -9879,7 +9884,7 @@
                                                           "cls": "lucide lucide-sparkles lucide-stars",
                                                           "box": [
                                                             519,
-                                                            370,
+                                                            346,
                                                             13,
                                                             13
                                                           ],
@@ -9915,7 +9920,7 @@
                                                               "text": "",
                                                               "box": [
                                                                 520,
-                                                                371,
+                                                                347,
                                                                 11,
                                                                 11
                                                               ],
@@ -9951,7 +9956,7 @@
                                                               "text": "",
                                                               "box": [
                                                                 520,
-                                                                379,
+                                                                355,
                                                                 2,
                                                                 2
                                                               ],
@@ -9989,7 +9994,7 @@
                                                           "text": "图片转提示词",
                                                           "box": [
                                                             536,
-                                                            367,
+                                                            343,
                                                             72,
                                                             19
                                                           ],
@@ -10031,7 +10036,7 @@
                                               "cls": "pk-desc-editor",
                                               "box": [
                                                 208,
-                                                400,
+                                                376,
                                                 400,
                                                 80
                                               ],
@@ -10067,7 +10072,7 @@
                                                   "text": "",
                                                   "box": [
                                                     208,
-                                                    400,
+                                                    376,
                                                     400,
                                                     80
                                                   ],
@@ -10102,7 +10107,7 @@
                                                   "cls": "pk-desc-expand",
                                                   "box": [
                                                     572,
-                                                    408,
+                                                    384,
                                                     28,
                                                     28
                                                   ],
@@ -10139,7 +10144,7 @@
                                                       "cls": "lucide lucide-maximize-2",
                                                       "box": [
                                                         579,
-                                                        415,
+                                                        391,
                                                         15,
                                                         15
                                                       ],
@@ -10175,7 +10180,7 @@
                                                           "text": "",
                                                           "box": [
                                                             588,
-                                                            416,
+                                                            392,
                                                             4,
                                                             4
                                                           ],
@@ -10211,7 +10216,7 @@
                                                           "text": "",
                                                           "box": [
                                                             587,
-                                                            416,
+                                                            392,
                                                             4,
                                                             4
                                                           ],
@@ -10247,7 +10252,7 @@
                                                           "text": "",
                                                           "box": [
                                                             580,
-                                                            423,
+                                                            399,
                                                             4,
                                                             4
                                                           ],
@@ -10283,7 +10288,7 @@
                                                           "text": "",
                                                           "box": [
                                                             580,
-                                                            424,
+                                                            400,
                                                             4,
                                                             4
                                                           ],
@@ -10330,21 +10335,21 @@
                                   "cls": "fc-actions",
                                   "box": [
                                     192,
-                                    758,
+                                    750,
                                     432,
-                                    118
+                                    134
                                   ],
                                   "style": {
                                     "display": "flex",
                                     "position": "static",
                                     "width": "432px",
-                                    "height": "118px",
-                                    "padding": "0px",
+                                    "height": "134px",
+                                    "padding": "16px 0px 0px",
                                     "margin": "0px",
                                     "gap": "16px",
                                     "flexDirection": "column",
                                     "flexWrap": "nowrap",
-                                    "backgroundColor": "rgba(0, 0, 0, 0)",
+                                    "backgroundColor": "rgb(246, 247, 251)",
                                     "color": "rgb(24, 32, 51)",
                                     "fontSize": "14px",
                                     "fontWeight": "400",
@@ -10366,7 +10371,7 @@
                                       "cls": "pk-submit-actions",
                                       "box": [
                                         192,
-                                        758,
+                                        766,
                                         432,
                                         118
                                       ],
@@ -10402,7 +10407,7 @@
                                           "cls": "pk-settings-shell",
                                           "box": [
                                             208,
-                                            772,
+                                            780,
                                             400,
                                             34
                                           ],
@@ -10437,7 +10442,7 @@
                                               "cls": "pk-settings-summary",
                                               "box": [
                                                 208,
-                                                772,
+                                                780,
                                                 400,
                                                 34
                                               ],
@@ -10447,7 +10452,7 @@
                                                 "width": "400px",
                                                 "height": "34px",
                                                 "minHeight": "0px",
-                                                "padding": "0px 12px",
+                                                "padding": "0px 10px",
                                                 "margin": "0px",
                                                 "gap": "8px",
                                                 "flexDirection": "row",
@@ -10460,7 +10465,7 @@
                                                 "lineHeight": "17.2857px",
                                                 "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
                                                 "textAlign": "center",
-                                                "borderRadius": "8px",
+                                                "borderRadius": "7px",
                                                 "border": "0px none rgb(102, 112, 133)",
                                                 "borderColor": "rgb(102, 112, 133)",
                                                 "borderWidth": "0px",
@@ -10475,8 +10480,8 @@
                                                   "cls": "pk-settings-label",
                                                   "text": "高级设置",
                                                   "box": [
-                                                    220,
-                                                    780,
+                                                    218,
+                                                    788,
                                                     48,
                                                     19
                                                   ],
@@ -10486,19 +10491,19 @@
                                                     "width": "48px",
                                                     "height": "18.8516px",
                                                     "padding": "0px",
-                                                    "margin": "0px 171.578px 0px 0px",
+                                                    "margin": "0px 175.578px 0px 0px",
                                                     "flexDirection": "row",
                                                     "flexWrap": "nowrap",
                                                     "backgroundColor": "rgba(0, 0, 0, 0)",
-                                                    "color": "rgb(78, 89, 105)",
+                                                    "color": "rgb(69, 76, 89)",
                                                     "fontSize": "12px",
                                                     "fontWeight": "600",
                                                     "lineHeight": "18.8571px",
                                                     "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
                                                     "textAlign": "center",
                                                     "borderRadius": "0px",
-                                                    "border": "0px none rgb(78, 89, 105)",
-                                                    "borderColor": "rgb(78, 89, 105)",
+                                                    "border": "0px none rgb(69, 76, 89)",
+                                                    "borderColor": "rgb(69, 76, 89)",
                                                     "borderWidth": "0px",
                                                     "opacity": "1",
                                                     "overflow": "visible",
@@ -10512,8 +10517,8 @@
                                                   "cls": "pk-settings-chip",
                                                   "text": "比例 1:1",
                                                   "box": [
-                                                    448,
-                                                    775,
+                                                    450,
+                                                    783,
                                                     60,
                                                     28
                                                   ],
@@ -10528,13 +10533,13 @@
                                                     "flexWrap": "nowrap",
                                                     "alignItems": "center",
                                                     "backgroundColor": "rgb(255, 255, 255)",
-                                                    "color": "rgb(78, 89, 105)",
+                                                    "color": "rgb(72, 80, 94)",
                                                     "fontSize": "11px",
                                                     "fontWeight": "400",
                                                     "lineHeight": "17.2857px",
                                                     "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
                                                     "textAlign": "center",
-                                                    "borderRadius": "4px",
+                                                    "borderRadius": "5px",
                                                     "border": "1px solid rgb(228, 231, 239)",
                                                     "borderColor": "rgb(228, 231, 239)",
                                                     "borderWidth": "1px",
@@ -10550,8 +10555,8 @@
                                                   "cls": "pk-settings-chip",
                                                   "text": "画质 1K",
                                                   "box": [
-                                                    515,
-                                                    775,
+                                                    517,
+                                                    783,
                                                     58,
                                                     28
                                                   ],
@@ -10566,13 +10571,13 @@
                                                     "flexWrap": "nowrap",
                                                     "alignItems": "center",
                                                     "backgroundColor": "rgb(255, 255, 255)",
-                                                    "color": "rgb(78, 89, 105)",
+                                                    "color": "rgb(72, 80, 94)",
                                                     "fontSize": "11px",
                                                     "fontWeight": "400",
                                                     "lineHeight": "17.2857px",
                                                     "fontFamily": "\"Noto Sans SC\", Inter, \"PingFang SC\", \"Microsoft YaHei\", Arial, sans-serif",
                                                     "textAlign": "center",
-                                                    "borderRadius": "4px",
+                                                    "borderRadius": "5px",
                                                     "border": "1px solid rgb(228, 231, 239)",
                                                     "borderColor": "rgb(228, 231, 239)",
                                                     "borderWidth": "1px",
@@ -10587,8 +10592,8 @@
                                                   "tag": "svg",
                                                   "cls": "lucide lucide-chevron-down pk-settings-chevron",
                                                   "box": [
-                                                    581,
-                                                    782,
+                                                    583,
+                                                    790,
                                                     15,
                                                     15
                                                   ],
@@ -10623,8 +10628,8 @@
                                                       "cls": "",
                                                       "text": "",
                                                       "box": [
-                                                        585,
-                                                        787,
+                                                        587,
+                                                        795,
                                                         8,
                                                         4
                                                       ],
@@ -10665,7 +10670,7 @@
                                           "cls": "pk-submit-row",
                                           "box": [
                                             208,
-                                            820,
+                                            828,
                                             400,
                                             40
                                           ],
@@ -10700,7 +10705,7 @@
                                               "cls": "pk-primary-btn",
                                               "box": [
                                                 208,
-                                                820,
+                                                828,
                                                 400,
                                                 40
                                               ],
@@ -10740,7 +10745,7 @@
                                                   "text": "登录免费生成",
                                                   "box": [
                                                     366,
-                                                    829,
+                                                    837,
                                                     84,
                                                     22
                                                   ],
@@ -10788,15 +10793,15 @@
                           "cls": "pk-result-pane",
                           "box": [
                             640,
-                            128,
-                            776,
-                            748
+                            120,
+                            784,
+                            764
                           ],
                           "style": {
                             "display": "flex",
                             "position": "static",
-                            "width": "776px",
-                            "height": "748px",
+                            "width": "784px",
+                            "height": "764px",
                             "padding": "0px",
                             "margin": "0px",
                             "flexDirection": "column",
@@ -10823,15 +10828,15 @@
                               "cls": "pk-preview-placeholder",
                               "box": [
                                 640,
-                                128,
-                                776,
-                                748
+                                120,
+                                784,
+                                764
                               ],
                               "style": {
                                 "display": "flex",
                                 "position": "static",
-                                "width": "776px",
-                                "height": "748px",
+                                "width": "784px",
+                                "height": "764px",
                                 "padding": "0px",
                                 "margin": "0px",
                                 "flexDirection": "row",
@@ -10859,7 +10864,7 @@
                                   "tag": "div",
                                   "cls": "pk-preview-inner",
                                   "box": [
-                                    848,
+                                    852,
                                     369,
                                     360,
                                     266
@@ -10899,7 +10904,7 @@
                                       "tag": "svg",
                                       "cls": "pk-empty-illustration",
                                       "box": [
-                                        948,
+                                        952,
                                         369,
                                         160,
                                         160
@@ -10935,7 +10940,7 @@
                                           "cls": "",
                                           "text": "",
                                           "box": [
-                                            966,
+                                            970,
                                             399,
                                             112,
                                             96
@@ -10973,7 +10978,7 @@
                                           "cls": "",
                                           "text": "",
                                           "box": [
-                                            978,
+                                            982,
                                             411,
                                             88,
                                             72
@@ -11011,7 +11016,7 @@
                                           "cls": "",
                                           "text": "",
                                           "box": [
-                                            998,
+                                            1002,
                                             427,
                                             16,
                                             16
@@ -11047,7 +11052,7 @@
                                           "cls": "",
                                           "text": "",
                                           "box": [
-                                            988,
+                                            992,
                                             447,
                                             78,
                                             32
@@ -11083,7 +11088,7 @@
                                           "cls": "",
                                           "text": "",
                                           "box": [
-                                            1050,
+                                            1054,
                                             399,
                                             32,
                                             32
@@ -11119,7 +11124,7 @@
                                           "cls": "",
                                           "text": "",
                                           "box": [
-                                            1059,
+                                            1063,
                                             408,
                                             14,
                                             14
@@ -11155,7 +11160,7 @@
                                           "cls": "",
                                           "text": "",
                                           "box": [
-                                            980,
+                                            984,
                                             405,
                                             5,
                                             5
@@ -11191,7 +11196,7 @@
                                           "cls": "",
                                           "text": "",
                                           "box": [
-                                            1072,
+                                            1076,
                                             479,
                                             5,
                                             5
@@ -11227,7 +11232,7 @@
                                           "cls": "",
                                           "text": "",
                                           "box": [
-                                            970,
+                                            974,
                                             453,
                                             4,
                                             4
@@ -11265,7 +11270,7 @@
                                       "cls": "",
                                       "text": "效果图预览",
                                       "box": [
-                                        993,
+                                        997,
                                         537,
                                         70,
                                         22
@@ -11302,7 +11307,7 @@
                                       "cls": "",
                                       "text": "提交任务后，生成结果将在此处展示",
                                       "box": [
-                                        932,
+                                        936,
                                         567,
                                         192,
                                         20
@@ -11337,9 +11342,9 @@
                                     {
                                       "tag": "p",
                                       "cls": "vc-mock-note",
-                                      "text": "本地演示：创作结果为参数化占位渲染（真实生成需接入 AI 模型），参考图会真实进入构图",
+                                      "text": "参考图与提示词会一并送入生成通道；结果卡上的徽标会如实标明本次产出来自真实模型还是本地算法",
                                       "box": [
-                                        868,
+                                        872,
                                         595,
                                         320,
                                         40

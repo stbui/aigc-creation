@@ -30,6 +30,7 @@ import { ConfigService } from '@nestjs/config';
 import * as fs from 'fs';
 import * as path from 'path';
 import { startupWarnings, type LogLevel } from '../../config/env.validation';
+import { currentRequestId } from '../request-context';
 
 /** 级别 → 数值。数值越小越严重，与 Nest 的过滤语义一致 */
 const LEVEL_RANK: Record<LogLevel, number> = {
@@ -217,7 +218,14 @@ private threshold: number;
   private emit(level: LogLevel, message: unknown, params: unknown[] = []): void {
     if (LEVEL_RANK[level] > this.threshold) return;
 
-    const body = maskSecrets(formatMessage(message, params));
+    const text = maskSecrets(formatMessage(message, params));
+    /*
+     * 请求上下文前缀: 有 AsyncLocalStorage 上下文时自动带上 rid,
+     * 于是同一个请求里的所有日志行 (含各 service 打的) 都能被一条 grep 串起来。
+     * 前缀加在脱敏之后 —— 它含唯一标识, 不该被"长随机串"类规则误伤。
+     */
+    const rid = currentRequestId();
+    const body = rid ? `[rid=${rid}] ${text}` : text;
     const line = `${new Date().toISOString()} [${level.toUpperCase()}] ${body}`;
 
     if (this.mirrorToConsole) {

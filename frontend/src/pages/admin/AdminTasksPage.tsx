@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Image, Input, Select, Table } from 'antd';
+import { App, Button, Image, Input, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import { useSearchParams } from 'react-router-dom';
 import { adminTasksApi, toAbsoluteUrl } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import {
   AdminDrawer,
   AdminListError,
+  AdminStaleError,
   AdminListLoading,
   ConfirmAction,
+  adminPagination,
   useAdminList,
 } from '../../components/admin/AdminWidgets';
 import {
@@ -19,7 +22,13 @@ import {
   StatCard,
   StatusTag,
 } from '../../components/admin/PageHeader';
-import type { AdminTask, AdminTaskDetail, AdminTaskListResult } from '../../types/api';
+import { BatchResultModal } from '../../components/admin/BatchResultModal';
+import type {
+  AdminTask,
+  AdminTaskDetail,
+  AdminTaskListResult,
+  BatchSummary,
+} from '../../types/api';
 
 type Row = AdminTask;
 
@@ -36,7 +45,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   gateway: '真实模型',
   local: '本地算法',
   // 建任务时的初值; 跑完后会被 processTask 改写成实际通道
-  mock: '待执行',
+  pending: '待执行',
 };
 
 /**
@@ -48,6 +57,8 @@ const PROVIDER_LABELS: Record<string, string> = {
  */
 const ERROR_LABELS: Record<string, string> = {
   '42201': '生成过程异常',
+  // 该能力本地没有实现, 且当时没有可用的模型通道 (已自动退款)
+  '42204': '无可用模型通道',
   cancelled_by_admin: '后台终止',
 };
 
@@ -100,10 +111,34 @@ export function AdminTasksPage() {
   const [from, setFrom] = useState<string>('');
   const [to, setTo] = useState<string>('');
 
-  const [detailId, setDetailId] = useState<string | null>(null);
+  /*
+   * 顶栏搜到「任务」时带 `?id=` 跳过来, 直接打开该任务的详情抽屉。
+   * 列表本身没有按 id 筛选的入口（任务 id 不是人记得住的东西）,
+   * 让运营落在一条被筛过的列表上反而要从几十行里再找一遍。
+   */
+  const [searchParams] = useSearchParams();
+  const [detailId, setDetailId] = useState<string | null>(() => searchParams.get('id'));
+  useEffect(() => {
+    const id = searchParams.get('id');
+    if (id) setDetailId(id);
+  }, [searchParams]);
+
   const [confirm, setConfirm] = useState<{ kind: 'retry' | 'cancel'; task: Row } | null>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
+
+  /*
+   * 批量选择与批量动作。
+   *
+   * 「批量重试」只对 failed 有效、「批量终止」只对 pending/running 有效 ——
+   * 页面不按状态过滤可选行 (一次筛选后混选是常态), 而是把不合法的行
+   * 交给后端逐条返回原因, 再在结果弹窗里列出来。前端预筛会让人以为
+   * "我明明选了 20 个, 怎么只处理了 8 个"。
+   */
+  const [selected, setSelected] = useState<string[]>([]);
+  const [batchKind, setBatchKind] = useState<'retry' | 'cancel' | null>(null);
+  const [batchSummary, setBatchSummary] = useState<BatchSummary<unknown> | null>(null);
+  const [batchTitle, setBatchTitle] = useState('');
 
   const fetcher = useCallback(
     (params: Record<string, unknown>) =>
@@ -165,7 +200,27 @@ export function AdminTasksPage() {
     [data],
   );
 
-  const applyQuery = () =>
+  const runBatch = async (kind: 'retry' | 'cancel') => {
+    if (selected.length === 0) return;
+    setBusy(true);
+    const trimmed = reason.trim();
+    try {
+      const summary = await adminTasksApi.batch(selected, kind, trimmed || undefined);
+      setBatchTitle(kind === 'retry' ? '批量重试结果' : '批量终止结果');
+      setBatchSummary(summary);
+      setBatchKind(null);
+      setReason('');
+      setSelected([]);
+      reload();
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : '批量操作失败');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const applyQuery = () => {
+    setSelected([]);
     setQuery({
       status,
       capability,
@@ -177,6 +232,7 @@ export function AdminTasksPage() {
       from: from || undefined,
       to: to || undefined,
     });
+  };
 
   const reset = () => {
     setStatus(undefined);
@@ -186,6 +242,7 @@ export function AdminTasksPage() {
     setProject('');
     setFrom('');
     setTo('');
+    setSelected([]);
     setQuery({
       status: undefined,
       capability: undefined,
@@ -270,16 +327,37 @@ export function AdminTasksPage() {
         title: '状态',
         dataIndex: 'status',
         key: 'status',
-        width: 90,
-        render: (v: string) => <StatusTag status={v} />,
+        width: 150,
+        /*
+         * 失败原因直接进列表。此前只有「失败」二字, 原因要进详情抽屉才看得到,
+         * 而详情入口是最右侧一条被横向裁掉一半的文字链 —— 排障动线被迫拉长。
+         */
+        render: (v: string, row: Row) => (
+          <div className="adm-cell-stack">
+            <StatusTag status={v} />
+            {v === 'failed' && row.errorCode && (
+              <span className="adm-cell-sub" title={row.errorCode}>
+                {ERROR_LABELS[row.errorCode] ?? row.errorCode}
+              </span>
+            )}
+          </div>
+        ),
       },
       {
         title: '通道',
         dataIndex: 'provider',
         key: 'provider',
         width: 90,
-        render: (v: string | null) =>
-          v ? <span className="adm-tag is-muted">{PROVIDER_LABELS[v] ?? v}</span> : <span className="adm-cell-sub">—</span>,
+        /*
+         * `pending` 是建任务时的初值 (还没跑出真实通道)。对失败任务显示「待执行」
+         * 会与同一行的「失败」互相矛盾, 读起来像任务没开始跑; 这类行一律显示「—」。
+         */
+        render: (v: string | null, row: Row) =>
+          !v || (v === 'pending' && row.status !== 'pending') ? (
+            <span className="adm-cell-sub">—</span>
+          ) : (
+            <span className="adm-tag is-muted">{PROVIDER_LABELS[v] ?? v}</span>
+          ),
       },
       {
         title: '用户',
@@ -317,33 +395,38 @@ export function AdminTasksPage() {
         title: '',
         key: 'ops',
         width: 130,
+        /*
+         * 固定在最右。表格实际宽 1250 > 容器 1106, 1440 屏下「详情」按钮右边界
+         * 到 1439px 已经被裁掉一截, 1280 屏更明显 —— 主操作默认看不见。
+         */
+        fixed: 'right',
         render: (_: unknown, row) => (
           <div className="adm-ops">
-            <button type="button" className="adm-link" onClick={() => setDetailId(row.id)}>
+            <Button type="link" className="adm-link" onClick={() => setDetailId(row.id)}>
               详情
-            </button>
+            </Button>
             {/*
              * 重试/终止按状态出现, 而不是一律置灰:
              * 「仅失败任务可重试」是后端硬校验, 给一个点不动的按钮
              * 只会让人反复试。不可用时直接不渲染。
              */}
             {row.status === 'failed' && can('task.retry') && (
-              <button
-                type="button"
+              <Button
+                type="link"
                 className="adm-link"
                 onClick={() => openConfirm('retry', row)}
               >
                 重试
-              </button>
+              </Button>
             )}
             {(row.status === 'pending' || row.status === 'running') && can('task.cancel') && (
-              <button
-                type="button"
+              <Button
+                type="link" danger
                 className="adm-link is-danger"
                 onClick={() => openConfirm('cancel', row)}
               >
                 终止
-              </button>
+              </Button>
             )}
           </div>
         ),
@@ -422,6 +505,8 @@ export function AdminTasksPage() {
           options={[
             { value: 'gateway', label: '真实模型' },
             { value: 'local', label: '本地算法' },
+            // 「建了但没跑起来」的任务: 排障时按它筛，比逐条看状态快
+            { value: 'pending', label: '待执行' },
           ]}
           value={provider}
           onChange={setProvider}
@@ -459,40 +544,97 @@ export function AdminTasksPage() {
           onChange={(e) => setTo(e.target.value)}
         />
         <FilterActions>
-          <button type="button" className="adm-btn is-primary" onClick={applyQuery}>
+          <Button type="primary" className="adm-btn is-primary" onClick={applyQuery}>
             查询
-          </button>
-          <button type="button" className="adm-btn" onClick={reset}>
+          </Button>
+          <Button type="default" className="adm-btn" onClick={reset}>
             重置
-          </button>
+          </Button>
         </FilterActions>
       </FilterBar>
+
+      {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
+      {error && data && <AdminStaleError error={error} onRetry={reload} />}
 
       <Panel>
         {loading && !data ? (
           <AdminListLoading tip="加载任务列表…" />
-        ) : error ? (
+        ) : error && !data ? (
           <AdminListError error={error} onRetry={reload} />
-        ) : (list?.items.length ?? 0) === 0 ? (
-          <AdminEmpty description="没有符合条件的任务。在前台任意生成一次，这里就会出现记录。" />
         ) : (
-          <Table<Row>
-            rowKey="id"
-            size="small"
-            columns={columns}
-            dataSource={list?.items ?? []}
-            loading={loading}
-            scroll={{ x: 1210 }}
-            pagination={{
-              current: list?.page ?? 1,
-              pageSize: list?.pageSize ?? 20,
-              total: list?.total ?? 0,
-              showSizeChanger: true,
-              pageSizeOptions: [20, 50, 100],
-              showTotal: (t) => `共 ${t} 条`,
-              onChange: setPage,
-            }}
-          />
+          <>
+            {selected.length > 0 && (
+              <div className="adm-bulk-bar">
+                <span className="adm-bulk-count">已选 {selected.length} 项</span>
+                {can('task.retry') && (
+                  <Button
+                    type="default"
+                    className="adm-btn"
+                    disabled={busy}
+                    onClick={() => {
+                      setReason('');
+                      setBatchKind('retry');
+                    }}
+                  >
+                    批量重试
+                  </Button>
+                )}
+                {can('task.cancel') && (
+                  <Button
+                    type="primary" danger
+                    className="adm-btn is-danger"
+                    disabled={busy}
+                    onClick={() => {
+                      setReason('');
+                      setBatchKind('cancel');
+                    }}
+                  >
+                    批量终止
+                  </Button>
+                )}
+                <Button type="link" className="adm-link" onClick={() => setSelected([])}>
+                  清空选择
+                </Button>
+              </div>
+            )}
+            {(list?.items.length ?? 0) === 0 ? (
+              <AdminEmpty description="没有符合条件的任务。在前台任意生成一次，这里就会出现记录。" />
+            ) : (
+              <Table<Row>
+                rowKey="id"
+                size="small"
+                columns={columns}
+                dataSource={list?.items ?? []}
+                loading={loading}
+                scroll={{ x: 1250 }}
+                /*
+                 * 整行可点开详情。此前只有最右侧那个「详情」文字链是入口,
+                 * 而它恰好是被横向裁掉的那一列。
+                 */
+                onRow={(record) => ({
+                  onClick: (e) => {
+                    const el = e.target as HTMLElement;
+                    if (el.closest('button, a, input, label')) return;
+                    setDetailId(record.id);
+                  },
+                })}
+                rowClassName="adm-row-clickable"
+                rowSelection={{
+                  selectedRowKeys: selected,
+                  onChange: (keys) => setSelected(keys as string[]),
+                }}
+                pagination={adminPagination({
+                  current: list?.page ?? 1,
+                  pageSize: list?.pageSize ?? 20,
+                  total: list?.total ?? 0,
+                  onChange: (page, size) => {
+                    setSelected([]);
+                    setPage(page, size);
+                  },
+                })}
+              />
+            )}
+          </>
         )}
       </Panel>
 
@@ -506,22 +648,22 @@ export function AdminTasksPage() {
           return (
             <div className="adm-ops">
               {d.status === 'failed' && can('task.retry') && row && (
-                <button
-                  type="button"
+                <Button
+                  type="primary"
                   className="adm-btn is-primary"
                   onClick={() => openConfirm('retry', row)}
                 >
                   重试此任务
-                </button>
+                </Button>
               )}
               {(d.status === 'pending' || d.status === 'running') && can('task.cancel') && row && (
-                <button
-                  type="button"
+                <Button
+                  type="primary" danger
                   className="adm-btn is-danger"
                   onClick={() => openConfirm('cancel', row)}
                 >
                   终止此任务
-                </button>
+                </Button>
               )}
             </div>
           );
@@ -573,17 +715,24 @@ export function AdminTasksPage() {
             </div>
 
             <div className="adm-section">
-              <div className="adm-section-title">
-                状态流转
-                <span className="adm-panel-note">系统未记录开始执行时刻，故不展示该节点</span>
-              </div>
+              <div className="adm-section-title">状态流转</div>
               <ul className="adm-timeline">
                 {d.timeline.map((n) => (
                   <li key={n.key} className={`adm-timeline-item${n.done ? ' is-done' : ''}`}>
                     <span className="adm-timeline-dot" aria-hidden="true" />
                     <span className="adm-timeline-label">{n.label}</span>
+                    {/*
+                     * 没有时间的节点不能一律写「进行中」——
+                     * pending 任务的终态节点会因此被误读成"已经开跑了"。
+                     */}
                     <span className="adm-cell-sub">
-                      {n.at ? new Date(n.at).toLocaleString('zh-CN') : '进行中'}
+                      {n.at
+                        ? new Date(n.at).toLocaleString('zh-CN')
+                        : n.done
+                          ? '未记录具体时间'
+                          : d.status === 'pending'
+                            ? '尚未开始'
+                            : '进行中'}
                     </span>
                   </li>
                 ))}
@@ -702,7 +851,7 @@ export function AdminTasksPage() {
              */
             <div className="adm-confirm-typing">
               <label htmlFor="adm-task-reason">操作原因（会记入操作审计）：</label>
-              <input
+              <Input
                 id="adm-task-reason"
                 type="text"
                 value={reason}
@@ -717,6 +866,69 @@ export function AdminTasksPage() {
           }
         />
       )}
+
+      {/* 批量重试 / 终止: 一次作用于 N 条, 更需要理由留痕 */}
+      {batchKind && (
+        <ConfirmAction
+          open
+          title={batchKind === 'retry' ? `批量重试 ${selected.length} 个任务` : `批量终止 ${selected.length} 个任务`}
+          confirmText={batchKind === 'retry' ? '确认重试' : '确认终止'}
+          danger={batchKind === 'cancel'}
+          loading={busy}
+          onCancel={() => {
+            setBatchKind(null);
+            setReason('');
+          }}
+          onConfirm={() => void runBatch(batchKind)}
+          description={
+            batchKind === 'retry' ? (
+              <>
+                <p>
+                  将为每个<b>失败</b>任务用原参数新建一个任务。非失败状态的行会被跳过，
+                  原因会在结果里逐条列出。
+                </p>
+                <p className="adm-cell-sub">重试会真实消耗模型额度，批量执行请先确认数量。</p>
+              </>
+            ) : (
+              <>
+                <p>
+                  选中的<b>等待中 / 执行中</b>任务会被置为失败并立即对用户可见。
+                  已完成的或已失败的行会被跳过。
+                </p>
+                <p className="adm-cell-sub">已发出的模型调用仍会跑完并计费，但产出图不再入库。</p>
+              </>
+            )
+          }
+          impact={
+            batchKind === 'retry'
+              ? [`最多新增 ${selected.length} 个任务`, '每个任务将真实消耗模型额度']
+              : ['目标任务状态变为失败', '不可撤销（需重新发起生成）']
+          }
+          extra={
+            <div className="adm-confirm-typing">
+              <label htmlFor="adm-task-batch-reason">操作原因（会记入操作审计）：</label>
+              <Input
+                id="adm-task-batch-reason"
+                type="text"
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder={
+                  batchKind === 'retry' ? '如：通道恢复后批量重试' : '如：批量清理卡死任务'
+                }
+                maxLength={200}
+                autoComplete="off"
+              />
+            </div>
+          }
+        />
+      )}
+
+      <BatchResultModal
+        open={batchSummary !== null}
+        title={batchTitle}
+        summary={batchSummary}
+        onClose={() => setBatchSummary(null)}
+      />
     </>
   );
 }

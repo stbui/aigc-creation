@@ -1,4 +1,3 @@
-import { toAssetUrl } from './gateway-image.provider';
 import { getCapability } from '../capabilities/capability.registry';
 
 /**
@@ -22,13 +21,6 @@ import { getCapability } from '../capabilities/capability.registry';
  * 第二个显式入参 `refCount`。
  */
 
-interface PromptContext {
-  baseUrl: string;
-  token: string;
-  model: string;
-  assetBase: string;
-}
-
 /**
  * 取能力的能力声明 (缺失即抛, 不再回落成裸 id)。
  *
@@ -45,32 +37,6 @@ function pluginOf(capability: string) {
     );
   }
   return def;
-}
-
-/** 组装请求体 (aigc 网关契约: type/prompt/model/params) */
-export function buildGatewayRequest(
-  capability: string,
-  inputPaths: string[],
-  params: Record<string, any>,
-  promptOverride: string | undefined,
-  ctx: PromptContext,
-): Record<string, unknown> {
-  const def = pluginOf(capability);
-  const prompt = promptOverride || def.buildPrompt(params, inputPaths.length);
-  return {
-    // ⚠️ type 取自能力自身的 modality: 同一套网关契约下, 图像与文本的
-    // type 取值不同, 写死 'image' 会让网关按图像契约解析文本请求。
-    type: def.modality,
-    prompt,
-    ...(ctx.model ? { model: ctx.model } : {}),
-    params: {
-      capability,
-      // 业务参数原样透传, 网关/渠道可自行取用
-      ...params,
-      // 参考图以站内 URL 回传 (网关侧拉取), 不传本地磁盘路径
-      inputImages: inputPaths.map((p) => `${ctx.assetBase}${toAssetUrl(p)}`),
-    },
-  };
 }
 
 /**

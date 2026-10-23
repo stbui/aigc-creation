@@ -167,7 +167,11 @@ export function MobileUploadModal({ open, onReceived, onCancel }: MobileUploadMo
       centered
       className="mum-modal"
       closeIcon={null}
-      styles={{ body: { padding: 0 } }}
+      styles={{
+        body: { padding: 0 },
+        // 参考站 backdrop: #14122180 (不带模糊)。antd 默认是 45% 纯黑, 比参考站更重。
+        mask: { background: '#14122180' },
+      }}
       title={null}
     >
       <div className="mum">
@@ -216,7 +220,7 @@ export function MobileUploadModal({ open, onReceived, onCancel }: MobileUploadMo
  * 手机端页面地址。
  *
  * ⚠️ **用当前页面的 origin 而不是写死 localhost**:
- * 手机扫码后要能真的打开这个地址 —— 本地开发时前端跑在 5173,
+ * 手机扫码后要能真的打开这个地址 —— 本地开发时前端跑在 5100,
  * 写死端口在反向代理/换端口的部署下就会指错地方。
  * 取 `window.location.origin` 保证与用户当前访问的站点一致。
  */

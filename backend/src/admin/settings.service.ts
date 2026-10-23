@@ -4,6 +4,7 @@ import { AppError } from '../common/app.exception';
 import {
   SETTING_DEFS,
   SETTING_GROUP_LABELS,
+  SETTING_KEY_TO_FIELD,
   findSettingDef,
   type SettingDef,
 } from './settings.dto';
@@ -27,7 +28,13 @@ export class AdminSettingsService {
 
     const groups: Record<
       string,
-      { key: string; label: string; items: Array<SettingDef & { value: string | number | boolean; overridden: boolean }> }
+      {
+        key: string;
+        label: string;
+        items: Array<
+          SettingDef & { field: string; value: string | number | boolean; overridden: boolean }
+        >;
+      }
     > = {};
 
     for (const def of SETTING_DEFS) {
@@ -35,11 +42,13 @@ export class AdminSettingsService {
       const overridden = raw !== undefined;
       const group = (groups[def.key.split('.')[0]] ??= {
         key: def.key.split('.')[0],
-        label: SETTING_GROUP_LABELS[def.group],
+        label: SETTING_GROUP_LABELS[def.group] ?? def.group,
         items: [],
       });
       group.items.push({
         ...def,
+        // 写入用的字段名随读接口一起下发, 前端不必自己猜「点号键怎么变驼峰」
+        field: SETTING_KEY_TO_FIELD[def.key] ?? def.key,
         value: overridden ? this.parseValue(raw as string, def) : def.default,
         overridden,
       });
@@ -97,6 +106,26 @@ export class AdminSettingsService {
     const row = await this.prisma.systemSetting.findUnique({ where: { key } });
     if (!row) return def.default as T;
     return this.parseValue(row.value, def) as T;
+  }
+
+  /**
+   * 退款规则快照 (B8)。
+   *
+   * 三项一次读齐再交给 `OrderService.refund` —— 让服务层只负责「按规则判」,
+   * 不必知道设置存在哪个表、键叫什么。规则在**提交那一刻**读取并冻结:
+   * 运营在退款过程中改了设置, 本次退款仍按提交时的规则判定。
+   */
+  async refundRules(): Promise<{
+    windowDays: number;
+    maxRatioBps: number;
+    allowConsumedTask: boolean;
+  }> {
+    const [windowDays, maxRatioBps, allowConsumedTask] = await Promise.all([
+      this.get<number>('refund.windowDays'),
+      this.get<number>('refund.maxRatioBps'),
+      this.get<boolean>('refund.allowConsumedTask'),
+    ]);
+    return { windowDays, maxRatioBps, allowConsumedTask };
   }
 
   /** 按 SettingDef 校验并归一化值 */

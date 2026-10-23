@@ -1,23 +1,27 @@
-import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { App, Modal, Spin } from 'antd';
 import { ImagePlus, Maximize2, RefreshCw, X } from 'lucide-react';
-import { assetsApi, toAbsoluteUrl } from '../lib/api';
+import { assetsApi, assetSrc, toAbsoluteUrl } from '../lib/api';
 
 import { useProject } from '../hooks/useProject';
 import { usePollAbort } from '../hooks/usePollAbort';
+import { useCapabilities } from '../hooks/useCapabilities';
 import { usePasteUpload } from '../hooks/usePasteUpload';
 import { useCreditLabel } from '../hooks/useCreditLabel';
-import { AssetLibraryModal } from './AssetLibraryModal';
+import { AssetLibraryModal, useAssetLibrary } from './AssetLibraryModal';
+import { MobileUploadModal } from './MobileUploadModal';
 import { ToolSettingsPopover } from './ToolSettingsPopover';
 import { ToolSubmitBar } from './ToolSubmitBar';
 import { ToolEmptyState, ToolGeneratingState } from './ToolEmptyState';
 import { ResultMedia, formatDuration } from './ResultMedia';
+import { ProviderBadge } from './ProviderBadge';
 import { pollToResult } from '../lib/poll';
-import type { Asset, Modality, Task, TaskStatus } from '../types/api';
+import { taskErrorText } from '../lib/constants';
+import type { Asset, MobileUploadAsset, Modality, Task, TaskStatus } from '../types/api';
 
 /**
  * 修图系工具页共享骨架 —— 1:1 复刻参考站 local-redraw / background-remove 等页的公共结构:
- *   左栏 432px: 上传卡 (* 上传图片 + 从素材库导入[disabled] + 手机上传 + dropzone)
+ *   左栏 432px: 上传卡 (* 上传图片 + 从素材库导入 + 手机上传 + dropzone)
  *              → 业务卡 (children, 各页自定义)
  *              → 提交区 (高级设置 popover + 主按钮, sticky 底部)
  *              → 历史记录 (可折叠, 真实任务数据)
@@ -37,6 +41,14 @@ export interface ToolResult {
   width?: number;
   height?: number;
   errorCode?: string | null;
+  /**
+   * 本次实际通道: gateway=真实模型 / local=本地算法。
+   *
+   * 由 `lib/poll.ts` 的 pollToResult 透出。结果卡按它显示徽标 ——
+   * 同一能力云端可用时是模型产出、云端故障时是本地回落, 必须如实区分,
+   * 不能按能力的静态 mode 猜。
+   */
+  provider?: string | null;
   /**
    * 产出模态 (2026-10-20 视频通道落地)。
    *
@@ -68,7 +80,7 @@ interface UploadSpec {
 interface SettingsSpec {
   /** 比例组 (含"原比例"首项; 参考站修图系默认原比例) */
   ratio?: boolean;
-  /** 分辨率组 (1K/2K, 4K 如实禁用) */
+  /** 分辨率组 (1K/2K/4K; 4K 在该能力无云端通道时禁用, 见 lib/optionSets) */
   resolution?: boolean;
   defaultRatio?: string;
 }
@@ -95,12 +107,15 @@ interface Props {
   creditLabel?: string;
   /** 提交按钮上方的提示行 (参考站部分页有 '* 确认素材和参数后提交…') */
   hint?: string;
-  /** mock 能力诚实披露 (空态与结果徽标) */
-  mockNote?: string;
   /** 空态描述 */
   emptyDesc: string;
-  /** 业务卡 (上传卡与提交区之间) */
-  children?: ReactNode;
+  /**
+   * 业务卡 (上传卡与提交区之间)。
+   *
+   * 传函数时**每次渲染都会拿到当前已上传的图片** —— 局部重绘要用它当画布底图
+   * （涂抹出的遮罩必须与原图同尺寸）。传普通节点则与改造前一致。
+   */
+  children?: ReactNode | ((images: ToolAsset[]) => ReactNode);
   /** 提交条件 */
   formValid: boolean;
   submitting: boolean;
@@ -121,6 +136,21 @@ export function ToolShell(props: Props) {
    * 让「价格跟着能力走」而不是「跟着页面记忆走」。
    */
   const autoCreditLabel = useCreditLabel(props.capability);
+
+  /*
+   * 该项能力此刻能不能提交 (2026-10-21)。
+   *
+   * 后端对「本地没有实现」的能力 (创意生图 / 局部重绘 / 图片翻译 / 自由创作)
+   * 是 **没通道就判失败并退款**, 不存在本地产出。故这些页在按钮上方如实说明,
+   * 并把提交置灰 —— 否则用户点下去只会等到一次 42204。
+   * 有真实本地算法的能力此时是 local, 不在拦截范围。
+   */
+  const { data: capsData } = useCapabilities();
+  const runtime = capsData?.items.find((c) => c.id === props.capability)?.runtime;
+  const unavailableReason =
+    runtime && (runtime.effective === 'unavailable' || runtime.effective === 'disabled')
+      ? runtime.reason || '该能力当前不可提交，请稍后再试或联系客服。'
+      : null;
   const {
     capability,
     title,
@@ -130,7 +160,6 @@ export function ToolShell(props: Props) {
     submitLabel,
     creditLabel,
     hint,
-    mockNote,
     emptyDesc,
     children,
     formValid,
@@ -152,16 +181,95 @@ export function ToolShell(props: Props) {
   const [resolution, setResolution] = useState('1k');
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  // 素材库导入 (参考站该按钮 disabled, 本地演示如实禁用并提示)
-  const [libraryOpen, setLibraryOpen] = useState(false);
-  const [libraryItems, setLibraryItems] = useState<Asset[]>([]);
-  const [libraryLoading, setLibraryLoading] = useState(false);
+  /** 手机上传弹窗 (二维码方案, 手机端传回后进入图片位) */
+  const [mobileOpen, setMobileOpen] = useState(false);
+
   /**
-   * 素材库加载失败必须与「无素材」分开 (2026-10-20 修)。
-   * 此前失败只弹 message.error, 弹窗内照常渲染「素材库暂无原始图片」——
-   * 用户以为是自己没上传过, 真相是接口没连上。
+   * 图片位的同步镜像。
+   *
+   * 素材库弹窗「确定」时是**同步 for 循环**逐个调 onPick, 期间不会重渲染 ——
+   * 只读 `images` 会让「最多 1 张」的页面把一次勾选的 3 张全部收下 (每张都读到
+   * 同一份旧 state)。故用 ref 记下本轮已接受的结果, 渲染后再与 state 对齐。
    */
-  const [libraryError, setLibraryError] = useState<string | null>(null);
+  const imagesRef = useRef<ToolAsset[]>(images);
+  useEffect(() => {
+    imagesRef.current = images;
+  }, [images]);
+
+  /**
+   * 素材库点选回填。
+   *
+   * ⚠️ 拒绝时必须显式 `return false`: undefined 会被选择器当成「接受」,
+   * 上限与去重就形同虚设 (AssetLibraryModal 的调用约定)。
+   */
+  const pickFromLibrary = useCallback(
+    (asset: Asset): boolean => {
+      if (!upload) return false;
+      const current = imagesRef.current;
+      if (current.length >= upload.max) {
+        message.warning(`最多上传 ${upload.max} 张图片`);
+        return false;
+      }
+      if (current.some((x) => x.id === asset.id)) {
+        message.info('该素材已在列表中');
+        return false;
+      }
+      const next: ToolAsset = {
+        id: asset.id,
+        url: assetSrc(asset) ?? toAbsoluteUrl(asset.sourceUrl) ?? '',
+        name: asset.sourceUrl.split('/').pop() ?? '素材',
+      };
+      imagesRef.current = [...current, next];
+      // 用 updater 追加: 一轮多选时前一张还没进 state, 直接读 images 会丢
+      setImages((prev) => (prev.some((x) => x.id === next.id) ? prev : [...prev, next]));
+      return true;
+    },
+    [message, upload],
+  );
+
+  // 素材库弹窗 (通用组件; 本页只提供额度与去重规则)
+  const {
+    open: libraryOpen,
+    loading: libraryLoading,
+    items: libraryItems,
+    error: libraryError,
+    openLibrary,
+    closeLibrary,
+  } = useAssetLibrary(pickFromLibrary);
+
+  /**
+   * 手机端传回图片 → 进入图片位。
+   *
+   * 超出位数的部分**如实告知被截断**, 不静默丢弃: 用户在手机上挑好了 5 张,
+   * 电脑端只进 1 张却不说, 是最难受的一种失败。
+   */
+  const addMobileAssets = useCallback(
+    (assets: MobileUploadAsset[]) => {
+      const max = upload?.max ?? 0;
+      const prev = imagesRef.current;
+      const room = max - prev.length;
+      if (room <= 0) {
+        message.warning(`图片位已满 (${max} 张), 手机上传的图片未加入`);
+        setMobileOpen(false);
+        return;
+      }
+      const fresh = assets.filter((a) => !prev.some((x) => x.id === a.id));
+      const accepted = fresh.slice(0, room);
+      const dropped = fresh.length - accepted.length;
+      if (dropped > 0) message.warning(`图片位只剩 ${room} 个, ${dropped} 张未加入`);
+
+      const added: ToolAsset[] = accepted.map((a) => ({
+        id: a.id,
+        url: toAbsoluteUrl(a.signedUrl || a.url) ?? '',
+        name: a.filename,
+      }));
+      imagesRef.current = [...prev, ...added];
+      setImages((cur) => [...cur, ...added.filter((a) => !cur.some((x) => x.id === a.id))]);
+      setMobileOpen(false);
+      if (added.length > 0) message.success(`已从手机接收 ${added.length} 张图片`);
+    },
+    [message, upload],
+  );
 
   const uploadFiles = useCallback(
     async (files: FileList | File[]) => {
@@ -184,7 +292,7 @@ export function ToolShell(props: Props) {
         const uploaded: ToolAsset[] = [];
         for (const file of accepted) {
           const asset = await assetsApi.upload(file, projectId);
-          uploaded.push({ id: asset.id, url: toAbsoluteUrl(asset.sourceUrl) ?? '', name: file.name });
+          uploaded.push({ id: asset.id, url: assetSrc(asset) ?? '', name: file.name });
         }
         setImages((prev) => [...prev, ...uploaded]);
         message.success(`已上传 ${uploaded.length} 张图片`);
@@ -204,6 +312,11 @@ export function ToolShell(props: Props) {
 
   const submit = async () => {
     if (!formValid || submitting) return;
+    // 能力不可提交 (未接通道 / 已下线): 不发这次注定 42204 的请求
+    if (unavailableReason) {
+      message.warning(unavailableReason);
+      return;
+    }
     await onSubmit(images, { ratio, resolution });
   };
 
@@ -229,29 +342,15 @@ export function ToolShell(props: Props) {
                       <button
                         type="button"
                         className="pk-text-link"
-                        disabled
-                        title="本地演示环境暂不支持素材库导入"
-                        onClick={() => {
-                          setLibraryOpen(true);
-                          setLibraryLoading(true);
-                          setLibraryError(null);
-                          assetsApi
-                            .list({ kind: 'original', limit: 60 })
-                            .then((res) => setLibraryItems(res.items ?? []))
-                            .catch((e: unknown) => {
-                              setLibraryError(e instanceof Error ? e.message : '素材库加载失败');
-                              message.error('素材库加载失败');
-                            })
-                            .finally(() => setLibraryLoading(false));
-                        }}
+                        onClick={openLibrary}
                       >
                         从素材库导入
                       </button>
                       <button
                         type="button"
                         className="pk-text-link"
-                        title="本地演示环境暂不支持手机上传"
-                        onClick={() => message.info('本地演示环境暂不支持手机上传，可直接拖拽或粘贴上传')}
+                        title="用手机扫码上传，图片回填到左侧"
+                        onClick={() => setMobileOpen(true)}
                       >
                         手机上传
                       </button>
@@ -336,15 +435,25 @@ export function ToolShell(props: Props) {
               </section>
             )}
 
-            {/* 业务卡 */}
-            {children}
+            {/* 业务卡 (函数形态可读到已上传图片, 供画布类页面当底图) */}
+            {typeof children === 'function' ? children(images) : children}
 
           </div>
 
           {/* 提交区 (sticky 底部) */}
+          {/*
+            能力不可提交时先说明再置灰 (2026-10-21)。
+            这些页(局部重绘/图片翻译/创意生图…)不做能力级判断, 而后端对
+            「本地没有实现」的能力会没通道就 failed/42204 —— 与其让用户
+            点下去等一次失败, 不如在这里说清原因。有真实本地算法的能力
+            (抠图/扩图/换色/去水印…)此时是 local, 不受影响。
+          */}
+          {unavailableReason && !submitting && (
+            <p className="tool-submit-notice tool-submit-notice-error">{unavailableReason}</p>
+          )}
           <ToolSubmitBar
             submitting={submitting}
-            disabled={!formValid}
+            disabled={!formValid || Boolean(unavailableReason)}
             label={submitLabel}
             creditLabel={creditLabel ?? autoCreditLabel ?? undefined}
             desc={desc}
@@ -358,9 +467,9 @@ export function ToolShell(props: Props) {
                   onRatioChange={setRatio}
                   resolution={resolution}
                   onResolutionChange={setResolution}
+                  capabilityId={capability}
                   showRatio={Boolean(settings.ratio)}
                   showResolution={Boolean(settings.resolution)}
-                  resolutionTitle="分辨率（积分/权益消耗）"
                 />
               ) : null
             }
@@ -385,9 +494,7 @@ export function ToolShell(props: Props) {
         {submitting && !showResult ? (
           <ToolGeneratingState />
         ) : !showResult ? (
-          <ToolEmptyState title={title} desc={emptyDesc}>
-              {mockNote && <p className="tool-mock-note">{mockNote}</p>}
-            </ToolEmptyState>
+          <ToolEmptyState title={title} desc={emptyDesc} />
         ) : (
           <div className="pk-result-body">
             <div className="pk-result-toolbar">
@@ -416,8 +523,11 @@ export function ToolShell(props: Props) {
                         />
                       </div>
                       <div className="pk-result-meta">
-                        <span className="pk-result-variant">{title}结果</span>
-                        {mockNote && <span className="pk-result-mock-badge">本地占位渲染</span>}
+                        <span className="pk-result-variant">
+                          {title}结果
+                          {/* 真实模型 / 本地回落必须区分显示, 不按能力 mode 猜 */}
+                          <ProviderBadge provider={r.provider} />
+                        </span>
                         <span className="pk-result-params">
                           {r.width && r.height ? `${r.width}×${r.height}` : ''}
                           {/* 视频没有宽高可显示 (Jimp 不解视频), 故显示时长 */}
@@ -432,7 +542,7 @@ export function ToolShell(props: Props) {
                     <div key={i} className="pk-result-card pk-result-card-detail">
                       <div className="pk-result-detail-media pk-result-failed">
                         <X size={20} />
-                        <span>生成失败（{r.errorCode ?? '未知错误'}）</span>
+                        <span>生成失败：{taskErrorText(r.errorCode)}</span>
                       </div>
                     </div>
                   ),
@@ -443,15 +553,22 @@ export function ToolShell(props: Props) {
         )}
       </section>
 
-      {/* 素材库弹窗 (参考站该入口 disabled, 保留真实数据兜底: 打开可看不可选) */}
+      {/* 素材库选择弹窗 (真实数据; 可选张数 = 剩余图片位) */}
       <AssetLibraryModal
         open={libraryOpen}
         loading={libraryLoading}
         items={libraryItems}
         error={libraryError}
-        onCancel={() => setLibraryOpen(false)}
-        onPick={() => undefined}
-        readOnly
+        onCancel={closeLibrary}
+        onPick={pickFromLibrary}
+        maxSelectable={upload ? Math.max(upload.max - images.length, 0) : undefined}
+      />
+
+      {/* 手机上传弹窗 (二维码方案) */}
+      <MobileUploadModal
+        open={mobileOpen}
+        onReceived={addMobileAssets}
+        onCancel={() => setMobileOpen(false)}
       />
     </div>
   );

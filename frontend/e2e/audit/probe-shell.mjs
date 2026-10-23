@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 
 const OUT = join(dirname(fileURLToPath(import.meta.url)), 'out');
 const EXEC = '/Users/bright/Library/Caches/ms-playwright/chromium-1134/chrome-mac/Chromium.app/Contents/MacOS/Chromium';
-const TARGETS = { ref: 'https://ijihua.cn/free-creation', local: 'http://localhost:5173/free-creation' };
+const TARGETS = { ref: 'https://ijihua.cn/free-creation', local: 'http://localhost:5100/free-creation' };
 
 const b = await chromium.launch({ executablePath: EXEC });
 

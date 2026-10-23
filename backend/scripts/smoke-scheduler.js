@@ -8,7 +8,16 @@
  *   - 手动触发白名单: 备份/清理不可手动跑
  *   - 状态接口如实报告连续失败
  */
-const BASE = 'http://localhost:3001/api/v1';
+// 可用 API_BASE 覆盖: 端口被其它进程占用时, 冒烟必须能指向目标实例
+const BASE = (process.env.API_BASE || 'http://localhost:4100').replace(/\/$/, '') + '/api/v1';
+// 后台凭据: seed:admin 只在首次运行打印一次性密码, 故允许环境变量覆盖
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@huojue.local';
+// 密码没有默认值: seed:admin 只打印一次, 硬编码等于把后台口令写进仓库
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+if (!ADMIN_PASSWORD) {
+  console.error('缺少 ADMIN_PASSWORD: 先 npm run seed:admin, 再用它打印的一次性密码运行本脚本。');
+  process.exit(1);
+}
 const { PrismaClient } = require('@prisma/client');
 const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
 const { resolveDbUrl } = require('./db-url');
@@ -51,7 +60,7 @@ function check(name, ok, detail = '') {
 
 (async () => {
   const admin = await call('POST', '/auth/login', null, {
-    email: 'admin@huojue.local', password: 'wQFFfQA8rXHKwSuLPpBz',
+    email: ADMIN_EMAIL, password: ADMIN_PASSWORD,
   });
   const T = admin.data.accessToken;
   if (!T) { console.log('登录失败'); process.exit(1); }

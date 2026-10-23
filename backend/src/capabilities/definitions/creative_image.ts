@@ -1,5 +1,5 @@
 /**
- * 创意生图 —— 参考站 creative-image。提示词驱动的创意视觉 (本地为参数化占位)。
+ * 创意生图 —— 参考站 creative-image。提示词驱动的创意视觉, 必须由真实模型完成。
  *
  * 2026-10-20 从 capability.registry.ts 抽离为独立文件。
  * 抽离的意义: 能力定义此前散在 registry / gateway-prompt / mock provider /
@@ -16,7 +16,7 @@ export const CreativeImage: CapabilityPlugin = {
   group: 'ecommerce_gen',
   summary: '根据提示词探索营销创意图。',
   sidebarHint: '上传参考图、描述你的想法，即可开始创作',
-  mode: 'mock',
+  mode: 'real',
   creditCost: 10, // 无既有展示价，取基准 10
   params: [
     {
@@ -30,7 +30,8 @@ export const CreativeImage: CapabilityPlugin = {
   ],
   buildPrompt: (p) =>
     `创意生图：${p.prompt || '按描述创作电商视觉'}${ratioText(p.ratio)}${sizeText(p.size)}`,
-  localImpl: 'makePlaceholder',
+  /** 提示词生成没有本地实现; 没通道就 failed/42204 并退款, 不交付占位图 */
+  localFallback: false,
   modality: 'image',
   inputs: 1,
   inWorkbench: true,

@@ -2,6 +2,8 @@
 
 版本 v1.0 ｜ 2026-10-19 ｜ 上游：`docs/admin-prd.md`（需求）
 
+> **文档状态**：设计依据。文中分模块的「未实现」进度已在 2026-10-21 的 B1–B8 全部落地（后台 28 页）；当前实现以代码与 [`CLAUDE.md`](../CLAUDE.md) 为准。
+
 本文描述**怎么做**，不重复**做什么**。每个模块给出页面结构、组件、数据流、接口、边界处理。
 
 视觉与布局见 `docs/admin-ui-design.md`。
@@ -1070,6 +1072,11 @@ PATCH /admin/compliance/capabilities/:id      { enabled, freeMode, rateLimit }
 
 ### 11.2 通道配置
 
+> **2026-10-20 实现变更**：下文「单一全局通道 / 凭据只读 / 测试弹窗」已被取代。
+> 实际为 `/admin/model-config` 三页签 + 多渠道线路表 + 编辑抽屉 + 草稿测试；
+> 接口为 `GET/POST/PATCH/DELETE /admin/model-channels*` 与 `POST /admin/model-channels/test`。
+> 详见 `docs/model-architecture.md` 与页面源码。
+
 ```
 通道路由
 ──────────────────────────────────────────────────
@@ -1100,7 +1107,7 @@ SystemSetting['channel.model']
 ```
 通道测试
 
-目标地址  http://localhost:3001/api/v1
+目标地址  http://localhost:4100/api/v1
 令牌      abcd****wxyz                      ← 脱敏，不可编辑
 超时      120000 ms
 

@@ -1,14 +1,22 @@
 import { useRef, useState } from 'react';
 import { App, Spin } from 'antd';
 import { ChevronDown, ChevronLeft, ChevronRight, Download, ImagePlus, Layers, RefreshCw, Sparkles, X } from 'lucide-react';
-import { assetsApi, generateApi, toAbsoluteUrl } from '../lib/api';
+import { assetSrc, assetsApi, generateApi, promptToolsApi, toAbsoluteUrl } from '../lib/api';
+import { MAX_IMAGE_MB } from '../lib/constants';
 import { ratioOptions, resolutionOptions } from '../lib/optionSets';
 import { useProject } from '../hooks/useProject';
 import { usePollAbort } from '../hooks/usePollAbort';
+import { useGenerateError } from '../hooks/useGenerateError';
+import { notifyCreditsChanged } from '../context/CreditsContext';
 import { pollToResult } from '../lib/poll';
 import type { ToolAsset, ToolResult } from '../components/ToolShell';
 import { useCreditLabel } from '../hooks/useCreditLabel';
 import { ToolGeneratingState } from '../components/ToolEmptyState';
+import { ProviderBadge } from '../components/ProviderBadge';
+import { MobileUploadModal } from '../components/MobileUploadModal';
+import { AssetLibraryModal, useAssetLibrary } from '../components/AssetLibraryModal';
+import { useAuth } from '../context/AuthContext';
+import type { Asset, MobileUploadAsset } from '../types/api';
 
 /**
  * 多图融合 —— 严格 1:1 复刻参考站 https://ijihua.cn/multi-image-fusion。
@@ -76,13 +84,15 @@ const MAX_ACCENTS = 5; // §4.1 字段标签「必传 · 1-5 张」
 
 const EMPTY_TITLE = '等待你的第一组融合创意';
 const EMPTY_HINT = '上传图片并提交生成，预览会出现在这里';
-const UPLOAD_SUBJECT_HINT = '支持 JPG、PNG，单张不超过 10MB，可直接粘贴';
+const UPLOAD_SUBJECT_HINT = `支持 JPG、PNG，单张不超过 ${MAX_IMAGE_MB}MB，可直接粘贴`;
 
 export function MultiFusionPage() {
   // 消耗价读后端下发的 creditCost, 不再写死 40
   const creditLabel = useCreditLabel('multi_fusion');
   const { message } = App.useApp();
+  const reportError = useGenerateError();
   const { ensureProject } = useProject();
+  const { token, openLogin } = useAuth();
   const subjectInputRef = useRef<HTMLInputElement>(null);
   const accentInputRef = useRef<HTMLInputElement>(null);
 
@@ -93,11 +103,29 @@ export function MultiFusionPage() {
   const [accents, setAccents] = useState<ToolAsset[]>([]);
   const [uploading, setUploading] = useState(false);
   const [dragging, setDragging] = useState(false);
+  /**
+   * 手机上传弹窗的目标位。
+   *
+   * 同一份二维码流程服务两个图位: 主体图只收 1 张, 搭配图收 1-5 张。
+   * 打开前必须登录 —— 会话与素材都挂在登录用户下。
+   */
+  const [mobileTarget, setMobileTarget] = useState<'subject' | 'accent' | null>(null);
 
   const [variantCount, setVariantCount] = useState('4');
   const [ratio, setRatio] = useState('1:1');
   const [resolution, setResolution] = useState('1k');
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  /**
+   * 画面描述 —— 提交时作为 `prompt` 参数进入能力提示词。
+   *
+   * 来源两条: 「AI 分析」按主体图识图生成, 或用户手写。留空不报错:
+   * 提示词会退回场景版式语义 (见 `definitions/multi_fusion.ts` 的 buildPrompt),
+   * 这与「分析失败」是两回事, 故不在前端强制必填。
+   */
+  const [prompt, setPrompt] = useState('');
+  /** AI 分析进行中 (按钮禁用 + 文案切换, 防止连点时重复请求文本通道) */
+  const [analyzing, setAnalyzing] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<ToolResult | null>(null);
@@ -119,6 +147,12 @@ export function MultiFusionPage() {
       message.warning('请选择图片文件（PNG / JPG）');
       return;
     }
+    // 体积校验此前缺失: 素材库尤其会收下一个改了后缀的非图片, 页面只当"上传成功"
+    const oversize = list.filter((f) => f.size > MAX_IMAGE_MB * 1024 * 1024);
+    if (oversize.length > 0) {
+      message.error(`单张不超过 ${MAX_IMAGE_MB}MB：${oversize.map((f) => f.name).join('、')}`);
+      return;
+    }
     if (target === 'accent') {
       const room = MAX_ACCENTS - accents.length;
       if (room <= 0) {
@@ -133,7 +167,7 @@ export function MultiFusionPage() {
         const uploaded: ToolAsset[] = [];
         for (const file of accepted) {
           const asset = await assetsApi.upload(file, projectId);
-          uploaded.push({ id: asset.id, url: toAbsoluteUrl(asset.sourceUrl) ?? '', name: file.name });
+          uploaded.push({ id: asset.id, url: assetSrc(asset) ?? '', name: file.name });
         }
         setAccents((prev) => [...prev, ...uploaded]);
         message.success(`已添加 ${uploaded.length} 张搭配图`);
@@ -149,7 +183,7 @@ export function MultiFusionPage() {
     try {
       const projectId = await ensureProject();
       const asset = await assetsApi.upload(file, projectId);
-      setSubject({ id: asset.id, url: toAbsoluteUrl(asset.sourceUrl) ?? '', name: file.name });
+      setSubject({ id: asset.id, url: assetSrc(asset) ?? '', name: file.name });
       message.success('主体图已上传（最多 1 张，新上传将替换原主体图）');
     } catch (e) {
       message.error((e as Error).message || '上传失败');
@@ -158,7 +192,140 @@ export function MultiFusionPage() {
     }
   };
 
+  const openMobileUpload = (target: 'subject' | 'accent') => {
+    // 会话建立与素材落库都挂在登录用户名下, 未登录先唤起登录
+    if (!token) {
+      openLogin();
+      return;
+    }
+    setMobileTarget(target);
+  };
+
+  // ── 素材库导入 (双通道: 主体位 / 搭配位) ──
+  const [libraryTarget, setLibraryTarget] = useState<'subject' | 'accent'>('subject');
+
+  /** 返回 false = 拒绝本次选择 (选择器会中止整批并保持打开) */
+  const pickFromLibrary = (asset: Asset): boolean => {
+    const next: ToolAsset = {
+      id: asset.id,
+      url: assetSrc(asset) ?? toAbsoluteUrl(asset.sourceUrl) ?? '',
+      name: asset.sourceUrl.split('/').pop() ?? '素材',
+    };
+    if (libraryTarget === 'subject') {
+      setSubject(next);
+      return true;
+    }
+    if (accents.length >= MAX_ACCENTS) {
+      message.warning(`最多添加 ${MAX_ACCENTS} 张搭配图`);
+      return false;
+    }
+    if (accents.some((x) => x.id === asset.id)) {
+      message.info('该素材已在搭配图中');
+      return false;
+    }
+    setAccents((prev) => [...prev, next]);
+    return true;
+  };
+
+  const {
+    open: libraryOpen,
+    loading: libraryLoading,
+    items: libraryItems,
+    error: libraryError,
+    openLibrary,
+    closeLibrary,
+    pick,
+  } = useAssetLibrary(pickFromLibrary);
+
+  const openLibraryFor = (target: 'subject' | 'accent') => {
+    // 素材列表需鉴权: 未登录时先唤起登录, 而不是等接口 401
+    if (!token) {
+      openLogin();
+      return;
+    }
+    // 搭配位已满时直接说清: 打开一个「最多可选 0 张」的弹窗等于让用户白点
+    if (target === 'accent' && accents.length >= MAX_ACCENTS) {
+      message.warning(`搭配图已满 ${MAX_ACCENTS} 张，请先移除一张`);
+      return;
+    }
+    setLibraryTarget(target);
+    openLibrary();
+  };
+
+  /**
+   * 手机端传回的图片落到当前目标图位。
+   *
+   * 手机端可一次多选: 主体位只留第一张, 余下的**转进搭配位**而不是丢弃 ——
+   * 用户多选时最合理的意图就是"这些都要用"。
+   */
+  const handleMobileReceived = (incoming: MobileUploadAsset[]) => {
+    const target = mobileTarget;
+    setMobileTarget(null);
+    if (!incoming.length) return;
+
+    const asToolAsset = (a: MobileUploadAsset): ToolAsset => ({
+      id: a.id,
+      url: toAbsoluteUrl(a.signedUrl || a.url) ?? '',
+      name: a.filename,
+    });
+
+    if (target === 'subject') {
+      const [first, ...rest] = incoming;
+      setSubject(asToolAsset(first));
+      if (rest.length === 0) {
+        message.success('主体图已从手机接收');
+        return;
+      }
+      // 提示放在 setState 之前算好 —— 在更新函数里发消息会在 StrictMode
+      // 双调用时弹两次, 而且 updater 本就不该有副作用
+      const room = Math.max(0, MAX_ACCENTS - accents.length);
+      const accepted = rest.slice(0, room).map(asToolAsset);
+      const dropped = rest.length - accepted.length;
+      if (dropped > 0) message.warning(`搭配图位只剩 ${room} 个，${dropped} 张未加入`);
+      if (accepted.length > 0) setAccents((prev) => [...prev, ...accepted]);
+      message.success(`已接收 ${incoming.length} 张图片（第 1 张为主体图）`);
+      return;
+    }
+
+    const room = Math.max(0, MAX_ACCENTS - accents.length);
+    const fresh = incoming.filter((a) => !accents.some((x) => x.id === a.id));
+    const accepted = fresh.slice(0, room).map(asToolAsset);
+    const dropped = fresh.length - accepted.length;
+    if (dropped > 0) message.warning(`搭配图位只剩 ${room} 个，${dropped} 张未加入`);
+    if (accepted.length > 0) setAccents((prev) => [...prev, ...accepted]);
+    message.success(`已从手机接收 ${accepted.length} 张搭配图`);
+  };
+
   const pollTask = (taskId: string) => pollToResult(taskId, { signal: pollSignal });
+
+  /**
+   * AI 分析: 对主体图做真实识图, 结果写进可编辑的「画面描述」。
+   *
+   * 走文本通道的 promptToolsApi.imageToPrompt (后端按 assetId 读图, 带归属校验)。
+   * 通道未配置时后端 502 —— 如实把原因抛给用户, 不编一段假的分析:
+   * 编出来的描述会被当成模型看过图的结论, 比"这次没分析出内容"更误导。
+   */
+  const runAiAnalyze = async () => {
+    if (!subject) {
+      message.warning('请先上传主体图');
+      return;
+    }
+    setAnalyzing(true);
+    try {
+      const { text } = await promptToolsApi.imageToPrompt(subject.id);
+      const content = text?.trim();
+      if (!content) {
+        message.warning('模型没有返回内容，请重试');
+        return;
+      }
+      setPrompt(content);
+      message.success('已按主体图生成画面描述，可继续编辑');
+    } catch (e) {
+      message.error((e as Error).message || '识图失败：文本通道未配置');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
 
   const submit = async () => {
     if (!subject || accents.length === 0 || submitting) return;
@@ -171,16 +338,18 @@ export function MultiFusionPage() {
         capability: 'multi_fusion',
         // 顺序即语义: [0]=主体图, [1..]=搭配图 (后端 processTask 按提交序保序)
         inputAssetIds: [subject.id, ...accents.map((a) => a.id)].slice(0, MAX_TOTAL),
-        params: { scene, variantCount, ratio, size: resolution },
+        params: { scene, variantCount, ratio, size: resolution, prompt: prompt.trim() },
       });
       const done = await pollTask(taskId);
       setResult(done);
       if (done.status === 'failed') message.error(`生成失败（${done.errorCode ?? '未知错误'}）`);
       else message.success('融合结果已生成');
     } catch (e) {
-      message.error((e as Error).message || '生成失败');
+      reportError(e);
     } finally {
       setSubmitting(false);
+      // 扣费在建任务时发生、失败会自动退还，两个方向都改了余额
+      notifyCreditsChanged();
     }
   };
 
@@ -287,16 +456,16 @@ export function MultiFusionPage() {
                   <button
                     type="button"
                     className="multi-image-fusion-field-link"
-                    disabled
-                    title="本地演示环境暂不支持素材库导入"
+                    title="从已上传的素材里选一张作为主体图"
+                    onClick={() => openLibraryFor('subject')}
                   >
                     从素材库导入
                   </button>
                   <button
                     type="button"
                     className="multi-image-fusion-field-link"
-                    title="本地演示环境暂不支持手机上传"
-                    onClick={() => message.info('本地演示环境暂不支持手机上传，可直接拖拽上传')}
+                    title="扫码在手机上选择图片，接收后进入主体图位"
+                    onClick={() => openMobileUpload('subject')}
                   >
                     手机上传
                   </button>
@@ -350,16 +519,16 @@ export function MultiFusionPage() {
                   <button
                     type="button"
                     className="multi-image-fusion-field-link"
-                    disabled
-                    title="本地演示环境暂不支持素材库导入"
+                    title="从已上传的素材里挑选搭配图"
+                    onClick={() => openLibraryFor('accent')}
                   >
                     从素材库导入
                   </button>
                   <button
                     type="button"
                     className="multi-image-fusion-field-link"
-                    title="本地演示环境暂不支持手机上传"
-                    onClick={() => message.info('本地演示环境暂不支持手机上传，可直接拖拽上传')}
+                    title="扫码在手机上选择图片，接收后进入搭配图位"
+                    onClick={() => openMobileUpload('accent')}
                   >
                     手机上传
                   </button>
@@ -417,11 +586,25 @@ export function MultiFusionPage() {
             <button
               type="button"
               className="multi-image-fusion-analyze-button"
-              onClick={() => message.info('本地演示环境暂不支持 AI 分析，将按场景版式直接合成')}
+              disabled={analyzing || !subject}
+              title={!subject ? '请先上传主体图' : undefined}
+              onClick={() => void runAiAnalyze()}
             >
               <Sparkles size={14} />
-              <span>AI 分析</span>
+              <span>{analyzing ? '分析中…' : 'AI 分析'}</span>
             </button>
+            {/* 分析结果落在可编辑的描述里, 不直接当提示词提交 —— 用户能改措辞 */}
+            <textarea
+              className="multi-image-fusion-analysis-input"
+              rows={4}
+              maxLength={2000}
+              value={prompt}
+              placeholder="点上方按钮按主体图识别，或手写画面要求（选填）"
+              onChange={(e) => setPrompt(e.target.value)}
+            />
+            <p className="multi-image-fusion-analysis-hint">
+              识图需要已配置文本通道；未配置时可手写，留空则按场景版式合成。
+            </p>
           </div>
 
           {/* ── 卡片 3/4: 输出参数 ── */}
@@ -501,7 +684,7 @@ export function MultiFusionPage() {
                     <div className="image-output-settings-group">
                       <span className="image-output-settings-label">画质</span>
                       <div className="multi-image-fusion-resolution-grid">
-                        {resolutionOptions().map((o) => (
+                        {resolutionOptions('multi_fusion').map((o) => (
                           <button
                             key={o.value}
                             type="button"
@@ -510,7 +693,7 @@ export function MultiFusionPage() {
                             }`}
                             aria-pressed={o.value === resolution}
                             disabled={o.disabled}
-                            title={o.disabled ? o.sub : undefined}
+                            title={o.disabled ? o.disabledReason : undefined}
                             onClick={() => setResolution(String(o.value))}
                           >
                             <strong>{o.label}</strong>
@@ -621,8 +804,8 @@ export function MultiFusionPage() {
                   本地能力说明
                 </summary>
                 <p>
-                  本地演示：multi_fusion 为占位能力，融合结果为场景版式 + 真实图片层叠的参数化合成（真实融合需接入
-                  AI 模型），主体图与搭配图真实参与构图；AI 分析按钮暂不支持。
+                  本地算法：无云端通道时由场景版式合成算法出图（真实图片层叠 + 光影融合），主体图与搭配图真实参与构图；
+                  配置图像通道后由模型完成语义融合。AI 分析走文本通道识图，未配置文本通道时可手写画面描述。
                 </p>
               </details>
             </>
@@ -636,6 +819,8 @@ export function MultiFusionPage() {
                     {result.width}×{result.height}
                   </span>
                 )}
+                {/* 本单实际走云端还是本地回落, 以 pollToResult 的 provider 为准 */}
+                <ProviderBadge provider={result.provider} className="mif-provider" />
               </div>
               <div className="multi-image-fusion-thumbnails">
                 <button type="button" className="selected">
@@ -654,6 +839,24 @@ export function MultiFusionPage() {
           )}
         </section>
       </div>
+
+      {/* 手机上传: 主体位与搭配位共用同一次扫码流程 */}
+      <MobileUploadModal
+        open={mobileTarget !== null}
+        onReceived={handleMobileReceived}
+        onCancel={() => setMobileTarget(null)}
+      />
+
+      {/* 素材库选择弹窗 (主体位 1 张 / 搭配位上限 5 张) */}
+      <AssetLibraryModal
+        open={libraryOpen}
+        loading={libraryLoading}
+        items={libraryItems}
+        error={libraryError}
+        onCancel={closeLibrary}
+        onPick={pick}
+        maxSelectable={libraryTarget === 'subject' ? 1 : MAX_ACCENTS - accents.length}
+      />
     </div>
   );
 }

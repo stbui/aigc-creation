@@ -33,7 +33,22 @@ export interface SettingDef {
   readOnly?: boolean;
 }
 
-export type SettingGroup = 'site' | 'upload' | 'generate' | 'security';
+/*
+ * 分组键必须与 `key.split('.')[0]` 一一对应, 且每个分组有自己的中文名。
+ *
+ * ⚠ 2026-10-22: 此前 backup / retention 两组都写成 'security', 而
+ * SETTING_GROUP_LABELS 又没有这两个键, 结果是系统设置页出现**三个同名「安全」页签**。
+ * 运营要改备份策略时得在三个同名片里逐个点开盲找, 也无法向同事描述"在哪个安全页里改"。
+ * 新增一组设置时, 这里与 SETTING_GROUP_LABELS 必须同时加。
+ */
+export type SettingGroup =
+  | 'site'
+  | 'upload'
+  | 'generate'
+  | 'refund'
+  | 'backup'
+  | 'retention'
+  | 'security';
 
 export const SETTING_DEFS: SettingDef[] = [
   // ── 站点 ────────────────────────────────────────────────────────────
@@ -108,6 +123,39 @@ export const SETTING_DEFS: SettingDef[] = [
     group: 'generate',
   },
 
+  // ── 退款 ────────────────────────────────────────────────────────────
+  {
+    key: 'refund.windowDays',
+    label: '可退款时间窗',
+    description:
+      '支付成功后多少天内可以退款。0 = 不限时间（仍受可退金额与积分消耗规则约束）',
+    type: 'number',
+    default: 7,
+    min: 0,
+    max: 365,
+    group: 'refund',
+  },
+  {
+    key: 'refund.maxRatioBps',
+    label: '可退上限（万分比）',
+    description:
+      '可退金额不超过实付的多少。10000 = 全额可退，5000 = 最多退一半。以「分」为单位按比例向下取整',
+    type: 'number',
+    default: 10000,
+    min: 0,
+    max: 10000,
+    group: 'refund',
+  },
+  {
+    key: 'refund.allowConsumedTask',
+    label: '允许已消耗积分退款',
+    description:
+      '关闭后，订单发放的积分一旦被用掉（无法全额扣回）就拒绝退款，避免「先用再退」。已完成的任务产出不会因此回收',
+    type: 'boolean',
+    default: true,
+    group: 'refund',
+  },
+
   // ── 数据安全 ────────────────────────────────────────────────────────
   {
     key: 'backup.frequencyDays',
@@ -117,7 +165,7 @@ export const SETTING_DEFS: SettingDef[] = [
     default: 1,
     min: 1,
     max: 30,
-    group: 'security',
+    group: 'backup',
   },
   {
     key: 'backup.keepCount',
@@ -127,7 +175,7 @@ export const SETTING_DEFS: SettingDef[] = [
     default: 7,
     min: 1,
     max: 100,
-    group: 'security',
+    group: 'backup',
   },
   {
     key: 'retention.auditLogDays',
@@ -138,7 +186,7 @@ export const SETTING_DEFS: SettingDef[] = [
     default: 180,
     min: 30,
     max: 1095,
-    group: 'security',
+    group: 'retention',
   },
 
   // ── 安全 ────────────────────────────────────────────────────────────
@@ -174,6 +222,9 @@ export const SETTING_GROUP_LABELS: Record<SettingGroup, string> = {
   site: '站点',
   upload: '上传',
   generate: '生成',
+  refund: '退款',
+  backup: '备份',
+  retention: '保留期',
   security: '安全',
 };
 
@@ -202,6 +253,10 @@ export class UpdateSettingsDto {
   @IsOptional() @IsInt() @Min(500) @Max(10000) generatePollIntervalMs?: number;
   @IsOptional() @IsInt() @Min(5) @Max(300) generateMaxPolls?: number;
 
+  @IsOptional() @IsInt() @Min(0) @Max(365) refundWindowDays?: number;
+  @IsOptional() @IsInt() @Min(0) @Max(10000) refundMaxRatioBps?: number;
+  @IsOptional() @IsBoolean() refundAllowConsumedTask?: boolean;
+
   @IsOptional() @IsInt() @Min(1) @Max(30) backupFrequencyDays?: number;
   @IsOptional() @IsInt() @Min(1) @Max(100) backupKeepCount?: number;
   @IsOptional() @IsInt() @Min(30) @Max(1095) retentionAuditLogDays?: number;
@@ -222,12 +277,26 @@ export const FIELD_TO_SETTING_KEY: Record<string, string> = {
   generateMaxConcurrent: 'generate.maxConcurrent',
   generatePollIntervalMs: 'generate.pollIntervalMs',
   generateMaxPolls: 'generate.maxPolls',
+  refundWindowDays: 'refund.windowDays',
+  refundMaxRatioBps: 'refund.maxRatioBps',
+  refundAllowConsumedTask: 'refund.allowConsumedTask',
   backupFrequencyDays: 'backup.frequencyDays',
   backupKeepCount: 'backup.keepCount',
   retentionAuditLogDays: 'retention.auditLogDays',
   securitySessionTtlDays: 'security.sessionTtlDays',
   securityPasswordMinLength: 'security.passwordMinLength',
 };
+
+/**
+ * SETTING_DEFS 键 → DTO 字段名 的反向映射。
+ *
+ * 读取接口必须把**写入时要用的字段名**一起下发: 前端拿到 `site.name`
+ * 直接回传会被 `whitelist: true` 静默剥掉, 表现为「保存成功但没变化」
+ * （实际是 400 `没有需要更新的设置项`）。这一条是真的踩过。
+ */
+export const SETTING_KEY_TO_FIELD: Record<string, string> = Object.fromEntries(
+  Object.entries(FIELD_TO_SETTING_KEY).map(([field, key]) => [key, field]),
+);
 
 /**
  * 从 DTO 提取「本次真正要改的键值」。

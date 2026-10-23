@@ -86,6 +86,17 @@ export class StorageService implements OnModuleInit {
   }
 
   async onModuleInit(): Promise<void> {
+    /*
+     * 配置的后端没起来 (例如 STORAGE_BACKEND=oss 但 ali-oss 未安装) 时**不回落本地**:
+     * 那会让生产数据静默写进容器本地盘, 重启即丢, 而日志只有一行 WARN。
+     * 这里保留启动 (健康检查与后台要能报出原因), 但每次读写都走 getActive() 的硬失败。
+     */
+    if (!this.providers.has(this.active)) {
+      this.logger.error(
+        `存储后端 ${this.active} 未就绪（SDK 未安装或凭据缺失），上传/读取将直接失败而不是写入本地盘`,
+      );
+      return;
+    }
     const active = this.getActive();
     const probe = await active.probe();
     if (probe.ok) {
@@ -112,9 +123,21 @@ export class StorageService implements OnModuleInit {
     return resolve(process.cwd(), raw);
   }
 
-  /** 当前默认后端的 provider */
+  /**
+   * 当前默认后端的 provider。
+   *
+   * 配置的后端不可用时**显式抛错**, 不再静默回落 local —— 回落会把
+   * 「配置写错」变成「文件悄悄写进容器本地盘」, 且没有任何调用方知道。
+   * 本地后端的回落只保留在 active 本来就是 local 的情况。
+   */
   getActive(): StorageProvider {
-    return this.providers.get(this.active) ?? this.providers.get('local')!;
+    const provider = this.providers.get(this.active);
+    if (provider) return provider;
+    if (this.active === 'local') return this.providers.get('local')!;
+    throw new Error(
+      `存储后端 ${this.active} 未就绪: SDK 未安装或凭据缺失。` +
+        `请补齐依赖/环境变量, 或将 STORAGE_BACKEND 改回 local（已拒绝静默回落本地盘）`,
+    );
   }
 
   get activeBackend(): StorageBackend {

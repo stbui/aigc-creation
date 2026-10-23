@@ -3,6 +3,7 @@ import { randomBytes, randomUUID } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { AppError } from '../common/app.exception';
+import { SignedUrlService } from '../common/signed-url.service';
 
 /**
  * 手机上传会话服务 —— 参考站「手机上传」的会话侧。
@@ -37,15 +38,29 @@ export class MobileUploadService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly signedUrl: SignedUrlService,
   ) {}
 
   /**
    * 创建会话。
    *
    * @param ownerId 电脑端用户 —— 手机端上传的图片会落到他的素材库
-   * @param projectId 图片归属的项目
+   * @param projectId 图片归属的项目。**必须是 ownerId 自己的项目**
+   *
+   * ⚠ 归属校验不能省 (2026-10-21 修): 此前只检查 projectId 非空, 任何人都能
+   * 传别人的 projectId 建会话, 再凭令牌把图片写进**别人的项目**。
+   * 手机端上传不需要登录, 令牌是唯一凭证 —— 会话创建就是权限边界的入口。
    */
-  create(ownerId: string, projectId: string): MobileUploadSession {
+  async create(ownerId: string, projectId: string): Promise<MobileUploadSession> {
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { ownerId: true },
+    });
+    if (!project || project.ownerId !== ownerId) {
+      // 与「不存在」同一口径: 不泄露"这个项目 id 存在但不属于你"
+      throw new AppError(40400, '项目不存在或无权限', 404);
+    }
+
     const now = Date.now();
     const session: MobileUploadSession = {
       id: randomUUID(),
@@ -129,6 +144,22 @@ export class MobileUploadService {
       throw new AppError(40001, `一次最多上传 ${MAX_FILES} 张`, 400);
     }
 
+    /*
+     * 写入前**再验一次项目归属**。
+     *
+     * 会话有效期 5 分钟, 期间项目可能已被删除或转移。写入时不复核,
+     * 就会产生指向不存在项目的素材 (孤儿行), 或写进已经不属于该用户的
+     * 项目里 —— 会话创建时校验过一次不能代替写入时校验。
+     */
+    const project = await this.prisma.project.findUnique({
+      where: { id: s.projectId },
+      select: { ownerId: true },
+    });
+    if (!project || project.ownerId !== s.ownerId) {
+      s.status = 'expired';
+      throw new AppError(41000, '目标项目已不存在，请在电脑端刷新后重试', 410);
+    }
+
     // 逐张校验并落库; 任意一张不合法即整批失败 (不落半截数据)
     const prepared = files.map((file) => {
       if (!file.data?.length) {
@@ -146,7 +177,7 @@ export class MobileUploadService {
 
     // 落存储: 走既有存储抽象层, 与网页上传同一条路径
     const provider = this.storage.getActive();
-    const created: Array<{ id: string; url: string; filename: string }> = [];
+    const created: Array<{ id: string; url: string; signedUrl: string | null; filename: string }> = [];
     for (const { file, mime } of prepared) {
       const ext = extOf(mime);
       const key = this.storage.buildKey('original', ext);
@@ -166,7 +197,13 @@ export class MobileUploadService {
           storageKey: key,
         },
       });
-      created.push({ id: asset.id, url, filename: file.filename || '手机上传图片' });
+      // 与素材库同一条兼容策略：sourceUrl 给服务端内部用，signedUrl 给 <img>
+      created.push({
+        id: asset.id,
+        url,
+        signedUrl: this.signedUrl.sign(url, { userId: s.ownerId }),
+        filename: file.filename || '手机上传图片',
+      });
     }
 
     s.status = 'received';
@@ -217,7 +254,7 @@ export interface MobileUploadSession {
    *
    * **顺序即构图顺序** —— 参考站手机端可排序, 电脑端按此顺序回填参考图位。
    */
-  assets: Array<{ id: string; url: string; filename: string }>;
+  assets: Array<{ id: string; url: string; signedUrl: string | null; filename: string }>;
   /**
    * 兼容字段: 第一张素材的 id / url / 文件名。
    *

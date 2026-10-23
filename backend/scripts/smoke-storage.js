@@ -6,11 +6,45 @@
  *   - 路径穿越被拦截
  *   - 下架不等于删除(可恢复)
  */
-const BASE = 'http://localhost:3001/api/v1';
+// 可用 API_BASE 覆盖: 端口被其它进程占用时, 冒烟必须能指向目标实例
+const BASE = (process.env.API_BASE || 'http://localhost:4100').replace(/\/$/, '') + '/api/v1';
+// 后台凭据: seed:admin 只在首次运行打印一次性密码, 故允许环境变量覆盖
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@huojue.local';
+// 密码没有默认值: seed:admin 只打印一次, 硬编码等于把后台口令写进仓库
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+if (!ADMIN_PASSWORD) {
+  console.error('缺少 ADMIN_PASSWORD: 先 npm run seed:admin, 再用它打印的一次性密码运行本脚本。');
+  process.exit(1);
+}
 const { PrismaClient } = require('@prisma/client');
 const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
 const { resolveDbUrl } = require('./db-url');
+const { ensureTestUser } = require('./lib/test-user');
 const prisma = new PrismaClient({ adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }) });
+
+/**
+ * 自建一个「有素材的 C 端账号」。
+ *
+ * 2026-10-22 起不再借用预置账号的素材：旧写法假设库里第 2 条素材的属主
+ * 有一个已知密码，既依赖内置演示账号，又让断言取决于库里的历史数据。
+ * 现在现场注册 + 上传，样本归属明确。
+ */
+async function seedOwnedAsset(token) {
+  const pj = await call('POST', '/projects', token, { name: `存储冒烟-${Date.now()}` });
+  const projectId = pj.data?.id;
+  const { Jimp } = require('jimp');
+  const png = await new Jimp({ width: 32, height: 32, color: 0x3366ffff }).getBuffer('image/png');
+  const fd = new FormData();
+  fd.append('file', new Blob([png], { type: 'image/png' }), `storage-probe-${Date.now()}.png`);
+  fd.append('projectId', projectId);
+  const res = await fetch(`${BASE}/assets/upload`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: fd,
+  });
+  const json = await res.json().catch(() => ({}));
+  return { projectId, asset: json.data ?? json, status: res.status };
+}
 
 async function call(method, path, token, body) {
   const res = await fetch(`${BASE}${path}`, {
@@ -34,9 +68,15 @@ function check(name, ok, detail = '') {
 
 (async () => {
   const login = await call('POST', '/auth/login', null, {
-    email: 'admin@huojue.local', password: 'wQFFfQA8rXHKwSuLPpBz',
+    email: ADMIN_EMAIL, password: ADMIN_PASSWORD,
   });
   const T = login.data.accessToken;
+
+  // 自建 C 端账号 + 一条自有素材，后续「下架 / 用户端过滤」都用它当样本
+  const owner = await ensureTestUser(BASE, { prefix: 'storage' });
+  const seeded = await seedOwnedAsset(owner.token);
+  check('自建素材上传成功', seeded.status === 201 && !!seeded.asset?.id,
+    `实际 ${seeded.status} ${JSON.stringify(seeded.asset).slice(0, 160)}`);
 
   console.log('\n【存储后端状态 B-63】');
   const st = await call('GET', '/admin/storage/status', T);
@@ -55,12 +95,20 @@ function check(name, ok, detail = '') {
   console.log('\n【素材列表 B-23】');
   const list = await call('GET', '/admin/assets?pageSize=5', T);
   check('素材列表可用', list.status === 200, `total=${list.data?.total}`);
-  check('返回存储后端字段', list.data?.items?.[0]?.storageBackend !== undefined,
-    `后端=${list.data?.items?.[0]?.storageBackend}`);
-  check('返回 storageKey', !!list.data?.items?.[0]?.storageKey,
-    list.data?.items?.[0]?.storageKey);
-  check('返回所属项目与用户', !!list.data?.items?.[0]?.projectName && !!list.data?.items?.[0]?.ownerEmail,
-    `${list.data?.items?.[0]?.projectName} / ${list.data?.items?.[0]?.ownerEmail}`);
+  /*
+   * 取**有 storageKey 的那一条**做样本：storageKey 是后加的字段，历史素材
+   * 允许为 null（迁移脚本只处理仍在线上的文件）。用 items[0] 会让断言
+   * 取决于库里恰好是哪条老数据，而不是接口有没有返回该字段。
+   */
+  // 优先用刚上传的那条：它的 storeKey / 属主都是确定的，断言不再依赖历史数据
+  const sample =
+    list.data?.items?.find((i) => i.id === seeded.asset?.id) ??
+    list.data?.items?.find((i) => i.storageKey) ??
+    list.data?.items?.[0];
+  check('返回存储后端字段', sample?.storageBackend !== undefined, `后端=${sample?.storageBackend}`);
+  check('返回 storageKey', !!sample?.storageKey, sample?.storageKey ?? '(无)');
+  check('返回所属项目与用户', !!sample?.projectName && !!sample?.ownerEmail,
+    `${sample?.projectName} / ${sample?.ownerEmail}`);
 
   console.log('\n【素材统计】');
   const stats = await call('GET', '/admin/assets/stats', T);
@@ -74,7 +122,7 @@ function check(name, ok, detail = '') {
     `项目「${projects.data?.items?.[0]?.name}」素材 ${projects.data?.items?.[0]?.assetCount} 任务 ${projects.data?.items?.[0]?.taskCount}`);
 
   console.log('\n【下架 ≠ 删除 B-26】');
-  const sample = list.data.items[0];
+  // 沿用上面选出的样本：下架后文件必须还在，没有 storageKey 的老数据验证不了这一点
   const hidden = await call('PATCH', `/admin/assets/${sample.id}/status`, T, { status: 'hidden' });
   check('下架成功', hidden.status === 200 || hidden.status === 201, `status=${hidden.data?.status}`);
 
@@ -87,23 +135,14 @@ function check(name, ok, detail = '') {
   check('可恢复上架', restore.status === 200 || restore.status === 201);
 
   console.log('\n【用户端过滤已下架素材】');
-  // 造一个下架素材, 验证用户端列表不返回
-  const testAsset = list.data.items[1];
+  // 用自建素材做样本：下架它，属主自己列表里必须看不到
+  const testAsset = seeded.asset;
   await call('PATCH', `/admin/assets/${testAsset.id}/status`, T, { status: 'hidden' });
-  const userEmail = testAsset.ownerEmail;
-  const user = await prisma.user.findUnique({ where: { email: userEmail }, select: { id: true } });
-  if (user) {
-    const uLogin = await call('POST', '/auth/login', null, { email: userEmail, password: 'demo1234' });
-    if (uLogin.data?.accessToken) {
-      const userList = await call('GET', '/assets?limit=100', uLogin.data.accessToken);
-      const visible = userList.data?.items ?? [];
-      const containsHidden = visible.some(a => a.id === testAsset.id);
-      check('用户端列表不含已下架素材', !containsHidden,
-        `用户端 ${visible.length} 条中含下架素材: ${containsHidden}`);
-    } else {
-      console.log('  SKIP  该用户无法登录(可能非 demo 密码), 跳过用户端过滤验证');
-    }
-  }
+  const userList = await call('GET', '/assets?limit=100', owner.token);
+  const visible = userList.data?.items ?? [];
+  const containsHidden = visible.some(a => a.id === testAsset.id);
+  check('用户端列表不含已下架素材', !containsHidden,
+    `用户端 ${visible.length} 条中含下架素材: ${containsHidden}`);
   await call('PATCH', `/admin/assets/${testAsset.id}/status`, T, { status: 'visible' });
 
   console.log('\n【管理端不过滤下架素材】');

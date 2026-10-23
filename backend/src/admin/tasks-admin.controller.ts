@@ -1,8 +1,10 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { IsOptional, IsString, MaxLength } from 'class-validator';
-import { AuditAction, RequirePermission } from './admin.decorator';
+import { ArrayMaxSize, IsArray, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { AdminUser, AuditAction, RequirePermission, type AdminUser as AdminUserType } from './admin.decorator';
+import { AdminRoleService } from './admin-role.service';
 import { TasksAdminService } from './tasks-admin.service';
 import { PERMISSIONS } from './permissions';
+import { AppError } from '../common/app.exception';
 // 值导入: DTO 依赖 design:paramtypes 做实例化与白名单剥离
 import { TaskListQueryDto } from './dto/task.dto';
 
@@ -29,9 +31,28 @@ export class TaskActionDto {
  * 路由顺序: 字面量路径 (`stats` / `capabilities`) 须在 `:id` 之前,
  * 否则被参数路由抢占。
  */
+/** 批量重试 / 终止 */
+export class TaskBatchDto {
+  @IsArray()
+  @ArrayMaxSize(100, { message: '单次批量最多 100 条' })
+  @IsString({ each: true })
+  ids!: string[];
+
+  @IsIn(['retry', 'cancel'], { message: 'action 只能是 retry 或 cancel' })
+  action!: 'retry' | 'cancel';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  reason?: string;
+}
+
 @Controller('admin/tasks')
 export class AdminTasksController {
-  constructor(private readonly tasks: TasksAdminService) {}
+  constructor(
+    private readonly tasks: TasksAdminService,
+    private readonly roles: AdminRoleService,
+  ) {}
 
   /** 拥堵指标 (B-31)。独立端点: 顶部告警条需高频刷新, 不必连带拉整页列表 */
   @Get('stats')
@@ -45,6 +66,24 @@ export class AdminTasksController {
   @RequirePermission(PERMISSIONS.taskRead)
   capabilities() {
     return this.tasks.capabilityOptions();
+  }
+
+  /**
+   * 批量重试 / 终止（B7）。
+   *
+   * 权限按 action 判定：重试要 `task.retry`，终止要 `task.cancel`。
+   * 两者都会真实影响用户可见状态（重试消耗模型额度、终止作废排队），
+   * 所以批量入口不能只凭 `task.read` 就放行。
+   */
+  @Post('batch')
+  @RequirePermission(PERMISSIONS.taskRead)
+  @AuditAction('task.batch')
+  async batch(@Body() dto: TaskBatchDto, @AdminUser() actor: AdminUserType) {
+    const needed = dto.action === 'retry' ? PERMISSIONS.taskRetry : PERMISSIONS.taskCancel;
+    if (!(await this.roles.hasPermission(actor.id, needed))) {
+      throw new AppError(40301, `没有执行该批量动作的权限（${needed}）`, 403);
+    }
+    return this.tasks.batchAction(dto.ids, dto.action);
   }
 
   /** 任务列表 + 拥堵统计 + 筛选项 (B-28 / B-29) */

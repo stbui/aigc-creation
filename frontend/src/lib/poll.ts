@@ -1,5 +1,5 @@
-import { generateApi, toAbsoluteUrl } from './api';
-import { POLL_INTERVAL_MS, POLL_MAX_TRIES } from './constants';
+import { generateApi, assetSrc } from './api';
+import { POLL_INTERVAL_MS, POLL_MAX_TRIES, POLL_VIDEO_MAX_TRIES } from './constants';
 import type { Modality, Task, TaskStatus } from '../types/api';
 
 /**
@@ -59,7 +59,7 @@ function sleep(ms: number): Promise<void> {
 /** 轮询任务直到 succeeded/failed 或超过 maxTries (超时)。 */
 export async function waitForTask(taskId: string, options: PollOptions = {}): Promise<PollOutcome> {
   const intervalMs = options.intervalMs ?? POLL_INTERVAL_MS;
-  const maxTries = options.maxTries ?? POLL_MAX_TRIES;
+  let maxTries = options.maxTries ?? POLL_MAX_TRIES;
   const { signal, onTick } = options;
 
   for (let tries = 0; tries < maxTries; tries++) {
@@ -67,6 +67,14 @@ export async function waitForTask(taskId: string, options: PollOptions = {}): Pr
     try {
       const task = await generateApi.getTask(taskId);
       onTick?.(task);
+      /*
+       * 视频与图像的产出时间不是一个量级：视频 1–2 分钟起。按图像上限
+       * 截断会让视频任务在前端确定性超时（后台仍在跑、已扣费）。
+       * 拿到任务模态后再放宽上限，图像任务不受影响。
+       */
+      if (task.modality === 'video') {
+        maxTries = options.maxTries ?? POLL_VIDEO_MAX_TRIES;
+      }
       if (task.status === 'succeeded' || task.status === 'failed') return { ok: true, task };
     } catch {
       /* 网络抖动: 不中断, 下一轮重试 */
@@ -84,7 +92,7 @@ export async function pollToResult(taskId: string, options: PollOptions = {}): P
   const { task } = outcome;
   return {
     status: task.status,
-    url: task.outputAsset ? toAbsoluteUrl(task.outputAsset.sourceUrl) : undefined,
+    url: task.outputAsset ? assetSrc(task.outputAsset) : undefined,
     width: task.outputAsset?.width ?? undefined,
     height: task.outputAsset?.height ?? undefined,
     errorCode: task.errorCode ?? null,

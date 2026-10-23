@@ -1,20 +1,25 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Input, Select, Table } from 'antd';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { App, Button, Input, Segmented, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import { useSearchParams } from 'react-router-dom';
 import { FolderOpen, Grid3x3, HardDrive, List } from 'lucide-react';
 import { adminAssetsApi, toAbsoluteUrl } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import {
   AdminListError,
   AdminListLoading,
+  AdminStaleError,
   ConfirmAction,
+  adminPagination,
   useAdminList,
 } from '../../components/admin/AdminWidgets';
 import { AdminEmpty, PageHeader, Panel } from '../../components/admin/PageHeader';
+import { BatchResultModal } from '../../components/admin/BatchResultModal';
 import type {
   AdminAssetListResult,
   AdminAssetStats,
   AssetStatus,
+  BatchSummary,
 } from '../../types/api';
 
 type Row = AdminAssetListResult['items'][number];
@@ -55,6 +60,10 @@ export function AdminAssetsPage() {
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Row | null>(null);
+  /** 批量删除需要二次确认: 它会连磁盘文件一起删, 不可恢复 */
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
+  const [batchSummary, setBatchSummary] = useState<BatchSummary<unknown> | null>(null);
+  const [batchTitle, setBatchTitle] = useState('');
 
   const fetcher = useCallback(
     (params: Record<string, unknown>) =>
@@ -71,6 +80,17 @@ export function AdminAssetsPage() {
 
   const { data, loading, error, setQuery, setPage, reload } =
     useAdminList<AdminAssetListResult>(fetcher);
+
+  /** 顶栏搜索带 `?q=` 跳过来时套用关键词（ref 防止覆盖页内手动筛选） */
+  const [searchParams] = useSearchParams();
+  const urlQ = searchParams.get('q') ?? '';
+  const appliedQ = useRef('');
+  useEffect(() => {
+    if (!urlQ || urlQ === appliedQ.current) return;
+    appliedQ.current = urlQ;
+    setKeyword(urlQ);
+    setQuery({ keyword: urlQ });
+  }, [urlQ, setQuery]);
 
   useEffect(() => {
     adminAssetsApi
@@ -89,18 +109,41 @@ export function AdminAssetsPage() {
     }
   };
 
-  const batch = async (next: AssetStatus) => {
+  /**
+   * 批量动作走 `/admin/assets/batch`（逐条结果）而不是旧的 `batch-status`（只回 count）。
+   *
+   * 素材可能在这几秒内被用户删掉 / 被别的运营下架 —— 只回一个总数时,
+   * 少处理的几条会被 `已处理 N 条` 掩盖过去。逐条结果才能把失败原因摊开。
+   */
+  const runBatch = async (action: 'hide' | 'show' | 'delete') => {
     if (selected.length === 0) return;
     setBusy(true);
     try {
-      const res = await adminAssetsApi.batchStatus(selected, next);
-      void message.success(`已处理 ${res.count} 条`);
+      const summary = await adminAssetsApi.batch(selected, action);
+      setBatchTitle(
+        action === 'hide' ? '批量下架结果' : action === 'show' ? '批量恢复结果' : '批量删除结果',
+      );
+      setBatchSummary(summary);
+      setBatchDeleteOpen(false);
       setSelected([]);
       reload();
     } catch (e) {
       void message.error((e as Error).message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const exportAssets = async () => {
+    try {
+      await adminAssetsApi.exportCsv({
+        keyword: keyword || undefined,
+        kind,
+        status,
+        backend,
+      });
+    } catch (e) {
+      void message.error((e as Error).message);
     }
   };
 
@@ -186,22 +229,22 @@ export function AdminAssetsPage() {
         render: (_: unknown, row) => (
           <div className="adm-row-actions">
             {can('asset.hide') && (
-              <button
-                type="button"
+              <Button
+                type="link"
                 className="adm-link"
                 onClick={() => void toggleStatus(row, row.status === 'visible' ? 'hidden' : 'visible')}
               >
                 {row.status === 'visible' ? '下架' : '恢复'}
-              </button>
+              </Button>
             )}
             {can('asset.delete') && (
-              <button
-                type="button"
+              <Button
+                type="link" danger
                 className="adm-link is-danger"
                 onClick={() => setDeleteTarget(row)}
               >
                 删除
-              </button>
+              </Button>
             )}
           </div>
         ),
@@ -212,7 +255,7 @@ export function AdminAssetsPage() {
   );
 
   if (loading && !data) return <AdminListLoading tip="加载素材…" />;
-  if (error) return <AdminListError error={error} onRetry={reload} />;
+  if (error && !data) return <AdminListError error={error} onRetry={reload} />;
 
   const items = data?.items ?? [];
 
@@ -223,33 +266,52 @@ export function AdminAssetsPage() {
         description="管理全平台用户的上传与生成素材；下架后用户端不可见但可恢复"
         actions={
           <>
-            <div className="adm-segmented">
-              <button
-                type="button"
-                className={`adm-segmented-item${view === 'grid' ? ' is-active' : ''}`}
-                onClick={() => setView('grid')}
-                title="缩略图网格"
-              >
-                <Grid3x3 size={14} />
-              </button>
-              <button
-                type="button"
-                className={`adm-segmented-item${view === 'table' ? ' is-active' : ''}`}
-                onClick={() => setView('table')}
-                title="表格视图"
-              >
-                <List size={14} />
-              </button>
-            </div>
+            <Segmented
+              value={view}
+              onChange={(value) => setView(value as 'grid' | 'table')}
+              options={[
+                {
+                  value: 'grid',
+                  label: (
+                    <span className="adm-segmented-item" title="缩略图网格">
+                      <Grid3x3 size={14} />
+                    </span>
+                  ),
+                },
+                {
+                  value: 'table',
+                  label: (
+                    <span className="adm-segmented-item" title="表格视图">
+                      <List size={14} />
+                    </span>
+                  ),
+                },
+              ]}
+            />
+            {can('data.export') && (
+              <Button type="default" className="adm-btn" onClick={() => void exportAssets()}>
+                导出 CSV
+              </Button>
+            )}
             {can('asset.hide') && selected.length > 0 && (
               <>
-                <button type="button" className="adm-btn" onClick={() => void batch('hidden')} disabled={busy}>
+                <Button type="default" className="adm-btn" onClick={() => void runBatch('hide')} disabled={busy}>
                   批量下架 ({selected.length})
-                </button>
-                <button type="button" className="adm-btn" onClick={() => void batch('visible')} disabled={busy}>
+                </Button>
+                <Button type="default" className="adm-btn" onClick={() => void runBatch('show')} disabled={busy}>
                   批量恢复
-                </button>
+                </Button>
               </>
+            )}
+            {can('asset.delete') && selected.length > 0 && (
+              <Button
+                type="primary" danger
+                className="adm-btn is-danger"
+                onClick={() => setBatchDeleteOpen(true)}
+                disabled={busy}
+              >
+                批量删除
+              </Button>
             )}
           </>
         }
@@ -294,13 +356,19 @@ export function AdminAssetsPage() {
         </div>
       )}
 
+      {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
+      {error && <AdminStaleError error={error} onRetry={reload} />}
+
       <div className="adm-filter">
         <Input
           className="adm-filter-input"
           placeholder="ID / 能力关键词"
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
-          onPressEnter={() => setQuery({ keyword: keyword || undefined })}
+          onPressEnter={() => {
+            setSelected([]);
+            setQuery({ keyword: keyword || undefined });
+          }}
           allowClear
         />
         <Select
@@ -334,23 +402,27 @@ export function AdminAssetsPage() {
           allowClear
         />
         <div className="adm-filter-actions">
-          <button
-            type="button"
+          <Button
+            type="primary"
             className="adm-btn is-primary"
-            onClick={() => setQuery({ keyword: keyword || undefined, kind, status, backend })}
+            onClick={() => {
+              setSelected([]);
+              setQuery({ keyword: keyword || undefined, kind, status, backend });
+            }}
           >
             查询
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            type="default"
             className="adm-btn"
             onClick={() => {
               setKeyword(''); setKind(undefined); setStatus(undefined); setBackend(undefined);
+              setSelected([]);
               setQuery({ keyword: undefined, kind: undefined, status: undefined, backend: undefined });
             }}
           >
             重置
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -364,7 +436,7 @@ export function AdminAssetsPage() {
                 key={a.id}
                 className={`adm-asset-cell${selected.includes(a.id) ? ' is-selected' : ''}`}
                 onClick={() =>
-                  can('asset.hide') &&
+                  (can('asset.hide') || can('asset.delete')) &&
                   setSelected((s) =>
                     s.includes(a.id) ? s.filter((x) => x !== a.id) : [...s, a.id],
                   )
@@ -394,43 +466,50 @@ export function AdminAssetsPage() {
             loading={loading}
             scroll={{ x: 1200 }}
             rowSelection={
-              can('asset.hide')
+              can('asset.hide') || can('asset.delete')
                 ? { selectedRowKeys: selected, onChange: (k) => setSelected(k as string[]) }
                 : undefined
             }
-            pagination={{
+            pagination={adminPagination({
               current: data?.page ?? 1,
               pageSize: data?.pageSize ?? 20,
               total: data?.total ?? 0,
-              showSizeChanger: true,
-              pageSizeOptions: [20, 50, 100],
-              showTotal: (t) => `共 ${t} 条`,
-              onChange: setPage,
-            }}
+              // 翻页必须清空选择: 否则会对看不见的行执行批量下架/删除
+              onChange: (page, size) => {
+                setSelected([]);
+                setPage(page, size);
+              },
+            })}
           />
         )}
 
         {view === 'grid' && (
           <div className="adm-pagination">
-            <button
-              type="button"
+            <Button
+              type="default"
               className="adm-btn"
               disabled={(data?.page ?? 1) <= 1}
-              onClick={() => setPage((data?.page ?? 1) - 1)}
+              onClick={() => {
+                setSelected([]);
+                setPage((data?.page ?? 1) - 1);
+              }}
             >
               上一页
-            </button>
+            </Button>
             <span className="adm-cell-sub">
               第 {data?.page ?? 1} 页 · 共 {data?.total ?? 0} 条
             </span>
-            <button
-              type="button"
+            <Button
+              type="default"
               className="adm-btn"
               disabled={(data?.page ?? 1) * (data?.pageSize ?? 60) >= (data?.total ?? 0)}
-              onClick={() => setPage((data?.page ?? 1) + 1)}
+              onClick={() => {
+                setSelected([]);
+                setPage((data?.page ?? 1) + 1);
+              }}
             >
               下一页
-            </button>
+            </Button>
           </div>
         )}
       </Panel>
@@ -462,6 +541,41 @@ export function AdminAssetsPage() {
           ]}
         />
       )}
+
+      {/* 批量删除: 连磁盘文件一起删, 必须二次确认并输入确认词 */}
+      {batchDeleteOpen && (
+        <ConfirmAction
+          open
+          title={`批量删除 ${selected.length} 张素材`}
+          confirmText="永久删除"
+          danger
+          requireTyping
+          typingText="删除"
+          loading={busy}
+          description={
+            <>
+              <p>选中的素材文件会被移除，产出它们的历史任务记录也一并清理，操作不可恢复。</p>
+              <p className="adm-cell-sub">
+                已选中的素材中，失败项会在结果里逐条列出原因（例如文件已不存在）。
+              </p>
+            </>
+          }
+          impact={[
+            `共 ${selected.length} 张素材`,
+            '其磁盘 / 云端文件将被删除',
+            '产出这些素材的生成任务记录会一并清理',
+          ]}
+          onCancel={() => setBatchDeleteOpen(false)}
+          onConfirm={() => void runBatch('delete')}
+        />
+      )}
+
+      <BatchResultModal
+        open={batchSummary !== null}
+        title={batchTitle}
+        summary={batchSummary}
+        onClose={() => setBatchSummary(null)}
+      />
     </>
   );
 }

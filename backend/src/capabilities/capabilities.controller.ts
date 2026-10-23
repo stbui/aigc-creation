@@ -6,6 +6,7 @@ import {
   defaultParamsFor,
 } from './capability.registry';
 import { CreditPriceService } from '../credits/credit-price.service';
+import { CapabilityAvailabilityService } from './capability-availability.service';
 
 /**
  * 能力清单下发接口 (公开, 免登录)。
@@ -15,7 +16,10 @@ import { CreditPriceService } from '../credits/credit-price.service';
  */
 @Controller('capabilities')
 export class CapabilitiesController {
-  constructor(private readonly price: CreditPriceService) {}
+  constructor(
+    private readonly price: CreditPriceService,
+    private readonly availability: CapabilityAvailabilityService,
+  ) {}
 
   /**
    * ⚠ `creditCost` 在此**覆盖**为运行时生效价 (SystemSetting > registry),
@@ -24,7 +28,7 @@ export class CapabilitiesController {
    */
   @Get()
   async list() {
-    const prices = await this.price.resolveAll();
+    const [prices, runtime] = await Promise.all([this.price.resolveAll(), this.availability.runtimeAll()]);
     return {
       groups: CAPABILITY_GROUPS,
       // 顺序即侧栏与工作台的展示顺序
@@ -32,6 +36,14 @@ export class CapabilitiesController {
         ...c,
         creditCost: prices[c.id] ?? c.creditCost ?? 0,
         defaultParams: defaultParamsFor(c.id),
+        /*
+         * 运行时真相：这一项**此刻**按下去会发生什么。
+         *
+         * 与 `mode` 正交且**不改 mode 的形状** —— 前端既有逻辑（已接入 / 规划中）
+         * 全部基于 mode，动它会牵一发动全身；runtime 是增量字段，
+         * 新界面用它，老界面不受影响。
+         */
+        runtime: runtime[c.id],
       })),
       workbenchIds: WORKBENCH_CAPABILITIES.map((c) => c.id),
     };

@@ -30,7 +30,7 @@
 | 参考站可达性 | 200，SPA 客户端渲染；guest 态**不跳登录**，可直接渲染 |
 | 参考站可观测态 | **仅空态**（guest 无素材）：标题 + 空态插画 + 两句文案。populated 态（网格/卡片/分组/批量条）**被登录墙挡住，本次未取到实时 DOM** |
 | populated 态数据来源 | 2026-10-17 提取的参考站**未混淆 CSS 产物** `/assets/index-*.css`（86 个 `.asset-library-*` 类，字面值可直读），已固化在 `LibraryPage.tsx:19-48` 注释块 |
-| 本地实测 | dev server `localhost:5173` + 演示账号 `admin@demo.com`（26 个素材，populated 态真实渲染），1280/1100/390 三视口 |
+| 本地实测 | dev server `localhost:5100` + 演示账号 `admin@demo.com`（26 个素材，populated 态真实渲染），1280/1100/390 三视口 |
 | 置信度 | 标题/空态/页面级几何 = **参考站实时实测**；populated 态卡片规格 = **CSS 产物字面值 + 本地实测**（无法与参考站登录态交叉验证） |
 
 ---

@@ -38,7 +38,7 @@ import { toolPath } from '../lib/capabilities';
  * <1400px 参考站自动切 100px 垂直轨 (aside pad 8 8 20 / 条目 77×60 图标置顶 / 标签 10px,
  *   active #f1efff+#5546d8) —— 该态由 global.css @media (max-width: 1399px) 以
  *   .app-sider-wrap 作用域实现 (容器宽度亦由 CSS 托管, 不再由 JSX inline 注入)。
- * 本地自有功能 (参考站无对应, 已登记): hover 产出预览卡 / 作品数徽标 / mock·免费圆点
+ * 本地自有功能 (参考站无对应, 已登记): hover 产出预览卡 / 作品数徽标 / 免费·规划中圆点
  */
 
 const ICONS: Record<string, LucideIcon> = {
@@ -187,11 +187,7 @@ function SideMenuItem({
 
   const dot =
     cap && (cap.badge || cap.mode !== 'real') ? (
-      <span
-        className={`side-menu-dot${cap.badge ? ' side-menu-dot-cta' : ''}${
-          cap.mode === 'mock' ? ' side-menu-dot-mock' : ''
-        }`}
-      />
+      <span className={`side-menu-dot${cap.badge ? ' side-menu-dot-cta' : ''}`} />
     ) : null;
 
   const body = (

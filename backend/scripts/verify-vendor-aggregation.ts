@@ -177,7 +177,9 @@ eq('目录完整性无问题', collectCatalogIssues().length, 0);
 
 // ── 6. 协议层: 标识唯一、模态正确、base64/url 传法齐备 ───────────
 {
-  eq('协议条数', PROTOCOL_SPECS.length, 5);
+  // 4 = 3 个图像协议 (openai / volcengine / minimax) + 1 个文本协议 (openai-chat);
+  // 视频协议在独立的 VIDEO_PROTOCOL_SPECS, 不计入这里。
+  eq('协议条数', PROTOCOL_SPECS.length, 4);
   eq('协议标识唯一', new Set(PROTOCOL_SPECS.map((p) => p.protocol)).size, PROTOCOL_SPECS.length);
   for (const p of PROTOCOL_SPECS) {
     ok(`${p.protocol} 有 mode 声明`, p.mode === 'sync' || p.mode === 'async');

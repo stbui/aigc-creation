@@ -1,5 +1,15 @@
-import * as React from 'react';
+import { useState } from 'react';
 import type { ReactNode } from 'react';
+import { Card, Collapse, Empty, Flex, Space, Tag, Typography } from 'antd';
+
+/** 状态语义色 → antd Tag 色值 */
+const TONE_TO_ANTD: Record<TagTone, string> = {
+  success: 'success',
+  danger: 'error',
+  warn: 'warning',
+  brand: 'processing',
+  muted: 'default',
+};
 
 /** 页头: 标题 + 描述 + 操作区 */
 export function PageHeader({
@@ -12,24 +22,45 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <div className="adm-page-head">
+    <Flex className="adm-page-head" align="flex-start" justify="space-between" gap={16}>
       <div>
-        <h1>{title}</h1>
-        {description && <p>{description}</p>}
+        <Typography.Title level={4} className="adm-page-head-title" style={{ margin: 0 }}>
+          {title}
+        </Typography.Title>
+        {description && (
+          <Typography.Paragraph
+            className="adm-page-head-desc"
+            style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}
+          >
+            {description}
+          </Typography.Paragraph>
+        )}
       </div>
-      {actions && <div className="adm-page-head-actions">{actions}</div>}
-    </div>
+      {actions && (
+        <Space className="adm-page-head-actions" size={8}>
+          {actions}
+        </Space>
+      )}
+    </Flex>
   );
 }
 
 /** 筛选条容器 */
 export function FilterBar({ children }: { children: ReactNode }) {
-  return <div className="adm-filter">{children}</div>;
+  return (
+    <Flex className="adm-filter" align="center" gap={8} wrap="wrap">
+      {children}
+    </Flex>
+  );
 }
 
 /** 筛选条右侧的查询/重置按钮组 */
 export function FilterActions({ children }: { children: ReactNode }) {
-  return <div className="adm-filter-actions">{children}</div>;
+  return (
+    <Space className="adm-filter-actions" size={8}>
+      {children}
+    </Space>
+  );
 }
 
 /** 统计卡 */
@@ -46,11 +77,24 @@ export function StatCard({
   tone?: 'danger' | 'warn';
 }) {
   return (
-    <div className={`adm-stat${tone ? ` is-${tone}` : ''}`}>
+    <Card
+      className={`adm-stat${tone ? ` is-${tone}` : ''}`}
+      style={{ padding: 0 }}
+      styles={{
+        body: {
+          padding: '16px 18px',
+          minHeight: 96,
+          width: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+        },
+      }}
+    >
       <div className="adm-stat-label">{label}</div>
       <div className="adm-stat-value">{value}</div>
       {hint && <div className="adm-stat-hint">{hint}</div>}
-    </div>
+    </Card>
   );
 }
 
@@ -70,7 +114,11 @@ export function Panel({
   children: ReactNode;
 }) {
   return (
-    <div className={`adm-panel${isNarrow ? ' is-narrow' : ''}`}>
+    <Card
+      className={`adm-panel${isNarrow ? ' is-narrow' : ''}`}
+      style={{ padding: 0 }}
+      styles={{ body: { padding: '20px 22px', width: '100%' } }}
+    >
       {title && (
         <div className="adm-panel-title">
           {title}
@@ -79,7 +127,7 @@ export function Panel({
         </div>
       )}
       {children}
-    </div>
+    </Card>
   );
 }
 
@@ -123,36 +171,33 @@ export function CollapsiblePanel({
   collapsedHint?: ReactNode;
   children: ReactNode;
 }) {
-  const [inner, setInner] = React.useState(defaultOpen);
+  const [inner, setInner] = useState(defaultOpen);
   const isOpen = open ?? inner;
-  const toggle = () => {
-    const next = !isOpen;
+  const handleChange = (keys: string | string[]) => {
+    const next = Array.isArray(keys) ? keys.includes('panel') : keys === 'panel';
     if (open === undefined) setInner(next);
     onToggle?.(next);
   };
 
   return (
-    <div className={`adm-panel adm-panel-collapsible${isOpen ? ' is-open' : ''}`}>
-      {(title || extra) && (
-        <button
-          type="button"
-          className="adm-panel-title adm-panel-title-btn"
-          onClick={toggle}
-          aria-expanded={isOpen}
-        >
-          <span className="adm-panel-caret" aria-hidden="true">
-            {isOpen ? '▾' : '▸'}
-          </span>
-          {title}
-          {note && <span className="adm-panel-note">{note}</span>}
-          {extra}
-          {!isOpen && collapsedHint && (
-            <span className="adm-panel-collapsed-hint">{collapsedHint}</span>
-          )}
-        </button>
-      )}
-      {isOpen && children}
-    </div>
+    <Collapse
+      className={`adm-panel adm-panel-collapsible${isOpen ? ' is-open' : ''}`}
+      activeKey={isOpen ? ['panel'] : []}
+      onChange={handleChange}
+      items={[
+        {
+          key: 'panel',
+          label: (
+            <span className="adm-panel-collapse-label">
+              {title}
+              {note && <span className="adm-panel-note">{note}</span>}
+            </span>
+          ),
+          extra: isOpen ? extra : (collapsedHint ?? extra),
+          children,
+        },
+      ]}
+    />
   );
 }
 
@@ -165,10 +210,9 @@ export function AdminEmpty({
   action?: ReactNode;
 }) {
   return (
-    <div className="adm-empty">
-      <p>{description}</p>
+    <Empty className="adm-empty" image={Empty.PRESENTED_IMAGE_SIMPLE} description={description}>
       {action}
-    </div>
+    </Empty>
   );
 }
 
@@ -198,16 +242,29 @@ const STATUS_META: Record<string, { label: string; tone: TagTone }> = {
   admin: { label: '管理员', tone: 'brand' },
   operator: { label: '运营', tone: 'success' },
   finance: { label: '财务', tone: 'success' },
+  // 订单状态 (后端 Prisma Order.status)。`pending` 与任务状态共用同一个键,
+  // 订单页通过 <StatusTag label="待支付"> 覆盖文案 —— 改这里的 label 会连带
+  // 把任务页的"等待"也改掉。
+  paid: { label: '已支付', tone: 'success' },
+  refunded: { label: '已退款', tone: 'danger' },
+  partial_refunded: { label: '部分退款', tone: 'warn' },
+  // 商品状态 (后端 Prisma Product.status)
+  offline: { label: '已下架', tone: 'muted' },
 };
 
 export type TagTone = 'success' | 'danger' | 'warn' | 'brand' | 'muted';
 
-export function StatusTag({ status }: { status: string }) {
+/**
+ * 状态标签。
+ *
+ * `label` 覆盖用于同一状态值在不同语境下中文不同 —— 订单的 `pending` 是
+ * "待支付", 任务的 `pending` 是"等待", 共用一键没法在映射表里同时满足。
+ */
+export function StatusTag({ status, label }: { status: string; label?: string }) {
   const item = STATUS_META[status] ?? { label: status, tone: 'muted' as TagTone };
   return (
-    <span className={`adm-tag is-${item.tone}`}>
-      <span className="adm-tag-dot" aria-hidden="true" />
-      {item.label}
-    </span>
+    <Tag color={TONE_TO_ANTD[item.tone]} icon={<span className="adm-tag-dot" aria-hidden="true" />}>
+      {label ?? item.label}
+    </Tag>
   );
 }

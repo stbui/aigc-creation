@@ -1,6 +1,6 @@
 # 完整商业运营后台系统 · 总体设计
 
-货觉AI ｜ 2026-10-19 ｜ 状态：待裁定（未动代码）
+货觉AI ｜ 2026-10-19 ｜ 状态：**设计已落地**（B0–B8，2026-10-21；实现现状见 [`CLAUDE.md`](../CLAUDE.md)「后台管理端」）
 
 **文档层级**：本文是**后台设计附件**。后台实现依据为 `docs/admin-prd.md`（后台管理系统需求）；整站产品需求见 `docs/prd.md`。本文负责：全域地图、补齐的 7 个缺失域、合规专项、总表、RBAC、总路线图。
 分域细节见 `docs/admin-console-design.md`（运营域）、`docs/commerce-design.md`（交易域）、`docs/gap-analysis.md`（缺口取证）。

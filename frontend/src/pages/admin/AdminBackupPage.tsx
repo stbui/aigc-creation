@@ -1,16 +1,18 @@
-import { useCallback, useEffect, useState } from 'react';
-import { App, Table } from 'antd';
+import { useState } from 'react';
+import { App, Button, Input, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { DatabaseBackup, ShieldAlert, ShieldCheck, Trash2 } from 'lucide-react';
 import { adminBackupsApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import {
   AdminListError,
+  AdminStaleError,
   AdminListLoading,
   ConfirmAction,
+  useAdminResource,
 } from '../../components/admin/AdminWidgets';
 import { AdminEmpty, PageHeader, Panel } from '../../components/admin/PageHeader';
-import type { AdminBackup, AdminBackupStats, AdminCleanupLog } from '../../types/api';
+import type { AdminBackup } from '../../types/api';
 
 /** 字节数 → 人类可读 */
 function formatBytes(bytes: number): string {
@@ -35,46 +37,50 @@ export function AdminBackupPage() {
   const { message } = App.useApp();
   const { can } = useAdmin();
 
-  const [rows, setRows] = useState<AdminBackup[]>([]);
-  const [stats, setStats] = useState<AdminBackupStats | null>(null);
-  const [logs, setLogs] = useState<AdminCleanupLog[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState<AdminBackup | null>(null);
   const [pruneOpen, setPruneOpen] = useState(false);
   const [keepCount, setKeepCount] = useState('7');
+  const [runOpen, setRunOpen] = useState(false);
+  const [runReason, setRunReason] = useState('');
+  const [runReasonError, setRunReasonError] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [list, st, lg] = await Promise.all([
-        adminBackupsApi.list(),
-        adminBackupsApi.stats(),
-        adminBackupsApi.cleanupLogs(10),
-      ]);
-      setRows(list);
-      setStats(st);
-      setLogs(lg);
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : '加载失败');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  /*
+   * 三个请求本来就绑定在同一份「备份现状」上, 拆开只会让页面出现
+   * 「统计有了但列表还空」的中间态。用一个 fetcher 一起拉, 一起成功或失败。
+   */
+  const { data, loading, error, reload } = useAdminResource(async () => {
+    const [rows, stats, logs] = await Promise.all([
+      adminBackupsApi.list(),
+      adminBackupsApi.stats(),
+      adminBackupsApi.cleanupLogs(10),
+    ]);
+    return { rows, stats, logs };
+  });
+  const rows = data?.rows ?? [];
+  const stats = data?.stats ?? null;
+  const logs = data?.logs ?? [];
 
-  useEffect(() => {
-    void load();
-  }, [load]);
-
+  /*
+   * 「立即备份」曾是**点一下就执行**的按钮: 高危权限清单里明明列了 backupRun,
+   * 界面上却既没有确认也没有原因, 审计里只留一条 reason=null 的记录。
+   * 备份会短暂占用写锁并落一份完整库文件, 误点后果不是"撤销一下"能收回的。
+   */
   const runBackup = async () => {
+    const trimmed = runReason.trim();
+    if (!trimmed) {
+      setRunReasonError(true);
+      return;
+    }
     setBusy(true);
     try {
-      const rec = await adminBackupsApi.run(`manual-${Date.now()}`);
+      const rec = await adminBackupsApi.run(`manual-${Date.now()}`, trimmed);
       void message.success(`备份完成: ${rec.filename}`);
-      await load();
+      setRunOpen(false);
+      setRunReason('');
+      setRunReasonError(false);
+      await reload();
     } catch (e) {
       void message.error((e as Error).message);
     } finally {
@@ -91,7 +97,7 @@ export function AdminBackupPage() {
       } else {
         void message.error('验证未通过, 详见详情');
       }
-      await load();
+      await reload();
     } catch (e) {
       void message.error((e as Error).message);
     } finally {
@@ -115,7 +121,7 @@ export function AdminBackupPage() {
       await adminBackupsApi.remove(deleteTarget.id);
       setDeleteTarget(null);
       void message.success('已删除');
-      await load();
+      await reload();
     } catch (e) {
       void message.error((e as Error).message);
     } finally {
@@ -129,7 +135,7 @@ export function AdminBackupPage() {
       const res = await adminBackupsApi.prune(Number(keepCount));
       setPruneOpen(false);
       void message.success(`已清理 ${res.removed} 份, 释放 ${formatBytes(res.freedBytes)}`);
-      await load();
+      await reload();
     } catch (e) {
       void message.error((e as Error).message);
     } finally {
@@ -204,14 +210,14 @@ export function AdminBackupPage() {
       render: (_: unknown, row) => (
         <div className="adm-row-actions">
           {can('backup.run') && row.status === 'succeeded' && (
-            <button type="button" className="adm-link" onClick={() => void verify(row)} disabled={busy}>
+            <Button type="link" className="adm-link" onClick={() => void verify(row)} disabled={busy}>
               验证
-            </button>
+            </Button>
           )}
           {row.verified ? (
-            <button type="button" className="adm-link" onClick={() => void download(row)}>
+            <Button type="link" className="adm-link" onClick={() => void download(row)}>
               下载
-            </button>
+            </Button>
           ) : (
             /* B-97: 无验证记录的备份视为无效, 不给下载入口 */
             <span className="adm-link is-disabled" title="未通过恢复验证的备份不可下载">
@@ -219,22 +225,22 @@ export function AdminBackupPage() {
             </span>
           )}
           {can('backup.run') && (
-            <button
-              type="button"
+            <Button
+              type="link" danger
               className="adm-link is-danger"
               onClick={() => setDeleteTarget(row)}
               disabled={busy}
             >
               删除
-            </button>
+            </Button>
           )}
         </div>
       ),
     },
   ];
 
-  if (loading && rows.length === 0 && !stats) return <AdminListLoading tip="加载备份记录…" />;
-  if (error) return <AdminListError error={error} onRetry={() => void load()} />;
+  if (loading && !data) return <AdminListLoading tip="加载备份记录…" />;
+  if (error && !data) return <AdminListError error={error} onRetry={() => void reload()} />;
 
   return (
     <>
@@ -245,19 +251,28 @@ export function AdminBackupPage() {
           <>
             {can('backup.run') && (
               <>
-                <button
-                  type="button"
+                <Button
+                  type="default"
                   className="adm-btn"
                   onClick={() => setPruneOpen(true)}
                   disabled={busy || rows.length === 0}
                 >
                   <Trash2 size={14} style={{ marginRight: 6 }} />
                   保留份数清理
-                </button>
-                <button type="button" className="adm-btn is-primary" onClick={() => void runBackup()} disabled={busy}>
+                </Button>
+                <Button
+                  type="primary"
+                  className="adm-btn is-primary"
+                  onClick={() => {
+                    setRunReason('');
+                    setRunReasonError(false);
+                    setRunOpen(true);
+                  }}
+                  disabled={busy}
+                >
                   <DatabaseBackup size={14} style={{ marginRight: 6 }} />
                   {busy ? '执行中…' : '立即备份'}
-                </button>
+                </Button>
               </>
             )}
           </>
@@ -330,15 +345,18 @@ export function AdminBackupPage() {
         </div>
       )}
 
+      {/* 刷新失败但手上还有上一次的数据: 备份是出事时才来的页面, 更不能假装数据是新的 */}
+      {error && <AdminStaleError error={error} onRetry={() => void reload()} />}
+
       <Panel title="备份记录" note="未验证的备份视为无效，不可下载">
         {rows.length === 0 ? (
           <AdminEmpty
             description="还没有任何备份记录"
             action={
               can('backup.run') ? (
-                <button type="button" className="adm-btn is-primary" onClick={() => void runBackup()} disabled={busy}>
+                <Button type="primary" className="adm-btn is-primary" onClick={() => void runBackup()} disabled={busy}>
                   立即执行一次备份
-                </button>
+                </Button>
               ) : undefined
             }
           />
@@ -419,6 +437,51 @@ export function AdminBackupPage() {
         )}
       </Panel>
 
+      {runOpen && (
+        <ConfirmAction
+          open
+          title="立即备份"
+          confirmText="开始备份"
+          loading={busy}
+          onCancel={() => setRunOpen(false)}
+          onConfirm={() => void runBackup()}
+          description={
+            <p>
+              将对当前数据库做一次全量快照，保存到服务器的备份目录。
+              备份期间会短暂持有数据库写锁，其他写操作会排队等待。
+            </p>
+          }
+          impact={[
+            stats ? `当前已备份 ${stats.total} 份，占用 ${stats.totalMb} MB` : '将在备份完成后重新统计占用',
+            '新备份初始状态为「未验证」，需再做一次恢复验证才能下载',
+            '本次操作原因会写入操作审计',
+          ]}
+          extra={
+            <div className="adm-confirm-typing">
+              <label htmlFor="adm-backup-reason">备份原因（强制，写入审计）：</label>
+              <Input
+                id="adm-backup-reason"
+                type="text"
+                value={runReason}
+                onChange={(e) => {
+                  setRunReason(e.target.value);
+                  if (e.target.value.trim()) setRunReasonError(false);
+                }}
+                placeholder="如：本周例行备份 / 改动结构前留档"
+                maxLength={200}
+                autoComplete="off"
+                aria-invalid={runReasonError}
+              />
+              {runReasonError && (
+                <span className="adm-text-danger" role="alert">
+                  请先填写原因，否则审计里无法回答「这次备份是谁为什么做的」。
+                </span>
+              )}
+            </div>
+          }
+        />
+      )}
+
       {deleteTarget && (
         <ConfirmAction
           open
@@ -454,7 +517,7 @@ export function AdminBackupPage() {
           extra={
             <div className="adm-field">
               <label htmlFor="adm-keep">保留份数</label>
-              <input
+              <Input
                 id="adm-keep"
                 type="number"
                 min={1}

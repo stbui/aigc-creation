@@ -175,7 +175,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // ── 失败必退还 ────────────────────────────────────────────────────
   console.log('\n【生成失败 → 自动退还到永久批次】');
   /*
-   * 难点: 删素材不足以触发失败 —— 网关不可用时 MockImageProvider 会用本地 Jimp
+   * 难点: 删素材不足以触发失败 —— 网关不可用时 LocalImageProvider 会用本地 Jimp
    * 兜底, 任务照样 succeeded, 那样根本走不到退还分支。
    *
    * 解法: 把素材记录指向一个**磁盘上不存在的文件**, readAssetBytes 的
@@ -193,6 +193,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   const cost2 = expand?.creditCost ?? 0;
   const balBeforeFail = (await call('GET', '/credits/balance', T)).data?.balance;
+  const consumeBefore = await prisma.creditLedger.count({ where: { userId: user.id, type: 'consume' } });
 
   const ok2 = await call('POST', '/generate', T, {
     projectId, capability: 'expand', inputAssetIds: [assetId], params: { ratio: '1:1' },
@@ -200,8 +201,21 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   check('余额充足时仍可建任务', ok2.status === 200 || ok2.status === 201, `HTTP ${ok2.status}`);
   const taskId2 = ok2.data?.taskId;
   const balAfterFailDeduct = (await call('GET', '/credits/balance', T)).data?.balance;
-  check('失败任务同样先扣费', balAfterFailDeduct === balBeforeFail - cost2,
-    `${balBeforeFail} → ${balAfterFailDeduct} (期望 ${balBeforeFail - cost2})`);
+  /*
+   * 不能用「余额是否少了 cost2」判断是否扣过费: 任务 enqueue 后立即执行, 素材
+   * 指向不存在的文件会瞬间失败并原额退还 —— 等 POST 返回再读余额, 扣费与退还
+   * 往往都已发生, 余额看起来「没变」。
+   *
+   * 也不能靠 consume 流水的 taskId 找它: 扣费发生在建任务之前 (那时还没有
+   * task id), 流水只记 userId。故用「本用户 consume 流水条数 +1」+「任务上的
+   * creditCost 快照」两条持久证据交叉验证先扣后退。
+   */
+  const consumeAfter = await prisma.creditLedger.count({ where: { userId: user.id, type: 'consume' } });
+  const costSnapshot = (await prisma.generationTask.findUnique({ where: { id: taskId2 } }))?.creditCost;
+  check('失败任务同样先扣费',
+    consumeAfter === consumeBefore + 1 && costSnapshot === cost2,
+    `consume 流水 ${consumeBefore}→${consumeAfter}，任务快照 ${costSnapshot} (期望 ${cost2})，`
+    + `余额 ${balBeforeFail} → ${balAfterFailDeduct}`);
 
   let t2 = null;
   const deadline2 = Date.now() + 25000;
@@ -330,6 +344,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await prisma.order.deleteMany({ where: { userId: user.id } });
   await prisma.creditLedger.deleteMany({ where: { userId: user.id } });
   await prisma.creditLot.deleteMany({ where: { userId: user.id } });
+  // 注册写同意留痕、登录写登录日志、退款失败给站内消息 —— 三者都直接引用 User,
+  // 漏删任意一张都会让最后一步 delete 撞上外键, 看起来像「脚本异常」而非清理不全
+  await prisma.consentRecord.deleteMany({ where: { userId: user.id } });
+  await prisma.loginLog.deleteMany({ where: { userId: user.id } });
+  await prisma.notification.deleteMany({ where: { userId: user.id } });
   await prisma.user.delete({ where: { id: user.id } });
 
   console.log(`\n${'='.repeat(54)}`);

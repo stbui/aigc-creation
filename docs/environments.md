@@ -14,7 +14,7 @@
 |---|---|
 | 数据库硬编码 | `prisma.config.ts` 与 `PrismaService` 都写死 `file:./dev.db`，测试往开发演示库里写脏数据，事后无法区分「测试污染」与「真实 bug」 |
 | 上传目录硬编码 | `join(process.cwd(), 'uploads', ...)` 散落 6 处，测试删任务会连带删掉开发环境正在用的素材图 |
-| 前端无 mode 分档 | `constants.ts` 硬回落 `localhost:3001`，换环境就得改代码 |
+| 前端无 mode 分档 | `constants.ts` 硬回落到固定开发端口，换环境就得改代码 |
 | 无生产构建 | `package.json` 只有 `build`，没有分环境命令 |
 | 无启动门禁 | `JWT_SECRET` 未设置时生产能照常起来，内置开发密钥上线路 |
 
@@ -28,14 +28,100 @@
 | 上传目录 | `uploads` | `uploads-test` | `/app/data/uploads`（绝对路径 + 卷） |
 | 备份目录 | `backups` | `backups-test` | `/app/data/backups` |
 | 日志目录 | `logs` | `logs/test` | `/app/data/logs` |
-| 后端端口 | 3001（占用则 3002/3003） | 3101 | `.env.production` 的 `PORT` |
-| 前端端口 | 5173（占用则 5174/5175） | 5273 | 4173（仅 preview） |
+| 后端端口 | 4100（占用则 4101/4102） | 4200 | `.env.production` 的 `PORT` |
+| 前端端口 | 5100（占用则 5101/5102） | 5200 | 4173（仅 preview） |
 | `HOST` | `127.0.0.1` | `127.0.0.1` | `0.0.0.0`（容器必须） |
 | `JWT_SECRET` | 留空（用内置开发密钥） | 独立测试密钥 | **必填**，缺失则拒绝启动 |
 | `JWT_TTL` | `7d` | `1h` | 建议 `2h` |
-| `CORS_ORIGINS` | 留空走默认本机白名单 | 显式放行 5273 | **必填**线上域名 |
+| `CORS_ORIGINS` | 留空走默认本机白名单 | 显式放行 5200 | **必填**线上域名 |
 | 界面角标 | 「开发」 | 「测试」 | 不显示 |
 | Docker profile | 默认 | `--profile test` | 见下方「生产部署」 |
+
+## 支付通道（`PAYMENT_PROVIDER`）
+
+支付通道是**按环境切换**的：开发/测试固定走沙箱，生产必须配真实商户号。变量定义在
+`backend/src/config/env.validation.ts` 的 `ENV_SPECS`（`payment.*` 段）。
+
+| 变量 | 开发 | 测试 | 生产 | 说明 |
+|---|---|---|---|---|
+| `PAYMENT_PROVIDER` | `sandbox` | `sandbox` | `alipay` / `wechat` | 默认通道；缺省按 `sandbox` |
+| `PAYMENT_NOTIFY_BASE` | 空 | 空 | **必填** | 渠道异步通知的公网基址，拼成 `{base}/api/v1/payments/callback/{channel}`。空时退回 `ASSET_PUBLIC_BASE`，再空则无法发起真实支付 |
+| `ALIPAY_APP_ID` / `ALIPAY_PRIVATE_KEY` / `ALIPAY_PUBLIC_KEY` | 空 | 空 | 按需 | RSA2。私钥是**应用私钥**，公钥是**支付宝公钥**（不是应用公钥，填反表现为回调一律验签失败） |
+| `ALIPAY_GATEWAY` | 空 | 空 | 按需 | 空则用正式网关；沙箱联调用 `https://openapi-sandbox.dl.alipaydev.com/gateway.do` |
+| `WECHAT_MCH_ID` / `WECHAT_APP_ID` / `WECHAT_API_V3_KEY` / `WECHAT_SERIAL_NO` / `WECHAT_PRIVATE_KEY` / `WECHAT_PLATFORM_PUBLIC_KEY` | 空 | 空 | 按需 | API v3。`API_V3_KEY` 必须 **32 字节**；`PLATFORM_PUBLIC_KEY` 用于验回调 |
+
+三条必须记住的规则：
+
+1. **凭据缺失返回 503，绝不静默降级为沙箱**。否则「生产漏配」会表现为「支付一直成功但一分钱没收到」。
+2. **沙箱回调在生产环境拒收**（`SandboxPaymentProvider` 显式判 `NODE_ENV`），防止伪造支付。
+3. **多行 PEM 用字面 `\n` 写进 env**，`normalizePem()` 会还原。粘贴真实换行会让后续几行变成独立键值。
+
+示例：
+
+```bash
+PAYMENT_PROVIDER=alipay
+PAYMENT_NOTIFY_BASE=https://api.example.com
+ALIPAY_APP_ID=2021000000000001
+ALIPAY_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEv...\n-----END PRIVATE KEY-----"
+ALIPAY_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\nMIIBI...\n-----END PUBLIC KEY-----"
+```
+
+支付宝 / 微信的签名与解密实现有离线交叉校验脚本（本地生成 RSA 密钥对，按公开规范独立复算签名串）：
+`cd backend && npx ts-node -T scripts/verify-payment-signatures.ts`。它不能替代真实商户号的端到端联调。
+
+## 邮件 / 短信通道（`EMAIL_PROVIDER` / `SMS_PROVIDER`）
+
+同支付一样是「适配器 + 控制台兜底」：默认 `console` **不真实投递**，正文写入
+`backend/logs/outbox/{email,sms}-*.log`，冒烟脚本据此校验验证码 / 重置链接。
+配置 `http` + 服务商 HTTP API，或 `aliyun` + 阿里云 AccessKey 即真实调用（`backend/src/channels/`）。
+
+| 变量 | 开发 | 测试 | 生产 | 说明 |
+|---|---|---|---|---|
+| `EMAIL_PROVIDER` | `console` | `console` | `http` / `aliyun` | `console` 打 WARN 表明不会投递；`aliyun` 走 DirectMail `SingleSendMail` |
+| `EMAIL_API_URL` / `EMAIL_API_KEY` | 空 | 空 | 按需 | 服务商 HTTP 接口（15s 超时 + 3 次指数退避） |
+| `EMAIL_FROM` | `noreply@huojue.local` | 同 | 真实发信地址 | 发件人显示名（`aliyun` 下显示名用 `ALIYUN_DM_FROM_ALIAS`） |
+| `SMS_PROVIDER` | `console` | `console` | `http` / `aliyun` | `aliyun` 走短信服务 `SendSms` |
+| `SMS_API_URL` / `SMS_API_KEY` | 空 | 空 | 按需 | 短信服务商接口 |
+| `SMS_SIGN` | `货觉AI` | 同 | 已备案签名 | 短信签名（`aliyun` 下 `ALIYUN_SMS_SIGN_NAME` 优先） |
+| `SMS_TEMPLATE` | 空 | 空 | 模板 ID | 服务商侧模板；留空用默认文案 |
+
+`aliyun` 通道的专用变量（SMS 与邮件共用同一组 AccessKey，建议用只授权 Dysms + Dm 的子账号）：
+
+| 变量 | 说明 |
+|---|---|
+| `ALIYUN_ACCESS_KEY_ID` / `ALIYUN_ACCESS_KEY_SECRET` | 必填；缺失时**告警并回落 console**（`delivers: false`），不阻止启动 |
+| `ALIYUN_SMS_SIGN_NAME` | 控制台已审核通过的短信签名；留空回落 `SMS_SIGN` 并告警 |
+| `ALIYUN_SMS_TEMPLATE_CODE` | 模板号 `SMS_xxx`；模板变量名必须是 `code` |
+| `ALIYUN_SMS_REGION` | 地域 id（如 `ap-southeast-1`）；留空或 `cn-hangzhou` 走中心域名。**只接受地域 id**，不接受任意 URL —— 一个可写的端点等于「把验证码发到别人的服务器」 |
+| `ALIYUN_DM_ACCOUNT_NAME` | DirectMail 控制台已配置的发信地址；**不能用 `EMAIL_FROM` 猜** |
+| `ALIYUN_DM_FROM_ALIAS` | 发件人显示名 |
+| `ALIYUN_DM_ADDRESS_TYPE` | `1` 随机账号（默认）/ `0` 批量发信 |
+
+**回退语义与支付相反**：支付通道凭据缺失一律 503、绝不降级沙箱；邮件/短信不是核心链路（忘记密码仍可走另一条通道或联系客服），因此 `aliyun` 缺凭据时**告警 + 回落 console**，由 `status()` 的 `delivers: false` 与 `/health` 的 channels 分项暴露「其实没在发」。`/admin/notifications` 页顶部的通道状态读同一份 `status()`。
+
+**刻意不手写 SMTP**：TLS 分片与认证流程的自研实现风险高于收益，邮件走服务商 HTTP API。阿里云 RPC 签名（HMAC-SHA1 + 排序 canonical query）有离线复算脚本：`cd backend && npx ts-node -T scripts/verify-channel-signatures.ts`，但它**只验签名与请求形状，不代表已真实投递**。
+
+## 安全与合规（签名 / 限流 / 追踪）
+
+| 变量 | 开发 | 测试 | 生产 | 说明 |
+|---|---|---|---|---|
+| `ASSET_SIGNING_SECRET` | 空（`/uploads/*` 公开） | 空 | **必填**（≥ 32 字符） | HMAC-SHA256 签名密钥。生产档：为空只 WARN（提醒素材公开），**长度不足直接拒绝启动** |
+| `RATE_LIMIT_ENABLED` | `true` | `true` | **必须 `true`** | 关闭时启动打 WARN。仅本地压测可关 |
+| `RATE_LIMIT_TRUST_PROXY` | `false` | `false` | 反代后为 `true` | 是否信任 `X-Forwarded-For`。**默认不信任**，否则伪造一个头就等于没有限流 |
+| `RATE_LIMIT_AUTH_PER_MIN` | `10` | `200` | `10` | 登录/注册/短信登录配额（请求期读取，冒烟靠它放宽） |
+| `RATE_LIMIT_RESET_TOKEN` | 空 | `test-reset-token` | **留空** | 测试重置入口 `POST /test/rate-limit/reset` 的令牌。非 test 环境该路由**直接 404**，令牌留空则一律拒绝 |
+| `ERROR_WEBHOOK_URL` | 空 | 空 | 按需 | 异常上报地址；留空只落本地日志 |
+
+三条必须记住的规则：
+
+1. **限流是单机内存计数**，多实例部署时每个实例各算各的。要做全局配额必须换 Redis（本轮不做）。
+2. **签名只增字段不改语义**：`sourceUrl` 保持干净，另发 `signedUrl`；签名关闭时 `signedUrl` 为 `null`，前端 `assetSrc()` 自动回落。
+3. **测试重置入口不是后门**：`NODE_ENV !== 'test'` 时返回 404（连路径都不承认），且需要令牌；它只清计数，断言仍打在同一个 guard 上。
+
+```bash
+# 生成签名密钥
+openssl rand -base64 32
+```
 
 ## 加载优先级
 
@@ -103,7 +189,7 @@ npm run seed:test             # 只灌测试库种子
 ```bash
 cd frontend
 npm run dev                # vite --mode development
-npm run dev:test           # vite --mode test（5273）
+npm run dev:test           # vite --mode test（5200）
 npm run build:prod         # tsc --noEmit && vite build --mode production
 npm run build:test         # 测试环境的静态产物
 ```

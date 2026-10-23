@@ -1,9 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react';
-import { productsApi, ordersApi, creditsApi } from '../lib/api';
-import type { Product, Order, CreditBalance } from '../types/api';
+import QRCode from 'qrcode';
+// quote (结算试算) 属于 C 端接口, 在 myMarketingApi 上; marketingApi 是后台优惠券管理
+import { productsApi, ordersApi, creditsApi, membershipApi, paymentsApi, myMarketingApi } from '../lib/api';
+import type {
+  Product,
+  Order,
+  CreditBalance,
+  MembershipPlan,
+  PaymentIntent,
+  MarketingQuote,
+} from '../types/api';
 import { notifyCreditsChanged } from '../context/CreditsContext';
+import { IS_PROD } from '../lib/constants';
 import { StateError, StateSkeleton } from '../components/StateViews';
 
 /**
@@ -58,7 +68,17 @@ export function CheckoutPage() {
    */
   const resumeOrderId = search.get('orderId');
 
+  /**
+   * 会员订阅结算 (`/checkout/membership?planId=...`)。
+   *
+   * 与积分包的差别不只是价格: 会员单没有 OrderItem、不叠加券与折扣,
+   * 支付成功后由后端激活权益 —— 所以这里只负责把套餐信息如实展示出来。
+   */
+  const planId = search.get('planId');
+  const isMembership = Boolean(planId) || search.get('type') === 'membership';
+
   const [product, setProduct] = useState<Product | null>(null);
+  const [plan, setPlan] = useState<MembershipPlan | null>(null);
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
@@ -66,6 +86,18 @@ export function CheckoutPage() {
   const [couponCode, setCouponCode] = useState('');
   const [phase, setPhase] = useState<Phase>('confirm');
   const [result, setResult] = useState<ResultView | null>(null);
+  /** 真实通道的预下单结果 (微信二维码 / 支付宝跳转) */
+  const [onlineIntent, setOnlineIntent] = useState<PaymentIntent | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  /**
+   * 结算试算（券 / 限时活动）。
+   *
+   * 只在**还没建单**时试算：一旦下单，金额与优惠以订单快照为准，
+   * 继续试算会让界面显示一个与服务端实际扣款不一致的数字。
+   * 试算不落库、不占幂等键，可以随输入反复调。
+   */
+  const [quotePreview, setQuotePreview] = useState<MarketingQuote | null>(null);
+  const pollRef = useRef<number | null>(null);
 
   /**
    * ⚠ 必须用 ref 而非 state: 重渲染会让 state 拿到新 key,
@@ -77,6 +109,13 @@ export function CheckoutPage() {
     let alive = true;
     setLoading(true);
 
+    const loadPlan = async (id: string) => {
+      const plans = await membershipApi.plans();
+      const found = plans.find((p) => p.id === id || p.code === id);
+      if (!found) throw new Error('会员套餐不存在或已下架');
+      if (alive) setPlan(found);
+    };
+
     // 续付路径: 先拉既有订单, 金额与优惠以它为准, 不重新下单
     if (resumeOrderId) {
       ordersApi
@@ -84,6 +123,11 @@ export function CheckoutPage() {
         .then(async (o) => {
           if (!alive) return;
           setOrder(o);
+          // 会员单没有 OrderItem, 套餐信息在 order.membershipPlanId 上
+          if (o.membershipPlanId) {
+            await loadPlan(o.membershipPlanId);
+            return;
+          }
           const item = o.items?.[0];
           if (!item) throw new Error('订单无商品明细');
           const p = await productsApi.detail(item.sku);
@@ -91,6 +135,27 @@ export function CheckoutPage() {
         })
         .catch((e: Error) => {
           if (alive) setError(e.message || '订单加载失败');
+        })
+        .finally(() => {
+          if (alive) setLoading(false);
+        });
+      return () => {
+        alive = false;
+      };
+    }
+
+    // 会员订阅: 套餐来自 /membership/plans, 不经过商品接口
+    if (isMembership) {
+      if (!planId) {
+        setError('缺少套餐参数，请从会员页重新进入');
+        setLoading(false);
+        return () => {
+          alive = false;
+        };
+      }
+      loadPlan(planId)
+        .catch((e: Error) => {
+          if (alive) setError(e.message || '套餐加载失败');
         })
         .finally(() => {
           if (alive) setLoading(false);
@@ -114,22 +179,187 @@ export function CheckoutPage() {
     return () => {
       alive = false;
     };
-  }, [sku, resumeOrderId]);
+  }, [sku, resumeOrderId, isMembership, planId]);
+
+  /*
+   * 券 / 活动试算。
+   *
+   * 此前结算页只显示商品原价，优惠要等下单后才由订单快照揭晓 ——
+   * 用户填了券码却看不到"省了多少"，只能先下单再判断，转化与信任都受损。
+   * 试算端点不落库、不建单，按输入防抖调用即可。
+   */
+  useEffect(() => {
+    if (order || plan || !product) {
+      setQuotePreview(null);
+      return;
+    }
+    let alive = true;
+    const timer = window.setTimeout(() => {
+      myMarketingApi
+        .quote({
+          productIds: [product.id],
+          quantities: [1],
+          couponCode: couponCode.trim() || undefined,
+        })
+        .then((q) => {
+          if (alive) setQuotePreview(q);
+        })
+        .catch(() => {
+          // 试算失败不阻断下单：以原价展示，最终金额仍以订单快照为准
+          if (alive) setQuotePreview(null);
+        });
+    }, 350);
+    return () => {
+      alive = false;
+      window.clearTimeout(timer);
+    };
+  }, [order, plan, product, couponCode]);
 
   /** 下单。重复调用复用同一 key, 后端返回同一订单 */
   const placeOrder = useCallback(async (): Promise<Order> => {
-    if (!product) throw new Error('商品未加载');
+    if (!product && !plan) throw new Error('商品未加载');
     if (order) return order; // 已建过单, 不重复建
 
     const created = await ordersApi.create({
-      productId: product.id,
-      quantity: 1,
+      ...(plan
+        ? {
+            membershipPlanId: plan.id,
+            // 会员单不接受券: 传了会被后端忽略并在 couponWarning 里说明,
+            // 这里干脆不传, 免得用户以为折扣生效了
+          }
+        : {
+            productId: product!.id,
+            quantity: 1,
+            couponCode: couponCode.trim() || undefined,
+          }),
       idempotencyKey: idemKeyRef.current,
-      couponCode: couponCode.trim() || undefined,
     });
     setOrder(created);
     return created;
-  }, [product, order, couponCode]);
+  }, [product, plan, order, couponCode]);
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current !== null) {
+      window.clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, []);
+
+  // 组件卸载时务必停掉轮询 —— 否则离开页面后仍在打接口, 且会在已卸载组件上 setState
+  useEffect(() => stopPolling, [stopPolling]);
+
+  /**
+   * 轮询支付结果。
+   *
+   * 真实通道到账是**渠道回调**驱动的, 前端没有任何办法「知道」支付完成,
+   * 只能问后端。5 分钟上限与订单过期时间一致: 超过之后即使到账,
+   * 订单也已经不该被当作有效支付, 用户需要去订单页确认。
+   */
+  const startPolling = useCallback(
+    (orderId: string) => {
+      stopPolling();
+      const startedAt = Date.now();
+      pollRef.current = window.setInterval(async () => {
+        if (Date.now() - startedAt > 5 * 60 * 1000) {
+          stopPolling();
+          setError('支付确认超时。若已扣款，请稍后在「我的订单」查看状态');
+          return;
+        }
+        try {
+          const st = await paymentsApi.status(orderId);
+          if (st.status !== 'paid') return;
+          stopPolling();
+          const fresh = await ordersApi.detail(orderId);
+          setOrder(fresh);
+          notifyCreditsChanged();
+          let balance: CreditBalance | null = null;
+          try {
+            balance = await creditsApi.balance();
+          } catch {
+            /* 余额回查失败不阻断结果展示 */
+          }
+          setResult({
+            kind: 'success',
+            title: '支付成功',
+            desc: fresh.grantedCredits > 0 ? `${fresh.grantedCredits} 积分已到账` : '权益已生效',
+            order: fresh,
+            balance,
+          });
+          setPhase('result');
+        } catch {
+          // 单次轮询失败 (网络抖动) 不应该中断, 下一轮继续
+        }
+      }, 2000);
+    },
+    [stopPolling],
+  );
+
+  /**
+   * 真实通道支付。
+   *
+   * 三种 mode 的处理:
+   *   sandbox  → 当前环境没配真实通道, 如实走站内模拟 (并保留沙箱声明)
+   *   redirect → 直接跳渠道收银台 (支付宝网页支付)
+   *   qrcode   → 渲染二维码并开始轮询 (微信 Native)
+   */
+  const payOnline = async () => {
+    setPaying(true);
+    setError(null);
+    try {
+      const o = order ?? (await placeOrder());
+      const intent = await paymentsApi.intent(o.id);
+
+      /*
+       * 0 元单（免费体验包 / 100% 优惠）：后端在 createIntent 里已经直接入账，
+       * 这里只负责把结果拿到并刷新余额。此前后端对 0 元单直接报错，
+       * 「免费领取」是一条永远走不通的路。
+       */
+      if (intent.mode === 'free') {
+        const fresh = await ordersApi.detail(o.id);
+        setOrder(fresh);
+        notifyCreditsChanged();
+        let balance: CreditBalance | null = null;
+        try {
+          balance = await creditsApi.balance();
+        } catch {
+          /* 余额回查失败不阻断结果展示 */
+        }
+        setResult({
+          kind: 'success',
+          title: '领取成功',
+          desc:
+            fresh.grantedCredits > 0
+              ? `${fresh.grantedCredits} 积分已到账`
+              : '订单已完成',
+          order: fresh,
+          balance,
+        });
+        setPhase('result');
+        return;
+      }
+
+      if (intent.mode === 'sandbox') {
+        await pay('success');
+        return;
+      }
+      if (intent.mode === 'redirect' && intent.payUrl) {
+        window.location.href = intent.payUrl;
+        return;
+      }
+      if (intent.mode === 'qrcode' && intent.codeUrl) {
+        const dataUrl = await QRCode.toDataURL(intent.codeUrl, { width: 220, margin: 1 });
+        setQrDataUrl(dataUrl);
+        setOnlineIntent(intent);
+        startPolling(o.id);
+        return;
+      }
+      setError('支付通道返回了无法识别的方式，请联系客服');
+    } catch (e) {
+      setError((e as Error).message || '发起支付失败');
+    } finally {
+      setPaying(false);
+    }
+  };
 
   /**
    * 沙箱支付三态演示。
@@ -198,7 +428,7 @@ export function CheckoutPage() {
     );
   }
 
-  if (!product) {
+  if (!product && !plan) {
     return (
       <div className="pkg-checkout-page">
         <div className="pkg-checkout-container">
@@ -208,7 +438,11 @@ export function CheckoutPage() {
           */}
           <StateError
             title="商品信息加载失败"
-            desc="没能取回该商品的信息。可能是后端未启动、链接有误或商品已下架。"
+            desc={
+              isMembership
+                ? '没能取回该会员套餐的信息。套餐可能已下架，请回到会员页重新选择。'
+                : '没能取回该商品的信息。可能是后端未启动、链接有误或商品已下架。'
+            }
             detail={error ?? undefined}
             action={
               <button type="button" className="state-btn is-ghost" onClick={() => navigate('/packages')}>
@@ -281,9 +515,9 @@ export function CheckoutPage() {
               <button
                 type="button"
                 className="pkg-result-btn is-primary"
-                onClick={() => navigate('/packages')}
+                onClick={() => navigate(plan ? '/' : '/packages')}
               >
-                继续购买
+                {plan ? '返回首页' : '继续购买'}
               </button>
             </div>
           </div>
@@ -294,8 +528,16 @@ export function CheckoutPage() {
 
   // ── 确认 + 支付态 ───────────────────────────────────────────────────
   const item = order?.items?.[0];
-  const payAmount = order?.paidCents ?? product.priceCents;
-  const discount = order?.discountCents ?? 0;
+  const unitCents = product?.priceCents ?? plan!.priceCents;
+  /*
+   * 金额口径: 已建单以**订单快照**为准（服务端定死的数），未建单用试算结果，
+   * 试算还没回来时退回商品原价。三层兜底保证界面永远有数可显示，
+   * 但绝不会在已下单后显示一个与服务端不一致的金额。
+   */
+  const subtotalCents = order ? item?.priceCents ?? unitCents : quotePreview?.subtotalCents ?? unitCents;
+  const payAmount = order?.paidCents ?? quotePreview?.payableCents ?? unitCents;
+  const discount = order?.discountCents ?? quotePreview?.discountCents ?? 0;
+  const title = plan ? '确认订阅' : '确认订单';
 
   return (
     <div className="pkg-checkout-page">
@@ -305,29 +547,49 @@ export function CheckoutPage() {
         </button>
 
         <div className="pkg-confirm-card">
-          <h2 className="pkg-confirm-title">确认订单</h2>
+          <h2 className="pkg-confirm-title">{title}</h2>
           <p className="pkg-confirm-sub">
-            {product.creditsValidDays > 0
-              ? `${product.creditsValidDays} 天内有效`
-              : '永久有效'}
+            {plan
+              ? `${plan.durationDays} 天有效 · 每月 ${plan.monthlyCredits} 积分`
+              : product!.creditsValidDays > 0
+                ? `${product!.creditsValidDays} 天内有效`
+                : '永久有效'}
           </p>
 
           <div className="pkg-confirm-row">
-            <span>商品</span>
-            <strong>{product.name}</strong>
+            <span>{plan ? '套餐' : '商品'}</span>
+            <strong>{plan ? plan.name : product!.name}</strong>
           </div>
           <div className="pkg-confirm-row">
             <span>数量</span>
             <strong>1</strong>
           </div>
-          <div className="pkg-confirm-row">
-            <span>获得积分</span>
-            <strong>{product.credits} 积分</strong>
-          </div>
+          {/*
+            会员单展示的是「权益口径」而非积分: 月度积分按月发放, 与一次性
+            积分包的「立刻到账 N 积分」不是同一件事, 写成「获得积分」会误导。
+          */}
+          {plan ? (
+            <>
+              <div className="pkg-confirm-row">
+                <span>会员周期</span>
+                <strong>{plan.durationDays} 天</strong>
+              </div>
+              <div className="pkg-confirm-row">
+                <span>月度积分</span>
+                <strong>{plan.monthlyCredits} 积分</strong>
+              </div>
+            </>
+          ) : (
+            <div className="pkg-confirm-row">
+              <span>获得积分</span>
+              <strong>{product!.credits} 积分</strong>
+            </div>
+          )}
 
           {/* 券码: 后端对不可用的券降级为不打折而非拒单, 原因随订单返回。
-              续付既有订单时不显示 —— 金额与优惠已在那张单上定死, 再改就不是同一笔了。 */}
-          {!order && (
+              续付既有订单时不显示 —— 金额与优惠已在那张单上定死, 再改就不是同一笔了。
+              会员单不参与券与折扣 (后端会忽略), 因此整块隐藏。 */}
+          {!order && !plan && (
             <div className="pkg-confirm-row">
               <span>优惠码</span>
               <input
@@ -347,13 +609,47 @@ export function CheckoutPage() {
             </p>
           )}
 
+          {/*
+            下单前的优惠试算说明。只在下单前展示 —— 下单后优惠已定死在订单快照里,
+            再显示试算结果会让两组数字并存, 用户无从判断以哪个为准。
+          */}
+          {!order && !plan && quotePreview && (
+            <>
+              {quotePreview.appliedSource === 'coupon' && quotePreview.appliedCouponCode && (
+                <p className="pkg-pay-hint" style={{ textAlign: 'left' }}>
+                  已使用优惠码 {quotePreview.appliedCouponCode}
+                </p>
+              )}
+              {quotePreview.appliedSource === 'campaign' && (
+                <p className="pkg-pay-hint" style={{ textAlign: 'left' }}>
+                  已命中限时活动，优惠金额已计入应付
+                </p>
+              )}
+              {quotePreview.notStackedNotice && (
+                <p className="pkg-pay-hint" style={{ textAlign: 'left' }}>
+                  {quotePreview.notStackedNotice}
+                </p>
+              )}
+              {/*
+                只有「填了券码、且一分钱优惠都没拿到」才算不可用。
+                命中活动时 appliedCouponCode 同样为空, 但优惠确实生效了,
+                此时提示"优惠码不可用"会误导用户。
+              */}
+              {couponCode.trim() && !quotePreview.appliedCouponCode && quotePreview.discountCents === 0 && (
+                <p className="pkg-pay-hint" style={{ textAlign: 'left', color: '#a32d2d' }}>
+                  该优惠码不可用或不满足使用条件
+                </p>
+              )}
+            </>
+          )}
+
           <div className="pkg-confirm-row pkg-confirm-total">
             <span>应付金额</span>
-            <strong>{product.isFree ? '免费' : formatYuan(payAmount)}</strong>
+            <strong>{payAmount <= 0 ? '免费' : formatYuan(payAmount)}</strong>
           </div>
           {discount > 0 && (
             <div className="pkg-confirm-offline">
-              <span>原价 {formatYuan(item?.priceCents ?? product.priceCents)}</span>
+              <span>原价 {formatYuan(subtotalCents)}</span>
               <span>已优惠 -{formatYuan(discount)}</span>
             </div>
           )}
@@ -363,57 +659,103 @@ export function CheckoutPage() {
           <h3 className="pkg-payment-title">支付方式</h3>
           <div className="pkg-payment-options">
             {/*
-             * 渠道配色沿用参考站实拍 (支付宝 #009FE8 / 微信 #24B340),
-             * 但**只有沙箱可选** —— 未接商户号, 摆出不可用的渠道
-             * 只会让用户点了才发现点不了。
+             * 渠道配色沿用参考站实拍 (支付宝 #009FE8 / 微信 #24B340)。
+             * `PAYMENT_PROVIDER` 未配置或未填凭据时保持沙箱, 页面如实标注;
+             * 配置真实通道后由后端决定 mode (跳转 / 二维码)。
              */}
             <div className="pkg-payment-option is-active">
               <span className="pkg-payment-icon is-sandbox">沙</span>
               <div className="pkg-payment-body">
-                <div className="pkg-payment-name">沙箱支付</div>
-                <div className="pkg-payment-desc">用于开发联调，不产生真实扣款</div>
+                <div className="pkg-payment-name">在线支付</div>
+                <div className="pkg-payment-desc">
+                  未配置真实商户号时走站内沙箱，不产生真实扣款
+                </div>
               </div>
             </div>
           </div>
 
-          <button
-            type="button"
-            className="pkg-pay-btn"
-            disabled={paying}
-            onClick={() => void pay('success')}
-          >
-            {paying ? '处理中…' : `确认支付 ${product.isFree ? '' : formatYuan(payAmount)}`}
-          </button>
+          {/*
+            二维码态: 微信 Native 支付。轮询在 startPolling 里, 到账后自动跳结果页 ——
+            用户扫完码不需要再点任何按钮。
+          */}
+          {qrDataUrl ? (
+            <div className="pkg-sandbox-actions" style={{ flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+              <img src={qrDataUrl} alt="微信支付二维码" width={220} height={220} />
+              <p className="pkg-pay-hint">请使用微信扫码支付，完成后本页会自动刷新结果</p>
+              <button
+                type="button"
+                className="pkg-sandbox-btn"
+                onClick={() => {
+                  stopPolling();
+                  setQrDataUrl(null);
+                  setOnlineIntent(null);
+                }}
+              >
+                取消扫码
+              </button>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="pkg-pay-btn"
+              disabled={paying}
+              onClick={() => void payOnline()}
+            >
+              {paying ? '处理中…' : payAmount <= 0 ? '免费领取' : `确认支付 ${formatYuan(payAmount)}`}
+            </button>
+          )}
 
           {/*
            * 沙箱三态演示。保留失败/超时两个入口是刻意的 ——
            * 只让点成功就等于没做失败路径的验证, 真实通道接入后
            * 回调重复/超时这些分支会第一次被跑到, 那时才发现问题就晚了。
            */}
-          <div className="pkg-sandbox-actions">
-            <button
-              type="button"
-              className="pkg-sandbox-btn"
-              disabled={paying}
-              onClick={() => void pay('failed')}
-            >
-              模拟支付失败
-            </button>
-            <button
-              type="button"
-              className="pkg-sandbox-btn"
-              disabled={paying}
-              onClick={() => void pay('timeout')}
-            >
-              模拟支付超时
-            </button>
-          </div>
+          {/*
+           * 沙箱三态演示只在开发/测试环境出现，且只在确实是沙箱通道时出现。
+           * 生产环境该端点本身已按 404 处理（见 OrderService.sandboxPay），
+           * 继续渲染按钮只会让用户点到一个「订单不存在」。
+           */}
+          {!IS_PROD && (!onlineIntent || onlineIntent.sandbox) && (
+            <div className="pkg-sandbox-actions">
+              <button
+                type="button"
+                className="pkg-sandbox-btn"
+                disabled={paying}
+                onClick={() => void pay('failed')}
+              >
+                模拟支付失败
+              </button>
+              <button
+                type="button"
+                className="pkg-sandbox-btn"
+                disabled={paying}
+                onClick={() => void pay('timeout')}
+              >
+                模拟支付超时
+              </button>
+            </div>
+          )}
 
           <div className="pkg-sandbox-notice">
             <AlertTriangle size={14} />
             <span>
-              <strong>沙箱环境，不产生真实扣款。</strong>
-              微信/支付宝通道尚未接入（无商户号），接入后本页面会替换为真实支付。
+              {onlineIntent && !onlineIntent.sandbox ? (
+                <>
+                  <strong>真实支付通道。</strong>
+                  请按渠道页面提示完成支付，扣款以渠道结果为准；支付结果稍后同步到本页。
+                </>
+              ) : onlineIntent?.sandbox ? (
+                <>
+                  <strong>沙箱环境，不产生真实扣款。</strong>
+                  支付在站内模拟，仅用于联调。
+                </>
+              ) : (
+                <>
+                  支付方式由后台通道配置决定：
+                  <strong>未配置真实商户号时走站内沙箱，不产生真实扣款</strong>；配置
+                  <code>PAYMENT_PROVIDER</code> 与商户凭据后由支付宝/微信完成真实扣款。
+                </>
+              )}
             </span>
           </div>
 

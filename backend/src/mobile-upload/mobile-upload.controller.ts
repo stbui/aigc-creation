@@ -42,11 +42,11 @@ export class MobileUploadController {
   /** 电脑端: 创建会话 (返回二维码内容与令牌) */
   @Post('sessions')
   @UseGuards(JwtAuthGuard)
-  create(@CurrentUser() user: AuthUser, @Body('projectId') projectId: string) {
+  async create(@CurrentUser() user: AuthUser, @Body('projectId') projectId: string) {
     if (!projectId) {
       throw new AppError(40001, 'projectId 必传', 400);
     }
-    const s = this.service.create(user.id, projectId);
+    const s = await this.service.create(user.id, projectId);
     return {
       sessionId: s.id,
       token: s.token,

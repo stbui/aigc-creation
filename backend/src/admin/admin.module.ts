@@ -14,9 +14,28 @@ import { AdminBackupController } from './backup.controller';
 import { AdminAssetsController } from './assets-admin.controller';
 import { AdminStorageController } from './storage.controller';
 import { AdminCommerceController } from './commerce.controller';
+import { AdminRetentionController } from './retention.controller';
+import { AdminReconciliationController } from './reconciliation.controller';
+import { AdminReconciliationService } from './reconciliation.service';
+import { AdminInvoicesController } from './invoices-admin.controller';
+import { AdminPaymentChannelsController } from './payment-channels.controller';
+import { PaymentsModule } from '../payments/payments.module';
+import { InvoicesModule } from '../invoices/invoices.module';
+import { LegalModule } from '../legal/legal.module';
+import { AccountModule } from '../account/account.module';
+import { AdminLegalController } from './legal.controller';
+import { AdminNotificationsController } from './notifications.controller';
+import { AdminTicketsController } from './tickets-admin.controller';
+import { AdminSearchController } from './search.controller';
+import { AdminSearchService } from './search.service';
+import { TicketsModule } from '../tickets/tickets.module';
+import { AdminCommerceService } from './commerce-admin.service';
 import { AdminSchedulerController } from './scheduler.controller';
 import { AdminModelConfigController, AdminModelCallsController } from './model.controller';
+import { AdminModelChannelsController } from './model-channel.controller';
 import { AdminTasksController } from './tasks-admin.controller';
+import { AdminCapabilitiesController } from './capability.controller';
+import { CapabilitiesModule } from '../capabilities/capabilities.module';
 import {
   AdminCampaignsController,
   AdminCheckinController,
@@ -35,6 +54,7 @@ import { BackupService } from './backup.service';
 import { AdminAssetsService } from './assets-admin.service';
 import { ModelConfigService } from './model-config.service';
 import { ModelCallService } from './model-call.service';
+import { ModelChannelService } from './model-channel.service';
 import { TasksAdminService } from './tasks-admin.service';
 import { MarketingCoreModule } from '../marketing/marketing-core.module';
 import { GenerateModule } from '../generate/generate.module';
@@ -71,6 +91,20 @@ import { SchedulerService } from './scheduler.service';
     MembershipModule,
     MarketingCoreModule,
     GenerateModule,
+    // 支付渠道状态页: 通道清单与凭据判定直接复用 PaymentProviderFactory,
+    // 不在后台另写一份「哪些通道可用」的规则 (两处判定必然漂移)
+    PaymentsModule,
+    // 发票: 复用 C 端的开票/渲染逻辑, 后台只做审核动作
+    InvoicesModule,
+    // 法务: 后台版本管理复用 C 端的版本解析与发布规则
+    LegalModule,
+    // 注销: 后台与 C 端自助注销复用同一份 AccountLifecycleService
+    AccountModule,
+    // 能力管控: 上下线状态与 C 端 GET /capabilities 共用同一份运行时判定
+    CapabilitiesModule,
+    // 工单: 后台只做流转与回复, 状态机集中在 TicketsService 一份,
+    // C 端与后台若各写一套, 「resolved 后用户回复回落 open」这类规则必然漂移
+    TicketsModule,
   ],
   controllers: [
     AdminController,
@@ -82,10 +116,26 @@ import { SchedulerService } from './scheduler.service';
     AdminAssetsController,
     AdminStorageController,
     AdminCommerceController,
+    // 保留期清理 (B-96)
+    AdminRetentionController,
+    // 渠道对账 (B3)
+    AdminReconciliationController,
+    // 发票审核 (B3)
+    AdminInvoicesController,
+    // 支付渠道状态 (只读): 凭据只从环境变量读
+    AdminPaymentChannelsController,
+    // 法务文档版本管理 + 站内消息广播/模板 (B4)
+    AdminLegalController,
+    AdminNotificationsController,
+    // 工单处理中心 + 全局搜索 (B7)
+    AdminTicketsController,
+    AdminSearchController,
     AdminModelConfigController,
     AdminModelCallsController,
+    AdminModelChannelsController,
     // 任务监控 (B-28~B-33)
     AdminTasksController,
+    AdminCapabilitiesController,
     // 营销中心 (M11)
     AdminCouponsController,
     AdminCampaignsController,
@@ -95,6 +145,7 @@ import { SchedulerService } from './scheduler.service';
     AdminSchedulerController,
   ],
   providers: [
+    AdminReconciliationService,
     AdminRoleService,
     AdminOverviewService,
     AdminUsersService,
@@ -102,9 +153,12 @@ import { SchedulerService } from './scheduler.service';
     AdminAuditService,
     BackupService,
     AdminAssetsService,
+    AdminCommerceService,
     ModelConfigService,
     ModelCallService,
+    ModelChannelService,
     TasksAdminService,
+    AdminSearchService,
     SchedulerService,
     { provide: APP_GUARD, useClass: AdminGuard },
     { provide: APP_GUARD, useClass: PermissionGuard },

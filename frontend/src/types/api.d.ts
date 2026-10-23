@@ -5,8 +5,13 @@
 export type KnownCapability = 'main_image' | 'detail_image' | 'matting';
 export type Capability = KnownCapability | (string & {});
 
-/** 能力模式: real=本地真实算法 / mock=本地占位效果 / planned=尚未开放 */
-export type CapabilityMode = 'real' | 'mock' | 'planned';
+/**
+ * 能力模式: real=已接入真实实现 (本地算法或云端模型) / planned=尚未开放。
+ *
+ * 2026-10-22 起没有 mock 一档 —— 本地占位实现已从后端删除, 没有真实产出路径的
+ * 能力不该对用户开放。
+ */
+export type CapabilityMode = 'real' | 'planned';
 export type CapabilityGroupId = 'ecommerce_gen' | 'ai_retouch' | 'ai_video';
 export type ParamType = 'enum' | 'number' | 'text' | 'boolean';
 
@@ -27,6 +32,33 @@ export interface CapabilityParam {
   step?: number;
   placeholder?: string;
   help?: string;
+  /** 由页面代填的技术参数（如遮罩素材 id），通用表单不渲染 */
+  hidden?: boolean;
+}
+
+/**
+ * 能力的**运行时真相**（2026-10-21）—— 与静态的 `mode` 正交。
+ *
+ * `mode` 说「代码实现到什么程度」，`runtime.effective` 说「此刻按下去会发生什么」：
+ * 后台下线的能力是 `disabled`；没配云端通道、却有本地实现的 real 能力是 `local`；
+ * 没有本地实现又没通道的是 `unavailable`。界面标注一律看这里，不看 mode。
+ *
+ * ⚠️ 它是**事前预期**；单次生成实际走的哪条路以任务结果里的 `provider`
+ * （gateway / local）为准 —— 云端失败会回落本地，两者不一致是正常的。
+ */
+export interface CapabilityRuntime {
+  /** 后台管控开关（无记录 = 启用） */
+  enabled: boolean;
+  /** 逐能力路由配置 */
+  route: 'auto' | 'local' | 'remote';
+  /** 该模态此刻是否具备可用的云端通道 */
+  remoteAvailable: boolean;
+  /** 本地实现质量：real=有可交付的本地真实算法 / none=本地根本没有实现 */
+  localQuality: 'real' | 'none';
+  /** 一句话结论 */
+  effective: 'remote' | 'local' | 'disabled' | 'unavailable';
+  /** 给用户看的原因 */
+  reason: string;
 }
 
 export interface CapabilityDef {
@@ -40,10 +72,19 @@ export interface CapabilityDef {
   /**
    * 产出模态 (2026-10-20) —— 'image' | 'text' | 'video'。
    *
-   * 与 mode **正交**: mode 说实现到什么程度 (real/mock/planned),
+   * 与 mode **正交**: mode 说实现到什么程度 (real/planned),
    * modality 说产出是什么。前端据此选 `<img>` 还是 `<video>` 渲染结果。
    */
   modality?: Modality;
+  /**
+   * 云端不可用时是否允许交付本地产物 (2026-10-21)。
+   *
+   * false = 本地根本没有实现 (创意生图 / 局部重绘 / 图片翻译 / 自由创作),
+   * 没通道就判失败并退款; 未下发时按 true 推断, 与后端 allowsLocalFallback() 同口径。
+   */
+  localFallback?: boolean;
+  /** 本地实现句柄名; 无此字段 = 该能力没有本地实现 (仅云端) */
+  localImpl?: string;
   inputs: 0 | 1 | 2;
   inWorkbench: boolean;
   help?: string;
@@ -55,6 +96,8 @@ export interface CapabilityDef {
    * 后台改价后前端无需改动即可显示新价。0 = 免费。
    */
   creditCost: number;
+  /** 运行时真相（后端未下发时前端按 mode 兜底） */
+  runtime?: CapabilityRuntime;
 }
 
 export interface CapabilityGroup {
@@ -100,8 +143,10 @@ export interface MobileUploadSessionCreated {
 /** 手机上传接收到的单张素材 */
 export interface MobileUploadAsset {
   id: string;
-  /** 素材的可访问地址 —— 由后端给出 (前端不能从 assetId 推出存储 key) */
+  /** 素材的干净地址 —— 由后端给出 (前端不能从 assetId 推出存储 key) */
   url: string;
+  /** 带签名的可显示地址; 未开启 ASSET_SIGNING_SECRET 时为 null */
+  signedUrl?: string | null;
   /** 手机端原始文件名 */
   filename: string;
 }
@@ -168,11 +213,27 @@ export interface RegisterRequest {
   email: string;
   password: string;
   name?: string;
+  /** 可选手机号。填了必须同时给 smsCode（后端强制校验归属） */
+  phone?: string;
+  /** 短信验证码，由 POST /auth/sms/send (purpose=verify) 下发 */
+  smsCode?: string;
+  /** 同意的用户协议版本号（GET /legal/user-agreement 的 version），用于同意留痕 */
+  consentVersion?: string;
+}
+
+/** 短信验证码用途：login 登录 / verify 注册时验证号码归属 */
+export type SmsPurpose = 'login' | 'verify';
+
+export interface SmsLoginRequest {
+  phone: string;
+  code: string;
 }
 
 export interface UserProfile {
   id: string;
   email: string;
+  /** 手机号（未绑定为 null） */
+  phone?: string | null;
   name?: string;
   /** 后台角色: 'user' | 'admin' | 'operator' | 'finance'。前端据此决定是否请求后台身份 */
   role?: string;
@@ -181,6 +242,38 @@ export interface UserProfile {
 export interface AuthResponse {
   accessToken: string;
   user?: UserProfile;
+}
+
+/** 扫码登录（B8）。票据明文只出现在建码响应里，由前端渲染成二维码 */
+export interface QrCreateResult {
+  ticket: string;
+  expiresAt: string;
+  ttlSeconds: number;
+  pollIntervalMs: number;
+}
+
+export type QrSessionStatus =
+  | 'pending'
+  | 'scanned'
+  | 'confirmed'
+  | 'consumed'
+  | 'expired'
+  | 'cancelled';
+
+/**
+ * 轮询/扫码/确认的统一回执。
+ *
+ * `accessToken` 只在**兑换成功的那一次**轮询里出现 —— 票据随即转 consumed，
+ * 之后同票据再查只会拿到 status=consumed。
+ */
+export interface QrStatusResult {
+  status: QrSessionStatus;
+  expiresAt: string;
+  scannedAt?: string | null;
+  accessToken?: string;
+  user?: UserProfile;
+  /** 发起端信息：手机端确认前必须展示，让人认出是不是自己的设备 */
+  desktop?: { ip: string | null; ua: string | null; createdAt: string | null };
 }
 
 export interface Project {
@@ -192,13 +285,40 @@ export interface Project {
 // 与后端 Prisma Asset 模型对齐 (backend/prisma/schema.prisma)
 // 后端 src/assets/assets.service.ts createOriginal 返回完整 Asset 记录,
 // 注意字段是 sourceUrl 而非 url。
+/**
+ * AIGC 标识结果 (B5)。后端 `common/aigc-label.ts` 产出, 落在
+ * `Asset.aigcMeta` / `GenerationTask.aigcMeta`。
+ *
+ * · `visible`  —— 图上是否已合成「AI 生成」角标
+ * · `metadata` —— 文件内是否写了 XMP / DigitalSourceType
+ * · `method: 'api-only'` 是视频: 没有 ffmpeg 无法写容器元数据,
+ *   合规靠接口字段 + 播放器角标, 前端必须据此自己画角标。
+ */
+export interface AigcMeta {
+  labeled: boolean;
+  metadata: boolean;
+  visible: boolean;
+  method: 'png-text+xmp' | 'jpeg-xmp' | 'visible-only' | 'unsupported' | 'api-only';
+  warning?: string;
+}
+
 export interface Asset {
   id: string;
   projectId: string;
   ownerId: string;
   kind: 'original' | 'generated' | string;
   capability?: Capability | null;
+  /**
+   * 干净地址 (不带签名)。**服务端内部用途 + 未开启签名时的兜底**。
+   * 渲染 `<img>` 请用 `assetSrc()`, 它会优先取 `signedUrl`。
+   */
   sourceUrl: string;
+  /** 开启 ASSET_SIGNING_SECRET 后有值; 未开启为 null */
+  signedUrl?: string | null;
+  /** AIGC 标识结果 (生成图才有) */
+  aigc?: AigcMeta | null;
+  /** 原始 JSON 串, 一般不用; 调试/后台展示时可读 */
+  aigcMeta?: string;
   width?: number | null;
   height?: number | null;
   format: string;
@@ -241,11 +361,13 @@ export interface Task {
   errorCode?: string | null;
   /** 本次实际扣掉的积分快照。改价不影响已创建的任务 */
   creditCost?: number;
+  /** 该能力的产出模态（后端按能力下发），轮询上限据此区分图像/视频 */
+  modality?: Modality;
   createdAt?: string;
   updatedAt?: string;
   outputAsset?: Pick<
     Asset,
-    'id' | 'sourceUrl' | 'capability' | 'width' | 'height' | 'format'
+    'id' | 'sourceUrl' | 'signedUrl' | 'aigc' | 'capability' | 'width' | 'height' | 'format'
   > & {
     /**
      * 产出模态 (2026-10-20 视频通道落地) —— 前端据此选 `<img>` 还是 `<video>`。
@@ -315,6 +437,35 @@ export interface AdminOverview {
   };
   /** 按日聚合并补齐无数据日, 天数与 days 一致 */
   trend: Array<{ date: string; total: number; succeeded: number; failed: number }>;
+  /**
+   * 交易侧概览 (2026-10-21 补)。
+   *
+   * 金额一律**整数分**, 前端负责除以 100 展示 —— 后端不做展示层格式化。
+   */
+  commerce: {
+    orders: {
+      total: number;
+      pending: number;
+      paid: number;
+      cancelled: number;
+      refunded: number;
+      partialRefunded: number;
+    };
+    /** 累计 GMV = 实付之和 (不含未支付订单) */
+    gmvCents: number;
+    /** 窗口内 GMV */
+    gmvWindowCents: number;
+    /** 待付订单金额 */
+    pendingCents: number;
+    refundedCents: number;
+    refundedWindowCents: number;
+    /** 支付成功率 (%), 无支付流水时为 null */
+    paymentSuccessRate: number | null;
+    members: { active: number; newInWindow: number };
+    credits: { grantedInWindow: number; consumedInWindow: number };
+    /** 按支付时间聚合的收入趋势 */
+    revenueTrend: Array<{ date: string; gmvCents: number; orders: number }>;
+  };
   recentTasks: Array<{
     id: string;
     capability: string;
@@ -356,7 +507,27 @@ export interface AdminUserListResult {
 }
 
 /** GET /api/v1/admin/users/:id */
+/** 后台用户详情的最近登录记录 (B2) */
+export interface AdminLoginLogItem {
+  id: string;
+  ip: string | null;
+  ua: string | null;
+  success: boolean;
+  /** 'password' | 'sms' 为成功渠道; 'bad_credentials' | 'disabled' | 'deleted' | 'sms_code' 为失败原因 */
+  reason: string;
+  createdAt: string;
+}
+
+export interface AdminLoginLogResult {
+  items: AdminLoginLogItem[];
+  total: number;
+  failedLast30Days: number;
+}
+
 export interface AdminUserDetail {
+  /** 绑定的手机号（未绑定为 null） */
+  phone?: string | null;
+  phoneVerifiedAt?: string | null;
   id: string;
   email: string;
   name: string;
@@ -425,6 +596,12 @@ export type AdminSettingField =
   | 'generateMaxConcurrent'
   | 'generatePollIntervalMs'
   | 'generateMaxPolls'
+  | 'refundWindowDays'
+  | 'refundMaxRatioBps'
+  | 'refundAllowConsumedTask'
+  | 'backupFrequencyDays'
+  | 'backupKeepCount'
+  | 'retentionAuditLogDays'
   | 'securitySessionTtlDays'
   | 'securityPasswordMinLength';
 
@@ -434,7 +611,10 @@ export interface AdminSettings {
     key: string;
     label: string;
     items: Array<{
-      key: AdminSettingField;
+      /** SETTING_DEFS 键, 带点号 (site.name)。**只读**, 回传会被白名单剥掉 */
+      key: string;
+      /** 写入用的扁平字段名 (siteName)。提交给它, 不是给 key */
+      field: AdminSettingField;
       label: string;
       description: string;
       type: 'string' | 'number' | 'boolean';
@@ -446,6 +626,65 @@ export interface AdminSettings {
       group: string;
     }>;
   }>;
+}
+
+// ── AIGC 可见角标样式 (2026-10-21) ─────────────────────────────────
+
+export type AigcLabelPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+
+/**
+ * 角标样式。渲染字段（文案/字体/配色）由浏览器画进位图，
+ * 几何字段（位置/比例/边距/透明度）在服务端合成时实时生效。
+ */
+export interface AigcLabelSpec {
+  /** 是否在产出图上显示可见角标（关闭后仍写隐式标识） */
+  enabled: boolean;
+  text: string;
+  fontFamily: string;
+  fontSize: number;
+  fontWeight: number;
+  letterSpacing: number;
+  textColor: string;
+  backgroundColor: string;
+  backgroundOpacity: number;
+  radius: number;
+  paddingX: number;
+  /** 空串 = 不画圆点 */
+  dotColor: string;
+  position: AigcLabelPosition;
+  scalePercent: number;
+  minWidthPx: number;
+  maxWidthPx: number;
+  marginPercent: number;
+  opacity: number;
+}
+
+/** GET /api/v1/admin/aigc-label */
+export interface AdminAigcLabel {
+  spec: AigcLabelSpec;
+  defaults: AigcLabelSpec;
+  badge: {
+    source: 'default' | 'custom';
+    width: number;
+    height: number;
+    /** 位图是否按旧样式渲染（true 时提示重新保存） */
+    stale: boolean;
+    pngBase64: string | null;
+    updatedBy: string | null;
+    updatedAt: string | null;
+  };
+}
+
+/** GET /api/v1/aigc-label（公开）—— 视频播放器角标用 */
+export interface PublicAigcLabel {
+  enabled: boolean;
+  text: string;
+  textColor: string;
+  backgroundColor: string;
+  backgroundOpacity: number;
+  radius: number;
+  dotColor: string;
+  position: AigcLabelPosition;
 }
 
 /** GET /api/v1/admin/audit-logs */
@@ -512,6 +751,13 @@ export interface AdminModelConfigItem {
   overridden: boolean;
   updatedAt: string | null;
   updatedBy: string | null;
+  /**
+   * env 覆盖时，后台曾保存过的值（仅供对照）。
+   * 非 secret 给原值；secret 只给 dbHasValue/dbMasked，绝不给明文。
+   */
+  dbValue?: string | number | boolean | null;
+  dbHasValue?: boolean | null;
+  dbMasked?: string | null;
 }
 
 /**
@@ -522,7 +768,6 @@ export interface AdminModelConfigItem {
  * 写法都是错的 —— 必须与 modality 组合使用。
  */
 export type GatewayProtocol =
-  | 'aigc'
   | 'openai'
   | 'volcengine'
   | 'minimax'
@@ -538,7 +783,7 @@ export type SizeStyle = 'openai-wh' | 'volc-tier' | 'ratio-only';
  * 内置厂商预设 (后端 provider-presets.ts 单一声明)。
  *
  * 用途: 后台「模型配置」页选厂商后自动填好 基址/协议/模型 三项 ——
- * 手填这三项最容易错, 而配错的表现是**静默回落本地占位图**, 界面上看不出来。
+ * 手填这三项最容易错, 而配错的表现是**静默回落本地算法**, 界面上看不出来。
  *
  * sizeStyle / sizeField / maxRefImages / refStyle 现为可选: 文生文无这些概念。
  */
@@ -610,6 +855,92 @@ export interface AdminModelChannel {
   protocolOptions: ProtocolOption[];
   /** 配了通道但协议未接入 —— 必须显式警告, 不能静默 */
   configuredButUnsupported: boolean;
+  /** 调度来源: 线路表 / 旧版单通道配置 / 未接入 */
+  dispatchSource?: 'channels' | 'legacy' | 'none';
+  channelCount?: number;
+  availableCount?: number;
+  coolingCount?: number;
+  unsupportedCount?: number;
+}
+
+/** 一条线路（ModelChannel 的后台视图，token 已脱敏） */
+export interface AdminModelChannelRecord {
+  id: string;
+  modality: Modality;
+  name: string;
+  protocol: string;
+  baseUrl: string;
+  model: string;
+  priority: number;
+  enabled: boolean;
+  tokenMasked: string;
+  hasToken: boolean;
+  failCount: number;
+  cooldownUntil: string | null;
+  lastSuccessAt: string | null;
+  lastFailureAt: string | null;
+  protocolKnown: boolean;
+  updatedAt: string | null;
+  /** true = 未落库的合成线路（沿用旧版单通道配置） */
+  synthetic: boolean;
+}
+
+export interface AdminModelChannelSnapshot {
+  modality: Modality;
+  source: 'channels' | 'legacy' | 'none';
+  total: number;
+  enabledCount: number;
+  availableCount: number;
+  coolingCount: number;
+  unsupportedCount: number;
+  channels: AdminModelChannelRecord[];
+}
+
+export interface AdminModelChannelsSnapshot {
+  /** 后端响应字段是 modalities，按模态索引 */
+  modalities: Record<Modality, AdminModelChannelSnapshot>;
+}
+
+export interface AdminChannelTestResult {
+  ok: boolean;
+  latencyMs: number;
+  message: string;
+  detail?: string;
+  testedAt: string;
+  target: 'draft' | 'saved';
+  usedStoredToken?: boolean;
+}
+
+/**
+ * 厂商模型清单（预设 + 实时）。
+ *
+ * preset 来自代码内置目录（离线可用, 带中文说明）；
+ * remote 是用线路令牌向厂商模型列表接口实时拉取的结果。
+ * remote 为 null = 拉不到（接口未开放/不可达/令牌无效）, 与「拉到空列表」区分开。
+ */
+export interface AdminModelListResult {
+  modality: Modality;
+  protocol: string;
+  baseUrl: string;
+  usedStoredToken: boolean;
+  preset: Array<{ id: string; label: string; note?: string }>;
+  remote: string[] | null;
+  /** 尝试过的模型列表端点（排障用） */
+  endpoints: string[];
+  message: string;
+}
+
+export interface AdminChannelTestAllResult {
+  results: Array<AdminChannelTestResult & {
+    channelId: string | null;
+    modality: Modality;
+    name: string;
+    enabled: boolean;
+    synthetic: boolean;
+  }>;
+  okCount: number;
+  total: number;
+  elapsedMs: number;
 }
 
 /**
@@ -653,7 +984,7 @@ export interface AdminModelConfig {
     /** 基址已脱敏 (路径替换为 /***) */
     baseUrl: string;
     model: string;
-    /** 当前通道协议 (openai / volcengine / minimax / aigc) */
+    /** 当前通道协议 (openai / volcengine / minimax) */
     provider: string;
     /** 该协议是否在本项目已实现生图; false 说明配了也会 404 回落 */
     protocolKnown: boolean;
@@ -678,7 +1009,7 @@ export interface AdminModelConfig {
 export interface AdminModelRouteRow {
     capability: string;
     name: string;
-    /** 能力自身的模式: real=已接入 / mock=占位 */
+    /** 能力自身的模式: real=已接入 / planned=规划中 */
     mode: string;
     /** 该能力产出什么模态 (与 mode 正交) */
     modality: Modality;
@@ -688,8 +1019,21 @@ export interface AdminModelRouteRow {
      *
      * ⚠️ 此前只有 gateway/local, 未配网关一律 local。但视频/文本**无本地兜底** ——
      * 标 local 等于谎报「会回落本地」, 实际是直接失败。
+     *
+     * 2026-10-22 起图像里也有 `none`: 本地根本没有实现的能力 (创意生图 /
+     * 局部重绘 / 图片翻译 / 自由创作) 没通道时判 failed/42204,
+     * 同样不得报 local —— 与 C 端 `runtime.effective=unavailable` 保持同一口径。
      */
     effective: 'gateway' | 'local' | 'none';
+    /**
+     * 该能力能否被压到本地 (2026-10-22)。
+     *
+     * 本地根本没有实现的能力 (创意生图 / 局部重绘 / 图片翻译 / 自由创作)
+     * 与文本/视频恒为 false —— 对它们选「仅本地」等于配置一个必然失败的组合,
+     * 前端要据此把选项置灰。后端 `updateAll` 用同一份 `allowsLocalFallback()`
+     * 拒绝落库, 前端置灰只是提前告知, 不是安全边界。
+     */
+    localAvailable: boolean;
 }
 
 export interface AdminModelCall {
@@ -737,6 +1081,9 @@ export interface AdminModelConfigTestResult {
   latencyMs: number;
   message: string;
   detail?: string;
+  /** 2026-10-20: 测试时间与目标（草稿/已保存），旧后端可能不返回 */
+  testedAt?: string;
+  target?: 'draft' | 'saved';
 }
 
 /**
@@ -839,6 +1186,12 @@ export interface Order {
   refunds: RefundView[];
   /** 幂等下单命中: true = 复用了既有订单, 未重复建单 */
   idempotentHit?: boolean;
+  /** 会员订阅单的套餐信息。非会员单为 null */
+  membershipPlanId?: string | null;
+  membershipPlanCode?: string | null;
+  membershipPlanName?: string | null;
+  /** 会员权益已发放的时刻 (null = 已支付但尚未激活) */
+  membershipAppliedAt?: string | null;
 }
 
 /** 积分余额总览。余额由批次汇总推导, 不存冗余字段 */
@@ -882,11 +1235,31 @@ export interface AdminCreditPrice {
   capabilityName: string;
   /** 运行时生效价 */
   cost: number;
-  /** setting = 后台覆盖中; registry = 用代码默认值 */
-  source: 'setting' | 'registry';
+  /**
+   * setting = 后台覆盖中; registry = 用代码默认值;
+   * campaign = 被进行中的限时免费活动覆盖（此时 cost 恒为 0，改价不生效）
+   */
+  source: 'setting' | 'registry' | 'campaign';
   overridden: boolean;
   /** 代码默认值, 供「回落」时对照 */
   registryDefault: number;
+  /** 是否被进行中的限时免费活动覆盖 */
+  freeCampaign: boolean;
+}
+
+/** 后台「能力管控」列表行（GET /admin/capabilities） */
+export interface AdminCapabilityControl {
+  capabilityId: string;
+  name: string;
+  group: string;
+  modality: 'image' | 'text' | 'video';
+  mode: CapabilityMode;
+  /** 后台开关（无记录 = true） */
+  enabled: boolean;
+  reason: string | null;
+  updatedBy: string | null;
+  updatedAt: string | null;
+  runtime: CapabilityRuntime;
 }
 
 /** 沙箱支付结果 */
@@ -949,7 +1322,7 @@ export interface AdminTask {
   capability: string;
   capabilityName: string;
   status: 'pending' | 'running' | 'succeeded' | 'failed';
-  /** 实际通道: gateway=真实模型 / local=本地算法 / mock=尚未跑完的初值 */
+  /** 实际通道: gateway=真实模型 / local=本地算法 / pending=尚未跑完的初值 */
   provider: string | null;
   errorCode: string | null;
   creditCost: number;
@@ -1159,6 +1532,34 @@ export interface AdminStorageStatus {
   credentialSource: string;
   /** PRD 约束: 凭据走环境变量, 界面不可编辑 */
   editable: false;
+}
+
+/** 支付通道标识, 与后端 PAYMENT_CHANNELS 一致 */
+export type PaymentChannelId = 'sandbox' | 'alipay' | 'wechat';
+
+/**
+ * GET /api/v1/admin/payment-channels
+ *
+ * 只读状态: 当前生效通道 / 各通道凭据是否齐全 / 缺失的变量名 / 回调地址。
+ * **不含任何凭据值** —— 缺失项只给变量名。
+ */
+export interface AdminPaymentChannelStatus {
+  active: PaymentChannelId;
+  environment: string;
+  channels: Array<{
+    channel: PaymentChannelId;
+    label: string;
+    configured: boolean;
+    active: boolean;
+    /** 缺失的环境变量名 (不含值) */
+    missing: string[];
+    /** 渠道异步通知地址; 沙箱没有渠道侧回调, 为 null */
+    notifyUrl: string | null;
+  }>;
+  credentialSource: string;
+  editable: false;
+  /** 后端判定的风险提示: 真实通道缺凭据 / 生产仍走沙箱 / 回调地址可能不可达 */
+  warnings: Array<{ level: 'danger' | 'warn'; message: string }>;
 }
 
 /* ────────────────────────────────────────────────────────────────
@@ -1437,6 +1838,27 @@ export interface PopupCampaign {
   serverNow: string;
 }
 
+/**
+ * 进行中的限时活动（`GET /marketing/campaigns`）。
+ *
+ * 只含真正影响价格的两种：限时价（带目标商品与生效活动价）与限时免费
+ * （带免费覆盖的能力）。商品下架、活动价不低于原价的活动后端已过滤掉，
+ * 前端拿到即可直接展示，不再二次判断 —— 判定口径只有后端一份。
+ */
+export interface PromoCampaign {
+  id: string;
+  name: string;
+  type: 'limited_price' | 'limited_free';
+  startAt: string;
+  endAt: string;
+  /** 限时价活动的目标商品 */
+  product?: { id: string; sku: string; name: string; priceCents: number };
+  /** 实际生效的活动价（分），限时价活动才有 */
+  priceCents?: number;
+  /** 限时免费覆盖的能力 id */
+  capabilityIds?: string[];
+}
+
 /* ────────────────────────────────────────────────────────────────
    定时任务 (admin-prd.md §3.18 B-90 / M9.5)
    ──────────────────────────────────────────────────────────────── */
@@ -1461,4 +1883,638 @@ export interface AdminSchedulerStatus {
   manuallyRunnable: string[];
   /** 当前有连续失败的任务名, 前端据此置顶告警 */
   failing: string[];
+}
+
+/* ────────────────────────────────────────────────────────────────
+   交易后台: 商品 / 订单 / 支付流水 / 积分账本 / 保留期清理 (B1)
+   ──────────────────────────────────────────────────────────────── */
+
+/** 商品。金额一律整数分; sku 创建后不可改 */
+export interface AdminProduct {
+  id: string;
+  sku: string;
+  name: string;
+  description: string;
+  type: string;
+  priceCents: number;
+  originalPriceCents: number | null;
+  credits: number;
+  creditsValidDays: number;
+  grantType: 'immediate' | 'manual';
+  status: 'active' | 'offline';
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateProductPayload {
+  sku: string;
+  name: string;
+  description?: string;
+  priceCents: number;
+  originalPriceCents?: number;
+  credits: number;
+  creditsValidDays?: number;
+  grantType?: 'immediate' | 'manual';
+  status?: 'active' | 'offline';
+  sortOrder?: number;
+}
+
+/**
+ * sku 不可改: 历史订单与外部对账都靠它认商品。
+ *
+ * `originalPriceCents` 允许显式传 null —— 那是「清空划线价」, 与「不改」
+ * (不传该字段) 是两件事, 用 undefined 表达不了后者之外的语义。
+ */
+export type UpdateProductPayload = Partial<
+  Omit<CreateProductPayload, 'sku' | 'originalPriceCents'>
+> & {
+  originalPriceCents?: number | null;
+  reason?: string;
+};
+
+export type AdminOrderStatus =
+  | 'pending'
+  | 'paid'
+  | 'cancelled'
+  | 'refunded'
+  | 'partial_refunded';
+
+/** GET /api/v1/admin/orders 的一行 */
+export interface AdminOrderRow {
+  id: string;
+  orderNo: string;
+  userId: string;
+  userEmail: string;
+  status: AdminOrderStatus;
+  channel: string | null;
+  totalCents: number;
+  discountCents: number;
+  paidCents: number;
+  refundedCents: number;
+  grantedCredits: number;
+  itemCount: number;
+  paymentCount: number;
+  membershipPlanCode: string | null;
+  membershipPlanName: string | null;
+  createdAt: string;
+  paidAt: string | null;
+}
+
+export interface AdminOrderListResult {
+  items: AdminOrderRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface AdminOrderPayment {
+  id: string;
+  channel: string;
+  payTransactionId: string;
+  amountCents: number;
+  status: string;
+  message: string | null;
+  sandboxScenario: string | null;
+  paidAt: string | null;
+  createdAt: string;
+}
+
+export interface AdminOrderRefund {
+  id: string;
+  amountCents: number;
+  reason: string;
+  status: string;
+  operatorId: string | null;
+  createdAt: string;
+}
+
+/** GET /api/v1/admin/orders/:id —— 明细 / 支付 / 退款 / 券与套餐一次取全 */
+export interface AdminOrderDetail {
+  id: string;
+  orderNo: string;
+  userId: string;
+  status: AdminOrderStatus;
+  channel: string | null;
+  totalCents: number;
+  discountCents: number;
+  paidCents: number;
+  refundedCents: number;
+  grantedCredits: number;
+  couponSnapshot: string | null;
+  membershipPlanId: string | null;
+  membershipAppliedAt: string | null;
+  paidAt: string | null;
+  /** 超时关闭时刻。库中必填, 不会为 null */
+  expiresAt: string;
+  createdAt: string;
+  user: { id: string; email: string; name: string; role: string };
+  items: Array<{
+    id: string;
+    productId: string;
+    skuSnapshot: string;
+    nameSnapshot: string;
+    priceCentsSnapshot: number;
+    creditsSnapshot: number;
+    validDaysSnapshot: number;
+    quantity: number;
+  }>;
+  payments: AdminOrderPayment[];
+  refunds: AdminOrderRefund[];
+  coupon: { code: string; name: string } | null;
+  campaign: { id: string; name: string; type: string } | null;
+  membershipPlan: {
+    id: string;
+    code: string;
+    name: string;
+    durationDays: number;
+    monthlyCredits: number;
+  } | null;
+}
+
+/** GET /api/v1/admin/payments */
+export interface AdminPaymentRow {
+  id: string;
+  orderNo: string;
+  orderId: string;
+  userEmail: string;
+  channel: string;
+  payTransactionId: string;
+  amountCents: number;
+  status: string;
+  message: string | null;
+  sandboxScenario: string | null;
+  paidAt: string | null;
+  createdAt: string;
+}
+
+/** GET /api/v1/admin/credits —— 用户余额总览 */
+export interface AdminCreditRow {
+  userId: string;
+  email: string;
+  name: string;
+  balance: number;
+  expiringSoon: number;
+  totalEarned: number;
+  totalConsumed: number;
+  activeLots: number;
+  nearestExpiry: string | null;
+}
+
+export interface AdminCreditListResult {
+  items: AdminCreditRow[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+/** 后台看到的批次是原始行 (含已过期与已用完), 不做状态归并 */
+export interface AdminCreditLotRow {
+  id: string;
+  source: string;
+  orderId: string | null;
+  totalCredits: number;
+  remainingCredits: number;
+  expireAt: string | null;
+  createdAt: string;
+}
+
+export interface AdminCreditLedgerRow {
+  id: string;
+  type: string;
+  amount: number;
+  balanceAfter: number;
+  lotId: string | null;
+  orderId: string | null;
+  taskId: string | null;
+  reason: string | null;
+  operatorId: string | null;
+  createdAt: string;
+  lot: { source: string; expireAt: string | null } | null;
+}
+
+/** POST /api/v1/admin/credits/batch-adjust —— 逐条独立执行 */
+export interface AdminBatchAdjustResult {
+  total: number;
+  succeeded: number;
+  failed: number;
+  results: Array<{
+    userId: string;
+    success: boolean;
+    balance?: number;
+    message?: string;
+  }>;
+}
+
+/** GET /api/v1/admin/retention/targets */
+export interface AdminRetentionTarget {
+  table: string;
+  label: string;
+  note: string;
+  retentionDays: number;
+  total: number;
+  /** 按当前保留天数会被删除的条数 (仅预估) */
+  expiring: number;
+  cutoff: string;
+  oldestAt: string | null;
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// 支付通道 / 发票 / 对账 (B3)
+// ══════════════════════════════════════════════════════════════════════
+
+/**
+ * 发起支付的结果 (`POST /payments/:orderId/intent`)。
+ *
+ * `mode` 决定前端怎么拉起支付:
+ *   redirect → 跳 `payUrl` 到渠道收银台 (支付宝)
+ *   qrcode   → 用 `codeUrl` 渲染二维码 (微信 Native)
+ *   sandbox  → 走站内沙箱模拟 (`POST /orders/:id/pay`)
+ *   free     → 0 元订单已由后端直接入账，前端只需展示结果
+ */
+export interface PaymentIntent {
+  orderId: string;
+  orderNo: string;
+  amountCents: number;
+  channel: 'sandbox' | 'alipay' | 'wechat' | 'free';
+  mode: 'redirect' | 'qrcode' | 'sandbox' | 'free';
+  payUrl?: string;
+  codeUrl?: string;
+  expiresAt: string;
+  hint?: string;
+  /** 沙箱通道: 界面必须显式标注「不产生真实扣款」 */
+  sandbox: boolean;
+}
+
+/** 支付状态轮询 (`GET /payments/:orderId/status`) */
+export interface PaymentStatusResult {
+  orderId: string;
+  orderNo: string;
+  status: OrderStatus;
+  paidCents: number;
+  paidAt: string | null;
+  payments: Array<{
+    id: string;
+    channel: string;
+    status: string;
+    amountCents: number;
+    payTransactionId: string | null;
+    paidAt: string | null;
+    createdAt: string;
+  }>;
+}
+
+/** 'pending' 待开具 | 'issued' 已开具 | 'rejected' 已驳回 */
+export type InvoiceStatus = 'pending' | 'issued' | 'rejected';
+
+/** 发票 (C 端) */
+export interface Invoice {
+  id: string;
+  invoiceNo: string;
+  orderId: string;
+  orderNo: string | null;
+  amountCents: number;
+  kind: 'personal' | 'company';
+  title: string;
+  taxNo: string | null;
+  email: string | null;
+  content: string;
+  status: InvoiceStatus;
+  rejectReason: string | null;
+  issuedAt: string | null;
+  createdAt: string;
+  /** 已开具时才有: 可打印 HTML 的地址 */
+  fileUrl: string | null;
+  hasStoredFile: boolean;
+}
+
+export interface CreateInvoicePayload {
+  orderId: string;
+  kind: 'personal' | 'company';
+  title: string;
+  taxNo?: string;
+  email?: string;
+  content?: string;
+}
+
+/** 后台发票行 (附带申请人信息) */
+export interface AdminInvoice extends Invoice {
+  userEmail: string | null;
+  userName: string | null;
+}
+
+/** 对账差异类型 */
+export type ReconciliationDiffType =
+  | 'matched'
+  | 'amount_mismatch'
+  | 'missing_local'
+  | 'missing_channel'
+  | 'duplicate';
+
+/** 一次对账导入 */
+export interface ReconciliationBatch {
+  id: string;
+  channel: string;
+  billDate: string;
+  fileName: string | null;
+  channelCount: number;
+  channelAmountCents: number;
+  localCount: number;
+  localAmountCents: number;
+  matchedCount: number;
+  diffCount: number;
+  status: 'imported' | 'resolved';
+  operatorId: string | null;
+  createdAt: string;
+}
+
+/** 对账差异行 */
+export interface ReconciliationItem {
+  id: string;
+  batchId: string;
+  tradeNo: string;
+  paymentId: string | null;
+  orderId: string | null;
+  diffType: ReconciliationDiffType;
+  channelAmountCents: number;
+  localAmountCents: number;
+  status: 'open' | 'resolved' | 'ignored';
+  note: string | null;
+  resolvedBy: string | null;
+  resolvedAt: string | null;
+}
+
+export interface ReconciliationBatchDetail {
+  batch: ReconciliationBatch;
+  items: ReconciliationItem[];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 账户自助 / 法务 / 站内消息 (B4)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type LegalSlug = 'user-agreement' | 'privacy-policy' | 'minors-policy' | 'account-rules';
+export type LegalStatus = 'draft' | 'published' | 'archived';
+
+/** 公开接口：某文档的最新已发布版本 */
+export interface LegalDoc {
+  slug: string;
+  version: string;
+  title: string;
+  content: string;
+  publishedAt: string;
+}
+
+/** 公开接口：三类文档的版本概览 */
+export interface LegalIndexItem {
+  slug: string;
+  label: string;
+  /** 从未发布过时为 null（前端走内置兜底文本） */
+  version: string | null;
+  title: string;
+  publishedAt: string | null;
+}
+
+/** 后台：某文档的全部版本（含草稿与历史） */
+export interface AdminLegalDoc {
+  id: string;
+  slug: string;
+  version: string;
+  title: string;
+  content: string;
+  status: LegalStatus;
+  publishedAt: string | null;
+  publishedBy: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 我的账号 */
+export interface MyProfile {
+  id: string;
+  email: string;
+  name: string;
+  phone: string | null;
+  phoneVerifiedAt: string | null;
+  status: string;
+  createdAt: string;
+  lastLoginAt: string | null;
+  counts: { projects: number; tasks: number; assets: number; orders: number };
+  unread: number;
+}
+
+/** 注销影响面预览 */
+export interface DeletionPreview {
+  email: string | null;
+  name: string | null;
+  createdAt: string | null;
+  projects: number;
+  tasks: number;
+  assets: number;
+  /** 订单会保留（法定留存），注销不删除 */
+  orders: number;
+  notifications: number;
+}
+
+/** 站内消息 */
+export interface NotificationItem {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  link: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface NotificationList {
+  items: NotificationItem[];
+  unread: number;
+}
+
+/** 后台消息模板 */
+export interface MessageTemplateItem {
+  id: string;
+  code: string;
+  channel: 'inapp' | 'email' | 'sms';
+  subject: string | null;
+  body: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * 邮件 / 短信通道的生效实现。
+ *
+ * `delivers: false` = 当前落到 console 通道（正文只写 logs/outbox，不会真的发出去）。
+ * `configured: false` = 填了真实 provider 但凭据不全，已告警并回落 console。
+ */
+export interface DeliveryChannelStatus {
+  provider: string;
+  delivers: boolean;
+  configured: boolean;
+  /** 邮件：发件地址；短信：签名 */
+  from?: string;
+  sign?: string;
+}
+
+export interface DeliveryChannelStatusMap {
+  email: DeliveryChannelStatus;
+  sms: DeliveryChannelStatus;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 工单 / 全局搜索 / 批量操作 (B7)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type TicketType = 'bug' | 'complaint' | 'consultation' | 'invoice' | 'other';
+export type TicketStatus = 'open' | 'processing' | 'resolved' | 'closed';
+export type TicketPriority = 'low' | 'normal' | 'high';
+
+export interface TicketReplyItem {
+  id: string;
+  ticketId: string;
+  /** `user` 用户 / `admin` 客服 */
+  authorType: 'user' | 'admin';
+  authorId: string;
+  /** 回复当时的展示名（快照，用户改名后历史回复不变） */
+  authorName: string;
+  content: string;
+  createdAt: string;
+}
+
+export interface Ticket {
+  id: string;
+  ticketNo: string;
+  type: TicketType;
+  typeLabel: string;
+  subject: string;
+  content: string;
+  status: TicketStatus;
+  statusLabel: string;
+  priority: TicketPriority;
+  orderId: string | null;
+  assetId: string | null;
+  assigneeId: string | null;
+  resolvedAt: string | null;
+  closedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  replies?: TicketReplyItem[];
+  replyCount?: number;
+}
+
+export interface TicketListResult {
+  items: Ticket[];
+  total: number;
+}
+
+export interface CreateTicketPayload {
+  type: TicketType;
+  subject: string;
+  content: string;
+  priority?: TicketPriority;
+  orderId?: string;
+  assetId?: string;
+}
+
+/** 后台工单行（附带提交人信息） */
+export interface AdminTicketRow extends Ticket {
+  userId: string;
+  userEmail: string;
+  userName: string;
+  replyCount: number;
+}
+
+export interface AdminTicketListResult {
+  items: AdminTicketRow[];
+  total: number;
+  /** 各状态分组计数（不受当前筛选影响之外的口径：与后端 groupBy 同源） */
+  counts: Record<string, number>;
+}
+
+/** 后台工单详情：关联订单/素材只读摘要，财务动作回订单模块 */
+export interface AdminTicketDetail extends Ticket {
+  replies: TicketReplyItem[];
+  user: { id: string; email: string; name: string; status: string };
+  related: {
+    order: {
+      id: string;
+      orderNo: string;
+      status: string;
+      totalCents: number;
+      paidCents: number;
+      refundedCents: number;
+      createdAt: string;
+    } | null;
+    asset: {
+      id: string;
+      sourceUrl: string;
+      width: number;
+      height: number;
+      createdAt: string;
+    } | null;
+  };
+}
+
+export interface TicketStats {
+  open: number;
+  processing: number;
+  resolved: number;
+  closed: number;
+  /** open + processing：真正"还没解决"的量 */
+  pending: number;
+}
+
+/** `GET /admin/search?q=` 的单条结果 */
+export interface AdminSearchHit {
+  id: string;
+  title: string;
+  subtitle: string;
+  /** 后台站内路径，点击直接跳转 */
+  link: string;
+}
+
+export interface AdminSearchGroup {
+  key: 'users' | 'orders' | 'tickets' | 'tasks' | 'assets';
+  label: string;
+  total: number;
+  items: AdminSearchHit[];
+}
+
+export interface AdminSearchResult {
+  query: string;
+  groups: AdminSearchGroup[];
+  total: number;
+}
+
+/** 批量操作逐条结果（后端 common/batch.ts） */
+export interface BatchItemResult<T = unknown> {
+  id: string;
+  ok: boolean;
+  message?: string;
+  data?: T;
+}
+
+export interface BatchSummary<T = unknown> {
+  total: number;
+  succeeded: number;
+  failed: number;
+  results: BatchItemResult<T>[];
+}
+
+/** 积分 CSV 导入的逐行结果 */
+export interface CreditImportResult {
+  total: number;
+  succeeded: number;
+  failed: number;
+  results: Array<{
+    row: number;
+    email: string;
+    delta: number;
+    success: boolean;
+    balance?: number;
+    message?: string;
+  }>;
 }

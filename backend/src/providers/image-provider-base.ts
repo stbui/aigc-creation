@@ -1,7 +1,7 @@
 import { readFile } from 'fs/promises';
 import { extname } from 'path';
 import { gatewayConfig } from './gateway.config';
-import { GatewayUnavailableError, type GatewayResult } from './gateway.types';
+import { GatewayUnavailableError, MaskUnsupportedError, type GatewayResult } from './gateway.types';
 import { sniffImageFormat } from './image-format';
 import { protocolSpec, type ProtocolSpec } from './protocols/protocol.spec';
 
@@ -93,7 +93,9 @@ export function buildSize(
     // 档位: 画质直接映射为 1K/2K/4K, 比例由服务端在档位内处理
     return { field: 'size', value: quality === '4k' ? '4K' : quality === '2k' ? '2K' : '1K' };
   }
-  const base = quality === '2k' ? 2048 : 1024;
+  // 4K 只在云端可选（前端按 runtime.remoteAvailable 放开），换算必须真的给到 4096，
+  // 否则选了 4K 实际出 1024 —— 静默降级成用户看不出来的谎
+  const base = quality === '4k' ? 4096 : quality === '2k' ? 2048 : 1024;
   const w = rw >= rh ? base : Math.round((base * rw) / rh);
   const h = rw >= rh ? Math.round((base * rh) / rw) : base;
   return { field: 'size', value: `${Math.round(w / 64) * 64}x${Math.round(h / 64) * 64}` };
@@ -129,22 +131,71 @@ export abstract class BaseImageProvider {
     return gatewayConfig();
   }
 
+  /**
+   * 本次调用使用的**通道级**凭据 (2026-10-20 多渠道)。
+   *
+   * ## 为什么需要它
+   *
+   * 改造前 provider 只从 `gatewayConfig()` 读全局配置 —— 那意味着一家厂商
+   * 一套 baseUrl/token/model。多渠道调度器选出了第二条通道, 但 provider
+   * 仍用第一条的凭据去请求 → **"切换通道"是假的**: 第一家挂了切过去,
+   * 发的还是第一家的地址, 照样失败。
+   *
+   * 故调度器选中某条通道时, 把它的凭据注入进来, 覆盖全局配置。
+   * 未注入时 (单通道路径 / 本地调用) 仍读全局, 行为与改造前一致。
+   *
+   * ⚠️ 用**每次调用时设置**而非构造期传参: provider 实例由工厂按协议创建,
+   * 一条通道一个实例的话工厂要按 priority 缓存实例, 反而复杂。
+   */
+  private channelCreds?: { baseUrl: string; token: string; model: string };
+
+  /** 注入通道级凭据 (由调度器在调用前设置) */
+  withChannel(creds: { baseUrl: string; token: string; model: string }): this {
+    this.channelCreds = creds;
+    return this;
+  }
+
+  /** 清掉通道级凭据, 恢复读全局配置 */
+  clearChannel(): this {
+    this.channelCreds = undefined;
+    return this;
+  }
+
   get enabled(): boolean {
     return gatewayConfig().enabled;
   }
 
+  /**
+   * @param maskPath 遮罩 PNG 的**本地磁盘路径**（可选）。
+   *
+   * ⚠️ 只有声明 `maskSupport: 'edits'` 的协议能接收。其它协议收到遮罩时
+   * 必须抛 `MaskUnsupportedError`，**不得**忽略后照常整图生成 ——
+   * 那是「用户涂了 A 区域、模型改了整张图」的静默不实。
+   */
   async generate(
     capability: string,
     inputPaths: string[],
     params: Record<string, any>,
     prompt: string,
+    maskPath?: string,
   ): Promise<GatewayResult> {
     const cfg = this.cfg;
-    if (!cfg.enabled) {
+    // 通道级凭据优先于全局配置 (多渠道下每家地址/令牌/模型都不同)
+    const creds = this.channelCreds ?? cfg;
+    if (!creds.baseUrl && !creds.token) {
       throw new GatewayUnavailableError('未配置网关', '网关基址与令牌均为空, 或通道被显式关闭');
     }
     const spec = this.spec;
-    const model = cfg.model || spec.defaultModel;
+    const model = creds.model || spec.defaultModel;
+    const promptText = prompt || String(params.prompt ?? '');
+
+    if (maskPath && (spec.maskSupport !== 'edits' || !spec.maskEndpoint)) {
+      throw new MaskUnsupportedError(`${spec.label} (${spec.protocol}) 没有图像编辑端点`);
+    }
+
+    if (maskPath) {
+      return this.generateWithMask(creds, spec, model, inputPaths[0], maskPath, promptText, params);
+    }
 
     const refs =
       spec.refStyle === 'base64'
@@ -153,14 +204,14 @@ export abstract class BaseImageProvider {
 
     const body: Record<string, unknown> = {
       model,
-      prompt: prompt || String(params.prompt ?? ''),
+      prompt: promptText,
       n: 1,
       ...spec.buildRefField(refs),
     };
     const size = buildSize(spec.sizeStyle, params.ratio, params.size);
     if (size) body[size.field] = size.value;
 
-    const json = await this.post(cfg.baseUrl, cfg.token, spec.endpoint(cfg.baseUrl), body);
+    const json = await this.post(creds.baseUrl, creds.token, spec.endpoint(creds.baseUrl), body);
 
     const err = spec.extractError(json);
     if (err) {
@@ -185,6 +236,73 @@ export abstract class BaseImageProvider {
     };
   }
 
+  /**
+   * 带遮罩的图像编辑（OpenAI 兼容 `/v1/images/edits`，2026-10-22）。
+   *
+   * ## 为什么不能复用 JSON 的 generate
+   *
+   * `images/edits` 是 **multipart/form-data**：`image` / `mask` 必须是文件段，
+   * 而不是 base64 字符串。把 base64 塞进 JSON 的 `image` 字段只有部分兼容
+   * 实现接受，官方端点会直接 400。故这里单独走一条通道，不把两种编码方式
+   * 混进同一个 body 构造里。
+   *
+   * ## 用第一张输入图
+   *
+   * 遮罩是「在同一张图上重绘」。协议层不声明多图+遮罩的语义（各家不一致），
+   * 故只取 `inputPaths[0]` —— 局部重绘的能力定义本就是 `inputs: 1`，
+   * 多张也不会走到这里。
+   *
+   * 失败语义与 generate 完全一致：HTTP 非 2xx / 业务错误 / 无产出图都抛
+   * `GatewayUnavailableError`，由路由器决定换通道还是判失败。
+   */
+  private async generateWithMask(
+    creds: { baseUrl: string; token: string; model: string },
+    spec: ProtocolSpec,
+    model: string,
+    imagePath: string | undefined,
+    maskPath: string,
+    promptText: string,
+    params: Record<string, any>,
+  ): Promise<GatewayResult> {
+    if (!imagePath) {
+      throw new GatewayUnavailableError('缺少待编辑的原图', '遮罩重绘需要 1 张输入图');
+    }
+    const imageBuf = await readFile(imagePath).catch(() => null);
+    const maskBuf = await readFile(maskPath).catch(() => null);
+    if (!imageBuf) throw new GatewayUnavailableError('读取原图失败', imagePath);
+    if (!maskBuf) throw new GatewayUnavailableError('读取遮罩失败', maskPath);
+
+    const form = new FormData();
+    form.append('model', model);
+    form.append('prompt', promptText);
+    form.append('n', '1');
+    form.append('image', new Blob([imageBuf], { type: mimeOf(imagePath) }), fileNameOf(imagePath));
+    // 遮罩必须是 PNG（OpenAI 文档硬要求），且与 image 同尺寸 —— 前端按原图尺寸生成
+    form.append('mask', new Blob([maskBuf], { type: 'image/png' }), 'mask.png');
+    const size = buildSize(spec.sizeStyle, params.ratio, params.size);
+    if (size) form.append(size.field, size.value);
+
+    const json = await this.postMultipart(creds.baseUrl, creds.token, spec.maskEndpoint!(creds.baseUrl), form);
+
+    const err = spec.extractError(json);
+    if (err) throw new GatewayUnavailableError(`${spec.label}返回错误`, err);
+    // b64_json 优先（edits 端点最常见形态），url 兜底 —— spec.extract 两种都认
+    const { url, b64 } = spec.extract(json);
+    if (!url && !b64) throw new GatewayUnavailableError('响应缺少产出图', summarizeJson(json));
+    const buffer = b64
+      ? Buffer.from(b64.replace(/^data:[^;]+;base64,/, ''), 'base64')
+      : await this.download(url!);
+    if (!buffer.length) throw new GatewayUnavailableError('产出图为空', summarizeJson(json));
+
+    return {
+      buffer,
+      format: sniffImageFormat(buffer),
+      taskId: String(json?.id ?? json?.created ?? ''),
+      model,
+      prompt: promptText,
+    };
+  }
+
   private async post(baseUrl: string, token: string, url: string, body: unknown): Promise<any> {
     const headers: Record<string, string> = { Accept: 'application/json', 'Content-Type': 'application/json' };
     if (token) headers.Authorization = `Bearer ${token}`;
@@ -192,6 +310,36 @@ export abstract class BaseImageProvider {
     const timer = setTimeout(() => ctrl.abort(), this.cfg.timeoutMs);
     try {
       const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: ctrl.signal });
+      const text = await res.text();
+      if (!res.ok) throw new GatewayUnavailableError('提交失败', `HTTP ${res.status} ${text.slice(0, 300)}`);
+      try {
+        return text ? JSON.parse(text) : {};
+      } catch {
+        throw new GatewayUnavailableError('响应不是合法 JSON', text.slice(0, 300));
+      }
+    } catch (e) {
+      if (e instanceof GatewayUnavailableError) throw e;
+      const msg = (e as Error).message || String(e);
+      throw new GatewayUnavailableError(/abort/i.test(msg) ? '调用超时' : '请求失败', msg);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  /**
+   * multipart 提交（2026-10-22，遮罩重绘用）。
+   *
+   * ⚠️ **不要手写 `Content-Type`**：boundary 由 fetch 根据 FormData 自动生成，
+   * 自己写 `multipart/form-data` 反而缺 boundary，服务端无法解析出任何文件段
+   * （表现为「收不到 image」而不是明确的格式错误）。
+   */
+  private async postMultipart(baseUrl: string, token: string, url: string, form: FormData): Promise<any> {
+    const headers: Record<string, string> = { Accept: 'application/json' };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), this.cfg.timeoutMs);
+    try {
+      const res = await fetch(url, { method: 'POST', headers, body: form, signal: ctrl.signal });
       const text = await res.text();
       if (!res.ok) throw new GatewayUnavailableError('提交失败', `HTTP ${res.status} ${text.slice(0, 300)}`);
       try {
@@ -222,6 +370,17 @@ export abstract class BaseImageProvider {
       clearTimeout(timer);
     }
   }
+}
+
+/**
+ * 文件名（multipart 文件段需要）。
+ *
+ * 只用 basename 且固定保留原扩展名 —— 文件段的名字会进入对方的日志与
+ * 内容嗅探，带完整路径没有好处。
+ */
+function fileNameOf(p: string): string {
+  const base = p.split('/').pop() || 'image';
+  return base.slice(-64);
 }
 
 /** 磁盘绝对路径 → 站内相对路径 (/uploads/xxx) */

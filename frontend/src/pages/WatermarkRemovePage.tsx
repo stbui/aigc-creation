@@ -14,8 +14,8 @@ import { ToolCard } from '../components/ToolWidgets';
  * 处理方式卡: 参考站上传后提供框选/圈选/涂抹画布操作, 本地以
  * "处理方式 (自动识别/指定区域) + 区域位置 (五宫格)" 枚举代替。
  *
- * 诚实披露: remove_watermark 为 mock 能力 (依赖真实 inpainting 模型),
- * 本地以区域模糊修补占位; 请仅处理你拥有版权或已获授权的图片。
+ * 诚实披露: remove_watermark 本地是真实算法 (区域镜像修补 + 羽化融合), 无云端通道时
+ * 由本地兜底出图; 请仅处理你拥有版权或已获授权的图片。
  */
 
 const MODE_OPTIONS = [
@@ -44,7 +44,6 @@ export function WatermarkRemovePage() {
       desc="框选、圈选或涂抹水印区域，即可去除图片中的水印"
       upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
       submitLabel="开始去除"
-      mockNote="本地演示：以指定区域模糊修补占位（真实去水印需接入 AI 模型）"
       emptyDesc="上传图片后，处理结果将在此处展示"
       formValid
       submitting={submitting}

@@ -28,6 +28,7 @@
  */
 
 import { CAPABILITIES } from '../src/capabilities/capability.registry';
+import { allowsLocalFallback } from '../src/capabilities/capability-plugin.type';
 import {
   gatewayConfigOf,
   setGatewayConfigOverrides,
@@ -68,7 +69,15 @@ async function main() {
 
     for (const r of out.routes) {
       if (r.modality === 'image') {
-        ok(`${r.capability} (image) 未接入 → local (有本地算法)`, r.effective === 'local', r.effective);
+        /*
+         * 图像里也分两类 (2026-10-21): 有真实本地像素算法 → local;
+         * 本地根本没有实现 (创意生图 / 局部重绘 / 图片翻译 / 自由创作) → none,
+         * 没通道会判失败。
+         * 后者若报 local, 与 C 端 runtime 的 unavailable 打架。
+         */
+        const def = CAPABILITIES.find((c) => c.id === r.capability)!;
+        const expect = def.localImpl && allowsLocalFallback(def) ? 'local' : 'none';
+        ok(`${r.capability} (image) 未接入 → ${expect}`, r.effective === expect, r.effective);
       } else {
         /*
          * ⚠️ 本页最关键的一条: 文本/视频**不得**报 local。
@@ -149,15 +158,87 @@ async function main() {
       (byModality.get('text') ?? 0) + (byModality.get('video') ?? 0) > 0,
       Object.fromEntries(byModality),
     );
-    // 「只有 image 有兜底」是三态判定成立的**独立证据**
+    /*
+     * 图像能力分两类 (2026-10-22 删除全部占位实现后依然成立):
+     *   有本地真实算法 (11 项) → 未接入报 local;
+     *   本地没有实现 (创意生图 / 局部重绘 / 图片翻译 / 自由创作, 4 项) → 报 none。
+     * 两类都必须在, 否则本文件第 1 段的分支只测到一半。
+     */
+    const imgLocal = CAPABILITIES.filter((c) => c.modality === 'image' && c.localImpl).length;
+    const imgCloudOnly = CAPABILITIES.filter((c) => c.modality === 'image' && !c.localImpl).length;
     ok(
-      '所有图像能力都有本地实现',
-      CAPABILITIES.filter((c) => c.modality === 'image' && !c.localImpl).length === 0,
+      '图像能力 = 11 项本地算法 + 4 项仅云端',
+      imgLocal === 11 && imgCloudOnly === 4,
+      { imgLocal, imgCloudOnly },
     );
     ok(
       '非图像能力都没有本地实现',
       CAPABILITIES.filter((c) => c.modality !== 'image' && c.localImpl).length === 0,
     );
+  }
+
+  // ── 5. 「强制本地」不可能成立的能力必须落库前被拒 ──────────────────
+  {
+    /*
+     * 症状: 运营把创意生图的路由配成 local, 后台回「保存成功」,
+     * 但 C 端该能力变成 runtime=unavailable (route=local + 本地无实现),
+     * 用户点进去直接看到「暂不可用」—— 而图像通道本来是通的。
+     *
+     * 这条断言必须打 updateAll (写入路径), 不能只测 readAll 的展示字段:
+     * 后者只能「如实显示配错了」, 前者才叫「不让它发生」。
+     */
+    const writable = () => {
+      const calls: string[] = [];
+      const prisma = {
+        modelChannelConfig: {
+          findMany: async () => [] as Array<{ key: string; value: string }>,
+          findUnique: async () => null,
+          update: async () => ({}),
+          create: async ({ data }: { data: { key: string; value: string } }) => {
+            calls.push(`${data.key}=${data.value}`);
+          },
+          upsert: async () => ({}),
+        },
+      } as never;
+      return { prisma, calls };
+    };
+
+    const cloudOnly = CAPABILITIES.find((c) => c.modality === 'image' && !c.localImpl)!;
+    const localCap = CAPABILITIES.find((c) => c.localImpl)!;
+
+    const bad = writable();
+    const svcBad = new ModelConfigService(bad.prisma, { invalidate: () => {} } as never);
+    let rejected = '';
+    try {
+      await svcBad.updateAll({ [`gateway.route.${cloudOnly.id}`]: 'local' }, [], 'verify');
+    } catch (e) {
+      rejected = (e as { code?: number }).code === 40001 ? 'ok' : `wrong-code:${(e as { code?: number }).code}`;
+    }
+    ok(`本地无实现的能力 (${cloudOnly.id}) 不能被强制本地`, rejected === 'ok', rejected);
+    ok('被拒时不产生任何写入', bad.calls.length === 0, bad.calls);
+
+    const good = writable();
+    const svcGood = new ModelConfigService(good.prisma, { invalidate: () => {} } as never);
+    await svcGood.updateAll({ [`gateway.route.${cloudOnly.id}`]: 'remote' }, [], 'verify');
+    ok('同一能力改 remote 正常写入', good.calls.length === 1, good.calls);
+
+    const localCfg = writable();
+    const svcLocal = new ModelConfigService(localCfg.prisma, { invalidate: () => {} } as never);
+    await svcLocal.updateAll({ [`gateway.route.${localCap.id}`]: 'local' }, [], 'verify');
+    ok(`有本地实现的能力 (${localCap.id}) 仍可强制本地`, localCfg.calls.length === 1, localCfg.calls);
+
+    /*
+     * 展示侧同源: routes[].localAvailable 必须与 allowsLocalFallback() 一致,
+     * 否则前端会为错误的能力置灰/放开「仅本地」。
+     */
+    setGatewayConfigOverrides({});
+    invalidateGatewayConfigCache();
+    const out = await makeService([]).readAll();
+    const mismatched = out.routes.filter((r) => {
+      const def = CAPABILITIES.find((c) => c.id === r.capability)!;
+      return r.localAvailable !== Boolean(def.localImpl && allowsLocalFallback(def));
+    });
+    ok('routes[].localAvailable 与 allowsLocalFallback 同源', mismatched.length === 0, mismatched.map((r) => r.capability));
   }
 
   console.log(`\n通过 ${pass} 项`);

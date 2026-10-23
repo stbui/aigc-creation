@@ -17,8 +17,9 @@ import { languageOptions } from '../lib/optionSets';
  *   提交: 立即翻译 (消耗价由后端下发); 提示行 "* 确认素材和参数后提交，右侧会展示翻译结果。"
  *   描述: 智能翻译图片文字，保留原版式快速本地化
  *
- * 诚实披露: image_translate 为 mock 能力 (需 OCR + 翻译模型), 本地以
- * "目标语言文本块 + 主体保护框" 占位渲染。
+ * 诚实披露: image_translate 必须由真实多模态 / 图像模型完成, 本地**没有实现**
+ * (能力定义里 localFallback: false)。没有可用模型通道时后端判 failed/42204 并退款,
+ * 本页据 runtime 提前禁用提交并说明原因, 不交付任何占位图。
  */
 
 export function ImageTranslatePage() {
@@ -36,7 +37,6 @@ export function ImageTranslatePage() {
       settings={{ resolution: true }}
       submitLabel="立即翻译"
       hint="* 确认素材和参数后提交，右侧会展示翻译结果。"
-      mockNote="本地演示：以目标语言文本块占位（真实翻译需接入 OCR + 翻译模型），保护商品主体开关真实生效"
       emptyDesc="上传图片后，翻译结果将在此处展示"
       formValid
       submitting={submitting}

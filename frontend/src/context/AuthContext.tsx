@@ -11,7 +11,6 @@ import {
   clearStoredRole,
   type StoredRole,
 } from '../lib/auth';
-import { LoginModal } from '../components/LoginModal';
 
 interface AuthContextValue {
   token: string | null;
@@ -26,6 +25,17 @@ interface AuthContextValue {
    * 顶栏「登录/注册」按钮点开遮罩弹窗, 登录成功留在原页。
    */
   openLogin: () => void;
+  /**
+   * 弹窗可见性与身份版本号, 供 `<LoginModalHost>` 渲染。
+   *
+   * ⚠ 宿主不在这里渲染: AuthCard 内部用 useNavigate() 跳「忘记密码」,
+   * 而 AuthProvider 位于 <BrowserRouter> 之外, 在此渲染会抛
+   * "useNavigate() may be used only in the context of a <Router> component",
+   * 弹窗挂不上 —— 表现为「点登录免费生成毫无反应」。宿主见 App.tsx。
+   */
+  loginOpen: boolean;
+  closeLogin: () => void;
+  authEpoch: number;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -87,9 +97,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ token, email, role, login, logout, openLogin }}>
+    <AuthContext.Provider
+      value={{ token, email, role, login, logout, openLogin, loginOpen, closeLogin, authEpoch }}
+    >
       {children}
-      <LoginModal open={loginOpen} onClose={closeLogin} authEpoch={authEpoch} />
     </AuthContext.Provider>
   );
 }

@@ -56,7 +56,7 @@ export interface ModalityConfig {
   model: string;
   /**
    * 通道协议。含义**随模态而变**:
-   *   image → aigc / openai / volcengine / minimax
+   *   image → openai / volcengine / minimax
    *   text  → openai-chat
    *   video → 尚未取证, 无有效取值
    * 两者路径与响应形状不同, 路由器据此选 provider 实现 —— 配错会直接调用失败。
@@ -196,7 +196,7 @@ export function resolveGatewayConfig(): RawConfig {
   const sources: Record<string, ConfigSource> = {};
   const value = (key: string) => resolveValue(key, sources).value;
 
-  const port = env.PORT ?? '3001';
+  const port = env.PORT ?? '4100';
   const assetBase = (String(value('asset.publicBase')) || `http://localhost:${port}`).replace(/\/+$/, '');
 
   // 逐模态解析: 用 defs 声明的 default, 不在此处另写一份 ——

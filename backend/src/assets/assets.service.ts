@@ -5,6 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
 import { StorageService } from '../storage/storage.service';
 import { resolveUploadsDir } from '../config/env-files';
+import { SignedUrlService } from '../common/signed-url.service';
 import type { StorageBackend } from '../storage/storage.provider';
 
 export interface UploadedFileMeta {
@@ -30,7 +31,23 @@ export class AssetsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
+    private readonly signedUrl: SignedUrlService,
   ) {}
+
+  /**
+   * 给素材补上 `signedUrl` 与解析后的 `aigc`。
+   *
+   * `sourceUrl` **原样保留**: 外部模型网关拉参考图、后台预览、既有冒烟都用它;
+   * 签名只是"多给前端一个带时效的地址", 不是替换。签名未开启时 signedUrl 为 null,
+   * 前端回落到 sourceUrl, 行为与改造前一致。
+   */
+  private decorate<T extends { sourceUrl: string; ownerId: string; aigcMeta?: string | null }>(asset: T) {
+    return {
+      ...asset,
+      signedUrl: this.signedUrl.sign(asset.sourceUrl, { userId: asset.ownerId }),
+      aigc: safeParse(asset.aigcMeta),
+    };
+  }
 
   async createOriginal(ownerId: string, projectId: string, file: UploadedFileMeta) {
     if (!projectId) {
@@ -48,6 +65,8 @@ export class AssetsService {
     // multer 已把上传落到本地临时目录（与 assets.controller 的 destination 同源,
     // 都读 UPLOAD_DIR）; 读出后转存到当前默认后端。
     // 云端部署时这一步把文件从临时盘搬到对象存储, 之后临时文件可由保留期策略清理。
+    // 用户上传的图**不打 AIGC 标识**: aigcMeta 保持 '{}'。
+    // 给用户自己的图打「AI 生成」角标等于诬告, 比不标更糟。
     const buf = await fsp.readFile(join(resolveUploadsDir(), 'original', file.filename));
 
     const provider = this.storage.getActive();
@@ -57,7 +76,9 @@ export class AssetsService {
 
     const dims = await probeDimensions(buf);
 
-    return this.prisma.asset.create({
+    // 返回值也要 decorate：上传成功后前端立刻用返回值渲染缩略图，
+    // 少这一层会出现「刚传完的图 403，刷新列表又好了」的怪异现象
+    const created = await this.prisma.asset.create({
       data: {
         projectId,
         ownerId,
@@ -72,6 +93,7 @@ export class AssetsService {
         storageKey: key,
       },
     });
+    return this.decorate(created);
   }
 
   /**
@@ -136,7 +158,7 @@ export class AssetsService {
       this.prisma.asset.count({ where }),
     ]);
 
-    return { items, total, limit, offset };
+    return { items: items.map((a) => this.decorate(a)), total, limit, offset };
   }
 
   async getOne(ownerId: string, id: string) {
@@ -244,5 +266,15 @@ async function probeDimensions(
     return { width: img.bitmap.width, height: img.bitmap.height };
   } catch {
     return null;
+  }
+}
+
+/** 安全解析 aigcMeta JSON: 坏数据不该让素材列表整个 500 */
+function safeParse(raw?: string | null): Record<string, unknown> {
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return {};
   }
 }
