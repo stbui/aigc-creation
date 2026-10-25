@@ -273,3 +273,186 @@ test.describe('失败任务重试', () => {
     });
   });
 });
+
+/**
+ * 局部重绘的交互回归 (2026-10-25)。
+ *
+ * 画布是手写 PointerEvent + Canvas，单测覆盖不到「坐标换算、区域上限、
+ * 参考图上传期间误提交」这类真实交互，故用浏览器跑一遍最短闭环：
+ *   上传底图 → 涂抹 4 次（第 4 次应被拒）→ 填写描述 → 上传参考图
+ *   → 上传中提交必须禁用 → 放行后提交 payload 带遮罩与逐标注参考图。
+ */
+const REDRAW_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAPAAAACgCAIAAAC9uXYyAAABxklEQVR4nO3SQQ3AIADAwDHVyEETijBBQtLcKeijY679QcX/OgBuMjQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUgxNiqFJMTQphibF0KQYmhRDk2JoUg4r2AMqWugFPwAAAABJRU5ErkJggg==',
+  'base64',
+);
+
+test.describe('局部重绘画布', () => {
+  test('限制 3 个标注，参考图上传中禁用提交，提交带遮罩与逐标注参考图', async ({ page, request }) => {
+    const { token, email } = await register(request);
+    const caps = await fetchCaps(request);
+    patchRuntime(caps, 'local_redraw', {
+      enabled: true,
+      remoteAvailable: true,
+      localQuality: 'none',
+      effective: 'remote',
+      reason: null,
+    });
+    await mockCaps(page, caps);
+
+    await page.route('**/api/v1/projects', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 0, data: [{ id: 'project-redraw-e2e', name: '测试项目' }], message: '' }),
+      }),
+    );
+    await page.route(/\/api\/v1\/tasks$/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 0, data: [], message: '' }),
+      }),
+    );
+    await page.route('**/uploads/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'image/png', body: REDRAW_PNG }),
+    );
+
+    let finishReferenceUpload: (() => Promise<void>) | null = null;
+    await page.route('**/api/v1/assets/upload', async (route) => {
+      const multipart = route.request().postDataBuffer()?.toString('latin1') ?? '';
+      const asset = (id: string, filename: string) => ({
+        code: 0,
+        data: {
+          id,
+          projectId: 'project-redraw-e2e',
+          ownerId: 'u1',
+          kind: 'original',
+          sourceUrl: `/uploads/original/${filename}`,
+          signedUrl: null,
+          format: 'image/png',
+          sizeBytes: REDRAW_PNG.length,
+          createdAt: new Date().toISOString(),
+        },
+        message: '',
+      });
+
+      if (multipart.includes('reference.png')) {
+        await new Promise<void>((resolve) => {
+          finishReferenceUpload = async () => {
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify(asset('asset-reference', 'reference.png')),
+            });
+            resolve();
+          };
+        });
+        return;
+      }
+      const isMask = multipart.includes('mask-');
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(
+          isMask ? asset('asset-mask', 'mask.png') : asset('asset-original', 'photo.png'),
+        ),
+      });
+    });
+
+    let posted: any = null;
+    await page.route('**/api/v1/generate', (route) => {
+      posted = route.request().postDataJSON();
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 0, data: { taskId: 'task-redraw-e2e' }, message: '' }),
+      });
+    });
+    await page.route('**/api/v1/tasks/task-redraw-e2e', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0,
+          data: {
+            id: 'task-redraw-e2e',
+            projectId: 'project-redraw-e2e',
+            capability: 'local_redraw',
+            status: 'succeeded',
+            inputAssetIds: ['asset-original'],
+            params: {},
+            outputAsset: {
+              id: 'asset-result',
+              sourceUrl: '/uploads/generated/result.png',
+              signedUrl: null,
+              width: 240,
+              height: 160,
+            },
+          },
+          message: '',
+        }),
+      }),
+    );
+
+    await authed(page, '/local-redraw', token, email);
+    await page.locator('input[type=file]').first().setInputFiles({
+      name: 'photo.png',
+      mimeType: 'image/png',
+      buffer: REDRAW_PNG,
+    });
+
+    const canvas = page.locator('.redraw-mask-overlay');
+    await expect(canvas).toBeVisible();
+    await page.waitForFunction(() => {
+      const el = document.querySelector('.redraw-mask-overlay') as HTMLCanvasElement | null;
+      return Boolean(el && el.width === 240 && el.height === 160);
+    });
+
+    const draw = async (y: number) => {
+      const box = await canvas.boundingBox();
+      expect(box).not.toBeNull();
+      await page.mouse.move(box!.x + box!.width * 0.2, box!.y + box!.height * y);
+      await page.mouse.down();
+      await page.mouse.move(box!.x + box!.width * 0.55, box!.y + box!.height * y, { steps: 5 });
+      await page.mouse.up();
+    };
+
+    for (const y of [0.25, 0.4, 0.55, 0.7]) await draw(y);
+    // 第 4 笔必须被拒绝，否则遮罩里会出现一条没有描述的区域。
+    await expect(page.locator('.redraw-prompt')).toHaveCount(3);
+
+    await page.locator('textarea').first().fill('把这里改成哑光材质');
+    const submit = page.locator('button.pk-primary-btn').first();
+    await expect(submit).toBeEnabled();
+
+    await page.locator('.redraw-prompt-tools input[type=file]').first().setInputFiles({
+      name: 'reference.png',
+      mimeType: 'image/png',
+      buffer: REDRAW_PNG,
+    });
+    await expect(page.getByText('上传中…')).toBeVisible();
+    await expect(submit).toBeDisabled();
+
+    await expect.poll(() => Boolean(finishReferenceUpload)).toBe(true);
+    await finishReferenceUpload!();
+    await expect(page.locator('.redraw-prompt-ref-preview img')).toBeVisible();
+    await expect(submit).toBeEnabled();
+
+    await submit.click();
+    await expect.poll(() => posted).not.toBeNull();
+    const annotations = JSON.parse(posted.params.annotations);
+    expect(annotations).toEqual([
+      {
+        annotationId: '1',
+        label: '标注1',
+        instruction: '把这里改成哑光材质',
+        referenceAssetId: 'asset-reference',
+      },
+    ]);
+    expect(posted.params.modelGuideAssetId).toBe('asset-mask');
+    expect(posted.params.maskAssetId).toBe('asset-mask');
+    expect(posted.params.prompt).toBe('标注1：把这里改成哑光材质');
+    expect(posted.inputAssetIds).toEqual(['asset-original']);
+  });
+});

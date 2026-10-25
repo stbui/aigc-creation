@@ -60,13 +60,13 @@ input antd
 环境事实（开跑前先确认，不要凭记忆）
 主工作目录：/Users/bright/github/aigc-creation（后端 backend/，默认端口 4100，前缀 /api/v1；前端 frontend/，默认端口 5100）
 三档环境各自独立，混用会静默写错库：
-development：backend/dev.db，4100 / 5100（端口被占自动回退 4101 / 5101）
-test：backend/test.db，4200 / 5200（本轮验收优先用这一档）
+development：backend/dev.db，4100 / 5100（端口固定；被占时 start.sh 停掉占用进程，不换端口）
+test：backend/test.db，4100 / 5100（端口同开发，两档不能并行；本轮验收优先用这一档）
 production：需 .env.production，不得用于测试
-启动：./start.sh（开发档）、./start.sh --env test（测试档，可与开发并行）
+启动：./start.sh（开发档）、./start.sh --env test（测试档；同端口，起它会停掉开发档）
 脚本不经过 Nest，连的是当前 NODE_ENV 对应的库。跑测试档必须同时满足：
 NODE_ENV=test
-API_BASE=http://127.0.0.1:4200（多数冒烟脚本；smoke-model-channels.js 用 SMOKE_BASE，smoke-marketing.js 用 MARKETING_API_BASE）
+API_BASE=http://127.0.0.1:4100（多数冒烟脚本；smoke-model-channels.js 用 SMOKE_BASE，smoke-marketing.js 用 MARKETING_API_BASE）
 开跑第一件事是确认库路径，不看这行就去点界面，后面所有结论都可能指向错误的数据：
 
 cd backend && node -e "console.log(require('./scripts/db-url').resolveDbPath())"

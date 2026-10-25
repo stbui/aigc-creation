@@ -15,7 +15,7 @@
  * 「静态中间件之前确实挂了这一层」—— 而这正是最容易漏接的地方。
  *
  * 用法（测试档，禁止指向开发库）:
- *   API_BASE=http://127.0.0.1:4200 NODE_ENV=test node scripts/smoke-signed-url.js
+ *   API_BASE=http://127.0.0.1:4100 NODE_ENV=test node scripts/smoke-signed-url.js
  *   node scripts/smoke-signed-url.js --offline   # 只跑 A 段
  */
 const fs = require('fs');

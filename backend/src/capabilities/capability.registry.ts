@@ -155,7 +155,7 @@ export function sanitizeParams(id: string, params: Record<string, any> | undefin
       if (p.type === 'enum' && p.options && !p.options.some((o) => o.value === raw)) {
         out[p.key] = p.default ?? p.options[0]?.value;
       } else {
-        out[p.key] = String(raw).slice(0, 2000);
+        out[p.key] = String(raw).slice(0, p.maxLength ?? 2000);
       }
     }
   }

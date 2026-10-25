@@ -15,10 +15,11 @@
 
 ## 2. 环境与数据隔离
 
-- 测试一律连**测试档**：`NODE_ENV=test` → `backend/test.db`、`uploads-test/`、`backups-test/`、`logs/test/`、后端 4200 / 前端 5200。
+- 测试一律连**测试档**：`NODE_ENV=test` → `backend/test.db`、`uploads-test/`、`backups-test/`、`logs/test/`。
+  端口与开发档相同（后端 4100 / 前端 5100），**两档不能同时跑**：起测试档会停掉开发档。
 - 冒烟与 seed 脚本按当前 `NODE_ENV` 选库（`backend/scripts/db-url.js`），**默认是开发库**。跑测试必须显式 `NODE_ENV=test`，否则会写脏 `dev.db`。
 - 重建测试环境：`NODE_ENV=test npm run db:reset:test`（删库 + 重建 + 重灌种子，带安全门禁）。
-- 启动测试后端：`NODE_ENV=test PORT=4200 node dist/main.js`（不要用 `nest start`）。
+- 启动测试后端：`./start.sh --env test`（端口固定 4100，占用即停；手工启动则 `NODE_ENV=test node dist/main.js`，不要用 `nest start`）。
 - 端口被其它进程占用时脚本必须能指向目标实例（开发档默认 4100）：多数支持 `API_BASE`，`smoke-marketing.js` 用 `MARKETING_API_BASE`（含 `/api/v1`），`smoke-model-channels.js` 用 `SMOKE_BASE`（含 `/api/v1`）。
 - SQLite 单写者：脚本直连库的同时后端在写库会撞 `database is locked`（P2039），脚本内已做退避重试。
 

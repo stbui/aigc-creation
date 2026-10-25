@@ -5,6 +5,7 @@ import { MembershipModule } from '../membership/membership.module';
 import { CreditsModule } from '../credits/credits.module';
 import { CapabilitiesModule } from '../capabilities/capabilities.module';
 import { AigcLabelModule } from '../aigc-label/aigc-label.module';
+import { PromptToolsModule } from '../prompt-tools/prompt-tools.module';
 import { GenerateService } from './generate.service';
 import { GenerateController } from './generate.controller';
 import { TasksController } from './tasks.controller';
@@ -20,6 +21,8 @@ import { TasksController } from './tasks.controller';
     CapabilitiesModule,
     // 可见 AIGC 角标的样式与位图（后台可配）。只读依赖，无循环
     AigcLabelModule,
+    // 局部重绘的参考图会先转成文字描述再并入提示词；只读依赖，无循环
+    PromptToolsModule,
   ],
   controllers: [GenerateController, TasksController],
   providers: [GenerateService],

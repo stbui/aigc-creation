@@ -10,7 +10,7 @@
  *   6. 法务文本公开可读; 注册携带 consentVersion 时落 ConsentRecord
  *
  * 用法（测试档, 禁止指向开发库）:
- *   API_BASE=http://127.0.0.1:4200 NODE_ENV=test node scripts/smoke-account.js
+ *   API_BASE=http://127.0.0.1:4100 NODE_ENV=test node scripts/smoke-account.js
  */
 const { PrismaClient } = require('@prisma/client');
 const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');

@@ -15,7 +15,7 @@
  * 固有特性，不是脚本缺陷。
  *
  * 用法（测试档）:
- *   API_BASE=http://127.0.0.1:4200 NODE_ENV=test node scripts/smoke-rate-limit.js
+ *   API_BASE=http://127.0.0.1:4100 NODE_ENV=test node scripts/smoke-rate-limit.js
  */
 const { loadEnvOnce } = require('./db-url');
 

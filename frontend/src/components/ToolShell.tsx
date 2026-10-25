@@ -132,6 +132,21 @@ interface Props {
    * 但左栏仍复用这里的上传/提交骨架，故由页面注入自己的结果面板。
    */
   resultPane?: ReactNode;
+  /**
+   * 结果栏空态的业务面板 (无结果时替换通用空态插画)。
+   *
+   * 局部重绘把涂抹画布放在右栏宽区 —— 左栏 432px 对着一张大图涂抹太挤;
+   * 传入函数形态时可读到当前已上传的图片 (与 children 同约定)。
+   * 返回 null 时回落默认空态, 页面可以只在「有图」时才接管这块。
+   */
+  sourcePane?: ReactNode | ((images: ToolAsset[]) => ReactNode);
+  /**
+   * 右侧附加栏 (局部重绘的常驻历史记录)。
+   *
+   * 只有传了这个 prop 的页面才切成三栏 —— 其余工具页继续沿用
+   * 「输入 + 结果」两栏，不受参考站历史侧栏改版影响。
+   */
+  trailingPane?: ReactNode;
 }
 
 const RATIO_LABEL: Record<string, string> = { original: '原比例' };
@@ -182,6 +197,8 @@ export function ToolShell(props: Props) {
     onSubmit,
     resultActions,
     resultPane,
+    sourcePane,
+    trailingPane,
   } = props;
 
   const { message } = App.useApp();
@@ -338,7 +355,7 @@ export function ToolShell(props: Props) {
   const showResult = results.length > 0;
 
   return (
-    <div className="pk-workspace">
+    <div className={`pk-workspace${trailingPane ? ' pk-workspace-trailing' : ''}`}>
       {/* ── 左: 输入栏 ── */}
       <aside className="pk-input-pane">
         <div className="pk-form-card">
@@ -509,7 +526,13 @@ export function ToolShell(props: Props) {
         {submitting && !showResult ? (
           <ToolGeneratingState />
         ) : !showResult ? (
-          <ToolEmptyState title={title} desc={emptyDesc} />
+          (sourcePane
+            ? typeof sourcePane === 'function'
+              ? sourcePane(images)
+              : sourcePane
+            : null) ?? (
+            <ToolEmptyState title={title} desc={emptyDesc} capability={capability} />
+          )
         ) : (
           <div className="pk-result-body">
             <div className="pk-result-toolbar">
@@ -568,6 +591,9 @@ export function ToolShell(props: Props) {
         )}
       </section>
       )}
+
+      {/* ── 右: 附加栏 (局部重绘历史记录; 其他页面不传则为空) ── */}
+      {trailingPane}
 
       {/* 素材库选择弹窗 (真实数据; 可选张数 = 剩余图片位) */}
       <AssetLibraryModal

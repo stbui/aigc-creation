@@ -1,6 +1,14 @@
 import type { ReactNode } from 'react';
 import { Activity, CircleCheck, ImagePlus } from 'lucide-react';
-import { ToolEmptyIllustration } from './illustrations';
+import {
+  EnhanceIllustration,
+  ExpandIllustration,
+  ImageTranslateIllustration,
+  LocalRedrawIllustration,
+  RemoveWatermarkIllustration,
+  ToolEmptyIllustration,
+} from './illustrations';
+import type { ComponentType } from 'react';
 import { StateSkeleton } from './StateViews';
 
 /**
@@ -15,19 +23,37 @@ import { StateSkeleton } from './StateViews';
  * 2026-10-20: 插画改从 `illustrations.tsx` 取，解掉与 ToolShell 的循环依赖
  * （此前此处 import ToolShell，而 ToolShell 又 import 本文件）。
  */
+/**
+ * 各修图工具的专属空态插画 (能力 id → 组件)。
+ *
+ * 未命中时回落 ToolEmptyIllustration —— 通用图仍然是兜底, 新工具页接入时
+ * 不必强制先画插画, 但画了就能让空态自己说明「这是哪个工具」。
+ */
+const CAPABILITY_ILLUSTRATIONS: Record<string, ComponentType> = {
+  remove_watermark: RemoveWatermarkIllustration,
+  image_translate: ImageTranslateIllustration,
+  expand: ExpandIllustration,
+  enhance: EnhanceIllustration,
+  local_redraw: LocalRedrawIllustration,
+};
+
 export function ToolEmptyState({
   title,
   desc,
   children,
+  capability,
 }: {
   title: string;
   desc?: string;
   children?: ReactNode;
+  /** 能力 id: 命中专属插画映射时替换通用占位图 */
+  capability?: string;
 }) {
+  const Illustration = (capability && CAPABILITY_ILLUSTRATIONS[capability]) || ToolEmptyIllustration;
   return (
     <div className="pk-preview-placeholder">
       <div className="pk-preview-inner">
-        <ToolEmptyIllustration />
+        <Illustration />
         <h3>{title}</h3>
         {desc && <p>{desc}</p>}
         {children}

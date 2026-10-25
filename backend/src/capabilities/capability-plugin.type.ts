@@ -45,6 +45,13 @@ export interface CapabilityParam {
   options?: ParamOption[];
   min?: number;
   max?: number;
+  /**
+   * text 参数的最大保留长度（字符数）。
+   *
+   * `sanitizeParams` 对文本参数默认截断到 2000 字符；需要更长内容的
+   * 技术参数（如局部重绘的 annotations JSON）可在此显式放大。
+   */
+  maxLength?: number;
   step?: number;
   placeholder?: string;
   help?: string;

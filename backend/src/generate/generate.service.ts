@@ -11,6 +11,7 @@ import { ImageProvider } from '../providers/image-provider.interface';
 import { MaskUnsupportedError, NoModelChannelError } from '../providers/gateway.types';
 import type { VideoProvider } from '../providers/unified/unified.provider';
 import { getCapability, sanitizeParams } from '../capabilities/capability.registry';
+import { parseLocalRedrawAnnotations } from '../capabilities/definitions/local_redraw';
 import { CapabilityAvailabilityService } from '../capabilities/capability-availability.service';
 import { CreateGenerationDto } from './dto/create-generation.dto';
 import { StorageService } from '../storage/storage.service';
@@ -20,6 +21,7 @@ import { CreditPriceService } from '../credits/credit-price.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { AigcVisibleLabelError, labelGeneratedImage, type AigcMeta } from '../common/aigc-label';
 import { AigcLabelService } from '../aigc-label/aigc-label.service';
+import { PromptToolsService } from '../prompt-tools/prompt-tools.service';
 import { SignedUrlService } from '../common/signed-url.service';
 import { resolveUploadsDir } from '../config/env-files';
 import type { StorageBackend } from '../storage/storage.provider';
@@ -53,6 +55,7 @@ export class GenerateService implements OnModuleInit {
     private readonly availability: CapabilityAvailabilityService,
     // 可见角标样式（后台「AI 标识」页可配）。读失败会回退默认样式，不影响生成
     private readonly aigcLabel: AigcLabelService,
+    private readonly promptTools: PromptToolsService,
   ) {}
 
   async createTask(ownerId: string, dto: CreateGenerationDto) {
@@ -133,6 +136,28 @@ export class GenerateService implements OnModuleInit {
       });
       if (!maskAsset) {
         throw new AppError(40001, '遮罩素材不存在或无权限', 400);
+      }
+    }
+
+    /*
+     * 局部重绘的逐标注参考图校验 (2026-10-25 接入)。
+     *
+     * 参考图是可选项, 但只要传了 id, 就必须属于本人且是上传素材。
+     * 放在扣费前的原因与遮罩一致: 这是生成输入, 不能让用户先付了积分,
+     * 再在异步执行阶段才发现某张参考图是无效 id。
+     */
+    if (dto.capability === 'local_redraw') {
+      const referenceIds = parseLocalRedrawAnnotations(dto.params?.annotations)
+        .map((item) => item.referenceAssetId)
+        .filter((id): id is string => typeof id === 'string' && Boolean(id.trim()));
+      for (const referenceId of new Set(referenceIds)) {
+        const reference = await this.prisma.asset.findFirst({
+          where: { id: referenceId, ownerId, kind: 'original' },
+          select: { id: true },
+        });
+        if (!reference) {
+          throw new AppError(40001, '局部重绘参考图素材不存在或无权限', 400);
+        }
       }
     }
 
@@ -278,6 +303,9 @@ export class GenerateService implements OnModuleInit {
       }
 
       const params = JSON.parse(task.params || '{}');
+      if (task.capability === 'local_redraw') {
+        await this.attachLocalRedrawReferenceHints(params, task.ownerId);
+      }
       /*
        * 遮罩物化到临时目录（局部重绘）。
        *
@@ -287,7 +315,11 @@ export class GenerateService implements OnModuleInit {
        * 传不下去时**直接抛**，不要静默退化成「无遮罩」：那会把
        * 「只改涂抹区域」变成「整图重绘」，用户付了积分拿到一张面目全非的图。
        */
-      const maskPath = await this.materializeMask(params.maskAssetId, task.ownerId, tempDir);
+      const maskPath = await this.materializeMask(
+        params.modelGuideAssetId ?? params.maskAssetId,
+        task.ownerId,
+        tempDir,
+      );
       /*
        * 产出按模态分流 (2026-10-20 视频通道落地)。
        *
@@ -836,6 +868,32 @@ export class GenerateService implements OnModuleInit {
     const path = join(tempDir, `mask-${asset.id}.png`);
     await writeFile(path, buf);
     return path;
+  }
+
+  /**
+   * 把局部重绘的逐标注参考图转成文字描述, 并写回 `params.__referenceHints`。
+   *
+   * 当前图像通道还没有参考站 createInpainting 那种「参考图资产 id」协议;
+   * 在不新增厂商协议的前提下, 这里把参考图交给多模态文生文通道做客观描述,
+   * 再把描述并入局部重绘提示词 —— 上传的参考图因此真正参与生成, 不再只落库不用。
+   *
+   * 任一参考图解析失败只降级 (跳过该图), 不让整单生成因此失败: 参考图是
+   * 增强信息, 主输入仍是原图 + 遮罩 + 文字描述。
+   */
+  private async attachLocalRedrawReferenceHints(params: Record<string, any>, ownerId: string): Promise<void> {
+    const annotations = parseLocalRedrawAnnotations(params.annotations);
+    const hints: string[] = [];
+    for (const item of annotations) {
+      if (typeof item.referenceAssetId !== 'string' || !item.referenceAssetId.trim()) continue;
+      try {
+        const result = await this.promptTools.imageToPrompt(ownerId, item.referenceAssetId, item.instruction);
+        const text = result.text?.trim();
+        if (text) hints.push(`${item.label || '参考图'}：${text}`);
+      } catch (e) {
+        this.logger.warn(`局部重绘参考图 ${item.referenceAssetId} 转描述失败, 已跳过 — ${(e as Error).message}`);
+      }
+    }
+    if (hints.length > 0) params.__referenceHints = hints;
   }
 
   /**

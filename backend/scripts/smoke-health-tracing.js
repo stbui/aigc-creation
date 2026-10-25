@@ -13,7 +13,7 @@
  *   6. 日志文件里出现 `[rid=<同一个 id>]` 前缀（AsyncLocalStorage 真的贯穿了 service）
  *
  * 用法（测试档）:
- *   API_BASE=http://127.0.0.1:4200 NODE_ENV=test node scripts/smoke-health-tracing.js
+ *   API_BASE=http://127.0.0.1:4100 NODE_ENV=test node scripts/smoke-health-tracing.js
  */
 const fs = require('fs');
 const path = require('path');

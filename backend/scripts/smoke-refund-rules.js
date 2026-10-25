@@ -11,7 +11,7 @@
  * 另验证会员订单全额退款会终止其发放的会员权益。
  *
  * 用法 (测试档, 禁止指向开发库):
- *   NODE_ENV=test API_BASE=http://127.0.0.1:4200 node scripts/smoke-refund-rules.js
+ *   NODE_ENV=test API_BASE=http://127.0.0.1:4100 node scripts/smoke-refund-rules.js
  */
 const { PrismaClient } = require('@prisma/client');
 const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');

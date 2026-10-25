@@ -28,12 +28,12 @@
 | 上传目录 | `uploads` | `uploads-test` | `/app/data/uploads`（绝对路径 + 卷） |
 | 备份目录 | `backups` | `backups-test` | `/app/data/backups` |
 | 日志目录 | `logs` | `logs/test` | `/app/data/logs` |
-| 后端端口 | 4100（占用则 4101/4102） | 4200 | `.env.production` 的 `PORT` |
-| 前端端口 | 5100（占用则 5101/5102） | 5200 | 4173（仅 preview） |
+| 后端端口 | 4100（固定；占用则停掉占用进程） | 4100（同开发） | `.env.production` 的 `PORT` |
+| 前端端口 | 5100（固定；占用则停掉占用进程） | 5100（同开发） | 4173（仅 preview） |
 | `HOST` | `127.0.0.1` | `127.0.0.1` | `0.0.0.0`（容器必须） |
 | `JWT_SECRET` | 留空（用内置开发密钥） | 独立测试密钥 | **必填**，缺失则拒绝启动 |
 | `JWT_TTL` | `7d` | `1h` | 建议 `2h` |
-| `CORS_ORIGINS` | 留空走默认本机白名单 | 显式放行 5200 | **必填**线上域名 |
+| `CORS_ORIGINS` | 留空走默认本机白名单 | 显式放行 5100 | **必填**线上域名 |
 | 界面角标 | 「开发」 | 「测试」 | 不显示 |
 | Docker profile | 默认 | `--profile test` | 见下方「生产部署」 |
 
@@ -163,12 +163,13 @@ production : .env.production.local  > .env.production
 
 ```bash
 ./start.sh                    # 开发
-./start.sh --env test         # 测试（独立库，独立端口）
+./start.sh --env test         # 测试（独立库；端口同开发，两档不能同时跑）
 ./start.sh --env prod         # 生产（需 .env.production 存在）
 
-# 开发与测试可并行，互不抢端口：
-./start.sh &
-./start.sh --env test &
+# 开发与测试**不能**并行（端口相同）：起测试档会自动停掉开发档，反之亦然。
+# 两档的隔离是库/上传目录/日志目录/密钥，不是端口。
+./start.sh --env test          # 起测试档（会停掉正在跑的开发档）
+./start.sh                     # 切回开发档（会停掉测试档）
 ```
 
 ### 建表与种子
@@ -189,7 +190,7 @@ npm run seed:test             # 只灌测试库种子
 ```bash
 cd frontend
 npm run dev                # vite --mode development
-npm run dev:test           # vite --mode test（5200）
+npm run dev:test           # vite --mode test（5100）
 npm run build:prod         # tsc --noEmit && vite build --mode production
 npm run build:test         # 测试环境的静态产物
 ```

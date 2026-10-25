@@ -1,138 +1,305 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { App } from 'antd';
-import { Eraser, Maximize2, Paintbrush, RotateCcw } from 'lucide-react';
+import { App, Drawer, Modal, Spin } from 'antd';
+import { ChevronUp, Circle, Eraser, Hand, History, ImagePlus, Maximize2, Minus, Paintbrush, Plus, Redo2, RotateCcw, Square, Undo2, X } from 'lucide-react';
 import { useToolTask } from '../hooks/useToolTask';
 import { useProject } from '../hooks/useProject';
-import { assetsApi } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
+import { assetsApi, assetSrc, generateApi } from '../lib/api';
 import { ExpandTextModal, ToolShell, type ToolAsset } from '../components/ToolShell';
 import { ToolCard } from '../components/ToolWidgets';
+import { LocalRedrawIllustration } from '../components/illustrations';
 
 /**
  * 局部重绘 —— 1:1 复刻参考站 https://ijihua.cn/local-redraw。
  *
- * 实拍结构 (local-redraw-page):
- *   上传卡: * 上传图片 (从素材库导入 / 手机上传 / 点击或拖拽图片到此处上传,
- *          "点击、拖拽或粘贴图片上传，最多 1 张")
- *   重绘区域卡: 参考站在画布上涂抹圈选 → 本页**真的画布涂抹**，产出遮罩 PNG
- *   描述卡: "这个区域改成什么？" textarea + 放大编辑
- *   高级设置: 比例 原比例 / 画质 1K (提交区汇总 chip)
- *   提交: 开始重绘 (消耗价由后端下发); 描述: 只想修改局部？圈出来写描述就行
+ * ## 画布交互 (2026-10-25 重构)
  *
- * ## 遮罩怎么走 (2026-10-22)
+ * 工具: 抓手 (平移) / 画笔 (涂抹重绘区) / 橡皮 (擦除涂抹) / 框选 / 圈选。
+ * 额外能力: 缩放 (按钮 ±) / 撤回 / 恢复 / 清空。
  *
- * 涂抹 → 画布导出**黑白 PNG**（透明区 = 要重绘的区域，OpenAI `images/edits`
- * 的约定）→ 上传成素材 → 提交时带 `maskAssetId`。
+ * 笔迹用**矢量标记**保存 (不是落成不可逆的位图)：
+ *   - brush/eraser → 一串采样点
+ *   - rect/ellipse → 归一化矩形
+ * 渲染时重放整份标记列表 → 生成可见叠层与黑白遮罩。因此撤回/恢复/清空
+ * 只是增删数组元素并重放，不需要保存 4K ImageData 快照。
  *
- * 后端对「协议不支持遮罩」的通道**不静默忽略**，而是判 `42205` 并退款 ——
- * 忽略的后果是整图重绘：用户涂了包装盒，模型把整张图改了，界面上还显示成功。
+ * ## 遮罩怎么走 (仍沿用 2026-10-22 的协议)
  *
- * 没涂抹时退回位置枚举：那时它只是**提示词**里的一句位置描述，
- * 不具备圈选能力，故文案里如实写明「不改变重绘范围」。
+ * 所有标记合成一张 PNG：透明区 = 要重绘的区域 (OpenAI `images/edits` 约定)，
+ * 上传成素材后随 `maskAssetId` 提交。后端对不支持遮罩的通道判 `42205` 退款。
  *
- * 诚实披露: local_redraw 必须由真实 inpainting 模型完成, 本地**没有实现**
- * (能力定义里 localFallback: false)。没有可用模型通道时后端判 failed/42204 并退款,
- * 本页据 runtime 提前禁用提交并说明原因, 不交付任何占位图。
+ * 诚实披露: local_redraw 必须由真实 inpainting 模型完成, 本地没有实现；
+ * 没有可用通道时后端判 failed/42204 并退款，本页据 runtime 提前禁用提交。
  */
 
-const REGION_OPTIONS = [
-  { value: 'center', label: '画面中心' },
-  { value: 'top', label: '画面上方' },
-  { value: 'bottom', label: '画面下方' },
-  { value: 'left', label: '画面左侧' },
-  { value: 'right', label: '画面右侧' },
-  { value: 'full', label: '整图重绘' },
+type PaintTool = 'hand' | 'brush' | 'eraser' | 'rect' | 'ellipse';
+
+/** 页面只有 3 条描述位，遮罩也必须与之一致，不能多圈区域却没有描述。 */
+const MAX_ANNOTATIONS = 3;
+
+const TOOLS: { value: PaintTool; label: string; shortcut: string; icon: typeof Hand }[] = [
+  { value: 'hand', label: '抓手', shortcut: 'H', icon: Hand },
+  { value: 'eraser', label: '擦除', shortcut: 'E', icon: Eraser },
+  { value: 'rect', label: '框选', shortcut: 'R', icon: Square },
+  { value: 'ellipse', label: '圈选', shortcut: 'O', icon: Circle },
+  { value: 'brush', label: '涂抹', shortcut: 'B', icon: Paintbrush },
 ];
 
-const REGION_LABEL: Record<string, string> = Object.fromEntries(REGION_OPTIONS.map((o) => [o.value, o.label]));
+type StrokeTool = 'brush' | 'eraser';
+type ShapeTool = 'rect' | 'ellipse';
 
-type BrushTool = 'brush' | 'eraser';
+/** 矢量标记：一笔涂抹 / 一个框选区域。坐标均为原图像素坐标。 */
+interface StrokeMark {
+  kind: 'stroke';
+  tool: StrokeTool;
+  points: { x: number; y: number }[];
+  /** 笔刷宽度（原图像素） */
+  width: number;
+}
+interface ShapeMark {
+  kind: 'shape';
+  tool: ShapeTool;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+type Mark = StrokeMark | ShapeMark;
 
-/** 画布对外的两个动作：导出遮罩 / 清空涂抹 */
+/** 一个可描述区域在原图上的包围盒（像素坐标） */
+interface RegionBounds {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  sourceWidth: number;
+  sourceHeight: number;
+}
+
+type RedrawHistoryTask = Awaited<ReturnType<typeof generateApi.list>>[number];
+
+/**
+ * 历史记录列表 (桌面常驻侧栏与窄屏抽屉共用)。
+ *
+ * 加载中必须与「没有记录」分开: 首次进入时 `history` 还是空数组,
+ * 直接显示「暂无记录」会在网络返回前给用户一个错误结论。
+ */
+function RedrawHistoryList({ tasks, loading }: { tasks: RedrawHistoryTask[]; loading: boolean }) {
+  if (loading) {
+    return (
+      <div className="redraw-history-loading" aria-live="polite">
+        <Spin size="small" />
+        <span>加载中…</span>
+      </div>
+    );
+  }
+  if (tasks.length === 0) {
+    return <div className="redraw-history-empty">暂无局部重绘记录</div>;
+  }
+  return (
+    <div className="redraw-history-grid">
+      {tasks.map((task) => (
+        <a
+          key={task.id}
+          className="redraw-history-card"
+          href={assetSrc(task.outputAsset) ?? '#'}
+          download
+          target="_blank"
+          rel="noreferrer"
+        >
+          <img src={assetSrc(task.outputAsset) ?? ''} alt="局部重绘结果" loading="lazy" decoding="async" />
+          <span>{task.createdAt ? new Date(task.createdAt).toLocaleString() : ''}</span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+/** 只有画笔涂抹和框选/圈选算可描述区域，橡皮只是修正遮罩 */
+function isRegionMark(mark: Mark): boolean {
+  return mark.kind === 'shape' || (mark.kind === 'stroke' && mark.tool === 'brush');
+}
+
+/** 画布对外的动作 */
 interface MaskPainterHandle {
-  /** 导出遮罩 PNG；没有任何涂抹时返回 null（调用方据此退回位置枚举） */
   toBlob: () => Promise<Blob | null>;
   clear: () => void;
+  undo: () => void;
+  redo: () => void;
+  getRegionCount: () => number;
+  getRegionBounds: () => RegionBounds[];
+  removeRegion: (index: number) => void;
+}
+
+/** 从 CSS 变量取品牌色，避免在画布代码里写死十六进制 */
+function brandColor(): string {
+  return getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || '#5b4df5';
 }
 
 /**
  * 遮罩画布。
  *
- * 结构是「一张 img 底图 + 一层透明画布叠在上面」：
- *   · 底图用 `<img>` 而不是把图画进 canvas —— 画进 canvas 后再「擦除」
- *     会把底图一起擦掉，用户看到的是白底而不是原图；
- *   · 涂抹只作用在叠层与离屏遮罩上，两者永不混入图片像素，
- *     故导出时不会因为跨域而得到一张被污染的空白 PNG。
- *
- * 离屏遮罩的初始状态是**全白不透明**；画笔是 `destination-out`
- * （把白色擦成透明）。于是「涂过的地方 = 透明 = 要重绘」，与 OpenAI
- * `images/edits` 的文档约定一致（见 protocol.spec.ts 的 maskSupport 注释）。
+ * 结构是「img 底图 + 叠层画布」，叠层只画品牌色预览，离屏遮罩画布负责导出。
+ * 底图不进 canvas —— 画进 canvas 后擦除会把底图一起擦掉，用户会看到白底。
  */
 function MaskPainter({
   url,
-  brush,
   tool,
+  brush,
+  zoom,
+  pan,
+  maxRegions,
+  onPanChange,
+  onRegionLimit,
   onChange,
   handleRef,
 }: {
   url: string;
+  tool: PaintTool;
   brush: number;
-  tool: BrushTool;
-  /** 涂抹状态变化（有任何笔迹 / 被清空） */
-  onChange: (painted: boolean) => void;
+  zoom: number;
+  pan: { x: number; y: number };
+  maxRegions: number;
+  onPanChange: (pan: { x: number; y: number }) => void;
+  onRegionLimit: () => void;
+  /** 有可提交的涂抹 / 可撤回 / 可恢复 / 当前标注区域数 */
+  onChange: (painted: boolean, canUndo: boolean, canRedo: boolean, regionCount: number) => void;
   handleRef: { current: MaskPainterHandle | null };
 }) {
   const overlayRef = useRef<HTMLCanvasElement | null>(null);
   const maskRef = useRef<HTMLCanvasElement | null>(null);
-  const drawing = useRef(false);
-  const lastPoint = useRef<{ x: number; y: number } | null>(null);
+  const transformRef = useRef<HTMLDivElement | null>(null);
 
-  /** 图片加载完后按原始像素尺寸建画布：遮罩必须与输入图同尺寸 */
-  const setup = useCallback(
-    (w: number, h: number) => {
-      const overlay = overlayRef.current;
-      const mask = maskRef.current;
-      if (!overlay || !mask || w <= 0 || h <= 0) return;
-      overlay.width = w;
-      overlay.height = h;
-      mask.width = w;
-      mask.height = h;
-
-      const octx = overlay.getContext('2d');
-      octx?.clearRect(0, 0, w, h);
-      const mctx = mask.getContext('2d');
-      if (mctx) {
-        mctx.globalCompositeOperation = 'source-over';
-        mctx.globalAlpha = 1;
-        mctx.fillStyle = 'white';
-        mctx.fillRect(0, 0, w, h);
-      }
-      onChange(false);
-    },
-    [onChange],
-  );
-
-  const clear = useCallback(() => {
-    const overlay = overlayRef.current;
-    const mask = maskRef.current;
-    if (overlay) overlay.getContext('2d')?.clearRect(0, 0, overlay.width, overlay.height);
-    if (mask) {
-      const mctx = mask.getContext('2d');
-      if (mctx) {
-        mctx.globalCompositeOperation = 'source-over';
-        mctx.globalAlpha = 1;
-        mctx.fillStyle = 'white';
-        mctx.fillRect(0, 0, mask.width, mask.height);
-      }
-    }
-    onChange(false);
-  }, [onChange]);
+  const marksRef = useRef<Mark[]>([]);
+  const redoRef = useRef<Mark[]>([]);
+  const draftRef = useRef<Mark | null>(null);
+  const shapeStartRef = useRef<{ x: number; y: number } | null>(null);
+  const panStartRef = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null);
+  const naturalRef = useRef<{ w: number; h: number }>({ w: 0, h: 0 });
 
   /**
-   * 判断「到底涂没涂」：用户可能涂完又全擦掉。
+   * 当前笔刷在原图像素下的线宽。
    *
-   * 在 64×64 的缩略图上数透明像素，而不是对整张 4K 遮罩逐像素扫描 ——
-   * 后者一次要读 60MB+ 的 ImageData，只为回答一个是非题。
+   * 画布内部是原图尺寸、外部再乘 zoom，所以这里要先除以 zoom：
+   * 否则 140% 时同一档笔刷会变得比 100% 粗 40%，用户看到的大小与滑块数字脱节。
    */
+  const lineWidth = useCallback(() => {
+    const w = naturalRef.current.w;
+    const displayWidth = transformRef.current?.offsetWidth || 1;
+    const scale = Math.max(zoom / 100, 0.01);
+    return Math.max(2, (brush * (w / Math.max(displayWidth, 1))) / scale);
+  }, [brush, zoom]);
+
+  const pointOf = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const c = e.currentTarget;
+    const rect = c.getBoundingClientRect();
+    // 画布内部分辨率是原图尺寸，显示尺寸带缩放 —— 必须换算，否则笔迹错位
+    return {
+      x: (e.clientX - rect.left) * (c.width / Math.max(rect.width, 1)),
+      y: (e.clientY - rect.top) * (c.height / Math.max(rect.height, 1)),
+    };
+  };
+
+  const drawMark = useCallback((octx: CanvasRenderingContext2D, mctx: CanvasRenderingContext2D, mark: Mark) => {
+    const brand = brandColor();
+    if (mark.kind === 'stroke') {
+      const points = mark.points;
+      if (points.length === 0) return;
+      const stroke = (ctx: CanvasRenderingContext2D) => {
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i += 1) ctx.lineTo(points[i].x, points[i].y);
+        ctx.stroke();
+      };
+      // 叠层：画笔画半透明品牌色，橡皮擦掉颜色（底图仍在下面）
+      octx.save();
+      octx.lineCap = 'round';
+      octx.lineJoin = 'round';
+      octx.lineWidth = mark.width;
+      if (mark.tool === 'brush') {
+        octx.globalCompositeOperation = 'source-over';
+        octx.globalAlpha = 0.45;
+        octx.strokeStyle = brand;
+      } else {
+        octx.globalCompositeOperation = 'destination-out';
+        octx.globalAlpha = 1;
+        octx.strokeStyle = 'black';
+      }
+      stroke(octx);
+      octx.restore();
+
+      // 遮罩：画笔擦成透明（重绘区），橡皮涂回白色
+      mctx.save();
+      mctx.lineCap = 'round';
+      mctx.lineJoin = 'round';
+      mctx.lineWidth = mark.width;
+      mctx.globalAlpha = 1;
+      if (mark.tool === 'brush') {
+        mctx.globalCompositeOperation = 'destination-out';
+        mctx.strokeStyle = 'black';
+      } else {
+        mctx.globalCompositeOperation = 'source-over';
+        mctx.strokeStyle = 'white';
+      }
+      stroke(mctx);
+      mctx.restore();
+      return;
+    }
+
+    // 形状：叠层画品牌色填充 + 描边，遮罩 destination-out 填充
+    octx.save();
+    octx.fillStyle = brand;
+    octx.globalAlpha = 0.4;
+    if (mark.tool === 'rect') octx.fillRect(mark.x, mark.y, mark.width, mark.height);
+    else {
+      octx.beginPath();
+      octx.ellipse(mark.x + mark.width / 2, mark.y + mark.height / 2, Math.abs(mark.width) / 2, Math.abs(mark.height) / 2, 0, 0, Math.PI * 2);
+      octx.fill();
+    }
+    octx.globalAlpha = 0.9;
+    octx.lineWidth = 2;
+    if (mark.tool === 'rect') octx.strokeRect(mark.x, mark.y, mark.width, mark.height);
+    else {
+      octx.beginPath();
+      octx.ellipse(mark.x + mark.width / 2, mark.y + mark.height / 2, Math.abs(mark.width) / 2, Math.abs(mark.height) / 2, 0, 0, Math.PI * 2);
+      octx.stroke();
+    }
+    octx.restore();
+
+    mctx.save();
+    mctx.globalCompositeOperation = 'destination-out';
+    mctx.fillStyle = 'black';
+    if (mark.tool === 'rect') mctx.fillRect(mark.x, mark.y, mark.width, mark.height);
+    else {
+      mctx.beginPath();
+      mctx.ellipse(mark.x + mark.width / 2, mark.y + mark.height / 2, Math.abs(mark.width) / 2, Math.abs(mark.height) / 2, 0, 0, Math.PI * 2);
+      mctx.fill();
+    }
+    mctx.restore();
+  }, []);
+
+  const render = useCallback(
+    (draft?: Mark | null) => {
+      const overlay = overlayRef.current;
+      const mask = maskRef.current;
+      if (!overlay || !mask) return;
+      const octx = overlay.getContext('2d');
+      const mctx = mask.getContext('2d');
+      if (!octx || !mctx) return;
+
+      octx.clearRect(0, 0, overlay.width, overlay.height);
+      mctx.globalCompositeOperation = 'source-over';
+      mctx.globalAlpha = 1;
+      mctx.fillStyle = 'white';
+      mctx.fillRect(0, 0, mask.width, mask.height);
+
+      for (const mark of marksRef.current) drawMark(octx, mctx, mark);
+      if (draft) drawMark(octx, mctx, draft);
+    },
+    [drawMark],
+  );
+
+  /** 在 64×64 缩略图上数透明像素，避免为 4K 遮罩逐像素扫描 */
   const hasPaint = useCallback((): boolean => {
     const mask = maskRef.current;
     if (!mask || mask.width === 0) return false;
@@ -145,9 +312,130 @@ function MaskPainter({
     const data = pctx.getImageData(0, 0, 64, 64).data;
     let transparent = 0;
     for (let i = 3; i < data.length; i += 4) if (data[i] < 128) transparent += 1;
-    // 少于 4 个采样点是抖动/抗锯齿，不算涂抹
     return transparent >= 4;
   }, []);
+
+  /**
+   * 可独立描述的重绘区域数。橡皮只是修正遮罩, 不创建新区域;
+   * 框选/圈选与每一段涂抹都算一个区域。
+   */
+  const getRegionCount = useCallback((): number => {
+    return marksRef.current.filter(isRegionMark).length;
+  }, []);
+
+  /** 每个可描述区域在原图上的包围盒，供标注卡显示区域缩略图 */
+  const getRegionBounds = useCallback((): RegionBounds[] => {
+    return marksRef.current.filter(isRegionMark).map((mark) => {
+      if (mark.kind === 'shape') {
+        return {
+          x: mark.x,
+          y: mark.y,
+          width: mark.width,
+          height: mark.height,
+          sourceWidth: naturalRef.current.w,
+          sourceHeight: naturalRef.current.h,
+        };
+      }
+      const points = mark.points;
+      const minX = Math.min(...points.map((p) => p.x));
+      const maxX = Math.max(...points.map((p) => p.x));
+      const minY = Math.min(...points.map((p) => p.y));
+      const maxY = Math.max(...points.map((p) => p.y));
+      const pad = mark.width / 2;
+      return {
+        x: Math.max(0, minX - pad),
+        y: Math.max(0, minY - pad),
+        width: maxX - minX + mark.width,
+        height: maxY - minY + mark.width,
+        sourceWidth: naturalRef.current.w,
+        sourceHeight: naturalRef.current.h,
+      };
+    });
+  }, []);
+
+  const notify = useCallback(() => {
+    onChange(hasPaint(), marksRef.current.length > 0, redoRef.current.length > 0, getRegionCount());
+  }, [getRegionCount, hasPaint, onChange]);
+
+  /** 删除第 index 个可描述区域（同时让标注卡少一条） */
+  const removeRegion = useCallback((index: number) => {
+    const regionMarks = marksRef.current.filter(isRegionMark);
+    const target = regionMarks[index];
+    if (!target) return;
+    marksRef.current = marksRef.current.filter((mark) => mark !== target);
+    redoRef.current = [];
+    draftRef.current = null;
+    shapeStartRef.current = null;
+    render();
+    notify();
+  }, [notify, render]);
+
+  const setup = useCallback(
+    (w: number, h: number) => {
+      const overlay = overlayRef.current;
+      const mask = maskRef.current;
+      if (!overlay || !mask || w <= 0 || h <= 0) return;
+      naturalRef.current = { w, h };
+      overlay.width = w;
+      overlay.height = h;
+      mask.width = w;
+      mask.height = h;
+      marksRef.current = [];
+      redoRef.current = [];
+      draftRef.current = null;
+      shapeStartRef.current = null;
+      render();
+      notify();
+    },
+    [notify, render],
+  );
+
+  const commit = useCallback(
+    (mark: Mark) => {
+      if (isRegionMark(mark) && getRegionCount() >= maxRegions) {
+        draftRef.current = null;
+        shapeStartRef.current = null;
+        render();
+        notify();
+        onRegionLimit();
+        return;
+      }
+      marksRef.current = [...marksRef.current, mark];
+      redoRef.current = [];
+      draftRef.current = null;
+      shapeStartRef.current = null;
+      render();
+      notify();
+    },
+    [getRegionCount, maxRegions, notify, onRegionLimit, render],
+  );
+
+  const undo = useCallback(() => {
+    const last = marksRef.current[marksRef.current.length - 1];
+    if (!last) return;
+    marksRef.current = marksRef.current.slice(0, -1);
+    redoRef.current = [...redoRef.current, last];
+    render();
+    notify();
+  }, [notify, render]);
+
+  const redo = useCallback(() => {
+    const next = redoRef.current[redoRef.current.length - 1];
+    if (!next) return;
+    redoRef.current = redoRef.current.slice(0, -1);
+    marksRef.current = [...marksRef.current, next];
+    render();
+    notify();
+  }, [notify, render]);
+
+  const clear = useCallback(() => {
+    marksRef.current = [];
+    redoRef.current = [];
+    draftRef.current = null;
+    shapeStartRef.current = null;
+    render();
+    notify();
+  }, [notify, render]);
 
   const toBlob = useCallback((): Promise<Blob | null> => {
     const mask = maskRef.current;
@@ -156,113 +444,105 @@ function MaskPainter({
   }, [hasPaint]);
 
   useEffect(() => {
-    handleRef.current = { toBlob, clear };
+    handleRef.current = { toBlob, clear, undo, redo, getRegionCount, getRegionBounds, removeRegion };
     return () => {
       handleRef.current = null;
     };
-  }, [clear, handleRef, toBlob]);
+  }, [clear, getRegionCount, getRegionBounds, handleRef, redo, removeRegion, toBlob, undo]);
 
-  const pointOf = (e: React.PointerEvent<HTMLCanvasElement>) => {
-    const c = e.currentTarget;
-    const rect = c.getBoundingClientRect();
-    // 画布内部分辨率是原图尺寸，显示尺寸是 CSS 宽度 —— 必须换算，否则笔迹错位
-    return {
-      x: (e.clientX - rect.left) * (c.width / Math.max(rect.width, 1)),
-      y: (e.clientY - rect.top) * (c.height / Math.max(rect.height, 1)),
-    };
+  const onPointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    if (tool === 'hand') {
+      panStartRef.current = { x: e.clientX, y: e.clientY, panX: pan.x, panY: pan.y };
+      return;
+    }
+    const p = pointOf(e);
+    if (tool === 'brush' || tool === 'eraser') {
+      draftRef.current = { kind: 'stroke', tool, points: [p], width: lineWidth() };
+      render(draftRef.current);
+      return;
+    }
+    shapeStartRef.current = p;
+    draftRef.current = { kind: 'shape', tool, x: p.x, y: p.y, width: 0, height: 0 };
+    render(draftRef.current);
   };
 
-  const drawSegment = (from: { x: number; y: number }, to: { x: number; y: number }) => {
-    const overlay = overlayRef.current;
-    const mask = maskRef.current;
-    if (!overlay || !mask) return;
-    const octx = overlay.getContext('2d');
-    const mctx = mask.getContext('2d');
-    if (!octx || !mctx) return;
-
-    const rect = overlay.getBoundingClientRect();
-    const lineWidth = Math.max(2, brush * (overlay.width / Math.max(rect.width, 1)));
-    // 品牌色从设计令牌读，不在这里写死十六进制（与全局样式同源）
-    const brand = getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || 'black';
-
-    // 叠层：涂抹画半透明品牌色；橡皮把颜色擦掉（底图仍在下面）
-    octx.save();
-    octx.lineCap = 'round';
-    octx.lineJoin = 'round';
-    octx.lineWidth = lineWidth;
-    if (tool === 'brush') {
-      octx.globalCompositeOperation = 'source-over';
-      octx.globalAlpha = 0.45;
-      octx.strokeStyle = brand;
-    } else {
-      octx.globalCompositeOperation = 'destination-out';
-      octx.globalAlpha = 1;
-      octx.strokeStyle = 'black';
+  const onPointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    if (tool === 'hand' && panStartRef.current) {
+      onPanChange({
+        x: panStartRef.current.panX + e.clientX - panStartRef.current.x,
+        y: panStartRef.current.panY + e.clientY - panStartRef.current.y,
+      });
+      return;
     }
-    octx.beginPath();
-    octx.moveTo(from.x, from.y);
-    octx.lineTo(to.x, to.y);
-    octx.stroke();
-    octx.restore();
-
-    // 离屏遮罩：涂抹 = 擦成透明（重绘区），橡皮 = 涂回白色
-    mctx.save();
-    mctx.lineCap = 'round';
-    mctx.lineJoin = 'round';
-    mctx.lineWidth = lineWidth;
-    mctx.globalAlpha = 1;
-    if (tool === 'brush') {
-      mctx.globalCompositeOperation = 'destination-out';
-      mctx.strokeStyle = 'black';
-    } else {
-      mctx.globalCompositeOperation = 'source-over';
-      mctx.strokeStyle = 'white';
+    const draft = draftRef.current;
+    if (!draft) return;
+    const p = pointOf(e);
+    if (draft.kind === 'stroke') {
+      draft.points = [...draft.points, p];
+    } else if (shapeStartRef.current) {
+      draft.x = Math.min(shapeStartRef.current.x, p.x);
+      draft.y = Math.min(shapeStartRef.current.y, p.y);
+      draft.width = Math.abs(p.x - shapeStartRef.current.x);
+      draft.height = Math.abs(p.y - shapeStartRef.current.y);
     }
-    mctx.beginPath();
-    mctx.moveTo(from.x, from.y);
-    mctx.lineTo(to.x, to.y);
-    mctx.stroke();
-    mctx.restore();
+    render(draft);
+  };
+
+  const onPointerUp = () => {
+    panStartRef.current = null;
+    const draft = draftRef.current;
+    if (!draft) return;
+    if (draft.kind === 'stroke') {
+      if (draft.points.length > 0) commit(draft);
+      else {
+        draftRef.current = null;
+        render();
+        notify();
+      }
+      return;
+    }
+    // 过小的框选视为误触，不提交
+    if (draft.width >= 4 || draft.height >= 4) commit(draft);
+    else {
+      draftRef.current = null;
+      shapeStartRef.current = null;
+      render();
+      notify();
+    }
+  };
+
+  const onPointerCancel = () => {
+    panStartRef.current = null;
+    draftRef.current = null;
+    shapeStartRef.current = null;
+    render();
+    notify();
   };
 
   return (
     <div className="redraw-mask-stage">
-      <img
-        className="redraw-mask-bg"
-        src={url}
-        alt="待重绘的原图"
-        onLoad={(e) => setup(e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)}
-      />
-      <canvas
-        ref={overlayRef}
-        className="redraw-mask-overlay"
-        aria-label="在图上涂抹要重绘的区域"
-        onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture(e.pointerId);
-          drawing.current = true;
-          const p = pointOf(e);
-          lastPoint.current = p;
-          drawSegment(p, p);
-          if (tool === 'brush') onChange(true);
-        }}
-        onPointerMove={(e) => {
-          if (!drawing.current) return;
-          const p = pointOf(e);
-          drawSegment(lastPoint.current ?? p, p);
-          lastPoint.current = p;
-        }}
-        onPointerUp={() => {
-          drawing.current = false;
-          lastPoint.current = null;
-          // 橡皮可能把最后一笔也擦掉了：以遮罩实际内容为准，不以「画过」为准
-          onChange(hasPaint());
-        }}
-        onPointerCancel={() => {
-          drawing.current = false;
-          lastPoint.current = null;
-          onChange(hasPaint());
-        }}
-      />
+      <div
+        ref={transformRef}
+        className="redraw-mask-transform"
+        style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom / 100})` }}
+      >
+        <img
+          className="redraw-mask-bg"
+          src={url}
+          alt="待重绘的原图"
+          onLoad={(e) => setup(e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)}
+        />
+        <canvas
+          ref={overlayRef}
+          className={`redraw-mask-overlay tool-${tool}`}
+          aria-label="在图上涂抹、框选或圈选要重绘的区域"
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerCancel}
+        />
+      </div>
       {/* 离屏遮罩：只用于导出，不显示 */}
       <canvas ref={maskRef} className="redraw-mask-hidden" aria-hidden="true" />
     </div>
@@ -274,49 +554,228 @@ export function LocalRedrawPage() {
   const { ensureProject } = useProject();
   const { submitting, result, run } = useToolTask({ capability: 'local_redraw', successMessage: '重绘结果已生成' });
 
-  const [region, setRegion] = useState('center');
-  const [prompt, setPrompt] = useState('');
-  const [expandOpen, setExpandOpen] = useState(false);
-  const [tool, setTool] = useState<BrushTool>('brush');
-  const [brush, setBrush] = useState(32);
+  const [tool, setTool] = useState<PaintTool>('brush');
+  const [brush, setBrush] = useState(30);
+  const [zoom, setZoom] = useState(100);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
   const [painted, setPainted] = useState(false);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const [regionCount, setRegionCount] = useState(0);
+  const [regionBounds, setRegionBounds] = useState<RegionBounds[]>([]);
+  /** 最多 3 条标注描述，与参考站一致 */
+  const [prompts, setPrompts] = useState<string[]>(['', '', '']);
+  const [expandIndex, setExpandIndex] = useState<number | null>(null);
   /** 遮罩上传期间也要禁用按钮 —— 否则连点会传两份遮罩 */
   const [preparing, setPreparing] = useState(false);
+  /** 每条标注可选上传的参考图 */
+  const [references, setReferences] = useState<Array<ToolAsset | null>>([null, null, null]);
+  /**
+   * 正在上传参考图的下标集合。
+   *
+   * 用集合而不是单个下标: 用户可能连着触发两条标注的上传，若只存一个值，
+   * 先完成的请求会把状态提前清空，后一条还在上传时按钮又变成可提交。
+   */
+  const [referenceUploading, setReferenceUploading] = useState<Set<number>>(() => new Set());
+  const uploadBusy = referenceUploading.size > 0;
+  /** 对比弹窗与历史抽屉 */
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<Awaited<ReturnType<typeof generateApi.list>>>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  /** 桌面右栏折叠; 窄屏本来就不显示右栏, 改用浮动按钮打开抽屉 */
+  const [historyCollapsed, setHistoryCollapsed] = useState(false);
+  const [sourceImage, setSourceImage] = useState<ToolAsset | null>(null);
   const painter = useRef<MaskPainterHandle | null>(null);
+  const referenceInputs = useRef<Record<number, HTMLInputElement | null>>({});
+  const { token } = useAuth();
+
+  const setPromptAt = (index: number, value: string) =>
+    setPrompts((prev) => prev.map((p, i) => (i === index ? value : p)));
+
+  const uploadReference = async (index: number, file: File | undefined) => {
+    if (!file) return;
+    try {
+      setReferenceUploading((prev) => new Set(prev).add(index));
+      const projectId = await ensureProject();
+      const asset = await assetsApi.upload(file, projectId);
+      setReferences((prev) => prev.map((item, i) => (i === index ? { id: asset.id, url: assetSrc(asset) ?? '', name: file.name } : item)));
+    } catch (e) {
+      message.error((e as Error).message || '参考图上传失败，请重试');
+    } finally {
+      setReferenceUploading((prev) => {
+        const next = new Set(prev);
+        next.delete(index);
+        return next;
+      });
+    }
+  };
+
+  // 历史记录以任务为准；生成完成后刷新一次，首次挂载若有登录态也拉一次。
+  useEffect(() => {
+    if (!token) {
+      setHistory([]);
+      setHistoryLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setHistoryLoading(true);
+    void generateApi
+      .list()
+      .then((items) => {
+        if (cancelled) return;
+        setHistory(
+          items
+            .filter((task) => task.capability === 'local_redraw' && task.status === 'succeeded' && task.outputAsset)
+            .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
+            .slice(0, 20),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setHistory([]);
+      })
+      .finally(() => {
+        if (!cancelled) setHistoryLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, result]);
+
+  const historyPane = (
+    <aside className="redraw-history-pane" aria-label="局部重绘历史记录">
+      <div className="redraw-history-head">
+        <h2>历史记录</h2>
+        <button
+          type="button"
+          className="redraw-history-collapse"
+          aria-label="收起历史记录"
+          title="收起历史记录"
+          onClick={() => setHistoryCollapsed(true)}
+        >
+          <ChevronUp size={16} />
+        </button>
+      </div>
+      <div className="redraw-history-scroll">
+        <RedrawHistoryList tasks={history} loading={historyLoading} />
+      </div>
+    </aside>
+  );
+
+  const handlePaintState = useCallback(
+    (isPainted: boolean, undoable: boolean, redoable: boolean, regions: number) => {
+      setPainted(isPainted);
+      setCanUndo(undoable);
+      setCanRedo(redoable);
+      setRegionCount(regions);
+      setRegionBounds(painter.current?.getRegionBounds() ?? []);
+    },
+    [],
+  );
+
+  const removeAnnotationAt = (index: number) => {
+    if (uploadBusy) {
+      message.warning('参考图上传中，请稍候再删除标注');
+      return;
+    }
+    painter.current?.removeRegion(index);
+    setPrompts((prev) => [...prev.filter((_, i) => i !== index), '']);
+    setReferences((prev) => [...prev.filter((_, i) => i !== index), null]);
+  };
+
+  const markPreviewStyle = (bounds: RegionBounds, box = 64): React.CSSProperties => {
+    const scale = Math.max(bounds.width / box, bounds.height / box);
+    return {
+      position: 'absolute',
+      left: `${(-bounds.x / scale / box) * 100}%`,
+      top: `${(-bounds.y / scale / box) * 100}%`,
+      width: `${(bounds.sourceWidth / scale / box) * 100}%`,
+      height: `${(bounds.sourceHeight / scale / box) * 100}%`,
+    };
+  };
+
+  // 快捷键：H/B/E/R/O 切工具，Ctrl+Z 撤回，Ctrl+Shift+Z 恢复，+/- 缩放
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'TEXTAREA' || target.tagName === 'INPUT' || target.isContentEditable)) return;
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) painter.current?.redo();
+        else painter.current?.undo();
+        return;
+      }
+      if (e.key === '+' || e.key === '=') {
+        setZoom((z) => Math.min(140, z + 10));
+        return;
+      }
+      if (e.key === '-') {
+        setZoom((z) => Math.max(70, z - 10));
+        return;
+      }
+      const toolKey = TOOLS.find((t) => t.shortcut.toLowerCase() === e.key.toLowerCase());
+      if (toolKey) setTool(toolKey.value);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const submit = async (inputs: ToolAsset[], settings: { ratio: string; resolution: string }) => {
+    if (uploadBusy) {
+      message.warning('参考图上传中，请稍候再提交');
+      return;
+    }
+    setSourceImage(inputs[0] ?? null);
     let maskAssetId: string | undefined;
     try {
       setPreparing(true);
       const blob = await painter.current?.toBlob();
       if (blob) {
-        // 遮罩先落成素材再用 id 提交：生成是异步的，不能把 Blob 挂在不落库的临时对象上
         const projectId = await ensureProject();
         const file = new File([blob], `mask-${Date.now()}.png`, { type: 'image/png' });
         const asset = await assetsApi.upload(file, projectId);
         maskAssetId = asset.id;
-      } else if (painted) {
-        // 涂过又全擦掉：如实说明按位置描述提交，不假装带上了遮罩
-        message.info('遮罩已擦空，本次按位置描述重绘');
+      } else {
+        message.warning('请先在图片上标注需要重绘的区域');
+        return;
       }
     } catch (e) {
       message.error((e as Error).message || '遮罩上传失败，请重试');
-      setPreparing(false);
       return;
     } finally {
       setPreparing(false);
     }
 
+    const annotationCount = Math.max(1, Math.min(MAX_ANNOTATIONS, regionCount));
+    const annotations = prompts
+      .slice(0, annotationCount)
+      .map((p, i) => ({
+        annotationId: String(i + 1),
+        label: `标注${i + 1}`,
+        instruction: p.trim(),
+        referenceAssetId: references[i]?.id ?? null,
+      }))
+      .filter((item) => item.instruction);
+    const parts = annotations.map((item) => `${item.label}：${item.instruction}`);
     await run(inputs, {
-      region,
-      prompt: prompt.trim(),
+      prompt: parts.join('；'),
+      annotations: JSON.stringify(annotations),
+      modelGuideAssetId: maskAssetId,
+      strength: Math.min(1, Math.max(0, brush / 60)),
       ratio: settings.ratio,
       size: settings.resolution,
       ...(maskAssetId ? { maskAssetId } : {}),
     });
   };
 
+  const currentResult = Array.isArray(result) ? result[0] : result;
+  const resultUrl = currentResult?.status === 'succeeded' ? currentResult.url : undefined;
+  /** 与参考站一致: 未标注时只给一条描述位; 标注后按区域数展开, 最多 3 条 */
+  const visiblePromptCount = Math.max(1, Math.min(MAX_ANNOTATIONS, regionCount));
+  const filledCount = prompts.slice(0, visiblePromptCount).filter((p) => p.trim()).length;
+
   return (
+    <div className={`local-redraw-page${historyCollapsed ? ' history-collapsed' : ''}`}>
     <ToolShell
       capability="local_redraw"
       title="局部重绘"
@@ -324,127 +783,306 @@ export function LocalRedrawPage() {
       upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
       settings={{ ratio: true, resolution: true }}
       submitLabel="开始重绘"
-      emptyDesc="上传图片并涂抹区域、写下描述后，重绘结果将在此处展示"
-      formValid
-      submitting={submitting || preparing}
+      emptyDesc="上传图片并标注区域、写下描述后，重绘结果将在此处展示"
+      formValid={painted && filledCount > 0 && !uploadBusy}
+      submitting={submitting || preparing || uploadBusy}
       result={result}
-      resultTag={painted ? '遮罩涂抹' : REGION_LABEL[region]}
+      resultTag={painted ? '已标注区域' : undefined}
+      resultActions={
+        resultUrl && sourceImage ? (
+          <button type="button" className="tool-result-action" onClick={() => setCompareOpen(true)}>
+            对比
+          </button>
+        ) : null
+      }
       onSubmit={(inputs, settings) => submit(inputs, settings)}
+      trailingPane={historyCollapsed ? undefined : historyPane}
+      sourcePane={(images) => {
+        const image = images[0];
+        if (!image) {
+          return (
+            <div className="redraw-intro">
+              <div className="redraw-intro-art">
+                <LocalRedrawIllustration />
+              </div>
+              <div className="redraw-intro-copy">
+                <h2>局部重绘</h2>
+                <p>只想修改局部？圈出来写描述就行，适合去掉瑕疵、更换图案、修改画面中的元素</p>
+                <ol className="redraw-intro-steps">
+                  <li><b>1</b> 上传图片</li>
+                  <li><b>2</b> 涂抹或框选区域</li>
+                  <li><b>3</b> 填写描述并重绘</li>
+                </ol>
+              </div>
+            </div>
+          );
+        }
+        const renderToolButton = (value: PaintTool) => {
+          const item = TOOLS.find((t) => t.value === value);
+          if (!item) return null;
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.value}
+              type="button"
+              className={`redraw-tool-btn${tool === item.value ? ' active' : ''}`}
+              aria-pressed={tool === item.value}
+              title={`${item.label} (${item.shortcut})`}
+              onClick={() => setTool(item.value)}
+            >
+              <Icon size={16} />
+              {item.label}
+            </button>
+          );
+        };
+        return (
+          <div className="pk-source-pane redraw-stage">
+            <div className="redraw-stage-topbar">
+              <div className="redraw-toolbar" role="toolbar" aria-label="重绘工具">
+                {renderToolButton('hand')}
+                {renderToolButton('eraser')}
+                <button
+                  type="button"
+                  className="redraw-tool-btn"
+                  disabled={!resultUrl || !sourceImage}
+                  title="对比原图与重绘结果"
+                  onClick={() => setCompareOpen(true)}
+                >
+                  对比
+                </button>
+                <span className="redraw-tool-divider" />
+                {renderToolButton('rect')}
+                {renderToolButton('ellipse')}
+                {renderToolButton('brush')}
+                {(tool === 'brush' || tool === 'eraser') && (
+                  <label className="redraw-toolbar-brush">
+                    <span className="sr-only">画笔大小</span>
+                    <input
+                      aria-label="画笔大小"
+                      type="range"
+                      min={10}
+                      max={60}
+                      step={2}
+                      value={brush}
+                      onChange={(e) => setBrush(Number(e.target.value))}
+                    />
+                    <output>{brush}</output>
+                  </label>
+                )}
+              </div>
+            </div>
+            <div className="redraw-canvas-wrap">
+              <MaskPainter
+                url={image.url}
+                tool={tool}
+                brush={brush}
+                zoom={zoom}
+                pan={pan}
+                maxRegions={MAX_ANNOTATIONS}
+                onPanChange={setPan}
+                onRegionLimit={() => message.warning(`最多支持 ${MAX_ANNOTATIONS} 个标注区域，请先撤回或删除一个`) }
+                onChange={handlePaintState}
+                handleRef={painter}
+              />
+            </div>
+            <p className="redraw-mask-hint">
+              {painted
+                ? '标注区域将按描述重绘，其余像素保持不变。'
+                : '还没标注。涂抹、框选或圈选要修改的区域后再提交。'}
+            </p>
+            <div className="redraw-canvas-footer">
+              <button
+                type="button"
+                className="redraw-footer-btn"
+                disabled={!canUndo || uploadBusy}
+                title="撤回 (Ctrl+Z)"
+                onClick={() => painter.current?.undo()}
+              >
+                <Undo2 size={13} />
+                撤回
+              </button>
+              <button
+                type="button"
+                className="redraw-footer-btn"
+                disabled={!canRedo || uploadBusy}
+                title="恢复 (Ctrl+Shift+Z)"
+                onClick={() => painter.current?.redo()}
+              >
+                <Redo2 size={13} />
+                恢复
+              </button>
+              <button type="button" className="redraw-footer-btn" disabled={uploadBusy} onClick={() => painter.current?.clear()}>
+                <RotateCcw size={13} />
+                清空
+              </button>
+              <span className="redraw-tool-divider" />
+              <button type="button" className="redraw-footer-btn redraw-zoom-btn" aria-label="缩小" title="缩小 (-)" onClick={() => setZoom((z) => Math.max(70, z - 10))}>
+                <Minus size={16} />
+              </button>
+              <span className="redraw-zoom-value">{zoom}%</span>
+              <button type="button" className="redraw-footer-btn redraw-zoom-btn" aria-label="放大" title="放大 (+)" onClick={() => setZoom((z) => Math.min(140, z + 10))}>
+                <Plus size={16} />
+              </button>
+            </div>
+            <p className="redraw-shortcut-hint">
+              快捷键：H 抓手 · B 涂抹 · E 擦除 · R 框选 · O 圈选 · Ctrl+Z 撤回 · Ctrl+Shift+Z 恢复 · +/- 缩放
+            </p>
+          </div>
+        );
+      }}
     >
       {(images) => {
+        if (images.length === 0) return null;
         const image = images[0];
         return (
           <>
-            <ToolCard title="重绘区域">
-              <p className="tool-card-copy">
-                在原图上涂抹要重绘的地方。遮罩会随任务一起提交，只有支持图像编辑的通道（openai
-                协议）能接收；其它通道会如实报错并退款，不会默默整图重绘。
-              </p>
-              {image ? (
-                <>
-                  <MaskPainter
-                    url={image.url}
-                    brush={brush}
-                    tool={tool}
-                    onChange={setPainted}
-                    handleRef={painter}
-                  />
-                  <div className="redraw-mask-toolbar">
+            <ToolCard title={`重绘描述（${filledCount}/${MAX_ANNOTATIONS}）`}>
+              {prompts.slice(0, visiblePromptCount).map((prompt, index) => (
+                <div key={index} className={`redraw-prompt${index < regionCount ? '' : ' is-pending'}`}>
+                  {index < regionCount && (
                     <button
                       type="button"
-                      className={`tool-region-chip${tool === 'brush' ? ' active' : ''}`}
-                      aria-pressed={tool === 'brush'}
-                      onClick={() => setTool('brush')}
+                      className="remove-annotation"
+                      aria-label={`删除标注${index + 1}`}
+                      title={`删除标注${index + 1}`}
+                      disabled={uploadBusy}
+                      onClick={() => removeAnnotationAt(index)}
                     >
-                      <Paintbrush size={13} />
-                      画笔
+                      <X size={13} />
                     </button>
-                    <button
-                      type="button"
-                      className={`tool-region-chip${tool === 'eraser' ? ' active' : ''}`}
-                      aria-pressed={tool === 'eraser'}
-                      onClick={() => setTool('eraser')}
+                  )}
+                  <div className="redraw-prompt-head">
+                    <label
+                      className={`redraw-prompt-label${index < regionCount ? ' is-marked' : ' is-pending'}`}
                     >
-                      <Eraser size={13} />
-                      橡皮
-                    </button>
-                    <label className="redraw-mask-brush">
-                      笔刷
-                      <input
-                        type="range"
-                        min={8}
-                        max={96}
-                        step={4}
-                        value={brush}
-                        onChange={(e) => setBrush(Number(e.target.value))}
-                      />
+                      <i />
+                      标注{index + 1}
                     </label>
-                    <button type="button" className="tool-region-chip" onClick={() => painter.current?.clear()}>
-                      <RotateCcw size={13} />
-                      清空
+                    <button
+                      type="button"
+                      className="pk-desc-expand"
+                      aria-label={`放大编辑标注${index + 1}`}
+                      title="放大编辑"
+                      onClick={() => setExpandIndex(index)}
+                    >
+                      <Maximize2 size={14} />
                     </button>
                   </div>
-                  <p className="redraw-mask-hint">
-                    {painted
-                      ? '涂抹区域将按描述重绘，其余像素保持不变。'
-                      : '还没涂。未涂抹时按下面的位置描述提交 —— 那只是提示词里的一句话，并不限定重绘范围。'}
-                  </p>
-                </>
-              ) : (
-                <p className="tool-card-copy">先上传一张图片，再在图上涂抹要重绘的区域。</p>
-              )}
-            </ToolCard>
-
-            <ToolCard title="重绘位置（未涂抹时使用）">
-              <div className="tool-select-row">
-                {REGION_OPTIONS.map((o) => (
-                  <button
-                    key={o.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={o.value === region}
-                    className={`tool-region-chip${o.value === region ? ' active' : ''}`}
-                    onClick={() => setRegion(o.value)}
-                  >
-                    {o.label}
-                  </button>
-                ))}
-              </div>
-            </ToolCard>
-
-            <ToolCard title="这个区域改成什么？">
-              <div className="pk-desc-editor">
-                <textarea
-                  rows={3}
-                  maxLength={1000}
-                  value={prompt}
-                  placeholder="例如：把包装盒改成哑光材质"
-                  onChange={(e) => setPrompt(e.target.value)}
-                />
-                <button
-                  type="button"
-                  className="pk-desc-expand"
-                  aria-label="放大编辑描述"
-                  title="放大编辑"
-                  onClick={() => setExpandOpen(true)}
-                >
-                  <Maximize2 size={14} />
-                </button>
-              </div>
+                  <div className="redraw-prompt-body">
+                    <textarea
+                      rows={2}
+                      maxLength={200}
+                      value={prompt}
+                      placeholder="请输入您要重绘的内容，例如：更换颜色..."
+                      onChange={(e) => setPromptAt(index, e.target.value)}
+                    />
+                    {index < regionCount && regionBounds[index] && image && (
+                      <div className="annotation-mark-preview" title={`标注${index + 1}区域`}>
+                        <img src={image.url} alt={`标注${index + 1}区域`} style={markPreviewStyle(regionBounds[index])} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="redraw-prompt-tools">
+                    <button
+                      type="button"
+                      className="redraw-prompt-ref"
+                      disabled={uploadBusy}
+                      onClick={() => referenceInputs.current[index]?.click()}
+                    >
+                      <ImagePlus size={13} />
+                      {referenceUploading.has(index) ? '上传中…' : references[index] ? '更换参考图' : '上传参考图'}
+                    </button>
+                    {references[index] && (
+                      <span className="redraw-prompt-ref-preview">
+                        <img src={references[index]!.url} alt={`标注${index + 1}参考图`} />
+                        <button
+                          type="button"
+                          aria-label={`移除标注${index + 1}参考图`}
+                          onClick={() =>
+                            setReferences((prev) => prev.map((item, i) => (i === index ? null : item)))
+                          }
+                        >
+                          <X size={11} />
+                        </button>
+                      </span>
+                    )}
+                    <input
+                      ref={(el) => {
+                        referenceInputs.current[index] = el;
+                      }}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      hidden
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        void uploadReference(index, file);
+                        e.target.value = '';
+                      }}
+                    />
+                  </div>
+                </div>
+              ))}
+              <p className="tool-card-copy">
+                多条描述会按标注顺序合并到同一条提示词中；遮罩为当前所有标注合成的一张 PNG。
+              </p>
             </ToolCard>
 
             <ExpandTextModal
-              open={expandOpen}
-              title="编辑重绘描述"
-              value={prompt}
+              open={expandIndex !== null}
+              title={`编辑标注${(expandIndex ?? 0) + 1}`}
+              value={prompts[expandIndex ?? 0] ?? ''}
               maxLength={1000}
               placeholder="例如：把包装盒改成哑光材质"
-              onChange={setPrompt}
-              onClose={() => setExpandOpen(false)}
+              onChange={(v) => setPromptAt(expandIndex ?? 0, v)}
+              onClose={() => setExpandIndex(null)}
             />
           </>
         );
       }}
     </ToolShell>
+
+      <button
+        type="button"
+        className="redraw-history-float-toggle"
+        aria-label="历史记录"
+        title="历史记录"
+        onClick={() => {
+          // 桌面端右栏收起后，浮动按钮把右栏展开；窄屏没有右栏，改用抽屉
+          if (window.matchMedia('(max-width: 1180px)').matches) setHistoryOpen(true);
+          else setHistoryCollapsed(false);
+        }}
+      >
+        <History size={16} />
+      </button>
+
+      <Drawer
+        title="历史记录"
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        size={320}
+        styles={{ body: { padding: 12 } }}
+      >
+        <RedrawHistoryList tasks={history} loading={historyLoading} />
+      </Drawer>
+
+      <Modal
+        open={compareOpen}
+        title="对比原图与重绘结果"
+        footer={null}
+        onCancel={() => setCompareOpen(false)}
+        width={900}
+      >
+        <div className="redraw-compare-grid">
+          <figure>
+            <img src={sourceImage?.url} alt="原图" />
+            <figcaption>原图</figcaption>
+          </figure>
+          <figure>
+            {resultUrl ? <img src={resultUrl} alt="重绘后" /> : <div className="redraw-compare-missing">暂无结果</div>}
+            <figcaption>重绘后</figcaption>
+          </figure>
+        </div>
+      </Modal>
+    </div>
   );
 }

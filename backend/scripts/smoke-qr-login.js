@@ -8,7 +8,7 @@
  * 另验证拒绝分支 (cancelled)、未登录不能扫码、登录审计记 'qr'。
  *
  * 用法 (测试档, 禁止指向开发库):
- *   NODE_ENV=test API_BASE=http://127.0.0.1:4200 node scripts/smoke-qr-login.js
+ *   NODE_ENV=test API_BASE=http://127.0.0.1:4100 node scripts/smoke-qr-login.js
  */
 const { createHash } = require('node:crypto');
 const { PrismaClient } = require('@prisma/client');

@@ -10,7 +10,7 @@
  *   6. 批量启停逐条返回结果; CSV 导入按邮箱匹配并逐行报告
  *
  * 用法（测试档, 禁止指向开发库）:
- *   NODE_ENV=test API_BASE=http://127.0.0.1:4200 node scripts/smoke-tickets-search.js
+ *   NODE_ENV=test API_BASE=http://127.0.0.1:4100 node scripts/smoke-tickets-search.js
  */
 const { PrismaClient } = require('@prisma/client');
 const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');

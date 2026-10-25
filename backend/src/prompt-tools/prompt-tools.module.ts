@@ -15,5 +15,6 @@ import { PromptToolsController } from './prompt-tools.controller';
   imports: [PrismaModule, StorageModule, ProvidersModule],
   controllers: [PromptToolsController],
   providers: [PromptToolsService],
+  exports: [PromptToolsService],
 })
 export class PromptToolsModule {}

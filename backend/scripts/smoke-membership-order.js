@@ -19,7 +19,7 @@
  *   API_BASE   后端地址 (默认 http://127.0.0.1:4100)
  *   NODE_ENV   决定连哪个库 (与 scripts/db-url.js 同一套档位逻辑)
  *
- * 例: NODE_ENV=test API_BASE=http://127.0.0.1:4200 node scripts/smoke-membership-order.js
+ * 例: NODE_ENV=test API_BASE=http://127.0.0.1:4100 node scripts/smoke-membership-order.js
  */
 const { PrismaClient } = require('@prisma/client');
 const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');

@@ -8,7 +8,7 @@
  *   3. 限时免费：进行中的活动把生效价压到 0，活动停用后自动恢复原价
  *
  * 用法:
- *   API_BASE=http://127.0.0.1:4200/api/v1 NODE_ENV=test node scripts/smoke-capability-runtime.js
+ *   API_BASE=http://127.0.0.1:4100/api/v1 NODE_ENV=test node scripts/smoke-capability-runtime.js
  *
  * ⚠ 必须指向**测试环境**：本脚本会建用户 / 建项目 / 开关能力 / 建活动，
  * 全都在清理段回收，但跑在开发库上仍属污染。

@@ -15,7 +15,7 @@
  * （production 档 console 通道不落盘，见 console-outbox.ts）。
  *
  * 用法（测试档）：
- *   API_BASE=http://127.0.0.1:4200 NODE_ENV=test node scripts/smoke-auth.js
+ *   API_BASE=http://127.0.0.1:4100 NODE_ENV=test node scripts/smoke-auth.js
  */
 const { resolve } = require('path');
 const { readFileSync } = require('fs');

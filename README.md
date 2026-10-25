@@ -92,11 +92,11 @@
 
 ```
 aigc-creation/
-├── start.sh                    # 一键启动（--env development|test|prod；避开端口占用 + 建表 + 种子）
+├── start.sh                    # 一键启动（--env development|test|prod；端口占用即停 + 建表 + 种子）
 ├── README.md                   # 本文：现状速查 + 逐轮执行记录
 ├── docs/                       # 分类文档，地图见 docs/README.md
 ├── docker-compose.yml          # 本地编排（默认 dev，--profile test 并行测试档）
-├── backend/                    # NestJS 服务，端口 4100（测试档 4200），全局前缀 /api/v1
+├── backend/                    # NestJS 服务，端口 4100（测试档同端口），全局前缀 /api/v1
 │   ├── prisma/schema.prisma    # 42 个模型；SQLite 无 enum，状态类字段 String + DTO 白名单
 │   ├── prisma.config.ts        # Prisma 7 连接配置（datasource url 移出 schema，按 NODE_ENV 选档）
 │   ├── scripts/                # seed-* / smoke-*（28 个）/ verify-* / probe / db-url
@@ -112,7 +112,7 @@ aigc-creation/
 │   │   └── health/ channels/ storage/ stats/ projects/ assets/ prompt-tools/ mobile-upload/
 │   ├── uploads/{original,generated}/   # 静态服务 GET /uploads/*（UPLOAD_DIR 可改）
 │   └── dev.db                  # 开发库（test.db / 生产库各自独立）
-└── frontend/                   # Vite SPA，端口 5100（测试档 5200）
+└── frontend/                   # Vite SPA，端口 5100（测试档同端口）
     ├── playwright*.ts / tests/ # e2e 配置与用例（`e2e/` 只是脚手架示例）
     └── src/
         ├── pages/              # 34 个 C 端页面 + pages/admin/ 28 个后台页面
@@ -132,7 +132,7 @@ aigc-creation/
 
 ```bash
 ./start.sh                 # 开发档：后端 4100 / 前端 5100
-./start.sh --env test      # 测试档：独立库 test.db / 4200 / 5200（可与开发档并行）
+./start.sh --env test      # 测试档：独立库 test.db，端口同开发（两档不能并行）
 ./start.sh --daemon        # 后台运行（PID 记在 .run/start.pids，脚本随即返回）
 ./start.sh --stop          # 停止后台服务（按 PID 记录 + 仅本仓库进程的端口兜底）
 ```
@@ -156,16 +156,23 @@ npm run dev                # http://localhost:5100
 
 前端 `VITE_API_BASE` **默认留空 = 同源**：开发态由 Vite 把 `/api` 与 `/uploads` 代理到 `VITE_API_PROXY`，生产态由 Nginx 反代；只有跨域部署才填绝对地址（此时后端 `CORS_ORIGINS` 必须包含它）。三环境变量矩阵见 `docs/environments.md`。
 
-### 端口被占用时换端口（本机跑多个项目）
+### 端口固定：被占用时自动停掉，不换端口
 
-5100/4100 被其他项目占用时，用环境变量换到备用端口（代码默认值不变）：
+端口写死，`./start.sh` 发现被占用会**先停掉占用进程再启动**（`free_port`：先 TERM，2 秒不退再 KILL，并打印被杀的 PID 与命令行）。不再回退到 4101/5101 —— 换端口会连带改前端代理与 CORS 来源，结果是「看起来起来了，浏览器访问的还是旧实例」，改的代码像没生效。
 
 ```bash
-# 后端
-PORT=4101 CORS_ORIGINS="http://localhost:5101,http://127.0.0.1:5101" node dist/main.js
+./start.sh                 # 开发：4100 / 5100，占用即停
+./start.sh --env test      # 测试：4100 / 5100（同开发），占用即停，会停掉开发档
+./start.sh --env prod      # 生产：只认 .env.production，端口被占直接失败，不自动杀进程
+```
 
-# 前端
-VITE_PORT=5101 VITE_API_PROXY=http://localhost:4101 VITE_API_BASE=http://localhost:4101 npm run dev
+生产档刻意不自动杀进程：线上端口上的东西可能不是本项目，静默杀掉代价太大，只报错让人确认。
+
+只匹配 **LISTEN** 状态的进程，客户端连接不算（否则会把代理 `/api` 的前端 dev server 一起误杀）。手工排查：
+
+```bash
+lsof -nP -iTCP:4100 -sTCP:LISTEN    # 谁占着后端
+lsof -nP -iTCP:5100 -sTCP:LISTEN    # 谁占着前端
 ```
 
 ### 工作台缩略图种子
@@ -213,23 +220,29 @@ host:port 是否在列表内 —— `localhost` 与 `127.0.0.1` 在 CORS 判定�
 
 ### 端口 / CORS / 代理 / 浏览器巡检
 
-**开发档后端默认占用 4100**（全局前缀 `/api/v1`）。
-若该端口已被其它进程占用，直接 `node dist/main.js` 会 `EADDRINUSE` 失败；若占用者不是本项目，前端登录会静默 404
+**开发档后端固定 4100**（全局前缀 `/api/v1`），前端固定 5100。
+若端口已被其它进程占用，直接 `node dist/main.js` 会 `EADDRINUSE` 失败；若占用者不是本项目，前端登录会静默 404
 （`Cannot POST /api/v1/auth/login`，对方返回的是自己的响应格式）。正确启动方式：
 
 ```bash
-# 后端（项目自带 PORT 开关）
-cd backend && PORT=4101 node dist/main.js        # 不要用 nest start：会触发安全守卫拒绝清空 dist
-# 前端（走 vite 代理，VITE_API_BASE 留空 = 同源）
-cd frontend && VITE_API_PROXY=http://localhost:4101 npx vite --port 5101 --strictPort
+./start.sh          # 端口被占时自动停掉占用进程，端口本身不变
 ```
 
-后端 CORS 只放行 `5100` / `4173`（测试档 5200），**前端必须用 5100**（用 5101 会被 CORS 拦）。
+手工启动（跳过 start.sh）则要自己先释放端口：
+
+```bash
+lsof -nP -iTCP:4100 -sTCP:LISTEN     # 确认占用者
+cd backend && node dist/main.js      # 不要用 nest start：会触发安全守卫拒绝清空 dist
+cd frontend && npm run dev           # 走 vite 代理，VITE_API_BASE 留空 = 同源
+```
+
+后端 CORS 只放行 `5100` / `4173`（三档同一端口），**前端必须用 5100**。手工换端口时后端 CORS 会拦，
+除非同步把新来源加进 `CORS_ORIGINS` —— 这也是 `start.sh` 不再自动换端口的原因。
 
 补充实测细节（2026-10-19，仍有效）：
 
 - 显式设置 `VITE_API_BASE` 后前端走**直连绝对地址**而非 vite 代理，preflight 直接被后端 CORS 拒 —— 换端口无效，除非同步把新来源加进 `CORS_ORIGINS`。
-- vite v8 绑 **IPv6 `::1`**，`127.0.0.1:5101` 不通；curl / playwright 必须用 `localhost`。
+- vite v8 绑 **IPv6 `::1`**，`127.0.0.1:5100` 不通；curl / playwright 必须用 `localhost`。
 - 本机 `HTTP_PROXY=127.0.0.1:49705`，curl 必须加 `--noproxy '*'`。
 - token 的 localStorage key 是 **`ecom_vision_token`**（`frontend/src/lib/auth.ts`）。
 - playwright 巡检必须**同一 context 内顺序 `goto`**：`browser.newPage()` 每次新建 context，

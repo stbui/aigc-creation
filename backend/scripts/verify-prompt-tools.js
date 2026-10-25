@@ -13,8 +13,8 @@
  * ⚠️ 断言要独立于实现: 期望值来自"接口契约 + 参考站实拍文案", 不是从代码反推。
  */
 const BASE = process.env.VERIFY_BASE || 'http://localhost:4100/api/v1';
-// 素材地址要打回**同一个实例**：硬写开发档端口会让脚本在测试档 4200 上跑时
-// 一律 404，看起来像上传失败，实际只是问错了端口。
+// 素材地址要打回**同一个实例**：硬写端口会让脚本在换端口跑时一律 404，
+// 看起来像上传失败，实际只是问错了端口。
 const ORIGIN = BASE.replace(/\/api\/v1\/?$/, '');
 const { ensureTestUser } = require('./lib/test-user');
 

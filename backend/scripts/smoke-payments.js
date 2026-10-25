@@ -22,7 +22,7 @@
  *   API_BASE    后端地址 (默认 http://127.0.0.1:4100)
  *   NODE_ENV    决定连哪个库 (与 scripts/db-url.js 同一套档位)
  *
- * 例: NODE_ENV=test API_BASE=http://127.0.0.1:4200 node scripts/smoke-payments.js
+ * 例: NODE_ENV=test API_BASE=http://127.0.0.1:4100 node scripts/smoke-payments.js
  *
  * 后台动作 (开票审核 / 对账) 需要一个**本脚本新建的**管理员夹具账号:
  * 直接写库建 user(role=admin) + 确保 AdminRole 记录存在。不复用 seed:admin

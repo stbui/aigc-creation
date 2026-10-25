@@ -16,7 +16,7 @@
  *      越界值被夹紧而非抛错，`specKey` 只跟渲染字段走
  *
  * 用法（测试档，禁止指向开发库）:
- *   API_BASE=http://127.0.0.1:4200 NODE_ENV=test node scripts/smoke-aigc.js
+ *   API_BASE=http://127.0.0.1:4100 NODE_ENV=test node scripts/smoke-aigc.js
  *
  * 只跑离线部分（不需要后端）:
  *   node scripts/smoke-aigc.js --offline

@@ -203,7 +203,7 @@ NODE_ENV=test npm run db:reset:test
 1. 确认档位与库路径（见 §0.2），与后端启动日志一致。
 2. 真实起服务、真实调接口、真实查库；不读代码推断行为。
 3. 每条链路五类用例 + 三身份，直接拿请求打后端（前端隐藏按钮不算校验）。
-4. 跑测试档脚本必须给对基址：多数 `API_BASE=http://127.0.0.1:4200`；`smoke-model-channels.js` 用 `SMOKE_BASE`；`smoke-marketing.js` 用 `MARKETING_API_BASE`；`verify-asset-filters.js` / `verify-prompt-tools.js` 用 `VERIFY_BASE`。
+4. 跑测试档脚本必须给对基址：多数 `API_BASE=http://127.0.0.1:4100`（测试档与开发档同端口，先 `./start.sh --env test` 起测试档）；`smoke-model-channels.js` 用 `SMOKE_BASE`；`smoke-marketing.js` 用 `MARKETING_API_BASE`；`verify-asset-filters.js` / `verify-prompt-tools.js` 用 `VERIFY_BASE`。
 5. 每条结论带三件套：命令、关键输出、库或磁盘记录。
 6. 一轮结束清理现场（`clear-ops-data.js`，或按 `docs/testing.md` 的外键顺序），避免残留把下一轮伪造成通过。
 
@@ -351,7 +351,7 @@ duplicate：并入主卡，指向主卡编号
 | L1 后端 | `cd backend && npm run build` | 阶段 6、9、10 | 需授权；不用 `nest start` |
 | L1 前端 | `cd frontend && npm run typecheck` / `npm run build:prod` | 阶段 6、9、10 | 需授权 |
 | L2 架构 | `cd backend && npx ts-node -T scripts/verify-*.ts` | 阶段 6、7、10 | 按改动域挑；`probe-environments.ts` 不连库 |
-| L3 冒烟 | `cd backend && API_BASE=http://127.0.0.1:4200 node scripts/smoke-*.js` | 阶段 7、10 | 测试档必须给 `API_BASE`；其他变量见 §2.7 |
+| L3 冒烟 | `cd backend && NODE_ENV=test API_BASE=http://127.0.0.1:4100 node scripts/smoke-*.js` | 阶段 7、10 | 先起测试档（同端口，会停开发档）；其他变量见 §2.7 |
 | L4 E2E | `cd frontend && npm run e2e` | 阶段 7、10 | 生产不跑 |
 | 依赖 | `cd backend && npm run verify:deps:critical` | 依赖变动时 | 新增依赖后必跑 |
 | 生产 | 只读接口 + `probe-environments.ts` | 阶段 13 | 不跑写入用例、不跑 E2E |

@@ -22,6 +22,18 @@
 | 后台侧栏与页面分组 | `frontend/src/components/admin/AdminLayout.tsx` 的 `MENU` |
 | 测试清单与覆盖矩阵 | `docs/testing.md`；文档分类地图见 `docs/README.md` |
 
+## 账号
+
+可用的管理员账号
+admin@huojue.local	44dXY9gja4VMmTfENyxg
+ops@huojue.local	ksUTeX8t3GCnLyuLby6n
+
+可用的测试账号
+test@admin.com
+dev@admin.com
+uat@admin.com
+
+
 ## 项目概览
 
 **货觉AI · MVP**（2026-10-19 定名；内部代号 `ecom-vision-mvp`，仓库目录 `aigc-creation`）—— 面向电商团队的智能视觉创作平台，页面结构与功能对标 **极画AI 工作台**（https://ijihua.cn/workbench）。
@@ -77,7 +89,7 @@ aigc-creation/
 │   └── *-ref/ · screenshots/ · research/   # 取证截图与一次性调研（不参与分类）
 ├── docker-compose.yml        # 本地编排：默认=dev，--profile test=test（不同卷、不同库）
 ├── .run/                     # backend.log / frontend.log（gitignore）
-├── backend/                  # NestJS 服务，默认端口 4100（测试档 4200），全局前缀 /api/v1
+├── backend/                  # NestJS 服务，端口 4100（测试档同端口），全局前缀 /api/v1
 │   ├── prisma/schema.prisma  # SQLite provider；无 enum，状态类字段一律 String + DTO 白名单
 │   ├── prisma.config.ts      # Prisma 7 连接配置（datasource url 移出 schema；按 NODE_ENV 选档）
 │   ├── Dockerfile            # ★ 三阶段镜像（node:24-slim；deps → build → prod）
@@ -113,7 +125,7 @@ aigc-creation/
 │   ├── logs/                 # AppFileLogger 产物：app-<日期>.log + .error.log（gitignore）
 │   ├── backups/              # 后台备份产物（BACKUP_DIR 可改）
 │   └── dev.db                # 开发库（test.db / prod 库各自独立）
-└── frontend/                 # Vite SPA，端口 5100（测试档 5200）
+└── frontend/                 # Vite SPA，端口 5100（测试档同端口）
     ├── Dockerfile            # ★ 三阶段：deps → build(--mode production) → nginx
     ├── nginx.conf.template   # ★ SPA 回退 + /api 反代 + /uploads 直出（envsubst 模板）
     ├── playwright*.ts / tests/ # e2e 配置与用例（`e2e/` 只是脚手架示例，不是用例目录）
@@ -142,7 +154,7 @@ aigc-creation/
                             #      --daemon（后台，PID 记 .run/start.pids）/ --stop（只停）
                             # 源码比 dist/main.js 新时自动 nest build（不再拿旧构建起服务）
                             #      --env test | --env prod
-./start.sh --env test       # 测试环境（独立库 test.db / 4200 / 5200，可与开发并行）
+./start.sh --env test       # 测试环境（独立库 test.db；端口同开发 4100/5100，两档不能并行）
 ./start.sh --env prod       # 生产环境（需 backend/.env.production 存在）
 
 # 手动启动
@@ -151,6 +163,7 @@ npm run prisma:push         # 建表（首次或 schema 变更后）
 npm run seed                # 预置开发账号（需 SEED_USER_EMAIL；未设置则不建任何账号，幂等）
 npm run build               # nest build
 PORT=4101 node dist/main.js # 不要用 nest start（触发安全守卫拒绝清空 dist）
+                            # 端口被占时用 ./start.sh，它会停掉占用进程并固定在 4100
 
 # 三环境专属命令（后端）
 npm run start:test          # NODE_ENV=test node dist/main.js
@@ -170,7 +183,7 @@ npm run seed:messages       # 五条站内消息模板（只补缺失，不覆�
 
 # 三环境构建（前端）
 npm run dev                 # vite --mode development（5100）
-npm run dev:test            # vite --mode test（5200）
+npm run dev:test            # vite --mode test（5100）
 npm run build:prod          # tsc --noEmit && vite build --mode production
 npm run typecheck           # tsc --noEmit
 npm run e2e                 # Playwright
@@ -180,7 +193,7 @@ cd backend && npx ts-node -T scripts/probe-environments.ts
 
 # Docker（本地编排，dev + test 两个 profile）
 docker compose up -d --build                # 开发（13001 / 15173）
-docker compose --profile test up -d --build # 开发 + 测试并行
+docker compose --profile test up -d --build # 开发 + 测试并行（容器端口 13001/13101 各自独立）
 docker compose down -v                      # 连数据卷一起删
 
 # 冒烟验证（需后端已启动；28 个脚本）
@@ -230,7 +243,7 @@ node scripts/verify-deps.js --quiet           # 仅结论，有致命问题 exit
 
 **开发账号（非演示账号）**：2026-10-22 起前端不再硬编码任何账号密码，登录页也没有「填充演示账号」。预置账号完全由环境变量决定：`SEED_USER_EMAIL=dev@example.com npm run seed`（密码可由 `SEED_USER_PASSWORD` 指定，未指定则随机生成并**只打印一次**）；未设置 `SEED_USER_EMAIL` 时 `npm run seed` **什么都不建并 exit 0**。可选初始积分 `SEED_USER_CREDITS`（默认 0，不再有「演示账号自带 100 积分」）。首次上传时前端自动创建「默认项目」。后台账号另外用 `npm run seed:admin` 生成，与普通账号是两套（见「环境注意事项」第 8 条）。
 
-冒烟脚本的后端地址：多数用 `API_BASE`（默认 `http://localhost:4100`），`smoke-model-channels.js` 用 `SMOKE_BASE`（默认 3005），`smoke-marketing.js` 用 `MARKETING_API_BASE`（默认 4100，含 `/api/v1`）。**跑测试档必须给 `API_BASE=http://127.0.0.1:4200`**，否则会连到开发档 4100 上那个进程。
+冒烟脚本的后端地址：多数用 `API_BASE`（默认 `http://localhost:4100`），`smoke-model-channels.js` 用 `SMOKE_BASE`（默认 3005），`smoke-marketing.js` 用 `MARKETING_API_BASE`（默认 4100，含 `/api/v1`）。**测试档与开发档端口相同（4100），跑测试档前必须先停掉开发档**（`./start.sh --env test` 会自动停），否则脚本打到的是开发库上的实例。
 
 **环境相关的完整说明见 `docs/environments.md`** —— 变量矩阵、加载优先级、生产门禁、Docker 与排查清单。
 
@@ -398,7 +411,7 @@ generate.service / prompt-tools
 | 上传目录 | `uploads` | `uploads-test` | 绝对路径 + 卷 |
 | 备份目录 | `backups` | `backups-test` | 绝对路径 + 卷 |
 | 日志目录 | `logs` | `logs/test` | 绝对路径 + 卷 |
-| 端口（后端/前端） | 4100 / 5100 | 4200 / 5200 | 由 env 文件决定 |
+| 端口（后端/前端） | 4100 / 5100 | 4100 / 5100（同开发，两档不能并行） | 由 env 文件决定 |
 
 档位选择逻辑在 `src/config/env-files.ts`（Nest 侧）与 `scripts/db-url.js`（脚本侧，**必须与前者逐字一致**，否则会出现「Nest 连 test.db、seed 往 dev.db 塞数据」的错位）。两条硬规则：
 
@@ -691,13 +704,13 @@ Jimp 内置字体仅含 ASCII，故生成图内文案为英文（如 `AI MAIN IM
 
 ## 环境注意事项（踩坑，务必遵守）
 
-1. **开发档后端默认占用 4100**（全局前缀 `/api/v1`）。
+1. **开发档后端固定 4100**（全局前缀 `/api/v1`），前端固定 5100。
    - 端口已被其它进程占用时，直接 `node dist/main.js` 会 `EADDRINUSE`；
    - 若占用者不是本项目，前端登录会**静默 404**（`Cannot POST /api/v1/auth/login`，对方返回自己的响应格式，不报错）。
-   - 正确做法：`PORT=4101 node dist/main.js`，前端 `VITE_API_PROXY=http://localhost:4101 npx vite --port 5101 --strictPort`。
-   - 或直接用 `./start.sh`（自动挑空闲端口并同步注入 CORS）。
+   - 正确做法：`./start.sh`（端口固定，占用即停掉占用进程再起，不回退到 4101/5101）。
+   - 生产档不自动杀进程：端口被占直接失败，需人工确认（线上端口上的东西可能不是本项目）。
 2. **不要用 `nest start`** —— 会触发安全守卫拒绝清空 `dist`。用 `npm run build` + `node dist/main.js`。
-3. **CORS 只放行 5100 / 4173**（默认），前端必须用 5100，用 5101 会被拦（测试档放行 5200）。
+3. **CORS 只放行 5100 / 4173**（默认），前端必须用 5100（三档同一端口）。
    - `CORS_ORIGINS`：逗号分隔显式白名单，**给定时覆盖其余规则**（生产用这个）。
    - `CORS_ALLOW_PRIVATE_LAN=1`：额外放行私有网段任意端口（`10.` / `172.16-31.` / `192.168.`，供手机同 WiFi 调试）。
    - 排错顺序：先看后端启动日志那行 `CORS origins: ...`，再核对浏览器地址栏 host:port。**`localhost` 与 `127.0.0.1` 在 CORS 判定上是不同来源，不能互换。**

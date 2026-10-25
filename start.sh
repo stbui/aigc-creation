@@ -3,8 +3,8 @@
 # ecom-vision-mvp 一键启动脚本
 # =============================
 # 按项目既有约定拉起「后端 (NestJS/dist) + 前端 (Vite)」，并处理本机已记录的坑：
-#   1. 4100 可能已被其它进程占用 → 自动回退到 4101/4102
-#   2. 前端必须落在后端 CORS 放行的来源上 → 前端换端口时自动注入 CORS_ORIGINS
+#   1. 端口固定不变（4100 / 5100）：被占用时直接停掉占用进程，绝不回退到 4101/5101
+#   2. 前端必须落在后端 CORS 放行的来源上 → 显式覆盖 FRONTEND_PORT 时自动注入 CORS_ORIGINS
 #   3. 不能用 `nest start`（会触发安全守卫拒绝清空 dist）→ 只跑 node dist/main.js
 #   4. 首次运行自动建表 (prisma db push) 并 provision 演示账号 (seed，幂等)
 #   5. Node 需 >= 22.5（依赖内置 node:sqlite）
@@ -12,8 +12,11 @@
 # 三环境（2026-10-20 起）
 # ---------------------
 #   ./start.sh               开发：库 dev.db  目录 uploads      前端 5100/后端 4100
-#   ./start.sh --env test     测试：库 test.db 目录 uploads-test  前端 5200/后端 4200
+#   ./start.sh --env test     测试：库 test.db 目录 uploads-test  端口同开发（4100/5100）
 #   ./start.sh --env prod     生产：读 .env.production，端口与库全由该文件决定
+#
+# 测试档与开发档**端口相同**，因此不能同时跑：起测试档会停掉开发档，反之亦然。
+# 两档的隔离靠库/上传目录/日志目录/JWT 密钥（见 backend/.env.{env}），不靠端口。
 #
 # 各环境的库/目录/密钥差异由 backend/.env.{env} 与 frontend/.env.{env} 承载
 # （详见 docs/environments.md），本脚本只负责把 NODE_ENV 与 --mode 串起来，
@@ -21,7 +24,7 @@
 #
 # 用法:
 #   ./start.sh                # 默认：必要时构建后端 → 建表+种子 → 起后端 → 起前端
-#   ./start.sh --env test     # 起测试环境（独立库，独立上传目录，独立端口）
+#   ./start.sh --env test     # 起测试环境（独立库/上传目录/密钥，端口与开发相同）
 #   ./start.sh --env prod     # 起生产环境（需 .env.production 存在）
 #   ./start.sh --build        # 强制重新构建后端
 #   ./start.sh --skip-db      # 跳过建表与演示账号种子
@@ -34,9 +37,11 @@
 #   ./start.sh --stop         # 停止 --daemon 起的进程（按 PID 记录 + 端口兜底，只动本仓库的进程）
 #   ./start.sh -h | --help    # 查看帮助
 #
-# 端口可用环境变量覆盖（不设则按环境默认，开发态仍自动挑选空闲端口）:
-#   BACKEND_PORT   开发默认 4100→4101→4102 取第一个空闲；test/prod 用 env 文件值
-#   FRONTEND_PORT  开发默认 5100→5101→5102；test 默认 5200
+# 端口固定（不回落）：被占用时先停掉占用进程再启动，绝不换端口。
+#   BACKEND_PORT   显式覆盖后端端口（默认取 env 文件的 PORT，三档均为 4100）
+#   FRONTEND_PORT  显式覆盖前端端口（默认取 env 文件的 VITE_PORT，三档均为 5100）
+# 为什么固定：换端口会连带改前端代理与 CORS 来源，结果是「看起来起来了，
+# 浏览器访问的还是旧实例」，改的代码像没生效。生产档不自动停占用进程（见下）。
 #
 # 停止: 前台按 Ctrl+C 即会同时关闭前后端；后台用 ./start.sh --stop。
 
@@ -51,6 +56,8 @@ BACKEND_LOG="$LOG_DIR/backend.log"
 FRONTEND_LOG="$LOG_DIR/frontend.log"
 # 后台模式的 PID 记录：一行一个 pid（后端、前端）。
 # 放 .run/ 是因为它已进 .gitignore，且与日志同处一地，排障时只看一个目录。
+# 只留一份：三档端口相同，同一时刻只有一个实例能跑，按环境分文件反而
+# 会让「起测试档」漏掉上一轮开发档的记录。
 PID_FILE="$LOG_DIR/start.pids"
 
 # foreground = 前台（默认，Ctrl+C 全停）；daemon = nohup 脱离；stop = 只停
@@ -90,21 +97,24 @@ usage() {
 }
 
 # ────────────────────────────── 参数解析 ──────────────────────────────
-for arg in "$@"; do
-  case "$arg" in
-    --env)         shift; APP_ENV="${1:-}"; [ -n "$APP_ENV" ] || { c_err '--env 缺参数'; exit 2; }; shift ;;
-    --env=*)       APP_ENV="${arg#--env=}" ;;
-    --build)       DO_BUILD=1 ;;
-    --skip-db)SKIP_DB=1 ;;
-    --with-thumbs) WITH_THUMBS=1 ;;
-    --install)     DO_INSTALL=1 ;;
-    --backend-only)RUN_FRONTEND=0 ;;
-    --frontend-only) RUN_BACKEND=0 ;;
-    --no-follow)   FOLLOW=0 ;;
-    --daemon)      MODE=daemon ;;
-    --stop)        MODE=stop ;;
+# 必须用 while + shift：写成 `for arg in "$@"` 时循环列表在进入前就固定了，
+# 里面 shift 只挪位置参数不动循环列表，于是 `--env test` 的 "test" 会在下一轮
+# 被当成未知参数报错 —— 而 README/文档里全是用这个写法。
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --env)         APP_ENV="${2:-}"; [ -n "$APP_ENV" ] || { c_err '--env 缺参数'; exit 2; }; shift 2 ;;
+    --env=*)       APP_ENV="${1#--env=}"; shift ;;
+    --build)       DO_BUILD=1; shift ;;
+    --skip-db)     SKIP_DB=1; shift ;;
+    --with-thumbs) WITH_THUMBS=1; shift ;;
+    --install)     DO_INSTALL=1; shift ;;
+    --backend-only)  RUN_FRONTEND=0; shift ;;
+    --frontend-only) RUN_BACKEND=0; shift ;;
+    --no-follow)   FOLLOW=0; shift ;;
+    --daemon)      MODE=daemon; shift ;;
+    --stop)        MODE=stop; shift ;;
     -h|--help)     usage ;;
-    *) c_err "未知参数: $arg（用 --help 查看用法）"; exit 2 ;;
+    *) c_err "未知参数: $1（用 --help 查看用法）"; exit 2 ;;
   esac
 done
 
@@ -146,12 +156,66 @@ cleanup() {
   c_ok '已退出。'
 }
 
+# ────────────────────────────── 端口探测 ──────────────────────────────
+# 只取 **LISTEN** 状态的进程。`lsof -ti :PORT` 会把「连到这个端口的客户端」
+# 一并列出来（浏览器、代理进程都算），拿它去 kill 会误杀一大片。
+# 参数顺序也有讲究：`-t` 必须单独给、且让端口过滤在前，
+# 写成 `lsof -ti -nP -iTCP:…` 时 -t 后面紧跟的 i 被当成文件名，选择条件全丢，
+# 结果变成「列出所有网络连接」—— 这是本脚本上一版差点造成的误杀。
+port_listeners() {
+  lsof -nP -iTCP:"$1" -sTCP:LISTEN -t 2>/dev/null || true
+}
+
+port_in_use() {
+  [ -n "$(port_listeners "$1")" ]
+}
+
+# 停掉监听某端口的进程 —— 端口固定，被占用就停掉，绝不换端口。
+# 先 TERM 给它正常收尾的机会，2 秒内没退出再 KILL。
+# 打一行「杀了谁」：悄悄杀掉一个不认识的进程，事后没人能复现当时发生了什么。
+free_port() {
+  local port="$1" pids pid i
+  pids="$(port_listeners "$port")"
+  [ -z "$pids" ] && return 0
+  for pid in $pids; do
+    c_warn "  端口 $port 被占用 → 停止 PID $pid: $(ps -o command= -p "$pid" 2>/dev/null | cut -c1-100 || true)"
+    kill "$pid" 2>/dev/null || true
+  done
+  for i in $(seq 1 10); do
+    port_in_use "$port" || { c_info "  端口 $port 已释放"; return 0; }
+    sleep 0.2
+  done
+  for pid in $pids; do kill -9 "$pid" 2>/dev/null || true; done
+  sleep 0.3
+  if port_in_use "$port"; then
+    c_err "  端口 $port 仍被占用（可能属于 root 或受系统保护），请手动处理：lsof -i :$port"
+    return 1
+  fi
+  c_info "  端口 $port 已强制释放"
+  return 0
+}
+
+# 端口占用处理策略：development / test 直接停掉占用进程（本机开发常态）；
+# production 不自动杀 —— 线上 4100 上的东西可能不是本项目，静默杀掉代价太大，
+# 这里只报错让人确认。
+ensure_port_free() {
+  local label="$1" port="$2"
+  if [ "$APP_ENV" = production ]; then
+    if port_in_use "$port"; then
+      c_err "$label端口 $port 已被占用。生产不自动停进程 —— 请先手动释放或改 .env.production"
+      return 1
+    fi
+    return 0
+  fi
+  free_port "$port"
+}
+
 # 只回收「工作目录属于本仓库」的监听进程 —— 4100 上可能跑着别人的服务，
 # 按端口无条件 kill -9 会误伤，所以必须再确认一次 cwd。
 # 注意：macOS 的 lsof -p 不一定能读到 cwd，读不到就一律跳过（宁可留进程，不可杀错）。
 kill_repo_listener() {
   local port="$1" pid
-  for pid in $(lsof -ti :"$port" 2>/dev/null || true); do
+  for pid in $(port_listeners "$port"); do
     if lsof -a -p "$pid" -d cwd -Fn 2>/dev/null | grep -q "$ROOT"; then
       kill_tree "$pid" && c_info "  释放端口 $port (PID $pid)"
     fi
@@ -159,8 +223,9 @@ kill_repo_listener() {
 }
 
 # ── --stop：停掉上一轮 --daemon（或遗留的）进程，不做别的 ──
+# 三档端口相同，所以停止不区分环境：停掉的就是占着 4100/5100 的那个实例。
 if [ "$MODE" = stop ]; then
-  step '停止后台服务'
+  step "停止后台服务"
   if [ -f "$PID_FILE" ]; then
     while read -r pid; do
       [ -n "$pid" ] && kill_tree "$pid"
@@ -170,9 +235,16 @@ if [ "$MODE" = stop ]; then
   else
     c_warn "没有 $PID_FILE，改为按端口回收本仓库进程"
   fi
-  # 兜底：PID 记录丢失（换终端/manual kill）时，按各环境默认端口清一遍。
-  # 后四个旧端口（3001/3101/5173/5273）一并保留，用于回收本次改端口前遗留的实例。
-  for p in 4100 4101 4102 4200 5100 5101 5102 5200 3001 3101 5173 5273; do
+  # 兜底：PID 记录丢失（换终端 / 手动 kill）时，按端口清一遍。
+  # 旧端口（4101/4102、5101/5102、4200/5200、3001/3101/5173/5273）一并保留，
+  # 用于回收「端口还允许回退 / 测试档曾用 4200」那些版本遗留的实例。
+  # 生产端口从 .env.production 现读（read_env_port 在后面才定义，这里不调用）。
+  if [ "$APP_ENV" = production ]; then
+    STOP_PORTS="$(grep -E '^PORT=' "$BACKEND_DIR/.env.production" 2>/dev/null | tail -n1 | cut -d= -f2- | tr -d '[:space:]')"
+  else
+    STOP_PORTS="4100 4101 4102 5100 5101 5102 4200 5200 3001 3101 5173 5273"
+  fi
+  for p in $STOP_PORTS; do
     kill_repo_listener "$p"
   done
   c_ok '已停止。'
@@ -186,8 +258,8 @@ if [ "$MODE" = foreground ]; then
 fi
 
 # 上一轮起的进程还在（常见于 --daemon 忘了停）：先停掉再起。
-# 不停的话端口被占，脚本会按候选序列悄悄落到 4101/5101 —— 前端代理也跟着变，
-# 看起来「启动了」，但你访问的旧实例还在，改的代码像没生效。
+# 现在端口固定，残留进程会占住 4100/5100，后续由 free_port 兜底处理；
+# 这里先按 PID 记录精确回收，日志里就不会出现「杀了一个不认识的 PID」。
 if [ -f "$PID_FILE" ]; then
   c_info '发现上一轮记录的服务，先停止…'
   while read -r pid; do
@@ -195,20 +267,6 @@ if [ -f "$PID_FILE" ]; then
   done < "$PID_FILE"
   rm -f "$PID_FILE"
 fi
-
-# ────────────────────────────── 端口探测 ──────────────────────────────
-port_in_use() {
-  lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1
-}
-
-# 在候选端口里挑第一个空闲的
-pick_port() {
-  local p
-  for p in "$@"; do
-    if ! port_in_use "$p"; then echo "$p"; return 0; fi
-  done
-  return 1
-}
 
 # ────────────────────────────── 环境检查 ──────────────────────────────
 step '检查运行环境'
@@ -257,23 +315,19 @@ check_modules() {
 mkdir -p "$LOG_DIR"
 
 # ────────────────────────────── 选择端口 ──────────────────────────────
-# 各环境的默认端口与候选序列不同：
-#   development 4100-4102 / 5100-5102（开发态要能绕开本机端口占用）
-#   test        4200 / 5200（固定 —— 与开发并行是常态，且 env 文件里已写死）
-#   production  只认 env 文件，不回退（端口被占就该起不来）
-BACKEND_CANDIDATES=""
-FRONTEND_CANDIDATES=""
-case "$APP_ENV" in
-  development) BACKEND_CANDIDATES="4100 4101 4102"; FRONTEND_CANDIDATES="5100 5101 5102" ;;
-  test)        BACKEND_CANDIDATES="4200";           FRONTEND_CANDIDATES="5200" ;;
-  production)  BACKEND_CANDIDATES="";               FRONTEND_CANDIDATES="" ;;
-esac
+# 端口固定不变，被占用就停掉占用进程（见 ensure_port_free），绝不回退到备用端口：
+#   development 4100 / 5100
+#   test        4100 / 5100（与开发相同 —— 两档不能同时跑，隔离靠库/目录/密钥）
+#   production  只认 env 文件（端口被占不自动杀进程，直接失败）
+# 显式传 BACKEND_PORT / FRONTEND_PORT 可覆盖，但仍然固定使用该值。
 
-# 从 env 文件读该环境的默认端口（读不到就用上面的候选首项）
+# 从 env 文件读该环境的默认端口（读不到用兜底值）
+# PORT 在 backend/.env.{env}，VITE_PORT 在 frontend/.env.{env} —— 两边分开读，
+# 别拿后端的文件去找 VITE_PORT（找不到就静默落到兜底值，端口就悄悄变了）。
 read_env_port() {
-  local env_file="$BACKEND_DIR/.env.$APP_ENV" var="$1" fallback="$2" val
+  local dir="$1" var="$2" fallback="$3" val env_file="$1/.env.$APP_ENV"
   if [ "$APP_ENV" = production ]; then
-    env_file="$BACKEND_DIR/.env.production"
+    env_file="$dir/.env.production"
   fi
   if [ -f "$env_file" ]; then
     val="$(grep -E "^${var}=" "$env_file" | tail -n1 | cut -d= -f2- | tr -d '[:space:]' || true)"
@@ -281,48 +335,22 @@ read_env_port() {
   [ -n "$val" ] && printf '%s' "$val" || printf '%s' "$fallback"
 }
 
-ENV_BACKEND_PORT="$(read_env_port PORT "$( [ -n "$BACKEND_CANDIDATES" ] && printf '%s' "${BACKEND_CANDIDATES%% *}" || printf '%s' 4100 )")"
-ENV_FRONTEND_PORT="$(read_env_port VITE_PORT "$( [ -n "$FRONTEND_CANDIDATES" ] && printf '%s' "${FRONTEND_CANDIDATES%% *}" || printf '%s' 4173 )")"
+ENV_BACKEND_PORT="$(read_env_port "$BACKEND_DIR" PORT 4100)"
+ENV_FRONTEND_PORT="$(read_env_port "$FRONTEND_DIR" VITE_PORT 5100)"
 
-step '分配端口'
+step '分配端口（固定，不回落）'
 
-if [ -n "${BACKEND_PORT:-}" ]; then
-  if [ "$RUN_BACKEND" -eq 1 ] && port_in_use "$BACKEND_PORT"; then
-    c_warn "指定的 BACKEND_PORT=$BACKEND_PORT 已被占用，仍尝试使用（若失败请换端口）"
-  fi
+if [ "$RUN_BACKEND" -eq 1 ]; then
+  BACKEND_PORT="${BACKEND_PORT:-$ENV_BACKEND_PORT}"
+  ensure_port_free '后端' "$BACKEND_PORT" || exit 1
 else
-  if [ "$RUN_BACKEND" -eq 1 ]; then
-    # 先试 env 文件里的端口，被占再按候选序列回退（生产无候选 → 直接失败）
-    if [ "$APP_ENV" = production ]; then
-      if port_in_use "$ENV_BACKEND_PORT"; then
-        c_err "生产端口 $ENV_BACKEND_PORT 已被占用。生产不做端口回退 —— 请先释放该端口或改 .env.production 的PORT"
-        exit 1
-      fi
-      BACKEND_PORT="$ENV_BACKEND_PORT"
-    elif ! BACKEND_PORT="$(pick_port "$ENV_BACKEND_PORT" $BACKEND_CANDIDATES)"; then
-      c_err "$BACKEND_CANDIDATES 均被占用，请用 BACKEND_PORT=<空闲端口> ./start.sh"; exit 1
-    fi
-    [ "$BACKEND_PORT" != "$ENV_BACKEND_PORT" ] && c_warn "$ENV_BACKEND_PORT 被占用，后端改用 $BACKEND_PORT"
-  else
-    # --frontend-only：后端由用户自己跑，指向该环境的默认端口，不探测
-    BACKEND_PORT="$ENV_BACKEND_PORT"
-  fi
+  # --frontend-only：后端由用户自己跑，指向该环境的默认端口，不探测
+  BACKEND_PORT="${BACKEND_PORT:-$ENV_BACKEND_PORT}"
 fi
 
 if [ "$RUN_FRONTEND" -eq 1 ]; then
-  if [ -n "${FRONTEND_PORT:-}" ]; then
-    if port_in_use "$FRONTEND_PORT"; then
-      c_err "指定的 FRONTEND_PORT=$FRONTEND_PORT 已被占用（Vite 用 --strictPort 会直接失败）"; exit 1
-    fi
-  elif [ "$APP_ENV" = production ]; then
-    if port_in_use "$ENV_FRONTEND_PORT"; then
-      c_err "生产前端端口 $ENV_FRONTEND_PORT 已被占用"; exit 1
-    fi
-    FRONTEND_PORT="$ENV_FRONTEND_PORT"
-  elif ! FRONTEND_PORT="$(pick_port "$ENV_FRONTEND_PORT" $FRONTEND_CANDIDATES)"; then
-    c_err "$FRONTEND_CANDIDATES 均被占用，请用 FRONTEND_PORT=<空闲端口> ./start.sh"; exit 1
-  fi
-  [ "$FRONTEND_PORT" != "$ENV_FRONTEND_PORT" ] && c_warn "$ENV_FRONTEND_PORT 被占用，前端改用 $FRONTEND_PORT"
+  FRONTEND_PORT="${FRONTEND_PORT:-$ENV_FRONTEND_PORT}"
+  ensure_port_free '前端' "$FRONTEND_PORT" || exit 1
 fi
 
 # 后端 CORS：test/production 由各自 env 文件显式给白名单；开发态前端换端口时注入。

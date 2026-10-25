@@ -9,7 +9,7 @@
  *   5. 法务已发布版本不可原地覆盖; 发布新版本会把旧版本归档
  *
  * 用法（测试档, 禁止指向开发库）:
- *   API_BASE=http://127.0.0.1:4200 NODE_ENV=test node scripts/smoke-notifications.js
+ *   API_BASE=http://127.0.0.1:4100 NODE_ENV=test node scripts/smoke-notifications.js
  */
 const { PrismaClient } = require('@prisma/client');
 const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');

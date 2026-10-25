@@ -177,9 +177,11 @@ section('三档 env 文件实际内容（读取仓库真实文件）');
   check('三环境上传目录互不相同', new Set([dev.UPLOAD_DIR, test.UPLOAD_DIR, prodSample.UPLOAD_DIR]).size === 3);
 
   check('测试 JWT 密钥 ≠ 开发', (test.JWT_SECRET || '') !== (dev.JWT_SECRET || ''));
-  check('测试端口 4200 ≠ 开发 4100', test.PORT !== dev.PORT, `${test.PORT} vs ${dev.PORT}`);
+  // 端口刻意与开发档相同（4100）：隔离靠库/目录/密钥，不靠端口。
+  // 端口一变，冒烟脚本的 API_BASE、CORS 白名单、前端代理都得跟着改，
+  // 忘一处就静默连到另一个实例上 —— 这种错查起来比重启一次贵得多。
   check('开发端口 = 4100', dev.PORT === '4100', dev.PORT);
-  check('测试端口 = 4200', test.PORT === '4200', test.PORT);
+  check('测试端口与开发相同（4100）', test.PORT === dev.PORT, `${test.PORT} vs ${dev.PORT}`);
   check('生产 HOST=0.0.0.0（容器必须对外监听）', prodSample.HOST === '0.0.0.0', prodSample.HOST);
   check('开发 HOST=127.0.0.1（不暴露局域网）', dev.HOST === '127.0.0.1');
   check('生产 CORS_ORIGINS 非空（留空会只放行本机端口）', (prodSample.CORS_ORIGINS || '').trim() !== '');

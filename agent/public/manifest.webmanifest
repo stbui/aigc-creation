@@ -1,0 +1,17 @@
+{
+  "name": "Codex Web",
+  "short_name": "Codex Web",
+  "description": "A local web workspace for the Codex SDK",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b0d10",
+  "theme_color": "#0b0d10",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
