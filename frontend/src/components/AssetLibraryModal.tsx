@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { App, Modal } from 'antd';
 import { ChevronDown, Search, X } from 'lucide-react';
 import { assetSrc, assetsApi } from '../lib/api';
+import { useAuth } from '../context/AuthContext';
 import { StateEmpty, StateError, StateLoading } from './StateViews';
 import { ResultMedia, modalityOfFormat } from './ResultMedia';
 import type { Asset } from '../types/api';
@@ -81,8 +82,16 @@ export function useAssetLibrary(onPick: (asset: Asset) => void | boolean): UseAs
    */
   const [error, setError] = useState<string | null>(null);
   const { message } = App.useApp();
+  const { token, openLogin } = useAuth();
 
   const openLibrary = useCallback(() => {
+    // 素材库是账号数据。未登录直接打开选择器只会拿到 401，并在弹窗里
+    // 显示「素材库加载失败」—— 把「需要登录」误报成「服务坏了」。
+    // 与提交/上传入口一致，先唤起登录弹窗，登录后用户再点一次即可。
+    if (!token) {
+      openLogin();
+      return;
+    }
     setOpen(true);
     setLoading(true);
     setError(null);
@@ -97,7 +106,7 @@ export function useAssetLibrary(onPick: (asset: Asset) => void | boolean): UseAs
         message.error('素材库加载失败');
       })
       .finally(() => setLoading(false));
-  }, [message]);
+  }, [message, openLogin, token]);
 
   const closeLibrary = useCallback(() => setOpen(false), []);
 
@@ -450,7 +459,9 @@ export function AssetLibraryModal({
               disabled={selected.length === 0}
               onClick={confirm}
             >
-              可多选 · 选择
+              {/* 单选入口（如 SKU 模板图）明确写「使用此素材」，避免用户
+                  在已选 1 张后仍找不到完成导入的按钮。 */}
+              {maxSelectable === 1 ? '使用此素材' : '可多选 · 选择'}
             </button>
           </div>
         </div>

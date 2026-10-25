@@ -11,6 +11,7 @@ import { Jimp, loadFont, JimpMime, rgbaToInt } from 'jimp';
 type Img = any;
 import { ImageProvider, ImageProviderResult } from './image-provider.interface';
 import { getCapability, sanitizeParams, parseDetailSections } from '../capabilities/capability.registry';
+import { parseSkuRegions, resolveSkuColor, type SkuRegionBox } from '../capabilities/definitions/sku_image';
 
 /**
  * 本地 Provider —— 只做**真实**像素算法, 不含任何占位图。
@@ -1006,6 +1007,12 @@ export class LocalImageProvider implements ImageProvider {
     const headH = Math.round(H * 0.09);
     const footH = Math.round(H * 0.34);
 
+    // 新链路有真实框选坐标: 保留整张模板, 只在框内叠加当前 SKU 的变体信息。
+    const regions = parseSkuRegions(params.regions);
+    if (regions.length > 0) {
+      return this.makeSkuRegionComposite(src, W, H, regions, params);
+    }
+
     const canvas = new Jimp({ width: W, height: H, color: 0xffffffff });
 
     // 标题条: 品牌紫细条 + 左对齐标题 (Jimp 无中文字体, 用 ASCII 版式名)
@@ -1044,8 +1051,7 @@ export class LocalImageProvider implements ImageProvider {
 
     // 规格区: 色卡 + 表格 + 变体条
     const footY = H - footH;
-    const colorKey = String(params.skuColor ?? '#FFFFFF');
-    const hex = (colorKey === 'custom' ? String(params.customColor ?? '') : colorKey).toUpperCase();
+    const hex = resolveSkuColor(params).toUpperCase();
     const rgb = hexToRgb(hex);
     const chip = Math.round(W * 0.07);
     const chipX = pad;
@@ -1084,6 +1090,72 @@ export class LocalImageProvider implements ImageProvider {
     });
 
     await drawFooterBar(canvas, `SKU TEMPLATE region ${params.region} ${W}x${H}`);
+    return { kind: 'image' as const, buffer: await canvas.getBuffer(JimpMime.jpeg), format: 'image/jpeg' };
+  }
+
+  /**
+   * 框选版 SKU 合成 (本地兜底)。
+   *
+   * 与上方固定版式的区别: 这里**不重排模板**, 而是把原模板按比例放进输出画布,
+   * 再把前端框选的归一化坐标映射到实际像素, 在框内叠加当前 SKU 的颜色与名称。
+   * 因此用户换了框选位置, 本地产出也会跟着变; 区域数量/位置不再被枚举吞掉。
+   */
+  private async makeSkuRegionComposite(
+    src: Img,
+    W: number,
+    H: number,
+    regions: SkuRegionBox[],
+    params: Record<string, any>,
+  ): Promise<ImageProviderResult> {
+    const canvas = new Jimp({ width: W, height: H, color: 0xffffffff });
+    const scale = Math.min(W / src.bitmap.width, H / src.bitmap.height);
+    const drawW = Math.max(1, Math.round(src.bitmap.width * scale));
+    const drawH = Math.max(1, Math.round(src.bitmap.height * scale));
+    const offX = Math.round((W - drawW) / 2);
+    const offY = Math.round((H - drawH) / 2);
+    canvas.composite(src.clone().resize({ w: drawW, h: drawH }), offX, offY);
+
+    const hex = resolveSkuColor(params).toUpperCase();
+    const rgb = hexToRgb(hex);
+    const sku = asciiOnly(params.skuName, 32) || 'CLASSIC-BLACK-M';
+    const fontPx = W >= 1600 ? 64 : 32;
+    const border = Math.max(2, Math.round(W / 512));
+
+    for (const [index, region] of regions.entries()) {
+      const x = clampInt(Math.round(offX + region.x * drawW), 0, W - 1);
+      const y = clampInt(Math.round(offY + region.y * drawH), 0, H - 1);
+      const w = Math.max(2, Math.min(W - x, Math.round(region.width * drawW)));
+      const h = Math.max(2, Math.min(H - y, Math.round(region.height * drawH)));
+
+      // 半透明 SKU 色块: 既保留模板细节, 又让框选位置对产出可见。
+      canvas.composite(
+        new Jimp({ width: w, height: h, color: rgbaToInt(rgb.r, rgb.g, rgb.b, 64) }),
+        x,
+        y,
+      );
+      drawRectBorder(canvas, x, y, w, h, border, 0x5546d8ff);
+
+      // 角标 (1/2/3) 证明该区域确实参与合成; 区域太小则只画框。
+      const badge = fontPx + 8;
+      if (w >= badge && h >= badge) {
+        canvas.composite(new Jimp({ width: badge, height: badge, color: 0x5546d8ff }), x, y);
+        await printText(canvas, String(index + 1), x + 4, y + 1, 'white');
+      }
+
+      // 只在空间足够的区域写入 SKU 名称; 避免大字号文字溢出框外。
+      const labelW = w - badge - 12;
+      const maxChars = Math.max(0, Math.floor(labelW / (fontPx * 0.6)));
+      if (maxChars >= 4 && h >= fontPx + 10) {
+        const labelBg = new Jimp({ width: labelW, height: fontPx + 8, color: 0xffffffee });
+        canvas.composite(labelBg, x + badge, y);
+        await printText(canvas, sku.slice(0, Math.min(32, maxChars)), x + badge + 6, y + 2, 'black');
+      }
+    }
+
+    await drawFooterBar(
+      canvas,
+      `SKU ${sku} | ${hex} | ${regions.length}R | ${W}x${H}`,
+    );
     return { kind: 'image' as const, buffer: await canvas.getBuffer(JimpMime.jpeg), format: 'image/jpeg' };
   }
 

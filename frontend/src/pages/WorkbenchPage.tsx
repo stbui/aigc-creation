@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight, TrendingUp, Images, BarChart3, CheckCircle2 } from 'lucide-react';
 import { toAbsoluteUrl, statsApi } from '../lib/api';
-import { capabilityById, toolPath } from '../lib/capabilities';
+import { capabilityById, isCapabilityVisible, toolPath } from '../lib/capabilities';
 import { CapabilityIcon } from '../components/AppLayout';
 import { HeroArt } from '../components/HeroArt';
 import { SafeThumb } from '../components/RailPreview';
@@ -101,7 +101,8 @@ export function WorkbenchPage({
     () =>
       workbenchIds
         .map((id) => capabilityById(id))
-        .filter((c): c is NonNullable<typeof c> => Boolean(c)),
+        // 与侧栏/顶导同一口径：运营下线的能力不保留一张点不动的卡片。
+        .filter((c): c is NonNullable<typeof c> => Boolean(c) && isCapabilityVisible(c!)),
     [workbenchIds],
   );
 
@@ -147,6 +148,7 @@ export function WorkbenchPage({
           // 运行时结论：运营下线的能力不可点，占位只在「确实走占位」时才标
           const rt = runtimeOf(c);
           const closed = c.mode === 'planned' || rt.effective === 'disabled';
+          const unavailable = rt.effective === 'unavailable';
           return (
             <button
               key={c.id}
@@ -154,7 +156,13 @@ export function WorkbenchPage({
               className={`wb-card wb-card-${c.mode}`}
               onClick={() => (closed ? undefined : navigate(toolPath(c.id)))}
               disabled={closed}
-              title={rt.effective === 'disabled' ? rt.reason || '该能力已下线' : undefined}
+              title={
+                rt.effective === 'disabled'
+                  ? rt.reason || '该能力已下线'
+                  : unavailable
+                    ? rt.reason || '该能力暂无可用模型通道'
+                    : undefined
+              }
             >
               <span className="wb-card-thumb">
                 <span className="wb-card-thumb-clip">
@@ -172,6 +180,9 @@ export function WorkbenchPage({
                 {c.mode === 'planned' && <span className="wb-card-badge wb-card-badge-planned">规划中</span>}
                 {c.mode !== 'planned' && rt.effective === 'disabled' && (
                   <span className="wb-card-badge wb-card-badge-planned">已下线</span>
+                )}
+                {c.mode !== 'planned' && rt.effective === 'unavailable' && (
+                  <span className="wb-card-badge wb-card-badge-planned">暂不可用</span>
                 )}
               </span>
               {/* 参考 .wb-tool-icon 是 .wb-tool-card 的直接子节点 (定位基准=卡片, bottom 88 / left 15),
@@ -299,7 +310,7 @@ export function WorkbenchPage({
                 </table>
               </div>
               <p className="wb-panel-note">
-                <CheckCircle2 size={13} /> 本地算法运行，不限次数；接入模型后同一入口返回真实结果。
+                <CheckCircle2 size={13} /> 生成按能力消耗积分，余额与扣费明细可在积分页查看。
               </p>
             </>
           ) : (

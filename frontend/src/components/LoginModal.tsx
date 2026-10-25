@@ -25,7 +25,7 @@ export function LoginModal({ open, onClose, authEpoch }: Props) {
       onCancel={onClose}
       footer={null}
       closable={false}
-      maskClosable
+      mask={{ closable: true }}
       keyboard
       width={840}
       centered

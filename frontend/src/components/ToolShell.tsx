@@ -8,6 +8,7 @@ import { usePollAbort } from '../hooks/usePollAbort';
 import { useCapabilities } from '../hooks/useCapabilities';
 import { usePasteUpload } from '../hooks/usePasteUpload';
 import { useCreditLabel } from '../hooks/useCreditLabel';
+import { useAuth } from '../context/AuthContext';
 import { AssetLibraryModal, useAssetLibrary } from './AssetLibraryModal';
 import { MobileUploadModal } from './MobileUploadModal';
 import { ToolSettingsPopover } from './ToolSettingsPopover';
@@ -124,8 +125,13 @@ interface Props {
   resultTag?: string;
   /** 提交: 输入按上传顺序给出, 设置含比例/画质 */
   onSubmit: (inputs: ToolAsset[], settings: ToolSettings) => Promise<void>;
-  /** 结果操作区附加按钮 (如 SKU 页的一键下载) */
+  /** 结果操作区附加按钮 (如批量下载) */
   resultActions?: ReactNode;
+  /**
+   * 替换默认结果栏。商品 SKU 图需要与商品主图共用「全部生成图」网格，
+   * 但左栏仍复用这里的上传/提交骨架，故由页面注入自己的结果面板。
+   */
+  resultPane?: ReactNode;
 }
 
 const RATIO_LABEL: Record<string, string> = { original: '原比例' };
@@ -146,11 +152,18 @@ export function ToolShell(props: Props) {
    * 有真实本地算法的能力此时是 local, 不在拦截范围。
    */
   const { data: capsData } = useCapabilities();
+  const { token } = useAuth();
   const runtime = capsData?.items.find((c) => c.id === props.capability)?.runtime;
   const unavailableReason =
     runtime && (runtime.effective === 'unavailable' || runtime.effective === 'disabled')
       ? runtime.reason || '该能力当前不可提交，请稍后再试或联系客服。'
       : null;
+  /*
+   * 只拦**已登录**用户的提交。访客点击仍要走登录弹窗（上传/提交接口的
+   * 401 → auth:required 契约）；把按钮对访客一起置灰，会让他在登录前
+   * 连「为什么不能用」的入口都点不到。
+   */
+  const blocked = Boolean(token) && Boolean(unavailableReason);
   const {
     capability,
     title,
@@ -168,6 +181,7 @@ export function ToolShell(props: Props) {
     resultTag,
     onSubmit,
     resultActions,
+    resultPane,
   } = props;
 
   const { message } = App.useApp();
@@ -313,8 +327,8 @@ export function ToolShell(props: Props) {
   const submit = async () => {
     if (!formValid || submitting) return;
     // 能力不可提交 (未接通道 / 已下线): 不发这次注定 42204 的请求
-    if (unavailableReason) {
-      message.warning(unavailableReason);
+    if (blocked) {
+      message.warning(unavailableReason || '该能力当前不可提交');
       return;
     }
     await onSubmit(images, { ratio, resolution });
@@ -448,12 +462,12 @@ export function ToolShell(props: Props) {
             点下去等一次失败, 不如在这里说清原因。有真实本地算法的能力
             (抠图/扩图/换色/去水印…)此时是 local, 不受影响。
           */}
-          {unavailableReason && !submitting && (
+          {blocked && unavailableReason && !submitting && (
             <p className="tool-submit-notice tool-submit-notice-error">{unavailableReason}</p>
           )}
           <ToolSubmitBar
             submitting={submitting}
-            disabled={!formValid || Boolean(unavailableReason)}
+            disabled={!formValid || blocked}
             label={submitLabel}
             creditLabel={creditLabel ?? autoCreditLabel ?? undefined}
             desc={desc}
@@ -478,7 +492,8 @@ export function ToolShell(props: Props) {
         </div>
       </aside>
 
-      {/* ── 右: 结果栏 ── */}
+      {/* ── 右: 结果栏 (页面可注入共享结果网格) ── */}
+      {resultPane ?? (
       <section className="pk-result-pane">
         {/*
           三态必须分开 (2026-10-20 修)。
@@ -552,6 +567,7 @@ export function ToolShell(props: Props) {
           </div>
         )}
       </section>
+      )}
 
       {/* 素材库选择弹窗 (真实数据; 可选张数 = 剩余图片位) */}
       <AssetLibraryModal

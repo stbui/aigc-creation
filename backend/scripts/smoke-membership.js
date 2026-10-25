@@ -234,8 +234,11 @@ function check(name, ok, detail = '') {
   const cancel = await call('POST', '/membership/cancel', T);
   check('取消成功', cancel.status === 200 || cancel.status === 201);
   const me4 = await call('GET', '/membership/me', T);
-  check('取消后立即失去权益', me4.data?.isMember === false || me4.data?.perks?.maxConcurrent !== 5,
-    `isMember=${me4.data?.isMember}`);
+  check('取消后已付周期内权益仍有效', me4.data?.isMember === true && me4.data?.cancelAtPeriodEnd === true,
+    `isMember=${me4.data?.isMember}, cancelAtPeriodEnd=${me4.data?.cancelAtPeriodEnd}`);
+  const cancelAgain = await call('POST', '/membership/cancel', T);
+  check('重复取消幂等', cancelAgain.status === 200 || cancelAgain.status === 201,
+    `status=${cancelAgain.status}`);
 
   console.log('\n【到期处理】');
   await prisma.membership.updateMany({

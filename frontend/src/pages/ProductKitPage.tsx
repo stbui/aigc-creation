@@ -1,23 +1,26 @@
 import { useCallback, useMemo, useState } from 'react';
-import { App, Modal } from 'antd';
+import { App, Input, Modal, Select } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { Maximize2, Minus, Plus, RefreshCw, Sparkles, X } from 'lucide-react';
+import { Maximize2, Minus, Plus, Sparkles } from 'lucide-react';
 import { generateApi, promptToolsApi } from '../lib/api';
-import { MAX_IMAGE_MB } from '../lib/constants';
+import { MAX_IMAGE_MB, taskErrorText } from '../lib/constants';
 import { languageOptions, platformOptions } from '../lib/optionSets';
 
-import { ToolEmptyState, ToolGeneratingState, ToolWorkflowSteps } from '../components/ToolEmptyState';
 import { ToolSubmitBar } from '../components/ToolSubmitBar';
 import { ToolImageDropzone } from '../components/ToolImageDropzone';
 import { ToolSettingsPopover } from '../components/ToolSettingsPopover';
 import { AssetLibraryModal } from '../components/AssetLibraryModal';
 import { MobileUploadModal } from '../components/MobileUploadModal';
-import { ProviderBadge } from '../components/ProviderBadge';
+import { ToolWorkflowSteps } from '../components/ToolEmptyState';
+import { ResultGalleryPane } from '../components/ResultGalleryPane';
 import { useImageUpload } from '../hooks/useImageUpload';
 import { useProject } from '../hooks/useProject';
 import { usePollAbort } from '../hooks/usePollAbort';
 import { useCreditLabel } from '../hooks/useCreditLabel';
+import { useCapabilityRuntime } from '../hooks/useCapabilityRuntime';
 import { useGenerateError } from '../hooks/useGenerateError';
+import { useResultGallery, type GalleryItem } from '../hooks/useResultGallery';
+import { useAuth } from '../context/AuthContext';
 import { notifyCreditsChanged } from '../context/CreditsContext';
 import { pollToResult } from '../lib/poll';
 import type { TaskStatus } from '../types/api';
@@ -71,8 +74,16 @@ interface PkResult {
   width?: number;
   height?: number;
   errorCode?: string | null;
-  /** 本次实际通道: gateway=真实模型 / local=本地算法 (来自 pollToResult) */
-  provider?: string | null;
+}
+
+/**
+ * 任务参数里的变体 → 中文标签。
+ * 后端定义在 definitions/param-options.ts 的 MAIN_IMAGE_VARIANTS, 这里的
+ * VARIANT_LABELS 与之一一对应; 认不出的变体原样显示, 不吞掉信息。
+ */
+function variantCaption(params: Record<string, unknown>): string | undefined {
+  const v = params?.variant;
+  return typeof v === 'string' ? (VARIANT_LABELS[v] ?? v) : undefined;
 }
 
 export function ProductKitPage() {
@@ -80,7 +91,7 @@ export function ProductKitPage() {
   const reportError = useGenerateError();
   const navigate = useNavigate();
   const { ensureProject } = useProject();
-  // 上传 (三重校验 / 素材库回填 / 粘贴) 已收口到 useImageUpload, 2026-10-19
+  // 上传 (三重校验 / 素材库回填 / 粘贴) 统一由 useImageUpload 处理
   const { images, uploading, fileInputRef, uploadFiles, removeImage, library, mobile } = useImageUpload({
     max: MAX_IMAGES,
     maxMb: MAX_IMAGE_MB,
@@ -117,8 +128,20 @@ export function ProductKitPage() {
   const [submitting, setSubmitting] = useState(false);
   // 实时价来自能力清单（后台可调价），按钮文案不能再写死「免费生图」
   const creditLabel = useCreditLabel('main_image');
+  const { blocked: capabilityBlocked, reason: capabilityReason } = useCapabilityRuntime('main_image');
   const [results, setResults] = useState<PkResult[]>([]);
+  /** 本次提交的变体清单: 生成期间在结果网格首位画等量占位卡 */
+  const [pending, setPending] = useState<Array<{ key: string; label?: string }>>([]);
   const pollSignal = usePollAbort();
+
+  // ── 右侧结果栏 ──
+  //
+  // 与创意生图页同构: 网格展示本能力**全部**历史产出, 本次出图由
+  // gallery.prepend 插到榜首, 用户仍能回看之前的白底图/场景图/卖点图。
+  const { token } = useAuth();
+  const gallery = useResultGallery({ capability: 'main_image', token, captionOf: variantCaption });
+  // 服务端仍有 running/pending 任务时也算生成中: 离开页面再回来, 禁用态与标题不丢
+  const generating = submitting || gallery.items.some((item) => !item.url);
 
   const totalCount = useMemo(
     () => VARIANT_FIELDS.reduce((sum, v) => sum + (counts[v.key] ?? 0), 0),
@@ -179,7 +202,13 @@ export function ProductKitPage() {
   );
 
   const submit = async () => {
-    if (!formValid || submitting) return;
+    if (!formValid || generating) return;
+    // guest 点击仍应走登录弹窗（generateApi 的 401 → auth:required 契约）；
+    // 已登录时才把「能力不可用」作为硬拦截。
+    if (token && capabilityBlocked) {
+      message.warning(capabilityReason || '该能力当前不可提交');
+      return;
+    }
     setSubmitting(true);
     setResults([]);
     try {
@@ -190,6 +219,8 @@ export function ProductKitPage() {
         const n = counts[v.key] ?? 0;
         for (let i = 0; i < n; i++) plan.push(v.key);
       }
+      // 占位卡与本次任务数一一对应 (含变体名), 出图后由新图顶替
+      setPending(plan.map((v, i) => ({ key: `${v}-${i}`, label: VARIANT_LABELS[v] ?? v })));
 
       const baseParams = {
         productName: productName.trim(),
@@ -215,6 +246,22 @@ export function ProductKitPage() {
 
       const done = await Promise.all(taskIds.map((t) => pollTask(t.taskId, t.variant)));
       setResults(done);
+      /*
+       * 成功的图**直接插到网格首位**, 不回头重拉列表 (与创意生图页同款):
+       * 重拉会多一次往返, 占位撤下与新图到位之间出现回弹闪烁。
+       * 成功的按任务参数补上变体标签 → 网格里能一眼区分白底图/场景图/卖点图。
+       */
+      const fresh: GalleryItem[] = done
+        .filter((r) => r.status === 'succeeded' && r.url)
+        .map((r) => ({
+          id: r.taskId,
+          url: r.url as string,
+          width: r.width ?? null,
+          height: r.height ?? null,
+          createdAt: new Date().toISOString(),
+          caption: VARIANT_LABELS[r.variant] ?? r.variant,
+        }));
+      gallery.prepend(fresh);
       const failed = done.filter((r) => r.status !== 'succeeded').length;
       if (failed > 0) message.error(`${failed} 张生成失败，请重试`);
       else message.success(`已生成 ${done.length} 张商品主图`);
@@ -222,12 +269,43 @@ export function ProductKitPage() {
       reportError(e);
     } finally {
       setSubmitting(false);
+      setPending([]);
       // 扣费在建任务时发生、失败会自动退还，两个方向都改了余额
       notifyCreditsChanged();
     }
   };
 
-  const succeeded = results.filter((r) => r.status === 'succeeded');
+  /*
+   * 本次提交里失败的任务。results 只装本次提交的结果, 历史产出由 gallery
+   * 维护, 两者不混 —— 历史失败不该挂在本次的提示行上。
+   */
+  const failedResults = results.filter((r) => r.status !== 'succeeded');
+  const failedCount = failedResults.length;
+
+  /**
+   * 删除一张生成图 —— DELETE /tasks/:id 会连带删掉产出素材与磁盘文件。
+   *
+   * 与创意生图页同款确认框: 删除不可逆, 且用户此时看到的是缩略图,
+   * 未必意识到「作品记录」也一起没了。
+   */
+  const deleteImage = (item: GalleryItem) => {
+    modal.confirm({
+      title: '删除这张作品？',
+      content: '生成图与本地文件会一并删除，不可恢复。',
+      okText: '删除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await generateApi.remove(item.id);
+          gallery.removeItem(item.id);
+          message.success('已删除作品及其生成图');
+        } catch (e) {
+          message.error((e as Error).message || '删除失败');
+        }
+      },
+    });
+  };
 
   return (
     <div className="pk-workspace">
@@ -239,7 +317,7 @@ export function ProductKitPage() {
             <button type="button" role="tab" aria-selected className="pk-editor-tab pk-editor-tab-active">
               商品主图
             </button>
-            <button type="button" role="tab" aria-selected={false} className="pk-editor-tab" onClick={() => navigate('/tools/detail_image')}>
+            <button type="button" role="tab" aria-selected={false} className="pk-editor-tab" onClick={() => navigate('/product-detail')}>
               商品详情
             </button>
             <button type="button" role="tab" aria-selected={false} className="pk-editor-tab" onClick={() => navigate('/viral-clone')}>
@@ -273,7 +351,7 @@ export function ProductKitPage() {
                     <span className="pk-field-label">
                       <i className="pk-required-mark">*</i>商品名称
                     </span>
-                    <input
+                    <Input
                       value={productName}
                       maxLength={MAX_NAME_LEN}
                       placeholder="* 请输入商品名称"
@@ -282,33 +360,33 @@ export function ProductKitPage() {
                   </label>
                   <label className="pk-field">
                     <span className="pk-field-label">品牌（选填）</span>
-                    <input
+                    <Input
                       value={brand}
                       maxLength={MAX_NAME_LEN}
                       placeholder="请输入品牌（选填）"
                       onChange={(e) => setBrand(e.target.value)}
                     />
                   </label>
-                  <label className="pk-field">
+                  {/* Select 不用 <label> 包裹: label 会把点击转发给内部 input,
+                      已知会让下拉"打开即关闭"; 无障碍名走 aria-label */}
+                  <div className="pk-field">
                     <span className="pk-field-label">平台</span>
-                    <select value={platform} onChange={(e) => setPlatform(e.target.value)}>
-                      {platformOptions().map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="pk-field">
+                    <Select
+                      value={platform}
+                      onChange={setPlatform}
+                      options={platformOptions().map((o) => ({ value: o.value, label: o.label }))}
+                      aria-label="平台"
+                    />
+                  </div>
+                  <div className="pk-field">
                     <span className="pk-field-label">语言</span>
-                    <select value={language} onChange={(e) => setLanguage(e.target.value)}>
-                      {languageOptions().map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                    <Select
+                      value={language}
+                      onChange={setLanguage}
+                      options={languageOptions().map((o) => ({ value: o.value, label: o.label }))}
+                      aria-label="语言"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -393,12 +471,16 @@ export function ProductKitPage() {
 
 
           {/* 高级设置 + 提交 (sticky 底部) */}
-          {/* 高级设置 + 提交 (sticky 底部) */}
           <ToolSubmitBar
-            submitting={submitting}
-            disabled={!formValid}
+            submitting={generating}
+            disabled={!formValid || (Boolean(token) && capabilityBlocked)}
             label="立即生成"
             creditLabel={creditLabel ?? undefined}
+            hint={
+              capabilityBlocked && token ? (
+                <span className="tool-submit-notice tool-submit-notice-error">{capabilityReason}</span>
+              ) : undefined
+            }
             settings={
               <ToolSettingsPopover
                 open={settingsOpen}
@@ -415,63 +497,33 @@ export function ProductKitPage() {
         </div>
       </aside>
 
-      {/* ── 右: 结果栏 ── */}
-      <section className="pk-result-pane">
-        {submitting && results.length === 0 ? (
-          /* 生成中 → 骨架占位, 不退回空态 (见 ToolGeneratingState 注释) */
-          <ToolGeneratingState />
-        ) : results.length === 0 ? (
-          <ToolEmptyState title="效果图预览" desc="提交任务后，生成结果将在此处展示">
-            <ToolWorkflowSteps />
-          </ToolEmptyState>
-        ) : (
-          <div className="pk-result-body">
-            <div className="pk-result-toolbar">
-              <div className="pk-result-title">
-                生成结果
-                <span className="pk-result-count">
-                  {succeeded.length}/{results.length}
-                </span>
-              </div>
-              <button type="button" className="pk-result-regen" disabled={submitting} onClick={() => void submit()}>
-                <RefreshCw size={13} />
-                重新生成
-              </button>
-            </div>
-            <div className="pk-result-grid" style={{ ['--pk-aspect' as string]: ratio.replace(':', ' / ') }}>
-              {results.map((r, i) => (
-                <div key={`${r.taskId}-${i}`} className="pk-result-card">
-                  <div className="pk-result-media">
-                    {r.status === 'succeeded' && r.url ? (
-                      <img src={r.url} alt={`${VARIANT_LABELS[r.variant] ?? r.variant} ${i + 1}`} />
-                    ) : (
-                      <div className="pk-result-failed">
-                        <X size={20} />
-                        <span>生成失败（{r.errorCode ?? '未知错误'}）</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="pk-result-meta">
-                    <span className="pk-result-variant">
-                      {VARIANT_LABELS[r.variant] ?? r.variant}
-                      <ProviderBadge provider={r.provider} />
-                    </span>
-                    <span className="pk-result-params">
-                      {platform} · {ratio} · {resolution.toUpperCase()}
-                      {r.width && r.height ? ` · ${r.width}×${r.height}` : ''}
-                    </span>
-                  </div>
-                  {r.status === 'succeeded' && r.url && (
-                    <a className="pk-result-download" href={r.url} download target="_blank" rel="noreferrer">
-                      下载原图
-                    </a>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </section>
+      {/* ── 右: 结果栏 (本能力全部生成图) ──
+          与创意生图页同构的全部产出网格; 本次出图由 gallery.prepend 插到榜首,
+          生成中按变体数画占位卡。 */}
+      <ResultGalleryPane
+        title={generating ? '生成中…' : '全部生成图'}
+        items={gallery.items}
+        loading={gallery.loading}
+        error={gallery.error}
+        notice={
+          failedCount > 0 ? (
+            <p className="tool-submit-notice tool-submit-notice-error">
+              本次有 {failedCount} 张生成失败：{taskErrorText(failedResults[0]?.errorCode)}，可重新生成
+            </p>
+          ) : null
+        }
+        pending={submitting ? pending : []}
+        emptyTitle="效果图预览"
+        emptyDesc={
+          token
+            ? '提交任务后，生成结果将在此处展示，本页生成过的图都会保留在这里'
+            : '登录后，你在这个页面生成过的图都会显示在这里'
+        }
+        emptyChildren={<ToolWorkflowSteps />}
+        onRefresh={() => void gallery.reload()}
+        onDelete={deleteImage}
+        downloadNamePrefix="main-image"
+      />
 
       {/* 素材库选择弹窗 (真实数据) */}
       <AssetLibraryModal
@@ -508,4 +560,3 @@ export function ProductKitPage() {
     </div>
   );
 }
-

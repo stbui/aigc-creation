@@ -24,7 +24,7 @@ import {
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { CapabilityDef, CapabilityGroup } from '../types/api';
-import { toolPath } from '../lib/capabilities';
+import { isCapabilityVisible, toolPath } from '../lib/capabilities';
 
 /**
  * 侧边菜单 —— 1:1 复刻参考站 workspace-side-menu-v2 (2026-10-18 重构)。
@@ -114,7 +114,8 @@ export function SideRail({ groups, items, thumbs, activePath, statsTotal, onNavi
         </div>
 
         {groups.map((g) => {
-          const list = items.filter((c) => c.group === g.id);
+          // 与顶导同一口径：下架/规划中的能力不占侧栏位置，空分组整组不渲染。
+          const list = items.filter((c) => c.group === g.id && isCapabilityVisible(c));
           if (list.length === 0) return null;
           return (
             <div key={g.id} className="workspace-side-menu-section">

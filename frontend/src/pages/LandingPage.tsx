@@ -2,7 +2,12 @@ import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronDown, Menu } from 'lucide-react';
 import { Drawer } from 'antd';
-import { capabilityById, capabilityName, toolPath } from '../lib/capabilities';
+import {
+  capabilityById,
+  capabilityName,
+  isCapabilityVisible,
+  toolPath,
+} from '../lib/capabilities';
 import { useCapabilities } from '../hooks/useCapabilities';
 import { PromoBar } from '../components/PromoBar';
 import { useAuth } from '../context/AuthContext';
@@ -49,6 +54,7 @@ interface BizCard {
   img: string;
   icon: string;
   to: string;
+  capability: string;
 }
 
 const BIZ_CARDS: BizCard[] = [
@@ -58,6 +64,7 @@ const BIZ_CARDS: BizCard[] = [
     img: `${A}/biz/商品套图.png`,
     icon: 'm_spzt',
     to: '/product-kit',
+    capability: 'main_image',
   },
   {
     title: '商品详情',
@@ -65,6 +72,7 @@ const BIZ_CARDS: BizCard[] = [
     img: `${A}/biz/商品详情.png`,
     icon: 'm_spxq',
     to: '/product-detail',
+    capability: 'detail_image',
   },
   {
     title: '爆款复刻',
@@ -72,6 +80,7 @@ const BIZ_CARDS: BizCard[] = [
     img: `${A}/biz/爆款复刻.png`,
     icon: 'm_bkfk',
     to: '/viral-clone',
+    capability: 'hot_remake',
   },
 ];
 
@@ -79,17 +88,18 @@ interface ToolEntry {
   label: string;
   icon: string;
   to: string;
+  capability: string;
 }
 
 const TOOL_ENTRIES: ToolEntry[] = [
-  { label: '局部重绘', icon: 'm_jbch', to: '/local-redraw' },
-  { label: '一键抠图', icon: 'm_bjxc', to: '/background-remove' },
-  { label: '去除水印', icon: 'm_qcsy', to: '/watermark-remove' },
-  { label: '产品精修', icon: 'm_cpjx', to: '/product-retouch' },
-  { label: '图片翻译', icon: 'm_tpfy', to: '/image-translate' },
-  { label: '智能扩图', icon: 'm_znkt', to: '/image-expand' },
-  { label: '商品换色', icon: 'm_sphs', to: '/product-recolor' },
-  { label: '旋转角度', icon: 'm_jdxz', to: '/rotate-angle' },
+  { label: '局部重绘', icon: 'm_jbch', to: '/local-redraw', capability: 'local_redraw' },
+  { label: '一键抠图', icon: 'm_bjxc', to: '/background-remove', capability: 'matting' },
+  { label: '去除水印', icon: 'm_qcsy', to: '/watermark-remove', capability: 'remove_watermark' },
+  { label: '产品精修', icon: 'm_cpjx', to: '/product-retouch', capability: 'enhance' },
+  { label: '图片翻译', icon: 'm_tpfy', to: '/image-translate', capability: 'image_translate' },
+  { label: '智能扩图', icon: 'm_znkt', to: '/image-expand', capability: 'expand' },
+  { label: '商品换色', icon: 'm_sphs', to: '/product-recolor', capability: 'recolor' },
+  { label: '旋转角度', icon: 'm_jdxz', to: '/rotate-angle', capability: 'rotate' },
 ];
 
 /**
@@ -131,13 +141,13 @@ const ADDON_ICONS = ['icon_jcb', 'icon_bzb', 'icon_zyb', 'icon_qjb'];
 
 /** 案例 tab: key → 图片前缀与文件名列表 (实拍自参考站 case-tab 切换) */
 const CASE_TABS = [
-  { key: 'spzt', label: '商品主图', files: buildFiles('spzt', 16, 'png', 'jpg') },
-  { key: 'spxqt', label: '商品详情图', files: buildFiles('spxqt', 16, 'png') },
-  { key: 'bkfk', label: '爆款复刻', files: buildFiles('bkfk', 8, 'png', undefined, 0) },
-  { key: 'cyst', label: '创意生图', files: buildFiles('cyst', 8, 'png', undefined, 0) },
-  { key: 'cpjx', label: '产品精修', files: buildFiles('cpjx', 16, 'png') },
-  { key: 'yjkt', label: '一键抠图', files: buildFiles('yjkt', 16, 'png') },
-  { key: 'xzjd', label: '旋转角度', files: buildFiles('xzjd', 16, 'png') },
+  { key: 'spzt', capability: 'main_image', label: '商品主图', files: buildFiles('spzt', 16, 'png', 'jpg') },
+  { key: 'spxqt', capability: 'detail_image', label: '商品详情图', files: buildFiles('spxqt', 16, 'png') },
+  { key: 'bkfk', capability: 'hot_remake', label: '爆款复刻', files: buildFiles('bkfk', 8, 'png', undefined, 0) },
+  { key: 'cyst', capability: 'free_create', label: '创意生图', files: buildFiles('cyst', 8, 'png', undefined, 0) },
+  { key: 'cpjx', capability: 'enhance', label: '产品精修', files: buildFiles('cpjx', 16, 'png') },
+  { key: 'yjkt', capability: 'matting', label: '一键抠图', files: buildFiles('yjkt', 16, 'png') },
+  { key: 'xzjd', capability: 'rotate', label: '旋转角度', files: buildFiles('xzjd', 16, 'png') },
 ] as const;
 
 /**
@@ -179,7 +189,8 @@ function LandingHeader() {
 
   // 落地页顶导与应用外壳同口径: 参考站 landing/workspace 共用同一套外壳, 3 个分组下拉齐全。
   // (旧注释「只展示两组 / 显式排除 ai_video」依据的是 10-17 旧快照, 已被 2026-10-19 实拍推翻)
-  const navGroups = data?.groups ?? [];
+  const navItems = (data?.items ?? []).filter(isCapabilityVisible);
+  const navGroups = (data?.groups ?? []).filter((g) => navItems.some((i) => i.group === g.id));
 
   // 移动端 (≤900px) 导航抽屉: 落地页顶栏是自有实现, 不走应用外壳那套断点,
   // 390 实测原本把品牌+导航+算力胶囊+登录挤成 4 行。参考站 390 是「品牌 + 汉堡」,
@@ -220,7 +231,7 @@ function LandingHeader() {
               </button>
               {open === g.id && (
                 <div className="landing-nav-menu">
-                  {(data?.items ?? [])
+                  {navItems
                     .filter((i) => i.group === g.id)
                     .map((i) => (
                       <button
@@ -245,7 +256,7 @@ function LandingHeader() {
           </Link>
         </nav>
         <div className="landing-topbar-right">
-          <span className="landing-quota-pill">本地算法 · 不限次数</span>
+          <span className="landing-quota-pill">AI 创作 · 按能力计费</span>
           <Link to="/works" className="landing-nav-item">
             我的作品
           </Link>
@@ -292,7 +303,7 @@ function LandingHeader() {
           {navGroups.map((g) => (
             <div key={g.id} className="landing-mobile-group">
               <span className="landing-mobile-group-title">{g.name}</span>
-              {(data?.items ?? [])
+              {navItems
                 .filter((i) => i.group === g.id)
                 .map((i) => (
                   <button
@@ -323,6 +334,13 @@ function LandingHeader() {
             <Link to="/stats" className="landing-mobile-item" onClick={closeMenu}>
               数据中心
             </Link>
+            <Link
+              to="/tickets?type=consultation&compose=1"
+              className="landing-mobile-item"
+              onClick={closeMenu}
+            >
+              联系客服
+            </Link>
           </div>
         </nav>
       </Drawer>
@@ -340,6 +358,7 @@ function formatCampaignEnd(iso: string): string {
 
 export function LandingPage() {
   const navigate = useNavigate();
+  const { data: capabilityData } = useCapabilities();
   const [pkgTab, setPkgTab] = useState<'sub' | 'addon' | 'campaign'>('sub');
   /**
    * 进行中的限时活动。页签**只在真有活动时出现** ——
@@ -404,9 +423,34 @@ export function LandingPage() {
     };
   }, []);
 
+  /**
+   * 首页入口同样跟随能力运行时状态。
+   *
+   * 能力清单未到达（或请求失败）时保留全部入口：首页是公开首屏，不能因为
+   * 一次清单抖动就整块消失。清单到达后再把运营下线的能力隐藏。
+   */
+  const visibleCapabilityIds = useMemo(() => {
+    if (!capabilityData) return null;
+    return new Set(capabilityData.items.filter(isCapabilityVisible).map((c) => c.id));
+  }, [capabilityData]);
+  const bizCards = visibleCapabilityIds
+    ? BIZ_CARDS.filter((b) => visibleCapabilityIds.has(b.capability))
+    : BIZ_CARDS;
+  const toolEntries = visibleCapabilityIds
+    ? TOOL_ENTRIES.filter((t) => visibleCapabilityIds.has(t.capability))
+    : TOOL_ENTRIES;
+
+  // 案例页签与商品卡、工具入口同口径：运营下线的能力不再展示案例 CTA。
+  const caseTabs = useMemo(
+    () =>
+      visibleCapabilityIds
+        ? CASE_TABS.filter((t) => visibleCapabilityIds.has(t.capability))
+        : CASE_TABS,
+    [visibleCapabilityIds],
+  );
   const activeCase = useMemo(
-    () => CASE_TABS.find((t) => t.key === caseTab) ?? CASE_TABS[0],
-    [caseTab],
+    () => caseTabs.find((t) => t.key === caseTab) ?? caseTabs[0] ?? null,
+    [caseTabs, caseTab],
   );
 
   /** 案例卡点击: 跳对应工具页 (未登录能力走工具页, 由 App 层鉴权兜底) */
@@ -421,7 +465,9 @@ export function LandingPage() {
       xzjd: 'rotate',
     };
     const def = capabilityById(map[key] ?? '');
-    return def ? `/tools/${def.id}` : '/workbench';
+    // 必须复用统一路径映射：手拼 /tools/:id 会让商品主图/详情图等
+    // 自定义工作台退化到通用工具页，用户看不到对应的专属表单。
+    return def ? toolPath(def.id) : '/workbench';
   };
 
   return (
@@ -440,7 +486,7 @@ export function LandingPage() {
       {/* ── 2. 业务场景 ── */}
       <section className="home-v2-businesses">
         <div className="home-v2-business-grid">
-          {BIZ_CARDS.map((b) => (
+          {bizCards.map((b) => (
             <article key={b.title} className="home-v2-business-card">
               <div className="home-v2-business-media">
                 <img src={b.img} alt={b.title} loading="lazy" />
@@ -463,7 +509,7 @@ export function LandingPage() {
       {/* ── 3. 修图工具入口 ── */}
       <section className="home-v2-tools">
         <div className="home-v2-tool-grid">
-          {TOOL_ENTRIES.map((t) => (
+          {toolEntries.map((t) => (
             <button key={t.label} type="button" className="home-v2-tool-card" onClick={() => navigate(t.to)}>
               <img src={`${A}/icons/${t.icon}.svg`} alt="" aria-hidden loading="lazy" decoding="async" />
               <span>{t.label}</span>
@@ -673,10 +719,11 @@ export function LandingPage() {
       </section>
 
       {/* ── 5. 优秀案例 ── */}
+      {activeCase && (
       <section className="home-v2-cases">
         <h2>优秀案例，了解工具能力</h2>
         <div className="home-v2-case-tabs" role="tablist">
-          {CASE_TABS.map((t) => (
+          {caseTabs.map((t) => (
             <button
               key={t.key}
               type="button"
@@ -703,6 +750,7 @@ export function LandingPage() {
           ))}
         </div>
       </section>
+      )}
 
       {/* ── 6. 产品特性 ── */}
       <section className="home-v2-features">
@@ -778,15 +826,16 @@ export function LandingPage() {
           </div>
           <div className="landing-footer-col">
             <h4>积分套餐</h4>
-            <span>积分购买</span>
-            <span>积分明细</span>
+            <Link to="/packages">积分购买</Link>
+            <Link to="/credits">积分明细</Link>
             <Link to="/works">任务记录</Link>
           </div>
           <div className="landing-footer-col">
             <h4>支持与服务</h4>
-            <span>帮助中心</span>
-            <span>用户协议</span>
-            <span>隐私政策</span>
+            <Link to="/tickets?type=consultation&compose=1">帮助中心</Link>
+            <Link to="/legal/user-agreement.html">用户协议</Link>
+            <Link to="/legal/privacy-policy.html">隐私政策</Link>
+            <Link to="/tickets?type=complaint&compose=1">投诉举报</Link>
           </div>
         </div>
         <p className="landing-footer-copy">

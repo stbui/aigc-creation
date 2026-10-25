@@ -1,5 +1,5 @@
 import { ChevronDown } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { ratioOptions, resolutionOptions } from '../lib/optionSets';
 
 /**
@@ -63,10 +63,32 @@ export function ToolSettingsPopover({
   popoverAriaLabel,
   onClose,
 }: ToolSettingsPopoverProps) {
+  const shellRef = useRef<HTMLDivElement>(null);
+
+  // 浮层是绝对定位的展开面板，不是 Modal；补上用户对浮层的通用预期：
+  // 点面板外或按 Esc 都能收起，避免移动端只能再点一次「高级设置」。
+  useEffect(() => {
+    if (!open) return;
+    const close = () => (onClose ?? onToggle)();
+    const onPointerDown = (event: PointerEvent) => {
+      if (shellRef.current?.contains(event.target as Node)) return;
+      close();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close();
+    };
+    document.addEventListener('pointerdown', onPointerDown, true);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [onClose, onToggle, open]);
+
   if (!showRatio && !showResolution) return null;
 
   return (
-    <div className="pk-settings-shell">
+    <div className="pk-settings-shell" ref={shellRef}>
       <button
         type="button"
         className={`pk-settings-summary${open ? ' pk-settings-summary-open' : ''}`}

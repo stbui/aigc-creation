@@ -1,23 +1,26 @@
 import { useCallback, useRef, useState } from 'react';
 import { App, Modal } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { Maximize2, RefreshCw, X } from 'lucide-react';
+import { ImagePlus, Maximize2 } from 'lucide-react';
 import { assetsApi, generateApi, assetSrc, toAbsoluteUrl } from '../lib/api';
 import { languageOptions, platformOptions } from '../lib/optionSets';
 
-import { ToolEmptyState, ToolGeneratingState, ToolWorkflowSteps } from '../components/ToolEmptyState';
+import { ToolWorkflowSteps } from '../components/ToolEmptyState';
 import { ToolSubmitBar } from '../components/ToolSubmitBar';
 import { ToolImageDropzone } from '../components/ToolImageDropzone';
 import { ToolSettingsPopover } from '../components/ToolSettingsPopover';
 import { AssetLibraryModal, useAssetLibrary } from '../components/AssetLibraryModal';
 import { MobileUploadModal } from '../components/MobileUploadModal';
-import { ProviderBadge } from '../components/ProviderBadge';
+import { ResultGalleryPane } from '../components/ResultGalleryPane';
+import type { ImageMenuItem } from '../components/ImageContextMenu';
 import { useProject } from '../hooks/useProject';
 import { usePollAbort } from '../hooks/usePollAbort';
 import { usePasteUpload } from '../hooks/usePasteUpload';
 import { useCapabilities } from '../hooks/useCapabilities';
 import { useCreditLabel } from '../hooks/useCreditLabel';
 import { useGenerateError } from '../hooks/useGenerateError';
+import { useResultGallery, type GalleryItem } from '../hooks/useResultGallery';
+import { useAuth } from '../context/AuthContext';
 import { notifyCreditsChanged } from '../context/CreditsContext';
 import { pollToResult } from '../lib/poll';
 import { MAX_IMAGE_MB, taskErrorText } from '../lib/constants';
@@ -44,8 +47,8 @@ import type { Asset, MobileUploadAsset, TaskStatus } from '../types/api';
  * 复刻要求/名称/品牌 → 任务参数 (中文原文完整下发; 不再有"图内只画 ASCII"的本地兜底);
  * 比例/画质 → ratio / size 参数。
  *
- * 2026-10-22 起本地实现是**真实算法** (makeClone: 提取参考图布局签名与调色板 →
- * 按两档复刻程度重建场景 / 换主体), 不再是占位图。云端通道不可用时由本地兜底出图,
+ * 本地实现是**真实算法** (makeClone: 提取参考图布局签名与调色板 →
+ * 按两档复刻程度重建场景 / 换主体)。云端通道不可用时由本地兜底出图,
  * 保底有产出; 只有能力被后台下线时才置灰提交。
  */
 
@@ -78,12 +81,22 @@ interface PkResult {
   width?: number;
   height?: number;
   errorCode?: string | null;
-  /** 本次实际通道: gateway=真实模型 / local=本地算法 (来自 pollToResult) */
-  provider?: string | null;
+}
+
+/**
+ * 任务参数里的复刻程度 → 缩略图标签。
+ *
+ * 本页唯一会显著改变产出观感的维度就是复刻程度 (参考风格 / 高度复刻),
+ * 两种结果混在一格里若不带标签, 用户无法知道自己看的是哪一档。
+ * 后台认不出的度数原样显示, 不吞掉信息。
+ */
+function degreeCaption(params: Record<string, unknown>): string | undefined {
+  const v = params?.degree;
+  return typeof v === 'string' ? (DEGREE_LABEL[v] ?? v) : undefined;
 }
 
 export function ViralClonePage() {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const reportError = useGenerateError();
   const navigate = useNavigate();
   const { ensureProject } = useProject();
@@ -116,14 +129,25 @@ export function ViralClonePage() {
   const [submitting, setSubmitting] = useState(false);
   // 实时价来自能力清单（后台可调价），按钮文案不能再写死「免费生图」
   const creditLabel = useCreditLabel('hot_remake');
+  /** 最近这一次提交的结果 (只用于提示行; 历史产出由 gallery 维护) */
   const [result, setResult] = useState<PkResult | null>(null);
   const pollSignal = usePollAbort();
+
+  // ── 右侧结果栏 ──
+  //
+  // 与创意生图页、商品主图页、商品详情页同构: 网格展示本能力**全部**历史产出,
+  // 用户可以并排比较「参考风格」与「高度复刻」两档的差异;
+  // 缩略图左上角按任务参数标出当次复刻程度。
+  const { token } = useAuth();
+  const gallery = useResultGallery({ capability: 'hot_remake', token, captionOf: degreeCaption });
+  // 服务端仍有 running/pending 任务时也算生成中: 离开页面再回来, 禁用态与标题不丢
+  const generating = submitting || gallery.items.some((item) => !item.url);
 
   // 参考站本页名称/品牌/复刻要求均为选填, 提交条件 = 商品图 ≥1 + 参考图 =1
   const formValid = images.length > 0 && reference !== null;
 
   /*
-   * 该能力此刻能不能生成 (2026-10-21, 2026-10-22 修订)。
+   * 该能力此刻能不能生成。
    *
    * hot_remake 有真实本地算法, 没通道会回落本地而非失败; 只有被后台下线
    * (`disabled`) 或能力状态异常 (`unavailable`) 时才需要提前拦住提交。
@@ -231,7 +255,7 @@ export function ViralClonePage() {
     return true;
   };
 
-  // 素材库弹窗 (通用组件, 2026-10-19 抽取; 双通道: 商品图 / 参考图)
+  // 素材库弹窗 (通用组件; 双通道: 商品图 / 参考图)
   const {
     open: libraryOpen,
     loading: libraryLoading,
@@ -299,7 +323,7 @@ export function ViralClonePage() {
   );
 
   const submit = async () => {
-    if (!formValid || !reference || submitting) return;
+    if (!formValid || !reference || generating) return;
     // 没有可用模型通道: 后端必定 42204 并退款, 不发起这次注定失败的任务
     if (unavailableReason) {
       message.warning(unavailableReason);
@@ -327,6 +351,21 @@ export function ViralClonePage() {
       });
       const done = await pollTask(taskId);
       setResult(done);
+      /*
+       * 成功的图**直接插到网格首位**, 不回头重拉列表 (与创意生图 / 商品主图同款):
+       * 重拉多一次往返, 占位撤下与新图到位之间会出现回弹闪烁。
+       */
+      if (done.status === 'succeeded' && done.url) {
+        const fresh: GalleryItem = {
+          id: taskId,
+          url: done.url,
+          width: done.width ?? null,
+          height: done.height ?? null,
+          createdAt: new Date().toISOString(),
+          caption: DEGREE_LABEL[degree] ?? degree,
+        };
+        gallery.prepend([fresh]);
+      }
       if (done.status === 'failed') message.error(`生成失败：${taskErrorText(done.errorCode)}`);
       else message.success('爆款复刻图已生成');
     } catch (e) {
@@ -336,6 +375,57 @@ export function ViralClonePage() {
       // 扣费在建任务时发生、失败会自动退还，两个方向都改了余额
       notifyCreditsChanged();
     }
+  };
+
+  /**
+   * 把这张生成图放进右侧「上传参考图（爆款图）」位。
+   *
+   * 本页的产出天然适合当下一轮的参考图 (复刻一张满意的结果, 再微调要求),
+   * 而参考图位只有 1 个 —— 直接替换, 不排队, 与上传语义一致。
+   */
+  const useAsReference = (item: GalleryItem) => {
+    const assetId = item.assetId;
+    if (!assetId) {
+      // 任务还在但素材已被清理 (后台删过素材): 不能拿一个空 id 去提交
+      message.error('这张图片的素材已不存在，无法用作参考图');
+      return;
+    }
+    if (reference?.id === assetId) {
+      message.info('该图片已在参考图位');
+      return;
+    }
+    setReference({ id: assetId, url: item.url, name: `生成图-${item.id.slice(-6)}` });
+    message.success('已放入参考图位，下一轮复刻会以它为参考');
+  };
+
+  /**
+   * 删除一张生成图 —— DELETE /tasks/:id 会连带删掉产出素材与磁盘文件。
+   *
+   * 与创意生图 / 商品主图 / 商品详情页同款确认框: 删除不可逆, 且用户此时看到的
+   * 是缩略图, 未必意识到「作品记录」也一起没了。
+   */
+  const deleteImage = (item: GalleryItem) => {
+    modal.confirm({
+      title: '删除这张作品？',
+      content: '生成图与本地文件会一并删除，不可恢复。',
+      okText: '删除',
+      okButtonProps: { danger: true },
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await generateApi.remove(item.id);
+          gallery.removeItem(item.id);
+          /*
+           * 产出素材随之被删, 若它已被「用作参考图」放进参考图位, 必须同步清掉 ——
+           * 否则下一次提交会带着一个已不存在的 assetId, 后端只能报错。
+           */
+          if (item.assetId) setReference((prev) => (prev?.id === item.assetId ? null : prev));
+          message.success('已删除作品及其生成图');
+        } catch (e) {
+          message.error((e as Error).message || '删除失败');
+        }
+      },
+    });
   };
 
   return (
@@ -373,7 +463,6 @@ export function ViralClonePage() {
                 noun="商品图片"
               />
 
-              {/* 上传参考图（爆款图）: 独立 section, 单张上传, 标题行无计数器 */}
               {/* 上传参考图（爆款图）: 独立 section, 单张上传, 标题行无计数器 */}
               <ToolImageDropzone
                 title="上传参考图（爆款图）"
@@ -497,11 +586,11 @@ export function ViralClonePage() {
 
           {/* 高级设置 + 提交 (sticky 底部) */}
           {/* 无可用模型通道: 提前说明, 而不是让用户点下去等一次 42204 */}
-          {unavailableReason && !submitting && (
+          {unavailableReason && !generating && (
             <p className="tool-submit-notice tool-submit-notice-error">{unavailableReason}</p>
           )}
           <ToolSubmitBar
-            submitting={submitting}
+            submitting={generating}
             disabled={!formValid || Boolean(unavailableReason)}
             label="立即生成"
             creditLabel={creditLabel ?? undefined}
@@ -521,59 +610,42 @@ export function ViralClonePage() {
         </div>
       </aside>
 
-      {/* ── 右: 结果栏 ── */}
-      <section className="pk-result-pane">
-        {submitting && !result ? (
-          /* 生成中 → 骨架占位, 不退回空态 (见 ToolGeneratingState 注释) */
-          <ToolGeneratingState />
-        ) : !result ? (
-          <ToolEmptyState title="效果图预览" desc="提交任务后，生成结果将在此处展示">
-            <ToolWorkflowSteps />
-          </ToolEmptyState>
-        ) : (
-          <div className="pk-result-body">
-            <div className="pk-result-toolbar">
-              <div className="pk-result-title">
-                生成结果
-                <span className="pk-result-count">{DEGREE_LABEL[degree]}</span>
-              </div>
-              <button type="button" className="pk-result-regen" disabled={submitting} onClick={() => void submit()}>
-                <RefreshCw size={13} />
-                重新生成
-              </button>
-            </div>
-            <div className="pk-result-detail-scroll">
-              {result.status === 'succeeded' && result.url ? (
-                <div className="pk-result-card pk-result-card-detail">
-                  <div className="pk-result-detail-media">
-                    <img src={result.url} alt="爆款复刻图" />
-                  </div>
-                  <div className="pk-result-meta">
-                    <span className="pk-result-variant">
-                      爆款复刻结果
-                      <ProviderBadge provider={result.provider} />
-                    </span>
-                    <span className="pk-result-params">
-                      {DEGREE_LABEL[degree]} · {platform} · {ratio} · {resolution.toUpperCase()}
-                      {result.width && result.height ? ` · ${result.width}×${result.height}` : ''}
-                    </span>
-                  </div>
-                  <a className="pk-result-download" href={result.url} download target="_blank" rel="noreferrer">
-                    下载原图
-                  </a>
-                </div>
-              ) : (
-                <div className="pk-result-card pk-result-card-detail">
-                  <div className="pk-result-detail-media pk-result-failed">
-                    <X size={20} />
-                    <span>生成失败：{taskErrorText(result.errorCode)}</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </section>
+      {/* ── 右: 结果栏 (本能力全部生成图) ──
+          与创意生图页同构的全部产出网格, 用户可以并排比较
+          「参考风格」与「高度复刻」两档的差异。
+          本次出图由 gallery.prepend 插到榜首, 生成中画一张占位卡。 */}
+      <ResultGalleryPane
+        title={generating ? '生成中…' : '全部生成图'}
+        items={gallery.items}
+        loading={gallery.loading}
+        error={gallery.error}
+        notice={
+          result && result.status === 'failed' ? (
+            <p className="tool-submit-notice tool-submit-notice-error">
+              本次生成失败：{taskErrorText(result.errorCode)}，可重新生成
+            </p>
+          ) : null
+        }
+        pending={submitting ? [{ key: 'clone', label: '爆款复刻图' }] : []}
+        emptyTitle="效果图预览"
+        emptyDesc={
+          token
+            ? '提交任务后，生成结果将在此处展示，本页生成过的图都会保留在这里'
+            : '登录后，你在这个页面生成过的图都会显示在这里'
+        }
+        emptyChildren={<ToolWorkflowSteps />}
+        onRefresh={() => void gallery.reload()}
+        onDelete={deleteImage}
+        extraActions={(item): ImageMenuItem[] => [
+          {
+            key: 'reference',
+            label: '用作参考图',
+            icon: ImagePlus,
+            onSelect: () => useAsReference(item),
+          },
+        ]}
+        downloadNamePrefix="viral-clone"
+      />
 
       {/* 素材库选择弹窗 (真实数据; 按 libraryTarget 决定写入商品图还是参考图)
           参考图是**单张位** → maxSelectable=1, 选择器自动退化为单选语义;
@@ -612,4 +684,3 @@ export function ViralClonePage() {
     </div>
   );
 }
-

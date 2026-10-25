@@ -1,4 +1,7 @@
+import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { isCapabilityVisible } from '../lib/capabilities';
+import { useCapabilities } from '../hooks/useCapabilities';
 
 /**
  * 网站地图 —— 复刻参考站 https://ijihua.cn/sitemap.html
@@ -23,7 +26,7 @@ interface SitemapSection {
   label: string;
   title: string;
   color: string;
-  links: { name: string; to: string; path: string }[];
+  links: { name: string; to: string; path: string; capability?: string }[];
 }
 
 const SECTIONS: SitemapSection[] = [
@@ -35,10 +38,11 @@ const SECTIONS: SitemapSection[] = [
     links: [
       { name: '营销首页', to: '/', path: '/' },
       { name: '工作台', to: '/workbench', path: '/workbench' },
-      { name: '商品主图', to: '/product-kit', path: '/product-kit' },
-      { name: '商品详情图', to: '/product-detail', path: '/product-detail' },
-      { name: '爆款复刻', to: '/viral-clone', path: '/viral-clone' },
+      { name: '商品主图', to: '/product-kit', path: '/product-kit', capability: 'main_image' },
+      { name: '商品详情图', to: '/product-detail', path: '/product-detail', capability: 'detail_image' },
+      { name: '爆款复刻', to: '/viral-clone', path: '/viral-clone', capability: 'hot_remake' },
       { name: '创意生图', to: '/free-creation', path: '/free-creation' },
+      { name: '自由创作', to: '/free-creation', path: '/free-creation', capability: 'free_create' },
     ],
   },
   {
@@ -47,14 +51,14 @@ const SECTIONS: SitemapSection[] = [
     title: 'AI 图片工具',
     color: '#2aa8c0',
     links: [
-      { name: '局部重绘', to: '/local-redraw', path: '/local-redraw' },
-      { name: '去除水印', to: '/watermark-remove', path: '/watermark-remove' },
-      { name: '一键抠图', to: '/background-remove', path: '/background-remove' },
-      { name: '产品精修', to: '/product-retouch', path: '/product-retouch' },
-      { name: '图片翻译', to: '/image-translate', path: '/image-translate' },
-      { name: '智能扩图', to: '/image-expand', path: '/image-expand' },
-      { name: '商品换色', to: '/product-recolor', path: '/product-recolor' },
-      { name: '旋转角度', to: '/rotate-angle', path: '/rotate-angle' },
+      { name: '局部重绘', to: '/local-redraw', path: '/local-redraw', capability: 'local_redraw' },
+      { name: '去除水印', to: '/watermark-remove', path: '/watermark-remove', capability: 'remove_watermark' },
+      { name: '一键抠图', to: '/background-remove', path: '/background-remove', capability: 'matting' },
+      { name: '产品精修', to: '/product-retouch', path: '/product-retouch', capability: 'enhance' },
+      { name: '图片翻译', to: '/image-translate', path: '/image-translate', capability: 'image_translate' },
+      { name: '智能扩图', to: '/image-expand', path: '/image-expand', capability: 'expand' },
+      { name: '商品换色', to: '/product-recolor', path: '/product-recolor', capability: 'recolor' },
+      { name: '旋转角度', to: '/rotate-angle', path: '/rotate-angle', capability: 'rotate' },
     ],
   },
   {
@@ -66,8 +70,14 @@ const SECTIONS: SitemapSection[] = [
       { name: '我的作品', to: '/works', path: '/works' },
       { name: '素材库', to: '/library', path: '/library' },
       { name: '数据中心', to: '/stats', path: '/stats' },
-      { name: '多图融合', to: '/multi-image-fusion', path: '/multi-image-fusion' },
-      { name: '商品SKU图', to: '/product-sku', path: '/product-sku' },
+      { name: '积分商城', to: '/packages', path: '/packages' },
+      { name: '积分明细', to: '/credits', path: '/credits' },
+      { name: '我的订单', to: '/orders', path: '/orders' },
+      { name: '账户设置', to: '/account', path: '/account' },
+      { name: '邀请有奖', to: '/invitations', path: '/invitations' },
+      { name: '我的工单', to: '/tickets', path: '/tickets' },
+      { name: '多图融合', to: '/multi-image-fusion', path: '/multi-image-fusion', capability: 'multi_fusion' },
+      { name: '商品SKU图', to: '/product-sku', path: '/product-sku', capability: 'sku_image' },
     ],
   },
   {
@@ -80,11 +90,23 @@ const SECTIONS: SitemapSection[] = [
       { name: '用户协议', to: '/legal/user-agreement.html', path: '/legal/user-agreement.html' },
       { name: '隐私政策', to: '/legal/privacy-policy.html', path: '/legal/privacy-policy.html' },
       { name: '账号规则', to: '/legal/account-rules.html', path: '/legal/account-rules.html' },
+      { name: '未成年人保护', to: '/legal/minors-policy.html', path: '/legal/minors-policy.html' },
+      { name: '投诉举报', to: '/tickets?type=complaint&compose=1', path: '/tickets?type=complaint&compose=1' },
     ],
   },
 ];
 
 export function SitemapPage() {
+  const { data } = useCapabilities();
+  const sections = useMemo(() => {
+    if (!data) return SECTIONS;
+    const visible = new Set(data.items.filter(isCapabilityVisible).map((c) => c.id));
+    return SECTIONS.map((s) => ({
+      ...s,
+      links: s.links.filter((l) => !l.capability || visible.has(l.capability)),
+    })).filter((s) => s.links.length > 0);
+  }, [data]);
+
   return (
     <div className="sitemap-page">
       <header className="sitemap-topbar">
@@ -114,7 +136,7 @@ export function SitemapPage() {
         </section>
 
         <div className="sitemap-grid">
-          {SECTIONS.map((s) => (
+          {sections.map((s) => (
             <section key={s.no} className="sitemap-section">
               <span className="sitemap-section-no" style={{ color: s.color }}>
                 {s.no} / {s.label}

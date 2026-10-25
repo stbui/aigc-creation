@@ -143,6 +143,9 @@ export function StatsPage() {
           size="small"
           rowKey="capability"
           pagination={false}
+          /* 390 宽下四列会把「能力」压成逐字换行; 给出最小宽度并让表格自身横向滚动,
+             比继续压缩列宽可读。 */
+          scroll={{ x: 560 }}
           dataSource={stats.byCapability}
           locale={{ emptyText: '还没有生成记录' }}
           columns={[

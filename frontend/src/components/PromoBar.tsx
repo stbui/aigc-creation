@@ -112,7 +112,7 @@ export function PromoBar() {
         <span className="app-promo-text">
           {campaign
             ? `${campaign.title}${campaign.body ? ` · ${campaign.body}` : ''}`
-            : '本地算法不限次数，12 项电商视觉能力全部可试'}
+            : '上传商品图，一键生成主图、详情与营销素材'}
           {campaign && remainText ? ` · 剩余 ${remainText}` : ''}
         </span>
         <button type="button" className="app-promo-cta" onClick={goCampaign}>

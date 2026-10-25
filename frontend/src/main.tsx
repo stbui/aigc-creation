@@ -13,6 +13,9 @@ import App from './App';
  *   --primary 组件紫 #5546d8 (参考站 CTA/active 字面值; hover 加深 #4838c6 同参考站)
  *   --text #182033 / 次级 #667085 / --line #e6e8ef / --bg #f6f7fb
  *   --success #18a875 / --danger #ef4444 (参考站 :root token 实测)
+ *   --link #5546d8 / hover #4838c6: antd 的链接色默认是 #1677ff, 不显式覆盖时
+ *   Typography.Link / Button type="link" 会在账户页、通知等位置漏出蓝色,
+ *   与全站紫系冲突。
  * borderRadius 8 / fontSize 14 维持 antd 控件基准 (参考站控件半径 6-12, 8 为折中;
  * 基准字号改 16 会连锁改变全部 antd 控件高度, 不做)。证据: docs/typography-components-details.md
  *
@@ -30,6 +33,9 @@ const ANTD_THEME_TOKEN = {
   colorPrimaryHover: '#4838c6',
   colorError: '#ef4444',
   colorSuccess: '#18a875',
+  colorLink: '#5546d8',
+  colorLinkHover: '#4838c6',
+  colorLinkActive: '#4838c6',
   colorBgLayout: '#f6f7fb',
   colorBorder: '#e6e8ef',
   colorText: '#182033',

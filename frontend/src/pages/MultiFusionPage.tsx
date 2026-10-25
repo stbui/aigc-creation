@@ -11,6 +11,7 @@ import { notifyCreditsChanged } from '../context/CreditsContext';
 import { pollToResult } from '../lib/poll';
 import type { ToolAsset, ToolResult } from '../components/ToolShell';
 import { useCreditLabel } from '../hooks/useCreditLabel';
+import { useCapabilityRuntime } from '../hooks/useCapabilityRuntime';
 import { ToolGeneratingState } from '../components/ToolEmptyState';
 import { ProviderBadge } from '../components/ProviderBadge';
 import { MobileUploadModal } from '../components/MobileUploadModal';
@@ -76,6 +77,7 @@ const SCENE_GROUPS: Array<{ name: string; scenes: SceneDef[] }> = [
 
 const ALL_SCENES = SCENE_GROUPS.flatMap((g) => g.scenes);
 const sceneLabel = (v: string) => ALL_SCENES.find((s) => s.value === v)?.label ?? v;
+const sceneImage = (value: string) => `/multi-fusion/scenes/${value}.webp`;
 
 const VARIANT_COUNTS = ['4', '3', '2', '1'];
 
@@ -89,6 +91,7 @@ const UPLOAD_SUBJECT_HINT = `支持 JPG、PNG，单张不超过 ${MAX_IMAGE_MB}M
 export function MultiFusionPage() {
   // 消耗价读后端下发的 creditCost, 不再写死 40
   const creditLabel = useCreditLabel('multi_fusion');
+  const { blocked: capabilityBlocked, reason: capabilityReason } = useCapabilityRuntime('multi_fusion');
   const { message } = App.useApp();
   const reportError = useGenerateError();
   const { ensureProject } = useProject();
@@ -329,6 +332,11 @@ export function MultiFusionPage() {
 
   const submit = async () => {
     if (!subject || accents.length === 0 || submitting) return;
+    // guest 点击仍应走登录弹窗；已登录时才把「能力不可用」作为硬拦截。
+    if (token && capabilityBlocked) {
+      message.warning(capabilityReason || '该能力当前不可提交');
+      return;
+    }
     setSubmitting(true);
     setResult(null);
     try {
@@ -382,9 +390,17 @@ export function MultiFusionPage() {
                       setStep('workspace');
                     }}
                   >
-                    {/* 参考站此处是 15 张各不相同的 WebP 场景预览图; 素材 URL 无证据 (§11) → 未复刻, 保留图标占位 */}
+                    {/* 15 个场景各配一张 2:1 预览图；图标留在图片下层，加载失败时自然兜底 */}
                     <span className="multi-image-fusion-scene-visual" aria-hidden>
                       <Sparkles size={20} />
+                      <img
+                        src={sceneImage(s.value)}
+                        alt=""
+                        width={640}
+                        height={320}
+                        loading="lazy"
+                        decoding="async"
+                      />
                     </span>
                     <span className="multi-image-fusion-scene-copy">
                       <strong>{s.label}</strong>
@@ -730,7 +746,7 @@ export function MultiFusionPage() {
             <button
               type="button"
               className="multi-image-fusion-submit-button"
-              disabled={!subject || accents.length === 0 || submitting}
+              disabled={!subject || accents.length === 0 || submitting || (Boolean(token) && capabilityBlocked)}
               onClick={() => void submit()}
             >
               {submitting ? (
@@ -748,6 +764,9 @@ export function MultiFusionPage() {
                 </>
               )}
             </button>
+            {capabilityBlocked && token && (
+              <p className="tool-submit-notice tool-submit-notice-error">{capabilityReason}</p>
+            )}
           </div>
         </section>
 
@@ -762,7 +781,9 @@ export function MultiFusionPage() {
             <div className="multi-image-fusion-result-actions">
               <button
                 type="button"
-                disabled={submitting || result?.status !== 'succeeded'}
+                disabled={
+                  submitting || (Boolean(token) && capabilityBlocked) || result?.status !== 'succeeded'
+                }
                 onClick={() => void submit()}
               >
                 <RefreshCw size={13} />

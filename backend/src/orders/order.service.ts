@@ -300,6 +300,37 @@ export class OrderService {
     return orders.map((o) => this.toOrderView(o));
   }
 
+  /**
+   * 用户主动关闭未支付订单。
+   *
+   * 只允许 pending → cancelled。已支付订单必须走退款流程，不能借这个入口
+   * 把交易记录改成「已取消」；重复取消按幂等处理，避免用户连点时第二次报错。
+   * 条件更新保证并发下只有一次真正生效。
+   */
+  async cancelByUser(orderId: string, userId: string) {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, userId: true, status: true },
+    });
+    if (!order) throw new AppError(40400, '订单不存在', 404);
+    if (order.userId !== userId) throw new AppError(40301, '无权操作该订单', 403);
+
+    if (order.status === 'cancelled') return this.detail(orderId, userId);
+    if (order.status !== 'pending') {
+      throw new AppError(40901, `订单当前状态不可取消: ${order.status}`, 409);
+    }
+
+    const updated = await this.prisma.order.updateMany({
+      where: { id: orderId, userId, status: 'pending' },
+      data: { status: 'cancelled' },
+    });
+    // 并发下另一个请求已经取消: 仍返回最新详情，调用方看到的就是终态
+    if (updated.count === 0) return this.detail(orderId, userId);
+
+    this.logger.log(`用户取消未支付订单: ${orderId}`);
+    return this.detail(orderId, userId);
+  }
+
   // ── 沙箱支付 ──────────────────────────────────────────────────────
 
   /**

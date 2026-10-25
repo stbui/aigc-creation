@@ -177,7 +177,9 @@ function Shell() {
     );
   }
 
-  if ((error || !data) && capabilityIndependent) {
+  // 加载中 data/error 都还是 null，不能把「尚未返回」当成「加载失败」。
+  // 账户/交易页会先渲染骨架并继续等清单返回，这里只在请求真正结束后告警。
+  if (!loading && (error || !data) && capabilityIndependent) {
     console.warn('[shell] 能力清单加载失败，账户/交易页以无导航降级模式渲染', error);
   }
 

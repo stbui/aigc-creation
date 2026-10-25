@@ -94,6 +94,7 @@ export function AccountPage() {
   const [loading, setLoading] = useState(true);
   const [savingName, setSavingName] = useState(false);
   const [name, setName] = useState('');
+  const [cancelling, setCancelling] = useState(false);
 
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -148,6 +149,32 @@ export function AccountPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /** 取消自动续费：已付周期保留，到期后不再发放下一周期权益。 */
+  const cancelMembership = () => {
+    Modal.confirm({
+      title: '取消会员自动续费？',
+      content: `取消后不再自动续费。当前周期权益保留至 ${
+        membership?.expiresAt ? fmtDate(membership.expiresAt) : '到期日'
+      }，期间仍可正常使用会员权益；需要时可随时续费。`,
+      okText: '取消自动续费',
+      cancelText: '继续续费',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setCancelling(true);
+        try {
+          const res = await membershipApi.cancel();
+          message.success(`已取消自动续费，权益保留至 ${fmtDate(res.expiresAt)}`);
+          await load();
+        } catch (e) {
+          message.error(e instanceof Error ? e.message : '取消续费失败');
+          throw e;
+        } finally {
+          setCancelling(false);
+        }
+      },
+    });
+  };
 
   if (!token) {
     return (
@@ -434,13 +461,23 @@ export function AccountPage() {
                 ? `有效期至 ${fmtDate(membership.expiresAt)} · 每月赠送 ${membership.monthlyCredits} 积分`
                 : '开通会员享专属折扣与每月赠送积分'}
             </small>
-            <Button
-              size="small"
-              type={membership?.isMember ? 'default' : 'primary'}
-              onClick={() => navigate('/packages')}
-            >
-              {membership?.isMember ? '续费会员' : '开通会员'}
-            </Button>
+            <div className="account-membership-actions">
+              <Button
+                size="small"
+                type={membership?.isMember ? 'default' : 'primary'}
+                onClick={() => navigate('/packages')}
+              >
+                {membership?.isMember ? '续费会员' : '开通会员'}
+              </Button>
+              {membership?.isMember && !membership.cancelAtPeriodEnd && (
+                <Button size="small" type="text" danger loading={cancelling} onClick={cancelMembership}>
+                  取消续费
+                </Button>
+              )}
+            </div>
+            {membership?.isMember && membership.cancelAtPeriodEnd && (
+              <span className="account-hint">已取消自动续费，权益保留至 {fmtDate(membership.expiresAt)}</span>
+            )}
           </div>
         </div>
       </section>
@@ -536,7 +573,11 @@ export function AccountPage() {
                   <span className="account-msg-dot" aria-hidden />
                   <span className="account-msg-main">
                     <span className="account-msg-title">{n.title}</span>
-                    {n.body && <span className="account-msg-body">{n.body}</span>}
+                    {n.body && (
+                      <span className="account-msg-body" title={n.body}>
+                        {n.body}
+                      </span>
+                    )}
                   </span>
                   <span className="account-msg-time">{fmtDateTime(n.createdAt, true)}</span>
                 </button>

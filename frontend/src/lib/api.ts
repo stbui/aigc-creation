@@ -573,6 +573,9 @@ export const ordersApi = {
   list: () => request<Order[]>('/orders'),
   detail: (id: string) => request<Order>(`/orders/${id}`),
 
+  /** 关闭未支付订单。已支付订单只能走退款，后端会拒绝 */
+  cancel: (id: string) => request<Order>(`/orders/${id}/cancel`, { method: 'POST' }),
+
   /**
    * 沙箱支付。
    *

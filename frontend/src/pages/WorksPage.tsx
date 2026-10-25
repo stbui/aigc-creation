@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App } from 'antd';
 import {
   Check,
@@ -15,16 +15,21 @@ import { useNavigate } from 'react-router-dom';
 import { generateApi, assetSrc } from '../lib/api';
 import { capabilityById, capabilityName, toolPath } from '../lib/capabilities';
 import { useCapabilities } from '../hooks/useCapabilities';
+import { usePollAbort } from '../hooks/usePollAbort';
+import { useGenerateError } from '../hooks/useGenerateError';
 import { useAuth } from '../context/AuthContext';
+import { notifyCreditsChanged } from '../context/CreditsContext';
+import { runtimeOf, taskErrorText } from '../lib/constants';
+import { waitForTask } from '../lib/poll';
 import { StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
 import { ResultMedia } from '../components/ResultMedia';
-import { ProviderBadge } from '../components/ProviderBadge';
+import { ImageLightbox, type LightboxItem } from '../components/ImageLightbox';
 import type { Modality, Task } from '../types/api';
 
 /**
  * 我的作品 —— 1:1 复刻参考站 https://ijihua.cn/my-works。
  *
- * 版面数值来源（2026-10-17）:
+ * 版面数值来源:
  *   ① 未登录可达空态实拍: `.my-works-page` 1190 宽 padding `28px 28px 72px`、bg #F6F7FB;
  *      h1 38.4px/600 #161616; 双 tab 56×32; 工具栏 `.my-works-toolbar` 白底 radius16
  *      padding `12px 14px` shadow rgba(41,33,22,.04) 0 12px 30; 4 个筛选器各 108×37
@@ -33,6 +38,7 @@ import type { Modality, Task } from '../types/api';
  *   ② 卡片区（登录墙内）取自参考站**样式产物** `/assets/index-*.css`（未混淆，类名可直读）:
  *      `.my-works-grid` repeat(6, minmax(0,1fr)) gap 16 align-items start（≤某断点降 5 列）
  *      `.my-work-meta` absolute top 10 left 10, flex gap 9, z7, pointer-events none
+ *      (本地精简: 只留能力名一个角标, 见下方渲染处的说明)
  *      `.my-work-card.selected` outline #6C5CE7; `.my-work-check` 选中 #6C5CE7
  *      `.my-works-selection-bar` 12px / #5B4BD7 on #F1EFFF / padding `10px 14px` / radius 9
  *      按钮 11px 白字 radius 999 padding `6px 10px`
@@ -54,12 +60,92 @@ type DatePreset = 'all' | 'today' | 'yesterday' | '7d' | 'custom';
 
 const PAGE_SIZE = 24;
 
-const STATUS_LABEL: Record<string, string> = {
-  succeeded: '成功',
-  failed: '失败',
-  running: '生成中',
-  pending: '生成中',
-};
+/**
+ * 作品卡的图片比例。
+ *
+ * 用产出的真实宽高计算比例, 并夹在 3:4 ~ 16:9 之间: 常见产出正好铺满,
+ * 极长竖图 / 超宽横幅只留少量边, 不裁掉内容。尺寸缺失时交给浏览器按
+ * 图片自然比例排。
+ */
+function mediaAspect(width?: number | null, height?: number | null): string | undefined {
+  if (!width || !height) return undefined;
+  const ratio = width / height;
+  const clamped = Math.min(16 / 9, Math.max(3 / 4, ratio));
+  return String(clamped);
+}
+
+/**
+ * 作品卡里的图片。
+ *
+ * - 加载中保留 shimmer 底、加载完成淡入，撤掉占位时不闪白；
+ * - 加载失败可原地重试（签名 URL 过期 / 后端重启后无需刷新整页）；
+ * - 状态按 **URL** 记而不是布尔值 —— 刷新列表会换签名地址，布尔值不会自己复位。
+ *
+ * 容器比例来自产出尺寸 (见 mediaAspect), 图片用 contain 填满, 不裁内容。
+ */
+function WorkImage({
+  src,
+  alt,
+  priority,
+  onOpen,
+  aspect,
+}: {
+  src: string;
+  alt: string;
+  /** 首屏前两张: 不懒加载, 让作品页一进来就有图可看 */
+  priority?: boolean;
+  onOpen: () => void;
+  /** 图片显示区的宽高比 (见 mediaAspect) */
+  aspect?: string;
+}) {
+  const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const loaded = loadedSrc === src;
+  const failed = failedSrc === src;
+
+  // 缓存命中时 load 可能早于监听挂载, 会永远停在 shimmer 上
+  useEffect(() => {
+    const img = imgRef.current;
+    if (img && img.complete && img.naturalWidth > 0) setLoadedSrc(src);
+  }, [src, retryNonce]);
+
+  const retry = () => {
+    setFailedSrc(null);
+    setLoadedSrc(null);
+    setRetryNonce((n) => n + 1);
+  };
+
+  return (
+    <button
+      type="button"
+      className={`my-work-image-button${loaded ? ' is-loaded' : ''}${failed ? ' is-failed' : ''}`}
+      style={aspect ? { aspectRatio: aspect } : undefined}
+      onClick={failed ? retry : onOpen}
+      aria-label={failed ? '图片加载失败，点击重试' : `查看${alt}大图`}
+      title={failed ? '加载失败，点击重试' : '点击查看大图'}
+    >
+      <img
+        ref={imgRef}
+        key={retryNonce}
+        src={src}
+        alt={alt}
+        loading={priority ? 'eager' : 'lazy'}
+        fetchPriority={priority ? 'high' : 'auto'}
+        decoding="async"
+        onLoad={() => setLoadedSrc(src)}
+        onError={() => setFailedSrc(src)}
+      />
+      {failed && (
+        <span className="my-work-image-failed">
+          <ImageOff size={18} />
+          <small>加载失败，点击重试</small>
+        </span>
+      )}
+    </button>
+  );
+}
 
 function startOfDay(d: Date): number {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -81,15 +167,16 @@ export function WorksPage() {
   const navigate = useNavigate();
   const { token, openLogin } = useAuth();
   const { data: caps } = useCapabilities();
+  const reportError = useGenerateError();
+  const retrySignal = usePollAbort();
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   /**
    * 加载失败必须与「没有作品」分开存。
    *
-   * 2026-10-20 修: 此前失败只 `message.error` 弹一下, 然后照样落进空态分支
-   * 渲染「还没有作品」—— 用户看到的是"你还没有作品", 而真相是"接口没连上"。
-   * 这会让人以为作品丢了而反复重试, 属于**谎报状态**。
+   * 失败时不能只弹 `message.error` 再落进空态分支渲染「还没有作品」——
+   * 用户看到"你还没有作品", 真相却是"接口没连上", 会以为作品丢了而反复重试。
    */
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<'image' | 'video'>('image');
@@ -108,6 +195,15 @@ export function WorksPage() {
 
   const [selected, setSelected] = useState<string[]>([]);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  /**
+   * 大图查看器的当前下标 (null = 关闭)。
+   *
+   * 列表取**当前页签下所有已出图的图片作品**, 与网格同源: 在大图里按 ←/→
+   * 翻的是用户此刻在页面上看到的那一组, 不会翻到另一个页签或别的筛选结果里。
+   */
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+  /** 正在重试的任务 id：按钮显示进度，避免连点重复建单。 */
+  const [retryingId, setRetryingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -139,6 +235,39 @@ export function WorksPage() {
     setStatusOpen(false);
     setTaskOpen(false);
   };
+
+  /*
+   * 点空白处 / 按 Esc 关闭筛选浮层。
+   *
+   * 之前只有 toolbar 的 onMouseLeave, 桌面端移出能关、移动端却关不掉：
+   * 手指点空白不会触发 mouseleave, 浮层会一直盖在作品上。事件挂在 document
+   * 上并排除 toolbar 内部 (浮层本身也在 toolbar 里), 选择筛选时不会误关。
+   */
+  useEffect(() => {
+    if (!bizOpen && !dateOpen && !statusOpen && !taskOpen) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target as Element | null;
+      if (target?.closest('.my-works-toolbar')) return;
+      setBizOpen(false);
+      setDateOpen(false);
+      setStatusOpen(false);
+      setTaskOpen(false);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setBizOpen(false);
+        setDateOpen(false);
+        setStatusOpen(false);
+        setTaskOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [bizOpen, dateOpen, statusOpen, taskOpen]);
 
   // ── 真实过滤（全部基于本地任务数据，不做假筛选）──
   const filtered = useMemo(() => {
@@ -177,14 +306,39 @@ export function WorksPage() {
   );
 
   const visible = sorted.slice(0, visibleCount);
+
+  const lightboxItems = useMemo<LightboxItem[]>(
+    () =>
+      sorted
+        .filter((t) => t.outputAsset && taskModality(t) !== 'video')
+        .map((t) => ({
+          id: t.id,
+          url: assetSrc(t.outputAsset)!,
+          width: t.outputAsset?.width ?? null,
+          height: t.outputAsset?.height ?? null,
+          createdAt: t.createdAt,
+        })),
+    [sorted],
+  );
   /**
    * 「张作品」只数有产出的卡片。
    *
    * 失败 / 生成中的任务仍在网格里 (用占位卡如实说明状态, 也能被「状态」筛选到),
-   * 但它们不是作品 —— 此前计数直接用 `sorted.length`, 于是一个失败任务就让
-   * 我的作品显示「8 张作品」, 而素材库只有 7 张生成图, 两个页面永远对不上。
+   * 但它们不是作品。计数不能直接用 `sorted.length`, 否则一个失败任务就会让
+   * 我的作品与素材库的生成图数量对不上。
    */
   const worksCount = useMemo(() => sorted.filter((t) => t.outputAsset).length, [sorted]);
+  /*
+   * 作品被删 / 筛选变化后, 大图查看器的下标可能指向不存在的项。
+   * 越界就关掉, 而不是让查看器拿着 undefined 渲染一屏空白。
+   */
+  useEffect(() => {
+    setPreviewIndex((prev) => {
+      if (prev === null) return null;
+      return prev < lightboxItems.length ? prev : lightboxItems.length > 0 ? lightboxItems.length - 1 : null;
+    });
+  }, [lightboxItems.length]);
+
   const activeFilterCount =
     biz.length + status.length + taskPick.length + (datePreset === 'all' ? 0 : 1);
 
@@ -217,8 +371,86 @@ export function WorksPage() {
     });
   };
 
+  /**
+   * 失败任务重试（PRD F-20）。
+   *
+   * 直接用原任务的 capability / inputAssetIds / params 新建一次任务，
+   * 而不是让用户回到工具页重新填一遍。失败任务在创建时扣过费、失败时已退款，
+   * 因此这是一次**新的扣费**，确认框必须写明本次消耗。
+   *
+   * 输入素材被删除、能力已下线、或能力此刻没有可用通道时不做无意义提交：
+   * 先告诉用户原因，再引导回对应工具页重新准备素材。
+   */
+  const retryTask = (t: Task) => {
+    const def = caps?.items.find((c) => c.id === t.capability);
+    if (!def) {
+      message.warning('能力清单尚未加载完成，请稍后再试');
+      return;
+    }
+    const rt = runtimeOf(def);
+    if (rt.effective === 'disabled' || rt.effective === 'unavailable') {
+      message.warning(rt.reason || '该能力当前不可提交，请稍后再试');
+      return;
+    }
+    const inputs = t.inputAssetIds ?? [];
+    if ((def.inputs ?? 0) > 0 && inputs.length < (def.inputs ?? 0)) {
+      message.warning('原任务的输入素材已不存在，请回到工具页重新上传');
+      navigate(toolPath(def.id));
+      return;
+    }
+
+    const costText = def.creditCost > 0 ? `本次将消耗 ${def.creditCost} 积分` : '本次免费';
+    modal.confirm({
+      title: `重新生成「${def.name}」？`,
+      content: `将沿用原任务的输入图与参数新建一次生成。${costText}；原失败任务已退回的积分不受影响。`,
+      okText: '重新生成',
+      cancelText: '取消',
+      onOk: async () => {
+        setRetryingId(t.id);
+        try {
+          const { taskId } = await generateApi.start({
+            projectId: t.projectId,
+            capability: t.capability,
+            inputAssetIds: inputs,
+            params: t.params ?? {},
+          });
+          // 先插一张进行中的卡，用户立刻能看到重试已被受理。
+          setTasks((prev) => [
+            {
+              id: taskId,
+              projectId: t.projectId,
+              capability: t.capability,
+              status: 'pending',
+              inputAssetIds: inputs,
+              params: t.params ?? {},
+              createdAt: new Date().toISOString(),
+            },
+            ...prev,
+          ]);
+          const outcome = await waitForTask(taskId, { signal: retrySignal });
+          if (outcome.ok && outcome.task.status === 'succeeded') {
+            message.success('重试完成，作品已更新');
+          } else if (outcome.ok) {
+            message.error(`重试失败：${taskErrorText(outcome.task.errorCode)}`);
+          }
+          await load();
+        } catch (e) {
+          reportError(e);
+          await load();
+        } finally {
+          setRetryingId(null);
+          notifyCreditsChanged();
+        }
+      },
+    });
+  };
+
   const downloadSelected = () => {
     const list = tasks.filter((t) => selected.includes(t.id) && t.outputAsset);
+    if (list.length === 0) {
+      message.warning('请选择已生成成功的作品');
+      return;
+    }
     list.forEach((t, i) => {
       const url = assetSrc(t.outputAsset)!;
       if (!url) return;
@@ -588,7 +820,7 @@ export function WorksPage() {
 
       {loading ? (
         /* 骨架屏占住卡片网格的形状 —— 内容到达时零位移;
-           此前是居中一个转圈, 网格区域整块塌陷再撑开, 页面明显跳动。 */
+           否则网格区域会先塌陷再撑开, 页面明显跳动。 */
         <StateSkeleton variant="card" count={12} columns={6} />
       ) : error ? (
         /* 失败态与空态必须分开: 「没连上」不是「没有作品」 */
@@ -620,105 +852,172 @@ export function WorksPage() {
       ) : (
         <>
           <div className="my-works-grid">
-            {visible.map((t) => {
+            {visible.map((t, cardIndex) => {
               const url = t.outputAsset ? assetSrc(t.outputAsset) : undefined;
               const isSel = selected.includes(t.id);
+              const isVideo = taskModality(t) === 'video';
+              const def = cardOf(t);
+              // 大图列表里的下标: 只有图片作品进查看器, 视频没有可翻的静态原图
+              const previewAt = url && !isVideo ? lightboxItems.findIndex((x) => x.id === t.id) : -1;
               return (
                 <article key={t.id} className={`my-work-card${isSel ? ' selected' : ''}`}>
-                  <button
-                    type="button"
-                    className="my-work-image-button"
-                    onClick={() => {
-                      const def = cardOf(t);
-                      if (def) navigate(toolPath(def.id));
-                    }}
+                  {/*
+                    图片点开大图查看器; 视频直接给可播放的播放器 (原生控件不能被
+                    <button> 包住); 「用它再做一张」留在 hover 浮层里。
+                  */}
+                  <div
+                    className={`my-work-media${isVideo ? ' is-video' : ''}${!url ? ' is-placeholder' : ''}`}
                   >
                     {url ? (
-                      <ResultMedia
-                        url={url}
-                        modality={t.outputAsset?.modality}
-                        // 视频没有容器元数据可写, 显式标识只能由播放器侧补 (图片已烙进像素)
-                        aigc={t.outputAsset?.aigc}
-                        alt={capabilityName(t.capability)}
-                      />
+                      isVideo ? (
+                        <ResultMedia
+                          url={url}
+                          modality="video"
+                          // 视频没有容器元数据可写, 显式标识只能由播放器侧补 (图片已烙进像素)
+                          aigc={t.outputAsset?.aigc}
+                          alt={capabilityName(t.capability)}
+                        />
+                      ) : (
+                        <WorkImage
+                          src={url}
+                          alt={capabilityName(t.capability)}
+                          priority={cardIndex < 2}
+                          aspect={mediaAspect(t.outputAsset?.width, t.outputAsset?.height)}
+                          onOpen={() => {
+                            if (previewAt >= 0) setPreviewIndex(previewAt);
+                          }}
+                        />
+                      )
                     ) : (
                       <span className="my-work-image-placeholder">
                         {t.status === 'failed' ? (
                           <>
                             <ImageOff size={18} />
-                            <small>生成失败</small>
+                            <strong>生成失败</strong>
+                            <small>{taskErrorText(t.errorCode)}</small>
+                            {def && (
+                              <button
+                                type="button"
+                                className="my-work-placeholder-retry"
+                                disabled={retryingId === t.id}
+                                title={
+                                  runtimeOf(def).effective === 'unavailable'
+                                    ? runtimeOf(def).reason || '该能力暂无可用模型通道'
+                                    : runtimeOf(def).effective === 'disabled'
+                                      ? runtimeOf(def).reason || '该能力已下线'
+                                      : '沿用原参数重新生成'
+                                }
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  retryTask(t);
+                                }}
+                              >
+                                {retryingId === t.id ? (
+                                  <Loader2 size={12} className="my-work-generating-spinner" />
+                                ) : (
+                                  <RefreshCw size={12} />
+                                )}
+                                {retryingId === t.id ? '重试中…' : '重试'}
+                              </button>
+                            )}
                           </>
                         ) : (
                           <>
                             <Loader2 size={18} className="my-work-generating-spinner" />
-                            <small>生成中</small>
+                            <strong>生成中</strong>
+                            <small>完成后会自动出现在这里</small>
                           </>
                         )}
                       </span>
                     )}
 
-                    {/* meta: absolute top10 left10 (实拍) */}
+                    {/*
+                      角标只留能力名。缩略图上的信息以「这张图是什么」为主;
+                      来源与状态在作品详情 / 占位图里表达, 不重复叠加。
+                    */}
                     <span className="my-work-meta">
-                      <span className={`my-work-tag status-${t.status}`}>
-                        {STATUS_LABEL[t.status] ?? t.status}
-                      </span>
                       <span className="my-work-tag">{capabilityName(t.capability)}</span>
-                      {/* 真实模型 / 本地回落如实标注 (来自任务的 provider, 不按能力 mode 猜) */}
-                      <ProviderBadge provider={t.provider} className="my-work-provider" />
                     </span>
 
-                    {/* hover 浮层: 顶部再来一张 / 底部操作 */}
-                    <span className="my-work-hover-actions">
-                      <span className="my-work-hover-top">
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const def = cardOf(t);
-                            if (def) navigate(toolPath(def.id));
-                          }}
-                        >
-                          <Sparkles size={12} /> 再来一张
+                    {/* hover 浮层: 顶部再来一张 / 底部操作。无产出的任务只能删除,
+                        不能显示一个实际不会下载任何文件的「下载」。 */}
+                    <span className={`my-work-hover-actions${url ? '' : ' is-placeholder'}`}>
+                      {url && (
+                        <span className="my-work-hover-top">
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => {
+                              if (def) navigate(toolPath(def.id));
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                if (def) navigate(toolPath(def.id));
+                              }
+                            }}
+                          >
+                            <Sparkles size={12} /> 再来一张
+                          </span>
                         </span>
-                      </span>
+                      )}
                       <span className="my-work-hover-bottom">
+                        {url && (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => {
+                              // 真下载: 用 a[download] 触发, 移动端也能保存
+                              const ext =
+                                (t.outputAsset!.format || '').toLowerCase().replace(/^\./, '') ||
+                                (isVideo ? 'mp4' : 'jpg');
+                              const a = document.createElement('a');
+                              a.href = url;
+                              a.download = `${t.capability}-${t.id.slice(-6)}.${ext}`;
+                              a.click();
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                window.open(url, '_blank', 'noopener');
+                              }
+                            }}
+                          >
+                            下载
+                          </span>
+                        )}
                         <span
                           role="button"
                           tabIndex={0}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (url) window.open(url, '_blank', 'noopener');
-                          }}
-                        >
-                          下载
-                        </span>
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            removeTask(t.id);
+                          onClick={() => removeTask(t.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              removeTask(t.id);
+                            }
                           }}
                         >
                           <Trash2 size={12} /> 删除
                         </span>
                       </span>
                     </span>
-                  </button>
+                  </div>
 
                   {/* 勾选（多选下载） */}
-                  <label className="my-work-check" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      checked={isSel}
-                      onChange={() => toggleIn(selected, t.id, setSelected)}
-                    />
-                    <span>{isSel && <Check size={11} />}</span>
-                  </label>
+                  {/* 没有产出的失败 / 生成中任务不能勾选: 下载的是文件, 不能把
+                      「任务」当成作品选中, 否则会提示下载 0 个文件。 */}
+                  {url && (
+                    <label className="my-work-check" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={isSel}
+                        onChange={() => toggleIn(selected, t.id, setSelected)}
+                      />
+                      <span>{isSel && <Check size={11} />}</span>
+                    </label>
+                  )}
 
                   <div className="my-work-caption">
-                    <span>{capabilityName(t.capability)}</span>
                     <small>
                       {t.createdAt
                         ? new Date(t.createdAt).toLocaleString('zh-CN', {
@@ -736,6 +1035,16 @@ export function WorksPage() {
               );
             })}
           </div>
+
+          {/* 大图查看器: 与结果栏同一套 (缩放 / 拖拽 / ←→ 翻页 / Esc 关闭) */}
+          {previewIndex !== null && lightboxItems[previewIndex] && (
+            <ImageLightbox
+              items={lightboxItems}
+              index={previewIndex}
+              onIndexChange={setPreviewIndex}
+              onClose={() => setPreviewIndex(null)}
+            />
+          )}
 
           {visibleCount < sorted.length && (
             <button

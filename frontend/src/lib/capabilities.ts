@@ -1,4 +1,5 @@
 import { API_ROOT, unwrapEnvelope } from './http';
+import { runtimeOf } from './constants';
 import type { Capability, CapabilityDef, CapabilityGroup } from '../types/api';
 
 /**
@@ -65,6 +66,23 @@ export function capabilityById(id: string | undefined | null): CapabilityDef | u
 export function capabilityName(id: string | undefined | null): string {
   if (!id) return '未知能力';
   return cache?.items.find((c) => c.id === id)?.name ?? id;
+}
+
+/**
+ * 是否应出现在 C 端导航 / 工作台 / 工具入口里。
+ *
+ * 「规划中」与运营下线的能力都不再给入口：前者本来就不能提交，后者点进去
+ * 只会看到一张说明页。继续渲染一个不可用入口会让用户以为页面坏了；PRD
+ * F-12 也明确要求下架能力从侧栏、顶导、工作台卡片等处隐藏。
+ *
+ * 注意与 `unavailable` 的区别：它表示「代码已实现，但此刻没有可用通道」。
+ * 这种能力仍保留入口，页面内会说明原因并禁用提交 —— 直接隐藏会让用户
+ * 误以为产品没有这项能力。
+ */
+export function isCapabilityVisible(
+  def: Pick<CapabilityDef, 'mode' | 'runtime' | 'localFallback' | 'localImpl' | 'modality'>,
+): boolean {
+  return def.mode !== 'planned' && runtimeOf(def).effective !== 'disabled';
 }
 
 /**

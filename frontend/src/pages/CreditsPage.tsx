@@ -217,33 +217,35 @@ export function CreditsPage() {
             <StateButton onClick={() => navigate('/packages')}>去获取积分</StateButton>
           </div>
         ) : (
-          <table className="credits-table">
-            <thead>
-              <tr>
-                <th>时间</th>
-                <th>类型</th>
-                <th>变动</th>
-                <th>余额</th>
-                <th>备注</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ledger.map((e) => (
-                <tr key={e.id}>
-                  <td>{formatDate(e.createdAt)}</td>
-                  <td>{LEDGER_LABEL[e.type] ?? e.type}</td>
-                  <td>
-                    {/* 有符号: 正为获得, 负为消耗 */}
-                    <span className={`credits-amount ${e.amount >= 0 ? 'is-plus' : 'is-minus'}`}>
-                      {e.amount >= 0 ? `+${e.amount}` : e.amount}
-                    </span>
-                  </td>
-                  <td>{e.balanceAfter}</td>
-                  <td>{e.reason ?? '—'}</td>
+          <div className="credits-table-wrap">
+            <table className="credits-table">
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>类型</th>
+                  <th>变动</th>
+                  <th>余额</th>
+                  <th>备注</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {ledger.map((e) => (
+                  <tr key={e.id}>
+                    <td>{formatDate(e.createdAt)}</td>
+                    <td>{LEDGER_LABEL[e.type] ?? e.type}</td>
+                    <td>
+                      {/* 有符号: 正为获得, 负为消耗 */}
+                      <span className={`credits-amount ${e.amount >= 0 ? 'is-plus' : 'is-minus'}`}>
+                        {e.amount >= 0 ? `+${e.amount}` : e.amount}
+                      </span>
+                    </td>
+                    <td>{e.balanceAfter}</td>
+                    <td>{e.reason ?? '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )
       )}
 
@@ -254,31 +256,33 @@ export function CreditsPage() {
             <StateButton onClick={() => navigate('/packages')}>去获取积分</StateButton>
           </div>
         ) : (
-          <table className="credits-table">
-            <thead>
-              <tr>
-                <th>来源</th>
-                <th>总额</th>
-                <th>剩余</th>
-                <th>到期日</th>
-                <th>状态</th>
-              </tr>
-            </thead>
-            <tbody>
-              {lots.map((l) => {
-                const st = LOT_STATUS[l.status] ?? LOT_STATUS.active;
-                return (
-                  <tr key={l.id}>
-                    <td>{SOURCE_LABEL[l.source] ?? l.source}</td>
-                    <td>{l.totalCredits}</td>
-                    <td>{l.remainingCredits}</td>
-                    <td>{formatDay(l.expireAt)}</td>
-                    <td style={{ color: st.color, fontWeight: 600 }}>{st.label}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <div className="credits-table-wrap">
+            <table className="credits-table">
+              <thead>
+                <tr>
+                  <th>来源</th>
+                  <th>总额</th>
+                  <th>剩余</th>
+                  <th>到期日</th>
+                  <th>状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lots.map((l) => {
+                  const st = LOT_STATUS[l.status] ?? LOT_STATUS.active;
+                  return (
+                    <tr key={l.id}>
+                      <td>{SOURCE_LABEL[l.source] ?? l.source}</td>
+                      <td>{l.totalCredits}</td>
+                      <td>{l.remainingCredits}</td>
+                      <td>{formatDay(l.expireAt)}</td>
+                      <td style={{ color: st.color, fontWeight: 600 }}>{st.label}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         )
       )}
     </div>

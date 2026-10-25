@@ -105,6 +105,12 @@ export class OrdersController {
     return this.orders.detail(id, user.id);
   }
 
+  /** 取消未支付订单。已支付订单只能走退款流程，不能经此入口改为已取消 */
+  @Post(':id/cancel')
+  cancel(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.orders.cancelByUser(id, user.id);
+  }
+
   /**
    * 沙箱支付 (M8)。
    *

@@ -2389,6 +2389,10 @@ html[data-promo='off'] {
   min-height: 620px;
   display: grid;
   grid-template-columns: 432px minmax(0, 1fr);
+  /* 单行必须锁在 workspace 高度内。否则 SKU/详情图等左栏内容较高时，
+     auto 行会被内容撑到 1200px+，右侧空态/结果区也跟着变长，
+     与其他工具页的固定预览区不一致。minmax(0, 1fr) 同时允许内部滚动。 */
+  grid-template-rows: minmax(0, 1fr);
   gap: 16px;
   align-items: start;
 }
@@ -2412,6 +2416,7 @@ html[data-promo='off'] .pk-workspace {
 .pk-input-pane {
   width: 432px;
   min-width: 0;
+  min-height: 0;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -2635,7 +2640,13 @@ html[data-promo='off'] .pk-workspace {
   clip-path: inset(50%);
   white-space: nowrap;
 }
-.pk-field input,
+/*
+ * 只匹配**原生**控件 (product-detail / viral-clone 仍在用)。
+ * 排除 antd 的 .ant-input 与 Select 内部的输入框 (v5 为
+ * .ant-select-selection-search-input, v6 为 .ant-select-input) ——
+ * 否则它们会被这里的 height/border/padding 二次覆盖, 出现双边框或遮住已选文案。
+ */
+.pk-field input:not(.ant-input):not(.ant-select-input):not(.ant-select-selection-search-input),
 .pk-field select {
   width: 100%;
   height: 32px;
@@ -2648,12 +2659,39 @@ html[data-promo='off'] .pk-workspace {
   background: #fff;
   outline: none;
 }
-.pk-field input:focus,
+.pk-field input:not(.ant-input):not(.ant-select-input):not(.ant-select-selection-search-input):focus,
 .pk-field select:focus {
   border-color: var(--brand-light);
 }
-.pk-field input::placeholder {
+.pk-field input:not(.ant-input):not(.ant-select-input):not(.ant-select-selection-search-input)::placeholder {
   color: var(--border-dot);
+}
+/* ── 生成设置: antd 控件 (product-kit 使用 antd Input / Select) ──
+   参考站表单项 196×32 / radius 4 / 边 #E5E7EF / 内边距 5px 12px。
+
+   上方 `.pk-field input` 是给 product-detail / viral-clone 的原生控件留的,
+   Select 内部的输入框已在上方排除; 这里只统一 antd 控件的外观。 */
+.pk-field .ant-input {
+  height: 32px;
+  padding: 5px 12px;
+  border-color: var(--border);
+  border-radius: var(--radius-tag);
+  font-size: 14px;
+  color: #333;
+}
+.pk-field .ant-input::placeholder {
+  color: var(--border-dot);
+}
+.pk-field .ant-select {
+  width: 100%;
+  height: 32px;
+  border-color: var(--border);
+  border-radius: var(--radius-tag);
+  font-size: 14px;
+  color: #333;
+}
+.pk-field .ant-select .ant-select-content {
+  line-height: 22px;
 }
 
 /* 商品描述 */
@@ -3014,6 +3052,7 @@ html[data-promo='off'] .pk-workspace {
 /* 结果栏 */
 .pk-result-pane {
   min-width: 0;
+  min-height: 0;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -3072,6 +3111,19 @@ html[data-promo='off'] .pk-workspace {
   background: #fff;
   border-radius: var(--radius-panel);
   padding: 16px;
+}
+/* 结果栏顶部提示行 (「本次有 N 张生成失败」等)。
+   网格分支里它是白卡片内的普通一行 (.pk-result-body 的 gap 已给足间距);
+   空态分支里挂在插画下方, 故 -standalone 补一小段上边距, 并撑满空态容器宽度 ——
+   空态容器是 flex column centered, 不设宽度提示条会被内容挤成一行窄条。 */
+.pk-result-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pk-result-notice-standalone {
+  width: 100%;
+  margin-top: 4px;
 }
 .pk-result-toolbar {
   display: flex;
@@ -3143,6 +3195,11 @@ html[data-promo='off'] .pk-workspace {
   position: relative;
   display: inline-flex;
   max-width: 100%;
+}
+/* 图片请求失败 (404 / 签名过期 / 文件被清理): 保留原尺寸的灰底,
+   不显示浏览器默认破图图标。尺寸由调用方的 class 决定, 这里只补底色。 */
+img[data-broken='1'] {
+  background: var(--surface);
 }
 
 .aigc-badge {
@@ -3388,9 +3445,18 @@ html[data-promo='off'] .pk-workspace {
     height: auto;
     min-height: 0;
     grid-template-columns: 1fr;
+    grid-template-rows: auto;
   }
   .pk-input-pane {
     width: 100%;
+    /* 窄屏是单列文档流，不能再继承桌面的 100% 行高。否则左栏会被压缩到
+       约 252px，素材卡/步骤/SKU 清单与提交条互相覆盖，结果区也会压到
+       步骤卡上。改为按内容自然增高，结果区顺排在其后。 */
+    height: auto;
+    min-height: auto;
+  }
+  .pk-form-card {
+    height: auto;
   }
   .pk-form-scroll {
     overflow: visible;
@@ -3413,6 +3479,7 @@ html[data-promo='off'] .pk-workspace {
     color: #7d8596;
   }
   .pk-result-pane {
+    height: auto;
     min-height: 480px;
   }
   /* 自由创作页窄屏: 标题头显示 + 提交区变 1 列灰底 (参考站同款行为) */
@@ -3795,7 +3862,8 @@ html[data-promo='off'] .pk-workspace {
   opacity: 1;
 }
 .fc-result-item.is-failed {
-  cursor: default;
+  /* 失败可点重试, 所以保留可点光标; 但不能是 zoom-in (点了不是看大图) */
+  cursor: pointer;
 }
 .fc-result-item-error {
   position: absolute;
@@ -3805,9 +3873,16 @@ html[data-promo='off'] .pk-workspace {
   align-items: center;
   justify-content: center;
   gap: 6px;
+  padding: 8px;
   font-size: 12px;
+  line-height: 18px;
+  text-align: center;
   color: var(--text-desc);
   background: var(--page-bg);
+}
+.fc-result-item.is-failed:hover .fc-result-item-error {
+  color: var(--brand);
+  background: var(--brand-bg);
 }
 /* 生成中占位卡: 点击生成后立刻出现在网格首位, 尺寸与真实图一致,
    出图后由新图顶替。虚线边框 + 流动高光表明「这里会有一张图」。 */
@@ -3857,6 +3932,23 @@ html[data-promo='off'] .pk-workspace {
   background: rgba(23, 26, 43, 0.32);
   opacity: 0;
   transition: opacity 0.15s ease;
+}
+/* 缩略图左上角的变体标签 (商品主图: 白底图 / 场景图 / 卖点图)。
+   不参与 hover 遮罩, 所以层级压在 mask 之上; 与遮罩同一时刻淡出淡入会让
+   用户在最想确认"这是哪一张"的时候反而看不见标签。 */
+.fc-result-item-caption {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  padding: 1px 7px;
+  border-radius: var(--radius-tag);
+  background: rgba(23, 26, 43, 0.62);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  pointer-events: none;
+  user-select: none;
 }
 .fc-result-item:hover .fc-result-item-mask,
 .fc-result-item:focus-visible .fc-result-item-mask {
@@ -3946,6 +4038,8 @@ html[data-promo='off'] .pk-workspace {
   padding: 56px 84px 72px;
   overflow: hidden;
   cursor: zoom-in;
+  /* 加载提示 / 失败卡按舞台居中, 不按整个查看器 —— 否则会偏到底部工具条上 */
+  position: relative;
 }
 .img-viewer-stage.is-zoomed {
   cursor: grab;
@@ -3964,6 +4058,67 @@ html[data-promo='off'] .pk-workspace {
   will-change: transform;
   user-select: none;
   -webkit-user-drag: none;
+  /* 原图通常几 MB, 加载完成前先别显示半截像素; 淡入与缩略图同一节奏 */
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.img-viewer-stage img.is-loaded {
+  opacity: 1;
+}
+/* 加载提示: 居中一行浅字, 不铺满画面 —— 大图下载时用户仍能看见当前舞台 */
+.img-viewer-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  pointer-events: none;
+}
+/* 失败态: 原地给原因与重试, 不把查看器关掉 (否则用户只能重新点开重来) */
+.img-viewer-failed {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: min(360px, calc(100% - 48px));
+  padding: 20px;
+  border-radius: var(--radius-card);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  text-align: center;
+  transform: translate(-50%, -50%);
+  cursor: default;
+}
+.img-viewer-failed strong {
+  color: #fff;
+  font-size: 14px;
+}
+.img-viewer-failed button {
+  height: 28px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+.img-viewer-failed button:hover {
+  background: var(--brand-hover);
+}
+/* 减弱动效: 去掉淡入, 避免反复打开时出现「空白一瞬」的错觉 */
+@media (prefers-reduced-motion: reduce) {
+  .img-viewer-stage img {
+    transition: none;
+  }
 }
 .img-viewer-bar {
   position: absolute;
@@ -5209,7 +5364,152 @@ html[data-promo='off'] .pk-workspace {
   color: var(--text-desc);
 }
 .product-sku-template-upload-wrap {
+  position: relative;
   display: block;
+}
+.product-sku-template-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-control);
+  background: rgba(255, 255, 255, 0.72);
+}
+.product-sku-template-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 8px;
+}
+.product-sku-template-actions button {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--text-body);
+  font-size: 12px;
+  line-height: 20px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.product-sku-template-actions button:hover {
+  color: var(--brand);
+}
+
+/* 模板图上的真实框选 (归一化坐标随任务提交) */
+.product-sku-region-selector {
+  display: grid;
+  gap: 7px;
+}
+.product-sku-region-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.product-sku-region-count {
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--text-desc);
+}
+.product-sku-region-count strong {
+  color: var(--brand-active);
+  font-weight: 700;
+}
+.product-sku-region-clear:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.product-sku-region-stage {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  line-height: 0;
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+}
+.product-sku-region-stage.is-limit {
+  cursor: default;
+}
+.product-sku-region-stage > img {
+  display: block;
+  width: 100%;
+  height: auto;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+.product-sku-region-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--brand-active);
+  border-radius: 4px;
+  background: rgba(85, 70, 216, 0.14);
+  pointer-events: none;
+  line-height: normal;
+}
+.product-sku-region-box > span {
+  position: absolute;
+  left: -1px;
+  top: -1px;
+  padding: 2px 6px;
+  border-radius: 4px 0 4px 0;
+  background: var(--brand-active);
+  color: #fff;
+  font-size: 10px;
+  line-height: 14px;
+  white-space: nowrap;
+}
+.product-sku-region-box.is-draft {
+  border-style: dashed;
+  background: rgba(85, 70, 216, 0.08);
+}
+.product-sku-region-box.is-draft > span {
+  background: rgba(85, 70, 216, 0.78);
+}
+.product-sku-region-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: rgba(17, 24, 39, 0.72);
+  color: #fff;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.product-sku-region-remove:hover {
+  background: rgba(17, 24, 39, 0.9);
+}
+.product-sku-region-empty-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  padding: 4px 9px;
+  border-radius: var(--radius-pill);
+  background: rgba(17, 24, 39, 0.62);
+  color: #fff;
+  font-size: 10px;
+  line-height: 16px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.product-sku-region-hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 18px;
 }
 .product-sku-template-thumb {
   position: relative;
@@ -5440,9 +5740,11 @@ ol.product-sku-steps {
   overflow: hidden;
 }
 .multi-image-fusion-scene-visual img {
-  object-fit: contain;
+  object-fit: cover;
   width: 100%;
   height: 100%;
+  position: absolute;
+  inset: 0;
   transition: transform var(--mif-motion-img);
   display: block;
 }
@@ -8610,20 +8912,96 @@ html[data-promo='off'] .multi-image-fusion-page {
 .my-work-card.selected {
   outline-color: var(--brand-strong);
 }
+/* 图片区容器: 图 / 视频 / 占位共用同一块, 保证 hover 浮层与徽标定位一致 */
+.my-work-media {
+  position: relative;
+  display: block;
+  width: 100%;
+  background: var(--surface);
+}
+
+/* 缩略图容器比例由产出真实宽高决定 (见 WorksPage.mediaAspect), 图片 contain 填充 */
 .my-work-image-button {
   display: block;
   width: 100%;
+  /* 尺寸缺失 (老数据无 width/height) 时给个下限, 避免卡片塌成一条线 */
+  min-height: 120px;
   padding: 0;
   border: 0;
-  background: none;
-  cursor: pointer;
+  cursor: zoom-in;
   position: relative;
+  overflow: hidden;
+  /* 加载完成前保持与占位同款浅底, 避免撤下占位时闪白 */
+  background: linear-gradient(100deg, #f5f6fa 20%, #eceef5 40%, #f5f6fa 60%);
+  background-size: 200% 100%;
+  animation: fc-result-shimmer 1.4s ease-in-out infinite;
+}
+.my-work-image-button.is-loaded {
+  background: var(--surface);
+  animation: none;
 }
 .my-work-image-button img {
   width: 100%;
-  aspect-ratio: 3 / 4;
-  object-fit: cover;
+  height: 100%;
+  /* 容器比例与图片一致时正好铺满; 夹到边界的长图只用 contain 留边, 不裁内容 */
+  object-fit: contain;
   display: block;
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+.my-work-image-button.is-loaded img {
+  opacity: 1;
+}
+.my-work-image-button.is-failed {
+  cursor: pointer;
+  animation: none;
+  background: var(--surface);
+}
+.my-work-image-failed {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: var(--text-desc);
+  font-size: 12px;
+  background: var(--surface);
+}
+.my-work-image-button.is-failed:hover .my-work-image-failed {
+  color: var(--brand);
+  background: var(--brand-bg);
+}
+/* 视频: 直接给可播放的播放器 (原生控件不能被 <button> 包住) */
+.my-work-media video {
+  width: 100%;
+  /* 视频按 16:9 展示: 竖向短视频会被 contain 留边, 不裁掉画面 */
+  aspect-ratio: 16 / 9;
+  max-height: 360px;
+  display: block;
+  background: #000;
+  object-fit: contain;
+}
+/* 视频右上角补的 AI 标识由 ResultMedia 的 .aigc-badge 承担, 这里只保证不被裁 */
+.my-work-media .result-media-aigc {
+  display: block;
+  position: relative;
+}
+/*
+ * 视频卡: 浮层的渐变底会盖在播放器画面上, 看着像一条脏灰条;
+ * 底部操作条又正好压在原生播放控件上 (播放键 / 进度条点不到)。
+ * 故视频卡把两组操作都收到顶部一行, 下半屏完全让给播放器。
+ */
+.my-work-media.is-video .my-work-hover-actions {
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 8px;
+  background: linear-gradient(180deg, rgba(24, 32, 51, 0.34) 0%, rgba(24, 32, 51, 0) 46%);
+}
+.my-work-media.is-video .my-work-hover-bottom {
+  margin-top: 0;
 }
 .my-work-image-placeholder {
   width: 100%;
@@ -8658,21 +9036,12 @@ html[data-promo='off'] .multi-image-fusion-page {
   line-height: 20px;
   backdrop-filter: blur(2px);
 }
-/* 来源徽标在 .my-work-meta 的 flex 里, 间距由容器的 gap 给, 不再叠一层外边距 */
-.my-work-provider {
-  margin-left: 0;
-}
-.my-work-tag.status-failed {
-  background: rgba(235, 87, 87, 0.9);
-}
-.my-work-tag.status-running,
-.my-work-tag.status-pending {
-  background: rgba(108, 92, 231, 0.9);
-}
+/* 失败 / 生成中状态由占位图内的图标 + 文案表达, 不叠彩色角标。 */
 /* hover 浮层: 顶部再来一张 + 底部操作 */
 .my-work-hover-actions {
   position: absolute;
   inset: 0;
+  /* 浮层要能盖住 meta(7) / 勾选框(8) 之外的所有内容, 又不能挡住勾选框 */
   z-index: 6;
   display: flex;
   flex-direction: column;
@@ -8681,6 +9050,12 @@ html[data-promo='off'] .multi-image-fusion-page {
   opacity: 0;
   transition: opacity 0.15s;
   background: linear-gradient(180deg, rgba(24, 32, 51, 0.28) 0%, rgba(24, 32, 51, 0) 40%);
+  /*
+   * 浮层本身不接收点击: 它铺满整个图片区, 若可点击就会把下面
+   * 「点图片看大图」和视频原生控件全部吃掉 (浮层透明时用户根本看不出原因)。
+   * 只有里面的操作按钮恢复可点。
+   */
+  pointer-events: none;
 }
 .my-work-card:hover .my-work-hover-actions {
   opacity: 1;
@@ -8689,6 +9064,8 @@ html[data-promo='off'] .multi-image-fusion-page {
 .my-work-hover-bottom {
   display: flex;
   gap: 8px;
+  /* 容器本身也不吃点击, 否则底部长条会盖住图片下半部分的「看大图 / 播放」 */
+  pointer-events: none;
 }
 .my-work-hover-bottom {
   margin-top: auto;
@@ -8704,6 +9081,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   color: var(--brand-hover);
   font-size: 12px;
   cursor: pointer;
+  pointer-events: auto;
 }
 .my-work-hover-actions [role='button']:hover {
   background: var(--brand-bg);
@@ -8755,10 +9133,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   color: #fff;
   pointer-events: none;
 }
-.my-work-caption span {
-  font-size: 13px;
-  font-weight: 500;
-}
+/* 左下角只剩日期与尺寸一行; 能力名由左上角角标表达 */
 .my-work-caption small {
   font-size: 11px;
   opacity: 0.86;
@@ -9688,6 +10063,11 @@ html[data-promo='off'] .multi-image-fusion-page {
   font-weight: 600;
   color: var(--pkg-success);
 }
+.pkg-card-perks {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--pkg-muted);
+}
 .pkg-card-price {
   display: flex;
   align-items: baseline;
@@ -10049,6 +10429,14 @@ html[data-promo='off'] .multi-image-fusion-page {
   border-color: var(--pkg-primary, #625df5);
   color: #fff;
 }
+.pkg-result-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.order-pay-actions {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}
 
 /* ── 积分明细页 ────────────────────────────────────────────────────────── */
 
@@ -10120,8 +10508,17 @@ html[data-promo='off'] .multi-image-fusion-page {
   border-bottom-color: var(--brand);
   font-weight: 600;
 }
+.credits-table-wrap {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
 .credits-table {
   width: 100%;
+  /* 五列在 390 视口下会被压成逐字竖排；保底宽度 + 外层横滚，
+     让「类型/备注」保持可读的整行文本。 */
+  min-width: 680px;
   border-collapse: collapse;
   font-size: 13px;
   background: #fff;
@@ -10134,6 +10531,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   padding: 12px 14px;
   text-align: left;
   border-bottom: 1px solid var(--border);
+  white-space: nowrap;
 }
 .credits-table th {
   background: var(--surface);
@@ -13662,15 +14060,22 @@ html[data-promo='off'] .multi-image-fusion-page {
   flex: none;
 }
 .alp-modal .ant-modal-body {
-  flex: auto;
+  flex: 1 1 auto;
   min-height: 0;
+  /* antd 6 的 body 默认是 block。只给外层 max-height 时，block 子级会按
+     内容自然高度排版，内部 .alp-body 的 100% 高度因此失效，footer 被撑到
+     可视区之外（实拍 900px 视口里 footer 的 y=1818）。这里让 body 成为
+     纵向 flex 容器，中间素材区才能收缩并滚动。 */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 /* 参考站 dialog 的三段: header(固定) / toolbar+layout(自适应) / footer(固定) */
 .alp-body {
+  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  height: 100%;
 }
 .alp-modal .ant-modal-header {
   padding: 0;
@@ -15016,6 +15421,12 @@ html[data-promo='off'] .multi-image-fusion-page {
 .account-asset .ant-btn {
   margin-top: 4px;
 }
+.account-membership-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
 
 /* 我的数据: 每格都是入口, 所以是 button 而不是 div */
 .account-stats {
@@ -15183,8 +15594,13 @@ html[data-promo='off'] .multi-image-fusion-page {
   font-size: 12px;
   color: var(--text-desc);
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  /* 站内消息不一定带 link；单行省略会让「退款原因/到账金额」这类正文
+     在没有跳转目标时永远读不全。保留两行，长文本再截断。 */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  white-space: normal;
 }
 .account-msg-time {
   flex: none;
@@ -15572,4 +15988,215 @@ html[data-promo='off'] .multi-image-fusion-page {
   margin-top: 8px;
   text-align: center;
   font-size: 12px;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * 前台窄屏修复 (2026-10-24)
+ *
+ * 这一组规则放在文件末尾, 用于压过后文里那些「1:1 实拍」的桌面覆盖层 ——
+ * 它们特异性相同、源顺序更靠后, 媒体查询本身又不增加特异性, 提前写会被反压。
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/* 首页案例区: 640 以下沿用其它区块的「一刀切 1 列」会让 17 个 600×800 案例
+   变成 7,700px 长的单列瀑布, 整页高度超过 13,000px。案例是图墙, 2 列在
+   390 宽下每张仍有 163px, 可辨认且符合浏览预期。 */
+@media (max-width: 640px) {
+  .home-v2-case-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+
+/* 工作台 hero: 32px/20px 是桌面单行实拍值, 窄屏标题换成两行后会上下重叠
+   (文字行高只有 20px)。同时把英雄区改为内容高度, 避免多行文案溢出。 */
+@media (max-width: 700px) {
+  .wb-hero {
+    height: auto;
+    min-height: 196px;
+    padding: 22px 20px;
+  }
+  .wb-hero-title {
+    font-size: 24px;
+    line-height: 1.4;
+    margin-bottom: 12px;
+    letter-spacing: 0;
+  }
+  .wb-hero-sub {
+    font-size: 14px;
+    line-height: 1.65;
+    margin-top: 0;
+  }
+}
+
+/* 商品主图「自定义配置」: 两列在 390 宽下每列只有 160px, 而一行需要
+   48px 标签 + 16px 间距 + 120px 步进器 = 184px; 右侧那一列的标签会盖住
+   左侧步进器的加减按钮, 实测「增加白底图」点不到。窄屏改单列。 */
+@media (max-width: 480px) {
+  /* 商品名称 / 品牌两列在 390 宽下各约 145px，连占位文案都被截断；
+     窄屏改单列，让输入内容完整可见。 */
+  .pk-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pk-count-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  .pk-count-field {
+    grid-template-columns: 52px minmax(0, 1fr);
+    gap: 12px;
+  }
+}
+
+/* 作品页计数行: 390 宽下「7 张作品 · 另有 1 个未出图任务 + 排序说明 + 刷新」
+   会挤成两行并把「刷新」拆成竖排。允许换行, 但按钮自身永不拆字。 */
+@media (max-width: 700px) {
+  .my-works-count-row {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+  .my-works-sort-label,
+  .my-works-refresh {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+}
+
+/* 作品筛选浮层: 320/308/318px 宽的锚定浮层在第二列按钮上会向右溢出
+   (实测日期右缘 478、所属任务 488, 视口只有 390), 右半边选项点不到。
+   窄屏改为居中的底部面板, 宽度跟随视口并允许内部滚动。 */
+@media (max-width: 700px) {
+  .my-works-filter-popover,
+  .my-works-filter-popover.my-works-business-popover,
+  .my-works-filter-popover.my-works-date-popover,
+  .my-works-filter-popover.my-works-status-popover,
+  .my-works-filter-popover.my-works-task-popover {
+    position: fixed;
+    top: auto;
+    right: auto;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(342px, calc(100vw - 24px));
+    max-height: min(70vh, 540px);
+    overflow-y: auto;
+  }
+  .my-works-custom-date .my-works-date-fields {
+    flex-wrap: wrap;
+  }
+  .my-works-custom-date .my-works-date-fields input {
+    min-width: 0;
+  }
+  /* 高级设置面板桌面固定 400px；其锚点在输入卡内，390 视口下右缘会到 442px。
+     跟随视口收缩并在高度不足时内部滚动。 */
+  .pk-settings-popover {
+    width: min(400px, calc(100vw - 48px));
+    max-height: calc(100dvh - 140px);
+    overflow-y: auto;
+  }
+}
+
+/* 失败 / 生成中的作品卡: 之前只有一句「生成失败」, 没有原因也没有下一步,
+   在手机上 hover 浮层又永远不出现, 等于走进了死胡同。失败态给出错误文案
+   与「重新生成」, 并把日期条的深色渐变换成浅色, 不再像一条脏灰带。 */
+.my-work-image-placeholder {
+  /* 日期条绝对定位在底部；给占位内容多留一行空间，避免「去重新生成」
+     与日期条叠在一起。 */
+  padding: 16px 16px 44px;
+  text-align: center;
+  line-height: 1.5;
+}
+.my-work-image-placeholder strong {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-body);
+}
+.my-work-image-placeholder small {
+  max-width: 100%;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-desc);
+}
+.my-work-placeholder-retry {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 28px;
+  margin-top: 2px;
+  padding: 0 12px;
+  border: 1px solid var(--brand-light);
+  border-radius: var(--radius-pill);
+  background: var(--brand-bg);
+  color: var(--brand-hover);
+  font-size: 12px;
+  cursor: pointer;
+}
+.my-work-placeholder-retry:hover {
+  background: #ece8ff;
+}
+.my-work-media.is-placeholder .my-work-caption {
+  background: linear-gradient(180deg, rgba(246, 247, 251, 0) 0%, rgba(246, 247, 251, 0.96) 58%);
+  color: var(--text-desc);
+}
+
+/* 触屏设备没有 hover: 下载 / 删除 / 再来一张此前永远不可见, 手机上无法
+   管理作品。保留底部操作条, 隐藏顶部「再来一张」(空间不足), 日期条上移避让。 */
+@media (hover: none) {
+  .my-work-hover-actions {
+    opacity: 1;
+    background: linear-gradient(180deg, rgba(24, 32, 51, 0) 54%, rgba(24, 32, 51, 0.58) 100%);
+  }
+  .my-work-hover-actions.is-placeholder {
+    background: none;
+  }
+  /* 占位卡上方已有失败原因/重试按钮，日期条不再为底部操作条让位，
+     否则会压住重试按钮。 */
+  .my-work-media.is-placeholder .my-work-caption {
+    bottom: 0;
+  }
+  .my-work-hover-top {
+    display: none;
+  }
+  .my-work-hover-bottom {
+    justify-content: flex-end;
+  }
+  .my-work-hover-actions [role='button'] {
+    height: 25px;
+    padding: 0 9px;
+    font-size: 11px;
+  }
+  .my-work-caption {
+    bottom: 30px;
+  }
+}
+
+/* 结果栏标题 + 每行张数: 390 宽下标题被右侧 3/4/5/6 + 刷新挤成竖排
+   (「全部生成 / 图」「1 张」各占一行)。窄屏改为上下两行, 标题独占一行。 */
+@media (max-width: 720px) {
+  .pk-result-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .pk-result-title {
+    flex-wrap: nowrap;
+    white-space: nowrap;
+  }
+  .pk-result-count {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+  .fc-result-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
+
+/* 数据中心的按能力分布表: 给列最小宽度后自身横向滚动, 不再把「商品主图」
+   拆成「商品主 / 图」。表头与单元格保持单行。 */
+.stats-card .ant-table-wrapper {
+  max-width: 100%;
+}
+.stats-card .ant-table-cell {
+  white-space: nowrap;
 }

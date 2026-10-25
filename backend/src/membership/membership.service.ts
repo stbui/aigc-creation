@@ -79,6 +79,8 @@ export interface ResolvedMembership {
   expiresAt: string | null;
   /** 会员页展示用 */
   monthlyCredits: number;
+  /** 已取消自动续费, 但当前已付周期仍有效 */
+  cancelAtPeriodEnd: boolean;
 }
 
 @Injectable()
@@ -105,6 +107,7 @@ export class MembershipService {
       perks: { ...DEFAULT_PERKS },
       expiresAt: null,
       monthlyCredits: 0,
+      cancelAtPeriodEnd: false,
     };
     if (!userId) return NON_MEMBER;
 
@@ -112,7 +115,8 @@ export class MembershipService {
       const m = await this.prisma.membership.findFirst({
         where: {
           userId,
-          status: { in: ['active', 'grace'] },
+          // cancelled 表示已取消自动续费, 但用户已付的周期不能被立刻收回。
+          status: { in: ['active', 'grace', 'cancelled'] },
           expiresAt: { gt: new Date() },
         },
         include: { plan: { select: { code: true, name: true } } },
@@ -128,6 +132,7 @@ export class MembershipService {
         perks: parsePerks(m.perksSnapshot),
         expiresAt: m.expiresAt.toISOString(),
         monthlyCredits: m.monthlyCreditsSnapshot,
+        cancelAtPeriodEnd: m.status === 'cancelled',
       };
     } catch (e) {
       this.logger.warn(`解析会员权益失败, 按非会员处理: ${(e as Error).message}`);
@@ -281,7 +286,8 @@ export class MembershipService {
 
       const now = new Date();
       const current = await tx.membership.findFirst({
-        where: { userId: params.userId, status: { in: ['active', 'grace'] } },
+        // 已取消但尚未到期的会员仍可续费: 新订单会把它重新激活并顺延到期时间。
+        where: { userId: params.userId, status: { in: ['active', 'grace', 'cancelled'] } },
         orderBy: { expiresAt: 'desc' },
       });
 
@@ -384,24 +390,35 @@ export class MembershipService {
    */
   async cancel(userId: string): Promise<{ expiresAt: string }> {
     const m = await this.prisma.membership.findFirst({
-      where: { userId, status: { in: ['active', 'grace'] } },
+      // cancelled 也要能查到: 重复点「取消续费」应幂等返回同一到期时间,
+      // 而不是报「没有生效中的会员」让用户以为第一次没生效。
+      where: { userId, status: { in: ['active', 'grace', 'cancelled'] }, expiresAt: { gt: new Date() } },
       orderBy: { expiresAt: 'desc' },
     });
     if (!m) throw new AppError(40400, '没有生效中的会员', 404);
 
-    // 周期内且未过 24h 的用户可立即失效, 否则保留到期末(标记取消即到期后失效)
-    const now = new Date();
-    const withinGrace = now.getTime() < m.expiresAt.getTime();
+    // 已经取消过: 不再改状态, 直接回同一到期时间
+    if (m.status === 'cancelled') {
+      return { expiresAt: m.expiresAt.toISOString() };
+    }
+
+    /*
+     * 已付周期保留到 `expiresAt`，只停止自动续费。
+     *
+     * 旧实现把状态置 cancelled 后 `resolve()` 又只认 active/grace，导致用户
+     * 刚点完取消就立刻失去会员 —— 与确认框承诺的「权益保留至到期日」不符。
+     * 现在 resolve() 也接受 cancelled，到期由调度任务统一失效。
+     */
     const updated = await this.prisma.membership.update({
       where: { id: m.id },
       data: {
-        status: withinGrace ? 'cancelled' : 'expired',
+        // 查询已限定 expiresAt > now，所以这里一定是「未到期」的取消
+        status: 'cancelled',
         nextCreditAt: null,
       },
     });
 
-    // 取消后仍在本周期内: 权益保留到期末, 只是不再发后续积分
-    // 故把 expiresAt 保留不变, 由 resolve() 的 status 过滤决定是否生效
+    // expiresAt 保持不变: cancelled 在到期前仍算会员, 只是不再自动续费
     this.logger.log(`会员取消: user=${userId}, 权益保留至 ${m.expiresAt.toISOString()}`);
     return { expiresAt: updated.expiresAt.toISOString() };
   }
@@ -428,7 +445,8 @@ export class MembershipService {
     //    先查出到期的是哪些人, 再条件更新: 通知需要一个 userId, 而 updateMany
     //    只回 count。条件里带上 status/expiresAt 保证并发下不会重复通知。
     const expiring = await this.prisma.membership.findMany({
-      where: { status: { in: ['active', 'grace'] }, expiresAt: { lte: now } },
+      // cancelled 也要在周期结束时真正失效, 否则会永远保留权益。
+      where: { status: { in: ['active', 'grace', 'cancelled'] }, expiresAt: { lte: now } },
       select: { id: true, userId: true, expiresAt: true },
     });
     const expiredRes = await this.prisma.membership.updateMany({

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { Layout, Button, Avatar, Dropdown, Drawer } from 'antd';
 import {
   ChevronDown,
@@ -13,7 +13,7 @@ import {
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { CapabilityDef, CapabilityGroup } from '../types/api';
 import { MODE_LABELS } from '../lib/constants';
-import { toolPath } from '../lib/capabilities';
+import { isCapabilityVisible, toolPath } from '../lib/capabilities';
 import { useAuth } from '../context/AuthContext';
 import { useAdmin } from '../context/AdminContext';
 import { useCredits } from '../context/CreditsContext';
@@ -57,8 +57,15 @@ export function AppLayout({ groups, items, thumbs, statsTotal, children }: Props
   // + 5 个直链 (我的作品/购买套餐/邀请有奖/联系客服 + 首页本身)。
   // registry 下发的 3 组顺序与参考站顶导一致, 故此处直接渲染全部组、不做 slice 截断 ——
   // 旧注释「参考站只有两个下拉」是 10-17 旧快照, 已被实拍推翻 (docs/topnav-design.md §2.3/P1-1)。
-  // 联系客服本地无客服体系, 暂不补 (诚实差异, 见 docs/topnav-design.md §5-2)。
-  const topGroups = groups;
+  // 联系客服落到真实工单页: 站内工单支持咨询/投诉/发票问题, 并能跟踪回复。
+  //
+  // 下架/规划中的能力不再出现在顶导。分组也要跟着收敛：如果某组的所有能力
+  // 都不可用，保留一个空下拉只会让用户点开看到「没有内容」。
+  const visibleItems = useMemo(() => items.filter(isCapabilityVisible), [items]);
+  const topGroups = useMemo(
+    () => groups.filter((g) => visibleItems.some((c) => c.group === g.id)),
+    [groups, visibleItems],
+  );
 
   return (
     <Layout className="app-layout">
@@ -86,7 +93,7 @@ export function AppLayout({ groups, items, thumbs, statsTotal, children }: Props
                  条目 36 r9 / 13-600 #475467 / icon 20 / hover #f2efff-#5b4df5), 见 global.css */
               classNames={{ root: 'app-topnav-dropdown' }}
               menu={{
-                items: items
+                items: visibleItems
                   .filter((c) => c.group === g.id)
                   .map((c) => ({
                     key: c.id,
@@ -111,13 +118,16 @@ export function AppLayout({ groups, items, thumbs, statsTotal, children }: Props
           <Link to="/works" className="app-topnav-item">
             我的作品
           </Link>
-          {/* 参考站顶导第 6/7 项 (80px 直链)。本地 /packages、/invitations 路由早已存在却无顶导入口,
-              补齐后与参考站同为 7 项 (联系客服无对应体系未补) */}
+          {/* 参考站顶导第 6/7/8 项 (80px 直链)。/packages、/invitations 与
+              站内工单都是真实能力, 补齐后与参考站同为 8 项。 */}
           <Link to="/packages" className="app-topnav-item">
             购买套餐
           </Link>
           <Link to="/invitations" className="app-topnav-item">
             邀请有奖
+          </Link>
+          <Link to="/tickets?type=consultation&compose=1" className="app-topnav-item">
+            联系客服
           </Link>
           {/* 数据中心不进顶导: 参考站仅侧栏分组, 本地侧栏已有 (SideRail.tsx「数据中心」),
               顶导再放一份是重复入口。见 docs/topnav-design.md P1-3 */}
@@ -219,7 +229,7 @@ export function AppLayout({ groups, items, thumbs, statsTotal, children }: Props
         <div className="app-sider-wrap">
           <SideRail
             groups={groups}
-            items={items}
+            items={visibleItems}
             thumbs={thumbs}
             activePath={location.pathname}
             statsTotal={statsTotal}
@@ -232,7 +242,7 @@ export function AppLayout({ groups, items, thumbs, statsTotal, children }: Props
       <Drawer
         title="导航菜单"
         placement="left"
-        width={280}
+        size={280}
         open={mobileNavOpen}
         onClose={() => setMobileNavOpen(false)}
         className="app-mobile-drawer"
@@ -240,7 +250,7 @@ export function AppLayout({ groups, items, thumbs, statsTotal, children }: Props
       >
         <SideRail
           groups={groups}
-          items={items}
+          items={visibleItems}
           thumbs={thumbs}
           activePath={location.pathname}
           statsTotal={statsTotal}

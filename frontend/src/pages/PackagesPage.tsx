@@ -139,6 +139,9 @@ export function PackagesPage() {
                   <span className="pkg-card-bonus">
                     {plan.description || `订阅 ${plan.durationDays} 天，每月发放积分`}
                   </span>
+                  {plan.perkLabels.length > 0 && (
+                    <span className="pkg-card-perks">{plan.perkLabels.join(' · ')}</span>
+                  )}
                   <div className="pkg-card-price">
                     <strong>{formatYuan(plan.priceCents)}</strong>
                   </div>

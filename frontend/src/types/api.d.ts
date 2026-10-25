@@ -1298,6 +1298,8 @@ export interface MyMembership {
   perks: MembershipPlan['perks'];
   expiresAt: string | null;
   monthlyCredits: number;
+  /** 已取消自动续费，但当前已付周期仍有效 */
+  cancelAtPeriodEnd: boolean;
   totalSavedCents: number;
   totalSavedYuan: string;
   discountedOrders: number;

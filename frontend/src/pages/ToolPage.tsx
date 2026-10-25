@@ -40,7 +40,7 @@ import { ExceptionPage } from '../components/ExceptionPage';
 import { ResultMedia, formatDuration } from '../components/ResultMedia';
 import { ProviderBadge } from '../components/ProviderBadge';
 import { StateEmpty, StateSkeleton } from '../components/StateViews';
-import type { Asset, CapabilityParam, Task } from '../types/api';
+import type { Asset, CapabilityDef, CapabilityParam, Task } from '../types/api';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -52,10 +52,64 @@ const { Title, Paragraph, Text } = Typography;
  */
 export function ToolPage() {
   const { capability = '' } = useParams();
+  const def = capabilityById(capability);
+
+  if (!def) {
+    return (
+      <ExceptionPage
+        kind="not-found"
+        title="工具不存在"
+        desc={`没有找到标识为 ${capability} 的能力，可能是链接已失效，或后端尚未下发该能力。`}
+        detail={`requested capability: ${capability}`}
+        action={{ to: '/workbench', label: '返回工作台' }}
+      />
+    );
+  }
+
+  if (def.mode === 'planned') {
+    return (
+      <ExceptionPage
+        kind="info"
+        title={`${def.name} 规划中`}
+        desc="该能力已在产品路线中占位，尚未接入实现。可以先回工作台看看其他已可用的工具。"
+        action={{ to: '/workbench', label: '返回工作台' }}
+      />
+    );
+  }
+
+  /*
+   * 运行时结论（2026-10-21）。`planned` 已在上方拦掉，这里处理运营侧的
+   * 下线与「云端通道没配且本地也没有实现」两种情况 —— 两者的共同点是
+   * **按下去必然失败**，所以直接换成说明页，而不是让用户上传完图才收到报错。
+   *
+   * 可用性判断放在表单组件之外：Form.useForm 一旦创建就必须挂上 <Form>，
+   * 在全量不可用/能力不存在时提前 return 会触发 antd 的未连接警告。
+   */
+  const runtime = runtimeOf(def);
+  const blocked = runtime.effective === 'disabled' || runtime.effective === 'unavailable';
+  if (blocked) {
+    return (
+      <ExceptionPage
+        kind="info"
+        title={`${def.name}${runtime.effective === 'disabled' ? ' 已下线' : ' 暂不可用'}`}
+        desc={runtime.reason || '该能力当前不可提交，请稍后再试或联系客服。'}
+        detail={
+          IS_PROD
+            ? undefined
+            : `runtime: ${runtime.effective} · route=${runtime.route} · remoteAvailable=${runtime.remoteAvailable}`
+        }
+        action={{ to: '/workbench', label: '返回工作台' }}
+      />
+    );
+  }
+
+  return <ToolPageContent key={def.id} capability={capability} def={def} />;
+}
+
+function ToolPageContent({ capability, def }: { capability: string; def: CapabilityDef }) {
   const navigate = useNavigate();
   const { message } = App.useApp();
   const reportError = useGenerateError();
-  const def = capabilityById(capability);
   const { ensureProject } = useProject();
   const [form] = Form.useForm();
 
@@ -65,7 +119,7 @@ export function ToolPage() {
   const [task, setTask] = useState<Task | null>(null);
   const pollSignal = usePollAbort();
 
-  const inputs = def?.inputs ?? 1;
+  const inputs = def.inputs;
   /*
    * 消耗价文案与定制工具页同源。此前通用页**完全不提积分**, 用户点下去
    * 才发现余额少了 —— 同一个能力从不同入口进来, 说辞必须一致。
@@ -101,68 +155,14 @@ export function ToolPage() {
 
   // 切换能力时重置表单与状态 (默认值来自后端声明)
   useEffect(() => {
-    if (!def) return;
     form.setFieldsValue(def.defaultParams as Record<string, unknown>);
     setFileList([]);
     setAssets([]);
     setTask(null);
-  }, [def?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [def.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const originalThumb = assets[0] ? assetSrc(assets[0]) : undefined;
-
-  if (!def) {
-    return (
-      <ExceptionPage
-        kind="not-found"
-        title="工具不存在"
-        desc={`没有找到标识为 ${capability} 的能力，可能是链接已失效，或后端尚未下发该能力。`}
-        detail={`requested capability: ${capability}`}
-        action={{ to: '/workbench', label: '返回工作台' }}
-      />
-    );
-  }
-
-  if (def.mode === 'planned') {
-    return (
-      <ExceptionPage
-        kind="info"
-        title={`${def.name} 规划中`}
-        desc="该能力已在产品路线中占位，尚未接入实现。可以先回工作台看看其他已可用的工具。"
-        action={{ to: '/workbench', label: '返回工作台' }}
-      />
-    );
-  }
-
-  /*
-   * 运行时结论（2026-10-21）。`planned` 已在上方拦掉，这里处理运营侧的
-   * 下线与「云端通道没配且本地也没有实现」两种情况 —— 两者的共同点是
-   * **按下去必然失败**，所以直接换成说明页，而不是让用户上传完图才收到报错。
-   */
   const runtime = runtimeOf(def);
-  const blocked = runtime.effective === 'disabled' || runtime.effective === 'unavailable';
-  if (blocked) {
-    return (
-      <ExceptionPage
-        kind="info"
-        title={`${def.name}${runtime.effective === 'disabled' ? ' 已下线' : ' 暂不可用'}`}
-        desc={runtime.reason || '该能力当前不可提交，请稍后再试或联系客服。'}
-        /*
-         * 诊断串只在非生产环境露出（2026-10-22 改）。
-         *
-         * 原来无条件渲染 `runtime: … · route=… · remoteAvailable=…` ——
-         * 那是给排障的开发者看的内部配置回显（运营侧的 `gateway.route.<id>`
-         * 取值、云端通道是否可用），对终端用户是纯黑话，还把通道部署情况
-         * 泄露给了客户。生产环境直接不给；本地/测试档留着自己排查。
-         */
-        detail={
-          IS_PROD
-            ? undefined
-            : `runtime: ${runtime.effective} · route=${runtime.route} · remoteAvailable=${runtime.remoteAvailable}`
-        }
-        action={{ to: '/workbench', label: '返回工作台' }}
-      />
-    );
-  }
 
   async function doUpload(file: File): Promise<Asset> {
     const projectId = await ensureProject();
@@ -189,14 +189,14 @@ export function ToolPage() {
       const { taskId } = await generateApi.start({
         projectId,
         inputAssetIds: assets.map((a) => a.id),
-        capability: def!.id,
+        capability: def.id,
         params,
       });
       const done = await pollTask(taskId);
       if (done.status === 'failed') {
         message.error(`生成失败：${taskErrorText(done.errorCode)}`);
       } else {
-        message.success(`${def!.name} 已完成`);
+        message.success(`${def.name} 已完成`);
       }
     } catch (e) {
       reportError(e);

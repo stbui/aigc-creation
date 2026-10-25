@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { App } from 'antd';
 import { ArrowLeft } from 'lucide-react';
 import { ordersApi, invoicesApi, paymentsApi } from '../lib/api';
 import { notifyCreditsChanged } from '../context/CreditsContext';
@@ -48,6 +49,7 @@ function canPay(o: Order): boolean {
 
 export function OrdersPage() {
   const navigate = useNavigate();
+  const { modal, message } = App.useApp();
   const { token, openLogin } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,6 +67,8 @@ export function OrdersPage() {
   });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  /** 正在取消的订单 id，避免连点重复请求 */
+  const [cancelling, setCancelling] = useState<string | null>(null);
 
   /**
    * 拉列表。
@@ -216,6 +220,35 @@ export function OrdersPage() {
     }
   };
 
+  /**
+   * 主动关闭未支付订单。
+   *
+   * 用户可能只是想换一单，却让旧单一直挂到 30 分钟超时。取消后**不可恢复**
+   * （pending → cancelled 是终态），因此必须二次确认并说明优惠券不会被占用。
+   */
+  const cancelOrder = (o: Order) => {
+    modal.confirm({
+      title: `取消订单 ${o.orderNo}？`,
+      content: '取消后订单不可恢复；优惠券只在支付成功后核销，本单不会占用券。',
+      okText: '取消订单',
+      cancelText: '保留订单',
+      okButtonProps: { danger: true },
+      onOk: async () => {
+        setCancelling(o.id);
+        try {
+          const fresh = await ordersApi.cancel(o.id);
+          setOrders((prev) => prev.map((x) => (x.id === fresh.id ? fresh : x)));
+          message.success('订单已取消');
+        } catch (e) {
+          message.error(e instanceof Error ? e.message : '取消失败');
+          throw e;
+        } finally {
+          setCancelling(null);
+        }
+      },
+    });
+  };
+
   return (
     <div className="orders-page">
       <button type="button" className="pkg-back-btn" onClick={() => navigate(-1)}>
@@ -321,7 +354,7 @@ export function OrdersPage() {
             </div>
 
             {payable && (
-              <div className="pkg-result-actions" style={{ marginTop: 12 }}>
+              <div className="pkg-result-actions order-pay-actions" style={{ marginTop: 12 }}>
                 <button
                   type="button"
                   className="pkg-result-btn is-primary"
@@ -334,6 +367,14 @@ export function OrdersPage() {
                   }
                 >
                   继续支付
+                </button>
+                <button
+                  type="button"
+                  className="pkg-result-btn"
+                  disabled={cancelling === o.id}
+                  onClick={() => cancelOrder(o)}
+                >
+                  {cancelling === o.id ? '取消中…' : '取消订单'}
                 </button>
               </div>
             )}

@@ -81,6 +81,25 @@ export function TicketsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  /**
+   * 从首页页脚 / 顶导的「投诉举报」「帮助中心」直达时带 `?type=...&compose=1`。
+   * 打开表单并预选类型后清掉参数: 后续进入某张工单详情会写 `?id=`,
+   * 若保留 type 会在每次 URL 变化时把表单重新弹出来。
+   */
+  useEffect(() => {
+    const typeParam = searchParams.get('type');
+    if (typeParam === null && searchParams.get('compose') !== '1') return;
+    const type = TYPE_OPTIONS.some((o) => o.value === typeParam)
+      ? (typeParam as TicketType)
+      : 'consultation';
+    setForm((prev) => ({ ...prev, type }));
+    setComposing(true);
+    const next = new URLSearchParams(searchParams);
+    next.delete('type');
+    next.delete('compose');
+    setSearchParams(next, { replace: true });
+  }, [searchParams, setSearchParams]);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);

@@ -570,9 +570,9 @@ generate.service / prompt-tools
 | GET | `/api/v1/stats/overview` | 数据中心聚合（含按能力缩略图） |
 | GET | `/api/v1/credits/{balance,lots,ledger}` | 积分余额 / 批次 / 流水 |
 | GET | `/api/v1/membership/plans`、`/me` | 会员套餐 / 我的会员 |
-| POST | `/api/v1/membership/{subscribe,cancel}` | 订阅 / 取消 |
+| POST | `/api/v1/membership/{subscribe,cancel}` | 订阅 / 取消自动续费（取消后 `status='cancelled'`，已付周期保留至 `expiresAt`，到期由调度任务失效；续费可重新激活并顺延） |
 | GET | `/api/v1/products/:sku` | 商品详情（结算页用） |
-| GET | `/api/v1/orders/:id`、POST `/pay` | 订单详情 / 发起沙箱支付 |
+| GET | `/api/v1/orders/:id`、POST `/pay`、POST `/cancel` | 订单详情 / 发起沙箱支付 / 用户取消未支付订单（仅 `pending → cancelled`，幂等；已支付只能走退款） |
 | POST | `/api/v1/payments/:orderId/intent` | 发起真实渠道支付（返回 `redirect` 跳转或 `qrcode` 扫码） |
 | POST | `/api/v1/payments/callback/:channel` | **渠道异步回调（公开，无信封，`@Res()` 直写）**，验签 + 金额核对 + 幂等 |
 | GET | `/api/v1/payments/:orderId/status` | 支付状态轮询 |
@@ -685,7 +685,7 @@ Jimp 内置字体仅含 ASCII，故生成图内文案为英文（如 `AI MAIN IM
 
 ### README 只写现状
 
-`README.md` 记录**当前**的页面结构、能力清单、目录树、启动方式、环境坑与复刻规格。2026-10-21 起**不再往 README 追加逐轮改动与验证记录**（此前的历史记录已从文件移除）：改动的取舍与真实验证结果随提交说明记录，闸口清单与已知红灯维护在 `docs/testing.md`。
+`README.md` 记录**当前**的页面结构、能力清单、目录树、启动方式、环境坑与复刻规格。**不往 README 追加逐轮改动与验证记录**：改动的取舍与真实验证结果随提交说明记录，闸口清单与已知红灯维护在 `docs/testing.md`。
 
 改动功能/样式/环境约定后仍应同步 README 的现状章节 —— 但如果与代码冲突，**以代码为准并顺手改 README**，能力事实以 `backend/src/capabilities/definitions/` 为准。
 
@@ -770,5 +770,3 @@ Jimp 内置字体仅含 ASCII，故生成图内文案为英文（如 `AI MAIN IM
 | --- | --- |
 | `docs/brand/brand-basics.md` | 品牌唯一事实源（色板 / 字体 / logo / 口号） |
 | `docs/brand/naming.md` | 取名与商标冲突核查 |
-
-**执行记录**：2026-10-21 起不再集中写进 README（其历史章节已移除）。改动的取舍、真实验证结果与「已实现未实测」边界随提交说明记录；能力与接口现状以代码和本文件为准。
