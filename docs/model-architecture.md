@@ -10,10 +10,10 @@
 | 身份与形状分离 | 厂商 = 谁家 / 谁的 key / 有哪些模型；协议 = 请求体长什么样、响应从哪掏 | `vendors/vendor.catalog.ts` vs `protocols/protocol.spec.ts` |
 | 单一事实源 | 协议形状、厂商目录、配置项、能力元信息各只有一处声明 | 四个目录文件，其余层只引用 |
 | 依赖单向 | 应用 → 路由 → 调度 → 通道 → 协议 → 模态叶子；协议层不得反向依赖厂商层 | `verify-architecture-layers.ts` 35 项断言 |
-| 失败语义按模态 | 图像可回落本地；文本/视频没有本地实现，失败即失败 | 三个路由器各自实现 |
+| 失败语义统一 | 所有模态只允许模型产出；无线路/上游失败即失败并退款，不回落本地 | 三个路由器各自实现 |
 | 观测旁路 | 每次调用写 `ModelCallLog`，写失败只 WARN，不影响出片 | `image-call-logger.ts` |
 | 配置热生效 | env > DB > 代码默认；后台保存后立即失效缓存 | `gateway.config.ts` + `model-config.service.ts` |
-| 不把本地伪装成模型 | 产出带 `source: gateway/local`，前端如实显示徽标 | `unified.provider.ts` + `generate.service` |
+| 不把历史本地产物伪装成模型 | 新任务 `source=gateway`；历史 `local` 仍如实显示 | `unified.provider.ts` + `generate.service` |
 
 ## 2. 分层总览
 
@@ -26,7 +26,7 @@
 ┌─ 路由层（三个平级路由器，各自只认本模态的接口）───────────────────────┐
 │ CapabilityRouterProvider │ VideoCapabilityRouter │ TextCapabilityRouter│
 │  - 读 routeOf(capability) 与 cfg.enabled                              │
-│  - 图像：失败回落本地；文本/视频：失败上抛                             │
+│  - 图像/文本/视频：失败上抛，不回落本地                                │
 └────────┬──────────────────────────────────────────────────────────────┘
          ▼
 ┌─ 调度层 ChannelScheduler.dispatch(modality, run) ─────────────────────┐
@@ -61,9 +61,9 @@
 | --- | --- | --- |
 | `providers/modality.ts` | `Modality = text \| image \| video` | 叶子（三层都依赖它） |
 | `providers/unified/unified.provider.ts` | `ImageProvider` / `TextProvider` / `VideoProvider` 三个接口与三种 Outcome | 统一能力层 |
-| `providers/capability-router.provider.ts` | 图像路由：route 决策、协议分派、失败回落、调用埋点 | 路由层 |
-| `providers/text-capability-router.provider.ts` | 文本路由：无本地兜底 | 路由层 |
-| `providers/video-capability-router.provider.ts` | 视频路由：无本地兜底 | 路由层 |
+| `providers/capability-router.provider.ts` | 图像路由：route 决策、协议分派、失败退款语义、调用埋点 | 路由层 |
+| `providers/text-capability-router.provider.ts` | 文本路由：仅模型 | 路由层 |
+| `providers/video-capability-router.provider.ts` | 视频路由：仅模型 | 路由层 |
 | `providers/channel-scheduler.ts` | 按 priority 顺序调度、熔断冷却、合成存量通道 | 调度层 |
 | `providers/channel-repository.ts` | 线路增删改/排序、快照、固化旧配置（已由 `admin/model-channels` 接线） | 调度层 |
 | `providers/gateway.config.ts` | 配置解析：env > DB > default，3s 缓存，存量键回落 | 配置 |
@@ -80,20 +80,20 @@
 | `providers/minimax-image.provider.ts` | `minimax` 协议（一行构造） | 协议实现 |
 | `providers/openai-chat-text.provider.ts` | `openai-chat` 文本协议（支持多模态 content 数组） | 协议实现 |
 | `providers/minimax-video.provider.ts` | `minimax-video` 四段式异步协议 | 协议实现 |
-| `providers/local-image.provider.ts` | 本地 Jimp：按 `localImpl` 句柄分派，11 个本地真实实现（`LocalImageProvider`，2026-10-22 由历史名 `MockImageProvider` 更名） | 本地兜底 |
+| ~~`providers/local-image.provider.ts`~~ | **2026-10-25 已删除**。本地图像生成算法不再存在 | — |
 | `providers/gateway-prompt.ts` | 从能力定义取 `buildPrompt`，组装请求体 | 应用支撑 |
 | `providers/image-call-logger.ts` | 写 `ModelCallLog`，截断 prompt/reason，失败只 WARN | 观测 |
 | `providers/providers.module.ts` | 注册三个路由器、调度器、埋点器，绑定三个 DI token | 装配 |
 
 ## 4. 三模态与统一接口
 
-| 模态 | 接口 | 产出 | 本地兜底 | 使用方 |
+| 模态 | 接口 | 产出 | 生成来源 | 使用方 |
 | --- | --- | --- | --- | --- |
-| image | `ImageProvider.generate(capability, inputPaths, params)` | `{ kind:'image', buffer, format, source }` | 11 项有（Jimp 真实算法），4 项无（必须云端） | `generate.service` |
-| text | `TextProvider.generate(capability, messages, params)` | `{ kind:'text', text, source, usage? }` | 无 | `prompt-tools.service` |
-| video | `VideoProvider.generate(capability, inputPaths, params)` | `{ kind:'video', buffer, format, source, durationMs? }` | 无 | `generate.service` |
+| image | `ImageProvider.generate(capability, inputPaths, params)` | `{ kind:'image', buffer, format, source }` | 仅模型，`source=gateway` | `generate.service` |
+| text | `TextProvider.generate(capability, messages, params)` | `{ kind:'text', text, source, usage? }` | 仅模型 | `prompt-tools.service` |
+| video | `VideoProvider.generate(capability, inputPaths, params)` | `{ kind:'video', buffer, format, source, durationMs? }` | 仅模型 | `generate.service` |
 
-- 三者都实现 `ProduceSource = 'gateway' | 'local'`，路由器出口必填。
+- 三者都使用 `ProduceSource = 'gateway' | 'local'` 类型；`local` 仅用于读取 2026-10-25 前的历史记录。
 - `generate.service` 只注入 `IMAGE_PROVIDER` 与 `VIDEO_PROVIDER`，按能力的 `modality` 分流：`video → videoProvider`，其余 → `imageProvider`。
 - 文本不经过 `generate.service`，由 `prompt-tools` 直接注入 `TEXT_PROVIDER`。
 
@@ -103,26 +103,20 @@
 
 | `route` | 网关状态 | 行为 |
 | --- | --- | --- |
-| `local` | 任意 | 直接本地 Jimp，不算回落（`fallback=false`） |
-| `remote` | 可用 | 强制远程；全部通道失败仍回落本地 |
-| `auto` | 未配置 | 直接本地，`reason` 记「网关未配置」 |
-| `auto` | 可用 | 远程；全部失败回落本地 |
+| `local` | 存量配置 | 明确不可用：不执行本地算法，不静默改走远程；任务 `42204` 并退款 |
+| `remote` | 可用 | 强制模型线路；全部线路失败 → `42201` 并退款 |
+| `remote` | 不可用 | `42204` 并退款 |
+| `auto` | 未配置 | `42204` 并退款 |
+| `auto` | 可用 | 按 priority 尝试模型线路；全部失败 → `42201` 并退款 |
 
 `route` 键为 `gateway.route.<能力id>`，默认 `auto`，env 名 `GATEWAY_ROUTE_<能力ID大写>`。
 
-⚠️ 上表是**允许本地兜底**的能力（本地实现是真实像素算法）的行为。`allowsLocalFallback(def)`
-为 `false` 的能力 —— 创意生图 / 局部重绘 / 图片翻译 / 自由创作，本地**没有实现**（2026-10-22 已删除全部占位算法）—— **不回落**：
-通道未配置或全部失败时路由器抛 `NoModelChannelError`，任务落 `failed/42204` 并原额退款，
-**绝不交付占位图**；对它们 `route=local` 也视为不可用（配置与能力策略冲突时以不交假图为准）。
+2026-10-25 起本地生成算法全部删除，`route=local` 只作为存量配置读取。带遮罩的局部重绘/去水印若没有
+支持 `edits` 的线路，按 `42205` 失败并退款；不会忽略遮罩做整图重绘。
 
-2026-10-22 起这种「不可能成立的组合」**在保存时就被拒**：`ModelConfigService.updateAll()` 的
-`validate()` 对 `gateway.route.<id>=local` 交叉校验 `allowsLocalFallback()`，本地无实现的
-能力返回 `40001`（此前只校验取值是否属于 `auto/local/remote`，于是运营能把它存进去 ——
-后台回「保存成功」，C 端却变成 `runtime.effective=unavailable`、`route=local`、
-`remoteAvailable=true`，只能靠一条诊断串才发现是配置压死了可用通道）。
-后台「逐能力路由」的 `routes[].localAvailable` 与 `allowsLocalFallback()` 同源，
-前端据此把 `local` 选项置灰。**env 侧不受该校验约束**（`GATEWAY_ROUTE_<ID>` 由运营直接注入），
-此时 `runtime.reason` 会如实说明「已被配置为强制本地（请改为 auto 或 remote）」。
+`ModelConfigService.updateAll()` 现在只接受 `auto/remote`，任何新写入 `local` 都返回 `40001`。
+存量 `local` 不静默改写，但后台标为「存量本地（已停用）」，C 端 `runtime.effective=unavailable`；
+env 注入的存量 `GATEWAY_ROUTE_<ID>=local` 同样按不可用处理并给出原因。
 
 ### 5.2 调度算法（`channel-scheduler.ts`）
 
@@ -131,7 +125,7 @@
 3. 逐条尝试：冷却中（`cooldownUntil > now`）跳过；`run(channel)` 抛异常即失败，继续下一条。
 4. 成功：`failCount=0`、清冷却、记 `lastSuccessAt`，立即返回。
 5. 失败：`failCount+1`；达到 3 次 → 冷却 `max(30s, pollMs×5)`；全部失败返回 `attempts[]` 摘要。
-6. 路由器把 `attempts` 折叠成一行写进 `ModelCallLog.reason`（每条通道各自的原因），再决定是否回落。
+6. 路由器把 `attempts` 折叠成一行写进 `ModelCallLog.reason`（每条通道各自的原因），无线路 `42204`、全部失败 `42201`。
 
 ### 5.3 凭据注入
 
@@ -246,16 +240,16 @@ generate.service.create
       → getCapability(capability).modality 分流
       → CapabilityRouterProvider.generate
           → refreshConfig()（拉 ModelChannelConfig 覆盖值）
-          → route=local / 未配置 → LocalImageProvider
+          → route=local → 明确失败 42204（不执行本地算法）
           → 否则 scheduler.dispatch('image', run)
               → factory(protocol) → withChannel(creds) → provider.generate
                   → 协议层拼端点/尺寸/参考图 → HTTP
                   → 响应解包 → 下载 → 魔数判格式
-          → 成功：ImageOutcome(gateway)；全失败：回落 Jimp(local, fallback=true)
+          → 成功：ImageOutcome(gateway)；全失败：抛错并退款，不回落本地
           → ImageCallLogger.logSuccess/logFailure
       → 终止检查（status 仍为 running？）
       → 按 mime 推导扩展名 → StorageService.put → Asset
-      → task(succeeded, outputAssetId, provider=gateway|local)
+      → task(succeeded, outputAssetId, provider=gateway)
 ```
 
 ### 9.2 文本
@@ -290,12 +284,13 @@ generate.service（modality=video）
 
 ## 10. 失败与观测
 
-### 10.1 回落矩阵
+### 10.1 失败矩阵
 
 | 模态 / 能力 | 通道未配置 | 通道调用失败 | 产出形态 |
 | --- | --- | --- | --- |
-| image（本地是真实算法） | 本地 Jimp，`reason=网关未配置` | 全部通道失败 → 本地 Jimp，`fallback=true` | 始终有图 |
-| image（本地没有实现：创意生图 / 局部重绘 / 图片翻译 / 自由创作） | 抛错 → 任务失败 `42204` | 抛错 → 任务失败 `42204`，附每条通道原因 | 无产出，绝不交付占位图 |
+| image（无线路 / 存量 local） | 任务失败 `42204` 并退款 | — | 无产出 |
+| image（有线路但全部失败） | — | 任务失败 `42201` 并退款，附每条通道原因 | 无产出 |
+| image（带遮罩且无 edits 线路） | — | 任务失败 `42205` 并退款 | 无产出 |
 | text | 抛错（502） | 抛错（502），附每条通道原因 | 无产出 |
 | video | 抛错（任务失败） | 抛错（任务失败），附每条通道原因 | 无产出 |
 
@@ -307,13 +302,13 @@ generate.service（modality=video）
 | --- | --- |
 | `capability` / `ownerId` | 能力 / 用户（无外键，注销后保留） |
 | `route` / `source` / `fallback` | 路由决策 / 实际来源 / 是否回落 |
-| `reason` | 回落或失败原因（截断 300 字） |
+| `reason` | 失败原因或历史回退记录（截断 300 字） |
 | `model` / `modality` | 实际模型 / `image` / `text` / `video`（历史记录为 null） |
 | `prompt` | 提示词（截断 500 字） |
 | `durationMs` / `success` / `errorCode` | 耗时 / 成败 / 错误码 |
 | `outputBytes` / `width` / `height` | 产出大小与尺寸（文本用 UTF-8 字节数近似） |
 
-后台「调用记录」只读、不提供删除；「模型配置」按模态展示 `effective = gateway | local | none` 三态 —— `none` 明确表示**没有本地兜底、会失败**，不允许把视频/文本谎报成「本地算法」。
+后台「调用记录」只读、不提供删除；「模型配置」按模态展示 `effective = gateway | none` 二态 —— `none` 明确表示没有可用模型线路、会失败。历史 `local` 记录只用于追溯，不代表新任务可产生本地产出。
 
 ## 11. 数据模型
 
@@ -329,9 +324,9 @@ generate.service（modality=video）
 
 ### 新增一项能力
 
-1. `capabilities/definitions/<id>.ts` 导出 `CapabilityPlugin`（含 `modality`、`buildPrompt`、`creditCost`；image 必须有 `localImpl`）。
+1. `capabilities/definitions/<id>.ts` 导出 `CapabilityPlugin`（含 `modality`、`buildPrompt`、`creditCost`；不得声明本地实现）。
 2. `definitions/index.ts` 注册。
-3. 装配期断言自动检查提示词/积分价/本地实现；路由配置项、DTO 白名单、后台列表自动生成（`verify-capability-extensibility.ts` 19 项）。
+3. 装配期断言自动检查提示词/积分价与“无本地实现字段”；路由配置项、DTO 白名单、后台列表自动生成。
 
 ### 新增一家厂商
 

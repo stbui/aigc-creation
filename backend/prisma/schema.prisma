@@ -381,6 +381,8 @@ model CreditLedger {
   lotId   String?
   orderId String?
   taskId  String?
+  /// 资金/积分动作幂等键。退款按 taskId 生成稳定键，重复调用只能落一条流水。
+  idempotencyKey String? @unique
 
   /// 人工调整的原因。强制填写 (PRD B-52)
   reason     String?
@@ -394,6 +396,7 @@ model CreditLedger {
   @@index([userId, createdAt])
   @@index([type])
   @@index([orderId])
+  @@index([taskId])
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -804,6 +807,8 @@ model GenerationTask {
   errorCode     String?
   // 本次实际扣掉的积分数快照 (0 = 免费)。用于后台展示与退款核算
   creditCost    Int     @default(0)
+  /// 请求幂等键。与 ownerId 组成唯一约束，客户端重试不能重复建任务/扣费。
+  idempotencyKey String?
 
   // ── 任务监控 (admin-prd.md B-32 重试) ────────────────────────────
   // 本任务由哪个失败任务重试而来 (null = 用户首次发起)。
@@ -841,6 +846,7 @@ model GenerationTask {
   @@index([status])
   @@index([capability])
   @@index([createdAt])
+  @@unique([ownerId, idempotencyKey])
   // 孤儿任务回收按 (status, heartbeatAt) 扫描
   @@index([status, heartbeatAt])
 }

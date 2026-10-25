@@ -330,8 +330,8 @@ export function ChannelManagementTab({
                   title={`该模态的 ${allChannels.length} 条线路均已停用，不会尝试远程`}
                   description={
                     modality === 'image'
-                      ? '图像生成会回落本地算法。'
-                      : '文生文/文生视频没有本地兜底，调用会直接失败。'
+                      ? '图像能力将不可提交；直调任务会失败并退款。'
+                      : '文生文/文生视频调用会直接失败并退款。'
                   }
                 />
               )}

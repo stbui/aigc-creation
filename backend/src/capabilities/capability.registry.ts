@@ -10,6 +10,7 @@ import {
 } from './capability-plugin.type';
 import { parseDetailSections } from './definitions/param-options';
 import type { Modality } from '../providers/modality';
+import { AppError } from '../common/app.exception';
 
 /**
  * 能力清单 —— 全站唯一事实源 (2026-10-20 起为**聚合门面**)。
@@ -17,9 +18,8 @@ import type { Modality } from '../providers/modality';
  * ## 本文件现在转发, 不再定义
  *
  * 改造前能力定义**本体**在这里 (791 行, 15 项)。它的问题是: 一项能力的信息
- * 还散落在另外三处 ——
+ * 还散落在另外两处 ——
  *   - 提示词在 `providers/gateway-prompt.ts` 的 PROMPTS 字典
- *   - 本地像素算法分派在 `local-image.provider.ts` 的两处 switch
  *   - 路由配置项的 id 列表在 `providers/channel-config.defs.ts` 的 CAPABILITY_IDS
  *
  * 于是新增一项能力要改四个文件, 而**漏改不报错**:
@@ -28,17 +28,15 @@ import type { Modality } from '../providers/modality';
  *   漏 id    → 后台模型配置页少一行路由, 无处可配
  *
  * 现在每项能力是一个自包含对象 (`definitions/<id>.ts`), 元信息 + 提示词 +
- * 本地实现句柄 + 模态 + 积分价都在一处声明, 漏声明由装配期断言拦下。
+ * 模态 + 积分价都在一处声明, 漏声明由装配期断言拦下。
  *
  * **本文件保留为稳定门面的理由**: 11 处调用点 (generate / credits / admin /
  * stats / dto) 按原路径 import 本文件, 保留门面可让它们一行不改;
  * 新增能力时也只需改 `definitions/` 一处。
  *
  * mode 含义 (语义不变):
- *   real    —— 已接入真实实现, 界面标「已接入」。含两类: Jimp 本地真实算法,
- *              以及已接云端模型的能力 (自由创作 → 优云智算 qwen-image-3.0)。
- *              ⚠️ real ≠「本地算法」: 具体走哪条通道以**每单真实的 task.provider**
- *              为准, 前端结果卡按它显示, 不靠 mode 猜。
+ *   real    —— 已接入真实模型通道, 界面标「已接入」。
+ *              具体走哪条线路以**每单真实的 task.provider** 为准。
  *   mock    —— (2026-10-22 已移除) 过去表示「本地只画占位图」; 占位实现已全部删除
  *   planned —— 参考站有、本项目暂未实现, 界面标「规划中」且不可提交
  *
@@ -143,7 +141,7 @@ export function sanitizeParams(id: string, params: Record<string, any> | undefin
        * hidden 参数是页面/接口显式代填的技术字段（参考站别名、遮罩 id、
        * 精确定位等），不是用户表单项。未提交时必须保持“未提供”，不能补
        * 默认值 —— 否则新别名的默认值会覆盖旧字段，例如旧调用方只传
-       * bgColor 时，本地实现会误以为用户选了 selectedColor=transparent。
+       * bgColor 时，下游会误以为用户选了 selectedColor=transparent。
        */
       if (p.hidden) continue;
       out[p.key] = defaultParamsFor(id)[p.key];
@@ -167,6 +165,72 @@ export function sanitizeParams(id: string, params: Record<string, any> | undefin
     }
   }
   return out;
+}
+
+/**
+ * 提交前严格校验参数。
+ *
+ * `sanitizeParams` 的职责是落库前收敛；它遇到非法枚举或越界数字会回落到
+ * 默认值。这在“修正展示参数”时可以接受，但对生成任务是一种静默失真：
+ * 调用方提交 120% 扩图占比，实际按默认的 80% 出图并扣费。这里在扣费前
+ * 再做一道严格闸，越界/类型错误直接 40001。
+ */
+export function validateCapabilityParams(
+  id: string,
+  params: Record<string, any> | undefined,
+): void {
+  const def = BY_ID.get(id);
+  if (!def) throw new AppError(40001, `不支持的能力: ${id}`, 400);
+  if (params !== undefined && params !== null && (typeof params !== 'object' || Array.isArray(params))) {
+    throw new AppError(40001, 'params 必须是对象', 400);
+  }
+
+  const input = params ?? {};
+  for (const p of def.params) {
+    const raw = input[p.key];
+    if (raw === undefined || raw === null || raw === '') continue;
+
+    if (p.type === 'number') {
+      const value = typeof raw === 'number' ? raw : Number(raw);
+      if (!Number.isFinite(value)) {
+        throw new AppError(40001, `${p.label}必须是有效数字`, 400);
+      }
+      if (p.min !== undefined && value < p.min) {
+        throw new AppError(40001, `${p.label}不能小于 ${p.min}`, 400);
+      }
+      if (p.max !== undefined && value > p.max) {
+        throw new AppError(40001, `${p.label}不能大于 ${p.max}`, 400);
+      }
+      continue;
+    }
+
+    if (p.type === 'boolean') {
+      if (![true, false, 1, 0, '1', '0', 'true', 'false'].includes(raw)) {
+        throw new AppError(40001, `${p.label}必须是布尔值`, 400);
+      }
+      continue;
+    }
+
+    if (p.type === 'enum') {
+      if (!p.options?.some((option) => String(option.value) === String(raw))) {
+        throw new AppError(
+          40001,
+          `${p.label}取值无效（允许：${p.options?.map((option) => option.value).join('、') ?? '无'}）`,
+          400,
+        );
+      }
+      continue;
+    }
+
+    if (typeof raw === 'object') {
+      throw new AppError(40001, `${p.label}必须是文本`, 400);
+    }
+    const text = String(raw);
+    const maxLength = p.maxLength ?? 2000;
+    if (text.length > maxLength) {
+      throw new AppError(40001, `${p.label}不能超过 ${maxLength} 个字符`, 400);
+    }
+  }
 }
 
 export type { Modality };

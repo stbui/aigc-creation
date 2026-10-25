@@ -6,8 +6,7 @@
  * channel-config 四处, 新增一项要改四个文件且漏改不报错; 现在自包含在一个对象里,
  * 漏声明由 assertCapabilityIntegrity 在装配期拦下。
  *
- * 2026-10-22: `localFallback: false` + **无本地实现** —— 创作只能由真实模型完成,
- * 本地没有也不该有兜底。没有可用模型通道时任务 failed/42204 并退款,
+ * 创作只能由真实模型完成。没有可用模型通道时任务 failed/42204 并退款,
  * 既不交付占位图, 也不假装"还能在本机画一张"。
  */
 
@@ -35,8 +34,6 @@ export const FreeCreate: CapabilityPlugin = {
   buildPrompt: (p, refCount) =>
     `自由创作：${p.prompt || '按描述创作电商视觉'}` +
     `${refCountText(refCount)}，保持主体一致${ratioText(p.ratio)}${sizeText(p.size)}`,
-  /** 必须由真实模型完成: 无本地实现, 没通道就失败 (见 capability-plugin.type 的说明) */
-  localFallback: false,
   modality: 'image',
   inputs: 0,
   inWorkbench: false,

@@ -21,8 +21,7 @@ import type { AdminCapabilityControl } from '../../types/api';
  *
  * 三列信息刻意分开，因为它们回答的是三个不同问题：
  *   实现程度 (mode)     —— 代码里做到什么程度
- *   本地兜底 (localQuality) —— 云端不可用时产出的是真实算法还是没有（none）
- *   当前结论 (effective)    —— 此刻按下去会发生什么（下架 / 云端 / 本地 / 暂不可用）
+ *   当前结论 (effective)    —— 此刻按下去会发生什么（下架 / 云端 / 暂不可用）
  * 只显示 mode 会让「real 但没配通道」看起来像云端可用，正是要消除的误读。
  *
  * 下架**必须填原因**：原因会原样展示给 C 端用户并写进审计。只说「已下线」
@@ -110,7 +109,7 @@ export function AdminCapabilitiesPage() {
       key: 'mode',
       width: 110,
       render: (v: string) => (
-        <Tooltip title={v === 'real' ? '已接入真实实现（本地算法或云端模型）' : '参考站有、本项目未实现'}>
+        <Tooltip title={v === 'real' ? '已接入真实模型通道' : '参考站有、本项目未实现'}>
           <span className={`adm-tag ${v === 'real' ? 'is-success' : 'is-warning'}`}>
             <span className="adm-tag-dot" aria-hidden="true" />
             {v === 'real' ? '已接入' : '规划中'}
@@ -124,7 +123,7 @@ export function AdminCapabilitiesPage() {
       width: 170,
       render: (_, row) => {
         const eff = row.runtime?.effective ?? 'unavailable';
-        const tone = eff === 'remote' ? 'is-success' : eff === 'local' ? 'is-info' : 'is-danger';
+        const tone = eff === 'remote' ? 'is-success' : 'is-danger';
         return (
           <Tooltip title={row.runtime?.reason || ''}>
             <span className={`adm-tag ${tone}`}>

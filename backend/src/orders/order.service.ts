@@ -539,7 +539,7 @@ export class OrderService {
           source: 'purchase',
           validDays: item.validDaysSnapshot,
           orderId: order.id,
-        });
+        }, tx);
       }
     });
 

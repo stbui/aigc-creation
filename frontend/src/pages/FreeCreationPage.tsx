@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { App, Modal, Spin } from 'antd';
 import { ChevronLeft, ChevronRight, ImagePlus, Maximize2, Plus, Sparkles, X } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { assetSrc, assetsApi, generateApi, toAbsoluteUrl } from '../lib/api';
 
 import { ToolSubmitBar } from '../components/ToolSubmitBar';
@@ -19,7 +20,14 @@ import { useGenerateError } from '../hooks/useGenerateError';
 import { notifyCreditsChanged } from '../context/CreditsContext';
 import { usePasteUpload } from '../hooks/usePasteUpload';
 import { pollToResult } from '../lib/poll';
-import { MAX_IMAGE_MB, taskErrorText } from '../lib/constants';
+import {
+  MAX_IMAGE_BYTES,
+  MAX_IMAGE_MB,
+  SUPPORTED_IMAGE_ACCEPT,
+  SUPPORTED_IMAGE_LABEL,
+  isSupportedImageFile,
+  taskErrorText,
+} from '../lib/constants';
 import { useCapabilities } from '../hooks/useCapabilities';
 import type { Asset, MobileUploadAsset, TaskStatus } from '../types/api';
 
@@ -61,10 +69,9 @@ import type { Asset, MobileUploadAsset, TaskStatus } from '../types/api';
  * (顶部条带横排参考图, 真实参与构图)。
  *
  * 产出来源不向用户展示: 创作统一走 API 调用模型, 界面不标
- * 「真实模型 / 本地算法」——这套标签只描述后端通道实现, 对用户没有意义。
+ * 历史本地产出标签已停用；新任务只显示真实模型来源。
  *
- * 没通道就失败: free_create 本地没有实现 (能力定义里
- * localFallback: false)。后端无可用模型通道时任务按 42204 失败并退款;
+ * 没通道就失败: free_create 只允许模型生成。后端无可用模型通道时任务按 42204 失败并退款;
  * 本页据此在 /capabilities 报 unavailable 时直接禁用提交并写明原因 ——
  * 不让用户点下去才失败, 也不交付任何冒充创作结果的东西。
  *
@@ -104,9 +111,14 @@ export function FreeCreationPage() {
   const reportError = useGenerateError();
   const { ensureProject } = useProject();
   const { token, openLogin } = useAuth();
+  const [searchParams] = useSearchParams();
+  // 创意生图与自由创作共用参考站的 /free-creation 页面，但提交的任务能力不同。
+  // 只接受两个白名单值，未知参数回落到本页默认的自由创作，避免把任意串透传给后端。
+  const capability =
+    searchParams.get('capability') === 'creative_image' ? 'creative_image' : 'free_create';
   const fileInputRef = useRef<HTMLInputElement>(null);
   // 消耗价读后端下发的 creditCost, 不再在本页写死「10 积分」
-  const creditLabel = useCreditLabel('free_create');
+  const creditLabel = useCreditLabel(capability);
 
   // ── 表单状态 ──
   const [images, setImages] = useState<PkAsset[]>([]);
@@ -140,7 +152,7 @@ export function FreeCreationPage() {
   // ── 右侧「全部生成图」(本页能力的历史产出) ──
   // 数据取自 /tasks 而非 /assets: 生成记录以任务为准 (创作时间、尺寸口径都在任务上)。
   // 网格/大图/右键菜单由 components/ResultGalleryPane 渲染 (与商品主图页共用)。
-  const gallery = useResultGallery({ capability: 'free_create', token });
+  const gallery = useResultGallery({ capability, token });
   // 服务端仍有 running/pending 任务时也算生成中: 离开页面再回来, 禁用态与标题不丢
   const generating = submitting || gallery.items.some((item) => !item.url);
 
@@ -154,7 +166,7 @@ export function FreeCreationPage() {
    * 否则一次网络抖动就会让整页不可用。
    */
   const { data: capData } = useCapabilities();
-  const freeCreateRuntime = capData?.items.find((c) => c.id === 'free_create')?.runtime;
+  const freeCreateRuntime = capData?.items.find((c) => c.id === capability)?.runtime;
   const unavailableReason =
     freeCreateRuntime &&
     (freeCreateRuntime.effective === 'unavailable' || freeCreateRuntime.effective === 'disabled')
@@ -164,9 +176,9 @@ export function FreeCreationPage() {
   // ── 上传: 参考图 (点击/拖拽/粘贴, 最多 4 张, 顺序保留) ──
   const uploadFiles = useCallback(
     async (files: FileList | File[]) => {
-      const list = Array.from(files).filter((f) => f.type.startsWith('image/'));
+      const list = Array.from(files).filter(isSupportedImageFile);
       if (list.length === 0) {
-        message.warning('请选择图片文件（PNG / JPG / WebP / GIF）');
+        message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
         return;
       }
       const room = MAX_REF_IMAGES - images.length;
@@ -176,7 +188,7 @@ export function FreeCreationPage() {
       }
       const accepted = list.slice(0, room);
       if (list.length > room) message.warning(`超出数量限制，仅取前 ${room} 张`);
-      const oversize = accepted.filter((f) => f.size > MAX_IMAGE_MB * 1024 * 1024);
+      const oversize = accepted.filter((f) => f.size > MAX_IMAGE_BYTES);
       if (oversize.length > 0) {
         message.error(`单张不超过 ${MAX_IMAGE_MB}MB：${oversize.map((f) => f.name).join('、')}`);
         return;
@@ -390,7 +402,7 @@ export function FreeCreationPage() {
       const projectId = await ensureProject();
       const { taskId } = await generateApi.start({
         projectId,
-        capability: 'free_create',
+        capability,
         // 参考图选填 0~4 张; 顺序即构图顺序 (provider 顶部条带按序横排)
         inputAssetIds: images.map((x) => x.id),
         params: {
@@ -495,7 +507,7 @@ export function FreeCreationPage() {
                   <input
                     ref={fileInputRef}
                     type="file"
-                    accept="image/png,image/jpeg,image/webp,image/gif"
+                    accept={SUPPORTED_IMAGE_ACCEPT}
                     multiple
                     hidden
                     onChange={(e) => {
@@ -640,7 +652,7 @@ export function FreeCreationPage() {
                   onRatioChange={setRatio}
                   resolution={resolution}
                   onResolutionChange={setResolution}
-                  capabilityId="free_create"
+                  capabilityId={capability}
                   popoverClassName="fc-settings-popover"
                   popoverRole="dialog"
                   popoverAriaLabel="高级设置"

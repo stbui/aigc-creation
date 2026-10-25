@@ -23,7 +23,13 @@ import { useResultGallery, type GalleryItem } from '../hooks/useResultGallery';
 import { useAuth } from '../context/AuthContext';
 import { notifyCreditsChanged } from '../context/CreditsContext';
 import { pollToResult } from '../lib/poll';
-import { MAX_IMAGE_MB, taskErrorText } from '../lib/constants';
+import {
+  MAX_IMAGE_BYTES,
+  MAX_IMAGE_MB,
+  SUPPORTED_IMAGE_LABEL,
+  isSupportedImageFile,
+  taskErrorText,
+} from '../lib/constants';
 import type { Asset, MobileUploadAsset, TaskStatus } from '../types/api';
 
 /**
@@ -47,9 +53,8 @@ import type { Asset, MobileUploadAsset, TaskStatus } from '../types/api';
  * 复刻要求/名称/品牌 → 任务参数 (中文原文完整下发; 不再有"图内只画 ASCII"的本地兜底);
  * 比例/画质 → ratio / size 参数。
  *
- * 本地实现是**真实算法** (makeClone: 提取参考图布局签名与调色板 →
- * 按两档复刻程度重建场景 / 换主体)。云端通道不可用时由本地兜底出图,
- * 保底有产出; 只有能力被后台下线时才置灰提交。
+ * 复刻由真实图像模型完成；没有可用模型通道时页面禁用提交，
+ * 直调任务会失败并退款。
  */
 
 // ───────────────── 常量 (参考站实拍) ─────────────────
@@ -149,8 +154,7 @@ export function ViralClonePage() {
   /*
    * 该能力此刻能不能生成。
    *
-   * hot_remake 有真实本地算法, 没通道会回落本地而非失败; 只有被后台下线
-   * (`disabled`) 或能力状态异常 (`unavailable`) 时才需要提前拦住提交。
+   * 没有可用模型通道 (`unavailable`) 或被后台下线 (`disabled`) 时提前拦住提交。
    */
   const { data: capData } = useCapabilities();
   const hotRemakeRuntime = capData?.items.find((c) => c.id === 'hot_remake')?.runtime;
@@ -163,9 +167,9 @@ export function ViralClonePage() {
   // ── 上传: 商品图 (点击/拖拽/粘贴, 最多 5 张) ──
   const uploadFiles = useCallback(
     async (files: FileList | File[]) => {
-      const list = Array.from(files).filter((f) => f.type.startsWith('image/'));
+      const list = Array.from(files).filter(isSupportedImageFile);
       if (list.length === 0) {
-        message.warning('请选择图片文件（PNG / JPG / WebP / GIF）');
+        message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
         return;
       }
       const room = MAX_IMAGES - images.length;
@@ -175,7 +179,7 @@ export function ViralClonePage() {
       }
       const accepted = list.slice(0, room);
       if (list.length > room) message.warning(`超出数量限制，仅取前 ${room} 张`);
-      const oversize = accepted.filter((f) => f.size > MAX_IMAGE_MB * 1024 * 1024);
+      const oversize = accepted.filter((f) => f.size > MAX_IMAGE_BYTES);
       if (oversize.length > 0) {
         message.error(`单张不超过 ${MAX_IMAGE_MB}MB：${oversize.map((f) => f.name).join('、')}`);
         return;
@@ -203,13 +207,13 @@ export function ViralClonePage() {
   // ── 上传: 参考图 (单张, 超出即替换) ──
   const uploadReference = useCallback(
     async (files: FileList | File[]) => {
-      const list = Array.from(files).filter((f) => f.type.startsWith('image/'));
+      const list = Array.from(files).filter(isSupportedImageFile);
       if (list.length === 0) {
-        message.warning('请选择图片文件（PNG / JPG / WebP / GIF）');
+        message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
         return;
       }
       const file = list[0];
-      if (file.size > MAX_IMAGE_MB * 1024 * 1024) {
+      if (file.size > MAX_IMAGE_BYTES) {
         message.error(`单张不超过 ${MAX_IMAGE_MB}MB：${file.name}`);
         return;
       }

@@ -41,11 +41,19 @@ async function fetchToken(request: APIRequestContext): Promise<{ token: string; 
   // 邮箱必须每次调用现生成 —— 模块级常量会被多个用例共享, 第二个用例注册会撞
   // "该邮箱已注册" (400)。
   const email = `e2e-state-${Date.now()}-${Math.floor(Math.random() * 1e6)}@local.dev`;
-  const res = await request.post(`${API}/api/v1/auth/register`, {
-    data: { email, password: 'E2e@123456', name: 'e2e-state' },
-  });
-  if (!res.ok()) throw new Error(`注册失败 ${res.status()}: ${await res.text()}`);
-  return { token: (await res.json()).data.accessToken, email };
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const res = await request.post(`${API}/api/v1/auth/register`, {
+      data: { email, password: 'E2e@123456', name: 'e2e-state' },
+    });
+    const text = await res.text();
+    if (res.ok()) return { token: JSON.parse(text).data.accessToken, email };
+    const waitSeconds = Number(text.match(/请\s*(\d+)\s*秒后再试/)?.[1] ?? 0);
+    if (res.status() !== 429 || attempt === 3) {
+      throw new Error(`注册失败 ${res.status()}: ${text}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, Math.max(waitSeconds, 1) * 1000 + 250));
+  }
+  throw new Error('注册失败: 限流重试次数耗尽');
 }
 
 /**
@@ -80,6 +88,35 @@ async function failEndpoint(page: Page, pattern: RegExp) {
       status: 500,
       contentType: 'application/json',
       body: JSON.stringify({ code: 50000, message: '注入的失败', data: null }),
+    }),
+  );
+}
+
+/**
+ * 让指定能力在页面内呈现为「云端模型可用」。
+ *
+ * 状态交接用例只关心提交后的 UI 状态，不应依赖本机是否真的配置了模型通道。
+ * 注意这里只改测试响应，不会调用或绕过真实生成接口。
+ */
+async function mockRemoteCapability(page: Page, request: APIRequestContext, capability: string) {
+  const res = await request.get(`${API}/api/v1/capabilities`);
+  expect(res.ok(), `capabilities ${res.status()}`).toBeTruthy();
+  const data = (await res.json()).data;
+  const item = data.items.find((c: { id: string }) => c.id === capability);
+  expect(item, `missing capability ${capability}`).toBeTruthy();
+  item.runtime = {
+    ...item.runtime,
+    enabled: true,
+    remoteAvailable: true,
+    localQuality: 'none',
+    effective: 'remote',
+    reason: null,
+  };
+  await page.route('**/api/v1/capabilities', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ code: 0, data, message: '' }),
     }),
   );
 }
@@ -166,15 +203,9 @@ test.describe('状态契约 · 加载中必须有指示', () => {
 test.describe('状态契约 · 生成中不得显示空态', () => {
   test('工具页: 提交后结果栏显示生成中骨架, 不显示「提交任务后…」空态', async ({ page, request }) => {
     const { token, email } = await fetchToken(request);
-    /*
-     * 2026-10-21 改打 /background-remove (matting)。
-     *
-     * 原来用 /local-redraw —— 它本地没有实现, 按
-     * `localFallback: false` 处理: 没有模型通道时 runtime=unavailable, 工具页
-     * 直接渲染「暂不可用」, 根本到不了"生成中"。本用例测的是提交后的状态交接,
-     * 与环境里配没配通道无关, 故换一项有**真实本地兜底**的能力 (matting),
-     * 无通道时 runtime=local 仍可提交。
-     */
+    // 2026-10-25 起所有图像能力都只由模型产出。本用例测的是提交后的状态交接，
+    // 与环境里是否配了模型通道无关，故显式 mock 为 remote 后再进入页面。
+    await mockRemoteCapability(page, request, 'matting');
     await gotoAsAuthed(page, '/background-remove', token, email);
 
     // 拦截 /generate 让它挂住, 使 "生成中" 状态可持续观察

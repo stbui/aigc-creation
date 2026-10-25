@@ -48,8 +48,8 @@ uat@admin.com
 
 当前形态 = **C 端创作站 + 独立后台管理端 + 商业运营域 + 账户合规/服务域**：
 
-- **16 项能力**（全部 `real`，0 `mock` / 0 `planned`，13 项进工作台）。2026-10-22 起**删除全部占位实现**，`mock` 这一档随之从类型里移除：11 项图像能力有本地真实算法（Jimp / 自研，云端不可用时回落），4 项图像能力（创意生图 / 局部重绘 / 图片翻译 / 自由创作）本地没有实现、只能走云端，1 项视频（图生视频走 MiniMax）无本地兜底。
-- **生成通道**为「模态 × 协议 × 厂商」三层可插拔，图像按能力路由并可自动回落本地；文本/视频无本地兜底，失败如实报错。
+- **16 项能力**（全部 `real`，0 `mock` / 0 `planned`，13 项进工作台）。2026-10-25 起**本地图像生成算法全部删除**：图像、文本、视频都只允许真实模型产出；无模型线路即失败并退款，不交付伪结果。
+- **生成通道**为「模态 × 协议 × 厂商」三层可插拔。`auto/remote` 只调度真实模型线路，存量 `route=local` 明确判不可用；新写入不再接受 `local`。
 - **后台管理端**（`/admin`）28 个页面，权限点 + 审计 + 定时任务 + 备份 + 存储切换。
 - **商业域**：商品 / 订单 / 支付 / 退款 / 积分账本 / 会员 / 优惠券 / 限时活动 / 邀请签到 / 发票 / 渠道对账。
 - **账户与合规域**：找回密码 / 短信登录 / **扫码登录** / 自助注销与数据导出 / 法务版本化与同意留痕 / 站内消息 / AIGC 标识（可见角标样式后台可配）/ 限流 / 健康检查 / 请求追踪。
@@ -63,7 +63,7 @@ uat@admin.com
 | 配置 | @nestjs/config（零依赖手写 validate） | 12.0.1 |
 | 日志 | 自研 AppFileLogger（落盘 + 轮转 + 脱敏） | 无新增依赖 |
 | 数据库 | SQLite（`backend/dev.db`），`node:sqlite` 内置模块 | 需 Node ≥ 22.5 |
-| 图像 | Jimp（11 项本地真实算法） | 1.6.1 |
+| 图像 | Jimp（仅上传校验 / 尺寸探测 / AIGC 角标，不生成图片） | 1.6.1 |
 | 鉴权/加密 | jsonwebtoken / bcryptjs | 9.0.3 / 3.0.3 |
 | 前端 | Vite + React + antd + lucide-react + react-router-dom | 8.3.4 / 19.3.0 / 6.6.6 / 1.57.0 / 7.18.4 |
 | 前端其他 | qrcode（邀请海报 / 扫码登录）/ Playwright（e2e） | 1.5.4 / `^1.64.1`（仅 e2e 允许 `^`） |
@@ -177,6 +177,7 @@ npm run db:push:test        # 建测试库表
 npm run db:reset:test       # ★ 删测试库+测试目录 → 重建 → 重灌种子（带安全门禁）
 npm run seed:test           # 只灌测试库种子
 npm run db:migrate:provider # 存量 GenerationTask.provider 'mock' → 'pending'（一次性、幂等；跑前打印影响行数）
+npm run db:migrate:tool-idempotency # 存量库补幂等字段/索引（非破坏、可重复；不要用 accept-data-loss）
 
 # 种子（按需组合；seed:all = 开发账号（未设 SEED_USER_EMAIL 则跳过）+ 角色 + 后台管理员 + 商品 + 会员 + 营销 + 法务 + 消息模板）
 npm run seed:admin          # 后台管理员（默认 admin@huojue.local，密码仅打印一次）
@@ -205,13 +206,7 @@ docker compose down -v                      # 连数据卷一起删
 # 冒烟验证（需后端已启动；28 个脚本）
 cd backend
 node scripts/smoke-auth.js                    # 注册/登录/改密后旧 token 失效
-node scripts/smoke-capabilities.js            # 图像能力：本地真实算法 11 / 仅云端 4 / 失败 0（视频模态跳过）
-node scripts/smoke-main-image-variants.js
-node scripts/smoke-detail-sections.js
-node scripts/smoke-viral-clone.js
-node scripts/smoke-multi-fusion.js
-node scripts/smoke-sku.js
-node scripts/smoke-gateway-channel.js         # 45 项断言：三图像协议路由/回落/请求体/预设完整性
+node scripts/smoke-capability-runtime.js       # runtime/model-only 契约 + 上下线 + 限时免费
 node scripts/smoke-admin.js                   # 后台身份/权限/审计
 node scripts/smoke-commerce.js                # 商品/订单/支付/退款/积分
 node scripts/smoke-membership.js              # 会员订阅与月度积分
@@ -228,7 +223,6 @@ node scripts/smoke-aigc.js                    # AIGC 标识：PNG chunk CRC / JP
 node scripts/smoke-signed-url.js             # 签名 URL：另起带密钥实例验证 403/200/篡改/过期/HEAD
 node scripts/smoke-rate-limit.js             # 限流：短信 1/分、寻找回 3/时、伪造 XFF 无效
 node scripts/smoke-health-tracing.js         # 健康分项 + X-Request-Id 回显 + 日志 [rid=] 串联
-node scripts/smoke-capability-runtime.js     # 28 项：runtime 字段自洽（无本地实现的能力不预告产出）/ 上下线 40005 / 限时免费 0 积分
 node scripts/smoke-tickets-search.js         # 42 项：工单状态机/越权 404/全局搜索/批量/CSV 导入导出
 node scripts/smoke-refund-rules.js            # 19 项：退款时间窗 40905/比例 40906/已消耗积分 40907/会员终止
 node scripts/smoke-qr-login.js                # 20 项：扫码≠授权/一次性兑换 consumed/过期/登录审计
@@ -262,36 +256,31 @@ node scripts/verify-deps.js --quiet           # 仅结论，有致命问题 exit
 
 能力清单**只在 `backend/src/capabilities/definitions/<id>.ts` 定义**，由 `definitions/index.ts` 聚合，经 `capability.registry.ts` 门面导出，再通过 `GET /api/v1/capabilities` 下发给前端。侧栏、卡片、表单、统计分布全部由这份数据渲染 —— **新增能力不需要改前端**。
 
-2026-10-20 起每项能力是**自包含对象**：元信息、提示词（`buildPrompt`）、本地实现句柄（`localImpl`）、模态（`modality`）、积分价（`creditCost`）都在一处声明。装配期由 `assertCapabilityIntegrity` 校验，漏声明即启动失败。
+2026-10-20 起每项能力是**自包含对象**：元信息、提示词（`buildPrompt`）、模态（`modality`）、积分价（`creditCost`）都在一处声明。2026-10-25 起不再有本地实现句柄。装配期由 `assertCapabilityIntegrity` 校验，漏声明即启动失败。
 
 新增一项能力只需两步：
 
 1. 在 `capabilities/definitions/` 下新建 `<id>.ts`，导出一个 `CapabilityPlugin`
 2. 在 `definitions/index.ts` 的 `CAPABILITY_PLUGINS` 数组里加 import + 一项
 
-`CapabilityPlugin` 关键字段：`id / name / group / summary / sidebarHint / badge / mode / modality / buildPrompt / localImpl? / localFallback? / creditCost / inputs(0|1|2) / inWorkbench / help / params[]`。`ParamType = enum | number | text | boolean`。
-
-`localFallback`：云端不可用时是否允许交付本地产物。省略时默认**允许**（`allowsLocalFallback()` 返回 `def.localFallback ?? true`）。本地没有实现的能力（创意生图 / 局部重绘 / 图片翻译 / 自由创作）显式写 `localFallback: false` —— **没通道就失败并退款，绝不交占位图**；有本地真实算法的能力保持回落。
+`CapabilityPlugin` 关键字段：`id / name / group / summary / sidebarHint / badge / mode / modality / buildPrompt / creditCost / inputs(0|1|2) / inWorkbench / help / params[]`。`ParamType = enum | number | text | boolean`。**不存在 `localImpl` / `localFallback`**。
 
 `mode` 语义（实现程度）：
 
-- `real` — **已接入真实实现**，界面标「已接入」。含 Jimp 本地真实算法与已接云端模型的能力
+- `real` — **已接入真实模型能力**，界面标「已接入」
 - `mock` — (2026-10-22 已移除) 过去标记「本地只画占位图」，那批占位实现已全部删除
 - `planned` — 参考站有、本项目未实现，界面标「规划中」且不可提交（当前 0 项）
 
-`modality` 语义（产出介质），与 `mode` **正交**：`image` / `text` / `video`。当前 15 项 image + 1 项 video（图生视频）；`text` 用于提示词工具等非能力项。**`real` ≠「本地算法」**：单次请求走云端还是本地回落，以 `task.provider` 为准（`gateway` / `local`；建任务时的初值是 `pending`，表示尚未执行，跑完会被改写。2026-10-22 前初值叫 `mock`，存量行用 `npm run db:migrate:provider` 归一），结果卡按它显示徽标（绿=真实模型 / 琥珀=本地算法），不靠 `mode` 猜。
+`modality` 语义（产出介质），与 `mode` **正交**：`image` / `text` / `video`。当前 15 项 image + 1 项 video（图生视频）；`text` 用于提示词工具等非能力项。新任务的 `task.provider` 恒为 `gateway`（建任务初值 `pending`）；`local` 只表示 2026-10-25 前的历史产出，结果卡仍如实标注为历史本地结果。
 
 **当前分布**（16 项）：
 
-- **全部 16 项 `real`**：
-  - 11 项有本地真实算法：商品主图 / 商品详情图 / 智能扩图 / 一键抠图 / 产品精修 / 商品换色 / 旋转角度 / 爆款复刻 / 商品SKU图 / 去除水印 / 多图融合
-  - 4 项只能走云端（`localFallback: false`）：创意生图 / 局部重绘 / 图片翻译 / 自由创作
-  - 1 项视频：图生视频（无本地兜底）
+- **全部 16 项 `real`，全部只能由模型生成**：15 项图像 + 1 项视频。
 - 分组：`ecommerce_gen` 6 / `ai_retouch` 8 / `ai_video` 2（自由创作与图生视频）
 
-新增能力时按实际实现程度声明 `mode`：有本地真实算法或已接云端模型即 `real`，本地没有实现的写 `localFallback: false` 而不是补一张占位图。
+新增能力时按实际实现程度声明 `mode`：已接真实模型即 `real`；未实现写 `planned`，不得补本地占位或伪模型结果。
 
-> ⚠️ 界面标注看的是 **`runtime.effective`**（见下），不是 `mode`。`mode` 只回答「代码实现到什么程度」；同一项能力在不同部署下按下去可能走云端或本地算法，本地没有实现的会如实报 `unavailable`。
+> ⚠️ 界面标注看的是 **`runtime.effective`**（见下），不是 `mode`。`mode` 只回答「代码实现到什么程度」；没有模型线路时一律如实报 `unavailable`。
 
 ### 能力运行时真相（`runtime`）
 
@@ -299,15 +288,14 @@ node scripts/verify-deps.js --quiet           # 仅结论，有致命问题 exit
 
 | `effective` | 含义 |
 | --- | --- |
-| `remote` | 有可用云端通道，按下去走真实模型 |
-| `local` | 无（或不走）云端，走本地真实算法 |
+| `remote` | 有可用模型线路，按下去走真实模型 |
 | `disabled` | 后台已下线（`CapabilityControl.enabled=false`） |
-| `unavailable` | 没有本地产物可交付且无云端通道：视频/文本，以及 `localFallback=false` 的 4 项图像能力（创意生图 / 局部重绘 / 图片翻译 / 自由创作） |
+| `unavailable` | 没有可用模型线路（或存在已停用的存量 `route=local`）：不可提交/任务失败并退款 |
 
 - 由 `capabilities/capability-availability.service.ts` 合成，3s 缓存，后台写入即 `invalidate()`。
 - **没有 `CapabilityControl` 行 = 启用**（默认全开，不预置 16 行）。
 - 下架必须填原因；`generate.service` 在**扣费之前**拦截并返回 `40005`，原因原样下发到 C 端。
-- `effective` 是**事前预期**；单次实际走的哪条路仍以 `task.provider` 为准（云端失败会回落本地）。
+- `effective` 是**事前预期**；新任务实际来源恒为 `gateway`，失败不会回落本地产出。
 - 后台「能力管控」页（`/admin/capabilities`）读写；权限 `capability.read` / `capability.write`（高危，需填原因 + 审计）。
 
 **积分价**：`creditCost` 是代码默认值，运行时一律经 `CreditPriceService.resolve()` 取生效价（后台可改）。业务代码**不要直接读 `creditCost`**，否则后台调价不生效。
@@ -356,18 +344,19 @@ generate.service / prompt-tools
 
 **图像 / 文本协议当前都是同步的**：一次请求阻塞到出结果，不存在「提交任务 + 轮询」的图像协议。`ProtocolSpec.mode` 与 `pollEndpoint?` 作为通用异步契约字段保留（视频走独立的 `VIDEO_PROTOCOL_SPECS`，四段式异步）。因此图像通道的 `GATEWAY_{MODALITY}_POLL_MS` / `_MAX_POLLS` 不参与出图，实际由视频协议与 `ChannelScheduler` 的冷却判定使用。
 
-### 回落策略：按模态与能力区分（勿扩大「必回落」）
+### 失败策略：所有模态都不回落本地
 
-| 模态 / 能力 | 远端失败时 | 理由 |
+| 模态 / 能力 | 失败时 | 错误码 |
 | --- | --- | --- |
-| image（本地是真实算法） | 回落 `LocalImageProvider`（本地 Jimp），打 WARN | 本地算法真能出图，用户不白屏 |
-| image（本地没有实现：创意生图 / 局部重绘 / 图片翻译 / 自由创作） | **不回落**，任务 `failed/42204` 并退款 | 本地没有该能力的真实算法，编一张图冒充模型产出比失败更糟 |
-| text | **不回落**，返回 502 + 可读错误 | 编模板文案会让用户误以为是模型产出 |
-| video | **不回落**，如实失败 | 本地不存在「生成视频」这回事 |
+| image，无可用线路或存量 `route=local` | 任务失败并退款 | `42204` |
+| image，有线路但全部失败 | 任务失败并退款 | `42201` |
+| image，带遮罩但没有 edits 协议线路 | 任务失败并退款 | `42205` |
+| text | 返回 502 + 可读错误 | HTTP 502 |
+| video | 如实失败并退款 | 视频路由错误码 |
 
-因此「失败必回落、用户始终拿得到图」只适用于**本地有真实算法**的图像能力；文本/视频**没有本地兜底**（校验器也只对 `image` 模态强制要求 `localImpl`），本地没有实现的图像能力则**没通道就失败**（`allowsLocalFallback` 判定，见 `capability-plugin.type.ts`）。
+本地图像生成算法已于 2026-10-25 删除。失败后不会合成、裁剪或占位出图；`generate.service` 按任务快照统一退款。
 
-**未知协议必须走同一条降级路径**：`CapabilityRouterProvider.pickProtocol()` 对未知协议抛错，但该调用**必须在 `try` 内** —— 放外面会让异常绕过能力策略直接穿透到 `generate.service`。放进 `try` 后它与通道失败走同一条路径（允许本地兜底的能力回落本地，无本地实现的能力判 `42204`），同时把「未知协议 xxx」写进 `ModelCallLog.reason`，静默失败照样看得见。
+**未知协议必须走失败路径**：`CapabilityRouterProvider.pickProtocol()` 对未知协议抛错，由调度器记为该线路失败并尝试下一条；全部失败时任务 `42201`，未知协议原因写入 `ModelCallLog.reason`，不静默换协议。
 
 ### 厂商目录与后台模型配置
 
@@ -375,7 +364,7 @@ generate.service / prompt-tools
 
 已内置 7 家：`modelverse`（优云智算，image+text）/ `siliconflow`（硅基流动，image+text）/ `openai`（官方，image+text）/ `volcengine`（火山方舟，image）/ `minimax`（image+video）/ `deepseek`（仅 text）/ `moonshot`（仅 text）。
 
-**DeepSeek / Moonshot 只进文本通道**：两者标称「OpenAI 兼容」指 `/v1/chat/completions` 的**文本**兼容，**没有图像生成端点**。把它们配到生图通道必然 404 → 回落本地，恰好制造本该消除的静默失败。
+**DeepSeek / Moonshot 只进文本通道**：两者标称「OpenAI 兼容」指 `/v1/chat/completions` 的**文本**兼容，**没有图像生成端点**。把它们配到生图通道必然 404，最终按线路失败处理并退款。
 
 后台「模型配置」还提供：通道增删改、连通性测试（`POST /admin/model-config/test`）、单通道测试、调用记录（`ModelCallLog`，含回落原因）。多渠道灾备由 `channel-scheduler.ts` 负责：按 `priority` 升序选通道、跳过冷却中的通道、失败记一笔并试下一条，连续失败达阈值即熔断冷却（刻意不做权重随机 —— 灾备需要确定性，排障要能说出「刚才走的是哪条」）。
 
@@ -389,10 +378,10 @@ generate.service / prompt-tools
 | `..._VENDOR` | 空 | 厂商预设标识，仅用于回看配置来源 |
 | `..._ENABLED` | false | 强制尝试远程；**基址或令牌非空即视为开启** |
 | `..._TIMEOUT_MS` / `..._POLL_MS` / `..._MAX_POLLS` | 图/文 120000 / 2000 / 60；视频 600000 / 2000 / 300 | 超时 / 轮询间隔 / 次数 |
-| `GATEWAY_ROUTE_<能力ID大写>` | `auto` | 单能力路由：`local` 强制本地 / `remote` 强制远程 |
+| `GATEWAY_ROUTE_<能力ID大写>` | `auto` | 单能力路由：`auto` / `remote`；存量 `local` 只读并判不可用 |
 | `ASSET_PUBLIC_BASE` | 空 | 参考图回传基址（网关需能拉取本站图片） |
 
-存量单前缀 `GATEWAY_BASE_URL` / `GATEWAY_TOKEN` 等**仅对 image 模态**继续生效（legacy 回落），新配置请用模态前缀。默认零配置时全部能力走本地实现，行为与接入前一致。参考图以**站内 URL** 形式回传（`params.inputImages`），不传本地磁盘路径。
+存量单前缀 `GATEWAY_BASE_URL` / `GATEWAY_TOKEN` 等**仅对 image 模态**继续生效（legacy 回落），新配置请用模态前缀。默认零配置时能力显示不可用，不会本地生成。参考图以**站内 URL** 形式回传（`params.inputImages`），不传本地磁盘路径。
 
 ### 配置层（@nestjs/config）+ 三环境体系
 
@@ -494,7 +483,7 @@ generate.service / prompt-tools
 | `40905` / `40906` / `40907` | 退款：超时间窗 / 超可退比例 / 积分已消耗且扣不回 | `orders/order.service.ts` |
 | `40908` | 该订单有退款仍在渠道处理中（`Refund.status='processing'`），不接受新的退款 | 同上 |
 | `42202` / `42203` | 任务中断回收失败 / AIGC 显式角标失败（均退款） | `generate/generate.service.ts` |
-| `42204` | 无可用模型通道且该能力没有本地实现、不交付本地产物（任务失败，退款） | `providers/capability-router.provider.ts` 抛 `NoModelChannelError`，`generate.service` 落码 |
+| `42204` | 无可用模型线路、或存量 `route=local`（任务失败，退款，不交付任何产出） | `providers/capability-router.provider.ts` 抛 `NoModelChannelError`，`generate.service` 落码 |
 | `42205` | 任务带遮罩但所有通道的协议都没有图像编辑端点（`maskSupport !== 'edits'`），**不忽略遮罩整图重绘**（任务失败，退款） | 同上，抛 `MaskUnsupportedError`，`generate.service` 落码 |
 | `42901` | 触发限流，附 `Retry-After` | `common/rate-limit.guard.ts` |
 | `50301` / `50302` | 支付通道未配置（缺凭据，绝不回落沙箱）/ **渠道退款未完成**（HTTP 502；订单状态与积分不变，可用同一退款单重试） | `payments/payment.factory.ts` / `orders/order.service.ts` |
@@ -663,7 +652,7 @@ JWT TTL 默认 7 天（`JWT_TTL` 可覆盖；本地 MVP 无 refresh，生产应�
 
 SQLite provider 不支持 Prisma enum，因此 `kind` / `status` / `capability` / `type` 一律 String 存储，取值范围在 DTO / service 层用白名单强制约束。`Asset.kind` = `original` | `generated`；`Asset.outputOfTask` 是 1:1 反向关系。计费相关字段以**快照**为准（`GenerationTask.creditCost`、`OrderItem.priceCentsSnapshot` / `creditsSnapshot`），不要事后按当前价重算。
 
-Jimp 内置字体仅含 ASCII，故生成图内文案为英文（如 `AI MAIN IMAGE - taobao`）；中文只出现在界面层。
+Jimp 仅用于上传校验、尺寸探测和 AIGC 角标合成，不参与生成图内容；生成图文字由模型决定。
 
 ## 开发约定
 

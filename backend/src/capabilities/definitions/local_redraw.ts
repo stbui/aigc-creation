@@ -1,6 +1,6 @@
 /**
  * 局部重绘 —— 参考站 local-redraw。只重绘指定区域, 其余像素不变。
- * 必须由真实 inpainting 模型完成, 本地没有实现。
+ * 必须由真实 inpainting 模型完成。
  *
  * 2026-10-20 从 capability.registry.ts 抽离为独立文件。
  * 抽离的意义: 能力定义此前散在 registry / gateway-prompt / mock provider /
@@ -173,8 +173,6 @@ export const LocalRedraw: CapabilityPlugin = {
     }
     return `局部重绘：只重绘${area}，其余像素保持不变。修改要求：${p.prompt || '按描述局部修改'}${hintText}${p.imageRatio ? `；输出比例 ${p.imageRatio}` : ''}`;
   },
-  /** 重绘没有本地实现; 没通道就 failed/42204 并退款, 不交付占位图 */
-  localFallback: false,
   modality: 'image',
   inputs: 1,
   inWorkbench: true,

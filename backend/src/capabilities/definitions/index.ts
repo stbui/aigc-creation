@@ -26,7 +26,7 @@ import { ImageToVideo } from './image_to_video';
  *   1. 在 `definitions/` 下新建 `<id>.ts`, 导出一个 `CapabilityPlugin`
  *   2. 在**本文件**的数组里加一行 import + 一条数组项
  *
- * 提示词、本地实现句柄、模态、积分价都随第 1 步的自包含对象一起带过来,
+ * 提示词、模态、积分价都随第 1 步的自包含对象一起带过来,
  * 不再需要去 gateway-prompt / mock provider / channel-config 各改一次。
  *
  * ⚠️ 本文件是**唯一**需要手工维护的地方, 故刻意保持极短且一眼可数 ——

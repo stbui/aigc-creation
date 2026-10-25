@@ -14,6 +14,7 @@
     "db:push:prod": "NODE_ENV=production npm run prisma:push",
     "db:reset:test": "node scripts/reset-test-env.js",
     "db:migrate:provider": "node scripts/migrate-provider-values.js",
+    "db:migrate:tool-idempotency": "node scripts/migrate-tool-idempotency.js",
     "seed:test": "NODE_ENV=test npm run seed:all",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev --name init",
@@ -27,11 +28,11 @@
     "seed:commerce": "ts-node -T scripts/seed-commerce.ts",
     "seed:marketing": "ts-node -T scripts/seed-marketing.ts",
     "smoke:marketing": "node scripts/smoke-marketing.js",
-    "seed:membership": "ts-node -T scripts/seed-membership.ts",
     "seed:legal": "ts-node -T scripts/seed-legal.ts",
     "seed:messages": "ts-node -T scripts/seed-message-templates.ts",
     "verify:credits": "ts-node -T scripts/verify-credit-deduction.ts",
-    "verify:credit-price": "ts-node -T scripts/verify-credit-price.ts"
+    "verify:credit-price": "ts-node -T scripts/verify-credit-price.ts",
+    "verify:tool-contracts": "ts-node -T scripts/verify-tool-contracts.ts"
   },
   "dependencies": {
     "@nestjs/common": "12.1.3",

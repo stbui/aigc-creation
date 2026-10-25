@@ -68,8 +68,8 @@ export class ModelCallService {
       }),
     ]);
 
-    // gateway 通道的平均耗时单独算: 混在本地算法里算没有意义
-    // (本地 Jimp 是毫秒级, 网关是秒级, 平均值会被本地拉平, 掩盖真实体验)
+    // gateway 通道的平均耗时单独算: 历史本地结果与模型网关耗时量级不同,
+    // 混算会掩盖真实模型体验。
     const gatewayAgg = await this.prisma.modelCallLog.aggregate({
       where: { ...where, source: 'gateway' },
       _avg: { durationMs: true },

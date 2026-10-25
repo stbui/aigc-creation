@@ -19,7 +19,14 @@ import { ProviderBadge } from './ProviderBadge';
 import { ImageCompare } from './ImageCompare';
 import { ImageLightbox } from './ImageLightbox';
 import { pollToResult } from '../lib/poll';
-import { taskErrorText } from '../lib/constants';
+import {
+  MAX_IMAGE_BYTES,
+  MAX_IMAGE_MB,
+  SUPPORTED_IMAGE_ACCEPT,
+  SUPPORTED_IMAGE_LABEL,
+  isSupportedImageFile,
+  taskErrorText,
+} from '../lib/constants';
 import type { Asset, MobileUploadAsset, Modality, Task, TaskStatus } from '../types/api';
 
 /**
@@ -45,11 +52,10 @@ export interface ToolResult {
   height?: number;
   errorCode?: string | null;
   /**
-   * 本次实际通道: gateway=真实模型 / local=本地算法。
+   * 本次实际通道: gateway=真实模型；local 仅用于历史任务。
    *
    * 由 `lib/poll.ts` 的 pollToResult 透出。结果卡按它显示徽标 ——
-   * 同一能力云端可用时是模型产出、云端故障时是本地回落, 必须如实区分,
-   * 不能按能力的静态 mode 猜。
+   * 新任务只会是 gateway；历史 local 记录必须如实区分，不能按静态 mode 猜。
    */
   provider?: string | null;
   /**
@@ -185,7 +191,7 @@ export function ToolShell(props: Props) {
    * 后端对「本地没有实现」的能力 (创意生图 / 局部重绘 / 图片翻译 / 自由创作)
    * 是 **没通道就判失败并退款**, 不存在本地产出。故这些页在按钮上方如实说明,
    * 并把提交置灰 —— 否则用户点下去只会等到一次 42204。
-   * 有真实本地算法的能力此时是 local, 不在拦截范围。
+   * 2026-10-25 起所有图像能力都必须有模型通道，unavailable 一律拦截。
    */
   const { data: capsData } = useCapabilities();
   const { token } = useAuth();
@@ -330,9 +336,18 @@ export function ToolShell(props: Props) {
   const uploadFiles = useCallback(
     async (files: FileList | File[]) => {
       if (!upload) return;
-      const list = Array.from(files).filter((f) => f.type.startsWith('image/'));
+      const all = Array.from(files);
+      const list = all.filter(isSupportedImageFile);
       if (list.length === 0) {
-        message.warning('请选择图片文件（PNG / JPG / WebP）');
+        message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
+        return;
+      }
+      if (list.length !== all.length) {
+        message.warning(`已忽略不支持的文件，仅支持 ${SUPPORTED_IMAGE_LABEL}`);
+      }
+      const oversize = list.filter((f) => f.size > MAX_IMAGE_BYTES);
+      if (oversize.length > 0) {
+        message.error(`单张不超过 ${MAX_IMAGE_MB}MB：${oversize.map((f) => f.name).join('、')}`);
         return;
       }
       const room = upload.max - images.length;
@@ -448,7 +463,7 @@ export function ToolShell(props: Props) {
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept={upload.accept ?? 'image/png,image/jpeg,image/webp'}
+                      accept={upload.accept ?? SUPPORTED_IMAGE_ACCEPT}
                       multiple={upload.max > 1}
                       hidden
                       onChange={(e) => {
@@ -512,10 +527,8 @@ export function ToolShell(props: Props) {
           {/* 提交区 (sticky 底部) */}
           {/*
             能力不可提交时先说明再置灰 (2026-10-21)。
-            这些页(局部重绘/图片翻译/创意生图…)不做能力级判断, 而后端对
-            「本地没有实现」的能力会没通道就 failed/42204 —— 与其让用户
-            点下去等一次失败, 不如在这里说清原因。有真实本地算法的能力
-            (抠图/扩图/换色/去水印…)此时是 local, 不受影响。
+            所有图像能力都只走模型。没有可用通道时后端会 failed/42204，
+            与其让用户点下去等一次失败，不如在这里说清原因并禁用提交。
           */}
           {blocked && unavailableReason && !submitting && (
             <p className="tool-submit-notice tool-submit-notice-error">{unavailableReason}</p>
@@ -621,7 +634,7 @@ export function ToolShell(props: Props) {
                       <div className="pk-result-meta">
                         <span className="pk-result-variant">
                           {title}结果
-                          {/* 真实模型 / 本地回落必须区分显示, 不按能力 mode 猜 */}
+                          {/* 新任务=模型；历史 local 也必须如实区分 */}
                           <ProviderBadge provider={r.provider} />
                         </span>
                         <span className="pk-result-params">

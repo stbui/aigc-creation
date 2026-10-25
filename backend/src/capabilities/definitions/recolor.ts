@@ -40,7 +40,6 @@ export const Recolor: CapabilityPlugin = {
   ],
   buildPrompt: (p) =>
     `商品换色：只改变商品主体颜色为 ${p.targetColor || p.color || '#FFFFFF'}，保持材质、光影与结构不变`,
-  localImpl: 'makeRecolor',
   modality: 'image',
   inputs: 1,
   inWorkbench: true,

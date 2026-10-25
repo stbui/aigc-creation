@@ -179,7 +179,7 @@ function buildFiles(prefix: string, count: number, ext: string, lastOverride?: s
  *   左侧导航项 h32 / 13px / radius 8 / padding `0 14px`;
  *     首页为激活态 (54x32, #5546D8 + bg #F1EFFF), 其余 #667085 透明底
  *   下拉项 119x36 / 13px #475467 / radius 9 / padding `0 12px`
- *   右侧营销位为参考站的签到/新人礼包（本地无积分体系）→ 改为如实标注「本地算法 · 不限次数」
+ *   右侧营销位为参考站的签到/新人礼包 → 改为如实标注「AI 创作 · 按能力计费」
  */
 function LandingHeader() {
   const { data } = useCapabilities();

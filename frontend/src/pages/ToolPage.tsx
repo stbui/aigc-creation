@@ -28,6 +28,9 @@ import {
   IS_PROD,
   MAX_IMAGE_MB,
   MAX_IMAGE_BYTES,
+  SUPPORTED_IMAGE_ACCEPT,
+  SUPPORTED_IMAGE_LABEL,
+  isSupportedImageFile,
   MODE_LABELS,
   RUNTIME_LABELS,
   runtimeOf,
@@ -79,7 +82,7 @@ export function ToolPage() {
 
   /*
    * 运行时结论（2026-10-21）。`planned` 已在上方拦掉，这里处理运营侧的
-   * 下线与「云端通道没配且本地也没有实现」两种情况 —— 两者的共同点是
+   * 下线与「模型通道没配」两种情况 —— 两者的共同点是
    * **按下去必然失败**，所以直接换成说明页，而不是让用户上传完图才收到报错。
    *
    * 可用性判断放在表单组件之外：Form.useForm 一旦创建就必须挂上 <Form>，
@@ -224,7 +227,7 @@ function ToolPageContent({ capability, def }: { capability: string; def: Capabil
             {def.name}
             {def.badge && <Tag className="tool-tag-free">{def.badge}</Tag>}
             {/*
-              标注以**运行时结论**为准（云端模型 / 本地算法 / 不可用），
+              标注以**运行时结论**为准（云端模型 / 不可用），
               mode 只在后端未下发 runtime 时兜底 —— 同一项能力在不同部署下
               按下去走的路不同，标 mode 会把「没配通道的 real」说成「已接入」。
             */}
@@ -247,10 +250,14 @@ function ToolPageContent({ capability, def }: { capability: string; def: Capabil
           <Upload
             listType="picture-card"
             fileList={fileList}
-            accept="image/png,image/jpeg,image/webp"
+            accept={SUPPORTED_IMAGE_ACCEPT}
             multiple={inputs > 1}
             maxCount={inputs}
             beforeUpload={(file) => {
+              if (!isSupportedImageFile(file)) {
+                message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
+                return Upload.LIST_IGNORE;
+              }
               // 体积上限与定制工具页同源; 超限直接拦下, 不再"传上去再说"
               if (file.size > MAX_IMAGE_BYTES) {
                 message.error(`单张不超过 ${MAX_IMAGE_MB}MB：${file.name}`);
@@ -335,7 +342,7 @@ function ToolPageContent({ capability, def }: { capability: string; def: Capabil
                       ? ` · ${formatDuration(task?.outputAsset?.durationMs)}`
                       : ''}
                   </Text>
-                  {/* 这一单实际走云端还是本地回落, 以 task.provider 为准 */}
+                  {/* 这一单实际走哪条通道, 以 task.provider 为准 */}
                   <ProviderBadge provider={task?.provider} />
                 </div>
                 <div className="tool-result-actions">

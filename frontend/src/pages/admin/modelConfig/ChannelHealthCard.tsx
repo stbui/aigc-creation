@@ -27,7 +27,7 @@ export function ChannelHealthCard({
 }) {
   const source = snapshot?.source ?? 'none';
   const available = snapshot?.availableCount ?? 0;
-  const effective = available > 0 ? 'gateway' : modality === 'image' ? 'local' : 'none';
+  const effective = available > 0 ? 'gateway' : 'none';
   const dispatch = DISPATCH_SOURCE_META[source];
   const total = snapshot?.total ?? 0;
   const cooling = snapshot?.coolingCount ?? 0;

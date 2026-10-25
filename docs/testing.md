@@ -35,7 +35,7 @@ cd frontend && npm run build:prod
 
 ### 3.2 架构与纯逻辑断言（L2）
 
-`backend/scripts/` 下共 23 个：19 个 `verify-*.ts` + 1 个 `probe-environments.ts`（不连库，见 3.2.1），以及 3 个需要后端已启动的 `verify-*.js`（见 3.2.2）。
+`backend/scripts/` 下共 24 个验证脚本：20 个 `verify-*.ts` + 1 个 `probe-environments.ts`（不连库，见 3.2.1），以及 3 个需要后端已启动的 `verify-*.js`（见 3.2.2）。
 
 #### 3.2.1 纯逻辑 / 自起服务（`npx ts-node -T scripts/<name>.ts`）
 
@@ -52,8 +52,9 @@ cd frontend && npm run build:prod
 | `verify-channel-scheduler.ts` | 多渠道调度：优先级、冷却、失败切换；**基址归一化**（尾部 `/v1` 在调度器与列表视图两条读路径都剥掉，`/api/v3` 与 `/v1/gw` 保留） |
 | `verify-channel-test.ts` | 连通性测试路径按模态构造（缺陷回归防护） |
 | `verify-failover.ts` | 故障转移时**真的**换上备用通道的 baseUrl / token / model |
-| `verify-model-config-fixes.ts` | 模型配置页 `effective` 三态回归；**全局设置 `gateway.*.baseUrl` 写入归一化**（只剥尾部 `/v1`，非法 URL 仍 40001 且不落库） |
-| `verify-image-pipeline.ts` | 图像产出链路（`kind: 'image'` 判别式、11 项本地算法均产出合法图片） |
+| `verify-model-config-fixes.ts` | 模型配置页 model-only 语义：无线路为 `none`、存量 `route=local` 不可用、新写入 local 被拒；**全局设置 `gateway.*.baseUrl` 写入归一化** |
+| `verify-image-pipeline.ts` | 图像链路：无线路 `42204`、存量 local 失败、遮罩无 edits 线路 `42205`、上游失败 `42201`、成功来源只能是 `gateway` |
+| `verify-tool-contracts.ts` | 8 个修图工具的能力定义、默认值、hidden 字段兼容、严格参数校验、标注解析、上传头与遮罩尺寸校验 |
 | `verify-video-pipeline.ts` | 视频四段式异步契约 |
 | `verify-payment-signatures.ts` | 支付宝 RSA2 / 微信 v3 AES-GCM 按公开规范**独立复算**（防「自己签自己验」） |
 | `verify-channel-signatures.ts` | 阿里云短信 / 邮件 RPC 签名（HMAC-SHA1 + sorted canonical query）固定 nonce/时间戳独立复算；**只验签名与请求形状，不代表已真实投递** |
@@ -74,7 +75,7 @@ cd frontend && npm run build:prod
 
 ### 3.3 HTTP 冒烟（L3）
 
-共 28 个脚本（`backend/scripts/smoke-*.js`），需后端已启动。按域分组：
+共 21 个脚本（`backend/scripts/smoke-*.js`），需后端已启动。按域分组：
 
 | 域 | 脚本 | 覆盖要点 |
 | --- | --- | --- |
@@ -86,11 +87,8 @@ cd frontend && npm run build:prod
 |  | `smoke-signed-url.js` | 另起带密钥实例：无签名 403、带签名 200、篡改 403、过期 410、HEAD 200 |
 |  | `smoke-rate-limit.js` | 短信 1/分、换号不换配额、伪造 XFF 无效、找回密码 3/时 |
 |  | `smoke-health-tracing.js` | 健康分项、请求号回显与替换、异常信封 `requestId`、日志 `[rid=]` 串联 |
-| 能力 | `smoke-capabilities.js` | 每个可提交图像能力真实执行并校验产出魔数 |
-|  | `smoke-capability-runtime.js` | `runtime` 四态自洽、无本地实现的能力不预告产出、上下线 40005、限时免费 0 积分、本地算法能力 11 项 |
-|  | `smoke-main-image-variants.js` / `smoke-detail-sections.js` / `smoke-viral-clone.js` / `smoke-multi-fusion.js` / `smoke-sku.js` | 各页产出的参数差异与真实参与像素 |
-| 模型通道 | `smoke-gateway-channel.js` | 三图像协议路由、回落、请求体契约、预设完整性；无本地实现的能力（自由创作）没通道时抛 `NoModelChannelError` 且不产出任何图 |
-|  | `smoke-model-channels.js` | 线路 CRUD / token 保持与清除 / 排序 / 测试响应 / 401 |
+| 能力 | `smoke-capability-runtime.js` | model-only runtime（`localQuality=none`、无 local 实现字段）、无线路不预告产出、上下线 40005、限时免费 0 积分 |
+| 模型通道 | `smoke-model-channels.js` | 线路 CRUD / token 保持与清除 / 排序 / 测试响应 / 401 |
 | 后台 | `smoke-admin.js` | 身份、权限点、审计 |
 |  | `smoke-backup.js` | 未验证备份不可下载、保留策略、路径穿越拦截 |
 |  | `smoke-scheduler.js` | 定时任务真的改数据（订单超时、积分到期等） |
@@ -103,7 +101,7 @@ cd frontend && npm run build:prod
 |  | `smoke-refund-rules.js` | 时间窗 40905 / 比例 40906 / 已消耗积分 40907 / 会员终止 |
 | 营销 | `smoke-marketing.js` | 券门槛与折扣区间、活动叠加取更优、邀请、签到、退款不得超实付 |
 
-> 2026-10-22 变更：删除 `smoke-free-creation.js`，同时移除 `smoke-capability-runtime.js` 的「OCR 解析」断言。原因是本地占位实现与图片翻译的 OCR 路径已从代码中删除，被测对象不存在；替代断言是「不存在 mock 实现程度」「本地算法能力数量 = 11」「无本地实现的能力没通道时不预告产出」。这是**废弃而非弱化**：原先靠占位实现存在的路径，现在由 42204 退款语义覆盖。
+> 2026-10-25 变更：本地图像生成算法与 `LocalImageProvider` 已删除，依赖它跑像素的旧烟测（`smoke-capabilities` / 各页面变体烟测 / `smoke-gateway-channel`）一并移除。替代覆盖是 `verify-image-pipeline.ts`（无线路、上游失败、遮罩协议、成功来源）、`verify-tool-contracts.ts`（8 个修图工具参数契约）与 Playwright 页面交互/状态用例。无模型通道时统一验证任务失败 `42204` 且退款，不生成伪结果。
 
 需要管理员凭据的脚本（`smoke-admin` / `smoke-commerce` / `smoke-model-channels` / 部分后台脚本）通过 `ADMIN_EMAIL` / `ADMIN_PASSWORD` 提供。**密码不写进仓库、不写进文档**：用 `NODE_ENV=test npm run seed:admin` 在测试档生成，或临时建一次性管理员，跑完清理。
 
@@ -123,6 +121,8 @@ cd frontend && npm run build:prod
 | `admin-scheduler.spec.ts` | 定时任务可观测（静默失败可见） |
 | `admin-screenshots.spec.ts` | 逐页截图取证 |
 | `free-creation-submit.spec.ts` | 登录墙 + 必填置灰的提交契约 |
+| `product-capabilities.spec.ts` | 8 个工具入口/能力上下文、局部重绘画布与标注上限、失败重试字段、站点地图可见性 |
+| `product-parameters.spec.ts` | 8 个工具页面参数渲染、提交态、结果/失败态与移动端无横向溢出 |
 | `state-contract.spec.ts` | 全站 loading / empty / error 状态契约 |
 | `example.spec.ts` | Playwright 脚手架示例（不覆盖本项目功能） |
 
@@ -173,6 +173,8 @@ cd frontend && npm run build:prod
 | `free-creation-submit.spec.ts` | 未登录点「登录免费生成」不弹登录框，控制台 `useNavigate() may be used only in the context of a <Router> component` | **产品缺陷**：`LoginModal` 由 `AuthProvider` 渲染，而 `AuthProvider` 在 `BrowserRouter` 之外，`AuthCard` 里的 `useNavigate` 渲染即抛错。宿主改为 Router 内的 `LoginModalHost`（App.tsx） |
 
 登录弹窗修好后暴露出第二层问题：页面加载时的只读 GET 401 也会广播 `auth:required`，guest 一进 `/workbench` 就被 `stats/overview` 自动弹出登录墙（`/credits` 同屏三组接口各弹一次）。`lib/api.ts` 已改为**只有写动作（非 GET）才弹框**；`free-creation-submit.spec.ts` 增加 `/workbench`、`/works`、`/credits`、`/invitations` 四条「guest 不被动弹登录」用例守住。此前该契约在数据页上是空过的——弹窗根本不存在，`toBeHidden` 恒真。
+
+**2026-10-25 工具页闸口补强**：上传前后端统一限制 PNG/JPEG/WebP、单张 10MB，并校验文件头/尺寸/像素/遮罩透明区域；生成请求带 `Idempotency-Key`，扣费与建任务在同一事务内，失败退款按 `refund:task:<id>` 稳定幂等键只记一次。存量库升级用 `npm run db:migrate:tool-idempotency`（nullable 字段 + `IF NOT EXISTS` 索引，可重复、不允许 `--accept-data-loss`），全新建库仍由 `prisma:push` 负责。
 
 **教训**：测试脚本连库靠「有没有走项目自己的 ConfigModule」，不靠 `NODE_ENV` 环境变量本身；最小模块装配则必须跟着真实模块的构造器依赖一起长，否则红灯指向的是脚本而不是产品。**「断言恒真」比红灯更危险**：一个永远不渲染的弹窗能让 `toBeHidden` 一直通过，修好渲染后才看见真正的回归。
 

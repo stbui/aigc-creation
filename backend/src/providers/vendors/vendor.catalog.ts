@@ -109,7 +109,7 @@ export interface VendorDef {
  *
  * ❌ **刻意不含 Kimi/Moonshot 与 DeepSeek 的图像通道**: 两者标称「OpenAI 兼容」,
  * 但那是 `/v1/chat/completions` 的**文本**兼容, **没有图像生成端点**。
- * 放进图像通道必然 404 → 回落本地, 恰好制造本层要消除的那种静默失败。
+ * 放进图像通道必然 404, 恰好制造本层要消除的那种静默失败。
  */
 export const VENDOR_CATALOG: VendorDef[] = [
   {

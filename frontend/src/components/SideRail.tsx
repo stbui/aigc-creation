@@ -76,6 +76,13 @@ interface Props {
 
 export function SideRail({ groups, items, thumbs, activePath, statsTotal, onNavigate }: Props) {
   const [collapsed, setCollapsed] = useState(false);
+  const location = useLocation();
+  const activeLocation = `${location.pathname}${location.search}`;
+
+  const toolIsActive = (id: string) => {
+    const target = toolPath(id);
+    return target.includes('?') ? activeLocation === target : activePath === target;
+  };
 
   return (
     <nav
@@ -125,7 +132,7 @@ export function SideRail({ groups, items, thumbs, activePath, statsTotal, onNavi
                     key={c.id}
                     cap={c}
                     thumb={thumbs[c.id] ?? null}
-                    active={activePath === toolPath(c.id)}
+                    active={toolIsActive(c.id)}
                     onNavigate={onNavigate}
                     collapsed={collapsed}
                   />

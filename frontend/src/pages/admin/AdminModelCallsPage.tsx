@@ -32,13 +32,13 @@ type Row = AdminModelCall;
 /** 路由/通道 → 中文。未登记的原样显示, 便于发现未文档化的取值 */
 const ROUTE_LABELS: Record<string, string> = {
   auto: '自动',
-  local: '强制本地',
+  local: '存量本地（已停用）',
   remote: '强制远程',
 };
 
 const SOURCE_LABELS: Record<string, string> = {
   gateway: '真实模型',
-  local: '本地算法',
+  local: '历史本地结果',
 };
 
 /** 毫秒 → 人类可读。耗时是这个页面的核心指标, 一律带单位 */
@@ -130,7 +130,7 @@ export function AdminModelCallsPage() {
             <span className={`adm-tag ${v === 'gateway' ? 'is-success' : 'is-muted'}`}>
               {SOURCE_LABELS[v] ?? v}
             </span>
-            {row.fallback && <span className="adm-tag is-danger">已回落</span>}
+            {row.fallback && <span className="adm-tag is-danger">历史回落</span>}
           </div>
         ),
       },
@@ -194,7 +194,7 @@ export function AdminModelCallsPage() {
     <>
       <PageHeader
         title="模型调用记录"
-        description="生成链路每次调用模型的明细：耗时、产出与回落原因。只读，不可删除或修改。"
+        description="生成链路每次调用模型的明细：耗时、产出与失败原因。只读，不可删除或修改。"
       />
 
       {/* 统计卡: 单看流水要看上百行, 而运营真正想问的是这几个数 */}
@@ -209,13 +209,13 @@ export function AdminModelCallsPage() {
         <StatCard
           label="真实模型占比"
           value={stats?.total ? `${Math.round(((stats?.gatewayCount ?? 0) / stats.total) * 100)}%` : '—'}
-          hint={`远程 ${stats?.gatewayCount ?? 0} · 本地 ${stats?.localCount ?? 0}`}
+          hint={`远程 ${stats?.gatewayCount ?? 0} · 历史本地 ${stats?.localCount ?? 0}`}
           tone={stats?.gatewayCount === 0 ? 'warn' : undefined}
         />
         <StatCard
-          label="回落次数"
+          label="历史回落次数"
           value={stats?.fallbackCount ?? 0}
-          hint="网关失败后改走本地算法"
+          hint="本地生成停用前由网关失败触发的回落记录"
           tone={(stats?.fallbackCount ?? 0) > 0 ? 'warn' : undefined}
         />
         <StatCard
@@ -245,7 +245,7 @@ export function AdminModelCallsPage() {
           placeholder="通道"
           options={[
             { value: 'gateway', label: '真实模型' },
-            { value: 'local', label: '本地算法' },
+            { value: 'local', label: '历史本地结果' },
           ]}
           value={source}
           onChange={setSource}
@@ -264,7 +264,7 @@ export function AdminModelCallsPage() {
         />
         <Select
           className="adm-filter-select"
-          placeholder="回落"
+          placeholder="历史回落"
           options={[
             { value: 'true', label: '已回落' },
             { value: 'false', label: '未回落' },
@@ -344,7 +344,7 @@ export function AdminModelCallsPage() {
                 <dt>实际通道</dt>
                 <dd>
                   {SOURCE_LABELS[row.source] ?? row.source}
-                  {row.fallback && <span className="adm-tag is-danger">已回落</span>}
+                  {row.fallback && <span className="adm-tag is-danger">历史回落</span>}
                 </dd>
                 <dt>模型</dt>
                 <dd>{row.model ? <code>{row.model}</code> : '—'}</dd>
@@ -376,7 +376,7 @@ export function AdminModelCallsPage() {
             {row.reason && (
               <div className="adm-section">
                 <div className="adm-section-title">
-                  {row.fallback ? '回落原因' : '备注'}
+                  {row.fallback ? '历史回落原因' : '备注'}
                 </div>
                 <div className="adm-reason-box">{row.reason}</div>
               </div>

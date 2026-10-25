@@ -1,6 +1,6 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { App } from 'antd';
-import { generateApi } from '../lib/api';
+import { ApiError, generateApi, newIdempotencyKey } from '../lib/api';
 import { useProject } from './useProject';
 import { useGenerateError } from './useGenerateError';
 import { useTaskPoller, type ToolAsset, type ToolResult } from '../components/ToolShell';
@@ -33,6 +33,8 @@ export function useToolTask({ capability, successMessage, minInputs = 1 }: UseTo
 
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<ToolResult | null>(null);
+  /** 网络结果未知时保留同一幂等键，避免用户重试造成重复任务与重复扣费。 */
+  const pendingRequest = useRef<{ fingerprint: string; key: string } | null>(null);
 
   const run = useCallback(
     async (inputs: ToolAsset[], params: Record<string, unknown>) => {
@@ -41,12 +43,22 @@ export function useToolTask({ capability, successMessage, minInputs = 1 }: UseTo
       setResult(null);
       try {
         const projectId = await ensureProject();
-        const { taskId } = await generateApi.start({
+        const payload = {
           projectId,
           capability,
           inputAssetIds: inputs.map((i) => i.id),
           params,
-        });
+        };
+        const fingerprint = JSON.stringify(payload);
+        const idempotencyKey =
+          pendingRequest.current?.fingerprint === fingerprint
+            ? pendingRequest.current.key
+            : newIdempotencyKey();
+        pendingRequest.current = { fingerprint, key: idempotencyKey };
+
+        const { taskId } = await generateApi.start({ ...payload, idempotencyKey });
+        // 已拿到服务端任务句柄：之后的轮询/网络失败都不需要重放创建请求。
+        pendingRequest.current = null;
         const done = await poll(taskId);
         setResult(done);
         if (done.status === 'failed') {
@@ -55,6 +67,10 @@ export function useToolTask({ capability, successMessage, minInputs = 1 }: UseTo
           message.success(successMessage);
         }
       } catch (e) {
+        // 4xx 是确定性拒绝，复用它只会再次失败；网络错误/5xx 保留幂等键。
+        if (e instanceof ApiError && e.status >= 400 && e.status < 500) {
+          pendingRequest.current = null;
+        }
         reportError(e);
       } finally {
         setSubmitting(false);

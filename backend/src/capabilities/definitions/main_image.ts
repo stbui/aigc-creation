@@ -37,7 +37,6 @@ export const MainImage: CapabilityPlugin = {
     `电商商品主图生成：${subjectText(p)}，${p.description || '突出卖点与质感'}。` +
     `需要白底图、场景图、卖点图三类主图，画面干净、主体突出${ratioText(p.ratio)}${sizeText(p.size)}` +
     (p.platform ? `，适配 ${p.platform} 平台` : ''),
-  localImpl: 'makeMainImage',
   modality: 'image',
   inputs: 1,
   inWorkbench: true,

@@ -39,21 +39,18 @@
 import type { Modality } from '../modality';
 
 /**
- * 产出来源。
+ * 历史产出来源。
  *
- * gateway = 真实模型通道产出; local = 本地算法产出。
- * 由路由器填充, 应用层据此如实显示来源 —— 不把本地算法伪装成模型结果,
- * 这是本项目一贯的约定。
+ * gateway = 真实模型通道产出；local 仅用于读取 2026-10-25 前的历史记录。
+ * 下方生成结果契约**不接受** local：新任务只能由模型通道产出。
  */
 export type ProduceSource = 'gateway' | 'local';
 
 /**
  * 统一的图像产出。
  *
- * ⚠️ `source` 保持**可选**, 与改造前的 ImageProviderResult 一致:
- * 本地算法 provider 直接返回字节, 由路由器补上 `source: 'local'`。
- * 改成必填会迫使本地算法 provider 里 11 处产出点全部改写, 而收益仅是让
- * 类型更严 —— 不值得。真正需要区分来源的只有路由器出口, 那里的 source 必定有值。
+ * 路由器出口的新产出只能是 gateway。把类型收窄成字面量，新增协议若试图
+ * 返回本地结果会在编译期失败，而不是把本地产出伪装成模型结果。
  */
 export interface ImageOutcome {
   /** 模态判别式 —— 让 ModelOutcome 联合类型可被收窄 */
@@ -61,7 +58,7 @@ export interface ImageOutcome {
   buffer: Buffer;
   /** mime, 如 image/jpeg | image/png */
   format: string;
-  source?: ProduceSource;
+  source: 'gateway';
   /** 实际使用的模型名 (渠道回报优先) */
   model?: string;
   /** 渠道侧任务 id, 便于对账排障 */
@@ -71,13 +68,12 @@ export interface ImageOutcome {
 /**
  * 统一的文本产出。
  *
- * ⚠️ 文本**没有**本地兜底: 文本没有「本地算法」概念, 编一段模板文案
- * 会让用户误以为是模型产出。故 source 恒为 'gateway'。
+ * 文本没有本地生成路径，source 恒为 'gateway'。
  */
 export interface TextOutcome {
   kind: 'text';
   text: string;
-  source: ProduceSource;
+  source: 'gateway';
   model?: string;
   taskId?: string;
   /** 分词用量; 渠道回报才有, 否则 undefined (不能臆造) */
@@ -95,7 +91,7 @@ export interface VideoOutcome {
   buffer: Buffer;
   /** mime, 如 video/mp4 */
   format: string;
-  source: ProduceSource;
+  source: 'gateway';
   model?: string;
   taskId?: string;
   /** 时长 (毫秒); 渠道回报才有 */

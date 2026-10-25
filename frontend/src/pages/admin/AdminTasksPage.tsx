@@ -43,7 +43,7 @@ type Row = AdminTask;
 /** 通道 → 中文。未登记的原样显示, 便于发现未文档化的取值 */
 const PROVIDER_LABELS: Record<string, string> = {
   gateway: '真实模型',
-  local: '本地算法',
+  local: '历史本地结果',
   // 建任务时的初值; 跑完后会被 processTask 改写成实际通道
   pending: '待执行',
 };
@@ -57,7 +57,7 @@ const PROVIDER_LABELS: Record<string, string> = {
  */
 const ERROR_LABELS: Record<string, string> = {
   '42201': '生成过程异常',
-  // 该能力本地没有实现, 且当时没有可用的模型通道 (已自动退款)
+  // 当时没有可用的模型通道（已自动退款）
   '42204': '无可用模型通道',
   cancelled_by_admin: '后台终止',
 };
@@ -504,7 +504,7 @@ export function AdminTasksPage() {
           placeholder="通道"
           options={[
             { value: 'gateway', label: '真实模型' },
-            { value: 'local', label: '本地算法' },
+            { value: 'local', label: '历史本地结果' },
             // 「建了但没跑起来」的任务: 排障时按它筛，比逐条看状态快
             { value: 'pending', label: '待执行' },
           ]}

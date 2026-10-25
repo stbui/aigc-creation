@@ -65,20 +65,19 @@ const newCapability = {
 
 const extended = [...CAPABILITIES, newCapability];
 
-// ── 断言 1: 声明完整时校验通过 (文本模态不强制 localImpl) ───────────
+// ── 断言 1: 声明完整时校验通过 (任何模态都不需要本地实现) ──────────
 let validated = false;
 try {
   assertCapabilityIntegrity(extended);
   validated = true;
 } catch (e) {
-  fails.push(`文本模态能力不应被要求声明 localImpl — ${(e as Error).message}`);
+  fails.push(`能力声明不应被要求提供本地实现 — ${(e as Error).message}`);
 }
-ok('文本模态能力可无 localImpl 通过校验', validated);
+ok('能力可无本地实现通过校验', validated);
 
 // ── 断言 2: 校验器能拦住漏声明 (这是抽离的核心价值) ────────────────
 const negativeCases: Array<[string, () => any[], string]> = [
   ['缺 buildPrompt', () => [{ ...CAPABILITIES[0], buildPrompt: undefined }], '未声明 buildPrompt'],
-  ['图像能力缺 localImpl', () => [{ ...CAPABILITIES[0], modality: 'image', localImpl: undefined }], '未声明 localImpl'],
   ['缺 creditCost', () => [{ ...CAPABILITIES[0], creditCost: undefined }], '未声明 creditCost'],
   // 真正构造重复: 两项同 id
   ['id 重复', () => [{ ...CAPABILITIES[0] }, { ...CAPABILITIES[0] }], '能力 id 重复'],

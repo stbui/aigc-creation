@@ -130,7 +130,7 @@ function modalityBaseDefs(modality: Modality): ConfigDef[] {
       description:
         modality === 'text'
           ? '大模型服务的根域地址, 如 https://api.deepseek.com。本项目只存根域, /v1/chat/completions 由服务端补'
-          : '模型网关的服务地址, 如 https://api.modelverse.cn。留空表示未接入真实模型, 该模态全部走本地算法',
+          : '模型网关的服务地址, 如 https://api.modelverse.cn。留空表示未接入真实模型, 该模态不可生成',
       type: 'string',
       default: '',
       maxLength: 200,
@@ -171,7 +171,7 @@ function modalityBaseDefs(modality: Modality): ConfigDef[] {
         modality === 'text'
           ? 'openai-chat=OpenAI 兼容对话补全 (POST {base}/v1/chat/completions), DeepSeek/Moonshot/硅基流动/OpenAI 官方'
           : modality === 'video'
-            ? 'minimax-video=MiniMax 四段式异步(提交 → 轮询 → 取文件 → 下载)。文生视频没有本地兜底, 未配置时调用会直接失败'
+            ? 'minimax-video=MiniMax 四段式异步(提交 → 轮询 → 取文件 → 下载)。文生视频只能走模型通道, 未配置时调用会直接失败'
             : 'openai=OpenAI兼容同步(POST {base}/v1/images/generations); volcengine=火山方舟(size 用 1K/2K 档位); minimax=MiniMax(用 aspect_ratio)。建议在页面顶部用「厂商预设」选择, 自动填好本项',
       type: 'string',
       default: modality === 'text' ? 'openai-chat' : modality === 'video' ? 'minimax-video' : 'openai',
@@ -197,7 +197,7 @@ function modalityBaseDefs(modality: Modality): ConfigDef[] {
       key: `${p}.enabled`,
       label: `${MODALITY_LABEL[modality]} · 强制启用远程通道`,
       description:
-        '开启后即使基址与令牌都为空也尝试走远程 (用于临时排障)。网关不可达时仍会回落本地算法',
+        '开启后即使基址与令牌都为空也尝试走远程 (用于临时排障)。模型不可达时任务失败并退款',
       type: 'boolean',
       default: false,
       group: 'base',
@@ -221,7 +221,7 @@ function modalityTimeoutDefs(modality: Modality): ConfigDef[] {
     {
       key: `${p}.timeoutMs`,
       label: `${MODALITY_LABEL[modality]} · 单次调用总超时`,
-      description: '含网关轮询全过程。超时后回落本地算法',
+      description: '含网关轮询全过程。超时后任务失败并退款',
       type: 'number',
       default: timeoutDefault,
       min: 5000,
@@ -247,7 +247,7 @@ function modalityTimeoutDefs(modality: Modality): ConfigDef[] {
     {
       key: `${p}.maxPolls`,
       label: `${MODALITY_LABEL[modality]} · 最大轮询次数`,
-      description: '超出视为轮询超时并回落本地算法',
+      description: '超出视为轮询超时，任务失败并退款',
       type: 'number',
       default: modality === 'video' ? 300 : 60,
       min: 1,
@@ -265,7 +265,7 @@ function routeDefs(): ConfigDef[] {
   return CAPABILITIES.map<ConfigDef>((cap) => ({
     key: `gateway.route.${cap.id}`,
     label: `路由 · ${cap.id}`,
-    description: 'auto=网关可用则远程 / local=强制本地算法 / remote=强制远程',
+    description: 'auto=有可用模型线路就走远程 / remote=强制远程。本地生成已停用，存量 local 仅按不可用识别',
     type: 'string' as ConfigType,
     default: 'auto',
     group: 'route' as ConfigGroup,
@@ -425,9 +425,9 @@ export const CONFIG_DEFS: ConfigDef[] = [
 
 export const CONFIG_GROUPS: Array<{ key: ConfigGroup; label: string; desc: string }> = [
   { key: 'base', label: '通道基址', desc: '各模态接入真实模型网关的地址与凭据' },
-  { key: 'timeout', label: '超时与轮询', desc: '远程通道的等待策略, 超时自动回落本地' },
+  { key: 'timeout', label: '超时与轮询', desc: '远程通道的等待策略, 超时按失败处理并退款' },
   { key: 'asset', label: '素材可达性', desc: '网关回拉参考图所需的站内可达地址' },
-  { key: 'route', label: '逐能力路由', desc: '按能力单独决定走真实模型还是本地算法' },
+  { key: 'route', label: '逐能力路由', desc: '按能力选择自动或强制模型通道；本地生成已停用' },
 ];
 
 export function findConfigDef(key: string): ConfigDef | undefined {
@@ -449,6 +449,14 @@ export function modalityPrefix(modality: Modality): string {
   return MODALITY_PREFIX[modality];
 }
 
-/** 路由取值白名单 */
+/**
+ * 路由取值白名单。
+ *
+ * `local` 只为读取存量配置保留：启动时不能把已保存的 local 静默改成 auto
+ * 或 remote（那会改变运营配置语义）。新写入必须使用 WRITABLE_ROUTE_VALUES。
+ */
 export const ROUTE_VALUES = ['auto', 'local', 'remote'] as const;
 export type RouteValue = (typeof ROUTE_VALUES)[number];
+
+/** 后台新写入允许的路由值；本地生成已删除，不再接受 local */
+export const WRITABLE_ROUTE_VALUES = ['auto', 'remote'] as const;

@@ -15,9 +15,9 @@ import { ToolHistoryPane } from '../components/ToolHistoryPane';
  * 参考站实际交互（从 index-Do3-_JpH.js 的 createWatermarkRemoval 提取）：
  *   抓手 / 画笔 / 橡皮 / 框选 / 圈选 → 合成 PNG 遮罩 → 上传素材 →
  *   createWatermarkRemoval({ maskAssetId, detectionMode:'MANUAL' })。
- * 本地后端已接入同一遮罩协议：透明像素 = 去除区域。
+ * 后端已接入同一遮罩协议：透明像素 = 去除区域，随任务提交给图像模型。
  *
- * 自动/指定区域保留为快捷兜底（本地真实镜像修补）。手动模式要求至少
+ * 自动/指定区域保留为快捷方式（由模型按提示处理）。手动模式要求至少
  * 涂出 4 个采样像素可识别的区域，按钮才允许提交。
  */
 
@@ -311,9 +311,9 @@ export function WatermarkRemovePage() {
         <p className="tool-card-copy">
           {mode === 'manual'
             ? '推荐使用手动标注：只有圈出的透明区域会被修补，压在主体上的水印也能精确避开。'
-            : '自动/区域模式使用本地镜像修补，适合角落纯色或渐变背景上的水印。'}
+            : '自动/区域模式由模型按提示清除指定区域；手动标注能更精确地限定范围。'}
         </p>
-        <p className="tool-card-copy">本地算法无法恢复水印下方消失的商品细节；这类图片建议配置云端重绘通道。</p>
+        <p className="tool-card-copy">去除效果取决于模型能力；压在商品主体上的水印建议使用手动遮罩。</p>
       </ToolCard>
     </ToolShell>
   );

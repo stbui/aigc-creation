@@ -24,7 +24,7 @@ export class ModelCallListQueryDto extends PageQueryDto {
   @IsBoolean()
   success?: boolean;
 
-  /** 是否发生回落 (网关失败后改走本地算法) */
+  /** 历史字段：是否发生本地回落；新记录恒为 false */
   @IsOptional()
   @Transform(toBool)
   @IsBoolean()

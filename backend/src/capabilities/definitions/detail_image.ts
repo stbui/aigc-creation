@@ -42,7 +42,6 @@ export const DetailImage: CapabilityPlugin = {
   buildPrompt: (p) =>
     `电商详情长图生成：${subjectText(p)}，${p.description || '把参数与卖点转成可视化内容'}。` +
     `按模块分区排版（首屏主视觉 / 卖点 / 参数细节 / 售后），纵向长图${ratioText(p.ratio)}${sizeText(p.size)}`,
-  localImpl: 'makeDetailImage',
   modality: 'image',
   inputs: 1,
   inWorkbench: true,

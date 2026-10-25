@@ -151,7 +151,7 @@ export function defaultModelFor(modality: Modality, protocol: GatewayProtocol): 
  * 该 (模态, 协议) 组合在本项目是否已有真实实现。
  *
  * 存在的意义: 让后台在选择协议时能提示「该组合下本项目尚无对应能力」,
- * 而不是让运营配完才发现 404 回落本地。
+ * 而不是让运营配完才发现 404。
  *
  * 判定依据是协议层 (PROTOCOL_SPECS) 而非「是否有厂商预设」——
  * 协议可能已实现但暂时没有厂商使用, 二者要区分开。
@@ -207,7 +207,7 @@ function modelHint(defaultModel: string): string[] {
  * （`优云智算/硅基流动/OpenAI 官方/火山方舟/MiniMax`），
  * 读起来像「这些厂商都支持该协议」，实际是错的 —— 火山方舟用
  * volcengine、MiniMax 用 minimax, 各自协议不同。运营照这句选协议,
- * 配出来的通道必然 404 回落本地。现在改为描述协议本身的形状:
+ * 配出来的通道必然 404。现在改为描述协议本身的形状:
  * 同步/异步、端点、尺寸写法、参考图、默认模型。
  */
 export const PROTOCOL_OPTIONS_BY_MODALITY: Record<

@@ -7,6 +7,7 @@ import { StorageService } from '../storage/storage.service';
 import { resolveUploadsDir } from '../config/env-files';
 import { SignedUrlService } from '../common/signed-url.service';
 import type { StorageBackend } from '../storage/storage.provider';
+import { inspectUploadedImage, maxUploadBytes, verifyDecodableImage } from './image-validation';
 
 export interface UploadedFileMeta {
   filename: string;
@@ -50,50 +51,62 @@ export class AssetsService {
   }
 
   async createOriginal(ownerId: string, projectId: string, file: UploadedFileMeta) {
-    if (!projectId) {
-      throw new AppError(40001, 'projectId 必填', 400);
+    const tempPath = join(resolveUploadsDir(), 'original', file.filename);
+    let storedKey: string | null = null;
+    let provider: ReturnType<StorageService['getActive']> | null = null;
+    try {
+      // multer 在进入 service 前已经把文件写到临时目录。项目校验也必须放进
+      // try 内：否则非法/越权 projectId 会在 finally 之前抛错，反复请求可把
+      // 磁盘堆满无主文件。清理范围必须覆盖“任何一次提前返回/失败”。
+      if (!projectId) {
+        throw new AppError(40001, 'projectId 必填', 400);
+      }
+
+      const project = await this.prisma.project.findUnique({ where: { id: projectId } });
+      if (!project || project.ownerId !== ownerId) {
+        throw new AppError(40001, '项目不存在或无权限', 403);
+      }
+
+      // 上传接口只负责把文件落到临时目录；这里以文件头为准重新判定真实格式。
+      // 客户端声明的 originalname / mimetype 均不可信，不能直接用来决定扩展名。
+      const buf = await fsp.readFile(tempPath);
+      const info = inspectUploadedImage(buf, { maxBytes: maxUploadBytes() });
+      if (file.size > maxUploadBytes()) {
+        throw new AppError(40001, `图片不能超过 ${Math.floor(maxUploadBytes() / 1024 / 1024)} MB`, 400);
+      }
+      await verifyDecodableImage(buf, info);
+
+      provider = this.storage.getActive();
+      const key = this.storage.buildKey('original', info.ext);
+      const stored = await provider.put(key, buf, info.mime);
+      storedKey = key;
+      const url = await provider.url(key);
+
+      // 返回值也要 decorate：上传成功后前端立刻用返回值渲染缩略图，
+      // 少这一层会出现「刚传完的图 403，刷新列表又好了」的怪异现象。
+      const created = await this.prisma.asset.create({
+        data: {
+          projectId,
+          ownerId,
+          kind: 'original',
+          sourceUrl: url,
+          format: info.mime,
+          sizeBytes: stored.sizeBytes,
+          width: info.width,
+          height: info.height,
+          storageBackend: provider.backend,
+          storageKey: key,
+        },
+      });
+      return this.decorate(created);
+    } catch (error) {
+      // 对象已写入但数据库失败时，删除对象避免留下无主文件；显式 best-effort，
+      // 不覆盖原始错误（DB 错误才是调用方需要看到的根因）。
+      if (storedKey && provider) await provider.delete(storedKey).catch(() => undefined);
+      throw error;
+    } finally {
+      await fsp.unlink(tempPath).catch(() => undefined);
     }
-
-    const project = await this.prisma.project.findUnique({ where: { id: projectId } });
-    if (!project || project.ownerId !== ownerId) {
-      throw new AppError(40001, '项目不存在或无权限', 403);
-    }
-
-    const ext = (file.originalname.toLowerCase().split('.').pop() || 'jpg').replace(/[^a-z0-9]/g, '');
-    const format = mimeFromExt(ext, file.mimetype);
-
-    // multer 已把上传落到本地临时目录（与 assets.controller 的 destination 同源,
-    // 都读 UPLOAD_DIR）; 读出后转存到当前默认后端。
-    // 云端部署时这一步把文件从临时盘搬到对象存储, 之后临时文件可由保留期策略清理。
-    // 用户上传的图**不打 AIGC 标识**: aigcMeta 保持 '{}'。
-    // 给用户自己的图打「AI 生成」角标等于诬告, 比不标更糟。
-    const buf = await fsp.readFile(join(resolveUploadsDir(), 'original', file.filename));
-
-    const provider = this.storage.getActive();
-    const key = this.storage.buildKey('original', ext);
-    const stored = await provider.put(key, buf, format);
-    const url = await provider.url(key);
-
-    const dims = await probeDimensions(buf);
-
-    // 返回值也要 decorate：上传成功后前端立刻用返回值渲染缩略图，
-    // 少这一层会出现「刚传完的图 403，刷新列表又好了」的怪异现象
-    const created = await this.prisma.asset.create({
-      data: {
-        projectId,
-        ownerId,
-        kind: 'original',
-        sourceUrl: url,
-        format,
-        sizeBytes: stored.sizeBytes,
-        // 记录尺寸, 素材库与作品页才有宽高可展示 (探测失败不阻断上传)
-        width: dims?.width ?? null,
-        height: dims?.height ?? null,
-        storageBackend: provider.backend,
-        storageKey: key,
-      },
-    });
-    return this.decorate(created);
   }
 
   /**
@@ -203,14 +216,6 @@ export class AssetsService {
   }
 }
 
-function mimeFromExt(ext: string, fallback: string): string {
-  if (ext === 'png') return 'image/png';
-  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
-  if (ext === 'webp') return 'image/webp';
-  if (ext === 'gif') return 'image/gif';
-  return fallback || 'application/octet-stream';
-}
-
 /**
  * 解析「日期」的起始时刻 (当天 00:00:00.000, 本地时区)。
  *
@@ -249,24 +254,6 @@ function parseDateInput(raw: string): Date | null {
   }
   const t = Date.parse(s);
   return Number.isNaN(t) ? null : new Date(t);
-}
-
-/**
- * 读取图片宽高。
- * 传 Buffer 而非磁盘路径 —— 云端后端下文件不在本地磁盘。
- * 懒加载 jimp: require 一次约 7s (本机 fs 慢), 不应拖慢服务启动。
- */
-async function probeDimensions(
-  buf: Buffer,
-): Promise<{ width: number; height: number } | null> {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { Jimp } = require('jimp');
-    const img = await Jimp.read(buf);
-    return { width: img.bitmap.width, height: img.bitmap.height };
-  } catch {
-    return null;
-  }
 }
 
 /** 安全解析 aigcMeta JSON: 坏数据不该让素材列表整个 500 */

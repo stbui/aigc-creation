@@ -9,7 +9,7 @@ import {
   CONFIG_DEFS,
   CONFIG_GROUPS,
   findConfigDef,
-  ROUTE_VALUES,
+  WRITABLE_ROUTE_VALUES,
   type ConfigDef,
 } from '../providers/channel-config.defs';
 import {
@@ -19,10 +19,7 @@ import {
   setGatewayConfigOverrides,
 } from '../providers/gateway.config';
 import { CAPABILITIES } from '../capabilities/capability.registry';
-import {
-  allowsLocalFallback,
-  type CapabilityPlugin,
-} from '../capabilities/capability-plugin.type';
+import type { CapabilityPlugin } from '../capabilities/capability-plugin.type';
 import {
   MODALITIES,
   PROTOCOL_OPTIONS_BY_MODALITY,
@@ -153,31 +150,10 @@ export class ModelConfigService {
           mode: c.mode,
           modality: c.modality,
           route,
-          /*
-           * ⚠️ effective 必须区分「本地兜底」与「无兜底」(2026-10-20 修)。
-           *
-           * 改造前只有 gateway/local 两态, 未配网关一律记 local。
-           * 但**视频与文本没有本地算法** —— 把它们标成「本地算法」等于
-           * 在后台谎报「会回落本地出图」, 而实际上会**直接失败**。
-           * 那是本项目最忌讳的那类静默不实 (与「不把本地伪装成模型」同源,
-           * 反过来同样错误: 不该把「无兜底」伪装成「有本地兜底」)。
-           *
-           * 故三态: gateway=真实模型 / local=本地算法 / none=无兜底(会失败)。
-           *
-           * 2026-10-22 补充: 图像里也有**无兜底**的能力 —— 本地根本没有实现
-           * (创意生图 / 局部重绘 / 图片翻译 / 自由创作, 见 allowsLocalFallback)。
-           * 它们没通道时会判 failed/42204, 这里若照旧报 local, 就与 C 端 runtime 打架。
-           * 判定与路由器共用 allowsLocalFallback(), 不在本文件另写一份。
-           */
+          // gateway=真实模型可用 / none=没有可用模型线路（提交会失败并退款）
           effective: this.routeEffectiveOf(c, route, snapshots),
-          /*
-           * 该能力「能不能被压到本地」—— 供前端把 local 这个选项置灰。
-           *
-           * 不能靠 `effective` 反推: route=auto 且通道已配时 effective 是
-           * gateway, 看不出本地是否可用。判定与路由器共用 allowsLocalFallback(),
-           * 与上面的 routeEffectiveOf 同源。
-           */
-          localAvailable: Boolean(c.localImpl) && allowsLocalFallback(c),
+          /** @deprecated 本地生成已移除；保留 false 供旧客户端兼容 */
+          localAvailable: false,
         };
       }),
     };
@@ -265,37 +241,31 @@ export class ModelConfigService {
   /**
    * 单项能力的生效来源 (后台「逐能力路由」用)。
    *
-   * 与 `effectiveOf` 只差在**无本地实现的能力**: 模态级快照只能说
-   * 「图像通道没配 → 本地」, 但这类能力此时不会回落, 而是判 failed/42204。
-   * 后台若照旧显示 local, 就是「界面预告有图、点下去失败」——
-   * 与 C 端 runtime 打架。判定与路由器共用 allowsLocalFallback()。
+   * 本地生成已删除：存量 route=local 明确显示 none，不静默改写。
    */
   private routeEffectiveOf(
     def: CapabilityPlugin,
     route: string,
     snapshots: Partial<Record<Modality, ChannelSnapshot | null>>,
-  ): 'gateway' | 'local' | 'none' {
-    const allowLocal = Boolean(def.localImpl) && allowsLocalFallback(def);
-    if (route === 'local') return allowLocal ? 'local' : 'none';
-    const effective = this.effectiveOf(def.modality, snapshots);
-    // 通道没配时 effectiveOf 对图像一律报 local —— 无兜底的能力要降级为 none
-    return effective === 'local' && !allowLocal ? 'none' : effective;
+  ): 'gateway' | 'none' {
+    if (route === 'local') return 'none';
+    return this.effectiveOf(def.modality, snapshots);
   }
 
   /**
    * 该模态当前的实际生效来源。
    *
    * 「有可用线路」才算 gateway —— 只看全局 `cfg.enabled` 会在多渠道下说谎：
-   * 表里有线路但旧基址为空时，旧算法会误报 local/none。
+   * 表里有线路但旧基址为空时，旧算法会误报 none。
    */
   private effectiveOf(
     modality: Modality,
     snapshots: Partial<Record<Modality, ChannelSnapshot | null>>,
-  ): 'gateway' | 'local' | 'none' {
+  ): 'gateway' | 'none' {
     const snap = snapshots[modality];
     const available = snap ? snap.availableCount > 0 : gatewayConfigOf(modality).enabled;
     if (available) return 'gateway';
-    return modality === 'image' ? 'local' : 'none';
+    return 'none';
   }
 
   /**
@@ -499,8 +469,8 @@ export class ModelConfigService {
   /**
    * 连通性测试: 用当前生效配置发一次最小请求。
    *
-   * 目的是让运营**看到真实报错**而不是猜 —— 网关不通时静默回落本地,
-   * 界面上看不出是配置错了还是网关挂了。
+   * 目的是让运营**看到真实报错**而不是猜 —— 网关不通时任务会失败并退款,
+   * 界面上需要能区分是配置错了还是网关挂了。
    *
    * 按模态分流 (2026-10-20): 三种模态的探测端点完全不同
    * (图 → 协议层声明的图像端点; 文 → /v1/chat/completions; 视频 → 尚无契约),
@@ -1155,37 +1125,13 @@ function validate(def: ConfigDef, raw: unknown): string {
     return normalizeBaseUrl(s);
   }
   if (def.key.startsWith('gateway.route.')) {
-    if (!(ROUTE_VALUES as readonly string[]).includes(s)) {
-      throw new AppError(40001, `${def.label} 只能是 auto / local / remote`, 400);
-    }
-    /*
-     * 「强制本地」只对**本地真有实现**的能力成立 (2026-10-22 补)。
-     *
-     * 本地没有实现的能力 (创意生图 / 局部重绘 / 图片翻译 / 自由创作, 即
-     * allowsLocalFallback() 为 false 或压根没有 localImpl) 压到 local 是
-     * 一个**不可能成立**的配置: 路由器对这种组合直接判 no-channel → 42204 + 退款,
-     * C 端 /capabilities 则报 effective=unavailable。而运营在后台看到的只是一句
-     * 「保存成功」, 随后用户点进去才发现按钮是死的 —— 这正是本项目最忌讳的
-     * 「保存了但静默失效」。
-     *
-     * 判定与路由器、availability、routeEffectiveOf 共用 allowsLocalFallback(),
-     * 不在这里另写一份, 否则四处口径迟早分叉。
-     */
-    if (s === 'local') {
-      const cap = CAPABILITIES.find((c) => c.id === def.key.slice('gateway.route.'.length));
-      if (cap && !(cap.localImpl && allowsLocalFallback(cap))) {
-        throw new AppError(
-          40001,
-          `${cap.name} 本地没有实现，不能强制本地（按下去会直接失败并退款），请改为 auto 或 remote`,
-          400,
-        );
-      }
+    if (!(WRITABLE_ROUTE_VALUES as readonly string[]).includes(s)) {
+      throw new AppError(40001, `${def.label} 只能是 auto / remote（本地生成已停用）`, 400);
     }
   }
   // 通道协议必须在本模态的已接入白名单内。
   // ⚠️ 这条校验是本次改造刻意新增的: 协议名跨模态复用 (openai 既是生图也是文本),
-  // 放行跨模态协议会让文生文请求被发到生图端点 —— 404 → 静默回落本地,
-  // 运营在界面上完全看不出配错了。
+  // 放行跨模态协议会让文生文请求被发到生图端点，运营在界面上看不出配错了。
   if (def.key.endsWith('.provider') && s) {
     const modality = def.modality;
     if (modality && !protocolSupports(modality, s)) {

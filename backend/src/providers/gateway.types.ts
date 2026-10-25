@@ -1,9 +1,14 @@
 /** 真实模型通道的共享类型 (gateway ↔ router 之间, 不依赖具体实现) */
 
-/** 单能力路由: auto=网关可用则远程 / local=强制本地 / remote=强制远程 */
+/**
+ * 单能力路由: auto=模型通道可用则远程 / remote=强制远程。
+ *
+ * `local` 仅用于解析 2026-10-25 前写入的存量配置；本地生成已删除，
+ * 运行时遇到 local 会明确判不可用，不会静默改走远程。
+ */
 export type CapabilityRoute = 'auto' | 'local' | 'remote';
 
-/** 产出来源: gateway=真实模型通道, local=本地 Jimp 算法 */
+/** 产出来源: gateway=真实模型通道；local 仅标识历史任务/调用记录 */
 export type ProduceSource = 'gateway' | 'local';
 
 /** 远程通道返回的结果 (router 转成 ImageProviderResult) */
@@ -18,7 +23,7 @@ export interface GatewayResult {
   prompt?: string;
 }
 
-/** 远程通道不可用 / 出错 (router 捕获后回落本地) */
+/** 远程通道不可用 / 出错（由调度器换下一条线路） */
 export class GatewayUnavailableError extends Error {
   readonly reason: string;
   constructor(reason: string, detail?: string) {
@@ -29,10 +34,9 @@ export class GatewayUnavailableError extends Error {
 }
 
 /**
- * 没有可用的真实模型通道, 且该能力**不允许**交付本地产物。
+ * 没有可用的真实模型通道。
  *
- * 与 GatewayUnavailableError 的区别: 后者是可降级的一次通道故障 (图像能力回落本地);
- * 本错误是**终局** —— 该能力本地没有实现 (占位算法已于 2026-10-22 全部删除),
+ * 本错误是**终局** —— 本地生成算法已于 2026-10-25 删除，
  * 除了真实模型没有别的产出路径。
  * 由 generate.service 转成任务失败 `42204` 并退款, 不落任何产出图。
  */
@@ -55,7 +59,7 @@ export class NoModelChannelError extends Error {
  * 一次看起来成功、结果却对不上的交付。
  *
  * 因此它不能与「通道故障」混为一谈:
- *   · 通道故障 → 试下一条通道 / 回落本地;
+ *   · 通道故障 → 试下一条通道；
  *   · 协议不支持 → 该通道无论重试多少次都不会支持, 只能换一条声明了
  *     `maskSupport: 'edits'` 的通道; 全部通道都不支持时判任务失败 `42205` 并退款。
  *

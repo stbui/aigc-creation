@@ -6,7 +6,7 @@ export type KnownCapability = 'main_image' | 'detail_image' | 'matting';
 export type Capability = KnownCapability | (string & {});
 
 /**
- * 能力模式: real=已接入真实实现 (本地算法或云端模型) / planned=尚未开放。
+ * 能力模式: real=已接入真实模型通道 / planned=尚未开放。
  *
  * 2026-10-22 起没有 mock 一档 —— 本地占位实现已从后端删除, 没有真实产出路径的
  * 能力不该对用户开放。
@@ -40,23 +40,23 @@ export interface CapabilityParam {
  * 能力的**运行时真相**（2026-10-21）—— 与静态的 `mode` 正交。
  *
  * `mode` 说「代码实现到什么程度」，`runtime.effective` 说「此刻按下去会发生什么」：
- * 后台下线的能力是 `disabled`；没配云端通道、却有本地实现的 real 能力是 `local`；
- * 没有本地实现又没通道的是 `unavailable`。界面标注一律看这里，不看 mode。
+ * 后台下线的能力是 `disabled`；没有可用模型通道的是 `unavailable`。
+ * 界面标注一律看这里，不看 mode。
  *
  * ⚠️ 它是**事前预期**；单次生成实际走的哪条路以任务结果里的 `provider`
- * （gateway / local）为准 —— 云端失败会回落本地，两者不一致是正常的。
+ * 为准。2026-10-25 起本地生成已移除，新任务只会是 gateway。
  */
 export interface CapabilityRuntime {
   /** 后台管控开关（无记录 = 启用） */
   enabled: boolean;
-  /** 逐能力路由配置 */
+  /** 逐能力路由配置；local 仅表示存量配置，运行时按不可用处理 */
   route: 'auto' | 'local' | 'remote';
   /** 该模态此刻是否具备可用的云端通道 */
   remoteAvailable: boolean;
-  /** 本地实现质量：real=有可交付的本地真实算法 / none=本地根本没有实现 */
-  localQuality: 'real' | 'none';
+  /** @deprecated 本地生成已移除，后端恒为 none */
+  localQuality: 'none';
   /** 一句话结论 */
-  effective: 'remote' | 'local' | 'disabled' | 'unavailable';
+  effective: 'remote' | 'disabled' | 'unavailable';
   /** 给用户看的原因 */
   reason: string;
 }
@@ -76,15 +76,6 @@ export interface CapabilityDef {
    * modality 说产出是什么。前端据此选 `<img>` 还是 `<video>` 渲染结果。
    */
   modality?: Modality;
-  /**
-   * 云端不可用时是否允许交付本地产物 (2026-10-21)。
-   *
-   * false = 本地根本没有实现 (创意生图 / 局部重绘 / 图片翻译 / 自由创作),
-   * 没通道就判失败并退款; 未下发时按 true 推断, 与后端 allowsLocalFallback() 同口径。
-   */
-  localFallback?: boolean;
-  /** 本地实现句柄名; 无此字段 = 该能力没有本地实现 (仅云端) */
-  localImpl?: string;
   inputs: 0 | 1 | 2;
   inWorkbench: boolean;
   help?: string;
@@ -341,11 +332,16 @@ export interface GenerateRequest {
   capability: Capability;
   inputAssetIds: string[];
   params: Record<string, unknown>;
+  /** 客户端请求幂等键；网络超时重试时复用同一值。 */
+  idempotencyKey?: string;
 }
 
 export interface GenerateResponse {
   taskId: string;
   id?: string;
+  status?: TaskStatus;
+  creditCost?: number;
+  idempotentHit?: boolean;
 }
 
 // 后端 getTask 返回 outputAsset (backend/src/generate/generate.service.ts:125),
@@ -783,7 +779,7 @@ export type SizeStyle = 'openai-wh' | 'volc-tier' | 'ratio-only';
  * 内置厂商预设 (后端 provider-presets.ts 单一声明)。
  *
  * 用途: 后台「模型配置」页选厂商后自动填好 基址/协议/模型 三项 ——
- * 手填这三项最容易错, 而配错的表现是**静默回落本地算法**, 界面上看不出来。
+ * 手填这三项最容易错, 而配错的表现是线路调用失败, 界面上不一定看得出来。
  *
  * sizeStyle / sizeField / maxRefImages / refStyle 现为可选: 文生文无这些概念。
  */
@@ -840,15 +836,8 @@ export interface AdminModelChannel {
   pollMs: number;
   maxPolls: number;
   assetBase: string;
-  /**
-   * 通道实际生效态 —— **三态** (2026-10-20)。
-   *
-   * ⚠️ 此前只有 gateway/local 两态, 未配网关一律记 local。但**视频与文本
-   * 没有本地兜底** —— 标成 local 会在后台显示「本地算法」, 而实际调用会
-   * 直接失败。那等于谎报可用性 (与「不把本地伪装成模型」是同一类错误的
-   * 反向版本)。故拆出第三态 `none`。
-   */
-  effective: 'gateway' | 'local' | 'none';
+  /** 通道实际生效态：gateway=真实模型可用 / none=没有可用模型线路 */
+  effective: 'gateway' | 'none';
   /** 该模态可选的厂商预设 */
   vendors: VendorPreset[];
   /** 该模态可选的协议; video 首批为空数组 = 尚未取证任何一家 */
@@ -993,10 +982,10 @@ export interface AdminModelConfig {
     maxPolls: number;
     assetBase: string;
     /**
-     * 当前整体生效通道 —— 三态。
-     * gateway=真实模型 / local=本地算法 / none=未接入且无兜底（会失败）。
+     * 当前整体生效通道 —— 两态。
+     * gateway=真实模型 / none=未接入（会失败并退款）。
      */
-    effective: 'gateway' | 'local' | 'none';
+    effective: 'gateway' | 'none';
   };
   /** @deprecated 用 channels[modality].vendors */
   vendors: VendorPreset[];
@@ -1015,24 +1004,11 @@ export interface AdminModelRouteRow {
     modality: Modality;
     route: 'auto' | 'local' | 'remote';
     /**
-     * 实际生效态 —— **三态** (2026-10-20)。
-     *
-     * ⚠️ 此前只有 gateway/local, 未配网关一律 local。但视频/文本**无本地兜底** ——
-     * 标 local 等于谎报「会回落本地」, 实际是直接失败。
-     *
-     * 2026-10-22 起图像里也有 `none`: 本地根本没有实现的能力 (创意生图 /
-     * 局部重绘 / 图片翻译 / 自由创作) 没通道时判 failed/42204,
-     * 同样不得报 local —— 与 C 端 `runtime.effective=unavailable` 保持同一口径。
+     * 实际生效态：gateway=真实模型可用 / none=没有可用模型线路。
+     * 本地生成已移除，不再存在 local 生效态。
      */
-    effective: 'gateway' | 'local' | 'none';
-    /**
-     * 该能力能否被压到本地 (2026-10-22)。
-     *
-     * 本地根本没有实现的能力 (创意生图 / 局部重绘 / 图片翻译 / 自由创作)
-     * 与文本/视频恒为 false —— 对它们选「仅本地」等于配置一个必然失败的组合,
-     * 前端要据此把选项置灰。后端 `updateAll` 用同一份 `allowsLocalFallback()`
-     * 拒绝落库, 前端置灰只是提前告知, 不是安全边界。
-     */
+    effective: 'gateway' | 'none';
+    /** @deprecated 本地生成已移除，恒为 false */
     localAvailable: boolean;
 }
 
@@ -1324,7 +1300,7 @@ export interface AdminTask {
   capability: string;
   capabilityName: string;
   status: 'pending' | 'running' | 'succeeded' | 'failed';
-  /** 实际通道: gateway=真实模型 / local=本地算法 / pending=尚未跑完的初值 */
+  /** 实际通道: gateway=真实模型 / local=停用前的历史本地产出 / pending=尚未跑完的初值 */
   provider: string | null;
   errorCode: string | null;
   creditCost: number;

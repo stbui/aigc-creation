@@ -1,6 +1,7 @@
 import { useState, type RefObject } from 'react';
 import { Spin } from 'antd';
 import { ImagePlus, Plus, X } from 'lucide-react';
+import { SUPPORTED_IMAGE_ACCEPT } from '../lib/constants';
 
 /**
  * 工具页图片上传区 —— 2026-10-19 从 4 个大页面抽出。
@@ -72,7 +73,7 @@ export function ToolImageDropzone({
   onOpenLibrary,
   onOpenMobile,
   noun = '商品图片',
-  accept = 'image/png,image/jpeg,image/webp,image/gif',
+  accept = SUPPORTED_IMAGE_ACCEPT,
   sectionClassName,
   dropzoneClassName,
   single = false,

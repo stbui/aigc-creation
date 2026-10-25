@@ -1087,7 +1087,7 @@ PATCH /admin/compliance/capabilities/:id      { enabled, freeMode, rateLimit }
 单能力覆盖
 能力          路由      优先级
 main_image    [自动 ▾]   继承全局
-matting       [本地 ▾]   强制本地
+matting       [自动 ▾]   按模型线路调度
 ```
 
 **优先级链**（唯一事实源不被破坏）：

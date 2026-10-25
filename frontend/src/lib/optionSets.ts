@@ -59,9 +59,9 @@ export type ResolutionOption = ParamOption & {
  * 静默回落成默认值，而界面看起来是可选的。
  *
  * 可用性由该能力此刻的实际路由决定（`runtime.remoteAvailable`）：
- *   - 4K 档：有云端通道 → 可选；只有本地 → 禁用并说明（本地 Jimp 上限 2048px）
+ *   - 4K 档：有模型通道 → 可选；没有模型通道 → 禁用并说明
  *     不隐藏 —— 隐藏会让用户以为没这个档位
- *   - 其余档位：本地与云端都能兑现，恒可选
+ *   - 其余档位：有模型通道即可选
  * 不传 capabilityId 时按「拿不到证据就不放开」处理：4K 禁用。
  *
  * 副文（2026-10-21 改）：参考站卡片副文是 `{multiplier}倍消耗`
@@ -77,6 +77,6 @@ export function resolutionOptions(capabilityId?: string): ResolutionOption[] {
   return qualityOptions().map((o) => {
     const base: ResolutionOption = { ...o, sub: '1倍消耗' };
     if (o.value !== '4k' || remote) return base;
-    return { ...base, disabled: true, disabledReason: '本地算法上限 2048px，需配置云端通道' };
+    return { ...base, disabled: true, disabledReason: '4K 需要支持该规格的模型通道，当前通道不可用' };
   });
 }

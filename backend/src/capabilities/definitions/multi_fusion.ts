@@ -18,7 +18,7 @@ export const MultiFusion: CapabilityPlugin = {
   sidebarHint: '多图合成，保留主体一致性',
   mode: 'real',
   creditCost: 40, // 原页面标注「本次消耗40积分」
-  help: '本地为场景版式合成算法 (真实图片层叠 + 光影融合), 云端可用时走模型语义融合',
+  help: '由图像模型完成场景语义融合，需要可用的图像通道',
   params: [
     { key: 'scene', label: '融合场景', type: 'enum', default: 'print_pattern', options: FUSION_SCENARIOS },
     { key: 'variantCount', label: '变体张数', type: 'enum', default: '4', options: FUSION_VARIANT_COUNTS },
@@ -41,7 +41,6 @@ export const MultiFusion: CapabilityPlugin = {
       `保持光影与透视一致${descPart}${ratioText(p.ratio)}${sizeText(p.size)}`
     );
   },
-  localImpl: 'makeMultiFusion',
   modality: 'image',
   inputs: 2,
   inWorkbench: false,

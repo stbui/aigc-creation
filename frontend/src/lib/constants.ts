@@ -40,6 +40,15 @@ export const DEFAULT_PROJECT_NAME = '默认项目';
  */
 export const MAX_IMAGE_MB = 10;
 export const MAX_IMAGE_BYTES = MAX_IMAGE_MB * 1024 * 1024;
+/** 后端图片解码与生成通道接受的三种真实格式；GIF 不在其中。 */
+export const SUPPORTED_IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'] as const;
+export const SUPPORTED_IMAGE_ACCEPT = SUPPORTED_IMAGE_TYPES.join(',');
+export const SUPPORTED_IMAGE_LABEL = 'PNG / JPG / WebP';
+
+/** 与后端 `inspectUploadedImage` 的格式白名单保持一致；GIF 等格式会被服务端拒绝。 */
+export function isSupportedImageFile(file: { type: string }): boolean {
+  return (SUPPORTED_IMAGE_TYPES as readonly string[]).includes(file.type);
+}
 export const POLL_INTERVAL_MS = 1200;
 export const POLL_MAX_TRIES = 60;
 /**
@@ -59,13 +68,8 @@ export const POLL_VIDEO_MAX_TRIES = 550;
 /**
  * 能力模式对应的界面标注。
  *
- * ⚠️ `real` 的文案是「已接入」而非「本地算法」——
- * real 现在涵盖两类实现: Jimp 本地真实算法(7项) 与 已接云端真实模型
- * (自由创作 → 优云智算 qwen-image-3.0)。写成「本地算法」会让云端模型能力被错标。
- *
- * mode 只回答「这项能力是否已接入真实实现」, **不承诺每次都走远程**。
- * 单次请求实际走云端模型还是本地 Jimp 回落, 以 task.provider 为准,
- * 由结果卡按provider 显示徽标 (绿=真实模型 / 琥珀=本地算法)。
+ * mode 只回答「这项能力是否已接入真实模型通道」。
+ * 单次请求实际走的线路以 task.provider 为准，由结果卡显示来源徽标。
  */
 export const MODE_LABELS: Record<string, string> = {
   real: '已接入',
@@ -77,11 +81,10 @@ export const MODE_LABELS: Record<string, string> = {
  *
  * 与 MODE_LABELS 的分工：MODE 是「代码里实现到什么程度」，RUNTIME 是
  * 「此刻按下去会发生什么」。用户要的信息永远是后者 —— 一项 real 能力
- * 在没配通道时按下去走的是本地算法，标「已接入」并不告诉他这一点。
+ * 在没配通道时不可提交，标「已接入」并不告诉他这一点。
  */
 export const RUNTIME_LABELS: Record<CapabilityRuntime['effective'], string> = {
   remote: '云端模型',
-  local: '本地算法',
   disabled: '已下线',
   unavailable: '暂不可用',
 };
@@ -89,27 +92,32 @@ export const RUNTIME_LABELS: Record<CapabilityRuntime['effective'], string> = {
 /**
  * 取能力的运行时状态；后端未下发时按定义兜底（兼容旧后端 / 旧缓存）。
  *
- * 兜底刻意保守：没有 runtime 就当作「本地」，不假称云端可用 ——
- * 宁可少标一句「云端模型」，也不能让界面承诺一条可能不存在的通道。
- * 没有本地实现的能力兜底成「暂不可用」，否则界面会预告一份按下就判失败
- * （并退款）的产物。
+ * 兜底刻意保守：没有 runtime 就当作「暂不可用」，不假称云端可用，
+ * 也不能让界面承诺一条可能不存在的通道。
  */
 export function runtimeOf(
-  def: Pick<CapabilityDef, 'mode' | 'runtime' | 'localFallback' | 'localImpl' | 'modality'>,
+  def: Pick<CapabilityDef, 'mode' | 'runtime'>,
 ): CapabilityRuntime {
-  if (def.runtime) return def.runtime;
-  // 与后端 allowsLocalFallback() 同一判定: 显式 localFallback=false 的能力不交付本地产物
-  const allowLocal = def.localFallback ?? true;
-  // 本地实现的判据是 localImpl 而非模态 —— 创意生图 / 局部重绘 / 图片翻译 /
-  // 自由创作同为图像能力, 却没有本地路径
-  const hasLocal = Boolean(def.localImpl) && allowLocal;
+  if (def.runtime) {
+    // 旧后端/旧缓存可能仍下发 local；本地生成已删除，必须按不可用处理，
+    // 不能让它绕过提交拦截去执行一条必然失败的任务。
+    if ((def.runtime.effective as string) === 'local') {
+      return {
+        ...def.runtime,
+        localQuality: 'none',
+        effective: 'unavailable',
+        reason: '本地生成已停用，请配置可用的模型通道',
+      };
+    }
+    return def.runtime;
+  }
   return {
     enabled: def.mode !== 'planned',
     route: 'auto',
     remoteAvailable: false,
-    localQuality: hasLocal ? 'real' : 'none',
-    effective: def.mode === 'planned' ? 'disabled' : hasLocal ? 'local' : 'unavailable',
-    reason: '',
+    localQuality: 'none',
+    effective: def.mode === 'planned' ? 'disabled' : 'unavailable',
+    reason: '尚未获取模型通道状态，请刷新后重试',
   };
 }
 
@@ -136,4 +144,3 @@ export function taskErrorText(code?: string | null): string {
   if (!code) return '未知错误';
   return TASK_ERROR_TEXT[code] ?? code;
 }
-

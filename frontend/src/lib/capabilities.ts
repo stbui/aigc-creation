@@ -80,7 +80,7 @@ export function capabilityName(id: string | undefined | null): string {
  * 误以为产品没有这项能力。
  */
 export function isCapabilityVisible(
-  def: Pick<CapabilityDef, 'mode' | 'runtime' | 'localFallback' | 'localImpl' | 'modality'>,
+  def: Pick<CapabilityDef, 'mode' | 'runtime'>,
 ): boolean {
   return def.mode !== 'planned' && runtimeOf(def).effective !== 'disabled';
 }
@@ -97,8 +97,9 @@ export function toolPath(id: string): string {
   if (id === 'detail_image') return '/product-detail';
   if (id === 'hot_remake') return '/viral-clone';
   if (id === 'free_create') return '/free-creation';
-  // 参考站「创意生图」与「自由创作」共用同一页 (实拍: 侧栏点击创意生图 → /free-creation)
-  if (id === 'creative_image') return '/free-creation';
+  // 参考站「创意生图」与「自由创作」共用同一页 (实拍: 侧栏点击创意生图 → /free-creation)。
+  // 查询参数保留入口语义: 页面外观相同，但提交的任务能力必须仍是 creative_image。
+  if (id === 'creative_image') return '/free-creation?capability=creative_image';
   if (id === 'multi_fusion') return '/multi-image-fusion';
   if (id === 'sku_image') return '/product-sku';
   if (id === 'local_redraw') return '/local-redraw';

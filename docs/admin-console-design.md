@@ -167,7 +167,7 @@
 | 分组 | 项 | 存储 |
 |---|---|---|
 | 站点 | 站点名称、维护模式开关（开启后 C 端只读，生成接口 503） | `SystemSetting` |
-| 上传 | 单文件大小上限（默认 20MB，与 `assets.controller.ts:34` 对齐）、允许的文件类型 | `SystemSetting` |
+| 上传 | 单文件大小上限（默认 10MB，前后端同源；后端可用 `ASSET_MAX_UPLOAD_BYTES` 上调）、允许类型固定为 PNG/JPEG/WebP | `SystemSetting` |
 | 生成 | 默认轮询上限、超时（对应 `GATEWAY_TIMEOUT_MS`/`MAX_POLLS`）、并发任务上限 | `SystemSetting` |
 | 安全 | JWT TTL 提示（只读，标注"生产应改短 TTL + refresh"）、管理员白名单展示 | 只读 |
 | 存储 | `uploads/` 目录占用与文件数、原始/生成分目录统计 | 运行时统计 |

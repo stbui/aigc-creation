@@ -1,6 +1,6 @@
 /**
  * 图片翻译 —— 参考站 image-translate。翻译图内文字并保持版式。
- * 必须由真实多模态 / 图像模型完成, 本地没有实现。
+ * 必须由真实多模态 / 图像模型完成。
  *
  * 2026-10-20 从 capability.registry.ts 抽离为独立文件。
  * 抽离的意义: 能力定义此前散在 registry / gateway-prompt / mock provider /
@@ -29,8 +29,6 @@ export const ImageTranslate: CapabilityPlugin = {
   buildPrompt: (p) =>
     `图片内文字翻译为 ${p.targetLanguage || p.targetLang || 'zh-CN'}：保持原版式、字号与颜色不变，` +
     `只替换文字内容${p.protectSubject ? '，商品主体像素不得改动' : ''}`,
-  /** 翻译没有本地实现; 没通道就 failed/42204 并退款, 不交付占位图 */
-  localFallback: false,
   modality: 'image',
   inputs: 1,
   inWorkbench: true,

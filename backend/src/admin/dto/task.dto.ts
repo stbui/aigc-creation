@@ -23,7 +23,7 @@ export class TaskListQueryDto extends PageQueryDto {
   capability?: string;
 
   /**
-   * 通道。落库值是 `gateway`(真实模型) / `local`(本地算法) / `pending`(尚未执行),
+   * 通道。落库值是 `gateway`(真实模型) / `local`(停用前的历史本地产出) / `pending`(尚未执行),
    * `pending` 是任务的初始值, 任务跑完后 processTask 会把它改写成实际通道,
    * 因此它只在「刚建、还没跑完」时可见。
    *

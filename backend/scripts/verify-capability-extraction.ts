@@ -10,7 +10,7 @@
  * 只有把抽离前后的定义逐字段对比才能发现。
  *
  * 因此本文件固定了一组**抽离前的基线快照** (id / 参数键序 / 枚举取值 /
- * 积分价 / 模态 / 本地实现), 与当前 definitions 逐项比对。
+ * 积分价 / 模态), 与当前 definitions 逐项比对。
  * 后续任何人改动能力定义, 若动了这些契约字段, 本脚本会红。
  */
 
@@ -36,13 +36,11 @@ const BASELINE: Array<{
   id: string;
   creditCost: number;
   modality: string;
-  /** 2026-10-22: 无本地实现的能力为 null (改为 localFallback: false, 仅云端) */
-  localImpl: string | null;
   paramKeys: string[];
   options: Record<string, string[]>; // paramKey → 选项 value 列表
 }> = [
   {
-    id: 'main_image', creditCost: 10, modality: 'image', localImpl: 'makeMainImage',
+    id: 'main_image', creditCost: 10, modality: 'image',
     paramKeys: ['productName', 'brand', 'platform', 'language', 'description', 'variant', 'ratio', 'size'],
     options: {
       platform: ['taobao', 'jd', 'douyin', 'pdd', 'xiaohongshu', 'amazon', 'tiktok-shop', 'shopify', 'temu'],
@@ -53,7 +51,7 @@ const BASELINE: Array<{
     },
   },
   {
-    id: 'detail_image', creditCost: 10, modality: 'image', localImpl: 'makeDetailImage',
+    id: 'detail_image', creditCost: 10, modality: 'image',
     paramKeys: ['productName', 'brand', 'platform', 'language', 'description', 'sections', 'sku', 'size'],
     options: {
       platform: ['taobao', 'jd', 'douyin', 'pdd', 'xiaohongshu', 'amazon', 'tiktok-shop', 'shopify', 'temu'],
@@ -62,7 +60,7 @@ const BASELINE: Array<{
     },
   },
   {
-    id: 'hot_remake', creditCost: 10, modality: 'image', localImpl: 'makeClone',
+    id: 'hot_remake', creditCost: 10, modality: 'image',
     paramKeys: ['productName', 'brand', 'platform', 'language', 'requirement', 'degree', 'ratio', 'size'],
     options: {
       platform: ['taobao', 'jd', 'douyin', 'pdd', 'xiaohongshu', 'amazon', 'tiktok-shop', 'shopify', 'temu'],
@@ -73,12 +71,12 @@ const BASELINE: Array<{
     },
   },
   {
-    id: 'creative_image', creditCost: 10, modality: 'image', localImpl: null,
+    id: 'creative_image', creditCost: 10, modality: 'image',
     paramKeys: ['prompt', 'ratio'],
     options: { ratio: ['1:1', '4:3', '3:4', '16:9', '9:16', '2:3', '3:2', '21:9'] },
   },
   {
-    id: 'multi_fusion', creditCost: 40, modality: 'image', localImpl: 'makeMultiFusion',
+    id: 'multi_fusion', creditCost: 40, modality: 'image',
     paramKeys: ['scene', 'variantCount', 'ratio', 'size', 'prompt'],
     options: {
       scene: [
@@ -92,7 +90,7 @@ const BASELINE: Array<{
     },
   },
   {
-    id: 'sku_image', creditCost: 0, modality: 'image', localImpl: 'makeSkuImage',
+    id: 'sku_image', creditCost: 0, modality: 'image',
     paramKeys: ['region', 'skuName', 'skuColor', 'customColor', 'regions', 'ratio', 'size'],
     options: {
       region: ['center', 'top', 'bottom', 'left', 'right'],
@@ -103,7 +101,7 @@ const BASELINE: Array<{
     },
   },
   {
-    id: 'local_redraw', creditCost: 5, modality: 'image', localImpl: null,
+    id: 'local_redraw', creditCost: 5, modality: 'image',
     paramKeys: ['region', 'prompt', 'maskAssetId', 'modelGuideAssetId', 'annotations', 'strength', 'outputCount', 'ratio', 'imageRatio', 'size'],
     options: {
       region: ['center', 'top', 'bottom', 'left', 'right', 'full'],
@@ -112,7 +110,7 @@ const BASELINE: Array<{
     },
   },
   {
-    id: 'expand', creditCost: 5, modality: 'image', localImpl: 'makeExpand',
+    id: 'expand', creditCost: 5, modality: 'image',
     // 2026-10-25: 追加参考站 placement* 字段（旧键与顺序保持不变）
     paramKeys: ['occupy', 'position', 'ratio', 'size', 'placementX', 'placementY', 'placementWidth', 'placementHeight', 'targetImageRatio'],
     options: {
@@ -122,7 +120,7 @@ const BASELINE: Array<{
     },
   },
   {
-    id: 'matting', creditCost: 0, modality: 'image', localImpl: 'makeMatting',
+    id: 'matting', creditCost: 0, modality: 'image',
     // 2026-10-25: 追加参考站 selectedColor/customAlpha（旧键与顺序保持不变）
     paramKeys: ['bgColor', 'customColor', 'ratio', 'selectedColor', 'customAlpha', 'resolution'],
     options: {
@@ -133,7 +131,7 @@ const BASELINE: Array<{
   },
   {
     // 2026-10-21 去除水印从占位升级为镜像修补 + 羽化融合的真实算法
-    id: 'remove_watermark', creditCost: 0, modality: 'image', localImpl: 'makeRemoveWatermark',
+    id: 'remove_watermark', creditCost: 0, modality: 'image',
     paramKeys: ['mode', 'region', 'maskAssetId', 'detectionMode', 'outputFormat'],
     options: {
       mode: ['auto', 'region'],
@@ -141,7 +139,7 @@ const BASELINE: Array<{
     },
   },
   {
-    id: 'image_translate', creditCost: 5, modality: 'image', localImpl: null,
+    id: 'image_translate', creditCost: 5, modality: 'image',
     paramKeys: ['targetLang', 'protectSubject', 'size', 'targetLanguage'],
     options: {
       targetLang: ['zh-CN', 'en-US', 'ru-RU', 'es-ES', 'de-DE', 'ja-JP', 'ko-KR', 'pt-PT', 'id-ID', 'th-TH'],
@@ -150,7 +148,7 @@ const BASELINE: Array<{
     },
   },
   {
-    id: 'enhance', creditCost: 5, modality: 'image', localImpl: 'makeEnhance',
+    id: 'enhance', creditCost: 5, modality: 'image',
     paramKeys: ['mode', 'note', 'ratio', 'size', 'templateCode', 'additionalRequirement', 'imageRatio'],
     options: {
       mode: ['comprehensive', 'texture', 'blemish', 'color', 'clarity', 'material'],
@@ -159,7 +157,7 @@ const BASELINE: Array<{
     },
   },
   {
-    id: 'recolor', creditCost: 5, modality: 'image', localImpl: 'makeRecolor',
+    id: 'recolor', creditCost: 5, modality: 'image',
     paramKeys: ['color', 'customColor', 'ratio', 'size', 'targetColor'],
     options: {
       color: ['#FFFFFF', '#82CEF3', '#3988E9', '#FF0B22', '#A8001B', 'custom'],
@@ -168,7 +166,7 @@ const BASELINE: Array<{
     },
   },
   {
-    id: 'rotate', creditCost: 5, modality: 'image', localImpl: 'makeRotate',
+    id: 'rotate', creditCost: 5, modality: 'image',
     paramKeys: ['yaw', 'pitch', 'zoom', 'ratio', 'size', 'azimuthDeg', 'elevationDeg', 'zoomFactor', 'imageRatio'],
     options: {
       ratio: ['original', '1:1', '4:3', '3:4', '16:9', '9:16', '2:3', '3:2', '21:9'],
@@ -176,7 +174,7 @@ const BASELINE: Array<{
     },
   },
   {
-    id: 'free_create', creditCost: 10, modality: 'image', localImpl: null,
+    id: 'free_create', creditCost: 10, modality: 'image',
     paramKeys: ['prompt', 'ratio', 'size'],
     options: {
       ratio: ['1:1', '4:3', '3:4', '16:9', '9:16', '2:3', '3:2', '21:9'],
@@ -216,7 +214,11 @@ for (const base of BASELINE) {
   }
   eq(`${base.id}.creditCost`, def.creditCost, base.creditCost);
   eq(`${base.id}.modality`, def.modality, base.modality);
-  eq(`${base.id}.localImpl`, def.localImpl ?? null, base.localImpl);
+  eq(
+    `${base.id} 不再声明本地实现`,
+    Object.prototype.hasOwnProperty.call(def, 'localImpl'),
+    false,
+  );
   eq(
     `${base.id} 参数键序`,
     def.params.map((p) => p.key).join(','),

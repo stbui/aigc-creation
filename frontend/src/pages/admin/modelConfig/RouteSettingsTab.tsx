@@ -40,7 +40,6 @@ export function RouteSettingsTab({
   const rows = config.routes.filter((r) => filter === 'all' || r.modality === filter);
   const summary = {
     gateway: rows.filter((r) => r.effective === 'gateway').length,
-    local: rows.filter((r) => r.effective === 'local').length,
     none: rows.filter((r) => r.effective === 'none').length,
   };
 
@@ -93,24 +92,21 @@ export function RouteSettingsTab({
           ? 'auto'
           : (draftState.draft[item.key] ?? item.value ?? 'auto');
         /*
-         * 本地没有实现的能力 (创意生图 / 局部重绘 / 图片翻译 / 自由创作,
-         * 以及文本/视频) 不能选「仅本地」—— 那是必然 42204 的组合。
-         * 后端 updateAll 会拒, 这里置灰是为了让人当场看懂原因, 而不是
-         * 点保存后才收到一句报错。
-         *
-         * 判据写成 `!== false` 而不是直接取反: 字段缺位 (前端先于后端上线、
-         * 或读到旧缓存) 时按「可本地」处理, 免得把 15 项能力全标成
-         * 「无本地实现」并锁死选项 —— 那才是更贵的误报。
+         * 新配置只允许 auto / remote。存量 local 不能静默改写，
+         * 但必须显式显示为「已停用」并引导运营选择自动或仅远程。
          */
-        const localAvailable = r.localAvailable !== false;
-        const options: Array<{ value: string; label: string; title?: string; disabled?: boolean }> =
-          localAvailable
-            ? ROUTE_OPTIONS_SHORT
-            : ROUTE_OPTIONS_SHORT.map((o) =>
-                o.value === 'local'
-                  ? { ...o, disabled: true, title: '该能力本地没有实现，选此项会直接失败' }
-                  : o,
-              );
+        const legacyLocal = String(value) === 'local';
+        const options = legacyLocal
+          ? [
+              {
+                value: 'local',
+                label: '存量本地（已停用）',
+                title: '本地生成已删除；保持此项会使能力不可提交，请改为自动或仅远程',
+                disabled: true,
+              },
+              ...ROUTE_OPTIONS_SHORT,
+            ]
+          : ROUTE_OPTIONS_SHORT;
         return (
           <Space size={6} wrap>
             <Select
@@ -126,8 +122,10 @@ export function RouteSettingsTab({
                 环境变量
               </Tag>
             )}
-            {!localAvailable && (
-              <Tag variant="filled">无本地实现</Tag>
+            {legacyLocal && !locked && (
+              <Tag color="error" variant="filled">
+                请改为自动/仅远程
+              </Tag>
             )}
             {draftState.clears[item.key] && (
               <Tag color="warning" variant="filled">
@@ -157,7 +155,7 @@ export function RouteSettingsTab({
         <Space size={8} wrap>
           <Typography.Text strong>逐能力路由</Typography.Text>
           <Typography.Text type="secondary" style={{ fontSize: 12, fontWeight: 400 }}>
-            按能力 id 全局唯一；图像可回落本地，文生文/视频没有本地兜底。
+            按能力 id 全局唯一；所有模态只允许模型通道，存量「仅本地」需改为自动或仅远程。
           </Typography.Text>
         </Space>
       }
@@ -167,12 +165,9 @@ export function RouteSettingsTab({
             <Typography.Text type="success" style={{ fontSize: 12 }}>
               ● {summary.gateway} 真实模型
             </Typography.Text>
-            <Typography.Text type="warning" style={{ fontSize: 12 }}>
-              ● {summary.local} 本地算法
-            </Typography.Text>
             {summary.none > 0 && (
               <Typography.Text type="danger" style={{ fontSize: 12 }}>
-                ● {summary.none} 无兜底
+                ● {summary.none} 需配置模型
               </Typography.Text>
             )}
           </Space>

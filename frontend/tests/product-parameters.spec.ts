@@ -25,11 +25,20 @@ const SOURCE_PNG = Buffer.from(
 
 async function register(request: APIRequestContext): Promise<{ token: string; email: string }> {
   const email = `e2e-params-${Date.now()}-${Math.floor(Math.random() * 1e6)}@local.dev`;
-  const res = await request.post(`${API}/api/v1/auth/register`, {
-    data: { email, password: 'E2e@123456', name: 'e2e-params' },
-  });
-  expect(res.ok(), `register ${res.status()}: ${await res.text()}`).toBeTruthy();
-  return { token: (await res.json()).data.accessToken, email };
+  // 连续用例会触发注册限流。按服务端 Retry 窗口等待，避免把正常保护当成回归。
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const res = await request.post(`${API}/api/v1/auth/register`, {
+      data: { email, password: 'E2e@123456', name: 'e2e-params' },
+    });
+    const text = await res.text();
+    if (res.ok()) return { token: JSON.parse(text).data.accessToken, email };
+    const waitSeconds = Number(text.match(/请\s*(\d+)\s*秒后再试/)?.[1] ?? 0);
+    if (res.status() !== 429 || attempt === 3) {
+      expect(res.ok(), `register ${res.status()}: ${text}`).toBeTruthy();
+    }
+    await new Promise((resolve) => setTimeout(resolve, Math.max(waitSeconds, 1) * 1000 + 250));
+  }
+  throw new Error('unreachable');
 }
 
 async function authed(page: Page, path: string, token: string, email: string) {

@@ -282,7 +282,7 @@ export function AdminModelConfigPage() {
       <AntConfirm
         open={confirmOpen}
         title="确认保存模型配置"
-        description="保存后立即生效，无需重启。错误的地址会让生成静默回落到本地算法，或直接失败。"
+        description="保存后立即生效，无需重启。错误的地址会让模型调用失败，任务会失败并自动退款。"
         impact={draftState.changed.map(
           (c) => `${c.label}：${String(c.value ?? '')} → ${String(draftState.draft[c.key] ?? '')}`,
         )}

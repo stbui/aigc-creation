@@ -32,7 +32,7 @@ function round4(n: number): number {
  * 解析 `regions` 参数。
  *
  * `sanitizeParams` 会把 text 参数收敛成字符串，所以正常链路收到的是 JSON 字符串；
- * 同时接受数组，供本地算法/测试直接调用。最多保留 3 个区域，越界坐标收敛到画面内。
+ * 同时接受数组，供测试直接调用。最多保留 3 个区域，越界坐标收敛到画面内。
  */
 export function parseSkuRegions(raw: unknown): SkuRegionBox[] {
   let value: unknown = raw;
@@ -86,7 +86,7 @@ export const SkuImage: CapabilityPlugin = {
   sidebarHint: '批量生成同款不同规格图',
   mode: 'real',
   creditCost: 0, // 原页面标注「本次消耗0积分」
-  help: '按模板图上框选的变体区域批量套版；本地兜底会把框选区域映射到实际像素',
+  help: '按模板图上框选的变体区域批量套版；框选坐标会随任务参数提交给模型',
   params: [
     {
       key: 'region',
@@ -139,7 +139,6 @@ export const SkuImage: CapabilityPlugin = {
       `${ratioText(p.ratio)}${sizeText(p.size)}`
     );
   },
-  localImpl: 'makeSkuImage',
   modality: 'image',
   inputs: 1,
   inWorkbench: false,

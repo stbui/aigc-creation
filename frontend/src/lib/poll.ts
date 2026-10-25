@@ -20,11 +20,11 @@ export interface PolledResult {
   height?: number;
   errorCode?: string | null;
   /**
-   * 产出的真实来源: gateway=真实模型通道 / local=本地算法回落。
+   * 产出的真实来源: gateway=真实模型通道；local 仅用于历史任务。
    *
    * 必须透出给结果卡 —— 页面要按**这一单实际走了哪条通道**显示徽标,
-   * 而不是按能力清单的静态 mode 猜。同一能力在网关可用时是模型产出、
-   * 网关故障时是本地回落, 两者都必须如实呈现, 否则等于用假效果冒充模型能力。
+   * 而不是按能力清单的静态 mode 猜。新任务只会是 gateway；
+   * 历史 local 记录仍须如实呈现，不能伪装成模型产出。
    */
   provider?: string | null;
   /**

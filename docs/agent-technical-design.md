@@ -157,7 +157,7 @@ export interface LlmProvider {
 | ---------------------------------- | -------------------------------------------------------------------- |
 | LLM 未配置（baseUrl/token 空且未 enabled） | `GET /agent/status` 返回 `llmAvailable:false`，前端直接展示表单模式，**不发 LLM 请求** |
 | LLM 超时 / 非 2xx / 解析失败              | `MockLlmProvider` 接管：规则匹配出计划；界面标注「规则降级模式」                            |
-| 图像 gateway 失败                      | 沿用现有回落本地 Jimp 算法，产出标 `provider='local'`                              |
+| 图像 gateway 失败                      | 任务失败并退款，标 `42204/42201/42205`；本地生成算法已删除，不产出任何图             |
 | 用户明确要真实模型但只有 mock 能力               | 界面如实标「占位效果」，不伪装                                                      |
 
 ---

@@ -27,8 +27,7 @@ export const PLATFORMS: ParamOption[] = [
 /**
  * 输出语言 (参考站「语言」下拉 10 项)
  *
- * 本地算法图内文字仅 ASCII, 该参数记录于任务参数并在结果卡片展示,
- * 不参与像素渲染; 接云端模型后它才真正参与提示词。
+ * 该参数会进入模型提示词，并原样记录在任务参数中。
  */
 export const LANGUAGES: ParamOption[] = [
   { value: 'zh-CN', label: '简体中文' },
@@ -149,7 +148,7 @@ export const MAIN_IMAGE_VARIANTS: ParamOption[] = [
 
 /**
  * 详情页模块 (参考站 product-detail「包含模块」多选 16 项, 默认勾选前 6 项, 上限 10)。
- * value 为英文键: 界面显示中文标签, 参数与图内文字用键名 (Jimp 字体仅 ASCII)。
+ * value 为英文键: 界面显示中文标签, 发送给模型的参数使用稳定英文键。
  */
 export const DETAIL_SECTIONS: ParamOption[] = [
   { value: 'hero', label: '首屏主视觉' },
@@ -193,10 +192,9 @@ export function parseDetailSections(raw: unknown): string[] {
  * 结果是「后端不认的档位靠前端兜」: 直接调接口传 `size=4k` 会被 sanitizeParams
  * 静默回落成默认值, 而界面上那一档看起来是可用的。
  *
- * 三档的实际兑现能力不同, 且**这一点不能靠隐藏档位来表达**:
- *   - 1K / 2K: 本地 Jimp 算法与云端通道都能兑现
- *   - 4K: 只有云端通道能兑现; 本地回落时硬上限 2048px, 由
- *     `local-image.provider.ts` 打 WARN 说明实际边长, 不谎报 4096
+ * 三档都依赖模型通道的实际能力:
+ *   - 1K / 2K: 绝大多数图像模型可兑现
+ *   - 4K: 仅声明支持的模型可兑现；未接入时前端禁用该档，不谎报 4096
  * 前端据 `runtime.remoteAvailable` 决定 4K 可否选中 (见 `lib/optionSets.ts`)。
  */
 export const QUALITY_OPTIONS: ParamOption[] = [

@@ -17,8 +17,7 @@ import { ToolHistoryPane } from '../components/ToolHistoryPane';
  *   提交: 立即换色 (消耗价由后端下发); 提示行 "* 确认素材和参数后提交，右侧会展示生成结果。"
  *   描述: 一键生成商品多色效果，快速制作全SKU展示图
  *
- * 诚实披露: recolor 为 real 能力 —— 估计商品主体色后按明度比例替换为目标色,
- * 高光/阴影层次保留 (本地算法, 非 AI)。
+ * 诚实披露: recolor 由真实图像模型完成换色，要求保持材质、高光与阴影。
  */
 
 const COLOR_LABEL: Record<string, string> = {
@@ -82,7 +81,7 @@ export function ProductRecolorPage() {
           onClear={() => setColor('#FFFFFF')}
           ariaLabel="商品颜色"
         />
-        <p className="tool-card-copy">本地算法：估计商品主体色后按明度比例替换，高光与阴影层次保留。</p>
+        <p className="tool-card-copy">由图像模型在保持结构与光影的前提下替换主体颜色。</p>
       </ToolCard>
     </ToolShell>
   );

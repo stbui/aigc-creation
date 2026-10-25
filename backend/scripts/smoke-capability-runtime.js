@@ -2,8 +2,8 @@
  * 能力运行时真相冒烟 (B6, 2026-10-21)。
  *
  * 覆盖三件事：
- *   1. GET /capabilities 每项都带 runtime，且 localQuality / effective 与实现程度自洽
- *      （没有本地实现的能力**永远**不得报 local —— 包括视频与 4 项纯云端图像能力）
+ *   1. GET /capabilities 每项都带 runtime；2026-10-25 起本地生成算法已删除，
+ *      localQuality 恒为 none、effective 不得为 local，没模型通道时必须是 unavailable
  *   2. 后台能力管控：下线无原因被拒、下线后 C 端不可提交（40005）、恢复后复原
  *   3. 限时免费：进行中的活动把生效价压到 0，活动停用后自动恢复原价
  *
@@ -53,7 +53,7 @@ function check(name, ok, detail = '') {
   }
 }
 
-const VALID_EFFECTIVE = ['remote', 'local', 'disabled', 'unavailable'];
+const VALID_EFFECTIVE = ['remote', 'disabled', 'unavailable'];
 
 (async () => {
   const admin = await call('POST', '/auth/login', null, { email: ADMIN_EMAIL, password: ADMIN_PASSWORD });
@@ -76,45 +76,37 @@ const VALID_EFFECTIVE = ['remote', 'local', 'disabled', 'unavailable'];
   const noReason = items.filter((c) => !c.runtime?.reason);
   check('每项都有可读的 reason', noReason.length === 0, noReason.map((c) => c.id).join(',') || '全部有');
 
-  /*
-   * localQuality 必须与「有没有可交付的本地实现」一致 (2026-10-22 起)。
-   *
-   * 占位实现已全部删除，故只有两档：声明了 localImpl 且没关掉回落 → real；
-   * 其余一律 none。按模态猜（图像=有本地）会把创意生图 / 局部重绘 / 图片翻译 /
-   * 自由创作说成「本地兜底：真实算法」，而它们点下去只会 42204 并退款。
-   */
-  const expectQuality = (c) => (c.localImpl && c.localFallback !== false ? 'real' : 'none');
-  const qualityWrong = items.filter((c) => c.runtime.localQuality !== expectQuality(c));
+  // 本地生成算法已删除。localQuality 仅为兼容旧前端保留，必须恒为 none。
+  const qualityWrong = items.filter((c) => c.runtime.localQuality !== 'none');
   check(
-    'localQuality 与本地实现一致',
+    'localQuality 恒为 none',
     qualityWrong.length === 0,
-    qualityWrong.map((c) => `${c.id}=${c.runtime.localQuality}(期望 ${expectQuality(c)})`).join(',') ||
-      `${items.length} 项`,
+    qualityWrong.map((c) => `${c.id}=${c.runtime.localQuality}`).join(',') || `${items.length} 项`,
   );
+  const legacyFields = items.filter(
+    (c) => Object.prototype.hasOwnProperty.call(c, 'localImpl') ||
+      Object.prototype.hasOwnProperty.call(c, 'localFallback'),
+  );
+  check('能力定义不再下发本地实现字段', legacyFields.length === 0, legacyFields.map((c) => c.id).join(','));
 
   /*
-   * 不允许本地兜底的能力，没有云端通道时必须是 unavailable —— 绝不能报 local，
-   * 否则界面预告有产出，点下去却是 failed/42204 + 退款。
+   * 没有模型通道时必须是 unavailable/disabled，绝不能预告有产出；
+   * 有模型通道时才允许 remote。出现 local 说明旧兜底语义漏回来了。
    */
-  const noFallbackItems = items.filter((c) => !c.localImpl || c.localFallback === false);
-  const misleading = noFallbackItems.filter(
+  const misleading = items.filter(
     (c) => !c.runtime.remoteAvailable && !['unavailable', 'disabled'].includes(c.runtime.effective),
   );
   check(
-    '无本地兜底的能力没通道时不预告产出',
+    '无模型通道的能力不预告产出',
     misleading.length === 0,
-    misleading.map((c) => `${c.id}=${c.runtime.effective}`).join(',') || `${noFallbackItems.length} 项`,
+    misleading.map((c) => `${c.id}=${c.runtime.effective}`).join(',') || `${items.length} 项`,
   );
 
-  /*
-   * 视频能力没有本地兜底。effective 只能是 remote 或 unavailable ——
-   * 出现 local 说明"本地兜底"这个概念漏到了非图像模态，
-   * 用户会以为按下去能拿到视频。
-   */
+  // 视频同样只能由模型产出。
   const videoItems = items.filter((c) => c.modality === 'video');
   const videoLeak = videoItems.filter((c) => c.runtime?.effective === 'local');
   check(
-    '视频能力不谎报本地兜底',
+    '视频能力不谎报本地产出',
     videoLeak.length === 0,
     videoItems.map((c) => `${c.id}=${c.runtime.effective}`).join(',') || '无视频能力',
   );
@@ -127,8 +119,6 @@ const VALID_EFFECTIVE = ['remote', 'local', 'disabled', 'unavailable'];
   const mockCount = items.filter((c) => c.mode === 'mock').length;
   const realCount = items.filter((c) => c.mode === 'real').length;
   check('不存在 mock 实现程度', mockCount === 0, `${realCount} real / ${mockCount} mock`);
-  const localCount = items.filter((c) => c.localImpl).length;
-  check('本地算法能力数量 = 11', localCount === 11, `${localCount} 项有 localImpl`);
 
   // ── 2. 后台上下线 ──
   console.log('\n【后台能力管控】');

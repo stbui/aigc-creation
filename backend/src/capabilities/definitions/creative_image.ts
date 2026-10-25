@@ -30,8 +30,6 @@ export const CreativeImage: CapabilityPlugin = {
   ],
   buildPrompt: (p) =>
     `创意生图：${p.prompt || '按描述创作电商视觉'}${ratioText(p.ratio)}${sizeText(p.size)}`,
-  /** 提示词生成没有本地实现; 没通道就 failed/42204 并退款, 不交付占位图 */
-  localFallback: false,
   modality: 'image',
   inputs: 1,
   inWorkbench: true,

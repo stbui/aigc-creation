@@ -22,11 +22,11 @@ export const MODALITY_LABEL: Record<Modality, string> = {
   video: '文生视频',
 };
 
-/** 模态未配置时，失败后果不同：图像会回落本地，文本/视频直接失败 */
+/** 模态未配置时，该模态能力不可提交；绕过界面直调会失败并退款 */
 export const MODALITY_EMPTY_HINT: Record<Modality, string> = {
-  image: '未接入真实模型时：有本地算法的能力回落本地出图，本地没有实现的能力（创意生图 / 局部重绘 / 图片翻译 / 自由创作）直接失败并退款。',
-  text: '文生文没有本地兜底，未接入时调用会直接失败。',
-  video: '文生视频没有本地兜底，未接入时调用会直接失败。',
+  image: '未接入可用模型线路时：图像能力不可提交；绕过界面直调会失败并自动退款。',
+  text: '文生文未接入时调用会直接失败并退款。',
+  video: '文生视频未接入时调用会直接失败并退款。',
 };
 
 export const SOURCE_META: Record<string, { label: string; tone: string; hint: string }> = {
@@ -41,32 +41,28 @@ export const SOURCE_META: Record<string, { label: string; tone: string; hint: st
 
 export const ROUTE_OPTIONS = [
   { value: 'auto', label: '自动（有可用线路就走远程）' },
-  { value: 'local', label: '仅本地算法' },
   { value: 'remote', label: '仅远程模型' },
 ];
 
 /** 表格内用短标签，避免 15 行重复同一句长文案 */
 export const ROUTE_OPTIONS_SHORT = [
-  { value: 'auto', label: '自动', title: '有可用线路就走远程，否则按该模态兜底规则处理' },
-  { value: 'local', label: '仅本地', title: '强制使用本地算法，不调用远程模型' },
-  { value: 'remote', label: '仅远程', title: '强制走远程模型；无可用线路时按该模态兜底规则处理' },
+  { value: 'auto', label: '自动', title: '有可用模型线路就走远程，否则不可提交' },
+  { value: 'remote', label: '仅远程', title: '只走模型通道；无可用线路时任务失败并退款' },
 ];
 
 export const ROUTE_LABEL: Record<string, string> = {
   auto: '自动',
-  local: '仅本地',
+  local: '存量本地（已停用）',
   remote: '仅远程',
 };
 
 export const EFFECTIVE_LABEL: Record<string, string> = {
   gateway: '真实模型',
-  local: '本地算法',
   none: '未接入（会失败）',
 };
 
 export const EFFECTIVE_TONE: Record<string, string> = {
   gateway: 'is-success',
-  local: 'is-warn',
   none: 'is-danger',
 };
 

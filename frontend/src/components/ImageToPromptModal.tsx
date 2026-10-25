@@ -1,4 +1,10 @@
-import { MAX_IMAGE_MB } from '../lib/constants';
+import {
+  MAX_IMAGE_BYTES,
+  MAX_IMAGE_MB,
+  SUPPORTED_IMAGE_ACCEPT,
+  SUPPORTED_IMAGE_LABEL,
+  isSupportedImageFile,
+} from '../lib/constants';
 import { useEffect, useRef, useState } from 'react';
 import { App, Modal, Spin } from 'antd';
 import { ImagePlus, X } from 'lucide-react';
@@ -16,7 +22,7 @@ import type { PromptToolResult } from '../types/api';
  *   │ 图片转提示词                            │
  *   ├────────────────────────────────────────┤
  *   │ ┌────┐  上传一张图片                    │  ← 左侧上传方块 + 右侧说明
- *   │ │ +  │  支持 PNG、JPG、WEBP、GIF,        │
+ *   │ │ +  │  支持 PNG、JPG、WEBP,             │
  *   │ └────┘  单张不超过 10MB                 │
  *   │ ┌────────────────────────────────────┐ │
  *   │ │ 上传图片解析提示词                 │ │  ← 输出区
@@ -75,11 +81,11 @@ export function ImageToPromptModal({ open, onApply, onCancel }: ImageToPromptMod
 
   const pickFile = (f: File | undefined | null) => {
     if (!f) return;
-    if (!f.type.startsWith('image/')) {
-      message.warning('请选择图片文件');
+    if (!isSupportedImageFile(f)) {
+      message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
       return;
     }
-    if (f.size > MAX_IMAGE_MB * 1024 * 1024) {
+    if (f.size > MAX_IMAGE_BYTES) {
       message.error(`单张不超过 ${MAX_IMAGE_MB}MB`);
       return;
     }
@@ -135,7 +141,7 @@ export function ImageToPromptModal({ open, onApply, onCancel }: ImageToPromptMod
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif"
+          accept={SUPPORTED_IMAGE_ACCEPT}
           hidden
           onChange={(e) => {
             pickFile(e.target.files?.[0]);
@@ -158,7 +164,7 @@ export function ImageToPromptModal({ open, onApply, onCancel }: ImageToPromptMod
         </button>
         <div className="pt-i2p-upload-text">
           <strong>{file ? file.name : '上传一张图片'}</strong>
-          <span>支持 PNG、JPG、WEBP、GIF，单张不超过 {MAX_IMAGE_MB}MB</span>
+          <span>支持 {SUPPORTED_IMAGE_LABEL}，单张不超过 {MAX_IMAGE_MB}MB</span>
         </div>
       </div>
 

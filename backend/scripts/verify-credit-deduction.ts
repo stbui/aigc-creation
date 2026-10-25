@@ -21,6 +21,7 @@ const { NestFactory } = require('@nestjs/core');
 const { AppModule } = require('../dist/app.module');
 const { ValidationPipe } = require('@nestjs/common');
 const { ResponseInterceptor } = require('../dist/common/response.interceptor');
+const http = require('http');
 
 const BASE = `http://127.0.0.1:${process.env.PORT}/api/v1`;
 
@@ -73,6 +74,31 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const prisma = app.get(require('../dist/prisma/prisma.service').PrismaService);
   const bcrypt = require('bcryptjs');
 
+  /*
+   * 模型-only 改造后，正常任务必须命中真实模型线路才会 succeeded。
+   * 这里起一个本机 OpenAI 兼容桩：成功时回 base64 PNG，失败时回 500。
+   * 它只验证协议与扣费状态机，不代表任何真实模型质量。
+   */
+  const smokePng = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64',
+  );
+  let modelMode = 'success';
+  const modelServer = http.createServer((req, res) => {
+    req.resume();
+    req.on('end', () => {
+      if (modelMode === 'failure') {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: { message: 'mock upstream failure' } }));
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ data: [{ b64_json: smokePng.toString('base64') }] }));
+    });
+  });
+  await new Promise((resolve) => modelServer.listen(0, '127.0.0.1', resolve));
+  const modelPort = modelServer.address().port;
+
   const email = `credit-${Date.now()}@test.com`;
   const user = await prisma.user.create({
     data: { email, passwordHash: await bcrypt.hash('test123456', 10), name: '扣费测试' },
@@ -115,10 +141,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const projectId = (await call('POST', '/projects', T, { name: '扣费冒烟' })).data?.id;
   check('项目已创建', !!projectId, projectId);
 
-  const png = Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-    'base64',
-  );
+  const png = smokePng;
   const fd = new FormData();
   fd.append('file', new Blob([png], { type: 'image/png' }), 'credit-smoke.png');
   fd.append('projectId', projectId);
@@ -160,6 +183,24 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     data: { userId: user.id, type: 'grant', amount: grant, balanceAfter: grant, reason: '冒烟发放' },
   });
 
+  const mockChannel = await prisma.modelChannel.create({
+    data: {
+      modality: 'image',
+      name: '扣费验证模型桩',
+      protocol: 'openai',
+      baseUrl: `http://127.0.0.1:${modelPort}`,
+      token: 'smoke-token',
+      model: 'smoke-image-model',
+      priority: -100,
+      enabled: true,
+    },
+  });
+  await prisma.modelChannelConfig.upsert({
+    where: { key: 'gateway.route.expand' },
+    create: { key: 'gateway.route.expand', value: 'auto', overridden: true },
+    update: { value: 'auto', overridden: true },
+  });
+
   const cost = expand?.creditCost ?? 0;
   const ok = await call('POST', '/generate', T, {
     projectId, capability: 'expand', inputAssetIds: [assetId], params: { ratio: '1:1' },
@@ -172,24 +213,84 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const taskRow = await prisma.generationTask.findUnique({ where: { id: taskId } });
   check('任务落库记了扣费快照', taskRow?.creditCost === cost, `creditCost=${taskRow?.creditCost}`);
 
+  let normalTask = null;
+  const normalDeadline = Date.now() + 15000;
+  while (Date.now() < normalDeadline) {
+    normalTask = (await call('GET', `/tasks/${taskId}`, T)).data;
+    if (normalTask && (normalTask.status === 'succeeded' || normalTask.status === 'failed')) break;
+    await sleep(300);
+  }
+  check('模型桩返回后任务成功', normalTask?.status === 'succeeded', normalTask?.status);
+  check('新任务产出来源为 gateway', normalTask?.provider === 'gateway', normalTask?.provider);
+
+  // ── 幂等创建：重放与并发都只能扣一次 ──────────────────────────────
+  console.log('\n【幂等创建 → 只扣一次、只建一个任务】');
+  const idemKey = `credit-idem-${Date.now()}`;
+  const tasksBeforeIdem = await prisma.generationTask.count({ where: { ownerId: user.id } });
+  const consumeBeforeIdem = await prisma.creditLedger.count({ where: { userId: user.id, type: 'consume' } });
+  const balanceBeforeIdem = (await call('GET', '/credits/balance', T)).data?.balance;
+  const idemPayload = {
+    projectId,
+    capability: 'expand',
+    inputAssetIds: [assetId],
+    params: { ratio: 'original', occupy: 80, position: 'center' },
+    idempotencyKey: idemKey,
+  };
+
+  const [idemA, idemB] = await Promise.all([
+    call('POST', '/generate', T, idemPayload),
+    call('POST', '/generate', T, idemPayload),
+  ]);
+  check(
+    '并发重放均成功',
+    [idemA, idemB].every((r) => r.status === 200 || r.status === 201),
+    `${idemA.status}/${idemB.status} ${idemA.message ?? ''} ${idemB.message ?? ''}`,
+  );
+  check('并发重放返回同一任务', idemA.data?.taskId === idemB.data?.taskId, `${idemA.data?.taskId} / ${idemB.data?.taskId}`);
+  check(
+    '竞态落败方标记幂等命中',
+    idemA.data?.idempotentHit === false && idemB.data?.idempotentHit === true ||
+      idemA.data?.idempotentHit === true && idemB.data?.idempotentHit === false,
+    `${idemA.data?.idempotentHit}/${idemB.data?.idempotentHit}`,
+  );
+  check(
+    '并发生成任务只增加一条',
+    (await prisma.generationTask.count({ where: { ownerId: user.id } })) === tasksBeforeIdem + 1,
+    `${(await prisma.generationTask.count({ where: { ownerId: user.id } }))} / ${tasksBeforeIdem + 1}`,
+  );
+  check(
+    '并发消耗流水只增加一条',
+    (await prisma.creditLedger.count({ where: { userId: user.id, type: 'consume' } })) === consumeBeforeIdem + 1,
+    `${(await prisma.creditLedger.count({ where: { userId: user.id, type: 'consume' } }))} / ${consumeBeforeIdem + 1}`,
+  );
+  check(
+    '并发重放只扣一次积分',
+    (await call('GET', '/credits/balance', T)).data?.balance === balanceBeforeIdem - cost,
+    `${(await call('GET', '/credits/balance', T)).data?.balance} / ${balanceBeforeIdem - cost}`,
+  );
+
+  /*
+   * 两路并发请求虽然已返回，任务执行仍是异步的。必须等幂等任务到达终态
+   * 后再切换失败桩，否则它会在「失败退款」用例期间执行并额外退款，
+   * 把余额断言污染成 195 → 190 这类假失败。
+   */
+  let idemTask = null;
+  const idemDeadline = Date.now() + 15000;
+  while (Date.now() < idemDeadline) {
+    idemTask = (await call('GET', `/tasks/${idemA.data?.taskId}`, T)).data;
+    if (idemTask && (idemTask.status === 'succeeded' || idemTask.status === 'failed')) break;
+    await sleep(300);
+  }
+  check('幂等任务在切换模型桩前已完成', idemTask?.status === 'succeeded', idemTask?.status);
+
   // ── 失败必退还 ────────────────────────────────────────────────────
   console.log('\n【生成失败 → 自动退还到永久批次】');
   /*
-   * 难点: 删素材不足以触发失败 —— 网关不可用时 LocalImageProvider 会用本地 Jimp
-   * 兜底, 任务照样 succeeded, 那样根本走不到退还分支。
-   *
-   * 解法: 把素材记录指向一个**磁盘上不存在的文件**, readAssetBytes 的
-   * provider.exists() 返回 false, 兜底 readFile 抛 ENOENT → processTask catch。
-   * 这比 mock 掉 provider 更接近真实故障 (磁盘文件被清理/迁移丢失),
-   * 且扣费与退还都发生在真实 HTTP 链路里。
-   *
-   * 必须**先破坏素材再建任务**: 任务 enqueue 后立即 setImmediate 执行,
-   * 事后改库可能赶不上读取时机。
+   * 模型-only 后不再存在“云端失败也本地画出图”的情况。这里让本机模型桩
+   * 返回 500，验证任务按真实上游异常失败并退款；素材保持有效，避免把
+   * “文件丢失”误说成“模型失败”。
    */
-  await prisma.asset.update({
-    where: { id: assetId },
-    data: { storageKey: 'vanished/does-not-exist.png', storageBackend: 'local' },
-  });
+  modelMode = 'failure';
 
   const cost2 = expand?.creditCost ?? 0;
   const balBeforeFail = (await call('GET', '/credits/balance', T)).data?.balance;
@@ -225,7 +326,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     if (t2 && (t2.status === 'succeeded' || t2.status === 'failed')) break;
     await sleep(600);
   }
-  check('破坏素材后任务转为 failed', t2?.status === 'failed', `状态 ${t2?.status}`);
+  check('模型通道失败后任务转为 failed', t2?.status === 'failed', `状态 ${t2?.status}`);
+  check('模型通道失败错误码为 42201', t2?.errorCode === '42201', t2?.errorCode);
 
   if (t2?.status === 'failed') {
     // 退还发生在 catch 分支, 可能稍晚于任务状态落库, 稍等再查余额
@@ -250,6 +352,33 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     check('退还流水已落库', !!ledger, ledger?.reason ?? '未找到');
     check('退还流水金额为正 (退回而非再扣)', (ledger?.amount ?? 0) > 0, `${ledger?.amount}`);
   }
+
+  // ── 没有模型通道 → 42204 且退款，不产出伪结果 ─────────────────
+  console.log('\n【无模型通道 → 42204 且退款】');
+  await prisma.modelChannel.update({ where: { id: mockChannel.id }, data: { enabled: false } });
+  const balBeforeNoChannel = (await call('GET', '/credits/balance', T)).data?.balance;
+  const noChannel = await call('POST', '/generate', T, {
+    projectId, capability: 'expand', inputAssetIds: [assetId], params: { ratio: '1:1' },
+  });
+  check('直调仍可建任务 (由执行期判失败)', noChannel.status === 200 || noChannel.status === 201, `HTTP ${noChannel.status}`);
+  let noChannelTask = null;
+  const noChannelDeadline = Date.now() + 15000;
+  while (Date.now() < noChannelDeadline) {
+    noChannelTask = (await call('GET', `/tasks/${noChannel.data?.taskId}`, T)).data;
+    if (noChannelTask && (noChannelTask.status === 'succeeded' || noChannelTask.status === 'failed')) break;
+    await sleep(300);
+  }
+  check('无通道任务失败', noChannelTask?.status === 'failed', noChannelTask?.status);
+  check('无通道错误码为 42204', noChannelTask?.errorCode === '42204', noChannelTask?.errorCode);
+  check('无通道任务没有产出素材', !noChannelTask?.outputAsset, noChannelTask?.outputAsset);
+  let balAfterNoChannel = balBeforeNoChannel;
+  for (let i = 0; i < 10; i++) {
+    balAfterNoChannel = (await call('GET', '/credits/balance', T)).data?.balance;
+    if (balAfterNoChannel === balBeforeNoChannel) break;
+    await sleep(300);
+  }
+  check('无通道失败后积分已退还', balAfterNoChannel === balBeforeNoChannel,
+    `${balBeforeNoChannel} → ${balAfterNoChannel}`);
 
   // ── 下单 → 沙箱支付 → 发积分 ──────────────────────────────────────
   console.log('\n【下单 → 沙箱支付 → 发积分】');
@@ -344,6 +473,8 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await prisma.order.deleteMany({ where: { userId: user.id } });
   await prisma.creditLedger.deleteMany({ where: { userId: user.id } });
   await prisma.creditLot.deleteMany({ where: { userId: user.id } });
+  await prisma.modelChannel.deleteMany({ where: { id: mockChannel.id } });
+  await prisma.modelChannelConfig.deleteMany({ where: { key: 'gateway.route.expand' } });
   // 注册写同意留痕、登录写登录日志、退款失败给站内消息 —— 三者都直接引用 User,
   // 漏删任意一张都会让最后一步 delete 撞上外键, 看起来像「脚本异常」而非清理不全
   await prisma.consentRecord.deleteMany({ where: { userId: user.id } });
@@ -356,6 +487,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   console.log('='.repeat(54));
 
   await app.close();
+  await new Promise((resolve) => modelServer.close(resolve));
   process.exit(fail > 0 ? 1 : 0);
 })().catch((e) => {
   console.error('[验证] 异常:', e);

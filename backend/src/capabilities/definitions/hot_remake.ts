@@ -28,7 +28,7 @@ export const HotRemake: CapabilityPlugin = {
       label: '复刻要求（选填）',
       type: 'text',
       placeholder: '例如：文案统一用英文、模特保持完全不变、参考图不变只替换商品。',
-      help: '本地算法仅将 ASCII 部分绘制到图上, 中文原文完整记录在任务参数中',
+      help: '中文原文会完整写入模型提示词',
     },
     {
       key: 'degree',
@@ -47,8 +47,6 @@ export const HotRemake: CapabilityPlugin = {
   buildPrompt: (p) =>
     `爆款风格复刻：参考上传的爆款图的构图、配色与氛围，替换主体为上传的商品，保持整体风格一致。` +
     `${p.degree === 'reference_style' ? '偏重保留参考图版式' : '偏重高度还原参考图'}${ratioText(p.ratio)}${sizeText(p.size)}`,
-  /** 本地是真实的版式重建算法 (提取参考图配色/结构 → 重绘 → 换主体), 不是占位图 */
-  localImpl: 'makeClone',
   modality: 'image',
   inputs: 2,
   inWorkbench: true,

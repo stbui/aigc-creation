@@ -3,7 +3,6 @@ import { PrismaService } from '../prisma/prisma.service';
 import { gatewayConfigOf } from '../providers/gateway.config';
 import { ChannelRepository } from '../providers/channel-repository';
 import { CAPABILITIES, getCapability } from './capability.registry';
-import { allowsLocalFallback } from './capability-plugin.type';
 import type { CapabilityRoute } from '../providers/gateway.types';
 import type { Modality } from '../providers/modality';
 
@@ -16,28 +15,25 @@ import type { Modality } from '../providers/modality';
  * 关心的是「我现在按下去会发生什么」，它由三件**运行时**的事共同决定：
  *   1. 后台是否把这项能力下线了（CapabilityControl）
  *   2. 逐能力路由是 local 还是 remote，以及对应模态的云端通道是否配置
- *   3. 它到底有没有本地实现（`localImpl`），以及是否允许交付本地产物
+ *   3. 对应的真实模型通道是否可用
  *
  * 把这三者合成 `runtime.effective` 下发，前端就不用（也无法）靠 `mode` 猜：
- * `mode: 'real'` 的能力在没配通道时，实际走的是本地算法。混淆两者会让界面上的
+ * `mode: 'real'` 的能力在没配通道时实际不可提交。混淆两者会让界面上的
  * 「已接入」变成谎话。
  *
  * 与 `task.provider` 的分工
  * -----------------------
  * 这里是**事前**的预期（按下去会怎样），`task.provider` 是**事后**的事实
- * （这一次实际走的哪条）。云端失败会回落本地，所以两者不一致是正常的；
- * 结果卡上的徽标永远以 `task.provider` 为准。
+ * （这一次实际走的哪条）。2026-10-25 起本地图像生成算法已删除，
+ * 新任务的 provider 恒为 gateway；结果卡仍以 `task.provider` 为准。
  */
 
 /**
- * 本地兜底的质量档：`real` = 有可交付的本地真实算法；`none` = 本地根本没有实现。
- *
- * 2026-10-22 起没有 `placeholder` 一档 —— 占位实现已从代码里删除，任何报
- * `placeholder` 的状态都会变成一句谎话（点下去只会失败并退款）。
+ * 保留字段供旧客户端兼容。2026-10-25 起本地生成算法已删除，恒为 `none`。
  */
-export type LocalQuality = 'real' | 'none';
+export type LocalQuality = 'none';
 
-export type EffectiveRoute = 'remote' | 'local' | 'disabled' | 'unavailable';
+export type EffectiveRoute = 'remote' | 'disabled' | 'unavailable';
 
 /**
  * 某模态此刻「有没有可用的云端通道」。
@@ -52,15 +48,15 @@ interface RemoteInfo {
 export interface CapabilityRuntime {
   /** 后台管控开关（无记录 = 启用） */
   enabled: boolean;
-  /** 逐能力路由配置：auto / local / remote */
+  /** 逐能力路由配置：auto / remote；local 仅用于识别存量已停用配置 */
   route: CapabilityRoute;
   /** 该模态此刻是否具备可用的云端通道 */
   remoteAvailable: boolean;
-  /** 本地兜底的质量 */
+  /** @deprecated 本地生成已移除，恒为 none */
   localQuality: LocalQuality;
   /** 一句话结论：这一单大概率会走哪条路 */
   effective: EffectiveRoute;
-  /** 给用户看的原因（下架原因 / 通道未配 / 无本地实现） */
+  /** 给用户看的原因（下架原因 / 通道未配 / 存量 local 已停用） */
   reason: string;
 }
 
@@ -155,7 +151,7 @@ export class CapabilityAvailabilityService {
     if (!def) return null;
     const map = await this.controls();
     const remote = await this.remoteOf(def.modality);
-    return this.compose(def.id, def.modality, def.localImpl, def.localFallback, remote, map.get(capabilityId));
+    return this.compose(def.id, def.modality, remote, map.get(capabilityId));
   }
 
   /** 全量能力的运行时状态（`GET /capabilities` 用） */
@@ -172,7 +168,7 @@ export class CapabilityAvailabilityService {
     const out: Record<string, CapabilityRuntime> = {};
     for (const def of CAPABILITIES) {
       const remote = remotes.get(def.modality) ?? { available: false, label: '' };
-      out[def.id] = this.compose(def.id, def.modality, def.localImpl, def.localFallback, remote, map.get(def.id));
+      out[def.id] = this.compose(def.id, def.modality, remote, map.get(def.id));
     }
     return out;
   }
@@ -180,36 +176,20 @@ export class CapabilityAvailabilityService {
   /**
    * 合成运行时结论。
    *
-   * 注意 `remote` 与 `local` 的判定顺序：**先看路由，再看通道**。
-   * route=local 时即便通道配好了也一定走本地（运营显式压到本地，
-   * 例如成本控制），此时报 remote 就是骗人。
-   *
-   * 2026-10-21 起还有第三种情况：能力**不允许交付本地产物**
-   * （`allowsLocalFallback` 为 false：本地根本没有实现）。此时没有云通道
-   * 就是 `unavailable` —— 点下去会失败并退款，界面却预告"有本地产出"，
-   * 是最难解释的那种不一致。
+   * 先看运营下线状态，再看存量路由与通道。`route=local` 是 2026-10-25 前
+   * 写入的存量配置；本地生成已删除，因此它必须报 `unavailable`，
+   * 既不能静默改走远程，也不能假装仍会产出本地图片。
    */
   private compose(
     id: string,
     modality: Modality,
-    localImpl: string | undefined,
-    localFallback: boolean | undefined,
     remote: RemoteInfo,
     control?: ControlRow,
   ): CapabilityRuntime {
     const cfg = gatewayConfigOf(modality as 'image' | 'text' | 'video');
     const route = cfg.routeOf(id);
     const remoteAvailable = remote.available;
-    /*
-     * 「有没有可交付的本地实现」= 声明了 localImpl 且没关掉回落。
-     *
-     * 用 localImpl 判定而不是 `modality === 'image'`: 视频/文本没有本地实现
-     * （本地不存在「生成视频」这回事），而创意生图 / 局部重绘 / 图片翻译 / 自由创作
-     * 这类图像能力同样没有 —— 按模态猜会把它们说成「本地兜底：真实算法」，
-     * 而实际按下只会 42204 并退款。
-     */
-    const hasLocal = Boolean(localImpl) && allowsLocalFallback({ localFallback });
-    const localQuality: LocalQuality = hasLocal ? 'real' : 'none';
+    const localQuality: LocalQuality = 'none';
     const enabled = control ? control.enabled : true;
     const disabledReason = control?.reason || '该能力已暂时下线';
     const needsModel = '该能力需要真实模型才能生成，当前暂不可用';
@@ -221,26 +201,16 @@ export class CapabilityAvailabilityService {
       effective = 'disabled';
       reason = disabledReason;
     } else if (route === 'local') {
-      if (!hasLocal) {
-        // 运营压到本地，但该能力本地没有实现 —— 点下去会判失败，如实说明
-        effective = 'unavailable';
-        reason = '该能力需要真实模型才能生成，但已被配置为强制本地（请改为 auto 或 remote）';
-      } else {
-        effective = 'local';
-        reason = '已按运营配置固定使用本地算法';
-      }
-    } else if (!hasLocal) {
-      effective = remoteAvailable ? 'remote' : 'unavailable';
-      reason = remoteAvailable ? remote.label : needsModel;
-    } else if (route === 'remote') {
-      // 强制远程：通道缺失时请求仍会回落本地，如实说明
-      effective = remoteAvailable ? 'remote' : 'local';
-      reason = remoteAvailable
-        ? `${remote.label}（强制远程）`
-        : '已配置强制远程，但云端通道不可用，将回落本地算法';
+      // 存量配置：不静默改写，但明确告知不会再有本地产出
+      effective = 'unavailable';
+      reason = '本地生成已停用，请将该能力的路由改为 auto 或 remote，并配置可用的模型通道';
     } else {
-      effective = remoteAvailable ? 'remote' : 'local';
-      reason = remoteAvailable ? remote.label : '未配置云端通道，使用本地真实算法';
+      effective = remoteAvailable ? 'remote' : 'unavailable';
+      reason = remoteAvailable
+        ? route === 'remote'
+          ? `${remote.label}（强制远程）`
+          : remote.label
+        : needsModel;
     }
 
     return { enabled, route, remoteAvailable, localQuality, effective, reason };

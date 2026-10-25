@@ -25,7 +25,7 @@ export const Expand: CapabilityPlugin = {
     { key: 'size', label: '画质（输出边长）', type: 'enum', default: '1k', options: QUALITY_OPTIONS },
     /*
      * 参考站 SMART_EXPAND 的定位字段（均相对目标画布 0..1）。
-     * 页面不填时由本地算法按 occupy + position 推导；API 直调时可直接给出
+     * 页面不填时由页面按 occupy + position 推导；API 直调时可直接给出
      * 精确构图，避免只能落在九宫格上。
      */
     { key: 'placementX', label: '原图 X（0-1）', type: 'number', min: 0, max: 1, step: 0.001, hidden: true },
@@ -38,7 +38,6 @@ export const Expand: CapabilityPlugin = {
     `智能扩图：把画面向外延展到${p.occupy ?? 80}% 的原图占比，` +
     `延展区域按原图内容自然补全${p.position ? `，原图位于${p.position}` : ''}` +
     `${p.targetImageRatio || p.ratio ? `，目标画幅 ${p.targetImageRatio || p.ratio}` : ''}`,
-  localImpl: 'makeExpand',
   modality: 'image',
   inputs: 1,
   inWorkbench: true,

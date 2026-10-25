@@ -9,9 +9,9 @@
  *                            才返回 200，否则 503。Docker/K8s 据此决定
  *                            要不要把流量打进来。
  *
- * 关键依赖只有数据库：模型通道全部不可用时应回落到本地算法继续出图，
- * 存储不可用时上传/生成确实会失败 —— 但那属于业务降级，不该让整个实例
- * 被摘除（否则后台管理也一起打不开，连排障入口都没了）。
+ * 关键依赖只有数据库：模型通道全部不可用时，生成任务会明确失败并退款，
+ * 但后台管理与排障入口仍应可用。存储不可用时上传/生成同样会失败 ——
+ * 这些属于业务降级，不该让整个实例被摘除。
  *
  * 存储探测带 30 秒缓存：OSS/MinIO 的连通性探测要发网络请求，
  * 探针 5 秒一次会把一个纯读接口变成对外部服务的压力源。
@@ -132,10 +132,10 @@ export class HealthController {
     for (const modality of MODALITIES) {
       try {
         const snap = await this.channels.snapshot(modality);
-        // 没有任何线路不算故障：图像会回落本地算法，文本/视频如实报错。
+        // 没有任何线路不算进程级故障，但该模态能力会不可提交/失败并退款。
         // 这里只如实汇报"可用的有几条"，由调用方判断这对当前部署意味着什么。
         out[modality] = {
-          ok: snap.availableCount > 0 || modality === 'image',
+          ok: snap.availableCount > 0,
           source: snap.source,
           available: snap.availableCount,
           total: snap.total,

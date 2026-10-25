@@ -41,7 +41,11 @@ const SECTIONS: SitemapSection[] = [
       { name: '商品主图', to: '/product-kit', path: '/product-kit', capability: 'main_image' },
       { name: '商品详情图', to: '/product-detail', path: '/product-detail', capability: 'detail_image' },
       { name: '爆款复刻', to: '/viral-clone', path: '/viral-clone', capability: 'hot_remake' },
-      { name: '创意生图', to: '/free-creation', path: '/free-creation' },
+      {
+        name: '创意生图',
+        to: '/free-creation?capability=creative_image',
+        path: '/free-creation',
+      },
       { name: '自由创作', to: '/free-creation', path: '/free-creation', capability: 'free_create' },
     ],
   },

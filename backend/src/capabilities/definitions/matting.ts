@@ -32,7 +32,7 @@ export const Matting: CapabilityPlugin = {
     /*
      * 2026-10-25 对齐参考站 createBackgroundRemoval 的字段名。
      *
-     * 页面代填 selectedColor，旧调用方仍可继续传 bgColor；本地实现优先读
+     * 页面代填 selectedColor，旧调用方仍可继续传 bgColor；提示词优先读
      * selectedColor，再回落 bgColor。customAlpha 让「自定义背景」不再只有
      * 全不透明一种结果，0 等价于透明底。
      */
@@ -72,7 +72,6 @@ export const Matting: CapabilityPlugin = {
           : `色板 ${color}`;
     return `商品抠图：精确分离主体与背景，边缘发丝级保留；背景替换为 ${backdrop}`;
   },
-  localImpl: 'makeMatting',
   modality: 'image',
   inputs: 1,
   inWorkbench: true,

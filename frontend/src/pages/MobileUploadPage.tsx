@@ -3,6 +3,11 @@ import { useSearchParams } from 'react-router-dom';
 import { App } from 'antd';
 import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ImagePlus, Upload } from 'lucide-react';
 import { mobileUploadApi } from '../lib/api';
+import {
+  SUPPORTED_IMAGE_ACCEPT,
+  SUPPORTED_IMAGE_LABEL,
+  isSupportedImageFile,
+} from '../lib/constants';
 
 /**
  * 手机端上传落地页 —— 1:1 复刻参考站 (ijihua.cn) 扫码后打开的
@@ -85,9 +90,9 @@ export function MobileUploadPage() {
   const onFiles = useCallback(
     async (list: FileList | File[] | null) => {
       if (!list) return;
-      const files = Array.from(list).filter((f) => f.type.startsWith('image/'));
+      const files = Array.from(list).filter(isSupportedImageFile);
       if (!files.length) {
-        setError('请选择图片文件');
+        setError(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
         return;
       }
       if (files.length > MAX_FILES) {
@@ -270,7 +275,7 @@ export function MobileUploadPage() {
             <input
               ref={inputRef}
               type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif"
+              accept={SUPPORTED_IMAGE_ACCEPT}
               multiple
               hidden
               onChange={(e) => {

@@ -6,7 +6,7 @@ import { test, expect, type APIRequestContext, type Page } from '@playwright/tes
  * 覆盖本次收口的四条真实契约:
  *   1. 运营下线的能力从顶导/侧栏/工作台/首页/站点地图一起消失；
  *   2. 仅「暂无通道」的能力保留入口，并在工作台标注「暂不可用」；
- *   3. 创意生图入口落到 /tools/creative_image，提交的是 creative_image 而非 free_create；
+ *   3. 创意生图与自由创作共用 /free-creation，但入口携带能力上下文并提交 creative_image；
  *   4. 我的作品失败任务重试沿用原任务的能力、输入素材与参数；
  *   5. ToolShell 页面只拦截已登录用户的不可用提交，访客仍能触发登录流程。
  *
@@ -46,11 +46,21 @@ async function mockCaps(page: Page, caps: Caps) {
 
 async function register(request: APIRequestContext): Promise<{ token: string; email: string }> {
   const email = `e2e-caps-${Date.now()}-${Math.floor(Math.random() * 1e6)}@local.dev`;
-  const res = await request.post(`${API}/api/v1/auth/register`, {
-    data: { email, password: 'E2e@123456', name: 'e2e-caps' },
-  });
-  expect(res.ok(), `register ${res.status()}: ${await res.text()}`).toBeTruthy();
-  return { token: (await res.json()).data.accessToken, email };
+  // 多个用例共用同一测试实例时，注册接口的滑动窗口限流会正常触发。
+  // 测试等待服务端给出的窗口，不绕过限流，也不把 429 误判成产品故障。
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    const res = await request.post(`${API}/api/v1/auth/register`, {
+      data: { email, password: 'E2e@123456', name: 'e2e-caps' },
+    });
+    const text = await res.text();
+    if (res.ok()) return { token: JSON.parse(text).data.accessToken, email };
+    const waitSeconds = Number(text.match(/请\s*(\d+)\s*秒后再试/)?.[1] ?? 0);
+    if (res.status() !== 429 || attempt === 3) {
+      expect(res.ok(), `register ${res.status()}: ${text}`).toBeTruthy();
+    }
+    await new Promise((resolve) => setTimeout(resolve, Math.max(waitSeconds, 1) * 1000 + 250));
+  }
+  throw new Error('unreachable');
 }
 
 async function authed(page: Page, path: string, token: string, email: string) {
@@ -107,10 +117,12 @@ test.describe('能力可见性与运行态', () => {
     // 站点地图：同样不再列出下线能力
     await page.goto(`${UI}/sitemap.html`);
     await expect(page.locator('a.sitemap-item[href="/background-remove"]')).toHaveCount(0);
-    await expect(page.locator('a.sitemap-item[href="/tools/creative_image"]')).toBeVisible();
+    await expect(
+      page.locator('a.sitemap-item[href="/free-creation?capability=creative_image"]'),
+    ).toBeVisible();
   });
 
-  test('创意生图入口落到专用路由，提交 capability=creative_image', async ({ page, request }) => {
+  test('创意生图入口携带能力上下文，提交 capability=creative_image', async ({ page, request }) => {
     const { token, email } = await register(request);
     const caps = await fetchCaps(request);
     await mockCaps(page, caps);
@@ -167,10 +179,10 @@ test.describe('能力可见性与运行态', () => {
 
     await authed(page, '/workbench', token, email);
     await page.locator('.wb-card').filter({ hasText: '创意生图' }).click();
-    await expect(page).toHaveURL(/\/tools\/creative_image$/);
+    await expect(page).toHaveURL(/\/free-creation\?capability=creative_image$/);
 
     await page.locator('input[type=file]').setInputFiles({ name: 'e2e.png', mimeType: 'image/png', buffer: PNG });
-    await expect(page.locator('.ant-upload-list-item-name', { hasText: 'e2e.png' })).toBeVisible();
+    await expect(page.locator('.fc-thumb img[alt="e2e.png"]')).toBeVisible();
     await page.locator('textarea').first().fill('清晨窗边的木质桌面');
     await page.getByRole('button', { name: /立即生成/ }).click();
 
@@ -196,13 +208,39 @@ test.describe('能力可见性与运行态', () => {
     await expect(page.locator('.tool-submit-notice-error')).toContainText('图像编辑通道维护中');
     await expect(btn).toBeDisabled();
 
-    // 访客：说明仍展示，但按钮不被能力状态置灰；上传动作会唤起登录
+    // 访客：能力不可用不应成为第一道墙；先让访客完成本页必填校验，
+    // 再通过上传动作触发登录。局部重绘要求涂抹区域与描述，空表单本就不能提交。
     await page.goto(`${UI}/local-redraw`);
     await page.evaluate(() => localStorage.clear());
     await page.reload();
-    await expect(page.locator('button.pk-primary-btn').first()).toBeEnabled();
+    await expect(page.locator('button.pk-primary-btn').first()).toBeDisabled();
     await page.locator('input[type=file]').setInputFiles({ name: 'guest.png', mimeType: 'image/png', buffer: PNG });
     await expect(page.locator('.login-modal')).toBeVisible({ timeout: 10000 });
+  });
+});
+
+test.describe('工具上传约束', () => {
+  test('GIF 与超过 10MB 的文件在选择阶段被拒，不发起上传', async ({ page }) => {
+    let uploadRequests = 0;
+    await page.route('**/api/v1/assets/upload', (route) => {
+      uploadRequests += 1;
+      return route.fulfill({ status: 500, body: 'must not be called' });
+    });
+
+    await page.goto(`${UI}/background-remove`);
+    const input = page.locator('input[type=file]');
+    await input.setInputFiles({ name: 'animated.gif', mimeType: 'image/gif', buffer: Buffer.from('GIF89a') });
+    await expect(page.locator('.ant-message')).toContainText(
+      '请选择图片文件（PNG / JPG / WebP）',
+    );
+
+    await input.setInputFiles({
+      name: 'oversize.png',
+      mimeType: 'image/png',
+      buffer: Buffer.alloc(10 * 1024 * 1024 + 1),
+    });
+    await expect(page.locator('.ant-message')).toContainText('单张不超过 10MB');
+    expect(uploadRequests).toBe(0);
   });
 });
 
@@ -265,12 +303,16 @@ test.describe('失败任务重试', () => {
     await dialog.getByRole('button', { name: '重新生成' }).click();
 
     await expect.poll(() => posted).not.toBeNull();
-    expect(posted).toEqual({
-      projectId: 'project-e2e',
-      capability: 'creative_image',
-      inputAssetIds: ['asset-original'],
-      params: { prompt: '原任务提示词', ratio: '4:3' },
-    });
+    expect(posted).toEqual(
+      expect.objectContaining({
+        projectId: 'project-e2e',
+        capability: 'creative_image',
+        inputAssetIds: ['asset-original'],
+        params: { prompt: '原任务提示词', ratio: '4:3' },
+      }),
+    );
+    // 重试同样必须带幂等键：短时间重复点击不能创建多个任务或重复扣费。
+    expect(posted.idempotencyKey).toMatch(/^[A-Za-z0-9._:-]{8,128}$/);
   });
 });
 

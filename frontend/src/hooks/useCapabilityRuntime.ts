@@ -7,7 +7,7 @@ export interface CapabilityRuntimeState {
   runtime: CapabilityRuntime | null;
   /** 能力清单是否仍在请求中。加载中不拦截，避免后端响应慢时把按钮误置灰。 */
   loading: boolean;
-  /** 已确认不可提交（运营下线，或没有本地实现且没有可用模型通道）。 */
+  /** 已确认不可提交（运营下线，或没有可用模型线路）。 */
   blocked: boolean;
   /** 对用户可解释的不可用原因；可提交时为 null。 */
   reason: string | null;

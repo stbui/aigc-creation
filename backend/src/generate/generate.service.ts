@@ -10,7 +10,7 @@ import { IMAGE_PROVIDER, VIDEO_PROVIDER } from '../providers/providers.module';
 import { ImageProvider } from '../providers/image-provider.interface';
 import { MaskUnsupportedError, NoModelChannelError } from '../providers/gateway.types';
 import type { VideoProvider } from '../providers/unified/unified.provider';
-import { getCapability, sanitizeParams } from '../capabilities/capability.registry';
+import { getCapability, sanitizeParams, validateCapabilityParams } from '../capabilities/capability.registry';
 import { parseLocalRedrawAnnotations } from '../capabilities/definitions/local_redraw';
 import { CapabilityAvailabilityService } from '../capabilities/capability-availability.service';
 import { CreateGenerationDto } from './dto/create-generation.dto';
@@ -25,6 +25,7 @@ import { PromptToolsService } from '../prompt-tools/prompt-tools.service';
 import { SignedUrlService } from '../common/signed-url.service';
 import { resolveUploadsDir } from '../config/env-files';
 import type { StorageBackend } from '../storage/storage.provider';
+import { inspectMaskImage, inspectUploadedImage } from '../assets/image-validation';
 
 /** 任务执行期心跳间隔 */
 const HEARTBEAT_INTERVAL_MS = 30_000;
@@ -58,7 +59,23 @@ export class GenerateService implements OnModuleInit {
     private readonly promptTools: PromptToolsService,
   ) {}
 
-  async createTask(ownerId: string, dto: CreateGenerationDto) {
+  async createTask(ownerId: string, dto: CreateGenerationDto, idempotencyHeader?: string) {
+    const idempotencyKey = normalizeIdempotencyKey(dto.idempotencyKey, idempotencyHeader);
+    // 幂等命中必须在会员并发/可用性校验之前：重试请求应拿回原任务，
+    // 不能因为原任务仍占用并发额度而把重试挡在门外。
+    if (idempotencyKey) {
+      const existing = await this.prisma.generationTask.findUnique({
+        where: { ownerId_idempotencyKey: { ownerId, idempotencyKey } },
+      });
+      if (existing) {
+        return {
+          taskId: existing.id,
+          status: existing.status,
+          creditCost: existing.creditCost,
+          idempotentHit: true,
+        };
+      }
+    }
     /*
      * 会员并发上限校验 (落地页承诺「同时处理多个任务」)。
      *
@@ -73,9 +90,8 @@ export class GenerateService implements OnModuleInit {
     /*
      * 会员「专享快速通道」标记 (落地页承诺「专享快速生成通道 2K/4K」)。
      *
-     * 传参而非改全局配置 —— route 是按能力配置的运营决策, 会员只应在
-     * 该能力允许远程时优先走远程, 不能把 local 强制改成 remote。
-     * 具体如何影响路由由 CapabilityRouterProvider 决定。
+     * 传参而非改全局配置 —— route 是按能力配置的运营决策。本地生成已删除,
+     * 会员只会影响远程线路的调度优先级。
      */
     const memberPerks = await this.membership.perksOf(ownerId);
 
@@ -91,6 +107,18 @@ export class GenerateService implements OnModuleInit {
     if (def.mode === 'planned') {
       throw new AppError(40001, `${def.name} 尚未开放`, 400);
     }
+
+    validateCapabilityParams(dto.capability, dto.params);
+    if (dto.inputAssetIds.length > 10) {
+      throw new AppError(40001, '一次最多提交 10 张输入图片', 400);
+    }
+    if (dto.inputAssetIds.some((id) => !id?.trim())) {
+      throw new AppError(40001, '输入素材 id 不能为空', 400);
+    }
+    if (new Set(dto.inputAssetIds).size !== dto.inputAssetIds.length) {
+      throw new AppError(40001, '输入素材不能重复', 400);
+    }
+
     /*
      * 后台上下线管控。
      *
@@ -133,10 +161,27 @@ export class GenerateService implements OnModuleInit {
     if (maskAssetId) {
       const maskAsset = await this.prisma.asset.findFirst({
         where: { id: maskAssetId, ownerId, kind: 'original' },
-        select: { id: true },
+        select: { id: true, format: true, width: true, height: true },
       });
       if (!maskAsset) {
         throw new AppError(40001, '遮罩素材不存在或无权限', 400);
+      }
+      if (maskAsset.format && maskAsset.format !== 'image/png') {
+        throw new AppError(40001, '遮罩必须使用 PNG 格式', 400);
+      }
+      const source = assets.find((asset) => asset.id === dto.inputAssetIds[0]);
+      if (
+        source?.width &&
+        source?.height &&
+        maskAsset.width &&
+        maskAsset.height &&
+        (source.width !== maskAsset.width || source.height !== maskAsset.height)
+      ) {
+        throw new AppError(
+          40001,
+          `遮罩尺寸必须与原图一致（原图 ${source.width}×${source.height}，遮罩 ${maskAsset.width}×${maskAsset.height}）`,
+          400,
+        );
       }
     }
 
@@ -148,6 +193,26 @@ export class GenerateService implements OnModuleInit {
      * 再在异步执行阶段才发现某张参考图是无效 id。
      */
     if (dto.capability === 'local_redraw') {
+      const rawAnnotations = dto.params?.annotations;
+      if (rawAnnotations !== undefined) {
+        let decoded: unknown;
+        try {
+          decoded = typeof rawAnnotations === 'string' ? JSON.parse(rawAnnotations) : rawAnnotations;
+        } catch {
+          throw new AppError(40001, 'annotations 必须是合法 JSON', 400);
+        }
+        if (!Array.isArray(decoded) || decoded.length === 0 || decoded.length > 3) {
+          throw new AppError(40001, 'annotations 必须是 1 至 3 项数组', 400);
+        }
+        const annotationsJson = typeof rawAnnotations === 'string' ? rawAnnotations : JSON.stringify(rawAnnotations);
+        const parsed = parseLocalRedrawAnnotations(annotationsJson);
+        if (parsed.length !== decoded.length) {
+          throw new AppError(40001, '每个标注都必须包含非空区域描述', 400);
+        }
+        // 兼容直接发送 JSON 数组的 API 调用方：落库仍使用字符串，
+        // 避免 sanitizeParams 把对象变成 "[object Object]"。
+        if (typeof rawAnnotations !== 'string') dto.params!.annotations = annotationsJson;
+      }
       const referenceIds = parseLocalRedrawAnnotations(dto.params?.annotations)
         .map((item) => item.referenceAssetId)
         .filter((id): id is string => typeof id === 'string' && Boolean(id.trim()));
@@ -163,77 +228,77 @@ export class GenerateService implements OnModuleInit {
     }
 
     /*
-     * ★ 扣费 (commerce-design.md C5)。
+     * ★ 扣费与建任务 (commerce-design.md C5)。
      *
-     * 位置三重约束, 顺序错了都是资损:
-     *   1. 在**所有校验之后** —— 校验失败却已扣费, 用户为一次根本没创建的
-     *      生成付费。上面的并发/项目/能力/素材校验任一失败都必须不扣分。
-     *   2. 在**建任务之前** —— 反过来则出现"有任务没扣钱", 白送算力。
-     *   3. 余额不足在此抛 402, 不进入建任务 —— 任务不会残留成孤儿。
+     * 两者必须在**同一个数据库事务**中:
+     *   - 所有业务校验通过后才扣费，校验失败不会产生扣费流水；
+     *   - 任务创建失败或幂等唯一键冲突时，扣减与流水一起回滚；
+     *   - 余额不足抛 402，事务内不留下半截任务或积分变动。
      *
      * cost 取自 CreditPriceService (后台可改), 不直读 def.creditCost。
      */
     const cost = await this.price.resolve(dto.capability);
-    if (cost > 0) {
-      try {
-        await this.credit.consume({ userId: ownerId, credits: cost });
-      } catch (e) {
-        // 余额不足由 CreditService 抛 40002; 转成 402 语义更准确 (Payment Required),
-        // 前端据此展示「去充值」而非「参数错误」
-        if (e instanceof AppError && e.code === 40002) {
-          throw new AppError(40201, e.message, 402);
-        }
-        throw e;
-      }
-    }
 
     let task;
     try {
-      task = await this.prisma.generationTask.create({
-        data: {
-          projectId: dto.projectId,
-          ownerId,
-          capability: dto.capability,
-          status: 'running',
-          inputAssetIds: JSON.stringify(dto.inputAssetIds),
-          /*
-           * 参数按 registry 收敛 (越界裁剪 / enum 回落默认值), 避免离谱数值打挂图像处理。
-           *
-           * `__memberFastChannel` 是会员权益标记: 随参数一起落库, 供异步执行阶段读取。
-           * 放进 params 而非加字段 —— 它是"本次生成用到的权益快照",
-           * 属任务上下文的一部分, 与用户当时的其它参数同等性质。
-           */
-          params: JSON.stringify({
-            ...sanitizeParams(dto.capability, dto.params),
-            __memberFastChannel: memberPerks.fastChannel,
-          }),
-          // 初始值 = 尚未执行; 跑完后由 processTask 改写成 gateway / local
-          provider: 'pending',
-          // 扣费快照: 后台重试据此核算, 退款按此值比对。改价不影响已扣的任务。
-          creditCost: cost,
-          // 建任务即开始计时, 避免「刚建完就崩溃」的任务没有心跳可判
-          heartbeatAt: new Date(),
-        },
+      task = await this.prisma.$transaction(async (tx) => {
+        if (cost > 0) {
+          try {
+            await this.credit.consume({ userId: ownerId, credits: cost }, tx);
+          } catch (e) {
+            // 余额不足由 CreditService 抛 40002; 转成 402 语义更准确
+            // (Payment Required), 前端据此展示「去充值」而非「参数错误」。
+            if (e instanceof AppError && e.code === 40002) {
+              throw new AppError(40201, e.message, 402);
+            }
+            throw e;
+          }
+        }
+
+        return tx.generationTask.create({
+          data: {
+            projectId: dto.projectId,
+            ownerId,
+            capability: dto.capability,
+            status: 'running',
+            inputAssetIds: JSON.stringify(dto.inputAssetIds),
+            /*
+             * 参数按 registry 收敛 (越界裁剪 / enum 回落默认值), 避免离谱数值打挂图像处理。
+             *
+             * `__memberFastChannel` 是会员权益标记: 随参数一起落库, 供异步执行阶段读取。
+             * 放进 params 而非加字段 —— 它是"本次生成用到的权益快照",
+             * 属任务上下文的一部分, 与用户当时的其它参数同等性质。
+             */
+            params: JSON.stringify({
+              ...sanitizeParams(dto.capability, dto.params),
+              __memberFastChannel: memberPerks.fastChannel,
+            }),
+            idempotencyKey,
+            // 初始值 = 尚未执行; 跑完后由 processTask 改写成 gateway / local
+            provider: 'pending',
+            // 扣费快照: 后台重试据此核算, 退款按此值比对。改价不影响已扣的任务。
+            creditCost: cost,
+            // 建任务即开始计时, 避免「刚建完就崩溃」的任务没有心跳可判
+            heartbeatAt: new Date(),
+          },
+        });
       });
     } catch (e) {
       /*
-       * 建任务失败必须退还 —— 否则出现「扣了积分但没有任务」, 用户白付一次。
-       * 这是扣费与建任务**不能同事务**的代价: CreditService.consume 自带事务,
-       * 这里只做失败补偿。补偿失败要显式告警, 静默吞掉等于凭空吞积分。
+       * 幂等竞态：两个相同键的请求都通过了前置查询，数据库唯一约束只允许
+       * 一个创建成功。失败方的事务已连同扣费一起回滚，直接返回赢家任务。
        */
-      if (cost > 0) {
-        try {
-          await this.credit.grant({
-            userId: ownerId,
-            credits: cost,
-            source: 'grant',
-            reason: '建任务失败自动退还',
-          });
-          this.logger.warn(`建任务失败已退还 ${cost} 积分: user=${ownerId} capability=${dto.capability}`);
-        } catch (re) {
-          this.logger.error(
-            `★资损: 建任务失败且退还失败 user=${ownerId} cost=${cost}: ${(re as Error).message}`,
-          );
+      if (idempotencyKey) {
+        const existing = await this.prisma.generationTask
+          .findUnique({ where: { ownerId_idempotencyKey: { ownerId, idempotencyKey } } })
+          .catch(() => null);
+        if (existing) {
+          return {
+            taskId: existing.id,
+            status: existing.status,
+            creditCost: existing.creditCost,
+            idempotentHit: true,
+          };
         }
       }
       throw e;
@@ -242,7 +307,7 @@ export class GenerateService implements OnModuleInit {
     // 异步处理: 立即返回任务句柄, 由后台完成生成
     this.enqueue(task.id);
 
-    return { taskId: task.id, status: task.status, creditCost: cost };
+    return { taskId: task.id, status: task.status, creditCost: cost, idempotentHit: false };
   }
 
   /**
@@ -320,12 +385,13 @@ export class GenerateService implements OnModuleInit {
         params.modelGuideAssetId ?? params.maskAssetId,
         task.ownerId,
         tempDir,
+        inputAssets[0],
       );
       /*
        * 产出按模态分流 (2026-10-20 视频通道落地)。
        *
        * ⚠️ **不能对视频走图像 provider**: 图像通道产出 ImageOutcome
-       * (buffer + mime), 而视频要走四段式异步契约, 且没有本地兜底。
+       * (buffer + mime), 而视频要走四段式异步契约。
        * 分流依据是**能力自己声明的 modality** —— 那是「这项能力产出什么」
        * 的唯一事实源, 不靠能力 id 前缀猜 (那会在新增能力时静默走错通道)。
        */
@@ -444,10 +510,18 @@ export class GenerateService implements OnModuleInit {
         }
       }
 
-      // 产出来源落库: gateway=真实模型通道, local=本地算法。前端据此如实显示,
-      // 不把本地算法的产出标成模型结果。
+      /*
+       * 产出来源落库: 新任务只可能是 gateway。
+       *
+       * 结果契约已在类型层排除 local；这里再做一次运行期校验，防止未来
+       * 新增 provider 通过 any/外部 SDK 绕过类型，把本地产出静默写成成功。
+       * 非法来源按生成失败处理，由统一 catch 退款，绝不让它进入素材库。
+       */
       const source = outcome.source;
-      const actualProvider = source === 'gateway' ? 'gateway' : 'local';
+      if (source !== 'gateway') {
+        throw new Error(`生成结果来源非法: ${String(source)}；只允许模型通道产出`);
+      }
+      const actualProvider = 'gateway';
       if (task.provider !== actualProvider) {
         await this.prisma.generationTask.update({
           where: { id: taskId },
@@ -518,7 +592,7 @@ export class GenerateService implements OnModuleInit {
       /*
        * 错误码区分「没通道」与「生成异常」: 前者运营要去后台配线路,
        * 后者要找模型厂商 —— 同一个 42201 会让两类问题看起来一样。
-       * 该能力不允许本地兜底时 (本地没有实现), 路由器抛 NoModelChannelError。
+       * 无可用模型线路时, 路由器抛 NoModelChannelError。
        */
       /*
        * 42205 = 遮罩重绘没有可用通道（协议不支持编辑端点）。
@@ -654,13 +728,19 @@ export class GenerateService implements OnModuleInit {
       recovered: '任务中断自动退还',
     } as const;
     try {
-      await this.credit.grant({
+      const refund = await this.credit.grant({
         userId,
         credits: cost,
         source: 'grant',
+        taskId,
+        idempotencyKey: `refund:task:${taskId}`,
         // 不传 validDays → 永久批次
         reason: labels[reason],
       });
+      if (refund.idempotentHit) {
+        this.logger.warn(`退款已处理过, 跳过重复流水与通知: task=${taskId}`);
+        return;
+      }
       this.logger.log(`已退还 ${cost} 积分: task=${taskId} user=${userId} 原因=${reason}`);
 
       /*
@@ -852,6 +932,7 @@ export class GenerateService implements OnModuleInit {
     maskAssetId: unknown,
     ownerId: string,
     tempDir: string,
+    sourceAsset: { id: string; sourceUrl: string; storageKey: string | null; storageBackend: string; width: number | null; height: number | null },
   ): Promise<string | undefined> {
     const id = typeof maskAssetId === 'string' ? maskAssetId.trim() : '';
     if (!id) return undefined;
@@ -864,7 +945,26 @@ export class GenerateService implements OnModuleInit {
       throw new AppError(40001, '遮罩素材不存在或无权限', 400);
     }
 
+    if (!sourceAsset) {
+      throw new AppError(40001, '应用遮罩时缺少原图素材', 400);
+    }
+    const sourceBuf = await this.readAssetBytes(sourceAsset);
+    const sourceInfo = inspectUploadedImage(sourceBuf);
     const buf = await this.readAssetBytes(asset);
+    inspectMaskImage(buf, { width: sourceInfo.width, height: sourceInfo.height });
+
+    // 遮罩画布以透明像素表示“要修改的区域”。全不透明的遮罩会让模型
+    // 收到一张“没有任何可编辑像素”的图，必须在调用通道前明确失败。
+    const mask = await Jimp.read(buf);
+    let transparent = 0;
+    const data = mask.bitmap.data;
+    for (let i = 3; i < data.length; i += 4) {
+      if (data[i] < 250) transparent += 1;
+    }
+    if (transparent === 0) {
+      throw new AppError(40001, '遮罩没有任何透明区域，无法确定重绘范围', 400);
+    }
+
     // 扩展名固定 png: OpenAI 的 edits 端点要求遮罩是 PNG, 与素材原格式无关
     const path = join(tempDir, `mask-${asset.id}.png`);
     await writeFile(path, buf);
@@ -935,6 +1035,23 @@ function parseAigcMeta(raw: string | null | undefined): Record<string, unknown> 
 function extOf(sourceUrl: string): string {
   const m = sourceUrl.match(/\.([a-z0-9]{2,5})(?:\?|$)/i);
   return m ? `.${m[1]}` : '.jpg';
+}
+
+const IDEMPOTENCY_KEY_RE = /^[A-Za-z0-9._:-]{8,128}$/;
+
+/** 请求体字段与 Idempotency-Key 头二选一；同时给出时必须一致。 */
+function normalizeIdempotencyKey(bodyValue?: string, headerValue?: string): string | undefined {
+  const body = typeof bodyValue === 'string' ? bodyValue.trim() : '';
+  const header = typeof headerValue === 'string' ? headerValue.trim() : '';
+  if (body && header && body !== header) {
+    throw new AppError(40001, '请求体与 Idempotency-Key 头的幂等键不一致', 400);
+  }
+  const key = body || header;
+  if (!key) return undefined;
+  if (!IDEMPOTENCY_KEY_RE.test(key)) {
+    throw new AppError(40001, '幂等键必须是 8-128 位字母、数字或 . _ : -', 400);
+  }
+  return key;
 }
 
 /**

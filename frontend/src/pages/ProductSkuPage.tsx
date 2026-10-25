@@ -14,7 +14,12 @@ import { useResultGallery, type GalleryItem } from '../hooks/useResultGallery';
 import { useAuth } from '../context/AuthContext';
 import { notifyCreditsChanged } from '../context/CreditsContext';
 import { pollToResult } from '../lib/poll';
-import { taskErrorText } from '../lib/constants';
+import {
+  SUPPORTED_IMAGE_ACCEPT,
+  SUPPORTED_IMAGE_LABEL,
+  isSupportedImageFile,
+  taskErrorText,
+} from '../lib/constants';
 import { ToolShell, type ToolAsset, type ToolSettings } from '../components/ToolShell';
 import { BG_COLOR_SWATCHES, ColorSwatchGrid, CustomColorInput } from '../components/ToolWidgets';
 
@@ -38,8 +43,7 @@ import { BG_COLOR_SWATCHES, ColorSwatchGrid, CustomColorInput } from '../compone
  * 一次任务 (sku_image)。结果栏与商品主图共用「全部生成图」网格
  * (方形缩略图 / 每行 3–6 张 / 大图 / 下载 / 删除), 避免同一壳内两套产图样式。
  *
- * 诚实披露: sku_image 本地是真实算法 (模板 + 区域填充的版式渲染), 无云端通道时
- * 由本地兜底出图。
+ * 诚实披露: sku_image 由真实图像模型完成版式渲染；没有可用模型通道时不可提交。
  */
 
 const COLOR_LABEL: Record<string, string> = {
@@ -92,9 +96,9 @@ export function ProductSkuPage() {
   }, [template?.id]);
 
   const uploadTemplate = async (files: FileList | File[]) => {
-    const file = Array.from(files).find((f) => f.type.startsWith('image/'));
+    const file = Array.from(files).find(isSupportedImageFile);
     if (!file) {
-      message.warning('请选择图片文件（PNG / JPG / WebP）');
+      message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
       return;
     }
     setUploading(true);
@@ -309,7 +313,7 @@ export function ProductSkuPage() {
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept={SUPPORTED_IMAGE_ACCEPT}
             hidden
             onChange={(e) => {
               if (e.target.files) void uploadTemplate(e.target.files);

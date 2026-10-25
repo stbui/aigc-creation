@@ -290,7 +290,7 @@ export function ChannelEditDrawer({
         r.sourceAfter === 'legacy'
           ? '该模态已回落到旧版单通道配置'
           : r.sourceAfter === 'none'
-            ? '该模态当前未接入，调用会失败或回落本地'
+            ? '该模态当前未接入，调用会失败并退款'
             : '其余线路继续按顺序调度';
       void message.success(`已删除线路。${after}`);
       setConfirmDelete(false);

@@ -762,7 +762,7 @@ generate(capability, messages, params, context?: TextCallContext): Promise<TextO
 
 结果卡必须如实展示：
 
-- 实际 `provider`：真实模型通道或本地算法回落。
+- 实际 `provider`：新任务为真实模型通道；历史任务可能为已停用的本地产出。
 - `creditCost`：该步骤真实扣费。
 - AIGC 标识信息。
 - 失败错误码与可操作建议。

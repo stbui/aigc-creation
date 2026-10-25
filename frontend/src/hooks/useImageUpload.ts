@@ -4,6 +4,7 @@ import { assetsApi, assetSrc, toAbsoluteUrl } from '../lib/api';
 import { useProject } from './useProject';
 import { usePasteUpload } from './usePasteUpload';
 import { useAssetLibrary } from '../components/AssetLibraryModal';
+import { SUPPORTED_IMAGE_LABEL, isSupportedImageFile } from '../lib/constants';
 import type { Asset, MobileUploadAsset } from '../types/api';
 
 export interface UploadedImage {
@@ -58,9 +59,9 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
 
   const uploadFiles = useCallback(
     async (files: FileList | File[]) => {
-      const list = Array.from(files).filter((f) => f.type.startsWith('image/'));
+      const list = Array.from(files).filter(isSupportedImageFile);
       if (list.length === 0) {
-        message.warning('请选择图片文件（PNG / JPG / WebP / GIF）');
+        message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
         return;
       }
       const room = max - images.length;

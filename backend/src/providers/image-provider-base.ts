@@ -2,7 +2,7 @@ import { readFile } from 'fs/promises';
 import { extname } from 'path';
 import { gatewayConfig } from './gateway.config';
 import { GatewayUnavailableError, MaskUnsupportedError, type GatewayResult } from './gateway.types';
-import { sniffImageFormat } from './image-format';
+import { detectImageFormat } from './image-format';
 import { protocolSpec, type ProtocolSpec } from './protocols/protocol.spec';
 
 /**
@@ -122,6 +122,7 @@ function channelQuality(params: Record<string, any>): string | undefined {
 export type { ProtocolSpec as ProtocolShape } from './protocols/protocol.spec';
 
 const MAX_REF_BYTES = 4 * 1024 * 1024;
+const MAX_OUTPUT_BYTES = Number(process.env.GATEWAY_MAX_OUTPUT_BYTES) || 50 * 1024 * 1024;
 
 export abstract class BaseImageProvider {
   /**
@@ -242,11 +243,13 @@ export abstract class BaseImageProvider {
       ? Buffer.from(b64.replace(/^data:[^;]+;base64,/, ''), 'base64')
       : await this.download(url!);
     if (!buffer.length) throw new GatewayUnavailableError('产出图为空', summarizeJson(json));
+    const format = detectImageFormat(buffer);
+    if (!format) throw new GatewayUnavailableError('通道返回的不是受支持图片', '响应内容无法通过图片魔数校验');
 
     return {
       buffer,
       // 按字节魔数判格式, 不看 URL 后缀 —— 火山/MiniMax 返回的链接常无扩展名
-      format: sniffImageFormat(buffer),
+      format,
       taskId: String(json?.id ?? json?.created ?? ''),
       model,
       prompt,
@@ -310,10 +313,12 @@ export abstract class BaseImageProvider {
       ? Buffer.from(b64.replace(/^data:[^;]+;base64,/, ''), 'base64')
       : await this.download(url!);
     if (!buffer.length) throw new GatewayUnavailableError('产出图为空', summarizeJson(json));
+    const format = detectImageFormat(buffer);
+    if (!format) throw new GatewayUnavailableError('通道返回的不是受支持图片', '响应内容无法通过图片魔数校验');
 
     return {
       buffer,
-      format: sniffImageFormat(buffer),
+      format,
       taskId: String(json?.id ?? json?.created ?? ''),
       model,
       prompt: promptText,
@@ -377,15 +382,76 @@ export abstract class BaseImageProvider {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), this.cfg.timeoutMs);
     try {
-      const res = await fetch(url, { signal: ctrl.signal });
-      if (!res.ok) throw new GatewayUnavailableError('下载产出图失败', `HTTP ${res.status}`);
-      return Buffer.from(await res.arrayBuffer());
+      let current = this.assertSafeDownloadUrl(url);
+      // 手动跟随重定向：每一跳都重新做协议/私网校验，避免公网地址 302 到内网。
+      for (let redirects = 0; redirects <= 3; redirects += 1) {
+        const res = await fetch(current, { signal: ctrl.signal, redirect: 'manual' });
+        if (res.status >= 300 && res.status < 400) {
+          const location = res.headers.get('location');
+          if (!location || redirects === 3) {
+            throw new GatewayUnavailableError('下载产出图失败', '重定向次数过多或缺少 Location');
+          }
+          current = this.assertSafeDownloadUrl(new URL(location, current).toString());
+          continue;
+        }
+        if (!res.ok) throw new GatewayUnavailableError('下载产出图失败', `HTTP ${res.status}`);
+        const declared = Number(res.headers.get('content-length') ?? 0);
+        if (declared > MAX_OUTPUT_BYTES) {
+          throw new GatewayUnavailableError('产出图过大', `${declared} bytes`);
+        }
+        if (!res.body) return Buffer.from(await res.arrayBuffer());
+        const reader = res.body.getReader();
+        const chunks: Buffer[] = [];
+        let total = 0;
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          total += value.byteLength;
+          if (total > MAX_OUTPUT_BYTES) {
+            await reader.cancel().catch(() => undefined);
+            throw new GatewayUnavailableError('产出图过大', `超过 ${MAX_OUTPUT_BYTES} bytes`);
+          }
+          chunks.push(Buffer.from(value));
+        }
+        return Buffer.concat(chunks);
+      }
+      throw new GatewayUnavailableError('下载产出图失败', '重定向次数过多');
     } catch (e) {
       if (e instanceof GatewayUnavailableError) throw e;
       throw new GatewayUnavailableError('下载产出图失败', (e as Error).message);
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  /**
+   * 通道返回的下载 URL 不能直接打进任意地址。公网通道返回私网/回环地址时
+   * 拒绝，避免被上游响应诱导访问本机管理端口。本地联调（网关基址本身也是
+   * 回环/私网）仍允许，保证 stub provider 测试不被误伤。
+   */
+  private assertSafeDownloadUrl(raw: string): string {
+    let target: URL;
+    try {
+      target = new URL(raw);
+    } catch {
+      throw new GatewayUnavailableError('产出图地址无效', String(raw).slice(0, 200));
+    }
+    if (target.protocol !== 'http:' && target.protocol !== 'https:') {
+      throw new GatewayUnavailableError('产出图地址协议不允许', target.protocol);
+    }
+    if (!isPrivateHost(target.hostname)) return target.toString();
+
+    const baseUrl = this.channelCreds?.baseUrl || this.cfg.baseUrl;
+    let basePrivate = false;
+    try {
+      basePrivate = Boolean(baseUrl) && isPrivateHost(new URL(baseUrl).hostname);
+    } catch {
+      basePrivate = false;
+    }
+    if (!basePrivate) {
+      throw new GatewayUnavailableError('产出图地址指向私网', target.hostname);
+    }
+    return target.toString();
   }
 }
 
@@ -407,4 +473,18 @@ function toSiteUrl(abs: string): string {
   if (i >= 0) return abs.slice(i);
   const parts = abs.split('/');
   return `/uploads/${parts[parts.length - 1]}`;
+}
+
+function isPrivateHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  if (host === 'localhost' || host === '::1' || host === '0.0.0.0') return true;
+  if (/^127\./.test(host) || /^10\./.test(host) || /^192\.168\./.test(host) || /^169\.254\./.test(host)) {
+    return true;
+  }
+  const match = /^172\.(\d{1,3})\./.exec(host);
+  if (match) {
+    const octet = Number(match[1]);
+    return octet >= 16 && octet <= 31;
+  }
+  return host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe80:');
 }

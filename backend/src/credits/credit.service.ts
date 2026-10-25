@@ -142,16 +142,16 @@ export class CreditService {
       source: 'purchase' | 'grant' | 'admin_adjust';
       validDays?: number;
       orderId?: string;
+      taskId?: string;
+      /** 稳定幂等键；重复发放直接返回已有流水，不再创建新批次。 */
+      idempotencyKey?: string;
       reason?: string;
       operatorId?: string;
     },
     tx?: Prisma.TransactionClient,
-  ): Promise<{ lotId: string; balance: number }> {
+  ): Promise<{ lotId: string; balance: number; idempotentHit?: boolean }> {
     const { userId, credits, source } = params;
     if (credits <= 0) throw new AppError(40001, '发放积分数必须大于 0', 400);
-
-    // 事务内必须用 tx 的客户端, 另开连接会读不到未提交的行(并在 SQLite 上等写锁)
-    const db: any = tx ?? this.prisma;
 
     // validDays=0 或未指定 → 永久有效(expireAt 为空, FEFO 排最后)
     const expireAt =
@@ -159,36 +159,86 @@ export class CreditService {
         ? new Date(Date.now() + params.validDays * 24 * 3600 * 1000)
         : null;
 
-    const lot = await db.creditLot.create({
-      data: {
-        userId,
-        source,
-        orderId: params.orderId,
-        totalCredits: credits,
-        remainingCredits: credits,
-        expireAt,
-      },
-    });
+    const execute = async (db: any) => {
+      if (params.idempotencyKey) {
+        const existing = await db.creditLedger.findUnique({
+          where: { idempotencyKey: params.idempotencyKey },
+          select: { userId: true, lotId: true },
+        });
+        if (existing) {
+          if (existing.userId !== userId) {
+            throw new AppError(40001, '积分幂等键冲突', 400);
+          }
+          return {
+            lotId: existing.lotId ?? '',
+            balance: await this.balanceWithin(db, userId),
+            idempotentHit: true,
+          };
+        }
+      }
 
-    const balance = tx
-      ? await this.balanceWithin(db, userId)
-      : (await this.balanceOf(userId)).balance;
-    await db.creditLedger.create({
-      data: {
-        userId,
-        type: source === 'purchase' ? 'purchase' : source === 'grant' ? 'grant' : 'admin_adjust',
-        amount: credits,
-        // balanceAfter 是**快照**, 仅供流水展示与快速核对;
-        // 余额永远从 CreditLot 推导, 两者不一致时以批次为准
-        balanceAfter: balance,
-        lotId: lot.id,
-        orderId: params.orderId,
-        reason: params.reason,
-        operatorId: params.operatorId,
-      },
-    });
+      const lot = await db.creditLot.create({
+        data: {
+          userId,
+          source,
+          orderId: params.orderId,
+          totalCredits: credits,
+          remainingCredits: credits,
+          expireAt,
+        },
+      });
 
-    return { lotId: lot.id, balance };
+      // 始终用当前事务客户端计算余额：事务外另开连接既读不到未提交行，
+      // 也可能在 SQLite 上等待写锁。
+      const balance = await this.balanceWithin(db, userId);
+      await db.creditLedger.create({
+        data: {
+          userId,
+          type: source === 'purchase' ? 'purchase' : source === 'grant' ? 'grant' : 'admin_adjust',
+          amount: credits,
+          // balanceAfter 是**快照**, 仅供流水展示与快速核对;
+          // 余额永远从 CreditLot 推导, 两者不一致时以批次为准
+          balanceAfter: balance,
+          lotId: lot.id,
+          orderId: params.orderId,
+          taskId: params.taskId,
+          idempotencyKey: params.idempotencyKey,
+          reason: params.reason,
+          operatorId: params.operatorId,
+        },
+      });
+
+      return { lotId: lot.id, balance, idempotentHit: false };
+    };
+
+    if (tx) return execute(tx);
+
+    try {
+      return await this.prisma.$transaction(execute);
+    } catch (error) {
+      /*
+       * 并发重试会在唯一键上撞车。此时整个事务已回滚（不会留下无流水的批次），
+       * 再读一次既有流水即可返回同一结果。只有幂等键明确时才走该分支。
+       */
+      if (
+        params.idempotencyKey &&
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        const existing = await this.prisma.creditLedger.findUnique({
+          where: { idempotencyKey: params.idempotencyKey },
+          select: { userId: true, lotId: true },
+        });
+        if (existing && existing.userId === userId) {
+          return {
+            lotId: existing.lotId ?? '',
+            balance: (await this.balanceOf(userId)).balance,
+            idempotentHit: true,
+          };
+        }
+      }
+      throw error;
+    }
   }
 
   /** 与 balanceOf 同口径的余额计算, 但在给定客户端(通常是事务)内执行 */
@@ -230,19 +280,19 @@ export class CreditService {
     /** 写进流水的说明（人工调整必填） */
     reason?: string;
     operatorId?: string;
-  }): Promise<{ consumed: number; balance: number; lotId: string | null }> {
+  }, tx?: Prisma.TransactionClient): Promise<{ consumed: number; balance: number; lotId: string | null }> {
     const { userId, credits } = params;
     if (credits <= 0) return { consumed: 0, balance: (await this.balanceOf(userId)).balance, lotId: null };
 
     const now = new Date();
 
-    const result = await this.prisma.$transaction(async (tx) => {
+    const execute = async (db: Prisma.TransactionClient) => {
       /*
        * FEFO 排序: expireAt 升序, NULL 排最后。
        * SQLite 的 NULL 默认排最前, 与"NULL 视为最晚到期"相反,
        * 故显式写 CASE WHEN。
        */
-      const lots = await tx.creditLot.findMany({
+      const lots = await db.creditLot.findMany({
         where: {
           userId,
           remainingCredits: { gt: 0 },
@@ -261,7 +311,7 @@ export class CreditService {
         const take = Math.min(lot.remainingCredits, remaining);
 
         // 条件更新: 影响 0 行说明并发下已被扣空, 换下一批
-        const res = await tx.creditLot.updateMany({
+        const res = await db.creditLot.updateMany({
           where: { id: lot.id, remainingCredits: { gte: take } },
           data: { remainingCredits: { decrement: take } },
         });
@@ -279,14 +329,14 @@ export class CreditService {
       }
 
       // 扣减完成后重算余额(必须在事务内, 避免与并发写入竞争)
-      const agg = await tx.creditLot.aggregate({
+      const agg = await db.creditLot.aggregate({
         where: { userId, remainingCredits: { gt: 0 }, OR: [{ expireAt: null }, { expireAt: { gt: now } }] },
         _sum: { remainingCredits: true },
       });
       const balance = agg._sum.remainingCredits ?? 0;
 
       if (credits > 0) {
-        await tx.creditLedger.create({
+        await db.creditLedger.create({
           data: {
             userId,
             type: params.ledgerType ?? 'consume',
@@ -302,7 +352,14 @@ export class CreditService {
       }
 
       return { consumed: credits, balance, lotId: lastLotId, takenByLot };
-    });
+    };
+
+    /*
+     * 建任务需要把「扣费 + 建任务」放进同一个事务: 任务唯一键冲突或建任务
+     * 失败时, 扣减与流水必须一起回滚。否则只能靠跨事务补偿, 而补偿与重试
+     * 之间没有任何原子边界 —— 补偿成功后再重试会既扣不到费又建出任务。
+     */
+    const result = tx ? await execute(tx) : await this.prisma.$transaction(execute);
 
     return { consumed: result.consumed, balance: result.balance, lotId: result.lotId };
   }

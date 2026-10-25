@@ -83,8 +83,8 @@ async function submitState(page: Page) {
 /**
  * 自由创作此刻能不能真的提交 —— 读 `/capabilities` 的 `runtime.effective`。
  *
- * 2026-10-21 起 free_create 是 `localFallback: false` 的能力: 没有可用模型通道时
- * 后端判 failed/42204 并退款, 前端也把提交按钮置灰(仅登录态)并给出原因。
+ * free_create 只能由模型生成: 没有可用模型通道时后端判 failed/42204 并退款,
+ * 前端也把提交按钮置灰(仅登录态)并给出原因。
  * 本机是否配了图像通道是**环境事实**, 不该让按钮契约随它飘 —— 故按实际结论分支断言。
  */
 async function freeCreateCanSubmit(request: APIRequestContext): Promise<boolean> {

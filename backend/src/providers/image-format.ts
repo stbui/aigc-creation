@@ -20,7 +20,10 @@
  * 猜错就把 PNG 字节以 image/jpeg 入库, 产出 mime 与真实内容不符。
  * 只有魔数是可靠的。
  */
-export function sniffImageFormat(buf: Buffer): string {
+export type SupportedImageFormat = 'image/png' | 'image/jpeg' | 'image/webp' | 'image/gif';
+
+/** 严格识别；未知内容返回 null，调用方应判失败而不是按 JPEG 碰运气。 */
+export function detectImageFormat(buf: Buffer): SupportedImageFormat | null {
   if (buf.length >= 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
     return 'image/png'; // \x89PNG
   }
@@ -31,6 +34,10 @@ export function sniffImageFormat(buf: Buffer): string {
     return 'image/webp';
   }
   if (buf.length >= 3 && buf.toString('ascii', 0, 3) === 'GIF') return 'image/gif';
-  // 认不出时按 jpeg 处理: generate.service 只会给 png / jpg 两种扩展名
-  return 'image/jpeg';
+  return null;
+}
+
+/** 旧调用方的兼容门面；新代码应使用 detectImageFormat 并显式处理 null。 */
+export function sniffImageFormat(buf: Buffer): string {
+  return detectImageFormat(buf) ?? 'image/jpeg';
 }

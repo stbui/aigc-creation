@@ -83,12 +83,12 @@ const eq = (n: string, a: unknown, e: unknown) => ok(n, Object.is(a, e), a);
   eq('厂商目录完整性', collectCatalogIssues().length, 0);
 }
 
-// ── 3. 能力层: 视频能力无 localImpl ─────────────────────────────
+// ── 3. 能力层: 视频能力只走模型 ─────────────────────────────────
 {
   const v = CAPABILITIES.find((c) => c.modality === 'video');
   ok('有视频能力', !!v);
   eq('视频能力 id', v?.id, 'image_to_video');
-  eq('视频能力无本地兜底', v?.localImpl, undefined);
+  eq('视频能力不再声明本地实现', v && Object.prototype.hasOwnProperty.call(v, 'localImpl'), false);
   ok('视频能力有积分价', typeof v?.creditCost === 'number');
 }
 

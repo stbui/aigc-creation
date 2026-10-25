@@ -17,8 +17,8 @@ import { ToolHistoryPane } from '../components/ToolHistoryPane';
  *   高级设置: 仅"比例 原比例" (参考站该页无画质档位, 输出保持输入分辨率)
  *   提交: 开始抠图 (creditCost=0, 即「限时免费」的价格语义); 描述: 上传图片后，自动去除图片背景
  *
- * 诚实披露: matting 为 real 能力 —— 四角采样估计底色 + 距离阈值抠除 (本地算法),
- * 非 AI 语义分割; 换底色为真实像素合成。
+ * 诚实披露: matting 由真实图像模型完成主体分割与背景替换；
+ * 抠图边缘质量取决于当前模型通道能力。
  */
 
 const COLOR_LABEL: Record<string, string> = {
@@ -110,7 +110,7 @@ export function BackgroundRemovePage() {
           clearLabel="透明底"
           ariaLabel="背景颜色"
         />
-        <p className="tool-card-copy">本地为四角采样估计底色的阈值抠除（非 AI 语义分割），换底色为真实像素合成。</p>
+        <p className="tool-card-copy">由图像模型完成主体分割与换底，边缘效果取决于当前模型能力。</p>
       </ToolCard>
     </ToolShell>
   );

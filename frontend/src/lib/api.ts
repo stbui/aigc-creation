@@ -383,12 +383,26 @@ export const assetsApi = {
 };
 
 export const generateApi = {
-  start: (data: GenerateRequest) =>
-    request<GenerateResponse>('/generate', { method: 'POST', body: data }),
+  start: (data: GenerateRequest) => {
+    const idempotencyKey = data.idempotencyKey || newIdempotencyKey();
+    return request<GenerateResponse>('/generate', {
+      method: 'POST',
+      headers: { 'Idempotency-Key': idempotencyKey },
+      body: { ...data, idempotencyKey },
+    });
+  },
   getTask: (id: string) => request<Task>(`/tasks/${id}`),
   list: () => request<TaskListResult>('/tasks').then((r) => asList<Task>(r)),
   remove: (id: string) => request<{ id: string; removedAsset: boolean }>(`/tasks/${id}`, { method: 'DELETE' }),
 };
+
+/** 浏览器端幂等键；不支持 randomUUID 的旧内核仍生成足够随机的回退值。 */
+export function newIdempotencyKey(): string {
+  const cryptoApi = globalThis.crypto;
+  if (cryptoApi && typeof cryptoApi.randomUUID === 'function') return cryptoApi.randomUUID();
+  const random = () => Math.random().toString(36).slice(2, 12);
+  return `gen-${Date.now().toString(36)}-${random()}-${random()}`;
+}
 
 export const statsApi = {
   overview: () => request<StatsOverview>('/stats/overview'),
@@ -803,7 +817,7 @@ export const adminModelApi = {
    * 批量测试全部通道 (2026-10-20)。
    *
    * 三个模态各有独立通道, 逐个点测试慢且易漏; 且「没配」在界面上
-   * 看不出来的 (视频/文本无本地兜底, 未接入 = 调用必然失败)。
+   * 看不出来的 (未接入 = 调用必然失败)。
    */
   testAllChannels: () =>
     request<AdminModelConfigTestAllResult>('/admin/model-config/test-all', {

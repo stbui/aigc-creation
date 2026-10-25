@@ -1,4 +1,4 @@
-import { Body, Controller, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Headers, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/current-user.decorator';
 import { GenerateService } from './generate.service';
@@ -16,7 +16,11 @@ export class GenerateController {
    */
   @RateLimit({ name: 'generate', limit: 20, windowSec: 60, scope: 'user' })
   @Post()
-  create(@CurrentUser() user: AuthUser, @Body() dto: CreateGenerationDto) {
-    return this.generateService.createTask(user.id, dto);
+  create(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateGenerationDto,
+    @Headers('idempotency-key') idempotencyHeader?: string,
+  ) {
+    return this.generateService.createTask(user.id, dto, idempotencyHeader);
   }
 }

@@ -25,7 +25,7 @@ export const Enhance: CapabilityPlugin = {
       label: '补充要求（选填）',
       type: 'text',
       placeholder: '如：去掉电镀件上的指纹，让皮革看起来更有光泽',
-      help: '本地算法仅将 ASCII 部分绘制到图上, 中文原文完整记录在任务参数中',
+      help: '中文原文会完整写入模型提示词',
     },
     { key: 'ratio', label: '画面比例', type: 'enum', default: 'original', options: RATIOS_WITH_ORIGINAL },
     { key: 'size', label: '画质（输出边长）', type: 'enum', default: '1k', options: QUALITY_OPTIONS },
@@ -59,7 +59,6 @@ export const Enhance: CapabilityPlugin = {
     `产品精修（${p.templateCode || p.mode || 'comprehensive'}）：` +
     `${p.additionalRequirement || p.note || '优化商品质感与画面细节'}，` +
     `保持结构与颜色真实，提升清晰度与质感${p.imageRatio ? `；输出比例 ${p.imageRatio}` : ''}`,
-  localImpl: 'makeEnhance',
   modality: 'image',
   inputs: 1,
   inWorkbench: true,

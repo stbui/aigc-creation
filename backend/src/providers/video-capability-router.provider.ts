@@ -1,29 +1,25 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MinimaxVideoProvider } from './minimax-video.provider';
-import { setGatewayConfigOverrides, invalidateGatewayConfigCache } from './gateway.config';
+import { gatewayConfigOf, setGatewayConfigOverrides, invalidateGatewayConfigCache } from './gateway.config';
 import { buildPromptFor } from './gateway-prompt';
 import { PrismaService } from '../prisma/prisma.service';
 import { ImageCallLogger } from './image-call-logger';
 import { ChannelScheduler } from './channel-scheduler';
 import type { VideoProvider, VideoOutcome } from './unified/unified.provider';
+import { NoModelChannelError } from './gateway.types';
 
 /**
  * 视频路由器 —— 视频模态的统一通道入口 (2026-10-20)。
  *
- * ## 与图像路由器的关键差异: **没有本地兜底**
+ * ## 只走真实模型
  *
- * 图像有 Jimp 本地算法, 远程失败可以回落, 用户至少拿到一张图。
- * 视频**没有本地算法** —— 本地不存在"生成一段视频"这回事。
- * 编一段占位素材当视频产出, 会让用户以为模型产出了成品
- * (违反本项目「不把本地伪装成模型结果」的既有约定)。
- *
- * 故视频失败即失败, 如实抛错 —— 由 generate.service 记为任务失败。
- * 这也是能力定义里 `image_to_video` 不声明 localImpl 的原因
- * (校验器只对 image 模态强制要求本地兜底)。
+ * 本地不存在"生成一段视频"这回事。编一段占位素材当视频产出, 会让用户
+ * 以为模型产出了成品。故视频失败即失败, 如实抛错 —— 由 generate.service
+ * 记为任务失败并退款。
  *
  * ## 路由决策
  *
- * 与图像侧同构: route=local 也不适用 (无本地实现), 直接走远程;
+ * 与图像侧同构: route=local 是存量配置，按不可用处理；auto/remote 才调度模型；
  * 通道未配置则明确报错, 不静默产出占位物。
  */
 @Injectable()
@@ -49,14 +45,18 @@ export class VideoCapabilityRouter implements VideoProvider {
     const startedAt = Date.now();
     const prompt = buildPromptFor(capability, params);
 
+    if (gatewayConfigOf('video').routeOf(capability) === 'local') {
+      throw new NoModelChannelError('本地生成已停用；请将该能力的路由改为 auto 或 remote');
+    }
+
     /*
      * 不用全局 `cfg.enabled` 拦截：线路表里有通道时，旧 gateway.video.* 为空
-     * 也必须走线路。没有可用线路由调度器返回原因，再如实失败（无本地兜底）。
+     * 也必须走线路。没有可用线路由调度器返回原因，再如实失败。
      */
     try {
       /*
        * 多渠道调度 (2026-10-20): 视频是**最需要**多渠道的模态 ——
-       * 它既没有本地兜底, 单次生成又要 1~2 分钟, 唯一那家一挂用户就彻底拿不到片。
+       * 单次生成要 1~2 分钟, 唯一那家一挂用户就彻底拿不到片。
        * 现在可按 priority 依次尝试多家 (如 MiniMax 主 + 火山方舟备)。
        */
       const dispatch = await this.scheduler.dispatch('video', async (channel) => {
@@ -108,7 +108,7 @@ export class VideoCapabilityRouter implements VideoProvider {
         durationMs: Date.now() - startedAt,
         reason,
       });
-      // ⚠️ 不回落: 视频没有本地实现。抛出去让 generate.service 记为任务失败。
+      // 不产出占位素材；抛出去让 generate.service 记为任务失败并退款。
       throw e;
     }
   }

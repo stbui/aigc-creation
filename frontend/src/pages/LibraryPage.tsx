@@ -11,7 +11,13 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { assetsApi, assetSrc, projectsApi } from '../lib/api';
-import { MAX_IMAGE_BYTES, MAX_IMAGE_MB } from '../lib/constants';
+import {
+  MAX_IMAGE_BYTES,
+  MAX_IMAGE_MB,
+  SUPPORTED_IMAGE_ACCEPT,
+  SUPPORTED_IMAGE_LABEL,
+  isSupportedImageFile,
+} from '../lib/constants';
 import { capabilityName, toolPath } from '../lib/capabilities';
 import { useAuth } from '../context/AuthContext';
 import { useProject } from '../hooks/useProject';
@@ -215,9 +221,9 @@ export function LibraryPage() {
    */
   const upload = async (files: FileList | File[]) => {
     const picked = Array.from(files);
-    const list = picked.filter((f) => f.type.startsWith('image/'));
+    const list = picked.filter(isSupportedImageFile);
     if (list.length === 0) {
-      message.warning('请选择图片文件（PNG / JPG / WebP / GIF）');
+      message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
       return;
     }
     if (list.length < picked.length) {
@@ -436,7 +442,7 @@ export function LibraryPage() {
           fileRef.current = el;
         }}
         type="file"
-        accept="image/*"
+        accept={SUPPORTED_IMAGE_ACCEPT}
         multiple
         hidden
         onChange={(e) => {

@@ -199,7 +199,7 @@ export const ENV_SPECS: readonly Spec[] = [
     type: 'string',
     // 默认 openai: 新部署应走主流协议; 存量 modelverse 值已在
     // CapabilityRouterProvider.pickProtocol 里作为 openai 的历史别名兼容。
-    // oneOf 把取值锁死 —— 填错协议的表现是 404 + 静默回落本地算法,
+    // oneOf 把取值锁死 —— 填错协议的表现会是上游 404,
     // 在启动时就拒掉比在生成时才暴露好得多。
     def: 'openai',
     oneOf: ['openai', 'modelverse', 'volcengine', 'minimax'],

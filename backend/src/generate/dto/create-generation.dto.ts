@@ -1,4 +1,4 @@
-import { IsArray, IsIn, IsObject, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsIn, IsObject, IsOptional, IsString, Length, Matches } from 'class-validator';
 import { SUBMITTABLE_CAPABILITY_IDS } from '../../capabilities/capability.registry';
 
 /**
@@ -19,4 +19,11 @@ export class CreateGenerationDto {
   @IsOptional()
   @IsObject()
   params?: Record<string, any>;
+
+  /** 客户端请求幂等键；也可通过 Idempotency-Key 头传入。 */
+  @IsOptional()
+  @IsString()
+  @Length(8, 128)
+  @Matches(/^[A-Za-z0-9._:-]+$/, { message: 'idempotencyKey 格式无效' })
+  idempotencyKey?: string;
 }

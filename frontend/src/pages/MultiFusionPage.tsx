@@ -2,7 +2,13 @@ import { useRef, useState } from 'react';
 import { App, Spin } from 'antd';
 import { ChevronDown, ChevronLeft, ChevronRight, Download, ImagePlus, Layers, RefreshCw, Sparkles, X } from 'lucide-react';
 import { assetSrc, assetsApi, generateApi, promptToolsApi, toAbsoluteUrl } from '../lib/api';
-import { MAX_IMAGE_MB } from '../lib/constants';
+import {
+  MAX_IMAGE_BYTES,
+  MAX_IMAGE_MB,
+  SUPPORTED_IMAGE_ACCEPT,
+  SUPPORTED_IMAGE_LABEL,
+  isSupportedImageFile,
+} from '../lib/constants';
 import { ratioOptions, resolutionOptions } from '../lib/optionSets';
 import { useProject } from '../hooks/useProject';
 import { usePollAbort } from '../hooks/usePollAbort';
@@ -145,13 +151,13 @@ export function MultiFusionPage() {
   const accentSlots = Math.min(MIN_ACCENT_SLOTS + accents.length, MAX_ACCENTS);
 
   const uploadTo = async (files: FileList | File[], target: 'subject' | 'accent') => {
-    const list = Array.from(files).filter((f) => f.type.startsWith('image/'));
+    const list = Array.from(files).filter(isSupportedImageFile);
     if (list.length === 0) {
-      message.warning('请选择图片文件（PNG / JPG）');
+      message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
       return;
     }
     // 体积校验此前缺失: 素材库尤其会收下一个改了后缀的非图片, 页面只当"上传成功"
-    const oversize = list.filter((f) => f.size > MAX_IMAGE_MB * 1024 * 1024);
+    const oversize = list.filter((f) => f.size > MAX_IMAGE_BYTES);
     if (oversize.length > 0) {
       message.error(`单张不超过 ${MAX_IMAGE_MB}MB：${oversize.map((f) => f.name).join('、')}`);
       return;
@@ -725,7 +731,7 @@ export function MultiFusionPage() {
             <input
               ref={subjectInputRef}
               type="file"
-              accept="image/png,image/jpeg"
+              accept={SUPPORTED_IMAGE_ACCEPT}
               hidden
               onChange={(e) => {
                 if (e.target.files) void uploadTo(e.target.files, 'subject');
@@ -735,7 +741,7 @@ export function MultiFusionPage() {
             <input
               ref={accentInputRef}
               type="file"
-              accept="image/png,image/jpeg"
+              accept={SUPPORTED_IMAGE_ACCEPT}
               multiple
               hidden
               onChange={(e) => {
@@ -822,11 +828,11 @@ export function MultiFusionPage() {
               <details className="multi-image-fusion-disclosure">
                 <summary>
                   <ChevronRight size={11} />
-                  本地能力说明
+                  模型能力说明
                 </summary>
                 <p>
-                  本地算法：无云端通道时由场景版式合成算法出图（真实图片层叠 + 光影融合），主体图与搭配图真实参与构图；
-                  配置图像通道后由模型完成语义融合。AI 分析走文本通道识图，未配置文本通道时可手写画面描述。
+                  图像融合由模型完成，主体图与搭配图会作为参考图提交；结果取决于当前图像模型能力。
+                  AI 分析走文本通道识图，未配置文本通道时可手写画面描述。
                 </p>
               </details>
             </>
@@ -840,7 +846,7 @@ export function MultiFusionPage() {
                     {result.width}×{result.height}
                   </span>
                 )}
-                {/* 本单实际走云端还是本地回落, 以 pollToResult 的 provider 为准 */}
+                {/* 以 pollToResult 的 provider 为准；新任务恒为模型，历史 local 如实保留 */}
                 <ProviderBadge provider={result.provider} className="mif-provider" />
               </div>
               <div className="multi-image-fusion-thumbnails">

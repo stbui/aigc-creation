@@ -264,7 +264,7 @@ export function RotateAnglePage() {
         <RangeRow label="缩放" display={zoom === 1 ? '特写' : zoom.toFixed(2)} min={0.8} max={1.2} step={0.01} value={zoom} onChange={setZoom} />
 
         <p className="tool-card-copy">相机保持静止，生成时按主体旋转角度重建商品展示。</p>
-        <p className="tool-card-copy">本地为 2D 近似（平面旋转 + 逐行剪切 + 缩放），非 3D 重建。</p>
+        <p className="tool-card-copy">由图像模型按视角参数重建，结果可能包含生成式补全。</p>
       </section>
         );
       }}

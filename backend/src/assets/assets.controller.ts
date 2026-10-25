@@ -19,6 +19,8 @@ import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/current-user.decorator';
 import { resolveUploadsDir } from '../config/env-files';
 import { AssetsService } from './assets.service';
+import { AppError } from '../common/app.exception';
+import { maxUploadBytes } from './image-validation';
 
 @UseGuards(JwtAuthGuard)
 @Controller('assets')
@@ -43,7 +45,7 @@ export class AssetsController {
           cb(null, `${unique}${ext}`);
         },
       }),
-      limits: { fileSize: 20 * 1024 * 1024 },
+      limits: { fileSize: maxUploadBytes(), files: 1 },
     }),
   )
   upload(
@@ -51,6 +53,7 @@ export class AssetsController {
     @UploadedFile() file: any,
     @Body('projectId') projectId: string,
   ) {
+    if (!file) throw new AppError(40001, '请选择要上传的图片', 400);
     return this.assetsService.createOriginal(user.id, projectId, {
       filename: file.filename,
       originalname: file.originalname,

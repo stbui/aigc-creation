@@ -35,7 +35,6 @@ export const Rotate: CapabilityPlugin = {
     `改变商品展示视角：水平旋转 ${p.azimuthDeg ?? p.yaw ?? 0}°、` +
     `俯仰 ${p.elevationDeg ?? p.pitch ?? 0}°、缩放 ${p.zoomFactor ?? p.zoom ?? 1}，` +
     `按新视角重建商品展示，背景保持不变${p.imageRatio ? `；输出比例 ${p.imageRatio}` : ''}`,
-  localImpl: 'makeRotate',
   modality: 'image',
   inputs: 1,
   inWorkbench: true,
