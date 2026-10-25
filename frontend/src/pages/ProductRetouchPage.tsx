@@ -3,6 +3,7 @@ import { Maximize2 } from 'lucide-react';
 import { useToolTask } from '../hooks/useToolTask';
 import { ExpandTextModal, ToolShell } from '../components/ToolShell';
 import { PillOptions, ToolCard } from '../components/ToolWidgets';
+import { ToolHistoryPane } from '../components/ToolHistoryPane';
 
 /**
  * 产品精修 —— 1:1 复刻参考站 https://ijihua.cn/product-retouch。
@@ -30,12 +31,23 @@ const MODE_OPTIONS = [
 
 const MODE_LABEL: Record<string, string> = Object.fromEntries(MODE_OPTIONS.map((o) => [o.value, o.label]));
 
+/** 参考站 PRODUCT_REFINEMENT 的模板码；本地 mode 与模板码双向对应。 */
+const MODE_TO_TEMPLATE: Record<string, string> = {
+  comprehensive: 'IT_PR_COMPREHENSIVE',
+  texture: 'IT_PR_TEXTURE',
+  blemish: 'IT_PR_DEFECT_REPAIR',
+  color: 'IT_PR_COLOR_CORRECTION',
+  clarity: 'IT_PR_CLARITY',
+  material: 'IT_PR_MATERIAL',
+};
+
 export function ProductRetouchPage() {
   const { submitting, result, run } = useToolTask({ capability: 'enhance', successMessage: '精修结果已生成' });
 
   const [mode, setMode] = useState('comprehensive');
   const [note, setNote] = useState('');
   const [expandOpen, setExpandOpen] = useState(false);
+  const [sourceUrl, setSourceUrl] = useState('');
 
   return (
     <ToolShell
@@ -50,8 +62,25 @@ export function ProductRetouchPage() {
       submitting={submitting}
       result={result}
       resultTag={MODE_LABEL[mode]}
-      onSubmit={(inputs, settings) =>
-        run(inputs, { mode, note: note.trim(), ratio: settings.ratio, size: settings.resolution })
+      resultCompare={
+        result?.status === 'succeeded' && result.url && sourceUrl
+          ? { beforeUrl: sourceUrl, beforeLabel: '原图', afterLabel: '精修后' }
+          : undefined
+      }
+      onSubmit={(inputs, settings) => {
+        setSourceUrl(inputs[0]?.url ?? '');
+        return run(inputs, {
+          mode,
+          note: note.trim(),
+          templateCode: MODE_TO_TEMPLATE[mode],
+          additionalRequirement: note.trim(),
+          ...(settings.ratio !== 'original' ? { imageRatio: settings.ratio } : {}),
+          ratio: settings.ratio,
+          size: settings.resolution,
+        });
+      }}
+      trailingPane={
+        <ToolHistoryPane capability="enhance" refreshKey={result?.url} emptyText="暂无精修记录" />
       }
     >
       <ToolCard title="精修模式">

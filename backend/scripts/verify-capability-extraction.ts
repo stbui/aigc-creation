@@ -49,7 +49,7 @@ const BASELINE: Array<{
       language: ['zh-CN', 'en-US', 'ru-RU', 'es-ES', 'de-DE', 'ja-JP', 'ko-KR', 'pt-PT', 'id-ID', 'th-TH'],
       variant: ['white_background', 'scene', 'selling_point', 'other'],
       ratio: ['1:1', '4:3', '3:4', '16:9', '9:16', '2:3', '3:2', '21:9'],
-      size: ['1k', '2k'],
+      size: ['1k', '2k', '4k'],
     },
   },
   {
@@ -58,7 +58,7 @@ const BASELINE: Array<{
     options: {
       platform: ['taobao', 'jd', 'douyin', 'pdd', 'xiaohongshu', 'amazon', 'tiktok-shop', 'shopify', 'temu'],
       language: ['zh-CN', 'en-US', 'ru-RU', 'es-ES', 'de-DE', 'ja-JP', 'ko-KR', 'pt-PT', 'id-ID', 'th-TH'],
-      size: ['1k', '2k'],
+      size: ['1k', '2k', '4k'],
     },
   },
   {
@@ -69,7 +69,7 @@ const BASELINE: Array<{
       language: ['zh-CN', 'en-US', 'ru-RU', 'es-ES', 'de-DE', 'ja-JP', 'ko-KR', 'pt-PT', 'id-ID', 'th-TH'],
       degree: ['reference_style', 'high_replica'],
       ratio: ['1:1', '4:3', '3:4', '16:9', '9:16', '2:3', '3:2', '21:9'],
-      size: ['1k', '2k'],
+      size: ['1k', '2k', '4k'],
     },
   },
   {
@@ -79,7 +79,7 @@ const BASELINE: Array<{
   },
   {
     id: 'multi_fusion', creditCost: 40, modality: 'image', localImpl: 'makeMultiFusion',
-    paramKeys: ['scene', 'variantCount', 'ratio', 'size'],
+    paramKeys: ['scene', 'variantCount', 'ratio', 'size', 'prompt'],
     options: {
       scene: [
         'print_pattern', 'embroidery', 'texture', 'sticker', 'hot_stamping', 'carving', 'painting',
@@ -88,50 +88,53 @@ const BASELINE: Array<{
       ],
       variantCount: ['4', '3', '2', '1'],
       ratio: ['1:1', '4:3', '3:4', '16:9', '9:16', '2:3', '3:2', '21:9'],
-      size: ['1k', '2k'],
+      size: ['1k', '2k', '4k'],
     },
   },
   {
     id: 'sku_image', creditCost: 0, modality: 'image', localImpl: 'makeSkuImage',
-    paramKeys: ['region', 'skuName', 'skuColor', 'ratio', 'size'],
+    paramKeys: ['region', 'skuName', 'skuColor', 'customColor', 'regions', 'ratio', 'size'],
     options: {
       region: ['center', 'top', 'bottom', 'left', 'right'],
-      // 原定义是 BG_COLOR_OPTIONS.slice(1, 6) —— 5 项, **不含 custom**
-      skuColor: ['#FFFFFF', '#82CEF3', '#3988E9', '#FF0B22', '#A8001B'],
+      // 页面支持框选多个 SKU 变体，并允许色板最后一档走自定义 HEX。
+      skuColor: ['#FFFFFF', '#82CEF3', '#3988E9', '#FF0B22', '#A8001B', 'custom'],
       ratio: ['1:1', '4:3', '3:4', '16:9', '9:16', '2:3', '3:2', '21:9'],
-      size: ['1k', '2k'],
+      size: ['1k', '2k', '4k'],
     },
   },
   {
     id: 'local_redraw', creditCost: 5, modality: 'image', localImpl: null,
-    paramKeys: ['region', 'prompt', 'ratio', 'size'],
+    paramKeys: ['region', 'prompt', 'maskAssetId', 'modelGuideAssetId', 'annotations', 'strength', 'outputCount', 'ratio', 'imageRatio', 'size'],
     options: {
       region: ['center', 'top', 'bottom', 'left', 'right', 'full'],
       ratio: ['original', '1:1', '4:3', '3:4', '16:9', '9:16', '2:3', '3:2', '21:9'],
-      size: ['1k', '2k'],
+      size: ['1k', '2k', '4k'],
     },
   },
   {
     id: 'expand', creditCost: 5, modality: 'image', localImpl: 'makeExpand',
-    paramKeys: ['occupy', 'position', 'ratio', 'size'],
+    // 2026-10-25: 追加参考站 placement* 字段（旧键与顺序保持不变）
+    paramKeys: ['occupy', 'position', 'ratio', 'size', 'placementX', 'placementY', 'placementWidth', 'placementHeight', 'targetImageRatio'],
     options: {
       position: ['top-left', 'top', 'top-right', 'left', 'center', 'right', 'bottom-left', 'bottom', 'bottom-right'],
       ratio: ['original', '1:1', '4:3', '3:4', '16:9', '9:16', '2:3', '3:2', '21:9'],
-      size: ['1k', '2k'],
+      size: ['1k', '2k', '4k'],
     },
   },
   {
     id: 'matting', creditCost: 0, modality: 'image', localImpl: 'makeMatting',
-    paramKeys: ['bgColor', 'customColor', 'ratio'],
+    // 2026-10-25: 追加参考站 selectedColor/customAlpha（旧键与顺序保持不变）
+    paramKeys: ['bgColor', 'customColor', 'ratio', 'selectedColor', 'customAlpha', 'resolution'],
     options: {
       bgColor: ['transparent', '#FFFFFF', '#82CEF3', '#3988E9', '#FF0B22', '#A8001B', 'custom'],
+      selectedColor: ['transparent', 'white', 'light-blue', 'blue', 'red', 'dark-red', 'custom'],
       ratio: ['original', '1:1', '4:3', '3:4', '16:9', '9:16', '2:3', '3:2', '21:9'],
     },
   },
   {
     // 2026-10-21 去除水印从占位升级为镜像修补 + 羽化融合的真实算法
     id: 'remove_watermark', creditCost: 0, modality: 'image', localImpl: 'makeRemoveWatermark',
-    paramKeys: ['mode', 'region'],
+    paramKeys: ['mode', 'region', 'maskAssetId', 'detectionMode', 'outputFormat'],
     options: {
       mode: ['auto', 'region'],
       region: ['bottom_right', 'bottom_left', 'top_right', 'top_left', 'center'],
@@ -139,36 +142,37 @@ const BASELINE: Array<{
   },
   {
     id: 'image_translate', creditCost: 5, modality: 'image', localImpl: null,
-    paramKeys: ['targetLang', 'protectSubject', 'size'],
+    paramKeys: ['targetLang', 'protectSubject', 'size', 'targetLanguage'],
     options: {
       targetLang: ['zh-CN', 'en-US', 'ru-RU', 'es-ES', 'de-DE', 'ja-JP', 'ko-KR', 'pt-PT', 'id-ID', 'th-TH'],
-      size: ['1k', '2k'],
+      targetLanguage: ['zh-CN', 'en-US', 'ru-RU', 'es-ES', 'de-DE', 'ja-JP', 'ko-KR', 'pt-PT', 'id-ID', 'th-TH'],
+      size: ['1k', '2k', '4k'],
     },
   },
   {
     id: 'enhance', creditCost: 5, modality: 'image', localImpl: 'makeEnhance',
-    paramKeys: ['mode', 'note', 'ratio', 'size'],
+    paramKeys: ['mode', 'note', 'ratio', 'size', 'templateCode', 'additionalRequirement', 'imageRatio'],
     options: {
       mode: ['comprehensive', 'texture', 'blemish', 'color', 'clarity', 'material'],
       ratio: ['original', '1:1', '4:3', '3:4', '16:9', '9:16', '2:3', '3:2', '21:9'],
-      size: ['1k', '2k'],
+      size: ['1k', '2k', '4k'],
     },
   },
   {
     id: 'recolor', creditCost: 5, modality: 'image', localImpl: 'makeRecolor',
-    paramKeys: ['color', 'customColor', 'ratio', 'size'],
+    paramKeys: ['color', 'customColor', 'ratio', 'size', 'targetColor'],
     options: {
       color: ['#FFFFFF', '#82CEF3', '#3988E9', '#FF0B22', '#A8001B', 'custom'],
       ratio: ['original', '1:1', '4:3', '3:4', '16:9', '9:16', '2:3', '3:2', '21:9'],
-      size: ['1k', '2k'],
+      size: ['1k', '2k', '4k'],
     },
   },
   {
     id: 'rotate', creditCost: 5, modality: 'image', localImpl: 'makeRotate',
-    paramKeys: ['yaw', 'pitch', 'zoom', 'ratio', 'size'],
+    paramKeys: ['yaw', 'pitch', 'zoom', 'ratio', 'size', 'azimuthDeg', 'elevationDeg', 'zoomFactor', 'imageRatio'],
     options: {
       ratio: ['original', '1:1', '4:3', '3:4', '16:9', '9:16', '2:3', '3:2', '21:9'],
-      size: ['1k', '2k'],
+      size: ['1k', '2k', '4k'],
     },
   },
   {
@@ -176,7 +180,7 @@ const BASELINE: Array<{
     paramKeys: ['prompt', 'ratio', 'size'],
     options: {
       ratio: ['1:1', '4:3', '3:4', '16:9', '9:16', '2:3', '3:2', '21:9'],
-      size: ['1k', '2k'],
+      size: ['1k', '2k', '4k'],
     },
   },
 ];

@@ -29,10 +29,36 @@ export const Enhance: CapabilityPlugin = {
     },
     { key: 'ratio', label: '画面比例', type: 'enum', default: 'original', options: RATIOS_WITH_ORIGINAL },
     { key: 'size', label: '画质（输出边长）', type: 'enum', default: '1k', options: QUALITY_OPTIONS },
+    /* 参考站 createTemplateImageTool('PRODUCT_REFINEMENT') 的模板码；旧 mode/note 仍兼容。 */
+    {
+      key: 'templateCode',
+      label: '精修模板（参考站字段）',
+      type: 'enum',
+      default: 'IT_PR_COMPREHENSIVE',
+      options: [
+        { value: 'IT_PR_COMPREHENSIVE', label: '综合精修' },
+        { value: 'IT_PR_TEXTURE', label: '质感增强' },
+        { value: 'IT_PR_DEFECT_REPAIR', label: '瑕疵修复' },
+        { value: 'IT_PR_COLOR_CORRECTION', label: '色彩校正' },
+        { value: 'IT_PR_CLARITY', label: '提升清晰度' },
+        { value: 'IT_PR_MATERIAL', label: '材质强化' },
+      ],
+      hidden: true,
+    },
+    {
+      key: 'additionalRequirement',
+      label: '补充要求（参考站字段）',
+      type: 'text',
+      maxLength: 2000,
+      hidden: true,
+    },
+    /* 参考站 PRODUCT_REFINEMENT 仅在非原比例时提交 imageRatio。 */
+    { key: 'imageRatio', label: '画面比例（参考站字段）', type: 'text', hidden: true },
   ],
   buildPrompt: (p) =>
-    `产品精修（${p.mode || 'comprehensive'}）：${p.note || '优化商品质感与画面细节'}，` +
-    `保持结构与颜色真实，提升清晰度与质感`,
+    `产品精修（${p.templateCode || p.mode || 'comprehensive'}）：` +
+    `${p.additionalRequirement || p.note || '优化商品质感与画面细节'}，` +
+    `保持结构与颜色真实，提升清晰度与质感${p.imageRatio ? `；输出比例 ${p.imageRatio}` : ''}`,
   localImpl: 'makeEnhance',
   modality: 'image',
   inputs: 1,

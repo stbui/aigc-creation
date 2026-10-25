@@ -1,7 +1,10 @@
 import { useState } from 'react';
+import { App } from 'antd';
 import { useToolTask } from '../hooks/useToolTask';
 import { ToolShell } from '../components/ToolShell';
 import { PositionGrid, ToolCard } from '../components/ToolWidgets';
+import { ToolHistoryPane } from '../components/ToolHistoryPane';
+import { computeExpandPlacement, loadImageSize } from '../lib/expandGeometry';
 
 /**
  * 智能扩图 —— 1:1 复刻参考站 https://ijihua.cn/image-expand。
@@ -33,11 +36,14 @@ const POSITION_LABEL: Record<string, string> = {
 };
 
 export function ImageExpandPage() {
+  const { message } = App.useApp();
   const { submitting, result, run } = useToolTask({ capability: 'expand', successMessage: '扩图结果已生成' });
 
   const [occupy, setOccupy] = useState(80);
   const [occupyText, setOccupyText] = useState('');
   const [position, setPosition] = useState('center');
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [preparing, setPreparing] = useState(false);
 
   const commitOccupy = (raw: string) => {
     setOccupyText(raw);
@@ -55,12 +61,37 @@ export function ImageExpandPage() {
       submitLabel="立即扩图"
       hint="*确认素材和参数后提交，右侧会展示生成结果。"
       emptyDesc="上传图片后，扩展构图的结果将在此处展示"
-      formValid
+      formValid={!preparing}
       submitting={submitting}
       result={result}
       resultTag={`占比 ${occupy}% · ${POSITION_LABEL[position]}`}
-      onSubmit={(inputs, settings) =>
-        run(inputs, { occupy, position, ratio: settings.ratio, size: settings.resolution })
+      resultCompare={
+        result?.status === 'succeeded' && result.url && sourceUrl
+          ? { beforeUrl: sourceUrl, beforeLabel: '原图', afterLabel: '扩图后' }
+          : undefined
+      }
+      onSubmit={async (inputs, settings) => {
+        setSourceUrl(inputs[0]?.url ?? '');
+        setPreparing(true);
+        try {
+          const size = await loadImageSize(inputs[0]?.url ?? '');
+          const placement = computeExpandPlacement(size.width, size.height, settings.ratio, occupy, position);
+          await run(inputs, {
+            occupy,
+            position,
+            ...placement,
+            ...(settings.ratio !== 'original' ? { targetImageRatio: settings.ratio } : {}),
+            ratio: settings.ratio,
+            size: settings.resolution,
+          });
+        } catch (e) {
+          message.error((e as Error).message || '扩图参数计算失败，请重试');
+        } finally {
+          setPreparing(false);
+        }
+      }}
+      trailingPane={
+        <ToolHistoryPane capability="expand" refreshKey={result?.url} emptyText="暂无扩图记录" />
       }
     >
       <ToolCard title="原图占比">

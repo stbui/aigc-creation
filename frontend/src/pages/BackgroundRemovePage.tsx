@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { useToolTask } from '../hooks/useToolTask';
 import { ToolShell } from '../components/ToolShell';
-import { BG_COLOR_SWATCHES, ColorSwatchGrid, CustomColorInput, ToolCard } from '../components/ToolWidgets';
+import { ToolCard } from '../components/ToolWidgets';
+import { ColorStudio, MATTING_COLOR_SWATCHES } from '../components/ColorStudio';
+import { MattingResultEditor } from '../components/MattingResultEditor';
+import { ToolHistoryPane } from '../components/ToolHistoryPane';
 
 /**
  * 一键抠图 —— 1:1 复刻参考站 https://ijihua.cn/background-remove。
@@ -20,19 +23,36 @@ import { BG_COLOR_SWATCHES, ColorSwatchGrid, CustomColorInput, ToolCard } from '
 
 const COLOR_LABEL: Record<string, string> = {
   transparent: '透明底',
+  white: '白色',
+  'light-blue': '浅蓝',
+  blue: '蓝色',
+  red: '红色',
+  'dark-red': '深红',
+  custom: '自定义',
   '#FFFFFF': '白色',
   '#82CEF3': '浅蓝',
   '#3988E9': '蓝色',
   '#FF0B22': '红色',
   '#A8001B': '深红',
-  custom: '自定义',
 };
 
 export function BackgroundRemovePage() {
   const { submitting, result, run } = useToolTask({ capability: 'matting', successMessage: '抠图结果已生成' });
 
-  const [bgColor, setBgColor] = useState('transparent');
-  const [customColor, setCustomColor] = useState('#8064F6');
+  const [selectedColor, setSelectedColor] = useState('transparent');
+  const [customColor, setCustomColor] = useState('#5546D8');
+  const [customAlpha, setCustomAlpha] = useState(100);
+  /*
+   * 结果编辑器需要原图做对比；提交时记录本次实际输入与比例，避免用户随后
+   * 换图/改设置时把旧结果和新素材拼在一起。比例变更通过 ToolShell 回调实时同步。
+   */
+  const [sourceUrl, setSourceUrl] = useState('');
+  const [outputRatio, setOutputRatio] = useState('original');
+
+  const colorLabel =
+    selectedColor === 'custom'
+      ? `自定义 ${customColor}${customAlpha < 100 ? ` · ${customAlpha}%` : ''}`
+      : (COLOR_LABEL[selectedColor] ?? selectedColor);
 
   return (
     <ToolShell
@@ -46,21 +66,50 @@ export function BackgroundRemovePage() {
       formValid
       submitting={submitting}
       result={result}
-      resultTag={COLOR_LABEL[bgColor] ?? bgColor}
-      onSubmit={(inputs, settings) =>
-        run(inputs, { bgColor, customColor: customColor.trim(), ratio: settings.ratio })
+      resultTag={colorLabel}
+      onSettingsChange={(settings) => setOutputRatio(settings.ratio)}
+      onSubmit={async (inputs, settings) => {
+        setSourceUrl(inputs[0]?.url ?? '');
+        setOutputRatio(settings.ratio);
+        await run(inputs, {
+          selectedColor,
+          customColor: customColor.trim(),
+          customAlpha,
+          ratio: settings.ratio,
+          resolution: settings.resolution,
+        });
+      }}
+      resultPane={
+        result?.status === 'succeeded' && result.url && sourceUrl ? (
+          <section className="pk-result-pane pk-result-pane-editor">
+            <MattingResultEditor
+              resultUrl={result.url}
+              originalUrl={sourceUrl}
+              selectedColor={selectedColor}
+              customColor={customColor}
+              customAlpha={customAlpha}
+              outputRatio={outputRatio}
+            />
+          </section>
+        ) : undefined
+      }
+      trailingPane={
+        <ToolHistoryPane capability="matting" refreshKey={result?.url} emptyText="暂无抠图记录" />
       }
     >
       <ToolCard title="背景颜色">
-        <ColorSwatchGrid
-          options={BG_COLOR_SWATCHES}
-          value={bgColor}
-          onChange={setBgColor}
-          onCustom={() => setBgColor('custom')}
-          customActive={bgColor === 'custom'}
+        <ColorStudio
+          options={MATTING_COLOR_SWATCHES}
+          value={selectedColor}
+          onChange={setSelectedColor}
+          customColor={customColor}
+          onCustomColor={setCustomColor}
+          customAlpha={customAlpha}
+          onCustomAlpha={setCustomAlpha}
+          onClear={() => setSelectedColor('transparent')}
+          clearLabel="透明底"
           ariaLabel="背景颜色"
         />
-        {bgColor === 'custom' && <CustomColorInput value={customColor} onChange={setCustomColor} label="自定义背景色（HEX）" />}
         <p className="tool-card-copy">本地为四角采样估计底色的阈值抠除（非 AI 语义分割），换底色为真实像素合成。</p>
       </ToolCard>
     </ToolShell>

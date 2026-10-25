@@ -23,9 +23,11 @@ export const ImageTranslate: CapabilityPlugin = {
     { key: 'targetLang', label: '目标语言', type: 'enum', default: 'zh-CN', options: LANGUAGES },
     { key: 'protectSubject', label: '保护商品主体', type: 'boolean', default: true },
     { key: 'size', label: '画质（输出边长）', type: 'enum', default: '1k', options: QUALITY_OPTIONS },
+    /* 参考站 createTemplateImageTool('IMAGE_TRANSLATION') 使用 targetLanguage。 */
+    { key: 'targetLanguage', label: '目标语言（参考站字段）', type: 'enum', default: 'zh-CN', options: LANGUAGES, hidden: true },
   ],
   buildPrompt: (p) =>
-    `图片内文字翻译为 ${p.targetLang || 'zh-CN'}：保持原版式、字号与颜色不变，` +
+    `图片内文字翻译为 ${p.targetLanguage || p.targetLang || 'zh-CN'}：保持原版式、字号与颜色不变，` +
     `只替换文字内容${p.protectSubject ? '，商品主体像素不得改动' : ''}`,
   /** 翻译没有本地实现; 没通道就 failed/42204 并退款, 不交付占位图 */
   localFallback: false,

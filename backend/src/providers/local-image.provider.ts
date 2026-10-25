@@ -70,7 +70,7 @@ const LOCAL_MAX_SIDE = 2048;
  * 降成 1024px, 比「回落 2048」更差且不留任何痕迹。改为「非 1k 即上限」。
  */
 function localOutputSide(capability: string, params: Record<string, any>): number {
-  const size = String(params.size ?? '1k');
+  const size = String((wasProvided(params, 'resolution') ? params.resolution : params.size) ?? '1k').toLowerCase();
   if (size === '4k') {
     log.warn(`[${capability}] 本地算法无法兑现 4K, 实际按 ${LOCAL_MAX_SIDE}px 输出（需配置云端通道）`);
   }
@@ -81,6 +81,12 @@ function requireInput(inputPaths: string[], capability: string): string {
   const p = inputPaths.find(Boolean);
   if (!p) throw new Error(`${capability} 需要至少一张输入图`);
   return p;
+}
+
+/** 参数是否由调用方显式传入（而非 sanitizeParams 补的默认值）。 */
+function wasProvided(params: Record<string, any>, key: string): boolean {
+  const keys = params.__providedKeys as Set<string> | undefined;
+  return Boolean(keys?.has(key));
 }
 
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
@@ -343,6 +349,7 @@ export class LocalImageProvider implements ImageProvider {
     capability: string,
     inputPaths: string[],
     rawParams: Record<string, any>,
+    maskPath?: string,
   ): Promise<ImageProviderResult> {
     const def = getCapability(capability);
     if (!def) throw new Error(`unsupported capability: ${capability}`);
@@ -350,6 +357,16 @@ export class LocalImageProvider implements ImageProvider {
       throw new Error(`${def.name} 尚未开放`);
     }
     const params = sanitizeParams(capability, rawParams);
+    /*
+     * sanitizeParams 会为每个声明参数补默认值，单看结果无法区分「用户传了
+     * selectedColor」与「默认值恰好是 transparent」。新旧字段并存期必须知道
+     * 调用方到底传了哪一个，否则旧 bgColor 会被新字段默认值覆盖。这里把
+     * 原始 key 集合挂成不可枚举属性，仅供本地实现判 presence，不会落库。
+     */
+    Object.defineProperty(params, '__providedKeys', {
+      value: new Set(Object.keys(rawParams ?? {})),
+      enumerable: false,
+    });
 
     /*
      * 分派: 按能力声明的 localImpl 句柄取实现 (2026-10-20 抽离)。
@@ -362,9 +379,13 @@ export class LocalImageProvider implements ImageProvider {
      * 「按名字取自己的方法」。新增能力无需碰这个类。
      */
     const impl = this.resolveLocalImpl(def.localImpl, capability);
-    return (
+    if (impl === 'makeRemoveWatermark') {
+      return this.makeRemoveWatermark(inputPaths, params, maskPath);
+    }
+    const fn = (
       this as unknown as Record<string, (a: string[], p: Record<string, any>) => Promise<ImageProviderResult>>
-    )[impl](inputPaths, params);
+    )[impl];
+    return fn.call(this, inputPaths, params);
   }
 
   /**
@@ -643,35 +664,35 @@ export class LocalImageProvider implements ImageProvider {
     }
 
     // 背景颜色: transparent 保持透明输出 PNG; 其余颜色按目标比例合成到画布
-    const bgColor = resolveBackdropColor(params);
-    const target = outputSizeFor(width, height, params.ratio);
-    if (bgColor === 'transparent' && target.w === width && target.h === height) {
+    const backdrop = resolveBackdropColor(params);
+    const target = outputSizeFor(width, height, params.ratio, localOutputSide('matting', params));
+    if (backdrop.kind === 'transparent' && target.w === width && target.h === height) {
       return { kind: 'image' as const, buffer: await src.getBuffer(JimpMime.png), format: 'image/png' };
     }
 
     const canvas = new Jimp({
       width: target.w,
       height: target.h,
-      color: bgColor === 'transparent' ? 0x00000000 : bgColor,
+      color: backdrop.kind === 'transparent' ? 0x00000000 : backdrop.color,
     });
     // 原图按比例适配后居中放入画布 (不放大, 避免插值模糊)
     const fit = fitInside(width, height, target.w, target.h);
     const cut = src.clone().cover({ w: fit.w, h: fit.h });
     canvas.composite(cut, Math.round((target.w - fit.w) / 2), Math.round((target.h - fit.h) / 2));
-    const label = bgColor === 'transparent' ? 'TRANSPARENT' : `BG ${bgColor.toString(16)}`;
+    const label = backdrop.kind === 'transparent' ? 'TRANSPARENT' : `BG ${backdrop.color.toString(16)}`;
     await drawFooterBar(canvas, `AI MATTING ${label} ${target.w}x${target.h}`);
     /*
      * 透明底必须出 PNG: JPEG 没有 alpha 通道, 抠掉的部分会被压成实色,
      * 用户拿到的图与「透明背景」的承诺不符。此前只有「尺寸未变」才走 PNG,
      * 一旦选了非 original 比例就静默丢透明度。
      */
-    if (bgColor === 'transparent') {
+    if (backdrop.kind === 'transparent' || backdrop.alpha < 255) {
       return { kind: 'image' as const, buffer: await canvas.getBuffer(JimpMime.png), format: 'image/png' };
     }
     return { kind: 'image' as const, buffer: await canvas.getBuffer(JimpMime.jpeg), format: 'image/jpeg' };
   }
 
-  // ── real: 智能扩图 (原图占比 + 原图位置 + 边缘延展) ──
+  // ── real: 智能扩图 (原图占比 + 位置 + 边缘延展) ──
   private async makeExpand(inputPaths: string[], params: Record<string, any>) {
     const inputPath = requireInput(inputPaths, 'expand');
     const src = await Jimp.read(inputPath);
@@ -679,37 +700,82 @@ export class LocalImageProvider implements ImageProvider {
     const sh = src.bitmap.height;
     const occupy = clampInt(Math.round(Number(params.occupy) || 80), 1, 99);
 
-    // 画布面积 = 原图面积 / 占比 (占比 100% 时不扩图, 保持原尺寸)
-    const ratioH = params.ratio && params.ratio !== 'original' ? parseRatio(params.ratio, sh / sw) : sh / sw;
-    // 目标长边: 由占比推导 (原图长边 / sqrt(占比)), 再用比例修正另一边
-    const longSide = Math.max(sw, sh) / Math.sqrt(occupy / 100);
+    /*
+     * 参考站 SMART_EXPAND 的构图语义 (2026-10-25 对齐):
+     *   scale = min(canvasW / srcW, canvasH / srcH) * occupy / 100
+     * 即「原图占比」是原图在一个轴向上的线性占比，不是旧的面积占比。
+     *
+     * 本地不把源图重采样到更小再放大，而是让最小边恰好保留原像素：
+     * 先按目标画幅求出能完整容纳源图的基础画布，再整体除以占比。
+     */
+    const ratioKey =
+      wasProvided(params, 'targetImageRatio') && params.targetImageRatio
+        ? String(params.targetImageRatio)
+        : params.ratio;
+    const ratioH = ratioKey && ratioKey !== 'original' ? parseRatio(ratioKey, sh / sw) : sh / sw;
+    const share = occupy / 100;
+    const sourceAspect = sw / sh;
     let W: number;
     let H: number;
-    if (sw >= sh) {
-      W = Math.max(sw + 2, Math.round(longSide));
+    if (sourceAspect >= 1 / ratioH) {
+      // 源图比目标画幅更宽：宽度是限制边
+      W = Math.max(sw + 2, Math.round(sw / share));
       H = Math.max(sh + 2, Math.round(W * ratioH));
     } else {
-      H = Math.max(sh + 2, Math.round(longSide));
+      // 源图比目标画幅更高：高度是限制边
+      H = Math.max(sh + 2, Math.round(sh / share));
       W = Math.max(sw + 2, Math.round(H / ratioH));
     }
-    W = Math.max(W, sw + 2);
-    H = Math.max(H, sh + 2);
 
-    // 原图在画布中的位置: 九宫格 (center 默认居中)
+    // 本地长边上限: 保持构图不变，对画布与放置尺寸按同一比例缩放。
+    const cap = Math.min(1, LOCAL_MAX_SIDE / Math.max(W, H));
+    W = Math.max(sw + 2, Math.round(W * cap));
+    H = Math.max(sh + 2, Math.round(H * cap));
+
+    // 用 min 保留源图比例，避免非原比例时被拉伸。
+    const fitScale = Math.min(W / sw, H / sh) * share;
+    let placeW = Math.max(1, Math.round(sw * fitScale));
+    let placeH = Math.max(1, Math.round(sh * fitScale));
+
+    const placementProvided =
+      wasProvided(params, 'placementWidth') && wasProvided(params, 'placementHeight');
+    if (placementProvided) {
+      const pw = clampNum(Number(params.placementWidth), 0.01, 1);
+      const ph = clampNum(Number(params.placementHeight), 0.01, 1);
+      placeW = Math.max(1, Math.round(W * pw));
+      placeH = Math.max(1, Math.round(H * ph));
+    }
+
+    /*
+     * 原图在画布中的位置: 精确 placement 优先，否则九宫格 (center 默认居中)。
+     * 参考站的 placementX/Y 是**源图左上角相对目标画布**的归一化坐标
+     * (浏览器端直接 `x / canvasWidth`)；不是「剩余空白区域的百分比」。
+     * 用后者会把 x=0.25 画到 0.125 的位置，只有 0/0.5/1 碰巧一致。
+     */
     const pos = EXPAND_POSITION_BOX[String(params.position)] ?? EXPAND_POSITION_BOX.center;
-    const offX = Math.round((W - sw) * pos.fx);
-    const offY = Math.round((H - sh) * pos.fy);
+    const offX = wasProvided(params, 'placementX')
+      ? clampInt(Math.round(clampNum(Number(params.placementX), 0, 1) * W), 0, Math.max(0, W - placeW))
+      : Math.round((W - placeW) * pos.fx);
+    const offY = wasProvided(params, 'placementY')
+      ? clampInt(Math.round(clampNum(Number(params.placementY), 0, 1) * H), 0, Math.max(0, H - placeH))
+      : Math.round((H - placeH) * pos.fy);
 
     const canvas = new Jimp({ width: W, height: H, color: 0xffffffff });
 
-    // 边缘延展: 逐像素把源图四边向外"拉伸", 模拟内容补全 (纯色/渐变背景效果自然)
+    // 边缘延展: 逐像素从原图最近边界取样，模拟内容补全 (纯色/渐变背景效果自然)
     const { data: sd } = src.bitmap;
     const { data: cd } = canvas.bitmap;
     for (let y = 0; y < H; y++) {
       for (let x = 0; x < W; x++) {
-        const inside = x >= offX && x < offX + sw && y >= offY && y < offY + sh;
-        const sx = inside ? x - offX : clampInt(x - offX, 0, sw - 1);
-        const sy = inside ? y - offY : clampInt(y - offY, 0, sh - 1);
+        const inside = x >= offX && x < offX + placeW && y >= offY && y < offY + placeH;
+        const relX = inside
+          ? ((x - offX) / Math.max(placeW, 1)) * sw
+          : ((clampInt(x - offX, 0, placeW - 1) / Math.max(placeW, 1)) * sw);
+        const relY = inside
+          ? ((y - offY) / Math.max(placeH, 1)) * sh
+          : ((clampInt(y - offY, 0, placeH - 1) / Math.max(placeH, 1)) * sh);
+        const sx = clampInt(Math.round(relX), 0, sw - 1);
+        const sy = clampInt(Math.round(relY), 0, sh - 1);
         const si = (sy * sw + sx) * 4;
         const di = (y * W + x) * 4;
         cd[di] = sd[si];
@@ -720,9 +786,12 @@ export class LocalImageProvider implements ImageProvider {
     }
 
     // 羽化: 在原图边界外做一圈渐变过渡, 减轻拼接感 (固定 8px, 参考站该页无此控件)
-    applyFeather(canvas, offX, offY, sw, sh, 8);
+    applyFeather(canvas, offX, offY, placeW, placeH, 8);
 
-    await drawFooterBar(canvas, `AI EXPAND occupy ${occupy}% pos ${params.position} ${W}x${H}`);
+    await drawFooterBar(
+      canvas,
+      `AI EXPAND occupy ${occupy}% pos ${params.position} place ${Math.round((placeW / W) * 100)}% ${W}x${H}`,
+    );
     return { kind: 'image' as const, buffer: await canvas.getBuffer(JimpMime.jpeg), format: 'image/jpeg' };
   }
 
@@ -730,22 +799,46 @@ export class LocalImageProvider implements ImageProvider {
   private async makeRotate(inputPaths: string[], params: Record<string, any>) {
     const inputPath = requireInput(inputPaths, 'rotate');
     const src = await Jimp.read(inputPath);
-    const yaw = clampNum(Number(params.yaw) || 0, -90, 90);
-    const pitch = clampNum(Number(params.pitch) || 0, -30, 60);
-    const zoom = clampNum(Number(params.zoom) || 1, 0.8, 1.2);
+    /*
+     * 同时收到新旧字段时以旧字段为准：页面的 yaw/pitch/zoom 是用户在预览里
+     * 实际看到的方向，而 azimuthDeg 在参考站主体模式下使用相机坐标系（符号
+     * 相反）。本地 2D 算法不能把预览方向悄悄反过来；仅传参考站字段时仍以其
+     * 为兜底，保证 API 兼容。
+     */
+    const rawYaw = wasProvided(params, 'yaw')
+      ? Number(params.yaw) || 0
+      : wasProvided(params, 'azimuthDeg')
+        ? Number(params.azimuthDeg) || 0
+        : 0;
+    const rawPitch = wasProvided(params, 'pitch')
+      ? Number(params.pitch) || 0
+      : wasProvided(params, 'elevationDeg')
+        ? Number(params.elevationDeg) || 0
+        : 0;
+    const rawZoom = wasProvided(params, 'zoom')
+      ? Number(params.zoom) || 1
+      : wasProvided(params, 'zoomFactor')
+        ? Number(params.zoomFactor) || 1
+        : 1;
+    const yaw = clampNum(rawYaw, -90, 90);
+    const pitch = clampNum(rawPitch, -30, 60);
+    const zoom = clampNum(rawZoom, 0.8, 1.2);
 
     // 目标画布: 原比例保持源尺寸; 指定比例按该比例生成 (仅缩小不放大, 长边上限 2048)
-    const target = outputSizeFor(src.bitmap.width, src.bitmap.height, params.ratio, 2048);
+    const ratio =
+      wasProvided(params, 'imageRatio') && params.imageRatio ? String(params.imageRatio) : params.ratio;
+    const target = outputSizeFor(src.bitmap.width, src.bitmap.height, ratio, 2048);
     const canvas = new Jimp({ width: target.w, height: target.h, color: 0xffffffff });
 
-    // zoom: 源图按中心缩放 (contain 适配画布)
-    const fit = fitInside(
-      Math.round(src.bitmap.width * zoom),
-      Math.round(src.bitmap.height * zoom),
-      target.w,
-      target.h,
-    );
-    let work = src.clone().cover({ w: fit.w, h: fit.h });
+    /*
+     * zoom: 以「源图 contain 进目标画布」为 1.0 基准，再乘缩放系数。
+     * 这里不能再调用 fitInside(源图×zoom)：它会把放大后的尺寸重新 contain
+     * 回画布，1.2 被 1/1.2 抵消，滑杆看起来有效但像素完全没变。
+     */
+    const baseScale = Math.min(target.w / src.bitmap.width, target.h / src.bitmap.height);
+    const workW = Math.max(1, Math.round(src.bitmap.width * baseScale * zoom));
+    const workH = Math.max(1, Math.round(src.bitmap.height * baseScale * zoom));
+    let work = src.clone().resize({ w: workW, h: workH });
 
     // yaw: 平面旋转 (mode:false 保持画布, 空角留白由白底画布兜住)
     if (yaw !== 0) work = work.rotate({ deg: yaw, mode: false });
@@ -773,6 +866,20 @@ export class LocalImageProvider implements ImageProvider {
       work = sheared;
     }
 
+    /*
+     * zoom > 1 时 work 会超出画布，先居中裁掉溢出部分再合成。
+     * Jimp composite 不接受负坐标（会直接跳过负区域），不能靠偏移实现裁切。
+     */
+    const cropW = Math.min(work.bitmap.width, target.w);
+    const cropH = Math.min(work.bitmap.height, target.h);
+    if (work.bitmap.width > target.w || work.bitmap.height > target.h) {
+      work = work.crop({
+        x: Math.max(0, Math.round((work.bitmap.width - target.w) / 2)),
+        y: Math.max(0, Math.round((work.bitmap.height - target.h) / 2)),
+        w: cropW,
+        h: cropH,
+      });
+    }
     canvas.composite(work, Math.round((target.w - work.bitmap.width) / 2), Math.round((target.h - work.bitmap.height) / 2));
     await drawFooterBar(canvas, `AI VIEW yaw ${yaw} pitch ${pitch} zoom ${zoom} ${target.w}x${target.h}`);
     return { kind: 'image' as const, buffer: await canvas.getBuffer(JimpMime.jpeg), format: 'image/jpeg' };
@@ -782,9 +889,18 @@ export class LocalImageProvider implements ImageProvider {
   private async makeRecolor(inputPaths: string[], params: Record<string, any>) {
     const inputPath = requireInput(inputPaths, 'recolor');
     const img = await Jimp.read(inputPath);
-    // color=custom 时取 customColor; 非法 HEX 回落经典蓝 (与 hexToRgb 兜底一致)
-    const colorKey = String(params.color ?? '#FFFFFF');
-    const targetHex = colorKey === 'custom' ? String(params.customColor ?? '') : colorKey;
+    /*
+     * 参考站 PRODUCT_RECOLOR 直接提交 targetColor (最终解析后的 HEX)；
+     * 旧页面仍提交 color/customColor。存在 targetColor 时不再看旧字段，
+     * 避免 sanitize 的默认白底把用户选中的颜色悄悄覆盖。
+     */
+    const colorKey = wasProvided(params, 'targetColor')
+      ? String(params.targetColor ?? '')
+      : String(params.color ?? '#FFFFFF');
+    const targetHex =
+      !wasProvided(params, 'targetColor') && colorKey === 'custom'
+        ? String(params.customColor ?? '')
+        : colorKey;
     const target = hexToRgb(targetHex);
 
     const product = estimateProductColor(img);
@@ -811,7 +927,7 @@ export class LocalImageProvider implements ImageProvider {
       replaced++;
     }
 
-    const tag = colorKey === 'custom' ? targetHex : colorKey;
+    const tag = targetHex;
     await drawFooterBar(img, `AI RECOLOR ${tag} (${replaced}px)`);
     return { kind: 'image' as const, buffer: await img.getBuffer(JimpMime.jpeg), format: 'image/jpeg' };
   }
@@ -820,11 +936,13 @@ export class LocalImageProvider implements ImageProvider {
   private async makeEnhance(inputPaths: string[], params: Record<string, any>) {
     const inputPath = requireInput(inputPaths, 'enhance');
     const src = await Jimp.read(inputPath);
-    const mode = String(params.mode ?? 'comprehensive');
+    const mode = RETOUCH_TEMPLATE_TO_MODE[String(params.templateCode ?? '')] ?? String(params.mode ?? 'comprehensive');
     const m = RETOUCH_PIPELINE[mode] ?? RETOUCH_PIPELINE.comprehensive;
 
     // 画布: 原比例保持源尺寸 (仅缩小不放大), 指定比例按该比例适配
-    const target = outputSizeFor(src.bitmap.width, src.bitmap.height, params.ratio, 2048);
+    const ratio =
+      wasProvided(params, 'imageRatio') && params.imageRatio ? String(params.imageRatio) : params.ratio;
+    const target = outputSizeFor(src.bitmap.width, src.bitmap.height, ratio, 2048);
     const img: Img =
       target.w === src.bitmap.width && target.h === src.bitmap.height
         ? src
@@ -885,7 +1003,7 @@ export class LocalImageProvider implements ImageProvider {
     }
 
     // 补充要求: 中文原文完整记录在任务参数中, 图内仅绘制 ASCII 部分 (Jimp 字体限制)
-    const note = asciiOnly(params.note, 60);
+    const note = asciiOnly(params.additionalRequirement ?? params.note, 60);
     if (note) await printText(img, `NOTE: ${note}`, 16, 16, 'black');
     await drawFooterBar(img, `AI RETOUCH mode=${mode} ${target.w}x${target.h}`);
     return { kind: 'image' as const, buffer: await img.getBuffer(JimpMime.jpeg), format: 'image/jpeg' };
@@ -1174,15 +1292,53 @@ export class LocalImageProvider implements ImageProvider {
    * 能力边界（别在文案里含糊）：这**去不掉压在商品主体上的水印**。真正压在
    * 主体细节上的水印需要生成式重绘，本地做不到 —— 那种情况应该走云端通道。
    */
-  private async makeRemoveWatermark(inputPaths: string[], params: Record<string, any>) {
+  private async makeRemoveWatermark(inputPaths: string[], params: Record<string, any>, maskPath?: string) {
     const inputPath = requireInput(inputPaths, 'remove_watermark');
     const img = await Jimp.read(inputPath);
+    const requestedFormat = String(params.outputFormat ?? '').toUpperCase();
+    const outputFormat = requestedFormat === 'PNG' ? 'image/png' : 'image/jpeg';
+    const encode = async () => ({
+      kind: 'image' as const,
+      buffer:
+        outputFormat === 'image/png'
+          ? await img.getBuffer(JimpMime.png)
+          : await img.getBuffer(JimpMime.jpeg),
+      format: outputFormat,
+    });
+
+    /*
+     * 手动遮罩优先 (2026-10-25)。前端画布的遮罩语义与局部重绘一致:
+     * 白色/不透明 = 保留，透明 = 去除。只要存在可用的透明像素，就完全按
+     * 用户标注修补，不再退化成固定角落框 —— 后者会把框内正常画面一起抹掉。
+     */
+    if (maskPath) {
+      try {
+        const mask = await Jimp.read(maskPath);
+        const covered = inpaintMaskedRegion(img.bitmap, mask.bitmap);
+        if (covered > 0) {
+          await drawFooterBar(
+            img,
+            `WATERMARK REMOVED (masked-inpaint ${covered}px) ${img.bitmap.width}x${img.bitmap.height}`,
+          );
+          return encode();
+        }
+      } catch (e) {
+        // 遮罩损坏不应让整个任务失败: 自动/区域模式仍是真实算法，但要留下日志
+        log.warn(`remove_watermark 遮罩读取失败, 回落到 ${String(params.mode ?? 'auto')} 模式 — ${(e as Error).message}`);
+      }
+    }
 
     /*
      * 自动识别 (默认) 与指定区域必须真的走不同分支 —— 此前 mode 只进页脚文案,
      * 两种模式固定用右下角 34%×12% 的框, 水印不在右下角时等于没处理。
      */
-    const mode = String(params.mode ?? 'auto');
+    /*
+     * 页面在“自动/指定区域”两种非手动模式下都会提交 detectionMode=AUTO，
+     * 因此不能反过来用它覆盖明确选中的 mode —— 否则用户选了“左上角”仍会
+     * 落到自动识别。detectionMode 只在旧调用方没给 mode 时作为兜底；
+     * 两者都缺省时保持旧行为的自动识别，而不是误落到固定区域。
+     */
+    const mode = String(params.mode ?? (params.detectionMode === 'MANUAL' ? 'region' : 'auto'));
     const detected = mode === 'auto' ? detectWatermarkRegion(img.bitmap) : null;
     const region = detected ? detected.region : String(params.region ?? 'bottom_right');
     const box = watermarkBox(region, img.bitmap.width, img.bitmap.height);
@@ -1195,8 +1351,9 @@ export class LocalImageProvider implements ImageProvider {
       img,
       `WATERMARK REMOVED (${method}) region ${regionLabel} ${img.bitmap.width}x${img.bitmap.height}`,
     );
-    return { kind: 'image' as const, buffer: await img.getBuffer(JimpMime.jpeg), format: 'image/jpeg' };
+    return encode();
   }
+
 }
 
 // ───────────────── 常量与像素辅助 ─────────────────
@@ -1212,6 +1369,16 @@ const RETOUCH_PIPELINE: Record<
   color: { brightness: 0, contrast: 6, saturation: 22, blur: 0, sharpen: 0, amount: 0 },
   clarity: { brightness: 2, contrast: 12, saturation: 0, blur: 0, sharpen: 3, amount: 0.9 },
   material: { brightness: 0, contrast: 10, saturation: 6, blur: 0, sharpen: 2, amount: 0.6 },
+};
+
+/** 参考站 PRODUCT_REFINEMENT 模板码 → 本地像素管线键 */
+const RETOUCH_TEMPLATE_TO_MODE: Record<string, string> = {
+  IT_PR_COMPREHENSIVE: 'comprehensive',
+  IT_PR_TEXTURE: 'texture',
+  IT_PR_DEFECT_REPAIR: 'blemish',
+  IT_PR_COLOR_CORRECTION: 'color',
+  IT_PR_CLARITY: 'clarity',
+  IT_PR_MATERIAL: 'material',
 };
 
 
@@ -1239,6 +1406,184 @@ function watermarkBox(region: string, W: number, H: number) {
   };
   const at = map[region] ?? map.bottom_right;
   return { x: Math.max(0, at.x), y: Math.max(0, at.y), w: Math.min(bw, W), h: Math.min(bh, H) };
+}
+
+/**
+ * 按像素遮罩修补 (2026-10-25)。
+ *
+ * 输入遮罩与局部重绘共用约定: 透明 = 要去除, 不透明 = 保留。为了兼容
+ * 直传的黑白遮罩，另外把「不透明且接近黑色」也视作去除区域。
+ *
+ * 算法不是把整块矩形镜像回来，而是只处理用户真正圈出的像素：
+ *   1. 以遮罩边界外的一圈真实像素为种子，做多源 BFS，把最近边界颜色向
+ *      遮罩内部扩散 —— 任意形状（画笔/框选/圈选）都能处理；
+ *   2. 用遮罩外环均值做整体色偏修正，避免接缝处出现一块明显色差；
+ *   3. 仅在遮罩内部做 3x3 平滑，压掉扩散产生的条纹。
+ *
+ * 返回实际修补像素数；0 表示遮罩里没有可处理区域（调用方回落自动模式）。
+ */
+function inpaintMaskedRegion(
+  bmp: { data: Buffer; width: number; height: number },
+  maskBmp: { data: Buffer; width: number; height: number },
+): number {
+  const { data, width: W, height: H } = bmp;
+  const mw = maskBmp.width;
+  const mh = maskBmp.height;
+  if (!mw || !mh) return 0;
+
+  const total = W * H;
+  const target = new Uint8Array(total);
+  let minX = W;
+  let minY = H;
+  let maxX = -1;
+  let maxY = -1;
+  let count = 0;
+  for (let y = 0; y < H; y++) {
+    const my = Math.min(mh - 1, Math.floor((y / H) * mh));
+    for (let x = 0; x < W; x++) {
+      const mx = Math.min(mw - 1, Math.floor((x / W) * mw));
+      const mi = (my * mw + mx) * 4;
+      const a = maskBmp.data[mi + 3];
+      const lum = (maskBmp.data[mi] + maskBmp.data[mi + 1] + maskBmp.data[mi + 2]) / 3;
+      if (a < 128 || (a >= 128 && lum < 96)) {
+        target[y * W + x] = 1;
+        count++;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  if (count < 4 || maxX < minX || maxY < minY) return 0;
+
+  const pad = 4;
+  const x0 = Math.max(0, minX - pad);
+  const y0 = Math.max(0, minY - pad);
+  const x1 = Math.min(W - 1, maxX + pad);
+  const y1 = Math.min(H - 1, maxY + pad);
+  const bw = x1 - x0 + 1;
+  const bh = y1 - y0 + 1;
+  const area = bw * bh;
+  const filled = new Uint8Array(area);
+  const queue = new Int32Array(area);
+  let head = 0;
+  let tail = 0;
+
+  const localIndex = (x: number, y: number) => (y - y0) * bw + (x - x0);
+  const at = (x: number, y: number) => (y * W + x) * 4;
+
+  // 种子: 贴着遮罩边界的外侧真实像素
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      if (target[y * W + x]) continue;
+      const touchesMask =
+        (x > x0 && target[y * W + x - 1]) ||
+        (x < x1 && target[y * W + x + 1]) ||
+        (y > y0 && target[(y - 1) * W + x]) ||
+        (y < y1 && target[(y + 1) * W + x]);
+      if (!touchesMask) continue;
+      const li = localIndex(x, y);
+      filled[li] = 1;
+      queue[tail++] = li;
+    }
+  }
+
+  /*
+   * 多源 BFS: 每个种子携带自己的颜色，向四邻扩散。只读原始缓冲，
+   * 因此不会把刚写入的混合色再复制出去（否则会形成明显拖尾）。
+   */
+  const original = Buffer.from(data);
+  while (head < tail) {
+    const li = queue[head++];
+    const lx = li % bw;
+    const ly = Math.floor(li / bw);
+    const x = lx + x0;
+    const y = ly + y0;
+    const si = at(x, y);
+    const neighbors: Array<[number, number]> = [
+      [x - 1, y],
+      [x + 1, y],
+      [x, y - 1],
+      [x, y + 1],
+    ];
+    for (const [nx, ny] of neighbors) {
+      if (nx < x0 || nx > x1 || ny < y0 || ny > y1) continue;
+      const di = ny * W + nx;
+      if (!target[di]) continue;
+      const nli = localIndex(nx, ny);
+      if (filled[nli]) continue;
+      const out = at(nx, ny);
+      data[out] = original[si];
+      data[out + 1] = original[si + 1];
+      data[out + 2] = original[si + 2];
+      filled[nli] = 1;
+      queue[tail++] = nli;
+    }
+  }
+
+  // 色偏修正: 用遮罩外环与修补块均值对齐（限制 ±24，避免整体过曝/偏色）
+  let ringR = 0;
+  let ringG = 0;
+  let ringB = 0;
+  let ringN = 0;
+  let fillR = 0;
+  let fillG = 0;
+  let fillB = 0;
+  let fillN = 0;
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      const i = at(x, y);
+      if (target[y * W + x]) {
+        fillR += data[i];
+        fillG += data[i + 1];
+        fillB += data[i + 2];
+        fillN++;
+      } else {
+        ringR += data[i];
+        ringG += data[i + 1];
+        ringB += data[i + 2];
+        ringN++;
+      }
+    }
+  }
+  const shift = [0, 1, 2].map((c) => {
+    if (!ringN || !fillN) return 0;
+    const ring = [ringR, ringG, ringB][c] / ringN;
+    const fill = [fillR, fillG, fillB][c] / fillN;
+    return clampInt(Math.round(ring - fill), -24, 24);
+  });
+
+  // 只在遮罩内部平滑，保留用户标注意外的原始像素与边界过渡
+  const smooth = Buffer.from(data);
+  for (let y = y0; y <= y1; y++) {
+    for (let x = x0; x <= x1; x++) {
+      if (!target[y * W + x]) continue;
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      let n = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+          const ni = (ny * W + nx) * 4;
+          r += smooth[ni];
+          g += smooth[ni + 1];
+          b += smooth[ni + 2];
+          n++;
+        }
+      }
+      if (!n) continue;
+      const di = at(x, y);
+      data[di] = clampInt(Math.round(r / n + shift[0]), 0, 255);
+      data[di + 1] = clampInt(Math.round(g / n + shift[1]), 0, 255);
+      data[di + 2] = clampInt(Math.round(b / n + shift[2]), 0, 255);
+    }
+  }
+
+  return count;
 }
 
 /**
@@ -1495,28 +1840,64 @@ function outputSizeFor(
   return { w, h };
 }
 
-/** 源图 contain 适配进目标框 (不放大) */
-function fitInside(srcW: number, srcH: number, boxW: number, boxH: number): { w: number; h: number } {
-  const k = Math.min(boxW / srcW, boxH / srcH, 1);
+/** 源图 contain 适配进目标框 (默认不放大) */
+function fitInside(
+  srcW: number,
+  srcH: number,
+  boxW: number,
+  boxH: number,
+  allowUpscale = false,
+): { w: number; h: number } {
+  const k = Math.min(boxW / srcW, boxH / srcH, allowUpscale ? Number.POSITIVE_INFINITY : 1);
   return { w: Math.max(2, Math.round(srcW * k)), h: Math.max(2, Math.round(srcH * k)) };
 }
 
+/** 参考站抠图色板的语义键 → HEX。旧 bgColor 直接传 HEX 时也在这里兼容。 */
+const MATTING_COLOR_HEX: Record<string, string> = {
+  white: '#FFFFFF',
+  'light-blue': '#82CEF3',
+  blue: '#3988E9',
+  red: '#FF0B22',
+  'dark-red': '#A8001B',
+};
+
+type Backdrop =
+  | { kind: 'transparent'; alpha: 0 }
+  | { kind: 'solid'; color: number; alpha: number; hex: string };
+
 /**
- * 背景颜色参数 → Jimp int 色值或 'transparent'。
- * transparent=透明输出; custom 取 customColor (非法 HEX 回落白色);
- * 其余为参考站色板的 HEX (枚举值即 HEX)。
+ * 背景颜色参数 → 画布色值。
+ *
+ * selectedColor 是参考站字段，优先级高于旧 bgColor；两者都缺省时输出透明底。
+ * customAlpha 仅在自定义颜色时生效，0 直接视为透明（PNG），避免产出
+ * 一张“全透明但仍写成 JPEG”的坏图。
  */
-function resolveBackdropColor(params: Record<string, any>): number | 'transparent' {
-  const key = String(params.bgColor ?? 'transparent');
-  if (key === 'transparent') return 'transparent';
+function resolveBackdropColor(params: Record<string, any>): Backdrop {
+  const key = String(
+    wasProvided(params, 'selectedColor') ? params.selectedColor : params.bgColor ?? 'transparent',
+  );
+  if (key === 'transparent') return { kind: 'transparent', alpha: 0 };
+
+  let hex = MATTING_COLOR_HEX[key] ?? key;
+  let alpha = 255;
   if (key === 'custom') {
-    const m = /^#?([0-9a-f]{6})$/i.exec(String(params.customColor ?? '').trim());
-    if (!m) return 0xffffffff;
-    const n = parseInt(m[1], 16);
-    return rgbaToInt((n >> 16) & 255, (n >> 8) & 255, n & 255, 255);
+    hex = String(params.customColor || '#5546D8').trim();
+    const pct = clampNum(Number(params.customAlpha ?? 100), 0, 100);
+    alpha = Math.round((pct / 100) * 255);
   }
-  const rgb = hexToRgb(key);
-  return rgbaToInt(rgb.r, rgb.g, rgb.b, 255);
+  if (alpha <= 0) return { kind: 'transparent', alpha: 0 };
+
+  const m = /^#?([0-9a-f]{6})([0-9a-f]{2})?$/i.exec(hex.trim());
+  if (!m) return { kind: 'solid', color: 0xffffffff, alpha: 255, hex: '#FFFFFF' };
+  const n = parseInt(m[1], 16);
+  const embeddedAlpha = m[2] ? parseInt(m[2], 16) : 255;
+  alpha = Math.round((alpha * embeddedAlpha) / 255);
+  return {
+    kind: 'solid',
+    color: rgbaToInt((n >> 16) & 255, (n >> 8) & 255, n & 255, alpha),
+    alpha,
+    hex: `#${m[1].toUpperCase()}`,
+  };
 }
 
 function samplePixel(data: Buffer, x: number, y: number, width: number) {

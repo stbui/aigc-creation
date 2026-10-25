@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { App, Modal, Spin } from 'antd';
 import { ImagePlus, Maximize2, RefreshCw, X } from 'lucide-react';
 import { assetsApi, assetSrc, toAbsoluteUrl } from '../lib/api';
@@ -16,6 +16,8 @@ import { ToolSubmitBar } from './ToolSubmitBar';
 import { ToolEmptyState, ToolGeneratingState } from './ToolEmptyState';
 import { ResultMedia, formatDuration } from './ResultMedia';
 import { ProviderBadge } from './ProviderBadge';
+import { ImageCompare } from './ImageCompare';
+import { ImageLightbox } from './ImageLightbox';
 import { pollToResult } from '../lib/poll';
 import { taskErrorText } from '../lib/constants';
 import type { Asset, MobileUploadAsset, Modality, Task, TaskStatus } from '../types/api';
@@ -66,6 +68,21 @@ export interface ToolSettings {
   ratio: string;
   resolution: string;
 }
+
+/** 结果卡里的原图/结果图分割对比；不传时仍显示普通结果预览。 */
+export interface ToolResultCompare {
+  beforeUrl: string;
+  beforeLabel?: string;
+  afterLabel?: string;
+}
+
+/** 修图页共用历史栏的收起状态；由 ToolShell 持有，ToolHistoryPane 消费。 */
+export interface ToolTrailingControl {
+  collapsed: boolean;
+  toggle: () => void;
+}
+
+export const ToolTrailingContext = createContext<ToolTrailingControl | null>(null);
 
 interface UploadSpec {
   title: string;
@@ -125,8 +142,12 @@ interface Props {
   resultTag?: string;
   /** 提交: 输入按上传顺序给出, 设置含比例/画质 */
   onSubmit: (inputs: ToolAsset[], settings: ToolSettings) => Promise<void>;
+  /** 高级设置变化 (结果编辑器需要与比例保持同步时使用) */
+  onSettingsChange?: (settings: ToolSettings) => void;
   /** 结果操作区附加按钮 (如批量下载) */
   resultActions?: ReactNode;
+  /** 结果卡内嵌原图/结果对比 (局部重绘、去水印)；多图结果不启用 */
+  resultCompare?: ToolResultCompare;
   /**
    * 替换默认结果栏。商品 SKU 图需要与商品主图共用「全部生成图」网格，
    * 但左栏仍复用这里的上传/提交骨架，故由页面注入自己的结果面板。
@@ -195,7 +216,9 @@ export function ToolShell(props: Props) {
     result,
     resultTag,
     onSubmit,
+    onSettingsChange,
     resultActions,
+    resultCompare,
     resultPane,
     sourcePane,
     trailingPane,
@@ -206,7 +229,9 @@ export function ToolShell(props: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [images, setImages] = useState<ToolAsset[]>([]);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [trailingCollapsed, setTrailingCollapsed] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [ratio, setRatio] = useState(settings?.defaultRatio ?? 'original');
   const [resolution, setResolution] = useState('1k');
@@ -353,9 +378,22 @@ export function ToolShell(props: Props) {
 
   const results: ToolResult[] = result === null ? [] : Array.isArray(result) ? result : [result];
   const showResult = results.length > 0;
+  const lightboxItems = results
+    .filter((item) => item.status === 'succeeded' && item.url && item.modality !== 'video')
+    .map((item) => ({
+      id: item.url!,
+      url: item.url!,
+      width: item.width,
+      height: item.height,
+    }));
+  const lightboxIndex = lightboxUrl ? lightboxItems.findIndex((item) => item.url === lightboxUrl) : -1;
 
   return (
-    <div className={`pk-workspace${trailingPane ? ' pk-workspace-trailing' : ''}`}>
+    <div
+      className={`pk-workspace${trailingPane ? ' pk-workspace-trailing' : ''}${
+        trailingPane && trailingCollapsed ? ' pk-workspace-trailing-collapsed' : ''
+      }`}
+    >
       {/* ── 左: 输入栏 ── */}
       <aside className="pk-input-pane">
         <div className="pk-form-card">
@@ -495,9 +533,15 @@ export function ToolShell(props: Props) {
                   open={settingsOpen}
                   onToggle={() => setSettingsOpen((v) => !v)}
                   ratio={ratio}
-                  onRatioChange={setRatio}
+                  onRatioChange={(next) => {
+                    setRatio(next);
+                    onSettingsChange?.({ ratio: next, resolution });
+                  }}
                   resolution={resolution}
-                  onResolutionChange={setResolution}
+                  onResolutionChange={(next) => {
+                    setResolution(next);
+                    onSettingsChange?.({ ratio, resolution: next });
+                  }}
                   capabilityId={capability}
                   showRatio={Boolean(settings.ratio)}
                   showResolution={Boolean(settings.resolution)}
@@ -554,11 +598,25 @@ export function ToolShell(props: Props) {
                   r.status === 'succeeded' && r.url ? (
                     <div key={i} className="pk-result-card pk-result-card-detail">
                       <div className="pk-result-detail-media">
-                        <ResultMedia
-                          url={r.url}
-                          modality={r.modality}
-                          alt={`${title}结果 ${i + 1}`}
-                        />
+                        {resultCompare && results.length === 1 ? (
+                          <ImageCompare
+                            beforeUrl={resultCompare.beforeUrl}
+                            afterUrl={r.url}
+                            beforeLabel={resultCompare.beforeLabel}
+                            afterLabel={resultCompare.afterLabel}
+                          />
+                        ) : r.modality === 'video' ? (
+                          <ResultMedia url={r.url} modality={r.modality} alt={`${title}结果 ${i + 1}`} />
+                        ) : (
+                          <button
+                            type="button"
+                            className="pk-result-preview"
+                            aria-label={`预览${title}结果 ${i + 1}`}
+                            onClick={() => setLightboxUrl(r.url!)}
+                          >
+                            <ResultMedia url={r.url} modality={r.modality} alt={`${title}结果 ${i + 1}`} />
+                          </button>
+                        )}
                       </div>
                       <div className="pk-result-meta">
                         <span className="pk-result-variant">
@@ -593,7 +651,22 @@ export function ToolShell(props: Props) {
       )}
 
       {/* ── 右: 附加栏 (局部重绘历史记录; 其他页面不传则为空) ── */}
-      {trailingPane}
+      {trailingPane && (
+        <ToolTrailingContext.Provider
+          value={{ collapsed: trailingCollapsed, toggle: () => setTrailingCollapsed((value) => !value) }}
+        >
+          {trailingPane}
+        </ToolTrailingContext.Provider>
+      )}
+
+      {lightboxIndex >= 0 && (
+        <ImageLightbox
+          items={lightboxItems}
+          index={lightboxIndex}
+          onIndexChange={(index) => setLightboxUrl(lightboxItems[index]?.url ?? null)}
+          onClose={() => setLightboxUrl(null)}
+        />
+      )}
 
       {/* 素材库选择弹窗 (真实数据; 可选张数 = 剩余图片位) */}
       <AssetLibraryModal

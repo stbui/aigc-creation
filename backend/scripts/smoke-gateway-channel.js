@@ -1,6 +1,6 @@
 /**
  * 真实模型通道冒烟 —— 不依赖任何真实 API key, 用一个「契约一致的通道桩」验证:
- *   A. 配置通道后路由快照: 16 项能力全部 effective=gateway
+ *   A. 配置通道后路由快照: 注册表全部能力 effective=gateway
  *   B. 未配置网关: 自动回落本地算法(source=local), 产出仍是合法图片
  *   C. 网关故障(端口无人监听): 回落本地算法且不抛错
  *   D. 单能力强制本地: GATEWAY_ROUTE_<ID>=local 时即使通道可用也走本地
@@ -200,12 +200,16 @@ async function inputImage() {
   const router = loadRouter();
 
   const snapshot = router.routingSnapshot();
-  // 16 项能力 = 15 图像 + 1 视频 (图生视频于 2026-10-20 加入 registry)。
-  // routingSnapshot 按 CAPABILITIES 全量出表, 故视频也在其中。
-  assert(Object.keys(snapshot).length === 16, `路由快照覆盖 16 项能力 (实际 ${Object.keys(snapshot).length})`);
+  // routingSnapshot 按 CAPABILITIES 全量出表, 含图像与视频能力。
+  // 用注册表长度而不是写死数字，新增能力不会再让这条冒烟误报。
+  const expectedCapabilities = require(path.join(ROOT, 'dist/capabilities/capability.registry.js')).CAPABILITIES.length;
+  assert(
+    Object.keys(snapshot).length === expectedCapabilities,
+    `路由快照覆盖 ${expectedCapabilities} 项能力 (实际 ${Object.keys(snapshot).length})`,
+  );
   assert(
     Object.values(snapshot).every((v) => v.effective === 'gateway'),
-    '配置网关后 16 项能力 effective 均为 gateway',
+    `配置网关后 ${expectedCapabilities} 项能力 effective 均为 gateway`,
   );
 
   // ── D. 单能力强制本地 ───────────────────────────────────────
@@ -477,7 +481,7 @@ async function inputImage() {
   const registry = require(path.join(ROOT, 'dist/capabilities/capability.registry.js'));
   const ids = registry.CAPABILITIES.map((c) => c.id);
   const missing = ids.filter((id) => buildPromptFor(id, {}) === id);
-  assert(missing.length === 0, `15 项能力均有专属提示词 (缺: ${missing.join(',') || '无'})`);
+  assert(missing.length === 0, `${ids.length} 项能力均有专属提示词 (缺: ${missing.join(',') || '无'})`);
   assert(
     buildPromptFor('main_image', { productName: '循环扇', platform: 'taobao' }).includes('循环扇'),
     '主图提示词注入商品名与平台',

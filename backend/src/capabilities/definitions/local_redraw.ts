@@ -132,7 +132,25 @@ export const LocalRedraw: CapabilityPlugin = {
       default: 0.5,
       help: '参考站 strength=brushSize/60；当前图像通道暂未消费，仅按协议留存',
     },
+    {
+      key: 'outputCount',
+      label: '输出张数',
+      type: 'number',
+      default: 1,
+      min: 1,
+      max: 1,
+      step: 1,
+      hidden: true,
+      help: '参考站 createInpainting 固定单张输出；保留字段以兼容其请求契约',
+    },
     { key: 'ratio', label: '画面比例', type: 'enum', default: 'original', options: RATIOS_WITH_ORIGINAL },
+    {
+      key: 'imageRatio',
+      label: '画面比例（参考站字段）',
+      type: 'text',
+      hidden: true,
+      help: '参考站 createInpainting 仅在非原比例时提交；与 ratio 同义',
+    },
     { key: 'size', label: '画质（输出边长）', type: 'enum', default: '1k', options: QUALITY_OPTIONS },
   ],
   /*
@@ -151,9 +169,9 @@ export const LocalRedraw: CapabilityPlugin = {
       const requirements = annotations
         .map((item) => `${item.label}：${item.instruction}`)
         .join('；');
-      return `局部重绘：只重绘${area}，其余像素保持不变。修改要求：${requirements || '按描述局部修改'}${hintText}`;
+      return `局部重绘：只重绘${area}，其余像素保持不变。修改要求：${requirements || '按描述局部修改'}${hintText}${p.imageRatio ? `；输出比例 ${p.imageRatio}` : ''}`;
     }
-    return `局部重绘：只重绘${area}，其余像素保持不变。修改要求：${p.prompt || '按描述局部修改'}${hintText}`;
+    return `局部重绘：只重绘${area}，其余像素保持不变。修改要求：${p.prompt || '按描述局部修改'}${hintText}${p.imageRatio ? `；输出比例 ${p.imageRatio}` : ''}`;
   },
   /** 重绘没有本地实现; 没通道就 failed/42204 并退款, 不交付占位图 */
   localFallback: false,

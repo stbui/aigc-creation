@@ -5,6 +5,9 @@
 > 状态：待评审
 > 关联：`docs/agent-technical-design.md`（技术方案）、`CLAUDE.md`（项目技术栈事实源）
 
+> ⚠️ 2026-10-25 更新：当前能力已无 mock 档，文生文通道也已落地。
+> 本文的交互目标仍有效；技术边界与实施方式以 [`agent-integration-design.md`](agent-integration-design.md) 为准。
+
 ---
 
 ## 1. 背景与定位

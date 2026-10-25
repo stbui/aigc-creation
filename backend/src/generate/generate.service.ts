@@ -128,7 +128,8 @@ export class GenerateService implements OnModuleInit {
      * 不要求与原图同项目 —— 用户可能先在别的项目里传过同一张底图，
      * 强行要求同项目只会让人莫名其妙地传两遍。
      */
-    const maskAssetId = typeof dto.params?.maskAssetId === 'string' ? dto.params.maskAssetId.trim() : '';
+    const maskAssetIdRaw = dto.params?.modelGuideAssetId ?? dto.params?.maskAssetId;
+    const maskAssetId = typeof maskAssetIdRaw === 'string' ? maskAssetIdRaw.trim() : '';
     if (maskAssetId) {
       const maskAsset = await this.prisma.asset.findFirst({
         where: { id: maskAssetId, ownerId, kind: 'original' },

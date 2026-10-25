@@ -110,7 +110,7 @@ export class CapabilityRouterProvider implements ImageProvider {
           '该能力不交付本地产物, 但逐能力路由被配置为 local',
         );
       }
-      return this.runLocal(capability, inputPaths, params, route, startedAt, null);
+      return this.runLocal(capability, inputPaths, params, route, startedAt, null, false, maskPath);
     }
 
     /*
@@ -174,7 +174,7 @@ export class CapabilityRouterProvider implements ImageProvider {
        * 调度器自身抛错（而非逐条通道失败）时，遮罩判定同样要排在前面，
        * 理由与下面 !dispatch.ok 分支一致：别把「协议收不了遮罩」报成「没通道」。
        */
-      if (maskPath && maskCapableChannels === 0) {
+      if (maskPath && maskCapableChannels === 0 && !allowLocal) {
         this.log.warn(`${capability}: 全部通道的协议都不支持遮罩重绘 — ${reason}`);
         return this.failWithoutChannel(capability, params, route, startedAt, reason, '42205');
       }
@@ -184,7 +184,7 @@ export class CapabilityRouterProvider implements ImageProvider {
       }
       this.log.warn(`${capability}: 真实模型通道失败, 回落本地算法 — ${reason}`);
       // 远程失败后走本地, 这才是「回落」; 失败原因落进调用记录供排障
-      return this.runLocal(capability, inputPaths, params, route, startedAt, reason, true);
+      return this.runLocal(capability, inputPaths, params, route, startedAt, reason, true, maskPath);
     }
 
     if (!dispatch.ok || !dispatch.value) {
@@ -210,7 +210,7 @@ export class CapabilityRouterProvider implements ImageProvider {
        * 「需要遮罩」，先判 42204 会让运营以为「没配通道」，实际是配了通道
        * 但协议不对 —— 两种问题的处置完全不同（加线路 vs 换成 openai 协议）。
        */
-      if (maskPath && maskCapableChannels === 0) {
+      if (maskPath && maskCapableChannels === 0 && !allowLocal) {
         this.log.warn(`${capability}: 全部通道的协议都不支持遮罩重绘 — ${reason}`);
         return this.failWithoutChannel(
           capability, params, route, startedAt,
@@ -229,7 +229,7 @@ export class CapabilityRouterProvider implements ImageProvider {
 
       const fallback = dispatch.attempts.length > 0;
       this.log.warn(`${capability}: 无可用真实模型通道, 回落本地算法 — ${reason}`);
-      return this.runLocal(capability, inputPaths, params, route, startedAt, reason, fallback);
+      return this.runLocal(capability, inputPaths, params, route, startedAt, reason, fallback, maskPath);
     }
 
     const r = dispatch.value;
@@ -329,10 +329,16 @@ export class CapabilityRouterProvider implements ImageProvider {
     startedAt: number,
     reason: string | null,
     fallback = false,
+    maskPath?: string,
   ): Promise<ImageProviderResult> {
     const prompt = buildPromptFor(capability, params);
     try {
-      const r = await this.local.generate(capability, inputPaths, params);
+      /*
+       * 遮罩也要传给本地实现。此前只有远程 provider 接收 maskPath，手动去水印
+       * 在“强制本地/远端故障回落”时会静默退化成角落框修补，用户白标了一遍。
+       * 不交付本地产物的能力（如局部重绘）已在调用方被拦住，不会走到这里。
+       */
+      const r = await this.local.generate(capability, inputPaths, params, maskPath);
       await this.callLogger.logSuccess({
         capability,
         params,

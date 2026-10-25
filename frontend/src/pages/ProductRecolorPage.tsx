@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useToolTask } from '../hooks/useToolTask';
 import { ToolShell } from '../components/ToolShell';
-import { BG_COLOR_SWATCHES, ColorSwatchGrid, CustomColorInput, ToolCard } from '../components/ToolWidgets';
+import { ToolCard } from '../components/ToolWidgets';
+import { ColorStudio, RECOLOR_COLOR_SWATCHES } from '../components/ColorStudio';
+import { ToolHistoryPane } from '../components/ToolHistoryPane';
 
 /**
  * 商品换色 —— 1:1 复刻参考站 https://ijihua.cn/product-recolor。
@@ -32,7 +34,9 @@ export function ProductRecolorPage() {
   const { submitting, result, run } = useToolTask({ capability: 'recolor', successMessage: '换色结果已生成' });
 
   const [color, setColor] = useState('#FFFFFF');
-  const [customColor, setCustomColor] = useState('#8064F6');
+  const [customColor, setCustomColor] = useState('#5546D8');
+  const [sourceUrl, setSourceUrl] = useState('');
+  const targetColor = color === 'custom' ? customColor : color;
 
   return (
     <ToolShell
@@ -47,21 +51,37 @@ export function ProductRecolorPage() {
       formValid
       submitting={submitting}
       result={result}
-      resultTag={COLOR_LABEL[color] ?? color}
-      onSubmit={(inputs, settings) =>
-        run(inputs, { color, customColor: customColor.trim(), ratio: settings.ratio, size: settings.resolution })
+      resultTag={COLOR_LABEL[color] ?? targetColor}
+      resultCompare={
+        result?.status === 'succeeded' && result.url && sourceUrl
+          ? { beforeUrl: sourceUrl, beforeLabel: '原图', afterLabel: '换色后' }
+          : undefined
+      }
+      onSubmit={(inputs, settings) => {
+        setSourceUrl(inputs[0]?.url ?? '');
+        return run(inputs, {
+          targetColor: targetColor.trim(),
+          customColor: customColor.trim(),
+          ratio: settings.ratio,
+          size: settings.resolution,
+        });
+      }}
+      trailingPane={
+        <ToolHistoryPane capability="recolor" refreshKey={result?.url} emptyText="暂无换色记录" />
       }
     >
       <ToolCard title="商品颜色">
-        <ColorSwatchGrid
-          options={BG_COLOR_SWATCHES.slice(1)}
+        <ColorStudio
+          options={RECOLOR_COLOR_SWATCHES}
           value={color}
           onChange={setColor}
-          onCustom={() => setColor('custom')}
-          customActive={color === 'custom'}
+          customColor={customColor}
+          onCustomColor={setCustomColor}
+          allowAlpha={false}
+          clearLabel="无填充"
+          onClear={() => setColor('#FFFFFF')}
           ariaLabel="商品颜色"
         />
-        {color === 'custom' && <CustomColorInput value={customColor} onChange={setCustomColor} label="自定义颜色（HEX）" />}
         <p className="tool-card-copy">本地算法：估计商品主体色后按明度比例替换，高光与阴影层次保留。</p>
       </ToolCard>
     </ToolShell>

@@ -41,9 +41,30 @@ export const RemoveWatermark: CapabilityPlugin = {
       { value: 'top_left', label: '左上角' },
       { value: 'center', label: '画面中央' },
     ] },
+    /*
+     * 2026-10-25 对齐参考站 createWatermarkRemoval：
+     * 手动涂抹/框选生成的 PNG 以素材 id 提交。遮罩语义与局部重绘一致：
+     * 透明像素 = 要去除的区域。声明为 hidden，避免通用工具页要求用户手填 UUID。
+     */
+    { key: 'maskAssetId', label: '遮罩素材', type: 'text', hidden: true },
+    { key: 'detectionMode', label: '检测方式', type: 'enum', default: 'MANUAL', options: [
+      { value: 'MANUAL', label: '手动标注' },
+      { value: 'AUTO', label: '自动识别' },
+    ], hidden: true },
+    {
+      key: 'outputFormat',
+      label: '输出格式（参考站字段）',
+      type: 'enum',
+      default: 'PNG',
+      options: [
+        { value: 'PNG', label: 'PNG' },
+        { value: 'JPEG', label: 'JPEG' },
+      ],
+      hidden: true,
+    },
   ],
   buildPrompt: (p) =>
-    `去除图片水印：${p.mode === 'auto' ? '自动识别并清除水印区域' : `清除${p.region || '指定区域'}的水印/遮挡文字`}，` +
+    `去除图片水印：${p.maskAssetId ? '清除遮罩圈定的水印区域' : p.mode === 'auto' ? '自动识别并清除水印区域' : `清除${p.region || '指定区域'}的水印/遮挡文字`}，` +
     `修补处与周围质感一致，不留痕迹`,
   localImpl: 'makeRemoveWatermark',
   modality: 'image',

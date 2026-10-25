@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { App } from 'antd';
 import { RotateCcw } from 'lucide-react';
 import { useToolTask } from '../hooks/useToolTask';
 import { ToolShell } from '../components/ToolShell';
 import { RangeRow, ToolCard } from '../components/ToolWidgets';
+import { ToolHistoryPane } from '../components/ToolHistoryPane';
 
 /**
  * 旋转角度 —— 1:1 复刻参考站 https://ijihua.cn/rotate-angle。
@@ -28,7 +29,18 @@ import { RangeRow, ToolCard } from '../components/ToolWidgets';
  * 2D 近似 (真实 3D 重建需 AI 模型, 页面与结果图均有标注)。
  */
 
-const ARROW_STEP = 15;
+/** 参考站方向键每次 ±5°; 预览拖拽按水平 0.7 / 垂直 0.45 的灵敏度换算。 */
+const ARROW_STEP = 5;
+const DRAG_YAW_FACTOR = 0.7;
+const DRAG_PITCH_FACTOR = 0.45;
+
+interface DragOrigin {
+  pointerId: number;
+  x: number;
+  y: number;
+  yaw: number;
+  pitch: number;
+}
 
 export function RotateAnglePage() {
   const { message } = App.useApp();
@@ -38,6 +50,9 @@ export function RotateAnglePage() {
   const [yaw, setYaw] = useState(0);
   const [pitch, setPitch] = useState(0);
   const [zoom, setZoom] = useState(1);
+  const [dragging, setDragging] = useState(false);
+  const [sourceUrl, setSourceUrl] = useState('');
+  const dragOrigin = useRef<DragOrigin | null>(null);
 
   const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
@@ -56,6 +71,38 @@ export function RotateAnglePage() {
     if (dir === 'down') setPitch((v) => clamp(v - ARROW_STEP, -30, 60));
   };
 
+  const startPreviewDrag = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.button !== 0) return;
+    // 预览里的方向键/按钮各自处理点击，不应触发整块预览拖拽。
+    if ((e.target as HTMLElement).closest('button')) return;
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragOrigin.current = {
+      pointerId: e.pointerId,
+      x: e.clientX,
+      y: e.clientY,
+      yaw,
+      pitch,
+    };
+    setDragging(true);
+  };
+
+  const movePreviewDrag = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const origin = dragOrigin.current;
+    if (!origin || origin.pointerId !== e.pointerId) return;
+    setYaw(Math.round(clamp(origin.yaw + (e.clientX - origin.x) * DRAG_YAW_FACTOR, -90, 90)));
+    setPitch(Math.round(clamp(origin.pitch - (e.clientY - origin.y) * DRAG_PITCH_FACTOR, -30, 60)));
+  };
+
+  const endPreviewDrag = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (dragOrigin.current?.pointerId !== e.pointerId) return;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+    dragOrigin.current = null;
+    setDragging(false);
+  };
+
   return (
     <ToolShell
       capability="rotate"
@@ -70,10 +117,42 @@ export function RotateAnglePage() {
       submitting={submitting}
       result={result}
       resultTag={`旋转 ${yaw} · 倾斜 ${pitch} · 缩放 ${zoom.toFixed(2)}`}
-      onSubmit={(inputs, settings) =>
-        run(inputs, { yaw, pitch, zoom, ratio: settings.ratio, size: settings.resolution })
+      resultCompare={
+        result?.status === 'succeeded' && result.url && sourceUrl
+          ? { beforeUrl: sourceUrl, beforeLabel: '原图', afterLabel: '旋转后' }
+          : undefined
+      }
+      onSubmit={(inputs, settings) => {
+        setSourceUrl(inputs[0]?.url ?? '');
+        return run(inputs, {
+          // 参考站主体模式使用相机坐标系，方位角与 UI 滑杆方向相反。
+          azimuthDeg: tab === 'subject' ? -yaw : yaw,
+          elevationDeg: pitch,
+          zoomFactor: zoom,
+          yaw,
+          pitch,
+          zoom,
+          ...(settings.ratio !== 'original' ? { imageRatio: settings.ratio } : {}),
+          ratio: settings.ratio,
+          size: settings.resolution,
+        });
+      }}
+      trailingPane={
+        <ToolHistoryPane capability="rotate" refreshKey={result?.url} emptyText="暂无旋转记录" />
       }
     >
+      {(images) => {
+        const previewImage = images[0]?.url;
+        // 摄像头模式按参考站的球面投影公式定位指针与相机，而不是把滑杆值直接当角度。
+        const yawRad = (yaw * Math.PI) / 180;
+        const pitchRatio = pitch >= 0 ? -pitch / 60 : -pitch / 30;
+        const horizontal = Math.sqrt(Math.max(0, 1 - pitchRatio * pitchRatio));
+        const orbitX = Math.sin(yawRad) * horizontal;
+        const orbitY = pitchRatio;
+        const orbitZ = Math.cos(yawRad) * horizontal;
+        const needleX = orbitX * 66;
+        const needleY = orbitY * 66;
+        return (
       <section className="local-redraw-card rotate-angle-settings">
         <div className="rotate-angle-settings-head">
           <h2>旋转角度</h2>
@@ -103,14 +182,27 @@ export function RotateAnglePage() {
           </button>
         </div>
 
-        {tab === 'subject' ? (
-          <div className="rotate-angle-preview">
+        <div
+          className={`rotate-angle-preview${dragging ? ' dragging' : ''}`}
+          onPointerDown={startPreviewDrag}
+          onPointerMove={movePreviewDrag}
+          onPointerUp={endPreviewDrag}
+          onPointerCancel={endPreviewDrag}
+          title="拖拽预览可调整旋转与倾斜"
+        >
+          {tab === 'subject' ? (
             <div className="rotate-angle-subject-stage">
               <div
                 className="rotate-angle-cube"
-                style={{ transform: `rotateX(${-pitch}deg) rotateY(${yaw}deg)` }}
+                style={{ transform: `rotateX(${-pitch * 0.6}deg) rotateY(${yaw}deg)` }}
               >
-                <span className="rotate-angle-cube-face front">前</span>
+                <span className="rotate-angle-cube-face front">
+                  {previewImage ? (
+                    <img src={previewImage} alt="" style={{ transform: `scale(${zoom})` }} draggable={false} />
+                  ) : (
+                    '前'
+                  )}
+                </span>
                 <span className="rotate-angle-cube-face back">后</span>
                 <span className="rotate-angle-cube-face left">左</span>
                 <span className="rotate-angle-cube-face right">右</span>
@@ -118,33 +210,54 @@ export function RotateAnglePage() {
                 <span className="rotate-angle-cube-face bottom">下</span>
               </div>
             </div>
-          </div>
-        ) : (
-          <div className="rotate-angle-preview">
+          ) : (
             <div className="rotate-angle-camera-stage">
               <div className="rotate-angle-orbit">
-                <div className="rotate-angle-wire" style={{ transform: `rotateX(${-pitch * 0.6}deg) rotateY(${yaw * 0.6}deg)` }}>
+                <div className="rotate-angle-wire" style={{ transform: `rotateX(${pitch * 0.38}deg) rotateY(${yaw * 0.22}deg) rotateZ(${-yaw * 0.12}deg)` }}>
                   {Array.from({ length: 12 }, (_, i) => (
                     <i key={i} style={{ ['--line-angle' as string]: `${i * 15}deg` }} />
                   ))}
                 </div>
               </div>
-              <div className="rotate-angle-needle" style={{ width: `${(yaw + 90) / 180 * 100}%`, transform: `rotate(${pitch}deg)` }} />
-              <button type="button" className="orbit-arrow left" aria-label="向左旋转" title="向左旋转" onClick={() => nudge('left')}>
+              <div
+                className="rotate-angle-needle"
+                style={{
+                  width: `${Math.hypot(needleX, needleY)}px`,
+                  transform: `rotate(${(Math.atan2(needleY, needleX) * 180) / Math.PI}deg)`,
+                }}
+              />
+              {previewImage && (
+                <div
+                  className="rotate-angle-orbit-subject"
+                  style={{ transform: `translate(-50%, -50%) scale(${zoom})` }}
+                >
+                  <img src={previewImage} alt="" draggable={false} />
+                </div>
+              )}
+              <div
+                className="rotate-angle-camera"
+                style={{
+                  transform: `translate(-50%, -50%) translate(${needleX}px, ${needleY}px) rotate(${yaw * 0.7}deg) scale(${0.82 + Math.max(0, orbitZ) * 0.18})`,
+                }}
+              >
+                <span className="rotate-angle-camera-body"><i /></span>
+              </div>
+              <button type="button" className="orbit-arrow left" aria-label="向左旋转" title="向左旋转" onPointerDown={(e) => e.stopPropagation()} onClick={() => nudge('left')}>
                 ‹
               </button>
-              <button type="button" className="orbit-arrow right" aria-label="向右旋转" title="向右旋转" onClick={() => nudge('right')}>
+              <button type="button" className="orbit-arrow right" aria-label="向右旋转" title="向右旋转" onPointerDown={(e) => e.stopPropagation()} onClick={() => nudge('right')}>
                 ›
               </button>
-              <button type="button" className="orbit-arrow up" aria-label="向上倾斜" title="向上倾斜" onClick={() => nudge('up')}>
+              <button type="button" className="orbit-arrow up" aria-label="向上倾斜" title="向上倾斜" onPointerDown={(e) => e.stopPropagation()} onClick={() => nudge('up')}>
                 ⌃
               </button>
-              <button type="button" className="orbit-arrow down" aria-label="向下倾斜" title="向下倾斜" onClick={() => nudge('down')}>
+              <button type="button" className="orbit-arrow down" aria-label="向下倾斜" title="向下倾斜" onPointerDown={(e) => e.stopPropagation()} onClick={() => nudge('down')}>
                 ⌄
               </button>
             </div>
-          </div>
-        )}
+          )}
+
+        </div>
 
         <RangeRow label="旋转" min={-90} max={90} step={1} value={yaw} onChange={setYaw} />
         <RangeRow label="倾斜" min={-30} max={60} step={1} value={pitch} onChange={setPitch} />
@@ -153,6 +266,8 @@ export function RotateAnglePage() {
         <p className="tool-card-copy">相机保持静止，生成时按主体旋转角度重建商品展示。</p>
         <p className="tool-card-copy">本地为 2D 近似（平面旋转 + 逐行剪切 + 缩放），非 3D 重建。</p>
       </section>
+        );
+      }}
     </ToolShell>
   );
 }

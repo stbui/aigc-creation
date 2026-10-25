@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { App, Drawer, Modal, Spin } from 'antd';
+import { App, Drawer, Spin } from 'antd';
 import { ChevronUp, Circle, Eraser, Hand, History, ImagePlus, Maximize2, Minus, Paintbrush, Plus, Redo2, RotateCcw, Square, Undo2, X } from 'lucide-react';
 import { useToolTask } from '../hooks/useToolTask';
 import { useProject } from '../hooks/useProject';
@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { assetsApi, assetSrc, generateApi } from '../lib/api';
 import { ExpandTextModal, ToolShell, type ToolAsset } from '../components/ToolShell';
 import { ToolCard } from '../components/ToolWidgets';
+import { StateError } from '../components/StateViews';
 import { LocalRedrawIllustration } from '../components/illustrations';
 
 /**
@@ -84,13 +85,34 @@ type RedrawHistoryTask = Awaited<ReturnType<typeof generateApi.list>>[number];
  * 加载中必须与「没有记录」分开: 首次进入时 `history` 还是空数组,
  * 直接显示「暂无记录」会在网络返回前给用户一个错误结论。
  */
-function RedrawHistoryList({ tasks, loading }: { tasks: RedrawHistoryTask[]; loading: boolean }) {
+function RedrawHistoryList({
+  tasks,
+  loading,
+  error,
+  onRetry,
+}: {
+  tasks: RedrawHistoryTask[];
+  loading: boolean;
+  error: string | null;
+  onRetry: () => void;
+}) {
   if (loading) {
     return (
       <div className="redraw-history-loading" aria-live="polite">
         <Spin size="small" />
         <span>加载中…</span>
       </div>
+    );
+  }
+  if (error) {
+    return (
+      <StateError
+        compact
+        title="历史记录加载失败"
+        desc="已有任务不会受影响，可稍后重试。"
+        detail={error}
+        onRetry={onRetry}
+      />
     );
   }
   if (tasks.length === 0) {
@@ -578,16 +600,25 @@ export function LocalRedrawPage() {
    */
   const [referenceUploading, setReferenceUploading] = useState<Set<number>>(() => new Set());
   const uploadBusy = referenceUploading.size > 0;
-  /** 对比弹窗与历史抽屉 */
-  const [compareOpen, setCompareOpen] = useState(false);
+  /** 历史抽屉 */
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<Awaited<ReturnType<typeof generateApi.list>>>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyReload, setHistoryReload] = useState(0);
   /** 桌面右栏折叠; 窄屏本来就不显示右栏, 改用浮动按钮打开抽屉 */
   const [historyCollapsed, setHistoryCollapsed] = useState(false);
   const [sourceImage, setSourceImage] = useState<ToolAsset | null>(null);
   const painter = useRef<MaskPainterHandle | null>(null);
   const referenceInputs = useRef<Record<number, HTMLInputElement | null>>({});
+  /*
+   * 提交后结果态会卸载标注画布，painter 也随之清空。「重新生成」必须复用
+   * 上一次的遮罩快照，否则会误报「请先标注」；同一张源图且遮罩未改时也
+   * 复用已上传的素材，避免每次重试都新传一份 PNG。
+   */
+  const maskBlobRef = useRef<Blob | null>(null);
+  const maskAssetIdRef = useRef<string | null>(null);
+  const maskSourceIdRef = useRef<string | null>(null);
   const { token } = useAuth();
 
   const setPromptAt = (index: number, value: string) =>
@@ -620,6 +651,7 @@ export function LocalRedrawPage() {
     }
     let cancelled = false;
     setHistoryLoading(true);
+    setHistoryError(null);
     void generateApi
       .list()
       .then((items) => {
@@ -631,8 +663,11 @@ export function LocalRedrawPage() {
             .slice(0, 20),
         );
       })
-      .catch(() => {
-        if (!cancelled) setHistory([]);
+      .catch((e) => {
+        if (!cancelled) {
+          setHistory([]);
+          setHistoryError((e as Error).message || '历史记录加载失败');
+        }
       })
       .finally(() => {
         if (!cancelled) setHistoryLoading(false);
@@ -640,7 +675,7 @@ export function LocalRedrawPage() {
     return () => {
       cancelled = true;
     };
-  }, [token, result]);
+  }, [token, result, historyReload]);
 
   const historyPane = (
     <aside className="redraw-history-pane" aria-label="局部重绘历史记录">
@@ -657,7 +692,12 @@ export function LocalRedrawPage() {
         </button>
       </div>
       <div className="redraw-history-scroll">
-        <RedrawHistoryList tasks={history} loading={historyLoading} />
+        <RedrawHistoryList
+          tasks={history}
+          loading={historyLoading}
+          error={historyError}
+          onRetry={() => setHistoryReload((value) => value + 1)}
+        />
       </div>
     </aside>
   );
@@ -726,19 +766,32 @@ export function LocalRedrawPage() {
       return;
     }
     setSourceImage(inputs[0] ?? null);
+    const sourceId = inputs[0]?.id ?? null;
+    if (maskSourceIdRef.current !== sourceId) {
+      maskBlobRef.current = null;
+      maskAssetIdRef.current = null;
+      maskSourceIdRef.current = sourceId;
+    }
     let maskAssetId: string | undefined;
     try {
       setPreparing(true);
-      const blob = await painter.current?.toBlob();
-      if (blob) {
-        const projectId = await ensureProject();
-        const file = new File([blob], `mask-${Date.now()}.png`, { type: 'image/png' });
-        const asset = await assetsApi.upload(file, projectId);
-        maskAssetId = asset.id;
-      } else {
+      const freshBlob = await painter.current?.toBlob();
+      const blob = freshBlob ?? maskBlobRef.current;
+      if (!blob) {
         message.warning('请先在图片上标注需要重绘的区域');
         return;
       }
+      if (freshBlob) {
+        maskBlobRef.current = freshBlob;
+        maskAssetIdRef.current = null;
+      }
+      if (!maskAssetIdRef.current) {
+        const projectId = await ensureProject();
+        const file = new File([blob], `mask-${Date.now()}.png`, { type: 'image/png' });
+        const asset = await assetsApi.upload(file, projectId);
+        maskAssetIdRef.current = asset.id;
+      }
+      maskAssetId = maskAssetIdRef.current;
     } catch (e) {
       message.error((e as Error).message || '遮罩上传失败，请重试');
       return;
@@ -764,7 +817,9 @@ export function LocalRedrawPage() {
       strength: Math.min(1, Math.max(0, brush / 60)),
       ratio: settings.ratio,
       size: settings.resolution,
+      ...(settings.ratio !== 'original' ? { imageRatio: settings.ratio } : {}),
       ...(maskAssetId ? { maskAssetId } : {}),
+      outputCount: 1,
     });
   };
 
@@ -784,17 +839,17 @@ export function LocalRedrawPage() {
       settings={{ ratio: true, resolution: true }}
       submitLabel="开始重绘"
       emptyDesc="上传图片并标注区域、写下描述后，重绘结果将在此处展示"
-      formValid={painted && filledCount > 0 && !uploadBusy}
-      submitting={submitting || preparing || uploadBusy}
+      formValid={painted && filledCount > 0 && !uploadBusy && !preparing}
+      /*
+       * uploadBusy 只通过 formValid 禁用提交，不能并入 submitting：ToolShell 在
+       * submitting 时会用生成态替换 sourcePane，画布会被卸载，参考图上传完成
+       * 后重建并清空刚画好的遮罩。遮罩上传也只通过 formValid 阻止重复提交，
+       * 不切换生成态 —— 上传失败时用户仍保留画布上的笔迹，可直接重试。
+       */
+      submitting={submitting}
       result={result}
       resultTag={painted ? '已标注区域' : undefined}
-      resultActions={
-        resultUrl && sourceImage ? (
-          <button type="button" className="tool-result-action" onClick={() => setCompareOpen(true)}>
-            对比
-          </button>
-        ) : null
-      }
+      resultCompare={resultUrl && sourceImage ? { beforeUrl: sourceImage.url, beforeLabel: '原图', afterLabel: '重绘后' } : undefined}
       onSubmit={(inputs, settings) => submit(inputs, settings)}
       trailingPane={historyCollapsed ? undefined : historyPane}
       sourcePane={(images) => {
@@ -841,15 +896,6 @@ export function LocalRedrawPage() {
               <div className="redraw-toolbar" role="toolbar" aria-label="重绘工具">
                 {renderToolButton('hand')}
                 {renderToolButton('eraser')}
-                <button
-                  type="button"
-                  className="redraw-tool-btn"
-                  disabled={!resultUrl || !sourceImage}
-                  title="对比原图与重绘结果"
-                  onClick={() => setCompareOpen(true)}
-                >
-                  对比
-                </button>
                 <span className="redraw-tool-divider" />
                 {renderToolButton('rect')}
                 {renderToolButton('ellipse')}
@@ -1062,27 +1108,14 @@ export function LocalRedrawPage() {
         size={320}
         styles={{ body: { padding: 12 } }}
       >
-        <RedrawHistoryList tasks={history} loading={historyLoading} />
+        <RedrawHistoryList
+          tasks={history}
+          loading={historyLoading}
+          error={historyError}
+          onRetry={() => setHistoryReload((value) => value + 1)}
+        />
       </Drawer>
 
-      <Modal
-        open={compareOpen}
-        title="对比原图与重绘结果"
-        footer={null}
-        onCancel={() => setCompareOpen(false)}
-        width={900}
-      >
-        <div className="redraw-compare-grid">
-          <figure>
-            <img src={sourceImage?.url} alt="原图" />
-            <figcaption>原图</figcaption>
-          </figure>
-          <figure>
-            {resultUrl ? <img src={resultUrl} alt="重绘后" /> : <div className="redraw-compare-missing">暂无结果</div>}
-            <figcaption>重绘后</figcaption>
-          </figure>
-        </div>
-      </Modal>
     </div>
   );
 }

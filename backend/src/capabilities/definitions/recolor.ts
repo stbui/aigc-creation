@@ -29,9 +29,17 @@ export const Recolor: CapabilityPlugin = {
     },
     { key: 'ratio', label: '画面比例', type: 'enum', default: 'original', options: RATIOS_WITH_ORIGINAL },
     { key: 'size', label: '画质（输出边长）', type: 'enum', default: '1k', options: QUALITY_OPTIONS },
+    /** 参考站 createTemplateImageTool 直接提交解析后的 HEX；旧 color/customColor 继续兼容。 */
+    {
+      key: 'targetColor',
+      label: '目标颜色（HEX）',
+      type: 'text',
+      placeholder: '#RRGGBB',
+      hidden: true,
+    },
   ],
   buildPrompt: (p) =>
-    `商品换色：只改变商品主体颜色为 ${p.color || '#FFFFFF'}，保持材质、光影与结构不变`,
+    `商品换色：只改变商品主体颜色为 ${p.targetColor || p.color || '#FFFFFF'}，保持材质、光影与结构不变`,
   localImpl: 'makeRecolor',
   modality: 'image',
   inputs: 1,

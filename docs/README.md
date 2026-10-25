@@ -16,7 +16,7 @@
 | [`prd.md`](prd.md) | 整站产品需求（含 C 端） | 历史快照（2026-10-19）；能力数量与「未实现」结论已被 B0–B8 取代 |
 | [`admin-prd.md`](admin-prd.md) | 后台管理系统需求 | 历史快照（2026-10-19）；后台已按 B1–B8 落地 |
 | [`gap-analysis.md`](gap-analysis.md) | 功能缺口全量审计（GAP-xx） | 取证索引；缺口已由 B0–B8 补齐，当前实现见 `CLAUDE.md`，已知红灯见 `testing.md` 第 5 节 |
-| [`agent-prd.md`](agent-prd.md) | AI 智能体产品需求 | 规划中，**明确不在本轮交付范围** |
+| [`agent-prd.md`](agent-prd.md) | AI 智能体产品需求 | 规划中，**明确不在本轮交付范围**；集成边界见 `agent-integration-design.md` |
 
 ## 2. 产品文档（Product）
 
@@ -82,7 +82,8 @@
 
 | 文档 | 内容 | 状态 |
 | --- | --- | --- |
-| [`agent-technical-design.md`](agent-technical-design.md) | AI 智能体技术方案 | 规划中，未实施 |
+| [`agent-integration-design.md`](agent-integration-design.md) | AI 智能体集成方案 v2：Agent 与现有页面双入口，覆盖全部生成能力；复用 TEXT_PROVIDER / registry / GenerateService，含 API、SSE、数据模型、安全与实施批次 | **现行方案，未实施** |
+| [`agent-technical-design.md`](agent-technical-design.md) | AI 智能体技术方案 v1.0 | 历史方案；LLM 通道与能力数量前提已过期，被 v2 取代 |
 
 ## 7. 变更记录在哪
 

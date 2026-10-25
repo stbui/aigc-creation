@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useToolTask } from '../hooks/useToolTask';
 import { ToolShell } from '../components/ToolShell';
 import { ToolCard, ToolSwitch } from '../components/ToolWidgets';
+import { ToolHistoryPane } from '../components/ToolHistoryPane';
 import { languageOptions } from '../lib/optionSets';
 
 /**
@@ -27,6 +28,7 @@ export function ImageTranslatePage() {
 
   const [targetLang, setTargetLang] = useState('zh-CN');
   const [protect, setProtect] = useState(true);
+  const [sourceUrl, setSourceUrl] = useState('');
 
   return (
     <ToolShell
@@ -42,8 +44,22 @@ export function ImageTranslatePage() {
       submitting={submitting}
       result={result}
       resultTag={languageOptions().find((l) => l.value === targetLang)?.label}
-      onSubmit={(inputs, settings) =>
-        run(inputs, { targetLang, protectSubject: protect, size: settings.resolution })
+      resultCompare={
+        result?.status === 'succeeded' && result.url && sourceUrl
+          ? { beforeUrl: sourceUrl, beforeLabel: '原图', afterLabel: '翻译后' }
+          : undefined
+      }
+      onSubmit={(inputs, settings) => {
+        setSourceUrl(inputs[0]?.url ?? '');
+        return run(inputs, {
+          targetLang,
+          targetLanguage: targetLang,
+          protectSubject: protect,
+          size: settings.resolution,
+        });
+      }}
+      trailingPane={
+        <ToolHistoryPane capability="image_translate" refreshKey={result?.url} emptyText="暂无翻译记录" />
       }
     >
       <ToolCard title="翻译语言">

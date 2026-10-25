@@ -139,6 +139,13 @@ export function sanitizeParams(id: string, params: Record<string, any> | undefin
   for (const p of def.params) {
     const raw = input[p.key];
     if (raw === undefined || raw === null || raw === '') {
+      /*
+       * hidden 参数是页面/接口显式代填的技术字段（参考站别名、遮罩 id、
+       * 精确定位等），不是用户表单项。未提交时必须保持“未提供”，不能补
+       * 默认值 —— 否则新别名的默认值会覆盖旧字段，例如旧调用方只传
+       * bgColor 时，本地实现会误以为用户选了 selectedColor=transparent。
+       */
+      if (p.hidden) continue;
       out[p.key] = defaultParamsFor(id)[p.key];
       continue;
     }

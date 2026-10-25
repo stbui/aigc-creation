@@ -121,6 +121,27 @@ test.describe('状态契约 · 加载失败必须呈现失败态', () => {
     await expect(err.locator('button.state-btn.is-primary')).toContainText('重试');
     await expect(page.getByText('还没有订单')).toHaveCount(0);
   });
+
+  test('工具历史: /tasks 500 → 失败态 + 重试, 不得显示「暂无抠图记录」', async ({ page, request }) => {
+    const { token, email } = await fetchToken(request);
+    let calls = 0;
+    await page.route(/\/api\/v1\/tasks(?:\?.*)?$/, (route) => {
+      calls += 1;
+      return route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 50000, message: '注入的历史加载失败', data: null }),
+      });
+    });
+    await gotoAsAuthed(page, '/background-remove', token, email);
+
+    const pane = page.locator('.redraw-history-pane');
+    await expect(pane.locator('.state-error')).toBeVisible({ timeout: 10000 });
+    await expect(pane.getByText('暂无抠图记录')).toHaveCount(0);
+    await pane.locator('button.state-btn.is-primary').click();
+    await expect.poll(() => calls).toBeGreaterThanOrEqual(2);
+    await expect(pane.locator('.state-error')).toBeVisible();
+  });
 });
 
 test.describe('状态契约 · 加载中必须有指示', () => {

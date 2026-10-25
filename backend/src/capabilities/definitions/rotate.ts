@@ -24,10 +24,17 @@ export const Rotate: CapabilityPlugin = {
     { key: 'zoom', label: '缩放', type: 'number', default: 1, min: 0.8, max: 1.2, step: 0.01 },
     { key: 'ratio', label: '画面比例', type: 'enum', default: 'original', options: RATIOS_WITH_ORIGINAL },
     { key: 'size', label: '画质（输出边长）', type: 'enum', default: '1k', options: QUALITY_OPTIONS },
+    /* 参考站 VIEW_ROTATION 的字段名；页面按主体/摄像头方向换算后同时提交，旧 yaw/pitch/zoom 兼容。 */
+    { key: 'azimuthDeg', label: '方位角（参考站字段）', type: 'number', min: -90, max: 90, step: 1, hidden: true },
+    { key: 'elevationDeg', label: '俯仰角（参考站字段）', type: 'number', min: -30, max: 60, step: 1, hidden: true },
+    { key: 'zoomFactor', label: '缩放系数（参考站字段）', type: 'number', min: 0.8, max: 1.2, step: 0.01, hidden: true },
+    /* 参考站 VIEW_ROTATION 仅在非原比例时提交 imageRatio。 */
+    { key: 'imageRatio', label: '画面比例（参考站字段）', type: 'text', hidden: true },
   ],
   buildPrompt: (p) =>
-    `改变商品展示视角：水平旋转 ${p.yaw ?? 0}°、俯仰 ${p.pitch ?? 0}°、缩放 ${p.zoom ?? 1}，` +
-    `按新视角重建商品展示，背景保持不变`,
+    `改变商品展示视角：水平旋转 ${p.azimuthDeg ?? p.yaw ?? 0}°、` +
+    `俯仰 ${p.elevationDeg ?? p.pitch ?? 0}°、缩放 ${p.zoomFactor ?? p.zoom ?? 1}，` +
+    `按新视角重建商品展示，背景保持不变${p.imageRatio ? `；输出比例 ${p.imageRatio}` : ''}`,
   localImpl: 'makeRotate',
   modality: 'image',
   inputs: 1,

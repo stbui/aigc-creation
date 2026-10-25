@@ -1,4 +1,7 @@
-# 货觉AI · AI 智能体（Agent）技术方案
+# 货觉AI · AI 智能体（Agent）技术方案（v1.0，已过期）
+
+> ⚠️ 本文的「LLM 通道从零新增」「15 项图像能力」「mock 能力」等前提已与当前代码不符。
+> 现行方案见 [`agent-integration-design.md`](agent-integration-design.md)。
 
 > 版本：v1.0  
 > 日期：2026-10-20  

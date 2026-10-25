@@ -72,6 +72,23 @@ export const BG_COLOR_OPTIONS: ParamOption[] = [
   { value: 'custom', label: '自定义颜色' },
 ];
 
+/**
+ * 抠图页的「语义色名」色板 (2026-10-25 对齐参考站 createBackgroundRemoval)。
+ *
+ * 参考站提交的是 `selectedColor: transparent|white|light-blue|...|custom`，
+ * 而不是直接提交 HEX；具体色值由服务端解析。保留上面的 BG_COLOR_OPTIONS
+ * 给 SKU/换色等旧能力使用，避免一次改动把既有契约连带改掉。
+ */
+export const MATTING_COLOR_OPTIONS: ParamOption[] = [
+  { value: 'transparent', label: '透明底' },
+  { value: 'white', label: '白色' },
+  { value: 'light-blue', label: '浅蓝' },
+  { value: 'blue', label: '蓝色' },
+  { value: 'red', label: '红色' },
+  { value: 'dark-red', label: '深红' },
+  { value: 'custom', label: '自定义颜色' },
+];
+
 /** 智能扩图「原图位置」九宫格 (参考站 smart-expand-position-grid 实拍, 默认 center) */
 export const EXPAND_POSITIONS: ParamOption[] = [
   { value: 'top-left', label: '左上' },

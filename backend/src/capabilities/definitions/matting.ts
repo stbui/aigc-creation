@@ -8,7 +8,7 @@
  */
 
 import type { CapabilityPlugin } from '../capability-plugin.type';
-import { BG_COLOR_OPTIONS, RATIOS_WITH_ORIGINAL } from './param-options';
+import { BG_COLOR_OPTIONS, MATTING_COLOR_OPTIONS, RATIOS_WITH_ORIGINAL } from './param-options';
 
 export const Matting: CapabilityPlugin = {
   id: 'matting',
@@ -29,10 +29,49 @@ export const Matting: CapabilityPlugin = {
       help: '仅当背景颜色选择"自定义颜色"时生效',
     },
     { key: 'ratio', label: '画面比例', type: 'enum', default: 'original', options: RATIOS_WITH_ORIGINAL },
+    /*
+     * 2026-10-25 对齐参考站 createBackgroundRemoval 的字段名。
+     *
+     * 页面代填 selectedColor，旧调用方仍可继续传 bgColor；本地实现优先读
+     * selectedColor，再回落 bgColor。customAlpha 让「自定义背景」不再只有
+     * 全不透明一种结果，0 等价于透明底。
+     */
+    {
+      key: 'selectedColor',
+      label: '背景颜色（参考站字段）',
+      type: 'enum',
+      default: 'transparent',
+      options: MATTING_COLOR_OPTIONS,
+      hidden: true,
+    },
+    {
+      key: 'customAlpha',
+      label: '自定义背景透明度（%）',
+      type: 'number',
+      default: 100,
+      min: 0,
+      max: 100,
+      step: 1,
+      hidden: true,
+    },
+    {
+      key: 'resolution',
+      label: '输出分辨率（参考站字段）',
+      type: 'text',
+      hidden: true,
+      help: '参考站 createBackgroundRemoval 的 resolution；与 size 同义，页面代填',
+    },
   ],
-  buildPrompt: (p) =>
-    `商品抠图：精确分离主体与背景，边缘发丝级保留；` +
-    `背景替换为 ${p.bgColor === 'transparent' ? '透明底' : `纯色 ${p.bgColor || '#FFFFFF'}`}`,
+  buildPrompt: (p) => {
+    const color = String(p.selectedColor ?? p.bgColor ?? 'transparent');
+    const backdrop =
+      color === 'transparent'
+        ? '透明底'
+        : color === 'custom'
+          ? `自定义色 ${p.customColor || '#5546D8'}，透明度 ${p.customAlpha ?? 100}%`
+          : `色板 ${color}`;
+    return `商品抠图：精确分离主体与背景，边缘发丝级保留；背景替换为 ${backdrop}`;
+  },
   localImpl: 'makeMatting',
   modality: 'image',
   inputs: 1,

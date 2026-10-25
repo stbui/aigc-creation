@@ -13,7 +13,8 @@
  */
 
 import { LocalImageProvider } from '../src/providers/local-image.provider';
-import { Jimp } from 'jimp';
+import { sanitizeParams } from '../src/capabilities/capability.registry';
+import { Jimp, intToRGBA } from 'jimp';
 
 let pass = 0;
 const fails: string[] = [];
@@ -30,6 +31,28 @@ async function makeInput(): Promise<string> {
   return p;
 }
 
+/** 造一张中间透明、四周白色的遮罩 (透明 = 要修补) */
+async function makeMask(): Promise<string> {
+  const mask = new Jimp({ width: 64, height: 64, color: 0xffffffff });
+  for (let y = 20; y < 44; y++) {
+    for (let x = 20; x < 44; x++) mask.setPixelColor(0x00000000, x, y);
+  }
+  const p = `/tmp/mock-provider-mask-${Date.now()}.png`;
+  await mask.write(p);
+  return p;
+}
+
+/** 造一张左上角有绿色标记的蓝底图，用于验证旋转页的 zoom 是否真的裁切。 */
+async function makeZoomInput(): Promise<string> {
+  const img = new Jimp({ width: 64, height: 64, color: 0x336699ff });
+  for (let y = 0; y < 4; y++) {
+    for (let x = 0; x < 4; x++) img.setPixelColor(0x00ff00ff, x, y);
+  }
+  const p = `/tmp/mock-provider-zoom-${Date.now()}.png`;
+  await img.write(p);
+  return p;
+}
+
 /** 魔数判定 —— 与后端 sniffImageFormat 同规则, 独立实现以免同源推导 */
 function isPng(buf: Buffer): boolean {
   return buf.length >= 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
@@ -40,7 +63,7 @@ function isJpeg(buf: Buffer): boolean {
 
 const provider = new LocalImageProvider();
 
-// ── 1. 全部 11 项**有本地实现**的图像能力都能真的产出图片字节 ──────
+// ── 1. 全部**有本地实现**的图像能力都能真的产出图片字节 ───────────
 //
 // 2026-10-22: 创意生图 / 局部重绘 / 图片翻译 / 自由创作 已删除本地占位实现,
 // 它们没有本地路径可验 (无通道即 42204 退款, 由 smoke-gateway-channel.js 覆盖)。
@@ -75,6 +98,82 @@ for (const cap of CAPS) {
     ok(`${cap.id} mime 与魔数一致`, r.format === 'image/png' ? isPng(r.buffer) : isJpeg(r.buffer), r.format);
   } catch (e) {
     fails.push(`${cap.id} 本地算法抛错 — ${(e as Error).message}`);
+  }
+}
+
+// ── 1b. 2026-10-25 新增/升级路径 ─────────────────────────────────
+try {
+  const customBg = await provider.generate('matting', [input], {
+    selectedColor: 'custom',
+    customColor: '#3988E9',
+    customAlpha: 40,
+    ratio: 'original',
+  });
+  ok('matting 自定义半透明底走 PNG', customBg.format === 'image/png', customBg.format);
+  const maskPath = await makeMask();
+  const masked = await provider.generate('remove_watermark', [input], { mode: 'auto' }, maskPath);
+  ok('remove_watermark 消费 maskPath', masked.buffer.length > 0 && masked.format === 'image/jpeg', masked.format);
+  const maskedPng = await provider.generate(
+    'remove_watermark',
+    [input],
+    { mode: 'auto', outputFormat: 'PNG' },
+    maskPath,
+  );
+  ok('remove_watermark outputFormat=PNG 真正输出 PNG', maskedPng.format === 'image/png' && isPng(maskedPng.buffer), maskedPng.format);
+  const mattingAlias = sanitizeParams('matting', { selectedColor: 'white', resolution: '2k' });
+  ok('matting resolution 参考站字段进入参数', mattingAlias.resolution === '2k', mattingAlias);
+  const redrawCount = sanitizeParams('local_redraw', {
+    prompt: '局部重绘',
+    modelGuideAssetId: 'mask-1',
+    outputCount: 1,
+  });
+  ok('local_redraw outputCount=1 被保留', redrawCount.outputCount === 1, redrawCount);
+  const zoomInput = await makeZoomInput();
+  const zoomNormal = await provider.generate('rotate', [zoomInput], {
+    azimuthDeg: 0,
+    elevationDeg: 0,
+    zoomFactor: 1,
+    ratio: 'original',
+    size: '1k',
+  });
+  const zoomClose = await provider.generate('rotate', [zoomInput], {
+    azimuthDeg: 0,
+    elevationDeg: 0,
+    zoomFactor: 1.2,
+    ratio: 'original',
+    size: '1k',
+  });
+  const normalPixel = intToRGBA((await Jimp.read(zoomNormal.buffer)).getPixelColor(1, 1));
+  const closePixel = intToRGBA((await Jimp.read(zoomClose.buffer)).getPixelColor(1, 1));
+  ok('rotate zoomFactor=1 保留左上角原始内容', normalPixel.g > 150, normalPixel);
+  ok('rotate zoomFactor=1.2 按中心真实裁切', closePixel.b > closePixel.g, closePixel);
+} catch (e) {
+  fails.push(`2026-10-25 新增路径抛错 — ${(e as Error).message}`);
+}
+
+// ── 1c. 旧字段兼容: hidden 别名未提交时不得被默认值注入 ───────────
+{
+  const oldMatting = sanitizeParams('matting', { bgColor: '#3988E9', ratio: 'original' });
+  ok('matting 未提交 selectedColor 时不补默认值', !('selectedColor' in oldMatting), Object.keys(oldMatting));
+  const oldExpand = sanitizeParams('expand', { occupy: 80, position: 'center', ratio: 'original', size: '1k' });
+  ok(
+    'expand 未提交 placement 时不补默认值',
+    !('placementX' in oldExpand) && !('placementWidth' in oldExpand),
+    Object.keys(oldExpand),
+  );
+  const oldRotate = sanitizeParams('rotate', { yaw: 20, pitch: 5, zoom: 1, ratio: 'original', size: '1k' });
+  ok(
+    'rotate 未提交参考站字段时不补默认值',
+    !('azimuthDeg' in oldRotate) && !('zoomFactor' in oldRotate),
+    Object.keys(oldRotate),
+  );
+  const oldEnhance = sanitizeParams('enhance', { mode: 'color', ratio: 'original', size: '1k' });
+  ok('enhance 未提交 templateCode 时不补默认值', !('templateCode' in oldEnhance), Object.keys(oldEnhance));
+  try {
+    const legacyBlue = await provider.generate('matting', [input], oldMatting);
+    ok('matting 旧 bgColor 仍生成不透明底 JPEG', legacyBlue.format === 'image/jpeg', legacyBlue.format);
+  } catch (e) {
+    fails.push(`matting 旧 bgColor 兼容失败 — ${(e as Error).message}`);
   }
 }
 
@@ -118,7 +217,7 @@ if (fails.length) {
   for (const f of fails) console.error('  ✗ ' + f);
   process.exit(1);
 }
-console.log('图像产出链路冒烟测试通过：11 项能力的本地算法均产出合法图片');
+console.log(`图像产出链路冒烟测试通过：${CAPS.length} 项能力的本地算法均产出合法图片`);
 }
 
 void main();

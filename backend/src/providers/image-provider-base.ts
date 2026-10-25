@@ -101,6 +101,23 @@ export function buildSize(
   return { field: 'size', value: `${Math.round(w / 64) * 64}x${Math.round(h / 64) * 64}` };
 }
 
+/**
+ * 参考站字段 → 通道尺寸字段。
+ *
+ * 各工具页仍同时提交旧字段（ratio/size）以兼容存量调用方；新接入的
+ * targetImageRatio（扩图）、imageRatio（重绘/精修/旋转）和 resolution（抠图）
+ * 必须也能直接生效，否则 API 调用方只发参考站字段时会静默落回 1:1/1K。
+ */
+function channelRatio(params: Record<string, any>): string | undefined {
+  const value = params.targetImageRatio || params.imageRatio || params.ratio;
+  return value === undefined || value === null || value === '' ? undefined : String(value);
+}
+
+function channelQuality(params: Record<string, any>): string | undefined {
+  const value = params.resolution || params.size;
+  return value === undefined || value === null || value === '' ? undefined : String(value).toLowerCase();
+}
+
 /** 协议形状 —— 转发到协议层, 本文件不再自带副本 */
 export type { ProtocolSpec as ProtocolShape } from './protocols/protocol.spec';
 
@@ -208,7 +225,7 @@ export abstract class BaseImageProvider {
       n: 1,
       ...spec.buildRefField(refs),
     };
-    const size = buildSize(spec.sizeStyle, params.ratio, params.size);
+    const size = buildSize(spec.sizeStyle, channelRatio(params), channelQuality(params));
     if (size) body[size.field] = size.value;
 
     const json = await this.post(creds.baseUrl, creds.token, spec.endpoint(creds.baseUrl), body);
@@ -279,7 +296,7 @@ export abstract class BaseImageProvider {
     form.append('image', new Blob([imageBuf], { type: mimeOf(imagePath) }), fileNameOf(imagePath));
     // 遮罩必须是 PNG（OpenAI 文档硬要求），且与 image 同尺寸 —— 前端按原图尺寸生成
     form.append('mask', new Blob([maskBuf], { type: 'image/png' }), 'mask.png');
-    const size = buildSize(spec.sizeStyle, params.ratio, params.size);
+    const size = buildSize(spec.sizeStyle, channelRatio(params), channelQuality(params));
     if (size) form.append(size.field, size.value);
 
     const json = await this.postMultipart(creds.baseUrl, creds.token, spec.maskEndpoint!(creds.baseUrl), form);

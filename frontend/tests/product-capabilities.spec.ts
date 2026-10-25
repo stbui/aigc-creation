@@ -439,6 +439,10 @@ test.describe('局部重绘画布', () => {
     await expect(page.locator('.redraw-prompt-ref-preview img')).toBeVisible();
     await expect(submit).toBeEnabled();
 
+    // 参考站仅在非原比例时提交 imageRatio；选 4:3 后随任务参数透传。
+    await page.getByRole('button', { name: /高级设置/ }).click();
+    await page.locator('.pk-ratio-option', { hasText: '4:3' }).click();
+
     await submit.click();
     await expect.poll(() => posted).not.toBeNull();
     const annotations = JSON.parse(posted.params.annotations);
@@ -453,6 +457,10 @@ test.describe('局部重绘画布', () => {
     expect(posted.params.modelGuideAssetId).toBe('asset-mask');
     expect(posted.params.maskAssetId).toBe('asset-mask');
     expect(posted.params.prompt).toBe('标注1：把这里改成哑光材质');
+    expect(posted.params.imageRatio).toBe('4:3');
+    expect(posted.params.strength).toBe(0.5);
+    expect(posted.params.outputCount).toBe(1);
     expect(posted.inputAssetIds).toEqual(['asset-original']);
+    await expect(page.locator('.pk-result-body')).toBeVisible({ timeout: 15000 });
   });
 });
