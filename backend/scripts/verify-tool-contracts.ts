@@ -94,10 +94,10 @@ check(
 
 const expand = getCapability('expand');
 check(
-  '扩图默认占比 80%、居中、范围 1..99',
+  '扩图默认占比 80%、居中、范围 1..100',
   expand?.params.find((p) => p.key === 'occupy')?.default === 80 &&
     expand?.params.find((p) => p.key === 'occupy')?.min === 1 &&
-    expand?.params.find((p) => p.key === 'occupy')?.max === 99 &&
+    expand?.params.find((p) => p.key === 'occupy')?.max === 100 &&
     expand?.params.find((p) => p.key === 'position')?.default === 'center',
 );
 check(
@@ -161,6 +161,11 @@ check(
 );
 const recolor = getCapability('recolor');
 check('换色目标 HEX 字段已声明', recolor?.params.find((p) => p.key === 'targetColor')?.hidden === true);
+check(
+  'HEX 字段携带后端格式约束',
+  recolor?.params.find((p) => p.key === 'customColor')?.pattern === '^#[0-9a-fA-F]{6}$' &&
+    getCapability('matting')?.params.find((p) => p.key === 'customColor')?.pattern === '^#[0-9a-fA-F]{6}$',
+);
 
 console.log('\n【hidden 字段兼容：未提交不得注入默认值】');
 const oldMatting = sanitizeParams('matting', { bgColor: '#3988E9' });
@@ -175,9 +180,19 @@ check('旧精修调用不注入 templateCode', !('templateCode' in oldEnhance), 
 console.log('\n【参数严格校验：越界/错枚举在扣费前拒绝】');
 check('扩图占比 120 被拒', throwsAppError(() => validateCapabilityParams('expand', { occupy: 120 })));
 check('扩图占比 0 被拒', throwsAppError(() => validateCapabilityParams('expand', { occupy: 0 })));
+check('扩图占比 100 通过', !throwsAppError(() => validateCapabilityParams('expand', { occupy: 100 })));
 check('旋转缩放 2 被拒', throwsAppError(() => validateCapabilityParams('rotate', { zoom: 2 })));
 check('旋转方位角 -91 被拒', throwsAppError(() => validateCapabilityParams('rotate', { azimuthDeg: -91 })));
 check('抠图非法枚举被拒', throwsAppError(() => validateCapabilityParams('matting', { selectedColor: 'pink' })));
+check(
+  '抠图非法 HEX 被拒',
+  throwsAppError(() => validateCapabilityParams('matting', { selectedColor: 'custom', customColor: 'red' })),
+);
+check(
+  '换色非法目标 HEX 被拒',
+  throwsAppError(() => validateCapabilityParams('recolor', { targetColor: '#12GG34' })),
+);
+check('合法 HEX 通过', !throwsAppError(() => validateCapabilityParams('recolor', { targetColor: '#7B2FF7' })));
 check('布尔字段传中文被拒', throwsAppError(() => validateCapabilityParams('image_translate', { protectSubject: '是' })));
 check('合法参数通过', !throwsAppError(() => validateCapabilityParams('expand', { occupy: 80, position: 'center' })));
 

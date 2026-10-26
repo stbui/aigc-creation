@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { Alert, Button, Card, Col, Row, Table, Tabs, Tag } from 'antd';
+import { ShoppingBag, Wallet } from 'lucide-react';
 import { creditsApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { PersonalPage } from '../components/PersonalPage';
 import { StateButton, StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
 import type { CreditBalance, CreditLedgerEntry, CreditLot } from '../types/api';
 
@@ -110,181 +112,216 @@ export function CreditsPage() {
    */
   if (!token) {
     return (
-      <div className="credits-page">
-        <button type="button" className="pkg-back-btn" onClick={() => navigate(-1)}>
-          <ArrowLeft size={14} /> 返回
-        </button>
-        <div className="state-page">
-          <StateEmpty
-            title="登录后查看积分明细"
-            desc="积分余额、批次与流水均与账号绑定，登录后即可查看。"
-            action={
-              <button type="button" className="state-btn is-primary" onClick={openLogin}>
-                登录/注册
-              </button>
-            }
-          />
-        </div>
-      </div>
+      <PersonalPage title="积分明细" description="查看余额、批次与每一笔积分流水。">
+        <StateEmpty
+          title="登录后查看积分明细"
+          desc="积分余额、批次与流水均与账号绑定，登录后即可查看。"
+          action={
+            <StateButton onClick={openLogin}>登录/注册</StateButton>
+          }
+        />
+      </PersonalPage>
     );
   }
 
-  return (
-    <div className="credits-page">
-      <button type="button" className="pkg-back-btn" onClick={() => navigate(-1)}>
-        <ArrowLeft size={14} /> 返回
-      </button>
+  const ledgerColumns = [
+    {
+      title: '时间',
+      dataIndex: 'createdAt',
+      width: 170,
+      render: (value: string | null) => formatDate(value),
+    },
+    {
+      title: '类型',
+      dataIndex: 'type',
+      width: 120,
+      render: (value: string) => LEDGER_LABEL[value] ?? value,
+    },
+    {
+      title: '变动',
+      dataIndex: 'amount',
+      width: 110,
+      align: 'right' as const,
+      render: (value: number) => (
+        <span className={`credits-amount ${value >= 0 ? 'is-plus' : 'is-minus'}`}>
+          {value >= 0 ? `+${value}` : value}
+        </span>
+      ),
+    },
+    {
+      title: '余额',
+      dataIndex: 'balanceAfter',
+      width: 100,
+      align: 'right' as const,
+    },
+    {
+      title: '备注',
+      dataIndex: 'reason',
+      ellipsis: true,
+      render: (value: string | null) => value ?? '—',
+    },
+  ];
 
-      <div className="credits-balance-card">
-        <div className="credits-stat">
-          <div className="credits-stat-label">可用余额</div>
-          <div className="credits-stat-value">{balance?.balance ?? '—'}</div>
-        </div>
-        <div className="credits-stat">
-          <div className="credits-stat-label">累计获得</div>
-          <div className="credits-stat-value">{balance?.totalEarned ?? '—'}</div>
-        </div>
-        <div className="credits-stat">
-          <div className="credits-stat-label">累计消耗</div>
-          <div className="credits-stat-value">{balance?.totalConsumed ?? '—'}</div>
-        </div>
-        <div className="credits-stat">
-          <div className="credits-stat-label">30 天内到期</div>
-          {/* 有临期积分才标黄 —— 常亮告警色等于没有告警 */}
-          <div className={`credits-stat-value${(balance?.expiringSoon ?? 0) > 0 ? ' is-warn' : ''}`}>
-            {balance?.expiringSoon ?? '—'}
+  const lotColumns = [
+    {
+      title: '来源',
+      dataIndex: 'source',
+      width: 130,
+      render: (value: string) => SOURCE_LABEL[value] ?? value,
+    },
+    { title: '总额', dataIndex: 'totalCredits', width: 100, align: 'right' as const },
+    { title: '剩余', dataIndex: 'remainingCredits', width: 100, align: 'right' as const },
+    {
+      title: '到期日',
+      dataIndex: 'expireAt',
+      width: 140,
+      render: (value: string | null) => formatDay(value),
+    },
+    {
+      title: '状态',
+      dataIndex: 'status',
+      width: 100,
+      render: (value: CreditLot['status']) => {
+        const status = LOT_STATUS[value] ?? LOT_STATUS.active;
+        return <Tag color={value === 'active' ? 'success' : value === 'expired' ? 'error' : 'default'}>{status.label}</Tag>;
+      },
+    },
+  ];
+
+  const stats = [
+    { label: '可用余额', value: balance?.balance, emphasis: true },
+    { label: '累计获得', value: balance?.totalEarned },
+    { label: '累计消耗', value: balance?.totalConsumed },
+    { label: '30 天内到期', value: balance?.expiringSoon, warn: (balance?.expiringSoon ?? 0) > 0 },
+  ];
+
+  return (
+    <PersonalPage
+      className="credits-page"
+      title="积分明细"
+      description="积分按批次发放并可能有有效期；余额由后端账本实时汇总。"
+      extra={
+        <Button type="primary" icon={<ShoppingBag size={15} />} onClick={() => navigate('/packages')}>
+          购买积分 / 会员
+        </Button>
+      }
+    >
+      <Card className="credits-hero" variant="borderless">
+        <div className="credits-hero-main">
+          <span className="credits-hero-icon" aria-hidden>
+            <Wallet size={22} />
+          </span>
+          <div>
+            <div className="credits-hero-label">当前可用积分</div>
+            <div className="credits-hero-value">{balance?.balance ?? '—'}</div>
+            <div className="credits-hero-note">
+              {balance && balance.activeLots > 0
+                ? `来自 ${balance.activeLots} 个可用批次，支付成功后积分立即到账`
+                : '暂无可用批次，购买积分或开通会员后即可使用'}
+            </div>
           </div>
         </div>
-      </div>
+        <div className="credits-hero-side">
+          {balance && balance.expiringSoon > 0 && balance.nearestExpiry ? (
+            <span className="credits-hero-warn">
+              {balance.expiringSoon} 积分将于 {formatDay(balance.nearestExpiry)} 到期
+            </span>
+          ) : (
+            <span className="credits-hero-ok">暂无即将到期的积分</span>
+          )}
+        </div>
+      </Card>
 
-      {/*
-        购买入口（2026-10-22 补）。
-        积分页是「积分用完了」时用户最先到的地方 —— 此前这里只有余额与流水，
-        没有任何出口：用户知道缺积分，却不知道去哪买，只能自己猜积分商城在哪。
-      */}
-      <div className="credits-actions">
-        <StateButton onClick={() => navigate('/packages')}>购买积分 / 开通会员</StateButton>
-        <span className="credits-actions-hint">
-          积分包与会员套餐都在积分商城，支付成功后积分立即到账
-        </span>
-      </div>
+      <Row gutter={[12, 12]} className="credits-stats">
+        {stats.map((item) => (
+          <Col xs={12} sm={6} key={item.label}>
+            <Card size="small" className={`credits-stat-card${item.emphasis ? ' is-emphasis' : ''}`}>
+              <div className="credits-stat-label">{item.label}</div>
+              <div className={`credits-stat-value${item.warn ? ' is-warn' : ''}`}>
+                {item.value ?? '—'}
+              </div>
+            </Card>
+          </Col>
+        ))}
+      </Row>
 
-      {balance && balance.expiringSoon > 0 && balance.nearestExpiry && (
-        <p className="pkg-pay-hint" style={{ textAlign: 'left', marginBottom: 16 }}>
-          有 {balance.expiringSoon} 积分将于 {formatDay(balance.nearestExpiry)} 到期，建议优先使用。
-        </p>
-      )}
+      <Card className="credits-list-card" title="积分明细">
+        <Tabs
+          activeKey={tab}
+          onChange={(key) => setTab(key as Tab)}
+          items={[
+            {
+              key: 'ledger',
+              label: '积分流水',
+              children: loading ? (
+                <StateSkeleton variant="row" count={5} />
+              ) : error ? (
+                <StateError
+                  title="积分数据加载失败"
+                  desc="没能取回积分流水与批次信息。可能是后端未启动或网络异常，重试一次即可。"
+                  detail={error}
+                  onRetry={() => void load()}
+                />
+              ) : ledger.length === 0 ? (
+                <StateEmpty
+                  compact
+                  title="还没有积分流水"
+                  desc="购买积分、开通会员或完成签到后，每一笔变动都会记录在这里。"
+                  action={<StateButton onClick={() => navigate('/packages')}>去获取积分</StateButton>}
+                />
+              ) : (
+                <Table
+                  rowKey="id"
+                  size="small"
+                  columns={ledgerColumns}
+                  dataSource={ledger}
+                  pagination={{ pageSize: 20, hideOnSinglePage: true, showSizeChanger: false }}
+                  scroll={{ x: 680 }}
+                />
+              ),
+            },
+            {
+              key: 'lots',
+              label: '批次明细',
+              children: loading ? (
+                <StateSkeleton variant="row" count={3} />
+              ) : error ? (
+                <StateError
+                  title="积分数据加载失败"
+                  desc="没能取回积分批次。可能是后端未启动或网络异常，重试一次即可。"
+                  detail={error}
+                  onRetry={() => void load()}
+                />
+              ) : lots.length === 0 ? (
+                <StateEmpty
+                  compact
+                  title="还没有积分批次"
+                  desc="每次购买或发放都会形成一个有有效期的积分批次。"
+                  action={<StateButton onClick={() => navigate('/packages')}>去获取积分</StateButton>}
+                />
+              ) : (
+                <Table
+                  rowKey="id"
+                  size="small"
+                  columns={lotColumns}
+                  dataSource={lots}
+                  pagination={{ pageSize: 20, hideOnSinglePage: true, showSizeChanger: false }}
+                  scroll={{ x: 620 }}
+                />
+              ),
+            },
+          ]}
+        />
+      </Card>
 
-      <div className="credits-tabs">
-        <button
-          type="button"
-          className={`credits-tab${tab === 'ledger' ? ' is-active' : ''}`}
-          onClick={() => setTab('ledger')}
-        >
-          积分流水
-        </button>
-        <button
-          type="button"
-          className={`credits-tab${tab === 'lots' ? ' is-active' : ''}`}
-          onClick={() => setTab('lots')}
-        >
-          批次明细
-        </button>
-      </div>
-
-      {/*
-        加载 / 失败 / 空 三态必须分开。
-
-        2026-10-20 修: 此前三者共用 `.credits-list-empty` 一个 class —— 同一句
-        「正在加载…」与「还没有积分流水」长得一模一样 (只有文字颜色不同),
-        失败时更糟: 直接把错误信息塞进这个 class, 渲染成一句灰字,
-        用户既不知道是"没数据"还是"没连上", 也没有重试入口。
-      */}
-      {loading && <StateSkeleton variant="row" count={5} />}
-      {!loading && error && (
-        <StateError
-          title="积分数据加载失败"
-          desc="没能取回积分流水与批次信息。可能是后端未启动或网络异常，重试一次即可。"
-          detail={error}
-          onRetry={() => void load()}
+      {error && !loading && (
+        <Alert
+          type="warning"
+          showIcon
+          message="部分积分数据未能加载"
+          description="余额与流水可能不完整，刷新页面或稍后重试即可恢复。"
         />
       )}
-
-      {!loading && !error && tab === 'ledger' && (
-        ledger.length === 0 ? (
-          <div className="credits-list-empty">
-            <p className="credits-empty-text">还没有积分流水</p>
-            <StateButton onClick={() => navigate('/packages')}>去获取积分</StateButton>
-          </div>
-        ) : (
-          <div className="credits-table-wrap">
-            <table className="credits-table">
-              <thead>
-                <tr>
-                  <th>时间</th>
-                  <th>类型</th>
-                  <th>变动</th>
-                  <th>余额</th>
-                  <th>备注</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ledger.map((e) => (
-                  <tr key={e.id}>
-                    <td>{formatDate(e.createdAt)}</td>
-                    <td>{LEDGER_LABEL[e.type] ?? e.type}</td>
-                    <td>
-                      {/* 有符号: 正为获得, 负为消耗 */}
-                      <span className={`credits-amount ${e.amount >= 0 ? 'is-plus' : 'is-minus'}`}>
-                        {e.amount >= 0 ? `+${e.amount}` : e.amount}
-                      </span>
-                    </td>
-                    <td>{e.balanceAfter}</td>
-                    <td>{e.reason ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
-      )}
-
-      {!loading && !error && tab === 'lots' && (
-        lots.length === 0 ? (
-          <div className="credits-list-empty">
-            <p className="credits-empty-text">还没有积分批次</p>
-            <StateButton onClick={() => navigate('/packages')}>去获取积分</StateButton>
-          </div>
-        ) : (
-          <div className="credits-table-wrap">
-            <table className="credits-table">
-              <thead>
-                <tr>
-                  <th>来源</th>
-                  <th>总额</th>
-                  <th>剩余</th>
-                  <th>到期日</th>
-                  <th>状态</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lots.map((l) => {
-                  const st = LOT_STATUS[l.status] ?? LOT_STATUS.active;
-                  return (
-                    <tr key={l.id}>
-                      <td>{SOURCE_LABEL[l.source] ?? l.source}</td>
-                      <td>{l.totalCredits}</td>
-                      <td>{l.remainingCredits}</td>
-                      <td>{formatDay(l.expireAt)}</td>
-                      <td style={{ color: st.color, fontWeight: 600 }}>{st.label}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )
-      )}
-    </div>
+    </PersonalPage>
   );
 }

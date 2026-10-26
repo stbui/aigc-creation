@@ -438,7 +438,7 @@ export function AdminReconciliationPage() {
 
       <Drawer
         title="对账明细"
-        width={880}
+        size={880}
         open={detailId !== null}
         onClose={() => setDetailId(null)}
         className="adm-drawer"

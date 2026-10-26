@@ -1,10 +1,16 @@
 import { useState } from 'react';
+import { App } from 'antd';
 import { useToolTask } from '../hooks/useToolTask';
 import { ToolShell } from '../components/ToolShell';
 import { ToolCard } from '../components/ToolWidgets';
-import { ColorStudio, MATTING_COLOR_SWATCHES } from '../components/ColorStudio';
+import {
+  ColorStudio,
+  MATTING_COLOR_SWATCHES,
+  isValidHexColor,
+  normalizeHexColor,
+} from '../components/ColorStudio';
 import { MattingResultEditor } from '../components/MattingResultEditor';
-import { ToolHistoryPane } from '../components/ToolHistoryPane';
+import { useCreditCost } from '../hooks/useCreditLabel';
 
 /**
  * 一键抠图 —— 1:1 复刻参考站 https://ijihua.cn/background-remove。
@@ -37,6 +43,7 @@ const COLOR_LABEL: Record<string, string> = {
 };
 
 export function BackgroundRemovePage() {
+  const { message } = App.useApp();
   const { submitting, result, run } = useToolTask({ capability: 'matting', successMessage: '抠图结果已生成' });
 
   const [selectedColor, setSelectedColor] = useState('transparent');
@@ -48,6 +55,8 @@ export function BackgroundRemovePage() {
    */
   const [sourceUrl, setSourceUrl] = useState('');
   const [outputRatio, setOutputRatio] = useState('original');
+  const creditCost = useCreditCost('matting');
+  const customColorValid = isValidHexColor(customColor);
 
   const colorLabel =
     selectedColor === 'custom'
@@ -57,23 +66,29 @@ export function BackgroundRemovePage() {
   return (
     <ToolShell
       capability="matting"
+      pageClass="background-remove-page"
       title="一键抠图"
       desc="上传图片后，自动去除图片背景"
       upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
       settings={{ ratio: true }}
       submitLabel="开始抠图"
+      creditLabel={creditCost === 0 ? '限时免费' : undefined}
       emptyDesc="上传图片后，抠除背景的结果将在此处展示"
-      formValid
+      formValid={selectedColor !== 'custom' || customColorValid}
       submitting={submitting}
       result={result}
       resultTag={colorLabel}
       onSettingsChange={(settings) => setOutputRatio(settings.ratio)}
       onSubmit={async (inputs, settings) => {
+        if (selectedColor === 'custom' && !customColorValid) {
+          message.error('请输入有效的 HEX 背景色（如 #5546D8）');
+          return;
+        }
         setSourceUrl(inputs[0]?.url ?? '');
         setOutputRatio(settings.ratio);
         await run(inputs, {
           selectedColor,
-          customColor: customColor.trim(),
+          customColor: normalizeHexColor(customColor) ?? '',
           customAlpha,
           ratio: settings.ratio,
           resolution: settings.resolution,
@@ -93,11 +108,8 @@ export function BackgroundRemovePage() {
           </section>
         ) : undefined
       }
-      trailingPane={
-        <ToolHistoryPane capability="matting" refreshKey={result?.url} emptyText="暂无抠图记录" />
-      }
     >
-      <ToolCard title="背景颜色">
+      <ToolCard title="背景颜色" className="background-color-card">
         <ColorStudio
           options={MATTING_COLOR_SWATCHES}
           value={selectedColor}
@@ -110,7 +122,6 @@ export function BackgroundRemovePage() {
           clearLabel="透明底"
           ariaLabel="背景颜色"
         />
-        <p className="tool-card-copy">由图像模型完成主体分割与换底，边缘效果取决于当前模型能力。</p>
       </ToolCard>
     </ToolShell>
   );

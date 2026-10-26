@@ -61,7 +61,7 @@ export function computeExpandPlacement(
     targetRatio === 'original'
       ? { width, height }
       : CANVAS_BY_RATIO[targetRatio] ?? parseRatio(targetRatio, 1, 1);
-  const share = Math.max(0.01, Math.min(0.99, occupy / 100));
+  const share = Math.max(0.01, Math.min(1, occupy / 100));
   const scale = Math.min(canvas.width / width, canvas.height / height) * share;
   const frameWidth = width * scale;
   const frameHeight = height * scale;

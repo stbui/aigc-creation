@@ -197,9 +197,26 @@ const REQUIRED_NESTING = [
   // 早期误以为它精确依赖 0.6.3 而嵌套安装, 结果遮蔽了正确版本 —— 故此处不再要求嵌套。
 ];
 
+/**
+ * 校验 package.json 里被 npm run 引用的脚本都已定义。
+ * 漏注册时 npm 只会报 Missing script，start.sh 的初始化链路会直接中断。
+ */
+function missingScriptRefs(pkg) {
+  const scripts = pkg.scripts || {};
+  const missing = [];
+  for (const [name, command] of Object.entries(scripts)) {
+    for (const match of String(command).matchAll(/\bnpm run(?: --silent)? ([A-Za-z0-9:_-]+)/g)) {
+      if (!(match[1] in scripts)) missing.push(`${name} -> npm run ${match[1]}`);
+    }
+  }
+  return missing;
+}
+
 function main() {
   const top = collectTop();
   const issues = [];
+  const rootPkg = loadPkg(path.join(__dirname, '..'));
+  const scriptIssues = rootPkg ? missingScriptRefs(rootPkg) : ['backend/package.json 无法读取'];
 
   for (const [name, pkg] of top) {
     if (CRITICAL_ONLY && !CRITICAL.has(name)) continue;
@@ -248,7 +265,7 @@ function main() {
   // 致命 = 非 PIN、且未被记录为已验证无害的偏差
   const fatalIssues = issues.filter((i) => !i.benign);
   const benignCount = issues.length - fatalIssues.length;
-  const fatal = fatalIssues.length + missingNesting.length;
+  const fatal = fatalIssues.length + missingNesting.length + scriptIssues.length;
   if (QUIET) {
     console.log(fatal === 0 ? 'deps OK' : `deps: ${fatal} 个问题`);
     process.exit(fatal === 0 ? 0 : 1);
@@ -272,6 +289,8 @@ function main() {
   }
   console.log(`\n必需嵌套副本: ${REQUIRED_NESTING.length - missingNesting.length}/${REQUIRED_NESTING.length} 就位`);
   for (const m of missingNesting) console.log(`  NESTING ${m}`);
+  console.log(`脚本引用: ${scriptIssues.length === 0 ? '全部已定义' : `${scriptIssues.length} 个缺失`}`);
+  for (const s of scriptIssues) console.log(`  SCRIPT ${s}`);
   console.log(fatal === 0 ? '\n结论: 依赖链无致命问题' : `\n结论: ${fatal} 个致命问题需修复`);
   process.exit(fatal === 0 ? 0 : 1);
 }

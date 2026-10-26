@@ -26,6 +26,7 @@
     "verify:deps": "node scripts/verify-deps.js",
     "verify:deps:critical": "node scripts/verify-deps.js --critical",
     "seed:commerce": "ts-node -T scripts/seed-commerce.ts",
+    "seed:membership": "ts-node -T scripts/seed-membership.ts",
     "seed:marketing": "ts-node -T scripts/seed-marketing.ts",
     "smoke:marketing": "node scripts/smoke-marketing.js",
     "seed:legal": "ts-node -T scripts/seed-legal.ts",

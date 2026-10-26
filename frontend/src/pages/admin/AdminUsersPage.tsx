@@ -8,8 +8,6 @@ import { useAdmin } from '../../context/AdminContext';
 import {
   AdminDrawer,
   AdminListError,
-  AdminMobileList,
-  AdminMobileRecord,
   AdminStaleError,
   AdminListLoading,
   ConfirmAction,
@@ -223,38 +221,34 @@ export function AdminUsersPage() {
     }
   };
 
-  const rowMenuItems = useCallback(
-    (row: Row) =>
-      [
-        can('user.disable') && row.status !== 'deleted'
-          ? {
-              key: 'status',
-              label: row.status === 'active' ? '禁用账号' : '启用账号',
-              onClick: () => setStatusTarget(row),
-            }
-          : null,
-        can('user.write') && row.status !== 'deleted'
-          ? { key: 'role', label: '变更角色', onClick: () => setRoleTarget(row) }
-          : null,
-        can('user.reset_password') && row.status !== 'deleted'
-          ? {
-              key: 'pwd',
-              label: '重置密码',
-              onClick: () => void doResetPassword(row),
-            }
-          : null,
-        can('user.delete')
-          ? { key: 'del', label: '删除用户', danger: true, onClick: () => void openDelete(row) }
-          : null,
-      ].filter(Boolean) as Array<{
-        key: string;
-        label: string;
-        danger?: boolean;
-        onClick: () => void;
-      }>,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [can],
-  );
+  const rowMenuItems = (row: Row) =>
+    [
+      can('user.disable') && row.status !== 'deleted'
+        ? {
+            key: 'status',
+            label: row.status === 'active' ? '禁用账号' : '启用账号',
+            onClick: () => setStatusTarget(row),
+          }
+        : null,
+      can('user.write') && row.status !== 'deleted'
+        ? { key: 'role', label: '变更角色', onClick: () => setRoleTarget(row) }
+        : null,
+      can('user.reset_password') && row.status !== 'deleted'
+        ? {
+            key: 'pwd',
+            label: '重置密码',
+            onClick: () => void doResetPassword(row),
+          }
+        : null,
+      can('user.delete')
+        ? { key: 'del', label: '删除用户', danger: true, onClick: () => void openDelete(row) }
+        : null,
+    ].filter(Boolean) as Array<{
+      key: string;
+      label: string;
+      danger?: boolean;
+      onClick: () => void;
+    }>;
 
   const columns: ColumnsType<Row> = useMemo(
     () => [
@@ -450,7 +444,6 @@ export function AdminUsersPage() {
             ) : (
               <>
                 <Table<Row>
-                  className="adm-responsive-table"
                   rowKey="id"
                   size="small"
                   columns={columns}
@@ -484,59 +477,6 @@ export function AdminUsersPage() {
                     },
                   })}
                 />
-
-                <AdminMobileList label="用户列表">
-                  {data?.items.map((row) => {
-                    const menuItems = rowMenuItems(row);
-                    return (
-                      <AdminMobileRecord
-                        key={row.id}
-                        title={row.email}
-                        subtitle={`注册于 ${new Date(row.createdAt).toLocaleDateString('zh-CN')}`}
-                        status={<StatusTag status={row.status} />}
-                        selected={selected.includes(row.id)}
-                        selectDisabled={row.status === 'deleted'}
-                        selectionLabel={`选择用户 ${row.email}`}
-                        onSelectedChange={(checked) =>
-                          setSelected((prev) =>
-                            checked ? [...prev, row.id] : prev.filter((id) => id !== row.id),
-                          )
-                        }
-                        meta={[
-                          { label: '角色', value: <StatusTag status={row.role} /> },
-                          {
-                            label: '资源',
-                            value: `${row.projectCount} 项目 · ${row.taskCount} 任务 · ${row.assetCount} 素材`,
-                          },
-                          {
-                            label: '最近登录',
-                            value: row.lastLoginAt
-                              ? new Date(row.lastLoginAt).toLocaleString('zh-CN')
-                              : '从未登录',
-                          },
-                        ]}
-                        actions={
-                          <>
-                            <Button
-                              type="link"
-                              className="adm-link"
-                              onClick={() => setDetailId(row.id)}
-                            >
-                              查看详情
-                            </Button>
-                            {menuItems.length > 0 && (
-                              <Dropdown trigger={['click']} menu={{ items: menuItems }} disabled={busy}>
-                                <Button type="link" className="adm-link">
-                                  更多操作
-                                </Button>
-                              </Dropdown>
-                            )}
-                          </>
-                        }
-                      />
-                    );
-                  })}
-                </AdminMobileList>
               </>
             )}
           </>

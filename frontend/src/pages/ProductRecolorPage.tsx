@@ -1,8 +1,14 @@
 import { useState } from 'react';
+import { App } from 'antd';
 import { useToolTask } from '../hooks/useToolTask';
 import { ToolShell } from '../components/ToolShell';
 import { ToolCard } from '../components/ToolWidgets';
-import { ColorStudio, RECOLOR_COLOR_SWATCHES } from '../components/ColorStudio';
+import {
+  ColorStudio,
+  RECOLOR_COLOR_SWATCHES,
+  isValidHexColor,
+  normalizeHexColor,
+} from '../components/ColorStudio';
 import { ToolHistoryPane } from '../components/ToolHistoryPane';
 
 /**
@@ -30,24 +36,31 @@ const COLOR_LABEL: Record<string, string> = {
 };
 
 export function ProductRecolorPage() {
-  const { submitting, result, run } = useToolTask({ capability: 'recolor', successMessage: '换色结果已生成' });
+  const { message } = App.useApp();
+  const { submitting, result, setResult, run } = useToolTask({ capability: 'recolor', successMessage: '换色结果已生成' });
 
   const [color, setColor] = useState('#FFFFFF');
   const [customColor, setCustomColor] = useState('#5546D8');
   const [sourceUrl, setSourceUrl] = useState('');
   const targetColor = color === 'custom' ? customColor : color;
+  const customColorValid = isValidHexColor(customColor);
+
+  const handleHistoryReuse = () => {
+    setSourceUrl('');
+    setResult(null);
+  };
 
   return (
     <ToolShell
       capability="recolor"
+      pageClass="product-retouch-page product-recolor-page"
       title="商品换色"
       desc="一键生成商品多色效果，快速制作全SKU展示图"
       upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
       settings={{ ratio: true, resolution: true }}
       submitLabel="立即换色"
-      hint="* 确认素材和参数后提交，右侧会展示生成结果。"
       emptyDesc="上传图片并选择商品颜色后，结果将在此处展示"
-      formValid
+      formValid={color !== 'custom' || customColorValid}
       submitting={submitting}
       result={result}
       resultTag={COLOR_LABEL[color] ?? targetColor}
@@ -57,19 +70,25 @@ export function ProductRecolorPage() {
           : undefined
       }
       onSubmit={(inputs, settings) => {
+        if (color === 'custom' && !customColorValid) {
+          message.error('请输入有效的 HEX 颜色（如 #5546D8）');
+          return Promise.resolve();
+        }
         setSourceUrl(inputs[0]?.url ?? '');
+        const normalizedCustom = normalizeHexColor(customColor) ?? '';
         return run(inputs, {
-          targetColor: targetColor.trim(),
-          customColor: customColor.trim(),
+          targetColor: color === 'custom' ? normalizedCustom : targetColor.trim(),
+          customColor: normalizedCustom,
           ratio: settings.ratio,
           size: settings.resolution,
         });
       }}
+      onHistoryReuse={handleHistoryReuse}
       trailingPane={
         <ToolHistoryPane capability="recolor" refreshKey={result?.url} emptyText="暂无换色记录" />
       }
     >
-      <ToolCard title="商品颜色">
+      <ToolCard title="商品颜色" className="background-color-card product-recolor-color-card">
         <ColorStudio
           options={RECOLOR_COLOR_SWATCHES}
           value={color}
@@ -81,7 +100,6 @@ export function ProductRecolorPage() {
           onClear={() => setColor('#FFFFFF')}
           ariaLabel="商品颜色"
         />
-        <p className="tool-card-copy">由图像模型在保持结构与光影的前提下替换主体颜色。</p>
       </ToolCard>
     </ToolShell>
   );

@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Alert, App, Button, Drawer, Input, Modal, Result, Skeleton, Space, Typography } from 'antd';
+import {
+  Alert,
+  App,
+  Button,
+  Drawer,
+  Input,
+  Modal,
+  Result,
+  Skeleton,
+  Space,
+  Typography,
+} from 'antd';
 import { AlertTriangle } from 'lucide-react';
 import { PageHeader } from './PageHeader';
 import { StateEmpty, StateError, StateLoading } from '../StateViews';
@@ -286,7 +297,7 @@ export function AdminDrawer<T>({
   return (
     <Drawer
       title={title}
-      width={720}
+      size={720}
       open={open}
       onClose={onClose}
       className="adm-drawer"

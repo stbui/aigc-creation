@@ -42,13 +42,17 @@ const COLOR_PRESETS = [
   '#22C55E',
 ];
 
-function normalizeHex(value: string): string | null {
+export function normalizeHexColor(value: string): string | null {
   const m = /^#?([0-9a-f]{6})$/i.exec(value.trim());
   return m ? `#${m[1].toUpperCase()}` : null;
 }
 
+export function isValidHexColor(value: string): boolean {
+  return normalizeHexColor(value) !== null;
+}
+
 function hexToHsv(hex: string): { h: number; s: number; v: number } {
-  const normalized = normalizeHex(hex) ?? '#5546D8';
+  const normalized = normalizeHexColor(hex) ?? '#5546D8';
   const n = parseInt(normalized.slice(1), 16);
   const r = ((n >> 16) & 255) / 255;
   const g = ((n >> 8) & 255) / 255;
@@ -117,7 +121,8 @@ export function ColorStudio({
   onClear?: () => void;
   ariaLabel: string;
 }) {
-  const hex = normalizeHex(customColor) ?? '#5546D8';
+  const hex = normalizeHexColor(customColor) ?? '#5546D8';
+  const customHexInvalid = value === 'custom' && !isValidHexColor(customColor);
   const hsv = useMemo(() => hexToHsv(hex), [hex]);
   const pickerSupported = typeof window !== 'undefined' && 'EyeDropper' in window;
 
@@ -126,7 +131,7 @@ export function ColorStudio({
     if (!Ctor) return;
     try {
       const result = await new Ctor().open();
-      const picked = normalizeHex(result.sRGBHex);
+      const picked = normalizeHexColor(result.sRGBHex);
       if (picked) onCustomColor(picked);
     } catch {
       // 用户按 Esc 取消取色是正常操作，不弹错误
@@ -172,9 +177,10 @@ export function ColorStudio({
                 value={customColor}
                 maxLength={7}
                 placeholder="#RRGGBB"
+                aria-invalid={customHexInvalid}
                 onChange={(e) => {
                   const next = e.target.value;
-                  const normalized = normalizeHex(next);
+                  const normalized = normalizeHexColor(next);
                   if (normalized) onCustomColor(normalized);
                   else onCustomColor(next.toUpperCase());
                 }}
@@ -191,6 +197,11 @@ export function ColorStudio({
               <Pipette size={15} />
             </button>
           </div>
+          {customHexInvalid && (
+            <p className="color-studio-hex-error" role="alert">
+              请输入有效的 HEX 颜色，例如 #5546D8
+            </p>
+          )}
 
           <label className="color-studio-slider">
             <span>

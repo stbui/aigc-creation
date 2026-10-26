@@ -425,7 +425,7 @@ export function AdminProductsPage() {
 
       <Drawer
         title={editing ? '编辑商品' : '新建商品'}
-        width={520}
+        size={520}
         open={creating || editing !== null}
         onClose={closeForm}
         className="adm-drawer"

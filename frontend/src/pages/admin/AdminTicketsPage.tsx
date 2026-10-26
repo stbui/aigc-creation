@@ -454,7 +454,7 @@ export function AdminTicketsPage() {
 
       <Drawer
         title={detail ? `${detail.subject} · ${detail.ticketNo}` : '工单详情'}
-        width={760}
+        size={760}
         open={detailId !== null}
         onClose={() => setDetailId(null)}
         className="adm-drawer"

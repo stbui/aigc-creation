@@ -1,6 +1,6 @@
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { App } from 'antd';
-import { RotateCcw } from 'lucide-react';
+import { Info, RotateCcw } from 'lucide-react';
 import { useToolTask } from '../hooks/useToolTask';
 import { ToolShell } from '../components/ToolShell';
 import { RangeRow, ToolCard } from '../components/ToolWidgets';
@@ -44,7 +44,7 @@ interface DragOrigin {
 
 export function RotateAnglePage() {
   const { message } = App.useApp();
-  const { submitting, result, run } = useToolTask({ capability: 'rotate', successMessage: '旋转结果已生成' });
+  const { submitting, result, setResult, run } = useToolTask({ capability: 'rotate', successMessage: '旋转结果已生成' });
 
   const [tab, setTab] = useState<'subject' | 'camera'>('subject');
   const [yaw, setYaw] = useState(0);
@@ -53,6 +53,11 @@ export function RotateAnglePage() {
   const [dragging, setDragging] = useState(false);
   const [sourceUrl, setSourceUrl] = useState('');
   const dragOrigin = useRef<DragOrigin | null>(null);
+
+  const handleHistoryReuse = () => {
+    setSourceUrl('');
+    setResult(null);
+  };
 
   const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
@@ -106,12 +111,14 @@ export function RotateAnglePage() {
   return (
     <ToolShell
       capability="rotate"
+      pageClass="product-retouch-page rotate-angle-page rotate-angle-grid"
+      inputPaneClassName="rotate-angle-controls"
+      uploadActionsPlacement="above"
       title="旋转角度"
       desc="视角平滑旋转，细节立体呈现"
       upload={{ title: '上传图片', required: true, max: 1, hint: '支持 JPG、PNG、WebP，最多 1 张' }}
       settings={{ ratio: true, resolution: true }}
       submitLabel="立即生成"
-      hint="确认素材和参数后提交，右侧会展示生成结果。"
       emptyDesc="上传图片并调整角度后，结果将在此处展示"
       formValid
       submitting={submitting}
@@ -137,6 +144,7 @@ export function RotateAnglePage() {
           size: settings.resolution,
         });
       }}
+      onHistoryReuse={handleHistoryReuse}
       trailingPane={
         <ToolHistoryPane capability="rotate" refreshKey={result?.url} emptyText="暂无旋转记录" />
       }
@@ -263,8 +271,10 @@ export function RotateAnglePage() {
         <RangeRow label="倾斜" min={-30} max={60} step={1} value={pitch} onChange={setPitch} />
         <RangeRow label="缩放" display={zoom === 1 ? '特写' : zoom.toFixed(2)} min={0.8} max={1.2} step={0.01} value={zoom} onChange={setZoom} />
 
-        <p className="tool-card-copy">相机保持静止，生成时按主体旋转角度重建商品展示。</p>
-        <p className="tool-card-copy">由图像模型按视角参数重建，结果可能包含生成式补全。</p>
+        <p className="rotate-angle-tip">
+          <Info size={13} />
+          <span>相机保持静止，生成时按主体旋转角度重建商品展示。</span>
+        </p>
       </section>
         );
       }}

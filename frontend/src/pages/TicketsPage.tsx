@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, MessageSquarePlus, Send, X } from 'lucide-react';
+import { Button, Input, Select } from 'antd';
+import { ChevronDown, MessageSquarePlus, Send, X } from 'lucide-react';
 import { ticketsApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
-import { StateError, StateSkeleton } from '../components/StateViews';
+import { PersonalPage } from '../components/PersonalPage';
+import { StateButton, StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
 import type { Ticket, TicketPriority, TicketStatus, TicketType } from '../types/api';
 
 /**
@@ -223,184 +225,178 @@ export function TicketsPage() {
 
   if (!token) {
     return (
-      <div className="orders-page">
-        <h1 className="orders-title">我的工单</h1>
-        <p className="orders-sub">登录后可提交问题反馈并跟踪客服处理进度。</p>
-        <button type="button" className="pkg-pay-btn" onClick={openLogin}>
-          登录 / 注册
+      <PersonalPage title="我的工单" description="提交问题反馈并跟踪客服处理进度。">
+        <StateEmpty
+          title="登录后查看工单"
+          desc="工单与你的账号绑定；登录后可以提交问题、查看客服回复并继续追问。"
+          action={<StateButton onClick={openLogin}>登录/注册</StateButton>}
+        />
+      </PersonalPage>
+    );
+  }
+
+  if (detail) {
+    return (
+      <PersonalPage
+        className="orders-page"
+        title={detail.subject}
+        description={
+          <>
+            {detail.ticketNo} · {detail.typeLabel} · 提交于 {fmt(detail.createdAt)}
+            {detail.status === 'resolved' && ' · 客服认为已解决，如仍有问题请继续回复'}
+          </>
+        }
+        extra={<span className={`ticket-status is-${detail.status}`}>{STATUS_LABELS[detail.status]}</span>}
+        showBack={false}
+      >
+        <button type="button" className="pkg-back-btn ticket-detail-back" onClick={closeDetail}>
+          ← 返回工单列表
         </button>
-      </div>
+
+        {detailError && <p className="ticket-error">{detailError}</p>}
+
+        {detailLoading && <StateSkeleton variant="row" count={2} />}
+
+        <div className="ticket-thread">
+          <div className="ticket-msg is-user">
+            <div className="ticket-msg-head">
+              <span>我</span>
+              <span>{fmt(detail.createdAt)}</span>
+            </div>
+            <div className="ticket-msg-body">{detail.content}</div>
+          </div>
+          {(detail.replies ?? []).map((r) => (
+            <div
+              key={r.id}
+              className={`ticket-msg ${r.authorType === 'admin' ? 'is-admin' : 'is-user'}`}
+            >
+              <div className="ticket-msg-head">
+                <span>{r.authorType === 'admin' ? '货觉客服' : '我'}</span>
+                <span>{fmt(r.createdAt)}</span>
+              </div>
+              <div className="ticket-msg-body">{r.content}</div>
+            </div>
+          ))}
+        </div>
+
+        {detail.status === 'closed' ? (
+          <p className="orders-sub">该工单已关闭，如需继续请新建工单。</p>
+        ) : (
+          <div className="ticket-reply">
+            <Input.TextArea
+              rows={4}
+              maxLength={2000}
+              value={reply}
+              disabled={busy}
+              onChange={(e) => setReply(e.target.value)}
+              placeholder="补充说明或继续追问…"
+              showCount
+            />
+            <div className="ticket-reply-actions">
+              <Button
+                type="primary"
+                icon={<Send size={14} />}
+                disabled={busy || !reply.trim()}
+                loading={busy}
+                onClick={() => void sendReply()}
+              >
+                发送
+              </Button>
+              <Button disabled={busy} onClick={() => void closeTicket()}>
+                问题已解决，关闭工单
+              </Button>
+            </div>
+          </div>
+        )}
+      </PersonalPage>
     );
   }
 
   return (
-    <div className="orders-page">
-      <button type="button" className="pkg-back-btn" onClick={() => navigate(-1)}>
-        <ArrowLeft size={14} /> 返回
-      </button>
-
-      {detail ? (
-        <>
-          <button type="button" className="pkg-back-btn" onClick={closeDetail}>
-            <ArrowLeft size={14} /> 返回工单列表
-          </button>
-
-          <div className="ticket-head">
-            <h1 className="orders-title">{detail.subject}</h1>
-            <span className={`ticket-status is-${detail.status}`}>{STATUS_LABELS[detail.status]}</span>
-          </div>
-          <p className="orders-sub">
-            {detail.ticketNo} · {detail.typeLabel} · 提交于 {fmt(detail.createdAt)}
-            {detail.status === 'resolved' && ' · 客服认为已解决，如仍有问题请继续回复'}
-          </p>
-
-          {detailError && (
-            <p className="ticket-error">{detailError}</p>
-          )}
-
-          {detailLoading && <StateSkeleton variant="row" count={2} />}
-
-          <div className="ticket-thread">
-            <div className="ticket-msg is-user">
-              <div className="ticket-msg-head">
-                <span>我</span>
-                <span>{fmt(detail.createdAt)}</span>
-              </div>
-              <div className="ticket-msg-body">{detail.content}</div>
-            </div>
-            {(detail.replies ?? []).map((r) => (
-              <div
-                key={r.id}
-                className={`ticket-msg ${r.authorType === 'admin' ? 'is-admin' : 'is-user'}`}
-              >
-                <div className="ticket-msg-head">
-                  <span>{r.authorType === 'admin' ? '货觉客服' : '我'}</span>
-                  <span>{fmt(r.createdAt)}</span>
-                </div>
-                <div className="ticket-msg-body">{r.content}</div>
-              </div>
-            ))}
-          </div>
-
-          {detail.status === 'closed' ? (
-            <p className="orders-sub">该工单已关闭，如需继续请新建工单。</p>
-          ) : (
-            <div className="ticket-reply">
-              <textarea
-                rows={4}
-                maxLength={2000}
-                value={reply}
-                disabled={busy}
-                onChange={(e) => setReply(e.target.value)}
-                placeholder="补充说明或继续追问…"
-              />
-              <div className="ticket-reply-actions">
-                <button
-                  type="button"
-                  className="pkg-pay-btn"
-                  disabled={busy || !reply.trim()}
-                  onClick={() => void sendReply()}
-                >
-                  <Send size={14} /> 发送
-                </button>
-                <button type="button" className="pkg-ghost-btn" disabled={busy} onClick={() => void closeTicket()}>
-                  问题已解决，关闭工单
-                </button>
-              </div>
-            </div>
-          )}
-        </>
-      ) : (
-        <>
-          <h1 className="orders-title">我的工单</h1>
-          <p className="orders-sub">提交问题、投诉或咨询，客服回复会出现在这里，也会推送站内消息。</p>
-
-          <button
-            type="button"
-            className="pkg-pay-btn ticket-new-btn"
-            onClick={() => setComposing((v) => !v)}
-          >
-            <MessageSquarePlus size={15} /> {composing ? '收起' : '提交新工单'}
-          </button>
-
-          {composing && (
-            <section className="ticket-compose">
-              <label>
-                问题类型
-                <select
-                  value={form.type}
-                  onChange={(e) => setForm({ ...form, type: e.target.value as TicketType })}
-                >
-                  {TYPE_OPTIONS.map((o) => (
-                    <option key={o.value} value={o.value}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                优先级
-                <select
-                  value={form.priority}
-                  onChange={(e) => setForm({ ...form, priority: e.target.value as TicketPriority })}
-                >
-                  {(['low', 'normal', 'high'] as TicketPriority[]).map((p) => (
-                    <option key={p} value={p}>
-                      {PRIORITY_LABELS[p]}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="is-full">
-                标题
-                <input
-                  type="text"
-                  maxLength={80}
-                  value={form.subject}
-                  onChange={(e) => setForm({ ...form, subject: e.target.value })}
-                  placeholder="一句话说明问题，如：生成的主图保存后是空白"
-                />
-              </label>
-              <label className="is-full">
-                详细描述
-                <textarea
-                  rows={5}
-                  maxLength={2000}
-                  value={form.content}
-                  onChange={(e) => setForm({ ...form, content: e.target.value })}
-                  placeholder="复现步骤、涉及的能力或订单号。信息越具体，客服越不必来回追问。"
-                />
-              </label>
-              {formError && <p className="ticket-error is-full">{formError}</p>}
-              <div className="ticket-compose-actions">
-                <button type="button" className="pkg-ghost-btn" onClick={() => setComposing(false)}>
-                  <X size={14} /> 取消
-                </button>
-                <button
-                  type="button"
-                  className="pkg-pay-btn"
-                  disabled={submitting}
-                  onClick={() => void submit()}
-                >
-                  {submitting ? '提交中…' : '提交工单'}
-                </button>
-              </div>
-            </section>
-          )}
-
-          {loading && <StateSkeleton variant="row" count={3} />}
-          {!loading && error && (
-            <StateError
-              title="工单加载失败"
-              desc="没能取回你的工单列表，重试一次即可。"
-              detail={error}
-              onRetry={() => void load()}
+    <PersonalPage
+      className="orders-page"
+      title="我的工单"
+      description="提交问题、投诉或咨询，客服回复会出现在这里，也会推送站内消息。"
+      extra={
+        <Button
+          type="primary"
+          icon={composing ? <X size={15} /> : <MessageSquarePlus size={15} />}
+          onClick={() => setComposing((v) => !v)}
+        >
+          {composing ? '收起表单' : '提交新工单'}
+        </Button>
+      }
+    >
+      {composing && (
+        <section className="ticket-compose">
+          <label>
+            问题类型
+            <Select
+              value={form.type}
+              onChange={(value) => setForm({ ...form, type: value })}
+              options={TYPE_OPTIONS}
             />
-          )}
-          {!loading && !error && items.length === 0 && (
-            <p className="credits-list-empty">还没有工单。遇到问题随时提交，客服会在这里回复你。</p>
-          )}
+          </label>
+          <label>
+            优先级
+            <Select
+              value={form.priority}
+              onChange={(value) => setForm({ ...form, priority: value })}
+              options={(['low', 'normal', 'high'] as TicketPriority[]).map((p) => ({
+                value: p,
+                label: PRIORITY_LABELS[p],
+              }))}
+            />
+          </label>
+          <label className="is-full">
+            标题
+            <Input
+              maxLength={80}
+              value={form.subject}
+              onChange={(e) => setForm({ ...form, subject: e.target.value })}
+              placeholder="一句话说明问题，如：生成的主图保存后是空白"
+            />
+          </label>
+          <label className="is-full">
+            详细描述
+            <Input.TextArea
+              rows={5}
+              maxLength={2000}
+              showCount
+              value={form.content}
+              onChange={(e) => setForm({ ...form, content: e.target.value })}
+              placeholder="复现步骤、涉及的能力或订单号。信息越具体，客服越不必来回追问。"
+            />
+          </label>
+          {formError && <p className="ticket-error is-full">{formError}</p>}
+          <div className="ticket-compose-actions">
+            <Button onClick={() => setComposing(false)}>取消</Button>
+            <Button type="primary" loading={submitting} onClick={() => void submit()}>
+              提交工单
+            </Button>
+          </div>
+        </section>
+      )}
 
+      {loading && <StateSkeleton variant="row" count={3} />}
+      {!loading && error && (
+        <StateError
+          title="工单加载失败"
+          desc="没能取回你的工单列表，重试一次即可。"
+          detail={error}
+          onRetry={() => void load()}
+        />
+      )}
+      {!loading && !error && items.length === 0 && (
+        <StateEmpty
+          title="还没有工单"
+          desc="遇到问题随时提交，客服回复会出现在这里，也会推送站内消息。"
+          action={<StateButton onClick={() => setComposing(true)}>提交新工单</StateButton>}
+        />
+      )}
+
+      {items.length > 0 && (
+        <div className="ticket-list">
           {items.map((t) => (
             <button
               key={t.id}
@@ -419,8 +415,8 @@ export function TicketsPage() {
               <ChevronDown size={14} className="ticket-card-arrow" />
             </button>
           ))}
-        </>
+        </div>
       )}
-    </div>
+    </PersonalPage>
   );
 }

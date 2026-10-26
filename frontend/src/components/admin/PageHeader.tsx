@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
 import { Card, Collapse, Empty, Flex, Space, Tag, Typography } from 'antd';
+import { ChevronRight } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
+import { findAdminMenuGroup, findAdminMenuItem } from './adminNav';
 
 /** 状态语义色 → antd Tag 色值 */
 const TONE_TO_ANTD: Record<TagTone, string> = {
@@ -21,9 +24,24 @@ export function PageHeader({
   description?: string;
   actions?: ReactNode;
 }) {
+  const location = useLocation();
+  const group = findAdminMenuGroup(location.pathname);
+  const current = findAdminMenuItem(location.pathname);
+
   return (
     <Flex className="adm-page-head" align="flex-start" justify="space-between" gap={16}>
-      <div>
+      <div className="adm-page-head-main">
+        <div className="adm-page-kicker" aria-label="当前位置">
+          <span>运营后台</span>
+          <ChevronRight size={12} aria-hidden="true" />
+          <span>{group?.name ?? '工作台'}</span>
+          {current && (
+            <>
+              <ChevronRight size={12} aria-hidden="true" />
+              <strong>{current.label}</strong>
+            </>
+          )}
+        </div>
         <Typography.Title level={4} className="adm-page-head-title" style={{ margin: 0 }}>
           {title}
         </Typography.Title>

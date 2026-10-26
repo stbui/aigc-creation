@@ -51,6 +51,13 @@ export interface CapabilityParam {
    * 技术参数（如局部重绘的 annotations JSON）可在此显式放大。
    */
   maxLength?: number;
+  /**
+   * text 参数的正则约束（完整匹配由 pattern 自身表达）。
+   *
+   * 用于有强格式要求的协议字段（如 #RRGGBB 颜色）。校验发生在扣费前，
+   * 非法值直接 40001，不会经 sanitizeParams 静默回落成默认值。
+   */
+  pattern?: string;
   step?: number;
   placeholder?: string;
   help?: string;
@@ -156,6 +163,13 @@ export function assertCapabilityIntegrity(plugins: CapabilityPlugin[]): void {
     for (const param of p.params ?? []) {
       if (keys.has(param.key)) errors.push(`能力 ${tag} 的参数 key 重复: ${param.key}`);
       keys.add(param.key);
+      if (param.pattern) {
+        try {
+          new RegExp(param.pattern);
+        } catch {
+          errors.push(`能力 ${tag} 的参数 ${param.key} 声明了无效正则: ${param.pattern}`);
+        }
+      }
     }
   }
 

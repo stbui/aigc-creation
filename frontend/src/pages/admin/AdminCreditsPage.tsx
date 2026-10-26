@@ -437,7 +437,7 @@ function CreditDetailDrawer({
   return (
     <Drawer
       title={`积分明细 · ${user.email}`}
-      width={760}
+      size={760}
       open
       onClose={onClose}
       className="adm-drawer"
@@ -790,7 +790,7 @@ function BatchAdjustModal({
   return (
     <Drawer
       title="批量调整积分"
-      width={680}
+      size={680}
       open={open}
       onClose={close}
       className="adm-drawer"
@@ -980,7 +980,7 @@ function CsvImportModal({
   return (
     <Drawer
       title="导入积分（CSV）"
-      width={680}
+      size={680}
       open={open}
       onClose={close}
       className="adm-drawer"

@@ -208,9 +208,20 @@ export function PillOptions({
 }
 
 /** 业务卡 (参考站 local-redraw-card: 白底圆角 + 标题行) */
-export function ToolCard({ title, children, actions }: { title?: string; children: ReactNode; actions?: ReactNode }) {
+export function ToolCard({
+  title,
+  children,
+  actions,
+  className,
+}: {
+  title?: string;
+  children: ReactNode;
+  actions?: ReactNode;
+  /** 参考站页面级卡片 class（如 background-color-card / product-retouch-card） */
+  className?: string;
+}) {
   return (
-    <section className="local-redraw-card tool-card">
+    <section className={`local-redraw-card tool-card${className ? ` ${className}` : ''}`}>
       {title && (
         <div className="card-title-row">
           <h2>{title}</h2>

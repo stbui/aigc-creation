@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { App } from 'antd';
-import { ArrowLeft } from 'lucide-react';
+import { App, Button, Input, Select } from 'antd';
+import { ShoppingBag } from 'lucide-react';
 import { ordersApi, invoicesApi, paymentsApi } from '../lib/api';
 import { notifyCreditsChanged } from '../context/CreditsContext';
 import { useAuth } from '../context/AuthContext';
-import { StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
+import { PersonalPage } from '../components/PersonalPage';
+import { StateButton, StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
 import type { Invoice, Order, OrderStatus } from '../types/api';
 
 /**
@@ -180,22 +181,13 @@ export function OrdersPage() {
    */
   if (!token) {
     return (
-      <div className="orders-page">
-        <button type="button" className="pkg-back-btn" onClick={() => navigate(-1)}>
-          <ArrowLeft size={14} /> 返回
-        </button>
-        <div className="state-page">
-          <StateEmpty
-            title="登录后查看订单"
-            desc="订单与支付记录和账号绑定，登录后可以查看历史订单并继续支付未完成的订单。"
-            action={
-              <button type="button" className="state-btn is-primary" onClick={openLogin}>
-                登录/注册
-              </button>
-            }
-          />
-        </div>
-      </div>
+      <PersonalPage title="我的订单" description="查看订单、支付记录与开票进度。">
+        <StateEmpty
+          title="登录后查看订单"
+          desc="订单与支付记录和账号绑定，登录后可以查看历史订单并继续支付未完成的订单。"
+          action={<StateButton onClick={openLogin}>登录/注册</StateButton>}
+        />
+      </PersonalPage>
     );
   }
 
@@ -249,14 +241,23 @@ export function OrdersPage() {
     });
   };
 
-  return (
-    <div className="orders-page">
-      <button type="button" className="pkg-back-btn" onClick={() => navigate(-1)}>
-        <ArrowLeft size={14} /> 返回
-      </button>
+  const pendingCount = orders.filter((o) => canPay(o)).length;
 
-      <h1 className="orders-title">我的订单</h1>
-      <p className="orders-sub">订单与支付记录，未支付订单可在有效期内继续支付</p>
+  return (
+    <PersonalPage
+      className="orders-page"
+      title="我的订单"
+      description={
+        pendingCount > 0
+          ? `有 ${pendingCount} 笔待支付订单，请在有效期内完成支付。`
+          : '订单与支付记录，未支付订单可在有效期内继续支付。'
+      }
+      extra={
+        <Button type="primary" icon={<ShoppingBag size={15} />} onClick={() => navigate('/packages')}>
+          购买积分 / 会员
+        </Button>
+      }
+    >
 
       {/* 加载 / 失败 / 空 三态分开 (2026-10-20 修, 同 CreditsPage) */}
       {loading && <StateSkeleton variant="row" count={3} />}
@@ -269,7 +270,11 @@ export function OrdersPage() {
         />
       )}
       {!loading && !error && orders.length === 0 && (
-        <p className="credits-list-empty">还没有订单</p>
+        <StateEmpty
+          title="还没有订单"
+          desc="购买积分或开通会员后，订单与支付记录会显示在这里。"
+          action={<StateButton onClick={() => navigate('/packages')}>去积分商城</StateButton>}
+        />
       )}
 
       {orders.map((o) => {
@@ -438,22 +443,22 @@ export function OrdersPage() {
               <div className="pkg-confirm-card" style={{ marginTop: 12 }}>
                 <div className="pkg-confirm-row">
                   <span>抬头类型</span>
-                  <select
-                    className="pkg-sandbox-btn"
+                  <Select
+                    size="small"
+                    style={{ width: 120 }}
                     value={form.kind}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, kind: e.target.value as 'personal' | 'company' }))
-                    }
-                  >
-                    <option value="personal">个人</option>
-                    <option value="company">企业</option>
-                  </select>
+                    onChange={(value) => setForm((f) => ({ ...f, kind: value }))}
+                    options={[
+                      { value: 'personal', label: '个人' },
+                      { value: 'company', label: '企业' },
+                    ]}
+                  />
                 </div>
                 <div className="pkg-confirm-row">
                   <span>发票抬头</span>
-                  <input
-                    className="pkg-sandbox-btn"
-                    style={{ maxWidth: 240, padding: '6px 10px' }}
+                  <Input
+                    size="small"
+                    style={{ maxWidth: 240 }}
                     value={form.title}
                     maxLength={60}
                     onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
@@ -463,9 +468,9 @@ export function OrdersPage() {
                 {form.kind === 'company' && (
                   <div className="pkg-confirm-row">
                     <span>税号</span>
-                    <input
-                      className="pkg-sandbox-btn"
-                      style={{ maxWidth: 240, padding: '6px 10px' }}
+                    <Input
+                      size="small"
+                      style={{ maxWidth: 240 }}
                       value={form.taxNo}
                       maxLength={30}
                       onChange={(e) => setForm((f) => ({ ...f, taxNo: e.target.value }))}
@@ -475,9 +480,9 @@ export function OrdersPage() {
                 )}
                 <div className="pkg-confirm-row">
                   <span>接收邮箱</span>
-                  <input
-                    className="pkg-sandbox-btn"
-                    style={{ maxWidth: 240, padding: '6px 10px' }}
+                  <Input
+                    size="small"
+                    style={{ maxWidth: 240 }}
                     value={form.email}
                     maxLength={120}
                     onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
@@ -506,6 +511,6 @@ export function OrdersPage() {
           </article>
         );
       })}
-    </div>
+    </PersonalPage>
   );
 }

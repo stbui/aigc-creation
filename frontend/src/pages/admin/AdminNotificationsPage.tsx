@@ -318,7 +318,7 @@ export function AdminNotificationsPage() {
 
       <Drawer
         open={formOpen}
-        width={640}
+        size={640}
         title={editing ? `编辑模板 ${editing.code}` : '新建消息模板'}
         onClose={() => setFormOpen(false)}
         destroyOnHidden

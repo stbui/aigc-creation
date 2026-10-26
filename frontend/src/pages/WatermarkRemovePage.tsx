@@ -5,7 +5,6 @@ import { useToolTask } from '../hooks/useToolTask';
 import { useProject } from '../hooks/useProject';
 import { assetsApi } from '../lib/api';
 import { ToolShell, type ToolAsset } from '../components/ToolShell';
-import { ToolCard } from '../components/ToolWidgets';
 import { MaskCanvas, type MaskCanvasHandle, type MaskTool } from '../components/MaskCanvas';
 import { ToolHistoryPane } from '../components/ToolHistoryPane';
 
@@ -17,11 +16,8 @@ import { ToolHistoryPane } from '../components/ToolHistoryPane';
  *   createWatermarkRemoval({ maskAssetId, detectionMode:'MANUAL' })。
  * 后端已接入同一遮罩协议：透明像素 = 去除区域，随任务提交给图像模型。
  *
- * 自动/指定区域保留为快捷方式（由模型按提示处理）。手动模式要求至少
- * 涂出 4 个采样像素可识别的区域，按钮才允许提交。
+ * 参考站只有手动标注这一条路径，按钮在至少涂出 4 个可识别采样像素前保持禁用。
  */
-
-type Mode = 'manual' | 'auto' | 'region';
 
 const TOOLS: Array<{ value: MaskTool; label: string; shortcut: string; icon: typeof Hand }> = [
   { value: 'hand', label: '抓手', shortcut: 'H', icon: Hand },
@@ -29,14 +25,6 @@ const TOOLS: Array<{ value: MaskTool; label: string; shortcut: string; icon: typ
   { value: 'eraser', label: '擦除', shortcut: 'E', icon: Eraser },
   { value: 'rect', label: '框选', shortcut: 'R', icon: Square },
   { value: 'ellipse', label: '圈选', shortcut: 'O', icon: Circle },
-];
-
-const REGIONS = [
-  { value: 'bottom_right', label: '右下角' },
-  { value: 'bottom_left', label: '左下角' },
-  { value: 'top_right', label: '右上角' },
-  { value: 'top_left', label: '左上角' },
-  { value: 'center', label: '画面中央' },
 ];
 
 export function WatermarkRemovePage() {
@@ -48,8 +36,6 @@ export function WatermarkRemovePage() {
   const maskAssetIdRef = useRef<string | null>(null);
   const maskSourceIdRef = useRef<string | null>(null);
 
-  const [mode, setMode] = useState<Mode>('manual');
-  const [region, setRegion] = useState('bottom_right');
   const [tool, setTool] = useState<MaskTool>('brush');
   const [brush, setBrush] = useState(30);
   const [zoom, setZoom] = useState(100);
@@ -89,56 +75,52 @@ export function WatermarkRemovePage() {
   const submit = async (inputs: ToolAsset[], settings: { ratio: string; resolution: string }) => {
     setSourceUrl(inputs[0]?.url ?? '');
     let maskAssetId: string | undefined;
-    if (mode === 'manual') {
-      try {
-        setPreparing(true);
-        const sourceId = inputs[0]?.id ?? null;
-        if (maskSourceIdRef.current !== sourceId) {
-          maskBlobRef.current = null;
-          maskAssetIdRef.current = null;
-          maskSourceIdRef.current = sourceId;
-        }
-        // 结果态会卸载画布；「重新生成」必须复用上一次的遮罩，而不是误报未标注。
-        const freshBlob = await painter.current?.toBlob();
-        const blob = freshBlob ?? maskBlobRef.current;
-        if (!blob) {
-          message.warning('请先在图片上圈出水印区域');
-          return;
-        }
-        if (freshBlob) {
-          maskBlobRef.current = freshBlob;
-          maskAssetIdRef.current = null;
-        }
-        if (!maskAssetIdRef.current) {
-          const projectId = await ensureProject();
-          const asset = await assetsApi.upload(
-            new File([blob], `watermark-mask-${Date.now()}.png`, { type: 'image/png' }),
-            projectId,
-          );
-          maskAssetIdRef.current = asset.id;
-        }
-        maskAssetId = maskAssetIdRef.current;
-      } catch (e) {
-        message.error((e as Error).message || '遮罩上传失败，请重试');
-        return;
-      } finally {
-        setPreparing(false);
+    try {
+      setPreparing(true);
+      const sourceId = inputs[0]?.id ?? null;
+      if (maskSourceIdRef.current !== sourceId) {
+        maskBlobRef.current = null;
+        maskAssetIdRef.current = null;
+        maskSourceIdRef.current = sourceId;
       }
+      // 结果态会卸载画布；「重新生成」必须复用上一次的遮罩，而不是误报未标注。
+      const freshBlob = await painter.current?.toBlob();
+      const blob = freshBlob ?? maskBlobRef.current;
+      if (!blob) {
+        message.warning('请先在图片上圈出水印区域');
+        return;
+      }
+      if (freshBlob) {
+        maskBlobRef.current = freshBlob;
+        maskAssetIdRef.current = null;
+      }
+      if (!maskAssetIdRef.current) {
+        const projectId = await ensureProject();
+        const asset = await assetsApi.upload(
+          new File([blob], `watermark-mask-${Date.now()}.png`, { type: 'image/png' }),
+          projectId,
+        );
+        maskAssetIdRef.current = asset.id;
+      }
+      maskAssetId = maskAssetIdRef.current;
+    } catch (e) {
+      message.error((e as Error).message || '遮罩上传失败，请重试');
+      return;
+    } finally {
+      setPreparing(false);
     }
 
     await run(inputs, {
-      mode: mode === 'region' ? 'region' : 'auto',
-      region,
-      detectionMode: mode === 'manual' ? 'MANUAL' : 'AUTO',
+      mode: 'manual',
+      detectionMode: 'MANUAL',
       ...(maskAssetId ? { maskAssetId } : {}),
-      ...(mode === 'manual' ? { outputFormat: 'PNG' } : {}),
+      outputFormat: 'PNG',
       ratio: settings.ratio,
       size: settings.resolution,
     });
   };
 
-  const resultTag =
-    mode === 'manual' ? '手动遮罩' : mode === 'auto' ? '自动识别' : REGIONS.find((item) => item.value === region)?.label;
+  const resultTag = '手动遮罩';
 
   /*
    * 结果态会卸载标注画布，遮罩的矢量笔迹无法随组件一起恢复。这里明确清空
@@ -154,16 +136,23 @@ export function WatermarkRemovePage() {
     setResult(null);
   };
 
+  const handleHistoryReuse = () => {
+    startReannotation();
+    setSourceUrl('');
+    setZoom(100);
+    setPan({ x: 0, y: 0 });
+  };
+
   return (
     <ToolShell
       capability="remove_watermark"
+      pageClass="watermark-removal-page local-redraw-page"
       title="去除水印"
       desc="框选、圈选或涂抹水印区域，即可去除图片中的水印"
       upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
       submitLabel="开始去除"
-      hint="* 请仅处理你拥有版权或已获授权的图片。"
       emptyDesc="上传图片并标注水印区域后，处理结果将在此处展示"
-      formValid={(mode !== 'manual' || painted) && !preparing}
+      formValid={painted && !preparing}
       submitting={submitting}
       result={result}
       resultTag={resultTag}
@@ -173,8 +162,9 @@ export function WatermarkRemovePage() {
           : undefined
       }
       onSubmit={submit}
+      onHistoryReuse={handleHistoryReuse}
       resultActions={
-        result?.status === 'succeeded' ? (
+        result ? (
           <button type="button" className="tool-result-action" onClick={startReannotation}>
             重新标注
           </button>
@@ -185,7 +175,7 @@ export function WatermarkRemovePage() {
       }
       sourcePane={(images) => {
         const image = images[0];
-        if (!image || mode !== 'manual') return null;
+        if (!image) return null;
 
         const toolButton = (item: (typeof TOOLS)[number]) => {
           const Icon = item.icon;
@@ -279,42 +269,6 @@ export function WatermarkRemovePage() {
         );
       }}
     >
-      <ToolCard title="处理方式">
-        <div className="tool-select-row">
-          {[
-            { value: 'manual', label: '手动标注' },
-            { value: 'auto', label: '自动识别' },
-            { value: 'region', label: '指定区域' },
-          ].map((item) => (
-            <button
-              key={item.value}
-              type="button"
-              role="radio"
-              aria-checked={mode === item.value}
-              className={`tool-region-chip${mode === item.value ? ' active' : ''}`}
-              onClick={() => setMode(item.value as Mode)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-        {mode === 'region' && (
-          <label className="tool-select-field">
-            <span>区域位置</span>
-            <select value={region} onChange={(e) => setRegion(e.target.value)}>
-              {REGIONS.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
-          </label>
-        )}
-        <p className="tool-card-copy">
-          {mode === 'manual'
-            ? '推荐使用手动标注：只有圈出的透明区域会被修补，压在主体上的水印也能精确避开。'
-            : '自动/区域模式由模型按提示清除指定区域；手动标注能更精确地限定范围。'}
-        </p>
-        <p className="tool-card-copy">去除效果取决于模型能力；压在商品主体上的水印建议使用手动遮罩。</p>
-      </ToolCard>
     </ToolShell>
   );
 }

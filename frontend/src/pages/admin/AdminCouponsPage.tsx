@@ -448,7 +448,7 @@ export function AdminCouponsPage() {
       {/* 创建/编辑抽屉 */}
       <Drawer
         title={editing ? `编辑优惠券 · ${editing.code}` : '新建优惠券'}
-        width={560}
+        size={560}
         open={formOpen}
         onClose={() => setFormOpen(false)}
         className="adm-drawer"

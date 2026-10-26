@@ -268,7 +268,7 @@ export function AdminLegalPage() {
 
       <Drawer
         open={formOpen}
-        width={720}
+        size={720}
         title={editing ? `编辑 ${editing.version}（草稿）` : '新建法务文档版本'}
         onClose={() => setFormOpen(false)}
         destroyOnHidden

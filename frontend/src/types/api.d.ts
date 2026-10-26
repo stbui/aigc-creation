@@ -29,6 +29,10 @@ export interface CapabilityParam {
   options?: ParamOption[];
   min?: number;
   max?: number;
+  /** 文本参数的完整格式约束（如 HEX: ^#[0-9a-fA-F]{6}$） */
+  pattern?: string;
+  /** 文本参数允许保留的最大长度；缺省由具体表单决定 */
+  maxLength?: number;
   step?: number;
   placeholder?: string;
   help?: string;
@@ -344,8 +348,8 @@ export interface GenerateResponse {
   idempotentHit?: boolean;
 }
 
-// 后端 getTask 返回 outputAsset (backend/src/generate/generate.service.ts:125),
-// listTasks 不返回 outputAsset。错误码字段是 errorCode 而非 error。
+// 后端 getTask 与 listTasks 都返回 outputAsset（后者用于历史缩略图/复用）。
+// 错误码字段是 errorCode 而非 error。
 export interface Task {
   id: string;
   projectId: string;

@@ -405,7 +405,7 @@ export function AdminCampaignsPage() {
 
       <Drawer
         title={editing ? `编辑活动 · ${editing.name}` : '新建活动'}
-        width={560}
+        size={560}
         open={formOpen}
         onClose={() => setFormOpen(false)}
         className="adm-drawer"

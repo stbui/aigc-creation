@@ -562,7 +562,20 @@ export function MattingResultEditor({
       const scale = Math.min(out.width / canvas.width, out.height / canvas.height) * (subjectZoom / 100);
       const drawWidth = canvas.width * scale;
       const drawHeight = canvas.height * scale;
-      ctx.drawImage(canvas, (out.width - drawWidth) / 2, (out.height - drawHeight) / 2, drawWidth, drawHeight);
+      /*
+       * 主体平移是结果的一部分，而画布平移只是视口。导出时只映射
+       * subjectPan，并保持导出画布尺寸与当前舞台一致，否则用户调整过
+       * 主体位置后下载到的图会与所见不一致。
+       */
+      const offsetX = subjectPan.x * (out.width / Math.max(stageSize.width, 1));
+      const offsetY = subjectPan.y * (out.height / Math.max(stageSize.height, 1));
+      ctx.drawImage(
+        canvas,
+        (out.width - drawWidth) / 2 + offsetX,
+        (out.height - drawHeight) / 2 + offsetY,
+        drawWidth,
+        drawHeight,
+      );
       out.toBlob((blob) => {
         if (!blob) {
           setDownloading(false);

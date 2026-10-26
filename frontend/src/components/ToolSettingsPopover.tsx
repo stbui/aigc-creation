@@ -96,7 +96,7 @@ export function ToolSettingsPopover({
         onClick={onToggle}
       >
         <span className="pk-settings-label">高级设置</span>
-        {showRatio && ratio && <span className="pk-settings-chip">比例 {ratio}</span>}
+        {showRatio && ratio && <span className="pk-settings-chip">比例 {ratioLabel(ratio)}</span>}
         {showResolution && <span className="pk-settings-chip">画质 {resolution.toUpperCase()}</span>}
         <ChevronDown size={15} className="pk-settings-chevron" />
       </button>
@@ -122,7 +122,7 @@ export function ToolSettingsPopover({
                       aria-pressed={v === ratio}
                       onClick={() => onRatioChange?.(v)}
                     >
-                      <small>{v}</small>
+                      <small>{shortRatioLabel(o.label, v)}</small>
                     </button>
                   );
                 })}
@@ -157,6 +157,20 @@ export function ToolSettingsPopover({
       )}
     </div>
   );
+}
+
+function ratioLabel(value: string): string {
+  return value === 'original' ? '原比例' : value;
+}
+
+/**
+ * 比例卡文案：原比例用中文，其余沿用后端 label/value。
+ *
+ * 参考站高级设置摘要与卡片都显示「原比例」，不能把内部枚举值 original
+ * 直接暴露给用户。
+ */
+function shortRatioLabel(label: string | undefined, value: string): string {
+  return label?.trim() || ratioLabel(value);
 }
 
 /**

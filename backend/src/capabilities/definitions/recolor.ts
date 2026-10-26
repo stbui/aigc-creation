@@ -25,6 +25,7 @@ export const Recolor: CapabilityPlugin = {
       label: '自定义颜色（HEX）',
       type: 'text',
       placeholder: '#RRGGBB',
+      pattern: '^#[0-9a-fA-F]{6}$',
       help: '仅当商品颜色选择"自定义颜色"时生效',
     },
     { key: 'ratio', label: '画面比例', type: 'enum', default: 'original', options: RATIOS_WITH_ORIGINAL },
@@ -36,6 +37,7 @@ export const Recolor: CapabilityPlugin = {
       type: 'text',
       placeholder: '#RRGGBB',
       hidden: true,
+      pattern: '^#[0-9a-fA-F]{6}$',
     },
   ],
   buildPrompt: (p) =>

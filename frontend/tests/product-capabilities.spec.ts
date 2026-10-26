@@ -125,6 +125,15 @@ test.describe('能力可见性与运行态', () => {
   test('创意生图入口携带能力上下文，提交 capability=creative_image', async ({ page, request }) => {
     const { token, email } = await register(request);
     const caps = await fetchCaps(request);
+    // 本机测试环境没有真实模型通道；该用例验证的是入口上下文与请求映射，
+    // 显式注入可用运行态，避免把「无通道时禁用提交」的正确保护当成回归。
+    patchRuntime(caps, 'creative_image', {
+      enabled: true,
+      remoteAvailable: true,
+      localQuality: 'none',
+      effective: 'remote',
+      reason: null,
+    });
     await mockCaps(page, caps);
 
     let posted: any = null;
@@ -247,6 +256,16 @@ test.describe('工具上传约束', () => {
 test.describe('失败任务重试', () => {
   test('沿用原任务的 capability / inputAssetIds / params，并显示进度', async ({ page, request }) => {
     const { token, email } = await register(request);
+    const caps = await fetchCaps(request);
+    // 重试确认框只在能力可提交时出现；测试环境无真实模型通道，显式注入可用态。
+    patchRuntime(caps, 'creative_image', {
+      enabled: true,
+      remoteAvailable: true,
+      localQuality: 'none',
+      effective: 'remote',
+      reason: null,
+    });
+    await mockCaps(page, caps);
     const failed = {
       id: 'task-failed-e2e',
       projectId: 'project-e2e',

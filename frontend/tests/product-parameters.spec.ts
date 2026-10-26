@@ -197,9 +197,14 @@ test.describe('8 个工具页参数与结果态', () => {
   test('抠图：selectedColor/customColor/customAlpha/ratio/resolution', async ({ page, request }) => {
     const env = await setup(page, request, 'matting');
     await authed(page, '/background-remove', env.token, env.email);
+    await expect(page.locator('.pk-settings-chip').first()).toHaveText('比例 原比例');
+    await expect(page.locator('.pk-primary-credit')).toHaveText('限时免费');
     await uploadAndWait(page);
 
     await page.getByRole('button', { name: '自定义颜色' }).click();
+    await page.locator('.color-studio-hex input').fill('#12');
+    await expect(page.locator('button.pk-primary-btn').first()).toBeDisabled();
+    await expect(page.locator('.color-studio-hex-error')).toContainText('有效的 HEX');
     await page.locator('.color-studio-hex input').fill('#22C55E');
     await setRange(page.locator('.color-studio-slider input[type=range]').last(), 72);
     await chooseRatio(page, '4:3');
@@ -283,9 +288,28 @@ test.describe('8 个工具页参数与结果态', () => {
     await authed(page, '/image-expand', env.token, env.email);
     await uploadAndWait(page);
 
-    await page.locator('.tool-percent-field input').fill('60');
+    await expect(page.locator('.smart-expand-source-preview')).toBeVisible();
+    await expect(page.locator('.smart-expand-source-preview img')).toBeVisible();
+
+    await page.getByRole('textbox', { name: '自定义占比' }).fill('0');
+    await expect(page.locator('button.pk-primary-btn').first()).toBeDisabled();
+    await expect(page.locator('.smart-expand-field-error')).toContainText('1-100');
+    await page.getByRole('textbox', { name: '自定义占比' }).fill('101');
+    await expect(page.locator('button.pk-primary-btn').first()).toBeDisabled();
+    await page.getByRole('textbox', { name: '自定义占比' }).fill('35');
+    await page.getByRole('textbox', { name: '自定义占比' }).blur();
+    await expect(page.locator('.smart-expand-preview-caption')).toContainText('原图 35%');
+    await page.getByRole('radio', { name: '100%' }).click();
+    await expect(page.locator('.smart-expand-source-preview img')).toHaveAttribute('style', /width: 100%/);
+    await expect(page.locator('button.pk-primary-btn').first()).toBeEnabled();
+    await page.getByRole('textbox', { name: '自定义占比' }).fill('60');
     await page.getByRole('radio', { name: '原图右下' }).click();
     await chooseRatio(page, '4:3');
+    await expect(page.locator('.smart-expand-source-preview')).toHaveCSS('aspect-ratio', '4 / 3');
+    await expect(page.locator('.smart-expand-source-preview img')).toHaveAttribute(
+      'style',
+      /width: 60%; height: 53\.3333%; left: 40%; top: 46\.6667%/,
+    );
 
     const posted = await waitForPosted(page, env.posted);
     expect(posted.params).toMatchObject({
@@ -307,6 +331,9 @@ test.describe('8 个工具页参数与结果态', () => {
     await uploadAndWait(page);
 
     await page.getByRole('button', { name: '自定义颜色' }).click();
+    await page.locator('.color-studio-hex input').fill('#12345');
+    await expect(page.locator('button.pk-primary-btn').first()).toBeDisabled();
+    await expect(page.locator('.color-studio-hex-error')).toBeVisible();
     await page.locator('.color-studio-hex input').fill('#7B2FF7');
 
     const posted = await waitForPosted(page, env.posted);
@@ -382,6 +409,99 @@ test.describe('8 个工具页参数与结果态', () => {
     await expect(page.locator('.pk-result-failed')).toContainText('生成失败', { timeout: 15000 });
     await expect(page.getByRole('button', { name: /重新生成/ })).toBeVisible();
   });
+
+  test('去水印失败后可回到标注画布重新调整遮罩', async ({ page, request }) => {
+    const env = await setup(page, request, 'remove_watermark');
+    await page.unroute(`**/api/v1/tasks/${TASK_ID}`);
+    await page.route(`**/api/v1/tasks/${TASK_ID}`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0,
+          data: {
+            id: TASK_ID,
+            projectId: 'project-e2e',
+            capability: 'remove_watermark',
+            status: 'failed',
+            inputAssetIds: ['asset-original'],
+            params: {},
+            outputAsset: null,
+            errorCode: '42201',
+          },
+          message: '',
+        }),
+      }),
+    );
+    await authed(page, '/watermark-remove', env.token, env.email);
+    await uploadAndWait(page);
+
+    const canvas = page.locator('.redraw-mask-overlay, .mask-canvas-overlay').first();
+    const box = await canvas.boundingBox();
+    expect(box).not.toBeNull();
+    await page.mouse.move(box!.x + box!.width * 0.25, box!.y + box!.height * 0.6);
+    await page.mouse.down();
+    await page.mouse.move(box!.x + box!.width * 0.65, box!.y + box!.height * 0.75, { steps: 6 });
+    await page.mouse.up();
+
+    await waitForPosted(page, env.posted);
+    await expect(page.locator('.pk-result-failed')).toContainText('生成失败', { timeout: 15000 });
+    await page.getByRole('button', { name: '重新标注' }).click();
+    await expect(canvas).toBeVisible();
+    await expect(page.locator('button.pk-primary-btn').first()).toBeDisabled();
+  });
+
+  test('历史结果：支持灯箱预览、复用为当前输入，并清理旧结果态', async ({ page, request }) => {
+    const env = await setup(page, request, 'enhance');
+    await page.unroute(/\/api\/v1\/tasks(?:\?.*)?$/);
+    await page.route(/\/api\/v1\/tasks(?:\?.*)?$/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0,
+          data: [
+            {
+              id: 'task-history-e2e',
+              projectId: 'project-e2e',
+              capability: 'enhance',
+              status: 'succeeded',
+              inputAssetIds: ['asset-old'],
+              params: {},
+              createdAt: '2026-10-25T12:00:00.000Z',
+              outputAsset: {
+                id: 'asset-history',
+                sourceUrl: '/uploads/generated/history.png',
+                signedUrl: null,
+                width: 240,
+                height: 160,
+                format: 'image/png',
+              },
+            },
+          ],
+          message: '',
+        }),
+      }),
+    );
+    await authed(page, '/product-retouch', env.token, env.email);
+
+    const pane = page.locator('.redraw-history-pane');
+    await expect(pane.locator('.tool-history-card')).toHaveCount(1);
+    await expect(pane.locator('.tool-history-meta-actions')).toBeVisible();
+
+    await uploadAndWait(page);
+    await waitForPosted(page, env.posted);
+    await expect(page.locator('.pk-result-body')).toBeVisible({ timeout: 15000 });
+
+    await pane.getByRole('button', { name: '预览历史结果' }).click();
+    await expect(page.locator('.img-viewer')).toBeVisible();
+    await page.locator('.img-viewer-close').click();
+
+    await pane.getByRole('button', { name: '使用历史结果继续创作' }).click();
+    await expect(page.locator('.pk-thumb img')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText('已把历史结果加入上传位')).toBeVisible();
+    await expect(page.locator('.pk-result-body')).toHaveCount(0);
+  });
 });
 
 test.describe('移动端布局烟测', () => {
@@ -405,8 +525,49 @@ test.describe('移动端布局烟测', () => {
       await page.goto(`${UI}${route}`);
       await expect(page.locator('.pk-input-pane')).toBeVisible();
       await expect(page.locator('button.pk-primary-btn').first()).toBeVisible();
+      await expect(page.locator('button.pk-primary-btn').first()).toBeDisabled();
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
       expect(overflow, `${route} 横向溢出 ${overflow}px`).toBeLessThanOrEqual(1);
     }
+  });
+
+  test('局部重绘移动历史抽屉位于共享上下文内，可预览并复用', async ({ page, request }) => {
+    const env = await setup(page, request, 'local_redraw');
+    await page.unroute(/\/api\/v1\/tasks(?:\?.*)?$/);
+    await page.route(/\/api\/v1\/tasks(?:\?.*)?$/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0,
+          data: [
+            {
+              id: 'task-redraw-history',
+              projectId: 'project-e2e',
+              capability: 'local_redraw',
+              status: 'succeeded',
+              createdAt: '2026-10-25T12:00:00.000Z',
+              outputAsset: {
+                id: 'asset-redraw-history',
+                sourceUrl: '/uploads/generated/redraw-history.png',
+                signedUrl: null,
+                width: 240,
+                height: 160,
+                format: 'image/png',
+              },
+            },
+          ],
+          message: '',
+        }),
+      }),
+    );
+    await authed(page, '/local-redraw', env.token, env.email);
+
+    await page.locator('.redraw-history-float-toggle').click();
+    const drawer = page.locator('.ant-drawer');
+    await expect(drawer).toBeVisible();
+    await expect(drawer.getByRole('button', { name: '使用历史结果继续创作' })).toBeVisible();
+    await drawer.getByRole('button', { name: '使用历史结果继续创作' }).click();
+    await expect(page.locator('.pk-thumb img')).toBeVisible({ timeout: 15000 });
   });
 });

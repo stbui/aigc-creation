@@ -26,6 +26,7 @@ export const Matting: CapabilityPlugin = {
       label: '自定义背景色（HEX）',
       type: 'text',
       placeholder: '#RRGGBB',
+      pattern: '^#[0-9a-fA-F]{6}$',
       help: '仅当背景颜色选择"自定义颜色"时生效',
     },
     { key: 'ratio', label: '画面比例', type: 'enum', default: 'original', options: RATIOS_WITH_ORIGINAL },

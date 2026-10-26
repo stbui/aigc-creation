@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Card, Col, Row, Table, Tag, Typography } from 'antd';
+import { Button, Card, Col, Row, Statistic, Table, Tag, Typography } from 'antd';
 import { toAbsoluteUrl, statsApi } from '../lib/api';
 import { MODE_LABELS } from '../lib/constants';
 import { useAuth } from '../context/AuthContext';
+import { PersonalPage } from '../components/PersonalPage';
 import { StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
 import type { StatsOverview } from '../types/api';
 
-const { Title, Text } = Typography;
+const { Text } = Typography;
 
 /** 数据中心: 全部来自真实表统计, 不编造积分/消耗类尚不存在的指标 */
 export function StatsPage() {
@@ -48,56 +49,60 @@ export function StatsPage() {
 
   if (!token) {
     return (
-      <div className="state-page">
+      <PersonalPage title="数据中心" description="查看累计生成、成功率与近 7 天产出。">
         <StateEmpty
           title="登录后查看你的创作数据"
           desc="创作数据与账号绑定，登录后即可查看累计生成、成功率与近 7 天产出。"
           action={
-            <button type="button" className="state-btn is-primary" onClick={openLogin}>
+            <Button type="primary" onClick={openLogin}>
               登录/注册
-            </button>
+            </Button>
           }
         />
-      </div>
+      </PersonalPage>
     );
   }
 
   if (loading) {
     return (
-      <div className="state-page">
+      <PersonalPage title="数据中心" description="查看累计生成、成功率与近 7 天产出。">
         <StateSkeleton variant="panel" count={5} />
-      </div>
+      </PersonalPage>
     );
   }
   if (error) {
     return (
-      <div className="state-page">
+      <PersonalPage title="数据中心" description="查看累计生成、成功率与近 7 天产出。">
         <StateError
           title="统计数据加载失败"
           desc="没能取回你的创作数据。可能是后端未启动或网络异常，重试一次即可。"
           detail={error}
           onRetry={load}
         />
-      </div>
+      </PersonalPage>
     );
   }
   if (!stats) {
     return (
-      <div className="state-page">
+      <PersonalPage title="数据中心" description="查看累计生成、成功率与近 7 天产出。">
         <StateEmpty title="暂无统计数据" desc="完成一次创作后，这里会出现你的数据分布。" />
-      </div>
+      </PersonalPage>
     );
   }
 
   const maxDay = Math.max(1, ...stats.last7Days.map((d) => d.count));
 
   return (
-    <div className="list-page">
-      <div className="list-page-head">
-        <Title level={3}>数据中心</Title>
-        <Text type="secondary">共 {stats.totals.projects} 个项目</Text>
-      </div>
-
+    <PersonalPage
+      className="stats-page"
+      title="数据中心"
+      description={`共 ${stats.totals.projects} 个项目；所有指标均来自真实生成记录。`}
+      extra={
+        <Button onClick={() => load()}>
+          刷新数据
+        </Button>
+      }
+    >
       <Row gutter={[12, 12]} className="stats-row">
         {[
           { label: '生成任务', value: stats.totals.tasks },
@@ -109,8 +114,7 @@ export function StatsPage() {
         ].map((s) => (
           <Col xs={12} sm={8} md={4} key={s.label}>
             <Card size="small" className="stat-tile">
-              <Text type="secondary">{s.label}</Text>
-              <div className="stat-tile-value">{s.value}</div>
+              <Statistic title={s.label} value={s.value} />
             </Card>
           </Col>
         ))}
@@ -203,6 +207,6 @@ export function StatsPage() {
           </div>
         )}
       </Card>
-    </div>
+    </PersonalPage>
   );
 }

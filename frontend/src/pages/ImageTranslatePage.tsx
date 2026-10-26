@@ -24,21 +24,26 @@ import { languageOptions } from '../lib/optionSets';
  */
 
 export function ImageTranslatePage() {
-  const { submitting, result, run } = useToolTask({ capability: 'image_translate', successMessage: '翻译结果已生成' });
+  const { submitting, result, setResult, run } = useToolTask({ capability: 'image_translate', successMessage: '翻译结果已生成' });
 
   const [targetLang, setTargetLang] = useState('zh-CN');
   const [protect, setProtect] = useState(true);
   const [sourceUrl, setSourceUrl] = useState('');
 
+  const handleHistoryReuse = () => {
+    setSourceUrl('');
+    setResult(null);
+  };
+
   return (
     <ToolShell
       capability="image_translate"
+      pageClass="product-retouch-page image-translate-page"
       title="图片翻译"
       desc="智能翻译图片文字，保留原版式快速本地化"
       upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
       settings={{ resolution: true }}
       submitLabel="立即翻译"
-      hint="* 确认素材和参数后提交，右侧会展示翻译结果。"
       emptyDesc="上传图片后，翻译结果将在此处展示"
       formValid
       submitting={submitting}
@@ -58,11 +63,12 @@ export function ImageTranslatePage() {
           size: settings.resolution,
         });
       }}
+      onHistoryReuse={handleHistoryReuse}
       trailingPane={
         <ToolHistoryPane capability="image_translate" refreshKey={result?.url} emptyText="暂无翻译记录" />
       }
     >
-      <ToolCard title="翻译语言">
+      <ToolCard title="翻译语言" className="product-retouch-card image-translate-settings">
         <label className="image-translate-language-field">
           <span>目标语言</span>
           <select value={targetLang} onChange={(e) => setTargetLang(e.target.value)}>

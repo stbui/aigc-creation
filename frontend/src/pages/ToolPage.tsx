@@ -448,8 +448,22 @@ function ParamField({ param }: { param: CapabilityParam }) {
     case 'text':
     default:
       return (
-        <Form.Item name={param.key} label={param.label} tooltip={param.help}>
-          <Input.TextArea rows={3} placeholder={param.placeholder} maxLength={500} showCount />
+        <Form.Item
+          name={param.key}
+          label={param.label}
+          tooltip={param.help}
+          rules={
+            param.pattern
+              ? [{ pattern: new RegExp(param.pattern), message: `${param.label}格式不正确` }]
+              : undefined
+          }
+        >
+          <Input.TextArea
+            rows={3}
+            placeholder={param.placeholder}
+            maxLength={param.maxLength ?? 500}
+            showCount
+          />
         </Form.Item>
       );
   }

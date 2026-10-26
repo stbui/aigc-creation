@@ -16,8 +16,8 @@ import { ToolHistoryPane } from '../components/ToolHistoryPane';
  *   高级设置: 比例 原比例 / 画质 1K
  *   提交: 立即生成 (消耗价由后端下发); 描述: 商品图去瑕疵，提高清晰度
  *
- * 诚实披露: enhance 为 real 能力 —— 6 模式各自映射真实像素管线
- * (亮度/对比度/饱和度/模糊去噪/unsharp 锐化), 补充要求中文原文记录于任务参数。
+ * 诚实披露: enhance 只走真实图像模型；6 个模式映射参考站模板码并进入提示词，
+ * 本地不执行亮度/锐化等像素处理，也不会在无模型通道时伪造精修结果。
  */
 
 const MODE_OPTIONS = [
@@ -42,16 +42,22 @@ const MODE_TO_TEMPLATE: Record<string, string> = {
 };
 
 export function ProductRetouchPage() {
-  const { submitting, result, run } = useToolTask({ capability: 'enhance', successMessage: '精修结果已生成' });
+  const { submitting, result, setResult, run } = useToolTask({ capability: 'enhance', successMessage: '精修结果已生成' });
 
   const [mode, setMode] = useState('comprehensive');
   const [note, setNote] = useState('');
   const [expandOpen, setExpandOpen] = useState(false);
   const [sourceUrl, setSourceUrl] = useState('');
 
+  const handleHistoryReuse = () => {
+    setSourceUrl('');
+    setResult(null);
+  };
+
   return (
     <ToolShell
       capability="enhance"
+      pageClass="product-retouch-page product-retouch-main-page"
       title="产品精修"
       desc="商品图去瑕疵，提高清晰度"
       upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
@@ -79,15 +85,16 @@ export function ProductRetouchPage() {
           size: settings.resolution,
         });
       }}
+      onHistoryReuse={handleHistoryReuse}
       trailingPane={
         <ToolHistoryPane capability="enhance" refreshKey={result?.url} emptyText="暂无精修记录" />
       }
     >
-      <ToolCard title="精修模式">
+      <ToolCard title="精修模式" className="product-retouch-card">
         <PillOptions options={MODE_OPTIONS} value={mode} onChange={setMode} ariaLabel="精修模式" />
       </ToolCard>
 
-      <ToolCard title="补充要求（选填）">
+      <ToolCard title="补充要求（选填）" className="product-retouch-card">
         <div className="pk-desc-editor">
           <textarea
             rows={3}

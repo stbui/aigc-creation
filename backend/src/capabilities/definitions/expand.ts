@@ -19,7 +19,7 @@ export const Expand: CapabilityPlugin = {
   mode: 'real',
   creditCost: 5, // 原页面标注「本次消耗5积分」
   params: [
-    { key: 'occupy', label: '原图占比（%）', type: 'number', default: 80, min: 1, max: 99, step: 1 },
+    { key: 'occupy', label: '原图占比（%）', type: 'number', default: 80, min: 1, max: 100, step: 1 },
     { key: 'position', label: '原图位置', type: 'enum', default: 'center', options: EXPAND_POSITIONS },
     { key: 'ratio', label: '画面比例', type: 'enum', default: 'original', options: RATIOS_WITH_ORIGINAL },
     { key: 'size', label: '画质（输出边长）', type: 'enum', default: '1k', options: QUALITY_OPTIONS },

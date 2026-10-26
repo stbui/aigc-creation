@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import { App, Modal } from 'antd';
+import { App, Button, Modal } from 'antd';
 import QRCode from 'qrcode';
 import { Link2, Image as ImageIcon, Sparkles, CalendarCheck, Gift, Download } from 'lucide-react';
 import { myMarketingApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { PersonalPage } from '../components/PersonalPage';
 import { StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
 import type { CheckinStatus, MyInvites } from '../types/api';
 
@@ -171,19 +172,13 @@ export function InvitationsPage() {
    */
   if (!token) {
     return (
-      <div className="invite-page">
-        <div className="state-page">
-          <StateEmpty
-            title="登录后查看邀请与签到"
-            desc="邀请链接、邀请人数与每日签到都与账号绑定；带邀请码进入的新用户注册后会自动绑定。"
-            action={
-              <button type="button" className="state-btn is-primary" onClick={openLogin}>
-                登录/注册
-              </button>
-            }
-          />
-        </div>
-      </div>
+      <PersonalPage title="邀请有奖" description="邀请好友注册，双方都能获得积分；每天签到也能领积分。">
+        <StateEmpty
+          title="登录后查看邀请与签到"
+          desc="邀请链接、邀请人数与每日签到都与账号绑定；带邀请码进入的新用户注册后会自动绑定。"
+          action={<Button type="primary" onClick={openLogin}>登录/注册</Button>}
+        />
+      </PersonalPage>
     );
   }
 
@@ -194,23 +189,23 @@ export function InvitationsPage() {
    */
   if (loading) {
     return (
-      <div className="invite-page">
+      <PersonalPage title="邀请有奖" description="邀请好友注册，双方都能获得积分；每天签到也能领积分。">
         <StateSkeleton variant="panel" count={4} />
-      </div>
+      </PersonalPage>
     );
   }
 
   // 加载失败: 如实说明, 不编造任何数字
   if (!data) {
     return (
-      <div className="invite-page">
+      <PersonalPage title="邀请有奖" description="邀请好友注册，双方都能获得积分；每天签到也能领积分。">
         <StateError
           title="邀请数据加载失败"
           desc="请确认已登录，且后端服务正常运行。本页数据全部来自真实接口，加载失败时不展示任何占位数字。"
           detail={error ?? undefined}
           onRetry={load}
         />
-      </div>
+      </PersonalPage>
     );
   }
 
@@ -243,7 +238,11 @@ export function InvitationsPage() {
   ];
 
   return (
-    <div className="invite-page">
+    <PersonalPage
+      className="invite-page"
+      title="邀请有奖"
+      description="分享专属链接，好友完成指定动作后奖励自动到账；每天签到也能积累积分。"
+    >
       <section className="invite-hero">
         <div className="invite-hero-copy">
           <h1>{enabled ? `邀请好友立赚 ${rule.inviterCredits} 积分` : '邀请好友一起用货觉AI'}</h1>
@@ -258,17 +257,16 @@ export function InvitationsPage() {
             )}
           </p>
           <div className="invite-hero-actions">
-            <button type="button" className="invite-btn-primary" onClick={() => void copyLink()}>
-              <Link2 size={15} /> 复制邀请链接
-            </button>
-            <button
-              type="button"
-              className="invite-btn-ghost"
+            <Button type="primary" icon={<Link2 size={15} />} onClick={() => void copyLink()}>
+              复制邀请链接
+            </Button>
+            <Button
+              icon={<ImageIcon size={15} />}
+              loading={posterBusy}
               onClick={() => void openPoster()}
-              disabled={posterBusy}
             >
-              <ImageIcon size={15} /> {posterBusy ? '生成中…' : '查看邀请海报'}
-            </button>
+              查看邀请海报
+            </Button>
           </div>
         </div>
       </section>
@@ -294,19 +292,19 @@ export function InvitationsPage() {
             </div>
           </div>
 
-          <button
-            type="button"
-            className="invite-btn-primary"
+          <Button
+            type="primary"
+            className="invite-checkin-btn"
             onClick={() => void doCheckin()}
-            disabled={checkin.checkedIn || submitting || !checkin.rule.enabled}
-            style={{ marginTop: 12 }}
+            loading={submitting}
+            disabled={checkin.checkedIn || !checkin.rule.enabled}
           >
             {checkin.checkedIn
               ? `今日已签到 +${checkin.todayCredits}`
               : checkin.rule.enabled
                 ? '立即签到'
                 : '签到未开启'}
-          </button>
+          </Button>
 
           {/* 未来 7 天: 让用户看清连签到第 3/7 天各能多拿多少 */}
           <ul className="invite-rules" style={{ marginTop: 12 }}>
@@ -393,12 +391,12 @@ export function InvitationsPage() {
         {posterUrl && (
           <img src={posterUrl} alt="邀请海报" className="invite-poster-image" />
         )}
-        <button type="button" className="invite-btn-primary invite-poster-download" onClick={downloadPoster}>
-          <Download size={15} /> 下载海报
-        </button>
+        <Button type="primary" block icon={<Download size={15} />} className="invite-poster-download" onClick={downloadPoster}>
+          下载海报
+        </Button>
         <p className="invite-poster-note">海报含你的专属邀请码，好友扫码注册后自动绑定邀请关系。</p>
       </Modal>
-    </div>
+    </PersonalPage>
   );
 }
 

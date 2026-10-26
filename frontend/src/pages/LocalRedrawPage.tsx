@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { App, Drawer, Spin } from 'antd';
-import { ChevronUp, Circle, Eraser, Hand, History, ImagePlus, Maximize2, Minus, Paintbrush, Plus, Redo2, RotateCcw, Square, Undo2, X } from 'lucide-react';
+import { App, Drawer } from 'antd';
+import { ChevronRight, ChevronUp, Circle, Eraser, Hand, History, ImagePlus, Maximize2, Minus, Paintbrush, Plus, Redo2, RotateCcw, Square, Undo2, X } from 'lucide-react';
 import { useToolTask } from '../hooks/useToolTask';
 import { useProject } from '../hooks/useProject';
 import { useAuth } from '../context/AuthContext';
 import { assetsApi, assetSrc, generateApi } from '../lib/api';
 import { ExpandTextModal, ToolShell, type ToolAsset } from '../components/ToolShell';
 import { ToolCard } from '../components/ToolWidgets';
-import { StateError } from '../components/StateViews';
+import { ToolHistoryGrid } from '../components/ToolHistoryPane';
 import { LocalRedrawIllustration } from '../components/illustrations';
 
 /**
@@ -75,66 +75,6 @@ interface RegionBounds {
   height: number;
   sourceWidth: number;
   sourceHeight: number;
-}
-
-type RedrawHistoryTask = Awaited<ReturnType<typeof generateApi.list>>[number];
-
-/**
- * 历史记录列表 (桌面常驻侧栏与窄屏抽屉共用)。
- *
- * 加载中必须与「没有记录」分开: 首次进入时 `history` 还是空数组,
- * 直接显示「暂无记录」会在网络返回前给用户一个错误结论。
- */
-function RedrawHistoryList({
-  tasks,
-  loading,
-  error,
-  onRetry,
-}: {
-  tasks: RedrawHistoryTask[];
-  loading: boolean;
-  error: string | null;
-  onRetry: () => void;
-}) {
-  if (loading) {
-    return (
-      <div className="redraw-history-loading" aria-live="polite">
-        <Spin size="small" />
-        <span>加载中…</span>
-      </div>
-    );
-  }
-  if (error) {
-    return (
-      <StateError
-        compact
-        title="历史记录加载失败"
-        desc="已有任务不会受影响，可稍后重试。"
-        detail={error}
-        onRetry={onRetry}
-      />
-    );
-  }
-  if (tasks.length === 0) {
-    return <div className="redraw-history-empty">暂无局部重绘记录</div>;
-  }
-  return (
-    <div className="redraw-history-grid">
-      {tasks.map((task) => (
-        <a
-          key={task.id}
-          className="redraw-history-card"
-          href={assetSrc(task.outputAsset) ?? '#'}
-          download
-          target="_blank"
-          rel="noreferrer"
-        >
-          <img src={assetSrc(task.outputAsset) ?? ''} alt="局部重绘结果" loading="lazy" decoding="async" />
-          <span>{task.createdAt ? new Date(task.createdAt).toLocaleString() : ''}</span>
-        </a>
-      ))}
-    </div>
-  );
 }
 
 /** 只有画笔涂抹和框选/圈选算可描述区域，橡皮只是修正遮罩 */
@@ -574,7 +514,7 @@ function MaskPainter({
 export function LocalRedrawPage() {
   const { message } = App.useApp();
   const { ensureProject } = useProject();
-  const { submitting, result, run } = useToolTask({ capability: 'local_redraw', successMessage: '重绘结果已生成' });
+  const { submitting, result, setResult, run } = useToolTask({ capability: 'local_redraw', successMessage: '重绘结果已生成' });
 
   const [tool, setTool] = useState<PaintTool>('brush');
   const [brush, setBrush] = useState(30);
@@ -677,29 +617,101 @@ export function LocalRedrawPage() {
     };
   }, [token, result, historyReload]);
 
+  /** 清掉当前图的遮罩、笔迹状态与结果；源图本身由上传位管理。 */
+  const clearMaskSession = () => {
+    maskBlobRef.current = null;
+    maskAssetIdRef.current = null;
+    maskSourceIdRef.current = null;
+    setPainted(false);
+    setCanUndo(false);
+    setCanRedo(false);
+    setRegionCount(0);
+    setRegionBounds([]);
+    setZoom(100);
+    setPan({ x: 0, y: 0 });
+    setResult(null);
+  };
+
+  /**
+   * 结果态会卸载标注画布，因此失败后也必须给用户一个回到画布的入口；
+   * 只保留「重新生成」会让一次失败变成无法调整标注的死路。
+   */
+  const handleReannotation = () => {
+    clearMaskSession();
+  };
+
+  /**
+   * 历史结果回填后清掉上一轮结果态、遮罩缓存与旧标注。
+   *
+   * ToolShell 会先把历史产出复制成当前项目的新素材；MaskPainter 因 URL
+   * 变化自动重置笔迹。这里把页面级引用和描述一起清掉，避免把上一张图的
+   * 区域描述与参考图带到新素材上。
+   */
+  const handleHistoryReuse = () => {
+    clearMaskSession();
+    setPrompts(['', '', '']);
+    setReferences([null, null, null]);
+    setSourceImage(null);
+    setHistoryOpen(false);
+  };
+
   const historyPane = (
-    <aside className="redraw-history-pane" aria-label="局部重绘历史记录">
-      <div className="redraw-history-head">
-        <h2>历史记录</h2>
-        <button
-          type="button"
-          className="redraw-history-collapse"
-          aria-label="收起历史记录"
-          title="收起历史记录"
-          onClick={() => setHistoryCollapsed(true)}
-        >
-          <ChevronUp size={16} />
-        </button>
-      </div>
-      <div className="redraw-history-scroll">
-        <RedrawHistoryList
+    <>
+      <aside className="redraw-history-pane" aria-label="局部重绘历史记录">
+        <div className="redraw-history-head">
+          <h2>历史记录</h2>
+          <button
+            type="button"
+            className="redraw-history-collapse"
+            aria-label={historyCollapsed ? '展开历史记录' : '收起历史记录'}
+            aria-expanded={!historyCollapsed}
+            title={historyCollapsed ? '展开历史记录' : '收起历史记录'}
+            onClick={() => setHistoryCollapsed((value) => !value)}
+          >
+            {historyCollapsed ? <ChevronRight size={16} /> : <ChevronUp size={16} />}
+          </button>
+        </div>
+        <div className="redraw-history-scroll">
+          <ToolHistoryGrid
+            tasks={history}
+            loading={historyLoading}
+            error={historyError}
+            emptyText="暂无局部重绘记录"
+            onRetry={() => setHistoryReload((value) => value + 1)}
+          />
+        </div>
+      </aside>
+
+      <button
+        type="button"
+        className="redraw-history-float-toggle"
+        aria-label="历史记录"
+        title="历史记录"
+        onClick={() => {
+          // 桌面端右栏收起后，浮动按钮把右栏展开；窄屏没有右栏，改用抽屉。
+          if (window.matchMedia('(max-width: 1180px)').matches) setHistoryOpen(true);
+          else setHistoryCollapsed(false);
+        }}
+      >
+        <History size={16} />
+      </button>
+
+      <Drawer
+        title="历史记录"
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        size={320}
+        styles={{ body: { padding: 12 } }}
+      >
+        <ToolHistoryGrid
           tasks={history}
           loading={historyLoading}
           error={historyError}
+          emptyText="暂无局部重绘记录"
           onRetry={() => setHistoryReload((value) => value + 1)}
         />
-      </div>
-    </aside>
+      </Drawer>
+    </>
   );
 
   const handlePaintState = useCallback(
@@ -830,9 +842,10 @@ export function LocalRedrawPage() {
   const filledCount = prompts.slice(0, visiblePromptCount).filter((p) => p.trim()).length;
 
   return (
-    <div className={`local-redraw-page${historyCollapsed ? ' history-collapsed' : ''}`}>
+    <>
     <ToolShell
       capability="local_redraw"
+      pageClass={`local-redraw-page${historyCollapsed ? ' history-collapsed' : ''}`}
       title="局部重绘"
       desc="只想修改局部？圈出来写描述就行，适合去掉瑕疵、更换图案、修改画面中的元素"
       upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
@@ -850,8 +863,16 @@ export function LocalRedrawPage() {
       result={result}
       resultTag={painted ? '已标注区域' : undefined}
       resultCompare={resultUrl && sourceImage ? { beforeUrl: sourceImage.url, beforeLabel: '原图', afterLabel: '重绘后' } : undefined}
+      onHistoryReuse={handleHistoryReuse}
       onSubmit={(inputs, settings) => submit(inputs, settings)}
-      trailingPane={historyCollapsed ? undefined : historyPane}
+      resultActions={
+        result ? (
+          <button type="button" className="tool-result-action" onClick={handleReannotation}>
+            重新标注
+          </button>
+        ) : null
+      }
+      trailingPane={historyPane}
       sourcePane={(images) => {
         const image = images[0];
         if (!image) {
@@ -1087,35 +1108,6 @@ export function LocalRedrawPage() {
       }}
     </ToolShell>
 
-      <button
-        type="button"
-        className="redraw-history-float-toggle"
-        aria-label="历史记录"
-        title="历史记录"
-        onClick={() => {
-          // 桌面端右栏收起后，浮动按钮把右栏展开；窄屏没有右栏，改用抽屉
-          if (window.matchMedia('(max-width: 1180px)').matches) setHistoryOpen(true);
-          else setHistoryCollapsed(false);
-        }}
-      >
-        <History size={16} />
-      </button>
-
-      <Drawer
-        title="历史记录"
-        open={historyOpen}
-        onClose={() => setHistoryOpen(false)}
-        size={320}
-        styles={{ body: { padding: 12 } }}
-      >
-        <RedrawHistoryList
-          tasks={history}
-          loading={historyLoading}
-          error={historyError}
-          onRetry={() => setHistoryReload((value) => value + 1)}
-        />
-      </Drawer>
-
-    </div>
+    </>
   );
 }

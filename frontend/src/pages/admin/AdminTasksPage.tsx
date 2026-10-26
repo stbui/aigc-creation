@@ -7,8 +7,6 @@ import { useAdmin } from '../../context/AdminContext';
 import {
   AdminDrawer,
   AdminListError,
-  AdminMobileList,
-  AdminMobileRecord,
   AdminStaleError,
   AdminListLoading,
   ConfirmAction,
@@ -604,7 +602,6 @@ export function AdminTasksPage() {
             ) : (
               <>
                 <Table<Row>
-                className="adm-responsive-table"
                 rowKey="id"
                 size="small"
                 columns={columns}
@@ -637,84 +634,6 @@ export function AdminTasksPage() {
                   },
                 })}
                 />
-
-                <AdminMobileList label="任务列表">
-                  {list?.items.map((row) => (
-                    <AdminMobileRecord
-                      key={row.id}
-                      title={row.capabilityName}
-                      subtitle={
-                        <code title={row.id}>
-                          {shortId(row.id)}
-                          {row.retriedFromId ? ` · 重试自 ${shortId(row.retriedFromId)}` : ''}
-                        </code>
-                      }
-                      status={
-                        <div className="adm-mobile-status-stack">
-                          <StatusTag status={row.status} />
-                          {row.status === 'failed' && row.errorCode && (
-                            <span>{ERROR_LABELS[row.errorCode] ?? row.errorCode}</span>
-                          )}
-                        </div>
-                      }
-                      selected={selected.includes(row.id)}
-                      selectionLabel={`选择任务 ${shortId(row.id)}`}
-                      onSelectedChange={(checked) =>
-                        setSelected((prev) =>
-                          checked ? [...prev, row.id] : prev.filter((id) => id !== row.id),
-                        )
-                      }
-                      meta={[
-                        { label: '用户', value: row.user.email },
-                        { label: '项目', value: row.project.name },
-                        {
-                          label: '通道',
-                          value:
-                            row.provider &&
-                            !(row.provider === 'pending' && row.status !== 'pending')
-                              ? PROVIDER_LABELS[row.provider] ?? row.provider
-                              : '—',
-                        },
-                        { label: '耗时', value: fmtDuration(row.durationMs) },
-                        {
-                          label: '创建',
-                          value: new Date(row.createdAt).toLocaleString('zh-CN'),
-                        },
-                      ]}
-                      actions={
-                        <>
-                          <Button
-                            type="link"
-                            className="adm-link"
-                            onClick={() => setDetailId(row.id)}
-                          >
-                            查看详情
-                          </Button>
-                          {row.status === 'failed' && can('task.retry') && (
-                            <Button
-                              type="link"
-                              className="adm-link"
-                              onClick={() => openConfirm('retry', row)}
-                            >
-                              重试
-                            </Button>
-                          )}
-                          {(row.status === 'pending' || row.status === 'running') &&
-                            can('task.cancel') && (
-                              <Button
-                                type="link"
-                                danger
-                                className="adm-link is-danger"
-                                onClick={() => openConfirm('cancel', row)}
-                              >
-                                终止
-                              </Button>
-                            )}
-                        </>
-                      }
-                    />
-                  ))}
-                </AdminMobileList>
               </>
             )}
           </>

@@ -86,6 +86,13 @@ export interface ToolResultCompare {
 export interface ToolTrailingControl {
   collapsed: boolean;
   toggle: () => void;
+  /**
+   * 把一条历史结果重新放回上传位，供用户基于它继续改图。
+   *
+   * 参考站历史卡的「再次使用」不是重放旧任务，而是把当时的结果作为新输入。
+   * 返回值表示是否已加入输入位；跨项目素材会先复制到当前项目再返回。
+   */
+  reuseTask: (task: Task) => Promise<boolean>;
 }
 
 export const ToolTrailingContext = createContext<ToolTrailingControl | null>(null);
@@ -112,6 +119,22 @@ interface SettingsSpec {
 interface Props {
   /** 能力 id (提交任务与历史过滤) */
   capability: string;
+  /**
+   * 参考站页面级 class (如 local-redraw-page / product-retouch-page)。
+   *
+   * 放在共享骨架上而不是再包一层 div: 参考站的页面 class 本身就承担
+   * grid/padding/height，再套一层会让负 margin 逃逸后的宽度与内层栅格错位。
+   */
+  pageClass?: string;
+  /** 输入栏附加 class (如参考站 rotate-angle-controls) */
+  inputPaneClassName?: string;
+  /**
+   * 上传辅助操作的位置。
+   *
+   * 旋转角度页把「从素材库导入 / 手机上传」渲染为上传卡上方的独立 13px 行；
+   * 其余页面仍在卡片标题行内。两种结构都由同一份按钮节点渲染。
+   */
+  uploadActionsPlacement?: 'inside' | 'above';
   /** 页标题 (空态 h3 与结果栏标题) */
   title: string;
   /** 提交按钮下方的一句话描述 (参考站各页固定文案) */
@@ -154,6 +177,8 @@ interface Props {
   resultActions?: ReactNode;
   /** 结果卡内嵌原图/结果对比 (局部重绘、去水印)；多图结果不启用 */
   resultCompare?: ToolResultCompare;
+  /** 历史结果已回填到上传位；页面可据此清掉上一轮结果态 */
+  onHistoryReuse?: () => void;
   /**
    * 替换默认结果栏。商品 SKU 图需要与商品主图共用「全部生成图」网格，
    * 但左栏仍复用这里的上传/提交骨架，故由页面注入自己的结果面板。
@@ -208,6 +233,9 @@ export function ToolShell(props: Props) {
   const blocked = Boolean(token) && Boolean(unavailableReason);
   const {
     capability,
+    pageClass,
+    inputPaneClassName,
+    uploadActionsPlacement = 'inside',
     title,
     desc,
     upload,
@@ -225,6 +253,7 @@ export function ToolShell(props: Props) {
     onSettingsChange,
     resultActions,
     resultCompare,
+    onHistoryReuse,
     resultPane,
     sourcePane,
     trailingPane,
@@ -381,8 +410,13 @@ export function ToolShell(props: Props) {
 
   const removeImage = (id: string) => setImages((prev) => prev.filter((x) => x.id !== id));
 
+  /** 必填图片位是否已满足；各页无需重复判断，避免出现“空图也能提交”。 */
+  const uploadSatisfied = !upload?.required || images.length >= 1;
+  /** 上传中同样阻止提交，防止遮罩/参数基于半完成素材生成。 */
+  const canSubmit = formValid && uploadSatisfied && !uploading;
+
   const submit = async () => {
-    if (!formValid || submitting) return;
+    if (!canSubmit || submitting) return;
     // 能力不可提交 (未接通道 / 已下线): 不发这次注定 42204 的请求
     if (blocked) {
       message.warning(unavailableReason || '该能力当前不可提交');
@@ -390,6 +424,67 @@ export function ToolShell(props: Props) {
     }
     await onSubmit(images, { ratio, resolution });
   };
+
+  /**
+   * 历史结果 → 当前输入。
+   *
+   * 参考站会先取回历史图片、再作为一次新的上传，而不是直接重放旧任务
+   * （旧参数可能已经失效，且跨项目素材不能直接作为新项目输入）。
+   * 这里沿用该语义：优先复制到当前项目成为 original 素材；签名图床
+   * 不允许跨域读取时，只有同项目素材才退回直接引用，跨项目明确报错。
+   */
+  const reuseHistoryTask = useCallback(
+    async (task: Task): Promise<boolean> => {
+      if (!upload) {
+        message.warning('当前页面不支持复用历史结果');
+        return false;
+      }
+      const output = task.outputAsset;
+      if (!output?.id) {
+        message.warning('这条历史记录没有可复用的图片');
+        return false;
+      }
+      const src = assetSrc(output) ?? toAbsoluteUrl(output.sourceUrl);
+      if (!src) {
+        message.warning('历史结果地址不可用');
+        return false;
+      }
+
+      const projectId = await ensureProject();
+      let next: ToolAsset | null = null;
+      try {
+        const response = await fetch(src, { mode: 'cors', credentials: 'omit' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const blob = await response.blob();
+        if (!blob.size) throw new Error('图片内容为空');
+        const mime = blob.type || output.format || 'image/png';
+        const extension = (mime.split('/')[1] || 'png').replace('jpeg', 'jpg').replace(/\+.*$/, '');
+        const file = new File([blob], `history-${task.id}.${extension}`, { type: mime });
+        const asset = await assetsApi.upload(file, projectId);
+        next = {
+          id: asset.id,
+          url: assetSrc(asset) ?? src,
+          name: `历史结果-${task.id.slice(-6)}.${extension}`,
+        };
+      } catch {
+        if (task.projectId !== projectId) {
+          throw new Error('历史结果属于其他项目，复制失败，请稍后重试');
+        }
+        next = {
+          id: output.id,
+          url: src,
+          name: `历史结果-${task.id.slice(-6)}`,
+        };
+      }
+
+      imagesRef.current = [next];
+      setImages([next]);
+      onHistoryReuse?.();
+      message.success('已把历史结果加入上传位，可调整参数后继续生成');
+      return true;
+    },
+    [ensureProject, message, onHistoryReuse, upload],
+  );
 
   const results: ToolResult[] = result === null ? [] : Array.isArray(result) ? result : [result];
   const showResult = results.length > 0;
@@ -403,16 +498,40 @@ export function ToolShell(props: Props) {
     }));
   const lightboxIndex = lightboxUrl ? lightboxItems.findIndex((item) => item.url === lightboxUrl) : -1;
 
+  const uploadActionLinks = upload ? (
+    <>
+      <button type="button" className="pk-text-link" onClick={openLibrary}>
+        从素材库导入
+      </button>
+      <button
+        type="button"
+        className="pk-text-link"
+        title="用手机扫码上传，图片回填到左侧"
+        onClick={() => setMobileOpen(true)}
+      >
+        手机上传
+      </button>
+      {upload.max > 1 && (
+        <span className="pk-upload-count">
+          {images.length}/{upload.max}
+        </span>
+      )}
+    </>
+  ) : null;
+
   return (
     <div
-      className={`pk-workspace${trailingPane ? ' pk-workspace-trailing' : ''}${
+      className={`pk-workspace${pageClass ? ` ${pageClass}` : ''}${trailingPane ? ' pk-workspace-trailing' : ''}${
         trailingPane && trailingCollapsed ? ' pk-workspace-trailing-collapsed' : ''
       }`}
     >
       {/* ── 左: 输入栏 ── */}
-      <aside className="pk-input-pane">
+      <aside className={`pk-input-pane${inputPaneClassName ? ` ${inputPaneClassName}` : ''}`}>
         <div className="pk-form-card">
           <div className="pk-form-scroll">
+            {upload && uploadActionsPlacement === 'above' && (
+              <div className="image-tool-upload-actions pk-upload-actions-above">{uploadActionLinks}</div>
+            )}
             {/* 上传卡 (页面自带上传区时跳过) */}
             {upload && (
               <section className="pk-config-card">
@@ -422,28 +541,9 @@ export function ToolShell(props: Props) {
                       {upload.required && <i className="pk-required-mark">*</i>}
                       {upload.title}
                     </strong>
-                    <div className="pk-upload-title-actions">
-                      <button
-                        type="button"
-                        className="pk-text-link"
-                        onClick={openLibrary}
-                      >
-                        从素材库导入
-                      </button>
-                      <button
-                        type="button"
-                        className="pk-text-link"
-                        title="用手机扫码上传，图片回填到左侧"
-                        onClick={() => setMobileOpen(true)}
-                      >
-                        手机上传
-                      </button>
-                      {upload.max > 1 && (
-                        <span className="pk-upload-count">
-                          {images.length}/{upload.max}
-                        </span>
-                      )}
-                    </div>
+                    {uploadActionsPlacement !== 'above' && (
+                      <div className="pk-upload-title-actions">{uploadActionLinks}</div>
+                    )}
                   </div>
 
                   <div
@@ -535,10 +635,9 @@ export function ToolShell(props: Props) {
           )}
           <ToolSubmitBar
             submitting={submitting}
-            disabled={!formValid || blocked}
+            disabled={!canSubmit || blocked}
             label={submitLabel}
             creditLabel={creditLabel ?? autoCreditLabel ?? undefined}
-            desc={desc}
             hint={hint}
             settings={
               settings && (settings.ratio || settings.resolution) ? (
@@ -588,7 +687,7 @@ export function ToolShell(props: Props) {
               ? sourcePane(images)
               : sourcePane
             : null) ?? (
-            <ToolEmptyState title={title} desc={emptyDesc} capability={capability} />
+            <ToolEmptyState title={title} desc={desc || emptyDesc} capability={capability} />
           )
         ) : (
           <div className="pk-result-body">
@@ -666,7 +765,11 @@ export function ToolShell(props: Props) {
       {/* ── 右: 附加栏 (局部重绘历史记录; 其他页面不传则为空) ── */}
       {trailingPane && (
         <ToolTrailingContext.Provider
-          value={{ collapsed: trailingCollapsed, toggle: () => setTrailingCollapsed((value) => !value) }}
+          value={{
+            collapsed: trailingCollapsed,
+            toggle: () => setTrailingCollapsed((value) => !value),
+            reuseTask: reuseHistoryTask,
+          }}
         >
           {trailingPane}
         </ToolTrailingContext.Provider>

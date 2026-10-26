@@ -12,10 +12,11 @@ import { test, expect } from '@playwright/test';
  */
 
 const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
+const EMAIL = process.env.ADMIN_EMAIL ?? 'admin@huojue.local';
 
 async function login(page: import('@playwright/test').Page) {
   await page.goto(`${UI}/login`);
-  await page.locator('input[type="email"], input#email').first().fill('admin@huojue.local');
+  await page.locator('input[type="email"], input#email').first().fill(EMAIL);
   await page.locator('input[type="password"]').first().fill(
     process.env.ADMIN_PASSWORD ?? '',
   );
@@ -121,6 +122,22 @@ test.describe('后台布局', () => {
     for (const [i, c] of m.counts.entries()) {
       expect(c, `第 ${i} 行直显动作 ${c} 个, 应 ≤2`).toBeLessThanOrEqual(2);
     }
+  });
+
+  test('全局搜索可用 Ctrl+K 唤起并支持 Esc 关闭', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await login(page);
+    await page.goto(`${UI}/admin/users`);
+    await page.waitForSelector('.adm-layout', { timeout: 15000 });
+
+    await page.keyboard.press('Control+K');
+    const search = page.locator('.adm-search input');
+    await expect(search).toBeFocused();
+    await search.fill('o');
+    await expect(page.getByText('至少输入 2 个字符开始搜索')).toBeVisible();
+
+    await search.press('Escape');
+    await expect(page.getByText('至少输入 2 个字符开始搜索')).toBeHidden();
   });
 
   test('操作列的下拉菜单可用', async ({ page }) => {

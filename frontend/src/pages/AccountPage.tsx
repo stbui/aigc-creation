@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Alert, Avatar, Button, Input, Modal, Tag, message } from 'antd';
 import {
-  ArrowLeft,
   BarChart3,
   Bell,
   CheckCheck,
@@ -17,6 +16,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { creditsApi, membershipApi, meApi, notificationsApi, ordersApi, ticketsApi } from '../lib/api';
+import { PersonalPage } from '../components/PersonalPage';
 import { StateSkeleton } from '../components/StateViews';
 import { useAuth } from '../context/AuthContext';
 import type {
@@ -178,10 +178,7 @@ export function AccountPage() {
 
   if (!token) {
     return (
-      <div className="account-page">
-        <button type="button" className="pkg-back-btn" onClick={() => navigate(-1)}>
-          <ArrowLeft size={15} /> 返回
-        </button>
+      <PersonalPage title="账户设置" description="管理你的资料、安全与数据。" width="narrow">
         <Alert
           type="info"
           showIcon
@@ -193,15 +190,15 @@ export function AccountPage() {
             </Button>
           }
         />
-      </div>
+      </PersonalPage>
     );
   }
 
   if (loading) {
     return (
-      <div className="account-page">
-        <StateSkeleton />
-      </div>
+      <PersonalPage title="账户设置" description="管理你的资料、安全与数据。" width="narrow">
+        <StateSkeleton variant="panel" count={4} />
+      </PersonalPage>
     );
   }
 
@@ -343,15 +340,21 @@ export function AccountPage() {
   const avatarChar = (profile?.name || profile?.email || 'U').charAt(0).toUpperCase();
 
   return (
-    <div className="account-page">
-      <button type="button" className="pkg-back-btn" onClick={() => navigate(-1)}>
-        <ArrowLeft size={15} /> 返回
-      </button>
-
+    <PersonalPage
+      className="account-page"
+      title="账户设置"
+      description="管理你的资料、安全与数据；积分与订单可从下方快捷进入。"
+      width="narrow"
+      extra={
+        <Button icon={<BarChart3 size={15} />} onClick={() => navigate('/stats')}>
+          创作数据
+        </Button>
+      }
+    >
       {/* ── 概览 ───────────────────────────────────────────────── */}
       <section className="account-card account-hero">
         <div className="account-hero-main">
-          <Avatar size={56} className="account-avatar">
+          <Avatar size={64} className="account-avatar">
             {avatarChar}
           </Avatar>
           <div className="account-hero-info">
@@ -371,7 +374,7 @@ export function AccountPage() {
           </div>
         </div>
         <div className="account-quick">
-          <Button icon={<Wallet size={14} />} onClick={() => navigate('/credits')}>
+          <Button type="primary" icon={<Wallet size={14} />} onClick={() => navigate('/credits')}>
             积分明细
           </Button>
           <Button icon={<Gem size={14} />} onClick={() => navigate('/packages')}>
@@ -692,6 +695,6 @@ export function AccountPage() {
           />
         </div>
       </Modal>
-    </div>
+    </PersonalPage>
   );
 }

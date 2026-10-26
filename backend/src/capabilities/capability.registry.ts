@@ -226,6 +226,9 @@ export function validateCapabilityParams(
       throw new AppError(40001, `${p.label}必须是文本`, 400);
     }
     const text = String(raw);
+    if (p.pattern && !new RegExp(p.pattern).test(text)) {
+      throw new AppError(40001, `${p.label}格式无效`, 400);
+    }
     const maxLength = p.maxLength ?? 2000;
     if (text.length > maxLength) {
       throw new AppError(40001, `${p.label}不能超过 ${maxLength} 个字符`, 400);
