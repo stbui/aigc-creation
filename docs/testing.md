@@ -71,7 +71,7 @@ cd frontend && npm run build:prod
 | --- | --- |
 | `verify-asset-filters.js` | 素材列表 `keyword` / `from` / `to` 三个筛选维度（基线来自接口契约，不从实现反推） |
 | `verify-prompt-tools.js` | AI 润色 / 图片转提示词 / 手机上传三段真实链路 + 未登录 401 |
-| `verify-deps.js` | `node_modules` 版本一致性审计（`npm run verify:deps` / `verify:deps:critical`），不依赖后端 |
+| `verify-deps.js` | `node_modules` 版本一致性审计 + `package.json` 内 `npm run <script>` 引用完整性（`npm run verify:deps` / `verify:deps:critical`），不依赖后端 |
 
 ### 3.3 HTTP 冒烟（L3）
 
