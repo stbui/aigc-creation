@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState, type ComponentType } from 'react';
 import { Button, Segmented } from 'antd';
 import { Navigate, Route, Routes, useLocation, useNavigate, Link } from 'react-router-dom';
 import { adminApi } from '../../lib/api';
@@ -6,37 +6,90 @@ import { useAuth } from '../../context/AuthContext';
 import { useAdmin } from '../../context/AdminContext';
 import { Activity, ImageOff, Users } from 'lucide-react';
 import { AdminLayout, AdminPageLoading, findAdminMenuItem } from '../../components/admin/AdminLayout';
+import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { ExceptionPage } from '../../components/ExceptionPage';
 import { PageHeader, StatusTag } from '../../components/admin/PageHeader';
 import { AdminStaleError, useAdminResource } from '../../components/admin/AdminWidgets';
-import { AdminUsersPage } from './AdminUsersPage';
-import { AdminRolesPage } from './AdminRolesPage';
-import { AdminSettingsPage } from './AdminSettingsPage';
-import { AdminAuditPage } from './AdminAuditPage';
-import { AdminBackupPage } from './AdminBackupPage';
-import { AdminAssetsPage } from './AdminAssetsPage';
-import { AdminStoragePage } from './AdminStoragePage';
-import { AdminCouponsPage } from './AdminCouponsPage';
-import { AdminCampaignsPage } from './AdminCampaignsPage';
-import { AdminMarketingRulesPage } from './AdminMarketingRulesPage';
-import { AdminSchedulerPage } from './AdminSchedulerPage';
-import { AdminModelConfigPage } from './AdminModelConfigPage';
-import { AdminModelCallsPage } from './AdminModelCallsPage';
-import { AdminTasksPage } from './AdminTasksPage';
-import { AdminCreditPricesPage } from './AdminCreditPricesPage';
-import { AdminCapabilitiesPage } from './AdminCapabilitiesPage';
-import { AdminProductsPage } from './AdminProductsPage';
-import { AdminOrdersPage } from './AdminOrdersPage';
-import { AdminCreditsPage } from './AdminCreditsPage';
-import { AdminRetentionPage } from './AdminRetentionPage';
-import { AdminInvoicesPage } from './AdminInvoicesPage';
-import { AdminPaymentChannelsPage } from './AdminPaymentChannelsPage';
-import { AdminReconciliationPage } from './AdminReconciliationPage';
-import { AdminLegalPage } from './AdminLegalPage';
-import { AdminNotificationsPage } from './AdminNotificationsPage';
-import { AdminAigcLabelPage } from './AdminAigcLabelPage';
-import { AdminTicketsPage } from './AdminTicketsPage';
 import { toAbsoluteUrl } from '../../lib/api';
+
+/**
+ * 后台子路由按页加载。
+ *
+ * `/admin` 外壳本身已经是懒加载，但此前外壳一次性静态导入全部 28 个页面，
+ * 进入概览时仍要下载整包后台代码。这里保留外壳与概览同步加载，其余页面
+ * 在首次导航到对应路由时再请求各自 chunk；Suspense 放在 AdminLayout 内，
+ * 加载期间顶栏与侧栏不消失，避免整屏闪白。
+ */
+function lazyAdminPage<T extends Record<string, ComponentType<any>>>(
+  loader: () => Promise<T>,
+  name: keyof T & string,
+) {
+  return lazy(() => loader().then((m) => ({ default: m[name] })));
+}
+
+const AdminUsersPage = lazyAdminPage(() => import('./AdminUsersPage'), 'AdminUsersPage');
+const AdminRolesPage = lazyAdminPage(() => import('./AdminRolesPage'), 'AdminRolesPage');
+const AdminSettingsPage = lazyAdminPage(() => import('./AdminSettingsPage'), 'AdminSettingsPage');
+const AdminAuditPage = lazyAdminPage(() => import('./AdminAuditPage'), 'AdminAuditPage');
+const AdminBackupPage = lazyAdminPage(() => import('./AdminBackupPage'), 'AdminBackupPage');
+const AdminAssetsPage = lazyAdminPage(() => import('./AdminAssetsPage'), 'AdminAssetsPage');
+const AdminStoragePage = lazyAdminPage(() => import('./AdminStoragePage'), 'AdminStoragePage');
+const AdminCouponsPage = lazyAdminPage(() => import('./AdminCouponsPage'), 'AdminCouponsPage');
+const AdminCampaignsPage = lazyAdminPage(
+  () => import('./AdminCampaignsPage'),
+  'AdminCampaignsPage',
+);
+const AdminMarketingRulesPage = lazyAdminPage(
+  () => import('./AdminMarketingRulesPage'),
+  'AdminMarketingRulesPage',
+);
+const AdminSchedulerPage = lazyAdminPage(
+  () => import('./AdminSchedulerPage'),
+  'AdminSchedulerPage',
+);
+const AdminModelConfigPage = lazyAdminPage(
+  () => import('./AdminModelConfigPage'),
+  'AdminModelConfigPage',
+);
+const AdminModelCallsPage = lazyAdminPage(
+  () => import('./AdminModelCallsPage'),
+  'AdminModelCallsPage',
+);
+const AdminCapabilitiesPage = lazyAdminPage(
+  () => import('./AdminCapabilitiesPage'),
+  'AdminCapabilitiesPage',
+);
+const AdminTasksPage = lazyAdminPage(() => import('./AdminTasksPage'), 'AdminTasksPage');
+const AdminTicketsPage = lazyAdminPage(() => import('./AdminTicketsPage'), 'AdminTicketsPage');
+const AdminCreditPricesPage = lazyAdminPage(
+  () => import('./AdminCreditPricesPage'),
+  'AdminCreditPricesPage',
+);
+const AdminProductsPage = lazyAdminPage(() => import('./AdminProductsPage'), 'AdminProductsPage');
+const AdminOrdersPage = lazyAdminPage(() => import('./AdminOrdersPage'), 'AdminOrdersPage');
+const AdminCreditsPage = lazyAdminPage(() => import('./AdminCreditsPage'), 'AdminCreditsPage');
+const AdminRetentionPage = lazyAdminPage(
+  () => import('./AdminRetentionPage'),
+  'AdminRetentionPage',
+);
+const AdminInvoicesPage = lazyAdminPage(() => import('./AdminInvoicesPage'), 'AdminInvoicesPage');
+const AdminPaymentChannelsPage = lazyAdminPage(
+  () => import('./AdminPaymentChannelsPage'),
+  'AdminPaymentChannelsPage',
+);
+const AdminReconciliationPage = lazyAdminPage(
+  () => import('./AdminReconciliationPage'),
+  'AdminReconciliationPage',
+);
+const AdminLegalPage = lazyAdminPage(() => import('./AdminLegalPage'), 'AdminLegalPage');
+const AdminNotificationsPage = lazyAdminPage(
+  () => import('./AdminNotificationsPage'),
+  'AdminNotificationsPage',
+);
+const AdminAigcLabelPage = lazyAdminPage(
+  () => import('./AdminAigcLabelPage'),
+  'AdminAigcLabelPage',
+);
 
 /**
  * 平台概览页 (M2 骨架)。
@@ -415,6 +468,7 @@ export function AdminDashboardContent() {
 export function AdminShell() {
   const { token, email } = useAuth();
   const { me, loading, error, errorStatus, refresh } = useAdmin();
+  const location = useLocation();
 
   if (!token) return <Navigate to="/login" replace />;
   if (loading) return <AdminPageLoading tip="校验后台权限…" />;
@@ -434,46 +488,50 @@ export function AdminShell() {
 
   return (
     <AdminLayout>
-      <Routes>
-        <Route index element={<DashboardContent />} />
-        <Route path="users" element={<AdminUsersPage />} />
-        <Route path="roles" element={<AdminRolesPage />} />
-        <Route path="settings" element={<AdminSettingsPage />} />
-        <Route path="audit-logs" element={<AdminAuditPage />} />
-        <Route path="backups" element={<AdminBackupPage />} />
-        <Route path="assets" element={<AdminAssetsPage />} />
-        <Route path="storage" element={<AdminStoragePage />} />
-        <Route path="coupons" element={<AdminCouponsPage />} />
-        <Route path="campaigns" element={<AdminCampaignsPage />} />
-        <Route path="marketing-rules" element={<AdminMarketingRulesPage />} />
-        <Route path="scheduler" element={<AdminSchedulerPage />} />
-        {/* 模型配置与调用记录 (2026-10-20) */}
-        <Route path="model-config" element={<AdminModelConfigPage />} />
-        <Route path="model-calls" element={<AdminModelCallsPage />} />
-        {/* 能力管控 (B6): 单项能力上下线 */}
-        <Route path="capabilities" element={<AdminCapabilitiesPage />} />
-        {/* 任务监控 (B-28~B-33) */}
-        <Route path="tasks" element={<AdminTasksPage />} />
-        {/* 工单处理 (B7): 客服队列, 与任务监控同组 */}
-        <Route path="tickets" element={<AdminTicketsPage />} />
-        {/* 能力消耗价 (commerce-design.md §4.4) */}
-        <Route path="credit-prices" element={<AdminCreditPricesPage />} />
-        {/* 交易后台四页 (B1): 商品 / 订单 / 积分账本 / 保留期清理 */}
-        <Route path="products" element={<AdminProductsPage />} />
-        <Route path="orders" element={<AdminOrdersPage />} />
-        <Route path="credits" element={<AdminCreditsPage />} />
-        <Route path="retention" element={<AdminRetentionPage />} />
-        {/* 财务 (B3): 支付渠道状态 / 发票审核 / 渠道对账 */}
-        <Route path="payment-channels" element={<AdminPaymentChannelsPage />} />
-        <Route path="invoices" element={<AdminInvoicesPage />} />
-        <Route path="reconciliation" element={<AdminReconciliationPage />} />
-        <Route path="legal" element={<AdminLegalPage />} />
-        <Route path="notifications" element={<AdminNotificationsPage />} />
-        {/* AI 标识样式 (2026-10-21): 文案/字体/配色由浏览器渲成位图, 位置与缩放服务端合成 */}
-        <Route path="aigc-label" element={<AdminAigcLabelPage />} />
-        {/* 未实现的模块: 显式提示而非静默跳回概览 */}
-        <Route path="*" element={<NotImplementedPage />} />
-      </Routes>
+      <ErrorBoundary resetKeys={[location.pathname]}>
+        <Suspense fallback={<AdminPageLoading tip="加载页面…" />}>
+          <Routes>
+            <Route index element={<DashboardContent />} />
+            <Route path="users" element={<AdminUsersPage />} />
+            <Route path="roles" element={<AdminRolesPage />} />
+            <Route path="settings" element={<AdminSettingsPage />} />
+            <Route path="audit-logs" element={<AdminAuditPage />} />
+            <Route path="backups" element={<AdminBackupPage />} />
+            <Route path="assets" element={<AdminAssetsPage />} />
+            <Route path="storage" element={<AdminStoragePage />} />
+            <Route path="coupons" element={<AdminCouponsPage />} />
+            <Route path="campaigns" element={<AdminCampaignsPage />} />
+            <Route path="marketing-rules" element={<AdminMarketingRulesPage />} />
+            <Route path="scheduler" element={<AdminSchedulerPage />} />
+            {/* 模型配置与调用记录 (2026-10-20) */}
+            <Route path="model-config" element={<AdminModelConfigPage />} />
+            <Route path="model-calls" element={<AdminModelCallsPage />} />
+            {/* 能力管控 (B6): 单项能力上下线 */}
+            <Route path="capabilities" element={<AdminCapabilitiesPage />} />
+            {/* 任务监控 (B-28~B-33) */}
+            <Route path="tasks" element={<AdminTasksPage />} />
+            {/* 工单处理 (B7): 客服队列, 与任务监控同组 */}
+            <Route path="tickets" element={<AdminTicketsPage />} />
+            {/* 能力消耗价 (commerce-design.md §4.4) */}
+            <Route path="credit-prices" element={<AdminCreditPricesPage />} />
+            {/* 交易后台四页 (B1): 商品 / 订单 / 积分账本 / 保留期清理 */}
+            <Route path="products" element={<AdminProductsPage />} />
+            <Route path="orders" element={<AdminOrdersPage />} />
+            <Route path="credits" element={<AdminCreditsPage />} />
+            <Route path="retention" element={<AdminRetentionPage />} />
+            {/* 财务 (B3): 支付渠道状态 / 发票审核 / 渠道对账 */}
+            <Route path="payment-channels" element={<AdminPaymentChannelsPage />} />
+            <Route path="invoices" element={<AdminInvoicesPage />} />
+            <Route path="reconciliation" element={<AdminReconciliationPage />} />
+            <Route path="legal" element={<AdminLegalPage />} />
+            <Route path="notifications" element={<AdminNotificationsPage />} />
+            {/* AI 标识样式 (2026-10-21): 文案/字体/配色由浏览器渲成位图, 位置与缩放服务端合成 */}
+            <Route path="aigc-label" element={<AdminAigcLabelPage />} />
+            {/* 未实现的模块: 显式提示而非静默跳回概览 */}
+            <Route path="*" element={<NotImplementedPage />} />
+          </Routes>
+        </Suspense>
+      </ErrorBoundary>
     </AdminLayout>
   );
 }

@@ -8,6 +8,8 @@ import { useAdmin } from '../../context/AdminContext';
 import {
   AdminDrawer,
   AdminListError,
+  AdminMobileList,
+  AdminMobileRecord,
   AdminStaleError,
   AdminListLoading,
   ConfirmAction,
@@ -221,6 +223,39 @@ export function AdminUsersPage() {
     }
   };
 
+  const rowMenuItems = useCallback(
+    (row: Row) =>
+      [
+        can('user.disable') && row.status !== 'deleted'
+          ? {
+              key: 'status',
+              label: row.status === 'active' ? '禁用账号' : '启用账号',
+              onClick: () => setStatusTarget(row),
+            }
+          : null,
+        can('user.write') && row.status !== 'deleted'
+          ? { key: 'role', label: '变更角色', onClick: () => setRoleTarget(row) }
+          : null,
+        can('user.reset_password') && row.status !== 'deleted'
+          ? {
+              key: 'pwd',
+              label: '重置密码',
+              onClick: () => void doResetPassword(row),
+            }
+          : null,
+        can('user.delete')
+          ? { key: 'del', label: '删除用户', danger: true, onClick: () => void openDelete(row) }
+          : null,
+      ].filter(Boolean) as Array<{
+        key: string;
+        label: string;
+        danger?: boolean;
+        onClick: () => void;
+      }>,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [can],
+  );
+
   const columns: ColumnsType<Row> = useMemo(
     () => [
       {
@@ -282,34 +317,7 @@ export function AdminUsersPage() {
          * 与 docs/admin-ui-design.md §2.3「操作列最多直显 2 个」一致。
          */
         render: (_: unknown, row) => {
-          const menuItems = [
-            can('user.disable') && row.status !== 'deleted'
-              ? {
-                  key: 'status',
-                  label: row.status === 'active' ? '禁用账号' : '启用账号',
-                  onClick: () => setStatusTarget(row),
-                }
-              : null,
-            can('user.write') && row.status !== 'deleted'
-              ? { key: 'role', label: '变更角色', onClick: () => setRoleTarget(row) }
-              : null,
-            can('user.reset_password') && row.status !== 'deleted'
-              ? {
-                  key: 'pwd',
-                  label: '重置密码',
-                  onClick: () => void doResetPassword(row),
-                }
-              : null,
-            can('user.delete')
-              ? { key: 'del', label: '删除用户', danger: true, onClick: () => void openDelete(row) }
-              : null,
-          ].filter(Boolean) as Array<{
-            key: string;
-            label: string;
-            danger?: boolean;
-            onClick: () => void;
-          }>;
-
+          const menuItems = rowMenuItems(row);
           return (
             <div className="adm-row-actions">
               <Button type="link" className="adm-link" onClick={() => setDetailId(row.id)}>
@@ -334,8 +342,7 @@ export function AdminUsersPage() {
         },
       },
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [can, busy],
+    [busy, rowMenuItems],
   );
 
   return (
@@ -438,37 +445,100 @@ export function AdminUsersPage() {
                 </Button>
               </div>
             )}
-            <Table<Row>
-              rowKey="id"
-              size="small"
-              columns={columns}
-              dataSource={data?.items ?? []}
-              loading={loading}
-              scroll={{ x: 1000 }}
-              rowSelection={{
-                selectedRowKeys: selected,
-                onChange: (keys) => setSelected(keys as string[]),
-                // 已注销账号不能再改状态, 但仍允许选中 (批量启用会逐条返回失败原因)
-                getCheckboxProps: (row) => ({ disabled: row.status === 'deleted' }),
-              }}
-              onChange={(_p, _f, sorter) => {
-                const s = Array.isArray(sorter) ? sorter[0] : sorter;
-                const field = s?.columnKey;
-                if (typeof field === 'string') {
-                  setQuery({ sort: `${field}:${s?.order === 'ascend' ? 'asc' : 'desc'}` }, false);
-                }
-              }}
-              pagination={adminPagination({
-                current: data?.page ?? 1,
-                pageSize: data?.pageSize ?? 20,
-                total: data?.total ?? 0,
-                // 翻页时清空选择 (见 selected 处的说明)
-                onChange: (page, size) => {
-                  setSelected([]);
-                  setPage(page, size);
-                },
-              })}
-            />
+            {(data?.items.length ?? 0) === 0 ? (
+              <AdminEmpty description="没有符合条件的用户。清除筛选或换一个关键词试试。" />
+            ) : (
+              <>
+                <Table<Row>
+                  className="adm-responsive-table"
+                  rowKey="id"
+                  size="small"
+                  columns={columns}
+                  dataSource={data?.items ?? []}
+                  loading={loading}
+                  scroll={{ x: 1000 }}
+                  rowSelection={{
+                    selectedRowKeys: selected,
+                    onChange: (keys) => setSelected(keys as string[]),
+                    // 已注销账号不能再改状态, 但仍允许选中 (批量启用会逐条返回失败原因)
+                    getCheckboxProps: (row) => ({ disabled: row.status === 'deleted' }),
+                  }}
+                  onChange={(_p, _f, sorter) => {
+                    const s = Array.isArray(sorter) ? sorter[0] : sorter;
+                    const field = s?.columnKey;
+                    if (typeof field === 'string') {
+                      setQuery(
+                        { sort: `${field}:${s?.order === 'ascend' ? 'asc' : 'desc'}` },
+                        false,
+                      );
+                    }
+                  }}
+                  pagination={adminPagination({
+                    current: data?.page ?? 1,
+                    pageSize: data?.pageSize ?? 20,
+                    total: data?.total ?? 0,
+                    // 翻页时清空选择 (见 selected 处的说明)
+                    onChange: (page, size) => {
+                      setSelected([]);
+                      setPage(page, size);
+                    },
+                  })}
+                />
+
+                <AdminMobileList label="用户列表">
+                  {data?.items.map((row) => {
+                    const menuItems = rowMenuItems(row);
+                    return (
+                      <AdminMobileRecord
+                        key={row.id}
+                        title={row.email}
+                        subtitle={`注册于 ${new Date(row.createdAt).toLocaleDateString('zh-CN')}`}
+                        status={<StatusTag status={row.status} />}
+                        selected={selected.includes(row.id)}
+                        selectDisabled={row.status === 'deleted'}
+                        selectionLabel={`选择用户 ${row.email}`}
+                        onSelectedChange={(checked) =>
+                          setSelected((prev) =>
+                            checked ? [...prev, row.id] : prev.filter((id) => id !== row.id),
+                          )
+                        }
+                        meta={[
+                          { label: '角色', value: <StatusTag status={row.role} /> },
+                          {
+                            label: '资源',
+                            value: `${row.projectCount} 项目 · ${row.taskCount} 任务 · ${row.assetCount} 素材`,
+                          },
+                          {
+                            label: '最近登录',
+                            value: row.lastLoginAt
+                              ? new Date(row.lastLoginAt).toLocaleString('zh-CN')
+                              : '从未登录',
+                          },
+                        ]}
+                        actions={
+                          <>
+                            <Button
+                              type="link"
+                              className="adm-link"
+                              onClick={() => setDetailId(row.id)}
+                            >
+                              查看详情
+                            </Button>
+                            {menuItems.length > 0 && (
+                              <Dropdown trigger={['click']} menu={{ items: menuItems }} disabled={busy}>
+                                <Button type="link" className="adm-link">
+                                  更多操作
+                                </Button>
+                              </Dropdown>
+                            )}
+                          </>
+                        }
+                      />
+                    );
+                  })}
+                </AdminMobileList>
+              </>
+            )}
           </>
         )}
       </Panel>

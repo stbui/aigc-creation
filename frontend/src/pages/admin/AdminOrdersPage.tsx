@@ -8,6 +8,8 @@ import { useAdmin } from '../../context/AdminContext';
 import {
   AdminDrawer,
   AdminListError,
+  AdminMobileList,
+  AdminMobileRecord,
   AdminStaleError,
   AdminListLoading,
   ConfirmAction,
@@ -541,7 +543,9 @@ export function AdminOrdersPage() {
             {(list?.items.length ?? 0) === 0 ? (
               <AdminEmpty description="没有符合条件的订单。清除筛选或换一个时间范围试试。" />
             ) : (
-              <Table<AdminOrderRow>
+              <>
+                <Table<AdminOrderRow>
+                className="adm-responsive-table"
                 rowKey="id"
                 size="small"
                 columns={columns}
@@ -565,6 +569,99 @@ export function AdminOrdersPage() {
                   },
                 })}
               />
+                <AdminMobileList label="订单列表">
+                {list?.items.map((row) => {
+                  const selectable = row.status === 'pending';
+                  const refundable =
+                    (row.status === 'paid' || row.status === 'partial_refunded') &&
+                    row.paidCents > row.refundedCents &&
+                    can('order.refund');
+                  return (
+                    <AdminMobileRecord
+                      key={row.id}
+                      title={<code>{row.orderNo}</code>}
+                      subtitle={new Date(row.createdAt).toLocaleString('zh-CN')}
+                      status={
+                        <StatusTag
+                          status={row.status}
+                          label={STATUS_LABEL_OVERRIDE[row.status]}
+                        />
+                      }
+                      selected={selected.includes(row.id)}
+                      selectDisabled={!selectable}
+                      selectionLabel={`选择订单 ${row.orderNo}`}
+                      onSelectedChange={(checked) =>
+                        setSelected((prev) =>
+                          checked ? [...prev, row.id] : prev.filter((id) => id !== row.id),
+                        )
+                      }
+                      meta={[
+                        { label: '用户', value: row.userEmail },
+                        {
+                          label: '金额',
+                          value: (
+                            <span>
+                              ¥ {yuan(row.paidCents)}
+                              {row.refundedCents > 0 && (
+                                <span className="adm-mobile-record-danger">
+                                  {' '}· 已退 ¥ {yuan(row.refundedCents)}
+                                </span>
+                              )}
+                            </span>
+                          ),
+                        },
+                        {
+                          label: '商品',
+                          value: row.membershipPlanName
+                            ? `${row.membershipPlanName} (${row.membershipPlanCode})`
+                            : `${row.itemCount} 件商品`,
+                        },
+                        {
+                          label: '支付',
+                          value: `${
+                            CHANNEL_LABELS[row.channel ?? ''] ?? row.channel ?? '—'
+                          } · ${
+                            row.paidAt
+                              ? new Date(row.paidAt).toLocaleString('zh-CN')
+                              : '未支付'
+                          }`,
+                        },
+                      ]}
+                      actions={
+                        <>
+                          <Button
+                            type="link"
+                            className="adm-link"
+                            onClick={() => setDetailId(row.id)}
+                          >
+                            查看详情
+                          </Button>
+                          {row.status === 'pending' && can('order.mark_paid') && (
+                            <Button
+                              type="link"
+                              className="adm-link"
+                              onClick={() => openAction('markPaid', row)}
+                            >
+                              手工核销
+                            </Button>
+                          )}
+                          {refundable && (
+                            <Button
+                              type="link"
+                              danger
+                              className="adm-link is-danger"
+                              onClick={() => openAction('refund', row)}
+                            >
+                              退款
+                            </Button>
+                          )}
+                        </>
+                      }
+                    />
+                  );
+                })}
+                </AdminMobileList>
+              </>
             )}
           </>
         )}
