@@ -82,6 +82,14 @@ export interface ToolResultCompare {
   afterLabel?: string;
 }
 
+/** 自定义已上传图片位的操作入口 (局部重绘的预览 / 重新编辑 / 重新上传)。 */
+export interface UploadPreviewControls {
+  open: () => void;
+  remove: (id: string) => void;
+  preview: (image: ToolAsset) => void;
+  uploading: boolean;
+}
+
 /** 修图页共用历史栏的收起状态；由 ToolShell 持有，ToolHistoryPane 消费。 */
 export interface ToolTrailingControl {
   collapsed: boolean;
@@ -163,6 +171,17 @@ interface Props {
    * （涂抹出的遮罩必须与原图同尺寸）。传普通节点则与改造前一致。
    */
   children?: ReactNode | ((images: ToolAsset[]) => ReactNode);
+  /**
+   * 自定义已上传图片位。
+   *
+   * 默认使用 pk-thumb-grid；局部重绘参考站是「160×160 预览 + 重新编辑/重新上传」，
+   * 由页面渲染这组操作，但仍复用 ToolShell 的图片状态、素材库与手机上传。
+   */
+  renderUploadPreview?: (images: ToolAsset[], controls: UploadPreviewControls) => ReactNode;
+  /** 单图工具重新上传时替换当前图，而不是被「最多 1 张」拒绝。 */
+  replaceUpload?: boolean;
+  /** 图片位变化 (上传 / 替换 / 移除 / 历史回填)。 */
+  onImagesChange?: (images: ToolAsset[]) => void;
   /** 提交条件 */
   formValid: boolean;
   submitting: boolean;
@@ -245,6 +264,9 @@ export function ToolShell(props: Props) {
     hint,
     emptyDesc,
     children,
+    renderUploadPreview,
+    replaceUpload = false,
+    onImagesChange,
     formValid,
     submitting,
     result,
@@ -286,6 +308,10 @@ export function ToolShell(props: Props) {
   useEffect(() => {
     imagesRef.current = images;
   }, [images]);
+
+  useEffect(() => {
+    onImagesChange?.(images);
+  }, [images, onImagesChange]);
 
   /**
    * 素材库点选回填。
@@ -379,7 +405,9 @@ export function ToolShell(props: Props) {
         message.error(`单张不超过 ${MAX_IMAGE_MB}MB：${oversize.map((f) => f.name).join('、')}`);
         return;
       }
-      const room = upload.max - images.length;
+      const current = imagesRef.current;
+      const replacing = replaceUpload && upload.max === 1 && current.length > 0;
+      const room = upload.max - current.length + (replacing ? 1 : 0);
       if (room <= 0) {
         message.warning(`最多上传 ${upload.max} 张图片`);
         return;
@@ -394,7 +422,9 @@ export function ToolShell(props: Props) {
           const asset = await assetsApi.upload(file, projectId);
           uploaded.push({ id: asset.id, url: assetSrc(asset) ?? '', name: file.name });
         }
-        setImages((prev) => [...prev, ...uploaded]);
+        const next = replacing ? uploaded.slice(0, 1) : [...imagesRef.current, ...uploaded];
+        imagesRef.current = next;
+        setImages(next);
         message.success(`已上传 ${uploaded.length} 张图片`);
       } catch (e) {
         message.error((e as Error).message || '上传失败');
@@ -402,13 +432,17 @@ export function ToolShell(props: Props) {
         setUploading(false);
       }
     },
-    [images.length, ensureProject, message, upload],
+    [ensureProject, message, replaceUpload, upload],
   );
 
   // 粘贴上传 (参考站支持直接粘贴)
   usePasteUpload(uploadFiles);
 
-  const removeImage = (id: string) => setImages((prev) => prev.filter((x) => x.id !== id));
+  const removeImage = (id: string) => {
+    const next = imagesRef.current.filter((x) => x.id !== id);
+    imagesRef.current = next;
+    setImages(next);
+  };
 
   /** 必填图片位是否已满足；各页无需重复判断，避免出现“空图也能提交”。 */
   const uploadSatisfied = !upload?.required || images.length >= 1;
@@ -582,6 +616,13 @@ export function ToolShell(props: Props) {
                         <span>{upload.prompt ?? '点击或拖拽图片到此处上传'}</span>
                         <small>{upload.hint}</small>
                       </label>
+                    ) : renderUploadPreview ? (
+                      renderUploadPreview(images, {
+                        open: () => fileInputRef.current?.click(),
+                        remove: removeImage,
+                        preview: (image) => setLightboxUrl(image.url),
+                        uploading,
+                      })
                     ) : (
                       <div className={`pk-thumb-grid${images.length === 1 ? ' pk-thumb-grid-single' : ''}`}>
                         {images.map((img) => (

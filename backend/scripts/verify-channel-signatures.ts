@@ -118,10 +118,15 @@ function verifyRequestBuilding(): void {
   };
   const canonical = canonicalQuery(params);
   ok('canonical 与独立实现一致', canonical === refCanonical(params), canonical);
+  /*
+   * 用 `&Version=` 而不是 `Version=` 定位：签名参数里还有一个
+   * `SignatureVersion=1.0`，裸子串会先命中它，导致 Timestamp < Version
+   * 恒为假 —— 断言红的是取子串的方式，不是排序实现。
+   */
   ok(
     '参数名按字典序（Action 在 AccessKeyId 之后、Version 在 Timestamp 之后）',
     canonical.indexOf('AccessKeyId=') < canonical.indexOf('Action=') &&
-      canonical.indexOf('Timestamp=') < canonical.indexOf('Version='),
+      canonical.indexOf('Timestamp=') < canonical.indexOf('&Version='),
     canonical.slice(0, 80),
   );
   ok('中文签名已百分号编码', canonical.includes('SignName=%E8%B4%A7%E8%A7%89AI'));

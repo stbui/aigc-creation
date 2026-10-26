@@ -11,7 +11,7 @@ import {
   adminPagination,
   useAdminList,
 } from '../../components/admin/AdminWidgets';
-import { AdminEmpty, PageHeader, Panel, StatusTag } from '../../components/admin/PageHeader';
+import { AdminEmpty, PageHeader, Panel, StatusTag, type TagTone } from '../../components/admin/PageHeader';
 import type {
   AdminCoupon,
   CouponScope,
@@ -56,8 +56,10 @@ interface FormState {
   code: string;
   name: string;
   type: CouponType;
+  /** 折扣为万分比；满减 / 固定额为用户输入的**元** —— 只在 buildPayload 换算一次 */
   value: string;
-  thresholdCents: string;
+  /** 使用门槛，用户输入的**元** —— 只在 buildPayload 换算一次 */
+  threshold: string;
   scope: CouponScope;
   totalCount: string;
   perUserLimit: string;
@@ -74,7 +76,7 @@ function emptyForm(): FormState {
     name: '',
     type: 'full_cut',
     value: '',
-    thresholdCents: '0',
+    threshold: '0',
     scope: 'all',
     totalCount: '0',
     perUserLimit: '1',
@@ -83,6 +85,16 @@ function emptyForm(): FormState {
     status: 'on',
   };
 }
+
+/** 券的派生生效态：优先于人工开关展示，过期/未开始/售罄不是「停用」 */
+const EFFECTIVE_META: Record<AdminCoupon['effective'], { label: string; tone: TagTone }> = {
+  on: { label: '生效中', tone: 'success' },
+  off: { label: '已停用', tone: 'muted' },
+  expired: { label: '已过期', tone: 'warn' },
+  not_started: { label: '未开始', tone: 'brand' },
+  sold_out: { label: '已售罄', tone: 'danger' },
+};
+
 
 export function AdminCouponsPage() {
   const { message } = App.useApp();
@@ -112,12 +124,14 @@ export function AdminCouponsPage() {
     [],
   );
 
-  const { data, loading, error, setQuery, setPage, reload } = useAdminList<{
+  const { data, loading, error, params, setQuery, setPage, reload } = useAdminList<{
     items: AdminCoupon[];
     total: number;
     page: number;
     pageSize: number;
   }>(fetcher);
+
+  const hasFilter = Boolean(params.keyword || params.type || params.status);
 
   const openCreate = () => {
     setEditing(null);
@@ -135,8 +149,8 @@ export function AdminCouponsPage() {
       type: c.type,
       // 折扣是万分比原样; 其余是分 → 元
       value: c.type === 'discount' ? String(c.value) : String(c.value / 100),
-      // 门槛以**元**载入表单, 提交时再换算成分 —— 表单内统一用元, 避免两处换算逻辑
-      thresholdCents: String(c.thresholdCents / 100),
+      // 门槛以**元**载入表单, 提交时再换算成分 —— 表单内只保留一种口径
+      threshold: String(c.thresholdCents / 100),
       scope: c.scope,
       totalCount: String(c.totalCount),
       perUserLimit: String(c.perUserLimit),
@@ -174,12 +188,15 @@ export function AdminCouponsPage() {
     if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return '有效期格式非法';
     if (to <= from) return '失效时间必须晚于生效时间';
 
+    const thresholdYuan = Number(form.threshold);
+    if (!Number.isFinite(thresholdYuan) || thresholdYuan < 0) return '使用门槛必须是非负数';
+
     const payload: UpsertCouponPayload = {
       name,
       type: form.type,
       value,
-      // 门槛: 表单内存元 → 存库用分
-      thresholdCents: Math.max(0, Math.round(Number(form.thresholdCents) * 100) || 0),
+      // 门槛: 表单内存元 → 存库用分（只在这里换算一次）
+      thresholdCents: Math.round(thresholdYuan * 100),
       scope: form.scope,
       totalCount: Math.max(0, Number(form.totalCount) || 0),
       perUserLimit: Math.max(0, Number(form.perUserLimit) || 0),
@@ -313,10 +330,13 @@ export function AdminCouponsPage() {
       },
       {
         title: '状态',
-        dataIndex: 'status',
+        dataIndex: 'effective',
         key: 'status',
-        width: 75,
-        render: (s: string) => <StatusTag status={s === 'on' ? 'active' : 'disabled'} />,
+        width: 80,
+        render: (_: unknown, row) => {
+          const meta = EFFECTIVE_META[row.effective] ?? { label: row.status, tone: 'muted' as TagTone };
+          return <StatusTag status={row.status} label={meta.label} tone={meta.tone} />;
+        },
       },
       {
         title: '操作',
@@ -416,16 +436,36 @@ export function AdminCouponsPage() {
 
       <Panel title="券列表">
         {(data?.items.length ?? 0) === 0 ? (
-          <AdminEmpty
-            description="还没有优惠券"
-            action={
-              writable ? (
-                <Button type="primary" className="adm-btn is-primary" onClick={openCreate}>
-                  创建第一张券
+          hasFilter ? (
+            <AdminEmpty
+              description="没有匹配的优惠券。清除筛选条件后再试。"
+              action={
+                <Button
+                  type="default"
+                  className="adm-btn"
+                  onClick={() => {
+                    setKeyword('');
+                    setType(undefined);
+                    setStatus(undefined);
+                    setQuery({ keyword: undefined, type: undefined, status: undefined });
+                  }}
+                >
+                  清除筛选
                 </Button>
-              ) : undefined
-            }
-          />
+              }
+            />
+          ) : (
+            <AdminEmpty
+              description="还没有优惠券"
+              action={
+                writable ? (
+                  <Button type="primary" className="adm-btn is-primary" onClick={openCreate}>
+                    创建第一张券
+                  </Button>
+                ) : undefined
+              }
+            />
+          )
         ) : (
           <Table<AdminCoupon>
             rowKey="id"
@@ -515,12 +555,8 @@ export function AdminCouponsPage() {
               <Input
                 id="c-value"
                 type="number"
-                /* 折扣存的是万分比(原样显示); 满减/固定额存的是分(除 100 显示为元) */
-                value={
-                  form.type === 'discount'
-                    ? form.value
-                    : Number(form.value || 0) / 100
-                }
+                /* 表单内已是展示单位：折扣为万分比，其余为元 */
+                value={form.value}
                 placeholder={form.type === 'discount' ? '8500 = 85折' : '10.00'}
                 onChange={(e) => setForm({ ...form, value: e.target.value })}
               />
@@ -533,12 +569,9 @@ export function AdminCouponsPage() {
               <Input
                 id="c-threshold"
                 type="number"
-                /* form 内存的是**分**(与后端一致), 这里除 100 显示为元 ——
-                   少了这步, 打开编辑会看到 100 倍的门槛值 */
-                value={Number(form.thresholdCents) / 100}
-                onChange={(e) =>
-                  setForm({ ...form, thresholdCents: String(Math.round(Number(e.target.value) * 100) || 0) })
-                }
+                /* 表单内统一是元，只在提交时乘 100 —— 渲染不能再除一次 */
+                value={form.threshold}
+                onChange={(e) => setForm({ ...form, threshold: e.target.value })}
               />
               <div className="adm-field-hint">0 表示无门槛</div>
             </div>

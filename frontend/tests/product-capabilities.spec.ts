@@ -469,6 +469,7 @@ test.describe('局部重绘画布', () => {
       const el = document.querySelector('.redraw-mask-overlay') as HTMLCanvasElement | null;
       return Boolean(el && el.width === 240 && el.height === 160);
     });
+    await page.locator('.redraw-tool-btn', { hasText: '涂抹' }).click();
 
     const draw = async (y: number) => {
       const box = await canvas.boundingBox();
@@ -497,7 +498,7 @@ test.describe('局部重绘画布', () => {
 
     await expect.poll(() => Boolean(finishReferenceUpload)).toBe(true);
     await finishReferenceUpload!();
-    await expect(page.locator('.redraw-prompt-ref-preview img')).toBeVisible();
+    await expect(page.locator('.reference-upload.has-image img')).toBeVisible();
     await expect(submit).toBeEnabled();
 
     // 参考站仅在非原比例时提交 imageRatio；选 4:3 后随任务参数透传。

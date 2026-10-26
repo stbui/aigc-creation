@@ -47,7 +47,7 @@ const STATUS_OPTIONS = [
 ];
 
 export function AdminUsersPage() {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const { can } = useAdmin();
 
   // 筛选输入与已提交的查询分离: 不做每键即查, 避免无意义请求
@@ -67,7 +67,7 @@ export function AdminUsersPage() {
     [],
   );
 
-  const { data, loading, error, setQuery, setPage, reload } = useAdminList<AdminUserListResult>(
+  const { data, loading, error, params, setQuery, setPage, reload } = useAdminList<AdminUserListResult>(
     fetcher,
   );
 
@@ -130,6 +130,21 @@ export function AdminUsersPage() {
     [setQuery],
   );
 
+  const confirmBatch = (action: 'disable' | 'enable') => {
+    if (selected.length === 0) return;
+    const disabling = action === 'disable';
+    modal.confirm({
+      title: disabling ? `批量禁用 ${selected.length} 个账号？` : `批量启用 ${selected.length} 个账号？`,
+      content: disabling
+        ? `将立即禁用已选的 ${selected.length} 个账号，其登录凭证失效且无法再调用接口。`
+        : `将恢复已选的 ${selected.length} 个账号的登录能力。`,
+      okText: disabling ? '确认禁用' : '确认启用',
+      okButtonProps: disabling ? { danger: true } : undefined,
+      cancelText: '取消',
+      onOk: () => runBatch(action),
+    });
+  };
+
   const runBatch = async (action: 'disable' | 'enable') => {
     if (selected.length === 0) return;
     setBusy(true);
@@ -148,10 +163,11 @@ export function AdminUsersPage() {
 
   const exportUsers = async () => {
     try {
+      // 导出必须与屏幕上的列表同口径：用已生效的 params，而不是输入框草稿
       await adminUsersApi.exportCsv({
-        keyword: keyword || undefined,
-        role,
-        status,
+        keyword: (params.keyword as string) || undefined,
+        role: params.role as string | undefined,
+        status: params.status as string | undefined,
       });
     } catch (e) {
       void message.error((e as Error).message);
@@ -221,6 +237,21 @@ export function AdminUsersPage() {
     }
   };
 
+  const confirmResetPassword = (target: Row) => {
+    modal.confirm({
+      title: '重置登录密码',
+      content: (
+        <>
+          将为 <strong>{target.email}</strong> 生成一次性临时密码，该账号已登录的会话不会立即失效。
+          临时密码只显示一次，请通过安全渠道转交本人。
+        </>
+      ),
+      okText: '确认重置',
+      cancelText: '取消',
+      onOk: () => doResetPassword(target),
+    });
+  };
+
   const rowMenuItems = (row: Row) =>
     [
       can('user.disable') && row.status !== 'deleted'
@@ -237,7 +268,7 @@ export function AdminUsersPage() {
         ? {
             key: 'pwd',
             label: '重置密码',
-            onClick: () => void doResetPassword(row),
+            onClick: () => confirmResetPassword(row),
           }
         : null,
       can('user.delete')
@@ -420,7 +451,7 @@ export function AdminUsersPage() {
                       type="primary" danger
                       className="adm-btn is-danger"
                       disabled={busy}
-                      onClick={() => void runBatch('disable')}
+                      onClick={() => confirmBatch('disable')}
                     >
                       批量禁用
                     </Button>
@@ -428,7 +459,7 @@ export function AdminUsersPage() {
                       type="default"
                       className="adm-btn"
                       disabled={busy}
-                      onClick={() => void runBatch('enable')}
+                      onClick={() => confirmBatch('enable')}
                     >
                       批量启用
                     </Button>
@@ -752,7 +783,10 @@ function RoleDialog({
   onCancel: () => void;
   onConfirm: (role: string, reason: string) => void;
 }) {
-  const [next, setNext] = useState<string>('operator');
+  // 默认值必须等于当前角色：管理员/财务账号打开时不能预选「运营」，
+  // 否则直接点确认就把人降权了
+  const currentAssignable = target.role === 'user' ? 'operator' : target.role;
+  const [next, setNext] = useState<string>(currentAssignable);
   const [reason, setReason] = useState('');
 
   return (
@@ -761,6 +795,7 @@ function RoleDialog({
       title="变更角色"
       confirmText="确认变更"
       loading={loading}
+      confirmDisabled={next === target.role}
       description={
         <>
           <p>

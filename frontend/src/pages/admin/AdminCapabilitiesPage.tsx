@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { App, Button, Input, Modal, Table, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { adminCapabilitiesApi } from '../../lib/api';
+import { useAdmin } from '../../context/AdminContext';
 import {
   AdminListError,
   AdminListLoading,
@@ -29,6 +30,9 @@ import type { AdminCapabilityControl } from '../../types/api';
  */
 export function AdminCapabilitiesPage() {
   const { message, modal } = App.useApp();
+  const { can } = useAdmin();
+  /** 只有 capability.write 能上下线；capability.read 只读 */
+  const writable = can('capability.write');
   const [saving, setSaving] = useState<string | null>(null);
   /** 下架弹窗的上下文；null = 弹窗关闭 */
   const [offline, setOffline] = useState<AdminCapabilityControl | null>(null);
@@ -172,21 +176,24 @@ export function AdminCapabilitiesPage() {
       key: 'ops',
       width: 120,
       render: (_, row) => (
-        <Button
-          size="small"
-          danger={row.enabled}
-          loading={saving === row.capabilityId}
-          onClick={() => {
-            if (row.enabled) {
-              setReason('');
-              setOffline(row);
-            } else {
-              bringOnline(row);
-            }
-          }}
-        >
-          {row.enabled ? '下线' : '上线'}
-        </Button>
+        <Tooltip title={writable ? undefined : '当前账号无 capability.write 权限'}>
+          <Button
+            size="small"
+            danger={row.enabled}
+            loading={saving === row.capabilityId}
+            disabled={!writable}
+            onClick={() => {
+              if (row.enabled) {
+                setReason('');
+                setOffline(row);
+              } else {
+                bringOnline(row);
+              }
+            }}
+          >
+            {row.enabled ? '下线' : '上线'}
+          </Button>
+        </Tooltip>
       ),
     },
   ];
@@ -195,7 +202,11 @@ export function AdminCapabilitiesPage() {
     <>
       <PageHeader
         title="能力管控"
-        description="按能力单独上下线。下架后 C 端立刻停止收单并展示下线原因，生成接口返回 40005；不影响其它能力与模型线路。"
+        description={
+          writable
+            ? '按能力单独上下线。下架后 C 端立刻停止收单并展示下线原因，生成接口返回 40005；不影响其它能力与模型线路。'
+            : '当前账号只有 capability.read 权限，可查看能力状态但不能上下线。'
+        }
       />
 
       <Panel title="能力清单" note="「当前结论」是运行时结论：它由后台开关、逐能力路由与该模态的云端通道共同决定。">
@@ -219,6 +230,7 @@ export function AdminCapabilitiesPage() {
             dataSource={rows}
             pagination={false}
             size="small"
+            scroll={{ x: 960 }}
           />
         )}
       </Panel>

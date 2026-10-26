@@ -265,7 +265,12 @@ async function main() {
   check('新任务 retriedFromId 已持久化', newTask?.retriedFromId === failed.id, newTask?.retriedFromId);
   check('新任务复制了原参数', JSON.parse(newTask?.params ?? '{}')?.width === 1024);
   check('新任务复制了 inputAssetIds', newTask?.inputAssetIds === failed.inputAssetIds);
-  check('新任务复制了 creditCost', newTask?.creditCost === 3);
+  /*
+   * 重试不二次扣费，新任务必须记 0 —— 不是在原快照上复制 3。
+   * 原任务失败时已按快照退款；若沿用 3，重试再失败会触发第二次退款，
+   * 用户没为这次重试付过钱，等于白送。原价请查原任务。
+   */
+  check('新任务不二次扣费(creditCost=0)', newTask?.creditCost === 0, newTask?.creditCost);
   check('新任务不是 original id(未原地复活)', !!newTaskId && newTaskId !== failed.id);
 
   // 成功任务不可重试

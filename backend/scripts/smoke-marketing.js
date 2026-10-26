@@ -601,9 +601,18 @@ async function seedPriorDays(userId, n) {
   // ══════════════════════════════════════════════════════════════
   console.log('\n【清理测试数据】');
   {
+    /*
+     * 只清本脚本自己造的那批账号（mk 前缀）。
+     * 旧写法按 `@test.local` 通配删除，会把其它闸口/冒烟留下的账号一起卷进来；
+     * 那些账号挂着 Project/Asset，deleteMany 撞外键后整段清理被 catch 吞掉，
+     * 残留数据反过来把后续用例带脏 —— 典型「测试自身假阳性」。
+     */
     const emails = (
       await db(() =>
-        prisma.user.findMany({ where: { email: { contains: '@test.local' } }, select: { id: true } }),
+        prisma.user.findMany({
+          where: { email: { startsWith: 'mk', endsWith: '@test.local' } },
+          select: { id: true },
+        }),
       )
     ).map((u) => u.id);
     if (emails.length) {
@@ -628,7 +637,14 @@ async function seedPriorDays(userId, n) {
       await db(() =>  prisma.notification.deleteMany({ where: { userId: { in: emails } } }));
       await db(() =>  prisma.accountToken.deleteMany({ where: { userId: { in: emails } } }));
       await db(() =>  prisma.loginLog.deleteMany({ where: { userId: { in: emails } } }));
+      await db(() =>  prisma.loginSession.deleteMany({ where: { userId: { in: emails } } }));
       await db(() =>  prisma.consentRecord.deleteMany({ where: { userId: { in: emails } } }));
+      await db(() =>  prisma.oAuthIdentity.deleteMany({ where: { userId: { in: emails } } }));
+      await db(() =>  prisma.ticket.deleteMany({ where: { userId: { in: emails } } }));
+      // 创作域：GenerationTask 引用 Asset.outputAssetId 与 Project，必须先删任务
+      await db(() =>  prisma.generationTask.deleteMany({ where: { ownerId: { in: emails } } }));
+      await db(() =>  prisma.asset.deleteMany({ where: { ownerId: { in: emails } } }));
+      await db(() =>  prisma.project.deleteMany({ where: { ownerId: { in: emails } } }));
       await db(() =>  prisma.user.deleteMany({ where: { id: { in: emails } } }));
     }
     // 清理测试券与活动

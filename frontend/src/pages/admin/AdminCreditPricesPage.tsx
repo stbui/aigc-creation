@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { App, Button, InputNumber, Popconfirm, Table, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { adminCreditPricesApi } from '../../lib/api';
+import { useAdmin } from '../../context/AdminContext';
+import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import {
   AdminListError,
   AdminListLoading,
@@ -24,6 +26,8 @@ import type { AdminCreditPrice } from '../../types/api';
  */
 export function AdminCreditPricesPage() {
   const { message } = App.useApp();
+  const { can } = useAdmin();
+  const writable = can('product.price');
   const [saving, setSaving] = useState<string | null>(null);
   /** 本地草稿: key = capabilityId, value = 输入框里的数字 */
   const [draft, setDraft] = useState<Record<string, number>>({});
@@ -34,6 +38,9 @@ export function AdminCreditPricesPage() {
     return Array.isArray(list) ? list : [];
   });
   const rows = data ?? [];
+
+  const dirtyCount = rows.filter((r) => draft[r.capabilityId] !== undefined && draft[r.capabilityId] !== r.cost).length;
+  useUnsavedGuard(dirtyCount > 0);
 
   /*
    * 草稿跟着生效价走: 拉到新价就把输入框重置成服务端的值。

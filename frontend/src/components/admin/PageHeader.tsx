@@ -278,10 +278,19 @@ export type TagTone = 'success' | 'danger' | 'warn' | 'brand' | 'muted';
  * `label` 覆盖用于同一状态值在不同语境下中文不同 —— 订单的 `pending` 是
  * "待支付", 任务的 `pending` 是"等待", 共用一键没法在映射表里同时满足。
  */
-export function StatusTag({ status, label }: { status: string; label?: string }) {
+export function StatusTag({
+  status,
+  label,
+  tone,
+}: {
+  status: string;
+  label?: string;
+  /** 覆盖自动推导的语义色，供不同业务域复用同一状态值 */
+  tone?: TagTone;
+}) {
   const item = STATUS_META[status] ?? { label: status, tone: 'muted' as TagTone };
   return (
-    <Tag color={TONE_TO_ANTD[item.tone]} icon={<span className="adm-tag-dot" aria-hidden="true" />}>
+    <Tag color={TONE_TO_ANTD[tone ?? item.tone]} icon={<span className="adm-tag-dot" aria-hidden="true" />}>
       {label ?? item.label}
     </Tag>
   );

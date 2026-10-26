@@ -86,14 +86,36 @@ async function call(method, path, token, body) {
   );
 
   console.log('\n【法务文档 · 公开读取】');
+  /*
+   * 2026-10-22 起固定四类 slug（新增 account-rules），且 seed:legal 只建草稿、
+   * 不再自动发布 —— 干净测试库上没有任何 published 版本是合法状态。
+   * 因此这里按现行契约断言：概览恒为四类、字段完整（version 可为 null）；
+   * 正文接口在无发布版本时返回 data=null（前端有内置兜底）。
+   * 「发布后能读到正文」由 smoke-notifications 的法务版本化用例覆盖。
+   */
   const index = await call('GET', '/legal', null);
-  check('三类文档概览可匿名读取', index.status === 200 && Array.isArray(index.data) && index.data.length === 3,
-    `status=${index.status} n=${Array.isArray(index.data) ? index.data.length : '?'}`);
-  check('概览带发布版本号', Array.isArray(index.data) && index.data.every((d) => d.version));
+  check(
+    '四类文档概览可匿名读取',
+    index.status === 200 && Array.isArray(index.data) && index.data.length === 4,
+    `status=${index.status} n=${Array.isArray(index.data) ? index.data.length : '?'}`,
+  );
+  check(
+    '概览含 account-rules 且字段完整',
+    Array.isArray(index.data) &&
+      index.data.some((d) => d.slug === 'account-rules') &&
+      index.data.every(
+        (d) => typeof d.slug === 'string' && typeof d.label === 'string' && 'version' in d,
+      ),
+  );
 
   const doc = await call('GET', '/legal/privacy-policy', null);
-  check('取到最新已发布正文', doc.status === 200 && doc.data?.slug === 'privacy-policy' && Boolean(doc.data?.content),
-    doc.data ? `v${doc.data.version} len=${String(doc.data.content || '').length}` : `status=${doc.status}`);
+  check(
+    '无发布版本时正文返回 null（不 500、不伪造内容）',
+    doc.status === 200 &&
+      (doc.data === null ||
+        (doc.data?.slug === 'privacy-policy' && Boolean(doc.data?.content))),
+    doc.data ? `v${doc.data.version} len=${String(doc.data.content || '').length}` : `status=${doc.status} data=null`,
+  );
 
   const unknown = await call('GET', '/legal/not-a-real-doc', null);
   check('未知 slug 返回 404', unknown.status === 404, `status=${unknown.status}`);

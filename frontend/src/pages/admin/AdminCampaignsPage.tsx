@@ -11,7 +11,7 @@ import {
   adminPagination,
   useAdminList,
 } from '../../components/admin/AdminWidgets';
-import { AdminEmpty, PageHeader, Panel, StatusTag } from '../../components/admin/PageHeader';
+import { AdminEmpty, PageHeader, Panel, StatusTag, type TagTone } from '../../components/admin/PageHeader';
 import type {
   AdminCampaign,
   CampaignStatus,
@@ -30,6 +30,19 @@ const TYPE_LABEL: Record<CampaignType, string> = {
 const STATUS_LABEL: Record<CampaignStatus, { label: string; tone: string }> = {
   draft: { label: '草稿', tone: 'muted' },
   active: { label: '进行中', tone: 'success' },
+  ended: { label: '已结束', tone: 'warn' },
+  off: { label: '已下线', tone: 'muted' },
+};
+
+/**
+ * 派生生效态优先于人工 status 展示。
+ * `status=active` 但时间窗未到，对用户就是不生效；把这种状态显示成「进行中」
+ * 会让运营以为活动已在曝光，实际一条都没跑到。
+ */
+const EFFECTIVE_META: Record<AdminCampaign['effective'], { label: string; tone: TagTone }> = {
+  draft: { label: '草稿', tone: 'muted' },
+  live: { label: '进行中', tone: 'success' },
+  scheduled: { label: '未开始', tone: 'brand' },
   ended: { label: '已结束', tone: 'warn' },
   off: { label: '已下线', tone: 'muted' },
 };
@@ -113,12 +126,14 @@ export function AdminCampaignsPage() {
     [],
   );
 
-  const { data, loading, error, setQuery, setPage, reload } = useAdminList<{
+  const { data, loading, error, params, setQuery, setPage, reload } = useAdminList<{
     items: AdminCampaign[];
     total: number;
     page: number;
     pageSize: number;
   }>(fetcher);
+
+  const hasFilter = Boolean(params.keyword || params.status);
 
   const openCreate = () => {
     setEditing(null);
@@ -138,7 +153,8 @@ export function AdminCampaignsPage() {
       status: c.status,
       onlyNewUsers: !!c.audience?.onlyNewUsers,
       productId: p.productId ?? '',
-      priceCents: p.priceCents !== undefined ? String(p.priceCents) : '',
+      // 表单内统一存「元」，提交时再换算成分 —— 避免编辑回填后又乘一次 100
+      priceCents: p.priceCents !== undefined ? String(p.priceCents / 100) : '',
       capabilityIds: (p.capabilityIds ?? []).join(','),
       title: p.title ?? '',
       body: p.body ?? '',
@@ -279,12 +295,12 @@ export function AdminCampaignsPage() {
       },
       {
         title: '状态',
-        dataIndex: 'status',
+        dataIndex: 'effective',
         key: 'status',
         width: 90,
-        render: (s: CampaignStatus) => {
-          const meta = STATUS_LABEL[s] ?? { label: s, tone: 'muted' };
-          return <StatusTag status={s === 'active' ? 'active' : s === 'ended' ? 'pending' : 'user'} />;
+        render: (_: unknown, row) => {
+          const meta = EFFECTIVE_META[row.effective] ?? { label: row.statusLabel, tone: 'muted' as TagTone };
+          return <StatusTag status={row.status} label={meta.label} tone={meta.tone} />;
         },
       },
       {
@@ -374,16 +390,35 @@ export function AdminCampaignsPage() {
 
       <Panel title="活动列表">
         {(data?.items.length ?? 0) === 0 ? (
-          <AdminEmpty
-            description="还没有活动"
-            action={
-              writable ? (
-                <Button type="primary" className="adm-btn is-primary" onClick={openCreate}>
-                  创建第一个活动
+          hasFilter ? (
+            <AdminEmpty
+              description="没有匹配的活动。清除筛选条件后再试。"
+              action={
+                <Button
+                  type="default"
+                  className="adm-btn"
+                  onClick={() => {
+                    setKeyword('');
+                    setStatus(undefined);
+                    setQuery({ keyword: undefined, status: undefined });
+                  }}
+                >
+                  清除筛选
                 </Button>
-              ) : undefined
-            }
-          />
+              }
+            />
+          ) : (
+            <AdminEmpty
+              description="还没有活动"
+              action={
+                writable ? (
+                  <Button type="primary" className="adm-btn is-primary" onClick={openCreate}>
+                    创建第一个活动
+                  </Button>
+                ) : undefined
+              }
+            />
+          )
         ) : (
           <Table<AdminCampaign>
             rowKey="id"

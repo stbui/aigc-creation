@@ -214,7 +214,7 @@ export function ToolCard({
   actions,
   className,
 }: {
-  title?: string;
+  title?: ReactNode;
   children: ReactNode;
   actions?: ReactNode;
   /** 参考站页面级卡片 class（如 background-color-card / product-retouch-card） */

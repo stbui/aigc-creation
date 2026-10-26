@@ -1,9 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
-import { App, Button, Input, Select, Table } from 'antd';
+import { Button, Input, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { adminAuditApi } from '../../lib/api';
 import {
-  AdminDrawer,
   AdminListError,
   AdminStaleError,
   AdminListLoading,
@@ -31,12 +30,99 @@ const ACTION_LABELS: Record<string, string> = {
   'setting.update': '修改系统设置',
 };
 
+/** 审计详情直接铺在表格行内，避免只读追溯被抽屉或弹窗打断 */
+function AuditExpandedDetail({ row }: { row: Row }) {
+  const detailEntries = Object.entries(row.detail);
+
+  return (
+    <div className="adm-audit-detail">
+      <div className="adm-audit-detail-head">
+        <div>
+          <div className="adm-audit-detail-title">审计详情</div>
+          <div className="adm-audit-detail-sub">记录只追加，不支持修改或删除</div>
+        </div>
+        <span className={`adm-tag ${row.success ? 'is-success' : 'is-danger'}`}>
+          {row.success ? '成功' : '失败'}
+        </span>
+      </div>
+
+      <dl className="adm-audit-detail-grid">
+        <div>
+          <dt>时间</dt>
+          <dd>{new Date(row.createdAt).toLocaleString('zh-CN')}</dd>
+        </div>
+        <div>
+          <dt>操作人</dt>
+          <dd>
+            {row.actorEmail} <span className="adm-cell-sub">{row.actorRole}</span>
+          </dd>
+        </div>
+        <div>
+          <dt>动作</dt>
+          <dd>{ACTION_LABELS[row.action] ?? row.action}</dd>
+        </div>
+        <div>
+          <dt>对象</dt>
+          <dd>
+            {row.targetType} / <code>{row.targetId}</code>
+          </dd>
+        </div>
+        <div>
+          <dt>来源 IP</dt>
+          <dd>
+            <code>{row.ip}</code>
+          </dd>
+        </div>
+        <div>
+          <dt>记录 ID</dt>
+          <dd>
+            <code>{row.id}</code>
+          </dd>
+        </div>
+      </dl>
+
+      {row.reason && (
+        <div className="adm-audit-detail-block">
+          <div className="adm-audit-detail-block-title">操作原因</div>
+          <div className="adm-reason-box">{row.reason}</div>
+        </div>
+      )}
+
+      <div className="adm-audit-detail-block">
+        <div className="adm-audit-detail-block-title">
+          变更内容
+          <span className="adm-panel-note">仅记录白名单字段，密码与凭据类内容不写入审计</span>
+        </div>
+        {detailEntries.length === 0 ? (
+          <div className="adm-audit-detail-empty">本条操作没有可展示的变更字段。</div>
+        ) : (
+          <table className="adm-diff-table">
+            <thead>
+              <tr>
+                <th>字段</th>
+                <th>值</th>
+              </tr>
+            </thead>
+            <tbody>
+              {detailEntries.map(([key, value]) => (
+                <tr key={key}>
+                  <td>{key}</td>
+                  <td>{typeof value === 'object' ? JSON.stringify(value) : String(value)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export function AdminAuditPage() {
-  const { message } = App.useApp();
   const [action, setAction] = useState<string | undefined>();
   const [targetId, setTargetId] = useState('');
   const [success, setSuccess] = useState<string | undefined>();
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const fetcher = useCallback(
     (params: Record<string, unknown>) =>
@@ -78,8 +164,6 @@ export function AdminAuditPage() {
         dataIndex: 'createdAt',
         key: 'createdAt',
         width: 160,
-        sorter: true,
-        defaultSortOrder: 'descend',
         render: (v: string) => new Date(v).toLocaleString('zh-CN'),
       },
       {
@@ -134,23 +218,21 @@ export function AdminAuditPage() {
       {
         title: '',
         key: 'detail',
-        width: 60,
+        width: 76,
         render: (_: unknown, row) => (
-          <Button type="link" className="adm-link" onClick={() => setDetailId(row.id)}>
-            详情
+          <Button
+            type="link"
+            className="adm-link"
+            aria-expanded={expandedId === row.id}
+            onClick={() => setExpandedId(expandedId === row.id ? null : row.id)}
+          >
+            {expandedId === row.id ? '收起' : '详情'}
           </Button>
         ),
       },
     ],
-    [],
+    [expandedId],
   );
-
-  const detailFetcher = useCallback(async () => {
-    // 详情复用列表里已取到的数据, 避免额外请求
-    const found = list?.items.find((i) => i.id === detailId);
-    if (!found) throw new Error('记录不存在');
-    return found;
-  }, [detailId, list]);
 
   return (
     <>
@@ -175,7 +257,10 @@ export function AdminAuditPage() {
           placeholder="对象 ID"
           value={targetId}
           onChange={(e) => setTargetId(e.target.value)}
-          onPressEnter={() => setQuery({ targetId: targetId || undefined })}
+          onPressEnter={() => {
+            setExpandedId(null);
+            setQuery({ targetId: targetId || undefined });
+          }}
           allowClear
         />
         <Select
@@ -193,13 +278,14 @@ export function AdminAuditPage() {
           <Button
             type="primary"
             className="adm-btn is-primary"
-            onClick={() =>
+            onClick={() => {
+              setExpandedId(null);
               setQuery({
                 action,
                 targetId: targetId || undefined,
                 success: success === undefined ? undefined : success === 'true',
-              })
-            }
+              });
+            }}
           >
             查询
           </Button>
@@ -210,6 +296,7 @@ export function AdminAuditPage() {
               setAction(undefined);
               setTargetId('');
               setSuccess(undefined);
+              setExpandedId(null);
               setQuery({ action: undefined, targetId: undefined, success: undefined });
             }}
           >
@@ -238,94 +325,26 @@ export function AdminAuditPage() {
             dataSource={list?.items ?? []}
             loading={loading}
             scroll={{ x: 1100 }}
-            onChange={(_p, _f, sorter) => {
-              const s = Array.isArray(sorter) ? sorter[0] : sorter;
-              // 审计默认按时间倒序, 且必须始终倒序 —— 最早的记录没有追责价值
-              void message.info('审计记录按时间倒序展示，不支持改序');
-              void s;
+            expandable={{
+              expandedRowKeys: expandedId ? [expandedId] : [],
+              expandedRowRender: (row) => <AuditExpandedDetail row={row} />,
+              expandedRowClassName: 'adm-audit-expanded-row',
+              showExpandColumn: false,
+              onExpandedRowsChange: (keys) =>
+                setExpandedId(keys.length > 0 ? String(keys[keys.length - 1]) : null),
             }}
             pagination={adminPagination({
               current: list?.page ?? 1,
               pageSize: list?.pageSize ?? 20,
               total: list?.total ?? 0,
-              onChange: setPage,
+              onChange: (page, pageSize) => {
+                setExpandedId(null);
+                setPage(page, pageSize);
+              },
             })}
           />
         )}
       </Panel>
-
-      <AdminDrawer<Row>
-        open={detailId !== null}
-        title="审计详情"
-        onClose={() => setDetailId(null)}
-        fetcher={detailFetcher}
-      >
-        {(row) => (
-          <>
-            <div className="adm-section">
-              <div className="adm-section-title">操作概要</div>
-              <dl className="adm-desc">
-                <dt>时间</dt>
-                <dd>{new Date(row.createdAt).toLocaleString('zh-CN')}</dd>
-                <dt>操作人</dt>
-                <dd>
-                  {row.actorEmail} <code className="adm-cell-sub">{row.actorRole}</code>
-                </dd>
-                <dt>动作</dt>
-                <dd>{ACTION_LABELS[row.action] ?? row.action}</dd>
-                <dt>对象</dt>
-                <dd>
-                  {row.targetType} / <code>{row.targetId}</code>
-                </dd>
-                <dt>来源 IP</dt>
-                <dd>
-                  <code>{row.ip}</code>
-                </dd>
-                <dt>结果</dt>
-                <dd>
-                  <span className={`adm-tag ${row.success ? 'is-success' : 'is-danger'}`}>
-                    {row.success ? '成功' : '失败'}
-                  </span>
-                </dd>
-              </dl>
-            </div>
-
-            {row.reason && (
-              <div className="adm-section">
-                <div className="adm-section-title">操作原因</div>
-                <div className="adm-reason-box">{row.reason}</div>
-              </div>
-            )}
-
-            <div className="adm-section">
-              <div className="adm-section-title">
-                变更内容
-                <span className="adm-panel-note">
-                  仅记录白名单字段，密码与凭据类内容不写入审计
-                </span>
-              </div>
-              <table className="adm-diff-table">
-                <thead>
-                  <tr>
-                    <th>字段</th>
-                    <th>值</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(row.detail).map(([k, v]) => (
-                    <tr key={k}>
-                      <td>{k}</td>
-                      <td>
-                        {typeof v === 'object' ? JSON.stringify(v) : String(v)}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </AdminDrawer>
     </>
   );
 }

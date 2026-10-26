@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { App, Button, Input, InputNumber, Switch, Tabs } from 'antd';
+import { Link } from 'react-router-dom';
 import { adminSettingsApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
+import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import {
   AdminListError,
   AdminListLoading,
@@ -25,6 +27,8 @@ export function AdminSettingsPage() {
   // 草稿: key -> value。仅存被改动过的项, 避免每次输入都发请求
   const [draft, setDraft] = useState<Partial<Record<AdminSettingField, string | number | boolean>>>({});
   const [confirming, setConfirming] = useState(false);
+  const [saveReason, setSaveReason] = useState('');
+  const [reasonError, setReasonError] = useState(false);
 
   const { data: settings, loading, error, reload } = useAdminResource(() => adminSettingsApi.read());
 
@@ -44,6 +48,8 @@ export function AdminSettingsPage() {
   );
 
   const changed = Object.keys(draft) as AdminSettingField[];
+  /** 系统设置是低频长表单，误点侧栏离开的代价很高 */
+  useUnsavedGuard(changed.length > 0);
 
   const setValue = (key: AdminSettingField, value: string | number | boolean) => {
     setDraft((d) => ({ ...d, [key]: value }));
@@ -59,10 +65,17 @@ export function AdminSettingsPage() {
   };
 
   const save = async () => {
+    const reason = saveReason.trim();
+    if (!reason) {
+      setReasonError(true);
+      return;
+    }
     setBusy(true);
     try {
-      const res = await adminSettingsApi.update({ ...draft, reason: '后台修改系统设置' });
+      const res = await adminSettingsApi.update({ ...draft, reason });
       setDraft({});
+      setSaveReason('');
+      setReasonError(false);
       await reload();
       setConfirming(false);
       void message.success(`已保存 ${res.updated.length} 项配置`);
@@ -198,20 +211,27 @@ export function AdminSettingsPage() {
       </div>
 
       {/*
-       * 交易域未上线时, 后台只有 9 项配置, 页面下半会大片留白。
-       * 与其在下方补装饰, 不如明确告知「还有哪些即将到来」——
-       * 留白本身不可解释, 「未开放的模块」是可解释的。
+       * 之前这里写死「尚未开放：法务文本 / 投诉举报」，但两页早已上线，
+       * 运营会被误导为功能没交付。改成真实入口，随菜单权限一起生效即可。
        */}
       <div className="adm-panel is-narrow adm-planned">
-        <div className="adm-planned-title">尚未开放</div>
+        <div className="adm-planned-title">相关管理入口</div>
         <ul className="adm-planned-list">
           <li>
-            <strong>法务文本</strong>
-            <span>用户协议 / 隐私政策的版本管理</span>
+            <strong>
+              <Link className="adm-link" to="/admin/legal">
+                法务文档
+              </Link>
+            </strong>
+            <span>用户协议 / 隐私政策 / 未成年人保护 / 账号规则的版本与发布</span>
           </li>
           <li>
-            <strong>投诉举报入口</strong>
-            <span>需与内容安全服务一并接入</span>
+            <strong>
+              <Link className="adm-link" to="/admin/tickets">
+                工单处理
+              </Link>
+            </strong>
+            <span>用户投诉、举报与咨询的受理和答复</span>
           </li>
         </ul>
       </div>
@@ -234,7 +254,11 @@ export function AdminSettingsPage() {
               type="primary"
               className="adm-btn is-primary"
               disabled={changed.length === 0 || busy}
-              onClick={() => setConfirming(true)}
+              onClick={() => {
+                setSaveReason('');
+                setReasonError(false);
+                setConfirming(true);
+              }}
             >
               保存变更
             </Button>
@@ -250,7 +274,32 @@ export function AdminSettingsPage() {
           loading={busy}
           description={<p>以下配置变更将立即生效，影响所有用户。</p>}
           impact={changeSummary.map((c) => `${c.label}：${c.from} → ${c.to}`)}
-          onCancel={() => setConfirming(false)}
+          extra={
+            <div className="adm-field">
+              <label htmlFor="adm-setting-reason">变更原因（写入审计）</label>
+              <Input
+                id="adm-setting-reason"
+                value={saveReason}
+                onChange={(e) => {
+                  setSaveReason(e.target.value);
+                  if (e.target.value.trim()) setReasonError(false);
+                }}
+                placeholder="如：退款窗口由 7 天调整为 15 天"
+                autoComplete="off"
+                aria-invalid={reasonError}
+              />
+              {reasonError && (
+                <span className="adm-text-danger" role="alert">
+                  请填写变更原因，审计记录需要能回答「谁为什么改」。
+                </span>
+              )}
+            </div>
+          }
+          onCancel={() => {
+            setConfirming(false);
+            setSaveReason('');
+            setReasonError(false);
+          }}
           onConfirm={() => void save()}
         />
       )}

@@ -12545,6 +12545,74 @@ html[data-promo='off'] .multi-image-fusion-page {
   word-break: break-all;
 }
 
+/* ── 操作审计行内详情 ─────────────────────────────────────────────────── */
+
+.adm-audit-expanded-row > td {
+  padding: 0 !important;
+  background: var(--card-bg) !important;
+}
+.adm-audit-detail {
+  padding: 18px 20px 20px;
+  background: var(--surface);
+  border-top: 1px solid var(--border-row);
+  border-bottom: 1px solid var(--border-row);
+}
+.adm-audit-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+.adm-audit-detail-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.adm-audit-detail-sub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+.adm-audit-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px 24px;
+  margin: 0;
+}
+.adm-audit-detail-grid > div {
+  min-width: 0;
+}
+.adm-audit-detail-grid dt {
+  margin-bottom: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.adm-audit-detail-grid dd {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+.adm-audit-detail-block {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.adm-audit-detail-block-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.adm-audit-detail-empty {
+  font-size: 13px;
+  color: var(--text-desc);
+}
+
 /* ── 确认弹窗 (自绘, 不依赖 antd Modal 以便控制样式) ──────────────────── */
 
 .adm-modal-mask {
@@ -20360,5 +20428,593 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   .adm-asset-cell:hover .adm-asset-image,
   .adm-asset-cell:focus-within .adm-asset-image {
     transform: none;
+  }
+}
+
+/* ───────── 局部重绘：方形画布舞台（2026-10-26） ────────────────────────
+ *
+ * 参考站 reference/ijihua/index.pretty.css:
+ *   .local-redraw-stage     flex + center + relative
+ *   .redraw-stage-topbar    position:absolute; top:0; width:100%
+ *   .redraw-toolbar         width:532px; height:40px; absolute 居中
+ *   .redraw-canvas-wrap     aspect-ratio:1; width:min(680px, 100% - 80px, …)
+ *   .canvas-footer-toolbar  absolute; bottom:45px; 居中
+ *   .shortcut-hint          absolute; bottom:8px; 居中
+ *
+ * 旧实现把顶栏/底栏放在文档流里，画布只能按剩余高度压缩，上传图后
+ * 工具栏、画布和底部操作条会互相挤位。这里只收敛局部重绘页，避免影响
+ * 共用 redraw-* class 的去水印页。
+ */
+.pk-workspace.local-redraw-page .pk-source-pane.redraw-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 16px;
+}
+.pk-workspace.local-redraw-page .redraw-stage-topbar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pk-workspace.local-redraw-page .redraw-toolbar {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  box-sizing: border-box;
+  width: 532px;
+  max-width: calc(100% - 32px);
+  height: 40px;
+  min-height: 40px;
+  padding: 0 16px;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow: hidden;
+  transform: translateX(-50%);
+}
+.pk-workspace.local-redraw-page .redraw-tool-btn {
+  height: 30px;
+  padding: 4px;
+}
+.pk-workspace.local-redraw-page .redraw-toolbar-brush {
+  margin-left: 0;
+}
+.pk-workspace.local-redraw-page .redraw-stage-main {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pk-workspace.local-redraw-page .redraw-canvas-wrap {
+  flex: none;
+  width: min(680px, calc(100% - 80px), calc(100vh - var(--workspace-topbar-height) - 144px));
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.pk-workspace.local-redraw-page .redraw-canvas-wrap .redraw-mask-stage {
+  width: auto;
+  max-width: 100%;
+  max-height: 100%;
+  margin: 0;
+}
+.pk-workspace.local-redraw-page .redraw-canvas-wrap .redraw-mask-transform,
+.pk-workspace.local-redraw-page .redraw-canvas-wrap .redraw-mask-bg {
+  width: 100%;
+  height: 100%;
+}
+.pk-workspace.local-redraw-page .redraw-canvas-wrap .redraw-mask-bg {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: fill;
+}
+.pk-workspace.local-redraw-page .redraw-stage .redraw-mask-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 87px;
+  z-index: 4;
+  width: min(520px, calc(100% - 32px));
+  margin: 0;
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+  transform: translateX(-50%);
+}
+.pk-workspace.local-redraw-page .redraw-canvas-footer {
+  position: absolute;
+  left: 50%;
+  bottom: 45px;
+  z-index: 5;
+  height: 40px;
+  padding: 0 16px;
+  gap: 8px;
+  transform: translateX(-50%);
+  box-shadow: 0 4px 16px rgba(107, 112, 128, 0.16);
+}
+.pk-workspace.local-redraw-page .redraw-shortcut-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  z-index: 4;
+  margin: 0;
+  color: #9aa1ad;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+@media (max-width: 1180px) {
+  .pk-workspace.local-redraw-page .redraw-stage-topbar {
+    left: 50%;
+    width: calc(100% - 32px);
+    transform: translateX(-50%);
+  }
+  .pk-workspace.local-redraw-page .redraw-toolbar {
+    position: static;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    justify-content: flex-start;
+    transform: none;
+  }
+  .pk-workspace.local-redraw-page .redraw-shortcut-hint {
+    display: none;
+  }
+}
+
+@media (max-width: 860px) {
+  .pk-workspace.local-redraw-page .pk-source-pane.redraw-stage {
+    min-height: 720px;
+  }
+  .pk-workspace.local-redraw-page .redraw-stage-topbar {
+    width: calc(100% - 24px);
+  }
+  .pk-workspace.local-redraw-page .redraw-canvas-wrap {
+    width: min(600px, calc(100% - 24px));
+  }
+}
+
+/* 局部重绘：上传卡 / 描述卡 / DOM 标注层 1:1（2026-10-26） */
+.pk-workspace.local-redraw-page .pk-dropzone.pk-dropzone-filled {
+  min-height: 160px;
+  height: 160px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pk-workspace.local-redraw-page .source-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  width: 100%;
+  height: 160px;
+  position: relative;
+}
+.pk-workspace.local-redraw-page .source-row.processing::after {
+  content: '处理中…';
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(17, 24, 39, 0.35);
+  color: #fff;
+  font-size: 12px;
+  pointer-events: none;
+}
+.pk-workspace.local-redraw-page .source-row > .local-source-preview {
+  flex: 0 0 160px;
+  width: 160px;
+  height: 160px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #e5e7ef;
+  border-radius: 8px;
+  background: #f2f4f7;
+  cursor: pointer;
+}
+.pk-workspace.local-redraw-page .source-row > .local-source-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pk-workspace.local-redraw-page .source-row > div {
+  display: grid;
+  gap: 10px;
+}
+.pk-workspace.local-redraw-page .source-row > div button {
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid #e5e7ef;
+  border-radius: 8px;
+  background: #fff;
+  color: #4e5969;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pk-workspace.local-redraw-page .source-row > div button.soft {
+  border-color: transparent;
+  background: #f2f3f5;
+}
+.pk-workspace.local-redraw-page .source-row > div button:hover:not(:disabled) {
+  border-color: #cfc8ff;
+  color: #5546d8;
+}
+.pk-workspace.local-redraw-page .source-row > div button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.pk-workspace.local-redraw-page .prompt-card {
+  display: grid;
+  gap: 16px;
+}
+.pk-workspace.local-redraw-page .prompt-card .card-title-row > span {
+  color: #4e5969;
+  font-size: 12px;
+}
+.pk-workspace.local-redraw-page .prompt-card .card-title-row {
+  min-height: 22px;
+  margin-bottom: 16px;
+}
+.pk-workspace.local-redraw-page .prompt-card .card-title-row h2 {
+  font-size: 14px;
+  line-height: 22px;
+}
+.pk-workspace.local-redraw-page .redraw-prompt {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 64px;
+  grid-template-rows: 20px minmax(44px, auto);
+  column-gap: 8px;
+  row-gap: 0;
+  margin-top: 0;
+  padding: 16px;
+  border-radius: 8px;
+  background: #fafafa;
+}
+.pk-workspace.local-redraw-page .redraw-prompt + .redraw-prompt {
+  margin-top: 0;
+}
+.pk-workspace.local-redraw-page .redraw-prompt > .redraw-prompt-label {
+  grid-area: 1 / 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 20px;
+  font-size: 14px;
+  line-height: 20px;
+  color: #333;
+}
+.pk-workspace.local-redraw-page .redraw-prompt-label i {
+  width: 14px;
+  height: 14px;
+  border: 4px solid #5546d8;
+  border-radius: 50%;
+  background: #fff;
+  box-sizing: border-box;
+}
+.pk-workspace.local-redraw-page .redraw-prompt-label.is-pending i {
+  border-color: #86909c;
+}
+.pk-workspace.local-redraw-page .redraw-prompt > textarea {
+  grid-area: 2 / 1;
+  width: 100%;
+  min-height: 44px;
+  padding: 2px 0;
+  overflow: hidden;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #333;
+  font: inherit;
+  font-size: 14px;
+  line-height: 22px;
+  resize: none;
+}
+.pk-workspace.local-redraw-page .redraw-prompt > .redraw-prompt-tools.reference-upload {
+  grid-area: 1 / 2 / 3 / 3;
+  align-self: center;
+  width: 64px;
+  height: 64px;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  overflow: hidden;
+  border: 1px dashed #e5e7ef;
+  border-radius: 8px;
+  background: #f2f4f7;
+  color: #4e5969;
+  font-size: 12px;
+  line-height: 16px;
+  cursor: pointer;
+}
+.pk-workspace.local-redraw-page .redraw-prompt > .redraw-prompt-tools.reference-upload.has-image {
+  position: relative;
+  border-style: solid;
+}
+.pk-workspace.local-redraw-page .redraw-prompt > .redraw-prompt-tools.reference-upload > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pk-workspace.local-redraw-page .redraw-prompt .remove-reference {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: 2;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(51, 51, 51, 0.78);
+  color: #fff;
+  cursor: pointer;
+}
+
+/* 画笔滑块：参考站轨道填充与白芯紫边滑块 */
+.pk-workspace.local-redraw-page .redraw-toolbar-brush input[type='range'] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100px;
+  height: 16px;
+  margin: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.pk-workspace.local-redraw-page .redraw-toolbar-brush input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border: 0;
+  border-radius: 10px;
+  background: linear-gradient(to right, #5546d8 0 var(--range-progress), #f2f4f7 var(--range-progress) 100%);
+}
+.pk-workspace.local-redraw-page .redraw-toolbar-brush input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  margin-top: -7px;
+  border: 3px solid #5546d8;
+  border-radius: 50%;
+  background: #fff;
+}
+.pk-workspace.local-redraw-page .redraw-toolbar-brush input[type='range']::-moz-range-track {
+  height: 4px;
+  border: 0;
+  border-radius: 10px;
+  background: #f2f4f7;
+}
+.pk-workspace.local-redraw-page .redraw-toolbar-brush input[type='range']::-moz-range-progress {
+  height: 4px;
+  border-radius: 10px;
+  background: #5546d8;
+}
+.pk-workspace.local-redraw-page .redraw-toolbar-brush input[type='range']::-moz-range-thumb {
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  border: 3px solid #5546d8;
+  border-radius: 50%;
+  background: #fff;
+}
+.pk-workspace.local-redraw-page .redraw-canvas-footer .redraw-footer-btn {
+  padding: 0;
+}
+.pk-workspace.local-redraw-page .redraw-canvas-footer .redraw-tool-divider {
+  margin: 0;
+}
+.pk-workspace.local-redraw-page .redraw-canvas-footer .redraw-zoom-value {
+  min-width: 40px;
+}
+.pk-workspace.local-redraw-page .redraw-shortcut-hint {
+  line-height: 16px;
+}
+
+/* 画布：图片、交互 canvas、DOM 标注三层严格同尺寸 */
+.pk-workspace.local-redraw-page .redraw-mask-stage {
+  margin-top: 0;
+  border: 0;
+  border-radius: 0;
+  background: #eef1f5;
+  overflow: hidden;
+}
+.pk-workspace.local-redraw-page .redraw-image-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #eef1f5;
+  touch-action: none;
+}
+.pk-workspace.local-redraw-page .redraw-image-frame > .redraw-mask-bg {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.pk-workspace.local-redraw-page .redraw-mask-overlay {
+  z-index: 1;
+  cursor: crosshair;
+}
+.pk-workspace.local-redraw-page .redraw-mask-overlay.tool-hand {
+  cursor: grab;
+}
+.pk-workspace.local-redraw-page .redraw-mask-overlay.tool-hand:active {
+  cursor: grabbing;
+}
+.pk-workspace.local-redraw-page .redraw-mask-overlay.tool-brush,
+.pk-workspace.local-redraw-page .redraw-mask-overlay.tool-eraser {
+  cursor: none;
+}
+.pk-workspace.local-redraw-page .mask-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.pk-workspace.local-redraw-page .mask-mark {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid rgba(128, 100, 246, 0.85);
+  border-radius: 50%;
+  background: rgba(128, 100, 246, 0.28);
+  cursor: move;
+  pointer-events: auto;
+  touch-action: none;
+  transform: translate(-50%, -50%);
+}
+.pk-workspace.local-redraw-page .mask-mark.has-index {
+  z-index: 10;
+}
+.pk-workspace.local-redraw-page .mask-mark.is-selected {
+  z-index: 12;
+  box-shadow: 0 0 0 1px rgba(85, 70, 216, 0.35);
+}
+.pk-workspace.local-redraw-page .mask-mark.rect {
+  border-radius: 3px;
+}
+.pk-workspace.local-redraw-page .mask-mark.brush {
+  aspect-ratio: 1;
+  border: 0;
+  background: #8064f6;
+}
+.pk-workspace.local-redraw-page .mask-mark-index {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #5546d8;
+  color: #fff;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1;
+  pointer-events: none;
+}
+.pk-workspace.local-redraw-page .mask-mark-index.brush-index {
+  transform: translate(-50%, -50%);
+  top: 0;
+  left: 0;
+}
+.pk-workspace.local-redraw-page .mask-brush-stroke {
+  position: absolute;
+  inset: 0;
+  opacity: 0.7;
+  pointer-events: none;
+}
+.pk-workspace.local-redraw-page .mask-brush-stroke .mask-mark.brush {
+  background: #8064f6;
+}
+.pk-workspace.local-redraw-page .resize-handle {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  width: 8px;
+  height: 8px;
+  border: 2px solid #5546d8;
+  border-radius: 2px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(31, 35, 41, 0.22);
+  pointer-events: auto;
+}
+.pk-workspace.local-redraw-page .resize-handle.n {
+  top: 0;
+  left: 50%;
+  cursor: ns-resize;
+  transform: translate(-50%, -50%);
+}
+.pk-workspace.local-redraw-page .resize-handle.e {
+  top: 50%;
+  right: 0;
+  cursor: ew-resize;
+  transform: translate(50%, -50%);
+}
+.pk-workspace.local-redraw-page .resize-handle.s {
+  bottom: 0;
+  left: 50%;
+  cursor: ns-resize;
+  transform: translate(-50%, 50%);
+}
+.pk-workspace.local-redraw-page .resize-handle.w {
+  top: 50%;
+  left: 0;
+  cursor: ew-resize;
+  transform: translate(-50%, -50%);
+}
+.pk-workspace.local-redraw-page .brush-cursor {
+  position: absolute;
+  z-index: 8;
+  aspect-ratio: 1;
+  border: 1px solid rgba(85, 70, 216, 0.95);
+  border-radius: 50%;
+  background: rgba(128, 100, 246, 0.18);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+@media (min-width: 901px) and (max-width: 1366px) {
+  .pk-workspace.local-redraw-page .source-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+  .pk-workspace.local-redraw-page .source-row > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: 100%;
+  }
+  .pk-workspace.local-redraw-page .source-row > div button {
+    width: 100%;
+    min-width: 0;
+    padding: 0 6px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 900px) {
+  .pk-workspace.local-redraw-page .redraw-prompt {
+    grid-template-columns: minmax(0, 1fr) 64px;
   }
 }

@@ -56,7 +56,6 @@ import { GenerateModule } from '../src/generate/generate.module';
 
 const PORT = 39777;
 const BASE = `http://127.0.0.1:${PORT}/api/v1`;
-const OUT = join(process.cwd(), 'uploads', 'verify');
 
 /**
  * 最小可运行应用: 只装配 free_create 链路依赖的模块
@@ -105,8 +104,6 @@ async function json(res: Response) {
 }
 
 async function main() {
-  await mkdir(OUT, { recursive: true });
-
   const app = await NestFactory.create<NestExpressApplication>(VerifyAppModule, {
     logger: ['error', 'warn'],
   });
@@ -121,6 +118,9 @@ async function main() {
    */
   const config = app.get(ConfigService);
   const uploadsDir = join(process.cwd(), config.get<string>('path.uploads') ?? 'uploads');
+  // 产出落盘目录跟随当前档位（test → uploads-test），不写死开发目录
+  const OUT = join(uploadsDir, 'verify');
+  await mkdir(OUT, { recursive: true });
   mkdirSync(join(uploadsDir, 'original'), { recursive: true });
   mkdirSync(join(uploadsDir, 'generated'), { recursive: true });
   app.useStaticAssets(uploadsDir, { prefix: '/uploads' });
@@ -134,6 +134,20 @@ async function main() {
   ok(Boolean(token), '登录拿到 accessToken');
   if (!token) return void (await app.close());
   const H = { Authorization: `Bearer ${token}` };
+
+  /*
+   * free_create 已改为真实计费（registry 默认 10 积分），新注册账号余额为 0。
+   * 不补积分时 POST /generate 直接 402，表现为「任务未提交 + 轮询超时」，
+   * 看起来像生成链路坏了，实际是测试账号没钱。这里像 smoke-aigc 一样
+   * 直接发一批积分，只验证生成链路，不把订单/支付拖进来。
+   */
+  const prisma = app.get(PrismaService);
+  const accountUser = await prisma.user.findUnique({ where: { email: account.email } });
+  if (accountUser) {
+    await prisma.creditLot.create({
+      data: { userId: accountUser.id, source: 'grant', totalCredits: 100, remainingCredits: 100 },
+    });
+  }
 
   // ── 建项目 ──
   const proj = await json(
@@ -220,7 +234,6 @@ async function main() {
 
   // ── 埋点校验 ──
   // 按类 token 取: 传字符串 'PrismaService' 在 Nest 10+ 解析不到 provider
-  const prisma = app.get(PrismaService);
   const logs = await prisma.modelCallLog.findMany({ orderBy: { createdAt: 'desc' }, take: 5 });
   const gw = logs.filter((l: any) => l.capability === 'free_create');
   ok(gw.length > 0, 'ModelCallLog 有 free_create 调用记录', `${gw.length} 条`);
@@ -228,6 +241,30 @@ async function main() {
   ok(Boolean(anyGw), '存在 source=gateway 且 fallback=false 的记录', anyGw ? `model=${anyGw.model} ${anyGw.durationMs}ms` : '');
   const anyFallback = gw.find((l: any) => l.fallback);
   if (anyFallback) console.log(`   ⚠️ 有回落记录: ${String(anyFallback.reason).slice(0, 100)}`);
+
+  /*
+   * 清理本轮现场：不清理的账号/项目/素材会留在测试库里，后续
+   * smoke-marketing 之类的「按 @test.local 批量删用户」就会撞上外键，
+   * 表现为无关用例红。顺序按外键依赖，子表先删。
+   */
+  if (accountUser) {
+    const tasks = await prisma.generationTask.findMany({
+      where: { ownerId: accountUser.id },
+      select: { id: true },
+    });
+    await prisma.creditLedger.deleteMany({ where: { userId: accountUser.id } }).catch(() => {});
+    await prisma.creditLot.deleteMany({ where: { userId: accountUser.id } }).catch(() => {});
+    await prisma.modelCallLog.deleteMany({ where: { taskId: { in: tasks.map((t) => t.id) } } }).catch(() => {});
+    await prisma.generationTask.deleteMany({ where: { ownerId: accountUser.id } }).catch(() => {});
+    await prisma.asset.deleteMany({ where: { ownerId: accountUser.id } }).catch(() => {});
+    await prisma.project.deleteMany({ where: { ownerId: accountUser.id } }).catch(() => {});
+    await prisma.accountToken.deleteMany({ where: { userId: accountUser.id } }).catch(() => {});
+    await prisma.loginLog.deleteMany({ where: { userId: accountUser.id } }).catch(() => {});
+    await prisma.loginSession.deleteMany({ where: { userId: accountUser.id } }).catch(() => {});
+    await prisma.consentRecord.deleteMany({ where: { userId: accountUser.id } }).catch(() => {});
+    await prisma.notification.deleteMany({ where: { userId: accountUser.id } }).catch(() => {});
+    await prisma.user.delete({ where: { id: accountUser.id } }).catch(() => {});
+  }
 
   await app.close();
   console.log('\n' + (process.exitCode ? '❌ E2E FAILED' : '✅ E2E ALL PASS'));

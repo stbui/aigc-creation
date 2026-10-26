@@ -152,4 +152,26 @@ test.describe('后台布局', () => {
     await expect(items.first()).toBeVisible();
     expect(await items.count()).toBeGreaterThanOrEqual(2);
   });
+
+  test('审计详情在行内展开，不使用抽屉或确认弹窗', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await login(page);
+    await page.goto(`${UI}/admin/audit-logs`);
+    await page.waitForSelector('.adm-content', { timeout: 15000 });
+    await page.waitForSelector('.ant-table-row', { timeout: 15000 }).catch(() => undefined);
+
+    const detailButton = page.getByRole('button', { name: '详情', exact: true }).first();
+    test.skip((await detailButton.count()) === 0, '当前库中暂无审计记录');
+
+    await detailButton.click();
+    await expect(page.locator('.adm-audit-expanded-row')).toBeVisible();
+    await expect(page.getByText('审计详情', { exact: true })).toBeVisible();
+    await expect(page.locator('.ant-drawer')).toHaveCount(0);
+    await expect(page.locator('.ant-modal')).toHaveCount(0);
+    await expect(page.locator('.adm-modal-mask')).toHaveCount(0);
+
+    await page.getByRole('button', { name: '收起', exact: true }).click();
+    // antd 会保留折叠后的隐藏行节点, 这里只看用户是否还能看到详情
+    await expect(page.locator('.adm-audit-expanded-row')).toBeHidden();
+  });
 });

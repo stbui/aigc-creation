@@ -201,6 +201,23 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     update: { value: 'auto', overridden: true },
   });
 
+  /*
+   * 本脚本要分别验证「桩失败 → 42201」和「无通道 → 42204」，
+   * 前提是调度器**只能看到本脚本的桩**。测试库里若已有后台配好的真实线路，
+   * 失败会被它接住并成功、无通道场景也仍有线路可用 —— 红的会变成脚本假设，
+   * 不是产品行为。故先临时停用其它 image 线路，跑完恢复原状。
+   */
+  const otherImageChannels = await prisma.modelChannel.findMany({
+    where: { modality: 'image', enabled: true, NOT: { id: mockChannel.id } },
+    select: { id: true },
+  });
+  if (otherImageChannels.length) {
+    await prisma.modelChannel.updateMany({
+      where: { id: { in: otherImageChannels.map((c) => c.id) } },
+      data: { enabled: false },
+    });
+  }
+
   const cost = expand?.creditCost ?? 0;
   const ok = await call('POST', '/generate', T, {
     projectId, capability: 'expand', inputAssetIds: [assetId], params: { ratio: '1:1' },
@@ -474,6 +491,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await prisma.creditLedger.deleteMany({ where: { userId: user.id } });
   await prisma.creditLot.deleteMany({ where: { userId: user.id } });
   await prisma.modelChannel.deleteMany({ where: { id: mockChannel.id } });
+  // 恢复被本脚本临时停用的既有线路，不能把测试档的模型配置留在关闭态
+  if (otherImageChannels.length) {
+    await prisma.modelChannel.updateMany({
+      where: { id: { in: otherImageChannels.map((c) => c.id) } },
+      data: { enabled: true },
+    });
+  }
   await prisma.modelChannelConfig.deleteMany({ where: { key: 'gateway.route.expand' } });
   // 注册写同意留痕、登录写登录日志、退款失败给站内消息 —— 三者都直接引用 User,
   // 漏删任意一张都会让最后一步 delete 撞上外键, 看起来像「脚本异常」而非清理不全

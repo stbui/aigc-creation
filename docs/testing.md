@@ -178,10 +178,26 @@ cd frontend && npm run build:prod
 
 **教训**：测试脚本连库靠「有没有走项目自己的 ConfigModule」，不靠 `NODE_ENV` 环境变量本身；最小模块装配则必须跟着真实模块的构造器依赖一起长，否则红灯指向的是脚本而不是产品。**「断言恒真」比红灯更危险**：一个永远不渲染的弹窗能让 `toBeHidden` 一直通过，修好渲染后才看见真正的回归。
 
+**2026-10-26 闸口漂移与自污染修正**（全部先复现红灯，再改脚本并复跑为绿）：
+
+| 脚本 | 红灯原因 | 修法 |
+| --- | --- | --- |
+| `verify-channel-signatures.ts` | 用裸 `Version=` 定位参数，先命中 `SignatureVersion=1.0` | 改查 `&Version=`，排序实现本身正确 |
+| `verify-failover.ts` | 备用通道夹具返回 ASCII `fakepng`，被图片魔数校验判为非法 | 换成可解码的 1×1 PNG，故障转移才真正走到成功分支 |
+| `verify-admin-tasks.ts` | 断言重试复制 `creditCost=3`，而实现刻意记 0（重试不二次扣费，避免二次退款） | 断言改为 `creditCost=0`，原价查原任务 |
+| `verify-credit-price.ts` | 脚本硬写 `NODE_ENV=development`，测试档跑仍读写 `dev.db` | 档位跟随调用方，未指定时默认开发档 |
+| `verify-free-create-e2e.ts` | 新账号 0 积分（`free_create` 已计费）→ POST 402，表现为轮询超时；产出还写死到开发 `uploads/` | 显式发放测试积分；上传目录从 ConfigService 派生；跑完按外键顺序清理账号/项目/素材/任务 |
+| `verify-credit-deduction.ts` | 测试库已有真实 image 线路时，桩失败会被线路接住成功，`42201`/`42204` 两个场景同时失真 | 场景内临时停用其它 image 线路，结束时恢复；不依赖「库里恰好没有通道」 |
+| `smoke-account.js` | 法务已扩为 4 类 slug，且 `seed:legal` 只建草稿，脚本仍断言 3 类且必有发布版本 | 按现行契约断言 4 类、`version` 可为 null、无发布版本时正文返回 null；发布态由 `smoke-notifications` 覆盖 |
+| `smoke-marketing.js` | 按 `@test.local` 通配删用户，会卷进其它脚本留下的 Project/Asset，撞外键后整段清理被吞 | 只清自己的 `mk*` 账号，并补齐 LoginSession/Project/Asset/GenerationTask 等外键子表 |
+
+**前置**：`smoke-aigc` 与 `verify-free-create-e2e` 需要可用的 image 通道。本机用仓库自带仿真网关：`cd test && node server.js`，在后台「模型配置」把 image 线路指向 `http://127.0.0.1:3900`（协议 `openai`，模型 `gpt-image-2`）；没有通道时它们会如实报 `42204`/轮询超时，不能当产品缺陷。
+
+
 ## 6. 测试数据与清理
 
 - 冒烟脚本自建账号 / 商品 / 订单，并在 `finally` 或结尾清理；失败中断时可能留残留，需手工按外键顺序清理。
-- 清理顺序（SQLite 无级联）：`Refund → Invoice → Payment → OrderItem → Membership → Order → CreditLedger → CreditLot → MembershipUsage → Notification → Ticket → LoginSession → LoginLog(置空 userId) → User → Product → MembershipPlan`。
+- 清理顺序（SQLite 无级联）：`GenerationTask → Asset → Project → Refund → Invoice → Payment → OrderItem → Membership → Order → CreditLedger → CreditLot → MembershipUsage → CheckinRecord → InviteRelation → Notification → Ticket → OAuthIdentity → AccountToken → LoginSession → LoginLog(置空 userId) → ConsentRecord → User → Product → MembershipPlan`。
 - 不得删除非本次测试产生的数据；发现历史残留时先确认归属。
 - 测试档账号与开发档账号是两套数据，**不要跨库复用凭据**。
 

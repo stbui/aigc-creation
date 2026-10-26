@@ -1,6 +1,11 @@
 /** 验证后台改价端点: SystemSetting 覆盖 → /capabilities 与生成扣费同步生效 */
 process.env.PORT = '3012';
-process.env.NODE_ENV = 'development';
+/*
+ * 档位跟随调用方（未指定时沿用开发档）。这里不能硬写 development：
+ * 否则 `NODE_ENV=test npx ts-node ...` 仍会读写 dev.db，并把开发库的
+ * 积分价改成测试值 —— 测试档隔离形同虚设。
+ */
+process.env.NODE_ENV = process.env.NODE_ENV || 'development';
 const { NestFactory } = require('@nestjs/core');
 const { AppModule } = require('../dist/app.module');
 const { ValidationPipe } = require('@nestjs/common');

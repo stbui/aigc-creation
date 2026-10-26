@@ -71,29 +71,33 @@ export class LegalService {
     };
   }
 
-  /** 三类文档的当前版本概览（前端页脚 / 注册页取版本号用） */
+  /** 四类文档的当前版本概览（前端页脚 / 注册页取版本号用） */
   async index() {
-    const out: Array<{
-      slug: string;
-      label: string;
-      version: string | null;
-      title: string;
-      publishedAt: Date | null;
-    }> = [];
-    for (const slug of LEGAL_SLUGS) {
-      const doc = await this.prisma.legalDocument.findFirst({
-        where: { slug, status: 'published' },
-        orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
-      });
-      out.push({
+    /*
+     * 一次查询取齐四类 slug 的已发布版本，再按 LEGAL_SLUGS 顺序回填。
+     * 旧实现是 for 循环里逐个 findFirst（4 次往返），页脚每次渲染都打一遍；
+     * 结果集很小，合并成一条 IN 查询既保持「每类只取最新」的语义，也少 3 次 DB 往返。
+     */
+    const docs = await this.prisma.legalDocument.findMany({
+      where: { slug: { in: [...LEGAL_SLUGS] }, status: 'published' },
+      orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
+      select: { slug: true, version: true, title: true, publishedAt: true, createdAt: true },
+    });
+    const latest = new Map<string, (typeof docs)[number]>();
+    for (const doc of docs) {
+      if (!latest.has(doc.slug)) latest.set(doc.slug, doc);
+    }
+
+    return LEGAL_SLUGS.map((slug) => {
+      const doc = latest.get(slug);
+      return {
         slug,
         label: LEGAL_SLUG_LABELS[slug],
         version: doc?.version ?? null,
         title: doc?.title ?? LEGAL_SLUG_LABELS[slug],
         publishedAt: doc?.publishedAt ?? null,
-      });
-    }
-    return out;
+      };
+    });
   }
 
   /** 后台：某 slug 的全部版本（含草稿与历史） */

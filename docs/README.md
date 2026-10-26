@@ -44,6 +44,7 @@
 | [`asset-library-design.md`](asset-library-design.md) | `/library` |
 | [`multi-image-fusion-spec.md`](multi-image-fusion-spec.md) | `/multi-image-fusion` |
 | [`free-creation-parity-audit.md`](free-creation-parity-audit.md) | `/free-creation` 偏差清单 |
+| [`shoppable-carousel-template-sources.md`](shoppable-carousel-template-sources.md) | `/shoppable-carousel` 模板素材与来源（49 个模板、147 张预览图；页面尚未实现） |
 
 ## 3. 技术文档（Technical）
 

@@ -11,7 +11,7 @@ import { LegalService } from './legal.service';
 export class LegalController {
   constructor(private readonly legal: LegalService) {}
 
-  /** 三类文档的当前版本概览 */
+  /** 四类文档的当前版本概览 */
   @Get()
   async index() {
     return this.legal.index();

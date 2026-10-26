@@ -42,7 +42,17 @@ async function main() {
   const backup = createServer((req, res) => {
     hits.push(`backup ${req.url}`);
     res.writeHead(200, {'Content-Type':'application/json'});
-    res.end(JSON.stringify({ data: [{ url: null, b64_json: Buffer.from('fakepng').toString('base64') }] }));
+    /*
+     * 必须是**可解码的真实图片**：2026-10 起图像链路会校验响应字节的
+     * 扩展名魔数，旧夹具用 ASCII "fakepng" 会被判成「不是受支持图片」，
+     * 备用通道因此永远失败 —— 红的是夹具，不是故障转移。
+     * 这里用 1×1 PNG（与 verify-credit-deduction / verify-credit-price 同源）。
+     */
+    const png = Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+      'base64',
+    );
+    res.end(JSON.stringify({ data: [{ url: null, b64_json: png.toString('base64') }] }));
   });
   await new Promise<void>(r => primary.listen(0, '127.0.0.1', r));
   await new Promise<void>(r => backup.listen(0, '127.0.0.1', r));
