@@ -580,9 +580,16 @@ export function AdminOrdersPage() {
         footer={(d) => {
           const row = list?.items.find((o) => o.id === d.id);
           if (!row) return null;
+          const canMarkPaid = d.status === 'pending' && can('order.mark_paid');
+          const canRefund =
+            (d.status === 'paid' || d.status === 'partial_refunded') &&
+            d.paidCents > d.refundedCents &&
+            can('order.refund');
+          // 无可执行动作时不渲染空页脚，避免详情底部留下无意义的空白操作条
+          if (!canMarkPaid && !canRefund) return null;
           return (
             <div className="adm-ops">
-              {d.status === 'pending' && can('order.mark_paid') && (
+              {canMarkPaid && (
                 <Button
                   type="primary"
                   className="adm-btn is-primary"
@@ -591,17 +598,15 @@ export function AdminOrdersPage() {
                   标记为已支付
                 </Button>
               )}
-              {(d.status === 'paid' || d.status === 'partial_refunded') &&
-                d.paidCents > d.refundedCents &&
-                can('order.refund') && (
-                  <Button
-                    type="primary" danger
-                    className="adm-btn is-danger"
-                    onClick={() => openAction('refund', row)}
-                  >
-                    退款
-                  </Button>
-                )}
+              {canRefund && (
+                <Button
+                  type="primary" danger
+                  className="adm-btn is-danger"
+                  onClick={() => openAction('refund', row)}
+                >
+                  退款
+                </Button>
+              )}
             </div>
           );
         }}

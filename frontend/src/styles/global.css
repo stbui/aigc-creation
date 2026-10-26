@@ -12239,6 +12239,13 @@ html[data-promo='off'] .multi-image-fusion-page {
   white-space: nowrap;
 }
 
+/* antd link 按钮默认 32px 高，会无谓撑高表格行；行内操作保持单行文本高度 */
+.adm-row-actions .adm-link {
+  height: 22px;
+  min-height: 0;
+  line-height: 22px;
+}
+
 .adm-cell-sub {
   font-size: 12px;
   color: var(--text-desc);
@@ -19225,6 +19232,7 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
    三档桌面宽度下的尺寸、层级、密度和反馈，不改业务逻辑与窄屏既有行为。
    ════════════════════════════════════════════════════════════════════════════ */
 
+:root,
 .adm-layout {
   --adm-header-height: 60px;
   --adm-sider-width: 236px;

@@ -241,7 +241,7 @@ export function AdminProductsPage() {
     {
       title: '商品',
       key: 'product',
-      width: 240,
+      width: 220,
       render: (_: unknown, row) => (
         <div className="adm-cell-stack">
           <span>{row.name}</span>
@@ -252,7 +252,7 @@ export function AdminProductsPage() {
     {
       title: '售价',
       key: 'price',
-      width: 150,
+      width: 130,
       render: (_: unknown, row) => (
         <div className="adm-cell-stack">
           <span>¥ {centsToYuanText(row.priceCents)}</span>
@@ -264,7 +264,7 @@ export function AdminProductsPage() {
     {
       title: '划线价',
       key: 'originalPrice',
-      width: 110,
+      width: 90,
       render: (_: unknown, row) =>
         row.originalPriceCents !== null ? (
           <span className="adm-cell-sub" style={{ textDecoration: 'line-through' }}>
@@ -277,7 +277,7 @@ export function AdminProductsPage() {
     {
       title: '赠送积分',
       key: 'credits',
-      width: 150,
+      width: 130,
       render: (_: unknown, row) => (
         <div className="adm-cell-stack">
           <span>{row.credits} 积分</span>
@@ -289,7 +289,7 @@ export function AdminProductsPage() {
       title: '发放方式',
       dataIndex: 'grantType',
       key: 'grantType',
-      width: 100,
+      width: 90,
       render: (v: string) => (
         <span className="adm-cell-sub">{v === 'immediate' ? '支付即发放' : '人工发放'}</span>
       ),
@@ -298,13 +298,13 @@ export function AdminProductsPage() {
       title: '排序',
       dataIndex: 'sortOrder',
       key: 'sortOrder',
-      width: 70,
+      width: 60,
     },
     {
       title: '状态',
       dataIndex: 'status',
       key: 'status',
-      width: 100,
+      width: 80,
       // `active` 与账号状态的「正常」共用同一个键: 商品语境下应读作「在售」
       render: (v: string) => <StatusTag status={v} label={v === 'active' ? '在售' : undefined} />,
     },
@@ -312,13 +312,14 @@ export function AdminProductsPage() {
       title: '更新时间',
       dataIndex: 'updatedAt',
       key: 'updatedAt',
-      width: 160,
+      width: 150,
       render: (v: string) => new Date(v).toLocaleString('zh-CN'),
     },
     {
       title: '',
       key: 'ops',
-      width: 120,
+      width: 110,
+      fixed: 'right',
       render: (_: unknown, row) => (
         <div className="adm-ops">
           {writable && (
@@ -418,7 +419,7 @@ export function AdminProductsPage() {
             dataSource={rows}
             loading={loading}
             pagination={false}
-            scroll={{ x: 1200 }}
+            scroll={{ x: 1060 }}
           />
         )}
       </Panel>

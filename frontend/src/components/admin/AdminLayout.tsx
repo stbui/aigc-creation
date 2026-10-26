@@ -265,7 +265,7 @@ function GlobalSearch({ canSearch, onNavigate }: { canSearch: boolean; onNavigat
             </div>
           ) : (
             <div role="listbox" aria-label="搜索结果">
-              {groups.map((g) => (
+              {groups.filter((g) => g.items.length > 0).map((g) => (
                 <div key={g.key} className="adm-search-group" role="group" aria-label={g.label}>
                   <div className="adm-search-group-title" aria-hidden>
                     {g.label}

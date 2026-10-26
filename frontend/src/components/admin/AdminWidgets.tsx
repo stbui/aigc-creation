@@ -294,6 +294,8 @@ export function AdminDrawer<T>({
       });
   }, [open, retryNonce]);
 
+  const footerContent = data && footer ? footer(data) : null;
+
   return (
     <Drawer
       title={title}
@@ -302,7 +304,9 @@ export function AdminDrawer<T>({
       onClose={onClose}
       className="adm-drawer"
       destroyOnHidden
-      footer={data && footer ? <div className="adm-drawer-footer">{footer(data)}</div> : undefined}
+      footer={
+        footerContent ? <div className="adm-drawer-footer">{footerContent}</div> : undefined
+      }
     >
       {loading ? (
         <div className="adm-drawer-loading">

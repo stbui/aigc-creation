@@ -243,19 +243,19 @@ export function AdminCouponsPage() {
       {
         title: '券码',
         key: 'code',
-        width: 130,
+        width: 125,
         render: (_: unknown, row) => (
           <Button type="link" className="adm-link adm-mono" onClick={() => openEdit(row)}>
             {row.code}
           </Button>
         ),
       },
-      { title: '名称', dataIndex: 'name', key: 'name', width: 140 },
+      { title: '名称', dataIndex: 'name', key: 'name', width: 130 },
       {
         title: '类型',
         dataIndex: 'type',
         key: 'type',
-        width: 80,
+        width: 70,
         render: (t: CouponType) => TYPE_LABEL[t] ?? t,
       },
       {
@@ -271,20 +271,20 @@ export function AdminCouponsPage() {
         title: '门槛',
         dataIndex: 'thresholdCents',
         key: 'threshold',
-        width: 90,
+        width: 80,
         render: (v: number) => (v > 0 ? `满 ¥${yuan(v)}` : <span className="adm-cell-sub">无门槛</span>),
       },
       {
         title: '适用范围',
         dataIndex: 'scope',
         key: 'scope',
-        width: 120,
+        width: 110,
         render: (s: CouponScope) => SCOPE_LABEL[s] ?? s,
       },
       {
         title: '核销',
         key: 'used',
-        width: 100,
+        width: 90,
         render: (_: unknown, row) => {
           const total = row.totalCount === 0 ? null : row.totalCount;
           const pct = total ? Math.round((row.usedCount / total) * 100) : null;
@@ -303,7 +303,7 @@ export function AdminCouponsPage() {
       {
         title: '有效期',
         key: 'valid',
-        width: 175,
+        width: 165,
         render: (_: unknown, row) => (
           <div className="adm-cell-sub">
             {new Date(row.validFrom).toLocaleDateString('zh-CN')} ~{' '}
@@ -315,13 +315,13 @@ export function AdminCouponsPage() {
         title: '状态',
         dataIndex: 'status',
         key: 'status',
-        width: 80,
+        width: 75,
         render: (s: string) => <StatusTag status={s === 'on' ? 'active' : 'disabled'} />,
       },
       {
         title: '操作',
         key: 'actions',
-        width: 110,
+        width: 105,
         fixed: 'right',
         render: (_: unknown, row) => (
           <div className="adm-row-actions">
@@ -433,7 +433,7 @@ export function AdminCouponsPage() {
             columns={columns}
             dataSource={data?.items ?? []}
             loading={loading}
-            scroll={{ x: 1200 }}
+            scroll={{ x: 1040 }}
             pagination={adminPagination({
               current: data?.page ?? 1,
               pageSize: data?.pageSize ?? 20,

@@ -878,17 +878,12 @@ export function LocalRedrawPage() {
         if (!image) {
           return (
             <div className="redraw-intro">
-              <div className="redraw-intro-art">
+              <div className="redraw-intro-art" aria-hidden="true">
                 <LocalRedrawIllustration />
               </div>
               <div className="redraw-intro-copy">
-                <h2>局部重绘</h2>
+                <strong>局部重绘</strong>
                 <p>只想修改局部？圈出来写描述就行，适合去掉瑕疵、更换图案、修改画面中的元素</p>
-                <ol className="redraw-intro-steps">
-                  <li><b>1</b> 上传图片</li>
-                  <li><b>2</b> 涂抹或框选区域</li>
-                  <li><b>3</b> 填写描述并重绘</li>
-                </ol>
               </div>
             </div>
           );

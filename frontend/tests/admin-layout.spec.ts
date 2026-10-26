@@ -134,10 +134,10 @@ test.describe('后台布局', () => {
     const search = page.locator('.adm-search input');
     await expect(search).toBeFocused();
     await search.fill('o');
-    await expect(page.getByText('至少输入 2 个字符开始搜索')).toBeVisible();
+    await expect(page.getByText('输入至少 2 个字符开始搜索')).toBeVisible();
 
     await search.press('Escape');
-    await expect(page.getByText('至少输入 2 个字符开始搜索')).toBeHidden();
+    await expect(page.getByText('输入至少 2 个字符开始搜索')).toBeHidden();
   });
 
   test('操作列的下拉菜单可用', async ({ page }) => {
