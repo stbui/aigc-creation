@@ -1,10 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { App, Button, Input, Segmented, Select, Table } from 'antd';
+import { App, Button, Checkbox, Input, Segmented, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useSearchParams } from 'react-router-dom';
-import { FolderOpen, Grid3x3, HardDrive, List } from 'lucide-react';
+import {
+  Eye,
+  EyeOff,
+  FolderOpen,
+  Grid3x3,
+  HardDrive,
+  ImageOff,
+  List,
+  Maximize2,
+  Trash2,
+} from 'lucide-react';
 import { adminAssetsApi, toAbsoluteUrl } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
+import { ImageLightbox, type LightboxItem } from '../../components/ImageLightbox';
 import {
   AdminListError,
   AdminListLoading,
@@ -45,6 +56,46 @@ const BACKEND_LABEL: Record<string, string> = {
  */
 const thumbOf = (url: string): string => toAbsoluteUrl(url) ?? url;
 
+const assetLabel = (a: Row): string =>
+  a.capability ?? (a.kind === 'original' ? '原始上传' : '生成图');
+
+const fmtFormat = (format: string): string =>
+  format ? (format.split('/').pop() ?? format).toUpperCase() : '—';
+
+type DeleteImpact = { sizeBytes: number; tasks: number; storageBackend?: string };
+
+/** 缩略图失败时保留稳定占位，避免破图图标破坏网格节奏 */
+function AssetThumb({
+  src,
+  alt,
+  className,
+}: {
+  src: string;
+  alt: string;
+  className: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
+
+  if (failed) {
+    return (
+      <span className={`${className} is-error`} role="img" aria-label={`${alt}，缩略图加载失败`}>
+        <ImageOff size={18} aria-hidden="true" />
+      </span>
+    );
+  }
+  return (
+    <img
+      className={className}
+      src={src}
+      alt={alt}
+      loading="lazy"
+      draggable={false}
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
 export function AdminAssetsPage() {
   const { message } = App.useApp();
   const { can } = useAdmin();
@@ -59,7 +110,13 @@ export function AdminAssetsPage() {
   const [stats, setStats] = useState<AdminAssetStats | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const [statusBusyId, setStatusBusyId] = useState<string | null>(null);
+  const [previewId, setPreviewId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Row | null>(null);
+  const [deleteImpact, setDeleteImpact] = useState<DeleteImpact | null>(null);
+  const [deleteImpactError, setDeleteImpactError] = useState<string | null>(null);
+  const [deleteImpactLoading, setDeleteImpactLoading] = useState(false);
+  const deleteImpactSeq = useRef(0);
   /** 批量删除需要二次确认: 它会连磁盘文件一起删, 不可恢复 */
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
   const [batchSummary, setBatchSummary] = useState<BatchSummary<unknown> | null>(null);
@@ -69,17 +126,57 @@ export function AdminAssetsPage() {
     (params: Record<string, unknown>) =>
       adminAssetsApi.list({
         page: params.page as number,
-        pageSize: view === 'grid' ? 60 : ((params.pageSize as number) ?? 20),
+        pageSize: params.pageSize as number,
         keyword: params.keyword as string | undefined,
         kind: params.kind as string | undefined,
         status: params.status as string | undefined,
         backend: params.backend as string | undefined,
       }),
-    [view],
+    [],
   );
 
-  const { data, loading, error, setQuery, setPage, reload } =
-    useAdminList<AdminAssetListResult>(fetcher);
+  const { data, loading, error, params, setQuery, setPage, reload } =
+    useAdminList<AdminAssetListResult>(fetcher, { pageSize: 60 });
+  const items = data?.items ?? [];
+
+  const previewItems = useMemo<LightboxItem[]>(
+    () =>
+      items.map((a) => ({
+        id: a.id,
+        url: thumbOf(a.sourceUrl),
+        alt: `${assetLabel(a)}素材预览`,
+        width: a.width,
+        height: a.height,
+        createdAt: a.createdAt,
+        meta: [
+          assetLabel(a),
+          a.status === 'visible' ? '已上架' : '已下架',
+          fmtFormat(a.format),
+          fmtBytes(a.sizeBytes),
+          BACKEND_LABEL[a.storageBackend] ?? a.storageBackend,
+          a.ownerEmail,
+          a.projectName,
+        ],
+      })),
+    [items],
+  );
+  const previewIndex = previewId ? items.findIndex((a) => a.id === previewId) : -1;
+  const previewAsset = previewIndex >= 0 ? items[previewIndex] : null;
+
+  const appliedKeyword = (params.keyword as string | undefined) ?? '';
+  const appliedKind = params.kind as string | undefined;
+  const appliedStatus = params.status as string | undefined;
+  const appliedBackend = params.backend as string | undefined;
+  const appliedChips = [
+    appliedKeyword ? `关键词「${appliedKeyword}」` : null,
+    appliedKind ? (appliedKind === 'original' ? '原始上传' : '生成图') : null,
+    appliedStatus ? (appliedStatus === 'visible' ? '已上架' : '已下架') : null,
+    appliedBackend ? (BACKEND_LABEL[appliedBackend] ?? appliedBackend) : null,
+  ].filter(Boolean) as string[];
+
+  const selectable = can('asset.hide') || can('asset.delete');
+  const allPageSelected = items.length > 0 && items.every((item) => selected.includes(item.id));
+  const somePageSelected = items.some((item) => selected.includes(item.id)) && !allPageSelected;
 
   /** 顶栏搜索带 `?q=` 跳过来时套用关键词（ref 防止覆盖页内手动筛选） */
   const [searchParams] = useSearchParams();
@@ -99,15 +196,62 @@ export function AdminAssetsPage() {
       .catch(() => undefined);
   }, [reload]);
 
-  const toggleStatus = async (row: Row, next: AssetStatus) => {
+  const applyFilters = useCallback(() => {
+    setSelected([]);
+    setQuery({
+      keyword: keyword.trim() || undefined,
+      kind,
+      status,
+      backend,
+    });
+  }, [backend, keyword, kind, setQuery, status]);
+
+  const resetFilters = useCallback(() => {
+    setKeyword('');
+    setKind(undefined);
+    setStatus(undefined);
+    setBackend(undefined);
+    setSelected([]);
+    setQuery({ keyword: undefined, kind: undefined, status: undefined, backend: undefined });
+  }, [setQuery]);
+
+  const handleViewChange = (next: 'grid' | 'table') => {
+    if (next === view) return;
+    setView(next);
+    setSelected([]);
+    setPreviewId(null);
+    // 网格适合扫图, 一页 60 张; 表格适合查属性, 一页 20 行。页码回到 1,
+    // 否则从网格第 4 页切到表格时可能直接落在越界页。
+    setQuery({ page: 1, pageSize: next === 'grid' ? 60 : 20 });
+  };
+
+  const toggleSelected = (id: string, checked: boolean) => {
+    setSelected((current) =>
+      checked
+        ? current.includes(id)
+          ? current
+          : [...current, id]
+        : current.filter((item) => item !== id),
+    );
+  };
+
+  const toggleSelectPage = (checked: boolean) => {
+    setSelected(checked ? items.map((item) => item.id) : []);
+  };
+
+  const toggleStatus = useCallback(async (row: Row, next: AssetStatus) => {
+    if (statusBusyId) return;
+    setStatusBusyId(row.id);
     try {
       await adminAssetsApi.setStatus(row.id, next);
       void message.success(next === 'hidden' ? '已下架，用户端不再展示' : '已恢复上架');
       reload();
     } catch (e) {
       void message.error((e as Error).message);
+    } finally {
+      setStatusBusyId(null);
     }
-  };
+  }, [message, reload, statusBusyId]);
 
   /**
    * 批量动作走 `/admin/assets/batch`（逐条结果）而不是旧的 `batch-status`（只回 count）。
@@ -137,22 +281,52 @@ export function AdminAssetsPage() {
   const exportAssets = async () => {
     try {
       await adminAssetsApi.exportCsv({
-        keyword: keyword || undefined,
-        kind,
-        status,
-        backend,
+        // 导出必须与屏幕上已生效的筛选一致，而不是筛选栏里尚未提交的草稿值
+        keyword: appliedKeyword || undefined,
+        kind: appliedKind,
+        status: appliedStatus,
+        backend: appliedBackend,
       });
     } catch (e) {
       void message.error((e as Error).message);
     }
   };
 
+  const openDelete = useCallback((row: Row) => {
+    const seq = ++deleteImpactSeq.current;
+    setPreviewId(null);
+    setDeleteTarget(row);
+    setDeleteImpact(null);
+    setDeleteImpactError(null);
+    setDeleteImpactLoading(true);
+    adminAssetsApi
+      .impact(row.id)
+      .then((impact) => {
+        if (seq === deleteImpactSeq.current) setDeleteImpact(impact);
+      })
+      .catch((e: unknown) => {
+        if (seq !== deleteImpactSeq.current) return;
+        setDeleteImpactError(e instanceof Error ? e.message : '影响统计失败');
+      })
+      .finally(() => {
+        if (seq === deleteImpactSeq.current) setDeleteImpactLoading(false);
+      });
+  }, []);
+
+  const closeDelete = useCallback(() => {
+    deleteImpactSeq.current += 1;
+    setDeleteTarget(null);
+    setDeleteImpact(null);
+    setDeleteImpactError(null);
+    setDeleteImpactLoading(false);
+  }, []);
+
   const doDelete = async () => {
     if (!deleteTarget) return;
     setBusy(true);
     try {
       const res = await adminAssetsApi.remove(deleteTarget.id);
-      setDeleteTarget(null);
+      closeDelete();
       void message.success(`已删除，连带清理 ${res.removedTasks} 条任务记录`);
       reload();
     } catch (e) {
@@ -167,9 +341,21 @@ export function AdminAssetsPage() {
       {
         title: '预览',
         key: 'thumb',
-        width: 64,
+        width: 72,
         render: (_: unknown, row) => (
-          <img className="adm-asset-thumb-sm" src={thumbOf(row.sourceUrl)} alt="" loading="lazy" />
+          <button
+            type="button"
+            className="adm-asset-thumb-btn"
+            title="查看大图"
+            aria-label={`查看大图：${assetLabel(row)}`}
+            onClick={() => setPreviewId(row.id)}
+          >
+            <AssetThumb
+              className="adm-asset-thumb-sm"
+              src={thumbOf(row.sourceUrl)}
+              alt={`${assetLabel(row)}缩略图`}
+            />
+          </button>
         ),
       },
       {
@@ -184,6 +370,7 @@ export function AdminAssetsPage() {
         dataIndex: 'capability',
         key: 'capability',
         width: 130,
+        ellipsis: true,
         render: (c: string | null) => c ?? <span className="adm-cell-sub">—</span>,
       },
       {
@@ -196,12 +383,19 @@ export function AdminAssetsPage() {
           </span>
         ),
       },
+      {
+        title: '格式',
+        dataIndex: 'format',
+        key: 'format',
+        width: 68,
+        render: (format: string) => <span className="adm-cell-sub">{fmtFormat(format)}</span>,
+      },
       { title: '大小', dataIndex: 'sizeBytes', key: 'size', width: 80, align: 'right',
         render: (v: number) => fmtBytes(v) },
       { title: '存储', dataIndex: 'storageBackend', key: 'backend', width: 90,
         render: (b: string) => BACKEND_LABEL[b] ?? b },
-      { title: '所属用户', dataIndex: 'ownerEmail', key: 'owner', width: 170 },
-      { title: '项目', dataIndex: 'projectName', key: 'project', width: 120 },
+      { title: '所属用户', dataIndex: 'ownerEmail', key: 'owner', width: 190, ellipsis: true },
+      { title: '项目', dataIndex: 'projectName', key: 'project', width: 130, ellipsis: true },
       {
         title: '状态',
         dataIndex: 'status',
@@ -232,6 +426,8 @@ export function AdminAssetsPage() {
               <Button
                 type="link"
                 className="adm-link"
+                loading={statusBusyId === row.id}
+                disabled={statusBusyId !== null && statusBusyId !== row.id}
                 onClick={() => void toggleStatus(row, row.status === 'visible' ? 'hidden' : 'visible')}
               >
                 {row.status === 'visible' ? '下架' : '恢复'}
@@ -241,7 +437,7 @@ export function AdminAssetsPage() {
               <Button
                 type="link" danger
                 className="adm-link is-danger"
-                onClick={() => setDeleteTarget(row)}
+                onClick={() => openDelete(row)}
               >
                 删除
               </Button>
@@ -251,13 +447,11 @@ export function AdminAssetsPage() {
       },
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [can],
+    [can, openDelete, statusBusyId, toggleStatus],
   );
 
   if (loading && !data) return <AdminListLoading tip="加载素材…" />;
   if (error && !data) return <AdminListError error={error} onRetry={reload} />;
-
-  const items = data?.items ?? [];
 
   return (
     <>
@@ -268,7 +462,7 @@ export function AdminAssetsPage() {
           <>
             <Segmented
               value={view}
-              onChange={(value) => setView(value as 'grid' | 'table')}
+              onChange={(value) => handleViewChange(value as 'grid' | 'table')}
               options={[
                 {
                   value: 'grid',
@@ -291,26 +485,6 @@ export function AdminAssetsPage() {
             {can('data.export') && (
               <Button type="default" className="adm-btn" onClick={() => void exportAssets()}>
                 导出 CSV
-              </Button>
-            )}
-            {can('asset.hide') && selected.length > 0 && (
-              <>
-                <Button type="default" className="adm-btn" onClick={() => void runBatch('hide')} disabled={busy}>
-                  批量下架 ({selected.length})
-                </Button>
-                <Button type="default" className="adm-btn" onClick={() => void runBatch('show')} disabled={busy}>
-                  批量恢复
-                </Button>
-              </>
-            )}
-            {can('asset.delete') && selected.length > 0 && (
-              <Button
-                type="primary" danger
-                className="adm-btn is-danger"
-                onClick={() => setBatchDeleteOpen(true)}
-                disabled={busy}
-              >
-                批量删除
               </Button>
             )}
           </>
@@ -365,10 +539,8 @@ export function AdminAssetsPage() {
           placeholder="ID / 能力关键词"
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
-          onPressEnter={() => {
-            setSelected([]);
-            setQuery({ keyword: keyword || undefined });
-          }}
+          onPressEnter={applyFilters}
+          aria-label="按素材 ID 或能力关键词筛选"
           allowClear
         />
         <Select
@@ -405,56 +577,190 @@ export function AdminAssetsPage() {
           <Button
             type="primary"
             className="adm-btn is-primary"
-            onClick={() => {
-              setSelected([]);
-              setQuery({ keyword: keyword || undefined, kind, status, backend });
-            }}
+            onClick={applyFilters}
           >
             查询
           </Button>
           <Button
             type="default"
             className="adm-btn"
-            onClick={() => {
-              setKeyword(''); setKind(undefined); setStatus(undefined); setBackend(undefined);
-              setSelected([]);
-              setQuery({ keyword: undefined, kind: undefined, status: undefined, backend: undefined });
-            }}
+            onClick={resetFilters}
+            disabled={!appliedChips.length && !keyword && !kind && !status && !backend}
           >
             重置
           </Button>
         </div>
+        {appliedChips.length > 0 && (
+          <div className="adm-filter-chips" aria-label="已生效的筛选条件">
+            <span className="adm-filter-chips-label">已筛选</span>
+            {appliedChips.map((chip, index) => (
+              <span className="adm-filter-chip" key={`${index}-${chip}`}>
+                {chip}
+              </span>
+            ))}
+            <Button type="link" className="adm-filter-chip-clear" onClick={resetFilters}>
+              全部清除
+            </Button>
+          </div>
+        )}
       </div>
 
-      <Panel title={view === 'grid' ? '缩略图网格' : '素材列表'}>
-        {items.length === 0 ? (
-          <AdminEmpty description="没有符合条件的素材" />
-        ) : view === 'grid' ? (
-          <div className="adm-asset-grid">
-            {items.map((a) => (
-              <div
-                key={a.id}
-                className={`adm-asset-cell${selected.includes(a.id) ? ' is-selected' : ''}`}
-                onClick={() =>
-                  (can('asset.hide') || can('asset.delete')) &&
-                  setSelected((s) =>
-                    s.includes(a.id) ? s.filter((x) => x !== a.id) : [...s, a.id],
-                  )
-                }
+      {selected.length > 0 && (
+        <div className="adm-bulk-bar" role="status">
+          <span className="adm-bulk-count">已选 {selected.length} 张素材</span>
+          <Checkbox
+            checked={allPageSelected}
+            indeterminate={somePageSelected}
+            onChange={(e) => toggleSelectPage(e.target.checked)}
+          >
+            {allPageSelected ? '取消全选' : '全选本页'}
+          </Checkbox>
+          {can('asset.hide') && (
+            <>
+              <Button
+                type="default"
+                className="adm-btn"
+                onClick={() => void runBatch('hide')}
+                disabled={busy}
               >
-                <img src={thumbOf(a.sourceUrl)} alt="" loading="lazy" />
-                {a.status === 'hidden' && <span className="adm-asset-badge">已下架</span>}
-                <div className="adm-asset-info">
-                  <div className="adm-asset-name">
-                    {a.capability ?? (a.kind === 'original' ? '原始上传' : '生成图')}
+                批量下架
+              </Button>
+              <Button
+                type="default"
+                className="adm-btn"
+                onClick={() => void runBatch('show')}
+                disabled={busy}
+              >
+                批量恢复
+              </Button>
+            </>
+          )}
+          {can('asset.delete') && (
+            <Button
+              type="primary"
+              danger
+              className="adm-btn is-danger"
+              onClick={() => setBatchDeleteOpen(true)}
+              disabled={busy}
+            >
+              批量删除
+            </Button>
+          )}
+          <Button type="link" className="adm-link" onClick={() => setSelected([])}>
+            清空选择
+          </Button>
+        </div>
+      )}
+
+      <Panel
+        title={view === 'grid' ? '缩略图网格' : '素材列表'}
+        note={`${data?.total ?? 0} 张`}
+      >
+        {items.length === 0 ? (
+          <AdminEmpty
+            description={
+              appliedChips.length > 0
+                ? '没有符合当前筛选条件的素材。清除筛选后可查看全部素材。'
+                : '暂无素材。用户上传或生成图片后，会在这里出现。'
+            }
+            action={
+              appliedChips.length > 0 ? (
+                <Button type="default" className="adm-btn" onClick={resetFilters}>
+                  清除筛选
+                </Button>
+              ) : undefined
+            }
+          />
+        ) : view === 'grid' ? (
+          <div className="adm-asset-grid" aria-busy={loading}>
+            {items.map((a) => (
+              <article
+                key={a.id}
+                className={[
+                  'adm-asset-cell',
+                  selected.includes(a.id) ? 'is-selected' : '',
+                  a.status === 'hidden' ? 'is-hidden' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              >
+                <div className="adm-asset-visual">
+                  <button
+                    type="button"
+                    className="adm-asset-preview"
+                    aria-label={`查看大图：${assetLabel(a)}`}
+                    onClick={() => setPreviewId(a.id)}
+                  >
+                    <AssetThumb
+                      className="adm-asset-image"
+                      src={thumbOf(a.sourceUrl)}
+                      alt={`${assetLabel(a)}缩略图`}
+                    />
+                  </button>
+                  {selectable && (
+                    <span className="adm-asset-select" onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        checked={selected.includes(a.id)}
+                        onChange={(e) => toggleSelected(a.id, e.target.checked)}
+                        aria-label={`选择 ${assetLabel(a)}`}
+                      />
+                    </span>
+                  )}
+                  {a.status === 'hidden' && <span className="adm-asset-badge">已下架</span>}
+                  <div className="adm-asset-actions" role="group" aria-label="素材快捷操作">
+                    <button
+                      type="button"
+                      className="adm-asset-action"
+                      title="查看大图"
+                      aria-label={`查看大图：${assetLabel(a)}`}
+                      onClick={() => setPreviewId(a.id)}
+                    >
+                      <Maximize2 size={15} />
+                    </button>
+                    {can('asset.hide') && (
+                      <button
+                        type="button"
+                        className="adm-asset-action"
+                        title={a.status === 'visible' ? '下架素材' : '恢复上架'}
+                        aria-label={a.status === 'visible' ? '下架素材' : '恢复上架'}
+                        disabled={statusBusyId === a.id}
+                        onClick={() =>
+                          void toggleStatus(a, a.status === 'visible' ? 'hidden' : 'visible')
+                        }
+                      >
+                        {a.status === 'visible' ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    )}
+                    {can('asset.delete') && (
+                      <button
+                        type="button"
+                        className="adm-asset-action is-danger"
+                        title="永久删除"
+                        aria-label="永久删除素材"
+                        onClick={() => openDelete(a)}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
                   </div>
-                  <div className="adm-asset-meta">
-                    {a.width && a.height ? `${a.width}×${a.height} · ` : ''}
-                    {fmtBytes(a.sizeBytes)} · {BACKEND_LABEL[a.storageBackend] ?? a.storageBackend}
-                  </div>
-                  <div className="adm-asset-meta">{a.ownerEmail}</div>
                 </div>
-              </div>
+                <div className="adm-asset-info">
+                  <div className="adm-asset-name" title={assetLabel(a)}>
+                    {assetLabel(a)}
+                  </div>
+                  <div
+                    className="adm-asset-meta"
+                    title={`${fmtFormat(a.format)}${a.width && a.height ? ` · ${a.width}×${a.height}` : ''} · ${fmtBytes(a.sizeBytes)}`}
+                  >
+                    {fmtFormat(a.format)}
+                    {a.width && a.height ? ` · ${a.width}×${a.height}` : ''} ·{' '}
+                    {fmtBytes(a.sizeBytes)}
+                  </div>
+                  <div className="adm-asset-meta" title={`${a.ownerEmail} · ${a.projectName}`}>
+                    {a.ownerEmail} · {a.projectName}
+                  </div>
+                </div>
+              </article>
             ))}
           </div>
         ) : (
@@ -464,7 +770,8 @@ export function AdminAssetsPage() {
             columns={columns}
             dataSource={items}
             loading={loading}
-            scroll={{ x: 1200 }}
+            scroll={{ x: 1300 }}
+            rowClassName={(row) => (row.status === 'hidden' ? 'is-hidden-row' : '')}
             rowSelection={
               can('asset.hide') || can('asset.delete')
                 ? { selectedRowKeys: selected, onChange: (k) => setSelected(k as string[]) }
@@ -514,6 +821,51 @@ export function AdminAssetsPage() {
         )}
       </Panel>
 
+      {previewAsset && (
+        <ImageLightbox
+          items={previewItems}
+          index={previewIndex}
+          onIndexChange={(nextIndex) => setPreviewId(items[nextIndex]?.id ?? null)}
+          onClose={() => setPreviewId(null)}
+          ariaLabel="素材预览"
+          renderActions={(nextIndex) => {
+            const asset = items[nextIndex];
+            if (!asset) return null;
+            return (
+              <div className="img-viewer-actions">
+                {can('asset.hide') && (
+                  <button
+                    type="button"
+                    className="img-viewer-action"
+                    disabled={statusBusyId === asset.id}
+                    onClick={() => {
+                      setPreviewId(null);
+                      void toggleStatus(
+                        asset,
+                        asset.status === 'visible' ? 'hidden' : 'visible',
+                      );
+                    }}
+                  >
+                    {asset.status === 'visible' ? <EyeOff size={14} /> : <Eye size={14} />}
+                    {asset.status === 'visible' ? '下架' : '恢复'}
+                  </button>
+                )}
+                {can('asset.delete') && (
+                  <button
+                    type="button"
+                    className="img-viewer-action is-danger"
+                    onClick={() => openDelete(asset)}
+                  >
+                    <Trash2 size={14} />
+                    删除
+                  </button>
+                )}
+              </div>
+            );
+          }}
+        />
+      )}
+
       {deleteTarget && (
         <ConfirmAction
           open
@@ -523,22 +875,37 @@ export function AdminAssetsPage() {
           requireTyping
           typingText="删除"
           loading={busy}
-          onCancel={() => setDeleteTarget(null)}
+          confirmDisabled={deleteImpactLoading}
+          onCancel={closeDelete}
           onConfirm={() => void doDelete()}
           description={
             <>
               <p>删除后素材文件与其产出任务都会被清理，操作不可恢复。</p>
               <p className="adm-cell-sub">
+                {assetLabel(deleteTarget)} · {deleteTarget.ownerEmail}
+                <br />
                 存储位置：{BACKEND_LABEL[deleteTarget.storageBackend] ?? deleteTarget.storageBackend} ·{' '}
                 {deleteTarget.storageKey}
               </p>
             </>
           }
-          impact={[
-            `文件大小 ${fmtBytes(deleteTarget.sizeBytes)} 将被释放`,
-            '其产出的生成任务记录会一并删除',
-            '若为云端素材，仅删除当前后端上的副本',
-          ]}
+          impact={
+            deleteImpactLoading
+              ? ['正在统计删除影响…']
+              : deleteImpact
+                ? [
+                    `文件大小 ${fmtBytes(deleteImpact.sizeBytes)} 将被释放`,
+                    `关联的 ${deleteImpact.tasks} 条产出任务记录会一并删除`,
+                    '若为云端素材，仅删除当前后端上的副本',
+                  ]
+                : [
+                    deleteImpactError
+                      ? `影响统计失败：${deleteImpactError}`
+                      : '未能获取服务端影响统计',
+                    `列表记录的文件大小为 ${fmtBytes(deleteTarget.sizeBytes)}，任务记录数未知`,
+                    '删除仍会清理素材文件；若云端删除失败，记录会保留并可重试',
+                  ]
+          }
         />
       )}
 

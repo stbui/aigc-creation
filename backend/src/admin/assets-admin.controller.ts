@@ -7,7 +7,9 @@ import { AdminAssetsService } from './assets-admin.service';
 import { PERMISSIONS } from './permissions';
 import { AppError } from '../common/app.exception';
 import { csvFilename } from '../common/csv';
-import type { AssetListQueryDto, ProjectListQueryDto } from './dto/asset.dto';
+// 必须用运行时导入: `import type` 会让 Nest 的 design:paramtypes 退化成
+// Object/Function, ValidationPipe 无法转换 pageSize, 分页会静默退回默认 20。
+import { AssetListQueryDto, ProjectListQueryDto } from './dto/asset.dto';
 
 /** 下架/恢复 */
 export class AssetStatusDto {

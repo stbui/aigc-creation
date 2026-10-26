@@ -44,6 +44,11 @@ test.describe('素材管理', () => {
     );
     const naturalW = await img.evaluate((el) => (el as HTMLImageElement).naturalWidth);
     expect(naturalW, '缩略图未加载成功').toBeGreaterThan(0);
+
+    // 网格每页 60 张: 后端 DTO 若丢失分页元数据会静默退回 20, 这里守住页容量
+    const totalText = await page.locator('.adm-panel .adm-panel-note').first().innerText();
+    const total = Number(totalText.match(/\d+/)?.[0] ?? 0);
+    expect(await page.locator('.adm-asset-cell').count()).toBe(Math.min(total, 60));
   });
 
   test('B-25 网格与表格视图可切换', async ({ page }) => {
@@ -58,6 +63,76 @@ test.describe('素材管理', () => {
     // 切回网格
     await page.locator('.adm-segmented-item[title="缩略图网格"]').click();
     await expect(page.locator('.adm-asset-cell').first()).toBeVisible({ timeout: 10000 });
+  });
+
+  test('网格勾选后出现批量操作条', async ({ page }) => {
+    await login(page);
+    await page.goto(`${UI}/admin/assets`);
+    await page.waitForSelector('.adm-asset-cell', { timeout: 20000 });
+
+    await page.locator('.adm-asset-select input[type="checkbox"]').first().check();
+    const bulkBar = page.locator('.adm-bulk-bar');
+    await expect(bulkBar).toBeVisible();
+    await expect(bulkBar.locator('.adm-bulk-count')).toContainText('已选 1 张素材');
+    await expect(bulkBar.getByRole('button', { name: '批量下架' })).toBeVisible();
+    await expect(bulkBar.getByRole('button', { name: '批量删除' })).toBeVisible();
+
+    await bulkBar.getByRole('button', { name: '清空选择' }).click();
+    await expect(bulkBar).toHaveCount(0);
+  });
+
+  test('点击缩略图打开大图预览并支持 Esc 关闭', async ({ page }) => {
+    await login(page);
+    await page.goto(`${UI}/admin/assets`);
+    await page.waitForSelector('.adm-asset-cell', { timeout: 20000 });
+
+    await page.locator('.adm-asset-cell .adm-asset-preview').first().click();
+    const viewer = page.getByRole('dialog', { name: '素材预览' });
+    await expect(viewer).toBeVisible();
+    await expect(viewer.locator('.img-viewer-meta')).toContainText(/已上架|已下架/);
+    await expect(viewer.locator('.img-viewer-actions')).toBeVisible();
+
+    await page.keyboard.press('Escape');
+    await expect(viewer).toHaveCount(0);
+  });
+
+  test('桌面 1280 / 1440 / 1920 无横向溢出且无控制台告警', async ({ page }) => {
+    const issues: string[] = [];
+    page.on('console', (msg) => {
+      if (msg.type() === 'error' || msg.type() === 'warning') {
+        issues.push(`${msg.type()}: ${msg.text()}`);
+      }
+    });
+    page.on('pageerror', (error) => issues.push(`pageerror: ${error.message}`));
+
+    await login(page);
+    for (const width of [1280, 1440, 1920]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto(`${UI}/admin/assets`);
+      await page.waitForSelector('.adm-asset-cell', { timeout: 20000 });
+
+      const gridMetrics = await page.evaluate(() => ({
+        docW: document.documentElement.scrollWidth,
+        winW: window.innerWidth,
+        contentW: document.querySelector('.adm-content')?.getBoundingClientRect().width ?? 0,
+      }));
+      expect(gridMetrics.docW, `${width}px 网格出现页面级横向溢出`).toBeLessThanOrEqual(
+        gridMetrics.winW + 1,
+      );
+      expect(gridMetrics.contentW).toBeGreaterThan(0);
+
+      await page.locator('.adm-segmented-item[title="表格视图"]').click();
+      await expect(page.locator('.adm-panel table').first()).toBeVisible();
+      const tableMetrics = await page.evaluate(() => ({
+        docW: document.documentElement.scrollWidth,
+        winW: window.innerWidth,
+      }));
+      expect(tableMetrics.docW, `${width}px 表格出现页面级横向溢出`).toBeLessThanOrEqual(
+        tableMetrics.winW + 1,
+      );
+    }
+
+    expect(issues).toEqual([]);
   });
 
   test('表格视图含存储后端列', async ({ page }) => {
@@ -75,10 +150,45 @@ test.describe('素材管理', () => {
     await page.waitForSelector('.adm-asset-cell', { timeout: 20000 });
 
     await page.locator('.adm-filter .ant-select').first().click();
-    await page.getByTitle('原始上传').click();
-    await page.waitForTimeout(1500);
+    await page.keyboard.press('ArrowDown');
+    await page.keyboard.press('Enter');
+    await page.locator('.adm-filter-actions .ant-btn-primary').click();
+    await expect(page.locator('.adm-filter-chip')).toHaveCount(1);
+    await expect(page.locator('.adm-filter-chip')).toContainText(/原始上传|生成图/);
+    await expect(page.locator('.adm-filter-chip-clear')).toBeVisible();
     // 筛选后仍有结果
     expect(await page.locator('.adm-asset-cell').count()).toBeGreaterThanOrEqual(0);
+
+    await page.getByRole('button', { name: '全部清除' }).click();
+    await expect(page.locator('.adm-filter-chip')).toHaveCount(0);
+  });
+
+  test('已下架素材在网格中仍可见且带角标', async ({ page }) => {
+    await login(page);
+    await page.goto(`${UI}/admin/assets`);
+    await page.waitForSelector('.adm-asset-cell', { timeout: 20000 });
+    await page.locator('.adm-segmented-item[title="表格视图"]').click();
+
+    const firstRow = page.locator('.adm-panel table tbody tr.ant-table-row').first();
+    await expect(firstRow).toBeVisible();
+    const wasHidden = (await firstRow.innerText()).includes('已下架');
+    if (!wasHidden) {
+      await firstRow.getByRole('button', { name: '下架' }).click();
+      await expect(firstRow).toContainText('已下架', { timeout: 10000 });
+    }
+
+    await page.locator('.adm-segmented-item[title="缩略图网格"]').click();
+    const firstCell = page.locator('.adm-asset-cell').first();
+    await expect(firstCell).toHaveClass(/is-hidden/);
+    await expect(firstCell.locator('.adm-asset-badge')).toHaveText('已下架');
+
+    if (!wasHidden) {
+      await page.locator('.adm-segmented-item[title="表格视图"]').click();
+      await page.locator('.adm-panel table tbody tr.ant-table-row').first()
+        .getByRole('button', { name: '恢复' }).click();
+      await expect(page.locator('.adm-panel table tbody tr.ant-table-row').first())
+        .toContainText('已上架', { timeout: 10000 });
+    }
   });
 
   test('下架素材出现角标且可恢复', async ({ page }) => {
@@ -112,10 +222,10 @@ test.describe('素材管理', () => {
     await expect(page.locator('.adm-panel table').first()).toBeVisible();
 
     await page.locator('.adm-panel table tbody tr.ant-table-row').first().locator('.adm-link.is-danger').click();
-    await expect(page.locator('.adm-modal-title', { hasText: '删除素材' })).toBeVisible();
+    await expect(page.locator('.ant-modal-title', { hasText: '删除素材' })).toBeVisible();
 
     // 确认词未输入时按钮应禁用
-    const confirmBtn = page.locator('.adm-modal-footer .adm-btn.is-danger');
+    const confirmBtn = page.getByRole('button', { name: '永久删除' });
     await expect(confirmBtn).toBeDisabled();
 
     // 输入后启用
@@ -123,7 +233,7 @@ test.describe('素材管理', () => {
     await expect(confirmBtn).toBeEnabled();
 
     // 取消
-    await page.getByRole('button', { name: '取消' }).click();
+    await page.getByRole('button', { name: /取\s*消/ }).click();
   });
 
   test('删除弹窗量化影响范围', async ({ page }) => {
@@ -137,8 +247,8 @@ test.describe('素材管理', () => {
     await expect(page.locator('.adm-confirm-impact-title')).toBeVisible();
     // 应量化说明文件大小与任务数, 而不是笼统的「将删除数据」
     await expect(page.locator('.adm-confirm-impact')).toContainText(/文件大小/);
-    await expect(page.locator('.adm-confirm-impact')).toContainText(/任务/);
-    await page.getByRole('button', { name: '取消' }).click();
+    await expect(page.locator('.adm-confirm-impact')).toContainText(/关联的 \d+ 条产出任务记录/);
+    await page.getByRole('button', { name: /取\s*消/ }).click();
   });
 });
 

@@ -347,6 +347,7 @@ export function ConfirmAction({
   typingText,
   confirmText = '确认',
   loading = false,
+  confirmDisabled = false,
   extra,
   onCancel,
   onConfirm,
@@ -361,6 +362,8 @@ export function ConfirmAction({
   typingText?: string;
   confirmText?: string;
   loading?: boolean;
+  /** 影响面仍在加载等场景下阻止误确认 */
+  confirmDisabled?: boolean;
   extra?: ReactNode;
   onCancel: () => void;
   onConfirm: (typed: string) => void;
@@ -390,7 +393,7 @@ export function ConfirmAction({
       okText={confirmText}
       cancelText="取消"
       confirmLoading={loading}
-      okButtonProps={{ danger, disabled: !ready }}
+      okButtonProps={{ danger, disabled: !ready || confirmDisabled }}
       cancelButtonProps={{ disabled: loading }}
       mask={{ closable: !loading }}
       onCancel={onCancel}
@@ -404,9 +407,10 @@ export function ConfirmAction({
 
         {impact && impact.length > 0 && (
           <Alert
+            className="adm-confirm-impact"
             type={danger ? 'error' : 'warning'}
             showIcon
-            title="影响范围"
+            title={<span className="adm-confirm-impact-title">影响范围</span>}
             description={
               <ul style={{ margin: 0, paddingLeft: 18 }}>
                 {impact.map((line) => (
@@ -423,6 +427,7 @@ export function ConfirmAction({
           <div>
             <Typography.Text type="secondary">请输入「{typingText}」以确认</Typography.Text>
             <Input
+              id="adm-confirm-input"
               style={{ marginTop: 6 }}
               value={typed}
               onChange={(e) => setTyped(e.target.value)}

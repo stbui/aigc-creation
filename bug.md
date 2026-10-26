@@ -19,7 +19,12 @@ input antd
 
 
 
-无限hua'b 
+无限画布
+
+
+复刻页面
+分析以下链接，将页面功能和设计完全复刻出来，页面样式适配项目
+https://www.designkit.cn/shoppable-carousel?from=product_kit_web
 
 
 .....
@@ -217,3 +222,63 @@ cd backend && node -e "console.log(require('./scripts/db-url').resolveDbPath())"
 - 补充了页面范围、状态覆盖、响应式和可访问性要求。
 - 明确禁止廉价渐变、过度阴影和“AI 模板感”。
 - 要求直接修改并验证，避免只输出设计建议。
+
+
+
+## 任务
+
+参考站：https://www.designkit.cn/shoppable-carousel?from=product_kit_web
+（美图设计室「AI带货图文」，SPA，左侧配置栏 + 右侧模板展示 + 底部历史记录）
+
+把它复刻成本站的一个新页面：**功能与交互逐项对齐，视觉与工程实现按本项目体系落地**（不是照搬参考站的配色和组件库）。
+
+## 先读
+
+- `CLAUDE.md`、`docs/development-workflow.md`：能力 / 厂商 / 协议 / 环境变量按「常见改动：从哪下手」逐项走，改源头不改调用点。
+- 只交付可运行代码：不写本地占位图、不造伪模型产出；无可用模型线路就如实失败并退款。
+- 模板缩略图与成套文案**按指令整套搬进仓库**（不是外链、不是占位），来源与抓取日期记进 `docs/shoppable-carousel-template-sources.md`；素材可用性属产品确认项，不阻塞开发。
+- 不代为 commit。
+
+## 阶段 0：取证（先做，不写代码）
+
+1. 用 Playwright + 本机 Chromium（`~/Library/Caches/ms-playwright/chromium-1134`，`--no-proxy-server`，locale zh-CN）打开参考站，1440×900 与 1920×1080 各抓一次。**不许只看截图凭印象**，要 computed styles + DOM 结构。
+2. 需要取证的项目（自行判定，不要预设结论）：
+   - 布局：左右分栏宽度、间距、滚动归属（是主区内部滚动还是 window 滚动）、窄屏行为
+   - 左栏各区块（上传 / 生成设置 / 文案 / 选择模板 / 附加功能）：控件类型、约束（图片张数上限、文案字数上限）、默认值、禁用态
+   - 底部数量步进器取值范围、积分消耗、主按钮的禁用条件与文案（未登录 / 余额不足 / 通道不可用三种态分别是什么）
+   - 右栏：分类 tab 的完整清单与顺序、模板卡构成（缩略图比例、标题、副标题结构、查看按钮）、hover 与选中态、懒加载与分页
+   - 顶部「新建任务」与历史记录区：数据来源、如何切回历史任务
+   - 五态：首次空态 / 生成中 / 有结果 / 失败 / 未登录或通道不可用
+3. 产出 `docs/shoppable-carousel-design.md`：实测值表（节点 / 属性 / 参考站值）+ 与本站设计令牌的映射。页面样式一律引用 `frontend/src/styles/global.css` 的 `var(--token)`，不写裸 hex；参考站品牌色不沿用。
+
+## 阶段 1：实现映射（先出结论，等确认再动手）
+
+1. **能力落点**：新增 `backend/src/capabilities/definitions/<id>.ts`（建议 `shoppable_carousel`），在 `definitions/index.ts` 注册；声明 `modality / params / buildPrompt / creditCost / inWorkbench / group / help`。说明「多张参考图 × N 条图文」如何展开成生成任务，与 `ProductKitPage` 的变体展开保持同一套做法，不另起一套。
+2. **模板数据**：分类、名称、镜头结构、提示词片段、缩略图**全部落进仓库**，唯一事实源为一个显式文件（建议 `backend/src/capabilities/definitions/shoppable-carousel.templates.ts`，与能力定义同域），字段含 `id / category / name / beats[3] / promptFragment / thumbFile / sourceUrl / capturedAt`。
+   - 缩略图下载到 `frontend/public/templates/shoppable-carousel/`（或按项目现有素材目录约定），文件名与 `id` 一致，登记尺寸与来源 URL；不运行时外链参考站，避免对方改图或防盗链导致破图。
+   - 抓取内容写清「抓自哪个页面 / 什么时间 / 用什么工具」，落 `docs/shoppable-carousel-template-sources.md`；模板卡片展示的是我们自己的文件，不是在页面上热链 B 站。
+   - 若某条模板无法取到缩略图（懒加载未渲染、需登录），**如实记进该文档的缺口清单**，卡片用项目自有占位并标注「待补」，不得伪造。
+3. **复用清单**：哪些直接用（`ToolImageDropzone` / `ToolSettingsPopover` / `ResultGalleryPane` / `useImageUpload` / `usePollAbort` / `useCapabilityRuntime` / `useCreditLabel` / `AssetLibraryModal`），哪些必须新写。
+4. 逐个列出要改的文件 `file:line`：路由（`App.tsx`）、页面、`lib/api.ts`、`types/api.d.ts`、`global.css`、能力定义、文档。
+
+## 阶段 2：实现
+
+- 新页面 `frontend/src/pages/ShoppableCarouselPage.tsx`，路由 `/shoppable-carousel` 注册进 `App.tsx` 的 C 端壳内路由段（注意 `/admin/*` 与 catch-all 的注册顺序）。
+- 每个控件接真实后端：上传走 assets API、生成走 generate API、扣费与退款走现有链路；失败如实报错，不用前端兜底掩盖接口缺失。
+- 积分价不写死，走 `CreditPriceService.resolve()`；页面展示的消耗数应与实际扣费一致。
+- AIGC 标识沿用现有产出链路，不绕过；页面不出现参考站品牌名与 logo。
+- 同步更新受影响的现状描述：`README.md` 能力清单与页面结构、`CLAUDE.md` 的能力数量、`docs/testing.md` 覆盖矩阵。
+
+## 验收（逐条给证据，不写"已完成"）
+
+- 五态齐全；未登录 / 通道不可用时按钮禁用并给出原因（`40005` / `42204` 原样呈现）。
+- 1440 与 1920 两个视口下逐项对比：节点 / 参考站实测 / 本站实测 / 差值 / 是否主动偏离及理由（表格）。
+- 至少一组同视口截图对比。
+- 贴真实命令输出：`npx ts-node -T scripts/verify-capability-extensibility.ts`、`verify-architecture-layers.ts`、`verify-credit-deduction.ts`；前端 `npm run typecheck`。build 与 tsc 全量按 `CLAUDE.md` 需授权，未跑就标注「待授权」。
+- 交付摘要：`file:line` 改动清单 + 未验边界 + 主动偏离项。
+
+## 不要做
+
+- 不在页面里热链参考站的缩略图 URL（必须落成本仓库内的文件）；不把参考站的品牌名、logo、付费标记（如「90 美豆」）带进来。
+- 不新增 mock / planned 能力来"凑页面"，不为让页面像而绕过真实生成链路。
+- 不顺手重构无关文件，不扩范围改后台。

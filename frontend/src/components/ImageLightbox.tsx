@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, Download, Minus, Plus, X } from 'lucide-react';
 
 /**
@@ -22,9 +22,13 @@ import { ChevronLeft, ChevronRight, Download, Minus, Plus, X } from 'lucide-reac
 export interface LightboxItem {
   id: string;
   url: string;
+  /** 图片替代文本；未传时沿用「生成图预览」 */
+  alt?: string;
   width?: number | null;
   height?: number | null;
   createdAt?: string;
+  /** 调用方补充的业务元信息，显示在尺寸/时间之前 */
+  meta?: string[];
 }
 
 interface ImageLightboxProps {
@@ -32,6 +36,10 @@ interface ImageLightboxProps {
   index: number;
   onIndexChange: (index: number) => void;
   onClose: () => void;
+  /** 无障碍名称，默认「生成图预览」 */
+  ariaLabel?: string;
+  /** 查看器底栏右侧的业务动作；参数为当前图片索引 */
+  renderActions?: (index: number) => ReactNode;
   /**
    * 图片上点右键。传了才接管系统菜单, 不传保持浏览器默认行为 ——
    * 查看器本身不认识「复制 / 下载 / 删除」这类业务动作, 交给调用方决定。
@@ -90,7 +98,15 @@ function anchorDelta(
   return { x: (fromZoom - toZoom) * px, y: (fromZoom - toZoom) * py };
 }
 
-export function ImageLightbox({ items, index, onIndexChange, onClose, onItemContextMenu }: ImageLightboxProps) {
+export function ImageLightbox({
+  items,
+  index,
+  onIndexChange,
+  onClose,
+  ariaLabel = '生成图预览',
+  renderActions,
+  onItemContextMenu,
+}: ImageLightboxProps) {
   const item = items[index];
   /*
    * 缩放与位移放在**同一个状态对象**里。
@@ -301,6 +317,7 @@ export function ImageLightbox({ items, index, onIndexChange, onClose, onItemCont
   const go = (dir: -1 | 1) => onIndexChange((index + dir + items.length) % items.length);
   const meta = [
     items.length > 1 ? `${index + 1} / ${items.length}` : null,
+    ...(item.meta ?? []),
     item.width && item.height ? `${item.width}×${item.height}` : null,
     item.createdAt ? new Date(item.createdAt).toLocaleString('zh-CN') : null,
   ].filter(Boolean) as string[];
@@ -315,7 +332,7 @@ export function ImageLightbox({ items, index, onIndexChange, onClose, onItemCont
       className="img-viewer"
       role="dialog"
       aria-modal="true"
-      aria-label="生成图预览"
+      aria-label={ariaLabel}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -433,7 +450,7 @@ export function ImageLightbox({ items, index, onIndexChange, onClose, onItemCont
           ref={imgRef}
           data-viewer-img="1"
           src={item.url}
-          alt="生成图预览"
+          alt={item.alt ?? '生成图预览'}
           draggable={false}
           className={imgState === 'loaded' ? 'is-loaded' : undefined}
           onLoad={() => setImageState({ id: item.id, state: 'loaded' })}
@@ -481,6 +498,7 @@ export function ImageLightbox({ items, index, onIndexChange, onClose, onItemCont
           <Download size={15} />
           下载原图
         </a>
+        {renderActions?.(index)}
       </div>
     </div>
   );

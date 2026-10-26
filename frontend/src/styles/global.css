@@ -4255,6 +4255,7 @@ img[data-broken='1'] {
   font-size: 12px;
 }
 .img-viewer-meta {
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -4307,6 +4308,45 @@ img[data-broken='1'] {
 }
 .img-viewer-download:hover {
   background: var(--brand-hover);
+}
+.img-viewer-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.16);
+}
+.img-viewer-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.img-viewer-action:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+.img-viewer-action.is-danger:hover:not(:disabled) {
+  border-color: rgba(248, 113, 113, 0.5);
+  background: rgba(239, 68, 68, 0.22);
+  color: #ffe4e6;
+}
+.img-viewer-action:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.78);
+  outline-offset: 2px;
+}
+.img-viewer-action:disabled {
+  opacity: 0.4;
+  cursor: wait;
 }
 /* 窄屏: 左右翻页按钮收进底栏上方, 舞台左右留白减小 */
 @media (max-width: 720px) {
@@ -11987,6 +12027,39 @@ html[data-promo='off'] .multi-image-fusion-page {
   display: flex;
   gap: 8px;
 }
+/* 筛选回显: 让用户始终知道屏幕上这批数据受哪些条件约束 */
+.adm-filter-chips {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-row);
+}
+.adm-filter-chips-label {
+  margin-right: 2px;
+  color: var(--text-desc);
+  font-size: 12px;
+}
+.adm-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-tint);
+  color: var(--text-body);
+  font-size: 12px;
+  line-height: 22px;
+  white-space: nowrap;
+}
+.adm-filter-chip-clear.ant-btn {
+  height: 24px;
+  padding: 0 4px;
+  font-size: 12px;
+}
 
 /*
  * 批量操作条。
@@ -12009,6 +12082,11 @@ html[data-promo='off'] .multi-image-fusion-page {
   font-weight: 600;
   color: var(--brand);
   margin-right: 4px;
+}
+.adm-bulk-bar .ant-checkbox-wrapper {
+  margin-right: 4px;
+  color: var(--text-body);
+  font-size: 12px;
 }
 .adm-bulk-bar .adm-link {
   margin-left: auto;
@@ -13406,7 +13484,7 @@ html[data-promo='off'] .multi-image-fusion-page {
 /* 缩略图网格 (B-25): 看图用网格, 查属性用表格 */
 .adm-asset-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
   gap: 12px;
 }
 .adm-asset-cell {
@@ -13415,56 +13493,229 @@ html[data-promo='off'] .multi-image-fusion-page {
   border-radius: var(--radius-card);
   overflow: hidden;
   background: var(--card-bg);
-  cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease;
 }
-.adm-asset-cell:hover {
-  border-color: var(--brand);
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+.adm-asset-cell:hover,
+.adm-asset-cell:focus-within {
+  border-color: var(--brand-border-soft);
+  box-shadow: 0 3px 12px rgba(15, 23, 42, 0.07);
 }
 .adm-asset-cell.is-selected {
   border-color: var(--brand);
   box-shadow: 0 0 0 2px var(--brand-bg);
 }
-.adm-asset-cell img {
+.adm-asset-visual {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
+  background: var(--surface);
+}
+.adm-asset-preview {
+  display: block;
   width: 100%;
-  aspect-ratio: 4 / 3;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+.adm-asset-preview:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+.adm-asset-cell img,
+.adm-asset-image {
+  width: 100%;
+  height: 100%;
   object-fit: cover;
   display: block;
   background: var(--surface);
+  transition:
+    opacity 0.16s ease,
+    transform 0.24s ease;
+}
+.adm-asset-cell:hover .adm-asset-image,
+.adm-asset-cell:focus-within .adm-asset-image {
+  transform: scale(1.015);
+}
+.adm-asset-image.is-error {
+  display: grid;
+  place-items: center;
+  color: var(--text-desc);
+  background: var(--surface);
+}
+/* 已下架素材仍可被运营查看与恢复, 但必须一眼与在架素材区分开 */
+.adm-asset-cell.is-hidden .adm-asset-image {
+  opacity: 0.38;
+  filter: saturate(0.55);
+}
+.adm-asset-cell.is-hidden:hover .adm-asset-image,
+.adm-asset-cell.is-hidden:focus-within .adm-asset-image {
+  opacity: 0.58;
+}
+.adm-asset-select {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: var(--radius-control);
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.12);
+  cursor: pointer;
+}
+.adm-asset-select .ant-checkbox-wrapper {
+  display: flex;
+}
+.adm-asset-select .ant-checkbox {
+  width: 18px;
+  height: 18px;
+  border: 1px solid #7b8496;
+  border-radius: 4px;
+  background: #fff;
+}
+.adm-asset-select .ant-checkbox:hover {
+  border-color: var(--brand);
+}
+.adm-asset-select .ant-checkbox-checked {
+  border-color: var(--brand);
+  background: var(--brand);
+}
+/* antd 6 的勾选标记是伪元素; 在白底浮层上加深描边, 保证缩略图背景再亮也看得见 */
+.adm-asset-select .ant-checkbox::after {
+  position: absolute;
+  top: 2px;
+  left: 6px;
+  width: 5px;
+  height: 9px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  content: '';
+  opacity: 0;
+  transform: rotate(45deg) scale(0.7);
+  transition:
+    opacity 0.12s ease,
+    transform 0.12s ease;
+}
+.adm-asset-select .ant-checkbox-checked::after {
+  opacity: 1;
+  transform: rotate(45deg) scale(1);
+}
+.adm-asset-select:focus-within {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
 }
 /* 已下架角标: 叠加在缩略图上, 不遮挡浏览 */
 .adm-asset-badge {
   position: absolute;
   top: 8px;
-  left: 8px;
+  right: 8px;
+  z-index: 2;
   padding: 2px 8px;
   border-radius: 999px;
-  background: rgba(23, 26, 43, 0.72);
+  background: rgba(23, 26, 43, 0.78);
   color: var(--on-brand);
   font-size: 11px;
   line-height: 18px;
 }
+.adm-asset-actions {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-control);
+  background: rgba(23, 26, 43, 0.72);
+  backdrop-filter: blur(8px);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(3px);
+  transition:
+    opacity 0.14s ease,
+    transform 0.14s ease;
+}
+.adm-asset-cell:hover .adm-asset-actions,
+.adm-asset-cell:focus-within .adm-asset-actions {
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+.adm-asset-action {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.88);
+  cursor: pointer;
+}
+.adm-asset-action:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+}
+.adm-asset-action.is-danger:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.24);
+  color: #ffe4e6;
+}
+.adm-asset-action:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.8);
+  outline-offset: -2px;
+}
+.adm-asset-action:disabled {
+  opacity: 0.4;
+  cursor: wait;
+}
 .adm-asset-info {
-  padding: 8px 10px 10px;
+  padding: 9px 10px 10px;
 }
 .adm-asset-name {
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-strong);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  margin-bottom: 3px;
+  margin-bottom: 4px;
 }
 .adm-asset-meta {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text-desc);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  line-height: 17px;
 }
 
+.adm-asset-thumb-btn {
+  display: block;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  cursor: zoom-in;
+}
+.adm-asset-thumb-btn:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
 .adm-asset-thumb-sm {
   width: 44px;
   height: 44px;
@@ -13472,6 +13723,14 @@ html[data-promo='off'] .multi-image-fusion-page {
   border-radius: var(--radius-control);
   background: var(--surface);
   border: 1px solid var(--border-row);
+}
+.adm-asset-thumb-sm.is-error {
+  display: grid;
+  place-items: center;
+  color: var(--text-desc);
+}
+.adm-panel table tr.is-hidden-row td {
+  color: var(--text-muted);
 }
 
 .adm-pagination {
@@ -17962,6 +18221,27 @@ html[data-promo='off'] .pk-workspace.watermark-removal-page {
   height: 100%;
   min-height: 0;
 }
+.pk-workspace.local-redraw-page {
+  font-size: 16px;
+  line-height: normal;
+  /* .app-body 的 min-height 只扣了 64px 顶栏；促销条开启时整页会多 40px
+   * (1440×900 实测 scrollHeight 940)。这页是固定视口工作台，按实际外壳
+   * 高度回填页面，避免出现假滚动；其他工具页不受影响。 */
+  height: calc(100vh - var(--workspace-topbar-height));
+  max-height: calc(100vh - var(--workspace-topbar-height));
+}
+html[data-promo='off'] .pk-workspace.local-redraw-page {
+  height: calc(100vh - 64px);
+  max-height: calc(100vh - 64px);
+}
+/* 外壳 .app-body 的 min-height 只扣 64px 顶栏；本页固定视口工作台在促销条
+ * 开启时会因此多出 40px 页面滚动。仅在局部重绘页存在时校正外壳高度。 */
+.app-body:has(> .app-content > .local-redraw-page) {
+  min-height: calc(100vh - var(--workspace-topbar-height));
+}
+.app-body:has(> .app-content > .local-redraw-page) > .app-sider-wrap {
+  height: calc(100vh - var(--workspace-topbar-height));
+}
 .pk-workspace.local-redraw-page > .redraw-history-pane,
 .pk-workspace.watermark-removal-page > .redraw-history-pane {
   width: 100%;
@@ -17991,9 +18271,21 @@ html[data-promo='off'] .pk-workspace.watermark-removal-page {
 .pk-workspace.local-redraw-page .redraw-intro-copy {
   gap: 8px;
 }
-.pk-workspace.local-redraw-page .redraw-intro-copy h2 {
+.pk-workspace.local-redraw-page .redraw-intro-copy strong {
+  color: #333;
   font-size: 14px;
   line-height: 20px;
+  font-weight: 700;
+}
+.pk-workspace.local-redraw-page .redraw-intro-copy p {
+  color: #86909c;
+  max-width: 692px;
+  margin: 0;
+  font-size: 12px;
+  line-height: 20px;
+}
+.pk-workspace.local-redraw-page > .redraw-history-pane {
+  padding: 0 0 16px;
 }
 
 /* 一键抠图：参考站没有历史栏，固定两栏 */
@@ -20059,7 +20351,14 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   .adm-stat,
   .adm-sider-item,
   .adm-search-item,
-  .adm-panel {
+  .adm-panel,
+  .adm-asset-cell,
+  .adm-asset-image,
+  .adm-asset-actions {
     transition: none;
+  }
+  .adm-asset-cell:hover .adm-asset-image,
+  .adm-asset-cell:focus-within .adm-asset-image {
+    transform: none;
   }
 }
