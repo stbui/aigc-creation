@@ -1,0 +1,4533 @@
+[
+  {
+    "url": "https://ijihua.cn/local-redraw",
+    "title": "极画AI｜智能电商图片与商品视觉生成平台",
+    "bodyText": "极画· AI 电商图首页电商生图电商都在用广大卖家优选电商都在用商品主图商品详情爆款复刻创意生图多图融合商品SKU图AI修图局部重绘一键抠图去除水印产品精修图片翻译智能扩图商品换色旋转角度AI视频NEW自由创作我的作品购买套餐邀请有奖限时加赠500联系客服邀请好友得100积分签到得积分工作台登录/注册签到得积分快捷入口首页工作台我的作品AI 视频自由创作电商生图商品主图商品详情爆款复刻创意生图多图融合AI 修图局部重绘一键抠图去除水印产品精修图片编辑图片翻译智能扩图商品换色旋转角度数据中心素材库账户服务购买套餐邀请有奖限时加赠500联系客服登录/注册工作台我的作品AI视频自由创作电商生图商品主",
+    "headings": [
+      "* 上传图片",
+      "点击或拖拽图片到此处上传点击、拖拽或粘贴图片上传，最多 1 张",
+      "历史记录"
+    ],
+    "buttons": [
+      {
+        "text": "极画· AI 电商图",
+        "cls": "brand workspace-brand",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "首页",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "电商生图电商都在用广大卖家优选电商都在用",
+        "cls": "workspace-nav-dropdown-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品主图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品详情",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "爆款复刻",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "创意生图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "多图融合",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品SKU图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI修图",
+        "cls": "workspace-nav-dropdown-trigger active",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "局部重绘",
+        "cls": "is-active",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "一键抠图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "去除水印",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品精修",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "图片翻译",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "智能扩图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品换色",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "旋转角度",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI视频NEW",
+        "cls": "workspace-nav-dropdown-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "自由创作",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "我的作品",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "购买套餐",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "邀请有奖限时加赠500",
+        "cls": "workspace-nav-invitations",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "联系客服",
+        "cls": "workspace-nav-customer-service",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "邀请好友得100积分",
+        "cls": "workspace-nav-promo",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "签到得积分",
+        "cls": "workspace-checkin-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "工作台",
+        "cls": "workspace-workbench-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "登录/注册",
+        "cls": "workspace-logout-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "工作台",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "我的作品",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI视频",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "自由创作",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "电商生图",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品主图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品详情",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "爆款复刻",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "创意生图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "多图融合",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品SKU图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI修图",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "局部重绘",
+        "cls": "active",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "一键抠图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "去除水印",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品精修",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "图片翻译",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "智能扩图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品换色",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "旋转角度",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "数据中心",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "素材库",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品建议",
+        "cls": "product-suggestion-launcher product-suggestion-sidebar-launcher",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "联系客服",
+        "cls": "workspace-customer-service-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "从素材库导入",
+        "cls": "workspace-material-library-trigger",
+        "disabled": true,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "手机上传",
+        "cls": "mobile-upload-trigger mobile-upload-qr-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": "使用手机上传图片"
+      },
+      {
+        "text": "高级设置比例 原比例画质 1K",
+        "cls": "image-output-settings-summary",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "开始重绘 本次消耗5积分",
+        "cls": "redraw-submit",
+        "disabled": true,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "⌃",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "promo-topbar-buy",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "promo-topbar-close",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      }
+    ],
+    "inputs": [],
+    "classes": [
+      "workspace-image-tool-route",
+      "local-redraw-page",
+      "upload-card",
+      "workspace-upload-title-actions",
+      "mobile-upload-trigger",
+      "mobile-upload-qr-trigger",
+      "local-redraw-source-upload",
+      "image-tool-submit-area",
+      "redraw-history",
+      "history-title"
+    ],
+    "bodyClasses": "promo-topbar-open",
+    "dialogs": [],
+    "route": "/local-redraw",
+    "nets": [
+      "200 GET https://ijihua.cn/api/design/system/version",
+      "200 GET https://ijihua.cn/api/design/checkin/public-info",
+      "200 GET https://ijihua.cn/api/design/system/ai-video-entries",
+      "200 POST https://ijihua.cn/api/design/paid-products/catalog",
+      "200 GET https://ijihua.cn/api/design/image-tools/billing-config?toolType=MASKED_INPAINT",
+      "200 GET https://ijihua.cn/api/design/options/form",
+      "200 GET https://ijihua.cn/api/design/invitations/activity-info",
+      "200 GET https://umami.wanhengtech.com/api/websites/0927c490-031e-4541-a9a0-43a603e23211/recorder",
+      "200 POST https://umami.wanhengtech.com/api/send"
+    ]
+  },
+  {
+    "url": "https://ijihua.cn/background-remove",
+    "title": "极画AI｜智能电商图片与商品视觉生成平台",
+    "bodyText": "极画· AI 电商图首页电商生图电商都在用广大卖家优选电商都在用商品主图商品详情爆款复刻创意生图多图融合商品SKU图AI修图局部重绘一键抠图去除水印产品精修图片翻译智能扩图商品换色旋转角度AI视频NEW自由创作我的作品购买套餐邀请有奖限时加赠500联系客服邀请好友得100积分签到得积分工作台登录/注册签到得积分快捷入口首页工作台我的作品AI 视频自由创作电商生图商品主图商品详情爆款复刻创意生图多图融合AI 修图局部重绘一键抠图去除水印产品精修图片编辑图片翻译智能扩图商品换色旋转角度数据中心素材库账户服务购买套餐邀请有奖限时加赠500联系客服登录/注册工作台我的作品AI视频自由创作电商生图商品主",
+    "headings": [
+      "* 上传图片",
+      "点击或拖拽图片到此处上传点击、拖拽或粘贴图片上传，最多 1 张",
+      "背景颜色"
+    ],
+    "buttons": [
+      {
+        "text": "极画· AI 电商图",
+        "cls": "brand workspace-brand",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "首页",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "电商生图电商都在用广大卖家优选电商都在用",
+        "cls": "workspace-nav-dropdown-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品主图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品详情",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "爆款复刻",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "创意生图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "多图融合",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品SKU图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI修图",
+        "cls": "workspace-nav-dropdown-trigger active",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "局部重绘",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "一键抠图",
+        "cls": "is-active",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "去除水印",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品精修",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "图片翻译",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "智能扩图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品换色",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "旋转角度",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI视频NEW",
+        "cls": "workspace-nav-dropdown-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "自由创作",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "我的作品",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "购买套餐",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "邀请有奖限时加赠500",
+        "cls": "workspace-nav-invitations",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "联系客服",
+        "cls": "workspace-nav-customer-service",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "邀请好友得100积分",
+        "cls": "workspace-nav-promo",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "签到得积分",
+        "cls": "workspace-checkin-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "工作台",
+        "cls": "workspace-workbench-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "登录/注册",
+        "cls": "workspace-logout-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "工作台",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "我的作品",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI视频",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "自由创作",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "电商生图",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品主图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品详情",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "爆款复刻",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "创意生图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "多图融合",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品SKU图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI修图",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "局部重绘",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "一键抠图",
+        "cls": "active",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "去除水印",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品精修",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "图片翻译",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "智能扩图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品换色",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "旋转角度",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "数据中心",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "素材库",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品建议",
+        "cls": "product-suggestion-launcher product-suggestion-sidebar-launcher",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "联系客服",
+        "cls": "workspace-customer-service-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "从素材库导入",
+        "cls": "workspace-material-library-trigger",
+        "disabled": true,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "手机上传",
+        "cls": "mobile-upload-trigger mobile-upload-qr-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": "使用手机上传图片"
+      },
+      {
+        "text": "",
+        "cls": "background-color-option checker active",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "background-color-option white",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "background-color-option",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "background-color-option",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "background-color-option",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "background-color-option",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "background-color-option custom-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "高级设置比例 原比例",
+        "cls": "image-output-settings-summary",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "开始抠图 限时免费",
+        "cls": "redraw-submit",
+        "disabled": true,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "promo-topbar-buy",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "promo-topbar-close",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      }
+    ],
+    "inputs": [],
+    "classes": [
+      "workspace-image-tool-route",
+      "background-remove-page",
+      "background-remove-settings",
+      "background-remove-scroll",
+      "background-upload-card",
+      "workspace-upload-title-actions",
+      "mobile-upload-trigger",
+      "mobile-upload-qr-trigger",
+      "local-redraw-source-upload",
+      "background-color-card",
+      "background-color-options",
+      "background-color-option",
+      "background-custom-picker",
+      "image-tool-submit-area",
+      "background-remove-stage",
+      "background-remove-empty"
+    ],
+    "bodyClasses": "promo-topbar-open",
+    "dialogs": [],
+    "route": "/background-remove",
+    "nets": [
+      "200 POST https://umami.wanhengtech.com/api/send",
+      "200 GET https://umami.wanhengtech.com/api/websites/0927c490-031e-4541-a9a0-43a603e23211/recorder",
+      "200 GET https://ijihua.cn/api/design/system/version",
+      "200 GET https://ijihua.cn/api/design/checkin/public-info",
+      "200 GET https://ijihua.cn/api/design/system/ai-video-entries",
+      "200 GET https://ijihua.cn/api/design/options/form",
+      "200 GET https://ijihua.cn/api/design/invitations/activity-info",
+      "200 GET https://ijihua.cn/api/design/image-tools/billing-config?toolType=BACKGROUND_REMOVAL",
+      "200 POST https://ijihua.cn/api/design/paid-products/catalog"
+    ]
+  },
+  {
+    "url": "https://ijihua.cn/watermark-remove",
+    "title": "极画AI｜智能电商图片与商品视觉生成平台",
+    "bodyText": "极画· AI 电商图首页电商生图电商都在用广大卖家优选电商都在用商品主图商品详情爆款复刻创意生图多图融合商品SKU图AI修图局部重绘一键抠图去除水印产品精修图片翻译智能扩图商品换色旋转角度AI视频NEW自由创作我的作品购买套餐邀请有奖限时加赠500联系客服邀请好友得100积分签到得积分工作台登录/注册签到得积分快捷入口首页工作台我的作品AI 视频自由创作电商生图商品主图商品详情爆款复刻创意生图多图融合AI 修图局部重绘一键抠图去除水印产品精修图片编辑图片翻译智能扩图商品换色旋转角度数据中心素材库账户服务购买套餐邀请有奖限时加赠500联系客服登录/注册工作台我的作品AI视频自由创作电商生图商品主",
+    "headings": [
+      "* 上传图片",
+      "点击或拖拽图片到此处上传点击、拖拽或粘贴图片上传，最多 1 张",
+      "历史记录"
+    ],
+    "buttons": [
+      {
+        "text": "极画· AI 电商图",
+        "cls": "brand workspace-brand",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "首页",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "电商生图电商都在用广大卖家优选电商都在用",
+        "cls": "workspace-nav-dropdown-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品主图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品详情",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "爆款复刻",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "创意生图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "多图融合",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品SKU图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI修图",
+        "cls": "workspace-nav-dropdown-trigger active",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "局部重绘",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "一键抠图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "去除水印",
+        "cls": "is-active",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品精修",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "图片翻译",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "智能扩图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品换色",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "旋转角度",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI视频NEW",
+        "cls": "workspace-nav-dropdown-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "自由创作",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "我的作品",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "购买套餐",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "邀请有奖限时加赠500",
+        "cls": "workspace-nav-invitations",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "联系客服",
+        "cls": "workspace-nav-customer-service",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "邀请好友得100积分",
+        "cls": "workspace-nav-promo",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "签到得积分",
+        "cls": "workspace-checkin-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "工作台",
+        "cls": "workspace-workbench-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "登录/注册",
+        "cls": "workspace-logout-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "工作台",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "我的作品",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI视频",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "自由创作",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "电商生图",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品主图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品详情",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "爆款复刻",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "创意生图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "多图融合",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品SKU图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI修图",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "局部重绘",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "一键抠图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "去除水印",
+        "cls": "active",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品精修",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "图片翻译",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "智能扩图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品换色",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "旋转角度",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "数据中心",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "素材库",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品建议",
+        "cls": "product-suggestion-launcher product-suggestion-sidebar-launcher",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "联系客服",
+        "cls": "workspace-customer-service-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "从素材库导入",
+        "cls": "workspace-material-library-trigger",
+        "disabled": true,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "手机上传",
+        "cls": "mobile-upload-trigger mobile-upload-qr-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": "使用手机上传图片"
+      },
+      {
+        "text": "开始去除 限时免费",
+        "cls": "redraw-submit",
+        "disabled": true,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "⌃",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "promo-topbar-buy",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "promo-topbar-close",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      }
+    ],
+    "inputs": [],
+    "classes": [
+      "workspace-image-tool-route",
+      "local-redraw-page",
+      "watermark-removal-page",
+      "upload-card",
+      "workspace-upload-title-actions",
+      "mobile-upload-trigger",
+      "mobile-upload-qr-trigger",
+      "local-redraw-source-upload",
+      "image-tool-submit-area",
+      "redraw-history",
+      "history-title"
+    ],
+    "bodyClasses": "promo-topbar-open",
+    "dialogs": [],
+    "route": "/watermark-remove",
+    "nets": [
+      "200 POST https://umami.wanhengtech.com/api/send",
+      "200 GET https://umami.wanhengtech.com/api/websites/0927c490-031e-4541-a9a0-43a603e23211/recorder",
+      "200 GET https://ijihua.cn/api/design/system/version",
+      "200 GET https://ijihua.cn/api/design/checkin/public-info",
+      "200 GET https://ijihua.cn/api/design/system/ai-video-entries",
+      "200 GET https://ijihua.cn/api/design/invitations/activity-info",
+      "200 GET https://ijihua.cn/api/design/image-tools/billing-config?toolType=WATERMARK_REMOVAL",
+      "200 GET https://ijihua.cn/api/design/options/form",
+      "200 POST https://ijihua.cn/api/design/paid-products/catalog"
+    ]
+  },
+  {
+    "url": "https://ijihua.cn/product-retouch",
+    "title": "极画AI｜智能电商图片与商品视觉生成平台",
+    "bodyText": "极画· AI 电商图首页电商生图电商都在用广大卖家优选电商都在用商品主图商品详情爆款复刻创意生图多图融合商品SKU图AI修图局部重绘一键抠图去除水印产品精修图片翻译智能扩图商品换色旋转角度AI视频NEW自由创作我的作品购买套餐邀请有奖限时加赠500联系客服邀请好友得100积分签到得积分工作台登录/注册签到得积分快捷入口首页工作台我的作品AI 视频自由创作电商生图商品主图商品详情爆款复刻创意生图多图融合AI 修图局部重绘一键抠图去除水印产品精修图片编辑图片翻译智能扩图商品换色旋转角度数据中心素材库账户服务购买套餐邀请有奖限时加赠500联系客服登录/注册工作台我的作品AI视频自由创作电商生图商品主",
+    "headings": [
+      "* 上传图片",
+      "点击或拖拽图片到此处上传点击、拖拽或粘贴图片上传，最多 1 张",
+      "精修模式",
+      "补充要求（选填）",
+      "历史记录"
+    ],
+    "buttons": [
+      {
+        "text": "极画· AI 电商图",
+        "cls": "brand workspace-brand",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "首页",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "电商生图电商都在用广大卖家优选电商都在用",
+        "cls": "workspace-nav-dropdown-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品主图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品详情",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "爆款复刻",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "创意生图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "多图融合",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品SKU图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI修图",
+        "cls": "workspace-nav-dropdown-trigger active",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "局部重绘",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "一键抠图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "去除水印",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品精修",
+        "cls": "is-active",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "图片翻译",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "智能扩图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品换色",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "旋转角度",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI视频NEW",
+        "cls": "workspace-nav-dropdown-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "自由创作",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "我的作品",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "购买套餐",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "邀请有奖限时加赠500",
+        "cls": "workspace-nav-invitations",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "联系客服",
+        "cls": "workspace-nav-customer-service",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "邀请好友得100积分",
+        "cls": "workspace-nav-promo",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "签到得积分",
+        "cls": "workspace-checkin-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "工作台",
+        "cls": "workspace-workbench-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "登录/注册",
+        "cls": "workspace-logout-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "工作台",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "我的作品",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI视频",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "自由创作",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "电商生图",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品主图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品详情",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "爆款复刻",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "创意生图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "多图融合",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品SKU图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI修图",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "局部重绘",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "一键抠图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "去除水印",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品精修",
+        "cls": "active",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "图片翻译",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "智能扩图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品换色",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "旋转角度",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "数据中心",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "素材库",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品建议",
+        "cls": "product-suggestion-launcher product-suggestion-sidebar-launcher",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "联系客服",
+        "cls": "workspace-customer-service-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "从素材库导入",
+        "cls": "workspace-material-library-trigger",
+        "disabled": true,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "手机上传",
+        "cls": "mobile-upload-trigger mobile-upload-qr-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": "使用手机上传图片"
+      },
+      {
+        "text": "综合精修",
+        "cls": "active",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "质感增强",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "瑕疵修复",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "色彩校正",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "提升清晰度",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "材质强化",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "高级设置比例 原比例画质 1K",
+        "cls": "image-output-settings-summary",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "立即生成 本次消耗5积分",
+        "cls": "product-retouch-submit",
+        "disabled": true,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "⌃",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "promo-topbar-buy",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "promo-topbar-close",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      }
+    ],
+    "inputs": [
+      {
+        "tag": "TEXTAREA",
+        "type": null,
+        "value": "",
+        "placeholder": "如：去掉电镀件上的指纹，让皮革看起来更有光泽",
+        "min": null,
+        "max": null,
+        "step": null,
+        "disabled": false,
+        "cls": ""
+      }
+    ],
+    "classes": [
+      "workspace-image-tool-route",
+      "product-retouch-page",
+      "product-retouch-grid",
+      "image-tool-upload-actions",
+      "mobile-upload-trigger",
+      "mobile-upload-qr-trigger",
+      "upload-card",
+      "local-redraw-source-upload",
+      "product-retouch-card",
+      "retouch-mode-options",
+      "product-retouch-submit-wrap",
+      "image-tool-submit-area",
+      "product-retouch-submit-note",
+      "product-retouch-submit-note-compact",
+      "product-retouch-submit",
+      "product-retouch-result",
+      "image-tool-empty-state",
+      "image-tool-empty-state-media",
+      "redraw-history",
+      "product-retouch-history",
+      "history-title"
+    ],
+    "bodyClasses": "promo-topbar-open",
+    "dialogs": [],
+    "route": "/product-retouch",
+    "nets": [
+      "200 POST https://umami.wanhengtech.com/api/send",
+      "200 GET https://umami.wanhengtech.com/api/websites/0927c490-031e-4541-a9a0-43a603e23211/recorder",
+      "200 GET https://ijihua.cn/api/design/checkin/public-info",
+      "200 GET https://ijihua.cn/api/design/system/version",
+      "200 GET https://ijihua.cn/api/design/system/ai-video-entries",
+      "200 GET https://ijihua.cn/api/design/invitations/activity-info",
+      "200 GET https://ijihua.cn/api/design/image-tools/billing-config?toolType=PRODUCT_REFINEMENT",
+      "200 GET https://ijihua.cn/api/design/options/form",
+      "200 POST https://ijihua.cn/api/design/paid-products/catalog"
+    ]
+  },
+  {
+    "url": "https://ijihua.cn/image-translate",
+    "title": "极画AI｜智能电商图片与商品视觉生成平台",
+    "bodyText": "极画· AI 电商图首页电商生图电商都在用广大卖家优选电商都在用商品主图商品详情爆款复刻创意生图多图融合商品SKU图AI修图局部重绘一键抠图去除水印产品精修图片翻译智能扩图商品换色旋转角度AI视频NEW自由创作我的作品购买套餐邀请有奖限时加赠500联系客服邀请好友得100积分签到得积分工作台登录/注册签到得积分快捷入口首页工作台我的作品AI 视频自由创作电商生图商品主图商品详情爆款复刻创意生图多图融合AI 修图局部重绘一键抠图去除水印产品精修图片编辑图片翻译智能扩图商品换色旋转角度数据中心素材库账户服务购买套餐邀请有奖限时加赠500联系客服登录/注册工作台我的作品AI视频自由创作电商生图商品主",
+    "headings": [
+      "* 上传图片",
+      "点击或拖拽图片到此处上传点击、拖拽或粘贴图片上传，最多 1 张",
+      "翻译语言",
+      "目标语言简体中文EnglishРусскийEspañolDeutsch日本語한국어PortuguêsBahasa Indonesiaไทย",
+      "保护商品主体",
+      "历史记录"
+    ],
+    "buttons": [
+      {
+        "text": "极画· AI 电商图",
+        "cls": "brand workspace-brand",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "首页",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "电商生图电商都在用广大卖家优选电商都在用",
+        "cls": "workspace-nav-dropdown-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品主图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品详情",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "爆款复刻",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "创意生图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "多图融合",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品SKU图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI修图",
+        "cls": "workspace-nav-dropdown-trigger active",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "局部重绘",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "一键抠图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "去除水印",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品精修",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "图片翻译",
+        "cls": "is-active",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "智能扩图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品换色",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "旋转角度",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI视频NEW",
+        "cls": "workspace-nav-dropdown-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "自由创作",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "我的作品",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "购买套餐",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "邀请有奖限时加赠500",
+        "cls": "workspace-nav-invitations",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "联系客服",
+        "cls": "workspace-nav-customer-service",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "邀请好友得100积分",
+        "cls": "workspace-nav-promo",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "签到得积分",
+        "cls": "workspace-checkin-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "工作台",
+        "cls": "workspace-workbench-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "登录/注册",
+        "cls": "workspace-logout-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "工作台",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "我的作品",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI视频",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "自由创作",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "电商生图",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品主图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品详情",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "爆款复刻",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "创意生图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "多图融合",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品SKU图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI修图",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "局部重绘",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "一键抠图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "去除水印",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品精修",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "图片翻译",
+        "cls": "active",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "智能扩图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品换色",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "旋转角度",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "数据中心",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "素材库",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品建议",
+        "cls": "product-suggestion-launcher product-suggestion-sidebar-launcher",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "联系客服",
+        "cls": "workspace-customer-service-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "从素材库导入",
+        "cls": "workspace-material-library-trigger",
+        "disabled": true,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "手机上传",
+        "cls": "mobile-upload-trigger mobile-upload-qr-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": "使用手机上传图片"
+      },
+      {
+        "text": "",
+        "cls": "active",
+        "disabled": false,
+        "role": "switch",
+        "checked": "true",
+        "title": null
+      },
+      {
+        "text": "高级设置画质 1K",
+        "cls": "image-output-settings-summary",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "立即翻译 本次消耗5积分",
+        "cls": "product-retouch-submit",
+        "disabled": true,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "⌃",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "promo-topbar-buy",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "promo-topbar-close",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      }
+    ],
+    "inputs": [
+      {
+        "tag": "SELECT",
+        "type": null,
+        "value": "zh-CN",
+        "placeholder": null,
+        "min": null,
+        "max": null,
+        "step": null,
+        "disabled": false,
+        "cls": ""
+      }
+    ],
+    "classes": [
+      "workspace-image-tool-route",
+      "product-retouch-page",
+      "image-translate-page",
+      "product-retouch-grid",
+      "image-tool-upload-actions",
+      "mobile-upload-trigger",
+      "mobile-upload-qr-trigger",
+      "upload-card",
+      "local-redraw-source-upload",
+      "product-retouch-card",
+      "image-translate-settings",
+      "image-translate-language-field",
+      "image-translate-protect",
+      "product-retouch-submit-wrap",
+      "image-tool-submit-area",
+      "product-retouch-submit-note",
+      "image-translate-submit-note-default",
+      "image-translate-submit-note-compact",
+      "product-retouch-submit",
+      "product-retouch-result",
+      "image-tool-empty-state",
+      "image-tool-empty-state-media",
+      "redraw-history",
+      "product-retouch-history",
+      "image-translate-history",
+      "history-title"
+    ],
+    "bodyClasses": "promo-topbar-open",
+    "dialogs": [],
+    "route": "/image-translate",
+    "nets": [
+      "200 POST https://umami.wanhengtech.com/api/send",
+      "200 GET https://umami.wanhengtech.com/api/websites/0927c490-031e-4541-a9a0-43a603e23211/recorder",
+      "200 GET https://ijihua.cn/api/design/system/ai-video-entries",
+      "200 GET https://ijihua.cn/api/design/checkin/public-info",
+      "200 GET https://ijihua.cn/api/design/invitations/activity-info",
+      "200 GET https://ijihua.cn/api/design/system/version",
+      "200 POST https://ijihua.cn/api/design/paid-products/catalog",
+      "200 GET https://ijihua.cn/api/design/image-tools/billing-config?toolType=IMAGE_TRANSLATION",
+      "200 GET https://ijihua.cn/api/design/options/form"
+    ]
+  },
+  {
+    "url": "https://ijihua.cn/image-expand",
+    "title": "极画AI｜智能电商图片与商品视觉生成平台",
+    "bodyText": "极画· AI 电商图首页电商生图电商都在用广大卖家优选电商都在用商品主图商品详情爆款复刻创意生图多图融合商品SKU图AI修图局部重绘一键抠图去除水印产品精修图片翻译智能扩图商品换色旋转角度AI视频NEW自由创作我的作品购买套餐邀请有奖限时加赠500联系客服邀请好友得100积分签到得积分工作台登录/注册签到得积分快捷入口首页工作台我的作品AI 视频自由创作电商生图商品主图商品详情爆款复刻创意生图多图融合AI 修图局部重绘一键抠图去除水印产品精修图片编辑图片翻译智能扩图商品换色旋转角度数据中心素材库账户服务购买套餐邀请有奖限时加赠500联系客服登录/注册工作台我的作品AI视频自由创作电商生图商品主",
+    "headings": [
+      "* 上传图片",
+      "点击或拖拽图片到此处上传点击、拖拽或粘贴图片上传，最多 1 张",
+      "原图占比",
+      "原图位置",
+      "历史记录"
+    ],
+    "buttons": [
+      {
+        "text": "极画· AI 电商图",
+        "cls": "brand workspace-brand",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "首页",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "电商生图电商都在用广大卖家优选电商都在用",
+        "cls": "workspace-nav-dropdown-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品主图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品详情",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "爆款复刻",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "创意生图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "多图融合",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品SKU图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI修图",
+        "cls": "workspace-nav-dropdown-trigger active",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "局部重绘",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "一键抠图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "去除水印",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品精修",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "图片翻译",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "智能扩图",
+        "cls": "is-active",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品换色",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "旋转角度",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI视频NEW",
+        "cls": "workspace-nav-dropdown-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "自由创作",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "我的作品",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "购买套餐",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "邀请有奖限时加赠500",
+        "cls": "workspace-nav-invitations",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "联系客服",
+        "cls": "workspace-nav-customer-service",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "邀请好友得100积分",
+        "cls": "workspace-nav-promo",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "签到得积分",
+        "cls": "workspace-checkin-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "工作台",
+        "cls": "workspace-workbench-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "登录/注册",
+        "cls": "workspace-logout-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "工作台",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "我的作品",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI视频",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "自由创作",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "电商生图",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品主图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品详情",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "爆款复刻",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "创意生图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "多图融合",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品SKU图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI修图",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "局部重绘",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "一键抠图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "去除水印",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品精修",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "图片翻译",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "智能扩图",
+        "cls": "active",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品换色",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "旋转角度",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "数据中心",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "素材库",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品建议",
+        "cls": "product-suggestion-launcher product-suggestion-sidebar-launcher",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "联系客服",
+        "cls": "workspace-customer-service-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "从素材库导入",
+        "cls": "workspace-material-library-trigger",
+        "disabled": true,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "手机上传",
+        "cls": "mobile-upload-trigger mobile-upload-qr-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": "使用手机上传图片"
+      },
+      {
+        "text": "100%",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "80%",
+        "cls": "active",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "60%",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "50%",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "↖",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "↑",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "↗",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "←",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "⊙",
+        "cls": "active",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "→",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "↙",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "↓",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "↘",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "高级设置比例 原比例画质 1K",
+        "cls": "image-output-settings-summary",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "立即扩图 本次消耗5积分",
+        "cls": "product-retouch-submit",
+        "disabled": true,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "⌃",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "promo-topbar-buy",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "promo-topbar-close",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      }
+    ],
+    "inputs": [
+      {
+        "tag": "INPUT",
+        "type": null,
+        "value": "",
+        "placeholder": "1-99%",
+        "min": "1",
+        "max": "99",
+        "step": null,
+        "checked": false,
+        "disabled": false,
+        "cls": ""
+      }
+    ],
+    "classes": [
+      "product-retouch-page",
+      "smart-expand-page",
+      "product-retouch-grid",
+      "image-tool-upload-actions",
+      "mobile-upload-trigger",
+      "mobile-upload-qr-trigger",
+      "upload-card",
+      "local-redraw-source-upload",
+      "smart-expand-card",
+      "smart-expand-scale-options",
+      "smart-expand-position-grid",
+      "product-retouch-submit-wrap",
+      "image-tool-submit-area",
+      "product-retouch-submit-note",
+      "product-retouch-submit",
+      "product-retouch-result",
+      "image-tool-empty-state",
+      "image-tool-empty-state-media",
+      "redraw-history",
+      "product-retouch-history",
+      "smart-expand-history",
+      "history-title"
+    ],
+    "bodyClasses": "promo-topbar-open",
+    "dialogs": [],
+    "route": "/image-expand",
+    "nets": [
+      "200 POST https://umami.wanhengtech.com/api/send",
+      "200 GET https://umami.wanhengtech.com/api/websites/0927c490-031e-4541-a9a0-43a603e23211/recorder",
+      "200 GET https://ijihua.cn/api/design/system/version",
+      "200 GET https://ijihua.cn/api/design/checkin/public-info",
+      "200 GET https://ijihua.cn/api/design/image-tools/billing-config?toolType=SMART_EXPAND",
+      "200 GET https://ijihua.cn/api/design/invitations/activity-info",
+      "200 POST https://ijihua.cn/api/design/paid-products/catalog",
+      "200 GET https://ijihua.cn/api/design/options/form",
+      "200 GET https://ijihua.cn/api/design/system/ai-video-entries"
+    ]
+  },
+  {
+    "url": "https://ijihua.cn/product-recolor",
+    "title": "极画AI｜智能电商图片与商品视觉生成平台",
+    "bodyText": "极画· AI 电商图首页电商生图电商都在用广大卖家优选电商都在用商品主图商品详情爆款复刻创意生图多图融合商品SKU图AI修图局部重绘一键抠图去除水印产品精修图片翻译智能扩图商品换色旋转角度AI视频NEW自由创作我的作品购买套餐邀请有奖限时加赠500联系客服邀请好友得100积分签到得积分工作台登录/注册签到得积分快捷入口首页工作台我的作品AI 视频自由创作电商生图商品主图商品详情爆款复刻创意生图多图融合AI 修图局部重绘一键抠图去除水印产品精修图片编辑图片翻译智能扩图商品换色旋转角度数据中心素材库账户服务购买套餐邀请有奖限时加赠500联系客服登录/注册工作台我的作品AI视频自由创作电商生图商品主",
+    "headings": [
+      "* 上传图片",
+      "点击或拖拽图片到此处上传点击、拖拽或粘贴图片上传，最多 1 张",
+      "商品颜色",
+      "历史记录"
+    ],
+    "buttons": [
+      {
+        "text": "极画· AI 电商图",
+        "cls": "brand workspace-brand",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "首页",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "电商生图电商都在用广大卖家优选电商都在用",
+        "cls": "workspace-nav-dropdown-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品主图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品详情",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "爆款复刻",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "创意生图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "多图融合",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品SKU图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI修图",
+        "cls": "workspace-nav-dropdown-trigger active",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "局部重绘",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "一键抠图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "去除水印",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品精修",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "图片翻译",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "智能扩图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品换色",
+        "cls": "is-active",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "旋转角度",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI视频NEW",
+        "cls": "workspace-nav-dropdown-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "自由创作",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "我的作品",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "购买套餐",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "邀请有奖限时加赠500",
+        "cls": "workspace-nav-invitations",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "联系客服",
+        "cls": "workspace-nav-customer-service",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "邀请好友得100积分",
+        "cls": "workspace-nav-promo",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "签到得积分",
+        "cls": "workspace-checkin-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "工作台",
+        "cls": "workspace-workbench-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "登录/注册",
+        "cls": "workspace-logout-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "工作台",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "我的作品",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI视频",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "自由创作",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "电商生图",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品主图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品详情",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "爆款复刻",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "创意生图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "多图融合",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品SKU图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI修图",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "局部重绘",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "一键抠图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "去除水印",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品精修",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "图片翻译",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "智能扩图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品换色",
+        "cls": "active",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "旋转角度",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "数据中心",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "素材库",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品建议",
+        "cls": "product-suggestion-launcher product-suggestion-sidebar-launcher",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "联系客服",
+        "cls": "workspace-customer-service-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "从素材库导入",
+        "cls": "workspace-material-library-trigger",
+        "disabled": true,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "手机上传",
+        "cls": "mobile-upload-trigger mobile-upload-qr-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": "使用手机上传图片"
+      },
+      {
+        "text": "",
+        "cls": "background-color-option white active",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "background-color-option",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "background-color-option",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "background-color-option",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "background-color-option",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "background-color-option custom-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "高级设置比例 原比例画质 1K",
+        "cls": "image-output-settings-summary",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "立即换色 本次消耗5积分",
+        "cls": "product-retouch-submit",
+        "disabled": true,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "⌃",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "promo-topbar-buy",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "promo-topbar-close",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      }
+    ],
+    "inputs": [],
+    "classes": [
+      "workspace-image-tool-route",
+      "product-retouch-page",
+      "product-recolor-page",
+      "product-retouch-grid",
+      "image-tool-upload-actions",
+      "mobile-upload-trigger",
+      "mobile-upload-qr-trigger",
+      "upload-card",
+      "local-redraw-source-upload",
+      "background-color-card",
+      "product-recolor-color-card",
+      "background-color-options",
+      "background-color-option",
+      "background-custom-picker",
+      "product-retouch-submit-wrap",
+      "image-tool-submit-area",
+      "product-retouch-submit-note",
+      "product-retouch-submit-note-default",
+      "product-retouch-submit-note-compact",
+      "product-retouch-submit",
+      "product-retouch-result",
+      "image-tool-empty-state",
+      "image-tool-empty-state-media",
+      "redraw-history",
+      "product-retouch-history",
+      "product-recolor-history",
+      "history-title"
+    ],
+    "bodyClasses": "promo-topbar-open",
+    "dialogs": [],
+    "route": "/product-recolor",
+    "nets": [
+      "200 GET https://umami.wanhengtech.com/api/websites/0927c490-031e-4541-a9a0-43a603e23211/recorder",
+      "200 POST https://umami.wanhengtech.com/api/send",
+      "200 GET https://ijihua.cn/api/design/system/version",
+      "200 GET https://ijihua.cn/api/design/system/ai-video-entries",
+      "200 GET https://ijihua.cn/api/design/checkin/public-info",
+      "200 GET https://ijihua.cn/api/design/options/form",
+      "200 GET https://ijihua.cn/api/design/invitations/activity-info",
+      "200 GET https://ijihua.cn/api/design/image-tools/billing-config?toolType=PRODUCT_RECOLOR",
+      "200 POST https://ijihua.cn/api/design/paid-products/catalog"
+    ]
+  },
+  {
+    "url": "https://ijihua.cn/rotate-angle",
+    "title": "极画AI｜智能电商图片与商品视觉生成平台",
+    "bodyText": "极画· AI 电商图首页电商生图电商都在用广大卖家优选电商都在用商品主图商品详情爆款复刻创意生图多图融合商品SKU图AI修图局部重绘一键抠图去除水印产品精修图片翻译智能扩图商品换色旋转角度AI视频NEW自由创作我的作品购买套餐邀请有奖限时加赠500联系客服邀请好友得100积分签到得积分工作台登录/注册签到得积分快捷入口首页工作台我的作品AI 视频自由创作电商生图商品主图商品详情爆款复刻创意生图多图融合AI 修图局部重绘一键抠图去除水印产品精修图片编辑图片翻译智能扩图商品换色旋转角度数据中心素材库账户服务购买套餐邀请有奖限时加赠500联系客服登录/注册工作台我的作品AI视频自由创作电商生图商品主",
+    "headings": [
+      "* 上传图片",
+      "点击或拖拽图片到此处上传支持 JPG、PNG、WebP，最多 1 张",
+      "旋转角度",
+      "旋转 0",
+      "倾斜 0",
+      "缩放 特写",
+      "历史记录"
+    ],
+    "buttons": [
+      {
+        "text": "极画· AI 电商图",
+        "cls": "brand workspace-brand",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "首页",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "电商生图电商都在用广大卖家优选电商都在用",
+        "cls": "workspace-nav-dropdown-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品主图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品详情",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "爆款复刻",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "创意生图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "多图融合",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品SKU图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI修图",
+        "cls": "workspace-nav-dropdown-trigger active",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "局部重绘",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "一键抠图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "去除水印",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品精修",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "图片翻译",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "智能扩图",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品换色",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "旋转角度",
+        "cls": "is-active",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI视频NEW",
+        "cls": "workspace-nav-dropdown-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "自由创作",
+        "cls": "",
+        "disabled": false,
+        "role": "menuitem",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "我的作品",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "购买套餐",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "邀请有奖限时加赠500",
+        "cls": "workspace-nav-invitations",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "联系客服",
+        "cls": "workspace-nav-customer-service",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "邀请好友得100积分",
+        "cls": "workspace-nav-promo",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "签到得积分",
+        "cls": "workspace-checkin-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "工作台",
+        "cls": "workspace-workbench-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "登录/注册",
+        "cls": "workspace-logout-btn",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "工作台",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "我的作品",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI视频",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "自由创作",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "电商生图",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品主图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品详情",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "爆款复刻",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "创意生图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "多图融合",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品SKU图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "AI修图",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "局部重绘",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "一键抠图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "去除水印",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品精修",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "图片翻译",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "智能扩图",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "商品换色",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "旋转角度",
+        "cls": "active",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "数据中心",
+        "cls": "workspace-menu-section-toggle",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "素材库",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "产品建议",
+        "cls": "product-suggestion-launcher product-suggestion-sidebar-launcher",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "联系客服",
+        "cls": "workspace-customer-service-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "从素材库导入",
+        "cls": "workspace-material-library-trigger",
+        "disabled": true,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "手机上传",
+        "cls": "mobile-upload-trigger mobile-upload-qr-trigger",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": "使用手机上传图片"
+      },
+      {
+        "text": "",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": "重置参数"
+      },
+      {
+        "text": "主体",
+        "cls": "active",
+        "disabled": false,
+        "role": "tab",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "摄像头",
+        "cls": "",
+        "disabled": false,
+        "role": "tab",
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "高级设置比例 原比例画质 1K",
+        "cls": "image-output-settings-summary",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "立即生成 本次消耗5积分",
+        "cls": "product-retouch-submit",
+        "disabled": true,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "⌃",
+        "cls": "",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "promo-topbar-buy",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      },
+      {
+        "text": "",
+        "cls": "promo-topbar-close",
+        "disabled": false,
+        "role": null,
+        "checked": null,
+        "title": null
+      }
+    ],
+    "inputs": [
+      {
+        "tag": "INPUT",
+        "type": "range",
+        "value": "0",
+        "placeholder": null,
+        "min": "-90",
+        "max": "90",
+        "step": null,
+        "checked": false,
+        "disabled": false,
+        "cls": ""
+      },
+      {
+        "tag": "INPUT",
+        "type": "range",
+        "value": "0",
+        "placeholder": null,
+        "min": "-30",
+        "max": "60",
+        "step": null,
+        "checked": false,
+        "disabled": false,
+        "cls": ""
+      },
+      {
+        "tag": "INPUT",
+        "type": "range",
+        "value": "1",
+        "placeholder": null,
+        "min": "0.8",
+        "max": "1.2",
+        "step": "0.01",
+        "checked": false,
+        "disabled": false,
+        "cls": ""
+      }
+    ],
+    "classes": [
+      "workspace-image-tool-route",
+      "product-retouch-page",
+      "rotate-angle-page",
+      "rotate-angle-grid",
+      "rotate-angle-controls",
+      "image-tool-upload-actions",
+      "mobile-upload-trigger",
+      "mobile-upload-qr-trigger",
+      "upload-card",
+      "local-redraw-source-upload",
+      "rotate-angle-settings",
+      "rotate-angle-settings-head",
+      "rotate-angle-tabs",
+      "rotate-angle-preview",
+      "rotate-angle-subject-stage",
+      "rotate-angle-cube",
+      "rotate-angle-cube-face",
+      "rotate-angle-range",
+      "rotate-angle-tip",
+      "image-tool-submit-area",
+      "rotate-angle-submit-area",
+      "product-retouch-submit-wrap",
+      "product-retouch-submit-note",
+      "product-retouch-submit",
+      "product-retouch-result",
+      "rotate-angle-result",
+      "image-tool-empty-state",
+      "image-tool-empty-state-media",
+      "redraw-history",
+      "product-retouch-history",
+      "rotate-angle-history",
+      "history-title"
+    ],
+    "bodyClasses": "promo-topbar-open",
+    "dialogs": [],
+    "route": "/rotate-angle",
+    "nets": [
+      "200 GET https://umami.wanhengtech.com/api/websites/0927c490-031e-4541-a9a0-43a603e23211/recorder",
+      "200 POST https://umami.wanhengtech.com/api/send",
+      "200 GET https://ijihua.cn/api/design/checkin/public-info",
+      "200 GET https://ijihua.cn/api/design/system/version",
+      "200 GET https://ijihua.cn/api/design/system/ai-video-entries",
+      "200 GET https://ijihua.cn/api/design/invitations/activity-info",
+      "200 GET https://ijihua.cn/api/design/image-tools/billing-config?toolType=VIEW_ROTATION",
+      "200 GET https://ijihua.cn/api/design/options/form",
+      "200 POST https://ijihua.cn/api/design/paid-products/catalog"
+    ]
+  }
+]
