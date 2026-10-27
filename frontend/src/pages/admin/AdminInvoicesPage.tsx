@@ -80,6 +80,8 @@ export function AdminInvoicesPage() {
   const { data, loading, error, params, setQuery, setPage, reload } =
     useAdminList<{ items: AdminInvoice[]; total: number }>(fetcher);
 
+  const hasFilter = Boolean(status || keyword);
+
   const applyQuery = () =>
     setQuery({ status, keyword: keyword.trim() || undefined });
 
@@ -238,6 +240,7 @@ export function AdminInvoicesPage() {
           placeholder="发票号 / 订单号 / 抬头"
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
+          onPressEnter={applyQuery}
           allowClear
         />
         <FilterActions>
@@ -259,7 +262,16 @@ export function AdminInvoicesPage() {
         ) : error && !data ? (
           <AdminListError error={error} onRetry={reload} />
         ) : (data?.items.length ?? 0) === 0 ? (
-          <AdminEmpty description="没有符合条件的开票申请。" />
+          <AdminEmpty
+            description={hasFilter ? '没有符合条件的开票申请。' : '还没有开票申请。'}
+            action={
+              hasFilter ? (
+                <Button type="default" className="adm-btn" onClick={reset}>
+                  清除筛选
+                </Button>
+              ) : undefined
+            }
+          />
         ) : (
           <Table<AdminInvoice>
             rowKey="id"

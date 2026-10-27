@@ -1,6 +1,14 @@
-import { createContext, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from 'react';
 import { App, Modal, Spin } from 'antd';
-import { ImagePlus, Maximize2, RefreshCw, X } from 'lucide-react';
+import { Download, ImagePlus, Maximize2, Plus, RefreshCw, X } from 'lucide-react';
 import { assetsApi, assetSrc, toAbsoluteUrl } from '../lib/api';
 
 import { useProject } from '../hooks/useProject';
@@ -14,6 +22,7 @@ import { MobileUploadModal } from './MobileUploadModal';
 import { ToolSettingsPopover } from './ToolSettingsPopover';
 import { ToolSubmitBar } from './ToolSubmitBar';
 import { ToolEmptyState, ToolGeneratingState } from './ToolEmptyState';
+import { StateLoading } from './StateViews';
 import { ResultMedia, formatDuration } from './ResultMedia';
 import { ProviderBadge } from './ProviderBadge';
 import { ImageCompare } from './ImageCompare';
@@ -113,6 +122,8 @@ interface UploadSpec {
   hint: string;
   /** 主提示语 (默认: 点击或拖拽图片到此处上传) */
   prompt?: string;
+  /** 主提示图标 (局部重绘/去水印参考站使用简单加号) */
+  promptIcon?: ReactNode;
   accept?: string;
 }
 
@@ -196,6 +207,18 @@ interface Props {
   resultActions?: ReactNode;
   /** 结果卡内嵌原图/结果对比 (局部重绘、去水印)；多图结果不启用 */
   resultCompare?: ToolResultCompare;
+  /**
+   * 单图工具的结果呈现方式。
+   *
+   * `product-card` 复刻参考站产品系工具（商品换色等）的右栏：不再套通用
+   * 「生成结果 / 重新生成 / 尺寸 / 下载原图」网格，而是在可用区域中央放
+   * 一张带角标和下载按钮的大图卡。生成中同样沿用该卡片的宽高比例。
+   */
+  resultView?: 'default' | 'product-card';
+  /** 生成中卡片的宽高比；通常取已上传原图的比例，未知时按 3:4。 */
+  generatingAspect?: number;
+  /** 产品卡右上角/左上角的状态角标；默认「结果」。 */
+  resultBadge?: string;
   /** 历史结果已回填到上传位；页面可据此清掉上一轮结果态 */
   onHistoryReuse?: () => void;
   /**
@@ -212,6 +235,23 @@ interface Props {
    */
   sourcePane?: ReactNode | ((images: ToolAsset[]) => ReactNode);
   /**
+   * 提交期间保留 sourcePane 不卸载。
+   *
+   * 局部重绘的画布状态（笔迹 / 标注）只存在于 MaskPainter 内部；若提交时
+   * 用生成态替换 sourcePane，一次确定性拒绝（如 402 积分不足）返回后画布
+   * 会以空态重建，用户刚画好的遮罩与描述位一起丢失，提交按钮也会因
+   * painted=false 永久禁用。该页改为保留画布，生成反馈由提交按钮承担。
+   */
+  keepSourceWhileSubmitting?: boolean;
+  /**
+   * 结果栏空态的演示视频 (1:1 复刻参考站 image-tool-empty-state-media)。
+   *
+   * 智能扩图 / 图片翻译 / 产品精修 / 商品换色 / 旋转角度在无图时播放各自的
+   * 演示视频 (素材自托管于 /static/mp4/, 与参考站同名同源)；传了才替换通用
+   * 空态插画, 结构与参考站一致: video 480×480 + strong 标题 + p 描述。
+   */
+  emptyVideo?: string;
+  /**
    * 右侧附加栏 (局部重绘的常驻历史记录)。
    *
    * 只有传了这个 prop 的页面才切成三栏 —— 其余工具页继续沿用
@@ -221,6 +261,76 @@ interface Props {
 }
 
 const RATIO_LABEL: Record<string, string> = { original: '原比例' };
+
+/**
+ * 产品系单图工具（商品换色）的生成中卡片。
+ *
+ * 参考站不是一块铺满右栏的白板，而是在原图比例的位置显示一张浅灰占位卡。
+ * 保持这个形状，生成完成时结果卡不会跳变尺寸。
+ */
+function ProductCardGenerating({ aspect }: { aspect?: number }) {
+  const ratio = aspect && Number.isFinite(aspect) && aspect > 0 ? aspect : 0.75;
+  return (
+    <main className="product-retouch-result product-recolor-result">
+      <div
+        className="product-retouch-result-state"
+        style={{ '--result-card-aspect': ratio } as CSSProperties}
+      >
+        <div className="free-generating-card product-recolor-generating-card">
+          <StateLoading tip="正在生成换色结果…" />
+        </div>
+      </div>
+    </main>
+  );
+}
+
+/** 商品换色结果卡：与参考站一致，只保留图片、角标和下载入口。 */
+function ProductCardResult({
+  result,
+  title,
+  badge,
+  fallbackAspect,
+  onPreview,
+}: {
+  result: ToolResult;
+  title: string;
+  badge: string;
+  fallbackAspect?: number;
+  onPreview: () => void;
+}) {
+  const measured = result.width && result.height ? result.width / result.height : undefined;
+  const ratio = measured || fallbackAspect || 1.5;
+  return (
+    <main className="product-retouch-result product-recolor-result">
+      <div
+        className="product-retouch-result-state"
+        style={{ '--result-card-aspect': ratio } as CSSProperties}
+      >
+        <figure className="product-retouch-result-card">
+          <button
+            type="button"
+            className="product-retouch-result-preview"
+            aria-label={`预览${title}结果`}
+            onClick={onPreview}
+          >
+            <ResultMedia url={result.url!} modality={result.modality} alt={`${title}结果`} />
+            <span className="product-retouch-result-mode">{badge}</span>
+          </button>
+          <a
+            className="product-retouch-download"
+            href={result.url}
+            download
+            target="_blank"
+            rel="noreferrer"
+          >
+            <Download size={14} />
+            下载
+          </a>
+        </figure>
+      </div>
+    </main>
+  );
+}
 
 export function ToolShell(props: Props) {
   /**
@@ -275,9 +385,14 @@ export function ToolShell(props: Props) {
     onSettingsChange,
     resultActions,
     resultCompare,
+    resultView = 'default',
+    generatingAspect,
+    resultBadge,
     onHistoryReuse,
     resultPane,
     sourcePane,
+    keepSourceWhileSubmitting = false,
+    emptyVideo,
     trailingPane,
   } = props;
 
@@ -323,11 +438,13 @@ export function ToolShell(props: Props) {
     (asset: Asset): boolean => {
       if (!upload) return false;
       const current = imagesRef.current;
-      if (current.length >= upload.max) {
+      const replacing = replaceUpload && upload.max === 1 && current.length > 0;
+      if (!replacing && current.length >= upload.max) {
         message.warning(`最多上传 ${upload.max} 张图片`);
         return false;
       }
       if (current.some((x) => x.id === asset.id)) {
+        if (replacing) return true;
         message.info('该素材已在列表中');
         return false;
       }
@@ -336,12 +453,16 @@ export function ToolShell(props: Props) {
         url: assetSrc(asset) ?? toAbsoluteUrl(asset.sourceUrl) ?? '',
         name: asset.sourceUrl.split('/').pop() ?? '素材',
       };
-      imagesRef.current = [...current, next];
-      // 用 updater 追加: 一轮多选时前一张还没进 state, 直接读 images 会丢
-      setImages((prev) => (prev.some((x) => x.id === next.id) ? prev : [...prev, next]));
+      const nextImages = replacing ? [next] : [...current, next];
+      imagesRef.current = nextImages;
+      // 用 updater 追加: 一轮多选时前一张还没进 state, 直接读 images 会丢。
+      // 单图替换则必须覆盖旧图，否则「素材库导入」会永远被额度拒绝。
+      setImages((prev) =>
+        replacing ? [next] : prev.some((x) => x.id === next.id) ? prev : [...prev, next],
+      );
       return true;
     },
-    [message, upload],
+    [message, replaceUpload, upload],
   );
 
   // 素材库弹窗 (通用组件; 本页只提供额度与去重规则)
@@ -364,7 +485,8 @@ export function ToolShell(props: Props) {
     (assets: MobileUploadAsset[]) => {
       const max = upload?.max ?? 0;
       const prev = imagesRef.current;
-      const room = max - prev.length;
+      const replacing = replaceUpload && max === 1 && prev.length > 0;
+      const room = max - prev.length + (replacing ? 1 : 0);
       if (room <= 0) {
         message.warning(`图片位已满 (${max} 张), 手机上传的图片未加入`);
         setMobileOpen(false);
@@ -380,12 +502,21 @@ export function ToolShell(props: Props) {
         url: toAbsoluteUrl(a.signedUrl || a.url) ?? '',
         name: a.filename,
       }));
-      imagesRef.current = [...prev, ...added];
-      setImages((cur) => [...cur, ...added.filter((a) => !cur.some((x) => x.id === a.id))]);
+      if (added.length === 0) {
+        setMobileOpen(false);
+        return;
+      }
+      const nextImages = replacing ? added.slice(0, 1) : [...prev, ...added];
+      imagesRef.current = nextImages;
+      setImages((cur) =>
+        replacing
+          ? added.slice(0, 1)
+          : [...cur, ...added.filter((a) => !cur.some((x) => x.id === a.id))],
+      );
       setMobileOpen(false);
       if (added.length > 0) message.success(`已从手机接收 ${added.length} 张图片`);
     },
-    [message, upload],
+    [message, replaceUpload, upload],
   );
 
   const uploadFiles = useCallback(
@@ -539,7 +670,7 @@ export function ToolShell(props: Props) {
       </button>
       <button
         type="button"
-        className="pk-text-link"
+        className="pk-text-link pk-mobile-upload-link"
         title="用手机扫码上传，图片回填到左侧"
         onClick={() => setMobileOpen(true)}
       >
@@ -612,7 +743,7 @@ export function ToolShell(props: Props) {
                     )}
                     {images.length === 0 ? (
                       <label className="pk-upload-prompt">
-                        <ImagePlus size={22} />
+                        {upload.promptIcon ?? <Plus size={22} />}
                         <span>{upload.prompt ?? '点击或拖拽图片到此处上传'}</span>
                         <small>{upload.hint}</small>
                       </label>
@@ -720,16 +851,44 @@ export function ToolShell(props: Props) {
 
           现在: 生成中 → 骨架占位; 失败 → 失败卡; 成功 → 结果图; 都没发生 → 空态。
         */}
-        {submitting && !showResult ? (
-          <ToolGeneratingState />
+        {submitting && !showResult && !keepSourceWhileSubmitting ? (
+          resultView === 'product-card' ? (
+            <ProductCardGenerating aspect={generatingAspect} />
+          ) : (
+            <ToolGeneratingState />
+          )
         ) : !showResult ? (
           (sourcePane
             ? typeof sourcePane === 'function'
               ? sourcePane(images)
               : sourcePane
-            : null) ?? (
+            : null) ?? (emptyVideo ? (
+            <div className="pk-preview-placeholder">
+              <div className="pk-preview-inner">
+                <video
+                  className="image-tool-empty-state-media"
+                  src={emptyVideo}
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  aria-label={`${title}演示`}
+                />
+                <h3>{title}</h3>
+                <p>{desc || emptyDesc}</p>
+              </div>
+            </div>
+          ) : (
             <ToolEmptyState title={title} desc={desc || emptyDesc} capability={capability} />
-          )
+          ))
+        ) : resultView === 'product-card' && results.length === 1 && results[0].status === 'succeeded' && results[0].url ? (
+          <ProductCardResult
+            result={results[0]}
+            title={title}
+            badge={resultBadge ?? resultTag ?? `${title}结果`}
+            fallbackAspect={generatingAspect}
+            onPreview={() => setLightboxUrl(results[0].url!)}
+          />
         ) : (
           <div className="pk-result-body">
             <div className="pk-result-toolbar">
@@ -833,7 +992,13 @@ export function ToolShell(props: Props) {
         error={libraryError}
         onCancel={closeLibrary}
         onPick={pickFromLibrary}
-        maxSelectable={upload ? Math.max(upload.max - images.length, 0) : undefined}
+        maxSelectable={
+          upload
+            ? replaceUpload && upload.max === 1 && images.length > 0
+              ? 1
+              : Math.max(upload.max - images.length, 0)
+            : undefined
+        }
       />
 
       {/* 手机上传弹窗 (二维码方案) */}

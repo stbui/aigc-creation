@@ -115,7 +115,9 @@ aigc-creation/
 │   └── dev.db                  # 开发库（test.db / 生产库各自独立）
 └── frontend/                   # Vite SPA，端口 5100（测试档同端口）
     ├── playwright*.ts / tests/ # e2e 配置与用例（`e2e/` 只是脚手架示例）
+    ├── vitest.config.ts        # 单元 / 组件测试（jsdom，`npm test`）
     └── src/
+        ├── **/__tests__/       # Vitest 用例（*.test.ts / *.test.tsx）
         ├── pages/              # 34 个 C 端页面 + pages/admin/ 28 个后台页面
         ├── components/         # AppLayout / SideRail / RailPreview / ToolShell / admin/AdminLayout ...
         ├── lib/                # api.ts（拆信封）/ http.ts / auth.ts / capabilities.ts / constants.ts

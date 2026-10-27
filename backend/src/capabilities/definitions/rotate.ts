@@ -34,8 +34,10 @@ export const Rotate: CapabilityPlugin = {
   buildPrompt: (p) =>
     `改变商品展示视角：水平旋转 ${p.azimuthDeg ?? p.yaw ?? 0}°、` +
     `俯仰 ${p.elevationDeg ?? p.pitch ?? 0}°、缩放 ${p.zoomFactor ?? p.zoom ?? 1}，` +
-    `按新视角重建商品展示，背景保持不变${p.imageRatio ? `；输出比例 ${p.imageRatio}` : ''}`,
+    `按新视角重建商品展示，背景保持不变${p.imageRatio ? `；输出比例 ${p.imageRatio}` : ''}。` +
+    `必须保持输入图中的同一件商品、数量、轮廓、部件、材质与颜色，不得替换商品或生成无关主体。`,
   modality: 'image',
   inputs: 1,
+  inputImageMode: 'edit',
   inWorkbench: true,
 };

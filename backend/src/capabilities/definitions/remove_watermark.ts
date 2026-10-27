@@ -67,5 +67,6 @@ export const RemoveWatermark: CapabilityPlugin = {
     `修补处与周围质感一致，不留痕迹`,
   modality: 'image',
   inputs: 1,
+  inputImageMode: 'edit',
   inWorkbench: true,
 };

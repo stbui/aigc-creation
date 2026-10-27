@@ -68,6 +68,7 @@ uat@admin.com
 | 鉴权/加密 | jsonwebtoken / bcryptjs | 9.0.3 / 3.0.3 |
 | 前端 | Vite + React + antd + lucide-react + react-router-dom | 8.3.4 / 19.3.0 / 6.6.6 / 1.57.0 / 7.18.4 |
 | 前端其他 | qrcode（邀请海报 / 扫码登录）/ Playwright（e2e） | 1.5.4 / `^1.64.1`（仅 e2e 允许 `^`） |
+| 前端测试 | Vitest + jsdom + Testing Library（单测 / 组件） | 5.0.5 / 30.1.3 / 16.3.3 |
 | 语言 | TypeScript | 后端 5.7.2 / 前端 7.0.2 |
 
 **版本必须精确锁定**。本机 npm 走 broker 代理，大批量安装会触发 5 分钟硬超时，依赖实际是用 `curl` + `tar` 直装 registry 装出来的，安装器不解析 semver 一律取 latest —— 详见「环境注意事项」第 4 条。
@@ -194,6 +195,8 @@ npm run dev                 # vite --mode development（5100）
 npm run dev:test            # vite --mode test（5100）
 npm run build:prod          # tsc --noEmit && vite build --mode production
 npm run typecheck           # tsc --noEmit
+npm test                    # Vitest 单测 / 组件（jsdom，无需起服务）
+npm run test:coverage       # 同上 + v8 覆盖率
 npm run e2e                 # Playwright
 
 # 环境体系自检（74 项断言，不连数据库）

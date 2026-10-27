@@ -126,7 +126,22 @@ test.describe('数据备份', () => {
     ).toBeVisible();
   });
 
-  test('删除备份需二次确认, 弹窗量化影响', async ({ page }) => {
+  test('删除备份直接执行, 不再弹窗确认', async ({ page }) => {
+    let deleteCalls = 0;
+    // 拦截真实删除, 避免 e2e 破坏开发库备份
+    await page.route('**/api/v1/admin/backups/*', async (route) => {
+      if (route.request().method() !== 'DELETE') {
+        await route.continue();
+        return;
+      }
+      deleteCalls += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 0, data: { id: 'e2e' }, message: '' }),
+      });
+    });
+
     await login(page);
     await page.goto(`${UI}/admin/backups`);
     await page.waitForSelector('.adm-panel table', { timeout: 20000 });
@@ -137,14 +152,9 @@ test.describe('数据备份', () => {
 
     await page.locator('.adm-panel table tbody tr').first().locator('.adm-link.is-danger').click();
 
-    // 确认弹窗应出现, 且说明"至少保留一份"
-    await expect(page.locator('.adm-modal-title', { hasText: '删除备份' })).toBeVisible();
-    await expect(page.getByText('至少保留一份已验证备份')).toBeVisible();
-
-    // 取消不应改变列表
-    await page.getByRole('button', { name: '取消' }).click();
-    await page.waitForTimeout(500);
-    expect(await page.locator('.adm-panel table tbody tr').count()).toBe(rows);
+    await expect(page.locator('.ant-modal')).toHaveCount(0);
+    await expect(page.locator('.adm-inline-confirm')).toHaveCount(0);
+    await expect.poll(() => deleteCalls).toBe(1);
   });
 
   test('清理留痕区可见', async ({ page }) => {

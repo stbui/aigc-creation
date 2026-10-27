@@ -58,8 +58,10 @@ export const Enhance: CapabilityPlugin = {
   buildPrompt: (p) =>
     `产品精修（${p.templateCode || p.mode || 'comprehensive'}）：` +
     `${p.additionalRequirement || p.note || '优化商品质感与画面细节'}，` +
-    `保持结构与颜色真实，提升清晰度与质感${p.imageRatio ? `；输出比例 ${p.imageRatio}` : ''}`,
+    `保持结构与颜色真实，提升清晰度与质感${p.imageRatio ? `；输出比例 ${p.imageRatio}` : ''}。` +
+    `必须保持输入图中的同一件商品、数量、轮廓、部件、材质、颜色、视角与构图，不得替换商品或重绘背景。`,
   modality: 'image',
   inputs: 1,
+  inputImageMode: 'edit',
   inWorkbench: true,
 };

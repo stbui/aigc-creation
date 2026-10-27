@@ -3,6 +3,7 @@ import { useToolTask } from '../hooks/useToolTask';
 import { ToolShell } from '../components/ToolShell';
 import { ToolCard, ToolSwitch } from '../components/ToolWidgets';
 import { ToolHistoryPane } from '../components/ToolHistoryPane';
+import { ProductSourceResult, ProductSourceUploadPreview } from '../components/ProductSourcePreview';
 import { languageOptions } from '../lib/optionSets';
 
 /**
@@ -42,8 +43,16 @@ export function ImageTranslatePage() {
       title="图片翻译"
       desc="智能翻译图片文字，保留原版式快速本地化"
       upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
+      replaceUpload
+      renderUploadPreview={(uploads, controls) => {
+        const image = uploads[0];
+        return image ? (
+          <ProductSourceUploadPreview image={image} controls={controls} alt="待翻译图片" />
+        ) : null;
+      }}
       settings={{ resolution: true }}
       submitLabel="立即翻译"
+      emptyVideo="/static/mp4/05_tpfy.mp4"
       emptyDesc="上传图片后，翻译结果将在此处展示"
       formValid
       submitting={submitting}
@@ -62,6 +71,10 @@ export function ImageTranslatePage() {
           protectSubject: protect,
           size: settings.resolution,
         });
+      }}
+      sourcePane={(images) => {
+        const image = images[0];
+        return image ? <ProductSourceResult image={image} alt="待翻译图片" /> : null;
       }}
       onHistoryReuse={handleHistoryReuse}
       trailingPane={

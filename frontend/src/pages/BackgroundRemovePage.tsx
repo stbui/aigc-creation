@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { type CSSProperties, useState } from 'react';
 import { App } from 'antd';
+import { Plus } from 'lucide-react';
 import { useToolTask } from '../hooks/useToolTask';
-import { ToolShell } from '../components/ToolShell';
+import { ToolShell, type ToolAsset } from '../components/ToolShell';
 import { ToolCard } from '../components/ToolWidgets';
 import {
   ColorStudio,
@@ -42,6 +43,26 @@ const COLOR_LABEL: Record<string, string> = {
   '#A8001B': '深红',
 };
 
+function BackgroundSourcePreview({ image }: { image: ToolAsset }) {
+  const [aspect, setAspect] = useState(1.6);
+
+  return (
+    <div
+      className="background-remove-preview background-remove-source-preview"
+      style={{ '--source-aspect': aspect } as CSSProperties}
+    >
+      <img
+        src={image.url}
+        alt={`${image.name} 原图预览`}
+        onLoad={(event) => {
+          const { naturalWidth, naturalHeight } = event.currentTarget;
+          if (naturalWidth > 0 && naturalHeight > 0) setAspect(naturalWidth / naturalHeight);
+        }}
+      />
+    </div>
+  );
+}
+
 export function BackgroundRemovePage() {
   const { message } = App.useApp();
   const { submitting, result, run } = useToolTask({ capability: 'matting', successMessage: '抠图结果已生成' });
@@ -69,7 +90,38 @@ export function BackgroundRemovePage() {
       pageClass="background-remove-page"
       title="一键抠图"
       desc="上传图片后，自动去除图片背景"
-      upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
+      upload={{
+        title: '上传图片',
+        required: true,
+        max: 1,
+        hint: '点击、拖拽或粘贴图片上传，最多 1 张',
+        promptIcon: <Plus size={22} />,
+      }}
+      replaceUpload
+      renderUploadPreview={(uploads, controls) => {
+        const image = uploads[0];
+        if (!image) return null;
+        return (
+          <div className={`background-source-row${controls.uploading ? ' processing' : ''}`}>
+            <button
+              type="button"
+              className="background-source-preview"
+              aria-label="预览待处理图片"
+              onClick={() => controls.preview(image)}
+            >
+              <img src={image.url} alt="待处理图片" draggable={false} />
+            </button>
+            <button
+              type="button"
+              className="background-source-reupload"
+              disabled={controls.uploading}
+              onClick={controls.open}
+            >
+              重新上传
+            </button>
+          </div>
+        );
+      }}
       settings={{ ratio: true }}
       submitLabel="开始抠图"
       creditLabel={creditCost === 0 ? '限时免费' : undefined}
@@ -78,6 +130,32 @@ export function BackgroundRemovePage() {
       submitting={submitting}
       result={result}
       resultTag={colorLabel}
+      sourcePane={(images) => {
+        const image = images[0];
+        if (!image) {
+          return (
+            <div className="background-remove-stage" aria-label="一键抠图介绍">
+              <div className="background-remove-empty">
+                <video
+                  src="/static/mp4/background-remove.mp4"
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  aria-label="一键抠图演示"
+                />
+                <strong>一键抠图</strong>
+                <p>上传图片后，自动去除图片背景</p>
+              </div>
+            </div>
+          );
+        }
+        return (
+          <div className="background-remove-stage background-remove-source-stage">
+            <BackgroundSourcePreview key={image.url} image={image} />
+          </div>
+        );
+      }}
       onSettingsChange={(settings) => setOutputRatio(settings.ratio)}
       onSubmit={async (inputs, settings) => {
         if (selectedColor === 'custom' && !customColorValid) {

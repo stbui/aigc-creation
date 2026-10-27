@@ -1,16 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import {
-  Alert,
-  App,
-  Button,
-  Drawer,
-  Input,
-  Modal,
-  Result,
-  Skeleton,
-  Space,
-  Typography,
-} from 'antd';
+import { Alert, Button, Drawer, Result, Skeleton } from 'antd';
 import { AlertTriangle } from 'lucide-react';
 import { PageHeader } from './PageHeader';
 import { StateEmpty, StateError, StateLoading } from '../StateViews';
@@ -331,11 +320,15 @@ export function AdminDrawer<T>({
 }
 
 /**
- * 高危操作确认弹窗。
+ * 高危操作确认区（页面内，不使用弹窗）。
  *
- * 两条硬规则 (来自 docs/admin-ui-design.md §2.5):
+ * 2026-10-26 按产品要求去掉阻塞式确认弹窗：操作仍需要看影响面与填必填项，
+ * 但以页面底部的操作条承载，不再遮罩页面、不再强制「输入确认词」。
+ * 纯确认类动作（无需填数据）应在调用方直接执行，不必挂这个组件。
+ *
+ * 仍然保留的两条硬规则 (来自 docs/admin-ui-design.md §2.5):
  *   1. 必须量化影响 —— 写「将删除相关数据」等于没写
- *   2. 破坏性操作必须输入确认词 —— 防止误触
+ *   2. 危险动作用 danger 标色，并把不可逆后果写在 description 里
  */
 export function ConfirmAction({
   open,
@@ -343,8 +336,6 @@ export function ConfirmAction({
   description,
   impact,
   danger = false,
-  requireTyping,
-  typingText,
   confirmText = '确认',
   loading = false,
   confirmDisabled = false,
@@ -358,86 +349,89 @@ export function ConfirmAction({
   /** 影响面量化, 如 ['12 个项目', '45 张素材'] */
   impact?: string[];
   danger?: boolean;
+  /** @deprecated 不再要求输入确认词，保留入参仅为兼容旧调用 */
   requireTyping?: boolean;
+  /** @deprecated 同上 */
   typingText?: string;
   confirmText?: string;
   loading?: boolean;
-  /** 影响面仍在加载等场景下阻止误确认 */
+  /** 影响面仍在加载等场景下阻止误操作 */
   confirmDisabled?: boolean;
   extra?: ReactNode;
   onCancel: () => void;
   onConfirm: (typed: string) => void;
 }) {
-  const [typed, setTyped] = useState('');
-  const { message } = App.useApp();
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (open) setTyped('');
-  }, [open]);
+    if (!open) return;
+    // 操作条固定在底部；把焦点移进去，键盘用户不必再 Tab 一圈
+    panelRef.current?.focus();
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !loading) onCancel();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [loading, onCancel, open]);
 
-  const ready = !requireTyping || typed.trim() === (typingText ?? '');
-
-  const confirm = () => {
-    if (!ready) {
-      void message.warning(`请输入「${typingText}」以确认`);
-      return;
-    }
-    onConfirm(typed);
-  };
+  if (!open) return null;
 
   return (
-    <Modal
-      open={open}
-      title={title}
-      width={540}
-      okText={confirmText}
-      cancelText="取消"
-      confirmLoading={loading}
-      okButtonProps={{ danger, disabled: !ready || confirmDisabled }}
-      cancelButtonProps={{ disabled: loading }}
-      mask={{ closable: !loading }}
-      onCancel={onCancel}
-      onOk={confirm}
-      destroyOnHidden
+    <div
+      ref={panelRef}
+      className={`adm-inline-confirm${danger ? ' is-danger' : ''}`}
+      role="region"
+      aria-label={title}
+      tabIndex={-1}
     >
-      <Space orientation="vertical" size={14} style={{ width: '100%' }}>
-        {description && (
-          <Typography.Paragraph style={{ margin: 0 }}>{description}</Typography.Paragraph>
-        )}
+      <div className="adm-inline-confirm-head">
+        <div className="adm-inline-confirm-title">{title}</div>
+        <Button
+          type="text"
+          size="small"
+          aria-label="关闭"
+          disabled={loading}
+          onClick={onCancel}
+        >
+          关闭
+        </Button>
+      </div>
 
-        {impact && impact.length > 0 && (
-          <Alert
-            className="adm-confirm-impact"
-            type={danger ? 'error' : 'warning'}
-            showIcon
-            title={<span className="adm-confirm-impact-title">影响范围</span>}
-            description={
-              <ul style={{ margin: 0, paddingLeft: 18 }}>
-                {impact.map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
-            }
-          />
-        )}
+      {description && <div className="adm-inline-confirm-desc">{description}</div>}
 
-        {extra}
+      {impact && impact.length > 0 && (
+        <Alert
+          className="adm-confirm-impact"
+          type={danger ? 'error' : 'warning'}
+          showIcon
+          title={<span className="adm-confirm-impact-title">影响范围</span>}
+          description={
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {impact.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+          }
+        />
+      )}
 
-        {requireTyping && (
-          <div>
-            <Typography.Text type="secondary">请输入「{typingText}」以确认</Typography.Text>
-            <Input
-              id="adm-confirm-input"
-              style={{ marginTop: 6 }}
-              value={typed}
-              onChange={(e) => setTyped(e.target.value)}
-              placeholder={typingText}
-              autoComplete="off"
-            />
-          </div>
-        )}
-      </Space>
-    </Modal>
+      {extra}
+
+      <div className="adm-inline-confirm-actions">
+        <Button onClick={onCancel} disabled={loading}>
+          取消
+        </Button>
+        <Button
+          type="primary"
+          danger={danger}
+          loading={loading}
+          disabled={confirmDisabled}
+          onClick={() => onConfirm('')}
+        >
+          {confirmText}
+        </Button>
+      </div>
+    </div>
   );
 }
 

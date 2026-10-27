@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { Palette } from 'lucide-react';
+import { Check } from 'lucide-react';
 
 /**
  * 修图系工具页共享控件 —— 数值均来自参考站 computed styles 实拍:
@@ -25,13 +25,14 @@ export const BG_COLOR_SWATCHES: ColorOption[] = [
   { value: '#A8001B', label: '深红', css: '#A8001B' },
 ];
 
-/** 背景/商品颜色选择 (参考站 background-color-option; 选中态: 透明=紫底勾, 其余=紫描边) */
+/** 背景/商品颜色选择 (参考站 background-color-option 实拍)。 */
 export function ColorSwatchGrid({
   options,
   value,
   onChange,
   onCustom,
   customActive,
+  customColor,
   ariaLabel,
 }: {
   options: ColorOption[];
@@ -39,29 +40,28 @@ export function ColorSwatchGrid({
   onChange: (v: string) => void;
   onCustom?: () => void;
   customActive?: boolean;
+  /** 自定义色块的当前颜色；未选中时该块仍显示参考站的彩虹图。 */
+  customColor?: string;
   ariaLabel: string;
 }) {
   return (
-    <div className="background-color-options" role="radiogroup" aria-label={ariaLabel}>
+    <div className="background-color-options" aria-label={ariaLabel}>
       {options.map((o) => {
         const active = o.value === value;
         const transparent = o.css === 'transparent';
+        const white = o.css.toUpperCase() === '#FFFFFF';
         return (
           <button
             key={o.value}
             type="button"
-            role="radio"
-            aria-checked={active}
+            aria-pressed={active}
             aria-label={o.label}
             title={o.label}
-            className={`background-color-option${transparent ? ' checker' : ''}${active ? ' active' : ''}`}
+            className={`background-color-option${transparent ? ' checker' : ''}${white ? ' white' : ''}${active ? ' active' : ''}`}
+            style={transparent || white ? undefined : { background: o.css }}
             onClick={() => onChange(o.value)}
           >
-            {transparent ? (
-              <i className="background-color-checker" aria-hidden />
-            ) : (
-              <i className="background-color-fill" style={{ background: o.css }} aria-hidden />
-            )}
+            {active && <Check size={15} strokeWidth={3} aria-hidden />}
           </button>
         );
       })}
@@ -69,12 +69,15 @@ export function ColorSwatchGrid({
         <div className="background-custom-picker">
           <button
             type="button"
-            className={`background-color-option custom-trigger${customActive ? ' active' : ''}`}
+            className={`background-color-option custom-trigger${customActive ? ' active custom-selected' : ''}`}
+            style={customActive ? { background: customColor ?? '#5546D8' } : undefined}
             aria-label="自定义颜色"
             title="自定义颜色"
+            aria-pressed={customActive}
             onClick={onCustom}
           >
-            <Palette size={15} />
+            <img src="/static/color.svg" alt="" aria-hidden />
+            {customActive && <Check size={15} strokeWidth={3} className="custom-check" aria-hidden />}
           </button>
         </div>
       )}

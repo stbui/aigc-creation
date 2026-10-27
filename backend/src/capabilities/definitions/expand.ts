@@ -37,8 +37,11 @@ export const Expand: CapabilityPlugin = {
   buildPrompt: (p) =>
     `智能扩图：把画面向外延展到${p.occupy ?? 80}% 的原图占比，` +
     `延展区域按原图内容自然补全${p.position ? `，原图位于${p.position}` : ''}` +
-    `${p.targetImageRatio || p.ratio ? `，目标画幅 ${p.targetImageRatio || p.ratio}` : ''}`,
+    `${p.targetImageRatio || p.ratio ? `，目标画幅 ${p.targetImageRatio || p.ratio}` : ''}。` +
+    `必须保留输入图中的商品主体、数量、材质、光影、视角与构图，只在画面边缘补全背景；` +
+    `不得替换主体、生成无关场景或重新创作一张新图。`,
   modality: 'image',
   inputs: 1,
+  inputImageMode: 'edit',
   inWorkbench: true,
 };

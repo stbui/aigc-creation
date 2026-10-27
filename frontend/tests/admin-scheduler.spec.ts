@@ -6,7 +6,7 @@ import { test, expect, type Page } from '@playwright/test';
  * 核心价值是"让静默失败可见", 故重点验证:
  *   1. 每个任务的状态都能看到 (上次执行/耗时/成败)
  *   2. 只有幂等任务给「立即执行」按钮 —— 备份/清理不给
- *   3. 手动执行走二次确认
+ *   3. 手动执行直接触发, 不使用确认弹窗
  */
 
 const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
@@ -80,7 +80,17 @@ test.describe('定时任务', () => {
     ).toHaveCount(0);
   });
 
-  test('手动执行走二次确认并说明幂等', async ({ page }) => {
+  test('手动执行直接触发, 不再弹窗确认', async ({ page }) => {
+    let runCalls = 0;
+    await page.route('**/api/v1/admin/scheduler/run*', async (route) => {
+      runCalls += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 0, data: { name: 'order-expire' }, message: '' }),
+      });
+    });
+
     await login(page);
     await page.goto(`${UI}/admin/scheduler`);
     await page.waitForSelector('.adm-task-row', { timeout: 20000 });
@@ -88,12 +98,9 @@ test.describe('定时任务', () => {
     await page.locator('.adm-task-row', { hasText: '订单超时关闭' })
       .getByRole('button', { name: '立即执行' }).click();
 
-    await expect(page.locator('.adm-modal-title')).toContainText('立即执行');
-    // 应说明影响范围与幂等性
-    await expect(page.locator('.adm-confirm-impact')).toContainText('超时');
-    await expect(page.locator('.adm-confirm-impact')).toContainText('幂等');
-
-    await page.getByRole('button', { name: '取消' }).click();
+    await expect(page.locator('.ant-modal')).toHaveCount(0);
+    await expect(page.locator('.adm-inline-confirm')).toHaveCount(0);
+    await expect.poll(() => runCalls).toBe(1);
   });
 
   test('设计说明解释可触发与不可触发', async ({ page }) => {

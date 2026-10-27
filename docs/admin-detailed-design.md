@@ -79,7 +79,7 @@ frontend/src/
 │   ├── PageHeader.tsx
 │   ├── FilterBar.tsx
 │   ├── DetailDrawer.tsx       # 统一详情抽屉
-│   ├── ConfirmAction.tsx      # 高危二次确认
+│   ├── ConfirmAction.tsx      # 高危操作页面内确认条
 │   └── StatCards.tsx
 ├── hooks/admin/
 │   ├── useAdminList.ts        # 列表数据 hook（分页/筛选/刷新）
@@ -165,20 +165,23 @@ export function useAdminList<T>(fetcher: (p: AdminListParams & { signal: AbortSi
 
 **约定**：抽屉打开时才发详情请求（懒加载），关闭时清空缓存；同一 id 重复打开不重复请求。
 
-### 0.6 高危操作二次确认
+### 0.6 高危操作确认（页面内）
+
+2026-10-26 起不再使用确认弹窗，也不再要求输入确认词。`ConfirmAction`
+渲染为页面底部固定操作条：保留影响面与必填原因，不遮罩页面。
 
 ```tsx
 <ConfirmAction
   danger
   title="删除用户"
-  impactText="将同时删除该用户的 12 个项目、45 张素材、89 条任务记录，且不可恢复"
-  requireTyping                            // 财务与删除类需输入确认词
-  typingText="删除"
+  impact={['12 个项目', '45 张素材', '89 条任务记录']}
+  extra={<操作原因输入 />}
   onConfirm={...}
 />
 ```
 
-`requireTyping` 用于：`user.delete` `asset.delete` `order.refund` `credit.adjust` `setting.write`。
+无需填写数据的纯确认动作（启停、手动触发、切换默认后端）直接执行，
+不再挂 `ConfirmAction`。需要退款金额、操作原因等数据的动作使用底部操作条。
 
 ### 0.7 审计拦截器
 

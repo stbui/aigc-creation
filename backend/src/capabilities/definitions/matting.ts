@@ -71,9 +71,13 @@ export const Matting: CapabilityPlugin = {
         : color === 'custom'
           ? `自定义色 ${p.customColor || '#5546D8'}，透明度 ${p.customAlpha ?? 100}%`
           : `色板 ${color}`;
-    return `商品抠图：精确分离主体与背景，边缘发丝级保留；背景替换为 ${backdrop}`;
+    return (
+      `商品抠图：精确分离主体与背景，边缘发丝级保留；背景替换为 ${backdrop}。` +
+      `主体商品的结构、颜色、材质、数量、位置与细节必须与输入图完全一致，不得重绘或替换商品。`
+    );
   },
   modality: 'image',
   inputs: 1,
+  inputImageMode: 'edit',
   inWorkbench: true,
 };

@@ -214,7 +214,22 @@ test.describe('素材管理', () => {
     await page.waitForTimeout(1200);
   });
 
-  test('删除素材需输入确认词', async ({ page }) => {
+  test('删除素材直接执行, 不再弹窗或要求输入确认词', async ({ page }) => {
+    let deleteCalls = 0;
+    // 拦截真实删除, 避免 e2e 破坏开发库素材
+    await page.route('**/api/v1/admin/assets/*', async (route) => {
+      if (route.request().method() !== 'DELETE') {
+        await route.continue();
+        return;
+      }
+      deleteCalls += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 0, data: { id: 'e2e', removedTasks: 0 }, message: '' }),
+      });
+    });
+
     await login(page);
     await page.goto(`${UI}/admin/assets`);
     await page.waitForSelector('.adm-asset-cell', { timeout: 20000 });
@@ -222,33 +237,11 @@ test.describe('素材管理', () => {
     await expect(page.locator('.adm-panel table').first()).toBeVisible();
 
     await page.locator('.adm-panel table tbody tr.ant-table-row').first().locator('.adm-link.is-danger').click();
-    await expect(page.locator('.ant-modal-title', { hasText: '删除素材' })).toBeVisible();
 
-    // 确认词未输入时按钮应禁用
-    const confirmBtn = page.getByRole('button', { name: '永久删除' });
-    await expect(confirmBtn).toBeDisabled();
-
-    // 输入后启用
-    await page.locator('#adm-confirm-input').fill('删除');
-    await expect(confirmBtn).toBeEnabled();
-
-    // 取消
-    await page.getByRole('button', { name: /取\s*消/ }).click();
-  });
-
-  test('删除弹窗量化影响范围', async ({ page }) => {
-    await login(page);
-    await page.goto(`${UI}/admin/assets`);
-    await page.waitForSelector('.adm-asset-cell', { timeout: 20000 });
-    await page.locator('.adm-segmented-item[title="表格视图"]').click();
-    await page.waitForTimeout(800);
-
-    await page.locator('.adm-panel table tbody tr.ant-table-row').first().locator('.adm-link.is-danger').click();
-    await expect(page.locator('.adm-confirm-impact-title')).toBeVisible();
-    // 应量化说明文件大小与任务数, 而不是笼统的「将删除数据」
-    await expect(page.locator('.adm-confirm-impact')).toContainText(/文件大小/);
-    await expect(page.locator('.adm-confirm-impact')).toContainText(/关联的 \d+ 条产出任务记录/);
-    await page.getByRole('button', { name: /取\s*消/ }).click();
+    // 没有弹窗、没有确认词输入框，请求直接发出
+    await expect(page.locator('.ant-modal')).toHaveCount(0);
+    await expect(page.locator('#adm-confirm-input')).toHaveCount(0);
+    await expect.poll(() => deleteCalls).toBe(1);
   });
 });
 

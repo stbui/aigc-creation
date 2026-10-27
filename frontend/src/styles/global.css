@@ -2907,18 +2907,54 @@ html[data-promo='off'] .pk-workspace {
   position: absolute;
   bottom: calc(100% + 8px);
   left: 0;
-  width: 400px;
+  width: 100%;
+  max-width: 100%;
   background: #fff;
   border-radius: var(--radius-panel);
   padding: 17px 16px;
   box-shadow: rgba(61, 66, 86, 0.2) 0 8px 24px;
   display: grid;
-  gap: 19px;
+  /* 参考站头部与分组分属两层: head margin-bottom 16 + settings gap 19。
+     等价为 row-gap:0 + 相邻分组 margin-top:19，避免头部下方多出 19px。 */
+  row-gap: 0;
   z-index: 40;
+}
+.pk-settings-popover-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 24px;
+  margin-bottom: 16px;
+}
+.pk-settings-popover-head h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 20px;
+  color: #292839;
+  font-weight: 700;
+}
+.pk-settings-close {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  flex: 0 0 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #526077;
+  cursor: pointer;
+}
+.pk-settings-close:hover {
+  color: var(--text-strong);
 }
 .pk-settings-group {
   display: grid;
   gap: 10px;
+}
+.pk-settings-group + .pk-settings-group {
+  margin-top: 19px;
 }
 .pk-settings-group-label {
   font-size: 13px;
@@ -3079,6 +3115,17 @@ html[data-promo='off'] .pk-workspace {
 }
 .pk-empty-illustration {
   display: block;
+}
+/* 参考站 5 页 (扩图/翻译/精修/换色/旋转) 空态演示视频:
+ * 与专属插画同尺寸位 (480×480 方框, 窄屏按容器收窄) 。
+ * 视频必须落本地并静音, 否则浏览器自动播放策略会停在首帧。 */
+.image-tool-empty-state-media {
+  display: block;
+  width: min(480px, calc(100% - 48px));
+  height: auto;
+  aspect-ratio: 1;
+  object-fit: cover;
+  background: #eef1f5;
 }
 .pk-preview-inner h3 {
   font-size: 14px;
@@ -4068,6 +4115,36 @@ img[data-broken='1'] {
   pointer-events: none;
   user-select: none;
 }
+.fc-result-item-prompt {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border-radius: var(--radius-tag);
+  background: rgba(23, 26, 43, 0.62);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+  pointer-events: none;
+  user-select: none;
+}
+/* 手机上 4 列网格的缩略图只有约 65px 宽, 带文字的标签会换行遮住大半张图。
+   窄屏改为右下角图标态, 同时避开左上角的变体标签 (白底图 / 场景图等)。 */
+@media (max-width: 640px) {
+  .fc-result-item-prompt {
+    top: auto;
+    right: 6px;
+    bottom: 6px;
+    padding: 2px 4px;
+  }
+  .fc-result-item-prompt-text {
+    display: none;
+  }
+}
 .fc-result-item:hover .fc-result-item-mask,
 .fc-result-item:focus-visible .fc-result-item-mask {
   opacity: 1;
@@ -4253,6 +4330,65 @@ img[data-broken='1'] {
   backdrop-filter: blur(12px);
   color: rgba(255, 255, 255, 0.88);
   font-size: 12px;
+}
+.img-viewer-prompt {
+  position: absolute;
+  left: 50%;
+  bottom: 72px;
+  z-index: 4;
+  width: min(720px, calc(100% - 32px));
+  max-height: min(40vh, 320px);
+  padding: 14px 16px;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-card);
+  background: rgba(23, 26, 43, 0.92);
+  color: rgba(255, 255, 255, 0.9);
+  transform: translateX(-50%);
+  backdrop-filter: blur(12px);
+}
+.img-viewer-prompt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+.img-viewer-prompt-head strong {
+  font-size: 13px;
+  color: #fff;
+}
+.img-viewer-prompt-head button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.12);
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.img-viewer-prompt-head button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.img-viewer-prompt p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 20px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.fc-prompt-view {
+  max-height: 50vh;
+  overflow-y: auto;
+  color: var(--text-body);
+  font-size: 13px;
+  line-height: 22px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .img-viewer-meta {
   min-width: 0;
@@ -5002,12 +5138,6 @@ img[data-broken='1'] {
   width: 96px;
   accent-color: var(--brand);
 }
-.redraw-mask-hint {
-  font-size: 12px;
-  line-height: 20px;
-  color: var(--text-muted);
-  margin: 8px 0 0;
-}
 .redraw-toolbar-sep {
   width: 1px;
   align-self: stretch;
@@ -5381,8 +5511,8 @@ img[data-broken='1'] {
   width: 32px;
   height: 32px;
   border-radius: var(--radius-control);
-  border: 1px solid var(--border);
-  background: #fff;
+  border: 1px solid transparent;
+  background: transparent;
   padding: 0;
   cursor: pointer;
   display: grid;
@@ -5393,33 +5523,53 @@ img[data-broken='1'] {
   border-color: var(--brand-light);
 }
 .background-color-option.active {
-  border-color: var(--brand-active);
-  box-shadow: 0 0 0 1px var(--brand-active);
+  box-shadow: none;
 }
-.background-color-option.checker.active {
-  background: var(--brand);
-  border-color: var(--brand);
+.background-color-option.white {
+  border: 1px solid #dfe3eb;
+  background: #fff !important;
 }
-.background-color-option.checker.active::after {
-  content: '';
-  width: 12px;
-  height: 12px;
-  border-radius: var(--radius-tag);
+.background-color-option.checker {
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #d5d9e0 25%, transparent 25%),
+    linear-gradient(-45deg, #d5d9e0 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #d5d9e0 75%),
+    linear-gradient(-45deg, transparent 75%, #d5d9e0 75%);
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-size: 16px 16px;
+}
+.background-color-option > svg {
+  color: var(--brand);
   background: #fff;
+  border-radius: 50%;
+  padding: 3px;
 }
-.background-color-fill {
-  position: absolute;
-  inset: 4px;
-  border-radius: var(--radius-tag);
+.background-color-option.white.active > svg,
+.background-color-option.checker.active > svg {
+  color: #fff;
+  background: var(--brand);
 }
 .background-color-option.custom-trigger {
   color: var(--text-muted);
-}
-.background-color-option.custom-trigger:hover {
-  color: var(--brand);
+  background: url('/static/color.svg') 50% / cover no-repeat;
 }
 .background-custom-picker {
   display: inline-flex;
+}
+.background-custom-picker .custom-trigger > img {
+  display: block;
+  width: 40px;
+  height: 40px;
+}
+.background-custom-picker .custom-trigger.custom-selected > img {
+  display: none;
+}
+.background-custom-picker .custom-trigger > .custom-check {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 
 /* ───────── 自定义颜色面板 (参考站取色 / 色相 / 透明度交互) ───────── */
@@ -5928,17 +6078,17 @@ img[data-broken='1'] {
 }
 .rotate-angle-cube {
   position: relative;
-  width: 96px;
-  height: 96px;
+  width: 104px;
+  height: 104px;
   transform-style: preserve-3d;
   transition: transform 0.2s ease-out;
 }
 .rotate-angle-cube-face {
   position: absolute;
   inset: 0;
-  border: 1px solid var(--brand-light);
-  background: rgba(128, 100, 246, 0.12);
-  color: var(--brand);
+  border: 1px solid #dedbea;
+  background: #fff;
+  color: #b4adc9;
   font-size: 13px;
   font-weight: 700;
   display: grid;
@@ -5957,22 +6107,22 @@ img[data-broken='1'] {
   transition: transform 0.16s ease-out;
 }
 .rotate-angle-cube-face.front {
-  transform: translateZ(48px);
+  transform: translateZ(52px);
 }
 .rotate-angle-cube-face.back {
-  transform: rotateY(180deg) translateZ(48px);
+  transform: rotateY(180deg) translateZ(52px);
 }
 .rotate-angle-cube-face.left {
-  transform: rotateY(-90deg) translateZ(48px);
+  transform: rotateY(-90deg) translateZ(52px);
 }
 .rotate-angle-cube-face.right {
-  transform: rotateY(90deg) translateZ(48px);
+  transform: rotateY(90deg) translateZ(52px);
 }
 .rotate-angle-cube-face.top {
-  transform: rotateX(90deg) translateZ(48px);
+  transform: rotateX(90deg) translateZ(52px);
 }
 .rotate-angle-cube-face.bottom {
-  transform: rotateX(-90deg) translateZ(48px);
+  transform: rotateX(-90deg) translateZ(52px);
 }
 
 /* 摄像头 tab: 轨道线 + 指针 + 4 方向键 */
@@ -12691,6 +12841,60 @@ html[data-promo='off'] .multi-image-fusion-page {
   border-color: var(--brand);
 }
 
+/* 页面内操作确认条：不遮罩页面，不拦截其它操作。
+ * 2026-10-26 替换原来的 Modal 确认弹窗。 */
+.adm-inline-confirm {
+  position: fixed;
+  z-index: 1200;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(70vh, 720px);
+  overflow: auto;
+  padding: 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 18px 48px color-mix(in srgb, var(--text-strong) 18%, transparent);
+}
+.adm-inline-confirm.is-danger {
+  border-color: var(--warn-border);
+}
+.adm-inline-confirm-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.adm-inline-confirm-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.adm-inline-confirm-desc {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--text-body);
+}
+.adm-inline-confirm-field {
+  margin-top: 14px;
+}
+.adm-inline-confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+@media (max-width: 640px) {
+  .adm-inline-confirm {
+    bottom: 12px;
+    padding: 12px;
+  }
+}
+
 /* ── 角色权限 ──────────────────────────────────────────────────────────── */
 
 .adm-legend {
@@ -14538,6 +14742,14 @@ html[data-promo='off'] .multi-image-fusion-page {
 }
 .state-skeleton-line.is-short {
   width: 40%;
+}
+.state-skeleton-block {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  border-radius: var(--radius-card);
+  background: var(--surface);
 }
 /* 脉动: 用 opacity 而非位移, 位移在网格里会带动周围元素抖动 */
 .state-skeleton-item > * {
@@ -17262,6 +17474,8 @@ html[data-promo='off'] .multi-image-fusion-page {
      跟随视口收缩并在高度不足时内部滚动。 */
   .pk-settings-popover {
     width: min(400px, calc(100vw - 48px));
+    /* 参考站窄屏弹层 padding-inline 12px（桌面 16px），比例/画质卡片随之变宽。 */
+    padding-inline: 12px;
     max-height: calc(100dvh - 140px);
     overflow-y: auto;
   }
@@ -17566,8 +17780,8 @@ html[data-promo='off'] .multi-image-fusion-page {
   }
 }
 
-/* 未上传图片时的中栏引导：用内联插画 + 三步说明替代通用空态，
- * 与参考站的 intro 视频位保持同一信息层级，但不引入第三方素材。 */
+/* 未上传图片时的中栏引导：与参考站同款的演示视频 (自托管 /static/mp4/)。
+ * 视频必须落本地并静音, 否则浏览器自动播放策略会停在首帧。 */
 .redraw-intro {
   flex: 1;
   min-height: 0;
@@ -17580,18 +17794,6 @@ html[data-promo='off'] .multi-image-fusion-page {
   text-align: center;
   background: #fff;
   border-radius: var(--radius-panel);
-}
-.redraw-intro-art {
-  width: 240px;
-  height: 240px;
-  display: grid;
-  place-items: center;
-  border-radius: 24px;
-  background: radial-gradient(circle at 50% 42%, var(--brand-bg), var(--surface) 72%);
-}
-.redraw-intro-art .pk-empty-illustration {
-  width: 200px;
-  height: 200px;
 }
 .redraw-intro-copy {
   display: flex;
@@ -17746,11 +17948,6 @@ html[data-promo='off'] .multi-image-fusion-page {
   max-height: calc(100vh - 300px);
   object-fit: contain;
 }
-.redraw-stage .redraw-mask-hint {
-  flex: none;
-  margin: 0;
-  text-align: center;
-}
 .redraw-canvas-footer {
   flex: none;
   align-self: center;
@@ -17826,14 +18023,6 @@ html[data-promo='off'] .multi-image-fusion-page {
   }
   .redraw-stage-topbar {
     width: 100%;
-  }
-  .redraw-intro-art {
-    width: 200px;
-    height: 200px;
-  }
-  .redraw-intro-art .pk-empty-illustration {
-    width: 168px;
-    height: 168px;
   }
 }
 
@@ -18310,6 +18499,17 @@ html[data-promo='off'] .pk-workspace.local-redraw-page {
 .app-body:has(> .app-content > .local-redraw-page) > .app-sider-wrap {
   height: calc(100vh - var(--workspace-topbar-height));
 }
+/* 产品系与抠图页同样是固定视口工作台：顶栏 + 推广条合计 104px，
+ * 外壳的 64px 扣减会让文档多出 12–40px 的假滚动。只在这两类页面收敛，
+ * 避免影响长文档页面（素材库 / 我的作品 / 首页）。 */
+.app-body:has(> .app-content > .product-retouch-page),
+.app-body:has(> .app-content > .background-remove-page) {
+  min-height: calc(100vh - var(--workspace-topbar-height));
+}
+.app-body:has(> .app-content > .product-retouch-page) > .app-sider-wrap,
+.app-body:has(> .app-content > .background-remove-page) > .app-sider-wrap {
+  height: calc(100vh - var(--workspace-topbar-height));
+}
 .pk-workspace.local-redraw-page > .redraw-history-pane,
 .pk-workspace.watermark-removal-page > .redraw-history-pane {
   width: 100%;
@@ -18319,22 +18519,13 @@ html[data-promo='off'] .pk-workspace.local-redraw-page {
   background: #fff;
 }
 .pk-workspace.local-redraw-page .redraw-intro {
+  flex: none;
   gap: 32px;
   width: min(100%, 720px);
+  margin: auto;
   padding: 24px;
   background: transparent;
   border-radius: 16px;
-}
-.pk-workspace.local-redraw-page .redraw-intro-art {
-  width: min(480px, 100%);
-  height: auto;
-  aspect-ratio: 1;
-  border-radius: 0;
-  background: #eef1f5;
-}
-.pk-workspace.local-redraw-page .redraw-intro-art .pk-empty-illustration {
-  width: min(360px, 86%);
-  height: auto;
 }
 .pk-workspace.local-redraw-page .redraw-intro-copy {
   gap: 8px;
@@ -18351,6 +18542,17 @@ html[data-promo='off'] .pk-workspace.local-redraw-page {
   margin: 0;
   font-size: 12px;
   line-height: 20px;
+}
+/* 参考站去水印空态是 480×480 演示视频；视频必须落本地并静音，
+ * 否则浏览器自动播放策略会让它停在首帧。 */
+.pk-workspace.local-redraw-page .redraw-intro-video {
+  display: block;
+  flex: none;
+  width: 480px;
+  max-width: 100%;
+  height: 480px;
+  object-fit: cover;
+  background: #eef1f5;
 }
 .pk-workspace.local-redraw-page > .redraw-history-pane {
   padding: 0 0 16px;
@@ -18384,6 +18586,123 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
 .pk-workspace.background-remove-page .pk-preview-placeholder {
   background: transparent;
   border-radius: 16px;
+}
+/* 抠图右栏：无图时是 480×480 演示视频；有图时用同一舞台展示原图。
+ * 视频和图片都只呈现真实上传内容，不提前伪造抠图结果。 */
+.pk-workspace.background-remove-page .background-remove-stage {
+  flex-direction: column;
+  gap: 12px;
+  border-radius: 16px;
+  text-align: center;
+}
+.pk-workspace.background-remove-page .background-remove-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #86909c;
+}
+.pk-workspace.background-remove-page .background-remove-empty video {
+  display: block;
+  width: 480px;
+  max-width: 100%;
+  height: 480px;
+  object-fit: cover;
+  background: #eef1f5;
+}
+.pk-workspace.background-remove-page .background-remove-empty strong {
+  display: block;
+  margin: 32px 0 8px;
+  color: #333;
+  font-size: 14px;
+  line-height: 20px;
+}
+.pk-workspace.background-remove-page .background-remove-empty p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16.5px;
+}
+.pk-workspace.background-remove-page .background-remove-source-stage .background-remove-preview {
+  width: min(
+    680px,
+    calc(100% - 80px),
+    calc((100vh - var(--workspace-topbar-height) - 144px) * var(--source-aspect, 1.6))
+  );
+  height: auto;
+  aspect-ratio: var(--source-aspect, 1.6);
+}
+.pk-workspace.background-remove-page .background-remove-source-stage .background-remove-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+/* 一键抠图上传态：参考站是 160×160 预览 + 单个重新上传按钮，
+ * 不能沿用通用 pk-thumb-grid 的填充上传区。 */
+.pk-workspace.background-remove-page .pk-dropzone-filled {
+  box-sizing: border-box;
+  min-height: 160px;
+  height: 160px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: default;
+}
+.pk-workspace.background-remove-page .pk-dropzone-filled:hover {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.pk-workspace.background-remove-page .background-source-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  width: 100%;
+  height: 160px;
+}
+.pk-workspace.background-remove-page .background-source-row.processing {
+  pointer-events: none;
+  opacity: 0.72;
+}
+.pk-workspace.background-remove-page .background-source-preview {
+  box-sizing: border-box;
+  flex: 0 0 160px;
+  width: 160px;
+  height: 160px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #e5e7ef;
+  border-radius: 8px;
+  background: #f2f4f7;
+  cursor: zoom-in;
+}
+.pk-workspace.background-remove-page .background-source-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pk-workspace.background-remove-page .background-source-reupload {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 88px;
+  width: 88px;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: #f2f3f5;
+  color: #4e5969;
+  font-size: 14px;
+  line-height: 22px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pk-workspace.background-remove-page .background-source-reupload:hover {
+  background: #eceef3;
 }
 
 /* 产品精修 / 翻译 / 扩图 / 换色 / 旋转：统一页面级 432 / 1fr / 192 */
@@ -18435,6 +18754,9 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
 }
 .pk-workspace.product-retouch-page .pk-preview-inner {
   width: 100%;
+  min-height: 0;
+  padding: 0;
+  gap: 0;
 }
 .pk-workspace.product-retouch-page .pk-empty-illustration {
   width: min(480px, calc(100% - 48px));
@@ -18448,8 +18770,200 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   font-size: 14px;
   line-height: 20px;
 }
+.pk-workspace.product-retouch-page .pk-preview-inner p {
+  font-size: 12px;
+  line-height: 20px;
+}
 .pk-workspace.product-retouch-page .pk-result-pane-editor {
   background: transparent;
+}
+
+/* 产品系四页的上传态：参考站用 source-row 替换虚线拖拽框，
+ * 左栏 160×160 缩略图 + 88×40 重新上传，右栏在生成前展示原图。 */
+.pk-workspace.product-retouch-page .pk-dropzone.pk-dropzone-filled {
+  box-sizing: border-box;
+  min-height: 160px;
+  height: 160px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pk-workspace.product-retouch-page .pk-dropzone.pk-dropzone-filled:hover {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.pk-workspace.product-retouch-page .source-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  width: 100%;
+  height: 160px;
+}
+.pk-workspace.product-retouch-page .source-row.processing {
+  pointer-events: none;
+  opacity: 0.72;
+}
+.pk-workspace.product-retouch-page .source-row > .product-retouch-source-preview {
+  box-sizing: border-box;
+  display: block;
+  flex: 0 0 160px;
+  width: 160px;
+  height: 160px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #e5e7ef;
+  border-radius: 8px;
+  background: #f2f4f7;
+  cursor: zoom-in;
+}
+.pk-workspace.product-retouch-page .source-row > .product-retouch-source-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pk-workspace.product-retouch-page .source-row > div {
+  display: grid;
+  flex: none;
+  gap: 10px;
+  width: auto;
+}
+.pk-workspace.product-retouch-page .source-row > div > button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 88px;
+  width: 88px;
+  min-width: 88px;
+  height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: #f2f3f5;
+  color: #4e5969;
+  font-size: 14px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pk-workspace.product-retouch-page .source-row > div > button:hover:not(:disabled) {
+  background: #eceef3;
+}
+.pk-workspace.product-retouch-page .source-row > div > button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+/* 上传后右栏的原图预览卡。宽度受结果栏限制、高度取 680/可用高度，
+ * 比例由图片 naturalWidth / naturalHeight 写入 CSS 变量。 */
+.pk-workspace.product-retouch-page .pk-result-pane > .product-retouch-result {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+.pk-workspace.product-retouch-page .product-retouch-result-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+.pk-workspace.product-retouch-page .product-retouch-result-card {
+  box-sizing: border-box;
+  position: relative;
+  width: auto;
+  max-width: 100%;
+  height: min(680px, calc(100% - 48px));
+  max-height: calc(100% - 48px);
+  aspect-ratio: var(--result-card-aspect, 1.6);
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #f6f7fb;
+}
+.pk-workspace.product-retouch-page .product-retouch-result-preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+.pk-workspace.product-retouch-page .product-retouch-result-preview > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+.pk-workspace.product-retouch-page .product-retouch-result-mode {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 4px 9px;
+  border-radius: 12px;
+  background: rgba(38, 42, 52, 0.72);
+  color: #fff;
+  font-size: 12px;
+  line-height: 17.5px;
+}
+
+@media (min-width: 901px) and (max-width: 1366px) {
+  .pk-workspace.product-retouch-page .pk-dropzone.pk-dropzone-filled {
+    height: auto;
+    min-height: 160px;
+  }
+  .pk-workspace.product-retouch-page .source-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    height: auto;
+  }
+  .pk-workspace.product-retouch-page .source-row > .product-retouch-source-preview {
+    flex: none;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+  }
+  .pk-workspace.product-retouch-page .source-row > div > button {
+    flex: none;
+    width: 100%;
+  }
+}
+
+@media (max-width: 900px) {
+  .pk-workspace.product-retouch-page .source-row {
+    gap: 12px;
+  }
+  .pk-workspace.product-retouch-page .source-row > .product-retouch-source-preview {
+    flex-basis: min(160px, 48vw);
+    width: min(160px, 48vw);
+    height: min(160px, 48vw);
+  }
+  .pk-workspace.rotate-angle-page .pk-result-pane:has(> .rotate-angle-result) {
+    flex: none;
+    height: auto;
+    min-height: 402px;
+    max-height: none;
+  }
 }
 
 /* ≤1500：局部重绘把宽度让给画布 (参考站 media query) */
@@ -18575,14 +19089,31 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   .pk-workspace.product-retouch-page .pk-primary-btn {
     height: 40px;
   }
-  .pk-workspace.local-redraw-page .redraw-intro-art {
-    width: min(480px, 100%);
-    height: auto;
-    aspect-ratio: 1;
+  .pk-workspace.local-redraw-page .pk-mobile-upload-link {
+    display: none;
   }
-  .pk-workspace.local-redraw-page .redraw-intro-art .pk-empty-illustration {
-    width: min(320px, 86%);
-    height: auto;
+}
+
+/* 参考站在 ≤900px 把滚动交给 route content，文档本身不产生第二层滚动。
+ * 本地对应容器是 .app-content；只在局部重绘存在时收敛高度。 */
+@media (max-width: 900px) {
+  .app-layout:has(> .app-body > .app-content > .local-redraw-page),
+  .app-layout:has(> .app-body > .app-content > .background-remove-page) {
+    height: 100vh;
+    min-height: 0;
+    overflow: hidden;
+  }
+  .app-body:has(> .app-content > .local-redraw-page),
+  .app-body:has(> .app-content > .background-remove-page) {
+    height: calc(100vh - var(--workspace-topbar-height));
+    min-height: 0;
+    overflow: hidden;
+  }
+  .app-body:has(> .app-content > .local-redraw-page) > .app-content,
+  .app-body:has(> .app-content > .background-remove-page) > .app-content {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden auto;
   }
 }
 
@@ -18629,6 +19160,11 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   padding: 0;
   gap: 8px;
 }
+.pk-workspace.local-redraw-page .pk-dropzone > .pk-upload-prompt {
+  width: 100%;
+  min-height: 0;
+  gap: 8px;
+}
 .pk-workspace.local-redraw-page .pk-thumb-grid-single,
 .pk-workspace.watermark-removal-page .pk-thumb-grid-single,
 .pk-workspace.background-remove-page .pk-thumb-grid-single,
@@ -18644,29 +19180,6 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  border-color: transparent;
-}
-.background-color-fill,
-.background-color-checker {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-}
-.background-color-checker {
-  background-color: #fff;
-  background-image:
-    linear-gradient(45deg, #d5d9e0 25%, transparent 25%),
-    linear-gradient(-45deg, #d5d9e0 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #d5d9e0 75%),
-    linear-gradient(-45deg, transparent 75%, #d5d9e0 75%);
-  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
-  background-size: 16px 16px;
-}
-.background-color-option.checker.active {
-  background: var(--brand);
-  border-color: var(--brand);
 }
 .background-color-options {
   gap: 10px 16px;
@@ -18676,6 +19189,10 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   flex: 0 0 40px;
   width: 40px;
   height: 40px;
+}
+.background-custom-picker .custom-trigger > img {
+  width: 100%;
+  height: 100%;
 }
 @media (min-width: 901px) and (max-width: 1366px) {
   .background-color-options {
@@ -18688,6 +19205,10 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   .background-custom-picker .custom-trigger {
     flex: 0 0 32px;
     justify-self: center;
+    width: 32px;
+    height: 32px;
+  }
+  .background-custom-picker .custom-trigger > img {
     width: 32px;
     height: 32px;
   }
@@ -18815,6 +19336,95 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   font-size: 11px;
   line-height: 16px;
 }
+/* 上传态与参考站一致：虚线框被 source-row 取代，160×160 缩略图 + 重新上传。 */
+.pk-workspace.smart-expand-page .pk-dropzone-filled {
+  box-sizing: border-box;
+  min-height: 160px;
+  height: 160px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: default;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pk-workspace.smart-expand-page .pk-dropzone-filled:hover {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.smart-expand-source-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  width: 100%;
+  height: 160px;
+}
+.smart-expand-source-row.processing {
+  pointer-events: none;
+}
+.smart-expand-source-thumb {
+  position: relative;
+  box-sizing: border-box;
+  display: block;
+  flex: 0 0 160px;
+  width: 160px;
+  height: 160px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #e5e7ef;
+  border-radius: 8px;
+  background: #f2f4f7;
+  cursor: zoom-in;
+}
+.smart-expand-source-row.processing .smart-expand-source-thumb::after {
+  content: '处理中…';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: rgba(17, 24, 39, 0.35);
+  color: #fff;
+  font-size: 12px;
+}
+.smart-expand-source-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.smart-expand-source-reupload {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 88px;
+  width: 88px;
+  min-width: 88px;
+  height: 40px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: #f2f3f5;
+  color: #4e5969;
+  font-size: 14px;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.smart-expand-source-reupload:hover:not(:disabled) {
+  background: #eceef3;
+}
+.smart-expand-source-reupload:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
 .smart-expand-position-grid {
   grid-template-columns: repeat(3, 28px);
   gap: 4px;
@@ -18832,19 +19442,26 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
 /* 参考站上传后即展示目标画布（棋盘格）；原图按 placement 绝对定位。
  * 预览只表达构图，不替代模型生成结果。 */
 .smart-expand-preview-stage {
-  flex: 1;
+  position: relative;
+  width: 100%;
+  height: 100%;
   min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 14px;
-  padding: 24px;
+  gap: 0;
+  padding: 0;
 }
 .smart-expand-source-preview {
   position: relative;
-  width: min(100%, 680px);
-  max-height: calc(100% - 40px);
+  display: block;
+  flex: 0 0 auto;
+  width: auto;
+  height: min(680px, calc(100% - 48px));
+  max-width: calc(100% - 48px);
+  max-height: calc(100% - 48px);
+  margin: 0;
   overflow: hidden;
   background-color: #fff;
   background-image:
@@ -18859,14 +19476,8 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
 .smart-expand-source-preview img {
   position: absolute;
   display: block;
+  max-width: 100%;
   object-fit: contain;
-}
-.smart-expand-preview-caption {
-  margin: 0;
-  color: #86909c;
-  font-size: 12px;
-  line-height: 20px;
-  text-align: center;
 }
 .smart-expand-preview-error {
   position: absolute;
@@ -18955,6 +19566,15 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   gap: 8px;
   height: 13px;
   min-height: 13px;
+  /* 参考站该行是 13px 文本 + 12px 行距（合计 25px），上传卡因此落在 y=147。
+   * 本地给链接按钮保留了 15px 行高，少掉的 2px 在这里补回。 */
+  padding-bottom: 0;
+  box-sizing: content-box;
+}
+@media (min-width: 901px) {
+  .pk-workspace.rotate-angle-page .pk-upload-actions-above {
+    padding-bottom: 2px;
+  }
 }
 .pk-workspace.rotate-angle-page .pk-section {
   gap: 12px;
@@ -19086,6 +19706,15 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   .pk-workspace.rotate-angle-page .pk-config-card {
     padding: 16px;
   }
+  .pk-workspace.rotate-angle-page .source-row {
+    gap: 24px;
+  }
+  .pk-workspace.rotate-angle-page .source-row > div > button {
+    flex: 0 0 90px;
+    width: 90px;
+    min-width: 90px;
+    padding: 0 16px;
+  }
   .pk-workspace.rotate-angle-page .rotate-angle-settings {
     padding: 14px;
   }
@@ -19105,6 +19734,19 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   .pk-workspace.rotate-angle-page .pk-result-pane {
     min-height: 402px;
   }
+  .pk-workspace.rotate-angle-page .rotate-angle-result,
+  .pk-workspace.rotate-angle-page .rotate-angle-result .product-retouch-result-state {
+    height: auto;
+  }
+  .pk-workspace.rotate-angle-page .rotate-angle-result .product-retouch-result-state {
+    box-sizing: border-box;
+    padding: 24px 18px;
+  }
+  .pk-workspace.rotate-angle-page .rotate-angle-result .product-retouch-result-card {
+    width: 100%;
+    height: auto;
+    max-height: none;
+  }
 }
 
 /* 产品系输入栏：参考站 aside 有 4px 右侧滚动留白（432 → 内容 428）。 */
@@ -19123,6 +19765,13 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
 /* 产品系卡片流：aside gap 12；移动端提交区与最后一张卡之间同为 12。 */
 .pk-workspace.product-retouch-page .pk-form-scroll {
   gap: 12px;
+}
+/* 桌面参考站 aside 的实际 gap 是 10px（上传卡 → 业务卡 → 提交区）。
+ * 移动端 y=296 已对齐，保留 12px，只收敛桌面。 */
+@media (min-width: 901px) {
+  .pk-workspace.product-retouch-page .pk-form-scroll {
+    gap: 10px;
+  }
 }
 @media (max-width: 900px) {
   .pk-workspace.product-retouch-page .pk-form-scroll {
@@ -19154,6 +19803,125 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   line-height: 20px;
 }
 
+/* 商品换色结果区：复刻参考站 product-retouch-result。
+ *
+ * 参考站生成成功后没有通用「生成结果」工具栏、尺寸行或二次网格，右栏只是
+ * 一张居中的大图卡：左上角「换色后」，右上角下载按钮，点击图片看大图。
+ * 生成中也使用同一张卡片比例，因此出图时不会从白板突然跳成另一套布局。 */
+.pk-workspace.product-recolor-page .pk-result-pane > .product-recolor-result {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+.pk-workspace.product-recolor-page .product-recolor-result .product-retouch-result-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+.pk-workspace.product-recolor-page .product-recolor-result .product-retouch-result-card {
+  width: min(100%, 680px);
+  height: auto;
+  max-height: calc(100% - 48px);
+  aspect-ratio: var(--result-card-aspect, 3 / 4);
+  min-height: 0;
+  margin: 0;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #f6f7fb;
+}
+.pk-workspace.product-recolor-page .product-recolor-result .product-retouch-result-preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+.pk-workspace.product-recolor-page .product-recolor-result .product-retouch-result-preview > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+.pk-workspace.product-recolor-page .product-recolor-result .product-retouch-result-mode {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: auto;
+  width: max-content;
+  padding: 4px 9px;
+  border-radius: 12px;
+  background: rgba(38, 42, 52, 0.72);
+  color: #fff;
+  font-size: 12px;
+  line-height: 17.5px;
+}
+.pk-workspace.product-recolor-page .product-retouch-download {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: #5546d8;
+  box-shadow: 0 4px 10px rgba(85, 70, 216, 0.2);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.pk-workspace.product-recolor-page .product-retouch-download:hover {
+  background: #493bc4;
+}
+.pk-workspace.product-recolor-page .product-recolor-generating-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(100%, 680px);
+  height: auto;
+  max-height: calc(100% - 48px);
+  min-height: 0;
+  aspect-ratio: var(--result-card-aspect, 3 / 4);
+  overflow: hidden;
+  border-radius: 16px;
+  background: #f2f3f5;
+}
+.pk-workspace.product-recolor-page .product-recolor-generating-card .state-loading {
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 24px;
+  color: #86909c;
+  font-size: 12px;
+  line-height: 22px;
+}
+.pk-workspace.product-recolor-page .product-recolor-generating-card .state-loading-tip {
+  color: #86909c;
+  font-size: 12px;
+  line-height: 22px;
+}
+.pk-workspace.product-recolor-page .product-recolor-generating-card .state-spinner {
+  width: 32px;
+  height: 32px;
+  border-color: #e3e6ed;
+  border-top-color: #9888ef;
+}
+
 /* 产品精修：两张 block 卡，标题 20+12，选项 gap8，textarea 72。 */
 .pk-workspace.product-retouch-main-page .local-redraw-card.tool-card {
   display: block;
@@ -19177,29 +19945,46 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   font-size: 12px;
   line-height: 20px;
 }
-.pk-workspace.product-retouch-main-page .pk-desc-editor {
-  height: 76.5px;
-}
-.pk-workspace.product-retouch-main-page .pk-desc-editor textarea {
+.pk-workspace.product-retouch-main-page .product-retouch-card > textarea {
+  display: inline-block;
+  width: 100%;
   box-sizing: border-box;
-  height: 72px;
-  padding: 9px 36px 9px 10px;
+  height: 56px;
+  padding: 9px;
+  border: 1px solid #dfe3eb;
+  border-radius: 8px;
+  background: #fff;
+  color: #000;
   font-size: 12px;
   line-height: normal;
+  resize: none;
+  outline: none;
+}
+.pk-workspace.product-retouch-main-page .product-retouch-card:has(> textarea) {
+  font-size: 16px;
+  line-height: normal;
+}
+@media (max-width: 900px) {
+  .pk-workspace.product-retouch-main-page .product-retouch-card > textarea {
+    height: 72px;
+    padding: 9px 10px;
+  }
 }
 
-/* 图片翻译：参考站设置卡是 flex + 14px gap，而非通用 grid 卡。 */
+/* 图片翻译：参考站设置卡是 flex + 14px gap + 1px 边框，而非通用 grid 卡。 */
 .pk-workspace.image-translate-page .local-redraw-card.tool-card {
   display: flex;
   flex-direction: column;
   gap: 14px;
   padding: 14px;
+  border: 1px solid #e1e5ed;
+  border-radius: 14px;
 }
 .pk-workspace.image-translate-page .local-redraw-card.tool-card .card-title-row {
   margin: 0;
 }
 .pk-workspace.image-translate-page .local-redraw-card.tool-card .card-title-row h2 {
-  margin: 0 0 12px;
+  margin: 0;
   font-size: 14px;
   line-height: 20px;
 }
@@ -19210,19 +19995,48 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
 }
 .pk-workspace.image-translate-page .image-translate-language-field > span,
 .pk-workspace.image-translate-page .image-translate-protect > span {
-  font-size: 12px;
-  line-height: normal;
+  font-size: 13px;
+  line-height: 17.5px;
 }
 .pk-workspace.image-translate-page .image-translate-language-field select {
   box-sizing: border-box;
   height: 36px;
+  padding: 0 10px;
+  font-size: 13px;
 }
 .pk-workspace.image-translate-page .image-translate-protect {
   height: 20px;
   align-items: center;
 }
+.pk-workspace.image-translate-page .image-translate-protect button {
+  width: 36px;
+  height: 20px;
+  padding: 0;
+}
 
 /* 智能扩图：参考站是「占比」「位置」两张独立卡；位置卡没有额外说明行。 */
+@media (min-width: 861px) and (max-width: 1366px) {
+  .pk-workspace.smart-expand-page .pk-dropzone-filled {
+    height: auto;
+    min-height: 160px;
+  }
+  .pk-workspace.smart-expand-page .smart-expand-source-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    height: auto;
+  }
+  .pk-workspace.smart-expand-page .smart-expand-source-thumb {
+    flex: none;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+  }
+  .pk-workspace.smart-expand-page .smart-expand-source-reupload {
+    flex: none;
+    width: 100%;
+  }
+}
 @media (max-width: 900px) {
   .pk-workspace.smart-expand-page .smart-expand-card {
     padding: 14px;
@@ -19231,6 +20045,26 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
     margin: 0 0 12px;
     font-size: 14px;
     line-height: 20px;
+  }
+  .pk-workspace.smart-expand-page .pk-dropzone-filled {
+    padding: 0;
+  }
+  .pk-workspace.smart-expand-page .smart-expand-source-row {
+    gap: 12px;
+  }
+  .pk-workspace.smart-expand-page .smart-expand-source-thumb {
+    flex-basis: min(160px, 48vw);
+    width: min(160px, 48vw);
+    height: min(160px, 48vw);
+  }
+}
+
+/* 图片翻译移动端：参考站设置卡仍是 167.5px 高（标题 20 + 14 + 语言 59.5
+ * + 14 + 开关 20 + 上下 padding 28 + 边框 2）。桌面端已按 157.5 对齐；
+ * 移动端上传卡与设置卡之间保留 12px，故只补卡片自身 10px。 */
+@media (max-width: 900px) {
+  .pk-workspace.image-translate-page .local-redraw-card.tool-card {
+    padding-bottom: 24px;
   }
 }
 
@@ -19254,6 +20088,17 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
  * 数值来自 reference/ijihua/ui-metrics.json 的页面/提交区坐标反推，
  * 不通过截图微调。 */
 @media (max-width: 900px) {
+  .pk-workspace.background-remove-page .background-source-row {
+    gap: 12px;
+  }
+  .pk-workspace.background-remove-page .background-source-preview {
+    flex-basis: min(160px, 48vw);
+    width: min(160px, 48vw);
+    height: min(160px, 48vw);
+  }
+  .pk-workspace.background-remove-page .background-source-reupload {
+    height: 40px;
+  }
   /* 参考站抠图卡标题 22px + 16px 底距，色板换行后自然高 176；
    * .pk-form-scroll 的 10px gap 与 12px 底部留白已由共享骨架提供。 */
   .pk-workspace.background-remove-page .background-color-card {
@@ -19261,6 +20106,11 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   }
   .pk-workspace.product-recolor-page .product-recolor-color-card {
     min-height: 132px;
+  }
+  /* 上传态仍保留参考站的 720px 展示高；生成/结果态是独立结果卡，按参考站
+   * `.product-retouch-result` 的 360px 下限收高。 */
+  .pk-workspace.product-recolor-page .pk-result-pane:has(> .product-recolor-result) {
+    min-height: 360px;
   }
 }
 
@@ -20522,17 +21372,13 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   max-height: 100%;
   object-fit: fill;
 }
-.pk-workspace.local-redraw-page .redraw-stage .redraw-mask-hint {
-  position: absolute;
-  left: 50%;
-  bottom: 87px;
-  z-index: 4;
-  width: min(520px, calc(100% - 32px));
-  margin: 0;
-  font-size: 11px;
-  line-height: 16px;
-  text-align: center;
-  transform: translateX(-50%);
+/* 提交期间画布保持可见（避免 402 等确定性拒绝后丢标注），
+ * 但锁住指针交互，反馈由提交按钮的「生成中…」承担。 */
+.pk-workspace.local-redraw-page .redraw-stage.is-submitting .redraw-canvas-wrap,
+.pk-workspace.local-redraw-page .redraw-stage.is-submitting .redraw-canvas-footer,
+.pk-workspace.local-redraw-page .redraw-stage.is-submitting .redraw-toolbar {
+  pointer-events: none;
+  opacity: 0.72;
 }
 .pk-workspace.local-redraw-page .redraw-canvas-footer {
   position: absolute;
@@ -20984,6 +21830,30 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   cursor: ew-resize;
   transform: translate(-50%, -50%);
 }
+.pk-workspace.local-redraw-page .resize-handle.nw {
+  top: 0;
+  left: 0;
+  cursor: nwse-resize;
+  transform: translate(-50%, -50%);
+}
+.pk-workspace.local-redraw-page .resize-handle.ne {
+  top: 0;
+  right: 0;
+  cursor: nesw-resize;
+  transform: translate(50%, -50%);
+}
+.pk-workspace.local-redraw-page .resize-handle.se {
+  right: 0;
+  bottom: 0;
+  cursor: nwse-resize;
+  transform: translate(50%, 50%);
+}
+.pk-workspace.local-redraw-page .resize-handle.sw {
+  bottom: 0;
+  left: 0;
+  cursor: nesw-resize;
+  transform: translate(-50%, 50%);
+}
 .pk-workspace.local-redraw-page .brush-cursor {
   position: absolute;
   z-index: 8;
@@ -21014,7 +21884,294 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
 }
 
 @media (max-width: 900px) {
+  .pk-workspace.local-redraw-page .source-row {
+    gap: 12px;
+  }
+  .pk-workspace.local-redraw-page .source-row > div button {
+    width: 88px;
+    min-width: 88px;
+    padding: 0 12px;
+  }
   .pk-workspace.local-redraw-page .redraw-prompt {
     grid-template-columns: minmax(0, 1fr) 64px;
+  }
+}
+
+/* 后台窄屏顶栏：后续新增样式把 .adm-search 固定成 240/280px，
+ * 旧的 @media(max-width:900px) 被层叠顺序覆盖，结果每个后台页都能横向晃动。
+ * 放在文件末尾重新约束搜索框与右侧控件，避免和上面的基准样式打架。 */
+@media (max-width: 900px) {
+  .adm-header {
+    padding: 0 10px;
+    gap: 8px;
+  }
+  .adm-header-right {
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 4px;
+    justify-content: flex-end;
+  }
+  .adm-search-wrap {
+    flex: 0 1 160px;
+    min-width: 0;
+  }
+  .adm-search {
+    width: 100%;
+  }
+  .adm-search-panel {
+    width: min(420px, calc(100vw - 20px));
+  }
+}
+
+@media (max-width: 420px) {
+  .adm-search-wrap {
+    flex-basis: 112px;
+  }
+  .adm-search-shortcut {
+    display: none;
+  }
+}
+
+/* ───────── 去除水印：参考站 watermark-removal-page 上传态 (2026-10-27) ─────────
+ *
+ * 这页与局部重绘共用 redraw-* 基础类，但参考站只暴露「抓手 / 对比 / 框选」，
+ * 工具栏固定 210px，可见标注是 DOM，不是交互 canvas。规则放在文件末尾，
+ * 避免被局部重绘的 532px 工具栏和画笔样式覆盖。
+ */
+.pk-workspace.watermark-removal-page .local-redraw-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.pk-workspace.watermark-removal-page .redraw-toolbar {
+  box-sizing: border-box;
+  width: 210px;
+  max-width: calc(100% - 32px);
+  height: 40px;
+  min-height: 40px;
+  padding: 0 16px;
+  gap: 6px;
+  flex-wrap: nowrap;
+  justify-content: center;
+  overflow: hidden;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(107, 114, 128, 0.2);
+}
+.pk-workspace.watermark-removal-page .toolbar-item-wrap {
+  display: contents;
+}
+.pk-workspace.watermark-removal-page .redraw-tool-btn {
+  box-sizing: border-box;
+  align-self: center;
+  height: 30px;
+  padding: 4px;
+  gap: 4px;
+  border-radius: 6px;
+  color: #596273;
+  font-size: 12px;
+}
+.pk-workspace.watermark-removal-page .redraw-tool-btn > svg {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+}
+.pk-workspace.watermark-removal-page .redraw-tool-btn.active {
+  color: #5546d8;
+  background: #f0edff;
+  box-shadow: inset 0 0 0 1px rgba(85, 70, 216, 0.1);
+}
+.pk-workspace.watermark-removal-page .redraw-tool-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.pk-workspace.watermark-removal-page .toolbar-divider {
+  flex: 0 0 1px;
+  width: 1px;
+  height: 16px;
+  margin: 0;
+  background: #e5e7ef;
+}
+
+.pk-workspace.watermark-removal-page .redraw-canvas-wrap {
+  transform-origin: 50% 50%;
+}
+.pk-workspace.watermark-removal-page .redraw-canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #eef1f5;
+  touch-action: none;
+  user-select: none;
+  overscroll-behavior: contain;
+}
+.pk-workspace.watermark-removal-page .redraw-canvas.tool-rect {
+  cursor: crosshair;
+}
+.pk-workspace.watermark-removal-page .redraw-canvas.tool-hand {
+  cursor: grab;
+}
+.pk-workspace.watermark-removal-page .redraw-canvas.tool-hand.is-panning {
+  cursor: grabbing;
+}
+.pk-workspace.watermark-removal-page .redraw-image-frame {
+  position: absolute;
+  overflow: hidden;
+  background: #fff;
+  touch-action: none;
+}
+.pk-workspace.watermark-removal-page .redraw-image-frame > .canvas-original {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.pk-workspace.watermark-removal-page .source-row {
+  gap: 12px;
+}
+.pk-workspace.watermark-removal-page .source-row > div button {
+  min-width: 88px;
+  height: 40px;
+  padding: 0 12px;
+}
+
+.pk-workspace.watermark-removal-page .watermark-mark-card {
+  gap: 16px;
+}
+.pk-workspace.watermark-removal-page .watermark-mark-card .pk-required-mark {
+  margin-right: 8px;
+}
+.pk-workspace.watermark-removal-page .watermark-annotation-row .redraw-prompt-label {
+  grid-area: 1 / 1;
+}
+.pk-workspace.watermark-removal-page .annotation-mark-preview {
+  grid-area: 1 / 2 / 3 / 3;
+  align-self: center;
+  width: 64px;
+  height: 64px;
+}
+.pk-workspace.watermark-removal-page .annotation-mark-preview > img {
+  display: block;
+  object-fit: fill;
+}
+.pk-workspace.watermark-removal-page .annotation-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(51, 51, 51, 0.78);
+  color: #fff;
+  cursor: pointer;
+}
+.pk-workspace.watermark-removal-page .annotation-remove:hover,
+.pk-workspace.watermark-removal-page .annotation-remove:focus-visible {
+  background: rgba(31, 35, 41, 0.92);
+  outline: none;
+}
+
+.pk-workspace.watermark-removal-page .redraw-canvas-footer {
+  height: 40px;
+  padding: 0 16px;
+  gap: 8px;
+  bottom: 45px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(107, 114, 128, 0.16);
+}
+.pk-workspace.watermark-removal-page .redraw-footer-btn {
+  width: 51px;
+  height: 18px;
+  padding: 0;
+  gap: 4px;
+  justify-content: center;
+  color: #86909c;
+  font-size: 12px;
+}
+.pk-workspace.watermark-removal-page .redraw-footer-btn > svg {
+  width: 16px;
+  height: 16px;
+}
+.pk-workspace.watermark-removal-page .redraw-footer-btn:disabled {
+  opacity: 0.35;
+}
+.pk-workspace.watermark-removal-page .redraw-zoom-btn {
+  width: 26px;
+  justify-content: center;
+}
+.pk-workspace.watermark-removal-page .redraw-canvas-footer .redraw-zoom-value {
+  width: 31px;
+  min-width: 31px;
+  text-align: center;
+  color: #333;
+  font-size: 12px;
+}
+.pk-workspace.watermark-removal-page .redraw-shortcut-hint {
+  bottom: 8px;
+  color: #9aa1ad;
+  font-size: 11px;
+  line-height: normal;
+}
+.pk-workspace.watermark-removal-page .pk-primary-btn {
+  background: linear-gradient(90deg, #8064f6, #5546d8);
+}
+
+@media (max-width: 1180px) {
+  .pk-workspace.watermark-removal-page .local-redraw-stage {
+    min-height: 720px;
+  }
+}
+
+@media (max-width: 900px) {
+  .pk-workspace.watermark-removal-page .redraw-stage-topbar {
+    left: 0;
+    width: calc(100% - 24px);
+    transform: none;
+  }
+  .pk-workspace.watermark-removal-page .redraw-toolbar {
+    max-width: 100%;
+  }
+  .pk-workspace.watermark-removal-page .redraw-canvas-wrap {
+    width: min(600px, calc(100% - 24px));
+  }
+  .pk-workspace.watermark-removal-page .redraw-canvas-footer .redraw-footer-btn {
+    box-sizing: border-box;
+    width: 40px;
+    height: 18.5px;
+    padding: 1px 6px;
+  }
+  .pk-workspace.watermark-removal-page .redraw-canvas-footer .redraw-tool-divider {
+    width: 0;
+  }
+  .pk-workspace.watermark-removal-page .redraw-canvas-footer .redraw-zoom-btn {
+    box-sizing: border-box;
+    width: 12.5px;
+    height: 18px;
+    padding: 1px 6px;
+  }
+  .pk-workspace.watermark-removal-page .redraw-canvas-footer .redraw-zoom-value {
+    width: 30.9px;
+    min-width: 30.9px;
   }
 }

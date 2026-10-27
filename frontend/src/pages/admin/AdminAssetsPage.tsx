@@ -20,7 +20,6 @@ import {
   AdminListError,
   AdminListLoading,
   AdminStaleError,
-  ConfirmAction,
   adminPagination,
   useAdminList,
 } from '../../components/admin/AdminWidgets';
@@ -61,8 +60,6 @@ const assetLabel = (a: Row): string =>
 
 const fmtFormat = (format: string): string =>
   format ? (format.split('/').pop() ?? format).toUpperCase() : '—';
-
-type DeleteImpact = { sizeBytes: number; tasks: number; storageBackend?: string };
 
 /** 缩略图失败时保留稳定占位，避免破图图标破坏网格节奏 */
 function AssetThumb({
@@ -112,13 +109,6 @@ export function AdminAssetsPage() {
   const [busy, setBusy] = useState(false);
   const [statusBusyId, setStatusBusyId] = useState<string | null>(null);
   const [previewId, setPreviewId] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Row | null>(null);
-  const [deleteImpact, setDeleteImpact] = useState<DeleteImpact | null>(null);
-  const [deleteImpactError, setDeleteImpactError] = useState<string | null>(null);
-  const [deleteImpactLoading, setDeleteImpactLoading] = useState(false);
-  const deleteImpactSeq = useRef(0);
-  /** 批量删除需要二次确认: 它会连磁盘文件一起删, 不可恢复 */
-  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
   const [batchSummary, setBatchSummary] = useState<BatchSummary<unknown> | null>(null);
   const [batchTitle, setBatchTitle] = useState('');
 
@@ -268,7 +258,6 @@ export function AdminAssetsPage() {
         action === 'hide' ? '批量下架结果' : action === 'show' ? '批量恢复结果' : '批量删除结果',
       );
       setBatchSummary(summary);
-      setBatchDeleteOpen(false);
       setSelected([]);
       reload();
     } catch (e) {
@@ -292,49 +281,23 @@ export function AdminAssetsPage() {
     }
   };
 
-  const openDelete = useCallback((row: Row) => {
-    const seq = ++deleteImpactSeq.current;
-    setPreviewId(null);
-    setDeleteTarget(row);
-    setDeleteImpact(null);
-    setDeleteImpactError(null);
-    setDeleteImpactLoading(true);
-    adminAssetsApi
-      .impact(row.id)
-      .then((impact) => {
-        if (seq === deleteImpactSeq.current) setDeleteImpact(impact);
-      })
-      .catch((e: unknown) => {
-        if (seq !== deleteImpactSeq.current) return;
-        setDeleteImpactError(e instanceof Error ? e.message : '影响统计失败');
-      })
-      .finally(() => {
-        if (seq === deleteImpactSeq.current) setDeleteImpactLoading(false);
-      });
-  }, []);
-
-  const closeDelete = useCallback(() => {
-    deleteImpactSeq.current += 1;
-    setDeleteTarget(null);
-    setDeleteImpact(null);
-    setDeleteImpactError(null);
-    setDeleteImpactLoading(false);
-  }, []);
-
-  const doDelete = async () => {
-    if (!deleteTarget) return;
-    setBusy(true);
-    try {
-      const res = await adminAssetsApi.remove(deleteTarget.id);
-      closeDelete();
-      void message.success(`已删除，连带清理 ${res.removedTasks} 条任务记录`);
-      reload();
-    } catch (e) {
-      void message.error((e as Error).message);
-    } finally {
-      setBusy(false);
-    }
-  };
+  /** 删除按产品要求直接执行，不再弹窗二次确认 */
+  const openDelete = useCallback(
+    async (row: Row) => {
+      setPreviewId(null);
+      setBusy(true);
+      try {
+        const res = await adminAssetsApi.remove(row.id);
+        void message.success(`已删除，连带清理 ${res.removedTasks} 条任务记录`);
+        reload();
+      } catch (e) {
+        void message.error((e as Error).message);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [reload],
+  );
 
   const columns: ColumnsType<Row> = useMemo(
     () => [
@@ -437,7 +400,7 @@ export function AdminAssetsPage() {
               <Button
                 type="link" danger
                 className="adm-link is-danger"
-                onClick={() => openDelete(row)}
+                onClick={() => void openDelete(row)}
               >
                 删除
               </Button>
@@ -640,7 +603,7 @@ export function AdminAssetsPage() {
               type="primary"
               danger
               className="adm-btn is-danger"
-              onClick={() => setBatchDeleteOpen(true)}
+              onClick={() => void runBatch('delete')}
               disabled={busy}
             >
               批量删除
@@ -737,7 +700,7 @@ export function AdminAssetsPage() {
                         className="adm-asset-action is-danger"
                         title="永久删除"
                         aria-label="永久删除素材"
-                        onClick={() => openDelete(a)}
+                        onClick={() => void openDelete(a)}
                       >
                         <Trash2 size={15} />
                       </button>
@@ -854,7 +817,7 @@ export function AdminAssetsPage() {
                   <button
                     type="button"
                     className="img-viewer-action is-danger"
-                    onClick={() => openDelete(asset)}
+                    onClick={() => void openDelete(asset)}
                   >
                     <Trash2 size={14} />
                     删除
@@ -863,77 +826,6 @@ export function AdminAssetsPage() {
               </div>
             );
           }}
-        />
-      )}
-
-      {deleteTarget && (
-        <ConfirmAction
-          open
-          title="删除素材"
-          confirmText="永久删除"
-          danger
-          requireTyping
-          typingText="删除"
-          loading={busy}
-          confirmDisabled={deleteImpactLoading}
-          onCancel={closeDelete}
-          onConfirm={() => void doDelete()}
-          description={
-            <>
-              <p>删除后素材文件与其产出任务都会被清理，操作不可恢复。</p>
-              <p className="adm-cell-sub">
-                {assetLabel(deleteTarget)} · {deleteTarget.ownerEmail}
-                <br />
-                存储位置：{BACKEND_LABEL[deleteTarget.storageBackend] ?? deleteTarget.storageBackend} ·{' '}
-                {deleteTarget.storageKey}
-              </p>
-            </>
-          }
-          impact={
-            deleteImpactLoading
-              ? ['正在统计删除影响…']
-              : deleteImpact
-                ? [
-                    `文件大小 ${fmtBytes(deleteImpact.sizeBytes)} 将被释放`,
-                    `关联的 ${deleteImpact.tasks} 条产出任务记录会一并删除`,
-                    '若为云端素材，仅删除当前后端上的副本',
-                  ]
-                : [
-                    deleteImpactError
-                      ? `影响统计失败：${deleteImpactError}`
-                      : '未能获取服务端影响统计',
-                    `列表记录的文件大小为 ${fmtBytes(deleteTarget.sizeBytes)}，任务记录数未知`,
-                    '删除仍会清理素材文件；若云端删除失败，记录会保留并可重试',
-                  ]
-          }
-        />
-      )}
-
-      {/* 批量删除: 连磁盘文件一起删, 必须二次确认并输入确认词 */}
-      {batchDeleteOpen && (
-        <ConfirmAction
-          open
-          title={`批量删除 ${selected.length} 张素材`}
-          confirmText="永久删除"
-          danger
-          requireTyping
-          typingText="删除"
-          loading={busy}
-          description={
-            <>
-              <p>选中的素材文件会被移除，产出它们的历史任务记录也一并清理，操作不可恢复。</p>
-              <p className="adm-cell-sub">
-                已选中的素材中，失败项会在结果里逐条列出原因（例如文件已不存在）。
-              </p>
-            </>
-          }
-          impact={[
-            `共 ${selected.length} 张素材`,
-            '其磁盘 / 云端文件将被删除',
-            '产出这些素材的生成任务记录会一并清理',
-          ]}
-          onCancel={() => setBatchDeleteOpen(false)}
-          onConfirm={() => void runBatch('delete')}
         />
       )}
 

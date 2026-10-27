@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { App, Button, InputNumber, Popconfirm, Table, Tooltip } from 'antd';
+import { App, Button, InputNumber, Table, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { adminCreditPricesApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
@@ -9,6 +9,7 @@ import {
   AdminListLoading,
   AdminStaleError,
   useAdminResource,
+  ConfirmAction,
 } from '../../components/admin/AdminWidgets';
 import { AdminEmpty, PageHeader, Panel } from '../../components/admin/PageHeader';
 import type { AdminCreditPrice } from '../../types/api';
@@ -31,6 +32,8 @@ export function AdminCreditPricesPage() {
   const [saving, setSaving] = useState<string | null>(null);
   /** 本地草稿: key = capabilityId, value = 输入框里的数字 */
   const [draft, setDraft] = useState<Record<string, number>>({});
+  /** 回退确认：选中的行 */
+  const [rowForReset, setRowForReset] = useState<AdminCreditPrice | null>(null);
 
   // 接口历史上有过直接回数组与回 { items } 两种形状, 统一兜成数组
   const { data, loading, error, reload } = useAdminResource(async () => {
@@ -80,6 +83,7 @@ export function AdminCreditPricesPage() {
       message.error((e as Error).message || '回落失败');
     } finally {
       setSaving(null);
+      setRowForReset(null);
     }
   };
 
@@ -102,10 +106,13 @@ export function AdminCreditPricesPage() {
           max={10000}
           size="small"
           value={draft[row.capabilityId]}
+          disabled={!writable}
           onChange={(v) =>
             setDraft((d) => ({ ...d, [row.capabilityId]: Number(v ?? 0) }))
           }
-          onPressEnter={() => void save(row)}
+          onPressEnter={() => {
+            if (writable) void save(row);
+          }}
           style={{ width: 110 }}
         />
       ),
@@ -162,24 +169,33 @@ export function AdminCreditPricesPage() {
             <Button
               size="small"
               type="primary"
-              disabled={!dirty}
+              disabled={!writable || !dirty}
               loading={saving === row.capabilityId}
               onClick={() => void save(row)}
             >
               保存
             </Button>
             {row.overridden ? (
-              <Popconfirm
-                title="回落到代码默认值？"
-                description={`将从 ${row.cost} 恢复为 ${row.registryDefault} 积分`}
-                onConfirm={() => void reset(row)}
-                okText="回落"
-                cancelText="取消"
-              >
-                <Button size="small" disabled={saving === row.capabilityId}>
+              <>
+                <Button
+                  size="small"
+                  danger
+                  disabled={!writable || saving === row.capabilityId}
+                  onClick={() => setRowForReset(row)}
+                >
                   回落默认
                 </Button>
-              </Popconfirm>
+                <ConfirmAction
+                  open={rowForReset?.capabilityId === row.capabilityId}
+                  title="回落到代码默认值？"
+                  description={`将从 ${row.cost} 恢复为 ${row.registryDefault} 积分`}
+                  impact={[`恢复 ${row.capabilityName} 价格为 ${row.registryDefault} 积分`]}
+                  danger
+                  loading={saving === row.capabilityId}
+                  onCancel={() => setRowForReset(null)}
+                  onConfirm={() => rowForReset && void reset(rowForReset)}
+                />
+              </>
             ) : (
               <Button size="small" disabled title="该项未覆盖，无需回落">
                 回落默认
@@ -195,7 +211,11 @@ export function AdminCreditPricesPage() {
     <>
       <PageHeader
         title="能力消耗价"
-        description="每次生成实际扣除的积分。保存后立即对 C 端展示与生成扣费生效，已创建的任务按当时价格不变。"
+        description={
+          writable
+            ? '每次生成实际扣除的积分。保存后立即对 C 端展示与生成扣费生效，已创建的任务按当时价格不变。'
+            : '当前账号只有 product.price 的读权限（或无此权限），可查看价格但不能修改。'
+        }
       />
 
       <Panel

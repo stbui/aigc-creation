@@ -1,4 +1,4 @@
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, X } from 'lucide-react';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { ratioOptions, resolutionOptions } from '../lib/optionSets';
 
@@ -107,12 +107,25 @@ export function ToolSettingsPopover({
           {...(popoverRole ? { role: popoverRole } : {})}
           {...(popoverAriaLabel ? { 'aria-label': popoverAriaLabel } : {})}
         >
-          {header}
+          {header ?? (
+            <div className="pk-settings-popover-head">
+              <h2>高级设置</h2>
+              <button
+                type="button"
+                className="pk-settings-close"
+                aria-label="关闭高级设置"
+                title="关闭"
+                onClick={onClose ?? onToggle}
+              >
+                <X size={18} />
+              </button>
+            </div>
+          )}
           {showRatio && (
             <div className="pk-settings-group">
               <strong className="pk-settings-group-label">图片比例</strong>
               <div className="pk-ratio-grid">
-                {ratioOptions().map((o) => {
+                {ratioOptions(capabilityId).map((o) => {
                   const v = String(o.value);
                   return (
                     <button

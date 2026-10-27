@@ -296,3 +296,13 @@ cd backend && node -e "console.log(require('./scripts/db-url').resolveDbPath())"
 2. 页面样式：间距、尺寸、字号、行高、圆角、边框、阴影、按钮状态、禁用态、画布比例和背景。
 3. 页面交互：上传、拖拽、粘贴、素材库、手机上传、画笔/橡皮/矩形/椭圆/手型、撤销/重做、缩放、标注选择、移动和缩放、标注上限、历史记录。
 4. 页面功能：底图上传、遮罩生成、逐标注提示词、逐标注参考图、生成请求、轮询、结果展示、失败退款、未登录 / 无通道 / 余额不足等状态。
+
+
+
+帮我编写提示词：
+页面布局，页面样式，页面交互，页面功能，还有差别
+【分析代码】
+- JS：https://ijihua.cn/assets/index-Do3-_JpH.js
+- CSS：https://ijihua.cn/assets/index-lrpwPXNE.css
+
+多图融合

@@ -1,8 +1,13 @@
 import { readFile } from 'fs/promises';
 import { extname } from 'path';
 import { gatewayConfig } from './gateway.config';
-import { GatewayUnavailableError, MaskUnsupportedError, type GatewayResult } from './gateway.types';
-import { detectImageFormat } from './image-format';
+import {
+  GatewayUnavailableError,
+  ImageEditUnsupportedError,
+  MaskUnsupportedError,
+  type GatewayResult,
+} from './gateway.types';
+import { detectImageFormat, readImageDimensions } from './image-format';
 import { protocolSpec, type ProtocolSpec } from './protocols/protocol.spec';
 
 /**
@@ -196,6 +201,7 @@ export abstract class BaseImageProvider {
     params: Record<string, any>,
     prompt: string,
     maskPath?: string,
+    requireImageEdit = false,
   ): Promise<GatewayResult> {
     const cfg = this.cfg;
     // 通道级凭据优先于全局配置 (多渠道下每家地址/令牌/模型都不同)
@@ -207,12 +213,15 @@ export abstract class BaseImageProvider {
     const model = creds.model || spec.defaultModel;
     const promptText = prompt || String(params.prompt ?? '');
 
-    if (maskPath && (spec.maskSupport !== 'edits' || !spec.maskEndpoint)) {
-      throw new MaskUnsupportedError(`${spec.label} (${spec.protocol}) 没有图像编辑端点`);
+    const useEditEndpoint = Boolean(maskPath) || (requireImageEdit && inputPaths.length > 0);
+    if (useEditEndpoint && (spec.maskSupport !== 'edits' || !spec.maskEndpoint)) {
+      throw maskPath
+        ? new MaskUnsupportedError(`${spec.label} (${spec.protocol}) 没有图像编辑端点`)
+        : new ImageEditUnsupportedError(`${spec.label} (${spec.protocol}) 没有图像编辑端点`);
     }
 
-    if (maskPath) {
-      return this.generateWithMask(creds, spec, model, inputPaths[0], maskPath, promptText, params);
+    if (useEditEndpoint) {
+      return this.generateWithEdit(creds, spec, model, inputPaths[0], maskPath, promptText, params);
     }
 
     const refs =
@@ -275,12 +284,12 @@ export abstract class BaseImageProvider {
    * 失败语义与 generate 完全一致：HTTP 非 2xx / 业务错误 / 无产出图都抛
    * `GatewayUnavailableError`，由路由器决定换通道还是判失败。
    */
-  private async generateWithMask(
+  private async generateWithEdit(
     creds: { baseUrl: string; token: string; model: string },
     spec: ProtocolSpec,
     model: string,
     imagePath: string | undefined,
-    maskPath: string,
+    maskPath: string | undefined,
     promptText: string,
     params: Record<string, any>,
   ): Promise<GatewayResult> {
@@ -288,19 +297,35 @@ export abstract class BaseImageProvider {
       throw new GatewayUnavailableError('缺少待编辑的原图', '遮罩重绘需要 1 张输入图');
     }
     const imageBuf = await readFile(imagePath).catch(() => null);
-    const maskBuf = await readFile(maskPath).catch(() => null);
     if (!imageBuf) throw new GatewayUnavailableError('读取原图失败', imagePath);
-    if (!maskBuf) throw new GatewayUnavailableError('读取遮罩失败', maskPath);
+    const maskBuf = maskPath ? await readFile(maskPath).catch(() => null) : undefined;
+    if (maskPath && !maskBuf) throw new GatewayUnavailableError('读取遮罩失败', maskPath);
 
     const form = new FormData();
     form.append('model', model);
     form.append('prompt', promptText);
     form.append('n', '1');
     form.append('image', new Blob([imageBuf], { type: mimeOf(imagePath) }), fileNameOf(imagePath));
-    // 遮罩必须是 PNG（OpenAI 文档硬要求），且与 image 同尺寸 —— 前端按原图尺寸生成
-    form.append('mask', new Blob([maskBuf], { type: 'image/png' }), 'mask.png');
-    const size = buildSize(spec.sizeStyle, channelRatio(params), channelQuality(params));
-    if (size) form.append(size.field, size.value);
+    if (maskBuf) {
+      // 遮罩必须是 PNG（OpenAI 文档硬要求），且与 image 同尺寸 —— 前端按原图尺寸生成
+      form.append('mask', new Blob([maskBuf], { type: 'image/png' }), 'mask.png');
+    }
+    /*
+     * “原比例”要翻译成原图的**具体像素比**。
+     *
+     * 第一版直接省略 size，期待服务端沿用底图比例；实测 a6api 的 edits 通道
+     * 会按默认正方形出图，960×1280 的水壶变成 1254×1254，两侧出现大片留白。
+     * 故从文件头读尺寸，转换为 `宽:高` 后再走既有尺寸换算。
+     */
+    // 未声明比例的能力（手动去水印 / 图片翻译）同样应保持输入图画幅，
+    // 不能把「没有 ratio 字段」误当成默认正方形。
+    const requestedRatio = channelRatio(params) ?? 'original';
+    const dimensions = requestedRatio === 'original' ? readImageDimensions(imageBuf) : null;
+    const editRatio = dimensions ? `${dimensions.width}:${dimensions.height}` : requestedRatio;
+    if (editRatio !== 'original') {
+      const size = buildSize(spec.sizeStyle, editRatio, channelQuality(params));
+      if (size) form.append(size.field, size.value);
+    }
 
     const json = await this.postMultipart(creds.baseUrl, creds.token, spec.maskEndpoint!(creds.baseUrl), form);
 

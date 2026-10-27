@@ -1,8 +1,8 @@
 /**
  * 智能扩图的 placement 几何（与参考站 D_ / SMART_EXPAND 一致）。
  *
- * 参考站提交的 placementWidth/Height 不是「原图占比」原样复制，而是把原图按
- * `min(画布宽/原图宽, 画布高/原图高) * 占比` 放进目标画布后的实际归一化尺寸。
+ * 「原比例」沿用源图画幅，占比同时作用于宽高；固定比例则把原图按
+ * `min(画布宽/原图宽, 画布高/原图高) * 占比` 放进目标画布后再归一化。
  * 当原图与目标画幅比例不同，宽高必然不相等；仅按 occupy/100 提交会让服务端
  * 把原图拉伸到错误比例。
  */
@@ -26,6 +26,8 @@ export interface ExpandPlacement {
 }
 
 const CANVAS_BY_RATIO: Record<string, { width: number; height: number }> = {
+  /* 源图尺寸未就绪时的占位；真正的原比例画幅由源图宽高决定。 */
+  original: { width: 1, height: 1 },
   '1:1': { width: 1024, height: 1024 },
   '3:4': { width: 864, height: 1152 },
   '4:3': { width: 1152, height: 864 },
@@ -44,6 +46,19 @@ function parseRatio(ratio: string | undefined, fallbackWidth: number, fallbackHe
   return w > 0 && h > 0 ? { width: w, height: h } : { width: fallbackWidth, height: fallbackHeight };
 }
 
+/** 预览盒的 aspect-ratio 与提交 placement 共用同一份目标画布定义。 */
+export function getExpandCanvasAspect(
+  targetRatio: string,
+  sourceWidth?: number,
+  sourceHeight?: number,
+): string {
+  if (targetRatio === 'original' && sourceWidth && sourceHeight) {
+    return `${sourceWidth} / ${sourceHeight}`;
+  }
+  const canvas = CANVAS_BY_RATIO[targetRatio] ?? parseRatio(targetRatio, 1, 1);
+  return `${canvas.width} / ${canvas.height}`;
+}
+
 export function computeExpandPlacement(
   sourceWidth: number,
   sourceHeight: number,
@@ -54,13 +69,13 @@ export function computeExpandPlacement(
   const width = Math.max(1, sourceWidth);
   const height = Math.max(1, sourceHeight);
   /*
-   * 「原比例」保持源图宽高比；指定比例用参考站的 1024 级画布。
-   * placement 是归一化值，画布像素尺寸不影响结果，只要宽高比一致。
+   * 「原比例」保持源图画幅，此时 occupy 同时作用于宽高（参考站默认
+   * 80% 即 80%×80%）。固定比例如 4:3 才使用目标画布做 contain 计算。
    */
   const canvas =
     targetRatio === 'original'
       ? { width, height }
-      : CANVAS_BY_RATIO[targetRatio] ?? parseRatio(targetRatio, 1, 1);
+      : (CANVAS_BY_RATIO[targetRatio] ?? parseRatio(targetRatio, 1, 1));
   const share = Math.max(0.01, Math.min(1, occupy / 100));
   const scale = Math.min(canvas.width / width, canvas.height / height) * share;
   const frameWidth = width * scale;

@@ -59,6 +59,7 @@ export function StateSkeleton({
         <div key={i} className="state-skeleton-item">
           {variant === 'card' && <span className="state-skeleton-thumb" />}
           {variant === 'panel' && <span className="state-skeleton-line is-wide" />}
+          {variant === 'block' && <span className="state-skeleton-block" />}
           {variant !== 'block' && <span className="state-skeleton-line" />}
           {variant !== 'block' && <span className="state-skeleton-line is-short" />}
         </div>

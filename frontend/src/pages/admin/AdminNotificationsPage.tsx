@@ -7,7 +7,6 @@ import {
   AdminListError,
   AdminListLoading,
   AdminStaleError,
-  ConfirmAction,
   adminMiniPagination,
   useAdminResource,
 } from '../../components/admin/AdminWidgets';
@@ -46,7 +45,6 @@ export function AdminNotificationsPage() {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [link, setLink] = useState('');
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const [sending, setSending] = useState(false);
   const [sentResult, setSentResult] = useState<{ sent: number; users: number } | null>(null);
 
@@ -93,7 +91,6 @@ export function AdminNotificationsPage() {
       setTitle('');
       setBody('');
       setLink('');
-      setConfirmOpen(false);
     } catch (e) {
       message.error(e instanceof Error ? e.message : '发送失败');
     } finally {
@@ -264,8 +261,9 @@ export function AdminNotificationsPage() {
             <Button
               type="primary"
               danger
-              disabled={!writable || !broadcastReady}
-              onClick={() => setConfirmOpen(true)}
+              disabled={!writable || !broadcastReady || sending}
+              loading={sending}
+              onClick={() => void doBroadcast()}
             >
               发送广播
             </Button>
@@ -296,6 +294,7 @@ export function AdminNotificationsPage() {
             columns={columns}
             dataSource={templates}
             pagination={adminMiniPagination()}
+            scroll={{ x: 760 }}
           />
         )}
         <div className="adm-field-hint" style={{ marginTop: 12 }}>
@@ -304,17 +303,6 @@ export function AdminNotificationsPage() {
           验证码与重置密码的邮件 / 短信走独立通道（console / http / aliyun，见环境变量），不读这些模板。
         </div>
       </Panel>
-
-      <ConfirmAction
-        open={confirmOpen}
-        title="确认发送全站广播"
-        description={`将向所有活跃账号写入这条站内消息，发送后无法撤回。标题：${title}`}
-        danger
-        confirmText="发送"
-        loading={sending}
-        onConfirm={() => void doBroadcast()}
-        onCancel={() => setConfirmOpen(false)}
-      />
 
       <Drawer
         open={formOpen}

@@ -28,8 +28,10 @@ export const ImageTranslate: CapabilityPlugin = {
   ],
   buildPrompt: (p) =>
     `图片内文字翻译为 ${p.targetLanguage || p.targetLang || 'zh-CN'}：保持原版式、字号与颜色不变，` +
-    `只替换文字内容${p.protectSubject ? '，商品主体像素不得改动' : ''}`,
+    `只替换文字内容${p.protectSubject ? '，商品主体像素不得改动' : ''}。` +
+    `不得改变画幅、构图、商品与背景，不得新增或删除画面元素。`,
   modality: 'image',
   inputs: 1,
+  inputImageMode: 'edit',
   inWorkbench: true,
 };

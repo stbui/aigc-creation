@@ -89,6 +89,8 @@ export function AdminModelCallsPage() {
     [data],
   );
 
+  const hasFilter = Boolean(capability || source || success || fallback);
+
   const reset = () => {
     setCapability(undefined);
     setSource(undefined);
@@ -303,7 +305,20 @@ export function AdminModelCallsPage() {
         ) : error && !data ? (
           <AdminListError error={error} onRetry={reload} />
         ) : (list?.items.length ?? 0) === 0 ? (
-          <AdminEmpty description="暂无调用记录。在前台任意生成一次（如下「自由创作」页），这里就会出现明细。" />
+          <AdminEmpty
+            description={
+              hasFilter
+                ? '没有符合条件的调用记录。清除筛选后再试。'
+                : '暂无调用记录。在前台任意生成一次（如下「自由创作」页），这里就会出现明细。'
+            }
+            action={
+              hasFilter ? (
+                <Button type="default" className="adm-btn" onClick={reset}>
+                  清除筛选
+                </Button>
+              ) : undefined
+            }
+          />
         ) : (
           <Table<Row>
             rowKey="id"

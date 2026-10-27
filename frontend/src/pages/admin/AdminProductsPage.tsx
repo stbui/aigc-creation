@@ -1,14 +1,13 @@
 import { useCallback, useMemo, useState } from 'react';
 import { App, Button, Drawer, Input, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { Pencil, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { adminProductsApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import {
   AdminListError,
   AdminStaleError,
   AdminListLoading,
-  ConfirmAction,
   useAdminList,
 } from '../../components/admin/AdminWidgets';
 import {
@@ -107,7 +106,7 @@ export function AdminProductsPage() {
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState<ProductDraft>(EMPTY_DRAFT);
   const [saving, setSaving] = useState(false);
-  const [toggling, setToggling] = useState<AdminProduct | null>(null);
+
 
   /**
    * 商品不分组不分页: 积分包/会员套餐一类的 SKU 通常只有个位数到几十个,
@@ -221,14 +220,13 @@ export function AdminProductsPage() {
     }
   };
 
-  const runToggle = async () => {
-    if (!toggling) return;
-    const next = toggling.status === 'active' ? 'offline' : 'active';
+  /** 上下架可随时再切回，按产品要求直接执行，不再弹窗确认 */
+  const runToggle = async (row: AdminProduct) => {
+    const next = row.status === 'active' ? 'offline' : 'active';
     setSaving(true);
     try {
-      await adminProductsApi.setStatus(toggling.id, next);
+      await adminProductsApi.setStatus(row.id, next);
       void message.success(next === 'active' ? '已上架' : '已下架');
-      setToggling(null);
       reload();
     } catch (e) {
       void message.error(e instanceof Error ? e.message : '操作失败');
@@ -330,7 +328,8 @@ export function AdminProductsPage() {
               <Button
                 type="default"
                 className={`adm-link${row.status === 'active' ? ' is-danger' : ''}`}
-                onClick={() => setToggling(row)}
+                disabled={saving}
+                onClick={() => void runToggle(row)}
               >
                 {row.status === 'active' ? '下架' : '上架'}
               </Button>
@@ -409,6 +408,20 @@ export function AdminProductsPage() {
               status
                 ? '当前筛选下没有商品。切换状态或清除筛选看看。'
                 : '还没有商品。新建一个积分包，C 端结算页才会出现可购买项。'
+            }
+            action={
+              status ? (
+                <Button
+                  type="default"
+                  className="adm-btn"
+                  onClick={() => {
+                    setStatus(undefined);
+                    setQuery({ status: undefined });
+                  }}
+                >
+                  清除筛选
+                </Button>
+              ) : undefined
             }
           />
         ) : (
@@ -577,35 +590,6 @@ export function AdminProductsPage() {
         </div>
       </Drawer>
 
-      {toggling && (
-        <ConfirmAction
-          open
-          title={toggling.status === 'active' ? '下架商品' : '上架商品'}
-          confirmText={toggling.status === 'active' ? '确认下架' : '确认上架'}
-          danger={toggling.status === 'active'}
-          loading={saving}
-          onCancel={() => setToggling(null)}
-          onConfirm={() => void runToggle()}
-          description={
-            <p>
-              {toggling.status === 'active'
-                ? '下架后 C 端结算页不再展示该商品，已下单未支付的订单仍可继续支付。'
-                : '上架后该商品立即出现在 C 端结算页，可被下单购买。'}
-            </p>
-          }
-          impact={[
-            `${toggling.name}（${toggling.sku}）`,
-            `售价 ¥ ${centsToYuanText(toggling.priceCents)} · 赠送 ${toggling.credits} 积分`,
-            toggling.status === 'active' ? '不影响历史订单与已发放积分' : '将真实产生交易',
-          ]}
-          extra={
-            <div className="adm-confirm-warn">
-              <Pencil size={14} />
-              <span>若只是想调价，请用「编辑」而不是反复上下架。</span>
-            </div>
-          }
-        />
-      )}
     </>
   );
 }

@@ -123,6 +123,8 @@ export interface ImageProvider {
     inputPaths: string[],
     params: Record<string, any>,
     maskPath?: string,
+    /** 输入图必须作为编辑底图，不能走生成端点（如商品换色）。 */
+    requireImageEdit?: boolean,
   ): Promise<ImageOutcome>;
 }
 

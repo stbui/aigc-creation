@@ -9,7 +9,6 @@ import {
   AdminListError,
   AdminListLoading,
   AdminStaleError,
-  ConfirmAction,
   adminMiniPagination,
   adminPagination,
   useAdminList,
@@ -112,6 +111,8 @@ export function AdminCreditsPage() {
       { balance: 0, expiring: 0 },
     );
   }, [rows]);
+
+  const hasFilter = Boolean(email || userId);
 
   const applyQuery = () =>
     setQuery({ email: email.trim() || undefined, userId: userId.trim() || undefined });
@@ -264,6 +265,7 @@ export function AdminCreditsPage() {
           placeholder="邮箱"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          onPressEnter={applyQuery}
           allowClear
         />
         <Input
@@ -271,6 +273,7 @@ export function AdminCreditsPage() {
           placeholder="用户 ID（精确）"
           value={userId}
           onChange={(e) => setUserId(e.target.value)}
+          onPressEnter={applyQuery}
           allowClear
         />
         <FilterActions>
@@ -292,7 +295,16 @@ export function AdminCreditsPage() {
         ) : error && !data ? (
           <AdminListError error={error} onRetry={reload} />
         ) : rows.length === 0 ? (
-          <AdminEmpty description="没有符合条件的用户。" />
+          <AdminEmpty
+            description={hasFilter ? '没有符合条件的用户。' : '还没有可查看的用户。'}
+            action={
+              hasFilter ? (
+                <Button type="default" className="adm-btn" onClick={reset}>
+                  清除筛选
+                </Button>
+              ) : undefined
+            }
+          />
         ) : (
           <Table<AdminCreditRow>
             rowKey="userId"
@@ -376,7 +388,7 @@ function CreditDetailDrawer({
   const [delta, setDelta] = useState('');
   const [reason, setReason] = useState('');
   const [validDays, setValidDays] = useState('');
-  const [confirming, setConfirming] = useState(false);
+
   const [busy, setBusy] = useState(false);
 
   /*
@@ -421,7 +433,6 @@ function CreditDetailDrawer({
         ...(validDays.trim() ? { validDays: Number(validDays) } : {}),
       });
       void message.success(`已调整 ${signed(parsedDelta)} 积分，当前余额 ${r.balance}`);
-      setConfirming(false);
       setDelta('');
       setReason('');
       setValidDays('');
@@ -515,7 +526,7 @@ function CreditDetailDrawer({
                 type="primary"
                 className="adm-btn is-primary"
                 disabled={!deltaValid}
-                onClick={() => setConfirming(true)}
+                onClick={() => void submitAdjust()}
               >
                 提交调整
               </Button>
@@ -666,36 +677,6 @@ function CreditDetailDrawer({
         )}
       </div>
 
-      {confirming && (
-        <ConfirmAction
-          open
-          title={parsedDelta > 0 ? '增加积分' : '扣减积分'}
-          confirmText="确认调整"
-          danger={parsedDelta < 0}
-          loading={busy}
-          onCancel={() => setConfirming(false)}
-          onConfirm={() => void submitAdjust()}
-          description={
-            <p>
-              将对 <b>{user.email}</b> {parsedDelta > 0 ? '增加' : '扣减'}{' '}
-              <b>{Math.abs(parsedDelta)}</b> 积分，立即生效且不可撤销。
-            </p>
-          }
-          impact={[
-            `当前余额 ${user.balance} → ${user.balance + parsedDelta}`,
-            validDays.trim() ? `新增批次有效期 ${validDays} 天` : '不设有效期（永久）',
-            `原因：${reason.trim() || '未填写'}`,
-            '写入操作审计（含操作人）',
-          ]}
-          extra={
-            parsedDelta < 0 && user.balance + parsedDelta < 0 ? (
-              <div className="adm-confirm-warn">
-                <span>扣减后余额为负，后端会拒绝本次操作。</span>
-              </div>
-            ) : undefined
-          }
-        />
-      )}
     </Drawer>
   );
 }

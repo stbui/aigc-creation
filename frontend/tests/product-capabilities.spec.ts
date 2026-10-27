@@ -157,12 +157,22 @@ test.describe('能力可见性与运行态', () => {
             capability: 'creative_image',
             status: 'succeeded',
             inputAssetIds: ['asset-1'],
-            params: {},
-            outputAsset: null,
+            params: { prompt: '清晨窗边的木质桌面' },
+            outputAsset: {
+              id: 'asset-creative-result',
+              sourceUrl: '/uploads/generated/result.png',
+              signedUrl: null,
+              width: 240,
+              height: 160,
+              format: 'image/png',
+            },
           },
           message: '',
         }),
       }),
+    );
+    await page.route('**/uploads/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'image/png', body: PNG }),
     );
     await page.route('**/api/v1/assets/upload', (route) =>
       route.fulfill({
@@ -190,6 +200,10 @@ test.describe('能力可见性与运行态', () => {
     await page.locator('.wb-card').filter({ hasText: '创意生图' }).click();
     await expect(page).toHaveURL(/\/free-creation\?capability=creative_image$/);
 
+    await page.locator('textarea').first().fill('清晨窗边的木质桌面');
+    await expect(page.getByRole('button', { name: /立即生成/ })).toBeEnabled();
+    await page.locator('textarea').first().fill('');
+
     await page.locator('input[type=file]').setInputFiles({ name: 'e2e.png', mimeType: 'image/png', buffer: PNG });
     await expect(page.locator('.fc-thumb img[alt="e2e.png"]')).toBeVisible();
     await page.locator('textarea').first().fill('清晨窗边的木质桌面');
@@ -198,6 +212,42 @@ test.describe('能力可见性与运行态', () => {
     await expect.poll(() => posted?.capability).toBe('creative_image');
     expect(posted.inputAssetIds).toEqual(['asset-1']);
     expect(posted.params.prompt).toBe('清晨窗边的木质桌面');
+
+    const result = page.locator('.fc-result-item.is-loaded').first();
+    await expect(result.locator('.fc-result-item-prompt')).toBeVisible({ timeout: 15000 });
+
+    // 右键菜单与查看器共用任务参数里的原始提示词，不重新调用模型改写。
+    await result.click({ button: 'right' });
+    const menu = page.locator('.img-context-menu');
+    await expect(menu).toContainText('查看提示词');
+    await menu.getByText('查看提示词', { exact: true }).click();
+    const promptModal = page.locator('.ant-modal-confirm');
+    await expect(promptModal).toContainText('生成提示词');
+    await expect(promptModal).toContainText('清晨窗边的木质桌面');
+    await promptModal.getByRole('button', { name: /关\s*闭/ }).click();
+
+    await result.click();
+    const viewer = page.locator('.img-viewer');
+    await expect(viewer).toBeVisible();
+    await viewer.getByRole('button', { name: '提示词' }).click();
+    await expect(viewer.locator('.img-viewer-prompt')).toContainText('清晨窗边的木质桌面');
+
+    // 窄屏 4 列时缩略图仅约 65px, 提示词标签必须收成图标态且留在图内,
+    // 不能换行遮住大半张图。
+    await page.keyboard.press('Escape');
+    await expect(viewer).toBeHidden();
+    await page.setViewportSize({ width: 390, height: 844 });
+    const mobileBadge = result.locator('.fc-result-item-prompt');
+    await expect(mobileBadge.locator('.fc-result-item-prompt-text')).toBeHidden();
+    const [thumbBox, badgeBox] = await Promise.all([result.boundingBox(), mobileBadge.boundingBox()]);
+    expect(thumbBox).not.toBeNull();
+    expect(badgeBox).not.toBeNull();
+    expect(badgeBox!.width).toBeLessThanOrEqual(26);
+    expect(badgeBox!.height).toBeLessThanOrEqual(24);
+    expect(badgeBox!.x).toBeGreaterThanOrEqual(thumbBox!.x);
+    expect(badgeBox!.y).toBeGreaterThanOrEqual(thumbBox!.y);
+    expect(badgeBox!.x + badgeBox!.width).toBeLessThanOrEqual(thumbBox!.x + thumbBox!.width);
+    expect(badgeBox!.y + badgeBox!.height).toBeLessThanOrEqual(thumbBox!.y + thumbBox!.height);
   });
 
   test('ToolShell：不可用时已登录用户被拦截，访客仍能触发登录', async ({ page, request }) => {
@@ -349,6 +399,49 @@ const REDRAW_PNG = Buffer.from(
 );
 
 test.describe('局部重绘画布', () => {
+  test('空态盒模型与参考站一致，移动端滚动归内容容器', async ({ page, request }) => {
+    const caps = await fetchCaps(request);
+    await mockCaps(page, caps);
+
+    const boxes = () =>
+      page.evaluate(() => {
+        const box = (selector: string) => {
+          const rect = document.querySelector(selector)?.getBoundingClientRect();
+          return rect
+            ? {
+                width: Math.round(rect.width),
+                height: Math.round(rect.height),
+              }
+            : null;
+        };
+        return {
+          documentHeight: document.documentElement.scrollHeight,
+          viewportHeight: window.innerHeight,
+          intro: box('.redraw-intro'),
+          demo: box('.redraw-intro-video'),
+          upload: box('.pk-dropzone'),
+        };
+      });
+
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`${UI}/local-redraw`);
+    await expect(page.locator('.redraw-intro-video')).toBeVisible();
+    const desktop = await boxes();
+    expect(desktop.intro).toEqual({ width: 634, height: 608 });
+    expect(desktop.demo).toEqual({ width: 480, height: 480 });
+    expect(desktop.upload).toEqual({ width: 358, height: 160 });
+
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload();
+    await expect(page.locator('.redraw-intro-video')).toBeVisible();
+    await expect(page.locator('.pk-mobile-upload-link')).toBeHidden();
+    const mobile = await boxes();
+    expect(mobile.documentHeight).toBe(mobile.viewportHeight);
+    expect(mobile.intro).toEqual({ width: 358, height: 628 });
+    expect(mobile.demo).toEqual({ width: 310, height: 480 });
+    expect(mobile.upload).toEqual({ width: 326, height: 160 });
+  });
+
   test('限制 3 个标注，参考图上传中禁用提交，提交带遮罩与逐标注参考图', async ({ page, request }) => {
     const { token, email } = await register(request);
     const caps = await fetchCaps(request);
@@ -469,6 +562,18 @@ test.describe('局部重绘画布', () => {
       const el = document.querySelector('.redraw-mask-overlay') as HTMLCanvasElement | null;
       return Boolean(el && el.width === 240 && el.height === 160);
     });
+
+    await page.locator('.redraw-tool-btn', { hasText: '框选' }).click();
+    const canvasBox = await canvas.boundingBox();
+    expect(canvasBox).not.toBeNull();
+    await page.mouse.move(canvasBox!.x + canvasBox!.width * 0.2, canvasBox!.y + canvasBox!.height * 0.2);
+    await page.mouse.down();
+    await page.mouse.move(canvasBox!.x + canvasBox!.width * 0.5, canvasBox!.y + canvasBox!.height * 0.5, { steps: 5 });
+    await page.mouse.up();
+    await expect(page.locator('.resize-handle')).toHaveCount(8);
+    await page.locator('.redraw-footer-btn', { hasText: '清空' }).click();
+    await expect(page.locator('.resize-handle')).toHaveCount(0);
+
     await page.locator('.redraw-tool-btn', { hasText: '涂抹' }).click();
 
     const draw = async (y: number) => {
@@ -524,5 +629,107 @@ test.describe('局部重绘画布', () => {
     expect(posted.params.outputCount).toBe(1);
     expect(posted.inputAssetIds).toEqual(['asset-original']);
     await expect(page.locator('.pk-result-body')).toBeVisible({ timeout: 15000 });
+  });
+
+  test('余额不足时提交 402：弹「积分不足」并保留画布，不进入生成态', async ({ page, request }) => {
+    const { token, email } = await register(request);
+    const caps = await fetchCaps(request);
+    patchRuntime(caps, 'local_redraw', {
+      enabled: true,
+      remoteAvailable: true,
+      localQuality: 'none',
+      effective: 'remote',
+      reason: null,
+    });
+    await mockCaps(page, caps);
+
+    await page.route('**/api/v1/projects', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 0, data: [{ id: 'project-redraw-e2e', name: '测试项目' }], message: '' }),
+      }),
+    );
+    await page.route(/\/api\/v1\/tasks$/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 0, data: [], message: '' }),
+      }),
+    );
+    await page.route('**/uploads/**', (route) =>
+      route.fulfill({ status: 200, contentType: 'image/png', body: REDRAW_PNG }),
+    );
+    await page.route('**/api/v1/assets/upload', (route) => {
+      const multipart = route.request().postDataBuffer()?.toString('latin1') ?? '';
+      const isMask = multipart.includes('mask-');
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0,
+          data: {
+            id: isMask ? 'asset-mask' : 'asset-original',
+            projectId: 'project-redraw-e2e',
+            ownerId: 'u1',
+            kind: 'original',
+            sourceUrl: `/uploads/original/${isMask ? 'mask.png' : 'photo.png'}`,
+            signedUrl: null,
+            format: 'image/png',
+            sizeBytes: REDRAW_PNG.length,
+            createdAt: new Date().toISOString(),
+          },
+          message: '',
+        }),
+      });
+    });
+
+    // 后端余额不足的真实形态：HTTP 402 + 40002「积分不足: 需要 X, 可用 Y」。
+    await page.route('**/api/v1/generate', (route) =>
+      route.fulfill({
+        status: 402,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 40002, data: null, message: '积分不足: 需要 10, 可用 0' }),
+      }),
+    );
+
+    await authed(page, '/local-redraw', token, email);
+    await page.locator('input[type=file]').first().setInputFiles({
+      name: 'photo.png',
+      mimeType: 'image/png',
+      buffer: REDRAW_PNG,
+    });
+    const canvas = page.locator('.redraw-mask-overlay');
+    await expect(canvas).toBeVisible();
+    await page.waitForFunction(() => {
+      const el = document.querySelector('.redraw-mask-overlay') as HTMLCanvasElement | null;
+      return Boolean(el && el.width === 240 && el.height === 160);
+    });
+
+    await page.locator('.redraw-tool-btn', { hasText: '涂抹' }).click();
+    const box = await canvas.boundingBox();
+    expect(box).not.toBeNull();
+    await page.mouse.move(box!.x + box!.width * 0.2, box!.y + box!.height * 0.4);
+    await page.mouse.down();
+    await page.mouse.move(box!.x + box!.width * 0.6, box!.y + box!.height * 0.4, { steps: 5 });
+    await page.mouse.up();
+    await page.locator('textarea').first().fill('换成哑光材质');
+
+    const submit = page.locator('button.pk-primary-btn').first();
+    await expect(submit).toBeEnabled();
+    await submit.click();
+
+    const dialog = page.locator('.ant-modal-confirm');
+    await expect(dialog).toContainText('积分不足');
+    await expect(dialog).toContainText('需要 10, 可用 0');
+    await expect(dialog.getByRole('button', { name: '去充值' })).toBeVisible();
+    // 402 是确定性拒绝：不应显示「生成结果」，也不能把已画好的遮罩清掉。
+    await expect(page.locator('.pk-result-body')).toHaveCount(0);
+    await expect(canvas).toBeVisible();
+    await dialog.getByRole('button', { name: '知道了' }).click();
+    // 402 后必须仍能直接重试：遮罩与描述都还在，按钮回到可用态。
+    await expect(page.locator('textarea').first()).toHaveValue('换成哑光材质');
+    await expect(page.locator('.mask-mark').first()).toBeVisible();
+    await expect(submit).toBeEnabled();
   });
 });

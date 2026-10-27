@@ -39,7 +39,6 @@ export function AdminBackupPage() {
 
   const [busy, setBusy] = useState(false);
 
-  const [deleteTarget, setDeleteTarget] = useState<AdminBackup | null>(null);
   const [pruneOpen, setPruneOpen] = useState(false);
   const [keepCount, setKeepCount] = useState('7');
   const [runOpen, setRunOpen] = useState(false);
@@ -63,9 +62,8 @@ export function AdminBackupPage() {
   const logs = data?.logs ?? [];
 
   /*
-   * 「立即备份」曾是**点一下就执行**的按钮: 高危权限清单里明明列了 backupRun,
-   * 界面上却既没有确认也没有原因, 审计里只留一条 reason=null 的记录。
-   * 备份会短暂占用写锁并落一份完整库文件, 误点后果不是"撤销一下"能收回的。
+   * 手动备份仍然要求填写原因（审计需要回答「谁为什么做」），但按产品要求
+   * 原因放在页面内操作条里，不再用弹窗；填完点「开始备份」直接执行。
    */
   const runBackup = async () => {
     const trimmed = runReason.trim();
@@ -114,12 +112,11 @@ export function AdminBackupPage() {
     }
   };
 
-  const doDelete = async () => {
-    if (!deleteTarget) return;
+  /** 删除单份备份按产品要求直接执行，不再弹窗二次确认 */
+  const doDelete = async (row: AdminBackup) => {
     setBusy(true);
     try {
-      await adminBackupsApi.remove(deleteTarget.id);
-      setDeleteTarget(null);
+      await adminBackupsApi.remove(row.id);
       void message.success('已删除');
       await reload();
     } catch (e) {
@@ -228,7 +225,7 @@ export function AdminBackupPage() {
             <Button
               type="link" danger
               className="adm-link is-danger"
-              onClick={() => setDeleteTarget(row)}
+              onClick={() => void doDelete(row)}
               disabled={busy}
             >
               删除
@@ -354,7 +351,16 @@ export function AdminBackupPage() {
             description="还没有任何备份记录"
             action={
               can('backup.run') ? (
-                <Button type="primary" className="adm-btn is-primary" onClick={() => void runBackup()} disabled={busy}>
+                <Button
+                  type="primary"
+                  className="adm-btn is-primary"
+                  onClick={() => {
+                    setRunReason('');
+                    setRunReasonError(false);
+                    setRunOpen(true);
+                  }}
+                  disabled={busy}
+                >
                   立即执行一次备份
                 </Button>
               ) : undefined
@@ -368,6 +374,7 @@ export function AdminBackupPage() {
             dataSource={rows}
             loading={loading}
             pagination={false}
+            scroll={{ x: 860 }}
             expandable={{
               expandedRowRender: (row) => (
                 <div className="adm-expand">
@@ -443,7 +450,11 @@ export function AdminBackupPage() {
           title="立即备份"
           confirmText="开始备份"
           loading={busy}
-          onCancel={() => setRunOpen(false)}
+          onCancel={() => {
+            setRunOpen(false);
+            setRunReason('');
+            setRunReasonError(false);
+          }}
           onConfirm={() => void runBackup()}
           description={
             <p>
@@ -482,28 +493,6 @@ export function AdminBackupPage() {
         />
       )}
 
-      {deleteTarget && (
-        <ConfirmAction
-          open
-          title="删除备份"
-          confirmText="确认删除"
-          danger
-          loading={busy}
-          onCancel={() => setDeleteTarget(null)}
-          onConfirm={() => void doDelete()}
-          description={
-            <>
-              <p>即将删除备份文件及其记录，删除后不可恢复。</p>
-              <code className="adm-mono">{deleteTarget.filename}</code>
-            </>
-          }
-          impact={[
-            `文件大小 ${formatBytes(deleteTarget.sizeBytes)} 将被释放`,
-            '系统会确保至少保留一份已验证备份，此规则不可关闭',
-          ]}
-        />
-      )}
-
       {pruneOpen && (
         <ConfirmAction
           open
@@ -511,6 +500,8 @@ export function AdminBackupPage() {
           confirmText="执行清理"
           danger
           loading={busy}
+          requireTyping
+          typingText="清理旧备份"
           onCancel={() => setPruneOpen(false)}
           onConfirm={() => void doPrune()}
           description={<p>超出保留份数的旧备份将被自动删除（仅删除已验证的备份）。</p>}

@@ -10,6 +10,7 @@ import {
   normalizeHexColor,
 } from '../components/ColorStudio';
 import { ToolHistoryPane } from '../components/ToolHistoryPane';
+import { ProductSourceResult, ProductSourceUploadPreview } from '../components/ProductSourcePreview';
 
 /**
  * 商品换色 —— 1:1 复刻参考站 https://ijihua.cn/product-recolor。
@@ -41,12 +42,12 @@ export function ProductRecolorPage() {
 
   const [color, setColor] = useState('#FFFFFF');
   const [customColor, setCustomColor] = useState('#5546D8');
-  const [sourceUrl, setSourceUrl] = useState('');
+  const [sourceAspect, setSourceAspect] = useState<number>();
   const targetColor = color === 'custom' ? customColor : color;
   const customColorValid = isValidHexColor(customColor);
 
   const handleHistoryReuse = () => {
-    setSourceUrl('');
+    setSourceAspect(undefined);
     setResult(null);
   };
 
@@ -57,24 +58,39 @@ export function ProductRecolorPage() {
       title="商品换色"
       desc="一键生成商品多色效果，快速制作全SKU展示图"
       upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
+      replaceUpload
+      renderUploadPreview={(uploads, controls) => {
+        const image = uploads[0];
+        return image ? (
+          <ProductSourceUploadPreview image={image} controls={controls} alt="待换色商品图" />
+        ) : null;
+      }}
       settings={{ ratio: true, resolution: true }}
       submitLabel="立即换色"
+      emptyVideo="/static/mp4/07_sphs.mp4"
       emptyDesc="上传图片并选择商品颜色后，结果将在此处展示"
       formValid={color !== 'custom' || customColorValid}
       submitting={submitting}
       result={result}
       resultTag={COLOR_LABEL[color] ?? targetColor}
-      resultCompare={
-        result?.status === 'succeeded' && result.url && sourceUrl
-          ? { beforeUrl: sourceUrl, beforeLabel: '原图', afterLabel: '换色后' }
-          : undefined
-      }
+      resultView="product-card"
+      resultBadge="换色后"
+      generatingAspect={sourceAspect}
       onSubmit={(inputs, settings) => {
         if (color === 'custom' && !customColorValid) {
           message.error('请输入有效的 HEX 颜色（如 #5546D8）');
           return Promise.resolve();
         }
-        setSourceUrl(inputs[0]?.url ?? '');
+        const nextSourceUrl = inputs[0]?.url ?? '';
+        if (nextSourceUrl) {
+          const image = new Image();
+          image.onload = () => {
+            if (image.naturalWidth > 0 && image.naturalHeight > 0) {
+              setSourceAspect(image.naturalWidth / image.naturalHeight);
+            }
+          };
+          image.src = nextSourceUrl;
+        }
         const normalizedCustom = normalizeHexColor(customColor) ?? '';
         return run(inputs, {
           targetColor: color === 'custom' ? normalizedCustom : targetColor.trim(),
@@ -82,6 +98,10 @@ export function ProductRecolorPage() {
           ratio: settings.ratio,
           size: settings.resolution,
         });
+      }}
+      sourcePane={(images) => {
+        const image = images[0];
+        return image ? <ProductSourceResult image={image} alt="待换色商品图" /> : null;
       }}
       onHistoryReuse={handleHistoryReuse}
       trailingPane={

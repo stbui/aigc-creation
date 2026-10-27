@@ -112,6 +112,18 @@ export interface CapabilityPlugin {
   creditCost: number;
   /** 需要上传几张输入图 */
   inputs: 0 | 1 | 2;
+  /**
+   * 输入图在模型侧的用途（默认 `reference`）。
+   *
+   * - `reference`: 作为生成条件/参考图，允许走协议的生成端点。
+   * - `edit`: 输入图就是待编辑的底图，必须走图像编辑端点。
+   *
+   * 商品换色不能只靠提示词“参考这张图”：部分聚合商的
+   * `/images/generations` 会静默忽略参考图，把请求当成文生图，于是
+   * 上传水壶却生成手提包。声明为 `edit` 后，路由器只选择支持图像编辑
+   * 的通道，不允许回落到生成端点。
+   */
+  inputImageMode?: 'reference' | 'edit';
   /** 是否在工作台卡片区展示 */
   inWorkbench: boolean;
   /** 能力级提示, 如合规提醒 */

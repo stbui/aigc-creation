@@ -15,6 +15,7 @@ import {
   validateCapabilityParams,
 } from '../src/capabilities/capability.registry';
 import { parseLocalRedrawAnnotations } from '../src/capabilities/definitions/local_redraw';
+import { buildPromptFor } from '../src/providers/gateway-prompt';
 import {
   inspectMaskImage,
   inspectUploadedImage,
@@ -166,6 +167,23 @@ check(
   recolor?.params.find((p) => p.key === 'customColor')?.pattern === '^#[0-9a-fA-F]{6}$' &&
     getCapability('matting')?.params.find((p) => p.key === 'customColor')?.pattern === '^#[0-9a-fA-F]{6}$',
 );
+check(
+  '换色预设色进入提示词',
+  buildPromptFor('recolor', sanitizeParams('recolor', { color: '#82CEF3' })).includes('#82CEF3'),
+);
+check(
+  '换色兼容 customColor 进入提示词',
+  buildPromptFor('recolor', sanitizeParams('recolor', { color: 'custom', customColor: '#7B2FF7' })).includes(
+    '#7B2FF7',
+  ),
+);
+check(
+  '换色 targetColor 优先于兼容字段',
+  buildPromptFor(
+    'recolor',
+    sanitizeParams('recolor', { color: 'custom', customColor: '#7B2FF7', targetColor: '#FF0B22' }),
+  ).includes('#FF0B22'),
+);
 
 console.log('\n【hidden 字段兼容：未提交不得注入默认值】');
 const oldMatting = sanitizeParams('matting', { bgColor: '#3988E9' });
@@ -193,6 +211,14 @@ check(
   throwsAppError(() => validateCapabilityParams('recolor', { targetColor: '#12GG34' })),
 );
 check('合法 HEX 通过', !throwsAppError(() => validateCapabilityParams('recolor', { targetColor: '#7B2FF7' })));
+check(
+  '换色自定义色缺少 HEX 被拒',
+  throwsAppError(() => validateCapabilityParams('recolor', { color: 'custom' })),
+);
+check(
+  '换色兼容自定义色通过',
+  !throwsAppError(() => validateCapabilityParams('recolor', { color: 'custom', customColor: '#7B2FF7' })),
+);
 check('布尔字段传中文被拒', throwsAppError(() => validateCapabilityParams('image_translate', { protectSubject: '是' })));
 check('合法参数通过', !throwsAppError(() => validateCapabilityParams('expand', { occupy: 80, position: 'center' })));
 

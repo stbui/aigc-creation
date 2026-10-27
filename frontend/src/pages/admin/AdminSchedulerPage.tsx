@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
 import { App, Button } from 'antd';
-import { AlertTriangle, CalendarClock, CheckCircle2, Clock, Play, RefreshCw, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, Play, RefreshCw, XCircle } from 'lucide-react';
 import { adminSchedulerApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import {
   AdminListError,
   AdminListLoading,
   AdminStaleError,
-  ConfirmAction,
   useAdminResource,
 } from '../../components/admin/AdminWidgets';
 import { AdminEmpty, PageHeader, Panel } from '../../components/admin/PageHeader';
@@ -45,7 +44,6 @@ export function AdminSchedulerPage() {
   const writable = can('setting.write');
 
   const [busy, setBusy] = useState(false);
-  const [runTarget, setRunTarget] = useState<AdminSchedulerTask | null>(null);
 
   /*
    * 2026-10-23: 原来手写的 `load()` 只在 finally 里置 false、从不置 true ——
@@ -63,13 +61,12 @@ export function AdminSchedulerPage() {
     return () => clearInterval(t);
   }, [reload]);
 
-  const runNow = async () => {
-    if (!runTarget) return;
+  /** 手动触发是幂等的，按产品要求直接执行，不再弹窗二次确认 */
+  const runNow = async (target: AdminSchedulerTask) => {
     setBusy(true);
     try {
-      await adminSchedulerApi.run(runTarget.name);
-      setRunTarget(null);
-      void message.success(`「${runTarget.label}」已手动执行`);
+      await adminSchedulerApi.run(target.name);
+      void message.success(`「${target.label}」已手动执行`);
       await reload();
     } catch (e) {
       void message.error((e as Error).message);
@@ -164,7 +161,7 @@ export function AdminSchedulerPage() {
                       <Button
                         type="default"
                         className="adm-btn"
-                        onClick={() => setRunTarget(t)}
+                        onClick={() => void runNow(t)}
                         disabled={busy}
                       >
                         <Play size={13} style={{ marginRight: 4 }} />
@@ -202,40 +199,6 @@ export function AdminSchedulerPage() {
         </ul>
       </Panel>
 
-      {runTarget && (
-        <ConfirmAction
-          open
-          title={`立即执行「${runTarget.label}」`}
-          confirmText="立即执行"
-          loading={busy}
-          onCancel={() => setRunTarget(null)}
-          onConfirm={() => void runNow()}
-          description={
-            <p>
-              忽略到期判定，立刻扫描并处理所有符合条件的记录。
-            </p>
-          }
-          impact={
-            runTarget.name === 'order-expire'
-              ? [
-                  '所有超时未支付的 pending 订单将被关闭',
-                  '已支付订单不受影响',
-                  '本操作幂等，重复执行安全',
-                ]
-              : [
-                  '所有已到期且仍有剩余的积分批次将被回收',
-                  '回收会写 expire 流水，积分归零但批次记录保留',
-                  '本操作幂等，重复执行安全',
-                ]
-          }
-          extra={
-            <div className="adm-confirm-warn">
-              <CalendarClock size={14} />
-              <span>若调度器正在执行其它任务，本次触发会被跳过并提示重试。</span>
-            </div>
-          }
-        />
-      )}
     </>
   );
 }

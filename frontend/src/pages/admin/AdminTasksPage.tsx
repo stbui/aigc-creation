@@ -219,6 +219,10 @@ export function AdminTasksPage() {
     }
   };
 
+  const hasFilter = Boolean(
+    status || capability || provider || owner || project || from || to,
+  );
+
   const applyQuery = () => {
     setSelected([]);
     setQuery({
@@ -522,6 +526,7 @@ export function AdminTasksPage() {
           placeholder="用户 ID"
           value={owner}
           onChange={(e) => setOwner(e.target.value)}
+          onPressEnter={applyQuery}
           allowClear
         />
         <Input
@@ -529,6 +534,7 @@ export function AdminTasksPage() {
           placeholder="项目 ID"
           value={project}
           onChange={(e) => setProject(e.target.value)}
+          onPressEnter={applyQuery}
           allowClear
         />
         <Input
@@ -598,7 +604,20 @@ export function AdminTasksPage() {
               </div>
             )}
             {(list?.items.length ?? 0) === 0 ? (
-              <AdminEmpty description="没有符合条件的任务。在前台任意生成一次，这里就会出现记录。" />
+              <AdminEmpty
+                description={
+                  hasFilter
+                    ? '没有符合条件的任务。清除筛选或换一个条件试试。'
+                    : '还没有任务。在前台任意生成一次，这里就会出现记录。'
+                }
+                action={
+                  hasFilter ? (
+                    <Button type="default" className="adm-btn" onClick={reset}>
+                      清除筛选
+                    </Button>
+                  ) : undefined
+                }
+              />
             ) : (
               <>
                 <Table<Row>

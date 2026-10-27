@@ -244,6 +244,7 @@ export function AdminLegalPage() {
             columns={columns}
             dataSource={rows}
             pagination={adminMiniPagination()}
+            scroll={{ x: 900 }}
           />
         )}
       </Panel>

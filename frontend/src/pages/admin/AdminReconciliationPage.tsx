@@ -81,6 +81,8 @@ function yuan(cents: number): string {
 export function AdminReconciliationPage() {
   const { message } = App.useApp();
   const { can } = useAdmin();
+  /** payment.read 可看批次；导入与差异处置需要 finance.reconcile */
+  const canReconcile = can('finance.reconcile');
 
   const [channel, setChannel] = useState('alipay');
   const [billDate, setBillDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -363,7 +365,11 @@ export function AdminReconciliationPage() {
 
       <Panel
         title="导入账单"
-        note="CSV，表头需含交易号与金额（支持 tradeno / transaction_id / 交易号 等别名）"
+        note={
+          canReconcile
+            ? 'CSV，表头需含交易号与金额（支持 tradeno / transaction_id / 交易号 等别名）'
+            : '当前账号无 finance.reconcile 权限，只能查看批次与差异，不能导入或处置'
+        }
       >
         <FilterBar>
           <Select
@@ -371,17 +377,20 @@ export function AdminReconciliationPage() {
             value={channel}
             onChange={setChannel}
             options={CHANNEL_OPTIONS}
+            disabled={!canReconcile}
           />
           <Input
             className="adm-filter-input"
             type="date"
             value={billDate}
             onChange={(e) => setBillDate(e.target.value)}
+            disabled={!canReconcile}
           />
           <AntUpload
             accept=".csv,text/csv"
             maxCount={1}
             fileList={fileList}
+            disabled={!canReconcile}
             beforeUpload={(next) => {
               setFile(next as File);
               setFileList([next]);
@@ -392,13 +401,15 @@ export function AdminReconciliationPage() {
               setFileList([]);
             }}
           >
-            <Button icon={<Upload size={14} />}>选择 CSV</Button>
+            <Button icon={<Upload size={14} />} disabled={!canReconcile}>
+              选择 CSV
+            </Button>
           </AntUpload>
           <FilterActions>
             <Button
               type="primary"
               className="adm-btn is-primary"
-              disabled={importing}
+              disabled={importing || !canReconcile}
               onClick={() => void runImport()}
             >
               <Upload size={14} style={{ marginRight: 4 }} />

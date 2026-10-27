@@ -14,14 +14,19 @@ const VIEWPORTS = [
 ];
 
 const SELECTORS = [
+  '.app-layout',
+  '.app-body',
+  '.app-content',
   '.local-redraw-page',
   '.pk-workspace.local-redraw-page',
   '.local-redraw-settings',
   '.pk-input-pane',
   '.upload-card',
   '.pk-config-card',
+  '.pk-dropzone',
   '.local-redraw-source-upload',
   '.pk-upload-prompt',
+  '.pk-mobile-upload-link',
   '.image-tool-submit-area',
   '.pk-submit-actions',
   '.redraw-submit',
@@ -31,6 +36,8 @@ const SELECTORS = [
   '.redraw-intro',
   '.redraw-intro-video',
   '.redraw-intro-art',
+  '.redraw-intro-art-image',
+  '.redraw-intro-art-mask',
   '.redraw-intro-copy',
   '.redraw-canvas-wrap',
   '.redraw-toolbar',

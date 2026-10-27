@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
-import { computeExpandPlacement, loadImageSize } from '../lib/expandGeometry';
+import { computeExpandPlacement, getExpandCanvasAspect, loadImageSize } from '../lib/expandGeometry';
 
 /**
  * 智能扩图的「原图 + 目标画布」几何预览。
  *
  * 参考站在上传后即用 .smart-expand-source-preview 显示目标画幅，并把原图按
- * 当前占比和九宫格位置绝对定位（宽高各占 64% 内的等比区域）。这里只做
- * 版式预览，不生成像素；真实扩图仍必须由模型完成。
+ * 当前占比和九宫格位置绝对定位。画幅盒随结果区高度铺开（桌面 510×680、
+ * 移动端 322×672），「原比例」沿用源图画幅。
+ * 这里只做版式预览，不生成像素；真实扩图仍必须由模型完成。
  *
  * 画布用 aspect-ratio 表达目标比例，原图用归一化 placement 转成百分比定位，
  * 因此与提交给后端的 placementX/Y/Width/Height 是同一份几何数据。
@@ -42,12 +43,7 @@ export function ExpandLayoutPreview({
     };
   }, [sourceUrl]);
 
-  const canvasRatio =
-    ratio === 'original' && size
-      ? `${size.width} / ${size.height}`
-      : /^\d+(?:\.\d+)?:\d+(?:\.\d+)?$/.test(ratio)
-        ? ratio.replace(':', ' / ')
-        : '1 / 1';
+  const canvasAspect = getExpandCanvasAspect(ratio, size?.width, size?.height);
   const placement = size
     ? computeExpandPlacement(size.width, size.height, ratio, occupy, position)
     : null;
@@ -55,7 +51,7 @@ export function ExpandLayoutPreview({
   return (
     <figure
       className="smart-expand-source-preview"
-      style={{ aspectRatio: canvasRatio }}
+      style={{ aspectRatio: canvasAspect }}
       aria-label="原图在目标画布中的布局预览"
     >
       {placement && sourceUrl && (

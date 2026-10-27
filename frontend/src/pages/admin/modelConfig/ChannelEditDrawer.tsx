@@ -95,7 +95,6 @@ export function ChannelEditDrawer({
   const [testResult, setTestResult] = useState<{ rev: number; result: AdminChannelTestResult } | null>(null);
   const [confirmSave, setConfirmSave] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [discardOpen, setDiscardOpen] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -128,7 +127,6 @@ export function ChannelEditDrawer({
     setError(null);
     setConfirmSave(false);
     setConfirmDelete(false);
-    setDiscardOpen(false);
   }, [open, mode, channel, protocolOptions, modality]);
 
   const patch = (p: Partial<FormState>) => {
@@ -303,10 +301,7 @@ export function ChannelEditDrawer({
     }
   };
 
-  const requestClose = () => {
-    if (dirty && !saving) setDiscardOpen(true);
-    else onClose();
-  };
+  const requestClose = () => onClose();
 
   const stale = testResult && testResult.rev !== formRev;
 
@@ -607,17 +602,6 @@ export function ChannelEditDrawer({
         onConfirm={(typed, reason) => void doDelete(typed, reason)}
       />
 
-      <AntConfirm
-        open={discardOpen}
-        title="放弃未保存的修改？"
-        description="关闭抽屉会丢失当前表单里的修改。"
-        confirmText="放弃修改"
-        onCancel={() => setDiscardOpen(false)}
-        onConfirm={() => {
-          setDiscardOpen(false);
-          onClose();
-        }}
-      />
     </>
   );
 }

@@ -103,6 +103,8 @@ export function AdminTicketsPage() {
   const { can, me } = useAdmin();
 
   const [stats, setStats] = useState<TicketStats | null>(null);
+  /** 关键词草稿：只有点「查询」或回车才生效，避免失焦与翻页互相抢请求 */
+  const [qDraft, setQDraft] = useState('');
 
   /** 顶栏搜索带 `?id=` 跳过来时直接展开该工单 */
   const [searchParams] = useSearchParams();
@@ -331,6 +333,21 @@ export function AdminTicketsPage() {
     [detail],
   );
 
+  const applyKeyword = () => setQuery({ q: qDraft.trim() || undefined });
+
+  const resetFilters = () => {
+    setQDraft('');
+    setQuery({
+      status: undefined,
+      type: undefined,
+      priority: undefined,
+      assigneeId: undefined,
+      q: undefined,
+    });
+  };
+
+  const hasFilter = Boolean(params.status || params.type || params.priority || params.assigneeId || params.q);
+
   return (
     <>
       <PageHeader
@@ -401,11 +418,17 @@ export function AdminTicketsPage() {
             className="adm-filter-input"
             placeholder="工单号 / 标题 / 正文"
             allowClear
-            defaultValue={(params.q as string) || ''}
-            onPressEnter={(e) => setQuery({ q: (e.target as HTMLInputElement).value })}
-            onBlur={(e) => setQuery({ q: e.target.value })}
+            value={qDraft}
+            onChange={(e) => setQDraft(e.target.value)}
+            onPressEnter={applyKeyword}
           />
           <FilterActions>
+            <Button type="primary" className="adm-btn is-primary" onClick={applyKeyword}>
+              查询
+            </Button>
+            <Button type="default" className="adm-btn" onClick={resetFilters}>
+              重置
+            </Button>
             {can('data.export') && (
               <Button
                 type="default"
@@ -433,7 +456,16 @@ export function AdminTicketsPage() {
         ) : error && !data ? (
           <AdminListError error={error} onRetry={reload} />
         ) : (data?.items.length ?? 0) === 0 ? (
-          <AdminEmpty description="当前筛选下没有工单。" />
+          <AdminEmpty
+            description={hasFilter ? '当前筛选下没有工单。' : '还没有工单。'}
+            action={
+              hasFilter ? (
+                <Button type="default" className="adm-btn" onClick={resetFilters}>
+                  清除筛选
+                </Button>
+              ) : undefined
+            }
+          />
         ) : (
           <Table<AdminTicketRow>
             rowKey="id"

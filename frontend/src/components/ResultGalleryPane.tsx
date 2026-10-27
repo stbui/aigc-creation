@@ -12,6 +12,7 @@ import {
   Copy,
   Download,
   ExternalLink,
+  FileText,
   ImagePlus,
   Maximize2,
   RefreshCw,
@@ -122,9 +123,21 @@ function GalleryThumb({
     <button
       type="button"
       className={`fc-result-item${loaded ? ' is-loaded' : ''}${failed ? ' is-failed' : ''}`}
-      title={failed ? '图片加载失败，点击重试' : '点击查看大图，右键更多操作'}
+      title={
+        failed
+          ? '图片加载失败，点击重试'
+          : item.prompt
+            ? '点击查看大图与提示词，右键更多操作'
+            : '点击查看大图，右键更多操作'
+      }
       aria-label={
-        failed ? '图片加载失败，点击重试' : item.caption ? `查看${item.caption}大图` : '查看生成图大图'
+        failed
+          ? '图片加载失败，点击重试'
+          : item.caption
+            ? `查看${item.caption}大图`
+            : item.prompt
+              ? '查看生成图大图与提示词'
+              : '查看生成图大图'
       }
       onClick={failed ? retry : onOpen}
       onContextMenu={(e) => {
@@ -144,6 +157,12 @@ function GalleryThumb({
         onError={() => setFailedUrl(item.url)}
       />
       {item.caption && <span className="fc-result-item-caption">{item.caption}</span>}
+      {item.prompt && (
+        <span className="fc-result-item-prompt" title="含生成提示词">
+          <FileText size={12} />
+          <span className="fc-result-item-prompt-text">提示词</span>
+        </span>
+      )}
       {failed && (
         <span className="fc-result-item-error">
           <X size={18} />
@@ -199,7 +218,7 @@ export function ResultGalleryPane({
   extraActions,
   downloadNamePrefix = 'generated',
 }: ResultGalleryPaneProps) {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const [cols, setCols] = useState<number>(readGridCols);
   /*
    * 大图预览按**索引**保存, 而不是按对象: 查看器要支持 ←/→ 翻页,
@@ -247,6 +266,26 @@ export function ResultGalleryPane({
     } catch {
       // 非安全上下文 (局域网 http) 或用户拒绝授权时 clipboard 会失败
       message.warning(`复制失败，请手动复制：${url}`);
+    }
+  };
+
+  const showPrompt = (item: GalleryItem) => {
+    if (!item.prompt) return;
+    modal.info({
+      title: '生成提示词',
+      width: 560,
+      okText: '关闭',
+      content: <div className="fc-prompt-view">{item.prompt}</div>,
+    });
+  };
+
+  const copyPrompt = async (item: GalleryItem) => {
+    if (!item.prompt) return;
+    try {
+      await navigator.clipboard.writeText(item.prompt);
+      message.success('提示词已复制');
+    } catch {
+      message.warning('复制失败，请使用「查看提示词」手动复制');
     }
   };
 
@@ -402,6 +441,22 @@ export function ResultGalleryPane({
           if (index >= 0) setPreviewIndex(index);
         },
       },
+      ...(item.prompt
+        ? [
+            {
+              key: 'prompt',
+              label: '查看提示词',
+              icon: FileText,
+              onSelect: () => showPrompt(item),
+            },
+            {
+              key: 'copy-prompt',
+              label: '复制提示词',
+              icon: Copy,
+              onSelect: () => void copyPrompt(item),
+            },
+          ]
+        : []),
       ...extras,
       {
         key: 'open',

@@ -175,5 +175,6 @@ export const LocalRedraw: CapabilityPlugin = {
   },
   modality: 'image',
   inputs: 1,
+  inputImageMode: 'edit',
   inWorkbench: true,
 };

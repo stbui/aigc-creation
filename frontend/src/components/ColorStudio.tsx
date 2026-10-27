@@ -156,6 +156,7 @@ export function ColorStudio({
           onCustomColor(hex);
         }}
         customActive={value === 'custom'}
+        customColor={hex}
         ariaLabel={ariaLabel}
       />
 

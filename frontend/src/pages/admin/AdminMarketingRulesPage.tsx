@@ -1,13 +1,12 @@
 import { useEffect, useState } from 'react';
 import { App, Button, Input, Select, Switch } from 'antd';
-import { Gift, Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { marketingApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import {
   AdminListError,
   AdminListLoading,
   AdminStaleError,
-  ConfirmAction,
   useAdminResource,
 } from '../../components/admin/AdminWidgets';
 import { PageHeader, Panel } from '../../components/admin/PageHeader';
@@ -26,7 +25,6 @@ export function AdminMarketingRulesPage() {
   const [invite, setInvite] = useState<InviteRule | null>(null);
   const [checkin, setCheckin] = useState<CheckinRule | null>(null);
   const [busy, setBusy] = useState(false);
-  const [confirming, setConfirming] = useState<'invite' | 'checkin' | null>(null);
 
   /*
    * 两条规则是同一次加载: 表单里常在两块之间来回对照(邀请奖励 vs 签到奖励),
@@ -57,7 +55,6 @@ export function AdminMarketingRulesPage() {
     setBusy(true);
     try {
       setInvite(await marketingApi.updateInviteRule(invite));
-      setConfirming(null);
       void message.success('邀请规则已保存，立即生效');
     } catch (e) {
       void message.error((e as Error).message);
@@ -71,7 +68,6 @@ export function AdminMarketingRulesPage() {
     setBusy(true);
     try {
       setCheckin(await marketingApi.updateCheckinRule(checkin));
-      setConfirming(null);
       void message.success('签到规则已保存，立即生效');
     } catch (e) {
       void message.error((e as Error).message);
@@ -156,7 +152,7 @@ export function AdminMarketingRulesPage() {
                 <Button
                   type="primary"
                   className="adm-btn is-primary"
-                  onClick={() => setConfirming('invite')}
+                  onClick={() => void saveInvite()}
                   disabled={busy}
                 >
                   保存邀请规则
@@ -263,7 +259,7 @@ export function AdminMarketingRulesPage() {
                 <Button
                   type="primary"
                   className="adm-btn is-primary"
-                  onClick={() => setConfirming('checkin')}
+                  onClick={() => void saveCheckin()}
                   disabled={busy}
                 >
                   保存签到规则
@@ -274,41 +270,6 @@ export function AdminMarketingRulesPage() {
         )}
       </Panel>
 
-      {confirming && (
-        <ConfirmAction
-          open
-          title={confirming === 'invite' ? '保存邀请规则' : '保存签到规则'}
-          confirmText="确认保存"
-          loading={busy}
-          onCancel={() => setConfirming(null)}
-          onConfirm={() =>
-            confirming === 'invite' ? void saveInvite() : void saveCheckin()
-          }
-          description={<p>规则保存后立即生效，影响后续所有符合条件的用户。</p>}
-          impact={
-            confirming === 'invite' && invite
-              ? [
-                  `邀请人获得 ${invite.inviterCredits} 积分`,
-                  `被邀请人获得 ${invite.inviteeCredits} 积分`,
-                  invite.triggerOn === 'register' ? '注册即发放' : '首次支付后发放',
-                  invite.valid ? '规则已启用' : '规则将停用',
-                ]
-              : checkin
-                ? [
-                    `每日基础 ${checkin.baseCredits} 积分`,
-                    ...checkin.bonusRules.map((b) => `连续 ${b.day} 天额外 +${b.bonus}`),
-                    '已签到记录不受影响',
-                  ]
-                : []
-          }
-          extra={
-            <div className="adm-confirm-warn">
-              <Gift size={14} />
-              <span>已发放的积分不会被追回或扣减，只影响后续发放。</span>
-            </div>
-          }
-        />
-      )}
     </>
   );
 }

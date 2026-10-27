@@ -1,5 +1,5 @@
 /**
- * 创意生图 —— 参考站 creative-image。提示词驱动的创意视觉, 必须由真实模型完成。
+ * 创意生图 —— 参考站 creative-image。提示词驱动的创意视觉, 参考图选填, 必须由真实模型完成。
  *
  * 2026-10-20 从 capability.registry.ts 抽离为独立文件。
  * 抽离的意义: 能力定义此前散在 registry / gateway-prompt / mock provider /
@@ -31,6 +31,6 @@ export const CreativeImage: CapabilityPlugin = {
   buildPrompt: (p) =>
     `创意生图：${p.prompt || '按描述创作电商视觉'}${ratioText(p.ratio)}${sizeText(p.size)}`,
   modality: 'image',
-  inputs: 1,
+  inputs: 0,
   inWorkbench: true,
 };

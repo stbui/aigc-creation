@@ -158,6 +158,8 @@ export function AdminOrdersPage() {
 
   const list = data;
 
+  const hasFilter = Boolean(status || orderNo || email || channel || from || to);
+
   const applyQuery = () => {
     setSelected([]);
     setQuery({
@@ -459,6 +461,7 @@ export function AdminOrdersPage() {
           placeholder="订单号"
           value={orderNo}
           onChange={(e) => setOrderNo(e.target.value)}
+          onPressEnter={applyQuery}
           allowClear
         />
         {/*
@@ -470,6 +473,7 @@ export function AdminOrdersPage() {
           placeholder="用户邮箱"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
+          onPressEnter={applyQuery}
           allowClear
         />
         <Select
@@ -539,7 +543,20 @@ export function AdminOrdersPage() {
               </div>
             )}
             {(list?.items.length ?? 0) === 0 ? (
-              <AdminEmpty description="没有符合条件的订单。清除筛选或换一个时间范围试试。" />
+              <AdminEmpty
+                description={
+                  hasFilter
+                    ? '没有符合条件的订单。清除筛选或换一个时间范围试试。'
+                    : '还没有订单。用户下单后会出现在这里。'
+                }
+                action={
+                  hasFilter ? (
+                    <Button type="default" className="adm-btn" onClick={reset}>
+                      清除筛选
+                    </Button>
+                  ) : undefined
+                }
+              />
             ) : (
               <>
                 <Table<AdminOrderRow>

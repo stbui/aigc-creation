@@ -288,6 +288,12 @@ ok('未知能力构造提示词时抛错', threw);
   eq('合法 enum 透传', out3.bgColor, 'transparent');
 }
 
+// ── 8. 创意生图/自由创作的参考图均为选填 ────────────────────────────
+for (const id of ['creative_image', 'free_create']) {
+  const def = CAPABILITIES.find((c) => c.id === id);
+  eq(`${id} 参考图选填`, def?.inputs, 0);
+}
+
 // ── 汇总 ────────────────────────────────────────────────────────────
 console.log(`\n通过 ${pass} 项`);
 if (fails.length) {

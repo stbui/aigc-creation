@@ -40,9 +40,23 @@ export const Recolor: CapabilityPlugin = {
       pattern: '^#[0-9a-fA-F]{6}$',
     },
   ],
-  buildPrompt: (p) =>
-    `商品换色：只改变商品主体颜色为 ${p.targetColor || p.color || '#FFFFFF'}，保持材质、光影与结构不变`,
+  buildPrompt: (p) => {
+    /*
+     * targetColor 是定制页提交的最终 HEX；color/customColor 是旧调用方的
+     * 兼容字段。选择 custom 时必须把 customColor 解析出来，否则提示词会变成
+     * “换成 custom”，模型无法知道要换什么颜色。
+     */
+    const targetColor =
+      p.targetColor || (p.color === 'custom' ? p.customColor : p.color) || '#FFFFFF';
+    return [
+      `商品换色：以输入图片中唯一的商品为基准，只把该商品主体颜色替换为 ${targetColor}。`,
+      '必须保持同一件商品：商品类别、外形轮廓、数量、部件与结构、材质纹理、反光/高光、阴影、视角、构图、背景和画面尺寸全部不变。',
+      '不得新增、移除或替换任何物体；不得把商品改画成其他品类；不得改变非主体颜色（金属件、透明件、Logo、装饰件保留原色）。',
+      '输出必须是与输入图同一商品、同一画面的换色版本，而不是重新创作一张相似风格的新图。',
+    ].join('');
+  },
   modality: 'image',
   inputs: 1,
+  inputImageMode: 'edit',
   inWorkbench: true,
 };

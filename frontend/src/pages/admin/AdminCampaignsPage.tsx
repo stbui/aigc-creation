@@ -7,7 +7,6 @@ import {
   AdminListError,
   AdminListLoading,
   AdminStaleError,
-  ConfirmAction,
   adminPagination,
   useAdminList,
 } from '../../components/admin/AdminWidgets';
@@ -113,7 +112,6 @@ export function AdminCampaignsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [formError, setFormError] = useState<string | null>(null);
-  const [toggleTarget, setToggleTarget] = useState<AdminCampaign | null>(null);
 
   const fetcher = useCallback(
     (params: Record<string, unknown>) =>
@@ -235,12 +233,11 @@ export function AdminCampaignsPage() {
     }
   };
 
-  const doToggle = async () => {
-    if (!toggleTarget) return;
+  /** 启停可随时再切回，按产品要求直接执行，不再弹窗确认 */
+  const doToggle = async (row: AdminCampaign) => {
     setBusy(true);
     try {
-      await marketingApi.toggleCampaign(toggleTarget.id);
-      setToggleTarget(null);
+      await marketingApi.toggleCampaign(row.id);
       void message.success('状态已切换');
       reload();
     } catch (e) {
@@ -315,7 +312,7 @@ export function AdminCampaignsPage() {
                 <Button type="link" className="adm-link" onClick={() => openEdit(row)}>
                   编辑
                 </Button>
-                <Button type="link" className="adm-link" onClick={() => setToggleTarget(row)}>
+                <Button type="link" className="adm-link" disabled={busy} onClick={() => void doToggle(row)}>
                   切换
                 </Button>
               </>
@@ -607,24 +604,6 @@ export function AdminCampaignsPage() {
         </div>
       </Drawer>
 
-      {toggleTarget && (
-        <ConfirmAction
-          open
-          title="切换活动状态"
-          confirmText="确认切换"
-          loading={busy}
-          onCancel={() => setToggleTarget(null)}
-          onConfirm={() => void doToggle()}
-          description={<p>活动「{toggleTarget.name}」</p>}
-          impact={[
-            `当前状态: ${STATUS_LABEL[toggleTarget.status]?.label ?? toggleTarget.status}`,
-            '切换后立即生效，用户端刷新即可见',
-            toggleTarget.status !== 'active' && !inWindow(toggleTarget)
-              ? '注意: 当前不在时间窗内，即使启用也不会展示'
-              : '活动将在时间窗内对目标人群生效',
-          ]}
-        />
-      )}
     </>
   );
 }

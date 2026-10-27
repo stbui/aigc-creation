@@ -169,6 +169,7 @@ test.describe('后台布局', () => {
     await expect(page.locator('.ant-drawer')).toHaveCount(0);
     await expect(page.locator('.ant-modal')).toHaveCount(0);
     await expect(page.locator('.adm-modal-mask')).toHaveCount(0);
+    await expect(page.locator('.adm-inline-confirm')).toHaveCount(0);
 
     await page.getByRole('button', { name: '收起', exact: true }).click();
     // antd 会保留折叠后的隐藏行节点, 这里只看用户是否还能看到详情

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { App, Button, Input, Modal, Table, Tooltip } from 'antd';
+import { App, Button, Input, Table, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { adminCapabilitiesApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
@@ -7,6 +7,7 @@ import {
   AdminListError,
   AdminListLoading,
   AdminStaleError,
+  ConfirmAction,
   useAdminResource,
 } from '../../components/admin/AdminWidgets';
 import { AdminEmpty, PageHeader, Panel } from '../../components/admin/PageHeader';
@@ -29,7 +30,7 @@ import type { AdminCapabilityControl } from '../../types/api';
  * 只能让用户去问客服，写清「云端通道维护中，预计 2 小时恢复」才是可自助的。
  */
 export function AdminCapabilitiesPage() {
-  const { message, modal } = App.useApp();
+  const { message } = App.useApp();
   const { can } = useAdmin();
   /** 只有 capability.write 能上下线；capability.read 只读 */
   const writable = can('capability.write');
@@ -66,25 +67,18 @@ export function AdminCapabilitiesPage() {
     }
   };
 
-  const bringOnline = (row: AdminCapabilityControl) => {
-    modal.confirm({
-      title: `重新上线「${row.name}」？`,
-      content: '上线后 C 端立刻可以提交该能力，生成链路会按当前通道配置执行。',
-      okText: '上线',
-      cancelText: '取消',
-      onOk: async () => {
-        setSaving(row.capabilityId);
-        try {
-          await adminCapabilitiesApi.set(row.capabilityId, true);
-          message.success(`${row.name} 已上线`);
-          await reload();
-        } catch (e) {
-          message.error((e as Error).message || '上线失败');
-        } finally {
-          setSaving(null);
-        }
-      },
-    });
+  /** 上线按产品要求直接执行，不再弹窗二次确认 */
+  const bringOnline = async (row: AdminCapabilityControl) => {
+    setSaving(row.capabilityId);
+    try {
+      await adminCapabilitiesApi.set(row.capabilityId, true);
+      message.success(`${row.name} 已上线`);
+      await reload();
+    } catch (e) {
+      message.error((e as Error).message || '上线失败');
+    } finally {
+      setSaving(null);
+    }
   };
 
   const columns: ColumnsType<AdminCapabilityControl> = [
@@ -187,7 +181,7 @@ export function AdminCapabilitiesPage() {
                 setReason('');
                 setOffline(row);
               } else {
-                bringOnline(row);
+                void bringOnline(row);
               }
             }}
           >
@@ -235,27 +229,31 @@ export function AdminCapabilitiesPage() {
         )}
       </Panel>
 
-      <Modal
+      <ConfirmAction
         open={!!offline}
         title={offline ? `下线「${offline.name}」` : ''}
-        okText="确认下线"
-        okButtonProps={{ danger: true, loading: saving === offline?.capabilityId }}
-        cancelText="取消"
-        onOk={() => void submitOffline()}
+        confirmText="确认下线"
+        danger
+        loading={saving === offline?.capabilityId}
         onCancel={() => setOffline(null)}
-      >
-        <p style={{ marginBottom: 8, color: 'var(--text-body)' }}>
-          下架后用户在 C 端会看到下方填写的「下线原因」，同时该能力不可提交。此操作会写入审计日志。
-        </p>
-        <Input.TextArea
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          rows={3}
-          maxLength={200}
-          showCount
-          placeholder="例如：云端通道维护中，预计 2 小时恢复"
-        />
-      </Modal>
+        onConfirm={() => void submitOffline()}
+        description={
+          <p style={{ marginBottom: 8, color: 'var(--text-body)' }}>
+            下架后用户在 C 端会看到下方填写的「下线原因」，同时该能力不可提交。此操作会写入审计日志。
+          </p>
+        }
+        impact={['C 端停止提交该能力', '下线原因展示给用户', '写操作审计（含操作人）']}
+        extra={
+          <Input.TextArea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={3}
+            maxLength={200}
+            showCount
+            placeholder="例如：云端通道维护中，预计 2 小时恢复"
+          />
+        }
+      />
     </>
   );
 }

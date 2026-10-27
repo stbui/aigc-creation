@@ -71,23 +71,23 @@ test.describe('后台管理端', () => {
   });
 
   /*
-   * 常驻确认弹窗回归 (2026-10-21)。
+   * 常驻确认层回归。
    *
-   * `ConfirmAction` 曾忽略 `open` 参数、无条件渲染遮罩: 这两页把弹窗常挂载并用
-   * `open={state}` 控制可见性, 于是**一进页面就被一个关不掉的弹窗挡住整页**
-   * (法务页「发布该版本」、消息页「确认发送全站广播」)。只渲染不交互的页面巡检
-   * 发现不了 —— 文本和表格都在, 只是被遮罩盖住。这里断言首屏无遮罩 + 表单可交互。
+   * 2026-10-26 起高危操作确认改为页面内操作条，不再使用 Modal。这里断言
+   * 首屏既没有弹窗/遮罩，也没有常驻的操作条；否则整页会被挡住或占位。
    */
   for (const [path, heading] of [
     ['/admin/legal', '法务文档'],
     ['/admin/notifications', '站内消息'],
   ] as const) {
-    test(`${heading}页不得常驻确认弹窗`, async ({ page }) => {
+    test(`${heading}页不得常驻确认弹窗或操作条`, async ({ page }) => {
       await loginViaUi(page);
       await page.goto(`${UI}${path}`);
       await expect(page.getByRole('heading', { name: heading })).toBeVisible({ timeout: 15000 });
       await expect(page.locator('.adm-modal-mask')).toHaveCount(0);
-      // 遮罩不在 = 页面真的可点: 抓一个首屏按钮验证可交互
+      await expect(page.locator('.ant-modal')).toHaveCount(0);
+      await expect(page.locator('.adm-inline-confirm')).toHaveCount(0);
+      // 页面真的可点: 抓一个首屏按钮验证可交互
       await expect(page.locator('.adm-btn, .ant-btn').first()).toBeEnabled();
     });
   }

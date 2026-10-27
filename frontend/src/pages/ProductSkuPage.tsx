@@ -428,6 +428,7 @@ export function ProductSkuPage() {
                   onChange={(v) => updateRow(row.key, { color: v })}
                   onCustom={() => updateRow(row.key, { color: 'custom' })}
                   customActive={row.color === 'custom'}
+                  customColor={row.customColor}
                   ariaLabel={`SKU ${idx + 1} 颜色`}
                 />
                 {row.color === 'custom' && (

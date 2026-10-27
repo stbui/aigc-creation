@@ -185,16 +185,30 @@ test.describe('营销中心', () => {
     await expect(page.locator('.adm-bonus-row')).toHaveCount(before);
   });
 
-  test('保存规则需二次确认', async ({ page }) => {
+  test('保存规则直接执行, 不再弹窗确认', async ({ page }) => {
+    let saved = false;
+    await page.route('**/api/v1/admin/invites/rules', async (route) => {
+      if (route.request().method() !== 'PUT') {
+        await route.continue();
+        return;
+      }
+      saved = true;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 0, data: route.request().postDataJSON(), message: '' }),
+      });
+    });
+
     await login(page);
     await page.goto(`${UI}/admin/marketing-rules`);
     await page.waitForSelector('#i-inviter', { timeout: 20000 });
 
     await page.getByRole('button', { name: '保存邀请规则' }).click();
-    await expect(page.locator('.adm-modal-title')).toContainText('保存邀请规则');
-    // 应量化说明影响
-    await expect(page.locator('.adm-confirm-impact')).toContainText('积分');
-    await page.getByRole('button', { name: '取消' }).click();
+
+    await expect(page.locator('.ant-modal')).toHaveCount(0);
+    await expect(page.locator('.adm-inline-confirm')).toHaveCount(0);
+    await expect.poll(() => saved).toBe(true);
   });
 });
 

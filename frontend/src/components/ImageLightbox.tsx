@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ChevronLeft, ChevronRight, Download, Minus, Plus, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Copy, Download, FileText, Minus, Plus, X } from 'lucide-react';
 
 /**
  * 生成图大图查看器。
@@ -27,6 +27,8 @@ export interface LightboxItem {
   width?: number | null;
   height?: number | null;
   createdAt?: string;
+  /** 生成时提交的提示词；有值时可在查看器内展开查看与复制 */
+  prompt?: string;
   /** 调用方补充的业务元信息，显示在尺寸/时间之前 */
   meta?: string[];
 }
@@ -116,6 +118,8 @@ export function ImageLightbox({
    * (表现为「放大后图突然偏到一边」)。合并成一个对象后每次更新都是纯计算。
    */
   const [view, setView] = useState({ zoom: 1, x: 0, y: 0 });
+  const [promptOpen, setPromptOpen] = useState(false);
+  const [promptCopied, setPromptCopied] = useState(false);
   const zoom = view.zoom;
   const offset = { x: view.x, y: view.y };
   const [dragging, setDragging] = useState(false);
@@ -164,6 +168,7 @@ export function ImageLightbox({
   if (renderedId !== item?.id) {
     setRenderedId(item?.id);
     setView({ zoom: 1, x: 0, y: 0 });
+    setPromptCopied(false);
     setImageState({ id: item?.id, state: item && loadedIdsRef.current.has(item.id) ? 'loaded' : 'loading' });
     setRetryNonce(0);
   }
@@ -325,6 +330,16 @@ export function ImageLightbox({
   const retry = () => {
     setImageState({ id: item.id, state: 'loading' });
     setRetryNonce((n) => n + 1);
+  };
+
+  const copyPrompt = async () => {
+    if (!item.prompt) return;
+    try {
+      await navigator.clipboard.writeText(item.prompt);
+      setPromptCopied(true);
+    } catch {
+      setPromptCopied(false);
+    }
   };
 
   return (
@@ -498,8 +513,32 @@ export function ImageLightbox({
           <Download size={15} />
           下载原图
         </a>
+        {item.prompt && (
+          <button
+            type="button"
+            className="img-viewer-action"
+            aria-expanded={promptOpen}
+            onClick={() => setPromptOpen((open) => !open)}
+          >
+            <FileText size={15} />
+            提示词
+          </button>
+        )}
         {renderActions?.(index)}
       </div>
+
+      {item.prompt && promptOpen && (
+        <div className="img-viewer-prompt" onClick={(e) => e.stopPropagation()}>
+          <div className="img-viewer-prompt-head">
+            <strong>生成提示词</strong>
+            <button type="button" onClick={() => void copyPrompt()}>
+              {promptCopied ? <Check size={14} /> : <Copy size={14} />}
+              {promptCopied ? '已复制' : '复制'}
+            </button>
+          </div>
+          <p>{item.prompt}</p>
+        </div>
+      )}
     </div>
   );
 }

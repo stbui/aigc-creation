@@ -8,7 +8,6 @@ import { assetsApi, assetSrc, generateApi } from '../lib/api';
 import { ToolShell, type ToolAsset } from '../components/ToolShell';
 import { ToolCard } from '../components/ToolWidgets';
 import { ToolHistoryGrid } from '../components/ToolHistoryPane';
-import { LocalRedrawIllustration } from '../components/illustrations';
 
 /**
  * 局部重绘 —— 1:1 复刻参考站 https://ijihua.cn/local-redraw。
@@ -68,7 +67,9 @@ interface ShapeMark {
   height: number;
 }
 type Mark = StrokeMark | ShapeMark;
-type ResizeHandle = 'n' | 'e' | 's' | 'w';
+type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+
+const RESIZE_HANDLES: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
 /** 一个可描述区域在原图上的包围盒（像素坐标） */
 interface RegionBounds {
@@ -578,10 +579,10 @@ function MaskPainter({
       let top = snapshot.y;
       let right = snapshot.x + snapshot.width;
       let bottom = snapshot.y + snapshot.height;
-      if (drag.handle === 'w') left = clamp(left + dx, 0, right - 4);
-      if (drag.handle === 'e') right = clamp(right + dx, left + 4, w);
-      if (drag.handle === 'n') top = clamp(top + dy, 0, bottom - 4);
-      if (drag.handle === 's') bottom = clamp(bottom + dy, top + 4, h);
+      if (drag.handle?.includes('w')) left = clamp(left + dx, 0, right - 4);
+      if (drag.handle?.includes('e')) right = clamp(right + dx, left + 4, w);
+      if (drag.handle?.includes('n')) top = clamp(top + dy, 0, bottom - 4);
+      if (drag.handle?.includes('s')) bottom = clamp(bottom + dy, top + 4, h);
       drag.mark.x = left;
       drag.mark.y = top;
       drag.mark.width = right - left;
@@ -716,7 +717,7 @@ function MaskPainter({
                 >
                   {index ? <span className="mask-mark-index">{index}</span> : null}
                   {selectedId === mark.id
-                    ? (['n', 'e', 's', 'w'] as ResizeHandle[]).map((handle) => (
+                    ? RESIZE_HANDLES.map((handle) => (
                         <span
                           key={handle}
                           className={`resize-handle ${handle}`}
@@ -928,7 +929,7 @@ export function LocalRedrawPage() {
             tasks={history}
             loading={historyLoading}
             error={historyError}
-            emptyText="暂无局部重绘记录"
+            emptyText=""
             onRetry={() => setHistoryReload((value) => value + 1)}
           />
         </div>
@@ -959,7 +960,7 @@ export function LocalRedrawPage() {
           tasks={history}
           loading={historyLoading}
           error={historyError}
-          emptyText="暂无局部重绘记录"
+          emptyText=""
           onRetry={() => setHistoryReload((value) => value + 1)}
         />
       </Drawer>
@@ -1099,10 +1100,10 @@ export function LocalRedrawPage() {
             <button
               type="button"
               className="local-source-preview"
-              aria-label="预览待重绘原图"
+              aria-label="预览待重绘商品"
               onClick={() => controls.preview(image)}
             >
-              <img src={image.url} alt="待重绘原图" draggable={false} />
+              <img src={image.url} alt="待重绘商品" draggable={false} />
             </button>
             <div>
               <button
@@ -1147,15 +1148,22 @@ export function LocalRedrawPage() {
           </button>
         ) : null
       }
+      keepSourceWhileSubmitting
       trailingPane={historyPane}
       sourcePane={(images) => {
         const image = images[0];
         if (!image) {
           return (
             <div className="redraw-intro">
-              <div className="redraw-intro-art" aria-hidden="true">
-                <LocalRedrawIllustration />
-              </div>
+              <video
+                className="redraw-intro-video"
+                src="/static/mp4/local-redraw.mp4"
+                autoPlay
+                loop
+                muted
+                playsInline
+                aria-label="局部重绘演示"
+              />
               <div className="redraw-intro-copy">
                 <strong>局部重绘</strong>
                 <p>只想修改局部？圈出来写描述就行，适合去掉瑕疵、更换图案、修改画面中的元素</p>
@@ -1182,7 +1190,7 @@ export function LocalRedrawPage() {
           );
         };
         return (
-          <div className="pk-source-pane redraw-stage">
+          <div className={`pk-source-pane redraw-stage${submitting ? ' is-submitting' : ''}`} aria-busy={submitting}>
             <div className="redraw-stage-topbar">
               <div className="redraw-toolbar" role="toolbar" aria-label="重绘工具">
                 {renderToolButton('hand')}
@@ -1230,11 +1238,6 @@ export function LocalRedrawPage() {
                   handleRef={painter}
                 />
               </div>
-              <p className="redraw-mask-hint">
-                {painted
-                  ? '标注区域将按描述重绘，其余像素保持不变。'
-                  : '还没标注。涂抹、框选或圈选要修改的区域后再提交。'}
-              </p>
             </div>
             <div className="redraw-canvas-footer">
               <button

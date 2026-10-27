@@ -234,6 +234,18 @@ export function validateCapabilityParams(
       throw new AppError(40001, `${p.label}不能超过 ${maxLength} 个字符`, 400);
     }
   }
+
+  /*
+   * 换色支持两条调用约定：定制页提交 targetColor，旧调用方提交
+   * color=custom + customColor。后者缺 HEX 时上面的逐字段校验会因空值跳过，
+   * 最终可能把字面量 "custom" 当成目标色发给模型。跨字段约束必须在这里拦下。
+   */
+  if (id === 'recolor' && input.color === 'custom') {
+    const targetColor = input.targetColor || input.customColor;
+    if (targetColor === undefined || targetColor === null || targetColor === '') {
+      throw new AppError(40001, '选择自定义颜色时必须填写有效的 HEX 颜色', 400);
+    }
+  }
 }
 
 export type { Modality };

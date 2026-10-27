@@ -429,6 +429,7 @@ export function FreeCreationPage() {
             width: done.width ?? null,
             height: done.height ?? null,
             createdAt: new Date().toISOString(),
+            prompt: prompt.trim(),
           },
         ]);
       } else if (done.status === 'failed') {

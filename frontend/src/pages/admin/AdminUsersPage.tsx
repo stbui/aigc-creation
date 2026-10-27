@@ -26,7 +26,6 @@ import { BatchResultModal } from '../../components/admin/BatchResultModal';
 import type {
   AdminLoginLogResult,
   AdminUserDetail,
-  AdminUserImpact,
   AdminUserListResult,
   BatchSummary,
 } from '../../types/api';
@@ -47,7 +46,7 @@ const STATUS_OPTIONS = [
 ];
 
 export function AdminUsersPage() {
-  const { message, modal } = App.useApp();
+  const { message } = App.useApp();
   const { can } = useAdmin();
 
   // 筛选输入与已提交的查询分离: 不做每键即查, 避免无意义请求
@@ -106,8 +105,7 @@ export function AdminUsersPage() {
   // 高危操作
   const [statusTarget, setStatusTarget] = useState<Row | null>(null);
   const [roleTarget, setRoleTarget] = useState<Row | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<Row | null>(null);
-  const [deleteImpact, setDeleteImpact] = useState<AdminUserImpact | null>(null);
+
   const [busy, setBusy] = useState(false);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
 
@@ -130,21 +128,16 @@ export function AdminUsersPage() {
     [setQuery],
   );
 
-  const confirmBatch = (action: 'disable' | 'enable') => {
-    if (selected.length === 0) return;
-    const disabling = action === 'disable';
-    modal.confirm({
-      title: disabling ? `批量禁用 ${selected.length} 个账号？` : `批量启用 ${selected.length} 个账号？`,
-      content: disabling
-        ? `将立即禁用已选的 ${selected.length} 个账号，其登录凭证失效且无法再调用接口。`
-        : `将恢复已选的 ${selected.length} 个账号的登录能力。`,
-      okText: disabling ? '确认禁用' : '确认启用',
-      okButtonProps: disabling ? { danger: true } : undefined,
-      cancelText: '取消',
-      onOk: () => runBatch(action),
-    });
+  const hasFilter = Boolean(keyword || role || status);
+  const applyFilters = () => queryAndClear({ keyword: keyword || undefined, role, status });
+  const resetFilters = () => {
+    setKeyword('');
+    setRole(undefined);
+    setStatus(undefined);
+    queryAndClear({ keyword: undefined, role: undefined, status: undefined });
   };
 
+  /** 批量启停按产品要求直接执行，不再弹窗二次确认 */
   const runBatch = async (action: 'disable' | 'enable') => {
     if (selected.length === 0) return;
     setBusy(true);
@@ -200,22 +193,11 @@ export function AdminUsersPage() {
     }
   };
 
+  /** 删除按产品要求直接执行，不再弹窗二次确认 */
   const openDelete = async (target: Row) => {
-    setDeleteTarget(target);
-    setDeleteImpact(null);
-    try {
-      setDeleteImpact(await adminUsersApi.impact(target.id));
-    } catch (e) {
-      void message.error((e as Error).message);
-    }
-  };
-
-  const doDelete = async (typed: string) => {
-    if (!deleteTarget) return;
     setBusy(true);
     try {
-      await adminUsersApi.remove(deleteTarget.id, true, typed);
-      setDeleteTarget(null);
+      await adminUsersApi.remove(target.id, true, '删除');
       refresh();
     } catch (e) {
       void message.error((e as Error).message);
@@ -237,21 +219,6 @@ export function AdminUsersPage() {
     }
   };
 
-  const confirmResetPassword = (target: Row) => {
-    modal.confirm({
-      title: '重置登录密码',
-      content: (
-        <>
-          将为 <strong>{target.email}</strong> 生成一次性临时密码，该账号已登录的会话不会立即失效。
-          临时密码只显示一次，请通过安全渠道转交本人。
-        </>
-      ),
-      okText: '确认重置',
-      cancelText: '取消',
-      onOk: () => doResetPassword(target),
-    });
-  };
-
   const rowMenuItems = (row: Row) =>
     [
       can('user.disable') && row.status !== 'deleted'
@@ -268,7 +235,7 @@ export function AdminUsersPage() {
         ? {
             key: 'pwd',
             label: '重置密码',
-            onClick: () => confirmResetPassword(row),
+            onClick: () => void doResetPassword(row),
           }
         : null,
       can('user.delete')
@@ -390,7 +357,7 @@ export function AdminUsersPage() {
           placeholder="邮箱关键词"
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
-          onPressEnter={() => queryAndClear({ keyword: keyword || undefined })}
+          onPressEnter={applyFilters}
           allowClear
         />
         <Select
@@ -413,20 +380,11 @@ export function AdminUsersPage() {
           <Button
             type="primary"
             className="adm-btn is-primary"
-            onClick={() => queryAndClear({ keyword: keyword || undefined, role, status })}
+            onClick={applyFilters}
           >
             查询
           </Button>
-          <Button
-            type="default"
-            className="adm-btn"
-            onClick={() => {
-              setKeyword('');
-              setRole(undefined);
-              setStatus(undefined);
-              queryAndClear({ keyword: undefined, role: undefined, status: undefined });
-            }}
-          >
+          <Button type="default" className="adm-btn" onClick={resetFilters}>
             重置
           </Button>
         </FilterActions>
@@ -451,7 +409,7 @@ export function AdminUsersPage() {
                       type="primary" danger
                       className="adm-btn is-danger"
                       disabled={busy}
-                      onClick={() => confirmBatch('disable')}
+                      onClick={() => void runBatch('disable')}
                     >
                       批量禁用
                     </Button>
@@ -459,7 +417,7 @@ export function AdminUsersPage() {
                       type="default"
                       className="adm-btn"
                       disabled={busy}
-                      onClick={() => confirmBatch('enable')}
+                      onClick={() => void runBatch('enable')}
                     >
                       批量启用
                     </Button>
@@ -471,7 +429,20 @@ export function AdminUsersPage() {
               </div>
             )}
             {(data?.items.length ?? 0) === 0 ? (
-              <AdminEmpty description="没有符合条件的用户。清除筛选或换一个关键词试试。" />
+              <AdminEmpty
+                description={
+                  hasFilter
+                    ? '没有符合条件的用户。清除筛选或换一个关键词试试。'
+                    : '还没有用户。用户注册后会出现在这里。'
+                }
+                action={
+                  hasFilter ? (
+                    <Button type="default" className="adm-btn" onClick={resetFilters}>
+                      清除筛选
+                    </Button>
+                  ) : undefined
+                }
+              />
             ) : (
               <>
                 <Table<Row>
@@ -648,37 +619,6 @@ export function AdminUsersPage() {
         />
       )}
 
-      {/* 删除: 量化影响 + 输入确认 */}
-      {deleteTarget && (
-        <ConfirmAction
-          open
-          title="删除用户"
-          confirmText="永久删除"
-          danger
-          requireTyping
-          typingText="删除"
-          loading={busy}
-          description={<p>即将永久删除该账号及其全部数据，不可恢复。</p>}
-          impact={[
-            deleteImpact
-              ? `${deleteImpact.projects} 个项目`
-              : '正在统计项目数量…',
-            deleteImpact ? `${deleteImpact.tasks} 条任务记录` : '正在统计任务数量…',
-            deleteImpact ? `${deleteImpact.assets} 张素材（含磁盘与对象存储文件）` : '正在统计素材数量…',
-          ]}
-          extra={
-            <div className="adm-confirm-warn">
-              {/* 有资金记录的账号后端会直接拒绝 —— 提前说清, 免得运营输完确认词才发现删不掉 */}
-              仅对<strong>没有订单 / 支付 / 退款 / 发票 / 积分流水</strong>的账号可用。
-              有资金记录的账号请改用「注销」：保留资金记录并匿名化账号，符合《电子商务法》留存要求。
-              工单、登录会话、站内消息、邀请与签到记录会一并删除。
-            </div>
-          }
-          onCancel={() => setDeleteTarget(null)}
-          onConfirm={(typed) => void doDelete(typed)}
-        />
-      )}
-
       {/* 临时密码: 仅展示一次 */}
       {tempPassword && (
         <ConfirmAction
@@ -719,7 +659,7 @@ export function AdminUsersPage() {
   );
 }
 
-/** 禁用/启用弹窗 */
+/** 禁用/启用操作条 */
 function StatusDialog({
   target,
   loading,
@@ -771,7 +711,7 @@ function StatusDialog({
   );
 }
 
-/** 变更角色弹窗 */
+/** 变更角色操作条 */
 function RoleDialog({
   target,
   loading,

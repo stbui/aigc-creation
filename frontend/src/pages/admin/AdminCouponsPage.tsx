@@ -7,7 +7,6 @@ import {
   AdminListError,
   AdminListLoading,
   AdminStaleError,
-  ConfirmAction,
   adminPagination,
   useAdminList,
 } from '../../components/admin/AdminWidgets';
@@ -110,7 +109,7 @@ export function AdminCouponsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
   const [formError, setFormError] = useState<string | null>(null);
-  const [toggleTarget, setToggleTarget] = useState<AdminCoupon | null>(null);
+
 
   const fetcher = useCallback(
     (params: Record<string, unknown>) =>
@@ -240,12 +239,11 @@ export function AdminCouponsPage() {
     }
   };
 
-  const doToggle = async () => {
-    if (!toggleTarget) return;
+  /** 启停可随时再切回，按产品要求直接执行，不再弹窗确认 */
+  const doToggle = async (row: AdminCoupon) => {
     setBusy(true);
     try {
-      const res = await marketingApi.toggleCoupon(toggleTarget.id);
-      setToggleTarget(null);
+      const res = await marketingApi.toggleCoupon(row.id);
       void message.success(res.status === 'on' ? '已启用' : '已停用');
       reload();
     } catch (e) {
@@ -350,7 +348,7 @@ export function AdminCouponsPage() {
                 <Button type="link" className="adm-link" onClick={() => openEdit(row)}>
                   编辑
                 </Button>
-                <Button type="link" className="adm-link" onClick={() => setToggleTarget(row)}>
+                <Button type="link" className="adm-link" disabled={busy} onClick={() => void doToggle(row)}>
                   {row.status === 'on' ? '停用' : '启用'}
                 </Button>
               </>
@@ -654,32 +652,6 @@ export function AdminCouponsPage() {
         </div>
       </Drawer>
 
-      {/* 启停确认 */}
-      {toggleTarget && (
-        <ConfirmAction
-          open
-          title={toggleTarget.status === 'on' ? '停用优惠券' : '启用优惠券'}
-          confirmText={toggleTarget.status === 'on' ? '确认停用' : '确认启用'}
-          danger={toggleTarget.status === 'on'}
-          loading={busy}
-          onCancel={() => setToggleTarget(null)}
-          onConfirm={() => void doToggle()}
-          description={
-            <p>
-              券 <strong>{toggleTarget.code}</strong>（{toggleTarget.name}）
-            </p>
-          }
-          impact={
-            toggleTarget.status === 'on'
-              ? [
-                  '停用后用户无法再使用该券',
-                  `已核销的 ${toggleTarget.usedCount} 笔订单不受影响`,
-                  '随时可重新启用',
-                ]
-              : ['启用后用户可立即使用该券', `有效期至 ${new Date(toggleTarget.validTo).toLocaleDateString('zh-CN')}`]
-          }
-        />
-      )}
     </>
   );
 }

@@ -7,7 +7,6 @@ import {
   AdminListError,
   AdminListLoading,
   AdminStaleError,
-  ConfirmAction,
   useAdminResource,
 } from '../../components/admin/AdminWidgets';
 import { AdminEmpty, PageHeader } from '../../components/admin/PageHeader';
@@ -46,7 +45,6 @@ export function AdminStoragePage() {
   const { can } = useAdmin();
 
   const [probing, setProbing] = useState<string | null>(null);
-  const [switchTarget, setSwitchTarget] = useState<StorageBackendId | null>(null);
   const [busy, setBusy] = useState(false);
 
   const { data, loading, error, reload } = useAdminResource(() => adminStorageApi.status());
@@ -68,13 +66,12 @@ export function AdminStoragePage() {
     }
   };
 
-  const doSwitch = async () => {
-    if (!switchTarget) return;
+  /** 切换只改运行时默认值，按产品要求直接执行，不再弹窗二次确认 */
+  const doSwitch = async (backend: StorageBackendId) => {
     setBusy(true);
     try {
-      const res = await adminStorageApi.setActive(switchTarget);
-      setSwitchTarget(null);
-      void message.success(`默认后端已切到 ${META[switchTarget].label} — ${res.note}`);
+      const res = await adminStorageApi.setActive(backend);
+      void message.success(`默认后端已切到 ${META[backend].label} — ${res.note}`);
       await reload();
     } catch (e) {
       void message.error((e as Error).message);
@@ -197,7 +194,8 @@ export function AdminStoragePage() {
                   <Button
                     type="primary"
                     className="adm-btn is-primary"
-                    onClick={() => setSwitchTarget(b.backend as StorageBackendId)}
+                    disabled={busy}
+                    onClick={() => void doSwitch(b.backend as StorageBackendId)}
                   >
                     设为默认
                   </Button>
@@ -208,24 +206,6 @@ export function AdminStoragePage() {
         })}
       </div>
 
-      {switchTarget && (
-        <ConfirmAction
-          open
-          title={`将默认存储后端切到 ${META[switchTarget].label}`}
-          confirmText="确认切换"
-          loading={busy}
-          onCancel={() => setSwitchTarget(null)}
-          onConfirm={() => void doSwitch()}
-          description={
-            <p>此后新上传的素材与新生成的产出将写入该后端。</p>
-          }
-          impact={[
-            '已写入的素材不受影响 —— 它们按 storageBackend 字段各自读取',
-            '切换只改运行时默认值，重启后需通过环境变量 STORAGE_BACKEND 固化',
-            '切换前建议先做连通性测试',
-          ]}
-        />
-      )}
     </>
   );
 }

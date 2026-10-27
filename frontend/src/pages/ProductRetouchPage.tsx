@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Maximize2 } from 'lucide-react';
 import { useToolTask } from '../hooks/useToolTask';
-import { ExpandTextModal, ToolShell } from '../components/ToolShell';
+import { ToolShell } from '../components/ToolShell';
 import { PillOptions, ToolCard } from '../components/ToolWidgets';
 import { ToolHistoryPane } from '../components/ToolHistoryPane';
+import { ProductSourceResult, ProductSourceUploadPreview } from '../components/ProductSourcePreview';
 
 /**
  * 产品精修 —— 1:1 复刻参考站 https://ijihua.cn/product-retouch。
@@ -46,7 +46,6 @@ export function ProductRetouchPage() {
 
   const [mode, setMode] = useState('comprehensive');
   const [note, setNote] = useState('');
-  const [expandOpen, setExpandOpen] = useState(false);
   const [sourceUrl, setSourceUrl] = useState('');
 
   const handleHistoryReuse = () => {
@@ -61,8 +60,16 @@ export function ProductRetouchPage() {
       title="产品精修"
       desc="商品图去瑕疵，提高清晰度"
       upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
+      replaceUpload
+      renderUploadPreview={(uploads, controls) => {
+        const image = uploads[0];
+        return image ? (
+          <ProductSourceUploadPreview image={image} controls={controls} alt="待精修商品图" />
+        ) : null;
+      }}
       settings={{ ratio: true, resolution: true }}
       submitLabel="立即生成"
+      emptyVideo="/static/mp4/04_cpjx.mp4"
       emptyDesc="上传图片并选择精修模式后，结果将在此处展示"
       formValid
       submitting={submitting}
@@ -85,6 +92,10 @@ export function ProductRetouchPage() {
           size: settings.resolution,
         });
       }}
+      sourcePane={(images) => {
+        const image = images[0];
+        return image ? <ProductSourceResult image={image} alt="待精修商品图" /> : null;
+      }}
       onHistoryReuse={handleHistoryReuse}
       trailingPane={
         <ToolHistoryPane capability="enhance" refreshKey={result?.url} emptyText="暂无精修记录" />
@@ -95,29 +106,13 @@ export function ProductRetouchPage() {
       </ToolCard>
 
       <ToolCard title="补充要求（选填）" className="product-retouch-card">
-        <div className="pk-desc-editor">
-          <textarea
-            rows={3}
-            maxLength={200}
-            value={note}
-            placeholder="如：去掉电镀件上的指纹，让皮革看起来更有光泽"
-            onChange={(e) => setNote(e.target.value)}
-          />
-          <button type="button" className="pk-desc-expand" aria-label="放大编辑补充要求" title="放大编辑" onClick={() => setExpandOpen(true)}>
-            <Maximize2 size={14} />
-          </button>
-        </div>
+        <textarea
+          maxLength={200}
+          value={note}
+          placeholder="如：去掉电镀件上的指纹，让皮革看起来更有光泽"
+          onChange={(e) => setNote(e.target.value)}
+        />
       </ToolCard>
-
-      <ExpandTextModal
-        open={expandOpen}
-        title="编辑补充要求"
-        value={note}
-        maxLength={200}
-        placeholder="如：去掉电镀件上的指纹，让皮革看起来更有光泽"
-        onChange={setNote}
-        onClose={() => setExpandOpen(false)}
-      />
     </ToolShell>
   );
 }

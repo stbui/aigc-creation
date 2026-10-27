@@ -6,7 +6,6 @@ import {
   AdminListError,
   AdminListLoading,
   AdminStaleError,
-  ConfirmAction,
   useAdminResource,
 } from '../../components/admin/AdminWidgets';
 import { AdminEmpty, PageHeader, Panel } from '../../components/admin/PageHeader';
@@ -127,12 +126,6 @@ export function AdminRolesPage() {
 
   // 草稿为 roleCode -> Set<permission>; 直接改库会导致每次勾选都发一次请求
   const [draft, setDraft] = useState<Record<string, Set<string>>>({});
-  const [pending, setPending] = useState<{
-    code: string;
-    label: string;
-    before: Set<string>;
-    after: Set<string>;
-  } | null>(null);
 
   /*
    * 角色清单与权限点清单必然一起用 (勾选框由后者铺开), 分两次拉会出现
@@ -242,14 +235,7 @@ export function AdminRolesPage() {
                     type="primary"
                     className="adm-btn is-primary"
                     disabled={!changed || busy}
-                    onClick={() =>
-                      setPending({
-                        code: r.code,
-                        label: r.label,
-                        before: original,
-                        after: new Set(current),
-                      })
-                    }
+                    onClick={() => void save(r.code, current)}
                   >
                     保存{r.label}权限
                     {changed ? ' *' : ''}
@@ -328,36 +314,6 @@ export function AdminRolesPage() {
         ))}
       </Panel>
 
-      {pending && (
-        <ConfirmAction
-          open
-          title={`保存「${pending.label}」的权限变更`}
-          confirmText="确认保存"
-          loading={busy}
-          description={<p>以下变更将在保存后立即对该角色的所有用户生效。</p>}
-          impact={(() => {
-            const added = Array.from(pending.after).filter((p) => !pending.before.has(p));
-            const removed = Array.from(pending.before).filter((p) => !pending.after.has(p));
-            const lines: string[] = [];
-            if (added.length) lines.push(`新增 ${added.length} 项：${added.join('、')}`);
-            if (removed.length) lines.push(`移除 ${removed.length} 项：${removed.join('、')}`);
-            return lines;
-          })()}
-          extra={
-            pending.code === me?.role ? (
-              <div className="adm-confirm-warn">
-                你正在修改自己所属角色的权限，保存后会立即生效，可能导致部分入口消失。
-              </div>
-            ) : undefined
-          }
-          onCancel={() => setPending(null)}
-          onConfirm={() => {
-            const { code, after } = pending;
-            setPending(null);
-            void save(code, after);
-          }}
-        />
-      )}
     </>
   );
 }

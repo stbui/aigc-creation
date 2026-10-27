@@ -32,9 +32,14 @@ export function languageOptions(): ParamOption[] {
   return optionsOf('main_image', 'language');
 }
 
-/** 画面比例（8 项）。取自商品主图能力。 */
-export function ratioOptions(): ParamOption[] {
-  return optionsOf('main_image', 'ratio');
+/**
+ * 画面比例。读取当前能力的 ratio 选项；修图系能力包含首项「原比例」，
+ * 商品主图等生图能力则只有 8 项。不能固定读 main_image —— 那会让
+ * 默认值为 original 的页面无法在弹层里重新选回原比例。
+ */
+export function ratioOptions(capabilityId?: string): ParamOption[] {
+  const own = capabilityId ? optionsOf(capabilityId, 'ratio') : [];
+  return own.length ? own : optionsOf('main_image', 'ratio');
 }
 
 /** 画质档位。取自商品主图能力（param key 为 `size`）。 */

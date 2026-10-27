@@ -41,3 +41,74 @@ export function detectImageFormat(buf: Buffer): SupportedImageFormat | null {
 export function sniffImageFormat(buf: Buffer): string {
   return detectImageFormat(buf) ?? 'image/jpeg';
 }
+
+/**
+ * 从图片头部读取像素尺寸。
+ *
+ * 图像编辑端点不使用业务侧传入的 `ratio: 'original'` —— 它只认具体尺寸。
+ * 不传 size 时，部分聚合通道会默认生成正方形，导致竖版商品图两侧多出大片
+ * 白边。这里只读文件头，不依赖 Jimp 解码（Jimp 当前不支持 WebP）。
+ *
+ * 解析失败返回 null，调用方应省略 size 而不是猜一个比例。
+ */
+export function readImageDimensions(buf: Buffer): { width: number; height: number } | null {
+  const format = detectImageFormat(buf);
+  if (!format || buf.length < 10) return null;
+
+  if (format === 'image/png') {
+    if (buf.length < 24) return null;
+    return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+  }
+
+  if (format === 'image/gif') {
+    if (buf.length < 10) return null;
+    return { width: buf.readUInt16LE(6), height: buf.readUInt16LE(8) };
+  }
+
+  if (format === 'image/webp') {
+    const chunk = buf.toString('ascii', 12, 16);
+    if (chunk === 'VP8X' && buf.length >= 30) {
+      return {
+        width: 1 + buf.readUIntLE(24, 3),
+        height: 1 + buf.readUIntLE(27, 3),
+      };
+    }
+    if (chunk === 'VP8L' && buf.length >= 25 && buf[20] === 0x2f) {
+      return {
+        width: 1 + ((buf[21] | (buf[22] << 8)) & 0x3fff),
+        height: 1 + (((buf[22] >> 6) | (buf[23] << 2) | (buf[24] << 10)) & 0x3fff),
+      };
+    }
+    if (chunk === 'VP8 ' && buf.length >= 30) {
+      return {
+        width: buf.readUInt16LE(26) & 0x3fff,
+        height: buf.readUInt16LE(28) & 0x3fff,
+      };
+    }
+    return null;
+  }
+
+  // JPEG: 遍历段标记，取 SOF0/SOF1/SOF2 等帧头里的尺寸
+  let offset = 2;
+  while (offset + 9 < buf.length) {
+    if (buf[offset] !== 0xff) {
+      offset += 1;
+      continue;
+    }
+    while (buf[offset] === 0xff) offset += 1;
+    const marker = buf[offset];
+    offset += 1;
+    if (marker === 0xd8 || marker === 0xd9 || marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) {
+      continue;
+    }
+    if (offset + 2 > buf.length) return null;
+    const length = buf.readUInt16BE(offset);
+    const isFrameHeader = marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker);
+    if (isFrameHeader && offset + 7 <= buf.length) {
+      return { width: buf.readUInt16BE(offset + 5), height: buf.readUInt16BE(offset + 3) };
+    }
+    if (length < 2) return null;
+    offset += length;
+  }
+  return null;
+}

@@ -7,6 +7,7 @@
 | 层 | 目的 | 载体 | 是否需要起服务 |
 | --- | --- | --- | --- |
 | L1 编译与类型 | 代码能否构建、类型是否自洽 | `backend npm run build`、`frontend npx tsc --noEmit`、`npm run build:prod` | 否 |
+| L1.5 前端单元 / 组件 | 纯逻辑、hooks、状态组件的分支与状态语义 | `frontend npm test`（Vitest + jsdom + Testing Library） | 否 |
 | L2 架构与纯逻辑断言 | 分层依赖、能力注册表、签名串、环境解析等**不靠类型检查能发现**的错误 | `backend/scripts/verify-*.ts`、`probe-environments.ts` | 多数否 |
 | L3 HTTP 冒烟 | 接口契约、权限、资金与积分规则、回落与失败语义 | `backend/scripts/smoke-*.js` | 是 |
 | L4 浏览器 E2E | 页面渲染、权限链路、提交契约、状态契约 | `frontend/tests/*.spec.ts`（Playwright） | 是（前端 + 后端） |
@@ -32,6 +33,21 @@ cd backend && npm run build
 cd frontend && npx tsc --noEmit
 cd frontend && npm run build:prod
 ```
+
+### 3.1.1 前端单元 / 组件（L1.5）
+
+配置在 `frontend/vitest.config.ts`，用例在 `frontend/src/**/*.test.{ts,tsx}`，jsdom 环境，**不需要起服务、不读 `.env.{mode}`**。
+
+```bash
+cd frontend
+npm test                # 单次，交付前用这个
+npm run test:watch      # watch
+npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitignore）
+```
+
+当前覆盖：扩图 placement 几何、AIGC 角标配置（缓存 / 失败回落 / 色值）、任务轮询（网络抖动重试 / 超时 / 视频上限放宽 / 中止语义）、未保存守卫、状态组件（空 / 失败 / 加载 / 骨架）、产出徽标、积分文案。
+
+边界：Vitest 只跑 jsdom，不替代 L3/L4。真实后端、真实浏览器、真实库与磁盘的记录仍以 `smoke-*` / `verify-*` / Playwright 为准，不要用 jsdom 的结果声称「页面能跑」。Playwright 只收集 `tests/*.spec.ts`，Vitest 只收集 `src/**/*.test.*`，两边互不重叠。
 
 ### 3.2 架构与纯逻辑断言（L2）
 
@@ -143,6 +159,8 @@ cd frontend && npm run build:prod
 | 合规与基础设施 | probe-environments | aigc、signed-url、health-tracing、notifications | state-contract |
 | 局部重绘遮罩（42205） | — | **暂无自动化闸口**（见下方说明） | — |
 
+L1.5（Vitest）不按功能域铺矩阵，覆盖清单见 3.1.1。新增纯逻辑、共享 hook 或状态组件时，优先补 `frontend/src/**/*.test.{ts,tsx}`；需要后端或浏览器的场景仍归 L3/L4。
+
 **局部重绘遮罩的验证缺口（2026-10-22）**：遮罩路径要求 ① 后台存在 `maskSupport: 'edits'`（openai 协议）的图像线路，② 该线路的模型支持 `images/edits`，③ 遮罩与原图同尺寸。仓库当前没有任何一条线路满足这三条，故本轮**只能验到代码层**：协议矩阵里 `maskSupport` 的声明、路由器「全部通道不支持遮罩 → 42205」的分支、`generate.service` 对 `maskAssetId` 的归属校验与 42205 落码。补闸口时的最小脚本（未实现）应覆盖三条拒绝路径：无遮罩素材权限 → 40001、全部通道 `maskSupport: 'none'` → 42205 且积分退回、支持遮罩时 multipart 请求体含 `image` 与 `mask` 两个文件段。**不写「已通过」**：真实出图必须由配好 openai 线路的环境实跑一次才算证据。
 
 **渠道退款的可验证边界（2026-10-22）**：退款从「改库」改为「真的调渠道」，`smoke-payments.js` 新增的六组断言钉住的是**顺序与失败语义**——全额/部分/二次退款的订单状态与积分处置、渠道未配置时 503 且不留半截退款行、在途退款 40908、`channel='manual'` 不调渠道、普通用户 403。这些都只在**沙箱通道**下成立（脚本在真实通道实例上整体跳过）。支付宝 RSA2 与微信 v3 的退款请求体、验签与 `PROCESSING` 分支**没有离线证据**：`verify-payment-signatures.ts` 覆盖的是支付签名，不是退款接口。真实渠道退款须用商户号实跑一次才算验证；在此之前只能说「代码按官方规格实现，失败语义已覆盖」，不能说「退款已验证」。
@@ -207,3 +225,4 @@ cd frontend && npm run build:prod
 2. 新增权限点、错误码、状态机边时，测试要覆盖「拒绝路径」，不只覆盖成功路径。
 3. 冒烟脚本只追加断言，不删除既有断言；确需废弃时写明原因。
 4. 任何「预期通过」都不算验证：交付时只写真实运行输出里的通过 / 失败数。
+5. 纯逻辑（几何 / 解析 / 状态机）与共享 hooks、状态组件优先补 Vitest 用例；断言用行为与返回值，不用快照比对样式。新增用例后须同时跑 `npm run typecheck` 与 `npm test`。

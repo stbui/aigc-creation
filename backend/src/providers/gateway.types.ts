@@ -73,3 +73,18 @@ export class MaskUnsupportedError extends Error {
     this.reason = reason;
   }
 }
+
+/**
+ * 能力声明输入图必须作为编辑底图，但当前通道没有图像编辑端点。
+ *
+ * 与遮罩错误共用 `42205` 的终局语义（配置问题，换协议而不是重试），
+ * 但错误文案必须能区分「换色底图被忽略」和「遮罩被忽略」，否则运营
+ * 会在错误的配置项里排查。
+ */
+export class ImageEditUnsupportedError extends MaskUnsupportedError {
+  constructor(reason: string) {
+    super(reason);
+    this.name = 'ImageEditUnsupportedError';
+    this.message = `通道不支持图像编辑: ${reason}`;
+  }
+}

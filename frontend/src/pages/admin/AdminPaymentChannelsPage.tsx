@@ -194,6 +194,7 @@ export function AdminPaymentChannelsPage() {
           dataSource={data.channels}
           pagination={false}
           size="small"
+          scroll={{ x: 800 }}
         />
       </Panel>
 

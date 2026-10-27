@@ -4,11 +4,17 @@ import { protocolSpec } from './protocols/protocol.spec';
 import { ChannelScheduler } from './channel-scheduler';
 import { gatewayConfig, setGatewayConfigOverrides, invalidateGatewayConfigCache } from './gateway.config';
 import { buildPromptFor } from './gateway-prompt';
-import { CAPABILITIES } from '../capabilities/capability.registry';
+import { CAPABILITIES, getCapability } from '../capabilities/capability.registry';
 import { PrismaService } from '../prisma/prisma.service';
 import { ImageCallLogger } from './image-call-logger';
 import type { ImageProvider, ImageProviderResult } from './image-provider.interface';
-import { MaskUnsupportedError, NoModelChannelError, type CapabilityRoute, type GatewayResult } from './gateway.types';
+import {
+  ImageEditUnsupportedError,
+  MaskUnsupportedError,
+  NoModelChannelError,
+  type CapabilityRoute,
+  type GatewayResult,
+} from './gateway.types';
 import type { ChannelDispatch } from './channel-scheduler';
 
 /**
@@ -49,8 +55,9 @@ export class CapabilityRouterProvider implements ImageProvider {
   /**
    * @param maskPath 遮罩 PNG 的本地路径（局部重绘/手动去水印用，可选）。
    *
-   * 通道不接受遮罩时换下一条支持 edits 的线路；全部不支持时判 42205。
-   * 不允许「忽略遮罩继续生成」——那会把局部修改变成整图重绘。
+   * 通道不接受遮罩/编辑底图时换下一条支持 edits 的线路；全部不支持时判 42205。
+   * 不允许「忽略遮罩或参考图继续生成」——前者会把局部修改变成整图重绘，
+   * 后者会把商品换色变成文生图（上传水壶却生成手提包）。
    */
   async generate(
     capability: string,
@@ -71,6 +78,8 @@ export class CapabilityRouterProvider implements ImageProvider {
     }
 
     const prompt = buildPromptFor(capability, params);
+    const requireImageEdit =
+      !maskPath && inputPaths.length > 0 && getCapability(capability)?.inputImageMode === 'edit';
 
     let dispatch: ChannelDispatch<GatewayResult>;
     /*
@@ -82,10 +91,12 @@ export class CapabilityRouterProvider implements ImageProvider {
     try {
       dispatch = await this.scheduler.dispatch('image', async (channel) => {
         const gateway = this.pickProtocol(channel.protocol);
-        if (maskPath) {
+        if (maskPath || requireImageEdit) {
           const support = protocolSpec(channel.protocol)?.maskSupport ?? 'none';
           if (support !== 'edits') {
-            throw new MaskUnsupportedError(`${channel.name} (${channel.protocol}) 没有图像编辑端点`);
+            throw requireImageEdit
+              ? new ImageEditUnsupportedError(`${channel.name} (${channel.protocol}) 没有图像编辑端点`)
+              : new MaskUnsupportedError(`${channel.name} (${channel.protocol}) 没有图像编辑端点`);
           }
           maskCapableChannels += 1;
         }
@@ -96,11 +107,11 @@ export class CapabilityRouterProvider implements ImageProvider {
             model: channel.model,
           });
         }
-        return gateway.generate(capability, inputPaths, params, prompt, maskPath);
+        return gateway.generate(capability, inputPaths, params, prompt, maskPath, requireImageEdit);
       });
     } catch (e) {
       const reason = (e as Error)?.message ?? String(e);
-      if (maskPath && e instanceof MaskUnsupportedError) {
+      if ((maskPath || requireImageEdit) && e instanceof MaskUnsupportedError) {
         return this.failWithMaskUnsupported(capability, params, route, startedAt, reason);
       }
       return this.failGeneration(capability, params, route, startedAt, reason);
@@ -117,13 +128,16 @@ export class CapabilityRouterProvider implements ImageProvider {
       const reason = [dispatch.unavailableReason, summary].filter(Boolean).join(' — ');
 
       // 有线路被尝试过、但没有任何一条支持遮罩 → 42205（换协议，而不是重试）
-      if (maskPath && dispatch.attempts.length > 0 && maskCapableChannels === 0) {
+      if ((maskPath || requireImageEdit) && dispatch.attempts.length > 0 && maskCapableChannels === 0) {
         return this.failWithMaskUnsupported(
           capability,
           params,
           route,
           startedAt,
-          reason || '当前线路均不支持遮罩重绘，请在后台改用 openai 协议的图像线路',
+          reason ||
+            (requireImageEdit
+              ? '当前线路均不支持图像编辑，请在后台改用 openai 协议的图像线路'
+              : '当前线路均不支持遮罩重绘，请在后台改用 openai 协议的图像线路'),
         );
       }
 

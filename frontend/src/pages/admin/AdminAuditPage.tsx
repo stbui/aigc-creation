@@ -234,6 +234,23 @@ export function AdminAuditPage() {
     [expandedId],
   );
 
+  const hasFilter = Boolean(action || targetId || success);
+  const applyFilters = () => {
+    setExpandedId(null);
+    setQuery({
+      action,
+      targetId: targetId || undefined,
+      success: success === undefined ? undefined : success === 'true',
+    });
+  };
+  const resetFilters = () => {
+    setAction(undefined);
+    setTargetId('');
+    setSuccess(undefined);
+    setExpandedId(null);
+    setQuery({ action: undefined, targetId: undefined, success: undefined });
+  };
+
   return (
     <>
       <PageHeader
@@ -257,10 +274,7 @@ export function AdminAuditPage() {
           placeholder="对象 ID"
           value={targetId}
           onChange={(e) => setTargetId(e.target.value)}
-          onPressEnter={() => {
-            setExpandedId(null);
-            setQuery({ targetId: targetId || undefined });
-          }}
+          onPressEnter={applyFilters}
           allowClear
         />
         <Select
@@ -278,28 +292,11 @@ export function AdminAuditPage() {
           <Button
             type="primary"
             className="adm-btn is-primary"
-            onClick={() => {
-              setExpandedId(null);
-              setQuery({
-                action,
-                targetId: targetId || undefined,
-                success: success === undefined ? undefined : success === 'true',
-              });
-            }}
+            onClick={applyFilters}
           >
             查询
           </Button>
-          <Button
-            type="default"
-            className="adm-btn"
-            onClick={() => {
-              setAction(undefined);
-              setTargetId('');
-              setSuccess(undefined);
-              setExpandedId(null);
-              setQuery({ action: undefined, targetId: undefined, success: undefined });
-            }}
-          >
+          <Button type="default" className="adm-btn" onClick={resetFilters}>
             重置
           </Button>
         </FilterActions>
@@ -315,7 +312,18 @@ export function AdminAuditPage() {
           <AdminListError error={error} onRetry={reload} />
         ) : (list?.items.length ?? 0) === 0 ? (
           <AdminEmpty
-            description="暂无审计记录。后台的写操作（禁用用户、调价、退款等）会自动记录在这里。"
+            description={
+              hasFilter
+                ? '没有符合条件的审计记录。清除筛选后再试。'
+                : '暂无审计记录。后台的写操作（禁用用户、调价、退款等）会自动记录在这里。'
+            }
+            action={
+              hasFilter ? (
+                <Button type="default" className="adm-btn" onClick={resetFilters}>
+                  清除筛选
+                </Button>
+              ) : undefined
+            }
           />
         ) : (
           <Table<Row>

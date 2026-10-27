@@ -5,6 +5,7 @@ import { useToolTask } from '../hooks/useToolTask';
 import { ToolShell } from '../components/ToolShell';
 import { RangeRow, ToolCard } from '../components/ToolWidgets';
 import { ToolHistoryPane } from '../components/ToolHistoryPane';
+import { ProductSourceResult, ProductSourceUploadPreview } from '../components/ProductSourcePreview';
 
 /**
  * 旋转角度 —— 1:1 复刻参考站 https://ijihua.cn/rotate-angle。
@@ -117,8 +118,16 @@ export function RotateAnglePage() {
       title="旋转角度"
       desc="视角平滑旋转，细节立体呈现"
       upload={{ title: '上传图片', required: true, max: 1, hint: '支持 JPG、PNG、WebP，最多 1 张' }}
+      replaceUpload
+      renderUploadPreview={(uploads, controls) => {
+        const image = uploads[0];
+        return image ? (
+          <ProductSourceUploadPreview image={image} controls={controls} alt="待生成商品图" />
+        ) : null;
+      }}
       settings={{ ratio: true, resolution: true }}
       submitLabel="立即生成"
+      emptyVideo="/static/mp4/07_xzjd.mp4"
       emptyDesc="上传图片并调整角度后，结果将在此处展示"
       formValid
       submitting={submitting}
@@ -143,6 +152,12 @@ export function RotateAnglePage() {
           ratio: settings.ratio,
           size: settings.resolution,
         });
+      }}
+      sourcePane={(images) => {
+        const image = images[0];
+        return image ? (
+          <ProductSourceResult image={image} alt="待生成商品图" className="rotate-angle-result" />
+        ) : null;
       }}
       onHistoryReuse={handleHistoryReuse}
       trailingPane={
