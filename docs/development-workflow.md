@@ -161,7 +161,7 @@
    | --- | --- |
    | 能力 / 厂商 / 协议 | `docs/model-architecture.md`、`docs/testing.md` 覆盖矩阵 |
    | 环境变量 / 档位 / 端口 | `docs/environments.md`、三档 env、`ENV_SPECS` |
-   | 接口 / 错误码 / 权限点 | `CLAUDE.md` 接口表与错误码表 |
+   | 接口 / 错误码 / 权限点 | `docs/api-contract.md`；权限点见 `admin/permissions.ts` |
    | 页面规格 / 交互 | `docs/<页面>*-design.md` |
    | 测试 | `docs/testing.md` 闸口清单；脚本落 `backend/scripts/` 或 `frontend/tests/` |
 

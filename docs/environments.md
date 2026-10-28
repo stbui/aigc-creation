@@ -197,6 +197,27 @@ npm run db:push:dev           # 建开发库表
 npm run db:push:test          # 建测试库表
 npm run db:reset:test         # ★ 删库+删目录+重建+重灌种子（带安全门禁）
 npm run seed:test             # 只灌测试库种子
+npm run start:test            # NODE_ENV=test node dist/main.js
+```
+
+种子按需组合（`seed:all` = 开发账号 + 角色 + 后台管理员 + 商品 + 会员 + 营销 + 法务 + 消息模板）：
+
+```bash
+npm run seed                  # 开发账号（需 SEED_USER_EMAIL，未设置则什么都不建）
+npm run seed:admin            # 后台管理员（默认 admin@huojue.local，密码仅打印一次，重复执行不重置）
+npm run seed:roles            # 后台角色与权限点
+npm run seed:commerce         # 商品（积分包）
+npm run seed:membership       # 会员套餐
+npm run seed:marketing        # 优惠券 / 活动 / 邀请签到规则
+npm run seed:legal            # 三份法务文档 v1 草稿（不自动发布；已发布的不会被覆盖；不在 seed:all 内）
+npm run seed:messages         # 五条站内消息模板（只补缺失，不覆盖已改文案）
+```
+
+一次性数据迁移（幂等，存量库专用）：
+
+```bash
+npm run db:migrate:provider          # GenerationTask.provider 'mock' → 'pending'（跑前打印影响行数）
+npm run db:migrate:tool-idempotency  # 补幂等字段/索引（非破坏、可重复；不要用 accept-data-loss）
 ```
 
 `db:reset:test` 会逐项校验删除目标路径**必须含 `test` 字样**且**不得越出 `backend/`**，

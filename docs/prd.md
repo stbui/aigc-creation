@@ -211,13 +211,15 @@
 | 权益 | `CreditLot` / `CreditLedger` / `MembershipPlan` / `Membership` / `MembershipUsage` |
 | 增长 | `Coupon` / `Campaign` / `InviteRelation` / `InviteRewardRule` / `CheckinRecord` / `CheckinRule` |
 | 财务 | `Invoice` / `ReconciliationBatch` / `ReconciliationItem` |
-| 身份安全 | `AccountToken` / `LoginLog` / `LoginSession` / `OAuthIdentity` |
-| 内容与合规 | `LegalDocument` / `ConsentRecord` / `Notification` / `MessageTemplate` / `AigcLabelConfig` |
-| 服务 | `Ticket` / `TicketReply` |
-| 模型通道 | `ModelChannel` / `ModelChannelConfig` / `ModelCallLog` / `CapabilityControl` |
+| 身份安全 | `AccountToken`（一次性令牌：重置密码等）/ `LoginLog` / `LoginSession`（扫码登录票据，**只存 SHA-256 哈希**，`confirmed → consumed` 一次性兑换）/ `OAuthIdentity`（第三方绑定：`provider` + `subject` 联合唯一，`lastLoginAt` 记录最近登录） |
+| 内容与合规 | `LegalDocument`（按 slug + version 版本化）/ `ConsentRecord`（同意留痕）/ `Notification` / `MessageTemplate` / `AigcLabelConfig`（单行 `id='default'`：`specJson` 样式 + `pngBase64` 浏览器渲染位图 + `specKey` 过期判定） |
+| 服务 | `Ticket`（`ticketNo @unique`，状态机见 `tickets.service.ts` 的 `TRANSITIONS`）/ `TicketReply` |
+| 模型通道 | `ModelChannel` / `ModelChannelConfig` / `ModelCallLog` / `CapabilityControl`（能力上下线，**无行 = 启用**） |
 | 运维 | `BackupRecord` / `CleanupLog` |
 
-SQLite 不支持 Prisma enum，状态类字段一律 String + DTO 白名单。计费相关字段以快照为准（`GenerationTask.creditCost`、`OrderItem.priceCentsSnapshot` / `creditsSnapshot`），不按当前价重算。
+SQLite 不支持 Prisma enum，状态类字段一律 String + DTO 白名单。`Asset.kind` = `original` | `generated`；`Asset.outputOfTask` 是 1:1 反向关系。计费相关字段以快照为准（`GenerationTask.creditCost`、`OrderItem.priceCentsSnapshot` / `creditsSnapshot`），不按当前价重算。
+
+Jimp 仅用于上传校验、尺寸探测和 AIGC 角标合成，不参与生成图内容；生成图文字由模型决定。
 
 ## 6. 非功能需求
 

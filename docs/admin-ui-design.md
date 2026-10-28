@@ -8,7 +8,7 @@
 | 菜单数据 | `frontend/src/components/admin/adminNav.ts` |
 | 通用结构 | `frontend/src/components/admin/AdminWidgets.tsx` / `PageHeader.tsx` |
 | 样式 | `frontend/src/styles/global.css` 的 `adm-*` 区块 |
-| 跨页微规格 | `docs/typography-components-details.md` |
+| 跨页微规格 | `docs/typography.md` |
 
 ---
 

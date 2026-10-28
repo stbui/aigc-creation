@@ -1,6 +1,6 @@
 # 货觉AI · 后台管理系统需求文档（PRD）
 
-> **文档状态**：现行需求，与代码同步维护。接口与页面的实现现状见 [`CLAUDE.md`](../CLAUDE.md)「后台管理端」，文档地图见 [`docs/README.md`](README.md)。
+> **文档状态**：现行需求，与代码同步维护。接口与页面的实现现状见 [`admin-console-design.md`](admin-console-design.md) 与 [`admin-detailed-design.md`](admin-detailed-design.md)，接口全表见 [`api-contract.md`](api-contract.md)，文档地图见 [`README.md`](README.md)。
 
 | 项 | 内容 |
 |---|---|

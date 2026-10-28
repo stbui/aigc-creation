@@ -38,7 +38,7 @@
 | [`workbench-design.md`](workbench-design.md) | `/workbench`、应用外壳、侧栏与响应式 |
 | [`topnav-design.md`](topnav-design.md) | 全站顶部导航与移动端抽屉 |
 | [`login-design.md`](login-design.md) | `/login`、登录弹窗、扫码登录入口 |
-| [`asset-library-design.md`](asset-library-design.md) | `/library`（别名 `/asset-library`） |
+| [`library-design.md`](library-design.md) | `/library`（别名 `/asset-library`） |
 
 ## 3. 技术文档（Technical）
 
@@ -49,10 +49,12 @@
 | [`environments.md`](environments.md) | 三环境变量矩阵、加载优先级、生产门禁、Docker、排查 |
 | [`docker-deployment.md`](docker-deployment.md) | 本地 / 测试 / 生产容器编排、TLS 边界、备份恢复、升级回滚、排障 |
 | [`model-architecture.md`](model-architecture.md) | 模型通道分层、协议矩阵、调度与配置、请求时序、扩展 SOP |
+| [`api-contract.md`](api-contract.md) | 统一响应信封、跨模块错误码、主要接口清单、令牌时长 |
+| [`runtime-infrastructure.md`](runtime-infrastructure.md) | AIGC 标识、签名 URL、限流、健康检查、请求追踪、日志落盘 |
 | [`development-workflow.md`](development-workflow.md) | Agent 执行手册：阶段执行卡、闸口命令、证据标准、交人边界 |
-| [`typography-components-details.md`](typography-components-details.md) | 字体、antd 主题、圆角阴影与组件微规格 |
+| [`typography.md`](typography.md) | 字体、antd 主题、圆角阴影与组件微规格 |
 
-接口清单、目录结构、错误码等与代码强相关的速查表放在仓库根 `CLAUDE.md`，不在 docs 下重复维护。
+目录结构、能力清单、环境坑等与代码强相关的坐标速查表放在仓库根 `CLAUDE.md`；接口清单与错误码在 [`api-contract.md`](api-contract.md)。
 
 ## 4. 测试文档（Testing）
 
@@ -69,12 +71,34 @@
 | [`agent-prd.md`](agent-prd.md) | AI 智能体产品需求 | 规划中，不在本轮交付范围 |
 | [`agent-integration-design.md`](agent-integration-design.md) | AI 智能体集成方案 v2：双入口、API、SSE、数据模型、安全边界 | 规划中，未实施 |
 
-## 6. 新增文档的放置约定
+## 6. 文档命名与放置规范
 
-| 文档类型 | 命名与位置 | 要求 |
+### 6.1 命名格式
+
+- 一律小写 ASCII kebab-case，匹配 `^[a-z0-9]+(-[a-z0-9]+)*\.md$`。禁止中文、下划线、空格、驼峰、大写。
+- 文件名 = `前缀（域）` + `粒度/主题` + `类型后缀`，缺哪段省哪段。
+- 类型后缀只有两个：`-prd`（需求）、`-design`（产品/设计方案）。技术文档与测试文档不加后缀，直接用领域名词（`environments.md` / `testing.md` / `model-architecture.md` / `docker-deployment.md`）。
+- 域前缀：整站文档不带前缀（`prd.md`）；子系统带前缀（`admin-` / `agent-` / `commerce-` / `workbench-` / `login-` …）。
+- 一个域内有多份文档时用「域-粒度-类型」，粒度由总到细固定为 `suite` → `console` → `detailed` → `ui`。新增粒度词须先改本节。
+
+### 6.2 禁止事项
+
+- 文件名不带版本号、日期、状态词：`-v2` / `-2026-10-28` / `-final` / `-new` / `-wip` / `-draft` 一律不出现。状态写在正文首行。
+- 过程产物不建文件：审计报告、取证日志、逐轮实施记录、单次运行结果随提交说明或仓库外的临时目录，不进 `docs/`（对应本文件开头第 3 条原则）。
+- 不按人名、批次号、需求单号命名。
+
+### 6.3 放置约定
+
+| 文档类型 | 位置与命名 | 要求 |
 | --- | --- | --- |
-| 需求文档 | 根 `docs/`，`<域>-prd.md` | 写目标、范围、不做什么；实现后补状态 |
-| 产品文档 | 页面规格 `<页面>-design.md`；域设计 `<域>-design.md` | 规格写现值与状态，不写与外部站点的对比 |
-| 技术文档 | 跨域事实源直接命名（如 `environments.md`） | 与代码同批更新，不做事后补写 |
-| 测试文档 | 统一进 `testing.md` | 只写真实存在、可执行的脚本与用例 |
-| 规划文档 | 文件名带 `-prd` / `-design` 并在首行标「规划中」 | 实现前不得写成现状 |
+| 需求文档 | `docs/<域>-prd.md` | 写目标、范围、不做什么；实现后补状态 |
+| 产品文档 | 页面规格 `docs/<页面>-design.md`；域设计 `docs/<域>-design.md` | 页面名取主路由（`library-design.md` 对应 `/library`），别名只写在正文；规格写现值与状态，不写与外部站点的对比 |
+| 技术文档 | `docs/<领域>.md`，跨域事实源可直接用领域名 | 与代码同批更新，不做事后补写 |
+| 测试文档 | 统一进 `docs/testing.md` | 只写真实存在、可执行的脚本与用例 |
+| 规划文档 | 与对应类型同位置 | 正文首行标「规划中」，实现前不得写成现状 |
+| 索引 | `docs/README.md` | 只做分类索引，不承载正文 |
+
+### 6.4 新增与改名
+
+- 新建或改名必须同批完成三件事：文件落位、本文件分类表更新、全仓引用更新（`grep -rn '<文件名>'` 除 `docs/` 外还须覆盖 `CLAUDE.md` 与代码注释）。
+- 一个文件只写一个主题；内容跨两个域时拆分，不要用「综合」「杂项」这类名字兜底。

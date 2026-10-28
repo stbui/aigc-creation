@@ -17,7 +17,7 @@ import App from './App';
  *   Typography.Link / Button type="link" 会在账户页、通知等位置漏出蓝色,
  *   与全站紫系冲突。
  * borderRadius 8 / fontSize 14 维持 antd 控件基准 (参考站控件半径 6-12, 8 为折中;
- * 基准字号改 16 会连锁改变全部 antd 控件高度, 不做)。证据: docs/typography-components-details.md
+ * 基准字号改 16 会连锁改变全部 antd 控件高度, 不做)。证据: docs/typography.md
  *
  * fontFamily 必须在这里声明, 不能只靠 global.css 的 body 规则:
  * antd v6 的 <App> 会渲染一个带 css-dev-only-do-not-override-* class 的 wrapper,
@@ -26,7 +26,7 @@ import App from './App';
  * body 上那行 Noto Sans SC 优先的声明等于死代码。
  * CDP `CSS.getPlatformFontsForNode` 实测: 参考站 ijihua.cn hero h1 实际渲染
  * 「Noto Sans SC」(Google webfont), 本地同一节点渲染「PingFang SC + .SF NS」;
- * token 补fontFamily 后两端对齐。证据: docs/typography-components-details.md §附录 D
+ * token 补fontFamily 后两端对齐。证据: docs/typography.md §附录 D
  */
 const ANTD_THEME_TOKEN = {
   colorPrimary: '#5546d8',

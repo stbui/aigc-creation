@@ -1,4 +1,4 @@
-# 货觉AI · MVP
+# 货觉AI
 
 面向电商团队的智能视觉创作平台：上传商品图或输入提示词，由真实模型通道产出可上架的主图、详情图、修图结果与短视频。
 
@@ -11,8 +11,9 @@
 > **本文定位**：只写现状——页面结构、能力清单、目录、启动、接口与环境约束。代码与本文冲突时以代码为准，并顺手改本文。
 
 **配套文档**：
-`CLAUDE.md`（接口全表、目录树、架构约束速查）｜
+`CLAUDE.md`（目录树、能力与通道约束速查）｜
 `docs/README.md`（需求 / 产品 / 技术 / 测试 / 规划五类地图）｜
+`docs/api-contract.md`（响应信封、错误码、接口全表）｜
 `docs/environments.md`（三环境变量与门禁）｜
 `docs/model-architecture.md`（通道分层与协议矩阵）｜
 `docs/testing.md`（测试分层、闸口清单与覆盖矩阵）｜
@@ -24,7 +25,7 @@
 | --- | --- |
 | 产品长什么样 | 页面结构 → 能力清单 → 工具页规格 |
 | 怎么跑起来 | 启动（含端口、CORS、工作台缩略图种子） |
-| 接口契约 | 接口（完整表在 `CLAUDE.md`） |
+| 接口契约 | 接口 → `docs/api-contract.md`（完整表） |
 | 外部模型怎么接 | 接入真实模型 → `docs/model-architecture.md` |
 | 踩过的环境坑 | 环境注意事项 |
 
@@ -260,7 +261,7 @@ node scripts/verify-deps.js --quiet   # 仅输出结论，有致命问题则 exi
 
 ## 接口
 
-> 完整接口表（后台管理、商业域、账户与合规、服务域）见 `CLAUDE.md`「主要接口」；这里只列 C 端主链路。
+> 完整接口表（后台管理、商业域、账户与合规、服务域）见 `docs/api-contract.md`「主要接口」；这里只列 C 端主链路。
 
 | 方法 | 路径 | 说明 |
 | --- | --- | --- |
@@ -283,7 +284,7 @@ node scripts/verify-deps.js --quiet   # 仅输出结论，有致命问题则 exi
 | GET/POST | `/api/v1/legal*`、`/notifications*`、`/tickets*` | 法务正文 / 站内消息 / 工单 |
 | GET | `/uploads/*` | 静态图片（签名开启时需 `sig` 参数） |
 
-所有成功响应统一信封 `{ code: 0, data, message: '' }`，前端 `lib/api.ts` 的 `request()` 负责剥离；异常走 `AppError` + `AllExceptionsFilter`，跨模块错误码表见 `CLAUDE.md`「统一响应信封」。
+所有成功响应统一信封 `{ code: 0, data, message: '' }`，前端 `lib/api.ts` 的 `request()` 负责剥离；异常走 `AppError` + `AllExceptionsFilter`，跨模块错误码表见 `docs/api-contract.md`。
 
 生成图内的文字由模型能力决定，不由本地字体渲染；完整中文参数记录在任务里，结果卡片 meta 行可见。
 
@@ -350,4 +351,4 @@ cd test && node server.js     # http://127.0.0.1:3900
 
 - 本文只写现状：页面结构、能力清单、目录树、启动、接口随代码更新；与代码冲突时以代码为准并顺手改这里。
 - 变更过程与单次验证结果不写进本文——测试清单、覆盖矩阵与已知红灯见 `docs/testing.md`，单次运行结果随提交说明记录。
-- 完整接口表、目录树与架构约束收敛在 `CLAUDE.md`，本文不重复；新增文档的命名与放置规则见 `docs/README.md`。
+- 完整接口表与错误码在 `docs/api-contract.md`，目录树与架构约束在 `CLAUDE.md`，本文不重复；新增文档的命名与放置规则见 `docs/README.md`。
