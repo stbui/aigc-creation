@@ -23,8 +23,7 @@ import { useAuth } from '../context/AuthContext';
 import { useProject } from '../hooks/useProject';
 import { ResultMedia, modalityOfFormat } from '../components/ResultMedia';
 import { useCapabilities } from '../hooks/useCapabilities';
-import { ToolEmptyIllustration } from '../components/illustrations';
-import { StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
+import { StateError, StateSkeleton } from '../components/StateViews';
 import type { Asset, Project } from '../types/api';
 
 /**
@@ -87,7 +86,7 @@ function dateBucket(iso: string): { key: string; label: string; sort: number } {
 export function LibraryPage() {
   const { message } = App.useApp();
   const navigate = useNavigate();
-  const { token, openLogin } = useAuth();
+  const { token } = useAuth();
   const { ensureProject } = useProject();
   const { data: caps } = useCapabilities();
   const fileRef = useMemo(() => ({ current: null as HTMLInputElement | null }), []);
@@ -136,6 +135,8 @@ export function LibraryPage() {
     if (!token) {
       setItems([]);
       setTotal(0);
+      setLoading(false);
+      setError(null);
       return;
     }
     setLoading(true);
@@ -290,44 +291,12 @@ export function LibraryPage() {
   const toggle = (id: string) =>
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
-  /*
-   * guest 态: 素材库路由对外开放, 未登录进来时此前会把 401 渲染成
-   * 「素材加载失败」, 而且上方还有一个点了没反应的上传按钮。
-   */
-  if (!token) {
-    return (
-      <div className="asset-library-page">
-        <header className="asset-library-header">
-          <div>
-            <h1 className="asset-library-title">素材库</h1>
-            <p className="asset-library-sub">上传的原图与生成的图片都会在这里统一管理</p>
-          </div>
-        </header>
-        <div className="state-page">
-          <StateEmpty
-            title="登录后管理你的素材"
-            desc="素材与账号绑定，登录后可以上传商品图、查看生成图并批量下载。"
-            action={
-              <button type="button" className="state-btn is-primary" onClick={openLogin}>
-                登录/注册
-              </button>
-            }
-          />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="asset-library-page">
+      <div className="asset-library-shell">
       <header className="asset-library-header">
-        <div>
-          <h1 className="asset-library-title">素材库</h1>
-          <p className="asset-library-sub">
-            共 {total} 个素材 · 上传的原图与生成的图片都在这里统一管理
-          </p>
-        </div>
-        <div className="asset-library-header-actions">
+        <div><h1 className="asset-library-title">素材库</h1></div>
+        {token && <div className="asset-library-header-actions">
           <select
             className="asset-library-date-filter"
             value={kind}
@@ -362,11 +331,11 @@ export function LibraryPage() {
           >
             {uploading ? <Loader2 size={13} /> : <Upload size={13} />} 上传素材
           </button>
-        </div>
+        </div>}
       </header>
 
       {/* 分组面板: 客户端按项目 / 能力 / 日期真实聚合, 点选分组即筛选 */}
-      <section className="asset-library-groups-panel">
+      {token && items.length > 0 && <section className="asset-library-groups-panel">
         <div className="asset-library-group-head">
           <strong>素材分组</strong>
           <span>按项目 / 能力 / 日期聚合当前素材，点选即可只看该组</span>
@@ -418,7 +387,7 @@ export function LibraryPage() {
             ))}
           </div>
         )}
-      </section>
+      </section>}
 
       {/* 批量操作条（选中后出现） */}
       {selected.length > 0 && (
@@ -463,16 +432,10 @@ export function LibraryPage() {
           onRetry={() => void load()}
         />
       ) : shown.length === 0 ? (
-        <div className="asset-library-empty">
-          {/* 参考站空态 = 160×160 插画 + strong + span（实测 160px yqempty-*.svg）。
-              本地不引参考站图片资源, 复用工具页同一张内联 SVG (ToolEmptyIllustration,
-              与 pk/vc/fc 同款), 文案保留本地产品语义。2026-10-19 */}
-          <ToolEmptyIllustration />
-          <strong>素材库还是空的</strong>
-          <span>上传商品图或完成一次生成后，素材会出现在这里</span>
-          <button type="button" className="asset-library-button" onClick={() => fileRef.current?.click()}>
-            <Upload size={13} /> 上传第一张
-          </button>
+        <div className="asset-library-state asset-library-state-empty">
+          <img src="/asset-library/empty.svg" alt="" width={160} height={160} />
+          <strong>暂无素材</strong>
+          <span>快去上传素材吧</span>
         </div>
       ) : (
         <>
@@ -568,6 +531,7 @@ export function LibraryPage() {
           )}
         </>
       )}
+      </div>
     </div>
   );
 }

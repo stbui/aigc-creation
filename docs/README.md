@@ -41,7 +41,8 @@
 | [`workbench-design.md`](workbench-design.md) | `/workbench` |
 | [`topnav-design.md`](topnav-design.md) | 全站顶导 |
 | [`login-design.md`](login-design.md) | `/login`（含扫码登录页签） |
-| [`asset-library-design.md`](asset-library-design.md) | `/library` |
+| [`asset-library-design.md`](asset-library-design.md) | `/library`（别名 `/asset-library`） |
+| [`workspace-pages-restoration-prompt.md`](workspace-pages-restoration-prompt.md) | 工作台 / 我的作品 / 素材库复原提示词与验收记录 |
 | [`multi-image-fusion-spec.md`](multi-image-fusion-spec.md) | `/multi-image-fusion` |
 | [`free-creation-parity-audit.md`](free-creation-parity-audit.md) | `/free-creation` 偏差清单 |
 | [`shoppable-carousel-template-sources.md`](shoppable-carousel-template-sources.md) | `/shoppable-carousel` 模板素材与来源（49 个模板、147 张预览图；页面尚未实现） |

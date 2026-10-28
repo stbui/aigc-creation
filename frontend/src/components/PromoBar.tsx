@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Gift, X } from 'lucide-react';
+import { useCampaignCountdown } from '../hooks/useCampaignCountdown';
 import { myMarketingApi } from '../lib/api';
 import type { PopupCampaign } from '../types/api';
 
@@ -63,7 +64,7 @@ export function PromoBar() {
     };
   }, [dismissed]);
 
-  const { remainText, expired } = useCountdown(campaign);
+  const { remainText, expired } = useCampaignCountdown(campaign);
 
   const [narrow, setNarrow] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 900px)').matches,
@@ -129,54 +130,4 @@ export function PromoBar() {
       </button>
     </div>
   );
-}
-
-/**
- * 倒计时。基准取服务端 `serverNow`, 本地只负责走秒。
- *
- * 偏移量用 useMemo 一次算定: 若每次渲染重算, 已过去的秒数会被抵消,
- * 倒计时永远停在起点 —— 这是倒计时最常见的实现缺陷。
- */
-function useCountdown(campaign: PopupCampaign | null) {
-  const [remainText, setRemainText] = useState('');
-  const [expired, setExpired] = useState(false);
-
-  const skewMs = useMemo(() => {
-    if (!campaign) return 0;
-    return new Date(campaign.serverNow).getTime() - Date.now();
-  }, [campaign]);
-
-  useEffect(() => {
-    if (!campaign) {
-      setRemainText('');
-      setExpired(false);
-      return;
-    }
-
-    const tick = () => {
-      const serverNow = Date.now() + skewMs;
-      const left = new Date(campaign.endAt).getTime() - serverNow;
-      if (left <= 0) {
-        setRemainText('');
-        setExpired(true);
-        return;
-      }
-      setExpired(false);
-
-      const totalSec = Math.floor(left / 1000);
-      const d = Math.floor(totalSec / 86400);
-      const h = Math.floor((totalSec % 86400) / 3600);
-      const m = Math.floor((totalSec % 3600) / 60);
-      const s = totalSec % 60;
-      const pad = (n: number) => String(n).padStart(2, '0');
-
-      setRemainText(d > 0 ? `${d} 天 ${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(h)}:${pad(m)}:${pad(s)}`);
-    };
-
-    tick();
-    const timer = setInterval(tick, 1000);
-    return () => clearInterval(timer);
-  }, [campaign, skewMs]);
-
-  return { remainText, expired };
 }

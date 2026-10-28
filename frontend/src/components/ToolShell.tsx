@@ -133,6 +133,8 @@ interface SettingsSpec {
   /** 分辨率组 (1K/2K/4K; 4K 在该能力无云端通道时禁用, 见 lib/optionSets) */
   resolution?: boolean;
   defaultRatio?: string;
+  /** 参考站历史恢复时回填画质档位；缺省 1K。 */
+  defaultResolution?: string;
 }
 
 interface Props {
@@ -406,7 +408,7 @@ export function ToolShell(props: Props) {
   const [trailingCollapsed, setTrailingCollapsed] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [ratio, setRatio] = useState(settings?.defaultRatio ?? 'original');
-  const [resolution, setResolution] = useState('1k');
+  const [resolution, setResolution] = useState(settings?.defaultResolution ?? '1k');
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   /** 手机上传弹窗 (二维码方案, 手机端传回后进入图片位) */

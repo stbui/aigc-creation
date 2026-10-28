@@ -365,10 +365,18 @@ export interface Task {
   modality?: Modality;
   createdAt?: string;
   updatedAt?: string;
-  outputAsset?: Pick<
-    Asset,
-    'id' | 'sourceUrl' | 'signedUrl' | 'aigc' | 'capability' | 'width' | 'height' | 'format'
-  > & {
+  outputAsset?: TaskOutputAsset | null;
+  /**
+   * 同一任务的完整产出列表。多图融合一次可产出 1-4 张真实变体；
+   * 首项与 outputAsset 相同。旧后端/旧任务缺省时按 [outputAsset] 处理。
+   */
+  outputAssets?: TaskOutputAsset[];
+}
+
+export interface TaskOutputAsset extends Pick<
+  Asset,
+  'id' | 'sourceUrl' | 'signedUrl' | 'aigc' | 'capability' | 'width' | 'height' | 'format'
+> {
     /**
      * 产出模态 (2026-10-20 视频通道落地) —— 前端据此选 `<img>` 还是 `<video>`。
      *
@@ -378,7 +386,6 @@ export interface Task {
     modality?: Modality;
     /** 视频时长 (毫秒); 仅视频产出有值 */
     durationMs?: number | null;
-  } | null;
 }
 
 export type TaskListResult = Task[];

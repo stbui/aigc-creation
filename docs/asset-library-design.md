@@ -1,6 +1,6 @@
 # 素材库页面（Asset Library）设计规格与实拍审计
 
-> 抓取人：小帮｜抓取日期：2026-10-19｜参考站路由：`https://ijihua.cn/asset-library`｜本地路由：`/library`
+> 抓取人：小帮｜抓取日期：2026-10-19｜参考站路由：`https://ijihua.cn/asset-library`｜本地路由：`/library`（2026-10-28 起同时支持 `/asset-library` 别名）
 > 抓取方式：Playwright（chromium，`--no-proxy-server` 直连）+ 本地 dev server 登录态实测（演示账号）
 > 本地实现现状：`frontend/src/pages/LibraryPage.tsx`（330 行）+ `frontend/src/styles/global.css` §素材库（7416–7791 行）
 > 本文件是**设计规格 + 差距审计**，不含代码改动。改动按「裁定在前 → 出偏差清单 → 获批 → 改码」纪律执行。
@@ -205,3 +205,40 @@ main.workspace-route-content        [1196x696 @84,104]  内部滚动, bg #f6f7fb
 
 - 本文件 P1-2（双重内边距）与 P2-2（min-height 变量）出自 `.workbuddy/memory/2026-10-19-design-audit.md` 的布局统一性审计 P1/P2，属同一修复批次，避免多头改动。
 - populated 态规格来源为 `LibraryPage.tsx:19-48` 注释块（10-17 参考站 CSS 产物提取），本次审计未推翻其中任何数值；新增事实仅有：标题 28px/700、page 移动 padding 18 12 36、空态插画与文案。
+
+---
+
+## 7. 2026-10-28 新产物复原记录
+
+参考站构建产物更新后重新复核游客态与登录态，完整提示词与三页验收记录见 `docs/workspace-pages-restoration-prompt.md`。
+
+### 7.1 结论
+
+| 项目 | 结果 |
+|---|---|
+| 路由 | 本地原 `/library` 保留；新增参考站同路径 `/asset-library` 别名 |
+| 游客态 | 不再显示登录墙；显示标题与 160×160 官方空态插画 |
+| 游客操作区 | 隐藏来源筛选、能力筛选、刷新、上传与分组面板 |
+| 登录态 | 显示完整操作区、分组面板、真实素材网格与批量操作 |
+| 资源 | 空态插画下载到 `frontend/public/asset-library/empty.svg`，运行时不请求参考站 |
+| 状态区分 | 加载失败、加载中、空态与正常内容保持四条独立分支 |
+
+### 7.2 1440 实测
+
+| 元素 | 参考站 | 本地 |
+|---|---|---|
+| `.asset-library-page` | `x=176, y=104, 1264×896`，`padding 24 24 56` | 同左 |
+| `.asset-library-shell` | `x=200, y=128, w=1216` | 同左 |
+| Header | `1216×40` | 同左 |
+| 空态 | `200,190,1216×212` | 同左 |
+| 空态插画 | `160×160` | `160×160` |
+
+### 7.3 验证
+
+- 1440 / 1280 / 760 / 390 无横向溢出。
+- 游客态无 401 请求、无错误文案。
+- 真实账号上传 PNG 后，素材卡片、分组统计、来源筛选与操作区均正常显示。
+- 登录态与游客态切换不影响 `/library` 既有入口。
+- 新增 `frontend/tests/workspace-pages.spec.ts`：`/asset-library` 与 `/library` 双路径直达、游客零 `/assets` 请求、官方空态资源、操作区隐藏、侧栏高亮和 390 无溢出。
+- 1440 主内容区视觉对拍 SSIM `0.999`。
+- 390 元素级对拍 SSIM `0.999`；页面 `390×790`，空态 `366×212`。

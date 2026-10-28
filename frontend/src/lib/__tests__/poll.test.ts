@@ -19,6 +19,7 @@ vi.mock('../api', () => ({
 vi.mock('../constants', () => ({
   POLL_INTERVAL_MS: 1000,
   POLL_MAX_TRIES: 2,
+  POLL_MULTI_FUSION_MAX_TRIES: 6,
   POLL_VIDEO_MAX_TRIES: 4,
 }));
 
@@ -106,6 +107,16 @@ describe('waitForTask', () => {
     expect(getTask).toHaveBeenCalledTimes(4);
   });
 
+  it('多图融合任务的轮询上限自动放宽，避免多变体误报超时', async () => {
+    getTask.mockResolvedValue(makeTask({ status: 'running', capability: 'multi_fusion' }));
+
+    const pending = waitForTask('task-1');
+    await vi.advanceTimersByTimeAsync(6000);
+
+    await expect(pending).resolves.toEqual({ ok: false, errorCode: 'POLL_TIMEOUT' });
+    expect(getTask).toHaveBeenCalledTimes(6);
+  });
+
   it('每轮都通过 onTick 回传最新任务', async () => {
     const onTick = vi.fn();
     getTask
@@ -181,7 +192,58 @@ describe('pollToResult', () => {
       provider: 'gateway',
       modality: 'image',
       durationMs: undefined,
+      outputs: [
+        {
+          url: '/uploads/a.png?sign=1',
+          width: 1024,
+          height: 768,
+          format: 'png',
+          modality: 'image',
+          durationMs: undefined,
+        },
+      ],
     });
+  });
+
+  it('多图融合任务按顺序映射全部真实产出', async () => {
+    const outputAssets = [
+      {
+        id: 'asset-1',
+        sourceUrl: '/uploads/a.png',
+        signedUrl: '/uploads/a.png?sign=1',
+        format: 'png',
+        width: 1024,
+        height: 768,
+        modality: 'image',
+        durationMs: null,
+      },
+      {
+        id: 'asset-2',
+        sourceUrl: '/uploads/b.png',
+        signedUrl: '/uploads/b.png?sign=2',
+        format: 'png',
+        width: 1024,
+        height: 768,
+        modality: 'image',
+        durationMs: null,
+      },
+    ] as unknown as Task['outputAssets'];
+    getTask.mockResolvedValue(
+      makeTask({
+        status: 'succeeded',
+        provider: 'gateway',
+        outputAsset: outputAssets?.[0] ?? null,
+        outputAssets,
+      }),
+    );
+
+    const result = await pollToResult('task-1');
+
+    expect(result.outputs?.map((output) => output.url)).toEqual([
+      '/uploads/a.png?sign=1',
+      '/uploads/b.png?sign=2',
+    ]);
+    expect(result.url).toBe('/uploads/a.png?sign=1');
   });
 
   it('轮询超时映射为 failed + POLL_TIMEOUT', async () => {

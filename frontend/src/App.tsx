@@ -305,6 +305,13 @@ function Shell() {
                   <LibraryPage />
               }
             />
+            {/* 参考站路径为 /asset-library; /library 保留为等价别名, 两边都可直达 */}
+            <Route
+              path="/asset-library"
+              element={
+                  <LibraryPage />
+              }
+            />
             <Route
               path="/stats"
               element={

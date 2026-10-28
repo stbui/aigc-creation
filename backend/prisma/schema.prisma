@@ -802,6 +802,10 @@ model GenerationTask {
   status        String // 'pending' | 'running' | 'succeeded' | 'failed'
   inputAssetIds String // JSON 数组字符串
   outputAssetId String? @unique // 1:1, 需 unique 约束
+  /// 多变体产出的有序素材 id 数组 (JSON)。首项与 outputAssetId 相同。
+  /// 多图融合一次任务可产出 1-4 张真实变体；保留 outputAssetId 兼容既有
+  /// 历史、后台和 1:1 关系，本字段只扩展“同一任务的其它产出”。
+  outputAssetIds String?
   params        String // JSON 对象字符串
   provider      String?
   errorCode     String?

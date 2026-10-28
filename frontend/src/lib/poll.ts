@@ -1,5 +1,10 @@
 import { generateApi, assetSrc } from './api';
-import { POLL_INTERVAL_MS, POLL_MAX_TRIES, POLL_VIDEO_MAX_TRIES } from './constants';
+import {
+  POLL_INTERVAL_MS,
+  POLL_MAX_TRIES,
+  POLL_MULTI_FUSION_MAX_TRIES,
+  POLL_VIDEO_MAX_TRIES,
+} from './constants';
 import type { Modality, Task, TaskStatus } from '../types/api';
 
 /**
@@ -36,6 +41,20 @@ export interface PolledResult {
    */
   modality?: Modality;
   /** 视频时长 (毫秒); 仅视频产出有值 */
+  durationMs?: number | null;
+  /**
+   * 同一任务的全部真实产出。多图融合一次可生成 1-4 张变体；
+   * 缺省时调用方按单个 url 处理，兼容旧后端。
+   */
+  outputs?: PolledOutput[];
+}
+
+export interface PolledOutput {
+  url: string;
+  width?: number;
+  height?: number;
+  format?: string;
+  modality?: Modality;
   durationMs?: number | null;
 }
 
@@ -74,6 +93,9 @@ export async function waitForTask(taskId: string, options: PollOptions = {}): Pr
        */
       if (task.modality === 'video') {
         maxTries = options.maxTries ?? POLL_VIDEO_MAX_TRIES;
+      } else if (task.capability === 'multi_fusion') {
+        // 多变体在同一次任务内并发调用模型，耗时上限高于普通单图能力。
+        maxTries = options.maxTries ?? POLL_MULTI_FUSION_MAX_TRIES;
       }
       if (task.status === 'succeeded' || task.status === 'failed') return { ok: true, task };
     } catch {
@@ -90,14 +112,31 @@ export async function pollToResult(taskId: string, options: PollOptions = {}): P
   const outcome = await waitForTask(taskId, options);
   if (!outcome.ok) return { status: 'failed', errorCode: outcome.errorCode };
   const { task } = outcome;
+  const taskOutputs = task.outputAssets?.length ? task.outputAssets : task.outputAsset ? [task.outputAsset] : [];
+  const outputs = taskOutputs.flatMap((output): PolledOutput[] => {
+    const url = assetSrc(output);
+    if (!url) return [];
+    return [
+      {
+        url,
+        width: output.width ?? undefined,
+        height: output.height ?? undefined,
+        format: output.format,
+        modality: output.modality,
+        durationMs: output.durationMs ?? undefined,
+      },
+    ];
+  });
+  const primary = outputs[0];
   return {
     status: task.status,
-    url: task.outputAsset ? assetSrc(task.outputAsset) : undefined,
-    width: task.outputAsset?.width ?? undefined,
-    height: task.outputAsset?.height ?? undefined,
+    url: primary?.url,
+    width: primary?.width,
+    height: primary?.height,
     errorCode: task.errorCode ?? null,
     provider: task.provider ?? null,
-    modality: task.outputAsset?.modality,
-    durationMs: task.outputAsset?.durationMs ?? undefined,
+    modality: primary?.modality,
+    durationMs: primary?.durationMs,
+    outputs,
   };
 }

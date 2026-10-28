@@ -68,6 +68,7 @@ import type {
   MarketingQuote,
   PopupCampaign,
   PromoCampaign,
+  Asset,
   AssetListResult,
   AssetUploadResponse,
   AuthResponse,
@@ -352,6 +353,9 @@ export const assetsApi = {
     fd.append('projectId', projectId);
     return request<AssetUploadResponse>('/assets/upload', { method: 'POST', body: fd });
   },
+
+  /** 读取单个素材。历史提交恢复需要用它找回当时使用的模板与参考图。 */
+  get: (id: string) => request<Asset>(`/assets/${id}`),
 
   /** 素材库列表: kind=original|generated, capability 过滤, 分页 */
   list: (params: {

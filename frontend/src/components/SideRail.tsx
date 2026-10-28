@@ -155,7 +155,9 @@ export function SideRail({ groups, items, thumbs, activePath, statsTotal, onNavi
             to="/library"
             label="素材库"
             icon={<Library size={20} />}
-            active={activePath.startsWith('/library')}
+            active={
+              activePath.startsWith('/library') || activePath.startsWith('/asset-library')
+            }
             onNavigate={onNavigate}
             collapsed={collapsed}
           />

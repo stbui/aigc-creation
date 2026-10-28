@@ -31,7 +31,8 @@ export const ImageToVideo: CapabilityPlugin = {
   },
   modality: 'video',
   inputs: 1,
-  inWorkbench: true,
+  // 参考站工作台当前固定 12 张电商生图/修图卡；AI 视频保留在侧栏与工具页，不占卡片位。
+  inWorkbench: false,
   params: [
     {
       key: 'prompt',

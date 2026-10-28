@@ -31,6 +31,8 @@ export interface GalleryItem {
   createdAt?: string;
   /** 生成时提交的提示词；只对参数里带 prompt 的能力有值 */
   prompt?: string;
+  /** 任务原始参数；SKU 批量历史按 batchId 聚合时使用。 */
+  params?: Record<string, unknown>;
   /**
    * 缩略图左上角的小标签 (商品主图用来标「白底图 / 场景图 / 卖点图」)。
    * 不传就不渲染 —— 自由创作页一次只出一种图, 没有可标的维度。
@@ -103,6 +105,7 @@ export function useResultGallery({ capability, token, captionOf }: Options): Res
               status: t.status,
               url: '',
               createdAt: t.createdAt,
+              params: t.params ?? {},
               prompt: promptOf(t.params),
               caption: captionRef.current?.(t.params ?? {}) || undefined,
             });
@@ -120,6 +123,7 @@ export function useResultGallery({ capability, token, captionOf }: Options): Res
           width: t.outputAsset?.width ?? null,
           height: t.outputAsset?.height ?? null,
           createdAt: t.createdAt,
+          params: t.params ?? {},
           prompt: promptOf(t.params),
           caption: captionRef.current?.(t.params ?? {}) || undefined,
         });

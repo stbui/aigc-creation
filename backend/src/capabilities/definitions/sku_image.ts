@@ -18,6 +18,14 @@ export interface SkuRegionBox {
   height: number;
 }
 
+/** 每个变体区域的文字说明与参考图映射。 */
+export interface SkuRegionVariant {
+  regionId: string;
+  instruction?: string;
+  referenceAssetId?: string;
+  referenceIndex?: number;
+}
+
 export const MAX_SKU_REGIONS = 3;
 
 function clamp01(n: number): number {
@@ -64,6 +72,37 @@ export function parseSkuRegions(raw: unknown): SkuRegionBox[] {
     const h = bottom - top;
     if (w < 0.005 || h < 0.005) continue;
     out.push({ x: round4(left), y: round4(top), width: round4(w), height: round4(h) });
+  }
+  return out;
+}
+
+/** 解析页面提交的变体说明；坏数据逐项丢弃，不阻断其余有效区域。 */
+export function parseSkuVariants(raw: unknown): SkuRegionVariant[] {
+  let value: unknown = raw;
+  if (typeof raw === 'string') {
+    if (!raw.trim()) return [];
+    try {
+      value = JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(value)) return [];
+  const out: SkuRegionVariant[] = [];
+  for (const item of value.slice(0, MAX_SKU_REGIONS)) {
+    if (!item || typeof item !== 'object') continue;
+    const entry = item as Record<string, unknown>;
+    const regionId = typeof entry.regionId === 'string' ? entry.regionId.trim() : '';
+    if (!regionId) continue;
+    const instruction = typeof entry.instruction === 'string' ? entry.instruction.trim().slice(0, 500) : '';
+    const referenceAssetId = typeof entry.referenceAssetId === 'string' ? entry.referenceAssetId.trim() : '';
+    const referenceIndex = Number(entry.referenceIndex);
+    out.push({
+      regionId,
+      instruction: instruction || undefined,
+      referenceAssetId: referenceAssetId || undefined,
+      referenceIndex: Number.isFinite(referenceIndex) && referenceIndex > 0 ? Math.floor(referenceIndex) : undefined,
+    });
   }
   return out;
 }
@@ -118,11 +157,23 @@ export const SkuImage: CapabilityPlugin = {
       hidden: true,
       help: '页面框选产生的归一化坐标 JSON，最多 3 个区域',
     },
+    {
+      key: 'variants',
+      label: '区域变体说明',
+      type: 'text',
+      hidden: true,
+      maxLength: 6000,
+      help: '每个区域对应的文字说明与参考图 index，最多 3 项',
+    },
+    { key: 'batchId', label: '批次 ID', type: 'text', hidden: true, maxLength: 128 },
+    { key: 'batchIndex', label: '批次序号', type: 'number', hidden: true, min: 1, max: 100, step: 1 },
+    { key: 'batchSize', label: '批次数量', type: 'number', hidden: true, min: 1, max: 100, step: 1 },
     { key: 'ratio', label: '画面比例', type: 'enum', default: '1:1', options: RATIOS },
     { key: 'size', label: '画质（输出边长）', type: 'enum', default: '1k', options: QUALITY_OPTIONS },
   ],
   buildPrompt: (p) => {
     const regions = parseSkuRegions(p.regions);
+    const variants = parseSkuVariants(p.variants);
     const color = resolveSkuColor(p);
     const target = regions.length
       ? `只替换模板中框选的 ${regions.length} 个区域（${regions
@@ -132,9 +183,23 @@ export const SkuImage: CapabilityPlugin = {
           )
           .join('；')}），框外内容、商品主体和版式保持不变`
       : `在${p.region || '指定'}区域替换 SKU 内容`;
+    const variantDetail = variants
+      .map((variant, index) => {
+        const position = Math.min(index + 1, MAX_SKU_REGIONS);
+        const instruction = variant.instruction ? `变化要求：${variant.instruction}` : '按 SKU 名称与参考图替换';
+        const reference = variant.referenceIndex
+          ? `；参考第 ${variant.referenceIndex} 张参考图（不含模板图）`
+          : variant.referenceAssetId
+            ? '；使用随任务提交的参考图'
+            : '';
+        return `区域${position} -> ${instruction}${reference}`;
+      })
+      .join('；');
     return (
       `SKU 套图：沿用上传模板图的版式，${target}。` +
       `每个框选区域填入 SKU「${p.skuName || ''}」的信息（颜色 ${color || '保持原样'}）。` +
+      (variantDetail ? `各区域的具体要求：${variantDetail}。` : '') +
+      `框外商品主体、文字、背景、视角和构图必须保持不变，输出图与模板图保持同一画幅。` +
       `不要整体重绘模板，不要改动框外区域；批量输出版式一致的整组 SKU 图` +
       `${ratioText(p.ratio)}${sizeText(p.size)}`
     );

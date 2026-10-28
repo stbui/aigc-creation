@@ -50,6 +50,10 @@ export function qualityOptions(): ParamOption[] {
 export type ResolutionOption = ParamOption & {
   /** 卡片副文。参考站是 `{multiplier}倍消耗`（bundle 字符串表 index 0x4ab4） */
   sub: string;
+  /** 画质倍率。多图融合与参考站 billing-config 对齐，其余能力按 1 倍。 */
+  multiplier: number;
+  /** 参考站卡片标题的短文案（多图融合为 1K/2K/4K，不带像素说明）。 */
+  shortLabel?: string;
   disabled?: boolean;
   /** 不可选原因。参考站卡片不显示原因，只作 hover 提示 */
   disabledReason?: string;
@@ -69,18 +73,24 @@ export type ResolutionOption = ParamOption & {
  *   - 其余档位：有模型通道即可选
  * 不传 capabilityId 时按「拿不到证据就不放开」处理：4K 禁用。
  *
- * 副文（2026-10-21 改）：参考站卡片副文是 `{multiplier}倍消耗`
- * （`.image-output-resolution-option span`，文案取自 bundle 字符串表 0x4ab4「倍消耗」）。
- * `multiplier` 由参考站的 `billing-config` 下发，本站没有分辨率倍率 ——
- * `generate.service` 的扣费只取能力价，与 size 无关，故三档一律 1 倍，
- * 这正是本站的真实计费，不跟随参考站的档位倍率臆造 2 倍/4 倍。
+ * 副文（2026-10-28 改）：多图融合按参考站 `billing-config` 使用
+ * `1K=1倍 / 2K=2倍 / 4K=3倍`，后端扣费同口径；其它能力仍按基础价 1 倍。
  */
 export function resolutionOptions(capabilityId?: string): ResolutionOption[] {
   const remote = capabilityId
     ? capabilityById(capabilityId)?.runtime?.remoteAvailable === true
     : false;
+  const fusion = capabilityId === 'multi_fusion';
   return qualityOptions().map((o) => {
-    const base: ResolutionOption = { ...o, sub: '1倍消耗' };
+    const multiplier = fusion
+      ? { '1k': 1, '2k': 2, '4k': 3 }[String(o.value).toLowerCase()] ?? 1
+      : 1;
+    const base: ResolutionOption = {
+      ...o,
+      ...(fusion ? { shortLabel: String(o.value).toUpperCase() } : {}),
+      multiplier,
+      sub: `${multiplier}倍消耗`,
+    };
     if (o.value !== '4k' || remote) return base;
     return { ...base, disabled: true, disabledReason: '4K 需要支持该规格的模型通道，当前通道不可用' };
   });

@@ -2,7 +2,7 @@ import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { writeFile, unlink, mkdtemp, rm } from 'fs/promises';
 import { join } from 'path';
 import { tmpdir } from 'os';
-import { Jimp } from 'jimp';
+import { Jimp, JimpMime } from 'jimp';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
@@ -12,6 +12,10 @@ import { MaskUnsupportedError, NoModelChannelError } from '../providers/gateway.
 import type { VideoProvider } from '../providers/unified/unified.provider';
 import { getCapability, sanitizeParams, validateCapabilityParams } from '../capabilities/capability.registry';
 import { parseLocalRedrawAnnotations } from '../capabilities/definitions/local_redraw';
+import {
+  multiFusionCreditCost,
+  multiFusionOutputDimensions,
+} from '../capabilities/definitions/multi_fusion';
 import { CapabilityAvailabilityService } from '../capabilities/capability-availability.service';
 import { CreateGenerationDto } from './dto/create-generation.dto';
 import { StorageService } from '../storage/storage.service';
@@ -38,6 +42,9 @@ const HEARTBEAT_INTERVAL_MS = 30_000;
  * 视频任务跑满 10 分钟期间心跳依然在跳。
  */
 const ORPHAN_STALE_MS = 10 * 60 * 1000;
+
+/** 单张输入图经过模型与标识流程后的产出。 */
+type ImageOutcome = Awaited<ReturnType<ImageProvider['generate']>>;
 
 @Injectable()
 export class GenerateService implements OnModuleInit {
@@ -237,7 +244,16 @@ export class GenerateService implements OnModuleInit {
      *
      * cost 取自 CreditPriceService (后台可改), 不直读 def.creditCost。
      */
-    const cost = await this.price.resolve(dto.capability);
+    const sanitizedParams = sanitizeParams(dto.capability, dto.params);
+    const baseCost = await this.price.resolve(dto.capability);
+    const cost =
+      dto.capability === 'multi_fusion'
+        ? multiFusionCreditCost(
+            baseCost,
+            sanitizedParams.variantCount,
+            sanitizedParams.size,
+          )
+        : baseCost;
 
     let task;
     try {
@@ -270,7 +286,7 @@ export class GenerateService implements OnModuleInit {
              * 属任务上下文的一部分, 与用户当时的其它参数同等性质。
              */
             params: JSON.stringify({
-              ...sanitizeParams(dto.capability, dto.params),
+              ...sanitizedParams,
               __memberFastChannel: memberPerks.fastChannel,
             }),
             idempotencyKey,
@@ -397,12 +413,88 @@ export class GenerateService implements OnModuleInit {
        */
       const def = getCapability(task.capability);
       const modality = def?.modality ?? 'image';
-      const outcome =
-        modality === 'video'
-          ? await this.videoProvider.generate(task.capability, inputPaths, params)
-          : await this.provider.generate(task.capability, inputPaths, params, maskPath);
-      const { buffer, format } = outcome;
-      const isVideo = outcome.kind === 'video';
+      /*
+       * 多图融合的“变体张数”必须是真实的多张模型产出。
+       *
+       * 这里在**同一个任务内**并发调用同一个图像能力 N 次，并给每次调用注入
+       * 变体序号；用户只提交一次、只扣一次积分。不能在前端把一张结果复制 N
+       * 份冒充变体，也不能因为 N 张就重复扣 N 次用户积分。
+       *
+       * 部分候选失败时保留成功候选；全部失败才让任务失败并走既有退款逻辑。
+       * 结果数量按真实成功数下发，不用重复图补齐。
+       */
+      const requestedVariants =
+        task.capability === 'multi_fusion'
+          ? Math.max(1, Math.min(4, Math.floor(Number(params.variantCount) || 1)))
+          : 1;
+      let outcomes;
+      if (modality === 'video') {
+        outcomes = [await this.videoProvider.generate(task.capability, inputPaths, params)];
+      } else if (requestedVariants > 1) {
+        /*
+         * 四路同时请求时偶发单路 120s 通道超时，日志表现为 aborted 而非
+         * 并发限流。两路分批会把 4 张拓展到约 7 分钟，反而损害体验，故
+         * 首批仍按用户选择并发发出，只对失败候选补一次独立调用。
+         *
+         * 重试仍是独立的模型调用，不复制成功图；二次仍失败时保留已成功
+         * 候选，任务只在**全部**候选失败时判失败并退款。
+         */
+        const results: Array<ImageOutcome | undefined> = new Array(requestedVariants);
+        const failures: Array<{ index: number; reason: unknown }> = [];
+        const runVariant = async (index: number) => {
+          const value = await this.provider.generate(
+            task.capability,
+            inputPaths,
+            { ...params, variantIndex: index + 1, variantTotal: requestedVariants },
+            maskPath,
+          );
+          results[index] = value;
+        };
+
+        const runBatch = async (indexes: number[]) => {
+          const settled = await Promise.allSettled(indexes.map((index) => runVariant(index)));
+          settled.forEach((item, offset) => {
+            if (item.status === 'rejected') {
+              failures.push({ index: indexes[offset], reason: item.reason });
+            }
+          });
+        };
+
+        await runBatch(Array.from({ length: requestedVariants }, (_, index) => index));
+
+        const failedIndexes = failures.map((item) => item.index);
+        if (failedIndexes.length > 0) {
+          this.logger.warn(
+            `多图融合首批变体失败 task=${taskId}: 重试 ${failedIndexes.length} 张（序号 ${failedIndexes
+              .map((index) => index + 1)
+              .join(',')}）`,
+          );
+          failures.length = 0;
+          await runBatch(failedIndexes);
+        }
+
+        outcomes = results.filter((item): item is ImageOutcome => Boolean(item));
+        if (outcomes.length === 0) {
+          throw failures[0]?.reason ?? new Error('变体生成全部失败');
+        }
+        if (outcomes.length < requestedVariants) {
+          this.logger.warn(
+            `多图融合部分变体最终失败 task=${taskId}: 请求 ${requestedVariants} 张, 实际成功 ${outcomes.length} 张；原因: ${failures
+              .map((item) => (item.reason instanceof Error ? item.reason.message : String(item.reason)))
+              .join(' | ')}`,
+          );
+        }
+      } else {
+        outcomes = [
+          await this.provider.generate(
+            task.capability,
+            inputPaths,
+            { ...params, variantIndex: 1, variantTotal: 1 },
+            maskPath,
+          ),
+        ];
+      }
+      const isVideo = outcomes[0]?.kind === 'video';
 
       /*
        * 终止检查点 (admin-prd.md B-33)。
@@ -444,70 +536,104 @@ export class GenerateService implements OnModuleInit {
        * 视频没有本地内嵌能力（无 ffmpeg）, 如实记录 `method='api-only'`:
        * 标识只存在于接口字段与播放器角标, 脱离本平台后不再携带。
        */
-      let outputBuffer = buffer;
-      let outputFormat = format;
-      let aigcMeta: AigcMeta;
-      let aigcLabeledAt: Date | null = null;
+      const prepared: Array<{
+        buffer: Buffer;
+        format: string;
+        durationMs: number | null;
+        aigcMeta: AigcMeta;
+        aigcLabeledAt: Date | null;
+      }> = [];
 
-      if (isVideo) {
-        aigcMeta = {
-          labeled: false,
-          metadata: false,
-          visible: false,
-          method: 'api-only',
-          warning: '视频未写入内嵌标识（本机无 ffmpeg）：标识仅存在于接口字段与播放器角标',
-        };
-      } else {
-        try {
-          /*
-           * 角标样式从后台配置取（3s 缓存）。`runtime()` 内部已把读失败
-           * 收敛成默认样式，这里不必再兜一层。
-           */
-          const visible = await this.aigcLabel.runtime();
-          const labeled = await labelGeneratedImage(buffer, format, {
-            capability: task.capability,
-            taskId,
-            createdAt: new Date(),
-            visible: { spec: visible.spec, badgePng: visible.badgePng },
-          });
-          outputBuffer = labeled.buffer;
-          outputFormat = labeled.format;
-          aigcMeta = labeled.meta;
-          aigcLabeledAt = new Date();
-          if (!aigcMeta.metadata) {
-            // 不阻断交付, 但必须留下痕迹: 排障时能区分"没做" 与 "做了没写进去"
-            this.logger.warn(`AIGC 隐式标识未写入 task=${taskId}: ${aigcMeta.warning ?? 'unknown'}`);
-          } else if (!aigcMeta.visible) {
-            // 后台关闭了可见角标: 属于合规层面的运营决策, 每张产出都留一行可回溯
-            this.logger.warn(`AIGC 可见角标已关闭, 仅写入隐式标识 task=${taskId}`);
-          }
-        } catch (e) {
-          if (e instanceof AigcVisibleLabelError) {
-            this.logger.error(`AIGC 可见角标合成失败, 任务判失败 task=${taskId}: ${e.message}`);
-            // 与生成失败同一条认领规则: 只有真正把 running 改写为 failed 的那次才退款
-            const claimed = await this.prisma.generationTask
-              .updateMany({
-                where: { id: taskId, status: 'running' },
-                data: {
-                  status: 'failed',
-                  errorCode: '42203',
-                  aigcMeta: JSON.stringify({
-                    labeled: false,
-                    metadata: false,
-                    visible: false,
-                    method: 'unsupported',
-                    warning: e.message,
-                  }),
-                },
-              })
-              .catch(() => ({ count: 0 }));
-            if (claimed.count > 0) {
-              await this.refundForFailure(task.ownerId, task.creditCost, taskId, 'generation_failed');
-            }
-            return;
-          }
-          throw e;
+      for (const outcome of outcomes) {
+        let outputBuffer = outcome.buffer;
+        let outputFormat = outcome.format;
+        let aigcMeta: AigcMeta;
+        let aigcLabeledAt: Date | null = null;
+
+        /*
+         * 当前 a6api 模型对 4K 请求可能只返回约 1.6MP 的图。若直接落库，
+         * 用户选择 4K 并支付 3 倍价格却拿到 1254px，是静默降级。这里按所选
+         * 档位和比例统一到目标长边，再做 AIGC 标识与落库，保证交付尺寸真实可验。
+         */
+        if (task.capability === 'multi_fusion' && !isVideo) {
+          const normalized = await normalizeFusionOutput(
+            outcome.buffer,
+            outcome.format,
+            params.ratio,
+            params.size,
+          );
+          outputBuffer = normalized.buffer;
+          outputFormat = normalized.format;
         }
+
+        if (isVideo) {
+          aigcMeta = {
+            labeled: false,
+            metadata: false,
+            visible: false,
+            method: 'api-only',
+            warning: '视频未写入内嵌标识（本机无 ffmpeg）：标识仅存在于接口字段与播放器角标',
+          };
+        } else {
+          try {
+            /*
+             * 角标样式从后台配置取（3s 缓存）。`runtime()` 内部已把读失败
+             * 收敛成默认样式，这里不必再兜一层。
+             */
+            const visible = await this.aigcLabel.runtime();
+            const labeled = await labelGeneratedImage(outputBuffer, outputFormat, {
+              capability: task.capability,
+              taskId,
+              createdAt: new Date(),
+              visible: { spec: visible.spec, badgePng: visible.badgePng },
+            });
+            outputBuffer = labeled.buffer;
+            outputFormat = labeled.format;
+            aigcMeta = labeled.meta;
+            aigcLabeledAt = new Date();
+            if (!aigcMeta.metadata) {
+              // 不阻断交付, 但必须留下痕迹: 排障时能区分"没做" 与 "做了没写进去"
+              this.logger.warn(`AIGC 隐式标识未写入 task=${taskId}: ${aigcMeta.warning ?? 'unknown'}`);
+            } else if (!aigcMeta.visible) {
+              // 后台关闭了可见角标: 属于合规层面的运营决策, 每张产出都留一行可回溯
+              this.logger.warn(`AIGC 可见角标已关闭, 仅写入隐式标识 task=${taskId}`);
+            }
+          } catch (e) {
+            if (e instanceof AigcVisibleLabelError) {
+              this.logger.error(`AIGC 可见角标合成失败, 任务判失败 task=${taskId}: ${e.message}`);
+              // 与生成失败同一条认领规则: 只有真正把 running 改写为 failed 的那次才退款
+              const claimed = await this.prisma.generationTask
+                .updateMany({
+                  where: { id: taskId, status: 'running' },
+                  data: {
+                    status: 'failed',
+                    errorCode: '42203',
+                    aigcMeta: JSON.stringify({
+                      labeled: false,
+                      metadata: false,
+                      visible: false,
+                      method: 'unsupported',
+                      warning: e.message,
+                    }),
+                  },
+                })
+                .catch(() => ({ count: 0 }));
+              if (claimed.count > 0) {
+                await this.refundForFailure(task.ownerId, task.creditCost, taskId, 'generation_failed');
+              }
+              return;
+            }
+            throw e;
+          }
+        }
+
+        prepared.push({
+          buffer: outputBuffer,
+          format: outputFormat,
+          durationMs: 'durationMs' in outcome ? (outcome.durationMs ?? null) : null,
+          aigcMeta,
+          aigcLabeledAt,
+        });
       }
 
       /*
@@ -517,9 +643,10 @@ export class GenerateService implements OnModuleInit {
        * 新增 provider 通过 any/外部 SDK 绕过类型，把本地产出静默写成成功。
        * 非法来源按生成失败处理，由统一 catch 退款，绝不让它进入素材库。
        */
-      const source = outcome.source;
-      if (source !== 'gateway') {
-        throw new Error(`生成结果来源非法: ${String(source)}；只允许模型通道产出`);
+      for (const outcome of outcomes) {
+        if (outcome.source !== 'gateway') {
+          throw new Error(`生成结果来源非法: ${String(outcome.source)}；只允许模型通道产出`);
+        }
       }
       const actualProvider = 'gateway';
       if (task.provider !== actualProvider) {
@@ -529,51 +656,50 @@ export class GenerateService implements OnModuleInit {
         });
       }
 
-      // 产出走存储层: 写进当前默认后端, 并记录写入时的后端与 key
-      // ⚠️ 扩展名按 mime 推导, 不再默认 jpg —— 视频会以 .mp4 落盘,
-      // 若仍存成 .jpg 则存储后端按扩展名推断 Content-Type 会发错 MIME,
-      // 浏览器按图片解码视频 → 播放失败。
-      // 扩展名与 mime 都取**标识后的**实际格式: PNG/JPEG 之外会被 Jimp
-      // 转成 JPEG, 沿用原 mime 会让存储按错误类型下发。
-      const ext = extOfFormat(outputFormat);
       const storage = this.storage.getActive();
-      const key = this.storage.buildKey('generated', ext);
-      const stored = await storage.put(key, outputBuffer, outputFormat);
-      const url = await storage.url(key);
+      const generatedAssets = [];
+      for (const output of prepared) {
+        // 产出走存储层: 写进当前默认后端, 并记录写入时的后端与 key。
+        // 扩展名与 mime 都取**标识后的**实际格式，避免 PNG/JPEG 被错误下发。
+        const ext = extOfFormat(output.format);
+        const key = this.storage.buildKey('generated', ext);
+        const stored = await storage.put(key, output.buffer, output.format);
+        const url = await storage.url(key);
+        const dims = isVideo ? { width: null, height: null } : await readImageDims(output.buffer);
 
-      /*
-       * 宽高按模态读取: 图像用 Jimp 解; 视频**不解** (Jimp 不支持 mp4)。
-       *
-       * 视频的宽高与时长改由 provider 回报 (MiniMax 轮询响应带
-       * video_width/video_height), 这里记 durationMs。
-       */
-      const dims = isVideo ? { width: null, height: null } : await readImageDims(outputBuffer);
+        const asset = await this.prisma.asset.create({
+          data: {
+            projectId: task.projectId,
+            ownerId: task.ownerId,
+            kind: 'generated',
+            capability: task.capability,
+            sourceUrl: url,
+            width: dims.width,
+            height: dims.height,
+            format: output.format,
+            sizeBytes: stored.sizeBytes,
+            durationMs: output.durationMs,
+            storageBackend: storage.backend,
+            storageKey: key,
+            aigcMeta: JSON.stringify(output.aigcMeta),
+            aigcLabeledAt: output.aigcLabeledAt,
+          },
+        });
+        generatedAssets.push(asset);
+      }
 
-      const asset = await this.prisma.asset.create({
-        data: {
-          projectId: task.projectId,
-          ownerId: task.ownerId,
-          kind: 'generated',
-          capability: task.capability,
-          sourceUrl: url,
-          width: dims.width,
-          height: dims.height,
-          format: outputFormat,
-          sizeBytes: stored.sizeBytes,
-          // 视频时长 (毫秒); 图像/文本产出为 null (不是 0 —— 0 长视频不存在)
-          durationMs: isVideo ? (outcome.durationMs ?? null) : null,
-          storageBackend: storage.backend,
-          storageKey: key,
-          // AIGC 标识落盘结果: 素材侧记"文件最终带着什么标识"
-          aigcMeta: JSON.stringify(aigcMeta),
-          aigcLabeledAt,
-        },
-      });
+      const primary = generatedAssets[0];
+      if (!primary) throw new Error('生成结果为空');
 
       await this.prisma.generationTask.update({
         where: { id: taskId },
         // 任务侧同样记录标识结果: 失败路径与素材侧可能不一致, 两份现场都要留
-        data: { status: 'succeeded', outputAssetId: asset.id, aigcMeta: JSON.stringify(aigcMeta) },
+        data: {
+          status: 'succeeded',
+          outputAssetId: primary.id,
+          outputAssetIds: JSON.stringify(generatedAssets.map((asset) => asset.id)),
+          aigcMeta: JSON.stringify(prepared[0]?.aigcMeta ?? {}),
+        },
       });
     } catch (err) {
       this.logger.error(`generation failed for task ${taskId}`, err);
@@ -776,9 +902,15 @@ export class GenerateService implements OnModuleInit {
       throw new AppError(40001, '任务不存在或无权限', 403);
     }
 
-    const output = task.outputAssetId
-      ? await this.prisma.asset.findUnique({ where: { id: task.outputAssetId } })
-      : null;
+    const outputIds = orderedOutputIds(task.outputAssetId, task.outputAssetIds);
+    const outputs = outputIds.length
+      ? await this.prisma.asset.findMany({ where: { id: { in: outputIds } } })
+      : [];
+    const outputById = new Map(outputs.map((asset) => [asset.id, asset]));
+    const outputAssets = outputIds
+      .map((assetId) => outputById.get(assetId))
+      .filter((asset): asset is NonNullable<typeof asset> => Boolean(asset))
+      .map((asset) => this.serializeOutputAsset(asset, task.ownerId));
 
     return {
       id: task.id,
@@ -794,50 +926,31 @@ export class GenerateService implements OnModuleInit {
       creditCost: task.creditCost,
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
-      outputAsset: output
-        ? {
-            id: output.id,
-            sourceUrl: output.sourceUrl,
-            signedUrl: this.signedUrl.sign(output.sourceUrl, { userId: task.ownerId }),
-            // AIGC 标识结果: 图片已烙进像素与元数据; 视频仅在此字段与播放器角标可见
-            aigc: parseAigcMeta(output.aigcMeta),
-            capability: output.capability,
-            width: output.width,
-            height: output.height,
-            format: output.format,
-            // 视频时长 (毫秒) —— 仅视频产出有值 (2026-10-20)
-            durationMs: output.durationMs ?? null,
-            /*
-             * 产出模态 —— 前端据此选 `<img>` 还是 `<video>`。
-             *
-             * ⚠️ 由 **mime** 推导而非查能力注册表: 产出形态是文件的真实
-             * 形态, 不该由"当初打算产出什么"决定 (能力可能已改版, 而
-             * 历史产出仍是旧形态)。用 format 前缀判断最诚实。
-             */
-            modality: output.format?.startsWith('video/') ? 'video' : 'image',
-          }
-        : null,
+      // outputAsset 保留为首项，兼容既有结果卡与历史；outputAssets 是新契约。
+      outputAsset: outputAssets[0] ?? null,
+      outputAssets,
     };
   }
 
   /** 删除作品: 连带删除其产出的生成图与磁盘文件 (作品=任务+产物) */
   async removeTask(ownerId: string, id: string) {
-    const task = await this.prisma.generationTask.findUnique({
-      where: { id },
-      include: { outputAsset: true },
-    });
+    const task = await this.prisma.generationTask.findUnique({ where: { id } });
     if (!task || task.ownerId !== ownerId) {
       throw new AppError(40001, '任务不存在或无权限', 403);
     }
 
+    const outputIds = orderedOutputIds(task.outputAssetId, task.outputAssetIds);
+    const outputs = outputIds.length
+      ? await this.prisma.asset.findMany({ where: { id: { in: outputIds } } })
+      : [];
+
     await this.prisma.generationTask.delete({ where: { id } });
 
-    let removedAsset = false;
-    if (task.outputAsset) {
+    let removedAsset = outputs.length > 0;
+    if (outputs.length > 0) {
       await this.prisma.asset
-        .delete({ where: { id: task.outputAsset.id } })
+        .deleteMany({ where: { id: { in: outputs.map((asset) => asset.id) } } })
         .catch(() => undefined);
-      removedAsset = true;
     }
 
     /*
@@ -847,15 +960,16 @@ export class GenerateService implements OnModuleInit {
      * 那里没有 /uploads/ 前缀, 按本地路径推导只会静默漏删,
      * 对象存储账单上留下一堆已从界面消失的文件。
      */
-    const out = task.outputAsset;
-    if (out?.storageKey) {
-      const backend = (out.storageBackend as StorageBackend) ?? 'local';
-      await this.storage.get(backend)?.delete(out.storageKey).catch(() => undefined);
-    } else if (out?.sourceUrl?.startsWith('/uploads/')) {
-      // 历史行没有 storageKey: 退回本地路径推导
-      const parts = out.sourceUrl.replace(/^\/uploads\//, '').split('/').filter(Boolean);
-      if (parts.length === 2 && !parts.some((p) => p.includes('..'))) {
-        await unlink(join(resolveUploadsDir(), parts[0], parts[1])).catch(() => undefined);
+    for (const out of outputs) {
+      if (out.storageKey) {
+        const backend = (out.storageBackend as StorageBackend) ?? 'local';
+        await this.storage.get(backend)?.delete(out.storageKey).catch(() => undefined);
+      } else if (out.sourceUrl?.startsWith('/uploads/')) {
+        // 历史行没有 storageKey: 退回本地路径推导
+        const parts = out.sourceUrl.replace(/^\/uploads\//, '').split('/').filter(Boolean);
+        if (parts.length === 2 && !parts.some((p) => p.includes('..'))) {
+          await unlink(join(resolveUploadsDir(), parts[0], parts[1])).catch(() => undefined);
+        }
       }
     }
 
@@ -866,57 +980,73 @@ export class GenerateService implements OnModuleInit {
     const where: Prisma.GenerationTaskWhereInput = { ownerId };
     if (projectId) where.projectId = projectId;
 
-    const tasks = (
-      await this.prisma.generationTask.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        // 前端 HistoryList 依赖 outputAsset.sourceUrl 渲染缩略图,
-        // 故列表与详情保持同一形状 (outputAssetId 上有唯一索引, include 为 1:1 无 N+1)
-        include: { outputAsset: true },
-      })
-    ).filter(
-      /*
-       * 产出素材被后台下架 (status='hidden') 的任务不再下发。
-       *
-       * 素材库按 `status='visible'` 过滤, 作品页若照常返回, 同一张图会在
-       * 两边数量对不上, 且用户点开会拿到 404 的图片链接。
-       * 没有产出的任务 (失败 / 进行中) 照常保留 —— 它们不是「被下架」,
-       * 而是本来就没有图, 作品页用占位卡如实展示。
-       */
-      (t) => !t.outputAsset || t.outputAsset.status === 'visible',
+    const tasks = await this.prisma.generationTask.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: { outputAsset: true },
+    });
+    const allOutputIds = Array.from(
+      new Set(tasks.flatMap((task) => orderedOutputIds(task.outputAssetId, task.outputAssetIds))),
     );
+    const outputRows = allOutputIds.length
+      ? await this.prisma.asset.findMany({ where: { id: { in: allOutputIds } } })
+      : [];
+    const outputById = new Map(outputRows.map((asset) => [asset.id, asset]));
 
-    return tasks.map((t) => ({
-      id: t.id,
-      projectId: t.projectId,
-      capability: t.capability,
-      status: t.status,
-      inputAssetIds: JSON.parse(t.inputAssetIds || '[]'),
-      params: JSON.parse(t.params || '{}'),
-      provider: t.provider,
-      errorCode: t.errorCode,
-      creditCost: t.creditCost,
-      createdAt: t.createdAt,
-      updatedAt: t.updatedAt,
-      outputAsset: t.outputAsset
-        ? {
-            id: t.outputAsset.id,
-            sourceUrl: t.outputAsset.sourceUrl,
-            // 开启 ASSET_SIGNING_SECRET 后前端优先用签名 URL; 关闭时为 null
-            signedUrl: this.signedUrl.sign(t.outputAsset.sourceUrl, { userId: t.ownerId }),
-            // AIGC 标识: 前端据此在视频上显示角标（图片的标识已烙在像素里）
-            aigc: parseAigcMeta(t.outputAsset.aigcMeta),
-            capability: t.outputAsset.capability,
-            width: t.outputAsset.width,
-            height: t.outputAsset.height,
-            format: t.outputAsset.format,
-            // 视频时长 (毫秒) —— 仅视频产出有值 (2026-10-20)
-            durationMs: t.outputAsset.durationMs ?? null,
-            // 产出模态 —— 前端据此选 `<img>` 还是 `<video>` (按 mime 推导)
-            modality: t.outputAsset.format?.startsWith('video/') ? 'video' : 'image',
-          }
-        : null,
-    }));
+    return tasks.map((t) => {
+      /*
+       * 产出素材被后台下架 (status='hidden') 的不再下发。没有产出的任务
+       * (失败 / 进行中) 照常保留 —— 它们不是「被下架」, 而是本来就没有图。
+       */
+      const outputAssets = orderedOutputIds(t.outputAssetId, t.outputAssetIds)
+        .map((assetId) => outputById.get(assetId))
+        .filter((asset): asset is NonNullable<typeof asset> => asset?.status === 'visible')
+        .map((asset) => this.serializeOutputAsset(asset, t.ownerId));
+      return {
+        id: t.id,
+        projectId: t.projectId,
+        capability: t.capability,
+        status: t.status,
+        inputAssetIds: JSON.parse(t.inputAssetIds || '[]'),
+        params: JSON.parse(t.params || '{}'),
+        provider: t.provider,
+        errorCode: t.errorCode,
+        creditCost: t.creditCost,
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt,
+        outputAsset: outputAssets[0] ?? null,
+        outputAssets,
+      };
+    });
+  }
+
+  /** 把任务里的素材记录转成前端任务接口的稳定形状。 */
+  private serializeOutputAsset(
+    output: {
+      id: string;
+      sourceUrl: string;
+      aigcMeta: string;
+      capability: string | null;
+      width: number | null;
+      height: number | null;
+      format: string;
+      durationMs: number | null;
+    },
+    ownerId: string,
+  ) {
+    return {
+      id: output.id,
+      sourceUrl: output.sourceUrl,
+      signedUrl: this.signedUrl.sign(output.sourceUrl, { userId: ownerId }),
+      aigc: parseAigcMeta(output.aigcMeta),
+      capability: output.capability,
+      width: output.width,
+      height: output.height,
+      format: output.format,
+      durationMs: output.durationMs ?? null,
+      // 产出模态由 mime 推导，不能用能力当前声明的模态倒推历史文件。
+      modality: output.format?.startsWith('video/') ? 'video' : 'image',
+    };
   }
 
   /**
@@ -1031,6 +1161,22 @@ function parseAigcMeta(raw: string | null | undefined): Record<string, unknown> 
   }
 }
 
+/** 任务产出顺序：首项始终是兼容字段 outputAssetId，之后是扩展的变体列表。 */
+function orderedOutputIds(primaryId: string | null, idsJson: string | null | undefined): string[] {
+  let extra: string[] = [];
+  if (idsJson) {
+    try {
+      const parsed = JSON.parse(idsJson);
+      if (Array.isArray(parsed)) {
+        extra = parsed.filter((id): id is string => typeof id === 'string' && Boolean(id));
+      }
+    } catch {
+      // 坏数据不应让任务详情整个 500；退回单产出字段。
+    }
+  }
+  return Array.from(new Set([primaryId, ...extra].filter((id): id is string => Boolean(id))));
+}
+
 /** 从 sourceUrl 推断扩展名, 供临时文件命名 */
 function extOf(sourceUrl: string): string {
   const m = sourceUrl.match(/\.([a-z0-9]{2,5})(?:\?|$)/i);
@@ -1099,4 +1245,32 @@ function extOfFormat(format: string): string {
 async function readImageDims(buffer: Buffer): Promise<{ width: number; height: number }> {
   const img = await Jimp.read(buffer);
   return { width: img.bitmap.width, height: img.bitmap.height };
+}
+
+/** 把多图融合产出统一到所选画质档位；仅处理 Jimp 可安全重编码的 PNG/JPEG。 */
+async function normalizeFusionOutput(
+  buffer: Buffer,
+  format: string,
+  ratio: unknown,
+  size: unknown,
+): Promise<{ buffer: Buffer; format: string }> {
+  if (format !== 'image/png' && format !== 'image/jpeg') return { buffer, format };
+  const target = multiFusionOutputDimensions(ratio, size);
+  if (!target) return { buffer, format };
+  const image = await Jimp.read(buffer);
+  if (image.bitmap.width === target.width && image.bitmap.height === target.height) {
+    return { buffer, format };
+  }
+  const sourceRatio = image.bitmap.width / image.bitmap.height;
+  const targetRatio = target.width / target.height;
+  if (Math.abs(sourceRatio - targetRatio) > 0.01) {
+    // 模型偶发按正方形出图；直接 resize 会把主体拉扁，居中等比裁切后再对齐尺寸。
+    image.cover({ w: target.width, h: target.height });
+  } else {
+    image.resize({ w: target.width, h: target.height });
+  }
+  return {
+    buffer: await image.getBuffer(format === 'image/jpeg' ? JimpMime.jpeg : JimpMime.png),
+    format,
+  };
 }

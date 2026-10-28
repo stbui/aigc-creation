@@ -20,6 +20,7 @@ import { useCredits } from '../context/CreditsContext';
 import { SideRail } from './SideRail';
 import { CapabilityIcon } from './SideRail';
 import { PromoBar } from './PromoBar';
+import { GuestPromoDialog } from './GuestPromoDialog';
 import { NotificationBell } from './NotificationBell';
 
 export { CapabilityIcon };
@@ -70,6 +71,7 @@ export function AppLayout({ groups, items, thumbs, statsTotal, children }: Props
   return (
     <Layout className="app-layout">
       <PromoBar />
+      <GuestPromoDialog />
       <Header className="app-header">
         <Link to="/workbench" className="app-brand">
           {/* 品牌标记: 货觉AI「觉眼」logo (2026-10-19, 见 docs/brand/brand-basics.md) */}

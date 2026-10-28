@@ -85,6 +85,12 @@ export class AssetsController {
     });
   }
 
+  /** 单个素材详情: 用户端历史恢复按 id 找回模板与参考图 */
+  @Get(':id')
+  getOne(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.assetsService.getOne(user.id, id);
+  }
+
   /** 删除素材 (生成图会连带删除产出它的任务) */
   @Delete(':id')
   remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {

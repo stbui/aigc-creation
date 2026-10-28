@@ -179,7 +179,7 @@ export class AssetsService {
     if (!asset || asset.ownerId !== ownerId) {
       throw new AppError(40400, '素材不存在', 404);
     }
-    return asset;
+    return this.decorate(asset);
   }
 
   /**

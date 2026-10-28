@@ -5,6 +5,7 @@ import {
   ChevronDown,
   Download,
   ImageOff,
+  Images,
   Loader2,
   RefreshCw,
   Search,
@@ -21,7 +22,7 @@ import { useAuth } from '../context/AuthContext';
 import { notifyCreditsChanged } from '../context/CreditsContext';
 import { runtimeOf, taskErrorText } from '../lib/constants';
 import { waitForTask } from '../lib/poll';
-import { StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
+import { StateError, StateSkeleton } from '../components/StateViews';
 import { ResultMedia } from '../components/ResultMedia';
 import { ImageLightbox, type LightboxItem } from '../components/ImageLightbox';
 import type { Modality, Task } from '../types/api';
@@ -165,7 +166,7 @@ function taskModality(t: Task): Modality {
 export function WorksPage() {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
-  const { token, openLogin } = useAuth();
+  const { token } = useAuth();
   const { data: caps } = useCapabilities();
   const reportError = useGenerateError();
   const retrySignal = usePollAbort();
@@ -498,55 +499,30 @@ export function WorksPage() {
       .slice(0, 20);
   }, [tasks, taskQuery]);
 
-  /*
-   * guest 态: 路由对外开放, 未登录也能进来。
-   * 不误报「作品列表加载失败」(那是接口 401 的文案), 而是给登录入口。
-   */
-  if (!token) {
-    return (
-      <div className="my-works-page">
-        <div className="my-works-head">
-          <h1>我的作品</h1>
-        </div>
-        <div className="state-page">
-          <StateEmpty
-            title="登录后查看你的作品"
-            desc="作品与账号绑定，登录后这里会列出你生成过的图片与视频。"
-            action={
-              <button type="button" className="state-btn is-primary" onClick={openLogin}>
-                登录/注册
-              </button>
-            }
-          />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="my-works-page">
-      <div className="my-works-head">
+      <div className="my-works-intro">
         <h1>我的作品</h1>
-        <div className="my-works-tabs" role="tablist">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'image'}
-            className={tab === 'image' ? 'is-active' : ''}
-            onClick={() => switchTab('image')}
-          >
-            图片作品
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === 'video'}
-            className={tab === 'video' ? 'is-active' : ''}
-            onClick={() => switchTab('video')}
-          >
-            视频作品
-          </button>
-        </div>
+      </div>
+      <div className="my-works-tabs" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'image'}
+          className={tab === 'image' ? 'active' : ''}
+          onClick={() => switchTab('image')}
+        >
+          图片作品
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'video'}
+          className={tab === 'video' ? 'active' : ''}
+          onClick={() => switchTab('video')}
+        >
+          视频作品
+        </button>
       </div>
 
       <div className="my-works-toolbar" onMouseLeave={closeAll}>
@@ -760,10 +736,10 @@ export function WorksPage() {
         <button
           type="button"
           className="my-works-download"
-          disabled={selected.length === 0}
           onClick={downloadSelected}
         >
-          <Download size={13} /> 选择下载{selected.length > 0 ? ` (${selected.length})` : ''}
+          <span className="my-works-select-box" aria-hidden="true" />
+          选择下载{selected.length > 0 ? ` (${selected.length})` : ''}
         </button>
 
         {activeFilterCount > 0 && (
@@ -813,9 +789,6 @@ export function WorksPage() {
           )}
         </span>
         <span className="my-works-sort-label">按创作日期倒序</span>
-        <button type="button" className="my-works-refresh" onClick={() => void load()}>
-          <RefreshCw size={13} /> 刷新
-        </button>
       </div>
 
       {loading ? (
@@ -832,6 +805,7 @@ export function WorksPage() {
         />
       ) : visible.length === 0 ? (
         <div className="my-works-empty">
+          <Images size={72} strokeWidth={1.35} aria-hidden="true" />
           <h2>
             {activeFilterCount === 0
               ? tab === 'video'
