@@ -345,7 +345,7 @@ npm run e2e                 # Playwright
    - 端口被其它进程占用时直接 `node dist/main.js` 会 `EADDRINUSE`；若占用者不是本项目，前端登录会**静默 404**（对方返回自己的响应格式，不报错）。
    - 正确做法：`./start.sh`（占用即停掉占用进程再起，不回退端口）。生产档不自动杀进程，需人工确认。
 2. **不要用 `nest start`** —— 会触发安全守卫拒绝清空 `dist`。用 `npm run build` + `node dist/main.js`。
-3. **CORS 默认只放行 5100 / 4173**，前端必须用 5100（三档同一端口）。
+3. **CORS 默认只放行 5100**，前端必须用 5100（三档同一端口）。
    - `CORS_ORIGINS` 逗号分隔白名单，**给定时覆盖其余规则**；`CORS_ALLOW_PRIVATE_LAN=1` 放行私有网段任意端口（手机调试）。
    - 排错：先看后端启动日志 `CORS origins: ...`，再核对浏览器地址栏。**`localhost` 与 `127.0.0.1` 在 CORS 判定上是不同来源**。
 4. **依赖安装会超时**。本机 npm 走 broker 代理，大批量安装触发 5 分钟硬超时，历史上用 `curl` + `tar` 直装 registry。因此 `node_modules` 里的**嵌套副本无法由 npm 自动重现**：

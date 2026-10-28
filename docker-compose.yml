@@ -3,16 +3,17 @@
 #
 # 为什么本地要用 compose
 # ----------------------
-# 宿主机端口常被其它项目占着，且多条环境需要并行跑（开发常驻 + 测试随时起）。
-# compose 用不同的端口映射与数据卷把两者隔开，且复现的就是生产的镜像形态 ——
-# 「本地 compose 跑通」比「本地 npm 跑通」更接近上线后的真实行为。
+# 宿主机端口常被其它项目占着。compose 复现的是生产的镜像形态 ——
+# 「本地 compose 跑通」比「本地 npm 跑通」更接近上线后的真实行为；
+# 不同环境靠数据卷隔离，端口与本地起法保持完全一致（4100 / 5100）。
 #
 # 两个 profile，对应两种起法
 # -------------------------
 #   开发（默认）:  docker compose up -d
 #   测试:  docker compose --profile test up -d
 #
-# 三者互不干扰：端口不同、库文件不同、上传目录不同（见下方 volumes）。
+# 两档默认都占用宿主机 4100 / 5100，因此**不能同时运行**；确需并行时显式
+# 覆盖测试档的 BACKEND_TEST_HOST_PORT / FRONTEND_TEST_HOST_PORT（库/目录本就不同）。
 # 每次 up 先跑一次幂等的 Prisma db push；全新卷也能直接启动，而不是空库健康。
 #
 # ⚠ 生产部署**不要**用这个文件。生产形态与生产注意事项见
@@ -57,7 +58,7 @@ services:
       # ---- 环境标识：这一项决定读哪一档 env 文件，改错就连错库 ----
       NODE_ENV: ${NODE_ENV:-development}
       HOST: 0.0.0.0          # 容器内必须对外监听（不能是 127.0.0.1）
-      PORT: 3001
+      PORT: 4100
 
       # ---- 数据库 ----
       # 开发：卷里的 dev.db；测试：卷里的 test.db。两者不同文件。
@@ -105,8 +106,8 @@ services:
       MINIO_BUCKET: ${MINIO_BUCKET:-huojue}
 
     ports:
-      # 容器内固定 3001（仅容器网络可见）；宿主机映射到 13001 避开常见占用
-      - "${BACKEND_HOST_PORT:-13001}:3001"
+      # 容器内外统一 4100；宿主机同一端口，与本地 npm 起法一致。
+      - "${BACKEND_HOST_PORT:-4100}:4100"
     volumes:
       # 具名卷：库文件、上传图、备份、日志全在里面，
       # `docker compose down` 不删（要删得显式 down -v）
@@ -145,15 +146,15 @@ services:
     environment:
       # nginx 模板里 ${BACKEND_UPSTREAM} 的取值。**必须与下方 depends_on
       # 的服务名一致** —— 写错不会报错，只会让前端静默代理到另一套环境。
-      BACKEND_UPSTREAM: backend:3001
+      BACKEND_UPSTREAM: backend:4100
       DNS_RESOLVER: 127.0.0.11
     ports:
-      - "${FRONTEND_HOST_PORT:-15173}:80"
+      - "${FRONTEND_HOST_PORT:-5100}:5100"
     depends_on:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5100/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3
@@ -201,13 +202,13 @@ services:
     environment:
       NODE_ENV: test
       HOST: 0.0.0.0
-      PORT: 3001
+      PORT: 4100
       # 测试库与开发库不同文件 —— compose 内已分卷
       DATABASE_URL: file:./data/test.db
       UPLOAD_DIR: /app/data/uploads-test
       BACKUP_DIR: /app/data/backups-test
       LOG_DIR: /app/data/logs-test
-      CORS_ORIGINS: http://localhost:15273,http://127.0.0.1:15273
+      CORS_ORIGINS: http://localhost:5100,http://127.0.0.1:5100
       # 测试用独立密钥：顺手验证「换密钥后旧 token 失效」
       JWT_SECRET: test-only-secret-do-not-reuse-in-prod
       JWT_TTL: 1h
@@ -217,7 +218,7 @@ services:
       LOG_ERROR_FILE: "1"
       STORAGE_BACKEND: local
     ports:
-      - "${BACKEND_TEST_HOST_PORT:-13101}:3001"
+      - "${BACKEND_TEST_HOST_PORT:-4100}:4100"
     volumes:
       # 独立卷：测试库与测试上传图都不与开发环境混用
       - huojue-test-data:/app/data
@@ -253,17 +254,17 @@ services:
     restart: unless-stopped
     init: true
     environment:
-      # 指向**测试**后端。写成 backend:3001 的话，测试前端会把请求
+      # 指向**测试**后端。写成 backend:4100 的话，测试前端会把请求
       # 代理到开发后端上 —— 不报错，只是数据全错。
-      BACKEND_UPSTREAM: backend-test:3001
+      BACKEND_UPSTREAM: backend-test:4100
       DNS_RESOLVER: 127.0.0.11
     ports:
-      - "${FRONTEND_TEST_HOST_PORT:-15273}:80"
+      - "${FRONTEND_TEST_HOST_PORT:-5100}:5100"
     depends_on:
       backend-test:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5100/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3

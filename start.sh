@@ -318,7 +318,7 @@ mkdir -p "$LOG_DIR"
 # 端口固定不变，被占用就停掉占用进程（见 ensure_port_free），绝不回退到备用端口：
 #   development 4100 / 5100
 #   test        4100 / 5100（与开发相同 —— 两档不能同时跑，隔离靠库/目录/密钥）
-#   production  只认 env 文件（端口被占不自动杀进程，直接失败）
+#   production  4100 / 5100（与开发相同；端口被占不自动杀进程，直接失败）
 # 显式传 BACKEND_PORT / FRONTEND_PORT 可覆盖，但仍然固定使用该值。
 
 # 从 env 文件读该环境的默认端口（读不到用兜底值）
@@ -358,7 +358,7 @@ fi
 #   而线上真实来源应该在 .env.production 的 CORS_ORIGINS 里写死。
 CORS_ORIGINS_VAL=""
 if [ "$APP_ENV" = development ] && [ "$RUN_FRONTEND" -eq 1 ]; then
-  if [ "$FRONTEND_PORT" != "5100" ] && [ "$FRONTEND_PORT" != "4173" ]; then
+  if [ "$FRONTEND_PORT" != "5100" ]; then
     CORS_ORIGINS_VAL="http://localhost:$FRONTEND_PORT,http://127.0.0.1:$FRONTEND_PORT"
   fi
 fi

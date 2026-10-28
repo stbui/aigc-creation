@@ -11,11 +11,11 @@
 
 | 文件 | 用途 | 默认入口 |
 |---|---|---|
-| `docker-compose.yml` | 本地开发 / 测试；会对数据卷里的库自动建表 | `13001`（后端）/ `15173`（前端） |
-| `docker-compose.yml --profile test` | 与开发并行的测试档；独立库、目录、卷 | `13101`（后端）/ `15273`（前端） |
-| `docker-compose.production.yml` | 生产单机编排；TLS 由外层反代终结 | `127.0.0.1:18080` |
+| `docker-compose.yml` | 本地开发 / 测试；会对数据卷里的库自动建表 | `4100`（后端）/ `5100`（前端） |
+| `docker-compose.yml --profile test` | 测试档；独立库、目录、卷（默认端口与开发相同，不能同时起） | `4100`（后端）/ `5100`（前端） |
+| `docker-compose.production.yml` | 生产单机编排；TLS 由外层反代终结 | `127.0.0.1:5100` |
 
-生产编排固定使用 `NODE_ENV=production`、容器内 `PORT=3001`、
+生产编排固定使用 `NODE_ENV=production`、容器内 `PORT=4100`、
 `DATABASE_URL=file:/app/data/prod.db`。后端端口不映射到宿主机，
 所有公网流量必须经过前端 Nginx。
 
@@ -35,11 +35,11 @@
 docker compose up -d --build
 docker compose ps -a
 
-# 开发 + 测试并行
+# 测试档（默认端口与开发相同，需先停开发；并行请覆盖 *_TEST_HOST_PORT）
 docker compose --profile test up -d --build
 
-curl -fsS http://127.0.0.1:15173/healthz
-curl -fsS http://127.0.0.1:15173/api/v1/health/ready
+curl -fsS http://127.0.0.1:5100/healthz
+curl -fsS http://127.0.0.1:5100/api/v1/health/ready
 ```
 
 `backend-migrate` / `backend-migrate-test` 是一次性任务，成功后会以退出码 0
@@ -142,9 +142,9 @@ BACKEND_ENV_FILE=./backend/.env.production \
   docker compose -f docker-compose.production.yml up -d --build
 
 docker compose -f docker-compose.production.yml ps -a
-curl -fsS http://127.0.0.1:18080/healthz
-curl -fsS http://127.0.0.1:18080/api/v1/health/ready
-curl -fsS http://127.0.0.1:18080/api/v1/capabilities
+curl -fsS http://127.0.0.1:5100/healthz
+curl -fsS http://127.0.0.1:5100/api/v1/health/ready
+curl -fsS http://127.0.0.1:5100/api/v1/capabilities
 ```
 
 预期：`migrate` 退出码为 0，`backend` / `frontend` 为 `healthy`。
@@ -164,7 +164,7 @@ BACKEND_ENV_FILE=./backend/.env.production \
 默认只绑定本机回环地址，避免后端或未加密入口直接暴露公网：
 
 ```text
-127.0.0.1:18080 -> frontend:80
+127.0.0.1:5100 -> frontend:5100
 ```
 
 需要换端口或内网地址时：
@@ -175,7 +175,7 @@ FRONTEND_BIND_ADDR=0.0.0.0 FRONTEND_HOST_PORT=8080 \
 ```
 
 生产应在前面放 Caddy / Nginx / 云负载均衡做 HTTPS 终结，再反代到
-`127.0.0.1:18080`。外层代理至少转发：
+`127.0.0.1:5100`。外层代理至少转发：
 
 ```nginx
 proxy_set_header Host              $host;
@@ -237,7 +237,7 @@ HUOJUE_IMAGE_TAG=2026-10-28-1 \
   docker compose -f docker-compose.production.yml up -d --no-build
 
 # 4. 验收健康与核心流程
-curl -fsS http://127.0.0.1:18080/api/v1/health/ready
+curl -fsS http://127.0.0.1:5100/api/v1/health/ready
 ```
 
 回滚镜像只回滚应用代码，**不会回滚已经执行的表结构变更**。SQLite 使用

@@ -73,7 +73,7 @@ async function bootstrap(): Promise<void> {
   app.setGlobalPrefix(config.get<string>('app.prefix') ?? 'api/v1');
 
   // CORS: 来源由 buildCorsAllowList 决定 (CORS_ORIGINS 显式白名单优先,
-  // 默认放行本机 5100/4173, 私有网段需显式开启) —— 见 src/common/cors-allow-list.ts
+  // 默认放行本机 5100, 私有网段需显式开启) —— 见 src/common/cors-allow-list.ts
   const cors = buildCorsAllowList();
   app.enableCors({
     origin: cors.origin,

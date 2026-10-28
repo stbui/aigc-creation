@@ -101,7 +101,7 @@ aigc-creation/
 ├── start.sh                    # 一键启动（--env development|test|prod；端口占用即停 + 建表 + 种子）
 ├── README.md                   # 本文：现状速查
 ├── docs/                       # 分类文档，地图见 docs/README.md
-├── docker-compose.yml          # 本地编排（默认 dev，--profile test 并行测试档）
+├── docker-compose.yml          # 本地编排（默认 dev；--profile test 测试档，端口同开发不能并行）
 ├── docker-compose.production.yml # 生产单机编排（自动建表 / 健康探针 / 持久卷）
 ├── test/                       # 零依赖仿真模型网关（本地联调与失败注入）
 ├── backend/                    # NestJS 服务，端口 4100（测试档同端口），全局前缀 /api/v1
@@ -182,6 +182,7 @@ npm run dev                # http://localhost:5100
 
 ```bash
 # 本地开发 / 测试（首次自动建表；migrate 退出 0 属正常）
+# 两档默认都占 4100/5100，不能同时运行；并行需覆盖 *_TEST_HOST_PORT
 docker compose up -d --build
 docker compose --profile test up -d --build
 
@@ -189,7 +190,7 @@ docker compose --profile test up -d --build
 docker compose -f docker-compose.production.yml up -d --build
 ```
 
-生产默认只监听 `127.0.0.1:18080`，由外层反代终结 TLS；后端不映射宿主机端口。自动建表、健康探针、数据卷、备份恢复、升级回滚与排障见 `docs/docker-deployment.md`。
+生产默认只监听 `127.0.0.1:5100`，由外层反代终结 TLS；后端不映射宿主机端口。自动建表、健康探针、数据卷、备份恢复、升级回滚与排障见 `docs/docker-deployment.md`。
 
 只匹配 LISTEN 状态的进程，客户端连接不算（否则会把代理 `/api` 的前端 dev server 一起误杀）。手工排查：
 
@@ -217,7 +218,7 @@ SEED_EMAIL=you@example.com SEED_PASSWORD='…' API=http://localhost:4100 \
 | `CORS_ORIGINS` | 逗号分隔的显式白名单，给定时覆盖其余规则（生产用这个） | 未设置 |
 | `CORS_ALLOW_PRIVATE_LAN` | `1`/`true` 时额外放行私有网段任意端口（`10.` / `172.16-31.` / `192.168.`，供手机同 WiFi 调试） | 关闭 |
 
-未设置任何变量时，默认放行本机开发入口：`http://{localhost,127.0.0.1,[::1]}:5100`（dev）与 `:4173`（`vite preview`）。
+未设置任何变量时，默认放行本机开发入口：`http://{localhost,127.0.0.1,[::1]}:5100`（三档统一）。
 
 浏览器端报错排查顺序：先看后端启动日志那行 `CORS origins: ...`，再确认浏览器地址栏的 host:port 是否在列表内——`localhost` 与 `127.0.0.1` 在 CORS 判定上是不同来源，不能互换。
 
@@ -233,7 +234,7 @@ SEED_EMAIL=you@example.com SEED_PASSWORD='…' API=http://localhost:4100 \
 
 开发档后端固定 4100（全局前缀 `/api/v1`），前端固定 5100。若端口已被其它进程占用，直接 `node dist/main.js` 会 `EADDRINUSE` 失败；若占用者不是本项目，前端登录会静默 404（`Cannot POST /api/v1/auth/login`，对方返回自己的响应格式）。正确启动方式是 `./start.sh`；手工启动则要自己先释放端口。
 
-后端 CORS 只放行 5100 / 4173（三档同一端口），前端必须用 5100。显式设置 `VITE_API_BASE` 后前端走直连绝对地址而非 Vite 代理，preflight 会被后端 CORS 拒——换端口无效，除非同步把新来源加进 `CORS_ORIGINS`。
+后端 CORS 只放行 5100（三档同一端口），前端必须用 5100。显式设置 `VITE_API_BASE` 后前端走直连绝对地址而非 Vite 代理，preflight 会被后端 CORS 拒——换端口无效，除非同步把新来源加进 `CORS_ORIGINS`。
 
 补充约束：
 

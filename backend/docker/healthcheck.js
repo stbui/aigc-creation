@@ -7,7 +7,7 @@
 
 const http = require('http');
 
-const port = Number(process.env.PORT || 3001);
+const port = Number(process.env.PORT || 4100);
 const prefix = (process.env.API_PREFIX || 'api/v1').replace(/^\/+|\/+$/g, '');
 const path = `/${prefix}/health/ready`;
 

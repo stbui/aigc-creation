@@ -26,7 +26,7 @@ map $http_x_real_ip $huojue_real_ip {
 }
 
 server {
-    listen       80;
+    listen       5100;
     server_name  _;
 
     # 端口映射/外层反代下，不让 Nginx 生成带错误 host:port 的绝对跳转。

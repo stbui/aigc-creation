@@ -11,7 +11,7 @@
 #   · backend 不映射宿主端口，只能经 frontend 的 Nginx 访问；
 #   · migrate 先建表，成功后才启动 backend；
 #   · SQLite / 上传图 / 备份 / 日志统一落 huojue-prod-data 卷；
-#   · 前端默认只绑 127.0.0.1:18080，TLS 由外层反代 / LB 终结；
+#   · 前端默认只绑 127.0.0.1:5100，TLS 由外层反代 / LB 终结；
 #   · seed 是显式 profile，不会随普通 up 自动跑。
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -25,7 +25,7 @@ x-backend-base: &backend-base
   environment:
     NODE_ENV: production
     HOST: 0.0.0.0
-    PORT: 3001
+    PORT: 4100
     API_PREFIX: api/v1
     TZ: ${TZ:-Asia/Shanghai}
     DATABASE_URL: file:/app/data/prod.db
@@ -98,16 +98,16 @@ services:
     restart: unless-stopped
     init: true
     environment:
-      BACKEND_UPSTREAM: backend:3001
+      BACKEND_UPSTREAM: backend:4100
       DNS_RESOLVER: 127.0.0.11
     ports:
       # 默认仅本机监听，供云 LB / Caddy / 系统 Nginx 做 TLS 终结。
-      - "${FRONTEND_BIND_ADDR:-127.0.0.1}:${FRONTEND_HOST_PORT:-18080}:80"
+      - "${FRONTEND_BIND_ADDR:-127.0.0.1}:${FRONTEND_HOST_PORT:-5100}:5100"
     depends_on:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5100/healthz"]
       interval: 30s
       timeout: 5s
       retries: 3

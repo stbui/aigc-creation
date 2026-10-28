@@ -29,14 +29,14 @@ export default defineConfig(({ mode }) => {
    * 优先级: 命令行显式给的同名变量 > env 文件 > 兜底默认值。
    */
   const fileEnv = loadEnv(mode, process.cwd(), 'VITE_');
-  const port = Number(process.env.VITE_PORT || fileEnv.VITE_PORT || (isProd ? 4173 : 5100));
+  const port = Number(process.env.VITE_PORT || fileEnv.VITE_PORT || 5100);
   const apiProxy = process.env.VITE_API_PROXY || fileEnv.VITE_API_PROXY || 'http://localhost:4100';
 
   return {
     plugins: [react()],
     server: {
       port,
-      strictPort: false,
+      strictPort: true,
       proxy: {
         '/api': {
           target: apiProxy,
@@ -63,7 +63,7 @@ export default defineConfig(({ mode }) => {
     },
     preview: {
       port,
-      strictPort: false,
+      strictPort: true,
     },
     build: {
       // 首屏体积优化: 框架/组件库/图标拆成稳定 chunk, 业务页面各自按路由懒加载。

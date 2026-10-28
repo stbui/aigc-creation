@@ -83,7 +83,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
-    PORT=3001 \
+    PORT=4100 \
     API_PREFIX=api/v1 \
     PRISMA_SKIP_POSTINSTALL_GENERATE=true
 
@@ -116,7 +116,7 @@ RUN mkdir -p /app/data/uploads/original /app/data/uploads/generated \
 # 非 root 运行：node 镜像自带 uid 1000 的 node 用户
 USER node
 
-EXPOSE 3001
+EXPOSE 4100
 
 # 就绪探针会真实查询数据库；只监听进程存活会把「空库」误判为可用。
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \

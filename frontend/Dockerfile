@@ -65,7 +65,7 @@ ENV NGINX_ENVSUBST_FILTER='BACKEND_UPSTREAM|DNS_RESOLVER'
 
 # 默认值让 `docker run` 单跑镜像也能用（compose 会覆盖成对应环境的服务名）。
 # 未设置时 ${BACKEND_UPSTREAM} 会原样留在配置里 → nginx 启动失败（快速失败，好过静默错配）
-ENV BACKEND_UPSTREAM=backend:3001
+ENV BACKEND_UPSTREAM=backend:4100
 
 # Docker Compose / Docker 内置 DNS。模板用变量形式 proxy_pass，让容器重建后的
 # 新 IP 能被重新解析，而不是 Nginx 启动时永久缓存旧地址。
@@ -77,9 +77,9 @@ ENV DNS_RESOLVER=127.0.0.11
 COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=build /app/dist /usr/share/nginx/html
 
-EXPOSE 80
+EXPOSE 5100
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD wget -qO- http://127.0.0.1/healthz >/dev/null || exit 1
+  CMD wget -qO- http://127.0.0.1:5100/healthz >/dev/null || exit 1
 
 CMD ["nginx", "-g", "daemon off;"]

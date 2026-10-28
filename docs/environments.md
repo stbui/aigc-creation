@@ -28,8 +28,8 @@
 | 上传目录 | `uploads` | `uploads-test` | `/app/data/uploads`（绝对路径 + 卷） |
 | 备份目录 | `backups` | `backups-test` | `/app/data/backups` |
 | 日志目录 | `logs` | `logs/test` | `/app/data/logs` |
-| 后端端口 | 4100（固定；占用则停掉占用进程） | 4100（同开发） | `.env.production` 的 `PORT` |
-| 前端端口 | 5100（固定；占用则停掉占用进程） | 5100（同开发） | 4173（仅 preview） |
+| 后端端口 | 4100（固定；占用则停掉占用进程） | 4100（同开发） | 4100（同开发；`.env.production` 可覆盖） |
+| 前端端口 | 5100（固定；占用则停掉占用进程） | 5100（同开发） | 5100（同开发） |
 | `HOST` | `127.0.0.1` | `127.0.0.1` | `0.0.0.0`（容器必须） |
 | `JWT_SECRET` | 留空（用内置开发密钥） | 独立测试密钥 | **必填**，缺失则拒绝启动 |
 | `JWT_TTL` | `7d` | `1h` | 建议 `2h` |
@@ -262,14 +262,15 @@ npx ts-node -T scripts/probe-environments.ts
 
 ```bash
 docker compose up -d --build                      # 开发
-docker compose --profile test up -d --build      # 开发 + 测试并行
+docker compose --profile test up -d --build      # 测试档（默认端口与开发相同，不能同时起）
 
 docker compose logs -f backend
 docker compose down          # 保留数据卷
 docker compose down -v       # 连数据卷一起删（库/上传图/备份/日志全没）
 ```
 
-端口避开本机常用值：开发 `13001` / `15173`，测试 `13101` / `15273`。
+端口与本地起法一致：开发 / 测试 / 生产均为后端 `4100`、前端 `5100`，
+两档默认不能同时运行；确需并行时覆盖 `BACKEND_TEST_HOST_PORT` / `FRONTEND_TEST_HOST_PORT`。
 
 每次 `up` 会先运行一次 `backend-migrate` / `backend-migrate-test`
 （幂等的 `prisma db push`），成功退出后后端才启动；全新数据卷也能直接启动。
@@ -277,13 +278,13 @@ docker compose down -v       # 连数据卷一起删（库/上传图/备份/日�
 
 两个 profile 用**不同的具名卷**（`huojue-data` / `huojue-test-data`），
 库文件与上传目录都不同。`frontend-test` 的 nginx 反向代理目标通过
-`BACKEND_UPSTREAM=backend-test:3001` 注入 —— 写错不报错，只会让测试前端
+`BACKEND_UPSTREAM=backend-test:4100` 注入 —— 写错不报错，只会让测试前端
 静默代理到开发后端。
 
 ### 生产部署
 
 **不要直接用 `docker-compose.yml`** —— 它是本地编排。生产使用
-`docker-compose.production.yml`，默认只把前端绑到 `127.0.0.1:18080`，
+`docker-compose.production.yml`，默认只把前端绑到 `127.0.0.1:5100`，
 由外层 Caddy / Nginx / LB 终结 TLS。
 
 ```bash
@@ -292,8 +293,8 @@ chmod 600 backend/.env.production
 docker compose -f docker-compose.production.yml config --quiet
 docker compose -f docker-compose.production.yml up -d --build
 
-curl -fsS http://127.0.0.1:18080/healthz
-curl -fsS http://127.0.0.1:18080/api/v1/health/ready
+curl -fsS http://127.0.0.1:5100/healthz
+curl -fsS http://127.0.0.1:5100/api/v1/health/ready
 ```
 
 编排会先跑 `migrate`，成功后才启动后端；后端端口不映射到宿主机，
