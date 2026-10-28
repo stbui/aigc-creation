@@ -43,7 +43,7 @@ export function loadConfig(env = process.env) {
   }
 
   return {
-    host: env.HOST || '127.0.0.1',
+    host: env.HOST || '0.0.0.0',
     port: parsePort(env.PORT, 4310),
     workspaceRoot: realpathSync(workspaceRoot),
     accessToken: env.AGENT_ACCESS_TOKEN || '',

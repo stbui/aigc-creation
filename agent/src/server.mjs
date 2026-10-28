@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { networkInterfaces } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createAgentServer } from './app.mjs';
@@ -39,16 +40,39 @@ try {
 
 const { server, sessions, storage } = createAgentServer({ config });
 
+function accessUrls(host, port) {
+  if (!['0.0.0.0', '::'].includes(host)) {
+    const displayHost = host.includes(':') ? `[${host}]` : host;
+    return [`http://${displayHost}:${port}`];
+  }
+
+  const urls = [`http://127.0.0.1:${port}`];
+  for (const addresses of Object.values(networkInterfaces())) {
+    for (const address of addresses || []) {
+      if (address.internal || address.family !== 'IPv4') continue;
+      urls.push(`http://${address.address}:${port}`);
+    }
+  }
+  return [...new Set(urls)];
+}
+
 server.listen(config.port, config.host, () => {
   const address = server.address();
   const port = typeof address === 'object' && address ? address.port : config.port;
-  const displayHost = ['0.0.0.0', '::'].includes(config.host) ? '127.0.0.1' : config.host;
-  console.log(`[codex-web] http://${displayHost}:${port}`);
+  for (const url of accessUrls(config.host, port)) {
+    console.log(`[codex-web] ${url}`);
+  }
   console.log(`[codex-web] workspace: ${config.workspaceRoot}`);
   console.log(`[codex-web] history: ${storage ? config.dataDir : 'memory only'}`);
   console.log('[codex-web] sdk: @openai/codex-sdk@0.164.0');
-  if (!config.accessToken && !['127.0.0.1', 'localhost', '::1'].includes(config.host)) {
-    console.warn('[codex-web] warning: listening beyond localhost without AGENT_ACCESS_TOKEN');
+  if (
+    !config.accessToken &&
+    (['0.0.0.0', '::'].includes(config.host) ||
+      !['127.0.0.1', 'localhost', '::1'].includes(config.host))
+  ) {
+    console.warn(
+      '[codex-web] warning: accessible from the network without AGENT_ACCESS_TOKEN',
+    );
   }
   if (config.allowDangerFullAccess) {
     console.warn('[codex-web] warning: danger-full-access is enabled');
