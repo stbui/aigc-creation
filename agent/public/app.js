@@ -1179,6 +1179,8 @@ function handleServerMessage(session, message) {
   } else if (message.type === 'error') {
     session.lastError = message.message || 'Codex 执行失败';
     showError('Codex 执行失败', session.lastError, message.hint || '');
+    // 服务端会把它落进时间线；浏览器端同步落一条，刷新前也能看到失败原因。
+    addNotice(session, session.lastError, 'error');
   }
   scheduleRender();
   persistSoon();

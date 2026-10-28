@@ -54,11 +54,33 @@ const STATIC_FILES = new Map([
   ['manifest.webmanifest', 'application/manifest+json; charset=utf-8'],
 ]);
 
+/** 自定义 OpenAI 兼容端点的 provider id；内置 `openai` 不允许被覆盖，必须另起一个。 */
+const CUSTOM_PROVIDER_ID = 'custom';
+
 export function createCodex(config) {
   const options = {};
   if (config.codexPathOverride) options.codexPathOverride = config.codexPathOverride;
   if (config.baseUrl) options.baseUrl = config.baseUrl;
   if (config.apiKey) options.apiKey = config.apiKey;
+  if (config.baseUrl) {
+    // Codex 0.164 会优先用 WebSocket 走 Responses API，失败 5 次后才回落 HTTPS。
+    // 多数 OpenAI 兼容端点（如 DeepSeek）只实现 HTTP 版 /responses，对 WebSocket
+    // 升级请求返回 405；而重试期间的 "Reconnecting... N/5" 会以顶层 error 事件下发，
+    // 前端据此判定整轮失败。这里显式声明该 provider 不支持 WebSocket，直接走 HTTPS。
+    options.config = {
+      model_provider: CUSTOM_PROVIDER_ID,
+      model_providers: {
+        [CUSTOM_PROVIDER_ID]: {
+          name: 'Custom OpenAI-compatible',
+          base_url: config.baseUrl,
+          // SDK 会把 CODEX_API_KEY 注入子进程；没有密钥的本地代理则不带 env_key。
+          ...(config.apiKey ? { env_key: 'CODEX_API_KEY' } : {}),
+          wire_api: 'responses',
+          supports_websockets: false,
+        },
+      },
+    };
+  }
   return new Codex(options);
 }
 
@@ -74,6 +96,16 @@ export function createAgentServer({ config, codex = createCodex(config) }) {
     for (const session of sessions.list()) {
       if (session.settings.sandboxMode === 'danger-full-access') {
         session.settings = { ...session.settings, sandboxMode: 'workspace-write' };
+      }
+    }
+  }
+
+  // 历史会话落盘时若 model 为空（当时没配 AGENT_DEFAULT_MODEL），续聊仍会以空模型起线程，
+  // 退回 Codex 内置模型被自定义端点拒绝。这里统一补上当前默认值，旧会话才能继续用。
+  if (config.defaultModel) {
+    for (const session of sessions.list()) {
+      if (!session.settings.model) {
+        session.settings = { ...session.settings, model: config.defaultModel };
       }
     }
   }
@@ -401,12 +433,39 @@ async function runTurn(req, res, session, { config, codex }) {
 
   const turnItemPrefix = `turn-${randomUUID().slice(0, 8)}-`;
 
-  try {
-    const { events } = await thread.runStreamed(prompt, {
-      signal: controller.signal,
-    });
+  // 上游卡死时 runStreamed 与事件流都会一直挂着不产出（上游断连、CLI 等登录、网络黑洞）。
+  // 每次等待上游都用同一段空闲超时包住：任意新事件到达即重新计时，服务端心跳不算数。
+  // 超时用 Promise.race 主动放弃等待，而不是只发 abort 信号 —— 即使 SDK 不响应 abort，
+  // 会话也必须解锁，不能永远停在 running。
+  const idleTimeoutMs = config.turnIdleTimeoutMs || 0;
+  let timedOut = false;
+  const triggerIdleTimeout = () => {
+    timedOut = true;
+    controller.abort(new Error('codex turn idle timeout'));
+  };
+  const timeoutFailure = () => ({
+    message: `Codex 已 ${formatDuration(idleTimeoutMs)}没有返回任何事件，任务已中止`,
+    hint: `请检查 Codex CLI 的登录与网络（codex login），或调整 AGENT_TURN_IDLE_TIMEOUT_MS（当前 ${idleTimeoutMs}ms）。`,
+  });
+  const failForTimeout = () => {
+    outcome = 'failed';
+    failure = timeoutFailure();
+    session.lastError = failure.message;
+    send({ type: 'error', ...failure });
+  };
 
-    for await (const event of events) {
+  try {
+    const streamed = await raceIdleTimeout(
+      thread.runStreamed(prompt, { signal: controller.signal }),
+      idleTimeoutMs,
+      triggerIdleTimeout,
+    );
+    const iterator = streamed.events[Symbol.asyncIterator]();
+
+    while (true) {
+      const step = await raceIdleTimeout(iterator.next(), idleTimeoutMs, triggerIdleTimeout);
+      if (step.done) break;
+      const event = step.value;
       if (!event || typeof event.type !== 'string') continue;
 
       let outboundEvent = event;
@@ -430,11 +489,19 @@ async function runTurn(req, res, session, { config, codex }) {
         }
         upsertItem(session, outboundEvent.item);
       } else if (event.type === 'turn.completed') {
+        // turn.completed 才是终态：SDK 会把可恢复的重试（如上游传输回退）也发成顶层
+        // error 事件，若据此提前判失败，实际已成功的这一轮会被误报成「Codex 执行失败」。
         session.usage = event.usage || null;
+        outcome = 'completed';
+        failure = null;
+        session.lastError = null;
       } else if (event.type === 'turn.failed') {
         outcome = 'failed';
         session.lastError = event.error?.message || 'Codex 任务失败';
       } else if (event.type === 'error') {
+        // SDK 文档把顶层 error 定义为不可恢复错误：必须按失败收尾并落一条时间线通知，
+        // 否则前端只弹一次横幅，刷新后历史里看不出这轮是失败的。
+        outcome = 'failed';
         session.lastError = event.message || 'Codex 返回错误';
       }
 
@@ -450,9 +517,13 @@ async function runTurn(req, res, session, { config, codex }) {
       send({ type: 'event', event: outboundEvent });
     }
   } catch (error) {
-    if (controller.signal.aborted) {
+    if (timedOut) {
+      failForTimeout();
+    } else if (controller.signal.aborted) {
       outcome = 'aborted';
-    } else {
+    } else if (!(outcome === 'failed' && session.lastError)) {
+      // 流内已收到 turn.failed / error 时，SDK 随后抛出的「exit code 1 + stderr」只是退出码
+      // 回声（stderr 常常只有 "Reading prompt from stdin..."），拿它覆盖会丢掉上游真实原因。
       outcome = 'failed';
       failure = describeError(error);
       session.lastError = failure.message;
@@ -516,6 +587,45 @@ function ensureSessionThread(session, codex, config) {
 
 function sessionsNotify(session) {
   session.onChange?.();
+}
+
+class TurnIdleTimeoutError extends Error {
+  constructor() {
+    super('Codex turn idle timeout');
+    this.name = 'TurnIdleTimeoutError';
+  }
+}
+
+/**
+ * 在 ms 内等待上游 promise。超时先执行 onTimeout（通常是 abort 上游），
+ * 再以 TurnIdleTimeoutError 拒绝；ms <= 0 表示关闭超时。
+ */
+async function raceIdleTimeout(promise, ms, onTimeout) {
+  if (!ms || ms <= 0) return promise;
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((resolve, reject) => {
+        timer = setTimeout(() => {
+          try {
+            onTimeout();
+          } finally {
+            reject(new TurnIdleTimeoutError());
+          }
+        }, ms);
+        timer.unref?.();
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function formatDuration(ms) {
+  if (ms >= 60_000 && ms % 60_000 === 0) return `${ms / 60_000} 分钟`;
+  if (ms >= 1000) return `${Math.round(ms / 1000)} 秒`;
+  return `${ms} 毫秒`;
 }
 
 function describeError(error) {

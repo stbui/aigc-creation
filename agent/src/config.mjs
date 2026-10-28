@@ -24,6 +24,15 @@ function parsePositiveInt(value, fallback) {
   return parsed;
 }
 
+function parseNonNegativeInt(value, fallback) {
+  if (value === undefined || value === '') return fallback;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 0) {
+    throw new Error(`Expected a non-negative integer, received: ${value}`);
+  }
+  return parsed;
+}
+
 function parseBoolean(value) {
   if (value === undefined || value === '') return false;
   return ['1', 'true', 'yes', 'on'].includes(String(value).toLowerCase());
@@ -49,6 +58,9 @@ export function loadConfig(env = process.env) {
     accessToken: env.AGENT_ACCESS_TOKEN || '',
     allowDangerFullAccess: parseBoolean(env.AGENT_ALLOW_DANGER_FULL_ACCESS),
     maxSessions: parsePositiveInt(env.AGENT_MAX_SESSIONS, 25),
+    // 0 表示关闭。Codex CLI 在上游断连时可能只吐出 turn.started 就不再有任何事件，
+    // 没有这道空闲超时，会话会一直卡在 running，浏览器只能无限转圈。
+    turnIdleTimeoutMs: parseNonNegativeInt(env.AGENT_TURN_IDLE_TIMEOUT_MS, 10 * 60 * 1000),
     dataDir: path.resolve(env.AGENT_DATA_DIR || defaultDataDir),
     defaultModel: env.AGENT_DEFAULT_MODEL || '',
     codexPathOverride: env.CODEX_PATH || '',

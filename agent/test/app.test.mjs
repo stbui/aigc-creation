@@ -14,6 +14,7 @@ function makeConfig(root, overrides = {}) {
     accessToken: '',
     allowDangerFullAccess: false,
     maxSessions: 10,
+    turnIdleTimeoutMs: 5_000,
     defaultModel: '',
     codexPathOverride: '',
     baseUrl: '',
@@ -88,6 +89,88 @@ function makeFakeThread(options, resumeId = null, failure = null) {
             reasoning_output_tokens: 1,
           },
         };
+      })();
+      return { events };
+    },
+  };
+}
+
+/**
+ * 模拟上游断连：吐出 turn.started 后彻底静默，只有 abort 信号能结束。
+ * 这正是 Codex CLI 无法访问模型服务时的真实表现。
+ */
+function makeStalledThread(options) {
+  return {
+    options,
+    async runStreamed(prompt, turnOptions = {}) {
+      const signal = turnOptions.signal;
+      const events = (async function* generate() {
+        yield { type: 'thread.started', thread_id: 'thread-stalled-123456' };
+        yield { type: 'turn.started' };
+        await new Promise((resolve, reject) => {
+          const onAbort = () => reject(signal?.reason || new Error('aborted'));
+          if (signal?.aborted) onAbort();
+          else signal?.addEventListener('abort', onAbort, { once: true });
+        });
+      })();
+      return { events };
+    },
+  };
+}
+
+/** 上游持续产出事件，但间隔小于空闲超时。 */
+function makeSlowThread(options) {
+  return {
+    options,
+    async runStreamed(prompt) {
+      const events = (async function* generate() {
+        yield { type: 'thread.started', thread_id: 'thread-slow-123456' };
+        yield { type: 'turn.started' };
+        await new Promise((resolve) => setTimeout(resolve, 60));
+        yield {
+          type: 'item.completed',
+          item: { id: 'message-slow-1', type: 'agent_message', text: `收到：${prompt}` },
+        };
+        await new Promise((resolve) => setTimeout(resolve, 60));
+        yield { type: 'turn.completed', usage: { output_tokens: 2 } };
+      })();
+      return { events };
+    },
+  };
+}
+
+/** 直接抛出一个不可恢复的顶层 error 事件后结束流。 */
+function makeErrorEventThread(options) {
+  return {
+    options,
+    async runStreamed() {
+      const events = (async function* generate() {
+        yield { type: 'thread.started', thread_id: 'thread-error-123456' };
+        yield { type: 'turn.started' };
+        yield { type: 'error', message: 'stream exploded' };
+      })();
+      return { events };
+    },
+  };
+}
+
+/**
+ * 模拟 Codex CLI 的可恢复重试：先发顶层 error（如传输回退），随后照常完成这一轮。
+ * 真实场景见 DeepSeek 等只支持 HTTP 版 Responses API 的端点。
+ */
+function makeRecoveringThread(options) {
+  return {
+    options,
+    async runStreamed(prompt) {
+      const events = (async function* generate() {
+        yield { type: 'thread.started', thread_id: 'thread-recover-123456' };
+        yield { type: 'turn.started' };
+        yield { type: 'error', message: 'Reconnecting... 1/5 (transport fallback)' };
+        yield {
+          type: 'item.completed',
+          item: { id: 'message-1', type: 'agent_message', text: `收到：${prompt}` },
+        };
+        yield { type: 'turn.completed', usage: { output_tokens: 2 } };
       })();
       return { events };
     },
@@ -484,3 +567,158 @@ test('does not surface benign Codex configuration diagnostics as errors', async 
     0,
   );
 });
+
+test('aborts a stalled turn with a readable idle-timeout error', { timeout: 5_000 }, async (t) => {
+  const root = mkdtempSync(path.join(tmpdir(), 'codex-web-idle-'));
+  const config = makeConfig(root, { turnIdleTimeoutMs: 120 });
+  const codex = {
+    startThread(options) {
+      return makeStalledThread(options);
+    },
+    resumeThread() {
+      throw new Error('not used');
+    },
+  };
+  const { baseUrl } = await startServer(t, { config, codex, root });
+  const { payload } = await createSession(baseUrl, {});
+
+  const turn = await fetch(`${baseUrl}/api/sessions/${payload.session.id}/turns`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: 'hang', messageId: 'client-idle-1' }),
+  });
+  assert.equal(turn.status, 200);
+  const messages = parseSse(await turn.text());
+
+  const error = messages.find((message) => message.type === 'error');
+  assert.ok(error, '超时必须下发 error 消息，而不是让浏览器无限等待');
+  assert.match(error.message, /没有返回任何事件/);
+  assert.match(error.hint, /AGENT_TURN_IDLE_TIMEOUT_MS/);
+
+  const done = messages.find((message) => message.type === 'done');
+  assert.ok(done);
+  assert.equal(done.session.status, 'idle');
+
+  const history = await (await fetch(`${baseUrl}/api/sessions/${payload.session.id}`)).json();
+  assert.match(history.session.lastError, /没有返回任何事件/);
+  assert.ok(
+    history.timeline.some(
+      (entry) => entry.type === 'notice' && entry.level === 'error' && /没有返回任何事件/.test(entry.text),
+    ),
+  );
+});
+
+test('resets the idle timeout whenever events keep arriving', { timeout: 5_000 }, async (t) => {
+  const root = mkdtempSync(path.join(tmpdir(), 'codex-web-idle-active-'));
+  const config = makeConfig(root, { turnIdleTimeoutMs: 400 });
+  const codex = {
+    startThread(options) {
+      return makeSlowThread(options);
+    },
+    resumeThread() {
+      throw new Error('not used');
+    },
+  };
+  const { baseUrl } = await startServer(t, { config, codex, root });
+  const { payload } = await createSession(baseUrl, {});
+
+  const turn = await fetch(`${baseUrl}/api/sessions/${payload.session.id}/turns`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: 'slow', messageId: 'client-slow-1' }),
+  });
+  const messages = parseSse(await turn.text());
+
+  assert.equal(messages.some((message) => message.type === 'error'), false);
+  assert.ok(
+    messages.some(
+      (message) =>
+        message.type === 'event' &&
+        message.event.item?.type === 'agent_message' &&
+        message.event.item.text === '收到：slow',
+    ),
+  );
+  const done = messages.find((message) => message.type === 'done');
+  assert.equal(done.session.status, 'idle');
+});
+
+test('treats a top-level error event as a failed turn', { timeout: 5_000 }, async (t) => {
+  const root = mkdtempSync(path.join(tmpdir(), 'codex-web-stream-error-'));
+  const config = makeConfig(root);
+  const codex = {
+    startThread(options) {
+      return makeErrorEventThread(options);
+    },
+    resumeThread() {
+      throw new Error('not used');
+    },
+  };
+  const { baseUrl } = await startServer(t, { config, codex, root });
+  const { payload } = await createSession(baseUrl, {});
+
+  const turn = await fetch(`${baseUrl}/api/sessions/${payload.session.id}/turns`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: 'boom', messageId: 'client-stream-error-1' }),
+  });
+  const messages = parseSse(await turn.text());
+
+  const error = messages.find((message) => message.type === 'error');
+  assert.ok(error);
+  assert.match(error.message, /stream exploded/);
+
+  const history = await (await fetch(`${baseUrl}/api/sessions/${payload.session.id}`)).json();
+  assert.equal(history.session.lastError, 'stream exploded');
+  assert.ok(
+    history.timeline.some(
+      (entry) => entry.type === 'notice' && entry.level === 'error' && entry.text === 'stream exploded',
+    ),
+  );
+});
+
+test(
+  'keeps the turn successful when a recoverable error is followed by turn.completed',
+  { timeout: 5_000 },
+  async (t) => {
+    const root = mkdtempSync(path.join(tmpdir(), 'codex-web-stream-recover-'));
+    const config = makeConfig(root);
+    const codex = {
+      startThread(options) {
+        return makeRecoveringThread(options);
+      },
+      resumeThread() {
+        throw new Error('not used');
+      },
+    };
+    const { baseUrl } = await startServer(t, { config, codex, root });
+    const { payload } = await createSession(baseUrl, {});
+
+    const turn = await fetch(`${baseUrl}/api/sessions/${payload.session.id}/turns`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt: 'retry', messageId: 'client-recover-1' }),
+    });
+    const messages = parseSse(await turn.text());
+
+    assert.equal(messages.some((message) => message.type === 'error'), false);
+    assert.ok(
+      messages.some(
+        (message) =>
+          message.type === 'event' &&
+          message.event.item?.type === 'agent_message' &&
+          message.event.item.text === '收到：retry',
+      ),
+    );
+
+    const done = messages.find((message) => message.type === 'done');
+    assert.equal(done.session.status, 'idle');
+    assert.equal(done.session.lastError, null);
+
+    const history = await (await fetch(`${baseUrl}/api/sessions/${payload.session.id}`)).json();
+    assert.equal(history.session.lastError, null);
+    assert.equal(
+      history.timeline.some((entry) => entry.type === 'notice' && entry.level === 'error'),
+      false,
+    );
+  },
+);

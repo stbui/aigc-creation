@@ -55,9 +55,10 @@ SDK 会优先使用 `~/.codex/config.toml` 中的模型与 provider 配置；页
 | `AGENT_ALLOW_DANGER_FULL_ACCESS` | `0` | 是否在 UI 中开放 `danger-full-access` |
 | `AGENT_DEFAULT_MODEL` | 空 | 新会话默认模型，空表示跟随 Codex 配置 |
 | `AGENT_MAX_SESSIONS` | `25` | 服务端内存中保留的最大会话数 |
+| `AGENT_TURN_IDLE_TIMEOUT_MS` | `600000` | 上游多久没有任何事件就中止任务（毫秒，`0` 关闭） |
 | `CODEX_PATH` | 空 | 自定义 Codex CLI 可执行文件 |
 | `CODEX_API_KEY` | 空 | 非交互环境下的 Codex API Key |
-| `CODEX_BASE_URL` | 空 | 自定义 Responses API 地址 |
+| `CODEX_BASE_URL` | 空 | 自定义 Responses API 地址。设置后固定走 HTTPS（不使用 WebSocket），以兼容只实现 HTTP 版 `/responses` 的端点（如 DeepSeek）；同时需把模型设为该端点支持的名称（`AGENT_DEFAULT_MODEL` 或在 UI 里填写），空模型会退回 Codex 内置默认模型并被上游拒绝 |
 
 ## 安全边界
 
@@ -99,10 +100,11 @@ npm test
 ```
 
 测试使用假的 Codex 线程，不会调用模型，也不会消耗 token。覆盖静态页面、认证、会话创建、SSE 事件、
-时间线持久化、路径越界、危险沙箱拦截、线程恢复和错误处理。
+时间线持久化、路径越界、危险沙箱拦截、线程恢复、空闲超时和错误处理。
 
 ## 已知限制
 
 - 服务端会话保存在内存中；服务重启后，页面可凭 `codexThreadId` 自动恢复 Codex 线程，但本地时间线缓存才是页面历史来源。
-- 同一会话同时只允许一个运行中的任务。
+- 同一会话同时只允许一个运行中的任务。上游持续无响应超过 `AGENT_TURN_IDLE_TIMEOUT_MS`（默认 10 分钟）
+  时任务会被中止并给出错误提示，不会让浏览器无限等待。
 - 不支持网页端的命令审批；需要审批的操作应通过沙箱策略禁止或放行。
