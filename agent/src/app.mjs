@@ -32,6 +32,10 @@ const REASONING_EFFORTS = new Set([
 const SANDBOX_MODES = new Set(['read-only', 'workspace-write']);
 const WEB_SEARCH_MODES = new Set(['disabled', 'cached', 'live']);
 const THREAD_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{5,127}$/;
+const MAX_PROMPT_LENGTH = 100_000;
+// 100k 字符按 UTF-8 编码最多约 400KB，JSON 转义后仍有富余；沿用 256KB 默认上限会把
+// 合法长度的中文提示词误判成 413。
+const MAX_TURN_BODY_BYTES = 1024 * 1024;
 
 const SECURITY_HEADERS = {
   'X-Content-Type-Options': 'nosniff',
@@ -110,7 +114,12 @@ function createSessionStorage(config) {
 
 async function handleRequest(req, res, deps) {
   const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
-  const pathname = decodeURIComponent(url.pathname);
+  let pathname;
+  try {
+    pathname = decodeURIComponent(url.pathname);
+  } catch {
+    throw new HttpError(400, '请求路径无效');
+  }
 
   if (pathname.startsWith('/api/')) {
     if (pathname === '/api/health' && req.method === 'GET') {
@@ -328,20 +337,30 @@ async function runTurn(req, res, session, { config, codex }) {
     throw new HttpError(409, '这个会话正在运行，请先停止当前任务');
   }
 
-  const body = await readJsonBody(req);
-  const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
-  if (!prompt) throw new HttpError(400, '请输入任务内容');
-  if (prompt.length > 100_000) throw new HttpError(413, '任务内容过长');
-  const messageId =
-    typeof body.messageId === 'string' && /^[A-Za-z0-9_-]{1,120}$/.test(body.messageId)
-      ? body.messageId
-      : undefined;
+  // 先占住会话再读请求体：读 body 是异步的，两个并发请求会在等待期间同时通过上面的检查，
+  // 导致同一个 Codex 线程被并发驱动（命令被重复执行、时间线交错）。占位后任何校验失败都要释放。
+  session.status = 'running';
 
-  const thread = ensureSessionThread(session, codex, config);
+  let prompt;
+  let messageId;
+  let thread;
+  try {
+    const body = await readJsonBody(req, MAX_TURN_BODY_BYTES);
+    prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
+    if (!prompt) throw new HttpError(400, '请输入任务内容');
+    if (prompt.length > MAX_PROMPT_LENGTH) throw new HttpError(413, '任务内容过长');
+    messageId =
+      typeof body.messageId === 'string' && /^[A-Za-z0-9_-]{1,120}$/.test(body.messageId)
+        ? body.messageId
+        : undefined;
+    thread = ensureSessionThread(session, codex, config);
+  } catch (error) {
+    session.status = 'idle';
+    throw error;
+  }
 
   if (session.title === '新会话') session.title = titleFromPrompt(prompt);
   appendUserMessage(session, prompt, messageId);
-  session.status = 'running';
   session.lastError = null;
   session.usage = null;
   sessionsNotify(session);

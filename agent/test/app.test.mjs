@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import http from 'node:http';
 import { mkdtempSync, mkdirSync, realpathSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -133,6 +134,42 @@ async function createSession(baseUrl, settings = {}, headers = {}) {
   return { response, payload: await response.json() };
 }
 
+/**
+ * 用 node:http 直接发起回合请求，并可把请求体拆成两段延迟发送。
+ * delayMs 为 0 时等价于普通请求，仅用于与其他请求制造并发重叠。
+ */
+function startTurnRequest(baseUrl, sessionId, payload, delayMs = 0) {
+  const url = new URL(`/api/sessions/${sessionId}/turns`, baseUrl);
+  const body = Buffer.from(JSON.stringify(payload));
+  const splitAt = Math.floor(body.length / 2);
+
+  return new Promise((resolve, reject) => {
+    const request = http.request(
+      {
+        hostname: url.hostname,
+        port: url.port,
+        path: url.pathname,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': body.length,
+        },
+      },
+      (response) => {
+        let text = '';
+        response.setEncoding('utf8');
+        response.on('data', (chunk) => {
+          text += chunk;
+        });
+        response.on('end', () => resolve({ status: response.statusCode, text }));
+      },
+    );
+    request.on('error', reject);
+    request.write(body.subarray(0, splitAt));
+    setTimeout(() => request.end(body.subarray(splitAt)), delayMs);
+  });
+}
+
 test('serves the UI and an unauthenticated health check', async (t) => {
   const { baseUrl, config } = await startServer(t);
 
@@ -235,6 +272,72 @@ test('keeps repeated Codex item ids separate across turns', async (t) => {
 
   assert.deepEqual(agentMessages, ['收到：first', '收到：second']);
   assert.equal(historyPayload.timeline.length, 6);
+});
+
+test('rejects a second turn while another turn is still being submitted', async (t) => {
+  const { baseUrl } = await startServer(t);
+  const { payload } = await createSession(baseUrl, {});
+  const sessionId = payload.session.id;
+
+  // 第一个请求故意把请求体拆成两段延迟发送，制造“已进入 runTurn、尚未读完 body”的窗口。
+  const first = startTurnRequest(baseUrl, sessionId, { prompt: 'first', messageId: 'm-first' }, 150);
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  const second = await startTurnRequest(baseUrl, sessionId, {
+    prompt: 'second',
+    messageId: 'm-second',
+  });
+
+  assert.equal(second.status, 409);
+  assert.match(second.text, /正在运行/);
+
+  const firstResult = await first;
+  assert.equal(firstResult.status, 200);
+
+  const history = await (await fetch(`${baseUrl}/api/sessions/${sessionId}`)).json();
+  const userMessages = history.timeline.filter((entry) => entry.type === 'user_message');
+  assert.deepEqual(userMessages.map((entry) => entry.text), ['first']);
+  assert.equal(history.session.status, 'idle');
+
+  // 被拒绝的请求不能把会话锁死：随后正常提交仍然可以执行。
+  const third = await fetch(`${baseUrl}/api/sessions/${sessionId}/turns`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: 'third', messageId: 'm-third' }),
+  });
+  assert.equal(third.status, 200);
+  await third.text();
+});
+
+test('answers malformed URL paths with 400 instead of 500', async (t) => {
+  const { baseUrl } = await startServer(t);
+
+  const response = await fetch(`${baseUrl}/%E0%A4%A`);
+  assert.equal(response.status, 400);
+  const payload = await response.json();
+  assert.match(payload.error, /路径/);
+});
+
+test('accepts a maximum-length Chinese prompt and rejects one character more', async (t) => {
+  const { baseUrl } = await startServer(t);
+  const { payload } = await createSession(baseUrl, {});
+  const sessionId = payload.session.id;
+
+  // 100k 个中文字符约 300KB：按字符长度合法，不能因为默认 256KB 的请求体上限被判 413。
+  const turn = await fetch(`${baseUrl}/api/sessions/${sessionId}/turns`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: '中'.repeat(100_000), messageId: 'm-long' }),
+  });
+  assert.equal(turn.status, 200);
+  await turn.text();
+
+  const tooLong = await fetch(`${baseUrl}/api/sessions/${sessionId}/turns`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: '中'.repeat(100_001), messageId: 'm-too-long' }),
+  });
+  assert.equal(tooLong.status, 413);
+  await tooLong.text();
 });
 
 test('danger-full-access is denied unless explicitly enabled', async (t) => {
