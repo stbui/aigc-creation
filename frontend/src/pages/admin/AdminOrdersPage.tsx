@@ -87,6 +87,13 @@ const REFUND_STATUS_LABELS: Record<string, string> = {
   failed: '退款失败',
 };
 
+/** 退款状态筛选项。值必须与后端 `REFUND_STATES` 白名单一致 */
+const REFUND_STATE_OPTIONS = [
+  { value: 'processing', label: '渠道处理中' },
+  { value: 'failed', label: '退款失败' },
+  { value: 'succeeded', label: '退款成功' },
+];
+
 /** 渠道 → 中文。未知渠道原样显示, 便于发现未登记的取值 */
 const CHANNEL_LABELS: Record<string, string> = {
   sandbox: '沙箱',
@@ -99,7 +106,20 @@ export function AdminOrdersPage() {
   const { message } = App.useApp();
   const { can } = useAdmin();
 
+  /*
+   * 退款状态可以直接从 URL 带进来（告警中心 `?refundState=processing`）。
+   * 非法值忽略，避免手工改地址栏把整页打到 400。
+   */
+  const [searchParams] = useSearchParams();
+  const rawUrlRefundState = searchParams.get('refundState');
+  const urlRefundState =
+    rawUrlRefundState && REFUND_STATE_OPTIONS.some((o) => o.value === rawUrlRefundState)
+      ? rawUrlRefundState
+      : undefined;
+  const appliedUrlRefundState = useRef<string | undefined>(urlRefundState);
+
   const [status, setStatus] = useState<string | undefined>();
+  const [refundState, setRefundState] = useState<string | undefined>(urlRefundState);
   const [orderNo, setOrderNo] = useState('');
   const [email, setEmail] = useState('');
   const [channel, setChannel] = useState<string | undefined>();
@@ -136,6 +156,7 @@ export function AdminOrdersPage() {
         orderNo: params.orderNo as string | undefined,
         email: params.email as string | undefined,
         channel: params.channel as string | undefined,
+        refundState: params.refundState as string | undefined,
         from: params.from as string | undefined,
         to: params.to as string | undefined,
       }),
@@ -143,10 +164,11 @@ export function AdminOrdersPage() {
   );
 
   const { data, loading, error, setQuery, setPage, reload } =
-    useAdminList<AdminOrderListResult>(fetcher);
+    useAdminList<AdminOrderListResult>(fetcher, {
+      ...(urlRefundState ? { refundState: urlRefundState } : {}),
+    });
 
   /** 顶栏搜索带 `?orderNo=` 跳过来时自动套用（ref 防止覆盖页内手动筛选） */
-  const [searchParams] = useSearchParams();
   const urlOrderNo = searchParams.get('orderNo') ?? '';
   const appliedOrderNo = useRef('');
   useEffect(() => {
@@ -156,14 +178,29 @@ export function AdminOrdersPage() {
     setQuery({ orderNo: urlOrderNo });
   }, [urlOrderNo, setQuery]);
 
+  /* 告警中心链接 `?refundState=processing`：已在本页时也要把筛选同步过去 */
+  useEffect(() => {
+    const raw = searchParams.get('refundState');
+    const next =
+      raw && REFUND_STATE_OPTIONS.some((o) => o.value === raw) ? raw : undefined;
+    if (next === appliedUrlRefundState.current) return;
+    appliedUrlRefundState.current = next;
+    setRefundState(next);
+    // 浏览器后退到无 refundState 的地址时也要清掉筛选，保持列表与地址栏一致
+    setQuery({ refundState: next });
+  }, [searchParams, setQuery]);
+
   const list = data;
 
-  const hasFilter = Boolean(status || orderNo || email || channel || from || to);
+  const hasFilter = Boolean(
+    status || refundState || orderNo || email || channel || from || to,
+  );
 
   const applyQuery = () => {
     setSelected([]);
     setQuery({
       status,
+      refundState,
       orderNo: orderNo.trim() || undefined,
       email: email.trim() || undefined,
       channel,
@@ -174,6 +211,7 @@ export function AdminOrdersPage() {
 
   const reset = () => {
     setStatus(undefined);
+    setRefundState(undefined);
     setOrderNo('');
     setEmail('');
     setChannel(undefined);
@@ -182,6 +220,7 @@ export function AdminOrdersPage() {
     setSelected([]);
     setQuery({
       status: undefined,
+      refundState: undefined,
       orderNo: undefined,
       email: undefined,
       channel: undefined,
@@ -254,6 +293,7 @@ export function AdminOrdersPage() {
     try {
       await adminOrdersApi.exportCsv({
         status,
+        refundState,
         orderNo: orderNo.trim() || undefined,
         email: email.trim() || undefined,
         channel,
@@ -483,6 +523,18 @@ export function AdminOrdersPage() {
           value={channel}
           onChange={setChannel}
           options={Object.entries(CHANNEL_LABELS).map(([value, label]) => ({ value, label }))}
+        />
+        {/*
+         * 退款状态是 Refund 维度，订单仍可能显示 paid —— 这正是渠道异步退款
+         * 需要人工核对的场景。告警中心 `?refundState=processing` 直达这里。
+         */}
+        <Select
+          className="adm-filter-select"
+          placeholder="退款状态"
+          allowClear
+          value={refundState}
+          onChange={setRefundState}
+          options={REFUND_STATE_OPTIONS}
         />
         <Input
           className="adm-filter-input"

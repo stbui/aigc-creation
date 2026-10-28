@@ -423,8 +423,30 @@ export interface AdminPermissionCatalog {
   roles: Array<{ code: AdminRole; label: string; permissions: string[] }>;
 }
 
+/** GET /api/v1/admin/alerts — 顶栏告警中心 */
+export type AdminAlertSeverity = 'critical' | 'warning' | 'info';
+
+export interface AdminAlertItem {
+  key: string;
+  severity: AdminAlertSeverity;
+  category: 'ticket' | 'task' | 'finance' | 'backup' | 'invoice';
+  title: string;
+  detail: string;
+  count: number | null;
+  link: string;
+}
+
+export interface AdminAlertsResult {
+  generatedAt: string;
+  total: number;
+  items: AdminAlertItem[];
+}
+
 /** GET /api/v1/admin/overview — 平台概览 */
 export interface AdminOverview {
+  /** 数据生成时间（后端 30 秒缓存） */
+  generatedAt: string;
+  cacheTtlSeconds: number;
   /** 统计窗口天数 (7 | 30 | 90) */
   days: number;
   totals: {
@@ -444,6 +466,33 @@ export interface AdminOverview {
   };
   /** 按日聚合并补齐无数据日, 天数与 days 一致 */
   trend: Array<{ date: string; total: number; succeeded: number; failed: number }>;
+  /** 窗口口径（与 trend 同源），回答「最近表现」而不是累计数字 */
+  window: {
+    tasks: number;
+    succeeded: number;
+    failed: number;
+    /** 窗口内成功率, 无已完成任务时为 null */
+    successRate: number | null;
+    /** 失败原因 Top 6, errorCode 由前端翻译 */
+    failureReasons: Array<{ errorCode: string; count: number }>;
+    revenue: {
+      gmvCents: number;
+      paidOrders: number;
+      refundedCents: number;
+      usersNew: number;
+    };
+  };
+  /** 上一窗口的同口径数字，用于环比 */
+  comparison: {
+    tasks: number;
+    succeeded: number;
+    failed: number;
+    successRate: number | null;
+    usersNew: number;
+    gmvCents: number;
+    paidOrders: number;
+    refundedCents: number;
+  };
   /**
    * 交易侧概览 (2026-10-21 补)。
    *
@@ -470,6 +519,8 @@ export interface AdminOverview {
     paymentSuccessRate: number | null;
     members: { active: number; newInWindow: number };
     credits: { grantedInWindow: number; consumedInWindow: number };
+    /** 窗口内收入按支付渠道拆分 */
+    channelMix: Array<{ channel: string; gmvCents: number; orders: number }>;
     /** 按支付时间聚合的收入趋势 */
     revenueTrend: Array<{ date: string; gmvCents: number; orders: number }>;
   };

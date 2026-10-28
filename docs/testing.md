@@ -128,7 +128,7 @@ npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitig
 | | `smoke-health-tracing.js` | 健康分项、请求号回显与替换、异常信封 `requestId`、日志 `[rid=]` 串联 |
 | 能力 | `smoke-capability-runtime.js` | model-only runtime、无线路不预告产出、上下线 `40005`、限时免费 0 积分 |
 | 模型通道 | `smoke-model-channels.js` | 线路 CRUD / token 保持与清除 / 排序 / 测试响应 / 401 |
-| 后台 | `smoke-admin.js` | 身份、权限点、审计 |
+| 后台 | `smoke-admin.js` | 身份、权限点、审计、告警结构、退款状态筛选 |
 | | `smoke-backup.js` | 未验证备份不可下载、保留策略、路径穿越拦截 |
 | | `smoke-scheduler.js` | 定时任务真的改数据（订单超时、积分到期等） |
 | | `smoke-storage.js` | 多存储后端语义、路径穿越、下架不可读 |

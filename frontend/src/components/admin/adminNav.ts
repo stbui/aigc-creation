@@ -58,6 +58,13 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
         icon: LayoutDashboard,
         permission: 'platform.dashboard',
       },
+      {
+        path: '/admin/alerts',
+        label: '告警中心',
+        icon: BellRing,
+        // 所有后台角色都可进入；具体来源在接口内按权限过滤
+        permission: null,
+      },
     ],
   },
   {

@@ -850,6 +850,9 @@ model GenerationTask {
   @@index([status])
   @@index([capability])
   @@index([createdAt])
+  /// 后台任务监控高频组合: 状态 + 时间窗 / 用户 + 时间线
+  @@index([status, createdAt])
+  @@index([ownerId, createdAt])
   @@unique([ownerId, idempotencyKey])
   // 孤儿任务回收按 (status, heartbeatAt) 扫描
   @@index([status, heartbeatAt])

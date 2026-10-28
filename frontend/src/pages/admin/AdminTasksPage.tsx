@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App, Button, Image, Input, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useSearchParams } from 'react-router-dom';
@@ -23,6 +23,7 @@ import {
   StatusTag,
 } from '../../components/admin/PageHeader';
 import { BatchResultModal } from '../../components/admin/BatchResultModal';
+import { taskErrorLabel } from '../../lib/admin-error-codes';
 import type {
   AdminTask,
   AdminTaskDetail,
@@ -53,14 +54,8 @@ const PROVIDER_LABELS: Record<string, string> = {
  *
  * 后端只落 errorCode 字符串, 运营看到 `42201` 无法判断该找谁。至少把
  * 已知取值翻译出来; 未登记的原样显示而不是隐藏 —— 隐藏会让"未知错误码"
- * 看起来像"没有问题"。
+ * 看起来像"没有问题"。翻译表与概览页共用 lib/admin-error-codes。
  */
-const ERROR_LABELS: Record<string, string> = {
-  '42201': '生成过程异常',
-  // 当时没有可用的模型通道（已自动退款）
-  '42204': '无可用模型通道',
-  cancelled_by_admin: '后台终止',
-};
 
 /** 状态筛选的可选值。与后端 DTO 白名单一致 */
 const STATUS_OPTIONS = [
@@ -101,9 +96,20 @@ export function AdminTasksPage() {
   const { message } = App.useApp();
   const { can } = useAdmin();
 
+  /*
+   * 顶栏搜索与告警中心都会带参数跳过来（`?id=` / `?status=failed`）。
+   * 筛选初值直接吃 URL，页面首次加载就落在正确的列表上；如果用户
+   * 已经停在本页时又点了另一条告警，由下面的 effect 把新状态并进去。
+   */
+  const [searchParams] = useSearchParams();
+  const rawUrlStatus = searchParams.get('status') ?? undefined;
+  const urlStatus =
+    rawUrlStatus && STATUS_OPTIONS.some((o) => o.value === rawUrlStatus) ? rawUrlStatus : undefined;
+  const appliedUrlStatus = useRef<string | undefined>(urlStatus);
+
   // 筛选受控值与已应用的查询分离: 用户改了下拉不代表已经点了「查询」,
   // 直接跟随会让每次切换下拉都打一次请求
-  const [status, setStatus] = useState<string | undefined>();
+  const [status, setStatus] = useState<string | undefined>(urlStatus);
   const [capability, setCapability] = useState<string | undefined>();
   const [provider, setProvider] = useState<string | undefined>();
   const [owner, setOwner] = useState<string>('');
@@ -116,16 +122,22 @@ export function AdminTasksPage() {
    * 列表本身没有按 id 筛选的入口（任务 id 不是人记得住的东西）,
    * 让运营落在一条被筛过的列表上反而要从几十行里再找一遍。
    */
-  const [searchParams] = useSearchParams();
   const [detailId, setDetailId] = useState<string | null>(() => searchParams.get('id'));
   useEffect(() => {
     const id = searchParams.get('id');
     if (id) setDetailId(id);
   }, [searchParams]);
 
+  /*
+   * 已在本页时点击「失败任务」告警：URL 变化但组件不会重挂，
+   * 这里补一次筛选同步，避免地址栏变了列表却没动。
+   * （effect 放在 useAdminList 之后，因为要用它返回的 setQuery。）
+   */
+
   const [confirm, setConfirm] = useState<{ kind: 'retry' | 'cancel'; task: Row } | null>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   /*
    * 批量选择与批量动作。
@@ -156,8 +168,21 @@ export function AdminTasksPage() {
     [],
   );
 
-  const { data, loading, error, setQuery, setPage, reload } =
-    useAdminList<AdminTaskListResult>(fetcher);
+  const { data, loading, error, params, setQuery, setPage, reload } =
+    useAdminList<AdminTaskListResult>(fetcher, {
+      ...(urlStatus ? { status: urlStatus } : {}),
+    });
+
+  useEffect(() => {
+    const raw = searchParams.get('status') ?? undefined;
+    const next =
+      raw && STATUS_OPTIONS.some((o) => o.value === raw) ? raw : undefined;
+    if (next === appliedUrlStatus.current) return;
+    appliedUrlStatus.current = next;
+    // 浏览器后退到无 status 的地址时也要清掉筛选，否则列表与地址栏不一致
+    setStatus(next);
+    setQuery({ status: next });
+  }, [searchParams, setQuery]);
 
   const list = data?.result;
 
@@ -341,7 +366,7 @@ export function AdminTasksPage() {
             <StatusTag status={v} />
             {v === 'failed' && row.errorCode && (
               <span className="adm-cell-sub" title={row.errorCode}>
-                {ERROR_LABELS[row.errorCode] ?? row.errorCode}
+                {taskErrorLabel(row.errorCode)}
               </span>
             )}
           </div>
@@ -444,6 +469,25 @@ export function AdminTasksPage() {
     return adminTasksApi.detail(detailId);
   }, [detailId]);
 
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      await adminTasksApi.exportCsv({
+        status: params.status as string | undefined,
+        capability: params.capability as string | undefined,
+        provider: params.provider as string | undefined,
+        userId: params.userId as string | undefined,
+        projectId: params.projectId as string | undefined,
+        from: params.from as string | undefined,
+        to: params.to as string | undefined,
+      });
+    } catch (e) {
+      message.error(e instanceof Error ? e.message : '导出失败');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const overloaded = (liveCongestion?.running ?? 0) > (liveCongestion?.runningThreshold ?? 50);
 
   return (
@@ -451,6 +495,18 @@ export function AdminTasksPage() {
       <PageHeader
         title="任务监控"
         description="生成任务的实时状态、输入产出与失败重试。拥堵数字每 30 秒自动刷新。"
+        actions={
+          can('data.export') ? (
+            <Button
+              type="default"
+              className="adm-btn"
+              loading={exporting}
+              onClick={() => void exportCsv()}
+            >
+              导出 CSV
+            </Button>
+          ) : undefined
+        }
       />
 
       <div className="adm-stat-grid">
@@ -709,8 +765,9 @@ export function AdminTasksPage() {
                   {d.errorCode && (
                     <span className="adm-cell-sub">
                       {' '}
-                      {d.errorCode}
-                      {ERROR_LABELS[d.errorCode] ? ` · ${ERROR_LABELS[d.errorCode]}` : ''}
+                      {taskErrorLabel(d.errorCode) === d.errorCode
+                        ? d.errorCode
+                        : `${d.errorCode} · ${taskErrorLabel(d.errorCode)}`}
                     </span>
                   )}
                 </dd>

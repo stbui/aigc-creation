@@ -34,6 +34,8 @@ import { AdminSchedulerController } from './scheduler.controller';
 import { AdminModelConfigController, AdminModelCallsController } from './model.controller';
 import { AdminModelChannelsController } from './model-channel.controller';
 import { AdminTasksController } from './tasks-admin.controller';
+import { AdminAlertsController } from './alerts.controller';
+import { AdminAlertsService } from './alerts.service';
 import { AdminCapabilitiesController } from './capability.controller';
 import { CapabilitiesModule } from '../capabilities/capabilities.module';
 import {
@@ -135,6 +137,8 @@ import { SchedulerService } from './scheduler.service';
     AdminModelChannelsController,
     // 任务监控 (B-28~B-33)
     AdminTasksController,
+    // 顶栏告警中心：按权限聚合待处理工单 / 失败任务 / 对账差异 / 备份状态
+    AdminAlertsController,
     AdminCapabilitiesController,
     // 营销中心 (M11)
     AdminCouponsController,
@@ -158,6 +162,7 @@ import { SchedulerService } from './scheduler.service';
     ModelCallService,
     ModelChannelService,
     TasksAdminService,
+    AdminAlertsService,
     AdminSearchService,
     SchedulerService,
     { provide: APP_GUARD, useClass: AdminGuard },

@@ -156,7 +156,7 @@
 
 ### 4.6 后台管理
 
-后台 28 个页面，权限点定义在 `backend/src/admin/permissions.ts`；侧栏分组唯一事实源是 `frontend/src/components/admin/adminNav.ts` 的 `ADMIN_MENU`。
+后台 29 个页面，权限点定义在 `backend/src/admin/permissions.ts`；侧栏分组唯一事实源是 `frontend/src/components/admin/adminNav.ts` 的 `ADMIN_MENU`。
 
 | 分组 | 页面 |
 | --- | --- |

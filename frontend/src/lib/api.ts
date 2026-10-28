@@ -20,6 +20,7 @@ import type {
   AdminVendorFillPlan,
   Modality,
   AdminOverview,
+  AdminAlertsResult,
   AdminPasswordReset,
   AdminPermissionCatalog,
   AdminRoleItem,
@@ -649,6 +650,9 @@ export const adminApi = {
 
   /** 平台概览。days 建议只用 7 / 30 / 90, 其它值后端回落到 7 */
   overview: (days: number) => request<AdminOverview>(`/admin/overview?days=${days}`),
+
+  /** 顶栏告警。后端按当前角色权限过滤来源 */
+  alerts: () => request<AdminAlertsResult>('/admin/alerts'),
 };
 
 export function toAbsoluteUrl(path?: string | null): string | undefined {
@@ -983,6 +987,17 @@ export const adminTasksApi = {
 
   /** 拥堵指标。独立拉取以便高频刷新告警条而不重载整页列表 */
   stats: () => request<AdminTaskCongestion>('/admin/tasks/stats'),
+
+  /** 导出当前筛选结果 (CSV, 上限 5000 行) */
+  exportCsv: (params: {
+    status?: string;
+    capability?: string;
+    provider?: string;
+    userId?: string;
+    projectId?: string;
+    from?: string;
+    to?: string;
+  } = {}) => downloadCsv(`/admin/tasks/export${toQuery(params)}`),
 
   detail: (id: string) => request<AdminTaskDetail>(`/admin/tasks/${id}`),
 
@@ -1440,6 +1455,8 @@ export const adminOrdersApi = {
     orderNo?: string;
     email?: string;
     channel?: string;
+    /** processing / failed / succeeded —— 退款状态挂在 Refund 行上 */
+    refundState?: string;
     from?: string;
     to?: string;
     userId?: string;
@@ -1455,6 +1472,7 @@ export const adminOrdersApi = {
     orderNo?: string;
     email?: string;
     channel?: string;
+    refundState?: string;
     from?: string;
     to?: string;
   } = {}) => downloadCsv(`/admin/orders/export${toQuery(params)}`),

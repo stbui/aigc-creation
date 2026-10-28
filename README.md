@@ -125,7 +125,7 @@ aigc-creation/
     ├── vitest.config.ts        # 单元 / 组件测试（jsdom，`npm test`）
     └── src/
         ├── **/__tests__/       # Vitest 用例（*.test.ts / *.test.tsx）
-        ├── pages/              # 35 个 C 端页面 + pages/admin/ 28 个后台页面
+        ├── pages/              # 35 个 C 端页面 + pages/admin/ 29 个后台页面
         ├── components/         # AppLayout / SideRail / RailPreview / ToolShell / admin/AdminLayout ...
         ├── lib/                # api.ts（拆信封）/ http.ts / auth.ts / capabilities.ts / constants.ts
         ├── context/ hooks/     # AuthContext / AdminContext（权限点）/ CreditsContext；useToolTask 等

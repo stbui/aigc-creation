@@ -11,6 +11,7 @@ import { ExceptionPage } from '../../components/ExceptionPage';
 import { PageHeader, StatusTag } from '../../components/admin/PageHeader';
 import { AdminStaleError, useAdminResource } from '../../components/admin/AdminWidgets';
 import { toAbsoluteUrl } from '../../lib/api';
+import { taskErrorLabel } from '../../lib/admin-error-codes';
 
 /**
  * 后台子路由按页加载。
@@ -90,6 +91,7 @@ const AdminAigcLabelPage = lazyAdminPage(
   () => import('./AdminAigcLabelPage'),
   'AdminAigcLabelPage',
 );
+const AdminAlertsPage = lazyAdminPage(() => import('./AdminAlertsPage'), 'AdminAlertsPage');
 
 /**
  * 平台概览页 (M2 骨架)。
@@ -129,6 +131,8 @@ function DashboardContent() {
 
   const t = data.totals;
   const c = data.commerce;
+  const w = data.window;
+  const cmp = data.comparison;
   const maxTrend = Math.max(...data.trend.map((d) => d.total), 1);
   const activeNow = t.running + t.pending;
   // 收入柱高以窗口内峰值为基准; 全 0 时取 1 避免除零
@@ -138,7 +142,9 @@ function DashboardContent() {
     <>
       <PageHeader
         title="平台概览"
-        description="用户、内容与生成任务的整体运行情况"
+        description={`用户、内容与生成任务的整体运行情况 · 数据截至 ${new Date(
+          data.generatedAt,
+        ).toLocaleTimeString('zh-CN', { hour12: false })}（${data.cacheTtlSeconds} 秒缓存）`}
         actions={
           <>
             <Segmented
@@ -221,6 +227,134 @@ function DashboardContent() {
           <div className="adm-stat-value">{t.assets.toLocaleString('zh-CN')}</div>
           <div className="adm-stat-hint">上传 {t.originals} · 生成 {t.generated}</div>
         </div>
+      </div>
+
+      {/*
+       * 窗口表现：与上面的累计口径分开。
+       *
+       * 「任务总数 / 成功率」是历史累计，运营真正要看的是「最近这一档在变好
+       * 还是变坏」。环比用紧邻的等长窗口，不用累计做分母 —— 否则任何窗口
+       * 看起来都在增长。
+       */}
+      <div className="adm-panel">
+        <div className="adm-panel-title">
+          近 {days} 天表现
+          <span className="adm-panel-note">对比上一个 {days} 天</span>
+        </div>
+        <div className="adm-stat-grid">
+          <div className="adm-stat is-primary">
+            <div className="adm-stat-head">
+              <span className="adm-stat-label">任务量</span>
+              <Activity className="adm-stat-icon" size={16} />
+            </div>
+            <div className="adm-stat-value">{w.tasks.toLocaleString('zh-CN')}</div>
+            <div className="adm-stat-hint">
+              <Delta current={w.tasks} previous={cmp.tasks} /> · 上一窗口 {cmp.tasks}
+            </div>
+          </div>
+
+          <div className="adm-stat">
+            <div className="adm-stat-head">
+              <span className="adm-stat-label">成功率</span>
+            </div>
+            <div
+              className={`adm-stat-value${
+                w.successRate !== null && w.successRate < 90 ? ' is-danger' : ''
+              }`}
+            >
+              {w.successRate === null ? '—' : `${w.successRate}%`}
+            </div>
+            <div className="adm-stat-hint">
+              <Delta current={w.successRate} previous={cmp.successRate} unit="pp" /> · 成功{' '}
+              {w.succeeded} · 失败 {w.failed}
+            </div>
+          </div>
+
+          <div className="adm-stat">
+            <div className="adm-stat-head">
+              <span className="adm-stat-label">新增用户</span>
+              <Users className="adm-stat-icon" size={16} />
+            </div>
+            <div className="adm-stat-value">{w.revenue.usersNew.toLocaleString('zh-CN')}</div>
+            <div className="adm-stat-hint">
+              <Delta current={w.revenue.usersNew} previous={cmp.usersNew} /> · 上一窗口{' '}
+              {cmp.usersNew}
+            </div>
+          </div>
+
+          <div className="adm-stat">
+            <div className="adm-stat-head">
+              <span className="adm-stat-label">营收</span>
+            </div>
+            <div className="adm-stat-value">¥{yuan(w.revenue.gmvCents)}</div>
+            <div className="adm-stat-hint">
+              <Delta current={w.revenue.gmvCents} previous={cmp.gmvCents} /> · 上一窗口 ¥
+              {yuan(cmp.gmvCents, 0)}
+            </div>
+          </div>
+
+          <div className="adm-stat">
+            <div className="adm-stat-head">
+              <span className="adm-stat-label">支付订单</span>
+            </div>
+            <div className="adm-stat-value">{w.revenue.paidOrders.toLocaleString('zh-CN')}</div>
+            <div className="adm-stat-hint">
+              <Delta current={w.revenue.paidOrders} previous={cmp.paidOrders} /> · 上一窗口{' '}
+              {cmp.paidOrders}
+            </div>
+          </div>
+
+          <div className="adm-stat">
+            <div className="adm-stat-head">
+              <span className="adm-stat-label">退款</span>
+            </div>
+            <div className={`adm-stat-value${w.revenue.refundedCents > 0 ? ' is-danger' : ''}`}>
+              ¥{yuan(w.revenue.refundedCents)}
+            </div>
+            <div className="adm-stat-hint">
+              <Delta current={w.revenue.refundedCents} previous={cmp.refundedCents} inverse /> ·
+              上一窗口 ¥{yuan(cmp.refundedCents, 0)}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 失败原因榜：只给数量没有意义，运营要知道「该找通道还是找代码」 */}
+      <div className="adm-panel">
+        <div className="adm-panel-title">
+          近 {days} 天失败原因
+          <span className="adm-panel-note">
+            {w.failed > 0 ? (
+              <Link className="adm-link" to="/admin/tasks?status=failed">
+                查看失败任务
+              </Link>
+            ) : (
+              '暂无失败任务'
+            )}
+          </span>
+        </div>
+        {w.failed === 0 ? (
+          <div className="adm-empty">近 {days} 天没有失败任务</div>
+        ) : (
+          <div className="adm-mix-list">
+            {w.failureReasons.map((reason) => (
+              <div key={reason.errorCode} className="adm-mix-row">
+                <span className="adm-mix-label" title={reason.errorCode}>
+                  {taskErrorLabel(reason.errorCode)}
+                </span>
+                <span className="adm-mix-track" aria-hidden="true">
+                  <span
+                    className="adm-mix-fill is-danger"
+                    style={{ width: `${Math.max((reason.count / w.failed) * 100, 2)}%` }}
+                  />
+                </span>
+                <span className="adm-mix-value">
+                  {reason.count} 个 · {Math.round((reason.count / w.failed) * 100)}%
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/*
@@ -324,6 +458,36 @@ function DashboardContent() {
             })}
           </div>
         )}
+
+        {/* 渠道构成: 总额之外回答「钱从哪个渠道来」，退款/对账优先看占比高的 */}
+        <div className="adm-trend-title">
+          收入渠道构成
+          <span className="adm-panel-note">近 {days} 天 · 按实付金额</span>
+        </div>
+        {c.channelMix.length === 0 ? (
+          <div className="adm-empty">所选窗口内没有支付记录</div>
+        ) : (
+          <div className="adm-mix-list">
+            {c.channelMix.map((ch) => (
+              <div key={ch.channel} className="adm-mix-row">
+                <span className="adm-mix-label">
+                  {CHANNEL_LABELS[ch.channel] ?? ch.channel}
+                </span>
+                <span className="adm-mix-track" aria-hidden="true">
+                  <span
+                    className="adm-mix-fill"
+                    style={{
+                      width: `${Math.max((ch.gmvCents / Math.max(c.gmvWindowCents, 1)) * 100, 2)}%`,
+                    }}
+                  />
+                </span>
+                <span className="adm-mix-value">
+                  ¥{yuan(ch.gmvCents, 0)} · {ch.orders} 单
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 趋势: 柱状 + 网格基线, 让"有多少"可被目测而非读数 */}
@@ -414,6 +578,58 @@ function DashboardContent() {
   );
 }
 
+/** 支付渠道 → 中文。未登记的原样显示，便于发现新增渠道 */
+const CHANNEL_LABELS: Record<string, string> = {
+  alipay: '支付宝',
+  wechat: '微信支付',
+  sandbox: '沙箱',
+  unknown: '未记录渠道',
+};
+
+/**
+ * 环比提示。
+ *
+ * - `unit="pp"` 用于成功率：两个百分比相减是百分点，不是「增长 x%」
+ * - `inverse` 用于退款等「越低越好」的指标，上涨标红
+ * - 上一窗口为 0 时不显示 ∞%，改为「新增」或「—」
+ */
+function Delta({
+  current,
+  previous,
+  unit = 'percent',
+  inverse = false,
+}: {
+  current: number | null;
+  previous: number | null;
+  unit?: 'percent' | 'pp';
+  inverse?: boolean;
+}) {
+  if (current === null || previous === null) {
+    return <span className="adm-delta is-flat">—</span>;
+  }
+  if (previous === 0) {
+    return current === 0 ? (
+      <span className="adm-delta is-flat">持平</span>
+    ) : (
+      <span className={`adm-delta ${inverse ? 'is-bad' : 'is-good'}`}>
+        {current > 0 ? '新增' : '—'}
+      </span>
+    );
+  }
+
+  const diff = unit === 'pp' ? current - previous : ((current - previous) / Math.abs(previous)) * 100;
+  if (Math.abs(diff) < 0.05) return <span className="adm-delta is-flat">持平</span>;
+
+  const up = diff > 0;
+  const good = inverse ? !up : up;
+  return (
+    <span className={`adm-delta ${good ? 'is-good' : 'is-bad'}`}>
+      {up ? '↑' : '↓'}
+      {unit === 'pp' ? `${Math.abs(diff).toFixed(1)}pp` : `${Math.abs(diff).toFixed(0)}%`}
+    </span>
+  );
+}
+
 /**
  * 分 → 元。
  *
@@ -492,6 +708,7 @@ export function AdminShell() {
         <Suspense fallback={<AdminPageLoading tip="加载页面…" />}>
           <Routes>
             <Route index element={<DashboardContent />} />
+            <Route path="alerts" element={<AdminAlertsPage />} />
             <Route path="users" element={<AdminUsersPage />} />
             <Route path="roles" element={<AdminRolesPage />} />
             <Route path="settings" element={<AdminSettingsPage />} />

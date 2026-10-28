@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App, Button, Drawer, Input, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useSearchParams } from 'react-router-dom';
@@ -81,6 +81,9 @@ const STATUS_TONES: Record<TicketStatus, string> = {
   closed: 'default',
 };
 
+/** URL 里只接受这四个状态，避免告警链接被手工改成非法值时整页 400 */
+const TICKET_STATUSES: TicketStatus[] = ['open', 'processing', 'resolved', 'closed'];
+
 const PRIORITY_LABELS: Record<TicketPriority, string> = {
   low: '低',
   normal: '中',
@@ -108,6 +111,12 @@ export function AdminTicketsPage() {
 
   /** 顶栏搜索带 `?id=` 跳过来时直接展开该工单 */
   const [searchParams] = useSearchParams();
+  const rawUrlTicketStatus = searchParams.get('status');
+  const urlTicketStatus =
+    rawUrlTicketStatus && TICKET_STATUSES.includes(rawUrlTicketStatus as TicketStatus)
+      ? rawUrlTicketStatus
+      : undefined;
+  const appliedUrlStatus = useRef<string | undefined>(urlTicketStatus);
   const [detailId, setDetailId] = useState<string | null>(() => searchParams.get('id'));
   useEffect(() => {
     const id = searchParams.get('id');
@@ -134,7 +143,21 @@ export function AdminTicketsPage() {
   );
 
   const { data, loading, error, params, setQuery, setPage, reload } =
-    useAdminList<{ items: AdminTicketRow[]; total: number; counts: Record<string, number> }>(fetcher);
+    useAdminList<{ items: AdminTicketRow[]; total: number; counts: Record<string, number> }>(
+      fetcher,
+      { ...(urlTicketStatus ? { status: urlTicketStatus } : {}) },
+    );
+
+  /* 告警中心链接 `?status=open`：已在本页时也要把筛选同步过去 */
+  useEffect(() => {
+    const raw = searchParams.get('status');
+    const next =
+      raw && TICKET_STATUSES.includes(raw as TicketStatus) ? raw : undefined;
+    if (next === appliedUrlStatus.current) return;
+    appliedUrlStatus.current = next;
+    // 浏览器后退到无 status 的地址时也要清掉筛选，否则列表与地址栏不一致
+    setQuery({ status: next });
+  }, [searchParams, setQuery]);
 
   const loadStats = useCallback(() => {
     adminTicketsApi

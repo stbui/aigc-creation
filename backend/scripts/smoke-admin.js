@@ -43,6 +43,32 @@ function check(name, ok, detail = '') {
   const T = admin.data.accessToken;
   const me = (await call('GET', '/admin/me', T)).data;
 
+  console.log('\n【告警中心】');
+  // 只要求后台身份; 来源在 service 内按角色权限过滤
+  const alerts = await call('GET', '/admin/alerts', T);
+  check(
+    '告警接口返回结构',
+    alerts.status === 200 &&
+      typeof alerts.data?.total === 'number' &&
+      Array.isArray(alerts.data?.items) &&
+      typeof alerts.data?.generatedAt === 'string',
+    `HTTP ${alerts.status} · ${alerts.data?.items?.length ?? 0} 条`,
+  );
+  const refundAlert = alerts.data?.items?.find((i) => i.key === 'refund-processing');
+  check(
+    '退款告警链接指向订单筛选',
+    !refundAlert ||
+      (refundAlert.category === 'finance' &&
+        refundAlert.link === '/admin/orders?refundState=processing'),
+    refundAlert ? refundAlert.link : '当前无退款卡单',
+  );
+
+  // 退款状态筛选: 非法值必须 400, 合法值可用 (告警深链依赖它)
+  const badRefundState = await call('GET', '/admin/orders?refundState=bogus', T);
+  check('退款状态非法值被拒', badRefundState.status === 400, badRefundState.message);
+  const okRefundState = await call('GET', '/admin/orders?refundState=processing&pageSize=1', T);
+  check('退款状态筛选可用', okRefundState.status === 200, `HTTP ${okRefundState.status}`);
+
   console.log('\n【自保护】');
   // 不能禁用自己
   const selfDisable = await call('PATCH', `/admin/users/${me.id}/status`, T, { status: 'disabled' });

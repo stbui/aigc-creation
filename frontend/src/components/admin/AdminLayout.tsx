@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, LogOut, Menu, Search, User, X } from 'lucide-react';
+import { ChevronDown, LogOut, Menu, Rows3, Rows4, Search, User, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   Avatar,
@@ -19,6 +19,7 @@ import { hasUnsavedChanges } from '../../lib/unsaved-guard';
 import type { AdminSearchGroup } from '../../types/api';
 import { APP_ENV, IS_PROD } from '../../lib/constants';
 import { ADMIN_MENU, findAdminMenuItem, type AdminMenuItem } from './adminNav';
+import { AdminAlertBell } from './AlertCenter';
 
 /**
  * 非生产环境才显示的环境标识, 防止误在生产执行测试操作。
@@ -43,6 +44,15 @@ function EnvironmentBadge() {
 interface Props {
   children: ReactNode;
 }
+
+/**
+ * 列表密度偏好。
+ *
+ * 后台大部分页面是「扫一眼找异常」的表格。运营在 1080p 上更希望一屏多看
+ * 几行，财务核对时又需要宽松行高。做成全局开关而不是每个表格各配一次：
+ * 偏好跟着人走，换页面不用重新设置。
+ */
+const DENSITY_KEY = 'huojue.admin.density';
 
 /**
  * 按路径查侧栏菜单项 (2026-10-20 新增)。
@@ -322,6 +332,10 @@ export function AdminLayout({ children }: Props) {
   const { logout } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  /** 紧凑表格：一屏多看几行，偏好存本地 */
+  const [compact, setCompact] = useState(
+    () => localStorage.getItem(DENSITY_KEY) === 'compact',
+  );
   /** 窄屏 (≤900px) 时侧栏不再是一列图标, 改为抽屉导航 */
   const [isNarrow, setIsNarrow] = useState(false);
   /** 有未保存变更时, 待跳转的目标路径; 非 null 即弹确认框 */
@@ -428,7 +442,7 @@ export function AdminLayout({ children }: Props) {
   );
 
   return (
-    <Layout className="adm-layout" onClickCapture={onClickCapture}>
+    <Layout className={`adm-layout${compact ? ' is-compact' : ''}`} onClickCapture={onClickCapture}>
       <a className="adm-skip-link" href="#adm-main">
         跳到主要内容
       </a>
@@ -452,12 +466,23 @@ export function AdminLayout({ children }: Props) {
         </div>
 
         <div className="adm-header-right">
-          <GlobalSearch canSearch={can('data.search')} onNavigate={navigate} />
-          <Tooltip title="告警将在告警模块落地后开放">
-            <button type="button" className="adm-icon-btn" aria-label="告警" disabled>
-              <Bell size={17} />
+          <Tooltip title={compact ? '切换为宽松列表' : '切换为紧凑列表'}>
+            <button
+              type="button"
+              className="adm-icon-btn"
+              aria-label={compact ? '切换为宽松列表' : '切换为紧凑列表'}
+              aria-pressed={compact}
+              onClick={() => {
+                const next = !compact;
+                setCompact(next);
+                localStorage.setItem(DENSITY_KEY, next ? 'compact' : 'comfortable');
+              }}
+            >
+              {compact ? <Rows3 size={17} /> : <Rows4 size={17} />}
             </button>
           </Tooltip>
+          <GlobalSearch canSearch={can('data.search')} onNavigate={navigate} />
+          <AdminAlertBell />
           <Dropdown
             menu={{
               items: [

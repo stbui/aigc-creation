@@ -18,18 +18,41 @@ import { SignedUrlService } from '../common/signed-url.service';
  */
 @Injectable()
 export class AdminOverviewService {
+  /**
+   * 概览缓存（30 秒）。
+   *
+   * 概览要扫窗口内的任务与订单明细，SQLite 单文件下 90 天窗口并不便宜。
+   * 后台同一时刻可能有多个管理员在看同一档，且页面本身只在切换窗口时请求；
+   * 30 秒足以挡住重复点击「刷新」，又不会让运营看到明显过期的数字。
+   * 响应里带 `generatedAt`，前端明确展示数据截至时间。
+   */
+  private readonly cache = new Map<number, { at: number; data: any }>();
+  private static readonly CACHE_TTL_MS = 30_000;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly signedUrl: SignedUrlService,
   ) {}
+
+  async overview(days: number) {
+    const cached = this.cache.get(days);
+    if (cached && Date.now() - cached.at < AdminOverviewService.CACHE_TTL_MS) {
+      return cached.data;
+    }
+    const data = await this.buildOverview(days);
+    this.cache.set(days, { at: Date.now(), data });
+    return data;
+  }
 
   /**
    * 概览数据。
    *
    * days 控制两个窗口: 趋势与"新增"。任务状态分布不受窗口影响 (全量)。
    */
-  async overview(days: number) {
+  private async buildOverview(days: number) {
     const since = new Date(Date.now() - days * 24 * 3600 * 1000);
+    /** 上一窗口的起点。用于环比，而不是拿「近 7 天」和「累计」比 */
+    const prevSince = new Date(since.getTime() - days * 24 * 3600 * 1000);
 
     const paidStatuses = ['paid', 'partial_refunded', 'refunded'];
     const now = new Date();
@@ -54,6 +77,10 @@ export class AdminOverviewService {
       newMembers,
       creditGranted,
       creditConsumed,
+      prevUserNew,
+      prevTasks,
+      prevOrders,
+      prevRefunds,
     ] = await Promise.all([
       this.prisma.user.count(),
       this.prisma.user.count({ where: { createdAt: { gte: since } } }),
@@ -79,7 +106,7 @@ export class AdminOverviewService {
       }),
       this.prisma.generationTask.findMany({
         where: { createdAt: { gte: since } },
-        select: { createdAt: true, status: true },
+        select: { createdAt: true, status: true, errorCode: true },
       }),
 
       // ── 交易侧 ──
@@ -108,7 +135,7 @@ export class AdminOverviewService {
       // 收入趋势按日聚合 —— 窗口内的已支付订单量可控, 在 Node 侧聚合即可
       this.prisma.order.findMany({
         where: { status: { in: paidStatuses }, paidAt: { gte: since } },
-        select: { paidAt: true, paidCents: true },
+        select: { paidAt: true, paidCents: true, channel: true },
       }),
       this.prisma.membership.count({
         where: { status: { in: ['active', 'grace'] }, expiresAt: { gt: now } },
@@ -127,6 +154,23 @@ export class AdminOverviewService {
       this.prisma.creditLedger.aggregate({
         where: { createdAt: { gte: since }, type: 'consume' },
         _sum: { amount: true },
+      }),
+
+      // ── 上一窗口（环比）──
+      // 与当前窗口等长且紧邻。用「累计」做分母会让任何窗口都显得在增长。
+      this.prisma.user.count({ where: { createdAt: { gte: prevSince, lt: since } } }),
+      this.prisma.generationTask.findMany({
+        where: { createdAt: { gte: prevSince, lt: since } },
+        select: { status: true },
+      }),
+      this.prisma.order.aggregate({
+        where: { status: { in: paidStatuses }, paidAt: { gte: prevSince, lt: since } },
+        _sum: { paidCents: true },
+        _count: { _all: true },
+      }),
+      this.prisma.refund.aggregate({
+        where: { createdAt: { gte: prevSince, lt: since } },
+        _sum: { amountCents: true },
       }),
     ]);
 
@@ -176,7 +220,48 @@ export class AdminOverviewService {
     const paymentSuccessRate =
       payOk + payFail === 0 ? null : Math.round((payOk / (payOk + payFail)) * 1000) / 10;
 
+    // ── 当前窗口与上一窗口 ──
+    // 顶部的「任务总数 / 成功率」是累计口径，容易被误读成「最近表现」。
+    // 这里单独给窗口口径，并配上一窗口用于环比。
+    const win = { tasks: 0, succeeded: 0, failed: 0 };
+    const reasonMap = new Map<string, number>();
+    for (const r of weekTasks) {
+      win.tasks += 1;
+      if (r.status === 'succeeded') win.succeeded += 1;
+      if (r.status === 'failed') {
+        win.failed += 1;
+        const code = r.errorCode || 'unknown';
+        reasonMap.set(code, (reasonMap.get(code) ?? 0) + 1);
+      }
+    }
+    const winFinished = win.succeeded + win.failed;
+    const winSuccessRate =
+      winFinished === 0 ? null : Math.round((win.succeeded / winFinished) * 1000) / 10;
+
+    const prevWin = { tasks: 0, succeeded: 0, failed: 0 };
+    for (const r of prevTasks) {
+      prevWin.tasks += 1;
+      if (r.status === 'succeeded') prevWin.succeeded += 1;
+      if (r.status === 'failed') prevWin.failed += 1;
+    }
+    const prevFinished = prevWin.succeeded + prevWin.failed;
+    const prevSuccessRate =
+      prevFinished === 0 ? null : Math.round((prevWin.succeeded / prevFinished) * 1000) / 10;
+
+    const channelMap = new Map<string, { channel: string; gmvCents: number; orders: number }>();
+    for (const o of paidInWindow) {
+      const channel = o.channel || 'unknown';
+      const cur = channelMap.get(channel) ?? { channel, gmvCents: 0, orders: 0 };
+      cur.gmvCents += o.paidCents;
+      cur.orders += 1;
+      channelMap.set(channel, cur);
+    }
+    const channelMix = Array.from(channelMap.values()).sort((a, b) => b.gmvCents - a.gmvCents);
+
     return {
+      /** 数据生成时间（30 秒缓存，前端据此显示「截至」） */
+      generatedAt: new Date().toISOString(),
+      cacheTtlSeconds: Math.round(AdminOverviewService.CACHE_TTL_MS / 1000),
       days,
       totals: {
         users: userTotal,
@@ -193,6 +278,34 @@ export class AdminOverviewService {
         generated: assets.generated,
       },
       trend: this.buildTrend(weekTasks, days),
+      /** 窗口口径（与 trend 同源），用于「最近表现」而不是累计数字 */
+      window: {
+        tasks: win.tasks,
+        succeeded: win.succeeded,
+        failed: win.failed,
+        successRate: winSuccessRate,
+        failureReasons: Array.from(reasonMap.entries())
+          .map(([errorCode, count]) => ({ errorCode, count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 6),
+        revenue: {
+          gmvCents: gmvWindow._sum.paidCents ?? 0,
+          paidOrders: paidInWindow.length,
+          refundedCents: refundWindow._sum.amountCents ?? 0,
+          usersNew: userNew,
+        },
+      },
+      /** 上一窗口的同口径数字。分母为 0 时前端显示「—」而不是 100% */
+      comparison: {
+        tasks: prevWin.tasks,
+        succeeded: prevWin.succeeded,
+        failed: prevWin.failed,
+        successRate: prevSuccessRate,
+        usersNew: prevUserNew,
+        gmvCents: prevOrders._sum.paidCents ?? 0,
+        paidOrders: prevOrders._count._all,
+        refundedCents: prevRefunds._sum.amountCents ?? 0,
+      },
       /*
        * 交易概览。
        *
@@ -217,6 +330,8 @@ export class AdminOverviewService {
           grantedInWindow: creditGranted._sum.amount ?? 0,
           consumedInWindow: Math.abs(creditConsumed._sum.amount ?? 0),
         },
+        /** 窗口内收入按支付渠道拆分，用于看营收结构而不只是总额 */
+        channelMix,
         revenueTrend: this.buildRevenueTrend(paidInWindow, days),
       },
       recentTasks: recentTasks.map((t) => {

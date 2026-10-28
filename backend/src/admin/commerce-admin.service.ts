@@ -39,6 +39,14 @@ export interface OrderListQuery {
   orderNo?: string;
   email?: string;
   channel?: string;
+  /**
+   * 退款状态 (2026-10-29)。
+   *
+   * 退款状态挂在 `Refund` 而不是订单上：一笔订单可能多次部分退款，且渠道
+   * 异步处理时订单仍是 `paid`。告警中心深链到 `?refundState=processing`
+   * 时靠这个筛选把「钱已受理但未确认到账」的订单捞出来。
+   */
+  refundState?: string;
   /** ISO 日期或 yyyy-mm-dd; 含当天 */
   from?: string;
   to?: string;
@@ -68,6 +76,9 @@ const ORDER_STATUSES = [
   'refunded',
   'partial_refunded',
 ] as const;
+
+/** `Refund.status` 的合法取值, 与退款落库路径保持一致 */
+const REFUND_STATES = ['processing', 'failed', 'succeeded'] as const;
 
 const LEDGER_TYPES = [
   'purchase',
@@ -235,6 +246,13 @@ export class AdminCommerceService {
       where.status = q.status;
     }
     if (q.channel) where.channel = q.channel;
+    if (q.refundState) {
+      if (!(REFUND_STATES as readonly string[]).includes(q.refundState)) {
+        throw new AppError(40001, `退款状态非法: ${q.refundState}`, 400);
+      }
+      // 一笔订单可能有多笔退款, 用 some 命中任意一笔; 列表展示的仍是订单维度
+      where.refunds = { some: { status: q.refundState } };
+    }
     if (q.orderNo?.trim()) where.orderNo = { contains: q.orderNo.trim() };
     if (q.email?.trim()) where.user = { email: { contains: q.email.trim() } };
 

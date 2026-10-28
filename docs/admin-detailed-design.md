@@ -52,7 +52,7 @@ frontend/src/components/admin/
 ├── BatchResultModal.tsx             # 批量动作结果（失败项排最前）
 └── PageHeader.tsx
 
-frontend/src/pages/admin/            # 28 个页面 + modelConfig/ 子组件目录
+frontend/src/pages/admin/            # 29 个页面 + modelConfig/ 子组件目录
 ```
 
 ### 0.2 守卫链与审计
@@ -153,14 +153,18 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 | --- | --- |
 | `totals` | `users` / `newUsers` / `projects` / `tasks` / `succeeded` / `failed` / `running` / `pending` / `successRate` / `assets` / `originals` / `generated` |
 | `trend` | 按日任务序列，长度由 `days` 决定 |
-| `commerce` | `orders` / `gmvCents` / `gmvWindowCents` / `pendingCents` / `refundedCents` / `refundedWindowCents` / `paymentSuccessRate` / `members` / `credits` / `revenueTrend` |
+| `window` | 窗口口径任务量 / 成功率 / 失败原因 Top 6 / 窗口营收与新增用户 |
+| `comparison` | 上一等长窗口的同口径数字，用于环比 |
+| `commerce` | `orders` / `gmvCents` / `gmvWindowCents` / `pendingCents` / `refundedCents` / `refundedWindowCents` / `paymentSuccessRate` / `members` / `credits` / `channelMix` / `revenueTrend` |
 
 ### 1.3 口径
 
 - 金额一律整数分，后端不做展示层格式化，避免「接口返回元、页面再乘 100」的口径漂移。
 - `paymentSuccessRate` 无支付流水时返回 `null` 而非 `0`：`0%` 会被误读为「支付全挂了」。
-- 任务状态分布是全量，不受 `days` 窗口影响；趋势与「新增」受窗口影响。
+- 任务状态分布是全量，不受 `days` 窗口影响；趋势、「新增」、`window` 与 `comparison` 受窗口影响。
+- 环比用紧邻的等长窗口，不用累计做分母；上一窗口为 0 时前端显示「新增」或「—」，不显示 ∞%。
 - 只统计现有表，不出现无数据支撑的指标。
+- **30 秒内存缓存**：`overview` 按 `days` 缓存 30 秒，响应带 `generatedAt`，页面明确展示「数据截至」；切换窗口或点刷新不会击穿到全量重算。
 
 ---
 
@@ -210,7 +214,7 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 
 ### 4.1 接口
 
-`GET /admin/tasks`、`/admin/tasks/stats`、`/admin/tasks/capabilities`、`/admin/tasks/:id`、`POST /admin/tasks/:id/retry`、`POST /admin/tasks/:id/cancel`、`POST /admin/tasks/batch`。
+`GET /admin/tasks`、`/admin/tasks/stats`、`/admin/tasks/capabilities`、`/admin/tasks/export`、`/admin/tasks/:id`、`POST /admin/tasks/:id/retry`、`POST /admin/tasks/:id/cancel`、`POST /admin/tasks/batch`。
 
 ### 4.2 规则
 
@@ -218,6 +222,9 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 - **重试不复用旧记录**：用原参数与原输入新建任务，再复用 `GenerateService.enqueue` 触发执行。原地复活会绕过 `GenerationTask.outputAssetId @unique` 的一产出约束。
 - **终止**把 `running` 置 `failed` + `cancelled_by_admin`，按任务快照退款。
 - 统计条显示各状态计数，积压（`pending` / `running`）超阈值标红。
+- **导出** CSV 与列表共用 `listWhere`，筛什么导什么，上限 5000 行，需 `data.export` 并留审计。
+- **性能**：能力 / 通道筛选项的全表 `groupBy` 缓存 60 秒；拥堵指标仍实时查询。`GenerationTask` 增加 `[status, createdAt]` 与 `[ownerId, createdAt]` 组合索引，服务「状态 + 时间窗」和用户详情时间线。
+- 告警链接 `?status=failed|running` 会作为列表初始筛选；页面已打开时 URL 变化也会同步过去。
 
 ---
 
@@ -313,6 +320,8 @@ partial_refunded → refunded | partial_refunded
 | 标记已支付 | `channel='manual'`，用于线下收款核销；不调渠道 | `order.mark_paid` |
 | 退款 | 先校验 → 落 `Refund(processing)` → 调渠道 → 成功后才回收积分与迁移状态 | `order.refund` |
 | 批量 / 导出 | `orders/batch` / `orders/export` | `data.batch` / `data.export` |
+
+列表支持按退款状态筛选（`?refundState=processing|failed|succeeded`）。退款状态挂在 `Refund` 行上，一笔订单可能多次部分退款；告警中心正是用它把「渠道已受理但本地未落账」的订单捞出来。
 
 ### 10.3 退款顺序不可反
 
@@ -535,7 +544,34 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 
 ---
 
-## 23. 明确不做
+## 23. 告警中心 `/admin/alerts`
+
+### 23.1 数据源与口径
+
+`GET /admin/alerts`（只要求后台身份，来源在 service 内按角色权限过滤）。返回 `generatedAt`、`total` 与 `items[]`（`key` / `severity` / `category` / `title` / `detail` / `count` / `link`）。
+
+| 来源 | 触发条件 | 升级为 `critical` | 所需权限 |
+| --- | --- | --- | --- |
+| 工单 | `status='open'` 数量 > 0（`processing` 已受理，不再告警） | 最早一条等待 ≥ 24 小时 | `ticket.read` |
+| 任务失败 | 近 24 小时 `failed` > 0 | 失败 ≥ 10 个 | `task.read` |
+| 任务积压 | `running` > 50 | — | `task.read` |
+| 对账差异 | `status='open'` 的差异 > 0 | ≥ 5 笔 | `payment.read` |
+| 退款卡单 | `Refund.status='processing'` 且创建超过 30 分钟（渠道异步退款、无回调） | 最早一笔 ≥ 24 小时 | `order.read` |
+| 备份失败/过期 | 最近一次失败，或无成功备份超过 48 小时 | 最近一次失败 | `backup.read` |
+| 备份未验证 | `succeeded && !verified` > 0 | — | `backup.read` |
+| 发票 | `status='pending'` > 0 | — | `invoice.write` |
+
+### 23.2 交互
+
+- 顶栏铃铛显示待处理**条目数**（不是底层记录数），点击展开前 5 条，底部进完整页面；每 60 秒轮询，页面隐藏时跳过。
+- 不引入「已读」状态：计数即「当前待处理数」，事项处理后自然消失，避免「点过就算解决」。
+- 没有待处理项时不产生条目，也不显示 0 角标；接口失败保留上一次数据并给重试。
+- `?status=open` / `?status=failed` / `?status=running` 直达对应列表筛选。
+- 退款告警链接到 `/admin/orders?refundState=processing`；订单列表新增退款状态筛选（`processing` / `failed` / `succeeded`），筛选的是 `Refund` 行，订单本身可能仍是 `paid`。
+
+---
+
+## 24. 明确不做
 
 | 项 | 原因 |
 | --- | --- |

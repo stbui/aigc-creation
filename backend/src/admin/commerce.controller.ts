@@ -302,6 +302,7 @@ export class AdminCommerceController {
     @Query('orderNo') orderNo?: string,
     @Query('email') email?: string,
     @Query('channel') channel?: string,
+    @Query('refundState') refundState?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
     @Query('userId') userId?: string,
@@ -314,6 +315,7 @@ export class AdminCommerceController {
       orderNo,
       email,
       channel,
+      refundState,
       from,
       to,
       page: num(page),
@@ -337,6 +339,7 @@ export class AdminCommerceController {
     @Query('orderNo') orderNo?: string,
     @Query('email') email?: string,
     @Query('channel') channel?: string,
+    @Query('refundState') refundState?: string,
     @Query('from') from?: string,
     @Query('to') to?: string,
   ) {
@@ -345,6 +348,7 @@ export class AdminCommerceController {
       orderNo,
       email,
       channel,
+      refundState,
       from,
       to,
     });

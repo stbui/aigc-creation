@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { GenerateService } from '../generate/generate.service';
 import { AppError } from '../common/app.exception';
 import { runBatch } from '../common/batch';
+import { toCsv } from '../common/csv';
 import { getCapability } from '../capabilities/capability.registry';
 import { CAPABILITY_IDS } from '../providers/channel-config.defs';
 import { buildPage, paginate, type PageResult } from './dto/page-query.dto';
@@ -68,6 +69,20 @@ export class TasksAdminService {
    * 一旦跟随筛选, 运营筛了 status=failed 后 running 恒为 0, 拥堵信号
    * 反而在最需要的时候消失。筛选项同理从全量聚合, 避免前端硬编码清单过期。
    */
+  /**
+   * 筛选项缓存（60 秒）。
+   *
+   * capability / provider 的 groupBy 是全表聚合，与当前页筛选无关。
+   * 每翻一页都扫两遍全表在 SQLite 上会随着任务量增长越来越慢，而筛选项
+   * 的计数并不需要秒级准确 —— 一分钟足够。拥堵指标仍实时查询。
+   */
+  private facetCache: {
+    at: number;
+    capabilities: Array<{ capability: string; count: number }>;
+    providers: Array<{ provider: string; count: number }>;
+  } | null = null;
+  private static readonly FACET_TTL_MS = 60_000;
+
   async list(query: TaskListQueryDto): Promise<{
     result: PageResult<unknown>;
     congestion: {
@@ -80,35 +95,9 @@ export class TasksAdminService {
     providers: Array<{ provider: string; count: number }>;
   }> {
     const page = buildPage(query, [...SORTABLE], 'createdAt:desc');
+    const where = this.listWhere(query);
 
-    const where: Record<string, unknown> = {};
-    if (query.status) where['status'] = query.status;
-    if (query.capability) where['capability'] = query.capability;
-    // 筛「待执行」要同时命中迁移前后的两种写法, 否则旧数据一个也筛不出来
-    if (query.provider) {
-      where['provider'] =
-        query.provider === 'pending'
-          ? { in: ['pending', LEGACY_PENDING_PROVIDER] }
-          : query.provider;
-    }
-    if (query.userId) where['ownerId'] = query.userId;
-    if (query.projectId) where['projectId'] = query.projectId;
-    if (query.from || query.to) {
-      const createdAt: Record<string, Date> = {};
-      const from = parseDate(query.from);
-      const to = parseDate(query.to);
-      if (from) createdAt['gte'] = from;
-      if (to) createdAt['lte'] = to;
-      if (Object.keys(createdAt).length > 0) where['createdAt'] = createdAt;
-    }
-
-    const [
-      rows,
-      total,
-      capGroups,
-      providerGroups,
-      congestion,
-    ] = await Promise.all([
+    const [rows, total, facets, congestion] = await Promise.all([
       this.prisma.generationTask.findMany({
         where,
         skip: page.skip,
@@ -126,8 +115,7 @@ export class TasksAdminService {
         },
       }),
       this.prisma.generationTask.count({ where }),
-      this.prisma.generationTask.groupBy({ by: ['capability'], _count: { _all: true } }),
-      this.prisma.generationTask.groupBy({ by: ['provider'], _count: { _all: true } }),
+      this.facets(),
       this.congestion(),
     ]);
 
@@ -159,10 +147,36 @@ export class TasksAdminService {
         page,
       ),
       congestion,
+      capabilities: facets.capabilities,
+      // 归一后再合并: 迁移前 pending 与 mock 会各占一行, 前端筛选器里出现两个「待执行」
+      providers: facets.providers,
+    };
+  }
+
+  /**
+   * 能力 / 通道筛选项。
+   *
+   * 全表 groupBy 的结果按 60 秒缓存；迁移前的 `mock` 与 `pending`
+   * 在这里归一合并，避免前端筛选器出现两个「待执行」。
+   */
+  private async facets(): Promise<{
+    capabilities: Array<{ capability: string; count: number }>;
+    providers: Array<{ provider: string; count: number }>;
+  }> {
+    const cached = this.facetCache;
+    if (cached && Date.now() - cached.at < TasksAdminService.FACET_TTL_MS) {
+      return { capabilities: cached.capabilities, providers: cached.providers };
+    }
+
+    const [capGroups, providerGroups] = await Promise.all([
+      this.prisma.generationTask.groupBy({ by: ['capability'], _count: { _all: true } }),
+      this.prisma.generationTask.groupBy({ by: ['provider'], _count: { _all: true } }),
+    ]);
+
+    const facets = {
       capabilities: capGroups
         .map((g) => ({ capability: g.capability, count: g._count._all }))
         .sort((a, b) => b.count - a.count),
-      // 归一后再合并: 迁移前 pending 与 mock 会各占一行, 前端筛选器里出现两个「待执行」
       providers: Object.entries(
         providerGroups.reduce<Record<string, number>>((acc, g) => {
           const key = normalizeProvider(g.provider) ?? 'unknown';
@@ -171,6 +185,72 @@ export class TasksAdminService {
         }, {}),
       ).map(([provider, count]) => ({ provider, count })),
     };
+    this.facetCache = { at: Date.now(), ...facets };
+    return facets;
+  }
+
+  /**
+   * 列表筛选条件。列表、导出与后续统计共用同一份构造器 ——
+   * 分开写会出现「列表筛出 32 条、导出 400 条」的口径漂移。
+   */
+  private listWhere(query: TaskListQueryDto): Record<string, unknown> {
+    const where: Record<string, unknown> = {};
+    if (query.status) where['status'] = query.status;
+    if (query.capability) where['capability'] = query.capability;
+    // 筛「待执行」要同时命中迁移前后的两种写法, 否则旧数据一个也筛不出来
+    if (query.provider) {
+      where['provider'] =
+        query.provider === 'pending'
+          ? { in: ['pending', LEGACY_PENDING_PROVIDER] }
+          : query.provider;
+    }
+    if (query.userId) where['ownerId'] = query.userId;
+    if (query.projectId) where['projectId'] = query.projectId;
+    if (query.from || query.to) {
+      const createdAt: Record<string, Date> = {};
+      const from = parseDate(query.from);
+      const to = parseDate(query.to);
+      if (from) createdAt['gte'] = from;
+      if (to) createdAt['lte'] = to;
+      if (Object.keys(createdAt).length > 0) where['createdAt'] = createdAt;
+    }
+    return where;
+  }
+
+  /**
+   * 导出任务 (CSV)。
+   *
+   * 上限 5000 行，与其它后台导出保持一致：导出是为了核对列表上的那批数据，
+   * 不是导全库。超过上限时宁可在文件里少几行，也不把 SQLite 拖到无法响应。
+   * 与列表共用 `listWhere`，筛什么就导出什么。
+   */
+  async exportCsv(query: TaskListQueryDto): Promise<string> {
+    const rows = await this.prisma.generationTask.findMany({
+      where: this.listWhere(query),
+      orderBy: { createdAt: 'desc' },
+      take: 5000,
+      include: {
+        owner: { select: { email: true } },
+        project: { select: { name: true } },
+      },
+    });
+
+    return toCsv(
+      [
+        { label: '任务 ID', value: (r) => r.id },
+        { label: '能力', value: (r) => getCapability(r.capability)?.name ?? r.capability },
+        { label: '状态', value: (r) => r.status },
+        { label: '通道', value: (r) => normalizeProvider(r.provider) ?? '' },
+        { label: '错误码', value: (r) => r.errorCode ?? '' },
+        { label: '用户邮箱', value: (r) => r.owner.email },
+        { label: '项目', value: (r) => r.project.name },
+        { label: '消耗积分', value: (r) => r.creditCost },
+        { label: '耗时(ms)', value: (r) => r.updatedAt.getTime() - r.createdAt.getTime() },
+        { label: '创建时间', value: (r) => r.createdAt },
+        { label: '更新时间', value: (r) => r.updatedAt },
+      ],
+      rows,
+    );
   }
 
   /**

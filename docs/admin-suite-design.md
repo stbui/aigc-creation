@@ -26,7 +26,7 @@
 | 模型 | 模型配置 / 调用记录 / 能力管控 | `/admin/model-config` · `/admin/model-calls` · `/admin/capabilities` |
 | 数据安全 | 数据备份 / 保留期清理 | `/admin/backups` · `/admin/retention` |
 
-合计 28 页、8 组。菜单项的 `permission` 字段决定可见性，`AdminLayout` 只渲染当前角色有权限的项。
+合计 29 页、8 组。菜单项的 `permission` 字段决定可见性，`AdminLayout` 只渲染当前角色有权限的项。
 
 ### 1.1 分组理由
 

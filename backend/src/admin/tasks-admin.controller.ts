@@ -1,10 +1,12 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { ArrayMaxSize, IsArray, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 import { AdminUser, AuditAction, RequirePermission, type AdminUser as AdminUserType } from './admin.decorator';
 import { AdminRoleService } from './admin-role.service';
 import { TasksAdminService } from './tasks-admin.service';
 import { PERMISSIONS } from './permissions';
 import { AppError } from '../common/app.exception';
+import { csvFilename } from '../common/csv';
 // 值导入: DTO 依赖 design:paramtypes 做实例化与白名单剥离
 import { TaskListQueryDto } from './dto/task.dto';
 
@@ -91,6 +93,22 @@ export class AdminTasksController {
   @RequirePermission(PERMISSIONS.taskRead)
   list(@Query() query: TaskListQueryDto) {
     return this.tasks.list(query);
+  }
+
+  /**
+   * 导出任务 (CSV)。
+   *
+   * 路由必须声明在 `:id` 之前，否则 `export` 会被当成任务 id。
+   * 导出把用户数据带出系统，用独立的 `data.export` 权限点并留审计。
+   */
+  @Get('export')
+  @RequirePermission(PERMISSIONS.dataExport)
+  @AuditAction('data.export')
+  async export(@Query() query: TaskListQueryDto, @Res() res: Response) {
+    const csv = await this.tasks.exportCsv(query);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${csvFilename('tasks')}"`);
+    res.send(csv);
   }
 
   /** 任务详情: 输入素材 / 参数 JSON / 产出图 / 时间线 (B-30) */

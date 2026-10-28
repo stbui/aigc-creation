@@ -49,7 +49,7 @@ uat@admin.com
 
 - **16 项能力**（全部 `real`，0 `mock` / 0 `planned`，12 项进工作台）。**图像、文本、视频都只允许真实模型产出**：无模型线路即失败并退款，不交付伪结果。
 - **生成通道**为「模态 × 协议 × 厂商」三层可插拔。`auto/remote` 只调度真实模型线路，存量 `route=local` 明确判不可用；新写入不再接受 `local`。
-- **后台管理端**（`/admin`）28 个页面，权限点 + 审计 + 定时任务 + 备份 + 存储切换。
+- **后台管理端**（`/admin`）29 个页面，权限点 + 审计 + 定时任务 + 备份 + 存储切换。
 - **商业域**：商品 / 订单 / 支付 / 退款 / 积分账本 / 会员 / 优惠券 / 限时活动 / 邀请签到 / 发票 / 渠道对账。
 - **账户与合规域**：找回密码 / 短信登录 / 扫码登录 / 第三方登录（OAuth2 / OIDC）/ 自助注销与数据导出 / 法务版本化与同意留痕 / 站内消息 / AIGC 标识 / 限流 / 健康检查 / 请求追踪。
 - **服务域**：工单、后台全局搜索、批量动作与 CSV 导入导出。
@@ -122,7 +122,7 @@ aigc-creation/
     └── src/
         ├── App.tsx           # 28 条壳内路由 + 9 条独立页 + /admin/* 子应用
         ├── components/       # AppLayout / SideRail / ToolShell / QrLoginPanel / admin/AdminLayout
-        ├── pages/            # 35 个 C 端页面 + pages/admin/ 28 个后台页面
+        ├── pages/            # 35 个 C 端页面 + pages/admin/ 29 个后台页面
         ├── lib/              # api.ts（request 拆信封）/ http / auth / capabilities / aigc-label / constants
         ├── context/          # AuthContext / AdminContext（权限点）/ CreditsContext
         ├── hooks/            # useToolTask / useProject / useCapabilities / usePollAbort / 上传相关
@@ -272,7 +272,7 @@ npm run e2e                 # Playwright
 
 **权限链**：`AdminGuard`（身份）→ `PermissionGuard`（权限点）→ controller → `AuditInterceptor`（落 `AdminAuditLog`）。权限点定义在 `src/admin/permissions.ts`。**前端 `AdminContext.can()` 只用于隐藏无权限按钮，不是安全边界**；真正的校验必须在后端。
 
-28 个页面、8 个侧栏分组以 `adminNav.ts` 的 `ADMIN_MENU` 为准；页面功能、接口与交互见 `docs/admin-console-design.md` / `admin-detailed-design.md`。
+29 个页面、8 个侧栏分组以 `adminNav.ts` 的 `ADMIN_MENU` 为准；页面功能、接口与交互见 `docs/admin-console-design.md` / `admin-detailed-design.md`。
 
 - 高危动作（删除 / 重置密码 / 退款 / 手动调整积分 / 模型配置写入 / 角色与系统设置写入 / 手动备份）须填原因并写审计（`HIGH_RISK_PERMISSIONS`）。
 - 批量动作：`ids ≤ 100`，`runBatch` 串行、**不包事务**，逐条返回结果；路由挂较弱读权限，处理器内再判动作权限。
