@@ -192,7 +192,6 @@ function Shell() {
       groups={groups}
       items={items}
       thumbs={thumbs}
-      statsTotal={stats?.totals.tasks ?? 0}
     >
       <ErrorBoundary resetKeys={[location.pathname]}>
         <Suspense fallback={<RouteFallback />}>

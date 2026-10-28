@@ -1236,22 +1236,23 @@ body {
   min-height: calc(100vh - 64px);
   align-items: stretch;
 }
-/* 侧栏外壳: 宽度由 CSS 托管 —— 桌面 176px 横排 / <1400px 自动塌缩 100px 垂直轨 /
+/* 侧栏外壳: 宽度由 CSS 托管 —— 桌面 176px 横排 / ≤1366px 自动塌缩 100px 垂直轨 /
    ≤900px display:none (响应式规则见文件末尾「响应式外壳」块)。
-   曾经由 JSX inline width 注入, inline 会压过媒体查询导致 <1400 塌缩失效 (2026-10-19 修正)。
+   曾经由 JSX inline width 注入, inline 会压过媒体查询导致窄屏塌缩失效 (2026-10-19 修正)。
+   top/height 必须跟随完整 chrome 高度: 促销条开启时为 64 + 40 = 104px, 若仍写死 64
+   会让侧栏底部超出视口 40px, 客服入口不可见 (2026-10-28 修正)。
    边框由内层 .workspace-side-menu-v2 自带 (#f2f3f5), 此处不重复描边 */
 .app-sider-wrap {
   background: var(--color-card);
   flex: 0 0 auto;
   width: 176px;
   position: sticky;
-  top: 64px;
-  height: calc(100vh - 64px);
+  top: var(--workspace-topbar-height, 64px);
+  height: calc(100vh - var(--workspace-topbar-height, 64px));
   overflow: visible;
 }
 
-/* 侧边菜单 —— 1:1 复刻参考站 workspace-side-menu-v2 (2026-10-18 重构;
-   原 100px 垂直能力轨为参考站 10-14 旧版结构, 新版参考站已换 176px 横排菜单列表) */
+/* 侧边菜单 —— 复刻参考站 workspace-side-menu-v2 (2026-10-28 重抓) */
 .workspace-side-menu-v2 {
   height: 100%;
   box-sizing: border-box;
@@ -1262,45 +1263,55 @@ body {
   display: flex;
   flex-direction: column;
 }
-.workspace-side-menu-head {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  height: 32px;
-  padding: 0 4px;
-  color: #333;
-  font-size: 12px;
-  line-height: 20px;
-  flex: none;
-}
-.workspace-side-collapse {
-  cursor: pointer;
-  background: none;
-  border: 1px solid transparent;
-  border-radius: var(--radius-control);
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  display: grid;
-  color: #667085;
-  transition:
-    background 0.18s,
-    border-color 0.18s;
-}
-.workspace-side-collapse:hover {
-  background: #f7f6ff;
-  border-color: #e5e7ef;
-}
 .workspace-side-menu-sections {
   flex: auto;
   min-height: 0;
   padding-right: 6px;
+  padding-top: 8px;
   overflow: hidden auto;
   scrollbar-width: thin;
   display: grid;
+  grid-auto-rows: max-content;
   gap: 16px;
   align-content: start;
+}
+.workspace-menu-section {
+  min-width: 0;
+}
+.workspace-menu-section-toggle {
+  width: 100%;
+  height: 28px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #333;
+  font: inherit;
+  font-size: 14px;
+  line-height: 20px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.workspace-menu-section-toggle:hover,
+.workspace-menu-section-toggle:focus-visible {
+  background: #f7f6ff;
+}
+.workspace-menu-section-toggle svg {
+  flex: none;
+  color: #4e5969;
+  transition: transform 0.18s;
+}
+.workspace-menu-section:not(.open) .workspace-menu-section-toggle svg {
+  transform: rotate(180deg);
+}
+.workspace-menu-section-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .workspace-side-menu-list {
   display: grid;
@@ -1321,6 +1332,8 @@ body {
   background: none;
   color: #333;
   font-size: 13px;
+  font-weight: 400;
+  line-height: 20px;
   text-align: left;
   text-decoration: none;
   cursor: pointer;
@@ -1341,13 +1354,30 @@ body {
 .side-menu-btn-wrap {
   position: relative;
 }
-.side-menu-icon {
-  width: 20px;
-  height: 20px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
+.workspace-menu-icon,
+.product-suggestion-sidebar-icon {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+}
+.workspace-menu-icon img {
+  width: auto;
+  max-width: 24px;
+  height: auto;
+  max-height: 24px;
+  display: block;
+  filter: grayscale() opacity(0.62);
+  transition: filter 0.18s;
+}
+.workspace-menu-icon.is-active img,
+.workspace-side-menu-btn:hover .workspace-menu-icon img,
+.workspace-side-menu-btn:focus-visible .workspace-menu-icon img,
+.workspace-customer-service-trigger:hover .workspace-menu-icon img,
+.workspace-customer-service-trigger:focus-visible .workspace-menu-icon img {
+  filter: brightness(0) saturate() invert(34%) sepia(78%) saturate(2147%)
+    hue-rotate(232deg) brightness(88%) contrast(90%);
 }
 .side-menu-label {
   min-width: 0;
@@ -1363,71 +1393,83 @@ body {
   background: none;
   color: #333;
 }
-/* 角标: 免费(橙点) —— 本地自有功能 (参考站无对应) */
-.side-menu-dot {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--color-slate-400);
-}
-.side-menu-dot-cta {
-  background: var(--color-cta);
-}
-/* 作品数徽标 —— 本地自有功能 (参考站无对应) */
-.side-menu-badge {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  min-width: 15px;
-  height: 15px;
-  padding: 0 4px;
-  border-radius: var(--radius-pill);
-  background: var(--color-cta);
-  color: #fff;
-  font-size: 10px;
-  line-height: 15px;
-  text-align: center;
-}
-/* 折叠态: 参考站 side-menu-collapsed (list 3 列, 按钮居中, 文字 10px lh14) */
-.side-menu-collapsed .workspace-side-menu-list {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-.side-menu-collapsed .workspace-side-menu-btn {
+/* 底部真实入口: 参考站 sidebar 固定在菜单列末尾 */
+.workspace-customer-service {
+  position: relative;
+  z-index: 3;
+  flex: none;
+  margin-top: 12px;
+  display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 0;
+  gap: 4px;
+}
+.product-suggestion-sidebar-launcher,
+.workspace-customer-service-trigger {
+  width: 100%;
+  height: 44px;
   padding: 8px 4px;
-  height: auto;
-  min-height: 45px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #333;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 20px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
 }
-.side-menu-collapsed .side-menu-label {
-  font-size: 10px;
-  font-weight: 500;
-  line-height: 14px;
+.product-suggestion-sidebar-launcher:hover,
+.product-suggestion-sidebar-launcher:focus-visible,
+.workspace-customer-service-trigger:hover,
+.workspace-customer-service-trigger:focus-visible {
+  color: #5546d8;
+  background: #f7f6ff;
 }
-.side-menu-collapsed .side-menu-dot,
-.side-menu-collapsed .side-menu-badge {
-  display: none;
+.product-suggestion-sidebar-icon svg {
+  display: block;
 }
-/* hover 预览大图 —— 本地自有功能 (参考站无对应): radius 16px, padding 14px 16px 16px,
-   shadow 0 10px 24px rgba(35,39,74,.16), opacity 0→1 + translateY(-50%) */
+
+/* hover 预览大图 —— 本地自有功能: 优先展示真实用户产出, 无产出时回退参考站演示图。
+   尺寸、渐变、箭头与阴影对齐参考站 workspace-menu-guide-popover。 */
 .rail-preview {
   position: fixed;
-  left: calc(100% + 12px);
   top: 50%;
   transform: translateY(-50%);
   z-index: 30;
-  width: 296px;
+  box-sizing: border-box;
+  width: 376px;
   padding: 14px 16px 16px;
-  border-radius: var(--radius-panel);
-  background: var(--color-card);
+  border-radius: 16px;
+  background: linear-gradient(110deg, #fff 0% 38%, #eeedff 100%);
   box-shadow: 0 10px 24px rgba(35, 39, 74, 0.16);
   pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   animation: rail-preview-in 0.16s ease-out;
+}
+.rail-preview::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -12px;
+  width: 0;
+  height: 0;
+  border-top: 9px solid transparent;
+  border-bottom: 9px solid transparent;
+  border-right: 12px solid #fff;
+  transform: translateY(-50%);
+}
+.rail-preview[data-flip='true']::before {
+  right: -12px;
+  left: auto;
+  border-right: 0;
+  border-left: 12px solid #fff;
 }
 @keyframes rail-preview-in {
   from {
@@ -1439,24 +1481,22 @@ body {
     transform: translateY(-50%) translateX(0);
   }
 }
-.rail-preview-title {
-  display: block;
-  font-size: 14px;
-  color: #333;
-  margin-bottom: 8px;
-}
 .rail-preview-img {
-  width: 100%;
-  height: 148px;
+  width: 344px;
+  height: 172px;
   object-fit: cover;
-  border-radius: var(--radius-card);
+  border-radius: 10px;
   display: block;
 }
 .rail-preview-desc {
   display: block;
-  font-size: 13px;
-  color: var(--color-text-secondary);
-  line-height: 1.6;
+  width: 344px;
+  overflow: hidden;
+  color: #333;
+  font-size: 14px;
+  line-height: 22px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .app-content {
@@ -1497,15 +1537,15 @@ html[data-promo='off'] {
   }
 }
 
-/* ── 响应式外壳 (2026-10-19, 参考站双断点实测, 详见 docs/workbench-design.md §4/§6) ──
-   参考站侧栏为视口响应式双态: <1400 → 100px 垂直轨 / ≥1400 → 176px 横排列表。
-   断点实测: 1360 → 100px 轨 / 1400 → 176px 横排 (落在 1360–1400 之间, 取 1400 落地)。
-   ≤900 → 参考站移动态: 侧栏 display:none + 54px 顶栏 + 汉堡抽屉 (促销条由 PromoBar
-   matchMedia 同步隐藏并置 html[data-promo='off'], 保住 pk/mif 的高度 calc 契约)。
-   注意层级: 1399 块在前、900 块在后 —— 两者同为 (0,1,0) 特异性, .app-content 的
-   margin-left 需要 900 块覆盖 1399 块的 -16px。 */
-@media (max-width: 1399px) {
-  /* 100px 垂直轨: 复刻参考站 1280 实测 (aside pad 8 8 20 / 条目 77×60 / 标签 10px) */
+/* ── 响应式外壳 (2026-10-28 复测) ──
+   参考站侧栏为视口响应式双态: ≤1366 → 100px 垂直轨 / ≥1367 → 176px 横排列表。
+   断点实测: 1366 → 100px 轨 / 1367 → 176px 横排。
+   ≤900 → 本地保留移动抽屉 (参考站侧栏在 900 仍显示, ≤768 才隐藏; 该差异见文档)。
+   注意层级: 1366 块在前、900 块在后 —— .app-content 的 margin-left 需要 900 块覆盖
+   1366 块的 -16px。 */
+@media (max-width: 1366px) {
+  /* 100px 垂直轨: 参考站 1280 实测 (aside pad 8 8 20 / sections 83 宽 gap14 /
+     条目 77×60 / 标签 10px / 分组标题 77×24) */
   .app-sider-wrap {
     width: 100px;
   }
@@ -1514,30 +1554,23 @@ html[data-promo='off'] {
   .app-content {
     margin-left: -16px;
   }
-  /* 参考站内容宽 = 视口 − 侧栏 − 48 且无 max-width (1280 实测 1148);
-     本页已整页取消 max-width 上限 (docs/workbench-design.md §6 P1-2 选项 B),
-     此处无需再覆盖 */
   .app-sider-wrap .workspace-side-menu-v2 {
     padding: 8px 8px 20px;
   }
-  /* 参考站垂直轨无 head (无 collapse 按钮, 该态不可手动折叠) */
-  .app-sider-wrap .workspace-side-menu-head {
-    display: none;
-  }
   .app-sider-wrap .workspace-side-menu-sections {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding-right: 0;
+    gap: 14px;
+    padding-top: 6px;
   }
-  .app-sider-wrap .workspace-side-menu-list {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding-top: 0;
+  .app-sider-wrap .workspace-menu-section-toggle {
+    height: 24px;
+    padding: 0 4px;
+    font-size: 12px;
+    line-height: 18px;
   }
-  /* 与 .side-menu-collapsed .workspace-side-menu-btn 同为 (0,2,0), 本块在文件中更靠后 ⇒ 胜出,
-     保证「横排态手动折叠过再缩窄到 <1400」时仍渲染为参考站垂直轨而非 3 列小格 */
+  .app-sider-wrap .workspace-menu-section-toggle svg {
+    width: 12px;
+    height: 12px;
+  }
   .app-sider-wrap .workspace-side-menu-btn,
   .app-sider-wrap .side-menu-disabled {
     width: 77px;
@@ -1547,13 +1580,37 @@ html[data-promo='off'] {
     gap: 2px;
     padding: 5px 2px;
   }
-  .app-sider-wrap .side-menu-label {
+  .app-sider-wrap .workspace-menu-icon {
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
+  }
+  .app-sider-wrap .workspace-side-menu-btn .side-menu-label {
+    font-size: 10px;
+    font-weight: 500;
+    line-height: 14px;
+    text-align: center;
+  }
+  /* 参考站窄轨下底部入口相对内容列再右移 8px, 形成 x=16 / 83px 宽的实拍几何。 */
+  .app-sider-wrap .workspace-customer-service {
+    left: 8px;
+  }
+  .app-sider-wrap .product-suggestion-sidebar-launcher,
+  .app-sider-wrap .workspace-customer-service-trigger {
+    height: 60px;
+    padding: 5px 2px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
     font-size: 10px;
     line-height: 14px;
+    text-align: center;
   }
-  .app-sider-wrap .side-menu-dot,
-  .app-sider-wrap .side-menu-badge {
-    display: none;
+  .app-sider-wrap .product-suggestion-sidebar-icon,
+  .app-sider-wrap .workspace-customer-service-trigger .workspace-menu-icon {
+    flex: 0 0 24px;
+    width: 24px;
+    height: 24px;
   }
 }
 @media (max-width: 900px) {
@@ -1572,7 +1629,7 @@ html[data-promo='off'] {
   .app-body {
     min-height: calc(100vh - 54px);
   }
-  /* 侧栏已隐藏, 撤销 1399 块的 -16px 重叠, 否则内容会向左溢出 16px。
+  /* 侧栏已隐藏, 撤销 1366 块的 -16px 重叠, 否则内容会向左溢出 16px。
      左右 10px: 参考站 390 实测 hero 宽 370 (= 390 − 20), 卡片 2 列 181 */
   .app-content {
     margin-left: 0;
@@ -1594,12 +1651,48 @@ html[data-promo='off'] {
     background: #f1efff;
     color: #5546d8;
   }
-  /* Drawer 内的侧栏: 去掉右边线 (抽屉自身即容器), 分组列表不内部滚动 (随抽屉高度流式) */
+  /* Drawer 内恢复完整横排菜单: 不受桌面窄轨的 77×60 / 10px 标签影响。 */
   .app-mobile-drawer .workspace-side-menu-v2 {
+    width: 100%;
+    height: auto;
+    min-height: 100%;
+    padding: 8px;
     border-right: none;
   }
   .app-mobile-drawer .workspace-side-menu-sections {
+    flex: none;
+    max-height: none;
+    padding-right: 0;
     overflow: visible;
+  }
+  .app-mobile-drawer .workspace-side-menu-btn,
+  .app-mobile-drawer .side-menu-disabled {
+    width: 100%;
+    height: 45px;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 8px 4px;
+  }
+  .app-mobile-drawer .workspace-side-menu-btn .side-menu-label {
+    font-size: 13px;
+    font-weight: 400;
+    line-height: 20px;
+    text-align: left;
+  }
+  .app-mobile-drawer .workspace-customer-service {
+    left: auto;
+  }
+  .app-mobile-drawer .product-suggestion-sidebar-launcher,
+  .app-mobile-drawer .workspace-customer-service-trigger {
+    height: 44px;
+    padding: 8px 4px;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    font-size: 14px;
+    line-height: 20px;
+    text-align: left;
   }
   /* 注意: .wb-* 的移动栅格规则不放在本块 —— 媒体查询不增特异性, 后方第一套
      base 规则会反压; 已改放到 wb 区块 base 规则之后 (见「工作台数据区移动适配」) */
@@ -1608,7 +1701,7 @@ html[data-promo='off'] {
 /* ───────── 工作台 (对齐参考站视觉, 数值来自实拍 computed styles) ───────── */
 /* 内容宽 = 视口 − 侧栏 − 48, 不设 max-width (2026-10-19 修正, 原 1142 上限):
    参考站实测无上限 (1280→1148 / 1440→1216 / 1920→1696 全宽), 且本页有「不偏移、
-   没有差异」的硬要求 (见下方 hero 注释)。1142 上限会在 ≥1400 档把 hero 标题
+   没有差异」的硬要求 (见下方 hero 注释)。1142 上限会在横排档把 hero 标题
    挤到 x=337 (参考站 300, 偏 37px), 故整页跟随参考站全宽。 */
 .workbench {
   margin: 0;
@@ -1617,7 +1710,7 @@ html[data-promo='off'] {
 /* hero: 参考站 .wb-workflow-banner — 实拍 1148x212 (1280) / radius 16 / padding 0 100px /
    bg var(--hero-grad-1) + bannerbg.png cover。本项目不引用第三方图片资源 → 渐变背景 + 真实产出拼贴（诚实替代）。
    padding 用参考站字面值 100px (2026-10-19 修正, 原 84px 是按 ~100px 侧栏的补偿值):
-   侧栏改 <1400 自动塌缩为 100px 轨后双态均自然对齐参考站实测 —— 轨态 (侧栏 100 + 重叠 16
+   侧栏改 ≤1366px 自动塌缩为 100px 轨后双态均自然对齐参考站实测 —— 轨态 (侧栏 100 + 重叠 16
    + padding 24 + 100) 标题落 x=208 (= 参考站 1280 实测); 横排态 (176 + 24 + 100) 落
    x=300 (= 参考站 1440 实测)。84px 在 176px 侧栏下反而偏 16px (321 vs 300)。 */
 .wb-hero {

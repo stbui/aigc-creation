@@ -94,11 +94,13 @@ export function TicketsPage() {
     const type = TYPE_OPTIONS.some((o) => o.value === typeParam)
       ? (typeParam as TicketType)
       : 'consultation';
-    setForm((prev) => ({ ...prev, type }));
+    const subject = searchParams.get('subject')?.trim();
+    setForm((prev) => ({ ...prev, type, ...(subject ? { subject } : {}) }));
     setComposing(true);
     const next = new URLSearchParams(searchParams);
     next.delete('type');
     next.delete('compose');
+    next.delete('subject');
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 

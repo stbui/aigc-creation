@@ -19,19 +19,24 @@ export function RailPreview({
   imageUrl: string | null;
   fallbackText: string;
 }) {
-  const [rect, setRect] = useState<{ top: number; left: number } | null>(null);
+  const [rect, setRect] = useState<{ top: number; left: number; flip: boolean } | null>(null);
   const [imgFailed, setImgFailed] = useState(false);
 
   useEffect(() => {
     const update = () => {
       const r = anchor.getBoundingClientRect();
-      const previewWidth = 296;
-      const gap = 12;
+      const previewWidth = 376;
+      const previewHeight = 236;
+      const gap = window.innerWidth <= 1366 ? 16 : 28;
       // 右侧空间不足时翻到左侧
       const flip = r.right + gap + previewWidth > window.innerWidth - 8;
       setRect({
-        top: Math.min(Math.max(r.top + r.height / 2, 90), window.innerHeight - 40),
+        top: Math.min(
+          Math.max(r.top + r.height / 2, 8 + previewHeight / 2),
+          window.innerHeight - 8 - previewHeight / 2,
+        ),
         left: flip ? Math.max(8, r.left - gap - previewWidth) : r.right + gap,
+        flip,
       });
     };
     update();
@@ -48,17 +53,21 @@ export function RailPreview({
   const showImage = Boolean(imageUrl) && !imgFailed;
 
   return createPortal(
-    <div className="rail-preview" style={{ top: rect.top, left: rect.left }} role="tooltip">
-      <span className="rail-preview-title">{title}</span>
-      {showImage ? (
+    <div
+      className="rail-preview"
+      style={{ top: rect.top, left: rect.left }}
+      role="tooltip"
+      aria-label={title}
+      data-flip={rect.flip ? 'true' : 'false'}
+    >
+      <span className="rail-preview-desc">{fallbackText}</span>
+      {showImage && (
         <img
           className="rail-preview-img"
           src={imageUrl as string}
           alt={`${title}示例`}
           onError={() => setImgFailed(true)}
         />
-      ) : (
-        <span className="rail-preview-desc">{fallbackText}</span>
       )}
     </div>,
     document.body,

@@ -15,7 +15,7 @@
 | # | 发现 | 优先级 | 一句话结论 |
 |---|---|---|---|
 | 1 | 应用外壳无移动端适配 | **P0** | `.app-sider-wrap` 176px 写死不隐藏、全仓无汉堡/抽屉，390px 下壳内页面横向溢出 780px、工具卡被压成 14px 宽，页面不可用 → **已修复**（§8） |
-| 2 | 侧栏无响应式塌缩，与参考站 `<1400px` 的 100px 轨不符 | **P1** | 参考站侧栏是双态响应式（1360→100px 轨 / 1400→176px 横排）；本地 `SIDEBAR_WIDTH=176` 写死，1280 视口下内容右移 76px、hero 文案补偿失效 → **已修复**（§8） |
+| 2 | 侧栏无响应式塌缩，与参考站窄屏 100px 轨不符 | **P1** | 参考站侧栏是双态响应式（1366→100px 轨 / 1367→176px 横排）；本地 `SIDEBAR_WIDTH=176` 写死，1280 视口下内容右移 76px、hero 文案补偿失效 → **已修复**（§8、§11） |
 | 3 | 内容宽度上限 1142 vs 参考站无上限全宽 | **P1** | 参考站内容宽 = 视口 − 侧栏 − 48（1920 时 1696 全宽）；本地 `.workbench` max-width 1142 截断，1440 时窄 74px → **已裁定 B（删上限全宽）并实施**（§6 P1-2 / §8） |
 | 4 | hero / 工具卡 / 数据区规格与参考站逐值一致 | ✅ 已对齐 | 32px/500 标题、14px/600 卡题、2:1 visual、40×40 跨界图标、2:1 面板 + 通栏、圆角 12/16 不一致均按 10-17 实拍复刻 |
 | 5 | guest 态数据面板 | ✅ 已登记诚实差异 | 参考站未登录显示登录引导（含 100 积分营销弹窗）；本地以真实 stats 填充，产品语义更完整，不回退 |
@@ -51,7 +51,7 @@ body.promo-topbar-open
    │  ├─ .workspace-brand              品牌区 266px（logo 36×36 + 「极画 · AI 电商图」）
    │  ├─ nav.workspace-auth-nav        导航 796px：首页/电商生图▾/AI修图▾/AI视频▾/我的作品/购买套餐
    │  └─ .landing-top-actions          用户区 170px：邀友/签到得积分/工作台/登录注册
-   ├─ aside.workspace-side-menu-v2     固定 100px（<1400）/ 176px（≥1400）——响应式双态，见 §4
+   ├─ aside.workspace-side-menu-v2     固定 100px（≤1366）/ 176px（≥1367）——响应式双态，见 §4/§11
    └─ main.workspace-route-content     内部滚动区（scrollHeight 1294 / clientHeight 696），bg #f6f7fb
       └─ 内容列                        x=108 宽 1148（= 84 + 24，即侧栏外延 16px + padding 24）
 ```
@@ -62,8 +62,8 @@ body.promo-topbar-open
 | 顶导 | h=64，白底，下边框 `#f2f3f5` 1px；grid 三栏 266/796/170 | 本地 `.app-header` 64px 同构 |
 | 导航项 | 13px/700 `#667085`，radius 8，pad 0 14，高 32 | 下拉菜单 `.workspace-nav-menu` 119–137px 宽、条目 36px 高 |
 | 签到按钮 | 13px/700 `#5546d8` on `#f1efff`，radius 999，pad 7 12，border 1px `#d8d2ff`，112×32 | 顶导右侧固定入口 |
-| 侧栏（<1400） | 100px 垂直轨：条目 77×60，flex column，图标 24×24 居中置顶、标签 10px 置下；active `#f1effff`/`#5546d8`，radius 8 | 分组头 `.workspace-menu-section-toggle` 77×24 可折叠 |
-| 侧栏（≥1400） | 176px 横排：条目 133×45，flex row，13px 标签；容器 padding 16 12 24 24，border-right 1px `#f2f3f5` | head 32px 含 collapse 按钮 24×24 |
+| 侧栏（≤1366） | 100px 垂直轨：sections 83px / 列表 77px，条目 77×60，flex column，图标 24×24、标签 10px/14；分组标题 77×24、12px/18；底部入口 83×60 | 分组标题 `.workspace-menu-section-toggle` 可折叠；无 head/collapse 按钮 |
+| 侧栏（≥1367） | 176px 横排：sections 139px / 列表 133px，条目 133×45，flex row，13px/20 标签；容器 padding 16 12 24 24，border-right 1px `#f2f3f5` | 分组标题 133×28、14px/20；底部入口 139×44；无 head/collapse 按钮 |
 | 主区滚动 | `.workspace-route-content` **内部滚动**，非 window 滚动 | 本地已登记为诚实差异（`WorkbenchPage.tsx:52-54`）：本地 window 滚动 |
 
 ---
@@ -128,14 +128,15 @@ body.promo-topbar-open
 
 ## 4. 响应式双态与断点（本次核心发现）
 
-参考站侧栏 `aside.workspace-side-menu-v2` 是**视口响应式双态**，断点位于 1360–1400 之间：
+参考站侧栏 `aside.workspace-side-menu-v2` 是**视口响应式双态**，2026-10-28 精确定点为 1366 / 1367：
 
 | 视口 | 侧栏 | 条目 | 标签 | 内容列 | hero 标题 x |
 |---|---|---|---|---|---|
 | 1280 | 100px 垂直轨 | 77×60 column | 10px | x=108 宽 1148 | **208** |
 | 1300 | 100px 轨 | 77×60 | 10px | — | — |
-| 1360 | 100px 轨 | 77×60 | 10px | — | — |
-| **1400** | **176px 横排** | 133×45 row | 13px | x=200 宽 1216 | 300 |
+| **1366** | **100px 轨** | 77×60 | 10px | — | — |
+| **1367** | **176px 横排** | 133×45 row | 13px | x=200 宽 1216 | 300 |
+| 1400 | 176px 横排 | 133×45 row | 13px | x=200 宽 1216 | 300 |
 | 1440 | 176px 横排 | 133×45 | 13px | x=200 宽 1216 | 300 |
 | 1920 | 176px 横排 | 133×45 | 13px | x=200 宽 **1696**（无 max-width 截断） | 300 |
 
@@ -147,7 +148,7 @@ body.promo-topbar-open
 
 | 维度 | 参考站 | 本地 | 判定 |
 |---|---|---|---|
-| 侧栏 @1280 | 100px 垂直轨（<1400 自动塌缩） | 176px 横排（`SIDEBAR_WIDTH=176` 写死，仅手动折叠，`SideRail.tsx:40`） | ❌ 漂移 +76px |
+| 侧栏 @1280 | 100px 垂直轨（≤1366 自动塌缩） | 100px 垂直轨；条目 77×60、标签 10px/14、分组标题 77×24 | ✅ 已对齐（2026-10-28，§11） |
 | 侧栏 @1440 | 176px 横排 | 176px 横排 | ✅ |
 | 侧栏 @390 | display:none | **display:block**（176px 挤占屏幕） | ❌ P0 |
 | 内容列 @1280 | x=108 宽 1148 | x=200 宽 1056 | ❌ 右移 92 / 窄 92 |
@@ -188,7 +189,7 @@ body.promo-topbar-open
 **证据**：§4 断点表；`global.css:886` 注释自述「hero padding 用 84px 补偿，使文案与参考站落在同一绝对 x=208」——该数学成立的前提是侧栏 ≈100px，但本地默认态侧栏 176px，1280 下标题实测 x=284（参考站 208）。
 
 **建议修法**：
-1. `<1400px` 自动应用塌缩态（参考站断点在 1360–1400 之间，建议以 1400px 落地后复测定点；本地 `.side-menu-collapsed` 三列 10px 实现已存在，`global.css:796-815`）
+1. 自动应用塌缩态（2026-10-28 精确定点为 `≤1366px`；旧 `.side-menu-collapsed` 三列实现已由 §11 的分组菜单取代）
 2. hero padding 84px → **100px**（参考站字面值）：删除补偿逻辑后双态自然对齐——100px 侧栏时 108+100=208 ✓；176px 侧栏时 200+100=300 ✓（参考站 1440 实测 300）
 3. `WorkbenchPage.tsx:52-54` 注释同步更新（84px 补偿的缘由作废）
 
@@ -217,9 +218,9 @@ body.promo-topbar-open
 | # | 事项 | 建议 | 状态 |
 |---|---|---|---|
 | 1 | P0-1 移动端外壳适配（隐藏侧栏 + 汉堡 + Drawer + 54px 顶栏） | 按 §6 修法实施，需 390/768 两档复测 | ✅ 已实施（2026-10-19，见 §8） |
-| 2 | P1-1 侧栏 <1400 自动塌缩 + hero padding 回归 100px | 实施后需 1280/1360/1440 三档复测 | ✅ 已实施（2026-10-19，见 §8） |
+| 2 | P1-1 侧栏自动塌缩 + hero padding 回归 100px | 实施后需 1280/1366/1367/1440 四档复测 | ✅ 已实施（2026-10-19；断点于 2026-10-28 校正为 1366，见 §11） |
 | 3 | P1-2 内容宽度上限（A 保留 1142 / B 跟随全宽） | 初倾向 A，实施期证据翻转 → **B** | ✅ 已裁定 B 并实施（见 §6 P1-2） |
-| 4 | 参考站侧栏断点精确定点（1360–1400 之间） | 实施 P1-1 时以 20px 步进复测 | ✅ 已复测：1360=轨 / 1400=横排，取 1400 落地 |
+| 4 | 参考站侧栏断点精确定点 | 实施 P1-1 时逐像素复测 | ✅ 2026-10-28 复测：1366=轨 / 1367=横排，已按 1366 落地（§11） |
 
 ---
 
@@ -231,8 +232,8 @@ body.promo-topbar-open
 |---|---|
 | `frontend/src/components/AppLayout.tsx` | 删 inline `width: SIDEBAR_WIDTH`（inline 会压过媒体查询）；新增汉堡按钮 `.app-mobile-toggle` + antd `Drawer` 承载 SideRail（点菜单即导航并关抽屉） |
 | `frontend/src/components/PromoBar.tsx` | 窄屏（≤900px）经 matchMedia 隐藏促销条，并同步 `html[data-promo='off']`——保住 pk-workspace / 多图融合页的高度 calc 契约（`global.css` 原 1648/5509 行） |
-| `frontend/src/components/SideRail.tsx` | 删除 `SIDEBAR_WIDTH` 导出（宽度改由 CSS 托管）；注释补记 <1400 垂直轨态 |
-| `frontend/src/styles/global.css` | ① `.app-sider-wrap` 宽度改 CSS 托管（176 桌面 / 100 轨 / 900 隐藏）；② 新增「响应式外壳」双媒体查询块（1399 轨态 + 900 移动态）；③ hero padding 84→100px；④ `.workbench` 删 max-width 全宽；⑤ 拆除「1:1 覆盖层」里 4 处静态 `grid-template-columns`（`.wb-tools`/`.wb-panels`/`.wb-account-metrics`/`.wb-dashboard-stats`，它们把第一套的响应式断点全压死）；⑥ `.wb-panels` 列宽并入参考站字面值 `minmax(0,2fr) minmax(300px,1fr)`；⑦ 数据区移动栅格（六格 2 列 / 账号堆叠 / 工具网格 520px gap 8） |
+| `frontend/src/components/SideRail.tsx` | 删除 `SIDEBAR_WIDTH` 导出（宽度改由 CSS 托管）；注释补记窄屏垂直轨态（2026-10-28 更新为 ≤1366） |
+| `frontend/src/styles/global.css` | ① `.app-sider-wrap` 宽度改 CSS 托管（176 桌面 / 100 轨 / 900 隐藏）；② 新增「响应式外壳」双媒体查询块（2026-10-28 校正为 1366 轨态 + 900 移动态）；③ hero padding 84→100px；④ `.workbench` 删 max-width 全宽；⑤ 拆除「1:1 覆盖层」里 4 处静态 `grid-template-columns`（`.wb-tools`/`.wb-panels`/`.wb-account-metrics`/`.wb-dashboard-stats`，它们把第一套的响应式断点全压死）；⑥ `.wb-panels` 列宽并入参考站字面值 `minmax(0,2fr) minmax(300px,1fr)`；⑦ 数据区移动栅格（六格 2 列 / 账号堆叠 / 工具网格 520px gap 8） |
 | `frontend/src/pages/WorkbenchPage.tsx` | 注释块同步（内容宽全宽、hero padding 100、卡片 178） |
 
 ### 8.2 验证结果（Playwright 实测，演示账号登录态）
@@ -292,7 +293,7 @@ body.promo-topbar-open
 
 ## 附录 B · 与 2026-10-17 实拍记录的差异说明
 
-本次为 guest 态重抓，与 10-17 记录（已固化于 `global.css` 注释）逐条复验：hero 排版、卡片规格、数据区几何、面板圆角 12/16 **全部一致**，无漂移。两处 10-17 记录之外的新事实：① 参考站侧栏为 1360–1400 间切换的双态响应式（10-18 本地注释只记录了 ≥1440 的 176px 横排态，漏记了 <1400 的 100px 轨态，导致本地外壳按 176px 单态实现）；② 参考站 guest 态数据面板为登录引导（10-17 记录的面板内部结构来自登录态或更早版本，本次无法复取，沿用）。
+本次为 guest 态重抓，与 10-17 记录（已固化于 `global.css` 注释）逐条复验：hero 排版、卡片规格、数据区几何、面板圆角 12/16 **全部一致**，无漂移。两处 10-17 记录之外的新事实：① 参考站侧栏为双态响应式（2026-10-28 精确复测为 1366 / 1367，详见 §11）；② 参考站 guest 态数据面板为登录引导（10-17 记录的面板内部结构来自登录态或更早版本，本次无法复取，沿用）。
 
 ---
 
@@ -328,3 +329,60 @@ body.promo-topbar-open
 - 类型检查、Vitest、前端生产构建、后端构建通过。
 - 新增 `frontend/tests/workspace-pages.spec.ts`：固定 12 卡顺序、游客不请求 `/stats/overview`、首卡进入 `/product-kit`、登录态 6 格看板、390 两列且无溢出。
 - 1440 主内容区视觉对拍 SSIM `0.950`；参考站的外壳不纳入主内容比较。游客营销弹层已按布局复制、权益改写落地，详见 §3.5 与 `docs/workspace-pages-restoration-prompt.md` §3.4。
+
+---
+
+## 11. 2026-10-28 左侧菜单复原
+
+参考站新产物为 `index-B4lo6Cz6.js` + `index-DDOEXtwn.css`。本轮只复原左侧菜单，不改工作台主内容。实拍视口为 1440×1000 与 1280×1000；促销条开启时参考站侧栏从 `y=104` 开始，高度 `896`。
+
+### 11.1 结构与顺序
+
+菜单为 `nav.workspace-side-menu-v2` 内的 `.workspace-side-menu-sections` 加上底部 `.workspace-customer-service`。默认全部展开：
+
+1. 根区域：工作台、我的作品
+2. AI视频：自由创作、图生视频*
+3. 电商生图：商品主图、商品详情、爆款复刻、创意生图、多图融合、商品SKU图
+4. AI修图：局部重绘、一键抠图、去除水印、产品精修、图片翻译、智能扩图、商品换色、旋转角度
+5. 数据中心：数据看板*、素材库
+6. 底部：产品建议、联系客服
+
+`*` 为本地真实 IA 增强，参考站当前没有图生视频和数据看板入口；不伪造路由，分别落在 `/tools/image_to_video` 与 `/stats`。商品详情能力名保持注册表不变，侧栏按参考站显示“商品详情”。
+
+### 11.2 几何与样式
+
+| 元素 | 1440 横排 | 1280 竖轨 |
+|---|---|---|
+| 侧栏 | 176px，pad 16 12 24 24 | 100px，pad 8 8 20 |
+| sections | 139px，gap 16，padding-top 8 | 83px，gap 14，padding-top 6 |
+| 列表 | 133px，gap 4，padding-top 4 | 77px，gap 4，padding-top 4 |
+| 条目 | 133×45，row，pad 8 4，gap 12 | 77×60，column，pad 5 2，gap 2 |
+| 标签 | 13px/20 | 10px/14 |
+| 分组标题 | 133×28，14px/20 | 77×24，12px/18 |
+| 底部入口 | 139×44 | 83×60 |
+
+- 条目 radius 8；active 为 `#f1efff` 底 + `#5546d8` 字，hover 为 `#f7f6ff`。
+- 分组标题右侧 14px `ChevronUp`，收起后旋转 180°；`aria-expanded` 与 `aria-controls` 同步。抽屉与桌面侧栏同时挂载时，面板 id 用 React `useId()` 加前缀，避免重复 DOM id。
+- 菜单图标使用参考站 `/static/menu/*.svg` 的本地副本 `frontend/public/menu/`，运行时只请求 `/menu/*`。默认 `grayscale + opacity(.62)`，active/hover 使用参考站紫色 filter。
+- 分组标题与底部入口没有 `head` / collapse 按钮；旧版手动折叠与三列小格逻辑已删除。
+
+### 11.3 Hover 预览
+
+`.rail-preview` 对齐参考站 `workspace-menu-guide-popover`：376px 宽、padding 14 16 16、gap 12、radius 16、渐变 `linear-gradient(110deg,#fff 0% 38%,#eeedff 100%)`、`0 10px 24px #23274a29`，左侧 12px 三角箭头，图片 344×172 / radius 10 / cover。右侧空间不足时翻到左侧，箭头同步换向。图片优先取用户该能力最近一次真实产出；没有产出时回退本地化的参考站演示图。
+
+### 11.4 底部入口与高度修复
+
+- “产品建议”落到真实 `/tickets?type=other&compose=1&subject=产品建议`，工单页读取 `subject` 预填标题并清除 URL 参数。
+- “联系客服”落到真实 `/tickets?type=consultation&compose=1`，预选“咨询”类型。
+- `.app-sider-wrap` 的 `top` / `height` 改为 `var(--workspace-topbar-height)`。此前固定按 64px 计算，促销条开启时顶栏实际 104px，侧栏底部会超出视口 40px，客服入口不可见。
+
+### 11.5 断点与保留差异
+
+- 精确断点：`≤1366px` 为 100px 竖轨，`≥1367px` 为 176px 横排。旧 CSS 的 `max-width:1399px` 已纠正。
+- 参考站 900px 仍显示侧栏，≤768px 才隐藏；本地为保护既有移动页面，继续在 `≤900px` 使用隐藏侧栏 + 汉堡 Drawer。Drawer 内恢复 280px 宽的完整横排菜单，不继承 77×60 竖轨。
+- 本地保留图生视频与数据看板两个真实入口，并在本条记录为差异。
+
+### 11.6 验证
+
+- `frontend/tests/sidebar.spec.ts` 6 条通过：1440 几何/顺序/本地图标/底部入口、1280 竖轨、1366/1367 断点、折叠与唯一面板 id、真实工单预填、390 抽屉与无溢出。
+- 原有 `frontend/tests/workspace-pages.spec.ts` 11 条通过，游客弹层、工作台、作品与素材库未回退。

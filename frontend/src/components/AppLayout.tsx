@@ -32,11 +32,10 @@ interface Props {
   items: CapabilityDef[];
   /** 侧栏 hover 预览用的真实产出图: capability -> sourceUrl */
   thumbs: Record<string, string | null>;
-  statsTotal: number;
   children: ReactNode;
 }
 
-export function AppLayout({ groups, items, thumbs, statsTotal, children }: Props) {
+export function AppLayout({ groups, items, thumbs, children }: Props) {
   const location = useLocation();
   const navigate = useNavigate();
   const { token, email, logout, openLogin } = useAuth();
@@ -226,7 +225,7 @@ export function AppLayout({ groups, items, thumbs, statsTotal, children }: Props
       </Header>
 
       <Layout className="app-body">
-        {/* 宽度由 CSS 托管: 桌面 176px 横排 / <1400px 自动塌缩 100px 垂直轨 / ≤900px 隐藏。
+        {/* 宽度由 CSS 托管: 桌面 176px 横排 / ≤1366px 自动塌缩 100px 垂直轨 / ≤900px 隐藏。
             曾经由 JSX inline width 注入, 会压过媒体查询导致响应式失效 (2026-10-19 修正) */}
         <div className="app-sider-wrap">
           <SideRail
@@ -234,7 +233,6 @@ export function AppLayout({ groups, items, thumbs, statsTotal, children }: Props
             items={visibleItems}
             thumbs={thumbs}
             activePath={location.pathname}
-            statsTotal={statsTotal}
             onNavigate={go}
           />
         </div>
@@ -255,7 +253,6 @@ export function AppLayout({ groups, items, thumbs, statsTotal, children }: Props
           items={visibleItems}
           thumbs={thumbs}
           activePath={location.pathname}
-          statsTotal={statsTotal}
           onNavigate={() => setMobileNavOpen(false)}
         />
       </Drawer>
