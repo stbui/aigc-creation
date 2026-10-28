@@ -8,17 +8,37 @@
 # 表现为「测试前端连着开发库」，且没有任何报错。
 # ─────────────────────────────────────────────────────────────────────────────
 
-upstream huojue_backend {
-    # 由环境变量 BACKEND_UPSTREAM 注入，默认 compose 的 backend:3001
-    server ${BACKEND_UPSTREAM} keepalive 32;
+# 外层 TLS 反代已经写入的客户端信息优先；直连容器时再回落到 Nginx 自身观测值。
+# 否则生产入口是 HTTPS，后端却始终看到 http，Secure Cookie / 跳转判断会出错。
+map $http_x_forwarded_proto $huojue_forwarded_proto {
+    default $http_x_forwarded_proto;
+    ""      $scheme;
+}
+
+map $http_x_forwarded_port $huojue_forwarded_port {
+    default $http_x_forwarded_port;
+    ""      $server_port;
+}
+
+map $http_x_real_ip $huojue_real_ip {
+    default $http_x_real_ip;
+    ""      $remote_addr;
 }
 
 server {
     listen       80;
     server_name  _;
 
+    # 端口映射/外层反代下，不让 Nginx 生成带错误 host:port 的绝对跳转。
+    absolute_redirect off;
+
+    # Docker 内置 DNS。用变量形式的 proxy_pass，容器重建换 IP 后无需重启 Nginx。
+    resolver ${DNS_RESOLVER} valid=10s ipv6=off;
+    set $huojue_backend ${BACKEND_UPSTREAM};
+
     root  /usr/share/nginx/html;
     index index.html;
+    server_tokens off;
 
     # ── 安全响应头 ─────────────────────────────────────────────────────────
     # CSP 暂不启用：Vite 产物会内联 style，开了 strict CSP 得逐条调内联资源，
@@ -39,13 +59,19 @@ server {
 
     # ── API 反代 ───────────────────────────────────────────────────────────
     location /api/ {
-        proxy_pass         http://huojue_backend;
+        proxy_pass         http://$huojue_backend;
         proxy_http_version 1.1;
         proxy_set_header   Connection "";
         proxy_set_header   Host              $host;
-        proxy_set_header   X-Real-IP         $remote_addr;
-        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto $scheme;
+        proxy_set_header   X-Forwarded-Host  $host;
+        proxy_set_header   X-Real-IP         $huojue_real_ip;
+        # 后端 trust proxy=1：只传「真实客户端」这一层，不再追加外层反代地址。
+        # 追加后 XFF 变成 client, outer-proxy，Express 会取到 outer-proxy，
+        # 结果是所有用户共用一个限流桶。外层反代应写 X-Real-IP。
+        proxy_set_header   X-Forwarded-For   $huojue_real_ip;
+        proxy_set_header   X-Forwarded-Proto $huojue_forwarded_proto;
+        proxy_set_header   X-Forwarded-Port  $huojue_forwarded_port;
+        proxy_hide_header  X-Powered-By;
 
         # 生成任务是长轮询（前端每 1.2s 查一次，最长 60 次），
         # 导出/备份类请求更久 —— 放宽到 300s。
@@ -59,10 +85,14 @@ server {
     # ⚠ 若生产把 STORAGE_BACKEND 换成 OSS/MinIO，本段应删除，
     #   让请求走 /api 的签名 URL 逻辑。
     location /uploads/ {
-        proxy_pass       http://huojue_backend;
-        proxy_set_header Host $host;
+        proxy_pass       http://$huojue_backend;
+        proxy_set_header Host             $host;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_set_header X-Real-IP        $huojue_real_ip;
+        proxy_set_header X-Forwarded-For  $huojue_real_ip;
         expires 30d;
         add_header Cache-Control "public, max-age=2592000";
+        add_header X-Content-Type-Options "nosniff" always;
     }
 
     # ── 静态资源 ───────────────────────────────────────────────────────────
@@ -71,17 +101,26 @@ server {
     location /assets/ {
         expires 1y;
         add_header Cache-Control "public, immutable";
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options        "SAMEORIGIN" always;
+        add_header Referrer-Policy        "strict-origin-when-cross-origin" always;
         access_log off;
     }
 
     location = /index.html {
         add_header Cache-Control "no-store, no-cache, must-revalidate";
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header X-Frame-Options        "SAMEORIGIN" always;
+        add_header Referrer-Policy        "strict-origin-when-cross-origin" always;
         expires 0;
     }
 
     # ── SPA 回退 ───────────────────────────────────────────────────────────
+    # 只测试文件，不测试 $uri/：public/workbench 是静态资源目录、/workbench 又是
+    # 前端路由，带 $uri/ 会先命中目录并 301，随后 /workbench/ 因无 index 返回 403。
+    # 静态资源文件仍由 $uri 命中，其余路径统一回退到 index.html。
     location / {
-        try_files $uri $uri/ /index.html;
+        try_files $uri /index.html;
     }
 
     # 健康检查：不落 access_log，避免刷爆日志

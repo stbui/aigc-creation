@@ -13,6 +13,7 @@
 #   测试:  docker compose --profile test up -d
 #
 # 三者互不干扰：端口不同、库文件不同、上传目录不同（见下方 volumes）。
+# 每次 up 先跑一次幂等的 Prisma db push；全新卷也能直接启动，而不是空库健康。
 #
 # ⚠ 生产部署**不要**用这个文件。生产形态与生产注意事项见
 #   docs/environments.md「生产部署」一节；那份编排涉及 TLS、域名、
@@ -22,14 +23,36 @@
 name: huojue
 
 services:
+  # ── 建表（一次性任务，成功后 backend 才启动）───────────────────────────────
+  backend-migrate:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: tools
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
+    image: huojue-backend-tools:local
+    container_name: huojue-backend-migrate-dev
+    restart: "no"
+    init: true
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      DATABASE_URL: ${DATABASE_URL:-file:./data/dev.db}
+    volumes:
+      - huojue-data:/app/data
+
   # ── 后端 ──────────────────────────────────────────────────────────────────
   backend:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
     image: huojue-backend:local
     container_name: huojue-backend-dev
     restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
     environment:
       # ---- 环境标识：这一项决定读哪一档 env 文件，改错就连错库 ----
       NODE_ENV: ${NODE_ENV:-development}
@@ -88,12 +111,22 @@ services:
       # 具名卷：库文件、上传图、备份、日志全在里面，
       # `docker compose down` 不删（要删得显式 down -v）
       - huojue-data:/app/data
+    depends_on:
+      backend-migrate:
+        condition: service_completed_successfully
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:3001/api/v1/capabilities"]
+      test: ["CMD", "node", "docker/healthcheck.js"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 25s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   # ── 前端 ──────────────────────────────────────────────────────────────────
   frontend:
@@ -101,16 +134,19 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
         # 留空 → 产物走同源 /api，由 nginx 反代（零 CORS）
         VITE_API_BASE: ${VITE_API_BASE:-}
         VITE_ENV_LABEL: ${VITE_ENV_LABEL:-}
     image: huojue-frontend:local
     container_name: huojue-frontend-dev
     restart: unless-stopped
+    init: true
     environment:
       # nginx 模板里 ${BACKEND_UPSTREAM} 的取值。**必须与下方 depends_on
       # 的服务名一致** —— 写错不会报错，只会让前端静默代理到另一套环境。
       BACKEND_UPSTREAM: backend:3001
+      DNS_RESOLVER: 127.0.0.11
     ports:
       - "${FRONTEND_HOST_PORT:-15173}:80"
     depends_on:
@@ -122,6 +158,32 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ── 测试档建表 ─────────────────────────────────────────────────────────────
+  backend-migrate-test:
+    profiles: ["test"]
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: tools
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
+    image: huojue-backend-tools:test
+    container_name: huojue-backend-migrate-test
+    restart: "no"
+    init: true
+    environment:
+      NODE_ENV: test
+      DATABASE_URL: file:./data/test.db
+    volumes:
+      - huojue-test-data:/app/data
 
   # ── 测试环境（--profile test 才起）────────────────────────────────────────
   backend-test:
@@ -129,9 +191,13 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
     image: huojue-backend:test
     container_name: huojue-backend-test
     restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
     environment:
       NODE_ENV: test
       HOST: 0.0.0.0
@@ -141,7 +207,7 @@ services:
       UPLOAD_DIR: /app/data/uploads-test
       BACKUP_DIR: /app/data/backups-test
       LOG_DIR: /app/data/logs-test
-      CORS_ORIGINS: http://localhost:15174,http://127.0.0.1:15174
+      CORS_ORIGINS: http://localhost:15273,http://127.0.0.1:15273
       # 测试用独立密钥：顺手验证「换密钥后旧 token 失效」
       JWT_SECRET: test-only-secret-do-not-reuse-in-prod
       JWT_TTL: 1h
@@ -155,6 +221,22 @@ services:
     volumes:
       # 独立卷：测试库与测试上传图都不与开发环境混用
       - huojue-test-data:/app/data
+    depends_on:
+      backend-migrate-test:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "docker/healthcheck.js"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   frontend-test:
     profiles: ["test"]
@@ -163,20 +245,36 @@ services:
       dockerfile: Dockerfile
       target: runtime
       args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
         VITE_API_BASE: ""
         VITE_ENV_LABEL: 测试
     image: huojue-frontend:test
     container_name: huojue-frontend-test
     restart: unless-stopped
+    init: true
     environment:
       # 指向**测试**后端。写成 backend:3001 的话，测试前端会把请求
       # 代理到开发后端上 —— 不报错，只是数据全错。
       BACKEND_UPSTREAM: backend-test:3001
+      DNS_RESOLVER: 127.0.0.11
     ports:
       - "${FRONTEND_TEST_HOST_PORT:-15273}:80"
     depends_on:
       backend-test:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   # 开发数据（dev.db + uploads + backups + logs）

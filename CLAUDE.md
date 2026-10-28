@@ -96,6 +96,7 @@ aigc-creation/
 │   ├── <页面>*-design.md     # 产品：1:1 规格与实拍审计（workbench / topnav / login / asset-library ...）
 │   └── *-ref/ · screenshots/ · research/   # 取证截图与一次性调研（不参与分类）
 ├── docker-compose.yml        # 本地编排：默认=dev，--profile test=test（不同卷、不同库）
+├── docker-compose.production.yml # 生产单机编排：migrate 门禁 / 健康探针 / 持久卷 / 仅本机监听
 ├── .run/                     # backend.log / frontend.log（gitignore）
 ├── backend/                  # NestJS 服务，端口 4100（测试档同端口），全局前缀 /api/v1
 │   ├── prisma/schema.prisma  # SQLite provider；无 enum，状态类字段一律 String + DTO 白名单
@@ -206,6 +207,10 @@ cd backend && npx ts-node -T scripts/probe-environments.ts
 docker compose up -d --build                # 开发（13001 / 15173）
 docker compose --profile test up -d --build # 开发 + 测试并行（容器端口 13001/13101 各自独立）
 docker compose down -v                      # 连数据卷一起删
+
+# 生产（先填 backend/.env.production 并 chmod 600；默认仅绑 127.0.0.1:18080）
+docker compose -f docker-compose.production.yml up -d --build
+docker compose -f docker-compose.production.yml ps -a
 
 # 冒烟验证（需后端已启动；28 个脚本）
 cd backend
@@ -765,6 +770,7 @@ Jimp 仅用于上传校验、尺寸探测和 AIGC 角标合成，不参与生成
 | 文档 | 内容 | 状态 |
 | --- | --- | --- |
 | `docs/environments.md` | 三环境变量矩阵、加载优先级、生产门禁、Docker、排查 | **现行事实源** |
+| `docs/docker-deployment.md` | 本地 / 测试 / 生产容器部署、TLS 边界、备份恢复、升级回滚、排障 | **现行事实源** |
 | `docs/model-architecture.md` | 模型通道分层、协议矩阵、调度与配置、请求时序、扩展 SOP | **现行事实源** |
 | `docs/layout-unification.md` / `typography-components-details.md` / `refactor-dedup.md` | 布局统一 / 字体细节 / 重复代码抽取 | 实施记录 |
 | `docs/agent-technical-design.md` | AI 智能体技术方案 | 规划 |

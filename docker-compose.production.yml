@@ -1,0 +1,151 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# 生产 / 单机 Docker Compose 部署
+#
+# 前置：
+#   1. cp backend/.env.production.example backend/.env.production
+#   2. 填好 JWT_SECRET、CORS_ORIGINS、WEB_BASE_URL、ASSET_SIGNING_SECRET 等
+#   3. chmod 600 backend/.env.production
+#   4. docker compose -f docker-compose.production.yml up -d --build
+#
+# 设计约束：
+#   · backend 不映射宿主端口，只能经 frontend 的 Nginx 访问；
+#   · migrate 先建表，成功后才启动 backend；
+#   · SQLite / 上传图 / 备份 / 日志统一落 huojue-prod-data 卷；
+#   · 前端默认只绑 127.0.0.1:18080，TLS 由外层反代 / LB 终结；
+#   · seed 是显式 profile，不会随普通 up 自动跑。
+# ─────────────────────────────────────────────────────────────────────────────
+
+name: huojue-production
+
+x-backend-base: &backend-base
+  restart: unless-stopped
+  init: true
+  env_file:
+    - ${BACKEND_ENV_FILE:-./backend/.env.production}
+  environment:
+    NODE_ENV: production
+    HOST: 0.0.0.0
+    PORT: 3001
+    API_PREFIX: api/v1
+    TZ: ${TZ:-Asia/Shanghai}
+    DATABASE_URL: file:/app/data/prod.db
+    UPLOAD_DIR: /app/data/uploads
+    BACKUP_DIR: /app/data/backups
+    LOG_DIR: /app/data/logs
+    # 后端只在内网，前面固定有 frontend Nginx；限流才能拿到真实客户端 IP。
+    RATE_LIMIT_TRUST_PROXY: "true"
+  volumes:
+    - huojue-prod-data:/app/data
+  security_opt:
+    - no-new-privileges:true
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+  networks:
+    - huojue
+
+services:
+  # 一次性建表任务。Prisma CLI 只存在于 tools 目标，不进入生产运行镜像。
+  migrate:
+    <<: *backend-base
+    restart: "no"
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: tools
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
+        NODE_IMAGE: ${NODE_IMAGE:-node:24-slim}
+    image: ${HUOJUE_IMAGE_PREFIX:-}huojue-backend-tools:${HUOJUE_IMAGE_TAG:-production}
+    command: ["npx", "prisma", "db", "push"]
+
+  backend:
+    <<: *backend-base
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: prod
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
+        NODE_IMAGE: ${NODE_IMAGE:-node:24-slim}
+    image: ${HUOJUE_IMAGE_PREFIX:-}huojue-backend:${HUOJUE_IMAGE_TAG:-production}
+    stop_grace_period: 30s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "docker/healthcheck.js"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: runtime
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
+        NODE_IMAGE: ${NODE_IMAGE:-node:24-slim}
+        NGINX_IMAGE: ${NGINX_IMAGE:-nginx:1.27-alpine}
+        # 同源部署保持空；只有前端单独挂 CDN 时才填绝对地址。
+        VITE_API_BASE: ${VITE_API_BASE:-}
+        VITE_ENV_LABEL: ${VITE_ENV_LABEL:-}
+    image: ${HUOJUE_IMAGE_PREFIX:-}huojue-frontend:${HUOJUE_IMAGE_TAG:-production}
+    restart: unless-stopped
+    init: true
+    environment:
+      BACKEND_UPSTREAM: backend:3001
+      DNS_RESOLVER: 127.0.0.11
+    ports:
+      # 默认仅本机监听，供云 LB / Caddy / 系统 Nginx 做 TLS 终结。
+      - "${FRONTEND_BIND_ADDR:-127.0.0.1}:${FRONTEND_HOST_PORT:-18080}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - huojue
+
+  # 可选初始化任务：
+  #   docker compose -f docker-compose.production.yml --profile seed run --rm seed
+  # 会执行 seed:all（管理员随机密码只在本次输出中显示一次，请立即保存）。
+  seed:
+    <<: *backend-base
+    profiles: ["seed"]
+    restart: "no"
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: tools
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
+        NODE_IMAGE: ${NODE_IMAGE:-node:24-slim}
+    image: ${HUOJUE_IMAGE_PREFIX:-}huojue-backend-tools:${HUOJUE_IMAGE_TAG:-production}
+    command: ["npm", "run", "seed:all"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+networks:
+  huojue:
+    driver: bridge
+
+volumes:
+  huojue-prod-data:
+    name: ${HUOJUE_DATA_VOLUME:-huojue-prod-data}

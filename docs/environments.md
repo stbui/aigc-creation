@@ -233,6 +233,10 @@ docker compose down -v       # 连数据卷一起删（库/上传图/备份/日�
 
 端口避开本机常用值：开发 `13001` / `15173`，测试 `13101` / `15273`。
 
+每次 `up` 会先运行一次 `backend-migrate` / `backend-migrate-test`
+（幂等的 `prisma db push`），成功退出后后端才启动；全新数据卷也能直接启动。
+这两个一次性任务显示为 `Exited (0)` 属正常，不是崩溃。
+
 两个 profile 用**不同的具名卷**（`huojue-data` / `huojue-test-data`），
 库文件与上传目录都不同。`frontend-test` 的 nginx 上游通过
 `BACKEND_UPSTREAM=backend-test:3001` 注入 —— 写错不报错，只会让测试前端
@@ -240,19 +244,26 @@ docker compose down -v       # 连数据卷一起删（库/上传图/备份/日�
 
 ### 生产部署
 
-**不要直接用 `docker-compose.yml`** —— 它是本地编排（无 TLS、无域名、无密钥管理、无滚动更新）。
+**不要直接用 `docker-compose.yml`** —— 它是本地编排。生产使用
+`docker-compose.production.yml`，默认只把前端绑到 `127.0.0.1:18080`，
+由外层 Caddy / Nginx / LB 终结 TLS。
 
-生产要做的事：
+```bash
+cp backend/.env.production.example backend/.env.production
+chmod 600 backend/.env.production
+docker compose -f docker-compose.production.yml config --quiet
+docker compose -f docker-compose.production.yml up -d --build
 
-1. **镜像**：CI 里 `docker build` 两个镜像，推到私有 registry，打不可变 tag（不要用 `latest`）
-2. **密钥**：`JWT_SECRET` / 网关 token / OSS 凭据走 K8s Secret 或云厂商密钥管理，
-   **绝不要 `ENV` 进 Dockerfile** —— 烤进镜像层的凭据即使后续删文件也仍在历史里
-3. **数据卷**：SQLite 单文件必须挂持久卷并纳入备份策略。
-   多副本部署时 SQLite 撑不住（写锁是全局的），需换 PostgreSQL
-4. **入口**：前面加 TLS 终结层（ALB / Nginx / Caddy），
-   前端容器只监听容器内 80
-5. **迁移**：SQLite 无 online DDL，表结构变更需要停机窗口或改走「新旧文件 + 切换」
-6. **回滚**：镜像 tag 可回滚，但**数据库迁移不可回滚** —— 提前想清楚
+curl -fsS http://127.0.0.1:18080/healthz
+curl -fsS http://127.0.0.1:18080/api/v1/health/ready
+```
+
+编排会先跑 `migrate`，成功后才启动后端；后端端口不映射到宿主机，
+SQLite / 上传图 / 备份 / 日志统一落 `huojue-prod-data` 卷。
+`seed` 是显式 profile，不会随普通 `up` 执行。
+
+完整的部署、TLS 反代示例、备份恢复、升级回滚与排障命令见
+[`docker-deployment.md`](docker-deployment.md)。
 
 ## 相关文件
 
@@ -264,9 +275,11 @@ docker compose down -v       # 连数据卷一起删（库/上传图/备份/日�
 | `backend/scripts/db-url.js` | 脚本侧同款档位逻辑（seed/smoke 不经过 Nest） |
 | `backend/.env.development` / `.env.test` / `.env.production.example` | 三档配置 |
 | `frontend/.env.development` / `.env.test` / `.env.production.example` | 三档配置 |
-| `backend/proisma.config.ts` | Prisma CLI 侧读同一份档位 |
+| `backend/prisma.config.ts` | Prisma CLI 侧读同一份档位 |
 | `start.sh` | `--env` 串起 NODE_ENV 与 Vite mode |
 | `docker-compose.yml` | 本地编排（dev + test profile） |
+| `docker-compose.production.yml` | 生产单机编排（自动建表 / 健康探针 / 持久卷 / TLS 边界） |
+| `docs/docker-deployment.md` | 容器部署、升级、备份恢复与排障操作手册 |
 
 ## 排查清单
 

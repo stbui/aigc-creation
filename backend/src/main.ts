@@ -114,6 +114,10 @@ async function bootstrap(): Promise<void> {
   // 此处不得再 useGlobalFilters —— 并存会导致过滤器执行两次
   app.useGlobalInterceptors(new ResponseInterceptor());
 
+  // Docker/K8s 停止容器时先发 SIGTERM。开启 Nest 关闭钩子，让 Prisma 在退出前
+  // 断开 SQLite 连接，避免正在提交的事务被硬中断。
+  app.enableShutdownHooks();
+
   // 端口来自配置层 (PORT, 默认 4100); 监听地址来自 HOST (默认 127.0.0.1)。
   // ⚠ 生产/容器必须 HOST=0.0.0.0: 只绑回环的话容器外根本连不上,
   // 且 compose 里 service 之间的互通同样失败。开发态保持 127.0.0.1 是有意的 ——

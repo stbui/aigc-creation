@@ -97,6 +97,7 @@ aigc-creation/
 ├── README.md                   # 本文：现状速查 + 逐轮执行记录
 ├── docs/                       # 分类文档，地图见 docs/README.md
 ├── docker-compose.yml          # 本地编排（默认 dev，--profile test 并行测试档）
+├── docker-compose.production.yml # 生产单机编排（自动建表 / 健康探针 / 持久卷）
 ├── backend/                    # NestJS 服务，端口 4100（测试档同端口），全局前缀 /api/v1
 │   ├── prisma/schema.prisma    # 42 个模型；SQLite 无 enum，状态类字段 String + DTO 白名单
 │   ├── prisma.config.ts        # Prisma 7 连接配置（datasource url 移出 schema，按 NODE_ENV 选档）
@@ -170,6 +171,21 @@ npm run dev                # http://localhost:5100
 ```
 
 生产档刻意不自动杀进程：线上端口上的东西可能不是本项目，静默杀掉代价太大，只报错让人确认。
+
+### Docker 部署
+
+```bash
+# 本地开发 / 测试（首次自动建表；migrate 退出 0 属正常）
+docker compose up -d --build
+docker compose --profile test up -d --build
+
+# 生产：先填 backend/.env.production 并 chmod 600
+docker compose -f docker-compose.production.yml up -d --build
+```
+
+生产默认只监听 `127.0.0.1:18080`，由外层反代终结 TLS；后端不映射宿主机端口。
+自动建表、健康探针、数据卷、备份恢复、升级回滚与排障见
+`docs/docker-deployment.md`。
 
 只匹配 **LISTEN** 状态的进程，客户端连接不算（否则会把代理 `/api` 的前端 dev server 一起误杀）。手工排查：
 

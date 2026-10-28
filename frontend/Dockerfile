@@ -1,3 +1,9 @@
+# 基础镜像可覆盖：受限网络/内网镜像仓库可在构建时传入
+#   --build-arg NODE_IMAGE=registry.example.com/library/node:24-slim
+#   --build-arg NGINX_IMAGE=registry.example.com/library/nginx:1.27-alpine
+ARG NODE_IMAGE=node:24-slim
+ARG NGINX_IMAGE=nginx:1.27-alpine
+
 # ─────────────────────────────────────────────────────────────────────────────
 # 前端镜像（Vite 构建 + Nginx 托管）
 #
@@ -10,19 +16,28 @@
 # ─────────────────────────────────────────────────────────────────────────────
 
 # ── 阶段 1: 依赖 ─────────────────────────────────────────────────────────────
-FROM node:24-slim AS deps
+FROM ${NODE_IMAGE} AS deps
 WORKDIR /app
 
-COPY package.json package-lock.json* .npmrc ./
-RUN sed -i 's|^registry=.*|registry=https://registry.npmjs.org/|' .npmrc \
- && npm ci --no-audit --no-fund 2>/dev/null || npm install --no-audit --no-fund
+COPY package.json package-lock.json .npmrc ./
+
+# 默认沿用 .npmrc 的 registry（与 lockfile 中的 resolved 地址一致）；
+# 海外 CI 可传 --build-arg NPM_REGISTRY=https://registry.npmjs.org 覆盖。
+ARG NPM_REGISTRY=https://registry.npmmirror.com
+RUN --mount=type=cache,target=/root/.npm \
+    npm config set registry "$NPM_REGISTRY" \
+ && npm ci --no-audit --no-fund \
+      --fetch-retries=5 \
+      --fetch-retry-mintimeout=1000 \
+      --fetch-retry-maxtimeout=20000 \
+      --fetch-timeout=600000
 
 # ── 阶段 2: 构建 ─────────────────────────────────────────────────────────────
-FROM node:24-slim AS build
+FROM ${NODE_IMAGE} AS build
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
-COPY package.json tsconfig.json vite.config.ts index.html ./
+COPY package.json package-lock.json tsconfig.json vite.config.ts index.html ./
 COPY public ./public
 COPY src ./src
 
@@ -38,7 +53,7 @@ ENV VITE_API_BASE=$VITE_API_BASE VITE_ENV_LABEL=$VITE_ENV_LABEL
 RUN npx tsc --noEmit && npx vite build --mode production
 
 # ── 阶段 3: 运行时（Nginx）───────────────────────────────────────────────────
-FROM nginx:1.27-alpine AS runtime
+FROM ${NGINX_IMAGE} AS runtime
 
 # ⚠ NGINX_ENVSUBST_FILTER 必须设，且必须**只列出自己要替换的变量名**。
 #   nginx 官方镜像的 envsubst 脚本默认替换**环境里的全部变量** ——
@@ -46,11 +61,15 @@ FROM nginx:1.27-alpine AS runtime
 #   变量，一旦环境里恰好有同名变量（HOSTNAME→$host 等），就会被替换成空串，
 #   表现为反代静默失效或 nginx 直接启动失败。
 #   官方文档给的做法就是这个 filter，它是唯一能保证「只替换该替换的」开关。
-ENV NGINX_ENVSUBST_FILTER=BACKEND_UPSTREAM
+ENV NGINX_ENVSUBST_FILTER='BACKEND_UPSTREAM|DNS_RESOLVER'
 
 # 默认值让 `docker run` 单跑镜像也能用（compose 会覆盖成对应环境的服务名）。
 # 未设置时 ${BACKEND_UPSTREAM} 会原样留在配置里 → nginx 启动失败（快速失败，好过静默错配）
 ENV BACKEND_UPSTREAM=backend:3001
+
+# Docker Compose / Docker 内置 DNS。模板用变量形式 proxy_pass，让容器重建后的
+# 新 IP 能被重新解析，而不是 Nginx 启动时永久缓存旧地址。
+ENV DNS_RESOLVER=127.0.0.11
 
 # 项目自带的 nginx 配置（模板）：SPA 回退 + /api 反代 + /uploads 静态直出。
 # 必须放 /etc/nginx/templates/ —— 官方镜像启动时会对该目录下的 *.template

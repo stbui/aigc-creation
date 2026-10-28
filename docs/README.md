@@ -54,6 +54,7 @@
 | 文档 | 内容 | 状态 |
 | --- | --- | --- |
 | [`environments.md`](environments.md) | 三环境变量矩阵、加载优先级、生产门禁、Docker、排查 | **现行事实源**；新增环境变量必须同步 |
+| [`docker-deployment.md`](docker-deployment.md) | 本地 / 测试 / 生产容器编排、TLS 边界、备份恢复、升级回滚、排障 | **现行事实源**；改 Compose / Dockerfile / Nginx 时同步 |
 | [`model-architecture.md`](model-architecture.md) | 模型通道分层、协议矩阵、调度与配置、请求时序、扩展 SOP | **现行事实源**；改协议 / 通道 / 厂商时同步 |
 | [`layout-unification.md`](layout-unification.md) | `AppLayout` 外壳与壳内页面 padding 的审计与实施 | 实施记录，规则仍有效 |
 | [`typography-components-details.md`](typography-components-details.md) | 全站字体 / antd 主题 / 圆角阴影微规格 | 实施记录，规则仍有效 |
