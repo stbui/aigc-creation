@@ -1,7 +1,7 @@
 # 模型通道架构
 
 > 范围：生成链路的模型层（`backend/src/providers/` + `generate/` + `admin/model-*`）。
-> 记录 2026-10-20 三层重构后的**实际实现**，不是设计意图。文中「现状问题」一节均经脚本或代码取证。
+> 本文只写**当前实际实现**，不写设计意图与历史方案；每条约束都能在代码或闸口脚本里核对。
 
 ## 1. 设计约束
 
@@ -9,8 +9,8 @@
 | --- | --- | --- |
 | 身份与形状分离 | 厂商 = 谁家 / 谁的 key / 有哪些模型；协议 = 请求体长什么样、响应从哪掏 | `vendors/vendor.catalog.ts` vs `protocols/protocol.spec.ts` |
 | 单一事实源 | 协议形状、厂商目录、配置项、能力元信息各只有一处声明 | 四个目录文件，其余层只引用 |
-| 依赖单向 | 应用 → 路由 → 调度 → 通道 → 协议 → 模态叶子；协议层不得反向依赖厂商层 | `verify-architecture-layers.ts` 35 项断言 |
-| 失败语义统一 | 所有模态只允许模型产出；无线路/上游失败即失败并退款，不回落本地 | 三个路由器各自实现 |
+| 依赖单向 | 应用 → 路由 → 调度 → 通道 → 协议 → 模态叶子；协议层不得反向依赖厂商层 | `verify-architecture-layers.ts` |
+| 失败语义统一 | 所有模态只允许模型产出；无线路或全部厂商线路失败即失败并退款，不回落本地 | 三个路由器各自实现 |
 | 观测旁路 | 每次调用写 `ModelCallLog`，写失败只 WARN，不影响出片 | `image-call-logger.ts` |
 | 配置热生效 | env > DB > 代码默认；后台保存后立即失效缓存 | `gateway.config.ts` + `model-config.service.ts` |
 | 不把历史本地产物伪装成模型 | 新任务 `source=gateway`；历史 `local` 仍如实显示 | `unified.provider.ts` + `generate.service` |
@@ -80,7 +80,6 @@
 | `providers/minimax-image.provider.ts` | `minimax` 协议（一行构造） | 协议实现 |
 | `providers/openai-chat-text.provider.ts` | `openai-chat` 文本协议（支持多模态 content 数组） | 协议实现 |
 | `providers/minimax-video.provider.ts` | `minimax-video` 四段式异步协议 | 协议实现 |
-| ~~`providers/local-image.provider.ts`~~ | **2026-10-25 已删除**。本地图像生成算法不再存在 | — |
 | `providers/gateway-prompt.ts` | 从能力定义取 `buildPrompt`，组装请求体 | 应用支撑 |
 | `providers/image-call-logger.ts` | 写 `ModelCallLog`，截断 prompt/reason，失败只 WARN | 观测 |
 | `providers/providers.module.ts` | 注册三个路由器、调度器、埋点器，绑定三个 DI token | 装配 |
@@ -93,7 +92,7 @@
 | text | `TextProvider.generate(capability, messages, params)` | `{ kind:'text', text, source, usage? }` | 仅模型 | `prompt-tools.service` |
 | video | `VideoProvider.generate(capability, inputPaths, params)` | `{ kind:'video', buffer, format, source, durationMs? }` | 仅模型 | `generate.service` |
 
-- 三者都使用 `ProduceSource = 'gateway' | 'local'` 类型；`local` 仅用于读取 2026-10-25 前的历史记录。
+- 三者都使用 `ProduceSource = 'gateway' | 'local'` 类型；`local` 仅用于读取历史记录，新任务不产生该取值。
 - `generate.service` 只注入 `IMAGE_PROVIDER` 与 `VIDEO_PROVIDER`，按能力的 `modality` 分流：`video → videoProvider`，其余 → `imageProvider`。
 - 文本不经过 `generate.service`，由 `prompt-tools` 直接注入 `TEXT_PROVIDER`。
 
@@ -111,10 +110,10 @@
 
 `route` 键为 `gateway.route.<能力id>`，默认 `auto`，env 名 `GATEWAY_ROUTE_<能力ID大写>`。
 
-2026-10-25 起本地生成算法全部删除，`route=local` 只作为存量配置读取。带遮罩的局部重绘/去水印若没有
+系统内没有本地生成算法：`route=local` 只作为存量配置读取，不构成可用线路。带遮罩的局部重绘/去水印若没有
 支持 `edits` 的线路，按 `42205` 失败并退款；不会忽略遮罩做整图重绘。
 
-`ModelConfigService.updateAll()` 现在只接受 `auto/remote`，任何新写入 `local` 都返回 `40001`。
+`ModelConfigService.updateAll()` 只接受 `auto/remote`，新写入 `local` 返回 `40001`。
 存量 `local` 不静默改写，但后台标为「存量本地（已停用）」，C 端 `runtime.effective=unavailable`；
 env 注入的存量 `GATEWAY_ROUTE_<ID>=local` 同样按不可用处理并给出原因。
 
@@ -152,7 +151,7 @@ env 注入的存量 `GATEWAY_ROUTE_<ID>=local` 同样按不可用处理并给出
 
 **格式一律按字节魔数判定**（`image-format.ts` / `video-format.ts`），不看 URL 后缀 —— 多家返回无扩展名或带签名参数的链接。
 
-**遮罩（局部重绘）按 `maskSupport` 声明**（2026-10-22）。`ProtocolSpec.maskSupport` 是必填字段，取值 `edits` | `none`，没有默认值 —— 强制每个协议显式做一次决定，而不是让「没写」被当成「不支持」或「支持」。
+**遮罩（局部重绘）按 `maskSupport` 声明**。`ProtocolSpec.maskSupport` 是必填字段，取值 `edits` | `none`，没有默认值 —— 强制每个协议显式做一次决定，而不是让「没写」被当成「不支持」或「支持」。
 
 | 协议 | `maskSupport` | 端点 / 说明 |
 | --- | --- | --- |
@@ -206,7 +205,7 @@ env（非空才生效） > ModelChannelConfig（overridden=true） > CONFIG_DEFS
 - **存量键回落**：image 模态的新键全空时，读旧单前缀 `gateway.baseUrl` / `GATEWAY_BASE_URL` 等。旧键只在 image 上存在，且 `hidden=true` 不可写。
 - **开启判定**：`ENABLED` 强制开 > 基址或令牌非空即视为开启。零配置 = 全部走本地/未接入。
 - **凭据**：读取只给 `hasValue` + 脱敏尾巴；写入空串 = 保持原值，清空需显式 `clears`。
-- **基址只存厂商根域**：`/v1` 一律由协议层补（`openai` → `/v1/images/generations`，`openai-chat` → `/v1/chat/completions`），运营照抄厂商文档填 `https://api.x.com/v1` 会拼成 `/v1/v1/...` → 上游 404 `api_route_not_found`，而生成侧只报「通道全部失败」。归一化在 `providers/base-url.ts` 的 `normalizeBaseUrl()`，**每个读写边界都调用**（env 注入、`ModelChannel` 读写、`ModelChannelConfig` 全局设置、草稿测试/模型清单），只剥尾部一整段 `/v1`（`/api/v3` 与路径中段 `/v1/gw` 保留）；格式错误（非 URL / 非 http(s)）仍拒绝。厂商目录内置基址另有装配期 `assertCatalogIntegrity()` 拦截。
+- **基址只存厂商根域**：`/v1` 一律由协议层补（`openai` → `/v1/images/generations`，`openai-chat` → `/v1/chat/completions`），运营照抄厂商文档填 `https://api.x.com/v1` 会拼成 `/v1/v1/...` → 厂商返回 404 `api_route_not_found`，而生成侧只报「通道全部失败」。归一化在 `providers/base-url.ts` 的 `normalizeBaseUrl()`，**每个读写边界都调用**（env 注入、`ModelChannel` 读写、`ModelChannelConfig` 全局设置、草稿测试/模型清单），只剥尾部一整段 `/v1`（`/api/v3` 与路径中段 `/v1/gw` 保留）；格式错误（非 URL / 非 http(s)）仍拒绝。厂商目录内置基址另有装配期 `assertCatalogIntegrity()` 拦截。
 - **热生效**：保存后 `reloadRuntime()` 重拉 DB 覆盖并失效缓存；另有 3s TTL 兜底。
 
 ### 8.3 后台接口
@@ -341,19 +340,7 @@ generate.service（modality=video）
 3. `provider-factory.ts` 加一行映射（或路由器 switch，文本/视频各有自己的 pickProtocol）。
 4. 同步协议选择器/后台协议下拉自动出现；新增后跑 `verify-architecture-layers` 与 `verify-vendor-aggregation`。
 
-## 13. 现状与已知边界（2026-10-20）
-
-### 已在同一轮修复
-
-| 问题 | 修复 |
-| --- | --- |
-| 视频生成 `cfg is not defined` | `minimax-video.provider.ts` 改用 `creds.baseUrl`；`global.timeoutMs` 改为 `this.cfg.timeoutMs`。`verify-video-pipeline.ts` 38/38 |
-| 多渠道未接线 | `ChannelRepository` 注册并导出；新增 `admin/model-channels` CRUD/排序/测试控制器；管理页「线路管理」可直接配置主备线路 |
-| 停用线路仍被调度 | `readChannels()` 先查全量行、再在内存过滤 `enabled`；全部停用时返回「均已停用」，**不会回落合成旧配置** |
-| 后台文案与事实相反 | 视频协议描述改为 `minimax-video`；能力数量、视频「无实现」等注释同步 |
-| 连通性测试把 POST-only 端点误判为不存在 | OPTIONS/GET 都 404 时补一次空 body POST；404 才判不存在，400/401/405/422 视为端点存在。实测 `api.modelverse.cn/v1/images/generations` 由「端点不存在」变为「端点存在 · 模型可用」 |
-
-### 仍需注意
+## 13. 现状与已知边界
 
 1. **新增文本能力时分流缺口仍在**：`generate.service.ts` 只分 `video` 与「其余走图像」。当前没有文本能力，所以无害；若新增 `modality: 'text'` 的能力，必须补第三分支，或让路由器按能力自身模态统一分派。
 2. **线路接管后旧配置不再参与**：某模态一旦有 `ModelChannel` 行，调度只读线路表；旧 `gateway.<modality>.*.baseUrl/token/model/provider` 仅保留在「全局设置」供对照。`TIMEOUT/POLL/MAX_POLLS` 仍按模态生效。页面已在两处常驻提示。
@@ -361,21 +348,7 @@ generate.service（modality=video）
 4. **合成线路的固化会复制环境变量中的令牌进 DB**：这是旧配置在固化后继续工作的必要条件；后台确认弹窗已明确说明。
 5. **测试不等于真实生成**：连通性测试只做 OPTIONS/GET 探测与模型名校验，不更新 `failCount/cooldownUntil/lastSuccessAt`；健康状态只由真实生成调用维护。
 
-## 14. 验证结果（2026-10-20 实测）
-
-| 脚本 | 结果 |
-| --- | --- |
-| `verify-architecture-layers.ts` | 通过 35 项：依赖方向单向、协议形状单一来源、转发层不声明数据 |
-| `verify-capability-extensibility.ts` | 通过 19 项：新增能力只需 definitions + index |
-| `verify-modality-config.ts` | 通过 78 项：三模态配置解析 |
-| `verify-vendor-aggregation.ts` | 通过 143 项：厂商聚合与重构前 9 条预设逐字段一致 |
-| `verify-channel-scheduler.ts` | 通过 58 项：顺序调度、失败转移、熔断、恢复、停用过滤、全停用不复活旧配置、快照计数 |
-| `verify-channel-test.ts` | 通过 39 项：草稿 override、令牌三种语义、来源标记、POST-only 端点识别 |
-| `verify-failover.ts` | 通过 8 项：主通道 500 → 备用 200，且备用请求真的用了自己的 baseUrl/token/model |
-| `verify-video-pipeline.ts` | 通过 38 项：四段式契约、状态归一、格式魔数 |
-| `smoke-model-channels.js` | 通过 20 项：线路 CRUD、token 保持/清除、排序、测试形状、sourceAfter、401 |
-
-## 15. 相关文档
+## 14. 相关文档
 
 - 三环境与变量矩阵：`docs/environments.md`
 - 后台设计：`docs/admin-*.md`（模型配置 / 调用记录在产品侧的定义）

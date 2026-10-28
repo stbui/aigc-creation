@@ -1,7 +1,16 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ChevronDown, Menu } from 'lucide-react';
-import { Drawer } from 'antd';
+import {
+  ChevronDown,
+  CreditCard,
+  Gift,
+  Home,
+  Images,
+  LayoutDashboard,
+  LogIn,
+  Menu,
+  MessageCircle,
+} from 'lucide-react';
 import {
   capabilityById,
   capabilityName,
@@ -102,6 +111,26 @@ const TOOL_ENTRIES: ToolEntry[] = [
   { label: '旋转角度', icon: 'm_jdxz', to: '/rotate-angle', capability: 'rotate' },
 ];
 
+/** 顶部菜单与参考站 `/static/menu/*.svg` 对齐的本地图标。 */
+const NAV_ICONS: Record<string, string> = {
+  free_create: '/menu/m_cyst.svg',
+  image_to_video: '/menu/m_cyst.svg',
+  main_image: '/menu/m_spzt.svg',
+  detail_image: '/menu/m_spxq.svg',
+  hot_remake: '/menu/m_bkfk.svg',
+  creative_image: '/menu/m_cyst.svg',
+  multi_fusion: '/menu/m_dtrh.svg',
+  sku_image: '/menu/m_sku.svg',
+  local_redraw: '/menu/m_jbch.svg',
+  matting: '/menu/m_bjxc.svg',
+  remove_watermark: '/menu/m_qcsy.svg',
+  enhance: '/menu/m_cpjx.svg',
+  image_translate: '/menu/m_tpfy.svg',
+  expand: '/menu/m_znkt.svg',
+  recolor: '/menu/m_sphs.svg',
+  rotate: '/menu/m_jdxz.svg',
+};
+
 /**
  * 订阅套餐静态描述 (**仅视觉, 不含价格**)。
  *
@@ -198,6 +227,29 @@ function LandingHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
   const closeMenu = () => setMenuOpen(false);
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      setOpen(null);
+      setMenuOpen(false);
+    };
+    const desktop = window.matchMedia('(min-width: 901px)');
+    const onBreakpointChange = (event: MediaQueryListEvent) => {
+      if (event.matches) setMenuOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    desktop.addEventListener('change', onBreakpointChange);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      desktop.removeEventListener('change', onBreakpointChange);
+    };
+  }, []);
+
+  const toggleMobileMenu = () => {
+    setOpen(null);
+    setMenuOpen((value) => !value);
+  };
+
   return (
     <>
       <PromoBar />
@@ -209,46 +261,54 @@ function LandingHeader() {
             货觉<span className="landing-brand-ai">AI</span>
           </span>
         </Link>
-        <nav className="landing-nav">
+        <nav className={`landing-nav${open ? ' has-open-menu' : ''}`}>
           <Link to="/" className="landing-nav-item is-active">
             首页
           </Link>
           {navGroups.map((g) => (
             <div
               key={g.id}
-              className="landing-nav-group"
+              className={`landing-nav-group${open === g.id ? ' is-open' : ''}`}
               onMouseEnter={() => setOpen(g.id)}
               onMouseLeave={() => setOpen(null)}
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                  setOpen(null);
+                }
+              }}
             >
               <button
                 type="button"
                 className={`landing-nav-item${open === g.id ? ' is-open' : ''}`}
                 aria-expanded={open === g.id}
+                aria-haspopup="true"
+                aria-controls={`landing-nav-menu-${g.id}`}
                 onClick={() => setOpen(open === g.id ? null : g.id)}
               >
                 {g.name}
-                <ChevronDown size={13} />
+                <ChevronDown size={13} className="landing-nav-chevron" />
               </button>
-              {open === g.id && (
-                <div className="landing-nav-menu">
-                  {navItems
-                    .filter((i) => i.group === g.id)
-                    .map((i) => (
-                      <button
-                        key={i.id}
-                        type="button"
-                        className="landing-nav-menu-item"
-                        onClick={() => {
-                          setOpen(null);
-                          navigate(toolPath(i.id));
-                        }}
-                      >
-                        <span className="landing-nav-menu-name">{i.name}</span>
-                        <span className="landing-nav-menu-sum">{i.summary}</span>
-                      </button>
-                    ))}
-                </div>
-              )}
+              <div className="landing-nav-menu" id={`landing-nav-menu-${g.id}`}>
+                {navItems
+                  .filter((i) => i.group === g.id)
+                  .map((i) => (
+                    <button
+                      key={i.id}
+                      type="button"
+                      className="landing-nav-menu-item"
+                      title={i.summary}
+                      onClick={() => {
+                        setOpen(null);
+                        navigate(toolPath(i.id));
+                      }}
+                    >
+                      {NAV_ICONS[i.id] && (
+                        <img src={NAV_ICONS[i.id]} alt="" aria-hidden loading="lazy" />
+                      )}
+                      <span className="landing-nav-menu-name">{i.name}</span>
+                    </button>
+                  ))}
+              </div>
             </div>
           ))}
           <Link to="/workbench" className="landing-nav-item">
@@ -278,72 +338,98 @@ function LandingHeader() {
         <button
           type="button"
           className="landing-mobile-toggle"
-          aria-label="打开导航菜单"
+          aria-label={menuOpen ? '关闭导航菜单' : '打开导航菜单'}
           aria-expanded={menuOpen}
-          onClick={() => setMenuOpen(true)}
+          aria-controls="landing-mobile-menu"
+          onClick={toggleMobileMenu}
         >
           <Menu size={20} />
         </button>
+        <nav
+          id="landing-mobile-menu"
+          className={`landing-mobile-menu${menuOpen ? ' is-open' : ''}`}
+          aria-label="移动端导航"
+          aria-hidden={!menuOpen}
+        >
+          <section className="landing-mobile-section">
+            <span className="landing-mobile-section-title">快捷入口</span>
+            <div className="landing-mobile-grid">
+              <Link to="/" className="landing-mobile-item is-active" onClick={closeMenu}>
+                <Home size={18} aria-hidden />
+                <span>首页</span>
+              </Link>
+              <Link to="/workbench" className="landing-mobile-item" onClick={closeMenu}>
+                <LayoutDashboard size={18} aria-hidden />
+                <span>工作台</span>
+              </Link>
+              <Link to="/works" className="landing-mobile-item" onClick={closeMenu}>
+                <Images size={18} aria-hidden />
+                <span>我的作品</span>
+              </Link>
+            </div>
+          </section>
+          {navGroups.map((g) => (
+            <section key={g.id} className="landing-mobile-section">
+              <span className="landing-mobile-section-title">{g.name}</span>
+              <div className="landing-mobile-grid">
+                {navItems
+                  .filter((i) => i.group === g.id)
+                  .map((i) => (
+                    <Link
+                      key={i.id}
+                      to={toolPath(i.id)}
+                      className="landing-mobile-item"
+                      onClick={closeMenu}
+                    >
+                      {NAV_ICONS[i.id] && (
+                        <img src={NAV_ICONS[i.id]} alt="" aria-hidden loading="lazy" />
+                      )}
+                      <span>{i.name}</span>
+                    </Link>
+                  ))}
+              </div>
+            </section>
+          ))}
+          <section className="landing-mobile-section">
+            <span className="landing-mobile-section-title">账户服务</span>
+            <div className="landing-mobile-grid">
+              <Link to="/packages" className="landing-mobile-item" onClick={closeMenu}>
+                <CreditCard size={18} aria-hidden />
+                <span>购买套餐</span>
+              </Link>
+              <Link to="/invitations" className="landing-mobile-item" onClick={closeMenu}>
+                <Gift size={18} aria-hidden />
+                <span>邀请好友</span>
+              </Link>
+              <Link
+                to="/tickets?type=consultation&compose=1"
+                className="landing-mobile-item"
+                onClick={closeMenu}
+              >
+                <MessageCircle size={18} aria-hidden />
+                <span>联系客服</span>
+              </Link>
+              <Link
+                to={token ? '/workbench' : '/login'}
+                className="landing-mobile-item"
+                onClick={closeMenu}
+              >
+                <LogIn size={18} aria-hidden />
+                <span>{token ? '进入工作台' : '登录/注册'}</span>
+              </Link>
+            </div>
+          </section>
+        </nav>
       </header>
 
-      {/* 移动端导航抽屉 (≤900px 顶栏只留品牌 + 汉堡, 参考站 390 同构) */}
-      <Drawer
-        title="导航菜单"
-        placement="right"
-        size={300}
-        open={menuOpen}
-        onClose={closeMenu}
-        className="landing-mobile-drawer"
-        styles={{ body: { padding: 0 } }}
-      >
-        <nav className="landing-mobile-nav" aria-label="移动端导航">
-          <Link to="/" className="landing-mobile-item" onClick={closeMenu}>
-            首页
-          </Link>
-          {navGroups.map((g) => (
-            <div key={g.id} className="landing-mobile-group">
-              <span className="landing-mobile-group-title">{g.name}</span>
-              {navItems
-                .filter((i) => i.group === g.id)
-                .map((i) => (
-                  <button
-                    key={i.id}
-                    type="button"
-                    className="landing-mobile-item"
-                    onClick={() => {
-                      closeMenu();
-                      navigate(toolPath(i.id));
-                    }}
-                  >
-                    {i.name}
-                  </button>
-                ))}
-            </div>
-          ))}
-          <div className="landing-mobile-group">
-            <span className="landing-mobile-group-title">账户与工具</span>
-            <Link to="/works" className="landing-mobile-item" onClick={closeMenu}>
-              我的作品
-            </Link>
-            <Link to="/packages" className="landing-mobile-item" onClick={closeMenu}>
-              购买套餐
-            </Link>
-            <Link to="/invitations" className="landing-mobile-item" onClick={closeMenu}>
-              邀请有奖
-            </Link>
-            <Link to="/stats" className="landing-mobile-item" onClick={closeMenu}>
-              数据中心
-            </Link>
-            <Link
-              to="/tickets?type=consultation&compose=1"
-              className="landing-mobile-item"
-              onClick={closeMenu}
-            >
-              联系客服
-            </Link>
-          </div>
-        </nav>
-      </Drawer>
+      {menuOpen && (
+        <button
+          type="button"
+          className="landing-mobile-scrim"
+          aria-label="关闭导航菜单"
+          onClick={closeMenu}
+        />
+      )}
     </>
   );
 }
@@ -479,7 +565,10 @@ export function LandingPage() {
         {/* 营销文案按 2026-10-17「完全照搬」决策保留, 但品牌名必须是自有品牌:
             原标题带参考站商标「极画AI」, 与 README「保留本项目自有品牌标识, 不替换为参考站商标」冲突,
             2026-10-19 统一为货觉AI (见 docs/brand/brand-basics.md) */}
-        <h1>货觉AI电商图 上新快10倍 拍图成本直降90%</h1>
+        <h1>
+          <span>货觉AI电商图</span>
+          <strong>上新快10倍 拍图成本直降90%</strong>
+        </h1>
         <p>上传商品图，一键生成白底图、场景图、卖点图、详情页全套电商图</p>
       </section>
 

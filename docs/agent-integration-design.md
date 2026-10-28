@@ -3,7 +3,6 @@
 > 版本：v2.0  
 > 日期：2026-10-25  
 > 状态：方案设计，未实施  
-> 取代：`docs/agent-technical-design.md`（v1.0 的「LLM 从零新增」前提已过期）  
 > 关联：`docs/agent-prd.md`、`docs/model-architecture.md`、`CLAUDE.md`
 
 ---
@@ -60,14 +59,13 @@
 | 账号与归属 | `JwtAuthGuard`、`Project`、`Asset.ownerId` 均已存在 | 所有查询与写入都可按当前用户强隔离 |
 | SSE 参考实现 | `agent/src/app.mjs` 已演示 POST + SSE、事件增量、取消与断线处理 | 可复用协议与前端解析思路，不复用运行时 |
 
-### 2.2 必须纠正的旧前提
+### 2.2 设计前提
 
-旧技术方案 `docs/agent-technical-design.md` 中以下判断已失效：
+本方案按以下现状设计，与早期设想不同：
 
-- 当时没有文本模型通道；现在已有 `TEXT_PROVIDER` 和后台模型配置。
-- 当时说「8 项 mock 能力」；现在 `mode` 只有 `real | planned`，占位实现已删除。
-- 当时按 15 项图像能力设计；现在注册表包含视频能力，Agent 规划应按 `modality` 而不是写死「只出图」。
-- 当时建议新建 LLM Provider；现在应扩展现有 `TextProvider` 的上下文参数与埋点，而不是再造一层。
+- 文本模型通道已落地（`TEXT_PROVIDER` 与后台模型配置），不需要新建 LLM Provider；应扩展现有 `TextProvider` 的上下文参数与埋点，而不是再造一层。
+- 能力 `mode` 只有 `real | planned`，占位实现已删除，Agent 的工具清单必须来自真实能力。
+- 注册表包含视频能力，Agent 规划按 `modality` 分支，不写死「只出图」。
 
 ### 2.3 与现有产品能力的关系
 
@@ -789,7 +787,7 @@ generate(capability, messages, params, context?: TextCallContext): Promise<TextO
 | Prompt 注入 | 用户文本只作为数据段；系统提示固定；计划必须过结构校验 |
 | 超长/恶意输入 | 消息与计划长度上限、步骤上限、素材数量上限、每用户限流 |
 | 成本失控 | 每用户规划限流、单会话单运行、步骤上限、积分预检与逐步扣费 |
-| 错误泄露内部信息 | 对外统一错误码；通道细节只进后台日志，不原样回显密钥或上游地址 |
+| 错误泄露内部信息 | 对外统一错误码；通道细节只进后台日志，不原样回显密钥或厂商地址 |
 
 建议限流：
 
@@ -854,24 +852,9 @@ generate(capability, messages, params, context?: TextCallContext): Promise<TextO
 
 ---
 
-## 15. 分批实施
+## 15. 关键取舍与待确认项
 
-| 批次 | 内容 | 交付判据 |
-| --- | --- | --- |
-| A0 | 扩展 TextProvider 调用上下文与 ModelCallLog 字段；补 `agent_plan` 埋点 | 假规划调用可落库；现有提示词工具不回归 |
-| A1 | Prisma 四表 + CatalogService + PlanValidator | 单测覆盖非法能力、参数、素材与依赖 |
-| A2 | PlannerService + 会话接口 + SSE 基础设施 | 消息可返回 clarify/plan；重复请求幂等 |
-| A3 | StepExecutor + 确认执行 + 单步重试 + 恢复 | 单步与多步真实任务闭环；失败退款正确 |
-| A4 | `/agent` 前端 + 计划卡 + 时间线 + 手动降级 | 浏览器真实会话可完成一套图 |
-| A5 | 观测量、限流、冒烟脚本与文档 | AG-01～AG-12 全过；依赖闸口通过 |
-
-建议按 1 名全栈工程师估算 12–18 个工作日；其中 A2/A3 是风险最高批次，应单独技术评审后再开工。
-
----
-
-## 16. 关键取舍与待确认项
-
-### 16.1 已做出的取舍
+### 15.1 已做出的取舍
 
 | 取舍 | 原因 |
 | --- | --- |
@@ -882,7 +865,7 @@ generate(capability, messages, params, context?: TextCallContext): Promise<TextO
 | 不做事件重放表 | 运行/步骤快照已能恢复 UI；避免多一张高速增长的表 |
 | 不自动恢复执行 | 避免进程重启后重复扣费或重复产出 |
 
-### 16.2 需要产品确认
+### 15.2 需要产品确认
 
 1. P1 是否把 AI 润色/图片转提示词与「查询我的任务/统计」纳入 Agent？P0 仅生成能力，文本工具与查数保留现有入口。
 2. 计划预估积分与余额不足时，是允许部分执行，还是必须先充值？

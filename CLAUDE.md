@@ -5,7 +5,7 @@
 ## 先读这里
 
 - **章节结构**：项目概览 → 技术栈 → 目录结构 → 常用命令 → 架构要点 → 开发约定 → 环境注意事项 → 工作纪律 → 文档索引。前四节建立坐标，深入某一域时直接跳到对应小节。
-- **事实源优先级**：代码 > 现行文档（`docs/environments.md` / `model-architecture.md` / `testing.md`）> 历史快照（2026-10-19 的 PRD 与后台设计稿，结论已被 B0–B8 取代）。本文件里的数量类描述若与代码不符，**以代码为准并顺手改这里**。
+- **事实源优先级**：代码 > 现行文档（`docs/environments.md` / `model-architecture.md` / `testing.md` / `prd.md`）。本文件里的数量类描述若与代码不符，**以代码为准并顺手改这里**。
 - **单一事实源**：下列内容只在一处定义，改动改源头，不要在别处复制一份。
 
 | 内容 | 唯一事实源 |
@@ -19,7 +19,7 @@
 | 启动期环境变量 | `backend/src/config/env.validation.ts` 的 `ENV_SPECS`；网关通道变量另见 `providers/channel-config.defs.ts` |
 | 设计令牌 | `frontend/src/styles/global.css` 的 `:root` |
 | AIGC 角标默认样式（文案/字号/配色/位置/缩放） | `backend/src/common/aigc-label.config.ts` 的 `AIGC_LABEL_DEFAULTS`；运行期由后台「AI 标识」页覆盖 |
-| 后台侧栏与页面分组 | `frontend/src/components/admin/AdminLayout.tsx` 的 `MENU` |
+| 后台侧栏与页面分组 | `frontend/src/components/admin/adminNav.ts` 的 `ADMIN_MENU` |
 | 测试清单与覆盖矩阵 | `docs/testing.md`；文档分类地图见 `docs/README.md` |
 
 ## 账号
@@ -43,17 +43,15 @@ uat@admin.com
 
 ## 项目概览
 
-**货觉AI · MVP**（2026-10-19 定名；内部代号 `ecom-vision-mvp`，仓库目录 `aigc-creation`）—— 面向电商团队的智能视觉创作平台，页面结构与功能对标 **极画AI 工作台**（https://ijihua.cn/workbench）。
-
-> 品牌唯一事实源：`docs/brand/brand-basics.md`（定位/口号/色板/字体/logo 规范/落地清单）；取名与商标冲突核查：`docs/brand/naming.md`。改色/改形/改口号属品牌级变更，须先改上述文件再动代码。
+**货觉AI**（内部代号 `ecom-vision-mvp`，仓库目录 `aigc-creation`）—— 面向电商团队与个人卖家的智能视觉创作平台。
 
 当前形态 = **C 端创作站 + 独立后台管理端 + 商业运营域 + 账户合规/服务域**：
 
-- **16 项能力**（全部 `real`，0 `mock` / 0 `planned`，13 项进工作台）。2026-10-25 起**本地图像生成算法全部删除**：图像、文本、视频都只允许真实模型产出；无模型线路即失败并退款，不交付伪结果。
+- **16 项能力**（全部 `real`，0 `mock` / 0 `planned`，12 项进工作台）。**图像、文本、视频都只允许真实模型产出**：无模型线路即失败并退款，不交付伪结果。
 - **生成通道**为「模态 × 协议 × 厂商」三层可插拔。`auto/remote` 只调度真实模型线路，存量 `route=local` 明确判不可用；新写入不再接受 `local`。
 - **后台管理端**（`/admin`）28 个页面，权限点 + 审计 + 定时任务 + 备份 + 存储切换。
 - **商业域**：商品 / 订单 / 支付 / 退款 / 积分账本 / 会员 / 优惠券 / 限时活动 / 邀请签到 / 发票 / 渠道对账。
-- **账户与合规域**：找回密码 / 短信登录 / **扫码登录** / 自助注销与数据导出 / 法务版本化与同意留痕 / 站内消息 / AIGC 标识（可见角标样式后台可配）/ 限流 / 健康检查 / 请求追踪。
+- **账户与合规域**：找回密码 / 短信登录 / **扫码登录** / **第三方登录（OAuth2 / OIDC）** / 自助注销与数据导出 / 法务版本化与同意留痕 / 站内消息 / AIGC 标识（可见角标样式后台可配）/ 限流 / 健康检查 / 请求追踪。
 - **服务域**：工单（C 端 `/tickets` + 后台工单中心）、后台全局搜索、批量动作与 CSV 导入导出。
 
 ## 技术栈
@@ -82,19 +80,18 @@ TS 配置差异（勿统一）：后端 `strict: false` / `strictNullChecks: fal
 ```
 aigc-creation/
 ├── start.sh                  # 一键启动（--env development|test|prod；处理端口占用/CORS/建表/种子）
-├── README.md                 # 现状速查（只写现状）：页面结构 / 能力清单 / 启动 / 接口 / 复刻规格 / 环境坑
+├── README.md                 # 现状速查（只写现状）：页面结构 / 能力清单 / 启动 / 接口 / 页面规格 / 环境坑
 ├── docs/
-│   ├── README.md             # ★ 文档地图（需求/产品/技术/测试/品牌/规划 六类 + 状态）
+│   ├── README.md             # ★ 文档地图（需求/产品/技术/测试/规划 五类）
+│   ├── prd.md                # ★ 需求：整站产品需求与功能状态
 │   ├── environments.md       # ★ 技术：三环境体系（变量矩阵/加载优先级/生产门禁/Docker/排查）
 │   ├── model-architecture.md # ★ 技术：通道分层 / 协议矩阵 / 调度 / 扩展 SOP
-│   ├── testing.md            # ★ 测试：四层测试、闸口清单、覆盖矩阵、已知红灯
-│   ├── development-workflow.md # ★ Agent 执行手册：十三阶段执行卡 / 闸口命令 / 证据标准 / 交人边界
-│   ├── brand/                # ★ 品牌唯一事实源 + 取证截图
+│   ├── testing.md            # ★ 测试：四层测试、闸口清单、覆盖矩阵、已知缺口
+│   ├── development-workflow.md # ★ Agent 执行手册：阶段执行卡 / 闸口命令 / 证据标准 / 交人边界
 │   ├── admin-*.md            # 需求 + 产品：后台 PRD / 功能 / 详细 / 界面 / 总体设计
-│   ├── commerce-design.md    # 产品：支付 / 积分 / 订单 / 商品
-│   ├── prd.md · gap-analysis.md · refactor-dedup.md
-│   ├── <页面>*-design.md     # 产品：1:1 规格与实拍审计（workbench / topnav / login / asset-library ...）
-│   └── *-ref/ · screenshots/ · research/   # 取证截图与一次性调研（不参与分类）
+│   ├── commerce-design.md    # 产品：支付 / 积分 / 订单 / 商品 / 会员 / 营销
+│   ├── <页面>-design.md      # 产品：C 端页面规格（workbench / topnav / login / asset-library）
+│   └── agent-*.md            # 规划：AI 智能体需求与集成方案（未实施）
 ├── docker-compose.yml        # 本地编排：默认=dev，--profile test=test（不同卷、不同库）
 ├── docker-compose.production.yml # 生产单机编排：migrate 门禁 / 健康探针 / 持久卷 / 仅本机监听
 ├── .run/                     # backend.log / frontend.log（gitignore）
@@ -102,7 +99,7 @@ aigc-creation/
 │   ├── prisma/schema.prisma  # SQLite provider；无 enum，状态类字段一律 String + DTO 白名单
 │   ├── prisma.config.ts      # Prisma 7 连接配置（datasource url 移出 schema；按 NODE_ENV 选档）
 │   ├── Dockerfile            # ★ 三阶段镜像（node:24-slim；deps → build → prod）
-│   ├── scripts/              # seed* / smoke*（28 个）/ verify* / probe / db-url
+│   ├── scripts/              # seed* / smoke*（21 个）/ verify*（24 个）/ db-url
 │   ├── .env.development      # ★ 开发档（入库）
 │   ├── .env.test             # ★ 测试档（入库；独立库/目录/端口/密钥）
 │   ├── .env.production.example # ★ 生产样例（复制为 .env.production，含凭据故不入库）
@@ -142,9 +139,9 @@ aigc-creation/
     ├── .env.test             # ★ 测试档（入库）
     ├── .env.production.example # ★ 生产样例（VITE_API_BASE 跨域时才需改）
     └── src/
-        ├── App.tsx           # 27 条壳内路由 + 8 条独立页 + /admin/* 子应用（见下）
+        ├── App.tsx           # 28 条壳内路由 + 9 条独立页 + /admin/* 子应用（见下）
         ├── components/       # AppLayout / SideRail / RailPreview / ToolShell / QrLoginPanel / admin/AdminLayout ...
-        ├── pages/            # 34 个 C 端页面 + pages/admin/ 28 个后台页面
+        ├── pages/            # 35 个 C 端页面 + pages/admin/ 28 个后台页面
         ├── lib/              # api.ts（request 拆信封）/ http.ts / auth.ts / capabilities.ts
         │                     # aigc-label.ts（角标参数拉取 + CSS 还原）/ constants.ts 含 APP_ENV / IS_PROD / API_BASE
         ├── context/          # AuthContext / AdminContext（权限点）/ CreditsContext
@@ -212,7 +209,7 @@ docker compose down -v                      # 连数据卷一起删
 docker compose -f docker-compose.production.yml up -d --build
 docker compose -f docker-compose.production.yml ps -a
 
-# 冒烟验证（需后端已启动；28 个脚本）
+# 冒烟验证（需后端已启动；21 个脚本，完整清单见 docs/testing.md）
 cd backend
 node scripts/smoke-auth.js                    # 注册/登录/改密后旧 token 失效
 node scripts/smoke-capability-runtime.js       # runtime/model-only 契约 + 上下线 + 限时免费
@@ -220,7 +217,7 @@ node scripts/smoke-admin.js                   # 后台身份/权限/审计
 node scripts/smoke-commerce.js                # 商品/订单/支付/退款/积分
 node scripts/smoke-membership.js              # 会员订阅与月度积分
 node scripts/smoke-membership-order.js        # 会员下单→支付→激活唯一路径（无订单拒绝/重复激活/退款）
-node scripts/smoke-payments.js                # 57 项：渠道回调入账/幂等/金额不符/CSV 对账/发票/支付渠道状态只读
+node scripts/smoke-payments.js                # 渠道回调入账/幂等/金额不符/CSV 对账/发票/支付渠道状态只读/退款先打渠道
 node scripts/smoke-marketing.js               # 优惠券/活动/邀请/签到
 node scripts/smoke-model-channels.js          # 模型线路 CRUD/排序/测试
 node scripts/smoke-storage.js                 # 存储后端切换
@@ -232,17 +229,17 @@ node scripts/smoke-aigc.js                    # AIGC 标识：PNG chunk CRC / JP
 node scripts/smoke-signed-url.js             # 签名 URL：另起带密钥实例验证 403/200/篡改/过期/HEAD
 node scripts/smoke-rate-limit.js             # 限流：短信 1/分、寻找回 3/时、伪造 XFF 无效
 node scripts/smoke-health-tracing.js         # 健康分项 + X-Request-Id 回显 + 日志 [rid=] 串联
-node scripts/smoke-tickets-search.js         # 42 项：工单状态机/越权 404/全局搜索/批量/CSV 导入导出
-node scripts/smoke-refund-rules.js            # 19 项：退款时间窗 40905/比例 40906/已消耗积分 40907/会员终止
-node scripts/smoke-qr-login.js                # 20 项：扫码≠授权/一次性兑换 consumed/过期/登录审计
+node scripts/smoke-tickets-search.js         # 工单状态机/越权 404/全局搜索/批量/CSV 导入导出
+node scripts/smoke-refund-rules.js            # 退款时间窗 40905/比例 40906/已消耗积分 40907/会员终止
+node scripts/smoke-qr-login.js                # 扫码≠授权/一次性兑换 consumed/过期/登录审计
 
-# 架构与链路闸口（不依赖后台 UI，直接跑服务层/脚本）
+# 架构与链路闸口（不依赖后台 UI，直接跑服务层/脚本；完整清单见 docs/testing.md）
 npx ts-node -T scripts/verify-architecture-layers.ts   # 分层依赖方向
 npx ts-node -T scripts/verify-capability-extensibility.ts
 npx ts-node -T scripts/verify-credit-deduction.ts
 npx ts-node -T scripts/verify-failover.ts            # 多渠道故障转移：切线路时真的换 baseUrl/token/model
 npx ts-node -T scripts/verify-video-pipeline.ts
-npx ts-node -T scripts/verify-payment-signatures.ts  # 44 项：支付宝 RSA2 / 微信 v3 AES-GCM 按公开规范独立复算（含退款响应验签、沙箱退款不造渠道单号）
+npx ts-node -T scripts/verify-payment-signatures.ts  # 支付宝 RSA2 / 微信 v3 AES-GCM 按公开规范独立复算
 
 # 依赖一致性审计
 npm run verify:deps:critical                # 日常用：只查运行时关键链
@@ -277,10 +274,10 @@ node scripts/verify-deps.js --quiet           # 仅结论，有致命问题 exit
 `mode` 语义（实现程度）：
 
 - `real` — **已接入真实模型能力**，界面标「已接入」
-- `mock` — (2026-10-22 已移除) 过去标记「本地只画占位图」，那批占位实现已全部删除
-- `planned` — 参考站有、本项目未实现，界面标「规划中」且不可提交（当前 0 项）
+- `mock` — 保留枚举值但已无使用（占位实现全部删除，当前 0 项）
+- `planned` — 未实现，界面标「规划中」且不可提交（当前 0 项）
 
-`modality` 语义（产出介质），与 `mode` **正交**：`image` / `text` / `video`。当前 15 项 image + 1 项 video（图生视频）；`text` 用于提示词工具等非能力项。新任务的 `task.provider` 恒为 `gateway`（建任务初值 `pending`）；`local` 只表示 2026-10-25 前的历史产出，结果卡仍如实标注为历史本地结果。
+`modality` 语义（产出介质），与 `mode` **正交**：`image` / `text` / `video`。当前 15 项 image + 1 项 video（图生视频）；`text` 用于提示词工具等非能力项。新任务的 `task.provider` 恒为 `gateway`（建任务初值 `pending`）；`local` 只表示存量历史产出的来源，结果卡仍如实标注为历史本地结果。
 
 **当前分布**（16 项）：
 
@@ -473,7 +470,7 @@ generate.service / prompt-tools
 
 用 `fs.appendFileSync` 而非 `createWriteStream`：stream 缓冲在 `kill -9` 时会丢，而「进程崩了」正是最需要日志的时刻。
 
-**未做**：`process.env.X` → `ConfigService` 的全量收敛。当前两者并存且语义等价，收敛是独立的重构批次。
+**未做**：`process.env.X` → `ConfigService` 的全量收敛。当前两者并存且语义等价。
 
 `AllExceptionsFilter` 由 AppModule 的 `APP_FILTER` 注册（需要注入 logger 才能落盘），`main.ts` **不得**再加 `useGlobalFilters`，两者并存会执行两次。`ResponseInterceptor` 无 DI 需求，仍走 `useGlobalInterceptors`。
 
@@ -503,7 +500,7 @@ generate.service / prompt-tools
 
 **权限链**：`AdminGuard`（身份）→ `PermissionGuard`（权限点）→ controller → `AuditInterceptor`（落 `AdminAuditLog`）。权限点 54 个，定义在 `src/admin/permissions.ts`，角色存 `AdminRole`。**前端 `AdminContext.can()` 只用于隐藏无权限按钮，不是安全边界**；真正的校验必须在后端。
 
-28 个页面，侧栏分 8 组（`AdminLayout.tsx` 的 `MENU` 是唯一事实源）：
+28 个页面，侧栏分 8 组（`adminNav.ts` 的 `ADMIN_MENU` 是唯一事实源）：
 
 | 分组 | 页面 |
 | --- | --- |
@@ -563,9 +560,10 @@ generate.service / prompt-tools
 - **手机上传**（`mobile-upload`）：创建一次性会话 + 令牌，手机扫码上传、桌面端接收，避免把素材先传到聊天工具。
 - **存储**（`storage`）：`local`（默认）/ `oss` / `minio`，按 `STORAGE_BACKEND` 切换；后台上报状态与连通性探测。切云端前需先装对应 SDK。
 - **账户自助**（`account`，2026-10-21）：`/me` 路径下只认令牌身份，路由层没有「别人的账号」这个概念。改密后 `tokenVersion + 1`，**该账号全部旧 token 立即失效（含当前这把）**。注销的实现在 `account-lifecycle.service.ts`，后台用户管理与 C 端自助共用同一份，行为与注销确认页的承诺逐条对应：**清除**作品 / 素材 / 项目 / 积分批次（含对象存储文件）、终止生效中的会员；**保留**订单 / 支付 / 退款 / 发票 / 积分流水（法定留存，流水断开批次引用），并匿名化与状态置 `deleted`。
-- **法务文档**（`legal`）：三类固定 slug（`user-agreement` / `privacy-policy` / `minors-policy`），按 `(slug, version)` 版本化。已发布版本**不可原地覆盖**（`upsert` 返回 409），改文本须升版本号再发布；发布时同 slug 的其他已发布版本自动置 `archived`，保证 `current()` 唯一。前台 `LegalPage` 读接口，读不到时用内置文本兜底。
+- **法务文档**（`legal`）：四类固定 slug（`user-agreement` / `privacy-policy` / `minors-policy` / `account-rules`，定义在 `legal.service.ts` 的 `LEGAL_SLUGS`），按 `(slug, version)` 版本化。已发布版本**不可原地覆盖**（`upsert` 返回 409），改文本须升版本号再发布；发布时同 slug 的其他已发布版本自动置 `archived`，保证 `current()` 唯一。前台 `LegalPage` 读接口，读不到时用内置文本兜底。
 - **扫码登录**（`auth/qr-login.service.ts`，2026-10-21）：桌面建码 → 手机（已登录）扫码 → 手机确认 → 桌面轮询换 JWT，票据 120 秒有效。三条不可放松的约束：**票据只存 SHA-256**（二维码会被截图/投屏，明文入库等于长期会话钥匙）、**扫码 ≠ 授权**（`scan` 只到 `scanned`，绑定账号必须 `confirm`）、**兑换一次性**（条件更新 `confirmed → consumed` 抢占，并发轮询只有一个拿到 token）。手机端确认前必须展示发起端 IP + UA。
-- **站内消息**（`notifications`，`@Global()`）：`notify()` **永不抛异常**（写库失败只 WARN），模板缺失回落到代码内置文案。已接入四个业务事件：支付成功（`order.service.markPaid`）、任务失败退款（`generate.service.refundForFailure`，**仅在退款真的成功时**）、会员到期（调度任务，先查后更才能拿到 userId）、工单回复（B7 接入）。变量只替换 `{name}` 形式占位符。
+- **第三方登录**（`auth/oauth/`）：标准 OAuth2 / OIDC，内置 `google` / `github`，另有 `generic` 可接任意合规 provider（`oauth.providers.ts`）。启用判定 = 凭据四项齐全且未被 `OAUTH_ENABLED` 排除；回调链路 `authorize`（签 `state`，10 分钟过期）→ `callback`（验 `state` → 换 token → 拉 profile → 找/绑/建本地账号）→ 302 回前端只带 **60 秒短时票据** → `POST /auth/oauth/complete` 换正式 JWT。三条约束：**`accessToken` 不进 URL**；**只有 `emailVerified` 的邮箱才自动绑定已有账号**（非 `active` 直接 `40302`）；**`returnTo` 只接受站内绝对路径**（拦 `//evil.com` 开放重定向）。登录审计记 `reason=oauth:<provider>`。
+- **站内消息**（`notifications`，`@Global()`）：`notify()` **永不抛异常**（写库失败只 WARN），模板缺失回落到代码内置文案。已接入四个业务事件：支付成功（`order.service.markPaid`）、任务失败退款（`generate.service.refundForFailure`，**仅在退款真的成功时**）、会员到期（调度任务，先查后更才能拿到 userId）、工单回复（`tickets.service`）。变量只替换 `{name}` 形式占位符。
 
 ### 主要接口
 
@@ -575,6 +573,9 @@ generate.service / prompt-tools
 | POST | `/api/v1/auth/register` | 注册，**直接返回 `accessToken`**（注册即登录） |
 | POST | `/api/v1/auth/login` | 登录，返回 `{ accessToken, user }` |
 | POST/GET | `/api/v1/auth/qr/create`、`/auth/qr/status` | 扫码登录：桌面建码 / 轮询换 token（公开，`status` 首次兑换即作废） |
+| GET | `/api/v1/auth/oauth/providers` | 已启用的第三方登录 provider 列表（公开；留空则登录页不渲染按钮） |
+| GET | `/api/v1/auth/oauth/:provider/authorize`、`/auth/oauth/:provider/callback` | 第三方登录跳转与回调（公开；`state` 10 分钟过期，回调只下发 60 秒票据） |
+| POST | `/api/v1/auth/oauth/complete` | 用短时票据换正式 `accessToken`（票据是 60 秒 JWT，服务端不存消费记录） |
 | POST | `/api/v1/auth/qr/{scan,confirm}` | 手机端（需登录）标记已扫 / 确认授权；**扫码≠授权**，确认才绑定账号 |
 | GET/POST | `/api/v1/projects` | 项目列表 / 创建 |
 | POST | `/api/v1/assets/upload` | 上传素材（multipart：`file` + `projectId` 均必填），返回含宽高 |
@@ -635,8 +636,8 @@ JWT TTL 默认 7 天（`JWT_TTL` 可覆盖；本地 MVP 无 refresh，生产应�
 
 三类外壳：
 
-- **独立页（无侧栏，8 条）**：`/`（landing）、`/sitemap.html`、`/legal/:slug`、`/login`（含扫码登录页签）、`/qr-login`（手机端扫码确认）、`/forgot-password`、`/reset-password`、`/mobile-upload`
-- **C 端 Shell 内（27 条）**：`/workbench`、`/product-kit`、`/product-detail`、`/viral-clone`、`/free-creation`、`/multi-image-fusion`、`/product-sku`、`/local-redraw`、`/background-remove`、`/watermark-remove`、`/product-retouch`、`/image-translate`、`/image-expand`、`/product-recolor`、`/rotate-angle`、`/tools/:capability`、`/works`、`/library`、`/stats`、`/invitations`、`/packages`、`/checkout/:sku`、`/credits`、`/orders`、`/account`、`/tickets`、`/my-works`
+- **独立页（无侧栏，9 条）**：`/`（landing）、`/sitemap.html`、`/legal/:slug`、`/login`（含扫码登录页签与第三方登录按钮）、`/auth/oauth/callback`（第三方登录落地页）、`/qr-login`（手机端扫码确认）、`/forgot-password`、`/reset-password`、`/mobile-upload`
+- **C 端 Shell 内（28 条）**：`/workbench`、`/product-kit`、`/product-detail`、`/viral-clone`、`/free-creation`、`/multi-image-fusion`、`/product-sku`、`/local-redraw`、`/background-remove`、`/watermark-remove`、`/product-retouch`、`/image-translate`、`/image-expand`、`/product-recolor`、`/rotate-angle`、`/tools/:capability`、`/works`、`/library`（别名 `/asset-library`）、`/stats`、`/invitations`、`/packages`、`/checkout/:sku`、`/credits`、`/orders`、`/account`、`/tickets`、`/my-works`（`/works` 的别名）
 - **后台子应用**：`/admin/*`（28 页，独立 Shell 与鉴权）
 
 未匹配 → `NotFoundPage`（`App.tsx` 的 `path="*"`）；`/admin/*` 必须注册在 catch-all 之前，否则会被吞进 C 端 Shell。**C 端路由已对外开放**（2026-10-19）：未登录可直接浏览，需要身份的动作唤起登录弹窗，`/login` 仅作深链接兜底。
@@ -645,7 +646,7 @@ JWT TTL 默认 7 天（`JWT_TTL` 可覆盖；本地 MVP 无 refresh，生产应�
 
 ### 数据模型要点
 
-42 个模型，按域分组：
+43 个模型，按域分组：
 
 - **用户与权限**：`User` / `AdminRole` / `AdminAuditLog` / `SystemSetting`
 - **创作**：`Project` / `Asset` / `GenerationTask`
@@ -653,7 +654,7 @@ JWT TTL 默认 7 天（`JWT_TTL` 可覆盖；本地 MVP 无 refresh，生产应�
 - **权益**：`CreditLot` / `CreditLedger` / `MembershipPlan` / `Membership` / `MembershipUsage`
 - **增长**：`Coupon` / `Campaign` / `InviteRelation` / `InviteRewardRule` / `CheckinRecord` / `CheckinRule`
 - **财务**：`Invoice` / `ReconciliationBatch` / `ReconciliationItem`
-- **身份安全**：`AccountToken`（一次性令牌：重置密码等）/ `LoginLog` / `LoginSession`（扫码登录票据，**只存 SHA-256 哈希**，`confirmed → consumed` 一次性兑换）
+- **身份安全**：`AccountToken`（一次性令牌：重置密码等）/ `LoginLog` / `LoginSession`（扫码登录票据，**只存 SHA-256 哈希**，`confirmed → consumed` 一次性兑换）/ `OAuthIdentity`（第三方登录绑定：`provider` + `subject` 联合唯一，`lastLoginAt` 记录最近登录）
 - **内容与合规**：`LegalDocument`（按 slug + version 版本化）/ `ConsentRecord`（同意留痕）/ `Notification` / `MessageTemplate` / `AigcLabelConfig`（单行 `id='default'`：`specJson` 样式 + `pngBase64` 浏览器渲染位图 + `specKey` 过期判定）
 - **服务**：`Ticket`（`ticketNo @unique`，状态机见 `tickets.service.ts`）/ `TicketReply`
 - **模型通道**：`ModelChannel` / `ModelChannelConfig` / `ModelCallLog` / `CapabilityControl`（能力上下线，无行 = 启用）
@@ -672,7 +673,7 @@ Jimp 仅用于上传校验、尺寸探测和 AIGC 角标合成，不参与生成
 | 新增一项能力 | `capabilities/definitions/<id>.ts` + `definitions/index.ts` | 启动期 `assertCapabilityIntegrity` 校验；`verify-capability-bootstrap.ts` / `-extensibility.ts` |
 | 新增厂商 | `providers/vendors/vendor.catalog.ts` 加一条（`vendor.presets.ts` 自动派生） | 选厂商自动填基址/协议/推荐模型；`verify-vendor-aggregation.ts` |
 | 新增协议 | `providers/protocols/protocol.spec.ts` 加协议形状 + `provider-factory.ts` 加一行映射 + 对应 provider 实现 | 图像能力继承 `BaseImageProvider` 只声明端点/尺寸/响应字段三处差异；未知协议**显式抛错**，不静默回落 |
-| 新增后台页 | `admin/permissions.ts` 权限点 → 后端 controller 挂 `@RequirePermission` → `AdminLayout.tsx` 的 `MENU` → `pages/admin/*.tsx` → `AdminDashboardPage.tsx` 路由 → `lib/api.ts` + `types/api.d.ts` | 前端 `AdminContext.can()` 只隐藏按钮，权限必须在后端 |
+| 新增后台页 | `admin/permissions.ts` 权限点 → 后端 controller 挂 `@RequirePermission` → `adminNav.ts` 的 `ADMIN_MENU` → `pages/admin/*.tsx` → `AdminDashboardPage.tsx` 路由 → `lib/api.ts` + `types/api.d.ts` | 前端 `AdminContext.can()` 只隐藏按钮，权限必须在后端 |
 | 新增环境变量 | `config/env.validation.ts` 的 `ENV_SPECS` + `.env.example` + 三档 env；通道类再加 `providers/channel-config.defs.ts` | `probe-environments.ts`；`docs/environments.md` |
 | 调整积分价 / 退款规则 | 默认值在 `definitions/<id>.ts` 的 `creditCost` / `settings.dto.ts` 的 `SETTING_DEFS` | 运行时一律走 `CreditPriceService.resolve()` 与设置读取，不在业务代码里写死 |
 
@@ -690,19 +691,19 @@ Jimp 仅用于上传校验、尺寸探测和 AIGC 角标合成，不参与生成
                             --radius-panel 16 / --radius-hero 24 / --radius-pill 999
 ```
 
-**已发生过的真实 bug 警示**：`--color-primary` 曾是蓝色 `#2563eb`，与紫系页面混用导致 hover 时蓝紫跳变，2026-10-18 已归位为品牌紫。新增颜色前先查 `global.css` 是否已有语义合适的 token；确需新增则定义 token 并全站替换，不留同义簇。
+**色值冲突的真实 bug 警示**：`--color-primary` 曾是蓝色 `#2563eb`，与紫系页面混用导致 hover 时蓝紫跳变，现已归位为品牌紫。新增颜色前先查 `global.css` 是否已有语义合适的 token；确需新增则定义 token 并全站替换，不留同义簇。
 
-### 1:1 复刻纪律
+### 设计一致性优先
 
-页面大量逐页 1:1 复刻自参考站实拍（computed styles，1920×1080）。改动复刻页时：参考站产物 CSS 的字面值是唯一基准，实拍值完整保留在 README 各页「复刻说明」与代码注释中，可按页回退。注意 2026-10-17 存在一次明确的取舍：设计一致性收口**有意偏离**部分页面的参考站实拍值（暖灰改冷灰、`#6C5CE7` → `#5546D8`、hero 副标题 17→16px），这是用户「统一优先于逐页 1:1」的决策，不要「修正」回去。
+全站统一的视觉基线（品牌紫 `#5546D8`、冷灰中性色族、五档圆角）**优先于任何单页的局部数值**。判断"某页数字与其它页不一致"时，先按全站令牌校准，不要按单页还原；页面级规格文档记录的是当前生效值，与 `global.css` 冲突时以 `global.css` 为准。
 
 ### 本仓库已初始化 git
 
-根目录有 `.git`（当前仅有 `master` 分支，未配置远端）。历史与回滚可用，但**不要代为 commit**（见「工作纪律」）。
+根目录有 `.git`（当前运行 `main` 分支，未配置远端）。历史与回滚可用，但**不要代为 commit**（见「工作纪律」）。
 
 ### README 只写现状
 
-`README.md` 记录**当前**的页面结构、能力清单、目录树、启动方式、环境坑与复刻规格。**不往 README 追加逐轮改动与验证记录**：改动的取舍与真实验证结果随提交说明记录，闸口清单与已知红灯维护在 `docs/testing.md`。
+`README.md` 记录**当前**的页面结构、能力清单、目录树、启动方式、环境坑与页面规格。**不往 README 追加逐轮改动与验证记录**：改动的取舍与真实验证结果随提交说明记录，闸口清单与已知缺口维护在 `docs/testing.md`。
 
 改动功能/样式/环境约定后仍应同步 README 的现状章节 —— 但如果与代码冲突，**以代码为准并顺手改 README**，能力事实以 `backend/src/capabilities/definitions/` 为准。
 
@@ -744,26 +745,24 @@ Jimp 仅用于上传校验、尺寸探测和 AIGC 角标合成，不参与生成
 
 ## 文档索引
 
-文档按类型分六类（需求 / 产品 / 技术 / 测试 / 品牌 / 规划），完整地图与状态见 **`docs/README.md`**。标记：**现行** = 与代码同步维护；**快照** = 2026-10-19 设计稿，结论已被 B0–B8 取代；**规划** = 未实施。
+文档按类型分五类（需求 / 产品 / 技术 / 测试 / 规划），完整地图见 **`docs/README.md`**。标记：**现行** = 与代码同步维护；**规划** = 未实施，不得写成现状。
 
 **需求文档**
 
 | 文档 | 内容 | 状态 |
 | --- | --- | --- |
-| `docs/prd.md` | 整站产品需求（含 C 端） | 快照 |
-| `docs/admin-prd.md` | 后台管理系统需求 | 快照（已落地） |
-| `docs/gap-analysis.md` | 功能缺口全量审计（GAP-xx 取证索引） | 快照（已补齐） |
+| `docs/prd.md` | 整站产品需求：账号合规、创作与资产、内容合规、交易、安全、后台、基础设施 | 现行 |
+| `docs/admin-prd.md` | 后台管理系统需求：角色权限、功能模块、接口与数据要求 | 现行 |
 | `docs/agent-prd.md` | AI 智能体产品需求 | 规划（不在本轮范围） |
 
 **产品文档**
 
 | 文档 | 内容 | 状态 |
 | --- | --- | --- |
-| `docs/admin-suite-design.md` | 后台总体设计（全域 / RBAC / 路线图） | 设计依据（已落地） |
-| `docs/admin-console-design.md` / `admin-detailed-design.md` / `admin-ui-design.md` | 后台功能 / 详细 / 界面设计 | 设计依据（已落地） |
-| `docs/commerce-design.md` | 支付 / 积分 / 订单 / 商品 | 设计依据（已落地） |
-| `docs/workbench-design.md` / `topnav-design.md` / `login-design.md` / `asset-library-design.md` | 页面级 1:1 规格与实拍审计 | 现行 |
-| `docs/multi-image-fusion-spec.md` / `free-creation-parity-audit.md` | 多图融合规格 / 自由创作偏差清单 | 现行 |
+| `docs/admin-suite-design.md` | 后台总体设计（全域 / RBAC / 信息架构） | 现行 |
+| `docs/admin-console-design.md` / `admin-detailed-design.md` / `admin-ui-design.md` | 后台功能 / 详细 / 界面设计 | 现行 |
+| `docs/commerce-design.md` | 支付 / 积分 / 订单 / 商品 / 会员 / 营销 | 现行 |
+| `docs/workbench-design.md` / `topnav-design.md` / `login-design.md` / `asset-library-design.md` | C 端页面规格：工作台 / 顶部导航 / 登录 / 素材库 | 现行 |
 
 **技术文档**
 
@@ -772,19 +771,12 @@ Jimp 仅用于上传校验、尺寸探测和 AIGC 角标合成，不参与生成
 | `docs/environments.md` | 三环境变量矩阵、加载优先级、生产门禁、Docker、排查 | **现行事实源** |
 | `docs/docker-deployment.md` | 本地 / 测试 / 生产容器部署、TLS 边界、备份恢复、升级回滚、排障 | **现行事实源** |
 | `docs/model-architecture.md` | 模型通道分层、协议矩阵、调度与配置、请求时序、扩展 SOP | **现行事实源** |
-| `docs/layout-unification.md` / `typography-components-details.md` / `refactor-dedup.md` | 布局统一 / 字体细节 / 重复代码抽取 | 实施记录 |
-| `docs/agent-technical-design.md` | AI 智能体技术方案 | 规划 |
+| `docs/typography-components-details.md` | 字体、antd 主题、圆角阴影与组件微规格 | 现行 |
+| `docs/agent-integration-design.md` | AI 智能体集成方案（双入口、API、SSE、数据模型、安全边界） | 规划 |
 
 **测试文档**
 
 | 文档 | 内容 | 状态 |
 | --- | --- | --- |
-| `docs/testing.md` | 四层测试、28 个冒烟 + 22 个 verify/probe 脚本清单、覆盖矩阵、已知红灯、数据清理 | **现行事实源** |
-| `docs/development-workflow.md` | **Agent 执行手册**：指令映射（跑 / 改 / 继续）、十三阶段执行卡（目标 / 动作 / 命令 / 退出检查 / 交人）、agent 自主边界与禁令、闸口命令矩阵、证据与交付摘要模板、缺陷卡模板、hotfix、完成定义 | **现行事实源**：agent 自动推进流程时按本文执行 |
-
-**品牌规范**
-
-| 文档 | 内容 |
-| --- | --- |
-| `docs/brand/brand-basics.md` | 品牌唯一事实源（色板 / 字体 / logo / 口号） |
-| `docs/brand/naming.md` | 取名与商标冲突核查 |
+| `docs/testing.md` | 四层测试、闸口脚本清单（21 冒烟 + 24 verify/probe + 13 Vitest + 14 E2E）、覆盖矩阵、已知缺口、数据清理 | **现行事实源** |
+| `docs/development-workflow.md` | **Agent 执行手册**：指令映射（跑 / 改 / 继续）、阶段执行卡（目标 / 动作 / 命令 / 退出检查 / 交人）、agent 自主边界与禁令、闸口命令矩阵、证据与交付摘要模板、缺陷卡模板、hotfix、完成定义 | **现行事实源**：agent 自动推进流程时按本文执行 |

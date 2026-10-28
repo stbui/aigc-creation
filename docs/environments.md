@@ -1,6 +1,6 @@
 # 三环境体系（开发 / 测试 / 生产）
 
-> 建立于 2026-10-20。此前项目只有 `NODE_ENV` 这一个枚举值，其余全是单环境硬编码。
+> 读哪一档 env、连哪个库、写哪个目录、用哪个前端构建模式、监听哪个端口，全部由 `NODE_ENV` 决定。
 
 ## 一句话
 
@@ -100,6 +100,23 @@ ALIPAY_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\nMIIBI...\n-----END PUBLIC KEY----
 **回退语义与支付相反**：支付通道凭据缺失一律 503、绝不降级沙箱；邮件/短信不是核心链路（忘记密码仍可走另一条通道或联系客服），因此 `aliyun` 缺凭据时**告警 + 回落 console**，由 `status()` 的 `delivers: false` 与 `/health` 的 channels 分项暴露「其实没在发」。`/admin/notifications` 页顶部的通道状态读同一份 `status()`。
 
 **刻意不手写 SMTP**：TLS 分片与认证流程的自研实现风险高于收益，邮件走服务商 HTTP API。阿里云 RPC 签名（HMAC-SHA1 + 排序 canonical query）有离线复算脚本：`cd backend && npx ts-node -T scripts/verify-channel-signatures.ts`，但它**只验签名与请求形状，不代表已真实投递**。
+
+## 第三方登录（`OAUTH_*`）
+
+标准 OAuth2 / OIDC 登录。内置 `google` / `github`，另有 `generic` 可接任意合规 provider（`backend/src/auth/oauth/oauth.providers.ts`）。
+
+| 变量 | 开发 | 测试 | 生产 | 说明 |
+|---|---|---|---|---|
+| `OAUTH_ENABLED` | 空 | 空 | 按需 | 逗号分隔白名单。**留空 = 凭据齐全的 provider 自动启用**；填了则只放行列出的 id |
+| `OAUTH_CALLBACK_BASE` | 空 | 空 | 对外域名 | 回调基址，默认 `WEB_BASE_URL` + `/api/v1`（再缺省 `http://localhost:5100/api/v1`）。本地经 Vite 反代可用 |
+| `OAUTH_<PROVIDER>_CLIENT_ID` / `_CLIENT_SECRET` | 空 | 空 | 必填 | 缺任一项该 provider 不启用，登录页不渲染按钮 |
+| `OAUTH_<PROVIDER>_REDIRECT_URI` | 空 | 空 | 按需 | 留空自动拼 `${OAUTH_CALLBACK_BASE}/auth/oauth/<provider>/callback`；**必须与 provider 后台登记的回调完全一致** |
+| `OAUTH_<PROVIDER>_AUTHORIZATION_ENDPOINT` / `_TOKEN_ENDPOINT` / `_USERINFO_ENDPOINT` | 空 | 空 | 按需 | 留空用 Google / GitHub 官方端点；`generic` 三项都必填 |
+| `OAUTH_<PROVIDER>_SCOPES` | 见默认 | 同 | 按需 | Google 默认 `openid,email,profile`；GitHub 默认 `read:user,user:email` |
+
+**启用判定**：`clientId` + `clientSecret` + `authorizationEndpoint` + `tokenEndpoint` 四项非空（`redirectUri` 有自动拼接的缺省值），且未被 `OAUTH_ENABLED` 排除。未启用时 `GET /auth/oauth/providers` 返回空数组，登录页整块不渲染——**不要在前端维护 provider 名单**。
+
+只有 provider 明确确权（`emailVerified`）的邮箱才会自动绑定同邮箱的既有账号；`accessToken` 不进回调 URL，只下发 60 秒票据由前端 `POST /auth/oauth/complete` 换取。详见 `docs/login-design.md` §3。
 
 ## 安全与合规（签名 / 限流 / 追踪）
 
@@ -238,7 +255,7 @@ docker compose down -v       # 连数据卷一起删（库/上传图/备份/日�
 这两个一次性任务显示为 `Exited (0)` 属正常，不是崩溃。
 
 两个 profile 用**不同的具名卷**（`huojue-data` / `huojue-test-data`），
-库文件与上传目录都不同。`frontend-test` 的 nginx 上游通过
+库文件与上传目录都不同。`frontend-test` 的 nginx 反向代理目标通过
 `BACKEND_UPSTREAM=backend-test:3001` 注入 —— 写错不报错，只会让测试前端
 静默代理到开发后端。
 

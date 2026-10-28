@@ -1,365 +1,202 @@
 # 后台管理端 · 功能设计
 
-货觉AI · MVP ｜ 2026-10-19 ｜ 状态：**设计已落地**（B0–B8，2026-10-21；正文「15 项能力 / 无后台」等表述为当时快照，当前以代码与 [`CLAUDE.md`](../CLAUDE.md) 为准）
+后台各页面的职责、可用动作与数据口径。信息架构与角色权限见 `docs/admin-suite-design.md`，字段级细节见 `docs/admin-detailed-design.md`，界面规格见 `docs/admin-ui-design.md`。
 
-> **本文是分域附件，层级低于后台 PRD** `docs/admin-prd.md`（后台管理系统需求）；实现细节见 `docs/admin-detailed-design.md`。整站产品需求见 `docs/prd.md`。
-> 本文 §0-5 的「两级 role」已被总纲 §2 改判为 **RBAC 三角色**（admin/operator/finance）；批次编号 A1-C1 已被总纲 §12 的 M1-M16 取代。实现时以 PRD 与总纲为准。
+| 项 | 事实源 |
+| --- | --- |
+| 侧栏分组与页面 | `frontend/src/components/admin/adminNav.ts` 的 `ADMIN_MENU` |
+| 页面组件 | `frontend/src/pages/admin/*` |
+| 后端控制器 | `backend/src/admin/*.controller.ts` |
+| 权限点 | `backend/src/admin/permissions.ts` |
+| 访问入口 | C 端顶栏用户菜单「进入运营后台」；`/admin/*` 在 `App.tsx` 中注册于 catch-all 之前 |
 
----
+## 1. 定位与边界
 
-## 0. 结论先行
+**是**：平台运营方（管理员 / 运营 / 财务）使用的内部控制台。
 
-| # | 裁定项 | 结论 | 依据 |
-|---|---|---|---|
-| 1 | 部署形态 | **同仓同进程**：前端新增 `/admin/*` 路由子树 + 独立 `AdminLayout`；后端新增 `admin/` 模块挂 `/api/v1/admin/*` | MVP 单仓单进程，另起服务只增运维成本 |
-| 2 | 外壳是否复用用户端 | **不复用**。管理端用 antd `Layout + Menu`，砍掉营销顶导 / 能力侧栏 / 促销条 | `AppLayout.tsx:60-140` 顶导与 `SideRail` 全部是 C 端语义，混入后台是噪音 |
-| 3 | 权限模型 | `User.role: String`（`user`/`admin`）+ 新增 `AdminGuard`（**每次查库**判角色，token 内的 role 只作 UI 提示） | 现 `JwtAuthGuard` 只解出 `{id, email}`（`common/jwt-auth.guard.ts:29`），提权后 token 7 天 TTL 内残留风险（`common/jwt.service.ts`） |
-| 4 | 管理员账号来源 | **不复用 `admin@demo.com`**。新增 `scripts/seed-admin.ts` 生成随机强密码；演示账号保持 `user` | `frontend/src/lib/constants.ts:15-18` 把 `admin@demo.com/demo1234` 硬编码进产物，给它 admin 等于把后台钥匙挂在门口 |
-| 5 | 计费 / 积分后台 | **已改判：做**。用户 2026-10-19 追加「支付，积分，订单，商品」，本文档 §5/§6/§7/§9 相应扩为 4 个模块，详见 `docs/commerce-design.md` | 用户指令；原「不做」的依据是「无业务表」，现业务表由 commerce 设计新建 |
-| 6 | 内容审核工单 | **降级为「作品巡检」**，只读 + 单条下架，不做审核队列/工单流转 | 素材库是 owner 私有（`assets.service.ts` 全部按 `ownerId` 过滤），无公开 UGC，审核流是伪需求 |
+**不是**：
 
-一句话：**这是「平台运营后台」**。做 8 个模块（+ commerce 追加的 4 个），全部落在 `User`/`Project`/`Asset`/`GenerationTask` 与 commerce 新建的 6 表上。
+- 不是 C 端账号设置页（那是 `/account` `/works` `/library` `/stats` 的职责）。
+- 不是公开 UGC 审核平台：素材库按 `ownerId` 私有，无公开内容流。
+- 不是支付渠道配置台：凭据只从环境变量读，后台只读展示与告警。
+- 不复用 C 端外壳：`AppLayout` / `SideRail` / `PromoBar` 都是消费级语义，后台用独立 `AdminLayout`。
 
----
+## 2. 信息架构
 
-## 1. 现状事实基线
+8 组 28 页，菜单项由 `permission` 字段过滤，`planned` 标记的项置灰但可见（明确告知规划状态而非直接隐藏）。
 
-代码为唯一权威源，以下均已实读。
+| 组 | 页面 |
+| --- | --- |
+| 总览 | 平台概览 |
+| 运营 | 用户管理 / 素材管理 / 任务监控 / 工单处理 |
+| 内容 | 法务文档 / 站内消息 / AI 标识 |
+| 交易 | 商品管理 / 订单管理 / 积分账本 / 能力消耗价 / 优惠券 / 限时活动 / 邀请与签到 |
+| 财务 | 支付渠道 / 发票管理 / 渠道对账 |
+| 系统 | 角色权限 / 系统设置 / 存储配置 / 定时任务 / 操作审计 |
+| 模型 | 模型配置 / 调用记录 / 能力管控 |
+| 数据安全 | 数据备份 / 保留期清理 |
 
-| 事实 | 出处 | 对设计的约束 |
-|---|---|---|
-| 数据模型仅 4 表：`User` / `Project` / `Asset` / `GenerationTask` | `backend/prisma/schema.prisma` | 所有后台统计必须从这 4 表聚合，不引入"尚不存在"的概念 |
-| `User` 无 `role`、无 `status`、无 `lastLoginAt` | 同上 `:11-18` | 必须先扩列 |
-| SQLite provider 不支持 Prisma enum，`kind`/`status`/`capability` 一律 String + DTO 白名单 | schema 头注释 `:3-5` | 新增 `role`/`action` 等同样 String 存储 + 白名单 |
-| 能力清单单一事实源在 `capability.registry.ts`，经 `GET /api/v1/capabilities` 公开下发 | `capabilities.controller.ts:13-25` | 后台不能改代码里的 `mode`，需 DB override 表叠加 |
-| 现状 15 项能力 = real 7 / mock 8 / planned 0 | registry + `CLAUDE.md:113` | 后台「能力管理」第一屏就是这份 mode 分布 |
-| `stats/overview` 强制按 `ownerId` 过滤，是 C 端个人数据中心 | `stats/stats.service.ts:12` | 平台级看板需要一套独立的 admin 聚合，**不能复用** |
-| 生成任务带 `provider`（`gateway`/`local`）、`errorCode`、`status` | `GenerationTask` 模型 | 通道健康度与失败归因**已有数据源**，不需要新埋点 |
-| 网关由 `GATEWAY_*` 环境变量驱动，路由可按能力覆盖 | `CLAUDE.md:130-143` | 后台要改运行时路由，必须有 DB 设置表 + env 兜底优先级 |
-| 演示凭据 `admin@demo.com/demo1234` 硬编码在前端产物 | `lib/constants.ts:15-18` | 不可作为管理员，见 §0-4 |
-| 前端 25 条路由全部包在 `Shell` 内（`AppLayout`） | `App.tsx:144-337` | `/admin/*` 必须在 `Shell` 之外分流，否则会被 catch-all 吞掉 |
-| `RequireAuth` 只判 token 存在，不判角色 | `App.tsx:59-64` | 需新增 `RequireAdmin` |
-| 无任何后台/运营相关页面 | `frontend/src/pages/` 24 个页面全是 C 端 | 全新模块 |
+详情一律用抽屉，不新增独立路由，便于保留列表筛选态。
 
----
+## 3. 模块功能
 
-## 2. 定位与边界
+### 3.1 平台概览 `/admin`
 
-**是什么**：平台运营方（你本人 + 后续客服/运营）用的内部控制台。
+`overview.service.ts` 一次聚合返回三段数据：
 
-**不是什么**：
-- 不是 C 端用户的"账号设置页"（那是 `/works` `/library` `/stats` 的职责）
-- 不是内容审核平台（无公开 UGC，见 §0-6）
-- 不是计费/财务后台（无计费系统，见 §0-5）
-- 不是给终端用户的多角色权限系统（只有 user/admin 两级，不做 RBAC 自定义）
+| 段 | 内容 |
+| --- | --- |
+| `totals` | 用户总数与窗口内新增、项目数、任务总数 / 成功 / 失败 / 进行中 / 成功率、素材总量 / 原始 / 生成 |
+| `trend` | 按日任务趋势（`days` 参数，默认 7 天） |
+| `commerce` | 订单计数、累计 GMV、窗口内 GMV、待付金额、退款（累计与窗口）、支付成功率、会员活跃与新增、积分发放与消耗、营收趋势 |
 
----
+金额一律整数分，后端不做展示层格式化。支付成功率无流水时返回 `null` 而非 `0`——`0%` 会被误读为「全挂了」。右下角列出最近任务，带能力名、状态、通道、错误码、耗时与缩略图。
 
-## 3. 信息架构
+### 3.2 用户管理 `/admin/users`
 
-```
-/admin                     平台概览（Dashboard）
-/admin/users               用户列表
-/admin/users/:id           用户详情（抽屉或子页）
-/admin/projects            全平台项目
-/admin/assets              全平台素材
-/admin/tasks               任务监控
-/admin/tasks/:id           任务详情
-/admin/capabilities        能力与通道
-/admin/settings            系统设置
-/admin/audit-logs          操作审计
-```
+| 动作 | 说明 |
+| --- | --- |
+| 列表 | 邮箱 / 昵称 / 角色 / 状态 / 注册时间 / 最近登录 / 项目数与任务数；支持关键字、角色、状态筛选与排序 |
+| 启用 / 禁用 | `User.status` 改动后旧 token 立即失效（`AdminGuard` 与 `JwtAuthGuard` 均查库校验） |
+| 角色变更 | `user` / `admin` / `operator` / `finance`；最后一个 `admin` 不可降级，服务层断言返回 409 |
+| 重置密码 | 生成一次性密码，仅当次响应可见，写审计 |
+| 删除 | 走与 C 端自助注销同一份 `account-lifecycle.service.ts`：清除作品 / 素材 / 项目 / 积分批次与对象存储文件，保留订单 / 支付 / 退款 / 发票 / 流水并匿名化 |
+| 登录记录 | `GET /admin/users/:id/logins` |
+| 影响面预览 | `GET /admin/users/:id/impact`，删除前展示将清除与保留的量 |
+| 批量 / 导出 | 批量启停与软删（≤100 条，逐条结果）、CSV 导出 |
 
-侧栏分组（7 项，分 4 组）：
+### 3.3 项目与素材 `/admin/assets`
 
-| 组 | 菜单 | 路由 | 优先级 |
-|---|---|---|---|
-| 总览 | 平台概览 | `/admin` | P0 |
-| 运营 | 用户管理 | `/admin/users` | P0 |
-| 运营 | 项目 / 素材 | `/admin/projects`、`/admin/assets` | P0 |
-| 运营 | 任务监控 | `/admin/tasks` | P0 |
-| 交易 | 商品管理 | `/admin/products` | P0（commerce） |
-| 交易 | 订单管理 | `/admin/orders` | P0（commerce） |
-| 交易 | 积分账本 | `/admin/credits` | P0（commerce） |
-| 交易 | 支付流水 | `/admin/payments` | P1（commerce） |
-| 配置 | 能力与通道 | `/admin/capabilities` | P1 |
-| 配置 | 系统设置 | `/admin/settings` | P1 |
-| 系统 | 操作审计 | `/admin/audit-logs` | P1 |
+| 模块 | 能力 |
+| --- | --- |
+| 项目 | `GET /admin/projects` 分页；`DELETE /admin/projects/:id` 连带素材与任务 |
+| 素材 | 缩略图 / kind / 能力 / 尺寸 / 格式 / 体积 / 所属用户与项目 / 上传时间；按 kind、能力、用户、时间筛选；统计接口 `assets/stats` |
+| 下架 | `PATCH /admin/assets/:id/status` 置 `hidden`，C 端列表过滤；影响面预览 `assets/:id/impact` |
+| 删除 | 连带磁盘文件，二次确认列出删除量 |
+| 批量 / 导出 | `assets/batch` / `assets/batch-status` / `assets/export` |
 
-入口：登录成功后 `AuthContext` 若拿到 `role === 'admin'`，在 C 端顶导 `app-user` 下拉里加一项「进入后台」；同时 `/` 直达 `/admin` 时若非管理员 → 跳 `/workbench`。
+### 3.4 任务监控 `/admin/tasks`
 
----
+列表带任务 ID / 能力 / 状态 / 通道 / 用户 / 项目 / 耗时 / errorCode；详情抽屉给输入素材、参数 JSON、产出图与完整错误码。失败任务可重试（用原参数新建任务，不复用旧 ID，避免 `outputAssetId @unique` 约束被绕过），运行中任务可终止（置 `failed` + `cancelled_by_admin`）。`GET /admin/tasks/stats` 给各状态计数，积压数量在顶部标红。
 
-## 4. 功能模块设计
+### 3.5 工单处理 `/admin/tickets`
 
-### 4.1 平台概览 `/admin` — P0
+`GET /admin/tickets`、`/:id`、`POST /:id/replies`、`PATCH /:id`（改状态或指派）、`stats`、`export`。状态机只在 `tickets.service.ts` 的 `TRANSITIONS` 定义；客服回复即 `open → processing` 并自动认领 `assigneeId`；`assigneeId: null` 表示取消指派，只能指派给启用中的后台账号。
 
-平台级聚合，全部来自 4 张表。
+**与订单的边界**：工单是沟通与记录通道，退款等财务动作一律到订单模块执行，避免两处都能改钱。
 
-| 指标卡 | 计算口径 |
-|---|---|
-| 用户总数 / 7 日新增 | `count(user)` / `count(user where createdAt >= now-7d)` |
-| 项目总数 | `count(project)` |
-| 素材总量 / 原始 / 生成 | `groupBy(kind)` |
-| 任务总量 / 成功 / 失败 / 进行中 | `groupBy(status)`，成功率 = succeeded/(succeeded+failed) |
-| 网关命中率 | `provider='gateway'` 占比（近 7 天） |
+### 3.6 法务文档 `/admin/legal`
 
-图表区：
-- 近 14 天任务趋势折线（按 `createdAt` 日聚合）
-- 能力使用分布横向条（`groupBy(capability)`，join registry 拿中文名与 mode）
-- 通道来源分布（`groupBy(provider)`）
-- 失败 Top 能力（`groupBy(capability) where status='failed'`，带最近 errorCode）
+四类固定 slug：`user-agreement` / `privacy-policy` / `minors-policy` / `account-rules`（`LEGAL_SLUGS`）。按 `(slug, version)` 版本化：`PUT` 新建草稿，`POST /:slug/:version/publish` 发布。已发布版本不可原地覆盖，改文本须升版本号；发布时同 slug 的其他已发布版本自动归档，保证「当前生效」唯一。读 `legal.read`、写 `legal.write`，发布必填原因。
 
-> 全部真实统计。**不出现**"今日营收 / 付费转化 / 积分消耗"这类无表支撑的卡片（对齐现有 `StatsPage` 的诚实口径）。commerce 落地后，营收/积分类卡片迁至 `/admin/finance/summary`（见 `commerce-design.md` §8.2），本概览只留运营指标。
+### 3.7 站内消息 `/admin/notifications`
 
-### 4.2 用户管理 `/admin/users` — P0
+`broadcast` 全站广播、`templates` 模板读写、`channels` 展示邮件 / 短信**实际生效实现**（`provider` / `delivers` / `configured`，不含凭据）。模板只替换 `{name}` 形式占位符，缺失时回落代码内置文案。权限 `message.write`。
 
-| 能力 | 说明 | 优先级 |
-|---|---|---|
-| 列表 | 邮箱 / 昵称 / 角色 / 状态 / 注册时间 / 最近登录 / 项目数 / 任务数 / 素材数；支持邮箱模糊搜索、按注册时间/任务数排序、服务端分页 | P0 |
-| 启用 / 禁用 | 置 `User.status = disabled`；**禁用后 JWT 立即失效**（AdminGuard 与 JwtAuthGuard 均校验） | P0 |
-| 角色变更 | `user ↔ admin`，最后一个 admin 不允许降级（服务层断言 + 409） | P0 |
-| 重置密码 | 管理员设临时密码（一次性），前端展示一次后不再可见 | P1 |
-| 删除用户 | 软删除优先（status=`deleted` + 保留数据）；物理删除连带项目/素材/任务/磁盘文件，**二次确认 + 明确列出将删除的量** | P1 |
-| 用户详情 | 基本信息 + 3 个统计 + 最近 20 条任务 + 最近 20 张素材缩略图 | P0 |
+### 3.8 AI 标识 `/admin/aigc-label`
 
-不可做：改密码（需本人或重置流程）、查看明文密码（不存在）。
+顶部「显示可见角标」开关（关闭时给法律风险提示）；左侧编辑样式（文案、字体族 / 字号 / 字重 / 字距 / 字色、底色与不透明度、圆角、内边距、圆点色、位置、缩放、边距、整体不透明度），右侧两层预览——CSS 还原的外观与 Canvas 按服务端同一套几何规则画在示例底图上的效果。保存时浏览器 Canvas 以 2x 渲染 PNG，与 `specJson` 原子提交。关闭状态下仍渲染并保存位图，重新开启即恢复原样式。读 `setting.read`、写 `setting.write`，保存必填原因，审计动作 `aigc.label_update`。
 
-### 4.3 项目 / 素材 `/admin/projects`、`/admin/assets` — P0
+### 3.9 交易与积分
 
-| 模块 | 列表能力 | 详情/操作 |
-|---|---|---|
-| 项目 | 名称 / 所属用户 / 素材数 / 任务数 / 创建时间 / 搜索与排序 | 删除项目（连带素材与任务，二次确认） |
-| 素材 | 缩略图 / kind / capability（join registry 名称）/ 尺寸 / 格式 / 大小 / 所属项目与用户 / 上传时间 | **下架**（置 `status='hidden'`，C 端列表过滤）/ 删除（连带磁盘文件）/ 打开原图 |
+| 页面 | 功能 |
+| --- | --- |
+| 商品管理 | SKU 增删改、上下架、消耗价表；`product.publish` 控制上下架 |
+| 订单管理 | 列表与详情、标记已支付、发起渠道退款（`order.refund`，必填原因） |
+| 积分账本 | 用户余额总览、批次与流水、人工增减（`credit.adjust`）、CSV 导入导出（`data.import` / `data.export`，按邮箱匹配逐行报结果） |
+| 能力消耗价 | 读写运行时积分价，生效来源显示 `override` / `campaign`；限时免活动命中时显示活动来源，运营据此判断「改了价没生效」是活动在起作用 |
 
-素材列表是后台最重的表，需要：分页、缩略图网格 + 表格视图切换、按 kind/capability/用户/时间筛选。
+计费口径详见 `docs/commerce-design.md`。
 
-> 「下架」需要给 `Asset` 加 `status` 列（`visible`/`hidden`），并在 `assets.service.ts` 的用户端列表过滤 `status='visible'`——这是**唯一一处会改 C 端行为**的变更，需单列说明。
+### 3.10 财务
 
-### 4.4 任务监控 `/admin/tasks` — P0
+| 页面 | 功能 | 权限 |
+| --- | --- | --- |
+| 支付渠道（只读） | 生效通道、各通道凭据是否齐全、缺失变量名、回调地址；三类静默故障告警：真实通道缺凭据（发起支付 503）、生产仍走沙箱、未配 `PAYMENT_NOTIFY_BASE` 导致回调不可公网访问 | `payment.read` |
+| 发票管理 | 审核与开具、驳回；金额取 `paidCents - refundedCents` 快照，输出可打印 HTML | `invoice.write` |
+| 渠道对账 | CSV 导入（RFC4180 + 表头别名，金额单位按表头含 `cent|分` 判定）、批次与明细、五类差异、处置只改状态与备注不改钱、导出 | `finance.reconcile` |
 
-| 能力 | 说明 |
-|---|---|
-| 列表 | 任务 ID / 能力 / 状态 / 通道(provider) / 用户 / 项目 / 创建与更新时间 / 耗时 / errorCode；按 status、capability、provider、时间范围筛选 |
-| 详情抽屉 | 输入素材缩略图、参数 JSON（`JSON.stringify(params, null, 2)`）、产出图、完整错误码、轮询耗时 |
-| 统计条 | 当前 pending / running 数量（>50 视为拥堵告警，标红） |
-| 重试 | 对 `failed` 任务，用原参数与原输入重建任务（新建记录，不复用旧 ID），返回新 taskId |
-| 终止 | 对 `running` 任务置 `status='failed'` + `errorCode='cancelled_by_admin'` |
+对账处置权只给财务：处置会让「账对不上」从看板上消失。
 
-> 重试不做"原地复活"，避免产物 1:1 约束（`GenerationTask.outputAssetId @unique`）被绕过。
+### 3.11 系统
 
-### 4.5 能力与通道 `/admin/capabilities` — P1
+| 页面 | 功能 |
+| --- | --- |
+| 角色权限 | 查看与调整三个内置角色的权限点（含 `admin`，`updatePermissions` 只校验权限点合法与角色存在，不阻止裁剪）；角色本身不可删除；改动因守卫每次请求查库而立即生效；高危权限点单独标注 |
+| 系统设置 | 站点 / 上传 / 生成 / 退款规则等分组配置，默认值定义在 `settings.dto.ts` 的 `SETTING_DEFS` |
+| 存储配置 | 当前后端、容量统计、连通性探测、切换新上传的后端（已写入的素材仍按写入时记录的后端读取）；后端未就绪（SDK 未装或凭据缺失）时上传直接失败，不静默回退本地盘 |
+| 定时任务 | 各任务上次 / 下次执行、结果、手动触发 |
+| 操作审计 | 按操作人 / 动作 / 时间筛选，详情含原因、IP、请求 ID；只读，无删除接口 |
 
-| 能力 | 说明 | 优先级 |
-|---|---|---|
-| 能力清单总览 | 15 项表格：名称 / 分组 / mode（real/mock/planned）/ 参数个数 / 工作台是否展示 / 近 7 天调用量 / 成功率。数据源仍是 registry | P0（只读） |
-| mode 覆盖 | 建议本期走 `SystemSetting` 键值（不另建 `CapabilityOverride` 表，见 PRD §3.4）；C 端 `GET /capabilities` 在service 层合并后下发 | P1 |
-| 上/下线能力 | `enabled=false` 时 C 端侧栏与工作台不展示 | P1 |
-| 单能力通道路由 | 覆盖 `GATEWAY_ROUTE_<能力ID>`：`auto`/`local`/`remote`，存 `SystemSetting` | P1 |
-| 全局通道开关 | 等价 `GATEWAY_ENABLED`，存 DB（优先级：DB > env） | P1 |
-| 通道测试 | 「测试连接」按钮：后端用当前凭据对网关发一次最小请求，返回真实耗时与结果摘要；**token 脱敏显示（仅前 4 后 4）** | P1 |
-| 凭据状态 | 只显示 `GATEWAY_BASE_URL` 是否设置、token 是否存在、脱敏值、**不提供明文查看/编辑**（编辑走部署环境变量，界面明示） | P0（只读） |
+### 3.12 模型
 
-> 环境变量是部署期事实源。后台改 DB 属运行时覆盖，必须在界面明确标注「运行时覆盖，重启后仍生效但 env 优先级更高」，避免误以为改 env。
+| 页面 | 功能 |
+| --- | --- |
+| 模型配置 | 页签「线路管理 / 可用模型 / 逐能力路由 / 全局设置」。线路按模态分组，支持增删改、排序、启停、测草稿、连通性测试、多渠道主备；「可用模型」合并内置预设与厂商实时清单（`POST /admin/model-channels/models`，令牌只在请求内使用，不落库不进审计） |
+| 调用记录 | `ModelCallLog` 列表与详情：通道、模型、耗时、结果、回落原因与错误摘要 |
+| 能力管控 | 16 项能力的上下线，下架必填原因；下线后 C 端 `runtime.effective=disabled`，任务在扣费前被拦截并返回 `40005` |
 
-### 4.6 系统设置 `/admin/settings` — P1
+读 `model.config_read`、写 `channel.route` / `model.config_write`、测试 `channel.test`。运营可读可测，不可写。
 
-| 分组 | 项 | 存储 |
-|---|---|---|
-| 站点 | 站点名称、维护模式开关（开启后 C 端只读，生成接口 503） | `SystemSetting` |
-| 上传 | 单文件大小上限（默认 10MB，前后端同源；后端可用 `ASSET_MAX_UPLOAD_BYTES` 上调）、允许类型固定为 PNG/JPEG/WebP | `SystemSetting` |
-| 生成 | 默认轮询上限、超时（对应 `GATEWAY_TIMEOUT_MS`/`MAX_POLLS`）、并发任务上限 | `SystemSetting` |
-| 安全 | JWT TTL 提示（只读，标注"生产应改短 TTL + refresh"）、管理员白名单展示 | 只读 |
-| 存储 | `uploads/` 目录占用与文件数、原始/生成分目录统计 | 运行时统计 |
+### 3.13 数据安全
 
-维护模式是唯一一个会改变 C 端全局行为的开关，需在后端 `JwtAuthGuard` 之后加一道全局拦截（或在 generate controller 前判定）。
+| 页面 | 功能 |
+| --- | --- |
+| 数据备份 | 手动 / 定时备份、SHA-256 校验、下载、按份数裁剪、清理日志 |
+| 保留期清理 | 各目标（文件、日志、记录）可清理量预览与执行，结果落 `CleanupLog` |
 
-### 4.7 操作审计 `/admin/audit-logs` — P1
+备份与清理均属高危动作，写审计。
 
-所有写操作（禁用用户、删项目、改 mode、开关维护模式、重试任务等）落 `AdminAuditLog`：`actorId / action / targetType / targetId / detail(JSON) / ip / createdAt`。
+### 3.14 全局能力
 
-页面：按操作人 / action / 时间筛选，分页。**只读、不可删**（审计不可自证清白的反面：审计记录本身要防篡改，留作 P2 的 hash 链或独立库）。
+| 能力 | 实现 |
+| --- | --- |
+| 全局搜索 | `GET /admin/search?q=` 用户 / 订单 / 工单 / 任务 / 素材五组各前 5 条 + 总数；`q` 长度 < 2 直接返回空组，避免五个 `LIKE` 全表扫描 |
+| 批量动作 | `POST /admin/{users,assets,tasks,orders}/batch`，`ids ≤ 100`，串行执行、不包事务，逐条返回 `{ id, ok, message?, data? }` |
+| CSV 导出 | `common/csv.ts`：UTF-8 BOM + RFC4180 + 公式注入前导 `'`；不走 JSON 信封 |
+| CSV 导入 | 仅积分导入，按邮箱匹配，逐行报结果 |
 
-### 4.8 商品 / 订单 / 积分 / 支付（commerce 追加）— 见 `docs/commerce-design.md`
-
-用户 2026-10-19 追加「支付，积分，订单，商品」后，后台新增 4 个模块。完整设计（字段、状态机、API、批次）见 `docs/commerce-design.md`，此处只列归属：
-
-| 模块 | 路由 | 归属文档 |
-|---|---|---|
-| 商品管理（SKU 增删改、上下架、能力消耗价表） | `/admin/products` | commerce §8.2 |
-| 订单管理（列表、详情、手工核销、退款） | `/admin/orders` | commerce §8.2 |
-| 积分账本（用户余额总览、批次明细、人工增减） | `/admin/credits` | commerce §8.2 |
-| 支付流水与财务概览 | `/admin/payments`、`/admin/finance/summary` | commerce §8.2 |
-
-后端 guard 与 §5 权限模型共用；`/admin/credits` 的人工增减、`/admin/orders` 的核销与退款**必须写 `AdminAuditLog`**。
-
----
-
-## 5. 权限模型
+## 4. 权限链与审计
 
 ```
-JwtAuthGuard（现有）→ AdminGuard（新增）→ Controller
+JwtAuthGuard（身份）→ AdminGuard（后台身份 + 账号状态）→ PermissionGuard（权限点）→ Controller → AuditInterceptor
 ```
 
-`AdminGuard` 职责：
-1. 校验 Bearer token（复用 `JwtAuthGuard` 逻辑，不重复实现）
-2. `prisma.user.findUnique({ where: { id: sub } })` 取 `role` 与 `status`
-3. `role !== 'admin'` → `AppError(40301, '需要管理员权限', 403)`
-4. `status === 'disabled'` → `AppError(40302, '账号已被禁用', 403)`
+- **每次查库**：token TTL 7 天，若只信 token，管理员降权或被禁用后旧 token 仍可用 7 天。SQLite 单文件、admin 接口低频，查库成本可忽略。
+- **兜底默认拒**：`PermissionGuard` 未命中权限点即 403 `40301`。
+- **前端 `AdminContext.can()` 只用于隐藏按钮**，不是安全边界。
+- **批量与导出**：路由挂较弱读权限，处理器内用 `AdminRoleService.hasPermission()` 再判动作权限。
+- **审计**：高危动作（`HIGH_RISK_PERMISSIONS`）必须填原因，落 `AdminAuditLog`（含 IP 与请求 ID），审计页只读。
 
-**为什么每次查库**：token TTL 7 天，若 role 只信 token，管理员降权/被禁用后旧 token 仍可用 7 天。SQLite 本地单文件，admin 接口低频，查库成本可忽略。
+## 5. 数据访问约束
 
-前端：`RequireAdmin` 组件（`App.tsx` 同款模式）——无 token 跳 `/login`，有 token 但非 admin 跳 `/workbench` 并 toast「需要管理员权限」。
+| 约束 | 说明 |
+| --- | --- |
+| 平台级聚合独立 | C 端 `stats/overview` 强制按 `ownerId` 过滤，后台看板用独立的 admin 聚合，不复用 |
+| 能力清单不落库 | 能力的名称、分组、参数、默认价仍以 `definitions/<id>.ts` 为准；后台只写「上下线」与「运行期价格」两类覆盖 |
+| 凭据只从环境变量读 | 支付通道、模型凭据、对象存储密钥均无写入端点；界面只展示是否齐备与脱敏值 |
+| 金额与积分用快照 | 退款按订单快照计算，人工调整写流水，不按当前价重算 |
+| 删除走统一生命周期 | 用户删除与 C 端自助注销共用 `account-lifecycle.service.ts`，两条路径行为一致 |
 
----
+## 6. 前端落地
 
-## 6. 数据模型变更
+| 层 | 约定 |
+| --- | --- |
+| 路由 | `/admin/*` 在 `App.tsx` 中必须注册在 catch-all 之前，否则会被 C 端 `Shell` 吞掉 |
+| 外壳 | `components/admin/AdminLayout.tsx` + `adminNav.ts`（菜单单一事实源） |
+| 页面 | `pages/admin/` 28 个页面 + `modelConfig/` 子组件目录 |
+| 请求 | `lib/api.ts` 的 `adminApi` 分组复用 `request()`（信封剥离、401 广播） |
+| 类型 | `types/api.d.ts` 的 `Admin*` 段 |
+| 组件 | 通用骨架走 antd（`PageHeader` / `FilterBar` / `StatCard` / `Panel` / `Empty` / `StatusTag` / `ConfirmAction`）；`adm-*` 只作业务布局 class |
+| 样式 | 只用 `global.css` 的 token，禁裸 hex；不做移动端适配 |
 
-### 6.1 User 扩列（向后兼容）
-
-| 字段 | 类型 | 默认 | 说明 |
-|---|---|---|---|
-| `role` | String | `"user"` | 白名单 `user` \| `admin` |
-| `status` | String | `"active"` | 白名单 `active` \| `disabled` \| `deleted` |
-| `lastLoginAt` | DateTime? | — | 登录时更新 |
-
-### 6.2 新增表
-
-| 模型 | 字段 | 用途 |
-|---|---|---|
-| `AdminAuditLog` | `id / actorId / action / targetType / targetId / detail / ip / createdAt` + `@@index([actorId])` `@@index([createdAt])` | 写操作审计 |
-| ~~`CapabilityOverride`~~ | ~~`capabilityId @id / mode / enabled`~~ | ⚠️ **建议暂缓（PRD §3.4 / D7）**：本期 mode 由 registry 静态声明即可，DB override 只在需要不发版切换时才值得。表中已预留 `SystemSetting` 可承载相同语义 |
-| `SystemSetting` | `key @id / value / updatedBy / updatedAt` | 站点/上传/生成/通道运行时配置 |
-
-> 不建 `ModerationTicket` / `Role` / `Permission`——无业务支撑，建了就是死表。
-> `Order` / `Point` 类表原也在此列，但 commerce 设计已新增 `Product` / `Order` / `OrderItem` / `CreditLot` / `CreditLedger` 共 **5** 表（D7 已删 `ProductCapabilityPrice`），见 `docs/commerce-design.md` §3。
-
-### 6.3 配置优先级链（唯一事实源不被破坏）
-
-```
-代码 registry / 环境变量（部署期，权威）
-        ↓ 被覆盖
-SystemSetting（运行期，后台可改；原 CapabilityOverride 表已按 D7 暂缓）
-```
-
-`GET /api/v1/capabilities` 需在 `capabilities.service` 层合并 override 后下发，**registry 文件本身保持纯静态、仍是默认值事实源**。
-
----
-
-## 7. API 清单（新增，全部 `/api/v1/admin/*` + JwtAuthGuard + AdminGuard）
-
-| 方法 | 路径 | 说明 |
-|---|---|---|
-| GET | `/admin/overview` | 平台总览聚合（§4.1） |
-| GET | `/admin/overview/trend?days=14` | 任务趋势序列 |
-| GET | `/admin/users?keyword&role&status&page&pageSize&sort` | 用户分页 |
-| GET | `/admin/users/:id` | 用户详情（含统计与最近记录） |
-| PATCH | `/admin/users/:id/status` | 启用 / 禁用 / 软删 |
-| PATCH | `/admin/users/:id/role` | 角色变更（最后一个 admin 保护） |
-| POST | `/admin/users/:id/password` | 重置密码，返回一次性明文 |
-| DELETE | `/admin/users/:id` | 物理删除（二次确认） |
-| GET | `/admin/projects?keyword&userId&page&pageSize` | 项目分页 |
-| DELETE | `/admin/projects/:id` | 删除项目及连带数据 |
-| GET | `/admin/assets?kind&capability&userId&status&page&pageSize` | 素材分页 |
-| PATCH | `/admin/assets/:id/status` | 下架 / 恢复 |
-| DELETE | `/admin/assets/:id` | 删除素材及磁盘文件 |
-| GET | `/admin/tasks?status&capability&provider&userId&from&to&page&pageSize` | 任务分页 |
-| GET | `/admin/tasks/:id` | 任务详情（含参数与产出） |
-| POST | `/admin/tasks/:id/retry` | 失败重试，返回新 taskId |
-| POST | `/admin/tasks/:id/cancel` | 终止运行中任务 |
-| GET | `/admin/capabilities` | 能力清单 + 调用量 + 成功率 |
-| PATCH | `/admin/capabilities/:id` | 改 mode / enabled |
-| GET | `/admin/channel` | 通道状态（脱敏）与各能力路由 |
-| PUT | `/admin/channel/route` | 设置单能力路由 / 全局开关 |
-| POST | `/admin/channel/test` | 真实探测网关 |
-| GET | `/admin/settings` | 全部设置（分组） |
-| PUT | `/admin/settings` | 批量写设置 |
-| GET | `/admin/storage` | uploads 占用统计 |
-| GET | `/admin/audit-logs?actorId&action&page&pageSize` | 审计分页 |
-| GET/POST/PATCH | `/admin/products`、`/admin/products/:id/prices` | 商品与消耗价（commerce 追加，详见 commerce §8.2） |
-| GET/POST | `/admin/orders`、`/admin/orders/:orderNo/{mark-paid,refund}` | 订单管理（commerce 追加） |
-| GET/POST | `/admin/credits/users`、`/admin/credits/users/:userId/{lots,adjust}` | 积分账本（commerce 追加） |
-| GET | `/admin/payments`、`/admin/finance/summary` | 支付流水与财务概览（commerce 追加） |
-
-统一响应信封、错误码规范全部沿用现有 `ResponseInterceptor` + `AppError`。
-
----
-
-## 8. 前端落地方案
-
-| 层 | 方案 |
-|---|---|
-| 路由 | `App.tsx` 在 `Shell` 之外新增 `/admin/*` 分支。**注意现有 `<Route path="*" element={<Shell />} />`（`App.tsx:348`）会吞掉所有路径**，admin 路由必须注册在它之前 |
-| 外壳 | 新建 `components/admin/AdminLayout.tsx`（antd `Layout`：`Sider` + `Header` + `Content`），不引入 `AppLayout` / `SideRail` / `PromoBar` |
-| 状态 | `AuthContext` 增加 `user.role`（登录响应已带 `user`，仅需扩类型与存储） |
-| 请求 | `lib/api.ts` 新增 `adminApi` 分组，复用现有 `request()`（已处理信封剥离与 401 广播） |
-| 类型 | `types/api.d.ts` 追加 `Admin*` 类型段 |
-| 样式 | 只用 `global.css` 已有 token（`--surface` `--border` `--text-body` `--brand` `--radius-card`），不新增裸 hex |
-| 页面 | `pages/admin/` 下 12 个文件（8 基础 + commerce 追加 4），全部 lazy 加载，接现有 `ErrorBoundary` |
-| 交易域 | commerce 追加：`pages/{CreditsPage,OrdersPage,CheckoutPage}.tsx` + `admin/{ProductsPage,OrdersPage,CreditsPage,PaymentsPage}.tsx` |
-
----
-
-## 9. 批次划分
-
-| 批次 | 内容 | 产出 | 依赖 |
-|---|---|---|---|
-| **A1** | schema 扩列 + 3 张新表 + `AdminGuard` + `seed-admin.ts` + `RequireAdmin` + `AdminLayout` 空壳 + 一条可达路由 | 管理端能进、越权被拦 | — |
-| **A2** | 平台概览 + 用户管理（含禁用/角色变更） | 后台第一批真实可用 | A1 |
-| **A3** | 项目 / 素材 / 任务监控（含重试、终止） | 运营日常动作闭环 | A1 |
-| **B1** | 能力与通道（override 合并进 `/capabilities` 下发 + 通道测试） | 配置能力 | A2 |
-| **B2** | 系统设置（含维护模式）+ 操作审计 | 配置与可追溯 | A2 |
-| **C1** | 独立审计存储 / hash 链、防篡改 | 加固 | B2 |
-
-commerce 链路的 K1–K4 批次见 `docs/commerce-design.md` §10（K1 积分账本 → K2 商品 → K3 订单+沙箱支付 → K4 后台 4 模块），K4 依赖本文档 A1。
-
-每批完成需过：`npm run prisma:push` → `npm run build` → `npm run typecheck` → 越权用例（C 端 token 打 admin 接口必须 403）。
-
----
-
-## 10. 明确不做（防范围蔓延）
+## 7. 明确不做
 
 | 不做 | 理由 |
-|---|---|
-| ~~计费 / 积分 / 订单后台~~ | **已改判为做**，见 `docs/commerce-design.md`。原理由（无业务表）已由 commerce 新建 6 表解决 |
-| 真实微信 / 支付宝通道对接 | 无商户号与证书；只做接口抽象 + 沙箱，凭据到位另开批次（commerce §10 K5） |
-| 积分提现 / 转赠 | 涉及资金出账与风控，非 MVP 范围 |
-| 内容审核工单 / 举报 / 申诉 | 素材库全私有，无公开 UGC |
-| 自定义角色 / 权限矩阵 / RBAC | 只有两级角色，YAGNI |
-| 消息推送 / 站内信 / 邮件 | 无触达体系 |
-| 多语言后台 | 主语言中文 |
-| 数据导出 CSV / 定时报表 | 无需求证据，P2 再议 |
-| 操作审计不可删 | 已内置（只读页 + 无 delete 接口） |
-
----
-
-## 11. 未决项（需裁定后才动代码）
-
-| # | 问题 | 我的建议 |
-|---|---|---|
-| 1 | 管理员账号怎么产生？ | 跑 `npm run seed:admin` 生成随机 16 位密码并打印一次；不落在任何前端常量里 |
-| 2 | `admin@demo.com` 是否给 admin 角色？ | **不给**。它是前端硬编码的公开演示凭据，给 admin 等于公开后台入口 |
-| 3 | 素材「下架」是否值得改 C 端列表？ | 值得，但要单列批次做，避免混进 A3 |
-| 4 | 维护模式做到什么程度？ | MVP 只拦生成接口（503），不改只读页面 |
-| 5 | 管理端是否需要独立域名/端口？ | MVP 同域 `/admin` 即可；上生产再拆（拆时只需加 Nginx 路由） |
-
----
-
-## 附录 · 与现有模块的改动接触面
-
-| 文件 | 改动 | 批次 |
-|---|---|---|
-| `backend/prisma/schema.prisma` | User 扩 3 列 + 3 张新表 | A1 |
-| `backend/src/common/admin.guard.ts` | 新增 | A1 |
-| `backend/src/admin/` | 新增模块（controller/service/dto） | A1–B2 |
-| `backend/src/app.module.ts` | 注册 `AdminModule` | A1 |
-| `backend/src/auth/auth.service.ts` | JWT 带 role、登录写 `lastLoginAt` | A1 |
-| `backend/src/assets/assets.service.ts` | 用户端列表过滤 `status='visible'` | A3（仅当裁定采纳下架） |
-| `backend/src/capabilities/capabilities.controller.ts` | 合并 override 后下发 | B1 |
-| `backend/scripts/seed-admin.ts` | 新增 | A1 |
-| `frontend/src/App.tsx` | admin 路由分支 + `RequireAdmin` | A1 |
-| `frontend/src/components/admin/*` | 新增 | A1 |
-| `frontend/src/pages/admin/*` | 新增 8 页 | A2–B2 |
-| `frontend/src/lib/api.ts` | 新增 `adminApi` | A2 |
-| `frontend/src/types/api.d.ts` | 新增 admin 类型段 | A2 |
-| `frontend/src/context/AuthContext.tsx` | 存 `role` | A1 |
+| --- | --- |
+| 多租户 / 企业席位 / 代理分销 | 单轨制，`User` 不加 `orgId`；改多租户要动全部查询，须有真实付费数据后再评估 |
+| 自定义角色 | 三个内置角色覆盖实际分工；权限点可调，角色本身不新增 |
+| 支付渠道切换的前端入口 | 切换须改 env 并重启，页面只读 + 风险告警 |
+| 第三方内容安全送审记录 | 未接入即如实显示「未接入」，不做假审核 |
+| 独立审计存储 / hash 链 | 当前审计只读且无删除接口；防篡改需独立存储，非本期范围 |
+| 数据分析看板（漏斗 / 留存 / LTV） | 无独立页面；概览只做现有表的聚合 |
