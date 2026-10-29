@@ -1,0 +1,344 @@
+<context>
+# 渠道模型改造
+
+## 概述
+
+货觉AI 的生成链路已经具备「模态 × 协议 × 厂商」三层可插拔结构，但经过多轮迭代后留下四类结构性问题：
+
+1. **配置双轨**：线路配置同时存在于 `ModelChannel` 表、`ModelChannelConfig` 键值表与环境变量三层；表为空时用旧 `gateway.<modality>.*` 合成一条内存通道，固化时把环境变量里的令牌复制进数据库，且 image 仍保留 `gateway.*` 单前缀回落。排障时无法回答「这条线路到底由谁定义」。
+2. **后台健康态割裂**：连通性测试只发探测请求，不写任何状态；真实调度维护的 `failCount / cooldownUntil / lastSuccessAt / lastFailureAt` 与运营刚跑完的测试结果互不相干，页面无法区分「刚测通」与「调度器仍在熔断」。
+3. **调度与任务模型受限**：`ChannelScheduler` 只按 `priority` 顺序尝试，没有权重、并发上限、限流与半开恢复；`generate.service` 只按「video / 其余走图像」二分，文本路由器虽然存在却没有接入任务体系；同步协议与异步协议没有统一的任务生命周期。
+4. **协议与厂商扩展靠人工**：协议形状、provider 工厂、后台下拉与校验脚本分别维护；未实现的 `(modality, protocol)` 仍可保存，直到生成时才失败；新增厂商/协议缺少启动期完整性校验。
+
+本次改造的目标不是增加新功能，而是把这四类问题收敛成可验证的单一事实源，并保持现有失败语义不变：**任何模态都只允许真实模型产出，无线路或全部线路失败即失败并退款，绝不回落本地**。
+
+## 本次改造的四个方向
+
+- R1 统一配置源 / 下线旧变量
+- R2 后台通道配置与健康态
+- R3 调度与任务模型重构
+- R4 协议与厂商扩展
+
+## 成功标准
+
+- 运行期线路身份（`baseUrl / token / model / protocol`）只有 `ModelChannel` 一个事实源；环境变量与 `ModelChannelConfig` 不再能定义线路。
+- 固化/迁移过程绝不把环境变量中的令牌写进数据库。
+- 后台保存未实现的 `(modality, protocol)` 直接被拒绝；页面下拉只出现已实现协议。
+- 连通性测试结果持久化并可展示，但测试本身不改变熔断状态；只有显式「恢复通道」动作能清除熔断，且必须填原因并写审计。
+- 新增文本能力时不需要修改 `generate.service` 的模态分支；三种模态共享同一套调度与任务生命周期。
+- 调度器支持同优先级权重、每线路并发上限、每分钟限流与半开恢复，并能解释每一次选择与跳过。
+- 新增协议/厂商只需改协议注册表与厂商目录，启动期完整性校验与脚本能发现漏配。
+- 后端单元/集成测试、前端单测、e2e 与既有 verify 脚本全部通过；相关文档与 `CLAUDE.md` 同步。
+
+## 非目标
+
+- 不引入任何本地生成、占位图或伪模型结果；失败仍然失败并退款。
+- 不改变积分扣费、退款、订单与 AIGC 标识的业务语义。
+- 不重做 C 端工作台交互；本次只保证后端任务模型能承载新模态。
+- 不做后台移动端适配与响应式设计。
+- 不引入新的 npm 依赖；并发控制与限流用项目内原生实现。
+- 不追溯回填历史 `ModelCallLog` 的通道字段。
+- 不在本次改造中新增对外的 C 端能力；文本能力只做通路与契约验证。
+
+</context>
+
+<PRD>
+# 技术架构与约束
+
+## 现状锚点（改造前必须核对）
+
+- `backend/src/providers/channel-scheduler.ts`：按 `priority` 升序顺序尝试；连续失败 3 次进入冷却，冷却时长 `max(30s, pollMs × 5)`；表为空时调用 `readChannels` 合成旧单通道。
+- `backend/src/providers/channel-repository.ts`：`synthesize()` 读 `gateway.<modality>.*` 生成未落库通道；`materialize()` 在首条线路创建时把旧配置（含 `token`）固化进 `ModelChannel`。
+- `backend/src/providers/gateway.config.ts` + `channel-config.defs.ts`：线路与运行参数共用 `env > DB > default` 优先级链；image 保留 `legacyKey` 单前缀回落；`hidden` 旧键只为回落服务。
+- `backend/src/admin/model-channel.service.ts`：`testConnection` 只返回结果，不写健康字段；未实现协议仅在前端警告，保存仍成功。
+- `backend/src/providers/protocols/protocol.spec.ts` + `provider-factory.ts`：`PROTOCOL_SPECS`、`VIDEO_PROTOCOL_SPECS` 与工厂 switch 三处维护；未知协议在调度时抛错。
+- `backend/src/generate/generate.service.ts`：只分 `modality === 'video'` 与「其余走图像」；文本路由器已存在但未接入任务创建与产出落库。
+- `backend/src/providers/vendors/vendor.catalog.ts` / `vendor.presets.ts` / `vendor.integrity.ts`：厂商目录是唯一事实源，presets 派生「模态 × 厂商」视图。
+- `backend/prisma/schema.prisma`：`ModelChannel` 有健康字段与 `(modality, priority)` 唯一约束；`ModelChannelConfig` 是 key-value；仓库无 `prisma/migrations`，建表走 `npm run prisma:push`。
+
+## 不可违背的约束
+
+1. **单一事实源**：线路只在 `ModelChannel` 定义；协议形状只在协议注册表定义；厂商只在 `vendor.catalog.ts` 定义；能力只在 `capabilities/definitions/*.ts` 定义。
+2. **依赖单向**：应用层 → 路由层 → 调度层 → 通道层 → 协议层 → `modality.ts`；协议层不得反向依赖厂商层。
+3. **失败语义不变**：无线路 `42204`、全部线路失败 `42201`、遮罩无编辑端点 `42205`、文本通道不可用 502、视频按既有错误码；一律失败并退款，不回落本地。
+4. **凭据只写不回显**：接口返回 `tokenMasked / hasToken`；审计 detail 不含 `token / baseUrl`；日志与错误信息不得出现明文令牌。
+5. **权限边界在后端**：前端 `AdminContext.can()` 只隐藏按钮；写线路 `channel.route`、测试 `channel.test`、读配置 `model.config_read`、写全局参数 `model.config_write`。
+6. **高危动作必填原因并审计**：线路增删改、排序、恢复熔断都要 `reason` 与 `AuditAction`。
+7. **开发阶段不写兼容代码**：本次是下线旧路径，不是长期双读；迁移只保留一次性脚本与启动期提示。
+8. **设计与文案**：后台沿用 antd 原生组件与 `global.css` 语义 token，不新增硬编码色值；输出中文，不使用 emoji。
+
+# R1 统一配置源 / 下线旧变量
+
+## R1.1 运行期线路唯一事实源
+
+- `ModelChannel` 表是唯一的线路来源。删除 `ChannelScheduler.readChannels()` 中的「表为空则合成」分支与 `ChannelRepository.synthesize()`。
+- 删除 `ChannelSnapshot.source` 的 `legacy` 取值，只保留 `channels | none`；`ChannelRepository.snapshot()` 在表内无行时直接返回 `none`。
+- 表内全部线路停用时仍然返回 `channels`（`enabledCount = 0`），**绝不回落旧配置**。
+- 没有可用线路时，能力 `runtime.effective = 'unavailable'`，生成前置拦截返回 `42204`，原因明确写「未配置模型线路，请在后台模型线路页添加」。
+
+## R1.2 配置分层
+
+- 线路身份四元组 `baseUrl / token / model / protocol` 只允许在 `ModelChannel` 写入与读取。
+- 运行参数继续走 `channel-config.defs.ts` 的 `env > DB > default`：`gateway.<modality>.timeoutMs`、`pollMs`、`maxPolls`、`asset.publicBase`、`gateway.route.<capability>` 保持不变。
+- 从 `CONFIG_DEFS` 删除 `gateway.<modality>.baseUrl / token / model / provider` 六组线路项；`gateway.route.*` 与超时类保留。
+- 后台「模型配置」页只保留全局参数与逐能力路由；线路相关表单项移除，并给出跳转到「模型线路」页的说明。
+
+## R1.3 下线旧键与别名
+
+必须删除以下读取路径与声明：
+
+- 环境变量：`GATEWAY_BASE_URL`、`GATEWAY_TOKEN`、`GATEWAY_PROVIDER`、`GATEWAY_MODEL`、`GATEWAY_{MODALITY}_BASE_URL`、`GATEWAY_{MODALITY}_TOKEN`、`GATEWAY_{MODALITY}_MODEL`、`GATEWAY_{MODALITY}_PROVIDER`。
+- `channel-config.defs.ts` 的 `legacyKey`、`hidden` 字段与所有旧单前缀键定义；`gateway.config.ts` 的 `resolveValue` 回落分支。
+- 协议历史别名 `modelverse`：运行期只认 `openai`；迁移脚本把存量 `ModelChannel.protocol = 'modelverse'` 改写为 `openai`。
+- `scripts/db-url.js`、`ENV_SPECS`、`.env.example`、三档 env 中对应的线路变量一并清理。
+
+新增启动期守卫 `channel-config.guard.ts`：
+
+- 启动时扫描 `process.env` 与 `ModelChannelConfig` 是否残留被删除的键，以及 `ModelChannel.protocol = 'modelverse'` 的存量行。
+- `NODE_ENV=production` 时拒绝启动，错误信息给出迁移命令；`development / test` 记录 ERROR 级日志并继续，便于本地排障。
+- 守卫必须在 `ConfigModule` 初始化之后、`ProvidersModule` 之前执行。
+
+## R1.4 一次性迁移工具
+
+新增 `backend/scripts/migrate-channel-model-v2.ts` 与 `npm run migrate:channel-v2`：
+
+- 默认 dry-run，只打印将创建/改写/删除的内容；`--apply` 才写库。
+- 写库前强制导出当前 `ModelChannel`、`ModelChannelConfig` 到 `backend/backups/channel-model-v2-<timestamp>.json`；导出失败即中止。
+- 从旧配置创建 `ModelChannel` 时**不写 token**：`token = ''`、`enabled = false`、名称标注「迁移自旧配置，待补录凭据」，并在报告中列出每条待补录线路。
+- 把 `protocol = 'modelverse'` 改写为 `openai`；无法映射的协议写报告并跳过，不猜测。
+- 删除 `ModelChannelConfig` 中已下线的线路键；保留运行参数与路由键。
+- 脚本幂等：重复执行不重复建行、不重复删除；所有变更逐条输出。
+- 更新 `docs/environments.md`，给出从旧变量迁移到后台线路的操作步骤与回滚方式。
+
+## R1.5 固化与凭据安全
+
+- 删除 `POST /admin/model-channels/materialize` 与 `ChannelRepository.materialize()`。
+- 新增线路时 `token` 允许为空，但该线路默认 `enabled = false`，`ChannelView.hasToken = false`；页面必须提示「未配置凭据，启用后生成会失败」。
+- 禁止任何代码路径把 `process.env` 中的令牌写入 `ModelChannel.token`；代码评审与测试都要覆盖该约束。
+- `tokenMasked` 仅显示前 3 位与后 4 位；空令牌显示空串，不回显 `undefined`。
+
+## R1.6 配置期协议校验
+
+- 从协议注册表派生 `supportedProtocols(modality)`，后台协议下拉只展示该模态已实现协议。
+- 创建/更新/排序线路时校验 `(modality, protocol)`；未实现返回 `AppError(40001, '协议 "x" 在文生图下尚未实现…', 400)`，不得保存。
+- 草稿测试同样校验；`ChannelView.protocolKnown` 保留，用于历史数据只读展示。
+- 前端在提交前用同一份注册表数据做一次预校验，但后端仍是唯一安全边界。
+
+# R2 后台通道配置与健康态
+
+## R2.1 健康数据模型
+
+`ModelChannel` 增加：
+
+- `weight Int @default(1)`：同优先级内的相对权重，范围 1-100。
+- `maxConcurrency Int @default(0)`：单线路并发上限，0 表示不限。
+- `rateLimitPerMin Int @default(0)`：单线路每分钟调用上限，0 表示不限。
+- `lastTestedAt DateTime?`、`lastTestStatus String?`（`ok | failed | unsupported`）、`lastTestLatencyMs Int?`、`lastTestError String?`。
+
+## R2.2 测试与熔断的关系
+
+- `testConnection` / `testDraft` / `testAll` 只写 `lastTest*` 字段，**不得修改** `failCount / cooldownUntil / lastSuccessAt / lastFailureAt`。
+- 原因：手动探测不是真实流量，不能把一个正在熔断的线路因为一次探测成功就放回线上；测试结果与调度健康必须分开呈现。
+- 新增 `POST /admin/model-channels/:id/reset-health`：权限 `channel.route`，必填 `reason`，审计动作 `model.channel_reset_health`；把 `failCount = 0`、`cooldownUntil = null`，并记录操作人/原因。这是唯一的手动恢复入口。
+- 健康状态由后端派生后下发：`closed`（未熔断）、`open`（冷却中）、`half-open`（冷却已过但失败计数仍达阈值、等待探测）。
+
+## R2.3 后台页面
+
+- 模型线路页顶部展示调度来源横幅：`channels` = 按线路表调度 / `none` = 未配置线路。删除 legacy 文案与「固化旧配置」入口。
+- 线路表格列：名称、模态、协议、模型、优先级、权重、并发、限流、启用、健康状态（含冷却倒计时）、最近成功/失败、最近测试（状态/耗时/错误）、操作。
+- 编辑器：模态与协议联动；协议只列已实现项；`baseUrl` 写入前归一化；`token` 只写不回显；模型下拉复用现有 `ModelPicker`；优先级/权重/并发/限流做范围校验。
+- 测试全部线路：并发 4，逐条展示结果；失败项可展开错误原文。
+- 恢复熔断：二次确认 + 必填原因；成功后刷新健康状态。
+- 所有列表支持导出 CSV（沿用 `common/csv.ts` 与权限），导出不包含 token 明文。
+- 遵循后台非响应式约定；使用 antd 表格/表单/抽屉，不新增自绘控件。
+
+## R2.4 观测
+
+- `ModelCallLog` 增加 `channelId String?`、`attemptIndex Int?`；每次调度尝试写一条（成功与失败都写），包含通道、协议、耗时、失败原因。
+- 后台调用记录支持按 `channelId` 筛选，详情页展示 attempts 链与最终选中通道。
+- 现有 `fallback` 字段继续表示「首条线路失败后切到下一条」，不再表示「回落本地」；更新字段注释与后台文案。
+
+# R3 调度与任务模型重构
+
+## R3.1 按能力模态统一分派
+
+- `generate.service` 删除 `modality === 'video'` 的二分；改为从能力定义读取 `modality`，通过统一门面分派：
+  - `image` → 图像路由器 / `ImageProvider`
+  - `text` → 文本路由器 / `TextProvider`
+  - `video` → 视频路由器 / `VideoProvider`
+- 三种模态共用「创建任务 → 扣费 → 执行 → 落产出 → 失败退款」的生命周期；各 provider 只负责产出形状。
+- `GenerationTask` 增加 `outputText String?`（文本产出）。图像/视频仍写 `Asset`；文本不生成图片文件，AIGC 文件标识不适用于文本，任务 `aigcMeta` 记录 `{ labeled: false, reason: 'text' }`。
+- 任务查询接口按模态返回 `outputText`，前端类型同步；本次不新增 C 端文本能力页面。
+- 新增测试：用测试用能力定义（不进入生产清单）验证 `text` 模态能走完创建/扣费/失败退款/成功落库，证明新增文本能力无需再改 `generate.service`。
+
+## R3.2 调度策略
+
+- 候选集：`enabled = true` 且协议已实现且不处于冷却中的线路。
+- 排序：先按 `priority` 升序分组；同组内按 `weight` 加权随机选择；跨组仍然低 priority 优先。
+- 跳过：达到 `maxConcurrency` 或 `rateLimitPerMin` 的线路记 `skippedReason`，不消耗调用；若全部候选都被限流/冷却，返回与「全部失败」不同的 `unavailableReason`（`限流中 / 冷却中`），供后台与日志区分。
+- 并发控制：进程内按 `channelId` 维护信号量；`maxConcurrency = 0` 不限。
+- 限流：进程内按 `channelId` 维护每分钟滑动窗口；`rateLimitPerMin = 0` 不限。
+- 多实例限制：SQLite 单实例部署下进程内计数足够；文档必须明确「多实例时并发/限流是每实例口径」。不得为此引入 Redis。
+- 加权随机必须记录 `chosen` 与 `attempts`，排障时能回答「这次为什么走这条」；不得只记录成功通道。
+
+## R3.3 熔断半开恢复
+
+- 状态机：`closed → open`（连续失败达阈值）→ `half-open`（冷却到期，只放行 1 个探测）→ `closed`（探测成功）或 `open`（探测失败，冷却时长指数退避，上限 30 分钟）。
+- 冷却基数沿用 `max(30s, pollMs × 5)`；退避倍数 `2^(连续开启次数-1)`。
+- 半开探测期间其他请求跳过该线路并记 `half-open 探测中`。
+- `failCount` 在成功探测后清零；`cooldownUntil` 清空。
+- 手动 `reset-health` 等价于强制 `closed` 并清零计数。
+
+## R3.4 统一异步任务契约
+
+- `ProtocolSpec.mode` 与 `VideoProtocolSpec` 的异步四段式统一为「提交 → 轮询 → 取结果 → 下载/落库」抽象；同步协议在同一次调用内完成提交与结果。
+- 图像/文本协议都可以声明 `mode: 'async'` 并提供 `pollEndpoint`；调度层按 `mode` 走同一轮询循环，不再由 provider 各自实现一套。
+- 超时/轮询参数继续按模态读取 `timeoutMs / pollMs / maxPolls`；`GATEWAY_{MODALITY}_POLL_MS` 等变量保留。
+- 任务状态仍为 `pending / running / succeeded / failed`；新增 `providerTaskId`（或等价字段）到 `ModelCallLog` / `GenerationTask`，用于恢复轮询与排障。
+
+## R3.5 失败与退款
+
+- 保持错误码：无线路 `42204`、全部线路失败 `42201`、遮罩无编辑端点 `42205`、文本 502、视频既有码。
+- 所有失败路径按 `task.creditCost` 快照原额退款；不得因为「测试通过」或「线路恢复」而补发产出。
+- 取消与孤儿任务回收逻辑不变；文本任务同样适用心跳与退款。
+
+# R4 协议与厂商扩展
+
+## R4.1 协议注册表
+
+- 新建统一注册表（建议 `protocols/protocol.registry.ts`），按 `(modality, protocol)` 声明：
+  - `spec`：端点、尺寸/比例写法、参考图上限与传法、响应解包、错误解包、mask 支持、`mode`。
+  - `createProvider`：构造对应 provider；未知协议显式抛错。
+  - `support`：后台协议下拉与保存校验的能力描述。
+- 启动期调用 `assertProtocolIntegrity()`：每个声明必须有 spec + factory；每个 factory 必须对应已声明协议；未知协议不得进入调度。
+- 新增 `verify-protocol-matrix.ts`：校验 `PROTOCOL_SPECS`、视频 spec、注册表、后台下拉、`provider-factory` 与 `vendor.catalog` 的协议声明完全一致。
+- 删除 `modelverse` 别名与工厂中的历史分支；`openai` 为唯一规范名。
+
+## R4.2 厂商目录与扩展
+
+- `vendor.catalog.ts` 继续作为厂商唯一事实源；`vendor.presets.ts` 自动派生「模态 × 厂商」；`vendor.integrity.ts` 增加「厂商声明的每个协议都必须在注册表中存在」的启动期校验。
+- 本次至少完成一个真实扩展试点，二选一（由任务 1 的取证结果决定，不预先编造 API）：
+  - 图像 + 文本：Google Gemini（`generateContent` 协议），验证同步图像与文本两种产出。
+  - 视频：快手可灵（异步创建/查询/下载），验证四段式适配。
+- 试点必须先写探测脚本，记录真实请求/响应/错误结构；未取得真实响应前不得把协议标记为 `real` 或写入能力清单。
+- 新增厂商必须同时更新：目录、presets、协议注册表、后台预设、`verify-vendor-aggregation`、`docs/model-architecture.md`。
+- 扩展 SOP 增加「任务 0：取证 → 协议形状 → 注册表 → 工厂 → 后台下拉 → 测试脚本」的固定顺序。
+
+## R4.3 文档与脚本
+
+- `docs/model-architecture.md`：更新分层图、配置源、调度算法（权重/并发/限流/半开）、协议矩阵、扩展 SOP、已知边界。
+- `docs/environments.md`：删除线路变量，新增迁移步骤与启动守卫说明。
+- `docs/api-contract.md`：新增/变更接口、错误码与字段。
+- `docs/testing.md`：新增覆盖矩阵与闸口命令。
+- `README.md` 与 `CLAUDE.md`：同步「配置源唯一化」「调度策略」「协议注册表」结论，删除旧双轨描述。
+
+# 数据模型与接口变更
+
+## 数据模型
+
+- `ModelChannel`：新增 `weight`、`maxConcurrency`、`rateLimitPerMin`、`lastTestedAt`、`lastTestStatus`、`lastTestLatencyMs`、`lastTestError`；保留现有健康字段与 `(modality, priority)` 唯一约束。
+- `ModelChannelConfig`：删除线路键对应行；保留超时/轮询/素材基址/路由键。
+- `ModelCallLog`：新增 `channelId`、`attemptIndex`。
+- `GenerationTask`：新增 `outputText`；新增 `providerTaskId`（若轮询恢复需要）。
+- 仓库无 `prisma/migrations`，使用 `npm run prisma:push`；所有数据变更必须由 `migrate-channel-model-v2.ts` 幂等完成，并在执行前备份。
+
+## 接口
+
+- `GET /api/v1/admin/model-channels`：`source` 只允许 `channels | none`；返回新增字段与派生健康状态。
+- `POST/PATCH /api/v1/admin/model-channels`：接收新字段；未实现协议返回 `40001`；空 token + enabled 的组合返回 `40001` 并提示先补录凭据或保存为停用。
+- `POST /api/v1/admin/model-channels/:id/test`：返回并持久化 `lastTest*`；不改健康计数。
+- `POST /api/v1/admin/model-channels/:id/reset-health`：新增，`channel.route` + 必填原因 + 审计。
+- `POST /api/v1/admin/model-channels/materialize`：删除。
+- `GET /api/v1/admin/model-config`：不再返回线路项；更新前端类型与页面。
+- `GET /api/v1/tasks/:id`（及列表）：按模态返回 `outputText`；不改变既有图像/视频字段。
+- 所有新增写接口沿用响应信封与 `AppError`；错误码沿用 `40001 / 40400 / 40901`，不新造码表。
+
+# 开发路线图
+
+## 阶段 0：基线与迁移准备
+
+- 备份开发库；导出当前 `ModelChannel` / `ModelChannelConfig` / 能力清单快照。
+- 完成旧配置盘点脚本（dry-run），列出所有受影响的环境变量、DB 键与 `modelverse` 行。
+- 写迁移脚本与回滚说明，但暂不执行 `--apply`。
+
+## 阶段 1：协议注册表与配置源统一
+
+- 协议注册表 + 启动期完整性校验 + 后台协议下拉数据源。
+- 删除线路 env/DB 读取、`synthesize`、`materialize`、`legacyKey`、`modelverse` 别名。
+- 启动守卫与迁移脚本落地；后台模型配置页移除线路项。
+- 此时系统在「未迁移」状态下应明确不可用并给出原因，而不是悄悄回落旧配置。
+
+## 阶段 2：后台健康态
+
+- Schema 新增健康测试字段；测试只写 `lastTest*`。
+- 新增 `reset-health` 接口、权限、审计与前端操作。
+- 线路页改版：来源横幅、健康列、恢复熔断、导出。
+
+## 阶段 3：调度与任务模型
+
+- 权重/并发/限流/半开恢复；attempts 与选择原因落日志。
+- `generate.service` 按模态统一分派；`outputText` 与文本任务生命周期。
+- 同步/异步协议统一轮询契约；保持失败码与退款语义。
+
+## 阶段 4：协议与厂商试点
+
+- 依据阶段 0 取证结果选定试点厂商/协议。
+- 注册表 + factory + presets + 后台预设 + 探测脚本 + verify 脚本。
+- 试点通过真实响应验证后才允许标记可用。
+
+## 阶段 5：测试与文档收口
+
+- 四层测试补齐；全部闸口通过。
+- 文档与 `README.md` / `CLAUDE.md` 同步；删除旧配置说明。
+- 输出迁移演练记录与回滚演练记录。
+
+# 逻辑依赖链
+
+1. 阶段 0 的盘点与迁移工具是后续所有改动的前提；没有它就无法安全删除旧配置。
+2. 协议注册表（R4.1）必须先于「配置期协议校验」（R1.6）与后台协议下拉，否则校验没有事实源。
+3. Schema 变更（R2.1 / R3.1）必须先于后台页面与调度实现。
+4. 配置源统一（R1）必须先于健康态页面与调度改造，否则页面仍在展示 legacy 来源。
+5. 调度策略（R3.2 / R3.3）依赖健康字段与线路新字段；任务模型（R3.1）可与调度并行，但必须在阶段 5 前合流。
+6. 厂商试点（R4.2）依赖协议注册表与调度契约；未完成前不得宣称新增协议可用。
+7. 文档与测试收口（阶段 5）必须最后执行，且以实际代码为准。
+
+# 测试与验收
+
+## 必须通过的闸口
+
+- 后端：`npm run build`；相关 `verify-*` 脚本（协议矩阵、厂商聚合、架构分层、渠道配置）；单元与集成测试。
+- 前端：`npm run typecheck`；`npm test`；`npm run e2e`（后台线路管理关键路径）。
+- 依赖：`npm run verify:deps:critical`（不得新增依赖）。
+- 文档：`docs/testing.md` 覆盖矩阵更新；`docs/api-contract.md` 与实际路由一致。
+
+## 验收用例
+
+1. **无线路**：清空/停用全部线路后，能力 `runtime.effective = 'unavailable'`，生成返回 `42204` 并退款；后台来源显示 `none`，不出现 legacy 合成线路。
+2. **旧变量守卫**：设置 `GATEWAY_BASE_URL` 后，production 启动失败并给出迁移命令；development 记录 ERROR 但可启动。
+3. **迁移**：dry-run 不写库；`--apply` 前生成备份；迁移后旧 DB 键被删除、`modelverse` 改写为 `openai`、新建线路 `token = ''` 且 `enabled = false`。
+4. **协议校验**：保存 `(image, 'not-a-protocol')` 返回 `40001`；后台下拉不出现该选项；历史行 `protocolKnown = false` 只读展示。
+5. **测试与健康分离**：对处于冷却的线路执行连通性测试成功，`cooldownUntil` 不变；执行 `reset-health` 后冷却清除并产生审计。
+6. **权重与限流**：同优先级两条线路按权重分配（统计上可验证）；达到 `maxConcurrency` 的线路被跳过并记录原因；全部限流时返回「限流中」而非「全部失败」。
+7. **半开恢复**：冷却到期后只放行一个探测；成功转 `closed`，失败按指数退避重新 `open`。
+8. **文本任务**：测试用文本能力可创建、扣费、成功写入 `outputText`；通道失败时退款且不落伪产出。
+9. **失败矩阵回归**：图像 `42201/42204/42205`、文本 502、视频既有错误码均不变；任何路径都不产生本地产出。
+10. **权限与审计**：无 `channel.route` 不能写线路；`channel.test` 只能测试；`reset-health` 缺原因被拒绝；审计 detail 不含 token/baseUrl。
+
+# 风险与缓解
+
+- **删除旧配置导致存量部署不可用**：迁移脚本默认 dry-run、强制备份、逐条报告缺失凭据；production 启动守卫在部署前就暴露问题，而不是生成时才发现。
+- **权重随机降低可排障性**：每次调度记录候选、权重、随机结果、跳过原因与最终通道；后台调用详情可回放 attempts。
+- **进程内并发/限流在多实例下失真**：文档明确单实例口径；不引入 Redis，避免为未发生的横向扩展增加运维面。
+- **协议试点 API 不确定**：先写探测脚本取证，再落注册表；未取得真实响应不得标记 `real`。
+- **SQLite 数据迁移不可逆**：执行前导出 JSON 备份；迁移脚本幂等；回滚按「恢复备份 + 重新 `prisma:push`」演练。
+- **后台与 C 端对文本产出的展示预期不一致**：本次只做后端通路与契约验证，不新增 C 端文本能力；前端仅扩展类型，避免半成品入口。
+
+# 附录：文件落点
+
+- 后端协议/调度：`backend/src/providers/protocols/*`、`channel-scheduler.ts`、`channel-repository.ts`、`gateway.config.ts`、`channel-config.defs.ts`、`vendors/*`。
+- 后端后台：`backend/src/admin/model-channel.*`、`model-config.service.ts`、`model-call.service.ts`、`permissions.ts`、`dto/model-channel.dto.ts`。
+- 后端任务：`backend/src/generate/generate.service.ts`、`generate.controller.ts`、`tasks.controller.ts`。
+- 数据层：`backend/prisma/schema.prisma`、`backend/scripts/migrate-channel-model-v2.ts`。
+- 前端：`frontend/src/pages/admin/modelConfig/*`、`frontend/src/lib/api.ts`、`frontend/src/components/admin/adminNav.ts`。
+- 文档：`docs/model-architecture.md`、`docs/environments.md`、`docs/api-contract.md`、`docs/testing.md`、`README.md`、`CLAUDE.md`。
+</PRD>

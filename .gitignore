@@ -33,3 +33,25 @@ _trash_*/
 # ── 第三方参考快照 (仅本地分析，不随产品构建) ───────────────────────────────
 reference/ijihua/index.js
 reference/ijihua/index.css
+
+# Logs
+logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+dev-debug.log
+# Dependency directories
+# Environment variables
+# Editor directories and files
+.idea
+.vscode
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+# OS specific
+
+# Task files
+# tasks.json
+# tasks/ 

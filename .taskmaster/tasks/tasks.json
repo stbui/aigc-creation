@@ -1,0 +1,166 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "建立改造基线与一次性迁移工具",
+        "description": "备份并导出当前 ModelChannel、ModelChannelConfig 与能力清单；实现旧配置盘点脚本与 migrate-channel-model-v2.ts（默认 dry-run，--apply 写库，写库前强制备份，幂等），并给出回滚演练步骤。",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "high",
+        "details": "落点：backend/scripts/migrate-channel-model-v2.ts、package.json scripts、backend/backups/。盘点项：GATEWAY_BASE_URL/GATEWAY_TOKEN/GATEWAY_{MODALITY}_{BASE_URL,TOKEN,MODEL,PROVIDER}、ModelChannelConfig 中的线路键、ModelChannel.protocol='modelverse'。迁移创建线路时 token=''、enabled=false，并逐条报告待补录凭据。写库前导出 channel-model-v2-<timestamp>.json，导出失败即中止。不执行 --apply，执行留给任务 5。",
+        "testStrategy": "dry-run 前后 DB 行数与字段完全不变；--apply 前备份文件存在且 JSON 可解析；重复执行 --apply 不新增/不重复删除；报告覆盖每条旧键与待补录线路。",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "建立协议注册表与启动期完整性校验",
+        "description": "新增按 (modality, protocol) 的协议注册表，合并 ProtocolSpec、VideoProtocolSpec 与 provider-factory 的声明；启动期 assertProtocolIntegrity，新增 verify-protocol-matrix 脚本。",
+        "status": "pending",
+        "dependencies": [1],
+        "priority": "high",
+        "details": "落点：backend/src/providers/protocols/protocol.registry.ts、protocol.spec.ts、provider-factory.ts、backend/scripts/verify-protocol-matrix.ts。注册项需含 spec、createProvider、support（后台下拉与保存校验用）。未知协议显式抛错。校验：每个声明有 factory、每个 factory 有声明、厂商目录声明的协议存在、后台下拉数据源一致。",
+        "testStrategy": "单测未知协议抛错；删除一条 factory 时启动失败并指出协议名；verify-protocol-matrix 通过；现有 image/text/video 协议全部登记。",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "统一运行期线路配置源，删除合成与固化路径",
+        "description": "ModelChannel 成为唯一线路事实源；删除 ChannelScheduler 合成通道、ChannelRepository.synthesize/materialize、HTTP materialize 端点；ChannelSnapshot.source 只保留 channels|none；无线路时能力 unavailable 且生成返回 42204。",
+        "status": "pending",
+        "dependencies": [1, 2],
+        "priority": "high",
+        "details": "落点：channel-scheduler.ts、channel-repository.ts、model-channel.service.ts/controller.ts、capability-availability.service.ts、generate.service.ts、frontend/src/lib/api.ts。全停用时 source 仍为 channels，绝不回落旧配置。前端删除 legacy 文案与固化入口。",
+        "testStrategy": "表空时 source=none；全停用时 source=channels 且 enabledCount=0；两种情况下生成均 42204 并退款；不存在 synthetic: 通道；materialize 路由 404。",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "下线旧环境变量、旧 DB 键与 modelverse 别名",
+        "description": "删除线路类 CONFIG_DEFS、legacyKey/hidden 回落、旧 GATEWAY_* 变量与 modelverse 运行期别名；新增启动守卫：production 残留旧键拒绝启动，development/test 记录 ERROR。后台模型配置页移除线路项。",
+        "status": "pending",
+        "dependencies": [2, 3],
+        "priority": "high",
+        "details": "落点：channel-config.defs.ts、gateway.config.ts、config/env.validation.ts、backend/.env.example、三档 env、scripts/db-url.js、新增 channel-config.guard.ts、frontend/src/pages/admin/AdminModelConfigPage.tsx。保留 timeoutMs/pollMs/maxPolls/asset.publicBase/gateway.route.*。协议规范名只认 openai。",
+        "testStrategy": "设置 GATEWAY_BASE_URL 后 production 启动失败并给出迁移命令；development 可启动且 ERROR 日志含键名；旧 DB 键不再参与读取；后台配置页无线路字段；modelverse 不再被识别。",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "执行迁移并完成回滚演练",
+        "description": "在开发库执行 dry-run、备份后 --apply，核对 token 未从 env 复制、enabled=false、modelverse 改写、旧键删除；随后按备份恢复做一次回滚演练并记录。",
+        "status": "pending",
+        "dependencies": [1, 3, 4],
+        "priority": "high",
+        "details": "执行前确认开发库路径与备份目录。核对项：新建线路 token=''、enabled=false；协议 modelverse→openai；ModelChannelConfig 仅保留运行参数与路由键；能力 runtime.effective=unavailable 且原因指向未配置线路。回滚：恢复 JSON 备份、npm run prisma:push、重启并抽查。",
+        "testStrategy": "迁移报告逐条可核对；回滚后 ModelChannel/ModelChannelConfig 与备份一致；回滚后系统可启动且无旧键读取；演练记录写入 docs/testing.md。",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "扩展 ModelChannel 健康与调度字段",
+        "description": "为 ModelChannel 增加 weight/maxConcurrency/rateLimitPerMin/lastTestedAt/lastTestStatus/lastTestLatencyMs/lastTestError；为 ModelCallLog 增加 channelId/attemptIndex；为 GenerationTask 增加 outputText/providerTaskId；同步 DTO、类型与前端 api.ts。",
+        "status": "pending",
+        "dependencies": [1],
+        "priority": "high",
+        "details": "落点：backend/prisma/schema.prisma、admin/dto/model-channel.dto.ts、channel-repository.ts toView、frontend/src/lib/api.ts。默认值：weight=1、maxConcurrency=0、rateLimitPerMin=0。lastTestStatus 取值 ok|failed|unsupported。用 npm run prisma:push 建表，不新增 migrations 目录。",
+        "testStrategy": "prisma db push 成功；旧行读取默认值正确；类型检查通过；DTO 范围校验（weight 1-100、并发/限流 >=0）；outputText 可空且不影响历史任务。",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "打通连通性测试、健康状态与手动恢复熔断",
+        "description": "连通性测试只持久化 lastTest*，不得修改 failCount/cooldownUntil/lastSuccessAt/lastFailureAt；后端派生 closed/open/half-open；新增 reset-health 接口（channel.route + 必填原因 + 审计）。",
+        "status": "pending",
+        "dependencies": [6],
+        "priority": "high",
+        "details": "落点：admin/model-channel.service.ts/controller.ts、model-config.service.ts testConnection、channel-repository.ts、permissions.ts、前端 API。reset-health 动作名 model.channel_reset_health，审计 detail 不含 token/baseUrl。健康派生：cooldownUntil>now=open；冷却已过且 failCount>=阈值=half-open；否则 closed。",
+        "testStrategy": "冷却中线路测试成功不改变 cooldownUntil/failCount；reset-health 清空计数并生成审计；缺 reason 返回 40001；半开判定正确；测试结果含状态/耗时/错误且持久化。",
+        "subtasks": []
+      },
+      {
+        "id": 8,
+        "title": "后台模型线路页改版",
+        "description": "线路页展示 channels|none 来源横幅，新增权重/并发/限流/健康/最近测试列、冷却倒计时、恢复熔断与 CSV 导出；编辑器做模态-协议联动、协议只列已实现项、token 只写不回显。",
+        "status": "pending",
+        "dependencies": [3, 6, 7],
+        "priority": "high",
+        "details": "落点：frontend/src/pages/admin/modelConfig/ChannelManagementTab.tsx、ChannelTable.tsx、ChannelEditDrawer.tsx、ChannelHealthCard.tsx、useModelConfigDraft.ts、AdminModelConfigPage.tsx。遵循 antd 原生组件、adminNav 与权限点、global.css token；不做移动端。导出走 common/csv.ts，排除 token 明文。",
+        "testStrategy": "组件测试覆盖来源横幅/健康状态/恢复确认；e2e 创建-编辑-测试-恢复-导出；无 channel.route 时写按钮隐藏且接口仍拒绝；页面不出现 legacy/固化入口；导出无 token。",
+        "subtasks": []
+      },
+      {
+        "id": 9,
+        "title": "按能力模态统一任务分派并支持文本产出",
+        "description": "generate.service 删除 video/其余图像二分，按能力自身 modality 分派 image/text/video；接入 TEXT_PROVIDER；文本任务产出写 GenerationTask.outputText，保留扣费、失败退款、心跳与孤儿回收。",
+        "status": "pending",
+        "dependencies": [3, 6],
+        "priority": "high",
+        "details": "落点：backend/src/generate/generate.service.ts、generate.controller.ts、tasks.controller.ts、providers/providers.module.ts、frontend 类型。文本不生成 Asset，aigcMeta 记录 {labeled:false,reason:'text'}。用测试用能力定义验证新增文本能力无需再改分派分支；不新增 C 端文本入口。",
+        "testStrategy": "单测三种模态走同一生命周期；文本成功写 outputText；文本通道失败退款且无伪产出；图像/视频回归不变；测试用能力定义不进入生产清单。",
+        "subtasks": []
+      },
+      {
+        "id": 10,
+        "title": "实现调度权重、并发上限与每分钟限流",
+        "description": "候选集按 priority 分组，同组按 weight 加权随机；按 channelId 维护进程内信号量与每分钟滑动窗口；全部被限流/冷却时返回独立的 unavailableReason，并记录跳过原因。",
+        "status": "pending",
+        "dependencies": [6, 7],
+        "priority": "high",
+        "details": "落点：channel-scheduler.ts、channel.types.ts（或等价）、model-channel DTO/页面。weight 1-100，maxConcurrency=0 不限，rateLimitPerMin=0 不限。每次调度记录候选、权重、随机结果、跳过原因、最终通道；多实例口径写入 docs/model-architecture.md，不引入 Redis。",
+        "testStrategy": "固定随机种子/大样本验证权重分布；maxConcurrency 达上限时跳过；rateLimitPerMin 窗口内跳过；0 表示不限；全部限流时原因不同于全部失败；attempts 含 skippedReason。",
+        "subtasks": []
+      },
+      {
+        "id": 11,
+        "title": "实现熔断半开恢复与调度观测",
+        "description": "把熔断状态机扩展为 closed/open/half-open；冷却到期只放行一个探测，成功 closed，失败指数退避至上限 30 分钟；每次尝试写 ModelCallLog（channelId/attemptIndex），后台可回放 attempts。",
+        "status": "pending",
+        "dependencies": [6, 7, 10],
+        "priority": "high",
+        "details": "落点：channel-scheduler.ts、image-call-logger.ts、admin/model-call.service.ts、后台调用记录页。冷却基数 max(30s, pollMs*5)，退避 2^(连续开启次数-1)，上限 30m。半开探测期间其他请求跳过并记原因。fallback 字段语义改为「切到下一条线路」，更新注释与文案。",
+        "testStrategy": "半开窗口并发请求仅一个进入探测；成功清计数转 closed；失败按指数退避重开；attempts 每次落库且可按 channelId 筛选；无本地产出与伪成功。",
+        "subtasks": []
+      },
+      {
+        "id": 12,
+        "title": "统一同步与异步协议的任务契约",
+        "description": "把 ProtocolSpec.mode 与视频四段式统一为提交/轮询/取结果/下载抽象；图像与文本协议可声明 async，调度层共享轮询循环；保留按模态的 timeoutMs/pollMs/maxPolls 与 providerTaskId 恢复。",
+        "status": "pending",
+        "dependencies": [2, 6, 9],
+        "priority": "medium",
+        "details": "落点：protocols/protocol.spec.ts、protocol.registry.ts、各 provider、channel-scheduler.ts、generate.service.ts。同步协议在一次调用内完成；异步协议返回外部任务 id 并轮询。视频四段式作为 VideoProtocolSpec 适配，不改变既有错误码。",
+        "testStrategy": "fake async image/text 协议可完成提交-轮询-落库；轮询超时失败退款；同步协议回归；视频四段式回归；providerTaskId 可在重启后恢复轮询（或明确记录不可恢复边界）。",
+        "subtasks": []
+      },
+      {
+        "id": 13,
+        "title": "完成协议与厂商扩展试点",
+        "description": "先取证再实现：在 Google Gemini（图像+文本，generateContent）或快手可灵（视频，异步创建/查询/下载）中选定一个试点，写探测脚本记录真实请求/响应/错误，再接入协议注册表、factory、vendor presets、后台预设与校验脚本。",
+        "status": "pending",
+        "dependencies": [2, 12],
+        "priority": "medium",
+        "details": "落点：vendors/vendor.catalog.ts、vendor.presets.ts、vendor.integrity.ts、protocols/protocol.registry.ts、provider 实现、backend/scripts 探测脚本、docs/model-architecture.md。未取得真实响应前不得标记 real 或写入能力清单。新增依赖需评估 verify:deps:critical，优先零新增依赖。",
+        "testStrategy": "探测脚本保存真实响应样本与错误结构；注册表/厂商完整性校验通过；后台预设可选且协议已实现；真实调用成功或给出可读失败原因；verify-vendor-aggregation 通过。",
+        "subtasks": []
+      },
+      {
+        "id": 14,
+        "title": "测试、闸口与文档收口",
+        "description": "补齐后端单测/集成、前端单测与 e2e，新增/更新 verify 脚本与覆盖矩阵；同步 model-architecture、environments、api-contract、testing、admin 文档、README 与 CLAUDE.md；记录迁移与回滚演练。",
+        "status": "pending",
+        "dependencies": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+        "priority": "high",
+        "details": "闸口：backend npm run build、相关 verify-*、前端 npm run typecheck、npm test、npm run e2e、npm run verify:deps:critical。文档删除双轨描述，写入唯一配置源、调度权重/限流/半开、协议注册表与迁移步骤。验收用例覆盖 PRD 的 10 条。",
+        "testStrategy": "全部闸口真实执行并留存输出；10 条验收用例逐条通过；文档与代码一致；全仓 grep 不再出现 GATEWAY_BASE_URL/GATEWAY_TOKEN/legacyKey/materialize 等旧路径（迁移脚本与历史文档除外）。",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2026-10-29T10:30:00.000Z",
+      "updated": "2026-10-29T10:30:00.000Z",
+      "description": "渠道模型改造：统一配置源、后台健康态、调度与任务模型重构、协议与厂商扩展",
+      "projectName": "货觉AI 渠道模型改造"
+    }
+  }
+}
