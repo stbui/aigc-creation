@@ -1,6 +1,8 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { AuditAction, AdminUser, RequirePermission } from './admin.decorator';
 import { AppError } from '../common/app.exception';
+import { sendCsv } from '../common/csv-response';
 import { ModelConfigService } from './model-config.service';
 import { ModelCallService } from './model-call.service';
 import { PERMISSIONS } from './permissions';
@@ -104,6 +106,20 @@ export class AdminModelCallsController {
   @RequirePermission(PERMISSIONS.modelCallRead)
   list(@Query() query: ModelCallListQueryDto) {
     return this.calls.list(query);
+  }
+
+  /**
+   * 导出调用记录 (CSV)。
+   *
+   * ⚠️ 路由必须声明在 `:id` 之前，否则 `export` 会被当成调用记录 id。
+   * 导出把提示词等用户内容带出系统，用独立的 `data.export` 权限点并留审计。
+   */
+  @Get('export')
+  @RequirePermission(PERMISSIONS.dataExport)
+  @AuditAction('data.export')
+  async export(@Query() query: ModelCallListQueryDto, @Res() res: Response) {
+    const csv = await this.calls.exportCsv(query);
+    sendCsv(res, 'model-calls', csv);
   }
 
   /** 单条详情 (含完整提示词) */

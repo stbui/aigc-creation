@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
-import { toCsv } from '../common/csv';
+import { CSV_EXPORT_MAX_ROWS, toCsv } from '../common/csv';
 import { NotificationsService } from '../notifications/notifications.service';
 
 /**
@@ -268,7 +268,7 @@ export class TicketsService {
     const rows = await this.prisma.ticket.findMany({
       where: this.adminWhere(query),
       orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
-      take: 5000,
+      take: CSV_EXPORT_MAX_ROWS,
       include: { user: { select: { email: true } } },
     });
     return toCsv(

@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
 import { runBatch } from '../common/batch';
-import { toCsv } from '../common/csv';
+import { CSV_EXPORT_MAX_ROWS, toCsv } from '../common/csv';
 import { StorageService } from '../storage/storage.service';
 import { SignedUrlService } from '../common/signed-url.service';
 import { buildPage, paginate, type PageResult } from './dto/page-query.dto';
@@ -173,7 +173,7 @@ export class AdminAssetsService {
     const rows = await this.prisma.asset.findMany({
       where: this.listWhere(query),
       orderBy: { createdAt: 'desc' },
-      take: 5000,
+      take: CSV_EXPORT_MAX_ROWS,
       include: {
         owner: { select: { email: true } },
         project: { select: { name: true } },

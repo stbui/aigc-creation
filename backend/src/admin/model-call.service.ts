@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CSV_EXPORT_MAX_ROWS, toCsv } from '../common/csv';
 import { buildPage, paginate, type PageResult } from './dto/page-query.dto';
 import type { ModelCallListQueryDto } from './dto/model.dto';
 import { CAPABILITY_IDS } from '../providers/channel-config.defs';
@@ -35,21 +36,7 @@ export class ModelCallService {
     sources: Array<{ source: string; count: number }>;
   }> {
     const page = buildPage(query, [...SORTABLE], 'createdAt:desc');
-
-    const where: Record<string, unknown> = {};
-    if (query.capability) where['capability'] = query.capability;
-    if (query.source) where['source'] = query.source;
-    if (query.fallback !== undefined) where['fallback'] = query.fallback;
-    if (query.success !== undefined) where['success'] = query.success;
-    if (query.model) where['model'] = query.model;
-    if (query.from || query.to) {
-      const createdAt: Record<string, Date> = {};
-      const from = parseDate(query.from);
-      const to = parseDate(query.to);
-      if (from) createdAt['gte'] = from;
-      if (to) createdAt['lte'] = to;
-      if (Object.keys(createdAt).length > 0) where['createdAt'] = createdAt;
-    }
+    const where = this.listWhere(query);
 
     const [items, total, capGroups, sourceGroups, agg] = await Promise.all([
       this.prisma.modelCallLog.findMany({
@@ -118,6 +105,40 @@ export class ModelCallService {
     };
   }
 
+  /**
+   * 导出调用记录 (CSV)。
+   *
+   * 与列表共用 `listWhere`，筛选口径完全一致。提示词一并导出：
+   * 排障时「当时送出的到底是什么」往往比耗时更能解释失败。
+   */
+  async exportCsv(query: ModelCallListQueryDto): Promise<string> {
+    const rows = await this.prisma.modelCallLog.findMany({
+      where: this.listWhere(query),
+      orderBy: { createdAt: 'desc' },
+      take: CSV_EXPORT_MAX_ROWS,
+    });
+    return toCsv(
+      [
+        { label: '时间', value: (r) => r.createdAt },
+        { label: '能力', value: (r) => r.capability },
+        { label: '路由', value: (r) => r.route },
+        { label: '实际通道', value: (r) => r.source },
+        { label: '历史回落', value: (r) => (r.fallback ? '是' : '否') },
+        { label: '模型', value: (r) => r.model ?? '' },
+        { label: '耗时(ms)', value: (r) => r.durationMs },
+        { label: '结果', value: (r) => (r.success ? '成功' : '失败') },
+        { label: '错误码', value: (r) => r.errorCode ?? '' },
+        { label: '宽', value: (r) => r.width ?? '' },
+        { label: '高', value: (r) => r.height ?? '' },
+        { label: '产出(字节)', value: (r) => r.outputBytes },
+        { label: '网关任务 ID', value: (r) => r.taskId ?? '' },
+        { label: '原因', value: (r) => r.reason ?? '' },
+        { label: '提示词', value: (r) => r.prompt ?? '' },
+      ],
+      rows,
+    );
+  }
+
   /** 单条详情 (含完整 prompt) */
   async detail(id: string) {
     const row = await this.prisma.modelCallLog.findUnique({ where: { id } });
@@ -127,6 +148,30 @@ export class ModelCallService {
   /** 已知能力 id 全集 (供前端筛选下拉, 与后端校验口径一致) */
   capabilityOptions() {
     return CAPABILITY_IDS.map((id) => ({ id }));
+  }
+
+  /**
+   * 列表与导出共用的筛选条件。
+   *
+   * 单独抽出而不是在两处各写一份：曾出现「列表筛失败 3 条、导出 4000 条」
+   * 这类口径分歧，运营据此对账会直接得出错误结论。
+   */
+  private listWhere(query: ModelCallListQueryDto): Record<string, unknown> {
+    const where: Record<string, unknown> = {};
+    if (query.capability) where['capability'] = query.capability;
+    if (query.source) where['source'] = query.source;
+    if (query.fallback !== undefined) where['fallback'] = query.fallback;
+    if (query.success !== undefined) where['success'] = query.success;
+    if (query.model) where['model'] = query.model;
+    if (query.from || query.to) {
+      const createdAt: Record<string, Date> = {};
+      const from = parseDate(query.from);
+      const to = parseDate(query.to);
+      if (from) createdAt['gte'] = from;
+      if (to) createdAt['lte'] = to;
+      if (Object.keys(createdAt).length > 0) where['createdAt'] = createdAt;
+    }
+    return where;
   }
 }
 

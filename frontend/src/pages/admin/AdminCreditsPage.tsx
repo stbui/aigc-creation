@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { App, Button, Drawer, Input, Select, Table, Upload as AntUpload } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { UploadFile } from 'antd';
@@ -13,6 +14,7 @@ import {
   adminPagination,
   useAdminList,
   useAdminResource,
+  useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
 import {
   AdminEmpty,
@@ -78,8 +80,13 @@ export function AdminCreditsPage() {
   const { message } = App.useApp();
   const { can } = useAdmin();
 
-  const [email, setEmail] = useState('');
-  const [userId, setUserId] = useState('');
+  // 深链/刷新后保留筛选。初始值同时喂给 useAdminList, 首次请求即带筛选。
+  const [searchParams] = useSearchParams();
+  const initialEmail = searchParams.get('email') ?? '';
+  const initialUserId = searchParams.get('userId') ?? '';
+
+  const [email, setEmail] = useState(initialEmail);
+  const [userId, setUserId] = useState(initialUserId);
 
   const [detail, setDetail] = useState<AdminCreditRow | null>(null);
   const [batchOpen, setBatchOpen] = useState(false);
@@ -97,8 +104,17 @@ export function AdminCreditsPage() {
     [],
   );
 
-  const { data, loading, error, setQuery, setPage, reload } =
-    useAdminList<AdminCreditListResult>(fetcher);
+  const { data, loading, error, params, setQuery, setPage, reload } =
+    useAdminList<AdminCreditListResult>(fetcher, {
+      email: initialEmail || undefined,
+      userId: initialUserId || undefined,
+    });
+
+  // 只同步已生效的筛选, 不同步分页
+  useAdminUrlFilterSync({
+    email: params.email as string | undefined,
+    userId: params.userId as string | undefined,
+  });
 
   const rows = data?.items ?? [];
 
@@ -123,12 +139,16 @@ export function AdminCreditsPage() {
     setQuery({ email: undefined, userId: undefined });
   };
 
+  /**
+   * 导出走**已生效**的筛选, 而不是输入框里的草稿 ——
+   * 用户输入后未点「查询」时, 导出的必须与屏幕上的列表同口径。
+   */
   const exportCsv = async () => {
     setExporting(true);
     try {
       await adminCreditsApi.exportCsv({
-        email: email.trim() || undefined,
-        userId: userId.trim() || undefined,
+        email: params.email as string | undefined,
+        userId: params.userId as string | undefined,
       });
       void message.success('导出已开始下载');
     } catch (e) {

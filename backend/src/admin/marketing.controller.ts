@@ -1,7 +1,9 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Put, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import { IsOptional, IsString, MaxLength } from 'class-validator';
 import { AuditAction, AdminUser, RequirePermission } from './admin.decorator';
 import { AppError } from '../common/app.exception';
+import { sendCsv } from '../common/csv-response';
 import { MarketingService } from '../marketing/marketing.service';
 import { PERMISSIONS } from './permissions';
 import {
@@ -83,6 +85,20 @@ export class AdminCouponsController {
     });
   }
 
+  /**
+   * 导出优惠券 (CSV)。
+   *
+   * ⚠️ 路由必须声明在 `:id` 之前，否则 `export` 会被当成券 id。
+   * 导出把券的发行与核销数据带出系统，用独立的 `data.export` 权限点并留审计。
+   */
+  @Get('export')
+  @RequirePermission(PERMISSIONS.dataExport)
+  @AuditAction('data.export')
+  async export(@Query() query: CouponListQueryDto, @Res() res: Response) {
+    const csv = await this.marketing.exportCoupons(query);
+    sendCsv(res, 'coupons', csv);
+  }
+
   @Get(':id')
   detail(@Param('id') id: string) {
     return this.marketing.getCoupon(id);
@@ -125,6 +141,15 @@ export class AdminCampaignsController {
       status: query.status,
       keyword: query.keyword,
     });
+  }
+
+  /** 导出限时活动 (CSV)。筛选口径与列表一致，独立 `data.export` 权限并留审计 */
+  @Get('export')
+  @RequirePermission(PERMISSIONS.dataExport)
+  @AuditAction('data.export')
+  async export(@Query() query: CampaignListQueryDto, @Res() res: Response) {
+    const csv = await this.marketing.exportCampaigns(query);
+    sendCsv(res, 'campaigns', csv);
   }
 
   @Post()

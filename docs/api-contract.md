@@ -100,7 +100,7 @@
 | GET/POST/PATCH | `/api/v1/admin/tickets/:id`、`/tickets/:id/replies` | 工单详情与回复 / 改状态或指派（`ticket.handle`） |
 | GET | `/api/v1/admin/search?q=` | 全局搜索五组各前 5 条（`data.search`，`q` < 2 返回空） |
 | POST | `/api/v1/admin/{users,assets,tasks,orders}/batch` | 批量动作，逐条结果（≤ 100 条，`data.batch`） |
-| GET | `/api/v1/admin/{users,assets,tickets,orders,payments,credits,tasks}/export` | CSV 导出（BOM，`data.export`） |
+| GET | `/api/v1/admin/{users,assets,tickets,orders,payments,credits,tasks,audit-logs,model-calls,invoices,coupons,campaigns}/export` | CSV 导出（BOM，`data.export` + `data.export` 审计；上限 5000 行，筛选口径与列表一致） |
 | POST | `/api/v1/admin/credits/import` | 积分 CSV 导入（multipart，按邮箱匹配，`data.import`） |
 | GET/PUT/POST | `/api/v1/admin/legal*` | 法务版本列表 / 新建草稿 / 发布（`legal.write`，发布需填原因） |
 | GET/POST | `/api/v1/admin/notifications/{broadcast,templates}` | 全站广播 / 消息模板（`message.write`） |

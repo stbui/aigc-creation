@@ -3,7 +3,7 @@ import type { Response } from 'express';
 import { AdminUser, AuditAction, RequirePermission } from './admin.decorator';
 import type { AdminUser as AdminUserType } from './admin.decorator';
 import { PERMISSIONS } from './permissions';
-import { csvFilename } from '../common/csv';
+import { sendCsv } from '../common/csv-response';
 import { TicketsService } from '../tickets/tickets.service';
 import {
   AdminTicketListQueryDto,
@@ -43,9 +43,7 @@ export class AdminTicketsController {
   @AuditAction('data.export')
   async export(@Query() query: AdminTicketListQueryDto, @Res() res: Response) {
     const csv = await this.tickets.exportCsv(query);
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${csvFilename('tickets')}"`);
-    res.send(csv);
+    sendCsv(res, 'tickets', csv);
   }
 
   @Get()

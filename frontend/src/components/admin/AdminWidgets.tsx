@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Alert, Button, Drawer, Result, Skeleton } from 'antd';
 import { AlertTriangle } from 'lucide-react';
 import { PageHeader } from './PageHeader';
@@ -62,6 +63,51 @@ export function useAdminList<T>(
   }, []);
 
   return { data, loading, error, params, setQuery, setPage, reload: load };
+}
+
+type UrlFilterValue = string | number | boolean | undefined | null;
+
+/**
+ * 已生效的筛选条件 → 地址栏同步 (2026-10-29)。
+ *
+ * 后台列表此前只有部分页面支持从 URL 读取筛选 (告警深链), 但用户把筛选
+ * 结果发给同事时地址栏还是裸的 `/admin/orders`。这里做**单向写回**:
+ * 页面内点「查询 / 重置」后, 把已生效的条件写进 URL。
+ *
+ * 三条刻意约束:
+ *   · 只同步传入的键 —— 分页、排序这类瞬时状态不进 URL, 分享链接不会
+ *     停在第 7 页或某个排序上;
+ *   · 用 `replace` —— 每筛一次都压一条历史, 后退键就再也退不出页面了;
+ *   · 其它查询参数原样保留 —— 详情抽屉等深链参数不受影响。
+ *
+ * 读取侧由页面在 `useState` 初始化时完成 (同步, 避免先发一次空筛选请求)。
+ */
+export function useAdminUrlFilterSync(applied: Record<string, UrlFilterValue>) {
+  const [, setSearchParams] = useSearchParams();
+  // setSearchParams 的引用随 searchParams 变化；放进依赖会让「写 URL → 引用变 →
+  // 再写一次」多跑一轮。这里用 ref 取最新实现，只按筛选内容变化触发。
+  const setSearchParamsRef = useRef(setSearchParams);
+  setSearchParamsRef.current = setSearchParams;
+
+  // undefined 也要占位, 否则「重置」时 JSON 会丢掉该键, URL 上的旧筛选清不掉
+  const serialized = JSON.stringify(applied, (_key, value) =>
+    value === undefined ? null : value,
+  );
+
+  useEffect(() => {
+    const values = JSON.parse(serialized) as Record<string, UrlFilterValue>;
+    setSearchParamsRef.current(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        for (const [key, value] of Object.entries(values)) {
+          next.delete(key);
+          if (value !== undefined && value !== null && value !== '') next.set(key, String(value));
+        }
+        return next;
+      },
+      { replace: true },
+    );
+  }, [serialized]);
 }
 
 /**

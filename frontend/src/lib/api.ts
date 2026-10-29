@@ -861,6 +861,16 @@ export const adminModelApi = {
     return request<AdminModelCallListResult>(`/admin/model-calls${suffix}`);
   },
 
+  /** 导出当前筛选结果 (CSV, 上限 5000 行) */
+  exportCsv: (params: {
+    capability?: string;
+    source?: string;
+    success?: boolean;
+    fallback?: boolean;
+    from?: string;
+    to?: string;
+  } = {}) => downloadCsv(`/admin/model-calls/export${toQuery(params)}`),
+
   callDetail: (id: string) => request<AdminModelCall>(`/admin/model-calls/${id}`),
 };
 
@@ -1050,6 +1060,16 @@ export const adminAuditApi = {
       `/admin/audit-logs${suffix}`,
     );
   },
+
+  /** 导出当前筛选结果 (CSV, 上限 5000 行) */
+  exportCsv: (params: {
+    actorId?: string;
+    action?: string;
+    targetId?: string;
+    success?: boolean;
+    from?: string;
+    to?: string;
+  } = {}) => downloadCsv(`/admin/audit-logs/export${toQuery(params)}`),
 };
 
 /**
@@ -1242,6 +1262,10 @@ export const marketingApi = {
   toggleCoupon: (id: string) =>
     request<AdminCoupon>(`/admin/coupons/${id}/toggle`, { method: 'PATCH' }),
 
+  /** 导出当前筛选结果 (CSV, 上限 5000 行) */
+  exportCoupons: (params: { keyword?: string; type?: string; status?: string } = {}) =>
+    downloadCsv(`/admin/coupons/export${toQuery(params)}`),
+
   // ── 限时活动 (B-65) ─────────────────────────────────────────────
   campaigns: (params: Record<string, string | number | undefined> = {}) => {
     const qs = new URLSearchParams();
@@ -1262,6 +1286,10 @@ export const marketingApi = {
 
   toggleCampaign: (id: string) =>
     request<AdminCampaign>(`/admin/campaigns/${id}/toggle`, { method: 'PATCH' }),
+
+  /** 导出当前筛选结果 (CSV, 上限 5000 行) */
+  exportCampaigns: (params: { keyword?: string; type?: string; status?: string } = {}) =>
+    downloadCsv(`/admin/campaigns/export${toQuery(params)}`),
 
   // ── 邀请规则 (B-66) ─────────────────────────────────────────────
   inviteRule: () => request<InviteRule>('/admin/invites/rules'),
@@ -1614,6 +1642,10 @@ export const adminInvoicesApi = {
 
   reject: (id: string, reason: string) =>
     request<AdminInvoice>(`/admin/invoices/${id}/reject`, { method: 'POST', body: { reason } }),
+
+  /** 导出当前筛选结果 (CSV, 上限 5000 行) */
+  exportCsv: (params: { status?: InvoiceStatus; keyword?: string } = {}) =>
+    downloadCsv(`/admin/invoices/export${toQuery(params)}`),
 
   preview: (id: string) => openHtmlDocument(`/admin/invoices/${id}/file`),
 };

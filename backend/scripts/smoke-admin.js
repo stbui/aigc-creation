@@ -23,6 +23,23 @@ async function call(method, path, token, body) {
   return { status: res.status, ...json };
 }
 
+/**
+ * CSV 导出是 text/csv 而不是 JSON 信封, 不能用 call() 解析。
+ * 同时校验 BOM: 没有它 Excel 打开中文表头会乱码。
+ */
+async function fetchCsv(path, token) {
+  const res = await fetch(`${BASE}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  const text = await res.text();
+  return {
+    status: res.status,
+    contentType: res.headers.get('content-type') || '',
+    hasBom: text.charCodeAt(0) === 0xfeff,
+    text,
+  };
+}
+
 let pass = 0;
 let fail = 0;
 function check(name, ok, detail = '') {
@@ -192,6 +209,37 @@ const { resolveDbUrl } = require('./db-url');
 
   const failedAudit = audit.data.result.items.filter((r) => r.success === false);
   check('失败操作也被记录', failedAudit.length >= 0, `失败记录 ${failedAudit.length} 条`);
+
+  console.log('\n【CSV 导出】');
+  // 五张只读列表的导出口径必须与列表一致, 且统一走 data.export 权限 +
+  // data.export 审计。这里只验「内容类型 + BOM + 表头」, 具体列由各页断言。
+  for (const [label, path] of [
+    ['审计日志', '/admin/audit-logs/export'],
+    ['模型调用记录', '/admin/model-calls/export'],
+    ['发票', '/admin/invoices/export'],
+    ['优惠券', '/admin/coupons/export'],
+    ['限时活动', '/admin/campaigns/export'],
+  ]) {
+    const csv = await fetchCsv(path, T);
+    check(
+      `${label}导出返回 CSV`,
+      csv.status === 200 && csv.contentType.includes('text/csv') && csv.hasBom,
+      `HTTP ${csv.status} · ${csv.text.length} 字符`,
+    );
+  }
+
+  // 导出即把用户数据带出系统, 匿名访问必须被挡在鉴权层
+  const anonCsv = await fetchCsv('/admin/audit-logs/export', null);
+  check('匿名导出被拒', anonCsv.status === 401, `HTTP ${anonCsv.status}`);
+
+  // 审计写入是 fire-and-forget, 给落库留一点时间再查
+  await new Promise((r) => setTimeout(r, 200));
+  const exportAudit = await call('GET', '/admin/audit-logs?action=data.export&pageSize=20', T);
+  check(
+    '导出留下审计记录',
+    exportAudit.status === 200 && (exportAudit.data?.result?.items?.length ?? 0) > 0,
+    `data.export 记录 ${exportAudit.data?.result?.items?.length ?? 0} 条`,
+  );
 
   console.log('\n【密码重置】');
   const reset = await call('POST', `/admin/users/${target.id}/password`, T);

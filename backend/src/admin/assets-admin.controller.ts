@@ -6,7 +6,7 @@ import { AdminRoleService } from './admin-role.service';
 import { AdminAssetsService } from './assets-admin.service';
 import { PERMISSIONS } from './permissions';
 import { AppError } from '../common/app.exception';
-import { csvFilename } from '../common/csv';
+import { sendCsv } from '../common/csv-response';
 // 必须用运行时导入: `import type` 会让 Nest 的 design:paramtypes 退化成
 // Object/Function, ValidationPipe 无法转换 pageSize, 分页会静默退回默认 20。
 import { AssetListQueryDto, ProjectListQueryDto } from './dto/asset.dto';
@@ -135,9 +135,7 @@ export class AdminAssetsController {
   @AuditAction('data.export')
   async export(@Query() query: AssetListQueryDto, @Res() res: Response) {
     const csv = await this.assets.exportCsv(query);
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${csvFilename('assets')}"`);
-    res.send(csv);
+    sendCsv(res, 'assets', csv);
   }
 
   /** 删除素材 (B-27): 连带磁盘文件与产出任务, 不可逆 */

@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { GenerateService } from '../generate/generate.service';
 import { AppError } from '../common/app.exception';
 import { runBatch } from '../common/batch';
-import { toCsv } from '../common/csv';
+import { CSV_EXPORT_MAX_ROWS, toCsv } from '../common/csv';
 import { getCapability } from '../capabilities/capability.registry';
 import { CAPABILITY_IDS } from '../providers/channel-config.defs';
 import { buildPage, paginate, type PageResult } from './dto/page-query.dto';
@@ -228,7 +228,7 @@ export class TasksAdminService {
     const rows = await this.prisma.generationTask.findMany({
       where: this.listWhere(query),
       orderBy: { createdAt: 'desc' },
-      take: 5000,
+      take: CSV_EXPORT_MAX_ROWS,
       include: {
         owner: { select: { email: true } },
         project: { select: { name: true } },

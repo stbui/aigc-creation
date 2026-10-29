@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AppError } from '../common/app.exception';
+import { CSV_EXPORT_MAX_ROWS, centsToYuan, toCsv } from '../common/csv';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { EmailService } from '../channels/email/email.service';
@@ -137,15 +138,7 @@ export class InvoicesService {
   async listForAdmin(query: { status?: string; keyword?: string; limit?: number; offset?: number }) {
     const take = Math.min(Math.max(Number(query.limit) || 20, 1), 200);
     const skip = Math.max(Number(query.offset) || 0, 0);
-    const where: Record<string, unknown> = {};
-    if (query.status) where.status = query.status;
-    if (query.keyword) {
-      where.OR = [
-        { invoiceNo: { contains: query.keyword } },
-        { title: { contains: query.keyword } },
-        { order: { orderNo: { contains: query.keyword } } },
-      ];
-    }
+    const where = this.adminWhere(query);
 
     const [items, total] = await Promise.all([
       this.prisma.invoice.findMany({
@@ -169,6 +162,65 @@ export class InvoicesService {
       })),
       total,
     };
+  }
+
+  /**
+   * 导出发票 (CSV)。
+   *
+   * 与后台列表共用 `adminWhere`，筛什么就导出什么。金额同时给分与元：
+   * 财务按元核对，技术按分回查，两列都在才不用回头换算。
+   */
+  async exportCsvForAdmin(query: {
+    status?: string;
+    keyword?: string;
+  }): Promise<string> {
+    const rows = await this.prisma.invoice.findMany({
+      where: this.adminWhere(query),
+      orderBy: { createdAt: 'desc' },
+      take: CSV_EXPORT_MAX_ROWS,
+      include: {
+        order: { select: { orderNo: true } },
+        user: { select: { email: true, name: true } },
+      },
+    });
+
+    return toCsv(
+      [
+        { label: '发票号', value: (r) => r.invoiceNo },
+        { label: '订单号', value: (r) => r.order?.orderNo ?? r.orderId },
+        { label: '申请邮箱', value: (r) => r.email ?? '' },
+        { label: '用户邮箱', value: (r) => r.user?.email ?? '' },
+        { label: '用户名称', value: (r) => r.user?.name ?? '' },
+        { label: '抬头类型', value: (r) => (r.kind === 'company' ? '企业' : '个人') },
+        { label: '抬头', value: (r) => r.title },
+        { label: '税号', value: (r) => r.taxNo ?? '' },
+        { label: '金额(分)', value: (r) => r.amountCents },
+        { label: '金额(元)', value: (r) => centsToYuan(r.amountCents) },
+        { label: '状态', value: (r) => r.status },
+        { label: '驳回原因', value: (r) => r.rejectReason ?? '' },
+        { label: '申请时间', value: (r) => r.createdAt },
+        { label: '开具时间', value: (r) => r.issuedAt ?? '' },
+      ],
+      rows,
+    );
+  }
+
+  /**
+   * 后台列表与导出共用的筛选条件。
+   *
+   * 单独抽出避免「列表筛出 3 条、导出 4000 条」的口径分歧。
+   */
+  private adminWhere(query: { status?: string; keyword?: string }): Record<string, unknown> {
+    const where: Record<string, unknown> = {};
+    if (query.status) where.status = query.status;
+    if (query.keyword) {
+      where.OR = [
+        { invoiceNo: { contains: query.keyword } },
+        { title: { contains: query.keyword } },
+        { order: { orderNo: { contains: query.keyword } } },
+      ];
+    }
+    return where;
   }
 
   /**

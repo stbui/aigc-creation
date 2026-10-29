@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
+import { CSV_EXPORT_MAX_ROWS, toCsv } from '../common/csv';
 import { CreditService } from '../credits/credit.service';
 import { Prisma } from '@prisma/client';
 
@@ -43,6 +44,15 @@ export const COUPON_SCOPE_LABELS: Record<CouponScope, string> = {
   new_user: '仅新用户',
 };
 
+/** 券派生生效态中文名 (与开关 status 分开: 过期/售罄不是「停用」) */
+export const COUPON_EFFECTIVE_LABELS: Record<string, string> = {
+  on: '生效中',
+  off: '已停用',
+  expired: '已过期',
+  not_started: '未开始',
+  sold_out: '已售罄',
+};
+
 /** 活动类型中文名 */
 export const CAMPAIGN_TYPE_LABELS: Record<CampaignType, string> = {
   limited_price: '限时价',
@@ -54,6 +64,15 @@ export const CAMPAIGN_TYPE_LABELS: Record<CampaignType, string> = {
 export const CAMPAIGN_STATUS_LABELS: Record<CampaignStatus, string> = {
   draft: '草稿',
   active: '进行中',
+  ended: '已结束',
+  off: '已下线',
+};
+
+/** 活动派生生效态中文名 (status=active 但时间窗未到, 对用户就是不生效) */
+export const CAMPAIGN_EFFECTIVE_LABELS: Record<string, string> = {
+  draft: '草稿',
+  live: '生效中',
+  scheduled: '未开始',
   ended: '已结束',
   off: '已下线',
 };
@@ -119,18 +138,7 @@ export class MarketingService {
     const pageSize = Math.min(100, query.pageSize ?? 20);
     const skip = (page - 1) * pageSize;
 
-    const where: Prisma.CouponWhereInput = {
-      ...(query.type ? { type: query.type } : {}),
-      ...(query.status ? { status: query.status } : {}),
-      ...(query.keyword
-        ? {
-            OR: [
-              { code: { contains: query.keyword.toUpperCase() } },
-              { name: { contains: query.keyword } },
-            ],
-          }
-        : {}),
-    };
+    const where = this.couponWhere(query);
 
     const [rows, total, summary] = await Promise.all([
       this.prisma.coupon.findMany({
@@ -161,6 +169,62 @@ export class MarketingService {
       },
       typeLabels: COUPON_TYPE_LABELS,
       scopeLabels: COUPON_SCOPE_LABELS,
+    };
+  }
+
+  /**
+   * 导出优惠券 (CSV)。
+   *
+   * 与列表共用 `couponWhere`，筛选口径一致。面额按展示口径导出
+   * （折扣 → 折数，其余 → 元），运营拿到表格不必再自己换算万分比。
+   */
+  async exportCoupons(query: {
+    type?: string;
+    status?: string;
+    keyword?: string;
+  }): Promise<string> {
+    const rows = await this.prisma.coupon.findMany({
+      where: this.couponWhere(query),
+      orderBy: { createdAt: 'desc' },
+      take: CSV_EXPORT_MAX_ROWS,
+    });
+    const now = new Date();
+    const views = rows.map((c) => this.toCouponView(c, now));
+    return toCsv(
+      [
+        { label: '券码', value: (c) => c.code },
+        { label: '名称', value: (c) => c.name },
+        { label: '类型', value: (c) => c.typeLabel },
+        { label: '面额', value: (c) => c.valueLabel },
+        { label: '使用门槛', value: (c) => c.thresholdLabel },
+        { label: '适用范围', value: (c) => c.scopeLabel },
+        { label: '发放总量', value: (c) => c.totalCount },
+        { label: '已使用', value: (c) => c.usedCount },
+        { label: '剩余', value: (c) => (c.remaining === null ? '不限' : c.remaining) },
+        { label: '每人限用', value: (c) => c.perUserLimit },
+        { label: '开关', value: (c) => (c.status === 'on' ? '启用' : '停用') },
+        { label: '生效状态', value: (c) => COUPON_EFFECTIVE_LABELS[c.effective] ?? c.effective },
+        { label: '开始时间', value: (c) => c.validFrom },
+        { label: '结束时间', value: (c) => c.validTo },
+        { label: '创建时间', value: (c) => c.createdAt },
+      ],
+      views,
+    );
+  }
+
+  /** 券列表与导出共用的筛选条件 */
+  private couponWhere(query: { type?: string; status?: string; keyword?: string }): Prisma.CouponWhereInput {
+    return {
+      ...(query.type ? { type: query.type } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.keyword
+        ? {
+            OR: [
+              { code: { contains: query.keyword.toUpperCase() } },
+              { name: { contains: query.keyword } },
+            ],
+          }
+        : {}),
     };
   }
 
@@ -462,11 +526,7 @@ export class MarketingService {
     const pageSize = Math.min(100, query.pageSize ?? 20);
     const skip = (page - 1) * pageSize;
 
-    const where: Prisma.CampaignWhereInput = {
-      ...(query.type ? { type: query.type } : {}),
-      ...(query.status ? { status: query.status } : {}),
-      ...(query.keyword ? { name: { contains: query.keyword } } : {}),
-    };
+    const where = this.campaignWhere(query);
 
     const [rows, total, activeCount] = await Promise.all([
       this.prisma.campaign.findMany({
@@ -491,6 +551,53 @@ export class MarketingService {
       summary: { count: total, liveNow: activeCount },
       typeLabels: CAMPAIGN_TYPE_LABELS,
       statusLabels: CAMPAIGN_STATUS_LABELS,
+    };
+  }
+
+  /**
+   * 导出限时活动 (CSV)。
+   *
+   * 与列表共用 `campaignWhere`。类型/状态导出中文名而不是原始枚举值 ——
+   * 这份表格会直接给运营与财务看，`limited_free` 不如「限时免费」可读。
+   */
+  async exportCampaigns(query: {
+    type?: string;
+    status?: string;
+    keyword?: string;
+  }): Promise<string> {
+    const rows = await this.prisma.campaign.findMany({
+      where: this.campaignWhere(query),
+      orderBy: { createdAt: 'desc' },
+      take: CSV_EXPORT_MAX_ROWS,
+    });
+    const now = new Date();
+    const views = rows.map((c) => this.toCampaignView(c, now));
+    return toCsv(
+      [
+        { label: '活动名称', value: (c) => c.name },
+        { label: '类型', value: (c) => c.typeLabel },
+        { label: '状态', value: (c) => c.statusLabel },
+        { label: '生效状态', value: (c) => CAMPAIGN_EFFECTIVE_LABELS[c.effective] ?? c.effective },
+        { label: '开始时间', value: (c) => c.startAt },
+        { label: '结束时间', value: (c) => c.endAt },
+        { label: '配置', value: (c) => c.payload },
+        { label: '人群', value: (c) => c.audience },
+        { label: '创建时间', value: (c) => c.createdAt },
+      ],
+      views,
+    );
+  }
+
+  /** 活动列表与导出共用的筛选条件 */
+  private campaignWhere(query: {
+    type?: string;
+    status?: string;
+    keyword?: string;
+  }): Prisma.CampaignWhereInput {
+    return {
+      ...(query.type ? { type: query.type } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.keyword ? { name: { contains: query.keyword } } : {}),
     };
   }
 

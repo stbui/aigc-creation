@@ -52,7 +52,7 @@ npm run test:watch      # watch
 npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitignore）
 ```
 
-当前 13 个用例文件：
+当前 14 个用例文件：
 
 | 用例 | 守住什么 |
 | --- | --- |
@@ -60,6 +60,7 @@ npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitig
 | `components/ImageLightbox.test.tsx` | 大图查看器开合、缩放/翻页键盘语义 |
 | `components/ProviderBadge.test.tsx` | 能力/产出来源徽标文案与状态映射 |
 | `components/StateViews.test.tsx` | 加载 / 空 / 失败 / 骨架四态渲染 |
+| `components/admin/AdminWidgets.test.tsx` | 列表筛选 → 地址栏同步：写回、重置清旧值、保留非筛选参数 |
 | `hooks/useCreditLabel.test.tsx` | 积分文案与生效价、限时免费的展示 |
 | `lib/aigc-label.test.ts` | 角标参数缓存、失败回退默认值、色值还原 |
 | `lib/expandGeometry.test.ts` | 扩图占比与原图位置几何换算 |
@@ -128,7 +129,7 @@ npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitig
 | | `smoke-health-tracing.js` | 健康分项、请求号回显与替换、异常信封 `requestId`、日志 `[rid=]` 串联 |
 | 能力 | `smoke-capability-runtime.js` | model-only runtime、无线路不预告产出、上下线 `40005`、限时免费 0 积分 |
 | 模型通道 | `smoke-model-channels.js` | 线路 CRUD / token 保持与清除 / 排序 / 测试响应 / 401 |
-| 后台 | `smoke-admin.js` | 身份、权限点、审计、告警结构、退款状态筛选 |
+| 后台 | `smoke-admin.js` | 身份、权限点、审计、告警结构、退款状态筛选、五类只读列表 CSV 导出（类型 / BOM / 匿名拒绝 / `data.export` 审计留痕） |
 | | `smoke-backup.js` | 未验证备份不可下载、保留策略、路径穿越拦截 |
 | | `smoke-scheduler.js` | 定时任务真的改数据（订单超时、积分到期等） |
 | | `smoke-storage.js` | 多存储后端语义、路径穿越、下架不可读 |

@@ -43,7 +43,8 @@ const SENSITIVE_PATTERNS = ['password', 'token', 'secret', 'hash', 'credential']
 /**
  * 操作审计拦截器。
  *
- * 记录所有后台写操作 (POST/PATCH/PUT/DELETE), 便于事后追责与举证。
+ * 记录所有后台写操作 (POST/PATCH/PUT/DELETE), 以及**显式声明了
+ * `@AuditAction` 的读操作** (导出 / 备份下载) —— 后者同样是把数据带出系统。
  *
  * 关键取舍: **审计失败不阻断业务**。
  * 审计表写失败时只打WARN 日志 —— 若让业务随审计失败, 审计系统就成了单点故障,
@@ -61,19 +62,27 @@ export class AuditInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const request = context.switchToHttp().getRequest();
 
-    // 全局拦截器: 仅审计后台写操作, C 端流量不受影响
+    // 全局拦截器: 只审计后台动作, C 端流量不受影响
     const url: string = request.originalUrl ?? request.url ?? '';
     if (!url.split('?')[0].includes('/admin')) return next.handle();
 
     const method: string = request.method ?? 'GET';
-    if (!AUDITED_METHODS.has(method)) return next.handle();
-
     const adminUser = request.adminUser;
     // 显式声明优先; 未声明时回退到 URL 推断, 保证审计条目不丢失
     const declaredAction = this.reflector.get<string | undefined>(
       AUDIT_ACTION_KEY,
       context.getHandler(),
     );
+
+    /*
+     * 写操作一律审计; **导出 / 下载这类 GET 只要显式声明了动作也要审计**。
+     *
+     * 2026-10-29 修: 此前只按方法白名单放行, 所有 `@Get('export')` 上的
+     * `@AuditAction('data.export')` 实际从未落库 —— 代码与文档都写着
+     * 「导出即把用户数据带出系统, 留审计」, 但审计表里查不到任何导出记录。
+     * 显式声明了动作就说明该端点需要留痕, 与 HTTP 方法无关。
+     */
+    if (!AUDITED_METHODS.has(method) && !declaredAction) return next.handle();
 
     return next.handle().pipe(
       tap({
@@ -139,7 +148,8 @@ export class AuditInterceptor implements NestInterceptor {
     const idx = parts.indexOf('admin');
     const rest = idx >= 0 ? parts.slice(idx + 1) : parts;
     const resource = rest[0] ?? 'unknown';
-    const targetId = rest[1] ?? '-';
+    // `export` / `download` 是动作而不是对象 id, 不能写进 targetId
+    const targetId = rest[1] && rest[1] !== 'export' && rest[1] !== 'download' ? rest[1] : '-';
 
     const action = declaredAction ?? resource;
     return { action, targetType: resource, targetId };

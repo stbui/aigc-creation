@@ -6,7 +6,7 @@ import { AdminRoleService } from './admin-role.service';
 import { TasksAdminService } from './tasks-admin.service';
 import { PERMISSIONS } from './permissions';
 import { AppError } from '../common/app.exception';
-import { csvFilename } from '../common/csv';
+import { sendCsv } from '../common/csv-response';
 // 值导入: DTO 依赖 design:paramtypes 做实例化与白名单剥离
 import { TaskListQueryDto } from './dto/task.dto';
 
@@ -106,9 +106,7 @@ export class AdminTasksController {
   @AuditAction('data.export')
   async export(@Query() query: TaskListQueryDto, @Res() res: Response) {
     const csv = await this.tasks.exportCsv(query);
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${csvFilename('tasks')}"`);
-    res.send(csv);
+    sendCsv(res, 'tasks', csv);
   }
 
   /** 任务详情: 输入素材 / 参数 JSON / 产出图 / 时间线 (B-30) */

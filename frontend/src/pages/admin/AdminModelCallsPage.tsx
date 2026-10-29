@@ -1,7 +1,10 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Button, Select, Table } from 'antd';
+import { useSearchParams } from 'react-router-dom';
+import { App, Button, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import { Download } from 'lucide-react';
 import { adminModelApi } from '../../lib/api';
+import { useAdmin } from '../../context/AdminContext';
 import {
   AdminDrawer,
   AdminListError,
@@ -9,6 +12,7 @@ import {
   AdminListLoading,
   adminPagination,
   useAdminList,
+  useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
 import {
   AdminEmpty,
@@ -55,11 +59,30 @@ function fmtBytes(n: number): string {
 }
 
 export function AdminModelCallsPage() {
-  const [capability, setCapability] = useState<string | undefined>();
-  const [source, setSource] = useState<string | undefined>();
-  const [success, setSuccess] = useState<string | undefined>();
-  const [fallback, setFallback] = useState<string | undefined>();
+  const { message } = App.useApp();
+  const { can } = useAdmin();
+  // 深链/刷新后保留筛选: 排障时经常需要把「这批失败调用」的链接发给同事。
+  // 初始值同时喂给 useAdminList, 首次请求即带筛选, 不白跑一次全量查询。
+  const [searchParams] = useSearchParams();
+  const initialCapability = searchParams.get('capability') ?? undefined;
+  const rawSource = searchParams.get('source');
+  const initialSource = rawSource === 'gateway' || rawSource === 'local' ? rawSource : undefined;
+  const rawSuccess = searchParams.get('success');
+  const initialSuccess = rawSuccess === 'true' ? true : rawSuccess === 'false' ? false : undefined;
+  const rawFallback = searchParams.get('fallback');
+  const initialFallback =
+    rawFallback === 'true' ? true : rawFallback === 'false' ? false : undefined;
+
+  const [capability, setCapability] = useState<string | undefined>(initialCapability);
+  const [source, setSource] = useState<string | undefined>(initialSource);
+  const [success, setSuccess] = useState<string | undefined>(
+    initialSuccess === undefined ? undefined : String(initialSuccess),
+  );
+  const [fallback, setFallback] = useState<string | undefined>(
+    initialFallback === undefined ? undefined : String(initialFallback),
+  );
   const [detailId, setDetailId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const fetcher = useCallback(
     (params: Record<string, unknown>) =>
@@ -74,8 +97,21 @@ export function AdminModelCallsPage() {
     [],
   );
 
-  const { data, loading, error, setQuery, setPage, reload } =
-    useAdminList<AdminModelCallListResult>(fetcher);
+  const { data, loading, error, params, setQuery, setPage, reload } =
+    useAdminList<AdminModelCallListResult>(fetcher, {
+      capability: initialCapability,
+      source: initialSource,
+      success: initialSuccess,
+      fallback: initialFallback,
+    });
+
+  // 只同步已生效的筛选, 不同步分页
+  useAdminUrlFilterSync({
+    capability: params.capability as string | undefined,
+    source: params.source as string | undefined,
+    success: params.success as boolean | undefined,
+    fallback: params.fallback as boolean | undefined,
+  });
 
   const list = data?.result;
   const stats = data?.stats;
@@ -97,6 +133,24 @@ export function AdminModelCallsPage() {
     setSuccess(undefined);
     setFallback(undefined);
     setQuery({ capability: undefined, source: undefined, success: undefined, fallback: undefined });
+  };
+
+  /** 导出走已生效的筛选条件 —— 必须与屏幕上的列表同口径 */
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      await adminModelApi.exportCsv({
+        capability: params.capability as string | undefined,
+        source: params.source as string | undefined,
+        success: params.success as boolean | undefined,
+        fallback: params.fallback as boolean | undefined,
+      });
+      void message.success('导出已开始下载');
+    } catch (e) {
+      void message.error(e instanceof Error ? e.message : '导出失败');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const columns: ColumnsType<Row> = useMemo(
@@ -197,6 +251,19 @@ export function AdminModelCallsPage() {
       <PageHeader
         title="模型调用记录"
         description="生成链路每次调用模型的明细：耗时、产出与失败原因。只读，不可删除或修改。"
+        actions={
+          can('data.export') ? (
+            <Button
+              type="default"
+              className="adm-btn"
+              loading={exporting}
+              onClick={() => void exportCsv()}
+            >
+              <Download size={14} style={{ marginRight: 4 }} />
+              {exporting ? '导出中…' : '导出 CSV'}
+            </Button>
+          ) : undefined
+        }
       />
 
       {/* 统计卡: 单看流水要看上百行, 而运营真正想问的是这几个数 */}

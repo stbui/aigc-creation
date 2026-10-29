@@ -1,6 +1,8 @@
 import { useCallback, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { App, Button, Drawer, Input, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import { Download } from 'lucide-react';
 import { marketingApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import {
@@ -9,6 +11,7 @@ import {
   AdminStaleError,
   adminPagination,
   useAdminList,
+  useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
 import { AdminEmpty, PageHeader, Panel, StatusTag, type TagTone } from '../../components/admin/PageHeader';
 import type {
@@ -100,10 +103,21 @@ export function AdminCouponsPage() {
   const { can } = useAdmin();
   const writable = can('marketing.write');
 
-  const [keyword, setKeyword] = useState('');
-  const [type, setType] = useState<string | undefined>();
-  const [status, setStatus] = useState<string | undefined>();
+  // 深链/刷新后保留筛选。初始值同时喂给 useAdminList, 首次请求即带筛选。
+  const [searchParams] = useSearchParams();
+  const initialKeyword = searchParams.get('keyword') ?? '';
+  // 地址栏参数不可信: 只接受本页筛选下拉里真实存在的取值, 否则会把
+  // 非法枚举直接送到后端, 变成一次 400
+  const rawType = searchParams.get('type');
+  const initialType = rawType && rawType in TYPE_LABEL ? rawType : undefined;
+  const rawStatus = searchParams.get('status');
+  const initialStatus = rawStatus === 'on' || rawStatus === 'off' ? rawStatus : undefined;
+
+  const [keyword, setKeyword] = useState(initialKeyword);
+  const [type, setType] = useState<string | undefined>(initialType);
+  const [status, setStatus] = useState<string | undefined>(initialStatus);
   const [busy, setBusy] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const [editing, setEditing] = useState<AdminCoupon | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -128,9 +142,37 @@ export function AdminCouponsPage() {
     total: number;
     page: number;
     pageSize: number;
-  }>(fetcher);
+  }>(fetcher, {
+    keyword: initialKeyword || undefined,
+    type: initialType,
+    status: initialStatus,
+  });
+
+  // 只同步已生效的筛选, 不同步分页
+  useAdminUrlFilterSync({
+    keyword: params.keyword as string | undefined,
+    type: params.type as string | undefined,
+    status: params.status as string | undefined,
+  });
 
   const hasFilter = Boolean(params.keyword || params.type || params.status);
+
+  /** 导出走已生效的筛选条件 —— 必须与屏幕上的列表同口径 */
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      await marketingApi.exportCoupons({
+        keyword: params.keyword as string | undefined,
+        type: params.type as string | undefined,
+        status: params.status as string | undefined,
+      });
+      void message.success('导出已开始下载');
+    } catch (e) {
+      void message.error(e instanceof Error ? e.message : '导出失败');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   const openCreate = () => {
     setEditing(null);
@@ -361,22 +403,32 @@ export function AdminCouponsPage() {
     [writable],
   );
 
-  if (loading && !data) return <AdminListLoading tip="加载优惠券…" />;
-  if (error && !data) return <AdminListError error={error} onRetry={reload} />;
-
   return (
     <>
       <PageHeader
         title="优惠券"
         description="发放范围、使用条件、有效期与限用。券不提供删除 —— 已核销订单仍引用它，只能停用。"
         actions={
-          writable ? (
-            <Button type="primary" className="adm-btn is-primary" onClick={openCreate}>
-              新建优惠券
-            </Button>
-          ) : (
-            <span className="adm-cell-sub">当前账号无 marketing.write 权限，仅可查看</span>
-          )
+          <div className="adm-ops">
+            {can('data.export') && (
+              <Button
+                type="default"
+                className="adm-btn"
+                loading={exporting}
+                onClick={() => void exportCsv()}
+              >
+                <Download size={14} style={{ marginRight: 4 }} />
+                {exporting ? '导出中…' : '导出 CSV'}
+              </Button>
+            )}
+            {writable ? (
+              <Button type="primary" className="adm-btn is-primary" onClick={openCreate}>
+                新建优惠券
+              </Button>
+            ) : (
+              <span className="adm-cell-sub">当前账号无 marketing.write 权限，仅可查看</span>
+            )}
+          </div>
         }
       />
 
@@ -433,7 +485,11 @@ export function AdminCouponsPage() {
       </div>
 
       <Panel title="券列表">
-        {(data?.items.length ?? 0) === 0 ? (
+        {loading && !data ? (
+          <AdminListLoading tip="加载优惠券…" />
+        ) : error && !data ? (
+          <AdminListError error={error} onRetry={reload} />
+        ) : (data?.items.length ?? 0) === 0 ? (
           hasFilter ? (
             <AdminEmpty
               description="没有匹配的优惠券。清除筛选条件后再试。"

@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AccountLifecycleService } from '../account/account-lifecycle.service';
 import { AppError } from '../common/app.exception';
 import { runBatch } from '../common/batch';
-import { toCsv } from '../common/csv';
+import { CSV_EXPORT_MAX_ROWS, toCsv } from '../common/csv';
 import { SignedUrlService } from '../common/signed-url.service';
 import { StorageService } from '../storage/storage.service';
 import type { StorageBackend } from '../storage/storage.provider';
@@ -102,7 +102,7 @@ export class AdminUsersService {
     const rows = await this.prisma.user.findMany({
       where: this.listWhere(query),
       orderBy: { createdAt: 'desc' },
-      take: 5000,
+      take: CSV_EXPORT_MAX_ROWS,
       select: {
         id: true,
         email: true,

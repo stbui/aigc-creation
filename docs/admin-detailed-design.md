@@ -351,7 +351,7 @@ partial_refunded → refunded | partial_refunded
 
 ### 11.2 发票
 
-`/admin/invoices`（`invoice.write`）。一单一票（`orderId @unique`），金额取 `paidCents - refundedCents` 快照；输出可打印 HTML（零 PDF 依赖）。开具与驳回必填原因并写审计。
+`/admin/invoices`（`invoice.write`）。一单一票（`orderId @unique`），金额取 `paidCents - refundedCents` 快照；输出可打印 HTML（零 PDF 依赖）。开具与驳回必填原因并写审计。`GET /admin/invoices/export` 导出同一 `status` / `keyword` 口径的 CSV（金额同时给分与元，`data.export` + 审计）。
 
 ### 11.3 渠道对账
 
@@ -379,8 +379,8 @@ partial_refunded → refunded | partial_refunded
 
 | 页面 | 接口 | 规则 |
 | --- | --- | --- |
-| 优惠券 | `/admin/coupons*`（`marketing.write`） | 满减 / 折扣 / 固定额；发放范围、门槛、有效期、每人限用、总量；核销走 `Order.couponId` |
-| 限时活动 | `/admin/campaigns*` | 类型 `limited_price` / `limited_free` / `popup`；进行中的免活动让 `resolve()` 返回 0；到期由调度任务收尾 |
+| 优惠券 | `/admin/coupons*`（`marketing.write`） | 满减 / 折扣 / 固定额；发放范围、门槛、有效期、每人限用、总量；核销走 `Order.couponId`；`GET /admin/coupons/export` 按同一筛选导出 CSV（`data.export` + 审计，路由在 `:id` 之前） |
+| 限时活动 | `/admin/campaigns*` | 类型 `limited_price` / `limited_free` / `popup`；进行中的免活动让 `resolve()` 返回 0；到期由调度任务收尾；`GET /admin/campaigns/export` 按同一筛选导出 CSV（`data.export` + 审计） |
 | 邀请与签到 | `/admin/invites*`、`/admin/checkin*` | 邀请奖励在被邀请人**首次付费**才触发；签到规则含基础积分与连签加成 |
 
 C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns` 只回真正更便宜且在售的活动）。
@@ -446,6 +446,10 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 
 `GET /admin/audit-logs`、`/admin/audit-logs/:id`（`audit.read`）。按操作人 / 动作 / 时间筛选，详情含原因、IP、请求 ID。**只读，无删除接口**。
 
+`GET /admin/audit-logs/export`（`data.export` + 审计）导出同一筛选口径的 CSV，详情列为 JSON；上限 5000 行。路由必须声明在 `:id` 之前。
+
+导出与备份下载是 GET，但显式声明了 `@AuditAction`，`AuditInterceptor` 同样落审计 —— 把数据带出系统必须能回答「谁、何时、导了哪类数据」。
+
 ---
 
 ## 18. 模型配置与调用记录
@@ -472,6 +476,8 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 ### 18.2 调用记录 `/admin/model-calls`
 
 `GET /admin/model-calls`、`/admin/model-calls/:id`（`model.call_read`）。记录线上每次通道调用：通道、模型、耗时、结果、失败原因与回落链路。用于回答「刚才走的是哪条线路」。
+
+`GET /admin/model-calls/export`（`data.export` + 审计）导出同一筛选口径的 CSV（含提示词）；上限 5000 行。路由必须声明在 `:id` 之前。
 
 ---
 

@@ -17,7 +17,7 @@ import { AdminUser, AuditAction, RequirePermission, type AdminUser as AdminUserT
 import { PERMISSIONS } from './permissions';
 import { AdminReconciliationService } from './reconciliation.service';
 import { AppError } from '../common/app.exception';
-import { csvFilename } from '../common/csv';
+import { sendCsv } from '../common/csv-response';
 
 export class ResolveDiffDto {
   @IsIn(['resolved', 'ignored'], { message: '处置结果只能是 resolved 或 ignored' })
@@ -52,14 +52,13 @@ export class AdminReconciliationController {
     return this.reconciliation.batchDetail(id);
   }
 
-  /** 差异清单导出 */
+  /** 差异清单导出。导出即把交易数据带出系统, 与其它导出一致留审计 */
   @Get('batches/:id/export')
   @RequirePermission(PERMISSIONS.dataExport)
+  @AuditAction('data.export')
   async export(@Param('id') id: string, @Res() res: Response) {
     const csv = await this.reconciliation.exportItems(id);
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${csvFilename('reconciliation')}"`);
-    res.send(csv);
+    sendCsv(res, 'reconciliation', csv);
   }
 
   /**

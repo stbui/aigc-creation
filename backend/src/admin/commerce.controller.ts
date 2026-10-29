@@ -35,7 +35,7 @@ import { CreditPriceService } from '../credits/credit-price.service';
 import { AdminCommerceService } from './commerce-admin.service';
 import { AdminSettingsService } from './settings.service';
 import { PERMISSIONS } from './permissions';
-import { csvFilename } from '../common/csv';
+import { sendCsv } from '../common/csv-response';
 
 /** 商品上/下架 */
 export class ProductStatusDto {
@@ -352,7 +352,7 @@ export class AdminCommerceController {
       from,
       to,
     });
-    sendCsv(res, csvFilename('orders'), csv);
+    sendCsv(res, 'orders', csv);
   }
 
   /** 订单详情 (B-41): 明细 / 支付 / 退款 / 券 / 会员套餐一次取全 */
@@ -434,7 +434,7 @@ export class AdminCommerceController {
     @Query('to') to?: string,
   ) {
     const csv = await this.commerce.exportPayments({ status, from, to });
-    sendCsv(res, csvFilename('payments'), csv);
+    sendCsv(res, 'payments', csv);
   }
 
   // ── 积分 (B-49~B-52) ────────────────────────────────────────────
@@ -466,7 +466,7 @@ export class AdminCommerceController {
     @Query('email') email?: string,
   ) {
     const csv = await this.commerce.exportCredits({ userId, email });
-    sendCsv(res, csvFilename('credits'), csv);
+    sendCsv(res, 'credits', csv);
   }
 
   /** 某用户的批次明细 (B-50) */
@@ -556,11 +556,4 @@ export class AdminCommerceController {
       operatorId: actor.id,
     });
   }
-}
-
-/** 统一的 CSV 响应头。文件名固定由服务端生成, 不拼用户输入 */
-function sendCsv(res: Response, filename: string, csv: string): void {
-  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-  res.send(csv);
 }

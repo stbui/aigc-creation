@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { App, Button, Input, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import { Download } from 'lucide-react';
 import { adminInvoicesApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import {
@@ -10,6 +12,7 @@ import {
   ConfirmAction,
   adminPagination,
   useAdminList,
+  useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
 import {
   AdminEmpty,
@@ -59,12 +62,23 @@ export function AdminInvoicesPage() {
   const { message } = App.useApp();
   const { can } = useAdmin();
 
-  const [status, setStatus] = useState<InvoiceStatus | undefined>();
-  const [keyword, setKeyword] = useState('');
+  // 深链/刷新后保留筛选: 财务之间传「待开具的这批」直接发地址。
+  // 初始值同时喂给 useAdminList, 首次请求即带筛选。
+  const [searchParams] = useSearchParams();
+  const rawStatus = searchParams.get('status');
+  const initialStatus: InvoiceStatus | undefined =
+    rawStatus === 'pending' || rawStatus === 'issued' || rawStatus === 'rejected'
+      ? rawStatus
+      : undefined;
+  const initialKeyword = searchParams.get('keyword') ?? '';
+
+  const [status, setStatus] = useState<InvoiceStatus | undefined>(initialStatus);
+  const [keyword, setKeyword] = useState(initialKeyword);
 
   const [action, setAction] = useState<{ kind: 'issue' | 'reject'; row: AdminInvoice } | null>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
+  const [exporting, setExporting] = useState(false);
 
   const fetcher = useCallback(
     (params: Record<string, unknown>) =>
@@ -78,7 +92,16 @@ export function AdminInvoicesPage() {
   );
 
   const { data, loading, error, params, setQuery, setPage, reload } =
-    useAdminList<{ items: AdminInvoice[]; total: number }>(fetcher);
+    useAdminList<{ items: AdminInvoice[]; total: number }>(fetcher, {
+      status: initialStatus,
+      keyword: initialKeyword || undefined,
+    });
+
+  // 只同步已生效的筛选, 不同步分页
+  useAdminUrlFilterSync({
+    status: params.status as string | undefined,
+    keyword: params.keyword as string | undefined,
+  });
 
   const hasFilter = Boolean(status || keyword);
 
@@ -89,6 +112,22 @@ export function AdminInvoicesPage() {
     setStatus(undefined);
     setKeyword('');
     setQuery({ status: undefined, keyword: undefined });
+  };
+
+  /** 导出走已生效的筛选条件 —— 必须与屏幕上的列表同口径 */
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      await adminInvoicesApi.exportCsv({
+        status: params.status as InvoiceStatus | undefined,
+        keyword: params.keyword as string | undefined,
+      });
+      void message.success('导出已开始下载');
+    } catch (e) {
+      void message.error(e instanceof Error ? e.message : '导出失败');
+    } finally {
+      setExporting(false);
+    }
   };
 
   const openAction = (kind: 'issue' | 'reject', row: AdminInvoice) => {
@@ -224,6 +263,19 @@ export function AdminInvoicesPage() {
       <PageHeader
         title="发票管理"
         description="审核并开具用户申请的开票。一单一票，开具后不可撤销，操作全程写入审计。"
+        actions={
+          can('data.export') ? (
+            <Button
+              type="default"
+              className="adm-btn"
+              loading={exporting}
+              onClick={() => void exportCsv()}
+            >
+              <Download size={14} style={{ marginRight: 4 }} />
+              {exporting ? '导出中…' : '导出 CSV'}
+            </Button>
+          ) : undefined
+        }
       />
 
       <FilterBar>

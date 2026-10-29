@@ -7,7 +7,7 @@ import { AdminUsersService } from './users.service';
 import { PERMISSIONS, ROLE_LABELS } from './permissions';
 import { AppError } from '../common/app.exception';
 import { runBatch } from '../common/batch';
-import { csvFilename } from '../common/csv';
+import { sendCsv } from '../common/csv-response';
 import {
   ChangeUserRoleDto,
   ChangeUserStatusDto,
@@ -67,9 +67,7 @@ export class AdminUsersController {
   @AuditAction('data.export')
   async export(@Query() query: UserListQueryDto, @Res() res: Response) {
     const csv = await this.users.exportCsv(query);
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${csvFilename('users')}"`);
-    res.send(csv);
+    sendCsv(res, 'users', csv);
   }
 
   /**

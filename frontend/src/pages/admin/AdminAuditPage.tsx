@@ -1,13 +1,17 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Button, Input, Select, Table } from 'antd';
+import { useSearchParams } from 'react-router-dom';
+import { App, Button, Input, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import { Download } from 'lucide-react';
 import { adminAuditApi } from '../../lib/api';
+import { useAdmin } from '../../context/AdminContext';
 import {
   AdminListError,
   AdminStaleError,
   AdminListLoading,
   adminPagination,
   useAdminList,
+  useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
 import {
   AdminEmpty,
@@ -28,6 +32,8 @@ const ACTION_LABELS: Record<string, string> = {
   'user.delete': '删除用户',
   'role.permissions_update': '调整角色权限',
   'setting.update': '修改系统设置',
+  'data.export': '导出数据',
+  'backup.download': '下载备份',
 };
 
 /** 审计详情直接铺在表格行内，避免只读追溯被抽屉或弹窗打断 */
@@ -119,10 +125,25 @@ function AuditExpandedDetail({ row }: { row: Row }) {
 }
 
 export function AdminAuditPage() {
-  const [action, setAction] = useState<string | undefined>();
-  const [targetId, setTargetId] = useState('');
-  const [success, setSuccess] = useState<string | undefined>();
+  const { message } = App.useApp();
+  const { can } = useAdmin();
+  // 深链/刷新后保留筛选: 地址栏是运营之间传「我看到的这批」最直接的方式。
+  // 初始值同时喂给 useState 与 useAdminList, 首次请求即带筛选 ——
+  // 否则会先拉一遍全量、再被 effect 改条件, 白跑一次查询。
+  const [searchParams] = useSearchParams();
+  const initialAction = searchParams.get('action') ?? undefined;
+  const initialTargetId = searchParams.get('targetId') ?? '';
+  const rawSuccess = searchParams.get('success');
+  const initialSuccess =
+    rawSuccess === 'true' ? true : rawSuccess === 'false' ? false : undefined;
+
+  const [action, setAction] = useState<string | undefined>(initialAction);
+  const [targetId, setTargetId] = useState(initialTargetId);
+  const [success, setSuccess] = useState<string | undefined>(
+    initialSuccess === undefined ? undefined : String(initialSuccess),
+  );
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const fetcher = useCallback(
     (params: Record<string, unknown>) =>
@@ -140,12 +161,25 @@ export function AdminAuditPage() {
     data,
     loading,
     error,
+    params,
     setQuery,
     setPage,
     reload,
   } = useAdminList<{ result: AdminAuditListResult; actions: Array<{ action: string; count: number }> }>(
     fetcher,
+    {
+      action: initialAction,
+      targetId: initialTargetId || undefined,
+      success: initialSuccess,
+    },
   );
+
+  // 只同步已生效的筛选, 不同步分页 —— 分享出去的链接不该停在第 7 页
+  useAdminUrlFilterSync({
+    action: params.action as string | undefined,
+    targetId: params.targetId as string | undefined,
+    success: params.success as boolean | undefined,
+  });
 
   const list = data?.result;
   const actions = useMemo(
@@ -251,11 +285,41 @@ export function AdminAuditPage() {
     setQuery({ action: undefined, targetId: undefined, success: undefined });
   };
 
+  /** 导出走已生效的筛选条件 —— 必须与屏幕上的列表同口径 */
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      await adminAuditApi.exportCsv({
+        action: params.action as string | undefined,
+        targetId: params.targetId as string | undefined,
+        success: params.success as boolean | undefined,
+      });
+      void message.success('导出已开始下载');
+    } catch (e) {
+      void message.error(e instanceof Error ? e.message : '导出失败');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <>
       <PageHeader
         title="操作审计"
         description="记录所有后台写操作，用于事后追责与举证。只读，不可删除或修改。"
+        actions={
+          can('data.export') ? (
+            <Button
+              type="default"
+              className="adm-btn"
+              loading={exporting}
+              onClick={() => void exportCsv()}
+            >
+              <Download size={14} style={{ marginRight: 4 }} />
+              {exporting ? '导出中…' : '导出 CSV'}
+            </Button>
+          ) : undefined
+        }
       />
 
       <FilterBar>

@@ -8,6 +8,7 @@ import {
   type AdminUser as AdminUserType,
 } from './admin.decorator';
 import { PERMISSIONS } from './permissions';
+import { sendCsv } from '../common/csv-response';
 import { InvoicesService } from '../invoices/invoices.service';
 
 /** 开具发票: 必须写原因 (票面金额与抬头是财务凭证, 事后要能解释) */
@@ -63,6 +64,27 @@ export class AdminInvoicesController {
   @AuditAction('invoice.reject')
   reject(@Param('id') id: string, @Body() dto: RejectInvoiceDto, @AdminUser() admin: AdminUserType) {
     return this.invoices.reject(id, admin.id, dto.reason);
+  }
+
+  /**
+   * 导出发票 (CSV)。
+   *
+   * 导出把用户抬头与税号带出系统，用独立的 `data.export` 权限点并留审计；
+   * 列出口径与列表完全一致（同一 status / keyword）。
+   */
+  @Get('export')
+  @RequirePermission(PERMISSIONS.dataExport)
+  @AuditAction('data.export')
+  async export(
+    @Res() res: Response,
+    @Query('status') status?: string,
+    @Query('keyword') keyword?: string,
+  ) {
+    const csv = await this.invoices.exportCsvForAdmin({
+      status: status || undefined,
+      keyword: keyword || undefined,
+    });
+    sendCsv(res, 'invoices', csv);
   }
 
   @Get(':id/file')
