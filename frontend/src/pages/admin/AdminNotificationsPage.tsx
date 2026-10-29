@@ -3,6 +3,7 @@ import { App, Button, Drawer, Input, Select, Switch, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { adminNotificationsApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
+import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import {
   AdminListError,
   AdminListLoading,
@@ -58,6 +59,7 @@ export function AdminNotificationsPage() {
     body: '',
     enabled: true,
   });
+  const [formBase, setFormBase] = useState<typeof form | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -66,6 +68,12 @@ export function AdminNotificationsPage() {
 
   const { data, loading, error, reload } = useAdminResource(() => adminNotificationsApi.templates());
   const templates = data ?? [];
+
+  const formDirty = Boolean(
+    formOpen && formBase && JSON.stringify(form) !== JSON.stringify(formBase),
+  );
+  useUnsavedGuard(formDirty);
+  const requestCloseForm = useDiscardConfirm(formDirty, () => setFormOpen(false));
 
   /*
    * 通道状态单独拉: 它失败不该把模板列表也拖成错误态（反之亦然）。
@@ -100,11 +108,12 @@ export function AdminNotificationsPage() {
 
   const openCreate = (base?: MessageTemplateItem) => {
     setEditing(base ?? null);
-    setForm(
+    const next =
       base
         ? { code: base.code, channel: base.channel, subject: base.subject ?? '', body: base.body, enabled: base.enabled }
-        : { code: '', channel: 'inapp', subject: '', body: '', enabled: true },
-    );
+        : { code: '', channel: 'inapp' as MessageTemplateItem['channel'], subject: '', body: '', enabled: true };
+    setForm(next);
+    setFormBase(next);
     setFormError(null);
     setFormOpen(true);
   };
@@ -308,11 +317,12 @@ export function AdminNotificationsPage() {
         open={formOpen}
         size={640}
         title={editing ? `编辑模板 ${editing.code}` : '新建消息模板'}
-        onClose={() => setFormOpen(false)}
+        onClose={requestCloseForm}
         destroyOnHidden
         extra={
           <div className="adm-row-actions">
-            <Button onClick={() => setFormOpen(false)}>取消</Button>
+            {formDirty && <span className="adm-cell-sub">有未保存修改</span>}
+            <Button onClick={requestCloseForm}>取消</Button>
             <Button type="primary" loading={saving} onClick={() => void saveTemplate()}>
               保存
             </Button>

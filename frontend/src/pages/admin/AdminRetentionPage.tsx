@@ -4,6 +4,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { ShieldAlert } from 'lucide-react';
 import { adminRetentionApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
+import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import {
   AdminListError,
   AdminListLoading,
@@ -65,6 +66,7 @@ export function AdminRetentionPage() {
 
   /** 每行的保留天数草稿。改动只影响本行, 点「清理」时才提交 */
   const [days, setDays] = useState<Record<string, number>>({});
+  const [daysBase, setDaysBase] = useState<Record<string, number>>({});
   const [pending, setPending] = useState<AdminRetentionTarget | null>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -75,8 +77,15 @@ export function AdminRetentionPage() {
    */
   useEffect(() => {
     if (!data) return;
-    setDays(Object.fromEntries(data[0].map((x) => [x.table, x.retentionDays])));
+    const next = Object.fromEntries(data[0].map((x) => [x.table, x.retentionDays]));
+    setDays(next);
+    setDaysBase(next);
   }, [data]);
+
+  const dirtyCount = targets.filter(
+    (t) => (days[t.table] ?? t.retentionDays) !== (daysBase[t.table] ?? t.retentionDays),
+  ).length;
+  useUnsavedGuard(writable && dirtyCount > 0);
 
   const openCleanup = (t: AdminRetentionTarget) => {
     setReason('');
@@ -256,6 +265,13 @@ export function AdminRetentionPage() {
       <Panel
         title="清理目标"
         note="每次清理都写入清理日志与操作审计"
+        extra={
+          writable && dirtyCount > 0 ? (
+            <Button type="link" className="adm-link" onClick={() => setDays({ ...daysBase })}>
+              放弃 {dirtyCount} 项改动
+            </Button>
+          ) : undefined
+        }
       >
         {/* 失败态不用 AdminEmpty: 那是「没有数据」的语义, 会把「没连上」说成「没有可清理目标」。
             已有上一次成功数据时只在上方挂 stale 提示, 表格继续可用, 不整块挖空 */}

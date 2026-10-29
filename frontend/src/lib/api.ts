@@ -1657,9 +1657,16 @@ export const adminInvoicesApi = {
  * 处置会让差异从看板上消失, 这是财务口径的责任。
  */
 export const adminReconciliationApi = {
-  batches: (limit = 20, offset = 0) =>
+  batches: (params: {
+    limit?: number;
+    offset?: number;
+    channel?: string;
+    status?: string;
+    from?: string;
+    to?: string;
+  } = {}) =>
     request<{ items: ReconciliationBatch[]; total: number }>(
-      `/admin/reconciliation/batches?limit=${limit}&offset=${offset}`,
+      `/admin/reconciliation/batches${toQuery(params)}`,
     ),
 
   batch: (id: string) => request<ReconciliationBatchDetail>(`/admin/reconciliation/batches/${id}`),
@@ -1856,6 +1863,7 @@ export const adminTicketsApi = {
     status?: string;
     type?: string;
     priority?: string;
+    assigneeId?: string;
     q?: string;
   } = {}) => downloadCsv(`/admin/tickets/export${toQuery(params)}`),
 };

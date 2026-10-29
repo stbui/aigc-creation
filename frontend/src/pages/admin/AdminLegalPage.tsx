@@ -3,6 +3,7 @@ import { App, Button, Drawer, Input, Modal, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { adminLegalApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
+import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import {
   AdminListError,
   AdminListLoading,
@@ -67,6 +68,7 @@ export function AdminLegalPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<AdminLegalDoc | null>(null);
   const [form, setForm] = useState<FormState>({ slug: 'user-agreement', version: '', title: '', content: '' });
+  const [formBase, setFormBase] = useState<FormState | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [publishTarget, setPublishTarget] = useState<AdminLegalDoc | null>(null);
   // 发布属高危动作（全站法律文本立即变更），必须填写原因并写入审计
@@ -82,22 +84,37 @@ export function AdminLegalPage() {
   );
   const rows = data ?? [];
 
+  const formDirty = Boolean(
+    formOpen && formBase && JSON.stringify(form) !== JSON.stringify(formBase),
+  );
+  useUnsavedGuard(formDirty);
+  const requestCloseForm = useDiscardConfirm(formDirty, () => setFormOpen(false));
+
   const openCreate = (base?: AdminLegalDoc) => {
     setEditing(null);
-    setForm({
+    const next = {
       slug: (base?.slug as LegalSlug) ?? (slugFilter as LegalSlug) ?? 'user-agreement',
       // 版本号不自动递增: 用户可能用日期或 v2.1, 猜一个反而让人改两遍
       version: '',
       title: base?.title ?? '',
       content: base?.content ?? '',
-    });
+    };
+    setForm(next);
+    setFormBase(next);
     setFormError(null);
     setFormOpen(true);
   };
 
   const openEdit = (doc: AdminLegalDoc) => {
     setEditing(doc);
-    setForm({ slug: doc.slug as LegalSlug, version: doc.version, title: doc.title, content: doc.content });
+    const next = {
+      slug: doc.slug as LegalSlug,
+      version: doc.version,
+      title: doc.title,
+      content: doc.content,
+    };
+    setForm(next);
+    setFormBase(next);
     setFormError(null);
     setFormOpen(true);
   };
@@ -271,11 +288,12 @@ export function AdminLegalPage() {
         open={formOpen}
         size={720}
         title={editing ? `编辑 ${editing.version}（草稿）` : '新建法务文档版本'}
-        onClose={() => setFormOpen(false)}
+        onClose={requestCloseForm}
         destroyOnHidden
         extra={
           <div className="adm-row-actions">
-            <Button onClick={() => setFormOpen(false)}>取消</Button>
+            {formDirty && <span className="adm-cell-sub">有未保存修改</span>}
+            <Button onClick={requestCloseForm}>取消</Button>
             <Button type="primary" loading={busy} onClick={() => void save()}>
               保存草稿
             </Button>

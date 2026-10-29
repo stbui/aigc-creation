@@ -42,12 +42,11 @@ function check(n: string, ok: boolean, d='') { if(ok){pass++;console.log(`  PASS
   /*
    * ⚠ 必须用 seed:admin 建的后台账号 —— C 端注册用户的 role 是 user,
    * 会被 AdminGuard 拦成 403, 表现为「改价失败」, 实则是身份不对。
-   * 密码没有默认值 (seed:admin 只打印一次), 由环境变量提供。
+   * development/test 使用统一预设，production 需通过环境变量提供 seed 密码。
    */
-  const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@huojue.local';
-  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+  const { email: ADMIN_EMAIL, password: ADMIN_PASSWORD } = require('./admin-credentials').getAdminCredentials();
   if (!ADMIN_PASSWORD) {
-    console.error('  缺少 ADMIN_PASSWORD: 先 npm run seed:admin, 再用它打印的一次性密码运行本脚本。');
+    console.error('  缺少 ADMIN_PASSWORD: production 环境请先 npm run seed:admin，再传入打印的一次性密码。');
     await app.close();
     process.exit(1);
   }

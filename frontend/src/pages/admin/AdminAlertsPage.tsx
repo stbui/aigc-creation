@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Segmented } from 'antd';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { CheckCircle2 } from 'lucide-react';
 import { PageHeader, Panel } from '../../components/admin/PageHeader';
 import {
@@ -9,7 +9,12 @@ import {
   alertTime,
   useAdminAlerts,
 } from '../../components/admin/AlertCenter';
-import { AdminListError, AdminListLoading, AdminStaleError } from '../../components/admin/AdminWidgets';
+import {
+  AdminListError,
+  AdminListLoading,
+  AdminStaleError,
+  useAdminUrlFilterSync,
+} from '../../components/admin/AdminWidgets';
 import type { AdminAlertSeverity } from '../../types/api';
 
 /**
@@ -21,7 +26,30 @@ import type { AdminAlertSeverity } from '../../types/api';
  */
 export function AdminAlertsPage() {
   const { data, loading, error, reload } = useAdminAlerts();
-  const [filter, setFilter] = useState<'all' | AdminAlertSeverity>('all');
+  const [searchParams] = useSearchParams();
+  const rawSeverity = searchParams.get('severity');
+  const initialFilter: 'all' | AdminAlertSeverity =
+    rawSeverity === 'critical' || rawSeverity === 'warning' || rawSeverity === 'info'
+      ? rawSeverity
+      : 'all';
+  const [filter, setFilter] = useState<'all' | AdminAlertSeverity>(initialFilter);
+  const appliedUrlFilter = useRef<'all' | AdminAlertSeverity>(initialFilter);
+
+  useEffect(() => {
+    const raw = searchParams.get('severity');
+    const next: 'all' | AdminAlertSeverity =
+      raw === 'critical' || raw === 'warning' || raw === 'info' ? raw : 'all';
+    if (next === appliedUrlFilter.current) return;
+    appliedUrlFilter.current = next;
+    setFilter(next);
+  }, [searchParams]);
+
+  useAdminUrlFilterSync({ severity: filter === 'all' ? undefined : filter });
+
+  const chooseFilter = (next: 'all' | AdminAlertSeverity) => {
+    appliedUrlFilter.current = next;
+    setFilter(next);
+  };
 
   const counts = useMemo(() => {
     const base: Record<AdminAlertSeverity, number> = { critical: 0, warning: 0, info: 0 };
@@ -85,7 +113,7 @@ export function AdminAlertsPage() {
         <div className="adm-alert-toolbar">
           <Segmented
             value={filter}
-            onChange={(value) => setFilter(value as 'all' | AdminAlertSeverity)}
+            onChange={(value) => chooseFilter(value as 'all' | AdminAlertSeverity)}
             options={[
               { value: 'all', label: `全部 ${data?.total ?? 0}` },
               { value: 'critical', label: `紧急 ${counts.critical}` },
@@ -112,7 +140,7 @@ export function AdminAlertsPage() {
                 : '切换到「全部」查看其它级别。'}
             </span>
             {filter !== 'all' && (
-              <Button size="small" onClick={() => setFilter('all')}>
+              <Button size="small" onClick={() => chooseFilter('all')}>
                 查看全部
               </Button>
             )}

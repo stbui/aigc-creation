@@ -26,11 +26,11 @@ const DEFAULTS = {
 /** 本网关内置的模型清单（OpenAI `/v1/models` 返回它）。 */
 export const BUILTIN_MODELS = [
   // 文本 —— 覆盖本项目协议默认值与厂商预设里出现的模型名
-  'deepseek-v4-flash',
+  'gpt-4o',
   // 图像
-  'gpt-image-2.5-sunburst',
+  'gpt-image-2',
   // 视频
-  'MiniMax-H3',
+  'MiniMax-Hailuo-2.3',
 ];
 
 function parseInteger(raw, fallback, { min = -Infinity, max = Infinity } = {}) {

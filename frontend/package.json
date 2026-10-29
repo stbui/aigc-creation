@@ -16,7 +16,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "e2e": "playwright test --config playwright.admin.config.ts"
+    "e2e": "playwright test --config playwright.admin.config.ts",
+    "e2e:smoke": "playwright test --config playwright.admin.config.ts tests/admin.spec.ts --grep \"概览页加载真实统计\""
   },
   "//": "版本为实际安装并验证通过的版本 (精确锁定), 避免安装器解析漂移",
   "dependencies": {

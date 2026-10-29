@@ -6,7 +6,8 @@
       "mcp__claude-vscode__getDiagnostics",
       "Read(//tmp/**)",
       "Read(//private/tmp/**)",
-      "WebSearch"
+      "WebSearch",
+      "WebFetch(domain:github.com)"
     ],
     "additionalDirectories": [
       "/tmp/arch-audit",

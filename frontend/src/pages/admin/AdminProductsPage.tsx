@@ -2,22 +2,27 @@ import { useCallback, useMemo, useState } from 'react';
 import { App, Button, Drawer, Input, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { Plus } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { adminProductsApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
+import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import {
   AdminListError,
   AdminStaleError,
   AdminListLoading,
   useAdminList,
+  useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
 import {
   AdminEmpty,
+  AppliedFilters,
   FilterActions,
   FilterBar,
   PageHeader,
   Panel,
   StatCard,
   StatusTag,
+  type AppliedFilter,
 } from '../../components/admin/PageHeader';
 import type { AdminProduct } from '../../types/api';
 
@@ -101,10 +106,16 @@ export function AdminProductsPage() {
   const { can } = useAdmin();
   const writable = can('product.write');
 
-  const [status, setStatus] = useState<'active' | 'offline' | undefined>();
+  const [searchParams] = useSearchParams();
+  const rawStatus = searchParams.get('status');
+  const initialStatus: 'active' | 'offline' | undefined =
+    rawStatus === 'active' || rawStatus === 'offline' ? rawStatus : undefined;
+
+  const [status, setStatus] = useState<'active' | 'offline' | undefined>(initialStatus);
   const [editing, setEditing] = useState<AdminProduct | null>(null);
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState<ProductDraft>(EMPTY_DRAFT);
+  const [draftBase, setDraftBase] = useState<ProductDraft>(EMPTY_DRAFT);
   const [saving, setSaving] = useState(false);
 
 
@@ -118,11 +129,29 @@ export function AdminProductsPage() {
     [],
   );
 
-  const { data, loading, error, setQuery, reload } = useAdminList<AdminProduct[]>(fetcher, {
-    status: undefined,
-  });
+  const { data, loading, error, params, setQuery, reload } = useAdminList<AdminProduct[]>(
+    fetcher,
+    {
+      ...(initialStatus ? { status: initialStatus } : {}),
+    },
+  );
+
+  useAdminUrlFilterSync({ status: params.status as string | undefined });
 
   const rows = data ?? [];
+  const appliedStatus = params.status as 'active' | 'offline' | undefined;
+  const appliedChips: AppliedFilter[] = appliedStatus
+    ? [
+        {
+          key: 'status',
+          label: `状态：${appliedStatus === 'active' ? '在售' : '已下架'}`,
+          onClear: () => {
+            setStatus(undefined);
+            setQuery({ status: undefined });
+          },
+        },
+      ]
+    : [];
 
   const stats = useMemo(() => {
     const active = rows.filter((p) => p.status === 'active');
@@ -135,21 +164,29 @@ export function AdminProductsPage() {
 
   const openCreate = () => {
     setDraft(EMPTY_DRAFT);
+    setDraftBase(EMPTY_DRAFT);
     setEditing(null);
     setCreating(true);
   };
 
   const openEdit = (p: AdminProduct) => {
-    setDraft(toDraft(p));
+    const next = toDraft(p);
+    setDraft(next);
+    setDraftBase(next);
     setEditing(p);
     setCreating(false);
   };
+
+  const formOpen = creating || editing !== null;
+  const formDirty = formOpen && JSON.stringify(draft) !== JSON.stringify(draftBase);
+  useUnsavedGuard(formDirty);
 
   const closeForm = () => {
     if (saving) return;
     setCreating(false);
     setEditing(null);
   };
+  const requestCloseForm = useDiscardConfirm(formDirty, closeForm);
 
   /** 提交前把草稿翻译成后端 payload; 任何一项非法就停下并指出是哪一项 */
   const submit = async () => {
@@ -389,6 +426,13 @@ export function AdminProductsPage() {
             刷新
           </Button>
         </FilterActions>
+        <AppliedFilters
+          items={appliedChips}
+          onClearAll={() => {
+            setStatus(undefined);
+            setQuery({ status: undefined });
+          }}
+        />
       </FilterBar>
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
@@ -440,13 +484,14 @@ export function AdminProductsPage() {
       <Drawer
         title={editing ? '编辑商品' : '新建商品'}
         size={520}
-        open={creating || editing !== null}
-        onClose={closeForm}
+        open={formOpen}
+        onClose={requestCloseForm}
         className="adm-drawer"
         destroyOnHidden
         footer={
           <div className="adm-drawer-footer">
-            <Button type="default" className="adm-btn" onClick={closeForm} disabled={saving}>
+            {formDirty && <span className="adm-cell-sub">有未保存修改</span>}
+            <Button type="default" className="adm-btn" onClick={requestCloseForm} disabled={saving}>
               取消
             </Button>
             <Button

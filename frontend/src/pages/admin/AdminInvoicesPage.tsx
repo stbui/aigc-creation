@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { App, Button, Input, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { Download } from 'lucide-react';
@@ -16,12 +16,15 @@ import {
 } from '../../components/admin/AdminWidgets';
 import {
   AdminEmpty,
+  AppliedFilters,
   FilterActions,
   FilterBar,
   PageHeader,
   Panel,
   StatusTag,
+  type AppliedFilter,
 } from '../../components/admin/PageHeader';
+import { adminOrderDetailHref, adminUserHref } from '../../lib/admin-links';
 import type { AdminInvoice, InvoiceStatus } from '../../types/api';
 
 /**
@@ -114,6 +117,31 @@ export function AdminInvoicesPage() {
     setQuery({ status: undefined, keyword: undefined });
   };
 
+  const appliedStatus = params.status as InvoiceStatus | undefined;
+  const appliedKeyword = (params.keyword as string | undefined) ?? '';
+  const appliedChips: AppliedFilter[] = [
+    appliedStatus
+      ? {
+          key: 'status',
+          label: `状态：${STATUS_LABELS[appliedStatus] ?? appliedStatus}`,
+          onClear: () => {
+            setStatus(undefined);
+            setQuery({ status: undefined });
+          },
+        }
+      : null,
+    appliedKeyword
+      ? {
+          key: 'keyword',
+          label: `关键词：${appliedKeyword}`,
+          onClear: () => {
+            setKeyword('');
+            setQuery({ keyword: undefined });
+          },
+        }
+      : null,
+  ].filter(Boolean) as AppliedFilter[];
+
   /** 导出走已生效的筛选条件 —— 必须与屏幕上的列表同口径 */
   const exportCsv = async () => {
     setExporting(true);
@@ -176,7 +204,11 @@ export function AdminInvoicesPage() {
       title: '订单号',
       key: 'orderNo',
       width: 180,
-      render: (_: unknown, row) => <code className="adm-cell-sub">{row.orderNo ?? row.orderId}</code>,
+      render: (_: unknown, row) => (
+        <Link className="adm-link" to={adminOrderDetailHref(row.orderId)}>
+          <code>{row.orderNo ?? row.orderId}</code>
+        </Link>
+      ),
     },
     {
       title: '用户',
@@ -185,7 +217,15 @@ export function AdminInvoicesPage() {
       render: (_: unknown, row) => (
         <div className="adm-cell-stack">
           {row.userName && <span>{row.userName}</span>}
-          <span className="adm-cell-sub">{row.userEmail ?? '—'}</span>
+          <span className="adm-cell-sub">
+            {row.userEmail ? (
+              <Link className="adm-link" to={adminUserHref(row.userEmail)}>
+                {row.userEmail}
+              </Link>
+            ) : (
+              '—'
+            )}
+          </span>
         </div>
       ),
     },
@@ -303,6 +343,7 @@ export function AdminInvoicesPage() {
             重置
           </Button>
         </FilterActions>
+        <AppliedFilters items={appliedChips} onClearAll={reset} />
       </FilterBar>
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}

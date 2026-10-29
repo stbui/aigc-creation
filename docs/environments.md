@@ -34,6 +34,7 @@
 | `JWT_SECRET` | 留空（用内置开发密钥） | 独立测试密钥 | **必填**，缺失则拒绝启动 |
 | `JWT_TTL` | `7d` | `1h` | 建议 `2h` |
 | `CORS_ORIGINS` | 留空走默认本机白名单 | 显式放行 5100 | **必填**线上域名 |
+| 后台管理员预设 | `admin@admin.com / 123456789` | 同开发 | 不设默认密码，必须显式配置或用随机密码 |
 | 界面角标 | 「开发」 | 「测试」 | 不显示 |
 | Docker profile | 默认 | `--profile test` | 见下方「生产部署」 |
 
@@ -204,7 +205,7 @@ npm run start:test            # NODE_ENV=test node dist/main.js
 
 ```bash
 npm run seed                  # 开发账号（需 SEED_USER_EMAIL，未设置则什么都不建）
-npm run seed:admin            # 后台管理员（默认 admin@huojue.local，密码仅打印一次，重复执行不重置）
+npm run seed:admin            # 后台管理员（dev/test 预设 admin@admin.com / 123456789；生产随机密码）
 npm run seed:roles            # 后台角色与权限点
 npm run seed:commerce         # 商品（积分包）
 npm run seed:membership       # 会员套餐

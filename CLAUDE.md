@@ -24,9 +24,10 @@
 
 ## 账号
 
-可用的管理员账号
-admin@huojue.local	44dXY9gja4VMmTfENyxg
-ops@huojue.local	ksUTeX8t3GCnLyuLby6n
+开发 / 测试后台预设账号
+admin@admin.com	123456789
+
+生产环境不设默认账号密码，必须通过 `ADMIN_EMAIL` / `ADMIN_PASSWORD` 或 `seed:admin` 生成并保存一次性密码。
 
 可用的测试账号
 test@admin.com
@@ -61,7 +62,7 @@ uat@admin.com
 | 后端 | NestJS + Prisma + **自研 node:sqlite driver adapter** | 12.1.3 / 7.10.0 |
 | 配置 | @nestjs/config（零依赖手写 validate） | 12.0.1 |
 | 日志 | 自研 AppFileLogger（落盘 + 轮转 + 脱敏） | 无新增依赖 |
-| 数据库 | SQLite（`backend/dev.db`），`node:sqlite` 内置模块 | 需 Node ≥ 22.5 |
+| 数据库 | SQLite（`backend/dev.db`），`node:sqlite` 内置模块 | 需 Node ≥ 22.12 |
 | 图像 | Jimp（仅上传校验 / 尺寸探测 / AIGC 角标，不生成图片） | 1.6.1 |
 | 鉴权/加密 | jsonwebtoken / bcryptjs | 9.0.3 / 3.0.3 |
 | 前端 | Vite + React + antd + lucide-react + react-router-dom | 8.3.4 / 19.3.0 / 6.6.6 / 1.57.0 / 7.18.4 |
@@ -140,12 +141,15 @@ aigc-creation/
                             #      --backend-only / --frontend-only / --no-follow
                             #      --daemon（PID 记 .run/start.pids）/ --stop（只停）
 
+# 工程门禁（根目录；Node 版本 + 依赖审计 + 构建 + 前端单测 + 仿真网关）
+npm run check
+
 # 手动
 cd backend && npm run build && node dist/main.js   # 不要用 nest start（会拒绝清空 dist）
 npm run prisma:push         # 建表（首次或 schema 变更后）
 npm run db:reset:test       # ★ 删测试库+测试目录 → 重建 → 重灌种子（带安全门禁）
 npm run seed                # 需 SEED_USER_EMAIL；未设置则什么都不建
-npm run seed:admin          # 后台管理员（密码仅打印一次，重复执行不重置）
+npm run seed:admin          # 后台管理员（dev/test 预设 admin@admin.com / 123456789；生产随机密码）
 
 # 前端
 cd frontend
@@ -356,10 +360,10 @@ npm run e2e                 # Playwright
    其中 `media-typer` 最关键：**错版会让 multer 静默不解析 multipart**（不报错，只是收不到文件）。新增依赖后重跑 `npm run verify:deps:critical`。工具维护 `ACCEPTED_PINS`（刻意的 pin 偏差）与 `KNOWN_BENIGN`（已验证无害的偏差簇）两份清单。
 
    `@nestjs/config` 那项的原因：它精确 pin `dotenv@18.0.3`，而顶层 `dotenv@17.4.2` 属 prisma / `@prisma/config`，两者不能共用。
-5. **Node ≥ 22.5**（依赖内置 `node:sqlite`）。
+5. **Node ≥ 22.12**（`node:sqlite` 可用，且满足下面 `require(esm)` 的要求）。
 6. **`@nestjs/config` 是纯 ESM，本项目是 CommonJS**。靠 Node ≥ 22.12 的 `require(esm)` 工作；若下探到 < 22.12 会 `ERR_REQUIRE_ESM`，只能升 Node 或退回 `@nestjs/config@4.x`（需手工处理 peer 冲突）。
 7. **`/uploads` 必须在前端代理里**。不代理时 Vite 会把它当 SPA 路由返回 `index.html` —— **HTTP 200 但 Content-Type 是 text/html**，图片静默破图，极易误判成「上传失败」。`vite.config.ts` 已同时代理 `/api` 与 `/uploads`。
-8. **普通账号与后台管理员是两套**。普通账号由 `npm run seed` + `SEED_USER_EMAIL` 决定，**永远不给 admin 角色**；后台账号用 `npm run seed:admin` 生成，密码**仅在本次运行输出一次**，重复执行不重置。冒烟脚本一律自注册临时账号，不依赖预置凭据。
+8. **普通账号与后台管理员是两套**。普通账号由 `npm run seed` + `SEED_USER_EMAIL` 决定，**永远不给 admin 角色**；后台账号在 development / test 使用固定预设 `admin@admin.com / 123456789`，production 必须显式提供 `ADMIN_PASSWORD` 或使用 seed 生成的一次性随机密码。重复执行不重置已有账号密码。
 
 ## 工作纪律
 

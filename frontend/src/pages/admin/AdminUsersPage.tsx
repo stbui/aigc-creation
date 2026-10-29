@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { App, Button, Dropdown, Input, Select, Table } from 'antd';
+import { App, Button, Dropdown, Input, Select, Table, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { adminUsersApi } from '../../lib/api';
 import { toAbsoluteUrl } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
@@ -12,17 +12,28 @@ import {
   AdminListLoading,
   ConfirmAction,
   adminPagination,
+  useAdminDetailParam,
   useAdminList,
+  useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
 import {
   AdminEmpty,
+  AppliedFilters,
   FilterActions,
   FilterBar,
   PageHeader,
   Panel,
   StatusTag,
+  type AppliedFilter,
 } from '../../components/admin/PageHeader';
 import { BatchResultModal } from '../../components/admin/BatchResultModal';
+import {
+  adminAssetHref,
+  adminCreditHref,
+  adminOrderHref,
+  adminTaskHref,
+  adminTasksHref,
+} from '../../lib/admin-links';
 import type {
   AdminLoginLogResult,
   AdminUserDetail,
@@ -49,10 +60,19 @@ export function AdminUsersPage() {
   const { message } = App.useApp();
   const { can } = useAdmin();
 
+  const [searchParams] = useSearchParams();
+  const initialKeyword = searchParams.get('q') ?? '';
+  const initialRole = ROLE_OPTIONS.some((option) => option.value === searchParams.get('role'))
+    ? (searchParams.get('role') as string)
+    : undefined;
+  const initialStatus = STATUS_OPTIONS.some((option) => option.value === searchParams.get('status'))
+    ? (searchParams.get('status') as string)
+    : undefined;
+
   // 筛选输入与已提交的查询分离: 不做每键即查, 避免无意义请求
-  const [keyword, setKeyword] = useState('');
-  const [role, setRole] = useState<string | undefined>();
-  const [status, setStatus] = useState<string | undefined>();
+  const [keyword, setKeyword] = useState(initialKeyword);
+  const [role, setRole] = useState<string | undefined>(initialRole);
+  const [status, setStatus] = useState<string | undefined>(initialStatus);
 
   const fetcher = useCallback(
     (params: Record<string, unknown>) =>
@@ -68,6 +88,11 @@ export function AdminUsersPage() {
 
   const { data, loading, error, params, setQuery, setPage, reload } = useAdminList<AdminUserListResult>(
     fetcher,
+    {
+      ...(initialKeyword ? { keyword: initialKeyword } : {}),
+      ...(initialRole ? { role: initialRole } : {}),
+      ...(initialStatus ? { status: initialStatus } : {}),
+    },
   );
 
   /*
@@ -75,18 +100,23 @@ export function AdminUsersPage() {
    * 用 ref 记录"已应用过哪一个值"而不是直接比较 state —— 用户在页内改筛选后
    * URL 不变, 若每次渲染都按 URL 覆盖, 页内筛选会被打回原样。
    */
-  const [searchParams] = useSearchParams();
   const urlQ = searchParams.get('q') ?? '';
-  const appliedQ = useRef('');
+  const appliedQ = useRef(initialKeyword);
   useEffect(() => {
-    if (!urlQ || urlQ === appliedQ.current) return;
+    if (urlQ === appliedQ.current) return;
     appliedQ.current = urlQ;
     setKeyword(urlQ);
-    setQuery({ keyword: urlQ });
+    setQuery({ keyword: urlQ || undefined });
   }, [urlQ, setQuery]);
 
+  useAdminUrlFilterSync({
+    q: params.keyword as string | undefined,
+    role: params.role as string | undefined,
+    status: params.status as string | undefined,
+  });
+
   // 详情抽屉
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const [detailId, setDetailId] = useAdminDetailParam();
 
   /*
    * 批量选择。
@@ -129,13 +159,54 @@ export function AdminUsersPage() {
   );
 
   const hasFilter = Boolean(keyword || role || status);
-  const applyFilters = () => queryAndClear({ keyword: keyword || undefined, role, status });
+  const applyFilters = () => {
+    appliedQ.current = keyword.trim();
+    queryAndClear({ keyword: keyword.trim() || undefined, role, status });
+  };
   const resetFilters = () => {
+    appliedQ.current = '';
     setKeyword('');
     setRole(undefined);
     setStatus(undefined);
     queryAndClear({ keyword: undefined, role: undefined, status: undefined });
   };
+
+  const appliedKeyword = (params.keyword as string | undefined) ?? '';
+  const appliedRole = params.role as string | undefined;
+  const appliedStatus = params.status as string | undefined;
+  const appliedChips: AppliedFilter[] = [
+    appliedKeyword
+      ? {
+          key: 'keyword',
+          label: `邮箱「${appliedKeyword}」`,
+          onClear: () => {
+            appliedQ.current = '';
+            setKeyword('');
+            queryAndClear({ keyword: undefined });
+          },
+        }
+      : null,
+    appliedRole
+      ? {
+          key: 'role',
+          label: `角色：${ROLE_OPTIONS.find((option) => option.value === appliedRole)?.label ?? appliedRole}`,
+          onClear: () => {
+            setRole(undefined);
+            queryAndClear({ role: undefined });
+          },
+        }
+      : null,
+    appliedStatus
+      ? {
+          key: 'status',
+          label: `状态：${STATUS_OPTIONS.find((option) => option.value === appliedStatus)?.label ?? appliedStatus}`,
+          onClear: () => {
+            setStatus(undefined);
+            queryAndClear({ status: undefined });
+          },
+        }
+      : null,
+  ].filter(Boolean) as AppliedFilter[];
 
   /** 批量启停按产品要求直接执行，不再弹窗二次确认 */
   const runBatch = async (action: 'disable' | 'enable') => {
@@ -256,9 +327,15 @@ export function AdminUsersPage() {
         key: 'email',
         sorter: true,
         render: (email: string, row) => (
-          <Button type="link" className="adm-link" onClick={() => setDetailId(row.id)}>
-            {email}
-          </Button>
+          <Tooltip title={email} placement="topLeft">
+            <Button
+              type="link"
+              className="adm-link adm-cell-clip"
+              onClick={() => setDetailId(row.id)}
+            >
+              {email}
+            </Button>
+          </Tooltip>
         ),
       },
       {
@@ -388,6 +465,7 @@ export function AdminUsersPage() {
             重置
           </Button>
         </FilterActions>
+        <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
       </FilterBar>
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
@@ -499,6 +577,12 @@ export function AdminUsersPage() {
               <dl className="adm-desc">
                 <dt>邮箱</dt>
                 <dd>{d.email}</dd>
+                <dt>关联记录</dt>
+                <dd className="adm-relation-links">
+                  <Link to={adminTasksHref({ userId: d.id })}>任务记录</Link>
+                  <Link to={adminOrderHref({ email: d.email })}>订单记录</Link>
+                  <Link to={adminCreditHref({ userId: d.id, email: d.email })}>积分账本</Link>
+                </dd>
                 <dt>昵称</dt>
                 <dd>{d.name}</dd>
                 <dt>角色</dt>
@@ -561,16 +645,26 @@ export function AdminUsersPage() {
                 <ul className="adm-mini-list">
                   {d.recentTasks.map((t) => (
                     <li key={t.id} className="adm-mini-item">
-                      {t.thumbnailUrl ? (
-                        <img className="adm-mini-thumb" src={toAbsoluteUrl(t.thumbnailUrl)} alt="" />
-                      ) : (
-                        <div className="adm-mini-thumb is-empty" />
-                      )}
-                      <span className="adm-mini-name">{t.capabilityName}</span>
-                      <StatusTag status={t.status} />
-                      <span className="adm-mini-time">
-                        {new Date(t.createdAt).toLocaleString('zh-CN')}
-                      </span>
+                      <Link
+                        className="adm-mini-link"
+                        to={adminTaskHref(t.id)}
+                        aria-label={`查看任务详情：${t.capabilityName} ${t.id.slice(-8)}`}
+                      >
+                        {t.thumbnailUrl ? (
+                          <img
+                            className="adm-mini-thumb"
+                            src={toAbsoluteUrl(t.thumbnailUrl)}
+                            alt=""
+                          />
+                        ) : (
+                          <div className="adm-mini-thumb is-empty" />
+                        )}
+                        <span className="adm-mini-name">{t.capabilityName}</span>
+                        <StatusTag status={t.status} />
+                        <span className="adm-mini-time">
+                          {new Date(t.createdAt).toLocaleString('zh-CN')}
+                        </span>
+                      </Link>
                     </li>
                   ))}
                 </ul>
@@ -584,13 +678,19 @@ export function AdminUsersPage() {
               ) : (
                 <div className="adm-thumb-grid">
                   {d.recentAssets.map((a) => (
-                    <img
+                    <Link
                       key={a.id}
-                      className="adm-thumb-cell"
-                      src={toAbsoluteUrl(a.sourceUrl)}
-                      alt=""
-                      loading="lazy"
-                    />
+                      className="adm-thumb-link"
+                      to={adminAssetHref(a.id)}
+                      aria-label={`在素材库查看素材 ${a.id.slice(-8)}`}
+                    >
+                      <img
+                        className="adm-thumb-cell"
+                        src={toAbsoluteUrl(a.sourceUrl)}
+                        alt=""
+                        loading="lazy"
+                      />
+                    </Link>
                   ))}
                 </div>
               )}

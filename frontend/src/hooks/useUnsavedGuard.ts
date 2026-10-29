@@ -1,4 +1,5 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
+import { App } from 'antd';
 import { registerUnsavedGuard } from '../lib/unsaved-guard';
 
 /**
@@ -27,4 +28,29 @@ export function useUnsavedGuard(dirty: boolean): void {
       window.removeEventListener('beforeunload', handler);
     };
   }, [dirty]);
+}
+
+/**
+ * 抽屉 / 表单关闭前的丢弃确认。
+ *
+ * `useUnsavedGuard` 负责路由跳转与刷新，但关闭抽屉不会触发路由变化。
+ * 这里统一用 antd 的确认框：有修改时先问一句，没有修改则直接关闭。
+ */
+export function useDiscardConfirm(dirty: boolean, onDiscard: () => void): () => void {
+  const { modal } = App.useApp();
+
+  return useCallback(() => {
+    if (!dirty) {
+      onDiscard();
+      return;
+    }
+    modal.confirm({
+      title: '放弃未保存的修改？',
+      content: '关闭后，本次填写的内容不会保留。',
+      okText: '放弃修改',
+      cancelText: '继续编辑',
+      okButtonProps: { danger: true },
+      onOk: onDiscard,
+    });
+  }, [dirty, modal, onDiscard]);
 }

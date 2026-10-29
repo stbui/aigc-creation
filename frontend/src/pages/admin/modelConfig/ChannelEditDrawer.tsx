@@ -17,6 +17,7 @@ import {
 } from 'antd';
 import { Info } from 'lucide-react';
 import { adminModelChannelsApi } from '../../../lib/api';
+import { useDiscardConfirm, useUnsavedGuard } from '../../../hooks/useUnsavedGuard';
 import type {
   AdminChannelTestResult,
   AdminModelChannelRecord,
@@ -146,6 +147,8 @@ export function ChannelEditDrawer({
       form.clearToken,
     [form, initial],
   );
+  useUnsavedGuard(open && dirty);
+  const requestClose = useDiscardConfirm(open && dirty, onClose);
 
   const scheduleAffecting = useMemo(() => {
     if (mode === 'create') return true;
@@ -300,8 +303,6 @@ export function ChannelEditDrawer({
       setSaving(false);
     }
   };
-
-  const requestClose = () => onClose();
 
   const stale = testResult && testResult.rev !== formRev;
 

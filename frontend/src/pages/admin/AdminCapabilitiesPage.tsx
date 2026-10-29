@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { App, Button, Input, Table, Tooltip } from 'antd';
+import { useMemo, useState } from 'react';
+import { App, Button, Input, Select, Table, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import { useSearchParams } from 'react-router-dom';
 import { adminCapabilitiesApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import {
@@ -9,8 +10,17 @@ import {
   AdminStaleError,
   ConfirmAction,
   useAdminResource,
+  useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
-import { AdminEmpty, PageHeader, Panel } from '../../components/admin/PageHeader';
+import {
+  AdminEmpty,
+  AppliedFilters,
+  FilterActions,
+  FilterBar,
+  PageHeader,
+  Panel,
+  type AppliedFilter,
+} from '../../components/admin/PageHeader';
 import { RUNTIME_LABELS } from '../../lib/constants';
 import type { AdminCapabilityControl } from '../../types/api';
 
@@ -39,12 +49,79 @@ export function AdminCapabilitiesPage() {
   const [offline, setOffline] = useState<AdminCapabilityControl | null>(null);
   const [reason, setReason] = useState('');
 
+  const [searchParams] = useSearchParams();
+  const initialQ = searchParams.get('q') ?? '';
+  const initialGroup = searchParams.get('group') ?? '';
+  const rawRuntime = searchParams.get('runtime');
+  const initialRuntime: 'remote' | 'disabled' | 'unavailable' | undefined =
+    rawRuntime === 'remote' || rawRuntime === 'disabled' || rawRuntime === 'unavailable'
+      ? rawRuntime
+      : undefined;
+  const [q, setQ] = useState(initialQ);
+  const [group, setGroup] = useState(initialGroup);
+  const [runtime, setRuntime] = useState<'remote' | 'disabled' | 'unavailable' | undefined>(
+    initialRuntime,
+  );
+  useAdminUrlFilterSync({
+    q: q.trim() || undefined,
+    group: group || undefined,
+    runtime,
+  });
+
   // 接口历史上有过直接回数组与回 { items } 两种形状, 统一兜成数组
   const { data, loading, error, reload } = useAdminResource(async () => {
     const list = await adminCapabilitiesApi.list();
     return Array.isArray(list) ? list : [];
   });
   const rows = data ?? [];
+
+  const groupOptions = useMemo(
+    () => Array.from(new Set(rows.map((row) => row.group))).sort().map((value) => ({ value, label: value })),
+    [rows],
+  );
+  const filteredRows = useMemo(() => {
+    const keyword = q.trim().toLowerCase();
+    return rows.filter((row) => {
+      const effective = row.runtime?.effective ?? 'unavailable';
+      if (group && row.group !== group) return false;
+      if (runtime && effective !== runtime) return false;
+      if (!keyword) return true;
+      return [row.name, row.capabilityId, row.group, row.modality]
+        .join(' ')
+        .toLowerCase()
+        .includes(keyword);
+    });
+  }, [group, q, rows, runtime]);
+
+  const appliedFilters: AppliedFilter[] = [
+    q.trim()
+      ? {
+          key: 'q',
+          label: `关键词：${q.trim()}`,
+          onClear: () => setQ(''),
+        }
+      : null,
+    group
+      ? {
+          key: 'group',
+          label: `分组：${group}`,
+          onClear: () => setGroup(''),
+        }
+      : null,
+    runtime
+      ? {
+          key: 'runtime',
+          label: `运行结论：${RUNTIME_LABELS[runtime]}`,
+          onClear: () => setRuntime(undefined),
+        }
+      : null,
+  ].filter(Boolean) as AppliedFilter[];
+  const hasFilter = appliedFilters.length > 0;
+  const resetFilters = () => {
+    setQ('');
+    setGroup('');
+    setRuntime(undefined);
+  };
 
   const submitOffline = async () => {
     if (!offline) return;
@@ -203,7 +280,46 @@ export function AdminCapabilitiesPage() {
         }
       />
 
-      <Panel title="能力清单" note="「当前结论」是运行时结论：它由后台开关、逐能力路由与该模态的云端通道共同决定。">
+      <Panel
+        title="能力清单"
+        note={`显示 ${filteredRows.length} / ${rows.length} 项 ·「当前结论」由后台开关、逐能力路由与该模态的云端通道共同决定`}
+      >
+        <FilterBar>
+          <Input
+            className="adm-filter-input"
+            placeholder="能力名称 / ID / 模态"
+            allowClear
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <Select
+            className="adm-filter-select"
+            placeholder="全部分组"
+            allowClear
+            value={group || undefined}
+            onChange={(value) => setGroup(value ?? '')}
+            options={groupOptions}
+          />
+          <Select
+            className="adm-filter-select"
+            placeholder="全部运行结论"
+            allowClear
+            value={runtime}
+            onChange={setRuntime}
+            options={[
+              { value: 'remote', label: RUNTIME_LABELS.remote },
+              { value: 'disabled', label: RUNTIME_LABELS.disabled },
+              { value: 'unavailable', label: RUNTIME_LABELS.unavailable },
+            ]}
+          />
+          <FilterActions>
+            <Button type="default" className="adm-btn" onClick={resetFilters}>
+              重置
+            </Button>
+          </FilterActions>
+          <AppliedFilters items={appliedFilters} onClearAll={resetFilters} />
+        </FilterBar>
+
         {/*
           三态必须分家 (2026-10-23): 之前加载中是裸 <p>加载中…</p>、失败态用的却是
           AdminEmpty —— 同一块区域把「没连上」说成「没有数据」, 运营会以为能力清单被清空了。
@@ -217,11 +333,20 @@ export function AdminCapabilitiesPage() {
           <AdminListError error={error} onRetry={() => void reload()} />
         ) : rows.length === 0 ? (
           <AdminEmpty description="没有可管控的能力" />
+        ) : filteredRows.length === 0 ? (
+          <AdminEmpty
+            description="没有符合当前筛选的能力。"
+            action={
+              <Button type="default" className="adm-btn" onClick={resetFilters}>
+                清除筛选
+              </Button>
+            }
+          />
         ) : (
           <Table
             rowKey="capabilityId"
             columns={columns}
-            dataSource={rows}
+            dataSource={filteredRows}
             pagination={false}
             size="small"
             scroll={{ x: 960 }}

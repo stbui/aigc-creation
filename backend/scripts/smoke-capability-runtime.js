@@ -19,12 +19,10 @@ const BASE =
   (process.env.API_BASE || 'http://localhost:4100')
     .replace(/\/$/, '')
     .replace(/\/api\/v1$/, '') + '/api/v1';
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@huojue.local';
-// seed:admin 的密码只打印一次；换过密码后用环境变量覆盖
-// 密码没有默认值: seed:admin 只打印一次, 硬编码等于把后台口令写进仓库
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+// 后台凭据: development/test 使用统一预设, production 必须显式提供 ADMIN_PASSWORD
+const { email: ADMIN_EMAIL, password: ADMIN_PASSWORD } = require('./admin-credentials').getAdminCredentials();
 if (!ADMIN_PASSWORD) {
-  console.error('缺少 ADMIN_PASSWORD: 先 npm run seed:admin, 再用它打印的一次性密码运行本脚本。');
+  console.error('缺少 ADMIN_PASSWORD: production 环境请先 npm run seed:admin，再传入打印的一次性密码。');
   process.exit(1);
 }
 

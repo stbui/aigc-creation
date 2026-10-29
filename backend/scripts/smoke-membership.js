@@ -11,7 +11,7 @@
  * 接口与库都可覆盖 —— 与 smoke-model-channels.js 同一套约定。
  *   API_BASE        后端地址 (默认 http://127.0.0.1:4100)
  *   NODE_ENV        决定连哪个库 (走 scripts/db-url.js, 与后端同源)
- *   ADMIN_EMAIL / ADMIN_PASSWORD  后台账号 (seed:admin 只打印一次)
+ *   ADMIN_EMAIL / ADMIN_PASSWORD  后台账号 (development/test 使用统一预设)
  *
  * 不写死 `file:./dev.db` 的原因: 测试档跑本脚本必须连 test.db,
  * 否则会在开发库留下测试账号。
@@ -21,8 +21,7 @@ const { PrismaClient } = require('@prisma/client');
 const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
 const { resolveDbUrl } = require('./db-url');
 const prisma = new PrismaClient({ adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }) });
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@huojue.local';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+const { email: ADMIN_EMAIL, password: ADMIN_PASSWORD } = require('./admin-credentials').getAdminCredentials();
 
 /** SQLite 单写者: 调度/下单写库期间紧随其后读会撞锁 */
 async function readWithRetry(fn, attempts = 6) {

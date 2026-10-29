@@ -16,6 +16,7 @@ import { IsIn, IsString, MaxLength } from 'class-validator';
 import { AdminUser, AuditAction, RequirePermission, type AdminUser as AdminUserType } from './admin.decorator';
 import { PERMISSIONS } from './permissions';
 import { AdminReconciliationService } from './reconciliation.service';
+import { ReconciliationBatchListQueryDto } from './dto/reconciliation.dto';
 import { AppError } from '../common/app.exception';
 import { sendCsv } from '../common/csv-response';
 
@@ -42,8 +43,8 @@ export class AdminReconciliationController {
 
   @Get('batches')
   @RequirePermission(PERMISSIONS.paymentRead)
-  batches(@Query('limit') limit?: string, @Query('offset') offset?: string) {
-    return this.reconciliation.listBatches(Number(limit) || 20, Number(offset) || 0);
+  batches(@Query() query: ReconciliationBatchListQueryDto) {
+    return this.reconciliation.listBatches(query);
   }
 
   @Get('batches/:id')

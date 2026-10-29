@@ -5,7 +5,7 @@
   "description": "仿真模型网关：OpenAI 兼容的文生文 / 文生图 / 文生视频，供本项目渠道配置与链路联调使用",
   "type": "module",
   "engines": {
-    "node": ">=22.5"
+    "node": ">=22.12"
   },
   "scripts": {
     "start": "node server.js",

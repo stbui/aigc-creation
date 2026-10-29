@@ -5,6 +5,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { Download } from 'lucide-react';
 import { marketingApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
+import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import {
   AdminListError,
   AdminListLoading,
@@ -13,7 +14,17 @@ import {
   useAdminList,
   useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
-import { AdminEmpty, PageHeader, Panel, StatusTag, type TagTone } from '../../components/admin/PageHeader';
+import {
+  AdminEmpty,
+  AppliedFilters,
+  FilterActions,
+  FilterBar,
+  PageHeader,
+  Panel,
+  StatusTag,
+  type AppliedFilter,
+  type TagTone,
+} from '../../components/admin/PageHeader';
 import type {
   AdminCampaign,
   CampaignStatus,
@@ -122,7 +133,14 @@ export function AdminCampaignsPage() {
   const [editing, setEditing] = useState<AdminCampaign | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
+  const [formBase, setFormBase] = useState<FormState | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const formDirty = Boolean(
+    formOpen && formBase && JSON.stringify(form) !== JSON.stringify(formBase),
+  );
+  useUnsavedGuard(formDirty);
+  const requestCloseForm = useDiscardConfirm(formDirty, () => setFormOpen(false));
 
   const fetcher = useCallback(
     (params: Record<string, unknown>) =>
@@ -153,6 +171,39 @@ export function AdminCampaignsPage() {
 
   const hasFilter = Boolean(params.keyword || params.status);
 
+  const applyFilters = () =>
+    setQuery({ keyword: keyword.trim() || undefined, status });
+  const resetFilters = () => {
+    setKeyword('');
+    setStatus(undefined);
+    setQuery({ keyword: undefined, status: undefined });
+  };
+
+  const appliedKeyword = (params.keyword as string | undefined) ?? '';
+  const appliedStatus = params.status as string | undefined;
+  const appliedChips: AppliedFilter[] = [
+    appliedKeyword
+      ? {
+          key: 'keyword',
+          label: `关键词：${appliedKeyword}`,
+          onClear: () => {
+            setKeyword('');
+            setQuery({ keyword: undefined });
+          },
+        }
+      : null,
+    appliedStatus
+      ? {
+          key: 'status',
+          label: `状态：${STATUS_LABEL[appliedStatus as CampaignStatus]?.label ?? appliedStatus}`,
+          onClear: () => {
+            setStatus(undefined);
+            setQuery({ status: undefined });
+          },
+        }
+      : null,
+  ].filter(Boolean) as AppliedFilter[];
+
   /** 导出走已生效的筛选条件 —— 必须与屏幕上的列表同口径 */
   const exportCsv = async () => {
     setExporting(true);
@@ -171,7 +222,9 @@ export function AdminCampaignsPage() {
 
   const openCreate = () => {
     setEditing(null);
-    setForm(emptyForm());
+    const next = emptyForm();
+    setForm(next);
+    setFormBase(next);
     setFormError(null);
     setFormOpen(true);
   };
@@ -179,7 +232,7 @@ export function AdminCampaignsPage() {
   const openEdit = (c: AdminCampaign) => {
     setEditing(c);
     const p = c.payload ?? {};
-    setForm({
+    const next = {
       name: c.name,
       type: c.type,
       startAt: toLocalInput(c.startAt),
@@ -194,7 +247,9 @@ export function AdminCampaignsPage() {
       body: p.body ?? '',
       ctaText: p.ctaText ?? '',
       ctaUrl: p.ctaUrl ?? '',
-    });
+    };
+    setForm(next);
+    setFormBase(next);
     setFormError(null);
     setFormOpen(true);
   };
@@ -393,13 +448,13 @@ export function AdminCampaignsPage() {
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
       {error && <AdminStaleError error={error} onRetry={reload} />}
 
-      <div className="adm-filter">
+      <FilterBar>
         <Input
           className="adm-filter-input"
           placeholder="活动名称"
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
-          onPressEnter={() => setQuery({ keyword: keyword || undefined })}
+          onPressEnter={applyFilters}
           allowClear
         />
         <Select
@@ -410,26 +465,16 @@ export function AdminCampaignsPage() {
           onChange={setStatus}
           allowClear
         />
-        <div className="adm-filter-actions">
-          <Button
-            type="primary"
-            className="adm-btn is-primary"
-            onClick={() => setQuery({ keyword: keyword || undefined, status })}
-          >
+        <FilterActions>
+          <Button type="primary" className="adm-btn is-primary" onClick={applyFilters}>
             查询
           </Button>
-          <Button
-            type="default"
-            className="adm-btn"
-            onClick={() => {
-              setKeyword(''); setStatus(undefined);
-              setQuery({ keyword: undefined, status: undefined });
-            }}
-          >
+          <Button type="default" className="adm-btn" onClick={resetFilters}>
             重置
           </Button>
-        </div>
-      </div>
+        </FilterActions>
+        <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
+      </FilterBar>
 
       <Panel title="活动列表">
         {loading && !data ? (
@@ -489,11 +534,12 @@ export function AdminCampaignsPage() {
         title={editing ? `编辑活动 · ${editing.name}` : '新建活动'}
         size={560}
         open={formOpen}
-        onClose={() => setFormOpen(false)}
+        onClose={requestCloseForm}
         className="adm-drawer"
         footer={
           <div className="adm-drawer-footer">
-            <Button type="default" className="adm-btn" onClick={() => setFormOpen(false)}>取消</Button>
+            {formDirty && <span className="adm-cell-sub">有未保存修改</span>}
+            <Button type="default" className="adm-btn" onClick={requestCloseForm}>取消</Button>
             <Button type="primary" className="adm-btn is-primary" onClick={() => void save()} disabled={busy}>
               {busy ? '保存中…' : '保存'}
             </Button>

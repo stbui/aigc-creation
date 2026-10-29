@@ -1,7 +1,7 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { describe, expect, it } from 'vitest';
-import { useAdminUrlFilterSync } from '../AdminWidgets';
+import { useAdminDetailParam, useAdminUrlFilterSync } from '../AdminWidgets';
 
 type Filters = Record<string, string | number | boolean | undefined>;
 
@@ -57,5 +57,48 @@ describe('useAdminUrlFilterSync', () => {
     expect(params.get('id')).toBe('t_1');
     expect(params.get('page')).toBe('7');
     expect(params.get('capability')).toBe('matting');
+  });
+});
+
+function DetailProbe() {
+  const [id, setId] = useAdminDetailParam();
+  const location = useLocation();
+  return (
+    <>
+      <span data-testid="detail-id">{id ?? ''}</span>
+      <span data-testid="search">{location.search}</span>
+      <button onClick={() => setId('u_2')}>open</button>
+      <button onClick={() => setId(null)}>close</button>
+    </>
+  );
+}
+
+describe('useAdminDetailParam', () => {
+  it('从 URL 恢复详情，并保留筛选参数', () => {
+    render(
+      <MemoryRouter initialEntries={['/admin/users?q=a%40b.com&id=u_1']}>
+        <DetailProbe />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByTestId('detail-id')).toHaveTextContent('u_1');
+  });
+
+  it('打开与关闭都会同步 id，且不清掉列表筛选', async () => {
+    render(
+      <MemoryRouter initialEntries={['/admin/users?q=a%40b.com']}>
+        <DetailProbe />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'open' }));
+    await waitFor(() => expect(screen.getByTestId('detail-id')).toHaveTextContent('u_2'));
+    expect(screen.getByTestId('search')).toHaveTextContent('q=a%40b.com');
+    expect(screen.getByTestId('search')).toHaveTextContent('id=u_2');
+
+    fireEvent.click(screen.getByRole('button', { name: 'close' }));
+    await waitFor(() => expect(screen.getByTestId('detail-id')).toBeEmptyDOMElement());
+    expect(screen.getByTestId('search')).toHaveTextContent('q=a%40b.com');
+    expect(screen.getByTestId('search')).not.toHaveTextContent('id=u_2');
   });
 });

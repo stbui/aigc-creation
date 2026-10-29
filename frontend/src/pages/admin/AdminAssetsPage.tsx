@@ -22,8 +22,15 @@ import {
   AdminStaleError,
   adminPagination,
   useAdminList,
+  useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
-import { AdminEmpty, PageHeader, Panel } from '../../components/admin/PageHeader';
+import {
+  AdminEmpty,
+  AppliedFilters,
+  PageHeader,
+  Panel,
+  type AppliedFilter,
+} from '../../components/admin/PageHeader';
 import { BatchResultModal } from '../../components/admin/BatchResultModal';
 import type {
   AdminAssetListResult,
@@ -97,12 +104,25 @@ export function AdminAssetsPage() {
   const { message } = App.useApp();
   const { can } = useAdmin();
 
-  const [keyword, setKeyword] = useState('');
-  const [kind, setKind] = useState<string | undefined>();
-  const [status, setStatus] = useState<string | undefined>();
-  const [backend, setBackend] = useState<string | undefined>();
+  const [searchParams] = useSearchParams();
+  const initialKeyword = searchParams.get('q') ?? '';
+  const rawKind = searchParams.get('kind');
+  const initialKind = rawKind === 'original' || rawKind === 'generated' ? rawKind : undefined;
+  const rawStatus = searchParams.get('status');
+  const initialStatus = rawStatus === 'visible' || rawStatus === 'hidden' ? rawStatus : undefined;
+  const rawBackend = searchParams.get('backend');
+  const initialBackend =
+    rawBackend && Object.prototype.hasOwnProperty.call(BACKEND_LABEL, rawBackend)
+      ? rawBackend
+      : undefined;
+  const initialView: 'grid' | 'table' = searchParams.get('view') === 'table' ? 'table' : 'grid';
+
+  const [keyword, setKeyword] = useState(initialKeyword);
+  const [kind, setKind] = useState<string | undefined>(initialKind);
+  const [status, setStatus] = useState<string | undefined>(initialStatus);
+  const [backend, setBackend] = useState<string | undefined>(initialBackend);
   /** B-25: 缩略图网格与表格视图切换。网格适合看图, 表格适合查属性 */
-  const [view, setView] = useState<'grid' | 'table'>('grid');
+  const [view, setView] = useState<'grid' | 'table'>(initialView);
 
   const [stats, setStats] = useState<AdminAssetStats | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
@@ -111,6 +131,7 @@ export function AdminAssetsPage() {
   const [previewId, setPreviewId] = useState<string | null>(null);
   const [batchSummary, setBatchSummary] = useState<BatchSummary<unknown> | null>(null);
   const [batchTitle, setBatchTitle] = useState('');
+  const appliedQ = useRef(initialKeyword);
 
   const fetcher = useCallback(
     (params: Record<string, unknown>) =>
@@ -126,7 +147,13 @@ export function AdminAssetsPage() {
   );
 
   const { data, loading, error, params, setQuery, setPage, reload } =
-    useAdminList<AdminAssetListResult>(fetcher, { pageSize: 60 });
+    useAdminList<AdminAssetListResult>(fetcher, {
+      pageSize: initialView === 'grid' ? 60 : 20,
+      ...(initialKeyword ? { keyword: initialKeyword } : {}),
+      ...(initialKind ? { kind: initialKind } : {}),
+      ...(initialStatus ? { status: initialStatus } : {}),
+      ...(initialBackend ? { backend: initialBackend } : {}),
+    });
   const items = data?.items ?? [];
 
   const previewItems = useMemo<LightboxItem[]>(
@@ -158,26 +185,69 @@ export function AdminAssetsPage() {
   const appliedStatus = params.status as string | undefined;
   const appliedBackend = params.backend as string | undefined;
   const appliedChips = [
-    appliedKeyword ? `关键词「${appliedKeyword}」` : null,
-    appliedKind ? (appliedKind === 'original' ? '原始上传' : '生成图') : null,
-    appliedStatus ? (appliedStatus === 'visible' ? '已上架' : '已下架') : null,
-    appliedBackend ? (BACKEND_LABEL[appliedBackend] ?? appliedBackend) : null,
-  ].filter(Boolean) as string[];
+    appliedKeyword
+      ? {
+          key: 'keyword',
+          label: `关键词「${appliedKeyword}」`,
+          onClear: () => {
+            appliedQ.current = '';
+            setKeyword('');
+            setQuery({ keyword: undefined });
+          },
+        }
+      : null,
+    appliedKind
+      ? {
+          key: 'kind',
+          label: appliedKind === 'original' ? '原始上传' : '生成图',
+          onClear: () => {
+            setKind(undefined);
+            setQuery({ kind: undefined });
+          },
+        }
+      : null,
+    appliedStatus
+      ? {
+          key: 'status',
+          label: appliedStatus === 'visible' ? '已上架' : '已下架',
+          onClear: () => {
+            setStatus(undefined);
+            setQuery({ status: undefined });
+          },
+        }
+      : null,
+    appliedBackend
+      ? {
+          key: 'backend',
+          label: BACKEND_LABEL[appliedBackend] ?? appliedBackend,
+          onClear: () => {
+            setBackend(undefined);
+            setQuery({ backend: undefined });
+          },
+        }
+      : null,
+  ].filter(Boolean) as AppliedFilter[];
 
   const selectable = can('asset.hide') || can('asset.delete');
   const allPageSelected = items.length > 0 && items.every((item) => selected.includes(item.id));
   const somePageSelected = items.some((item) => selected.includes(item.id)) && !allPageSelected;
 
   /** 顶栏搜索带 `?q=` 跳过来时套用关键词（ref 防止覆盖页内手动筛选） */
-  const [searchParams] = useSearchParams();
   const urlQ = searchParams.get('q') ?? '';
-  const appliedQ = useRef('');
   useEffect(() => {
-    if (!urlQ || urlQ === appliedQ.current) return;
+    if (urlQ === appliedQ.current) return;
     appliedQ.current = urlQ;
     setKeyword(urlQ);
-    setQuery({ keyword: urlQ });
+    setQuery({ keyword: urlQ || undefined });
   }, [urlQ, setQuery]);
+
+  useAdminUrlFilterSync({
+    q: params.keyword as string | undefined,
+    kind: params.kind as string | undefined,
+    status: params.status as string | undefined,
+    backend: params.backend as string | undefined,
+    view,
+  });
 
   useEffect(() => {
     adminAssetsApi
@@ -187,6 +257,7 @@ export function AdminAssetsPage() {
   }, [reload]);
 
   const applyFilters = useCallback(() => {
+    appliedQ.current = keyword.trim();
     setSelected([]);
     setQuery({
       keyword: keyword.trim() || undefined,
@@ -197,6 +268,7 @@ export function AdminAssetsPage() {
   }, [backend, keyword, kind, setQuery, status]);
 
   const resetFilters = useCallback(() => {
+    appliedQ.current = '';
     setKeyword('');
     setKind(undefined);
     setStatus(undefined);
@@ -553,19 +625,7 @@ export function AdminAssetsPage() {
             重置
           </Button>
         </div>
-        {appliedChips.length > 0 && (
-          <div className="adm-filter-chips" aria-label="已生效的筛选条件">
-            <span className="adm-filter-chips-label">已筛选</span>
-            {appliedChips.map((chip, index) => (
-              <span className="adm-filter-chip" key={`${index}-${chip}`}>
-                {chip}
-              </span>
-            ))}
-            <Button type="link" className="adm-filter-chip-clear" onClick={resetFilters}>
-              全部清除
-            </Button>
-          </div>
-        )}
+        <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
       </div>
 
       {selected.length > 0 && (

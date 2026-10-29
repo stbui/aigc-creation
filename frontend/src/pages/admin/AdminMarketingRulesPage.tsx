@@ -3,6 +3,7 @@ import { App, Button, Input, Select, Switch } from 'antd';
 import { Plus, Trash2 } from 'lucide-react';
 import { marketingApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
+import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import {
   AdminListError,
   AdminListLoading,
@@ -24,6 +25,9 @@ export function AdminMarketingRulesPage() {
 
   const [invite, setInvite] = useState<InviteRule | null>(null);
   const [checkin, setCheckin] = useState<CheckinRule | null>(null);
+  /** 服务端最后一次成功保存的快照，用于判断未保存修改与“放弃变更” */
+  const [inviteBase, setInviteBase] = useState<InviteRule | null>(null);
+  const [checkinBase, setCheckinBase] = useState<CheckinRule | null>(null);
   const [busy, setBusy] = useState(false);
 
   /*
@@ -43,7 +47,18 @@ export function AdminMarketingRulesPage() {
     if (!data) return;
     setInvite(data[0]);
     setCheckin(data[1]);
+    setInviteBase(data[0]);
+    setCheckinBase(data[1]);
   }, [data]);
+
+  const inviteDirty = Boolean(
+    invite && inviteBase && JSON.stringify(invite) !== JSON.stringify(inviteBase),
+  );
+  const checkinDirty = Boolean(
+    checkin && checkinBase && JSON.stringify(checkin) !== JSON.stringify(checkinBase),
+  );
+  const dirtyCount = Number(inviteDirty) + Number(checkinDirty);
+  useUnsavedGuard(writable && dirtyCount > 0);
 
   // 只有完全没有数据时才塌整页; 已有草稿时保留表单, 由下方 stale 提示交代刷新失败
   if (loading && !data) return <AdminListLoading tip="加载营销规则…" />;
@@ -54,7 +69,9 @@ export function AdminMarketingRulesPage() {
     if (!invite) return;
     setBusy(true);
     try {
-      setInvite(await marketingApi.updateInviteRule(invite));
+      const saved = await marketingApi.updateInviteRule(invite);
+      setInvite(saved);
+      setInviteBase(saved);
       void message.success('邀请规则已保存，立即生效');
     } catch (e) {
       void message.error((e as Error).message);
@@ -67,7 +84,9 @@ export function AdminMarketingRulesPage() {
     if (!checkin) return;
     setBusy(true);
     try {
-      setCheckin(await marketingApi.updateCheckinRule(checkin));
+      const saved = await marketingApi.updateCheckinRule(checkin);
+      setCheckin(saved);
+      setCheckinBase(saved);
       void message.success('签到规则已保存，立即生效');
     } catch (e) {
       void message.error((e as Error).message);
@@ -147,8 +166,19 @@ export function AdminMarketingRulesPage() {
             {writable && (
               <div className="adm-action-bar" style={{ position: 'static' }}>
                 <span className="adm-action-hint">
+                  {inviteDirty && '有未保存修改 · '}
                   邀请人得 {invite.inviterCredits} 分，被邀请人得 {invite.inviteeCredits} 分
                 </span>
+                {inviteDirty && (
+                  <Button
+                    type="default"
+                    className="adm-btn"
+                    disabled={busy}
+                    onClick={() => setInvite(inviteBase)}
+                  >
+                    放弃变更
+                  </Button>
+                )}
                 <Button
                   type="primary"
                   className="adm-btn is-primary"
@@ -254,8 +284,19 @@ export function AdminMarketingRulesPage() {
             {writable && (
               <div className="adm-action-bar" style={{ position: 'static' }}>
                 <span className="adm-action-hint">
+                  {checkinDirty && '有未保存修改 · '}
                   基础 {checkin.baseCredits} 分/天 · {checkin.bonusRules.length} 个加成档位
                 </span>
+                {checkinDirty && (
+                  <Button
+                    type="default"
+                    className="adm-btn"
+                    disabled={busy}
+                    onClick={() => setCheckin(checkinBase)}
+                  >
+                    放弃变更
+                  </Button>
+                )}
                 <Button
                   type="primary"
                   className="adm-btn is-primary"

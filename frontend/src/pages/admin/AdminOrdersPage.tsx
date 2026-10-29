@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { App, Button, Input, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Download } from 'lucide-react';
 import { adminOrdersApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
@@ -12,17 +12,27 @@ import {
   AdminListLoading,
   ConfirmAction,
   adminPagination,
+  useAdminDetailParam,
   useAdminList,
+  useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
 import {
   AdminEmpty,
+  AppliedFilters,
   FilterActions,
   FilterBar,
   PageHeader,
   Panel,
   StatusTag,
+  type AppliedFilter,
 } from '../../components/admin/PageHeader';
 import { BatchResultModal } from '../../components/admin/BatchResultModal';
+import {
+  adminCreditHref,
+  adminOrderDetailHref,
+  adminTasksHref,
+  adminUserDetailHref,
+} from '../../lib/admin-links';
 import type {
   AdminOrderDetail,
   AdminOrderListResult,
@@ -118,15 +128,26 @@ export function AdminOrdersPage() {
       : undefined;
   const appliedUrlRefundState = useRef<string | undefined>(urlRefundState);
 
-  const [status, setStatus] = useState<string | undefined>();
-  const [refundState, setRefundState] = useState<string | undefined>(urlRefundState);
-  const [orderNo, setOrderNo] = useState('');
-  const [email, setEmail] = useState('');
-  const [channel, setChannel] = useState<string | undefined>();
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  const rawUrlStatus = searchParams.get('status') ?? undefined;
+  const initialStatus =
+    rawUrlStatus && STATUS_OPTIONS.some((option) => option.value === rawUrlStatus)
+      ? rawUrlStatus
+      : undefined;
+  const initialOrderNo = searchParams.get('orderNo') ?? '';
+  const initialEmail = searchParams.get('email') ?? '';
+  const initialChannel = searchParams.get('channel') ?? undefined;
+  const initialFrom = searchParams.get('from') ?? '';
+  const initialTo = searchParams.get('to') ?? '';
 
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | undefined>(initialStatus);
+  const [refundState, setRefundState] = useState<string | undefined>(urlRefundState);
+  const [orderNo, setOrderNo] = useState(initialOrderNo);
+  const [email, setEmail] = useState(initialEmail);
+  const [channel, setChannel] = useState<string | undefined>(initialChannel);
+  const [from, setFrom] = useState(initialFrom);
+  const [to, setTo] = useState(initialTo);
+
+  const [detailId, setDetailId] = useAdminDetailParam();
   const [action, setAction] = useState<{ kind: 'markPaid' | 'refund'; row: AdminOrderRow } | null>(
     null,
   );
@@ -163,17 +184,23 @@ export function AdminOrdersPage() {
     [],
   );
 
-  const { data, loading, error, setQuery, setPage, reload } =
+  const { data, loading, error, params, setQuery, setPage, reload } =
     useAdminList<AdminOrderListResult>(fetcher, {
+      ...(initialStatus ? { status: initialStatus } : {}),
       ...(urlRefundState ? { refundState: urlRefundState } : {}),
+      ...(initialOrderNo ? { orderNo: initialOrderNo } : {}),
+      ...(initialEmail ? { email: initialEmail } : {}),
+      ...(initialChannel ? { channel: initialChannel } : {}),
+      ...(initialFrom ? { from: initialFrom } : {}),
+      ...(initialTo ? { to: initialTo } : {}),
     });
 
   /** 顶栏搜索带 `?orderNo=` 跳过来时自动套用（ref 防止覆盖页内手动筛选） */
   const urlOrderNo = searchParams.get('orderNo') ?? '';
-  const appliedOrderNo = useRef('');
+  const appliedOrderNoRef = useRef(initialOrderNo);
   useEffect(() => {
-    if (!urlOrderNo || urlOrderNo === appliedOrderNo.current) return;
-    appliedOrderNo.current = urlOrderNo;
+    if (!urlOrderNo || urlOrderNo === appliedOrderNoRef.current) return;
+    appliedOrderNoRef.current = urlOrderNo;
     setOrderNo(urlOrderNo);
     setQuery({ orderNo: urlOrderNo });
   }, [urlOrderNo, setQuery]);
@@ -190,6 +217,16 @@ export function AdminOrdersPage() {
     setQuery({ refundState: next });
   }, [searchParams, setQuery]);
 
+  useAdminUrlFilterSync({
+    status: params.status as string | undefined,
+    refundState: params.refundState as string | undefined,
+    orderNo: params.orderNo as string | undefined,
+    email: params.email as string | undefined,
+    channel: params.channel as string | undefined,
+    from: params.from as string | undefined,
+    to: params.to as string | undefined,
+  });
+
   const list = data;
 
   const hasFilter = Boolean(
@@ -197,11 +234,14 @@ export function AdminOrdersPage() {
   );
 
   const applyQuery = () => {
+    const nextOrderNo = orderNo.trim();
+    appliedOrderNoRef.current = nextOrderNo;
+    appliedUrlRefundState.current = refundState;
     setSelected([]);
     setQuery({
       status,
       refundState,
-      orderNo: orderNo.trim() || undefined,
+      orderNo: nextOrderNo || undefined,
       email: email.trim() || undefined,
       channel,
       from: from || undefined,
@@ -210,6 +250,8 @@ export function AdminOrdersPage() {
   };
 
   const reset = () => {
+    appliedOrderNoRef.current = '';
+    appliedUrlRefundState.current = undefined;
     setStatus(undefined);
     setRefundState(undefined);
     setOrderNo('');
@@ -228,6 +270,88 @@ export function AdminOrdersPage() {
       to: undefined,
     });
   };
+
+  const appliedStatus = params.status as string | undefined;
+  const appliedRefundState = params.refundState as string | undefined;
+  const appliedOrderNo = (params.orderNo as string | undefined) ?? '';
+  const appliedEmail = (params.email as string | undefined) ?? '';
+  const appliedChannel = params.channel as string | undefined;
+  const appliedFrom = (params.from as string | undefined) ?? '';
+  const appliedTo = (params.to as string | undefined) ?? '';
+  const appliedChips: AppliedFilter[] = [
+    appliedOrderNo
+      ? {
+          key: 'orderNo',
+          label: `订单号「${appliedOrderNo}」`,
+          onClear: () => {
+            appliedOrderNoRef.current = '';
+            setOrderNo('');
+            setQuery({ orderNo: undefined });
+          },
+        }
+      : null,
+    appliedEmail
+      ? {
+          key: 'email',
+          label: `邮箱「${appliedEmail}」`,
+          onClear: () => {
+            setEmail('');
+            setQuery({ email: undefined });
+          },
+        }
+      : null,
+    appliedStatus
+      ? {
+          key: 'status',
+          label: `状态：${STATUS_OPTIONS.find((option) => option.value === appliedStatus)?.label ?? appliedStatus}`,
+          onClear: () => {
+            setStatus(undefined);
+            setQuery({ status: undefined });
+          },
+        }
+      : null,
+    appliedRefundState
+      ? {
+          key: 'refundState',
+          label: `退款：${REFUND_STATE_OPTIONS.find((option) => option.value === appliedRefundState)?.label ?? appliedRefundState}`,
+          onClear: () => {
+            appliedUrlRefundState.current = undefined;
+            setRefundState(undefined);
+            setQuery({ refundState: undefined });
+          },
+        }
+      : null,
+    appliedChannel
+      ? {
+          key: 'channel',
+          label: `渠道：${CHANNEL_LABELS[appliedChannel] ?? appliedChannel}`,
+          onClear: () => {
+            setChannel(undefined);
+            setQuery({ channel: undefined });
+          },
+        }
+      : null,
+    appliedFrom
+      ? {
+          key: 'from',
+          label: `开始：${appliedFrom}`,
+          onClear: () => {
+            setFrom('');
+            setQuery({ from: undefined });
+          },
+        }
+      : null,
+    appliedTo
+      ? {
+          key: 'to',
+          label: `结束：${appliedTo}`,
+          onClear: () => {
+            setTo('');
+            setQuery({ to: undefined });
+          },
+        }
+      : null,
+  ].filter(Boolean) as AppliedFilter[];
 
   const openAction = (kind: 'markPaid' | 'refund', row: AdminOrderRow) => {
     setAction({ kind, row });
@@ -331,12 +455,14 @@ export function AdminOrdersPage() {
 
   const columns: ColumnsType<AdminOrderRow> = [
     {
-      title: '订单号',
+      title: '订单号 / 下单时间',
       key: 'orderNo',
-      width: 190,
+      width: 180,
       render: (_: unknown, row) => (
         <div className="adm-cell-stack">
-          <code>{row.orderNo}</code>
+          <Link className="adm-link adm-cell-clip" to={adminOrderDetailHref(row.id)}>
+            <code>{row.orderNo}</code>
+          </Link>
           <span className="adm-cell-sub">
             {new Date(row.createdAt).toLocaleString('zh-CN')}
           </span>
@@ -346,91 +472,87 @@ export function AdminOrdersPage() {
     {
       title: '用户',
       key: 'user',
-      width: 190,
-      render: (_: unknown, row) => <span className="adm-cell-sub">{row.userEmail}</span>,
+      width: 170,
+      render: (_: unknown, row) => (
+        <Link className="adm-link adm-cell-clip" to={adminUserDetailHref(row.userId)}>
+          {row.userEmail}
+        </Link>
+      ),
     },
     {
-      title: '状态',
+      title: '状态 / 渠道',
       dataIndex: 'status',
       key: 'status',
-      width: 100,
-      render: (v: string) => <StatusTag status={v} label={STATUS_LABEL_OVERRIDE[v]} />,
-    },
-    {
-      title: '实付',
-      key: 'paid',
-      width: 140,
-      render: (_: unknown, row) => (
+      width: 120,
+      render: (v: string, row) => (
         <div className="adm-cell-stack">
-          <span>¥ {yuan(row.paidCents)}</span>
-          {/* 有退款时把已退金额摊开: 只看实付会以为这单全额到账 */}
-          {row.refundedCents > 0 && (
-            <span className="adm-cell-sub adm-text-danger">
-              已退 ¥ {yuan(row.refundedCents)}
-            </span>
-          )}
+          <StatusTag status={v} label={STATUS_LABEL_OVERRIDE[v]} />
+          <span className="adm-cell-sub adm-cell-clip">
+            {row.channel ? CHANNEL_LABELS[row.channel] ?? row.channel : '—'}
+          </span>
         </div>
       ),
     },
     {
-      title: '优惠',
-      key: 'discount',
-      width: 100,
-      render: (_: unknown, row) =>
-        row.discountCents > 0 ? (
-          <span className="adm-cell-sub">- ¥ {yuan(row.discountCents)}</span>
-        ) : (
-          <span className="adm-cell-sub">—</span>
-        ),
+      title: '实付 / 优惠',
+      key: 'paid',
+      width: 140,
+      render: (_: unknown, row) => {
+        const extra = [
+          row.refundedCents > 0 ? `已退 ¥ ${yuan(row.refundedCents)}` : '',
+          row.discountCents > 0 ? `优惠 -¥ ${yuan(row.discountCents)}` : '',
+        ]
+          .filter(Boolean)
+          .join(' · ');
+        return (
+          <div className="adm-cell-stack">
+            <span>¥ {yuan(row.paidCents)}</span>
+            <span
+              className={`adm-cell-sub adm-cell-clip${row.refundedCents > 0 ? ' adm-text-danger' : ''}`}
+              title={extra || undefined}
+            >
+              {extra || '无优惠'}
+            </span>
+          </div>
+        );
+      },
     },
     {
-      title: '商品 / 套餐',
+      title: '商品 / 积分',
       key: 'items',
-      width: 170,
-      render: (_: unknown, row) =>
-        row.membershipPlanName ? (
+      width: 180,
+      render: (_: unknown, row) => {
+        const credits = row.grantedCredits > 0 ? `+${row.grantedCredits} 积分` : '无积分';
+        return row.membershipPlanName ? (
           <div className="adm-cell-stack">
-            <span>{row.membershipPlanName}</span>
-            <code className="adm-cell-sub">{row.membershipPlanCode}</code>
+            <span className="adm-cell-clip" title={row.membershipPlanName}>
+              {row.membershipPlanName}
+            </span>
+            <span className="adm-cell-sub adm-cell-clip" title={`${row.membershipPlanCode} · ${credits}`}>
+              {row.membershipPlanCode} · {credits}
+            </span>
           </div>
         ) : (
-          <span className="adm-cell-sub">{row.itemCount} 件商品</span>
-        ),
-    },
-    {
-      title: '积分',
-      dataIndex: 'grantedCredits',
-      key: 'grantedCredits',
-      width: 90,
-      render: (v: number) => (v > 0 ? `+${v}` : <span className="adm-cell-sub">—</span>),
-    },
-    {
-      title: '渠道',
-      key: 'channel',
-      width: 110,
-      render: (_: unknown, row) =>
-        row.channel ? (
-          <span className="adm-cell-sub">{CHANNEL_LABELS[row.channel] ?? row.channel}</span>
-        ) : (
-          <span className="adm-cell-sub">—</span>
-        ),
+          <div className="adm-cell-stack">
+            <span className="adm-cell-sub">{row.itemCount} 件商品</span>
+            <span className="adm-cell-sub">{credits}</span>
+          </div>
+        );
+      },
     },
     {
       title: '支付时间',
       dataIndex: 'paidAt',
       key: 'paidAt',
-      width: 160,
+      width: 140,
       render: (v: string | null) =>
         v ? new Date(v).toLocaleString('zh-CN') : <span className="adm-cell-sub">未支付</span>,
     },
     {
       title: '',
       key: 'ops',
-      width: 150,
-      /*
-       * 固定在最右: 表格 1340 > 容器 1106, 1440 屏下「退款」按钮右边界到 1564px
-       * 已被容器裁掉, 不横向滚动就只看到半个按钮 —— 退款是这页最常做的动作。
-       */
+      width: 130,
+      /* 固定在最右, 保证滚动时高频动作仍可见 */
       fixed: 'right',
       render: (_: unknown, row) => (
         <div className="adm-ops">
@@ -558,6 +680,7 @@ export function AdminOrdersPage() {
             重置
           </Button>
         </FilterActions>
+        <AppliedFilters items={appliedChips} onClearAll={reset} />
       </FilterBar>
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
@@ -617,7 +740,7 @@ export function AdminOrdersPage() {
                 columns={columns}
                 dataSource={list?.items ?? []}
                 loading={loading}
-                scroll={{ x: 1340 }}
+                scroll={{ x: 1080 }}
                 rowSelection={{
                   selectedRowKeys: selected,
                   onChange: (keys) => setSelected(keys as string[]),
@@ -700,8 +823,18 @@ export function AdminOrdersPage() {
                 </dd>
                 <dt>用户</dt>
                 <dd>
-                  {d.user.name ? `${d.user.name} · ` : ''}
-                  {d.user.email}
+                  <div>
+                    {d.user.name ? `${d.user.name} · ` : ''}
+                    <Link className="adm-link" to={adminUserDetailHref(d.userId)}>
+                      {d.user.email}
+                    </Link>
+                  </div>
+                  <div className="adm-relation-links">
+                    <Link to={adminCreditHref({ userId: d.userId, email: d.user.email })}>
+                      积分账本
+                    </Link>
+                    <Link to={adminTasksHref({ userId: d.userId })}>任务记录</Link>
+                  </div>
                 </dd>
                 <dt>订单金额</dt>
                 <dd>¥ {yuan(d.totalCents)}（{d.totalCents} 分）</dd>

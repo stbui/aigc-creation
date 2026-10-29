@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { Card, Collapse, Empty, Flex, Space, Tag, Typography } from 'antd';
+import { Button, Card, Collapse, Empty, Flex, Space, Tag, Typography } from 'antd';
 import { ChevronRight } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { findAdminMenuGroup, findAdminMenuItem } from './adminNav';
@@ -78,6 +78,54 @@ export function FilterActions({ children }: { children: ReactNode }) {
     <Space className="adm-filter-actions" size={8}>
       {children}
     </Space>
+  );
+}
+
+/** 一条已生效的筛选条件。`onClear` 为空时只展示，不提供单独清除。 */
+export interface AppliedFilter {
+  key: string;
+  label: string;
+  onClear?: () => void;
+}
+
+/**
+ * 已生效筛选回显。
+ *
+ * 与筛选栏里的草稿值分开：用户改了输入框但没有点「查询」时，这里仍显示
+ * 当前列表真正使用的条件。每条带单独清除，避免为了去掉一个条件整页重置。
+ */
+export function AppliedFilters({
+  items,
+  onClearAll,
+}: {
+  items: AppliedFilter[];
+  onClearAll?: () => void;
+}) {
+  if (items.length === 0) return null;
+
+  return (
+    <div className="adm-filter-chips" aria-label="已生效的筛选条件">
+      <span className="adm-filter-chips-label">已筛选</span>
+      {items.map((item) => (
+        <Tag
+          key={item.key}
+          className="adm-filter-chip"
+          closable={Boolean(item.onClear)}
+          onClose={(event) => {
+            event.preventDefault();
+            item.onClear?.();
+          }}
+          title={item.label}
+        >
+          {item.label}
+        </Tag>
+      ))}
+      {onClearAll && (
+        <Button type="link" className="adm-filter-chip-clear" onClick={onClearAll}>
+          全部清除
+        </Button>
+      )}
+    </div>
   );
 }
 

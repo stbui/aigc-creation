@@ -4,7 +4,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate, Link } from 'react-r
 import { adminApi } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useAdmin } from '../../context/AdminContext';
-import { Activity, ImageOff, Users } from 'lucide-react';
+import { Activity, ChevronRight, ImageOff, Users } from 'lucide-react';
 import { AdminLayout, AdminPageLoading, findAdminMenuItem } from '../../components/admin/AdminLayout';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { ExceptionPage } from '../../components/ExceptionPage';
@@ -539,36 +539,43 @@ function DashboardContent() {
         </div>
         <ul className="adm-task-list">
           {data.recentTasks.map((task) => (
-            <li key={task.id} className="adm-task-item">
-              {task.thumbnailUrl ? (
-                <img
-                  className="adm-task-thumb"
-                  src={toAbsoluteUrl(task.thumbnailUrl)}
-                  alt=""
-                  loading="lazy"
-                />
-              ) : (
-                <div className="adm-task-thumb is-empty">
-                  <ImageOff size={14} />
-                </div>
-              )}
+            <li key={task.id}>
+              <Link
+                className="adm-task-item"
+                to={`/admin/tasks?id=${encodeURIComponent(task.id)}`}
+                aria-label={`查看任务详情：${task.capabilityName} ${task.id.slice(-8)}`}
+              >
+                {task.thumbnailUrl ? (
+                  <img
+                    className="adm-task-thumb"
+                    src={toAbsoluteUrl(task.thumbnailUrl)}
+                    alt=""
+                    loading="lazy"
+                  />
+                ) : (
+                  <div className="adm-task-thumb is-empty">
+                    <ImageOff size={14} />
+                  </div>
+                )}
 
-              <div className="adm-task-main">
-                {/* 能力名是主信息, 加重; 其余降级为次要信息 */}
-                <div className="adm-task-name">{task.capabilityName}</div>
-                <div className="adm-task-meta">
-                  <StatusTag status={task.status} />
-                  {task.provider && <span className="adm-task-provider">{task.provider}</span>}
-                  <code className="adm-task-id">{task.id.slice(-8)}</code>
+                <div className="adm-task-main">
+                  {/* 能力名是主信息, 加重; 其余降级为次要信息 */}
+                  <div className="adm-task-name">{task.capabilityName}</div>
+                  <div className="adm-task-meta">
+                    <StatusTag status={task.status} />
+                    {task.provider && <span className="adm-task-provider">{task.provider}</span>}
+                    <code className="adm-task-id">{task.id.slice(-8)}</code>
+                  </div>
                 </div>
-              </div>
 
-              <div className="adm-task-time">
-                {/* 相对时间用于快速判断新鲜度, 绝对时间保留在title 里供核对 */}
-                <span title={new Date(task.createdAt).toLocaleString('zh-CN')}>
-                  {formatRelative(task.createdAt)}
-                </span>
-              </div>
+                <div className="adm-task-time">
+                  {/* 相对时间用于快速判断新鲜度, 绝对时间保留在title 里供核对 */}
+                  <span title={new Date(task.createdAt).toLocaleString('zh-CN')}>
+                    {formatRelative(task.createdAt)}
+                  </span>
+                </div>
+                <ChevronRight className="adm-task-arrow" size={14} aria-hidden="true" />
+              </Link>
             </li>
           ))}
           {data.recentTasks.length === 0 && <div className="adm-empty">暂无任务记录</div>}
@@ -813,8 +820,8 @@ function NoAdminAccess({ email }: { email: string | null }) {
             <strong>如何进入</strong>
             <ul>
               <li>
-                退出后用运营账号登录：运行 <code>npm run seed:admin</code> 会创建管理员并输出
-                一次性随机密码
+                退出后用运营账号登录：development / test 启动时会自动创建预设管理员；
+                production 运行 <code>npm run seed:admin</code> 生成一次性随机密码
               </li>
               <li>已有管理员账号但不知密码：用该账号在「用户管理 → 重置密码」获取临时密码</li>
             </ul>

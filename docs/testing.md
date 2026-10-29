@@ -141,7 +141,7 @@ npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitig
 | | `smoke-refund-rules.js` | 时间窗 `40905` / 比例 `40906` / 已消耗积分 `40907` / 会员终止 |
 | 营销 | `smoke-marketing.js` | 券门槛与折扣区间、活动叠加取更优、邀请、签到、退款不得超实付 |
 
-需要管理员凭据的脚本通过 `ADMIN_EMAIL` / `ADMIN_PASSWORD` 提供。密码不写进仓库、不写进文档：用 `NODE_ENV=test npm run seed:admin` 在测试档生成，或临时建一次性管理员，跑完清理。
+development / test 的管理员凭据统一为 `admin@admin.com / 123456789`，后台 E2E 与冒烟脚本默认直接使用。需要覆盖时传 `ADMIN_EMAIL` / `ADMIN_PASSWORD`；production 不提供默认密码，必须使用显式环境变量或 `seed:admin` 生成的一次性密码。
 
 #### 仿真模型网关
 
@@ -157,7 +157,7 @@ cd test && npm run smoke:spawn  # 起网关跑联网冒烟
 
 ### 3.5 浏览器 E2E（L4）
 
-配置在 `frontend/playwright.admin.config.ts` / `playwright.config.ts` / `playwright.local.config.ts`，用例在 `frontend/tests/`，共 14 个 spec：
+配置在 `frontend/playwright.admin.config.ts` / `playwright.config.ts` / `playwright.local.config.ts`，用例在 `frontend/tests/`，共 15 个 spec：
 
 | 用例 | 守住什么 |
 | --- | --- |
@@ -168,6 +168,7 @@ cd test && npm run smoke:spawn  # 起网关跑联网冒烟
 | `admin-marketing.spec.ts` | 营销中心三条约束 |
 | `admin-scheduler.spec.ts` | 定时任务可观测（静默失败可见） |
 | `admin-screenshots.spec.ts` | 后台逐页截图取证 |
+| `admin-ux.spec.ts` | 筛选深链与逐条清除（含工单/商品/对账/能力/告警）、订单/任务/模型线路宽表在 1440px 无横向滚动、页面/编辑抽屉/工单回复/积分调整的未保存保护、角色权限未保存拦截、概览任务直达、任务详情到积分账本及项目筛选的跨模块深链、详情 `?id=` 刷新恢复与关闭移除 |
 | `free-creation-submit.spec.ts` | 登录墙 + 必填置灰的提交契约 + guest 不被只读接口弹登录 |
 | `product-capabilities.spec.ts` | 8 个工具入口/能力上下文、局部重绘画布与标注上限、失败重试字段、站点地图可见性 |
 | `product-parameters.spec.ts` | 8 个工具页面参数渲染、提交态、结果/失败态与移动端无横向溢出 |
@@ -176,7 +177,7 @@ cd test && npm run smoke:spawn  # 起网关跑联网冒烟
 | `workspace-pages.spec.ts` | 工作台 12 卡顺序、guest 不请求统计、素材库双路径、390 无溢出 |
 | `example.spec.ts` | Playwright 脚手架示例（不覆盖本项目功能） |
 
-运行：`cd frontend && npm run e2e`（默认 `playwright.admin.config.ts`，`ADMIN_UI` 可覆盖 baseURL）。
+运行：`cd frontend && npm run e2e`（默认 `playwright.admin.config.ts`，`ADMIN_UI` 可覆盖 baseURL）。后台套件先用 `admin-auth.setup.ts` 登录一次并落盘 `playwright/.auth/admin.json`，其余用例复用 `storageState`；这样不会因每条用例重复登录而撞上认证限流。需要验证访客或普通用户的用例会主动清空会话。
 
 `frontend/e2e/` 下只有脚手架示例与一次性审计脚本，不是本项目用例目录。
 

@@ -1,11 +1,13 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { App, Button, Drawer, Input, Select, Table, Upload as AntUpload } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import type { UploadFile } from 'antd';
 import { Download, Upload } from 'lucide-react';
 import { adminCreditsApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
+import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
+import { adminOrderHref, adminTasksHref, adminUserDetailHref } from '../../lib/admin-links';
 import {
   AdminListError,
   AdminListLoading,
@@ -18,11 +20,13 @@ import {
 } from '../../components/admin/AdminWidgets';
 import {
   AdminEmpty,
+  AppliedFilters,
   FilterActions,
   FilterBar,
   PageHeader,
   Panel,
   StatCard,
+  type AppliedFilter,
 } from '../../components/admin/PageHeader';
 import type {
   AdminCreditLedgerRow,
@@ -139,6 +143,31 @@ export function AdminCreditsPage() {
     setQuery({ email: undefined, userId: undefined });
   };
 
+  const appliedEmail = (params.email as string | undefined) ?? '';
+  const appliedUserId = (params.userId as string | undefined) ?? '';
+  const appliedChips: AppliedFilter[] = [
+    appliedEmail
+      ? {
+          key: 'email',
+          label: `邮箱：${appliedEmail}`,
+          onClear: () => {
+            setEmail('');
+            setQuery({ email: undefined });
+          },
+        }
+      : null,
+    appliedUserId
+      ? {
+          key: 'userId',
+          label: `用户 ID：${appliedUserId}`,
+          onClear: () => {
+            setUserId('');
+            setQuery({ userId: undefined });
+          },
+        }
+      : null,
+  ].filter(Boolean) as AppliedFilter[];
+
   /**
    * 导出走**已生效**的筛选, 而不是输入框里的草稿 ——
    * 用户输入后未点「查询」时, 导出的必须与屏幕上的列表同口径。
@@ -167,7 +196,9 @@ export function AdminCreditsPage() {
         <div className="adm-cell-stack">
           <span>{row.name || row.email}</span>
           <span className="adm-cell-sub">
-            {row.email}
+            <Link className="adm-link" to={adminUserDetailHref(row.userId)}>
+              {row.email}
+            </Link>
             {row.name ? '' : ' · 无昵称'}
           </span>
           <code className="adm-cell-sub" title={row.userId}>
@@ -304,6 +335,7 @@ export function AdminCreditsPage() {
             重置
           </Button>
         </FilterActions>
+        <AppliedFilters items={appliedChips} onClearAll={reset} />
       </FilterBar>
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
@@ -433,6 +465,9 @@ function CreditDetailDrawer({
 
   const parsedDelta = Number(delta);
   const deltaValid = Number.isInteger(parsedDelta) && parsedDelta !== 0;
+  const adjustmentDirty = Boolean(delta.trim() || reason.trim() || validDays.trim());
+  useUnsavedGuard(adjustmentDirty);
+  const requestClose = useDiscardConfirm(adjustmentDirty, onClose);
 
   const submitAdjust = async () => {
     if (!deltaValid) {
@@ -470,7 +505,7 @@ function CreditDetailDrawer({
       title={`积分明细 · ${user.email}`}
       size={760}
       open
-      onClose={onClose}
+      onClose={requestClose}
       className="adm-drawer"
       destroyOnHidden
     >
@@ -479,9 +514,20 @@ function CreditDetailDrawer({
       <div className="adm-section">
         <div className="adm-section-title">账户概要</div>
         <dl className="adm-desc">
+          <dt>用户</dt>
+          <dd>
+            <Link className="adm-link" to={adminUserDetailHref(user.userId)}>
+              {user.email}
+            </Link>
+          </dd>
           <dt>用户 ID</dt>
           <dd>
             <code>{user.userId}</code>
+          </dd>
+          <dt>关联记录</dt>
+          <dd className="adm-relation-links">
+            <Link to={adminOrderHref({ email: user.email })}>订单记录</Link>
+            <Link to={adminTasksHref({ userId: user.userId })}>任务记录</Link>
           </dd>
           <dt>当前余额</dt>
           <dd>
@@ -727,6 +773,8 @@ function BatchAdjustModal({
     failed: number;
     results: Array<{ userId: string; success: boolean; balance?: number; message?: string }>;
   } | null>(null);
+  const dirty = !result && Boolean(text.trim() || reason.trim());
+  useUnsavedGuard(open && dirty);
 
   /** 解析结果与错误行分开返回: 有错行时仍展示能解析的部分, 便于边改边看 */
   const parsed = useMemo(() => {
@@ -761,8 +809,17 @@ function BatchAdjustModal({
 
   const close = () => {
     if (busy) return;
+    setText('');
+    setReason('');
     setResult(null);
     onClose();
+  };
+  const requestClose = useDiscardConfirm(open && dirty, close);
+  const done = () => {
+    setText('');
+    setReason('');
+    setResult(null);
+    onDone();
   };
 
   const submit = async () => {
@@ -793,16 +850,16 @@ function BatchAdjustModal({
       title="批量调整积分"
       size={680}
       open={open}
-      onClose={close}
+      onClose={requestClose}
       className="adm-drawer"
       destroyOnHidden
       footer={
         <div className="adm-drawer-footer">
-          <Button type="default" className="adm-btn" onClick={close} disabled={busy}>
+          <Button type="default" className="adm-btn" onClick={requestClose} disabled={busy}>
             {result ? '关闭' : '取消'}
           </Button>
           {result ? (
-            <Button type="primary" className="adm-btn is-primary" onClick={onDone}>
+            <Button type="primary" className="adm-btn is-primary" onClick={done}>
               完成
             </Button>
           ) : (
@@ -940,6 +997,8 @@ function CsvImportModal({
   const [validDays, setValidDays] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<CreditImportResult | null>(null);
+  const dirty = !result && Boolean(file || reason.trim() || validDays.trim());
+  useUnsavedGuard(open && dirty);
 
   /** 关闭时清空: 下次打开不该看到上次选的文件 */
   const close = () => {
@@ -950,6 +1009,15 @@ function CsvImportModal({
     setResult(null);
     setFileList([]);
     onClose();
+  };
+  const requestClose = useDiscardConfirm(open && dirty, close);
+  const done = () => {
+    setFile(null);
+    setReason('');
+    setValidDays('');
+    setResult(null);
+    setFileList([]);
+    onDone();
   };
 
   const submit = async () => {
@@ -983,16 +1051,16 @@ function CsvImportModal({
       title="导入积分（CSV）"
       size={680}
       open={open}
-      onClose={close}
+      onClose={requestClose}
       className="adm-drawer"
       destroyOnHidden
       footer={
         <div className="adm-drawer-footer">
-          <Button type="default" className="adm-btn" onClick={close} disabled={busy}>
+          <Button type="default" className="adm-btn" onClick={requestClose} disabled={busy}>
             {result ? '关闭' : '取消'}
           </Button>
           {result ? (
-            <Button type="primary" className="adm-btn is-primary" onClick={onDone}>
+            <Button type="primary" className="adm-btn is-primary" onClick={done}>
               完成
             </Button>
           ) : (

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App, Button, Image, Input, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { adminTasksApi, toAbsoluteUrl } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import {
@@ -11,19 +11,31 @@ import {
   AdminListLoading,
   ConfirmAction,
   adminPagination,
+  useAdminDetailParam,
   useAdminList,
+  useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
 import {
   AdminEmpty,
+  AppliedFilters,
   FilterActions,
   FilterBar,
   PageHeader,
   Panel,
   StatCard,
   StatusTag,
+  type AppliedFilter,
 } from '../../components/admin/PageHeader';
 import { BatchResultModal } from '../../components/admin/BatchResultModal';
 import { taskErrorLabel } from '../../lib/admin-error-codes';
+import {
+  adminAssetHref,
+  adminCreditHref,
+  adminOrderHref,
+  adminTaskHref,
+  adminTasksHref,
+  adminUserDetailHref,
+} from '../../lib/admin-links';
 import type {
   AdminTask,
   AdminTaskDetail,
@@ -106,27 +118,34 @@ export function AdminTasksPage() {
   const urlStatus =
     rawUrlStatus && STATUS_OPTIONS.some((o) => o.value === rawUrlStatus) ? rawUrlStatus : undefined;
   const appliedUrlStatus = useRef<string | undefined>(urlStatus);
+  const initialCapability = searchParams.get('capability') ?? undefined;
+  const rawInitialProvider = searchParams.get('provider') ?? undefined;
+  const initialProvider =
+    rawInitialProvider && Object.prototype.hasOwnProperty.call(PROVIDER_LABELS, rawInitialProvider)
+      ? rawInitialProvider
+      : undefined;
+  const initialOwner = searchParams.get('userId') ?? '';
+  const initialProject = searchParams.get('projectId') ?? '';
+  const initialFrom = searchParams.get('from') ?? '';
+  const initialTo = searchParams.get('to') ?? '';
+  const appliedUrlProject = useRef(initialProject);
 
   // 筛选受控值与已应用的查询分离: 用户改了下拉不代表已经点了「查询」,
   // 直接跟随会让每次切换下拉都打一次请求
   const [status, setStatus] = useState<string | undefined>(urlStatus);
-  const [capability, setCapability] = useState<string | undefined>();
-  const [provider, setProvider] = useState<string | undefined>();
-  const [owner, setOwner] = useState<string>('');
-  const [project, setProject] = useState<string>('');
-  const [from, setFrom] = useState<string>('');
-  const [to, setTo] = useState<string>('');
+  const [capability, setCapability] = useState<string | undefined>(initialCapability);
+  const [provider, setProvider] = useState<string | undefined>(initialProvider);
+  const [owner, setOwner] = useState<string>(initialOwner);
+  const [project, setProject] = useState<string>(initialProject);
+  const [from, setFrom] = useState<string>(initialFrom);
+  const [to, setTo] = useState<string>(initialTo);
 
   /*
    * 顶栏搜到「任务」时带 `?id=` 跳过来, 直接打开该任务的详情抽屉。
    * 列表本身没有按 id 筛选的入口（任务 id 不是人记得住的东西）,
    * 让运营落在一条被筛过的列表上反而要从几十行里再找一遍。
    */
-  const [detailId, setDetailId] = useState<string | null>(() => searchParams.get('id'));
-  useEffect(() => {
-    const id = searchParams.get('id');
-    if (id) setDetailId(id);
-  }, [searchParams]);
+  const [detailId, setDetailId] = useAdminDetailParam();
 
   /*
    * 已在本页时点击「失败任务」告警：URL 变化但组件不会重挂，
@@ -171,18 +190,43 @@ export function AdminTasksPage() {
   const { data, loading, error, params, setQuery, setPage, reload } =
     useAdminList<AdminTaskListResult>(fetcher, {
       ...(urlStatus ? { status: urlStatus } : {}),
+      ...(initialCapability ? { capability: initialCapability } : {}),
+      ...(initialProvider ? { provider: initialProvider } : {}),
+      ...(initialOwner ? { userId: initialOwner } : {}),
+      ...(initialProject ? { projectId: initialProject } : {}),
+      ...(initialFrom ? { from: initialFrom } : {}),
+      ...(initialTo ? { to: initialTo } : {}),
     });
 
+  /* 告警中心链接只改 URL 时，已在本页也要把筛选同步过去 */
   useEffect(() => {
     const raw = searchParams.get('status') ?? undefined;
     const next =
       raw && STATUS_OPTIONS.some((o) => o.value === raw) ? raw : undefined;
     if (next === appliedUrlStatus.current) return;
     appliedUrlStatus.current = next;
-    // 浏览器后退到无 status 的地址时也要清掉筛选，否则列表与地址栏不一致
     setStatus(next);
     setQuery({ status: next });
   }, [searchParams, setQuery]);
+
+  /* 任务详情里的项目入口与列表同页：URL 变了要同步筛选并关掉详情 */
+  useEffect(() => {
+    const next = searchParams.get('projectId') ?? '';
+    if (next === appliedUrlProject.current) return;
+    appliedUrlProject.current = next;
+    setProject(next);
+    setQuery({ projectId: next || undefined });
+  }, [searchParams, setQuery]);
+
+  useAdminUrlFilterSync({
+    status: params.status as string | undefined,
+    capability: params.capability as string | undefined,
+    provider: params.provider as string | undefined,
+    userId: params.userId as string | undefined,
+    projectId: params.projectId as string | undefined,
+    from: params.from as string | undefined,
+    to: params.to as string | undefined,
+  });
 
   const list = data?.result;
 
@@ -249,6 +293,8 @@ export function AdminTasksPage() {
   );
 
   const applyQuery = () => {
+    appliedUrlStatus.current = status;
+    appliedUrlProject.current = project.trim();
     setSelected([]);
     setQuery({
       status,
@@ -264,6 +310,8 @@ export function AdminTasksPage() {
   };
 
   const reset = () => {
+    appliedUrlStatus.current = undefined;
+    appliedUrlProject.current = '';
     setStatus(undefined);
     setCapability(undefined);
     setProvider(undefined);
@@ -282,6 +330,88 @@ export function AdminTasksPage() {
       to: undefined,
     });
   };
+
+  const appliedStatus = params.status as string | undefined;
+  const appliedCapability = params.capability as string | undefined;
+  const appliedProvider = params.provider as string | undefined;
+  const appliedOwner = (params.userId as string | undefined) ?? '';
+  const appliedProject = (params.projectId as string | undefined) ?? '';
+  const appliedFrom = (params.from as string | undefined) ?? '';
+  const appliedTo = (params.to as string | undefined) ?? '';
+  const appliedChips: AppliedFilter[] = [
+    appliedStatus
+      ? {
+          key: 'status',
+          label: `状态：${STATUS_OPTIONS.find((option) => option.value === appliedStatus)?.label ?? appliedStatus}`,
+          onClear: () => {
+            appliedUrlStatus.current = undefined;
+            setStatus(undefined);
+            setQuery({ status: undefined });
+          },
+        }
+      : null,
+    appliedCapability
+      ? {
+          key: 'capability',
+          label: `能力：${appliedCapability}`,
+          onClear: () => {
+            setCapability(undefined);
+            setQuery({ capability: undefined });
+          },
+        }
+      : null,
+    appliedProvider
+      ? {
+          key: 'provider',
+          label: `通道：${PROVIDER_LABELS[appliedProvider] ?? appliedProvider}`,
+          onClear: () => {
+            setProvider(undefined);
+            setQuery({ provider: undefined });
+          },
+        }
+      : null,
+    appliedOwner
+      ? {
+          key: 'userId',
+          label: `用户 ID：${appliedOwner}`,
+          onClear: () => {
+            setOwner('');
+            setQuery({ userId: undefined });
+          },
+        }
+      : null,
+    appliedProject
+      ? {
+          key: 'projectId',
+          label: `项目 ID：${appliedProject}`,
+          onClear: () => {
+            appliedUrlProject.current = '';
+            setProject('');
+            setQuery({ projectId: undefined });
+          },
+        }
+      : null,
+    appliedFrom
+      ? {
+          key: 'from',
+          label: `开始：${appliedFrom}`,
+          onClear: () => {
+            setFrom('');
+            setQuery({ from: undefined });
+          },
+        }
+      : null,
+    appliedTo
+      ? {
+          key: 'to',
+          label: `结束：${appliedTo}`,
+          onClear: () => {
+            setTo('');
+            setQuery({ to: undefined });
+          },
+        }
+      : null,
+  ].filter(Boolean) as AppliedFilter[];
 
   /** 打开确认弹窗。重置原因输入, 避免上一次的内容被误提交 */
   const openConfirm = useCallback((kind: 'retry' | 'cancel', task: Row) => {
@@ -317,7 +447,7 @@ export function AdminTasksPage() {
       {
         title: '任务',
         key: 'task',
-        width: 190,
+        width: 170,
         render: (_: unknown, row) => (
           <div className="adm-cell-stack">
             {/* 缩略图 + 短 id 并排: 排障时先认出图, 再对 id 查日志 */}
@@ -343,12 +473,16 @@ export function AdminTasksPage() {
       {
         title: '能力',
         key: 'capability',
-        width: 150,
+        width: 140,
         render: (_: unknown, row) => (
           <div className="adm-cell-stack">
             {/* 中文能力名为主, id 降为副信息 —— 运营看的是"爆款复刻"不是 hot_remake */}
-            <span>{row.capabilityName}</span>
-            <code className="adm-cell-sub">{row.capability}</code>
+            <span className="adm-cell-clip" title={row.capabilityName}>
+              {row.capabilityName}
+            </span>
+            <code className="adm-cell-sub adm-cell-clip" title={row.capability}>
+              {row.capability}
+            </code>
           </div>
         ),
       },
@@ -356,7 +490,7 @@ export function AdminTasksPage() {
         title: '状态',
         dataIndex: 'status',
         key: 'status',
-        width: 150,
+        width: 145,
         /*
          * 失败原因直接进列表。此前只有「失败」二字, 原因要进详情抽屉才看得到,
          * 而详情入口是最右侧一条被横向裁掉一半的文字链 —— 排障动线被迫拉长。
@@ -376,7 +510,7 @@ export function AdminTasksPage() {
         title: '通道',
         dataIndex: 'provider',
         key: 'provider',
-        width: 90,
+        width: 80,
         /*
          * `pending` 是建任务时的初值 (还没跑出真实通道)。对失败任务显示「待执行」
          * 会与同一行的「失败」互相矛盾, 读起来像任务没开始跑; 这类行一律显示「—」。
@@ -389,45 +523,46 @@ export function AdminTasksPage() {
           ),
       },
       {
-        title: '用户',
-        key: 'user',
-        width: 170,
-        render: (_: unknown, row) => <span className="adm-cell-sub">{row.user.email}</span>,
-      },
-      {
-        title: '项目',
-        key: 'project',
-        width: 130,
-        render: (_: unknown, row) => row.project.name,
-      },
-      {
-        title: '耗时',
-        dataIndex: 'durationMs',
-        key: 'durationMs',
-        width: 100,
-        render: (ms: number, row) => (
+        title: '归属',
+        key: 'owner',
+        width: 190,
+        render: (_: unknown, row) => (
           <div className="adm-cell-stack">
-            <span>{fmtDuration(ms)}</span>
-            {/* running 的耗时仍在增长, 不加标注会被当成已完成的耗时读 */}
-            {row.status === 'running' && <span className="adm-cell-sub">进行中</span>}
+            <span className="adm-cell-sub adm-cell-clip" title={row.user.email}>
+              <Link className="adm-link" to={adminUserDetailHref(row.user.id)}>
+                {row.user.email}
+              </Link>
+            </span>
+            <span className="adm-cell-sub adm-cell-clip" title={row.project.name}>
+              项目 ·{' '}
+              <Link className="adm-link" to={adminTasksHref({ projectId: row.project.id })}>
+                {row.project.name}
+              </Link>
+            </span>
           </div>
         ),
       },
       {
-        title: '创建时间',
-        dataIndex: 'createdAt',
-        key: 'createdAt',
-        width: 150,
-        render: (v: string) => new Date(v).toLocaleString('zh-CN'),
+        title: '耗时 / 创建时间',
+        dataIndex: 'durationMs',
+        key: 'durationMs',
+        width: 160,
+        render: (ms: number, row) => (
+          <div className="adm-cell-stack">
+            <span>
+              {fmtDuration(ms)}
+              {/* running 的耗时仍在增长, 不加标注会被当成已完成的耗时读 */}
+              {row.status === 'running' && <span className="adm-cell-sub"> · 进行中</span>}
+            </span>
+            <span className="adm-cell-sub">{new Date(row.createdAt).toLocaleString('zh-CN')}</span>
+          </div>
+        ),
       },
       {
         title: '',
         key: 'ops',
-        width: 130,
-        /*
-         * 固定在最右。表格实际宽 1250 > 容器 1106, 1440 屏下「详情」按钮右边界
-         * 到 1439px 已经被裁掉一截, 1280 屏更明显 —— 主操作默认看不见。
-         */
+        width: 125,
+        /* 固定在最右, 保证滚动时主操作仍可见 */
         fixed: 'right',
         render: (_: unknown, row) => (
           <div className="adm-ops">
@@ -598,12 +733,16 @@ export function AdminTasksPage() {
           type="datetime-local"
           value={from}
           onChange={(e) => setFrom(e.target.value)}
+          onPressEnter={applyQuery}
+          aria-label="开始时间"
         />
         <Input
           className="adm-filter-input"
           type="datetime-local"
           value={to}
           onChange={(e) => setTo(e.target.value)}
+          onPressEnter={applyQuery}
+          aria-label="结束时间"
         />
         <FilterActions>
           <Button type="primary" className="adm-btn is-primary" onClick={applyQuery}>
@@ -613,6 +752,7 @@ export function AdminTasksPage() {
             重置
           </Button>
         </FilterActions>
+        <AppliedFilters items={appliedChips} onClearAll={reset} />
       </FilterBar>
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
@@ -682,7 +822,7 @@ export function AdminTasksPage() {
                 columns={columns}
                 dataSource={list?.items ?? []}
                 loading={loading}
-                scroll={{ x: 1250 }}
+                scroll={{ x: 1020 }}
                 /*
                  * 整行可点开详情。此前只有最右侧那个「详情」文字链是入口,
                  * 而它恰好是被横向裁掉的那一列。
@@ -774,9 +914,23 @@ export function AdminTasksPage() {
                 <dt>通道</dt>
                 <dd>{d.provider ? (PROVIDER_LABELS[d.provider] ?? d.provider) : '—'}</dd>
                 <dt>用户</dt>
-                <dd>{d.user.email}</dd>
+                <dd>
+                  <Link className="adm-link" to={adminUserDetailHref(d.user.id)}>
+                    {d.user.email}
+                  </Link>
+                  <div className="adm-relation-links">
+                    <Link to={adminCreditHref({ userId: d.user.id, email: d.user.email })}>
+                      积分账本
+                    </Link>
+                    <Link to={adminOrderHref({ email: d.user.email })}>订单记录</Link>
+                  </div>
+                </dd>
                 <dt>项目</dt>
-                <dd>{d.project.name}</dd>
+                <dd>
+                  <Link className="adm-link" to={adminTasksHref({ projectId: d.project.id })}>
+                    {d.project.name}
+                  </Link>
+                </dd>
                 <dt>耗时</dt>
                 <dd>{fmtDuration(d.durationMs)}</dd>
                 <dt>创建时间</dt>
@@ -785,7 +939,9 @@ export function AdminTasksPage() {
                   <>
                     <dt>重试来源</dt>
                     <dd>
-                      <code>{d.retriedFromId}</code>
+                      <Link className="adm-link" to={adminTaskHref(d.retriedFromId)}>
+                        <code>{d.retriedFromId}</code>
+                      </Link>
                     </dd>
                   </>
                 )}
@@ -832,6 +988,10 @@ export function AdminTasksPage() {
                     ? `${d.outputAsset.width}×${d.outputAsset.height}`
                     : '尺寸未知'}{' '}
                   · {d.outputAsset.format} · {fmtBytes(d.outputAsset.sizeBytes)}
+                  {' · '}
+                  <Link className="adm-link" to={adminAssetHref(d.outputAsset.id)}>
+                    在素材库查看
+                  </Link>
                 </div>
               </div>
             ) : (

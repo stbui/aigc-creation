@@ -1,14 +1,15 @@
 import { test, expect } from '@playwright/test';
 import { mkdirSync } from 'fs';
+import { ADMIN_EMAIL, ADMIN_PASSWORD, HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
 
 /** 截图取证: 登录后台后逐页截图, 作为交付证据 */
 const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
-const EMAIL = process.env.ADMIN_EMAIL ?? 'admin@huojue.local';
-const PASSWORD = process.env.ADMIN_PASSWORD ?? '';
+const EMAIL = ADMIN_EMAIL;
+const PASSWORD = ADMIN_PASSWORD;
 const OUT = '../docs/screenshots/admin';
 
 test('后台五页截图', async ({ page }) => {
-  test.skip(!PASSWORD, '未提供 ADMIN_PASSWORD');
+  test.skip(!HAS_ADMIN_CREDENTIALS, '未提供后台管理员凭据');
   mkdirSync(OUT, { recursive: true });
 
   await page.setViewportSize({ width: 1440, height: 900 });

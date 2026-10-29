@@ -111,6 +111,36 @@ export function useAdminUrlFilterSync(applied: Record<string, UrlFilterValue>) {
 }
 
 /**
+ * 详情抽屉与地址栏的 `?id=` 双向同步。
+ *
+ * 任务与工单原先只支持「带 id 进来」，从列表打开详情却不写回地址栏：
+ * 刷新后详情消失、分享链接也打不开同一条记录。这里把 id 作为唯一真相，
+ * 打开即写入、关闭即移除；筛选写回仍由 `useAdminUrlFilterSync` 负责，
+ * 两边都基于 URLSearchParams 合并，不会互相覆盖。
+ */
+export function useAdminDetailParam() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const id = searchParams.get('id') || null;
+
+  const setId = useCallback(
+    (next: string | null) => {
+      setSearchParams(
+        (prev) => {
+          const params = new URLSearchParams(prev);
+          if (next) params.set('id', next);
+          else params.delete('id');
+          return params;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  return [id, setId] as const;
+}
+
+/**
  * 列表分页的统一配置 (2026-10-23)。
  *
  * 后台 12 张服务端分页表此前各写一份 `pagination={{...}}`, 差异全是历史遗留:

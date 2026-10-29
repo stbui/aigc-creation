@@ -47,7 +47,7 @@ export function ChannelTable({
       title: '线路',
       dataIndex: 'name',
       key: 'name',
-      width: 280,
+      width: 260,
       render: (_: unknown, ch: AdminModelChannelRecord) => {
         const health = healthMeta(ch);
         const vendor = matchVendor(ch, vendors);

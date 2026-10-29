@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { ADMIN_EMAIL, ADMIN_PASSWORD, HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
 
 /**
  * 素材管理 + 存储配置 E2E (admin-prd.md §3.4 B-21~27 / §3.11 B-62/63)。
@@ -15,14 +16,14 @@ async function login(page: Page) {
   // 侧栏在 ≤1280px 折叠, 分组标题按设计隐藏
   await page.setViewportSize({ width: 1600, height: 1000 });
   await page.goto(`${UI}/login`);
-  await page.locator('input[type="email"], input#email').first().fill('admin@huojue.local');
-  await page.locator('input[type="password"]').first().fill(process.env.ADMIN_PASSWORD ?? '');
+  await page.locator('input[type="email"], input#email').first().fill(ADMIN_EMAIL);
+  await page.locator('input[type="password"]').first().fill(ADMIN_PASSWORD);
   await page.locator('input[type="password"]').first().press('Enter');
   await page.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 15000 });
 }
 
 test.describe('素材管理', () => {
-  test.skip(!process.env.ADMIN_PASSWORD, '未提供 ADMIN_PASSWORD');
+  test.skip(!HAS_ADMIN_CREDENTIALS, '未提供后台管理员凭据');
 
   test('网格视图渲染缩略图与统计卡', async ({ page }) => {
     await login(page);
@@ -246,7 +247,7 @@ test.describe('素材管理', () => {
 });
 
 test.describe('存储配置', () => {
-  test.skip(!process.env.ADMIN_PASSWORD, '未提供 ADMIN_PASSWORD');
+  test.skip(!HAS_ADMIN_CREDENTIALS, '未提供后台管理员凭据');
 
   test('展示各后端状态与凭据来源', async ({ page }) => {
     await login(page);

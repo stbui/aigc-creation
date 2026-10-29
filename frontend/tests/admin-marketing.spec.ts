@@ -1,4 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
+import { ADMIN_EMAIL, ADMIN_PASSWORD, HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
 
 /**
  * 营销中心 E2E (admin-prd.md §3.12 B-64~B-67 / M11)。
@@ -11,17 +12,17 @@ import { test, expect, type Page } from '@playwright/test';
 
 const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
 
-async function login(page: Page, email = 'admin@huojue.local') {
+async function login(page: Page, email = ADMIN_EMAIL) {
   await page.setViewportSize({ width: 1600, height: 1000 });
   await page.goto(`${UI}/login`);
   await page.locator('input[type="email"], input#email').first().fill(email);
-  await page.locator('input[type="password"]').first().fill(process.env.ADMIN_PASSWORD ?? '');
+  await page.locator('input[type="password"]').first().fill(ADMIN_PASSWORD);
   await page.locator('input[type="password"]').first().press('Enter');
   await page.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 15000 });
 }
 
 test.describe('营销中心', () => {
-  test.skip(!process.env.ADMIN_PASSWORD, '未提供 ADMIN_PASSWORD');
+  test.skip(!HAS_ADMIN_CREDENTIALS, '未提供后台管理员凭据');
 
   test('优惠券页渲染', async ({ page }) => {
     await login(page);
@@ -213,7 +214,7 @@ test.describe('营销中心', () => {
 });
 
 test.describe('营销中心权限', () => {
-  test.skip(!process.env.ADMIN_PASSWORD, '未提供 ADMIN_PASSWORD');
+  test.skip(!HAS_ADMIN_CREDENTIALS, '未提供后台管理员凭据');
 
   test('侧栏「交易」分组含三个营销入口', async ({ page }) => {
     await login(page);

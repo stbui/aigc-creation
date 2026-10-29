@@ -1,0 +1,92 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '24'
+  NPM_CONFIG_REGISTRY: https://registry.npmjs.org
+  CI: 'true'
+
+jobs:
+  quality:
+    name: Static checks and tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - name: Install backend dependencies
+        run: npm --prefix backend ci
+      - name: Generate Prisma client
+        run: npm --prefix backend run prisma:generate
+      - name: Install frontend dependencies
+        run: npm --prefix frontend ci
+      - name: Run project checks
+        run: npm run check
+
+  e2e-smoke:
+    name: Admin E2E smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - name: Install dependencies
+        run: |
+          npm --prefix backend ci
+          npm --prefix frontend ci
+      - name: Generate Prisma client and build backend
+        run: |
+          npm --prefix backend run prisma:generate
+          npm --prefix backend run build
+      - name: Install Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Start test environment
+        run: ./start.sh --env test --daemon
+      - name: Wait for services
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:4100/api/v1/health/ready >/dev/null \
+              && curl -fsS http://localhost:5100/ >/dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          echo 'services did not become ready in time' >&2
+          exit 1
+      - name: Run admin smoke
+        run: npm run test:e2e:smoke
+      - name: Upload Playwright artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            frontend/test-results
+            frontend/playwright-report
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Stop services
+        if: always()
+        run: ./start.sh --stop || true

@@ -4,6 +4,7 @@ import type { ColumnsType } from 'antd/es/table';
 import type { UploadFile } from 'antd';
 import { Download, Upload } from 'lucide-react';
 import { Drawer } from 'antd';
+import { useSearchParams } from 'react-router-dom';
 import { adminReconciliationApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import {
@@ -14,14 +15,17 @@ import {
   adminMiniPagination,
   adminPagination,
   useAdminList,
+  useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
 import {
   AdminEmpty,
+  AppliedFilters,
   FilterActions,
   FilterBar,
   PageHeader,
   Panel,
   StatusTag,
+  type AppliedFilter,
 } from '../../components/admin/PageHeader';
 import type {
   ReconciliationBatch,
@@ -102,17 +106,113 @@ export function AdminReconciliationPage() {
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
 
+  // 批次列表筛选与“导入账单”表单分开：前者是查询条件，后者是待提交内容。
+  const [searchParams] = useSearchParams();
+  const rawFilterChannel = searchParams.get('channel');
+  const initialFilterChannel =
+    rawFilterChannel && CHANNEL_OPTIONS.some((o) => o.value === rawFilterChannel)
+      ? rawFilterChannel
+      : undefined;
+  const rawFilterStatus = searchParams.get('status');
+  const initialFilterStatus: 'imported' | 'resolved' | undefined =
+    rawFilterStatus === 'imported' || rawFilterStatus === 'resolved'
+      ? rawFilterStatus
+      : undefined;
+  const dateParam = (key: string) => {
+    const value = searchParams.get(key);
+    return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : '';
+  };
+  const initialFilterFrom = dateParam('from');
+  const initialFilterTo = dateParam('to');
+  const [filterChannel, setFilterChannel] = useState<string | undefined>(initialFilterChannel);
+  const [filterStatus, setFilterStatus] = useState<'imported' | 'resolved' | undefined>(
+    initialFilterStatus,
+  );
+  const [filterFrom, setFilterFrom] = useState(initialFilterFrom);
+  const [filterTo, setFilterTo] = useState(initialFilterTo);
+
   const fetcher = useCallback(
     (params: Record<string, unknown>) =>
-      adminReconciliationApi.batches(
-        params.pageSize as number,
-        ((params.page as number) - 1) * (params.pageSize as number),
-      ),
+      adminReconciliationApi.batches({
+        limit: params.pageSize as number,
+        offset: ((params.page as number) - 1) * (params.pageSize as number),
+        channel: params.channel as string | undefined,
+        status: params.status as string | undefined,
+        from: params.from as string | undefined,
+        to: params.to as string | undefined,
+      }),
     [],
   );
 
   const { data, loading, error, params, setQuery, setPage, reload } =
-    useAdminList<{ items: ReconciliationBatch[]; total: number }>(fetcher);
+    useAdminList<{ items: ReconciliationBatch[]; total: number }>(fetcher, {
+      ...(initialFilterChannel ? { channel: initialFilterChannel } : {}),
+      ...(initialFilterStatus ? { status: initialFilterStatus } : {}),
+      ...(initialFilterFrom ? { from: initialFilterFrom } : {}),
+      ...(initialFilterTo ? { to: initialFilterTo } : {}),
+    });
+
+  useAdminUrlFilterSync({
+    channel: params.channel as string | undefined,
+    status: params.status as string | undefined,
+    from: params.from as string | undefined,
+    to: params.to as string | undefined,
+  });
+
+  const appliedChannel = params.channel as string | undefined;
+  const appliedStatus = params.status as 'imported' | 'resolved' | undefined;
+  const appliedFrom = (params.from as string | undefined) ?? '';
+  const appliedTo = (params.to as string | undefined) ?? '';
+  const appliedFilters: AppliedFilter[] = [
+    appliedChannel
+      ? {
+          key: 'channel',
+          label: `渠道：${CHANNEL_LABELS[appliedChannel] ?? appliedChannel}`,
+          onClear: () => {
+            setFilterChannel(undefined);
+            setQuery({ channel: undefined });
+          },
+        }
+      : null,
+    appliedStatus
+      ? {
+          key: 'status',
+          label: `状态：${appliedStatus === 'resolved' ? '已结案' : '待处置'}`,
+          onClear: () => {
+            setFilterStatus(undefined);
+            setQuery({ status: undefined });
+          },
+        }
+      : null,
+    appliedFrom
+      ? {
+          key: 'from',
+          label: `账单日 ≥ ${appliedFrom}`,
+          onClear: () => {
+            setFilterFrom('');
+            setQuery({ from: undefined });
+          },
+        }
+      : null,
+    appliedTo
+      ? {
+          key: 'to',
+          label: `账单日 ≤ ${appliedTo}`,
+          onClear: () => {
+            setFilterTo('');
+            setQuery({ to: undefined });
+          },
+        }
+      : null,
+  ].filter(Boolean) as AppliedFilter[];
+  const hasBatchFilter = appliedFilters.length > 0;
+  const resetBatchFilters = () => {
+    setFilterChannel(undefined);
+    setFilterStatus(undefined);
+    setFilterFrom('');
+    setFilterTo('');
+    setQuery({ channel: undefined, status: undefined, from: undefined, to: undefined });
+  };
 
   const loadDetail = useCallback(async (id: string) => {
     setDetailLoading(true);
@@ -423,12 +523,79 @@ export function AdminReconciliationPage() {
       {error && data && <AdminStaleError error={error} onRetry={reload} />}
 
       <Panel title="对账批次" note="批次在全部差异处置完成后自动结案">
+        <FilterBar>
+          <Select
+            className="adm-filter-select"
+            placeholder="全部渠道"
+            allowClear
+            value={filterChannel}
+            onChange={(v) => {
+              setFilterChannel(v);
+              setQuery({ channel: v });
+            }}
+            options={CHANNEL_OPTIONS}
+          />
+          <Select
+            className="adm-filter-select"
+            placeholder="全部状态"
+            allowClear
+            value={filterStatus}
+            onChange={(v) => {
+              setFilterStatus(v);
+              setQuery({ status: v });
+            }}
+            options={[
+              { value: 'imported', label: '待处置' },
+              { value: 'resolved', label: '已结案' },
+            ]}
+          />
+          <Input
+            className="adm-filter-input"
+            type="date"
+            aria-label="账单日开始日期"
+            value={filterFrom}
+            onChange={(e) => {
+              setFilterFrom(e.target.value);
+              setQuery({ from: e.target.value || undefined });
+            }}
+          />
+          <Input
+            className="adm-filter-input"
+            type="date"
+            aria-label="账单日结束日期"
+            value={filterTo}
+            onChange={(e) => {
+              setFilterTo(e.target.value);
+              setQuery({ to: e.target.value || undefined });
+            }}
+          />
+          <FilterActions>
+            <Button type="default" className="adm-btn" onClick={resetBatchFilters}>
+              重置
+            </Button>
+          </FilterActions>
+          <AppliedFilters items={appliedFilters} onClearAll={resetBatchFilters} />
+        </FilterBar>
+
         {loading && !data ? (
           <AdminListLoading tip="加载对账批次…" />
         ) : error && !data ? (
           <AdminListError error={error} onRetry={reload} />
         ) : (data?.items.length ?? 0) === 0 ? (
-          <AdminEmpty description="还没有对账记录。导入一份渠道账单开始核对。" />
+          <AdminEmpty
+            description={
+              hasBatchFilter
+                ? '当前筛选下没有对账批次。'
+                : '还没有对账记录。导入一份渠道账单开始核对。'
+            }
+            action={
+              hasBatchFilter ? (
+                <Button type="default" className="adm-btn" onClick={resetBatchFilters}>
+                  清除筛选
+                </Button>
+              ) : undefined
+            }
+          />
         ) : (
           <Table<ReconciliationBatch>
             rowKey="id"

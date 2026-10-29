@@ -7,7 +7,7 @@
 #   2. 前端必须落在后端 CORS 放行的来源上 → 显式覆盖 FRONTEND_PORT 时自动注入 CORS_ORIGINS
 #   3. 不能用 `nest start`（会触发安全守卫拒绝清空 dist）→ 只跑 node dist/main.js
 #   4. 首次运行自动建表 (prisma db push) 并 provision 演示账号 (seed，幂等)
-#   5. Node 需 >= 22.5（依赖内置 node:sqlite）
+#   5. Node 需 >= 22.12（node:sqlite + @nestjs/config 的 require(esm)）
 #
 # 三环境（2026-10-20 起）
 # ---------------------
@@ -283,7 +283,7 @@ if [ "$APP_ENV" = production ]; then
 fi
 
 if ! command -v node >/dev/null 2>&1; then
-  c_err '未找到 node，请先安装 Node.js >= 22.5'; exit 1
+  c_err '未找到 node，请先安装 Node.js >= 22.12'; exit 1
 fi
 
 NODE_VER="$(node -v)"
@@ -291,7 +291,7 @@ node -e '
   const [maj, min] = process.versions.node.split(".").map(Number);
   if (maj < 22 || (maj === 22 && min < 5)) process.exit(1);
 ' || {
-  c_err "Node 版本过低：需要 >= 22.5（依赖内置 node:sqlite），当前 $NODE_VER"; exit 1;
+  c_err "Node 版本过低：需要 >= 22.12（node:sqlite + require(esm)），当前 $NODE_VER"; exit 1;
 }
 c_ok "Node $NODE_VER ✓"
 
@@ -377,11 +377,16 @@ if [ "$RUN_BACKEND" -eq 1 ] && [ "$SKIP_DB" -eq 0 ]; then
   ( cd "$BACKEND_DIR" && NODE_ENV="$NODE_ENV" npm run --silent prisma:push )
   # 只跑 seed 会得到一个「有账号但没有任何在售商品」的库：积分商城空、首页
   # 套餐空、会员买不到。购买链路的种子是 commerce/membership/marketing 三份。
-  # 刻意不跑 seed:admin（会生成随机密码并打印一次），后台账号由用户按需建。
   ( cd "$BACKEND_DIR" && NODE_ENV="$NODE_ENV" npm run --silent seed \
     && NODE_ENV="$NODE_ENV" npm run --silent seed:commerce \
     && NODE_ENV="$NODE_ENV" npm run --silent seed:membership \
     && NODE_ENV="$NODE_ENV" npm run --silent seed:marketing )
+  # development / test 使用固定后台预设账号，启动时自动补齐角色与管理员；
+  # production 不自动创建账号，仍由部署者显式执行 seed:admin 并保存随机密码。
+  if [ "$APP_ENV" != production ]; then
+    ( cd "$BACKEND_DIR" && NODE_ENV="$NODE_ENV" npm run --silent seed:roles \
+      && NODE_ENV="$NODE_ENV" npm run --silent seed:admin )
+  fi
   # seed 已改成环境驱动：未设 SEED_USER_EMAIL 时什么都不建，不再有内置演示凭据。
   c_ok "数据库就绪（$APP_ENV 库）"
   c_info '预置 C 端账号：SEED_USER_EMAIL=you@example.com ./start.sh（密码随机并打印一次，或加 SEED_USER_PASSWORD 指定）'
@@ -510,7 +515,7 @@ c_info "环境  NODE_ENV=$NODE_ENV · 前端 mode=$VITE_MODE"
 c_info "数据  见后端启动日志首行的「运行环境 / 数据库 / 上传目录」"
 if [ "$APP_ENV" != production ]; then
   c_info 'C 端账号  自行注册，或 SEED_USER_EMAIL=… ./start.sh 预置'
-  c_info '后台账号  cd backend && npm run seed:admin（密码随机，仅打印一次）'
+  c_info '后台账号  admin@admin.com / 123456789（development/test 预设）'
 fi
 c_info "日志  backend: $BACKEND_LOG"
 c_info "日志  frontend: $FRONTEND_LOG"

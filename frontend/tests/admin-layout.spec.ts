@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
 
 /**
  * 后台布局回归。
@@ -12,17 +13,6 @@ import { test, expect } from '@playwright/test';
  */
 
 const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
-const EMAIL = process.env.ADMIN_EMAIL ?? 'admin@huojue.local';
-
-async function login(page: import('@playwright/test').Page) {
-  await page.goto(`${UI}/login`);
-  await page.locator('input[type="email"], input#email').first().fill(EMAIL);
-  await page.locator('input[type="password"]').first().fill(
-    process.env.ADMIN_PASSWORD ?? '',
-  );
-  await page.locator('input[type="password"]').first().press('Enter');
-  await page.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 15000 });
-}
 
 const PAGES = [
   ['/admin', '概览'],
@@ -39,12 +29,11 @@ const SIZES: Array<[number, number]> = [
 ];
 
 test.describe('后台布局', () => {
-  test.skip(!process.env.ADMIN_PASSWORD, '未提供 ADMIN_PASSWORD');
+  test.skip(!HAS_ADMIN_CREDENTIALS, '未提供后台管理员凭据');
 
   for (const [w, h] of SIZES) {
     test(`${w}px 宽下内容区正确扣除侧栏宽度且无横向溢出`, async ({ page }) => {
       await page.setViewportSize({ width: w, height: h });
-      await login(page);
 
       for (const [path, name] of PAGES) {
         await page.goto(`${UI}${path}`);
@@ -77,7 +66,6 @@ test.describe('后台布局', () => {
 
   test('侧栏占满视口高度并独立滚动', async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
-    await login(page);
     await page.goto(`${UI}/admin/roles`); // 权限页最长, 最能暴露滚动问题
     await page.waitForSelector('.adm-sider', { timeout: 15000 });
 
@@ -101,7 +89,6 @@ test.describe('后台布局', () => {
 
   test('用户表格行高一致、操作列不换行', async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
-    await login(page);
     await page.goto(`${UI}/admin/users`);
     await page.waitForSelector('.adm-row-actions', { timeout: 15000 });
     await page.waitForTimeout(800);
@@ -126,7 +113,6 @@ test.describe('后台布局', () => {
 
   test('全局搜索可用 Ctrl+K 唤起并支持 Esc 关闭', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await login(page);
     await page.goto(`${UI}/admin/users`);
     await page.waitForSelector('.adm-layout', { timeout: 15000 });
 
@@ -142,7 +128,6 @@ test.describe('后台布局', () => {
 
   test('操作列的下拉菜单可用', async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
-    await login(page);
     await page.goto(`${UI}/admin/users`);
     await page.waitForSelector('.adm-row-actions', { timeout: 15000 });
 
@@ -155,7 +140,6 @@ test.describe('后台布局', () => {
 
   test('审计详情在行内展开，不使用抽屉或确认弹窗', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await login(page);
     await page.goto(`${UI}/admin/audit-logs`);
     await page.waitForSelector('.adm-content', { timeout: 15000 });
     await page.waitForSelector('.ant-table-row', { timeout: 15000 }).catch(() => undefined);

@@ -15,10 +15,12 @@ import {
 } from '../../components/admin/AdminWidgets';
 import {
   AdminEmpty,
+  AppliedFilters,
   FilterActions,
   FilterBar,
   PageHeader,
   Panel,
+  type AppliedFilter,
 } from '../../components/admin/PageHeader';
 import type { AdminAuditListResult } from '../../types/api';
 
@@ -285,6 +287,45 @@ export function AdminAuditPage() {
     setQuery({ action: undefined, targetId: undefined, success: undefined });
   };
 
+  const appliedAction = params.action as string | undefined;
+  const appliedTargetId = (params.targetId as string | undefined) ?? '';
+  const appliedSuccess = params.success as boolean | undefined;
+  const appliedChips: AppliedFilter[] = [
+    appliedAction
+      ? {
+          key: 'action',
+          label: `动作：${ACTION_LABELS[appliedAction] ?? appliedAction}`,
+          onClear: () => {
+            setAction(undefined);
+            setExpandedId(null);
+            setQuery({ action: undefined });
+          },
+        }
+      : null,
+    appliedTargetId
+      ? {
+          key: 'targetId',
+          label: `对象 ID：${appliedTargetId}`,
+          onClear: () => {
+            setTargetId('');
+            setExpandedId(null);
+            setQuery({ targetId: undefined });
+          },
+        }
+      : null,
+    appliedSuccess !== undefined
+      ? {
+          key: 'success',
+          label: `结果：${appliedSuccess ? '成功' : '失败'}`,
+          onClear: () => {
+            setSuccess(undefined);
+            setExpandedId(null);
+            setQuery({ success: undefined });
+          },
+        }
+      : null,
+  ].filter(Boolean) as AppliedFilter[];
+
   /** 导出走已生效的筛选条件 —— 必须与屏幕上的列表同口径 */
   const exportCsv = async () => {
     setExporting(true);
@@ -364,6 +405,7 @@ export function AdminAuditPage() {
             重置
           </Button>
         </FilterActions>
+        <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
       </FilterBar>
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}

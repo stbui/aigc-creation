@@ -4,16 +4,15 @@
  * 需要后端已启动，且用一个有 channel.route / channel.test 权限的管理员登录。
  * 连接与凭据通过环境变量提供：
  *   SMOKE_BASE         默认 http://localhost:3005/api/v1
- *   ADMIN_EMAIL        默认 admin@huojue.local
- *   ADMIN_PASSWORD     必填（seed:admin 只打印一次，脚本不猜密码）
+ *   ADMIN_EMAIL        development/test 默认 admin@admin.com
+ *   ADMIN_PASSWORD     development/test 默认 123456789；production 必填
  *
  * 覆盖：线路 CRUD、token 保持/清除、排序、测试响应形状、sourceAfter、未登录 401。
  * 探测目标固定为不可达地址，不消耗任何模型额度。
  */
 
 const BASE = process.env.SMOKE_BASE || 'http://localhost:3005/api/v1';
-const EMAIL = process.env.ADMIN_EMAIL || 'admin@huojue.local';
-const PASSWORD = process.env.ADMIN_PASSWORD;
+const { email: EMAIL, password: PASSWORD } = require('./admin-credentials').getAdminCredentials();
 
 let pass = 0;
 let fail = 0;

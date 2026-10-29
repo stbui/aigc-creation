@@ -9,6 +9,7 @@ import {
   useAdminResource,
 } from '../../components/admin/AdminWidgets';
 import { AdminEmpty, PageHeader, Panel } from '../../components/admin/PageHeader';
+import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 
 /** 权限点 → 中文说明。未登记的权限点原样显示 id, 不静默消失 */
 const PERMISSION_LABELS: Record<string, string> = {
@@ -138,6 +139,33 @@ export function AdminRolesPage() {
   const roles = data?.roles ?? [];
   const allPermissions = data?.allPermissions ?? [];
 
+  /**
+   * 每个角色相对服务端的差异。
+   *
+   * 同时用于两处：顶部概览的计数，以及保存条只为「真的改过的角色」
+   * 出按钮。把差异算在渲染路径上会让三个角色每次勾选都各扫一遍全部权限，
+   * 尤其是这个页面有 50+ 权限点，统一放 useMemo 更稳。
+   */
+  const roleChanges = useMemo(
+    () =>
+      roles.map((role) => {
+        const current = draft[role.code] ?? new Set<string>();
+        const original = new Set(role.permissions);
+        const added = Array.from(current).filter((code) => !original.has(code));
+        const removed = Array.from(original).filter((code) => !current.has(code));
+        return {
+          code: role.code,
+          label: role.label,
+          current,
+          changedCount: added.length + removed.length,
+        };
+      }),
+    [draft, roles],
+  );
+  const dirtyRoles = roleChanges.filter((role) => role.changedCount > 0);
+
+  useUnsavedGuard(editable && dirtyRoles.length > 0);
+
   /*
    * 草稿按服务端的权限重置: 拉到新数据即重建「已保存态」。
    * 依赖写 `data` 而不是 `roles`(每次渲染都是新数组), 否则每渲染都 setDraft 一次。
@@ -148,6 +176,14 @@ export function AdminRolesPage() {
     for (const r of data.roles) next[r.code] = new Set(r.permissions);
     setDraft(next);
   }, [data]);
+
+  /** 放弃所有未保存的勾选，回到服务端最后一次成功拉到的状态 */
+  const resetDraft = () => {
+    if (!data) return;
+    const next: Record<string, Set<string>> = {};
+    for (const role of data.roles) next[role.code] = new Set(role.permissions);
+    setDraft(next);
+  };
 
   /*
    * 权限点按模块分组, 树状比平铺 54 行可读。
@@ -188,10 +224,25 @@ export function AdminRolesPage() {
     });
   };
 
-  const save = async (code: string, after: Set<string>) => {
+  /**
+   * 一次保存所有改动角色。
+   *
+   * 不提供单角色保存：`reload()` 会用服务端结果重建全部草稿，如果只保存
+   * 其中一个角色，其余角色的未保存勾选会被这次刷新一并抹掉。统一保存后
+   * 再刷新，才不会出现「保存了运营，管理员的改动却消失了」。
+   */
+  const saveAll = async () => {
+    const rolesToSave = dirtyRoles;
+    if (rolesToSave.length === 0) return;
     setBusy(true);
     try {
-      await adminRolesApi.updatePermissions(code, Array.from(after), '后台角色权限调整');
+      for (const role of rolesToSave) {
+        await adminRolesApi.updatePermissions(
+          role.code,
+          Array.from(role.current),
+          '后台角色权限调整',
+        );
+      }
       await reload();
       /*
        * 2026-10-23 修: 原写法是 `if (me?.role === code) await load();` 再调一次
@@ -199,7 +250,7 @@ export function AdminRolesPage() {
        * **根本没有更新 AdminContext 里那份生效权限**, 于是自己的角色被降权后,
        * 侧栏与按钮权限要等整页刷新才变。这里改调 context 的 refresh()。
        */
-      if (me?.role === code) refresh();
+      if (rolesToSave.some((role) => role.code === me?.role)) refresh();
       void message.success('权限已保存，立即生效');
     } catch (e) {
       void message.error((e as Error).message);
@@ -218,36 +269,35 @@ export function AdminRolesPage() {
         title="角色权限"
         description={
           editable
-            ? '勾选变更后点右上角「保存」提交；保存立即生效，无需重启或重新登录'
+            ? '勾选变更后使用保存条提交；保存立即生效，无需重启或重新登录'
             : '当前账号无 role.write 权限，仅可查看'
-        }
-        actions={
-          editable
-            ? roles.map((r) => {
-                const current = draft[r.code] ?? new Set<string>();
-                const original = new Set(r.permissions);
-                const changed =
-                  current.size !== original.size ||
-                  Array.from(current).some((p) => !original.has(p));
-                return (
-                  <Button
-                    key={r.code}
-                    type="primary"
-                    className="adm-btn is-primary"
-                    disabled={!changed || busy}
-                    onClick={() => void save(r.code, current)}
-                  >
-                    保存{r.label}权限
-                    {changed ? ' *' : ''}
-                  </Button>
-                );
-              })
-            : undefined
         }
       />
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
       {error && <AdminStaleError error={error} onRetry={reload} />}
+
+      {editable && dirtyRoles.length > 0 && (
+        <div className="adm-action-bar adm-role-save-bar" role="status">
+          <span className="adm-action-hint">
+            有 {dirtyRoles.length} 个角色未保存：
+            {dirtyRoles.map((role) => `${role.label} ${role.changedCount} 项`).join('、')}
+          </span>
+          <div className="adm-action-buttons">
+            <Button type="default" className="adm-btn" disabled={busy} onClick={resetDraft}>
+              放弃变更
+            </Button>
+            <Button
+              type="primary"
+              className="adm-btn is-primary"
+              disabled={busy}
+              onClick={() => void saveAll()}
+            >
+              保存全部变更
+            </Button>
+          </div>
+        </div>
+      )}
 
       <Panel isNarrow note={`共 ${allPermissions.length} 个权限点，内置角色不可删除，仅可调整权限`}>
         <div className="adm-legend">

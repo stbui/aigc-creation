@@ -344,10 +344,11 @@ duplicate：并入主卡，指向主卡编号
 
 ## 4. 闸口矩阵（命令级）
 
-「全量」指按 `docs/testing.md` 第 3 节清单逐组执行；仓库**没有**一键全量闸口（无 `smoke:all` / `gate:all`），不得在交付摘要里声称「全量通过」而不附逐组结果。
+「全量」指按 `docs/testing.md` 第 3 节清单逐组执行；仓库**没有**一键全量业务冒烟（无 `smoke:all` / `gate:all`），不得在交付摘要里声称「全量通过」而不附逐组结果。根目录 `npm run check` 只覆盖 Node 版本、依赖审计、构建、前端单测与仿真网关测试。
 
 | 层 | 命令 | 何时跑 | 备注 |
 | --- | --- | --- | --- |
+| 工程门禁 | `npm run check` | 阶段 6、9、10 | 根目录执行；静态 + L1/L1.5，不含业务冒烟 |
 | L1 后端 | `cd backend && npm run build` | 阶段 6、9、10 | 需授权；不用 `nest start` |
 | L1 前端 | `cd frontend && npm run typecheck` / `npm run build:prod` | 阶段 6、9、10 | 需授权 |
 | L2 架构 | `cd backend && npx ts-node -T scripts/verify-*.ts` | 阶段 6、7、10 | 按改动域挑；`probe-environments.ts` 不连库 |

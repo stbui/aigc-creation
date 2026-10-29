@@ -10,12 +10,10 @@
  */
 // 可用 API_BASE 覆盖: 端口被其它进程占用时, 冒烟必须能指向目标实例
 const BASE = (process.env.API_BASE || 'http://localhost:4100').replace(/\/$/, '') + '/api/v1';
-// 后台凭据: seed:admin 只在首次运行打印一次性密码, 故允许环境变量覆盖
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@huojue.local';
-// 密码没有默认值: seed:admin 只打印一次, 硬编码等于把后台口令写进仓库
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+// 后台凭据: development/test 使用统一预设, production 必须显式提供 ADMIN_PASSWORD
+const { email: ADMIN_EMAIL, password: ADMIN_PASSWORD } = require('./admin-credentials').getAdminCredentials();
 if (!ADMIN_PASSWORD) {
-  console.error('缺少 ADMIN_PASSWORD: 先 npm run seed:admin, 再用它打印的一次性密码运行本脚本。');
+  console.error('缺少 ADMIN_PASSWORD: production 环境请先 npm run seed:admin，再传入打印的一次性密码。');
   process.exit(1);
 }
 const { PrismaClient } = require('@prisma/client');

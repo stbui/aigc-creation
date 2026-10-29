@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { App, Button, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { Download } from 'lucide-react';
@@ -11,17 +11,21 @@ import {
   AdminStaleError,
   AdminListLoading,
   adminPagination,
+  useAdminDetailParam,
   useAdminList,
   useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
 import {
   AdminEmpty,
+  AppliedFilters,
   FilterActions,
   FilterBar,
   PageHeader,
   Panel,
   StatCard,
+  type AppliedFilter,
 } from '../../components/admin/PageHeader';
+import { adminTaskHref } from '../../lib/admin-links';
 import type { AdminModelCall, AdminModelCallListResult } from '../../types/api';
 
 type Row = AdminModelCall;
@@ -81,7 +85,7 @@ export function AdminModelCallsPage() {
   const [fallback, setFallback] = useState<string | undefined>(
     initialFallback === undefined ? undefined : String(initialFallback),
   );
-  const [detailId, setDetailId] = useState<string | null>(null);
+  const [detailId, setDetailId] = useAdminDetailParam();
   const [exporting, setExporting] = useState(false);
 
   const fetcher = useCallback(
@@ -134,6 +138,53 @@ export function AdminModelCallsPage() {
     setFallback(undefined);
     setQuery({ capability: undefined, source: undefined, success: undefined, fallback: undefined });
   };
+
+  const appliedCapability = params.capability as string | undefined;
+  const appliedSource = params.source as string | undefined;
+  const appliedSuccess = params.success as boolean | undefined;
+  const appliedFallback = params.fallback as boolean | undefined;
+  const appliedChips: AppliedFilter[] = [
+    appliedCapability
+      ? {
+          key: 'capability',
+          label: `能力：${appliedCapability}`,
+          onClear: () => {
+            setCapability(undefined);
+            setQuery({ capability: undefined });
+          },
+        }
+      : null,
+    appliedSource
+      ? {
+          key: 'source',
+          label: `通道：${SOURCE_LABELS[appliedSource] ?? appliedSource}`,
+          onClear: () => {
+            setSource(undefined);
+            setQuery({ source: undefined });
+          },
+        }
+      : null,
+    appliedSuccess !== undefined
+      ? {
+          key: 'success',
+          label: `结果：${appliedSuccess ? '成功' : '失败'}`,
+          onClear: () => {
+            setSuccess(undefined);
+            setQuery({ success: undefined });
+          },
+        }
+      : null,
+    appliedFallback !== undefined
+      ? {
+          key: 'fallback',
+          label: `历史回落：${appliedFallback ? '已回落' : '未回落'}`,
+          onClear: () => {
+            setFallback(undefined);
+            setQuery({ fallback: undefined });
+          },
+        }
+      : null,
+  ].filter(Boolean) as AppliedFilter[];
 
   /** 导出走已生效的筛选条件 —— 必须与屏幕上的列表同口径 */
   const exportCsv = async () => {
@@ -361,6 +412,7 @@ export function AdminModelCallsPage() {
             重置
           </Button>
         </FilterActions>
+        <AppliedFilters items={appliedChips} onClearAll={reset} />
       </FilterBar>
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
@@ -448,7 +500,9 @@ export function AdminModelCallsPage() {
                   <>
                     <dt>网关任务</dt>
                     <dd>
-                      <code>{row.taskId}</code>
+                      <Link className="adm-link" to={adminTaskHref(row.taskId)}>
+                        <code>{row.taskId}</code>
+                      </Link>
                     </dd>
                   </>
                 )}

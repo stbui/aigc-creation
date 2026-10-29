@@ -14770,6 +14770,23 @@ html[data-promo='off'] .multi-image-fusion-page {
   margin: 0;
   color: var(--text-strong);
 }
+.adm-relation-links {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin-top: 2px;
+}
+.adm-relation-links a {
+  color: var(--brand);
+  font-size: 12px;
+  line-height: 20px;
+  text-decoration: none;
+}
+.adm-relation-links a:hover {
+  color: var(--brand-hover);
+  text-decoration: underline;
+}
 
 .adm-reason-box {
   background: var(--warn-bg);
@@ -14815,6 +14832,24 @@ html[data-promo='off'] .multi-image-fusion-page {
 .adm-mini-item:last-child {
   border-bottom: none;
 }
+.adm-mini-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+.adm-mini-link:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: var(--radius-control);
+}
+.adm-mini-link:hover .adm-mini-name,
+.adm-mini-link:focus-visible .adm-mini-name {
+  color: var(--brand);
+}
 .adm-mini-thumb {
   width: 32px;
   height: 32px;
@@ -14852,6 +14887,15 @@ html[data-promo='off'] .multi-image-fusion-page {
   border-radius: var(--radius-control);
   background: var(--surface);
   cursor: pointer;
+}
+.adm-thumb-link {
+  display: block;
+  min-width: 0;
+  border-radius: var(--radius-control);
+}
+.adm-thumb-link:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
 }
 
 .adm-diff-table {
@@ -25931,4 +25975,88 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
 .adm-layout.is-compact .adm-task-item {
   padding-top: 6px;
   padding-bottom: 6px;
+}
+
+/* ── 后台交互细化 (2026-10-29) ─────────────────────────────────────────
+   · 已生效筛选用 antd Tag 呈现，保留 Tag 自带的关闭语义
+   · 长邮箱 / 订单号在窄列里用省略号收住，title 仍可读全文
+   · 角色权限页的保存条在有改动时才出现，避免长页面来回滚动
+   ──────────────────────────────────────────────────────────────────── */
+.adm-filter-chip.ant-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  margin-inline-end: 0;
+  padding-inline: 9px;
+  border-color: var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-tint);
+  color: var(--text-body);
+  font-size: 12px;
+  line-height: 22px;
+}
+.adm-filter-chip.ant-tag .ant-tag-close-icon {
+  margin-inline-start: 2px;
+  color: var(--text-desc);
+  font-size: 10px;
+}
+.adm-filter-chip.ant-tag .ant-tag-close-icon:hover {
+  color: var(--brand);
+}
+
+.adm-cell-clip {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+a.adm-task-item {
+  color: inherit;
+  text-decoration: none;
+}
+a.adm-task-item:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+.adm-task-arrow {
+  flex: 0 0 auto;
+  color: var(--border-dot);
+  transition: color 0.15s ease, transform 0.15s ease;
+}
+a.adm-task-item:hover .adm-task-arrow,
+a.adm-task-item:focus-visible .adm-task-arrow {
+  color: var(--brand);
+  transform: translateX(2px);
+}
+
+.adm-role-save-bar {
+  max-width: 780px;
+  top: 68px;
+  bottom: auto;
+  margin-top: 0;
+  margin-bottom: 12px;
+  z-index: 12;
+  flex-wrap: wrap;
+}
+.adm-content > .adm-role-save-bar {
+  width: 100%;
+  margin-inline: auto;
+}
+.adm-role-save-bar .adm-action-buttons {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  a.adm-task-item,
+  .adm-task-arrow {
+    transition: none;
+  }
+  a.adm-task-item:hover .adm-task-arrow {
+    transform: none;
+  }
 }

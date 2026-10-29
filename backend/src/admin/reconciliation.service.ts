@@ -238,16 +238,36 @@ export class AdminReconciliationService {
     return this.batchDetail(batch.id);
   }
 
-  async listBatches(limit = 20, offset = 0) {
-    const take = Math.min(Math.max(Number(limit) || 20, 1), 100);
-    const skip = Math.max(Number(offset) || 0, 0);
+  async listBatches(query: {
+    limit?: number;
+    offset?: number;
+    channel?: string;
+    status?: string;
+    from?: string;
+    to?: string;
+  } = {}) {
+    const take = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
+    const skip = Math.max(Number(query.offset) || 0, 0);
+    const where = {
+      ...(query.channel ? { channel: query.channel } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.from || query.to
+        ? {
+            billDate: {
+              ...(query.from ? { gte: query.from } : {}),
+              ...(query.to ? { lte: query.to } : {}),
+            },
+          }
+        : {}),
+    };
     const [items, total] = await Promise.all([
       this.prisma.reconciliationBatch.findMany({
+        where,
         orderBy: { createdAt: 'desc' },
         take,
         skip,
       }),
-      this.prisma.reconciliationBatch.count(),
+      this.prisma.reconciliationBatch.count({ where }),
     ]);
     return { items, total };
   }

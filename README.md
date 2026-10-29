@@ -98,6 +98,8 @@
 
 ```
 aigc-creation/
+├── package.json                # 根级工程命令（check / build / test / setup）
+├── .github/workflows/ci.yml    # CI：静态门禁 + 单元测试 + 后台 E2E 冒烟
 ├── start.sh                    # 一键启动（--env development|test|prod；端口占用即停 + 建表 + 种子）
 ├── README.md                   # 本文：现状速查
 ├── docs/                       # 分类文档，地图见 docs/README.md
@@ -134,9 +136,24 @@ aigc-creation/
 
 逐模块注释的完整目录树见 `CLAUDE.md`「目录结构」。
 
+## 工程命令
+
+统一从仓库根目录执行，默认 Node 版本见 `.node-version`（24 LTS，最低 22.12）：
+
+```bash
+npm run setup                 # 干净环境安装依赖并生成 Prisma Client（npm ci）
+npm run check                 # Node 版本 + 依赖审计 + 全量构建 + 单元/组件/仿真网关测试
+npm run check:node            # 只检查 Node 版本
+npm run build                 # 后端 Nest 构建 + 前端生产构建
+npm run test                  # 前端 Vitest + 仿真模型网关测试
+npm run test:e2e:smoke        # 后台登录与概览页 E2E 冒烟（需先启动测试档）
+```
+
+`npm run check` 是静态与 L1/L1.5 门禁，不等于全量业务冒烟；交易、支付、权限等链路仍按 `docs/testing.md` 分组执行。CI 配置见 `.github/workflows/ci.yml`。
+
 ## 启动
 
-**前置**：Node ≥ 22.5（依赖内置 `node:sqlite`）
+**前置**：Node ≥ 22.12（内置 `node:sqlite` 与 `@nestjs/config` 的 `require(esm)` 都需要）
 
 推荐直接用一键启动脚本（自动处理端口占用、建表 + 种子、前后端同时起）：
 
@@ -222,7 +239,7 @@ SEED_EMAIL=you@example.com SEED_PASSWORD='…' API=http://localhost:4100 \
 
 浏览器端报错排查顺序：先看后端启动日志那行 `CORS origins: ...`，再确认浏览器地址栏的 host:port 是否在列表内——`localhost` 与 `127.0.0.1` 在 CORS 判定上是不同来源，不能互换。
 
-开发账号由环境变量决定：`SEED_USER_EMAIL=dev@example.com npm run seed`（`SEED_USER_PASSWORD` 可指定密码，未指定则随机生成并只打印一次；未设置邮箱时脚本什么都不建）。可选初始积分 `SEED_USER_CREDITS`（默认 0）。登录页不预填任何凭据。后台管理员另用 `npm run seed:admin` 生成，两者是两套账号。首次上传时前端会自动创建「默认项目」。
+开发账号由环境变量决定：`SEED_USER_EMAIL=dev@example.com npm run seed`（`SEED_USER_PASSWORD` 可指定密码，未指定则随机生成并只打印一次；未设置邮箱时脚本什么都不建）。可选初始积分 `SEED_USER_CREDITS`（默认 0）。登录页不预填任何凭据。后台管理员在 development / test 统一为 `admin@admin.com / 123456789`，production 使用 `npm run seed:admin` 生成的一次性密码，两者是两套账号。首次上传时前端会自动创建「默认项目」。
 
 登录令牌 TTL 默认 7 天（本地 MVP 无 refresh 机制，`JWT_TTL` 环境变量可覆盖；生产应恢复短 TTL + refresh）。
 

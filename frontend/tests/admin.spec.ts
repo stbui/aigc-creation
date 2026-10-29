@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
+import { HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
 
 /**
  * 后台管理端 E2E 冒烟。
@@ -7,32 +8,12 @@ import { test, expect, type Page } from '@playwright/test';
  * 前置: 后端与前端 dev server 已在 BASE 指向的端口运行, 且已 seed 管理员。
  */
 
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? 'admin@huojue.local';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? '';
-
 const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
 
-/** 通过 UI 登录页登录 */
-async function loginViaUi(page: Page) {
-  await page.goto(`${UI}/login`);
-  await page.waitForLoadState('domcontentloaded');
-  // 登录页可能是自绘表单或 antd Form, 两者选择器都试
-  const emailInput = page.locator('input[type="email"], input#email, input[name="email"]').first();
-  await emailInput.waitFor({ state: 'visible', timeout: 15000 });
-  await emailInput.fill(ADMIN_EMAIL);
-
-  const pwdInput = page.locator('input[type="password"]').first();
-  await pwdInput.fill(ADMIN_PASSWORD);
-  await pwdInput.press('Enter');
-
-  await page.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 15000 });
-}
-
 test.describe('后台管理端', () => {
-  test.skip(!ADMIN_PASSWORD, '未提供 ADMIN_PASSWORD, 跳过登录相关用例');
+  test.skip(!HAS_ADMIN_CREDENTIALS, '未提供后台管理员凭据, 跳过登录相关用例');
 
   test('概览页加载真实统计', async ({ page }) => {
-    await loginViaUi(page);
     await page.goto(`${UI}/admin`);
     await expect(page.getByRole('heading', { name: '平台概览' })).toBeVisible({ timeout: 15000 });
     await expect(page.getByText('用户总数')).toBeVisible();
@@ -40,7 +21,6 @@ test.describe('后台管理端', () => {
   });
 
   test('用户管理页渲染列表', async ({ page }) => {
-    await loginViaUi(page);
     await page.goto(`${UI}/admin/users`);
     await expect(page.getByRole('heading', { name: '用户管理' })).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.adm-filter').first()).toBeVisible();
@@ -49,14 +29,12 @@ test.describe('后台管理端', () => {
   });
 
   test('角色权限页渲染权限模块', async ({ page }) => {
-    await loginViaUi(page);
     await page.goto(`${UI}/admin/roles`);
     await expect(page.getByRole('heading', { name: '角色权限' })).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.adm-perm-module').first()).toBeVisible();
   });
 
   test('系统设置页渲染 Tab 与设置项', async ({ page }) => {
-    await loginViaUi(page);
     await page.goto(`${UI}/admin/settings`);
     await expect(page.getByRole('heading', { name: '系统设置' })).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.adm-tab').first()).toBeVisible();
@@ -64,7 +42,6 @@ test.describe('后台管理端', () => {
   });
 
   test('操作审计页渲染表格', async ({ page }) => {
-    await loginViaUi(page);
     await page.goto(`${UI}/admin/audit-logs`);
     await expect(page.getByRole('heading', { name: '操作审计' })).toBeVisible({ timeout: 15000 });
     await expect(page.locator('.adm-filter').first()).toBeVisible();
@@ -81,7 +58,6 @@ test.describe('后台管理端', () => {
     ['/admin/notifications', '站内消息'],
   ] as const) {
     test(`${heading}页不得常驻确认弹窗或操作条`, async ({ page }) => {
-      await loginViaUi(page);
       await page.goto(`${UI}${path}`);
       await expect(page.getByRole('heading', { name: heading })).toBeVisible({ timeout: 15000 });
       await expect(page.locator('.adm-modal-mask')).toHaveCount(0);
@@ -103,7 +79,13 @@ test.describe('越权拦截', () => {
     const email = `e2e-admin-${stamp}@test.local`;
     const password = 'test123456';
 
+    // 共用登录态会带到本用例；先清掉管理员会话，才是真正的普通用户路径。
     await page.goto(`${UI}/login`);
+    await page.evaluate(() => {
+      localStorage.clear();
+      sessionStorage.clear();
+    });
+    await page.reload();
     await page.waitForLoadState('domcontentloaded');
 
     const emailInput = page.locator('input[type="email"], input#email, input[name="email"]').first();

@@ -118,7 +118,9 @@ export class AdminSearchService {
           id: u.id,
           title: `${u.name} (${u.email})`,
           subtitle: `${roleLabel(u.role)} · ${statusLabel(u.status)}`,
-          link: `/admin/users?q=${encodeURIComponent(u.email)}`,
+          // 用户页已支持 ?id= 直接展开详情：搜索的目标是「看这个人」，
+          // 落到被邮箱筛过的列表后还要再点一次详情，多此一举。
+          link: `/admin/users?id=${encodeURIComponent(u.id)}`,
         })),
       },
       {
@@ -129,7 +131,7 @@ export class AdminSearchService {
           id: o.id,
           title: o.orderNo,
           subtitle: `${o.user?.email ?? ''} · ¥${yuan(o.paidCents > 0 ? o.paidCents : o.totalCents)} · ${o.status}`,
-          link: `/admin/orders?orderNo=${encodeURIComponent(o.orderNo)}`,
+          link: `/admin/orders?id=${encodeURIComponent(o.id)}`,
         })),
       },
       {

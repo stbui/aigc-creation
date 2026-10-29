@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App, Button, Drawer, Input, Select, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Download, Send, UserCheck } from 'lucide-react';
 import { adminTicketsApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
@@ -10,17 +10,29 @@ import {
   AdminStaleError,
   AdminListLoading,
   adminPagination,
+  useAdminDetailParam,
   useAdminList,
+  useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
 import {
   AdminEmpty,
+  AppliedFilters,
   FilterActions,
   FilterBar,
   PageHeader,
   Panel,
   StatCard,
   StatusTag,
+  type AppliedFilter,
 } from '../../components/admin/PageHeader';
+import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
+import {
+  adminAssetHref,
+  adminCreditHref,
+  adminOrderDetailHref,
+  adminOrderHref,
+  adminUserDetailHref,
+} from '../../lib/admin-links';
 import type {
   AdminTicketDetail,
   AdminTicketRow,
@@ -106,8 +118,6 @@ export function AdminTicketsPage() {
   const { can, me } = useAdmin();
 
   const [stats, setStats] = useState<TicketStats | null>(null);
-  /** 关键词草稿：只有点「查询」或回车才生效，避免失焦与翻页互相抢请求 */
-  const [qDraft, setQDraft] = useState('');
 
   /** 顶栏搜索带 `?id=` 跳过来时直接展开该工单 */
   const [searchParams] = useSearchParams();
@@ -116,12 +126,23 @@ export function AdminTicketsPage() {
     rawUrlTicketStatus && TICKET_STATUSES.includes(rawUrlTicketStatus as TicketStatus)
       ? rawUrlTicketStatus
       : undefined;
+  const rawUrlType = searchParams.get('type');
+  const urlTicketType =
+    rawUrlType && Object.prototype.hasOwnProperty.call(TYPE_LABELS, rawUrlType)
+      ? rawUrlType
+      : undefined;
+  const rawUrlPriority = searchParams.get('priority');
+  const urlTicketPriority =
+    rawUrlPriority && Object.prototype.hasOwnProperty.call(PRIORITY_LABELS, rawUrlPriority)
+      ? rawUrlPriority
+      : undefined;
+  const urlAssigneeId = searchParams.get('assigneeId') ?? undefined;
+  const urlQ = searchParams.get('q') ?? '';
+
+  /** 关键词草稿：只有点「查询」或回车才生效，避免失焦与翻页互相抢请求 */
+  const [qDraft, setQDraft] = useState(urlQ);
   const appliedUrlStatus = useRef<string | undefined>(urlTicketStatus);
-  const [detailId, setDetailId] = useState<string | null>(() => searchParams.get('id'));
-  useEffect(() => {
-    const id = searchParams.get('id');
-    if (id) setDetailId(id);
-  }, [searchParams]);
+  const [detailId, setDetailId] = useAdminDetailParam();
   const [detail, setDetail] = useState<AdminTicketDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -145,7 +166,13 @@ export function AdminTicketsPage() {
   const { data, loading, error, params, setQuery, setPage, reload } =
     useAdminList<{ items: AdminTicketRow[]; total: number; counts: Record<string, number> }>(
       fetcher,
-      { ...(urlTicketStatus ? { status: urlTicketStatus } : {}) },
+      {
+        ...(urlTicketStatus ? { status: urlTicketStatus } : {}),
+        ...(urlTicketType ? { type: urlTicketType } : {}),
+        ...(urlTicketPriority ? { priority: urlTicketPriority } : {}),
+        ...(urlAssigneeId ? { assigneeId: urlAssigneeId } : {}),
+        ...(urlQ ? { q: urlQ } : {}),
+      },
     );
 
   /* 告警中心链接 `?status=open`：已在本页时也要把筛选同步过去 */
@@ -158,6 +185,14 @@ export function AdminTicketsPage() {
     // 浏览器后退到无 status 的地址时也要清掉筛选，否则列表与地址栏不一致
     setQuery({ status: next });
   }, [searchParams, setQuery]);
+
+  useAdminUrlFilterSync({
+    status: params.status as string | undefined,
+    type: params.type as string | undefined,
+    priority: params.priority as string | undefined,
+    assigneeId: params.assigneeId as string | undefined,
+    q: params.q as string | undefined,
+  });
 
   const loadStats = useCallback(() => {
     adminTicketsApi
@@ -282,7 +317,9 @@ export function AdminTicketsPage() {
       width: 280,
       render: (_: unknown, row) => (
         <div className="adm-cell-stack">
-          <span>{row.subject}</span>
+          <span className="adm-cell-clip" title={row.subject}>
+            {row.subject}
+          </span>
           <span className="adm-cell-sub">
             <code>{row.ticketNo}</code> · {row.typeLabel || TYPE_LABELS[row.type]}
           </span>
@@ -296,7 +333,11 @@ export function AdminTicketsPage() {
       render: (_: unknown, row) => (
         <div className="adm-cell-stack">
           <span>{row.userName || '—'}</span>
-          <span className="adm-cell-sub">{row.userEmail}</span>
+          <span className="adm-cell-sub adm-cell-clip" title={row.userEmail}>
+            <Link className="adm-link" to={adminUserDetailHref(row.userId)}>
+              {row.userEmail}
+            </Link>
+          </span>
         </div>
       ),
     },
@@ -359,6 +400,7 @@ export function AdminTicketsPage() {
   const applyKeyword = () => setQuery({ q: qDraft.trim() || undefined });
 
   const resetFilters = () => {
+    appliedUrlStatus.current = undefined;
     setQDraft('');
     setQuery({
       status: undefined,
@@ -369,7 +411,62 @@ export function AdminTicketsPage() {
     });
   };
 
-  const hasFilter = Boolean(params.status || params.type || params.priority || params.assigneeId || params.q);
+  const appliedStatus = params.status as string | undefined;
+  const appliedType = params.type as string | undefined;
+  const appliedPriority = params.priority as string | undefined;
+  const appliedAssignee = params.assigneeId as string | undefined;
+  const appliedQ = (params.q as string | undefined) ?? '';
+  const appliedChips: AppliedFilter[] = [
+    appliedStatus
+      ? {
+          key: 'status',
+          label: `状态：${STATUS_LABELS[appliedStatus as TicketStatus] ?? appliedStatus}`,
+          onClear: () => {
+            appliedUrlStatus.current = undefined;
+            setQuery({ status: undefined });
+          },
+        }
+      : null,
+    appliedType
+      ? {
+          key: 'type',
+          label: `类型：${TYPE_LABELS[appliedType as TicketType] ?? appliedType}`,
+          onClear: () => setQuery({ type: undefined }),
+        }
+      : null,
+    appliedPriority
+      ? {
+          key: 'priority',
+          label: `优先级：${PRIORITY_LABELS[appliedPriority as TicketPriority] ?? appliedPriority}`,
+          onClear: () => setQuery({ priority: undefined }),
+        }
+      : null,
+    appliedAssignee
+      ? {
+          key: 'assigneeId',
+          label:
+            appliedAssignee === 'unassigned'
+              ? '归属：仅未指派'
+              : `处理人：${appliedAssignee}`,
+          onClear: () => setQuery({ assigneeId: undefined }),
+        }
+      : null,
+    appliedQ
+      ? {
+          key: 'q',
+          label: `关键词：${appliedQ}`,
+          onClear: () => {
+            setQDraft('');
+            setQuery({ q: undefined });
+          },
+        }
+      : null,
+  ].filter(Boolean) as AppliedFilter[];
+  const hasFilter = appliedChips.length > 0;
+
+  const replyDirty = detailId !== null && Boolean(reply.trim());
+  useUnsavedGuard(replyDirty);
+  const requestCloseDetail = useDiscardConfirm(replyDirty, () => setDetailId(null));
 
   return (
     <>
@@ -401,7 +498,10 @@ export function AdminTicketsPage() {
             placeholder="全部状态"
             allowClear
             value={(params.status as string) || undefined}
-            onChange={(v) => setQuery({ status: v })}
+            onChange={(v) => {
+              appliedUrlStatus.current = v;
+              setQuery({ status: v });
+            }}
             options={[
               { value: 'open', label: '待处理' },
               { value: 'processing', label: '处理中' },
@@ -462,6 +562,7 @@ export function AdminTicketsPage() {
                       status: params.status as string | undefined,
                       type: params.type as string | undefined,
                       priority: params.priority as string | undefined,
+                      assigneeId: params.assigneeId as string | undefined,
                       q: params.q as string | undefined,
                     })
                     .catch((e: Error) => message.error(e.message))
@@ -472,6 +573,7 @@ export function AdminTicketsPage() {
               </Button>
             )}
           </FilterActions>
+          <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
         </FilterBar>
 
         {loading && !data ? (
@@ -511,7 +613,7 @@ export function AdminTicketsPage() {
         title={detail ? `${detail.subject} · ${detail.ticketNo}` : '工单详情'}
         size={760}
         open={detailId !== null}
-        onClose={() => setDetailId(null)}
+        onClose={requestCloseDetail}
         className="adm-drawer"
         destroyOnHidden
       >
@@ -536,7 +638,20 @@ export function AdminTicketsPage() {
               </dd>
               <dt>提交人</dt>
               <dd>
-                {detail.user.name || '—'} <span className="adm-cell-sub">{detail.user.email}</span>
+                <div>
+                  {detail.user.name || '—'} ·{' '}
+                  <Link className="adm-link" to={adminUserDetailHref(detail.user.id)}>
+                    {detail.user.email}
+                  </Link>
+                </div>
+                <div className="adm-relation-links">
+                  <Link
+                    to={adminCreditHref({ userId: detail.user.id, email: detail.user.email })}
+                  >
+                    积分账本
+                  </Link>
+                  <Link to={adminOrderHref({ email: detail.user.email })}>全部订单</Link>
+                </div>
               </dd>
               <dt>类型</dt>
               <dd>{detail.typeLabel || TYPE_LABELS[detail.type]}</dd>
@@ -567,9 +682,12 @@ export function AdminTicketsPage() {
                 <>
                   <dt>关联订单</dt>
                   <dd>
-                    <a href={`/admin/orders?orderNo=${encodeURIComponent(detail.related.order.orderNo)}`}>
+                    <Link
+                      className="adm-link"
+                      to={adminOrderDetailHref(detail.related.order.id)}
+                    >
                       {detail.related.order.orderNo}
-                    </a>{' '}
+                    </Link>{' '}
                     <span className="adm-cell-sub">
                       {detail.related.order.status} · ¥
                       {(detail.related.order.paidCents / 100).toFixed(2)}
@@ -581,7 +699,9 @@ export function AdminTicketsPage() {
                 <>
                   <dt>关联素材</dt>
                   <dd>
-                    <code>{detail.related.asset.id}</code>{' '}
+                    <Link className="adm-link" to={adminAssetHref(detail.related.asset.id)}>
+                      <code>{detail.related.asset.id}</code>
+                    </Link>{' '}
                     <span className="adm-cell-sub">
                       {detail.related.asset.width}×{detail.related.asset.height}
                     </span>
