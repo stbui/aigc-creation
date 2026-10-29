@@ -12,7 +12,7 @@ import {
   toDisplayPath,
   writeJson,
 } from './lib.mjs';
-import { SessionStore, appendUserMessage, upsertItem } from './sessions.mjs';
+import { SessionStore, appendNotice, appendUserMessage, upsertItem } from './sessions.mjs';
 import { SessionStorage } from './storage.mjs';
 import { isBenignCodexDiagnostic } from './diagnostics.mjs';
 
@@ -89,7 +89,7 @@ export function createAgentServer({ config, codex = createCodex(config) }) {
   const sessions = new SessionStore({
     maxSessions: config.maxSessions,
     initialSessions: storage?.load() || [],
-    onChange: () => storage?.schedule(sessions.snapshot()),
+    onChange: () => storage?.schedule(() => sessions.snapshot()),
   });
 
   if (!config.allowDangerFullAccess) {
@@ -372,6 +372,8 @@ async function runTurn(req, res, session, { config, codex }) {
   // 先占住会话再读请求体：读 body 是异步的，两个并发请求会在等待期间同时通过上面的检查，
   // 导致同一个 Codex 线程被并发驱动（命令被重复执行、时间线交错）。占位后任何校验失败都要释放。
   session.status = 'running';
+  const controller = new AbortController();
+  session.abortController = controller;
 
   let prompt;
   let messageId;
@@ -385,9 +387,12 @@ async function runTurn(req, res, session, { config, codex }) {
       typeof body.messageId === 'string' && /^[A-Za-z0-9_-]{1,120}$/.test(body.messageId)
         ? body.messageId
         : undefined;
+    if (controller.signal.aborted) throw new HttpError(409, '任务已取消');
     thread = ensureSessionThread(session, codex, config);
   } catch (error) {
     session.status = 'idle';
+    if (session.abortController === controller) session.abortController = null;
+    session.updatedAt = Date.now();
     throw error;
   }
 
@@ -396,9 +401,6 @@ async function runTurn(req, res, session, { config, codex }) {
   session.lastError = null;
   session.usage = null;
   sessionsNotify(session);
-
-  const controller = new AbortController();
-  session.abortController = controller;
 
   res.writeHead(200, {
     'Content-Type': 'text/event-stream; charset=utf-8',
@@ -454,17 +456,24 @@ async function runTurn(req, res, session, { config, codex }) {
     send({ type: 'error', ...failure });
   };
 
+  let iterator = null;
+  let iteratorDone = false;
+  let sawTurnCompleted = false;
+  const waitForUpstream = (promise) =>
+    raceIdleTimeout(promise, idleTimeoutMs, triggerIdleTimeout, controller.signal);
+
   try {
-    const streamed = await raceIdleTimeout(
+    const streamed = await waitForUpstream(
       thread.runStreamed(prompt, { signal: controller.signal }),
-      idleTimeoutMs,
-      triggerIdleTimeout,
     );
-    const iterator = streamed.events[Symbol.asyncIterator]();
+    iterator = streamed.events[Symbol.asyncIterator]();
 
     while (true) {
-      const step = await raceIdleTimeout(iterator.next(), idleTimeoutMs, triggerIdleTimeout);
-      if (step.done) break;
+      const step = await waitForUpstream(iterator.next());
+      if (step.done) {
+        iteratorDone = true;
+        break;
+      }
       const event = step.value;
       if (!event || typeof event.type !== 'string') continue;
 
@@ -495,6 +504,7 @@ async function runTurn(req, res, session, { config, codex }) {
         outcome = 'completed';
         failure = null;
         session.lastError = null;
+        sawTurnCompleted = true;
       } else if (event.type === 'turn.failed') {
         outcome = 'failed';
         session.lastError = event.error?.message || 'Codex 任务失败';
@@ -516,6 +526,15 @@ async function runTurn(req, res, session, { config, codex }) {
       }
       send({ type: 'event', event: outboundEvent });
     }
+
+    if (!sawTurnCompleted && outcome !== 'failed' && !controller.signal.aborted) {
+      outcome = 'failed';
+      failure = {
+        message: 'Codex 事件流在本轮完成前意外结束，请重试当前任务。',
+      };
+      session.lastError = failure.message;
+      send({ type: 'error', ...failure });
+    }
   } catch (error) {
     if (timedOut) {
       failForTimeout();
@@ -532,7 +551,14 @@ async function runTurn(req, res, session, { config, codex }) {
   } finally {
     finished = true;
     clearInterval(heartbeat);
-    session.abortController = null;
+    if (iterator && !iteratorDone) {
+      try {
+        Promise.resolve(iterator.return?.()).catch(() => {});
+      } catch {
+        // 上游已经关闭时 return 也可能同步抛错，不影响本轮收尾。
+      }
+    }
+    if (session.abortController === controller) session.abortController = null;
     session.status = 'idle';
     session.updatedAt = Date.now();
     sessionsNotify(session);
@@ -550,13 +576,7 @@ async function runTurn(req, res, session, { config, codex }) {
           entry.item?.message === failure.message,
       );
       if (!alreadyCaptured) {
-        session.timeline.push({
-          type: 'notice',
-          id: `notice-${randomUUID()}`,
-          level: 'error',
-          text: failure.message,
-          createdAt: new Date().toISOString(),
-        });
+        appendNotice(session, failure.message, 'error');
         sessionsNotify(session);
       }
     }
@@ -600,13 +620,16 @@ class TurnIdleTimeoutError extends Error {
  * 在 ms 内等待上游 promise。超时先执行 onTimeout（通常是 abort 上游），
  * 再以 TurnIdleTimeoutError 拒绝；ms <= 0 表示关闭超时。
  */
-async function raceIdleTimeout(promise, ms, onTimeout) {
-  if (!ms || ms <= 0) return promise;
+async function raceIdleTimeout(promise, ms, onTimeout, signal) {
+  if ((!ms || ms <= 0) && !signal) return promise;
+  if (signal?.aborted) throw signal.reason || new Error('aborted');
+
   let timer;
+  let onAbort;
   try {
-    return await Promise.race([
-      promise,
-      new Promise((resolve, reject) => {
+    const waits = [promise];
+    if (ms > 0) {
+      waits.push(new Promise((resolve, reject) => {
         timer = setTimeout(() => {
           try {
             onTimeout();
@@ -615,10 +638,18 @@ async function raceIdleTimeout(promise, ms, onTimeout) {
           }
         }, ms);
         timer.unref?.();
-      }),
-    ]);
+      }));
+    }
+    if (signal) {
+      waits.push(new Promise((resolve, reject) => {
+        onAbort = () => reject(signal.reason || new Error('aborted'));
+        signal.addEventListener('abort', onAbort, { once: true });
+      }));
+    }
+    return await Promise.race(waits);
   } finally {
     clearTimeout(timer);
+    if (onAbort) signal.removeEventListener('abort', onAbort);
   }
 }
 

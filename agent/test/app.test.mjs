@@ -154,6 +154,39 @@ function makeErrorEventThread(options) {
   };
 }
 
+/** 模拟上游异常退出：没有任何终态事件，事件流直接结束。 */
+function makeTruncatedThread(options) {
+  return {
+    options,
+    async runStreamed(prompt) {
+      const events = (async function* generate() {
+        yield { type: 'thread.started', thread_id: 'thread-truncated-123456' };
+        yield { type: 'turn.started' };
+        yield {
+          type: 'item.completed',
+          item: { id: 'message-truncated-1', type: 'agent_message', text: `收到：${prompt}` },
+        };
+      })();
+      return { events };
+    },
+  };
+}
+
+/** 上游明确返回 turn.failed 终态。 */
+function makeTurnFailedThread(options) {
+  return {
+    options,
+    async runStreamed() {
+      const events = (async function* generate() {
+        yield { type: 'thread.started', thread_id: 'thread-failed-123456' };
+        yield { type: 'turn.started' };
+        yield { type: 'turn.failed', error: { message: 'model overloaded' } };
+      })();
+      return { events };
+    },
+  };
+}
+
 /**
  * 模拟 Codex CLI 的可恢复重试：先发顶层 error（如传输回退），随后照常完成这一轮。
  * 真实场景见 DeepSeek 等只支持 HTTP 版 Responses API 的端点。
@@ -389,6 +422,25 @@ test('rejects a second turn while another turn is still being submitted', async 
   });
   assert.equal(third.status, 200);
   await third.text();
+});
+
+test('cancels a turn while its request body is still being submitted', async (t) => {
+  const { baseUrl } = await startServer(t);
+  const { payload } = await createSession(baseUrl, {});
+  const sessionId = payload.session.id;
+
+  const first = startTurnRequest(baseUrl, sessionId, { prompt: 'cancel me' }, 150);
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  const cancelled = await fetch(`${baseUrl}/api/sessions/${sessionId}/cancel`, { method: 'POST' });
+  assert.equal(cancelled.status, 200);
+
+  const firstResult = await first;
+  assert.equal(firstResult.status, 409);
+  assert.match(firstResult.text, /已取消/);
+
+  const history = await (await fetch(`${baseUrl}/api/sessions/${sessionId}`)).json();
+  assert.equal(history.session.status, 'idle');
+  assert.equal(history.timeline.some((entry) => entry.type === 'user_message'), false);
 });
 
 test('answers malformed URL paths with 400 instead of 500', async (t) => {
@@ -672,6 +724,77 @@ test('treats a top-level error event as a failed turn', { timeout: 5_000 }, asyn
   assert.ok(
     history.timeline.some(
       (entry) => entry.type === 'notice' && entry.level === 'error' && entry.text === 'stream exploded',
+    ),
+  );
+});
+
+test('fails a turn when the event stream ends without turn.completed', async (t) => {
+  const root = mkdtempSync(path.join(tmpdir(), 'codex-web-stream-truncated-'));
+  const config = makeConfig(root);
+  const codex = {
+    startThread(options) {
+      return makeTruncatedThread(options);
+    },
+    resumeThread() {
+      throw new Error('not used');
+    },
+  };
+  const { baseUrl } = await startServer(t, { config, codex, root });
+  const { payload } = await createSession(baseUrl, {});
+
+  const turn = await fetch(`${baseUrl}/api/sessions/${payload.session.id}/turns`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: 'cut off', messageId: 'client-truncated-1' }),
+  });
+  const messages = parseSse(await turn.text());
+
+  const error = messages.find((message) => message.type === 'error');
+  assert.ok(error);
+  assert.match(error.message, /意外结束/);
+
+  const done = messages.find((message) => message.type === 'done');
+  assert.equal(done.session.status, 'idle');
+
+  const history = await (await fetch(`${baseUrl}/api/sessions/${payload.session.id}`)).json();
+  assert.match(history.session.lastError, /意外结束/);
+  assert.ok(
+    history.timeline.some(
+      (entry) => entry.type === 'notice' && entry.level === 'error' && /意外结束/.test(entry.text),
+    ),
+  );
+});
+
+test('turns a turn.failed event into a persisted failure', async (t) => {
+  const root = mkdtempSync(path.join(tmpdir(), 'codex-web-turn-failed-'));
+  const config = makeConfig(root);
+  const codex = {
+    startThread(options) {
+      return makeTurnFailedThread(options);
+    },
+    resumeThread() {
+      throw new Error('not used');
+    },
+  };
+  const { baseUrl } = await startServer(t, { config, codex, root });
+  const { payload } = await createSession(baseUrl, {});
+
+  const turn = await fetch(`${baseUrl}/api/sessions/${payload.session.id}/turns`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: 'overload', messageId: 'client-turn-failed-1' }),
+  });
+  const messages = parseSse(await turn.text());
+
+  const error = messages.find((message) => message.type === 'error');
+  assert.ok(error);
+  assert.equal(error.message, 'model overloaded');
+
+  const history = await (await fetch(`${baseUrl}/api/sessions/${payload.session.id}`)).json();
+  assert.equal(history.session.lastError, 'model overloaded');
+  assert.ok(
+    history.timeline.some(
+      (entry) => entry.type === 'notice' && entry.level === 'error' && entry.text === 'model overloaded',
     ),
   );
 });

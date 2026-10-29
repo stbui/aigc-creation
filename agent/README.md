@@ -79,7 +79,7 @@ agent/
   src/sessions.mjs     内存会话与时间线
   src/server.mjs       进程入口
   public/              无构建步骤的浏览器端
-  test/app.test.mjs    基于假 Codex 的接口与流式测试
+  test/                假 Codex 接口测试，以及会话裁剪 / 持久化单元测试
 ```
 
 ## API
@@ -88,7 +88,7 @@ agent/
 - `GET /api/config`：工作区根、默认设置与能力开关。
 - `GET /api/sessions`：当前内存会话列表。
 - `POST /api/sessions`：新建或恢复会话。
-- `GET /api/sessions/:id`：会话元数据与完整时间线。
+- `GET /api/sessions/:id`：会话元数据与最近 300 条时间线。
 - `DELETE /api/sessions/:id`：删除会话。
 - `POST /api/sessions/:id/turns`：执行任务，返回 `text/event-stream`。
 - `POST /api/sessions/:id/cancel`：停止正在运行的任务。
@@ -105,6 +105,7 @@ npm test
 ## 已知限制
 
 - 服务端会话保存在内存中；服务重启后，页面可凭 `codexThreadId` 自动恢复 Codex 线程，但本地时间线缓存才是页面历史来源。
+- 服务端与浏览器内存各保留最近 300 条时间线记录，避免长会话无限增长；`localStorage` 只缓存最近 120 条，刷新后会从服务端补全。
 - 同一会话同时只允许一个运行中的任务。上游持续无响应超过 `AGENT_TURN_IDLE_TIMEOUT_MS`（默认 10 分钟）
   时任务会被中止并给出错误提示，不会让浏览器无限等待。
 - 不支持网页端的命令审批；需要审批的操作应通过沙箱策略禁止或放行。

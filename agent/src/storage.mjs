@@ -1,4 +1,5 @@
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync } from 'node:fs';
+import { rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const STORAGE_VERSION = 1;
@@ -36,8 +37,8 @@ export class SessionStorage {
     }
   }
 
-  schedule(sessions) {
-    this.pending = sessions;
+  schedule(source) {
+    this.pending = source;
     if (this.timer) return;
     this.timer = setTimeout(() => {
       this.timer = null;
@@ -52,9 +53,17 @@ export class SessionStorage {
       this.timer = null;
     }
 
-    const sessions = this.pending;
+    const source = this.pending;
     this.pending = null;
-    if (!sessions) return this.writing;
+    if (!source) return this.writing;
+
+    let sessions;
+    try {
+      sessions = typeof source === 'function' ? source() : source;
+    } catch (error) {
+      console.error('[codex-web] failed to snapshot sessions:', error.message);
+      return this.writing;
+    }
 
     const payload = JSON.stringify(
       { version: STORAGE_VERSION, savedAt: new Date().toISOString(), sessions },
@@ -63,9 +72,9 @@ export class SessionStorage {
     );
     this.writing = this.writing
       .catch(() => {})
-      .then(() => {
-        writeFileSync(this.tempPath, payload, { mode: 0o600 });
-        renameSync(this.tempPath, this.filePath);
+      .then(async () => {
+        await writeFile(this.tempPath, payload, { mode: 0o600 });
+        await rename(this.tempPath, this.filePath);
       })
       .catch((error) => {
         console.error('[codex-web] failed to save sessions:', error.message);
@@ -77,7 +86,12 @@ export class SessionStorage {
   }
 
   async close() {
-    await this.flush();
-    await this.writing;
+    do {
+      while (this.pending || this.timer) {
+        await this.flush();
+        await this.writing;
+      }
+      await this.writing;
+    } while (this.pending || this.timer);
   }
 }

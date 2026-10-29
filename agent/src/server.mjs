@@ -79,12 +79,26 @@ server.listen(config.port, config.host, () => {
   }
 });
 
+let shuttingDown = false;
+
 async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
   console.log(`\n[codex-web] ${signal}, shutting down`);
   sessions.abortAll();
-  await storage?.close();
-  server.close(() => process.exit(0));
-  setTimeout(() => process.exit(0), 3_000).unref();
+  const forceExit = setTimeout(() => process.exit(0), 3_000);
+  forceExit.unref();
+
+  try {
+    await new Promise((resolve) => {
+      server.close(resolve);
+      server.closeIdleConnections?.();
+    });
+    await storage?.close();
+  } finally {
+    clearTimeout(forceExit);
+    process.exit(0);
+  }
 }
 
 process.on('SIGINT', () => shutdown('SIGINT'));

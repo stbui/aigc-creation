@@ -27,6 +27,9 @@ const REASONING_EFFORTS = new Set([
 const SANDBOX_MODES = new Set(['read-only', 'workspace-write', 'danger-full-access']);
 const WEB_SEARCH_MODES = new Set(['disabled', 'cached', 'live']);
 const THREAD_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_-]{5,127}$/;
+const MAX_SESSIONS = 20;
+const MAX_TIMELINE_ENTRIES = 300;
+const MAX_PERSISTED_TIMELINE_ENTRIES = 120;
 
 const BENIGN_DIAGNOSTICS = [
   /^Codex is ignoring \d+ unrecognized configuration settings/i,
@@ -163,7 +166,7 @@ function loadSessions() {
     if (!Array.isArray(parsed)) return [];
     const seen = new Set();
     const sessions = [];
-    for (const raw of parsed.slice(0, 20)) {
+    for (const raw of parsed.slice(0, MAX_SESSIONS)) {
       if (!raw || typeof raw !== 'object' || typeof raw.id !== 'string' || seen.has(raw.id)) {
         continue;
       }
@@ -178,7 +181,9 @@ function loadSessions() {
         status: 'idle',
         settings: sanitizeSettings(raw.settings),
         timeline: Array.isArray(raw.timeline)
-          ? raw.timeline.filter((entry) => entry && typeof entry === 'object').slice(-120)
+          ? raw.timeline
+              .filter((entry) => entry && typeof entry === 'object')
+              .slice(-MAX_PERSISTED_TIMELINE_ENTRIES)
           : [],
         usage: raw.usage && typeof raw.usage === 'object' ? raw.usage : null,
         lastError: null,
@@ -211,6 +216,16 @@ function makeDraft(settings) {
     lastError: null,
     serverMissing: false,
   };
+}
+
+function rememberSession(session) {
+  state.sessions = [
+    session,
+    ...state.sessions.filter(
+      (candidate) => candidate !== session && (!session.id || candidate.id !== session.id),
+    ),
+  ].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+  if (state.sessions.length > MAX_SESSIONS) state.sessions.length = MAX_SESSIONS;
 }
 
 function newId(prefix = 'id') {
@@ -1070,17 +1085,21 @@ async function readSse(response, onMessage) {
       .map((line) => line.slice(5).trimStart())
       .join('\n');
     if (!data) return;
+    let payload;
     try {
-      onMessage(JSON.parse(data));
+      payload = JSON.parse(data);
     } catch (error) {
       console.warn('[codex-web] invalid SSE payload', error);
+      return;
     }
+    onMessage(payload);
   };
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+    buffer += decoder.decode(value, { stream: true });
+    buffer = buffer.replace(/\r\n/g, '\n');
     let boundary = buffer.indexOf('\n\n');
     while (boundary >= 0) {
       consumeBlock(buffer.slice(0, boundary));
@@ -1089,6 +1108,7 @@ async function readSse(response, onMessage) {
     }
   }
   buffer += decoder.decode();
+  buffer = buffer.replace(/\r\n/g, '\n');
   if (buffer.trim()) consumeBlock(buffer);
 }
 
@@ -1098,8 +1118,14 @@ function applyServerSession(session, serverSession) {
   if (serverSession.codexThreadId) session.codexThreadId = serverSession.codexThreadId;
   if (serverSession.status) session.status = serverSession.status;
   if (serverSession.settings) session.settings = sanitizeSettings(serverSession.settings);
-  if (serverSession.usage) session.usage = serverSession.usage;
-  if (serverSession.lastError) session.lastError = serverSession.lastError;
+  if ('usage' in serverSession) {
+    session.usage = serverSession.usage && typeof serverSession.usage === 'object'
+      ? serverSession.usage
+      : null;
+  }
+  if ('lastError' in serverSession) {
+    session.lastError = typeof serverSession.lastError === 'string' ? serverSession.lastError : null;
+  }
   if (serverSession.updatedAt) session.updatedAt = validDate(serverSession.updatedAt);
 }
 
@@ -1117,6 +1143,7 @@ function upsertClientItem(session, item) {
       updatedAt: new Date().toISOString(),
     };
     session.timeline.push(entry);
+    trimClientTimeline(session);
   } else {
     entry.item = item;
     entry.updatedAt = new Date().toISOString();
@@ -1134,6 +1161,13 @@ function addNotice(session, text, level = '') {
     level,
     createdAt: new Date().toISOString(),
   });
+  trimClientTimeline(session);
+  session.updatedAt = new Date().toISOString();
+}
+
+function trimClientTimeline(session) {
+  const overflow = session.timeline.length - MAX_TIMELINE_ENTRIES;
+  if (overflow > 0) session.timeline.splice(0, overflow);
 }
 
 function handleCodexEvent(session, event) {
@@ -1204,7 +1238,14 @@ async function openTurnStream(session, prompt, messageId, controller) {
     throw new ApiError(response.status, payload?.error || `请求失败 (${response.status})`, payload);
   }
 
-  await readSse(response, (message) => handleServerMessage(session, message));
+  let receivedTerminal = false;
+  await readSse(response, (message) => {
+    if (message?.type === 'done' || message?.type === 'aborted') receivedTerminal = true;
+    handleServerMessage(session, message);
+  });
+  if (!receivedTerminal && !controller.signal.aborted) {
+    throw new Error('连接在本轮完成前中断，请重试当前任务。');
+  }
 }
 
 async function ensureServerSession(session) {
@@ -1222,7 +1263,7 @@ async function ensureServerSession(session) {
   session.serverMissing = false;
   session.codexThreadId = data.session.codexThreadId || session.codexThreadId;
   applyServerSession(session, data.session);
-  if (!state.sessions.includes(session)) state.sessions.unshift(session);
+  if (!state.sessions.includes(session)) rememberSession(session);
   persistSoon();
 }
 
@@ -1262,6 +1303,7 @@ async function sendPrompt(rawPrompt) {
       text: prompt,
       createdAt: new Date().toISOString(),
     });
+    trimClientTimeline(session);
     userEntryAdded = true;
     session.status = 'running';
     session.lastError = null;
@@ -1329,11 +1371,13 @@ function mergeTimelines(local, server) {
   };
   for (const entry of local || []) merged.set(keyOf(entry), entry);
   for (const entry of server || []) merged.set(keyOf(entry), entry);
-  return [...merged.values()].sort((a, b) => {
-    const aTime = Date.parse(a.createdAt || 0);
-    const bTime = Date.parse(b.createdAt || 0);
-    return (Number.isFinite(aTime) ? aTime : 0) - (Number.isFinite(bTime) ? bTime : 0);
-  });
+  return [...merged.values()]
+    .sort((a, b) => {
+      const aTime = Date.parse(a.createdAt || 0);
+      const bTime = Date.parse(b.createdAt || 0);
+      return (Number.isFinite(aTime) ? aTime : 0) - (Number.isFinite(bTime) ? bTime : 0);
+    })
+    .slice(-MAX_TIMELINE_ENTRIES);
 }
 
 async function refreshSession(session) {
@@ -1413,18 +1457,24 @@ function persistSoon() {
 }
 
 function persistSessions() {
-  const serialized = state.sessions.slice(0, 20).map((session) => ({
-    id: session.id,
-    title: session.title,
-    codexThreadId: session.codexThreadId,
-    createdAt: session.createdAt,
-    updatedAt: session.updatedAt,
-    status: 'idle',
-    settings: session.settings,
-    usage: session.usage,
-    serverMissing: Boolean(session.serverMissing),
-    timeline: (session.timeline || []).slice(-120).map(serializeEntry),
-  }));
+  const serialized = [...state.sessions]
+    .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+    .slice(0, MAX_SESSIONS)
+    .map((session) => ({
+      id: session.id,
+      title: session.title,
+      codexThreadId: session.codexThreadId,
+      createdAt: session.createdAt,
+      updatedAt: session.updatedAt,
+      status: 'idle',
+      settings: session.settings,
+      usage: session.usage,
+      serverMissing: Boolean(session.serverMissing),
+      timeline: (session.timeline || [])
+        .slice(-MAX_PERSISTED_TIMELINE_ENTRIES)
+        .map(serializeEntry)
+        .filter(Boolean),
+    }));
   try {
     localStorage.setItem(STORAGE_KEYS.sessions, JSON.stringify(serialized));
   } catch (error) {
@@ -1433,13 +1483,9 @@ function persistSessions() {
 }
 
 function serializeEntry(entry) {
-  let copy;
-  try {
-    copy = JSON.parse(JSON.stringify(entry));
-  } catch {
-    return null;
-  }
-  if (!copy || typeof copy !== 'object') return null;
+  if (!entry || typeof entry !== 'object') return null;
+  const copy = { ...entry };
+  if (entry.item && typeof entry.item === 'object') copy.item = { ...entry.item };
   if (copy.type === 'user_message') copy.text = truncate(copy.text, 40_000);
   if (copy.type === 'notice') copy.text = truncate(copy.text, 2_000);
   if (copy.type === 'item' && copy.item) {
@@ -1552,7 +1598,7 @@ async function resumeThread() {
       usage: data.session.usage || null,
       serverMissing: false,
     };
-    state.sessions.unshift(session);
+    rememberSession(session);
     state.current = session;
     clearError();
     closeDialog(ui.resumeDialog);

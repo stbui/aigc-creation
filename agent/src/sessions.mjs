@@ -1,4 +1,6 @@
-const MAX_STORED_TIMELINE_ENTRIES = 300;
+import { randomUUID } from 'node:crypto';
+
+const MAX_TIMELINE_ENTRIES = 300;
 const MAX_MESSAGE_LENGTH = 100_000;
 const MAX_OUTPUT_LENGTH = 64_000;
 
@@ -111,8 +113,23 @@ export function appendUserMessage(session, text, id) {
     createdAt: new Date().toISOString(),
   };
   session.timeline.push(entry);
+  trimTimeline(session);
   session.updatedAt = Date.now();
   session.onChange?.();
+  return entry;
+}
+
+export function appendNotice(session, text, level = '') {
+  const entry = {
+    type: 'notice',
+    id: `notice-${randomUUID()}`,
+    level: level === 'error' ? 'error' : '',
+    text,
+    createdAt: new Date().toISOString(),
+  };
+  session.timeline.push(entry);
+  trimTimeline(session);
+  session.updatedAt = Date.now();
   return entry;
 }
 
@@ -130,6 +147,7 @@ export function upsertItem(session, item) {
     };
     session.itemEntries.set(item.id, entry);
     session.timeline.push(entry);
+    trimTimeline(session);
   } else {
     entry.item = item;
     entry.updatedAt = new Date().toISOString();
@@ -137,6 +155,17 @@ export function upsertItem(session, item) {
   session.updatedAt = Date.now();
   session.onChange?.();
   return entry;
+}
+
+function trimTimeline(session) {
+  const overflow = session.timeline.length - MAX_TIMELINE_ENTRIES;
+  if (overflow <= 0) return;
+
+  for (const entry of session.timeline.splice(0, overflow)) {
+    if (entry.type === 'item' && session.itemEntries.get(entry.item.id) === entry) {
+      session.itemEntries.delete(entry.item.id);
+    }
+  }
 }
 
 function restoreSession(raw, onChange) {
@@ -148,7 +177,7 @@ function restoreSession(raw, onChange) {
   const timeline = [];
   const itemEntries = new Map();
 
-  for (const entry of Array.isArray(raw.timeline) ? raw.timeline.slice(-MAX_STORED_TIMELINE_ENTRIES) : []) {
+  for (const entry of Array.isArray(raw.timeline) ? raw.timeline.slice(-MAX_TIMELINE_ENTRIES) : []) {
     const restored = restoreEntry(entry);
     if (!restored) continue;
     timeline.push(restored);
@@ -229,7 +258,7 @@ function serializeSession(session) {
     resolvedWorkingDirectory: session.resolvedWorkingDirectory,
     usage: session.usage,
     lastError: session.lastError,
-    timeline: session.timeline.slice(-MAX_STORED_TIMELINE_ENTRIES).map(serializeEntry).filter(Boolean),
+    timeline: session.timeline.slice(-MAX_TIMELINE_ENTRIES).map(serializeEntry).filter(Boolean),
   };
 }
 

@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Bash(node -e \"console.log\\(process.version\\)\")",
+      "mcp__claude-vscode__getDiagnostics",
+      "Read(//tmp/**)",
+      "Read(//private/tmp/**)",
+      "WebSearch"
+    ],
+    "additionalDirectories": [
+      "/tmp/arch-audit",
+      "/private/tmp/arch-audit"
+    ]
+  }
+}
