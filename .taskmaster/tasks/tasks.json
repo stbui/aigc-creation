@@ -17,7 +17,9 @@
         "title": "建立协议注册表与启动期完整性校验",
         "description": "新增按 (modality, protocol) 的协议注册表，合并 ProtocolSpec、VideoProtocolSpec 与 provider-factory 的声明；启动期 assertProtocolIntegrity，新增 verify-protocol-matrix 脚本。",
         "status": "pending",
-        "dependencies": [1],
+        "dependencies": [
+          1
+        ],
         "priority": "high",
         "details": "落点：backend/src/providers/protocols/protocol.registry.ts、protocol.spec.ts、provider-factory.ts、backend/scripts/verify-protocol-matrix.ts。注册项需含 spec、createProvider、support（后台下拉与保存校验用）。未知协议显式抛错。校验：每个声明有 factory、每个 factory 有声明、厂商目录声明的协议存在、后台下拉数据源一致。",
         "testStrategy": "单测未知协议抛错；删除一条 factory 时启动失败并指出协议名；verify-protocol-matrix 通过；现有 image/text/video 协议全部登记。",
@@ -28,7 +30,10 @@
         "title": "统一运行期线路配置源，删除合成与固化路径",
         "description": "ModelChannel 成为唯一线路事实源；删除 ChannelScheduler 合成通道、ChannelRepository.synthesize/materialize、HTTP materialize 端点；ChannelSnapshot.source 只保留 channels|none；无线路时能力 unavailable 且生成返回 42204。",
         "status": "pending",
-        "dependencies": [1, 2],
+        "dependencies": [
+          1,
+          2
+        ],
         "priority": "high",
         "details": "落点：channel-scheduler.ts、channel-repository.ts、model-channel.service.ts/controller.ts、capability-availability.service.ts、generate.service.ts、frontend/src/lib/api.ts。全停用时 source 仍为 channels，绝不回落旧配置。前端删除 legacy 文案与固化入口。",
         "testStrategy": "表空时 source=none；全停用时 source=channels 且 enabledCount=0；两种情况下生成均 42204 并退款；不存在 synthetic: 通道；materialize 路由 404。",
@@ -39,7 +44,10 @@
         "title": "下线旧环境变量、旧 DB 键与 modelverse 别名",
         "description": "删除线路类 CONFIG_DEFS、legacyKey/hidden 回落、旧 GATEWAY_* 变量与 modelverse 运行期别名；新增启动守卫：production 残留旧键拒绝启动，development/test 记录 ERROR。后台模型配置页移除线路项。",
         "status": "pending",
-        "dependencies": [2, 3],
+        "dependencies": [
+          2,
+          3
+        ],
         "priority": "high",
         "details": "落点：channel-config.defs.ts、gateway.config.ts、config/env.validation.ts、backend/.env.example、三档 env、scripts/db-url.js、新增 channel-config.guard.ts、frontend/src/pages/admin/AdminModelConfigPage.tsx。保留 timeoutMs/pollMs/maxPolls/asset.publicBase/gateway.route.*。协议规范名只认 openai。",
         "testStrategy": "设置 GATEWAY_BASE_URL 后 production 启动失败并给出迁移命令；development 可启动且 ERROR 日志含键名；旧 DB 键不再参与读取；后台配置页无线路字段；modelverse 不再被识别。",
@@ -50,7 +58,11 @@
         "title": "执行迁移并完成回滚演练",
         "description": "在开发库执行 dry-run、备份后 --apply，核对 token 未从 env 复制、enabled=false、modelverse 改写、旧键删除；随后按备份恢复做一次回滚演练并记录。",
         "status": "pending",
-        "dependencies": [1, 3, 4],
+        "dependencies": [
+          1,
+          3,
+          4
+        ],
         "priority": "high",
         "details": "执行前确认开发库路径与备份目录。核对项：新建线路 token=''、enabled=false；协议 modelverse→openai；ModelChannelConfig 仅保留运行参数与路由键；能力 runtime.effective=unavailable 且原因指向未配置线路。回滚：恢复 JSON 备份、npm run prisma:push、重启并抽查。",
         "testStrategy": "迁移报告逐条可核对；回滚后 ModelChannel/ModelChannelConfig 与备份一致；回滚后系统可启动且无旧键读取；演练记录写入 docs/testing.md。",
@@ -61,7 +73,9 @@
         "title": "扩展 ModelChannel 健康与调度字段",
         "description": "为 ModelChannel 增加 weight/maxConcurrency/rateLimitPerMin/lastTestedAt/lastTestStatus/lastTestLatencyMs/lastTestError；为 ModelCallLog 增加 channelId/attemptIndex；为 GenerationTask 增加 outputText/providerTaskId；同步 DTO、类型与前端 api.ts。",
         "status": "pending",
-        "dependencies": [1],
+        "dependencies": [
+          1
+        ],
         "priority": "high",
         "details": "落点：backend/prisma/schema.prisma、admin/dto/model-channel.dto.ts、channel-repository.ts toView、frontend/src/lib/api.ts。默认值：weight=1、maxConcurrency=0、rateLimitPerMin=0。lastTestStatus 取值 ok|failed|unsupported。用 npm run prisma:push 建表，不新增 migrations 目录。",
         "testStrategy": "prisma db push 成功；旧行读取默认值正确；类型检查通过；DTO 范围校验（weight 1-100、并发/限流 >=0）；outputText 可空且不影响历史任务。",
@@ -72,7 +86,9 @@
         "title": "打通连通性测试、健康状态与手动恢复熔断",
         "description": "连通性测试只持久化 lastTest*，不得修改 failCount/cooldownUntil/lastSuccessAt/lastFailureAt；后端派生 closed/open/half-open；新增 reset-health 接口（channel.route + 必填原因 + 审计）。",
         "status": "pending",
-        "dependencies": [6],
+        "dependencies": [
+          6
+        ],
         "priority": "high",
         "details": "落点：admin/model-channel.service.ts/controller.ts、model-config.service.ts testConnection、channel-repository.ts、permissions.ts、前端 API。reset-health 动作名 model.channel_reset_health，审计 detail 不含 token/baseUrl。健康派生：cooldownUntil>now=open；冷却已过且 failCount>=阈值=half-open；否则 closed。",
         "testStrategy": "冷却中线路测试成功不改变 cooldownUntil/failCount；reset-health 清空计数并生成审计；缺 reason 返回 40001；半开判定正确；测试结果含状态/耗时/错误且持久化。",
@@ -83,7 +99,11 @@
         "title": "后台模型线路页改版",
         "description": "线路页展示 channels|none 来源横幅，新增权重/并发/限流/健康/最近测试列、冷却倒计时、恢复熔断与 CSV 导出；编辑器做模态-协议联动、协议只列已实现项、token 只写不回显。",
         "status": "pending",
-        "dependencies": [3, 6, 7],
+        "dependencies": [
+          3,
+          6,
+          7
+        ],
         "priority": "high",
         "details": "落点：frontend/src/pages/admin/modelConfig/ChannelManagementTab.tsx、ChannelTable.tsx、ChannelEditDrawer.tsx、ChannelHealthCard.tsx、useModelConfigDraft.ts、AdminModelConfigPage.tsx。遵循 antd 原生组件、adminNav 与权限点、global.css token；不做移动端。导出走 common/csv.ts，排除 token 明文。",
         "testStrategy": "组件测试覆盖来源横幅/健康状态/恢复确认；e2e 创建-编辑-测试-恢复-导出；无 channel.route 时写按钮隐藏且接口仍拒绝；页面不出现 legacy/固化入口；导出无 token。",
@@ -94,7 +114,10 @@
         "title": "按能力模态统一任务分派并支持文本产出",
         "description": "generate.service 删除 video/其余图像二分，按能力自身 modality 分派 image/text/video；接入 TEXT_PROVIDER；文本任务产出写 GenerationTask.outputText，保留扣费、失败退款、心跳与孤儿回收。",
         "status": "pending",
-        "dependencies": [3, 6],
+        "dependencies": [
+          3,
+          6
+        ],
         "priority": "high",
         "details": "落点：backend/src/generate/generate.service.ts、generate.controller.ts、tasks.controller.ts、providers/providers.module.ts、frontend 类型。文本不生成 Asset，aigcMeta 记录 {labeled:false,reason:'text'}。用测试用能力定义验证新增文本能力无需再改分派分支；不新增 C 端文本入口。",
         "testStrategy": "单测三种模态走同一生命周期；文本成功写 outputText；文本通道失败退款且无伪产出；图像/视频回归不变；测试用能力定义不进入生产清单。",
@@ -105,7 +128,10 @@
         "title": "实现调度权重、并发上限与每分钟限流",
         "description": "候选集按 priority 分组，同组按 weight 加权随机；按 channelId 维护进程内信号量与每分钟滑动窗口；全部被限流/冷却时返回独立的 unavailableReason，并记录跳过原因。",
         "status": "pending",
-        "dependencies": [6, 7],
+        "dependencies": [
+          6,
+          7
+        ],
         "priority": "high",
         "details": "落点：channel-scheduler.ts、channel.types.ts（或等价）、model-channel DTO/页面。weight 1-100，maxConcurrency=0 不限，rateLimitPerMin=0 不限。每次调度记录候选、权重、随机结果、跳过原因、最终通道；多实例口径写入 docs/model-architecture.md，不引入 Redis。",
         "testStrategy": "固定随机种子/大样本验证权重分布；maxConcurrency 达上限时跳过；rateLimitPerMin 窗口内跳过；0 表示不限；全部限流时原因不同于全部失败；attempts 含 skippedReason。",
@@ -116,7 +142,11 @@
         "title": "实现熔断半开恢复与调度观测",
         "description": "把熔断状态机扩展为 closed/open/half-open；冷却到期只放行一个探测，成功 closed，失败指数退避至上限 30 分钟；每次尝试写 ModelCallLog（channelId/attemptIndex），后台可回放 attempts。",
         "status": "pending",
-        "dependencies": [6, 7, 10],
+        "dependencies": [
+          6,
+          7,
+          10
+        ],
         "priority": "high",
         "details": "落点：channel-scheduler.ts、image-call-logger.ts、admin/model-call.service.ts、后台调用记录页。冷却基数 max(30s, pollMs*5)，退避 2^(连续开启次数-1)，上限 30m。半开探测期间其他请求跳过并记原因。fallback 字段语义改为「切到下一条线路」，更新注释与文案。",
         "testStrategy": "半开窗口并发请求仅一个进入探测；成功清计数转 closed；失败按指数退避重开；attempts 每次落库且可按 channelId 筛选；无本地产出与伪成功。",
@@ -127,7 +157,11 @@
         "title": "统一同步与异步协议的任务契约",
         "description": "把 ProtocolSpec.mode 与视频四段式统一为提交/轮询/取结果/下载抽象；图像与文本协议可声明 async，调度层共享轮询循环；保留按模态的 timeoutMs/pollMs/maxPolls 与 providerTaskId 恢复。",
         "status": "pending",
-        "dependencies": [2, 6, 9],
+        "dependencies": [
+          2,
+          6,
+          9
+        ],
         "priority": "medium",
         "details": "落点：protocols/protocol.spec.ts、protocol.registry.ts、各 provider、channel-scheduler.ts、generate.service.ts。同步协议在一次调用内完成；异步协议返回外部任务 id 并轮询。视频四段式作为 VideoProtocolSpec 适配，不改变既有错误码。",
         "testStrategy": "fake async image/text 协议可完成提交-轮询-落库；轮询超时失败退款；同步协议回归；视频四段式回归；providerTaskId 可在重启后恢复轮询（或明确记录不可恢复边界）。",
@@ -138,7 +172,10 @@
         "title": "完成协议与厂商扩展试点",
         "description": "先取证再实现：在 Google Gemini（图像+文本，generateContent）或快手可灵（视频，异步创建/查询/下载）中选定一个试点，写探测脚本记录真实请求/响应/错误，再接入协议注册表、factory、vendor presets、后台预设与校验脚本。",
         "status": "pending",
-        "dependencies": [2, 12],
+        "dependencies": [
+          2,
+          12
+        ],
         "priority": "medium",
         "details": "落点：vendors/vendor.catalog.ts、vendor.presets.ts、vendor.integrity.ts、protocols/protocol.registry.ts、provider 实现、backend/scripts 探测脚本、docs/model-architecture.md。未取得真实响应前不得标记 real 或写入能力清单。新增依赖需评估 verify:deps:critical，优先零新增依赖。",
         "testStrategy": "探测脚本保存真实响应样本与错误结构；注册表/厂商完整性校验通过；后台预设可选且协议已实现；真实调用成功或给出可读失败原因；verify-vendor-aggregation 通过。",
@@ -149,7 +186,21 @@
         "title": "测试、闸口与文档收口",
         "description": "补齐后端单测/集成、前端单测与 e2e，新增/更新 verify 脚本与覆盖矩阵；同步 model-architecture、environments、api-contract、testing、admin 文档、README 与 CLAUDE.md；记录迁移与回滚演练。",
         "status": "pending",
-        "dependencies": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13],
+        "dependencies": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13
+        ],
         "priority": "high",
         "details": "闸口：backend npm run build、相关 verify-*、前端 npm run typecheck、npm test、npm run e2e、npm run verify:deps:critical。文档删除双轨描述，写入唯一配置源、调度权重/限流/半开、协议注册表与迁移步骤。验收用例覆盖 PRD 的 10 条。",
         "testStrategy": "全部闸口真实执行并留存输出；10 条验收用例逐条通过；文档与代码一致；全仓 grep 不再出现 GATEWAY_BASE_URL/GATEWAY_TOKEN/legacyKey/materialize 等旧路径（迁移脚本与历史文档除外）。",
@@ -161,6 +212,301 @@
       "updated": "2026-10-29T10:30:00.000Z",
       "description": "渠道模型改造：统一配置源、后台健康态、调度与任务模型重构、协议与厂商扩展",
       "projectName": "货觉AI 渠道模型改造"
+    }
+  },
+  "agent": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "建立 Agent 数据模型与运行状态机",
+        "description": "在 Prisma 中新增 AgentSession / AgentMessage / AgentRun / AgentStep 四个模型与索引，补齐 User/Project 反向关系；扩展 ModelCallLog（agentRunId / promptTokens / completionTokens）；集中定义会话、运行、步骤状态常量与合法转移；用 prisma db push 建表。",
+        "details": "落点：backend/prisma/schema.prisma、backend/src/agent/agent.constants.ts、backend/src/agent/agent.types.ts。字段按 docs/agent-integration-design.md §9。运行状态 planning|awaiting_input|awaiting_confirm|running|handoff|succeeded|partial|failed|cancelled；步骤状态 pending|running|succeeded|failed|skipped。AgentSession.styleLock、AgentRun.plan/styleLock、AgentStep.inputRefs/inputAssetIds/dependsOn/params 均用 JSON 字符串。索引：session(ownerId,updatedAt)、run(sessionId,createdAt / ownerId,status / status,updatedAt)、step(runId,stepIndex) 唯一、step(taskId)。ModelCallLog 新列可空，不回填历史。不建平行任务表：GenerationTask/Asset 仍是唯一任务与产出事实源；User/Project 只加反向关系，不改既有字段含义。",
+        "testStrategy": "npm run prisma:push 成功；旧库增量建表不丢数据；状态常量单测覆盖全部合法边与非法边；backend npm run build 通过；历史 ModelCallLog 新列为 null。",
+        "status": "pending",
+        "dependencies": [],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 2,
+        "title": "扩展 TextProvider 上下文与 LLM 调用日志",
+        "description": "为 TextProvider.generate 增加可选 TextCallContext（ownerId / agentRunId），把上下文透传到 TextCapabilityRouter 与日志写入；规划调用写 ModelCallLog（capability='agent_plan'、modality='text'、model、durationMs、promptTokens/completionTokens、success/reason）；现有调用方不传 context 时行为不变。",
+        "details": "落点：backend/src/providers/unified/unified.provider.ts、text-capability-router.provider.ts、openai-chat-text.provider.ts、image-call-logger.ts（或等价日志服务）。从 OpenAI 兼容响应 usage 提取 prompt_tokens/completion_tokens，缺失时置 null 不猜。失败调用也要落日志并带原因。日志不得写入 token/baseUrl；prompt 仍按现有截断策略。多渠道调度失败原因写入 reason。保持 prompt-tools 与 verify-prompt-tools 行为不变。",
+        "testStrategy": "单测 fake provider 传入 context 后日志字段齐全；不传 context 与旧行为逐字段一致；失败调用 success=false 且有 reason；backend npm run build；verify-prompt-tools.js 回归通过。",
+        "status": "pending",
+        "dependencies": [
+          1
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 3,
+        "title": "派生 Agent 能力目录 CatalogService",
+        "description": "新增 CatalogService，从 CAPABILITIES 与运行时可用性/运行时积分价派生 Agent 可规划目录；输出结构化 capability spec（id/name/summary/modality/inputs/runtime price/enabled/params），过滤 planned、后台下线与 hidden 参数；提供 tool schema 与 handoff 路由映射。",
+        "details": "落点：backend/src/agent/catalog.service.ts、agent.types.ts。唯一事实源仍是 capabilities/definitions，禁止第二份能力表。价格必须走 CreditPriceService.resolve()，不得读 def.creditCost。enabled 取 CapabilityAvailabilityService（3s 缓存，后台写入即失效）。hidden 参数默认不下发，但不能因此排除能力：可安全默认的由服务端补齐，必须用户交互的生成 handoff。handoff 路由复用 toolPath，不允许模型给任意 URL。新增能力只改 definitions/ 后目录自动更新。",
+        "testStrategy": "遍历 SUBMITTABLE_CAPABILITY_IDS，每项要么出现在目录、要么有显式 handoff 映射，不允许消失（AG-13/AG-15）；后台下线能力后目录立即消失；改价后目录价格与 /capabilities 一致；verify-capability-* 回归。",
+        "status": "pending",
+        "dependencies": [
+          1
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 4,
+        "title": "定义计划契约与 PlanValidator",
+        "description": "定义 PlanDraft（clarify / handoff / plan）、PlanStep、StyleLockDraft 类型；实现服务端 PlanValidator，对计划做硬校验与规范化：能力存在可提交在线、步骤上限 6、计划不超过 32KB、引用无环、素材归属、参数白名单、enum/number/text 收敛、积分重算、sanitizeParams 对齐。",
+        "details": "落点：backend/src/agent/plan.types.ts、plan-validator.service.ts、plan-validator.spec.ts。规则按 docs/agent-integration-design.md §5.2/§6.3。inputRefs 只允许 asset:A<n> 与 step:<ref>.output；dependsOn 只能指向前序；每步 inputs 数量必须满足插件声明；hidden 参数禁止模型填写；数字 clamp 到 min/max，text 按 maxLength 截断，enum 必须命中选项；积分用运行时价重算，不接受模型报价；sanitizeParams 后比对是否静默丢参。校验失败返回可修复的结构化错误，供 Planner 一次重试。handoff 只接受 catalog 映射路由与非 hidden prefill。",
+        "testStrategy": "单测覆盖每条规则正反例：超 6 步、超 32KB、环依赖、跨用户素材、编造能力、hidden 参数、enum 越界、价格篡改；AG-02/03/13/14；非法计划不落库、不扣费。",
+        "status": "pending",
+        "dependencies": [
+          1,
+          3
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 5,
+        "title": "实现 PlannerService（规划/澄清/handoff/降级）",
+        "description": "新增 PlannerService，把用户消息、最近上下文、素材符号、风格锁与能力目录组装为固定系统提示，调用 TEXT_PROVIDER 产出 PlanDraft；解析 JSON，失败时携带错误原因重试一次；无法修复则返回 clarify 或降级；LLM 不可用时返回 unavailable，不抛 5xx。",
+        "details": "落点：backend/src/agent/planner.service.ts、agent-plan.prompt.ts。用户文本只作为数据段，系统提示固定，防 Prompt 注入；不向模型暴露真实 assetId，只暴露 A1/A2 符号，服务端解析归属。规划阶段不扣积分、不建生成任务。每次调用带 TextCallContext（ownerId/agentRunId）并写 ModelCallLog。响应必须过 PlanValidator；修复重试至多一次。规划超时/失败落 AgentRun.status=failed 并带可读错误码，不写入非法计划。支持 clarify（questions + partialPlan）与 handoff（capability/reason/assetRefs/prefill）。P0 不做 token 级流式。",
+        "testStrategy": "fake TEXT_PROVIDER 集成：正常计划、clarify、handoff、非法 JSON 修复一次、二次仍非法降级、通道不可用降级；ModelCallLog 可按 agentRunId 查（AG-12）；不产生 GenerationTask 与积分流水。",
+        "status": "pending",
+        "dependencies": [
+          2,
+          3,
+          4
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 6,
+        "title": "实现会话与消息服务及基础 API",
+        "description": "新增 SessionService 与对应 controller/DTO：创建、列出、查看、删除会话，发送消息入口（规划由任务 5 接入），会话绑定项目并强校验归属，clientMessageId 幂等，标题自动生成，删除保护。",
+        "details": "落点：backend/src/agent/session.service.ts、agent.controller.ts、dto/、agent.module.ts。所有归属只从 JWT 注入；project.ownerId 必须等于当前用户，越权返回 404 不泄露存在性。clientMessageId 在会话内唯一（唯一索引），重复提交返回同一消息/运行快照，不重复调 LLM。列表按 updatedAt 倒序分页。删除会话：存在 planning|awaiting_confirm|running 运行返回 409；删除连带消息与运行，但不删 Asset/GenerationTask。消息与会话长度、数量上限在此先挡。",
+        "testStrategy": "HTTP 冒烟覆盖：未登录 401、跨用户 404、重复 clientMessageId 幂等、活跃运行删除 409、删除后作品仍存在；分页与归属查询正确。",
+        "status": "pending",
+        "dependencies": [
+          1
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 7,
+        "title": "实现 Orchestrator、运行状态机与 SSE 事件层",
+        "description": "新增 AgentOrchestrator/AgentRunService，串联 planning -> awaiting_input | awaiting_confirm | handoff -> running -> succeeded|partial|failed|cancelled；实现确认的条件更新抢占、单会话单活跃运行、单用户最多 2 个活跃运行；实现 POST SSE 事件流、seq、15s 心跳与快照对齐。",
+        "details": "落点：backend/src/agent/orchestrator.service.ts、agent-run.service.ts、agent-sse.service.ts、agent.events.ts。确认用 updateMany({where:{id,ownerId,status:'awaiting_confirm'}}) 且 count===1 才启动执行器，重复点击不重复建任务/扣费。事件集合：planning.started/plan.ready/clarify.required/handoff.ready/run.started/step.started/step.progress/step.succeeded/step.failed/run.completed/degraded/notice/ping。SSE 头：text/event-stream; charset=utf-8、Cache-Control: no-cache, no-transform、X-Accel-Buffering: no；每个事件带递增 seq；规划流在 plan.ready|clarify.required|degraded 后关闭，执行流在 run.completed 后关闭。关闭 SSE/刷新不取消已确认任务；cancel 只设置 cancelRequested，当前任务继续、不再启动下一步。断线恢复靠 GET /agent/runs/:id 快照，不做事件重放表。",
+        "testStrategy": "状态机单测覆盖全部合法/非法转移；并发确认只有一个请求启动执行器；SSE 事件顺序与 seq 单调；断线后快照与后台一致（AG-10）；取消语义单测。",
+        "status": "pending",
+        "dependencies": [
+          4,
+          5,
+          6
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 8,
+        "title": "实现 StepExecutor（串行执行/依赖门控/失败语义）",
+        "description": "实现 StepExecutor：确认后按依赖串行执行步骤，每步调用 GenerateService.createTask，服务端轮询 getTask 直到 succeeded|failed；成功记录 outputAssetId 供下游引用，失败记录 errorCode 并跳过依赖它的步骤；余额不足停止后续并转 partial；Agent 不直接调 Provider、不复制扣费/退款逻辑。",
+        "details": "落点：backend/src/agent/step-executor.service.ts。projectId 来自会话且服务端二次校验；capability/inputAssetIds/params 必须是 PlanValidator 规范化后的值。每步真实扣费与失败退款全部沿用 GenerateService，Agent 不二次退款。实际积分取任务 creditCost 快照，预估积分另存。状态更新用条件更新避免重复执行；执行前检查 cancelRequested。余额不足是正常业务结果：当前步不建任务、不扣费，运行转 partial 并给出未执行步骤与充值入口数据。轮询沿用现有任务查询与超时语义；视频任务较长时持续心跳。",
+        "testStrategy": "集成测试用假 GenerateService/fake task：多步成功、某步失败后续跳过、余额不足 partial、取消只停后续、产出进 Asset（AG-04/05）；确认只建一次任务；已成功步骤不重复扣费（AG-07）。",
+        "status": "pending",
+        "dependencies": [
+          4,
+          7
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 9,
+        "title": "实现单步重试、续跑与进程重启恢复",
+        "description": "实现 failed 步骤的单步重试、partial 运行的 resume，以及启动期恢复：planning 超 2 分钟标记失败、running 步骤按对应 GenerationTask 对齐、running 但无 running 步骤标记 partial；恢复只对账，不自动重放可能已扣费的步骤。",
+        "details": "落点：backend/src/agent/step-executor.service.ts、agent-recovery.service.ts、agent.module.ts（onModuleInit）、调度器注册。重试只允许 failed；新建 GenerationTask 且 retriedFromId 指向原任务，AgentStep.attempt++；已成功步骤与产出保持不变；重试仍走真实扣费与退款，不做免费重跑。resume 只拾取 pending 步骤。恢复错误码：AGENT_PLAN_INTERRUPTED / AGENT_EXECUTOR_RESTARTED。恢复逻辑必须幂等，重复启动不产生重复任务。",
+        "testStrategy": "重启模拟：running 步骤任务成功 -> 补记成功、运行 partial；任务失败 -> 补记失败；planning 超时 -> failed；running 无 running 步骤 -> partial；resume 不重跑 succeeded（AG-06/11）；重复执行恢复不重复扣费。",
+        "status": "pending",
+        "dependencies": [
+          8
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 10,
+        "title": "实现风格锁定与 stylePrompt 注入",
+        "description": "实现 StyleLock 的冻结、校验与注入：计划确认时把 styleLock 冻结到 AgentRun；执行时按能力声明合并 promptPrefix 与非 hidden 公共参数；为 GenerateService 增加受控 stylePrompt 入参并统一前置到提示词。",
+        "details": "落点：backend/src/agent/style-lock.ts、backend/src/generate/dto/create-generation.dto.ts、generate.service.ts、backend/src/providers/gateway-prompt.ts。stylePrompt 不超过 500 字符，仅 Agent 与显式高级入口使用；GenerateService 在 sanitizeParams 后存 __stylePrompt，buildPromptFor 统一前置 `${style}。${base}`；只合并能力已声明且非 hidden 的参数，其余忽略并在计划卡明示。无提示词通道的能力（如纯几何旋转）必须诚实标注仅继承比例/画质参数，不承诺风格一致。不得改变手动 /generate 的既有行为。",
+        "testStrategy": "单测合并规则与 hidden 过滤；生成任务 params 含 __stylePrompt 且提示词前缀正确；手动 /generate 不带 stylePrompt 时逐字不变；超长截断/拒绝；无通道能力的提示文案正确。",
+        "status": "pending",
+        "dependencies": [
+          1,
+          4
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 11,
+        "title": "收口 Agent REST/SSE 接口、幂等、限流与错误码",
+        "description": "完成设计文档 §8.1 全部接口（status/sessions CRUD/messages/confirm/resume/cancel/retry/run 快照），统一响应信封与 SSE 约定，接入限流、幂等键、错误码与归属策略；更新 docs/api-contract.md。",
+        "details": "落点：backend/src/agent/agent.controller.ts、dto/、common/rate-limit.guard.ts 注解、docs/api-contract.md。GET /agent/status 无需登录，返回 available、degradedReason、默认模型展示名（不泄露 token/baseUrl）。普通 JSON 走 {code,data,message}；SSE 用 @Res() 直接写。所有用户接口强制 JWT，越权 404。限流：messages 10/min + 20/h/用户，confirm 5/min/用户，单用户 2 个活跃运行，单会话 1 个。Idempotency-Key/clientMessageId 重复请求返回同一快照。删除有活跃运行会话 409。错误码登记到 api-contract，不把内部异常原样回显。",
+        "testStrategy": "smoke-agent.js 覆盖 401/404/409/429、重复确认与重复消息、SSE 响应头与事件形状、status 无需登录；错误信封与 code 一致；现有接口回归不受影响。",
+        "status": "pending",
+        "dependencies": [
+          6,
+          7,
+          8,
+          9
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 12,
+        "title": "前端 Agent 页面与流式交互",
+        "description": "新增 /agent 页面及组件：会话列表、对话流、计划卡、步骤时间线、产出画廊、手动能力选择器、handoff 卡；实现 fetch + ReadableStream 的 SSE 解析、取消、断线快照恢复；接入项目/素材选择、积分预估与余额、登录弹窗。",
+        "details": "落点：frontend/src/pages/agent/*、hooks/useAgentStream.ts、lib/api.ts、App.tsx。组件：AgentPage、AgentConversation、PlanCard、StepTimeline、AgentOutputGallery、ManualCapabilityPicker、HandoffCard。不得复制能力参数表，选项全部来自 /capabilities 或 Agent 目录；样式只用 global.css token，遵循现有 C 端设计；未登录可浏览，发送/上传/确认时唤起登录弹窗。计划卡必须展示步骤、假设、预估积分、余额、确认/调整/降级；步骤卡展示真实 provider、creditCost、AIGC 标识、错误码与重试；断线不把流结束当失败，重新拉快照。SSE 用 Bearer 头，token 不进 query。不使用原生 EventSource。",
+        "testStrategy": "Vitest 覆盖 useAgentStream 解析/取消/重连、PlanCard 与 StepTimeline 状态；frontend npx tsc --noEmit；Playwright 覆盖建会话 -> 发消息 -> 确认 -> 看到步骤与产出 -> 刷新恢复。",
+        "status": "pending",
+        "dependencies": [
+          11
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 13,
+        "title": "接入前端入口、功能开关与降级回归",
+        "description": "在现有布局中加入 Agent 入口（侧栏 AI 创作置于工作台之前、顶导 CTA、/agent 懒加载路由），接入服务端功能开关与 /agent/status；实现三种降级（能力不可用、规划连续失败、余额不足）到手动模式，并保证现有页面行为不变。",
+        "details": "落点：frontend/src/components/SideRail.tsx、AppLayout/顶导组件、App.tsx、pages/agent/AgentPage.tsx、ManualCapabilityPicker.tsx。开关关闭时显示维护提示并引导回 /workbench，不 5xx、不白屏。降级保留原始需求、已选素材与项目上下文；余额不足展示预估/余额/充值入口并保留计划到过期。不得隐藏或改写现有工作台、工具页、素材库、作品页入口；/admin/* 路由仍在 catch-all 之前。",
+        "testStrategy": "E2E：开关关闭 -> 维护提示；LLM 通道停用 -> 手动模式可用（AG-08）；余额不足 -> 充值入口且计划保留；现有 /workbench /generate /tasks /works /capabilities 回归（AG-16）。",
+        "status": "pending",
+        "dependencies": [
+          12
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 14,
+        "title": "后台 Agent 运行记录页与权限/审计",
+        "description": "后台新增 Agent 运行记录页：会话/运行/步骤列表与详情、状态与耗时、预估/实际积分、失败错误码、关联 GenerationTask 与 Asset、筛选与 CSV 导出；登记权限点，高危动作写审计。",
+        "details": "落点：backend/src/admin/permissions.ts、新增 admin/agent-admin.controller.ts + service、frontend/src/components/admin/adminNav.ts、pages/admin/AgentRunsPage.tsx、lib/api.ts、common/csv.ts。按用户/时间/状态/会话筛选；只读为主；终止运行/清理记录属高危，必须填原因并写 AdminAuditLog，审计 detail 不含 token/baseUrl。CSV 走 common/csv.ts（BOM/RFC4180/公式注入前导单引号）；前端 downloadCsv 不走 JSON 信封。权限点按 <模块>.<动作> 命名并在后端强校验；前端 can() 只隐藏按钮。",
+        "testStrategy": "权限点单测/HTTP：无权限 403、跨用户数据不可见；筛选与分页正确；CSV 可解析且无敏感字段；高危动作缺原因 400；审计落库。",
+        "status": "pending",
+        "dependencies": [
+          1,
+          7,
+          8,
+          11
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 15,
+        "title": "后台 Agent 配置、提示词版本化与功能开关",
+        "description": "在后台增加 Agent 配置：全局开关、单计划最大步数、单用户活跃运行上限、消息/计划长度上限、留存天数、默认模型展示；提示词版本化，发布后不可原地覆盖；运行记录留存当次提示词版本；配置写入即时生效并写审计。",
+        "details": "落点：backend/src/admin/settings.dto.ts 的 SETTING_DEFS、新增 agent-prompt 模型/服务、admin controller、frontend/src/pages/admin/AgentSettingsPage.tsx、adminNav.ts、env.validation.ts（若需环境变量）。配置读取走统一设置服务并有短缓存，后台写入 invalidate；提示词版本按 (name, version) 存储，已发布不可覆盖，修改必须升版本；AgentRun 记录 promptVersion 与 model。高危写入（全局开关、提示词发布）填原因并审计。生产环境变量门禁与 ENV_SPECS 同步。",
+        "testStrategy": "改配置后目录/限制即时生效；已发布提示词不可覆盖；运行记录能追溯到当次版本与模型；缺原因 400；审计落库；probe-environments 通过。",
+        "status": "pending",
+        "dependencies": [
+          5,
+          14
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 16,
+        "title": "可观测性、成本核算与数据留存清理",
+        "description": "补齐 Agent 可观测性：规划/步骤结构化日志带 sessionId/runId/stepId/ownerId；ModelCallLog 记录 token 与 agentRunId；后台提供运行指标聚合；把 Agent 会话/消息/运行/步骤纳入现有留存清理（默认 90 天，可配），清理不删 Asset/GenerationTask，并写审计。",
+        "details": "落点：backend/src/agent/*、providers/image-call-logger.ts、admin/retention.controller.ts 的 TARGETS、admin/scheduler.service.ts、frontend AdminModelCallsPage/AdminRetentionPage。指标至少：规划耗时、修复重试、clarify 比例、运行成功率、步骤失败分布、每运行积分、LLM token 成本。日志串联现有请求追踪 ID。清理任务支持 dry-run 与手动触发，按运行创建时间删除；有活跃运行的会话不清理。不得删除已产出作品；清理结果写审计与定时任务记录。",
+        "testStrategy": "日志字段断言；ModelCallLog 按 agentRunId/ownerId 可查（AG-12）；指标聚合查询与后台展示一致；留存 dry-run 只统计不删；实际清理后 Asset/GenerationTask 仍在；调度任务登记且可手动触发。",
+        "status": "pending",
+        "dependencies": [
+          2,
+          8,
+          9,
+          15
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 17,
+        "title": "P1 只读查询工具（作品/任务/统计/素材）",
+        "description": "在 Agent 工具目录中增加只读查询工具：我的作品、任务状态与失败原因、生成统计、素材列表；只读、强归属、结果结构化；写操作仍必须走计划确认，不允许模型直接执行写动作。",
+        "details": "落点：backend/src/agent/tools/query-tools.ts、catalog.service.ts（工具类别）、planner prompt、service 层复用现有 assets/tasks/stats 查询。参数 schema 白名单化（时间范围/状态/分页/关键词），查询强制 ownerId；禁止跨用户、禁止 SQL 拼接。返回给模型的字段做裁剪，不带 token/内部地址。查询结果只用于回答，不产生 GenerationTask 与积分流水。沿用 AG-09 越权 404 口径。",
+        "testStrategy": "单测/集成：正常查询、越权查询 404、非法参数拒绝、结果字段裁剪；不产生任务与扣费；LLM 不可用时降级不影响只读入口。",
+        "status": "pending",
+        "dependencies": [
+          3,
+          11
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 18,
+        "title": "P1 工作流模板保存与复用",
+        "description": "支持把确认过的计划保存为工作流模板（命名、描述、可见范围），下次一键带入新会话；模板只保存能力、参数、依赖与风格锁，不保存真实素材 id；调用时重新校验能力在线、素材归属与积分。",
+        "details": "落点：backend/src/agent/workflow-template.service.ts、controller、prisma 模型 WorkflowTemplate（ownerId/name/description/plan/styleLock/isShared/version）、frontend 模板选择器。模板内容必须过 PlanValidator；保存时固化版本，能力参数变化后调用时重新校验并提示差异。素材使用占位引用，运行时由用户重新选择；不得保存他人素材或跨用户共享敏感内容。模板调用不绕过确认与逐步扣费。P1 不做低代码编排画布。",
+        "testStrategy": "保存 -> 新会话调用 -> 计划合法；能力下线/参数变更时调用被拒绝并给可读原因；跨用户模板 404；模板不保存真实 assetId；调用仍走确认与逐步扣费。",
+        "status": "pending",
+        "dependencies": [
+          4,
+          7,
+          8,
+          11
+        ],
+        "priority": "medium",
+        "subtasks": []
+      },
+      {
+        "id": 19,
+        "title": "建立 Agent 测试体系与覆盖矩阵",
+        "description": "补齐四层测试：PlanValidator/Catalog/状态机/SSE 单测，假 TEXT_PROVIDER 与假生成任务的集成测试，smoke-agent.js HTTP 冒烟，Playwright 浏览器 E2E；建立 SUBMITTABLE_CAPABILITY_IDS 覆盖矩阵与 AG-01~AG-16 回归清单，纳入 docs/testing.md。",
+        "details": "落点：backend/src/agent/**/*.spec.ts、backend/scripts/verify-agent-*.ts、backend/scripts/smoke-agent.js、frontend/src/**/__tests__、frontend/tests/agent.spec.ts、docs/testing.md。覆盖 AG-01~AG-16；新增能力只改 definitions/ 后覆盖测试自动发现；任何能力只能可执行或显式 handoff 二选一。回归现有 21 个 smoke 与 14 个 Vitest、verify:deps:critical。测试一律 NODE_ENV=test，连 test.db；脚本先跑红再最小修订，不得为变绿改断言。",
+        "testStrategy": "全部 L1/L1.5/L2/L3/L4 闸口实跑并记录证据；覆盖矩阵无遗漏；现有冒烟与单测不回退；verify:deps:critical 通过。",
+        "status": "pending",
+        "dependencies": [
+          10,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18
+        ],
+        "priority": "high",
+        "subtasks": []
+      },
+      {
+        "id": 20,
+        "title": "文档、环境变量与发布回滚",
+        "description": "更新文档与环境变量：api-contract 增加 Agent 接口/SSE 事件/错误码，environments 增加 Agent 变量，testing 增加闸口与覆盖矩阵，prd/README 增加入口与页面结构；新增变量同步 ENV_SPECS/.env.example/三档 env；给出灰度发布、监控与回滚步骤。",
+        "details": "落点：docs/api-contract.md、docs/environments.md、docs/testing.md、docs/prd.md、README.md、backend/.env.example、backend/.env.development/.env.test/.env.production.example、src/config/env.validation.ts。明确写入不集成 Codex SDK、agent/ 仅参考的决策。发布：先开关关闭上线 -> 内部账号灰度 -> 观察指标 -> 逐步放开；回滚：关开关即恢复，数据表可保留，清理任务可回退。已知缺口与待确认项（P1 优先级、留存期、跨项目素材）写清。",
+        "testStrategy": "probe-environments 通过；文档与代码变量逐项一致；生产档缺关键变量拒绝启动的行为不变；按文档执行一次开关关闭/开启演练并记录。",
+        "status": "pending",
+        "dependencies": [
+          19
+        ],
+        "priority": "medium",
+        "subtasks": []
+      }
+    ],
+    "metadata": {
+      "created": "2026-10-29T05:37:10.573Z",
+      "updated": "2026-10-29T05:51:22.905Z",
+      "description": "Agent 集成（生产级完整版）；来源 .taskmaster/docs/prd-agent-full.md"
     }
   }
 }
