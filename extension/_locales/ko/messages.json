@@ -1,0 +1,315 @@
+{
+  "extensionName": {
+    "message": "화줴AI 이미지 수집"
+  },
+  "extensionDescription": {
+    "message": "쇼핑몰 상품 이미지를 클릭 한 번으로 화줴AI 소재 라이브러리에 수집해 언제든 참고하고 재현하세요."
+  },
+  "contextMenuSave": {
+    "message": "화줴AI에 저장"
+  },
+  "popupIllustration": {
+    "message": "애니메이션 일러스트"
+  },
+  "popupIntro": {
+    "message": "로그인하면 쇼핑 및 콘텐츠 사이트에서 마음에 드는 이미지를 클릭 한 번으로 화줴AI 소재 라이브러리에 수집할 수 있습니다."
+  },
+  "popupLoading": {
+    "message": "불러오는 중…"
+  },
+  "login": {
+    "message": "로그인"
+  },
+  "defaultUser": {
+    "message": "화줴AI 사용자"
+  },
+  "collectionSettings": {
+    "message": "수집 설정"
+  },
+  "disableOnSite": {
+    "message": "이 사이트에서 확장 프로그램 사용 안 함"
+  },
+  "viewLibrary": {
+    "message": "내 소재 보기"
+  },
+  "notLoggedIn": {
+    "message": "로그인하지 않음"
+  },
+  "openingLogin": {
+    "message": "로그인 페이지를 여는 중…"
+  },
+  "cannotOpenLogin": {
+    "message": "로그인 페이지를 열 수 없습니다"
+  },
+  "cannotOpenLoginRetry": {
+    "message": "로그인 페이지를 열 수 없습니다. 다시 시도하세요."
+  },
+  "settingsSaveFailed": {
+    "message": "저장 실패"
+  },
+  "imageActions": {
+    "message": "이미지 작업"
+  },
+  "save": {
+    "message": "저장"
+  },
+  "saveImageToLibrary": {
+    "message": "이미지를 소재 라이브러리에 저장"
+  },
+  "expandMoreActions": {
+    "message": "이미지 작업 더 보기"
+  },
+  "collapseMoreActions": {
+    "message": "추가 이미지 작업 숨기기"
+  },
+  "batchSave": {
+    "message": "이미지 그룹 저장"
+  },
+  "replicate": {
+    "message": "이미지 재현"
+  },
+  "saveResult": {
+    "message": "화줴AI 이미지 저장 결과"
+  },
+  "saveSuccess": {
+    "message": "저장 완료"
+  },
+  "partialSaveSuccess": {
+    "message": "일부 저장 완료"
+  },
+  "savedTo": {
+    "message": "저장 위치"
+  },
+  "selectFolder": {
+    "message": "폴더 선택"
+  },
+  "uncategorized": {
+    "message": "미분류"
+  },
+  "view": {
+    "message": "보기"
+  },
+  "newFolder": {
+    "message": "새로 만들기"
+  },
+  "enterFolderName": {
+    "message": "폴더 이름 입력"
+  },
+  "newFolderName": {
+    "message": "새 폴더 이름"
+  },
+  "copyAddress": {
+    "message": "URL 복사"
+  },
+  "uploadToLibrary": {
+    "message": "소재 라이브러리에 저장"
+  },
+  "batchSaveImages": {
+    "message": "이미지 일괄 저장"
+  },
+  "selectImages": {
+    "message": "저장할 이미지 선택"
+  },
+  "batchLoadFailed": {
+    "message": "그룹의 모든 이미지를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
+  },
+  "closeBatchSelection": {
+    "message": "이미지 선택 취소"
+  },
+  "batchImages": {
+    "message": "일괄 저장 가능한 이미지"
+  },
+  "loginSuccess": {
+    "message": "로그인 완료"
+  },
+  "loginContinue": {
+    "message": "화줴AI에 로그인했습니다. 업로드를 계속하세요."
+  },
+  "continueUpload": {
+    "message": "업로드 계속"
+  },
+  "reloginRequired": {
+    "message": "다시 로그인해야 합니다"
+  },
+  "loggedOutRetry": {
+    "message": "화줴AI에서 로그아웃되었습니다. 다시 로그인한 후 업로드하세요."
+  },
+  "loginAgain": {
+    "message": "다시 로그인"
+  },
+  "pendingImage": {
+    "message": "저장 대기 이미지 $INDEX$",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectedImages": {
+    "message": "$COUNT$개 선택됨",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "deselectAll": {
+    "message": "전체 선택 해제"
+  },
+  "selectAll": {
+    "message": "전체 선택"
+  },
+  "saveSelection": {
+    "message": "저장 ($SELECTED$/$TOTAL$)",
+    "placeholders": {
+      "selected": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "deselectImage": {
+    "message": "이미지 $INDEX$ 선택 해제",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectImage": {
+    "message": "이미지 $INDEX$ 선택",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "saveFailedRetry": {
+    "message": "저장하지 못했습니다. 잠시 후 다시 시도하세요."
+  },
+  "networkConnectionError": {
+    "message": "네트워크 연결 오류입니다. 네트워크 상태를 확인하세요."
+  },
+  "savedThenLogin": {
+    "message": "$SAVED$개 저장됨. 로그인 후 $REMAINING$개 계속",
+    "placeholders": {
+      "saved": {
+        "content": "$1"
+      },
+      "remaining": {
+        "content": "$2"
+      }
+    }
+  },
+  "savedWithFailures": {
+    "message": "$SAVED$개 저장됨, $FAILED$개 실패",
+    "placeholders": {
+      "saved": {
+        "content": "$1"
+      },
+      "failed": {
+        "content": "$2"
+      }
+    }
+  },
+  "loginRetrySelection": {
+    "message": "로그인 후 재시도 ($REMAINING$/$TOTAL$)",
+    "placeholders": {
+      "remaining": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "retrySelection": {
+    "message": "재시도 ($REMAINING$/$TOTAL$)",
+    "placeholders": {
+      "remaining": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "savingProgress": {
+    "message": "저장 중... $CURRENT$/$TOTAL$",
+    "placeholders": {
+      "current": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "batchSavedTo": {
+    "message": "$COUNT$개 이미지 저장 위치",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "replicateUploading": {
+    "message": "이미지를 업로드하고 이미지 재현을 여는 중"
+  },
+  "replicateFailed": {
+    "message": "이미지 재현을 준비하지 못했습니다. 다시 시도하세요."
+  },
+  "replicateOpening": {
+    "message": "이미지 업로드 완료. 이미지 재현을 여는 중입니다."
+  },
+  "copied": {
+    "message": "복사됨"
+  },
+  "addressCopied": {
+    "message": "URL 복사됨"
+  },
+  "copyFailed": {
+    "message": "복사 실패"
+  },
+  "copyFailedManual": {
+    "message": "복사하지 못했습니다. URL을 직접 선택하여 복사하세요."
+  },
+  "uploading": {
+    "message": "업로드 중…"
+  },
+  "uploadingToAssets": {
+    "message": "이미지를 업로드하여 에셋에 저장하는 중"
+  },
+  "uploadFailedRetry": {
+    "message": "업로드하지 못했습니다. 잠시 후 다시 시도하세요."
+  },
+  "retryAfterLogin": {
+    "message": "로그인 후 재시도"
+  },
+  "retryUpload": {
+    "message": "업로드 재시도"
+  },
+  "saveFailedSimple": {
+    "message": "저장하지 못했습니다. 다시 시도하세요."
+  },
+  "saving": {
+    "message": "저장 중"
+  },
+  "noFolders": {
+    "message": "폴더가 없습니다. ‘새로 만들기’를 클릭하세요."
+  },
+  "savingEllipsis": {
+    "message": "저장 중…"
+  },
+  "createFolderFailed": {
+    "message": "폴더를 만들지 못했습니다. 다시 시도하세요."
+  },
+  "saveFolderFailed": {
+    "message": "폴더에 저장하지 못했습니다. 다시 시도하세요."
+  },
+  "copyAddressFailed": {
+    "message": "이미지 URL을 복사할 수 없습니다"
+  }
+}

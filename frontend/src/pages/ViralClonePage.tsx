@@ -1,6 +1,6 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { App, Modal } from 'antd';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ImagePlus, Maximize2 } from 'lucide-react';
 import { assetsApi, generateApi, assetSrc, toAbsoluteUrl } from '../lib/api';
 import { languageOptions, platformOptions } from '../lib/optionSets';
@@ -150,6 +150,60 @@ export function ViralClonePage() {
 
   // 参考站本页名称/品牌/复刻要求均为选填, 提交条件 = 商品图 ≥1 + 参考图 =1
   const formValid = images.length > 0 && reference !== null;
+
+  /*
+   * ── 外部入口: 浏览器扩展「图片复刻」直接带参考图进来 ──
+   *
+   * 扩展只拿得到素材 id (生成接口吃 inputAssetIds, 不是 URL), 故约定
+   * `/viral-clone?referenceAssetId=xxx`: 进来按 id 取回素材回填参考图,
+   * 用完即从地址栏摘掉 —— 保留会让刷新/后退重复拉取, 也会让用户复制链接
+   * 给别人时莫名其妙多带一张图。
+   *
+   * 未登录时不发请求 (C 端路由开放浏览, 此时必然 401); 参数留在地址上,
+   * 登录回来 token 到位后本 effect 自然再次触发。
+   */
+  const [searchParams, setSearchParams] = useSearchParams();
+  const referenceAssetId = searchParams.get('referenceAssetId');
+  /** 已处理过的 id, 防止 token 变化等依赖抖动导致重复拉取 */
+  const handledReferenceAssetId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!referenceAssetId || !token) return;
+    if (handledReferenceAssetId.current === referenceAssetId) return;
+    handledReferenceAssetId.current = referenceAssetId;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const asset = await assetsApi.get(referenceAssetId);
+        if (cancelled) return;
+        setReference({
+          id: asset.id,
+          url: assetSrc(asset) ?? '',
+          name: asset.sourceTitle || asset.sourceUrl.split('/').pop() || '参考图',
+        });
+        message.success('已带入采集的参考图');
+      } catch (e) {
+        if (cancelled) return;
+        message.error((e as Error).message || '参考图读取失败');
+      } finally {
+        if (!cancelled) {
+          setSearchParams(
+            (prev) => {
+              const next = new URLSearchParams(prev);
+              next.delete('referenceAssetId');
+              return next;
+            },
+            { replace: true },
+          );
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [referenceAssetId, token, message, setSearchParams]);
 
   /*
    * 该能力此刻能不能生成。

@@ -1,0 +1,51 @@
+.logged-out-animation {
+  position: relative;
+  width: 332px;
+  max-width: 100%;
+  height: 221.333px;
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: 11.067px;
+  background: #303030;
+}
+
+.logged-out-animation__player,
+.logged-out-animation__fallback {
+  position: absolute;
+  inset: 0;
+}
+
+.logged-out-animation__player {
+  opacity: 0;
+  transition: opacity 160ms ease-out;
+}
+
+.logged-out-animation__player svg {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.logged-out-animation__fallback {
+  display: grid;
+  place-items: center;
+  color: #a3a3a3;
+  font-size: 14px;
+  transition: opacity 120ms ease-out;
+}
+
+.logged-out-animation--ready .logged-out-animation__player {
+  opacity: 1;
+}
+
+.logged-out-animation--ready .logged-out-animation__fallback {
+  visibility: hidden;
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logged-out-animation__player,
+  .logged-out-animation__fallback {
+    transition: none;
+  }
+}

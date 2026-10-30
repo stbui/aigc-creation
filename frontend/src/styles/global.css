@@ -13749,6 +13749,21 @@ html[data-promo='off'] .multi-image-fusion-page {
   line-height: 17px;
   color: #a0a7b6;
 }
+/* 采集来源: 只有扩展采集的素材才有，站点名链回原页面（溯源用） */
+.asset-library-card-source {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--text-desc);
+  text-decoration: none;
+}
+.asset-library-card-source:hover {
+  color: var(--brand);
+}
 /* 状态与空态: strong 14/16 #333
    .asset-library-state 已移除 (2026-10-20): 素材库加载态改用 StateSkeleton 骨架屏 */
 .asset-library-empty {

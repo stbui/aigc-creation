@@ -1,0 +1,77 @@
+{
+  "manifest_version": 3,
+  "name": "__MSG_extensionName__",
+  "version": "1.1.0",
+  "description": "__MSG_extensionDescription__",
+  "default_locale": "zh_CN",
+  "icons": {
+    "16": "assets/huojue-logo-16.png",
+    "32": "assets/huojue-logo-32.png",
+    "48": "assets/huojue-logo-48.png",
+    "128": "assets/huojue-logo-128.png"
+  },
+  "action": {
+    "default_title": "__MSG_extensionName__",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "assets/huojue-logo-16.png",
+      "32": "assets/huojue-logo-32.png",
+      "48": "assets/huojue-logo-48.png",
+      "128": "assets/huojue-logo-128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "exclude_matches": [
+        "http://localhost:5100/*",
+        "http://127.0.0.1:5100/*",
+        "https://your-domain.com/*",
+        "https://*.your-domain.com/*"
+      ],
+      "js": ["content/image-candidate-filter.js", "content/image-hover.js"],
+      "css": [
+        "content/image-hover.css",
+        "content/image-hover-design.css",
+        "content/toast-design.css"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "http://localhost:5100/*",
+        "http://127.0.0.1:5100/*",
+        "https://your-domain.com/*",
+        "https://*.your-domain.com/*"
+      ],
+      "js": ["content/auth-monitor.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "permissions": ["activeTab", "contextMenus", "scripting", "storage"],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "content/assets/hover-batch.svg",
+        "content/assets/hover-replicate.svg",
+        "content/assets/hover-save.svg",
+        "content/assets/hover-chevron.svg",
+        "content/assets/toast-chevron.svg",
+        "content/assets/toast-plus.svg",
+        "content/assets/toast-radio.svg",
+        "content/assets/toast-folder.svg",
+        "content/assets/toast-radio-selected.svg",
+        "content/assets/toast-check.svg",
+        "content/assets/toast-close.svg",
+        "content/assets/toast-loading.svg",
+        "content/assets/toast-error-alert.svg"
+      ],
+      "matches": ["http://*/*", "https://*/*"]
+    }
+  ]
+}

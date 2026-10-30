@@ -1,0 +1,6 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="33" height="18" viewBox="0 0 33 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Switch">
+<path id="Background" d="M0 9C0 4.02944 4.02944 0 9 0H24C28.9706 0 33 4.02944 33 9V9C33 13.9706 28.9706 18 24 18H9C4.02944 18 0 13.9706 0 9V9Z" fill="#E5E5E5"/>
+<circle id="Toggle" cx="24" cy="9" r="8" fill="#171717"/>
+</g>
+</svg>

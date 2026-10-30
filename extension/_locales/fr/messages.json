@@ -1,0 +1,315 @@
+{
+  "extensionName": {
+    "message": "Huojue AI Capture d’images"
+  },
+  "extensionDescription": {
+    "message": "Capturez les images produits de n’importe quel site dans votre bibliothèque d’assets Huojue AI, prêtes à être consultées ou recréées."
+  },
+  "contextMenuSave": {
+    "message": "Enregistrer dans Huojue AI"
+  },
+  "popupIllustration": {
+    "message": "Illustration animée"
+  },
+  "popupIntro": {
+    "message": "Connectez-vous pour capturer en un clic les images qui vous plaisent dans votre bibliothèque d’assets Huojue AI."
+  },
+  "popupLoading": {
+    "message": "Chargement…"
+  },
+  "login": {
+    "message": "Se connecter"
+  },
+  "defaultUser": {
+    "message": "Utilisateur Huojue AI"
+  },
+  "collectionSettings": {
+    "message": "Paramètres de capture"
+  },
+  "disableOnSite": {
+    "message": "Désactiver l’extension sur ce site"
+  },
+  "viewLibrary": {
+    "message": "Voir mes assets"
+  },
+  "notLoggedIn": {
+    "message": "Non connecté"
+  },
+  "openingLogin": {
+    "message": "Ouverture de la page de connexion…"
+  },
+  "cannotOpenLogin": {
+    "message": "Impossible d’ouvrir la page de connexion"
+  },
+  "cannotOpenLoginRetry": {
+    "message": "Impossible d’ouvrir la page de connexion. Réessayez."
+  },
+  "settingsSaveFailed": {
+    "message": "Échec de l’enregistrement"
+  },
+  "imageActions": {
+    "message": "Actions sur l’image"
+  },
+  "save": {
+    "message": "Enregistrer"
+  },
+  "saveImageToLibrary": {
+    "message": "Enregistrer l’image dans la bibliothèque"
+  },
+  "expandMoreActions": {
+    "message": "Afficher plus d’actions"
+  },
+  "collapseMoreActions": {
+    "message": "Masquer les actions supplémentaires"
+  },
+  "batchSave": {
+    "message": "Enregistrer le groupe d’images"
+  },
+  "replicate": {
+    "message": "Recréer l’image"
+  },
+  "saveResult": {
+    "message": "Résultat de l’enregistrement Huojue AI"
+  },
+  "saveSuccess": {
+    "message": "Enregistrement réussi"
+  },
+  "partialSaveSuccess": {
+    "message": "Enregistrement partiel réussi"
+  },
+  "savedTo": {
+    "message": "Enregistré dans"
+  },
+  "selectFolder": {
+    "message": "Choisir un dossier"
+  },
+  "uncategorized": {
+    "message": "Sans catégorie"
+  },
+  "view": {
+    "message": "Voir"
+  },
+  "newFolder": {
+    "message": "Nouveau"
+  },
+  "enterFolderName": {
+    "message": "Saisissez le nom du dossier"
+  },
+  "newFolderName": {
+    "message": "Nom du nouveau dossier"
+  },
+  "copyAddress": {
+    "message": "Copier l’URL"
+  },
+  "uploadToLibrary": {
+    "message": "Enregistrer dans la bibliothèque"
+  },
+  "batchSaveImages": {
+    "message": "Enregistrer plusieurs images"
+  },
+  "selectImages": {
+    "message": "Sélectionnez les images à enregistrer"
+  },
+  "batchLoadFailed": {
+    "message": "Impossible de charger toutes les images du groupe. Veuillez réessayer."
+  },
+  "closeBatchSelection": {
+    "message": "Annuler la sélection des images"
+  },
+  "batchImages": {
+    "message": "Images disponibles pour l’enregistrement groupé"
+  },
+  "loginSuccess": {
+    "message": "Connexion réussie"
+  },
+  "loginContinue": {
+    "message": "Connexion à Huojue AI réussie. Poursuivez l’importation."
+  },
+  "continueUpload": {
+    "message": "Poursuivre l’importation"
+  },
+  "reloginRequired": {
+    "message": "Reconnectez-vous"
+  },
+  "loggedOutRetry": {
+    "message": "Vous êtes déconnecté de Huojue AI. Reconnectez-vous pour importer."
+  },
+  "loginAgain": {
+    "message": "Se reconnecter"
+  },
+  "pendingImage": {
+    "message": "Image $INDEX$ à enregistrer",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectedImages": {
+    "message": "$COUNT$ sélectionnée(s)",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "deselectAll": {
+    "message": "Tout désélectionner"
+  },
+  "selectAll": {
+    "message": "Tout sélectionner"
+  },
+  "saveSelection": {
+    "message": "Enregistrer ($SELECTED$/$TOTAL$)",
+    "placeholders": {
+      "selected": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "deselectImage": {
+    "message": "Désélectionner l’image $INDEX$",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectImage": {
+    "message": "Sélectionner l’image $INDEX$",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "saveFailedRetry": {
+    "message": "Échec de l’enregistrement. Réessayez plus tard."
+  },
+  "networkConnectionError": {
+    "message": "Erreur de connexion réseau. Vérifiez votre connexion."
+  },
+  "savedThenLogin": {
+    "message": "$SAVED$ enregistrée(s) ; connectez-vous pour continuer avec $REMAINING$",
+    "placeholders": {
+      "saved": {
+        "content": "$1"
+      },
+      "remaining": {
+        "content": "$2"
+      }
+    }
+  },
+  "savedWithFailures": {
+    "message": "$SAVED$ enregistrée(s) ; $FAILED$ échec(s)",
+    "placeholders": {
+      "saved": {
+        "content": "$1"
+      },
+      "failed": {
+        "content": "$2"
+      }
+    }
+  },
+  "loginRetrySelection": {
+    "message": "Se connecter et réessayer ($REMAINING$/$TOTAL$)",
+    "placeholders": {
+      "remaining": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "retrySelection": {
+    "message": "Réessayer ($REMAINING$/$TOTAL$)",
+    "placeholders": {
+      "remaining": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "savingProgress": {
+    "message": "Enregistrement... $CURRENT$/$TOTAL$",
+    "placeholders": {
+      "current": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "batchSavedTo": {
+    "message": "$COUNT$ image(s) enregistrée(s) dans",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "replicateUploading": {
+    "message": "Importation de l’image et ouverture de la recréation"
+  },
+  "replicateFailed": {
+    "message": "Impossible de préparer la recréation. Réessayez."
+  },
+  "replicateOpening": {
+    "message": "Image importée. Ouverture de la recréation."
+  },
+  "copied": {
+    "message": "Copié"
+  },
+  "addressCopied": {
+    "message": "URL copiée"
+  },
+  "copyFailed": {
+    "message": "Échec de la copie"
+  },
+  "copyFailedManual": {
+    "message": "Échec de la copie. Sélectionnez et copiez l’URL manuellement."
+  },
+  "uploading": {
+    "message": "Importation…"
+  },
+  "uploadingToAssets": {
+    "message": "Importation et enregistrement de l’image dans vos ressources"
+  },
+  "uploadFailedRetry": {
+    "message": "Échec de l’importation. Réessayez plus tard."
+  },
+  "retryAfterLogin": {
+    "message": "Se connecter et réessayer"
+  },
+  "retryUpload": {
+    "message": "Réessayer l’importation"
+  },
+  "saveFailedSimple": {
+    "message": "Échec de l’enregistrement. Réessayez."
+  },
+  "saving": {
+    "message": "Enregistrement"
+  },
+  "noFolders": {
+    "message": "Aucun dossier. Cliquez sur « Nouveau »."
+  },
+  "savingEllipsis": {
+    "message": "Enregistrement…"
+  },
+  "createFolderFailed": {
+    "message": "Impossible de créer le dossier. Réessayez."
+  },
+  "saveFolderFailed": {
+    "message": "Impossible d’enregistrer dans le dossier. Réessayez."
+  },
+  "copyAddressFailed": {
+    "message": "Impossible de copier l’URL de l’image"
+  }
+}

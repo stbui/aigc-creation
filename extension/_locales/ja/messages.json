@@ -1,0 +1,315 @@
+{
+  "extensionName": {
+    "message": "貨覚AI 画像キャプチャ"
+  },
+  "extensionDescription": {
+    "message": "ECサイトの商品画像をワンクリックで貨覚AIの素材ライブラリに取り込み、いつでも参考・再現できます。"
+  },
+  "contextMenuSave": {
+    "message": "貨覚AIに保存"
+  },
+  "popupIllustration": {
+    "message": "アニメーション画像"
+  },
+  "popupIntro": {
+    "message": "ログインすると、ショッピングやコンテンツサイトの気に入った画像をワンクリックで貨覚AIの素材ライブラリに取り込めます。"
+  },
+  "popupLoading": {
+    "message": "読み込み中…"
+  },
+  "login": {
+    "message": "ログイン"
+  },
+  "defaultUser": {
+    "message": "貨覚AI ユーザー"
+  },
+  "collectionSettings": {
+    "message": "キャプチャ設定"
+  },
+  "disableOnSite": {
+    "message": "このサイトで拡張機能を無効にする"
+  },
+  "viewLibrary": {
+    "message": "マイ素材を見る"
+  },
+  "notLoggedIn": {
+    "message": "ログインしていません"
+  },
+  "openingLogin": {
+    "message": "ログインページを開いています…"
+  },
+  "cannotOpenLogin": {
+    "message": "ログインページを開けません"
+  },
+  "cannotOpenLoginRetry": {
+    "message": "ログインページを開けません。もう一度お試しください。"
+  },
+  "settingsSaveFailed": {
+    "message": "保存に失敗しました"
+  },
+  "imageActions": {
+    "message": "画像操作"
+  },
+  "save": {
+    "message": "保存"
+  },
+  "saveImageToLibrary": {
+    "message": "画像を素材ライブラリに保存"
+  },
+  "expandMoreActions": {
+    "message": "その他の画像操作を表示"
+  },
+  "collapseMoreActions": {
+    "message": "その他の画像操作を閉じる"
+  },
+  "batchSave": {
+    "message": "画像グループを保存"
+  },
+  "replicate": {
+    "message": "画像を再現"
+  },
+  "saveResult": {
+    "message": "貨覚AI 画像保存結果"
+  },
+  "saveSuccess": {
+    "message": "保存しました"
+  },
+  "partialSaveSuccess": {
+    "message": "一部の画像を保存しました"
+  },
+  "savedTo": {
+    "message": "保存先"
+  },
+  "selectFolder": {
+    "message": "フォルダーを選択"
+  },
+  "uncategorized": {
+    "message": "未分類"
+  },
+  "view": {
+    "message": "表示"
+  },
+  "newFolder": {
+    "message": "新規"
+  },
+  "enterFolderName": {
+    "message": "フォルダー名を入力"
+  },
+  "newFolderName": {
+    "message": "新しいフォルダー名"
+  },
+  "copyAddress": {
+    "message": "URL をコピー"
+  },
+  "uploadToLibrary": {
+    "message": "素材ライブラリに保存"
+  },
+  "batchSaveImages": {
+    "message": "画像を一括保存"
+  },
+  "selectImages": {
+    "message": "保存する画像を選択"
+  },
+  "batchLoadFailed": {
+    "message": "グループ内の画像をすべて読み込めませんでした。後でもう一度お試しください。"
+  },
+  "closeBatchSelection": {
+    "message": "画像の選択をキャンセル"
+  },
+  "batchImages": {
+    "message": "一括保存できる画像"
+  },
+  "loginSuccess": {
+    "message": "ログインしました"
+  },
+  "loginContinue": {
+    "message": "貨覚AI にログインしました。アップロードを続けてください。"
+  },
+  "continueUpload": {
+    "message": "アップロードを続ける"
+  },
+  "reloginRequired": {
+    "message": "再ログインが必要です"
+  },
+  "loggedOutRetry": {
+    "message": "貨覚AI からログアウトしました。再ログインしてアップロードしてください。"
+  },
+  "loginAgain": {
+    "message": "再ログイン"
+  },
+  "pendingImage": {
+    "message": "保存待ち画像 $INDEX$",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectedImages": {
+    "message": "$COUNT$ 枚選択済み",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "deselectAll": {
+    "message": "すべて解除"
+  },
+  "selectAll": {
+    "message": "すべて選択"
+  },
+  "saveSelection": {
+    "message": "保存 ($SELECTED$/$TOTAL$)",
+    "placeholders": {
+      "selected": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "deselectImage": {
+    "message": "画像 $INDEX$ の選択を解除",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectImage": {
+    "message": "画像 $INDEX$ を選択",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "saveFailedRetry": {
+    "message": "保存に失敗しました。しばらくしてから再試行してください。"
+  },
+  "networkConnectionError": {
+    "message": "ネットワーク接続エラーです。接続状況を確認してください。"
+  },
+  "savedThenLogin": {
+    "message": "$SAVED$ 枚保存済み。ログイン後に残り $REMAINING$ 枚を続行",
+    "placeholders": {
+      "saved": {
+        "content": "$1"
+      },
+      "remaining": {
+        "content": "$2"
+      }
+    }
+  },
+  "savedWithFailures": {
+    "message": "$SAVED$ 枚保存済み、$FAILED$ 枚失敗",
+    "placeholders": {
+      "saved": {
+        "content": "$1"
+      },
+      "failed": {
+        "content": "$2"
+      }
+    }
+  },
+  "loginRetrySelection": {
+    "message": "ログインして再試行 ($REMAINING$/$TOTAL$)",
+    "placeholders": {
+      "remaining": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "retrySelection": {
+    "message": "再試行 ($REMAINING$/$TOTAL$)",
+    "placeholders": {
+      "remaining": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "savingProgress": {
+    "message": "保存中... $CURRENT$/$TOTAL$",
+    "placeholders": {
+      "current": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "batchSavedTo": {
+    "message": "$COUNT$ 枚の保存先",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "replicateUploading": {
+    "message": "画像をアップロードして画像再現を開いています"
+  },
+  "replicateFailed": {
+    "message": "画像再現の準備に失敗しました。もう一度お試しください。"
+  },
+  "replicateOpening": {
+    "message": "画像のアップロードが完了しました。画像再現を開いています。"
+  },
+  "copied": {
+    "message": "コピー済み"
+  },
+  "addressCopied": {
+    "message": "URL をコピーしました"
+  },
+  "copyFailed": {
+    "message": "コピー失敗"
+  },
+  "copyFailedManual": {
+    "message": "コピーに失敗しました。URL を手動で選択してコピーしてください。"
+  },
+  "uploading": {
+    "message": "アップロード中…"
+  },
+  "uploadingToAssets": {
+    "message": "画像をアップロードしてアセットに保存しています"
+  },
+  "uploadFailedRetry": {
+    "message": "アップロードに失敗しました。しばらくしてから再試行してください。"
+  },
+  "retryAfterLogin": {
+    "message": "ログインして再試行"
+  },
+  "retryUpload": {
+    "message": "アップロードを再試行"
+  },
+  "saveFailedSimple": {
+    "message": "保存に失敗しました。もう一度お試しください。"
+  },
+  "saving": {
+    "message": "保存中"
+  },
+  "noFolders": {
+    "message": "フォルダーがありません。「新規」をクリックしてください。"
+  },
+  "savingEllipsis": {
+    "message": "保存中…"
+  },
+  "createFolderFailed": {
+    "message": "フォルダーを作成できませんでした。もう一度お試しください。"
+  },
+  "saveFolderFailed": {
+    "message": "フォルダーへの保存に失敗しました。もう一度お試しください。"
+  },
+  "copyAddressFailed": {
+    "message": "画像 URL をコピーできません"
+  }
+}

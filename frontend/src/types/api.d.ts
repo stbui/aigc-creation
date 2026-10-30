@@ -319,6 +319,13 @@ export interface Asset {
   format: string;
   sizeBytes: number;
   createdAt: string;
+  /**
+   * 来源元数据: 只有浏览器扩展「图片采集」上传的 original 素材才有值。
+   * 仅作展示与溯源, 服务端不据此鉴权或抓取。
+   */
+  sourceSite?: string | null;
+  sourceTitle?: string | null;
+  sourcePageUrl?: string | null;
 }
 
 export type AssetUploadResponse = Asset;

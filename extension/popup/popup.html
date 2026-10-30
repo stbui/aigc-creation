@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>货觉AI 图片采集</title>
+    <link rel="stylesheet" href="popup.css" />
+    <link rel="stylesheet" href="popup.animation.css" />
+    <link rel="stylesheet" href="popup.logged-in.css" />
+    <link rel="stylesheet" href="popup.design.css" />
+  </head>
+  <body>
+    <main class="popup popup--loading" aria-busy="true">
+      <section id="loading-view" class="view popup-loading-view" role="status" aria-live="polite">
+        <img class="popup-loading-logo" src="../assets/huojue-logo-32.png" alt="" />
+        <span class="popup-loading-text" data-i18n="popupLoading">正在加载…</span>
+      </section>
+      <section id="logged-out-view" class="view" hidden>
+        <header class="brand">
+          <img class="brand-mark" src="../assets/huojue-logo-32.png" alt="" />
+          <strong data-i18n="extensionName">货觉AI 图片采集</strong>
+        </header>
+        <div class="logged-out-content">
+          <div
+            id="logged-out-animation"
+            class="logged-out-animation"
+            role="img"
+            aria-label="动画配图"
+            data-i18n-aria-label="popupIllustration"
+          >
+            <div id="logged-out-animation-player" class="logged-out-animation__player" aria-hidden="true"></div>
+            <span class="logged-out-animation__fallback" data-i18n="popupIllustration">动画配图</span>
+          </div>
+          <p class="intro" data-i18n="popupIntro">登录后可在浏览电商与内容平台时，一键把喜欢的图片采集到货觉AI素材库，随时参考与复刻</p>
+        </div>
+        <button id="login-button" class="action-button" type="button" data-i18n="login">登录</button>
+      </section>
+      <section id="logged-in-view" class="view" hidden>
+        <header class="account">
+          <span id="user-avatar-fallback" class="avatar">货</span>
+          <strong id="user-name" data-i18n="defaultUser">货觉AI 用户</strong>
+        </header>
+        <div class="divider"></div>
+        <div class="site-setting-block">
+          <p class="section-label" data-i18n="collectionSettings">采集设置</p>
+          <label class="site-row current-site-setting">
+            <img class="site-setting-icon" src="figma-assets/disable-extension.svg" alt="" />
+            <span class="site-setting-label" data-i18n="disableOnSite">在此网站禁用扩展</span>
+            <input id="current-site-toggle" type="checkbox" />
+            <span class="figma-switch" aria-hidden="true">
+              <img class="figma-switch-state figma-switch-state--enabled" src="figma-assets/extension-switch-enabled.svg" alt="" />
+              <img class="figma-switch-state figma-switch-state--disabled" src="figma-assets/extension-switch.svg" alt="" />
+            </span>
+          </label>
+        </div>
+        <button id="library-button" class="action-button" type="button" data-i18n="viewLibrary">查看我的素材</button>
+      </section>
+      <p id="message" class="message" role="status"></p>
+    </main>
+    <script src="vendor/lottie.min.js"></script>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

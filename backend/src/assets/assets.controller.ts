@@ -4,6 +4,7 @@ import {
   Delete,
   Get,
   Param,
+  Patch,
   Post,
   Query,
   UploadedFile,
@@ -21,6 +22,8 @@ import { resolveUploadsDir } from '../config/env-files';
 import { AssetsService } from './assets.service';
 import { AppError } from '../common/app.exception';
 import { maxUploadBytes } from './image-validation';
+import { UploadAssetDto } from './dto/upload-asset.dto';
+import { MoveAssetsDto } from './dto/move-asset.dto';
 
 @UseGuards(JwtAuthGuard)
 @Controller('assets')
@@ -51,15 +54,36 @@ export class AssetsController {
   upload(
     @CurrentUser() user: AuthUser,
     @UploadedFile() file: any,
-    @Body('projectId') projectId: string,
+    @Body() dto: UploadAssetDto,
   ) {
     if (!file) throw new AppError(40001, '请选择要上传的图片', 400);
-    return this.assetsService.createOriginal(user.id, projectId, {
-      filename: file.filename,
-      originalname: file.originalname,
-      size: file.size,
-      mimetype: file.mimetype,
-    });
+    return this.assetsService.createOriginal(
+      user.id,
+      dto.projectId,
+      {
+        filename: file.filename,
+        originalname: file.originalname,
+        size: file.size,
+        mimetype: file.mimetype,
+      },
+      {
+        sourceSite: dto.sourceSite,
+        sourceTitle: dto.sourceTitle,
+        sourcePageUrl: dto.sourcePageUrl,
+      },
+    );
+  }
+
+  /**
+   * 批量移动素材到另一个项目 (分组)。
+   *
+   * 浏览器扩展的「换分组再保存」是批量语义: 一次选中 N 张、已落到默认分组,
+   * 再整体改投目标分组 —— 逐条 PATCH 会放大成 N 次请求且中途失败无法回滚,
+   * 故做成批量端点。校验一次目标项目归属, 再按 ownerId 过滤素材。
+   */
+  @Patch('move')
+  move(@CurrentUser() user: AuthUser, @Body() dto: MoveAssetsDto) {
+    return this.assetsService.moveToProject(user.id, dto.ids, dto.projectId);
   }
 
   /** 素材库列表: 支持 kind / capability 筛选与分页 */

@@ -1,0 +1,315 @@
+{
+  "extensionName": {
+    "message": "货觉AI 图片采集"
+  },
+  "extensionDescription": {
+    "message": "电商好图一键采集到货觉AI素材库，随时参考与复刻。"
+  },
+  "contextMenuSave": {
+    "message": "保存至货觉AI"
+  },
+  "popupIllustration": {
+    "message": "动画配图"
+  },
+  "popupIntro": {
+    "message": "登录后可在浏览电商与内容平台时，一键把喜欢的图片采集到货觉AI素材库，随时参考与复刻"
+  },
+  "popupLoading": {
+    "message": "正在加载…"
+  },
+  "login": {
+    "message": "登录"
+  },
+  "defaultUser": {
+    "message": "货觉AI 用户"
+  },
+  "collectionSettings": {
+    "message": "采集设置"
+  },
+  "disableOnSite": {
+    "message": "在此网站禁用扩展"
+  },
+  "viewLibrary": {
+    "message": "查看我的素材"
+  },
+  "notLoggedIn": {
+    "message": "未登录"
+  },
+  "openingLogin": {
+    "message": "正在打开登录页面…"
+  },
+  "cannotOpenLogin": {
+    "message": "无法打开登录页面"
+  },
+  "cannotOpenLoginRetry": {
+    "message": "无法打开登录页面，请重试"
+  },
+  "settingsSaveFailed": {
+    "message": "保存失败"
+  },
+  "imageActions": {
+    "message": "图片操作"
+  },
+  "save": {
+    "message": "保存"
+  },
+  "saveImageToLibrary": {
+    "message": "保存图片到素材库"
+  },
+  "expandMoreActions": {
+    "message": "展开更多图片操作"
+  },
+  "collapseMoreActions": {
+    "message": "收起更多图片操作"
+  },
+  "batchSave": {
+    "message": "批量保存组图"
+  },
+  "replicate": {
+    "message": "图片复刻"
+  },
+  "saveResult": {
+    "message": "货觉AI 图片保存结果"
+  },
+  "saveSuccess": {
+    "message": "保存成功"
+  },
+  "partialSaveSuccess": {
+    "message": "部分保存成功"
+  },
+  "savedTo": {
+    "message": "已保存至"
+  },
+  "selectFolder": {
+    "message": "选择分组"
+  },
+  "uncategorized": {
+    "message": "未分类"
+  },
+  "view": {
+    "message": "查看"
+  },
+  "newFolder": {
+    "message": "新建"
+  },
+  "enterFolderName": {
+    "message": "请输入分组名称"
+  },
+  "newFolderName": {
+    "message": "新分组名称"
+  },
+  "copyAddress": {
+    "message": "复制地址"
+  },
+  "uploadToLibrary": {
+    "message": "保存到素材库"
+  },
+  "batchSaveImages": {
+    "message": "批量保存图片"
+  },
+  "selectImages": {
+    "message": "选择要保存的图片"
+  },
+  "batchLoadFailed": {
+    "message": "无法加载完整组图，请稍后重试。"
+  },
+  "closeBatchSelection": {
+    "message": "取消选择组图"
+  },
+  "batchImages": {
+    "message": "可批量保存的图片"
+  },
+  "loginSuccess": {
+    "message": "登录成功"
+  },
+  "loginContinue": {
+    "message": "货觉AI 登录成功，请继续上传"
+  },
+  "continueUpload": {
+    "message": "继续上传"
+  },
+  "reloginRequired": {
+    "message": "需要重新登录"
+  },
+  "loggedOutRetry": {
+    "message": "货觉AI 已退出登录，请重新登录后上传"
+  },
+  "loginAgain": {
+    "message": "重新登录"
+  },
+  "pendingImage": {
+    "message": "待保存图片 $INDEX$",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectedImages": {
+    "message": "已选择 $COUNT$ 张",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "deselectAll": {
+    "message": "取消全选"
+  },
+  "selectAll": {
+    "message": "全选"
+  },
+  "saveSelection": {
+    "message": "保存 ($SELECTED$/$TOTAL$)",
+    "placeholders": {
+      "selected": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "deselectImage": {
+    "message": "取消选择第 $INDEX$ 张图片",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectImage": {
+    "message": "选择第 $INDEX$ 张图片",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "saveFailedRetry": {
+    "message": "保存失败，请稍后重试。"
+  },
+  "networkConnectionError": {
+    "message": "网络连接错误，请检查您的网络情况"
+  },
+  "savedThenLogin": {
+    "message": "已保存 $SAVED$ 张，登录后继续 $REMAINING$ 张",
+    "placeholders": {
+      "saved": {
+        "content": "$1"
+      },
+      "remaining": {
+        "content": "$2"
+      }
+    }
+  },
+  "savedWithFailures": {
+    "message": "已保存 $SAVED$ 张，$FAILED$ 张失败",
+    "placeholders": {
+      "saved": {
+        "content": "$1"
+      },
+      "failed": {
+        "content": "$2"
+      }
+    }
+  },
+  "loginRetrySelection": {
+    "message": "登录后重试 ($REMAINING$/$TOTAL$)",
+    "placeholders": {
+      "remaining": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "retrySelection": {
+    "message": "重试 ($REMAINING$/$TOTAL$)",
+    "placeholders": {
+      "remaining": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "savingProgress": {
+    "message": "正在保存... $CURRENT$/$TOTAL$",
+    "placeholders": {
+      "current": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "batchSavedTo": {
+    "message": "$COUNT$ 张图已保存至",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "replicateUploading": {
+    "message": "正在上传图片并打开图片复刻"
+  },
+  "replicateFailed": {
+    "message": "图片复刻准备失败，请稍后重试。"
+  },
+  "replicateOpening": {
+    "message": "图片已上传，正在打开图片复刻"
+  },
+  "copied": {
+    "message": "已复制"
+  },
+  "addressCopied": {
+    "message": "地址已复制"
+  },
+  "copyFailed": {
+    "message": "复制失败"
+  },
+  "copyFailedManual": {
+    "message": "复制失败，请手动选择 URL 复制"
+  },
+  "uploading": {
+    "message": "上传中…"
+  },
+  "uploadingToAssets": {
+    "message": "正在上传图片并保存到用户素材"
+  },
+  "uploadFailedRetry": {
+    "message": "上传失败，请稍后重试。"
+  },
+  "retryAfterLogin": {
+    "message": "登录后重试"
+  },
+  "retryUpload": {
+    "message": "重试上传"
+  },
+  "saveFailedSimple": {
+    "message": "保存失败，请重试"
+  },
+  "saving": {
+    "message": "正在保存"
+  },
+  "noFolders": {
+    "message": "暂无分组，可点击“新建”"
+  },
+  "savingEllipsis": {
+    "message": "保存中…"
+  },
+  "createFolderFailed": {
+    "message": "创建分组失败，请重试。"
+  },
+  "saveFolderFailed": {
+    "message": "保存到分组失败，请重试。"
+  },
+  "copyAddressFailed": {
+    "message": "无法复制图片地址"
+  }
+}

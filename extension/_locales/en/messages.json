@@ -1,0 +1,315 @@
+{
+  "extensionName": {
+    "message": "Huojue AI Image Capture"
+  },
+  "extensionDescription": {
+    "message": "Capture product images from any site into your Huojue AI asset library, ready to reference or recreate."
+  },
+  "contextMenuSave": {
+    "message": "Save to Huojue AI"
+  },
+  "popupIllustration": {
+    "message": "Animated illustration"
+  },
+  "popupIntro": {
+    "message": "Sign in to capture images you like from shopping and content sites into your Huojue AI asset library for reference or recreation."
+  },
+  "popupLoading": {
+    "message": "Loading…"
+  },
+  "login": {
+    "message": "Sign in"
+  },
+  "defaultUser": {
+    "message": "Huojue AI user"
+  },
+  "collectionSettings": {
+    "message": "Capture settings"
+  },
+  "disableOnSite": {
+    "message": "Disable extension on this site"
+  },
+  "viewLibrary": {
+    "message": "View my assets"
+  },
+  "notLoggedIn": {
+    "message": "Not signed in"
+  },
+  "openingLogin": {
+    "message": "Opening sign-in page…"
+  },
+  "cannotOpenLogin": {
+    "message": "Unable to open sign-in page"
+  },
+  "cannotOpenLoginRetry": {
+    "message": "Unable to open sign-in page. Please try again."
+  },
+  "settingsSaveFailed": {
+    "message": "Failed to save"
+  },
+  "imageActions": {
+    "message": "Image actions"
+  },
+  "save": {
+    "message": "Save"
+  },
+  "saveImageToLibrary": {
+    "message": "Save image to asset library"
+  },
+  "expandMoreActions": {
+    "message": "Show more image actions"
+  },
+  "collapseMoreActions": {
+    "message": "Hide more image actions"
+  },
+  "batchSave": {
+    "message": "Save image group"
+  },
+  "replicate": {
+    "message": "Recreate image"
+  },
+  "saveResult": {
+    "message": "Huojue AI image save result"
+  },
+  "saveSuccess": {
+    "message": "Saved"
+  },
+  "partialSaveSuccess": {
+    "message": "Some images saved"
+  },
+  "savedTo": {
+    "message": "Saved to"
+  },
+  "selectFolder": {
+    "message": "Choose folder"
+  },
+  "uncategorized": {
+    "message": "Uncategorized"
+  },
+  "view": {
+    "message": "View"
+  },
+  "newFolder": {
+    "message": "New"
+  },
+  "enterFolderName": {
+    "message": "Enter folder name"
+  },
+  "newFolderName": {
+    "message": "New folder name"
+  },
+  "copyAddress": {
+    "message": "Copy URL"
+  },
+  "uploadToLibrary": {
+    "message": "Save to asset library"
+  },
+  "batchSaveImages": {
+    "message": "Save images in batch"
+  },
+  "selectImages": {
+    "message": "Select images to save"
+  },
+  "batchLoadFailed": {
+    "message": "Could not load the full image group. Please try again."
+  },
+  "closeBatchSelection": {
+    "message": "Cancel image selection"
+  },
+  "batchImages": {
+    "message": "Images available for batch saving"
+  },
+  "loginSuccess": {
+    "message": "Signed in"
+  },
+  "loginContinue": {
+    "message": "Signed in to Huojue AI. Continue uploading."
+  },
+  "continueUpload": {
+    "message": "Continue upload"
+  },
+  "reloginRequired": {
+    "message": "Sign in again"
+  },
+  "loggedOutRetry": {
+    "message": "You have signed out of Huojue AI. Sign in again to upload."
+  },
+  "loginAgain": {
+    "message": "Sign in again"
+  },
+  "pendingImage": {
+    "message": "Image $INDEX$ to save",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectedImages": {
+    "message": "$COUNT$ selected",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "deselectAll": {
+    "message": "Deselect all"
+  },
+  "selectAll": {
+    "message": "Select all"
+  },
+  "saveSelection": {
+    "message": "Save ($SELECTED$/$TOTAL$)",
+    "placeholders": {
+      "selected": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "deselectImage": {
+    "message": "Deselect image $INDEX$",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectImage": {
+    "message": "Select image $INDEX$",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "saveFailedRetry": {
+    "message": "Save failed. Please try again later."
+  },
+  "networkConnectionError": {
+    "message": "Network connection error. Please check your connection."
+  },
+  "savedThenLogin": {
+    "message": "Saved $SAVED$; sign in to continue with $REMAINING$",
+    "placeholders": {
+      "saved": {
+        "content": "$1"
+      },
+      "remaining": {
+        "content": "$2"
+      }
+    }
+  },
+  "savedWithFailures": {
+    "message": "Saved $SAVED$; $FAILED$ failed",
+    "placeholders": {
+      "saved": {
+        "content": "$1"
+      },
+      "failed": {
+        "content": "$2"
+      }
+    }
+  },
+  "loginRetrySelection": {
+    "message": "Sign in and retry ($REMAINING$/$TOTAL$)",
+    "placeholders": {
+      "remaining": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "retrySelection": {
+    "message": "Retry ($REMAINING$/$TOTAL$)",
+    "placeholders": {
+      "remaining": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "savingProgress": {
+    "message": "Saving... $CURRENT$/$TOTAL$",
+    "placeholders": {
+      "current": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "batchSavedTo": {
+    "message": "$COUNT$ images saved to",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "replicateUploading": {
+    "message": "Uploading image and opening image recreation"
+  },
+  "replicateFailed": {
+    "message": "Could not prepare image recreation. Please try again."
+  },
+  "replicateOpening": {
+    "message": "Image uploaded. Opening image recreation."
+  },
+  "copied": {
+    "message": "Copied"
+  },
+  "addressCopied": {
+    "message": "URL copied"
+  },
+  "copyFailed": {
+    "message": "Copy failed"
+  },
+  "copyFailedManual": {
+    "message": "Copy failed. Select and copy the URL manually."
+  },
+  "uploading": {
+    "message": "Uploading…"
+  },
+  "uploadingToAssets": {
+    "message": "Uploading image and saving it to your assets"
+  },
+  "uploadFailedRetry": {
+    "message": "Upload failed. Please try again later."
+  },
+  "retryAfterLogin": {
+    "message": "Sign in and retry"
+  },
+  "retryUpload": {
+    "message": "Retry upload"
+  },
+  "saveFailedSimple": {
+    "message": "Save failed. Please try again."
+  },
+  "saving": {
+    "message": "Saving"
+  },
+  "noFolders": {
+    "message": "No folders yet. Click “New”."
+  },
+  "savingEllipsis": {
+    "message": "Saving…"
+  },
+  "createFolderFailed": {
+    "message": "Could not create the folder. Please try again."
+  },
+  "saveFolderFailed": {
+    "message": "Could not save to the folder. Please try again."
+  },
+  "copyAddressFailed": {
+    "message": "Unable to copy image URL"
+  }
+}

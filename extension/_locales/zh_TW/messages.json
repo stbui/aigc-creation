@@ -1,0 +1,315 @@
+{
+  "extensionName": {
+    "message": "貨覺AI 圖片採集"
+  },
+  "extensionDescription": {
+    "message": "電商好圖一鍵採集到貨覺AI素材庫，隨時參考與複刻。"
+  },
+  "contextMenuSave": {
+    "message": "儲存至貨覺AI"
+  },
+  "popupIllustration": {
+    "message": "動畫插圖"
+  },
+  "popupIntro": {
+    "message": "登入後，瀏覽電商與內容平台時可一鍵將喜歡的圖片採集到貨覺AI素材庫，隨時參考與複刻"
+  },
+  "popupLoading": {
+    "message": "正在載入…"
+  },
+  "login": {
+    "message": "登入"
+  },
+  "defaultUser": {
+    "message": "貨覺AI 使用者"
+  },
+  "collectionSettings": {
+    "message": "採集設定"
+  },
+  "disableOnSite": {
+    "message": "在此網站停用擴充功能"
+  },
+  "viewLibrary": {
+    "message": "查看我的素材"
+  },
+  "notLoggedIn": {
+    "message": "尚未登入"
+  },
+  "openingLogin": {
+    "message": "正在開啟登入頁面…"
+  },
+  "cannotOpenLogin": {
+    "message": "無法開啟登入頁面"
+  },
+  "cannotOpenLoginRetry": {
+    "message": "無法開啟登入頁面，請重試"
+  },
+  "settingsSaveFailed": {
+    "message": "儲存失敗"
+  },
+  "imageActions": {
+    "message": "圖片操作"
+  },
+  "save": {
+    "message": "儲存"
+  },
+  "saveImageToLibrary": {
+    "message": "將圖片儲存到素材庫"
+  },
+  "expandMoreActions": {
+    "message": "展開更多圖片操作"
+  },
+  "collapseMoreActions": {
+    "message": "收合更多圖片操作"
+  },
+  "batchSave": {
+    "message": "批次儲存組圖"
+  },
+  "replicate": {
+    "message": "圖片復刻"
+  },
+  "saveResult": {
+    "message": "貨覺AI 圖片儲存結果"
+  },
+  "saveSuccess": {
+    "message": "儲存成功"
+  },
+  "partialSaveSuccess": {
+    "message": "部分儲存成功"
+  },
+  "savedTo": {
+    "message": "已儲存至"
+  },
+  "selectFolder": {
+    "message": "選擇分類"
+  },
+  "uncategorized": {
+    "message": "未分類"
+  },
+  "view": {
+    "message": "查看"
+  },
+  "newFolder": {
+    "message": "新增"
+  },
+  "enterFolderName": {
+    "message": "請輸入分類名稱"
+  },
+  "newFolderName": {
+    "message": "新分類名稱"
+  },
+  "copyAddress": {
+    "message": "複製網址"
+  },
+  "uploadToLibrary": {
+    "message": "儲存到素材庫"
+  },
+  "batchSaveImages": {
+    "message": "批次儲存圖片"
+  },
+  "selectImages": {
+    "message": "選擇要儲存的圖片"
+  },
+  "batchLoadFailed": {
+    "message": "無法載入完整組圖，請稍後再試。"
+  },
+  "closeBatchSelection": {
+    "message": "取消選擇組圖"
+  },
+  "batchImages": {
+    "message": "可批次儲存的圖片"
+  },
+  "loginSuccess": {
+    "message": "登入成功"
+  },
+  "loginContinue": {
+    "message": "貨覺AI 登入成功，請繼續上傳"
+  },
+  "continueUpload": {
+    "message": "繼續上傳"
+  },
+  "reloginRequired": {
+    "message": "需要重新登入"
+  },
+  "loggedOutRetry": {
+    "message": "貨覺AI 已登出，請重新登入後上傳"
+  },
+  "loginAgain": {
+    "message": "重新登入"
+  },
+  "pendingImage": {
+    "message": "待儲存圖片 $INDEX$",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectedImages": {
+    "message": "已選擇 $COUNT$ 張",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "deselectAll": {
+    "message": "取消全選"
+  },
+  "selectAll": {
+    "message": "全選"
+  },
+  "saveSelection": {
+    "message": "儲存 ($SELECTED$/$TOTAL$)",
+    "placeholders": {
+      "selected": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "deselectImage": {
+    "message": "取消選擇第 $INDEX$ 張圖片",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectImage": {
+    "message": "選擇第 $INDEX$ 張圖片",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "saveFailedRetry": {
+    "message": "儲存失敗，請稍後重試。"
+  },
+  "networkConnectionError": {
+    "message": "網路連線錯誤，請檢查您的網路狀況"
+  },
+  "savedThenLogin": {
+    "message": "已儲存 $SAVED$ 張，登入後繼續 $REMAINING$ 張",
+    "placeholders": {
+      "saved": {
+        "content": "$1"
+      },
+      "remaining": {
+        "content": "$2"
+      }
+    }
+  },
+  "savedWithFailures": {
+    "message": "已儲存 $SAVED$ 張，$FAILED$ 張失敗",
+    "placeholders": {
+      "saved": {
+        "content": "$1"
+      },
+      "failed": {
+        "content": "$2"
+      }
+    }
+  },
+  "loginRetrySelection": {
+    "message": "登入後重試 ($REMAINING$/$TOTAL$)",
+    "placeholders": {
+      "remaining": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "retrySelection": {
+    "message": "重試 ($REMAINING$/$TOTAL$)",
+    "placeholders": {
+      "remaining": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "savingProgress": {
+    "message": "正在儲存... $CURRENT$/$TOTAL$",
+    "placeholders": {
+      "current": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "batchSavedTo": {
+    "message": "$COUNT$ 張圖片已儲存至",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "replicateUploading": {
+    "message": "正在上傳圖片並開啟圖片複刻"
+  },
+  "replicateFailed": {
+    "message": "圖片復刻準備失敗，請稍後重試。"
+  },
+  "replicateOpening": {
+    "message": "圖片已上傳，正在開啟圖片複刻"
+  },
+  "copied": {
+    "message": "已複製"
+  },
+  "addressCopied": {
+    "message": "網址已複製"
+  },
+  "copyFailed": {
+    "message": "複製失敗"
+  },
+  "copyFailedManual": {
+    "message": "複製失敗，請手動選取 URL 複製"
+  },
+  "uploading": {
+    "message": "上傳中…"
+  },
+  "uploadingToAssets": {
+    "message": "正在上傳圖片並儲存到使用者素材"
+  },
+  "uploadFailedRetry": {
+    "message": "上傳失敗，請稍後重試。"
+  },
+  "retryAfterLogin": {
+    "message": "登入後重試"
+  },
+  "retryUpload": {
+    "message": "重試上傳"
+  },
+  "saveFailedSimple": {
+    "message": "儲存失敗，請重試"
+  },
+  "saving": {
+    "message": "正在儲存"
+  },
+  "noFolders": {
+    "message": "暫無分類，可點擊「新增」"
+  },
+  "savingEllipsis": {
+    "message": "儲存中…"
+  },
+  "createFolderFailed": {
+    "message": "建立分類失敗，請重試。"
+  },
+  "saveFolderFailed": {
+    "message": "儲存到分類失敗，請重試。"
+  },
+  "copyAddressFailed": {
+    "message": "無法複製圖片網址"
+  }
+}

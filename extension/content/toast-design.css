@@ -1,0 +1,836 @@
+/* Single-image save result: Figma 9309:5209, 9224:835, 9309:5255. */
+.huojue-toast:not(.huojue-toast--batch) {
+  display: flex !important;
+  width: min(356px, calc(100vw - 24px)) !important;
+  max-width: none !important;
+  max-height: min(80vh, 480px) !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 12px !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  border: 1px solid #404040 !important;
+  border-radius: 16px !important;
+  padding: 12px !important;
+  color: #fafafa !important;
+  background: #262626 !important;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 10%),
+    0 4px 6px -4px rgb(0 0 0 / 10%) !important;
+  font-family: "Noto Sans SC", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  line-height: 20px !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__header {
+  width: 100% !important;
+  min-width: 0 !important;
+  flex: 0 0 auto !important;
+  gap: 12px !important;
+  font-family: inherit !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__thumbnail {
+  box-sizing: border-box !important;
+  width: 44px !important;
+  height: 44px !important;
+  flex: 0 0 44px !important;
+  border-color: rgb(255 255 255 / 10%) !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__account {
+  min-width: 0 !important;
+  gap: 0 !important;
+  font-family: inherit !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__account-copy {
+  width: 100% !important;
+  min-width: 0 !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__account strong {
+  color: #fafafa !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  line-height: 20px !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__status {
+  min-height: 0 !important;
+  color: #a3a3a3 !important;
+  font-size: 12px !important;
+  line-height: 16px !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)[data-state="loading"]
+  .huojue-toast__status {
+  width: 100% !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__status:empty {
+  display: none !important;
+}
+
+.huojue-toast__error-icon {
+  display: none !important;
+}
+
+/* Save failure: Figma 9358:6689. */
+.huojue-toast.huojue-toast--save-error:not(
+    .huojue-toast--batch
+  ) {
+  max-height: none !important;
+  gap: 6px !important;
+  overflow: hidden !important;
+}
+
+.huojue-toast.huojue-toast--save-error:not(.huojue-toast--batch)
+  .huojue-toast__header {
+  align-items: flex-start !important;
+  gap: 12px !important;
+}
+
+.huojue-toast.huojue-toast--save-error:not(.huojue-toast--batch)
+  .huojue-toast__error-icon {
+  display: block !important;
+  flex: 0 0 auto !important;
+  margin-top: 2px !important;
+}
+
+.huojue-toast.huojue-toast--save-error:not(.huojue-toast--batch)
+  .huojue-toast__thumbnail,
+.huojue-toast.huojue-toast--save-error:not(.huojue-toast--batch)
+  .huojue-toast__destination,
+.huojue-toast.huojue-toast--save-error:not(.huojue-toast--batch)
+  .huojue-toast__view,
+.huojue-toast.huojue-toast--save-error:not(.huojue-toast--batch)
+  .huojue-toast__separator,
+.huojue-toast.huojue-toast--save-error:not(.huojue-toast--batch)
+  .huojue-toast__group-panel,
+.huojue-toast.huojue-toast--save-error:not(.huojue-toast--batch)
+  .huojue-toast__actions {
+  display: none !important;
+}
+
+.huojue-toast.huojue-toast--save-error:not(.huojue-toast--batch)
+  .huojue-toast__account {
+  gap: 0 !important;
+}
+
+.huojue-toast.huojue-toast--save-error:not(.huojue-toast--batch)
+  .huojue-toast__account strong {
+  color: #e5484d !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  line-height: 20px !important;
+}
+
+.huojue-toast.huojue-toast--save-error:not(.huojue-toast--batch)
+  .huojue-toast__status {
+  display: block !important;
+  min-height: 0 !important;
+  margin-top: 2px !important;
+  color: #a3a3a3 !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  line-height: 20px !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__destination {
+  display: flex !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  height: 24px !important;
+  align-items: center !important;
+  gap: 4px !important;
+  overflow: hidden !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)[data-state="loading"]
+  .huojue-toast__destination,
+.huojue-toast:not(.huojue-toast--batch)[data-state="error"]
+  .huojue-toast__destination {
+  display: none !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__destination > span {
+  display: block !important;
+  min-width: 0 !important;
+  flex: 0 0 auto !important;
+  color: #a3a3a3 !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 16px !important;
+  white-space: nowrap !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-trigger {
+  display: inline-flex !important;
+  height: 24px !important;
+  min-width: 26px !important;
+  max-width: 128px !important;
+  flex: 0 1 auto !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  margin: 0 !important;
+  border-radius: 8px !important;
+  padding: 0 4px !important;
+  color: #a3a3a3 !important;
+  background: rgb(255 255 255 / 5%) !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 16px !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-trigger span {
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-trigger img,
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-create img,
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-item img,
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-create-row img {
+  display: block !important;
+  flex: none !important;
+  object-fit: contain !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__view {
+  display: inline-flex !important;
+  height: 32px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 1px solid #404040 !important;
+  border-radius: 8px !important;
+  padding: 0 16px !important;
+  color: #d4d4d4 !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  line-height: 20px !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__separator {
+  width: 100% !important;
+  height: 1px !important;
+  flex: 0 0 1px !important;
+  background: #404040 !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-panel {
+  display: flex !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  padding: 0 !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-panel-heading {
+  display: flex !important;
+  height: 24px !important;
+  flex: 0 0 24px !important;
+  color: #a3a3a3 !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 16px !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-create {
+  display: inline-flex !important;
+  height: 24px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  border-radius: 6px !important;
+  padding: 0 10px !important;
+  color: #d4d4d4 !important;
+  background: transparent !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 16px !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-list {
+  display: flex !important;
+  /* 5 行完整分类 + 4px 行间距 + 下一行 16px（半行）。 */
+  max-height: 196px !important;
+  min-height: 0 !important;
+  flex: 0 1 auto !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  scrollbar-gutter: stable !important;
+  scrollbar-width: thin !important;
+  scrollbar-color: #525252 transparent !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-list::-webkit-scrollbar {
+  width: 6px !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-list::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-list::-webkit-scrollbar-thumb {
+  border-radius: 9999px !important;
+  background: #525252 !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-item[aria-pressed="true"] {
+  background: rgb(255 255 255 / 5%) !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-item,
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-create-row {
+  box-sizing: border-box !important;
+  display: flex !important;
+  width: 100% !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  align-items: center !important;
+  gap: 6px !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  padding: 4px !important;
+  color: #fafafa !important;
+  background: transparent !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  line-height: 20px !important;
+  text-align: left !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-name {
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  color: #fafafa !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  line-height: 20px !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-folder-icon {
+  display: flex !important;
+  width: 24px !important;
+  height: 24px !important;
+  flex: 0 0 24px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 4px !important;
+  background: #262626 !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-folder-icon img {
+  display: block !important;
+  width: 16px !important;
+  height: 16px !important;
+  flex: none !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-create-row {
+  border: 1px solid #404040 !important;
+  border-radius: 8px !important;
+  background: #171717 !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-input {
+  display: block !important;
+  min-width: 0 !important;
+  height: 24px !important;
+  flex: 1 1 auto !important;
+  border: 0 !important;
+  padding: 0 !important;
+  outline: 0 !important;
+  color: #fafafa !important;
+  background: transparent !important;
+  font-family: inherit !important;
+  font-size: 14px !important;
+  line-height: 20px !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-input::placeholder {
+  color: #a3a3a3 !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__actions {
+  display: flex !important;
+  width: 100% !important;
+  flex: 0 0 auto !important;
+  gap: 0 !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__actions .huojue-toast__upload {
+  display: flex !important;
+  width: 100% !important;
+  height: 36px !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  padding: 0 16px !important;
+  color: #171717 !important;
+  background: #e5e5e5 !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  line-height: 20px !important;
+}
+
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__actions .huojue-toast__upload:hover:not(:disabled) {
+  background: #f5f5f5 !important;
+}
+
+.huojue-toast [hidden] {
+  display: none !important;
+}
+
+/* Keep the success toast compact until the category chevron is opened. */
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-panel[hidden],
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__separator[hidden],
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__actions[hidden],
+.huojue-toast:not(.huojue-toast--batch)
+  .huojue-toast__group-create-row[hidden] {
+  display: none !important;
+}
+
+/* Batch image picker: Figma 9197:12074 and 9358:6104. */
+.huojue-batch-backdrop {
+  all: initial !important;
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  inset: 0 !important;
+  display: block !important;
+  background: rgb(0 0 0 / 55%) !important;
+  pointer-events: auto !important;
+}
+
+.huojue-toast.huojue-toast--batch {
+  display: flex !important;
+  width: min(356px, calc(100vw - 24px)) !important;
+  max-width: none !important;
+  max-height: min(530px, calc(100vh - 24px)) !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 0 !important;
+  overflow: hidden !important;
+  border: 1px solid rgb(255 255 255 / 40%) !important;
+  border-radius: 16px !important;
+  padding: 12px !important;
+  color: #ffffff !important;
+  background: #262626 !important;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 10%),
+    0 4px 6px -4px rgb(0 0 0 / 10%) !important;
+  font-family: "Noto Sans SC", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif !important;
+}
+
+.huojue-toast--batch > .huojue-toast__header,
+.huojue-toast--batch > .huojue-toast__separator,
+.huojue-toast--batch > .huojue-toast__group-panel,
+.huojue-toast--batch > .huojue-toast__actions {
+  display: none !important;
+}
+
+.huojue-toast--batch .huojue-toast__batch-panel {
+  display: flex !important;
+  position: relative !important;
+  width: 100% !important;
+  min-height: 0 !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 16px !important;
+  font-family: inherit !important;
+}
+
+.huojue-toast--batch .huojue-toast__batch-panel[hidden] {
+  display: none !important;
+}
+
+.huojue-toast--batch .huojue-toast__batch-title {
+  all: initial !important;
+  display: block !important;
+  margin: 0 !important;
+  color: #ffffff !important;
+  font-family: inherit !important;
+  font-size: 16px !important;
+  font-weight: 500 !important;
+  line-height: 24px !important;
+  letter-spacing: 0 !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+}
+
+.huojue-toast--batch .huojue-toast__batch-close {
+  all: initial !important;
+  box-sizing: border-box !important;
+  position: absolute !important;
+  top: 0 !important;
+  right: 0 !important;
+  display: grid !important;
+  width: 24px !important;
+  height: 24px !important;
+  place-items: center !important;
+  border: 0 !important;
+  border-radius: 6px !important;
+  background: rgb(255 255 255 / 5%) !important;
+  cursor: pointer !important;
+}
+
+.huojue-toast--batch .huojue-toast__batch-close img {
+  display: block !important;
+  width: 14px !important;
+  height: 14px !important;
+  pointer-events: none !important;
+}
+
+.huojue-toast--batch
+  .huojue-toast__batch-close:hover {
+  background: rgb(255 255 255 / 12%) !important;
+}
+
+.huojue-toast--batch .huojue-toast__batch-content {
+  display: flex !important;
+  min-height: 0 !important;
+  flex: 1 1 auto !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+}
+
+.huojue-toast--batch .huojue-toast__batch-toolbar {
+  display: flex !important;
+  width: 100% !important;
+  height: 24px !important;
+  flex: 0 0 24px !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+}
+
+.huojue-toast--batch .huojue-toast__batch-selection {
+  all: initial !important;
+  display: block !important;
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+  overflow: hidden !important;
+  color: rgb(255 255 255 / 60%) !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 16px !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+.huojue-toast--batch
+  .huojue-toast__batch-select-toggle {
+  all: initial !important;
+  box-sizing: border-box !important;
+  display: inline-flex !important;
+  height: 24px !important;
+  flex: 0 0 auto !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 6px !important;
+  padding: 0 10px !important;
+  color: rgb(255 255 255 / 60%) !important;
+  background: transparent !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 16px !important;
+  cursor: pointer !important;
+}
+
+.huojue-toast--batch
+  .huojue-toast__batch-select-toggle:hover:not(:disabled) {
+  color: #ffffff !important;
+  background: rgb(255 255 255 / 8%) !important;
+}
+
+.huojue-toast--batch .huojue-toast__batch-grid {
+  box-sizing: border-box !important;
+  display: grid !important;
+  width: 100% !important;
+  height: 354px !important;
+  min-height: 0 !important;
+  max-height: 354px !important;
+  flex: 1 1 354px !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  grid-auto-rows: max-content !important;
+  align-content: start !important;
+  gap: 13px !important;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain !important;
+  scrollbar-color: rgb(255 255 255 / 24%) transparent !important;
+  scrollbar-width: thin !important;
+}
+
+.huojue-toast--batch
+  .huojue-toast__batch-grid::-webkit-scrollbar {
+  width: 6px !important;
+}
+
+.huojue-toast--batch
+  .huojue-toast__batch-grid::-webkit-scrollbar-thumb {
+  border-radius: 9999px !important;
+  background: rgb(255 255 255 / 24%) !important;
+}
+
+.huojue-toast--batch .huojue-toast__batch-item {
+  all: initial !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  display: block !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  aspect-ratio: 1 / 1 !important;
+  overflow: hidden !important;
+  border: 1px solid rgb(255 255 255 / 10%) !important;
+  border-radius: 16px !important;
+  background: #262626 !important;
+  cursor: pointer !important;
+}
+
+.huojue-toast--batch .huojue-toast__batch-item::before {
+  position: absolute !important;
+  z-index: 1 !important;
+  inset: -1px !important;
+  background: rgb(0 0 0 / 15%) !important;
+  content: "" !important;
+  pointer-events: none !important;
+}
+
+.huojue-toast--batch .huojue-toast__batch-image {
+  position: absolute !important;
+  inset: -1px !important;
+  display: block !important;
+  width: calc(100% + 2px) !important;
+  height: calc(100% + 2px) !important;
+  max-width: none !important;
+  object-fit: cover !important;
+  pointer-events: none !important;
+}
+
+.huojue-toast--batch .huojue-toast__batch-checkbox {
+  box-sizing: border-box !important;
+  position: absolute !important;
+  z-index: 2 !important;
+  top: 7px !important;
+  left: 7px !important;
+  display: grid !important;
+  width: 16px !important;
+  height: 16px !important;
+  place-items: center !important;
+  overflow: hidden !important;
+  border: 1px solid #ffffff !important;
+  border-radius: 4px !important;
+  background: rgb(255 255 255 / 20%) !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  pointer-events: none !important;
+}
+
+.huojue-toast--batch
+  .huojue-toast__batch-checkbox img {
+  display: none !important;
+  width: 14px !important;
+  height: 14px !important;
+  object-fit: contain !important;
+}
+
+.huojue-toast--batch
+  .huojue-toast__batch-item[aria-pressed="true"]
+  .huojue-toast__batch-checkbox {
+  border-color: #000000 !important;
+  background: #000000 !important;
+}
+
+.huojue-toast--batch
+  .huojue-toast__batch-item[aria-pressed="true"]
+  .huojue-toast__batch-checkbox img {
+  display: block !important;
+}
+
+.huojue-toast--batch
+  .huojue-toast__batch-item:focus-visible,
+.huojue-toast--batch
+  .huojue-toast__batch-select-toggle:focus-visible,
+.huojue-toast--batch
+  .huojue-toast__batch-close:focus-visible,
+.huojue-toast--batch
+  .huojue-toast__batch-save:focus-visible {
+  outline: 2px solid #ffffff !important;
+  outline-offset: 2px !important;
+}
+
+.huojue-toast--batch .huojue-toast__batch-save {
+  all: initial !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  width: 100% !important;
+  height: 36px !important;
+  flex: 0 0 36px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 10px !important;
+  padding: 0 16px !important;
+  color: #171717 !important;
+  background: #e5e5e5 !important;
+  font-family: inherit !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  line-height: 20px !important;
+  text-align: center !important;
+  cursor: pointer !important;
+}
+
+.huojue-toast--batch
+  .huojue-toast__batch-save:hover:not(:disabled) {
+  background: #f5f5f5 !important;
+}
+
+.huojue-toast--batch
+  .huojue-toast__batch-save:disabled,
+.huojue-toast--batch
+  .huojue-toast__batch-select-toggle:disabled,
+.huojue-toast--batch
+  .huojue-toast__batch-item:disabled {
+  cursor: default !important;
+}
+
+.huojue-toast--batch
+  .huojue-toast__batch-save:disabled {
+  opacity: 0.65 !important;
+}
+
+.huojue-toast.huojue-toast--batch[data-batch-view="progress"] {
+  width: max-content !important;
+  max-width: calc(100vw - 24px) !important;
+  min-height: 48px !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  padding: 12px 16px !important;
+}
+
+.huojue-toast--batch .huojue-toast__batch-progress {
+  display: flex !important;
+  min-width: 0 !important;
+  align-items: center !important;
+  gap: 6px !important;
+  color: #fafafa !important;
+  font-family: inherit !important;
+}
+
+.huojue-toast--batch
+  .huojue-toast__batch-progress[hidden] {
+  display: none !important;
+}
+
+.huojue-toast--batch
+  .huojue-toast__batch-progress-icon {
+  display: block !important;
+  width: 16px !important;
+  height: 16px !important;
+  flex: 0 0 16px !important;
+  object-fit: contain !important;
+  animation: huojue-batch-loading 900ms linear infinite !important;
+}
+
+.huojue-toast--batch
+  .huojue-toast__batch-progress-text {
+  all: initial !important;
+  display: block !important;
+  overflow: hidden !important;
+  color: #fafafa !important;
+  font-family: inherit !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  line-height: 20px !important;
+  letter-spacing: 0 !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+@keyframes huojue-batch-loading {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .huojue-toast--batch
+    .huojue-toast__batch-progress-icon {
+    animation: none !important;
+  }
+}
+
+.huojue-toast.huojue-toast--batch-success
+  .huojue-toast__header {
+  gap: 12px !important;
+}
+
+.huojue-toast.huojue-toast--batch-success
+  .huojue-toast__group-trigger {
+  background: transparent !important;
+}
+
+.huojue-toast
+  .huojue-toast__account
+  > .huojue-toast__avatar {
+  display: none !important;
+}

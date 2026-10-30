@@ -17,6 +17,18 @@ export interface UploadedFileMeta {
 }
 
 /**
+ * 采集来源元数据 (浏览器扩展提交, 人类用户上传时省略)。
+ *
+ * 全部可选: 任一字段缺失或非法都按「未提供」落 null, 不影响上传本身 ——
+ * 用户按下采集时意图是存图, 页面标题取不到不该让整次保存失败。
+ */
+export interface AssetSourceInput {
+  sourceSite?: string;
+  sourceTitle?: string;
+  sourcePageUrl?: string;
+}
+
+/**
  * 用户端素材服务。
  *
  * 改造要点 (对应 admin-prd.md §3.4/ §3.17):
@@ -50,7 +62,12 @@ export class AssetsService {
     };
   }
 
-  async createOriginal(ownerId: string, projectId: string, file: UploadedFileMeta) {
+  async createOriginal(
+    ownerId: string,
+    projectId: string,
+    file: UploadedFileMeta,
+    source: AssetSourceInput = {},
+  ) {
     const tempPath = join(resolveUploadsDir(), 'original', file.filename);
     let storedKey: string | null = null;
     let provider: ReturnType<StorageService['getActive']> | null = null;
@@ -96,6 +113,7 @@ export class AssetsService {
           height: info.height,
           storageBackend: provider.backend,
           storageKey: key,
+          ...normalizeSource(source),
         },
       });
       return this.decorate(created);
@@ -214,6 +232,90 @@ export class AssetsService {
 
     return { id, removedTasks: producedTasks.length };
   }
+
+  /**
+   * 批量移动素材到另一个项目 (分组)。
+   *
+   * 只改 `Asset.projectId` —— **不动 `GenerationTask.projectId`**: 任务是历史事实
+   * (当时在哪个项目跑的、扣了多少积分), 素材归档到哪个分组是后续的组织行为,
+   * 改任务归属会让历史记录说谎。
+   *
+   * 归属校验做两层: 目标项目必须属于调用者 (否则越权写), 素材按 `ownerId` 过滤后
+   * 才更新; 不属于调用者的 id 不回 404 也不报错, 归入 `missing` 由调用方自行提示 ——
+   * 批量语义下逐条失败逐个报错没有意义, 且 404/403 差异会泄露他人素材是否存在。
+   */
+  async moveToProject(ownerId: string, assetIds: string[], projectId: string) {
+    const ids = [...new Set((assetIds ?? []).map((v) => String(v ?? '').trim()).filter(Boolean))];
+    if (ids.length === 0) {
+      throw new AppError(40001, '请选择要移动的素材', 400);
+    }
+
+    const project = await this.prisma.project.findUnique({ where: { id: projectId } });
+    if (!project || project.ownerId !== ownerId) {
+      throw new AppError(40001, '项目不存在或无权限', 403);
+    }
+
+    const owned = await this.prisma.asset.findMany({
+      where: { id: { in: ids }, ownerId },
+      select: { id: true },
+    });
+    const movable = owned.map((a) => a.id);
+    const ownedSet = new Set(movable);
+    const missing = ids.filter((id) => !ownedSet.has(id));
+
+    if (movable.length > 0) {
+      await this.prisma.asset.updateMany({
+        where: { id: { in: movable }, ownerId },
+        data: { projectId },
+      });
+    }
+
+    return { moved: movable.length, missing, projectId };
+  }
+}
+
+/**
+ * 归一化采集来源三字段。
+ *
+ * 非法值一律落 `null` 而不是抛错 (见 `AssetSourceInput` 说明): 长度超限截断、
+ * `sourcePageUrl` 只接受 http/https (扩展可能把 `about:blank` / `chrome://`
+ * 之类的页面地址带上来)。`sourceSite` 额外去掉 `www.` 前缀并转小写, 与扩展侧
+ * 的命名保持一致, 便于按站点聚合。
+ */
+function normalizeSource(source: AssetSourceInput) {
+  const site = clampText(source.sourceSite, 255);
+  const title = clampText(source.sourceTitle, 500);
+  const rawUrl = clampText(source.sourcePageUrl, 2048);
+
+  let pageUrl: string | null = null;
+  if (rawUrl) {
+    try {
+      const parsed = new URL(rawUrl);
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') pageUrl = parsed.toString();
+    } catch {
+      pageUrl = null;
+    }
+  }
+
+  const normalizedSite = site
+    ? site.replace(/^www\./i, '').toLowerCase() || null
+    : pageUrl
+      ? new URL(pageUrl).hostname.replace(/^www\./i, '').toLowerCase() || null
+      : null;
+
+  return {
+    sourceSite: normalizedSite,
+    sourceTitle: title,
+    sourcePageUrl: pageUrl,
+  };
+}
+
+/** 去首尾空白 + 按字符数截断; 空串视为未提供 */
+function clampText(value: string | undefined, maxLength: number): string | null {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.length > maxLength ? trimmed.slice(0, maxLength) : trimmed;
 }
 
 /**

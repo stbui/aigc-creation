@@ -1,0 +1,315 @@
+{
+  "extensionName": {
+    "message": "Huojue AI Bilderfassung"
+  },
+  "extensionDescription": {
+    "message": "Produktbilder von jeder Website direkt in Ihre Huojue-AI-Asset-Bibliothek übernehmen – zum Nachschlagen oder Nachgestalten."
+  },
+  "contextMenuSave": {
+    "message": "In Huojue AI speichern"
+  },
+  "popupIllustration": {
+    "message": "Animierte Illustration"
+  },
+  "popupIntro": {
+    "message": "Melden Sie sich an, um Bilder von Shopping- und Content-Websites mit einem Klick in Ihrer Huojue-AI-Asset-Bibliothek zu sammeln."
+  },
+  "popupLoading": {
+    "message": "Wird geladen…"
+  },
+  "login": {
+    "message": "Anmelden"
+  },
+  "defaultUser": {
+    "message": "Huojue-AI-Benutzer"
+  },
+  "collectionSettings": {
+    "message": "Erfassungseinstellungen"
+  },
+  "disableOnSite": {
+    "message": "Erweiterung auf dieser Website deaktivieren"
+  },
+  "viewLibrary": {
+    "message": "Meine Assets ansehen"
+  },
+  "notLoggedIn": {
+    "message": "Nicht angemeldet"
+  },
+  "openingLogin": {
+    "message": "Anmeldeseite wird geöffnet…"
+  },
+  "cannotOpenLogin": {
+    "message": "Anmeldeseite kann nicht geöffnet werden"
+  },
+  "cannotOpenLoginRetry": {
+    "message": "Anmeldeseite kann nicht geöffnet werden. Bitte erneut versuchen."
+  },
+  "settingsSaveFailed": {
+    "message": "Speichern fehlgeschlagen"
+  },
+  "imageActions": {
+    "message": "Bildaktionen"
+  },
+  "save": {
+    "message": "Speichern"
+  },
+  "saveImageToLibrary": {
+    "message": "Bild in der Asset-Bibliothek speichern"
+  },
+  "expandMoreActions": {
+    "message": "Weitere Bildaktionen anzeigen"
+  },
+  "collapseMoreActions": {
+    "message": "Weitere Bildaktionen ausblenden"
+  },
+  "batchSave": {
+    "message": "Bildgruppe speichern"
+  },
+  "replicate": {
+    "message": "Bild nachbilden"
+  },
+  "saveResult": {
+    "message": "Huojue-AI-Speicherergebnis"
+  },
+  "saveSuccess": {
+    "message": "Gespeichert"
+  },
+  "partialSaveSuccess": {
+    "message": "Teilweise erfolgreich gespeichert"
+  },
+  "savedTo": {
+    "message": "Gespeichert in"
+  },
+  "selectFolder": {
+    "message": "Ordner auswählen"
+  },
+  "uncategorized": {
+    "message": "Nicht kategorisiert"
+  },
+  "view": {
+    "message": "Anzeigen"
+  },
+  "newFolder": {
+    "message": "Neu"
+  },
+  "enterFolderName": {
+    "message": "Ordnernamen eingeben"
+  },
+  "newFolderName": {
+    "message": "Name des neuen Ordners"
+  },
+  "copyAddress": {
+    "message": "URL kopieren"
+  },
+  "uploadToLibrary": {
+    "message": "In der Asset-Bibliothek speichern"
+  },
+  "batchSaveImages": {
+    "message": "Bilder gesammelt speichern"
+  },
+  "selectImages": {
+    "message": "Zu speichernde Bilder auswählen"
+  },
+  "batchLoadFailed": {
+    "message": "Die vollständige Bildgruppe konnte nicht geladen werden. Bitte erneut versuchen."
+  },
+  "closeBatchSelection": {
+    "message": "Bildauswahl abbrechen"
+  },
+  "batchImages": {
+    "message": "Für die Stapelspeicherung verfügbare Bilder"
+  },
+  "loginSuccess": {
+    "message": "Angemeldet"
+  },
+  "loginContinue": {
+    "message": "Bei Huojue AI angemeldet. Upload fortsetzen."
+  },
+  "continueUpload": {
+    "message": "Upload fortsetzen"
+  },
+  "reloginRequired": {
+    "message": "Erneut anmelden"
+  },
+  "loggedOutRetry": {
+    "message": "Sie wurden von Huojue AI abgemeldet. Melden Sie sich erneut an."
+  },
+  "loginAgain": {
+    "message": "Erneut anmelden"
+  },
+  "pendingImage": {
+    "message": "Zu speicherndes Bild $INDEX$",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectedImages": {
+    "message": "$COUNT$ ausgewählt",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "deselectAll": {
+    "message": "Auswahl aufheben"
+  },
+  "selectAll": {
+    "message": "Alle auswählen"
+  },
+  "saveSelection": {
+    "message": "Speichern ($SELECTED$/$TOTAL$)",
+    "placeholders": {
+      "selected": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "deselectImage": {
+    "message": "Bild $INDEX$ abwählen",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectImage": {
+    "message": "Bild $INDEX$ auswählen",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "saveFailedRetry": {
+    "message": "Speichern fehlgeschlagen. Bitte später erneut versuchen."
+  },
+  "networkConnectionError": {
+    "message": "Netzwerkverbindungsfehler. Bitte überprüfen Sie Ihre Verbindung."
+  },
+  "savedThenLogin": {
+    "message": "$SAVED$ gespeichert; anmelden, um mit $REMAINING$ fortzufahren",
+    "placeholders": {
+      "saved": {
+        "content": "$1"
+      },
+      "remaining": {
+        "content": "$2"
+      }
+    }
+  },
+  "savedWithFailures": {
+    "message": "$SAVED$ gespeichert; $FAILED$ fehlgeschlagen",
+    "placeholders": {
+      "saved": {
+        "content": "$1"
+      },
+      "failed": {
+        "content": "$2"
+      }
+    }
+  },
+  "loginRetrySelection": {
+    "message": "Anmelden und erneut versuchen ($REMAINING$/$TOTAL$)",
+    "placeholders": {
+      "remaining": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "retrySelection": {
+    "message": "Erneut versuchen ($REMAINING$/$TOTAL$)",
+    "placeholders": {
+      "remaining": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "savingProgress": {
+    "message": "Speichern... $CURRENT$/$TOTAL$",
+    "placeholders": {
+      "current": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "batchSavedTo": {
+    "message": "$COUNT$ Bilder gespeichert in",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "replicateUploading": {
+    "message": "Bild wird hochgeladen und Bild-Nachbildung geöffnet"
+  },
+  "replicateFailed": {
+    "message": "Bildnachbildung konnte nicht vorbereitet werden. Bitte erneut versuchen."
+  },
+  "replicateOpening": {
+    "message": "Bild hochgeladen. Bild-Nachbildung wird geöffnet."
+  },
+  "copied": {
+    "message": "Kopiert"
+  },
+  "addressCopied": {
+    "message": "URL kopiert"
+  },
+  "copyFailed": {
+    "message": "Kopieren fehlgeschlagen"
+  },
+  "copyFailedManual": {
+    "message": "Kopieren fehlgeschlagen. URL manuell auswählen und kopieren."
+  },
+  "uploading": {
+    "message": "Wird hochgeladen…"
+  },
+  "uploadingToAssets": {
+    "message": "Bild wird hochgeladen und in Ihren Assets gespeichert"
+  },
+  "uploadFailedRetry": {
+    "message": "Upload fehlgeschlagen. Bitte später erneut versuchen."
+  },
+  "retryAfterLogin": {
+    "message": "Anmelden und erneut versuchen"
+  },
+  "retryUpload": {
+    "message": "Upload wiederholen"
+  },
+  "saveFailedSimple": {
+    "message": "Speichern fehlgeschlagen. Bitte erneut versuchen."
+  },
+  "saving": {
+    "message": "Wird gespeichert"
+  },
+  "noFolders": {
+    "message": "Noch keine Ordner. Klicken Sie auf „Neu“."
+  },
+  "savingEllipsis": {
+    "message": "Wird gespeichert…"
+  },
+  "createFolderFailed": {
+    "message": "Ordner konnte nicht erstellt werden. Bitte erneut versuchen."
+  },
+  "saveFolderFailed": {
+    "message": "Speichern im Ordner fehlgeschlagen. Bitte erneut versuchen."
+  },
+  "copyAddressFailed": {
+    "message": "Bild-URL kann nicht kopiert werden"
+  }
+}

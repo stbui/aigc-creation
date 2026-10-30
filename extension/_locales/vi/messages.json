@@ -1,0 +1,315 @@
+{
+  "extensionName": {
+    "message": "Huojue AI Thu thập hình ảnh"
+  },
+  "extensionDescription": {
+    "message": "Thu thập hình ảnh sản phẩm từ mọi trang web vào thư viện tư liệu Huojue AI để tham khảo hoặc tái hiện bất cứ lúc nào."
+  },
+  "contextMenuSave": {
+    "message": "Lưu vào Huojue AI"
+  },
+  "popupIllustration": {
+    "message": "Hình minh họa động"
+  },
+  "popupIntro": {
+    "message": "Đăng nhập để thu thập nhanh ảnh yêu thích từ các trang mua sắm và nội dung vào thư viện tư liệu Huojue AI."
+  },
+  "popupLoading": {
+    "message": "Đang tải…"
+  },
+  "login": {
+    "message": "Đăng nhập"
+  },
+  "defaultUser": {
+    "message": "Người dùng Huojue AI"
+  },
+  "collectionSettings": {
+    "message": "Cài đặt thu thập"
+  },
+  "disableOnSite": {
+    "message": "Tắt tiện ích trên trang này"
+  },
+  "viewLibrary": {
+    "message": "Xem tư liệu của tôi"
+  },
+  "notLoggedIn": {
+    "message": "Chưa đăng nhập"
+  },
+  "openingLogin": {
+    "message": "Đang mở trang đăng nhập…"
+  },
+  "cannotOpenLogin": {
+    "message": "Không thể mở trang đăng nhập"
+  },
+  "cannotOpenLoginRetry": {
+    "message": "Không thể mở trang đăng nhập. Vui lòng thử lại."
+  },
+  "settingsSaveFailed": {
+    "message": "Lưu thất bại"
+  },
+  "imageActions": {
+    "message": "Thao tác với ảnh"
+  },
+  "save": {
+    "message": "Lưu"
+  },
+  "saveImageToLibrary": {
+    "message": "Lưu ảnh vào thư viện tư liệu"
+  },
+  "expandMoreActions": {
+    "message": "Hiển thị thêm thao tác ảnh"
+  },
+  "collapseMoreActions": {
+    "message": "Ẩn các thao tác ảnh khác"
+  },
+  "batchSave": {
+    "message": "Lưu nhóm ảnh"
+  },
+  "replicate": {
+    "message": "Tạo lại ảnh"
+  },
+  "saveResult": {
+    "message": "Kết quả lưu ảnh Huojue AI"
+  },
+  "saveSuccess": {
+    "message": "Đã lưu"
+  },
+  "partialSaveSuccess": {
+    "message": "Đã lưu một phần"
+  },
+  "savedTo": {
+    "message": "Đã lưu vào"
+  },
+  "selectFolder": {
+    "message": "Chọn thư mục"
+  },
+  "uncategorized": {
+    "message": "Chưa phân loại"
+  },
+  "view": {
+    "message": "Xem"
+  },
+  "newFolder": {
+    "message": "Tạo mới"
+  },
+  "enterFolderName": {
+    "message": "Nhập tên thư mục"
+  },
+  "newFolderName": {
+    "message": "Tên thư mục mới"
+  },
+  "copyAddress": {
+    "message": "Sao chép URL"
+  },
+  "uploadToLibrary": {
+    "message": "Lưu vào thư viện tư liệu"
+  },
+  "batchSaveImages": {
+    "message": "Lưu hàng loạt ảnh"
+  },
+  "selectImages": {
+    "message": "Chọn ảnh cần lưu"
+  },
+  "batchLoadFailed": {
+    "message": "Không thể tải đầy đủ nhóm ảnh. Vui lòng thử lại sau."
+  },
+  "closeBatchSelection": {
+    "message": "Hủy chọn nhóm ảnh"
+  },
+  "batchImages": {
+    "message": "Ảnh có thể lưu hàng loạt"
+  },
+  "loginSuccess": {
+    "message": "Đăng nhập thành công"
+  },
+  "loginContinue": {
+    "message": "Đã đăng nhập Huojue AI. Hãy tiếp tục tải lên."
+  },
+  "continueUpload": {
+    "message": "Tiếp tục tải lên"
+  },
+  "reloginRequired": {
+    "message": "Cần đăng nhập lại"
+  },
+  "loggedOutRetry": {
+    "message": "Bạn đã đăng xuất khỏi Huojue AI. Hãy đăng nhập lại để tải lên."
+  },
+  "loginAgain": {
+    "message": "Đăng nhập lại"
+  },
+  "pendingImage": {
+    "message": "Ảnh chờ lưu $INDEX$",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectedImages": {
+    "message": "Đã chọn $COUNT$ ảnh",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "deselectAll": {
+    "message": "Bỏ chọn tất cả"
+  },
+  "selectAll": {
+    "message": "Chọn tất cả"
+  },
+  "saveSelection": {
+    "message": "Lưu ($SELECTED$/$TOTAL$)",
+    "placeholders": {
+      "selected": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "deselectImage": {
+    "message": "Bỏ chọn ảnh $INDEX$",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "selectImage": {
+    "message": "Chọn ảnh $INDEX$",
+    "placeholders": {
+      "index": {
+        "content": "$1"
+      }
+    }
+  },
+  "saveFailedRetry": {
+    "message": "Lưu thất bại. Vui lòng thử lại sau."
+  },
+  "networkConnectionError": {
+    "message": "Lỗi kết nối mạng. Vui lòng kiểm tra kết nối của bạn."
+  },
+  "savedThenLogin": {
+    "message": "Đã lưu $SAVED$ ảnh; đăng nhập để tiếp tục $REMAINING$ ảnh",
+    "placeholders": {
+      "saved": {
+        "content": "$1"
+      },
+      "remaining": {
+        "content": "$2"
+      }
+    }
+  },
+  "savedWithFailures": {
+    "message": "Đã lưu $SAVED$ ảnh; $FAILED$ ảnh thất bại",
+    "placeholders": {
+      "saved": {
+        "content": "$1"
+      },
+      "failed": {
+        "content": "$2"
+      }
+    }
+  },
+  "loginRetrySelection": {
+    "message": "Đăng nhập và thử lại ($REMAINING$/$TOTAL$)",
+    "placeholders": {
+      "remaining": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "retrySelection": {
+    "message": "Thử lại ($REMAINING$/$TOTAL$)",
+    "placeholders": {
+      "remaining": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "savingProgress": {
+    "message": "Đang lưu... $CURRENT$/$TOTAL$",
+    "placeholders": {
+      "current": {
+        "content": "$1"
+      },
+      "total": {
+        "content": "$2"
+      }
+    }
+  },
+  "batchSavedTo": {
+    "message": "Đã lưu $COUNT$ ảnh vào",
+    "placeholders": {
+      "count": {
+        "content": "$1"
+      }
+    }
+  },
+  "replicateUploading": {
+    "message": "Đang tải ảnh lên và mở tính năng tái hiện ảnh"
+  },
+  "replicateFailed": {
+    "message": "Không thể chuẩn bị tạo lại ảnh. Vui lòng thử lại."
+  },
+  "replicateOpening": {
+    "message": "Đã tải ảnh lên. Đang mở tính năng tái hiện ảnh"
+  },
+  "copied": {
+    "message": "Đã sao chép"
+  },
+  "addressCopied": {
+    "message": "Đã sao chép URL"
+  },
+  "copyFailed": {
+    "message": "Sao chép thất bại"
+  },
+  "copyFailedManual": {
+    "message": "Sao chép thất bại. Hãy chọn và sao chép URL thủ công."
+  },
+  "uploading": {
+    "message": "Đang tải lên…"
+  },
+  "uploadingToAssets": {
+    "message": "Đang tải ảnh lên và lưu vào tài nguyên của bạn"
+  },
+  "uploadFailedRetry": {
+    "message": "Tải lên thất bại. Vui lòng thử lại sau."
+  },
+  "retryAfterLogin": {
+    "message": "Đăng nhập và thử lại"
+  },
+  "retryUpload": {
+    "message": "Thử tải lên lại"
+  },
+  "saveFailedSimple": {
+    "message": "Lưu thất bại. Vui lòng thử lại."
+  },
+  "saving": {
+    "message": "Đang lưu"
+  },
+  "noFolders": {
+    "message": "Chưa có thư mục. Nhấp “Tạo mới”."
+  },
+  "savingEllipsis": {
+    "message": "Đang lưu…"
+  },
+  "createFolderFailed": {
+    "message": "Không thể tạo thư mục. Vui lòng thử lại."
+  },
+  "saveFolderFailed": {
+    "message": "Không thể lưu vào thư mục. Vui lòng thử lại."
+  },
+  "copyAddressFailed": {
+    "message": "Không thể sao chép URL ảnh"
+  }
+}

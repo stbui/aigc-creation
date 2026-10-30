@@ -4,12 +4,13 @@ import {
   Check,
   Download,
   FolderPlus,
+  Link2,
   Loader2,
   RefreshCw,
   Trash2,
   Upload,
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { assetsApi, assetSrc, projectsApi } from '../lib/api';
 import {
   MAX_IMAGE_BYTES,
@@ -83,6 +84,20 @@ function dateBucket(iso: string): { key: string; label: string; sort: number } {
   return { key: 'earlier', label: '更早', sort: 3 };
 }
 
+/**
+ * 来源站点的显示名：优先用后端归一化后的 `sourceSite`，缺失时从页面 URL 兜底。
+ * `sourcePageUrl` 由服务端校验过 http/https，但老数据/手改库仍可能不合法 ——
+ * 渲染期不能因为一个坏 URL 抛异常把整个素材库打白。
+ */
+function sourceHost(a: Asset): string {
+  if (a.sourceSite) return a.sourceSite;
+  try {
+    return new URL(a.sourcePageUrl ?? '').hostname.replace(/^www\./, '') || '来源';
+  } catch {
+    return '来源';
+  }
+}
+
 export function LibraryPage() {
   const { message } = App.useApp();
   const navigate = useNavigate();
@@ -105,9 +120,16 @@ export function LibraryPage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  /*
+   * 外部入口: 浏览器扩展保存后跳 `/asset-library?projectId=xxx`，直接落在
+   * 刚采集进的那个分组上。惰性初始化是为了首帧就分组，不闪一下「全部」。
+   */
+  const [searchParams] = useSearchParams();
+  const projectIdParam = searchParams.get('projectId');
+
   /** 分组依据与当前选中的分组（null = 全部分组） */
-  const [groupBy, setGroupBy] = useState<GroupBy>('none');
-  const [groupKey, setGroupKey] = useState<string | null>(null);
+  const [groupBy, setGroupBy] = useState<GroupBy>(projectIdParam ? 'project' : 'none');
+  const [groupKey, setGroupKey] = useState<string | null>(projectIdParam);
   /** 项目名映射：按项目分组时要显示名字，只有 id 的分组没人看得懂 */
   const [projects, setProjects] = useState<Project[]>([]);
 
@@ -128,6 +150,16 @@ export function LibraryPage() {
       alive = false;
     };
   }, [groupBy, projects.length, token]);
+
+  /*
+   * 站内跳转 (已在素材库时再点扩展的通知) 不会重建组件，惰性初始化不生效，
+   * 故再跟一次参数变化。用户随后手动换分组不受影响 —— 参数没变就不会再触发。
+   */
+  useEffect(() => {
+    if (!projectIdParam) return;
+    setGroupBy('project');
+    setGroupKey(projectIdParam);
+  }, [projectIdParam]);
 
   const load = useCallback(async () => {
     // guest 不发请求: 素材接口要鉴权, 401 会被渲染成「素材加载失败」。
@@ -513,7 +545,9 @@ export function LibraryPage() {
                   </div>
                   <div className="asset-library-card-content">
                     <span className="asset-library-card-title">
-                      {a.kind === 'generated' ? capabilityName(a.capability) : '原图素材'}
+                      {a.kind === 'generated'
+                        ? capabilityName(a.capability)
+                        : a.sourceTitle || '原图素材'}
                     </span>
                     <span className="asset-library-card-meta">
                       <span>
@@ -521,6 +555,19 @@ export function LibraryPage() {
                       </span>
                       <span>{a.kind === 'generated' ? '生成图' : '原图'}</span>
                     </span>
+                    {/* 扩展采集的素材才有来源: 站点名链回原页面, 供溯源与回访 */}
+                    {a.sourcePageUrl && (
+                      <a
+                        className="asset-library-card-source"
+                        href={a.sourcePageUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title={a.sourcePageUrl}
+                      >
+                        <Link2 size={11} />
+                        {sourceHost(a)}
+                      </a>
+                    )}
                   </div>
                 </article>
               );

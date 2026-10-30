@@ -346,14 +346,31 @@ export const projectsApi = {
     request<Project>('/projects', { method: 'POST', body: { name } }),
 };
 
+/** 采集来源元数据 (浏览器扩展上传时提交, 站点内上传不需要) */
+export interface AssetSourceFields {
+  sourceSite?: string;
+  sourceTitle?: string;
+  sourcePageUrl?: string;
+}
+
 export const assetsApi = {
   // projectId 必传: 后端 assets.service.ts:21 校验缺失即 400
-  upload: (file: File, projectId: string) => {
+  upload: (file: File, projectId: string, source: AssetSourceFields = {}) => {
     const fd = new FormData();
     fd.append('file', file);
     fd.append('projectId', projectId);
+    if (source.sourceSite) fd.append('sourceSite', source.sourceSite);
+    if (source.sourceTitle) fd.append('sourceTitle', source.sourceTitle);
+    if (source.sourcePageUrl) fd.append('sourcePageUrl', source.sourcePageUrl);
     return request<AssetUploadResponse>('/assets/upload', { method: 'POST', body: fd });
   },
+
+  /** 批量移动素材到另一项目 (分组); 只改素材归属, 不动生成任务的历史记录 */
+  move: (ids: string[], projectId: string) =>
+    request<{ moved: number; missing: string[]; projectId: string }>('/assets/move', {
+      method: 'PATCH',
+      body: { ids, projectId },
+    }),
 
   /** 读取单个素材。历史提交恢复需要用它找回当时使用的模板与参考图。 */
   get: (id: string) => request<Asset>(`/assets/${id}`),

@@ -97,6 +97,7 @@ aigc-creation/
 │   └── agent-*.md            # 规划：AI 智能体需求与集成方案（未实施）
 ├── docker-compose.yml        # 本地编排：默认=dev，--profile test=test（不同卷、不同库）
 ├── docker-compose.production.yml # 生产单机编排：migrate 门禁 / 健康探针 / 持久卷 / 仅本机监听
+├── extension/                # Chrome MV3 扩展：电商页图片一键采集到素材库（README 为唯一说明）
 ├── backend/                  # NestJS 服务，端口 4100（测试档同端口），全局前缀 /api/v1
 │   ├── prisma/schema.prisma  # SQLite provider；无 enum，状态类字段一律 String + DTO 白名单
 │   ├── prisma.config.ts      # Prisma 7 连接配置（datasource url 移出 schema；按 NODE_ENV 选档）

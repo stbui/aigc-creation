@@ -49,8 +49,9 @@
 | POST | `/api/v1/auth/oauth/complete` | 用短时票据换正式 `accessToken`（票据是 60 秒 JWT，服务端不存消费记录） |
 | POST | `/api/v1/auth/qr/{scan,confirm}` | 手机端（需登录）标记已扫 / 确认授权；**扫码≠授权**，确认才绑定账号 |
 | GET/POST | `/api/v1/projects` | 项目列表 / 创建 |
-| POST | `/api/v1/assets/upload` | 上传素材（multipart：`file` + `projectId` 均必填），返回含宽高 |
+| POST | `/api/v1/assets/upload` | 上传素材（multipart：`file` + `projectId` 均必填；可选来源字段 `sourceSite`/`sourceTitle`/`sourcePageUrl`，仅扩展采集时带），返回含宽高 |
 | GET | `/api/v1/assets` | 素材库列表（`kind`/`capability`/`limit`/`offset`） |
+| PATCH | `/api/v1/assets/move` | 批量移动素材到另一项目（`{ ids: string[], projectId }`，≤100），返回 `{ moved, missing, projectId }`；只改素材分组，不动任务归属 |
 | DELETE | `/api/v1/assets/:id` | 删除素材（生成图连带删除产出它的任务） |
 | POST | `/api/v1/generate` | 创建生成任务，返回 `{ taskId, status, creditCost }`，异步执行 |
 | GET | `/api/v1/tasks/:id` | 轮询任务，`outputAsset.sourceUrl` 为结果图 |

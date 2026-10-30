@@ -1,0 +1,512 @@
+.huojue-image-action {
+  all: initial !important;
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  display: none !important;
+  box-sizing: border-box !important;
+  min-width: 0 !important;
+  max-width: calc(100vw - 16px) !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 4px !important;
+  color: #ffffff !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  filter: drop-shadow(0 5px 15px rgb(15 23 42 / 28%)) !important;
+  -webkit-font-smoothing: antialiased !important;
+}
+
+.huojue-image-action--visible {
+  display: flex !important;
+}
+
+.huojue-image-action__primary,
+.huojue-image-action__toggle,
+.huojue-image-action__menu-item {
+  all: initial !important;
+  box-sizing: border-box !important;
+  border: 1px solid rgb(255 255 255 / 35%) !important;
+  color: #ffffff !important;
+  background: rgb(15 23 42 / 88%) !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  cursor: pointer !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-font-smoothing: antialiased !important;
+}
+
+.huojue-image-action__primary {
+  display: inline-flex !important;
+  min-width: 86px !important;
+  height: 28px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 7px 0 0 7px !important;
+  padding: 0 10px !important;
+}
+
+.huojue-image-action__toggle {
+  position: absolute !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  display: inline-flex !important;
+  width: 28px !important;
+  height: 28px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-left: 0 !important;
+  border-radius: 0 7px 7px 0 !important;
+  padding: 0 !important;
+  font-size: 15px !important;
+}
+
+.huojue-image-action__menu {
+  display: none !important;
+  flex-direction: column !important;
+  gap: 4px !important;
+}
+
+.huojue-image-action--expanded .huojue-image-action__menu {
+  display: flex !important;
+}
+
+.huojue-image-action__menu-item {
+  display: flex !important;
+  min-height: 28px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 7px !important;
+  padding: 0 10px !important;
+}
+
+.huojue-image-action__primary:focus-visible,
+.huojue-image-action__toggle:focus-visible,
+.huojue-image-action__menu-item:focus-visible {
+  outline: 3px solid rgb(147 197 253 / 85%) !important;
+  outline-offset: 2px !important;
+}
+
+.huojue-toast {
+  all: initial !important;
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  top: 20px !important;
+  left: 50% !important;
+  right: auto !important;
+  translate: -50% 0 !important;
+  display: grid !important;
+  box-sizing: border-box !important;
+  width: min(460px, calc(100vw - 32px)) !important;
+  max-width: min(420px, calc(100vw - 32px)) !important;
+  max-height: min(240px, calc(100vh - 40px)) !important;
+  overflow: auto !important;
+  gap: 12px !important;
+  border: 1px solid rgb(255 255 255 / 12%) !important;
+  border-radius: 16px !important;
+  padding: 12px !important;
+  color: #f8fafc !important;
+  background: #202020 !important;
+  box-shadow: 0 12px 28px rgb(0 0 0 / 35%) !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+  line-height: 1.4 !important;
+  overflow-wrap: anywhere !important;
+  text-align: left !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  user-select: text !important;
+  opacity: 0 !important;
+  transform: translateY(-10px) !important;
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease !important;
+  -webkit-font-smoothing: antialiased !important;
+}
+
+.huojue-save-progress {
+  all: initial !important;
+  position: fixed !important;
+  z-index: 2147483647 !important;
+  top: 20px !important;
+  left: 50% !important;
+  translate: -50% 0 !important;
+  display: flex !important;
+  box-sizing: border-box !important;
+  max-width: calc(100vw - 24px) !important;
+  align-items: center !important;
+  gap: 8px !important;
+  border: 1px solid #404040 !important;
+  border-radius: 16px !important;
+  padding: 12px 16px !important;
+  color: #fafafa !important;
+  background: #262626 !important;
+  box-shadow: 0 10px 15px -3px rgb(0 0 0 / 10%),
+    0 4px 6px -4px rgb(0 0 0 / 10%) !important;
+  font-family: "Noto Sans SC", -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif !important;
+  font-size: 14px !important;
+  font-weight: 400 !important;
+  line-height: 20px !important;
+  white-space: nowrap !important;
+  pointer-events: none !important;
+}
+
+.huojue-save-progress img {
+  display: block !important;
+  width: 16px !important;
+  height: 16px !important;
+  flex: 0 0 16px !important;
+  object-fit: contain !important;
+  animation: huojue-save-progress-spin 900ms linear infinite !important;
+}
+
+.huojue-save-progress span {
+  overflow: hidden !important;
+  font: inherit !important;
+  color: inherit !important;
+  text-overflow: ellipsis !important;
+}
+
+@keyframes huojue-save-progress-spin {
+  to { transform: rotate(360deg); }
+}
+
+.huojue-toast__header {
+  all: initial !important;
+  display: flex !important;
+  align-items: center !important;
+  flex: 1 1 auto !important;
+  gap: 12px !important;
+  color: #f8fafc !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+
+.huojue-toast__thumbnail {
+  display: block !important;
+  width: 44px !important;
+  height: 44px !important;
+  flex: 0 0 44px !important;
+  border: 1px solid rgb(255 255 255 / 10%) !important;
+  border-radius: 8px !important;
+  background-color: #333 !important;
+  background-position: center !important;
+  background-size: cover !important;
+}
+
+.huojue-toast__account {
+  all: initial !important;
+  display: flex !important;
+  min-width: 0 !important;
+  align-items: center !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  flex: 1 1 auto !important;
+  gap: 4px !important;
+  color: #f8fafc !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+
+.huojue-toast__avatar {
+  display: none !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 50% !important;
+  color: #ffffff !important;
+  background: #6d28d9 !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+}
+
+.huojue-toast__account strong,
+.huojue-toast__account span {
+  display: block !important;
+  color: inherit !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
+  line-height: 1.35 !important;
+}
+
+.huojue-toast__account strong {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  line-height: 20px !important;
+}
+.huojue-toast__status {
+  display: block !important;
+  color: rgb(255 255 255 / 60%) !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+  line-height: 16px !important;
+}
+
+.huojue-toast__account span {
+  color: #a3a3a3 !important;
+}
+
+.huojue-toast__group-trigger,
+.huojue-toast__view,
+.huojue-toast__group-create,
+.huojue-toast__group-save,
+.huojue-toast__group-item {
+  all: initial !important;
+  box-sizing: border-box !important;
+  border: 0 !important;
+  color: #d4d4d4 !important;
+  background: transparent !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-size: 11px !important;
+  line-height: 1.3 !important;
+  cursor: pointer !important;
+}
+
+.huojue-toast__group-trigger {
+  display: block !important;
+  max-width: 150px !important;
+  margin-top: 2px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  color: #a3a3a3 !important;
+}
+
+.huojue-toast__view {
+  flex: 0 0 auto !important;
+  border: 1px solid rgb(255 255 255 / 12%) !important;
+  border-radius: 5px !important;
+  height: 32px !important;
+  padding: 0 16px !important;
+  color: #e5e5e5 !important;
+  background: transparent !important;
+}
+
+.huojue-toast__group-panel {
+  display: grid !important;
+  gap: 8px !important;
+  border-top: 1px solid rgb(255 255 255 / 10%) !important;
+  border-bottom: 1px solid rgb(255 255 255 / 10%) !important;
+  padding: 9px 0 !important;
+}
+
+.huojue-toast__separator {
+  width: 100% !important;
+  height: 1px !important;
+  background: #404040 !important;
+}
+
+.huojue-toast__actions {
+  display: flex !important;
+  width: 100% !important;
+}
+
+.huojue-toast__actions .huojue-toast__copy {
+  display: none !important;
+}
+
+.huojue-toast__actions .huojue-toast__upload {
+  display: flex !important;
+  width: 100% !important;
+  height: 36px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 0 !important;
+  border-radius: 10px !important;
+  color: #171717 !important;
+  background: #e5e5e5 !important;
+  font-size: 14px !important;
+}
+
+.huojue-toast--batch .huojue-toast__header {
+  width: 100% !important;
+}
+.huojue-toast--batch .huojue-toast__thumbnail,
+.huojue-toast--batch .huojue-toast__view {
+  display: none !important;
+}
+.huojue-toast--batch .huojue-toast__account {
+  align-items: flex-start !important;
+}
+.huojue-toast--batch .huojue-toast__account .huojue-toast__group-trigger {
+  display: none !important;
+}
+.huojue-toast__batch-grid {
+  display: grid !important;
+  width: 100% !important;
+  height: 354px !important;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  gap: 13px !important;
+  overflow: hidden !important;
+}
+.huojue-toast__batch-item {
+  position: relative !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  border: 1px solid rgb(255 255 255 / 10%) !important;
+  border-radius: 16px !important;
+  background-position: center !important;
+  background-size: cover !important;
+  cursor: pointer !important;
+}
+.huojue-toast__batch-item::after {
+  position: absolute !important;
+  top: 7px !important;
+  left: 7px !important;
+  width: 16px !important;
+  height: 16px !important;
+  border: 1px solid #fff !important;
+  border-radius: 4px !important;
+  background: rgb(255 255 255 / 20%) !important;
+  content: "" !important;
+}
+.huojue-toast__batch-item[aria-pressed="true"]::after {
+  border-color: #000 !important;
+  background: #000 !important;
+  box-shadow: inset 0 0 0 4px #000 !important;
+}
+
+.huojue-toast__group-panel[hidden] {
+  display: none !important;
+}
+
+.huojue-toast__group-panel-heading {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  color: #a3a3a3 !important;
+  font-size: 11px !important;
+}
+
+.huojue-toast__group-list {
+  display: grid !important;
+  gap: 4px !important;
+}
+
+.huojue-toast__group-item {
+  width: 100% !important;
+  border-radius: 5px !important;
+  padding: 7px 8px !important;
+  text-align: left !important;
+  color: #f5f5f5 !important;
+  background: rgb(255 255 255 / 5%) !important;
+}
+
+.huojue-toast__group-item:hover,
+.huojue-toast__group-create:hover,
+.huojue-toast__group-save:hover,
+.huojue-toast__view:hover {
+  background: rgb(255 255 255 / 12%) !important;
+}
+
+.huojue-toast__group-empty {
+  color: #737373 !important;
+  font-size: 11px !important;
+}
+
+.huojue-toast__group-input {
+  all: initial !important;
+  box-sizing: border-box !important;
+  width: 100% !important;
+  border: 1px solid rgb(255 255 255 / 18%) !important;
+  border-radius: 5px !important;
+  padding: 7px 8px !important;
+  color: #f5f5f5 !important;
+  background: #171717 !important;
+  font-family: inherit !important;
+  font-size: 12px !important;
+}
+
+.huojue-toast--visible {
+  visibility: visible !important;
+  pointer-events: auto !important;
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+}
+
+.huojue-toast__url {
+  all: initial !important;
+  display: block !important;
+  color: #d4d4d4 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+  overflow-wrap: anywhere !important;
+  user-select: text !important;
+  cursor: text !important;
+}
+
+.huojue-toast__status {
+  all: initial !important;
+  display: block !important;
+  min-height: 18px !important;
+  color: #a3a3a3 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+
+.huojue-toast__actions {
+  all: initial !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+}
+
+.huojue-toast__copy,
+.huojue-toast__upload {
+  all: initial !important;
+  display: inline-flex !important;
+  width: fit-content !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 7px !important;
+  padding: 6px 10px !important;
+  color: #ffffff !important;
+  background: #16a34a !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  line-height: 1 !important;
+  cursor: pointer !important;
+  user-select: none !important;
+}
+
+.huojue-toast__copy:hover {
+  background: #15803d !important;
+}
+
+.huojue-toast__upload {
+  background: #2563eb !important;
+}
+
+.huojue-toast__upload:hover:not(:disabled) {
+  background: #1d4ed8 !important;
+}
+
+.huojue-toast__copy:focus-visible,
+.huojue-toast__upload:focus-visible {
+  outline: 3px solid rgb(134 239 172 / 85%) !important;
+  outline-offset: 2px !important;
+}
+
+.huojue-toast__copy:disabled,
+.huojue-toast__upload:disabled {
+  cursor: not-allowed !important;
+  opacity: 0.65 !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .huojue-toast {
+    transition: none !important;
+  }
+
+  .huojue-save-progress img {
+    animation: none !important;
+  }
+}
