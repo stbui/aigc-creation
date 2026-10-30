@@ -141,15 +141,16 @@ aigc-creation/
 统一从仓库根目录执行，默认 Node 版本见 `.node-version`（24 LTS，最低 22.12）：
 
 ```bash
-npm run setup                 # 干净环境安装依赖并生成 Prisma Client（npm ci）
-npm run check                 # Node 版本 + 依赖审计 + 全量构建 + 单元/组件/仿真网关测试
+npm run setup                 # 干净环境安装后端/前端/agent 依赖并生成 Prisma Client（npm ci）
+npm run check                 # Node 版本 + 依赖审计 + 全量构建 + 前端/agent/仿真网关测试
 npm run check:node            # 只检查 Node 版本
 npm run build                 # 后端 Nest 构建 + 前端生产构建
-npm run test                  # 前端 Vitest + 仿真模型网关测试
+npm run test                  # 前端 Vitest + agent 测试 + 仿真模型网关测试
 npm run test:e2e:smoke        # 后台登录与概览页 E2E 冒烟（需先启动测试档）
+npm run verify:compose        # 校验本地/测试/生产三套 Docker Compose 配置
 ```
 
-`npm run check` 是静态与 L1/L1.5 门禁，不等于全量业务冒烟；交易、支付、权限等链路仍按 `docs/testing.md` 分组执行。CI 配置见 `.github/workflows/ci.yml`。
+`npm run check` 是静态与 L1/L1.5 门禁，不等于全量业务冒烟；交易、支付、权限等链路仍按 `docs/testing.md` 分组执行。`npm run verify:compose` 需要 Docker，因此单独执行，不并入 `check`。CI 配置见 `.github/workflows/ci.yml`。
 
 ## 启动
 

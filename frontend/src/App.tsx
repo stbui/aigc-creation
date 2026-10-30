@@ -7,9 +7,11 @@ import { AppLayout } from './components/AppLayout';
 import { LoginModalHost } from './components/LoginModal';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ExceptionPage, NotFoundPage } from './components/ExceptionPage';
+import { RouteExperience } from './components/RouteExperience';
 import { useCapabilities } from './hooks/useCapabilities';
 import { StateLoading } from './components/StateViews';
 import { statsApi, toAbsoluteUrl } from './lib/api';
+import { registerRoutePreload } from './lib/routePreload';
 import type { StatsOverview } from './types/api';
 
 /**
@@ -30,59 +32,91 @@ function lazyNamed<T extends Record<string, ComponentType<any>>>(
   return lazy(() => loader().then((m) => ({ default: m[name] })));
 }
 
-const LoginPage = lazyNamed(() => import('./pages/LoginPage'), 'LoginPage');
+function lazyRoute<T extends Record<string, ComponentType<any>>>(
+  paths: string | string[],
+  loader: () => Promise<T>,
+  name: keyof T & string,
+) {
+  for (const path of Array.isArray(paths) ? paths : [paths]) {
+    registerRoutePreload(path, loader);
+  }
+  return lazyNamed(loader, name);
+}
+
+const LoginPage = lazyRoute('/login', () => import('./pages/LoginPage'), 'LoginPage');
 // 通用 OAuth 回调完成页：provider 授权后回跳，用短时 ticket 换正式会话
-const OAuthCallbackPage = lazyNamed(() => import('./pages/OAuthCallbackPage'), 'OAuthCallbackPage');
+const OAuthCallbackPage = lazyRoute(
+  '/auth/oauth/callback',
+  () => import('./pages/OAuthCallbackPage'),
+  'OAuthCallbackPage',
+);
 // 扫码登录确认页 (B8): 手机相机扫开二维码即进入, 裸外壳
-const QrLoginPage = lazyNamed(() => import('./pages/QrLoginPage'), 'QrLoginPage');
+const QrLoginPage = lazyRoute('/qr-login', () => import('./pages/QrLoginPage'), 'QrLoginPage');
 // 找回/重置密码 (B2): 独立页, 与登录页同为裸卡布局
-const ForgotPasswordPage = lazyNamed(
+const ForgotPasswordPage = lazyRoute(
+  '/forgot-password',
   () => import('./pages/ForgotPasswordPage'),
   'ForgotPasswordPage',
 );
-const ResetPasswordPage = lazyNamed(
+const ResetPasswordPage = lazyRoute(
+  '/reset-password',
   () => import('./pages/ResetPasswordPage'),
   'ResetPasswordPage',
 );
-const LandingPage = lazyNamed(() => import('./pages/LandingPage'), 'LandingPage');
-const SitemapPage = lazyNamed(() => import('./pages/SitemapPage'), 'SitemapPage');
-const LegalPage = lazyNamed(() => import('./pages/LegalPage'), 'LegalPage');
-const WorkbenchPage = lazyNamed(() => import('./pages/WorkbenchPage'), 'WorkbenchPage');
-const ProductKitPage = lazyNamed(() => import('./pages/ProductKitPage'), 'ProductKitPage');
-const ProductDetailPage = lazyNamed(() => import('./pages/ProductDetailPage'), 'ProductDetailPage');
-const ViralClonePage = lazyNamed(() => import('./pages/ViralClonePage'), 'ViralClonePage');
-const FreeCreationPage = lazyNamed(() => import('./pages/FreeCreationPage'), 'FreeCreationPage');
-const MobileUploadPage = lazyNamed(() => import('./pages/MobileUploadPage'), 'MobileUploadPage');
-const MultiFusionPage = lazyNamed(() => import('./pages/MultiFusionPage'), 'MultiFusionPage');
-const ProductSkuPage = lazyNamed(() => import('./pages/ProductSkuPage'), 'ProductSkuPage');
-const LocalRedrawPage = lazyNamed(() => import('./pages/LocalRedrawPage'), 'LocalRedrawPage');
-const BackgroundRemovePage = lazyNamed(() => import('./pages/BackgroundRemovePage'), 'BackgroundRemovePage');
-const WatermarkRemovePage = lazyNamed(() => import('./pages/WatermarkRemovePage'), 'WatermarkRemovePage');
-const ProductRetouchPage = lazyNamed(() => import('./pages/ProductRetouchPage'), 'ProductRetouchPage');
-const ImageTranslatePage = lazyNamed(() => import('./pages/ImageTranslatePage'), 'ImageTranslatePage');
-const ImageExpandPage = lazyNamed(() => import('./pages/ImageExpandPage'), 'ImageExpandPage');
-const ProductRecolorPage = lazyNamed(() => import('./pages/ProductRecolorPage'), 'ProductRecolorPage');
-const RotateAnglePage = lazyNamed(() => import('./pages/RotateAnglePage'), 'RotateAnglePage');
-const ToolPage = lazyNamed(() => import('./pages/ToolPage'), 'ToolPage');
-const WorksPage = lazyNamed(() => import('./pages/WorksPage'), 'WorksPage');
-const LibraryPage = lazyNamed(() => import('./pages/LibraryPage'), 'LibraryPage');
-const StatsPage = lazyNamed(() => import('./pages/StatsPage'), 'StatsPage');
-const InvitationsPage = lazyNamed(() => import('./pages/InvitationsPage'), 'InvitationsPage');
-const PackagesPage = lazyNamed(() => import('./pages/PackagesPage'), 'PackagesPage');
-const CheckoutPage = lazyNamed(() => import('./pages/CheckoutPage'), 'CheckoutPage');
-const CreditsPage = lazyNamed(() => import('./pages/CreditsPage'), 'CreditsPage');
-const OrdersPage = lazyNamed(() => import('./pages/OrdersPage'), 'OrdersPage');
-const AccountPage = lazyNamed(() => import('./pages/AccountPage'), 'AccountPage');
-const TicketsPage = lazyNamed(() => import('./pages/TicketsPage'), 'TicketsPage');
+const LandingPage = lazyRoute('/', () => import('./pages/LandingPage'), 'LandingPage');
+const SitemapPage = lazyRoute('/sitemap.html', () => import('./pages/SitemapPage'), 'SitemapPage');
+const LegalPage = lazyRoute('/legal/*', () => import('./pages/LegalPage'), 'LegalPage');
+const WorkbenchPage = lazyRoute('/workbench', () => import('./pages/WorkbenchPage'), 'WorkbenchPage');
+const ProductKitPage = lazyRoute('/product-kit', () => import('./pages/ProductKitPage'), 'ProductKitPage');
+const ProductDetailPage = lazyRoute('/product-detail', () => import('./pages/ProductDetailPage'), 'ProductDetailPage');
+const ViralClonePage = lazyRoute('/viral-clone', () => import('./pages/ViralClonePage'), 'ViralClonePage');
+const FreeCreationPage = lazyRoute('/free-creation', () => import('./pages/FreeCreationPage'), 'FreeCreationPage');
+const MobileUploadPage = lazyRoute('/mobile-upload', () => import('./pages/MobileUploadPage'), 'MobileUploadPage');
+const MultiFusionPage = lazyRoute('/multi-image-fusion', () => import('./pages/MultiFusionPage'), 'MultiFusionPage');
+const ProductSkuPage = lazyRoute('/product-sku', () => import('./pages/ProductSkuPage'), 'ProductSkuPage');
+const LocalRedrawPage = lazyRoute('/local-redraw', () => import('./pages/LocalRedrawPage'), 'LocalRedrawPage');
+const BackgroundRemovePage = lazyRoute('/background-remove', () => import('./pages/BackgroundRemovePage'), 'BackgroundRemovePage');
+const WatermarkRemovePage = lazyRoute('/watermark-remove', () => import('./pages/WatermarkRemovePage'), 'WatermarkRemovePage');
+const ProductRetouchPage = lazyRoute('/product-retouch', () => import('./pages/ProductRetouchPage'), 'ProductRetouchPage');
+const ImageTranslatePage = lazyRoute('/image-translate', () => import('./pages/ImageTranslatePage'), 'ImageTranslatePage');
+const ImageExpandPage = lazyRoute('/image-expand', () => import('./pages/ImageExpandPage'), 'ImageExpandPage');
+const ProductRecolorPage = lazyRoute('/product-recolor', () => import('./pages/ProductRecolorPage'), 'ProductRecolorPage');
+const RotateAnglePage = lazyRoute('/rotate-angle', () => import('./pages/RotateAnglePage'), 'RotateAnglePage');
+const ToolPage = lazyRoute('/tools/*', () => import('./pages/ToolPage'), 'ToolPage');
+const WorksPage = lazyRoute(['/works', '/my-works'], () => import('./pages/WorksPage'), 'WorksPage');
+const LibraryPage = lazyRoute(['/library', '/asset-library'], () => import('./pages/LibraryPage'), 'LibraryPage');
+const StatsPage = lazyRoute('/stats', () => import('./pages/StatsPage'), 'StatsPage');
+const InvitationsPage = lazyRoute('/invitations', () => import('./pages/InvitationsPage'), 'InvitationsPage');
+const PackagesPage = lazyRoute('/packages', () => import('./pages/PackagesPage'), 'PackagesPage');
+const CheckoutPage = lazyRoute('/checkout/*', () => import('./pages/CheckoutPage'), 'CheckoutPage');
+const CreditsPage = lazyRoute('/credits', () => import('./pages/CreditsPage'), 'CreditsPage');
+const OrdersPage = lazyRoute('/orders', () => import('./pages/OrdersPage'), 'OrdersPage');
+const AccountPage = lazyRoute('/account', () => import('./pages/AccountPage'), 'AccountPage');
+const TicketsPage = lazyRoute('/tickets', () => import('./pages/TicketsPage'), 'TicketsPage');
 
 // 后台管理端: 独立外壳与鉴权, 不走 C 端 Shell (侧栏/顶导/促销条均为 C 端语义)
-const AdminShell = lazyNamed(() => import('./pages/admin/AdminDashboardPage'), 'AdminShell');
+const AdminShell = lazyRoute(
+  ['/admin', '/admin/*'],
+  () => import('./pages/admin/AdminDashboardPage'),
+  'AdminShell',
+);
 
-/** 懒加载页面的统一兜底 (与 app-boot 同款居中骨架, 避免切页时闪烁空白) */
+/** 懒加载页面的统一兜底：保留页面节奏的骨架，而不是一整块空白转圈。 */
 function RouteFallback() {
   return (
-    <div className="app-boot">
-      <StateLoading tip="加载页面…" full />
+    <div className="route-fallback" role="status" aria-live="polite">
+      <span className="route-fallback-progress" aria-hidden />
+      <div className="route-fallback-skeleton" aria-hidden>
+        <span className="route-skeleton-line is-eyebrow" />
+        <span className="route-skeleton-line is-title" />
+        <span className="route-skeleton-line is-subtitle" />
+        <div className="route-skeleton-grid">
+          {Array.from({ length: 3 }, (_, index) => (
+            <span key={index} className="route-skeleton-card" />
+          ))}
+        </div>
+      </div>
+      <p className="route-fallback-tip">正在加载页面…</p>
     </div>
   );
 }
@@ -151,32 +185,6 @@ function Shell() {
   const capabilityIndependent =
     /^\/(account|credits|orders|tickets|packages|checkout)(\/|$)/.test(location.pathname);
 
-  if (loading && !capabilityIndependent) {
-    return (
-      <div className="app-boot">
-        <StateLoading tip="加载能力清单…" full />
-      </div>
-    );
-  }
-
-  if ((error || !data) && !capabilityIndependent) {
-    return (
-      <ExceptionPage
-        kind="warning"
-        fullScreen
-        title="无法连接服务"
-        desc="能力清单加载失败，工具暂时不可用。请确认后端已启动；若持续失败，可能是网络或服务状态异常。"
-        detail={error ?? undefined}
-        footnote={`默认后端地址 http://localhost:4100，如已改端口请检查 .env 的 VITE_API_BASE 配置。`}
-        action={
-          <button type="button" className="exc-btn is-primary" onClick={() => window.location.reload()}>
-            重新加载
-          </button>
-        }
-      />
-    );
-  }
-
   // 加载中 data/error 都还是 null，不能把「尚未返回」当成「加载失败」。
   // 账户/交易页会先渲染骨架并继续等清单返回，这里只在请求真正结束后告警。
   if (!loading && (error || !data) && capabilityIndependent) {
@@ -187,21 +195,39 @@ function Shell() {
   const items = data?.items ?? [];
   const workbenchIds = data?.workbenchIds ?? [];
 
-  return (
-    <AppLayout
-      groups={groups}
-      items={items}
-      thumbs={thumbs}
-    >
-      <ErrorBoundary resetKeys={[location.pathname]}>
-        <Suspense fallback={<RouteFallback />}>
-          <Routes>
-            <Route
-              path="/workbench"
-              element={
-                  <WorkbenchPage workbenchIds={workbenchIds} groups={groups} />
-              }
-            />
+  /*
+   * 能力清单只影响内容区与导航数据，不能把整个外壳一起替换掉。
+   * 此前 loading/error 分支直接 return 全屏页，慢网或接口失败时用户看到的
+   * 是「全站只有转圈/报错」，顶栏和侧栏都不存在，也无法去账户/订单等独立页面。
+   */
+  const capabilityPending = loading && !capabilityIndependent;
+  const capabilityFailed = !loading && (error || !data) && !capabilityIndependent;
+
+  const content = capabilityPending ? (
+    <div className="app-content-state">
+      <StateLoading tip="加载能力清单…" />
+    </div>
+  ) : capabilityFailed ? (
+    <ExceptionPage
+      kind="warning"
+      title="工具暂时不可用"
+      desc="能力清单加载失败，创作工具暂时无法使用。你可以先去账户、积分或订单页面，稍后再回来重试。"
+      detail={error ?? undefined}
+      footnote={`默认后端地址 http://localhost:4100，如已改端口请检查 .env 的 VITE_API_BASE 配置。`}
+      action={
+        <button type="button" className="exc-btn is-primary" onClick={() => window.location.reload()}>
+          重新加载
+        </button>
+      }
+    />
+  ) : (
+    <ErrorBoundary resetKeys={[location.pathname]}>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route
+            path="/workbench"
+            element={<WorkbenchPage workbenchIds={workbenchIds} groups={groups} />}
+          />
             <Route
               path="/product-kit"
               element={
@@ -378,6 +404,11 @@ function Shell() {
           </Routes>
         </Suspense>
       </ErrorBoundary>
+    );
+
+  return (
+    <AppLayout groups={groups} items={items} thumbs={thumbs}>
+      {content}
     </AppLayout>
   );
 }
@@ -391,6 +422,7 @@ export default function App() {
         {/* 登录弹窗宿主必须在 Router 之内: 卡片里的 useNavigate 依赖路由上下文。
             放在 AuthProvider 里 (Router 之外) 会让弹窗渲染即抛错、点登录毫无反应。 */}
         <LoginModalHost />
+        <RouteExperience />
         {/* AdminProvider 包在 BrowserRouter 内: useAdmin 依赖 useAuth 的 token,
             路由切到 /admin 时才加载身份, 不影响 C 端首屏 */}
         <AdminProvider>

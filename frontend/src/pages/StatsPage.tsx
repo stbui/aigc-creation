@@ -91,6 +91,7 @@ export function StatsPage() {
   }
 
   const maxDay = Math.max(1, ...stats.last7Days.map((d) => d.count));
+  const hasRecentOutput = stats.last7Days.some((d) => d.count > 0);
 
   return (
     <PersonalPage
@@ -121,25 +122,33 @@ export function StatsPage() {
       </Row>
 
       <Card size="small" title="近 7 天产出" className="stats-card">
-        <div className="trend-chart">
-          {stats.last7Days.map((d) => (
-            <div key={d.date} className="trend-col">
-              <div className="trend-bar-wrap">
-                <div
-                  className="trend-bar"
-                  style={{ height: `${Math.round((d.count / maxDay) * 100)}%` }}
-                  title={`${d.date}: ${d.count}`}
-                />
+        {hasRecentOutput ? (
+          <div className="trend-chart">
+            {stats.last7Days.map((d) => (
+              <div key={d.date} className="trend-col">
+                <div className="trend-bar-wrap">
+                  <div
+                    className="trend-bar"
+                    style={{ height: `${Math.round((d.count / maxDay) * 100)}%` }}
+                    title={`${d.date}: ${d.count}`}
+                  />
+                </div>
+                <Text type="secondary" className="trend-label">
+                  {d.count}
+                </Text>
+                <Text type="secondary" className="trend-date">
+                  {d.date.slice(5)}
+                </Text>
               </div>
-              <Text type="secondary" className="trend-label">
-                {d.count}
-              </Text>
-              <Text type="secondary" className="trend-date">
-                {d.date.slice(5)}
-              </Text>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <StateEmpty
+            compact
+            title="近 7 天还没有产出"
+            desc="完成一次生成后，这里会显示每天的产出数量。"
+          />
+        )}
       </Card>
 
       <Card size="small" title="按能力分布" className="stats-card">

@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Layout, Button, Avatar, Dropdown, Drawer } from 'antd';
 import {
   ChevronDown,
@@ -44,6 +44,28 @@ export function AppLayout({ groups, items, thumbs, children }: Props) {
   const [navOpen, setNavOpen] = useState<string | null>(null);
   // 移动端导航抽屉 (≤900px 侧栏 display:none, 参考站 390 实测同构)
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [headerElevated, setHeaderElevated] = useState(false);
+
+  useEffect(() => {
+    setMobileNavOpen(false);
+  }, [location.pathname]);
+
+  useEffect(() => {
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        setHeaderElevated(window.scrollY > 4);
+      });
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', onScroll);
+    };
+  }, []);
 
   /** 是否展示后台入口: 身份已加载且为后台角色 */
   const isAdminRole = !adminLoading && me !== null;
@@ -69,9 +91,12 @@ export function AppLayout({ groups, items, thumbs, children }: Props) {
 
   return (
     <Layout className="app-layout">
+      <a className="skip-to-content" href="#main-content">
+        跳到主要内容
+      </a>
       <PromoBar />
       <GuestPromoDialog />
-      <Header className="app-header">
+      <Header className={`app-header${headerElevated ? ' is-scrolled' : ''}`}>
         <Link to="/workbench" className="app-brand">
           {/* 品牌标记: 货觉AI「觉眼」logo (2026-10-19, 见 docs/brand/brand-basics.md) */}
           <span className="app-brand-mark">
@@ -236,7 +261,9 @@ export function AppLayout({ groups, items, thumbs, children }: Props) {
             onNavigate={go}
           />
         </div>
-        <Content className="app-content">{children}</Content>
+        <Content className="app-content" id="main-content" data-route-stage tabIndex={-1}>
+          {children}
+        </Content>
       </Layout>
 
       <Drawer

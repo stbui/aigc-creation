@@ -105,7 +105,7 @@ function AlertRow({
   );
 }
 
-export function AdminAlertBell() {
+export function AdminAlertBell({ placement = 'bottomRight' }: { placement?: 'bottomRight' | 'rightTop' | 'rightBottom' }) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const { data, error, loading, reload } = useAdminAlerts();
@@ -188,7 +188,7 @@ export function AdminAlertBell() {
     <Popover
       content={content}
       trigger="click"
-      placement="bottomRight"
+      placement={placement}
       open={open}
       onOpenChange={setOpen}
       arrow={false}

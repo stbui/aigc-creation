@@ -356,7 +356,12 @@ function SideMenuItem({
       ) : (
         <Link
           to={path}
-          onClick={() => onNavigate?.(path)}
+          onClick={() => {
+            // The pointer stays over the rail after SPA navigation, so leaving
+            // the preview open would cover the destination page's form.
+            setOpen(false);
+            onNavigate?.(path);
+          }}
           className={`workspace-side-menu-btn${active ? ' active' : ''}`}
           aria-current={active ? 'page' : undefined}
         >

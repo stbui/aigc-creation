@@ -7,11 +7,15 @@
       "Read(//tmp/**)",
       "Read(//private/tmp/**)",
       "WebSearch",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "Skill(oil-ui)",
+      "Skill(oil-ui:*)"
     ],
     "additionalDirectories": [
       "/tmp/arch-audit",
-      "/private/tmp/arch-audit"
+      "/private/tmp/arch-audit",
+      "/tmp/ux-review",
+      "/private/tmp/ux-review"
     ]
   }
 }

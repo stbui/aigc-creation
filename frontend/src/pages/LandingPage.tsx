@@ -557,7 +557,7 @@ export function LandingPage() {
   };
 
   return (
-    <div className="landing-page">
+    <div className="landing-page" data-route-stage>
       <LandingHeader />
 
       {/* ── 1. hero ── */}
@@ -661,13 +661,11 @@ export function LandingPage() {
               {plansState === 'error' && (
                 <p className="home-v2-addon-empty">套餐暂时加载失败，请稍后刷新查看</p>
               )}
-              {plansState === 'ready' && plans.length === 0 && (
+              {plansState === 'ready' && plans.filter((p) => p.durationDays > 0).length === 0 && (
                 <p className="home-v2-addon-empty">暂无可用套餐</p>
               )}
-              {plans.map((plan, i) => {
+              {plans.filter((plan) => plan.durationDays > 0).map((plan, i) => {
                 const visual = PACKAGE_VISUALS[i];
-                // free 档无 durationDays, 不作为可购买的订阅卡
-                if (plan.durationDays <= 0) return null;
                 return (
                   <article
                     key={plan.id}

@@ -86,7 +86,7 @@ function dateBucket(iso: string): { key: string; label: string; sort: number } {
 export function LibraryPage() {
   const { message } = App.useApp();
   const navigate = useNavigate();
-  const { token } = useAuth();
+  const { token, openLogin } = useAuth();
   const { ensureProject } = useProject();
   const { data: caps } = useCapabilities();
   const fileRef = useMemo(() => ({ current: null as HTMLInputElement | null }), []);
@@ -436,6 +436,13 @@ export function LibraryPage() {
           <img src="/asset-library/empty.svg" alt="" width={160} height={160} />
           <strong>暂无素材</strong>
           <span>快去上传素材吧</span>
+          <button
+            type="button"
+            className="asset-library-button asset-library-button-primary asset-library-empty-action"
+            onClick={() => (token ? fileRef.current?.click() : openLogin())}
+          >
+            <Upload size={14} /> 上传素材
+          </button>
         </div>
       ) : (
         <>

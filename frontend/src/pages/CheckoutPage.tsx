@@ -3,7 +3,15 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react';
 import QRCode from 'qrcode';
 // quote (结算试算) 属于 C 端接口, 在 myMarketingApi 上; marketingApi 是后台优惠券管理
-import { productsApi, ordersApi, creditsApi, membershipApi, paymentsApi, myMarketingApi } from '../lib/api';
+import {
+  ApiError,
+  productsApi,
+  ordersApi,
+  creditsApi,
+  membershipApi,
+  paymentsApi,
+  myMarketingApi,
+} from '../lib/api';
 import type {
   Product,
   Order,
@@ -97,6 +105,14 @@ export function CheckoutPage() {
    * 试算不落库、不占幂等键，可以随输入反复调。
    */
   const [quotePreview, setQuotePreview] = useState<MarketingQuote | null>(null);
+  /**
+   * 券码试算失败的原因。
+   *
+   * 试算失败时 `quotePreview` 会被置空，原先依赖 quotePreview 的提示块也随之消失，
+   * 用户输入不存在的券码时页面没有任何反馈。这里单独保存失败文案，
+   * 与「试算成功但券未生效」的提示分开。
+   */
+  const [quoteError, setQuoteError] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
 
   /**
@@ -191,8 +207,11 @@ export function CheckoutPage() {
   useEffect(() => {
     if (order || plan || !product) {
       setQuotePreview(null);
+      setQuoteError(null);
       return;
     }
+    // 输入变化后先清掉上一轮提示，避免防抖期间还显示旧券码的错误
+    setQuoteError(null);
     let alive = true;
     const timer = window.setTimeout(() => {
       myMarketingApi
@@ -202,11 +221,27 @@ export function CheckoutPage() {
           couponCode: couponCode.trim() || undefined,
         })
         .then((q) => {
-          if (alive) setQuotePreview(q);
+          if (alive) {
+            setQuotePreview(q);
+            setQuoteError(null);
+          }
         })
-        .catch(() => {
-          // 试算失败不阻断下单：以原价展示，最终金额仍以订单快照为准
-          if (alive) setQuotePreview(null);
+        .catch((e: unknown) => {
+          // 试算失败不阻断下单：以原价展示，最终金额仍以订单快照为准。
+          // 但填了券时必须把失败原因告诉用户，否则用户会以为券已生效。
+          if (!alive) return;
+          setQuotePreview(null);
+          if (!couponCode.trim()) {
+            setQuoteError(null);
+            return;
+          }
+          const status = e instanceof ApiError ? e.status : 0;
+          const message = e instanceof Error ? e.message : '';
+          setQuoteError(
+            status >= 400 && status < 500
+              ? `优惠码不可用：${message || '券码不存在或已失效'}`
+              : '优惠试算失败，当前按原价结算',
+          );
         });
     }, 350);
     return () => {
@@ -552,8 +587,8 @@ export function CheckoutPage() {
             {plan
               ? `${plan.durationDays} 天有效 · 每月 ${plan.monthlyCredits} 积分`
               : product!.creditsValidDays > 0
-                ? `${product!.creditsValidDays} 天内有效`
-                : '永久有效'}
+                ? `获得积分 ${product!.creditsValidDays} 天内有效`
+                : '获得积分永久有效'}
           </p>
 
           <div className="pkg-confirm-row">
@@ -601,6 +636,12 @@ export function CheckoutPage() {
                 maxLength={24}
               />
             </div>
+          )}
+
+          {!order && !plan && quoteError && (
+            <p className="pkg-pay-hint" role="alert" style={{ textAlign: 'left', color: '#a32d2d' }}>
+              {quoteError}
+            </p>
           )}
 
           {order?.couponWarning && (

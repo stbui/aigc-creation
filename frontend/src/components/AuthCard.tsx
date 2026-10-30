@@ -58,7 +58,7 @@ function benefitValue(group: string, item: string): string {
     if (item === '老用户签到') return '每日 5 积分起';
     return '邀请双方得积分';
   }
-  if (item === 'AI 生图') return '按能力计费';
+  if (item === 'AI 生图') return '10 积分起';
   if (item === 'AI 修图') return '5 积分起';
   return '免费';
 }

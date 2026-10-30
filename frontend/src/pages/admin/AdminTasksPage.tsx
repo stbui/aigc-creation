@@ -21,12 +21,14 @@ import {
   FilterActions,
   FilterBar,
   PageHeader,
-  Panel,
-  StatCard,
   StatusTag,
   type AppliedFilter,
 } from '../../components/admin/PageHeader';
+import { AlertTriangle } from 'lucide-react';
 import { BatchResultModal } from '../../components/admin/BatchResultModal';
+import { useDuty } from '../../components/admin/DutyContext';
+/* 耗时的写法与值班带共用一份：卡住的失败任务可能跑了几十小时，两边不能各写一套 */
+import { duration as fmtDuration } from '../../components/admin/DutyBand';
 import { taskErrorLabel } from '../../lib/admin-error-codes';
 import {
   adminAssetHref,
@@ -76,21 +78,6 @@ const STATUS_OPTIONS = [
   { value: 'succeeded', label: '已完成' },
   { value: 'failed', label: '失败' },
 ];
-
-/**
- * 耗时格式化。
- *
- * <1s 显示毫秒、<1min 显示秒、更长显示时分 —— 固定单位会让 "3.5秒" 变
- * "3500ms", 运营扫视时难以快速分出快慢。
- */
-function fmtDuration(ms: number): string {
-  if (ms < 0) return '—';
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
-  const min = Math.floor(ms / 60_000);
-  const sec = Math.round((ms % 60_000) / 1000);
-  return `${min}分${sec}秒`;
-}
 
 function fmtBytes(n: number): string {
   if (n <= 0) return '—';
@@ -231,34 +218,14 @@ export function AdminTasksPage() {
   const list = data?.result;
 
   /*
-   * 拥堵条独立轮询 (30s)。
+   * 拥堵读数改由值班带提供（30 秒轮询，页面不可见时暂停）。
    *
-   * 刻意不复用列表的 loading: 列表正在翻页/筛选时不该让顶部告警数字闪成
-   * 骨架, 告警数字的稳定性比实时性更重要 —— 它要在余光里就能读到。
-   * 列表自带一份 congestion 作为首屏值, 之后由轮询接管。
-   * 页面卸载后靠 alive 标志停止, 不留悬挂定时器。
+   * 此前本页另开了一个 30 秒轮询，两处节奏不同步时「带子里的执行中」与
+   * 「页面上的拥堵卡」会差一拍。顶部的等待 / 执行中 / 近 1 小时失败已经
+   * 由常驻值班带回答，本页只留列表真正需要的那条超阈值提示。
    */
-  const [liveCongestion, setLiveCongestion] = useState(data?.congestion);
-  useEffect(() => {
-    setLiveCongestion(data?.congestion);
-  }, [data]);
-
-  useEffect(() => {
-    let alive = true;
-    const tick = () => {
-      adminTasksApi
-        .stats()
-        .then((c) => {
-          if (alive) setLiveCongestion(c);
-        })
-        .catch(() => undefined); // 轮询失败静默: 保留上一次数字即可
-    };
-    const timer = window.setInterval(tick, 30_000);
-    return () => {
-      alive = false;
-      window.clearInterval(timer);
-    };
-  }, []);
+  const { data: duty } = useDuty();
+  const liveCongestion = duty?.congestion ?? data?.congestion;
 
   const capOptions = useMemo(
     () =>
@@ -447,7 +414,7 @@ export function AdminTasksPage() {
       {
         title: '任务',
         key: 'task',
-        width: 170,
+        width: 188,
         render: (_: unknown, row) => (
           <div className="adm-cell-stack">
             {/* 缩略图 + 短 id 并排: 排障时先认出图, 再对 id 查日志 */}
@@ -473,7 +440,7 @@ export function AdminTasksPage() {
       {
         title: '能力',
         key: 'capability',
-        width: 140,
+        width: 126,
         render: (_: unknown, row) => (
           <div className="adm-cell-stack">
             {/* 中文能力名为主, id 降为副信息 —— 运营看的是"爆款复刻"不是 hot_remake */}
@@ -490,7 +457,7 @@ export function AdminTasksPage() {
         title: '状态',
         dataIndex: 'status',
         key: 'status',
-        width: 145,
+        width: 126,
         /*
          * 失败原因直接进列表。此前只有「失败」二字, 原因要进详情抽屉才看得到,
          * 而详情入口是最右侧一条被横向裁掉一半的文字链 —— 排障动线被迫拉长。
@@ -510,7 +477,7 @@ export function AdminTasksPage() {
         title: '通道',
         dataIndex: 'provider',
         key: 'provider',
-        width: 80,
+        width: 88,
         /*
          * `pending` 是建任务时的初值 (还没跑出真实通道)。对失败任务显示「待执行」
          * 会与同一行的「失败」互相矛盾, 读起来像任务没开始跑; 这类行一律显示「—」。
@@ -525,7 +492,7 @@ export function AdminTasksPage() {
       {
         title: '归属',
         key: 'owner',
-        width: 190,
+        width: 276,
         render: (_: unknown, row) => (
           <div className="adm-cell-stack">
             <span className="adm-cell-sub adm-cell-clip" title={row.user.email}>
@@ -546,7 +513,7 @@ export function AdminTasksPage() {
         title: '耗时 / 创建时间',
         dataIndex: 'durationMs',
         key: 'durationMs',
-        width: 160,
+        width: 150,
         render: (ms: number, row) => (
           <div className="adm-cell-stack">
             <span>
@@ -561,7 +528,7 @@ export function AdminTasksPage() {
       {
         title: '',
         key: 'ops',
-        width: 125,
+        width: 110,
         /* 固定在最右, 保证滚动时主操作仍可见 */
         fixed: 'right',
         render: (_: unknown, row) => (
@@ -629,7 +596,11 @@ export function AdminTasksPage() {
     <>
       <PageHeader
         title="任务监控"
-        description="生成任务的实时状态、输入产出与失败重试。拥堵数字每 30 秒自动刷新。"
+        description={`${
+          list
+            ? `共 ${list.total.toLocaleString('zh-CN')} 条${hasFilter ? '符合筛选' : '任务'}`
+            : '生成任务的实时状态'
+        } · 状态、输入产出与失败重试`}
         actions={
           can('data.export') ? (
             <Button
@@ -644,38 +615,20 @@ export function AdminTasksPage() {
         }
       />
 
-      <div className="adm-stat-grid">
-        <StatCard
-          label="等待中"
-          value={liveCongestion?.pending ?? '—'}
-          hint="已提交但尚未开始执行"
-          tone={(liveCongestion?.pending ?? 0) > 20 ? 'warn' : undefined}
-        />
-        <StatCard
-          label="执行中"
-          value={liveCongestion?.running ?? '—'}
-          // 超阈值才提示: 不然阈值就成了永远亮着的装饰
-          hint={
-            overloaded
-              ? `已超阈值 ${liveCongestion?.runningThreshold}, 通道可能跟不上提交速度`
-              : `阈值 ${liveCongestion?.runningThreshold ?? 50}, 当前正常`
-          }
-          tone={overloaded ? 'danger' : undefined}
-        />
-        <StatCard
-          label="近 1 小时失败"
-          value={liveCongestion?.failedLastHour ?? '—'}
-          hint="失败突增往往先于拥堵出现"
-          tone={(liveCongestion?.failedLastHour ?? 0) > 0 ? 'warn' : undefined}
-        />
-        <StatCard
-          label="当前筛选"
-          value={list?.total ?? '—'}
-          hint="符合筛选条件的任务总数"
-        />
-      </div>
+      {/* 超阈值只在真的超了才出现：常亮的阈值提示会变成装饰 */}
+      {overloaded && (
+        <div className="adm-alert is-warn" role="status">
+          <AlertTriangle size={16} />
+          <div>
+            <strong>
+              执行中 {liveCongestion?.running} 已超阈值 {liveCongestion?.runningThreshold}
+            </strong>
+            <div>通道可能跟不上提交速度，先看值班带右侧的线路状态。</div>
+          </div>
+        </div>
+      )}
 
-      <FilterBar>
+      <FilterBar className="is-grid">
         <Select
           className="adm-filter-select"
           placeholder="状态"
@@ -744,8 +697,12 @@ export function AdminTasksPage() {
           onPressEnter={applyQuery}
           aria-label="结束时间"
         />
+        {/*
+         * 查询不是这一屏的主动作 —— 主动作在值班带里（接手最早异常）。
+         * 筛选用默认按钮，把实心紫留给「人的决定」。
+         */}
         <FilterActions>
-          <Button type="primary" className="adm-btn is-primary" onClick={applyQuery}>
+          <Button type="default" className="adm-btn" onClick={applyQuery}>
             查询
           </Button>
           <Button type="default" className="adm-btn" onClick={reset}>
@@ -758,7 +715,7 @@ export function AdminTasksPage() {
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
       {error && data && <AdminStaleError error={error} onRetry={reload} />}
 
-      <Panel>
+      <div className="adm-table-block">
         {loading && !data ? (
           <AdminListLoading tip="加载任务列表…" />
         ) : error && !data ? (
@@ -822,7 +779,7 @@ export function AdminTasksPage() {
                 columns={columns}
                 dataSource={list?.items ?? []}
                 loading={loading}
-                scroll={{ x: 1020 }}
+                scroll={{ x: 1120 }}
                 /*
                  * 整行可点开详情。此前只有最右侧那个「详情」文字链是入口,
                  * 而它恰好是被横向裁掉的那一列。
@@ -853,7 +810,7 @@ export function AdminTasksPage() {
             )}
           </>
         )}
-      </Panel>
+      </div>
 
       <AdminDrawer<AdminTaskDetail>
         open={detailId !== null}
@@ -912,7 +869,15 @@ export function AdminTasksPage() {
                   )}
                 </dd>
                 <dt>通道</dt>
-                <dd>{d.provider ? (PROVIDER_LABELS[d.provider] ?? d.provider) : '—'}</dd>
+                {/*
+                 * 与列表列同一规则：`pending` 是建任务的初值，任务已经失败时
+                 * 再写「待执行」会和上面的「失败」互相矛盾。
+                 */}
+                <dd>
+                  {!d.provider || (d.provider === 'pending' && d.status !== 'pending')
+                    ? '—'
+                    : (PROVIDER_LABELS[d.provider] ?? d.provider)}
+                </dd>
                 <dt>用户</dt>
                 <dd>
                   <Link className="adm-link" to={adminUserDetailHref(d.user.id)}>

@@ -360,9 +360,6 @@ export function InvitationsPage() {
             </div>
           ))}
         </div>
-        <p className="invite-metrics-note">
-          以上为真实数据，来自 <code>GET /api/v1/marketing/invites</code>，非示例值。
-        </p>
       </section>
 
       {data.relations.length > 0 && (

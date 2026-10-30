@@ -8,7 +8,8 @@ ARG NODE_IMAGE=node:24-slim
 # 为什么用 node:24-slim
 # ---------------------
 # 项目依赖 Node **内置**的 node:sqlite（自研 Prisma driver adapter
-# 见 src/prisma/node-sqlite-adapter.ts），Node >= 22.5 才有。
+# 见 src/prisma/node-sqlite-adapter.ts），Node >= 22.5 才有；
+# 本项目还要求 >= 22.12 以支持 @nestjs/config 的 require(esm)。
 # 选 24 是因为 22.x/23.x 的 node:sqlite 仍带实验性警告，24 起转正。
 #
 # 为什么不用 alpine

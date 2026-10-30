@@ -120,11 +120,51 @@ const DEFAULTS = { refundWindowDays: 7, refundMaxRatioBps: 10000, refundAllowCon
 let seq = 0;
 const idem = (tag) => `rf-${tag}-${Date.now()}-${seq++}`;
 
+/**
+ * 测试数据清理。
+ *
+ * 原先只在成功路径末尾删除；断言抛错或脚本被中断时，SMOKE-RF-* 商品/套餐
+ * 会留在库里并出现在 C 端商店。把清理抽出来，成功和失败路径都必须走到。
+ */
+const cleanupState = { userIds: [], orderIds: [], productId: null, planId: null };
+
+async function cleanupTestData() {
+  const { userIds, orderIds, productId, planId } = cleanupState;
+  if (userIds.length === 0 && orderIds.length === 0 && !productId && !planId) {
+    await prisma.$disconnect().catch(() => undefined);
+    return;
+  }
+  try {
+    await prisma.refund.deleteMany({ where: { orderId: { in: orderIds } } });
+    await prisma.payment.deleteMany({ where: { orderId: { in: orderIds } } });
+    await prisma.orderItem.deleteMany({ where: { orderId: { in: orderIds } } });
+    await prisma.membership.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.order.deleteMany({ where: { id: { in: orderIds } } });
+    await prisma.creditLedger.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.creditLot.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.notification.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.loginLog.updateMany({ where: { userId: { in: userIds } }, data: { userId: null } });
+    await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+    // 商品与套餐必须最后删: OrderItem/Order 仍以外键引用它们
+    if (productId) await prisma.product.deleteMany({ where: { id: productId } });
+    if (planId) await prisma.membershipPlan.deleteMany({ where: { id: planId } });
+    console.log('  已清理测试订单、账号、商品与套餐');
+  } finally {
+    userIds.length = 0;
+    orderIds.length = 0;
+    cleanupState.productId = null;
+    cleanupState.planId = null;
+    await prisma.$disconnect().catch(() => undefined);
+  }
+}
+
 (async () => {
   const bcrypt = require('bcryptjs');
   const stamp = Date.now();
   const userIds = [];
   const orderIds = [];
+  cleanupState.userIds = userIds;
+  cleanupState.orderIds = orderIds;
 
   await ensureAdminRole();
 
@@ -184,6 +224,7 @@ const idem = (tag) => `rf-${tag}-${Date.now()}-${seq++}`;
       status: 'active',
     },
   });
+  cleanupState.productId = product.id;
   const plan = await prisma.membershipPlan.create({
     data: {
       code: `smoke-refund-plan-${stamp}`,
@@ -194,6 +235,7 @@ const idem = (tag) => `rf-${tag}-${Date.now()}-${seq++}`;
       status: 'active',
     },
   });
+  cleanupState.planId = plan.id;
   check(
     '测试账号与商品就绪',
     Boolean(A.token && user.token && product && plan),
@@ -377,26 +419,15 @@ const idem = (tag) => `rf-${tag}-${Date.now()}-${seq++}`;
 
   // ── 清理 ────────────────────────────────────────────────────────────
   console.log('\n【清理】');
-  await prisma.refund.deleteMany({ where: { orderId: { in: orderIds } } });
-  await prisma.payment.deleteMany({ where: { orderId: { in: orderIds } } });
-  await prisma.orderItem.deleteMany({ where: { orderId: { in: orderIds } } });
-  await prisma.membership.deleteMany({ where: { userId: { in: userIds } } });
-  await prisma.order.deleteMany({ where: { id: { in: orderIds } } });
-  await prisma.creditLedger.deleteMany({ where: { userId: { in: userIds } } });
-  await prisma.creditLot.deleteMany({ where: { userId: { in: userIds } } });
-  await prisma.notification.deleteMany({ where: { userId: { in: userIds } } });
-  await prisma.loginLog.updateMany({ where: { userId: { in: userIds } }, data: { userId: null } });
-  await prisma.user.deleteMany({ where: { id: { in: userIds } } });
-  // 商品与套餐必须最后删: OrderItem/Order 仍以外键引用它们
-  await prisma.product.deleteMany({ where: { id: product.id } });
-  await prisma.membershipPlan.deleteMany({ where: { id: plan.id } });
-  await prisma.$disconnect();
-  console.log('  已清理测试订单与测试账号');
+  await cleanupTestData();
 
   console.log(`\n结果: ${pass} 通过 / ${fail} 失败`);
   process.exit(fail === 0 ? 0 : 1);
 })().catch(async (e) => {
   console.error('冒烟脚本异常:', e);
-  await prisma.$disconnect().catch(() => undefined);
+  await cleanupTestData().catch((cleanupErr) => {
+    console.error('冒烟测试数据清理失败:', cleanupErr);
+    return prisma.$disconnect().catch(() => undefined);
+  });
   process.exit(1);
 });

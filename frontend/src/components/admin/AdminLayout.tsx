@@ -20,6 +20,8 @@ import type { AdminSearchGroup } from '../../types/api';
 import { APP_ENV, IS_PROD } from '../../lib/constants';
 import { ADMIN_MENU, findAdminMenuItem, type AdminMenuItem } from './adminNav';
 import { AdminAlertBell } from './AlertCenter';
+import { AdminDutyBand } from './DutyBand';
+import { AdminDutyProvider } from './DutyContext';
 
 /**
  * 非生产环境才显示的环境标识, 防止误在生产执行测试操作。
@@ -28,15 +30,21 @@ import { AdminAlertBell } from './AlertCenter';
  * 回落规则与 APP_ENV 对齐：development→开发 / test→测试 / 其他非生产→预发。
  * 显式给 label 的好处是「测试」与「预发」在界面上不会混为一谈 ——
  * 测试环境可以随便造脏数据，预发环境的数据往往要给客户看。
+ *
+ * @param dotOnly 侧栏折叠成图标栏时只留一个色点，完整标签放不进 64px
  */
-function EnvironmentBadge() {
+function EnvironmentBadge({ dotOnly = false }: { dotOnly?: boolean }) {
   if (IS_PROD) return null;
   const fallback = APP_ENV === 'development' ? '开发' : APP_ENV === 'test' ? '测试' : '预发';
   const label = import.meta.env.VITE_ENV_LABEL || fallback;
   return (
-    <span className="adm-env-tag" title={`当前环境: ${APP_ENV} (${label})`}>
+    <span
+      className={`adm-env-tag${dotOnly ? ' is-dot' : ''}`}
+      title={`当前环境: ${APP_ENV} (${label})`}
+      aria-label={`当前环境: ${label}`}
+    >
       <span className="adm-env-dot" aria-hidden="true" />
-      {label}
+      {!dotOnly && label}
     </span>
   );
 }
@@ -74,7 +82,16 @@ export { findAdminMenuItem } from './adminNav';
  *   3. **点击即跳转并清空关键词**。继续保留关键词会让下一次打开面板
  *      看到上次的结果, 分不清是缓存还是新搜索。
  */
-function GlobalSearch({ canSearch, onNavigate }: { canSearch: boolean; onNavigate: (to: string) => void }) {
+function GlobalSearch({
+  canSearch,
+  onNavigate,
+  focusSignal = 0,
+}: {
+  canSearch: boolean;
+  onNavigate: (to: string) => void;
+  /** 侧栏折叠态点搜索图标后递增；非 0 时挂载即聚焦 */
+  focusSignal?: number;
+}) {
   const [keyword, setKeyword] = useState('');
   const [groups, setGroups] = useState<AdminSearchGroup[]>([]);
   const [open, setOpen] = useState(false);
@@ -120,6 +137,13 @@ function GlobalSearch({ canSearch, onNavigate }: { canSearch: boolean; onNavigat
   useEffect(() => {
     setActiveIndex(0);
   }, [groups]);
+
+  // 折叠态点「搜索」时侧栏展开、搜索框挂载，这里补一次聚焦
+  useEffect(() => {
+    if (!focusSignal || !canSearch) return;
+    setOpen(true);
+    inputRef.current?.focus();
+  }, [focusSignal, canSearch]);
 
   useEffect(() => {
     activeItemRef.current?.scrollIntoView({ block: 'nearest' });
@@ -187,11 +211,12 @@ function GlobalSearch({ canSearch, onNavigate }: { canSearch: boolean; onNavigat
 
   return (
     <div className="adm-search-wrap" ref={wrapRef}>
+      {/* 216px 侧栏里放不下「搜索用户 / 订单」+ ⌘K 徽标，换成顿号版正好不裁 */}
       <Input
         ref={inputRef}
         className="adm-search"
         prefix={<Search size={15} />}
-        placeholder={canSearch ? '搜索用户 / 订单 / 工单 / 任务 / 素材' : '无搜索权限'}
+        placeholder={canSearch ? '搜索用户、订单' : '无搜索权限'}
         allowClear
         disabled={!canSearch}
         value={keyword}
@@ -340,6 +365,8 @@ export function AdminLayout({ children }: Props) {
   const [isNarrow, setIsNarrow] = useState(false);
   /** 有未保存变更时, 待跳转的目标路径; 非 null 即弹确认框 */
   const [leaveTo, setLeaveTo] = useState<string | null>(null);
+  /** 折叠态点搜索: 展开侧栏后递增, 让搜索框挂载即聚焦 */
+  const [searchSignal, setSearchSignal] = useState(0);
 
   // 窄屏自动折叠: 后台最小使用宽度 1280, 更窄时侧栏收为图标栏
   useEffect(() => {
@@ -412,7 +439,6 @@ export function AdminLayout({ children }: Props) {
         <div key={g.name} className="adm-sider-group">
           <div className="adm-sider-group-title">{collapsed ? '' : g.name}</div>
           {g.items.map((it) => {
-            const Icon = it.icon;
             const isActive = activePath === it.path;
             const btn = (
               <button
@@ -421,10 +447,21 @@ export function AdminLayout({ children }: Props) {
                 className={`adm-sider-item${isActive ? ' is-active' : ''}${it.planned ? ' is-planned' : ''}`}
                 onClick={() => go(it.path)}
                 aria-current={isActive ? 'page' : undefined}
+                /* 折叠态只剩两个字，读屏拿不到全名，用 aria-label 补回 */
+                aria-label={collapsed ? it.label + (it.planned ? ' (待开放)' : '') : undefined}
                 title={collapsed ? it.label + (it.planned ? ' (待开放)' : '') : undefined}
               >
-                <Icon size={18} className="adm-sider-item-icon" />
-                {!collapsed && <span className="adm-sider-item-label">{it.label}</span>}
+                {/*
+                 * 29 个图标只增加噪音，导航用文字就够。折叠到 64px 后取标签前两字
+                 * 当字形 —— 读到的仍是人话（「订单」「积分」），不是一个要猜的符号。
+                 */}
+                {collapsed ? (
+                  <span className="adm-sider-item-glyph" aria-hidden="true">
+                    {it.short ?? it.label.slice(0, 2)}
+                  </span>
+                ) : (
+                  <span className="adm-sider-item-label">{it.label}</span>
+                )}
                 {!collapsed && it.planned && <span className="adm-sider-item-tag">待建</span>}
               </button>
             );
@@ -441,102 +478,153 @@ export function AdminLayout({ children }: Props) {
     </nav>
   );
 
+  /*
+   * 概览页给完整值班带（128px），其余页面压缩成 44px 常驻。
+   * 判断按已激活路径：`/admin` 与 `/admin/` 都算概览。
+   */
+  const isOverview = activePath === '/admin';
+
   return (
     <Layout className={`adm-layout${compact ? ' is-compact' : ''}`} onClickCapture={onClickCapture}>
       <a className="adm-skip-link" href="#adm-main">
         跳到主要内容
       </a>
-      <Layout.Header className="adm-header">
-        <div className="adm-header-left">
-          <button
-            type="button"
-            className="adm-collapse-btn"
-            onClick={() => (isNarrow ? setMobileNavOpen(true) : setCollapsed((c) => !c))}
-            aria-label={isNarrow ? '打开导航菜单' : collapsed ? '展开侧栏' : '收起侧栏'}
-          >
-            <Menu size={18} />
-          </button>
-          <Link to="/admin" className="adm-brand" aria-label="货觉 AI 运营后台首页">
-            <img className="adm-brand-mark" src="/brand/huojue-mark.svg" alt="" />
-            <span className="adm-brand-name">
-              货觉<span>运营后台</span>
-            </span>
-          </Link>
-          <EnvironmentBadge />
-        </div>
 
-        <div className="adm-header-right">
-          <Tooltip title={compact ? '切换为宽松列表' : '切换为紧凑列表'}>
+      <div className="adm-shell">
+        {/*
+         * 左栏同时承担导航与「值班牌」：搜索在顶部，环境标识、告警铃、
+         * 列表密度与账号在底部。上一版的顶栏因此可以整个删掉 ——
+         * 省下的高度交给值班带，机器状态常驻在视线里。
+         */}
+        <aside className={`adm-rail${collapsed ? ' is-collapsed' : ''}`} aria-label="后台导航">
+          <div className="adm-rail-top">
             <button
               type="button"
-              className="adm-icon-btn"
-              aria-label={compact ? '切换为宽松列表' : '切换为紧凑列表'}
-              aria-pressed={compact}
-              onClick={() => {
-                const next = !compact;
-                setCompact(next);
-                localStorage.setItem(DENSITY_KEY, next ? 'compact' : 'comfortable');
+              className="adm-collapse-btn"
+              onClick={() => (isNarrow ? setMobileNavOpen(true) : setCollapsed((c) => !c))}
+              aria-label={isNarrow ? '打开导航菜单' : collapsed ? '展开侧栏' : '收起侧栏'}
+            >
+              <Menu size={18} />
+            </button>
+            <Link to="/admin" className="adm-brand" aria-label="货觉 AI 运营后台首页">
+              <img className="adm-brand-mark" src="/brand/huojue-mark.svg" alt="" />
+              {!collapsed && (
+                <span className="adm-brand-name">
+                  货觉<span>运营后台</span>
+                </span>
+              )}
+            </Link>
+          </div>
+
+          <div className="adm-rail-search">
+            {collapsed ? (
+              <Tooltip title="搜索（展开侧栏）" placement="right">
+                <button
+                  type="button"
+                  className="adm-icon-btn"
+                  aria-label="搜索（展开侧栏）"
+                  onClick={() => {
+                    setCollapsed(false);
+                    setSearchSignal((n) => n + 1);
+                  }}
+                >
+                  <Search size={17} />
+                </button>
+              </Tooltip>
+            ) : (
+              <GlobalSearch
+                canSearch={can('data.search')}
+                onNavigate={navigate}
+                focusSignal={searchSignal}
+              />
+            )}
+          </div>
+
+          <div className="adm-rail-nav">{navList}</div>
+
+          <div className="adm-rail-foot">
+            <div className="adm-foot-tools">
+              <EnvironmentBadge dotOnly={collapsed} />
+              <AdminAlertBell placement={collapsed ? 'rightTop' : 'rightBottom'} />
+              <Tooltip title={compact ? '切换为宽松列表' : '切换为紧凑列表'}>
+                <button
+                  type="button"
+                  className="adm-icon-btn"
+                  aria-label={compact ? '切换为宽松列表' : '切换为紧凑列表'}
+                  aria-pressed={compact}
+                  onClick={() => {
+                    const next = !compact;
+                    setCompact(next);
+                    localStorage.setItem(DENSITY_KEY, next ? 'compact' : 'comfortable');
+                  }}
+                >
+                  {compact ? <Rows3 size={17} /> : <Rows4 size={17} />}
+                </button>
+              </Tooltip>
+            </div>
+
+            <Dropdown
+              placement="topRight"
+              menu={{
+                items: [
+                  { key: 'email', label: me?.email ?? '', icon: <User size={14} />, disabled: true },
+                  { type: 'divider' as const },
+                  {
+                    key: 'frontend',
+                    label: '返回前台',
+                    onClick: () => navigate('/workbench'),
+                  },
+                  {
+                    key: 'logout',
+                    label: '退出登录',
+                    icon: <LogOut size={14} />,
+                    onClick: () => {
+                      logout();
+                      navigate('/login');
+                    },
+                  },
+                ],
               }}
             >
-              {compact ? <Rows3 size={17} /> : <Rows4 size={17} />}
-            </button>
-          </Tooltip>
-          <GlobalSearch canSearch={can('data.search')} onNavigate={navigate} />
-          <AdminAlertBell />
-          <Dropdown
-            menu={{
-              items: [
-                { key: 'email', label: me?.email ?? '', icon: <User size={14} />, disabled: true },
-                { type: 'divider' as const },
-                {
-                  key: 'frontend',
-                  label: '返回前台',
-                  onClick: () => navigate('/workbench'),
-                },
-                {
-                  key: 'logout',
-                  label: '退出登录',
-                  icon: <LogOut size={14} />,
-                  onClick: () => {
-                    logout();
-                    navigate('/login');
-                  },
-                },
-              ],
-            }}
+              <button type="button" className="adm-user" aria-label="打开用户菜单">
+                <Avatar size={26} className="adm-user-avatar">
+                  {(me?.email ?? 'A').charAt(0).toUpperCase()}
+                </Avatar>
+                {!collapsed && (
+                  <>
+                    <span className="adm-user-name">{me?.roleLabel ?? '加载中'}</span>
+                    <ChevronDown className="adm-user-chevron" size={14} />
+                  </>
+                )}
+              </button>
+            </Dropdown>
+          </div>
+
+          {/* 窄屏（≤900px）时左栏不可展开，导航走抽屉 */}
+          <Drawer
+            title="导航菜单"
+            placement="left"
+            size={280}
+            open={mobileNavOpen}
+            onClose={() => setMobileNavOpen(false)}
+            className="adm-mobile-drawer"
+            extra={
+              <Button type="text" icon={<X size={16} />} onClick={() => setMobileNavOpen(false)} />
+            }
           >
-            <button type="button" className="adm-user" aria-label="打开用户菜单">
-              <Avatar size={26} className="adm-user-avatar">
-                {(me?.email ?? 'A').charAt(0).toUpperCase()}
-              </Avatar>
-              <span className="adm-user-name">{me?.roleLabel ?? '加载中'}</span>
-              <ChevronDown className="adm-user-chevron" size={14} />
-            </button>
-          </Dropdown>
+            <div className="adm-sider is-mobile">{navList}</div>
+          </Drawer>
+        </aside>
+
+        <div className="adm-main-col">
+          <AdminDutyProvider>
+            <AdminDutyBand variant={isOverview ? 'full' : 'compact'} />
+            <Layout.Content id="adm-main" className="adm-content" tabIndex={-1}>
+              {children}
+            </Layout.Content>
+          </AdminDutyProvider>
         </div>
-      </Layout.Header>
-
-      <Layout className="adm-body">
-        <div className={`adm-sider${collapsed ? ' is-collapsed' : ''}`}>{navList}</div>
-
-        <Drawer
-          title="导航菜单"
-          placement="left"
-          size={280}
-          open={mobileNavOpen}
-          onClose={() => setMobileNavOpen(false)}
-          className="adm-mobile-drawer"
-          extra={
-            <Button type="text" icon={<X size={16} />} onClick={() => setMobileNavOpen(false)} />
-          }
-        >
-          <div className="adm-sider is-mobile">{navList}</div>
-        </Drawer>
-
-        <Layout.Content id="adm-main" className="adm-content" tabIndex={-1}>
-          {children}
-        </Layout.Content>
-      </Layout>
+      </div>
 
       {/* 未保存变更的离开确认: 用 antd Modal, Esc 可关、焦点被限制在框内 */}
       <Modal

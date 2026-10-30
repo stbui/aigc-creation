@@ -1,5 +1,6 @@
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthCard } from '../components/AuthCard';
+import { useAuth } from '../context/AuthContext';
 
 /**
  * 登录独立页 —— 登录卡的**兜底宿主**。
@@ -12,6 +13,7 @@ import { AuthCard } from '../components/AuthCard';
  */
 export function LoginPage() {
   const navigate = useNavigate();
+  const { token } = useAuth();
   const [params] = useSearchParams();
 
   /**
@@ -22,7 +24,13 @@ export function LoginPage() {
    * 经典写法，必须挡掉。非法值一律回落工作台。
    */
   const redirect = params.get('redirect') ?? '';
-  const target = redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/workbench';
+  const target =
+    redirect.startsWith('/') && !redirect.startsWith('//') && redirect !== '/login'
+      ? redirect
+      : '/workbench';
+
+  // 已登录用户点到旧登录链接时直接回到目标页，避免误以为登录态丢失。
+  if (token) return <Navigate to={target} replace />;
 
   return (
     <div className="login-page">

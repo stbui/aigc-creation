@@ -39,6 +39,8 @@ export function PackagesPage() {
    * 入口」，放在同一页比再开一个会员页更少绕路。
    */
   const [plans, setPlans] = useState<MembershipPlan[]>([]);
+  /** 当前生效套餐的 code；免费用户为 'free'。只用于展示，不参与价格计算 */
+  const [currentPlanCode, setCurrentPlanCode] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -64,6 +66,27 @@ export function PackagesPage() {
     void load();
   }, [load]);
 
+  useEffect(() => {
+    if (!token) {
+      setCurrentPlanCode(null);
+      return;
+    }
+    let alive = true;
+    membershipApi
+      .me()
+      .then((m) => {
+        if (alive) setCurrentPlanCode(m.planCode);
+      })
+      .catch((e: unknown) => {
+        // 会员详情失败不阻断价目展示；没有徽标比整页报错更可接受
+        console.warn('[packages] 会员详情加载失败，当前方案徽标暂不展示', e);
+        if (alive) setCurrentPlanCode(null);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [token]);
+
   const buy = (p: Product) => {
     if (!token) {
       /*
@@ -85,6 +108,8 @@ export function PackagesPage() {
     }
     navigate(`/checkout/membership?planId=${encodeURIComponent(plan.id)}`);
   };
+
+  const currentPlan = plans.find((p) => p.code === currentPlanCode) ?? null;
 
   return (
     <div className="pkg-shop-page">
@@ -126,34 +151,53 @@ export function PackagesPage() {
               <p>订阅后每月自动发放积分，享专属权益</p>
             </div>
             <div className="pkg-grid">
-              {plans.map((plan) => (
-                <article key={plan.id} className="pkg-card">
-                  <div className="pkg-card-top">
-                    <span className="pkg-card-name">{plan.name}</span>
-                    <span className="pkg-card-badge">{plan.durationDays} 天</span>
-                  </div>
-                  <div className="pkg-card-points">
-                    <strong>{formatCredits(plan.monthlyCredits)}</strong>
-                    <span>积分 / 月</span>
-                  </div>
-                  <span className="pkg-card-bonus">
-                    {plan.description || `订阅 ${plan.durationDays} 天，每月发放积分`}
-                  </span>
-                  {plan.perkLabels.length > 0 && (
-                    <span className="pkg-card-perks">{plan.perkLabels.join(' · ')}</span>
-                  )}
-                  <div className="pkg-card-price">
-                    <strong>{formatYuan(plan.priceCents)}</strong>
-                  </div>
-                  <button
-                    type="button"
-                    className="pkg-select-btn"
-                    onClick={() => subscribe(plan)}
-                  >
-                    立即订阅
-                  </button>
-                </article>
-              ))}
+              {plans.map((plan) => {
+                const isCurrent = currentPlanCode === plan.code;
+                const isFreePlan = plan.durationDays <= 0;
+                const actionLabel = isFreePlan
+                  ? isCurrent
+                    ? '当前方案'
+                    : '免费档'
+                  : !currentPlanCode
+                    ? '订阅'
+                    : isCurrent
+                      ? '续费'
+                      : currentPlan && plan.priceCents < currentPlan.priceCents
+                        ? '切换'
+                        : '升级';
+                return (
+                  <article key={plan.id} className={`pkg-card${isCurrent ? ' is-current' : ''}`}>
+                    <div className="pkg-card-top">
+                      <span className="pkg-card-name">{plan.name}</span>
+                      <span className="pkg-card-badge">
+                        {isFreePlan ? '永久免费' : `${plan.durationDays} 天`}
+                      </span>
+                      {isCurrent && <span className="pkg-card-badge is-current">当前方案</span>}
+                    </div>
+                    <div className="pkg-card-points">
+                      <strong>{formatCredits(plan.monthlyCredits)}</strong>
+                      <span>积分 / 月</span>
+                    </div>
+                    <span className="pkg-card-bonus">
+                      {plan.description || `订阅 ${plan.durationDays} 天，每月发放积分`}
+                    </span>
+                    {plan.perkLabels.length > 0 && (
+                      <span className="pkg-card-perks">{plan.perkLabels.join(' · ')}</span>
+                    )}
+                    <div className="pkg-card-price">
+                      <strong>{formatYuan(plan.priceCents)}</strong>
+                    </div>
+                    <button
+                      type="button"
+                      className="pkg-select-btn"
+                      disabled={isFreePlan}
+                      onClick={() => subscribe(plan)}
+                    >
+                      {actionLabel}
+                    </button>
+                  </article>
+                );
+              })}
             </div>
           </section>
         )}

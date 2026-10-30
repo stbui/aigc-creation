@@ -23,7 +23,7 @@ type Tab = 'ledger' | 'lots';
 const SOURCE_LABEL: Record<string, string> = {
   purchase: '购买',
   grant: '赠送',
-  admin_adjust: '人工调整',
+  admin_adjust: '客服调整',
 };
 
 const LEDGER_LABEL: Record<string, string> = {
@@ -32,7 +32,7 @@ const LEDGER_LABEL: Record<string, string> = {
   consume: '生成消耗',
   refund_reclaim: '退款扣回',
   expire: '到期回收',
-  admin_adjust: '人工调整',
+  admin_adjust: '客服调整',
 };
 
 function formatDate(iso: string | null | undefined): string {
@@ -158,7 +158,12 @@ export function CreditsPage() {
       title: '备注',
       dataIndex: 'reason',
       ellipsis: true,
-      render: (value: string | null) => value ?? '—',
+      /*
+       * 后台人工调整的 reason 是运营填写的内部备注，可能含工单号、客服姓名。
+       * C 端只展示枚举文案，不把内部原文透出给用户。
+       */
+      render: (value: string | null, row: CreditLedgerEntry) =>
+        row.type === 'admin_adjust' ? '客服调整' : (value ?? '—'),
     },
   ];
 

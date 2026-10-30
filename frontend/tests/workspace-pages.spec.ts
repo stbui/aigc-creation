@@ -40,7 +40,7 @@ function trackApi(page: Page, path: string) {
   return () => count;
 }
 
-/** 让非营销弹层用例跳过 1.2s 后出现的游客福利，避免遮罩挡住后续点击。 */
+/** 让非营销弹层用例跳过游客福利，避免遮罩挡住后续点击。 */
 async function skipGuestPromo(page: Page) {
   await page.addInitScript(
     ([key]) => localStorage.setItem(key as string, '1'),
@@ -259,7 +259,7 @@ test.describe('游客新人福利弹层', () => {
     await page.goto(`${UI}/workbench`);
 
     const overlay = page.locator('.guest-promo-overlay');
-    await expect(overlay).toBeVisible({ timeout: 5000 });
+    await expect(overlay).toBeVisible({ timeout: 9000 });
     await expect(page.locator('.guest-promo-title')).toHaveText('新人首单立减');
     await expect(page.locator('.guest-promo-countdown')).toContainText('后活动结束');
     await expect(page.locator('.guest-promo-countdown span')).toHaveCount(3);
@@ -287,7 +287,7 @@ test.describe('游客新人福利弹层', () => {
     await page.goto(`${UI}/workbench`);
 
     const overlay = page.locator('.guest-promo-overlay');
-    await expect(overlay).toBeVisible({ timeout: 5000 });
+    await expect(overlay).toBeVisible({ timeout: 9000 });
     await page.getByRole('button', { name: '关闭新人福利' }).click();
     await expect(overlay).toHaveCount(0);
     expect(await page.evaluate((key) => localStorage.getItem(key), GUEST_PROMO_DISMISS_KEY)).toBe(
@@ -312,7 +312,7 @@ test.describe('游客新人福利弹层', () => {
     await page.goto(`${UI}/workbench`);
 
     const overlay = page.locator('.guest-promo-overlay');
-    await expect(overlay).toBeVisible({ timeout: 5000 });
+    await expect(overlay).toBeVisible({ timeout: 9000 });
     await expect(page.locator('.guest-promo-title')).toHaveText('新用户创作礼');
     await expect(page.locator('.guest-promo-countdown')).toHaveCount(0);
     await expect(page.locator('.guest-promo-note')).toHaveText('真实权益 · 登录即用');
@@ -337,6 +337,23 @@ test.describe('游客新人福利弹层', () => {
 
     await page.locator('.guest-promo-claim').click();
     await expect(page).toHaveURL(/\/background-remove$/);
+    await expect(page.locator('.guest-promo-overlay')).toHaveCount(0);
+  });
+
+  test('用户开始操作后不自动打断当前任务', async ({ page }) => {
+    await mockPopup(page, {
+      title: '新人首单立减',
+      body: '限时活动',
+      ctaText: '去使用',
+      ctaUrl: '/packages',
+      durationMs: 60 * 60 * 1000,
+    });
+    await page.goto(`${UI}/workbench`);
+    await page.locator('.wb-tool-card').first().waitFor();
+
+    // 键盘/指针/滚轮任一真实操作都应取消本次自动弹出，促销条仍保留入口。
+    await page.keyboard.press('Tab');
+    await page.waitForTimeout(6500);
     await expect(page.locator('.guest-promo-overlay')).toHaveCount(0);
   });
 });

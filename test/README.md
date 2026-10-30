@@ -19,7 +19,7 @@ node server.js        # 默认 http://127.0.0.1:3900
 npm start
 ```
 
-- 要求 **Node ≥ 22.5**，**没有任何第三方依赖**（不需要 `npm install`）。
+- 要求 **Node ≥ 22.12**（与仓库根级版本约束一致），**没有任何第三方依赖**（不需要 `npm install`）。
 - 默认只监听回环地址。需要给手机或容器联调时显式设置 `MOCK_HOST=0.0.0.0`。
 - 默认不校验令牌（方便开箱即用）；设置 `MOCK_API_KEY` 后所有 `/v1/*` 请求都要带
   `Authorization: Bearer <MOCK_API_KEY>`。

@@ -27,6 +27,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: |
+            agent/package-lock.json
             backend/package-lock.json
             frontend/package-lock.json
       - name: Install backend dependencies
@@ -35,6 +36,8 @@ jobs:
         run: npm --prefix backend run prisma:generate
       - name: Install frontend dependencies
         run: npm --prefix frontend ci
+      - name: Install agent dependencies
+        run: npm --prefix agent ci
       - name: Run project checks
         run: npm run check
 
@@ -90,3 +93,18 @@ jobs:
       - name: Stop services
         if: always()
         run: ./start.sh --stop || true
+
+  docker-build:
+    name: Docker build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BACKEND_ENV_FILE: ./backend/.env.production.example
+      NPM_REGISTRY: https://registry.npmjs.org
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose files
+        run: npm run verify:compose
+      - uses: docker/setup-buildx-action@v3
+      - name: Build production images
+        run: docker compose -f docker-compose.production.yml build migrate backend frontend

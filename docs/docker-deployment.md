@@ -280,10 +280,8 @@ docker compose -f docker-compose.production.yml stop
 任何改动前先跑：
 
 ```bash
-docker compose -f docker-compose.yml config --quiet
-docker compose -f docker-compose.yml --profile test config --quiet
-BACKEND_ENV_FILE=./backend/.env.production \
-  docker compose -f docker-compose.production.yml config --quiet
+# 根目录执行；生产档默认用 .env.production.example 做结构校验
+npm run verify:compose
 ```
 
 ## 8. 已知边界

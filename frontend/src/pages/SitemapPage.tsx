@@ -166,9 +166,6 @@ export function SitemapPage() {
 
       <footer className="sitemap-footer">
         <span>© 2026 货觉AI</span>
-        <span className="sitemap-footer-note">
-          路由结构对齐参考站设计；条目为本站真实路由
-        </span>
       </footer>
     </div>
   );

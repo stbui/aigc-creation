@@ -329,6 +329,11 @@ export function WorksPage() {
    * 我的作品与素材库的生成图数量对不上。
    */
   const worksCount = useMemo(() => sorted.filter((t) => t.outputAsset).length, [sorted]);
+  /** 可下载的已选作品数。选中失败/生成中的任务时按钮仍需保持禁用。 */
+  const downloadableSelected = useMemo(
+    () => tasks.filter((t) => selected.includes(t.id) && t.outputAsset).length,
+    [tasks, selected],
+  );
   /*
    * 作品被删 / 筛选变化后, 大图查看器的下标可能指向不存在的项。
    * 越界就关掉, 而不是让查看器拿着 undefined 渲染一屏空白。
@@ -736,6 +741,8 @@ export function WorksPage() {
         <button
           type="button"
           className="my-works-download"
+          disabled={downloadableSelected === 0}
+          title={downloadableSelected === 0 ? '请先选择已生成成功的作品' : undefined}
           onClick={downloadSelected}
         >
           <span className="my-works-select-box" aria-hidden="true" />
@@ -763,7 +770,11 @@ export function WorksPage() {
       {selected.length > 0 && (
         <div className="my-works-selection-bar">
           <span>已选 {selected.length} 个作品</span>
-          <button type="button" onClick={downloadSelected}>
+          <button
+            type="button"
+            disabled={downloadableSelected === 0}
+            onClick={downloadSelected}
+          >
             <Download size={11} /> 下载所选
           </button>
           <button
@@ -822,6 +833,15 @@ export function WorksPage() {
                 ? '视频作品来自「图生视频」能力，完成后会出现在这里。'
                 : '完成一次创作后，作品会出现在这里。'}
           </p>
+          {activeFilterCount === 0 && (
+            <button
+              type="button"
+              className="my-works-empty-action"
+              onClick={() => navigate('/workbench')}
+            >
+              去创作
+            </button>
+          )}
         </div>
       ) : (
         <>

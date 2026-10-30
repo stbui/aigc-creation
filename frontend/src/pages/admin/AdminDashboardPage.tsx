@@ -1,17 +1,21 @@
-import { lazy, Suspense, useState, type ComponentType } from 'react';
+import { lazy, Suspense, useState, type ComponentType, type ReactNode } from 'react';
 import { Button, Segmented } from 'antd';
 import { Navigate, Route, Routes, useLocation, useNavigate, Link } from 'react-router-dom';
 import { adminApi } from '../../lib/api';
 import { useAuth } from '../../context/AuthContext';
 import { useAdmin } from '../../context/AdminContext';
-import { Activity, ChevronRight, ImageOff, Users } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { AdminLayout, AdminPageLoading, findAdminMenuItem } from '../../components/admin/AdminLayout';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { ExceptionPage } from '../../components/ExceptionPage';
-import { PageHeader, StatusTag } from '../../components/admin/PageHeader';
+import { PageHeader } from '../../components/admin/PageHeader';
 import { AdminStaleError, useAdminResource } from '../../components/admin/AdminWidgets';
+import { DutyChannelTower, duration, earliestFailure } from '../../components/admin/DutyBand';
+import { useDuty, type DutyTask } from '../../components/admin/DutyContext';
 import { toAbsoluteUrl } from '../../lib/api';
 import { taskErrorLabel } from '../../lib/admin-error-codes';
+import { adminOrderDetailHref, adminTaskHref } from '../../lib/admin-links';
+import type { AdminOrderRow, AdminOverview } from '../../types/api';
 
 /**
  * 后台子路由按页加载。
@@ -94,9 +98,19 @@ const AdminAigcLabelPage = lazyAdminPage(
 const AdminAlertsPage = lazyAdminPage(() => import('./AdminAlertsPage'), 'AdminAlertsPage');
 
 /**
- * 平台概览页 (M2 骨架)。
+ * 平台概览（值班台）。
  *
- * 交易域相关指标在 M9 上线前不出现 —— 不填0 值占位, 空卡片比没有更困惑。
+ * ## 首屏只回答三件事
+ *
+ * 有什么坏了（异常队列）→ 机器还在不在转（机器状态）→ 最近产出了什么
+ * （产出条）。此前首屏是十几张同权重的指标卡，异常淹没在正常里；现在
+ * 只有「需要动作」的东西占据第一屏，累计指标下沉到带分隔线的区块。
+ *
+ * ## 与值班带同源
+ *
+ * 带子（外壳里的 128px 深色仪表带）与这里的队列读同一份 DutyContext 快照，
+ * 不会出现「带子里 6 条异常、队列里 5 条」。财务没有 task.read：队列换成
+ * 待付订单，机器状态换成交易指标，不请求任务接口。
  */
 function DashboardContent() {
   const [days, setDays] = useState<number>(7);
@@ -108,6 +122,10 @@ function DashboardContent() {
     () => adminApi.overview(days),
     [days],
   );
+  const { data: duty } = useDuty();
+  const { can } = useAdmin();
+  /* 财务没有任务读权: 队列、产出条、任务趋势整体换成交易视角 */
+  const isFinance = !can('task.read');
 
   // 首屏骨架: 只有完全没有数据时才塌整页
   if (loading && !data) return <AdminPageLoading tip="加载统计数据…" />;
@@ -129,22 +147,23 @@ function DashboardContent() {
   }
   if (!data) return null;
 
-  const t = data.totals;
   const c = data.commerce;
   const w = data.window;
-  const cmp = data.comparison;
-  const maxTrend = Math.max(...data.trend.map((d) => d.total), 1);
-  const activeNow = t.running + t.pending;
-  // 收入柱高以窗口内峰值为基准; 全 0 时取 1 避免除零
-  const revPeak = Math.max(...c.revenueTrend.map((d) => d.gmvCents), 1);
+  const tasks = duty?.tasks ?? [];
+  /*
+   * 带子上的「近 1 小时失败」与队列里的失败不是同一个时间窗：队列是最新
+   * 74 条快照里的全部失败。把最早那条的时刻写到标题旁，读的人不用自己
+   * 去对「带子说 0、队列有 4 条」这件事。
+   */
+  const firstFailure = earliestFailure(tasks);
 
   return (
     <>
       <PageHeader
         title="平台概览"
-        description={`用户、内容与生成任务的整体运行情况 · 数据截至 ${new Date(
+        description={`${isFinance ? '经营' : '生成与经营'} · 近 ${days} 天 · 截至 ${hhmm(
           data.generatedAt,
-        ).toLocaleTimeString('zh-CN', { hour12: false })}（${data.cacheTtlSeconds} 秒缓存）`}
+        )} · 每 ${data.cacheTtlSeconds} 秒刷新`}
         actions={
           <>
             <Segmented
@@ -163,426 +182,608 @@ function DashboardContent() {
       {error && <AdminStaleError error={error} onRetry={() => void reload()} />}
 
       {/*
-       * 统计卡分两层: 前两张为「规模」主指标(带图标与强调底), 其余为次级指标。
-       * 六张同权重平铺会让视线无处落点 —— 用户看不出哪个数最重要。
+       * 首屏双栏: 左 62% 给需要动作的队列, 右 38% 给机器状态。
+       * 不等分 —— 队列是「要做的事」, 通道是「要确认的环境」, 前者优先。
        */}
-      <div className="adm-stat-grid">
-        <div className="adm-stat is-primary">
-          <div className="adm-stat-head">
-            <span className="adm-stat-label">用户总数</span>
-            <Users className="adm-stat-icon" size={16} />
-          </div>
-          <div className="adm-stat-value">{t.users.toLocaleString('zh-CN')}</div>
-          <div className="adm-stat-hint">近 {days} 天新增 {t.newUsers}</div>
-        </div>
-
-        <div className="adm-stat is-primary">
-          <div className="adm-stat-head">
-            <span className="adm-stat-label">任务总数</span>
-            <Activity className="adm-stat-icon" size={16} />
-          </div>
-          <div className="adm-stat-value">{t.tasks.toLocaleString('zh-CN')}</div>
-          <div className="adm-stat-hint">
-            成功 {t.succeeded} · 失败 {t.failed}
-          </div>
-        </div>
-
-        <div className="adm-stat">
-          <div className="adm-stat-head">
-            <span className="adm-stat-label">成功率</span>
-          </div>
-          {/* null 表示窗口内无已完成任务 —— 显示「—」而非 0%, 0% 会被误读为全部失败 */}
-          <div
-            className={`adm-stat-value${
-              t.successRate !== null && t.successRate < 90 ? ' is-danger' : ''
-            }`}
+      <div className="adm-deck">
+        {isFinance ? (
+          <Block
+            title="待办队列"
+            note={duty ? `最早 ${duty.orders.length} 笔待付 · 按创建时间` : '读取中…'}
+            action={
+              <Link className="adm-block-link" to="/admin/orders?status=pending">
+                全部待付订单
+              </Link>
+            }
           >
-            {t.successRate === null ? '—' : `${t.successRate}%`}
-          </div>
-          <div className="adm-stat-hint">
-            {t.successRate === null ? '暂无已完成任务' : '已完成的成功占比'}
-          </div>
-        </div>
+            <OrderQueue orders={duty?.orders ?? []} loading={!duty} />
+          </Block>
+        ) : (
+          <Block
+            title="异常队列"
+            note={
+              duty
+                ? `最近 ${tasks.length} 条任务中的失败${
+                    firstFailure ? ` · 最早 ${queueTime(firstFailure.createdAt)}` : ' · 无'
+                  }`
+                : '读取中…'
+            }
+            action={
+              <Link className="adm-block-link" to="/admin/tasks?status=failed">
+                全部失败任务
+              </Link>
+            }
+          >
+            <FailureQueue tasks={tasks} loading={!duty} />
+          </Block>
+        )}
 
-        <div className="adm-stat">
-          <div className="adm-stat-head">
-            <span className="adm-stat-label">进行中</span>
-          </div>
-          <div className="adm-stat-value">{activeNow}</div>
-          <div className="adm-stat-hint">运行 {t.running} · 等待 {t.pending}</div>
-        </div>
-
-        <div className="adm-stat">
-          <div className="adm-stat-head">
-            <span className="adm-stat-label">项目</span>
-          </div>
-          <div className="adm-stat-value">{t.projects.toLocaleString('zh-CN')}</div>
-          <div className="adm-stat-hint">用户创建的项目总数</div>
-        </div>
-
-        <div className="adm-stat">
-          <div className="adm-stat-head">
-            <span className="adm-stat-label">素材</span>
-          </div>
-          <div className="adm-stat-value">{t.assets.toLocaleString('zh-CN')}</div>
-          <div className="adm-stat-hint">上传 {t.originals} · 生成 {t.generated}</div>
-        </div>
+        <Block
+          title="机器状态"
+          note={
+            isFinance
+              ? `近 ${days} 天汇总`
+              : duty
+                ? duty.cooling > 0
+                  ? `${duty.cooling} 条线路冷却中`
+                  : '线路全部可用'
+                : '读取中…'
+          }
+          action={
+            !isFinance && can('model.config_read') ? (
+              <Link className="adm-block-link" to="/admin/model-config">
+                模型配置
+              </Link>
+            ) : undefined
+          }
+        >
+          {isFinance ? (
+            <FinanceGrid commerce={c} days={days} />
+          ) : (
+            <div className="adm-machine">
+              <DutyChannelTower limit={4} />
+              <MachineStats tasks={tasks} />
+            </div>
+          )}
+        </Block>
       </div>
 
       {/*
-       * 窗口表现：与上面的累计口径分开。
-       *
-       * 「任务总数 / 成功率」是历史累计，运营真正要看的是「最近这一档在变好
-       * 还是变坏」。环比用紧邻的等长窗口，不用累计做分母 —— 否则任何窗口
-       * 看起来都在增长。
+       * 窗口表现：与首屏的实时读数分开。
+       * 「任务总量 / 成功率」是历史累计，运营真正要看的是「最近这一档在变好
+       * 还是变坏」，所以环比用紧邻的等长窗口做分母。
        */}
-      <div className="adm-panel">
-        <div className="adm-panel-title">
-          近 {days} 天表现
-          <span className="adm-panel-note">对比上一个 {days} 天</span>
-        </div>
-        <div className="adm-stat-grid">
-          <div className="adm-stat is-primary">
-            <div className="adm-stat-head">
-              <span className="adm-stat-label">任务量</span>
-              <Activity className="adm-stat-icon" size={16} />
-            </div>
-            <div className="adm-stat-value">{w.tasks.toLocaleString('zh-CN')}</div>
-            <div className="adm-stat-hint">
-              <Delta current={w.tasks} previous={cmp.tasks} /> · 上一窗口 {cmp.tasks}
-            </div>
-          </div>
-
-          <div className="adm-stat">
-            <div className="adm-stat-head">
-              <span className="adm-stat-label">成功率</span>
-            </div>
-            <div
-              className={`adm-stat-value${
-                w.successRate !== null && w.successRate < 90 ? ' is-danger' : ''
-              }`}
-            >
-              {w.successRate === null ? '—' : `${w.successRate}%`}
-            </div>
-            <div className="adm-stat-hint">
-              <Delta current={w.successRate} previous={cmp.successRate} unit="pp" /> · 成功{' '}
-              {w.succeeded} · 失败 {w.failed}
-            </div>
-          </div>
-
-          <div className="adm-stat">
-            <div className="adm-stat-head">
-              <span className="adm-stat-label">新增用户</span>
-              <Users className="adm-stat-icon" size={16} />
-            </div>
-            <div className="adm-stat-value">{w.revenue.usersNew.toLocaleString('zh-CN')}</div>
-            <div className="adm-stat-hint">
-              <Delta current={w.revenue.usersNew} previous={cmp.usersNew} /> · 上一窗口{' '}
-              {cmp.usersNew}
-            </div>
-          </div>
-
-          <div className="adm-stat">
-            <div className="adm-stat-head">
-              <span className="adm-stat-label">营收</span>
-            </div>
-            <div className="adm-stat-value">¥{yuan(w.revenue.gmvCents)}</div>
-            <div className="adm-stat-hint">
-              <Delta current={w.revenue.gmvCents} previous={cmp.gmvCents} /> · 上一窗口 ¥
-              {yuan(cmp.gmvCents, 0)}
-            </div>
-          </div>
-
-          <div className="adm-stat">
-            <div className="adm-stat-head">
-              <span className="adm-stat-label">支付订单</span>
-            </div>
-            <div className="adm-stat-value">{w.revenue.paidOrders.toLocaleString('zh-CN')}</div>
-            <div className="adm-stat-hint">
-              <Delta current={w.revenue.paidOrders} previous={cmp.paidOrders} /> · 上一窗口{' '}
-              {cmp.paidOrders}
-            </div>
-          </div>
-
-          <div className="adm-stat">
-            <div className="adm-stat-head">
-              <span className="adm-stat-label">退款</span>
-            </div>
-            <div className={`adm-stat-value${w.revenue.refundedCents > 0 ? ' is-danger' : ''}`}>
-              ¥{yuan(w.revenue.refundedCents)}
-            </div>
-            <div className="adm-stat-hint">
-              <Delta current={w.revenue.refundedCents} previous={cmp.refundedCents} inverse /> ·
-              上一窗口 ¥{yuan(cmp.refundedCents, 0)}
-            </div>
-          </div>
-        </div>
+      <div className="adm-fold">
+        <Block title={`近 ${days} 天`} note={`对比上一个 ${days} 天`}>
+          <WindowStrip data={data} isFinance={isFinance} />
+        </Block>
       </div>
 
-      {/* 失败原因榜：只给数量没有意义，运营要知道「该找通道还是找代码」 */}
-      <div className="adm-panel">
-        <div className="adm-panel-title">
-          近 {days} 天失败原因
-          <span className="adm-panel-note">
-            {w.failed > 0 ? (
-              <Link className="adm-link" to="/admin/tasks?status=failed">
-                查看失败任务
+      {!isFinance && (
+        <div className="adm-fold">
+          <Block
+            title="最近产出"
+            note={`最近 ${tasks.length} 条任务里的成功产出 · 最多 ${FRAME_LIMIT} 张`}
+            action={
+              <Link className="adm-block-link" to="/admin/tasks">
+                前往任务监控
               </Link>
+            }
+          >
+            <OutputStrip tasks={tasks} />
+          </Block>
+        </div>
+      )}
+
+      {!isFinance && (
+        <div className="adm-fold">
+          <Block title="任务趋势" note={`近 ${days} 天 · 有失败的日子标红`}>
+            <TrendChart
+              ariaLabel={`近 ${days} 天每日任务量`}
+              empty="所选窗口内没有任务记录"
+              items={data.trend.map((d) => ({
+                key: d.date,
+                date: d.date,
+                value: d.total,
+                text: String(d.total),
+                title: `${d.date} · ${d.total} 个任务 · 失败 ${d.failed}`,
+                warn: d.failed > 0,
+              }))}
+            />
+          </Block>
+        </div>
+      )}
+
+      {!isFinance && (
+        <div className="adm-fold">
+          <Block
+            title="失败原因"
+            note={w.failed > 0 ? `近 ${days} 天共 ${w.failed} 条失败` : `近 ${days} 天没有失败任务`}
+            action={
+              w.failed > 0 ? (
+                <Link className="adm-block-link" to="/admin/tasks?status=failed">
+                  查看失败任务
+                </Link>
+              ) : undefined
+            }
+          >
+            {w.failed === 0 ? (
+              <div className="adm-empty-inline is-ok">近 {days} 天没有失败任务</div>
             ) : (
-              '暂无失败任务'
+              <div className="adm-mix-list">
+                {w.failureReasons.map((reason) => (
+                  <div key={reason.errorCode} className="adm-mix-row">
+                    <span className="adm-mix-label" title={reason.errorCode}>
+                      {taskErrorLabel(reason.errorCode)}
+                    </span>
+                    <span className="adm-mix-track" aria-hidden="true">
+                      <span
+                        className="adm-mix-fill is-danger"
+                        style={{ width: `${Math.max((reason.count / w.failed) * 100, 2)}%` }}
+                      />
+                    </span>
+                    <span className="adm-mix-value">
+                      {reason.count} 个 · {Math.round((reason.count / w.failed) * 100)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
             )}
-          </span>
+          </Block>
         </div>
-        {w.failed === 0 ? (
-          <div className="adm-empty">近 {days} 天没有失败任务</div>
-        ) : (
-          <div className="adm-mix-list">
-            {w.failureReasons.map((reason) => (
-              <div key={reason.errorCode} className="adm-mix-row">
-                <span className="adm-mix-label" title={reason.errorCode}>
-                  {taskErrorLabel(reason.errorCode)}
-                </span>
-                <span className="adm-mix-track" aria-hidden="true">
-                  <span
-                    className="adm-mix-fill is-danger"
-                    style={{ width: `${Math.max((reason.count / w.failed) * 100, 2)}%` }}
-                  />
-                </span>
-                <span className="adm-mix-value">
-                  {reason.count} 个 · {Math.round((reason.count / w.failed) * 100)}%
-                </span>
+      )}
+
+      <div className="adm-fold">
+        <Block
+          title="收入"
+          note={`近 ${days} 天 ¥${yuan(c.gmvWindowCents)} · 累计 ¥${yuan(c.gmvCents)}`}
+        >
+          <div className="adm-split">
+            <div className="adm-split-col">
+              <div className="adm-subhead">
+                收入趋势<span>按支付时间 · 单位: 元</span>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/*
-       * 交易概览单独成块: 创作侧指标都在涨、营收却停滞, 是运营最需要看见的信号。
-       * 与上面六张卡混排会让人以为 GMV 是"任务数"的另一种说法。
-       */}
-      <div className="adm-panel">
-        <div className="adm-panel-title">
-          交易概览
-          <span className="adm-panel-note">
-            累计 GMV ¥{yuan(c.gmvCents)} · 近 {days} 天 ¥{yuan(c.gmvWindowCents)}
-          </span>
-        </div>
-        <div className="adm-stat-grid">
-          <div className="adm-stat is-primary">
-            <div className="adm-stat-head">
-              <span className="adm-stat-label">近 {days} 天营收</span>
+              <TrendChart
+                ariaLabel={`近 ${days} 天每日收入`}
+                empty="所选窗口内没有支付记录"
+                items={c.revenueTrend.map((d) => ({
+                  key: d.date,
+                  date: d.date,
+                  value: d.gmvCents,
+                  text: yuan(d.gmvCents, 0),
+                  title: `${d.date} · ¥${yuan(d.gmvCents)} · ${d.orders} 单`,
+                }))}
+              />
             </div>
-            <div className="adm-stat-value">¥{yuan(c.gmvWindowCents)}</div>
-            <div className="adm-stat-hint">按支付时间统计 · 实付金额</div>
-          </div>
-
-          <div className="adm-stat">
-            <div className="adm-stat-head">
-              <span className="adm-stat-label">支付成功率</span>
-            </div>
-            {/* null = 无支付流水, 展示「—」而不是 0% */}
-            <div className="adm-stat-value">
-              {c.paymentSuccessRate === null ? '—' : `${c.paymentSuccessRate}%`}
-            </div>
-            <div className="adm-stat-hint">
-              {c.paymentSuccessRate === null ? '暂无支付流水' : `成功 ${c.orders.paid} 单`}
-            </div>
-          </div>
-
-          <div className="adm-stat">
-            <div className="adm-stat-head">
-              <span className="adm-stat-label">待付订单</span>
-            </div>
-            <div className="adm-stat-value">{c.orders.pending}</div>
-            <div className="adm-stat-hint">金额 ¥{yuan(c.pendingCents)}</div>
-          </div>
-
-          <div className="adm-stat">
-            <div className="adm-stat-head">
-              <span className="adm-stat-label">近 {days} 天退款</span>
-            </div>
-            <div className={`adm-stat-value${c.refundedWindowCents > 0 ? ' is-danger' : ''}`}>
-              ¥{yuan(c.refundedWindowCents)}
-            </div>
-            <div className="adm-stat-hint">累计 ¥{yuan(c.refundedCents)}</div>
-          </div>
-
-          <div className="adm-stat">
-            <div className="adm-stat-head">
-              <span className="adm-stat-label">有效会员</span>
-            </div>
-            <div className="adm-stat-value">{c.members.active.toLocaleString('zh-CN')}</div>
-            <div className="adm-stat-hint">近 {days} 天新增 {c.members.newInWindow}</div>
-          </div>
-
-          <div className="adm-stat">
-            <div className="adm-stat-head">
-              <span className="adm-stat-label">积分发放</span>
-            </div>
-            <div className="adm-stat-value">{c.credits.grantedInWindow.toLocaleString('zh-CN')}</div>
-            <div className="adm-stat-hint">窗口内消耗 {c.credits.consumedInWindow.toLocaleString('zh-CN')}</div>
-          </div>
-        </div>
-
-        {/* 收入趋势: 与任务趋势同一套柱状语言, 只换数据源与单位 */}
-        <div className="adm-trend-title">
-          收入趋势
-          <span className="adm-panel-note">按支付时间 · 单位: 元</span>
-        </div>
-        {c.revenueTrend.every((d) => d.gmvCents === 0) ? (
-          <div className="adm-empty">所选窗口内没有支付记录</div>
-        ) : (
-          <div className="adm-trend">
-            <div className="adm-trend-grid" aria-hidden="true">
-              {[100, 75, 50, 25, 0].map((p) => (
-                <div key={p} className="adm-trend-gridline" style={{ bottom: `${p}%` }} />
-              ))}
-            </div>
-            {c.revenueTrend.map((d) => {
-              const h = Math.round((d.gmvCents / revPeak) * 100);
-              return (
-                <div key={d.date} className="adm-trend-col">
-                  <div className="adm-trend-bar-wrap">
-                    <div
-                      className="adm-trend-bar"
-                      style={{ height: `${Math.max(h, d.gmvCents > 0 ? 3 : 0)}%` }}
-                      title={`${d.date} · ¥${yuan(d.gmvCents)} · ${d.orders} 单`}
-                    >
-                      {d.gmvCents > 0 && <span className="adm-trend-value">{yuan(d.gmvCents, 0)}</span>}
-                    </div>
-                  </div>
-                  <div className="adm-trend-label">{d.date.slice(5).replace('-', '/')}</div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* 渠道构成: 总额之外回答「钱从哪个渠道来」，退款/对账优先看占比高的 */}
-        <div className="adm-trend-title">
-          收入渠道构成
-          <span className="adm-panel-note">近 {days} 天 · 按实付金额</span>
-        </div>
-        {c.channelMix.length === 0 ? (
-          <div className="adm-empty">所选窗口内没有支付记录</div>
-        ) : (
-          <div className="adm-mix-list">
-            {c.channelMix.map((ch) => (
-              <div key={ch.channel} className="adm-mix-row">
-                <span className="adm-mix-label">
-                  {CHANNEL_LABELS[ch.channel] ?? ch.channel}
-                </span>
-                <span className="adm-mix-track" aria-hidden="true">
-                  <span
-                    className="adm-mix-fill"
-                    style={{
-                      width: `${Math.max((ch.gmvCents / Math.max(c.gmvWindowCents, 1)) * 100, 2)}%`,
-                    }}
-                  />
-                </span>
-                <span className="adm-mix-value">
-                  ¥{yuan(ch.gmvCents, 0)} · {ch.orders} 单
-                </span>
+            <div className="adm-split-col">
+              <div className="adm-subhead">
+                渠道构成<span>近 {days} 天 · 按实付金额</span>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* 趋势: 柱状 + 网格基线, 让"有多少"可被目测而非读数 */}
-      <div className="adm-panel">
-        <div className="adm-panel-title">
-          任务趋势
-          <span className="adm-panel-note">近 {days} 天 · 峰值 {maxTrend} 个/天</span>
-        </div>
-        {data.trend.every((d) => d.total === 0) ? (
-          <div className="adm-empty">所选窗口内没有任务记录</div>
-        ) : (
-          <div className="adm-trend">
-            {/* 网格线: 给柱状图一个基准, 否则高度无从判断 */}
-            <div className="adm-trend-grid" aria-hidden="true">
-              {[100, 75, 50, 25, 0].map((p) => (
-                <div key={p} className="adm-trend-gridline" style={{ bottom: `${p}%` }} />
-              ))}
-            </div>
-            {data.trend.map((d) => {
-              const h = Math.round((d.total / maxTrend) * 100);
-              const hasFailed = d.failed > 0;
-              return (
-                <div key={d.date} className="adm-trend-col">
-                  <div className="adm-trend-bar-wrap">
-                    {/* 有失败任务时用警示色标出: 趋势图不能只展示成功的一面 */}
-                    <div
-                      className={`adm-trend-bar${hasFailed ? ' has-failed' : ''}`}
-                      style={{ height: `${Math.max(h, d.total > 0 ? 3 : 0)}%` }}
-                    >
-                      {d.total > 0 && <span className="adm-trend-value">{d.total}</span>}
+              {c.channelMix.length === 0 ? (
+                <div className="adm-empty-inline">所选窗口内没有支付记录</div>
+              ) : (
+                <div className="adm-mix-list">
+                  {c.channelMix.map((ch) => (
+                    <div key={ch.channel} className="adm-mix-row">
+                      <span className="adm-mix-label">
+                        {CHANNEL_LABELS[ch.channel] ?? ch.channel}
+                      </span>
+                      <span className="adm-mix-track" aria-hidden="true">
+                        <span
+                          className="adm-mix-fill"
+                          style={{
+                            width: `${Math.max((ch.gmvCents / Math.max(c.gmvWindowCents, 1)) * 100, 2)}%`,
+                          }}
+                        />
+                      </span>
+                      <span className="adm-mix-value">
+                        ¥{yuan(ch.gmvCents, 0)} · {ch.orders} 单
+                      </span>
                     </div>
-                  </div>
-                  <div className="adm-trend-label">{d.date.slice(5).replace('-', '/')}</div>
+                  ))}
                 </div>
-              );
-            })}
+              )}
+            </div>
           </div>
-        )}
-      </div>
-
-      <div className="adm-panel">
-        <div className="adm-panel-title">
-          最近任务
-          <span className="adm-panel-note">
-            <Link className="adm-link" to="/admin/tasks">
-              前往任务监控
-            </Link>
-          </span>
-        </div>
-        <ul className="adm-task-list">
-          {data.recentTasks.map((task) => (
-            <li key={task.id}>
-              <Link
-                className="adm-task-item"
-                to={`/admin/tasks?id=${encodeURIComponent(task.id)}`}
-                aria-label={`查看任务详情：${task.capabilityName} ${task.id.slice(-8)}`}
-              >
-                {task.thumbnailUrl ? (
-                  <img
-                    className="adm-task-thumb"
-                    src={toAbsoluteUrl(task.thumbnailUrl)}
-                    alt=""
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="adm-task-thumb is-empty">
-                    <ImageOff size={14} />
-                  </div>
-                )}
-
-                <div className="adm-task-main">
-                  {/* 能力名是主信息, 加重; 其余降级为次要信息 */}
-                  <div className="adm-task-name">{task.capabilityName}</div>
-                  <div className="adm-task-meta">
-                    <StatusTag status={task.status} />
-                    {task.provider && <span className="adm-task-provider">{task.provider}</span>}
-                    <code className="adm-task-id">{task.id.slice(-8)}</code>
-                  </div>
-                </div>
-
-                <div className="adm-task-time">
-                  {/* 相对时间用于快速判断新鲜度, 绝对时间保留在title 里供核对 */}
-                  <span title={new Date(task.createdAt).toLocaleString('zh-CN')}>
-                    {formatRelative(task.createdAt)}
-                  </span>
-                </div>
-                <ChevronRight className="adm-task-arrow" size={14} aria-hidden="true" />
-              </Link>
-            </li>
-          ))}
-          {data.recentTasks.length === 0 && <div className="adm-empty">暂无任务记录</div>}
-        </ul>
+        </Block>
       </div>
     </>
   );
+}
+
+/* ── 首屏构件 ────────────────────────────────────────────────────────────── */
+
+/** 队列最多列几条：再多就不叫队列，剩下的去任务页筛 */
+const QUEUE_LIMIT = 6;
+/** 产出条最多几帧：1440 宽下正好两行 */
+const FRAME_LIMIT = 24;
+
+/** 任务通道 → 中文。未登记的原样显示，便于发现新增通道 */
+const PROVIDER_LABELS: Record<string, string> = {
+  gateway: '真实模型',
+  local: '历史本地结果',
+  pending: '待执行',
+};
+
+/**
+ * 区块：一行标题 + 说明 + 右侧入口。
+ *
+ * 不画卡片：区块之间只隔一条发丝线，页面读起来是一张工作表而不是一堆盒子。
+ */
+function Block({
+  title,
+  note,
+  action,
+  children,
+}: {
+  title: string;
+  note?: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="adm-block">
+      <header className="adm-block-head">
+        <h2 className="adm-block-title">{title}</h2>
+        {note && <span className="adm-block-note">{note}</span>}
+        {action && <span className="adm-block-action">{action}</span>}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+/**
+ * 异常队列。
+ *
+ * 最早的在最上面：值班带的主按钮「接手最早异常」跳到的那条，就是这里的
+ * 第一行 —— 带子与队列指向同一条任务，人不需要再找一次。
+ */
+function FailureQueue({ tasks, loading }: { tasks: DutyTask[]; loading: boolean }) {
+  const failures = tasks
+    .filter((t) => t.status === 'failed')
+    .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt));
+  const shown = failures.slice(0, QUEUE_LIMIT);
+
+  if (loading && tasks.length === 0) {
+    return <div className="adm-empty-inline">读取任务快照…</div>;
+  }
+  if (shown.length === 0) {
+    return (
+      <div className="adm-empty-inline is-ok">
+        最近 {tasks.length} 条任务没有失败 —— 暂时没有需要接手的异常。
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <ol className="adm-queue">
+        {shown.map((t, i) => (
+          <li key={t.id}>
+            <Link className="adm-queue-row" to={adminTaskHref(t.id)}>
+              <span className="adm-queue-seq">{String(i + 1).padStart(2, '0')}</span>
+              <span className="adm-queue-main">
+                <span className="adm-queue-title">
+                  {/* 状态点先于文字：一列红点让「这是异常」在扫视时成立 */}
+                  <span className="adm-status-dot is-danger" aria-hidden="true" />
+                  {t.capabilityName}
+                </span>
+                <span className="adm-queue-sub">
+                  {/* 错误码放在原因前面：排障时先拿码去查日志 */}
+                  {t.errorCode ? `${t.errorCode} · ` : ''}
+                  {taskErrorLabel(t.errorCode)}
+                  {/*
+                   * `pending` 是建任务时的初值：失败任务上写「待执行」会与
+                   * 同一行的失败原因互相矛盾，与任务列表列的处理保持一致。
+                   */}
+                  {t.provider && t.provider !== 'pending'
+                    ? ` · ${PROVIDER_LABELS[t.provider] ?? t.provider}`
+                    : ''}
+                  {` · ${duration(t.durationMs)}`}
+                </span>
+              </span>
+              <span className="adm-queue-time" title={new Date(t.createdAt).toLocaleString('zh-CN')}>
+                {queueTime(t.createdAt)}
+              </span>
+              <ChevronRight className="adm-queue-arrow" size={14} aria-hidden="true" />
+            </Link>
+          </li>
+        ))}
+      </ol>
+      {failures.length > shown.length && (
+        <p className="adm-queue-more">
+          <Link className="adm-block-link" to="/admin/tasks?status=failed">
+            另有 {failures.length - shown.length} 条失败任务 →
+          </Link>
+        </p>
+      )}
+    </>
+  );
+}
+
+/**
+ * 最近一批已结算任务的成功率与中位耗时。
+ *
+ * 样本是最近 100 条任务里的已完成项，不是全量 —— 说明里写明，避免被
+ * 读成「平台历史成功率」。
+ */
+function MachineStats({ tasks }: { tasks: DutyTask[] }) {
+  const finished = tasks.filter((t) => t.status === 'succeeded' || t.status === 'failed');
+  const ok = finished.filter((t) => t.status === 'succeeded').length;
+  const rate = finished.length > 0 ? Math.round((ok / finished.length) * 100) : null;
+  const durations = finished
+    .map((t) => t.durationMs)
+    .filter((ms) => ms >= 0)
+    .sort((a, b) => a - b);
+  const median = durations.length > 0 ? durations[Math.floor(durations.length / 2)] : null;
+
+  return (
+    <dl className="adm-machine-stats">
+      <div>
+        {/* 「近期」是要紧的限定：下面还有一条近 N 天的成功率，不区分会被读成打架 */}
+        <dt title={`最近 ${tasks.length} 条任务中的已结算项`}>近期成功率</dt>
+        <dd className={rate !== null && rate < 90 ? 'is-danger' : undefined}>
+          {rate === null ? '—' : `${rate}%`}
+        </dd>
+      </div>
+      <div>
+        <dt>中位耗时</dt>
+        <dd>{median === null ? '—' : duration(median)}</dd>
+      </div>
+      <div>
+        <dt>样本</dt>
+        <dd>{finished.length}</dd>
+      </div>
+    </dl>
+  );
+}
+
+/** 产出条：最近成功的图，点开就是那条任务的详情抽屉 */
+function OutputStrip({ tasks }: { tasks: DutyTask[] }) {
+  const frames = tasks
+    .filter((t) => t.status === 'succeeded' && t.thumbnailUrl)
+    .slice(0, FRAME_LIMIT);
+
+  if (frames.length === 0) {
+    return <div className="adm-empty-inline">最近的任务还没有产出图。</div>;
+  }
+
+  return (
+    <ul className="adm-frames">
+      {frames.map((t) => (
+        <li key={t.id}>
+          <Link
+            className="adm-frame"
+            to={adminTaskHref(t.id)}
+            title={`${t.capabilityName} · ${new Date(t.createdAt).toLocaleString('zh-CN')}`}
+            aria-label={`查看产出任务：${t.capabilityName}`}
+          >
+            <img src={toAbsoluteUrl(t.thumbnailUrl!)} alt="" loading="lazy" />
+            <span className="adm-frame-time">{hhmm(t.createdAt)}</span>
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** 财务待办：最早的几笔待付订单，点开就是订单列表里的同一条 */
+function OrderQueue({ orders, loading }: { orders: AdminOrderRow[]; loading: boolean }) {
+  if (loading) return <div className="adm-empty-inline">读取订单…</div>;
+  if (orders.length === 0) return <div className="adm-empty-inline is-ok">没有待支付订单。</div>;
+
+  return (
+    <ol className="adm-queue">
+      {orders.map((o, i) => (
+        <li key={o.id}>
+          <Link className="adm-queue-row" to={adminOrderDetailHref(o.id)}>
+            <span className="adm-queue-seq">{String(i + 1).padStart(2, '0')}</span>
+            <span className="adm-queue-main">
+              <span className="adm-queue-title">{o.orderNo}</span>
+              <span className="adm-queue-sub">{o.userEmail}</span>
+            </span>
+            <span className="adm-queue-amount">¥{yuan(o.totalCents, 0)}</span>
+            <span className="adm-queue-time" title={new Date(o.createdAt).toLocaleString('zh-CN')}>
+              {hhmm(o.createdAt)}
+            </span>
+            <ChevronRight className="adm-queue-arrow" size={14} aria-hidden="true" />
+          </Link>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+/** 财务视角的机器状态：交易口径的关键读数，不做任务成功率 */
+function FinanceGrid({ commerce, days }: { commerce: AdminOverview['commerce']; days: number }) {
+  const items: Array<{ label: string; value: string; tone?: 'danger' | 'warn' }> = [
+    { label: `近 ${days} 天营收`, value: `¥${yuan(commerce.gmvWindowCents)}` },
+    {
+      label: '支付成功率',
+      value: commerce.paymentSuccessRate === null ? '—' : `${commerce.paymentSuccessRate}%`,
+    },
+    { label: '待付金额', value: `¥${yuan(commerce.pendingCents, 0)}` },
+    {
+      label: `近 ${days} 天退款`,
+      value: `¥${yuan(commerce.refundedWindowCents)}`,
+      tone: commerce.refundedWindowCents > 0 ? 'danger' : undefined,
+    },
+    { label: '有效会员', value: commerce.members.active.toLocaleString('zh-CN') },
+    {
+      label: `近 ${days} 天积分消耗`,
+      value: commerce.credits.consumedInWindow.toLocaleString('zh-CN'),
+    },
+  ];
+
+  return (
+    <dl className="adm-machine-stats is-grid">
+      {items.map((item) => (
+        <div key={item.label}>
+          <dt>{item.label}</dt>
+          <dd className={item.tone ? `is-${item.tone}` : undefined}>{item.value}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/**
+ * 窗口指标带。
+ *
+ * 一行读数 + 环比，替代原来的六张指标卡：数值与「比上一窗口好还是坏」
+ * 挨在一起，扫一眼就有判断，不必在卡片之间来回比对。
+ */
+function WindowStrip({ data, isFinance }: { data: AdminOverview; isFinance: boolean }) {
+  const w = data.window;
+  const cmp = data.comparison;
+
+  const items: Array<{
+    key: string;
+    label: string;
+    value: string;
+    delta: ReactNode;
+    hint: string;
+    danger?: boolean;
+  }> = [
+    ...(isFinance
+      ? []
+      : [
+          {
+            key: 'tasks',
+            label: '任务量',
+            value: w.tasks.toLocaleString('zh-CN'),
+            delta: <Delta current={w.tasks} previous={cmp.tasks} />,
+            hint: `上一窗口 ${cmp.tasks}`,
+          },
+          {
+            key: 'rate',
+            label: '成功率',
+            value: w.successRate === null ? '—' : `${w.successRate}%`,
+            delta: <Delta current={w.successRate} previous={cmp.successRate} unit="pp" />,
+            hint: `失败 ${w.failed} 条`,
+            danger: w.successRate !== null && w.successRate < 90,
+          },
+        ]),
+    {
+      key: 'users',
+      label: '新增用户',
+      value: w.revenue.usersNew.toLocaleString('zh-CN'),
+      delta: <Delta current={w.revenue.usersNew} previous={cmp.usersNew} />,
+      hint: `上一窗口 ${cmp.usersNew}`,
+    },
+    {
+      key: 'gmv',
+      label: '营收',
+      value: `¥${yuan(w.revenue.gmvCents)}`,
+      delta: <Delta current={w.revenue.gmvCents} previous={cmp.gmvCents} />,
+      hint: `上一窗口 ¥${yuan(cmp.gmvCents, 0)}`,
+    },
+    {
+      key: 'paid',
+      label: '支付订单',
+      value: w.revenue.paidOrders.toLocaleString('zh-CN'),
+      delta: <Delta current={w.revenue.paidOrders} previous={cmp.paidOrders} />,
+      hint: `上一窗口 ${cmp.paidOrders}`,
+    },
+    {
+      key: 'refund',
+      label: '退款',
+      value: `¥${yuan(w.revenue.refundedCents)}`,
+      delta: <Delta current={w.revenue.refundedCents} previous={cmp.refundedCents} inverse />,
+      hint: `上一窗口 ¥${yuan(cmp.refundedCents, 0)}`,
+      danger: w.revenue.refundedCents > 0,
+    },
+  ];
+
+  return (
+    <dl className="adm-metrics">
+      {items.map((item) => (
+        <div key={item.key} className={`adm-metric${item.danger ? ' is-danger' : ''}`}>
+          <dt>{item.label}</dt>
+          <dd>
+            <span className="adm-metric-value">{item.value}</span>
+            <span className="adm-metric-delta">{item.delta}</span>
+          </dd>
+          <span className="adm-metric-hint">{item.hint}</span>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/**
+ * 柱状趋势。
+ *
+ * 网格线给柱子一个基准，否则高度无从判断；有失败的日子整根柱子转警示色 ——
+ * 趋势图不能只展示成功的一面。
+ */
+function TrendChart({
+  items,
+  empty,
+  ariaLabel,
+}: {
+  items: Array<{ key: string; date: string; value: number; text: string; title: string; warn?: boolean }>;
+  empty: string;
+  ariaLabel: string;
+}) {
+  if (items.every((i) => i.value === 0)) {
+    return <div className="adm-empty-inline">{empty}</div>;
+  }
+  const peak = Math.max(...items.map((i) => i.value), 1);
+
+  return (
+    <div className="adm-trend" role="img" aria-label={ariaLabel}>
+      <div className="adm-trend-grid" aria-hidden="true">
+        {[100, 75, 50, 25, 0].map((p) => (
+          <div key={p} className="adm-trend-gridline" style={{ bottom: `${p}%` }} />
+        ))}
+      </div>
+      {items.map((d) => {
+        const h = Math.round((d.value / peak) * 100);
+        return (
+          <div key={d.key} className="adm-trend-col">
+            <div className="adm-trend-bar-wrap">
+              <div
+                className={`adm-trend-bar${d.warn ? ' has-failed' : ''}`}
+                style={{ height: `${Math.max(h, d.value > 0 ? 3 : 0)}%` }}
+                title={d.title}
+              >
+                {d.value > 0 && <span className="adm-trend-value">{d.text}</span>}
+              </div>
+            </div>
+            <div className="adm-trend-label">{d.date.slice(5).replace('-', '/')}</div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * 队列时刻。
+ *
+ * 只写 HH:MM 会骗人：队列里的失败可能来自几天前，读起来却像「今天 21:54」，
+ * 甚至晚于页头的「截至时刻」。跨天的行带上月日。
+ */
+function queueTime(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  const now = new Date();
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  const time = hhmm(iso);
+  if (sameDay) return time;
+  return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${time}`;
+}
+
+/** 时刻 → HH:MM。后台用 24 小时制，与日志时间对齐 */
+function hhmm(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' });
 }
 
 /** 支付渠道 → 中文。未登记的原样显示，便于发现新增渠道 */
@@ -650,19 +851,6 @@ function yuan(cents: number, digits = 2): string {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
-}
-
-/** 相对时间: 后台看"新旧"比看"几点几分"更常用 */
-function formatRelative(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime();
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return '刚刚';
-  if (min < 60) return `${min} 分钟前`;
-  const hour = Math.floor(min / 60);
-  if (hour < 24) return `${hour} 小时前`;
-  const day = Math.floor(hour / 24);
-  if (day < 30) return `${day} 天前`;
-  return new Date(iso).toLocaleDateString('zh-CN');
 }
 
 /**

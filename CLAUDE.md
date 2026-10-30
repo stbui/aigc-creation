@@ -141,7 +141,7 @@ aigc-creation/
                             #      --backend-only / --frontend-only / --no-follow
                             #      --daemon（PID 记 .run/start.pids）/ --stop（只停）
 
-# 工程门禁（根目录；Node 版本 + 依赖审计 + 构建 + 前端单测 + 仿真网关）
+# 工程门禁（根目录；Node 版本 + 依赖审计 + 构建 + 前端/agent 单测 + 仿真网关）
 npm run check
 
 # 手动

@@ -1,20 +1,31 @@
 import { useState } from 'react';
 import type { ReactNode } from 'react';
-import { Button, Card, Collapse, Empty, Flex, Space, Tag, Typography } from 'antd';
-import { ChevronRight } from 'lucide-react';
-import { useLocation } from 'react-router-dom';
-import { findAdminMenuGroup, findAdminMenuItem } from './adminNav';
+import { Button, Card, Collapse, Empty, Flex, Space, Tag } from 'antd';
 
-/** 状态语义色 → antd Tag 色值 */
-const TONE_TO_ANTD: Record<TagTone, string> = {
-  success: 'success',
-  danger: 'error',
-  warn: 'warning',
-  brand: 'processing',
-  muted: 'default',
+/** 状态语义色 → .adm-tag 的修饰类（底色与文字色都来自 global.css 的令牌） */
+const TONE_CLASS: Record<TagTone, string> = {
+  success: 'is-success',
+  danger: 'is-danger',
+  warn: 'is-warn',
+  brand: 'is-brand',
+  muted: 'is-muted',
 };
 
-/** 页头: 标题 + 描述 + 操作区 */
+/**
+ * 栏目线（原三行页头）。
+ *
+ * ## 删掉了什么
+ *
+ * 面包屑「运营后台 / 分组 / 页面」：左栏已经标出当前位置，再写一遍只是
+ * 在首屏占掉一行；页头说明段：页面用途一句话足够，长说明移到标题的
+ * 悬停提示里，需要时看，不需要时不占首屏。
+ *
+ * 留下来的只有三样：标题、一行说明、右侧动作。整行 40px，压在内容上方
+ * 一条发丝线下 —— 它是分隔线，不是一块页头装饰。
+ *
+ * `description` 保持字符串入参：29 个页面都传的是纯文本，这里不做
+ * ReactNode 兼容，改文案不会牵出布局差异。
+ */
 export function PageHeader({
   title,
   description,
@@ -24,34 +35,14 @@ export function PageHeader({
   description?: string;
   actions?: ReactNode;
 }) {
-  const location = useLocation();
-  const group = findAdminMenuGroup(location.pathname);
-  const current = findAdminMenuItem(location.pathname);
-
   return (
-    <Flex className="adm-page-head" align="flex-start" justify="space-between" gap={16}>
+    <header className="adm-page-head">
       <div className="adm-page-head-main">
-        <div className="adm-page-kicker" aria-label="当前位置">
-          <span>运营后台</span>
-          <ChevronRight size={12} aria-hidden="true" />
-          <span>{group?.name ?? '工作台'}</span>
-          {current && (
-            <>
-              <ChevronRight size={12} aria-hidden="true" />
-              <strong>{current.label}</strong>
-            </>
-          )}
-        </div>
-        <Typography.Title level={4} className="adm-page-head-title" style={{ margin: 0 }}>
-          {title}
-        </Typography.Title>
+        <h1 className="adm-page-head-title">{title}</h1>
         {description && (
-          <Typography.Paragraph
-            className="adm-page-head-desc"
-            style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}
-          >
+          <p className="adm-page-head-note" title={description}>
             {description}
-          </Typography.Paragraph>
+          </p>
         )}
       </div>
       {actions && (
@@ -59,14 +50,26 @@ export function PageHeader({
           {actions}
         </Space>
       )}
-    </Flex>
+    </header>
   );
 }
 
-/** 筛选条容器 */
-export function FilterBar({ children }: { children: ReactNode }) {
+/**
+ * 筛选条容器。
+ *
+ * 默认是自动换行的 flex：控件少的页面一行放得下，多的页面自然换行。
+ * `className="is-grid"` 换成等宽网格（2 行 × 4 列），用于控件多到换行后
+ * 只剩一个控件、右侧又吊着查询按钮的页面 —— 那种断行的空白比控件本身更显眼。
+ */
+export function FilterBar({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <Flex className="adm-filter" align="center" gap={8} wrap="wrap">
+    <Flex className={`adm-filter${className ? ` ${className}` : ''}`} align="center" gap={8} wrap="wrap">
       {children}
     </Flex>
   );
@@ -164,7 +167,12 @@ export function StatCard({
   );
 }
 
-/** 面板容器 */
+/**
+ * 区块容器。
+ *
+ * 2026-10-29：从 antd Card 换成裸 section —— 后台不使用卡片容器与投影，
+ * 区块之间靠栏目线、发丝线与留白分区。类名保持不变，页面无需改动。
+ */
 export function Panel({
   title,
   note,
@@ -180,11 +188,7 @@ export function Panel({
   children: ReactNode;
 }) {
   return (
-    <Card
-      className={`adm-panel${isNarrow ? ' is-narrow' : ''}`}
-      style={{ padding: 0 }}
-      styles={{ body: { padding: '20px 22px', width: '100%' } }}
-    >
+    <section className={`adm-panel${isNarrow ? ' is-narrow' : ''}`}>
       {title && (
         <div className="adm-panel-title">
           {title}
@@ -193,7 +197,7 @@ export function Panel({
         </div>
       )}
       {children}
-    </Card>
+    </section>
   );
 }
 
@@ -338,8 +342,9 @@ export function StatusTag({
 }) {
   const item = STATUS_META[status] ?? { label: status, tone: 'muted' as TagTone };
   return (
-    <Tag color={TONE_TO_ANTD[tone ?? item.tone]} icon={<span className="adm-tag-dot" aria-hidden="true" />}>
+    <span className={`adm-tag ${TONE_CLASS[tone ?? item.tone]}`}>
+      <span className="adm-tag-dot" aria-hidden="true" />
       {label ?? item.label}
-    </Tag>
+    </span>
   );
 }
