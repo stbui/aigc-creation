@@ -51,16 +51,25 @@ export class CreditService {
     const now = new Date();
     const soon = new Date(now.getTime() + 30 * 24 * 3600 * 1000);
 
-    const lots = await this.prisma.creditLot.findMany({
-      where: { userId, remainingCredits: { gt: 0 } },
-      select: { remainingCredits: true, totalCredits: true, expireAt: true },
-    });
+    const [lots, earnedAgg] = await Promise.all([
+      this.prisma.creditLot.findMany({
+        where: { userId, remainingCredits: { gt: 0 } },
+        select: { remainingCredits: true, expireAt: true },
+      }),
+      // 累计获得是终身口径: 已用尽 / 已过期的批次也曾到账。只汇总
+      // remainingCredits > 0 的批次会让「累计获得 - 累计消耗」小于余额，
+      // 用户拿三个数字一对就以为账错了。
+      this.prisma.creditLot.aggregate({
+        where: { userId },
+        _sum: { totalCredits: true },
+      }),
+    ]);
 
     // 已过期批次不计入余额 —— 但不删记录, 保留供对账追溯
     const valid = lots.filter((l) => !l.expireAt || l.expireAt > now);
 
     const balance = valid.reduce((sum, l) => sum + l.remainingCredits, 0);
-    const totalEarned = lots.reduce((sum, l) => sum + l.totalCredits, 0);
+    const totalEarned = earnedAgg._sum.totalCredits ?? 0;
     const expiringSoon = valid
       .filter((l) => l.expireAt && l.expireAt <= soon)
       .reduce((sum, l) => sum + l.remainingCredits, 0);

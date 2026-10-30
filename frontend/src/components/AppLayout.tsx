@@ -45,6 +45,8 @@ export function AppLayout({ groups, items, thumbs, children }: Props) {
   // 移动端导航抽屉 (≤900px 侧栏 display:none, 参考站 390 实测同构)
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [headerElevated, setHeaderElevated] = useState(false);
+  /** 用户菜单展开态: 仅驱动触发器箭头翻转, 菜单本身仍由 antd 托管 */
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   useEffect(() => {
     setMobileNavOpen(false);
@@ -172,13 +174,25 @@ export function AppLayout({ groups, items, thumbs, children }: Props) {
           {/* 消息铃铛: 未登录时组件自身返回 null */}
           <NotificationBell />
           {token && (
-            <Link to="/credits" className="app-quota">
-              <Wallet size={14} />
-              {balance ? `${balance.balance} 积分` : '积分'}
+            <Link
+              to="/credits"
+              className="app-quota"
+              title="查看积分明细"
+              aria-label={balance ? `积分余额 ${balance.balance}，查看积分明细` : '查看积分明细'}
+            >
+              <Wallet size={14} aria-hidden="true" />
+              <span className="app-quota-num">
+                {balance ? balance.balance.toLocaleString('zh-CN') : '—'}
+              </span>
+              <span className="app-quota-label">积分</span>
             </Link>
           )}
+          {/* 细分割线把「工具 / 余额」与「身份」分开: 右侧只有一处需要强调的东西 —— 余额 */}
+          {token && <span className="app-header-divider" aria-hidden="true" />}
           {token ? (
             <Dropdown
+              placement="bottomRight"
+              onOpenChange={setUserMenuOpen}
               menu={{
                 items: [
                   { key: 'email', label: email ?? '', icon: <UserIcon size={14} />, disabled: true },
@@ -222,11 +236,20 @@ export function AppLayout({ groups, items, thumbs, children }: Props) {
                 ],
               }}
             >
-              <button className="app-user" type="button">
-                <Avatar size={26} className="app-user-avatar">
+              <button
+                className={`app-user${userMenuOpen ? ' is-open' : ''}`}
+                type="button"
+                aria-label="打开账户菜单"
+                aria-haspopup="menu"
+                aria-expanded={userMenuOpen}
+              >
+                <Avatar size={28} className="app-user-avatar">
                   {(email ?? 'U').charAt(0).toUpperCase()}
                 </Avatar>
-                <span className="app-user-email">{email}</span>
+                <span className="app-user-email" title={email ?? ''}>
+                  {email}
+                </span>
+                <ChevronDown size={14} className="app-user-chevron" aria-hidden="true" />
               </button>
             </Dropdown>
           ) : (

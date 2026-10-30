@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Alert, Button, Card, Col, Row, Table, Tabs, Tag } from 'antd';
+import { Button, Card, Col, Pagination, Row, Table, Tabs, Tag } from 'antd';
 import { ShoppingBag, Wallet } from 'lucide-react';
 import { creditsApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useMediaQuery } from '../hooks/useMediaQuery';
 import { PersonalPage } from '../components/PersonalPage';
 import { StateButton, StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
 import type { CreditBalance, CreditLedgerEntry, CreditLot } from '../types/api';
@@ -55,11 +56,79 @@ function formatDay(iso: string | null | undefined): string {
   return d.toLocaleDateString('zh-CN');
 }
 
-const LOT_STATUS: Record<CreditLot['status'], { label: string; color: string }> = {
-  active: { label: '可用', color: '#18a875' },
-  expired: { label: '已过期', color: '#e5484d' },
-  exhausted: { label: '已用尽', color: '#86909c' },
+const LOT_STATUS: Record<CreditLot['status'], string> = {
+  active: '可用',
+  expired: '已过期',
+  exhausted: '已用尽',
 };
+
+/** 每页条数: 桌面表格与窄屏列表共用, 换结构不改分页节奏 */
+const PAGE_SIZE = 20;
+
+/**
+ * 流水的备注口径: 后台人工调整的原文可能含工单号 / 客服姓名,
+ * C 端只展示枚举文案, 不把内部备注透出给用户。
+ */
+function ledgerRemark(row: CreditLedgerEntry): string | null {
+  if (row.type === 'admin_adjust') return '客服调整';
+  return row.reason ?? null;
+}
+
+/**
+ * 窄屏流水列表。
+ *
+ * ≤767px 时不再用表格: 五列在 680px 以下必然被卡片右缘切断,
+ * 用户看到的是半截「变动」「备注」而不是可以横滚的表。改成两行一条:
+ * 第一行类型 + 金额, 第二行时间 + 变动后余额, 备注另起一行。
+ */
+function LedgerList({ rows }: { rows: CreditLedgerEntry[] }) {
+  return (
+    <ul className="credits-mobile-list">
+      {rows.map((row) => {
+        const remark = ledgerRemark(row);
+        return (
+          <li key={row.id} className="credits-mobile-item">
+            <div className="credits-mobile-line">
+              <span className="credits-mobile-title">{LEDGER_LABEL[row.type] ?? row.type}</span>
+              <span className={`credits-amount ${row.amount >= 0 ? 'is-plus' : 'is-minus'}`}>
+                {row.amount >= 0 ? `+${row.amount}` : row.amount}
+              </span>
+            </div>
+            <div className="credits-mobile-meta">
+              <span>{formatDate(row.createdAt)}</span>
+              <span>变动后余额 {row.balanceAfter}</span>
+            </div>
+            {remark && <div className="credits-mobile-note">{remark}</div>}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** 窄屏批次列表: 来源 + 状态一行, 剩余 / 总额 / 到期日一行 */
+function LotList({ rows }: { rows: CreditLot[] }) {
+  return (
+    <ul className="credits-mobile-list">
+      {rows.map((lot) => (
+        <li key={lot.id} className="credits-mobile-item">
+          <div className="credits-mobile-line">
+            <span className="credits-mobile-title">{SOURCE_LABEL[lot.source] ?? lot.source}</span>
+            <Tag variant="filled" className={`credits-status is-${lot.status}`}>
+              {LOT_STATUS[lot.status] ?? LOT_STATUS.active}
+            </Tag>
+          </div>
+          <div className="credits-mobile-meta">
+            <span>
+              剩余 {lot.remainingCredits}，共 {lot.totalCredits}
+            </span>
+            <span>{lot.expireAt ? `${formatDay(lot.expireAt)} 到期` : '长期有效'}</span>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 export function CreditsPage() {
   const navigate = useNavigate();
@@ -70,6 +139,13 @@ export function CreditsPage() {
   const [lots, setLots] = useState<CreditLot[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /*
+   * 表格在窄屏会被卡片右缘切断, 换成列表渲染 (见 LedgerList / LotList)。
+   * 767 是 antd 的 md 边界, 也是 680px 表宽能完整放下的下限。
+   */
+  const narrow = useMediaQuery('(max-width: 767px)');
+  const [ledgerPage, setLedgerPage] = useState(1);
+  const [lotsPage, setLotsPage] = useState(1);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -83,8 +159,15 @@ export function CreditsPage() {
         creditsApi.lots(),
       ]);
       if (b.status === 'fulfilled') setBalance(b.value);
-      if (l.status === 'fulfilled') setLedger(l.value);
-      if (k.status === 'fulfilled') setLots(k.value);
+      if (l.status === 'fulfilled') {
+        setLedger(l.value);
+        // 重新取数后回到第一页, 免得停在一个已经不存在的页码上
+        setLedgerPage(1);
+      }
+      if (k.status === 'fulfilled') {
+        setLots(k.value);
+        setLotsPage(1);
+      }
       if (b.status === 'rejected' && l.status === 'rejected') {
         setError((b.reason as Error)?.message || '积分数据加载失败');
       }
@@ -149,9 +232,11 @@ export function CreditsPage() {
       ),
     },
     {
-      title: '余额',
+      // 这是该笔变动**发生当时**的快照, 不等于当前余额；
+      // 列名叫「余额」会让用户拿它和顶部的 3805 对照, 误以为账错了。
+      title: '变动后余额',
       dataIndex: 'balanceAfter',
-      width: 100,
+      width: 110,
       align: 'right' as const,
     },
     {
@@ -162,8 +247,7 @@ export function CreditsPage() {
        * 后台人工调整的 reason 是运营填写的内部备注，可能含工单号、客服姓名。
        * C 端只展示枚举文案，不把内部原文透出给用户。
        */
-      render: (value: string | null, row: CreditLedgerEntry) =>
-        row.type === 'admin_adjust' ? '客服调整' : (value ?? '—'),
+      render: (_value: string | null, row: CreditLedgerEntry) => ledgerRemark(row) ?? '—',
     },
   ];
 
@@ -187,18 +271,38 @@ export function CreditsPage() {
       dataIndex: 'status',
       width: 100,
       render: (value: CreditLot['status']) => {
-        const status = LOT_STATUS[value] ?? LOT_STATUS.active;
-        return <Tag color={value === 'active' ? 'success' : value === 'expired' ? 'error' : 'default'}>{status.label}</Tag>;
+        // 不用 antd 的 success / error 预设色: 默认绿字在淡绿底上只有 2.41:1,
+        // 状态色统一走 .credits-status 的深色前景。
+        return (
+          <Tag variant="filled" className={`credits-status is-${value}`}>
+            {LOT_STATUS[value] ?? LOT_STATUS.active}
+          </Tag>
+        );
       },
     },
   ];
 
   const stats = [
-    { label: '可用余额', value: balance?.balance, emphasis: true },
+    /*
+     * 不再放「可用余额」：上面的 hero 已经给了同一个数，两张卡片并排
+     * 重复 3805 只会让页面看起来像两套账。这里换成批次数，回答 hero
+     * 那个数字是由几笔积分拼出来的。
+     */
+    { label: '可用批次', value: balance?.activeLots },
     { label: '累计获得', value: balance?.totalEarned },
-    { label: '累计消耗', value: balance?.totalConsumed },
+    /*
+     * 后端 totalConsumed 只统计 type='consume' 的流水（人工扣减走 admin_adjust、
+     * 退款扣回走 refund_reclaim、到期走 expire，都不计入）。标成「累计消耗」会
+     * 让人拿「获得 - 消耗」去对余额，一旦有到期或人工扣减就对不上；
+     * 用「生成消耗」与流水里的类型名一致。
+     */
+    { label: '生成消耗', value: balance?.totalConsumed },
     { label: '30 天内到期', value: balance?.expiringSoon, warn: (balance?.expiringSoon ?? 0) > 0 },
   ];
+
+  // 窄屏列表自己分页; 桌面表格沿用 antd 内部的分页状态
+  const ledgerView = ledger.slice((ledgerPage - 1) * PAGE_SIZE, ledgerPage * PAGE_SIZE);
+  const lotsView = lots.slice((lotsPage - 1) * PAGE_SIZE, lotsPage * PAGE_SIZE);
 
   return (
     <PersonalPage
@@ -220,27 +324,37 @@ export function CreditsPage() {
             <div className="credits-hero-label">当前可用积分</div>
             <div className="credits-hero-value">{balance?.balance ?? '—'}</div>
             <div className="credits-hero-note">
-              {balance && balance.activeLots > 0
-                ? `来自 ${balance.activeLots} 个可用批次，支付成功后积分立即到账`
-                : '暂无可用批次，购买积分或开通会员后即可使用'}
+              {balance && balance.activeLots > 0 ? (
+                <>
+                  {balance.nearestExpiry
+                    ? `最近一笔将于 ${formatDay(balance.nearestExpiry)} 到期，`
+                    : '积分永久有效，'}
+                  <span className="credits-hero-rule">积分按到期先后扣减</span>
+                </>
+              ) : (
+                '暂无可用批次，购买积分或开通会员后即可使用'
+              )}
             </div>
           </div>
         </div>
-        <div className="credits-hero-side">
-          {balance && balance.expiringSoon > 0 && balance.nearestExpiry ? (
+        {/*
+         * 只在真的有积分将要到期时才占位。没有到期项时这里原本写着
+         * 「暂无即将到期的积分」，和下面「30 天内到期 0」是同一句话，
+         * 还会在窄屏折行后把 hero 撑成两段。
+         */}
+        {balance && balance.expiringSoon > 0 && balance.nearestExpiry && (
+          <div className="credits-hero-side">
             <span className="credits-hero-warn">
               {balance.expiringSoon} 积分将于 {formatDay(balance.nearestExpiry)} 到期
             </span>
-          ) : (
-            <span className="credits-hero-ok">暂无即将到期的积分</span>
-          )}
-        </div>
+          </div>
+        )}
       </Card>
 
       <Row gutter={[12, 12]} className="credits-stats">
         {stats.map((item) => (
           <Col xs={12} sm={6} key={item.label}>
-            <Card size="small" className={`credits-stat-card${item.emphasis ? ' is-emphasis' : ''}`}>
+            <Card size="small" className="credits-stat-card">
               <div className="credits-stat-label">{item.label}</div>
               <div className={`credits-stat-value${item.warn ? ' is-warn' : ''}`}>
                 {item.value ?? '—'}
@@ -250,7 +364,7 @@ export function CreditsPage() {
         ))}
       </Row>
 
-      <Card className="credits-list-card" title="积分明细">
+      <Card className="credits-list-card">
         <Tabs
           activeKey={tab}
           onChange={(key) => setTab(key as Tab)}
@@ -274,13 +388,29 @@ export function CreditsPage() {
                   desc="购买积分、开通会员或完成签到后，每一笔变动都会记录在这里。"
                   action={<StateButton onClick={() => navigate('/packages')}>去获取积分</StateButton>}
                 />
+              ) : narrow ? (
+                <>
+                  <LedgerList rows={ledgerView} />
+                  {ledger.length > PAGE_SIZE && (
+                    <div className="credits-mobile-pager">
+                      <Pagination
+                        simple
+                        size="small"
+                        current={ledgerPage}
+                        pageSize={PAGE_SIZE}
+                        total={ledger.length}
+                        onChange={setLedgerPage}
+                      />
+                    </div>
+                  )}
+                </>
               ) : (
                 <Table
                   rowKey="id"
                   size="small"
                   columns={ledgerColumns}
                   dataSource={ledger}
-                  pagination={{ pageSize: 20, hideOnSinglePage: true, showSizeChanger: false }}
+                  pagination={{ pageSize: PAGE_SIZE, hideOnSinglePage: true, showSizeChanger: false }}
                   scroll={{ x: 680 }}
                 />
               ),
@@ -304,13 +434,29 @@ export function CreditsPage() {
                   desc="每次购买或发放都会形成一个有有效期的积分批次。"
                   action={<StateButton onClick={() => navigate('/packages')}>去获取积分</StateButton>}
                 />
+              ) : narrow ? (
+                <>
+                  <LotList rows={lotsView} />
+                  {lots.length > PAGE_SIZE && (
+                    <div className="credits-mobile-pager">
+                      <Pagination
+                        simple
+                        size="small"
+                        current={lotsPage}
+                        pageSize={PAGE_SIZE}
+                        total={lots.length}
+                        onChange={setLotsPage}
+                      />
+                    </div>
+                  )}
+                </>
               ) : (
                 <Table
                   rowKey="id"
                   size="small"
                   columns={lotColumns}
                   dataSource={lots}
-                  pagination={{ pageSize: 20, hideOnSinglePage: true, showSizeChanger: false }}
+                  pagination={{ pageSize: PAGE_SIZE, hideOnSinglePage: true, showSizeChanger: false }}
                   scroll={{ x: 620 }}
                 />
               ),
@@ -318,15 +464,6 @@ export function CreditsPage() {
           ]}
         />
       </Card>
-
-      {error && !loading && (
-        <Alert
-          type="warning"
-          showIcon
-          message="部分积分数据未能加载"
-          description="余额与流水可能不完整，刷新页面或稍后重试即可恢复。"
-        />
-      )}
     </PersonalPage>
   );
 }

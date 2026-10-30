@@ -1308,42 +1308,105 @@ body {
   color: #5546d8;
   background: #f1efff;
 }
+/*
+ * 右侧动作区 (2026-10-30 收拢)
+ *
+ * 之前三个控件的视觉尺度各走各的: 铃铛 32 高、余额胶囊 24 高、用户钮 34 高，
+ * 余额又是灰字灰底，看起来像一段不可点的状态文字。现在统一成 32px 控件带，
+ * 余额用「白底 + 细描边 + 深色数字」成为唯一有量的信息，身份区前加一道
+ * 16px 细分割线；hover 一律落到品牌淡紫，强调色仍然只给交互态。
+ */
 .app-header-right {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin-left: auto;
+}
+.app-header-divider {
+  flex: none;
+  width: 1px;
+  height: 16px;
+  background: var(--border);
 }
 .app-quota {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
   font-size: 12px;
-  color: #667085;
-  background: var(--color-bg); /* 原 --color-slate-100 (#f1f5f9, Tailwind 遗留色, 不在品牌色板) → 云白 */
-  padding: 4px 10px;
+  color: var(--text-muted);
+  background: var(--color-card);
+  border: 1px solid var(--border);
   border-radius: var(--radius-pill);
+  white-space: nowrap;
+  text-decoration: none;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease;
+}
+.app-quota:hover {
+  color: var(--brand);
+  background: var(--brand-bg);
+  border-color: var(--brand);
+}
+.app-quota svg {
+  flex: none;
+  color: var(--text-desc);
+  transition: color 0.18s ease;
+}
+.app-quota:hover svg {
+  color: var(--brand);
+}
+.app-quota-num {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+  transition: color 0.18s ease;
+}
+.app-quota:hover .app-quota-num {
+  color: var(--brand);
+}
+.app-quota-label {
+  color: inherit;
 }
 .app-user {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  height: 32px;
+  padding: 0 8px 0 4px;
   background: transparent;
   border: none;
   cursor: pointer;
-  padding: 4px 6px;
   border-radius: var(--radius-control);
+  transition: background 0.18s ease;
 }
 /* 用户区 hover: 对齐参考站 #f1efff (2026-10-18 去蓝, 原 slate-100) */
-.app-user:hover {
+.app-user:hover,
+.app-user.is-open {
   background: #f1efff;
 }
 .app-user-avatar {
+  flex: none;
   background: #5546d8;
+  font-size: 12px;
+  font-weight: 600;
 }
 .app-user-email {
+  max-width: 168px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 13px;
-  color: #667085;
+  color: var(--text-body);
+}
+.app-user-chevron {
+  flex: none;
+  color: var(--text-desc);
+  transition: transform 0.18s ease;
+}
+.app-user.is-open .app-user-chevron {
+  transform: rotate(180deg);
 }
 /* 移动端汉堡按钮: 仅 ≤900px 显示 (桌面隐藏), 点击开 Drawer 承载侧栏 */
 .app-mobile-toggle {
@@ -1360,7 +1423,8 @@ body {
   }
 }
 @media (max-width: 1099px) {
-  .app-quota {
+  .app-quota,
+  .app-header-divider {
     display: none;
   }
 }
@@ -1777,6 +1841,7 @@ html[data-promo='off'] {
   }
   .app-topnav,
   .app-quota,
+  .app-header-divider,
   .app-user-email,
   .app-sider-wrap {
     display: none;
@@ -11566,53 +11631,84 @@ html[data-promo='off'] .multi-image-fusion-page {
   flex-direction: column;
   gap: 16px;
 }
+/* 页头: 左文案 / 右二维码。二维码与「邀请码」并置, 电脑上复制链接、
+   面对面时直接让对方扫码, 不必先打开海报弹窗 */
 .invite-hero {
-  background: linear-gradient(90deg, var(--brand-bg) 0%, var(--card-bg) 48%, var(--brand-bg) 100%);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 30px 32px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-panel);
-  padding: 32px;
+  background:
+    radial-gradient(120% 160% at 100% 0%, var(--brand-bg) 0%, transparent 58%),
+    linear-gradient(115deg, var(--brand-bg) 0%, var(--card-bg) 64%);
+}
+.invite-hero-copy {
+  flex: 1;
+  min-width: 0;
 }
 .invite-hero h1 {
   margin: 0;
   font-size: 28px;
-  font-weight: 600;
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: -0.3px;
   color: var(--text-strong);
 }
 .invite-hero p {
   margin: 12px 0 0;
-  max-width: 640px;
+  max-width: 560px;
   font-size: 14px;
   line-height: 24px;
   color: var(--text-muted);
 }
 .invite-hero-actions {
-  margin-top: 20px;
+  margin-top: 22px;
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
-.invite-btn-primary,
-.invite-btn-ghost {
-  height: 36px;
-  padding: 0 18px;
+.invite-hero-qr {
+  flex: none;
+  width: 188px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card-bg);
+  box-shadow: var(--shadow-card);
+  text-align: center;
+}
+.invite-hero-qr img,
+.invite-hero-qr-fallback {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
   border-radius: var(--radius-control);
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
+  background: var(--surface);
+}
+.invite-hero-qr-meta {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
   gap: 6px;
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--text-desc);
 }
-.invite-btn-primary {
-  border: 0;
-  background: var(--brand-strong);
-  color: #fff;
+.invite-hero-qr-meta strong {
+  font-size: 15px;
+  letter-spacing: 0.08em;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
 }
-.invite-btn-primary:hover {
-  background: var(--brand-hover);
-}
-.invite-btn-ghost {
-  border: 1px solid var(--border-soft);
-  background: #fff;
-  color: var(--text-body);
+.invite-hero-qr p {
+  margin: 4px 0 0;
+  max-width: none;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--text-desc);
 }
 /* 邀请海报弹窗 (B8): 图片按弹窗宽度等比展示, 下载按钮通栏 */
 .invite-poster-image {
@@ -11635,12 +11731,20 @@ html[data-promo='off'] .multi-image-fusion-page {
   text-align: center;
 }
 .invite-block {
-  background: #fff;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
   border-radius: var(--radius-panel);
-  padding: 24px;
+  padding: 22px 24px 24px;
+}
+.invite-block-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin-bottom: 16px;
 }
 .invite-block h2 {
-  margin: 0 0 16px;
+  margin: 0;
   font-size: 16px;
   font-weight: 600;
   color: var(--text-strong);
@@ -11649,6 +11753,108 @@ html[data-promo='off'] .multi-image-fusion-page {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+.invite-block h2 svg {
+  flex: none;
+  color: var(--brand);
+}
+.invite-block-sub {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-desc);
+}
+
+/* 签到: 两项数据 + 主按钮一行, 下方 7 天连签路线 */
+.invite-checkin {
+  display: flex;
+  align-items: stretch;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.invite-checkin-stats {
+  display: flex;
+  flex: 1 1 320px;
+  gap: 12px;
+  min-width: 0;
+}
+.invite-checkin-stat {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 14px 16px;
+  border-radius: var(--radius-card);
+  background: var(--page-bg);
+}
+.invite-checkin-value {
+  font-size: 24px;
+  line-height: 30px;
+  font-weight: 700;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+.invite-checkin-value em {
+  margin-left: 4px;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+/* 非数字值 (签到未开启) 用小一号文字, 不冒充积分数量 */
+.invite-checkin-value.is-text {
+  font-size: 15px;
+  line-height: 30px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.invite-checkin-btn {
+  flex: none;
+  align-self: center;
+  min-width: 148px;
+  height: 42px;
+  margin: 0;
+}
+.invite-checkin-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.invite-checkin-days li {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 6px;
+  border-radius: var(--radius-control);
+  background: var(--page-bg);
+}
+.invite-checkin-day {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-body);
+}
+.invite-checkin-streak {
+  font-size: 11px;
+  color: var(--text-desc);
+}
+.invite-checkin-days strong {
+  font-size: 14px;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+/* 今天与含加成日: 淡紫底 + 品牌色, 一眼看出哪格多拿 */
+.invite-checkin-days li.is-today {
+  background: var(--brand-bg);
+}
+.invite-checkin-days li.is-today .invite-checkin-day {
+  color: var(--brand);
+}
+.invite-checkin-days li.is-bonus strong {
+  color: var(--brand);
 }
 .invite-steps {
   margin: 0;
@@ -11671,7 +11877,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   height: 24px;
   border-radius: 50%;
   background: var(--brand-strong);
-  color: #fff;
+  color: var(--on-brand);
   font-size: 12px;
   display: grid;
   place-items: center;
@@ -11721,27 +11927,124 @@ html[data-promo='off'] .multi-image-fusion-page {
   font-weight: 700;
   color: var(--text-strong);
 }
-.invite-metrics-note {
-  margin: 14px 0 0;
+/* 收益是本页唯一「到手」的指标, 用品牌色与其余计数区分 */
+.invite-metric-value.is-brand {
+  color: var(--brand);
+}
+/* 邀请记录: 一行一人, 名称 / 绑定时间 / 奖励状态三段对齐 */
+.invite-relations {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.invite-relation {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border-row);
+  font-size: 13px;
+}
+.invite-relation:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.invite-relation:last-child {
+  padding-bottom: 0;
+}
+.invite-relation-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+  color: var(--text-strong);
+}
+.invite-relation-date {
+  flex: none;
   font-size: 12px;
   color: var(--text-desc);
+  font-variant-numeric: tabular-nums;
 }
-.invite-metrics-note code {
+.invite-relation-status {
+  flex: none;
+  min-width: 60px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
   font-size: 12px;
-  background: var(--surface);
-  padding: 1px 5px;
-  border-radius: var(--radius-tag);
+  text-align: center;
 }
+.invite-relation-status.is-granted {
+  background: var(--success-soft-bg);
+  color: var(--success-text);
+}
+.invite-relation-status.is-pending {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+.invite-relation-status.is-rejected {
+  background: var(--surface);
+  color: var(--text-desc);
+}
+
 @media (max-width: 900px) {
-  .sitemap-grid,
-  .invite-steps,
-  .invite-metrics {
+  .sitemap-grid {
     grid-template-columns: 1fr;
     gap: 32px;
+  }
+  /* 步骤横排三段在窄屏会挤成竖条, 退成单列; 指标四格退两列仍可读 */
+  .invite-steps {
+    grid-template-columns: 1fr;
+  }
+  .invite-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .invite-hero {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 24px;
+    padding: 24px;
+  }
+  .invite-hero-qr {
+    width: 100%;
+    max-width: 320px;
+    margin: 0 auto;
   }
   .sitemap-hero h1 {
     font-size: 40px;
     line-height: 44px;
+  }
+}
+
+@media (max-width: 640px) {
+  .invite-block {
+    padding: 18px 16px 20px;
+  }
+  .invite-checkin {
+    flex-direction: column;
+    gap: 12px;
+  }
+  /* 竖排后 flex-basis 落在高度轴上, 320px 会把两块数据撑成空轮胎 */
+  .invite-checkin-stats {
+    flex: 0 0 auto;
+  }
+  .invite-checkin-btn {
+    width: 100%;
+  }
+  /* 7 天一屏放不下就横向滑动, 不折行破坏「连续 7 天」的读法 */
+  .invite-checkin-days {
+    grid-template-columns: none;
+    grid-auto-flow: column;
+    grid-auto-columns: 68px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-width: thin;
+  }
+  .invite-relation {
+    gap: 8px;
   }
 }
 
@@ -13294,30 +13597,36 @@ html[data-promo='off'] .multi-image-fusion-page {
   background: var(--wb-brand);
 }
 
-/* ───────── 积分商城 /packages (1:1 复刻 ijihua.cn/packages) ─────────
-   证据: 参考站产物 CSS `pkg-*` 族 91 条规则; 变量真值取自参考站 :root
-   (--primary #625DF5 / --line #E6E8EF / --muted #7D8596 / --text #182033 / --success #18A875)
-   命名空间独立(pkg-*), 不复用 .pk-*(ProductKit 页在用), 不受全局收拢 token 影响 */
+/* ───────── 积分商城 /packages ─────────
+   2026-10-30 优化:
+   - 配色并回全站令牌 (品牌紫 / 中性灰 / 圆角五档 / --on-brand),
+     此前 pkg-* 自带一套参考站紫色 (#625DF5), 与全站 #5546D8 差一档, 两页之间跳变;
+   - 页头由居中标语改成横向 hero: 左标题、右「当前积分」入口 (需登录);
+   - 会员与积分包各自成区, 积分包补上区块标题 (此前两段商品直接相接, 分不清);
+   - 卡片由 4 列固定网格改为等高弹性栅格: 5 个方案在 4 列下必然落单,
+     弹性行最后一行居中, 任意数量都不出现半排空位。
+   命名空间仍独立(pkg-*), 不复用 .pk-*(ProductKit 页在用)。 */
 .pkg-shop-page {
-  --pkg-primary: #625df5;
-  --pkg-line: #e6e8ef;
-  --pkg-muted: #7d8596;
-  --pkg-text: #182033;
-  --pkg-success: #18a875;
-  --pkg-warn: #d97706;
-  --pkg-warn-bg: #fef3c7;
+  --pkg-primary: var(--brand);
+  --pkg-line: var(--border);
+  --pkg-muted: var(--text-muted);
+  --pkg-text: var(--text-strong);
+  --pkg-success: var(--success-text);
+  --pkg-warn: var(--warn-text);
+  --pkg-warn-bg: var(--warn-bg);
+  --pkg-card: var(--card-bg);
   animation: 0.35s both fadeIn;
 }
 .pkg-shop-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 24px;
+  padding: 24px 24px 40px;
 }
 .pkg-back-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   padding: 8px 0;
   border: 0;
   background: none;
@@ -13329,140 +13638,286 @@ html[data-promo='off'] .multi-image-fusion-page {
 .pkg-back-btn:hover {
   color: var(--pkg-text);
 }
+
+/* ── 页头: 标题 + 余额入口 ───────────────────────────────────────────── */
 .pkg-shop-hero {
-  text-align: center;
-  padding: 28px 0 36px;
-}
-.pkg-shop-hero h1 {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin: 0 0 8px;
-  font-size: 28px;
-  letter-spacing: -0.5px;
-  color: var(--pkg-text);
+  justify-content: space-between;
+  gap: 20px;
+  margin: 4px 0 28px;
+  padding: 22px 24px;
+  border: 1px solid var(--pkg-line);
+  border-radius: var(--radius-hero);
+  background: linear-gradient(120deg, var(--brand-bg) 0%, var(--pkg-card) 62%);
 }
-.pkg-shop-hero h1 svg {
-  color: var(--pkg-primary);
+.pkg-shop-hero-main {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.pkg-shop-hero-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  border-radius: var(--radius-card);
+  background: var(--brand);
+  color: var(--on-brand);
+  box-shadow: 0 8px 18px rgba(85, 70, 216, 0.22);
+}
+.pkg-shop-hero h1 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  line-height: 30px;
+  letter-spacing: -0.3px;
+  color: var(--pkg-text);
 }
 .pkg-shop-hero p {
   margin: 0;
-  font-size: 14px;
+  font-size: 13px;
+  line-height: 20px;
   color: var(--pkg-muted);
 }
-/* 会员套餐区（与积分包同页，用一条分隔标题区分两类商品） */
+/* 余额入口: 商城页能看见「买之前有多少」, 点击去积分明细 */
+.pkg-shop-balance {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--pkg-line);
+  border-radius: var(--radius-pill);
+  background: var(--pkg-card);
+  color: var(--pkg-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    color 0.18s ease;
+}
+.pkg-shop-balance strong {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--pkg-text);
+  font-variant-numeric: tabular-nums;
+  transition: color 0.18s ease;
+}
+.pkg-shop-balance:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+.pkg-shop-balance:hover strong {
+  color: var(--brand);
+}
+
+/* ── 区块标题 (会员套餐 / 积分包) ─────────────────────────────────────── */
 .pkg-section {
-  margin-bottom: 32px;
+  margin-bottom: 30px;
 }
 .pkg-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin-bottom: 14px;
+}
+.pkg-section-copy {
   display: flex;
   align-items: baseline;
   flex-wrap: wrap;
   gap: 4px 12px;
-  margin-bottom: 16px;
+  min-width: 0;
 }
-.pkg-section-head h2 {
+.pkg-section-copy h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
+  line-height: 24px;
   font-weight: 700;
   color: var(--pkg-text);
 }
-.pkg-section-head p {
+.pkg-section-copy p {
   margin: 0;
   font-size: 13px;
+  line-height: 20px;
   color: var(--pkg-muted);
 }
+/* 当前会员状态: 只在已登录且是会员时出现 */
+.pkg-section-note {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-bg);
+  color: var(--brand);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/* ── 商品卡 ───────────────────────────────────────────────────────────── */
+/* 弹性行: 每张卡从 208px 起伸展 (上限 280), 一行放不下就换行并居中,
+   这样 5 张卡在 1152 内容列里是一整行, 在 900 左右是 3+2 而不是 4+1。 */
 .pkg-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 16px;
 }
 .pkg-card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  padding: 24px 20px;
-  text-align: center;
-  background: #fff;
+  gap: 12px;
+  flex: 1 1 208px;
+  min-width: 0;
+  max-width: 280px;
+  padding: 22px 20px 20px;
+  background: var(--pkg-card);
   border: 1px solid var(--pkg-line);
-  border-radius: 18px;
-  cursor: pointer;
+  border-radius: var(--radius-panel);
   transition:
-    border-color 0.15s,
-    box-shadow 0.15s;
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
 }
-.pkg-card:hover {
-  border-color: #d4d2f8;
-  box-shadow: 0 8px 30px rgba(34, 41, 67, 0.1);
-}
-.pkg-card.is-selected {
-  border-color: var(--pkg-primary);
-  box-shadow: 0 0 0 2px rgba(98, 93, 245, 0.1);
+@media (hover: hover) {
+  .pkg-card:hover {
+    box-shadow: 0 10px 26px rgba(34, 41, 67, 0.08);
+    transform: translateY(-2px);
+  }
 }
 .pkg-card.is-current {
   border-color: var(--pkg-primary);
+  box-shadow: 0 0 0 3px rgba(85, 70, 216, 0.08);
+}
+/* 当前方案角标: 脱离文档流压在卡片上沿, 不占标题行 */
+.pkg-card-flag {
+  position: absolute;
+  top: -10px;
+  right: 16px;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  color: var(--on-brand);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  box-shadow: 0 4px 10px rgba(85, 70, 216, 0.25);
 }
 .pkg-card-top {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 8px;
 }
 .pkg-card-name {
   font-size: 15px;
+  line-height: 20px;
   font-weight: 700;
   color: var(--pkg-text);
+  overflow-wrap: anywhere;
 }
 .pkg-card-badge {
-  display: inline-block;
-  padding: 2px 10px;
-  border-radius: var(--radius-control);
-  background: var(--pkg-warn-bg);
-  color: var(--pkg-warn);
-  font-size: 12px;
-  font-weight: 700;
+  flex: none;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--pkg-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
 }
-.pkg-card-badge.is-current {
-  background: var(--brand-bg);
-  color: var(--brand);
+/* 免费 / 最划算: 两种营销标记各用自己的语义色, 不再一律用警告黄 */
+.pkg-card-badge.is-free {
+  background: var(--success-soft-bg);
+  color: var(--success-text);
+}
+.pkg-card-badge.is-hot {
+  background: var(--warn-bg);
+  color: var(--warn-text);
 }
 .pkg-card-points {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 5px;
   color: var(--pkg-primary);
 }
 .pkg-card-points strong {
   font-size: 28px;
+  line-height: 34px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  font-variant-numeric: tabular-nums;
 }
 .pkg-card-points span {
-  font-size: 14px;
+  font-size: 12px;
   color: var(--pkg-muted);
 }
-.pkg-card-bonus {
+.pkg-card-desc {
+  margin: 0;
   font-size: 12px;
-  font-weight: 600;
-  color: var(--pkg-success);
+  line-height: 18px;
+  color: var(--pkg-muted);
+}
+.pkg-card-validity {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--pkg-muted);
+}
+.pkg-card-validity svg {
+  flex: none;
+  color: var(--text-desc);
 }
 .pkg-card-perks {
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--pkg-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
+.pkg-card-perks li {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-body);
+}
+.pkg-card-perks svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--brand);
+}
+/* 价格行压到卡片底部: 权益条数不同时, 各卡的价与按钮仍然对齐 */
 .pkg-card-price {
   display: flex;
   align-items: baseline;
   gap: 8px;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px dashed var(--pkg-line);
 }
 .pkg-card-price strong {
-  font-size: 18px;
+  font-size: 20px;
+  line-height: 26px;
+  font-weight: 700;
   color: var(--pkg-text);
+  font-variant-numeric: tabular-nums;
+}
+.pkg-card-price-unit {
+  font-size: 12px;
+  color: var(--pkg-muted);
 }
 .pkg-card-price-old {
-  font-size: 13px;
-  color: var(--pkg-muted);
+  font-size: 12px;
+  color: var(--text-desc);
   text-decoration: line-through;
 }
 .pkg-select-btn {
@@ -13470,18 +13925,23 @@ html[data-promo='off'] .multi-image-fusion-page {
   align-items: center;
   justify-content: center;
   width: 100%;
-  margin-top: 2px;
-  padding: 9px 18px;
+  padding: 10px 16px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-control);
   background: var(--pkg-primary);
-  color: #fff;
-  font-size: 14px;
+  color: var(--on-brand);
+  font-size: 13px;
   font-weight: 600;
+  line-height: 18px;
   cursor: pointer;
+  transition: background 0.18s ease;
+}
+.pkg-select-btn:hover:not(:disabled) {
+  background: var(--brand-hover);
 }
 .pkg-select-btn:disabled {
-  background: #c9cddb;
+  background: var(--surface);
+  color: var(--pkg-muted);
   cursor: not-allowed;
 }
 /* 落地页套餐区空态 (接口未就绪/无在售商品时如实显示, 不回落硬编码价) */
@@ -13493,27 +13953,75 @@ html[data-promo='off'] .multi-image-fusion-page {
   color: var(--text-muted, #667085);
 }
 
+/* 购买说明: 用户口径 (有效期 / 扣费 / 退款), 不再写后台配置路径 */
 .pkg-shop-disclosure {
-  margin: 24px 0 8px;
+  margin: 8px 0 0;
   padding: 12px 14px;
   border: 1px dashed var(--pkg-line);
   border-radius: var(--radius-card);
-  background: #fbfcff;
+  background: var(--surface);
   font-size: 12px;
   line-height: 20px;
   color: var(--pkg-muted);
 }
-.pkg-shop-disclosure strong {
-  color: var(--pkg-text);
-}
-@media (max-width: 1100px) {
-  .pkg-grid {
-    grid-template-columns: repeat(2, 1fr);
+
+@media (max-width: 900px) {
+  .pkg-shop-container {
+    padding: 16px 16px 32px;
+  }
+  .pkg-shop-hero {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+    padding: 20px;
+  }
+  .pkg-shop-balance {
+    justify-content: flex-start;
+    width: 100%;
   }
 }
 @media (max-width: 640px) {
+  .pkg-shop-container {
+    padding: 12px 10px 28px;
+  }
+  .pkg-back-btn {
+    margin-bottom: 12px;
+  }
+  .pkg-shop-hero {
+    padding: 18px 16px;
+    border-radius: var(--radius-panel);
+  }
+  .pkg-shop-hero h1 {
+    font-size: 20px;
+  }
   .pkg-grid {
-    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  /* 会员权益文案较长, 窄屏一张一行; 积分包信息短, 两列并排 */
+  .pkg-card {
+    flex-basis: 100%;
+    max-width: none;
+    padding: 18px 16px 16px;
+  }
+  .pkg-grid.is-products .pkg-card {
+    flex-grow: 0;
+    flex-basis: calc(50% - 6px);
+    padding: 16px 12px 14px;
+    gap: 10px;
+  }
+  /* 商品数为奇数时, 末张占满整行 —— 半张卡悬在中间比落单更难解释 */
+  .pkg-grid.is-products .pkg-card:last-child:nth-child(odd) {
+    flex-basis: 100%;
+  }
+  .pkg-grid.is-products .pkg-card-name {
+    font-size: 14px;
+  }
+  .pkg-grid.is-products .pkg-card-points strong {
+    font-size: 22px;
+    line-height: 28px;
+  }
+  .pkg-grid.is-products .pkg-card-price strong {
+    font-size: 17px;
   }
 }
 
@@ -13526,7 +14034,12 @@ html[data-promo='off'] .multi-image-fusion-page {
 
 /* ── 下单确认 (CheckoutPage) ────────────────────────────────────────── */
 
+/* 结算页与商城共用一套 pkg-* 变量: 下单链路两屏之间颜色不跳变 */
 .pkg-checkout-page {
+  --pkg-primary: var(--brand);
+  --pkg-line: var(--border);
+  --pkg-muted: var(--text-muted);
+  --pkg-text: var(--text-strong);
   --pkg-alipay: #009fe8;
   --pkg-wechat: #24b340;
   min-height: 100vh;
@@ -13615,11 +14128,11 @@ html[data-promo='off'] .multi-image-fusion-page {
   transition: border-color 0.15s;
 }
 .pkg-payment-option:hover {
-  border-color: #d4d2f8;
+  border-color: color-mix(in srgb, var(--pkg-primary) 22%, var(--pkg-line));
 }
 .pkg-payment-option.is-active {
   border-color: var(--pkg-primary, #625df5);
-  box-shadow: 0 0 0 2px rgba(98, 93, 245, 0.1);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pkg-primary) 10%, transparent);
 }
 .pkg-payment-icon {
   width: 32px;
@@ -13823,24 +14336,14 @@ html[data-promo='off'] .multi-image-fusion-page {
 
 /* ── 积分明细页 ────────────────────────────────────────────────────────── */
 
+/* 宽度与内边距由 .personal-page 骨架决定, 这里只挂页面级语义色 */
 .credits-page {
-  max-width: 1000px;
-  margin: 0 auto;
-  padding: 24px;
-}
-.credits-balance-card {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1px;
-  background: var(--border);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-card, 12px);
-  overflow: hidden;
-  margin-bottom: 20px;
-}
-.credits-stat {
-  background: #fff;
-  padding: 18px;
+  /*
+   * 增减金额的专用语义色。--success-text / --danger-text 在各自淡底上
+   * 只有 3.99 / 4.14，13px 表格数字不达标；这里压深一档，色相不变。
+   */
+  --credits-plus: #147d55;
+  --credits-minus: #c81e1e;
 }
 .credits-stat-label {
   font-size: 12px;
@@ -13853,90 +14356,39 @@ html[data-promo='off'] .multi-image-fusion-page {
   color: var(--text-strong, #171a2b);
 }
 .credits-stat-value.is-warn {
-  color: #d97706;
-}
-/* 购买入口: 积分页要能通向积分商城, 否则「没积分了」在这里是死路 */
-.credits-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin: -4px 0 16px;
-}
-.credits-actions-hint {
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--text-muted);
-}
-.credits-empty-text {
-  margin: 0 0 12px;
-}
-.credits-tabs {
-  display: flex;
-  gap: 4px;
-  margin-bottom: 12px;
-  border-bottom: 1px solid var(--border);
-}
-.credits-tab {
-  padding: 10px 16px;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: none;
-  font-size: 14px;
-  color: var(--text-muted, #667085);
-  cursor: pointer;
-}
-.credits-tab.is-active {
-  color: var(--brand);
-  border-bottom-color: var(--brand);
-  font-weight: 600;
-}
-.credits-table-wrap {
-  width: 100%;
-  max-width: 100%;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-.credits-table {
-  width: 100%;
-  /* 五列在 390 视口下会被压成逐字竖排；保底宽度 + 外层横滚，
-     让「类型/备注」保持可读的整行文本。 */
-  min-width: 680px;
-  border-collapse: collapse;
-  font-size: 13px;
-  background: #fff;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-card, 12px);
-  overflow: hidden;
-}
-.credits-table th,
-.credits-table td {
-  padding: 12px 14px;
-  text-align: left;
-  border-bottom: 1px solid var(--border);
-  white-space: nowrap;
-}
-.credits-table th {
-  background: var(--surface);
-  color: var(--text-muted, #667085);
-  font-weight: 500;
-  font-size: 12px;
+  color: var(--warn-text);
 }
 .credits-amount.is-plus {
-  color: #18a875;
+  color: var(--credits-plus);
   font-weight: 600;
 }
 .credits-amount.is-minus {
-  color: #e5484d;
+  color: var(--credits-minus);
   font-weight: 600;
 }
-.credits-list-empty {
-  padding: 48px 16px;
-  text-align: center;
-  color: var(--text-muted, #667085);
-  font-size: 14px;
+/* 批次状态: 深色前景 + 淡底胶囊, 不再用 antd 预设 success / error 的 2.41:1 绿字 */
+.credits-status.ant-tag {
+  margin-inline-end: 0;
+  height: 22px;
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 22px;
 }
-
+.credits-status.is-active {
+  color: var(--credits-plus);
+  background: var(--success-soft-bg);
+}
+.credits-status.is-expired {
+  color: var(--credits-minus);
+  background: var(--danger-soft-bg);
+}
+.credits-status.is-exhausted {
+  color: var(--text-body);
+  background: var(--surface);
+}
 /* ── 我的订单 ──────────────────────────────────────────────────────────── */
 
 .orders-page {
@@ -14034,9 +14486,6 @@ html[data-promo='off'] .multi-image-fusion-page {
 }
 
 @media (max-width: 768px) {
-  .credits-balance-card {
-    grid-template-columns: repeat(2, 1fr);
-  }
   .pkg-sandbox-actions {
     grid-template-columns: 1fr;
   }
@@ -19019,6 +19468,16 @@ html[data-promo='off'] .multi-image-fusion-page {
 .app-notif-trigger .ant-badge {
   display: inline-flex;
 }
+/* 未读角标压到 10px 并加 2px 白描边: 18px 铃铛上的默认角标会糊成一团红点 */
+.app-notif-trigger .ant-badge .ant-badge-count {
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  line-height: 16px;
+  font-size: 10px;
+  font-weight: 600;
+  box-shadow: 0 0 0 2px var(--color-card);
+}
 .app-notif-panel {
   width: 320px;
   max-width: calc(100vw - 32px);
@@ -22606,13 +23065,17 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   gap: 16px;
   min-width: 0;
 }
-/* 页面类不再自己决定宽度与内边距，避免与骨架叠加 */
+/*
+ * 页面类不再自己决定宽度与内边距，避免与骨架叠加。
+ * 只清 padding: 这里的页类原先各自带 `margin: 0 auto` 或 `margin: 0`，
+ * 若连 margin 一起清掉，会比骨架的 `margin: 0 auto` 更晚生效，
+ * 1120 的列在 1440 视口里贴左留出右侧空档。水平居中交给骨架。
+ */
 .personal-page.account-page,
 .personal-page.credits-page,
 .personal-page.orders-page,
 .personal-page.invite-page,
 .personal-page.stats-page {
-  margin: 0;
   padding: 0;
 }
 
@@ -22659,7 +23122,8 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
 }
 .credits-hero-label {
   font-size: 12px;
-  color: var(--text-muted);
+  font-weight: 500;
+  color: var(--text-body);
 }
 .credits-hero-value {
   margin-top: 2px;
@@ -22671,9 +23135,13 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
 }
 .credits-hero-note {
   margin-top: 4px;
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--text-desc);
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-body);
+}
+/* 扣减规则作为整体换行: 窄屏下只剩「扣减」两字吊在第二行比换行本身更难读 */
+.credits-hero-rule {
+  white-space: nowrap;
 }
 .credits-hero-side {
   flex: none;
@@ -22687,19 +23155,11 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   color: var(--warn-text);
   font-size: 12px;
 }
-.credits-hero-ok {
-  font-size: 12px;
-  color: var(--text-muted);
-}
 .credits-stats {
   margin-bottom: 0;
 }
 .credits-stat-card .ant-card-body {
   padding: 14px 16px;
-}
-.credits-stat-card.is-emphasis {
-  border-color: var(--brand-bg);
-  background: var(--brand-bg);
 }
 .credits-stat-card .credits-stat-label {
   margin-bottom: 4px;
@@ -22708,10 +23168,66 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   border-radius: var(--radius-panel) !important;
 }
 .credits-list-card .ant-card-body {
-  padding: 4px 20px 20px;
+  padding: 16px 20px 20px;
 }
 .credits-list-card .ant-tabs-nav {
   margin-bottom: 12px;
+}
+
+/*
+ * 窄屏列表（≤767px，由 useMediaQuery 切结构）。
+ *
+ * 流水五列最小 680px，批次最小 620px，在手机上必然是「半截列」而不是可读的
+ * 表格，所以这一档不再渲染 Table：每条记录两行，第一行标题 + 金额 / 状态，
+ * 第二行时间与余额 / 到期日，横向不再需要滚动。
+ */
+.credits-mobile-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.credits-mobile-item {
+  padding: 10px 2px;
+  border-bottom: 1px solid var(--border);
+}
+.credits-mobile-item:last-child {
+  border-bottom: 0;
+}
+.credits-mobile-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 22px;
+}
+.credits-mobile-line .credits-amount {
+  font-size: 14px;
+}
+.credits-mobile-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.credits-mobile-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.credits-mobile-note {
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 20px;
+  color: var(--text-muted);
+}
+.credits-mobile-pager {
+  display: flex;
+  justify-content: center;
+  padding-top: 12px;
 }
 
 /* 数据中心 */
@@ -22760,16 +23276,14 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
 }
 
 /* 邀请页 */
-.invite-page .invite-hero {
-  border: 1px solid var(--border);
-}
 .invite-hero-actions .ant-btn {
   height: 36px;
   padding-inline: 16px;
   border-radius: var(--radius-control);
 }
+/* 签到按钮在 flex 行内垂直居中, 不再靠 margin 顶开 (2026-10-30 重排版式) */
 .invite-checkin-btn {
-  margin-top: 12px;
+  margin-top: 0;
 }
 .invite-poster-download {
   margin-top: 16px;
@@ -22805,7 +23319,7 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
     text-align: left;
   }
   .credits-list-card .ant-card-body {
-    padding: 0 14px 16px;
+    padding: 12px 14px 16px;
   }
   .personal-page .account-hero {
     padding: 18px;
@@ -22851,9 +23365,6 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   }
   .ticket-compose-actions .ant-btn {
     flex: 1 1 auto;
-  }
-  .invite-hero {
-    padding: 22px 18px;
   }
   .invite-hero h1 {
     font-size: 23px;

@@ -16,7 +16,7 @@ PromoBar  40px（≤900px 隐藏，并置 html[data-promo='off']）
 AppHeader 64px（≤900px 54px）sticky top:0 z-index 20
 ├── .app-brand          36×36 标记 + 「货觉」+ 紫色 AI 后缀
 ├── .app-topnav         flex:1，8 个导航项
-└── .app-header-right   算力胶囊 / 用户菜单｜游客「登录 / 注册」
+└── .app-header-right   消息铃铛 / 算力胶囊 / 用户菜单｜游客「登录 / 注册」
 ```
 
 `--workspace-topbar-height` 是跨组件契约：侧栏的 `top`/`height`、多图融合页与 pk 工作区的 `calc` 都读它。促销条显隐必须同步更新这个变量（由 `html[data-promo]` 驱动），只写 `display:none` 会让依赖它的页面高度算错 40px。
@@ -72,7 +72,7 @@ AppHeader 64px（≤900px 54px）sticky top:0 z-index 20
 | hover | `#5546d8` 文字 on `#f1efff` 底 |
 | 换行 | `white-space: nowrap`，`flex: none` |
 
-窄档不换行：64px 定高顶栏一旦换行就破版，靠「右侧减重」腾宽度 —— ≤1199 隐藏 `.app-user-email`，≤1099 隐藏 `.app-quota`。
+窄档不换行：64px 定高顶栏一旦换行就破版，靠「右侧减重」腾宽度 —— ≤1199 隐藏 `.app-user-email`，≤1099 隐藏 `.app-quota` 与 `.app-header-divider`。
 
 ### 2.5 分组下拉
 
@@ -93,17 +93,28 @@ AppHeader 64px（≤900px 54px）sticky top:0 z-index 20
 
 | 状态 | 内容 |
 | --- | --- |
-| 已登录 | `.app-quota` 算力胶囊（指向 `/credits`）+ 用户菜单（头像 / 邮箱、账户设置、我的工单、进入运营后台、退出登录） |
+| 已登录 | 消息铃铛 + `.app-quota` 算力胶囊（指向 `/credits`）+ 1px 分割线 + 用户菜单（头像 / 邮箱、账户设置、我的工单、进入运营后台、退出登录） |
 | 游客 | `.app-guest-login`：68×32，`padding: 8px`，radius 6，13px / 700 / `#667085`，**纯文字无底**；hover `#5546d8` on `#f1efff` |
 
 游客按钮不得用 antd 实底主按钮：外壳里唯一的实底主色留给页面内的提交动作。
+
+已登录动作区统一为 32px 控件带，间距 8（2026-10-30 收拢）：
+
+| 元素 | 值 |
+| --- | --- |
+| 铃铛 | `.app-notif-trigger` 32×32，radius 8；icon 18；未读角标 16×16 / 10px / 600 / 2px 白描边 |
+| 算力胶囊 | `.app-quota` 高 32，`padding: 0 12px`，白底 + `1px solid var(--border)`，radius pill；图标 14 `--text-desc`；数字 13 / 700 `--text-strong` + tabular-nums；「积分」12 / `--text-muted`；hover 字色与描边转 `--brand`、底 `--brand-bg` |
+| 分割线 | `.app-header-divider` 1×16 `var(--border)`，仅出现在算力胶囊与用户菜单之间 |
+| 用户菜单 | `.app-user` 高 32，`padding: 0 8px 0 4px`，radius 8；头像 28；邮箱 13 `--text-body`，`max-width: 168px` 超长省略；右侧 `ChevronDown` 14 `--text-desc`，展开旋转 180°；hover / 展开底 `#f1efff` |
+
+右侧只保留一处「有量」的信息（余额），其余控件默认中性，强调色只出现在交互态。
 
 ## 3. 移动端
 
 | 视口 | 行为 |
 | --- | --- |
 | > 900 | 完整桌面顶栏 |
-| ≤ 900 | 顶栏 54px，`padding: 0 14px`；`.app-topnav`、`.app-quota`、`.app-user-email`、`.app-sider-wrap` 全部 `display:none`；右侧只留头像与 `.app-mobile-toggle` 汉堡（36×36，icon 20，radius 8） |
+| ≤ 900 | 顶栏 54px，`padding: 0 14px`；`.app-topnav`、`.app-quota`、`.app-header-divider`、`.app-user-email`、`.app-sider-wrap` 全部 `display:none`；右侧只留消息铃铛、头像（含展开箭头）与 `.app-mobile-toggle` 汉堡（36×36，icon 20，radius 8） |
 
 汉堡点击打开 antd `Drawer` 承载完整的 `SideRail`；抽屉内恢复 280px 宽横排菜单，点菜单即导航并关闭抽屉。
 
