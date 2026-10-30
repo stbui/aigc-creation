@@ -15,7 +15,9 @@
       "/tmp/arch-audit",
       "/private/tmp/arch-audit",
       "/tmp/ux-review",
-      "/private/tmp/ux-review"
+      "/private/tmp/ux-review",
+      "/tmp",
+      "/private/tmp"
     ]
   }
 }

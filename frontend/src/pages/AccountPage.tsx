@@ -1,23 +1,28 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Alert, Avatar, Button, Input, Modal, Tag, message } from 'antd';
+import { Alert, Avatar, Button, Input, Modal, message } from 'antd';
 import {
   BarChart3,
   Bell,
   CheckCheck,
+  ChevronRight,
   Download,
+  FolderOpen,
   Gem,
   Gift,
+  Image as ImageIcon,
+  Images,
   KeyRound,
   LifeBuoy,
+  MessageSquare,
   Receipt,
   ShieldAlert,
-  UserRound,
+  ShieldCheck,
   Wallet,
 } from 'lucide-react';
 import { creditsApi, membershipApi, meApi, notificationsApi, ordersApi, ticketsApi } from '../lib/api';
 import { PersonalPage } from '../components/PersonalPage';
-import { StateSkeleton } from '../components/StateViews';
+import { StateButton, StateEmpty, StateSkeleton } from '../components/StateViews';
 import { useAuth } from '../context/AuthContext';
 import type {
   CreditBalance,
@@ -100,6 +105,8 @@ export function AccountPage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changing, setChanging] = useState(false);
+  /** 改密表单放在弹窗里: 它一年用一两次, 常驻占走首屏一半高度不划算 */
+  const [pwdOpen, setPwdOpen] = useState(false);
 
   const [exporting, setExporting] = useState(false);
 
@@ -178,17 +185,16 @@ export function AccountPage() {
 
   if (!token) {
     return (
-      <PersonalPage title="账户设置" description="管理你的资料、安全与数据。" width="narrow">
-        <Alert
-          type="info"
-          showIcon
-          message="请先登录"
-          description="账户设置需要登录后才能查看。"
-          action={
-            <Button size="small" type="primary" onClick={openLogin}>
-              去登录
-            </Button>
-          }
+      <PersonalPage
+        title="账户设置"
+        description="管理你的资料、安全与数据。"
+        className="account-page"
+      >
+        {/* 与工单 / 积分等个人页一致: 空态用居中的引导块, 而不是一条通栏提示 */}
+        <StateEmpty
+          title="登录后管理账户"
+          desc="账户设置与你的账号绑定；登录后可以修改昵称、查看积分与会员、导出数据。"
+          action={<StateButton onClick={openLogin}>登录/注册</StateButton>}
         />
       </PersonalPage>
     );
@@ -196,7 +202,7 @@ export function AccountPage() {
 
   if (loading) {
     return (
-      <PersonalPage title="账户设置" description="管理你的资料、安全与数据。" width="narrow">
+      <PersonalPage title="账户设置" description="管理你的资料、安全与数据。" className="account-page">
         <StateSkeleton variant="panel" count={4} />
       </PersonalPage>
     );
@@ -221,27 +227,42 @@ export function AccountPage() {
     }
   };
 
-  const changePassword = async () => {
+  /**
+   * 改密。返回是否成功: 弹窗只在成功时关闭,
+   * 校验失败 (密码太短 / 两次不一致) 停在原地让用户改, 而不是丢掉已填内容。
+   */
+  const changePassword = async (): Promise<boolean> => {
     if (newPassword.length < 6) {
       message.warning('新密码至少 6 位');
-      return;
+      return false;
     }
     if (newPassword !== confirmPassword) {
       message.warning('两次输入的新密码不一致');
-      return;
+      return false;
     }
     setChanging(true);
     try {
       await meApi.changePassword(oldPassword, newPassword);
       message.success('密码已修改，请重新登录');
+      setPwdOpen(false);
       // 后端已把 tokenVersion + 1，旧 token 全部失效 —— 主动登出比等 401 更干净
       logout();
       navigate('/login', { replace: true });
+      return true;
     } catch (e) {
       message.error(e instanceof Error ? e.message : '修改失败');
+      return false;
     } finally {
       setChanging(false);
     }
+  };
+
+  /** 打开改密弹窗时清空上次输入, 避免残留已失效的密码 */
+  const openPassword = () => {
+    setOldPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPwdOpen(true);
   };
 
   const exportData = async () => {
@@ -329,100 +350,108 @@ export function AccountPage() {
   };
 
   const counts = profile?.counts;
-  const STATS: Array<{ label: string; value: number | null; to: string }> = [
-    { label: '项目', value: counts?.projects ?? null, to: '/library' },
-    { label: '作品', value: counts?.tasks ?? null, to: '/works' },
-    { label: '素材', value: counts?.assets ?? null, to: '/library' },
-    { label: '订单', value: counts?.orders ?? null, to: '/orders' },
-    { label: '工单', value: ticketTotal, to: '/tickets' },
+  /** 每格都是入口: 图标帮扫读, 工单数来自独立的工单接口而非 /me.counts */
+  const STATS: Array<{ label: string; value: number | null; to: string; icon: ReactNode }> = [
+    { label: '项目', value: counts?.projects ?? null, to: '/library', icon: <FolderOpen size={13} aria-hidden /> },
+    { label: '作品', value: counts?.tasks ?? null, to: '/works', icon: <ImageIcon size={13} aria-hidden /> },
+    { label: '素材', value: counts?.assets ?? null, to: '/library', icon: <Images size={13} aria-hidden /> },
+    { label: '订单', value: counts?.orders ?? null, to: '/orders', icon: <Receipt size={13} aria-hidden /> },
+    { label: '工单', value: ticketTotal, to: '/tickets', icon: <MessageSquare size={13} aria-hidden /> },
   ];
 
   const avatarChar = (profile?.name || profile?.email || 'U').charAt(0).toUpperCase();
+  /**
+   * 昵称有改动才允许保存。之前按钮恒为实心紫、恒可点, 点一次只弹一句
+   * 「昵称已更新」, 用户分不清是自己没改还是没存上。
+   */
+  const nameDirty = name.trim().length > 0 && name.trim() !== (profile?.name ?? '');
 
   return (
     <PersonalPage
       className="account-page"
       title="账户设置"
-      description="管理你的资料、安全与数据；积分与订单可从下方快捷进入。"
-      width="narrow"
+      description="管理资料、安全与数据；积分、订单与工单可从卡片直接进入。"
       extra={
         <Button icon={<BarChart3 size={15} />} onClick={() => navigate('/stats')}>
           创作数据
         </Button>
       }
     >
-      {/* ── 概览 ───────────────────────────────────────────────── */}
-      <section className="account-card account-hero">
-        <div className="account-hero-main">
+      {/*
+        身份与资料合成一张卡: 概览卡原先重复展示一次邮箱、资料卡再展示一次,
+        同一屏里两处「你叫什么、邮箱是什么」既占高度又让人以为各自可改。
+        这里上排只回答「我是谁」, 下排只回答「哪些能改」。
+      */}
+      <section className="account-card account-identity">
+        <div className="account-identity-head">
           <Avatar size={64} className="account-avatar">
             {avatarChar}
           </Avatar>
-          <div className="account-hero-info">
-            <div className="account-hero-name">
-              {profile?.name || '未设置昵称'}
-              <Tag color={profile?.status === 'active' ? 'green' : 'default'} className="account-status">
+          <div className="account-identity-info">
+            <div className="account-identity-name">
+              <h2>{profile?.name || '未设置昵称'}</h2>
+              <span className={`account-pill${profile?.status === 'active' ? ' is-ok' : ' is-muted'}`}>
                 {profile?.status === 'active' ? '正常' : profile?.status || '—'}
-              </Tag>
-              {unread > 0 && <Tag color="blue">{unread} 条未读消息</Tag>}
+              </span>
+              {unread > 0 && <span className="account-pill is-brand">{unread} 条未读消息</span>}
             </div>
-            <div className="account-hero-email">{profile?.email}</div>
-            <div className="account-hero-meta">
+            <div className="account-identity-meta">
               <span>注册于 {fmtDate(profile?.createdAt)}</span>
               <span>上次登录 {fmtDateTime(profile?.lastLoginAt)}</span>
-              <span>{profile?.phone ? `手机 ${profile.phone}` : '未绑定手机'}</span>
             </div>
           </div>
-        </div>
-        <div className="account-quick">
-          <Button type="primary" icon={<Wallet size={14} />} onClick={() => navigate('/credits')}>
-            积分明细
-          </Button>
-          <Button icon={<Gem size={14} />} onClick={() => navigate('/packages')}>
-            购买套餐
-          </Button>
-          <Button icon={<LifeBuoy size={14} />} onClick={() => navigate('/tickets')}>
-            我的工单
-          </Button>
-          {/* 邀请 / 签到此前只有顶导一个入口, 个人主页是用户找「还能做什么」的地方 */}
-          <Button icon={<Gift size={14} />} onClick={() => navigate('/invitations')}>
-            邀请有礼
-          </Button>
-        </div>
-      </section>
-
-      {/* ── 资料 ───────────────────────────────────────────────── */}
-      <section className="account-card">
-        <header className="account-card-head">
-          <UserRound size={16} />
-          <h2>基本资料</h2>
-        </header>
-        <div className="account-field">
-          <label>邮箱</label>
-          <div className="account-value">
-            {profile?.email}
-            <span className="account-hint">登录标识，已用于订单与发票，暂不支持修改</span>
-          </div>
-        </div>
-        <div className="account-field">
-          <label>昵称</label>
-          <div className="account-value">
-            <Input
-              value={name}
-              maxLength={20}
-              onChange={(e) => setName(e.target.value)}
-              onPressEnter={() => void saveName()}
-              style={{ maxWidth: 280 }}
-            />
-            <Button size="small" type="primary" loading={savingName} onClick={() => void saveName()}>
-              保存
+          <div className="account-quick">
+            <Button type="primary" icon={<Wallet size={14} />} onClick={() => navigate('/credits')}>
+              积分明细
+            </Button>
+            <Button icon={<Gem size={14} />} onClick={() => navigate('/packages')}>
+              购买套餐
+            </Button>
+            <Button icon={<LifeBuoy size={14} />} onClick={() => navigate('/tickets')}>
+              我的工单
+            </Button>
+            {/* 邀请 / 签到此前只有顶导一个入口, 个人主页是用户找「还能做什么」的地方 */}
+            <Button icon={<Gift size={14} />} onClick={() => navigate('/invitations')}>
+              邀请有礼
             </Button>
           </div>
         </div>
-        <div className="account-field">
-          <label>手机号</label>
-          <div className="account-value">
-            {profile?.phone ?? '未绑定'}
-            <span className="account-hint">绑定与更换需短信验证，请前往登录页使用短信登录后绑定</span>
+
+        <div className="account-fields">
+          <div className="account-field">
+            <span className="account-field-label">邮箱</span>
+            <div className="account-field-value">
+              <span className="account-field-text">{profile?.email}</span>
+              <span className="account-hint">登录标识，已用于订单与发票，暂不支持修改</span>
+            </div>
+          </div>
+          <div className="account-field">
+            <span className="account-field-label">昵称</span>
+            <div className="account-field-value">
+              <Input
+                className="account-nick-input"
+                value={name}
+                maxLength={20}
+                onChange={(e) => setName(e.target.value)}
+                onPressEnter={() => nameDirty && void saveName()}
+              />
+              <Button
+                size="small"
+                type={nameDirty ? 'primary' : 'default'}
+                disabled={!nameDirty}
+                loading={savingName}
+                onClick={() => void saveName()}
+              >
+                保存
+              </Button>
+            </div>
+          </div>
+          <div className="account-field">
+            <span className="account-field-label">手机号</span>
+            <div className="account-field-value">
+              <span className="account-field-text">{profile?.phone ?? '未绑定'}</span>
+              <span className="account-hint">绑定与更换需短信验证，请前往登录页使用短信登录后绑定</span>
+            </div>
           </div>
         </div>
       </section>
@@ -430,7 +459,7 @@ export function AccountPage() {
       {/* ── 积分与会员 ─────────────────────────────────────────── */}
       <section className="account-card">
         <header className="account-card-head">
-          <Wallet size={16} />
+          <Wallet size={15} aria-hidden />
           <h2>积分与会员</h2>
           <Button
             type="link"
@@ -438,12 +467,12 @@ export function AccountPage() {
             className="account-card-more"
             onClick={() => navigate('/credits')}
           >
-            查看明细
+            查看积分明细
           </Button>
         </header>
         <div className="account-assets">
           <div className="account-asset">
-            <span>可用积分</span>
+            <span className="account-asset-label">可用积分</span>
             <b>{credits ? credits.balance.toLocaleString('zh-CN') : '—'}</b>
             <small>
               {credits
@@ -452,19 +481,21 @@ export function AccountPage() {
                   : '暂无即将到期的积分'
                 : '积分余额加载失败，可前往积分明细页查看'}
             </small>
-            <Button size="small" onClick={() => navigate('/packages')}>
-              购买积分
-            </Button>
+            <div className="account-asset-actions">
+              <Button size="small" onClick={() => navigate('/packages')}>
+                购买积分
+              </Button>
+            </div>
           </div>
-          <div className="account-asset">
-            <span>会员状态</span>
+          <div className={`account-asset${membership?.isMember ? ' is-member' : ''}`}>
+            <span className="account-asset-label">会员状态</span>
             <b>{membership?.isMember ? membership.planName : '普通用户'}</b>
             <small>
               {membership?.isMember
                 ? `有效期至 ${fmtDate(membership.expiresAt)} · 每月赠送 ${membership.monthlyCredits} 积分`
                 : '开通会员享专属折扣与每月赠送积分'}
             </small>
-            <div className="account-membership-actions">
+            <div className="account-asset-actions">
               <Button
                 size="small"
                 type={membership?.isMember ? 'default' : 'primary'}
@@ -474,7 +505,7 @@ export function AccountPage() {
               </Button>
               {membership?.isMember && !membership.cancelAtPeriodEnd && (
                 <Button size="small" type="text" danger loading={cancelling} onClick={cancelMembership}>
-                  取消续费
+                  取消自动续费
                 </Button>
               )}
             </div>
@@ -488,115 +519,182 @@ export function AccountPage() {
       {/* ── 我的数据 ───────────────────────────────────────────── */}
       <section className="account-card">
         <header className="account-card-head">
-          <BarChart3 size={16} />
+          <BarChart3 size={15} aria-hidden />
           <h2>我的数据</h2>
         </header>
         <div className="account-stats">
           {STATS.map((s) => (
             <button key={s.label} type="button" className="account-stat" onClick={() => navigate(s.to)}>
-              <span>{s.label}</span>
+              <span className="account-stat-label">
+                {s.icon}
+                {s.label}
+                <ChevronRight size={13} className="account-stat-arrow" aria-hidden />
+              </span>
               <b>{s.value ?? '—'}</b>
             </button>
           ))}
         </div>
       </section>
 
-      {/* ── 最近订单 ───────────────────────────────────────────── */}
-      <section className="account-card">
-        <header className="account-card-head">
-          <Receipt size={16} />
-          <h2>最近订单</h2>
-          <Button
-            type="link"
-            size="small"
-            className="account-card-more"
-            onClick={() => navigate('/orders')}
-          >
-            全部订单
-          </Button>
-        </header>
-        {recentOrders.length === 0 ? (
-          <p className="account-empty">
-            暂无订单。
-            <Button type="link" size="small" onClick={() => navigate('/packages')}>
-              去购买积分或会员
+      {/* ── 最近订单 / 最近消息 ───────────────────────────────── */}
+      {/* 两列并排: 单列铺满 1120 时每行两侧都是空白, 上下叠起来又多滚一屏 */}
+      <div className="account-split">
+        <section className="account-card">
+          <header className="account-card-head">
+            <Receipt size={15} aria-hidden />
+            <h2>最近订单</h2>
+            <Button
+              type="link"
+              size="small"
+              className="account-card-more"
+              onClick={() => navigate('/orders')}
+            >
+              全部订单
             </Button>
-          </p>
-        ) : (
-          <ul className="account-order-list">
-            {recentOrders.map((o) => (
-              <li key={o.id}>
-                <button type="button" className="account-order" onClick={() => navigate('/orders')}>
-                  <span className="account-order-main">
-                    <span className="account-order-title">
-                      {o.membershipPlanName || o.items.map((it) => it.name).join('、') || o.orderNo}
-                    </span>
-                    <span className="account-order-meta">
-                      {o.orderNo} · {fmtDateTime(o.createdAt, true)}
-                    </span>
-                  </span>
-                  <span className="account-order-amount">{fmtYuan(o.paidCents)}</span>
-                  <span className={`account-order-status is-${o.status}`}>
-                    {ORDER_STATUS_LABEL[o.status]}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      {/* ── 最近消息 ───────────────────────────────────────────── */}
-      <section className="account-card">
-        <header className="account-card-head">
-          <Bell size={16} />
-          <h2>最近消息</h2>
-          <Button
-            type="link"
-            size="small"
-            className="account-card-more"
-            icon={<CheckCheck size={13} />}
-            disabled={unread === 0}
-            onClick={() => void markAllRead()}
-          >
-            全部已读
-          </Button>
-        </header>
-        {messages.length === 0 ? (
-          <p className="account-empty">暂无消息。支付、任务失败退款与工单回复会在这里通知你。</p>
-        ) : (
-          <ul className="account-msg-list">
-            {messages.map((n) => (
-              <li key={n.id}>
-                <button
-                  type="button"
-                  className={`account-msg${n.readAt ? '' : ' is-unread'}`}
-                  onClick={() => void openMessage(n)}
-                >
-                  <span className="account-msg-dot" aria-hidden />
-                  <span className="account-msg-main">
-                    <span className="account-msg-title">{n.title}</span>
-                    {n.body && (
-                      <span className="account-msg-body" title={n.body}>
-                        {n.body}
+          </header>
+          {recentOrders.length === 0 ? (
+            <p className="account-empty">
+              暂无订单。
+              <Button type="link" size="small" onClick={() => navigate('/packages')}>
+                去购买积分或会员
+              </Button>
+            </p>
+          ) : (
+            <ul className="account-order-list">
+              {recentOrders.map((o) => (
+                <li key={o.id}>
+                  <button type="button" className="account-order" onClick={() => navigate('/orders')}>
+                    <span className="account-order-main">
+                      <span className="account-order-title">
+                        {o.membershipPlanName || o.items.map((it) => it.name).join('、') || o.orderNo}
                       </span>
-                    )}
-                  </span>
-                  <span className="account-msg-time">{fmtDateTime(n.createdAt, true)}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+                      <span className="account-order-meta">
+                        {o.orderNo} · {fmtDateTime(o.createdAt, true)}
+                      </span>
+                    </span>
+                    <span className="account-order-amount">{fmtYuan(o.paidCents)}</span>
+                    <span className={`account-order-status is-${o.status}`}>
+                      {ORDER_STATUS_LABEL[o.status]}
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
-      {/* ── 安全 ───────────────────────────────────────────────── */}
+        <section className="account-card">
+          <header className="account-card-head">
+            <Bell size={15} aria-hidden />
+            <h2>最近消息</h2>
+            <Button
+              type="link"
+              size="small"
+              className="account-card-more"
+              icon={<CheckCheck size={13} />}
+              disabled={unread === 0}
+              onClick={() => void markAllRead()}
+            >
+              全部已读
+            </Button>
+          </header>
+          {messages.length === 0 ? (
+            <p className="account-empty">暂无消息。支付、任务失败退款与工单回复会在这里通知你。</p>
+          ) : (
+            <ul className="account-msg-list">
+              {messages.map((n) => (
+                <li key={n.id}>
+                  <button
+                    type="button"
+                    className={`account-msg${n.readAt ? '' : ' is-unread'}`}
+                    onClick={() => void openMessage(n)}
+                  >
+                    <span className="account-msg-dot" aria-hidden />
+                    <span className="account-msg-main">
+                      <span className="account-msg-title">{n.title}</span>
+                      {n.body && (
+                        <span className="account-msg-body" title={n.body}>
+                          {n.body}
+                        </span>
+                      )}
+                    </span>
+                    <span className="account-msg-time">{fmtDateTime(n.createdAt, true)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
+
+      {/*
+        安全与数据合并成一行一条: 改密 / 导出 / 注销 都是一年用不了几次的动作,
+        原先三张卡占了整页 1/3 高度, 还把「注销」抬到和「积分」同等显眼的位置。
+      */}
       <section className="account-card">
         <header className="account-card-head">
-          <KeyRound size={16} />
-          <h2>修改密码</h2>
+          <ShieldCheck size={15} aria-hidden />
+          <h2>安全与数据</h2>
         </header>
-        <p className="account-desc">修改成功后，该账号在所有设备上的登录状态都会失效，需要重新登录。</p>
+        <ul className="account-actions">
+          <li>
+            <div className="account-action-text">
+              <span className="account-action-title">
+                <KeyRound size={13} aria-hidden />
+                登录密码
+              </span>
+              <span className="account-action-desc">
+                修改后该账号在所有设备上的登录状态都会失效，需要重新登录。
+              </span>
+            </div>
+            <Button onClick={openPassword}>修改密码</Button>
+          </li>
+          <li>
+            <div className="account-action-text">
+              <span className="account-action-title">
+                <Download size={13} aria-hidden />
+                个人数据导出
+              </span>
+              <span className="account-action-desc">
+                导出账号资料、项目、素材元信息、生成记录、订单、积分流水与消息（JSON）。导出不含密码哈希等内部字段；素材文件本体请到素材库单独下载。
+              </span>
+            </div>
+            <Button loading={exporting} onClick={() => void exportData()}>
+              导出我的数据
+            </Button>
+          </li>
+          <li className="is-danger">
+            <div className="account-action-text">
+              <span className="account-action-title">
+                <ShieldAlert size={13} aria-hidden />
+                注销账号
+              </span>
+              <span className="account-action-desc">
+                注销后账号不可恢复：作品、素材与积分将被清除，生效中的会员权益同时终止且不退款。依据会计与消费者权益相关法规，订单、支付与积分流水会以匿名化形式保留。
+              </span>
+            </div>
+            <Button danger onClick={() => void openDelete()}>
+              注销账号
+            </Button>
+          </li>
+        </ul>
+      </section>
+
+      <Modal
+        className="account-modal"
+        open={pwdOpen}
+        title="修改密码"
+        okText="确认修改"
+        cancelText="取消"
+        confirmLoading={changing}
+        okButtonProps={{ disabled: !oldPassword || !newPassword || !confirmPassword }}
+        onOk={() => void changePassword()}
+        onCancel={() => setPwdOpen(false)}
+        destroyOnHidden
+      >
+        <p className="account-desc">
+          修改成功后，该账号在所有设备上的登录状态都会失效，需要重新登录。
+        </p>
         <div className="account-form">
           <Input.Password
             placeholder="当前密码"
@@ -616,44 +714,8 @@ export function AccountPage() {
             onChange={(e) => setConfirmPassword(e.target.value)}
             autoComplete="new-password"
           />
-          <Button
-            type="primary"
-            loading={changing}
-            onClick={() => void changePassword()}
-            disabled={!oldPassword || !newPassword}
-          >
-            修改密码
-          </Button>
         </div>
-      </section>
-
-      {/* ── 导出 ───────────────────────────────────────────────── */}
-      <section className="account-card">
-        <header className="account-card-head">
-          <Download size={16} />
-          <h2>个人数据导出</h2>
-        </header>
-        <p className="account-desc">
-          导出账号资料、项目、素材元信息、生成记录、订单、积分流水与消息（JSON）。导出不含密码哈希等内部字段；素材文件本体请到素材库单独下载。
-        </p>
-        <Button loading={exporting} onClick={() => void exportData()}>
-          导出我的数据
-        </Button>
-      </section>
-
-      {/* ── 注销 ───────────────────────────────────────────────── */}
-      <section className="account-card is-danger">
-        <header className="account-card-head">
-          <ShieldAlert size={16} />
-          <h2>注销账号</h2>
-        </header>
-        <p className="account-desc">
-          注销后账号不可恢复：作品、素材与积分将被清除，生效中的会员权益同时终止且不退款。依据会计与消费者权益相关法规，订单、支付与积分流水会以匿名化形式保留。
-        </p>
-        <Button danger onClick={() => void openDelete()}>
-          注销账号
-        </Button>
-      </section>
+      </Modal>
 
       <Modal
         open={deleteOpen}
@@ -673,7 +735,7 @@ export function AccountPage() {
           <Alert
             type="warning"
             showIcon
-            message="此操作不可撤销"
+            title="此操作不可撤销"
             description={
               previewLoading
                 ? '正在统计影响面…'

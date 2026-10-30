@@ -1,9 +1,37 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Alert, Button, Drawer, Result, Skeleton } from 'antd';
-import { AlertTriangle } from 'lucide-react';
+import { USE_BOARDUI_ADMIN } from '../../admin-ui/lib/flag';
+import * as boardui from '../../admin-ui/widgets/AdminChrome';
+import * as legacy from './AdminWidgets.legacy';
 import { PageHeader } from './PageHeader';
-import { StateEmpty, StateError, StateLoading } from '../StateViews';
+
+/**
+ * 后台列表共享控件（入口）。
+ *
+ * ## 为什么这里只做「分流」
+ *
+ * 数据逻辑（`useAdminList` / `useAdminResource` / URL 同步 / 分页配置）与渲染
+ * 无关，只保留一份 —— 两条渲染路径若各存一份逻辑，「失败不清空数据」「筛选
+ * 变更重置页码」这类行为迟早会分叉。
+ *
+ * 渲染层有两份：`admin-ui/widgets/AdminChrome`（BoardUI）与
+ * `AdminWidgets.legacy`（antd 回滚路径），由 `VITE_ADMIN_UI` 决定用哪份。
+ * 页面只 `import ... from '../../components/admin/AdminWidgets'`，不感知差异，
+ * 29 个页面因此不需要改 import。
+ */
+const impl = USE_BOARDUI_ADMIN ? boardui : legacy;
+
+/*
+ * 逐项标注成 legacy 版的类型而不是让 TS 推导联合类型。
+ * `AdminDrawer` 是泛型组件，联合的泛型签名在调用处推不出 T，页面里的
+ * `children={(data) => data.xxx}` 会退化成 unknown。legacy 的签名就是契约，
+ * BoardUI 版与之逐字一致，这里的 as 不会掩盖真实差异。
+ */
+export const AdminListLoading: typeof legacy.AdminListLoading = impl.AdminListLoading;
+export const AdminListError: typeof legacy.AdminListError = impl.AdminListError;
+export const AdminStaleError: typeof legacy.AdminStaleError = impl.AdminStaleError;
+export const AdminDrawer: typeof legacy.AdminDrawer = impl.AdminDrawer;
+export const ConfirmAction: typeof legacy.ConfirmAction = impl.ConfirmAction;
 
 /**
  * 列表数据 hook。
@@ -149,6 +177,9 @@ export function useAdminDetailParam() {
  * 适应分页器 —— 这不该靠记忆。
  *
  * `unit` 保留各页的计量词 (券用「张」、活动用「个」), 其余一律统一。
+ *
+ * 注：返回的是 antd Pagination 的配置形状。BoardUI 路径下由 `AdminDataTable`
+ * 消费同一份配置并渲染自己的分页器 —— 配置只在一处定义。
  */
 export function adminPagination({
   current,
@@ -208,10 +239,6 @@ export function adminMiniPagination({
  *   2. 失败不清空已加载的数据 (刷新失败不该让整页塌成错误态)
  *   3. `silent` 轮询 (定时任务页 30s 轮询时, 按钮不该每 30 秒闪一次转圈)
  *
- * 此前这十来个页面各抄一份 `useState(loading/error)` + `useCallback(load)` +
- * `useEffect`, 差异全在细节上: 有的 `load()` 忘了置 loading、有的没有竞态保护、
- * 有的在 finally 里去 `setData(null)`。收敛成一份, 页面只写 `fetcher` 与依赖。
- *
  * `deps` 变化即重新拉取 (等价于「筛选条件变了就重查」), 语义与 `useEffect`
  * 的依赖数组一致, 调用处必须传**定长**数组。
  */
@@ -247,268 +274,6 @@ export function useAdminResource<T>(fetcher: () => Promise<T>, deps: readonly un
   }, [load, ...deps]);
 
   return { data, loading, error, reload: load };
-}
-
-/**
- * 列表页统一骨架: 保持布局稳定, 避免内容跳动。
- *
- * 2026-10-20: 原为 antd `<Spin size="large" tip>` 配一个 120×120 空 div。
- * 改用骨架屏 —— 空 div 撑不出真实列表的高度, 数据到达时仍会跳动。
- */
-export function AdminListLoading({ tip = '加载中…' }: { tip?: string }) {
-  return (
-    <div className="adm-page-loading">
-      <Skeleton active paragraph={{ rows: 5 }} />
-      <p className="adm-page-loading-tip">{tip}</p>
-    </div>
-  );
-}
-
-/** 列表页统一失败态: 保留筛选条件, 给出重试 */
-export function AdminListError({ error, onRetry }: { error: string; onRetry: () => void }) {
-  return (
-    <Result
-      status="warning"
-      title="加载失败"
-      subTitle={error}
-      extra={<Button onClick={onRetry}>重试</Button>}
-    />
-  );
-}
-
-/**
- * 刷新失败、但手上有上一次成功的数据 (2026-10-23)。
- *
- * 用 `useAdminResource` / `useAdminList` 之后失败不会清空数据 —— 好处是页面
- * 还能读, 坏处是**页面上每一处的数据都可能已经过期**, 而用户看不出来。
- * 这个条就是补上那句话说清楚: 「下面这些是上次的」, 并就地给重试。
- *
- * 必须在 `error && data` 时渲染; `error && !data` 走 `AdminListError` 整块替换。
- */
-export function AdminStaleError({ error, onRetry }: { error: string; onRetry: () => void }) {
-  return (
-    <div className="adm-alert is-danger">
-      <AlertTriangle size={16} />
-      <div>
-        <strong>刷新失败，下面是上一次成功获取的数据</strong>
-        <div>{error}</div>
-        <div style={{ marginTop: 4 }}>
-          <Button size="small" onClick={onRetry}>
-            重试
-          </Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/**
- * 详情抽屉。
- *
- * 懒加载: 打开才请求, 关闭清空 —— 避免打开列表时就为几十条记录各拉一次详情。
- * children 是渲染函数而非元素, 这样详情数据到达前不会渲染出空壳。
- */
-export function AdminDrawer<T>({
-  open,
-  title,
-  onClose,
-  fetcher,
-  children,
-  footer,
-}: {
-  open: boolean;
-  title: ReactNode;
-  onClose: () => void;
-  fetcher: () => Promise<T>;
-  children: (data: T) => ReactNode;
-  footer?: (data: T) => ReactNode;
-}) {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const fetcherRef = useRef(fetcher);
-  fetcherRef.current = fetcher;
-  const seq = useRef(0);
-  /**
-   * 重试计数 —— 失败态的「重试」按钮靠它重新触发拉取。
-   * 不能靠 setOpen(v => v): 抽屉的拉取只依赖 open, 值不变就不会重跑。
-   */
-  const [retryNonce, setRetryNonce] = useState(0);
-
-  useEffect(() => {
-    if (!open) {
-      setData(null);
-      setError(null);
-      return;
-    }
-    const current = ++seq.current;
-    setLoading(true);
-    setError(null);
-    fetcherRef
-      .current()
-      .then((d) => {
-        if (current !== seq.current) return;
-        setData(d);
-      })
-      .catch((e: unknown) => {
-        if (current !== seq.current) return;
-        setError(e instanceof Error ? e.message : '加载失败');
-      })
-      .finally(() => {
-        if (current === seq.current) setLoading(false);
-      });
-  }, [open, retryNonce]);
-
-  const footerContent = data && footer ? footer(data) : null;
-
-  return (
-    <Drawer
-      title={title}
-      size={720}
-      open={open}
-      onClose={onClose}
-      className="adm-drawer"
-      destroyOnHidden
-      footer={
-        footerContent ? <div className="adm-drawer-footer">{footerContent}</div> : undefined
-      }
-    >
-      {loading ? (
-        <div className="adm-drawer-loading">
-          <StateLoading tip="加载详情…" />
-        </div>
-      ) : error ? (
-        /* 失败态: 详情加载失败不该显示成 antd Empty 的"暂无数据" */
-        <StateError
-          compact
-          title="详情加载失败"
-          desc="没能取回该条记录详情。"
-          detail={error}
-          onRetry={() => setRetryNonce((n) => n + 1)}
-        />
-      ) : data ? (
-        children(data)
-      ) : (
-        <StateEmpty compact title="暂无详情" />
-      )}
-    </Drawer>
-  );
-}
-
-/**
- * 高危操作确认区（页面内，不使用弹窗）。
- *
- * 2026-10-26 按产品要求去掉阻塞式确认弹窗：操作仍需要看影响面与填必填项，
- * 但以页面底部的操作条承载，不再遮罩页面、不再强制「输入确认词」。
- * 纯确认类动作（无需填数据）应在调用方直接执行，不必挂这个组件。
- *
- * 仍然保留的两条硬规则 (来自 docs/admin-ui-design.md §2.5):
- *   1. 必须量化影响 —— 写「将删除相关数据」等于没写
- *   2. 危险动作用 danger 标色，并把不可逆后果写在 description 里
- */
-export function ConfirmAction({
-  open,
-  title,
-  description,
-  impact,
-  danger = false,
-  confirmText = '确认',
-  loading = false,
-  confirmDisabled = false,
-  extra,
-  onCancel,
-  onConfirm,
-}: {
-  open: boolean;
-  title: string;
-  description?: ReactNode;
-  /** 影响面量化, 如 ['12 个项目', '45 张素材'] */
-  impact?: string[];
-  danger?: boolean;
-  /** @deprecated 不再要求输入确认词，保留入参仅为兼容旧调用 */
-  requireTyping?: boolean;
-  /** @deprecated 同上 */
-  typingText?: string;
-  confirmText?: string;
-  loading?: boolean;
-  /** 影响面仍在加载等场景下阻止误操作 */
-  confirmDisabled?: boolean;
-  extra?: ReactNode;
-  onCancel: () => void;
-  onConfirm: (typed: string) => void;
-}) {
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    // 操作条固定在底部；把焦点移进去，键盘用户不必再 Tab 一圈
-    panelRef.current?.focus();
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && !loading) onCancel();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [loading, onCancel, open]);
-
-  if (!open) return null;
-
-  return (
-    <div
-      ref={panelRef}
-      className={`adm-inline-confirm${danger ? ' is-danger' : ''}`}
-      role="region"
-      aria-label={title}
-      tabIndex={-1}
-    >
-      <div className="adm-inline-confirm-head">
-        <div className="adm-inline-confirm-title">{title}</div>
-        <Button
-          type="text"
-          size="small"
-          aria-label="关闭"
-          disabled={loading}
-          onClick={onCancel}
-        >
-          关闭
-        </Button>
-      </div>
-
-      {description && <div className="adm-inline-confirm-desc">{description}</div>}
-
-      {impact && impact.length > 0 && (
-        <Alert
-          className="adm-confirm-impact"
-          type={danger ? 'error' : 'warning'}
-          showIcon
-          title={<span className="adm-confirm-impact-title">影响范围</span>}
-          description={
-            <ul style={{ margin: 0, paddingLeft: 18 }}>
-              {impact.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-          }
-        />
-      )}
-
-      {extra}
-
-      <div className="adm-inline-confirm-actions">
-        <Button onClick={onCancel} disabled={loading}>
-          取消
-        </Button>
-        <Button
-          type="primary"
-          danger={danger}
-          loading={loading}
-          disabled={confirmDisabled}
-          onClick={() => onConfirm('')}
-        >
-          {confirmText}
-        </Button>
-      </div>
-    </div>
-  );
 }
 
 export { PageHeader };

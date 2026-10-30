@@ -6,6 +6,10 @@ import { useAuth } from '../../context/AuthContext';
 import { useAdmin } from '../../context/AdminContext';
 import { ChevronRight } from 'lucide-react';
 import { AdminLayout, AdminPageLoading, findAdminMenuItem } from '../../components/admin/AdminLayout';
+import { USE_BOARDUI_ADMIN } from '../../admin-ui/lib/flag';
+import { AdminUIProvider } from '../../admin-ui/providers/AdminUIProvider';
+import { AdminBoardLayout } from '../../admin-ui/shell/AdminBoardLayout';
+import '../../styles/boardui.css';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { ExceptionPage } from '../../components/ExceptionPage';
 import { PageHeader } from '../../components/admin/PageHeader';
@@ -897,54 +901,62 @@ export function AdminShell() {
     return <NoAdminAccess email={email} />;
   }
 
+  /*
+   * 外壳切换（2026-10-30）：默认走 BoardUI，`VITE_ADMIN_UI=legacy` 可整页回滚。
+   * 回退单位是「整页 / 整个外壳」，不做两套组件混搭。
+   */
+  const Shell = USE_BOARDUI_ADMIN ? AdminBoardLayout : AdminLayout;
+
   return (
-    <AdminLayout>
-      <ErrorBoundary resetKeys={[location.pathname]}>
-        <Suspense fallback={<AdminPageLoading tip="加载页面…" />}>
-          <Routes>
-            <Route index element={<DashboardContent />} />
-            <Route path="alerts" element={<AdminAlertsPage />} />
-            <Route path="users" element={<AdminUsersPage />} />
-            <Route path="roles" element={<AdminRolesPage />} />
-            <Route path="settings" element={<AdminSettingsPage />} />
-            <Route path="audit-logs" element={<AdminAuditPage />} />
-            <Route path="backups" element={<AdminBackupPage />} />
-            <Route path="assets" element={<AdminAssetsPage />} />
-            <Route path="storage" element={<AdminStoragePage />} />
-            <Route path="coupons" element={<AdminCouponsPage />} />
-            <Route path="campaigns" element={<AdminCampaignsPage />} />
-            <Route path="marketing-rules" element={<AdminMarketingRulesPage />} />
-            <Route path="scheduler" element={<AdminSchedulerPage />} />
-            {/* 模型配置与调用记录 (2026-10-20) */}
-            <Route path="model-config" element={<AdminModelConfigPage />} />
-            <Route path="model-calls" element={<AdminModelCallsPage />} />
-            {/* 能力管控 (B6): 单项能力上下线 */}
-            <Route path="capabilities" element={<AdminCapabilitiesPage />} />
-            {/* 任务监控 (B-28~B-33) */}
-            <Route path="tasks" element={<AdminTasksPage />} />
-            {/* 工单处理 (B7): 客服队列, 与任务监控同组 */}
-            <Route path="tickets" element={<AdminTicketsPage />} />
-            {/* 能力消耗价 (commerce-design.md §4.4) */}
-            <Route path="credit-prices" element={<AdminCreditPricesPage />} />
-            {/* 交易后台四页 (B1): 商品 / 订单 / 积分账本 / 保留期清理 */}
-            <Route path="products" element={<AdminProductsPage />} />
-            <Route path="orders" element={<AdminOrdersPage />} />
-            <Route path="credits" element={<AdminCreditsPage />} />
-            <Route path="retention" element={<AdminRetentionPage />} />
-            {/* 财务 (B3): 支付渠道状态 / 发票审核 / 渠道对账 */}
-            <Route path="payment-channels" element={<AdminPaymentChannelsPage />} />
-            <Route path="invoices" element={<AdminInvoicesPage />} />
-            <Route path="reconciliation" element={<AdminReconciliationPage />} />
-            <Route path="legal" element={<AdminLegalPage />} />
-            <Route path="notifications" element={<AdminNotificationsPage />} />
-            {/* AI 标识样式 (2026-10-21): 文案/字体/配色由浏览器渲成位图, 位置与缩放服务端合成 */}
-            <Route path="aigc-label" element={<AdminAigcLabelPage />} />
-            {/* 未实现的模块: 显式提示而非静默跳回概览 */}
-            <Route path="*" element={<NotImplementedPage />} />
-          </Routes>
-        </Suspense>
-      </ErrorBoundary>
-    </AdminLayout>
+    <AdminUIProvider>
+      <Shell>
+        <ErrorBoundary resetKeys={[location.pathname]}>
+          <Suspense fallback={<AdminPageLoading tip="加载页面…" />}>
+            <Routes>
+              <Route index element={<DashboardContent />} />
+              <Route path="alerts" element={<AdminAlertsPage />} />
+              <Route path="users" element={<AdminUsersPage />} />
+              <Route path="roles" element={<AdminRolesPage />} />
+              <Route path="settings" element={<AdminSettingsPage />} />
+              <Route path="audit-logs" element={<AdminAuditPage />} />
+              <Route path="backups" element={<AdminBackupPage />} />
+              <Route path="assets" element={<AdminAssetsPage />} />
+              <Route path="storage" element={<AdminStoragePage />} />
+              <Route path="coupons" element={<AdminCouponsPage />} />
+              <Route path="campaigns" element={<AdminCampaignsPage />} />
+              <Route path="marketing-rules" element={<AdminMarketingRulesPage />} />
+              <Route path="scheduler" element={<AdminSchedulerPage />} />
+              {/* 模型配置与调用记录 (2026-10-20) */}
+              <Route path="model-config" element={<AdminModelConfigPage />} />
+              <Route path="model-calls" element={<AdminModelCallsPage />} />
+              {/* 能力管控 (B6): 单项能力上下线 */}
+              <Route path="capabilities" element={<AdminCapabilitiesPage />} />
+              {/* 任务监控 (B-28~B-33) */}
+              <Route path="tasks" element={<AdminTasksPage />} />
+              {/* 工单处理 (B7): 客服队列, 与任务监控同组 */}
+              <Route path="tickets" element={<AdminTicketsPage />} />
+              {/* 能力消耗价 (commerce-design.md §4.4) */}
+              <Route path="credit-prices" element={<AdminCreditPricesPage />} />
+              {/* 交易后台四页 (B1): 商品 / 订单 / 积分账本 / 保留期清理 */}
+              <Route path="products" element={<AdminProductsPage />} />
+              <Route path="orders" element={<AdminOrdersPage />} />
+              <Route path="credits" element={<AdminCreditsPage />} />
+              <Route path="retention" element={<AdminRetentionPage />} />
+              {/* 财务 (B3): 支付渠道状态 / 发票审核 / 渠道对账 */}
+              <Route path="payment-channels" element={<AdminPaymentChannelsPage />} />
+              <Route path="invoices" element={<AdminInvoicesPage />} />
+              <Route path="reconciliation" element={<AdminReconciliationPage />} />
+              <Route path="legal" element={<AdminLegalPage />} />
+              <Route path="notifications" element={<AdminNotificationsPage />} />
+              {/* AI 标识样式 (2026-10-21): 文案/字体/配色由浏览器渲成位图, 位置与缩放服务端合成 */}
+              <Route path="aigc-label" element={<AdminAigcLabelPage />} />
+              {/* 未实现的模块: 显式提示而非静默跳回概览 */}
+              <Route path="*" element={<NotImplementedPage />} />
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
+      </Shell>
+    </AdminUIProvider>
   );
 }
 

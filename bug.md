@@ -5,12 +5,28 @@ systemctl status cloudcli      # 查看状态
   systemctl stop cloudcli        # 停止
   journalctl -u cloudcli -f      # 实时日志
 
+页面不提示不显示 
+支付方式由后台通道配置决定：未配置真实商户号时走站内沙箱，不产生真实扣款；配置 PAYMENT_PROVIDER 与商户凭据后由支付宝/微信完成真实扣款。
+能力咩有接入
+功能开发中
+测试方案
+mock 数据
+模拟
+
+
+系统升级、数据备份、数据迁移
 
 模型配置页面改版
 
 无限画布
 
 支持：android
+
+tailwind-merge
+
+
+
+
 
 
 复刻页面

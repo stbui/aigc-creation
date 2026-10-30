@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Check, CheckCircle2, XCircle, Clock, AlertTriangle } from 'lucide-react';
 import QRCode from 'qrcode';
 // quote (结算试算) 属于 C 端接口, 在 myMarketingApi 上; marketingApi 是后台优惠券管理
 import {
@@ -33,7 +33,7 @@ import { StateError, StateSkeleton } from '../components/StateViews';
  *    必须复用同一个 key, 否则后端会当成两笔新订单各扣一次钱。
  *    用 useState 会在重渲染后拿到新值, 所以用 ref。
  *
- * 2. **沙箱身份明示**: 当前只有沙箱通道, 不产生真实扣款。页面顶部常驻声明,
+ * 2. **沙箱身份明示**: 当前只有沙箱通道, 不产生真实扣款。支付方式卡片内常驻声明,
  *    不做「看起来像真支付」的蒙混 —— 否则截图外流会被误认为已接通支付。
  *
  * 3. **结果如实展示**: 失败/超时都把后端给的 message 原样透出,
@@ -455,7 +455,7 @@ export function CheckoutPage() {
   if (loading) {
     return (
       <div className="pkg-checkout-page">
-        <div className="pkg-checkout-container">
+        <div className="co-shell">
           {/* 2026-10-20: 原为纯文本「正在加载…」—— 慢网下与"空页面"难以区分 */}
           <StateSkeleton variant="panel" count={3} />
         </div>
@@ -466,13 +466,13 @@ export function CheckoutPage() {
   if (!product && !plan) {
     return (
       <div className="pkg-checkout-page">
-        <div className="pkg-checkout-container">
+        <div className="co-shell">
           {/*
-            失败态: 原复用 `.pkg-sandbox-notice` —— 那个 class 语义是"沙箱支付说明",
-            拿来渲染"商品加载失败"会把环境说明和错误混在同一视觉里。
+            失败态不复用支付卡的沙箱声明块 (`.co-notice`): 那个 class 的语义是
+            "沙箱支付说明", 拿来渲染"商品加载失败"会把环境说明和错误混在同一视觉里。
           */}
           <StateError
-            title="商品信息加载失败"
+            title={isMembership ? '套餐信息加载失败' : '商品信息加载失败'}
             desc={
               isMembership
                 ? '没能取回该会员套餐的信息。套餐可能已下架，请回到会员页重新选择。'
@@ -496,60 +496,56 @@ export function CheckoutPage() {
       result.kind === 'success' ? CheckCircle2 : result.kind === 'timeout' ? Clock : XCircle;
     return (
       <div className="pkg-checkout-page">
-        <div className="pkg-checkout-container">
-          <div className="pkg-result-card">
-            <div className={`pkg-result-icon is-${result.kind}`}>
-              <Icon size={28} />
+        <div className="co-shell">
+          <div className="co-result">
+            <div className={`co-result-icon is-${result.kind}`}>
+              <Icon size={26} aria-hidden />
             </div>
-            <h2 className="pkg-result-title">{result.title}</h2>
-            <p className="pkg-result-desc">{result.desc}</p>
+            <h1 className="co-result-title">{result.title}</h1>
+            <p className="co-result-desc">{result.desc}</p>
 
-            <div className="pkg-result-detail">
-              <div className="pkg-result-row">
-                <span>订单号</span>
-                <strong>{result.order.orderNo}</strong>
+            <dl className="co-result-rows">
+              <div className="co-result-row">
+                <dt>订单号</dt>
+                <dd>{result.order.orderNo}</dd>
               </div>
-              <div className="pkg-result-row">
-                <span>实付金额</span>
-                <strong>{formatYuan(result.order.paidCents)}</strong>
+              <div className="co-result-row">
+                <dt>实付金额</dt>
+                <dd>{formatYuan(result.order.paidCents)}</dd>
               </div>
               {result.order.grantedCredits > 0 && (
-                <div className="pkg-result-row">
-                  <span>获得积分</span>
-                  <strong>{result.order.grantedCredits}</strong>
+                <div className="co-result-row">
+                  <dt>获得积分</dt>
+                  <dd>{result.order.grantedCredits}</dd>
                 </div>
               )}
               {result.balance && (
-                <div className="pkg-result-row">
-                  <span>当前余额</span>
-                  <strong>{result.balance.balance}</strong>
+                <div className="co-result-row">
+                  <dt>当前余额</dt>
+                  <dd>{result.balance.balance}</dd>
                 </div>
               )}
               {result.balance && result.balance.expiringSoon > 0 && (
-                <div className="pkg-result-row">
-                  <span>30 天内到期</span>
-                  <strong>{result.balance.expiringSoon}</strong>
+                <div className="co-result-row">
+                  <dt>30 天内到期</dt>
+                  <dd>{result.balance.expiringSoon}</dd>
                 </div>
               )}
               {result.order.discountCents > 0 && (
-                <div className="pkg-result-row">
-                  <span>优惠减免</span>
-                  <strong>-{formatYuan(result.order.discountCents)}</strong>
+                <div className="co-result-row">
+                  <dt>优惠减免</dt>
+                  <dd>-{formatYuan(result.order.discountCents)}</dd>
                 </div>
               )}
-            </div>
+            </dl>
 
-            <div className="pkg-result-actions">
-              <button
-                type="button"
-                className="pkg-result-btn"
-                onClick={() => navigate('/orders')}
-              >
+            <div className="co-result-actions">
+              <button type="button" className="co-btn" onClick={() => navigate('/orders')}>
                 我的订单
               </button>
               <button
                 type="button"
-                className="pkg-result-btn is-primary"
+                className="co-btn is-primary"
                 onClick={() => navigate(plan ? '/' : '/packages')}
               >
                 {plan ? '返回首页' : '继续购买'}
@@ -576,236 +572,268 @@ export function CheckoutPage() {
 
   return (
     <div className="pkg-checkout-page">
-      <div className="pkg-checkout-container">
-        <button type="button" className="pkg-back-btn" onClick={() => navigate(-1)}>
-          <ArrowLeft size={14} /> 返回
-        </button>
+      <button type="button" className="co-back" onClick={() => navigate(-1)}>
+        <ArrowLeft size={14} aria-hidden /> 返回
+      </button>
 
-        <div className="pkg-confirm-card">
-          <h2 className="pkg-confirm-title">{title}</h2>
-          <p className="pkg-confirm-sub">
-            {plan
-              ? `${plan.durationDays} 天有效 · 每月 ${plan.monthlyCredits} 积分`
-              : product!.creditsValidDays > 0
-                ? `获得积分 ${product!.creditsValidDays} 天内有效`
-                : '获得积分永久有效'}
-          </p>
-
-          <div className="pkg-confirm-row">
-            <span>{plan ? '套餐' : '商品'}</span>
-            <strong>{plan ? plan.name : product!.name}</strong>
-          </div>
-          <div className="pkg-confirm-row">
-            <span>数量</span>
-            <strong>1</strong>
-          </div>
-          {/*
-            会员单展示的是「权益口径」而非积分: 月度积分按月发放, 与一次性
-            积分包的「立刻到账 N 积分」不是同一件事, 写成「获得积分」会误导。
-          */}
-          {plan ? (
-            <>
-              <div className="pkg-confirm-row">
-                <span>会员周期</span>
-                <strong>{plan.durationDays} 天</strong>
-              </div>
-              <div className="pkg-confirm-row">
-                <span>月度积分</span>
-                <strong>{plan.monthlyCredits} 积分</strong>
-              </div>
-            </>
-          ) : (
-            <div className="pkg-confirm-row">
-              <span>获得积分</span>
-              <strong>{product!.credits} 积分</strong>
-            </div>
-          )}
-
-          {/* 券码: 后端对不可用的券降级为不打折而非拒单, 原因随订单返回。
-              续付既有订单时不显示 —— 金额与优惠已在那张单上定死, 再改就不是同一笔了。
-              会员单不参与券与折扣 (后端会忽略), 因此整块隐藏。 */}
-          {!order && !plan && (
-            <div className="pkg-confirm-row">
-              <span>优惠码</span>
-              <input
-                className="pkg-sandbox-btn"
-                style={{ maxWidth: 160, padding: '6px 10px' }}
-                placeholder="选填"
-                value={couponCode}
-                onChange={(e) => setCouponCode(e.target.value)}
-                maxLength={24}
-              />
-            </div>
-          )}
-
-          {!order && !plan && quoteError && (
-            <p className="pkg-pay-hint" role="alert" style={{ textAlign: 'left', color: '#a32d2d' }}>
-              {quoteError}
-            </p>
-          )}
-
-          {order?.couponWarning && (
-            <p className="pkg-pay-hint" style={{ textAlign: 'left', color: '#a32d2d' }}>
-              优惠码不可用：{order.couponWarning}
-            </p>
-          )}
-
-          {/*
-            下单前的优惠试算说明。只在下单前展示 —— 下单后优惠已定死在订单快照里,
-            再显示试算结果会让两组数字并存, 用户无从判断以哪个为准。
-          */}
-          {!order && !plan && quotePreview && (
-            <>
-              {quotePreview.appliedSource === 'coupon' && quotePreview.appliedCouponCode && (
-                <p className="pkg-pay-hint" style={{ textAlign: 'left' }}>
-                  已使用优惠码 {quotePreview.appliedCouponCode}
-                </p>
-              )}
-              {quotePreview.appliedSource === 'campaign' && (
-                <p className="pkg-pay-hint" style={{ textAlign: 'left' }}>
-                  已命中限时活动，优惠金额已计入应付
-                </p>
-              )}
-              {quotePreview.notStackedNotice && (
-                <p className="pkg-pay-hint" style={{ textAlign: 'left' }}>
-                  {quotePreview.notStackedNotice}
-                </p>
-              )}
-              {/*
-                只有「填了券码、且一分钱优惠都没拿到」才算不可用。
-                命中活动时 appliedCouponCode 同样为空, 但优惠确实生效了,
-                此时提示"优惠码不可用"会误导用户。
-              */}
-              {couponCode.trim() && !quotePreview.appliedCouponCode && quotePreview.discountCents === 0 && (
-                <p className="pkg-pay-hint" style={{ textAlign: 'left', color: '#a32d2d' }}>
-                  该优惠码不可用或不满足使用条件
-                </p>
-              )}
-            </>
-          )}
-
-          <div className="pkg-confirm-row pkg-confirm-total">
-            <span>应付金额</span>
-            <strong>{payAmount <= 0 ? '免费' : formatYuan(payAmount)}</strong>
-          </div>
-          {discount > 0 && (
-            <div className="pkg-confirm-offline">
-              <span>原价 {formatYuan(subtotalCents)}</span>
-              <span>已优惠 -{formatYuan(discount)}</span>
-            </div>
-          )}
+      <header className="co-head">
+        <div className="co-head-title">
+          <h1>{title}</h1>
+          <span className="co-head-badge">{plan ? '会员订阅' : '积分包'}</span>
         </div>
+        <p>
+          {plan
+            ? `${plan.durationDays} 天有效 · 每月 ${plan.monthlyCredits} 积分`
+            : '支付完成后积分立即到账'}
+        </p>
+      </header>
 
-        <div className="pkg-confirm-card">
-          <h3 className="pkg-payment-title">支付方式</h3>
-          <div className="pkg-payment-options">
-            {/*
-             * 渠道配色沿用参考站实拍 (支付宝 #009FE8 / 微信 #24B340)。
-             * `PAYMENT_PROVIDER` 未配置或未填凭据时保持沙箱, 页面如实标注;
-             * 配置真实通道后由后端决定 mode (跳转 / 二维码)。
-             */}
-            <div className="pkg-payment-option is-active">
-              <span className="pkg-payment-icon is-sandbox">沙</span>
-              <div className="pkg-payment-body">
-                <div className="pkg-payment-name">在线支付</div>
-                <div className="pkg-payment-desc">
-                  未配置真实商户号时走站内沙箱，不产生真实扣款
-                </div>
+      <div className="co-layout">
+        <div className="co-main">
+          <section className="co-card">
+            <div className="co-card-head">
+              <h2>{plan ? '套餐信息' : '商品信息'}</h2>
+              <span>数量 1</span>
+            </div>
+            <dl className="co-rows">
+              <div className="co-row">
+                <dt>{plan ? '套餐' : '商品'}</dt>
+                <dd>{plan ? plan.name : product!.name}</dd>
               </div>
-            </div>
-          </div>
-
-          {/*
-            二维码态: 微信 Native 支付。轮询在 startPolling 里, 到账后自动跳结果页 ——
-            用户扫完码不需要再点任何按钮。
-          */}
-          {qrDataUrl ? (
-            <div className="pkg-sandbox-actions" style={{ flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-              <img src={qrDataUrl} alt="微信支付二维码" width={220} height={220} />
-              <p className="pkg-pay-hint">请使用微信扫码支付，完成后本页会自动刷新结果</p>
-              <button
-                type="button"
-                className="pkg-sandbox-btn"
-                onClick={() => {
-                  stopPolling();
-                  setQrDataUrl(null);
-                  setOnlineIntent(null);
-                }}
-              >
-                取消扫码
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              className="pkg-pay-btn"
-              disabled={paying}
-              onClick={() => void payOnline()}
-            >
-              {paying ? '处理中…' : payAmount <= 0 ? '免费领取' : `确认支付 ${formatYuan(payAmount)}`}
-            </button>
-          )}
-
-          {/*
-           * 沙箱三态演示。保留失败/超时两个入口是刻意的 ——
-           * 只让点成功就等于没做失败路径的验证, 真实通道接入后
-           * 回调重复/超时这些分支会第一次被跑到, 那时才发现问题就晚了。
-           */}
-          {/*
-           * 沙箱三态演示只在开发/测试环境出现，且只在确实是沙箱通道时出现。
-           * 生产环境该端点本身已按 404 处理（见 OrderService.sandboxPay），
-           * 继续渲染按钮只会让用户点到一个「订单不存在」。
-           */}
-          {!IS_PROD && (!onlineIntent || onlineIntent.sandbox) && (
-            <div className="pkg-sandbox-actions">
-              <button
-                type="button"
-                className="pkg-sandbox-btn"
-                disabled={paying}
-                onClick={() => void pay('failed')}
-              >
-                模拟支付失败
-              </button>
-              <button
-                type="button"
-                className="pkg-sandbox-btn"
-                disabled={paying}
-                onClick={() => void pay('timeout')}
-              >
-                模拟支付超时
-              </button>
-            </div>
-          )}
-
-          <div className="pkg-sandbox-notice">
-            <AlertTriangle size={14} />
-            <span>
-              {onlineIntent && !onlineIntent.sandbox ? (
+              {/*
+                会员单展示的是「权益口径」而非积分: 月度积分按月发放, 与一次性
+                积分包的「立刻到账 N 积分」不是同一件事, 写成「获得积分」会误导。
+              */}
+              {plan ? (
                 <>
-                  <strong>真实支付通道。</strong>
-                  请按渠道页面提示完成支付，扣款以渠道结果为准；支付结果稍后同步到本页。
-                </>
-              ) : onlineIntent?.sandbox ? (
-                <>
-                  <strong>沙箱环境，不产生真实扣款。</strong>
-                  支付在站内模拟，仅用于联调。
+                  <div className="co-row">
+                    <dt>会员周期</dt>
+                    <dd>{plan.durationDays} 天</dd>
+                  </div>
+                  <div className="co-row">
+                    <dt>月度积分</dt>
+                    <dd>{plan.monthlyCredits} 积分 / 月</dd>
+                  </div>
                 </>
               ) : (
                 <>
-                  支付方式由后台通道配置决定：
-                  <strong>未配置真实商户号时走站内沙箱，不产生真实扣款</strong>；配置
-                  <code>PAYMENT_PROVIDER</code> 与商户凭据后由支付宝/微信完成真实扣款。
+                  <div className="co-row">
+                    <dt>获得积分</dt>
+                    <dd>{product!.credits} 积分</dd>
+                  </div>
+                  <div className="co-row">
+                    <dt>积分有效期</dt>
+                    <dd>{product!.creditsValidDays > 0 ? `${product!.creditsValidDays} 天` : '永久有效'}</dd>
+                  </div>
                 </>
               )}
-            </span>
-          </div>
+            </dl>
+          </section>
 
-          {error && (
-            <p className="pkg-pay-hint" style={{ color: '#a32d2d' }}>
-              {error}
-            </p>
+          {/* 权益来自套餐本身 (后端生成的可读文案), 空数组时整块不渲染 */}
+          {plan && plan.perkLabels.length > 0 && (
+            <section className="co-card">
+              <div className="co-card-head">
+                <h2>会员权益</h2>
+                <span>订阅期内有效</span>
+              </div>
+              <ul className="co-perks">
+                {plan.perkLabels.map((label) => (
+                  <li key={label}>
+                    <Check size={14} aria-hidden />
+                    {label}
+                  </li>
+                ))}
+              </ul>
+            </section>
           )}
+
+          <section className="co-card">
+            <div className="co-card-head">
+              <h2>支付方式</h2>
+            </div>
+            {/*
+             * `PAYMENT_PROVIDER` 未配置或未填凭据时保持沙箱, 页面如实标注;
+             * 配置真实通道后由后端决定 mode (跳转 / 二维码)。
+             */}
+            <div className="co-pay-option">
+              <span className="co-pay-icon">沙</span>
+              <div className="co-pay-body">
+                <div className="co-pay-name">在线支付</div>
+                <div className="co-pay-desc">未配置真实商户号时走站内沙箱，不产生真实扣款</div>
+              </div>
+              <CheckCircle2 size={17} className="co-pay-check" aria-hidden />
+            </div>
+
+            <div className="co-notice">
+              <AlertTriangle size={14} aria-hidden />
+              <span>
+                {onlineIntent && !onlineIntent.sandbox ? (
+                  <>
+                    <strong>真实支付通道。</strong>
+                    请按渠道页面提示完成支付，扣款以渠道结果为准；支付结果稍后同步到本页。
+                  </>
+                ) : onlineIntent?.sandbox ? (
+                  <>
+                    <strong>沙箱环境，不产生真实扣款。</strong>
+                    支付在站内模拟，仅用于联调。
+                  </>
+                ) : (
+                  <>
+                    支付方式由后台通道配置决定：
+                    <strong>未配置真实商户号时走站内沙箱，不产生真实扣款</strong>；配置{' '}
+                    <code>PAYMENT_PROVIDER</code> 与商户凭据后由支付宝/微信完成真实扣款。
+                  </>
+                )}
+              </span>
+            </div>
+          </section>
         </div>
+
+        <aside className="co-side">
+          <div className="co-side-card">
+            <h2 className="co-side-title">订单金额</h2>
+
+            {/* 券码: 后端对不可用的券降级为不打折而非拒单, 原因随订单返回。
+                续付既有订单时不显示 —— 金额与优惠已在那张单上定死, 再改就不是同一笔了。
+                会员单不参与券与折扣 (后端会忽略), 因此整块隐藏。 */}
+            {!order && !plan && (
+              <label className="co-coupon">
+                <span>优惠码</span>
+                <input
+                  placeholder="选填，提交后自动核算"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value)}
+                  maxLength={24}
+                />
+              </label>
+            )}
+
+            {!order && !plan && quoteError && (
+              <p className="co-hint is-error" role="alert">
+                {quoteError}
+              </p>
+            )}
+
+            {order?.couponWarning && (
+              <p className="co-hint is-error">优惠码不可用：{order.couponWarning}</p>
+            )}
+
+            {/*
+              下单前的优惠试算说明。只在下单前展示 —— 下单后优惠已定死在订单快照里,
+              再显示试算结果会让两组数字并存, 用户无从判断以哪个为准。
+            */}
+            {!order && !plan && quotePreview && (
+              <>
+                {quotePreview.appliedSource === 'coupon' && quotePreview.appliedCouponCode && (
+                  <p className="co-hint">已使用优惠码 {quotePreview.appliedCouponCode}</p>
+                )}
+                {quotePreview.appliedSource === 'campaign' && (
+                  <p className="co-hint">已命中限时活动，优惠金额已计入应付</p>
+                )}
+                {quotePreview.notStackedNotice && (
+                  <p className="co-hint">{quotePreview.notStackedNotice}</p>
+                )}
+                {/*
+                  只有「填了券码、且一分钱优惠都没拿到」才算不可用。
+                  命中活动时 appliedCouponCode 同样为空, 但优惠确实生效了,
+                  此时提示"优惠码不可用"会误导用户。
+                */}
+                {couponCode.trim() &&
+                  !quotePreview.appliedCouponCode &&
+                  quotePreview.discountCents === 0 && (
+                    <p className="co-hint is-error">该优惠码不可用或不满足使用条件</p>
+                  )}
+              </>
+            )}
+
+            <div className="co-total">
+              <span>应付金额</span>
+              <strong>{payAmount <= 0 ? '免费' : formatYuan(payAmount)}</strong>
+            </div>
+            {discount > 0 && (
+              <div className="co-sub">
+                <span>原价 {formatYuan(subtotalCents)}</span>
+                <span>已优惠 -{formatYuan(discount)}</span>
+              </div>
+            )}
+
+            {/*
+              二维码态: 微信 Native 支付。轮询在 startPolling 里, 到账后自动跳结果页 ——
+              用户扫完码不需要再点任何按钮。
+            */}
+            {qrDataUrl ? (
+              <div className="co-qr">
+                <img src={qrDataUrl} alt="微信支付二维码" width={210} height={210} />
+                <p className="co-hint">请使用微信扫码支付，完成后本页会自动刷新结果</p>
+                <button
+                  type="button"
+                  className="co-btn"
+                  onClick={() => {
+                    stopPolling();
+                    setQrDataUrl(null);
+                    setOnlineIntent(null);
+                  }}
+                >
+                  取消扫码
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className="co-pay-btn"
+                disabled={paying}
+                onClick={() => void payOnline()}
+              >
+                {paying ? '处理中…' : payAmount <= 0 ? '免费领取' : `确认支付 ${formatYuan(payAmount)}`}
+              </button>
+            )}
+
+            {/*
+             * 沙箱三态演示。保留失败/超时两个入口是刻意的 ——
+             * 只让点成功就等于没做失败路径的验证, 真实通道接入后
+             * 回调重复/超时这些分支会第一次被跑到, 那时才发现问题就晚了。
+             * 且只在开发/测试环境、且确实是沙箱通道时出现: 生产环境该端点
+             * 本身已按 404 处理 (见 OrderService.sandboxPay), 继续渲染按钮
+             * 只会让用户点到一个「订单不存在」。
+             */}
+            {!IS_PROD && (!onlineIntent || onlineIntent.sandbox) && (
+              <div className="co-sandbox">
+                <span className="co-sandbox-label">沙箱联调</span>
+                <div className="co-sandbox-actions">
+                  <button
+                    type="button"
+                    className="co-sandbox-btn"
+                    disabled={paying}
+                    onClick={() => void pay('failed')}
+                  >
+                    模拟支付失败
+                  </button>
+                  <button
+                    type="button"
+                    className="co-sandbox-btn"
+                    disabled={paying}
+                    onClick={() => void pay('timeout')}
+                  >
+                    模拟支付超时
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {error && (
+              <p className="co-hint is-error" role="alert">
+                {error}
+              </p>
+            )}
+
+            <p className="co-side-note">
+              {plan
+                ? '支付成功后会员权益立即生效，可在「我的订单」查看记录。'
+                : '积分即时到账，可在「积分明细」查看发放记录。'}
+            </p>
+          </div>
+        </aside>
       </div>
     </div>
   );

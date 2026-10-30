@@ -67,6 +67,7 @@ uat@admin.com
 | 鉴权/加密 | jsonwebtoken / bcryptjs | 9.0.3 / 3.0.3 |
 | 前端 | Vite + React + antd + lucide-react + react-router-dom | 8.3.4 / 19.3.0 / 6.6.6 / 1.57.0 / 7.18.4 |
 | 前端其他 | qrcode（邀请海报 / 扫码登录）/ Playwright（e2e） | 1.5.4 / `^1.64.1`（仅 e2e 允许 `^`） |
+| 后台 UI | BoardUI 免费层（vendor 源码）+ Tailwind v4 + React Aria Components | 源码锁 `ec5c5eb` / 4.3.3 / 1.22.1 |
 | 前端测试 | Vitest + jsdom + Testing Library | 5.0.5 / 30.1.3 / 16.3.3 |
 | 语言 | TypeScript | 后端 5.7.2 / 前端 7.0.2 |
 
@@ -282,6 +283,8 @@ npm run e2e                 # Playwright
 - 批量动作：`ids ≤ 100`，`runBatch` 串行、**不包事务**，逐条返回结果；路由挂较弱读权限，处理器内再判动作权限。
 - CSV 统一走 `common/csv.ts`（BOM + RFC4180 + 公式注入前导 `'`）；前端 `downloadCsv()` 不走 JSON 信封。
 - 后台通用骨架已是 antd 原生组件，`adm-*` 仅用于业务布局 class；改动时不要退回自绘 `div/button/input/select`。
+- **外壳已换 BoardUI**（2026-10-30）：`admin-ui/shell/AdminBoardLayout` 接管导航 / 搜索 / 告警铃 / 密度 / 用户菜单，无值班带；`VITE_ADMIN_UI=legacy` 可整站回滚（开关只在 `admin-ui/lib/flag.ts` 读一次）。页面内容仍在逐页迁移，新页面直接写 `admin-ui/`，不要再加 antd 组件。vendor 源码在 `frontend/src/vendor/boardui/`，保持上游原样不改，来源见 `PROVENANCE.md`。
+- **共享控件已分流**：`components/admin/PageHeader.tsx` 与 `AdminWidgets.tsx` 只是入口 —— 数据 hook 只有一份，渲染层按开关走 `admin-ui/widgets/AdminChrome`（BoardUI）或 `*.legacy.tsx`（antd）。页面 import 不变；改控件外观改 `AdminChrome`，不要在两处各改一半。表格迁 `admin-ui/primitives/DataTable`，状态色映射改 `components/admin/statusMeta.ts`。
 
 ### 商业域
 

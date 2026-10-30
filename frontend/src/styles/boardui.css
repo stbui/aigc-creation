@@ -1,0 +1,141 @@
+/**
+ * BoardUI 后台样式入口（2026-10-30）。
+ *
+ * ## 为什么不是 `@import "tailwindcss"`
+ *
+ * 完整入口会带 preflight —— 它会重置全站的 border/box-sizing/标题字号，
+ * 直接打断 28,900 行的 global.css 与 C 端页面。这里只取 theme + utilities：
+ * 主题变量负责 token，utilities 负责 BoardUI 组件自带的类名。
+ *
+ * ## 作用域
+ *
+ * - `@source` 白名单只扫 `vendor/boardui` 与 `admin-ui`，C 端类名不进产物。
+ * - base 规则限定 `.bui-admin`，不写全局元素选择器。
+ * - 本文件只在 admin 路由 chunk 里 import（AdminDashboardPage），C 端不下载。
+ */
+
+@layer theme, base, components, utilities;
+
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities) source(none);
+/*
+ * vendor 的主题文件不能包进 layer(theme)：它内部有 `@utility` 定义（如
+ * `bg-button-primary`），而 Tailwind 要求 `@utility` 必须在顶层，嵌套会直接
+ * 报「@utility cannot be nested」并中断整份样式编译。
+ */
+@import '../vendor/boardui/styles/theme.css';
+@import '../vendor/boardui/styles/typography.css';
+
+@source '../vendor/boardui';
+@source '../admin-ui';
+
+@theme {
+  /* 字体沿用全站栈：BoardUI 默认 Inter，中文会掉到系统字体且字重不一致 */
+  --font-sans:
+    'Noto Sans SC', Inter, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+
+  /*
+   * accent 色阶整体重映射为品牌紫 #5546d8。
+   * BoardUI 的交互面（主按钮、焦点环、选中态、开关、复选框）全走 accent-*，
+   * 不改这一段，后台会出现第二套蓝紫色系。
+   */
+  --color-accent-50: #f3f1fe;
+  --color-accent-100: #e9e5fd;
+  --color-accent-200: #d5cefb;
+  --color-accent-300: #b7aaf6;
+  --color-accent-400: #9382ef;
+  --color-accent-500: #5546d8;
+  --color-accent-600: #4a3bc4;
+  --color-accent-700: #3e31a3;
+  --color-accent-800: #342b84;
+  --color-accent-900: #2c256a;
+  --color-accent-950: #1b1742;
+}
+
+@layer base {
+  /*
+   * 最小 preflight（2026-10-30）。
+   *
+   * 不导入 Tailwind 的完整 preflight（它会重置全站字号、列表、表单），
+   * 只补真正缺的两条。
+   */
+
+  /*
+   * ① border-style 兜底 —— 必须是**全局**规则。
+   *
+   * Tailwind 的 `border` / `border-b` 等工具类只写宽度，样式靠 preflight 给的
+   * `solid`；没有这条，所有 BoardUI 卡片、输入框、表头的边线都不显示。
+   *
+   * 之所以不能只写在 `.bui-admin` 下：抽屉、弹层、Toast 都渲染在
+   * `document.body` 的 portal 里，不在 `.bui-admin` 之内 —— 作用域化会让浮层
+   * 独自丢掉全部边线，而这种问题只在打开弹层时才看得见。
+   *
+   * 对现有样式无副作用：宽度为 0 的边框本来就不渲染，global.css 里只改宽度
+   * 的那几处（`.state-spinner.is-small` 等）都已由同组规则给出样式。global.css
+   * 是未分层样式，优先级高于本层，冲突时仍以它为准。
+   */
+  *,
+  ::before,
+  ::after {
+    border: 0 solid;
+  }
+
+  /* ② 后台作用域：字体与底色。`.bui-scope` 供 portal 浮层复用（不带底色） */
+  .bui-admin,
+  .bui-scope {
+    font-family: var(--font-sans);
+    color: var(--color-text-primary, #171a2b);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .bui-admin {
+    background: var(--page-bg, #f6f7fb);
+  }
+
+  /* 控件重置：按钮/输入框不能带系统灰底与默认边框 */
+  :is(.bui-admin, .bui-scope) :where(button, input, select, textarea) {
+    font: inherit;
+    color: inherit;
+    background: transparent;
+  }
+
+  :is(.bui-admin, .bui-scope) :where(img, svg, video) {
+    display: block;
+    vertical-align: middle;
+  }
+
+  :is(.bui-admin, .bui-scope) :focus-visible {
+    outline: 2px solid var(--color-accent-500);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :is(.bui-admin, .bui-scope) *,
+    :is(.bui-admin, .bui-scope) *::before,
+    :is(.bui-admin, .bui-scope) *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/*
+ * 冲突变量回写（2026-10-30）。
+ *
+ * vendor 的 theme.css 把一批语义变量写在**无条件 `:root`** 里，其中两个与
+ * global.css 同名但值不同：`--color-text-secondary`、`--shadow-card`。
+ * 本文件在 admin chunk 中晚于 global.css 加载，vendor 的值会盖掉全站令牌，
+ * 让后台遗留的 13 处 `adm-*` 样式静默换色/换投影 —— 这类改动不会有任何报错，
+ * 只会让「同一个灰」在两个页面里不一样。
+ *
+ * vendor 源码要求保持上游原样，不能把它的 `:root` 改成 `.bui-admin`；因此
+ * 在这里把原值写回来。取值必须与 global.css 的 `:root` 保持一致。
+ * 清单是穷举的：新增 BoardUI 版本时重新比对一次两份文件的变量名交集。
+ */
+:root {
+  --color-text-secondary: #475569;
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.05);
+}

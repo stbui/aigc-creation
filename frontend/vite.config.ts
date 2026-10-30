@@ -1,5 +1,7 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 
 /**
  * Vite 配置 —— 三环境由 `--mode` 驱动。
@@ -33,7 +35,17 @@ export default defineConfig(({ mode }) => {
   const apiProxy = process.env.VITE_API_PROXY || fileEnv.VITE_API_PROXY || 'http://localhost:4100';
 
   return {
-    plugins: [react()],
+    plugins: [react(), tailwindcss()],
+    /*
+     * BoardUI 源码保持上游写法（`@/components/...`、`@/utils/...`），不做批量改写。
+     * 把 `@` 指向 vendor 根，vendor 目录内就是一份自洽的仓库克隆，升级时可直接覆盖文件。
+     * 业务代码一律用相对路径，避免与这个别名混淆。
+     */
+    resolve: {
+      alias: {
+        '@': fileURLToPath(new URL('./src/vendor/boardui', import.meta.url)),
+      },
+    },
     server: {
       port,
       strictPort: true,

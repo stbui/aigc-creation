@@ -28,26 +28,15 @@ import { ImageLightbox, type LightboxItem } from '../components/ImageLightbox';
 import type { Modality, Task } from '../types/api';
 
 /**
- * 我的作品 —— 1:1 复刻参考站 https://ijihua.cn/my-works。
+ * 我的作品。
  *
- * 版面数值来源:
- *   ① 未登录可达空态实拍: `.my-works-page` 1190 宽 padding `28px 28px 72px`、bg #F6F7FB;
- *      h1 38.4px/600 #161616; 双 tab 56×32; 工具栏 `.my-works-toolbar` 白底 radius16
- *      padding `12px 14px` shadow rgba(41,33,22,.04) 0 12px 30; 4 个筛选器各 108×37
- *      (12px #5F5B55 / border #EBE8E1 / radius 999); 「选择下载」97×33 白字 radius 999;
- *      计数 13px #4D4943; 排序说明 12px #96918A; 空态 h2 18px/700 #3D3934
- *   ② 卡片区（登录墙内）取自参考站**样式产物** `/assets/index-*.css`（未混淆，类名可直读）:
- *      `.my-works-grid` repeat(6, minmax(0,1fr)) gap 16 align-items start（≤某断点降 5 列）
- *      `.my-work-meta` absolute top 10 left 10, flex gap 9, z7, pointer-events none
- *      (本地精简: 只留能力名一个角标, 见下方渲染处的说明)
- *      `.my-work-card.selected` outline #6C5CE7; `.my-work-check` 选中 #6C5CE7
- *      `.my-works-selection-bar` 12px / #5B4BD7 on #F1EFFF / padding `10px 14px` / radius 9
- *      按钮 11px 白字 radius 999 padding `6px 10px`
- *      `.my-works-load-more` min-height 58 / 12px #9A958D
- *      `.my-works-empty` min-height 300 / #9A958D / align-content center / gap 8
- *      `.my-works-tabs` border-bottom #ECE9E3 gap 24, 按钮 14px/600 #8B8F9B padding `0 0 12px`
- *      `.my-works-filter-popover` 白底 radius12 padding16 shadow rgba(33,31,27,.14) 0 16px 36
- *      业务类型 330×318（分组多选）· 日期 308×229 · 状态 214×167 · 所属任务 318×159
+ * 版面 (2026-10-30 重排): 回到全站骨架 —— 1120 内容列、24px 标题、令牌配色,
+ * 与订单 / 数据中心同一套页头与卡片语言; 原先那版是参考站 (ijihua.cn/my-works)
+ * 的逐像素复刻 (逃逸内边距的整幅灰底 / 40px 标题 / 蓝紫混色筛选器), 与站内其它
+ * 个人域页面脱节。具体样式见 global.css 的「我的作品」块。
+ *
+ * 卡片: 方形画布 + contain (产出比例不一, 统一裁切会切掉商品主体),
+ * 能力名与「时间 · 尺寸」放在白底脚注里, 不再压深色渐变在图片上。
  *
  * 诚实差异:
  *   - 「视频作品」页签按**产出模态**真实过滤（图生视频落地的产物），
@@ -62,42 +51,26 @@ type DatePreset = 'all' | 'today' | 'yesterday' | '7d' | 'custom';
 const PAGE_SIZE = 24;
 
 /**
- * 作品卡的图片比例。
- *
- * 用产出的真实宽高计算比例, 并夹在 3:4 ~ 16:9 之间: 常见产出正好铺满,
- * 极长竖图 / 超宽横幅只留少量边, 不裁掉内容。尺寸缺失时交给浏览器按
- * 图片自然比例排。
- */
-function mediaAspect(width?: number | null, height?: number | null): string | undefined {
-  if (!width || !height) return undefined;
-  const ratio = width / height;
-  const clamped = Math.min(16 / 9, Math.max(3 / 4, ratio));
-  return String(clamped);
-}
-
-/**
  * 作品卡里的图片。
  *
  * - 加载中保留 shimmer 底、加载完成淡入，撤掉占位时不闪白；
  * - 加载失败可原地重试（签名 URL 过期 / 后端重启后无需刷新整页）；
  * - 状态按 **URL** 记而不是布尔值 —— 刷新列表会换签名地址，布尔值不会自己复位。
  *
- * 容器比例来自产出尺寸 (见 mediaAspect), 图片用 contain 填满, 不裁内容。
+ * 画布是固定方形的 (见 .my-work-image-button), 图片 contain 填满: 产出比例
+ * 从 1:1 到 16:9 不等, 按各自比例排会让同一行的卡片高矮不齐。
  */
 function WorkImage({
   src,
   alt,
   priority,
   onOpen,
-  aspect,
 }: {
   src: string;
   alt: string;
   /** 首屏前两张: 不懒加载, 让作品页一进来就有图可看 */
   priority?: boolean;
   onOpen: () => void;
-  /** 图片显示区的宽高比 (见 mediaAspect) */
-  aspect?: string;
 }) {
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
@@ -122,7 +95,6 @@ function WorkImage({
     <button
       type="button"
       className={`my-work-image-button${loaded ? ' is-loaded' : ''}${failed ? ' is-failed' : ''}`}
-      style={aspect ? { aspectRatio: aspect } : undefined}
       onClick={failed ? retry : onOpen}
       aria-label={failed ? '图片加载失败，点击重试' : `查看${alt}大图`}
       title={failed ? '加载失败，点击重试' : '点击查看大图'}
@@ -166,7 +138,7 @@ function taskModality(t: Task): Modality {
 export function WorksPage() {
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
-  const { token } = useAuth();
+  const { token, openLogin } = useAuth();
   const { data: caps } = useCapabilities();
   const reportError = useGenerateError();
   const retrySignal = usePollAbort();
@@ -506,9 +478,21 @@ export function WorksPage() {
 
   return (
     <div className="my-works-page">
-      <div className="my-works-intro">
-        <h1>我的作品</h1>
-      </div>
+      <header className="my-works-head">
+        <div className="my-works-heading">
+          <h1>我的作品</h1>
+          <p>所有生成产出都汇总在这里，可查看大图、批量下载或再次创作。</p>
+        </div>
+        <button
+          type="button"
+          className="my-works-refresh"
+          disabled={loading || !token}
+          onClick={() => void load()}
+        >
+          <RefreshCw size={14} className={loading ? 'my-work-generating-spinner' : undefined} />
+          刷新
+        </button>
+      </header>
       <div className="my-works-tabs" role="tablist">
         <button
           type="button"
@@ -738,17 +722,7 @@ export function WorksPage() {
           )}
         </div>
 
-        <button
-          type="button"
-          className="my-works-download"
-          disabled={downloadableSelected === 0}
-          title={downloadableSelected === 0 ? '请先选择已生成成功的作品' : undefined}
-          onClick={downloadSelected}
-        >
-          <span className="my-works-select-box" aria-hidden="true" />
-          选择下载{selected.length > 0 ? ` (${selected.length})` : ''}
-        </button>
-
+        {/* 清除筛选紧跟筛选器 (次要动作), 主操作「选择下载」守在工具栏右端 */}
         {activeFilterCount > 0 && (
           <button
             type="button"
@@ -764,6 +738,17 @@ export function WorksPage() {
             清除筛选
           </button>
         )}
+
+        <button
+          type="button"
+          className="my-works-download"
+          disabled={downloadableSelected === 0}
+          title={downloadableSelected === 0 ? '请先勾选已生成成功的作品' : undefined}
+          onClick={downloadSelected}
+        >
+          <Download size={14} />
+          下载所选{selected.length > 0 ? ` (${selected.length})` : ''}
+        </button>
       </div>
 
       {/* 多选操作条（选择任一卡片后出现，实测 spec: #5B4BD7 on #F1EFFF） */}
@@ -814,6 +799,16 @@ export function WorksPage() {
           detail={error}
           onRetry={() => void load()}
         />
+      ) : !token ? (
+        /* 作品与账号绑定: 访客看到「还没有作品」会误以为产出丢了, 直接给登录入口 */
+        <div className="my-works-empty">
+          <Images size={72} strokeWidth={1.35} aria-hidden="true" />
+          <h2>登录后查看你的作品</h2>
+          <p>作品与账号绑定，登录后即可查看、下载并继续创作。</p>
+          <button type="button" className="my-works-empty-action" onClick={openLogin}>
+            登录/注册
+          </button>
+        </div>
       ) : visible.length === 0 ? (
         <div className="my-works-empty">
           <Images size={72} strokeWidth={1.35} aria-hidden="true" />
@@ -876,7 +871,6 @@ export function WorksPage() {
                           src={url}
                           alt={capabilityName(t.capability)}
                           priority={cardIndex < 2}
-                          aspect={mediaAspect(t.outputAsset?.width, t.outputAsset?.height)}
                           onOpen={() => {
                             if (previewAt >= 0) setPreviewIndex(previewAt);
                           }}
@@ -926,13 +920,9 @@ export function WorksPage() {
                     )}
 
                     {/*
-                      角标只留能力名。缩略图上的信息以「这张图是什么」为主;
-                      来源与状态在作品详情 / 占位图里表达, 不重复叠加。
+                      能力名与时间 / 尺寸放在图片下方的脚注里 (见 .my-work-caption),
+                      不再用角标 + 深色渐变压在画面上: 缩略图的每个像素都留给产出本身。
                     */}
-                    <span className="my-work-meta">
-                      <span className="my-work-tag">{capabilityName(t.capability)}</span>
-                    </span>
-
                     {/* hover 浮层: 顶部再来一张 / 底部操作。无产出的任务只能删除,
                         不能显示一个实际不会下载任何文件的「下载」。 */}
                     <span className={`my-work-hover-actions${url ? '' : ' is-placeholder'}`}>
@@ -977,12 +967,13 @@ export function WorksPage() {
                               }
                             }}
                           >
-                            下载
+                            <Download size={12} /> 下载
                           </span>
                         )}
                         <span
                           role="button"
                           tabIndex={0}
+                          className="is-danger"
                           onClick={() => removeTask(t.id)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' || e.key === ' ') {
@@ -1012,6 +1003,7 @@ export function WorksPage() {
                   )}
 
                   <div className="my-work-caption">
+                    <span className="my-work-caption-name">{capabilityName(t.capability)}</span>
                     <small>
                       {t.createdAt
                         ? new Date(t.createdAt).toLocaleString('zh-CN', {

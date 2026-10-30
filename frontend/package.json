@@ -21,12 +21,20 @@
   },
   "//": "版本为实际安装并验证通过的版本 (精确锁定), 避免安装器解析漂移",
   "dependencies": {
+    "@internationalized/date": "3.12.4",
+    "@remixicon/react": "4.9.0",
+    "@tailwindcss/vite": "4.3.3",
+    "@tanstack/react-table": "8.21.3",
     "antd": "6.6.6",
     "lucide-react": "1.57.0",
+    "motion": "12.43.0",
     "qrcode": "1.5.4",
     "react": "19.3.0",
+    "react-aria-components": "1.22.1",
     "react-dom": "19.3.0",
-    "react-router-dom": "7.18.4"
+    "react-router-dom": "7.18.4",
+    "tailwind-merge": "3.7.0",
+    "tailwindcss": "4.3.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

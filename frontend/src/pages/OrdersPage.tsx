@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { App, Button, Input, Select } from 'antd';
 import { ShoppingBag } from 'lucide-react';
@@ -15,6 +15,9 @@ import type { Invoice, Order, OrderStatus } from '../types/api';
  * ⚠ **未支付订单可继续支付**: pending 状态的订单 30 分钟内有效
  * (后端 ORDER_TTL_MINUTES), 订单列表是用户回来继续付款的唯一入口 ——
  * 用户离开结算页再回来时, 不该只能重新下单。
+ *
+ * 列表按状态切片在客户端完成: 订单接口一次返回全部, 切档位不再请求 ——
+ * 与工单页同一套筛选交互, 计数直接来自已加载数据, 不伪造。
  */
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
@@ -24,6 +27,23 @@ const STATUS_LABEL: Record<OrderStatus, string> = {
   refunded: '已退款',
   partial_refunded: '部分退款',
 };
+
+const FILTERS: Array<{ value: 'all' | 'pending' | 'paid' | 'refund' | 'cancelled'; label: string }> = [
+  { value: 'all', label: '全部' },
+  { value: 'pending', label: '待支付' },
+  { value: 'paid', label: '已支付' },
+  { value: 'refund', label: '退款' },
+  { value: 'cancelled', label: '已取消' },
+];
+
+type FilterValue = (typeof FILTERS)[number]['value'];
+
+/** 两种退款状态在筛选里合并成同一个档位 */
+function matchesFilter(o: Order, filter: FilterValue): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'refund') return o.status === 'refunded' || o.status === 'partial_refunded';
+  return o.status === filter;
+}
 
 function formatYuan(cents: number): string {
   return `¥${(cents / 100).toFixed(2)}`;
@@ -70,6 +90,8 @@ export function OrdersPage() {
   const [formError, setFormError] = useState<string | null>(null);
   /** 正在取消的订单 id，避免连点重复请求 */
   const [cancelling, setCancelling] = useState<string | null>(null);
+  /** 列表状态筛选; 只影响当前视图, 不改动已加载的数据 */
+  const [filter, setFilter] = useState<FilterValue>('all');
 
   /**
    * 拉列表。
@@ -174,6 +196,19 @@ export function OrdersPage() {
     };
   }, [load]);
 
+  /** 各状态计数: 直接来自已加载列表, 与卡片上的状态一一对应 */
+  const counts = useMemo(() => {
+    // 计数复用 matchesFilter, 保证「标签上的数字」与「点进去看到的卡片数」永远一致
+    const acc = {} as Record<FilterValue, number>;
+    for (const f of FILTERS) acc[f.value] = orders.filter((o) => matchesFilter(o, f.value)).length;
+    return acc;
+  }, [orders]);
+
+  const visibleOrders = useMemo(
+    () => (filter === 'all' ? orders : orders.filter((o) => matchesFilter(o, filter))),
+    [orders, filter],
+  );
+
   /*
    * guest 态: 路由对外开放, 未登录也能进来。
    * 此前直接把订单接口的 401 渲染成「订单加载失败」—— 用户以为系统坏了,
@@ -243,6 +278,58 @@ export function OrdersPage() {
 
   const pendingCount = orders.filter((o) => canPay(o)).length;
 
+  /**
+   * 开票入口。一单一票: 已有发票时不再给「申请」按钮,
+   * 而是按状态展示进度 (审核中 / 已开具 / 被驳回的原因)。
+   */
+  const renderInvoice = (o: Order) => {
+    const inv = invoices[o.id];
+    if (!inv) {
+      return (
+        <Button
+          size="small"
+          onClick={() => {
+            setFormFor(formFor === o.id ? null : o.id);
+            setFormError(null);
+          }}
+        >
+          {formFor === o.id ? '收起开票信息' : '申请开票'}
+        </Button>
+      );
+    }
+    if (inv.status === 'issued') {
+      return (
+        <span className="order-invoice-state is-issued">
+          发票 {inv.invoiceNo} 已开具
+          <Button
+            size="small"
+            type="link"
+            onClick={() => void invoicesApi.preview(inv.id).catch(() => undefined)}
+          >
+            查看
+          </Button>
+        </span>
+      );
+    }
+    if (inv.status === 'pending') {
+      return <span className="order-invoice-state is-pending">发票 {inv.invoiceNo} 审核中</span>;
+    }
+    return (
+      <span className="order-invoice-state is-rejected">
+        发票被驳回：{inv.rejectReason ?? '未说明原因'}
+        <Button
+          size="small"
+          onClick={() => {
+            setFormFor(o.id);
+            setFormError(null);
+          }}
+        >
+          重新申请
+        </Button>
+      </span>
+    );
+  };
+
   return (
     <PersonalPage
       className="orders-page"
@@ -277,8 +364,50 @@ export function OrdersPage() {
         />
       )}
 
-      {orders.map((o) => {
+      {/* 状态筛选: 计数直接来自已加载列表, 与卡片上的状态一一对应 */}
+      {orders.length > 0 && (
+        <div className="order-filters" role="tablist" aria-label="按状态筛选订单">
+          {FILTERS.map((f) => {
+            const active = filter === f.value;
+            return (
+              <button
+                key={f.value}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                className={`order-filter${active ? ' is-active' : ''}`}
+                onClick={() => setFilter(f.value)}
+              >
+                {f.label}
+                <span className="order-filter-count">{counts[f.value]}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {orders.length > 0 && visibleOrders.length === 0 && (
+        <p className="order-filter-empty">该状态下还没有订单</p>
+      )}
+
+      {visibleOrders.map((o) => {
         const payable = canPay(o);
+        const invoiceable = o.status === 'paid' || o.status === 'partial_refunded';
+        /*
+         * 时间线与结果分开成一段文本: 原先多个 <span> 直接相邻,
+         * 「支付于 …」和「已到账 …」会粘成「…15:20:00已到账 2000 积分」。
+         */
+        const meta: string[] = [];
+        if (o.status === 'pending') meta.push(`有效至 ${formatDate(o.expiresAt)}`);
+        if (o.paidAt) meta.push(`支付于 ${formatDate(o.paidAt)}`);
+        if (o.status === 'paid' && o.grantedCredits > 0) meta.push(`已到账 ${o.grantedCredits} 积分`);
+        if (o.membershipPlanId && o.status === 'paid') {
+          meta.push(o.membershipAppliedAt ? '会员权益已生效' : '会员权益发放中');
+        }
+        if (o.status === 'cancelled') meta.push('未支付');
+        if (o.status === 'cancelled') meta.push(`创建于 ${formatDate(o.createdAt)}`);
+        const totalValue =
+          o.status === 'cancelled' ? o.totalCents : o.paidCents;
+
         return (
           <article key={o.id} className="order-card">
             <div className="order-card-head">
@@ -286,226 +415,171 @@ export function OrdersPage() {
               <span className={`order-status is-${o.status}`}>{STATUS_LABEL[o.status]}</span>
             </div>
 
-            <div className="order-items">
+            <div className="order-lines">
               {/*
                 会员订单**没有 OrderItem** —— 套餐不是商品, 下单时只记
                 `membershipPlanId`。这里按订单上的套餐快照渲染, 否则会员单
                 会显示成一张没有明细的空卡片。
               */}
               {o.membershipPlanId && (
-                <div className="order-item">
-                  <span>
-                    <span className="order-item-name">{o.membershipPlanName ?? '会员套餐'}</span>
-                    <span className="order-item-meta"> 会员订阅 · 支付后立即生效</span>
-                  </span>
-                  <span>{formatYuan(o.totalCents)}</span>
+                <div className="order-line">
+                  <div className="order-line-main">
+                    <span className="order-line-name">{o.membershipPlanName ?? '会员套餐'}</span>
+                    <span className="order-line-meta">会员订阅 · 支付后立即生效</span>
+                  </div>
+                  <span className="order-line-amount">{formatYuan(o.totalCents)}</span>
                 </div>
               )}
               {o.items.map((it) => (
-                <div key={it.id} className="order-item">
-                  <span>
-                    <span className="order-item-name">{it.name}</span>
-                    <span className="order-item-meta">
-                      {' '}
+                <div key={it.id} className="order-line">
+                  <div className="order-line-main">
+                    <span className="order-line-name">{it.name}</span>
+                    <span className="order-line-meta">
                       × {it.quantity} · {it.credits} 积分
                       {it.validDays > 0 ? ` · ${it.validDays} 天有效` : ' · 永久有效'}
                     </span>
-                  </span>
-                  <span>{formatYuan(it.priceCents * it.quantity)}</span>
+                  </div>
+                  <span className="order-line-amount">{formatYuan(it.priceCents * it.quantity)}</span>
+                </div>
+              ))}
+
+              {/*
+               * 退款如实展示「已消耗无法追回」的部分。
+               * 隐去这一栏会让用户以为系统吞了积分 —— 那部分是他自己用掉的,
+               * 账说清楚才不会有客服工单。
+               */}
+              {o.refunds.map((r) => (
+                <div key={r.id} className="order-line is-refund">
+                  <div className="order-line-main">
+                    <span className="order-line-name">退款 {formatYuan(r.amountCents)}</span>
+                    <span className="order-line-meta">
+                      扣回 {r.creditsReclaimed} 积分
+                      {r.creditsUnreclaimable > 0 &&
+                        `（${r.creditsUnreclaimable} 已消耗无法追回）`}
+                      {' · '}
+                      {r.reason} · {formatDate(r.createdAt)}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
 
-            {/*
-             * 退款如实展示「已消耗无法追回」的部分。
-             * 隐去这一栏会让用户以为系统吞了积分 —— 那部分是他自己用掉的,
-             * 账说清楚才不会有客服工单。
-             */}
-            {o.refunds.length > 0 && (
-              <div className="order-items">
-                {o.refunds.map((r) => (
-                  <div key={r.id} className="order-item">
-                    <span className="order-item-meta">
-                      退款 {formatYuan(r.amountCents)} · 扣回 {r.creditsReclaimed} 积分
-                      {r.creditsUnreclaimable > 0 && `（已消耗 ${r.creditsUnreclaimable} 无法追回）`}
-                      · {r.reason}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-
             <div className="order-card-foot">
-              <span className="order-item-meta">
-                {o.status === 'pending' && (
-                  <>有效至 {formatDate(o.expiresAt)}</>
-                )}
-                {o.paidAt && <>支付于 {formatDate(o.paidAt)}</>}
-                {o.status === 'paid' && o.grantedCredits > 0 && (
-                  <>已到账 {o.grantedCredits} 积分</>
-                )}
-                {o.membershipPlanId && o.status === 'paid' && (
-                  <>{o.membershipAppliedAt ? '会员权益已生效' : '会员权益发放中'}</>
-                )}
-              </span>
-              <span className="order-amount">
-                {o.discountCents > 0 && (
-                  <span className="order-item-meta" style={{ marginRight: 8 }}>
-                    -{formatYuan(o.discountCents)}
+              <span className="order-card-meta">{meta.join(' · ')}</span>
+              <div className="order-total">
+                {(o.discountCents > 0 || o.refundedCents > 0) && (
+                  <span className="order-total-note">
+                    {o.discountCents > 0 && `优惠 -${formatYuan(o.discountCents)}`}
+                    {o.discountCents > 0 && o.refundedCents > 0 && ' · '}
+                    {o.refundedCents > 0 && `已退 ${formatYuan(o.refundedCents)}`}
                   </span>
                 )}
-                {formatYuan(o.paidCents)}
-              </span>
+                <span className="order-total-main">
+                  <span className="order-total-label">
+                    {o.status === 'cancelled' ? '订单金额' : o.status === 'pending' ? '应付' : '实付'}
+                  </span>
+                  <strong className={`order-total-value${o.status === 'cancelled' ? ' is-void' : ''}`}>
+                    {formatYuan(totalValue)}
+                  </strong>
+                </span>
+              </div>
             </div>
 
-            {payable && (
-              <div className="pkg-result-actions order-pay-actions" style={{ marginTop: 12 }}>
-                <button
-                  type="button"
-                  className="pkg-result-btn is-primary"
-                  onClick={() =>
-                    navigate(
-                      o.membershipPlanId
-                        ? `/checkout/membership?orderId=${o.id}`
-                        : `/checkout/${o.items[0]?.sku ?? ''}?orderId=${o.id}`,
-                    )
-                  }
-                >
-                  继续支付
-                </button>
-                <button
-                  type="button"
-                  className="pkg-result-btn"
-                  disabled={cancelling === o.id}
-                  onClick={() => cancelOrder(o)}
-                >
-                  {cancelling === o.id ? '取消中…' : '取消订单'}
-                </button>
-              </div>
-            )}
-
-            {/* ── 发票 ─────────────────────────────────────────────────
-                只有已支付(含部分退款)的订单能开票。一单一票: 已有发票时
-                不再给「申请」入口, 而是按状态展示进度或查看入口。 */}
-            {(o.status === 'paid' || o.status === 'partial_refunded') && (
-              <div style={{ marginTop: 12 }}>
-                {(() => {
-                  const inv = invoices[o.id];
-                  if (!inv) {
-                    return (
-                      <button
-                        type="button"
-                        className="pkg-sandbox-btn"
-                        onClick={() => {
-                          setFormFor(formFor === o.id ? null : o.id);
-                          setFormError(null);
-                        }}
-                      >
-                        {formFor === o.id ? '收起开票信息' : '申请开票'}
-                      </button>
-                    );
-                  }
-                  if (inv.status === 'issued') {
-                    return (
-                      <button
-                        type="button"
-                        className="pkg-sandbox-btn"
-                        onClick={() => void invoicesApi.preview(inv.id).catch(() => undefined)}
-                      >
-                        查看发票 {inv.invoiceNo}
-                      </button>
-                    );
-                  }
-                  if (inv.status === 'pending') {
-                    return <span className="order-item-meta">发票 {inv.invoiceNo} 审核中</span>;
-                  }
-                  return (
-                    <div>
-                      <span className="order-item-meta">发票已驳回：{inv.rejectReason ?? '未说明原因'}</span>
-                      <button
-                        type="button"
-                        className="pkg-sandbox-btn"
-                        style={{ marginLeft: 8 }}
-                        onClick={() => {
-                          setFormFor(o.id);
-                          setFormError(null);
-                        }}
-                      >
-                        重新申请
-                      </button>
-                    </div>
-                  );
-                })()}
+            {(payable || invoiceable) && (
+              <div className="order-card-actions">
+                {/* 发票: 一单一票, 有发票后只展示进度与查看, 不再给重复申请 */}
+                <div className="order-invoice-slot">{invoiceable ? renderInvoice(o) : null}</div>
+                {payable && (
+                  <div className="order-action-btns">
+                    <Button
+                      disabled={cancelling === o.id}
+                      onClick={() => cancelOrder(o)}
+                    >
+                      {cancelling === o.id ? '取消中…' : '取消订单'}
+                    </Button>
+                    <Button
+                      type="primary"
+                      onClick={() =>
+                        navigate(
+                          o.membershipPlanId
+                            ? `/checkout/membership?orderId=${o.id}`
+                            : `/checkout/${o.items[0]?.sku ?? ''}?orderId=${o.id}`,
+                        )
+                      }
+                    >
+                      继续支付
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
 
             {formFor === o.id && (
-              <div className="pkg-confirm-card" style={{ marginTop: 12 }}>
-                <div className="pkg-confirm-row">
-                  <span>抬头类型</span>
-                  <Select
-                    size="small"
-                    style={{ width: 120 }}
-                    value={form.kind}
-                    onChange={(value) => setForm((f) => ({ ...f, kind: value }))}
-                    options={[
-                      { value: 'personal', label: '个人' },
-                      { value: 'company', label: '企业' },
-                    ]}
-                  />
+              <div className="order-invoice-form">
+                <div className="order-invoice-head">
+                  <span className="order-invoice-title">开票信息</span>
+                  <span className="order-invoice-amount">
+                    开票金额 {formatYuan(o.paidCents - o.refundedCents)}
+                  </span>
                 </div>
-                <div className="pkg-confirm-row">
-                  <span>发票抬头</span>
-                  <Input
-                    size="small"
-                    style={{ maxWidth: 240 }}
-                    value={form.title}
-                    maxLength={60}
-                    onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-                    placeholder={form.kind === 'company' ? '公司全称' : '个人姓名'}
-                  />
-                </div>
-                {form.kind === 'company' && (
-                  <div className="pkg-confirm-row">
-                    <span>税号</span>
-                    <Input
-                      size="small"
-                      style={{ maxWidth: 240 }}
-                      value={form.taxNo}
-                      maxLength={30}
-                      onChange={(e) => setForm((f) => ({ ...f, taxNo: e.target.value }))}
-                      placeholder="纳税人识别号"
+                <div className="order-invoice-grid">
+                  <label className="order-field">
+                    <span>抬头类型</span>
+                    <Select
+                      value={form.kind}
+                      onChange={(value) => setForm((f) => ({ ...f, kind: value }))}
+                      options={[
+                        { value: 'personal', label: '个人' },
+                        { value: 'company', label: '企业' },
+                      ]}
                     />
-                  </div>
-                )}
-                <div className="pkg-confirm-row">
-                  <span>接收邮箱</span>
-                  <Input
-                    size="small"
-                    style={{ maxWidth: 240 }}
-                    value={form.email}
-                    maxLength={120}
-                    onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                    placeholder="选填，开具后通知"
-                  />
-                </div>
-                <div className="pkg-confirm-row">
-                  <span>开票金额</span>
-                  <strong>{formatYuan(o.paidCents - o.refundedCents)}</strong>
+                  </label>
+                  <label className="order-field">
+                    <span>发票抬头</span>
+                    <Input
+                      value={form.title}
+                      maxLength={60}
+                      onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                      placeholder={form.kind === 'company' ? '公司全称' : '个人姓名'}
+                    />
+                  </label>
+                  {form.kind === 'company' && (
+                    <label className="order-field">
+                      <span>税号</span>
+                      <Input
+                        value={form.taxNo}
+                        maxLength={30}
+                        onChange={(e) => setForm((f) => ({ ...f, taxNo: e.target.value }))}
+                        placeholder="纳税人识别号"
+                      />
+                    </label>
+                  )}
+                  <label className="order-field">
+                    <span>接收邮箱</span>
+                    <Input
+                      value={form.email}
+                      maxLength={120}
+                      onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+                      placeholder="选填，开具后通知"
+                    />
+                  </label>
                 </div>
                 {formError && (
-                  <p className="pkg-pay-hint" style={{ color: '#a32d2d', textAlign: 'left' }}>
+                  <p className="order-form-error" role="alert">
                     {formError}
                   </p>
                 )}
-                <button
-                  type="button"
-                  className="pkg-pay-btn"
-                  disabled={submitting || !form.title.trim()}
-                  onClick={() => void submitInvoice(o)}
-                >
-                  {submitting ? '提交中…' : '提交开票申请'}
-                </button>
+                <div className="order-invoice-actions">
+                  <Button onClick={() => setFormFor(null)}>取消</Button>
+                  <Button
+                    type="primary"
+                    loading={submitting}
+                    disabled={!form.title.trim()}
+                    onClick={() => void submitInvoice(o)}
+                  >
+                    提交开票申请
+                  </Button>
+                </div>
               </div>
             )}
           </article>

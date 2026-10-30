@@ -20,6 +20,7 @@ export function PersonalPage({
   className = '',
   width = 'wide',
   showBack = true,
+  onBack,
 }: {
   title?: string;
   description?: ReactNode;
@@ -30,6 +31,12 @@ export function PersonalPage({
   /** wide = 个人中心列表页；narrow = 账户设置类长表单 */
   width?: 'wide' | 'narrow';
   showBack?: boolean;
+  /**
+   * 覆盖返回按钮的行为。
+   * 默认 `navigate(-1)` 只是「回上一页」; 同页内的二级视图 (如工单详情)
+   * 需要回到本页列表, 由页面自己给出这个动作。
+   */
+  onBack?: () => void;
 }) {
   const navigate = useNavigate();
   return (
@@ -40,7 +47,7 @@ export function PersonalPage({
           size="small"
           className="personal-page-back"
           icon={<ArrowLeft size={15} />}
-          onClick={() => navigate(-1)}
+          onClick={() => (onBack ? onBack() : navigate(-1))}
         >
           返回
         </Button>
