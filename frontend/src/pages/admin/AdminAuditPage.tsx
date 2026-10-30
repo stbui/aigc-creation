@@ -1,28 +1,37 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { App, Button, Input, Select, Table } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
 import { Download } from 'lucide-react';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
 import { adminAuditApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
+import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
+import { SelectBox, TextInput } from '../../admin-ui/controls';
 import {
-  AdminListError,
   AdminStaleError,
-  AdminListLoading,
-  adminPagination,
   useAdminList,
   useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
 import {
-  AdminEmpty,
-  AppliedFilters,
   FilterActions,
   FilterBar,
   PageHeader,
   Panel,
+  StatusTag,
   type AppliedFilter,
 } from '../../components/admin/PageHeader';
 import type { AdminAuditListResult } from '../../types/api';
+
+/**
+ * 操作审计（BoardUI）。
+ *
+ * 页面职责不变：只读，记录后台全部写操作，用于事后追责与举证。
+ * 本次改造只换渲染层 —— 筛选条件、URL 同步、导出、行内展开的行为逐条保留：
+ *
+ * - 筛选值有「草稿 / 已生效」两态，只有点「查询」才改列表，URL 也只同步已生效的值；
+ * - 详情铺在行内而不是抽屉：追溯时经常要对照上一行的记录，抽屉会挡住上下文；
+ * - 导出走**已生效**的筛选条件，与屏幕上的列表同口径。
+ */
 
 type Row = AdminAuditListResult['items'][number];
 
@@ -43,79 +52,75 @@ function AuditExpandedDetail({ row }: { row: Row }) {
   const detailEntries = Object.entries(row.detail);
 
   return (
-    <div className="adm-audit-detail">
-      <div className="adm-audit-detail-head">
+    <div className="flex flex-col gap-3">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="adm-audit-detail-title">审计详情</div>
-          <div className="adm-audit-detail-sub">记录只追加，不支持修改或删除</div>
+          <div className="text-xs font-semibold text-text-primary">审计详情</div>
+          <div className="mt-0.5 text-[11px] text-text-tertiary">
+            记录只追加，不支持修改或删除
+          </div>
         </div>
-        <span className={`adm-tag ${row.success ? 'is-success' : 'is-danger'}`}>
-          {row.success ? '成功' : '失败'}
-        </span>
+        <StatusTag
+          status={row.success ? 'succeeded' : 'failed'}
+          label={row.success ? '成功' : '失败'}
+        />
       </div>
 
-      <dl className="adm-audit-detail-grid">
-        <div>
-          <dt>时间</dt>
-          <dd>{new Date(row.createdAt).toLocaleString('zh-CN')}</dd>
-        </div>
-        <div>
-          <dt>操作人</dt>
-          <dd>
-            {row.actorEmail} <span className="adm-cell-sub">{row.actorRole}</span>
-          </dd>
-        </div>
-        <div>
-          <dt>动作</dt>
-          <dd>{ACTION_LABELS[row.action] ?? row.action}</dd>
-        </div>
-        <div>
-          <dt>对象</dt>
-          <dd>
-            {row.targetType} / <code>{row.targetId}</code>
-          </dd>
-        </div>
-        <div>
-          <dt>来源 IP</dt>
-          <dd>
-            <code>{row.ip}</code>
-          </dd>
-        </div>
-        <div>
-          <dt>记录 ID</dt>
-          <dd>
-            <code>{row.id}</code>
-          </dd>
-        </div>
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-2 md:grid-cols-3 xl:grid-cols-6">
+        <Field label="时间">{new Date(row.createdAt).toLocaleString('zh-CN')}</Field>
+        <Field label="操作人">
+          {row.actorEmail}
+          <span className="ml-1.5 text-text-tertiary">{row.actorRole}</span>
+        </Field>
+        <Field label="动作">{ACTION_LABELS[row.action] ?? row.action}</Field>
+        <Field label="对象">
+          {row.targetType} / <Mono>{row.targetId}</Mono>
+        </Field>
+        <Field label="来源 IP">
+          <Mono>{row.ip}</Mono>
+        </Field>
+        <Field label="记录 ID">
+          <Mono>{row.id}</Mono>
+        </Field>
       </dl>
 
       {row.reason && (
-        <div className="adm-audit-detail-block">
-          <div className="adm-audit-detail-block-title">操作原因</div>
-          <div className="adm-reason-box">{row.reason}</div>
+        <div>
+          <div className="mb-1 text-[11px] text-text-tertiary">操作原因</div>
+          <div className="rounded-lg border border-border-table bg-amber-50/60 px-2.5 py-2 text-xs text-text-primary">
+            {row.reason}
+          </div>
         </div>
       )}
 
-      <div className="adm-audit-detail-block">
-        <div className="adm-audit-detail-block-title">
-          变更内容
-          <span className="adm-panel-note">仅记录白名单字段，密码与凭据类内容不写入审计</span>
+      <div>
+        <div className="mb-1 flex items-baseline gap-2">
+          <span className="text-[11px] text-text-tertiary">变更内容</span>
+          <span className="text-[11px] text-text-placeholder">
+            仅记录白名单字段，密码与凭据类内容不写入审计
+          </span>
         </div>
         {detailEntries.length === 0 ? (
-          <div className="adm-audit-detail-empty">本条操作没有可展示的变更字段。</div>
+          <div className="text-xs text-text-tertiary">本条操作没有可展示的变更字段。</div>
         ) : (
-          <table className="adm-diff-table">
+          <table className="w-auto border-collapse text-xs">
             <thead>
-              <tr>
-                <th>字段</th>
-                <th>值</th>
+              <tr className="border-b border-border-table bg-background-secondary-default/60">
+                <th scope="col" className="px-2 py-1 text-left font-medium text-text-secondary">
+                  字段
+                </th>
+                <th scope="col" className="px-2 py-1 text-left font-medium text-text-secondary">
+                  值
+                </th>
               </tr>
             </thead>
             <tbody>
               {detailEntries.map(([key, value]) => (
-                <tr key={key}>
-                  <td>{key}</td>
-                  <td>{typeof value === 'object' ? JSON.stringify(value) : String(value)}</td>
+                <tr key={key} className="border-b border-border-table/70">
+                  <td className="px-2 py-1 align-top text-text-secondary">{key}</td>
+                  <td className="px-2 py-1 align-top text-text-primary">
+                    {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -126,8 +131,23 @@ function AuditExpandedDetail({ row }: { row: Row }) {
   );
 }
 
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[11px] text-text-tertiary">{label}</dt>
+      <dd className="truncate text-xs text-text-primary" title={typeof children === 'string' ? children : undefined}>
+        {children}
+      </dd>
+    </div>
+  );
+}
+
+function Mono({ children }: { children: ReactNode }) {
+  return <code className="font-mono text-[11px] text-text-secondary">{children}</code>;
+}
+
 export function AdminAuditPage() {
-  const { message } = App.useApp();
+  const toast = useToast();
   const { can } = useAdmin();
   // 深链/刷新后保留筛选: 地址栏是运营之间传「我看到的这批」最直接的方式。
   // 初始值同时喂给 useState 与 useAdminList, 首次请求即带筛选 ——
@@ -193,72 +213,73 @@ export function AdminAuditPage() {
     [data],
   );
 
-  const columns: ColumnsType<Row> = useMemo(
+  const columns: Array<AdminColumn<Row>> = useMemo(
     () => [
       {
-        title: '时间',
-        dataIndex: 'createdAt',
         key: 'createdAt',
+        title: '时间',
         width: 160,
-        render: (v: string) => new Date(v).toLocaleString('zh-CN'),
+        render: (row) => new Date(row.createdAt).toLocaleString('zh-CN'),
       },
       {
-        title: '操作人',
-        dataIndex: 'actorEmail',
         key: 'actor',
+        title: '操作人',
         width: 190,
-        render: (email: string, row) => (
+        render: (row) => (
           <div>
-            <div>{email}</div>
-            <div className="adm-cell-sub">{row.actorRole}</div>
+            <div>{row.actorEmail}</div>
+            <div className="text-[11px] text-text-tertiary">{row.actorRole}</div>
           </div>
         ),
       },
       {
-        title: '动作',
-        dataIndex: 'action',
         key: 'action',
+        title: '动作',
         width: 150,
-        render: (a: string, row) => (
-          <span className={`adm-tag ${row.success ? 'is-success' : 'is-danger'}`}>
-            {ACTION_LABELS[a] ?? a}
-          </span>
+        // 动作标签的颜色跟随结果：一眼扫下去先看见红的是什么动作失败
+        render: (row) => (
+          <StatusTag
+            status={row.success ? 'succeeded' : 'failed'}
+            label={ACTION_LABELS[row.action] ?? row.action}
+          />
         ),
       },
       {
-        title: '对象',
-        dataIndex: 'targetType',
         key: 'target',
+        title: '对象',
         width: 200,
-        render: (type: string, row) => (
+        render: (row) => (
           <div>
-            <div>{type}</div>
-            <code className="adm-cell-sub">{row.targetId.slice(-8)}</code>
+            <div>{row.targetType}</div>
+            <Mono>{row.targetId.slice(-8)}</Mono>
           </div>
         ),
       },
       {
-        title: 'IP',
-        dataIndex: 'ip',
         key: 'ip',
+        title: 'IP',
         width: 120,
-        render: (v: string) => <code>{v}</code>,
+        render: (row) => <Mono>{row.ip}</Mono>,
       },
       {
-        title: '结果',
-        dataIndex: 'success',
         key: 'success',
+        title: '结果',
         width: 70,
-        render: (ok: boolean) => <span className={`adm-tag ${ok ? 'is-success' : 'is-danger'}`}>{ok ? '成功' : '失败'}</span>,
+        render: (row) => (
+          <StatusTag
+            status={row.success ? 'succeeded' : 'failed'}
+            label={row.success ? '成功' : '失败'}
+          />
+        ),
       },
       {
-        title: '',
         key: 'detail',
+        title: '',
         width: 76,
-        render: (_: unknown, row) => (
+        render: (row) => (
           <Button
-            type="link"
-            className="adm-link"
+            variant="ghost"
+            size="small"
             aria-expanded={expandedId === row.id}
             onClick={() => setExpandedId(expandedId === row.id ? null : row.id)}
           >
@@ -335,9 +356,9 @@ export function AdminAuditPage() {
         targetId: params.targetId as string | undefined,
         success: params.success as boolean | undefined,
       });
-      void message.success('导出已开始下载');
+      toast.success('导出已开始下载');
     } catch (e) {
-      void message.error(e instanceof Error ? e.message : '导出失败');
+      toast.error(e instanceof Error ? e.message : '导出失败');
     } finally {
       setExporting(false);
     }
@@ -351,12 +372,12 @@ export function AdminAuditPage() {
         actions={
           can('data.export') ? (
             <Button
-              type="default"
-              className="adm-btn"
-              loading={exporting}
+              variant="secondary"
+              size="small"
+              leadingIcon={Download}
+              disabled={exporting}
               onClick={() => void exportCsv()}
             >
-              <Download size={14} style={{ marginRight: 4 }} />
               {exporting ? '导出中…' : '导出 CSV'}
             </Button>
           ) : undefined
@@ -364,44 +385,45 @@ export function AdminAuditPage() {
       />
 
       <FilterBar>
-        <Select
-          className="adm-filter-select"
+        {/*
+         * 动作下拉不再带搜索框（BoardUI 的 Select 是 React Aria 组合件，没有
+         * ComboBox 变体）。动作总数取自后端聚合，量级在十几条；RAC 的 ListBox
+         * 自带首字母跳转，键盘仍然可用，因此不再自造搜索框。
+         */}
+        <SelectBox
+          className="w-48"
+          ariaLabel="按动作筛选"
           placeholder="动作"
           options={actions}
           value={action}
           onChange={setAction}
           allowClear
-          showSearch
-          optionFilterProp="label"
         />
-        <Input
-          className="adm-filter-input"
+        <TextInput
+          className="w-48"
           placeholder="对象 ID"
           value={targetId}
-          onChange={(e) => setTargetId(e.target.value)}
-          onPressEnter={applyFilters}
+          onChange={setTargetId}
+          onEnter={applyFilters}
           allowClear
         />
-        <Select
-          className="adm-filter-select"
+        <SelectBox
+          className="w-28"
+          ariaLabel="按结果筛选"
           placeholder="结果"
           options={[
             { value: 'true', label: '成功' },
             { value: 'false', label: '失败' },
           ]}
           value={success}
-          onChange={(v) => setSuccess(v)}
+          onChange={setSuccess}
           allowClear
         />
         <FilterActions>
-          <Button
-            type="primary"
-            className="adm-btn is-primary"
-            onClick={applyFilters}
-          >
+          <Button variant="primary" size="small" onClick={applyFilters}>
             查询
           </Button>
-          <Button type="default" className="adm-btn" onClick={resetFilters}>
+          <Button variant="secondary" size="small" onClick={resetFilters}>
             重置
           </Button>
         </FilterActions>
@@ -412,52 +434,41 @@ export function AdminAuditPage() {
       {error && data && <AdminStaleError error={error} onRetry={reload} />}
 
       <Panel>
-        {loading && !data ? (
-          <AdminListLoading tip="加载审计记录…" />
-        ) : error && !data ? (
-          <AdminListError error={error} onRetry={reload} />
-        ) : (list?.items.length ?? 0) === 0 ? (
-          <AdminEmpty
-            description={
-              hasFilter
-                ? '没有符合条件的审计记录。清除筛选后再试。'
-                : '暂无审计记录。后台的写操作（禁用用户、调价、退款等）会自动记录在这里。'
-            }
-            action={
-              hasFilter ? (
-                <Button type="default" className="adm-btn" onClick={resetFilters}>
-                  清除筛选
-                </Button>
-              ) : undefined
-            }
-          />
-        ) : (
-          <Table<Row>
-            rowKey="id"
-            size="small"
-            columns={columns}
-            dataSource={list?.items ?? []}
-            loading={loading}
-            scroll={{ x: 1100 }}
-            expandable={{
-              expandedRowKeys: expandedId ? [expandedId] : [],
-              expandedRowRender: (row) => <AuditExpandedDetail row={row} />,
-              expandedRowClassName: 'adm-audit-expanded-row',
-              showExpandColumn: false,
-              onExpandedRowsChange: (keys) =>
-                setExpandedId(keys.length > 0 ? String(keys[keys.length - 1]) : null),
-            }}
-            pagination={adminPagination({
-              current: list?.page ?? 1,
-              pageSize: list?.pageSize ?? 20,
-              total: list?.total ?? 0,
-              onChange: (page, pageSize) => {
-                setExpandedId(null);
-                setPage(page, pageSize);
-              },
-            })}
-          />
-        )}
+        <AdminDataTable<Row>
+          rows={list?.items ?? []}
+          columns={columns}
+          rowKey={(row) => row.id}
+          loading={loading}
+          error={error}
+          onRetry={reload}
+          minWidth={1100}
+          emptyText={
+            hasFilter
+              ? '没有符合条件的审计记录。清除筛选后再试。'
+              : '暂无审计记录。后台的写操作（禁用用户、调价、退款等）会自动记录在这里。'
+          }
+          emptyAction={
+            hasFilter ? (
+              <Button variant="secondary" size="small" onClick={resetFilters}>
+                清除筛选
+              </Button>
+            ) : undefined
+          }
+          expandedKeys={expandedId ? [expandedId] : []}
+          onExpandedChange={(keys) =>
+            setExpandedId(keys.length > 0 ? keys[keys.length - 1] : null)
+          }
+          renderExpanded={(row) => <AuditExpandedDetail row={row} />}
+          pagination={{
+            current: list?.page ?? 1,
+            pageSize: list?.pageSize ?? 20,
+            total: list?.total ?? 0,
+            onChange: (page, pageSize) => {
+              setExpandedId(null);
+              setPage(page, pageSize);
+            },
+          }}
+        />
       </Panel>
     </>
   );

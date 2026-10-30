@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Button, Flex, Select, Space, Tag, Tooltip, Typography } from 'antd';
+import { Chip } from '../../../vendor/boardui/components/base/badges/chip';
+import { Button } from '../../../vendor/boardui/components/base/buttons/button';
 import { Download } from 'lucide-react';
 import { adminModelChannelsApi } from '../../../lib/api';
+import { Notice } from '../../../admin-ui/primitives';
+import { HoverTip, TextInput } from '../../../admin-ui/controls';
 import type { AdminModelListResult, Modality } from '../../../types/api';
 
 export interface PresetModel {
@@ -15,8 +18,6 @@ interface ModelOption {
   label: string;
   note?: string;
   source: 'preset' | 'remote' | 'custom';
-  /** antd 的 option 类型带索引签名，这里补一份以保持可赋值 */
-  [name: string]: unknown;
 }
 
 /**
@@ -32,9 +33,16 @@ interface ModelOption {
  * 现在把三层来源都摆出来:
  *   1. 内置预设 —— vendor.catalog.ts 收录的模型, 带中文说明, 离线可用;
  *   2. 厂商实时清单 —— 用当前线路令牌向厂商模型列表接口拉取, 可选;
- *   3. 自定义 —— 输入清单里没有的名字, 下拉末尾会出现「使用 ...」选项。
+ *   3. 自定义 —— 输入清单里没有的名字, 末项会出现「使用这个自定义模型名」。
  *
  * ⚠️ 拉取需要「通道测试」权限, 且会把令牌发给厂商 —— 与草稿测试同一档权限。
+ *
+ * ## 为什么不是下拉框
+ *
+ * BoardUI 免费层没有可搜索的 Select（vendor 的 `Select` 是单选菜单，没有
+ * 自由输入）。而这个字段必须允许「清单里没有的模型名直接手填」——
+ * 那是运营换新模型最常见的动作，做成下拉就只能选不能填。
+ * 故这里用「可输入的文本框 + 常驻候选列表」：输入即筛选，候选随时可见。
  */
 export function ModelPicker({
   modality,
@@ -98,7 +106,7 @@ export function ModelPicker({
       seen.add(id);
       out.push({ value: id, label: id, note: '厂商模型列表返回', source: 'remote' });
     }
-    // 已保存的自定义模型名不在任何清单里时，也要能在下拉里显示出来
+    // 已保存的自定义模型名不在任何清单里时，也要能在列表里显示出来
     if (value && !seen.has(value)) {
       out.push({ value, label: value, note: '当前手填（不在预设/实时清单中）', source: 'custom' });
     }
@@ -108,6 +116,15 @@ export function ModelPicker({
     }
     return out;
   }, [presetModels, remoteIds, value, search]);
+
+  /** 候选列表按当前搜索词过滤；搜索为空时展示全部 */
+  const visibleOptions = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return options;
+    return options.filter(
+      (o) => o.value.toLowerCase().includes(q) || o.label.toLowerCase().includes(q),
+    );
+  }, [options, search]);
 
   const fetchModels = async () => {
     const key = fetchKey;
@@ -141,157 +158,139 @@ export function ModelPicker({
         : undefined;
 
   return (
-    <Flex vertical gap={8}>
-      <Select<string>
-        id="mc-model"
-        allowClear
+    <div className="flex flex-col gap-2">
+      <TextInput
+        value={search}
+        onChange={setSearch}
         disabled={!canWrite}
-        value={value || undefined}
-        placeholder="留空则使用协议默认模型；输入模型名可筛选或选用自定义名"
-        options={options}
-        showSearch={{
-          onSearch: setSearch,
-          filterOption: (input, option) => {
-            const q = input.trim().toLowerCase();
-            if (!q) return true;
-            if (!option) return false;
-            const o = option as unknown as ModelOption;
-            return o.value.toLowerCase().includes(q) || o.label.toLowerCase().includes(q);
-          },
-        }}
-        onChange={(v) => {
-          setSearch('');
-          onChange(v ?? '');
-        }}
-        notFoundContent={
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            没有匹配的模型；直接输入完整模型名即可使用
-          </Typography.Text>
-        }
-        optionRender={(option) => {
-          const o = option.data as ModelOption;
-          return (
-            <Flex vertical gap={2} style={{ padding: '2px 0' }}>
-              <Space size={6} wrap>
-                <Typography.Text>{o.label}</Typography.Text>
-                {o.source === 'remote' && (
-                  <Tag color="success" variant="filled" style={{ marginInlineEnd: 0 }}>
-                    实时
-                  </Tag>
-                )}
-                {o.source === 'custom' && (
-                  <Tag color="warning" variant="filled" style={{ marginInlineEnd: 0 }}>
-                    自定义
-                  </Tag>
-                )}
-              </Space>
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                {o.value}
-                {o.note ? ` · ${o.note}` : ''}
-              </Typography.Text>
-            </Flex>
-          );
-        }}
+        placeholder="输入模型名筛选，或直接手填清单里没有的模型"
+        ariaLabel="默认模型"
       />
 
-      <Flex justify="space-between" align="center" gap={8} wrap>
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+      {/* 当前生效的模型名常驻显示 —— 输入框只是筛选器，真正生效的值在这里 */}
+      <div className="flex items-center gap-1.5 text-xs">
+        <span className="text-text-tertiary">当前模型</span>
+        {value ? (
+          <code className="rounded bg-background-secondary-default px-1.5 py-0.5 font-mono text-text-primary">
+            {value}
+          </code>
+        ) : (
+          <span className="text-text-tertiary">留空则使用协议默认模型</span>
+        )}
+      </div>
+
+      <div className="max-h-[220px] overflow-y-auto rounded-lg border border-border-table">
+        {visibleOptions.length === 0 ? (
+          <p className="px-3 py-3 text-xs text-text-tertiary">
+            没有匹配的模型；直接输入完整模型名即可使用
+          </p>
+        ) : (
+          <ul className="flex flex-col">
+            {visibleOptions.map((option) => {
+              const active = option.value === value;
+              return (
+                <li key={option.value}>
+                  <button
+                    type="button"
+                    disabled={!canWrite}
+                    onClick={() => {
+                      setSearch('');
+                      onChange(option.value);
+                    }}
+                    className={
+                      active
+                        ? 'flex w-full flex-col gap-0.5 bg-accent-50 px-3 py-2 text-left'
+                        : 'flex w-full flex-col gap-0.5 px-3 py-2 text-left hover:bg-background-secondary-default disabled:cursor-not-allowed'
+                    }
+                  >
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-xs font-medium text-text-primary">{option.label}</span>
+                      {option.source === 'remote' && (
+                        <Chip variant="caption" color="lime">
+                          实时
+                        </Chip>
+                      )}
+                      {option.source === 'custom' && (
+                        <Chip variant="caption" color="yellow">
+                          自定义
+                        </Chip>
+                      )}
+                      {active && (
+                        <Chip variant="caption" color="purple">
+                          使用中
+                        </Chip>
+                      )}
+                    </span>
+                    <span className="text-[11px] text-text-tertiary">
+                      {option.value}
+                      {option.note ? ` · ${option.note}` : ''}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs text-text-tertiary">
           内置预设 {presetModels.length} 个
-          {remote
-            ? ` · 厂商返回 ${remote.remote?.length ?? 0} 个`
-            : ' · 可向厂商拉取实时清单'}
-        </Typography.Text>
-        <Tooltip title={fetchDisabledReason}>
+          {remote ? ` · 厂商返回 ${remote.remote?.length ?? 0} 个` : ' · 可向厂商拉取实时清单'}
+        </span>
+        <HoverTip tip={fetchDisabledReason}>
           <span>
             <Button
+              variant="secondary"
               size="small"
-              icon={<Download size={13} />}
-              loading={loading}
-              disabled={Boolean(fetchDisabledReason)}
+              leadingIcon={Download}
+              disabled={Boolean(fetchDisabledReason) || loading}
               onClick={() => void fetchModels()}
             >
-              从厂商拉取模型清单
+              {loading ? '拉取中…' : '从厂商拉取模型清单'}
             </Button>
           </span>
-        </Tooltip>
-      </Flex>
-
-      {presetModels.length > 0 && (
-        <Flex vertical gap={4}>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-            内置预设（点击选用）：
-          </Typography.Text>
-          <Space size={[6, 6]} wrap>
-            {presetModels.map((m) => (
-              <Tooltip key={m.id} title={m.note ? `${m.id} · ${m.note}` : m.id}>
-                <Tag
-                  color={value === m.id ? 'purple' : undefined}
-                  variant={value === m.id ? 'filled' : 'outlined'}
-                  style={{ cursor: canWrite ? 'pointer' : 'default', marginInlineEnd: 0 }}
-                  onClick={() => {
-                    if (canWrite) onChange(m.id);
-                  }}
-                >
-                  {m.label}
-                </Tag>
-              </Tooltip>
-            ))}
-          </Space>
-        </Flex>
-      )}
+        </HoverTip>
+      </div>
 
       {presetModels.length === 0 && !remote && (
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+        <p className="text-xs text-text-tertiary">
           当前厂商/协议没有内置预设。可直接手填模型名，或点「从厂商拉取模型清单」获取真实列表。
-        </Typography.Text>
+        </p>
       )}
 
       {remote && (
-        <Alert
-          type={remote.remote && remote.remote.length > 0 ? 'success' : 'warning'}
-          showIcon
+        <Notice
+          tone={remote.remote && remote.remote.length > 0 ? 'success' : 'warn'}
           title={remote.message}
-          description={
-            <Flex vertical gap={4}>
-              {remote.remote && remote.remote.length > 0 && (
-                <Space size={[6, 6]} wrap>
-                  {remote.remote.slice(0, 60).map((id) => (
-                    <Tag
-                      key={id}
-                      color={value === id ? 'purple' : undefined}
-                      variant={value === id ? 'filled' : 'outlined'}
-                      style={{ cursor: canWrite ? 'pointer' : 'default', marginInlineEnd: 0 }}
-                      onClick={() => {
-                        if (canWrite) onChange(id);
-                      }}
-                    >
-                      {id}
-                    </Tag>
-                  ))}
-                  {remote.remote.length > 60 && (
-                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      共 {remote.remote.length} 个，下拉里可搜索全部
-                    </Typography.Text>
-                  )}
-                </Space>
+          className="mb-0"
+        >
+          {remote.remote && remote.remote.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {remote.remote.slice(0, 60).map((id) => (
+                <HoverTip key={id} tip={id}>
+                  <Chip variant="caption" color={value === id ? 'purple' : 'neutral'}>
+                    {id}
+                  </Chip>
+                </HoverTip>
+              ))}
+              {remote.remote.length > 60 && (
+                <span className="text-text-tertiary">
+                  共 {remote.remote.length} 个，上方列表可搜索全部
+                </span>
               )}
-              {remote.usedStoredToken && (
-                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  使用已保存的访问令牌请求厂商接口。
-                </Typography.Text>
-              )}
-              {!remote.remote && remote.endpoints.length > 0 && (
-                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  尝试过的端点：{remote.endpoints.join('、')}
-                </Typography.Text>
-              )}
-            </Flex>
-          }
-          style={{ marginTop: 4 }}
-        />
+            </div>
+          )}
+          {remote.usedStoredToken && (
+            <div className="mt-1">使用已保存的访问令牌请求厂商接口。</div>
+          )}
+          {!remote.remote && remote.endpoints.length > 0 && (
+            <div className="mt-1">尝试过的端点：{remote.endpoints.join('、')}</div>
+          )}
+        </Notice>
       )}
 
-      {error && <Alert type="error" showIcon title={error} />}
-    </Flex>
+      {error && <Notice tone="danger" title={error} className="mb-0" />}
+    </div>
   );
 }

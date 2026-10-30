@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
-import { App, Button } from 'antd';
 import { AlertTriangle, CheckCircle2, Clock, Play, RefreshCw, XCircle } from 'lucide-react';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
+import { Chip } from '../../vendor/boardui/components/base/badges/chip';
 import { adminSchedulerApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
+import { Notice } from '../../admin-ui/primitives';
 import {
   AdminListError,
   AdminListLoading,
@@ -10,6 +13,7 @@ import {
   useAdminResource,
 } from '../../components/admin/AdminWidgets';
 import { AdminEmpty, PageHeader, Panel } from '../../components/admin/PageHeader';
+import { cx } from '../../admin-ui/lib/cn';
 import type { AdminSchedulerTask } from '../../types/api';
 
 /** 相对时间 —— 运维看的是"多久没跑了", 不是绝对时间 */
@@ -32,6 +36,21 @@ function freshness(t: AdminSchedulerTask): 'ok' | 'failed' | 'never' {
 }
 
 /**
+ * 三态的视觉表达：边框色 + 图标。
+ *
+ * 只有「失败」染红 —— 从未执行只是「还没到点」，多数是部署后首轮未触发，
+ * 一律标红会让真正失败的条目失去分量。
+ */
+const FRESHNESS_STYLE: Record<
+  'ok' | 'failed' | 'never',
+  { row: string; icon: string; Icon: typeof CheckCircle2 }
+> = {
+  ok: { row: 'border-border-table bg-white', icon: 'text-emerald-600', Icon: CheckCircle2 },
+  failed: { row: 'border-rose-200 bg-rose-50/40', icon: 'text-rose-600', Icon: XCircle },
+  never: { row: 'border-border-table bg-white', icon: 'text-text-placeholder', Icon: Clock },
+};
+
+/**
  * 定时任务 (admin-prd.md §3.18 B-90 / M9.5)。
  *
  * 这个页面的核心价值: **让"静默失败"变得可见**。
@@ -39,7 +58,7 @@ function freshness(t: AdminSchedulerTask): 'ok' | 'failed' | 'never' {
  * 所有人都会以为它在跑。
  */
 export function AdminSchedulerPage() {
-  const { message } = App.useApp();
+  const toast = useToast();
   const { can } = useAdmin();
   const writable = can('setting.write');
 
@@ -66,10 +85,10 @@ export function AdminSchedulerPage() {
     setBusy(true);
     try {
       await adminSchedulerApi.run(target.name);
-      void message.success(`「${target.label}」已手动执行`);
+      toast.success(`「${target.label}」已手动执行`);
       await reload();
     } catch (e) {
-      void message.error((e as Error).message);
+      toast.error((e as Error).message);
     } finally {
       setBusy(false);
     }
@@ -80,6 +99,10 @@ export function AdminSchedulerPage() {
   if (!data) return <AdminEmpty description="暂无调度信息" />;
 
   const failing = data.failing;
+  const failingLabels = data.tasks
+    .filter((t) => failing.includes(t.name))
+    .map((t) => `${t.label}（${t.consecutiveFailures} 次）`)
+    .join('、');
 
   return (
     <>
@@ -87,8 +110,13 @@ export function AdminSchedulerPage() {
         title="定时任务"
         description="订单超时关闭、积分到期回收、备份与保留期清理的统一调度"
         actions={
-          <Button type="default" className="adm-btn" loading={loading} onClick={() => void reload()}>
-            <RefreshCw size={14} style={{ marginRight: 6 }} />
+          <Button
+            variant="secondary"
+            size="small"
+            leadingIcon={RefreshCw}
+            disabled={loading}
+            onClick={() => void reload()}
+          >
             刷新
           </Button>
         }
@@ -100,75 +128,72 @@ export function AdminSchedulerPage() {
 
       {/* 连续失败置顶告警: 这正是"没人看出调度已挂"的解药 */}
       {failing.length > 0 && (
-        <div className="adm-alert is-danger">
-          <AlertTriangle size={16} />
-          <div>
-            <strong>{failing.length} 个任务连续失败</strong>
-            <div>
-              涉及：
-              {data.tasks
-                .filter((t) => failing.includes(t.name))
-                .map((t) => `${t.label}（${t.consecutiveFailures} 次）`)
-                .join('、')}
-            </div>
-            <div>调度器不会因为单个任务失败而停止其它任务，但该任务已停止生效。</div>
-          </div>
-        </div>
+        <Notice
+          tone="danger"
+          title={`${failing.length} 个任务连续失败`}
+          icon={<AlertTriangle className="size-4 shrink-0" aria-hidden />}
+        >
+          <p>涉及：{failingLabels}</p>
+          <p>调度器不会因为单个任务失败而停止其它任务，但该任务已停止生效。</p>
+        </Notice>
       )}
 
       <Panel title="任务列表" note="每 10 分钟检查一次；单个任务失败不影响其它任务">
-        <div className="adm-task-list">
+        <div className="flex flex-col gap-2">
           {data.tasks.map((t) => {
             const fresh = freshness(t);
+            const style = FRESHNESS_STYLE[fresh];
+            const Icon = style.Icon;
             return (
-              <div key={t.name} className={`adm-task-row is-${fresh}`}>
-                <div className="adm-task-icon">
-                  {fresh === 'failed' ? (
-                    <XCircle size={18} />
-                  ) : fresh === 'never' ? (
-                    <Clock size={18} />
-                  ) : (
-                    <CheckCircle2 size={18} />
-                  )}
-                </div>
+              <div
+                key={t.name}
+                data-testid="admin-task-row"
+                data-task={t.name}
+                className={cx('flex items-center gap-3 rounded-xl border px-3.5 py-2.5', style.row)}
+              >
+                <span className={cx('shrink-0', style.icon)}>
+                  <Icon size={18} aria-hidden />
+                </span>
 
-                <div className="adm-task-main">
-                  <div className="adm-task-title">
-                    {t.label}
-                    <code className="adm-mono adm-task-code">{t.name}</code>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-sm font-medium text-text-primary">{t.label}</span>
+                    <code className="font-mono text-[11px] text-text-tertiary">{t.name}</code>
                   </div>
-                  <div className="adm-task-meta">
+                  <div className="mt-0.5 text-[11px] leading-4 text-text-tertiary">
                     上次执行：{since(t.lastRunAt)}
                     {t.lastDurationMs !== null && ` · 耗时 ${t.lastDurationMs}ms`}
                     {t.totalRuns > 0 && ` · 累计 ${t.totalRuns} 次`}
                   </div>
                   {t.lastError && (
-                    <div className="adm-task-error" title={t.lastError}>
+                    <div
+                      className="mt-1 truncate font-mono text-[11px] text-rose-700"
+                      title={t.lastError}
+                    >
                       {t.lastError}
                     </div>
                   )}
                 </div>
 
-                <div className="adm-task-actions">
+                <div className="flex shrink-0 items-center gap-2">
                   {t.consecutiveFailures > 0 && (
-                    <span className="adm-tag is-danger">
-                      <span className="adm-tag-dot" />
+                    <Chip variant="bold" color="rose">
                       连续失败 {t.consecutiveFailures}
-                    </span>
+                    </Chip>
                   )}
                   {data.manuallyRunnable.includes(t.name) &&
                     (writable ? (
                       <Button
-                        type="default"
-                        className="adm-btn"
-                        onClick={() => void runNow(t)}
+                        variant="secondary"
+                        size="small"
+                        leadingIcon={Play}
                         disabled={busy}
+                        onClick={() => void runNow(t)}
                       >
-                        <Play size={13} style={{ marginRight: 4 }} />
                         立即执行
                       </Button>
                     ) : (
-                      <span className="adm-cell-sub">仅查看</span>
+                      <span className="text-[11px] text-text-placeholder">仅查看</span>
                     ))}
                 </div>
               </div>
@@ -178,27 +203,26 @@ export function AdminSchedulerPage() {
       </Panel>
 
       <Panel title="设计说明" note="为什么这些能手动触发、哪些不能">
-        <ul className="adm-note-list">
+        <ul className="flex list-disc flex-col gap-1.5 pl-4 text-xs leading-5 text-text-secondary">
           <li>
-            <strong>可手动触发</strong>：订单超时关闭、积分到期回收。
+            <strong className="text-text-primary">可手动触发</strong>：订单超时关闭、积分到期回收。
             两者都是「扫一批已到期的」，重复执行不产生副作用 —— 这是幂等的前提。
           </li>
           <li>
-            <strong>不可手动触发</strong>：备份、保留期清理。
+            <strong className="text-text-primary">不可手动触发</strong>：备份、保留期清理。
             它们会写文件或删数据，被随意触发可能覆盖可用备份或误删未到期数据。
           </li>
           <li>
-            <strong>失败隔离</strong>：每个任务独立捕获异常。
+            <strong className="text-text-primary">失败隔离</strong>：每个任务独立捕获异常。
             早期版本用一个大 try 包住全部任务，结果备份一抛错，订单超时关闭就被跳过 ——
             订单不关闭会直接影响用户看到的可用金额。
           </li>
           <li>
-            <strong>节流</strong>：订单关闭最短间隔 5 分钟、积分回收 10 分钟。
+            <strong className="text-text-primary">节流</strong>：订单关闭最短间隔 5 分钟、积分回收 10 分钟。
             订单超时是 30 分钟粒度，再密也没意义，而回收涉及多次写库。
           </li>
         </ul>
       </Panel>
-
     </>
   );
 }

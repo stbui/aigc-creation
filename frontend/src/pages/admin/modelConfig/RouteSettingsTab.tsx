@@ -1,5 +1,10 @@
 import { useMemo, useState } from 'react';
-import { Card, Flex, Segmented, Select, Space, Table, Tag, Typography } from 'antd';
+import { Chip } from '../../../vendor/boardui/components/base/badges/chip';
+import { AdminDataTable, type AdminColumn } from '../../../admin-ui/primitives/DataTable';
+import { Notice } from '../../../admin-ui/primitives';
+import { Panel } from '../../../components/admin/PageHeader';
+import { SegmentedBox, SelectBox } from '../../../admin-ui/controls';
+import { TONE_CHIP_COLOR } from '../../../components/admin/statusMeta';
 import type { AdminModelConfig, AdminModelConfigItem, AdminModelRouteRow, Modality } from '../../../types/api';
 import type { ModelConfigDraft } from './useModelConfigDraft';
 import {
@@ -9,11 +14,10 @@ import {
   MODALITY_ORDER,
   ROUTE_LABEL,
   ROUTE_OPTIONS_SHORT,
-  tagColor,
 } from './meta';
 
 /**
- * 逐能力路由页签（antd Table）。
+ * 逐能力路由页签。
  *
  * 编辑与生效结果合并在一张表；运行方式用短标签，避免 15 行重复长句。
  */
@@ -43,48 +47,48 @@ export function RouteSettingsTab({
     none: rows.filter((r) => r.effective === 'none').length,
   };
 
-  const columns = [
+  const columns: Array<AdminColumn<AdminModelRouteRow>> = [
     {
-      title: '能力',
       key: 'name',
+      title: '能力',
       width: 240,
-      render: (_: unknown, r: AdminModelRouteRow) => (
-        <Flex vertical gap={0}>
-          <Typography.Text strong>{r.name}</Typography.Text>
-          <Typography.Text code style={{ fontSize: 11 }}>
-            {r.capability}
-          </Typography.Text>
-        </Flex>
+      render: (r) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-sm font-medium text-text-primary">{r.name}</span>
+          <code className="font-mono text-[11px] text-text-tertiary">{r.capability}</code>
+        </div>
       ),
     },
     ...(filter === 'all'
       ? [
           {
-            title: '产出模态',
             key: 'modality',
+            title: '产出模态',
             width: 100,
-            render: (_: unknown, r: AdminModelRouteRow) => MODALITY_LABEL[r.modality],
-          },
+            render: (r: AdminModelRouteRow) => MODALITY_LABEL[r.modality],
+          } as AdminColumn<AdminModelRouteRow>,
         ]
       : []),
     {
-      title: '实现程度',
       key: 'mode',
+      title: '实现程度',
       width: 110,
-      render: (_: unknown, r: AdminModelRouteRow) =>
+      render: (r) =>
         r.mode === 'real' ? (
-          <Tag color="success" variant="filled">
+          <Chip variant="caption" color="lime">
             已接入
-          </Tag>
+          </Chip>
         ) : (
-          <Tag variant="filled">规划中</Tag>
+          <Chip variant="caption" color="neutral">
+            规划中
+          </Chip>
         ),
     },
     {
-      title: '运行方式',
       key: 'route',
-      width: 220,
-      render: (_: unknown, r: AdminModelRouteRow) => {
+      title: '运行方式',
+      width: 240,
+      render: (r) => {
         const item = routeItems.get(r.capability);
         if (!item) return ROUTE_LABEL[r.route] ?? r.route;
         const locked = item.source === 'env';
@@ -96,101 +100,96 @@ export function RouteSettingsTab({
          * 但必须显式显示为「已停用」并引导运营选择自动或仅远程。
          */
         const legacyLocal = String(value) === 'local';
-        const options = legacyLocal
-          ? [
-              {
-                value: 'local',
-                label: '存量本地（已停用）',
-                title: '本地生成已删除；保持此项会使能力不可提交，请改为自动或仅远程',
-                disabled: true,
-              },
-              ...ROUTE_OPTIONS_SHORT,
-            ]
-          : ROUTE_OPTIONS_SHORT;
         return (
-          <Space size={6} wrap>
-            <Select
-              size="small"
-              style={{ width: 110 }}
-              value={String(value)}
-              disabled={!canWrite || locked}
-              onChange={(v) => draftState.setValue(item.key, v)}
-              options={options}
-            />
+          <div className="flex flex-wrap items-center gap-1.5">
+            {legacyLocal ? (
+              <SelectBox
+                value={undefined}
+                onChange={(next) => {
+                  if (next) draftState.setValue(item.key, next);
+                }}
+                disabled={!canWrite || locked}
+                placeholder="存量本地（已停用）"
+                options={ROUTE_OPTIONS_SHORT.map((o) => ({ value: o.value, label: o.label }))}
+                ariaLabel={`${r.name} 运行方式`}
+              />
+            ) : (
+              <SelectBox
+                value={String(value)}
+                onChange={(next) => {
+                  if (next) draftState.setValue(item.key, next);
+                }}
+                disabled={!canWrite || locked}
+                options={ROUTE_OPTIONS_SHORT.map((o) => ({ value: o.value, label: o.label }))}
+                ariaLabel={`${r.name} 运行方式`}
+              />
+            )}
             {locked && (
-              <Tag color="error" variant="filled">
+              <Chip variant="caption" color="rose">
                 环境变量
-              </Tag>
+              </Chip>
             )}
             {legacyLocal && !locked && (
-              <Tag color="error" variant="filled">
+              <Chip variant="caption" color="rose">
                 请改为自动/仅远程
-              </Tag>
+              </Chip>
             )}
             {draftState.clears[item.key] && (
-              <Tag color="warning" variant="filled">
+              <Chip variant="caption" color="yellow">
                 保存后恢复默认
-              </Tag>
+              </Chip>
             )}
-          </Space>
+          </div>
         );
       },
     },
     {
-      title: '实际生效',
       key: 'effective',
+      title: '实际生效',
       width: 170,
-      render: (_: unknown, r: AdminModelRouteRow) => (
-        <Tag color={tagColor(EFFECTIVE_TONE[r.effective])} variant="filled">
+      render: (r) => (
+        <Chip variant="caption" color={TONE_CHIP_COLOR[EFFECTIVE_TONE[r.effective]]}>
           {EFFECTIVE_LABEL[r.effective]}
-        </Tag>
+        </Chip>
       ),
     },
   ];
 
   return (
-    <Card
-      size="small"
-      title={
-        <Space size={8} wrap>
-          <Typography.Text strong>逐能力路由</Typography.Text>
-          <Typography.Text type="secondary" style={{ fontSize: 12, fontWeight: 400 }}>
-            按能力 id 全局唯一；所有模态只允许模型通道，存量「仅本地」需改为自动或仅远程。
-          </Typography.Text>
-        </Space>
-      }
+    <Panel
+      title="逐能力路由"
+      note="按能力 id 全局唯一；所有模态只允许模型通道，存量「仅本地」需改为自动或仅远程。"
       extra={
-        <Flex align="center" gap={16} wrap>
-          <Space size={12}>
-            <Typography.Text type="success" style={{ fontSize: 12 }}>
-              ● {summary.gateway} 真实模型
-            </Typography.Text>
-            {summary.none > 0 && (
-              <Typography.Text type="danger" style={{ fontSize: 12 }}>
-                ● {summary.none} 需配置模型
-              </Typography.Text>
-            )}
-          </Space>
-          <Segmented<'all' | Modality>
-            size="small"
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-emerald-700">● {summary.gateway} 真实模型</span>
+          {summary.none > 0 && (
+            <span className="text-xs text-rose-600">● {summary.none} 需配置模型</span>
+          )}
+          <SegmentedBox
             value={filter}
-            onChange={setFilter}
+            onChange={(next) => setFilter(next as 'all' | Modality)}
+            ariaLabel="按模态筛选"
             options={[
-              { label: '全部', value: 'all' },
-              ...MODALITY_ORDER.map((m) => ({ label: MODALITY_LABEL[m], value: m })),
+              { value: 'all', label: '全部' },
+              ...MODALITY_ORDER.map((m) => ({ value: m, label: MODALITY_LABEL[m] })),
             ]}
           />
-        </Flex>
+        </div>
       }
     >
-      <Table<AdminModelRouteRow>
-        rowKey="capability"
-        size="small"
+      <Notice tone="info" className="mb-3" title="这里的「运行方式」决定能力提交时走哪条链路">
+        保存后立即生效。存量「仅本地」是本地生成删除前留下的配置，必须显式改为
+        「自动」或「仅远程」，否则该能力保持不可提交。
+      </Notice>
+
+      <AdminDataTable
+        rows={rows}
         columns={columns}
-        dataSource={rows}
-        pagination={false}
-        scroll={{ x: 840 }}
+        rowKey={(row) => row.capability}
+        minWidth={840}
+        density="compact"
+        emptyText="没有匹配的能力"
       />
-    </Card>
+    </Panel>
   );
 }

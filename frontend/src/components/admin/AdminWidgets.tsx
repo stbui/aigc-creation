@@ -1,37 +1,33 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { USE_BOARDUI_ADMIN } from '../../admin-ui/lib/flag';
 import * as boardui from '../../admin-ui/widgets/AdminChrome';
-import * as legacy from './AdminWidgets.legacy';
 import { PageHeader } from './PageHeader';
 
 /**
- * 后台列表共享控件（入口）。
+ * 后台列表共享控件。
  *
- * ## 为什么这里只做「分流」
+ * ## 为什么这里只做「入口」
  *
  * 数据逻辑（`useAdminList` / `useAdminResource` / URL 同步 / 分页配置）与渲染
  * 无关，只保留一份 —— 两条渲染路径若各存一份逻辑，「失败不清空数据」「筛选
  * 变更重置页码」这类行为迟早会分叉。
  *
- * 渲染层有两份：`admin-ui/widgets/AdminChrome`（BoardUI）与
- * `AdminWidgets.legacy`（antd 回滚路径），由 `VITE_ADMIN_UI` 决定用哪份。
- * 页面只 `import ... from '../../components/admin/AdminWidgets'`，不感知差异，
- * 29 个页面因此不需要改 import。
+ * 渲染层此前有两份：`admin-ui/widgets/AdminChrome`（BoardUI）与
+ * `AdminWidgets.legacy`（antd 回滚路径），由 `VITE_ADMIN_UI` 决定。29 页全部
+ * 迁完后 legacy 已无调用方，随 P4 删除（纯 C 决策：不允许交付中间态），
+ * 切换开关 `VITE_ADMIN_UI` 同时下线。
+ * 页面只 `import ... from '../../components/admin/AdminWidgets'`，不感知差异。
  */
-const impl = USE_BOARDUI_ADMIN ? boardui : legacy;
-
 /*
- * 逐项标注成 legacy 版的类型而不是让 TS 推导联合类型。
+ * 显式标注类型而不是让 TS 推导联合类型。
  * `AdminDrawer` 是泛型组件，联合的泛型签名在调用处推不出 T，页面里的
- * `children={(data) => data.xxx}` 会退化成 unknown。legacy 的签名就是契约，
- * BoardUI 版与之逐字一致，这里的 as 不会掩盖真实差异。
+ * `children={(data) => data.xxx}` 会退化成 unknown。签名就是契约。
  */
-export const AdminListLoading: typeof legacy.AdminListLoading = impl.AdminListLoading;
-export const AdminListError: typeof legacy.AdminListError = impl.AdminListError;
-export const AdminStaleError: typeof legacy.AdminStaleError = impl.AdminStaleError;
-export const AdminDrawer: typeof legacy.AdminDrawer = impl.AdminDrawer;
-export const ConfirmAction: typeof legacy.ConfirmAction = impl.ConfirmAction;
+export const AdminListLoading: typeof boardui.AdminListLoading = boardui.AdminListLoading;
+export const AdminListError: typeof boardui.AdminListError = boardui.AdminListError;
+export const AdminStaleError: typeof boardui.AdminStaleError = boardui.AdminStaleError;
+export const AdminDrawer: typeof boardui.AdminDrawer = boardui.AdminDrawer;
+export const ConfirmAction: typeof boardui.ConfirmAction = boardui.ConfirmAction;
 
 /**
  * 列表数据 hook。
@@ -166,68 +162,6 @@ export function useAdminDetailParam() {
   );
 
   return [id, setId] as const;
-}
-
-/**
- * 列表分页的统一配置 (2026-10-23)。
- *
- * 后台 12 张服务端分页表此前各写一份 `pagination={{...}}`, 差异全是历史遗留:
- * 有的给了 `showSizeChanger` 有的没给、`pageSizeOptions` 只有部分页面写、
- * `showTotal` 的单位有「条 / 张 / 个 / 行」四种写法。运营换个页面就得重新
- * 适应分页器 —— 这不该靠记忆。
- *
- * `unit` 保留各页的计量词 (券用「张」、活动用「个」), 其余一律统一。
- *
- * 注：返回的是 antd Pagination 的配置形状。BoardUI 路径下由 `AdminDataTable`
- * 消费同一份配置并渲染自己的分页器 —— 配置只在一处定义。
- */
-export function adminPagination({
-  current,
-  pageSize,
-  total,
-  onChange,
-  unit = '条',
-}: {
-  current: number;
-  pageSize: number;
-  total: number;
-  onChange: (page: number, pageSize: number) => void;
-  /** 计量词, 默认「条」 */
-  unit?: string;
-}) {
-  return {
-    current,
-    pageSize,
-    total,
-    showSizeChanger: true,
-    pageSizeOptions: [20, 50, 100],
-    showTotal: (t: number) => `共 ${t} ${unit}`,
-    onChange,
-  };
-}
-
-/**
- * 局部小表的分页配置 (2026-10-23)。
- *
- * 抽屉里的明细表、导入结果表这类数据本来就少且只在本页, 用 antd 的
- * **客户端分页** (不分页器自己算 current), 不需要像服务端分页那样把
- * current/total 传进来。此前 4 处各写一份 `{ pageSize: N, ... }`,
- * 单位有「行 / 条」两种、`hideOnSinglePage` 只有两处写。
- */
-export function adminMiniPagination({
-  pageSize = 20,
-  unit = '条',
-}: {
-  pageSize?: number;
-  /** 计量词, 默认「条」 */
-  unit?: string;
-} = {}) {
-  return {
-    pageSize,
-    // 只有一页时不显示分页器: 它占掉一整行, 却没有可翻的东西
-    hideOnSinglePage: true,
-    showTotal: (t: number) => `共 ${t} ${unit}`,
-  };
 }
 
 /**

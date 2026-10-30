@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react';
-import { App, Button, InputNumber, Table, Tooltip } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
 import { adminCreditPricesApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
+import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
+import { HoverTip, NumberInput } from '../../admin-ui/controls';
 import {
-  AdminListError,
-  AdminListLoading,
   AdminStaleError,
-  useAdminResource,
   ConfirmAction,
+  useAdminResource,
 } from '../../components/admin/AdminWidgets';
-import { AdminEmpty, PageHeader, Panel } from '../../components/admin/PageHeader';
+import { PageHeader, Panel, StatusTag } from '../../components/admin/PageHeader';
 import type { AdminCreditPrice } from '../../types/api';
 
 /**
@@ -24,9 +24,13 @@ import type { AdminCreditPrice } from '../../types/api';
  * 关键设计: 每行同时显示「生效价」与「代码默认值」+ 来源标记。
  * 不标来源的话, 运营改完价看到数字没变会以为是 bug,
  * 实际是自己在改一个不生效的层 (或反之)。
+ *
+ * 改造 (2026-10-30) 只换渲染层: 草稿 / 脏标记 / 未保存拦截 / 回落二次确认
+ * 逐条保留。来源标记从 `adm-tag` 换成 `StatusTag` 并用 `HoverTip` 解释，
+ * 原 antd Tooltip 只在鼠标悬停时出现，键盘用户看不到说明。
  */
 export function AdminCreditPricesPage() {
-  const { message } = App.useApp();
+  const toast = useToast();
   const { can } = useAdmin();
   const writable = can('product.price');
   const [saving, setSaving] = useState<string | null>(null);
@@ -64,10 +68,10 @@ export function AdminCreditPricesPage() {
     setSaving(row.capabilityId);
     try {
       await adminCreditPricesApi.update([{ capabilityId: row.capabilityId, cost: next }]);
-      message.success(`${row.capabilityName} 已改为 ${next} 积分，立即生效`);
+      toast.success(`${row.capabilityName} 已改为 ${next} 积分，立即生效`);
       await reload();
     } catch (e) {
-      message.error((e as Error).message || '保存失败');
+      toast.error((e as Error).message || '保存失败');
     } finally {
       setSaving(null);
     }
@@ -77,109 +81,97 @@ export function AdminCreditPricesPage() {
     setSaving(row.capabilityId);
     try {
       const res = await adminCreditPricesApi.reset(row.capabilityId);
-      message.success(`已回落到默认值 ${res.cost} 积分`);
+      toast.success(`已回落到默认值 ${res.cost} 积分`);
       await reload();
     } catch (e) {
-      message.error((e as Error).message || '回落失败');
+      toast.error((e as Error).message || '回落失败');
     } finally {
       setSaving(null);
       setRowForReset(null);
     }
   };
 
-  const columns: ColumnsType<AdminCreditPrice> = [
-    { title: '能力', dataIndex: 'capabilityName', key: 'name', width: 160 },
+  const columns: Array<AdminColumn<AdminCreditPrice>> = [
+    { key: 'name', title: '能力', width: 160, render: (row) => row.capabilityName },
     {
-      title: '能力 ID',
-      dataIndex: 'capabilityId',
       key: 'id',
+      title: '能力 ID',
       width: 160,
-      render: (v: string) => <code style={{ fontSize: 12 }}>{v}</code>,
+      render: (row) => (
+        <code className="font-mono text-[11px] text-text-secondary">{row.capabilityId}</code>
+      ),
     },
     {
-      title: '生效消耗价（积分）',
       key: 'cost',
+      title: '生效消耗价（积分）',
       width: 200,
-      render: (_, row) => (
-        <InputNumber
+      render: (row) => (
+        <NumberInput
+          className="w-[110px]"
+          ariaLabel={`${row.capabilityName} 生效消耗价`}
           min={0}
           max={10000}
-          size="small"
           value={draft[row.capabilityId]}
           disabled={!writable}
-          onChange={(v) =>
-            setDraft((d) => ({ ...d, [row.capabilityId]: Number(v ?? 0) }))
-          }
-          onPressEnter={() => {
+          onChange={(v) => setDraft((d) => ({ ...d, [row.capabilityId]: v ?? 0 }))}
+          onEnter={() => {
             if (writable) void save(row);
           }}
-          style={{ width: 110 }}
         />
       ),
     },
     {
-      title: '代码默认值',
-      dataIndex: 'registryDefault',
       key: 'registryDefault',
+      title: '代码默认值',
       width: 110,
-      render: (v: number) => <span style={{ color: 'var(--text-muted)' }}>{v}</span>,
+      align: 'right',
+      render: (row) => <span className="tabular-nums text-text-tertiary">{row.registryDefault}</span>,
     },
     {
-      title: '来源',
-      dataIndex: 'source',
       key: 'source',
+      title: '来源',
       width: 130,
-      render: (v: string, row) =>
-        v === 'campaign' ? (
+      render: (row) =>
+        row.source === 'campaign' ? (
           /*
            * 活动覆盖必须单独标出来：此时生效价恒为 0，运营在输入框里改价
            * **不会生效**（活动到点后自动恢复）。不标来源的话，这段表现为
            * 「改了没反应」，会被当成改价 bug。
            */
-          <Tooltip title="进行中的限时免费活动覆盖了这项能力，活动结束后自动恢复原价">
-            <span className="adm-tag is-danger">
-              <span className="adm-tag-dot" aria-hidden="true" />
-              限时免费
-            </span>
-          </Tooltip>
-        ) : v === 'setting' ? (
-          <Tooltip title="后台覆盖中。回落默认后恢复为 registry 的值">
-            <span className="adm-tag is-warning">
-              <span className="adm-tag-dot" aria-hidden="true" />
-              后台设置
-            </span>
-          </Tooltip>
+          <HoverTip tip="进行中的限时免费活动覆盖了这项能力，活动结束后自动恢复原价">
+            <StatusTag status="campaign" tone="danger" label="限时免费" />
+          </HoverTip>
+        ) : row.source === 'setting' ? (
+          <HoverTip tip="后台覆盖中。回落默认后恢复为 registry 的值">
+            <StatusTag status="setting" tone="warn" label="后台设置" />
+          </HoverTip>
         ) : (
-          <Tooltip title="未覆盖，使用代码里的 registry.creditCost">
-            <span className="adm-tag is-muted">
-              <span className="adm-tag-dot" aria-hidden="true" />
-              代码默认
-            </span>
-          </Tooltip>
+          <HoverTip tip="未覆盖，使用代码里的 registry.creditCost">
+            <StatusTag status="registry" tone="muted" label="代码默认" />
+          </HoverTip>
         ),
     },
     {
-      title: '操作',
       key: 'ops',
-      width: 170,
-      render: (_, row) => {
+      title: '操作',
+      width: 190,
+      render: (row) => {
         const dirty = draft[row.capabilityId] !== undefined && draft[row.capabilityId] !== row.cost;
         return (
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="flex items-center gap-2">
             <Button
               size="small"
-              type="primary"
-              disabled={!writable || !dirty}
-              loading={saving === row.capabilityId}
+              variant="primary"
+              disabled={!writable || !dirty || saving === row.capabilityId}
               onClick={() => void save(row)}
             >
-              保存
+              {saving === row.capabilityId ? '保存中…' : '保存'}
             </Button>
             {row.overridden ? (
               <>
                 <Button
                   size="small"
-                  danger
+                  variant="danger"
                   disabled={!writable || saving === row.capabilityId}
                   onClick={() => setRowForReset(row)}
                 >
@@ -197,7 +189,7 @@ export function AdminCreditPricesPage() {
                 />
               </>
             ) : (
-              <Button size="small" disabled title="该项未覆盖，无需回落">
+              <Button size="small" variant="secondary" disabled>
                 回落默认
               </Button>
             )}
@@ -225,22 +217,17 @@ export function AdminCreditPricesPage() {
         {error && rows.length > 0 && (
           <AdminStaleError error={error} onRetry={() => void reload()} />
         )}
-        {/* 三态分家: 失败态不能渲染成 AdminEmpty, 否则「没连上」会被读成「没有可配置的能力」 */}
-        {loading && rows.length === 0 ? (
-          <AdminListLoading tip="加载消耗价…" />
-        ) : error && rows.length === 0 ? (
-          <AdminListError error={error} onRetry={() => void reload()} />
-        ) : rows.length === 0 ? (
-          <AdminEmpty description="没有可配置的能力" />
-        ) : (
-          <Table
-            rowKey="capabilityId"
-            columns={columns}
-            dataSource={rows}
-            pagination={false}
-            size="small"
-          />
-        )}
+        {/* 三态分家由表格内部处理: 失败态不渲染成空态, 否则「没连上」会被读成「没有可配置的能力」 */}
+        <AdminDataTable<AdminCreditPrice>
+          rows={rows}
+          columns={columns}
+          rowKey={(row) => row.capabilityId}
+          loading={loading}
+          error={error}
+          onRetry={() => void reload()}
+          minWidth={940}
+          emptyText="没有可配置的能力"
+        />
       </Panel>
     </>
   );

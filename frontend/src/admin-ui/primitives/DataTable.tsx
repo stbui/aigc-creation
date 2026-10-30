@@ -1,8 +1,9 @@
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ChevronsUpDown, RotateCcw } from 'lucide-react';
 import { Button } from '../../vendor/boardui/components/base/buttons/button';
 import { Pagination } from '../../vendor/boardui/components/base/pagination/pagination';
 import { cx } from '../lib/cn';
+import { useDensity, type Density } from '../lib/density';
 import { EmptyState, Result, Skeleton } from './index';
 
 /**
@@ -35,8 +36,8 @@ export interface AdminColumn<T> {
   sortable?: boolean;
   /** 固定到右侧（操作列） */
   fixed?: 'right';
-  /** 单元格标题属性，用于截断文本的悬停提示 */
-  title?: (row: T) => string | undefined;
+  /** 单元格 `title` 属性，用于截断文本的悬停提示 */
+  cellTitle?: (row: T) => string | undefined;
 }
 
 export interface AdminDataTableProps<T> {
@@ -68,10 +69,15 @@ export interface AdminDataTableProps<T> {
   };
   /** 横向滚动的最小宽度，列多时给出 */
   minWidth?: number;
-  density?: 'comfortable' | 'compact';
+  /** 行密度。不传则由外壳的密度开关决定（见 admin-ui/lib/density） */
+  density?: Density;
   onRowClick?: (row: T) => void;
   /** 行附加类名（如高亮异常行） */
   rowClassName?: (row: T) => string | undefined;
+  /** 展开行内容。给出即允许逐行展开，用于把只读详情铺在行内而不是弹抽屉 */
+  renderExpanded?: (row: T) => ReactNode;
+  expandedKeys?: string[];
+  onExpandedChange?: (keys: string[]) => void;
 }
 
 /** 批量上限。与后端 `common/batch.ts` 的 MAX_BATCH 对齐，超出直接拒绝 */
@@ -100,11 +106,17 @@ export function AdminDataTable<T>({
   isRowSelectable,
   pagination,
   minWidth,
-  density = 'comfortable',
+  density: densityProp,
   onRowClick,
   rowClassName,
+  renderExpanded,
+  expandedKeys = [],
+  onExpandedChange,
 }: AdminDataTableProps<T>) {
   const [sortField, sortDir] = parseSort(sort);
+  // hook 必须无条件调用，不能写在 `??` 右边
+  const shellDensity = useDensity();
+  const density = densityProp ?? shellDensity;
   const rowH = density === 'compact' ? 'h-9' : 'h-11';
   const cellY = density === 'compact' ? 'py-1.5' : 'py-2.5';
 
@@ -181,8 +193,12 @@ export function AdminDataTable<T>({
 
   return (
     <div className="flex flex-col">
-      <div className={cx('relative overflow-x-auto', loading && rows.length > 0 && 'opacity-60')}>
+      <div
+        data-testid="admin-table-scroll"
+        className={cx('relative overflow-x-auto', loading && rows.length > 0 && 'opacity-60')}
+      >
         <table
+          data-testid="admin-table"
           className="w-full border-collapse text-[13px]"
           style={minWidth ? { minWidth } : undefined}
         >
@@ -250,9 +266,12 @@ export function AdminDataTable<T>({
               const key = rowKey(row);
               const checked = selected.includes(key);
               const canSelect = selectable && (isRowSelectable ? isRowSelectable(row) : true);
+              const isExpanded = expandedKeys.includes(key);
               return (
+                <Fragment key={key}>
                 <tr
-                  key={key}
+                  data-testid="admin-table-row"
+                  data-row-key={key}
                   className={cx(
                     'border-b border-border-table/70 transition-colors',
                     rowH,
@@ -287,7 +306,7 @@ export function AdminDataTable<T>({
                   {columns.map((column) => (
                     <td
                       key={column.key}
-                      title={column.title?.(row)}
+                      title={column.cellTitle?.(row)}
                       className={cx(
                         'px-3 align-middle text-text-primary',
                         cellY,
@@ -299,6 +318,17 @@ export function AdminDataTable<T>({
                     </td>
                   ))}
                 </tr>
+                {isExpanded && renderExpanded && (
+                  <tr data-testid="admin-table-expanded" className="border-b border-border-table/70">
+                    <td
+                      colSpan={columns.length + (selectable ? 1 : 0)}
+                      className="bg-background-secondary-default/40 px-3 py-3"
+                    >
+                      {renderExpanded(row)}
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               );
             })}
           </tbody>

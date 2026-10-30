@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 
@@ -14,6 +15,15 @@ import react from '@vitejs/plugin-react';
  */
 export default defineConfig({
   plugins: [react()],
+  /*
+   * 必须与 `vite.config.ts` 的别名保持一致：BoardUI vendor 源码用 `@/...` 引自身，
+   * 缺这条别名时任何渲染 vendor 组件的测试都会挂在 import 解析上。
+   */
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src/vendor/boardui', import.meta.url)),
+    },
+  },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],

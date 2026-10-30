@@ -9,7 +9,11 @@
  *
  * ## 作用域
  *
- * - `@source` 白名单只扫 `vendor/boardui` 与 `admin-ui`，C 端类名不进产物。
+ * - `@source` 白名单只扫后台目录（`vendor/boardui` / `admin-ui` / `pages/admin` /
+ *   `components/admin`），C 端类名不进产物。`pages/admin` 与 `components/admin`
+ *   必须列进来：`utilities.css` 用了 `source(none)` 关掉自动探测，漏一处，
+ *   该目录里的工具类（`tabular-nums` / `w-32` / `border-t` 之类）就不会生成，
+ *   页面看着「样式丢了一半」但构建不报错。
  * - base 规则限定 `.bui-admin`，不写全局元素选择器。
  * - 本文件只在 admin 路由 chunk 里 import（AdminDashboardPage），C 端不下载。
  */
@@ -28,6 +32,8 @@
 
 @source '../vendor/boardui';
 @source '../admin-ui';
+@source '../pages/admin';
+@source '../components/admin';
 
 @theme {
   /* 字体沿用全站栈：BoardUI 默认 Inter，中文会掉到系统字体且字重不一致 */

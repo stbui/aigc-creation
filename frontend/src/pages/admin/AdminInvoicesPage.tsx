@@ -1,21 +1,19 @@
 import { useCallback, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { App, Button, Input, Select, Table } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
 import { Download } from 'lucide-react';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
 import { adminInvoicesApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
+import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
+import { SelectBox, TextInput } from '../../admin-ui/controls';
 import {
-  AdminListError,
   AdminStaleError,
-  AdminListLoading,
   ConfirmAction,
-  adminPagination,
   useAdminList,
   useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
 import {
-  AdminEmpty,
   AppliedFilters,
   FilterActions,
   FilterBar,
@@ -62,7 +60,7 @@ function yuan(cents: number): string {
 }
 
 export function AdminInvoicesPage() {
-  const { message } = App.useApp();
+  const toast = useToast();
   const { can } = useAdmin();
 
   // 深链/刷新后保留筛选: 财务之间传「待开具的这批」直接发地址。
@@ -150,9 +148,9 @@ export function AdminInvoicesPage() {
         status: params.status as InvoiceStatus | undefined,
         keyword: params.keyword as string | undefined,
       });
-      void message.success('导出已开始下载');
+      toast.success('导出已开始下载');
     } catch (e) {
-      void message.error(e instanceof Error ? e.message : '导出失败');
+      toast.error(e instanceof Error ? e.message : '导出失败');
     } finally {
       setExporting(false);
     }
@@ -167,59 +165,61 @@ export function AdminInvoicesPage() {
     if (!action) return;
     const trimmed = reason.trim();
     if (!trimmed) {
-      void message.warning('请填写说明，它会写入操作审计');
+      toast.warning('请填写说明，它会写入操作审计');
       return;
     }
     setBusy(true);
     try {
       if (action.kind === 'issue') {
         const r = await adminInvoicesApi.issue(action.row.id, trimmed);
-        void message.success(`已开具 ${r.invoiceNo}`);
+        toast.success(`已开具 ${r.invoiceNo}`);
       } else {
         await adminInvoicesApi.reject(action.row.id, trimmed);
-        void message.success('已驳回，原因会展示给用户');
+        toast.success('已驳回，原因会展示给用户');
       }
       setAction(null);
       reload();
     } catch (e) {
-      void message.error(e instanceof Error ? e.message : '操作失败');
+      toast.error(e instanceof Error ? e.message : '操作失败');
     } finally {
       setBusy(false);
     }
   };
 
-  const columns: ColumnsType<AdminInvoice> = [
+  const columns: Array<AdminColumn<AdminInvoice>> = [
     {
-      title: '发票号',
       key: 'invoiceNo',
+      title: '发票号',
       width: 180,
-      render: (_: unknown, row) => (
-        <div className="adm-cell-stack">
-          <code>{row.invoiceNo}</code>
-          <span className="adm-cell-sub">{new Date(row.createdAt).toLocaleString('zh-CN')}</span>
+      render: (row) => (
+        <div className="flex flex-col gap-0.5">
+          <code className="font-mono text-[11px] text-text-primary">{row.invoiceNo}</code>
+          <span className="text-[11px] text-text-tertiary">
+            {new Date(row.createdAt).toLocaleString('zh-CN')}
+          </span>
         </div>
       ),
     },
     {
-      title: '订单号',
       key: 'orderNo',
+      title: '订单号',
       width: 180,
-      render: (_: unknown, row) => (
-        <Link className="adm-link" to={adminOrderDetailHref(row.orderId)}>
-          <code>{row.orderNo ?? row.orderId}</code>
+      render: (row) => (
+        <Link className="text-accent-600 hover:underline" to={adminOrderDetailHref(row.orderId)}>
+          <code className="font-mono text-[11px]">{row.orderNo ?? row.orderId}</code>
         </Link>
       ),
     },
     {
-      title: '用户',
       key: 'user',
+      title: '用户',
       width: 190,
-      render: (_: unknown, row) => (
-        <div className="adm-cell-stack">
+      render: (row) => (
+        <div className="flex flex-col gap-0.5">
           {row.userName && <span>{row.userName}</span>}
-          <span className="adm-cell-sub">
+          <span className="text-[11px] text-text-tertiary">
             {row.userEmail ? (
-              <Link className="adm-link" to={adminUserHref(row.userEmail)}>
+              <Link className="hover:underline" to={adminUserHref(row.userEmail)}>
                 {row.userEmail}
               </Link>
             ) : (
@@ -230,65 +230,67 @@ export function AdminInvoicesPage() {
       ),
     },
     {
-      title: '抬头',
       key: 'title',
+      title: '抬头',
       width: 200,
-      render: (_: unknown, row) => (
-        <div className="adm-cell-stack">
+      render: (row) => (
+        <div className="flex flex-col gap-0.5">
           <span>
             {row.title}
-            <span className="adm-cell-sub"> · {KIND_LABELS[row.kind] ?? row.kind}</span>
+            <span className="text-[11px] text-text-tertiary">
+              {' '}
+              · {KIND_LABELS[row.kind] ?? row.kind}
+            </span>
           </span>
-          {row.taxNo && <code className="adm-cell-sub">{row.taxNo}</code>}
-        </div>
-      ),
-    },
-    {
-      title: '金额',
-      key: 'amount',
-      width: 120,
-      render: (_: unknown, row) => `¥ ${yuan(row.amountCents)}`,
-    },
-    {
-      title: '状态',
-      dataIndex: 'status',
-      key: 'status',
-      width: 110,
-      render: (v: string, row) => (
-        <div className="adm-cell-stack">
-          <StatusTag status={v} label={STATUS_LABELS[v]} />
-          {row.status === 'rejected' && row.rejectReason && (
-            <span className="adm-cell-sub">{row.rejectReason}</span>
+          {row.taxNo && (
+            <code className="font-mono text-[11px] text-text-tertiary">{row.taxNo}</code>
           )}
         </div>
       ),
     },
     {
-      title: '',
+      key: 'amount',
+      title: '金额',
+      width: 120,
+      align: 'right',
+      render: (row) => <span className="tabular-nums">¥ {yuan(row.amountCents)}</span>,
+    },
+    {
+      key: 'status',
+      title: '状态',
+      width: 110,
+      render: (row) => (
+        <div className="flex flex-col gap-0.5">
+          <StatusTag status={row.status} label={STATUS_LABELS[row.status]} />
+          {row.status === 'rejected' && row.rejectReason && (
+            <span className="text-[11px] text-text-tertiary">{row.rejectReason}</span>
+          )}
+        </div>
+      ),
+    },
+    {
       key: 'ops',
+      title: '',
       width: 170,
-      render: (_: unknown, row) => (
-        <div className="adm-ops">
+      fixed: 'right',
+      render: (row) => (
+        <div className="flex items-center gap-1">
           {/* 只有待开具的票可操作: 已开具不可逆, 已驳回不复活 (用户需重新申请) */}
           {row.status === 'pending' && can('invoice.write') && (
             <>
-              <Button type="link" className="adm-link" onClick={() => openAction('issue', row)}>
+              <Button variant="ghost" size="small" onClick={() => openAction('issue', row)}>
                 开具
               </Button>
-              <Button
-                type="link" danger
-                className="adm-link is-danger"
-                onClick={() => openAction('reject', row)}
-              >
+              <Button variant="ghost" size="small" onClick={() => openAction('reject', row)}>
                 驳回
               </Button>
             </>
           )}
           {row.hasStoredFile && (
             <Button
-              type="link"
-              className="adm-link"
-              onClick={() => void adminInvoicesApi.preview(row.id).catch((e: Error) => message.error(e.message))}
+              variant="ghost"
+              size="small"
+              onClick={() => void adminInvoicesApi.preview(row.id).catch((e: Error) => toast.error(e.message))}
             >
               预览
             </Button>
@@ -306,12 +308,12 @@ export function AdminInvoicesPage() {
         actions={
           can('data.export') ? (
             <Button
-              type="default"
-              className="adm-btn"
-              loading={exporting}
+              variant="secondary"
+              size="small"
+              leadingIcon={Download}
+              disabled={exporting}
               onClick={() => void exportCsv()}
             >
-              <Download size={14} style={{ marginRight: 4 }} />
               {exporting ? '导出中…' : '导出 CSV'}
             </Button>
           ) : undefined
@@ -319,27 +321,28 @@ export function AdminInvoicesPage() {
       />
 
       <FilterBar>
-        <Select
-          className="adm-filter-select"
+        <SelectBox
+          className="w-32"
+          ariaLabel="按状态筛选"
           placeholder="状态"
           allowClear
           value={status}
-          onChange={setStatus}
+          onChange={(value) => setStatus(value as InvoiceStatus | undefined)}
           options={STATUS_OPTIONS}
         />
-        <Input
-          className="adm-filter-input"
+        <TextInput
+          className="w-64"
           placeholder="发票号 / 订单号 / 抬头"
           value={keyword}
-          onChange={(e) => setKeyword(e.target.value)}
-          onPressEnter={applyQuery}
+          onChange={setKeyword}
+          onEnter={applyQuery}
           allowClear
         />
         <FilterActions>
-          <Button type="primary" className="adm-btn is-primary" onClick={applyQuery}>
+          <Button variant="primary" size="small" onClick={applyQuery}>
             查询
           </Button>
-          <Button type="default" className="adm-btn" onClick={reset}>
+          <Button variant="secondary" size="small" onClick={reset}>
             重置
           </Button>
         </FilterActions>
@@ -350,37 +353,29 @@ export function AdminInvoicesPage() {
       {error && data && <AdminStaleError error={error} onRetry={reload} />}
 
       <Panel title="开票申请" note="默认展示全部，按状态与关键字筛选">
-        {loading && !data ? (
-          <AdminListLoading tip="加载发票…" />
-        ) : error && !data ? (
-          <AdminListError error={error} onRetry={reload} />
-        ) : (data?.items.length ?? 0) === 0 ? (
-          <AdminEmpty
-            description={hasFilter ? '没有符合条件的开票申请。' : '还没有开票申请。'}
-            action={
-              hasFilter ? (
-                <Button type="default" className="adm-btn" onClick={reset}>
-                  清除筛选
-                </Button>
-              ) : undefined
-            }
-          />
-        ) : (
-          <Table<AdminInvoice>
-            rowKey="id"
-            size="small"
-            columns={columns}
-            dataSource={data?.items ?? []}
-            loading={loading}
-            scroll={{ x: 1060 }}
-            pagination={adminPagination({
-              current: (params.page as number) || 1,
-              pageSize: (params.pageSize as number) || 20,
-              total: data?.total ?? 0,
-              onChange: setPage,
-            })}
-          />
-        )}
+        <AdminDataTable<AdminInvoice>
+          rows={data?.items ?? []}
+          columns={columns}
+          rowKey={(row) => row.id}
+          loading={loading}
+          error={error}
+          onRetry={reload}
+          minWidth={1060}
+          emptyText={hasFilter ? '没有符合条件的开票申请。' : '还没有开票申请。'}
+          emptyAction={
+            hasFilter ? (
+              <Button variant="secondary" size="small" onClick={reset}>
+                清除筛选
+              </Button>
+            ) : undefined
+          }
+          pagination={{
+            current: (params.page as number) || 1,
+            pageSize: (params.pageSize as number) || 20,
+            total: data?.total ?? 0,
+            onChange: setPage,
+          }}
+        />
       </Panel>
 
       {action && (
@@ -396,14 +391,14 @@ export function AdminInvoicesPage() {
             action.kind === 'issue' ? (
               <>
                 <p>将为该申请生成正式票号并输出可打印发票文件，同时邮件通知用户。</p>
-                <p className="adm-cell-sub">
+                <p className="text-[11px] text-text-tertiary">
                   {action.row.invoiceNo} · {action.row.title} · ¥ {yuan(action.row.amountCents)}
                 </p>
               </>
             ) : (
               <>
                 <p>驳回后用户会看到驳回原因，可重新提交申请（将占用新的票号）。</p>
-                <p className="adm-cell-sub">
+                <p className="text-[11px] text-text-tertiary">
                   {action.row.invoiceNo} · {action.row.title} · ¥ {yuan(action.row.amountCents)}
                 </p>
               </>
@@ -415,18 +410,16 @@ export function AdminInvoicesPage() {
               : [`发票 ${action.row.invoiceNo} → 已驳回`, '用户可重新申请', '写操作审计（含操作人）']
           }
           extra={
-            <div className="adm-confirm-typing">
-              <label htmlFor="adm-invoice-reason">
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="adm-invoice-reason" className="text-xs text-text-secondary">
                 {action.kind === 'issue' ? '开具说明（强制，写入审计）：' : '驳回原因（会展示给用户）：'}
               </label>
-              <Input
-                id="adm-invoice-reason"
-                type="text"
+              <TextInput
+                ariaLabel="说明"
                 value={reason}
-                onChange={(e) => setReason(e.target.value)}
+                onChange={setReason}
                 placeholder={action.kind === 'issue' ? '如：已按申请抬头开具' : '如：抬头与税号不一致，请修改后重提'}
                 maxLength={300}
-                autoComplete="off"
               />
             </div>
           }

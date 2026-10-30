@@ -1,21 +1,21 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { App, Button, Drawer, Input, Select, Table } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import { Download } from 'lucide-react';
+import { Download, Plus } from 'lucide-react';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
 import { marketingApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
+import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
+import { Drawer } from '../../admin-ui/primitives/Drawer';
+import { Notice } from '../../admin-ui/primitives';
+import { SelectBox, TextInput } from '../../admin-ui/controls';
 import {
-  AdminListError,
-  AdminListLoading,
   AdminStaleError,
-  adminPagination,
   useAdminList,
   useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
 import {
-  AdminEmpty,
   AppliedFilters,
   FilterActions,
   FilterBar,
@@ -65,6 +65,17 @@ function toLocalInput(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+/** 表单字段：标签 + 控件 + 一句说明 */
+function Field({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-xs font-medium text-text-secondary">{label}</span>
+      {children}
+      {hint && <p className="text-[11px] leading-4 text-text-tertiary">{hint}</p>}
+    </div>
+  );
+}
+
 interface FormState {
   code: string;
   name: string;
@@ -108,9 +119,8 @@ const EFFECTIVE_META: Record<AdminCoupon['effective'], { label: string; tone: Ta
   sold_out: { label: '已售罄', tone: 'danger' },
 };
 
-
 export function AdminCouponsPage() {
-  const { message } = App.useApp();
+  const toast = useToast();
   const { can } = useAdmin();
   const writable = can('marketing.write');
 
@@ -228,9 +238,9 @@ export function AdminCouponsPage() {
         type: params.type as string | undefined,
         status: params.status as string | undefined,
       });
-      void message.success('导出已开始下载');
+      toast.success('导出已开始下载');
     } catch (e) {
-      void message.error(e instanceof Error ? e.message : '导出失败');
+      toast.error(e instanceof Error ? e.message : '导出失败');
     } finally {
       setExporting(false);
     }
@@ -247,7 +257,7 @@ export function AdminCouponsPage() {
 
   const openEdit = (c: AdminCoupon) => {
     setEditing(c);
-    const next = {
+    const next: FormState = {
       // 券码编辑时留空 = 不改。改券码等于让用户手里的券集体失效
       code: '',
       name: c.name,
@@ -333,10 +343,10 @@ export function AdminCouponsPage() {
     try {
       if (editing) {
         await marketingApi.updateCoupon(editing.id, payload);
-        void message.success('已保存');
+        toast.success('已保存');
       } else {
         await marketingApi.createCoupon(payload);
-        void message.success('优惠券已创建');
+        toast.success('优惠券已创建');
       }
       setFormOpen(false);
       reload();
@@ -352,122 +362,134 @@ export function AdminCouponsPage() {
     setBusy(true);
     try {
       const res = await marketingApi.toggleCoupon(row.id);
-      void message.success(res.status === 'on' ? '已启用' : '已停用');
+      toast.success(res.status === 'on' ? '已启用' : '已停用');
       reload();
     } catch (e) {
-      void message.error((e as Error).message);
+      toast.error((e as Error).message);
     } finally {
       setBusy(false);
     }
   };
 
-  const columns: ColumnsType<AdminCoupon> = useMemo(
-    () => [
-      {
-        title: '券码',
-        key: 'code',
-        width: 125,
-        render: (_: unknown, row) => (
-          <Button type="link" className="adm-link adm-mono" onClick={() => openEdit(row)}>
-            {row.code}
-          </Button>
+  const columns: Array<AdminColumn<AdminCoupon>> = [
+    {
+      key: 'code',
+      title: '券码',
+      width: 125,
+      render: (row) => (
+        <button
+          type="button"
+          className="rounded font-mono text-xs font-medium text-accent-700 hover:underline"
+          onClick={() => openEdit(row)}
+        >
+          {row.code}
+        </button>
+      ),
+    },
+    { key: 'name', title: '名称', width: 140, render: (row) => <span>{row.name}</span> },
+    {
+      key: 'type',
+      title: '类型',
+      width: 70,
+      render: (row) => <span className="text-xs">{TYPE_LABEL[row.type] ?? row.type}</span>,
+    },
+    {
+      key: 'value',
+      title: '面额',
+      width: 90,
+      render: (row) => (
+        <span className="font-medium text-accent-700">{faceValue({ type: row.type, value: row.value })}</span>
+      ),
+    },
+    {
+      key: 'threshold',
+      title: '门槛',
+      width: 90,
+      render: (row) =>
+        row.thresholdCents > 0 ? (
+          <span className="tabular-nums">满 ¥{yuan(row.thresholdCents)}</span>
+        ) : (
+          <span className="text-[11px] text-text-tertiary">无门槛</span>
         ),
-      },
-      { title: '名称', dataIndex: 'name', key: 'name', width: 130 },
-      {
-        title: '类型',
-        dataIndex: 'type',
-        key: 'type',
-        width: 70,
-        render: (t: CouponType) => TYPE_LABEL[t] ?? t,
-      },
-      {
-        title: '面额',
-        dataIndex: 'value',
-        key: 'value',
-        width: 90,
-        render: (v: number, row) => (
-          <span style={{ color: 'var(--brand)', fontWeight: 500 }}>{faceValue({ type: row.type, value: v })}</span>
-        ),
-      },
-      {
-        title: '门槛',
-        dataIndex: 'thresholdCents',
-        key: 'threshold',
-        width: 80,
-        render: (v: number) => (v > 0 ? `满 ¥${yuan(v)}` : <span className="adm-cell-sub">无门槛</span>),
-      },
-      {
-        title: '适用范围',
-        dataIndex: 'scope',
-        key: 'scope',
-        width: 110,
-        render: (s: CouponScope) => SCOPE_LABEL[s] ?? s,
-      },
-      {
-        title: '核销',
-        key: 'used',
-        width: 90,
-        render: (_: unknown, row) => {
-          const total = row.totalCount === 0 ? null : row.totalCount;
-          const pct = total ? Math.round((row.usedCount / total) * 100) : null;
-          return (
-            <div>
-              <div>{row.usedCount}{total ? ` / ${total}` : ' / 不限'}</div>
-              {pct !== null && (
-                <div className="adm-progress">
-                  <div className="adm-progress-bar" style={{ width: `${Math.min(pct, 100)}%` }} />
-                </div>
-              )}
-            </div>
-          );
-        },
-      },
-      {
-        title: '有效期',
-        key: 'valid',
-        width: 165,
-        render: (_: unknown, row) => (
-          <div className="adm-cell-sub">
-            {new Date(row.validFrom).toLocaleDateString('zh-CN')} ~{' '}
-            {new Date(row.validTo).toLocaleDateString('zh-CN')}
-          </div>
-        ),
-      },
-      {
-        title: '状态',
-        dataIndex: 'effective',
-        key: 'status',
-        width: 80,
-        render: (_: unknown, row) => {
-          const meta = EFFECTIVE_META[row.effective] ?? { label: row.status, tone: 'muted' as TagTone };
-          return <StatusTag status={row.status} label={meta.label} tone={meta.tone} />;
-        },
-      },
-      {
-        title: '操作',
-        key: 'actions',
-        width: 105,
-        fixed: 'right',
-        render: (_: unknown, row) => (
-          <div className="adm-row-actions">
-            {writable && (
-              <>
-                <Button type="link" className="adm-link" onClick={() => openEdit(row)}>
-                  编辑
-                </Button>
-                <Button type="link" className="adm-link" disabled={busy} onClick={() => void doToggle(row)}>
-                  {row.status === 'on' ? '停用' : '启用'}
-                </Button>
-              </>
+    },
+    {
+      key: 'scope',
+      title: '适用范围',
+      width: 110,
+      render: (row) => <span className="text-xs">{SCOPE_LABEL[row.scope] ?? row.scope}</span>,
+    },
+    {
+      key: 'used',
+      title: '核销',
+      width: 100,
+      render: (row) => {
+        const total = row.totalCount === 0 ? null : row.totalCount;
+        const pct = total ? Math.round((row.usedCount / total) * 100) : null;
+        return (
+          <div className="flex flex-col gap-1">
+            <span className="tabular-nums">
+              {row.usedCount}
+              {total ? ` / ${total}` : ' / 不限'}
+            </span>
+            {pct !== null && (
+              <span
+                className="block h-1 w-16 overflow-hidden rounded-full bg-background-secondary-default"
+                aria-hidden
+              >
+                <span
+                  className="block h-full rounded-full bg-accent-500"
+                  style={{ width: `${Math.min(pct, 100)}%` }}
+                />
+              </span>
             )}
           </div>
-        ),
+        );
       },
-    ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [writable],
-  );
+    },
+    {
+      key: 'valid',
+      title: '有效期',
+      width: 170,
+      render: (row) => (
+        <span className="text-[11px] tabular-nums text-text-tertiary">
+          {new Date(row.validFrom).toLocaleDateString('zh-CN')} ~{' '}
+          {new Date(row.validTo).toLocaleDateString('zh-CN')}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      title: '状态',
+      width: 80,
+      render: (row) => {
+        const meta = EFFECTIVE_META[row.effective] ?? { label: row.status, tone: 'muted' as TagTone };
+        return <StatusTag status={row.status} label={meta.label} tone={meta.tone} />;
+      },
+    },
+    {
+      key: 'ops',
+      title: '',
+      width: 110,
+      fixed: 'right',
+      render: (row) =>
+        writable ? (
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="small" onClick={() => openEdit(row)}>
+              编辑
+            </Button>
+            <Button
+              variant="ghost"
+              size="small"
+              disabled={busy}
+              className={row.status === 'on' ? 'text-rose-600' : undefined}
+              onClick={() => void doToggle(row)}
+            >
+              {row.status === 'on' ? '停用' : '启用'}
+            </Button>
+          </div>
+        ) : null,
+    },
+  ];
 
   return (
     <>
@@ -475,285 +497,252 @@ export function AdminCouponsPage() {
         title="优惠券"
         description="发放范围、使用条件、有效期与限用。券不提供删除 —— 已核销订单仍引用它，只能停用。"
         actions={
-          <div className="adm-ops">
+          <div className="flex items-center gap-2">
             {can('data.export') && (
               <Button
-                type="default"
-                className="adm-btn"
-                loading={exporting}
+                variant="secondary"
+                size="small"
+                leadingIcon={Download}
+                disabled={exporting}
                 onClick={() => void exportCsv()}
               >
-                <Download size={14} style={{ marginRight: 4 }} />
                 {exporting ? '导出中…' : '导出 CSV'}
               </Button>
             )}
             {writable ? (
-              <Button type="primary" className="adm-btn is-primary" onClick={openCreate}>
+              <Button variant="primary" size="small" leadingIcon={Plus} onClick={openCreate}>
                 新建优惠券
               </Button>
             ) : (
-              <span className="adm-cell-sub">当前账号无 marketing.write 权限，仅可查看</span>
+              <span className="text-[11px] text-text-tertiary">
+                当前账号无 marketing.write 权限，仅可查看
+              </span>
             )}
           </div>
         }
       />
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
-      {error && <AdminStaleError error={error} onRetry={reload} />}
+      {error && data && <AdminStaleError error={error} onRetry={reload} />}
 
       <FilterBar>
-        <Input
-          className="adm-filter-input"
+        <TextInput
+          className="w-56"
+          ariaLabel="按券码或名称搜索"
           placeholder="券码 / 名称"
           value={keyword}
-          onChange={(e) => setKeyword(e.target.value)}
-          onPressEnter={applyFilters}
+          onChange={setKeyword}
+          onEnter={applyFilters}
           allowClear
         />
-        <Select
-          className="adm-filter-select"
+        <SelectBox
+          className="w-32"
+          ariaLabel="按类型筛选"
           placeholder="类型"
-          options={Object.entries(TYPE_LABEL).map(([value, label]) => ({ value, label }))}
+          allowClear
           value={type}
           onChange={setType}
-          allowClear
+          options={Object.entries(TYPE_LABEL).map(([value, label]) => ({ value, label }))}
         />
-        <Select
-          className="adm-filter-select"
+        <SelectBox
+          className="w-32"
+          ariaLabel="按状态筛选"
           placeholder="状态"
+          allowClear
+          value={status}
+          onChange={setStatus}
           options={[
             { value: 'on', label: '启用' },
             { value: 'off', label: '停用' },
           ]}
-          value={status}
-          onChange={setStatus}
-          allowClear
         />
         <FilterActions>
-          <Button type="primary" className="adm-btn is-primary" onClick={applyFilters}>
+          <Button variant="primary" size="small" onClick={applyFilters}>
             查询
           </Button>
-          <Button type="default" className="adm-btn" onClick={resetFilters}>
+          <Button variant="secondary" size="small" onClick={resetFilters}>
             重置
           </Button>
         </FilterActions>
         <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
       </FilterBar>
 
-      <Panel title="券列表">
-        {loading && !data ? (
-          <AdminListLoading tip="加载优惠券…" />
-        ) : error && !data ? (
-          <AdminListError error={error} onRetry={reload} />
-        ) : (data?.items.length ?? 0) === 0 ? (
-          hasFilter ? (
-            <AdminEmpty
-              description="没有匹配的优惠券。清除筛选条件后再试。"
-              action={
-                <Button
-                  type="default"
-                  className="adm-btn"
-                  onClick={() => {
-                    setKeyword('');
-                    setType(undefined);
-                    setStatus(undefined);
-                    setQuery({ keyword: undefined, type: undefined, status: undefined });
-                  }}
-                >
-                  清除筛选
-                </Button>
-              }
-            />
-          ) : (
-            <AdminEmpty
-              description="还没有优惠券"
-              action={
-                writable ? (
-                  <Button type="primary" className="adm-btn is-primary" onClick={openCreate}>
-                    创建第一张券
-                  </Button>
-                ) : undefined
-              }
-            />
-          )
-        ) : (
-          <Table<AdminCoupon>
-            rowKey="id"
-            size="small"
-            columns={columns}
-            dataSource={data?.items ?? []}
-            loading={loading}
-            scroll={{ x: 1040 }}
-            pagination={adminPagination({
-              current: data?.page ?? 1,
-              pageSize: data?.pageSize ?? 20,
-              total: data?.total ?? 0,
-              unit: '张',
-              onChange: setPage,
-            })}
-          />
-        )}
+      <Panel title="券列表" note="核销进度按发行总量计算，不限量券不显示进度">
+        <AdminDataTable<AdminCoupon>
+          rows={data?.items ?? []}
+          columns={columns}
+          rowKey={(row) => row.id}
+          loading={loading}
+          error={error}
+          onRetry={reload}
+          minWidth={1060}
+          pagination={{
+            current: data?.page ?? 1,
+            pageSize: data?.pageSize ?? 20,
+            total: data?.total ?? 0,
+            unit: '张',
+            onChange: setPage,
+          }}
+          emptyText={
+            hasFilter
+              ? '没有匹配的优惠券。清除筛选条件后再试。'
+              : '还没有优惠券。新建第一张券，C 端结算页才会出现可用的抵扣项。'
+          }
+          emptyAction={
+            hasFilter ? (
+              <Button variant="secondary" size="small" onClick={resetFilters}>
+                清除筛选
+              </Button>
+            ) : writable ? (
+              <Button variant="primary" size="small" leadingIcon={Plus} onClick={openCreate}>
+                创建第一张券
+              </Button>
+            ) : undefined
+          }
+        />
       </Panel>
 
       {/* 创建/编辑抽屉 */}
       <Drawer
-        title={editing ? `编辑优惠券 · ${editing.code}` : '新建优惠券'}
-        size={560}
         open={formOpen}
-        onClose={requestCloseForm}
-        className="adm-drawer"
+        onOpenChange={(open) => {
+          if (!open) requestCloseForm();
+        }}
+        width={560}
+        title={editing ? `编辑优惠券 · ${editing.code}` : '新建优惠券'}
+        description={formDirty ? '有未保存修改' : undefined}
         footer={
-          <div className="adm-drawer-footer">
-            {formDirty && <span className="adm-cell-sub">有未保存修改</span>}
-            <Button type="default" className="adm-btn" onClick={requestCloseForm}>
+          <>
+            <Button variant="secondary" size="small" onClick={requestCloseForm} disabled={busy}>
               取消
             </Button>
-            <Button
-              type="primary"
-              className="adm-btn is-primary"
-              onClick={() => void save()}
-              disabled={busy}
-            >
+            <Button variant="primary" size="small" disabled={busy} onClick={() => void save()}>
               {busy ? '保存中…' : '保存'}
             </Button>
-          </div>
+          </>
         }
       >
-        {formError && <div className="adm-form-error">{formError}</div>}
-
-        <div className="adm-form">
-          {!editing && (
-            <div className="adm-field">
-              <label htmlFor="c-code">券码</label>
-              <Input
-                id="c-code"
-                type="text"
-                value={form.code}
-                placeholder="4~24 位大写字母或数字"
-                onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
-              />
-              <div className="adm-field-hint">用户手动输入此码。创建后不可修改。</div>
-            </div>
+        <div className="flex flex-col gap-4">
+          {formError && (
+            <Notice tone="danger" className="mb-0">
+              {formError}
+            </Notice>
           )}
 
-          <div className="adm-field">
-            <label htmlFor="c-name">券名称</label>
-            <Input
-              id="c-name"
-              type="text"
+          {!editing && (
+            <Field label="券码" hint="用户手动输入此码。创建后不可修改。">
+              <TextInput
+                ariaLabel="券码"
+                value={form.code}
+                placeholder="4~24 位大写字母或数字"
+                maxLength={24}
+                onChange={(value) => setForm({ ...form, code: value.toUpperCase() })}
+              />
+            </Field>
+          )}
+
+          <Field label="券名称">
+            <TextInput
+              ariaLabel="券名称"
               value={form.name}
               placeholder="如: 新客立减 10 元"
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              maxLength={60}
+              onChange={(value) => setForm({ ...form, name: value })}
             />
-          </div>
+          </Field>
 
-          <div className="adm-form-row">
-            <div className="adm-field">
-              <label htmlFor="c-type">类型</label>
-              <Select
-                id="c-type"
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="类型">
+              <SelectBox
+                ariaLabel="类型"
                 value={form.type}
+                // 换类型要清空面额: 折扣的万分比与金额的分是两套单位, 留着旧值必然算错
                 onChange={(value) =>
                   setForm({ ...form, type: value as CouponType, value: '' })
                 }
                 options={Object.entries(TYPE_LABEL).map(([value, label]) => ({ value, label }))}
               />
-            </div>
-            <div className="adm-field">
-              <label htmlFor="c-value">
-                {form.type === 'discount' ? '折扣 (万分比)' : '减免金额 (元)'}
-              </label>
-              <Input
-                id="c-value"
-                type="number"
-                /* 表单内已是展示单位：折扣为万分比，其余为元 */
+            </Field>
+            <Field
+              label={form.type === 'discount' ? '折扣 (万分比)' : '减免金额 (元)'}
+              hint={form.type === 'discount' ? '8500 表示 8.5 折' : '表单内填元，入库换算成分'}
+            >
+              <TextInput
+                ariaLabel="面额"
+                inputMode="decimal"
                 value={form.value}
-                placeholder={form.type === 'discount' ? '8500 = 85折' : '10.00'}
-                onChange={(e) => setForm({ ...form, value: e.target.value })}
+                placeholder={form.type === 'discount' ? '8500 = 8.5折' : '10.00'}
+                onChange={(value) => setForm({ ...form, value })}
               />
-            </div>
+            </Field>
           </div>
 
-          <div className="adm-form-row">
-            <div className="adm-field">
-              <label htmlFor="c-threshold">使用门槛 (元)</label>
-              <Input
-                id="c-threshold"
-                type="number"
-                /* 表单内统一是元，只在提交时乘 100 —— 渲染不能再除一次 */
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="使用门槛 (元)" hint="0 表示无门槛">
+              <TextInput
+                ariaLabel="使用门槛"
+                inputMode="decimal"
                 value={form.threshold}
-                onChange={(e) => setForm({ ...form, threshold: e.target.value })}
+                onChange={(value) => setForm({ ...form, threshold: value })}
               />
-              <div className="adm-field-hint">0 表示无门槛</div>
-            </div>
-            <div className="adm-field">
-              <label htmlFor="c-scope">适用范围</label>
-              <Select
-                id="c-scope"
+            </Field>
+            <Field label="适用范围">
+              <SelectBox
+                ariaLabel="适用范围"
                 value={form.scope}
                 onChange={(value) => setForm({ ...form, scope: value as CouponScope })}
                 options={Object.entries(SCOPE_LABEL).map(([value, label]) => ({ value, label }))}
               />
-            </div>
+            </Field>
           </div>
 
           {form.scope === 'product' && (
-            <div className="adm-field">
-              <label>指定商品</label>
-              <div className="adm-field-hint">
-                商品范围由后端按订单明细校验，此处留空表示不限具体商品（仅限制在指定范围订单内）。
-              </div>
-            </div>
+            <p className="rounded-lg border border-border-table bg-background-secondary-default/60 px-3 py-2 text-[11px] leading-4 text-text-tertiary">
+              商品范围由后端按订单明细校验，此处留空表示不限具体商品（仅限制在指定范围订单内）。
+            </p>
           )}
 
-          <div className="adm-form-row">
-            <div className="adm-field">
-              <label htmlFor="c-total">发行总量</label>
-              <Input
-                id="c-total"
-                type="number"
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="发行总量" hint="0 表示不限量">
+              <TextInput
+                ariaLabel="发行总量"
+                inputMode="numeric"
                 value={form.totalCount}
-                onChange={(e) => setForm({ ...form, totalCount: e.target.value })}
+                onChange={(value) => setForm({ ...form, totalCount: value })}
               />
-              <div className="adm-field-hint">0 表示不限量</div>
-            </div>
-            <div className="adm-field">
-              <label htmlFor="c-limit">每人限用</label>
-              <Input
-                id="c-limit"
-                type="number"
+            </Field>
+            <Field label="每人限用" hint="0 表示不限">
+              <TextInput
+                ariaLabel="每人限用"
+                inputMode="numeric"
                 value={form.perUserLimit}
-                onChange={(e) => setForm({ ...form, perUserLimit: e.target.value })}
+                onChange={(value) => setForm({ ...form, perUserLimit: value })}
               />
-              <div className="adm-field-hint">0 表示不限</div>
-            </div>
+            </Field>
           </div>
 
-          <div className="adm-form-row">
-            <div className="adm-field">
-              <label htmlFor="c-from">生效时间</label>
-              <Input
-                id="c-from"
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="生效时间">
+              <TextInput
+                ariaLabel="生效时间"
                 type="datetime-local"
                 value={form.validFrom}
-                onChange={(e) => setForm({ ...form, validFrom: e.target.value })}
+                onChange={(value) => setForm({ ...form, validFrom: value })}
               />
-            </div>
-            <div className="adm-field">
-              <label htmlFor="c-to">失效时间</label>
-              <Input
-                id="c-to"
+            </Field>
+            <Field label="失效时间">
+              <TextInput
+                ariaLabel="失效时间"
                 type="datetime-local"
                 value={form.validTo}
-                onChange={(e) => setForm({ ...form, validTo: e.target.value })}
+                onChange={(value) => setForm({ ...form, validTo: value })}
               />
-            </div>
+            </Field>
           </div>
 
-          <div className="adm-field">
-            <label htmlFor="c-status">状态</label>
-            <Select
-              id="c-status"
+          <Field label="状态" hint="过期、未开始、售罄由时间与库存派生，列表里优先展示派生结果">
+            <SelectBox
+              ariaLabel="状态"
               value={form.status}
               onChange={(value) => setForm({ ...form, status: value as CouponStatus })}
               options={[
@@ -761,10 +750,15 @@ export function AdminCouponsPage() {
                 { value: 'off', label: '停用' },
               ]}
             />
-          </div>
+          </Field>
+
+          {editing && (
+            <p className="text-[11px] leading-4 text-text-tertiary">
+              已核销 {editing.usedCount} 张 · 券码不可修改，停用后已发放的券立即失效
+            </p>
+          )}
         </div>
       </Drawer>
-
     </>
   );
 }

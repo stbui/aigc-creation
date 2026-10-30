@@ -12,6 +12,22 @@
 
 export type TagTone = 'success' | 'danger' | 'warn' | 'brand' | 'muted';
 
+/**
+ * tone → BoardUI Chip 颜色。
+ *
+ * 放在这里而不是各页自己写映射：同一套语义色在 Chip（表格内）与 antd Tag
+ * （legacy 回滚路径）之间必须一一对应，否则切换外壳后同一个状态会变色。
+ * success 用 lime 而不是 green —— BoardUI 的颜色阶里 lime 才是正向态。
+ */
+export const TONE_CHIP_COLOR: Record<TagTone, 'lime' | 'rose' | 'yellow' | 'purple' | 'neutral'> =
+  {
+    success: 'lime',
+    danger: 'rose',
+    warn: 'yellow',
+    brand: 'purple',
+    muted: 'neutral',
+  };
+
 export const STATUS_META: Record<string, { label: string; tone: TagTone }> = {
   // 任务状态 (后端 Prisma GenerationTask.status)
   succeeded: { label: '已完成', tone: 'success' },
@@ -36,4 +52,7 @@ export const STATUS_META: Record<string, { label: string; tone: TagTone }> = {
   partial_refunded: { label: '部分退款', tone: 'warn' },
   // 商品状态 (后端 Prisma Product.status)
   offline: { label: '已下架', tone: 'muted' },
+  // 发票状态。`pending` 复用库存量条的「等待」色，发票页用 `label="待开具"` 覆盖文案
+  issued: { label: '已开具', tone: 'success' },
+  rejected: { label: '已驳回', tone: 'danger' },
 };

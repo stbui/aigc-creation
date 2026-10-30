@@ -45,12 +45,23 @@ backend/src/admin/
 ├── audit.controller.ts / audit.service.ts
 └── search.controller.ts / search.service.ts
 
+frontend/src/admin-ui/              # 后台 UI（BoardUI）
+├── shell/AdminBoardLayout.tsx      # 外壳（侧栏 + 内容区，无顶栏无值班带）
+├── shell/AdminSearchPalette.tsx    # ⌘K 全局搜索
+├── primitives/                     # DataTable / Drawer / Dialog / Panel / EmptyState / Skeleton / Result ...
+├── controls/                       # TextInput / SelectBox / NumberInput / TextArea / SwitchBox / SegmentedBox / CheckBox ...
+├── widgets/                        # AdminChrome（页头 / 筛选条 / 统计卡 / 状态标签…）+ DutyStrip
+├── providers/                      # Toast / Confirm / AdminUIProvider
+└── lib/                            # cn（tailwind-merge）、density（DensityContext）
+
 frontend/src/components/admin/
-├── AdminLayout.tsx                  # 外壳（侧栏 + 顶栏 + 搜索 + 面包屑）
 ├── adminNav.ts                      # ADMIN_MENU 单一事实源
-├── AdminWidgets.tsx                 # useAdminList / adminPagination / AdminDrawer / ConfirmAction 等
+├── AdminWidgets.tsx                 # useAdminList / useAdminUrlFilterSync / useAdminDetailParam + 控件再导出
+├── PageHeader.tsx                   # 页头 / 筛选条 / 统计卡等入口（再导出 admin-ui/widgets）
 ├── BatchResultModal.tsx             # 批量动作结果（失败项排最前）
-└── PageHeader.tsx
+├── AlertCenter.tsx                  # 告警铃 + 来源聚合
+├── DutyBand.tsx / DutyContext.tsx   # 值班塔渲染与耗时格式化工具；轮询只挂在概览路由
+└── statusMeta.ts                    # 状态 → 文案 / 色调映射
 
 frontend/src/pages/admin/            # 29 个页面 + modelConfig/ 子组件目录
 ```
@@ -116,7 +127,7 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 
 ### 0.6 高危操作确认
 
-`ConfirmAction`（antd `Modal` + `Alert` + 输入确认词）用于删除、退款、重置密码、手动调整积分、模型配置写入、角色与系统设置写入、备份。文案必须写明**影响量**（如「将删除 12 个素材」），不能只写「确定删除吗」。
+`ConfirmAction`（页内确认条，`admin-ui/widgets/AdminChrome`，`role="region"`）用于删除、退款、重置密码、手动调整积分、模型配置写入、角色与系统设置写入、备份。文案必须写明**影响量**（`impact` 数组，如「将删除 12 个素材」），不能只写「确定删除吗」。高危动作的原因输入仍走各页表单字段并落审计；2026-10-30 起不再要求输入确认词（`requireTyping` / `typingText` 仅保留入参兼容）。
 
 ### 0.7 批量动作
 

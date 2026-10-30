@@ -1,21 +1,13 @@
 import { useMemo, useState } from 'react';
-import {
-  Alert,
-  App,
-  Button,
-  Card,
-  Col,
-  Collapse,
-  Divider,
-  Flex,
-  Row,
-  Segmented,
-  Select,
-  Space,
-  Tag,
-  Typography,
-} from 'antd';
+import { ExternalLink } from 'lucide-react';
+import { Button } from '../../../vendor/boardui/components/base/buttons/button';
+import { Chip } from '../../../vendor/boardui/components/base/badges/chip';
 import { adminModelApi } from '../../../lib/api';
+import { useToast } from '../../../admin-ui/providers/ToastProvider';
+import { CollapsiblePanel, Panel } from '../../../components/admin/PageHeader';
+import { Notice } from '../../../admin-ui/primitives';
+import { SegmentedBox, SelectBox } from '../../../admin-ui/controls';
+import { TONE_CHIP_COLOR } from '../../../components/admin/statusMeta';
 import type { AdminModelConfig, AdminModelConfigItem, Modality } from '../../../types/api';
 import { ConfigItemRow } from './ConfigItemRow';
 import {
@@ -26,15 +18,17 @@ import {
   PROTOCOL_HINT,
   fmtLatency,
   fmtTime,
-  tagColor,
   vendorDisplayLabel,
 } from './meta';
 import type { ModelConfigDraft } from './useModelConfigDraft';
 
 const ADVANCED_KEY = 'admin.modelCfg.advancedOpen';
 
+/** 「自定义（手动填写）」在厂商下拉里的哨兵值 */
+const CUSTOM = '__custom__';
+
 /**
- * 全局设置页签（antd Card / Collapse / Segmented / Alert）。
+ * 全局设置页签。
  *
  * 这里保留旧版配置，不是历史包袱：没有线路的部署仍靠它工作。
  * 一旦某模态有线路，对应分组会明确标注「不参与调度」。
@@ -50,7 +44,7 @@ export function GlobalSettingsTab({
   canWrite: boolean;
   canTest: boolean;
 }) {
-  const { message } = App.useApp();
+  const toast = useToast();
   const [modality, setModality] = useState<Modality>('image');
   const [advancedOpen, setAdvancedOpen] = useState<boolean>(() => {
     try {
@@ -134,7 +128,7 @@ export function GlobalSettingsTab({
         plan.fills.flatMap((f) => [`gateway.${f.modality}.baseUrl`, `gateway.${f.modality}.provider`]),
       );
       if (plan.fills.length > 1) {
-        void message.info(
+        toast.info(
           `已按「${plan.label}」联动填入 ${plan.fills.length} 个模态的基址与模型（令牌仍需分别填写）`,
         );
       }
@@ -169,8 +163,8 @@ export function GlobalSettingsTab({
         ...(token !== undefined ? { token } : {}),
       });
       setTestResult(r);
-      if (r.ok) void message.success(`${MODALITY_LABEL[modality]}草稿连通正常`);
-      else void message.warning(`${MODALITY_LABEL[modality]}草稿测试失败：${r.message}`);
+      if (r.ok) toast.success(`${MODALITY_LABEL[modality]}草稿连通正常`);
+      else toast.warning(`${MODALITY_LABEL[modality]}草稿测试失败：${r.message}`);
     } catch (e) {
       setTestResult({
         ok: false,
@@ -197,152 +191,151 @@ export function GlobalSettingsTab({
   );
 
   return (
-    <Flex vertical gap={16}>
-      <Segmented<Modality>
-        value={modality}
-        onChange={(m) => {
-          setModality(m);
-          setTestResult(null);
-        }}
-        options={MODALITY_ORDER.map((m) => ({ label: MODALITY_LABEL[m], value: m }))}
-      />
+    <>
+      <div className="mb-3">
+        <SegmentedBox
+          value={modality}
+          onChange={(next) => {
+            setModality(next as Modality);
+            setTestResult(null);
+          }}
+          ariaLabel="按模态切换"
+          options={MODALITY_ORDER.map((m) => ({ value: m, label: MODALITY_LABEL[m] }))}
+        />
+      </div>
 
-      <Card
-        size="small"
+      <Panel
         title={
-          <Space size={8}>
-            <Typography.Text strong>旧版单通道配置</Typography.Text>
-            <Tag color={tagColor(dispatch.tone)} variant="filled">
+          <span className="flex items-center gap-2">
+            <span>旧版单通道配置</span>
+            <Chip variant="caption" color={TONE_CHIP_COLOR[dispatch.tone]}>
               {dispatch.label}
-            </Tag>
-          </Space>
+            </Chip>
+          </span>
         }
+        note="没有线路时由这里提供接入参数；有线路后仅超时与轮询仍生效。"
       >
-        <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-          没有线路时由这里提供接入参数；有线路后仅超时与轮询仍生效。
-        </Typography.Paragraph>
-
         {channel?.dispatchSource === 'channels' && (
-          <Alert
-            type="info"
-            showIcon
-            style={{ marginBottom: 16 }}
+          <Notice
+            tone="info"
+            className="mb-3"
             title={`该模态已有 ${channel.channelCount ?? 0} 条线路，生成按线路列表调度`}
-            description="以下基址/令牌/协议不再参与该模态的调度；只有在删除全部线路后才会恢复生效。"
-          />
+          >
+            以下基址/令牌/协议不再参与该模态的调度；只有在删除全部线路后才会恢复生效。
+          </Notice>
         )}
         {channel?.dispatchSource === 'none' && (
-          <Alert
-            type={modality === 'image' ? 'warning' : 'error'}
-            showIcon
-            style={{ marginBottom: 16 }}
+          <Notice
+            tone={modality === 'image' ? 'warn' : 'danger'}
+            className="mb-3"
             title={MODALITY_EMPTY_HINT[modality]}
           />
         )}
 
-        <Row gutter={24}>
-          <Col xs={24} md={12}>
-            <Space orientation="vertical" size={4} style={{ width: '100%', marginBottom: 12 }}>
-              <Typography.Text strong>模型厂商</Typography.Text>
-              <Select
-                value={currentVendor?.key ?? '__custom__'}
-                disabled={!canWrite}
-                style={{ width: '100%' }}
-                onChange={(v) =>
-                  v === '__custom__' ? draftState.setValue(`${prefix}.vendor`, '') : void applyVendor(v)
-                }
-                options={[
-                  ...(channel?.vendors ?? []).map((v) => ({
-                    value: v.key,
-                    label: vendorDisplayLabel(v.label),
-                  })),
-                  { value: '__custom__', label: '自定义（手动填写）' },
-                ]}
-              />
-            </Space>
-          </Col>
-          <Col xs={24} md={12}>
-            <Space orientation="vertical" size={4} style={{ width: '100%', marginBottom: 12 }}>
-              <Typography.Text strong>通道协议</Typography.Text>
-              <Select
-                value={String(valueOf(`${prefix}.provider`) ?? '')}
-                disabled={!canWrite}
-                style={{ width: '100%' }}
-                onChange={changeProtocol}
-                options={(channel?.protocolOptions ?? []).map((o) => ({
-                  value: o.value,
-                  label: o.label,
-                  title: o.desc,
-                }))}
-              />
-            </Space>
-          </Col>
-        </Row>
+        <div className="mb-3 grid grid-cols-2 gap-4">
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-text-secondary">模型厂商</span>
+            <SelectBox
+              value={currentVendor?.key ?? CUSTOM}
+              onChange={(next) => {
+                if (!next) return;
+                if (next === CUSTOM) draftState.setValue(`${prefix}.vendor`, '');
+                else void applyVendor(next);
+              }}
+              disabled={!canWrite}
+              options={[
+                ...(channel?.vendors ?? []).map((v) => ({
+                  value: v.key,
+                  label: vendorDisplayLabel(v.label),
+                })),
+                { value: CUSTOM, label: '自定义（手动填写）' },
+              ]}
+              ariaLabel="模型厂商"
+              className="w-full"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-text-secondary">通道协议</span>
+            <SelectBox
+              value={String(valueOf(`${prefix}.provider`) ?? '') || undefined}
+              onChange={(next) => {
+                if (next) changeProtocol(next);
+              }}
+              disabled={!canWrite}
+              options={(channel?.protocolOptions ?? []).map((o) => ({ value: o.value, label: o.label }))}
+              ariaLabel="通道协议"
+              className="w-full"
+            />
+          </div>
+        </div>
 
-        <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginBottom: 4 }}>
+        <p className="mb-1 text-xs leading-5 text-text-tertiary">
           {PROTOCOL_HINT[currentProtocol] ?? '按协议层声明的端点与参数格式调用。'}
           {currentVendor && (
             <>
               {' '}
-              <Typography.Link href={currentVendor.consoleUrl} target="_blank" rel="noreferrer">
-                前往 {vendorDisplayLabel(currentVendor.label)} 控制台获取 API Key →
-              </Typography.Link>
+              <a
+                href={currentVendor.consoleUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-0.5 text-accent-600 underline-offset-2 hover:underline"
+              >
+                前往 {vendorDisplayLabel(currentVendor.label)} 控制台获取 API Key
+                <ExternalLink className="size-3" aria-hidden />
+              </a>
             </>
           )}
-        </Typography.Paragraph>
+        </p>
         {/* 协议形状与线路抽屉同一份说明, 两处都常驻展示 */}
         {protocolDesc && (
-          <Typography.Paragraph type="secondary" className="mc-protocol-note-tech" style={{ fontSize: 12 }}>
-            {protocolDesc}
-          </Typography.Paragraph>
+          <p className="mb-3 text-xs leading-5 text-text-tertiary">{protocolDesc}</p>
         )}
 
         <div>{baseItems.map(renderItem)}</div>
 
-        <Divider style={{ margin: '16px 0 12px' }} />
-
-        <Space size={12} wrap style={{ marginBottom: 12 }}>
-          <Button loading={testing} disabled={!canTest} onClick={() => void runTest()}>
-            测试{MODALITY_LABEL[modality]}当前草稿
+        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-border-table pt-3">
+          <Button
+            variant="secondary"
+            size="small"
+            disabled={!canTest || testing}
+            onClick={() => void runTest()}
+          >
+            {testing ? '测试中…' : `测试${MODALITY_LABEL[modality]}当前草稿`}
           </Button>
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          <span className="text-xs text-text-tertiary">
             {canTest ? '使用当前表单值测试，不需要先保存。' : '当前角色没有通道测试权限。'}
-          </Typography.Text>
-        </Space>
+          </span>
+        </div>
 
         {testResult && (
-          <Alert
-            type={testResult.ok ? 'success' : 'error'}
-            showIcon
+          <Notice
+            tone={testResult.ok ? 'success' : 'danger'}
+            className="mb-0 mt-3"
             title={
-              <Space size={8} wrap>
+              <span className="flex flex-wrap items-center gap-2">
                 <span>
                   {testResult.ok ? '连通正常' : '连通失败'} · {fmtLatency(testResult.latencyMs)}
                 </span>
-                <Tag variant="filled">草稿</Tag>
-              </Space>
+                <span className="rounded bg-black/10 px-1.5 py-0.5 text-[11px]">草稿</span>
+              </span>
             }
-            description={
-              <Space orientation="vertical" size={2}>
-                <Typography.Text>{testResult.message}</Typography.Text>
-                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  {fmtTime(testResult.testedAt)}
-                </Typography.Text>
-                {testResult.detail && (
-                  <Typography.Text code style={{ fontSize: 12, whiteSpace: 'pre-wrap' }}>
-                    {testResult.detail}
-                  </Typography.Text>
-                )}
-              </Space>
-            }
-          />
+          >
+            <div>{testResult.message}</div>
+            <div className="mt-0.5 text-text-tertiary">{fmtTime(testResult.testedAt)}</div>
+            {testResult.detail && (
+              <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-[11px] text-text-secondary">
+                {testResult.detail}
+              </pre>
+            )}
+          </Notice>
         )}
-      </Card>
+      </Panel>
 
-      <Collapse
-        activeKey={advancedOpen ? ['advanced'] : []}
-        onChange={(keys) => {
-          const next = Array.isArray(keys) && keys.includes('advanced');
+      <CollapsiblePanel
+        title="超时与轮询"
+        note="多数情况用默认值；排障轮询超时时再调。"
+        open={advancedOpen}
+        onToggle={(next) => {
           setAdvancedOpen(next);
           try {
             localStorage.setItem(ADVANCED_KEY, next ? '1' : '0');
@@ -350,31 +343,18 @@ export function GlobalSettingsTab({
             // ignore
           }
         }}
-        items={[
-          {
-            key: 'advanced',
-            label: (
-              <Space size={8}>
-                <Typography.Text strong>超时与轮询</Typography.Text>
-                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  多数情况用默认值；排障轮询超时时再调。
-                </Typography.Text>
-                <Tag variant="filled">
-                  {timeoutItems.length} 项 · {timeoutItems.filter((i) => i.overridden).length} 项已改
-                </Tag>
-              </Space>
-            ),
-            children: <div>{timeoutItems.map(renderItem)}</div>,
-          },
-        ]}
-      />
+        collapsedHint={
+          <span className="rounded bg-background-secondary-default px-1.5 py-0.5 text-[11px]">
+            {timeoutItems.length} 项 · {timeoutItems.filter((i) => i.overridden).length} 项已改
+          </span>
+        }
+      >
+        {timeoutItems.map(renderItem)}
+      </CollapsiblePanel>
 
-      <Card size="small" title="素材回传地址">
-        <Typography.Paragraph type="secondary" style={{ fontSize: 12 }}>
-          真实模型网关回拉参考图时使用的站内可达地址。
-        </Typography.Paragraph>
+      <Panel title="素材回传地址" note="真实模型网关回拉参考图时使用的站内可达地址。">
         <div>{assetItems.map(renderItem)}</div>
-      </Card>
-    </Flex>
+      </Panel>
+    </>
   );
 }

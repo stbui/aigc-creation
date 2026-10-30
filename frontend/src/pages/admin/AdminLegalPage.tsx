@@ -1,18 +1,19 @@
-import { useState } from 'react';
-import { App, Button, Drawer, Input, Modal, Select, Table } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import { useState, type ReactNode } from 'react';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
 import { adminLegalApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
+import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
+import { Drawer } from '../../admin-ui/primitives/Drawer';
+import { ModalDialog } from '../../admin-ui/primitives/Dialog';
+import { SelectBox, TextArea, TextInput } from '../../admin-ui/controls';
 import {
-  AdminListError,
-  AdminListLoading,
   AdminStaleError,
   ConfirmAction,
-  adminMiniPagination,
   useAdminResource,
 } from '../../components/admin/AdminWidgets';
-import { AdminEmpty, FilterActions, FilterBar, PageHeader, Panel, StatusTag } from '../../components/admin/PageHeader';
+import { FilterActions, FilterBar, PageHeader, Panel, StatusTag } from '../../components/admin/PageHeader';
 import type { AdminLegalDoc, LegalSlug, LegalStatus } from '../../types/api';
 
 const SLUGS: { value: LegalSlug; label: string }[] = [
@@ -56,8 +57,20 @@ interface FormState {
   content: string;
 }
 
+/**
+ * 法务文档（BoardUI）。
+ *
+ * 版本化的三条硬约束不能因为换界面而松动：
+ *   1. 已发布的版本不可原地覆盖 —— 编辑只对草稿与归档版本开放；
+ *   2. 保存只建草稿，发布走独立接口（它负责归档同文档的旧版本）；
+ *   3. 发布是高危动作，必须填原因并写审计。
+ *
+ * 渲染层变化：读原文预览从 antd Modal 换成 `ModalDialog`，编辑表单从 antd
+ * Drawer 换成 `Drawer` 原语（带固定操作区，长正文滚动时按钮不跑），未保存
+ * 拦截与关闭确认沿用同一套 hook。
+ */
 export function AdminLegalPage() {
-  const { message } = App.useApp();
+  const toast = useToast();
   const { can } = useAdmin();
   const writable = can('legal.write');
 
@@ -133,7 +146,7 @@ export function AdminLegalPage() {
       // 只建草稿: 发布走独立接口, 由它负责把同 slug 的旧版本归档 ——
       // 若这里直接 upsert 成 published, 会出现「两个生效版本」的中间态。
       await adminLegalApi.upsert({ slug: form.slug, version, title, content, status: 'draft' });
-      message.success('草稿已保存，确认无误后点「发布」生效');
+      toast.success('草稿已保存，确认无误后点「发布」生效');
       setFormOpen(false);
       await reload();
     } catch (e) {
@@ -146,68 +159,84 @@ export function AdminLegalPage() {
   const doPublish = async () => {
     if (!publishTarget) return;
     if (!publishReason.trim()) {
-      message.warning('请填写发布原因（写入审计日志）');
+      toast.warning('请填写发布原因（写入审计日志）');
       return;
     }
     setBusy(true);
     try {
       await adminLegalApi.publish(publishTarget.slug, publishTarget.version, publishReason.trim());
-      message.success(`版本 ${publishTarget.version} 已发布，同文档的旧版本已归档`);
+      toast.success(`版本 ${publishTarget.version} 已发布，同文档的旧版本已归档`);
       setPublishTarget(null);
       setPublishReason('');
       await reload();
     } catch (e) {
-      message.error(e instanceof Error ? e.message : '发布失败');
+      toast.error(e instanceof Error ? e.message : '发布失败');
     } finally {
       setBusy(false);
     }
   };
 
-  const columns: ColumnsType<AdminLegalDoc> = [
+  const columns: Array<AdminColumn<AdminLegalDoc>> = [
     {
+      key: 'slug',
       title: '文档',
-      dataIndex: 'slug',
       width: 130,
-      render: (v: string) => SLUG_LABEL[v] ?? v,
+      render: (row) => SLUG_LABEL[row.slug] ?? row.slug,
     },
-    { title: '版本', dataIndex: 'version', width: 120 },
-    { title: '标题', dataIndex: 'title', ellipsis: true },
     {
+      key: 'version',
+      title: '版本',
+      width: 120,
+      render: (row) => <code className="font-mono text-[11px] text-text-secondary">{row.version}</code>,
+    },
+    {
+      key: 'title',
+      title: '标题',
+      render: (row) => (
+        <span className="block max-w-[420px] truncate" title={row.title}>
+          {row.title}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
       title: '状态',
-      dataIndex: 'status',
       width: 100,
-      render: (v: LegalStatus) => <StatusTag status={STATUS_TONE_KEY[v]} label={STATUS_LABEL[v]} />,
+      render: (row) => (
+        <StatusTag status={STATUS_TONE_KEY[row.status]} label={STATUS_LABEL[row.status]} />
+      ),
     },
-    { title: '发布时间', dataIndex: 'publishedAt', width: 170, render: (v: string | null) => fmt(v) },
-    { title: '更新时间', dataIndex: 'updatedAt', width: 170, render: (v: string | null) => fmt(v) },
+    { key: 'publishedAt', title: '发布时间', width: 170, render: (row) => fmt(row.publishedAt) },
+    { key: 'updatedAt', title: '更新时间', width: 170, render: (row) => fmt(row.updatedAt) },
     {
-      title: '操作',
       key: 'actions',
-      width: 200,
-      render: (_, doc) => (
-        <div className="adm-row-actions">
-          <Button size="small" type="link" onClick={() => setPreview(doc)}>
+      title: '操作',
+      width: 220,
+      fixed: 'right',
+      render: (row) => (
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="small" onClick={() => setPreview(row)}>
             查看
           </Button>
-          {writable && doc.status !== 'published' && (
-            <Button size="small" type="link" onClick={() => openEdit(doc)}>
+          {writable && row.status !== 'published' && (
+            <Button variant="ghost" size="small" onClick={() => openEdit(row)}>
               编辑
             </Button>
           )}
-          {writable && doc.status !== 'published' && (
+          {writable && row.status !== 'published' && (
             <Button
-                size="small"
-                type="link"
-                onClick={() => {
-                  setPublishReason('');
-                  setPublishTarget(doc);
-                }}
-              >
+              variant="ghost"
+              size="small"
+              onClick={() => {
+                setPublishReason('');
+                setPublishTarget(row);
+              }}
+            >
               发布
             </Button>
           )}
           {writable && (
-            <Button size="small" type="link" onClick={() => openCreate(doc)}>
+            <Button variant="ghost" size="small" onClick={() => openCreate(row)}>
               新版本
             </Button>
           )}
@@ -223,24 +252,27 @@ export function AdminLegalPage() {
         description="协议文本按版本管理：已发布的版本不可覆盖，修改须新建版本后发布；发布新版本时同文档的旧版本自动归档。"
         actions={
           writable ? (
-            <Button type="primary" onClick={() => openCreate()}>
+            <Button variant="primary" size="small" onClick={() => openCreate()}>
               新建版本
             </Button>
-          ) : null
+          ) : undefined
         }
       />
 
       <FilterBar>
-        <Select
-          allowClear
+        <SelectBox
+          className="w-48"
+          ariaLabel="按文档筛选"
           placeholder="全部文档"
-          style={{ width: 200 }}
+          allowClear
           value={slugFilter}
-          onChange={(v) => setSlugFilter(v)}
+          onChange={setSlugFilter}
           options={SLUGS}
         />
         <FilterActions>
-          <Button onClick={() => void reload()}>刷新</Button>
+          <Button variant="secondary" size="small" onClick={() => void reload()}>
+            刷新
+          </Button>
         </FilterActions>
       </FilterBar>
 
@@ -248,109 +280,125 @@ export function AdminLegalPage() {
         {error && rows.length > 0 && (
           <AdminStaleError error={error} onRetry={() => void reload()} />
         )}
-        {error && rows.length === 0 ? (
-          <AdminListError error={error} onRetry={() => void reload()} />
-        ) : loading && rows.length === 0 ? (
-          <AdminListLoading />
-        ) : rows.length === 0 ? (
-          <AdminEmpty description="还没有法务文档，执行 npm run seed:legal 可灌入模板草稿（draft，需审阅后在此发布）" />
-        ) : (
-          <Table
-            rowKey="id"
-            size="small"
-            columns={columns}
-            dataSource={rows}
-            pagination={adminMiniPagination()}
-            scroll={{ x: 900 }}
-          />
-        )}
+        {/*
+         * 法务文档总量小（4 类 × 若干版本），后端一次全量返回，因此不做分页：
+         * 分页器只会在「只有一页」时占掉一整行。
+         */}
+        <AdminDataTable<AdminLegalDoc>
+          rows={rows}
+          columns={columns}
+          rowKey={(row) => row.id}
+          loading={loading}
+          error={error}
+          onRetry={() => void reload()}
+          minWidth={900}
+          emptyText="还没有法务文档，执行 npm run seed:legal 可灌入模板草稿（draft，需审阅后在此发布）"
+        />
       </Panel>
 
       {/* 只读预览: 用 pre 保留正文换行, 不渲染 Markdown —— 后台看的是原文 */}
-      <Modal
+      <ModalDialog
         open={!!preview}
+        onOpenChange={(open) => {
+          if (!open) setPreview(null);
+        }}
         title={preview ? `${SLUG_LABEL[preview.slug] ?? preview.slug} · ${preview.version}` : ''}
-        onCancel={() => setPreview(null)}
-        footer={null}
-        width={720}
+        description={
+          preview ? `${preview.title} · ${STATUS_LABEL[preview.status]} · 更新于 ${fmt(preview.updatedAt)}` : undefined
+        }
       >
         {preview && (
-          <div className="adm-legal-preview">
-            <div className="adm-legal-meta">
-              {preview.title} · {STATUS_LABEL[preview.status]} · 更新于 {fmt(preview.updatedAt)}
-            </div>
-            <pre>{preview.content}</pre>
-          </div>
+          <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-6 text-text-primary">
+            {preview.content}
+          </pre>
         )}
-      </Modal>
+      </ModalDialog>
 
       <Drawer
         open={formOpen}
-        size={720}
+        onOpenChange={(open) => {
+          if (!open) requestCloseForm();
+        }}
+        width={720}
         title={editing ? `编辑 ${editing.version}（草稿）` : '新建法务文档版本'}
-        onClose={requestCloseForm}
-        destroyOnHidden
-        extra={
-          <div className="adm-row-actions">
-            {formDirty && <span className="adm-cell-sub">有未保存修改</span>}
-            <Button onClick={requestCloseForm}>取消</Button>
-            <Button type="primary" loading={busy} onClick={() => void save()}>
-              保存草稿
+        description={formDirty ? '有未保存修改' : undefined}
+        footer={
+          <>
+            <Button variant="secondary" size="small" onClick={requestCloseForm}>
+              取消
             </Button>
-          </div>
+            <Button
+              variant="primary"
+              size="small"
+              disabled={busy}
+              onClick={() => void save()}
+            >
+              {busy ? '保存中…' : '保存草稿'}
+            </Button>
+          </>
         }
       >
-        <div className="adm-form">
-          <div className="adm-field">
-            <label htmlFor="lg-slug">文档类型</label>
-            <Select
-              id="lg-slug"
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-text-secondary">文档类型</label>
+            <SelectBox
+              ariaLabel="文档类型"
+              className="w-56"
               value={form.slug}
               disabled={!!editing}
-              onChange={(v) => setForm((f) => ({ ...f, slug: v }))}
+              onChange={(value) => setForm((f) => ({ ...f, slug: value as LegalSlug }))}
               options={SLUGS}
             />
           </div>
 
-          <div className="adm-field">
-            <label htmlFor="lg-version">版本号</label>
-            <Input
-              id="lg-version"
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-text-secondary">版本号</label>
+            <TextInput
+              ariaLabel="版本号"
+              className="w-56"
               value={form.version}
               disabled={!!editing}
               placeholder="如 v2 / 2026-11-01"
               maxLength={40}
-              onChange={(e) => setForm((f) => ({ ...f, version: e.target.value }))}
+              onChange={(value) => setForm((f) => ({ ...f, version: value }))}
             />
-            <div className="adm-field-hint">
+            <p className="text-[11px] leading-4 text-text-tertiary">
               版本号一经使用即固定：已发布的版本不允许改正文，要改请用新版本号；同一 (文档, 版本) 的草稿可反复保存。
-            </div>
+            </p>
           </div>
 
-          <div className="adm-field">
-            <label htmlFor="lg-title">标题</label>
-            <Input
-              id="lg-title"
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-text-secondary">标题</label>
+            <TextInput
+              ariaLabel="标题"
               value={form.title}
               maxLength={80}
-              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              onChange={(value) => setForm((f) => ({ ...f, title: value }))}
             />
           </div>
 
-          <div className="adm-field">
-            <label htmlFor="lg-content">正文</label>
-            <Input.TextArea
-              id="lg-content"
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-text-secondary">正文</label>
+            <TextArea
+              ariaLabel="正文"
               value={form.content}
               rows={18}
-              onChange={(e) => setForm((f) => ({ ...f, content: e.target.value }))}
+              onChange={(value) => setForm((f) => ({ ...f, content: value }))}
             />
-            <div className="adm-field-hint">
-              支持轻量 Markdown：<code>## 标题</code>、<code>&gt; 提示</code>、空行分段、<code>**粗体**</code>。前台按这四种形态渲染。
-            </div>
+            <p className="text-[11px] leading-4 text-text-tertiary">
+              支持轻量 Markdown：<Code>## 标题</Code>、<Code>&gt; 提示</Code>、空行分段、
+              <Code>**粗体**</Code>。前台按这四种形态渲染。
+            </p>
           </div>
 
-          {formError && <div className="adm-form-error">{formError}</div>}
+          {formError && (
+            <div
+              role="alert"
+              className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800"
+            >
+              {formError}
+            </div>
+          )}
         </div>
       </Drawer>
 
@@ -365,15 +413,17 @@ export function AdminLegalPage() {
         confirmText="发布"
         loading={busy}
         extra={
-          <div className="adm-field">
-            <label htmlFor="lg-publish-reason">操作原因（必填，写入审计）</label>
-            <Input.TextArea
-              id="lg-publish-reason"
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="lg-publish-reason" className="text-xs text-text-secondary">
+              操作原因（必填，写入审计）
+            </label>
+            <TextArea
+              ariaLabel="操作原因"
               rows={2}
               maxLength={200}
               value={publishReason}
               placeholder="如：V2 补充未成年人保护条款，法务 2026-10-21 定稿"
-              onChange={(e) => setPublishReason(e.target.value)}
+              onChange={setPublishReason}
             />
           </div>
         }
@@ -382,4 +432,8 @@ export function AdminLegalPage() {
       />
     </>
   );
+}
+
+function Code({ children }: { children: ReactNode }) {
+  return <code className="rounded bg-background-secondary-default px-1 font-mono text-[11px]">{children}</code>;
 }

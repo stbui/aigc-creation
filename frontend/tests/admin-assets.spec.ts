@@ -8,9 +8,18 @@ import { ADMIN_EMAIL, ADMIN_PASSWORD, HAS_ADMIN_CREDENTIALS } from './support/ad
  *   1. 下架 ≠ 删除 —— 误操作可恢复
  *   2. 已下架素材用户端不可见, 管理端可见
  *   3. 凭据只读: 界面不提供任何写凭据的输入框
+ *
+ * ## 选择器约定（2026-10-30 换 BoardUI 后）
+ *
+ * 网格单元 / 批量条 / 存储卡片走 `data-testid="admin-*"`；视图切换、筛选与
+ * 行内动作走 `aria-label` 与按钮名。预览灯箱 `ImageLightbox` 是 C 端共用组件，
+ * 保留 `img-viewer-*` 类名。
  */
 
 const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
+
+const cells = (page: Page) => page.getByTestId('admin-asset-cell');
+const rows = (page: Page) => page.getByTestId('admin-table-row');
 
 async function login(page: Page) {
   // 侧栏在 ≤1280px 折叠, 分组标题按设计隐藏
@@ -20,6 +29,18 @@ async function login(page: Page) {
   await page.locator('input[type="password"]').first().fill(ADMIN_PASSWORD);
   await page.locator('input[type="password"]').first().press('Enter');
   await page.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 15000 });
+}
+
+/** 切到表格视图 */
+async function toTable(page: Page) {
+  await page.getByRole('button', { name: '表格', exact: true }).click();
+  await expect(page.getByTestId('admin-table').first()).toBeVisible({ timeout: 10000 });
+}
+
+/** 切回网格视图 */
+async function toGrid(page: Page) {
+  await page.getByRole('button', { name: '网格', exact: true }).click();
+  await expect(cells(page).first()).toBeVisible({ timeout: 10000 });
 }
 
 test.describe('素材管理', () => {
@@ -35,9 +56,9 @@ test.describe('素材管理', () => {
     await expect(page.getByText('存储分布')).toBeVisible();
 
     // 网格单元
-    await expect(page.locator('.adm-asset-cell').first()).toBeVisible({ timeout: 10000 });
+    await expect(cells(page).first()).toBeVisible({ timeout: 10000 });
     // 缩略图应实际加载出来(不是 broken image)
-    const img = page.locator('.adm-asset-cell img').first();
+    const img = cells(page).first().locator('img');
     await expect(img).toBeVisible();
     // 等图片真正 decode 完成再断言 —— naturalWidth 在 decode 前是 0
     await img.evaluate((el) =>
@@ -47,34 +68,29 @@ test.describe('素材管理', () => {
     expect(naturalW, '缩略图未加载成功').toBeGreaterThan(0);
 
     // 网格每页 60 张: 后端 DTO 若丢失分页元数据会静默退回 20, 这里守住页容量
-    const totalText = await page.locator('.adm-panel .adm-panel-note').first().innerText();
+    const totalText = await page.getByText(/^共 \d+ 张$/).first().innerText();
     const total = Number(totalText.match(/\d+/)?.[0] ?? 0);
-    expect(await page.locator('.adm-asset-cell').count()).toBe(Math.min(total, 60));
+    expect(await cells(page).count()).toBe(Math.min(total, 60));
   });
 
   test('B-25 网格与表格视图可切换', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/assets`);
-    await page.waitForSelector('.adm-asset-cell', { timeout: 20000 });
+    await cells(page).first().waitFor({ state: 'visible', timeout: 20000 });
 
-    // 切到表格
-    await page.locator('.adm-segmented-item[title="表格视图"]').click();
-    await expect(page.locator('.adm-panel table').first()).toBeVisible({ timeout: 10000 });
-
-    // 切回网格
-    await page.locator('.adm-segmented-item[title="缩略图网格"]').click();
-    await expect(page.locator('.adm-asset-cell').first()).toBeVisible({ timeout: 10000 });
+    await toTable(page);
+    await toGrid(page);
   });
 
   test('网格勾选后出现批量操作条', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/assets`);
-    await page.waitForSelector('.adm-asset-cell', { timeout: 20000 });
+    await cells(page).first().waitFor({ state: 'visible', timeout: 20000 });
 
-    await page.locator('.adm-asset-select input[type="checkbox"]').first().check();
-    const bulkBar = page.locator('.adm-bulk-bar');
+    await page.getByRole('checkbox', { name: /^选择 / }).first().check();
+    const bulkBar = page.getByTestId('admin-bulk-bar');
     await expect(bulkBar).toBeVisible();
-    await expect(bulkBar.locator('.adm-bulk-count')).toContainText('已选 1 张素材');
+    await expect(bulkBar).toContainText('已选 1 张素材');
     await expect(bulkBar.getByRole('button', { name: '批量下架' })).toBeVisible();
     await expect(bulkBar.getByRole('button', { name: '批量删除' })).toBeVisible();
 
@@ -85,9 +101,9 @@ test.describe('素材管理', () => {
   test('点击缩略图打开大图预览并支持 Esc 关闭', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/assets`);
-    await page.waitForSelector('.adm-asset-cell', { timeout: 20000 });
+    await cells(page).first().waitFor({ state: 'visible', timeout: 20000 });
 
-    await page.locator('.adm-asset-cell .adm-asset-preview').first().click();
+    await page.getByRole('button', { name: /^查看大图：/ }).first().click();
     const viewer = page.getByRole('dialog', { name: '素材预览' });
     await expect(viewer).toBeVisible();
     await expect(viewer.locator('.img-viewer-meta')).toContainText(/已上架|已下架/);
@@ -110,7 +126,7 @@ test.describe('素材管理', () => {
     for (const width of [1280, 1440, 1920]) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto(`${UI}/admin/assets`);
-      await page.waitForSelector('.adm-asset-cell', { timeout: 20000 });
+      await cells(page).first().waitFor({ state: 'visible', timeout: 20000 });
 
       const gridMetrics = await page.evaluate(() => ({
         docW: document.documentElement.scrollWidth,
@@ -122,8 +138,7 @@ test.describe('素材管理', () => {
       );
       expect(gridMetrics.contentW).toBeGreaterThan(0);
 
-      await page.locator('.adm-segmented-item[title="表格视图"]').click();
-      await expect(page.locator('.adm-panel table').first()).toBeVisible();
+      await toTable(page);
       const tableMetrics = await page.evaluate(() => ({
         docW: document.documentElement.scrollWidth,
         winW: window.innerWidth,
@@ -139,79 +154,82 @@ test.describe('素材管理', () => {
   test('表格视图含存储后端列', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/assets`);
-    await page.waitForSelector('.adm-asset-cell', { timeout: 20000 });
-    await page.locator('.adm-segmented-item[title="表格视图"]').click();
-    await expect(page.locator('.adm-panel table th', { hasText: '存储' }).first()).toBeVisible();
-    await expect(page.locator('.adm-panel table td', { hasText: /本地|OSS|MinIO/ }).first()).toBeVisible();
+    await cells(page).first().waitFor({ state: 'visible', timeout: 20000 });
+    await toTable(page);
+
+    const table = page.getByTestId('admin-table').first();
+    await expect(table.locator('th', { hasText: '存储' }).first()).toBeVisible();
+    await expect(table.locator('td', { hasText: /本地|阿里云 OSS|MinIO/ }).first()).toBeVisible();
   });
 
-  test('筛选: 存储后端与类型', async ({ page }) => {
+  test('筛选: 类型筛选后生成条件回显', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/assets`);
-    await page.waitForSelector('.adm-asset-cell', { timeout: 20000 });
+    await cells(page).first().waitFor({ state: 'visible', timeout: 20000 });
 
-    await page.locator('.adm-filter .ant-select').first().click();
-    await page.keyboard.press('ArrowDown');
-    await page.keyboard.press('Enter');
-    await page.locator('.adm-filter-actions .ant-btn-primary').click();
-    await expect(page.locator('.adm-filter-chip')).toHaveCount(1);
-    await expect(page.locator('.adm-filter-chip')).toContainText(/原始上传|生成图/);
-    await expect(page.locator('.adm-filter-chip-clear')).toBeVisible();
-    // 筛选后仍有结果
-    expect(await page.locator('.adm-asset-cell').count()).toBeGreaterThanOrEqual(0);
+    await page.getByLabel('按类型筛选').click();
+    await page.getByRole('option', { name: '原始上传' }).click();
+    await page.getByRole('button', { name: '查询' }).click();
 
-    await page.getByRole('button', { name: '全部清除' }).click();
-    await expect(page.locator('.adm-filter-chip')).toHaveCount(0);
+    const chipList = page.getByTestId('admin-filter-chips');
+    await expect(chipList).toBeVisible();
+    await expect(page.getByTestId('admin-filter-chip')).toHaveCount(1);
+    await expect(chipList).toContainText(/原始上传|生成图/);
+
+    await chipList.getByRole('button', { name: '全部清除' }).click();
+    await expect(page.getByTestId('admin-filter-chip')).toHaveCount(0);
   });
 
   test('已下架素材在网格中仍可见且带角标', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/assets`);
-    await page.waitForSelector('.adm-asset-cell', { timeout: 20000 });
-    await page.locator('.adm-segmented-item[title="表格视图"]').click();
+    await cells(page).first().waitFor({ state: 'visible', timeout: 20000 });
+    await toTable(page);
 
-    const firstRow = page.locator('.adm-panel table tbody tr.ant-table-row').first();
+    const firstRow = rows(page).first();
     await expect(firstRow).toBeVisible();
     const wasHidden = (await firstRow.innerText()).includes('已下架');
     if (!wasHidden) {
-      await firstRow.getByRole('button', { name: '下架' }).click();
+      await firstRow.getByRole('button', { name: '下架', exact: true }).click();
       await expect(firstRow).toContainText('已下架', { timeout: 10000 });
     }
 
-    await page.locator('.adm-segmented-item[title="缩略图网格"]').click();
-    const firstCell = page.locator('.adm-asset-cell').first();
-    await expect(firstCell).toHaveClass(/is-hidden/);
-    await expect(firstCell.locator('.adm-asset-badge')).toHaveText('已下架');
+    await toGrid(page);
+    const firstCell = cells(page).first();
+    await expect(firstCell).toHaveAttribute('data-status', 'hidden');
+    await expect(firstCell.getByText('已下架', { exact: true })).toBeVisible();
 
     if (!wasHidden) {
-      await page.locator('.adm-segmented-item[title="表格视图"]').click();
-      await page.locator('.adm-panel table tbody tr.ant-table-row').first()
-        .getByRole('button', { name: '恢复' }).click();
-      await expect(page.locator('.adm-panel table tbody tr.ant-table-row').first())
-        .toContainText('已上架', { timeout: 10000 });
+      await toTable(page);
+      await rows(page)
+        .first()
+        .getByRole('button', { name: '恢复', exact: true })
+        .click();
+      await expect(rows(page).first()).toContainText('已上架', { timeout: 10000 });
     }
   });
 
   test('下架素材出现角标且可恢复', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/assets`);
-    await page.waitForSelector('.adm-asset-cell', { timeout: 20000 });
-    await page.locator('.adm-segmented-item[title="表格视图"]').click();
-    await expect(page.locator('.adm-panel table').first()).toBeVisible();
+    await cells(page).first().waitFor({ state: 'visible', timeout: 20000 });
+    await toTable(page);
 
-    const firstRow = page.locator('.adm-panel table tbody tr.ant-table-row').first();
+    const firstRow = rows(page).first();
     const wasHidden = (await firstRow.innerText()).includes('已下架');
     const actionLabel = wasHidden ? '恢复' : '下架';
 
-    await firstRow.locator('.adm-link', { hasText: actionLabel }).click();
+    await firstRow.getByRole('button', { name: actionLabel, exact: true }).click();
     await page.waitForTimeout(1500);
 
-    const nowHidden = (await page.locator('.adm-panel table tbody tr.ant-table-row').first().innerText()).includes('已下架');
+    const nowHidden = (await rows(page).first().innerText()).includes('已下架');
     expect(nowHidden).toBe(!wasHidden);
 
     // 恢复原状
-    await page.locator('.adm-panel table tbody tr.ant-table-row').first()
-      .locator('.adm-link', { hasText: wasHidden ? '下架' : '恢复' }).click();
+    await rows(page)
+      .first()
+      .getByRole('button', { name: wasHidden ? '下架' : '恢复', exact: true })
+      .click();
     await page.waitForTimeout(1200);
   });
 
@@ -233,15 +251,17 @@ test.describe('素材管理', () => {
 
     await login(page);
     await page.goto(`${UI}/admin/assets`);
-    await page.waitForSelector('.adm-asset-cell', { timeout: 20000 });
-    await page.locator('.adm-segmented-item[title="表格视图"]').click();
-    await expect(page.locator('.adm-panel table').first()).toBeVisible();
+    await cells(page).first().waitFor({ state: 'visible', timeout: 20000 });
+    await toTable(page);
 
-    await page.locator('.adm-panel table tbody tr.ant-table-row').first().locator('.adm-link.is-danger').click();
+    await rows(page)
+      .first()
+      .getByRole('button', { name: '删除', exact: true })
+      .click();
 
     // 没有弹窗、没有确认词输入框，请求直接发出
-    await expect(page.locator('.ant-modal')).toHaveCount(0);
-    await expect(page.locator('#adm-confirm-input')).toHaveCount(0);
+    await expect(page.getByTestId('admin-modal')).toHaveCount(0);
+    await expect(page.getByTestId('admin-confirm-action')).toHaveCount(0);
     await expect.poll(() => deleteCalls).toBe(1);
   });
 });
@@ -249,54 +269,55 @@ test.describe('素材管理', () => {
 test.describe('存储配置', () => {
   test.skip(!HAS_ADMIN_CREDENTIALS, '未提供后台管理员凭据');
 
+  const cards = (page: Page) => page.getByTestId('admin-storage-card');
+
   test('展示各后端状态与凭据来源', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/storage`);
     await expect(page.getByRole('heading', { name: '存储配置' })).toBeVisible({ timeout: 20000 });
 
     // 三个候选后端都要展示 —— 未配置的也要显示, 否则运营不知道它们存在
-    await expect(page.locator('.adm-storage-card')).toHaveCount(3);
-    await expect(page.locator('.adm-storage-card', { hasText: '本地磁盘' })).toBeVisible();
-    await expect(page.locator('.adm-storage-card', { hasText: '阿里云 OSS' })).toBeVisible();
-    await expect(page.locator('.adm-storage-card', { hasText: 'MinIO' })).toBeVisible();
-    await expect(page.locator('.adm-storage-badge', { hasText: '当前' })).toBeVisible();
+    await expect(cards(page)).toHaveCount(3);
+    await expect(cards(page).filter({ hasText: '本地磁盘' })).toBeVisible();
+    await expect(cards(page).filter({ hasText: '阿里云 OSS' })).toBeVisible();
+    await expect(cards(page).filter({ hasText: 'MinIO' })).toBeVisible();
+    await expect(page.getByTestId('admin-storage-badge')).toContainText('当前');
 
     // 未配置的后端应列出启用所需的环境变量 —— 比「未启用」三个字有用
-    const ossCard = page.locator('.adm-storage-card', { hasText: '阿里云 OSS' });
-    await expect(ossCard.locator('.adm-storage-env-title')).toBeVisible();
-    await expect(ossCard.locator('.adm-storage-env')).toContainText('OSS_ACCESS_KEY_ID');
+    const ossCard = cards(page).filter({ hasText: '阿里云 OSS' });
+    await expect(ossCard.getByTestId('admin-storage-env')).toContainText('OSS_ACCESS_KEY_ID');
   });
 
   test('B-63 凭据只读: 界面无凭据输入框', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/storage`);
-    await page.waitForSelector('.adm-storage-card', { timeout: 20000 });
+    await cards(page).first().waitFor({ state: 'visible', timeout: 20000 });
 
     // 全页不应有可编辑的凭据输入框
-    const inputs = page.locator('.adm-storage-card input[type="password"], .adm-storage-card input[type="text"]');
+    const inputs = cards(page).locator('input[type="password"], input[type="text"]');
     expect(await inputs.count()).toBe(0);
 
     // 明确告知凭据来源与不可编辑
-    await expect(page.getByText('凭据不在界面配置')).toBeVisible();
+    await expect(page.getByText(/凭据不在界面配置/)).toBeVisible();
     await expect(page.getByText(/STORAGE_BACKEND/)).toBeVisible();
   });
 
   test('连通性测试可用', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/storage`);
-    await page.waitForSelector('.adm-storage-card', { timeout: 20000 });
+    await cards(page).first().waitFor({ state: 'visible', timeout: 20000 });
 
     await page.getByRole('button', { name: '连通性测试' }).first().click();
     // 应出现成功或失败的反馈, 不论结果都说明请求已发出
-    await expect(page.locator('.ant-message')).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('admin-toast').first()).toBeVisible({ timeout: 15000 });
   });
 
   test('当前后端不显示「设为默认」按钮', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/storage`);
-    await page.waitForSelector('.adm-storage-card', { timeout: 20000 });
+    await cards(page).first().waitFor({ state: 'visible', timeout: 20000 });
 
-    const activeCard = page.locator('.adm-storage-card.is-active');
+    const activeCard = cards(page).filter({ has: page.getByTestId('admin-storage-badge') });
     await expect(activeCard.getByRole('button', { name: '设为默认' })).toHaveCount(0);
   });
 });

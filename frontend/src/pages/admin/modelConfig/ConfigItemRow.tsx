@@ -1,9 +1,13 @@
-import { Col, Flex, Input, InputNumber, Row, Space, Switch, Tag, Tooltip, Typography } from 'antd';
+import { Chip } from '../../../vendor/boardui/components/base/badges/chip';
+import { Button } from '../../../vendor/boardui/components/base/buttons/button';
+import { NumberInput, SwitchBox, TextInput } from '../../../admin-ui/controls';
+import { HoverTip } from '../../../admin-ui/controls';
+import { TONE_CHIP_COLOR } from '../../../components/admin/statusMeta';
 import type { AdminModelConfigItem } from '../../../types/api';
-import { SOURCE_META, fmtTime, tagColor, withoutModalityPrefix } from './meta';
+import { SOURCE_META, fmtTime, withoutModalityPrefix } from './meta';
 
 /**
- * 单个配置项（antd Row/Col 布局）。
+ * 单个配置项（左右两栏：说明 / 控件）。
  *
  * 来源信息只在需要时出现：默认值不挂标签，env 名放进 label tooltip；
  * 只有真被 env 覆盖时，才在正文里显示变量名与后台曾保存的值。
@@ -28,34 +32,44 @@ export function ConfigItemRow({
   const label = item.modality ? withoutModalityPrefix(item.label, item.modality) : item.label;
 
   const control = cleared ? (
-    <Typography.Text type="warning">保存后恢复为默认值「{String(item.default)}」</Typography.Text>
+    <span className="text-xs text-amber-700">
+      保存后恢复为默认值「{String(item.default)}」
+    </span>
   ) : item.type === 'boolean' ? (
-    <Switch checked={Boolean(value)} disabled={locked || !canWrite} onChange={(v) => onChange(v)} />
+    <SwitchBox
+      checked={Boolean(value)}
+      disabled={locked || !canWrite}
+      onChange={(next) => onChange(next)}
+      ariaLabel={label}
+    />
   ) : item.type === 'number' ? (
-    <InputNumber
-      style={{ width: '100%' }}
+    <NumberInput
       value={Number(value ?? 0)}
       disabled={locked || !canWrite}
-      onChange={(v) => onChange(Number(v ?? 0))}
+      onChange={(next) => onChange(Number(next ?? 0))}
+      ariaLabel={label}
+      className="w-full"
     />
   ) : item.type === 'secret' ? (
-    <Flex gap={8} align="center">
-      <Input.Password
-        style={{ flex: 1 }}
+    <div className="flex items-center gap-2">
+      <TextInput
         value={String(value ?? '')}
         placeholder={item.hasValue ? `已配置（${item.masked ?? '***'}），留空保持不变` : '尚未配置'}
         disabled={!canWrite || locked}
-        autoComplete="new-password"
-        onChange={(e) => onChange(e.target.value)}
+        type="password"
+        maxLength={200}
+        onChange={(next) => onChange(next)}
+        ariaLabel={`${label} 访问令牌`}
+        className="flex-1"
       />
-      <Tooltip title={locked ? '该项被部署环境变量覆盖，后台无法修改' : meta.hint}>
-        <Tag color={item.hasValue ? 'success' : 'default'} variant="filled">
+      <HoverTip tip={locked ? '该项被部署环境变量覆盖，后台无法修改' : meta.hint}>
+        <Chip variant="caption" color={item.hasValue ? 'lime' : 'neutral'}>
           {locked ? '环境变量' : item.hasValue ? '已配置' : '未配置'}
-        </Tag>
-      </Tooltip>
-    </Flex>
+        </Chip>
+      </HoverTip>
+    </div>
   ) : (
-    <Input
+    <TextInput
       value={String(value ?? '')}
       disabled={locked || !canWrite}
       placeholder={
@@ -65,85 +79,66 @@ export function ConfigItemRow({
             ? '留空则使用协议默认模型'
             : String(item.default)
       }
-      onChange={(e) => onChange(e.target.value)}
+      onChange={(next) => onChange(next)}
+      ariaLabel={label}
+      className="w-full"
     />
   );
 
   return (
-    <Row
-      gutter={24}
-      align="middle"
-      style={{ padding: '12px 0', borderBottom: '1px solid var(--border-row)' }}
-    >
-      <Col xs={24} md={14}>
-        <Space size={8} wrap>
-          <Tooltip title={item.envName ? `可用环境变量 ${item.envName} 覆盖` : undefined}>
-            <Typography.Text strong>{label}</Typography.Text>
-          </Tooltip>
+    <div className="flex items-start gap-4 border-b border-border-table py-3 last:border-b-0">
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          {item.envName ? (
+            <HoverTip tip={`可用环境变量 ${item.envName} 覆盖`}>
+              <span className="text-sm font-medium text-text-primary">{label}</span>
+            </HoverTip>
+          ) : (
+            <span className="text-sm font-medium text-text-primary">{label}</span>
+          )}
           {item.source !== 'default' && (
-            <Tooltip title={meta.hint}>
-              <Tag color={tagColor(meta.tone)} variant="filled">
+            <HoverTip tip={meta.hint}>
+              <Chip variant="caption" color={TONE_CHIP_COLOR[meta.tone]}>
                 {meta.label}
-              </Tag>
-            </Tooltip>
+              </Chip>
+            </HoverTip>
           )}
           {item.overridden && !locked && (
-            <ButtonLink
+            <Button
+              variant="ghost"
+              size="xs"
               disabled={!canWrite}
-              text={cleared ? '取消恢复' : '恢复默认'}
               onClick={onToggleClear}
-            />
+            >
+              {cleared ? '取消恢复' : '恢复默认'}
+            </Button>
           )}
-        </Space>
+        </div>
 
-        <Typography.Paragraph type="secondary" style={{ fontSize: 12, margin: '2px 0 0' }}>
-          {item.description}
-        </Typography.Paragraph>
+        <p className="mt-0.5 text-xs leading-5 text-text-tertiary">{item.description}</p>
 
         {locked && (item.dbValue != null || item.dbHasValue) && (
-          <Typography.Text type="warning" style={{ fontSize: 12 }}>
-            后台曾保存：<Typography.Text code>{item.secret ? item.dbMasked : String(item.dbValue)}</Typography.Text>
+          <p className="mt-0.5 text-xs text-amber-700">
+            后台曾保存：
+            <code className="font-mono">
+              {item.secret ? item.dbMasked : String(item.dbValue)}
+            </code>
             （当前被环境变量覆盖，保存不会生效）
-          </Typography.Text>
+          </p>
         )}
         {locked && item.dbValue == null && !item.dbHasValue && (
-          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          <p className="mt-0.5 text-xs text-text-tertiary">
             后台没有保存过该项，当前完全由部署环境提供。
-          </Typography.Text>
+          </p>
         )}
 
         {item.overridden && item.updatedAt && (
-          <Typography.Text type="secondary" style={{ display: 'block', fontSize: 11 }}>
+          <p className="mt-0.5 text-[11px] text-text-tertiary">
             上次修改：{item.updatedBy || 'admin'} · {fmtTime(item.updatedAt)}
-          </Typography.Text>
+          </p>
         )}
-      </Col>
-      <Col xs={24} md={10}>
-        {control}
-      </Col>
-    </Row>
-  );
-}
-
-/** 极轻量的行内操作按钮，避免每行都渲染一个完整 Button */
-function ButtonLink({
-  text,
-  disabled,
-  onClick,
-}: {
-  text: string;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <Typography.Link
-      style={{ fontSize: 12 }}
-      aria-disabled={disabled}
-      onClick={() => {
-        if (!disabled) onClick();
-      }}
-    >
-      {text}
-    </Typography.Link>
+      </div>
+      <div className="w-[42%] min-w-[220px] shrink-0">{control}</div>
+    </div>
   );
 }

@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { App, Button, Checkbox } from 'antd';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
+import { Chip } from '../../vendor/boardui/components/base/badges/chip';
 import { adminApi, adminRolesApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
+import { CheckBox } from '../../admin-ui/controls';
 import {
   AdminListError,
   AdminListLoading,
@@ -10,6 +13,7 @@ import {
 } from '../../components/admin/AdminWidgets';
 import { AdminEmpty, PageHeader, Panel } from '../../components/admin/PageHeader';
 import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
+import { cx } from '../../admin-ui/lib/cn';
 
 /** 权限点 → 中文说明。未登记的权限点原样显示 id, 不静默消失 */
 const PERMISSION_LABELS: Record<string, string> = {
@@ -112,6 +116,9 @@ const HIGH_RISK = new Set([
   'backup.run',
 ]);
 
+/** 角色列宽：模块头的全选按钮与每行的勾选框必须共用同一列宽才能上下对齐 */
+const ROLE_COL = 'w-[112px]';
+
 interface PermModule {
   module: string;
   label: string;
@@ -119,7 +126,7 @@ interface PermModule {
 }
 
 export function AdminRolesPage() {
-  const { message } = App.useApp();
+  const toast = useToast();
   const { can, me, refresh } = useAdmin();
   const editable = can('role.write');
 
@@ -251,9 +258,9 @@ export function AdminRolesPage() {
        * 侧栏与按钮权限要等整页刷新才变。这里改调 context 的 refresh()。
        */
       if (rolesToSave.some((role) => role.code === me?.role)) refresh();
-      void message.success('权限已保存，立即生效');
+      toast.success('权限已保存，立即生效');
     } catch (e) {
-      void message.error((e as Error).message);
+      toast.error((e as Error).message);
     } finally {
       setBusy(false);
     }
@@ -278,92 +285,112 @@ export function AdminRolesPage() {
       {error && <AdminStaleError error={error} onRetry={reload} />}
 
       {editable && dirtyRoles.length > 0 && (
-        <div className="adm-action-bar adm-role-save-bar" role="status">
-          <span className="adm-action-hint">
+        <div
+          role="status"
+          data-testid="admin-role-save-bar"
+          className="mb-3 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/60 px-3.5 py-2.5"
+        >
+          <span className="min-w-0 flex-1 text-xs text-amber-900">
             有 {dirtyRoles.length} 个角色未保存：
             {dirtyRoles.map((role) => `${role.label} ${role.changedCount} 项`).join('、')}
           </span>
-          <div className="adm-action-buttons">
-            <Button type="default" className="adm-btn" disabled={busy} onClick={resetDraft}>
-              放弃变更
-            </Button>
-            <Button
-              type="primary"
-              className="adm-btn is-primary"
-              disabled={busy}
-              onClick={() => void saveAll()}
-            >
-              保存全部变更
-            </Button>
-          </div>
+          <Button variant="secondary" size="small" disabled={busy} onClick={resetDraft}>
+            放弃变更
+          </Button>
+          <Button variant="primary" size="small" disabled={busy} onClick={() => void saveAll()}>
+            {busy ? '保存中…' : '保存全部变更'}
+          </Button>
         </div>
       )}
 
-      <Panel isNarrow note={`共 ${allPermissions.length} 个权限点，内置角色不可删除，仅可调整权限`}>
-        <div className="adm-legend">
+      <Panel
+        title="权限矩阵"
+        note={`共 ${allPermissions.length} 个权限点，内置角色不可删除，仅可调整权限`}
+      >
+        {/* 图例：每个角色当前勾了多少，与右侧模块表同一份草稿 */}
+        <div className="mb-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 border-b border-border-table pb-3">
           {roles.map((r) => (
-            <span key={r.code} className="adm-legend-item">
+            <span key={r.code} className="flex items-baseline gap-1.5 text-xs text-text-secondary">
               {r.label}
-              <em>{(draft[r.code] ?? new Set()).size} / {allPermissions.length}</em>
+              <em className="font-medium not-italic tabular-nums text-text-primary">
+                {(draft[r.code] ?? new Set()).size} / {allPermissions.length}
+              </em>
             </span>
           ))}
         </div>
 
-        {modules.map((mod) => (
-          <div key={mod.module} className="adm-perm-module">
-            <div className="adm-perm-module-head">
-              <strong>{mod.label}</strong>
-              <div className="adm-perm-module-actions">
-                {roles.map((r) => {
-                  const set = draft[r.code] ?? new Set<string>();
-                  const all = mod.codes.every((c) => set.has(c));
-                  const none = mod.codes.every((c) => !set.has(c));
-                  return (
-                    <Button
-                      key={r.code}
-                      type="text"
-                      className={`adm-perm-all-btn${all ? ' is-on' : ''}${none ? ' is-off' : ''}`}
-                      onClick={() => toggleModule(r.code, mod.codes)}
-                      disabled={!editable}
-                      title={`${r.label}：全选/全不选`}
-                    >
-                      {r.label}
-                    </Button>
-                  );
-                })}
+        <div className="flex flex-col gap-4">
+          {modules.map((mod) => (
+            <section key={mod.module}>
+              {/* 模块头：每个角色一个「全选 / 全不选」的快捷切换 */}
+              <div className="flex items-center gap-3 border-b border-border-table pb-1.5">
+                <strong className="min-w-0 flex-1 text-xs font-semibold text-text-primary">
+                  {mod.label}
+                </strong>
+                <div className="flex shrink-0">
+                  {roles.map((r) => {
+                    const set = draft[r.code] ?? new Set<string>();
+                    const all = mod.codes.every((c) => set.has(c));
+                    const none = mod.codes.every((c) => !set.has(c));
+                    return (
+                      <div key={r.code} className={cx(ROLE_COL, 'shrink-0')}>
+                        <Button
+                          variant="ghost"
+                          size="xs"
+                          disabled={!editable}
+                          aria-pressed={all}
+                          className={cx(
+                            all && 'text-accent-700',
+                            none && 'text-text-placeholder',
+                          )}
+                          onClick={() => toggleModule(r.code, mod.codes)}
+                        >
+                          {all ? '全不选' : '全选'}
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
 
-            <div className="adm-perm-list">
               {mod.codes.map((code) => (
                 <div
                   key={code}
-                  className={`adm-perm-row${HIGH_RISK.has(code) ? ' is-high-risk' : ''}`}
+                  className={cx(
+                    'flex items-center gap-3 border-b border-border-table/60 py-1.5 last:border-b-0',
+                    HIGH_RISK.has(code) && 'bg-rose-50/30',
+                  )}
                 >
-                  <div className="adm-perm-name">
-                    {PERMISSION_LABELS[code] ?? code}
-                    {HIGH_RISK.has(code) && <span className="adm-perm-risk">高危</span>}
-                    <code className="adm-perm-code">{code}</code>
+                  <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                    <span className="truncate text-xs text-text-primary">
+                      {PERMISSION_LABELS[code] ?? code}
+                    </span>
+                    {HIGH_RISK.has(code) && (
+                      <Chip variant="caption" color="orange">
+                        高危
+                      </Chip>
+                    )}
+                    <code className="truncate font-mono text-[11px] text-text-placeholder">{code}</code>
                   </div>
-                  <div className="adm-perm-roles">
+                  <div className="flex shrink-0">
                     {roles.map((r) => (
-                      <Checkbox
-                        key={r.code}
-                        checked={(draft[r.code] ?? new Set()).has(code)}
-                        onChange={() => toggle(r.code, code)}
-                        disabled={!editable}
-                      >
-                        {r.label}
-                      </Checkbox>
+                      <div key={r.code} className={cx(ROLE_COL, 'shrink-0')}>
+                        <CheckBox
+                          size="sm"
+                          checked={(draft[r.code] ?? new Set()).has(code)}
+                          disabled={!editable}
+                          ariaLabel={`${r.label} · ${PERMISSION_LABELS[code] ?? code}`}
+                          onChange={() => toggle(r.code, code)}
+                        />
+                      </div>
                     ))}
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-        ))}
+            </section>
+          ))}
+        </div>
       </Panel>
-
     </>
   );
 }

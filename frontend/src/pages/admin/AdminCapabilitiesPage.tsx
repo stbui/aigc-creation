@@ -1,24 +1,24 @@
 import { useMemo, useState } from 'react';
-import { App, Button, Input, Select, Table, Tooltip } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
 import { useSearchParams } from 'react-router-dom';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
 import { adminCapabilitiesApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
+import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
+import { HoverTip, SelectBox, TextArea, TextInput } from '../../admin-ui/controls';
 import {
-  AdminListError,
-  AdminListLoading,
   AdminStaleError,
   ConfirmAction,
   useAdminResource,
   useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
 import {
-  AdminEmpty,
   AppliedFilters,
   FilterActions,
   FilterBar,
   PageHeader,
   Panel,
+  StatusTag,
   type AppliedFilter,
 } from '../../components/admin/PageHeader';
 import { RUNTIME_LABELS } from '../../lib/constants';
@@ -38,9 +38,12 @@ import type { AdminCapabilityControl } from '../../types/api';
  *
  * 下架**必须填原因**：原因会原样展示给 C 端用户并写进审计。只说「已下线」
  * 只能让用户去问客服，写清「云端通道维护中，预计 2 小时恢复」才是可自助的。
+ *
+ * 改造 (2026-10-30) 只换渲染层：筛选为客户端过滤（不请求后端），URL 同步、
+ * 三态分家、下线必须填原因逐条保留。
  */
 export function AdminCapabilitiesPage() {
-  const { message } = App.useApp();
+  const toast = useToast();
   const { can } = useAdmin();
   /** 只有 capability.write 能上下线；capability.read 只读 */
   const writable = can('capability.write');
@@ -127,18 +130,18 @@ export function AdminCapabilitiesPage() {
     if (!offline) return;
     const text = reason.trim();
     if (!text) {
-      message.warning('下架必须填写原因，用户会看到它');
+      toast.warning('下架必须填写原因，用户会看到它');
       return;
     }
     setSaving(offline.capabilityId);
     try {
       await adminCapabilitiesApi.set(offline.capabilityId, false, text);
-      message.success(`${offline.name} 已下线，C 端立即生效`);
+      toast.success(`${offline.name} 已下线，C 端立即生效`);
       setOffline(null);
       setReason('');
       await reload();
     } catch (e) {
-      message.error((e as Error).message || '下线失败');
+      toast.error((e as Error).message || '下线失败');
     } finally {
       setSaving(null);
     }
@@ -149,110 +152,104 @@ export function AdminCapabilitiesPage() {
     setSaving(row.capabilityId);
     try {
       await adminCapabilitiesApi.set(row.capabilityId, true);
-      message.success(`${row.name} 已上线`);
+      toast.success(`${row.name} 已上线`);
       await reload();
     } catch (e) {
-      message.error((e as Error).message || '上线失败');
+      toast.error((e as Error).message || '上线失败');
     } finally {
       setSaving(null);
     }
   };
 
-  const columns: ColumnsType<AdminCapabilityControl> = [
+  const columns: Array<AdminColumn<AdminCapabilityControl>> = [
     {
-      title: '能力',
       key: 'name',
+      title: '能力',
       width: 200,
-      render: (_, row) => (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <span style={{ fontWeight: 600 }}>{row.name}</span>
-          <code style={{ fontSize: 12, color: 'var(--text-muted)' }}>{row.capabilityId}</code>
+      render: (row) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="font-medium">{row.name}</span>
+          <code className="font-mono text-[11px] text-text-tertiary">{row.capabilityId}</code>
         </div>
       ),
     },
-    { title: '分组', dataIndex: 'group', key: 'group', width: 120 },
+    { key: 'group', title: '分组', width: 120, render: (row) => row.group },
     {
-      title: '模态',
-      dataIndex: 'modality',
       key: 'modality',
+      title: '模态',
       width: 90,
-      render: (v: string) => <code style={{ fontSize: 12 }}>{v}</code>,
-    },
-    {
-      title: '实现程度',
-      dataIndex: 'mode',
-      key: 'mode',
-      width: 110,
-      render: (v: string) => (
-        <Tooltip title={v === 'real' ? '已接入真实模型通道' : '参考站有、本项目未实现'}>
-          <span className={`adm-tag ${v === 'real' ? 'is-success' : 'is-warning'}`}>
-            <span className="adm-tag-dot" aria-hidden="true" />
-            {v === 'real' ? '已接入' : '规划中'}
-          </span>
-        </Tooltip>
+      render: (row) => (
+        <code className="font-mono text-[11px] text-text-secondary">{row.modality}</code>
       ),
     },
     {
-      title: '当前结论',
+      key: 'mode',
+      title: '实现程度',
+      width: 110,
+      render: (row) => (
+        <HoverTip tip={row.mode === 'real' ? '已接入真实模型通道' : '参考站有、本项目未实现'}>
+          <StatusTag
+            status="mode"
+            tone={row.mode === 'real' ? 'success' : 'warn'}
+            label={row.mode === 'real' ? '已接入' : '规划中'}
+          />
+        </HoverTip>
+      ),
+    },
+    {
       key: 'runtime',
+      title: '当前结论',
       width: 170,
-      render: (_, row) => {
+      render: (row) => {
         const eff = row.runtime?.effective ?? 'unavailable';
-        const tone = eff === 'remote' ? 'is-success' : 'is-danger';
         return (
-          <Tooltip title={row.runtime?.reason || ''}>
-            <span className={`adm-tag ${tone}`}>
-              <span className="adm-tag-dot" aria-hidden="true" />
-              {RUNTIME_LABELS[eff] ?? eff}
-            </span>
-          </Tooltip>
+          <HoverTip tip={row.runtime?.reason || '尚无运行结论'}>
+            <StatusTag
+              status="runtime"
+              tone={eff === 'remote' ? 'success' : 'danger'}
+              label={RUNTIME_LABELS[eff] ?? eff}
+            />
+          </HoverTip>
         );
       },
     },
     {
-      title: '状态',
       key: 'enabled',
+      title: '状态',
       width: 120,
-      render: (_, row) =>
+      render: (row) =>
         row.enabled ? (
-          <span className="adm-tag is-success">
-            <span className="adm-tag-dot" aria-hidden="true" />
-            上线中
-          </span>
+          <StatusTag status="enabled" tone="success" label="上线中" />
         ) : (
-          <Tooltip title={row.reason || ''}>
-            <span className="adm-tag is-danger">
-              <span className="adm-tag-dot" aria-hidden="true" />
-              已下线
-            </span>
-          </Tooltip>
+          <HoverTip tip={row.reason || '未填写下线原因'}>
+            <StatusTag status="disabled" tone="danger" label="已下线" />
+          </HoverTip>
         ),
     },
     {
-      title: '最后修改',
       key: 'updated',
+      title: '最后修改',
       width: 180,
-      render: (_, row) =>
+      render: (row) =>
         row.updatedAt ? (
-          <div style={{ display: 'flex', flexDirection: 'column', fontSize: 12 }}>
+          <div className="flex flex-col text-xs">
             <span>{new Date(row.updatedAt).toLocaleString('zh-CN')}</span>
-            <span style={{ color: 'var(--text-muted)' }}>{row.updatedBy ?? '-'}</span>
+            <span className="text-[11px] text-text-tertiary">{row.updatedBy ?? '-'}</span>
           </div>
         ) : (
-          <span style={{ color: 'var(--text-muted)' }}>从未调整</span>
+          <span className="text-text-placeholder">从未调整</span>
         ),
     },
     {
-      title: '操作',
       key: 'ops',
+      title: '操作',
       width: 120,
-      render: (_, row) => (
-        <Tooltip title={writable ? undefined : '当前账号无 capability.write 权限'}>
+      render: (row) => {
+        const button = (
           <Button
             size="small"
-            danger={row.enabled}
-            loading={saving === row.capabilityId}
-            disabled={!writable}
+            variant={row.enabled ? 'danger' : 'secondary'}
+            disabled={!writable || saving === row.capabilityId}
             onClick={() => {
               if (row.enabled) {
                 setReason('');
@@ -262,10 +259,12 @@ export function AdminCapabilitiesPage() {
               }
             }}
           >
-            {row.enabled ? '下线' : '上线'}
+            {saving === row.capabilityId ? '处理中…' : row.enabled ? '下线' : '上线'}
           </Button>
-        </Tooltip>
-      ),
+        );
+        // 无写权限时把「为什么点不动」说清楚，不留一个灰按钮
+        return writable ? button : <HoverTip tip="当前账号无 capability.write 权限">{button}</HoverTip>;
+      },
     },
   ];
 
@@ -285,27 +284,31 @@ export function AdminCapabilitiesPage() {
         note={`显示 ${filteredRows.length} / ${rows.length} 项 ·「当前结论」由后台开关、逐能力路由与该模态的云端通道共同决定`}
       >
         <FilterBar>
-          <Input
-            className="adm-filter-input"
+          <TextInput
+            className="w-56"
             placeholder="能力名称 / ID / 模态"
             allowClear
             value={q}
-            onChange={(e) => setQ(e.target.value)}
+            onChange={setQ}
           />
-          <Select
-            className="adm-filter-select"
+          <SelectBox
+            className="w-40"
+            ariaLabel="按分组筛选"
             placeholder="全部分组"
             allowClear
             value={group || undefined}
             onChange={(value) => setGroup(value ?? '')}
             options={groupOptions}
           />
-          <Select
-            className="adm-filter-select"
+          <SelectBox
+            className="w-40"
+            ariaLabel="按运行结论筛选"
             placeholder="全部运行结论"
             allowClear
             value={runtime}
-            onChange={setRuntime}
+            onChange={(value) =>
+              setRuntime(value as 'remote' | 'disabled' | 'unavailable' | undefined)
+            }
             options={[
               { value: 'remote', label: RUNTIME_LABELS.remote },
               { value: 'disabled', label: RUNTIME_LABELS.disabled },
@@ -313,7 +316,7 @@ export function AdminCapabilitiesPage() {
             ]}
           />
           <FilterActions>
-            <Button type="default" className="adm-btn" onClick={resetFilters}>
+            <Button variant="secondary" size="small" onClick={resetFilters}>
               重置
             </Button>
           </FilterActions>
@@ -323,35 +326,32 @@ export function AdminCapabilitiesPage() {
         {/*
           三态必须分家 (2026-10-23): 之前加载中是裸 <p>加载中…</p>、失败态用的却是
           AdminEmpty —— 同一块区域把「没连上」说成「没有数据」, 运营会以为能力清单被清空了。
+          现在由表格统一处理：失败态带重试，空态说明「为什么空」。
         */}
         {error && rows.length > 0 && (
           <AdminStaleError error={error} onRetry={() => void reload()} />
         )}
-        {loading && rows.length === 0 ? (
-          <AdminListLoading tip="加载能力清单…" />
-        ) : error && rows.length === 0 ? (
-          <AdminListError error={error} onRetry={() => void reload()} />
-        ) : rows.length === 0 ? (
-          <AdminEmpty description="没有可管控的能力" />
-        ) : filteredRows.length === 0 ? (
-          <AdminEmpty
-            description="没有符合当前筛选的能力。"
-            action={
-              <Button type="default" className="adm-btn" onClick={resetFilters}>
+        <AdminDataTable<AdminCapabilityControl>
+          rows={filteredRows}
+          columns={columns}
+          rowKey={(row) => row.capabilityId}
+          loading={loading}
+          error={error}
+          onRetry={() => void reload()}
+          minWidth={960}
+          emptyText={
+            rows.length === 0
+              ? '没有可管控的能力'
+              : '没有符合当前筛选的能力。'
+          }
+          emptyAction={
+            rows.length > 0 && hasFilter ? (
+              <Button variant="secondary" size="small" onClick={resetFilters}>
                 清除筛选
               </Button>
-            }
-          />
-        ) : (
-          <Table
-            rowKey="capabilityId"
-            columns={columns}
-            dataSource={filteredRows}
-            pagination={false}
-            size="small"
-            scroll={{ x: 960 }}
-          />
-        )}
+            ) : undefined
+          }
+        />
       </Panel>
 
       <ConfirmAction
@@ -363,18 +363,19 @@ export function AdminCapabilitiesPage() {
         onCancel={() => setOffline(null)}
         onConfirm={() => void submitOffline()}
         description={
-          <p style={{ marginBottom: 8, color: 'var(--text-body)' }}>
+          <p className="text-xs text-text-secondary">
             下架后用户在 C 端会看到下方填写的「下线原因」，同时该能力不可提交。此操作会写入审计日志。
           </p>
         }
         impact={['C 端停止提交该能力', '下线原因展示给用户', '写操作审计（含操作人）']}
         extra={
-          <Input.TextArea
+          <TextArea
             value={reason}
-            onChange={(e) => setReason(e.target.value)}
+            onChange={setReason}
             rows={3}
             maxLength={200}
             showCount
+            ariaLabel="下线原因"
             placeholder="例如：云端通道维护中，预计 2 小时恢复"
           />
         }

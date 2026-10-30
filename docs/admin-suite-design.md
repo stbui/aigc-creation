@@ -26,7 +26,7 @@
 | 模型 | 模型配置 / 调用记录 / 能力管控 | `/admin/model-config` · `/admin/model-calls` · `/admin/capabilities` |
 | 数据安全 | 数据备份 / 保留期清理 | `/admin/backups` · `/admin/retention` |
 
-合计 29 页、8 组。菜单项的 `permission` 字段决定可见性，`AdminLayout` 只渲染当前角色有权限的项。
+合计 29 页、8 组。菜单项的 `permission` 字段决定可见性，外壳 `AdminBoardLayout` 只渲染当前角色有权限的项。
 
 ### 1.1 分组理由
 
@@ -175,8 +175,8 @@ SQLite provider 不支持 Prisma enum，`kind` / `status` / `type` 一律 String
 
 | 层 | 规范 |
 | --- | --- |
-| 外壳 | 单一 `AdminLayout`（antd `Layout`）。**禁止**复用 `AppLayout` / `SideRail` / `PromoBar`（C 端语义） |
-| 组件底座 | 通用骨架走 antd 原生组件（`PageHeader`/`FilterBar`/`StatCard`/`Panel`/`Empty`/`StatusTag` 基于 `Typography`/`Flex`/`Card`/`Tag`）；`adm-*` 只作业务布局 class，不要把通用组件退回自绘 `div/button/input` |
+| 外壳 | 单一 `admin-ui/shell/AdminBoardLayout`（BoardUI 单栏：侧栏 + 内容区）。**禁止**复用 `AppLayout` / `SideRail` / `PromoBar`（C 端语义） |
+| 组件底座 | 通用骨架走 `admin-ui/widgets/AdminChrome` 与 `admin-ui/primitives`（`PageHeader` / `FilterBar` / `StatCard` / `Panel` / `Empty` / `StatusTag`），表单控件走 `admin-ui/controls`；后台树内**不引 antd**，也不要把通用组件退回自绘 `div/button/input`。`adm-*` 只剩外壳骨架与值班塔，页面内不新增 |
 | 侧栏 | 分组折叠菜单，图标 lucide 20px，选中态 `var(--brand)` + `var(--brand-bg)`；数据源 `adminNav.ts` |
 | 列表页 | 页头（标题 + 主操作）→ 筛选条 → 表格 → 分页；`rowKey="id"`、`size="small"` |
 | 详情 | 一律抽屉，不跳独立路由，便于保留筛选态 |

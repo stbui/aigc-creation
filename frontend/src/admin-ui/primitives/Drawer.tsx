@@ -41,6 +41,7 @@ export function Drawer({
     >
       <Modal className="fixed inset-y-0 right-0 flex outline-none">
         <Dialog
+          data-testid="admin-drawer"
           className={cx(
             'flex h-full w-[min(var(--drawer-width),100vw)] flex-col bg-white shadow-2xl outline-none',
             'border-l border-border-table',

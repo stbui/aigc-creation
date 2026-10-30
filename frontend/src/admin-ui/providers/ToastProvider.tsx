@@ -117,6 +117,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             return (
               <div
                 key={item.id}
+                data-testid="admin-toast"
                 role={item.tone === 'error' ? 'alert' : 'status'}
                 className="pointer-events-auto flex items-start gap-2.5 rounded-xl border border-border-table bg-white p-3 shadow-lg"
               >

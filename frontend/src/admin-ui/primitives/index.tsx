@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { AlertTriangle, CheckCircle2, Info, Lock } from 'lucide-react';
 import { cx } from '../lib/cn';
 
 /**
@@ -28,6 +29,7 @@ export function Panel({
 }) {
   return (
     <section
+      data-testid="admin-panel"
       className={cx(
         'mb-3 rounded-xl border border-border-table bg-white',
         isNarrow && 'max-w-[760px]',
@@ -124,7 +126,7 @@ export function Descriptions({
 }) {
   const colClass = columns === 3 ? 'sm:grid-cols-3' : columns === 2 ? 'sm:grid-cols-2' : '';
   return (
-    <dl className={cx('grid grid-cols-1 gap-x-6 gap-y-3', colClass)}>
+    <dl data-testid="admin-desc" className={cx('grid grid-cols-1 gap-x-6 gap-y-3', colClass)}>
       {items.map((item, index) => (
         <div key={index} className="min-w-0">
           <dt className="text-xs text-text-tertiary">{item.label}</dt>
@@ -216,6 +218,51 @@ export function FormField({
       ) : (
         hint && <p className="text-xs text-text-tertiary">{hint}</p>
       )}
+    </div>
+  );
+}
+
+/**
+ * 页面级提示条。
+ *
+ * 后台大量结论是「这一屏不安全 / 这条链路是静默的」（支付通道缺凭据、
+ * 存储切到云端、备份失败），必须比正文更抢眼，又不能用弹窗打断操作。
+ * 四种语气固定，颜色只用 token 与语义色，不在这里新增色值。
+ */
+export function Notice({
+  tone = 'info',
+  title,
+  icon,
+  children,
+  className,
+}: {
+  tone?: 'info' | 'success' | 'warn' | 'danger' | 'locked';
+  title?: ReactNode;
+  /** 覆盖默认图标；传 null 表示不要图标 */
+  icon?: ReactNode;
+  children?: ReactNode;
+  className?: string;
+}) {
+  const meta = {
+    info: { Icon: Info, cls: 'border-sky-200 bg-sky-50 text-sky-900' },
+    success: { Icon: CheckCircle2, cls: 'border-emerald-200 bg-emerald-50 text-emerald-900' },
+    warn: { Icon: AlertTriangle, cls: 'border-amber-200 bg-amber-50 text-amber-900' },
+    danger: { Icon: AlertTriangle, cls: 'border-rose-200 bg-rose-50 text-rose-900' },
+    locked: { Icon: Lock, cls: 'border-border-table bg-background-secondary-default text-text-secondary' },
+  }[tone];
+
+  const rendered = icon === null ? null : (icon ?? <meta.Icon className="size-4 shrink-0" aria-hidden />);
+
+  return (
+    <div
+      role={tone === 'danger' ? 'alert' : 'status'}
+      className={cx('mb-3 flex items-start gap-2.5 rounded-xl border px-3.5 py-2.5', meta.cls, className)}
+    >
+      {rendered && <span className="mt-px shrink-0">{rendered}</span>}
+      <div className="min-w-0 flex-1 text-xs leading-5">
+        {title && <div className="font-semibold">{title}</div>}
+        {children}
+      </div>
     </div>
   );
 }

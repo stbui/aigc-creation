@@ -1,23 +1,23 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { App, Button, Input, Select, Table } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Download } from 'lucide-react';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
 import { adminOrdersApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
+import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
+import { Descriptions } from '../../admin-ui/primitives';
+import { SelectBox, TextInput } from '../../admin-ui/controls';
+import { cx } from '../../admin-ui/lib/cn';
 import {
   AdminDrawer,
-  AdminListError,
   AdminStaleError,
-  AdminListLoading,
   ConfirmAction,
-  adminPagination,
   useAdminDetailParam,
   useAdminList,
   useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
 import {
-  AdminEmpty,
   AppliedFilters,
   FilterActions,
   FilterBar,
@@ -112,8 +112,46 @@ const CHANNEL_LABELS: Record<string, string> = {
   wechat: '微信支付',
 };
 
+/** 详情抽屉里的小节标题：标题 + 一句口径说明 */
+function SectionTitle({ title, note }: { title: string; note?: string }) {
+  return (
+    <div className="mb-2 flex items-baseline gap-2 border-b border-border-table pb-1.5">
+      <strong className="text-xs font-semibold text-text-primary">{title}</strong>
+      {note && <span className="text-[11px] text-text-tertiary">{note}</span>}
+    </div>
+  );
+}
+
+/** 详情抽屉里的一条时间线记录：状态点 + 主行 + 灰色补充行 */
+function RecordRow({
+  head,
+  meta,
+  state = 'done',
+}: {
+  head: ReactNode;
+  meta: ReactNode;
+  /** 未成功的流水/退款用灰点：既保留时间线，又不假装它已经成立 */
+  state?: 'done' | 'pending';
+}) {
+  return (
+    <li className="flex items-start gap-2.5 px-3 py-2">
+      <span
+        className={cx(
+          'mt-1.5 size-1.5 shrink-0 rounded-full',
+          state === 'done' ? 'bg-accent-500' : 'bg-neutral-300',
+        )}
+        aria-hidden
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block text-xs text-text-primary">{head}</span>
+        <span className="mt-0.5 block text-[11px] leading-4 text-text-tertiary">{meta}</span>
+      </span>
+    </li>
+  );
+}
+
 export function AdminOrdersPage() {
-  const { message } = App.useApp();
+  const toast = useToast();
   const { can } = useAdmin();
 
   /*
@@ -364,20 +402,20 @@ export function AdminOrdersPage() {
     if (!action) return;
     const trimmed = reason.trim();
     if (!trimmed) {
-      void message.warning('请填写操作原因，它会写入操作审计');
+      toast.warning('请填写操作原因，它会写入操作审计');
       return;
     }
     setBusy(true);
     try {
       if (action.kind === 'markPaid') {
         const r = await adminOrdersApi.markPaid(action.row.id);
-        void message.success(
+        toast.success(
           r.idempotentHit ? `订单已是已支付状态（${r.message ?? '幂等命中'}）` : '已标记为已支付并发放权益',
         );
       } else {
         const cents = yuanToCents(refundYuan);
         if (cents === null) {
-          void message.error('退款金额格式不正确');
+          toast.error('退款金额格式不正确');
           setBusy(false);
           return;
         }
@@ -388,24 +426,24 @@ export function AdminOrdersPage() {
          * 退款回调端点时的既有边界, 装作成功会让财务提前销账。
          */
         if (r.state === 'processing') {
-          void message.warning(r.message || '渠道已受理退款但仍在处理中，请到渠道商户后台确认');
+          toast.warning(r.message || '渠道已受理退款但仍在处理中，请到渠道商户后台确认');
         } else if (r.creditsUnreclaimable > 0) {
           /*
            * 积分回收结果必须显式说出来: 用户已经花掉的积分扣不回来,
            * 只提示"退款成功"会让财务以为权益也已全额回收。
            */
-          void message.warning(
+          toast.warning(
             `已退款 ¥${yuan(cents)}；回收积分 ${r.creditsReclaimed}，另有 ${r.creditsUnreclaimable} 积分已被消耗无法回收`,
           );
         } else {
-          void message.success(`已退款 ¥${yuan(cents)}，回收积分 ${r.creditsReclaimed}`);
+          toast.success(`已退款 ¥${yuan(cents)}，回收积分 ${r.creditsReclaimed}`);
         }
       }
       setAction(null);
       setDetailId(null);
       reload();
     } catch (e) {
-      void message.error(e instanceof Error ? e.message : '操作失败');
+      toast.error(e instanceof Error ? e.message : '操作失败');
     } finally {
       setBusy(false);
     }
@@ -424,9 +462,9 @@ export function AdminOrdersPage() {
         from: from || undefined,
         to: to || undefined,
       });
-      void message.success('导出已开始下载');
+      toast.success('导出已开始下载');
     } catch (e) {
-      void message.error(e instanceof Error ? e.message : '导出失败');
+      toast.error(e instanceof Error ? e.message : '导出失败');
     } finally {
       setExporting(false);
     }
@@ -435,7 +473,7 @@ export function AdminOrdersPage() {
   const runBatchMarkPaid = async () => {
     const trimmed = reason.trim();
     if (!trimmed) {
-      void message.warning('请填写操作原因，它会写入操作审计');
+      toast.warning('请填写操作原因，它会写入操作审计');
       return;
     }
     if (selected.length === 0) return;
@@ -447,57 +485,62 @@ export function AdminOrdersPage() {
       setSelected([]);
       reload();
     } catch (e) {
-      void message.error(e instanceof Error ? e.message : '批量核销失败');
+      toast.error(e instanceof Error ? e.message : '批量核销失败');
     } finally {
       setBusy(false);
     }
   };
 
-  const columns: ColumnsType<AdminOrderRow> = [
+  const columns: Array<AdminColumn<AdminOrderRow>> = [
     {
-      title: '订单号 / 下单时间',
       key: 'orderNo',
+      title: '订单号 / 下单时间',
       width: 180,
-      render: (_: unknown, row) => (
-        <div className="adm-cell-stack">
-          <Link className="adm-link adm-cell-clip" to={adminOrderDetailHref(row.id)}>
-            <code>{row.orderNo}</code>
+      render: (row) => (
+        <div className="flex flex-col gap-0.5">
+          <Link
+            className="truncate rounded font-mono text-xs font-medium text-accent-700 hover:underline"
+            to={adminOrderDetailHref(row.id)}
+          >
+            {row.orderNo}
           </Link>
-          <span className="adm-cell-sub">
+          <span className="text-[11px] text-text-tertiary">
             {new Date(row.createdAt).toLocaleString('zh-CN')}
           </span>
         </div>
       ),
     },
     {
-      title: '用户',
       key: 'user',
+      title: '用户',
       width: 170,
-      render: (_: unknown, row) => (
-        <Link className="adm-link adm-cell-clip" to={adminUserDetailHref(row.userId)}>
+      render: (row) => (
+        <Link
+          className="block max-w-[160px] truncate text-xs text-accent-700 hover:underline"
+          to={adminUserDetailHref(row.userId)}
+        >
           {row.userEmail}
         </Link>
       ),
     },
     {
-      title: '状态 / 渠道',
-      dataIndex: 'status',
       key: 'status',
+      title: '状态 / 渠道',
       width: 120,
-      render: (v: string, row) => (
-        <div className="adm-cell-stack">
-          <StatusTag status={v} label={STATUS_LABEL_OVERRIDE[v]} />
-          <span className="adm-cell-sub adm-cell-clip">
+      render: (row) => (
+        <div className="flex flex-col items-start gap-0.5">
+          <StatusTag status={row.status} label={STATUS_LABEL_OVERRIDE[row.status]} />
+          <span className="max-w-[110px] truncate text-[11px] text-text-tertiary">
             {row.channel ? CHANNEL_LABELS[row.channel] ?? row.channel : '—'}
           </span>
         </div>
       ),
     },
     {
-      title: '实付 / 优惠',
       key: 'paid',
-      width: 140,
-      render: (_: unknown, row) => {
+      title: '实付 / 优惠',
+      width: 150,
+      render: (row) => {
         const extra = [
           row.refundedCents > 0 ? `已退 ¥ ${yuan(row.refundedCents)}` : '',
           row.discountCents > 0 ? `优惠 -¥ ${yuan(row.discountCents)}` : '',
@@ -505,10 +548,14 @@ export function AdminOrdersPage() {
           .filter(Boolean)
           .join(' · ');
         return (
-          <div className="adm-cell-stack">
-            <span>¥ {yuan(row.paidCents)}</span>
+          <div className="flex flex-col gap-0.5">
+            <span className="tabular-nums">¥ {yuan(row.paidCents)}</span>
             <span
-              className={`adm-cell-sub adm-cell-clip${row.refundedCents > 0 ? ' adm-text-danger' : ''}`}
+              className={
+                row.refundedCents > 0
+                  ? 'max-w-[140px] truncate text-[11px] text-rose-600'
+                  : 'max-w-[140px] truncate text-[11px] text-text-tertiary'
+              }
               title={extra || undefined}
             >
               {extra || '无优惠'}
@@ -518,45 +565,51 @@ export function AdminOrdersPage() {
       },
     },
     {
-      title: '商品 / 积分',
       key: 'items',
+      title: '商品 / 积分',
       width: 180,
-      render: (_: unknown, row) => {
+      render: (row) => {
         const credits = row.grantedCredits > 0 ? `+${row.grantedCredits} 积分` : '无积分';
         return row.membershipPlanName ? (
-          <div className="adm-cell-stack">
-            <span className="adm-cell-clip" title={row.membershipPlanName}>
+          <div className="flex flex-col gap-0.5">
+            <span className="max-w-[170px] truncate" title={row.membershipPlanName}>
               {row.membershipPlanName}
             </span>
-            <span className="adm-cell-sub adm-cell-clip" title={`${row.membershipPlanCode} · ${credits}`}>
+            <span
+              className="max-w-[170px] truncate text-[11px] text-text-tertiary"
+              title={`${row.membershipPlanCode} · ${credits}`}
+            >
               {row.membershipPlanCode} · {credits}
             </span>
           </div>
         ) : (
-          <div className="adm-cell-stack">
-            <span className="adm-cell-sub">{row.itemCount} 件商品</span>
-            <span className="adm-cell-sub">{credits}</span>
+          <div className="flex flex-col gap-0.5 text-[11px] text-text-tertiary">
+            <span>{row.itemCount} 件商品</span>
+            <span>{credits}</span>
           </div>
         );
       },
     },
     {
-      title: '支付时间',
-      dataIndex: 'paidAt',
       key: 'paidAt',
-      width: 140,
-      render: (v: string | null) =>
-        v ? new Date(v).toLocaleString('zh-CN') : <span className="adm-cell-sub">未支付</span>,
+      title: '支付时间',
+      width: 150,
+      render: (row) =>
+        row.paidAt ? (
+          <span className="text-xs tabular-nums">{new Date(row.paidAt).toLocaleString('zh-CN')}</span>
+        ) : (
+          <span className="text-[11px] text-text-tertiary">未支付</span>
+        ),
     },
     {
-      title: '',
       key: 'ops',
+      title: '',
       width: 130,
       /* 固定在最右, 保证滚动时高频动作仍可见 */
       fixed: 'right',
-      render: (_: unknown, row) => (
-        <div className="adm-ops">
-          <Button type="link" className="adm-link" onClick={() => setDetailId(row.id)}>
+      render: (row) => (
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="small" onClick={() => setDetailId(row.id)}>
             详情
           </Button>
           {/*
@@ -564,7 +617,7 @@ export function AdminOrdersPage() {
            * 后端硬校验, 给一个点不动的按钮只会让人反复试。
            */}
           {row.status === 'pending' && can('order.mark_paid') && (
-            <Button type="link" className="adm-link" onClick={() => openAction('markPaid', row)}>
+            <Button variant="ghost" size="small" onClick={() => openAction('markPaid', row)}>
               核销
             </Button>
           )}
@@ -572,8 +625,9 @@ export function AdminOrdersPage() {
             row.paidCents > row.refundedCents &&
             can('order.refund') && (
               <Button
-                type="link" danger
-                className="adm-link is-danger"
+                variant="ghost"
+                size="small"
+                className="text-rose-600"
                 onClick={() => openAction('refund', row)}
               >
                 退款
@@ -597,12 +651,12 @@ export function AdminOrdersPage() {
         actions={
           can('data.export') ? (
             <Button
-              type="default"
-              className="adm-btn"
-              onClick={() => void exportCsv()}
+              variant="secondary"
+              size="small"
+              leadingIcon={Download}
               disabled={exporting}
+              onClick={() => void exportCsv()}
             >
-              <Download size={14} style={{ marginRight: 4 }} />
               {exporting ? '导出中…' : '导出 CSV'}
             </Button>
           ) : undefined
@@ -610,36 +664,40 @@ export function AdminOrdersPage() {
       />
 
       <FilterBar>
-        <Select
-          className="adm-filter-select"
+        <SelectBox
+          className="w-32"
+          ariaLabel="按状态筛选"
           placeholder="状态"
           allowClear
           value={status}
           onChange={setStatus}
           options={STATUS_OPTIONS}
         />
-        <Input
-          className="adm-filter-input"
+        <TextInput
+          className="w-44"
+          ariaLabel="按订单号搜索"
           placeholder="订单号"
           value={orderNo}
-          onChange={(e) => setOrderNo(e.target.value)}
-          onPressEnter={applyQuery}
+          onChange={setOrderNo}
+          onEnter={applyQuery}
           allowClear
         />
         {/*
          * 邮箱而非用户 ID: 客服拿到的是用户自报的邮箱。用 ID 意味着先查用户
          * 再查订单, 多一步且该用户未必记得自己的 id。
          */}
-        <Input
-          className="adm-filter-input"
+        <TextInput
+          className="w-52"
+          ariaLabel="按用户邮箱搜索"
           placeholder="用户邮箱"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          onPressEnter={applyQuery}
+          onChange={setEmail}
+          onEnter={applyQuery}
           allowClear
         />
-        <Select
-          className="adm-filter-select"
+        <SelectBox
+          className="w-32"
+          ariaLabel="按渠道筛选"
           placeholder="渠道"
           allowClear
           value={channel}
@@ -650,33 +708,28 @@ export function AdminOrdersPage() {
          * 退款状态是 Refund 维度，订单仍可能显示 paid —— 这正是渠道异步退款
          * 需要人工核对的场景。告警中心 `?refundState=processing` 直达这里。
          */}
-        <Select
-          className="adm-filter-select"
+        <SelectBox
+          className="w-36"
+          ariaLabel="按退款状态筛选"
           placeholder="退款状态"
           allowClear
           value={refundState}
           onChange={setRefundState}
           options={REFUND_STATE_OPTIONS}
         />
-        <Input
-          className="adm-filter-input"
+        <TextInput
+          className="w-40"
+          ariaLabel="开始日期"
           type="date"
           value={from}
-          onChange={(e) => setFrom(e.target.value)}
-          placeholder="开始日期"
+          onChange={setFrom}
         />
-        <Input
-          className="adm-filter-input"
-          type="date"
-          value={to}
-          onChange={(e) => setTo(e.target.value)}
-          placeholder="结束日期"
-        />
+        <TextInput className="w-40" ariaLabel="结束日期" type="date" value={to} onChange={setTo} />
         <FilterActions>
-          <Button type="primary" className="adm-btn is-primary" onClick={applyQuery}>
+          <Button variant="primary" size="small" onClick={applyQuery}>
             查询
           </Button>
-          <Button type="default" className="adm-btn" onClick={reset}>
+          <Button variant="secondary" size="small" onClick={reset}>
             重置
           </Button>
         </FilterActions>
@@ -686,82 +739,70 @@ export function AdminOrdersPage() {
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
       {error && data && <AdminStaleError error={error} onRetry={reload} />}
 
-      <Panel
-        title="订单列表"
-        note="日期筛选含结束当天；导出口径与当前筛选一致"
-      >
-        {loading && !data ? (
-          <AdminListLoading tip="加载订单…" />
-        ) : error && !data ? (
-          <AdminListError error={error} onRetry={reload} />
-        ) : (
-          <>
-            {selected.length > 0 && (
-              <div className="adm-bulk-bar">
-                <span className="adm-bulk-count">已选 {selected.length} 单</span>
-                {can('order.mark_paid') && (
-                  <Button
-                    type="primary"
-                    className="adm-btn is-primary"
-                    disabled={busy}
-                    onClick={() => {
-                      setReason('');
-                      setBatchOpen(true);
-                    }}
-                  >
-                    批量核销
-                  </Button>
-                )}
-                <Button type="link" className="adm-link" onClick={() => setSelected([])}>
-                  清空选择
-                </Button>
-              </div>
-            )}
-            {(list?.items.length ?? 0) === 0 ? (
-              <AdminEmpty
-                description={
-                  hasFilter
-                    ? '没有符合条件的订单。清除筛选或换一个时间范围试试。'
-                    : '还没有订单。用户下单后会出现在这里。'
-                }
-                action={
-                  hasFilter ? (
-                    <Button type="default" className="adm-btn" onClick={reset}>
-                      清除筛选
-                    </Button>
-                  ) : undefined
-                }
-              />
-            ) : (
-              <>
-                <Table<AdminOrderRow>
-                rowKey="id"
+      <Panel title="订单列表" note="日期筛选含结束当天；导出口径与当前筛选一致">
+        {/* 批量条贴在表头上方: 勾选后要立即看到「能动多少笔」 */}
+        {selected.length > 0 && (
+          <div
+            role="status"
+            className="mb-3 flex items-center gap-3 rounded-lg border border-accent-200 bg-accent-50 px-3 py-2"
+          >
+            <span className="min-w-0 flex-1 text-xs text-accent-900">已选 {selected.length} 单</span>
+            {can('order.mark_paid') && (
+              <Button
+                variant="primary"
                 size="small"
-                columns={columns}
-                dataSource={list?.items ?? []}
-                loading={loading}
-                scroll={{ x: 1080 }}
-                rowSelection={{
-                  selectedRowKeys: selected,
-                  onChange: (keys) => setSelected(keys as string[]),
-                  // 只有待支付能核销; 已支付/已退款选中后再点批量核销只会得到一堆失败项
-                  getCheckboxProps: (row) => ({ disabled: row.status !== 'pending' }),
+                disabled={busy}
+                onClick={() => {
+                  setReason('');
+                  setBatchOpen(true);
                 }}
-                pagination={adminPagination({
-                  current: list?.page ?? 1,
-                  pageSize: list?.pageSize ?? 20,
-                  total: list?.total ?? 0,
-                  // 翻页清空选择: 批量核销/退款只应对看得见的行下手
-                  onChange: (page, size) => {
-                    setSelected([]);
-                    setPage(page, size);
-                  },
-                })}
-                />
-              </>
+              >
+                批量核销
+              </Button>
             )}
-          </>
+            <Button variant="ghost" size="small" onClick={() => setSelected([])}>
+              清空选择
+            </Button>
+          </div>
         )}
+
+        <AdminDataTable<AdminOrderRow>
+          rows={list?.items ?? []}
+          columns={columns}
+          rowKey={(row) => row.id}
+          loading={loading}
+          error={error}
+          onRetry={reload}
+          minWidth={1090}
+          selectable
+          selected={selected}
+          onSelectedChange={setSelected}
+          // 只有待支付能核销; 已支付/已退款选中后再点批量核销只会得到一堆失败项
+          isRowSelectable={(row) => row.status === 'pending'}
+          pagination={{
+            current: list?.page ?? 1,
+            pageSize: list?.pageSize ?? 20,
+            total: list?.total ?? 0,
+            unit: '单',
+            // 翻页清空选择: 批量核销/退款只应对看得见的行下手
+            onChange: (page, size) => {
+              setSelected([]);
+              setPage(page, size);
+            },
+          }}
+          emptyText={
+            hasFilter
+              ? '没有符合条件的订单。清除筛选或换一个时间范围试试。'
+              : '还没有订单。用户下单后会出现在这里。'
+          }
+          emptyAction={
+            hasFilter ? (
+              <Button variant="secondary" size="small" onClick={reset}>
+                清除筛选
+              </Button>
+            ) : undefined
+          }
+        />
       </Panel>
 
       <AdminDrawer<AdminOrderDetail>
@@ -780,178 +821,213 @@ export function AdminOrdersPage() {
           // 无可执行动作时不渲染空页脚，避免详情底部留下无意义的空白操作条
           if (!canMarkPaid && !canRefund) return null;
           return (
-            <div className="adm-ops">
+            <>
               {canMarkPaid && (
                 <Button
-                  type="primary"
-                  className="adm-btn is-primary"
+                  variant="primary"
+                  size="small"
                   onClick={() => openAction('markPaid', row)}
                 >
                   标记为已支付
                 </Button>
               )}
               {canRefund && (
-                <Button
-                  type="primary" danger
-                  className="adm-btn is-danger"
-                  onClick={() => openAction('refund', row)}
-                >
+                <Button variant="danger" size="small" onClick={() => openAction('refund', row)}>
                   退款
                 </Button>
               )}
-            </div>
+            </>
           );
         }}
       >
         {(d) => (
-          <>
-            <div className="adm-section">
-              <div className="adm-section-title">
-                订单概要
-                <span className="adm-panel-note">
-                  金额以「分」存储，展示按「元」
-                </span>
-              </div>
-              <dl className="adm-desc">
-                <dt>订单号</dt>
-                <dd>
-                  <code>{d.orderNo}</code>
-                </dd>
-                <dt>状态</dt>
-                <dd>
-                  <StatusTag status={d.status} label={STATUS_LABEL_OVERRIDE[d.status]} />
-                </dd>
-                <dt>用户</dt>
-                <dd>
-                  <div>
-                    {d.user.name ? `${d.user.name} · ` : ''}
-                    <Link className="adm-link" to={adminUserDetailHref(d.userId)}>
-                      {d.user.email}
-                    </Link>
-                  </div>
-                  <div className="adm-relation-links">
-                    <Link to={adminCreditHref({ userId: d.userId, email: d.user.email })}>
-                      积分账本
-                    </Link>
-                    <Link to={adminTasksHref({ userId: d.userId })}>任务记录</Link>
-                  </div>
-                </dd>
-                <dt>订单金额</dt>
-                <dd>¥ {yuan(d.totalCents)}（{d.totalCents} 分）</dd>
-                <dt>优惠</dt>
-                <dd>
-                  ¥ {yuan(d.discountCents)}
-                  {d.coupon && ` · 券 ${d.coupon.code}`}
-                  {d.campaign && ` · 活动 ${d.campaign.name}`}
-                </dd>
-                <dt>实付</dt>
-                <dd>¥ {yuan(d.paidCents)}</dd>
-                <dt>已退</dt>
-                <dd>¥ {yuan(d.refundedCents)}</dd>
-                <dt>发放积分</dt>
-                <dd>{d.grantedCredits}</dd>
-                <dt>渠道</dt>
-                <dd>{d.channel ? (CHANNEL_LABELS[d.channel] ?? d.channel) : '—'}</dd>
-                <dt>下单时间</dt>
-                <dd>{new Date(d.createdAt).toLocaleString('zh-CN')}</dd>
-                <dt>支付时间</dt>
-                <dd>{d.paidAt ? new Date(d.paidAt).toLocaleString('zh-CN') : '未支付'}</dd>
-                <dt>支付时限</dt>
-                <dd>{new Date(d.expiresAt).toLocaleString('zh-CN')}</dd>
-                {d.membershipPlan && (
-                  <>
-                    <dt>会员套餐</dt>
-                    <dd>
-                      {d.membershipPlan.name}（{d.membershipPlan.durationDays} 天 · 每月{' '}
-                      {d.membershipPlan.monthlyCredits} 积分）
-                      {d.membershipAppliedAt ? (
-                        <span className="adm-cell-sub"> · 权益已发放</span>
-                      ) : (
-                        <span className="adm-cell-sub adm-text-danger">
-                          {' '}
-                          · 权益尚未发放
+          <div className="flex flex-col gap-6">
+            <section>
+              <SectionTitle title="订单概要" note="金额以「分」存储，展示按「元」" />
+              <Descriptions
+                columns={2}
+                items={[
+                  {
+                    label: '订单号',
+                    value: <code className="font-mono text-xs">{d.orderNo}</code>,
+                  },
+                  {
+                    label: '状态',
+                    value: <StatusTag status={d.status} label={STATUS_LABEL_OVERRIDE[d.status]} />,
+                  },
+                  {
+                    label: '用户',
+                    value: (
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <span>
+                          {d.user.name ? `${d.user.name} · ` : ''}
+                          <Link
+                            className="text-accent-700 hover:underline"
+                            to={adminUserDetailHref(d.userId)}
+                          >
+                            {d.user.email}
+                          </Link>
                         </span>
-                      )}
-                    </dd>
-                  </>
-                )}
-              </dl>
-            </div>
+                        <Link
+                          className="text-[11px] text-accent-600 hover:underline"
+                          to={adminCreditHref({ userId: d.userId, email: d.user.email })}
+                        >
+                          积分账本
+                        </Link>
+                        <Link
+                          className="text-[11px] text-accent-600 hover:underline"
+                          to={adminTasksHref({ userId: d.userId })}
+                        >
+                          任务记录
+                        </Link>
+                      </div>
+                    ),
+                  },
+                  {
+                    label: '订单金额',
+                    value: (
+                      <span className="tabular-nums">
+                        ¥ {yuan(d.totalCents)}（{d.totalCents} 分）
+                      </span>
+                    ),
+                  },
+                  {
+                    label: '优惠',
+                    value: (
+                      <span>
+                        ¥ {yuan(d.discountCents)}
+                        {d.coupon ? ` · 券 ${d.coupon.code}` : ''}
+                        {d.campaign ? ` · 活动 ${d.campaign.name}` : ''}
+                      </span>
+                    ),
+                  },
+                  { label: '实付', value: <span className="tabular-nums">¥ {yuan(d.paidCents)}</span> },
+                  {
+                    label: '已退',
+                    value: <span className="tabular-nums">¥ {yuan(d.refundedCents)}</span>,
+                  },
+                  {
+                    label: '发放积分',
+                    value: <span className="tabular-nums">{d.grantedCredits}</span>,
+                  },
+                  { label: '渠道', value: d.channel ? CHANNEL_LABELS[d.channel] ?? d.channel : '—' },
+                  { label: '下单时间', value: new Date(d.createdAt).toLocaleString('zh-CN') },
+                  {
+                    label: '支付时间',
+                    value: d.paidAt ? new Date(d.paidAt).toLocaleString('zh-CN') : '未支付',
+                  },
+                  { label: '支付时限', value: new Date(d.expiresAt).toLocaleString('zh-CN') },
+                  ...(d.membershipPlan
+                    ? [
+                        {
+                          label: '会员套餐',
+                          value: (
+                            <>
+                              {d.membershipPlan.name}（{d.membershipPlan.durationDays} 天 · 每月{' '}
+                              {d.membershipPlan.monthlyCredits} 积分）
+                              {d.membershipAppliedAt ? (
+                                <span className="text-[11px] text-text-tertiary"> · 权益已发放</span>
+                              ) : (
+                                <span className="text-[11px] text-rose-600"> · 权益尚未发放</span>
+                              )}
+                            </>
+                          ),
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            </section>
 
             {d.items.length > 0 && (
-              <div className="adm-section">
-                <div className="adm-section-title">
-                  商品明细
-                  <span className="adm-panel-note">下单时的快照，不随后续改价变化</span>
-                </div>
-                <ul className="adm-timeline">
+              <section>
+                <SectionTitle title="商品明细" note="下单时的快照，不随后续改价变化" />
+                <ul className="divide-y divide-border-table rounded-lg border border-border-table">
                   {d.items.map((it) => (
-                    <li key={it.id} className="adm-timeline-item is-done">
-                      <span className="adm-timeline-dot" aria-hidden="true" />
-                      <span className="adm-timeline-label">
-                        {it.nameSnapshot} <code className="adm-cell-sub">{it.skuSnapshot}</code>
-                      </span>
-                      <span className="adm-cell-sub">
-                        ¥ {yuan(it.priceCentsSnapshot)} × {it.quantity} · +{it.creditsSnapshot} 积分
-                      </span>
-                    </li>
+                    <RecordRow
+                      key={it.id}
+                      head={
+                        <>
+                          {it.nameSnapshot}{' '}
+                          <code className="font-mono text-[11px] text-text-tertiary">
+                            {it.skuSnapshot}
+                          </code>
+                        </>
+                      }
+                      meta={
+                        <span className="tabular-nums">
+                          ¥ {yuan(it.priceCentsSnapshot)} × {it.quantity} · +{it.creditsSnapshot}{' '}
+                          积分
+                        </span>
+                      }
+                    />
                   ))}
                 </ul>
-              </div>
+              </section>
             )}
 
-            <div className="adm-section">
-              <div className="adm-section-title">
-                支付流水
-                <span className="adm-panel-note">渠道回调的原始记录</span>
-              </div>
+            <section>
+              <SectionTitle title="支付流水" note="渠道回调的原始记录" />
               {d.payments.length === 0 ? (
-                <div className="adm-empty">
-                  <p>尚无支付记录。订单未支付，或渠道回调尚未到达。</p>
-                </div>
+                <p className="rounded-lg border border-dashed border-border-table px-3 py-4 text-center text-xs text-text-tertiary">
+                  尚无支付记录。订单未支付，或渠道回调尚未到达。
+                </p>
               ) : (
-                <ul className="adm-timeline">
+                <ul className="divide-y divide-border-table rounded-lg border border-border-table">
                   {d.payments.map((p) => (
-                    <li key={p.id} className={`adm-timeline-item${p.status === 'succeeded' ? ' is-done' : ''}`}>
-                      <span className="adm-timeline-dot" aria-hidden="true" />
-                      <span className="adm-timeline-label">
-                        {CHANNEL_LABELS[p.channel] ?? p.channel} · ¥ {yuan(p.amountCents)}
-                      </span>
-                      <span className="adm-cell-sub">
-                        <code>{p.payTransactionId}</code>
-                        {p.sandboxScenario ? ` · 沙箱/${p.sandboxScenario}` : ''}
-                        {p.message ? ` · ${p.message}` : ''} ·{' '}
-                        {new Date(p.createdAt).toLocaleString('zh-CN')}
-                      </span>
-                    </li>
+                    <RecordRow
+                      key={p.id}
+                      state={p.status === 'succeeded' ? 'done' : 'pending'}
+                      head={
+                        <>
+                          {CHANNEL_LABELS[p.channel] ?? p.channel} · ¥ {yuan(p.amountCents)}
+                        </>
+                      }
+                      meta={
+                        <>
+                          <code className="font-mono">{p.payTransactionId}</code>
+                          {p.sandboxScenario ? ` · 沙箱/${p.sandboxScenario}` : ''}
+                          {p.message ? ` · ${p.message}` : ''} ·{' '}
+                          {new Date(p.createdAt).toLocaleString('zh-CN')}
+                        </>
+                      }
+                    />
                   ))}
                 </ul>
               )}
-            </div>
+            </section>
 
             {d.refunds.length > 0 && (
-              <div className="adm-section">
-                <div className="adm-section-title">退款记录</div>
-                <ul className="adm-timeline">
+              <section>
+                <SectionTitle title="退款记录" />
+                <ul className="divide-y divide-border-table rounded-lg border border-border-table">
                   {d.refunds.map((r) => (
-                    <li key={r.id} className="adm-timeline-item is-done">
-                      <span className="adm-timeline-dot" aria-hidden="true" />
-                      <span className="adm-timeline-label">
-                        ¥ {yuan(r.amountCents)}
-                        {/* 失败/处理中的退款行必须显示状态: 它们没有动过订单与积分 */}
-                        {r.status !== 'succeeded' && (
-                          <span className="adm-cell-sub"> · {REFUND_STATUS_LABELS[r.status] ?? r.status}</span>
-                        )}
-                      </span>
-                      <span className="adm-cell-sub">
-                        {r.reason} · {new Date(r.createdAt).toLocaleString('zh-CN')}
-                      </span>
-                    </li>
+                    <RecordRow
+                      key={r.id}
+                      state={r.status === 'succeeded' ? 'done' : 'pending'}
+                      head={
+                        <>
+                          ¥ {yuan(r.amountCents)}
+                          {/* 失败/处理中的退款行必须显示状态: 它们没有动过订单与积分 */}
+                          {r.status !== 'succeeded' && (
+                            <span className="text-[11px] text-amber-700">
+                              {' '}
+                              · {REFUND_STATUS_LABELS[r.status] ?? r.status}
+                            </span>
+                          )}
+                        </>
+                      }
+                      meta={
+                        <>
+                          {r.reason} · {new Date(r.createdAt).toLocaleString('zh-CN')}
+                        </>
+                      }
+                    />
                   ))}
                 </ul>
-              </div>
+              </section>
             )}
-          </>
+          </div>
         )}
       </AdminDrawer>
 
@@ -970,7 +1046,7 @@ export function AdminOrdersPage() {
                 <p>
                   将先生成一条 <b>channel=manual</b> 的支付流水，再把订单置为已支付并发放积分/会员权益。
                 </p>
-                <p className="adm-cell-sub">
+                <p className="text-[11px] text-text-tertiary">
                   订单 {action.row.orderNo} · ¥ {yuan(action.row.paidCents)} ·{' '}
                   {action.row.membershipPlanName ?? `${action.row.itemCount} 件商品`}
                 </p>
@@ -980,7 +1056,7 @@ export function AdminOrdersPage() {
                 <p>
                   退款会回收本单发放且<b>尚未被消耗</b>的积分；已被用掉的部分无法扣回，结果会如实提示。
                 </p>
-                <p className="adm-cell-sub">
+                <p className="text-[11px] text-text-tertiary">
                   订单 {action.row.orderNo} · 实付 ¥ {yuan(action.row.paidCents)} · 已退 ¥{' '}
                   {yuan(action.row.refundedCents)} · 可退上限 ¥{' '}
                   {yuan(Math.max(action.row.paidCents - action.row.refundedCents, 0))}
@@ -1006,33 +1082,29 @@ export function AdminOrdersPage() {
           extra={
             <>
               {action.kind === 'refund' && (
-                <div className="adm-confirm-typing">
-                  <label htmlFor="adm-refund-amount">退款金额（元）</label>
-                  <Input
-                    id="adm-refund-amount"
-                    type="text"
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs text-text-secondary">退款金额（元）</span>
+                  <TextInput
+                    ariaLabel="退款金额"
                     inputMode="decimal"
                     value={refundYuan}
-                    onChange={(e) => setRefundYuan(e.target.value)}
+                    onChange={setRefundYuan}
                     placeholder="0.00"
-                    autoComplete="off"
                   />
                 </div>
               )}
-              <div className="adm-confirm-typing">
-                <label htmlFor="adm-order-reason">操作原因（强制，写入审计）：</label>
-                <Input
-                  id="adm-order-reason"
-                  type="text"
+              <div className="flex flex-col gap-1.5">
+                <span className="text-xs text-text-secondary">操作原因（强制，写入审计）：</span>
+                <TextInput
+                  ariaLabel="操作原因"
                   value={reason}
-                  onChange={(e) => setReason(e.target.value)}
+                  onChange={setReason}
                   placeholder={
                     action.kind === 'markPaid'
                       ? '如：用户线下转账，财务已确认到账'
                       : '如：用户申请退款，商品未使用'
                   }
                   maxLength={200}
-                  autoComplete="off"
                 />
               </div>
             </>
@@ -1056,7 +1128,7 @@ export function AdminOrdersPage() {
               <p>
                 将为每笔订单生成一条 <b>channel=manual</b> 的支付流水，置为已支付并发放对应积分 / 会员权益。
               </p>
-              <p className="adm-cell-sub">
+              <p className="text-[11px] text-text-tertiary">
                 只处理「待支付」状态的订单；已是已支付的订单会返回幂等命中而不重复发放。
               </p>
             </>
@@ -1068,16 +1140,14 @@ export function AdminOrdersPage() {
             '写操作审计（含操作人与原因）',
           ]}
           extra={
-            <div className="adm-confirm-typing">
-              <label htmlFor="adm-order-batch-reason">操作原因（强制，写入审计）：</label>
-              <Input
-                id="adm-order-batch-reason"
-                type="text"
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs text-text-secondary">操作原因（强制，写入审计）：</span>
+              <TextInput
+                ariaLabel="批量核销原因"
                 value={reason}
-                onChange={(e) => setReason(e.target.value)}
+                onChange={setReason}
                 placeholder="如：对公转账已到账，财务批量核销"
                 maxLength={200}
-                autoComplete="off"
               />
             </div>
           }

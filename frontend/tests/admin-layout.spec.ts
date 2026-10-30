@@ -10,12 +10,15 @@ import { HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
  *
  * 断言用几何量测而非截图比对 —— 截图会被无关的样式改动弄红,
  * 而"内容区宽度 =视口 -侧栏" 与 "行高 ≤ 46" 是硬约束, 不会因视觉微调而失效。
+ *
+ * 2026-10-30 外壳换成 BoardUI 单栏结构：没有顶部 header，侧栏自带品牌头，
+ * 导航区独立滚动。选择器统一走 `data-testid="admin-*"`。
  */
 
 const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
 
 const PAGES = [
-  ['/admin', '概览'],
+  ['/admin', '平台概览'],
   ['/admin/users', '用户管理'],
   ['/admin/roles', '角色权限'],
   ['/admin/settings', '系统设置'],
@@ -37,11 +40,11 @@ test.describe('后台布局', () => {
 
       for (const [path, name] of PAGES) {
         await page.goto(`${UI}${path}`);
-        await page.waitForSelector('.adm-content', { timeout: 15000 });
+        await page.waitForSelector('[data-testid="admin-sider"]', { timeout: 15000 });
         await page.waitForTimeout(600);
 
         const m = await page.evaluate(() => {
-          const sider = document.querySelector('.adm-sider')?.getBoundingClientRect();
+          const sider = document.querySelector('[data-testid="admin-sider"]')?.getBoundingClientRect();
           const content = document.querySelector('.adm-content')?.getBoundingClientRect();
           return {
             siderW: sider?.width ?? 0,
@@ -64,48 +67,60 @@ test.describe('后台布局', () => {
     });
   }
 
-  test('侧栏占满视口高度并独立滚动', async ({ page }) => {
+  test('侧栏占满视口高度且导航区独立滚动', async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto(`${UI}/admin/roles`); // 权限页最长, 最能暴露滚动问题
-    await page.waitForSelector('.adm-sider', { timeout: 15000 });
+    await page.waitForSelector('[data-testid="admin-nav-scroll"]', { timeout: 15000 });
 
     const m = await page.evaluate(() => {
-      const sider = document.querySelector('.adm-sider') as HTMLElement;
+      const sider = document.querySelector('[data-testid="admin-sider"]') as HTMLElement;
+      const navScroll = document.querySelector('[data-testid="admin-nav-scroll"]') as HTMLElement;
+      const head = document.querySelector('[data-testid="admin-sider-head"]') as HTMLElement;
       const r = sider.getBoundingClientRect();
       return {
         height: Math.round(r.height),
         viewport: window.innerHeight,
-        headerH: Math.round(document.querySelector('.adm-header')?.getBoundingClientRect().height ?? 0),
-        overflowY: getComputedStyle(sider).overflowY,
+        headH: Math.round(head.getBoundingClientRect().height),
+        navOverflowY: getComputedStyle(navScroll).overflowY,
+        docScrollH: document.documentElement.scrollHeight,
       };
     });
 
-    // 高度应等于视口 - Header, 而不是撑满整个视口(会盖住 Header)
-    expect(m.height).toBeLessThanOrEqual(m.viewport - m.headerH + 2);
+    // 侧栏高度 = 视口高度（单栏结构，没有顶部 header 要扣）
+    expect(m.height).toBeLessThanOrEqual(m.viewport + 2);
     expect(m.height).toBeGreaterThan(400);
-    // 长内容时侧栏自身滚动, 页面整体不滚
-    expect(['auto', 'scroll']).toContain(m.overflowY);
+    // 品牌头固定 56px 不参与滚动
+    expect(m.headH).toBeGreaterThan(40);
+    expect(m.headH).toBeLessThanOrEqual(64);
+    // 长内容时导航区自身滚动
+    expect(['auto', 'scroll']).toContain(m.navOverflowY);
   });
 
   test('用户表格行高一致、操作列不换行', async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto(`${UI}/admin/users`);
-    await page.waitForSelector('.adm-row-actions', { timeout: 15000 });
+    await page.waitForSelector('[data-testid="admin-table-row"]', { timeout: 15000 });
     await page.waitForTimeout(800);
 
     const m = await page.evaluate(() => {
-      const rows = Array.from(document.querySelectorAll('.adm-row-actions')) as HTMLElement[];
+      const rows = Array.from(
+        document.querySelectorAll('[data-testid="admin-table-row"]'),
+      ) as HTMLElement[];
       return {
         heights: rows.map((r) => Math.round(r.getBoundingClientRect().height)),
         // 动作项数应 ≤2 (详情 + 更多), 多的应在下拉里
-        counts: rows.map((r) => r.querySelectorAll('.adm-link').length),
+        counts: rows.map(
+          (r) => r.querySelectorAll('td:last-child button').length,
+        ),
       };
     });
 
-    // 操作区高度 = 单行文本高度, 换行会翻倍到 ~34px 以上
-    for (const [i, h] of m.heights.entries()) {
-      expect(h, `第 ${i} 行操作区高度 ${h}px, 疑似换行`).toBeLessThanOrEqual(28);
-    }
+    // BoardUI small 按钮是 32px，单元格 py-2.5 ⇒ 单行行高约 52px；
+    // 换行会把行高撑到 70+，所以「所有行等高且 ≤60」就是没换行。
+    const max = Math.max(...m.heights);
+    const min = Math.min(...m.heights);
+    expect(max, `最高行 ${max}px, 疑似换行`).toBeLessThanOrEqual(60);
+    expect(max - min, `行高不一致(${min}~${max}px), 疑似个别行换行`).toBeLessThanOrEqual(2);
     for (const [i, c] of m.counts.entries()) {
       expect(c, `第 ${i} 行直显动作 ${c} 个, 应 ≤2`).toBeLessThanOrEqual(2);
     }
@@ -114,26 +129,30 @@ test.describe('后台布局', () => {
   test('全局搜索可用 Ctrl+K 唤起并支持 Esc 关闭', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`${UI}/admin/users`);
-    await page.waitForSelector('.adm-layout', { timeout: 15000 });
+    await page.waitForSelector('[data-testid="admin-sider"]', { timeout: 15000 });
 
     await page.keyboard.press('Control+K');
-    const search = page.locator('.adm-search input');
+    const search = page.getByRole('textbox', { name: '后台全局搜索' });
     await expect(search).toBeFocused();
     await search.fill('o');
     await expect(page.getByText('输入至少 2 个字符开始搜索')).toBeVisible();
 
     await search.press('Escape');
-    await expect(page.getByText('输入至少 2 个字符开始搜索')).toBeHidden();
+    await expect(search).toBeHidden();
   });
 
   test('操作列的下拉菜单可用', async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto(`${UI}/admin/users`);
-    await page.waitForSelector('.adm-row-actions', { timeout: 15000 });
+    await page.waitForSelector('[data-testid="admin-table-row"]', { timeout: 15000 });
 
-    await page.locator('.adm-row-actions').first().getByText('更多').click();
+    await page
+      .getByTestId('admin-table-row')
+      .first()
+      .getByRole('button', { name: '更多' })
+      .click();
     // 下拉应至少含禁用/删除这类动作
-    const items = page.locator('.ant-dropdown-menu-item');
+    const items = page.getByRole('menuitem');
     await expect(items.first()).toBeVisible();
     expect(await items.count()).toBeGreaterThanOrEqual(2);
   });
@@ -142,21 +161,21 @@ test.describe('后台布局', () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`${UI}/admin/audit-logs`);
     await page.waitForSelector('.adm-content', { timeout: 15000 });
-    await page.waitForSelector('.ant-table-row', { timeout: 15000 }).catch(() => undefined);
+    await page
+      .waitForSelector('[data-testid="admin-table-row"]', { timeout: 15000 })
+      .catch(() => undefined);
 
     const detailButton = page.getByRole('button', { name: '详情', exact: true }).first();
     test.skip((await detailButton.count()) === 0, '当前库中暂无审计记录');
 
     await detailButton.click();
-    await expect(page.locator('.adm-audit-expanded-row')).toBeVisible();
+    await expect(page.getByTestId('admin-table-expanded')).toBeVisible();
     await expect(page.getByText('审计详情', { exact: true })).toBeVisible();
-    await expect(page.locator('.ant-drawer')).toHaveCount(0);
-    await expect(page.locator('.ant-modal')).toHaveCount(0);
-    await expect(page.locator('.adm-modal-mask')).toHaveCount(0);
-    await expect(page.locator('.adm-inline-confirm')).toHaveCount(0);
+    await expect(page.getByTestId('admin-drawer')).toHaveCount(0);
+    await expect(page.getByTestId('admin-modal')).toHaveCount(0);
+    await expect(page.getByTestId('admin-confirm-action')).toHaveCount(0);
 
     await page.getByRole('button', { name: '收起', exact: true }).click();
-    // antd 会保留折叠后的隐藏行节点, 这里只看用户是否还能看到详情
-    await expect(page.locator('.adm-audit-expanded-row')).toBeHidden();
+    await expect(page.getByTestId('admin-table-expanded')).toHaveCount(0);
   });
 });

@@ -1,23 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Alert,
-  App,
-  Button,
-  Checkbox,
-  Divider,
-  Drawer,
-  Flex,
-  Form,
-  Input,
-  Select,
-  Space,
-  Switch,
-  Tag,
-  Typography,
-} from 'antd';
 import { Info } from 'lucide-react';
+import { Button } from '../../../vendor/boardui/components/base/buttons/button';
 import { adminModelChannelsApi } from '../../../lib/api';
+import { useToast } from '../../../admin-ui/providers/ToastProvider';
 import { useDiscardConfirm, useUnsavedGuard } from '../../../hooks/useUnsavedGuard';
+import { Drawer } from '../../../admin-ui/primitives/Drawer';
+import { FormField, Notice } from '../../../admin-ui/primitives';
+import { CheckBox, SelectBox, SwitchBox, TextInput } from '../../../admin-ui/controls';
 import type {
   AdminChannelTestResult,
   AdminModelChannelRecord,
@@ -25,7 +14,7 @@ import type {
   ProtocolOption,
   VendorPreset,
 } from '../../../types/api';
-import { AntConfirm } from './AntConfirm';
+import { InlineConfirm } from './InlineConfirm';
 import { ModelPicker } from './ModelPicker';
 import {
   fmtLatency,
@@ -57,8 +46,11 @@ const EMPTY: FormState = {
   enabled: true,
 };
 
+/** 「自定义（手动填写）」在两个下拉里的哨兵值 */
+const CUSTOM = '__custom__';
+
 /**
- * 线路编辑抽屉（antd Form 版）。
+ * 线路编辑抽屉。
  *
  * 令牌只写不回显：空 = 保持原值，只有显式「清除令牌」才清空；
  * 草稿测试不保存也能验证当前表单，字段一改旧结果立即标过期。
@@ -86,7 +78,7 @@ export function ChannelEditDrawer({
   onClose: () => void;
   onSaved: () => void;
 }) {
-  const { message } = App.useApp();
+  const toast = useToast();
   const [form, setForm] = useState<FormState>(EMPTY);
   const [initial, setInitial] = useState<FormState>(EMPTY);
   const [formRev, setFormRev] = useState(0);
@@ -246,7 +238,9 @@ export function ChannelEditDrawer({
           enabled: form.enabled,
           ...(reason.trim() ? { reason: reason.trim() } : {}),
         });
-        void message.success(r.materialized ? '已新增线路，并已把旧版配置转为第 1 条线路' : '已新增线路');
+        toast.success(
+          r.materialized ? '已新增线路，并已把旧版配置转为第 1 条线路' : '已新增线路',
+        );
       } else if (channel) {
         await adminModelChannelsApi.update(channel.id, {
           name: form.name.trim(),
@@ -259,14 +253,14 @@ export function ChannelEditDrawer({
           expectedUpdatedAt: channel.updatedAt ?? undefined,
           ...(reason.trim() ? { reason: reason.trim() } : {}),
         });
-        void message.success('已保存，下一条生成立即按新配置调度');
+        toast.success('已保存，下一条生成立即按新配置调度');
       }
       setConfirmSave(false);
       onSaved();
       onClose();
     } catch (e) {
       setError((e as Error).message || '保存失败');
-      void message.error((e as Error).message || '保存失败');
+      toast.error((e as Error).message || '保存失败');
     } finally {
       setSaving(false);
     }
@@ -293,94 +287,103 @@ export function ChannelEditDrawer({
           : r.sourceAfter === 'none'
             ? '该模态当前未接入，调用会失败并退款'
             : '其余线路继续按顺序调度';
-      void message.success(`已删除线路。${after}`);
+      toast.success(`已删除线路。${after}`);
       setConfirmDelete(false);
       onSaved();
       onClose();
     } catch (e) {
-      void message.error((e as Error).message || '删除失败');
+      toast.error((e as Error).message || '删除失败');
     } finally {
       setSaving(false);
     }
   };
 
   const stale = testResult && testResult.rev !== formRev;
+  const protocolDesc = protocolOptions.find((o) => o.value === form.protocol)?.desc;
 
   return (
     <>
       <Drawer
         open={open}
-        size={720}
+        onOpenChange={(next) => {
+          if (!next) requestClose();
+        }}
         title={`${mode === 'create' ? '新增线路' : '编辑线路'} · ${MODALITY_LABEL[modality]}`}
-        onClose={requestClose}
-        mask={{ closable: !saving }}
-        keyboard={!saving}
+        width={720}
         footer={
-          <Flex justify="space-between" align="center" gap={12} wrap>
-            <Space>
+          <div className="flex w-full items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
               {mode === 'edit' && (
-                <Button danger disabled={!canWrite || saving} onClick={() => setConfirmDelete(true)}>
+                <Button
+                  variant="danger"
+                  size="small"
+                  disabled={!canWrite || saving}
+                  onClick={() => setConfirmDelete(true)}
+                >
                   删除线路
                 </Button>
               )}
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              <span className="text-xs text-text-tertiary">
                 {dirty ? '有未保存的修改' : '保存后立即生效'}
-              </Typography.Text>
-            </Space>
-            <Space>
-              <Button onClick={requestClose} disabled={saving}>
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" size="small" onClick={requestClose} disabled={saving}>
                 取消
               </Button>
               <Button
-                type="primary"
-                loading={saving}
-                disabled={!canWrite || (mode === 'edit' && !dirty)}
+                variant="primary"
+                size="small"
+                disabled={!canWrite || saving || (mode === 'edit' && !dirty)}
                 onClick={trySave}
               >
-                保存
+                {saving ? '保存中…' : '保存'}
               </Button>
-            </Space>
-          </Flex>
+            </div>
+          </div>
         }
       >
-        {error && <Alert type="error" showIcon title={error} style={{ marginBottom: 16 }} />}
+        {error && <Notice tone="danger" title={error} />}
 
-        <Form layout="vertical" requiredMark={false}>
-          <Divider titlePlacement="start">
-            基本信息
-          </Divider>
+        <div className="flex flex-col gap-4">
+          <SectionTitle title="基本信息" />
 
-          <Form.Item
+          <FormField
+            label="线路名称"
             htmlFor="mc-name"
-            label={
-              <span>
-                线路名称 <span style={{ color: 'var(--danger-text)' }}>*</span>
-              </span>
-            }
-            extra="只用于后台辨认，不影响生成。"
+            required
+            hint="只用于后台辨认，不影响生成。"
           >
-            <Input
-              id="mc-name"
+            <TextInput
               value={form.name}
               maxLength={60}
               disabled={!canWrite}
               placeholder="如：硅基流动 · 主线路"
-              onChange={(e) => patch({ name: e.target.value })}
+              onChange={(next) => patch({ name: next })}
+              ariaLabel="线路名称"
             />
-          </Form.Item>
+          </FormField>
 
-          <Form.Item htmlFor="mc-vendor" label="厂商预设" extra="选中后自动填接入地址、协议与推荐模型；访问令牌仍需手填。">
-            <Select
-              id="mc-vendor"
-              value={vendor?.key ?? '__custom__'}
+          <FormField
+            label="厂商预设"
+            htmlFor="mc-vendor"
+            hint="选中后自动填接入地址、协议与推荐模型；访问令牌仍需手填。"
+          >
+            <SelectBox
+              value={vendor?.key ?? CUSTOM}
+              onChange={(next) => {
+                if (!next || next === CUSTOM) return;
+                pickVendor(next);
+              }}
               disabled={!canWrite}
-              onChange={(v) => (v === '__custom__' ? undefined : pickVendor(v))}
               options={[
                 ...vendors.map((v) => ({ value: v.key, label: vendorDisplayLabel(v.label) })),
-                { value: '__custom__', label: '自定义（手动填写）' },
+                { value: CUSTOM, label: '自定义（手动填写）' },
               ]}
+              ariaLabel="厂商预设"
+              className="w-full"
             />
-          </Form.Item>
+          </FormField>
 
           {/*
             协议说明常驻展示, 不再只挂 tooltip。
@@ -389,47 +392,34 @@ export function ChannelEditDrawer({
             而这三项恰恰决定通道能不能配通 (例如把 MiniMax 配成 openai 协议,
             请求体缺 size 字段直接 404)。运营选协议的那一刻就该看到。
           */}
-          <Form.Item
-            htmlFor="mc-protocol"
-            label={
-              <span>
-                对接协议 <span style={{ color: 'var(--danger-text)' }}>*</span>
-              </span>
-            }
-            extra={
-              form.protocol && (
-                <div className="mc-protocol-note">
-                  <div className="mc-protocol-note-title">
-                    <Info size={12} />
-                    协议说明
-                  </div>
-                  <div>{PROTOCOL_HINT[form.protocol] ?? '按协议层声明的端点与参数格式调用。'}</div>
-                  {protocolOptions.find((o) => o.value === form.protocol)?.desc && (
-                    <div className="mc-protocol-note-tech">
-                      {protocolOptions.find((o) => o.value === form.protocol)?.desc}
-                    </div>
-                  )}
-                </div>
-              )
-            }
-          >
+          <FormField label="对接协议" htmlFor="mc-protocol" required>
             {protocolOptions.length === 0 ? (
-              <Alert type="warning" showIcon title="该模态尚未接入任何协议" />
+              <Notice tone="warn" title="该模态尚未接入任何协议" className="mb-0" />
             ) : (
-              <Select
-                id="mc-protocol"
+              <SelectBox
                 value={form.protocol || undefined}
+                onChange={(next) => patch({ protocol: next ?? '' })}
                 disabled={!canWrite}
-                onChange={(v) => patch({ protocol: v })}
-                options={protocolOptions.map((o) => ({ value: o.value, label: o.label, title: o.desc }))}
+                options={protocolOptions.map((o) => ({ value: o.value, label: o.label }))}
+                ariaLabel="对接协议"
+                className="w-full"
               />
             )}
-          </Form.Item>
+            {form.protocol && (
+              <div className="mt-2 flex flex-col gap-1 rounded-lg border border-border-table bg-background-secondary-default px-3 py-2 text-xs leading-5 text-text-secondary">
+                <span className="flex items-center gap-1 font-medium text-text-primary">
+                  <Info className="size-3" aria-hidden />
+                  协议说明
+                </span>
+                <span>{PROTOCOL_HINT[form.protocol] ?? '按协议层声明的端点与参数格式调用。'}</span>
+                {protocolDesc && <span className="break-words text-text-tertiary">{protocolDesc}</span>}
+              </div>
+            )}
+          </FormField>
 
-          <Form.Item
-            htmlFor="mc-model"
+          <FormField
             label="默认模型"
-            extra="从内置预设或厂商实时清单里选；清单里没有的模型名也可以直接输入。"
+            hint="从内置预设或厂商实时清单里选；清单里没有的模型名也可以直接输入。"
           >
             <ModelPicker
               modality={modality}
@@ -443,130 +433,130 @@ export function ChannelEditDrawer({
               clearToken={form.clearToken}
               canWrite={canWrite}
               canTest={canTest}
-              onChange={(v) => patch({ model: v })}
+              onChange={(next) => patch({ model: next })}
             />
-          </Form.Item>
+          </FormField>
 
-          <Divider titlePlacement="start">
-            连接信息
-          </Divider>
+          <SectionTitle title="连接信息" />
 
-          <Form.Item
+          <FormField
+            label="接入地址"
             htmlFor="mc-baseurl"
-            label={
-              <span>
-                接入地址 <span style={{ color: 'var(--danger-text)' }}>*</span>
-              </span>
-            }
-            extra="填厂商根地址（如 https://api.example.com），/v1 等路径由协议自动补全，请不要带 /v1。"
+            required
+            hint="填厂商根地址（如 https://api.example.com），/v1 等路径由协议自动补全，请不要带 /v1。"
           >
-            <Input
-              id="mc-baseurl"
+            <TextInput
               value={form.baseUrl}
               disabled={!canWrite}
               placeholder="https://api.example.com"
-              onChange={(e) => patch({ baseUrl: e.target.value })}
+              onChange={(next) => patch({ baseUrl: next })}
+              ariaLabel="接入地址"
             />
-          </Form.Item>
+          </FormField>
 
-          <Form.Item
-            htmlFor="mc-token"
+          <FormField
             label="访问令牌"
-            extra={
+            htmlFor="mc-token"
+            hint={
               mode === 'edit' && channel?.hasToken
                 ? `当前已配置（${channel.tokenMasked}），留空保持不变。`
                 : undefined
             }
           >
-            <Input.Password
-              id="mc-token"
+            <TextInput
               value={form.token}
-              autoComplete="new-password"
               disabled={!canWrite || form.clearToken}
+              type="password"
               placeholder={mode === 'edit' && channel?.hasToken ? '留空保持不变' : '尚未配置'}
-              onChange={(e) => patch({ token: e.target.value })}
+              maxLength={200}
+              onChange={(next) => patch({ token: next })}
+              ariaLabel="访问令牌"
             />
             {mode === 'edit' && (
-              <Checkbox
-                style={{ marginTop: 8 }}
-                checked={form.clearToken}
-                disabled={!canWrite || form.token.length > 0}
-                onChange={(e) => patch({ clearToken: e.target.checked })}
-              >
-                清除已保存的访问令牌
-              </Checkbox>
+              <div className="mt-2">
+                <CheckBox
+                  checked={form.clearToken}
+                  disabled={!canWrite || form.token.length > 0}
+                  onChange={(next) => patch({ clearToken: next })}
+                  label={
+                    <span className="text-xs text-text-secondary">
+                      清除已保存的访问令牌
+                    </span>
+                  }
+                />
+              </div>
             )}
-          </Form.Item>
+          </FormField>
 
-          <Divider titlePlacement="start">
-            调度
-          </Divider>
+          <SectionTitle title="调度" />
 
-          <Form.Item
+          <FormField
             label="启用这条线路"
-            extra="停用后不参与调度，但仍可测试；尝试顺序在列表里用上下移调整。"
+            hint="停用后不参与调度，但仍可测试；尝试顺序在列表里用上下移调整。"
           >
-            <Switch checked={form.enabled} disabled={!canWrite} onChange={(v) => patch({ enabled: v })} />
-          </Form.Item>
-          <Typography.Paragraph type="secondary" style={{ fontSize: 12, marginTop: -8 }}>
+            <SwitchBox
+              checked={form.enabled}
+              disabled={!canWrite}
+              onChange={(next) => patch({ enabled: next })}
+              ariaLabel="启用这条线路"
+            />
+          </FormField>
+          <p className="-mt-2 text-xs text-text-tertiary">
             超时与轮询按模态统一设置，不随单条线路保存。
-          </Typography.Paragraph>
+          </p>
 
-          <Divider titlePlacement="start">
-            连通性测试
-          </Divider>
+          <SectionTitle title="连通性测试" />
 
-          <Space size={12} wrap style={{ marginBottom: 12 }}>
+          <div className="flex flex-wrap items-center gap-3">
             <Button
-              loading={testing}
-              disabled={!canTest || saving}
+              variant="secondary"
+              size="small"
+              disabled={!canTest || saving || testing}
               onClick={() => void runTest()}
               title={canTest ? '用当前表单值测试，不保存' : '需要「通道测试」权限'}
             >
-              测试这条草稿
+              {testing ? '测试中…' : '测试这条草稿'}
             </Button>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              {canTest ? '只探测地址与模型，不消耗模型额度、不修改健康状态。' : '当前角色没有通道测试权限。'}
-            </Typography.Text>
-          </Space>
+            <span className="text-xs text-text-tertiary">
+              {canTest
+                ? '只探测地址与模型，不消耗模型额度、不修改健康状态。'
+                : '当前角色没有通道测试权限。'}
+            </span>
+          </div>
 
           {testResult && (
-            <Alert
-              type={testResult.result.ok ? 'success' : 'error'}
-              showIcon
+            <Notice
+              tone={testResult.result.ok ? 'success' : 'danger'}
               title={
-                <Space size={8} wrap>
+                <span className="flex flex-wrap items-center gap-2">
                   <span>
                     {testResult.result.ok ? '连通正常' : '连通失败'} ·{' '}
                     {fmtLatency(testResult.result.latencyMs)}
                   </span>
-                  <Tag variant="filled">草稿</Tag>
-                </Space>
+                  <span className="rounded bg-black/10 px-1.5 py-0.5 text-[11px]">草稿</span>
+                </span>
               }
-              description={
-                <Space orientation="vertical" size={4} style={{ width: '100%' }}>
-                  <Typography.Text>{testResult.result.message}</Typography.Text>
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    {fmtTime(testResult.result.testedAt)}
-                    {testResult.result.usedStoredToken ? ' · 使用了已保存的访问令牌' : ''}
-                  </Typography.Text>
-                  {testResult.result.detail && (
-                    <Typography.Text
-                      code
-                      style={{ display: 'block', whiteSpace: 'pre-wrap', fontSize: 12 }}
-                    >
-                      {testResult.result.detail}
-                    </Typography.Text>
-                  )}
-                  {stale && <Tag color="warning">草稿已修改，此结果已过期，请重新测试</Tag>}
-                </Space>
-              }
-            />
+              className="mb-0"
+            >
+              <div>{testResult.result.message}</div>
+              <div className="mt-0.5 text-text-tertiary">
+                {fmtTime(testResult.result.testedAt)}
+                {testResult.result.usedStoredToken ? ' · 使用了已保存的访问令牌' : ''}
+              </div>
+              {testResult.result.detail && (
+                <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-[11px] text-text-secondary">
+                  {testResult.result.detail}
+                </pre>
+              )}
+              {stale && (
+                <div className="mt-1 text-amber-700">草稿已修改，此结果已过期，请重新测试</div>
+              )}
+            </Notice>
           )}
-        </Form>
+        </div>
       </Drawer>
 
-      <AntConfirm
+      <InlineConfirm
         open={confirmSave}
         title="确认保存线路变更"
         description={
@@ -587,11 +577,9 @@ export function ChannelEditDrawer({
         onConfirm={(typed, reason) => void doSave(typed, reason)}
       />
 
-      <AntConfirm
+      <InlineConfirm
         open={confirmDelete}
         danger
-        requireTyping
-        typingText={channel?.name}
         title="确认删除线路"
         description="删除后该线路立即退出调度。若这是该模态最后一条线路，会回落到旧版单通道配置（仍启用时）。"
         impact={channel ? [`线路：${channel.name}`, `接入地址：${channel.baseUrl || '未填写'}`] : undefined}
@@ -602,7 +590,15 @@ export function ChannelEditDrawer({
         onCancel={() => setConfirmDelete(false)}
         onConfirm={(typed, reason) => void doDelete(typed, reason)}
       />
-
     </>
+  );
+}
+
+/** 抽屉内的分段标题：一条发丝线 + 小标题 */
+function SectionTitle({ title }: { title: string }) {
+  return (
+    <h3 className="border-b border-border-table pb-1.5 text-[13px] font-semibold text-text-primary">
+      {title}
+    </h3>
   );
 }

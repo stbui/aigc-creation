@@ -1,17 +1,11 @@
 import { useMemo, useState } from 'react';
-import {
-  Alert,
-  Button,
-  Card,
-  Empty,
-  Flex,
-  Space,
-  Tag,
-  Tooltip,
-  Typography,
-} from 'antd';
 import { Download, ExternalLink } from 'lucide-react';
+import { Button } from '../../../vendor/boardui/components/base/buttons/button';
+import { Chip } from '../../../vendor/boardui/components/base/badges/chip';
 import { adminModelChannelsApi } from '../../../lib/api';
+import { EmptyState, Notice } from '../../../admin-ui/primitives';
+import { Panel } from '../../../components/admin/PageHeader';
+import { HoverTip } from '../../../admin-ui/controls';
 import type {
   AdminModelChannelRecord,
   AdminModelChannelsSnapshot,
@@ -60,13 +54,14 @@ export function ModelCatalogTab({
   };
 
   return (
-    <Flex vertical gap={16}>
-      <Alert
-        type="info"
-        showIcon
+    <>
+      <Notice
+        tone="info"
         title="模型清单由「内置预设 + 厂商实时拉取」两部分组成"
-        description="预设来自代码内置的厂商目录，离线可用但可能滞后；实时清单会用该厂商已保存线路的令牌请求厂商模型列表接口，返回的是账号下真正可用的模型。拉取失败不影响手填。"
-      />
+        className="mb-3"
+      >
+        预设来自代码内置的厂商目录，离线可用但可能滞后；实时清单会用该厂商已保存线路的令牌请求厂商模型列表接口，返回的是账号下真正可用的模型。拉取失败不影响手填。
+      </Notice>
 
       {MODALITY_ORDER.map((modality) => {
         const vendors = config.channels[modality]?.vendors ?? [];
@@ -78,26 +73,20 @@ export function ModelCatalogTab({
         );
 
         return (
-          <Card
+          <Panel
             key={modality}
-            size="small"
-            title={
-              <Space size={8} wrap>
-                <Typography.Text strong>{MODALITY_LABEL[modality]}</Typography.Text>
-                <Typography.Text type="secondary" style={{ fontSize: 12, fontWeight: 400 }}>
-                  {vendors.length} 家厂商 · {modelCount} 个预设模型
-                  {customLines.length > 0 ? ` · ${customLines.length} 条自定义线路` : ''}
-                </Typography.Text>
-              </Space>
-            }
+            title={MODALITY_LABEL[modality]}
+            note={`${vendors.length} 家厂商 · ${modelCount} 个预设模型${
+              customLines.length > 0 ? ` · ${customLines.length} 条自定义线路` : ''
+            }`}
           >
             {vendors.length === 0 && customLines.length === 0 ? (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={`${MODALITY_LABEL[modality]}暂无可选厂商预设`}
+              <EmptyState
+                title={`${MODALITY_LABEL[modality]}暂无可选厂商预设`}
+                description="在「线路管理」里新增一条线路后，这里会出现该厂商的模型清单。"
               />
             ) : (
-              <Flex vertical gap={12}>
+              <div className="flex flex-col gap-3">
                 {vendors.map((vendor, index) => (
                   <VendorBlock
                     key={vendor.key}
@@ -117,16 +106,16 @@ export function ModelCatalogTab({
                     lines={[ch]}
                     state={states[`channel:${ch.id}`]}
                     canTest={canTest}
-                    divided={true}
+                    divided
                     onFetch={(id) => void load(`channel:${ch.id}`, { modality, id })}
                   />
                 ))}
-              </Flex>
+              </div>
             )}
-          </Card>
+          </Panel>
         );
       })}
-    </Flex>
+    </>
   );
 }
 
@@ -168,36 +157,34 @@ function VendorBlock({
   const remote = state?.result?.remote ?? null;
 
   return (
-    <Flex
-      vertical
-      gap={8}
-      style={divided ? { borderTop: '1px solid var(--border-row)', paddingTop: 12 } : undefined}
-    >
-      <Flex justify="space-between" align="flex-start" gap={12} wrap>
-        <Flex vertical gap={2} style={{ minWidth: 0 }}>
-          <Space size={8} wrap>
-            <Typography.Text strong>{title}</Typography.Text>
-            <Tag variant="filled">{protocol}</Tag>
-            <Typography.Text code style={{ fontSize: 12 }}>
+    <div className={divided ? 'border-t border-border-table pt-3' : undefined}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-text-primary">{title}</span>
+            <Chip variant="caption" color="neutral">
+              {protocol}
+            </Chip>
+            <code className="font-mono text-[11px] text-text-tertiary">
               {hostOf(baseUrl) || '未填写地址'}
-            </Typography.Text>
+            </code>
             {consoleUrl && (
-              <Typography.Link href={consoleUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
-                <Space size={4}>
-                  获取令牌 <ExternalLink size={11} />
-                </Space>
-              </Typography.Link>
+              <a
+                href={consoleUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-0.5 text-xs text-accent-600 underline-offset-2 hover:underline"
+              >
+                获取令牌
+                <ExternalLink className="size-3" aria-hidden />
+              </a>
             )}
-          </Space>
-          {note && (
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              {note}
-            </Typography.Text>
-          )}
-        </Flex>
+          </div>
+          {note && <span className="text-xs text-text-tertiary">{note}</span>}
+        </div>
 
-        <Tooltip
-          title={
+        <HoverTip
+          tip={
             !canTest
               ? '当前角色没有「通道测试」权限'
               : !tokenLine
@@ -207,89 +194,71 @@ function VendorBlock({
         >
           <span>
             <Button
+              variant="secondary"
               size="small"
-              icon={<Download size={13} />}
-              loading={state?.loading}
+              leadingIcon={Download}
               disabled={!canTest || !tokenLine}
               onClick={() => {
                 if (tokenLine) onFetch(tokenLine.id);
               }}
             >
-              拉取实时清单
+              {state?.loading ? '拉取中…' : '拉取实时清单'}
             </Button>
           </span>
-        </Tooltip>
-      </Flex>
+        </HoverTip>
+      </div>
 
       {models.length > 0 && (
-        <Space size={[6, 6]} wrap>
+        <div className="mt-2 flex flex-wrap gap-1.5">
           {models.map((m) => (
-            <Tooltip
-              key={m.id}
-              title={[m.id, m.note].filter(Boolean).join(' · ')}
-            >
-              <Tag
-                color={usedModels.has(m.id) ? 'purple' : undefined}
-                variant={usedModels.has(m.id) ? 'filled' : 'outlined'}
-                style={{ marginInlineEnd: 0 }}
-              >
+            <HoverTip key={m.id} tip={[m.id, m.note].filter(Boolean).join(' · ')}>
+              <Chip variant="caption" color={usedModels.has(m.id) ? 'purple' : 'neutral'}>
                 {m.label}
                 {usedModels.has(m.id) ? ' · 使用中' : ''}
-              </Tag>
-            </Tooltip>
+              </Chip>
+            </HoverTip>
           ))}
-        </Space>
+        </div>
       )}
 
       {models.length === 0 && !remote && (
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+        <p className="mt-2 text-xs text-text-tertiary">
           没有内置预设模型；配置线路后可用令牌拉取厂商真实清单。
-        </Typography.Text>
+        </p>
       )}
 
-      {state?.error && <Alert type="error" showIcon title={state.error} />}
+      {state?.error && (
+        <Notice tone="danger" title={state.error} className="mb-0 mt-2" />
+      )}
 
       {state?.result && (
-        <Alert
-          type={remote && remote.length > 0 ? 'success' : 'warning'}
-          showIcon
+        <Notice
+          tone={remote && remote.length > 0 ? 'success' : 'warn'}
           title={state.result.message}
-          description={
-            <Flex vertical gap={6}>
-              {remote && remote.length > 0 && (
-                <Space size={[6, 6]} wrap>
-                  {remote.slice(0, 80).map((id) => (
-                    <Tooltip key={id} title={usedModels.has(id) ? '已有线路在使用' : undefined}>
-                      <Tag
-                        color={usedModels.has(id) ? 'purple' : undefined}
-                        variant={usedModels.has(id) ? 'filled' : 'outlined'}
-                        style={{ marginInlineEnd: 0 }}
-                      >
-                        {id}
-                      </Tag>
-                    </Tooltip>
-                  ))}
-                  {remote.length > 80 && (
-                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      共 {remote.length} 个，仅展示前 80 个
-                    </Typography.Text>
-                  )}
-                </Space>
+          className="mb-0 mt-2"
+        >
+          {remote && remote.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {remote.slice(0, 80).map((id) => (
+                <HoverTip key={id} tip={usedModels.has(id) ? '已有线路在使用' : undefined}>
+                  <Chip variant="caption" color={usedModels.has(id) ? 'purple' : 'neutral'}>
+                    {id}
+                  </Chip>
+                </HoverTip>
+              ))}
+              {remote.length > 80 && (
+                <span className="text-text-tertiary">共 {remote.length} 个，仅展示前 80 个</span>
               )}
-              {state.result.usedStoredToken && (
-                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  使用该线路已保存的访问令牌请求厂商接口。
-                </Typography.Text>
-              )}
-              {!remote && state.result.endpoints.length > 0 && (
-                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  尝试过的端点：{state.result.endpoints.join('、')}
-                </Typography.Text>
-              )}
-            </Flex>
-          }
-        />
+            </div>
+          )}
+          {state.result.usedStoredToken && (
+            <div className="mt-1">使用该线路已保存的访问令牌请求厂商接口。</div>
+          )}
+          {!remote && state.result.endpoints.length > 0 && (
+            <div className="mt-1">尝试过的端点：{state.result.endpoints.join('、')}</div>
+          )}
+        </Notice>
       )}
-    </Flex>
+    </div>
   );
 }

@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { Button } from '../../vendor/boardui/components/base/buttons/button';
 import { Chip } from '../../vendor/boardui/components/base/badges/chip';
-import { STATUS_META, type TagTone } from '../../components/admin/statusMeta';
+import { STATUS_META, TONE_CHIP_COLOR, type TagTone } from '../../components/admin/statusMeta';
 import { cx } from '../lib/cn';
 import { Drawer } from '../primitives/Drawer';
 import { EmptyState, Result, Skeleton } from '../primitives';
@@ -67,6 +67,7 @@ export function FilterBar({
 }) {
   return (
     <div
+      data-testid="admin-filter"
       className={cx(
         'mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-border-table bg-white px-3 py-2.5',
         className,
@@ -78,7 +79,11 @@ export function FilterBar({
 }
 
 export function FilterActions({ children }: { children: ReactNode }) {
-  return <div className="ml-auto flex shrink-0 items-center gap-2">{children}</div>;
+  return (
+    <div data-testid="admin-filter-actions" className="ml-auto flex shrink-0 items-center gap-2">
+      {children}
+    </div>
+  );
 }
 
 export interface AppliedFilter {
@@ -103,11 +108,17 @@ export function AppliedFilters({
   if (items.length === 0) return null;
 
   return (
-    <div className="mb-3 flex flex-wrap items-center gap-1.5" aria-label="已生效的筛选条件">
+    <div
+      data-testid="admin-filter-chips"
+      className="mb-3 flex flex-wrap items-center gap-1.5"
+      aria-label="已生效的筛选条件"
+    >
       <span className="text-xs text-text-tertiary">已筛选</span>
       {items.map((item) => (
         <span
           key={item.key}
+          data-testid="admin-filter-chip"
+          data-filter-key={item.key}
           title={item.label}
           className="inline-flex items-center gap-1 rounded-md bg-accent-50 px-1.5 py-0.5 text-xs text-accent-700"
         >
@@ -228,14 +239,8 @@ export function CollapsiblePanel({
 
 /* ────────────────────────── 状态标签 ────────────────────────── */
 
-/** TagTone → Chip 颜色。success 用 lime 而不是 green：BoardUI 的颜色阶里 lime 才是正向态 */
-const TONE_CHIP: Record<TagTone, 'lime' | 'rose' | 'yellow' | 'purple' | 'neutral'> = {
-  success: 'lime',
-  danger: 'rose',
-  warn: 'yellow',
-  brand: 'purple',
-  muted: 'neutral',
-};
+/** TagTone → Chip 颜色。映射表在 `statusMeta.ts`（唯一事实源），BoardUI 与 legacy 共用 */
+const TONE_CHIP = TONE_CHIP_COLOR;
 
 export function StatusTag({
   status,
@@ -271,7 +276,12 @@ export function AdminEmpty({
 /** 保持布局稳定的骨架屏：空 div 撑不出真实列表高度，数据到达时会跳动 */
 export function AdminListLoading({ tip = '加载中…' }: { tip?: string }) {
   return (
-    <div className="flex flex-col gap-3 px-1 py-6" aria-busy="true" aria-live="polite">
+    <div
+      data-testid="admin-page-loading"
+      className="flex flex-col gap-3 px-1 py-6"
+      aria-busy="true"
+      aria-live="polite"
+    >
       <Skeleton rows={5} />
       <p className="text-center text-xs text-text-tertiary">{tip}</p>
     </div>
@@ -478,6 +488,7 @@ export function ConfirmAction({
       ref={panelRef}
       role="region"
       aria-label={title}
+      data-testid="admin-confirm-action"
       tabIndex={-1}
       className={cx(
         'sticky bottom-0 z-10 mt-3 rounded-xl border bg-white shadow-lg outline-none',

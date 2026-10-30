@@ -333,7 +333,7 @@
 
 | 项 | 要求 |
 |---|---|
-| 布局 | `AdminLayout`：侧栏 240px 固定 +顶栏 56px + 内容区 |
+| 布局 | `admin-ui/shell/AdminBoardLayout`：侧栏 232px（折叠 60px）+ 内容区，无顶栏、无值班带 |
 | 独立性 | 不复用 C 端的 `AppLayout` / `SideRail` / `PromoBar`（均为 C 端语义） |
 | 路由 | `/admin/*` 独立于 C 端外壳，注册在 catch-all 之前 |
 

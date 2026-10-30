@@ -1,20 +1,20 @@
-import { useCallback, useMemo, useState } from 'react';
-import { App, Button, Drawer, Input, Select, Table } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Plus } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
 import { adminProductsApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
+import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
+import { Drawer } from '../../admin-ui/primitives/Drawer';
+import { SelectBox, TextArea, TextInput } from '../../admin-ui/controls';
 import {
-  AdminListError,
   AdminStaleError,
-  AdminListLoading,
   useAdminList,
   useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
 import {
-  AdminEmpty,
   AppliedFilters,
   FilterActions,
   FilterBar,
@@ -101,8 +101,19 @@ function validDaysText(days: number): string {
   return days === 0 ? '永久有效' : `${days} 天`;
 }
 
+/** 表单字段：标签 + 控件 + 一句说明 */
+function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-xs font-medium text-text-secondary">{label}</span>
+      {children}
+      {hint && <p className="text-[11px] leading-4 text-text-tertiary">{hint}</p>}
+    </div>
+  );
+}
+
 export function AdminProductsPage() {
-  const { message } = App.useApp();
+  const toast = useToast();
   const { can } = useAdmin();
   const writable = can('product.write');
 
@@ -117,7 +128,6 @@ export function AdminProductsPage() {
   const [draft, setDraft] = useState<ProductDraft>(EMPTY_DRAFT);
   const [draftBase, setDraftBase] = useState<ProductDraft>(EMPTY_DRAFT);
   const [saving, setSaving] = useState(false);
-
 
   /**
    * 商品不分组不分页: 积分包/会员套餐一类的 SKU 通常只有个位数到几十个,
@@ -192,24 +202,24 @@ export function AdminProductsPage() {
   const submit = async () => {
     const priceCents = yuanTextToCents(draft.priceYuan);
     if (priceCents === null) {
-      void message.error('售价格式不正确，请填两位小数的金额，如 9.90');
+      toast.error('售价格式不正确，请填两位小数的金额，如 9.90');
       return;
     }
     const originalCents = draft.originalPriceYuan.trim()
       ? yuanTextToCents(draft.originalPriceYuan)
       : undefined;
     if (draft.originalPriceYuan.trim() && originalCents === null) {
-      void message.error('划线价格式不正确');
+      toast.error('划线价格式不正确');
       return;
     }
     const credits = Number(draft.credits);
     if (!Number.isInteger(credits) || credits < 0) {
-      void message.error('赠送积分必须是非负整数');
+      toast.error('赠送积分必须是非负整数');
       return;
     }
     const validDays = Number(draft.creditsValidDays || '0');
     if (!Number.isInteger(validDays) || validDays < 0) {
-      void message.error('积分有效期必须是非负整数天');
+      toast.error('积分有效期必须是非负整数天');
       return;
     }
 
@@ -230,7 +240,7 @@ export function AdminProductsPage() {
             ? { reason: `改价 ${centsToYuanText(editing.priceCents)} → ${centsToYuanText(priceCents)} 元` }
             : {}),
         });
-        void message.success('商品已更新，新价格对后续下单生效');
+        toast.success('商品已更新，新价格对后续下单生效');
       } else {
         await adminProductsApi.create({
           sku: draft.sku.trim(),
@@ -246,12 +256,12 @@ export function AdminProductsPage() {
           // 新建一律先下架: 建完确认无误再上架, 避免半成品 SKU 立刻可售
           status: 'offline',
         });
-        void message.success('商品已创建，当前为下架状态，确认后请手动上架');
+        toast.success('商品已创建，当前为下架状态，确认后请手动上架');
       }
       closeForm();
       reload();
     } catch (e) {
-      void message.error(e instanceof Error ? e.message : '保存失败');
+      toast.error(e instanceof Error ? e.message : '保存失败');
     } finally {
       setSaving(false);
     }
@@ -263,119 +273,124 @@ export function AdminProductsPage() {
     setSaving(true);
     try {
       await adminProductsApi.setStatus(row.id, next);
-      void message.success(next === 'active' ? '已上架' : '已下架');
+      toast.success(next === 'active' ? '已上架' : '已下架');
       reload();
     } catch (e) {
-      void message.error(e instanceof Error ? e.message : '操作失败');
+      toast.error(e instanceof Error ? e.message : '操作失败');
     } finally {
       setSaving(false);
     }
   };
 
-  const columns: ColumnsType<AdminProduct> = [
+  const columns: Array<AdminColumn<AdminProduct>> = [
     {
-      title: '商品',
       key: 'product',
+      title: '商品',
       width: 220,
-      render: (_: unknown, row) => (
-        <div className="adm-cell-stack">
+      render: (row) => (
+        <div className="flex flex-col gap-0.5">
           <span>{row.name}</span>
-          <code className="adm-cell-sub">{row.sku}</code>
+          <code className="font-mono text-[11px] text-text-tertiary">{row.sku}</code>
         </div>
       ),
     },
     {
-      title: '售价',
       key: 'price',
+      title: '售价',
       width: 130,
-      render: (_: unknown, row) => (
-        <div className="adm-cell-stack">
-          <span>¥ {centsToYuanText(row.priceCents)}</span>
+      render: (row) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="tabular-nums">¥ {centsToYuanText(row.priceCents)}</span>
           {/* 分的口径同时给出: 财务回查流水时看到的是分, 免得每次心算 */}
-          <span className="adm-cell-sub">{row.priceCents} 分</span>
+          <span className="text-[11px] tabular-nums text-text-tertiary">{row.priceCents} 分</span>
         </div>
       ),
     },
     {
-      title: '划线价',
       key: 'originalPrice',
+      title: '划线价',
       width: 90,
-      render: (_: unknown, row) =>
+      render: (row) =>
         row.originalPriceCents !== null ? (
-          <span className="adm-cell-sub" style={{ textDecoration: 'line-through' }}>
+          <span className="tabular-nums text-text-tertiary line-through">
             ¥ {centsToYuanText(row.originalPriceCents)}
           </span>
         ) : (
-          <span className="adm-cell-sub">—</span>
+          <span className="text-text-placeholder">—</span>
         ),
     },
     {
-      title: '赠送积分',
       key: 'credits',
+      title: '赠送积分',
       width: 130,
-      render: (_: unknown, row) => (
-        <div className="adm-cell-stack">
-          <span>{row.credits} 积分</span>
-          <span className="adm-cell-sub">{validDaysText(row.creditsValidDays)}</span>
+      render: (row) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="tabular-nums">{row.credits} 积分</span>
+          <span className="text-[11px] text-text-tertiary">{validDaysText(row.creditsValidDays)}</span>
         </div>
       ),
     },
     {
-      title: '发放方式',
-      dataIndex: 'grantType',
       key: 'grantType',
+      title: '发放方式',
       width: 90,
-      render: (v: string) => (
-        <span className="adm-cell-sub">{v === 'immediate' ? '支付即发放' : '人工发放'}</span>
+      render: (row) => (
+        <span className="text-[11px] text-text-tertiary">
+          {row.grantType === 'immediate' ? '支付即发放' : '人工发放'}
+        </span>
       ),
     },
     {
-      title: '排序',
-      dataIndex: 'sortOrder',
       key: 'sortOrder',
+      title: '排序',
       width: 60,
+      align: 'right',
+      render: (row) => <span className="tabular-nums">{row.sortOrder}</span>,
     },
     {
-      title: '状态',
-      dataIndex: 'status',
       key: 'status',
+      title: '状态',
       width: 80,
       // `active` 与账号状态的「正常」共用同一个键: 商品语境下应读作「在售」
-      render: (v: string) => <StatusTag status={v} label={v === 'active' ? '在售' : undefined} />,
-    },
-    {
-      title: '更新时间',
-      dataIndex: 'updatedAt',
-      key: 'updatedAt',
-      width: 150,
-      render: (v: string) => new Date(v).toLocaleString('zh-CN'),
-    },
-    {
-      title: '',
-      key: 'ops',
-      width: 110,
-      fixed: 'right',
-      render: (_: unknown, row) => (
-        <div className="adm-ops">
-          {writable && (
-            <>
-              <Button type="link" className="adm-link" onClick={() => openEdit(row)}>
-                编辑
-              </Button>
-              <Button
-                type="default"
-                className={`adm-link${row.status === 'active' ? ' is-danger' : ''}`}
-                disabled={saving}
-                onClick={() => void runToggle(row)}
-              >
-                {row.status === 'active' ? '下架' : '上架'}
-              </Button>
-            </>
-          )}
-        </div>
+      render: (row) => (
+        <StatusTag status={row.status} label={row.status === 'active' ? '在售' : undefined} />
       ),
     },
+    {
+      key: 'updatedAt',
+      title: '更新时间',
+      width: 150,
+      render: (row) => new Date(row.updatedAt).toLocaleString('zh-CN'),
+    },
+    {
+      key: 'ops',
+      title: '',
+      width: 120,
+      fixed: 'right',
+      render: (row) =>
+        writable ? (
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="small" onClick={() => openEdit(row)}>
+              编辑
+            </Button>
+            <Button
+              variant="ghost"
+              size="small"
+              disabled={saving}
+              className={row.status === 'active' ? 'text-rose-600' : undefined}
+              onClick={() => void runToggle(row)}
+            >
+              {row.status === 'active' ? '下架' : '上架'}
+            </Button>
+          </div>
+        ) : null,
+    },
   ];
+
+  const clearStatus = () => {
+    setStatus(undefined);
+    setQuery({ status: undefined });
+  };
 
   return (
     <>
@@ -384,17 +399,18 @@ export function AdminProductsPage() {
         description="积分包与增值商品的价目表。改价只影响之后的下单，历史订单按下单时的快照结算。"
         actions={
           writable ? (
-            <Button type="primary" className="adm-btn is-primary" onClick={openCreate}>
-              <Plus size={14} style={{ marginRight: 4 }} />
+            <Button variant="primary" size="small" leadingIcon={Plus} onClick={openCreate}>
               新建商品
             </Button>
           ) : (
-            <span className="adm-cell-sub">当前账号无 product.write 权限，仅可查看</span>
+            <span className="text-[11px] text-text-tertiary">
+              当前账号无 product.write 权限，仅可查看
+            </span>
           )
         }
       />
 
-      <div className="adm-stat-grid">
+      <div className="mb-3 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
         <StatCard label="商品总数" value={rows.length} hint="含已下架，均可被历史订单引用" />
         <StatCard label="在售" value={stats.active} hint="C 端可下单" />
         <StatCard label="已下架" value={stats.offline} hint="不可下单，历史订单不受影响" />
@@ -407,14 +423,16 @@ export function AdminProductsPage() {
       </div>
 
       <FilterBar>
-        <Select
-          className="adm-filter-select"
+        <SelectBox
+          className="w-32"
+          ariaLabel="按状态筛选"
           placeholder="状态"
           allowClear
           value={status}
-          onChange={(v) => {
-            setStatus(v);
-            setQuery({ status: v });
+          onChange={(value) => {
+            const next = value as 'active' | 'offline' | undefined;
+            setStatus(next);
+            setQuery({ status: next });
           }}
           options={[
             { value: 'active', label: '在售' },
@@ -422,17 +440,11 @@ export function AdminProductsPage() {
           ]}
         />
         <FilterActions>
-          <Button type="default" className="adm-btn" onClick={reload}>
+          <Button variant="secondary" size="small" onClick={reload}>
             刷新
           </Button>
         </FilterActions>
-        <AppliedFilters
-          items={appliedChips}
-          onClearAll={() => {
-            setStatus(undefined);
-            setQuery({ status: undefined });
-          }}
-        />
+        <AppliedFilters items={appliedChips} onClearAll={clearStatus} />
       </FilterBar>
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
@@ -442,199 +454,174 @@ export function AdminProductsPage() {
         title="全部商品"
         note="价格以「分」存储，界面展示按「元」；两者同时显示便于与流水核对"
       >
-        {loading && !data ? (
-          <AdminListLoading tip="加载商品…" />
-        ) : error && !data ? (
-          <AdminListError error={error} onRetry={reload} />
-        ) : rows.length === 0 ? (
-          <AdminEmpty
-            description={
-              status
-                ? '当前筛选下没有商品。切换状态或清除筛选看看。'
-                : '还没有商品。新建一个积分包，C 端结算页才会出现可购买项。'
-            }
-            action={
-              status ? (
-                <Button
-                  type="default"
-                  className="adm-btn"
-                  onClick={() => {
-                    setStatus(undefined);
-                    setQuery({ status: undefined });
-                  }}
-                >
-                  清除筛选
-                </Button>
-              ) : undefined
-            }
-          />
-        ) : (
-          <Table<AdminProduct>
-            rowKey="id"
-            size="small"
-            columns={columns}
-            dataSource={rows}
-            loading={loading}
-            pagination={false}
-            scroll={{ x: 1060 }}
-          />
-        )}
+        <AdminDataTable<AdminProduct>
+          rows={rows}
+          columns={columns}
+          rowKey={(row) => row.id}
+          loading={loading}
+          error={error}
+          onRetry={reload}
+          minWidth={1120}
+          emptyText={
+            status
+              ? '当前筛选下没有商品。切换状态或清除筛选看看。'
+              : '还没有商品。新建一个积分包，C 端结算页才会出现可购买项。'
+          }
+          emptyAction={
+            status ? (
+              <Button variant="secondary" size="small" onClick={clearStatus}>
+                清除筛选
+              </Button>
+            ) : undefined
+          }
+        />
       </Panel>
 
       <Drawer
-        title={editing ? '编辑商品' : '新建商品'}
-        size={520}
         open={formOpen}
-        onClose={requestCloseForm}
-        className="adm-drawer"
-        destroyOnHidden
+        onOpenChange={(open) => {
+          if (!open) requestCloseForm();
+        }}
+        width={520}
+        title={editing ? '编辑商品' : '新建商品'}
+        description={formDirty ? '有未保存修改' : undefined}
         footer={
-          <div className="adm-drawer-footer">
-            {formDirty && <span className="adm-cell-sub">有未保存修改</span>}
-            <Button type="default" className="adm-btn" onClick={requestCloseForm} disabled={saving}>
+          <>
+            <Button variant="secondary" size="small" onClick={requestCloseForm} disabled={saving}>
               取消
             </Button>
-            <Button
-              type="primary"
-              className="adm-btn is-primary"
-              onClick={() => void submit()}
-              disabled={saving}
-            >
+            <Button variant="primary" size="small" disabled={saving} onClick={() => void submit()}>
               {saving ? '保存中…' : editing ? '保存修改' : '创建'}
             </Button>
-          </div>
+          </>
         }
       >
-        <div className="adm-form">
-          <div className="adm-field">
-            <label htmlFor="p-sku">SKU</label>
-            <Input
-              id="p-sku"
+        <div className="flex flex-col gap-4">
+          <Field
+            label="SKU"
+            hint={
+              editing
+                ? 'SKU 创建后不可修改：历史订单与外部对账都靠它认商品'
+                : '只允许字母、数字与连字符，创建后不可修改'
+            }
+          >
+            <TextInput
+              ariaLabel="SKU"
               value={draft.sku}
               disabled={editing !== null}
-              onChange={(e) => setDraft({ ...draft, sku: e.target.value })}
+              onChange={(value) => setDraft({ ...draft, sku: value })}
               placeholder="如 credits-100"
               maxLength={40}
             />
-            <div className="adm-field-hint">
-              {editing
-                ? 'SKU 创建后不可修改：历史订单与外部对账都靠它认商品'
-                : '只允许字母、数字与连字符，创建后不可修改'}
-            </div>
-          </div>
+          </Field>
 
-          <div className="adm-field">
-            <label htmlFor="p-name">商品名称</label>
-            <Input
-              id="p-name"
+          <Field label="商品名称">
+            <TextInput
+              ariaLabel="商品名称"
               value={draft.name}
-              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              onChange={(value) => setDraft({ ...draft, name: value })}
               placeholder="如 100 积分包"
               maxLength={80}
             />
-          </div>
+          </Field>
 
-          <div className="adm-field">
-            <label htmlFor="p-desc">商品描述</label>
-            <Input.TextArea
-              id="p-desc"
+          <Field label="商品描述">
+            <TextArea
+              ariaLabel="商品描述"
               value={draft.description}
-              onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+              onChange={(value) => setDraft({ ...draft, description: value })}
               rows={2}
               maxLength={500}
               placeholder="展示在结算页的补充说明，可留空"
             />
-          </div>
+          </Field>
 
-          <div className="adm-form-row">
-            <div className="adm-field">
-              <label htmlFor="p-price">售价（元）</label>
-              <Input
-                id="p-price"
-                value={draft.priceYuan}
-                onChange={(e) => setDraft({ ...draft, priceYuan: e.target.value })}
-                placeholder="9.90"
-                inputMode="decimal"
-              />
-              <div className="adm-field-hint">
-                {yuanTextToCents(draft.priceYuan) !== null
+          <div className="grid grid-cols-2 gap-4">
+            <Field
+              label="售价（元）"
+              hint={
+                yuanTextToCents(draft.priceYuan) !== null
                   ? `入库为 ${yuanTextToCents(draft.priceYuan)} 分`
-                  : '两位小数'}
-              </div>
-            </div>
-            <div className="adm-field">
-              <label htmlFor="p-original">划线价（元）</label>
-              <Input
-                id="p-original"
-                value={draft.originalPriceYuan}
-                onChange={(e) => setDraft({ ...draft, originalPriceYuan: e.target.value })}
-                placeholder="留空表示不展示"
+                  : '两位小数'
+              }
+            >
+              <TextInput
+                ariaLabel="售价"
                 inputMode="decimal"
+                value={draft.priceYuan}
+                onChange={(value) => setDraft({ ...draft, priceYuan: value })}
+                placeholder="9.90"
               />
-              <div className="adm-field-hint">仅用于展示对比，不参与结算</div>
-            </div>
+            </Field>
+            <Field label="划线价（元）" hint="仅用于展示对比，不参与结算">
+              <TextInput
+                ariaLabel="划线价"
+                inputMode="decimal"
+                value={draft.originalPriceYuan}
+                onChange={(value) => setDraft({ ...draft, originalPriceYuan: value })}
+                placeholder="留空表示不展示"
+              />
+            </Field>
           </div>
 
-          <div className="adm-form-row">
-            <div className="adm-field">
-              <label htmlFor="p-credits">赠送积分</label>
-              <Input
-                id="p-credits"
-                value={draft.credits}
-                onChange={(e) => setDraft({ ...draft, credits: e.target.value })}
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="赠送积分">
+              <TextInput
+                ariaLabel="赠送积分"
                 inputMode="numeric"
+                value={draft.credits}
+                onChange={(value) => setDraft({ ...draft, credits: value })}
                 placeholder="100"
               />
-            </div>
-            <div className="adm-field">
-              <label htmlFor="p-days">积分有效期（天）</label>
-              <Input
-                id="p-days"
-                value={draft.creditsValidDays}
-                onChange={(e) => setDraft({ ...draft, creditsValidDays: e.target.value })}
+            </Field>
+            <Field label="积分有效期（天）" hint="0 表示永久有效，不参与到期回收">
+              <TextInput
+                ariaLabel="积分有效期天数"
                 inputMode="numeric"
+                value={draft.creditsValidDays}
+                onChange={(value) => setDraft({ ...draft, creditsValidDays: value })}
                 placeholder="0"
               />
-              <div className="adm-field-hint">0 表示永久有效，不参与到期回收</div>
-            </div>
+            </Field>
           </div>
 
-          <div className="adm-form-row">
-            <div className="adm-field">
-              <label htmlFor="p-grant">发放方式</label>
-              <Select
-                id="p-grant"
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="发放方式">
+              <SelectBox
+                ariaLabel="发放方式"
                 value={draft.grantType}
                 onChange={(value) =>
                   setDraft({ ...draft, grantType: value as 'immediate' | 'manual' })
                 }
                 options={[
                   { value: 'immediate', label: '支付成功即发放' },
-                  { value: 'manual', label: '人工发放（需运营在积分账本操作）' },
+                  { value: 'manual', label: '人工发放' },
                 ]}
               />
-            </div>
-            <div className="adm-field">
-              <label htmlFor="p-sort">排序权重</label>
-              <Input
-                id="p-sort"
-                value={draft.sortOrder}
-                onChange={(e) => setDraft({ ...draft, sortOrder: e.target.value })}
+              {draft.grantType === 'manual' && (
+                <p className="text-[11px] leading-4 text-text-tertiary">
+                  需运营在积分账本中手动发放
+                </p>
+              )}
+            </Field>
+            <Field label="排序权重" hint="数字越小越靠前">
+              <TextInput
+                ariaLabel="排序权重"
                 inputMode="numeric"
+                value={draft.sortOrder}
+                onChange={(value) => setDraft({ ...draft, sortOrder: value })}
                 placeholder="0"
               />
-              <div className="adm-field-hint">数字越小越靠前</div>
-            </div>
+            </Field>
           </div>
 
           {editing && (
-            <div className="adm-field-hint">
+            <p className="text-[11px] leading-4 text-text-tertiary">
               上次更新：{new Date(editing.updatedAt).toLocaleString('zh-CN')} · 改价会写入操作审计
-            </div>
+            </p>
           )}
         </div>
       </Drawer>
-
     </>
   );
 }

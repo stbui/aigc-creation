@@ -1,19 +1,17 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { App, Button, Drawer, Input, Select, Table, Upload as AntUpload } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import type { UploadFile } from 'antd';
 import { Download, Upload } from 'lucide-react';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
+import { Pagination } from '../../vendor/boardui/components/base/pagination/pagination';
 import { adminCreditsApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
 import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import { adminOrderHref, adminTasksHref, adminUserDetailHref } from '../../lib/admin-links';
 import {
   AdminListError,
   AdminListLoading,
   AdminStaleError,
-  adminMiniPagination,
-  adminPagination,
   useAdminList,
   useAdminResource,
   useAdminUrlFilterSync,
@@ -26,8 +24,14 @@ import {
   PageHeader,
   Panel,
   StatCard,
+  StatusTag,
   type AppliedFilter,
 } from '../../components/admin/PageHeader';
+import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
+import { Drawer } from '../../admin-ui/primitives/Drawer';
+import { Descriptions, FormField, Notice } from '../../admin-ui/primitives';
+import { FilePick, SelectBox, TextArea, TextInput } from '../../admin-ui/controls';
+import { cx } from '../../admin-ui/lib/cn';
 import type {
   AdminCreditLedgerRow,
   AdminCreditListResult,
@@ -71,6 +75,9 @@ const SOURCE_LABELS: Record<string, string> = {
 
 const LEDGER_OPTIONS = Object.entries(LEDGER_LABELS).map(([value, label]) => ({ value, label }));
 
+/** CSV 导入结果每页行数。结果是一次性返回的, 分页只在客户端做。 */
+const IMPORT_PAGE_SIZE = 10;
+
 /** 带符号的积分文本: 正数显式加号, 否则扫视时看不出是增还是减 */
 function signed(n: number): string {
   return n > 0 ? `+${n}` : String(n);
@@ -81,7 +88,7 @@ function fmtTime(v: string | null): string {
 }
 
 export function AdminCreditsPage() {
-  const { message } = App.useApp();
+  const toast = useToast();
   const { can } = useAdmin();
 
   // 深链/刷新后保留筛选。初始值同时喂给 useAdminList, 首次请求即带筛选。
@@ -179,84 +186,86 @@ export function AdminCreditsPage() {
         email: params.email as string | undefined,
         userId: params.userId as string | undefined,
       });
-      void message.success('导出已开始下载');
+      toast.success('导出已开始下载');
     } catch (e) {
-      void message.error(e instanceof Error ? e.message : '导出失败');
+      toast.error(e instanceof Error ? e.message : '导出失败');
     } finally {
       setExporting(false);
     }
   };
 
-  const columns: ColumnsType<AdminCreditRow> = [
+  const columns: Array<AdminColumn<AdminCreditRow>> = [
     {
-      title: '用户',
       key: 'user',
+      title: '用户',
       width: 230,
-      render: (_: unknown, row) => (
-        <div className="adm-cell-stack">
-          <span>{row.name || row.email}</span>
-          <span className="adm-cell-sub">
-            <Link className="adm-link" to={adminUserDetailHref(row.userId)}>
+      render: (row) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="text-sm text-text-primary">{row.name || row.email}</span>
+          <span className="text-[11px] text-text-tertiary">
+            <Link className="text-accent-700 hover:underline" to={adminUserDetailHref(row.userId)}>
               {row.email}
             </Link>
             {row.name ? '' : ' · 无昵称'}
           </span>
-          <code className="adm-cell-sub" title={row.userId}>
+          <code className="text-[11px] text-text-tertiary" title={row.userId}>
             {row.userId}
           </code>
         </div>
       ),
     },
     {
-      title: '当前余额',
-      dataIndex: 'balance',
       key: 'balance',
+      title: '当前余额',
       width: 110,
-      render: (v: number) => <b>{v}</b>,
+      render: (row) => <b className="tabular-nums">{row.balance}</b>,
     },
     {
-      title: '30 天内到期',
-      dataIndex: 'expiringSoon',
       key: 'expiringSoon',
+      title: '30 天内到期',
       width: 120,
-      render: (v: number) =>
-        v > 0 ? <span className="adm-text-warn">{v}</span> : <span className="adm-cell-sub">—</span>,
+      render: (row) =>
+        row.expiringSoon > 0 ? (
+          <span className="tabular-nums text-amber-700">{row.expiringSoon}</span>
+        ) : (
+          <span className="text-[11px] text-text-tertiary">—</span>
+        ),
     },
     {
-      title: '累计获得',
-      dataIndex: 'totalEarned',
       key: 'totalEarned',
+      title: '累计获得',
       width: 100,
+      render: (row) => <span className="tabular-nums">{row.totalEarned}</span>,
     },
     {
-      title: '累计消耗',
-      dataIndex: 'totalConsumed',
       key: 'totalConsumed',
+      title: '累计消耗',
       width: 100,
+      render: (row) => <span className="tabular-nums">{row.totalConsumed}</span>,
     },
     {
-      title: '有效批次',
-      dataIndex: 'activeLots',
       key: 'activeLots',
+      title: '有效批次',
       width: 90,
+      render: (row) => <span className="tabular-nums">{row.activeLots}</span>,
     },
     {
-      title: '最近到期',
-      dataIndex: 'nearestExpiry',
       key: 'nearestExpiry',
+      title: '最近到期',
       width: 160,
-      render: (v: string | null) => <span className="adm-cell-sub">{fmtTime(v)}</span>,
+      render: (row) => (
+        <span className="text-[11px] text-text-tertiary">{fmtTime(row.nearestExpiry)}</span>
+      ),
     },
     {
-      title: '',
       key: 'ops',
+      title: '',
       width: 80,
-      render: (_: unknown, row) => (
-        <div className="adm-ops">
-          <Button type="link" className="adm-link" onClick={() => setDetail(row)}>
-            明细
-          </Button>
-        </div>
+      fixed: 'right',
+      render: (row) => (
+        <Button variant="ghost" size="xs" onClick={() => setDetail(row)}>
+          明细
+        </Button>
       ),
     },
   ];
@@ -267,10 +276,9 @@ export function AdminCreditsPage() {
         title="积分账本"
         description="余额由批次推导，流水只追加不修改。人工调整会立即改变用户可用余额并写入审计。"
         actions={
-          <div className="adm-ops">
+          <>
             {can('credit.adjust') && (
-              <Button type="default" className="adm-btn" onClick={() => setBatchOpen(true)}>
-                <Upload size={14} style={{ marginRight: 4 }} />
+              <Button variant="secondary" size="small" leadingIcon={Upload} onClick={() => setBatchOpen(true)}>
                 批量调整
               </Button>
             )}
@@ -279,27 +287,26 @@ export function AdminCreditsPage() {
                 与人工调整同一套规则）。此前这里用 data.import，导致有 credit.adjust
                 的财务看不到入口，而只有 data.import 的角色点进去反而 403。 */}
             {can('credit.adjust') && (
-              <Button type="default" className="adm-btn" onClick={() => setImportOpen(true)}>
-                <Upload size={14} style={{ marginRight: 4 }} />
+              <Button variant="secondary" size="small" leadingIcon={Upload} onClick={() => setImportOpen(true)}>
                 导入 CSV
               </Button>
             )}
             {can('data.export') && (
               <Button
-                type="default"
-                className="adm-btn"
+                variant="secondary"
+                size="small"
+                leadingIcon={Download}
                 onClick={() => void exportCsv()}
                 disabled={exporting}
               >
-                <Download size={14} style={{ marginRight: 4 }} />
                 {exporting ? '导出中…' : '导出 CSV'}
               </Button>
             )}
-          </div>
+          </>
         }
       />
 
-      <div className="adm-stat-grid">
+      <div className="mb-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
         <StatCard label="用户总数" value={data?.total ?? '—'} hint="符合当前筛选的账户数" />
         <StatCard label="本页余额合计" value={pageSummary.balance} hint="仅统计当前页，不是全站总量" />
         <StatCard
@@ -311,27 +318,29 @@ export function AdminCreditsPage() {
       </div>
 
       <FilterBar>
-        <Input
-          className="adm-filter-input"
+        <TextInput
+          className="w-52"
+          ariaLabel="按邮箱筛选"
           placeholder="邮箱"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          onPressEnter={applyQuery}
+          onChange={setEmail}
+          onEnter={applyQuery}
           allowClear
         />
-        <Input
-          className="adm-filter-input"
+        <TextInput
+          className="w-52"
+          ariaLabel="按用户 ID 筛选"
           placeholder="用户 ID（精确）"
           value={userId}
-          onChange={(e) => setUserId(e.target.value)}
-          onPressEnter={applyQuery}
+          onChange={setUserId}
+          onEnter={applyQuery}
           allowClear
         />
         <FilterActions>
-          <Button type="primary" className="adm-btn is-primary" onClick={applyQuery}>
+          <Button variant="primary" size="small" onClick={applyQuery}>
             查询
           </Button>
-          <Button type="default" className="adm-btn" onClick={reset}>
+          <Button variant="secondary" size="small" onClick={reset}>
             重置
           </Button>
         </FilterActions>
@@ -351,26 +360,28 @@ export function AdminCreditsPage() {
             description={hasFilter ? '没有符合条件的用户。' : '还没有可查看的用户。'}
             action={
               hasFilter ? (
-                <Button type="default" className="adm-btn" onClick={reset}>
+                <Button variant="secondary" size="small" onClick={reset}>
                   清除筛选
                 </Button>
               ) : undefined
             }
           />
         ) : (
-          <Table<AdminCreditRow>
-            rowKey="userId"
-            size="small"
+          <AdminDataTable<AdminCreditRow>
+            rows={rows}
             columns={columns}
-            dataSource={rows}
+            rowKey={(row) => row.userId}
             loading={loading}
-            scroll={{ x: 1100 }}
-            pagination={adminPagination({
+            error={error}
+            onRetry={reload}
+            minWidth={1100}
+            pagination={{
               current: data?.page ?? 1,
               pageSize: data?.pageSize ?? 20,
               total: data?.total ?? 0,
-              onChange: setPage,
-            })}
+              unit: '个账户',
+              onChange: (page, size) => setPage(page, size),
+            }}
           />
         )}
       </Panel>
@@ -394,7 +405,7 @@ export function AdminCreditsPage() {
         />
       )}
 
-      <BatchAdjustModal
+      <BatchAdjustDrawer
         open={batchOpen}
         onClose={() => setBatchOpen(false)}
         onDone={() => {
@@ -403,7 +414,7 @@ export function AdminCreditsPage() {
         }}
       />
 
-      <CsvImportModal
+      <CsvImportDrawer
         open={importOpen}
         onClose={() => setImportOpen(false)}
         onDone={() => {
@@ -432,7 +443,7 @@ function CreditDetailDrawer({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const { message } = App.useApp();
+  const toast = useToast();
   const [type, setType] = useState<string | undefined>();
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -471,12 +482,12 @@ function CreditDetailDrawer({
 
   const submitAdjust = async () => {
     if (!deltaValid) {
-      void message.warning('变动量必须是非零整数，正数增加、负数扣减');
+      toast.warning('变动量必须是非零整数，正数增加、负数扣减');
       return;
     }
     const trimmed = reason.trim();
     if (!trimmed) {
-      void message.warning('请填写调整原因');
+      toast.warning('请填写调整原因');
       return;
     }
     setBusy(true);
@@ -487,110 +498,197 @@ function CreditDetailDrawer({
         reason: trimmed,
         ...(validDays.trim() ? { validDays: Number(validDays) } : {}),
       });
-      void message.success(`已调整 ${signed(parsedDelta)} 积分，当前余额 ${r.balance}`);
+      toast.success(`已调整 ${signed(parsedDelta)} 积分，当前余额 ${r.balance}`);
       setDelta('');
       setReason('');
       setValidDays('');
       void reload({ silent: true });
       onChanged();
     } catch (e) {
-      void message.error(e instanceof Error ? e.message : '调整失败');
+      toast.error(e instanceof Error ? e.message : '调整失败');
     } finally {
       setBusy(false);
     }
   };
 
+  const lotColumns: Array<AdminColumn<AdminCreditLotRow>> = [
+    {
+      key: 'source',
+      title: '来源',
+      width: 100,
+      render: (row) => <span className="text-xs">{SOURCE_LABELS[row.source] ?? row.source}</span>,
+    },
+    {
+      key: 'amount',
+      title: '剩余 / 总量',
+      width: 140,
+      render: (row) => (
+        <span className="tabular-nums text-xs">
+          {row.remainingCredits} / {row.totalCredits}
+        </span>
+      ),
+    },
+    {
+      key: 'expireAt',
+      title: '到期',
+      width: 170,
+      render: (row) =>
+        row.expireAt ? (
+          <span className="text-[11px] text-text-secondary">{fmtTime(row.expireAt)}</span>
+        ) : (
+          <span className="text-[11px] text-text-tertiary">永久</span>
+        ),
+    },
+    {
+      key: 'createdAt',
+      title: '创建时间',
+      render: (row) => (
+        <span className="text-[11px] text-text-secondary">{fmtTime(row.createdAt)}</span>
+      ),
+    },
+  ];
+
+  const ledgerColumns: Array<AdminColumn<AdminCreditLedgerRow>> = [
+    {
+      key: 'createdAt',
+      title: '时间',
+      width: 170,
+      render: (row) => (
+        <span className="text-[11px] tabular-nums text-text-secondary">{fmtTime(row.createdAt)}</span>
+      ),
+    },
+    {
+      key: 'type',
+      title: '类型',
+      width: 110,
+      render: (row) => <span className="text-xs">{LEDGER_LABELS[row.type] ?? row.type}</span>,
+    },
+    {
+      key: 'amount',
+      title: '变动',
+      width: 90,
+      render: (row) => (
+        <b className={cx('tabular-nums', row.amount > 0 ? 'text-emerald-600' : 'text-rose-600')}>
+          {signed(row.amount)}
+        </b>
+      ),
+    },
+    {
+      key: 'balanceAfter',
+      title: '变动后余额',
+      width: 110,
+      render: (row) => <span className="tabular-nums text-xs">{row.balanceAfter}</span>,
+    },
+    {
+      key: 'reason',
+      title: '说明',
+      render: (row) => (
+        <span className="text-[11px] text-text-tertiary">
+          {row.reason ?? '—'}
+          {row.taskId ? ` · 任务 ${row.taskId.slice(-8)}` : ''}
+          {row.orderId ? ` · 订单 ${row.orderId.slice(-8)}` : ''}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <Drawer
       title={`积分明细 · ${user.email}`}
-      size={760}
+      width={760}
       open
-      onClose={requestClose}
-      className="adm-drawer"
-      destroyOnHidden
+      onOpenChange={(next) => {
+        if (!next) requestClose();
+      }}
     >
       {error && data && <AdminStaleError error={error} onRetry={() => void reload()} />}
 
-      <div className="adm-section">
-        <div className="adm-section-title">账户概要</div>
-        <dl className="adm-desc">
-          <dt>用户</dt>
-          <dd>
-            <Link className="adm-link" to={adminUserDetailHref(user.userId)}>
-              {user.email}
-            </Link>
-          </dd>
-          <dt>用户 ID</dt>
-          <dd>
-            <code>{user.userId}</code>
-          </dd>
-          <dt>关联记录</dt>
-          <dd className="adm-relation-links">
-            <Link to={adminOrderHref({ email: user.email })}>订单记录</Link>
-            <Link to={adminTasksHref({ userId: user.userId })}>任务记录</Link>
-          </dd>
-          <dt>当前余额</dt>
-          <dd>
-            <b>{user.balance}</b>
-          </dd>
-          <dt>30 天内到期</dt>
-          <dd>{user.expiringSoon}</dd>
-          <dt>累计获得 / 消耗</dt>
-          <dd>
-            {user.totalEarned} / {user.totalConsumed}
-            <span className="adm-panel-note">
-              {' '}
-              不含到期回收与退款扣回，故与余额不构成等式
-            </span>
-          </dd>
-          <dt>最近到期</dt>
-          <dd>{fmtTime(user.nearestExpiry)}</dd>
-        </dl>
-      </div>
+      <section className="mb-6">
+        <SectionTitle title="账户概要" />
+        <Descriptions
+          columns={2}
+          items={[
+            {
+              label: '用户',
+              value: (
+                <Link className="text-accent-700 hover:underline" to={adminUserDetailHref(user.userId)}>
+                  {user.email}
+                </Link>
+              ),
+            },
+            { label: '用户 ID', value: <code className="font-mono text-xs">{user.userId}</code> },
+            {
+              label: '关联记录',
+              value: (
+                <span className="flex flex-wrap gap-x-3">
+                  <Link className="text-accent-700 hover:underline" to={adminOrderHref({ email: user.email })}>
+                    订单记录
+                  </Link>
+                  <Link className="text-accent-700 hover:underline" to={adminTasksHref({ userId: user.userId })}>
+                    任务记录
+                  </Link>
+                </span>
+              ),
+            },
+            { label: '当前余额', value: <b className="tabular-nums">{user.balance}</b> },
+            { label: '30 天内到期', value: <span className="tabular-nums">{user.expiringSoon}</span> },
+            {
+              label: '累计获得 / 消耗',
+              value: (
+                <span className="tabular-nums">
+                  {user.totalEarned} / {user.totalConsumed}
+                  <span className="ml-1 text-[11px] text-text-tertiary">
+                    不含到期回收与退款扣回，故与余额不构成等式
+                  </span>
+                </span>
+              ),
+            },
+            { label: '最近到期', value: fmtTime(user.nearestExpiry) },
+          ]}
+        />
+      </section>
 
       {writable && (
-        <div className="adm-section">
-          <div className="adm-section-title">
-            人工调整
-            <span className="adm-panel-note">正数增加、负数扣减；扣减受余额限制</span>
-          </div>
-          <div className="adm-form">
-            <div className="adm-form-row">
-              <div className="adm-field">
-                <label htmlFor="c-delta">变动量（积分）</label>
-                <Input
-                  id="c-delta"
-                  value={delta}
-                  onChange={(e) => setDelta(e.target.value)}
-                  placeholder="如 100 或 -50"
-                  inputMode="numeric"
-                />
+        <section className="mb-6">
+          <SectionTitle title="人工调整" note="正数增加、负数扣减；扣减受余额限制" />
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap gap-3">
+              <div className="w-40">
+                <FormField label="变动量（积分）" htmlFor="c-delta">
+                  <TextInput
+                    value={delta}
+                    onChange={setDelta}
+                    placeholder="如 100 或 -50"
+                    inputMode="numeric"
+                    ariaLabel="变动量"
+                  />
+                </FormField>
               </div>
-              <div className="adm-field">
-                <label htmlFor="c-valid">有效天数（可选）</label>
-                <Input
-                  id="c-valid"
-                  value={validDays}
-                  onChange={(e) => setValidDays(e.target.value)}
-                  placeholder="留空 = 永久"
-                  inputMode="numeric"
-                />
+              <div className="w-40">
+                <FormField label="有效天数（可选）" htmlFor="c-valid">
+                  <TextInput
+                    value={validDays}
+                    onChange={setValidDays}
+                    placeholder="留空 = 永久"
+                    inputMode="numeric"
+                    ariaLabel="有效天数"
+                  />
+                </FormField>
               </div>
             </div>
-            <div className="adm-field">
-              <label htmlFor="c-reason">调整原因（强制）</label>
-              <Input
-                id="c-reason"
+            <FormField label="调整原因（强制）" htmlFor="c-reason">
+              <TextInput
                 value={reason}
-                onChange={(e) => setReason(e.target.value)}
+                onChange={setReason}
                 placeholder="如：工单 #123 补偿生成失败"
                 maxLength={200}
+                ariaLabel="调整原因"
               />
-            </div>
+            </FormField>
             <div>
               <Button
-                type="primary"
-                className="adm-btn is-primary"
+                variant="primary"
+                size="small"
                 disabled={!deltaValid}
                 onClick={() => void submitAdjust()}
               >
@@ -598,14 +696,11 @@ function CreditDetailDrawer({
               </Button>
             </div>
           </div>
-        </div>
+        </section>
       )}
 
-      <div className="adm-section">
-        <div className="adm-section-title">
-          批次
-          <span className="adm-panel-note">消耗按先到期先扣（FEFO），空到期视为最晚</span>
-        </div>
+      <section className="mb-6">
+        <SectionTitle title="批次" note="消耗按先到期先扣（FEFO），空到期视为最晚" />
         {loading && !data ? (
           <AdminListLoading tip="加载积分批次…" />
         ) : error && !data ? (
@@ -613,69 +708,33 @@ function CreditDetailDrawer({
         ) : lots.length === 0 ? (
           <AdminEmpty description="该用户没有积分批次。" />
         ) : (
-          <Table<AdminCreditLotRow>
-            rowKey="id"
-            size="small"
-            pagination={false}
-            dataSource={lots}
-            columns={[
-              {
-                title: '来源',
-                dataIndex: 'source',
-                key: 'source',
-                width: 100,
-                render: (v: string) => SOURCE_LABELS[v] ?? v,
-              },
-              {
-                title: '剩余 / 总量',
-                key: 'amount',
-                width: 140,
-                render: (_: unknown, r) => `${r.remainingCredits} / ${r.totalCredits}`,
-              },
-              {
-                title: '到期',
-                dataIndex: 'expireAt',
-                key: 'expireAt',
-                width: 170,
-                render: (v: string | null) =>
-                  v ? fmtTime(v) : <span className="adm-cell-sub">永久</span>,
-              },
-              {
-                title: '创建时间',
-                dataIndex: 'createdAt',
-                key: 'createdAt',
-                render: (v: string) => fmtTime(v),
-              },
-            ]}
+          <AdminDataTable<AdminCreditLotRow>
+            rows={lots}
+            columns={lotColumns}
+            rowKey={(row) => row.id}
+            loading={loading}
+            density="compact"
+            emptyText="该用户没有积分批次。"
           />
         )}
-      </div>
+      </section>
 
-      <div className="adm-section">
-        <div className="adm-section-title">流水</div>
+      <section>
+        <SectionTitle title="流水" />
         <FilterBar>
-          <Select
-            className="adm-filter-select"
+          <SelectBox
+            className="w-36"
+            ariaLabel="按流水类型筛选"
             placeholder="类型"
             allowClear
             value={type}
             onChange={setType}
             options={LEDGER_OPTIONS}
           />
-          <Input
-            className="adm-filter-input"
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-          />
-          <Input
-            className="adm-filter-input"
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-          />
+          <TextInput className="w-40" ariaLabel="开始日期" type="date" value={from} onChange={setFrom} />
+          <TextInput className="w-40" ariaLabel="结束日期" type="date" value={to} onChange={setTo} />
           <FilterActions>
-            <Button type="default" className="adm-btn" loading={loading} onClick={() => void reload()}>
+            <Button variant="secondary" size="small" onClick={() => void reload()} disabled={loading}>
               刷新
             </Button>
           </FilterActions>
@@ -689,60 +748,16 @@ function CreditDetailDrawer({
         ) : error && !data ? null : ledger.length === 0 ? (
           <AdminEmpty description="没有符合条件的流水。" />
         ) : (
-          <Table<AdminCreditLedgerRow>
-            rowKey="id"
-            size="small"
-            pagination={false}
+          <AdminDataTable<AdminCreditLedgerRow>
+            rows={ledger}
+            columns={ledgerColumns}
+            rowKey={(row) => row.id}
             loading={loading}
-            dataSource={ledger}
-            columns={[
-              {
-                title: '时间',
-                dataIndex: 'createdAt',
-                key: 'createdAt',
-                width: 170,
-                render: (v: string) => fmtTime(v),
-              },
-              {
-                title: '类型',
-                dataIndex: 'type',
-                key: 'type',
-                width: 110,
-                render: (v: string) => LEDGER_LABELS[v] ?? v,
-              },
-              {
-                title: '变动',
-                dataIndex: 'amount',
-                key: 'amount',
-                width: 90,
-                render: (v: number) => (
-                  <b className={v > 0 ? 'adm-text-success' : 'adm-text-danger'}>
-                    {signed(v)}
-                  </b>
-                ),
-              },
-              {
-                title: '变动后余额',
-                dataIndex: 'balanceAfter',
-                key: 'balanceAfter',
-                width: 110,
-              },
-              {
-                title: '说明',
-                key: 'reason',
-                render: (_: unknown, r) => (
-                  <span className="adm-cell-sub">
-                    {r.reason ?? '—'}
-                    {r.taskId ? ` · 任务 ${r.taskId.slice(-8)}` : ''}
-                    {r.orderId ? ` · 订单 ${r.orderId.slice(-8)}` : ''}
-                  </span>
-                ),
-              },
-            ]}
+            density="compact"
+            emptyText="没有符合条件的流水。"
           />
         )}
-      </div>
-
+      </section>
     </Drawer>
   );
 }
@@ -754,7 +769,7 @@ function CreditDetailDrawer({
  * 运营手里通常是从表格里复制出来的一批 id, 粘进 textarea 比逐行点「添加」
  * 快一个数量级, 也避免了 N 个受控输入各自校验。
  */
-function BatchAdjustModal({
+function BatchAdjustDrawer({
   open,
   onClose,
   onDone,
@@ -763,7 +778,7 @@ function BatchAdjustModal({
   onClose: () => void;
   onDone: () => void;
 }) {
-  const { message } = App.useApp();
+  const toast = useToast();
   const [text, setText] = useState('');
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
@@ -825,141 +840,134 @@ function BatchAdjustModal({
   const submit = async () => {
     const trimmed = reason.trim();
     if (!trimmed) {
-      void message.warning('请填写整批调整原因');
+      toast.warning('请填写整批调整原因');
       return;
     }
     if (parsed.items.length === 0) {
-      void message.warning('没有可提交的有效行');
+      toast.warning('没有可提交的有效行');
       return;
     }
     setBusy(true);
     try {
       const r = await adminCreditsApi.batchAdjust({ items: parsed.items, reason: trimmed });
       setResult(r);
-      if (r.failed === 0) void message.success(`已调整 ${r.succeeded} 条`);
-      else void message.warning(`成功 ${r.succeeded} 条，失败 ${r.failed} 条`);
+      if (r.failed === 0) toast.success(`已调整 ${r.succeeded} 条`);
+      else toast.warning(`成功 ${r.succeeded} 条，失败 ${r.failed} 条`);
     } catch (e) {
-      void message.error(e instanceof Error ? e.message : '批量调整失败');
+      toast.error(e instanceof Error ? e.message : '批量调整失败');
     } finally {
       setBusy(false);
     }
   };
 
+  const resultColumns: Array<AdminColumn<{ userId: string; success: boolean; balance?: number; message?: string }>> = [
+    {
+      key: 'userId',
+      title: '用户 ID',
+      render: (row) => (
+        <code className="font-mono text-[11px] text-text-secondary">{row.userId}</code>
+      ),
+    },
+    {
+      key: 'ok',
+      title: '结果',
+      width: 90,
+      render: (row) =>
+        row.success ? (
+          <StatusTag status="succeeded" label="成功" tone="success" />
+        ) : (
+          <StatusTag status="failed" label="失败" tone="danger" />
+        ),
+    },
+    {
+      key: 'msg',
+      title: '说明',
+      render: (row) => (
+        <span className="text-[11px] text-text-tertiary">
+          {row.success ? `余额 ${row.balance}` : (row.message ?? '未知原因')}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <Drawer
       title="批量调整积分"
-      size={680}
+      width={680}
       open={open}
-      onClose={requestClose}
-      className="adm-drawer"
-      destroyOnHidden
+      onOpenChange={(next) => {
+        if (!next) requestClose();
+      }}
       footer={
-        <div className="adm-drawer-footer">
-          <Button type="default" className="adm-btn" onClick={requestClose} disabled={busy}>
+        <>
+          <Button variant="secondary" size="small" onClick={requestClose} disabled={busy}>
             {result ? '关闭' : '取消'}
           </Button>
           {result ? (
-            <Button type="primary" className="adm-btn is-primary" onClick={done}>
+            <Button variant="primary" size="small" onClick={done}>
               完成
             </Button>
           ) : (
             <Button
-              type="primary"
-              className="adm-btn is-primary"
+              variant="primary"
+              size="small"
               onClick={() => void submit()}
               disabled={busy || parsed.items.length === 0}
             >
               {busy ? '提交中…' : `提交 ${parsed.items.length} 条`}
             </Button>
           )}
-        </div>
+        </>
       }
     >
       {result ? (
-        <div className="adm-section">
-          <div className="adm-section-title">
-            执行结果
-            <span className="adm-panel-note">
-              成功 {result.succeeded} · 失败 {result.failed}
-            </span>
-          </div>
-          <Table
-            rowKey="userId"
-            size="small"
-            pagination={false}
-            dataSource={result.results}
-            columns={[
-              {
-                title: '用户 ID',
-                dataIndex: 'userId',
-                key: 'userId',
-                render: (v: string) => <code className="adm-cell-sub">{v}</code>,
-              },
-              {
-                title: '结果',
-                key: 'ok',
-                width: 90,
-                render: (_: unknown, r) =>
-                  r.success ? (
-                    <span className="adm-tag is-success">
-                      <span className="adm-tag-dot" aria-hidden="true" />
-                      成功
-                    </span>
-                  ) : (
-                    <span className="adm-tag is-danger">
-                      <span className="adm-tag-dot" aria-hidden="true" />
-                      失败
-                    </span>
-                  ),
-              },
-              {
-                title: '说明',
-                key: 'msg',
-                render: (_: unknown, r) => (
-                  <span className="adm-cell-sub">
-                    {r.success ? `余额 ${r.balance}` : (r.message ?? '未知原因')}
-                  </span>
-                ),
-              },
-            ]}
+        <section>
+          <SectionTitle
+            title="执行结果"
+            note={`成功 ${result.succeeded} · 失败 ${result.failed}`}
           />
-        </div>
+          <AdminDataTable
+            rows={result.results}
+            columns={resultColumns}
+            rowKey={(row) => row.userId}
+            density="compact"
+            emptyText="没有结果"
+          />
+        </section>
       ) : (
-        <div className="adm-form">
-          <div className="adm-field">
-            <label htmlFor="b-lines">调整清单</label>
-            <Input.TextArea
-              id="b-lines"
-              rows={8}
+        <div className="flex flex-col gap-4">
+          <FormField
+            label="调整清单"
+            hint="正数增加、负数扣减，单次最多 100 条；逐条独立执行，一条失败不影响其余"
+          >
+            <TextArea
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={setText}
+              rows={8}
               placeholder={'每行一条：用户ID,变动量[,单独原因]\n如：\ncuid_abc,100\ncuid_def,-50,工单 #223 扣回'}
+              ariaLabel="调整清单"
             />
-            <div className="adm-field-hint">
-              正数增加、负数扣减，单次最多 100 条；逐条独立执行，一条失败不影响其余
-            </div>
-          </div>
+          </FormField>
 
           {parsed.errors.length > 0 && (
-            <div className="adm-confirm-warn">
-              <span>
-                {parsed.errors.slice(0, 5).join('；')}
-                {parsed.errors.length > 5 ? ` …共 ${parsed.errors.length} 处问题` : ''}
-              </span>
-            </div>
+            <Notice tone="warn">
+              {parsed.errors.slice(0, 5).join('；')}
+              {parsed.errors.length > 5 ? ` …共 ${parsed.errors.length} 处问题` : ''}
+            </Notice>
           )}
 
-          <div className="adm-field">
-            <label htmlFor="b-reason">整批原因（强制）</label>
-            <Input
-              id="b-reason"
+          <FormField
+            label="整批原因（强制）"
+            hint="逐行未填原因时使用该文案；每一条都会写入审计"
+          >
+            <TextInput
               value={reason}
-              onChange={(e) => setReason(e.target.value)}
+              onChange={setReason}
               placeholder="如：2026-10 故障补偿"
               maxLength={200}
+              ariaLabel="整批原因"
             />
-            <div className="adm-field-hint">逐行未填原因时使用该文案；每一条都会写入审计</div>
-          </div>
+          </FormField>
         </div>
       )}
     </Drawer>
@@ -981,7 +989,7 @@ function BatchAdjustModal({
  * 直接的数据行 —— 两种在 Excel 另存为 CSV 的场景里都很常见, 后端两种都认。
  * 逗号分隔、UTF-8（Excel 中文版另存的 CSV 常带 BOM, 后端会剥掉）。
  */
-function CsvImportModal({
+function CsvImportDrawer({
   open,
   onClose,
   onDone,
@@ -990,13 +998,13 @@ function CsvImportModal({
   onClose: () => void;
   onDone: () => void;
 }) {
-  const { message } = App.useApp();
+  const toast = useToast();
   const [file, setFile] = useState<File | null>(null);
-  const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [reason, setReason] = useState('');
   const [validDays, setValidDays] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<CreditImportResult | null>(null);
+  const [importPage, setImportPage] = useState(1);
   const dirty = !result && Boolean(file || reason.trim() || validDays.trim());
   useUnsavedGuard(open && dirty);
 
@@ -1007,7 +1015,7 @@ function CsvImportModal({
     setReason('');
     setValidDays('');
     setResult(null);
-    setFileList([]);
+    setImportPage(1);
     onClose();
   };
   const requestClose = useDiscardConfirm(open && dirty, close);
@@ -1016,18 +1024,27 @@ function CsvImportModal({
     setReason('');
     setValidDays('');
     setResult(null);
-    setFileList([]);
+    setImportPage(1);
     onDone();
   };
 
+  /** 失败行排最后 + 客户端分页切片 */
+  const importRows = useMemo(() => {
+    const sorted = [...(result?.results ?? [])].sort(
+      (a, b) => Number(a.success) - Number(b.success),
+    );
+    const start = (importPage - 1) * IMPORT_PAGE_SIZE;
+    return sorted.slice(start, start + IMPORT_PAGE_SIZE);
+  }, [result, importPage]);
+
   const submit = async () => {
     if (!file) {
-      void message.warning('请先选择 CSV 文件');
+      toast.warning('请先选择 CSV 文件');
       return;
     }
     const days = validDays.trim() ? Number(validDays.trim()) : undefined;
     if (days !== undefined && (!Number.isInteger(days) || days <= 0)) {
-      void message.warning('有效期必须是不小于 1 的整数天');
+      toast.warning('有效期必须是不小于 1 的整数天');
       return;
     }
     setBusy(true);
@@ -1037,159 +1054,164 @@ function CsvImportModal({
         validDays: days,
       });
       setResult(r);
-      if (r.failed === 0) void message.success(`已导入 ${r.succeeded} 条`);
-      else void message.warning(`成功 ${r.succeeded} 条，失败 ${r.failed} 条`);
+      if (r.failed === 0) toast.success(`已导入 ${r.succeeded} 条`);
+      else toast.warning(`成功 ${r.succeeded} 条，失败 ${r.failed} 条`);
     } catch (e) {
-      void message.error(e instanceof Error ? e.message : '导入失败');
+      toast.error(e instanceof Error ? e.message : '导入失败');
     } finally {
       setBusy(false);
     }
   };
 
+  const resultColumns: Array<AdminColumn<CreditImportResult['results'][number]>> = [
+    { key: 'row', title: '行号', width: 70, render: (row) => <span className="tabular-nums">{row.row}</span> },
+    {
+      key: 'email',
+      title: '邮箱',
+      render: (row) => <span className="text-[11px] text-text-tertiary">{row.email || '—'}</span>,
+    },
+    {
+      key: 'delta',
+      title: '变动',
+      width: 90,
+      render: (row) => (
+        <span className="tabular-nums text-xs">
+          {Number.isFinite(row.delta) ? signed(row.delta) : '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'ok',
+      title: '结果',
+      width: 90,
+      render: (row) =>
+        row.success ? (
+          <StatusTag status="succeeded" label="成功" tone="success" />
+        ) : (
+          <StatusTag status="failed" label="失败" tone="danger" />
+        ),
+    },
+    {
+      key: 'msg',
+      title: '说明',
+      render: (row) => (
+        <span className="text-[11px] text-text-tertiary">
+          {row.success ? `余额 ${row.balance}` : (row.message ?? '未知原因')}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <Drawer
       title="导入积分（CSV）"
-      size={680}
+      width={680}
       open={open}
-      onClose={requestClose}
-      className="adm-drawer"
-      destroyOnHidden
+      onOpenChange={(next) => {
+        if (!next) requestClose();
+      }}
       footer={
-        <div className="adm-drawer-footer">
-          <Button type="default" className="adm-btn" onClick={requestClose} disabled={busy}>
+        <>
+          <Button variant="secondary" size="small" onClick={requestClose} disabled={busy}>
             {result ? '关闭' : '取消'}
           </Button>
           {result ? (
-            <Button type="primary" className="adm-btn is-primary" onClick={done}>
+            <Button variant="primary" size="small" onClick={done}>
               完成
             </Button>
           ) : (
             <Button
-              type="primary"
-              className="adm-btn is-primary"
+              variant="primary"
+              size="small"
               onClick={() => void submit()}
               disabled={busy || !file}
             >
               {busy ? '导入中…' : '开始导入'}
             </Button>
           )}
-        </div>
+        </>
       }
     >
       {result ? (
-        <div className="adm-section">
-          <div className="adm-section-title">
-            导入结果
-            <span className="adm-panel-note">
-              共 {result.total} 行 · 成功 {result.succeeded} · 失败 {result.failed}
-            </span>
-          </div>
-          <Table
-            rowKey="row"
-            size="small"
-            pagination={adminMiniPagination({ pageSize: 10, unit: '行' })}
-            dataSource={[...result.results].sort((a, b) => Number(a.success) - Number(b.success))}
-            columns={[
-              { title: '行号', dataIndex: 'row', key: 'row', width: 70 },
-              {
-                title: '邮箱',
-                dataIndex: 'email',
-                key: 'email',
-                render: (v: string) => <span className="adm-cell-sub">{v || '—'}</span>,
-              },
-              {
-                title: '变动',
-                dataIndex: 'delta',
-                key: 'delta',
-                width: 90,
-                render: (v: number) => (Number.isFinite(v) ? signed(v) : '—'),
-              },
-              {
-                title: '结果',
-                key: 'ok',
-                width: 90,
-                render: (_: unknown, r) =>
-                  r.success ? (
-                    <span className="adm-tag is-success">
-                      <span className="adm-tag-dot" aria-hidden="true" />
-                      成功
-                    </span>
-                  ) : (
-                    <span className="adm-tag is-danger">
-                      <span className="adm-tag-dot" aria-hidden="true" />
-                      失败
-                    </span>
-                  ),
-              },
-              {
-                title: '说明',
-                key: 'msg',
-                render: (_: unknown, r) => (
-                  <span className="adm-cell-sub">
-                    {r.success ? `余额 ${r.balance}` : (r.message ?? '未知原因')}
-                  </span>
-                ),
-              },
-            ]}
+        <section>
+          <SectionTitle
+            title="导入结果"
+            note={`共 ${result.total} 行 · 成功 ${result.succeeded} · 失败 ${result.failed}`}
           />
-        </div>
-      ) : (
-        <div className="adm-form">
-          <div className="adm-field">
-            <label htmlFor="imp-file">CSV 文件</label>
-            <AntUpload
-              accept=".csv,text/csv"
-              maxCount={1}
-              fileList={fileList}
-              beforeUpload={(next) => {
-                setFile(next as File);
-                setFileList([next]);
-                return false;
-              }}
-              onRemove={() => {
-                setFile(null);
-                setFileList([]);
-              }}
-            >
-              <Button icon={<Upload size={14} />}>选择 CSV</Button>
-            </AntUpload>
-            <div className="adm-field-hint">
-              每行 <code>邮箱,变动量[,原因]</code>，首行可带表头；单次最多 500 行。
-              正数增加、负数扣减。
-            </div>
+          {/*
+            失败行排在最后 (原 antd 版同样如此): 运营最先要处理的是失败。
+            结果是纯前端一次返回的, 所以这里做客户端分页 —— 不走 DataTable 的
+            `pagination` prop, 那个会带出 20/50/100 的每页条数选择器, 与
+            这里每页 10 行的口径打架。
+          */}
+          <AdminDataTable
+            rows={importRows}
+            columns={resultColumns}
+            rowKey={(row) => String(row.row)}
+            density="compact"
+            emptyText="没有结果"
+          />
+          <div className="mt-2 flex justify-end">
+            <Pagination
+              page={importPage}
+              totalPages={Math.max(1, Math.ceil(importRows.length / IMPORT_PAGE_SIZE))}
+              onChange={setImportPage}
+              previousLabel="上一页"
+              nextLabel="下一页"
+              aria-label="导入结果分页"
+            />
           </div>
+        </section>
+      ) : (
+        <div className="flex flex-col gap-4">
+          <FormField
+            label="CSV 文件"
+            hint="每行 邮箱,变动量[,原因]，首行可带表头；单次最多 500 行。正数增加、负数扣减。"
+          >
+            <FilePick
+              file={file}
+              accept=".csv,text/csv"
+              label="选择 CSV"
+              onPick={setFile}
+              onClear={() => setFile(null)}
+            />
+          </FormField>
 
-          <div className="adm-field">
-            <label htmlFor="imp-reason">整批原因</label>
-            <Input
-              id="imp-reason"
+          <FormField label="整批原因" hint="会写入每一条的审计记录">
+            <TextInput
               value={reason}
-              onChange={(e) => setReason(e.target.value)}
+              onChange={setReason}
               placeholder="如：2026-10 故障补偿（行内未填原因时使用该文案）"
               maxLength={200}
+              ariaLabel="整批原因"
             />
-            <div className="adm-field-hint">会写入每一条的审计记录</div>
-          </div>
+          </FormField>
 
-          <div className="adm-field">
-            <label htmlFor="imp-days">有效期（天，可选）</label>
-            <Input
-              id="imp-days"
+          <FormField label="有效期（天，可选）">
+            <TextInput
               value={validDays}
-              onChange={(e) => setValidDays(e.target.value)}
+              onChange={setValidDays}
               placeholder="留空表示永久有效"
               inputMode="numeric"
+              ariaLabel="有效期"
             />
-          </div>
+          </FormField>
 
-          <div className="adm-confirm-warn">
-            <span>
-              导入会立即改变用户可用余额且不可撤销。建议先用几行小数据验证格式，
-              再导全量。
-            </span>
-          </div>
+          <Notice tone="warn">
+            导入会立即改变用户可用余额且不可撤销。建议先用几行小数据验证格式，再导全量。
+          </Notice>
         </div>
       )}
     </Drawer>
+  );
+}
+
+/** 抽屉里的小节标题：标题 + 一句口径说明 */
+function SectionTitle({ title, note }: { title: string; note?: string }) {
+  return (
+    <div className="mb-2 flex items-baseline gap-2 border-b border-border-table pb-1.5">
+      <strong className="text-xs font-semibold text-text-primary">{title}</strong>
+      {note && <span className="text-[11px] text-text-tertiary">{note}</span>}
+    </div>
   );
 }

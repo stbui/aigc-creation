@@ -2,14 +2,15 @@
 
 后台管理端 `/admin` 的视觉与布局规格：令牌、外壳几何、通用结构与页面原型。功能与接口见 `docs/admin-console-design.md` 与 `docs/admin-detailed-design.md`。
 
-规划中的 BoardUI 整站替换方案见 §7（未实施），不改变第 0–6 节的现值。
+> **2026-10-30 已整站替换为 BoardUI**，方案与实施记录见 §7。第 0–6 节是旧外壳的视觉规格，其中 `adm-*` 类名与 antd 组件已不存在于代码 —— 现值以 §7 与上表「事实源」为准。
 
 | 项 | 事实源 |
 | --- | --- |
-| 外壳组件 | `frontend/src/components/admin/AdminLayout.tsx` |
+| 外壳组件 | `frontend/src/admin-ui/shell/AdminBoardLayout.tsx` |
 | 菜单数据 | `frontend/src/components/admin/adminNav.ts` |
-| 通用结构 | `frontend/src/components/admin/AdminWidgets.tsx` / `PageHeader.tsx` |
-| 样式 | `frontend/src/styles/global.css` 的 `adm-*` 区块 |
+| 通用结构 | `frontend/src/admin-ui/widgets/AdminChrome.tsx`（经 `components/admin/PageHeader.tsx` / `AdminWidgets.tsx` 再导出） |
+| 基础件 / 表单控件 / 数据表 | `frontend/src/admin-ui/primitives/` · `controls/` · `primitives/DataTable.tsx` |
+| 样式 | `global.css` 的 `:root` 令牌 + `frontend/src/styles/boardui.css`（后台 Tailwind 入口） |
 | 跨页微规格 | `docs/typography.md` |
 
 ---
@@ -62,7 +63,20 @@
 
 ### 2.1 骨架
 
-> 现状校正：本节描述的是 Header + Sider 旧版外壳。2026-10-30 前代码是 `adm-shell` / `adm-rail`（`global.css:27827`，栏宽 216 / 折叠 64）与值班带（128 / 44）；2026-10-30 起外壳已由 `admin-ui/shell/AdminBoardLayout` 接管（单栏、无值班带），旧外壳仅在 `VITE_ADMIN_UI=legacy` 时启用。P4 收尾时统一重写 §2–§3。
+> 现状（2026-10-30 起，P4 收尾后）：外壳由 `admin-ui/shell/AdminBoardLayout` 实现，**无顶栏、无值班带**，Header + Sider 的旧外壳与 `VITE_ADMIN_UI` 回滚开关均已删除。§2.2–§3 是旧外壳的设计记录，保留供回溯，其中的尺寸与类名（`adm-header` / `adm-rail` / `adm-band`）在代码里已不存在。
+
+现行骨架（`AdminBoardLayout.tsx`）：
+
+```
+Sider 232px（折叠 60px，≤1280px 自动折叠；sticky，h-screen）
+├── 头 56px：折叠按钮 + 品牌（标记 24 + 「货觉 运营后台」）
+├── 导航：8 个分组（总览 / 运营 / 内容 / 交易 / 财务 / 系统 / 模型 / 数据安全），按权限点过滤
+└── 底：环境标识 + 告警铃 + 密度开关 + 用户菜单
+
+Content（.adm-content）：padding 18 / 26 / 56，子块统一限宽 1600 居中，横向滚动限在该区内
+```
+
+旧版骨架（历史）：
 
 ```
 Header 56px（sticky top:0 z-index:20，padding 0 16）
@@ -86,7 +100,7 @@ Body
 | 环境徽标 | 圆角胶囊，12px / 行高 20 / `padding 0 8`，`--warn-bg` + `--warn-border`；**仅非生产环境显示**，避免误在生产执行测试操作 |
 | 搜索 | 宽 240px，浅底（`--surface`）输入框，面板最大高 `min(540px, 100dvh - 88px)` |
 | 告警 | 36 左右图标按钮，带待处理数量角标；点击展开前 5 条，底部进 `/admin/alerts`。来源按权限过滤，无待处理项时不显示数字（不做假未读） |
-| 密度 | 顶栏列表密度开关（宽松 / 紧凑），偏好存 `localStorage`，只压表格单元格上下内边距，不改字号 |
+| 密度 | 列表密度开关（宽松 / 紧凑），偏好存 `localStorage`，只压表格行高与单元格上下内边距，不改字号。**现行**：开关随外壳移到了侧栏底部，偏好经 `admin-ui/lib/density.ts` 的 `DensityContext` 下发给所有 `AdminDataTable`（不再写 `adm-layout.is-compact` 类） |
 | 用户 | 头像 26 + 角色名 + `ChevronDown`；菜单：邮箱（只读）、返回前台、退出登录 |
 
 ### 2.3 Sider
@@ -214,9 +228,9 @@ Body
 | 自定义主题 | 不支持；品牌色只由 `global.css` 与 antd token 两处决定 |
 | 图表 | 概览趋势为 CSS 自绘柱状图（含网格线与数值标签），不引入图表库 |
 
-## 7. 实施中：BoardUI 整站替换
+## 7. 已实施：BoardUI 整站替换
 
-> 状态：实施中（2026-10-30）。外壳与页面共享控件（页头 / 筛选条 / 面板 / 状态标签 / 抽屉 / 页内确认条）已切到 BoardUI（`VITE_ADMIN_UI=legacy` 可整站回滚）；页面内部的表格与表单控件仍是 antd，逐页迁移中；进度见 §7.10。
+> 状态：**已完成（2026-10-30）**。外壳、共享控件与 29 个页面全部走 BoardUI；后台树内 `from 'antd'` 为 0，legacy 实现与 `VITE_ADMIN_UI` 开关已删除，无回滚路径。进度与消费审计见 §7.10。
 > 来源：BoardUI 免费层（MIT），仓库 `https://github.com/BoardUI/boardui`，commit `ec5c5eb`（2026-10-02）。
 > 决策：2026-10-30 选定「C 整站替换」，范围仅 `/admin`，C 端不动；纯 C，不保留值班带。
 
@@ -233,7 +247,7 @@ Body
 | 项 | 现状（2026-10-30 代码） |
 | --- | --- |
 | 后台页面 | 29 页 / 16,666 行（`frontend/src/pages/admin`） |
-| antd 依赖面 | 44 个文件 `from 'antd'`；约 171 处 `message.*` 调用；29 处 `<Table>`；13 处 Drawer；17 处 Form；49 处 Select；30 处 Tag；24 处 Tooltip；11 处 Card；20 处 Alert；32 处 `App.useApp()` |
+| antd 依赖面 | 迁移前基线：44 个文件 `from 'antd'`、约 171 处 `message.*`、29 处 `<Table>`、13 处 Drawer、17 处 Form、49 处 Select、30 处 Tag、24 处 Tooltip、11 处 Card、20 处 Alert、32 处 `App.useApp()`。**迁移后**：`pages/admin` + `components/admin` + `admin-ui` 三个目录 `from 'antd'` 均为 **0**；全仓仍有 48 个文件引 antd，全部在 C 端 |
 | BoardUI 免费层缺口 | 无通用 Drawer / Toast / Confirm / Form / Card / Empty / Skeleton / Result / Descriptions / Steps，需先建约 10 个基础件 |
 | 测试 | 后台组件单测、共享 `StateViews` 单测、Playwright admin e2e，选择器需重写 |
 
@@ -246,8 +260,8 @@ Body
   - `providers/`：Toast、Confirm、Direction（zh-CN）、light-only theme。
   - `shell/`：`AdminBoardLayout`，复用 `AdminShell` 鉴权链与路由表；单栏结构（导航 + 内容），不含值班带。
   - `primitives/`：BoardUI 缺的 Drawer / Toast / Confirm / Card / Empty / Skeleton / Result / Descriptions / Steps / FormField；DataTable / Pagination / FilterBar 适配层。
-  - `pages/`：29 页的 BoardUI 实现，与 legacy 页面一一对应。
-- `frontend/src/styles/boardui.css`：只导入 `tailwindcss/theme.css` + `tailwindcss/utilities.css`，**不导入 preflight**；`@source` 指向 `admin-ui` 与 `vendor/boardui`；`--color-accent-*` 重映射品牌紫 `#5546d8`；不导入 `.dark`。只在 admin 入口 chunk 加载，C 端不下载。三条非显然的约定：
+  - `pages/`：29 页的页面级布局与业务编排；控件全部取自 `primitives/controls/widgets`，页面内不再出现 `adm-*` 类。
+- `frontend/src/styles/boardui.css`：只导入 `tailwindcss/theme.css` + `tailwindcss/utilities.css`，**不导入 preflight**；`@source` 指向 `admin-ui` / `pages/admin` / `components/admin` / `vendor/boardui`（`utilities.css` 用 `source(none)` 关掉自动探测，四个目录缺一个，该目录的工具类就不生成且构建不报错）；`--color-accent-*` 重映射品牌紫 `#5546d8`；不导入 `.dark`。只在 admin 入口 chunk 加载，C 端不下载。三条非显然的约定：
   - **`* { border: 0 solid }` 必须是全局规则，不能收进 `.bui-admin`**：Tailwind 的边框工具类只写宽度，样式靠 preflight；而抽屉 / 弹层 / Toast 渲染在 `body` 的 portal 里，收进作用域会让浮层独自丢掉所有边线，且只在打开弹层时才看得见。宽度为 0 的边框本来不渲染，对现有样式无副作用；global.css 未分层，冲突时仍以它为准。
   - **portal 浮层根节点要挂 `.bui-scope`**：它只带字体与控件重置、不带底色。`bui-scope` 与 `.bui-admin` 的区别是后者还会上页面底色，挂到遮罩上会把半透明遮罩刷成实色。
   - **vendor `theme.css` 的 `:root` 会盖掉同名全站令牌**：目前交集是 `--color-text-secondary` 与 `--shadow-card`，已在文件末尾回写 global.css 原值并注明来由。升级 BoardUI 时重新比对一次两份文件的变量名交集。
@@ -256,9 +270,9 @@ Body
 
 ### 7.4 迁移方式
 
-- `/admin/*` 路由不变；加 `VITE_ADMIN_UI=legacy|boardui` 与逐页开关，页面内部选择 legacy 或 boardui 实现。
-- `AdminDashboardPage.tsx:901` 的 `<AdminLayout>` 改为按 flag 选择 `AdminLayout` 或 `AdminBoardLayout`；`AdminShell` 的鉴权链与 `Routes` 表不动。
-- legacy 文件保留到 P4，可逐页回滚；不改业务逻辑，只换渲染层。
+- `/admin/*` 路由不变；迁移期曾用 `VITE_ADMIN_UI=legacy|boardui` 双跑，P4 收尾时连同 `admin-ui/lib/flag.ts`、`AdminLayout.tsx`、`*.legacy.tsx` 一并删除 —— **无回滚路径**，这是「纯 C」决策的直接后果。
+- `AdminShell`（在 `AdminDashboardPage` 内导出）的鉴权链与 `Routes` 表全程未动，只换了外壳与渲染层。
+- `components/admin/PageHeader.tsx` 与 `AdminWidgets.tsx` 保留为单一路径的再导出，29 页 import 与签名不变。
 
 ### 7.5 阶段计划
 
@@ -268,7 +282,7 @@ Body
 | P1 基础件（5–8 人日） | Providers、AdminShell、基础件、DataTable 适配层、Pagination、FilterBar、StatusDot | 五态 / 键盘 / 焦点 / reduced-motion 通过；单测 |
 | P2 试点两页（5–7 人日） | 平台概览 + 任务监控，flag 双跑 | 三身份 / 五态 / 三视口；抽屉、审计原因、URL 筛选一致；概览页已承接值班带的刻度、四计数与「接手最早异常」主动作 |
 | P3 按原型铺开（15–20 人日） | 看板 1 / 列表约 12 / 配置约 10 / 内容约 3；每类先做模板页再复制 | 每类模板过 G3；批量 / CSV / 导入导出 / 详情深链一致 |
-| P4 收尾（约 5 人日） | 删除 legacy admin；admin 内 antd 引用清零；文档 / 测试 / e2e 更新 | 全量 e2e；bundle 审计；文档同步 |
+| P4 收尾（已完成，2026-10-30） | 删除 legacy admin；admin 内 antd 引用清零；`global.css` 清死选择器；e2e 选择器重写；文档同步 | admin 三目录 `from 'antd'` = 0；`.adm-*` 364 → 30 条；e2e 七份 spec 全部改锚 `data-testid="admin-*"` |
 
 ### 7.6 关键决策
 
@@ -276,13 +290,13 @@ Body
 - **表单**：不引 react-hook-form；用 React Aria 字段校验 + `AdminForm` 薄封装，错误展示与后端错误码对齐；`AdminSettingsPage` 的自定义行布局保留，只换控件。
 - **反馈**：约 171 处 `message.*` → `toast`；`Modal.confirm` / `ConfirmAction` → `confirm()`；32 处 `App.useApp()` 移除；以 grep 闸口保证 admin 内 `message.` 清零。
 - **图标**：BoardUI 的 Remix 图标换 lucide 等价图标，保持一套 16px/1.5 图标语言；若保留 Remix，只限 vendor 内部。
-- **值班带**：不保留（2026-10-30 决策）。外壳回到 BoardUI `app-shell` 单栏结构；`DutyBand.tsx` 与 `.adm-band` 样式在 P4 删除。信息面不能跟着丢，按以下三条改挂：
-  - 100 根产出刻度 + 四个计数（任务模式为排队 / 异常 / 线路冷却；财务模式为待付 / 退款 / 发票 / 对账）+「接手最早异常」主动作 → 概览页首屏，用 BoardUI `dashboard` 版式承接（`DutyContext` 数据层保留，只换渲染）。
-  - 其余 28 页不再常驻这条带；异常提醒由侧栏 `notification-center` 入口的告警铃承担。
-  - 环境标识、密度切换、用户菜单本来就在侧栏底部（[AdminLayout.tsx:545](frontend/src/components/admin/AdminLayout.tsx#L545)），迁移时原样搬到 BoardUI 外壳的对应位置。
+- **值班带**：不保留（2026-10-30 决策）。外壳改为 BoardUI 单栏结构；`.adm-band-*` 样式已删除，`DutyBand.tsx` **保留**（概览首屏的值班塔 `.adm-tower*` 与 `duration` / `earliestFailure` 格式化工具仍从这里导出）。信息面不跟着丢，按以下三条改挂：
+  - 100 根产出刻度 + 四个计数（任务模式为排队 / 异常 / 线路冷却；财务模式为待付 / 退款 / 发票 / 对账）+「接手最早异常」主动作 → 概览页首屏（`admin-ui/widgets/DutyStrip.tsx`）。`DutyContext` 数据层保留，轮询从「外壳常驻」改为「只挂在概览路由」，其余 28 页不再陪着每 30 秒拉一次任务列表。
+  - 其余 28 页不再常驻这条带；异常提醒由侧栏告警铃承担。
+  - 环境标识、密度切换、用户菜单在侧栏底部（`AdminBoardLayout.tsx` 的 sider 尾部）。
 - **权限/审计**：`AdminGuard` / `PermissionGuard` / `AuditInterceptor` 不动；高危动作的原因输入与审计编号逐页保留。
 - **视觉方向**：原「值班台」方向卡（`.oil-ui`）已删除，不再另立方向卡；C 的后台视觉即 BoardUI 免费层默认语言 + 品牌紫 `#5546d8` 重映射，以 §7.3 的 `boardui.css` 为唯一落点。
-- **文档**：C 生效后同步改 `CLAUDE.md` 的「后台通用骨架已是 antd 原生组件」、本文档 §0/§2–§3、`README.md`、`docs/testing.md`。
+- **文档**：`CLAUDE.md`（后台骨架 / 共享控件两段）、本文档 §2.1 现状、`README.md`、`docs/testing.md` 已同步；`.adm-*` 的迁移叙事只留在本文档，`README.md` 只写现状。
 
 ### 7.7 验收与止损
 
@@ -344,19 +358,23 @@ Body
 | 样式入口 | `frontend/src/styles/boardui.css`（无 preflight，accent 重映射品牌紫，`.bui-admin` 作用域） |
 | 构建接入 | `vite.config.ts` 的 Tailwind 插件与 `@` 别名；`tsconfig.json` 的 `paths` |
 | 运行时 | `admin-ui/providers/`：Toast、Confirm（含高危原因输入）、`AdminUIProvider` |
-| 基础件 | `admin-ui/primitives/`：Drawer、Panel、EmptyState、Skeleton、Result、Descriptions、Steps、FormField |
+| 基础件 | `admin-ui/primitives/`：Drawer、ModalDialog（居中弹窗，与抽屉分工见文件注释）、Panel、EmptyState、Skeleton、Result、Descriptions、Steps、FormField、Notice（info/success/warn/danger/locked） |
 | 外壳 | `admin-ui/shell/AdminBoardLayout.tsx`：侧栏导航、⌘K 全局搜索、告警铃、环境标识、密度开关、用户菜单、未保存拦截；无值班带 |
 | 共享控件（BoardUI 版） | `admin-ui/widgets/AdminChrome.tsx`：页头、筛选条、已筛选回显、统计卡、可折叠面板、状态标签、空/加载/失败/陈旧态、详情抽屉、页内确认条；签名与旧版逐字一致 |
-| 共享控件分流 | `components/admin/PageHeader.tsx` 与 `AdminWidgets.tsx` 改为入口：数据 hook 只保留一份，渲染层按开关在 `AdminChrome` 与 `*.legacy.tsx` 之间选择，29 页 import 不变 |
-| 数据表 | `admin-ui/primitives/DataTable.tsx`：服务端分页/排序/选择（上限 100）、右固定操作列、密度、空/加载/失败态 |
-| 状态语义映射 | `components/admin/statusMeta.ts`：`STATUS_META` 唯一事实源，antd 版与 BoardUI 版共用 |
-| 开关 | `VITE_ADMIN_UI=legacy` 整站回滚（`admin-ui/lib/flag.ts` 单点读取）；默认 BoardUI |
+| 共享控件入口 | `components/admin/PageHeader.tsx` 与 `AdminWidgets.tsx` 是**单一路径**的再导出（指向 `admin-ui/widgets/AdminChrome` 与 `primitives`），数据 hook 只有一份；29 页 import 与签名不变。`*.legacy.tsx` 两份已随 P4 删除 |
+| 数据表 | `admin-ui/primitives/DataTable.tsx`：服务端分页/排序/选择（上限 100）、右固定操作列、密度、空/加载/失败态、行内展开（`renderExpanded` + `expandedKeys`） |
+| 表单控件 | `admin-ui/controls/`：`TextInput`（allowClear / 回车提交 / `showCount` / `disabled` / `type=date\|datetime-local`）、`SelectBox`（React Aria Select 包成 `string \| undefined` + 「全部」哨兵；**必须渲染静态 `SelectItem` 元素**，vendor 的 `Select.children` 收 `ReactNode`，传 `(item) => …` 渲染函数会被当普通子节点交给 Provider，React 每帧报 function-as-child）、`NumberInput`（含步进）、`TextArea`（含计数与 `disabled`）、`SwitchBox`（把 RAC 的 `isSelected` 收成 `checked`）、`SegmentedBox`（分段切换，单选不可空）、`CheckBox`（含半选）、`FilePick`（只选文件不发请求，选完再点导入）、`HoverTip`（可聚焦的说明气泡） |
+| 全局件挂载 | `admin-ui/providers/AdminUIProvider` 统一挂 Toast + Confirm，在 `AdminShell`（`AdminDashboardPage` 内导出）里包住全部 `/admin/*` 路由；两个 Provider 只在真正弹提示 / 确认时才渲染 portal |
+| 状态语义映射 | `components/admin/statusMeta.ts`：`STATUS_META` 唯一事实源 |
+| 值班条 | `admin-ui/widgets/DutyStrip.tsx`：100 刻度 + 四计数 + 「接手最早异常」，落在概览首屏；`DutyContext` 从外壳移到概览路由，其余 28 页不再轮询 |
+| 密度 | `admin-ui/lib/density.ts` 的 `DensityContext`：外壳左栏底部开关写 `localStorage`，`AdminDataTable` 读它决定行高（`h-9` / `h-11`）；表格仍可用 `density` prop 覆盖 |
+| 测试锚点 | 共享控件与页面关键节点统一挂 `data-testid="admin-*"`（`admin-filter` / `admin-filter-chip` / `admin-table` / `admin-table-row` / `admin-table-expanded` / `admin-drawer` / `admin-modal` / `admin-confirm-action` / `admin-toast` / `admin-sider` / `admin-panel` / `admin-bulk-bar` / `admin-asset-cell` / `admin-storage-card` / `admin-task-row`）；表单控件用 `aria-label` 而非 `id`，e2e 一律 `getByLabel` / `getByTestId`，不追 Tailwind 工具类 |
+| 旧样式清理 | `global.css` 的 `.adm-*`：364 条选择器 → 30 条（外壳骨架 `adm-layout` / `adm-content` / `adm-skip-link`、值班塔 `adm-tower*` / `adm-dot` / `adm-empty-inline`、限宽令牌 `--adm-page-max`）。同时删掉只服务 antd 后台的 4 个令牌（`--brand-bg-tint` / `--brand-border-soft` / `--info-text` / `--info-border`）与 3 个无人引用的 `@keyframes` |
 
 未落地（按 §7.5 继续）：
 
-1. 29 页逐页迁移到 `AdminDataTable` 与 BoardUI 表单控件：页头、筛选条、面板、状态标签、抽屉已随共享控件切换，页面内的 `Table` / `Select` / `Input` / `Button` / `message` 仍是 antd。
-2. 概览首屏承接值班带的刻度 / 四计数 / 主动作（`DutyContext` 数据仍在，渲染尚未接）。
-3. 概览趋势图是否引 `recharts`。
-4. `message.*` 清理、e2e 选择器与组件单测。
+1. 插件级差异：`SelectBox` 无搜索框（vendor 无 ComboBox），长选项表依赖 React Aria 的首字母跳转；`Image`（预览）/ `Tabs` 的 BoardUI 对应件未封装，图片预览走自绘 lightbox 不引 vendor 件；`Upload` 的「先选文件再提交」由 `FilePick` 覆盖，服务端接收与进度条无对应件。`Dropdown` 不另封装，直接用 vendor 的 `Dropdown` + `DropdownTrigger` + `DropdownPopover`。
+2. 概览趋势图仍用 CSS 自绘柱状图，未引 `recharts`。
+3. 后台组件单测目前两份：`components/admin/__tests__/AdminWidgets.test.tsx`（`useAdminUrlFilterSync` / `useAdminDetailParam` 两个 URL 契约）与 `admin-ui/primitives/__tests__/DataTable.density.test.tsx`（密度上下文下发与 `density` prop 优先级）。`AdminDataTable` 的排序 / 选择 / 展开交互、`DraftGuard`、`FilterBar` 尚未补单测。`vitest.config.ts` 已补上 `@` → `src/vendor/boardui` 别名（与 `vite.config.ts` 一致），否则任何渲染 vendor 组件的测试都会挂在 import 解析上。
 
-验证状态：按仓库纪律未运行 `tsc` / 构建；已用 esbuild 对新增的 admin-ui 与 legacy 分流文件做语法检查（通过）；用 `@tailwindcss/oxide` 扫描 `admin-ui` + `vendor/boardui` 得 2606 个候选类，编译产物 119,886 字节，确认 accent 已重映射、无 preflight、`.bui-scope` 与全局边框规则均在产物中。浏览器验收待仓库所有者执行。
+验证状态（P4）：按仓库纪律未运行 `tsc` / 构建，浏览器验收待仓库所有者执行。已做的检查：`pages/admin` + `components/admin` + `admin-ui` 三目录 `from 'antd'` grep 结果为 0；`tests/*.spec.ts` 内无残留 antd / `adm-*` 选择器（C 端 `product-*.spec.ts` 里的 `.ant-*` 属于 C 端，正确）；`pages/admin` + `components/admin` + `admin-ui` 共 63 个源文件一次性交给 esbuild 转译，全部通过（无语法 / 解析错误）；`global.css` 花括号配平（3564 / 3564），删除的 925 条选择器逐条核对「全部含 `adm-`」，无 C 端选择器被误删；`npm test` 全量 18 文件 / 96 用例通过。另用 Playwright 驱动真实 Chrome 带着 admin 令牌逐条打开 29 个后台路由（开发档 5100 + 4100 同时起），逐页断言外壳渲染、内容非空、控制台零报错；正式 e2e 套件（`frontend/tests`）未执行。

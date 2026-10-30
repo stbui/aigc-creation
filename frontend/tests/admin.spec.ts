@@ -6,6 +6,12 @@ import { HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
  *
  * 覆盖的是「权限链路 + 四页渲染」, 不是像素级视觉回归。
  * 前置: 后端与前端 dev server 已在 BASE 指向的端口运行, 且已 seed 管理员。
+ *
+ * ## 选择器约定（2026-10-30 外壳换 BoardUI 后）
+ *
+ * 后台共享控件只暴露 `data-testid="admin-*"`, 不再依赖 antd 的 `.ant-*` 与
+ * 旧版 `adm-*` 组件类。DOM 结构、Tailwind 类名可以随时改, 这些钩子不能改 ——
+ * 需要新钩子时在 `src/admin-ui/` 的共享控件里加, 不在页面里拼结构选择器。
  */
 
 const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
@@ -23,35 +29,40 @@ test.describe('后台管理端', () => {
   test('用户管理页渲染列表', async ({ page }) => {
     await page.goto(`${UI}/admin/users`);
     await expect(page.getByRole('heading', { name: '用户管理' })).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('.adm-filter').first()).toBeVisible();
+    await expect(page.getByTestId('admin-filter').first()).toBeVisible();
     // 表格首屏应有数据行
-    await expect(page.locator('.adm-panel .adm-table, .adm-panel table').first()).toBeVisible();
+    await expect(page.getByTestId('admin-table').first()).toBeVisible();
+    await expect(page.getByTestId('admin-table-row').first()).toBeVisible();
   });
 
   test('角色权限页渲染权限模块', async ({ page }) => {
     await page.goto(`${UI}/admin/roles`);
     await expect(page.getByRole('heading', { name: '角色权限' })).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('.adm-perm-module').first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: '权限矩阵' })).toBeVisible();
+    await expect(page.getByRole('checkbox').first()).toBeVisible();
   });
 
   test('系统设置页渲染 Tab 与设置项', async ({ page }) => {
     await page.goto(`${UI}/admin/settings`);
     await expect(page.getByRole('heading', { name: '系统设置' })).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('.adm-tab').first()).toBeVisible();
-    await expect(page.locator('.adm-setting-row').first()).toBeVisible();
+    await expect(page.getByRole('tab').first()).toBeVisible();
+    // 当前分组里必须有配置项（输入框 / 数字框 / 开关都算）
+    const panel = page.getByTestId('admin-panel').first();
+    await expect(panel).toBeVisible();
+    await expect(panel.locator('input').first()).toBeVisible();
   });
 
   test('操作审计页渲染表格', async ({ page }) => {
     await page.goto(`${UI}/admin/audit-logs`);
     await expect(page.getByRole('heading', { name: '操作审计' })).toBeVisible({ timeout: 15000 });
-    await expect(page.locator('.adm-filter').first()).toBeVisible();
+    await expect(page.getByTestId('admin-filter').first()).toBeVisible();
   });
 
   /*
    * 常驻确认层回归。
    *
    * 2026-10-26 起高危操作确认改为页面内操作条，不再使用 Modal。这里断言
-   * 首屏既没有弹窗/遮罩，也没有常驻的操作条；否则整页会被挡住或占位。
+   * 首屏既没有弹窗/抽屉，也没有常驻的操作条；否则整页会被挡住或占位。
    */
   for (const [path, heading] of [
     ['/admin/legal', '法务文档'],
@@ -60,11 +71,11 @@ test.describe('后台管理端', () => {
     test(`${heading}页不得常驻确认弹窗或操作条`, async ({ page }) => {
       await page.goto(`${UI}${path}`);
       await expect(page.getByRole('heading', { name: heading })).toBeVisible({ timeout: 15000 });
-      await expect(page.locator('.adm-modal-mask')).toHaveCount(0);
-      await expect(page.locator('.ant-modal')).toHaveCount(0);
-      await expect(page.locator('.adm-inline-confirm')).toHaveCount(0);
+      await expect(page.getByTestId('admin-modal')).toHaveCount(0);
+      await expect(page.getByTestId('admin-drawer')).toHaveCount(0);
+      await expect(page.getByTestId('admin-confirm-action')).toHaveCount(0);
       // 页面真的可点: 抓一个首屏按钮验证可交互
-      await expect(page.locator('.adm-btn, .ant-btn').first()).toBeEnabled();
+      await expect(page.getByRole('button').first()).toBeEnabled();
     });
   }
 });

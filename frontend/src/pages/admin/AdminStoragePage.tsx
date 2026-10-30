@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { App, Button } from 'antd';
-import { CheckCircle2, Cloud, HardDrive, Lock, Server, XCircle } from 'lucide-react';
+import { CheckCircle2, Cloud, HardDrive, Lock, RefreshCw, Server, XCircle } from 'lucide-react';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
+import { Chip } from '../../vendor/boardui/components/base/badges/chip';
 import { adminStorageApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
+import { Notice } from '../../admin-ui/primitives';
 import {
   AdminListError,
   AdminListLoading,
@@ -10,6 +13,7 @@ import {
   useAdminResource,
 } from '../../components/admin/AdminWidgets';
 import { AdminEmpty, PageHeader } from '../../components/admin/PageHeader';
+import { cx } from '../../admin-ui/lib/cn';
 import type { StorageBackendId } from '../../types/api';
 
 const META: Record<StorageBackendId, { label: string; desc: string; icon: typeof HardDrive; envKeys: string[] }> = {
@@ -41,7 +45,7 @@ const META: Record<StorageBackendId, { label: string; desc: string; icon: typeof
  * 这不是功能缺失，是刻意的安全边界。
  */
 export function AdminStoragePage() {
-  const { message } = App.useApp();
+  const toast = useToast();
   const { can } = useAdmin();
 
   const [probing, setProbing] = useState<string | null>(null);
@@ -54,13 +58,13 @@ export function AdminStoragePage() {
     try {
       const res = await adminStorageApi.probe(backend);
       if (res.ok) {
-        void message.success(`${META[backend].label} 连通正常${res.latencyMs ? ` (${res.latencyMs}ms)` : ''}`);
+        toast.success(`${META[backend].label} 连通正常${res.latencyMs ? ` (${res.latencyMs}ms)` : ''}`);
       } else {
-        void message.error(res.message);
+        toast.error(res.message);
       }
       await reload();
     } catch (e) {
-      void message.error((e as Error).message);
+      toast.error((e as Error).message);
     } finally {
       setProbing(null);
     }
@@ -71,10 +75,10 @@ export function AdminStoragePage() {
     setBusy(true);
     try {
       const res = await adminStorageApi.setActive(backend);
-      void message.success(`默认后端已切到 ${META[backend].label} — ${res.note}`);
+      toast.success(`默认后端已切到 ${META[backend].label} — ${res.note}`);
       await reload();
     } catch (e) {
-      void message.error((e as Error).message);
+      toast.error((e as Error).message);
     } finally {
       setBusy(false);
     }
@@ -95,7 +99,13 @@ export function AdminStoragePage() {
         title="存储配置"
         description="素材文件的存放位置。切换只影响新上传，已写入的素材仍按原后端读取。"
         actions={
-          <Button type="default" className="adm-btn" loading={loading} onClick={() => void reload()}>
+          <Button
+            variant="secondary"
+            size="small"
+            leadingIcon={RefreshCw}
+            disabled={loading}
+            onClick={() => void reload()}
+          >
             刷新
           </Button>
         }
@@ -103,97 +113,133 @@ export function AdminStoragePage() {
 
       {error && <AdminStaleError error={error} onRetry={() => void reload()} />}
 
-      <div className="adm-alert is-info">
-        <Lock size={16} />
-        <div>
-          <strong>凭据不在界面配置。</strong>
-          <div>出于安全考虑，OSS / MinIO 的密钥只从部署环境变量读取，页面仅显示是否配置与脱敏值。</div>
-          <div className="adm-mono" style={{ marginTop: 4 }}>{data.credentialSource}</div>
-        </div>
-      </div>
+      <Notice
+        tone="locked"
+        title="凭据不在界面配置。"
+        icon={<Lock className="size-4 shrink-0" aria-hidden />}
+      >
+        <p>出于安全考虑，OSS / MinIO 的密钥只从部署环境变量读取，页面仅显示是否配置与脱敏值。</p>
+        <code className="mt-1 block break-all font-mono text-[11px] text-text-secondary">
+          {data.credentialSource}
+        </code>
+      </Notice>
 
-      <div className="adm-storage-grid">
+      {/*
+       * auto-fit 而非固定三列: 后端清单未来会随 STORAGE_BACKEND 增加，
+       * 固定 3 列在只有 2 个后端时会留出半屏空白。
+       */}
+      <div className="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(300px,1fr))]">
         {data.backends.map((b) => {
           const meta = META[b.backend as StorageBackendId] ?? META.local;
           const Icon = meta.icon;
           return (
-            <div
+            <section
               key={b.backend}
-              className={`adm-storage-card${b.active ? ' is-active' : ''}${b.configured ? '' : ' is-disabled'}`}
+              data-testid="admin-storage-card"
+              data-backend={b.backend}
+              data-active={b.active ? 'true' : 'false'}
+              className={cx(
+                'flex flex-col rounded-xl border bg-white p-4',
+                b.active ? 'border-accent-400' : 'border-border-table',
+                !b.configured && 'bg-background-secondary-default/40',
+              )}
             >
-              <div className="adm-storage-head">
-                <Icon size={18} className="adm-storage-icon" />
-                <div className="adm-storage-title">
-                  <div className="adm-storage-name">
-                    {meta.label}
-                    {b.active && <span className="adm-storage-badge">当前</span>}
+              <div className="flex items-start gap-2.5">
+                <span
+                  className={cx(
+                    'mt-0.5 shrink-0',
+                    b.active ? 'text-accent-600' : 'text-text-tertiary',
+                  )}
+                >
+                  <Icon size={18} aria-hidden />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-sm font-semibold text-text-primary">{meta.label}</span>
+                    {b.active && (
+                      <span
+                        data-testid="admin-storage-badge"
+                        className="rounded-md bg-accent-100 px-1.5 py-0.5 text-[10px] font-medium text-accent-700"
+                      >
+                        当前
+                      </span>
+                    )}
                   </div>
-                  <div className="adm-storage-desc">{meta.desc}</div>
+                  <p className="mt-0.5 text-[11px] leading-4 text-text-tertiary">{meta.desc}</p>
                 </div>
               </div>
 
-              <div className="adm-storage-status">
+              <div className="mt-3">
                 {b.available ? (
-                  <span className="adm-tag is-success">
-                    <CheckCircle2 size={12} />
+                  <Chip variant="bold" color="lime">
+                    <CheckCircle2 size={12} aria-hidden className="mr-1" />
                     连通正常
                     {b.probeLatencyMs ? ` ${b.probeLatencyMs}ms` : ''}
-                  </span>
+                  </Chip>
                 ) : b.configured ? (
-                  <span className="adm-tag is-danger">
-                    <XCircle size={12} />
+                  <Chip variant="bold" color="rose">
+                    <XCircle size={12} aria-hidden className="mr-1" />
                     不可用
-                  </span>
+                  </Chip>
                 ) : (
-                  <span className="adm-tag is-muted">未启用</span>
+                  <Chip variant="bold" color="neutral">
+                    未启用
+                  </Chip>
                 )}
               </div>
 
-              {b.probeMessage && <div className="adm-storage-probe">{b.probeMessage}</div>}
+              {b.probeMessage && (
+                <p className="mt-2 break-all font-mono text-[11px] leading-4 text-text-tertiary">
+                  {b.probeMessage}
+                </p>
+              )}
 
-              <dl className="adm-storage-meta">
-                <dt>凭据</dt>
-                <dd>
+              <dl className="mt-3 grid grid-cols-[40px_1fr] gap-x-2 gap-y-1 text-[11px] leading-4">
+                <dt className="text-text-tertiary">凭据</dt>
+                <dd className="min-w-0 truncate font-mono text-text-secondary">
                   {b.masked ? (
-                    <code className="adm-mono">{b.masked}</code>
+                    b.masked
                   ) : (
-                    <span className="adm-cell-sub">
+                    <span className="font-sans text-text-placeholder">
                       {b.backend === 'local' ? '无需凭据' : '未配置'}
                     </span>
                   )}
                 </dd>
-                <dt>地址</dt>
-                <dd>
-                  <code className="adm-mono">{b.endpoint ?? '—'}</code>
-                </dd>
+                <dt className="text-text-tertiary">地址</dt>
+                <dd className="min-w-0 truncate font-mono text-text-secondary">{b.endpoint ?? '—'}</dd>
               </dl>
 
               {!b.configured && b.backend !== 'local' && (
-                <div className="adm-storage-env">
-                  <div className="adm-storage-env-title">启用所需环境变量：</div>
-                  {meta.envKeys.map((k) => (
-                    <code key={k} className="adm-mono">
-                      {k}
-                    </code>
-                  ))}
+                <div className="mt-3">
+                  <div className="text-[11px] text-text-tertiary">启用所需环境变量：</div>
+                  <div data-testid="admin-storage-env" className="mt-1 flex flex-wrap gap-1">
+                    {meta.envKeys.map((k) => (
+                      <code
+                        key={k}
+                        className="rounded border border-border-table bg-white px-1.5 py-0.5 font-mono text-[11px] text-text-secondary"
+                      >
+                        {k}
+                      </code>
+                    ))}
+                  </div>
                 </div>
               )}
 
-              <div className="adm-storage-actions">
+              <div className="mt-auto flex items-center gap-2 pt-3">
                 {b.configured && (
                   <Button
-                    type="default"
-                    className="adm-btn"
-                    onClick={() => void probe(b.backend as StorageBackendId)}
+                    variant="secondary"
+                    size="small"
                     disabled={probing === b.backend}
+                    onClick={() => void probe(b.backend as StorageBackendId)}
                   >
                     {probing === b.backend ? '测试中…' : '连通性测试'}
                   </Button>
                 )}
                 {can('setting.write') && b.configured && !b.active && (
                   <Button
-                    type="primary"
-                    className="adm-btn is-primary"
+                    variant="primary"
+                    size="small"
                     disabled={busy}
                     onClick={() => void doSwitch(b.backend as StorageBackendId)}
                   >
@@ -201,11 +247,10 @@ export function AdminStoragePage() {
                   </Button>
                 )}
               </div>
-            </div>
+            </section>
           );
         })}
       </div>
-
     </>
   );
 }

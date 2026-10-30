@@ -1,18 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { ReactNode } from 'react';
-import {
-  App,
-  AutoComplete,
-  Button,
-  ColorPicker,
-  Input,
-  InputNumber,
-  Slider,
-  Switch,
-} from 'antd';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
 import { adminAigcLabelApi } from '../../lib/api';
 import { hexToRgba } from '../../lib/aigc-label';
 import { useAdmin } from '../../context/AdminContext';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
 import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import {
   AdminListError,
@@ -22,6 +13,15 @@ import {
   useAdminResource,
 } from '../../components/admin/AdminWidgets';
 import { AdminEmpty, PageHeader, Panel } from '../../components/admin/PageHeader';
+import { FormField, Notice } from '../../admin-ui/primitives';
+import {
+  ColorBox,
+  NumberInput,
+  RangeBox,
+  SuggestInput,
+  SwitchBox,
+  TextInput,
+} from '../../admin-ui/controls';
 import type { AigcLabelPosition, AigcLabelSpec } from '../../types/api';
 
 /**
@@ -177,92 +177,8 @@ function drawPreview(canvas: HTMLCanvasElement, spec: AigcLabelSpec, badge: HTML
   ctx.globalAlpha = 1;
 }
 
-/** 表单行 */
-function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 14 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-strong)' }}>{label}</div>
-      {children}
-      {hint && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{hint}</div>}
-    </div>
-  );
-}
-
-/** 颜色：原生取色器 + 可粘 hex 的输入框 */
-function ColorField({
-  value,
-  onChange,
-  disabled,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-      <ColorPicker
-        value={/^#[0-9a-f]{6}$/i.test(value) ? value : '#ffffff'}
-        onChange={(color) => onChange(color.toHexString())}
-        disabled={disabled}
-        showText={false}
-      />
-      <Input
-        className="adm-input"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        placeholder="#rrggbb"
-        maxLength={7}
-      />
-    </div>
-  );
-}
-
-/** 滑块 + 数字输入，两者同步 */
-function RangeField({
-  value,
-  min,
-  max,
-  step = 1,
-  suffix,
-  onChange,
-  disabled,
-}: {
-  value: number;
-  min: number;
-  max: number;
-  step?: number;
-  suffix?: string;
-  onChange: (v: number) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-      <Slider
-        min={min}
-        max={max}
-        step={step}
-        value={Number.isFinite(value) ? value : min}
-        onChange={onChange}
-        disabled={disabled}
-        style={{ flex: 1 }}
-      />
-      <InputNumber
-        min={min}
-        max={max}
-        step={step}
-        value={Number.isFinite(value) ? value : min}
-        onChange={(next) => onChange(Number(next))}
-        disabled={disabled}
-        style={{ width: 92 }}
-      />
-      {suffix && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{suffix}</span>}
-    </div>
-  );
-}
-
 export function AdminAigcLabelPage() {
-  const { message } = App.useApp();
+  const toast = useToast();
   const { can } = useAdmin();
   const editable = can('setting.write');
 
@@ -314,15 +230,15 @@ export function AdminAigcLabelPage() {
   const openConfirm = () => {
     if (!spec) return;
     if (!spec.text.trim()) {
-      void message.warning('角标文案不能为空');
+      toast.warning('角标文案不能为空');
       return;
     }
     if (!/^#[0-9a-f]{6}$/i.test(spec.textColor) || !/^#[0-9a-f]{6}$/i.test(spec.backgroundColor)) {
-      void message.warning('颜色必须是 #rrggbb 格式');
+      toast.warning('颜色必须是 #rrggbb 格式');
       return;
     }
     if (spec.dotColor && !/^#[0-9a-f]{6}$/i.test(spec.dotColor)) {
-      void message.warning('圆点颜色必须是 #rrggbb，或留空关闭圆点');
+      toast.warning('圆点颜色必须是 #rrggbb，或留空关闭圆点');
       return;
     }
     setConfirming(true);
@@ -332,7 +248,7 @@ export function AdminAigcLabelPage() {
     if (!spec) return;
     const text = reason.trim();
     if (!text) {
-      void message.warning('请填写变更原因（写入审计日志）');
+      toast.warning('请填写变更原因（写入审计日志）');
       return;
     }
     setBusy(true);
@@ -350,9 +266,9 @@ export function AdminAigcLabelPage() {
       setConfirming(false);
       // 服务端返回的就是最新快照, 静默重取一次让 dirty 基线跟上, 不闪骨架屏
       void reload({ silent: true });
-      void message.success('已保存，下一张生成的图片立即使用新角标');
+      toast.success('已保存，下一张生成的图片立即使用新角标');
     } catch (e) {
-      void message.error((e as Error).message || '保存失败');
+      toast.error((e as Error).message || '保存失败');
     } finally {
       setBusy(false);
     }
@@ -383,285 +299,276 @@ export function AdminAigcLabelPage() {
       {error && <AdminStaleError error={error} onRetry={() => void reload()} />}
 
       {data.badge.stale && (
-        <div
-          style={{
-            marginBottom: 16,
-            padding: '10px 14px',
-            borderRadius: 10,
-            background: 'rgba(250, 173, 20, 0.12)',
-            color: 'var(--text-body)',
-            fontSize: 13,
-          }}
-        >
+        <Notice tone="warn">
           当前位图是按旧样式渲染的（样式改过但没重新保存位图）。点「保存并应用」会用当前样式重新生成。
-        </div>
+        </Notice>
       )}
 
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))',
-          gap: 16,
-          alignItems: 'start',
-        }}
-      >
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
         <Panel title="样式">
-          <Field
-            label="显示可见角标"
-            hint="关闭后产出图不再合成角标，但文件内的隐式标识（XMP / IPTC DigitalSourceType）仍照常写入。按《人工智能生成合成内容标识办法》，显式标识属法定义务，关闭前请自行确认适用场景与法律风险。"
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-              <Switch
-                checked={spec.enabled}
-                onChange={(checked) => patch({ enabled: checked })}
-                disabled={!editable}
-              />
-              <span style={{ color: spec.enabled ? 'var(--text-body)' : 'var(--danger-text)' }}>
-                {spec.enabled ? '开启（默认）' : '已关闭：产出图不显示角标'}
-              </span>
-            </div>
-            {!spec.enabled && (
-              <div
-                style={{
-                  marginTop: 8,
-                  padding: '8px 12px',
-                  borderRadius: 8,
-                  background: 'rgba(212, 56, 13, 0.08)',
-                  fontSize: 12,
-                  lineHeight: 1.7,
-                  color: 'var(--text-body)',
-                }}
-              >
-                关闭后仅保留隐式标识；产品图被转发到站外时，观看者将看不到「AI 生成」提示。
-              </div>
-            )}
-          </Field>
-
-          <Field label="角标文案" hint="最多 20 个字。用户下载/转发图片时会一起带走">
-            <Input
-              className="adm-input"
-              value={spec.text}
-              maxLength={20}
-              onChange={(e) => patch({ text: e.target.value })}
-              disabled={!editable}
-            />
-          </Field>
-
-          <Field label="字体" hint="使用你本机已安装的字体；不同运营电脑的预览可能略有差异">
-            <AutoComplete
-              className="adm-input"
-              value={spec.fontFamily}
-              options={FONT_PRESETS.map((font) => ({ value: font }))}
-              onChange={(value) => patch({ fontFamily: value })}
-              disabled={!editable}
-            />
-          </Field>
-
-          <Field label="字号">
-            <RangeField
-              value={spec.fontSize}
-              min={12}
-              max={80}
-              suffix="px（2x 基准）"
-              onChange={(v) => patch({ fontSize: v })}
-              disabled={!editable}
-            />
-          </Field>
-
-          <Field label="字重">
-            <div style={{ display: 'flex', gap: 8 }}>
-              {[400, 500, 600, 700].map((w) => (
-                <Button
-                  key={w}
-                  type="default"
-                  className={`adm-btn${spec.fontWeight === w ? ' is-primary' : ''}`}
-                  onClick={() => patch({ fontWeight: w })}
+          <div className="flex flex-col gap-4">
+            <FormField
+              label="显示可见角标"
+              hint="关闭后产出图不再合成角标，但文件内的隐式标识（XMP / IPTC DigitalSourceType）仍照常写入。按《人工智能生成合成内容标识办法》，显式标识属法定义务，关闭前请自行确认适用场景与法律风险。"
+            >
+              <div className="flex items-center gap-2">
+                <SwitchBox
+                  checked={spec.enabled}
+                  onChange={(checked) => patch({ enabled: checked })}
                   disabled={!editable}
-                >
-                  {w}
-                </Button>
-              ))}
-            </div>
-          </Field>
+                  ariaLabel="显示可见角标"
+                />
+                <span className="text-xs text-text-secondary">
+                  {spec.enabled ? '开启（默认）' : '已关闭：产出图不显示角标'}
+                </span>
+              </div>
+              {!spec.enabled && (
+                <Notice tone="danger" className="mt-2">
+                  关闭后仅保留隐式标识；产品图被转发到站外时，观看者将看不到「AI 生成」提示。
+                </Notice>
+              )}
+            </FormField>
 
-          <Field label="字距">
-            <RangeField
-              value={spec.letterSpacing}
-              min={0}
-              max={12}
-              step={0.5}
-              suffix="px"
-              onChange={(v) => patch({ letterSpacing: v })}
-              disabled={!editable}
-            />
-          </Field>
-
-          <Field label="文字颜色">
-            <ColorField value={spec.textColor} onChange={(v) => patch({ textColor: v })} disabled={!editable} />
-          </Field>
-
-          <Field label="底色">
-            <ColorField
-              value={spec.backgroundColor}
-              onChange={(v) => patch({ backgroundColor: v })}
-              disabled={!editable}
-            />
-          </Field>
-
-          <Field label="底色不透明度">
-            <RangeField
-              value={spec.backgroundOpacity}
-              min={0}
-              max={100}
-              suffix="%"
-              onChange={(v) => patch({ backgroundOpacity: v })}
-              disabled={!editable}
-            />
-          </Field>
-
-          <Field label="圆角">
-            <RangeField
-              value={spec.radius}
-              min={0}
-              max={60}
-              suffix="px（2x 基准）"
-              onChange={(v) => patch({ radius: v })}
-              disabled={!editable}
-            />
-          </Field>
-
-          <Field label="水平内边距">
-            <RangeField
-              value={spec.paddingX}
-              min={0}
-              max={80}
-              suffix="px（2x 基准）"
-              onChange={(v) => patch({ paddingX: v })}
-              disabled={!editable}
-            />
-          </Field>
-
-          <Field label="圆点" hint="留空 = 不画圆点">
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <Input
-                className="adm-input"
-                value={spec.dotColor}
-                placeholder="#5546d8（留空关闭）"
-                maxLength={7}
-                onChange={(e) => patch({ dotColor: e.target.value })}
+            <FormField label="角标文案" hint="最多 20 个字。用户下载/转发图片时会一起带走">
+              <TextInput
+                value={spec.text}
+                maxLength={20}
+                onChange={(next) => patch({ text: next })}
                 disabled={!editable}
+                ariaLabel="角标文案"
               />
-              <ColorPicker
-                value={/^#[0-9a-f]{6}$/i.test(spec.dotColor) ? spec.dotColor : '#5546d8'}
-                onChange={(color) => patch({ dotColor: color.toHexString() })}
+            </FormField>
+
+            <FormField
+              label="字体"
+              hint="使用你本机已安装的字体；不同运营电脑的预览可能略有差异"
+            >
+              <SuggestInput
+                value={spec.fontFamily}
+                suggestions={FONT_PRESETS}
+                onChange={(next) => patch({ fontFamily: next })}
+                disabled={!editable}
+                ariaLabel="字体"
+              />
+            </FormField>
+
+            <FormField label="字号">
+              <RangeBox
+                value={spec.fontSize}
+                min={12}
+                max={80}
+                suffix="px（2x 基准）"
+                onChange={(v) => patch({ fontSize: v })}
+                disabled={!editable}
+                ariaLabel="字号"
+              />
+            </FormField>
+
+            <FormField label="字重">
+              <div className="flex gap-2">
+                {[400, 500, 600, 700].map((w) => (
+                  <Button
+                    key={w}
+                    variant={spec.fontWeight === w ? 'primary' : 'secondary'}
+                    size="small"
+                    onClick={() => patch({ fontWeight: w })}
+                    disabled={!editable}
+                    aria-pressed={spec.fontWeight === w}
+                  >
+                    {w}
+                  </Button>
+                ))}
+              </div>
+            </FormField>
+
+            <FormField label="字距">
+              <RangeBox
+                value={spec.letterSpacing}
+                min={0}
+                max={12}
+                step={0.5}
+                suffix="px"
+                onChange={(v) => patch({ letterSpacing: v })}
+                disabled={!editable}
+                ariaLabel="字距"
+              />
+            </FormField>
+
+            <FormField label="文字颜色">
+              <ColorBox
+                value={spec.textColor}
+                onChange={(v) => patch({ textColor: v })}
+                disabled={!editable}
+                ariaLabel="文字颜色"
+              />
+            </FormField>
+
+            <FormField label="底色">
+              <ColorBox
+                value={spec.backgroundColor}
+                onChange={(v) => patch({ backgroundColor: v })}
+                disabled={!editable}
+                ariaLabel="底色"
+              />
+            </FormField>
+
+            <FormField label="底色不透明度">
+              <RangeBox
+                value={spec.backgroundOpacity}
+                min={0}
+                max={100}
+                suffix="%"
+                onChange={(v) => patch({ backgroundOpacity: v })}
+                disabled={!editable}
+                ariaLabel="底色不透明度"
+              />
+            </FormField>
+
+            <FormField label="圆角">
+              <RangeBox
+                value={spec.radius}
+                min={0}
+                max={60}
+                suffix="px（2x 基准）"
+                onChange={(v) => patch({ radius: v })}
+                disabled={!editable}
+                ariaLabel="圆角"
+              />
+            </FormField>
+
+            <FormField label="水平内边距">
+              <RangeBox
+                value={spec.paddingX}
+                min={0}
+                max={80}
+                suffix="px（2x 基准）"
+                onChange={(v) => patch({ paddingX: v })}
+                disabled={!editable}
+                ariaLabel="水平内边距"
+              />
+            </FormField>
+
+            <FormField label="圆点" hint="留空 = 不画圆点">
+              <ColorBox
+                value={spec.dotColor}
+                onChange={(v) => patch({ dotColor: v })}
                 disabled={!editable || !spec.dotColor}
-                showText={false}
+                ariaLabel="圆点颜色"
               />
-            </div>
-          </Field>
+            </FormField>
+          </div>
         </Panel>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, position: 'sticky', top: 16 }}>
+        <div className="flex flex-col gap-4">
           <Panel title="预览" note="按合成规则实时计算">
             <canvas
               ref={previewRef}
               width={760}
               height={500}
-              style={{ width: '100%', height: 'auto', borderRadius: 12, display: 'block' }}
+              className="block h-auto w-full rounded-xl"
             />
             {previewError && (
-              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--danger-text)' }}>{previewError}</div>
+              <p className="mt-2 text-xs text-rose-600">{previewError}</p>
             )}
-            <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.7 }}>
+            <p className="mt-2.5 text-xs leading-5 text-text-tertiary">
               预览只影响你看到的画面；用户拿到的图片由服务端按同一组参数合成。
-            </div>
+            </p>
           </Panel>
 
           <Panel title="位置与缩放">
-            <Field label="位置">
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                {(Object.keys(POSITION_LABELS) as AigcLabelPosition[]).map((p) => (
-                  <Button
-                    key={p}
-                    type="default"
-                    className={`adm-btn${spec.position === p ? ' is-primary' : ''}`}
-                    onClick={() => patch({ position: p })}
+            <div className="flex flex-col gap-4">
+              <FormField label="位置">
+                <div className="flex flex-wrap gap-2">
+                  {(Object.keys(POSITION_LABELS) as AigcLabelPosition[]).map((p) => (
+                    <Button
+                      key={p}
+                      variant={spec.position === p ? 'primary' : 'secondary'}
+                      size="small"
+                      onClick={() => patch({ position: p })}
+                      disabled={!editable}
+                      aria-pressed={spec.position === p}
+                    >
+                      {POSITION_LABELS[p]}
+                    </Button>
+                  ))}
+                </div>
+              </FormField>
+
+              <FormField label="宽度（占图片宽度的比例）">
+                <RangeBox
+                  value={spec.scalePercent}
+                  min={4}
+                  max={60}
+                  suffix="%"
+                  onChange={(v) => patch({ scalePercent: v })}
+                  disabled={!editable}
+                  ariaLabel="宽度比例"
+                />
+              </FormField>
+
+              <FormField
+                label="宽度上下限"
+                hint="缩略图不至于被角标糊掉，大图上也不会小到看不见"
+              >
+                <div className="flex items-center gap-2">
+                  <NumberInput
+                    value={spec.minWidthPx}
+                    min={16}
+                    max={2048}
+                    onChange={(next) => patch({ minWidthPx: next ?? spec.minWidthPx })}
                     disabled={!editable}
-                  >
-                    {POSITION_LABELS[p]}
-                  </Button>
-                ))}
-              </div>
-            </Field>
+                    ariaLabel="最小宽度"
+                    className="w-24"
+                  />
+                  <span className="text-xs text-text-tertiary">~</span>
+                  <NumberInput
+                    value={spec.maxWidthPx}
+                    min={16}
+                    max={4096}
+                    onChange={(next) => patch({ maxWidthPx: next ?? spec.maxWidthPx })}
+                    disabled={!editable}
+                    ariaLabel="最大宽度"
+                    className="w-24"
+                  />
+                  <span className="text-xs text-text-tertiary">px</span>
+                </div>
+              </FormField>
 
-            <Field label="宽度（占图片宽度的比例）">
-              <RangeField
-                value={spec.scalePercent}
-                min={4}
-                max={60}
-                suffix="%"
-                onChange={(v) => patch({ scalePercent: v })}
-                disabled={!editable}
-              />
-            </Field>
-
-            <Field label="宽度上下限" hint="缩略图不至于被角标糊掉，大图上也不会小到看不见">
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <Input
-                  type="number"
-                  className="adm-input adm-input-number"
-                  value={spec.minWidthPx}
-                  min={16}
-                  max={2048}
-                  onChange={(e) => patch({ minWidthPx: Number(e.target.value) })}
+              <FormField label="边距（占图片宽度的比例，至少 6px）">
+                <RangeBox
+                  value={spec.marginPercent}
+                  min={0}
+                  max={10}
+                  step={0.5}
+                  suffix="%"
+                  onChange={(v) => patch({ marginPercent: v })}
                   disabled={!editable}
+                  ariaLabel="边距"
                 />
-                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>~</span>
-                <Input
-                  type="number"
-                  className="adm-input adm-input-number"
-                  value={spec.maxWidthPx}
-                  min={16}
-                  max={4096}
-                  onChange={(e) => patch({ maxWidthPx: Number(e.target.value) })}
+              </FormField>
+
+              <FormField
+                label="整体不透明度"
+                hint="低于 20% 在浅色图上几乎不可见，服务端会按下限夹紧"
+              >
+                <RangeBox
+                  value={spec.opacity}
+                  min={20}
+                  max={100}
+                  suffix="%"
+                  onChange={(v) => patch({ opacity: v })}
                   disabled={!editable}
+                  ariaLabel="整体不透明度"
                 />
-                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>px</span>
-              </div>
-            </Field>
-
-            <Field label="边距（占图片宽度的比例，至少 6px）">
-              <RangeField
-                value={spec.marginPercent}
-                min={0}
-                max={10}
-                step={0.5}
-                suffix="%"
-                onChange={(v) => patch({ marginPercent: v })}
-                disabled={!editable}
-              />
-            </Field>
-
-            <Field label="整体不透明度" hint="低于 20% 在浅色图上几乎不可见，服务端会按下限夹紧">
-              <RangeField
-                value={spec.opacity}
-                min={20}
-                max={100}
-                suffix="%"
-                onChange={(v) => patch({ opacity: v })}
-                disabled={!editable}
-              />
-            </Field>
+              </FormField>
+            </div>
           </Panel>
 
           {data.badge.source === 'custom' && data.badge.pngBase64 && (
             <Panel title="当前生效位图" note="服务端实际使用的那一张">
               <div
+                className="grid place-items-center rounded-xl p-3"
                 style={{
-                  display: 'grid',
-                  placeItems: 'center',
-                  padding: 12,
-                  borderRadius: 10,
                   background:
                     'repeating-conic-gradient(var(--surface) 0% 25%, var(--page-bg) 0% 50%) 50% / 16px 16px',
                 }}
@@ -669,43 +576,45 @@ export function AdminAigcLabelPage() {
                 <img
                   src={`data:image/png;base64,${data.badge.pngBase64}`}
                   alt="当前角标位图"
-                  style={{ maxWidth: '100%' }}
+                  className="max-w-full"
                 />
               </div>
-              <div style={{ marginTop: 8, fontSize: 12, color: 'var(--text-muted)' }}>
+              <p className="mt-2 text-xs text-text-tertiary">
                 {data.badge.width}×{data.badge.height}px
-                {data.badge.updatedAt ? ` · 更新于 ${new Date(data.badge.updatedAt).toLocaleString('zh-CN')}` : ''}
-              </div>
+                {data.badge.updatedAt
+                  ? ` · 更新于 ${new Date(data.badge.updatedAt).toLocaleString('zh-CN')}`
+                  : ''}
+              </p>
             </Panel>
           )}
         </div>
       </div>
 
       {editable && (
-        <div className="adm-action-bar">
-          <span className="adm-action-hint">
+        <div className="sticky bottom-0 z-10 mt-3 flex items-center gap-3 rounded-xl border border-border-table bg-white px-4 py-2.5 shadow-lg">
+          <span className="min-w-0 flex-1 text-xs text-text-secondary">
             {dirty ? '有未保存的变更' : '当前配置已保存'}
           </span>
-          <div className="adm-action-buttons">
+          <div className="flex shrink-0 items-center gap-2">
             <Button
-              type="default"
-              className="adm-btn"
+              variant="secondary"
+              size="small"
               disabled={busy || !dirty}
               onClick={() => setSpec(data.spec)}
             >
               放弃变更
             </Button>
             <Button
-              type="default"
-              className="adm-btn"
+              variant="secondary"
+              size="small"
               disabled={busy}
               onClick={() => setSpec(data.defaults)}
             >
               恢复默认样式
             </Button>
             <Button
-              type="primary"
-              className="adm-btn is-primary"
+              variant="primary"
+              size="small"
               disabled={busy || (!dirty && !data.badge.stale)}
               onClick={openConfirm}
             >
@@ -733,16 +642,15 @@ export function AdminAigcLabelPage() {
             `宽度：${data.spec.scalePercent}% → ${spec.scalePercent}%`,
           ]}
           extra={
-            <div style={{ marginTop: 12 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>变更原因（写入审计日志）</div>
-              <Input
-                className="adm-input"
+            <FormField label="变更原因（写入审计日志）" required>
+              <TextInput
                 value={reason}
-                onChange={(e) => setReason(e.target.value)}
+                onChange={setReason}
                 placeholder="例如：按品牌规范调整角标配色"
                 maxLength={200}
+                ariaLabel="变更原因"
               />
-            </div>
+            </FormField>
           }
           onCancel={() => {
             setConfirming(false);

@@ -1,5 +1,7 @@
-import { Modal, Table } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import { useEffect, useState } from 'react';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
+import { ModalDialog } from '../../admin-ui/primitives/Dialog';
+import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
 import { StatusTag } from './PageHeader';
 import type { BatchItemResult, BatchSummary } from '../../types/api';
 
@@ -14,6 +16,10 @@ import type { BatchItemResult, BatchSummary } from '../../types/api';
  * 列表默认**把失败项排在前面**: 成功项是"不需要再看"的信息,
  * 真正需要处理的是失败原因。
  */
+
+/** 一页 20 条：与数据表的分页尺寸选项对齐，避免页大小选择器显示空值 */
+const PAGE_SIZE = 20;
+
 export function BatchResultModal<T = unknown>({
   open,
   title,
@@ -25,59 +31,75 @@ export function BatchResultModal<T = unknown>({
   summary: BatchSummary<T> | null;
   onClose: () => void;
 }) {
+  const [page, setPage] = useState(1);
+
+  // 每次打开都从第一页看起：上一批失败项的位置与这一批无关
+  useEffect(() => {
+    if (open) setPage(1);
+  }, [open, summary]);
+
   const rows = summary
     ? [...summary.results].sort((a, b) => Number(a.ok) - Number(b.ok))
     : [];
 
-  const columns: ColumnsType<BatchItemResult<T>> = [
+  const columns: Array<AdminColumn<BatchItemResult<T>>> = [
     {
-      title: '记录',
-      dataIndex: 'id',
       key: 'id',
+      title: '记录',
       width: 220,
-      render: (v: string) => <code>{v}</code>,
+      render: (row) => <code className="font-mono text-xs text-text-secondary">{row.id}</code>,
     },
     {
-      title: '结果',
-      dataIndex: 'ok',
       key: 'ok',
+      title: '结果',
       width: 90,
-      render: (ok: boolean) => <StatusTag status={ok ? 'success' : 'failed'} label={ok ? '成功' : '失败'} />,
+      render: (row) => (
+        <StatusTag status={row.ok ? 'success' : 'failed'} label={row.ok ? '成功' : '失败'} />
+      ),
     },
     {
-      title: '原因',
-      dataIndex: 'message',
       key: 'message',
-      render: (v: string | undefined) => <span className="adm-cell-sub">{v ?? '—'}</span>,
+      title: '原因',
+      render: (row) => <span className="text-[11px] text-text-tertiary">{row.message ?? '—'}</span>,
     },
   ];
 
+  const pageRows = rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
   return (
-    <Modal
-      title={title}
+    <ModalDialog
       open={open}
-      onCancel={onClose}
-      onOk={onClose}
-      okText="知道了"
-      cancelButtonProps={{ style: { display: 'none' } }}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      title={title}
       width={720}
+      footer={
+        <Button variant="primary" size="small" onClick={onClose}>
+          知道了
+        </Button>
+      }
     >
       {summary && (
         <>
-          <p className="adm-cell-sub" style={{ marginTop: 0 }}>
+          <p className="mb-3 text-xs text-text-tertiary">
             共 {summary.total} 条 · 成功 {summary.succeeded} 条
             {summary.failed > 0 ? ` · 失败 ${summary.failed} 条（已按原因排在前面）` : ''}
           </p>
-          <Table<BatchItemResult<T>>
-            rowKey="id"
-            size="small"
+          <AdminDataTable<BatchItemResult<T>>
+            rows={pageRows}
             columns={columns}
-            dataSource={rows}
-            pagination={{ pageSize: 10, showTotal: (t) => `共 ${t} 条` }}
-            scroll={{ y: 360 }}
+            rowKey={(row) => row.id}
+            minWidth={600}
+            pagination={{
+              current: page,
+              pageSize: PAGE_SIZE,
+              total: rows.length,
+              onChange: (next) => setPage(next),
+            }}
           />
         </>
       )}
-    </Modal>
+    </ModalDialog>
   );
 }

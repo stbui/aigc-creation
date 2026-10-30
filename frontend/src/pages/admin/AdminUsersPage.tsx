@@ -1,17 +1,27 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { App, Button, Dropdown, Input, Select, Table, Tooltip } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { Download } from 'lucide-react';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
+import {
+  Dropdown,
+  DropdownGroup,
+  DropdownItem,
+  DropdownPopover,
+  DropdownTrigger,
+} from '../../vendor/boardui/components/base/dropdown/dropdown';
 import { adminUsersApi } from '../../lib/api';
 import { toAbsoluteUrl } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
+import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
+import { SelectBox, TextInput } from '../../admin-ui/controls';
+import { cx } from '../../admin-ui/lib/cn';
 import {
   AdminDrawer,
   AdminListError,
-  AdminStaleError,
   AdminListLoading,
+  AdminStaleError,
   ConfirmAction,
-  adminPagination,
   useAdminDetailParam,
   useAdminList,
   useAdminUrlFilterSync,
@@ -41,6 +51,26 @@ import type {
   BatchSummary,
 } from '../../types/api';
 
+/**
+ * 用户管理 (B-27~B-33)。
+ *
+ * ## 选择状态不跨翻页保留
+ *
+ * 运营切到另一页继续勾选时, 上一页选中的账号仍在选中集里 —— 界面上看不见
+ * 它们, 此时点「批量禁用」会禁用一批肉眼不可见的账号。每次重新查询就清空,
+ * 是更安全的默认。
+ *
+ * ## 删除不弹确认, 禁用/变更角色要
+ *
+ * 删除按产品要求直接执行 (接口本身写审计原因); 禁用与变更角色会切断在线凭证,
+ * 用页内确认条承载原因输入, 原因随请求落审计。
+ *
+ * ## 登录记录单独取数
+ *
+ * `GET /admin/users/:id/logins` 需要 `audit.read`。并进详情会让没有审计权限
+ * 的角色顺带看到全站登录 IP, 所以单独请求, 403 按「不可见」渲染说明。
+ */
+
 type Row = AdminUserListResult['items'][number];
 
 const ROLE_OPTIONS = [
@@ -56,8 +86,55 @@ const STATUS_OPTIONS = [
   { value: 'deleted', label: '已注销' },
 ];
 
+/** 列表默认排序。后端默认与之一致, 显式传参是为了让表头箭头与请求口径对得上 */
+const DEFAULT_SORT = 'createdAt:desc';
+
+/** 详情抽屉里的小节标题：标题 + 一句口径说明 */
+function Section({
+  title,
+  note,
+  children,
+}: {
+  title: string;
+  note?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="border-t border-border-table pt-3 first:border-t-0 first:pt-0">
+      <div className="mb-2 flex items-baseline gap-2">
+        <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
+        {note && <span className="text-[11px] text-text-tertiary">{note}</span>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/** 抽屉里的小计数格。不用 StatCard: 那套是列表页首屏用的, 96px 高度在抽屉里太占 */
+function MiniStat({ label, value, hint }: { label: string; value: ReactNode; hint?: ReactNode }) {
+  return (
+    <div className="rounded-lg border border-border-table px-3 py-2">
+      <div className="text-[11px] text-text-tertiary">{label}</div>
+      <div className="mt-0.5 text-lg font-semibold leading-6 tabular-nums text-text-primary">
+        {value}
+      </div>
+      {hint && <div className="text-[11px] text-text-tertiary">{hint}</div>}
+    </div>
+  );
+}
+
+/** 表单字段：标签 + 控件 */
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-xs font-medium text-text-secondary">{label}</span>
+      {children}
+    </div>
+  );
+}
+
 export function AdminUsersPage() {
-  const { message } = App.useApp();
+  const toast = useToast();
   const { can } = useAdmin();
 
   const [searchParams] = useSearchParams();
@@ -82,18 +159,18 @@ export function AdminUsersPage() {
         keyword: params.keyword as string | undefined,
         role: params.role as string | undefined,
         status: params.status as string | undefined,
+        // 排序必须真的发给后端: 少了这一行表头箭头会变而顺序不变
+        sort: (params.sort as string | undefined) ?? DEFAULT_SORT,
       }),
     [],
   );
 
-  const { data, loading, error, params, setQuery, setPage, reload } = useAdminList<AdminUserListResult>(
-    fetcher,
-    {
+  const { data, loading, error, params, setQuery, setPage, reload } =
+    useAdminList<AdminUserListResult>(fetcher, {
       ...(initialKeyword ? { keyword: initialKeyword } : {}),
       ...(initialRole ? { role: initialRole } : {}),
       ...(initialStatus ? { status: initialStatus } : {}),
-    },
-  );
+    });
 
   /*
    * 顶栏全局搜索带 `?q=` 跳过来时自动套用筛选。
@@ -118,13 +195,6 @@ export function AdminUsersPage() {
   // 详情抽屉
   const [detailId, setDetailId] = useAdminDetailParam();
 
-  /*
-   * 批量选择。
-   *
-   * 选择状态**不跨翻页/筛选保留**: 运营切到另一页继续选时, 上一页选中的账号
-   * 仍在选中集里 —— 但界面上看不见它们, 此时点「批量禁用」会禁用一批
-   * 肉眼不可见的账号。每次重新查询就清空, 是更安全的默认。
-   */
   const [selected, setSelected] = useState<string[]>([]);
   const [batchSummary, setBatchSummary] = useState<BatchSummary<{
     id: string;
@@ -139,14 +209,11 @@ export function AdminUsersPage() {
   const [busy, setBusy] = useState(false);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
 
-  const detailFetcher = useCallback(
-    () => adminUsersApi.detail(detailId as string),
-    [detailId],
-  );
+  const detailFetcher = useCallback(() => adminUsersApi.detail(detailId as string), [detailId]);
 
-  const refresh = () => {
+  const refresh = (tip?: string) => {
     reload();
-    void message.success('操作完成');
+    if (tip) toast.success(tip);
   };
 
   /** 翻页 / 改筛选都会清空选择, 避免对不可见的行下手 */
@@ -158,7 +225,6 @@ export function AdminUsersPage() {
     [setQuery],
   );
 
-  const hasFilter = Boolean(keyword || role || status);
   const applyFilters = () => {
     appliedQ.current = keyword.trim();
     queryAndClear({ keyword: keyword.trim() || undefined, role, status });
@@ -208,6 +274,9 @@ export function AdminUsersPage() {
       : null,
   ].filter(Boolean) as AppliedFilter[];
 
+  const hasFilter = Boolean(appliedKeyword || appliedRole || appliedStatus);
+  const rows = data?.items ?? [];
+
   /** 批量启停按产品要求直接执行，不再弹窗二次确认 */
   const runBatch = async (action: 'disable' | 'enable') => {
     if (selected.length === 0) return;
@@ -219,7 +288,7 @@ export function AdminUsersPage() {
       setSelected([]);
       reload();
     } catch (e) {
-      void message.error((e as Error).message);
+      toast.error(e instanceof Error ? e.message : '批量操作失败');
     } finally {
       setBusy(false);
     }
@@ -234,7 +303,7 @@ export function AdminUsersPage() {
         status: params.status as string | undefined,
       });
     } catch (e) {
-      void message.error((e as Error).message);
+      toast.error(e instanceof Error ? e.message : '导出失败');
     }
   };
 
@@ -243,9 +312,9 @@ export function AdminUsersPage() {
     try {
       await adminUsersApi.changeStatus(target.id, next, reason || undefined);
       setStatusTarget(null);
-      refresh();
+      refresh(next === 'disabled' ? '账号已禁用，登录凭证立即失效' : '账号已启用');
     } catch (e) {
-      void message.error((e as Error).message);
+      toast.error(e instanceof Error ? e.message : '操作失败');
     } finally {
       setBusy(false);
     }
@@ -256,9 +325,9 @@ export function AdminUsersPage() {
     try {
       await adminUsersApi.changeRole(target.id, next, reason || undefined);
       setRoleTarget(null);
-      refresh();
+      refresh('角色已变更');
     } catch (e) {
-      void message.error((e as Error).message);
+      toast.error(e instanceof Error ? e.message : '操作失败');
     } finally {
       setBusy(false);
     }
@@ -269,9 +338,9 @@ export function AdminUsersPage() {
     setBusy(true);
     try {
       await adminUsersApi.remove(target.id, true, '删除');
-      refresh();
+      refresh('用户已删除');
     } catch (e) {
-      void message.error((e as Error).message);
+      toast.error(e instanceof Error ? e.message : '删除失败');
     } finally {
       setBusy(false);
     }
@@ -282,15 +351,22 @@ export function AdminUsersPage() {
     try {
       const res = await adminUsersApi.resetPassword(target.id);
       setTempPassword(res.tempPassword);
-      refresh();
+      reload();
     } catch (e) {
-      void message.error((e as Error).message);
+      toast.error(e instanceof Error ? e.message : '重置密码失败');
     } finally {
       setBusy(false);
     }
   };
 
-  const rowMenuItems = (row: Row) =>
+  interface RowAction {
+    key: string;
+    label: string;
+    danger?: boolean;
+    onClick: () => void;
+  }
+
+  const rowMenuItems = (row: Row): RowAction[] =>
     [
       can('user.disable') && row.status !== 'deleted'
         ? {
@@ -303,116 +379,115 @@ export function AdminUsersPage() {
         ? { key: 'role', label: '变更角色', onClick: () => setRoleTarget(row) }
         : null,
       can('user.reset_password') && row.status !== 'deleted'
-        ? {
-            key: 'pwd',
-            label: '重置密码',
-            onClick: () => void doResetPassword(row),
-          }
+        ? { key: 'pwd', label: '重置密码', onClick: () => void doResetPassword(row) }
         : null,
       can('user.delete')
         ? { key: 'del', label: '删除用户', danger: true, onClick: () => void openDelete(row) }
         : null,
-    ].filter(Boolean) as Array<{
-      key: string;
-      label: string;
-      danger?: boolean;
-      onClick: () => void;
-    }>;
+    ].filter(Boolean) as RowAction[];
 
-  const columns: ColumnsType<Row> = useMemo(
+  const columns: Array<AdminColumn<Row>> = useMemo(
     () => [
       {
-        title: '邮箱',
-        dataIndex: 'email',
         key: 'email',
-        sorter: true,
-        render: (email: string, row) => (
-          <Tooltip title={email} placement="topLeft">
-            <Button
-              type="link"
-              className="adm-link adm-cell-clip"
-              onClick={() => setDetailId(row.id)}
-            >
-              {email}
-            </Button>
-          </Tooltip>
+        title: '邮箱',
+        width: 230,
+        sortable: true,
+        // 邮箱常被截断, 悬停给出完整值
+        cellTitle: (row: Row) => row.email,
+        render: (row: Row) => (
+          <button
+            type="button"
+            className="max-w-[220px] truncate rounded text-left text-accent-700 hover:underline"
+            onClick={() => setDetailId(row.id)}
+          >
+            {row.email}
+          </button>
         ),
       },
       {
-        title: '角色',
-        dataIndex: 'roleLabel',
         key: 'role',
+        title: '角色',
         width: 90,
-        render: (_: unknown, row) => <StatusTag status={row.role} />,
+        render: (row: Row) => <StatusTag status={row.role} />,
       },
       {
-        title: '状态',
-        dataIndex: 'statusLabel',
         key: 'status',
+        title: '状态',
         width: 90,
-        render: (_: unknown, row) => <StatusTag status={row.status} />,
+        render: (row: Row) => <StatusTag status={row.status} />,
       },
-      { title: '项目', dataIndex: 'projectCount', key: 'projects', width: 70, align: 'right' },
-      { title: '任务', dataIndex: 'taskCount', key: 'tasks', width: 70, align: 'right' },
-      { title: '素材', dataIndex: 'assetCount', key: 'assets', width: 70, align: 'right' },
       {
-        title: '注册时间',
-        dataIndex: 'createdAt',
+        key: 'projects',
+        title: '项目',
+        width: 70,
+        align: 'right',
+        render: (row: Row) => <span className="tabular-nums">{row.projectCount}</span>,
+      },
+      {
+        key: 'tasks',
+        title: '任务',
+        width: 70,
+        align: 'right',
+        render: (row: Row) => <span className="tabular-nums">{row.taskCount}</span>,
+      },
+      {
+        key: 'assets',
+        title: '素材',
+        width: 70,
+        align: 'right',
+        render: (row: Row) => <span className="tabular-nums">{row.assetCount}</span>,
+      },
+      {
         key: 'createdAt',
-        width: 150,
-        sorter: true,
-        defaultSortOrder: 'descend',
-        render: (v: string) => new Date(v).toLocaleString('zh-CN'),
+        title: '注册时间',
+        width: 160,
+        sortable: true,
+        render: (row: Row) => (
+          <span className="text-[12px] tabular-nums">
+            {new Date(row.createdAt).toLocaleString('zh-CN')}
+          </span>
+        ),
       },
       {
-        title: '最近登录',
-        dataIndex: 'lastLoginAt',
         key: 'lastLoginAt',
-        width: 150,
-        sorter: true,
+        title: '最近登录',
+        width: 160,
+        sortable: true,
         // 无登录记录显示「—」而非空单元格: 空白会被误读为加载中
-        render: (v: string | null) => (v ? new Date(v).toLocaleString('zh-CN') : '—'),
+        render: (row: Row) => (
+          <span className="text-[12px] tabular-nums text-text-secondary">
+            {row.lastLoginAt ? new Date(row.lastLoginAt).toLocaleString('zh-CN') : '—'}
+          </span>
+        ),
       },
       {
-        title: '操作',
-        key: 'actions',
+        key: 'ops',
+        title: '',
         width: 150,
         fixed: 'right',
         /*
          * 只直显「详情」+「更多」, 其余动作收进下拉。
          *
-         * 实测: 5 个动作平铺需~340px, 列宽 190px 时会折成两行 (行高 44→51px),
-         * 把整行撑高且右侧被裁。收到下拉后列宽 150px 足够, 行高稳定。
-         * 与 docs/admin-ui-design.md §2.3「操作列最多直显 2 个」一致。
+         * 实测: 5 个动作平铺需~340px, 把整行撑高且右侧被裁。与
+         * docs/admin-ui-design.md §2.3「操作列最多直显 2 个」一致。
          */
-        render: (_: unknown, row) => {
-          const menuItems = rowMenuItems(row);
-          return (
-            <div className="adm-row-actions">
-              <Button type="link" className="adm-link" onClick={() => setDetailId(row.id)}>
-                详情
-              </Button>
-              {menuItems.length > 0 && (
-                <Dropdown
-                  trigger={['click']}
-                  menu={{
-                    items: menuItems,
-                    // 危险动作与常规动作之间加分隔线, 避免误点
-                  }}
-                  disabled={busy}
-                >
-                  <Button type="link" className="adm-link">
-                    更多
-                  </Button>
-                </Dropdown>
-              )}
-            </div>
-          );
-        },
+        render: (row: Row) => (
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="small" onClick={() => setDetailId(row.id)}>
+              详情
+            </Button>
+            <RowMenu items={rowMenuItems(row)} />
+          </div>
+        ),
       },
     ],
-    [busy, rowMenuItems],
+    // rowMenuItems 依赖 can() 与 busy 捕获的 setter, 均为稳定引用
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [can, busy],
   );
+
+  const sort = (params.sort as string | undefined) ?? DEFAULT_SORT;
 
   return (
     <>
@@ -421,47 +496,54 @@ export function AdminUsersPage() {
         description="管理注册用户的账号状态、角色与资源"
         actions={
           can('data.export') ? (
-            <Button type="default" className="adm-btn" onClick={() => void exportUsers()}>
+            <Button
+              variant="secondary"
+              size="small"
+              leadingIcon={Download}
+              onClick={() => void exportUsers()}
+            >
               导出 CSV
             </Button>
-          ) : undefined
+          ) : (
+            <span className="text-[11px] text-text-tertiary">
+              当前账号无 data.export 权限，不可导出
+            </span>
+          )
         }
       />
 
       <FilterBar>
-        <Input
-          className="adm-filter-input"
+        <TextInput
+          className="w-56"
           placeholder="邮箱关键词"
+          allowClear
           value={keyword}
-          onChange={(e) => setKeyword(e.target.value)}
-          onPressEnter={applyFilters}
-          allowClear
+          onChange={setKeyword}
+          onEnter={applyFilters}
         />
-        <Select
-          className="adm-filter-select"
+        <SelectBox
+          className="w-32"
+          ariaLabel="按角色筛选"
           placeholder="角色"
-          options={ROLE_OPTIONS}
+          allowClear
           value={role}
-          onChange={(v) => setRole(v)}
-          allowClear
+          onChange={setRole}
+          options={ROLE_OPTIONS}
         />
-        <Select
-          className="adm-filter-select"
+        <SelectBox
+          className="w-32"
+          ariaLabel="按状态筛选"
           placeholder="状态"
-          options={STATUS_OPTIONS}
-          value={status}
-          onChange={(v) => setStatus(v)}
           allowClear
+          value={status}
+          onChange={setStatus}
+          options={STATUS_OPTIONS}
         />
         <FilterActions>
-          <Button
-            type="primary"
-            className="adm-btn is-primary"
-            onClick={applyFilters}
-          >
+          <Button variant="primary" size="small" onClick={applyFilters}>
             查询
           </Button>
-          <Button type="default" className="adm-btn" onClick={resetFilters}>
+          <Button variant="secondary" size="small" onClick={resetFilters}>
             重置
           </Button>
         </FilterActions>
@@ -471,96 +553,82 @@ export function AdminUsersPage() {
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
       {error && data && <AdminStaleError error={error} onRetry={reload} />}
 
-      <Panel>
-        {loading && !data ? (
-          <AdminListLoading tip="加载用户列表…" />
-        ) : error && !data ? (
-          <AdminListError error={error} onRetry={reload} />
-        ) : (
-          <>
-            {selected.length > 0 && (
-              <div className="adm-bulk-bar">
-                <span className="adm-bulk-count">已选 {selected.length} 项</span>
-                {can('user.disable') && (
-                  <>
-                    <Button
-                      type="primary" danger
-                      className="adm-btn is-danger"
-                      disabled={busy}
-                      onClick={() => void runBatch('disable')}
-                    >
-                      批量禁用
-                    </Button>
-                    <Button
-                      type="default"
-                      className="adm-btn"
-                      disabled={busy}
-                      onClick={() => void runBatch('enable')}
-                    >
-                      批量启用
-                    </Button>
-                  </>
-                )}
-                <Button type="link" className="adm-link" onClick={() => setSelected([])}>
-                  清空选择
-                </Button>
-              </div>
-            )}
-            {(data?.items.length ?? 0) === 0 ? (
-              <AdminEmpty
-                description={
-                  hasFilter
-                    ? '没有符合条件的用户。清除筛选或换一个关键词试试。'
-                    : '还没有用户。用户注册后会出现在这里。'
-                }
-                action={
-                  hasFilter ? (
-                    <Button type="default" className="adm-btn" onClick={resetFilters}>
-                      清除筛选
-                    </Button>
-                  ) : undefined
-                }
-              />
-            ) : (
+      <Panel
+        title="用户列表"
+        note="已注销账号不可再改状态，但仍可勾选——批量操作会逐条返回失败原因"
+      >
+        {selected.length > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-accent-200 bg-accent-50 px-3 py-2">
+            <span className="text-xs font-medium text-accent-900">已选 {selected.length} 项</span>
+            {can('user.disable') && (
               <>
-                <Table<Row>
-                  rowKey="id"
+                <Button
+                  variant="danger"
                   size="small"
-                  columns={columns}
-                  dataSource={data?.items ?? []}
-                  loading={loading}
-                  scroll={{ x: 1000 }}
-                  rowSelection={{
-                    selectedRowKeys: selected,
-                    onChange: (keys) => setSelected(keys as string[]),
-                    // 已注销账号不能再改状态, 但仍允许选中 (批量启用会逐条返回失败原因)
-                    getCheckboxProps: (row) => ({ disabled: row.status === 'deleted' }),
-                  }}
-                  onChange={(_p, _f, sorter) => {
-                    const s = Array.isArray(sorter) ? sorter[0] : sorter;
-                    const field = s?.columnKey;
-                    if (typeof field === 'string') {
-                      setQuery(
-                        { sort: `${field}:${s?.order === 'ascend' ? 'asc' : 'desc'}` },
-                        false,
-                      );
-                    }
-                  }}
-                  pagination={adminPagination({
-                    current: data?.page ?? 1,
-                    pageSize: data?.pageSize ?? 20,
-                    total: data?.total ?? 0,
-                    // 翻页时清空选择 (见 selected 处的说明)
-                    onChange: (page, size) => {
-                      setSelected([]);
-                      setPage(page, size);
-                    },
-                  })}
-                />
+                  disabled={busy}
+                  onClick={() => void runBatch('disable')}
+                >
+                  批量禁用
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="small"
+                  disabled={busy}
+                  onClick={() => void runBatch('enable')}
+                >
+                  批量启用
+                </Button>
               </>
             )}
-          </>
+            <Button variant="ghost" size="small" onClick={() => setSelected([])}>
+              清空选择
+            </Button>
+          </div>
         )}
+
+        <AdminDataTable<Row>
+          rows={rows}
+          columns={columns}
+          rowKey={(row) => row.id}
+          loading={loading}
+          error={error}
+          onRetry={reload}
+          minWidth={1040}
+          sort={sort}
+          onSortChange={(next) => setQuery({ sort: next ?? DEFAULT_SORT }, false)}
+          selectable
+          selected={selected}
+          onSelectedChange={setSelected}
+          // 已注销账号不能再改状态, 但仍允许选中 (批量启用会逐条返回失败原因)
+          isRowSelectable={(row) => row.status !== 'deleted'}
+          emptyText={
+            hasFilter
+              ? '没有符合条件的用户。清除筛选或换一个关键词试试。'
+              : '还没有用户。用户注册后会出现在这里。'
+          }
+          emptyAction={
+            hasFilter ? (
+              <Button variant="secondary" size="small" onClick={resetFilters}>
+                清除筛选
+              </Button>
+            ) : undefined
+          }
+          pagination={
+            data
+              ? {
+                  current: data.page,
+                  pageSize: data.pageSize,
+                  total: data.total,
+                  unit: '位用户',
+                  // 翻页时清空选择 (见 selected 处的说明)
+                  onChange: (page, size) => {
+                    setSelected([]);
+                    setPage(page, size);
+                  },
+                }
+              : undefined
+          }
+        />
       </Panel>
 
       {/* 详情抽屉 */}
@@ -571,97 +639,99 @@ export function AdminUsersPage() {
         fetcher={detailFetcher}
       >
         {(d) => (
-          <>
-            <div className="adm-section">
-              <div className="adm-section-title">基本信息</div>
-              <dl className="adm-desc">
-                <dt>邮箱</dt>
-                <dd>{d.email}</dd>
-                <dt>关联记录</dt>
-                <dd className="adm-relation-links">
-                  <Link to={adminTasksHref({ userId: d.id })}>任务记录</Link>
-                  <Link to={adminOrderHref({ email: d.email })}>订单记录</Link>
-                  <Link to={adminCreditHref({ userId: d.id, email: d.email })}>积分账本</Link>
-                </dd>
-                <dt>昵称</dt>
-                <dd>{d.name}</dd>
-                <dt>角色</dt>
-                <dd>
-                  <StatusTag status={d.role} />
-                </dd>
-                <dt>状态</dt>
-                <dd>
-                  <StatusTag status={d.status} />
-                </dd>
-                <dt>手机号</dt>
-                <dd>
-                  {d.phone ? (
-                    <>
-                      {d.phone}
-                      <span className="adm-field-hint" style={{ marginLeft: 8 }}>
-                        {d.phoneVerifiedAt ? '已验证' : '未验证'}
+          <div className="flex flex-col gap-4">
+            <Section title="基本信息">
+              <dl className="grid grid-cols-2 gap-x-6 gap-y-2.5">
+                <div className="col-span-2 min-w-0">
+                  <dt className="text-[11px] text-text-tertiary">邮箱</dt>
+                  <dd className="mt-0.5 break-all text-sm text-text-primary">{d.email}</dd>
+                </div>
+                <div className="col-span-2 min-w-0">
+                  <dt className="text-[11px] text-text-tertiary">关联记录</dt>
+                  <dd className="mt-0.5 flex flex-wrap gap-3 text-xs">
+                    <Link className="text-accent-700 hover:underline" to={adminTasksHref({ userId: d.id })}>
+                      任务记录
+                    </Link>
+                    <Link className="text-accent-700 hover:underline" to={adminOrderHref({ email: d.email })}>
+                      订单记录
+                    </Link>
+                    <Link
+                      className="text-accent-700 hover:underline"
+                      to={adminCreditHref({ userId: d.id, email: d.email })}
+                    >
+                      积分账本
+                    </Link>
+                  </dd>
+                </div>
+                <InfoItem label="昵称" value={d.name} />
+                <InfoItem label="角色" value={<StatusTag status={d.role} />} />
+                <InfoItem label="状态" value={<StatusTag status={d.status} />} />
+                <InfoItem
+                  label="手机号"
+                  value={
+                    d.phone ? (
+                      <span className="flex items-center gap-1.5">
+                        {d.phone}
+                        <span className="text-[11px] text-text-tertiary">
+                          {d.phoneVerifiedAt ? '已验证' : '未验证'}
+                        </span>
                       </span>
-                    </>
-                  ) : (
-                    '未绑定'
-                  )}
-                </dd>
-                <dt>注册时间</dt>
-                <dd>{new Date(d.createdAt).toLocaleString('zh-CN')}</dd>
-                <dt>最近登录</dt>
-                <dd>{d.lastLoginAt ? new Date(d.lastLoginAt).toLocaleString('zh-CN') : '从未登录'}</dd>
+                    ) : (
+                      '未绑定'
+                    )
+                  }
+                />
+                <InfoItem label="注册时间" value={new Date(d.createdAt).toLocaleString('zh-CN')} />
+                <InfoItem
+                  label="最近登录"
+                  value={
+                    d.lastLoginAt ? new Date(d.lastLoginAt).toLocaleString('zh-CN') : '从未登录'
+                  }
+                />
               </dl>
-            </div>
+            </Section>
 
             {/* 登录审计：权限点 audit.read，无权限时静默显示说明而非报错 */}
             <RecentLoginsSection userId={d.id} />
 
-            <div className="adm-section">
-              <div className="adm-section-title">资源统计</div>
-              <div className="adm-stat-grid is-compact">
-                <div className="adm-stat">
-                  <div className="adm-stat-label">项目</div>
-                  <div className="adm-stat-value">{d.stats.projects}</div>
-                </div>
-                <div className="adm-stat">
-                  <div className="adm-stat-label">任务</div>
-                  <div className="adm-stat-value">{d.stats.tasks}</div>
-                  <div className="adm-stat-hint">
-                    成功 {d.stats.taskStatus.succeeded} · 失败 {d.stats.taskStatus.failed}
-                  </div>
-                </div>
-                <div className="adm-stat">
-                  <div className="adm-stat-label">素材</div>
-                  <div className="adm-stat-value">{d.stats.assets}</div>
-                </div>
+            <Section title="资源统计">
+              <div className="grid grid-cols-3 gap-2">
+                <MiniStat label="项目" value={d.stats.projects} />
+                <MiniStat
+                  label="任务"
+                  value={d.stats.tasks}
+                  hint={`成功 ${d.stats.taskStatus.succeeded} · 失败 ${d.stats.taskStatus.failed}`}
+                />
+                <MiniStat label="素材" value={d.stats.assets} />
               </div>
-            </div>
+            </Section>
 
-            <div className="adm-section">
-              <div className="adm-section-title">最近任务（20 条）</div>
+            <Section title="最近任务" note="20 条">
               {d.recentTasks.length === 0 ? (
                 <AdminEmpty description="暂无任务记录" />
               ) : (
-                <ul className="adm-mini-list">
+                <ul className="flex flex-col divide-y divide-border-table">
                   {d.recentTasks.map((t) => (
-                    <li key={t.id} className="adm-mini-item">
+                    <li key={t.id}>
                       <Link
-                        className="adm-mini-link"
+                        className="flex items-center gap-2.5 py-1.5 hover:bg-background-secondary-default/70"
                         to={adminTaskHref(t.id)}
                         aria-label={`查看任务详情：${t.capabilityName} ${t.id.slice(-8)}`}
                       >
                         {t.thumbnailUrl ? (
                           <img
-                            className="adm-mini-thumb"
+                            className="size-9 shrink-0 rounded-md border border-border-table object-cover"
                             src={toAbsoluteUrl(t.thumbnailUrl)}
                             alt=""
                           />
                         ) : (
-                          <div className="adm-mini-thumb is-empty" />
+                          <div className="size-9 shrink-0 rounded-md border border-dashed border-border-table bg-background-secondary-default" />
                         )}
-                        <span className="adm-mini-name">{t.capabilityName}</span>
+                        <span className="min-w-0 flex-1 truncate text-sm text-text-primary">
+                          {t.capabilityName}
+                        </span>
                         <StatusTag status={t.status} />
-                        <span className="adm-mini-time">
+                        <span className="shrink-0 text-[11px] tabular-nums text-text-tertiary">
                           {new Date(t.createdAt).toLocaleString('zh-CN')}
                         </span>
                       </Link>
@@ -669,23 +739,22 @@ export function AdminUsersPage() {
                   ))}
                 </ul>
               )}
-            </div>
+            </Section>
 
-            <div className="adm-section">
-              <div className="adm-section-title">最近素材（20 张）</div>
+            <Section title="最近素材" note="20 张">
               {d.recentAssets.length === 0 ? (
                 <AdminEmpty description="暂无素材" />
               ) : (
-                <div className="adm-thumb-grid">
+                <div className="grid grid-cols-5 gap-1.5">
                   {d.recentAssets.map((a) => (
                     <Link
                       key={a.id}
-                      className="adm-thumb-link"
+                      className="block overflow-hidden rounded-md border border-border-table"
                       to={adminAssetHref(a.id)}
                       aria-label={`在素材库查看素材 ${a.id.slice(-8)}`}
                     >
                       <img
-                        className="adm-thumb-cell"
+                        className="aspect-square w-full object-cover"
                         src={toAbsoluteUrl(a.sourceUrl)}
                         alt=""
                         loading="lazy"
@@ -694,14 +763,14 @@ export function AdminUsersPage() {
                   ))}
                 </div>
               )}
-            </div>
-          </>
+            </Section>
+          </div>
         )}
       </AdminDrawer>
 
       {/* 禁用/启用 */}
       {statusTarget && (
-        <StatusDialog
+        <StatusPanel
           target={statusTarget}
           loading={busy}
           onCancel={() => setStatusTarget(null)}
@@ -711,7 +780,7 @@ export function AdminUsersPage() {
 
       {/* 变更角色 */}
       {roleTarget && (
-        <RoleDialog
+        <RolePanel
           target={roleTarget}
           loading={busy}
           onCancel={() => setRoleTarget(null)}
@@ -726,23 +795,23 @@ export function AdminUsersPage() {
           title="临时密码已生成"
           confirmText="我已保存"
           loading={busy}
-          description={
-            <>
-              <p>请立即复制并安全转交给用户，此密码关闭后无法再次查看。</p>
-              <div className="adm-secret-box">
-                <code>{tempPassword}</code>
-                <Button
-                  type="default"
-                  className="adm-btn"
-                  onClick={() => {
-                    void navigator.clipboard?.writeText(tempPassword);
-                    void message.success('已复制');
-                  }}
-                >
-                  复制
-                </Button>
-              </div>
-            </>
+          description="请立即复制并安全转交给用户，此密码关闭后无法再次查看。"
+          extra={
+            <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+              <code className="min-w-0 flex-1 break-all font-mono text-sm text-text-primary">
+                {tempPassword}
+              </code>
+              <Button
+                variant="secondary"
+                size="small"
+                onClick={() => {
+                  void navigator.clipboard?.writeText(tempPassword);
+                  toast.success('已复制');
+                }}
+              >
+                复制
+              </Button>
+            </div>
           }
           onCancel={() => setTempPassword(null)}
           onConfirm={() => setTempPassword(null)}
@@ -759,8 +828,54 @@ export function AdminUsersPage() {
   );
 }
 
+/** 描述列表的一项 */
+function InfoItem({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-[11px] text-text-tertiary">{label}</dt>
+      <dd className="mt-0.5 text-sm text-text-primary">{value}</dd>
+    </div>
+  );
+}
+
+/**
+ * 行内「更多」菜单。
+ *
+ * 受控展开: 选中一项后必须收起, 否则删完用户菜单还浮在空行上。
+ * 无可用动作时整个触发器不渲染 —— 留一个点开是空的菜单比没有更糟。
+ */
+function RowMenu({ items }: { items: Array<{ key: string; label: string; danger?: boolean; onClick: () => void }> }) {
+  const [open, setOpen] = useState(false);
+
+  if (items.length === 0) return null;
+
+  return (
+    <Dropdown isOpen={open} onOpenChange={setOpen}>
+      <DropdownTrigger className="inline-flex h-7 items-center rounded-lg px-2 text-xs text-accent-700 hover:bg-accent-50">
+        更多
+      </DropdownTrigger>
+      <DropdownPopover aria-label="更多操作" placement="bottom end" className="w-40">
+        <DropdownGroup>
+          {items.map((item) => (
+            <DropdownItem
+              key={item.key}
+              className={item.danger ? 'text-rose-600' : undefined}
+              onSelect={() => {
+                setOpen(false);
+                item.onClick();
+              }}
+            >
+              {item.label}
+            </DropdownItem>
+          ))}
+        </DropdownGroup>
+      </DropdownPopover>
+    </Dropdown>
+  );
+}
+
 /** 禁用/启用操作条 */
-function StatusDialog({
+function StatusPanel({
   target,
   loading,
   onCancel,
@@ -787,23 +902,21 @@ function StatusDialog({
             用户：<strong>{target.email}</strong>
           </p>
           {next === 'disabled' && (
-            <div className="adm-confirm-warn">
+            <p className="mt-1 text-rose-700">
               禁用后该用户的登录凭证立即失效，无法再登录或调用接口。
-            </div>
+            </p>
           )}
         </>
       }
       extra={
-        <div className="adm-field">
-          <label htmlFor="adm-status-reason">操作原因（建议填写）</label>
-          <Input
-            id="adm-status-reason"
-            type="text"
+        <Field label="操作原因（建议填写）">
+          <TextInput
+            ariaLabel="操作原因"
             placeholder="如：违规使用"
             value={reason}
-            onChange={(e) => setReason(e.target.value)}
+            onChange={setReason}
           />
-        </div>
+        </Field>
       }
       onCancel={onCancel}
       onConfirm={() => onConfirm(next, reason)}
@@ -812,7 +925,7 @@ function StatusDialog({
 }
 
 /** 变更角色操作条 */
-function RoleDialog({
+function RolePanel({
   target,
   loading,
   onCancel,
@@ -841,7 +954,7 @@ function RoleDialog({
           <p>
             用户：<strong>{target.email}</strong>
           </p>
-          <p>
+          <p className="mt-1 flex items-center gap-1.5">
             当前角色：<StatusTag status={target.role} />
           </p>
         </>
@@ -852,29 +965,29 @@ function RoleDialog({
       ]}
       extra={
         <>
-          <div className="adm-field">
-            <label htmlFor="adm-role-select">目标角色</label>
-            <Select
-              id="adm-role-select"
+          <Field label="目标角色">
+            <SelectBox
+              ariaLabel="目标角色"
+              size="md"
               value={next}
-              onChange={(value) => setNext(value)}
+              onChange={(value) => {
+                if (value) setNext(value);
+              }}
               options={[
                 { value: 'operator', label: '运营' },
                 { value: 'finance', label: '财务' },
                 { value: 'admin', label: '管理员' },
               ]}
             />
-          </div>
-          <div className="adm-field">
-            <label htmlFor="adm-role-reason">操作原因</label>
-            <Input
-              id="adm-role-reason"
-              type="text"
+          </Field>
+          <Field label="操作原因">
+            <TextInput
+              ariaLabel="操作原因"
               placeholder="如：岗位调整"
               value={reason}
-              onChange={(e) => setReason(e.target.value)}
+              onChange={setReason}
             />
-          </div>
+          </Field>
         </>
       }
       onCancel={onCancel}
@@ -883,7 +996,7 @@ function RoleDialog({
   );
 }
 
-/** 失败原因 -> 中文。未知值原样展示，免得新原因被吞成「其他」 */
+/** 登录方式/失败原因 -> 中文。未知值原样展示，免得新原因被吞成「其他」 */
 const LOGIN_REASON_LABEL: Record<string, string> = {
   password: '密码登录',
   sms: '短信登录',
@@ -927,18 +1040,19 @@ function RecentLoginsSection({ userId }: { userId: string }) {
   }, [userId, reloadKey]);
 
   return (
-    <div className="adm-section">
-      <div className="adm-section-title">
-        最近登录
-        {state === 'ready' && data ? (
-          <span className="adm-field-hint" style={{ marginLeft: 8 }}>
-            共 {data.total} 次 · 近 30 天失败 {data.failedLast30Days} 次
-          </span>
-        ) : null}
-      </div>
-      {state === 'loading' ? <AdminListLoading /> : null}
+    <Section
+      title="最近登录"
+      note={
+        state === 'ready' && data
+          ? `共 ${data.total} 次 · 近 30 天失败 ${data.failedLast30Days} 次`
+          : undefined
+      }
+    >
+      {state === 'loading' ? <AdminListLoading tip="加载登录记录…" /> : null}
       {state === 'forbidden' ? (
-        <div className="adm-field-hint">当前角色没有审计权限（audit.read），无法查看登录记录。</div>
+        <p className="text-[11px] text-text-tertiary">
+          当前角色没有审计权限（audit.read），无法查看登录记录。
+        </p>
       ) : null}
       {state === 'error' ? (
         <AdminListError error="登录记录加载失败" onRetry={() => setReloadKey((n) => n + 1)} />
@@ -947,18 +1061,27 @@ function RecentLoginsSection({ userId }: { userId: string }) {
         data.items.length === 0 ? (
           <AdminEmpty description="暂无登录记录" />
         ) : (
-          <ul className="adm-mini-list">
+          <ul className="flex flex-col divide-y divide-border-table">
             {data.items.map((item) => (
-              <li key={item.id} className="adm-mini-item">
-                <StatusTag status={item.success ? 'success' : 'failed'} label={item.success ? '成功' : '失败'} />
-                <span className="adm-mini-name">{LOGIN_REASON_LABEL[item.reason] ?? item.reason}</span>
-                <span className="adm-mini-time">{item.ip || '未知 IP'}</span>
-                <span className="adm-mini-time">{new Date(item.createdAt).toLocaleString('zh-CN')}</span>
+              <li key={item.id} className="flex items-center gap-2.5 py-1.5">
+                <StatusTag
+                  status={item.success ? 'success' : 'failed'}
+                  label={item.success ? '成功' : '失败'}
+                />
+                <span className="min-w-0 flex-1 truncate text-xs text-text-primary">
+                  {LOGIN_REASON_LABEL[item.reason] ?? item.reason}
+                </span>
+                <span className={cx('shrink-0 text-[11px] tabular-nums text-text-tertiary')}>
+                  {item.ip || '未知 IP'}
+                </span>
+                <span className="shrink-0 text-[11px] tabular-nums text-text-tertiary">
+                  {new Date(item.createdAt).toLocaleString('zh-CN')}
+                </span>
               </li>
             ))}
           </ul>
         )
       ) : null}
-    </div>
+    </Section>
   );
 }

@@ -123,12 +123,14 @@ aigc-creation/
     ├── .env.development / .env.test / .env.production.example
     └── src/
         ├── App.tsx           # 28 条壳内路由 + 9 条独立页 + /admin/* 子应用
-        ├── components/       # AppLayout / SideRail / ToolShell / QrLoginPanel / admin/AdminLayout
+        ├── admin-ui/         # 后台 UI：shell/AdminBoardLayout · primitives · controls · widgets · providers · lib
+        ├── vendor/boardui/   # BoardUI 免费层源码（MIT，上游原样；来源见 PROVENANCE.md）
+        ├── components/       # AppLayout / SideRail / ToolShell / QrLoginPanel / admin/（控件入口 + adminNav + AlertCenter + DutyBand + statusMeta）
         ├── pages/            # 35 个 C 端页面 + pages/admin/ 29 个后台页面
         ├── lib/              # api.ts（request 拆信封）/ http / auth / capabilities / aigc-label / constants
         ├── context/          # AuthContext / AdminContext（权限点）/ CreditsContext
         ├── hooks/            # useToolTask / useProject / useCapabilities / usePollAbort / 上传相关
-        └── styles/global.css # 设计令牌 + 全站规则
+        └── styles/           # global.css（设计令牌 + 全站规则）+ boardui.css（后台 Tailwind 入口）
 ```
 
 `backend/uploads`（UPLOAD_DIR）、`backend/logs`（LOG_DIR）、`backend/backups`（BACKUP_DIR）均为运行期产物，不入库。
@@ -273,7 +275,7 @@ npm run e2e                 # Playwright
 
 ### 后台管理端（`/admin`）
 
-独立外壳（`AdminShell` + `components/admin/AdminLayout`），与 C 端 `AppLayout` 完全分离：C 端侧栏/顶导/促销条都是消费级语义，不能复用。
+独立外壳（`AdminShell` 鉴权链 + `admin-ui/shell/AdminBoardLayout`），与 C 端 `AppLayout` 完全分离：C 端侧栏/顶导/促销条都是消费级语义，不能复用。
 
 **权限链**：`AdminGuard`（身份）→ `PermissionGuard`（权限点）→ controller → `AuditInterceptor`（落 `AdminAuditLog`）。权限点定义在 `src/admin/permissions.ts`。**前端 `AdminContext.can()` 只用于隐藏无权限按钮，不是安全边界**；真正的校验必须在后端。
 
@@ -282,9 +284,10 @@ npm run e2e                 # Playwright
 - 高危动作（删除 / 重置密码 / 退款 / 手动调整积分 / 模型配置写入 / 角色与系统设置写入 / 手动备份）须填原因并写审计（`HIGH_RISK_PERMISSIONS`）。
 - 批量动作：`ids ≤ 100`，`runBatch` 串行、**不包事务**，逐条返回结果；路由挂较弱读权限，处理器内再判动作权限。
 - CSV 统一走 `common/csv.ts`（BOM + RFC4180 + 公式注入前导 `'`）；前端 `downloadCsv()` 不走 JSON 信封。
-- 后台通用骨架已是 antd 原生组件，`adm-*` 仅用于业务布局 class；改动时不要退回自绘 `div/button/input/select`。
-- **外壳已换 BoardUI**（2026-10-30）：`admin-ui/shell/AdminBoardLayout` 接管导航 / 搜索 / 告警铃 / 密度 / 用户菜单，无值班带；`VITE_ADMIN_UI=legacy` 可整站回滚（开关只在 `admin-ui/lib/flag.ts` 读一次）。页面内容仍在逐页迁移，新页面直接写 `admin-ui/`，不要再加 antd 组件。vendor 源码在 `frontend/src/vendor/boardui/`，保持上游原样不改，来源见 `PROVENANCE.md`。
-- **共享控件已分流**：`components/admin/PageHeader.tsx` 与 `AdminWidgets.tsx` 只是入口 —— 数据 hook 只有一份，渲染层按开关走 `admin-ui/widgets/AdminChrome`（BoardUI）或 `*.legacy.tsx`（antd）。页面 import 不变；改控件外观改 `AdminChrome`，不要在两处各改一半。表格迁 `admin-ui/primitives/DataTable`，状态色映射改 `components/admin/statusMeta.ts`。
+- **后台整站是 BoardUI**（2026-10-30 完成，29 页 + 外壳全部切换）：`pages/admin` / `components/admin` / `admin-ui` 三目录 `from 'antd'` 为 0，legacy 实现与 `VITE_ADMIN_UI` 开关已删除、无回滚。新页面直接写 `admin-ui/`，不要引 antd，也不要退回自绘 `div/button/input/select`。vendor 源码在 `frontend/src/vendor/boardui/`，保持上游原样不改，来源见 `PROVENANCE.md`。
+- **外壳**：`admin-ui/shell/AdminBoardLayout` —— 单栏（侧栏 232 / 折叠 60，≤1280 自动折叠），无顶栏、无值班带；导航 / ⌘K 搜索 / 告警铃 / 密度 / 用户菜单都在侧栏。值班塔只出现在概览首屏（`admin-ui/widgets/DutyStrip`）。`global.css` 的 `.adm-*` 只剩外壳骨架（`adm-layout` / `adm-content` / `adm-skip-link`）与值班塔（`adm-tower*` / `adm-dot` / `adm-empty-inline`），页面内新增 `adm-*` 类是错的。
+- **共享控件**：`components/admin/PageHeader.tsx` 与 `AdminWidgets.tsx` 是单一路径的再导出（→ `admin-ui/widgets/AdminChrome` / `primitives`），页面 import 不变；改外观只改 `AdminChrome`。表格 `admin-ui/primitives/DataTable`（密度走 `admin-ui/lib/density` 的 `DensityContext`，由外壳下发），状态色 `components/admin/statusMeta.ts`。
+- **e2e 锚点**：共享控件与页面关键节点挂 `data-testid="admin-*"`，表单控件用 `aria-label`；测试一律 `getByTestId` / `getByLabel` / 角色名，不追 Tailwind 工具类与已删除的 `adm-*` 类。
 
 ### 商业域
 

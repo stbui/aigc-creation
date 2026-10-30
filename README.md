@@ -3,7 +3,7 @@
 面向电商团队的智能视觉创作平台：上传商品图或输入提示词，由真实模型通道产出可上架的主图、详情图、修图结果与短视频。
 
 - 后端：NestJS 12 + Prisma 7 + 自研 `node:sqlite` driver adapter（零原生编译依赖）
-- 前端：Vite 8 + React 19 + antd 6 + lucide-react
+- 前端：Vite 8 + React 19 + antd 6 + lucide-react；**后台另起一套 UI**：BoardUI 免费层（vendor 源码）+ Tailwind v4 + React Aria Components，后台树内不引 antd
 - 图像生成：仅真实模型通道（OpenAI 兼容 / 火山方舟 / MiniMax）；无可用线路时任务失败 `42204` 并退款，不生成伪结果
 - 视频生成：MiniMax 四段式异步，同样只走模型通道（未配通道时如实标注不可用）
 - Jimp 1.6 仅用于上传图片校验、尺寸探测与 AIGC 角标合成，不承担任何图像生成
@@ -128,10 +128,12 @@ aigc-creation/
     └── src/
         ├── **/__tests__/       # Vitest 用例（*.test.ts / *.test.tsx）
         ├── pages/              # 35 个 C 端页面 + pages/admin/ 29 个后台页面
-        ├── components/         # AppLayout / SideRail / RailPreview / ToolShell / admin/AdminLayout ...
+        ├── admin-ui/           # 后台 UI：shell（单栏外壳）/ primitives / controls / widgets / providers / lib
+        ├── vendor/boardui/     # BoardUI 免费层源码（MIT，保持上游原样，见 PROVENANCE.md）
+        ├── components/         # AppLayout / SideRail / RailPreview / ToolShell；admin/（共享控件入口、adminNav、AlertCenter、DutyBand、statusMeta）
         ├── lib/                # api.ts（拆信封）/ http.ts / auth.ts / capabilities.ts / constants.ts
         ├── context/ hooks/     # AuthContext / AdminContext（权限点）/ CreditsContext；useToolTask 等
-        └── styles/global.css   # ★ 设计令牌（全站唯一色值来源）
+        └── styles/             # global.css（★ 设计令牌）+ boardui.css（后台 Tailwind 入口，无 preflight）
 ```
 
 逐模块注释的完整目录树见 `CLAUDE.md`「目录结构」。

@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Badge, Button, Popover } from 'antd';
-import { useNavigate } from 'react-router-dom';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
 import {
   AlertOctagon,
   AlertTriangle,
-  Bell,
   CheckCircle2,
   Info,
   RefreshCw,
@@ -79,136 +77,13 @@ export function alertTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('zh-CN', { hour12: false });
 }
 
-function AlertRow({
-  item,
-  onOpen,
-}: {
-  item: AdminAlertItem;
-  onOpen: (link: string) => void;
-}) {
-  const meta = ALERT_SEVERITY_META[item.severity];
-  const Icon = meta.icon;
-  return (
-    <button
-      type="button"
-      className={`adm-bell-item is-${item.severity}`}
-      onClick={() => onOpen(item.link)}
-      title={item.detail}
-    >
-      <Icon size={16} className="adm-bell-item-icon" aria-hidden="true" />
-      <span className="adm-bell-item-main">
-        <span className="adm-bell-item-title">{item.title}</span>
-        <span className="adm-bell-item-detail">{item.detail}</span>
-      </span>
-      {item.count !== null && <span className="adm-bell-item-count">{item.count}</span>}
-    </button>
-  );
-}
-
-export function AdminAlertBell({ placement = 'bottomRight' }: { placement?: 'bottomRight' | 'rightTop' | 'rightBottom' }) {
-  const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
-  const { data, error, loading, reload } = useAdminAlerts();
-
-  const items = data?.items ?? [];
-  const hidden = Math.max(items.length - 5, 0);
-  const count = items.length;
-
-  const content = (
-    <div className="adm-bell-panel">
-      <div className="adm-bell-head">
-        <strong>待处理告警</strong>
-        <span>{count > 0 ? `${count} 项` : '暂无'}</span>
-      </div>
-
-      {error && (
-        <div className="adm-bell-error" role="status">
-          <span>{error}</span>
-          <button type="button" onClick={() => void reload()}>
-            重试
-          </button>
-        </div>
-      )}
-
-      {loading && !data ? (
-        <div className="adm-bell-empty">正在检查待处理事项…</div>
-      ) : error && !data ? (
-        /*
-         * 首次加载失败时不能落到下面的「当前没有待处理告警」分支 ——
-         * 那会把「查不到」说成「没有问题」，比不显示更危险。
-         */
-        <div className="adm-bell-empty">
-          <AlertOctagon size={20} aria-hidden="true" />
-          <strong>告警加载失败</strong>
-          <span>请稍后重试，或到告警中心查看。</span>
-        </div>
-      ) : items.length === 0 ? (
-        <div className="adm-bell-empty">
-          <CheckCircle2 size={20} aria-hidden="true" />
-          <strong>当前没有待处理告警</strong>
-          <span>
-            {data ? `截至 ${alertTime(data.generatedAt)} · 每 60 秒检查` : '每 60 秒检查一次'}
-          </span>
-        </div>
-      ) : (
-        <div className="adm-bell-list">
-          {items.slice(0, 5).map((item) => (
-            <AlertRow
-              key={item.key}
-              item={item}
-              onOpen={(link) => {
-                setOpen(false);
-                navigate(link);
-              }}
-            />
-          ))}
-        </div>
-      )}
-
-      <div className="adm-bell-foot">
-        <span>
-          {data ? `截至 ${alertTime(data.generatedAt)}` : '等待数据'}
-          {hidden > 0 ? ` · 另有 ${hidden} 项` : ''}
-        </span>
-        <button
-          type="button"
-          className="adm-bell-more"
-          onClick={() => {
-            setOpen(false);
-            navigate('/admin/alerts');
-          }}
-        >
-          查看全部
-        </button>
-      </div>
-    </div>
-  );
-
-  return (
-    <Popover
-      content={content}
-      trigger="click"
-      placement={placement}
-      open={open}
-      onOpenChange={setOpen}
-      arrow={false}
-      styles={{ content: { padding: 0 } }}
-    >
-      <button
-        type="button"
-        className="adm-icon-btn adm-bell-btn"
-        aria-label={count > 0 ? `告警中心，${count} 项待处理` : '告警中心，暂无待处理'}
-        title={count > 0 ? `${count} 项待处理告警` : '告警中心'}
-      >
-        <Badge count={count} size="small" offset={[2, -2]}>
-          <Bell size={17} />
-        </Badge>
-      </button>
-    </Popover>
-  );
-}
-
-/** 告警页的刷新按钮复用同一份轮询数据，避免两个入口各算一套 */
+/**
+ * 告警页的刷新按钮复用同一份轮询数据，避免两个入口各算一套。
+ *
+ * 用 BoardUI 的 `Button`（而非 antd 的 `type="default"` + `loading`）：
+ * 它渲染在 BoardUI 页头的操作区里，混用两套按钮会让同一行里出现两种高度与圆角。
+ * vendor 的 Button 没有 `loading`，用「禁用 + 改文案」表达同一件事。
+ */
 export function AlertRefreshButton({
   loading,
   onRefresh,
@@ -218,13 +93,13 @@ export function AlertRefreshButton({
 }) {
   return (
     <Button
-      type="default"
-      className="adm-btn"
-      icon={<RefreshCw size={14} />}
-      loading={loading}
+      variant="secondary"
+      size="small"
+      leadingIcon={RefreshCw}
+      disabled={loading}
       onClick={onRefresh}
     >
-      刷新
+      {loading ? '刷新中…' : '刷新'}
     </Button>
   );
 }

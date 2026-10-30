@@ -166,3 +166,14 @@ export function useConfirm(): ConfirmFn {
   if (!confirm) throw new Error('useConfirm 必须在 ConfirmProvider 内使用');
   return confirm;
 }
+
+/**
+ * 可选版本：不在 `ConfirmProvider` 内时返回 `null`。
+ *
+ * 给共享 hook 用 —— `hooks/useUnsavedGuard` 的丢弃确认既要服务已切到
+ * BoardUI 的页面，也不能在没挂 Provider 的环境里抛错（那样连「有没有改过」
+ * 都问不出来，会直接白屏）。
+ */
+export function useOptionalConfirm(): ConfirmFn | null {
+  return useContext(ConfirmContext);
+}

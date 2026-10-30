@@ -1,14 +1,16 @@
-import { Button, Table } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import { AlertTriangle, CheckCircle2, CreditCard, Lock, RefreshCw, XCircle } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { RefreshCw } from 'lucide-react';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
 import { adminPaymentChannelsApi } from '../../lib/api';
+import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
+import { Notice } from '../../admin-ui/primitives';
 import {
   AdminListError,
   AdminListLoading,
   AdminStaleError,
   useAdminResource,
 } from '../../components/admin/AdminWidgets';
-import { AdminEmpty, PageHeader, Panel, StatCard } from '../../components/admin/PageHeader';
+import { AdminEmpty, PageHeader, Panel, StatCard, StatusTag } from '../../components/admin/PageHeader';
 import type { AdminPaymentChannelStatus, PaymentChannelId } from '../../types/api';
 
 /** 通道的静态说明（后端只给状态, 文案与变量名放前端, 避免接口变成 i18n 字典） */
@@ -40,6 +42,8 @@ const ENV_LABELS: Record<string, string> = {
   production: '生产',
 };
 
+type Channel = AdminPaymentChannelStatus['channels'][number];
+
 /**
  * 支付渠道状态（只读）。
  *
@@ -63,58 +67,63 @@ export function AdminPaymentChannelsPage() {
   const activeChannel = data.channels.find((c) => c.channel === data.active);
   const hasDanger = (data.warnings ?? []).some((w) => w.level === 'danger');
 
-  const columns: ColumnsType<AdminPaymentChannelStatus['channels'][number]> = [
+  const columns: Array<AdminColumn<Channel>> = [
     {
+      key: 'label',
       title: '通道',
-      dataIndex: 'label',
-      render: (_v, row) => (
-        <div className="adm-cell-stack">
-          <strong>
+      render: (row) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="flex items-center gap-2 font-medium">
             {row.label}
-            {row.active && <span className="adm-tag is-brand" style={{ marginLeft: 8 }}>当前生效</span>}
-          </strong>
-          <span className="adm-cell-sub">{META[row.channel].desc}</span>
+            {row.active && <StatusTag status="active" tone="brand" label="当前生效" />}
+          </span>
+          <span className="text-[11px] text-text-tertiary">{META[row.channel].desc}</span>
         </div>
       ),
     },
     {
+      key: 'configured',
       title: '凭据',
-      dataIndex: 'configured',
       width: 200,
-      render: (_v, row) =>
+      render: (row) =>
         row.configured ? (
-          <span className="adm-tag is-success">
-            <CheckCircle2 size={12} />
-            {row.channel === 'sandbox' ? '无需凭据' : '已齐全'}
-          </span>
+          <StatusTag
+            status="configured"
+            tone="success"
+            label={row.channel === 'sandbox' ? '无需凭据' : '已齐全'}
+          />
         ) : (
-          <span className="adm-tag is-danger">
-            <XCircle size={12} />
-            缺 {row.missing.length} 项
-          </span>
+          <StatusTag status="missing" tone="danger" label={`缺 ${row.missing.length} 项`} />
         ),
     },
     {
+      key: 'missing',
       title: '缺失的环境变量',
-      dataIndex: 'missing',
-      render: (_v, row) =>
+      render: (row) =>
         row.missing.length === 0 ? (
-          <span className="adm-cell-sub">—</span>
+          <span className="text-text-placeholder">—</span>
         ) : (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-            {row.missing.map((k) => (
-              <code key={k} className="adm-mono">
-                {k}
+          <div className="flex flex-wrap gap-1">
+            {row.missing.map((key) => (
+              <code
+                key={key}
+                className="rounded border border-border-table bg-background-secondary-default px-1.5 py-0.5 font-mono text-[11px] text-text-secondary"
+              >
+                {key}
               </code>
             ))}
           </div>
         ),
     },
     {
+      key: 'notifyUrl',
       title: '渠道回调地址',
-      dataIndex: 'notifyUrl',
-      render: (url: string | null) =>
-        url ? <code className="adm-mono">{url}</code> : <span className="adm-cell-sub">站内模拟，无需回调</span>,
+      render: (row) =>
+        row.notifyUrl ? (
+          <code className="break-all font-mono text-[11px] text-text-secondary">{row.notifyUrl}</code>
+        ) : (
+          <span className="text-text-placeholder">站内模拟，无需回调</span>
+        ),
     },
   ];
 
@@ -124,8 +133,13 @@ export function AdminPaymentChannelsPage() {
         title="支付渠道"
         description="当前生效的收款通道与凭据状态。切换通道需修改部署环境变量并重启，页面不提供编辑。"
         actions={
-          <Button type="default" className="adm-btn" loading={loading} onClick={() => void reload()}>
-            <RefreshCw size={14} style={{ marginRight: 6 }} />
+          <Button
+            variant="secondary"
+            size="small"
+            leadingIcon={RefreshCw}
+            disabled={loading}
+            onClick={() => void reload()}
+          >
             刷新
           </Button>
         }
@@ -135,36 +149,27 @@ export function AdminPaymentChannelsPage() {
           看着旧状态而不知道它已经过期, 比看不到更危险 */}
       {error && <AdminStaleError error={error} onRetry={() => void reload()} />}
 
-      <div className="adm-alert is-info">
-        <Lock size={16} />
+      <Notice tone="locked" title="凭据不在界面配置。">
         <div>
-          <strong>凭据不在界面配置。</strong>
-          <div>商户号、私钥等只从部署环境变量读取，页面只展示是否配齐与缺失的变量名，不回传任何凭据值。</div>
-          <div className="adm-mono" style={{ marginTop: 4 }}>{data.credentialSource}</div>
+          商户号、私钥等只从部署环境变量读取，页面只展示是否配齐与缺失的变量名，不回传任何凭据值。
         </div>
-      </div>
+        <code className="mt-1 block break-all font-mono text-[11px] text-text-secondary">
+          {data.credentialSource}
+        </code>
+      </Notice>
 
       {(data.warnings ?? []).map((w) => (
-        <div key={w.message} className={`adm-alert${w.level === 'danger' ? ' is-danger' : ''}`}>
-          <AlertTriangle size={16} />
-          <div>{w.message}</div>
-        </div>
+        <Notice key={w.message} tone={w.level === 'danger' ? 'danger' : 'warn'}>
+          {w.message}
+        </Notice>
       ))}
 
-      {/* 三张卡: 用 auto-fit 而不是 adm-stat-grid —— 后者桌面端固定 6 列,
-          只放 3 张会剩下半屏空白 */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
-          gap: 12,
-          marginBottom: 16,
-        }}
-      >
+      {/* 三张卡用 auto-fit 而不是固定列数: 桌面端固定 6 列时只放 3 张会剩下半屏空白 */}
+      <div className="mb-4 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(220px,1fr))]">
         <StatCard
           label="当前生效通道"
           value={activeChannel?.label ?? data.active}
-          hint={<code className="adm-mono">PAYMENT_PROVIDER={data.active}</code>}
+          hint={<code className="font-mono text-[11px]">PAYMENT_PROVIDER={data.active}</code>}
           tone={hasDanger ? 'danger' : undefined}
         />
         <StatCard
@@ -180,7 +185,7 @@ export function AdminPaymentChannelsPage() {
         <StatCard
           label="运行环境"
           value={ENV_LABELS[data.environment] ?? data.environment}
-          hint={<code className="adm-mono">{data.environment}</code>}
+          hint={<code className="font-mono text-[11px]">{data.environment}</code>}
         />
       </div>
 
@@ -188,51 +193,44 @@ export function AdminPaymentChannelsPage() {
         title="通道清单"
         note="状态由后端 PaymentProviderFactory 直接判定，与真实支付链路同一份逻辑"
       >
-        <Table
-          rowKey="channel"
+        <AdminDataTable<Channel>
+          rows={data.channels}
           columns={columns}
-          dataSource={data.channels}
-          pagination={false}
-          size="small"
-          scroll={{ x: 800 }}
+          rowKey={(row) => row.channel}
+          minWidth={800}
+          emptyText="没有可展示的支付通道"
         />
       </Panel>
 
       <Panel title="如何切换通道" note="改配置 + 重启，不在界面里做">
-        <ul className="adm-note-list">
+        <ul className="flex list-disc flex-col gap-1.5 pl-4 text-xs leading-5 text-text-secondary">
           <li>
-            <strong>切换生效通道</strong>：修改 <code className="adm-mono">PAYMENT_PROVIDER</code> 为
-            <code className="adm-mono"> alipay </code>或<code className="adm-mono"> wechat</code> 后重启服务。
+            <strong className="text-text-primary">切换生效通道</strong>：修改{' '}
+            <Code>PAYMENT_PROVIDER</Code> 为 <Code>alipay</Code> 或 <Code>wechat</Code> 后重启服务。
           </li>
           <li>
-            <strong>不放一键按钮的原因</strong>：支付通道改错不会报错，只会让「用户付款成功、账上没有钱」，
+            <strong className="text-text-primary">不放一键按钮的原因</strong>：支付通道改错不会报错，只会让「用户付款成功、账上没有钱」，
             必须经过部署流程与重启，留下可追溯的配置变更。
           </li>
           <li>
-            <strong>回调地址</strong>：真实通道的 <code className="adm-mono">notifyUrl</code> 必须是渠道服务器
-            能公网访问的地址（由 <code className="adm-mono">PAYMENT_NOTIFY_BASE</code> 决定），
-            并在支付宝 / 微信商户后台登记。
+            <strong className="text-text-primary">回调地址</strong>：真实通道的 <Code>notifyUrl</Code> 必须是渠道服务器
+            能公网访问的地址（由 <Code>PAYMENT_NOTIFY_BASE</Code> 决定），并在支付宝 / 微信商户后台登记。
           </li>
           <li>
-            <strong>缺凭据不降级</strong>：真实通道缺任一项凭据时发起支付返回 503，绝不会静默回落到沙箱 ——
+            <strong className="text-text-primary">缺凭据不降级</strong>：真实通道缺任一项凭据时发起支付返回 503，绝不会静默回落到沙箱 ——
             沙箱「支付成功」在生产等于白送积分。
           </li>
         </ul>
       </Panel>
 
       <Panel title="各通道所需环境变量" note="缺失项在上表已标红；此处列全量，便于部署时逐项核对">
-        <ul className="adm-note-list">
-          {data.channels.map((c) => (
-            <li key={c.channel}>
-              <strong>
-                <CreditCard size={13} style={{ marginRight: 4, verticalAlign: -2 }} />
-                {c.label}
-              </strong>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
-                {META[c.channel].envKeys.map((k) => (
-                  <code key={k} className="adm-mono">
-                    {k}
-                  </code>
+        <ul className="flex flex-col gap-3 text-xs">
+          {data.channels.map((channel) => (
+            <li key={channel.channel}>
+              <strong className="text-text-primary">{channel.label}</strong>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                {META[channel.channel].envKeys.map((key) => (
+                  <Code key={key}>{key}</Code>
                 ))}
               </div>
             </li>
@@ -240,5 +238,13 @@ export function AdminPaymentChannelsPage() {
         </ul>
       </Panel>
     </>
+  );
+}
+
+function Code({ children }: { children: ReactNode }) {
+  return (
+    <code className="rounded border border-border-table bg-background-secondary-default px-1 py-0.5 font-mono text-[11px] text-text-secondary">
+      {children}
+    </code>
   );
 }

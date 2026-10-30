@@ -19,7 +19,7 @@
 - 不是 C 端账号设置页（那是 `/account` `/works` `/library` `/stats` 的职责）。
 - 不是公开 UGC 审核平台：素材库按 `ownerId` 私有，无公开内容流。
 - 不是支付渠道配置台：凭据只从环境变量读，后台只读展示与告警。
-- 不复用 C 端外壳：`AppLayout` / `SideRail` / `PromoBar` 都是消费级语义，后台用独立 `AdminLayout`。
+- 不复用 C 端外壳：`AppLayout` / `SideRail` / `PromoBar` 都是消费级语义，后台用独立外壳 `admin-ui/shell/AdminBoardLayout`。
 
 ## 2. 信息架构
 
@@ -194,11 +194,11 @@ JwtAuthGuard（身份）→ AdminGuard（后台身份 + 账号状态）→ Permi
 | 层 | 约定 |
 | --- | --- |
 | 路由 | `/admin/*` 在 `App.tsx` 中必须注册在 catch-all 之前，否则会被 C 端 `Shell` 吞掉 |
-| 外壳 | `components/admin/AdminLayout.tsx` + `adminNav.ts`（菜单单一事实源） |
+| 外壳 | `admin-ui/shell/AdminBoardLayout.tsx` + `components/admin/adminNav.ts`（菜单单一事实源） |
 | 页面 | `pages/admin/` 29 个页面 + `modelConfig/` 子组件目录 |
 | 请求 | `lib/api.ts` 的 `adminApi` 分组复用 `request()`（信封剥离、401 广播） |
 | 类型 | `types/api.d.ts` 的 `Admin*` 段 |
-| 组件 | 通用骨架走 antd（`PageHeader` / `FilterBar` / `StatCard` / `Panel` / `Empty` / `StatusTag` / `ConfirmAction`）；`adm-*` 只作业务布局 class |
+| 组件 | 通用骨架走 `admin-ui/widgets/AdminChrome`（`PageHeader` / `FilterBar` / `StatCard` / `Panel` / `Empty` / `StatusTag` / `ConfirmAction`）与 `admin-ui/primitives`；后台树内不引 antd，`adm-*` 只剩外壳骨架与值班塔 |
 | 样式 | 只用 `global.css` 的 token，禁裸 hex；不做移动端适配 |
 
 ## 7. 明确不做

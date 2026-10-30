@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { App, Button, Checkbox, Input, Segmented, Select, Table } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
 import { useSearchParams } from 'react-router-dom';
 import {
+  Download,
   Eye,
   EyeOff,
   FolderOpen,
@@ -13,22 +12,32 @@ import {
   Maximize2,
   Trash2,
 } from 'lucide-react';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
+import { IconButton } from '../../vendor/boardui/components/base/buttons/icon-button';
+import { Pagination } from '../../vendor/boardui/components/base/pagination/pagination';
 import { adminAssetsApi, toAbsoluteUrl } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
+import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
+import { CheckBox, SegmentedBox, SelectBox, TextInput } from '../../admin-ui/controls';
+import { cx } from '../../admin-ui/lib/cn';
 import { ImageLightbox, type LightboxItem } from '../../components/ImageLightbox';
 import {
   AdminListError,
   AdminListLoading,
   AdminStaleError,
-  adminPagination,
   useAdminList,
   useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
 import {
   AdminEmpty,
   AppliedFilters,
+  FilterActions,
+  FilterBar,
   PageHeader,
   Panel,
+  StatCard,
+  StatusTag,
   type AppliedFilter,
 } from '../../components/admin/PageHeader';
 import { BatchResultModal } from '../../components/admin/BatchResultModal';
@@ -38,6 +47,25 @@ import type {
   AssetStatus,
   BatchSummary,
 } from '../../types/api';
+
+/**
+ * 素材管理 (B-22~B-26)。
+ *
+ * ## 两种视图解决两个问题
+ *
+ * 缩略图网格用来「扫图」—— 一页 60 张，看得快；表格用来「查属性」—— 尺寸、
+ * 格式、存储后端、所属用户都在列上，一页 20 行。切换视图同时改页码与页大小，
+ * 否则从网格第 4 页切到表格会落在越界页上显示空表。
+ *
+ * ## 批量动作要逐条结果
+ *
+ * 素材可能在这几秒内被用户删掉或被别的运营下架 —— 只回一个总数时，少处理的
+ * 几条会被「已处理 N 条」掩盖。批量接口回逐条结果，弹窗把失败原因摊开。
+ *
+ * ## 删除不弹确认
+ *
+ * 按产品要求直接执行；接口返回连带清理的任务数，用提示如实告知。
+ */
 
 type Row = AdminAssetListResult['items'][number];
 
@@ -83,14 +111,21 @@ function AssetThumb({
 
   if (failed) {
     return (
-      <span className={`${className} is-error`} role="img" aria-label={`${alt}，缩略图加载失败`}>
-        <ImageOff size={18} aria-hidden="true" />
+      <span
+        className={cx(
+          'flex items-center justify-center bg-background-secondary-default text-text-placeholder',
+          className,
+        )}
+        role="img"
+        aria-label={`${alt}，缩略图加载失败`}
+      >
+        <ImageOff className="size-4" aria-hidden />
       </span>
     );
   }
   return (
     <img
-      className={className}
+      className={cx('bg-background-secondary-default object-cover', className)}
       src={src}
       alt={alt}
       loading="lazy"
@@ -101,7 +136,7 @@ function AssetThumb({
 }
 
 export function AdminAssetsPage() {
-  const { message } = App.useApp();
+  const toast = useToast();
   const { can } = useAdmin();
 
   const [searchParams] = useSearchParams();
@@ -229,6 +264,9 @@ export function AdminAssetsPage() {
   ].filter(Boolean) as AppliedFilter[];
 
   const selectable = can('asset.hide') || can('asset.delete');
+  const page = data?.page ?? 1;
+  const total = data?.total ?? 0;
+  const pageSize = data?.pageSize ?? (view === 'grid' ? 60 : 20);
   const allPageSelected = items.length > 0 && items.every((item) => selected.includes(item.id));
   const somePageSelected = items.some((item) => selected.includes(item.id)) && !allPageSelected;
 
@@ -301,25 +339,25 @@ export function AdminAssetsPage() {
     setSelected(checked ? items.map((item) => item.id) : []);
   };
 
-  const toggleStatus = useCallback(async (row: Row, next: AssetStatus) => {
-    if (statusBusyId) return;
-    setStatusBusyId(row.id);
-    try {
-      await adminAssetsApi.setStatus(row.id, next);
-      void message.success(next === 'hidden' ? '已下架，用户端不再展示' : '已恢复上架');
-      reload();
-    } catch (e) {
-      void message.error((e as Error).message);
-    } finally {
-      setStatusBusyId(null);
-    }
-  }, [message, reload, statusBusyId]);
+  const toggleStatus = useCallback(
+    async (row: Row, next: AssetStatus) => {
+      if (statusBusyId) return;
+      setStatusBusyId(row.id);
+      try {
+        await adminAssetsApi.setStatus(row.id, next);
+        toast.success(next === 'hidden' ? '已下架，用户端不再展示' : '已恢复上架');
+        reload();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : '操作失败');
+      } finally {
+        setStatusBusyId(null);
+      }
+    },
+    [reload, statusBusyId, toast],
+  );
 
   /**
    * 批量动作走 `/admin/assets/batch`（逐条结果）而不是旧的 `batch-status`（只回 count）。
-   *
-   * 素材可能在这几秒内被用户删掉 / 被别的运营下架 —— 只回一个总数时,
-   * 少处理的几条会被 `已处理 N 条` 掩盖过去。逐条结果才能把失败原因摊开。
    */
   const runBatch = async (action: 'hide' | 'show' | 'delete') => {
     if (selected.length === 0) return;
@@ -333,7 +371,7 @@ export function AdminAssetsPage() {
       setSelected([]);
       reload();
     } catch (e) {
-      void message.error((e as Error).message);
+      toast.error(e instanceof Error ? e.message : '批量操作失败');
     } finally {
       setBusy(false);
     }
@@ -349,7 +387,7 @@ export function AdminAssetsPage() {
         backend: appliedBackend,
       });
     } catch (e) {
-      void message.error((e as Error).message);
+      toast.error(e instanceof Error ? e.message : '导出失败');
     }
   };
 
@@ -360,33 +398,33 @@ export function AdminAssetsPage() {
       setBusy(true);
       try {
         const res = await adminAssetsApi.remove(row.id);
-        void message.success(`已删除，连带清理 ${res.removedTasks} 条任务记录`);
+        toast.success(`已删除，连带清理 ${res.removedTasks} 条任务记录`);
         reload();
       } catch (e) {
-        void message.error((e as Error).message);
+        toast.error(e instanceof Error ? e.message : '删除失败');
       } finally {
         setBusy(false);
       }
     },
-    [reload],
+    [reload, toast],
   );
 
-  const columns: ColumnsType<Row> = useMemo(
+  const columns: Array<AdminColumn<Row>> = useMemo(
     () => [
       {
-        title: '预览',
         key: 'thumb',
+        title: '预览',
         width: 72,
-        render: (_: unknown, row) => (
+        render: (row: Row) => (
           <button
             type="button"
-            className="adm-asset-thumb-btn"
+            className="block size-9 overflow-hidden rounded-md border border-border-table"
             title="查看大图"
             aria-label={`查看大图：${assetLabel(row)}`}
             onClick={() => setPreviewId(row.id)}
           >
             <AssetThumb
-              className="adm-asset-thumb-sm"
+              className="size-full"
               src={thumbOf(row.sourceUrl)}
               alt={`${assetLabel(row)}缩略图`}
             />
@@ -394,84 +432,105 @@ export function AdminAssetsPage() {
         ),
       },
       {
-        title: '类型',
-        dataIndex: 'kind',
         key: 'kind',
+        title: '类型',
         width: 80,
-        render: (k: string) => (k === 'original' ? '原始' : '生成'),
+        render: (row: Row) => (row.kind === 'original' ? '原始' : '生成'),
       },
       {
-        title: '能力',
-        dataIndex: 'capability',
         key: 'capability',
+        title: '能力',
         width: 130,
-        ellipsis: true,
-        render: (c: string | null) => c ?? <span className="adm-cell-sub">—</span>,
+        cellTitle: (row: Row) => row.capability ?? undefined,
+        render: (row: Row) =>
+          row.capability ?? <span className="text-text-placeholder">—</span>,
       },
       {
-        title: '尺寸',
         key: 'dim',
+        title: '尺寸',
         width: 110,
-        render: (_: unknown, row) => (
-          <span className="adm-cell-sub">
+        render: (row: Row) => (
+          <span className="text-text-secondary">
             {row.width && row.height ? `${row.width}×${row.height}` : '—'}
           </span>
         ),
       },
       {
-        title: '格式',
-        dataIndex: 'format',
         key: 'format',
+        title: '格式',
         width: 68,
-        render: (format: string) => <span className="adm-cell-sub">{fmtFormat(format)}</span>,
+        render: (row: Row) => <span className="text-text-secondary">{fmtFormat(row.format)}</span>,
       },
-      { title: '大小', dataIndex: 'sizeBytes', key: 'size', width: 80, align: 'right',
-        render: (v: number) => fmtBytes(v) },
-      { title: '存储', dataIndex: 'storageBackend', key: 'backend', width: 90,
-        render: (b: string) => BACKEND_LABEL[b] ?? b },
-      { title: '所属用户', dataIndex: 'ownerEmail', key: 'owner', width: 190, ellipsis: true },
-      { title: '项目', dataIndex: 'projectName', key: 'project', width: 130, ellipsis: true },
       {
-        title: '状态',
-        dataIndex: 'status',
-        key: 'status',
+        key: 'sizeBytes',
+        title: '大小',
         width: 80,
-        render: (s: string) => (
-          <span className={`adm-tag ${s === 'visible' ? 'is-success' : 'is-warn'}`}>
-            <span className="adm-tag-dot" />
-            {s === 'visible' ? '已上架' : '已下架'}
-          </span>
+        align: 'right',
+        render: (row: Row) => <span className="tabular-nums">{fmtBytes(row.sizeBytes)}</span>,
+      },
+      {
+        key: 'storageBackend',
+        title: '存储',
+        width: 90,
+        render: (row: Row) => BACKEND_LABEL[row.storageBackend] ?? row.storageBackend,
+      },
+      {
+        key: 'ownerEmail',
+        title: '所属用户',
+        width: 190,
+        cellTitle: (row: Row) => row.ownerEmail,
+        render: (row: Row) => <span className="block max-w-[180px] truncate">{row.ownerEmail}</span>,
+      },
+      {
+        key: 'projectName',
+        title: '项目',
+        width: 130,
+        cellTitle: (row: Row) => row.projectName,
+        render: (row: Row) => <span className="block max-w-[120px] truncate">{row.projectName}</span>,
+      },
+      {
+        key: 'status',
+        title: '状态',
+        width: 80,
+        // visible / hidden 不在 STATUS_META 里：素材语境下要读作「上架 / 下架」
+        render: (row: Row) => (
+          <StatusTag
+            status={row.status}
+            label={row.status === 'visible' ? '已上架' : '已下架'}
+            tone={row.status === 'visible' ? 'success' : 'warn'}
+          />
         ),
       },
       {
-        title: '上传时间',
-        dataIndex: 'createdAt',
         key: 'createdAt',
+        title: '上传时间',
         width: 120,
-        render: (v: string) => new Date(v).toLocaleDateString('zh-CN'),
+        render: (row: Row) => new Date(row.createdAt).toLocaleDateString('zh-CN'),
       },
       {
-        title: '操作',
-        key: 'actions',
+        key: 'ops',
+        title: '',
         width: 130,
         fixed: 'right',
-        render: (_: unknown, row) => (
-          <div className="adm-row-actions">
+        render: (row: Row) => (
+          <div className="flex items-center gap-1">
             {can('asset.hide') && (
               <Button
-                type="link"
-                className="adm-link"
-                loading={statusBusyId === row.id}
-                disabled={statusBusyId !== null && statusBusyId !== row.id}
-                onClick={() => void toggleStatus(row, row.status === 'visible' ? 'hidden' : 'visible')}
+                variant="ghost"
+                size="small"
+                disabled={statusBusyId !== null}
+                onClick={() =>
+                  void toggleStatus(row, row.status === 'visible' ? 'hidden' : 'visible')
+                }
               >
-                {row.status === 'visible' ? '下架' : '恢复'}
+                {statusBusyId === row.id ? '处理中…' : row.status === 'visible' ? '下架' : '恢复'}
               </Button>
             )}
             {can('asset.delete') && (
               <Button
-                type="link" danger
-                className="adm-link is-danger"
+                variant="ghost"
+                size="small"
+                className="text-rose-600"
                 onClick={() => void openDelete(row)}
               >
                 删除
@@ -485,8 +544,9 @@ export function AdminAssetsPage() {
     [can, openDelete, statusBusyId, toggleStatus],
   );
 
-  if (loading && !data) return <AdminListLoading tip="加载素材…" />;
-  if (error && !data) return <AdminListError error={error} onRetry={reload} />;
+  /** 表格页大小必须落在 `AdminDataTable` 的选项集里，否则选择器显示空值 */
+  const tablePageSize = [20, 50, 100].includes(pageSize) ? pageSize : 20;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   return (
     <>
@@ -495,30 +555,38 @@ export function AdminAssetsPage() {
         description="管理全平台用户的上传与生成素材；下架后用户端不可见但可恢复"
         actions={
           <>
-            <Segmented
+            <SegmentedBox
+              ariaLabel="切换视图"
               value={view}
-              onChange={(value) => handleViewChange(value as 'grid' | 'table')}
+              onChange={(next) => handleViewChange(next as 'grid' | 'table')}
               options={[
                 {
                   value: 'grid',
                   label: (
-                    <span className="adm-segmented-item" title="缩略图网格">
-                      <Grid3x3 size={14} />
+                    <span className="inline-flex items-center gap-1" title="缩略图网格">
+                      <Grid3x3 className="size-3.5" aria-hidden />
+                      网格
                     </span>
                   ),
                 },
                 {
                   value: 'table',
                   label: (
-                    <span className="adm-segmented-item" title="表格视图">
-                      <List size={14} />
+                    <span className="inline-flex items-center gap-1" title="表格视图">
+                      <List className="size-3.5" aria-hidden />
+                      表格
                     </span>
                   ),
                 },
               ]}
             />
             {can('data.export') && (
-              <Button type="default" className="adm-btn" onClick={() => void exportAssets()}>
+              <Button
+                variant="secondary"
+                size="small"
+                leadingIcon={Download}
+                onClick={() => void exportAssets()}
+              >
                 导出 CSV
               </Button>
             )}
@@ -527,130 +595,129 @@ export function AdminAssetsPage() {
       />
 
       {stats && (
-        <div className="adm-stat-grid is-4">
-          <div className="adm-stat is-primary">
-            <div className="adm-stat-head">
-              <span className="adm-stat-label">素材总量</span>
-              <FolderOpen className="adm-stat-icon" size={16} />
-            </div>
-            <div className="adm-stat-value">{stats.total}</div>
-            <div className="adm-stat-hint">共 {stats.totalMb} MB</div>
-          </div>
-          <div className="adm-stat">
-            <div className="adm-stat-head">
-              <span className="adm-stat-label">已下架</span>
-            </div>
-            <div className="adm-stat-value">{stats.byStatus.hidden ?? 0}</div>
-            <div className="adm-stat-hint">用户端不可见</div>
-          </div>
-          <div className="adm-stat">
-            <div className="adm-stat-head">
-              <span className="adm-stat-label">生成图</span>
-            </div>
-            <div className="adm-stat-value">{stats.byKind.generated ?? 0}</div>
-            <div className="adm-stat-hint">原始上传 {stats.byKind.original ?? 0}</div>
-          </div>
-          <div className="adm-stat">
-            <div className="adm-stat-head">
-              <span className="adm-stat-label">存储分布</span>
-              <HardDrive className="adm-stat-icon" size={16} />
-            </div>
-            <div className="adm-stat-value" style={{ fontSize: 18 }}>
-              {Object.entries(stats.byBackend)
-                .map(([k, v]) => `${BACKEND_LABEL[k] ?? k} ${v}`)
-                .join(' · ') || '—'}
-            </div>
-            <div className="adm-stat-hint">按写入时后端统计</div>
-          </div>
+        <div className="mb-3 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
+          <StatCard
+            label="素材总量"
+            value={stats.total}
+            hint={`共 ${stats.totalMb} MB`}
+          />
+          <StatCard
+            label="已下架"
+            value={stats.byStatus.hidden ?? 0}
+            hint="用户端不可见"
+            tone={(stats.byStatus.hidden ?? 0) > 0 ? 'warn' : undefined}
+          />
+          <StatCard
+            label="生成图"
+            value={stats.byKind.generated ?? 0}
+            hint={`原始上传 ${stats.byKind.original ?? 0}`}
+          />
+          <StatCard
+            label="存储分布"
+            value={
+              <span className="flex items-center gap-1.5 text-[15px] leading-6">
+                <HardDrive className="size-4 text-text-tertiary" aria-hidden />
+                {Object.entries(stats.byBackend)
+                  .map(([k, v]) => `${BACKEND_LABEL[k] ?? k} ${v}`)
+                  .join(' · ') || '—'}
+              </span>
+            }
+            hint="按写入时后端统计，切换后端不迁移既有文件"
+          />
         </div>
       )}
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
-      {error && <AdminStaleError error={error} onRetry={reload} />}
+      {error && data && <AdminStaleError error={error} onRetry={reload} />}
 
-      <div className="adm-filter">
-        <Input
-          className="adm-filter-input"
+      <FilterBar>
+        <TextInput
+          className="w-56"
           placeholder="ID / 能力关键词"
-          value={keyword}
-          onChange={(e) => setKeyword(e.target.value)}
-          onPressEnter={applyFilters}
-          aria-label="按素材 ID 或能力关键词筛选"
+          ariaLabel="按素材 ID 或能力关键词筛选"
           allowClear
+          value={keyword}
+          onChange={setKeyword}
+          onEnter={applyFilters}
         />
-        <Select
-          className="adm-filter-select"
+        <SelectBox
+          className="w-32"
+          ariaLabel="按类型筛选"
           placeholder="类型"
+          allowClear
+          value={kind}
+          onChange={setKind}
           options={[
             { value: 'original', label: '原始上传' },
             { value: 'generated', label: '生成图' },
           ]}
-          value={kind}
-          onChange={setKind}
-          allowClear
         />
-        <Select
-          className="adm-filter-select"
+        <SelectBox
+          className="w-32"
+          ariaLabel="按状态筛选"
           placeholder="状态"
+          allowClear
+          value={status}
+          onChange={setStatus}
           options={[
             { value: 'visible', label: '已上架' },
             { value: 'hidden', label: '已下架' },
           ]}
-          value={status}
-          onChange={setStatus}
-          allowClear
         />
-        <Select
-          className="adm-filter-select"
+        <SelectBox
+          className="w-36"
+          ariaLabel="按存储后端筛选"
           placeholder="存储后端"
-          options={Object.entries(BACKEND_LABEL).map(([value, label]) => ({ value, label }))}
+          allowClear
           value={backend}
           onChange={setBackend}
-          allowClear
+          options={Object.entries(BACKEND_LABEL).map(([value, label]) => ({ value, label }))}
         />
-        <div className="adm-filter-actions">
-          <Button
-            type="primary"
-            className="adm-btn is-primary"
-            onClick={applyFilters}
-          >
+        <FilterActions>
+          <Button variant="primary" size="small" onClick={applyFilters}>
             查询
           </Button>
           <Button
-            type="default"
-            className="adm-btn"
+            variant="secondary"
+            size="small"
             onClick={resetFilters}
-            disabled={!appliedChips.length && !keyword && !kind && !status && !backend}
+            disabled={appliedChips.length === 0 && !keyword && !kind && !status && !backend}
           >
             重置
           </Button>
-        </div>
+        </FilterActions>
         <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
-      </div>
+      </FilterBar>
 
       {selected.length > 0 && (
-        <div className="adm-bulk-bar" role="status">
-          <span className="adm-bulk-count">已选 {selected.length} 张素材</span>
-          <Checkbox
-            checked={allPageSelected}
-            indeterminate={somePageSelected}
-            onChange={(e) => toggleSelectPage(e.target.checked)}
-          >
-            {allPageSelected ? '取消全选' : '全选本页'}
-          </Checkbox>
+        <div
+          data-testid="admin-bulk-bar"
+          className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-accent-200 bg-accent-50 px-3 py-2"
+          role="status"
+        >
+          <span className="text-xs font-medium text-accent-900">已选 {selected.length} 张素材</span>
+          {view === 'grid' && (
+            <CheckBox
+              size="sm"
+              checked={allPageSelected}
+              indeterminate={somePageSelected}
+              label={allPageSelected ? '取消全选' : '全选本页'}
+              onChange={toggleSelectPage}
+            />
+          )}
           {can('asset.hide') && (
             <>
               <Button
-                type="default"
-                className="adm-btn"
+                variant="secondary"
+                size="small"
                 onClick={() => void runBatch('hide')}
                 disabled={busy}
               >
                 批量下架
               </Button>
               <Button
-                type="default"
-                className="adm-btn"
+                variant="secondary"
+                size="small"
                 onClick={() => void runBatch('show')}
                 disabled={busy}
               >
@@ -660,16 +727,15 @@ export function AdminAssetsPage() {
           )}
           {can('asset.delete') && (
             <Button
-              type="primary"
-              danger
-              className="adm-btn is-danger"
+              variant="danger"
+              size="small"
               onClick={() => void runBatch('delete')}
               disabled={busy}
             >
               批量删除
             </Button>
           )}
-          <Button type="link" className="adm-link" onClick={() => setSelected([])}>
+          <Button variant="ghost" size="small" onClick={() => setSelected([])}>
             清空选择
           </Button>
         </div>
@@ -677,170 +743,216 @@ export function AdminAssetsPage() {
 
       <Panel
         title={view === 'grid' ? '缩略图网格' : '素材列表'}
-        note={`${data?.total ?? 0} 张`}
+        note={`${total} 张`}
+        extra={
+          view === 'grid' && items.length > 0 ? (
+            <span className="flex items-center gap-1.5 text-[11px] text-text-tertiary">
+              <FolderOpen className="size-3.5" aria-hidden />
+              每页 {pageSize} 张
+            </span>
+          ) : undefined
+        }
       >
-        {items.length === 0 ? (
-          <AdminEmpty
-            description={
+        {view === 'grid' ? (
+          loading && items.length === 0 ? (
+            <AdminListLoading tip="加载素材…" />
+          ) : error && items.length === 0 ? (
+            <AdminListError error={error} onRetry={reload} />
+          ) : items.length === 0 ? (
+            <AdminEmpty
+              description={
+                appliedChips.length > 0
+                  ? '没有符合当前筛选条件的素材。清除筛选后可查看全部素材。'
+                  : '暂无素材。用户上传或生成图片后，会在这里出现。'
+              }
+              action={
+                appliedChips.length > 0 ? (
+                  <Button variant="secondary" size="small" onClick={resetFilters}>
+                    清除筛选
+                  </Button>
+                ) : undefined
+              }
+            />
+          ) : (
+            <>
+              <div
+                className={cx(
+                  'grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]',
+                  loading && 'opacity-60',
+                )}
+                aria-busy={loading}
+              >
+                {items.map((a) => {
+                  const checked = selected.includes(a.id);
+                  return (
+                    <article
+                      key={a.id}
+                      data-testid="admin-asset-cell"
+                      data-status={a.status}
+                      className={cx(
+                        'group overflow-hidden rounded-xl border bg-white transition-colors',
+                        checked ? 'border-accent-400 ring-1 ring-accent-200' : 'border-border-table',
+                        a.status === 'hidden' && 'opacity-75',
+                      )}
+                    >
+                      <div className="relative aspect-square">
+                        <button
+                          type="button"
+                          className="block size-full"
+                          aria-label={`查看大图：${assetLabel(a)}`}
+                          onClick={() => setPreviewId(a.id)}
+                        >
+                          <AssetThumb
+                            className="size-full"
+                            src={thumbOf(a.sourceUrl)}
+                            alt={`${assetLabel(a)}缩略图`}
+                          />
+                        </button>
+
+                        {selectable && (
+                          <label className="absolute left-2 top-2 flex size-5 cursor-pointer items-center justify-center rounded bg-white/90 shadow-xs">
+                            <input
+                              type="checkbox"
+                              className="size-3.5 cursor-pointer accent-accent-600"
+                              checked={checked}
+                              aria-label={`选择 ${assetLabel(a)}`}
+                              onChange={(event) => toggleSelected(a.id, event.target.checked)}
+                            />
+                          </label>
+                        )}
+
+                        {a.status === 'hidden' && (
+                          <span className="absolute right-2 top-2 rounded bg-neutral-900/80 px-1.5 py-0.5 text-[10px] text-white">
+                            已下架
+                          </span>
+                        )}
+
+                        <div
+                          className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-black/55 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
+                          role="group"
+                          aria-label="素材快捷操作"
+                        >
+                          <IconButton
+                            size="small"
+                            icon={Maximize2}
+                            aria-label={`查看大图：${assetLabel(a)}`}
+                            title="查看大图"
+                            onClick={() => setPreviewId(a.id)}
+                          />
+                          {can('asset.hide') && (
+                            <IconButton
+                              size="small"
+                              icon={a.status === 'visible' ? EyeOff : Eye}
+                              aria-label={a.status === 'visible' ? '下架素材' : '恢复上架'}
+                              title={a.status === 'visible' ? '下架素材' : '恢复上架'}
+                              disabled={statusBusyId === a.id}
+                              onClick={() =>
+                                void toggleStatus(
+                                  a,
+                                  a.status === 'visible' ? 'hidden' : 'visible',
+                                )
+                              }
+                            />
+                          )}
+                          {can('asset.delete') && (
+                            <IconButton
+                              size="small"
+                              icon={Trash2}
+                              aria-label="永久删除素材"
+                              title="永久删除"
+                              className="text-rose-600"
+                              onClick={() => void openDelete(a)}
+                            />
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="px-2 py-1.5">
+                        <div className="truncate text-xs font-medium text-text-primary" title={assetLabel(a)}>
+                          {assetLabel(a)}
+                        </div>
+                        <div
+                          className="truncate text-[11px] text-text-tertiary"
+                          title={`${fmtFormat(a.format)}${
+                            a.width && a.height ? ` · ${a.width}×${a.height}` : ''
+                          } · ${fmtBytes(a.sizeBytes)}`}
+                        >
+                          {fmtFormat(a.format)}
+                          {a.width && a.height ? ` · ${a.width}×${a.height}` : ''} ·{' '}
+                          {fmtBytes(a.sizeBytes)}
+                        </div>
+                        <div
+                          className="truncate text-[11px] text-text-tertiary"
+                          title={`${a.ownerEmail} · ${a.projectName}`}
+                        >
+                          {a.ownerEmail} · {a.projectName}
+                        </div>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+
+              {total > 0 && (
+                <div className="mt-3 flex items-center justify-between border-t border-border-table pt-3">
+                  <span className="text-xs text-text-tertiary">共 {total} 张</span>
+                  <Pagination
+                    page={Math.min(page, totalPages)}
+                    totalPages={totalPages}
+                    // 翻页必须清空选择: 否则会对看不见的行执行批量下架/删除
+                    onChange={(next) => {
+                      setSelected([]);
+                      setPage(next);
+                    }}
+                    previousLabel="上一页"
+                    nextLabel="下一页"
+                    aria-label="分页"
+                  />
+                </div>
+              )}
+            </>
+          )
+        ) : (
+          <AdminDataTable<Row>
+            rows={items}
+            columns={columns}
+            rowKey={(row) => row.id}
+            loading={loading}
+            error={error}
+            onRetry={reload}
+            minWidth={1300}
+            rowClassName={(row) => (row.status === 'hidden' ? 'bg-amber-50/40' : undefined)}
+            selectable={selectable}
+            selected={selected}
+            onSelectedChange={setSelected}
+            emptyText={
               appliedChips.length > 0
                 ? '没有符合当前筛选条件的素材。清除筛选后可查看全部素材。'
                 : '暂无素材。用户上传或生成图片后，会在这里出现。'
             }
-            action={
+            emptyAction={
               appliedChips.length > 0 ? (
-                <Button type="default" className="adm-btn" onClick={resetFilters}>
+                <Button variant="secondary" size="small" onClick={resetFilters}>
                   清除筛选
                 </Button>
               ) : undefined
             }
-          />
-        ) : view === 'grid' ? (
-          <div className="adm-asset-grid" aria-busy={loading}>
-            {items.map((a) => (
-              <article
-                key={a.id}
-                className={[
-                  'adm-asset-cell',
-                  selected.includes(a.id) ? 'is-selected' : '',
-                  a.status === 'hidden' ? 'is-hidden' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
-              >
-                <div className="adm-asset-visual">
-                  <button
-                    type="button"
-                    className="adm-asset-preview"
-                    aria-label={`查看大图：${assetLabel(a)}`}
-                    onClick={() => setPreviewId(a.id)}
-                  >
-                    <AssetThumb
-                      className="adm-asset-image"
-                      src={thumbOf(a.sourceUrl)}
-                      alt={`${assetLabel(a)}缩略图`}
-                    />
-                  </button>
-                  {selectable && (
-                    <span className="adm-asset-select" onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        checked={selected.includes(a.id)}
-                        onChange={(e) => toggleSelected(a.id, e.target.checked)}
-                        aria-label={`选择 ${assetLabel(a)}`}
-                      />
-                    </span>
-                  )}
-                  {a.status === 'hidden' && <span className="adm-asset-badge">已下架</span>}
-                  <div className="adm-asset-actions" role="group" aria-label="素材快捷操作">
-                    <button
-                      type="button"
-                      className="adm-asset-action"
-                      title="查看大图"
-                      aria-label={`查看大图：${assetLabel(a)}`}
-                      onClick={() => setPreviewId(a.id)}
-                    >
-                      <Maximize2 size={15} />
-                    </button>
-                    {can('asset.hide') && (
-                      <button
-                        type="button"
-                        className="adm-asset-action"
-                        title={a.status === 'visible' ? '下架素材' : '恢复上架'}
-                        aria-label={a.status === 'visible' ? '下架素材' : '恢复上架'}
-                        disabled={statusBusyId === a.id}
-                        onClick={() =>
-                          void toggleStatus(a, a.status === 'visible' ? 'hidden' : 'visible')
-                        }
-                      >
-                        {a.status === 'visible' ? <EyeOff size={15} /> : <Eye size={15} />}
-                      </button>
-                    )}
-                    {can('asset.delete') && (
-                      <button
-                        type="button"
-                        className="adm-asset-action is-danger"
-                        title="永久删除"
-                        aria-label="永久删除素材"
-                        onClick={() => void openDelete(a)}
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="adm-asset-info">
-                  <div className="adm-asset-name" title={assetLabel(a)}>
-                    {assetLabel(a)}
-                  </div>
-                  <div
-                    className="adm-asset-meta"
-                    title={`${fmtFormat(a.format)}${a.width && a.height ? ` · ${a.width}×${a.height}` : ''} · ${fmtBytes(a.sizeBytes)}`}
-                  >
-                    {fmtFormat(a.format)}
-                    {a.width && a.height ? ` · ${a.width}×${a.height}` : ''} ·{' '}
-                    {fmtBytes(a.sizeBytes)}
-                  </div>
-                  <div className="adm-asset-meta" title={`${a.ownerEmail} · ${a.projectName}`}>
-                    {a.ownerEmail} · {a.projectName}
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <Table<Row>
-            rowKey="id"
-            size="small"
-            columns={columns}
-            dataSource={items}
-            loading={loading}
-            scroll={{ x: 1300 }}
-            rowClassName={(row) => (row.status === 'hidden' ? 'is-hidden-row' : '')}
-            rowSelection={
-              can('asset.hide') || can('asset.delete')
-                ? { selectedRowKeys: selected, onChange: (k) => setSelected(k as string[]) }
+            pagination={
+              data
+                ? {
+                    current: page,
+                    pageSize: tablePageSize,
+                    total,
+                    unit: '张',
+                    // 翻页必须清空选择: 否则会对看不见的行执行批量下架/删除
+                    onChange: (next, size) => {
+                      setSelected([]);
+                      setPage(next, size);
+                    },
+                  }
                 : undefined
             }
-            pagination={adminPagination({
-              current: data?.page ?? 1,
-              pageSize: data?.pageSize ?? 20,
-              total: data?.total ?? 0,
-              // 翻页必须清空选择: 否则会对看不见的行执行批量下架/删除
-              onChange: (page, size) => {
-                setSelected([]);
-                setPage(page, size);
-              },
-            })}
           />
-        )}
-
-        {view === 'grid' && (
-          <div className="adm-pagination">
-            <Button
-              type="default"
-              className="adm-btn"
-              disabled={(data?.page ?? 1) <= 1}
-              onClick={() => {
-                setSelected([]);
-                setPage((data?.page ?? 1) - 1);
-              }}
-            >
-              上一页
-            </Button>
-            <span className="adm-cell-sub">
-              第 {data?.page ?? 1} 页 · 共 {data?.total ?? 0} 条
-            </span>
-            <Button
-              type="default"
-              className="adm-btn"
-              disabled={(data?.page ?? 1) * (data?.pageSize ?? 60) >= (data?.total ?? 0)}
-              onClick={() => {
-                setSelected([]);
-                setPage((data?.page ?? 1) + 1);
-              }}
-            >
-              下一页
-            </Button>
-          </div>
         )}
       </Panel>
 

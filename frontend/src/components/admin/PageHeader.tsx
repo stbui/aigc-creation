@@ -1,31 +1,28 @@
-import { USE_BOARDUI_ADMIN } from '../../admin-ui/lib/flag';
 import * as boardui from '../../admin-ui/widgets/AdminChrome';
 import { Panel as BoardUIPanel } from '../../admin-ui/primitives';
-import * as legacy from './PageHeader.legacy';
 
 /**
- * 后台页面骨架控件（入口）。
+ * 后台页面骨架控件。
  *
- * 29 个页面都从这里取页头、筛选条、面板、统计卡、状态标签。渲染层有两份：
- * `admin-ui/widgets/AdminChrome`（BoardUI）与 `PageHeader.legacy`（antd 回滚
- * 路径），由 `VITE_ADMIN_UI` 决定。页面不感知差异，也就不需要改 import。
+ * 29 个页面都从这里取页头、筛选条、面板、统计卡、状态标签。渲染层只有一份：
+ * `admin-ui/widgets/AdminChrome`（BoardUI）。
  *
- * 导出显式标注成 legacy 版的类型：条件表达式推导出的联合类型在 JSX 里无法
- * 稳定地做属性检查，而 legacy 的签名就是契约，BoardUI 版与之逐字一致。
+ * 2026-10-30：此前这里按 `VITE_ADMIN_UI` 在 BoardUI 与 antd 两份实现之间分流。
+ * 29 页全部迁完后那份 antd 实现已无调用方（纯 C 决策不允许交付「页面是新的、
+ * 外壳是旧的」中间态），随 P4 一并删除，切换开关 `VITE_ADMIN_UI` 同时下线。
+ * 页面 import 不变，签名不变。
  */
-const impl = USE_BOARDUI_ADMIN ? boardui : legacy;
+export const PageHeader = boardui.PageHeader;
+export const FilterBar = boardui.FilterBar;
+export const FilterActions = boardui.FilterActions;
+export const AppliedFilters = boardui.AppliedFilters;
+export const StatCard = boardui.StatCard;
+export const CollapsiblePanel = boardui.CollapsiblePanel;
+export const AdminEmpty = boardui.AdminEmpty;
+export const StatusTag = boardui.StatusTag;
 
-export const PageHeader: typeof legacy.PageHeader = impl.PageHeader;
-export const FilterBar: typeof legacy.FilterBar = impl.FilterBar;
-export const FilterActions: typeof legacy.FilterActions = impl.FilterActions;
-export const AppliedFilters: typeof legacy.AppliedFilters = impl.AppliedFilters;
-export const StatCard: typeof legacy.StatCard = impl.StatCard;
-export const CollapsiblePanel: typeof legacy.CollapsiblePanel = impl.CollapsiblePanel;
-export const AdminEmpty: typeof legacy.AdminEmpty = impl.AdminEmpty;
-export const StatusTag: typeof legacy.StatusTag = impl.StatusTag;
-
-/** `isNarrow` 在 BoardUI 版由 primitives 的 Panel 支持，两版签名一致 */
-export const Panel: typeof legacy.Panel = USE_BOARDUI_ADMIN ? BoardUIPanel : legacy.Panel;
+/** `Panel` 由 primitives 提供（支持 `isNarrow` 限宽），与页面用法一致 */
+export const Panel = BoardUIPanel;
 
 export type { AppliedFilter } from '../../admin-ui/widgets/AdminChrome';
 export type { TagTone } from './statusMeta';

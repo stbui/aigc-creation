@@ -23,11 +23,11 @@ import { Popover } from 'react-aria-components';
 import { useAdmin } from '../../context/AdminContext';
 import { useAuth } from '../../context/AuthContext';
 import { ADMIN_MENU } from '../../components/admin/adminNav';
-import { AdminDutyProvider } from '../../components/admin/DutyContext';
 import { useAdminAlerts, ALERT_SEVERITY_META, alertTime } from '../../components/admin/AlertCenter';
 import { hasUnsavedChanges } from '../../lib/unsaved-guard';
 import { APP_ENV, IS_PROD } from '../../lib/constants';
 import { cx } from '../lib/cn';
+import { DensityContext } from '../lib/density';
 import { useConfirm } from '../providers/ConfirmProvider';
 import { AdminSearchPalette } from './AdminSearchPalette';
 
@@ -44,7 +44,7 @@ import { AdminSearchPalette } from './AdminSearchPalette';
  *
  * - 按权限点过滤导航项，待建模块仍然可见并给「待建」标记；
  * - 有未保存变更时，站内跳转先确认再放行；
- * - 密度偏好存 localStorage，旧页面通过 `adm-layout is-compact` 继续生效；
+ * - 密度偏好存 localStorage，经 `DensityContext` 下发给所有表格（行高随之收紧）；
  * - 环境标识只在非生产出现，避免把测试库当生产看；
  * - 告警铃 60 秒轮询，页面不可见时跳过。
  */
@@ -290,7 +290,7 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
 
   return (
     <div
-      className={cx('bui-admin adm-layout min-h-screen bg-[var(--page-bg)]', compact && 'is-compact')}
+      className="bui-admin adm-layout min-h-screen bg-[var(--page-bg)]"
       onClickCapture={onClickCapture}
     >
       <a className="adm-skip-link" href="#adm-main">
@@ -299,13 +299,14 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
 
       <div className="flex min-h-screen">
         <aside
+          data-testid="admin-sider"
           className={cx(
             'sticky top-0 flex h-screen shrink-0 flex-col border-r border-border-table bg-white transition-[width] duration-150',
             collapsed ? 'w-[60px]' : 'w-[232px]',
           )}
           aria-label="后台导航栏"
         >
-          <div className="flex h-14 items-center gap-2 border-b border-border-table px-3">
+          <div data-testid="admin-sider-head" className="flex h-14 items-center gap-2 border-b border-border-table px-3">
             <IconButton
               icon={collapsed ? PanelLeftOpen : PanelLeftClose}
               size="small"
@@ -356,7 +357,9 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
             )}
           </div>
 
-          <div className="min-h-0 flex-1 overflow-y-auto py-1">{navList}</div>
+          <div data-testid="admin-nav-scroll" className="min-h-0 flex-1 overflow-y-auto py-1">
+            {navList}
+          </div>
 
           <div className="flex flex-col gap-1 border-t border-border-table p-2">
             <div className={cx('flex items-center gap-1', collapsed ? 'flex-col' : 'justify-between')}>
@@ -425,15 +428,20 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
         </aside>
 
         {/*
-         * `.adm-content` 是旧页面依赖的容器：`> .adm-page-head` / `> .adm-filter`
-         * 等直接子元素选择器靠它限宽居中。Provider 不产生 DOM，children 仍是
-         * main 的直接子元素，迁移期页面不会被撑到 1600px 以外。
+         * `.adm-content` 承担两件事（见 styles/global.css 的后台外壳段）：
+         * 给宽表一个自己的横向滚动区，`> *` 统一限宽 1600px 居中。
          *
-         * 值班带已移除，但概览页仍从 DutyContext 读任务快照；P2 把数据并进
-         * 概览首屏之前先保留 Provider，避免概览变成空壳。
+         * 密度偏好经 `DensityContext` 只包页面内容：外壳自身没有表格，挂在外层
+         * 没有额外收益，反而让「开关作用域」变得含糊。
+         *
+         * 值班数据（DutyContext）不在这里挂：它每 30 秒拉一次最近 100 条任务，
+         * 只有概览页消费。挂在外壳上等于让 28 个与它无关的页面陪着轮询。
+         * 概览页自己包 Provider（见 AdminDashboardPage 的 index 路由）。
          */}
         <main id="adm-main" tabIndex={-1} className="adm-content min-w-0 flex-1">
-          <AdminDutyProvider>{children}</AdminDutyProvider>
+          <DensityContext.Provider value={compact ? 'compact' : 'comfortable'}>
+            {children}
+          </DensityContext.Provider>
         </main>
       </div>
 

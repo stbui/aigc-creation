@@ -1,21 +1,18 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { App, Button, Drawer, Input, Select, Switch, Table } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import { Download } from 'lucide-react';
+import { Download, Plus } from 'lucide-react';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
+import { Chip } from '../../vendor/boardui/components/base/badges/chip';
 import { marketingApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
+import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
+import { Drawer } from '../../admin-ui/primitives/Drawer';
+import { Notice } from '../../admin-ui/primitives';
+import { SelectBox, SwitchBox, TextArea, TextInput } from '../../admin-ui/controls';
+import { AdminStaleError, useAdminList, useAdminUrlFilterSync } from '../../components/admin/AdminWidgets';
 import {
-  AdminListError,
-  AdminListLoading,
-  AdminStaleError,
-  adminPagination,
-  useAdminList,
-  useAdminUrlFilterSync,
-} from '../../components/admin/AdminWidgets';
-import {
-  AdminEmpty,
   AppliedFilters,
   FilterActions,
   FilterBar,
@@ -85,6 +82,17 @@ function inWindow(c: AdminCampaign): boolean {
   return now >= new Date(c.startAt).getTime() && now <= new Date(c.endAt).getTime();
 }
 
+/** 表单字段：标签 + 控件 + 一句说明 */
+function Field({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-xs font-medium text-text-secondary">{label}</span>
+      {children}
+      {hint && <p className="text-[11px] leading-4 text-text-tertiary">{hint}</p>}
+    </div>
+  );
+}
+
 interface FormState {
   name: string;
   type: CampaignType;
@@ -115,7 +123,7 @@ function emptyForm(): FormState {
 }
 
 export function AdminCampaignsPage() {
-  const { message } = App.useApp();
+  const toast = useToast();
   const { can } = useAdmin();
   const writable = can('marketing.write');
 
@@ -212,9 +220,9 @@ export function AdminCampaignsPage() {
         keyword: params.keyword as string | undefined,
         status: params.status as string | undefined,
       });
-      void message.success('导出已开始下载');
+      toast.success('导出已开始下载');
     } catch (e) {
-      void message.error(e instanceof Error ? e.message : '导出失败');
+      toast.error(e instanceof Error ? e.message : '导出失败');
     } finally {
       setExporting(false);
     }
@@ -232,7 +240,7 @@ export function AdminCampaignsPage() {
   const openEdit = (c: AdminCampaign) => {
     setEditing(c);
     const p = c.payload ?? {};
-    const next = {
+    const next: FormState = {
       name: c.name,
       type: c.type,
       startAt: toLocalInput(c.startAt),
@@ -310,10 +318,10 @@ export function AdminCampaignsPage() {
     try {
       if (editing) {
         await marketingApi.updateCampaign(editing.id, payload);
-        void message.success('已保存');
+        toast.success('已保存');
       } else {
         await marketingApi.createCampaign(payload);
-        void message.success('活动已创建');
+        toast.success('活动已创建');
       }
       setFormOpen(false);
       reload();
@@ -329,92 +337,89 @@ export function AdminCampaignsPage() {
     setBusy(true);
     try {
       await marketingApi.toggleCampaign(row.id);
-      void message.success('状态已切换');
+      toast.success('状态已切换');
       reload();
     } catch (e) {
-      void message.error((e as Error).message);
+      toast.error((e as Error).message);
     } finally {
       setBusy(false);
     }
   };
 
-  const columns: ColumnsType<AdminCampaign> = useMemo(
-    () => [
-      { title: '活动名称', dataIndex: 'name', key: 'name', width: 160 },
-      {
-        title: '类型',
-        dataIndex: 'type',
-        key: 'type',
-        width: 90,
-        render: (t: CampaignType) => TYPE_LABEL[t] ?? t,
-      },
-      {
-        title: '内容',
-        key: 'payload',
-        width: 150,
-        render: (_: unknown, row) => <span className="adm-cell-sub">{payloadSummary(row)}</span>,
-      },
-      {
-        title: '投放人群',
-        key: 'audience',
-        width: 90,
-        render: (_: unknown, row) =>
-          row.audience?.onlyNewUsers ? '仅新用户' : <span className="adm-cell-sub">全站</span>,
-      },
-      {
-        title: '时间窗',
-        key: 'window',
-        width: 185,
-        render: (_: unknown, row) => {
-          const live = inWindow(row);
-          return (
-            <div className="adm-cell-sub">
+  const columns: Array<AdminColumn<AdminCampaign>> = [
+    { key: 'name', title: '活动名称', width: 160, render: (row) => <span>{row.name}</span> },
+    {
+      key: 'type',
+      title: '类型',
+      width: 90,
+      render: (row) => <span className="text-xs">{TYPE_LABEL[row.type] ?? row.type}</span>,
+    },
+    {
+      key: 'payload',
+      title: '内容',
+      width: 150,
+      render: (row) => <span className="text-[11px] text-text-tertiary">{payloadSummary(row)}</span>,
+    },
+    {
+      key: 'audience',
+      title: '投放人群',
+      width: 90,
+      render: (row) =>
+        row.audience?.onlyNewUsers ? (
+          <span className="text-xs">仅新用户</span>
+        ) : (
+          <span className="text-[11px] text-text-tertiary">全站</span>
+        ),
+    },
+    {
+      key: 'window',
+      title: '时间窗',
+      width: 200,
+      render: (row) => {
+        const live = inWindow(row);
+        return (
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
+            <span className="text-[11px] tabular-nums text-text-tertiary">
               {new Date(row.startAt).toLocaleDateString('zh-CN')} ~{' '}
               {new Date(row.endAt).toLocaleDateString('zh-CN')}
-              {/* active 但不在窗内: 配置生效了却不会展示, 必须让人看见 */}
-              {row.status === 'active' && !live && (
-                <span className="adm-tag is-warn" style={{ marginLeft: 6 }}>
-                  未在窗内
-                </span>
-              )}
-            </div>
-          );
-        },
-      },
-      {
-        title: '状态',
-        dataIndex: 'effective',
-        key: 'status',
-        width: 90,
-        render: (_: unknown, row) => {
-          const meta = EFFECTIVE_META[row.effective] ?? { label: row.statusLabel, tone: 'muted' as TagTone };
-          return <StatusTag status={row.status} label={meta.label} tone={meta.tone} />;
-        },
-      },
-      {
-        title: '操作',
-        key: 'actions',
-        width: 110,
-        fixed: 'right',
-        render: (_: unknown, row) => (
-          <div className="adm-row-actions">
-            {writable && (
-              <>
-                <Button type="link" className="adm-link" onClick={() => openEdit(row)}>
-                  编辑
-                </Button>
-                <Button type="link" className="adm-link" disabled={busy} onClick={() => void doToggle(row)}>
-                  切换
-                </Button>
-              </>
+            </span>
+            {/* active 但不在窗内: 配置生效了却不会展示, 必须让人看见 */}
+            {row.status === 'active' && !live && (
+              <Chip variant="caption" color="yellow">
+                未在窗内
+              </Chip>
             )}
           </div>
-        ),
+        );
       },
-    ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [writable],
-  );
+    },
+    {
+      key: 'status',
+      title: '状态',
+      width: 90,
+      render: (row) => {
+        const meta = EFFECTIVE_META[row.effective] ?? { label: row.statusLabel, tone: 'muted' as TagTone };
+        return <StatusTag status={row.status} label={meta.label} tone={meta.tone} />;
+      },
+    },
+    {
+      key: 'ops',
+      title: '',
+      width: 110,
+      fixed: 'right',
+      render: (row) =>
+        writable ? (
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="small" onClick={() => openEdit(row)}>
+              编辑
+            </Button>
+            <Button variant="ghost" size="small" disabled={busy} onClick={() => void doToggle(row)}>
+              切换
+            </Button>
+          </div>
+        ) : null,
+    },
+  ];
 
   return (
     <>
@@ -422,265 +427,240 @@ export function AdminCampaignsPage() {
         title="限时活动"
         description="限时价 / 限时免费 / 弹窗位。状态为「进行中」但不在时间窗内，活动不会展示。"
         actions={
-          <div className="adm-ops">
+          <div className="flex items-center gap-2">
             {can('data.export') && (
               <Button
-                type="default"
-                className="adm-btn"
-                loading={exporting}
+                variant="secondary"
+                size="small"
+                leadingIcon={Download}
+                disabled={exporting}
                 onClick={() => void exportCsv()}
               >
-                <Download size={14} style={{ marginRight: 4 }} />
                 {exporting ? '导出中…' : '导出 CSV'}
               </Button>
             )}
             {writable ? (
-              <Button type="primary" className="adm-btn is-primary" onClick={openCreate}>
+              <Button variant="primary" size="small" leadingIcon={Plus} onClick={openCreate}>
                 新建活动
               </Button>
             ) : (
-              <span className="adm-cell-sub">当前账号无 marketing.write 权限，仅可查看</span>
+              <span className="text-[11px] text-text-tertiary">当前账号无 marketing.write 权限，仅可查看</span>
             )}
           </div>
         }
       />
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
-      {error && <AdminStaleError error={error} onRetry={reload} />}
+      {error && data && <AdminStaleError error={error} onRetry={reload} />}
 
       <FilterBar>
-        <Input
-          className="adm-filter-input"
+        <TextInput
+          className="w-56"
+          ariaLabel="按活动名称搜索"
           placeholder="活动名称"
           value={keyword}
-          onChange={(e) => setKeyword(e.target.value)}
-          onPressEnter={applyFilters}
+          onChange={setKeyword}
+          onEnter={applyFilters}
           allowClear
         />
-        <Select
-          className="adm-filter-select"
+        <SelectBox
+          className="w-32"
+          ariaLabel="按状态筛选"
           placeholder="状态"
-          options={Object.entries(STATUS_LABEL).map(([v, m]) => ({ value: v, label: m.label }))}
+          allowClear
           value={status}
           onChange={setStatus}
-          allowClear
+          options={Object.entries(STATUS_LABEL).map(([value, item]) => ({ value, label: item.label }))}
         />
         <FilterActions>
-          <Button type="primary" className="adm-btn is-primary" onClick={applyFilters}>
+          <Button variant="primary" size="small" onClick={applyFilters}>
             查询
           </Button>
-          <Button type="default" className="adm-btn" onClick={resetFilters}>
+          <Button variant="secondary" size="small" onClick={resetFilters}>
             重置
           </Button>
         </FilterActions>
         <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
       </FilterBar>
 
-      <Panel title="活动列表">
-        {loading && !data ? (
-          <AdminListLoading tip="加载活动…" />
-        ) : error && !data ? (
-          <AdminListError error={error} onRetry={reload} />
-        ) : (data?.items.length ?? 0) === 0 ? (
-          hasFilter ? (
-            <AdminEmpty
-              description="没有匹配的活动。清除筛选条件后再试。"
-              action={
-                <Button
-                  type="default"
-                  className="adm-btn"
-                  onClick={() => {
-                    setKeyword('');
-                    setStatus(undefined);
-                    setQuery({ keyword: undefined, status: undefined });
-                  }}
-                >
-                  清除筛选
-                </Button>
-              }
-            />
-          ) : (
-            <AdminEmpty
-              description="还没有活动"
-              action={
-                writable ? (
-                  <Button type="primary" className="adm-btn is-primary" onClick={openCreate}>
-                    创建第一个活动
-                  </Button>
-                ) : undefined
-              }
-            />
-          )
-        ) : (
-          <Table<AdminCampaign>
-            rowKey="id"
-            size="small"
-            columns={columns}
-            dataSource={data?.items ?? []}
-            loading={loading}
-            scroll={{ x: 1000 }}
-            pagination={adminPagination({
-              current: data?.page ?? 1,
-              pageSize: data?.pageSize ?? 20,
-              total: data?.total ?? 0,
-              unit: '个',
-              onChange: setPage,
-            })}
-          />
-        )}
+      <Panel title="活动列表" note="列表状态为派生结果：时间窗、人工开关与上下线共同决定">
+        <AdminDataTable<AdminCampaign>
+          rows={data?.items ?? []}
+          columns={columns}
+          rowKey={(row) => row.id}
+          loading={loading}
+          error={error}
+          onRetry={reload}
+          minWidth={1010}
+          pagination={{
+            current: data?.page ?? 1,
+            pageSize: data?.pageSize ?? 20,
+            total: data?.total ?? 0,
+            unit: '个',
+            onChange: setPage,
+          }}
+          emptyText={
+            hasFilter
+              ? '没有匹配的活动。清除筛选条件后再试。'
+              : '还没有活动。新建一个限时活动，C 端会按时间窗自动生效。'
+          }
+          emptyAction={
+            hasFilter ? (
+              <Button variant="secondary" size="small" onClick={resetFilters}>
+                清除筛选
+              </Button>
+            ) : writable ? (
+              <Button variant="primary" size="small" leadingIcon={Plus} onClick={openCreate}>
+                创建第一个活动
+              </Button>
+            ) : undefined
+          }
+        />
       </Panel>
 
       <Drawer
-        title={editing ? `编辑活动 · ${editing.name}` : '新建活动'}
-        size={560}
         open={formOpen}
-        onClose={requestCloseForm}
-        className="adm-drawer"
+        onOpenChange={(open) => {
+          if (!open) requestCloseForm();
+        }}
+        width={560}
+        title={editing ? `编辑活动 · ${editing.name}` : '新建活动'}
+        description={formDirty ? '有未保存修改' : undefined}
         footer={
-          <div className="adm-drawer-footer">
-            {formDirty && <span className="adm-cell-sub">有未保存修改</span>}
-            <Button type="default" className="adm-btn" onClick={requestCloseForm}>取消</Button>
-            <Button type="primary" className="adm-btn is-primary" onClick={() => void save()} disabled={busy}>
+          <>
+            <Button variant="secondary" size="small" onClick={requestCloseForm} disabled={busy}>
+              取消
+            </Button>
+            <Button variant="primary" size="small" disabled={busy} onClick={() => void save()}>
               {busy ? '保存中…' : '保存'}
             </Button>
-          </div>
+          </>
         }
       >
-        {formError && <div className="adm-form-error">{formError}</div>}
+        <div className="flex flex-col gap-4">
+          {formError && (
+            <Notice tone="danger" className="mb-0">
+              {formError}
+            </Notice>
+          )}
 
-        <div className="adm-form">
-          <div className="adm-field">
-            <label htmlFor="k-name">活动名称</label>
-            <Input
-              id="k-name"
-              type="text"
+          <Field label="活动名称">
+            <TextInput
+              ariaLabel="活动名称"
               value={form.name}
               placeholder="如: 双十一大促"
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              maxLength={60}
+              onChange={(value) => setForm({ ...form, name: value })}
             />
-          </div>
+          </Field>
 
-          <div className="adm-field">
-            <label htmlFor="k-type">类型</label>
-            <Select
-              id="k-type"
+          <Field label="类型" hint="类型决定 payload 字段，切换类型后原有的内容不会保留">
+            <SelectBox
+              ariaLabel="活动类型"
               value={form.type}
               onChange={(value) => setForm({ ...form, type: value as CampaignType })}
               options={Object.entries(TYPE_LABEL).map(([value, label]) => ({ value, label }))}
             />
-          </div>
+          </Field>
 
           {/* payload 字段随类型切换, 避免看到不相关的输入框 */}
           {form.type === 'limited_price' && (
             <>
-              <div className="adm-field">
-                <label htmlFor="k-pid">目标商品 ID</label>
-                <Input
-                  id="k-pid"
-                  type="text"
+              <Field label="目标商品 ID">
+                <TextInput
+                  ariaLabel="目标商品 ID"
                   value={form.productId}
                   placeholder="商品 ID"
-                  onChange={(e) => setForm({ ...form, productId: e.target.value })}
+                  onChange={(value) => setForm({ ...form, productId: value })}
                 />
-              </div>
-              <div className="adm-field">
-                <label htmlFor="k-price">活动价 (元)</label>
-                <Input
-                  id="k-price"
-                  type="number"
+              </Field>
+              <Field label="活动价 (元)" hint="表单内填元，入库换算成分">
+                <TextInput
+                  ariaLabel="活动价"
+                  inputMode="decimal"
                   value={form.priceCents}
                   placeholder="9.90"
-                  onChange={(e) => setForm({ ...form, priceCents: e.target.value })}
+                  onChange={(value) => setForm({ ...form, priceCents: value })}
                 />
-              </div>
+              </Field>
             </>
           )}
 
           {form.type === 'limited_free' && (
-            <div className="adm-field">
-              <label htmlFor="k-caps">能力 ID (逗号分隔)</label>
-              <Input
-                id="k-caps"
-                type="text"
+            <Field label="能力 ID (逗号分隔)" hint="这些能力在活动期内免费使用">
+              <TextInput
+                ariaLabel="能力 ID"
                 value={form.capabilityIds}
                 placeholder="main_image, detail_image"
-                onChange={(e) => setForm({ ...form, capabilityIds: e.target.value })}
+                onChange={(value) => setForm({ ...form, capabilityIds: value })}
               />
-              <div className="adm-field-hint">这些能力在活动期内免费使用</div>
-            </div>
+            </Field>
           )}
 
           {form.type === 'popup' && (
             <>
-              <div className="adm-field">
-                <label htmlFor="k-title">弹窗标题</label>
-                <Input
-                  id="k-title"
-                  type="text"
+              <Field label="弹窗标题">
+                <TextInput
+                  ariaLabel="弹窗标题"
                   value={form.title}
-                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+                  maxLength={60}
+                  onChange={(value) => setForm({ ...form, title: value })}
                 />
-              </div>
-              <div className="adm-field">
-                <label htmlFor="k-body">正文</label>
-                <Input.TextArea
-                  id="k-body"
+              </Field>
+              <Field label="正文">
+                <TextArea
+                  ariaLabel="弹窗正文"
                   rows={3}
                   value={form.body}
-                  onChange={(e) => setForm({ ...form, body: e.target.value })}
+                  maxLength={300}
+                  showCount
+                  onChange={(value) => setForm({ ...form, body: value })}
                 />
-              </div>
-              <div className="adm-form-row">
-                <div className="adm-field">
-                  <label htmlFor="k-cta">按钮文案</label>
-                  <Input
-                    id="k-cta"
-                    type="text"
+              </Field>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="按钮文案">
+                  <TextInput
+                    ariaLabel="按钮文案"
                     value={form.ctaText}
-                    onChange={(e) => setForm({ ...form, ctaText: e.target.value })}
+                    maxLength={12}
+                    onChange={(value) => setForm({ ...form, ctaText: value })}
                   />
-                </div>
-                <div className="adm-field">
-                  <label htmlFor="k-url">跳转地址</label>
-                  <Input
-                    id="k-url"
-                    type="text"
+                </Field>
+                <Field label="跳转地址" hint="仅支持站内相对路径">
+                  <TextInput
+                    ariaLabel="跳转地址"
                     value={form.ctaUrl}
                     placeholder="/workbench"
-                    onChange={(e) => setForm({ ...form, ctaUrl: e.target.value })}
+                    onChange={(value) => setForm({ ...form, ctaUrl: value })}
                   />
-                  <div className="adm-field-hint">仅支持站内相对路径</div>
-                </div>
+                </Field>
               </div>
             </>
           )}
 
-          <div className="adm-form-row">
-            <div className="adm-field">
-              <label htmlFor="k-from">开始时间</label>
-              <Input
-                id="k-from"
+          <div className="grid grid-cols-2 gap-4">
+            <Field label="开始时间">
+              <TextInput
+                ariaLabel="开始时间"
                 type="datetime-local"
                 value={form.startAt}
-                onChange={(e) => setForm({ ...form, startAt: e.target.value })}
+                onChange={(value) => setForm({ ...form, startAt: value })}
               />
-            </div>
-            <div className="adm-field">
-              <label htmlFor="k-to">结束时间</label>
-              <Input
-                id="k-to"
+            </Field>
+            <Field label="结束时间">
+              <TextInput
+                ariaLabel="结束时间"
                 type="datetime-local"
                 value={form.endAt}
-                onChange={(e) => setForm({ ...form, endAt: e.target.value })}
+                onChange={(value) => setForm({ ...form, endAt: value })}
               />
-            </div>
+            </Field>
           </div>
 
-          <div className="adm-form-row">
-            <div className="adm-field">
-              <label htmlFor="k-status">状态</label>
-              <Select
-                id="k-status"
+          <div className="grid grid-cols-2 items-start gap-4">
+            <Field label="状态">
+              <SelectBox
+                ariaLabel="状态"
                 value={form.status}
                 onChange={(value) => setForm({ ...form, status: value as CampaignStatus })}
                 options={Object.entries(STATUS_LABEL).map(([value, item]) => ({
@@ -688,18 +668,24 @@ export function AdminCampaignsPage() {
                   label: item.label,
                 }))}
               />
-            </div>
-            <div className="adm-field">
-              <Switch
+            </Field>
+            <div className="pt-6">
+              <SwitchBox
                 checked={form.onlyNewUsers}
-                checkedChildren="仅投放新用户"
                 onChange={(checked) => setForm({ ...form, onlyNewUsers: checked })}
+                label={form.onlyNewUsers ? '仅投放新用户' : '投放全站用户'}
               />
             </div>
           </div>
+
+          {editing && (
+            <p className="text-[11px] leading-4 text-text-tertiary">
+              当前派生状态：{EFFECTIVE_META[editing.effective]?.label ?? editing.statusLabel}
+              {editing.status === 'active' && !inWindow(editing) && '（不在时间窗内，实际不会曝光）'}
+            </p>
+          )}
         </div>
       </Drawer>
-
     </>
   );
 }

@@ -1,24 +1,19 @@
 import { useEffect, useState } from 'react';
-import { App, Button, Input, Table } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
 import { ShieldAlert } from 'lucide-react';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
 import { adminRetentionApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
+import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
+import { Notice } from '../../admin-ui/primitives';
+import { NumberInput, TextInput } from '../../admin-ui/controls';
 import {
-  AdminListError,
-  AdminListLoading,
   AdminStaleError,
   ConfirmAction,
   useAdminResource,
 } from '../../components/admin/AdminWidgets';
-import {
-  AdminEmpty,
-  PageHeader,
-  Panel,
-  StatCard,
-  StatusTag,
-} from '../../components/admin/PageHeader';
+import { PageHeader, Panel, StatCard, StatusTag } from '../../components/admin/PageHeader';
 import type { AdminCleanupLog, AdminRetentionTarget } from '../../types/api';
 
 /**
@@ -49,7 +44,7 @@ const TARGET_LABELS: Record<string, string> = {
 };
 
 export function AdminRetentionPage() {
-  const { message } = App.useApp();
+  const toast = useToast();
   const { can } = useAdmin();
   const writable = can('backup.run');
 
@@ -96,18 +91,18 @@ export function AdminRetentionPage() {
     if (!pending) return;
     const trimmed = reason.trim();
     if (!trimmed) {
-      void message.warning('请填写清理原因，它会写入操作审计');
+      toast.warning('请填写清理原因，它会写入操作审计');
       return;
     }
     const keep = days[pending.table] ?? pending.retentionDays;
     setBusy(true);
     try {
       const r = await adminRetentionApi.cleanup(pending.table, keep, trimmed);
-      void message.success(`已清理 ${r.deleted} 条（保留 ${keep} 天）`);
+      toast.success(`已清理 ${r.deleted} 条（保留 ${keep} 天）`);
       setPending(null);
       void reload({ silent: true });
     } catch (e) {
-      void message.error(e instanceof Error ? e.message : '清理失败');
+      toast.error(e instanceof Error ? e.message : '清理失败');
     } finally {
       setBusy(false);
     }
@@ -116,129 +111,130 @@ export function AdminRetentionPage() {
   const totalRows = targets.reduce((s, t) => s + t.total, 0);
   const totalExpiring = targets.reduce((s, t) => s + t.expiring, 0);
 
-  const targetColumns: ColumnsType<AdminRetentionTarget> = [
+  const targetColumns: Array<AdminColumn<AdminRetentionTarget>> = [
     {
-      title: '清理目标',
       key: 'target',
+      title: '清理目标',
       width: 220,
-      render: (_: unknown, row) => (
-        <div className="adm-cell-stack">
+      render: (row) => (
+        <div className="flex flex-col gap-0.5">
           <span>{row.label}</span>
-          <code className="adm-cell-sub">{row.table}</code>
+          <code className="font-mono text-[11px] text-text-tertiary">{row.table}</code>
         </div>
       ),
     },
     {
-      title: '说明',
-      dataIndex: 'note',
       key: 'note',
-      render: (v: string) => <span className="adm-cell-sub">{v}</span>,
+      title: '说明',
+      render: (row) => <span className="text-[11px] text-text-tertiary">{row.note}</span>,
     },
     {
-      title: '当前条数',
-      dataIndex: 'total',
       key: 'total',
+      title: '当前条数',
       width: 100,
+      align: 'right',
+      render: (row) => <span className="tabular-nums">{row.total}</span>,
     },
     {
-      title: '保留天数',
       key: 'days',
+      title: '保留天数',
       width: 120,
-      render: (_: unknown, row) => (
-        <Input
-          value={String(days[row.table] ?? row.retentionDays)}
+      render: (row) => (
+        <NumberInput
+          ariaLabel={`${row.label}保留天数`}
+          className="w-[90px]"
+          value={days[row.table] ?? row.retentionDays}
           disabled={!writable}
-          onChange={(e) =>
-            setDays((d) => ({ ...d, [row.table]: Number(e.target.value.replace(/\D/g, '')) || 0 }))
-          }
-          inputMode="numeric"
-          style={{ width: 90 }}
+          onChange={(value) => setDays((d) => ({ ...d, [row.table]: value ?? 0 }))}
         />
       ),
     },
     {
-      title: '预计删除',
       key: 'expiring',
-      width: 140,
-      render: (_: unknown, row) => {
+      title: '预计删除',
+      width: 150,
+      render: (row) => {
         const keep = days[row.table] ?? row.retentionDays;
         // 改了天数后, 原预估就失效了 —— 必须显式说明而不是继续显示旧数字
         const dirty = keep !== row.retentionDays;
         return (
-          <div className="adm-cell-stack">
-            <span className={row.expiring > 0 ? 'adm-text-danger' : undefined}>
+          <div className="flex flex-col gap-0.5">
+            <span
+              className={
+                row.expiring > 0 ? 'tabular-nums font-medium text-rose-600' : 'tabular-nums'
+              }
+            >
               {row.expiring} 条
             </span>
-            {dirty && <span className="adm-cell-sub">按 {row.retentionDays} 天估算，已改动</span>}
+            {dirty && (
+              <span className="text-[11px] text-text-tertiary">按 {row.retentionDays} 天估算，已改动</span>
+            )}
           </div>
         );
       },
     },
     {
-      title: '最早记录',
-      dataIndex: 'oldestAt',
       key: 'oldestAt',
+      title: '最早记录',
       width: 170,
-      render: (v: string | null) => <span className="adm-cell-sub">{fmtTime(v)}</span>,
+      render: (row) => <span className="text-[11px] text-text-tertiary">{fmtTime(row.oldestAt)}</span>,
     },
     {
-      title: '',
       key: 'ops',
+      title: '',
       width: 90,
-      render: (_: unknown, row) =>
+      fixed: 'right',
+      render: (row) =>
         writable ? (
-          <Button type="link" danger className="adm-link is-danger" onClick={() => openCleanup(row)}>
+          <Button variant="ghost" size="small" onClick={() => openCleanup(row)}>
             清理
           </Button>
         ) : null,
     },
   ];
 
-  const logColumns: ColumnsType<AdminCleanupLog> = [
+  const logColumns: Array<AdminColumn<AdminCleanupLog>> = [
     {
-      title: '时间',
-      dataIndex: 'createdAt',
       key: 'createdAt',
+      title: '时间',
       width: 170,
-      render: (v: string) => fmtTime(v),
+      render: (row) => fmtTime(row.createdAt),
     },
     {
-      title: '目标',
       key: 'target',
+      title: '目标',
       width: 150,
-      render: (_: unknown, r) => (
-        <span className="adm-cell-sub">{TARGET_LABELS[r.target] ?? r.target}</span>
+      render: (row) => (
+        <span className="text-[11px] text-text-tertiary">{TARGET_LABELS[row.target] ?? row.target}</span>
       ),
     },
     {
-      title: '保留天数',
-      dataIndex: 'retentionDays',
       key: 'retentionDays',
+      title: '保留天数',
       width: 100,
+      align: 'right',
+      render: (row) => <span className="tabular-nums">{row.retentionDays}</span>,
     },
     {
-      title: '删除条数',
-      dataIndex: 'deletedCount',
       key: 'deletedCount',
+      title: '删除条数',
       width: 100,
+      align: 'right',
+      render: (row) => <span className="tabular-nums">{row.deletedCount}</span>,
     },
+    { key: 'trigger', title: '触发', width: 90, render: (row) => (row.trigger === 'manual' ? '手动' : '定时') },
     {
-      title: '触发',
-      dataIndex: 'trigger',
-      key: 'trigger',
-      width: 90,
-      render: (v: string) => (v === 'manual' ? '手动' : '定时'),
-    },
-    {
-      title: '结果',
       key: 'success',
+      title: '结果',
       width: 100,
-      render: (_: unknown, r) => <StatusTag status={r.success ? 'succeeded' : 'failed'} />,
+      render: (row) => <StatusTag status={row.success ? 'succeeded' : 'failed'} />,
     },
     {
-      title: '说明',
       key: 'msg',
-      render: (_: unknown, r) => <span className="adm-cell-sub">{r.errorMessage ?? '—'}</span>,
+      title: '说明',
+      render: (row) => (
+        <span className="text-[11px] text-text-tertiary">{row.errorMessage ?? '—'}</span>
+      ),
     },
   ];
 
@@ -249,7 +245,7 @@ export function AdminRetentionPage() {
         description="按时间清理运行痕迹类数据。订单、积分流水、素材与任务不在可清理范围内。"
       />
 
-      <div className="adm-stat-grid">
+      <div className="mb-3 grid gap-3 [grid-template-columns:repeat(3,minmax(0,1fr))]">
         <StatCard label="可清理目标" value={targets.length} hint="固定白名单，不支持自定义表名" />
         <StatCard label="记录总数" value={loading ? '—' : totalRows} hint="上述目标的合计条数" />
         <StatCard
@@ -267,50 +263,37 @@ export function AdminRetentionPage() {
         note="每次清理都写入清理日志与操作审计"
         extra={
           writable && dirtyCount > 0 ? (
-            <Button type="link" className="adm-link" onClick={() => setDays({ ...daysBase })}>
+            <Button variant="ghost" size="small" onClick={() => setDays({ ...daysBase })}>
               放弃 {dirtyCount} 项改动
             </Button>
           ) : undefined
         }
       >
-        {/* 失败态不用 AdminEmpty: 那是「没有数据」的语义, 会把「没连上」说成「没有可清理目标」。
-            已有上一次成功数据时只在上方挂 stale 提示, 表格继续可用, 不整块挖空 */}
-        {loading && !data ? (
-          <AdminListLoading tip="加载清理目标…" />
-        ) : error && !data ? (
-          <AdminListError error={error} onRetry={() => void reload()} />
-        ) : (
-          <Table<AdminRetentionTarget>
-            rowKey="table"
-            size="small"
-            loading={loading}
-            columns={targetColumns}
-            dataSource={targets}
-            pagination={false}
-            scroll={{ x: 1100 }}
-          />
-        )}
+        {/* 失败态交给 AdminDataTable 统一渲染: 「没有可清理目标」是空态语义,
+            不能把「没连上」显示成「没有目标」 */}
+        <AdminDataTable<AdminRetentionTarget>
+          rows={targets}
+          columns={targetColumns}
+          rowKey={(row) => row.table}
+          loading={loading}
+          error={error}
+          onRetry={() => void reload()}
+          minWidth={1100}
+          emptyText="没有可清理的目标"
+        />
       </Panel>
 
-      <Panel
-        title="清理记录"
-        note="最近 50 条；失败记录同样留痕"
-      >
-        {loading && !data ? (
-          <AdminListLoading tip="加载清理记录…" />
-        ) : logs.length === 0 ? (
-          <AdminEmpty description="还没有清理记录。" />
-        ) : (
-          <Table<AdminCleanupLog>
-            rowKey="id"
-            size="small"
-            loading={loading}
-            columns={logColumns}
-            dataSource={logs}
-            pagination={false}
-            scroll={{ x: 1000 }}
-          />
-        )}
+      <Panel title="清理记录" note="最近 50 条；失败记录同样留痕">
+        <AdminDataTable<AdminCleanupLog>
+          rows={logs}
+          columns={logColumns}
+          rowKey={(row) => row.id}
+          loading={loading}
+          error={error}
+          onRetry={() => void reload()}
+          minWidth={1000}
+          emptyText="还没有清理记录"
+        />
       </Panel>
 
       {pending && (
@@ -336,30 +319,27 @@ export function AdminRetentionPage() {
             '写入清理日志与操作审计',
           ]}
           extra={
-            <div className="adm-confirm-typing">
-              <label htmlFor="adm-retention-reason">清理原因（强制，写入审计）：</label>
-              <Input
-                id="adm-retention-reason"
-                type="text"
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs text-text-secondary">清理原因（强制，写入审计）：</label>
+              <TextInput
+                ariaLabel="清理原因"
                 value={reason}
-                onChange={(e) => setReason(e.target.value)}
+                onChange={setReason}
                 placeholder="如：季度合规清理"
                 maxLength={200}
-                autoComplete="off"
               />
             </div>
           }
         />
       )}
 
-      <div className="adm-panel">
-        <div className="adm-confirm-warn">
-          <ShieldAlert size={14} />
-          <span>
-            删除前请确认已做过备份：清理不进入回收站，SQLite 的 VACUUM 之后也无法从文件碎片恢复。
-          </span>
-        </div>
-      </div>
+      <Notice
+        tone="warn"
+        icon={<ShieldAlert className="size-4 shrink-0" aria-hidden />}
+        className="mb-0"
+      >
+        删除前请确认已做过备份：清理不进入回收站，SQLite 的 VACUUM 之后也无法从文件碎片恢复。
+      </Notice>
     </>
   );
 }

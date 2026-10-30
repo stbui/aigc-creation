@@ -8,9 +8,13 @@ import { ADMIN_EMAIL, ADMIN_PASSWORD, HAS_ADMIN_CREDENTIALS } from './support/ad
  *   1. 每个任务的状态都能看到 (上次执行/耗时/成败)
  *   2. 只有幂等任务给「立即执行」按钮 —— 备份/清理不给
  *   3. 手动执行直接触发, 不使用确认弹窗
+ *
+ * 选择器：任务行 `data-testid="admin-task-row"`（带 `data-task` 名称）。
  */
 
 const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
+
+const taskRows = (page: Page) => page.getByTestId('admin-task-row');
 
 async function login(page: Page) {
   await page.setViewportSize({ width: 1600, height: 1000 });
@@ -43,42 +47,40 @@ test.describe('定时任务', () => {
       '会员到期与月度积分',
       '中断任务与会员补发',
     ];
-    await expect(page.locator('.adm-task-row')).toHaveCount(TASKS.length, { timeout: 10000 });
+    await expect(taskRows(page)).toHaveCount(TASKS.length, { timeout: 10000 });
     // B-90 的三项必须都在, 其余任务同样不得漏渲染
     for (const label of TASKS) {
-      await expect(page.locator('.adm-task-row', { hasText: label })).toBeVisible();
+      await expect(taskRows(page).filter({ hasText: label })).toBeVisible();
     }
   });
 
   test('每行显示上次执行与耗时', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/scheduler`);
-    await page.waitForSelector('.adm-task-row', { timeout: 20000 });
+    await taskRows(page).first().waitFor({ state: 'visible', timeout: 20000 });
 
-    const firstRow = page.locator('.adm-task-row').first();
-    await expect(firstRow.locator('.adm-task-meta')).toContainText('上次执行');
+    await expect(taskRows(page).first()).toContainText('上次执行');
+    await expect(taskRows(page).first()).toContainText(/耗时|累计/);
   });
 
   test('只有幂等任务有「立即执行」按钮', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/scheduler`);
-    await page.waitForSelector('.adm-task-row', { timeout: 20000 });
+    await taskRows(page).first().waitFor({ state: 'visible', timeout: 20000 });
 
     // 订单/积分 有按钮
-    await expect(
-      page.locator('.adm-task-row', { hasText: '订单超时关闭' }).getByRole('button', { name: '立即执行' }),
-    ).toBeVisible();
-    await expect(
-      page.locator('.adm-task-row', { hasText: '积分到期回收' }).getByRole('button', { name: '立即执行' }),
-    ).toBeVisible();
+    for (const label of ['订单超时关闭', '积分到期回收']) {
+      await expect(
+        taskRows(page).filter({ hasText: label }).getByRole('button', { name: '立即执行' }),
+      ).toBeVisible();
+    }
 
     // 备份/清理 不该有 —— 它们会写文件或删数据
-    await expect(
-      page.locator('.adm-task-row', { hasText: '数据备份' }).getByRole('button', { name: '立即执行' }),
-    ).toHaveCount(0);
-    await expect(
-      page.locator('.adm-task-row', { hasText: '数据保留期清理' }).getByRole('button', { name: '立即执行' }),
-    ).toHaveCount(0);
+    for (const label of ['数据备份', '数据保留期清理']) {
+      await expect(
+        taskRows(page).filter({ hasText: label }).getByRole('button', { name: '立即执行' }),
+      ).toHaveCount(0);
+    }
   });
 
   test('手动执行直接触发, 不再弹窗确认', async ({ page }) => {
@@ -94,22 +96,27 @@ test.describe('定时任务', () => {
 
     await login(page);
     await page.goto(`${UI}/admin/scheduler`);
-    await page.waitForSelector('.adm-task-row', { timeout: 20000 });
+    await taskRows(page).first().waitFor({ state: 'visible', timeout: 20000 });
 
-    await page.locator('.adm-task-row', { hasText: '订单超时关闭' })
-      .getByRole('button', { name: '立即执行' }).click();
+    await taskRows(page)
+      .filter({ hasText: '订单超时关闭' })
+      .getByRole('button', { name: '立即执行' })
+      .click();
 
-    await expect(page.locator('.ant-modal')).toHaveCount(0);
-    await expect(page.locator('.adm-inline-confirm')).toHaveCount(0);
+    await expect(page.getByTestId('admin-modal')).toHaveCount(0);
+    await expect(page.getByTestId('admin-confirm-action')).toHaveCount(0);
     await expect.poll(() => runCalls).toBe(1);
   });
 
   test('设计说明解释可触发与不可触发', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/scheduler`);
-    await expect(page.locator('.adm-panel-title', { hasText: '设计说明' })).toBeVisible({ timeout: 20000 });
+    const panel = page
+      .getByTestId('admin-panel')
+      .filter({ has: page.getByRole('heading', { name: '设计说明' }) });
+    await expect(panel).toBeVisible({ timeout: 20000 });
 
-    const notes = await page.locator('.adm-note-list').innerText();
+    const notes = await panel.innerText();
     expect(notes).toContain('幂等');
     expect(notes).toContain('失败隔离');
     // 解释为什么备份/清理不能手动触发
@@ -119,6 +126,8 @@ test.describe('定时任务', () => {
   test('侧栏入口已注册', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/scheduler`);
-    await expect(page.locator('.adm-sider-item.is-active')).toContainText('定时任务');
+    await expect(
+      page.getByTestId('admin-sider').locator('button[aria-current="page"]'),
+    ).toContainText('定时任务');
   });
 });

@@ -1,17 +1,18 @@
 import { useEffect, useState } from 'react';
-import { App, Button, Drawer, Input, Select, Switch, Table } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
 import { adminNotificationsApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
+import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
+import { Drawer } from '../../admin-ui/primitives/Drawer';
+import { Notice } from '../../admin-ui/primitives';
+import { SelectBox, SwitchBox, TextArea, TextInput } from '../../admin-ui/controls';
 import {
-  AdminListError,
-  AdminListLoading,
   AdminStaleError,
-  adminMiniPagination,
   useAdminResource,
 } from '../../components/admin/AdminWidgets';
-import { AdminEmpty, PageHeader, Panel, StatusTag } from '../../components/admin/PageHeader';
+import { PageHeader, Panel, StatusTag } from '../../components/admin/PageHeader';
 import type { DeliveryChannelStatusMap, MessageTemplateItem } from '../../types/api';
 
 const CHANNEL_LABEL: Record<string, string> = {
@@ -37,8 +38,21 @@ function fmt(iso: string): string {
   return d.toLocaleString('zh-CN', { hour12: false });
 }
 
+/**
+ * 站内消息（BoardUI）。
+ *
+ * 三块互不相干的数据放在一页，但失败域必须彼此隔离：
+ *   · 投递通道是**只读事实**，拉取失败就整块不渲染 —— 绝不能让「读失败」
+ *     看起来像「通道正常」；
+ *   · 广播按活跃账号逐条写入，不可撤回，因此按钮在缺少标题或正文时保持禁用；
+ *   · 模板列表失败只影响模板区，不影响上面两块。
+ *
+ * 渲染层变化：antd Table → `AdminDataTable`（自带骨架 / 错误 / 空态），
+ * antd Drawer → `Drawer` 原语（操作区固定，长正文不把按钮滚走），
+ * antd Switch → `SwitchBox`（`isSelected` 与 `checked` 的命名差异收在控件层）。
+ */
 export function AdminNotificationsPage() {
-  const { message } = App.useApp();
+  const toast = useToast();
   const { can } = useAdmin();
   const writable = can('message.write');
 
@@ -95,12 +109,12 @@ export function AdminNotificationsPage() {
         ...(link.trim() ? { link: link.trim() } : {}),
       });
       setSentResult(res);
-      message.success(`已向 ${res.users} 个活跃账号发送 ${res.sent} 条站内消息`);
+      toast.success(`已向 ${res.users} 个活跃账号发送 ${res.sent} 条站内消息`);
       setTitle('');
       setBody('');
       setLink('');
     } catch (e) {
-      message.error(e instanceof Error ? e.message : '发送失败');
+      toast.error(e instanceof Error ? e.message : '发送失败');
     } finally {
       setSending(false);
     }
@@ -132,7 +146,7 @@ export function AdminNotificationsPage() {
         body: form.body,
         enabled: form.enabled,
       });
-      message.success('模板已保存');
+      toast.success('模板已保存');
       setFormOpen(false);
       await reload();
     } catch (e) {
@@ -142,34 +156,57 @@ export function AdminNotificationsPage() {
     }
   };
 
-  const columns: ColumnsType<MessageTemplateItem> = [
-    { title: '编码', dataIndex: 'code', width: 180 },
+  const columns: Array<AdminColumn<MessageTemplateItem>> = [
     {
+      key: 'code',
+      title: '编码',
+      width: 180,
+      render: (row) => <code className="font-mono text-[11px] text-text-primary">{row.code}</code>,
+    },
+    {
+      key: 'channel',
       title: '通道',
-      dataIndex: 'channel',
       width: 100,
-      render: (v: string) => CHANNEL_LABEL[v] ?? v,
+      render: (row) => CHANNEL_LABEL[row.channel] ?? row.channel,
     },
-    { title: '标题', dataIndex: 'subject', width: 180, render: (v: string | null) => v || '—' },
-    { title: '正文', dataIndex: 'body', ellipsis: true },
     {
+      key: 'subject',
+      title: '标题',
+      width: 180,
+      render: (row) => (
+        <span className="block max-w-[180px] truncate" title={row.subject ?? undefined}>
+          {row.subject || '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'body',
+      title: '正文',
+      render: (row) => (
+        <span className="block max-w-[420px] truncate text-text-secondary" title={row.body}>
+          {row.body}
+        </span>
+      ),
+    },
+    {
+      key: 'enabled',
       title: '状态',
-      dataIndex: 'enabled',
       width: 90,
-      render: (v: boolean) => <StatusTag status={v ? 'active' : 'disabled'} label={v ? '启用' : '停用'} />,
+      render: (row) => (
+        <StatusTag status={row.enabled ? 'active' : 'disabled'} label={row.enabled ? '启用' : '停用'} />
+      ),
     },
-    { title: '更新时间', dataIndex: 'updatedAt', width: 170, render: (v: string) => fmt(v) },
+    { key: 'updatedAt', title: '更新时间', width: 170, render: (row) => fmt(row.updatedAt) },
     {
-      title: '操作',
       key: 'actions',
+      title: '操作',
       width: 100,
-      render: (_, row) =>
+      fixed: 'right',
+      render: (row) =>
         writable ? (
-          <div className="adm-row-actions">
-            <Button size="small" type="link" onClick={() => openCreate(row)}>
-              编辑
-            </Button>
-          </div>
+          <Button variant="ghost" size="small" onClick={() => openCreate(row)}>
+            编辑
+          </Button>
         ) : null,
     },
   ];
@@ -183,10 +220,10 @@ export function AdminNotificationsPage() {
         description="向全站活跃账号发送公告，或维护业务通知的文案模板。消息写入后用户可在顶栏铃铛查看。"
         actions={
           writable ? (
-            <Button type="primary" onClick={() => openCreate()}>
+            <Button variant="primary" size="small" onClick={() => openCreate()}>
               新建模板
             </Button>
-          ) : null
+          ) : undefined
         }
       />
 
@@ -196,93 +233,105 @@ export function AdminNotificationsPage() {
       */}
       {channels ? (
         <Panel title="投递通道" note="只读：来自服务启动时选中的实现，改配置需改环境变量并重启">
-          <div className="adm-channel-status">
+          <ul className="flex flex-col gap-2.5">
             {(
               [
                 { label: '邮件', st: channels.email, target: channels.email.from },
                 { label: '短信', st: channels.sms, target: channels.sms.sign },
               ] as const
             ).map(({ label, st, target }) => (
-              <div key={label} className="adm-channel-status-item">
-                <span className="adm-channel-status-name">{label}</span>
+              <li key={label} className="flex flex-wrap items-center gap-2 text-xs">
+                <span className="w-10 shrink-0 font-medium text-text-primary">{label}</span>
                 <StatusTag
                   status={st.delivers ? 'active' : 'disabled'}
                   label={st.delivers ? `真实投递 · ${st.provider}` : `${st.provider} · 不真实投递`}
                 />
-                {target ? <span className="adm-channel-status-target">{target}</span> : null}
-                {!st.configured ? (
-                  <span className="adm-channel-status-warn">凭据不全，已回落控制台（日志有 WARN）</span>
+                {target ? (
+                  <span className="font-mono text-[11px] text-text-tertiary">{target}</span>
                 ) : null}
-              </div>
+                {!st.configured ? (
+                  <span className="text-status-yellow-text">凭据不全，已回落控制台（日志有 WARN）</span>
+                ) : null}
+              </li>
             ))}
-          </div>
+          </ul>
         </Panel>
       ) : null}
 
       <Panel title="全站广播" note="按当前活跃账号逐个写入，不可撤回">
-        <div className="adm-msg-broadcast">
-          <div className="adm-field">
-            <label htmlFor="bc-title">标题</label>
-            <Input
-              id="bc-title"
+        <div className="flex max-w-[760px] flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-text-secondary">
+              标题
+            </label>
+            <TextInput
+              ariaLabel="广播标题"
               value={title}
               maxLength={80}
               showCount
               disabled={!writable}
               placeholder="如：双十一活动将于 11 月 1 日开启"
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={setTitle}
             />
           </div>
-          <div className="adm-field">
-            <label htmlFor="bc-body">正文</label>
-            <Input.TextArea
-              id="bc-body"
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-text-secondary">
+              正文
+            </label>
+            <TextArea
+              ariaLabel="广播正文"
               value={body}
               rows={4}
               maxLength={2000}
               showCount
               disabled={!writable}
               placeholder="写清楚时间、范围与用户要做什么"
-              onChange={(e) => setBody(e.target.value)}
+              onChange={setBody}
             />
           </div>
-          <div className="adm-field">
-            <label htmlFor="bc-link">跳转路径（可选）</label>
-            <Input
-              id="bc-link"
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-text-secondary">
+              跳转路径（可选）
+            </label>
+            <TextInput
+              ariaLabel="跳转路径"
+              className="w-[320px]"
               value={link}
               maxLength={200}
               disabled={!writable}
               placeholder="站内相对路径，如 /packages"
-              onChange={(e) => setLink(e.target.value)}
+              onChange={setLink}
             />
-            <div className="adm-field-hint">留空表示消息不可点击。只接受站内路径，外链请勿填写。</div>
+            <p className="text-[11px] leading-4 text-text-tertiary">
+              留空表示消息不可点击。只接受站内路径，外链请勿填写。
+            </p>
           </div>
 
+          {/* 预览按用户实际看到的顺序排：标题在上、正文在下、可点击时整条可点 */}
           {broadcastReady && (
-            <div className="adm-msg-preview">
-              <strong>{title}</strong>
-              {body}
+            <div className="rounded-lg border border-border-table bg-background-secondary-default px-3 py-2.5 text-xs leading-5 text-text-secondary">
+              <strong className="block text-text-primary">{title}</strong>
+              <p className="mt-1 whitespace-pre-wrap">{body}</p>
             </div>
           )}
 
-          <div>
+          <div className="flex items-center gap-2">
             <Button
-              type="primary"
-              danger
+              variant="danger"
+              size="small"
               disabled={!writable || !broadcastReady || sending}
-              loading={sending}
               onClick={() => void doBroadcast()}
             >
-              发送广播
+              {sending ? '发送中…' : '发送广播'}
             </Button>
+            {sentResult && (
+              <span className="text-[11px] text-text-tertiary">
+                上次发送：{sentResult.users} 个账号，共 {sentResult.sent} 条。
+              </span>
+            )}
           </div>
-
-          {sentResult && (
-            <div className="adm-field-hint">
-              上次发送：{sentResult.users} 个账号，共 {sentResult.sent} 条。
-            </div>
-          )}
         </div>
       </Panel>
 
@@ -290,96 +339,117 @@ export function AdminNotificationsPage() {
         {error && templates.length > 0 && (
           <AdminStaleError error={error} onRetry={() => void reload()} />
         )}
-        {error && templates.length === 0 ? (
-          <AdminListError error={error} onRetry={() => void reload()} />
-        ) : loading && templates.length === 0 ? (
-          <AdminListLoading />
-        ) : templates.length === 0 ? (
-          <AdminEmpty description="还没有模板，执行 npm run seed:messages 可灌入五条内置文案" />
-        ) : (
-          <Table
-            rowKey="id"
-            size="small"
-            columns={columns}
-            dataSource={templates}
-            pagination={adminMiniPagination()}
-            scroll={{ x: 760 }}
-          />
-        )}
-        <div className="adm-field-hint" style={{ marginTop: 12 }}>
-          变量用 <code>{'{name}'}</code> 占位，仅替换通知调用方传入的字段。当前实际生效的编码：
+        {/*
+         * 模板总量小（内置 5 条 + 运营自建），后端一次全量返回，因此不做分页：
+         * 分页器只会在「只有一页」时占掉一整行。
+         */}
+        <AdminDataTable<MessageTemplateItem>
+          rows={templates}
+          columns={columns}
+          rowKey={(row) => row.id}
+          loading={loading}
+          error={error}
+          onRetry={() => void reload()}
+          minWidth={860}
+          emptyText="还没有模板，执行 npm run seed:messages 可灌入五条内置文案"
+        />
+        <p className="mt-3 text-[11px] leading-4 text-text-tertiary">
+          变量用 <code className="font-mono">{'{name}'}</code> 占位，仅替换通知调用方传入的字段。当前实际生效的编码：
           {BUILTIN_CODES.map((c) => ` ${c.code}`).join('、')}。本页模板只驱动站内消息（channel=inapp）；
           验证码与重置密码的邮件 / 短信走独立通道（console / http / aliyun，见环境变量），不读这些模板。
-        </div>
+        </p>
       </Panel>
 
       <Drawer
         open={formOpen}
-        size={640}
+        onOpenChange={(open) => {
+          if (!open) requestCloseForm();
+        }}
+        width={640}
         title={editing ? `编辑模板 ${editing.code}` : '新建消息模板'}
-        onClose={requestCloseForm}
-        destroyOnHidden
-        extra={
-          <div className="adm-row-actions">
-            {formDirty && <span className="adm-cell-sub">有未保存修改</span>}
-            <Button onClick={requestCloseForm}>取消</Button>
-            <Button type="primary" loading={saving} onClick={() => void saveTemplate()}>
-              保存
+        description={formDirty ? '有未保存修改' : undefined}
+        footer={
+          <>
+            <Button variant="secondary" size="small" onClick={requestCloseForm}>
+              取消
             </Button>
-          </div>
+            <Button variant="primary" size="small" disabled={saving} onClick={() => void saveTemplate()}>
+              {saving ? '保存中…' : '保存'}
+            </Button>
+          </>
         }
       >
-        <div className="adm-form">
-          <div className="adm-field">
-            <label htmlFor="tp-code">模板编码</label>
-            <Input
-              id="tp-code"
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-text-secondary">模板编码</label>
+            <TextInput
+              ariaLabel="模板编码"
+              className="w-[240px]"
               value={form.code}
               maxLength={60}
               disabled={!!editing}
               placeholder="如 task_failed"
-              onChange={(e) => setForm((f) => ({ ...f, code: e.target.value }))}
+              onChange={(value) => setForm((f) => ({ ...f, code: value }))}
             />
-            <div className="adm-field-hint">
+            <p className="text-[11px] leading-4 text-text-tertiary">
               编码与业务事件绑定，建好后不要改。可用编码：{BUILTIN_CODES.map((c) => c.code).join('、')}
-            </div>
+            </p>
           </div>
-          <div className="adm-field">
-            <label htmlFor="tp-channel">通道</label>
-            <Select
-              id="tp-channel"
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-text-secondary">通道</label>
+            <SelectBox
+              ariaLabel="通道"
+              className="w-[200px]"
               value={form.channel}
+              onChange={(value) =>
+                setForm((f) => ({ ...f, channel: (value ?? 'inapp') as MessageTemplateItem['channel'] }))
+              }
               options={CHANNEL_OPTIONS}
-              onChange={(v) => setForm((f) => ({ ...f, channel: v }))}
             />
           </div>
-          <div className="adm-field">
-            <label htmlFor="tp-subject">标题</label>
-            <Input
-              id="tp-subject"
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-text-secondary">标题</label>
+            <TextInput
+              ariaLabel="模板标题"
               value={form.subject}
               maxLength={120}
-              onChange={(e) => setForm((f) => ({ ...f, subject: e.target.value }))}
+              onChange={(value) => setForm((f) => ({ ...f, subject: value }))}
             />
           </div>
-          <div className="adm-field">
-            <label htmlFor="tp-body">正文</label>
-            <Input.TextArea
-              id="tp-body"
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-text-secondary">正文</label>
+            <TextArea
+              ariaLabel="模板正文"
               value={form.body}
               rows={6}
               maxLength={2000}
-              onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
+              onChange={(value) => setForm((f) => ({ ...f, body: value }))}
             />
-            <div className="adm-field-hint">
-              变量占位：{BUILTIN_CODES.map((c) => `${c.code} → ${c.hint}`).join('；')}。未提供的变量原样保留，便于发现漏传。
-            </div>
+            <p className="text-[11px] leading-4 text-text-tertiary">
+              变量占位：{BUILTIN_CODES.map((c) => `${c.code} → ${c.hint}`).join('；')}。
+              未提供的变量原样保留，便于发现漏传。
+            </p>
           </div>
-          <div className="adm-field">
-            <label>启用</label>
-            <Switch checked={form.enabled} onChange={(v) => setForm((f) => ({ ...f, enabled: v }))} />
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-medium text-text-secondary">启用</label>
+            <SwitchBox
+              checked={form.enabled}
+              onChange={(value) => setForm((f) => ({ ...f, enabled: value }))}
+            />
+            <p className="text-[11px] leading-4 text-text-tertiary">
+              {form.enabled ? '启用中：站内通知会使用本模板的文案。' : '已停用：回落到代码内置文案。'}
+            </p>
           </div>
-          {formError && <div className="adm-form-error">{formError}</div>}
+
+          {formError && (
+            <Notice tone="danger">
+              {formError}
+            </Notice>
+          )}
         </div>
       </Drawer>
     </>

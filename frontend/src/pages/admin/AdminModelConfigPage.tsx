@@ -1,25 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  Alert,
-  App,
-  Badge,
-  Button,
-  Card,
-  ConfigProvider,
-  Flex,
-  Result,
-  Skeleton,
-  Space,
-  Tabs,
-  Typography,
-} from 'antd';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
+import { Chip } from '../../vendor/boardui/components/base/badges/chip';
 import { adminModelApi, adminModelChannelsApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
 import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
+import { Notice, Result, Skeleton } from '../../admin-ui/primitives';
+import { TabGroup } from '../../admin-ui/controls';
 import type { AdminModelChannelsSnapshot, AdminModelConfig } from '../../types/api';
 import { AdminStaleError } from '../../components/admin/AdminWidgets';
-import { AntConfirm } from './modelConfig/AntConfirm';
+import { PageHeader } from '../../components/admin/PageHeader';
+import { InlineConfirm } from './modelConfig/InlineConfirm';
 import { ChannelManagementTab } from './modelConfig/ChannelManagementTab';
 import { GlobalSettingsTab } from './modelConfig/GlobalSettingsTab';
 import { ModelCatalogTab } from './modelConfig/ModelCatalogTab';
@@ -29,15 +21,20 @@ import { useModelConfigDraft } from './modelConfig/useModelConfigDraft';
 type TabKey = 'channels' | 'catalog' | 'routes' | 'settings';
 
 /**
- * 模型配置页（antd 版）。
+ * 模型配置页。
  *
- * 结构：Typography 页头 + antd Tabs + 三块内容 + 底部保存条。
- * 业务约束不变：
- *   1. 某模态一旦有线路，旧版 baseUrl/token/model/provider 不再参与调度；
- *   2. 测试只验证地址/模型可达，不代表真实生成健康。
+ * 结构：页头 + 页签 + 底部保存条。
+ *
+ * ## 两条不能破的约束
+ *
+ * 1. 某模态一旦有线路，旧版 baseUrl/token/model/provider 不再参与调度 ——
+ *    页面上必须把「当前生效的是哪一套」说清楚，否则运营改了不生效的字段会
+ *    以为功能坏了。
+ * 2. 测试只验证地址与模型可达，不代表真实生成健康 —— 所以「测试通过」
+ *    在这一页永远不写成「正常」。
  */
 export function AdminModelConfigPage() {
-  const { message } = App.useApp();
+  const toast = useToast();
   const navigate = useNavigate();
   const { can } = useAdmin();
   const canWrite = can('model.config_write');
@@ -47,9 +44,7 @@ export function AdminModelConfigPage() {
   const [params, setParams] = useSearchParams();
   const tabParam = params.get('tab');
   const tab: TabKey =
-    tabParam === 'catalog' || tabParam === 'routes' || tabParam === 'settings'
-      ? tabParam
-      : 'channels';
+    tabParam === 'catalog' || tabParam === 'routes' || tabParam === 'settings' ? tabParam : 'channels';
 
   const [config, setConfig] = useState<AdminModelConfig | null>(null);
   const [channels, setChannels] = useState<AdminModelChannelsSnapshot | null>(null);
@@ -99,12 +94,12 @@ export function AdminModelConfigPage() {
     try {
       const { settings, clears } = draftState.buildPayload();
       await adminModelApi.updateConfig(settings, clears, reason.trim() || undefined);
-      void message.success(`已保存 ${draftState.changed.length + draftState.clearKeys.length} 项，立即生效`);
+      toast.success(`已保存 ${draftState.changed.length + draftState.clearKeys.length} 项，立即生效`);
       setConfirmOpen(false);
       await load();
       draftState.reset();
     } catch (e) {
-      void message.error((e as Error).message || '保存失败');
+      toast.error((e as Error).message || '保存失败');
     } finally {
       setSaving(false);
     }
@@ -122,58 +117,11 @@ export function AdminModelConfigPage() {
     return changed || cleared;
   }, [draftState.changed, draftState.clearKeys]);
 
-  const tabItems = [
-    {
-      key: 'channels',
-      label: '线路管理',
-      children: config && channels && (
-        <ChannelManagementTab
-          config={config}
-          snapshot={channels}
-          canWrite={canChannelWrite}
-          canTest={canTest}
-          onReload={load}
-        />
-      ),
-    },
-    {
-      key: 'catalog',
-      label: '可用模型',
-      children: config && channels && (
-        <ModelCatalogTab config={config} snapshot={channels} canTest={canTest} />
-      ),
-    },
-    {
-      key: 'routes',
-      label: (
-        <Space size={6}>
-          逐能力路由
-          {routeDirty && <Badge status="warning" />}
-        </Space>
-      ),
-      children: config && (
-        <RouteSettingsTab config={config} draftState={draftState} canWrite={canWrite} />
-      ),
-    },
-    {
-      key: 'settings',
-      label: (
-        <Space size={6}>
-          全局设置
-          {settingsDirty && <Badge status="warning" />}
-        </Space>
-      ),
-      children: config && (
-        <GlobalSettingsTab config={config} draftState={draftState} canWrite={canWrite} canTest={canTest} />
-      ),
-    },
-  ];
-
   if (loading && !config) {
     return (
-      <Card>
-        <Skeleton active paragraph={{ rows: 6 }} />
-      </Card>
+      <div className="rounded-xl border border-border-table bg-white p-4">
+        <Skeleton rows={6} />
+      </div>
     );
   }
 
@@ -181,11 +129,11 @@ export function AdminModelConfigPage() {
   if (error && !config) {
     return (
       <Result
-        status="warning"
+        tone="error"
         title="无法加载模型配置"
-        subTitle={error}
-        extra={
-          <Button type="primary" onClick={() => void load()}>
+        description={error}
+        actions={
+          <Button variant="primary" size="small" onClick={() => void load()}>
             重试
           </Button>
         }
@@ -196,74 +144,117 @@ export function AdminModelConfigPage() {
   if (!config || !channels) return null;
 
   return (
-    <ConfigProvider button={{ autoInsertSpace: false }}>
-      <Flex vertical gap={16}>
-      <Flex justify="space-between" align="flex-start" gap={16} wrap>
-        <div>
-          <Typography.Title level={4} style={{ margin: 0 }}>
-            模型配置
-          </Typography.Title>
-          <Typography.Paragraph type="secondary" style={{ margin: '4px 0 0' }}>
-            按模态管理真实模型线路；没有线路时沿用旧版单通道配置。保存后立即生效，无需重启。
-          </Typography.Paragraph>
-        </div>
-        <Space style={{ marginLeft: 'auto' }}>
-          <Button
-            onClick={() => {
-              if (draftState.dirty) {
-                void message.warning('有未保存的修改，请先保存或放弃后再离开');
-                return;
-              }
-              navigate('/admin/model-calls');
-            }}
-          >
-            调用记录
-          </Button>
-          <Button disabled={draftState.dirty} onClick={() => void load()}>
-            刷新
-          </Button>
-        </Space>
-      </Flex>
+    <>
+      <PageHeader
+        title="模型配置"
+        description="按模态管理真实模型线路；没有线路时沿用旧版单通道配置。保存后立即生效，无需重启。"
+        actions={
+          <>
+            <Button
+              variant="secondary"
+              size="small"
+              onClick={() => {
+                if (draftState.dirty) {
+                  toast.warning('有未保存的修改，请先保存或放弃后再离开');
+                  return;
+                }
+                navigate('/admin/model-calls');
+              }}
+            >
+              调用记录
+            </Button>
+            <Button variant="secondary" size="small" disabled={draftState.dirty} onClick={() => void load()}>
+              刷新
+            </Button>
+          </>
+        }
+      />
 
       {/* 刷新失败但手上还有上一次的配置: 明说是旧值, 别让人拿过期线路做判断 */}
       {error && <AdminStaleError error={error} onRetry={() => void load()} />}
 
       {!canWrite && (
-        <Alert
-          type="info"
-          showIcon
+        <Notice
+          tone="info"
           title="你当前的角色只能查看配置与线路健康；连通性测试可用，修改配置与线路需要管理员权限。"
         />
       )}
 
       {tab === 'channels' && (settingsDirty || routeDirty) && (
-        <Alert
-          type="warning"
-          showIcon
+        <Notice
+          tone="warn"
           title="全局设置 / 逐能力路由还有未保存修改"
-          description="线路的新增、删除或排序会重新加载配置，可能丢弃这些修改；请先保存或放弃。"
-        />
+          className="mb-3"
+        >
+          线路的新增、删除或排序会重新加载配置，可能丢弃这些修改；请先保存或放弃。
+        </Notice>
       )}
 
-      <Tabs activeKey={tab} onChange={switchTab} items={tabItems} />
+      <TabGroup
+        value={tab}
+        onChange={switchTab}
+        ariaLabel="模型配置分组"
+        tabs={[
+          {
+            id: 'channels',
+            label: '线路管理',
+            content: (
+              <ChannelManagementTab
+                config={config}
+                snapshot={channels}
+                canWrite={canChannelWrite}
+                canTest={canTest}
+                onReload={load}
+              />
+            ),
+          },
+          {
+            id: 'catalog',
+            label: '可用模型',
+            content: <ModelCatalogTab config={config} snapshot={channels} canTest={canTest} />,
+          },
+          {
+            id: 'routes',
+            label: (
+              <span className="flex items-center gap-1.5">
+                逐能力路由
+                {routeDirty && <Chip variant="caption" color="yellow">未保存</Chip>}
+              </span>
+            ),
+            content: (
+              <RouteSettingsTab config={config} draftState={draftState} canWrite={canWrite} />
+            ),
+          },
+          {
+            id: 'settings',
+            label: (
+              <span className="flex items-center gap-1.5">
+                全局设置
+                {settingsDirty && <Chip variant="caption" color="yellow">未保存</Chip>}
+              </span>
+            ),
+            content: (
+              <GlobalSettingsTab
+                config={config}
+                draftState={draftState}
+                canWrite={canWrite}
+                canTest={canTest}
+              />
+            ),
+          },
+        ]}
+      />
 
       {draftState.dirty && (
-        <Card
-          size="small"
-          style={{
-            position: 'sticky',
-            bottom: 16,
-            zIndex: 10,
-            boxShadow: '0 -2px 12px rgba(23, 26, 43, 0.08)',
-          }}
-          styles={{ body: { padding: '10px 16px' } }}
-        >
-          <Flex justify="space-between" align="center" gap={12} wrap>
-            <Typography.Text type="secondary">
+        <div className="sticky bottom-4 z-10 mt-3 rounded-xl border border-border-table bg-white px-4 py-2.5 shadow-lg">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <span className="text-xs text-text-secondary">
               有 {draftState.changed.length + draftState.clearKeys.length} 项未保存修改
-            </Typography.Text>
-            <Space>
+            </span>
+            <div className="flex items-center gap-2">
               <Button
+                variant="secondary"
+                size="small"
                 disabled={saving}
                 onClick={() => {
                   draftState.reset();
@@ -271,15 +262,20 @@ export function AdminModelConfigPage() {
               >
                 放弃变更
               </Button>
-              <Button type="primary" disabled={saving || !canWrite} onClick={() => setConfirmOpen(true)}>
+              <Button
+                variant="primary"
+                size="small"
+                disabled={saving || !canWrite}
+                onClick={() => setConfirmOpen(true)}
+              >
                 保存变更
               </Button>
-            </Space>
-          </Flex>
-        </Card>
+            </div>
+          </div>
+        </div>
       )}
 
-      <AntConfirm
+      <InlineConfirm
         open={confirmOpen}
         title="确认保存模型配置"
         description="保存后立即生效，无需重启。错误的地址会让模型调用失败，任务会失败并自动退款。"
@@ -293,7 +289,6 @@ export function AdminModelConfigPage() {
         onCancel={() => setConfirmOpen(false)}
         onConfirm={(typed, reason) => void save(typed, reason)}
       />
-      </Flex>
-    </ConfigProvider>
+    </>
   );
 }

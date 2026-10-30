@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useState } from 'react';
-import { App, Button, Input, Select, Table, Upload as AntUpload } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import type { UploadFile } from 'antd';
-import { Download, Upload } from 'lucide-react';
-import { Drawer } from 'antd';
 import { useSearchParams } from 'react-router-dom';
+import { Download, Upload } from 'lucide-react';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
 import { adminReconciliationApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
+import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
+import { Drawer } from '../../admin-ui/primitives/Drawer';
+import { Descriptions } from '../../admin-ui/primitives';
+import { FilePick, SelectBox, TextInput } from '../../admin-ui/controls';
 import {
   AdminListError,
   AdminListLoading,
   AdminStaleError,
   ConfirmAction,
-  adminMiniPagination,
-  adminPagination,
   useAdminList,
   useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
@@ -78,12 +78,15 @@ const DIFF_TONES: Record<ReconciliationDiffType, string> = {
   duplicate: 'warning',
 };
 
+/** 抽屉内差异明细的每页条数。与数据表的分页尺寸选项对齐 */
+const ITEM_PAGE_SIZE = 20;
+
 function yuan(cents: number): string {
   return (cents / 100).toFixed(2);
 }
 
 export function AdminReconciliationPage() {
-  const { message } = App.useApp();
+  const toast = useToast();
   const { can } = useAdmin();
   /** payment.read 可看批次；导入与差异处置需要 finance.reconcile */
   const canReconcile = can('finance.reconcile');
@@ -91,13 +94,13 @@ export function AdminReconciliationPage() {
   const [channel, setChannel] = useState('alipay');
   const [billDate, setBillDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [file, setFile] = useState<File | null>(null);
-  const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [importing, setImporting] = useState(false);
 
   const [detailId, setDetailId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ReconciliationBatchDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [itemPage, setItemPage] = useState(1);
 
   const [resolving, setResolving] = useState<{
     item: ReconciliationItem;
@@ -231,32 +234,33 @@ export function AdminReconciliationPage() {
       setDetail(null);
       return;
     }
+    // 换批次要回到第一页：上一批的页码与这一批的条数无关
+    setItemPage(1);
     void loadDetail(detailId);
   }, [detailId, loadDetail]);
 
   const runImport = async () => {
     if (!file) {
-      void message.warning('请选择渠道账单文件 (CSV)');
+      toast.warning('请选择渠道账单文件 (CSV)');
       return;
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(billDate)) {
-      void message.warning('请选择账单日期');
+      toast.warning('请选择账单日期');
       return;
     }
     setImporting(true);
     try {
       const r = await adminReconciliationApi.importFile(file, channel, billDate);
-      void message.success(
+      toast.success(
         r.batch.diffCount > 0
           ? `导入完成：${r.batch.matchedCount} 笔一致，${r.batch.diffCount} 笔差异待处理`
           : `导入完成：${r.batch.matchedCount} 笔全部一致`,
       );
       setFile(null);
-      setFileList([]);
       reload();
       setDetailId(r.batch.id);
     } catch (e) {
-      void message.error(e instanceof Error ? e.message : '导入失败');
+      toast.error(e instanceof Error ? e.message : '导入失败');
     } finally {
       setImporting(false);
     }
@@ -266,117 +270,119 @@ export function AdminReconciliationPage() {
     if (!resolving) return;
     const trimmed = note.trim();
     if (!trimmed) {
-      void message.warning('请填写处置说明，它对账时是唯一的解释');
+      toast.warning('请填写处置说明，它对账时是唯一的解释');
       return;
     }
     setBusy(true);
     try {
       await adminReconciliationApi.resolve(resolving.item.id, resolving.status, trimmed);
-      void message.success(resolving.status === 'resolved' ? '已标记为处理完成' : '已标记为忽略');
+      toast.success(resolving.status === 'resolved' ? '已标记为处理完成' : '已标记为忽略');
       setResolving(null);
       setNote('');
       if (detailId) void loadDetail(detailId);
       reload();
     } catch (e) {
-      void message.error(e instanceof Error ? e.message : '处置失败');
+      toast.error(e instanceof Error ? e.message : '处置失败');
     } finally {
       setBusy(false);
     }
   };
 
-  const columns: ColumnsType<ReconciliationBatch> = [
+  const exportBatch = (id: string) => {
+    void adminReconciliationApi.exportCsv(id).catch((e: Error) => toast.error(e.message));
+  };
+
+  const columns: Array<AdminColumn<ReconciliationBatch>> = [
     {
-      title: '渠道 / 账单日',
       key: 'channel',
+      title: '渠道 / 账单日',
       width: 160,
-      render: (_: unknown, row) => (
-        <div className="adm-cell-stack">
+      render: (row) => (
+        <div className="flex flex-col gap-0.5">
           <span>{CHANNEL_LABELS[row.channel] ?? row.channel}</span>
-          <span className="adm-cell-sub">{row.billDate}</span>
+          <span className="text-[11px] tabular-nums text-text-tertiary">{row.billDate}</span>
         </div>
       ),
     },
     {
-      title: '账单文件',
       key: 'file',
-      width: 190,
-      render: (_: unknown, row) => (
-        <div className="adm-cell-stack">
-          <span className="adm-cell-sub">{row.fileName ?? '—'}</span>
-          <span className="adm-cell-sub">{new Date(row.createdAt).toLocaleString('zh-CN')}</span>
+      title: '账单文件',
+      width: 200,
+      render: (row) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="max-w-[190px] truncate text-[11px] text-text-secondary" title={row.fileName ?? undefined}>
+            {row.fileName ?? '—'}
+          </span>
+          <span className="text-[11px] text-text-tertiary">
+            {new Date(row.createdAt).toLocaleString('zh-CN')}
+          </span>
         </div>
       ),
     },
     {
-      title: '渠道侧',
       key: 'channelSide',
+      title: '渠道侧',
       width: 140,
-      render: (_: unknown, row) => (
-        <div className="adm-cell-stack">
-          <span>{row.channelCount} 笔</span>
-          <span className="adm-cell-sub">¥ {yuan(row.channelAmountCents)}</span>
+      render: (row) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="tabular-nums">{row.channelCount} 笔</span>
+          <span className="text-[11px] tabular-nums text-text-tertiary">
+            ¥ {yuan(row.channelAmountCents)}
+          </span>
         </div>
       ),
     },
     {
-      title: '本地侧',
       key: 'localSide',
+      title: '本地侧',
       width: 140,
-      render: (_: unknown, row) => (
-        <div className="adm-cell-stack">
-          <span>{row.localCount} 笔</span>
-          <span className="adm-cell-sub">¥ {yuan(row.localAmountCents)}</span>
+      render: (row) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="tabular-nums">{row.localCount} 笔</span>
+          <span className="text-[11px] tabular-nums text-text-tertiary">
+            ¥ {yuan(row.localAmountCents)}
+          </span>
         </div>
       ),
     },
     {
-      title: '一致 / 差异',
       key: 'diff',
+      title: '一致 / 差异',
       width: 130,
-      render: (_: unknown, row) => (
-        <div className="adm-cell-stack">
-          <span>{row.matchedCount} 笔一致</span>
+      render: (row) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="tabular-nums">{row.matchedCount} 笔一致</span>
           {row.diffCount > 0 ? (
-            <span className="adm-cell-sub adm-text-danger">
-              {row.diffCount} 笔差异
-            </span>
+            <span className="text-[11px] tabular-nums text-rose-600">{row.diffCount} 笔差异</span>
           ) : (
-            <span className="adm-cell-sub">无差异</span>
+            <span className="text-[11px] text-text-tertiary">无差异</span>
           )}
         </div>
       ),
     },
     {
-      title: '状态',
-      dataIndex: 'status',
       key: 'status',
+      title: '状态',
       width: 100,
-      render: (v: string) => (
+      render: (row) => (
         <StatusTag
-          status={v === 'resolved' ? 'success' : 'warning'}
-          label={v === 'resolved' ? '已结案' : '待处置'}
+          status={row.status === 'resolved' ? 'success' : 'warning'}
+          label={row.status === 'resolved' ? '已结案' : '待处置'}
         />
       ),
     },
     {
-      title: '',
       key: 'ops',
+      title: '',
       width: 150,
-      render: (_: unknown, row) => (
-        <div className="adm-ops">
-          <Button type="link" className="adm-link" onClick={() => setDetailId(row.id)}>
+      fixed: 'right',
+      render: (row) => (
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="small" onClick={() => setDetailId(row.id)}>
             详情
           </Button>
           {can('data.export') && (
-            <Button
-              type="link"
-              className="adm-link"
-              onClick={() =>
-                void adminReconciliationApi
-                  .exportCsv(row.id)
-                  .catch((e: Error) => message.error(e.message))
-              }
-            >
+            <Button variant="ghost" size="small" onClick={() => exportBatch(row.id)}>
               导出
             </Button>
           )}
@@ -385,55 +391,61 @@ export function AdminReconciliationPage() {
     },
   ];
 
-  const itemColumns: ColumnsType<ReconciliationItem> = [
+  const itemColumns: Array<AdminColumn<ReconciliationItem>> = [
     {
-      title: '渠道交易号',
-      dataIndex: 'tradeNo',
       key: 'tradeNo',
+      title: '渠道交易号',
       width: 190,
-      render: (v: string) => <code>{v}</code>,
+      render: (row) => <code className="font-mono text-xs text-text-secondary">{row.tradeNo}</code>,
     },
     {
-      title: '差异',
-      dataIndex: 'diffType',
       key: 'diffType',
+      title: '差异',
       width: 110,
-      render: (v: ReconciliationDiffType) => <StatusTag status={DIFF_TONES[v]} label={DIFF_LABELS[v]} />,
+      render: (row) => (
+        <StatusTag status={DIFF_TONES[row.diffType]} label={DIFF_LABELS[row.diffType]} />
+      ),
     },
     {
-      title: '渠道 / 本地金额',
       key: 'amount',
+      title: '渠道 / 本地金额',
       width: 150,
-      render: (_: unknown, row) => (
-        <div className="adm-cell-stack">
-          <span>¥ {yuan(row.channelAmountCents)}</span>
-          <span className="adm-cell-sub">本地 ¥ {yuan(row.localAmountCents)}</span>
+      render: (row) => (
+        <div className="flex flex-col gap-0.5">
+          <span className="tabular-nums">¥ {yuan(row.channelAmountCents)}</span>
+          <span className="text-[11px] tabular-nums text-text-tertiary">
+            本地 ¥ {yuan(row.localAmountCents)}
+          </span>
         </div>
       ),
     },
     {
-      title: '处置',
       key: 'status',
-      width: 150,
-      render: (_: unknown, row) => (
-        <div className="adm-cell-stack">
+      title: '处置',
+      width: 180,
+      render: (row) => (
+        <div className="flex flex-col gap-0.5">
           <span>
             {row.status === 'open' ? '待处理' : row.status === 'resolved' ? '已处理' : '已忽略'}
           </span>
-          {row.note && <span className="adm-cell-sub">{row.note}</span>}
+          {row.note && (
+            <span className="max-w-[170px] truncate text-[11px] text-text-tertiary" title={row.note}>
+              {row.note}
+            </span>
+          )}
         </div>
       ),
     },
     {
-      title: '',
       key: 'ops',
-      width: 130,
-      render: (_: unknown, row) =>
-        row.status === 'open' && can('finance.reconcile') ? (
-          <div className="adm-ops">
+      title: '',
+      width: 140,
+      render: (row) =>
+        row.status === 'open' && canReconcile ? (
+          <div className="flex items-center gap-1">
             <Button
-              type="link"
-              className="adm-link"
+              variant="ghost"
+              size="small"
               onClick={() => {
                 setResolving({ item: row, status: 'resolved' });
                 setNote('');
@@ -442,8 +454,8 @@ export function AdminReconciliationPage() {
               标记处理
             </Button>
             <Button
-              type="link"
-              className="adm-link"
+              variant="ghost"
+              size="small"
               onClick={() => {
                 setResolving({ item: row, status: 'ignored' });
                 setNote('');
@@ -455,6 +467,12 @@ export function AdminReconciliationPage() {
         ) : null,
     },
   ];
+
+  const itemRows = detail ? detail.items : [];
+  const pagedItems = itemRows.slice(
+    (itemPage - 1) * ITEM_PAGE_SIZE,
+    itemPage * ITEM_PAGE_SIZE,
+  );
 
   return (
     <>
@@ -471,218 +489,225 @@ export function AdminReconciliationPage() {
             : '当前账号无 finance.reconcile 权限，只能查看批次与差异，不能导入或处置'
         }
       >
-        <FilterBar>
-          <Select
-            className="adm-filter-select"
+        {/* 面板内不再套一层筛选框：FormRow 直接铺开，避免「框套框」 */}
+        <div className="flex flex-wrap items-center gap-2">
+          <SelectBox
+            className="w-32"
+            ariaLabel="渠道"
             value={channel}
-            onChange={setChannel}
+            onChange={(value) => setChannel(value ?? 'alipay')}
             options={CHANNEL_OPTIONS}
             disabled={!canReconcile}
           />
-          <Input
-            className="adm-filter-input"
+          <TextInput
+            className="w-40"
+            ariaLabel="账单日期"
             type="date"
             value={billDate}
-            onChange={(e) => setBillDate(e.target.value)}
+            onChange={setBillDate}
             disabled={!canReconcile}
           />
-          <AntUpload
+          <FilePick
+            file={file}
             accept=".csv,text/csv"
-            maxCount={1}
-            fileList={fileList}
+            label="选择 CSV"
+            hint="尚未选择文件"
             disabled={!canReconcile}
-            beforeUpload={(next) => {
-              setFile(next as File);
-              setFileList([next]);
-              return false;
-            }}
-            onRemove={() => {
-              setFile(null);
-              setFileList([]);
-            }}
-          >
-            <Button icon={<Upload size={14} />} disabled={!canReconcile}>
-              选择 CSV
-            </Button>
-          </AntUpload>
-          <FilterActions>
+            onPick={setFile}
+            onClear={() => setFile(null)}
+          />
+          <div className="ml-auto flex shrink-0 items-center gap-2">
             <Button
-              type="primary"
-              className="adm-btn is-primary"
+              variant="primary"
+              size="small"
+              leadingIcon={Upload}
               disabled={importing || !canReconcile}
               onClick={() => void runImport()}
             >
-              <Upload size={14} style={{ marginRight: 4 }} />
               {importing ? '导入中…' : '导入并比对'}
             </Button>
-          </FilterActions>
-        </FilterBar>
+          </div>
+        </div>
       </Panel>
 
       {/* 刷新失败但手上还有上一次的批次列表: 明说是旧数据, 别让人拿它下处置结论 */}
       {error && data && <AdminStaleError error={error} onRetry={reload} />}
 
-      <Panel title="对账批次" note="批次在全部差异处置完成后自动结案">
-        <FilterBar>
-          <Select
-            className="adm-filter-select"
-            placeholder="全部渠道"
-            allowClear
-            value={filterChannel}
-            onChange={(v) => {
-              setFilterChannel(v);
-              setQuery({ channel: v });
-            }}
-            options={CHANNEL_OPTIONS}
-          />
-          <Select
-            className="adm-filter-select"
-            placeholder="全部状态"
-            allowClear
-            value={filterStatus}
-            onChange={(v) => {
-              setFilterStatus(v);
-              setQuery({ status: v });
-            }}
-            options={[
-              { value: 'imported', label: '待处置' },
-              { value: 'resolved', label: '已结案' },
-            ]}
-          />
-          <Input
-            className="adm-filter-input"
-            type="date"
-            aria-label="账单日开始日期"
-            value={filterFrom}
-            onChange={(e) => {
-              setFilterFrom(e.target.value);
-              setQuery({ from: e.target.value || undefined });
-            }}
-          />
-          <Input
-            className="adm-filter-input"
-            type="date"
-            aria-label="账单日结束日期"
-            value={filterTo}
-            onChange={(e) => {
-              setFilterTo(e.target.value);
-              setQuery({ to: e.target.value || undefined });
-            }}
-          />
-          <FilterActions>
-            <Button type="default" className="adm-btn" onClick={resetBatchFilters}>
-              重置
-            </Button>
-          </FilterActions>
-          <AppliedFilters items={appliedFilters} onClearAll={resetBatchFilters} />
-        </FilterBar>
+      <FilterBar>
+        <SelectBox
+          className="w-32"
+          ariaLabel="按渠道筛选"
+          placeholder="全部渠道"
+          allowClear
+          value={filterChannel}
+          onChange={(value) => {
+            setFilterChannel(value);
+            setQuery({ channel: value });
+          }}
+          options={CHANNEL_OPTIONS}
+        />
+        <SelectBox
+          className="w-32"
+          ariaLabel="按状态筛选"
+          placeholder="全部状态"
+          allowClear
+          value={filterStatus}
+          onChange={(value) => {
+            setFilterStatus(value as 'imported' | 'resolved' | undefined);
+            setQuery({ status: value });
+          }}
+          options={[
+            { value: 'imported', label: '待处置' },
+            { value: 'resolved', label: '已结案' },
+          ]}
+        />
+        <TextInput
+          className="w-40"
+          ariaLabel="账单日开始日期"
+          type="date"
+          value={filterFrom}
+          onChange={(value) => {
+            setFilterFrom(value);
+            setQuery({ from: value || undefined });
+          }}
+        />
+        <TextInput
+          className="w-40"
+          ariaLabel="账单日结束日期"
+          type="date"
+          value={filterTo}
+          onChange={(value) => {
+            setFilterTo(value);
+            setQuery({ to: value || undefined });
+          }}
+        />
+        <FilterActions>
+          <Button variant="secondary" size="small" onClick={resetBatchFilters}>
+            重置
+          </Button>
+        </FilterActions>
+        <AppliedFilters items={appliedFilters} onClearAll={resetBatchFilters} />
+      </FilterBar>
 
-        {loading && !data ? (
-          <AdminListLoading tip="加载对账批次…" />
-        ) : error && !data ? (
-          <AdminListError error={error} onRetry={reload} />
-        ) : (data?.items.length ?? 0) === 0 ? (
-          <AdminEmpty
-            description={
-              hasBatchFilter
-                ? '当前筛选下没有对账批次。'
-                : '还没有对账记录。导入一份渠道账单开始核对。'
-            }
-            action={
-              hasBatchFilter ? (
-                <Button type="default" className="adm-btn" onClick={resetBatchFilters}>
-                  清除筛选
-                </Button>
-              ) : undefined
-            }
-          />
-        ) : (
-          <Table<ReconciliationBatch>
-            rowKey="id"
-            size="small"
-            columns={columns}
-            dataSource={data?.items ?? []}
-            loading={loading}
-            scroll={{ x: 1000 }}
-            pagination={adminPagination({
-              current: (params.page as number) || 1,
-              pageSize: (params.pageSize as number) || 20,
-              total: data?.total ?? 0,
-              onChange: setPage,
-            })}
-          />
-        )}
+      <Panel title="对账批次" note="批次在全部差异处置完成后自动结案">
+        <AdminDataTable<ReconciliationBatch>
+          rows={data?.items ?? []}
+          columns={columns}
+          rowKey={(row) => row.id}
+          loading={loading}
+          error={error}
+          onRetry={reload}
+          minWidth={1010}
+          pagination={{
+            current: (params.page as number) || 1,
+            pageSize: (params.pageSize as number) || 20,
+            total: data?.total ?? 0,
+            unit: '个批次',
+            onChange: setPage,
+          }}
+          emptyText={
+            hasBatchFilter
+              ? '当前筛选下没有对账批次。'
+              : '还没有对账记录。导入一份渠道账单开始核对。'
+          }
+          emptyAction={
+            hasBatchFilter ? (
+              <Button variant="secondary" size="small" onClick={resetBatchFilters}>
+                清除筛选
+              </Button>
+            ) : undefined
+          }
+        />
       </Panel>
 
       <Drawer
-        title="对账明细"
-        size={880}
         open={detailId !== null}
-        onClose={() => setDetailId(null)}
-        className="adm-drawer"
-        destroyOnHidden
+        onOpenChange={(next) => {
+          if (!next) setDetailId(null);
+        }}
+        width={880}
+        title="对账明细"
+        description={detail ? `${CHANNEL_LABELS[detail.batch.channel] ?? detail.batch.channel} · ${detail.batch.billDate}` : undefined}
+        footer={
+          detail && can('data.export') ? (
+            <Button
+              variant="secondary"
+              size="small"
+              leadingIcon={Download}
+              onClick={() => exportBatch(detail.batch.id)}
+            >
+              导出差异清单
+            </Button>
+          ) : undefined
+        }
       >
         {detailLoading ? (
           <AdminListLoading tip="加载明细…" />
         ) : detailError ? (
           <AdminListError
             error={detailError}
-            onRetry={() => detailId && void loadDetail(detailId)}
+            onRetry={() => {
+              if (detailId) void loadDetail(detailId);
+            }}
           />
         ) : detail ? (
-          <>
-            <dl className="adm-desc">
-              <dt>渠道</dt>
-              <dd>{CHANNEL_LABELS[detail.batch.channel] ?? detail.batch.channel}</dd>
-              <dt>账单日</dt>
-              <dd>{detail.batch.billDate}</dd>
-              <dt>渠道合计</dt>
-              <dd>
-                {detail.batch.channelCount} 笔 · ¥ {yuan(detail.batch.channelAmountCents)}
-              </dd>
-              <dt>本地合计</dt>
-              <dd>
-                {detail.batch.localCount} 笔 · ¥ {yuan(detail.batch.localAmountCents)}
-              </dd>
-              <dt>差额</dt>
-              <dd>
-                ¥ {yuan(detail.batch.channelAmountCents - detail.batch.localAmountCents)}
-                {detail.batch.diffCount > 0 && (
-                  <span className="adm-cell-sub"> · {detail.batch.diffCount} 笔差异待处置</span>
-                )}
-              </dd>
-            </dl>
+          <div className="flex flex-col gap-5">
+            <Descriptions
+              columns={2}
+              items={[
+                {
+                  label: '渠道合计',
+                  value: (
+                    <span className="tabular-nums">
+                      {detail.batch.channelCount} 笔 · ¥ {yuan(detail.batch.channelAmountCents)}
+                    </span>
+                  ),
+                },
+                {
+                  label: '本地合计',
+                  value: (
+                    <span className="tabular-nums">
+                      {detail.batch.localCount} 笔 · ¥ {yuan(detail.batch.localAmountCents)}
+                    </span>
+                  ),
+                },
+                {
+                  label: '差额',
+                  value: (
+                    <span className="tabular-nums">
+                      ¥ {yuan(detail.batch.channelAmountCents - detail.batch.localAmountCents)}
+                      {detail.batch.diffCount > 0 && (
+                        <span className="text-[11px] text-text-tertiary">
+                          {' '}
+                          · {detail.batch.diffCount} 笔差异待处置
+                        </span>
+                      )}
+                    </span>
+                  ),
+                },
+              ]}
+            />
 
-            <div className="adm-section">
-              <div className="adm-section-title">
-                差异明细
-                <span className="adm-panel-note">一致的行默认已标记处理</span>
+            <section>
+              <div className="mb-2 flex items-baseline gap-2 border-b border-border-table pb-1.5">
+                <strong className="text-xs font-semibold text-text-primary">差异明细</strong>
+                <span className="text-[11px] text-text-tertiary">一致的行默认已标记处理</span>
               </div>
-              <Table<ReconciliationItem>
-                rowKey="id"
-                size="small"
+              <AdminDataTable<ReconciliationItem>
+                rows={pagedItems}
                 columns={itemColumns}
-                dataSource={detail.items}
-                pagination={adminMiniPagination()}
-                scroll={{ x: 730 }}
+                rowKey={(row) => row.id}
+                minWidth={770}
+                pagination={{
+                  current: itemPage,
+                  pageSize: ITEM_PAGE_SIZE,
+                  total: itemRows.length,
+                  onChange: (next) => setItemPage(next),
+                }}
+                emptyText="这一批没有差异行"
               />
-            </div>
-
-            {can('data.export') && (
-              <Button
-                type="default"
-                className="adm-btn"
-                onClick={() =>
-                  void adminReconciliationApi
-                    .exportCsv(detail.batch.id)
-                    .catch((e: Error) => message.error(e.message))
-                }
-              >
-                <Download size={14} style={{ marginRight: 4 }} />
-                导出差异清单
-              </Button>
-            )}
-          </>
+            </section>
+          </div>
         ) : (
           <AdminEmpty description="没有可展示的对账明细。" />
         )}
@@ -702,8 +727,8 @@ export function AdminReconciliationPage() {
               <p>
                 该操作只改变差异行的状态，<b>不会修改任何金额或订单</b>。若需要补单或退款，请到订单管理执行。
               </p>
-              <p className="adm-cell-sub">
-                交易号 <code>{resolving.item.tradeNo}</code> ·{' '}
+              <p className="text-[11px] text-text-tertiary">
+                交易号 <code className="font-mono">{resolving.item.tradeNo}</code> ·{' '}
                 {DIFF_LABELS[resolving.item.diffType]} · 渠道 ¥{' '}
                 {yuan(resolving.item.channelAmountCents)} / 本地 ¥{' '}
                 {yuan(resolving.item.localAmountCents)}
@@ -716,20 +741,18 @@ export function AdminReconciliationPage() {
             '写操作审计（含操作人）',
           ]}
           extra={
-            <div className="adm-confirm-typing">
-              <label htmlFor="adm-recon-note">处置说明（强制，写入审计）：</label>
-              <Input
-                id="adm-recon-note"
-                type="text"
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs text-text-secondary">处置说明（强制，写入审计）：</span>
+              <TextInput
+                ariaLabel="处置说明"
                 value={note}
-                onChange={(e) => setNote(e.target.value)}
+                onChange={setNote}
                 placeholder={
                   resolving.status === 'resolved'
                     ? '如：已在订单模块补单，订单号 xxx'
                     : '如：渠道侧重复推送，本地仅一笔'
                 }
                 maxLength={300}
-                autoComplete="off"
               />
             </div>
           }

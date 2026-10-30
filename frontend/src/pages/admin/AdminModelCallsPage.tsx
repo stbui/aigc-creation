@@ -1,28 +1,28 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { App, Button, Select, Table } from 'antd';
-import type { ColumnsType } from 'antd/es/table';
 import { Download } from 'lucide-react';
+import { Button } from '../../vendor/boardui/components/base/buttons/button';
 import { adminModelApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
+import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
+import { Descriptions } from '../../admin-ui/primitives';
+import { SelectBox } from '../../admin-ui/controls';
 import {
   AdminDrawer,
-  AdminListError,
   AdminStaleError,
-  AdminListLoading,
-  adminPagination,
   useAdminDetailParam,
   useAdminList,
   useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
 import {
-  AdminEmpty,
   AppliedFilters,
   FilterActions,
   FilterBar,
   PageHeader,
   Panel,
   StatCard,
+  StatusTag,
   type AppliedFilter,
 } from '../../components/admin/PageHeader';
 import { adminTaskHref } from '../../lib/admin-links';
@@ -31,10 +31,13 @@ import type { AdminModelCall, AdminModelCallListResult } from '../../types/api';
 type Row = AdminModelCall;
 
 /**
- * 模型调用记录 (只读)。
+ * 模型调用记录（BoardUI，只读）。
  *
  * 与「操作审计」页的分工: 审计记「谁在后台做了什么」,本页记「生成链路每次调模型的明细」。
  * 排障时先看本页的统计卡判断是通道问题还是业务问题, 再下钻到流水看单次明细。
+ *
+ * 本次改造只换渲染层：筛选的草稿 / 已生效两态、URL 同步、导出同口径、抽屉详情
+ * 逐条保留。
  */
 
 /** 路由/通道 → 中文。未登记的原样显示, 便于发现未文档化的取值 */
@@ -62,8 +65,25 @@ function fmtBytes(n: number): string {
   return `${(n / 1024 / 1024).toFixed(2)}MB`;
 }
 
+function Mono({ children }: { children: ReactNode }) {
+  return <code className="font-mono text-[11px] text-text-secondary">{children}</code>;
+}
+
+/** 抽屉内的分区：标题 + 发丝线，不用卡片套卡片 */
+function Section({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
+  return (
+    <section className="border-t border-border-table pt-3 first:border-t-0 first:pt-0 [&+&]:mt-3">
+      <h3 className="mb-2 flex items-baseline gap-2 text-xs font-semibold text-text-primary">
+        {title}
+        {note && <span className="text-[11px] font-normal text-text-placeholder">{note}</span>}
+      </h3>
+      {children}
+    </section>
+  );
+}
+
 export function AdminModelCallsPage() {
-  const { message } = App.useApp();
+  const toast = useToast();
   const { can } = useAdmin();
   // 深链/刷新后保留筛选: 排障时经常需要把「这批失败调用」的链接发给同事。
   // 初始值同时喂给 useAdminList, 首次请求即带筛选, 不白跑一次全量查询。
@@ -196,97 +216,99 @@ export function AdminModelCallsPage() {
         success: params.success as boolean | undefined,
         fallback: params.fallback as boolean | undefined,
       });
-      void message.success('导出已开始下载');
+      toast.success('导出已开始下载');
     } catch (e) {
-      void message.error(e instanceof Error ? e.message : '导出失败');
+      toast.error(e instanceof Error ? e.message : '导出失败');
     } finally {
       setExporting(false);
     }
   };
 
-  const columns: ColumnsType<Row> = useMemo(
+  const columns: Array<AdminColumn<Row>> = useMemo(
     () => [
       {
-        title: '时间',
-        dataIndex: 'createdAt',
         key: 'createdAt',
+        title: '时间',
         width: 160,
-        render: (v: string) => new Date(v).toLocaleString('zh-CN'),
+        render: (row) => new Date(row.createdAt).toLocaleString('zh-CN'),
       },
       {
-        title: '能力',
-        dataIndex: 'capability',
         key: 'capability',
+        title: '能力',
         width: 130,
-        render: (v: string) => <code>{v}</code>,
+        render: (row) => <Mono>{row.capability}</Mono>,
       },
       {
-        title: '路由',
-        dataIndex: 'route',
         key: 'route',
-        width: 90,
-        render: (v: string) => ROUTE_LABELS[v] ?? v,
+        title: '路由',
+        width: 110,
+        render: (row) => ROUTE_LABELS[row.route] ?? row.route,
       },
       {
-        title: '实际通道',
-        dataIndex: 'source',
         key: 'source',
-        width: 120,
-        render: (v: string, row) => (
-          <div className="adm-cell-stack">
-            <span className={`adm-tag ${v === 'gateway' ? 'is-success' : 'is-muted'}`}>
-              {SOURCE_LABELS[v] ?? v}
-            </span>
-            {row.fallback && <span className="adm-tag is-danger">历史回落</span>}
+        title: '实际通道',
+        width: 140,
+        render: (row) => (
+          <div className="flex flex-wrap items-center gap-1">
+            <StatusTag
+              status="source"
+              tone={row.source === 'gateway' ? 'success' : 'muted'}
+              label={SOURCE_LABELS[row.source] ?? row.source}
+            />
+            {row.fallback && <StatusTag status="fallback" tone="danger" label="历史回落" />}
           </div>
         ),
       },
       {
-        title: '模型',
-        dataIndex: 'model',
         key: 'model',
-        width: 130,
-        render: (v: string | null) => (v ? <code>{v}</code> : <span className="adm-cell-sub">—</span>),
+        title: '模型',
+        width: 140,
+        render: (row) =>
+          row.model ? <Mono>{row.model}</Mono> : <span className="text-text-placeholder">—</span>,
       },
       {
-        title: '耗时',
-        dataIndex: 'durationMs',
         key: 'durationMs',
+        title: '耗时',
         width: 90,
-        render: (v: number) => fmtDuration(v),
+        align: 'right',
+        render: (row) => <span className="tabular-nums">{fmtDuration(row.durationMs)}</span>,
       },
       {
-        title: '产出',
         key: 'output',
+        title: '产出',
         width: 130,
-        render: (_: unknown, row) => (
-          <div className="adm-cell-stack">
-            <span>{row.width && row.height ? `${row.width}×${row.height}` : '—'}</span>
-            <span className="adm-cell-sub">{fmtBytes(row.outputBytes)}</span>
+        render: (row) => (
+          <div>
+            <div className="tabular-nums">
+              {row.width && row.height ? `${row.width}×${row.height}` : '—'}
+            </div>
+            <div className="text-[11px] text-text-tertiary">{fmtBytes(row.outputBytes)}</div>
           </div>
         ),
       },
       {
-        title: '结果',
-        dataIndex: 'success',
         key: 'success',
+        title: '结果',
         width: 70,
-        render: (ok: boolean) => (
-          <span className={`adm-tag ${ok ? 'is-success' : 'is-danger'}`}>{ok ? '成功' : '失败'}</span>
+        render: (row) => (
+          <StatusTag
+            status={row.success ? 'succeeded' : 'failed'}
+            label={row.success ? '成功' : '失败'}
+          />
         ),
       },
       {
-        title: '',
         key: 'detail',
+        title: '',
         width: 60,
-        render: (_: unknown, row) => (
-          <Button type="link" className="adm-link" onClick={() => setDetailId(row.id)}>
+        render: (row) => (
+          <Button variant="ghost" size="small" onClick={() => setDetailId(row.id)}>
             详情
           </Button>
         ),
       },
     ],
-    [],
+    [setDetailId],
   );
 
   const detailFetcher = useCallback(async () => {
@@ -305,12 +327,12 @@ export function AdminModelCallsPage() {
         actions={
           can('data.export') ? (
             <Button
-              type="default"
-              className="adm-btn"
-              loading={exporting}
+              variant="secondary"
+              size="small"
+              leadingIcon={Download}
+              disabled={exporting}
               onClick={() => void exportCsv()}
             >
-              <Download size={14} style={{ marginRight: 4 }} />
               {exporting ? '导出中…' : '导出 CSV'}
             </Button>
           ) : undefined
@@ -318,7 +340,7 @@ export function AdminModelCallsPage() {
       />
 
       {/* 统计卡: 单看流水要看上百行, 而运营真正想问的是这几个数 */}
-      <div className="adm-stat-grid">
+      <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-5">
         <StatCard label="调用总数" value={stats?.total ?? '—'} hint="当前筛选条件下" />
         <StatCard
           label="成功率"
@@ -328,7 +350,9 @@ export function AdminModelCallsPage() {
         />
         <StatCard
           label="真实模型占比"
-          value={stats?.total ? `${Math.round(((stats?.gatewayCount ?? 0) / stats.total) * 100)}%` : '—'}
+          value={
+            stats?.total ? `${Math.round(((stats?.gatewayCount ?? 0) / stats.total) * 100)}%` : '—'
+          }
           hint={`远程 ${stats?.gatewayCount ?? 0} · 历史本地 ${stats?.localCount ?? 0}`}
           tone={stats?.gatewayCount === 0 ? 'warn' : undefined}
         />
@@ -350,18 +374,18 @@ export function AdminModelCallsPage() {
       </div>
 
       <FilterBar>
-        <Select
-          className="adm-filter-select"
+        <SelectBox
+          className="w-44"
+          ariaLabel="按能力筛选"
           placeholder="能力"
           options={capOptions}
           value={capability}
           onChange={setCapability}
           allowClear
-          showSearch
-          optionFilterProp="label"
         />
-        <Select
-          className="adm-filter-select"
+        <SelectBox
+          className="w-40"
+          ariaLabel="按通道筛选"
           placeholder="通道"
           options={[
             { value: 'gateway', label: '真实模型' },
@@ -371,8 +395,9 @@ export function AdminModelCallsPage() {
           onChange={setSource}
           allowClear
         />
-        <Select
-          className="adm-filter-select"
+        <SelectBox
+          className="w-28"
+          ariaLabel="按结果筛选"
           placeholder="结果"
           options={[
             { value: 'true', label: '成功' },
@@ -382,8 +407,9 @@ export function AdminModelCallsPage() {
           onChange={setSuccess}
           allowClear
         />
-        <Select
-          className="adm-filter-select"
+        <SelectBox
+          className="w-32"
+          ariaLabel="按历史回落筛选"
           placeholder="历史回落"
           options={[
             { value: 'true', label: '已回落' },
@@ -395,8 +421,8 @@ export function AdminModelCallsPage() {
         />
         <FilterActions>
           <Button
-            type="primary"
-            className="adm-btn is-primary"
+            variant="primary"
+            size="small"
             onClick={() =>
               setQuery({
                 capability,
@@ -408,7 +434,7 @@ export function AdminModelCallsPage() {
           >
             查询
           </Button>
-          <Button type="default" className="adm-btn" onClick={reset}>
+          <Button variant="secondary" size="small" onClick={reset}>
             重置
           </Button>
         </FilterActions>
@@ -419,41 +445,33 @@ export function AdminModelCallsPage() {
       {error && data && <AdminStaleError error={error} onRetry={reload} />}
 
       <Panel>
-        {loading && !data ? (
-          <AdminListLoading tip="加载调用记录…" />
-        ) : error && !data ? (
-          <AdminListError error={error} onRetry={reload} />
-        ) : (list?.items.length ?? 0) === 0 ? (
-          <AdminEmpty
-            description={
-              hasFilter
-                ? '没有符合条件的调用记录。清除筛选后再试。'
-                : '暂无调用记录。在前台任意生成一次（如下「自由创作」页），这里就会出现明细。'
-            }
-            action={
-              hasFilter ? (
-                <Button type="default" className="adm-btn" onClick={reset}>
-                  清除筛选
-                </Button>
-              ) : undefined
-            }
-          />
-        ) : (
-          <Table<Row>
-            rowKey="id"
-            size="small"
-            columns={columns}
-            dataSource={list?.items ?? []}
-            loading={loading}
-            scroll={{ x: 1080 }}
-            pagination={adminPagination({
-              current: list?.page ?? 1,
-              pageSize: list?.pageSize ?? 20,
-              total: list?.total ?? 0,
-              onChange: setPage,
-            })}
-          />
-        )}
+        <AdminDataTable<Row>
+          rows={list?.items ?? []}
+          columns={columns}
+          rowKey={(row) => row.id}
+          loading={loading}
+          error={error}
+          onRetry={reload}
+          minWidth={1080}
+          emptyText={
+            hasFilter
+              ? '没有符合条件的调用记录。清除筛选后再试。'
+              : '暂无调用记录。在前台任意生成一次（如下「自由创作」页），这里就会出现明细。'
+          }
+          emptyAction={
+            hasFilter ? (
+              <Button variant="secondary" size="small" onClick={reset}>
+                清除筛选
+              </Button>
+            ) : undefined
+          }
+          pagination={{
+            current: list?.page ?? 1,
+            pageSize: list?.pageSize ?? 20,
+            total: list?.total ?? 0,
+            onChange: setPage,
+          }}
+        />
       </Panel>
 
       <AdminDrawer<Row>
@@ -464,68 +482,80 @@ export function AdminModelCallsPage() {
       >
         {(row) => (
           <>
-            <div className="adm-section">
-              <div className="adm-section-title">调用概要</div>
-              <dl className="adm-desc">
-                <dt>时间</dt>
-                <dd>{new Date(row.createdAt).toLocaleString('zh-CN')}</dd>
-                <dt>能力</dt>
-                <dd>
-                  <code>{row.capability}</code>
-                </dd>
-                <dt>路由决策</dt>
-                <dd>{ROUTE_LABELS[row.route] ?? row.route}</dd>
-                <dt>实际通道</dt>
-                <dd>
-                  {SOURCE_LABELS[row.source] ?? row.source}
-                  {row.fallback && <span className="adm-tag is-danger">历史回落</span>}
-                </dd>
-                <dt>模型</dt>
-                <dd>{row.model ? <code>{row.model}</code> : '—'}</dd>
-                <dt>耗时</dt>
-                <dd>{fmtDuration(row.durationMs)}</dd>
-                <dt>产出</dt>
-                <dd>
-                  {row.width && row.height ? `${row.width}×${row.height}` : '—'} ·{' '}
-                  {fmtBytes(row.outputBytes)}
-                </dd>
-                <dt>结果</dt>
-                <dd>
-                  <span className={`adm-tag ${row.success ? 'is-success' : 'is-danger'}`}>
-                    {row.success ? '成功' : '失败'}
-                  </span>
-                  {row.errorCode && <code className="adm-cell-sub"> {row.errorCode}</code>}
-                </dd>
-                {row.taskId && (
-                  <>
-                    <dt>网关任务</dt>
-                    <dd>
-                      <Link className="adm-link" to={adminTaskHref(row.taskId)}>
-                        <code>{row.taskId}</code>
-                      </Link>
-                    </dd>
-                  </>
-                )}
-              </dl>
-            </div>
+            <Section title="调用概要">
+              <Descriptions
+                columns={2}
+                items={[
+                  { label: '时间', value: new Date(row.createdAt).toLocaleString('zh-CN') },
+                  { label: '能力', value: <Mono>{row.capability}</Mono> },
+                  { label: '路由决策', value: ROUTE_LABELS[row.route] ?? row.route },
+                  {
+                    label: '实际通道',
+                    value: (
+                      <span className="inline-flex flex-wrap items-center gap-1">
+                        {SOURCE_LABELS[row.source] ?? row.source}
+                        {row.fallback && (
+                          <StatusTag status="fallback" tone="danger" label="历史回落" />
+                        )}
+                      </span>
+                    ),
+                  },
+                  { label: '模型', value: row.model ? <Mono>{row.model}</Mono> : '—' },
+                  { label: '耗时', value: <span className="tabular-nums">{fmtDuration(row.durationMs)}</span> },
+                  {
+                    label: '产出',
+                    value: (
+                      <>
+                        {row.width && row.height ? `${row.width}×${row.height}` : '—'} ·{' '}
+                        {fmtBytes(row.outputBytes)}
+                      </>
+                    ),
+                  },
+                  {
+                    label: '结果',
+                    value: (
+                      <span className="inline-flex flex-wrap items-center gap-1.5">
+                        <StatusTag
+                          status={row.success ? 'succeeded' : 'failed'}
+                          label={row.success ? '成功' : '失败'}
+                        />
+                        {row.errorCode && <Mono>{row.errorCode}</Mono>}
+                      </span>
+                    ),
+                  },
+                  ...(row.taskId
+                    ? [
+                        {
+                          label: '网关任务',
+                          value: (
+                            <Link
+                              className="text-accent-600 hover:underline"
+                              to={adminTaskHref(row.taskId)}
+                            >
+                              <Mono>{row.taskId}</Mono>
+                            </Link>
+                          ),
+                        },
+                      ]
+                    : []),
+                ]}
+              />
+            </Section>
 
             {row.reason && (
-              <div className="adm-section">
-                <div className="adm-section-title">
-                  {row.fallback ? '历史回落原因' : '备注'}
+              <Section title={row.fallback ? '历史回落原因' : '备注'}>
+                <div className="rounded-lg border border-border-table bg-amber-50/60 px-2.5 py-2 text-xs text-text-primary">
+                  {row.reason}
                 </div>
-                <div className="adm-reason-box">{row.reason}</div>
-              </div>
+              </Section>
             )}
 
             {row.prompt && (
-              <div className="adm-section">
-                <div className="adm-section-title">
-                  送出提示词
-                  <span className="adm-panel-note">超长内容已截断，完整参数见生成任务记录</span>
-                </div>
-                <pre className="adm-pre">{row.prompt}</pre>
-              </div>
+              <Section title="送出提示词" note="超长内容已截断，完整参数见生成任务记录">
+                <pre className="max-h-[360px] overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border-table bg-background-secondary-default px-2.5 py-2 font-mono text-[11px] leading-5 text-text-secondary">
+                  {row.prompt}
+                </pre>
+              </Section>
             )}
           </>
         )}

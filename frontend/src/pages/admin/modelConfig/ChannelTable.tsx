@@ -1,5 +1,9 @@
-import { Button, Flex, Popover, Space, Table, Tag, Tooltip, Typography } from 'antd';
+import { Chip } from '../../../vendor/boardui/components/base/badges/chip';
+import { Button } from '../../../vendor/boardui/components/base/buttons/button';
 import { ArrowDown, ArrowUp } from 'lucide-react';
+import { AdminDataTable, type AdminColumn } from '../../../admin-ui/primitives/DataTable';
+import { HoverTip } from '../../../admin-ui/controls';
+import { TONE_CHIP_COLOR } from '../../../components/admin/statusMeta';
 import type { AdminModelChannelRecord, VendorPreset } from '../../../types/api';
 import {
   fmtLatency,
@@ -8,12 +12,11 @@ import {
   hostOf,
   matchVendor,
   readCachedTest,
-  tagColor,
   vendorDisplayLabel,
 } from './meta';
 
 /**
- * 单模态线路表（antd Table）。
+ * 单模态线路表。
  *
  * 服务商并入「线路」副行，去掉「最近更新」列，把宽度留给模型与操作。
  */
@@ -42,23 +45,22 @@ export function ChannelTable({
   onDelete: (ch: AdminModelChannelRecord) => void;
   onMaterialize: (ch: AdminModelChannelRecord) => void;
 }) {
-  const columns = [
+  const columns: Array<AdminColumn<AdminModelChannelRecord>> = [
     {
-      title: '线路',
-      dataIndex: 'name',
       key: 'name',
+      title: '线路',
       width: 260,
-      render: (_: unknown, ch: AdminModelChannelRecord) => {
+      render: (ch) => {
         const health = healthMeta(ch);
         const vendor = matchVendor(ch, vendors);
         const vendorLabel = vendor ? vendorDisplayLabel(vendor.label) : '自定义';
         return (
-          <Flex vertical gap={2}>
-            <Space size={6} wrap>
+          <div className="flex flex-col gap-1">
+            <div className="flex flex-wrap items-center gap-1.5">
               <Button
-                type="link"
-                size="small"
-                style={{ padding: 0, fontWeight: 600 }}
+                variant="ghost"
+                size="xs"
+                className="!px-0 font-semibold text-text-primary"
                 onClick={() => onEdit(ch)}
                 disabled={ch.synthetic}
                 title={ch.synthetic ? '旧版配置需先转为可管理线路' : '编辑线路'}
@@ -66,216 +68,212 @@ export function ChannelTable({
                 {ch.name}
               </Button>
               {ch.synthetic && (
-                <Tag color="warning" variant="filled">
+                <Chip variant="caption" color="yellow">
                   旧版配置
-                </Tag>
+                </Chip>
               )}
               {!ch.enabled && (
-                <Tag variant="filled" color="default">
+                <Chip variant="caption" color="neutral">
                   已停用
-                </Tag>
+                </Chip>
               )}
               {!ch.protocolKnown && (
-                <Tooltip title="该协议在本项目尚未实现，启用后调用会失败">
-                  <Tag color="error" variant="filled">
+                <HoverTip tip="该协议在本项目尚未实现，启用后调用会失败">
+                  <Chip variant="caption" color="rose">
                     协议未接入
-                  </Tag>
-                </Tooltip>
+                  </Chip>
+                </HoverTip>
               )}
-              {health.tone === 'is-danger' && (
-                <Tooltip title={health.hint}>
-                  <Tag color="error" variant="filled">
+              {health.tone === 'danger' && (
+                <HoverTip tip={health.hint}>
+                  <Chip variant="caption" color="rose">
                     冷却中
-                  </Tag>
-                </Tooltip>
+                  </Chip>
+                </HoverTip>
               )}
-            </Space>
-            <Space size={4}>
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                {vendorLabel}
-              </Typography.Text>
-              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                ·
-              </Typography.Text>
-              <Typography.Text code style={{ fontSize: 11 }}>
-                {ch.protocol}
-              </Typography.Text>
-            </Space>
-          </Flex>
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-text-tertiary">
+              <span>{vendorLabel}</span>
+              <span aria-hidden>·</span>
+              <code className="font-mono text-[11px]">{ch.protocol}</code>
+            </div>
+          </div>
         );
       },
     },
     {
-      title: '默认模型',
-      dataIndex: 'model',
       key: 'model',
+      title: '默认模型',
       width: 240,
       /*
        * 除了「这条线路用哪个模型」，还要回答「这家厂商还有哪些模型可选」——
        * 运营配下一跳或换模型时不必再点开编辑抽屉逐个找。
        */
-      render: (v: string, ch: AdminModelChannelRecord) => {
+      render: (ch) => {
         const vendor = matchVendor(ch, vendors);
         const models = vendor?.models ?? [];
         const others = models.filter((m) => m.id !== ch.model);
+        if (!ch.model) {
+          return <span className="text-xs text-text-tertiary">按协议默认</span>;
+        }
         return (
-          <Flex vertical gap={2}>
-            {v ? (
-              <Tooltip title={v}>
-                <Typography.Text code style={{ fontSize: 12 }}>
-                  {v}
-                </Typography.Text>
-              </Tooltip>
-            ) : (
-              <Typography.Text type="secondary">按协议默认</Typography.Text>
-            )}
+          <div className="flex flex-col gap-1">
+            <HoverTip tip={ch.model}>
+              <code className="font-mono text-xs">{ch.model}</code>
+            </HoverTip>
             {vendor && models.length > 0 && (
-              <Popover
-                trigger="click"
-                placement="bottomLeft"
-                title={`${vendorDisplayLabel(vendor.label)} · 可选模型（${models.length}）`}
-                content={
-                  <Flex vertical gap={6} style={{ maxWidth: 380 }}>
+              <details className="group">
+                <summary className="cursor-pointer list-none text-[11px] text-accent-700 hover:underline">
+                  {others.length > 0 ? `另有 ${others.length} 个可选模型` : '查看该厂商模型'}
+                </summary>
+                <div className="mt-1.5 max-w-[380px] rounded-lg border border-border-table bg-white p-2 shadow-lg">
+                  <p className="mb-1 text-[11px] font-medium text-text-secondary">
+                    {vendorDisplayLabel(vendor.label)} · 可选模型（{models.length}）
+                  </p>
+                  <ul className="flex flex-col gap-1.5">
                     {models.map((m) => (
-                      <Flex key={m.id} vertical gap={0}>
-                        <Space size={6} wrap>
-                          <Typography.Text strong style={{ fontSize: 12 }}>
-                            {m.label}
-                          </Typography.Text>
+                      <li key={m.id} className="flex flex-col gap-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-medium text-text-primary">{m.label}</span>
                           {m.id === ch.model && (
-                            <Tag color="purple" variant="filled" style={{ marginInlineEnd: 0 }}>
+                            <Chip variant="caption" color="purple">
                               当前
-                            </Tag>
+                            </Chip>
                           )}
-                        </Space>
-                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        </div>
+                        <span className="text-[11px] text-text-tertiary">
                           {m.id}
                           {m.note ? ` · ${m.note}` : ''}
-                        </Typography.Text>
-                      </Flex>
+                        </span>
+                      </li>
                     ))}
-                  </Flex>
-                }
-              >
-                <Typography.Link style={{ fontSize: 11 }}>
-                  {others.length > 0 ? `另有 ${others.length} 个可选模型` : '查看该厂商模型'}
-                </Typography.Link>
-              </Popover>
+                  </ul>
+                </div>
+              </details>
             )}
-          </Flex>
+          </div>
         );
       },
     },
     {
-      title: '接入地址',
-      dataIndex: 'baseUrl',
       key: 'baseUrl',
+      title: '接入地址',
       width: 170,
-      render: (v: string) =>
-        v ? (
-          <Tooltip title={v}>
-            <Typography.Text code style={{ fontSize: 12 }}>
-              {hostOf(v)}
-            </Typography.Text>
-          </Tooltip>
+      cellTitle: (ch) => ch.baseUrl,
+      render: (ch) =>
+        ch.baseUrl ? (
+          <HoverTip tip={ch.baseUrl}>
+            <code className="font-mono text-xs">{hostOf(ch.baseUrl)}</code>
+          </HoverTip>
         ) : (
-          <Typography.Text type="secondary">未填写</Typography.Text>
+          <span className="text-xs text-text-tertiary">未填写</span>
         ),
     },
     {
-      title: '健康',
       key: 'health',
+      title: '健康',
       width: 180,
-      render: (_: unknown, ch: AdminModelChannelRecord) => {
+      render: (ch) => {
         const health = healthMeta(ch);
         const cached = testNonce >= 0 && !ch.synthetic ? readCachedTest(ch.id, ch.updatedAt) : null;
         return (
-          <Flex vertical gap={2}>
-            <Tooltip title={health.hint}>
-              <Tag color={tagColor(health.tone)} variant="filled" style={{ width: 'fit-content' }}>
+          <div className="flex flex-col gap-1">
+            <HoverTip tip={health.hint}>
+              <Chip variant="caption" color={TONE_CHIP_COLOR[health.tone]}>
                 {health.label}
-              </Tag>
-            </Tooltip>
+              </Chip>
+            </HoverTip>
             {cached && (
-              <Typography.Text
-                type={cached.result.ok ? 'success' : 'danger'}
-                style={{ fontSize: 11 }}
+              <span
+                className={
+                  cached.result.ok ? 'text-[11px] text-emerald-700' : 'text-[11px] text-rose-600'
+                }
                 title="测试只验证地址与模型可达，不代表真实生成健康"
               >
                 {cached.result.ok ? '测试通过' : '测试失败'} · {fmtLatency(cached.result.latencyMs)} ·{' '}
                 {fmtTime(cached.testedAt)}
-              </Typography.Text>
+              </span>
             )}
-          </Flex>
+          </div>
         );
       },
     },
     {
-      title: '顺序',
       key: 'priority',
+      title: '顺序',
       width: 112,
-      render: (_: unknown, ch: AdminModelChannelRecord, index: number) => {
-        if (ch.synthetic) return <Typography.Text type="secondary">—</Typography.Text>;
+      render: (ch, index) => {
+        if (ch.synthetic) return <span className="text-xs text-text-tertiary">—</span>;
         return (
-          <Space size={2}>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              第 {index + 1} 位
-            </Typography.Text>
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-text-tertiary">第 {index + 1} 位</span>
             <Button
-              type="text"
-              size="small"
+              variant="ghost"
+              size="xs"
+              iconOnly
+              leadingIcon={ArrowUp}
               aria-label="上移"
               disabled={!canWrite || index === 0 || busyId === ch.id}
               onClick={() => onMove(ch, 'up')}
-              icon={<ArrowUp size={13} />}
             />
             <Button
-              type="text"
-              size="small"
+              variant="ghost"
+              size="xs"
+              iconOnly
+              leadingIcon={ArrowDown}
               aria-label="下移"
               disabled={!canWrite || index === channels.length - 1 || busyId === ch.id}
               onClick={() => onMove(ch, 'down')}
-              icon={<ArrowDown size={13} />}
             />
-          </Space>
+          </div>
         );
       },
     },
     {
-      title: '操作',
       key: 'actions',
+      title: '操作',
       width: 160,
-      fixed: 'right' as const,
-      render: (_: unknown, ch: AdminModelChannelRecord) =>
+      fixed: 'right',
+      render: (ch) =>
         ch.synthetic ? (
-          <Button type="link" size="small" disabled={!canWrite} onClick={() => onMaterialize(ch)}>
+          <Button variant="ghost" size="xs" disabled={!canWrite} onClick={() => onMaterialize(ch)}>
             转为可管理
           </Button>
         ) : (
-          <Space size={4}>
-            <Button type="link" size="small" disabled={!canWrite} onClick={() => onEdit(ch)}>
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="xs" disabled={!canWrite} onClick={() => onEdit(ch)}>
               编辑
             </Button>
-            <Button type="link" size="small" disabled={!canTest || busyId === ch.id} onClick={() => onTest(ch)}>
+            <Button
+              variant="ghost"
+              size="xs"
+              disabled={!canTest || busyId === ch.id}
+              onClick={() => onTest(ch)}
+            >
               {busyId === ch.id ? '测试中' : '测试'}
             </Button>
-            <Button type="link" size="small" danger disabled={!canWrite} onClick={() => onDelete(ch)}>
+            <Button
+              variant="ghost"
+              size="xs"
+              className="text-rose-600"
+              disabled={!canWrite}
+              onClick={() => onDelete(ch)}
+            >
               删除
             </Button>
-          </Space>
+          </div>
         ),
     },
   ];
 
   return (
-    <Table<AdminModelChannelRecord>
-      rowKey="id"
-      size="small"
+    <AdminDataTable
+      rows={channels}
       columns={columns}
-      dataSource={channels}
-      pagination={false}
-      scroll={{ x: 1080 }}
-      aria-label="模型线路列表"
+      rowKey={(row) => row.id}
+      minWidth={1080}
+      density="compact"
+      emptyText="该模态还没有线路"
     />
   );
 }

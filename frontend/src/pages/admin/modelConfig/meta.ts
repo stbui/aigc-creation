@@ -5,6 +5,7 @@ import type {
   Modality,
   VendorPreset,
 } from '../../../types/api';
+import { type TagTone } from '../../../components/admin/statusMeta';
 
 /**
  * 模型配置页的展示文案与派生逻辑。
@@ -12,6 +13,9 @@ import type {
  * 原则：界面给运营看的是「线路 / 接入地址 / 访问令牌 / 尝试顺序」，
  * 不直接把 baseUrl / pollMs / failCount 这些字段名摊在页面上；
  * 需要排查时再在 tooltip 或 <code> 里给原始值。
+ *
+ * 语义色一律用 `statusMeta.ts` 的 `TagTone`，本页不再发明同义色簇 ——
+ * 同一套调度来源 / 健康度 / 配置来源的配色必须与后台其它页一致。
  */
 
 export const MODALITY_ORDER: Modality[] = ['image', 'text', 'video'];
@@ -29,14 +33,14 @@ export const MODALITY_EMPTY_HINT: Record<Modality, string> = {
   video: '文生视频未接入时调用会直接失败并退款。',
 };
 
-export const SOURCE_META: Record<string, { label: string; tone: string; hint: string }> = {
+export const SOURCE_META: Record<string, { label: string; tone: TagTone; hint: string }> = {
   env: {
     label: '环境变量',
-    tone: 'is-danger',
+    tone: 'danger',
     hint: '该项被部署环境变量覆盖，后台修改不会生效；下方可对照后台曾保存的值。',
   },
-  db: { label: '后台已改', tone: 'is-success', hint: '当前使用后台写入的值，保存后立即生效。' },
-  default: { label: '默认值', tone: 'is-muted', hint: '当前使用代码内置默认值。' },
+  db: { label: '后台已改', tone: 'success', hint: '当前使用后台写入的值，保存后立即生效。' },
+  default: { label: '默认值', tone: 'muted', hint: '当前使用代码内置默认值。' },
 };
 
 export const ROUTE_OPTIONS = [
@@ -61,19 +65,10 @@ export const EFFECTIVE_LABEL: Record<string, string> = {
   none: '未接入（会失败）',
 };
 
-export const EFFECTIVE_TONE: Record<string, string> = {
-  gateway: 'is-success',
-  none: 'is-danger',
+export const EFFECTIVE_TONE: Record<string, TagTone> = {
+  gateway: 'success',
+  none: 'danger',
 };
-
-/** 既有 tone 命名 → antd Tag 的 color */
-export function tagColor(tone: string): string {
-  if (tone === 'is-success') return 'success';
-  if (tone === 'is-warn') return 'warning';
-  if (tone === 'is-danger') return 'error';
-  if (tone === 'is-brand') return 'purple';
-  return 'default';
-}
 
 /**
  * 协议的人话说明。
@@ -102,21 +97,21 @@ export function withoutModalityPrefix(label: string, modality: Modality): string
 
 export const DISPATCH_SOURCE_META: Record<
   AdminModelChannelSnapshot['source'],
-  { label: string; tone: string; hint: string }
+  { label: string; tone: TagTone; hint: string }
 > = {
   channels: {
     label: '按线路列表调度',
-    tone: 'is-success',
+    tone: 'success',
     hint: '该模态已按下方线路顺序尝试；旧版单通道参数不再参与调度。',
   },
   legacy: {
     label: '沿用旧版配置',
-    tone: 'is-warn',
+    tone: 'warn',
     hint: '当前没有落库线路，沿用「全局设置」里的旧版单通道参数。新增线路后即切换为线路调度。',
   },
   none: {
     label: '未接入',
-    tone: 'is-danger',
+    tone: 'danger',
     hint: '没有任何可用线路，也没有启用旧版配置。',
   },
 };
@@ -148,26 +143,26 @@ export function fmtTime(iso: string | null | undefined): string {
 
 export interface HealthMeta {
   label: string;
-  tone: string;
+  tone: TagTone;
   hint?: string;
 }
 
 /** 健康度只来自真实调用（测试结果单独展示，避免把「能连通」当成「健康」） */
 export function healthMeta(ch: AdminModelChannelRecord): HealthMeta {
-  if (ch.synthetic) return { label: '旧版配置', tone: 'is-warn', hint: '尚未转为可管理线路' };
-  if (!ch.enabled) return { label: '已停用', tone: 'is-muted', hint: '不参与调度，但仍可测试' };
+  if (ch.synthetic) return { label: '旧版配置', tone: 'warn', hint: '尚未转为可管理线路' };
+  if (!ch.enabled) return { label: '已停用', tone: 'muted', hint: '不参与调度，但仍可测试' };
   if (ch.cooldownUntil && Date.parse(ch.cooldownUntil) > Date.now()) {
     return {
       label: `暂停尝试至 ${new Date(ch.cooldownUntil).toLocaleTimeString('zh-CN')}`,
-      tone: 'is-danger',
+      tone: 'danger',
       hint: `连续失败 ${ch.failCount} 次，调度会跳过该线路直到冷却结束`,
     };
   }
   if (ch.failCount > 0) {
-    return { label: `连续失败 ${ch.failCount} 次`, tone: 'is-warn', hint: '再次失败将进入冷却' };
+    return { label: `连续失败 ${ch.failCount} 次`, tone: 'warn', hint: '再次失败将进入冷却' };
   }
-  if (ch.lastSuccessAt) return { label: '正常', tone: 'is-success', hint: `最近成功 ${fmtTime(ch.lastSuccessAt)}` };
-  return { label: '尚无调用记录', tone: 'is-muted', hint: '还没有真实生成走过这条线路' };
+  if (ch.lastSuccessAt) return { label: '正常', tone: 'success', hint: `最近成功 ${fmtTime(ch.lastSuccessAt)}` };
+  return { label: '尚无调用记录', tone: 'muted', hint: '还没有真实生成走过这条线路' };
 }
 
 /** 用 baseUrl + protocol 反查厂商预设；模型名可能被手工改过，不作为匹配依据 */
