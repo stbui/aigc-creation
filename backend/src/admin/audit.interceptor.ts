@@ -101,6 +101,8 @@ export class AuditInterceptor implements NestInterceptor {
       url: string;
       ip?: string;
       body?: Record<string, unknown>;
+      /** 路由/服务层组装的审计摘要（如设置项前后值），优先于请求体白名单 */
+      auditExtra?: Record<string, unknown>;
     },
     method: string,
     adminUser: { id: string; email: string; role: string } | undefined,
@@ -157,12 +159,12 @@ export class AuditInterceptor implements NestInterceptor {
 
   /** 只保留白名单字段, 过滤敏感字段 */
   private buildDetail(
-    request: { body?: Record<string, unknown> },
+    request: { body?: Record<string, unknown>; auditExtra?: Record<string, unknown> },
     success: boolean,
     err: unknown,
   ): Record<string, unknown> {
     const source = request.body ?? {};
-    const detail: Record<string, unknown> = { ok: success };
+    const detail: Record<string, unknown> = { ok: success, ...(request.auditExtra ?? {}) };
     for (const field of DETAIL_FIELDS) {
       // 双保险: 白名单已限定字段, 这里再挡一次敏感词, 防止后续往 DETAIL_FIELDS
       // 追加字段时误把凭据类内容写进审计 (审计本身对所有后台角色可读)

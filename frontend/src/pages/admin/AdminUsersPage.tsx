@@ -851,7 +851,14 @@ function RowMenu({ items }: { items: Array<{ key: string; label: string; danger?
 
   return (
     <Dropdown isOpen={open} onOpenChange={setOpen}>
-      <DropdownTrigger className="inline-flex h-7 items-center rounded-lg px-2 text-xs text-accent-700 hover:bg-accent-50">
+      {/*
+       * 与同列的「详情」保持同一形态（ghost 按钮）。
+       * 之前这里是纯文字链，同一列里一个带底色一个不带，
+       * 读起来像两个不同层级的操作。
+       */}
+      <DropdownTrigger
+        className="inline-flex h-8 items-center rounded-lg bg-button-ghost-background px-2 text-xs text-button-ghost-foreground transition-colors hover:bg-button-ghost-hover"
+      >
         更多
       </DropdownTrigger>
       <DropdownPopover aria-label="更多操作" placement="bottom end" className="w-40">

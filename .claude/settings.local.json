@@ -9,7 +9,9 @@
       "WebSearch",
       "WebFetch(domain:github.com)",
       "Skill(oil-ui)",
-      "Skill(oil-ui:*)"
+      "Skill(oil-ui:*)",
+      "Read(//Users/bright/.claude/plugins/cache/claude-plugins-official/mattpocock-skills/1.3.1/skills/productivity/grill-me/**)",
+      "WebFetch(domain:developer.chrome.com)"
     ],
     "additionalDirectories": [
       "/tmp/arch-audit",

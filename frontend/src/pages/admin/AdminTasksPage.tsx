@@ -580,9 +580,8 @@ export function AdminTasksPage() {
             )}
             {(row.status === 'pending' || row.status === 'running') && can('task.cancel') && (
               <Button
-                variant="ghost"
+                variant="dangerGhost"
                 size="small"
-                className="text-rose-600"
                 onClick={() => openConfirm('cancel', row)}
               >
                 终止
@@ -665,7 +664,7 @@ export function AdminTasksPage() {
 
       <FilterBar>
         <SelectBox
-          className="w-32"
+          className="w-28"
           ariaLabel="按状态筛选"
           placeholder="状态"
           allowClear
@@ -674,7 +673,7 @@ export function AdminTasksPage() {
           options={STATUS_OPTIONS}
         />
         <SelectBox
-          className="w-44"
+          className="w-28"
           ariaLabel="按能力筛选"
           placeholder="能力"
           allowClear
@@ -683,7 +682,7 @@ export function AdminTasksPage() {
           options={capOptions}
         />
         <SelectBox
-          className="w-36"
+          className="w-28"
           ariaLabel="按通道筛选"
           placeholder="通道"
           allowClear
@@ -697,7 +696,7 @@ export function AdminTasksPage() {
          * (运营手上通常正有从工单/日志里复制的 id)。
          */}
         <TextInput
-          className="w-40"
+          className="w-32"
           placeholder="用户 ID"
           allowClear
           value={owner}
@@ -705,7 +704,7 @@ export function AdminTasksPage() {
           onEnter={applyQuery}
         />
         <TextInput
-          className="w-40"
+          className="w-32"
           placeholder="项目 ID"
           allowClear
           value={project}
@@ -785,7 +784,8 @@ export function AdminTasksPage() {
           loading={loading}
           error={error}
           onRetry={reload}
-          minWidth={1120}
+          /* 1440px 视口下内容区约 1109px；1120 会多出 11px 横向滚动 */
+          minWidth={1080}
           selectable
           selected={selected}
           onSelectedChange={setSelected}

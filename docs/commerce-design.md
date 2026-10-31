@@ -12,7 +12,7 @@
 | 会员 | `backend/src/membership/` |
 | 营销 | `backend/src/marketing/` |
 | 发票 / 对账 | `backend/src/invoices/`、`backend/src/admin/reconciliation.service.ts` |
-| 退款规则默认值 | `backend/src/admin/settings.dto.ts` 的 `SETTING_DEFS` |
+| 退款规则默认值 | `backend/src/common/setting-defs.ts` 的 `SETTING_DEFS` |
 
 ---
 
@@ -160,6 +160,7 @@ PaymentsService（编排）
 - 到期失效同由该任务处理，失效前先查后更，以便给用户发站内消息。
 - 取消自动续费后 `status='cancelled'`，已付周期保留至 `expiresAt`；续费可重新激活并顺延。
 - 会员折扣与用量落 `MembershipUsage`（`orderId @unique`、`savedCents`），用于统计权益被用掉多少。
+- 后台 `/admin/membership-plans` 是套餐价的唯一写入入口：编码创建后不可改；改价/改权益只影响之后的订单，存量会员按 `perksSnapshot` 保留原权益；下架不终止已付周期。
 
 ## 8. 营销
 
@@ -215,7 +216,7 @@ PaymentsService（编排）
 
 ### 11.2 后台
 
-见 `docs/admin-detailed-design.md` §9–§13。统一约束：退款、人工调价、积分调整、发票开具属高危动作，必填原因并写审计。
+见 `docs/admin-detailed-design.md` §9–§13。统一约束：退款、人工调价、积分调整、发票开具、会员套餐变更属高危动作，必填原因并写审计。
 
 ## 12. 前端改造点
 

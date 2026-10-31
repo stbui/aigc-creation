@@ -109,7 +109,7 @@
 1. 规格落到 `docs/<页面>*-design.md` 或 `docs/admin-*.md`，必须覆盖五态：首次空态 / loading / 有数据 / 加载失败 / 未登录或无权限。
 2. 写清每个按钮点下去发生什么，成功与失败分别怎么反馈；不可逆操作（删除 / 退款 / 注销）的二次确认与后果。
 3. 权限点对照 `backend/src/admin/permissions.ts` 的真实权限名，不自己起名。
-4. 商业规则（价格 / 退款 / 会员 / 优惠）指向唯一事实源：`definitions/<id>.ts`、`settings.dto.ts` 的 `SETTING_DEFS`、`docs/commerce-design.md`。
+4. 商业规则（价格 / 退款 / 会员 / 优惠）指向唯一事实源：`definitions/<id>.ts`、`common/setting-defs.ts` 的 `SETTING_DEFS`、`docs/commerce-design.md`。
 5. 样式只引 `var(--token)`，不写裸 hex；新颜色先查 `frontend/src/styles/global.css` 是否已有语义合适的令牌。
 
 **产出**：页面规格；变更单（冻结后新增需求时：改什么 / 为什么现在改 / 影响哪几段 / 是否顺延）。

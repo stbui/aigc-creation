@@ -25,7 +25,8 @@ import type {
   AdminPermissionCatalog,
   AdminRoleItem,
   AdminSettings,
-  AdminSettingField,
+  AdminSettingsUpdatePayload,
+  AdminSettingsUpdateResult,
   AdminAigcLabel,
   AigcLabelSpec,
   AdminUserDetail,
@@ -56,6 +57,10 @@ import type {
   AdminProduct,
   CreateProductPayload,
   UpdateProductPayload,
+  AdminMembershipPlan,
+  AdminMembershipPlanList,
+  AdminMembershipPlanPayload,
+  CreateAdminMembershipPlanPayload,
   AdminOrderListResult,
   AdminOrderDetail,
   AdminPaymentRow,
@@ -781,8 +786,8 @@ export const adminRolesApi = {
 /** 系统设置 (扁平结构提交, 字段名见后端 FIELD_TO_SETTING_KEY) */
 export const adminSettingsApi = {
   read: () => request<AdminSettings>('/admin/settings'),
-  update: (payload: Partial<Record<AdminSettingField, string | number | boolean>> & { reason?: string }) =>
-    request<{ updated: string[] }>('/admin/settings', { method: 'PATCH', body: payload }),
+  update: (payload: AdminSettingsUpdatePayload) =>
+    request<AdminSettingsUpdateResult>('/admin/settings', { method: 'PATCH', body: payload }),
 };
 
 /**
@@ -864,6 +869,7 @@ export const adminModelApi = {
   calls: (params: {    page?: number;
     pageSize?: number;
     capability?: string;
+    modality?: string;
     source?: string;
     success?: boolean;
     fallback?: boolean;
@@ -881,6 +887,7 @@ export const adminModelApi = {
   /** 导出当前筛选结果 (CSV, 上限 5000 行) */
   exportCsv: (params: {
     capability?: string;
+    modality?: string;
     source?: string;
     success?: boolean;
     fallback?: boolean;
@@ -1490,6 +1497,26 @@ export const adminProductsApi = {
     request<{ id: string; status: string }>(`/admin/products/${id}/status`, {
       method: 'PATCH',
       body: { status, ...(reason ? { reason } : {}) },
+    }),
+};
+
+/** 会员套餐管理：C 端价目表的唯一写入入口 */
+export const adminMembershipPlansApi = {
+  list: () => request<AdminMembershipPlanList>('/admin/membership-plans'),
+
+  create: (payload: CreateAdminMembershipPlanPayload) =>
+    request<AdminMembershipPlan>('/admin/membership-plans', { method: 'POST', body: payload }),
+
+  update: (id: string, payload: AdminMembershipPlanPayload) =>
+    request<AdminMembershipPlan>(`/admin/membership-plans/${id}`, {
+      method: 'PATCH',
+      body: payload,
+    }),
+
+  setStatus: (id: string, status: 'active' | 'offline', reason: string) =>
+    request<AdminMembershipPlan>(`/admin/membership-plans/${id}/status`, {
+      method: 'PATCH',
+      body: { status, reason },
     }),
 };
 

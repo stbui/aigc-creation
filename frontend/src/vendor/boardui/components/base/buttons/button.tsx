@@ -44,7 +44,7 @@ import { directionalIconClass } from "@/utils/directional-icon";
  * `variant` to avoid the clash.
  */
 
-type ButtonVariant = "primary" | "secondary" | "ghost" | "danger";
+type ButtonVariant = "primary" | "secondary" | "ghost" | "danger" | "dangerGhost";
 type ButtonSize = "medium" | "small" | "xs";
 
 type IconComponent = ComponentType<{
@@ -136,6 +136,20 @@ const styles = sortCx({
     ghost: [
       "bg-button-ghost-background text-button-ghost-foreground",
       "hover:bg-button-ghost-hover active:bg-button-ghost-active",
+      "disabled:bg-button-ghost-disabled disabled:text-button-ghost-disabled-foreground disabled:shadow-none",
+      "aria-disabled:bg-button-ghost-disabled aria-disabled:text-button-ghost-disabled-foreground aria-disabled:shadow-none",
+    ].join(" "),
+    /*
+     * 行内危险动作（退款 / 删除 / 下线）。
+     *
+     * 单独给一套变体，而不是 `variant="ghost" className="text-rose-600"`：
+     * ghost 自带的前景色与外部红字是同一个属性，靠 tailwind-merge 判冲突
+     * 并不可靠（自定义 utility 它认不出来）。显式变体让「危险动作长什么样」
+     * 只有一个事实源，也方便统一 hover / disabled 态。
+     */
+    dangerGhost: [
+      "bg-button-ghost-background text-rose-600",
+      "hover:bg-rose-50 active:bg-rose-100",
       "disabled:bg-button-ghost-disabled disabled:text-button-ghost-disabled-foreground disabled:shadow-none",
       "aria-disabled:bg-button-ghost-disabled aria-disabled:text-button-ghost-disabled-foreground aria-disabled:shadow-none",
     ].join(" "),

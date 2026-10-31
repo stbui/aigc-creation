@@ -52,6 +52,18 @@ const SOURCE_LABELS: Record<string, string> = {
   local: '历史本地结果',
 };
 
+const MODALITY_LABELS: Record<string, string> = {
+  image: '图像',
+  text: '文本',
+  video: '视频',
+  unknown: '历史未知',
+};
+
+function modalityLabel(value: string | null): string {
+  if (!value) return MODALITY_LABELS.unknown;
+  return MODALITY_LABELS[value] ?? value;
+}
+
 /** 毫秒 → 人类可读。耗时是这个页面的核心指标, 一律带单位 */
 function fmtDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
@@ -89,6 +101,11 @@ export function AdminModelCallsPage() {
   // 初始值同时喂给 useAdminList, 首次请求即带筛选, 不白跑一次全量查询。
   const [searchParams] = useSearchParams();
   const initialCapability = searchParams.get('capability') ?? undefined;
+  const rawModality = searchParams.get('modality');
+  const initialModality =
+    rawModality === 'image' || rawModality === 'text' || rawModality === 'video' || rawModality === 'unknown'
+      ? rawModality
+      : undefined;
   const rawSource = searchParams.get('source');
   const initialSource = rawSource === 'gateway' || rawSource === 'local' ? rawSource : undefined;
   const rawSuccess = searchParams.get('success');
@@ -98,6 +115,7 @@ export function AdminModelCallsPage() {
     rawFallback === 'true' ? true : rawFallback === 'false' ? false : undefined;
 
   const [capability, setCapability] = useState<string | undefined>(initialCapability);
+  const [modality, setModality] = useState<string | undefined>(initialModality);
   const [source, setSource] = useState<string | undefined>(initialSource);
   const [success, setSuccess] = useState<string | undefined>(
     initialSuccess === undefined ? undefined : String(initialSuccess),
@@ -114,6 +132,7 @@ export function AdminModelCallsPage() {
         page: params.page as number,
         pageSize: params.pageSize as number,
         capability: params.capability as string | undefined,
+        modality: params.modality as string | undefined,
         source: params.source as string | undefined,
         success: params.success === undefined ? undefined : Boolean(params.success),
         fallback: params.fallback === undefined ? undefined : Boolean(params.fallback),
@@ -124,6 +143,7 @@ export function AdminModelCallsPage() {
   const { data, loading, error, params, setQuery, setPage, reload } =
     useAdminList<AdminModelCallListResult>(fetcher, {
       capability: initialCapability,
+      modality: initialModality,
       source: initialSource,
       success: initialSuccess,
       fallback: initialFallback,
@@ -132,6 +152,7 @@ export function AdminModelCallsPage() {
   // 只同步已生效的筛选, 不同步分页
   useAdminUrlFilterSync({
     capability: params.capability as string | undefined,
+    modality: params.modality as string | undefined,
     source: params.source as string | undefined,
     success: params.success as boolean | undefined,
     fallback: params.fallback as boolean | undefined,
@@ -149,17 +170,25 @@ export function AdminModelCallsPage() {
     [data],
   );
 
-  const hasFilter = Boolean(capability || source || success || fallback);
+  const hasFilter = Boolean(capability || modality || source || success || fallback);
 
   const reset = () => {
     setCapability(undefined);
+    setModality(undefined);
     setSource(undefined);
     setSuccess(undefined);
     setFallback(undefined);
-    setQuery({ capability: undefined, source: undefined, success: undefined, fallback: undefined });
+    setQuery({
+      capability: undefined,
+      modality: undefined,
+      source: undefined,
+      success: undefined,
+      fallback: undefined,
+    });
   };
 
   const appliedCapability = params.capability as string | undefined;
+  const appliedModality = params.modality as string | undefined;
   const appliedSource = params.source as string | undefined;
   const appliedSuccess = params.success as boolean | undefined;
   const appliedFallback = params.fallback as boolean | undefined;
@@ -171,6 +200,16 @@ export function AdminModelCallsPage() {
           onClear: () => {
             setCapability(undefined);
             setQuery({ capability: undefined });
+          },
+        }
+      : null,
+    appliedModality
+      ? {
+          key: 'modality',
+          label: `模态：${modalityLabel(appliedModality)}`,
+          onClear: () => {
+            setModality(undefined);
+            setQuery({ modality: undefined });
           },
         }
       : null,
@@ -212,6 +251,7 @@ export function AdminModelCallsPage() {
     try {
       await adminModelApi.exportCsv({
         capability: params.capability as string | undefined,
+        modality: params.modality as string | undefined,
         source: params.source as string | undefined,
         success: params.success as boolean | undefined,
         fallback: params.fallback as boolean | undefined,
@@ -236,7 +276,12 @@ export function AdminModelCallsPage() {
         key: 'capability',
         title: '能力',
         width: 130,
-        render: (row) => <Mono>{row.capability}</Mono>,
+        render: (row) => (
+          <div className="min-w-0">
+            <Mono>{row.capability}</Mono>
+            <div className="mt-0.5 text-[11px] text-text-tertiary">{modalityLabel(row.modality)}</div>
+          </div>
+        ),
       },
       {
         key: 'route',
@@ -340,7 +385,9 @@ export function AdminModelCallsPage() {
       />
 
       {/* 统计卡: 单看流水要看上百行, 而运营真正想问的是这几个数 */}
-      <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-3 2xl:grid-cols-5">
+      {/* auto-fit 而不是固定列数：1440px 下 2xl 断点没触发时 5 张卡会排成 3+2，
+          第二行空出三格。与其它带统计卡的后台页保持一致。 */}
+      <div className="mb-3 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]">
         <StatCard label="调用总数" value={stats?.total ?? '—'} hint="当前筛选条件下" />
         <StatCard
           label="成功率"
@@ -381,6 +428,20 @@ export function AdminModelCallsPage() {
           options={capOptions}
           value={capability}
           onChange={setCapability}
+          allowClear
+        />
+        <SelectBox
+          className="w-32"
+          ariaLabel="按模态筛选"
+          placeholder="模态"
+          options={[
+            { value: 'image', label: '图像' },
+            { value: 'text', label: '文本' },
+            { value: 'video', label: '视频' },
+            { value: 'unknown', label: '历史未知' },
+          ]}
+          value={modality}
+          onChange={setModality}
           allowClear
         />
         <SelectBox
@@ -488,6 +549,7 @@ export function AdminModelCallsPage() {
                 items={[
                   { label: '时间', value: new Date(row.createdAt).toLocaleString('zh-CN') },
                   { label: '能力', value: <Mono>{row.capability}</Mono> },
+                  { label: '模态', value: modalityLabel(row.modality) },
                   { label: '路由决策', value: ROUTE_LABELS[row.route] ?? row.route },
                   {
                     label: '实际通道',
@@ -523,20 +585,29 @@ export function AdminModelCallsPage() {
                       </span>
                     ),
                   },
-                  ...(row.taskId
+                  ...(row.generationTaskId
                     ? [
                         {
-                          label: '网关任务',
+                          label: '生成任务',
                           value: (
                             <Link
                               className="text-accent-600 hover:underline"
-                              to={adminTaskHref(row.taskId)}
+                              to={adminTaskHref(row.generationTaskId)}
                             >
-                              <Mono>{row.taskId}</Mono>
+                              <Mono>{row.generationTaskId}</Mono>
                             </Link>
                           ),
                         },
                       ]
+                    : row.gatewayTaskId
+                      ? [
+                          {
+                            // 渠道任务号在本地任务表里不存在，只用于和通道对账，
+                            // 不能渲染成任务页链接（会稳定 404）。
+                            label: '渠道任务 ID',
+                            value: <Mono>{row.gatewayTaskId}</Mono>,
+                          },
+                        ]
                     : []),
                 ]}
               />
@@ -551,7 +622,14 @@ export function AdminModelCallsPage() {
             )}
 
             {row.prompt && (
-              <Section title="送出提示词" note="超长内容已截断，完整参数见生成任务记录">
+              <Section
+                title="送出提示词"
+                note={
+                  row.generationTaskId
+                    ? '超长内容已截断，完整参数见生成任务记录'
+                    : '超长内容已截断'
+                }
+              >
                 <pre className="max-h-[360px] overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border-table bg-background-secondary-default px-2.5 py-2 font-mono text-[11px] leading-5 text-text-secondary">
                   {row.prompt}
                 </pre>

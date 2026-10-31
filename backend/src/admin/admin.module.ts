@@ -14,6 +14,10 @@ import { AdminBackupController } from './backup.controller';
 import { AdminAssetsController } from './assets-admin.controller';
 import { AdminStorageController } from './storage.controller';
 import { AdminCommerceController } from './commerce.controller';
+import {
+  AdminMembershipPlansController,
+  AdminMembershipPlansService,
+} from './membership-plans.controller';
 import { AdminRetentionController } from './retention.controller';
 import { AdminReconciliationController } from './reconciliation.controller';
 import { AdminReconciliationService } from './reconciliation.service';
@@ -118,6 +122,8 @@ import { SchedulerService } from './scheduler.service';
     AdminAssetsController,
     AdminStorageController,
     AdminCommerceController,
+    // 会员套餐：C 端价目表的唯一写入入口
+    AdminMembershipPlansController,
     // 保留期清理 (B-96)
     AdminRetentionController,
     // 渠道对账 (B3)
@@ -158,6 +164,7 @@ import { SchedulerService } from './scheduler.service';
     BackupService,
     AdminAssetsService,
     AdminCommerceService,
+    AdminMembershipPlansService,
     ModelConfigService,
     ModelCallService,
     ModelChannelService,

@@ -13,7 +13,7 @@ import {
   useAdminResource,
 } from '../../components/admin/AdminWidgets';
 import { AdminEmpty, PageHeader, Panel } from '../../components/admin/PageHeader';
-import { FormField, Notice } from '../../admin-ui/primitives';
+import { FormField, Notice, SaveBar } from '../../admin-ui/primitives';
 import {
   ColorBox,
   NumberInput,
@@ -591,7 +591,7 @@ export function AdminAigcLabelPage() {
       </div>
 
       {editable && (
-        <div className="sticky bottom-0 z-10 mt-3 flex items-center gap-3 rounded-xl border border-border-table bg-white px-4 py-2.5 shadow-lg">
+        <SaveBar>
           <span className="min-w-0 flex-1 text-xs text-text-secondary">
             {dirty ? '有未保存的变更' : '当前配置已保存'}
           </span>
@@ -621,7 +621,7 @@ export function AdminAigcLabelPage() {
               保存并应用
             </Button>
           </div>
-        </div>
+        </SaveBar>
       )}
 
       {confirming && (

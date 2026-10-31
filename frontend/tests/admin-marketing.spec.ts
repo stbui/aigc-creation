@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
-import { ADMIN_EMAIL, ADMIN_PASSWORD, HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
+import { HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
+import { ensureAdminLogin } from './support/admin-login';
 
 /**
  * 营销中心 E2E (admin-prd.md §3.12 B-64~B-67 / M11)。
@@ -17,18 +18,16 @@ import { ADMIN_EMAIL, ADMIN_PASSWORD, HAS_ADMIN_CREDENTIALS } from './support/ad
 
 const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
 
-async function login(page: Page, email = ADMIN_EMAIL) {
+async function login(page: Page) {
   await page.setViewportSize({ width: 1600, height: 1000 });
-  await page.goto(`${UI}/login`);
-  await page.locator('input[type="email"], input#email').first().fill(email);
-  await page.locator('input[type="password"]').first().fill(ADMIN_PASSWORD);
-  await page.locator('input[type="password"]').first().press('Enter');
-  await page.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 15000 });
+  await ensureAdminLogin(page);
 }
 
 /** 单值下拉（RAC Select）：点触发器 → 选选项 */
 async function pick(page: Page, label: string, option: string) {
-  await page.getByLabel(label).click();
+  // RAC Select 的触发器是 button，可见名由「当前值 + 字段名」组成；
+  // getByLabel 只覆盖原生表单控件，找不到它。
+  await page.getByRole('button', { name: new RegExp(`${label}$`) }).first().click();
   await page.getByRole('option', { name: option, exact: true }).click();
 }
 
@@ -50,10 +49,11 @@ test.describe('营销中心', () => {
 
     const panel = page.getByRole('dialog', { name: '新建优惠券' });
     await expect(panel).toBeVisible();
-    // 关键字段
-    for (const label of ['券码', '券名称', '类型', '面额', '生效时间', '失效时间']) {
+    // 关键字段。类型是 RAC Select 触发器，不是原生输入框。
+    for (const label of ['券码', '券名称', '面额', '生效时间', '失效时间']) {
       await expect(panel.getByLabel(label)).toBeVisible();
     }
+    await expect(panel.getByRole('button', { name: /类型$/ })).toBeVisible();
   });
 
   test('折扣类型的面额标签随之变化', async ({ page }) => {
@@ -194,8 +194,8 @@ test.describe('营销中心', () => {
 
     await expect(page.getByRole('heading', { name: '邀请分销规则' })).toBeVisible();
     await expect(page.getByRole('heading', { name: '签到规则' })).toBeVisible();
-    await expect(page.getByLabel('邀请人奖励积分')).toBeVisible();
-    await expect(page.getByLabel('被邀请人奖励积分')).toBeVisible();
+    await expect(page.getByLabel('邀请人奖励积分', { exact: true })).toBeVisible();
+    await expect(page.getByLabel('被邀请人奖励积分', { exact: true })).toBeVisible();
     await expect(page.getByLabel('每日基础积分')).toBeVisible();
     // 「添加加成档位」按钮应始终存在 —— 默认无加成档位(bonusRules 为空数组)
     await expect(page.getByRole('button', { name: /添加加成档位/ })).toBeVisible();
@@ -234,7 +234,7 @@ test.describe('营销中心', () => {
 
     await login(page);
     await page.goto(`${UI}/admin/marketing-rules`);
-    await page.getByLabel('邀请人奖励积分').waitFor({ state: 'visible', timeout: 20000 });
+    await page.getByLabel('邀请人奖励积分', { exact: true }).waitFor({ state: 'visible', timeout: 20000 });
 
     await page.getByRole('button', { name: '保存邀请规则' }).click();
 

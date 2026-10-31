@@ -15,6 +15,11 @@ export class ModelCallListQueryDto extends PageQueryDto {
   @MaxLength(64)
   capability?: string;
 
+  /** 产出模态。unknown 用于筛选迁移前 modality 为 null 的历史记录 */
+  @IsOptional()
+  @IsIn(['image', 'text', 'video', 'unknown'], { message: 'modality 取值非法' })
+  modality?: 'image' | 'text' | 'video' | 'unknown';
+
   @IsOptional()
   @IsIn(['gateway', 'local'], { message: 'source 取值非法' })
   source?: 'gateway' | 'local';

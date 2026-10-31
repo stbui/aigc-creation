@@ -110,7 +110,12 @@ export function AppliedFilters({
   return (
     <div
       data-testid="admin-filter-chips"
-      className="mb-3 flex flex-wrap items-center gap-1.5"
+      /*
+       * 这条回显放在 FilterBar 里（所有调用方都挂在筛选条末尾）。用
+       * `basis-full` 让它单独占一行：否则它会跟「查询 / 重置」挤在同一行，
+       * 把按钮和回显混成一串。
+       */
+      className="flex basis-full flex-wrap items-center gap-1.5 pt-0.5"
       aria-label="已生效的筛选条件"
     >
       <span className="text-xs text-text-tertiary">已筛选</span>

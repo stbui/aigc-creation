@@ -151,10 +151,10 @@ test.describe('后台布局', () => {
       .first()
       .getByRole('button', { name: '更多' })
       .click();
-    // 下拉应至少含禁用/删除这类动作
-    const items = page.getByRole('menuitem');
-    await expect(items.first()).toBeVisible();
-    expect(await items.count()).toBeGreaterThanOrEqual(2);
+    // Dropdown 基于 DialogTrigger，动作是普通 button 而不是 menuitem
+    const menu = page.getByRole('dialog', { name: '更多操作' });
+    await expect(menu).toBeVisible();
+    expect(await menu.getByRole('button').count()).toBeGreaterThanOrEqual(2);
   });
 
   test('审计详情在行内展开，不使用抽屉或确认弹窗', async ({ page }) => {
@@ -177,5 +177,73 @@ test.describe('后台布局', () => {
 
     await page.getByRole('button', { name: '收起', exact: true }).click();
     await expect(page.getByTestId('admin-table-expanded')).toHaveCount(0);
+  });
+
+  test('窄版表单页的面板与保存条左对齐且同宽', async ({ page }) => {
+    // 回归：`.adm-content > *` 的居中限宽会把窄面板推到内容区中线附近，
+    // 而同页另一块面板是左对齐 —— 两块的左边缘差出 190px 以上。
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    for (const [path, label] of [
+      ['/admin/settings', '系统设置'],
+      ['/admin/marketing-rules', '营销规则'],
+    ] as const) {
+      await page.goto(`${UI}${path}`);
+      await page.waitForSelector('[data-testid="admin-panel"]', { timeout: 15000 });
+      await page.waitForTimeout(400);
+
+      const m = await page.evaluate(() => {
+        const panels = Array.from(document.querySelectorAll('[data-testid="admin-panel"]'))
+          .map((el) => el.getBoundingClientRect())
+          .filter((r) => r.width > 0)
+          .map((r) => ({ left: Math.round(r.left), width: Math.round(r.width) }));
+        const bar = document.querySelector('[data-testid="admin-save-bar"]')?.getBoundingClientRect();
+        return {
+          panels,
+          bar: bar && bar.width > 0 ? { left: Math.round(bar.left), width: Math.round(bar.width) } : null,
+        };
+      });
+
+      expect(m.panels.length, `${label}: 未找到窄版面板`).toBeGreaterThanOrEqual(2);
+      const [first] = m.panels;
+      for (const panel of m.panels) {
+        expect(Math.abs(panel.left - first.left), `${label}: 面板左边缘不一致`).toBeLessThanOrEqual(1);
+        expect(Math.abs(panel.width - first.width), `${label}: 面板宽度不一致`).toBeLessThanOrEqual(1);
+      }
+      expect(first.width, `${label}: 窄版面板应限宽 760px`).toBeLessThanOrEqual(761);
+
+      // 保存条必须与面板同宽同左边缘（宽版页面没有窄保存条则跳过）
+      if (m.bar) {
+        expect(Math.abs(m.bar.left - first.left), `${label}: 保存条与面板左边缘不一致`).toBeLessThanOrEqual(1);
+        expect(Math.abs(m.bar.width - first.width), `${label}: 保存条与面板宽度不一致`).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
+  test('1440px 下筛选条不换行', async ({ page }) => {
+    // 回归：订单/任务页的筛选项 + 查询重置曾撑到两行，结束日期单独掉行。
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    for (const [path, label] of [
+      ['/admin/orders', '订单'],
+      ['/admin/tasks', '任务'],
+    ] as const) {
+      await page.goto(`${UI}${path}`);
+      await page.waitForSelector('[data-testid="admin-filter"]', { timeout: 15000 });
+      await page.waitForTimeout(400);
+
+      const rows = await page.evaluate(() => {
+        const bar = document.querySelector('[data-testid="admin-filter"]');
+        if (!bar) return 0;
+        const tops = new Set<number>();
+        for (const el of Array.from(bar.children)) {
+          const rect = el.getBoundingClientRect();
+          if (rect.width > 0) tops.add(Math.round(rect.top));
+        }
+        return tops.size;
+      });
+
+      expect(rows, `${label} 页筛选条发生换行`).toBe(1);
+    }
   });
 });

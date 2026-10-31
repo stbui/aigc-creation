@@ -259,9 +259,8 @@ export function AdminBackupPage() {
           )}
           {can('backup.run') && (
             <Button
-              variant="ghost"
+              variant="dangerGhost"
               size="xs"
-              className="text-rose-600"
               onClick={() => void doDelete(row)}
               disabled={busy}
             >

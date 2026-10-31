@@ -652,23 +652,28 @@ export interface AdminRoleItem {
   permissions: string[];
 }
 
-/** 系统设置的可写字段 (扁平, 与后端 UpdateSettingsDto 一致) */
-export type AdminSettingField =
-  | 'siteName'
-  | 'siteMaintenance'
-  | 'uploadMaxSizeMb'
-  | 'uploadAllowedTypes'
-  | 'generateMaxConcurrent'
-  | 'generatePollIntervalMs'
-  | 'generateMaxPolls'
-  | 'refundWindowDays'
-  | 'refundMaxRatioBps'
-  | 'refundAllowConsumedTask'
-  | 'backupFrequencyDays'
-  | 'backupKeepCount'
-  | 'retentionAuditLogDays'
-  | 'securitySessionTtlDays'
-  | 'securityPasswordMinLength';
+/** 系统设置值。写入按 SETTING_DEFS 的 key 提交，后端负责类型与范围校验 */
+export type AdminSettingValue = string | number | boolean;
+
+/** 系统设置写入载荷。`clears` 表示删除运行时覆盖、回落代码默认值 */
+export interface AdminSettingsUpdatePayload {
+  settings: Record<string, AdminSettingValue>;
+  clears?: string[];
+  reason: string;
+}
+
+/** 系统设置写入结果（含逐项 before/after，供审计与页面提示） */
+export interface AdminSettingsUpdateResult {
+  updated: string[];
+  cleared: string[];
+  changes: Array<{
+    key: string;
+    label: string;
+    before: AdminSettingValue;
+    after: AdminSettingValue;
+    action: 'update' | 'clear';
+  }>;
+}
 
 /** GET /api/v1/admin/settings */
 export interface AdminSettings {
@@ -676,19 +681,26 @@ export interface AdminSettings {
     key: string;
     label: string;
     items: Array<{
-      /** SETTING_DEFS 键, 带点号 (site.name)。**只读**, 回传会被白名单剥掉 */
+      /** SETTING_DEFS 键, 带点号 (site.name)。写入与恢复默认都用它 */
       key: string;
-      /** 写入用的扁平字段名 (siteName)。提交给它, 不是给 key */
-      field: AdminSettingField;
       label: string;
       description: string;
       type: 'string' | 'number' | 'boolean';
-      value: string | number | boolean;
-      default: string | number | boolean;
+      value: AdminSettingValue;
+      default: AdminSettingValue;
       min?: number;
       max?: number;
+      maxLength?: number;
+      /** 允许取值的枚举；存在时渲染下拉而不是自由输入 */
+      enum?: number[];
+      /** 只读项：真实旋钮在别处，页面只展示当前值并给出跳转 */
+      readOnly?: boolean;
+      /** 只读项的跳转目标（后台路由） */
+      linkTo?: string;
       overridden: boolean;
       group: string;
+      updatedBy: string | null;
+      updatedAt: string | null;
     }>;
   }>;
 }
@@ -1085,7 +1097,17 @@ export interface AdminModelCall {
   id: string;
   createdAt: string;
   capability: string;
+  /** 产出模态; 迁移前的历史记录为 null (unknown) */
+  modality: string | null;
+  /**
+   * 原始关联 id。历史写入为渠道/厂商任务号，**不保证是本地任务 id**。
+   * 需要深链任务时使用详情接口返回的 `generationTaskId`。
+   */
   taskId: string | null;
+  /** 仅详情接口: taskId 命中本地 GenerationTask 时为其 id，可安全深链 */
+  generationTaskId?: string | null;
+  /** 仅详情接口: taskId 未命中本地任务时，说明它是渠道/厂商任务号 */
+  gatewayTaskId?: string | null;
   route: string;
   source: 'gateway' | 'local';
   fallback: boolean;
@@ -1979,6 +2001,55 @@ export type UpdateProductPayload = Partial<
   originalPriceCents?: number | null;
   reason?: string;
 };
+
+/** 会员权益。与后端 MembershipService.Perks 同构 */
+export interface AdminMembershipPerks {
+  fastChannel: boolean;
+  /** 同时进行中任务上限。0 = 不限 */
+  maxConcurrent: number;
+  /** 加油包折扣万分比。9500 = 95 折，10000 = 无折扣 */
+  addonDiscountBps: number;
+}
+
+/** GET /api/v1/admin/membership-plans */
+export interface AdminMembershipPlan {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  priceCents: number;
+  durationDays: number;
+  monthlyCredits: number;
+  perks: AdminMembershipPerks;
+  /** 权益文案由后端生成 */
+  perkLabels: string[];
+  status: 'active' | 'offline';
+  sortOrder: number;
+  memberCount: number;
+  orderCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AdminMembershipPlanList {
+  items: AdminMembershipPlan[];
+}
+
+export interface AdminMembershipPlanPayload {
+  name: string;
+  description?: string;
+  priceCents: number;
+  durationDays: number;
+  monthlyCredits: number;
+  perks: AdminMembershipPerks;
+  sortOrder?: number;
+  reason: string;
+}
+
+export interface CreateAdminMembershipPlanPayload extends AdminMembershipPlanPayload {
+  code: string;
+  status?: 'active' | 'offline';
+}
 
 export type AdminOrderStatus =
   | 'pending'

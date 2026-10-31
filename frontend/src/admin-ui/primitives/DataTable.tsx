@@ -1,5 +1,5 @@
 import { Fragment, type ReactNode } from 'react';
-import { ArrowDown, ArrowUp, ChevronsUpDown, RotateCcw } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronsUpDown, Inbox, RotateCcw } from 'lucide-react';
 import { Button } from '../../vendor/boardui/components/base/buttons/button';
 import { Pagination } from '../../vendor/boardui/components/base/pagination/pagination';
 import { cx } from '../lib/cn';
@@ -149,7 +149,8 @@ export function AdminDataTable<T>({
   }
 
   if (!loading && rows.length === 0) {
-    return <EmptyState title={emptyText} action={emptyAction} />;
+    // 空表默认带一个图标：整块留白里只有一行小字，很像「没加载出来」
+    return <EmptyState icon={<Inbox />} title={emptyText} action={emptyAction} />;
   }
 
   const selectableRows = selectable

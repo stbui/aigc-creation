@@ -99,9 +99,10 @@ export class ImageCallLogger {
       await this.prisma.modelCallLog.create({
         data: {
           capability: row.capability,
-          // 网关任务 id 放在 taskId 位: 本表 taskId 语义是「关联的生成任务」,
-          // 而 provider 层拿不到业务任务 id (它在 generate.service 才创建),
-          // 故此处退而记网关侧 id, 仍可用于与网关对账。
+          // ⚠️ 这里写入的是渠道/网关任务号, 不是本地 GenerationTask.id。
+          // provider 层拿不到业务任务 id (它在 generate.service 才创建), 故占用
+          // taskId 列做渠道对账。后台详情必须先查本地任务是否存在再决定是否深链,
+          // 否则会把渠道任务号拼成 /admin/tasks?id=... 的坏链接。
           taskId: row.gatewayTaskId ?? null,
           route: row.route,
           source: row.source,

@@ -127,7 +127,7 @@ aigc-creation/
     ├── vitest.config.ts        # 单元 / 组件测试（jsdom，`npm test`）
     └── src/
         ├── **/__tests__/       # Vitest 用例（*.test.ts / *.test.tsx）
-        ├── pages/              # 35 个 C 端页面 + pages/admin/ 29 个后台页面
+        ├── pages/              # 35 个 C 端页面 + pages/admin/ 30 个后台页面
         ├── admin-ui/           # 后台 UI：shell（单栏外壳）/ primitives / controls / widgets / providers / lib
         ├── vendor/boardui/     # BoardUI 免费层源码（MIT，保持上游原样，见 PROVENANCE.md）
         ├── components/         # AppLayout / SideRail / RailPreview / ToolShell；admin/（共享控件入口、adminNav、AlertCenter、DutyBand、statusMeta）

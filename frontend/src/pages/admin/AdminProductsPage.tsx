@@ -374,10 +374,9 @@ export function AdminProductsPage() {
               编辑
             </Button>
             <Button
-              variant="ghost"
+              variant={row.status === 'active' ? 'dangerGhost' : 'ghost'}
               size="small"
               disabled={saving}
-              className={row.status === 'active' ? 'text-rose-600' : undefined}
               onClick={() => void runToggle(row)}
             >
               {row.status === 'active' ? '下架' : '上架'}

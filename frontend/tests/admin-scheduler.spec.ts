@@ -18,7 +18,14 @@ const taskRows = (page: Page) => page.getByTestId('admin-task-row');
 
 async function login(page: Page) {
   await page.setViewportSize({ width: 1600, height: 1000 });
-  await page.goto(`${UI}/login`);
+  /*
+   * 本套件复用 admin-auth.setup.ts 落盘的登录态。此时直接打开 /login 会被
+   * 重定向到工作台，页面上根本没有邮箱输入框。先访问后台目标页；只有真的
+   * 落在登录页（单独运行本文件、没有 storageState 时）才补一次登录。
+   */
+  await page.goto(`${UI}/admin/scheduler`);
+  if (!page.url().includes('/login')) return;
+
   await page.locator('input[type="email"], input#email').first().fill(ADMIN_EMAIL);
   await page.locator('input[type="password"]').first().fill(ADMIN_PASSWORD);
   await page.locator('input[type="password"]').first().press('Enter');

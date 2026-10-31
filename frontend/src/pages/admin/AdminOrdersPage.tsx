@@ -625,9 +625,8 @@ export function AdminOrdersPage() {
             row.paidCents > row.refundedCents &&
             can('order.refund') && (
               <Button
-                variant="ghost"
+                variant="dangerGhost"
                 size="small"
-                className="text-rose-600"
                 onClick={() => openAction('refund', row)}
               >
                 退款
@@ -665,7 +664,7 @@ export function AdminOrdersPage() {
 
       <FilterBar>
         <SelectBox
-          className="w-32"
+          className="w-28"
           ariaLabel="按状态筛选"
           placeholder="状态"
           allowClear
@@ -674,7 +673,7 @@ export function AdminOrdersPage() {
           options={STATUS_OPTIONS}
         />
         <TextInput
-          className="w-44"
+          className="w-36"
           ariaLabel="按订单号搜索"
           placeholder="订单号"
           value={orderNo}
@@ -687,7 +686,7 @@ export function AdminOrdersPage() {
          * 再查订单, 多一步且该用户未必记得自己的 id。
          */}
         <TextInput
-          className="w-52"
+          className="w-40"
           ariaLabel="按用户邮箱搜索"
           placeholder="用户邮箱"
           value={email}
@@ -696,7 +695,7 @@ export function AdminOrdersPage() {
           allowClear
         />
         <SelectBox
-          className="w-32"
+          className="w-28"
           ariaLabel="按渠道筛选"
           placeholder="渠道"
           allowClear
@@ -709,7 +708,7 @@ export function AdminOrdersPage() {
          * 需要人工核对的场景。告警中心 `?refundState=processing` 直达这里。
          */}
         <SelectBox
-          className="w-36"
+          className="w-28"
           ariaLabel="按退款状态筛选"
           placeholder="退款状态"
           allowClear
@@ -718,13 +717,13 @@ export function AdminOrdersPage() {
           options={REFUND_STATE_OPTIONS}
         />
         <TextInput
-          className="w-40"
+          className="w-32"
           ariaLabel="开始日期"
           type="date"
           value={from}
           onChange={setFrom}
         />
-        <TextInput className="w-40" ariaLabel="结束日期" type="date" value={to} onChange={setTo} />
+        <TextInput className="w-32" ariaLabel="结束日期" type="date" value={to} onChange={setTo} />
         <FilterActions>
           <Button variant="primary" size="small" onClick={applyQuery}>
             查询

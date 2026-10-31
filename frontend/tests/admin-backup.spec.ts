@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
-import { ADMIN_EMAIL, ADMIN_PASSWORD, HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
+import { HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
+import { ensureAdminLogin } from './support/admin-login';
 
 /**
  * 数据备份 E2E (admin-prd.md B-96/97/98/100)。
@@ -20,11 +21,7 @@ const rows = (page: Page) => page.getByTestId('admin-table-row');
 async function login(page: Page) {
   // 侧栏在 ≤1280px 折叠, 分组标题按设计隐藏 —— 用例需断言侧栏结构时用宽视口
   await page.setViewportSize({ width: 1600, height: 1000 });
-  await page.goto(`${UI}/login`);
-  await page.locator('input[type="email"], input#email').first().fill(ADMIN_EMAIL);
-  await page.locator('input[type="password"]').first().fill(ADMIN_PASSWORD);
-  await page.locator('input[type="password"]').first().press('Enter');
-  await page.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 15000 });
+  await ensureAdminLogin(page);
 }
 
 test.describe('数据备份', () => {

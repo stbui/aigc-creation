@@ -55,7 +55,11 @@ test.describe('后台高频动线', () => {
   test('其余深链列表页同样回显已生效筛选', async ({ page }) => {
     const cases = [
       ['/admin/audit-logs?action=user.delete&success=false', '操作审计', ['动作：删除用户', '结果：失败']],
-      ['/admin/model-calls?source=gateway&success=false', '模型调用记录', ['通道：真实模型', '结果：失败']],
+      [
+        '/admin/model-calls?source=gateway&success=false&modality=image',
+        '模型调用记录',
+        ['模态：图像', '通道：真实模型', '结果：失败'],
+      ],
       ['/admin/invoices?status=pending&keyword=INV', '发票管理', ['状态：待开具', '关键词：INV']],
       ['/admin/coupons?type=full_cut&status=on', '优惠券', ['类型：满减', '状态：启用']],
       ['/admin/campaigns?status=active', '限时活动', ['状态：进行中']],
@@ -82,19 +86,93 @@ test.describe('后台高频动线', () => {
     }
   });
 
+  test('模型调用详情区分离线任务与渠道任务号，不为渠道号渲染坏链', async ({ page }) => {
+    const base = {
+      createdAt: '2026-10-31T08:00:00.000Z',
+      capability: 'free_create',
+      route: 'auto',
+      source: 'gateway',
+      fallback: false,
+      reason: '渠道返回失败',
+      model: 'gpt-image-1',
+      prompt: '一只猫',
+      durationMs: 179,
+      success: false,
+      outputBytes: 0,
+      width: null,
+      height: null,
+      errorCode: '42201',
+    };
+    const detail = (id: string, generationTaskId: string | null, gatewayTaskId: string | null) =>
+      JSON.stringify({
+        code: 0,
+        data: {
+          ...base,
+          id,
+          taskId: generationTaskId ?? gatewayTaskId,
+          generationTaskId,
+          gatewayTaskId,
+        },
+      });
+
+    await page.route('**/api/v1/admin/model-calls/test-gateway-task', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: detail('test-gateway-task', null, '1793119194'),
+      }),
+    );
+    await page.route('**/api/v1/admin/model-calls/test-local-task', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: detail('test-local-task', 'cm-local-task', null),
+      }),
+    );
+
+    // 渠道任务号只做文本展示，不能拼成本地任务页链接（历史实现会稳定 404）
+    await page.goto(`${UI}/admin/model-calls?id=test-gateway-task`);
+    await expect(drawer(page)).toBeVisible({ timeout: 15000 });
+    await expect(drawer(page).getByText('渠道任务 ID')).toBeVisible();
+    await expect(drawer(page).getByText('1793119194')).toBeVisible();
+    await expect(drawer(page).getByRole('link', { name: '1793119194' })).toHaveCount(0);
+
+    // 真正命中本地任务时才显示可点击的「生成任务」
+    await page.goto(`${UI}/admin/model-calls?id=test-local-task`);
+    await expect(drawer(page)).toBeVisible({ timeout: 15000 });
+    const taskLink = drawer(page).getByRole('link', { name: 'cm-local-task' });
+    await expect(taskLink).toHaveAttribute('href', '/admin/tasks?id=cm-local-task');
+    await expect(drawer(page).getByText('生成任务', { exact: true })).toBeVisible();
+  });
+
+  test('模型调用统计卡与筛选同口径，通道计数之和不超过筛选总数', async ({ page }) => {
+    await page.goto(`${UI}/admin/model-calls?modality=image`);
+    await expect(page.getByRole('heading', { name: '模型调用记录' })).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(rows(page).first()).toBeVisible();
+
+    const card = (label: string) => page.getByText(label, { exact: true }).locator('..');
+    const total = Number((await card('调用总数').locator('div').nth(1).textContent()) ?? '0');
+    const hint = (await card('真实模型占比').locator('div').nth(2).textContent()) ?? '';
+    const match = hint.match(/远程 (\d+) · 历史本地 (\d+)/);
+
+    expect(match, `真实模型占比提示格式异常: ${hint}`).not.toBeNull();
+    const [gateway, local] = [Number(match![1]), Number(match![2])];
+    expect(gateway + local).toBe(total);
+    expect(total).toBeGreaterThan(0);
+  });
+
   test('告警级别从地址栏恢复，并随切换同步', async ({ page }) => {
     await page.goto(`${UI}/admin/alerts?severity=critical`);
     await expect(page.getByRole('heading', { name: '告警中心' })).toBeVisible({
       timeout: 15000,
     });
 
-    // 分段控件用 aria-pressed 表达选中态
-    await expect(page.getByRole('button', { name: '紧急' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
+    // 分段控件是单选组（radiogroup），不是一组普通按钮
+    await expect(page.getByRole('radio', { name: /^紧急/ })).toBeChecked();
 
-    await page.getByRole('button', { name: /^全部/ }).click();
+    await page.getByRole('radio', { name: /^全部/ }).click();
     await expect(page).not.toHaveURL(/severity=critical/);
   });
 
@@ -106,7 +184,7 @@ test.describe('后台高频动线', () => {
     await expect(chips(page)).toContainText('关键词：__no_such_capability__');
     await expect(page.getByText('没有符合当前筛选的能力。')).toBeVisible();
 
-    await page.getByRole('button', { name: '清除筛选' }).click();
+    await page.getByRole('button', { name: '清除筛选', exact: true }).click();
     await expect(chips(page)).toHaveCount(0);
     await expect(page.getByTestId('admin-table-row').first()).toBeVisible();
   });
@@ -116,6 +194,7 @@ test.describe('后台高频动线', () => {
     for (const [path, heading] of [
       ['/admin/orders', '订单管理'],
       ['/admin/tasks', '任务监控'],
+      ['/admin/model-calls', '模型调用记录'],
       ['/admin/model-config', '模型配置'],
     ] as const) {
       await page.goto(`${UI}${path}`);
@@ -138,7 +217,7 @@ test.describe('后台高频动线', () => {
       timeout: 15000,
     });
 
-    const inviter = page.getByLabel('邀请人奖励积分');
+    const inviter = page.getByLabel('邀请人奖励积分', { exact: true });
     const original = await inviter.inputValue();
     await inviter.fill(String(Number(original || '0') + 1));
     await expect(page.getByRole('button', { name: '放弃变更', exact: true })).toBeVisible();
@@ -271,8 +350,11 @@ test.describe('后台高频动线', () => {
       timeout: 15000,
     });
 
-    // 只改动草稿，不点保存；测试结束后放弃，避免污染开发库里的真实权限
-    await page.getByRole('checkbox').nth(1).click();
+    // 只改动草稿，不点保存；测试结束后放弃，避免污染开发库里的真实权限。
+    // 复选框的可视勾选框会挡住指针，这里用键盘操作，也更贴近无障碍真实路径。
+    const permission = page.getByRole('checkbox', { name: '运营 · 查看平台概览' });
+    await permission.focus();
+    await page.keyboard.press('Space');
 
     const saveBar = page.getByTestId('admin-role-save-bar');
     await expect(saveBar).toBeVisible();

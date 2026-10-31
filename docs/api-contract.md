@@ -90,6 +90,7 @@
 | GET | `/api/v1/admin/alerts` | 告警中心：按当前角色权限聚合待处理工单 / 失败任务 / 对账差异 / 退款卡单 / 备份 / 发票（只要求后台身份） |
 | GET/PATCH/POST/DELETE | `/api/v1/admin/users*`、`assets*`、`tasks*` | 用户 / 素材 / 任务管理 |
 | GET/PUT/POST | `/api/v1/admin/{credit-prices,products,orders,payments,credits}*` | 交易与积分管理 |
+| GET/POST/PATCH | `/api/v1/admin/membership-plans*` | 会员套餐列表 / 新建 / 改价改权益 / 上下架（`product.read` / `product.write`，写需原因 + 审计；下架不影响存量会员） |
 | POST | `/api/v1/admin/orders/:id/refund` | 渠道退款（**先调渠道再改本地账**；渠道失败 `50302` 且订单/积分不变，在途退款 `40908`，`order.refund` 权限 + 必填原因 + 审计） |
 | GET/PUT/POST | `/api/v1/admin/{coupons,campaigns,marketing-rules}*` | 营销管理 |
 | GET/POST | `/api/v1/admin/{reconciliation,invoices}*` | 对账导入 / 批次与明细 / 差异处置 / 导出；发票审核与开具 |

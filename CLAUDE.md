@@ -12,7 +12,7 @@
 | 能力清单 / 字段 / 默认积分价 | `backend/src/capabilities/definitions/<id>.ts`（由 `definitions/index.ts` 聚合） |
 | 运行期生效积分价 | `CreditPriceService.resolve()`；业务代码**不读** `creditCost` |
 | 权限点 | `backend/src/admin/permissions.ts` |
-| 退款与站点设置默认值 | `backend/src/admin/settings.dto.ts` 的 `SETTING_DEFS` |
+| 退款与站点设置默认值 | `backend/src/common/setting-defs.ts` 的 `SETTING_DEFS` |
 | 工单状态机 | `backend/src/tickets/tickets.service.ts` 的 `TRANSITIONS` |
 | 厂商与推荐模型 | `backend/src/providers/vendors/vendor.catalog.ts` / `vendor.presets.ts` |
 | 启动期环境变量 | `backend/src/config/env.validation.ts` 的 `ENV_SPECS`；网关通道变量另见 `providers/channel-config.defs.ts` |
@@ -50,7 +50,7 @@ uat@admin.com
 
 - **16 项能力**（全部 `real`，0 `mock` / 0 `planned`，12 项进工作台）。**图像、文本、视频都只允许真实模型产出**：无模型线路即失败并退款，不交付伪结果。
 - **生成通道**为「模态 × 协议 × 厂商」三层可插拔。`auto/remote` 只调度真实模型线路，存量 `route=local` 明确判不可用；新写入不再接受 `local`。
-- **后台管理端**（`/admin`）29 个页面，权限点 + 审计 + 定时任务 + 备份 + 存储切换。
+- **后台管理端**（`/admin`）30 个页面，权限点 + 审计 + 定时任务 + 备份 + 存储切换。
 - **商业域**：商品 / 订单 / 支付 / 退款 / 积分账本 / 会员 / 优惠券 / 限时活动 / 邀请签到 / 发票 / 渠道对账。
 - **账户与合规域**：找回密码 / 短信登录 / 扫码登录 / 第三方登录（OAuth2 / OIDC）/ 自助注销与数据导出 / 法务版本化与同意留痕 / 站内消息 / AIGC 标识 / 限流 / 健康检查 / 请求追踪。
 - **服务域**：工单、后台全局搜索、批量动作与 CSV 导入导出。
@@ -127,7 +127,7 @@ aigc-creation/
         ├── admin-ui/         # 后台 UI：shell/AdminBoardLayout · primitives · controls · widgets · providers · lib
         ├── vendor/boardui/   # BoardUI 免费层源码（MIT，上游原样；来源见 PROVENANCE.md）
         ├── components/       # AppLayout / SideRail / ToolShell / QrLoginPanel / admin/（控件入口 + adminNav + AlertCenter + DutyBand + statusMeta）
-        ├── pages/            # 35 个 C 端页面 + pages/admin/ 29 个后台页面
+        ├── pages/            # 35 个 C 端页面 + pages/admin/ 30 个后台页面
         ├── lib/              # api.ts（request 拆信封）/ http / auth / capabilities / aigc-label / constants
         ├── context/          # AuthContext / AdminContext（权限点）/ CreditsContext
         ├── hooks/            # useToolTask / useProject / useCapabilities / usePollAbort / 上传相关
@@ -280,12 +280,12 @@ npm run e2e                 # Playwright
 
 **权限链**：`AdminGuard`（身份）→ `PermissionGuard`（权限点）→ controller → `AuditInterceptor`（落 `AdminAuditLog`）。权限点定义在 `src/admin/permissions.ts`。**前端 `AdminContext.can()` 只用于隐藏无权限按钮，不是安全边界**；真正的校验必须在后端。
 
-29 个页面、8 个侧栏分组以 `adminNav.ts` 的 `ADMIN_MENU` 为准；页面功能、接口与交互见 `docs/admin-console-design.md` / `admin-detailed-design.md`。
+30 个页面、8 个侧栏分组以 `adminNav.ts` 的 `ADMIN_MENU` 为准；页面功能、接口与交互见 `docs/admin-console-design.md` / `admin-detailed-design.md`。
 
 - 高危动作（删除 / 重置密码 / 退款 / 手动调整积分 / 模型配置写入 / 角色与系统设置写入 / 手动备份）须填原因并写审计（`HIGH_RISK_PERMISSIONS`）。
 - 批量动作：`ids ≤ 100`，`runBatch` 串行、**不包事务**，逐条返回结果；路由挂较弱读权限，处理器内再判动作权限。
 - CSV 统一走 `common/csv.ts`（BOM + RFC4180 + 公式注入前导 `'`）；前端 `downloadCsv()` 不走 JSON 信封。
-- **后台整站是 BoardUI**（2026-10-30 完成，29 页 + 外壳全部切换）：`pages/admin` / `components/admin` / `admin-ui` 三目录 `from 'antd'` 为 0，legacy 实现与 `VITE_ADMIN_UI` 开关已删除、无回滚。新页面直接写 `admin-ui/`，不要引 antd，也不要退回自绘 `div/button/input/select`。vendor 源码在 `frontend/src/vendor/boardui/`，保持上游原样不改，来源见 `PROVENANCE.md`。
+- **后台整站是 BoardUI**（2026-10-30 完成，30 页 + 外壳全部切换）：`pages/admin` / `components/admin` / `admin-ui` 三目录 `from 'antd'` 为 0，legacy 实现与 `VITE_ADMIN_UI` 开关已删除、无回滚。新页面直接写 `admin-ui/`，不要引 antd，也不要退回自绘 `div/button/input/select`。vendor 源码在 `frontend/src/vendor/boardui/`，保持上游原样不改，来源见 `PROVENANCE.md`。
 - **外壳**：`admin-ui/shell/AdminBoardLayout` —— 单栏（侧栏 232 / 折叠 60，≤1280 自动折叠），无顶栏、无值班带；导航 / ⌘K 搜索 / 告警铃 / 密度 / 用户菜单都在侧栏。值班塔只出现在概览首屏（`admin-ui/widgets/DutyStrip`）。`global.css` 的 `.adm-*` 只剩外壳骨架（`adm-layout` / `adm-content` / `adm-skip-link`）与值班塔（`adm-tower*` / `adm-dot` / `adm-empty-inline`），页面内新增 `adm-*` 类是错的。
 - **共享控件**：`components/admin/PageHeader.tsx` 与 `AdminWidgets.tsx` 是单一路径的再导出（→ `admin-ui/widgets/AdminChrome` / `primitives`），页面 import 不变；改外观只改 `AdminChrome`。表格 `admin-ui/primitives/DataTable`（密度走 `admin-ui/lib/density` 的 `DensityContext`，由外壳下发），状态色 `components/admin/statusMeta.ts`。
 - **e2e 锚点**：共享控件与页面关键节点挂 `data-testid="admin-*"`，表单控件用 `aria-label`；测试一律 `getByTestId` / `getByLabel` / 角色名，不追 Tailwind 工具类与已删除的 `adm-*` 类。
@@ -327,7 +327,7 @@ npm run e2e                 # Playwright
 | 新增协议 | `protocol.spec.ts` 加协议形状 + `provider-factory.ts` 加映射 + provider 实现 | 图像能力继承 `BaseImageProvider` 只声明三处差异；未知协议**显式抛错** |
 | 新增后台页 | `admin/permissions.ts` → controller 挂 `@RequirePermission` → `adminNav.ts` → `pages/admin/*.tsx` → 路由 → `lib/api.ts` | 前端 `can()` 只隐藏按钮，权限必须在后端 |
 | 新增环境变量 | `ENV_SPECS` + `.env.example` + 三档 env；通道类再加 `channel-config.defs.ts` | `probe-environments.ts`；`docs/environments.md` |
-| 调整积分价 / 退款规则 | `definitions/<id>.ts` 的 `creditCost` / `settings.dto.ts` 的 `SETTING_DEFS` | 运行时走 `resolve()` 与设置读取，不写死 |
+| 调整积分价 / 退款规则 | `definitions/<id>.ts` 的 `creditCost` / `common/setting-defs.ts` 的 `SETTING_DEFS` | 运行时走 `resolve()` 与设置读取，不写死 |
 
 ### 样式：语义化 token，禁止硬编码色值
 

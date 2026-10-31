@@ -78,6 +78,10 @@ const AdminCreditPricesPage = lazyAdminPage(
   'AdminCreditPricesPage',
 );
 const AdminProductsPage = lazyAdminPage(() => import('./AdminProductsPage'), 'AdminProductsPage');
+const AdminMembershipPlansPage = lazyAdminPage(
+  () => import('./AdminMembershipPlansPage'),
+  'AdminMembershipPlansPage',
+);
 const AdminOrdersPage = lazyAdminPage(() => import('./AdminOrdersPage'), 'AdminOrdersPage');
 const AdminCreditsPage = lazyAdminPage(() => import('./AdminCreditsPage'), 'AdminCreditsPage');
 const AdminRetentionPage = lazyAdminPage(
@@ -1101,6 +1105,7 @@ export function AdminShell() {
               <Route path="credit-prices" element={<AdminCreditPricesPage />} />
               {/* 交易后台四页 (B1): 商品 / 订单 / 积分账本 / 保留期清理 */}
               <Route path="products" element={<AdminProductsPage />} />
+              <Route path="membership-plans" element={<AdminMembershipPlansPage />} />
               <Route path="orders" element={<AdminOrdersPage />} />
               <Route path="credits" element={<AdminCreditsPage />} />
               <Route path="retention" element={<AdminRetentionPage />} />

@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ConfigProvider, App as AntApp } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
-import 'antd/dist/reset.css';
+import './styles/antd-reset.css';
 import './styles/global.css';
 import App from './App';
 

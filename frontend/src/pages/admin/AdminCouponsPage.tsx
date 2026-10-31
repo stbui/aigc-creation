@@ -478,10 +478,9 @@ export function AdminCouponsPage() {
               编辑
             </Button>
             <Button
-              variant="ghost"
+              variant={row.status === 'on' ? 'dangerGhost' : 'ghost'}
               size="small"
               disabled={busy}
-              className={row.status === 'on' ? 'text-rose-600' : undefined}
               onClick={() => void doToggle(row)}
             >
               {row.status === 'on' ? '停用' : '启用'}

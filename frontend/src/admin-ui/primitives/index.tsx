@@ -30,11 +30,16 @@ export function Panel({
   return (
     <section
       data-testid="admin-panel"
-      className={cx(
-        'mb-3 rounded-xl border border-border-table bg-white',
-        isNarrow && 'max-w-[760px]',
-        className,
-      )}
+      /*
+       * 外壳有 `.adm-content > * { max-width: 1600px }` 的统一限宽。
+       * 这里用 inline style 而不是工具类，避免被那条规则按加载顺序盖掉，
+       * 导致同一页出现「760px 与 1141px 混排」。
+       *
+       * 窄版面板一律左对齐：内容区本身已居中限宽，窄面板再居中就会与
+       * 同页其它面板错开一条边（设置页的「站点」与「相关管理入口」）。
+       */
+      style={isNarrow ? { maxWidth: 760, marginInline: 0 } : undefined}
+      className={cx('mb-3 rounded-xl border border-border-table bg-white', className)}
     >
       {(title || extra) && (
         <header className="flex items-center gap-3 border-b border-border-table px-4 py-3">
@@ -47,6 +52,32 @@ export function Panel({
       )}
       <div className="p-4">{children}</div>
     </section>
+  );
+}
+
+/**
+ * 页面底部的保存条。
+ *
+ * 窄版表单页（设置、营销规则）的内容区限宽 760px，保存条若跟着内容区
+ * 全宽，就会比上方面板宽出一截，页面看起来像「两块没对齐的板」。
+ * `narrow` 用与窄版 `Panel` 相同的宽度与左对齐方式，保证竖向是一条边；
+ * 宽版页面（如 AI 标识的双栏布局）直接铺满内容区。
+ */
+export function SaveBar({
+  narrow = false,
+  children,
+}: {
+  narrow?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      data-testid="admin-save-bar"
+      style={narrow ? { maxWidth: 760, marginInline: 0 } : undefined}
+      className="sticky bottom-0 z-10 mt-3 flex items-center gap-3 rounded-xl border border-border-table bg-white px-4 py-2.5 shadow-lg"
+    >
+      {children}
+    </div>
   );
 }
 

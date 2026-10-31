@@ -528,9 +528,8 @@ export function AdminAssetsPage() {
             )}
             {can('asset.delete') && (
               <Button
-                variant="ghost"
+                variant="dangerGhost"
                 size="small"
-                className="text-rose-600"
                 onClick={() => void openDelete(row)}
               >
                 删除
@@ -860,7 +859,7 @@ export function AdminAssetsPage() {
                               icon={Trash2}
                               aria-label="永久删除素材"
                               title="永久删除"
-                              className="text-rose-600"
+                              style={{ color: 'var(--color-rose-600)' }}
                               onClick={() => void openDelete(a)}
                             />
                           )}

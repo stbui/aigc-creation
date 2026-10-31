@@ -163,7 +163,7 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
   const traceId = createTraceId();
   void resolveContextMenuImageContext(info, tab.id, traceId).then((context) => {
     if (!context.imageUrl) {
-      return sendToTab(tab.id, {
+      return notifyTab(tab.id, {
         type: CONTEXT_MENU_RESULT_MESSAGE,
         traceId,
         ok: false,

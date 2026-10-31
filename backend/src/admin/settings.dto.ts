@@ -1,316 +1,45 @@
-import {
-  IsBoolean,
-  IsInt,
-  IsOptional,
-  IsString,
-  Max,
-  MaxLength,
-  Min,
-} from 'class-validator';
+import { IsArray, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
 
 /**
- * 系统设置项定义。
+ * 写入系统设置（kv 结构）。
  *
- * 用代码声明而非裸 kv: 每项有类型、默认值、取值范围与说明,
- * 避免后台存进库里的值无法校验 (存了 "abc" 到 number 类型的项,
- * 后续读取时静默出错比拒绝写入更糟)。
+ * ⚠️ 这里**不再逐字段声明校验装饰器** —— 那是「加一项设置要改 4 处」的根源
+ * （`SETTING_DEFS` + DTO 装饰器 + 驼峰↔点号映射表 + 前端手写联合类型），
+ * 任一处漏改就静默漂移。
  *
- * ⚠️ 这里的默认值是**代码默认值**, 可被 SystemSetting 表覆盖 (运行时覆盖)。
- * 与 capability.registry / GATEWAY_* 环境变量是同一优先级链。
- */
-export interface SettingDef {
-  key: string;
-  label: string;
-  description: string;
-  type: 'string' | 'number' | 'boolean';
-  default: string | number | boolean;
-  min?: number;
-  max?: number;
-  maxLength?: number;
-  /** 分组, 前端按此渲染 Tab */
-  group: SettingGroup;
-  /** 环境徽标类配置是否只读 (凭据类不由后台编辑) */
-  readOnly?: boolean;
-}
-
-/*
- * 分组键必须与 `key.split('.')[0]` 一一对应, 且每个分组有自己的中文名。
+ * ⚠️ DTO 必须用值导入 (不能用 `import type`)。
+ * `import type` 会在编译期抹掉类的运行时值, 使 design:paramtypes 退化成 Function,
+ * ValidationPipe 因此无法识别类型 —— @Body 拿到的是未校验的原始 body,
+ * 结果是「请求 200 但 DTO 上一个字段都没生效」, 比直接报错更难排查。
  *
- * ⚠ 2026-10-22: 此前 backup / retention 两组都写成 'security', 而
- * SETTING_GROUP_LABELS 又没有这两个键, 结果是系统设置页出现**三个同名「安全」页签**。
- * 运营要改备份策略时得在三个同名片里逐个点开盲找, 也无法向同事描述"在哪个安全页里改"。
- * 新增一组设置时, 这里与 SETTING_GROUP_LABELS 必须同时加。
- */
-export type SettingGroup =
-  | 'site'
-  | 'upload'
-  | 'generate'
-  | 'refund'
-  | 'backup'
-  | 'retention'
-  | 'security';
-
-export const SETTING_DEFS: SettingDef[] = [
-  // ── 站点 ────────────────────────────────────────────────────────────
-  {
-    key: 'site.name',
-    label: '站点名称',
-    description: '显示在页面标题与页脚',
-    type: 'string',
-    default: '货觉AI',
-    maxLength: 40,
-    group: 'site',
-  },
-  {
-    key: 'site.maintenance',
-    label: '维护模式',
-    description: '开启后 C 端只读, 生成接口返回 503。用户仍可查看订单与申请退款',
-    type: 'boolean',
-    default: false,
-    group: 'site',
-  },
-
-  // ── 上传 ────────────────────────────────────────────────────────────
-  {
-    key: 'upload.maxSizeMb',
-    label: '单文件大小上限',
-    description: '前端与后端同步校验, 以后端为准',
-    type: 'number',
-    default: 20,
-    min: 1,
-    max: 200,
-    group: 'upload',
-  },
-  {
-    key: 'upload.allowedTypes',
-    label: '允许的文件类型',
-    description: '逗号分隔的扩展名, 如 jpg,png,webp',
-    type: 'string',
-    default: 'jpg,jpeg,png,webp',
-    maxLength: 200,
-    group: 'upload',
-  },
-
-  // ── 生成 ────────────────────────────────────────────────────────────
-  {
-    key: 'generate.maxConcurrent',
-    label: '并发任务上限',
-    description: '单用户同时进行的生成任务数',
-    type: 'number',
-    default: 3,
-    min: 1,
-    max: 20,
-    group: 'generate',
-  },
-  {
-    key: 'generate.pollIntervalMs',
-    label: '轮询间隔',
-    description: '前端查询任务状态的间隔',
-    type: 'number',
-    default: 1200,
-    min: 500,
-    max: 10000,
-    group: 'generate',
-  },
-  {
-    key: 'generate.maxPolls',
-    label: '最大轮询次数',
-    description: '超出视为超时。对应 GATEWAY_MAX_POLLS',
-    type: 'number',
-    default: 60,
-    min: 5,
-    max: 300,
-    group: 'generate',
-  },
-
-  // ── 退款 ────────────────────────────────────────────────────────────
-  {
-    key: 'refund.windowDays',
-    label: '可退款时间窗',
-    description:
-      '支付成功后多少天内可以退款。0 = 不限时间（仍受可退金额与积分消耗规则约束）',
-    type: 'number',
-    default: 7,
-    min: 0,
-    max: 365,
-    group: 'refund',
-  },
-  {
-    key: 'refund.maxRatioBps',
-    label: '可退上限（万分比）',
-    description:
-      '可退金额不超过实付的多少。10000 = 全额可退，5000 = 最多退一半。以「分」为单位按比例向下取整',
-    type: 'number',
-    default: 10000,
-    min: 0,
-    max: 10000,
-    group: 'refund',
-  },
-  {
-    key: 'refund.allowConsumedTask',
-    label: '允许已消耗积分退款',
-    description:
-      '关闭后，订单发放的积分一旦被用掉（无法全额扣回）就拒绝退款，避免「先用再退」。已完成的任务产出不会因此回收',
-    type: 'boolean',
-    default: true,
-    group: 'refund',
-  },
-
-  // ── 数据安全 ────────────────────────────────────────────────────────
-  {
-    key: 'backup.frequencyDays',
-    label: '备份频次',
-    description: '每隔多少天自动备份一次。可选 1 / 7 / 30',
-    type: 'number',
-    default: 1,
-    min: 1,
-    max: 30,
-    group: 'backup',
-  },
-  {
-    key: 'backup.keepCount',
-    label: '备份保留份数',
-    description: '超过此份数的旧备份会被自动清理。至少保留 1 份',
-    type: 'number',
-    default: 7,
-    min: 1,
-    max: 100,
-    group: 'backup',
-  },
-  {
-    key: 'retention.auditLogDays',
-    label: '操作日志保留天数',
-    description:
-      '超过此天数的操作日志会被清理。订单与用户素材不参与清理（《电子商务法》要求交易信息保存 3 年）',
-    type: 'number',
-    default: 180,
-    min: 30,
-    max: 1095,
-    group: 'retention',
-  },
-
-  // ── 安全 ────────────────────────────────────────────────────────────
-  {
-    key: 'security.sessionTtlDays',
-    label: '会话有效期',
-    description: 'JWT 有效期。天数越长风险越高, 生产建议改短并配合 refresh',
-    type: 'number',
-    default: 7,
-    min: 1,
-    max: 30,
-    group: 'security',
-  },
-  {
-    key: 'security.passwordMinLength',
-    label: '密码最小长度',
-    description: '仅对新设置的密码生效',
-    type: 'number',
-    default: 8,
-    min: 6,
-    max: 32,
-    group: 'security',
-  },
-];
-
-export const SETTING_KEYS = SETTING_DEFS.map((d) => d.key);
-
-export function findSettingDef(key: string): SettingDef | undefined {
-  return SETTING_DEFS.find((d) => d.key === key);
-}
-
-export const SETTING_GROUP_LABELS: Record<SettingGroup, string> = {
-  site: '站点',
-  upload: '上传',
-  generate: '生成',
-  refund: '退款',
-  backup: '备份',
-  retention: '保留期',
-  security: '安全',
-};
-
-/**
- * 写入系统设置 (扁平结构)。
- *
- * ⚠️ 每个字段都必须显式声明校验装饰器 —— 全局 ValidationPipe 配了
- * `whitelist: true`, 未声明的属性会被**静默剥离**。曾用
- * `settings!: Record<string, unknown>` 导致: 请求 200 但什么都没写入,
- * 表现为"保存成功但配置没变"。这类静默失败比直接报错更难排查。
- *
- * 键名与服务端 SETTING_DEFS 的 key 不同 (这里是 siteName 而非 site.name),
- * 原因: class-validator 的属性名不能带点号, 用 FIELD_TO_SETTING_KEY 做映射。
- *
- * 范围校验在此层与 service 层双重进行 —— 这里的 min/max 是给前端即时反馈,
- * service 里按 SettingDef 再校验一次, 保证绕过前端直接调接口时也拦得住。
+ * 白名单与类型校验在 service 层按 `SETTING_DEFS` 做 —— **未知键直接 400**。
+ * 这比此前「白名单静默剥离 → 再报 400 没有需要更新的设置项」的两段式失败更直接：
+ * 运营改错键名时会立刻看到是哪个键不认识。
  */
 export class UpdateSettingsDto {
-  @IsOptional() @IsString() @MaxLength(40) siteName?: string;
-  @IsOptional() @IsBoolean() siteMaintenance?: boolean;
+  /**
+   * 要设置的键值对。键为 `SETTING_DEFS` 的键（如 `upload.maxSizeMb`）。
+   *
+   * 用 `@IsObject()` 而不是逐字段 —— 值的合法性由 service 按定义校验，
+   * 这里只挡「不是一个对象」这一种结构性错误。
+   */
+  @IsObject()
+  settings!: Record<string, unknown>;
 
-  @IsOptional() @IsInt() @Min(1) @Max(200) uploadMaxSizeMb?: number;
-  @IsOptional() @IsString() @MaxLength(200) uploadAllowedTypes?: string;
+  /**
+   * 要恢复默认的键。删除 SystemSetting 行即回落代码默认值。
+   *
+   * 独立于 `settings` 而不是复用它传 undefined —— 「设置为默认值」与
+   * 「取消覆盖」在审计上是两件事（前者改了值，后者删了覆盖），
+   * 混在一个字段里会让审计的 before/after 语义含糊。
+   */
+  @IsOptional()
+  @IsArray()
+  clears?: string[];
 
-  @IsOptional() @IsInt() @Min(1) @Max(20) generateMaxConcurrent?: number;
-  @IsOptional() @IsInt() @Min(500) @Max(10000) generatePollIntervalMs?: number;
-  @IsOptional() @IsInt() @Min(5) @Max(300) generateMaxPolls?: number;
-
-  @IsOptional() @IsInt() @Min(0) @Max(365) refundWindowDays?: number;
-  @IsOptional() @IsInt() @Min(0) @Max(10000) refundMaxRatioBps?: number;
-  @IsOptional() @IsBoolean() refundAllowConsumedTask?: boolean;
-
-  @IsOptional() @IsInt() @Min(1) @Max(30) backupFrequencyDays?: number;
-  @IsOptional() @IsInt() @Min(1) @Max(100) backupKeepCount?: number;
-  @IsOptional() @IsInt() @Min(30) @Max(1095) retentionAuditLogDays?: number;
-
-  @IsOptional() @IsInt() @Min(1) @Max(30) securitySessionTtlDays?: number;
-  @IsOptional() @IsInt() @Min(6) @Max(32) securityPasswordMinLength?: number;
-
-  /** 操作原因。写入系统设置属高危动作, 建议填写以便追溯 */
-  @IsOptional() @IsString() @MaxLength(200) reason?: string;
-}
-
-/** DTO 字段名 → SETTING_DEFS 键 的映射 */
-export const FIELD_TO_SETTING_KEY: Record<string, string> = {
-  siteName: 'site.name',
-  siteMaintenance: 'site.maintenance',
-  uploadMaxSizeMb: 'upload.maxSizeMb',
-  uploadAllowedTypes: 'upload.allowedTypes',
-  generateMaxConcurrent: 'generate.maxConcurrent',
-  generatePollIntervalMs: 'generate.pollIntervalMs',
-  generateMaxPolls: 'generate.maxPolls',
-  refundWindowDays: 'refund.windowDays',
-  refundMaxRatioBps: 'refund.maxRatioBps',
-  refundAllowConsumedTask: 'refund.allowConsumedTask',
-  backupFrequencyDays: 'backup.frequencyDays',
-  backupKeepCount: 'backup.keepCount',
-  retentionAuditLogDays: 'retention.auditLogDays',
-  securitySessionTtlDays: 'security.sessionTtlDays',
-  securityPasswordMinLength: 'security.passwordMinLength',
-};
-
-/**
- * SETTING_DEFS 键 → DTO 字段名 的反向映射。
- *
- * 读取接口必须把**写入时要用的字段名**一起下发: 前端拿到 `site.name`
- * 直接回传会被 `whitelist: true` 静默剥掉, 表现为「保存成功但没变化」
- * （实际是 400 `没有需要更新的设置项`）。这一条是真的踩过。
- */
-export const SETTING_KEY_TO_FIELD: Record<string, string> = Object.fromEntries(
-  Object.entries(FIELD_TO_SETTING_KEY).map(([field, key]) => [key, field]),
-);
-
-/**
- * 从 DTO 提取「本次真正要改的键值」。
- *
- * 用 hasOwnProperty 而非真值判断 —— siteMaintenance=false、uploadMaxSizeMb=0
- * 都是有效值, 用 `if (dto.siteMaintenance)` 会把 false 误判为"未提供"。
- */
-export function collectSettingEntries(dto: UpdateSettingsDto): Record<string, unknown> {
-  const out: Record<string, unknown> = {};
-  const source = dto as unknown as Record<string, unknown>;
-  for (const [field, key] of Object.entries(FIELD_TO_SETTING_KEY)) {
-    if (Object.prototype.hasOwnProperty.call(source, field) && source[field] !== undefined) {
-      out[key] = source[field];
-    }
-  }
-  return out;
+  /** 操作原因。写入系统设置属高危动作，后端强制要求 —— 审计要能回答「谁为什么改」 */
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  reason?: string;
 }

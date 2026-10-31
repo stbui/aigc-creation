@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
-import { AuditAction, RequirePermission } from './admin.decorator';
+import { Body, Controller, Get, Param, Patch, Query, Req } from '@nestjs/common';
+import { AuditAction, RequirePermission, AdminUser } from './admin.decorator';
 import { AppError } from '../common/app.exception';
 import { AdminRoleService } from './admin-role.service';
 import { AdminSettingsService } from './settings.service';
@@ -9,7 +9,7 @@ import { PERMISSIONS, ROLE_LABELS, isAdminRole } from './permissions';
 // ValidationPipe 因此无法识别类型 —— @Body 拿到的是未校验的原始 body,
 // 结果是「请求 200 但 DTO 上一个字段都没生效」, 比直接报错更难排查。
 import { RoleListQueryDto, UpdateRolePermissionsDto } from './dto/audit.dto';
-import { collectSettingEntries, UpdateSettingsDto } from './settings.dto';
+import { UpdateSettingsDto } from './settings.dto';
 
 /** 角色权限管理 */
 @Controller('admin/roles')
@@ -70,17 +70,49 @@ export class AdminSettingsController {
   }
 
   /**
-   * 写入系统设置。
+   * 写入系统设置 / 恢复默认。
    *
-   * 扁平结构提交 (siteName / uploadMaxSizeMb / ...), 字段名到 SETTING_DEFS
-   * key 的映射见 collectSettingEntries。
-   * 未提供任何字段时返回 400, 而不是静默成功。
+   * kv 结构提交：`{ settings: { 'upload.maxSizeMb': 20 }, clears: ['refund.windowDays'], reason }`。
+   * 键的合法性与取值范围由 `SETTING_DEFS` 校验，未知键直接 400。
+   *
+   * **原因强制必填**（此前只有前端拦，后端不校验 —— 绕过前端直接调接口
+   * 就能留下一条没有原因的审计，改了退款窗口也查不出为什么）。
    */
   @Patch()
   @RequirePermission(PERMISSIONS.settingWrite)
   @AuditAction('setting.update')
-  update(@Body() dto: UpdateSettingsDto) {
-    const entries = collectSettingEntries(dto);
-    return this.settings.updateAll(entries, dto?.reason);
+  async update(@Body() dto: UpdateSettingsDto, @AdminUser() user: AdminUser, @Req() req: Request) {
+    const reason = (dto?.reason ?? '').trim();
+    if (!reason) {
+      throw new AppError(40001, '必须填写变更原因 —— 审计记录需要能回答「谁为什么改」', 400);
+    }
+
+    const result = await this.settings.updateAll(
+      dto?.settings ?? {},
+      dto?.clears ?? [],
+      user?.email ?? 'admin',
+      reason,
+    );
+
+    /*
+     * 把「键 → 旧值 → 新值」交给审计拦截器。
+     *
+     * 拦截器只从 body 里挑白名单字段，它拿不到旧值（旧值在库里，
+     * 请求体里没有）。所以由 service 组装好挂在 request 上 ——
+     * 否则审计里只有 reason 文本，改了哪个键、从几改成几全都查不到。
+     */
+    (req as Request & { auditExtra?: Record<string, unknown> }).auditExtra = {
+      changes: result.changes.map((c) => ({
+        key: c.key,
+        label: c.label,
+        before: c.before,
+        after: c.after,
+        action: c.action,
+      })),
+      updated: result.updated,
+      cleared: result.cleared,
+    };
+
+    return result;
   }
 }

@@ -4,7 +4,7 @@
  * 为什么把原先散在 gateway.config.ts 里的 env 常量搬到这里声明:
  * 后台要能编辑这些项, 而可编辑的前提是「每一项有类型/默认值/取值范围/说明」——
  * 否则运营能写进代码根本不认识的键, 或写入越界值后读取时静默出错
- * (与 admin/settings.dto.ts 的 SETTING_DEFS 完全同构, 故沿用其写法)。
+ * (与 common/setting-defs.ts 的 SETTING_DEFS 完全同构, 故沿用其写法)。
  *
  * 优先级链 (三者都生效, 从高到低):
  *   1. 环境变量 <KEY>_ENV / ASSET_PUBLIC_BASE —— 部署期固化, 最高优先

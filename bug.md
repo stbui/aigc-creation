@@ -30,6 +30,18 @@ agent
 tailwind-merge
 
 
+#980	sub2_20261031DOgtRWVM	订阅	
+¥2.36 (手续费 3%)
+到账金额: ¥2.29
+支付宝	已完成	2026/10/31 08:45:15
+
+
+到期时间
+2026/11/01 08:45 (明天)
+每日 Token
+200.07m / 200.00m tokens
+
+
 
 https://www.pixpix.com/zh-CN/workbench
 

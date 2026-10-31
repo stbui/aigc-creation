@@ -20,13 +20,13 @@
 | 总览 | 平台概览 | `/admin` |
 | 运营 | 用户 / 素材 / 任务 / 工单 | `/admin/users` · `/admin/assets` · `/admin/tasks` · `/admin/tickets` |
 | 内容 | 法务文档 / 站内消息 / AI 标识 | `/admin/legal` · `/admin/notifications` · `/admin/aigc-label` |
-| 交易 | 商品 / 订单 / 积分账本 / 能力消耗价 / 优惠券 / 限时活动 / 邀请与签到 | `/admin/products` 等 7 页 |
+| 交易 | 商品 / 会员套餐 / 订单 / 积分账本 / 能力消耗价 / 优惠券 / 限时活动 / 邀请与签到 | `/admin/products` 等 8 页 |
 | 财务 | 支付渠道 / 发票 / 渠道对账 | `/admin/payment-channels` · `/admin/invoices` · `/admin/reconciliation` |
 | 系统 | 角色权限 / 系统设置 / 存储配置 / 定时任务 / 操作审计 | `/admin/roles` 等 5 页 |
 | 模型 | 模型配置 / 调用记录 / 能力管控 | `/admin/model-config` · `/admin/model-calls` · `/admin/capabilities` |
 | 数据安全 | 数据备份 / 保留期清理 | `/admin/backups` · `/admin/retention` |
 
-合计 29 页、8 组。菜单项的 `permission` 字段决定可见性，外壳 `AdminBoardLayout` 只渲染当前角色有权限的项。
+合计 30 页、8 组。菜单项的 `permission` 字段决定可见性，外壳 `AdminBoardLayout` 只渲染当前角色有权限的项。
 
 ### 1.1 分组理由
 

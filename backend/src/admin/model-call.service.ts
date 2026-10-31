@@ -62,9 +62,14 @@ export class ModelCallService {
       _avg: { durationMs: true },
     });
 
-    const gatewayCount = sourceGroups.find((g) => g.source === 'gateway')?._count._all ?? 0;
-    const successCount = await this.prisma.modelCallLog.count({ where: { ...where, success: true } });
-    const fallbackCount = await this.prisma.modelCallLog.count({ where: { ...where, fallback: true } });
+    // 统计卡必须与当前筛选同口径。此前 gatewayCount/localCount 取的是全局
+    // sourceGroups, 只筛模态/能力时会算出「真实模型占比 110%」这种荒谬值。
+    const [successCount, fallbackCount, gatewayCount, localCount] = await Promise.all([
+      this.prisma.modelCallLog.count({ where: { ...where, success: true } }),
+      this.prisma.modelCallLog.count({ where: { ...where, fallback: true } }),
+      this.prisma.modelCallLog.count({ where: { ...where, source: 'gateway' } }),
+      this.prisma.modelCallLog.count({ where: { ...where, source: 'local' } }),
+    ]);
 
     return {
       result: paginate(
@@ -72,6 +77,7 @@ export class ModelCallService {
           id: row.id,
           createdAt: row.createdAt,
           capability: row.capability,
+          modality: row.modality,
           taskId: row.taskId,
           route: row.route,
           source: row.source,
@@ -92,7 +98,7 @@ export class ModelCallService {
       stats: {
         total,
         gatewayCount,
-        localCount: (sourceGroups.find((g) => g.source === 'local')?._count._all ?? 0),
+        localCount,
         successCount,
         fallbackCount,
         avgDurationMs: Math.round(agg._avg.durationMs ?? 0),
@@ -121,6 +127,7 @@ export class ModelCallService {
       [
         { label: '时间', value: (r) => r.createdAt },
         { label: '能力', value: (r) => r.capability },
+        { label: '模态', value: (r) => r.modality ?? '' },
         { label: '路由', value: (r) => r.route },
         { label: '实际通道', value: (r) => r.source },
         { label: '历史回落', value: (r) => (r.fallback ? '是' : '否') },
@@ -142,7 +149,23 @@ export class ModelCallService {
   /** 单条详情 (含完整 prompt) */
   async detail(id: string) {
     const row = await this.prisma.modelCallLog.findUnique({ where: { id } });
-    return row ? { ...row } : null;
+    if (!row) return null;
+
+    // taskId 列历史上写的是渠道/厂商任务 id（见 image-call-logger），并不是
+    // GenerationTask.id。这里以数据库实际存在与否为准做区分：命中才是可深链的
+    // 本地任务，未命中则如实作为渠道任务号展示，避免前端拼出 404 链接。
+    const localTask = row.taskId
+      ? await this.prisma.generationTask.findUnique({
+          where: { id: row.taskId },
+          select: { id: true },
+        })
+      : null;
+
+    return {
+      ...row,
+      generationTaskId: localTask?.id ?? null,
+      gatewayTaskId: localTask ? null : row.taskId,
+    };
   }
 
   /** 已知能力 id 全集 (供前端筛选下拉, 与后端校验口径一致) */
@@ -159,6 +182,9 @@ export class ModelCallService {
   private listWhere(query: ModelCallListQueryDto): Record<string, unknown> {
     const where: Record<string, unknown> = {};
     if (query.capability) where['capability'] = query.capability;
+    if (query.modality) {
+      where['modality'] = query.modality === 'unknown' ? null : query.modality;
+    }
     if (query.source) where['source'] = query.source;
     if (query.fallback !== undefined) where['fallback'] = query.fallback;
     if (query.success !== undefined) where['success'] = query.success;

@@ -186,7 +186,7 @@ Body
 
 ## 4. 页面原型
 
-29 个页面归为四类。同一类共享布局，只变列与操作，新增页面照原型走。
+30 个页面归为四类。同一类共享布局，只变列与操作，新增页面照原型走。
 
 | 原型 | 页面 | 结构 |
 | --- | --- | --- |
@@ -230,7 +230,7 @@ Body
 
 ## 7. 已实施：BoardUI 整站替换
 
-> 状态：**已完成（2026-10-30）**。外壳、共享控件与 29 个页面全部走 BoardUI；后台树内 `from 'antd'` 为 0，legacy 实现与 `VITE_ADMIN_UI` 开关已删除，无回滚路径。进度与消费审计见 §7.10。
+> 状态：**已完成（2026-10-30）**。外壳、共享控件与 30 个页面全部走 BoardUI；后台树内 `from 'antd'` 为 0，legacy 实现与 `VITE_ADMIN_UI` 开关已删除，无回滚路径。进度与消费审计见 §7.10。
 > 来源：BoardUI 免费层（MIT），仓库 `https://github.com/BoardUI/boardui`，commit `ec5c5eb`（2026-10-02）。
 > 决策：2026-10-30 选定「C 整站替换」，范围仅 `/admin`，C 端不动；纯 C，不保留值班带。
 
@@ -238,7 +238,7 @@ Body
 
 | 做 | 不做 |
 | --- | --- |
-| 后台 29 页的 UI 层重写为 BoardUI + React Aria | 不改 C 端、不改后端 / API / 权限 / 审计 / 数据模型 |
+| 后台 30 页的 UI 层重写为 BoardUI + React Aria | 不改 C 端、不改后端 / API / 权限 / 审计 / 数据模型 |
 | 保留 `/admin/*` 路由、权限链、审计原因、批量 ≤100、CSV、URL 筛选、`?id=` 深链 | 不引入 BoardUI Pro、不启用暗色 / RTL / 移动端布局 |
 | 复用 `lib/api.ts`、`context/*`、`hooks/*` 与业务校验 | 不顺手重构 C 端或无关页面 |
 
@@ -246,7 +246,7 @@ Body
 
 | 项 | 现状（2026-10-30 代码） |
 | --- | --- |
-| 后台页面 | 29 页 / 16,666 行（`frontend/src/pages/admin`） |
+| 后台页面 | 30 页 / 16,666 行（`frontend/src/pages/admin`） |
 | antd 依赖面 | 迁移前基线：44 个文件 `from 'antd'`、约 171 处 `message.*`、29 处 `<Table>`、13 处 Drawer、17 处 Form、49 处 Select、30 处 Tag、24 处 Tooltip、11 处 Card、20 处 Alert、32 处 `App.useApp()`。**迁移后**：`pages/admin` + `components/admin` + `admin-ui` 三个目录 `from 'antd'` 均为 **0**；全仓仍有 48 个文件引 antd，全部在 C 端 |
 | BoardUI 免费层缺口 | 无通用 Drawer / Toast / Confirm / Form / Card / Empty / Skeleton / Result / Descriptions / Steps，需先建约 10 个基础件 |
 | 测试 | 后台组件单测、共享 `StateViews` 单测、Playwright admin e2e，选择器需重写 |
@@ -260,7 +260,7 @@ Body
   - `providers/`：Toast、Confirm、Direction（zh-CN）、light-only theme。
   - `shell/`：`AdminBoardLayout`，复用 `AdminShell` 鉴权链与路由表；单栏结构（导航 + 内容），不含值班带。
   - `primitives/`：BoardUI 缺的 Drawer / Toast / Confirm / Card / Empty / Skeleton / Result / Descriptions / Steps / FormField；DataTable / Pagination / FilterBar 适配层。
-  - `pages/`：29 页的页面级布局与业务编排；控件全部取自 `primitives/controls/widgets`，页面内不再出现 `adm-*` 类。
+  - `pages/`：30 页的页面级布局与业务编排；控件全部取自 `primitives/controls/widgets`，页面内不再出现 `adm-*` 类。
 - `frontend/src/styles/boardui.css`：只导入 `tailwindcss/theme.css` + `tailwindcss/utilities.css`，**不导入 preflight**；`@source` 指向 `admin-ui` / `pages/admin` / `components/admin` / `vendor/boardui`（`utilities.css` 用 `source(none)` 关掉自动探测，四个目录缺一个，该目录的工具类就不生成且构建不报错）；`--color-accent-*` 重映射品牌紫 `#5546d8`；不导入 `.dark`。只在 admin 入口 chunk 加载，C 端不下载。三条非显然的约定：
   - **`* { border: 0 solid }` 必须是全局规则，不能收进 `.bui-admin`**：Tailwind 的边框工具类只写宽度，样式靠 preflight；而抽屉 / 弹层 / Toast 渲染在 `body` 的 portal 里，收进作用域会让浮层独自丢掉所有边线，且只在打开弹层时才看得见。宽度为 0 的边框本来不渲染，对现有样式无副作用；global.css 未分层，冲突时仍以它为准。
   - **portal 浮层根节点要挂 `.bui-scope`**：它只带字体与控件重置、不带底色。`bui-scope` 与 `.bui-admin` 的区别是后者还会上页面底色，挂到遮罩上会把半透明遮罩刷成实色。
@@ -272,7 +272,7 @@ Body
 
 - `/admin/*` 路由不变；迁移期曾用 `VITE_ADMIN_UI=legacy|boardui` 双跑，P4 收尾时连同 `admin-ui/lib/flag.ts`、`AdminLayout.tsx`、`*.legacy.tsx` 一并删除 —— **无回滚路径**，这是「纯 C」决策的直接后果。
 - `AdminShell`（在 `AdminDashboardPage` 内导出）的鉴权链与 `Routes` 表全程未动，只换了外壳与渲染层。
-- `components/admin/PageHeader.tsx` 与 `AdminWidgets.tsx` 保留为单一路径的再导出，29 页 import 与签名不变。
+- `components/admin/PageHeader.tsx` 与 `AdminWidgets.tsx` 保留为单一路径的再导出，30 页 import 与签名不变。
 
 ### 7.5 阶段计划
 
@@ -361,7 +361,7 @@ Body
 | 基础件 | `admin-ui/primitives/`：Drawer、ModalDialog（居中弹窗，与抽屉分工见文件注释）、Panel、EmptyState、Skeleton、Result、Descriptions、Steps、FormField、Notice（info/success/warn/danger/locked） |
 | 外壳 | `admin-ui/shell/AdminBoardLayout.tsx`：侧栏导航、⌘K 全局搜索、告警铃、环境标识、密度开关、用户菜单、未保存拦截；无值班带 |
 | 共享控件（BoardUI 版） | `admin-ui/widgets/AdminChrome.tsx`：页头、筛选条、已筛选回显、统计卡、可折叠面板、状态标签、空/加载/失败/陈旧态、详情抽屉、页内确认条；签名与旧版逐字一致 |
-| 共享控件入口 | `components/admin/PageHeader.tsx` 与 `AdminWidgets.tsx` 是**单一路径**的再导出（指向 `admin-ui/widgets/AdminChrome` 与 `primitives`），数据 hook 只有一份；29 页 import 与签名不变。`*.legacy.tsx` 两份已随 P4 删除 |
+| 共享控件入口 | `components/admin/PageHeader.tsx` 与 `AdminWidgets.tsx` 是**单一路径**的再导出（指向 `admin-ui/widgets/AdminChrome` 与 `primitives`），数据 hook 只有一份；30 页 import 与签名不变。`*.legacy.tsx` 两份已随 P4 删除 |
 | 数据表 | `admin-ui/primitives/DataTable.tsx`：服务端分页/排序/选择（上限 100）、右固定操作列、密度、空/加载/失败态、行内展开（`renderExpanded` + `expandedKeys`） |
 | 表单控件 | `admin-ui/controls/`：`TextInput`（allowClear / 回车提交 / `showCount` / `disabled` / `type=date\|datetime-local`）、`SelectBox`（React Aria Select 包成 `string \| undefined` + 「全部」哨兵；**必须渲染静态 `SelectItem` 元素**，vendor 的 `Select.children` 收 `ReactNode`，传 `(item) => …` 渲染函数会被当普通子节点交给 Provider，React 每帧报 function-as-child）、`NumberInput`（含步进）、`TextArea`（含计数与 `disabled`）、`SwitchBox`（把 RAC 的 `isSelected` 收成 `checked`）、`SegmentedBox`（分段切换，单选不可空）、`CheckBox`（含半选）、`FilePick`（只选文件不发请求，选完再点导入）、`HoverTip`（可聚焦的说明气泡） |
 | 全局件挂载 | `admin-ui/providers/AdminUIProvider` 统一挂 Toast + Confirm，在 `AdminShell`（`AdminDashboardPage` 内导出）里包住全部 `/admin/*` 路由；两个 Provider 只在真正弹提示 / 确认时才渲染 portal |
@@ -377,4 +377,53 @@ Body
 2. 概览趋势图仍用 CSS 自绘柱状图，未引 `recharts`。
 3. 后台组件单测目前两份：`components/admin/__tests__/AdminWidgets.test.tsx`（`useAdminUrlFilterSync` / `useAdminDetailParam` 两个 URL 契约）与 `admin-ui/primitives/__tests__/DataTable.density.test.tsx`（密度上下文下发与 `density` prop 优先级）。`AdminDataTable` 的排序 / 选择 / 展开交互、`DraftGuard`、`FilterBar` 尚未补单测。`vitest.config.ts` 已补上 `@` → `src/vendor/boardui` 别名（与 `vite.config.ts` 一致），否则任何渲染 vendor 组件的测试都会挂在 import 解析上。
 
-验证状态（P4）：按仓库纪律未运行 `tsc` / 构建，浏览器验收待仓库所有者执行。已做的检查：`pages/admin` + `components/admin` + `admin-ui` 三目录 `from 'antd'` grep 结果为 0；`tests/*.spec.ts` 内无残留 antd / `adm-*` 选择器（C 端 `product-*.spec.ts` 里的 `.ant-*` 属于 C 端，正确）；`pages/admin` + `components/admin` + `admin-ui` 共 63 个源文件一次性交给 esbuild 转译，全部通过（无语法 / 解析错误）；`global.css` 花括号配平（3564 / 3564），删除的 925 条选择器逐条核对「全部含 `adm-`」，无 C 端选择器被误删；`npm test` 全量 18 文件 / 96 用例通过。另用 Playwright 驱动真实 Chrome 带着 admin 令牌逐条打开 29 个后台路由（开发档 5100 + 4100 同时起），逐页断言外壳渲染、内容非空、控制台零报错；正式 e2e 套件（`frontend/tests`）未执行。
+验证状态（P4）：按仓库纪律未运行 `tsc` / 构建，浏览器验收待仓库所有者执行。已做的检查：`pages/admin` + `components/admin` + `admin-ui` 三目录 `from 'antd'` grep 结果为 0；`tests/*.spec.ts` 内无残留 antd / `adm-*` 选择器（C 端 `product-*.spec.ts` 里的 `.ant-*` 属于 C 端，正确）；`pages/admin` + `components/admin` + `admin-ui` 共 63 个源文件一次性交给 esbuild 转译，全部通过（无语法 / 解析错误）；`global.css` 花括号配平（3564 / 3564），删除的 925 条选择器逐条核对「全部含 `adm-`」，无 C 端选择器被误删；`npm test` 全量 18 文件 / 96 用例通过。另用 Playwright 驱动真实 Chrome 带着 admin 令牌逐条打开 30 个后台路由（开发档 5100 + 4100 同时起），逐页断言外壳渲染、内容非空、控制台零报错；正式 e2e 套件（`frontend/tests`）未执行。
+
+### 7.11 UI 一致性规则（2026-10-31 逐页排查补充）
+
+这一轮按 30 个后台路由逐页截图 + DOM 几何量测排查，下面几条是**必须守住**的规则，
+以及踩过的坑。
+
+#### 窄版面板与保存条
+
+- 表单型页面（系统设置、AI 标识、营销规则）的 `Panel isNarrow` 限宽 760px，
+  **一律左对齐**。外壳的 `.adm-content > :where(*)` 会把直接子块居中，
+  若窄面板跟着居中，同页两块面板的左边缘会差出 190px 以上。
+  实现上用 `inline style={{ maxWidth: 760, marginInline: 0 }}`，不要用
+  `max-w-[760px]` 工具类 —— 宽度会被外壳规则按加载顺序盖掉。
+- 底部保存条用 `SaveBar narrow`（`admin-ui/primitives`），宽度与左边缘必须和
+  上方面板严格一致；宽版页面（AI 标识的双栏布局）用 `<SaveBar>`，铺满内容区。
+- 回归用例：`tests/admin-layout.spec.ts` 的「窄版表单页的面板与保存条左对齐且同宽」。
+
+#### 筛选条
+
+- `FilterBar` 在 1440px 内容区（1141px）内**必须单行**。控件宽度总和要预留
+  「查询 / 重置」约 120px，宽度用 `w-28` / `w-32` / `w-36` / `w-40`，
+  日期框最多 `w-32`（`type=date`）或 `w-40`（`type=datetime-local`）。
+- `SelectBox` 未选中时显示 `placeholder`（「状态」「渠道」「退款状态」），
+  不再一律显示「全部」——并排三个「全部」时看不出哪一格是什么。
+  下拉里的「全部」项仍然表示「不过滤」。
+- `AppliedFilters` 回显必须独占一行（`basis-full`），不能和查询按钮挤在同一行。
+- 回归用例：`tests/admin-layout.spec.ts` 的「1440px 下筛选条不换行」。
+
+#### 行内动作与按钮配色
+
+- 表格行内动作统一 `Button variant="ghost" size="small"`；危险动作
+  （退款 / 删除 / 下线 / 终止）用 `variant="dangerGhost"`（浅底红字），
+  **不要**每行铺一颗实心红按钮 —— 整页最抢眼的不该是重复的「下线」。
+- 禁止写 `variant="ghost" className="text-rose-600"`：ghost 的前景色是自定义
+  utility，`tailwind-merge` 不认为两者冲突，最终由 CSS 顺序决定，红字不生效。
+- **关键坑：`antd/dist/reset.css` 不能以不分层方式全局引入。** 它里面的
+  `input, button, select, optgroup, textarea { color: inherit }` 属于未分层规则，
+  优先级高于后台所有 `@layer utilities` 里的颜色类 —— 主按钮白字、危险动作红字
+  全部被盖成继承色（紫底黑字）。现统一经 `src/styles/antd-reset.css`
+  以 `layer(base)` 引入；改动这里前先看该文件注释。
+
+#### 其它
+
+- 指标卡栅格用 `[grid-template-columns:repeat(auto-fit,minmax(170~190px,1fr))]`，
+  不要写死 `2xl:grid-cols-5` —— 1440px 下断点不触发，5 张卡会排成 3+2。
+- `NumberInput` 自带 ▲▼ 步进，必须用 `.adm-number-input` 关掉浏览器原生
+  spinner，否则两套箭头叠在圆角边框上。
+- 空表默认带 `Inbox` 图标（`AdminDataTable` 内置），不要只留一行小字。
+- 不可手动触发的定时任务在行尾标「定时执行」，不要留空白。

@@ -23398,8 +23398,28 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   padding: 18px 26px 56px;
   background: var(--page-bg);
 }
-/* 所有直接子块统一限宽居中 */
-.adm-content > * {
+/*
+ * 后台数字输入。组件自己画了 ▲▼ 步进按钮，浏览器原生 spinner 会在右侧
+ * 再叠一组黑色三角（Chrome 上还会溢出圆角边框），必须关掉。
+ */
+.adm-number-input::-webkit-outer-spin-button,
+.adm-number-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.adm-number-input {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/*
+ * 所有直接子块统一限宽居中。
+ *
+ * 用 :where() 把选择器权重降到与普通工具类相同 —— 否则 `.adm-content > *`
+ * 会压过 `max-w-[760px]`，让表单页的窄版面板仍被拉成 1600px，
+ * 页面里出现「第一块 760、下一块 1141」的错位。
+ */
+.adm-content > :where(*) {
   width: 100%;
   max-width: var(--adm-page-max);
   margin-inline: auto;

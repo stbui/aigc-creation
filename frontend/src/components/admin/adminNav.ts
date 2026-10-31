@@ -61,6 +61,7 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
     name: '交易',
     items: [
       { path: '/admin/products', label: '商品管理', permission: 'product.read' },
+      { path: '/admin/membership-plans', label: '会员套餐', short: '会员', permission: 'product.read' },
       { path: '/admin/orders', label: '订单管理', permission: 'order.read' },
       { path: '/admin/credits', label: '积分账本', permission: 'credit.read' },
       // 「能力消耗价」与「能力管控」前两字相同，折叠态各给一个能区分的字形

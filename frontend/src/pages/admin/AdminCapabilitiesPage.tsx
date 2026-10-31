@@ -248,7 +248,12 @@ export function AdminCapabilitiesPage() {
         const button = (
           <Button
             size="small"
-            variant={row.enabled ? 'danger' : 'secondary'}
+            /*
+             * 与其它表的行内动作保持一致：ghost 小按钮 + 危险动作用红字。
+             * 之前每行一颗实心红按钮，16 行下来整页最抢眼的是「下线」，
+             * 反而看不出真正的状态列。
+             */
+            variant={row.enabled ? 'dangerGhost' : 'ghost'}
             disabled={!writable || saving === row.capabilityId}
             onClick={() => {
               if (row.enabled) {

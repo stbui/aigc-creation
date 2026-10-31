@@ -660,7 +660,8 @@ model ModelChannelConfig {
 // 库管理员仍可直接删库, 彻底解决需独立存储或哈希链。
 model ModelCallLog {
   id          String   @id @default(cuid())
-  /// 关联的生成任务; 网关提交失败等场景下可能为空 (taskId 由业务侧后填, 允许空)
+  /// 生成侧关联 id。历史写入为渠道/厂商任务号, 不保证是本地 GenerationTask.id;
+  /// 后台展示时必须先校验本地任务是否存在, 不能直接拼任务详情深链。
   taskId      String?
   /// 触发本次调用的能力, 如 'free_create' | 'main_image'
   capability  String

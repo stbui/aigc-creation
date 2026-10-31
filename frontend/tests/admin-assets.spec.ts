@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
-import { ADMIN_EMAIL, ADMIN_PASSWORD, HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
+import { HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
+import { ensureAdminLogin } from './support/admin-login';
 
 /**
  * 素材管理 + 存储配置 E2E (admin-prd.md §3.4 B-21~27 / §3.11 B-62/63)。
@@ -24,22 +25,18 @@ const rows = (page: Page) => page.getByTestId('admin-table-row');
 async function login(page: Page) {
   // 侧栏在 ≤1280px 折叠, 分组标题按设计隐藏
   await page.setViewportSize({ width: 1600, height: 1000 });
-  await page.goto(`${UI}/login`);
-  await page.locator('input[type="email"], input#email').first().fill(ADMIN_EMAIL);
-  await page.locator('input[type="password"]').first().fill(ADMIN_PASSWORD);
-  await page.locator('input[type="password"]').first().press('Enter');
-  await page.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 15000 });
+  await ensureAdminLogin(page);
 }
 
 /** 切到表格视图 */
 async function toTable(page: Page) {
-  await page.getByRole('button', { name: '表格', exact: true }).click();
+  await page.getByRole('radio', { name: '表格', exact: true }).click();
   await expect(page.getByTestId('admin-table').first()).toBeVisible({ timeout: 10000 });
 }
 
 /** 切回网格视图 */
 async function toGrid(page: Page) {
-  await page.getByRole('button', { name: '网格', exact: true }).click();
+  await page.getByRole('radio', { name: '网格', exact: true }).click();
   await expect(cells(page).first()).toBeVisible({ timeout: 10000 });
 }
 
@@ -116,7 +113,11 @@ test.describe('素材管理', () => {
   test('桌面 1280 / 1440 / 1920 无横向溢出且无控制台告警', async ({ page }) => {
     const issues: string[] = [];
     page.on('console', (msg) => {
-      if (msg.type() === 'error' || msg.type() === 'warning') {
+      // 素材可能指向外部存储；单张图请求被重置会由浏览器记一条资源错误，
+      // 页面自身已有加载失败占位。这里只守应用 JS / 业务告警，避免外部
+      // 网络抖动把布局回归弄红。
+      const resourceLoadNoise = msg.text().startsWith('Failed to load resource:');
+      if (!resourceLoadNoise && (msg.type() === 'error' || msg.type() === 'warning')) {
         issues.push(`${msg.type()}: ${msg.text()}`);
       }
     });
@@ -167,7 +168,7 @@ test.describe('素材管理', () => {
     await page.goto(`${UI}/admin/assets`);
     await cells(page).first().waitFor({ state: 'visible', timeout: 20000 });
 
-    await page.getByLabel('按类型筛选').click();
+    await page.getByRole('button', { name: /按类型筛选/ }).click();
     await page.getByRole('option', { name: '原始上传' }).click();
     await page.getByRole('button', { name: '查询' }).click();
 

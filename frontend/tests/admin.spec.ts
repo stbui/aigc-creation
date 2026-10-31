@@ -22,8 +22,11 @@ test.describe('后台管理端', () => {
   test('概览页加载真实统计', async ({ page }) => {
     await page.goto(`${UI}/admin`);
     await expect(page.getByRole('heading', { name: '平台概览' })).toBeVisible({ timeout: 15000 });
-    await expect(page.getByText('用户总数')).toBeVisible();
-    await expect(page.getByText('任务总数')).toBeVisible();
+    // 2026-10-30 起概览首屏改为值班台：先回答「什么坏了 / 机器是否在转」，
+    // 累计指标下沉到下方区块。断言改为当前真实存在的工作表区块。
+    await expect(page.getByRole('region', { name: '值班条' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '异常队列' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '机器状态' })).toBeVisible();
   });
 
   test('用户管理页渲染列表', async ({ page }) => {
@@ -42,11 +45,40 @@ test.describe('后台管理端', () => {
     await expect(page.getByRole('checkbox').first()).toBeVisible();
   });
 
+  test('会员套餐页渲染真实套餐列表', async ({ page }) => {
+    await page.goto(`${UI}/admin/membership-plans`);
+    await expect(page.getByRole('heading', { name: '会员套餐', exact: true })).toBeVisible({ timeout: 15000 });
+    await expect(page.getByTestId('admin-table-row').filter({ hasText: 'free' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '新建套餐' })).toBeVisible();
+  });
+
+  test('会员套餐关闭抽屉前保护未保存修改', async ({ page }) => {
+    await page.goto(`${UI}/admin/membership-plans`);
+    await expect(page.getByRole('heading', { name: '会员套餐', exact: true })).toBeVisible({ timeout: 15000 });
+
+    await page.getByTestId('admin-table-row').first().getByRole('button', { name: '编辑' }).click();
+    const panel = page.getByRole('dialog', { name: '编辑会员套餐' });
+    await expect(panel).toBeVisible();
+    const name = panel.getByLabel('套餐名称');
+    await name.fill(`${await name.inputValue()} · 未保存`);
+
+    await panel.getByRole('button', { name: '关闭' }).click();
+    const confirm = page.getByRole('dialog').filter({ hasText: '放弃未保存的修改？' });
+    await expect(confirm).toBeVisible();
+    await confirm.getByRole('button', { name: '继续编辑' }).click();
+    await expect(panel).toBeVisible();
+
+    await panel.getByRole('button', { name: '关闭' }).click();
+    await confirm.getByRole('button', { name: '放弃修改' }).click();
+    await expect(page.getByTestId('admin-drawer')).toHaveCount(0);
+  });
+
   test('系统设置页渲染 Tab 与设置项', async ({ page }) => {
     await page.goto(`${UI}/admin/settings`);
     await expect(page.getByRole('heading', { name: '系统设置' })).toBeVisible({ timeout: 15000 });
     await expect(page.getByRole('tab').first()).toBeVisible();
-    // 当前分组里必须有配置项（输入框 / 数字框 / 开关都算）
+    // 默认分组「站点」是只读配置地图，不渲染输入框；切到「上传」才应出现可编辑控件。
+    await page.getByRole('tab', { name: /上传/ }).click();
     const panel = page.getByTestId('admin-panel').first();
     await expect(panel).toBeVisible();
     await expect(panel.locator('input').first()).toBeVisible();

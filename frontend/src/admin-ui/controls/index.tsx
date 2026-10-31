@@ -207,7 +207,8 @@ export function NumberInput({
   };
 
   const inputClass = cx(
-    'h-8 w-full rounded-lg border border-border-button-default bg-background-primary-default pl-2.5 text-body-medium text-text-primary shadow-xs tabular-nums',
+    // adm-number-input 关掉浏览器原生 spinner：下面自带 ▲▼，两套箭头会叠在一起
+    'adm-number-input h-8 w-full rounded-lg border border-border-button-default bg-background-primary-default pl-2.5 text-body-medium text-text-primary shadow-xs tabular-nums',
     'transition-colors hover:border-border-button-hover',
     'outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-border-focus-ring',
     disabled ? 'cursor-not-allowed opacity-60' : 'pr-6',
@@ -552,8 +553,17 @@ export function SelectBox({
         // 选中「全部」时按占位色显示，筛选条里才能一眼看出「这一项没在过滤」
         !value && 'text-text-placeholder',
       )}
+      /*
+       * 未选中（含「全部」这一哨兵项）时显示各自的占位文案。
+       * 否则筛选条里并排的三个下拉会同时写「全部」，看不出哪个是状态、
+       * 哪个是渠道；placeholder 才是这一格的身份标签。
+       */
       renderValue={({ selectedText, isPlaceholder }) =>
-        isPlaceholder ? <span className="text-text-placeholder">{placeholder}</span> : selectedText
+        !value || isPlaceholder ? (
+          <span className="text-text-placeholder">{placeholder}</span>
+        ) : (
+          selectedText
+        )
       }
     >
       {/*

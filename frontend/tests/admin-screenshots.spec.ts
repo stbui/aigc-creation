@@ -1,11 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { mkdirSync } from 'fs';
-import { ADMIN_EMAIL, ADMIN_PASSWORD, HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
+import { HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
+import { ensureAdminLogin } from './support/admin-login';
 
 /** 截图取证: 登录后台后逐页截图, 作为交付证据 */
 const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
-const EMAIL = ADMIN_EMAIL;
-const PASSWORD = ADMIN_PASSWORD;
 const OUT = '../docs/screenshots/admin';
 
 test('后台五页截图', async ({ page }) => {
@@ -13,11 +12,7 @@ test('后台五页截图', async ({ page }) => {
   mkdirSync(OUT, { recursive: true });
 
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto(`${UI}/login`);
-  await page.locator('input[type="email"], input#email').first().fill(EMAIL);
-  await page.locator('input[type="password"]').first().fill(PASSWORD);
-  await page.locator('input[type="password"]').first().press('Enter');
-  await page.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 15000 });
+  await ensureAdminLogin(page);
 
   const pages: Array<[string, string]> = [
     ['/admin', '01-dashboard'],

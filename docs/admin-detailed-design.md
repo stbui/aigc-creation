@@ -39,7 +39,7 @@ backend/src/admin/
 ├── model.controller.ts / model-config.service.ts / model-call.service.ts
 ├── model-channel.controller.ts / model-channel.service.ts
 ├── capability.controller.ts
-├── roles.controller.ts / settings.service.ts / settings.dto.ts
+├── roles.controller.ts / settings.service.ts / ../common/setting-defs.ts
 ├── storage.controller.ts / scheduler.controller.ts / scheduler.service.ts
 ├── backup.controller.ts / backup.service.ts / retention.controller.ts
 ├── audit.controller.ts / audit.service.ts
@@ -63,7 +63,7 @@ frontend/src/components/admin/
 ├── DutyBand.tsx / DutyContext.tsx   # 值班塔渲染与耗时格式化工具；轮询只挂在概览路由
 └── statusMeta.ts                    # 状态 → 文案 / 色调映射
 
-frontend/src/pages/admin/            # 29 个页面 + modelConfig/ 子组件目录
+frontend/src/pages/admin/            # 30 个页面 + modelConfig/ 子组件目录
 ```
 
 ### 0.2 守卫链与审计
@@ -400,11 +400,13 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 
 ## 14. 系统设置 `/admin/settings`
 
-`GET|PATCH /admin/settings`（`setting.read` / `setting.write`）。默认值与键名只在 `settings.dto.ts` 的 `SETTING_DEFS` 定义，包括：站点信息、上传限制、生成超时与轮询、退款规则（`refund.windowDays` / `refund.maxRatioBps` / `refund.allowConsumedTask`）、备份频次与保留份数。
+`GET|PATCH /admin/settings`（`setting.read` / `setting.write`）。默认值与键名只在 `backend/src/common/setting-defs.ts` 的 `SETTING_DEFS` 定义，包括：站点信息、上传限制、生成超时与轮询、退款规则（`refund.windowDays` / `refund.maxRatioBps` / `refund.allowConsumedTask`）、备份频次与保留份数。
 
 规则：
 
-- 写入前按 `SETTING_DEFS` 做类型与范围校验，非法值整体拒绝。
+- 写入载荷为 `{ settings: Record<key, value>, clears?: string[], reason }`；`settings` 用点号键，`clears` 删除运行时覆盖并回落代码默认值。
+- 写入前按 `SETTING_DEFS` 做类型与范围校验，非法值整体拒绝；同一键不能同时出现在 `settings` 与 `clears`。
+- 只读项（`readOnly`）不渲染可编辑控件，只展示当前值并给出 `linkTo` 入口。
 - 退款规则的读取方是 `order.service.refund`，规则对象由后台控制器取好后传入，订单域不依赖 admin 层。
 - 保存写审计；`setting.write` 属高危，必填原因。
 
@@ -486,7 +488,9 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 
 ### 18.2 调用记录 `/admin/model-calls`
 
-`GET /admin/model-calls`、`/admin/model-calls/:id`（`model.call_read`）。记录线上每次通道调用：通道、模型、耗时、结果、失败原因与回落链路。用于回答「刚才走的是哪条线路」。
+`GET /admin/model-calls`、`/admin/model-calls/:id`（`model.call_read`）。记录线上每次通道调用：模态、通道、模型、耗时、结果、失败原因与回落链路，可按能力 / 模态 / 通道 / 成败 / 历史回落筛选。用于回答「刚才走的是哪条线路」。
+
+`taskId` 列历史上存放的是渠道/厂商任务号，不保证命中本地 `GenerationTask`。详情接口会校验后分别下发 `generationTaskId`（可深链）与 `gatewayTaskId`（仅文本展示），前端不得直接把原始 `taskId` 拼成任务详情链接。
 
 `GET /admin/model-calls/export`（`data.export` + 审计）导出同一筛选口径的 CSV（含提示词）；上限 5000 行。路由必须声明在 `:id` 之前。
 

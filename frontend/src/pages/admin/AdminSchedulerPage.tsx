@@ -181,20 +181,25 @@ export function AdminSchedulerPage() {
                       连续失败 {t.consecutiveFailures}
                     </Chip>
                   )}
-                  {data.manuallyRunnable.includes(t.name) &&
-                    (writable ? (
-                      <Button
-                        variant="secondary"
-                        size="small"
-                        leadingIcon={Play}
-                        disabled={busy}
-                        onClick={() => void runNow(t)}
-                      >
-                        立即执行
-                      </Button>
-                    ) : (
-                      <span className="text-[11px] text-text-placeholder">仅查看</span>
-                    ))}
+                  {/*
+                   * 有些任务按设计不可手动触发（备份 / 清理会写库）。什么都不显示
+                   * 会让人以为「按钮丢了」，补一句「定时执行」把空位说明白。
+                   */}
+                  {!data.manuallyRunnable.includes(t.name) ? (
+                    <span className="text-[11px] text-text-placeholder">定时执行</span>
+                  ) : writable ? (
+                    <Button
+                      variant="secondary"
+                      size="small"
+                      leadingIcon={Play}
+                      disabled={busy}
+                      onClick={() => void runNow(t)}
+                    >
+                      立即执行
+                    </Button>
+                  ) : (
+                    <span className="text-[11px] text-text-placeholder">仅查看</span>
+                  )}
                 </div>
               </div>
             );

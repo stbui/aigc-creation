@@ -31,7 +31,7 @@ export type OrderStatus = 'pending' | 'paid' | 'cancelled' | 'refunded' | 'parti
  * 退款规则快照 (B8)。
  *
  * 由调用方（后台控制器）从 `AdminSettingsService.refundRules()` 取好再传入 ——
- * OrdersModule 不依赖 admin 层, 规则键名只在一处（`settings.dto.ts`）定义。
+ * OrdersModule 不依赖 admin 层, 规则键名只在一处（`common/setting-defs.ts`）定义。
  */
 export interface RefundRules {
   /** 支付后多少天内可退, 0 = 不限 */

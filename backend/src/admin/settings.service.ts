@@ -1,30 +1,48 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
+import { SettingsService } from '../common/settings.service';
 import {
   SETTING_DEFS,
   SETTING_GROUP_LABELS,
-  SETTING_KEY_TO_FIELD,
   findSettingDef,
+  validateSettingValue,
   type SettingDef,
-} from './settings.dto';
+} from '../common/setting-defs';
+import { unknownAllowedExts } from '../common/image-formats';
 
 /**
- * 系统设置。
+ * 后台系统设置 —— 写路径。
  *
- * 优先级链 (与通道配置同构):
- *   代码默认值 (本文件)  →  DB 运行时覆盖 (SystemSetting 表)
- * 后台写入的是 DB 覆盖值, 重启后仍生效; 若将来改为环境变量控制,
- * 需在界面明示「环境变量优先级更高」—— 目前本项目尚无对应环境变量。
+ * 读路径（业务侧读生效值）在 `common/settings.service.ts`；这里是**唯一**
+ * 写 SystemSetting 表的地方。
+ *
+ * 三条设计约束，都来自实际踩过的坑：
+ *
+ * 1. **kv 提交**。`SETTING_DEFS` 是唯一事实源，写入按它校验白名单与类型，
+ *    未知键直接 400。此前用 DTO 逐字段装饰器 + 驼峰↔点号映射表，
+ *    「加一项设置要改 4 处」，任一处漏改就静默漂移。
+ *
+ * 2. **落库走事务**。此前逐条 `await`，第 3 条失败时前 2 条已持久化 ——
+ *    页面报错说「保存失败」，配置却已生效，运营无从判断该重试还是回滚。
+ *
+ * 3. **能改回去**。`clears` 删掉 SystemSetting 行即回落代码默认值 ——
+ *    此前只有 create/update，没有 delete，页面却在报告 `overridden`
+ *    并渲染「已自定义」徽标：告诉运营这个值被改过，却不给他任何办法改回去。
  */
 @Injectable()
 export class AdminSettingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly logger = new Logger(AdminSettingsService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly settings: SettingsService,
+  ) {}
 
   /** 分组读取全部设置项 + 当前生效值 */
   async readAll() {
     const rows = await this.prisma.systemSetting.findMany();
-    const byKey = new Map(rows.map((r) => [r.key, r.value]));
+    const byKey = new Map(rows.map((r) => [r.key, r]));
 
     const groups: Record<
       string,
@@ -32,25 +50,31 @@ export class AdminSettingsService {
         key: string;
         label: string;
         items: Array<
-          SettingDef & { field: string; value: string | number | boolean; overridden: boolean }
+          SettingDef & {
+            value: string | number | boolean;
+            overridden: boolean;
+            updatedBy: string | null;
+            updatedAt: string | null;
+          }
         >;
       }
     > = {};
 
     for (const def of SETTING_DEFS) {
-      const raw = byKey.get(def.key);
-      const overridden = raw !== undefined;
-      const group = (groups[def.key.split('.')[0]] ??= {
-        key: def.key.split('.')[0],
+      const row = byKey.get(def.key);
+      const overridden = row !== undefined;
+      const groupKey = def.key.split('.')[0];
+      const group = (groups[groupKey] ??= {
+        key: groupKey,
         label: SETTING_GROUP_LABELS[def.group] ?? def.group,
         items: [],
       });
       group.items.push({
         ...def,
-        // 写入用的字段名随读接口一起下发, 前端不必自己猜「点号键怎么变驼峰」
-        field: SETTING_KEY_TO_FIELD[def.key] ?? def.key,
-        value: overridden ? this.parseValue(raw as string, def) : def.default,
+        value: overridden ? this.parseValue(row!.value, def) : def.default,
         overridden,
+        updatedBy: row?.updatedBy ?? null,
+        updatedAt: row?.updatedAt ? row.updatedAt.toISOString() : null,
       });
     }
 
@@ -58,117 +82,184 @@ export class AdminSettingsService {
   }
 
   /**
-   * 批量写入。
+   * 批量写入 / 恢复默认。
    *
-   * 逐项按 SettingDef 校验后写入, **不是直接接收任意 kv** ——
-   * 否则运营可以写进一个代码里根本不认识的键, 或写入超出取值范围的值,
-   * 后续读取时静默出错。
+   * @param settings 要设置的键值对。键必须是 SETTING_DEFS 里的键
+   * @param clears   要恢复默认的键。语义照抄 `model-config.service.ts` 的成熟实现：
+   *                 删除 SystemSetting 行 → 回落代码默认值
+   * @param actor    操作人标识（写入 SystemSetting.updatedBy，供审计追溯）
+   * @param reason   操作原因（写入审计）
    */
   async updateAll(
     settings: Record<string, unknown>,
+    clears: string[] = [],
+    actor?: string,
     reason?: string,
-  ): Promise<{ updated: string[] }> {
+  ): Promise<{ updated: string[]; cleared: string[]; changes: SettingChange[] }> {
     const entries = Object.entries(settings ?? {});
-    if (entries.length === 0) {
+    const clearList = Array.from(new Set(clears ?? []));
+    if (entries.length === 0 && clearList.length === 0) {
       throw new AppError(40001, '没有需要更新的设置项', 400);
     }
 
-    // 先全部校验再落库: 部分成功会让运营误以为整批生效
+    // ── 先全部校验，一个不通过就整批拒绝 ────────────────────────────────
+    // 部分成功会让运营误以为整批生效。校验必须覆盖清单项 ——
+    // 否则「恢复一个不存在的键」会静默成功。
     const normalized = entries.map(([key, value]) => {
       const def = findSettingDef(key);
       if (!def) throw new AppError(40001, `未知设置项: ${key}`, 400);
       if (def.readOnly) throw new AppError(40001, `${def.label} 为只读项, 不可修改`, 400);
-      return { key, value: this.validate(def, value) };
+      return { key, def, value: this.validate(def, value) };
     });
 
-    const actorNote = reason ? ` | ${reason}` : '';
-    for (const { key, value } of normalized) {
-      const existing = await this.prisma.systemSetting.findUnique({ where: { key } });
-      if (existing) {
-        await this.prisma.systemSetting.update({
-          where: { key },
-          data: { value: String(value), updatedBy: 'admin' },
-        });
-      } else {
-        await this.prisma.systemSetting.create({
-          data: { key, value: String(value), updatedBy: 'admin' },
-        });
-      }
+    for (const key of clearList) {
+      const def = findSettingDef(key);
+      if (!def) throw new AppError(40001, `未知设置项: ${key}`, 400);
+      if (def.readOnly) throw new AppError(40001, `${def.label} 为只读项, 不可修改`, 400);
     }
 
-    return { updated: normalized.map((n) => n.key) };
+    // 同一键既在 settings 又在 clears 里 —— 以 clears 为准（恢复默认），
+    // 但这是调用方的 bug，必须让调用方看见而不是静默择一。
+    const overlap = normalized.filter((n) => clearList.includes(n.key)).map((n) => n.key);
+    if (overlap.length > 0) {
+      throw new AppError(
+        40001,
+        `同一设置项不能同时设置与恢复默认: ${overlap.join(', ')}`,
+        400,
+      );
+    }
+
+    // ── 记录改动前后的值（审计要的就是这个） ──────────────────────────
+    const before = await this.prisma.systemSetting.findMany({
+      where: { key: { in: [...normalized.map((n) => n.key), ...clearList] } },
+    });
+    const beforeByKey = new Map(before.map((r) => [r.key, r]));
+
+    // ── 事务落库 ───────────────────────────────────────────────────────
+    const actorName = actor ?? 'admin';
+    const changes: SettingChange[] = [];
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const { key, def, value } of normalized) {
+        const prev = beforeByKey.get(key);
+        const prevValue = prev ? this.parseValue(prev.value, def) : def.default;
+
+        const data = { value: String(value), updatedBy: actorName };
+        if (prev) {
+          await tx.systemSetting.update({ where: { key }, data });
+        } else {
+          await tx.systemSetting.create({ data: { key, ...data } });
+        }
+        changes.push({
+          key,
+          label: def.label,
+          before: prevValue,
+          after: value,
+          action: 'update',
+        });
+      }
+
+      for (const key of clearList) {
+        const def = findSettingDef(key)!;
+        const prev = beforeByKey.get(key);
+        if (!prev) {
+          // 本来就是默认值 —— 无事可做，但要在审计里如实体现
+          changes.push({
+            key,
+            label: def.label,
+            before: def.default,
+            after: def.default,
+            action: 'clear',
+          });
+          continue;
+        }
+        const prevValue = this.parseValue(prev.value, def);
+        await tx.systemSetting.delete({ where: { key } });
+        changes.push({
+          key,
+          label: def.label,
+          before: prevValue,
+          after: def.default,
+          action: 'clear',
+        });
+      }
+    });
+
+    // 写入即失效缓存，让新值立刻生效（不等 3s TTL）
+    this.settings.invalidate();
+
+    this.logger.log(
+      `设置变更 by ${actorName}: ${changes
+        .map((c) => `${c.key} ${String(c.before)}→${String(c.after)}`)
+        .join(', ')}${reason ? ` | ${reason}` : ''}`,
+    );
+
+    return {
+      updated: normalized.map((n) => n.key),
+      cleared: clearList,
+      changes,
+    };
   }
 
-  /** 读取单个设置的有效值 (供业务代码消费) */
+  /** 读取单个设置的有效值 (供后台内部消费) */
   async get<T = string | number | boolean>(key: string): Promise<T> {
-    const def = findSettingDef(key);
-    if (!def) throw new AppError(40400, `未知设置项: ${key}`, 404);
-    const row = await this.prisma.systemSetting.findUnique({ where: { key } });
-    if (!row) return def.default as T;
-    return this.parseValue(row.value, def) as T;
+    return this.settings.get<T>(key);
   }
 
   /**
-   * 退款规则快照 (B8)。
+   * 退款规则快照 (时间窗 / 可退比例 / 是否允许已消耗积分退款)。
    *
-   * 三项一次读齐再交给 `OrderService.refund` —— 让服务层只负责「按规则判」,
-   * 不必知道设置存在哪个表、键叫什么。规则在**提交那一刻**读取并冻结:
-   * 运营在退款过程中改了设置, 本次退款仍按提交时的规则判定。
+   * 退款接口在**提交那一刻**读取并冻结规则；这里转调公共 SettingsService，
+   * 让调用方继续只依赖后台设置服务，不必同时注入两个服务。
    */
   async refundRules(): Promise<{
     windowDays: number;
     maxRatioBps: number;
     allowConsumedTask: boolean;
   }> {
-    const [windowDays, maxRatioBps, allowConsumedTask] = await Promise.all([
-      this.get<number>('refund.windowDays'),
-      this.get<number>('refund.maxRatioBps'),
-      this.get<boolean>('refund.allowConsumedTask'),
-    ]);
-    return { windowDays, maxRatioBps, allowConsumedTask };
-  }
-
-  /** 按 SettingDef 校验并归一化值 */
-  private validate(def: SettingDef, raw: unknown): string | number | boolean {
-    if (def.type === 'boolean') {
-      if (typeof raw === 'boolean') return raw;
-      if (raw === 'true') return true;
-      if (raw === 'false') return false;
-      throw new AppError(40001, `${def.label} 必须是布尔值`, 400);
-    }
-
-    if (def.type === 'number') {
-      const n = Number(raw);
-      if (!Number.isFinite(n)) {
-        throw new AppError(40001, `${def.label} 必须是数字`, 400);
-      }
-      if (def.min !== undefined && n < def.min) {
-        throw new AppError(40001, `${def.label} 不得小于 ${def.min}`, 400);
-      }
-      if (def.max !== undefined && n > def.max) {
-        throw new AppError(40001, `${def.label} 不得大于 ${def.max}`, 400);
-      }
-      return n;
-    }
-
-    const s = String(raw ?? '').trim();
-    if (def.maxLength !== undefined && s.length > def.maxLength) {
-      throw new AppError(40001, `${def.label} 长度不得超过 ${def.maxLength}`, 400);
-    }
-    return s;
+    return this.settings.refundRules();
   }
 
   /**
-   * 解析库里的字符串值为目标类型。
+   * 按 SettingDef 校验并归一化值。
    *
-   * 存量数据可能格式不合法 (手工改过库), 此时回退到代码默认值 ——
-   * 一个坏配置不应让整页设置加载失败。
+   * 与读路径共用 `validateSettingValue` —— 读写的合法性判断必须一致。
    */
+  private validate(def: SettingDef, raw: unknown): string | number | boolean {
+    if (def.key === 'upload.allowedTypes') {
+      // 允许类型是「后端认识的格式」的子集。写入一个后端不认识的格式
+      // (如 gif) 会让页面显示「已允许 GIF」而上传依然被拒 —— 分叉。
+      const unknown = unknownAllowedExts(String(raw ?? ''));
+      if (unknown.length > 0) {
+        throw new AppError(
+          40001,
+          `不支持的文件类型: ${unknown.join(', ')}（仅支持 jpg,jpeg,png,webp）`,
+          400,
+        );
+      }
+      if (!String(raw ?? '').trim()) {
+        throw new AppError(40001, '至少要允许一种文件类型', 400);
+      }
+    }
+    return validateSettingValue(def, raw);
+  }
+
+  /** 解析库里的字符串值为目标类型（坏值回落到代码默认值） */
   private parseValue(raw: string, def: SettingDef): string | number | boolean {
     try {
-      return this.validate(def, raw);
+      return validateSettingValue(def, raw);
     } catch {
       return def.default;
     }
   }
+}
+
+/** 单项改动的前后对照 —— 写入审计 detail */
+export interface SettingChange {
+  key: string;
+  label: string;
+  before: string | number | boolean;
+  after: string | number | boolean;
+  /** update = 改为新值；clear = 恢复默认 */
+  action: 'update' | 'clear';
 }

@@ -1,5 +1,6 @@
 import { Global, Module } from '@nestjs/common';
 import { SignedUrlService } from './signed-url.service';
+import { SettingsService } from './settings.service';
 
 /**
  * 横切关注点模块（B5）。
@@ -13,7 +14,7 @@ import { SignedUrlService } from './signed-url.service';
  */
 @Global()
 @Module({
-  providers: [SignedUrlService],
-  exports: [SignedUrlService],
+  providers: [SignedUrlService, SettingsService],
+  exports: [SignedUrlService, SettingsService],
 })
 export class CommonModule {}
