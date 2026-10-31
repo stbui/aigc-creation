@@ -15,7 +15,16 @@ import {
   validateCapabilityParams,
 } from '../src/capabilities/capability.registry';
 import { parseLocalRedrawAnnotations } from '../src/capabilities/definitions/local_redraw';
-import { buildPromptFor } from '../src/providers/gateway-prompt';
+
+/**
+ * 提示词构造：与任务链路同一条路径 —— 能力定义里的 `buildPrompt`。
+ * 第二个参数是参考图张数，这些断言都是纯文本参数，传 0。
+ */
+function buildPromptFor(id: string, params: Record<string, any>): string {
+  const def = getCapability(id);
+  if (!def) throw new Error(`未知能力: ${id}`);
+  return def.buildPrompt(params, 0);
+}
 import {
   inspectMaskImage,
   inspectUploadedImage,

@@ -15,7 +15,7 @@ import {
 import { Button } from '../../vendor/boardui/components/base/buttons/button';
 import { IconButton } from '../../vendor/boardui/components/base/buttons/icon-button';
 import { Pagination } from '../../vendor/boardui/components/base/pagination/pagination';
-import { adminAssetsApi, toAbsoluteUrl } from '../../lib/api';
+import { adminAssetsApi, assetThumbUrl, toAbsoluteUrl } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
 import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
@@ -89,6 +89,9 @@ const BACKEND_LABEL: Record<string, string> = {
  * 这两条规则已封装在 toAbsoluteUrl, 重写一遍必然漂移。
  */
 const thumbOf = (url: string): string => toAbsoluteUrl(url) ?? url;
+
+/** 列表 / 网格用的方形缩略图; 查看大图仍用 thumbOf 的完整地址 */
+const thumbSrc = (url: string, size = 320): string => assetThumbUrl(url, size) ?? thumbOf(url);
 
 const assetLabel = (a: Row): string =>
   a.capability ?? (a.kind === 'original' ? '原始上传' : '生成图');
@@ -425,7 +428,7 @@ export function AdminAssetsPage() {
           >
             <AssetThumb
               className="size-full"
-              src={thumbOf(row.sourceUrl)}
+              src={thumbSrc(row.sourceUrl, 96)}
               alt={`${assetLabel(row)}缩略图`}
             />
           </button>
@@ -803,7 +806,7 @@ export function AdminAssetsPage() {
                         >
                           <AssetThumb
                             className="size-full"
-                            src={thumbOf(a.sourceUrl)}
+                            src={thumbSrc(a.sourceUrl, 320)}
                             alt={`${assetLabel(a)}缩略图`}
                           />
                         </button>

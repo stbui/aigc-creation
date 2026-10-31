@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreditService } from '../credits/credit.service';
+import { CreditService, microcreditsToCredits, projectEntry } from '../credits/credit.service';
 import { OrderService } from '../orders/order.service';
 import { AppError } from '../common/app.exception';
 import { runBatch } from '../common/batch';
@@ -87,6 +87,8 @@ const LEDGER_TYPES = [
   'admin_adjust',
   'expire',
   'refund_reclaim',
+  'reserve',
+  'refund',
 ] as const;
 
 const GRANT_TYPES = ['immediate', 'manual'] as const;
@@ -505,12 +507,34 @@ export class AdminCommerceService {
     return paginate(items, total, page);
   }
 
+  /**
+   * 积分批次（后台只读）。
+   *
+   * 库里的金额是 BigInt 微积分，必须投影成积分口径再出参 —— 直接返回 Prisma 行
+   * 会让 `JSON.stringify` 在 BigInt 上抛错。`status` 与 C 端口径保持一致。
+   */
   async creditLots(userId: string, query: { from?: string; to?: string } = {}) {
     const range = this.dateRange(query.from, query.to);
-    return this.prisma.creditLot.findMany({
+    const rows = await this.prisma.creditLot.findMany({
       where: { userId, ...(range ? { createdAt: range } : {}) },
       orderBy: { createdAt: 'desc' },
       take: 200,
+    });
+    const now = Date.now();
+    return rows.map((row) => {
+      const remaining = microcreditsToCredits(row.remainingMicrocredits);
+      return {
+        id: row.id,
+        userId: row.userId,
+        source: row.source,
+        orderId: row.orderId,
+        totalCredits: microcreditsToCredits(row.totalMicrocredits),
+        remainingCredits: remaining,
+        expireAt: row.expireAt,
+        createdAt: row.createdAt,
+        status:
+          remaining <= 0 ? 'exhausted' : row.expireAt && row.expireAt.getTime() <= now ? 'expired' : 'active',
+      };
     });
   }
 
@@ -526,12 +550,12 @@ export class AdminCommerceService {
     if (range) where.createdAt = range;
 
     const limit = Math.min(query.limit ?? 50, 500);
-    return this.prisma.creditLedger.findMany({
+    const rows = await this.prisma.creditLedgerEntry.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       take: limit,
-      include: { lot: { select: { source: true, expireAt: true } } },
     });
+    return rows.map(projectEntry);
   }
 
   /**

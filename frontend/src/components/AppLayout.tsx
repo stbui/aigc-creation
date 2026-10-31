@@ -30,12 +30,10 @@ const { Header, Content } = Layout;
 interface Props {
   groups: CapabilityGroup[];
   items: CapabilityDef[];
-  /** 侧栏 hover 预览用的真实产出图: capability -> sourceUrl */
-  thumbs: Record<string, string | null>;
   children: ReactNode;
 }
 
-export function AppLayout({ groups, items, thumbs, children }: Props) {
+export function AppLayout({ groups, items, children }: Props) {
   const location = useLocation();
   const navigate = useNavigate();
   const { token, email, logout, openLogin } = useAuth();
@@ -279,7 +277,6 @@ export function AppLayout({ groups, items, thumbs, children }: Props) {
           <SideRail
             groups={groups}
             items={visibleItems}
-            thumbs={thumbs}
             activePath={location.pathname}
             onNavigate={go}
           />
@@ -301,7 +298,6 @@ export function AppLayout({ groups, items, thumbs, children }: Props) {
         <SideRail
           groups={groups}
           items={visibleItems}
-          thumbs={thumbs}
           activePath={location.pathname}
           onNavigate={() => setMobileNavOpen(false)}
         />

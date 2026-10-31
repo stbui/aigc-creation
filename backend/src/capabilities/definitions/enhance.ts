@@ -8,6 +8,7 @@
  */
 
 import type { CapabilityPlugin } from '../capability-plugin.type';
+import { editImageIntent } from '../model-mapping';
 import { QUALITY_OPTIONS, RATIOS_WITH_ORIGINAL, RETOUCH_MODES } from './param-options';
 
 export const Enhance: CapabilityPlugin = {
@@ -61,6 +62,7 @@ export const Enhance: CapabilityPlugin = {
     `保持结构与颜色真实，提升清晰度与质感${p.imageRatio ? `；输出比例 ${p.imageRatio}` : ''}。` +
     `必须保持输入图中的同一件商品、数量、轮廓、部件、材质、颜色、视角与构图，不得替换商品或重绘背景。`,
   modality: 'image',
+  model: { capability: 'image', operation: 'image_to_image', intent: editImageIntent },
   inputs: 1,
   inputImageMode: 'edit',
   inWorkbench: true,

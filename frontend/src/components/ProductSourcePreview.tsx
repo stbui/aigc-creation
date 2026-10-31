@@ -1,6 +1,7 @@
 import { useState, type CSSProperties } from 'react';
 
 import type { ToolAsset, UploadPreviewControls } from './ToolShell';
+import { assetThumbUrl } from '../lib/api';
 
 interface SourceUploadPreviewProps {
   image: ToolAsset;
@@ -27,7 +28,8 @@ export function ProductSourceUploadPreview({ image, controls, alt }: SourceUploa
           controls.preview(image);
         }}
       >
-        <img src={image.url} alt={alt} draggable={false} />
+        {/* 160×160 上传位, 用缩略图; 右栏原图卡 (ProductSourceResult) 仍用原图 */}
+        <img src={assetThumbUrl(image.url, 320) ?? image.url} alt={alt} draggable={false} />
       </button>
       <div>
         <button

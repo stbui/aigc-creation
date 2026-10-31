@@ -19,6 +19,7 @@ if (!ADMIN_PASSWORD) {
 const { PrismaClient } = require('@prisma/client');
 const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
 const { resolveDbUrl } = require('./db-url');
+const { grantCredits, clearCredits } = require('./credit-fixture');
 const prisma = new PrismaClient({ adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }) });
 
 async function call(method, path, token, body) {
@@ -139,45 +140,43 @@ function check(name, ok, detail = '') {
   check('未超时订单不受影响', afterFresh.status === 'pending', afterFresh.status);
 
   console.log('\n【积分到期回收 B-90】');
-  const expiredLot = await prisma.creditLot.create({
-    data: {
-      userId: user.id,
-      source: 'grant',
-      totalCredits: 300,
-      remainingCredits: 300,
-      expireAt: new Date(Date.now() - 60_000), // 已过期
-    },
+  const expiredLot = await grantCredits(prisma, {
+    userId: user.id,
+    credits: 300,
+    reason: '到期回收冒烟（已过期）',
+    expireAt: new Date(Date.now() - 60_000),
   });
-  const activeLot = await prisma.creditLot.create({
-    data: {
-      userId: user.id, source: 'grant',
-      totalCredits: 500, remainingCredits: 500,
-      expireAt: new Date(Date.now() + 7 * 24 * 3600_000),
-    },
+  const activeLot = await grantCredits(prisma, {
+    userId: user.id,
+    credits: 500,
+    reason: '到期回收冒烟（未到期）',
+    expireAt: new Date(Date.now() + 7 * 24 * 3600_000),
   });
 
   const runCredits = await call('POST', '/admin/scheduler/run?task=credit-expire', T);
   check('手动触发成功', runCredits.status === 200 || runCredits.status === 201);
 
+  // 金额是微积分：300 积分 = 3e8 微积分
+  const MICRO = 1_000_000n;
   const lotAfter = await readWithRetry(() => prisma.creditLot.findUnique({ where: { id: expiredLot.id } }));
-  check('已到期批次剩余归零', lotAfter.remainingCredits === 0, `剩余 ${lotAfter.remainingCredits}`);
-  check('**批次记录保留**(不删)', !!lotAfter, `totalCredits 仍为 ${lotAfter.totalCredits}`);
+  check('已到期批次剩余归零', lotAfter.remainingMicrocredits === 0n, `剩余 ${lotAfter.remainingMicrocredits}`);
+  check('**批次记录保留**(不删)', !!lotAfter, `totalMicrocredits 仍为 ${lotAfter.totalMicrocredits}`);
   check('到期时间保留', !!lotAfter.expireAt);
 
   const activeAfter = await readWithRetry(() => prisma.creditLot.findUnique({ where: { id: activeLot.id } }));
-  check('未到期批次不受影响', activeAfter.remainingCredits === 500, `剩余 ${activeAfter.remainingCredits}`);
+  check('未到期批次不受影响', activeAfter.remainingMicrocredits === 500n * MICRO, `剩余 ${activeAfter.remainingMicrocredits}`);
 
   console.log('\n【回收留痕】');
-  const ledger = await readWithRetry(() => prisma.creditLedger.findMany({
+  const ledger = await readWithRetry(() => prisma.creditLedgerEntry.findMany({
     where: { userId: user.id, type: 'expire' },
   }));
   check('写了 expire 流水', ledger.length >= 1, `${ledger.length} 条`);
-  check('流水金额为负', ledger[0]?.amount === -300, `${ledger[0]?.amount}`);
+  check('流水金额为负', ledger[0]?.amountMicrocredits === -300n * MICRO, `${ledger[0]?.amountMicrocredits}`);
   check('流水关联到批次', ledger[0]?.lotId === expiredLot.id);
 
   console.log('\n【幂等: 重复执行】');
   await call('POST', '/admin/scheduler/run?task=credit-expire', T);
-  const ledgerAfter = await readWithRetry(() => prisma.creditLedger.count({ where: { userId: user.id, type: 'expire' } }));
+  const ledgerAfter = await readWithRetry(() => prisma.creditLedgerEntry.count({ where: { userId: user.id, type: 'expire' } }));
   check('重复执行不重复写流水', ledgerAfter === ledger.length, `${ledger.length} → ${ledgerAfter}`);
 
   console.log('\n【执行状态上报】');
@@ -215,10 +214,9 @@ function check(name, ok, detail = '') {
     console.log('  SKIP  finance 登录失败, 跳过越权验证');
   }
 
-  // 清理
+  // 清理：积分批次/账户/预约/流水由夹具统一处理
+  await clearCredits(prisma, user.id).catch(() => undefined);
   await prisma.$transaction([
-    prisma.creditLedger.deleteMany({ where: { userId: user.id } }),
-    prisma.creditLot.deleteMany({ where: { userId: user.id } }),
     prisma.orderItem.deleteMany({ where: { order: { userId: user.id } } }),
     prisma.order.deleteMany({ where: { userId: user.id } }),
     prisma.user.delete({ where: { id: user.id } }),

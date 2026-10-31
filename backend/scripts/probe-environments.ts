@@ -296,7 +296,7 @@ section('ENV_SPECS 覆盖度');
   for (const required of [
     'NODE_ENV', 'PORT', 'HOST', 'DATABASE_URL', 'UPLOAD_DIR', 'BACKUP_DIR',
     'CORS_ORIGINS', 'JWT_SECRET', 'JWT_TTL', 'LOG_LEVEL', 'LOG_DIR',
-    'STORAGE_BACKEND', 'GATEWAY_BASE_URL',
+    'STORAGE_BACKEND', 'ASSET_PUBLIC_BASE',
   ]) {
     check(`${required} 在 ENV_SPECS 中`, names.has(required));
   }

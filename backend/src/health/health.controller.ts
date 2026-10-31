@@ -2,16 +2,17 @@
  * 健康检查。
  *
  * 两个端点，用途不同，**不要合并**：
- *   · `GET /health`        —— 给人看的诊断面板：数据库、存储、三条模型通道
- *                            各自的状态与延迟。永远返回 200（除非进程起不来），
+ *   · `GET /health`        —— 给人看的诊断面板：数据库、存储、三种模态的模型线路
+ *                            各自的状态与冷却情况。永远返回 200（除非进程起不来），
  *                            部分降级时 `status='degraded'`。
  *   · `GET /health/ready`  —— 给编排系统看的就绪探针：只有「关键依赖可用」
  *                            才返回 200，否则 503。Docker/K8s 据此决定
  *                            要不要把流量打进来。
  *
- * 关键依赖只有数据库：模型通道全部不可用时，生成任务会明确失败并退款，
+ * 关键依赖只有数据库：模型线路全部不可用时，生成任务会明确失败并退款，
  * 但后台管理与排障入口仍应可用。存储不可用时上传/生成同样会失败 ——
- * 这些属于业务降级，不该让整个实例被摘除。
+ * 这些属于业务降级，不该让整个实例被摘除。容器探针走 `/health/ready`，
+ * 不受线路状态影响。
  *
  * 存储探测带 30 秒缓存：OSS/MinIO 的连通性探测要发网络请求，
  * 探针 5 秒一次会把一个纯读接口变成对外部服务的压力源。
@@ -20,14 +21,27 @@ import { Controller, Get, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
-import { ChannelRepository } from '../providers/channel-repository';
+import { RouteHealthService } from '../model/routing/route-health.service';
 import { AppError } from '../common/app.exception';
 import { currentRequestId } from '../common/request-context';
-import type { Modality } from '../providers/modality';
+import type { Modality } from '../common/modality';
 
 interface CheckResult {
   ok: boolean;
   latencyMs: number;
+  message?: string;
+}
+
+/** 一种模态的供应侧概况 */
+interface ModalityChannels {
+  ok: boolean;
+  /** 该模态未删除的渠道模型总数 */
+  total: number;
+  /** 其中自身启用、且所属渠道启用未删的线路数 */
+  enabled: number;
+  /** 在上述基础上再排除冷却中的渠道 / 渠道模型 */
+  available: number;
+  cooling: number;
   message?: string;
 }
 
@@ -52,7 +66,7 @@ export class HealthController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
-    private readonly channels: ChannelRepository,
+    private readonly routeHealth: RouteHealthService,
     private readonly config: ConfigService,
   ) {}
 
@@ -125,24 +139,59 @@ export class HealthController {
     return { ...value, backend, cached: false };
   }
 
-  private async checkChannels(): Promise<
-    Record<string, { ok: boolean; source: string; available: number; total: number; cooling: number; message?: string }>
-  > {
-    const out: Record<string, any> = {};
-    for (const modality of MODALITIES) {
-      try {
-        const snap = await this.channels.snapshot(modality);
-        // 没有任何线路不算进程级故障，但该模态能力会不可提交/失败并退款。
-        // 这里只如实汇报"可用的有几条"，由调用方判断这对当前部署意味着什么。
+  /**
+   * 三种模态的线路概况。
+   *
+   * 口径与调度器一致：**渠道模型是线路的最小单位**，渠道停用即其下所有模型不可用；
+   * 冷却中的键来自 `RouteHealthService`（进程内，只反映本实例）。
+   * 没有任何可用线路不算进程级故障，但该模态能力会不可提交 / 失败并退款 ——
+   * 这里只如实汇报「可用的有几条」，由调用方判断这对当前部署意味着什么。
+   */
+  private async checkChannels(): Promise<Record<string, ModalityChannels>> {
+    const out: Record<string, ModalityChannels> = {};
+    try {
+      const blocked = new Set(this.routeHealth.snapshot().map((block) => block.key));
+      const [channels, models] = await Promise.all([
+        this.prisma.modelChannel.findMany({
+          where: { enabled: true, deletedAt: null },
+          select: { id: true },
+        }),
+        this.prisma.channelModel.findMany({
+          where: { deletedAt: null },
+          select: { id: true, channelId: true, capability: true, enabled: true },
+        }),
+      ]);
+      const liveChannelIds = new Set(channels.map((row) => row.id));
+      for (const modality of MODALITIES) {
+        const rows = models.filter((row) => row.capability === modality);
+        const live = rows.filter((row) => liveChannelIds.has(row.channelId));
+        const cooling = live.filter(
+          (row) => blocked.has(`channel:${row.channelId}`) || blocked.has(`channel-model:${row.id}`),
+        );
+        const usable = live.filter(
+          (row) =>
+            row.enabled &&
+            !blocked.has(`channel:${row.channelId}`) &&
+            !blocked.has(`channel-model:${row.id}`),
+        );
         out[modality] = {
-          ok: snap.availableCount > 0,
-          source: snap.source,
-          available: snap.availableCount,
-          total: snap.total,
-          cooling: snap.coolingCount,
+          ok: usable.length > 0,
+          total: rows.length,
+          enabled: live.filter((row) => row.enabled).length,
+          available: usable.length,
+          cooling: cooling.length,
         };
-      } catch (e) {
-        out[modality] = { ok: false, source: 'unknown', available: 0, total: 0, cooling: 0, message: (e as Error).message };
+      }
+    } catch (e) {
+      for (const modality of MODALITIES) {
+        out[modality] = {
+          ok: false,
+          total: 0,
+          enabled: 0,
+          available: 0,
+          cooling: 0,
+          message: (e as Error).message,
+        };
       }
     }
     return out;

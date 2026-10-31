@@ -10,7 +10,7 @@ import {
   DropdownTrigger,
 } from '../../vendor/boardui/components/base/dropdown/dropdown';
 import { adminUsersApi } from '../../lib/api';
-import { toAbsoluteUrl } from '../../lib/api';
+import { assetThumbUrl } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
 import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
@@ -721,7 +721,7 @@ export function AdminUsersPage() {
                         {t.thumbnailUrl ? (
                           <img
                             className="size-9 shrink-0 rounded-md border border-border-table object-cover"
-                            src={toAbsoluteUrl(t.thumbnailUrl)}
+                            src={assetThumbUrl(t.thumbnailUrl, 96)}
                             alt=""
                           />
                         ) : (
@@ -755,7 +755,7 @@ export function AdminUsersPage() {
                     >
                       <img
                         className="aspect-square w-full object-cover"
-                        src={toAbsoluteUrl(a.sourceUrl)}
+                        src={assetThumbUrl(a.sourceUrl, 240)}
                         alt=""
                         loading="lazy"
                       />

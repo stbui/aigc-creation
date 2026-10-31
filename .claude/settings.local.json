@@ -11,7 +11,22 @@
       "Skill(oil-ui)",
       "Skill(oil-ui:*)",
       "Read(//Users/bright/.claude/plugins/cache/claude-plugins-official/mattpocock-skills/1.3.1/skills/productivity/grill-me/**)",
-      "WebFetch(domain:developer.chrome.com)"
+      "WebFetch(domain:developer.chrome.com)",
+      "Read(//Users/bright/github/open-ai-canvas/web/src/services/api/**)",
+      "Read(//Users/bright/github/open-ai-canvas/docs/content/docs/backend/**)",
+      "Read(//Users/bright/github/open-ai-canvas/backend/internal/model/**)",
+      "Read(//Users/bright/github/open-ai-canvas/backend/internal/handler/**)",
+      "Read(//Users/bright/github/open-ai-canvas/web/src/lib/**)",
+      "Read(//Users/bright/github/open-ai-canvas/web/src/components/**)",
+      "Read(//Users/bright/github/open-ai-canvas/web/src/pages/settings/**)",
+      "Read(//Users/bright/github/open-ai-canvas/backend/internal/app/**)",
+      "Read(//Users/bright/github/open-ai-canvas/backend/internal/database/**)",
+      "Read(//Users/bright/github/open-ai-canvas/docs/content/docs/overview/**)",
+      "Read(//Users/bright/github/open-ai-canvas/backend/internal/repository/**)",
+      "Read(//Users/bright/github/open-ai-canvas/backend/internal/outbound/**)",
+      "Read(//Users/bright/github/open-ai-canvas/backend/internal/platform/**)",
+      "Read(//Users/bright/github/open-ai-canvas/**)",
+      "WebFetch(domain:www.seeany.com)"
     ],
     "additionalDirectories": [
       "/tmp/arch-audit",

@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { toAbsoluteUrl } from '../lib/api';
 import { ImageLightbox } from './ImageLightbox';
+import { assetThumbUrl } from '../lib/api';
 import { ImageContextMenu, type ImageMenuItem } from './ImageContextMenu';
 import { ToolEmptyState } from './ToolEmptyState';
 import type { GalleryItem } from '../hooks/useResultGallery';
@@ -148,7 +149,7 @@ function GalleryThumb({
       <img
         ref={imgRef}
         key={retryNonce}
-        src={item.url}
+        src={assetThumbUrl(item.url, 640) ?? item.url}
         alt={item.caption ? `${item.caption}生成图` : '生成图'}
         loading={priority ? 'eager' : 'lazy'}
         fetchPriority={priority ? 'high' : 'auto'}

@@ -23,7 +23,7 @@
 
 ## 2. 信息架构
 
-8 组 30 页，菜单项由 `permission` 字段过滤，`planned` 标记的项置灰但可见（明确告知规划状态而非直接隐藏）。
+8 组 35 页，菜单项由 `permission` 字段过滤，`planned` 标记的项置灰但可见（明确告知规划状态而非直接隐藏）。
 
 | 组 | 页面 |
 | --- | --- |
@@ -33,7 +33,7 @@
 | 交易 | 商品管理 / 会员套餐 / 订单管理 / 积分账本 / 能力消耗价 / 优惠券 / 限时活动 / 邀请与签到 |
 | 财务 | 支付渠道 / 发票管理 / 渠道对账 |
 | 系统 | 角色权限 / 系统设置 / 存储配置 / 定时任务 / 操作审计 |
-| 模型 | 模型配置 / 调用记录 / 能力管控 |
+| 模型 | 渠道工作台 / 前台模型 / 用户分组 / 插件 / 能力管控 / 调用记录 / 生成账单 / 财务分析 |
 | 数据安全 | 数据备份 / 保留期清理 |
 
 分组理由：「内容」是**发给全体用户的话**（法务文本、站内消息、AI 标识都会烙印到每个账号 / 每张产出图上），误改一条协议比调错一次价格更难挽回；「财务」是钱已收进来之后的动作，与「卖什么 / 卖了多少」不是同一批人；「模型」是生成链路的生产关键配置，排障时不能淹没在通用系统设置里；「数据安全」只在出事时进，频率与日常运营不同。
@@ -137,11 +137,16 @@
 
 | 页面 | 功能 |
 | --- | --- |
-| 模型配置 | 页签「线路管理 / 可用模型 / 逐能力路由 / 全局设置」。线路按模态分组，支持增删改、排序、启停、测草稿、连通性测试、多渠道主备；「可用模型」合并内置预设与厂商实时清单（`POST /admin/model-channels/models`，令牌只在请求内使用，不落库不进审计） |
-| 调用记录 | `ModelCallLog` 列表与详情：通道、模型、耗时、结果、回落原因与错误摘要；CSV 导出含提示词，与列表同口径（`data.export`） |
-| 能力管控 | 16 项能力的上下线，下架必填原因；下线后 C 端 `runtime.effective=disabled`，任务在扣费前被拦截并返回 `40005` |
+| 渠道工作台 `/admin/channels` | 供应侧配置：渠道（凭证加密存储）、渠道模型（模态 / 协议 / 权重 / 优先级 / 价格档）与健康列（启停、协议是否已注册、进程内冷却截止）。支持测草稿、连通性测试、从服务商目录拉取实时模型清单（令牌只在请求内使用，不落库不进审计） |
+| 前台模型 `/admin/logical-models` | C 端可见身份：`LogicalModel` + 发布快照（revision）+ 线路（route）。线路按能力合同匹配，可模拟选路验证 |
+| 用户分组 `/admin/user-groups` | 分组决定倍率、可见渠道与按模型的覆盖价格；没有有效会员的用户落在 `default` 分组，默认分组不可删除 |
+| 插件 `/admin/plugins` | 协议来源：启停即重注册协议，渠道模型可选的协议列表随之变化；支持安装、校验与查看服务商目录 |
+| 调用记录 `/admin/model-calls` | `ApiCallLog` 列表与详情：能力、协议、渠道、耗时、结果、`RouteAttempt.failureCode` 与错误摘要；CSV 导出与列表同口径（`data.export`），不含请求体 / 响应体 |
+| 生成账单 `/admin/billing-orders` | `BillingOrder` 列表与详情；`uncertain` 账单只能人工结算或退款，必填原因并写审计 |
+| 财务分析 `/admin/finance` | 实收 = 已结算账单、已退 = 订单退款、净收入 = 实收 − 已退；预留 / 运行 / 待核对单列为「挂账」，不计入实收 |
+| 能力管控 `/admin/capabilities` | 16 项能力的上下线，下架必填原因；下线后 C 端 `runtime.effective=disabled`，任务在扣费前被拦截并返回 `40005` |
 
-读 `model.config_read`、写 `channel.route` / `model.config_write`、测试 `channel.test`。运营可读可测，不可写。
+读 `channel.read` / `channel.model_read` / `logical_model.read` / `user_group.read` / `plugin.read` / `billing_order.read` / `model.call_read` / `model.analytics_read`；写 `channel.write` / `channel.model_write`（含凭证、价格档与渠道模型连通性测试）/ `logical_model.write` / `user_group.write` / `plugin.write`，账单处置 `billing_order.resolve`。`channel.test` 只用于存储 / 通知的连通性探测。运营只读，不可写；财务可读账单与财务分析并处置挂账单。
 
 ### 3.13 数据安全
 
@@ -196,7 +201,7 @@ JwtAuthGuard（身份）→ AdminGuard（后台身份 + 账号状态）→ Permi
 | --- | --- |
 | 路由 | `/admin/*` 在 `App.tsx` 中必须注册在 catch-all 之前，否则会被 C 端 `Shell` 吞掉 |
 | 外壳 | `admin-ui/shell/AdminBoardLayout.tsx` + `components/admin/adminNav.ts`（菜单单一事实源） |
-| 页面 | `pages/admin/` 30 个页面 + `modelConfig/` 子组件目录 |
+| 页面 | `pages/admin/` 35 个页面 + `channels/` 子组件目录 |
 | 请求 | `lib/api.ts` 的 `adminApi` 分组复用 `request()`（信封剥离、401 广播） |
 | 类型 | `types/api.d.ts` 的 `Admin*` 段 |
 | 组件 | 通用骨架走 `admin-ui/widgets/AdminChrome`（`PageHeader` / `FilterBar` / `StatCard` / `Panel` / `Empty` / `StatusTag` / `ConfirmAction`）与 `admin-ui/primitives`；后台树内不引 antd，`adm-*` 只剩外壳骨架与值班塔 |

@@ -31,6 +31,8 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { HealthModule } from './health/health.module';
 import { AigcLabelModule } from './aigc-label/aigc-label.module';
+import { ModelModule } from './model/model.module';
+import { ProxyModule } from './model/proxy/proxy.module';
 
 @Module({
   imports: [
@@ -65,8 +67,8 @@ import { AigcLabelModule } from './aigc-label/aigc-label.module';
     // C 端营销 (M11)。依赖 AdminModule 导出的 MarketingService,
     // 而 AdminModule 不依赖本模块 —— 单向, 无循环
     MarketingModule,
-    // 提示词工具 (AI润色 / 图片转提示词)。走文生文通道, 产出是文字不是图片,
-    // 故不进 generate 任务体系。依赖 ProvidersModule 的 TEXT_PROVIDER。
+    // 提示词工具 (AI润色 / 图片转提示词)。走模型的 text 能力, 产出是文字不是图片,
+    // 故不进 generate 任务体系。文本选路与协议调用由 ModelModule 的 TextToolService 提供。
     PromptToolsModule,
     // 手机上传会话 (二维码 + 手机端收图)。依赖 Prisma 与 Storage。
     MobileUploadModule,
@@ -82,6 +84,12 @@ import { AigcLabelModule } from './aigc-label/aigc-label.module';
     // GenerateModule 依赖它取运行时素材，故必须排在 GenerateModule 之后亦可
     // （Nest 的模块图与 import 顺序无关），此处放在末尾更易读。
     AigcLabelModule,
+    // 渠道与模型子系统（移植自 open-ai-canvas）。P0 只装无状态地基：
+    // 凭证加密 / 协议注册表 / 内置插件清单 / 出站策略。
+    ModelModule,
+    // 代理中转（P6）：必须**最后一个**导入 —— 短路径入口
+    // `/api/v1/:channelId/*path` 是 catch-all，排在业务路由之后才不会抢路由。
+    ProxyModule,
   ],
   // 测试辅助接口（NODE_ENV=test 之外一律 404）：冒烟脚本用它重置限流计数。
   // 放在 AppModule 而不是 CommonModule —— 它要注入 RateLimitGuard 的**同一个实例**，

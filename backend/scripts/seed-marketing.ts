@@ -97,10 +97,13 @@ async function seedCoupons(): Promise<void> {
 }
 
 async function seedCampaigns(): Promise<void> {
-  // 限时价需绑定真实商品, 商品不存在则活动无法生效 (productId 匹配不上)
-  const product = await prisma.product.findUnique({
-    where: { sku: 'CREDITS_STARTER' },
-    select: { id: true, priceCents: true },
+  // 限时价需绑定真实商品, 商品不存在则活动无法生效 (productId 匹配不上)。
+  // 按「在售且最便宜的付费包」动态取: 积分包档位会随运营调整, 写死 SKU 会让活动静默失效。
+  // 排除冒烟脚本自建的商品 —— 它们只是临时夹具, 不该成为活动对象。
+  const product = await prisma.product.findFirst({
+    where: { status: 'active', priceCents: { gt: 0 }, sku: { not: { startsWith: 'SMOKE-' } } },
+    orderBy: { priceCents: 'asc' },
+    select: { id: true, priceCents: true, name: true },
   });
 
   const campaigns: Array<{
@@ -140,7 +143,7 @@ async function seedCampaigns(): Promise<void> {
     // 活动价必须低于原价: 校验层会夹到原价, 但配错等于"名为优惠实为涨价"
     const promoPrice = Math.max(1, Math.floor(product.priceCents * 0.7));
     campaigns.push({
-      name: '入门积分包限时价',
+      name: '积分包限时价',
       type: 'limited_price',
       payload: { productId: product.id, priceCents: promoPrice },
       startAt: new Date(now - HOUR),
@@ -148,11 +151,17 @@ async function seedCampaigns(): Promise<void> {
       status: 'active',
     });
     console.log(
-      `[seed] 限时价活动已配置: 入门积分包 ${product.priceCents / 100} 元 → ${promoPrice / 100} 元`,
+      `[seed] 限时价活动已配置: ${product.name} ${product.priceCents / 100} 元 → ${promoPrice / 100} 元`,
     );
   } else {
-    console.warn('[seed] 未找到 CREDITS_STARTER 商品, 跳过限时价活动 (需先跑 seed:commerce)');
+    console.warn('[seed] 未找到在售积分包, 跳过限时价活动 (需先跑 seed:commerce)');
   }
+
+  // 旧活动指向已下架的「入门积分包」, 留着只会多一条永远不生效的记录
+  await prisma.campaign.updateMany({
+    where: { name: '入门积分包限时价', type: 'limited_price' },
+    data: { status: 'off' },
+  });
 
   for (const c of campaigns) {
     const exists = await prisma.campaign.findFirst({

@@ -84,15 +84,31 @@ export const PERMISSIONS = {
   // 能力与通道
   capabilityRead: 'capability.read',
   capabilityWrite: 'capability.write',
-  channelRoute: 'channel.route',
+  /** 存储 / 通知的连通性探测：只探测，不写配置 */
   channelTest: 'channel.test',
 
-  // 模型配置与调用记录 (2026-10-20)
-  // 读写分离: 模型配置属生产关键路径 (改错会让全站生图回落或打挂), 只给 admin;
-  // 调用记录是只读排障数据, 运营也需要, 故单独给 read 权限点。
-  modelConfigRead: 'model.config_read',
-  modelConfigWrite: 'model.config_write',
+  // 调用记录是只读排障数据, 运营与财务也需要。
+  // 旧的 `model.config_read` / `model.config_write` 随 P6 删除 ——
+  // 模型配置已由 `channel.*` / `logical_model.*` / `user_group.*` / `plugin.*` 接管。
   modelCallRead: 'model.call_read',
+
+  // 渠道与模型（P1 起接管上面三个旧权限点的业务）
+  // 凭证、价格档与连通性测试都随渠道模型 / 渠道记录的写权限一起授权：
+  // 它们的入口就是同一条 `PATCH`，拆成独立权限点却不在任何路由上校验，
+  // 只会让人以为「没授予 secret_write 就改不了凭证」——实际能改。
+  channelRead: 'channel.read',
+  channelWrite: 'channel.write',
+  channelModelRead: 'channel.model_read',
+  channelModelWrite: 'channel.model_write',
+  logicalModelRead: 'logical_model.read',
+  logicalModelWrite: 'logical_model.write',
+  userGroupRead: 'user_group.read',
+  userGroupWrite: 'user_group.write',
+  pluginRead: 'plugin.read',
+  pluginWrite: 'plugin.write',
+  billingOrderRead: 'billing_order.read',
+  billingOrderResolve: 'billing_order.resolve',
+  modelAnalyticsRead: 'model.analytics_read',
 
   // 增长
   marketingWrite: 'marketing.write',
@@ -153,8 +169,14 @@ export const ROLE_PERMISSIONS: Record<AdminRoleCode, Permission[]> = {
     PERMISSIONS.complianceRead,
     PERMISSIONS.contentRead,
     PERMISSIONS.capabilityRead,
-    PERMISSIONS.modelConfigRead,
     PERMISSIONS.modelCallRead,
+    PERMISSIONS.channelRead,
+    PERMISSIONS.channelModelRead,
+    PERMISSIONS.logicalModelRead,
+    PERMISSIONS.userGroupRead,
+    PERMISSIONS.pluginRead,
+    PERMISSIONS.billingOrderRead,
+    PERMISSIONS.modelAnalyticsRead,
     // 只读排障：允许发起连通性测试（只探测，不写配置、不改健康状态）
     PERMISSIONS.channelTest,
     PERMISSIONS.marketingWrite,
@@ -183,6 +205,12 @@ export const ROLE_PERMISSIONS: Record<AdminRoleCode, Permission[]> = {
     PERMISSIONS.financeReconcile,
     PERMISSIONS.creditRead,
     PERMISSIONS.creditAdjust,
+    // 财务需要对账渠道成本与生成账单，但不配置线路
+    PERMISSIONS.channelRead,
+    PERMISSIONS.channelModelRead,
+    PERMISSIONS.billingOrderRead,
+    PERMISSIONS.billingOrderResolve,
+    PERMISSIONS.modelAnalyticsRead,
     PERMISSIONS.ticketRead,
     PERMISSIONS.ticketHandle,
     PERMISSIONS.legalRead,
@@ -205,8 +233,12 @@ export const HIGH_RISK_PERMISSIONS: Permission[] = [
   PERMISSIONS.creditAdjust,
   PERMISSIONS.complianceTakedown,
   PERMISSIONS.capabilityWrite,
-  PERMISSIONS.channelRoute,
-  PERMISSIONS.modelConfigWrite,
+  PERMISSIONS.channelWrite,
+  PERMISSIONS.channelModelWrite,
+  PERMISSIONS.logicalModelWrite,
+  PERMISSIONS.userGroupWrite,
+  PERMISSIONS.pluginWrite,
+  PERMISSIONS.billingOrderResolve,
   PERMISSIONS.settingWrite,
   PERMISSIONS.legalWrite,
   PERMISSIONS.roleWrite,

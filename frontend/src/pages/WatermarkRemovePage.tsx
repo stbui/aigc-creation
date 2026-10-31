@@ -4,7 +4,7 @@ import { Columns2, Hand, Minus, Plus, Redo2, Square, Trash2, Undo2, X } from 'lu
 import { useToolTask } from '../hooks/useToolTask';
 import { useProject } from '../hooks/useProject';
 import { useCreditCost } from '../hooks/useCreditLabel';
-import { assetsApi } from '../lib/api';
+import { assetThumbUrl, assetsApi } from '../lib/api';
 import { ToolShell, type ToolAsset } from '../components/ToolShell';
 import { ToolCard } from '../components/ToolWidgets';
 import {
@@ -217,7 +217,7 @@ export function WatermarkRemovePage() {
               aria-label="预览待去水印图片"
               onClick={() => controls.preview(image)}
             >
-              <img src={image.url} alt="待去水印图片" draggable={false} />
+              <img src={assetThumbUrl(image.url, 320) ?? image.url} alt="待去水印图片" draggable={false} />
             </button>
             <div>
               <button

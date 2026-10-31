@@ -22,7 +22,7 @@ import { PageQueryDto } from './page-query.dto';
  *
  * ⚠ **必须值导入** (不能用 `import type`): `@Body()` / `@Query()` 的 DTO 依赖
  * `design:paramtypes` 做实例化与白名单剥离, 用 `import type` 会让类退化成 Function,
- * 校验完全绕过 —— 与 model.dto.ts 同一条约束。
+ * 校验完全绕过 —— 全部后台 DTO 同一条约束。
  *
  * 取值白名单是本文件的主要职责: SQLite 无 enum, 不在 DTO 层拦住非法值,
  * 就只能靠 service 层逐处 if 判断, 漏一处就是脏数据。

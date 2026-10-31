@@ -8,19 +8,23 @@
  * 不是绕过网络层的函数直调 —— 扣费与建任务的顺序、状态机的条件更新
  * 只有在真实链路上才成立。
  *
- * 覆盖 commerce-design.md C5 的三条不可让步的约定:
- *   1. 扣费在建任务之前, 余额不足不产生任务
- *   2. 生成失败必退还, 且退到**永久批次**
+ * 覆盖 commerce-design.md C5 的三条不可让步的约定（新模型层口径）:
+ *   1. 建任务后立即**预留**积分并落账单, 余额不足不产生任务
+ *   2. 上游明确未接单(4xx) → 失败并按预留明细原路退还;
+ *      上游 5xx 属「结果不明」(42206), 冻结等人工核对, **不自动退款**
  *   3. 前置校验失败不扣费
  * 另验证 C 端商品端点、能力消耗价下发、购买→沙箱支付→发积分。
  */
 process.env.PORT = process.env.PORT || '3011';
 process.env.NODE_ENV = process.env.NODE_ENV || 'development';
+// 本机模型桩是 127.0.0.1：出站层默认拒绝私网，必须在 ConfigModule 装载前放行。
+// 已存在的非空环境变量不会被 env 文件覆盖，故这里显式赋值即可。
+process.env.MODEL_ALLOW_PRIVATE_UPSTREAMS = 'true';
 
 const { NestFactory } = require('@nestjs/core');
-const { AppModule } = require('../dist/app.module');
+const { AppModule } = require('../src/app.module');
 const { ValidationPipe } = require('@nestjs/common');
-const { ResponseInterceptor } = require('../dist/common/response.interceptor');
+const { ResponseInterceptor } = require('../src/common/response.interceptor');
 const http = require('http');
 
 const BASE = `http://127.0.0.1:${process.env.PORT}/api/v1`;
@@ -71,7 +75,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   await app.listen(Number(process.env.PORT), '127.0.0.1');
   console.log(`[验证] 后端已在 ${BASE} 启动\n`);
 
-  const prisma = app.get(require('../dist/prisma/prisma.service').PrismaService);
+  const prisma = app.get(require('../src/prisma/prisma.service').PrismaService);
+  const health = app.get(require('../src/model/routing/route-health.service').RouteHealthService);
+  const billing = app.get(require('../src/model/billing/billing.service').BillingService);
   const bcrypt = require('bcryptjs');
 
   /*
@@ -87,7 +93,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const modelServer = http.createServer((req, res) => {
     req.resume();
     req.on('end', () => {
+      if (modelMode === 'reject') {
+        // 4xx = 上游**明确没有接下任务**：这条路必然走「切线 / 失败退款」
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: { code: 'invalid_api_key', message: 'mock upstream rejected' } }));
+        return;
+      }
       if (modelMode === 'failure') {
+        // 5xx = 请求可能已被上游受理：结果不明，不切线也不自动退款
         res.writeHead(500, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: { message: 'mock upstream failure' } }));
         return;
@@ -153,12 +166,96 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const assetId = upJson.data?.id;
   check('素材已上传', !!assetId, assetId ?? JSON.stringify(upJson).slice(0, 100));
 
+  /*
+   * 新模型层夹具：渠道 → 渠道模型 → 前台模型（revision + 线路）。
+   *
+   * 协议填**插件声明的 provider id**（`openai-image`）而不是插件 id
+   * （`openai-images`）—— 注册表按 provider 注册，填插件 id 会在派发时
+   * 报「协议尚未注册执行器」。该协议同步返回 `data[0].b64_json`，与模型桩
+   * 的响应形状一致；走的是生产同一条 `ProtocolExecutor` → 出站安全链路。
+   */
+  const IMAGE_CONFIG = {
+    version: 1,
+    image: {
+      references: { promptMaxChars: 4000, maxImages: 4, maxImageBytes: 0, maskSupported: false },
+      size: { parameter: 'size', values: ['1:1', '16:9'], default: '1:1', allowCustom: false },
+      resolution: { supported: true, values: ['1k', '2k'], default: '1k' },
+      quality: { supported: false, values: [], default: 'auto' },
+      transparentBackground: { supported: false, default: false },
+      responseFormat: { supported: true, default: 'url' },
+      outputFormat: { supported: false },
+      maxOutputs: 1,
+    },
+  };
+  const MICRO = 1_000_000n;
+  const cost = expand?.creditCost ?? 0;
+
+  const channel = await prisma.modelChannel.create({
+    data: {
+      userId: '',
+      scope: 'system',
+      enabled: true,
+      name: `扣费验证渠道-${Date.now()}`,
+      baseUrl: `http://127.0.0.1:${modelPort}`,
+      apiKey: 'smoke-token',
+      sortOrder: -100,
+    },
+  });
+  const channelModel = await prisma.channelModel.create({
+    data: {
+      channelId: channel.id,
+      modelKey: 'smoke-image-model',
+      activeKey: 'smoke-image-model',
+      providerModelKey: 'smoke-image-model',
+      displayName: '扣费验证模型桩',
+      capability: 'image',
+      protocol: 'openai-image',
+      billingMode: 'fixed_request',
+      capabilityConfigJson: JSON.stringify(IMAGE_CONFIG),
+      enabled: true,
+      priceConfigured: false,
+    },
+  });
+  const logicalModel = await prisma.logicalModel.create({
+    data: {
+      code: `credit-smoke-${Date.now()}`,
+      activeKey: `credit-smoke-${Date.now()}`,
+      name: '扣费验证模型',
+      // 准入按「前台模型 capability == 请求能力 id」校验
+      capability: 'expand',
+      enabled: true,
+      pricePolicy: 'unified',
+      billingMode: 'fixed_request',
+      unitPriceMicrocredits: BigInt(cost) * MICRO,
+    },
+  });
+  const revision = await prisma.logicalModelRevision.create({
+    data: {
+      logicalModelId: logicalModel.id,
+      version: 1,
+      capabilitySpecJson: JSON.stringify(
+        require('../src/model/intent/capability-spec').capabilitySpecFromModelCapabilityConfig(IMAGE_CONFIG, 'image'),
+      ),
+      defaultOptionsJson: '{}',
+    },
+  });
+  await prisma.logicalModelRoute.create({
+    data: { logicalModelRevisionId: revision.id, channelModelId: channelModel.id, priority: 0, weight: 100, enabled: true },
+  });
+  await prisma.logicalModel.update({
+    where: { id: logicalModel.id },
+    data: { activeRevisionId: revision.id, revisionSequence: 1 },
+  });
+  const logicalModelId = logicalModel.id;
+  // 本进程直接写库，目录快照不会自己失效
+  app.get(require('../src/model/catalog/route-catalog.service').RouteCatalogService).invalidateLocal();
+
   // ── 余额不足 ──────────────────────────────────────────────────────
   console.log('\n【余额不足 → 402 且不建任务】');
   check('新用户余额为 0', (await call('GET', '/credits/balance', T)).data?.balance === 0);
   const before = await prisma.generationTask.count({ where: { ownerId: user.id } });
   const poor = await call('POST', '/generate', T, {
-    projectId, capability: 'expand', inputAssetIds: [assetId], params: { ratio: '1:1' },
+    projectId, capability: 'expand', logicalModelId, inputAssetIds: [assetId], params: { ratio: '1:1' },
   });
   check('余额不足返回 402', poor.status === 402, `HTTP ${poor.status} ${poor.message ?? ''}`);
   const after = await prisma.generationTask.count({ where: { ownerId: user.id } });
@@ -176,51 +273,31 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // ── 发放后正常扣费 ────────────────────────────────────────────────
   console.log('\n【正常扣费】');
   const grant = 200;
-  await prisma.creditLot.create({
-    data: { userId: user.id, source: 'grant', totalCredits: grant, remainingCredits: grant, expireAt: null },
+  // 金额在库里是微积分（1 积分 = 1e6）；批次与账户同建，否则余额接口读不到
+  const grantAmount = BigInt(grant) * 1_000_000n;
+  const grantLot = await prisma.creditLot.create({
+    data: { userId: user.id, source: 'grant', totalMicrocredits: grantAmount, remainingMicrocredits: grantAmount, expireAt: null },
   });
-  await prisma.creditLedger.create({
-    data: { userId: user.id, type: 'grant', amount: grant, balanceAfter: grant, reason: '冒烟发放' },
+  await prisma.creditAccount.upsert({
+    where: { userId: user.id },
+    create: { userId: user.id, availableMicrocredits: grantAmount },
+    update: { availableMicrocredits: { increment: grantAmount }, version: { increment: 1 } },
   });
-
-  const mockChannel = await prisma.modelChannel.create({
+  await prisma.creditLedgerEntry.create({
     data: {
-      modality: 'image',
-      name: '扣费验证模型桩',
-      protocol: 'openai',
-      baseUrl: `http://127.0.0.1:${modelPort}`,
-      token: 'smoke-token',
-      model: 'smoke-image-model',
-      priority: -100,
-      enabled: true,
+      userId: user.id,
+      type: 'grant',
+      amountMicrocredits: grantAmount,
+      availableDeltaMicrocredits: grantAmount,
+      availableAfterMicrocredits: grantAmount,
+      reservedAfterMicrocredits: 0n,
+      lotId: grantLot.id,
+      note: '冒烟发放',
     },
   });
-  await prisma.modelChannelConfig.upsert({
-    where: { key: 'gateway.route.expand' },
-    create: { key: 'gateway.route.expand', value: 'auto', overridden: true },
-    update: { value: 'auto', overridden: true },
-  });
 
-  /*
-   * 本脚本要分别验证「桩失败 → 42201」和「无通道 → 42204」，
-   * 前提是调度器**只能看到本脚本的桩**。测试库里若已有后台配好的真实线路，
-   * 失败会被它接住并成功、无通道场景也仍有线路可用 —— 红的会变成脚本假设，
-   * 不是产品行为。故先临时停用其它 image 线路，跑完恢复原状。
-   */
-  const otherImageChannels = await prisma.modelChannel.findMany({
-    where: { modality: 'image', enabled: true, NOT: { id: mockChannel.id } },
-    select: { id: true },
-  });
-  if (otherImageChannels.length) {
-    await prisma.modelChannel.updateMany({
-      where: { id: { in: otherImageChannels.map((c) => c.id) } },
-      data: { enabled: false },
-    });
-  }
-
-  const cost = expand?.creditCost ?? 0;
   const ok = await call('POST', '/generate', T, {
-    projectId, capability: 'expand', inputAssetIds: [assetId], params: { ratio: '1:1' },
+    projectId, capability: 'expand', logicalModelId, inputAssetIds: [assetId], params: { ratio: '1:1' },
   });
   check('余额充足时创建成功', ok.status === 200 || ok.status === 201, `HTTP ${ok.status} ${ok.message ?? ''}`);
   check('响应带扣费快照', ok.data?.creditCost === cost, `返回 ${ok.data?.creditCost} / 期望 ${cost}`);
@@ -244,11 +321,12 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   console.log('\n【幂等创建 → 只扣一次、只建一个任务】');
   const idemKey = `credit-idem-${Date.now()}`;
   const tasksBeforeIdem = await prisma.generationTask.count({ where: { ownerId: user.id } });
-  const consumeBeforeIdem = await prisma.creditLedger.count({ where: { userId: user.id, type: 'consume' } });
+  const ordersBeforeIdem = await prisma.billingOrder.count({ where: { userId: user.id } });
   const balanceBeforeIdem = (await call('GET', '/credits/balance', T)).data?.balance;
   const idemPayload = {
     projectId,
     capability: 'expand',
+    logicalModelId,
     inputAssetIds: [assetId],
     params: { ratio: 'original', occupy: 80, position: 'center' },
     idempotencyKey: idemKey,
@@ -275,10 +353,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     (await prisma.generationTask.count({ where: { ownerId: user.id } })) === tasksBeforeIdem + 1,
     `${(await prisma.generationTask.count({ where: { ownerId: user.id } }))} / ${tasksBeforeIdem + 1}`,
   );
+  const ordersAfterIdem = await prisma.billingOrder.count({ where: { userId: user.id } });
   check(
-    '并发消耗流水只增加一条',
-    (await prisma.creditLedger.count({ where: { userId: user.id, type: 'consume' } })) === consumeBeforeIdem + 1,
-    `${(await prisma.creditLedger.count({ where: { userId: user.id, type: 'consume' } }))} / ${consumeBeforeIdem + 1}`,
+    '并发只产生一张账单',
+    ordersAfterIdem === ordersBeforeIdem + 1,
+    `${ordersAfterIdem} / ${ordersBeforeIdem + 1}`,
   );
   check(
     '并发重放只扣一次积分',
@@ -300,40 +379,41 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   }
   check('幂等任务在切换模型桩前已完成', idemTask?.status === 'succeeded', idemTask?.status);
 
-  // ── 失败必退还 ────────────────────────────────────────────────────
-  console.log('\n【生成失败 → 自动退还到永久批次】');
+  // ── 上游明确拒绝 → 失败并全额退还 ────────────────────────────────
+  console.log('\n【上游明确拒绝 → 任务失败并全额退还】');
   /*
-   * 模型-only 后不再存在“云端失败也本地画出图”的情况。这里让本机模型桩
-   * 返回 500，验证任务按真实上游异常失败并退款；素材保持有效，避免把
-   * “文件丢失”误说成“模型失败”。
+   * 4xx 表示上游**没有接下这次任务**，请求不可能已计费，因此可以切线；
+   * 本夹具只有一条线路，切线即「没有可用线路」，任务以 42204 失败并退款。
+   *
+   * 不能再用 5xx 验退款：新模型层把 5xx 归为「结果不明」（42206），
+   * 刻意不切线也不退款 —— 那正是下一段要单独验的行为。
    */
-  modelMode = 'failure';
+  modelMode = 'reject';
 
   const cost2 = expand?.creditCost ?? 0;
   const balBeforeFail = (await call('GET', '/credits/balance', T)).data?.balance;
-  const consumeBefore = await prisma.creditLedger.count({ where: { userId: user.id, type: 'consume' } });
 
   const ok2 = await call('POST', '/generate', T, {
-    projectId, capability: 'expand', inputAssetIds: [assetId], params: { ratio: '1:1' },
+    projectId, capability: 'expand', logicalModelId, inputAssetIds: [assetId], params: { ratio: '1:1' },
   });
   check('余额充足时仍可建任务', ok2.status === 200 || ok2.status === 201, `HTTP ${ok2.status}`);
   const taskId2 = ok2.data?.taskId;
-  const balAfterFailDeduct = (await call('GET', '/credits/balance', T)).data?.balance;
   /*
-   * 不能用「余额是否少了 cost2」判断是否扣过费: 任务 enqueue 后立即执行, 素材
-   * 指向不存在的文件会瞬间失败并原额退还 —— 等 POST 返回再读余额, 扣费与退还
-   * 往往都已发生, 余额看起来「没变」。
+   * 不能用「余额是否少了 cost2」判断是否扣过费：任务一入库就进 worker，桩返回
+   * 4xx 会瞬间失败并原额退款，等 POST 返回再读余额时扣与退往往都已发生。
    *
-   * 也不能靠 consume 流水的 taskId 找它: 扣费发生在建任务之前 (那时还没有
-   * task id), 流水只记 userId。故用「本用户 consume 流水条数 +1」+「任务上的
-   * creditCost 快照」两条持久证据交叉验证先扣后退。
+   * 新模型层的持久证据是账单：建任务后立即预留并落 `BillingOrder`。故断言
+   * 「该任务有账单」+「账单金额 = 能力消耗价」+「任务快照 creditCost」，三段
+   * 交叉证明先冻结后结算，与结算终态分开验。
    */
-  const consumeAfter = await prisma.creditLedger.count({ where: { userId: user.id, type: 'consume' } });
+  const failOrder = await prisma.billingOrder.findFirst({
+    where: { taskId: taskId2 },
+    orderBy: { createdAt: 'desc' },
+  });
   const costSnapshot = (await prisma.generationTask.findUnique({ where: { id: taskId2 } }))?.creditCost;
-  check('失败任务同样先扣费',
-    consumeAfter === consumeBefore + 1 && costSnapshot === cost2,
-    `consume 流水 ${consumeBefore}→${consumeAfter}，任务快照 ${costSnapshot} (期望 ${cost2})，`
-    + `余额 ${balBeforeFail} → ${balAfterFailDeduct}`);
+  check('失败任务同样先冻结积分',
+    !!failOrder && failOrder.amountMicrocredits === BigInt(cost2) * MICRO && costSnapshot === cost2,
+    `账单 ${failOrder?.amountMicrocredits ?? '无'} (期望 ${BigInt(cost2) * MICRO})，任务快照 ${costSnapshot} (期望 ${cost2})`);
 
   let t2 = null;
   const deadline2 = Date.now() + 25000;
@@ -343,39 +423,111 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
     if (t2 && (t2.status === 'succeeded' || t2.status === 'failed')) break;
     await sleep(600);
   }
-  check('模型通道失败后任务转为 failed', t2?.status === 'failed', `状态 ${t2?.status}`);
-  check('模型通道失败错误码为 42201', t2?.errorCode === '42201', t2?.errorCode);
+  check('上游拒绝后任务转为 failed', t2?.status === 'failed', `状态 ${t2?.status}`);
+  check('线路全部不可用错误码为 42204', t2?.errorCode === '42204', t2?.errorCode);
+
+  const rejectedAttempt = await prisma.routeAttempt.findFirst({
+    where: { taskId: taskId2 },
+    orderBy: { attemptNumber: 'desc' },
+  });
+  check('4xx 记为「明确未接单」，切线安全',
+    rejectedAttempt?.dispatchState === 'rejected_no_job' && rejectedAttempt?.failureCode === 'upstream_401',
+    `${rejectedAttempt?.dispatchState} / ${rejectedAttempt?.failureCode}`);
 
   if (t2?.status === 'failed') {
-    // 退还发生在 catch 分支, 可能稍晚于任务状态落库, 稍等再查余额
-    let balAfterRefund = balAfterFailDeduct;
+    // 退还发生在失败分支, 可能稍晚于任务状态落库, 稍等再查余额
+    let balAfterRefund = balBeforeFail - cost2;
     for (let i = 0; i < 10; i++) {
       balAfterRefund = (await call('GET', '/credits/balance', T)).data?.balance;
       if (balAfterRefund === balBeforeFail) break;
       await sleep(400);
     }
     check('失败后余额已退还', balAfterRefund === balBeforeFail,
-      `${balAfterFailDeduct} → ${balAfterRefund} (期望 ${balBeforeFail})`);
+      `${balAfterRefund} (期望 ${balBeforeFail})`);
 
-    const lastLot = await prisma.creditLot.findFirst({
-      where: { userId: user.id }, orderBy: { createdAt: 'desc' },
-    });
-    // 退还必须落在**永久批次**: 原批次带过期日的话, 退到那里等于让用户白付
-    check('退还批次为永久 (expireAt 为空)', lastLot?.expireAt === null, `expireAt=${lastLot?.expireAt}`);
+    const settled = await prisma.billingOrder.findUnique({ where: { id: failOrder.id } });
+    check('失败账单转 refunded 且全额退回',
+      settled?.status === 'refunded' && settled?.refundedAmountMicrocredits === settled?.amountMicrocredits,
+      `${settled?.status} / ${settled?.refundedAmountMicrocredits} / ${settled?.amountMicrocredits}`);
 
-    const ledger = await prisma.creditLedger.findFirst({
-      where: { userId: user.id, reason: { contains: '自动退还' } },
+    // 退款不是新发积分：必须按预留明细回填原批次，新建批次会让到期时间失真
+    const reservationItems = await prisma.creditReservationItem.findMany({
+      where: { billingOrderId: failOrder.id },
     });
-    check('退还流水已落库', !!ledger, ledger?.reason ?? '未找到');
-    check('退还流水金额为正 (退回而非再扣)', (ledger?.amount ?? 0) > 0, `${ledger?.amount}`);
+    check('退款按预留明细原路回填批次', reservationItems.length > 0, `${reservationItems.length} 条`);
+
+    const ledger = await prisma.creditLedgerEntry.findFirst({
+      where: { userId: user.id, type: 'refund' },
+    });
+    check('退还流水已落库', !!ledger, ledger?.note ?? '未找到');
+    check('退还流水金额为正 (退回而非再扣)', (ledger?.amountMicrocredits ?? 0n) > 0n, `${ledger?.amountMicrocredits}`);
   }
+
+  /*
+   * 4xx 会按 failureCode 给渠道打冷却（401 → 渠道 10 分钟）。这是运行时的正确
+   * 行为，但会挡住后面的用例 —— 显式清空，让每段从「健康线路」开始。
+   */
+  health.clear();
+
+  // ── 上游 5xx → 结果不明，不切线也不自动退款 ─────────────────────
+  console.log('\n【上游 5xx → 42206 结果不明，冻结等人工核对】');
+  modelMode = 'failure';
+
+  const balBeforeUncertain = (await call('GET', '/credits/balance', T)).data?.balance;
+  const uncertainCreate = await call('POST', '/generate', T, {
+    projectId, capability: 'expand', logicalModelId, inputAssetIds: [assetId], params: { ratio: '1:1' },
+  });
+  check('5xx 用例同样可以先建任务', uncertainCreate.status === 200 || uncertainCreate.status === 201,
+    `HTTP ${uncertainCreate.status}`);
+  const uncertainTaskId = uncertainCreate.data?.taskId;
+
+  let t3 = null;
+  const deadline3 = Date.now() + 25000;
+  while (Date.now() < deadline3) {
+    t3 = (await call('GET', `/tasks/${uncertainTaskId}`, T)).data;
+    if (t3 && (t3.status === 'succeeded' || t3.status === 'failed')) break;
+    await sleep(600);
+  }
+  check('5xx 后任务转为 failed', t3?.status === 'failed', `状态 ${t3?.status}`);
+  check('错误码为 42206（结果不明）', t3?.errorCode === '42206', t3?.errorCode);
+
+  const uncertainOrder = await prisma.billingOrder.findFirst({
+    where: { taskId: uncertainTaskId },
+    orderBy: { createdAt: 'desc' },
+  });
+  check('账单保持 uncertain，积分仍在冻结',
+    uncertainOrder?.status === 'uncertain' && (uncertainOrder?.refundedAmountMicrocredits ?? 0n) === 0n,
+    `${uncertainOrder?.status} / 已退 ${uncertainOrder?.refundedAmountMicrocredits}`);
+  check('未自动退款（余额未回到失败前）',
+    (await call('GET', '/credits/balance', T)).data?.balance === balBeforeUncertain - cost2,
+    `${(await call('GET', '/credits/balance', T)).data?.balance} / ${balBeforeUncertain - cost2}`);
+
+  /*
+   * 人工核对的出口：运营在后台选「退款」后余额必须原额回来。
+   * 这里直接调服务（与后台接口同一条路径），不绕过账本。
+   */
+  await billing.refund(uncertainOrder.id, '验收：结果不明经人工核对后退款');
+  let balAfterManual = balBeforeUncertain - cost2;
+  for (let i = 0; i < 10; i++) {
+    balAfterManual = (await call('GET', '/credits/balance', T)).data?.balance;
+    if (balAfterManual === balBeforeUncertain) break;
+    await sleep(300);
+  }
+  check('人工退款后余额原额恢复', balAfterManual === balBeforeUncertain,
+    `${balAfterManual} (期望 ${balBeforeUncertain})`);
 
   // ── 没有模型通道 → 42204 且退款，不产出伪结果 ─────────────────
   console.log('\n【无模型通道 → 42204 且退款】');
-  await prisma.modelChannel.update({ where: { id: mockChannel.id }, data: { enabled: false } });
+  /*
+   * 只停渠道、**不**失效目录：快照里仍保留这条线路，准入通过、执行期装配失败，
+   * 正是要验的「线路在派发前失效」路径。
+   */
+  // 先回源一份新快照：停用渠道后 30s 内不会重载，准入才能看到这条线路
+  await app.get(require('../src/model/catalog/route-catalog.service').RouteCatalogService).snapshotNow();
+  await prisma.modelChannel.update({ where: { id: channel.id }, data: { enabled: false } });
   const balBeforeNoChannel = (await call('GET', '/credits/balance', T)).data?.balance;
   const noChannel = await call('POST', '/generate', T, {
-    projectId, capability: 'expand', inputAssetIds: [assetId], params: { ratio: '1:1' },
+    projectId, capability: 'expand', logicalModelId, inputAssetIds: [assetId], params: { ratio: '1:1' },
   });
   check('直调仍可建任务 (由执行期判失败)', noChannel.status === 200 || noChannel.status === 201, `HTTP ${noChannel.status}`);
   let noChannelTask = null;
@@ -477,28 +629,37 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   // ── 余额口径 ──────────────────────────────────────────────────────
   console.log('\n【余额口径】');
   const lots = await prisma.creditLot.findMany({ where: { userId: user.id } });
-  const sum = lots.reduce((s, l) => s + l.remainingCredits, 0);
+  // 批次是微积分口径，接口余额是积分口径：只在断言处换算
+  const sum = Number(lots.reduce((s, l) => s + l.remainingMicrocredits, 0n) / 1_000_000n);
   check('接口余额 = Σ批次剩余', (await call('GET', '/credits/balance', T)).data?.balance === sum,
     `接口 ${(await call('GET', '/credits/balance', T)).data?.balance} / 批次汇总 ${sum}`);
 
   // ── 清理 ──────────────────────────────────────────────────────────
+  const taskIds = (await prisma.generationTask.findMany({ where: { ownerId: user.id }, select: { id: true } }))
+    .map((t) => t.id);
+  const orderIds = (await prisma.billingOrder.findMany({ where: { userId: user.id }, select: { id: true } }))
+    .map((o) => o.id);
   await prisma.generationTask.deleteMany({ where: { ownerId: user.id } });
   await prisma.asset.deleteMany({ where: { ownerId: user.id } });
   await prisma.project.deleteMany({ where: { id: projectId } });
   await prisma.payment.deleteMany({ where: { userId: user.id } });
   await prisma.orderItem.deleteMany({ where: { order: { userId: user.id } } });
   await prisma.order.deleteMany({ where: { userId: user.id } });
-  await prisma.creditLedger.deleteMany({ where: { userId: user.id } });
-  await prisma.creditLot.deleteMany({ where: { userId: user.id } });
-  await prisma.modelChannel.deleteMany({ where: { id: mockChannel.id } });
-  // 恢复被本脚本临时停用的既有线路，不能把测试档的模型配置留在关闭态
-  if (otherImageChannels.length) {
-    await prisma.modelChannel.updateMany({
-      where: { id: { in: otherImageChannels.map((c) => c.id) } },
-      data: { enabled: true },
-    });
-  }
-  await prisma.modelChannelConfig.deleteMany({ where: { key: 'gateway.route.expand' } });
+  await require('./credit-fixture').clearCredits(prisma, user.id);
+  /*
+   * 新模型层的运行时台账（RouteAttempt / BillingOrder / CreditReservationItem /
+   * ApiCallLog）都是字符串关联、没有外键级联，不显式删就会永远留在测试库里。
+   */
+  await prisma.routeAttempt.deleteMany({ where: { taskId: { in: taskIds } } });
+  await prisma.creditReservationItem.deleteMany({ where: { billingOrderId: { in: orderIds } } });
+  await prisma.billingOrder.deleteMany({ where: { userId: user.id } });
+  await prisma.apiCallLog.deleteMany({ where: { userId: user.id } });
+  // 模型夹具：线路 → 渠道模型 → 渠道 → 前台模型（revision 随模型级联）
+  await prisma.logicalModelRoute.deleteMany({ where: { logicalModelRevisionId: revision.id } });
+  await prisma.logicalModelRevision.deleteMany({ where: { logicalModelId: logicalModel.id } });
+  await prisma.logicalModel.deleteMany({ where: { id: logicalModel.id } });
+  await prisma.channelModel.deleteMany({ where: { id: channelModel.id } });
+  await prisma.modelChannel.deleteMany({ where: { id: channel.id } });
   // 注册写同意留痕、登录写登录日志、退款失败给站内消息 —— 三者都直接引用 User,
   // 漏删任意一张都会让最后一步 delete 撞上外键, 看起来像「脚本异常」而非清理不全
   await prisma.consentRecord.deleteMany({ where: { userId: user.id } });

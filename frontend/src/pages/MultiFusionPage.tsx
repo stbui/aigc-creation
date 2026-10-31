@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react';
 import { App, Spin } from 'antd';
 import { ChevronDown, ChevronLeft, Download, ImagePlus, Layers, RefreshCw, Sparkles, X } from 'lucide-react';
-import { assetSrc, assetsApi, generateApi, promptToolsApi, toAbsoluteUrl } from '../lib/api';
+import { assetSrc, assetThumbUrl, assetsApi, generateApi, promptToolsApi, toAbsoluteUrl } from '../lib/api';
+import { resolveModelId } from '../lib/models';
 import {
   MAX_IMAGE_BYTES,
   MAX_IMAGE_MB,
@@ -379,9 +380,11 @@ export function MultiFusionPage() {
     setLastFailure(null);
     try {
       const projectId = await ensureProject();
+      const logicalModelId = await resolveModelId('multi_fusion');
       const { taskId } = await generateApi.start({
         projectId,
         capability: 'multi_fusion',
+        logicalModelId,
         // 顺序即语义: [0]=主体图, [1..]=搭配图 (后端 processTask 按提交序保序)
         inputAssetIds: [subject.id, ...accents.map((a) => a.id)].slice(0, MAX_TOTAL),
         params: { scene, variantCount, ratio, size: resolution, prompt: prompt.trim() },
@@ -557,7 +560,12 @@ export function MultiFusionPage() {
               </div>
               {subject ? (
                 <div className="multi-image-fusion-image-card">
-                  <img src={subject.url} alt={subject.name} loading="lazy" decoding="async" />
+                  <img
+                    src={assetThumbUrl(subject.url, 320) ?? subject.url}
+                    alt={subject.name}
+                    loading="lazy"
+                    decoding="async"
+                  />
                   <button
                     type="button"
                     className="multi-image-fusion-remove"
@@ -630,7 +638,12 @@ export function MultiFusionPage() {
               >
                 {accents.map((a) => (
                   <div key={a.id} className="multi-image-fusion-image-card">
-                    <img src={a.url} alt={a.name} loading="lazy" decoding="async" />
+                    <img
+                      src={assetThumbUrl(a.url, 320) ?? a.url}
+                      alt={a.name}
+                      loading="lazy"
+                      decoding="async"
+                    />
                     <button
                       type="button"
                       className="multi-image-fusion-remove"
@@ -952,7 +965,7 @@ export function MultiFusionPage() {
                     onClick={() => setActiveResultIndex(index)}
                   >
                     <img
-                      src={item.url}
+                      src={assetThumbUrl(item.url, 240) ?? item.url}
                       alt={`融合结果缩略图 ${index + 1}`}
                       loading="lazy"
                       decoding="async"

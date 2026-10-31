@@ -8,6 +8,7 @@
  */
 
 import type { CapabilityPlugin } from '../capability-plugin.type';
+import { generateImageIntent } from '../model-mapping';
 import { LANGUAGES, PLATFORMS, QUALITY_OPTIONS, RATIOS, ratioText, sizeText } from './param-options';
 
 export const HotRemake: CapabilityPlugin = {
@@ -48,6 +49,7 @@ export const HotRemake: CapabilityPlugin = {
     `爆款风格复刻：参考上传的爆款图的构图、配色与氛围，替换主体为上传的商品，保持整体风格一致。` +
     `${p.degree === 'reference_style' ? '偏重保留参考图版式' : '偏重高度还原参考图'}${ratioText(p.ratio)}${sizeText(p.size)}`,
   modality: 'image',
+  model: { capability: 'image', operation: 'text_to_image', intent: generateImageIntent },
   inputs: 2,
   inWorkbench: true,
 };

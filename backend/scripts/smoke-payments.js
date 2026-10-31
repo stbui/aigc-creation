@@ -437,10 +437,15 @@ function localDate(d = new Date()) {
     balBefore.data?.balance - balAfter.data?.balance === product.credits,
     `${balBefore.data?.balance} → ${balAfter.data?.balance} (应减少 ${product.credits})`,
   );
-  const reclaimLedger = await prisma.creditLedger.findFirst({
-    where: { orderId: orderR1.id, type: 'refund_reclaim' },
+  const reclaimLedger = await prisma.creditLedgerEntry.findFirst({
+    where: { paymentOrderId: orderR1.id, type: 'refund_reclaim' },
   });
-  check('积分回收留有 refund_reclaim 流水', reclaimLedger?.amount === -product.credits, `${reclaimLedger?.amount}`);
+  // 流水金额是微积分；-product.credits 积分折 1e6
+  check(
+    '积分回收留有 refund_reclaim 流水',
+    reclaimLedger?.amountMicrocredits === BigInt(-product.credits) * 1_000_000n,
+    `${reclaimLedger?.amountMicrocredits}`,
+  );
 
   // 5.2 部分退款: 分两次退完, 第二次不重复扣积分
   const orderR2 = await paidOrder('refund-partial', 'REFUND-PART');

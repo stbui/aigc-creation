@@ -21,7 +21,7 @@
 - 冒烟与 seed 脚本按当前 `NODE_ENV` 选库（`backend/scripts/db-url.js`），默认是开发库。跑测试必须显式 `NODE_ENV=test`，否则会写脏 `dev.db`。
 - 重建测试环境：`NODE_ENV=test npm run db:reset:test`（删库 + 重建 + 重灌种子，带安全门禁）。
 - 启动测试后端：`./start.sh --env test`（端口固定 4100，占用即停）；手工启动用 `NODE_ENV=test node dist/main.js`，不要用 `nest start`。
-- 脚本基址：多数支持 `API_BASE`；`smoke-marketing.js` 用 `MARKETING_API_BASE`（含 `/api/v1`）；`smoke-model-channels.js` 用 `SMOKE_BASE`；L2 的 `.js` 验证脚本用 `VERIFY_BASE`。
+- 脚本基址：多数支持 `API_BASE`；`smoke-marketing.js` 用 `MARKETING_API_BASE`（含 `/api/v1`）；L2 的 `.js` 验证脚本用 `VERIFY_BASE`。
 - SQLite 单写者：脚本直连库时后端同时写库会撞 `database is locked`（P2039），脚本内已做退避重试。
 
 开跑前确认库路径，避免「以为在测、实际连着开发库」：
@@ -52,55 +52,52 @@ npm run test:watch      # watch
 npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitignore）
 ```
 
-当前 14 个用例文件：
+当前 18 个用例文件：
 
 | 用例 | 守住什么 |
 | --- | --- |
+| `admin-ui/primitives/DataTable.density.test.tsx` | 表格密度：`DensityContext` 生效、显式 `density` prop 优先 |
 | `components/ColorSwatchGrid.test.tsx` | 色板选择、自定义色回显、禁用态 |
 | `components/ImageLightbox.test.tsx` | 大图查看器开合、缩放/翻页键盘语义 |
 | `components/ProviderBadge.test.tsx` | 能力/产出来源徽标文案与状态映射 |
 | `components/StateViews.test.tsx` | 加载 / 空 / 失败 / 骨架四态渲染 |
 | `components/admin/AdminWidgets.test.tsx` | 列表筛选 → 地址栏同步：写回、重置清旧值、保留非筛选参数 |
 | `hooks/useCreditLabel.test.tsx` | 积分文案与生效价、限时免费的展示 |
+| `lib/admin-links.test.ts` | 跨模块深链的参数编码（邮箱、任务 id 等） |
 | `lib/aigc-label.test.ts` | 角标参数缓存、失败回退默认值、色值还原 |
 | `lib/expandGeometry.test.ts` | 扩图占比与原图位置几何换算 |
 | `lib/multiFusionBilling.test.ts` | 多图融合变体数 × 积分计费 |
 | `lib/optionSets.test.ts` | 平台/语言/比例等选项集合的默认值与排序 |
 | `lib/poll.test.ts` | 轮询重试、超时、视频上限放宽、中止语义 |
+| `lib/routePreload.test.ts` | 路由预加载：精确路由只预热一次、通配路由匹配 |
 | `lib/skuBatches.test.ts` | SKU 行批量展开与坐标映射 |
 | `lib/unsaved-guard.test.ts` | 离开页面时的未保存拦截 |
 | `lib/zip.test.ts` | 浏览器内批量下载打包 |
+| `pages/admin/admin-modules.test.ts` | 后台目录具名导入 / 导出对账：相对导入的每个名字都必须在目标模块导出（防 `/admin` 整块白屏） |
 
 边界：Vitest 只跑 jsdom，不替代 L3/L4。真实后端、真实浏览器、真实库与磁盘的记录仍以 `smoke-*` / `verify-*` / Playwright 为准。Playwright 只收集 `tests/*.spec.ts`，Vitest 只收集 `src/**/*.test.*`，两边互不重叠。
 
 ### 3.3 架构与纯逻辑断言（L2）
 
-`backend/scripts/` 下共 24 个验证脚本：20 个 `verify-*.ts` + 1 个 `probe-environments.ts`，以及 3 个需要后端已启动的 `verify-*.js`。
+`backend/scripts/` 下共 17 个验证脚本：13 个 `verify-*.ts` + 1 个 `probe-environments.ts`，以及 3 个需要后端已启动的 `verify-*.js`。
 
 #### 3.3.1 纯逻辑 / 自起服务
 
 | 脚本 | 断言什么 |
 | --- | --- |
-| `verify-architecture-layers.ts` | 分层依赖方向：应用层 → unified → vendors → protocols → modality，反向依赖即失败 |
-| `verify-capability-bootstrap.ts` | 能力定义能真实加载并通过 `assertCapabilityIntegrity` |
-| `verify-capability-extensibility.ts` | 新增能力只需改一处（registry 扩展性） |
-| `verify-capability-extraction.ts` | 能力定义拆分前后的逐字段等价性 |
-| `verify-credit-deduction.ts` | 生成扣费 / 失败退款 / 余额一致性（同进程起 Nest 打真实 HTTP） |
+| `verify-capability-bootstrap.ts` | 能力定义能真实加载并通过 `assertCapabilityIntegrity`，且没有能力再声明本地图像实现 |
+| `verify-credit-deduction.ts` | 生成扣费 / 失败退款 / 余额一致性（同进程起 Nest 打真实 HTTP）：建任务即预留并落账单、余额不足不产生任务 |
 | `verify-credit-price.ts` | 后台改价 → `/capabilities` 与生成扣费同步生效 |
-| `verify-modality-config.ts` | 三模态配置解析与存量键回落方向 |
-| `verify-vendor-aggregation.ts` | 厂商目录 → 模态视图的派生等价性 |
-| `verify-channel-scheduler.ts` | 多渠道调度：优先级、冷却、失败切换、基址归一化 |
-| `verify-channel-test.ts` | 连通性测试路径按模态构造 |
-| `verify-failover.ts` | 故障转移时真的换上备用通道的 baseUrl / token / model |
-| `verify-model-config-fixes.ts` | model-only 语义：无线路为 `none`、存量 `route=local` 不可用、新写入 local 被拒 |
-| `verify-image-pipeline.ts` | 图像链路：无线路 `42204`、存量 local 失败、遮罩无 edits 线路 `42205`、线路失败 `42201`、成功来源只能是 `gateway` |
-| `verify-tool-contracts.ts` | 8 个修图工具的能力定义、默认值、hidden 字段兼容、严格参数校验、标注解析、上传头与遮罩尺寸校验 |
-| `verify-video-pipeline.ts` | 视频四段式异步契约 |
+| `verify-tool-contracts.ts` | 8 个修图工具的能力定义、默认值、hidden 字段、严格参数校验、标注解析、上传头与遮罩尺寸校验 |
 | `verify-payment-signatures.ts` | 支付宝 RSA2 / 微信 v3 AES-GCM 按公开规范独立复算，防「自己签自己验」 |
 | `verify-channel-signatures.ts` | 阿里云短信 / 邮件 RPC 签名（HMAC-SHA1 + sorted canonical query）独立复算；只验签名与请求形状，不代表已真实投递 |
-| `verify-admin-tasks.ts` | 后台任务监控（同进程起服务） |
-| `verify-free-create-e2e.ts` | 自由创作真实 HTTP → 落库字段核对 |
-| `verify-modelverse-live.ts` | 一次性真实通道验证，需要真实 token；不在常规闸口内 |
+| `verify-plugin-manifests.ts` | 内置插件清单解析（`plugins/` 107 个可用包 / 115 个 provider；`src-*` 源目录镜像跳过）：id 唯一、能力与后端类型分布 |
+| `verify-model-consistency.ts` | 渠道/模型数据层不变量：activeKey 软删除唯一键、selectorKey 规范 JSON、档位不越能力合同、模型摘要与档位汇总一致、`modelsJson` 与启用模型一致 |
+| `verify-channel-flow.ts` | 渠道全链路（同进程起 Nest 打真实 HTTP）：建渠道 → 建模型含两档价格 → 上游键改名级联 → 复制 → 导出断言无凭证 → 改名导入 → 批量删除 → 删渠道 |
+| `verify-protocol-runtime.ts` | 协议运行时：115 个已注册 provider 的 `buildCreate` 冒烟、成功 / 异步 / 失败三类响应归一化；本地假上游走真实接口跑通 `POST /admin/channels/:id/models/test`（image 同步 + video 轮询）与 `POST /admin/channels/:id/models/{fetch,import}`，校验 `ApiCallLog`（`billable=false` / 无明文凭证）、导入默认停用未定价、重复导入不新增、审计动作落库；假上游只在回环地址，脚本内临时打开 `MODEL_ALLOW_PRIVATE_UPSTREAMS` |
+| `verify-billing.ts` | 计费账本：预留（含幂等）、固定价结算、Token 差额退回 / 超预授权补扣 / 授权上限截断、按秒计费按实际时长重算、失败全额退款（幂等）、已结算拒绝自动退款、`uncertain` 保留冻结后人工核对、余额不足 `40002`；每一步后校验 `CreditAccount.available == Σ CreditLot.remaining` |
+| `verify-route-catalog.ts` | 前台模型与选路：priority 硬分层与下沉、同层加权分布、SKU 选择（精确 / 通配 / 1.5K 相邻 / 停用档）、冷却三键与不冷却码、`simulate` 与 `resolve` 选中同一条线路与价格档、目录投影的渠道可见性与「先换货币再乘倍率」；后半段同进程起 Nest 打真实 HTTP 校验 `/models`、`/models/available`、`/models/:id/quote` 与后台模拟接口的接线与守卫。`VERIFY_HTTP=0` 可只跑纯逻辑 |
+| `verify-task-runtime.ts` | 任务运行时端到端：起本机 HTTP mock 上游，经真实 `ProtocolExecutor` / 出站层跑四条路径——同步成功（产物落盘、格式按字节嗅探、AIGC 标识、`settled`、按目录价扣费）、上游 401 切线（`rejected_no_job` + `upstream_401`、旧账单退回、新账单按新线路价结算、`task.creditCost` 同步）、轮询超时（`42206` / `uncertain`、**不切线**、备份线路零调用）、唯一线路 429（`42204`、全额退款、余额回正），末尾校验「可用余额 == Σ 批次剩余」；夹具全部自建并按外键序清理（含产物文件） |
 | `probe-environments.ts` | 三环境解析：档位顺序、不回落 `.env`、空串语义等（不连数据库） |
 
 #### 3.3.2 需先起服务的 HTTP 验证
@@ -115,7 +112,7 @@ npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitig
 
 ### 3.4 HTTP 冒烟（L3）
 
-共 21 个脚本（`backend/scripts/smoke-*.js`），需后端已启动。按域分组：
+共 20 个脚本（`backend/scripts/smoke-*.js`），需后端已启动。按域分组：
 
 | 域 | 脚本 | 覆盖要点 |
 | --- | --- | --- |
@@ -127,9 +124,8 @@ npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitig
 | | `smoke-signed-url.js` | 另起带密钥实例：无签名 403、带签名 200、篡改 403、过期 410、HEAD 200 |
 | | `smoke-rate-limit.js` | 短信 1/分、换号不换配额、伪造 XFF 无效、找回密码 3/时 |
 | | `smoke-health-tracing.js` | 健康分项、请求号回显与替换、异常信封 `requestId`、日志 `[rid=]` 串联 |
-| 能力 | `smoke-capability-runtime.js` | model-only runtime、无线路不预告产出、上下线 `40005`、限时免费 0 积分 |
-| 模型通道 | `smoke-model-channels.js` | 线路 CRUD / token 保持与清除 / 排序 / 测试响应 / 401 |
-| 后台 | `smoke-admin.js` | 身份、权限点、审计、告警结构、退款状态筛选、五类只读列表 CSV 导出（类型 / BOM / 匿名拒绝 / `data.export` 审计留痕） |
+| 能力 | `smoke-capability-runtime.js` | `runtime` 只有 `enabled / remoteAvailable / effective / reason`（不残留 `route` / `localQuality`）、无线路不预告产出、上下线 `40005`、限时免费 0 积分 |
+| 后台 | `smoke-admin.js` | 身份、权限点、审计、告警结构、退款状态筛选、五类只读列表 CSV 导出（类型 / BOM / 匿名拒绝 / `data.export` 审计留痕；调用记录走 `/admin/api-logs/export`） |
 | | `smoke-backup.js` | 未验证备份不可下载、保留策略、路径穿越拦截 |
 | | `smoke-scheduler.js` | 定时任务真的改数据（订单超时、积分到期等） |
 | | `smoke-storage.js` | 多存储后端语义、路径穿越、下架不可读 |
@@ -145,7 +141,7 @@ development / test 的管理员凭据统一为 `admin@admin.com / 123456789`，�
 
 #### 仿真模型网关
 
-零依赖的仿真模型网关在 `test/`：提供 OpenAI 标准协议的文生文 / 文生图 / 文生视频端点与 MiniMax 兼容视频端点，无真实凭据也能跑通「模型配置 → 测试连接 → 生成 → 下载」全链路，并支持 `[[fail]]` / `[[401]]` / `[[429]]` 失败注入。
+零依赖的仿真模型网关在 `test/`：提供 OpenAI 标准协议的文生文 / 文生图 / 文生视频端点与 MiniMax 兼容视频端点，无真实凭据也能跑通「渠道工作台 → 连通性测试 → 生成 → 下载」全链路，并支持 `[[fail]]` / `[[401]]` / `[[429]]` 失败注入。
 
 ```bash
 cd test && node server.js       # http://127.0.0.1:3900
@@ -153,11 +149,11 @@ cd test && npm test             # 网关自测
 cd test && npm run smoke:spawn  # 起网关跑联网冒烟
 ```
 
-后台「模型配置」把线路指到 `http://127.0.0.1:3900`，基址只填根域，不要带 `/v1`。`smoke-aigc` 与 `verify-free-create-e2e` 需要可用的 image 线路；没有通道时它们会如实报 `42204` / 轮询超时，不能当产品缺陷。
+后台「渠道工作台」新建渠道并把基址指到 `http://127.0.0.1:3900`（只填根域，不要带 `/v1`），协议按能力选 `openai-image` / `chat-completion` / `minimax-video`，再到「前台模型」挂一条线路。`smoke-aigc` 需要可用的 image 线路；没有线路时它会如实报 `42204`，不能当产品缺陷。
 
 ### 3.5 浏览器 E2E（L4）
 
-配置在 `frontend/playwright.admin.config.ts` / `playwright.config.ts` / `playwright.local.config.ts`，用例在 `frontend/tests/`，共 15 个 spec：
+配置在 `frontend/playwright.admin.config.ts` / `playwright.config.ts` / `playwright.local.config.ts`，用例在 `frontend/tests/`，共 16 个 spec：
 
 | 用例 | 守住什么 |
 | --- | --- |
@@ -166,6 +162,7 @@ cd test && npm run smoke:spawn  # 起网关跑联网冒烟
 | `admin-backup.spec.ts` | 未通过恢复验证的备份不可下载 |
 | `admin-layout.spec.ts` | 后台布局回归 |
 | `admin-marketing.spec.ts` | 营销中心三条约束 |
+| `admin-model-suite.spec.ts` | 渠道 / 模型 P5 五页与 C 端选型：渠道工作台列表与模型抽屉、前台模型的路由模拟、用户分组与插件页渲染、生成账单与调用记录的筛选和详情、工具页 `ModelPicker` 选型后报价随之变化；生成段需要可用 image 线路，无线路时该段跳过 |
 | `admin-scheduler.spec.ts` | 定时任务可观测（静默失败可见） |
 | `admin-screenshots.spec.ts` | 后台逐页截图取证 |
 | `admin-ux.spec.ts` | 筛选深链与逐条清除（含工单/商品/对账/能力/告警）、订单/任务/模型线路宽表在 1440px 无横向滚动、页面/编辑抽屉/工单回复/积分调整的未保存保护、角色权限未保存拦截、概览任务直达、任务详情到积分账本及项目筛选的跨模块深链、详情 `?id=` 刷新恢复与关闭移除 |
@@ -196,16 +193,17 @@ node scripts/verify-deps.js --quiet   # 仅结论，有致命问题 exit 1
 
 | 功能域 | L2 | L3 | L4 |
 | --- | --- | --- | --- |
-| 能力注册表 / 生成链路 | capability-*、image/video-pipeline、credit-*、tool-contracts | capability-runtime | product-capabilities、product-parameters、state-contract |
-| 模型通道 | modality-config、vendor-aggregation、channel-*、failover、model-config-fixes | model-channels | — |
+| 能力注册表 / 生成链路 | capability-bootstrap、credit-*、tool-contracts | capability-runtime | product-capabilities、product-parameters、state-contract |
+| 模型层（渠道 / 选路 / 计费 / 任务） | plugin-manifests、model-consistency、channel-flow、protocol-runtime、route-catalog、billing、task-runtime | 暂无（见 5.5） | admin-model-suite |
 | 身份与账户 | — | auth、qr-login、account、rate-limit | admin、free-creation-submit |
 | 第三方登录（OAuth） | — | 暂无自动化闸口（见 5.3） | — |
 | 交易与权益 | credit-deduction、credit-price、payment-signatures | commerce、membership、membership-order、payments、refund-rules | admin、admin-marketing |
 | 营销 | — | marketing | admin-marketing |
-| 后台与运维 | architecture-layers、admin-tasks | admin、backup、scheduler、storage、tickets-search | admin-*、admin-screenshots、sidebar |
+| 后台与运维 | — | admin、backup、scheduler、storage、tickets-search | admin-*、admin-screenshots、sidebar |
+| 中转与运营（P6） | — | 暂无自动化闸口（见 5.6） | — |
 | 合规与基础设施 | probe-environments、channel-signatures | aigc、signed-url、health-tracing、notifications | state-contract |
 | 工作台 / 素材库 | — | — | workspace-pages、sidebar |
-| 局部重绘遮罩（`42205`） | tool-contracts、image-pipeline | 暂无自动化闸口（见 5.1） | — |
+| 局部重绘遮罩（`42205`） | tool-contracts | 暂无自动化闸口（见 5.1） | — |
 
 L1.5 不按功能域铺矩阵，覆盖清单见 3.2。新增纯逻辑、共享 hook 或状态组件时优先补 Vitest；需要后端或浏览器的场景归 L3/L4。
 
@@ -213,13 +211,13 @@ L1.5 不按功能域铺矩阵，覆盖清单见 3.2。新增纯逻辑、共享 h
 
 ### 5.1 局部重绘遮罩
 
-遮罩路径要求：① 后台存在 `maskSupport: 'edits'`（openai 协议）的图像线路；② 该线路模型支持 `images/edits`；③ 遮罩与原图同尺寸。当前仓库没有满足条件的内置线路，因此只能验到代码层：
+遮罩路径要求：① 前台模型的 revision 能力合同把图片参考声明为 `maskSupported: true`（派生为意图里的 `inputs.mask`）；② 渠道模型的上游协议真的接受 `images/edits` 形态；③ 遮罩素材是 PNG 且与原图同尺寸。仓库默认没有带遮罩能力的线路，因此只能验到代码层：
 
-- 协议矩阵里 `maskSupport` 的声明；
-- 路由器「全部通道不支持遮罩 → `42205`」的分支；
-- `generate.service` 对 `maskAssetId` 的归属校验与 `42205` 落码。
+- `capability-config.ts` 的 `maskSupported` → `capability-spec.ts` 的 `inputs.mask` 派生；
+- 准入阶段「任务带遮罩但线路合同没有 `inputs.mask`」→ `42205`（`task-admission.service.ts`）；
+- `maskAssetId` 的归属、格式与尺寸校验 → `40001`。
 
-补闸口时应覆盖三条拒绝路径：无遮罩素材权限 → `40001`、全部通道 `maskSupport: 'none'` → `42205` 且积分退回、支持遮罩时 multipart 请求体含 `image` 与 `mask` 两个文件段。真实出图必须由配好 openai edits 线路的环境实跑一次才算证据。
+补闸口时应覆盖两条拒绝路径（无 `inputs.mask` → `42205` 且积分退回；遮罩非同尺寸 → `40001`）以及成功路径（上游收到 `images/edits` 的两个文件段）。真实出图必须由配好 edits 线路的环境实跑一次才算证据。
 
 ### 5.2 渠道退款
 
@@ -231,21 +229,42 @@ L1.5 不按功能域铺矩阵，覆盖清单见 3.2。新增纯逻辑、共享 h
 
 | 脚本 / 用例 | 外部条件 |
 | --- | --- |
-| `verify-modelverse-live.ts` | 真实厂商 token；一次性验证，不在常规闸口 |
-| `smoke-aigc.js` / `verify-free-create-e2e.ts` | 可用的 image 线路（可用 `test/` 仿真网关） |
+| `smoke-aigc.js` | 可用的 image 线路（可用 `test/` 仿真网关 + 后台渠道工作台配一条） |
+| 真实厂商连通性 | 各家 API key；`POST /admin/channels/:id/models/test` 实跑一次才算证据 |
+| `admin-model-suite.spec.ts` 的「生成 → 账单核对」段 | 后台存在一条启用且有价格的 image 线路（`cd test && node server.js` 指到 `http://127.0.0.1:3900`）；无线路时该段跳过，其余断言照常执行 |
 | 真实支付宝 / 微信回调与退款 | 商户号与可公网访问的回调地址 |
 | 第三方登录（OAuth2 / OIDC） | 真实 provider 的 `clientId` / `clientSecret` 与可公网访问的回调地址；离线只能验「未配置时 `/auth/oauth/providers` 返回空、登录页不渲染按钮」 |
 
-### 5.4 断言假阳性防范
+### 5.4 模型层的覆盖边界
+
+`verify-billing.ts` 钉住**账本本身**（状态机 + 资金变动 + 不变量），`verify-task-runtime.ts` 钉住**任务侧**（准入 → 派发 → 切线 → 轮询 → 收尾的四条路径）。两者合起来覆盖了「钱怎么走」与「任务怎么跑」，但仍有空白：
+
+- **L3 没有模型层的 HTTP 冒烟**：渠道工作台 / 前台模型 / 用户分组 / 插件 / 生成账单 / 调用记录六个后台页面只有 Playwright 用例（`admin-model-suite.spec.ts`）与 `verify-channel-flow.ts` 的接口级断言，没有 `smoke-*.js`；
+- **准入的失败分支**只在 `verify-route-catalog` / `verify-task-runtime` 的部分路径上覆盖，参数白名单与非 JSON 选项的拒绝路径依赖 `verify-tool-contracts`；
+- **`models/*` 公开接口的分组可见性**由 `verify-route-catalog` 的纯逻辑部分保证，多分组并存的 HTTP 组合未单独断言。
+
+补测时优先补一条 `smoke-model-layer.js`（渠道 → 前台模型 → 选路 → 生成 → 账单 → 调用记录），而不是继续堆纯逻辑断言。
+
+### 5.5 断言假阳性防范
 
 - 断言恒真比红灯更危险：不渲染的弹窗会让 `toBeHidden` 永远通过。E2E 必须先断言元素存在/数量 > 0，再扫溢出与状态。
 - 脚本连库取决于是否使用项目自己的 `ConfigModule`，不取决于 `NODE_ENV` 环境变量本身；最小模块装配要跟随真实构造器依赖。
 - 溢出扫描要等真实内容就绪（`waitForSelector` + 断言元素数），`networkidle` 不等于内容渲染完成。
 
+### 5.6 中转与运营（P6）
+
+P6 的三条链路（系统渠道中转 / 短路径中转 / 自定义上游中转）、插件上传安装与卸载、服务商目录、财务分析、预留超时自动退款**目前没有自动化闸口**，只有代码层实现。缺口逐条列明，补测前不得引用为已验证：
+
+- **中转计费**：`reserved → running → settled / refunded / uncertain` 的迁移依赖真实上游（或 `test/` 仿真网关）+ 一条启用且有价格的线路。流式（SSE）透传、客户端 `key/api_key` 剥离、渠道自定义头覆盖、并发槽 `429` 都需要实跑观察；
+- **SSRF**：自定义中转的地址校验是纯函数（`validateCustomRelayUrl`），可直接补 L2 断言，目前未覆盖；
+- **插件装卸**：`POST /admin/plugins/install` 的包解析拒绝分支（非 zip、路径穿越、同 id 40909）、`DELETE` 的「内置包 40001 / 仍被渠道模型引用 40909」需要构造插件包，目前只做了手工验证；
+- **财务分析**：口径由 `verify-billing.ts` 的账本不变量间接保证，页面上「挂账不计入实收」等数字本身无断言；补测应直接比对 `BillingOrder` 聚合与接口返回；
+- **自动退款**：`BillingSweeperService` 需 `MODEL_BILLING_SWEEP_ENABLED=true` 且等过 `reserved` 30 分钟 / `running` 60 分钟 TTL，未进常规闸口；补测应把 TTL 做成可注入参数再断言两条迁移。
+
 ## 6. 测试数据与清理
 
 - 冒烟脚本自建账号 / 商品 / 订单，并在 `finally` 或结尾清理；失败中断时可能留残留，需手工按外键顺序清理。
-- 清理顺序（SQLite 无级联）：`GenerationTask → Asset → Project → Refund → Invoice → Payment → OrderItem → Membership → Order → CreditLedger → CreditLot → MembershipUsage → CheckinRecord → InviteRelation → Notification → Ticket → OAuthIdentity → AccountToken → LoginSession → LoginLog(置空 userId) → ConsentRecord → User → Product → MembershipPlan`。
+- 清理顺序（SQLite 无级联）：`GenerationTask → Asset → Project → Refund → Invoice → Payment → OrderItem → Membership → Order → ApiCallLog → CreditReservationItem → BillingOrder → CreditLedgerEntry → CreditLot → CreditAccount → MembershipUsage → CheckinRecord → InviteRelation → Notification → Ticket → OAuthIdentity → AccountToken → LoginSession → LoginLog(置空 userId) → ConsentRecord → User → Product → MembershipPlan`。脚本侧可直接用 `scripts/credit-fixture.js` 的 `clearCredits()` 完成账单 / 预留明细 / 流水 / 批次 / 账户五张表的清理。
 - 不得删除非本次测试产生的数据；发现历史残留时先确认归属。
 - 测试档账号与开发档账号是两套数据，不要跨库复用凭据。
 

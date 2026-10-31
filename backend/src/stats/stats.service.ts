@@ -51,7 +51,7 @@ export class StatsService {
     ]);
 
     // 任务汇总
-    const tasks: Record<string, number> = { total: 0, succeeded: 0, failed: 0, running: 0, pending: 0 };
+    const tasks: Record<string, number> = { total: 0, succeeded: 0, failed: 0, running: 0, queued: 0 };
     const byCapabilityMap = new Map<string, { total: number; succeeded: number }>();
     for (const g of taskGroups) {
       const n = g._count._all;
@@ -105,7 +105,8 @@ export class StatsService {
         tasks: tasks.total,
         succeeded: tasks.succeeded,
         failed: tasks.failed,
-        running: tasks.running + tasks.pending,
+        // 「进行中」= 执行中 + 排队中：对用户而言两者都是还没出结果
+        running: tasks.running + tasks.queued,
         assets: assets.total,
         originals: assets.original,
         generated: assets.generated,

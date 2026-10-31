@@ -62,8 +62,10 @@ async function collectMoveCounts(db, ids) {
     ['orders', db.order, { userId: { in: ids } }],
     ['payments', db.payment, { userId: { in: ids } }],
     ['refunds', db.refund, { userId: { in: ids } }],
+    ['creditAccounts', db.creditAccount, { userId: { in: ids } }],
     ['creditLots', db.creditLot, { userId: { in: ids } }],
-    ['creditLedger', db.creditLedger, { userId: { in: ids } }],
+    ['creditLedger', db.creditLedgerEntry, { userId: { in: ids } }],
+    ['billingOrders', db.billingOrder, { userId: { in: ids } }],
     ['memberships', db.membership, { userId: { in: ids } }],
     ['membershipUsage', db.membershipUsage, { userId: { in: ids } }],
     ['projects', db.project, { ownerId: { in: ids } }],
@@ -147,7 +149,7 @@ async function main() {
     });
     const operatorReferences = {
       refundOperators: await prisma.refund.count({ where: { operatorId: { in: sourceIds } } }),
-      ledgerOperators: await prisma.creditLedger.count({ where: { operatorId: { in: sourceIds } } }),
+      ledgerOperators: await prisma.creditLedgerEntry.count({ where: { actorUserId: { in: sourceIds } } }),
       invoiceIssuers: await prisma.invoice.count({ where: { issuedBy: { in: sourceIds } } }),
       reconciliationOperators: await prisma.reconciliationBatch.count({ where: { operatorId: { in: sourceIds } } }),
       settingUpdaters: await prisma.systemSetting.count({ where: { updatedBy: { in: sourceIds } } }),
@@ -179,7 +181,25 @@ async function main() {
       await moveWhere('payments', tx.payment, { userId: sourceFilter }, { userId: target.id });
       await moveWhere('refunds', tx.refund, { userId: sourceFilter }, { userId: target.id });
       await moveWhere('creditLots', tx.creditLot, { userId: sourceFilter }, { userId: target.id });
-      await moveWhere('creditLedger', tx.creditLedger, { userId: sourceFilter }, { userId: target.id });
+      await moveWhere('creditLedger', tx.creditLedgerEntry, { userId: sourceFilter }, { userId: target.id });
+      await moveWhere('billingOrders', tx.billingOrder, { userId: sourceFilter }, { userId: target.id });
+      // 账户余额以 CreditAccount 为准，批次迁名后必须同步并入，否则目标账户 = Σ批次 的不变量立刻破掉
+      const sourceAccounts = await tx.creditAccount.findMany({ where: { userId: sourceFilter } });
+      if (sourceAccounts.length > 0) {
+        const available = sourceAccounts.reduce((sum, row) => sum + row.availableMicrocredits, 0n);
+        const reserved = sourceAccounts.reduce((sum, row) => sum + row.reservedMicrocredits, 0n);
+        await tx.creditAccount.upsert({
+          where: { userId: target.id },
+          create: { userId: target.id, availableMicrocredits: available, reservedMicrocredits: reserved },
+          update: {
+            availableMicrocredits: { increment: available },
+            reservedMicrocredits: { increment: reserved },
+            version: { increment: 1 },
+          },
+        });
+        await tx.creditAccount.deleteMany({ where: { userId: sourceFilter } });
+        moved.creditAccountsMerged = sourceAccounts.length;
+      }
       await moveWhere('memberships', tx.membership, { userId: sourceFilter }, { userId: target.id });
       await moveWhere('membershipUsage', tx.membershipUsage, { userId: sourceFilter }, { userId: target.id });
       await moveWhere('projects', tx.project, { ownerId: sourceFilter }, { ownerId: target.id });
@@ -206,7 +226,7 @@ async function main() {
         { targetId: target.id },
       );
       await moveWhere('refundOperators', tx.refund, { operatorId: sourceFilter }, { operatorId: target.id });
-      await moveWhere('ledgerOperators', tx.creditLedger, { operatorId: sourceFilter }, { operatorId: target.id });
+      await moveWhere('ledgerOperators', tx.creditLedgerEntry, { actorUserId: sourceFilter }, { actorUserId: target.id });
       await moveWhere('invoiceIssuers', tx.invoice, { issuedBy: sourceFilter }, { issuedBy: target.id });
       await moveWhere('reconciliationOperators', tx.reconciliationBatch, { operatorId: sourceFilter }, { operatorId: target.id });
       await moveWhere('settingUpdaters', tx.systemSetting, { updatedBy: sourceFilter }, { updatedBy: target.id });

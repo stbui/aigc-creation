@@ -15,6 +15,7 @@
 const { PrismaClient } = require('@prisma/client');
 const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
 const { resolveDbUrl } = require('./db-url');
+const { clearCredits } = require('./credit-fixture');
 
 const BASE = (process.env.API_BASE || 'http://127.0.0.1:4100').replace(/\/$/, '') + '/api/v1';
 const prisma = new PrismaClient({ adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }) });
@@ -229,14 +230,13 @@ async function call(method, path, token, body) {
   check('订单按法定留存要求保留', Boolean(keptOrder), keptOrder?.orderNo);
   check('通知已随账号清除', (await prisma.notification.count({ where: { userId } })) === 0);
 
-  // 清理
+  // 清理（积分账户 / 批次 / 流水由夹具按依赖顺序清）
+  await clearCredits(prisma, userId);
   await prisma.$transaction([
     prisma.notification.deleteMany({ where: { userId } }),
     prisma.consentRecord.deleteMany({ where: { userId } }),
     prisma.accountToken.deleteMany({ where: { userId } }),
     prisma.loginLog.deleteMany({ where: { userId } }),
-    prisma.creditLedger.deleteMany({ where: { userId } }),
-    prisma.creditLot.deleteMany({ where: { userId } }),
     prisma.orderItem.deleteMany({ where: { order: { userId } } }),
     prisma.order.deleteMany({ where: { userId } }),
     prisma.project.deleteMany({ where: { ownerId: userId } }),

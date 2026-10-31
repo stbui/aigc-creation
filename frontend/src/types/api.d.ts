@@ -53,12 +53,8 @@ export interface CapabilityParam {
 export interface CapabilityRuntime {
   /** 后台管控开关（无记录 = 启用） */
   enabled: boolean;
-  /** 逐能力路由配置；local 仅表示存量配置，运行时按不可用处理 */
-  route: 'auto' | 'local' | 'remote';
-  /** 该模态此刻是否具备可用的云端通道 */
+  /** 该能力此刻是否具备可用的模型线路 */
   remoteAvailable: boolean;
-  /** @deprecated 本地生成已移除，后端恒为 none */
-  localQuality: 'none';
   /** 一句话结论 */
   effective: 'remote' | 'disabled' | 'unavailable';
   /** 给用户看的原因 */
@@ -117,12 +113,12 @@ export interface CapabilitiesResponse {
 export interface PromptToolResult {
   /** 产出的文本 */
   text: string;
-  /** 来源标记 (恒为 gateway) */
+  /** 来源标记（恒为 `model`：文本没有本地兜底） */
   source: string;
-  /** 渠道回报的实际模型名 */
+  /** 上游实际使用的模型键 */
   model?: string;
-  /** 分词用量 */
-  usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number };
+  /** 上游返回的原始 usage（各家字段不同，原样透出） */
+  usage?: Record<string, unknown>;
 }
 
 /** POST /api/v1/mobile-upload/sessions —— 电脑端创建会话 */
@@ -197,7 +193,14 @@ export interface StatsOverview {
   }>;
 }
 
-export type TaskStatus = 'pending' | 'running' | 'succeeded' | 'failed';
+/**
+ * 任务状态。
+ *
+ * `queued` 排队中（还没被 worker 领取）/ `running` 执行中 / `succeeded` 成功 /
+ * `failed` 失败 / `cancelled` 后台终止。旧版 `pending` 已废止，存量数据在改造
+ * 时统一改写为 `queued`。
+ */
+export type TaskStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 
 export interface LoginRequest {
   email: string;
@@ -318,6 +321,8 @@ export interface Asset {
   height?: number | null;
   format: string;
   sizeBytes: number;
+  /** 写入时的存储后端: 'local' | 'oss' | 'minio' (决定能否走本地缩略图管线) */
+  storageBackend?: string | null;
   createdAt: string;
   /**
    * 来源元数据: 只有浏览器扩展「图片采集」上传的 original 素材才有值。
@@ -341,6 +346,12 @@ export interface AssetListResult {
 export interface GenerateRequest {
   projectId: string;
   capability: Capability;
+  /**
+   * 前台模型 id（`LogicalModel.id`）。
+   *
+   * 必填：渠道、协议、价格一律由服务端按所选模型解析，前端只表达「用哪个模型」。
+   */
+  logicalModelId: string;
   inputAssetIds: string[];
   params: Record<string, unknown>;
   /** 客户端请求幂等键；网络超时重试时复用同一值。 */
@@ -351,8 +362,13 @@ export interface GenerateResponse {
   taskId: string;
   id?: string;
   status?: TaskStatus;
+  /** 本次合计消耗（多图产出按张计费，已是 N 张之和） */
   creditCost?: number;
   idempotentHit?: boolean;
+  /** 多图产出的批次 id（一次生成拆成 N 个任务时才有） */
+  batchId?: string;
+  /** 本批次产出张数；单图能力缺省 */
+  batchSize?: number;
 }
 
 // 后端 getTask 与 listTasks 都返回 outputAsset（后者用于历史缩略图/复用）。
@@ -363,9 +379,25 @@ export interface Task {
   capability: Capability;
   status: TaskStatus;
   inputAssetIds?: string[];
+  /**
+   * 输入素材（原图）的完整信息。详情图结果行要按批次展示「原图 + 商品名称」，
+   * 只给 id 的话前端还得为每行再查一次素材。
+   */
+  inputAssets?: TaskOutputAsset[];
+  /**
+   * 同一次生成的父任务 id。一次生成按模块拆成 N 个任务时，第 2..N 张挂在
+   * 首张之下（每张各有一条账单），前端按 params.batchId 聚合成一行。
+   */
+  parentTaskId?: string | null;
   params?: Record<string, unknown>;
   provider?: string | null;
   errorCode?: string | null;
+  /**
+   * 建任务时选定的前台模型 id（`LogicalModel.id`）。
+   * 作品页「重新生成」沿用它，保证重试落在与原任务相同的模型上；
+   * 改造前的存量任务为 null。
+   */
+  logicalModelId?: string | null;
   /** 本次实际扣掉的积分快照。改价不影响已创建的任务 */
   creditCost?: number;
   /** 该能力的产出模态（后端按能力下发），轮询上限据此区分图像/视频 */
@@ -464,7 +496,7 @@ export interface AdminOverview {
     succeeded: number;
     failed: number;
     running: number;
-    pending: number;
+    queued: number;
     /** 百分比, 无已完成任务时为 null (不是 0 —— 0 表示"全部失败") */
     successRate: number | null;
     assets: number;
@@ -606,7 +638,7 @@ export interface AdminUserDetail {
     projects: number;
     tasks: number;
     assets: number;
-    taskStatus: { succeeded: number; failed: number; running: number; pending: number };
+    taskStatus: { succeeded: number; failed: number; running: number; queued: number };
   };
   recentTasks: Array<{
     id: string;
@@ -786,13 +818,6 @@ export interface AdminAuditListResult {
   pageSize: number;
 }
 
-/* ────────────────────────────────────────────────────────────────
-   模型配置与调用记录 (2026-10-20)
-   ──────────────────────────────────────────────────────────────── */
-
-/** 配置项的实际来源: env 优先级最高, 其次后台写入, 最后代码默认值 */
-export type ConfigSource = 'env' | 'db' | 'default';
-
 /**
  * 模态 —— 2026-10-20 起配置与路由的一等维度。
  *
@@ -801,380 +826,6 @@ export type ConfigSource = 'env' | 'db' | 'default';
  */
 export type Modality = 'text' | 'image' | 'video';
 
-export interface AdminModelConfigItem {
-  key: string;
-  label: string;
-  description: string;
-  type: 'string' | 'number' | 'boolean' | 'secret';
-  group: string;
-  /** 该项所属模态; null 表示跨模态共用 (如素材对外基址) */
-  modality: Modality | null;
-  /** 对应的环境变量名; 存在且非空时会覆盖后台写入值 */
-  envName: string | null;
-  /**
-   * 存量键名 (2026-10-20 模态拆分遗留)。
-   * 非空说明当前生效值读自改造前的旧单前缀键 —— 界面上应提示
-   * 「读的是存量配置」, 否则运营改了新键却看不到变化会以为坏了。
-   */
-  legacyKey: string | null;
-  secret: boolean;
-  default: string | number | boolean;
-  /** 生效值; secret 类恒为 null (只给 hasValue/masked) */
-  value: string | number | boolean | null;
-  hasValue: boolean;
-  /** 凭据脱敏值, 如 sk-a****3456 */
-  masked: string | null;
-  source: ConfigSource;
-  overridden: boolean;
-  updatedAt: string | null;
-  updatedBy: string | null;
-  /**
-   * env 覆盖时，后台曾保存过的值（仅供对照）。
-   * 非 secret 给原值；secret 只给 dbHasValue/dbMasked，绝不给明文。
-   */
-  dbValue?: string | number | boolean | null;
-  dbHasValue?: boolean | null;
-  dbMasked?: string | null;
-}
-
-/**
- * 通道协议。
- *
- * ⚠️ 协议名**跨模态复用**: openai 在文生图是 images/generations,
- * 在文生文是 chat/completions, 端点完全不同。故任何按协议名反推用途的
- * 写法都是错的 —— 必须与 modality 组合使用。
- */
-export type GatewayProtocol =
-  | 'openai'
-  | 'volcengine'
-  | 'minimax'
-  | 'openai-chat'
-  | 'aigc-video'
-  | 'openai-video'
-  | (string & {});
-
-/** 尺寸参数的表达方式 —— 各家对「多大」的写法完全不同 */
-export type SizeStyle = 'openai-wh' | 'volc-tier' | 'ratio-only';
-
-/**
- * 内置厂商预设 (后端 provider-presets.ts 单一声明)。
- *
- * 用途: 后台「模型配置」页选厂商后自动填好 基址/协议/模型 三项 ——
- * 手填这三项最容易错, 而配错的表现是线路调用失败, 界面上不一定看得出来。
- *
- * sizeStyle / sizeField / maxRefImages / refStyle 现为可选: 文生文无这些概念。
- */
-export interface VendorPreset {
-  key: string;
-  /**
-   * 所属厂商的标识 —— 同一家厂商跨模态共享基址与凭据。
-   * 后台选厂商时据此联动填充各模态。
-   */
-  vendorKey: string;
-  label: string;
-  /** 该预设服务哪个模态 */
-  modality: Modality;
-  protocol: GatewayProtocol;
-  /** 一律存到厂商根域 (不含 /v1); /v1 由后端 provider 统一补 */
-  baseUrl: string;
-  models: Array<{ id: string; label: string; note?: string }>;
-  sizeStyle?: SizeStyle;
-  /** 尺寸字段实际名, 如 "size（档位）" / "aspect_ratio" */
-  sizeField?: string;
-  maxRefImages?: number;
-  refStyle?: 'base64' | 'url';
-  /** 拿 token 的控制台地址 */
-  consoleUrl: string;
-  note?: string;
-}
-
-export interface ProtocolOption {
-  value: GatewayProtocol;
-  label: string;
-  desc: string;
-}
-
-/** 单个模态的通道快照 */
-export interface AdminModelChannel {
-  modality: Modality;
-  label: string;
-  desc: string;
-  enabled: boolean;
-  /** 基址已脱敏 (路径替换为 /***) */
-  baseUrl: string;
-  model: string;
-  provider: string;
-  /** 该 (模态, 协议) 组合本项目是否已有实现; false 说明配了也必然失败 */
-  protocolKnown: boolean;
-  /**
-   * 当前选中的厂商预设 key (2026-10-20 通道总览卡片用)。
-   * 空串 = 未选厂商预设 (按各字段手填)。
-   */
-  vendor: string;
-  /** 当前厂商的可读名; 未匹配到预设时为空串 */
-  vendorLabel: string;
-  timeoutMs: number;
-  pollMs: number;
-  maxPolls: number;
-  assetBase: string;
-  /** 通道实际生效态：gateway=真实模型可用 / none=没有可用模型线路 */
-  effective: 'gateway' | 'none';
-  /** 该模态可选的厂商预设 */
-  vendors: VendorPreset[];
-  /** 该模态可选的协议; video 首批为空数组 = 尚未取证任何一家 */
-  protocolOptions: ProtocolOption[];
-  /** 配了通道但协议未接入 —— 必须显式警告, 不能静默 */
-  configuredButUnsupported: boolean;
-  /** 调度来源: 线路表 / 旧版单通道配置 / 未接入 */
-  dispatchSource?: 'channels' | 'legacy' | 'none';
-  channelCount?: number;
-  availableCount?: number;
-  coolingCount?: number;
-  unsupportedCount?: number;
-}
-
-/** 一条线路（ModelChannel 的后台视图，token 已脱敏） */
-export interface AdminModelChannelRecord {
-  id: string;
-  modality: Modality;
-  name: string;
-  protocol: string;
-  baseUrl: string;
-  model: string;
-  priority: number;
-  enabled: boolean;
-  tokenMasked: string;
-  hasToken: boolean;
-  failCount: number;
-  cooldownUntil: string | null;
-  lastSuccessAt: string | null;
-  lastFailureAt: string | null;
-  protocolKnown: boolean;
-  updatedAt: string | null;
-  /** true = 未落库的合成线路（沿用旧版单通道配置） */
-  synthetic: boolean;
-}
-
-export interface AdminModelChannelSnapshot {
-  modality: Modality;
-  source: 'channels' | 'legacy' | 'none';
-  total: number;
-  enabledCount: number;
-  availableCount: number;
-  coolingCount: number;
-  unsupportedCount: number;
-  channels: AdminModelChannelRecord[];
-}
-
-export interface AdminModelChannelsSnapshot {
-  /** 后端响应字段是 modalities，按模态索引 */
-  modalities: Record<Modality, AdminModelChannelSnapshot>;
-}
-
-export interface AdminChannelTestResult {
-  ok: boolean;
-  latencyMs: number;
-  message: string;
-  detail?: string;
-  testedAt: string;
-  target: 'draft' | 'saved';
-  usedStoredToken?: boolean;
-}
-
-/**
- * 厂商模型清单（预设 + 实时）。
- *
- * preset 来自代码内置目录（离线可用, 带中文说明）；
- * remote 是用线路令牌向厂商模型列表接口实时拉取的结果。
- * remote 为 null = 拉不到（接口未开放/不可达/令牌无效）, 与「拉到空列表」区分开。
- */
-export interface AdminModelListResult {
-  modality: Modality;
-  protocol: string;
-  baseUrl: string;
-  usedStoredToken: boolean;
-  preset: Array<{ id: string; label: string; note?: string }>;
-  remote: string[] | null;
-  /** 尝试过的模型列表端点（排障用） */
-  endpoints: string[];
-  message: string;
-}
-
-export interface AdminChannelTestAllResult {
-  results: Array<AdminChannelTestResult & {
-    channelId: string | null;
-    modality: Modality;
-    name: string;
-    enabled: boolean;
-    synthetic: boolean;
-  }>;
-  okCount: number;
-  total: number;
-  elapsedMs: number;
-}
-
-/**
- * 厂商联动填充方案 (2026-10-20 厂商聚合后新增)。
- *
- * 厂商聚合后, 同一家的多个模态共享基址与凭据。但配置项仍按模态分开
- * (存量键不改名), 故由后端给出「选这家厂商 → 各模态该填什么」,
- * 前端一次填完, 免得运营在三个模态里手动填同一个基址。
- */
-export interface AdminVendorFillPlan {
-  vendorKey: string;
-  label: string;
-  /** 各模态的填充项 (只有该厂商支持的模态才有) */
-  fills: Array<{
-    modality: Modality;
-    baseUrl: string;
-    provider: string;
-    model: string;
-    vendorPresetKey: string;
-  }>;
-  /** 该厂商涉及的模态 */
-  modalities: Modality[];
-}
-
-export interface AdminModelConfig {
-  groups: Array<{
-    key: string;
-    label: string;
-    desc: string;
-    items: AdminModelConfigItem[];
-  }>;
-  /** 逐模态通道快照 —— 页面分栏渲染的主数据源 */
-  channels: Record<Modality, AdminModelChannel>;
-  modalities: Array<{ value: Modality; label: string; desc: string }>;
-  /**
-   * @deprecated 恒等于 channels.image。保留是为让改造前的存量前端与外部脚本
-   * 继续读到 shape 不变的数据; 新代码请一律走 channels[modality]。
-   */
-  channel: {
-    enabled: boolean;
-    /** 基址已脱敏 (路径替换为 /***) */
-    baseUrl: string;
-    model: string;
-    /** 当前通道协议 (openai / volcengine / minimax) */
-    provider: string;
-    /** 该协议是否在本项目已实现生图; false 说明配了也会 404 回落 */
-    protocolKnown: boolean;
-    timeoutMs: number;
-    pollMs: number;
-    maxPolls: number;
-    assetBase: string;
-    /**
-     * 当前整体生效通道 —— 两态。
-     * gateway=真实模型 / none=未接入（会失败并退款）。
-     */
-    effective: 'gateway' | 'none';
-  };
-  /** @deprecated 用 channels[modality].vendors */
-  vendors: VendorPreset[];
-  /** @deprecated 用 channels[modality].protocolOptions */
-  protocolOptions: ProtocolOption[];
-  routes: AdminModelRouteRow[];
-}
-
-/** 逐能力路由总览的一行 (2026-10-20 抽出为具名类型, 供组件复用) */
-export interface AdminModelRouteRow {
-    capability: string;
-    name: string;
-    /** 能力自身的模式: real=已接入 / planned=规划中 */
-    mode: string;
-    /** 该能力产出什么模态 (与 mode 正交) */
-    modality: Modality;
-    route: 'auto' | 'local' | 'remote';
-    /**
-     * 实际生效态：gateway=真实模型可用 / none=没有可用模型线路。
-     * 本地生成已移除，不再存在 local 生效态。
-     */
-    effective: 'gateway' | 'none';
-    /** @deprecated 本地生成已移除，恒为 false */
-    localAvailable: boolean;
-}
-
-export interface AdminModelCall {
-  id: string;
-  createdAt: string;
-  capability: string;
-  /** 产出模态; 迁移前的历史记录为 null (unknown) */
-  modality: string | null;
-  /**
-   * 原始关联 id。历史写入为渠道/厂商任务号，**不保证是本地任务 id**。
-   * 需要深链任务时使用详情接口返回的 `generationTaskId`。
-   */
-  taskId: string | null;
-  /** 仅详情接口: taskId 命中本地 GenerationTask 时为其 id，可安全深链 */
-  generationTaskId?: string | null;
-  /** 仅详情接口: taskId 未命中本地任务时，说明它是渠道/厂商任务号 */
-  gatewayTaskId?: string | null;
-  route: string;
-  source: 'gateway' | 'local';
-  fallback: boolean;
-  reason: string | null;
-  model: string | null;
-  prompt: string | null;
-  durationMs: number;
-  success: boolean;
-  outputBytes: number;
-  width: number | null;
-  height: number | null;
-  errorCode: string | null;
-}
-
-export interface AdminModelCallListResult {
-  result: {
-    items: AdminModelCall[];
-    total: number;
-    page: number;
-    pageSize: number;
-  };
-  stats: {
-    total: number;
-    gatewayCount: number;
-    localCount: number;
-    successCount: number;
-    fallbackCount: number;
-    avgDurationMs: number;
-    /** 仅 gateway 通道的平均耗时 (与本地混算无意义) */
-    gatewayAvgDurationMs: number;
-  };
-  capabilities: Array<{ capability: string; count: number }>;
-  sources: Array<{ source: string; count: number }>;
-}
-
-export interface AdminModelConfigTestResult {
-  ok: boolean;
-  latencyMs: number;
-  message: string;
-  detail?: string;
-  /** 2026-10-20: 测试时间与目标（草稿/已保存），旧后端可能不返回 */
-  testedAt?: string;
-  target?: 'draft' | 'saved';
-}
-
-/**
- * 批量连通性测试结果 (2026-10-20)。
- *
- * 每个模态一个结果 —— 某模态失败**不影响**其它模态的结果返回
- * (批量测试的目的就是「一次看全」)。
- */
-export interface AdminModelConfigTestAllResult {
-  /** 按模态索引: 'text' | 'image' | 'video' */
-  results: Record<string, AdminModelConfigTestResult>;
-  /** 通过的模态数 */
-  okCount: number;
-  /** 总模态数 */
-  total: number;
-  /** 批量测试总耗时 (毫秒) —— 并发执行, 约等于最慢的那一个 */
-  elapsedMs: number;
-}
-
-/* ────────────────────────────────────────────────────────────────
-   交易域: 商品 / 订单 / 积分 (commerce-design.md)
-   ──────────────────────────────────────────────────────────────── */
-
-/** 在售商品 (SKU)。金额一律整数分, 由展示层除 100 格式化 */
 export interface Product {
   id: string;
   sku: string;
@@ -1390,8 +1041,8 @@ export interface AdminTask {
   id: string;
   capability: string;
   capabilityName: string;
-  status: 'pending' | 'running' | 'succeeded' | 'failed';
-  /** 实际通道: gateway=真实模型 / local=停用前的历史本地产出 / pending=尚未跑完的初值 */
+  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+  /** 实际通道: gateway=真实模型 / local=停用前的历史本地产出 / pending=改造前的历史初始值 */
   provider: string | null;
   errorCode: string | null;
   creditCost: number;
@@ -1408,7 +1059,7 @@ export interface AdminTask {
 
 /** 拥堵指标。刻意不受列表筛选影响 —— 它的用途是回答"系统现在堵不堵" */
 export interface AdminTaskCongestion {
-  pending: number;
+  queued: number;
   running: number;
   failedLastHour: number;
   runningThreshold: number;

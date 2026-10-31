@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { App, Modal, Spin } from 'antd';
 import { Download, ImagePlus, Maximize2, Plus, RefreshCw, X } from 'lucide-react';
-import { assetsApi, assetSrc, toAbsoluteUrl } from '../lib/api';
+import { assetsApi, assetSrc, assetThumbUrl, toAbsoluteUrl } from '../lib/api';
 
 import { useProject } from '../hooks/useProject';
 import { usePollAbort } from '../hooks/usePollAbort';
@@ -20,6 +20,7 @@ import { useAuth } from '../context/AuthContext';
 import { AssetLibraryModal, useAssetLibrary } from './AssetLibraryModal';
 import { MobileUploadModal } from './MobileUploadModal';
 import { ToolSettingsPopover } from './ToolSettingsPopover';
+import { ModelPicker } from './ModelPicker';
 import { ToolSubmitBar } from './ToolSubmitBar';
 import { ToolEmptyState, ToolGeneratingState } from './ToolEmptyState';
 import { StateLoading } from './StateViews';
@@ -760,7 +761,12 @@ export function ToolShell(props: Props) {
                       <div className={`pk-thumb-grid${images.length === 1 ? ' pk-thumb-grid-single' : ''}`}>
                         {images.map((img) => (
                           <div key={img.id} className="pk-thumb">
-                            <img src={img.url} alt={img.name} loading="lazy" decoding="async" />
+                            <img
+                              src={assetThumbUrl(img.url, 320) ?? img.url}
+                              alt={img.name}
+                              loading="lazy"
+                              decoding="async"
+                            />
                             <button
                               type="button"
                               className="pk-thumb-remove"
@@ -831,6 +837,7 @@ export function ToolShell(props: Props) {
                   capabilityId={capability}
                   showRatio={Boolean(settings.ratio)}
                   showResolution={Boolean(settings.resolution)}
+                  modelPicker={<ModelPicker capability={capability} options={{ ratio, resolution }} />}
                 />
               ) : null
             }

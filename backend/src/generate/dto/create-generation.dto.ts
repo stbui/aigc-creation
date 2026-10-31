@@ -12,6 +12,16 @@ export class CreateGenerationDto {
   @IsIn(SUBMITTABLE_CAPABILITY_IDS)
   capability: string;
 
+  /**
+   * 前台模型 id（`LogicalModel.id`）。
+   *
+   * 必填：客户端只能表达「用哪个模型 + 什么参数」，渠道、协议、价格一律由
+   * 服务端目录解析 —— 这是「展示的模型」与「实际执行并扣费的模型」同源的唯一保证。
+   */
+  @IsString()
+  @Length(1, 64)
+  logicalModelId: string;
+
   @IsArray()
   @IsString({ each: true })
   inputAssetIds: string[];

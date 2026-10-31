@@ -31,6 +31,13 @@ export interface GalleryItem {
   createdAt?: string;
   /** 生成时提交的提示词；只对参数里带 prompt 的能力有值 */
   prompt?: string;
+  /**
+   * 输入原图（任务的首张输入素材）。
+   *
+   * 详情图结果行要展示「原图 + 各模块图」，原图不在产出里，只能从任务输入取。
+   * 素材被删或历史任务缺字段时为空，调用方按商品名称占位。
+   */
+  inputUrl?: string;
   /** 任务原始参数；SKU 批量历史按 batchId 聚合时使用。 */
   params?: Record<string, unknown>;
   /**
@@ -65,9 +72,16 @@ interface Options {
   token: string | null;
   /** 从任务参数推导标签; 返回空串/undefined 表示不标 */
   captionOf?: (params: Record<string, unknown>) => string | undefined;
+  /**
+   * 是否把 failed / cancelled 任务也放进列表（没有 url，由调用方渲染成失败格）。
+   *
+   * 默认 false：网格页只展示有图的产出，失败任务靠提示行说明。详情图的批次
+   * 结果行需要逐个模块显示「这张失败了」，否则用户只看到少了一张图。
+   */
+  includeFailed?: boolean;
 }
 
-export function useResultGallery({ capability, token, captionOf }: Options): ResultGallery {
+export function useResultGallery({ capability, token, captionOf, includeFailed = false }: Options): ResultGallery {
   const [items, setItems] = useState<GalleryItem[]>([]);
   /*
    * 已登录时首帧就是 loading: reload 在 effect 里才跑, 若初值是 false,
@@ -97,40 +111,39 @@ export function useResultGallery({ capability, token, captionOf }: Options): Res
       const next: GalleryItem[] = [];
       for (const t of tasks) {
         if (t.capability !== capability) continue;
+        const params = t.params ?? {};
+        const base = {
+          id: t.id,
+          createdAt: t.createdAt,
+          params,
+          prompt: promptOf(params),
+          caption: captionRef.current?.(params) || undefined,
+          inputUrl: assetSrc(t.inputAssets?.[0]),
+        };
         if (t.status !== 'succeeded') {
           // 生成中的任务也要进列表: 离开页面再回来时, 占位卡由服务端状态回填
-          if (t.status === 'running' || t.status === 'pending') {
-            next.push({
-              id: t.id,
-              status: t.status,
-              url: '',
-              createdAt: t.createdAt,
-              params: t.params ?? {},
-              prompt: promptOf(t.params),
-              caption: captionRef.current?.(t.params ?? {}) || undefined,
-            });
+          if (t.status === 'running' || t.status === 'queued') {
+            next.push({ ...base, status: t.status, url: '' });
+          } else if (includeFailed && (t.status === 'failed' || t.status === 'cancelled')) {
+            next.push({ ...base, status: t.status, url: '' });
           }
           continue;
         }
         const url = assetSrc(t.outputAsset);
         if (!url) continue;
         next.push({
-          id: t.id,
+          ...base,
           status: 'succeeded',
           url,
           assetId: t.outputAsset?.id,
           format: t.outputAsset?.format,
           width: t.outputAsset?.width ?? null,
           height: t.outputAsset?.height ?? null,
-          createdAt: t.createdAt,
-          params: t.params ?? {},
-          prompt: promptOf(t.params),
-          caption: captionRef.current?.(t.params ?? {}) || undefined,
         });
       }
       setItems(next);
       setError(null);
-      const active = next.filter((x) => x.status === 'running' || x.status === 'pending').length;
+      const active = next.filter((x) => x.status === 'running' || x.status === 'queued').length;
       activeRef.current = active;
       return active;
     } catch (e) {
@@ -141,11 +154,26 @@ export function useResultGallery({ capability, token, captionOf }: Options): Res
       // 静默轮询不置 true, 但首次静默加载要把初始的 true 收掉
       setLoading(false);
     }
-  }, [capability, token]);
+  }, [capability, token, includeFailed]);
 
   const reload = useCallback(() => load(false), [load]);
 
+  // 首次进入拉一次 (占位卡由服务端状态回填)
   useEffect(() => {
+    void load(true);
+  }, [load]);
+
+  /**
+   * 有生成中的任务就按间隔轮询, 全部到终态即停。
+   *
+   * 轮询条件挂在「列表里还有占位卡」上而不是一次性的启动循环: 提交任务后
+   * `reload()` 把新任务放进列表, 此时必须重新起轮询 —— 否则首帧 active=0
+   * 就让循环退出了, 用户看到的占位卡永远停在「生成中…」。
+   */
+  const hasActive = items.some((item) => item.status === 'running' || item.status === 'queued');
+
+  useEffect(() => {
+    if (!token || !hasActive) return;
     let cancelled = false;
     let timer: number | undefined;
 
@@ -155,12 +183,12 @@ export function useResultGallery({ capability, token, captionOf }: Options): Res
       timer = window.setTimeout(() => void tick(), POLL_INTERVAL_MS);
     };
 
-    void tick();
+    timer = window.setTimeout(() => void tick(), POLL_INTERVAL_MS);
     return () => {
       cancelled = true;
       if (timer !== undefined) window.clearTimeout(timer);
     };
-  }, [load]);
+  }, [token, hasActive, load]);
 
   const prepend = useCallback((fresh: GalleryItem[]) => {
     if (fresh.length === 0) return;

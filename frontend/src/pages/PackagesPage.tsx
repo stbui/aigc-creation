@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Check, ChevronRight, Clock3, Gem, Wallet } from 'lucide-react';
 import { membershipApi, productsApi } from '../lib/api';
+import { PLAN_VISUALS } from '../lib/constants';
 import { useAuth } from '../context/AuthContext';
 import { useCredits } from '../context/CreditsContext';
 import { StateError, StateSkeleton } from '../components/StateViews';
@@ -37,6 +38,25 @@ function formatDay(iso: string | null | undefined): string {
 }
 
 /**
+ * 折合单价 (元 / 积分)，只对「付费且积分 > 0」的商品有意义。
+ *
+ * 购包时用户真正比较的是单价而不是总价 —— 总价随档位单调上升，
+ * 只给总价等于让人自己做除法。保留 4 位小数：积分单价普遍在 0.01–0.03 元。
+ */
+function formatPerCredit(p: Product): string | null {
+  if (p.priceCents <= 0 || p.credits <= 0) return null;
+  return `¥${(p.priceCents / p.credits / 100).toFixed(4)}`;
+}
+
+/** 积分包按有效期分组：31 天短期包与永久包是两种消费方式，混在一排里没法比较 */
+const PACK_FILTERS = [
+  { key: 'all', label: '全部' },
+  { key: 'short', label: '31 天有效' },
+  { key: 'forever', label: '永久有效' },
+] as const;
+type PackFilter = (typeof PACK_FILTERS)[number]['key'];
+
+/**
  * 找出「每元积分最多」的在售商品, 用于卡片上的「最划算」标记。
  *
  * 只比较付费商品, 且至少两件时才标记 —— 只有一件付费包时人人都是最划算,
@@ -67,6 +87,8 @@ export function PackagesPage() {
   const [membership, setMembership] = useState<MyMembership | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** 积分包有效期筛选: 15 张卡一屏铺开时, 按消费方式先分组再看价 */
+  const [packFilter, setPackFilter] = useState<PackFilter>('all');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -114,6 +136,24 @@ export function PackagesPage() {
   const currentPlanCode = membership?.planCode ?? null;
   const currentPlan = plans.find((p) => p.code === currentPlanCode) ?? null;
   const bestValueId = useMemo(() => pickBestValueId(products), [products]);
+  /** 付费档: 视觉标签按付费档顺序取, 免费档不占位 */
+  const paidPlans = useMemo(() => plans.filter((p) => p.durationDays > 0), [plans]);
+  /** 免费档: 单独压成一行基线说明, 不参与套餐卡排列 */
+  const freePlan = useMemo(() => plans.find((p) => p.durationDays <= 0) ?? null, [plans]);
+  const packCounts = useMemo(
+    () => ({
+      all: products.length,
+      short: products.filter((p) => p.creditsValidDays > 0).length,
+      forever: products.filter((p) => p.creditsValidDays === 0).length,
+    }),
+    [products],
+  );
+  const shownPacks = useMemo(() => {
+    if (packFilter === 'all') return products;
+    return products.filter((p) =>
+      packFilter === 'short' ? p.creditsValidDays > 0 : p.creditsValidDays === 0,
+    );
+  }, [products, packFilter]);
 
   const buy = (p: Product) => {
     if (!token) {
@@ -211,17 +251,35 @@ export function PackagesPage() {
                 </span>
               )}
             </div>
-            <div className="pkg-grid">
-              {plans.map((plan) => {
+            {/*
+             * 免费档不作为商品陈列: 它没有价格、没有月度配额、也没有可点的按钮,
+             * 混在付费卡里只会撑出一张空心卡并打乱行数。压成一行基线说明,
+             * 付费档就能整齐排成 3×2。
+             */}
+            {freePlan && (
+              <div className="pkg-free-strip">
+                <span className="pkg-free-strip-name">{freePlan.name}</span>
+                <span className="pkg-card-badge is-free">永久免费</span>
+                <span className="pkg-free-strip-desc">{freePlan.description}</span>
+              </div>
+            )}
+            <div className="pkg-grid is-plans">
+              {paidPlans.map((plan, i) => {
                 const isCurrent = currentPlanCode === plan.code;
-                const isFreePlan = plan.durationDays <= 0;
+                // 视觉标签按付费档顺序取; 后台新加的档位没有标签时回落有效期
+                const visual = PLAN_VISUALS[i];
                 return (
-                  <article key={plan.id} className={`pkg-card${isCurrent ? ' is-current' : ''}`}>
+                  <article
+                    key={plan.id}
+                    className={`pkg-card${isCurrent ? ' is-current' : visual?.recommended ? ' is-recommended' : ''}`}
+                  >
                     {isCurrent && <span className="pkg-card-flag">当前方案</span>}
                     <div className="pkg-card-top">
                       <span className="pkg-card-name">{plan.name}</span>
-                      <span className={`pkg-card-badge${isFreePlan ? ' is-free' : ''}`}>
-                        {isFreePlan ? '永久免费' : `${plan.durationDays} 天有效`}
+                      <span
+                        className={`pkg-card-badge${visual?.recommended ? ' is-hot' : ''}`}
+                      >
+                        {visual?.tag ?? `${plan.durationDays} 天有效`}
                       </span>
                     </div>
                     <div className="pkg-card-points">
@@ -243,15 +301,12 @@ export function PackagesPage() {
                       </ul>
                     )}
                     <div className="pkg-card-price">
-                      <strong>{isFreePlan ? '免费' : formatYuan(plan.priceCents)}</strong>
-                      {!isFreePlan && (
-                        <span className="pkg-card-price-unit">/ {plan.durationDays} 天</span>
-                      )}
+                      <strong>{formatYuan(plan.priceCents)}</strong>
+                      <span className="pkg-card-price-unit">/ {plan.durationDays} 天</span>
                     </div>
                     <button
                       type="button"
                       className="pkg-select-btn"
-                      disabled={isFreePlan}
                       onClick={() => subscribe(plan)}
                     >
                       {planActionLabel(plan)}
@@ -274,9 +329,24 @@ export function PackagesPage() {
                 <h2>积分包</h2>
                 <p>一次性购买，按需补充；积分有效期以卡片标注为准</p>
               </div>
+              {/* 只展示真实存在分类的筛选项: 永远给一个点开是空列表的按钮没有意义 */}
+              <div className="pkg-filter" role="group" aria-label="按有效期筛选">
+                {PACK_FILTERS.filter((f) => packCounts[f.key] > 0).map((f) => (
+                  <button
+                    key={f.key}
+                    type="button"
+                    aria-pressed={packFilter === f.key}
+                    className={`pkg-filter-btn${packFilter === f.key ? ' is-active' : ''}`}
+                    onClick={() => setPackFilter(f.key)}
+                  >
+                    {f.label}
+                    <span>{packCounts[f.key]}</span>
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="pkg-grid is-products">
-              {products.map((p) => (
+              {shownPacks.map((p) => (
                 <article key={p.id} className="pkg-card">
                   <div className="pkg-card-top">
                     <span className="pkg-card-name">{p.name}</span>
@@ -292,11 +362,16 @@ export function PackagesPage() {
                     <span>积分</span>
                   </div>
 
-                  {/* 有效期来自 SKU 而非写死: 加油包永久、订阅卡有期限 */}
-                  <span className="pkg-card-validity">
-                    <Clock3 size={13} aria-hidden />
-                    {p.creditsValidDays > 0 ? `${p.creditsValidDays} 天内有效` : '永久有效'}
-                  </span>
+                  {/* 有效期来自 SKU 而非写死; 折合单价由价格 / 积分算出, 不写进商品文案 */}
+                  <div className="pkg-card-meta">
+                    <span className="pkg-card-validity">
+                      <Clock3 size={13} aria-hidden />
+                      {p.creditsValidDays > 0 ? `${p.creditsValidDays} 天内有效` : '永久有效'}
+                    </span>
+                    {formatPerCredit(p) && (
+                      <span className="pkg-card-unit">折合 {formatPerCredit(p)} / 分</span>
+                    )}
+                  </div>
 
                   {p.description && <p className="pkg-card-desc">{p.description}</p>}
 

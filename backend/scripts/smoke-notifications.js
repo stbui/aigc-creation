@@ -14,6 +14,7 @@
 const { PrismaClient } = require('@prisma/client');
 const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
 const { resolveDbUrl } = require('./db-url');
+const { clearCredits } = require('./credit-fixture');
 
 const BASE = (process.env.API_BASE || 'http://127.0.0.1:4100').replace(/\/$/, '') + '/api/v1';
 const prisma = new PrismaClient({ adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }) });
@@ -331,8 +332,7 @@ async function ensureAdminRole() {
     () => prisma.accountToken.deleteMany({ where: { userId: { in: createdUserIds } } }),
     () => prisma.loginLog.deleteMany({ where: { userId: { in: createdUserIds } } }),
     () => prisma.adminAuditLog.deleteMany({ where: { operatorId: { in: createdUserIds } } }),
-    () => prisma.creditLedger.deleteMany({ where: { userId: { in: createdUserIds } } }),
-    () => prisma.creditLot.deleteMany({ where: { userId: { in: createdUserIds } } }),
+    () => clearCredits(prisma, { in: createdUserIds }),
     () => prisma.membership.deleteMany({ where: { userId: { in: createdUserIds } } }),
     () => prisma.project.deleteMany({ where: { ownerId: { in: createdUserIds } } }),
     () => prisma.asset.deleteMany({ where: { ownerId: { in: createdUserIds } } }),

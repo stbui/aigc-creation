@@ -8,6 +8,7 @@
  */
 
 import type { CapabilityPlugin } from '../capability-plugin.type';
+import { fusionImageIntent } from '../model-mapping';
 import { FUSION_SCENARIOS, FUSION_VARIANT_COUNTS, QUALITY_OPTIONS, RATIOS, ratioText, sizeText } from './param-options';
 
 /**
@@ -111,6 +112,7 @@ export const MultiFusion: CapabilityPlugin = {
     );
   },
   modality: 'image',
+  model: { capability: 'image', operation: 'image_to_image', intent: fusionImageIntent },
   inputs: 2,
   inWorkbench: false,
 };

@@ -70,6 +70,31 @@ ALIPAY_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\nMIIBI...\n-----END PUBLIC KEY----
 支付宝 / 微信的签名与解密实现有离线交叉校验脚本（本地生成 RSA 密钥对，按公开规范独立复算签名串）：
 `cd backend && npx ts-node -T scripts/verify-payment-signatures.ts`。它不能替代真实商户号的端到端联调。
 
+## 模型层（`MODEL_*`）
+
+**渠道、渠道模型、价格、前台模型与用户分组都不在环境变量里** —— 它们在后台「渠道工作台 / 前台模型 / 用户分组」
+配置并落库。环境变量只管进程行为与密钥。定义在 `backend/src/config/env.validation.ts` 的 `ENV_SPECS`（`model.*` 段）。
+
+| 变量 | 开发 | 测试 | 生产 | 说明 |
+|---|---|---|---|---|
+| `MODEL_SECRET_KEY` | 空 | 空 | **必填** | base64 编码的 32 字节密钥，AES-256-GCM 加密渠道凭证。留空时在 `data/.model-secret-key` 生成并持久化（换钥匙 = 全部凭证作废） |
+| `MODEL_PLUGIN_DIR` / `MODEL_PLUGIN_INSTALL_DIR` | `plugins` / `plugins-installed` | 同开发 | 同开发 | 内置包（随代码入库、不可卸载）与后台上传包两个目录，分开扫描 |
+| `MODEL_PROVIDER_CATALOG_URL` | 空 | 空 | 空 | 服务商目录远端 JSON；留空 = 后台目录为空态，不内置任何厂商条目 |
+| `MODEL_ACTIVE_TASK_LIMIT` | `2` | `2` | 按实例配额调 | 本进程同时执行的任务数（1–64） |
+| `MODEL_HTTP_TIMEOUT_MS` / `MODEL_MEDIA_TIMEOUT_MS` | `120000` / `180000` | `30000` / `60000` | 按上游调 | 单次上游请求 / 产物下载超时 |
+| `MODEL_WORKER_INTERVAL_MS` / `MODEL_LEASE_MS` | `1000` / `120000` | `200` / `30000` | 同开发 | 调度节拍与任务租约（租约另有 45s 代码下限） |
+| `MODEL_ALLOW_PRIVATE_UPSTREAMS` / `MODEL_ALLOWED_PRIVATE_UPSTREAM_HOSTS` | `false` / 空 | `false` / 空 | `false` / 按需 | SSRF 逃生开关，**自定义渠道不受其影响**（必须逐个点名主机） |
+| `MODEL_PROXY_ENABLED` | `true` | `true` | 按需 | 中转总开关，`false` 时系统 / 自定义中转一律 503 |
+| `MODEL_PROXY_*_{REQUEST,RESPONSE}_MB` / `_TIMEOUT_MS` | 32 / 64 / 600000 | 同开发 | 按需 | 系统与自定义中转各一组，调大前先确认反代 `client_max_body_size` |
+| `MODEL_PROXY_CUSTOM_CONCURRENCY` | `2` | `2` | 按需 | 单用户自定义中转并发，`0` = 不限 |
+| `MODEL_BILLING_SWEEP_ENABLED` | `true` | `true` | `true` | 账单兜底清扫：`reserved` 超时退款、`running` 超时转人工核对 |
+
+三条必须记住：
+
+1. **零配置 = 没有可用线路**：能力 `runtime.effective` 为 `unavailable`，提交被 `40005` 拦下，不会生成任何伪结果。
+2. **冷却 / 并发槽 / 目录版本都是进程内存**，多实例部署时各台独立判定，上游配额按实例数放大。
+3. 中转限流（`MODEL_PROXY_SYSTEM_RATE_LIMIT` / `MODEL_PROXY_CUSTOM_RATE_LIMIT`）由限流守卫在请求期读取，**不经过配置树**。
+
 ## 邮件 / 短信通道（`EMAIL_PROVIDER` / `SMS_PROVIDER`）
 
 同支付一样是「适配器 + 控制台兜底」：默认 `console` **不真实投递**，正文写入

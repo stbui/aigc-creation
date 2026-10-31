@@ -1,4 +1,5 @@
 import type { CapabilityPlugin } from '../capability-plugin.type';
+import { imageToVideoIntent } from '../model-mapping';
 import { VIDEO_DURATIONS, VIDEO_MOTION_PRESETS, VIDEO_MOTION_TEXT, VIDEO_RESOLUTIONS } from './video-param-options';
 
 /**
@@ -30,6 +31,7 @@ export const ImageToVideo: CapabilityPlugin = {
     );
   },
   modality: 'video',
+  model: { capability: 'video', operation: 'image_to_video', intent: imageToVideoIntent },
   inputs: 1,
   // 参考站工作台当前固定 12 张电商生图/修图卡；AI 视频保留在侧栏与工具页，不占卡片位。
   inWorkbench: false,

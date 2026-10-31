@@ -355,11 +355,11 @@ export function AdminSettingsPage() {
         <ul className="flex flex-col gap-2">
           <li className="flex items-baseline gap-2">
             <strong>
-              <Link className="text-accent-700 hover:underline" to="/admin/model-config">
-                模型配置
+              <Link className="text-accent-700 hover:underline" to="/admin/channels">
+                渠道工作台
               </Link>
             </strong>
-            <span className="text-xs text-text-tertiary">通道、默认模型与逐能力路由</span>
+            <span className="text-xs text-text-tertiary">上游渠道、渠道模型与协议</span>
           </li>
           <li className="flex items-baseline gap-2">
             <strong>

@@ -15,6 +15,7 @@ const BASE = process.env.MARKETING_API_BASE || 'http://localhost:4100/api/v1';
 const { PrismaClient } = require('@prisma/client');
 const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
 const { resolveDbUrl } = require('./db-url');
+const { clearCredits } = require('./credit-fixture');
 const prisma = new PrismaClient({ adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }) });
 
 const DAY = 24 * 3600 * 1000;
@@ -628,8 +629,7 @@ async function seedPriorDays(userId, n) {
       await db(() =>  prisma.membership.deleteMany({ where: { userId: { in: emails } } }));
       await db(() =>  prisma.orderItem.deleteMany({ where: { order: { userId: { in: emails } } } }));
       await db(() =>  prisma.order.deleteMany({ where: { userId: { in: emails } } }));
-      await db(() =>  prisma.creditLedger.deleteMany({ where: { userId: { in: emails } } }));
-      await db(() =>  prisma.creditLot.deleteMany({ where: { userId: { in: emails } } }));
+      await db(() =>  clearCredits(prisma, { in: emails }));
       await db(() =>  prisma.checkinRecord.deleteMany({ where: { userId: { in: emails } } }));
       await db(() =>  prisma.inviteRelation.deleteMany({ where: { OR: [{ inviterId: { in: emails } }, { inviteeId: { in: emails } }] } }));
       // B4 引入的表同样挂 userId 外键：不先清掉, 删用户必然 FOREIGN KEY failed,

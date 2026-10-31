@@ -11,6 +11,7 @@
  */
 
 import type { CapabilityPlugin } from '../capability-plugin.type';
+import { editImageIntent } from '../model-mapping';
 
 export const RemoveWatermark: CapabilityPlugin = {
   id: 'remove_watermark',
@@ -66,6 +67,7 @@ export const RemoveWatermark: CapabilityPlugin = {
     `去除图片水印：${p.maskAssetId ? '清除遮罩圈定的水印区域' : p.mode === 'auto' ? '自动识别并清除水印区域' : `清除${p.region || '指定区域'}的水印/遮挡文字`}，` +
     `修补处与周围质感一致，不留痕迹`,
   modality: 'image',
+  model: { capability: 'image', operation: 'image_to_image', intent: editImageIntent },
   inputs: 1,
   inputImageMode: 'edit',
   inWorkbench: true,

@@ -14,8 +14,8 @@ import { PageQueryDto } from './page-query.dto';
  */
 export class TaskListQueryDto extends PageQueryDto {
   @IsOptional()
-  @IsIn(['pending', 'running', 'succeeded', 'failed'], { message: 'status 取值非法' })
-  status?: 'pending' | 'running' | 'succeeded' | 'failed';
+  @IsIn(['queued', 'running', 'succeeded', 'failed', 'cancelled'], { message: 'status 取值非法' })
+  status?: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 
   @IsOptional()
   @IsString()
@@ -23,12 +23,8 @@ export class TaskListQueryDto extends PageQueryDto {
   capability?: string;
 
   /**
-   * 通道。落库值是 `gateway`(真实模型) / `local`(停用前的历史本地产出) / `pending`(尚未执行),
-   * `pending` 是任务的初始值, 任务跑完后 processTask 会把它改写成实际通道,
-   * 因此它只在「刚建、还没跑完」时可见。
-   *
-   * 历史值 `mock` 与 `pending` 同义 (2026-10-22 前的初始值), 查询时在 service
-   * 层归一成 `pending`, 否则旧数据按「待执行」筛不到。
+   * 通道。新任务恒为 `gateway`（真实模型线路）；`local` 只表示 2026-10-25
+   * 之前的历史本地产出；`pending` 是旧版「尚未执行」的初始值，仅存量数据可见。
    */
   @IsOptional()
   @IsIn(['gateway', 'local', 'pending'], { message: 'provider 取值非法' })

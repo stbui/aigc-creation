@@ -2,6 +2,7 @@ import { type CSSProperties, useState } from 'react';
 import { App } from 'antd';
 import { Plus } from 'lucide-react';
 import { useToolTask } from '../hooks/useToolTask';
+import { assetThumbUrl } from '../lib/api';
 import { ToolShell, type ToolAsset } from '../components/ToolShell';
 import { ToolCard } from '../components/ToolWidgets';
 import {
@@ -109,7 +110,7 @@ export function BackgroundRemovePage() {
               aria-label="预览待处理图片"
               onClick={() => controls.preview(image)}
             >
-              <img src={image.url} alt="待处理图片" draggable={false} />
+              <img src={assetThumbUrl(image.url, 320) ?? image.url} alt="待处理图片" draggable={false} />
             </button>
             <button
               type="button"

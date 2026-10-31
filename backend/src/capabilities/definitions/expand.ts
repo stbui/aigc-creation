@@ -8,6 +8,7 @@
  */
 
 import type { CapabilityPlugin } from '../capability-plugin.type';
+import { editImageIntent } from '../model-mapping';
 import { EXPAND_POSITIONS, QUALITY_OPTIONS, RATIOS_WITH_ORIGINAL } from './param-options';
 
 export const Expand: CapabilityPlugin = {
@@ -41,6 +42,7 @@ export const Expand: CapabilityPlugin = {
     `必须保留输入图中的商品主体、数量、材质、光影、视角与构图，只在画面边缘补全背景；` +
     `不得替换主体、生成无关场景或重新创作一张新图。`,
   modality: 'image',
+  model: { capability: 'image', operation: 'image_to_image', intent: editImageIntent },
   inputs: 1,
   inputImageMode: 'edit',
   inWorkbench: true,

@@ -8,6 +8,7 @@
  */
 
 import type { CapabilityPlugin } from '../capability-plugin.type';
+import { generateImageIntent } from '../model-mapping';
 import { RATIOS, ratioText, sizeText } from './param-options';
 
 export const CreativeImage: CapabilityPlugin = {
@@ -31,6 +32,7 @@ export const CreativeImage: CapabilityPlugin = {
   buildPrompt: (p) =>
     `创意生图：${p.prompt || '按描述创作电商视觉'}${ratioText(p.ratio)}${sizeText(p.size)}`,
   modality: 'image',
+  model: { capability: 'image', operation: 'text_to_image', intent: generateImageIntent },
   inputs: 0,
   inWorkbench: true,
 };

@@ -1,4 +1,5 @@
-import type { Modality } from '../providers/modality';
+import type { Modality } from '../common/modality';
+import type { ModelRequestIntent } from '../model/intent/spec-types';
 
 /**
  * 能力插件类型 —— 一项能力的**完整**定义 (2026-10-20 抽离为独立可扩展)。
@@ -7,8 +8,8 @@ import type { Modality } from '../providers/modality';
  *
  * 改造前一项能力的信息散在**四处**, 且没有任何机制保证它们同步:
  *   1. `capability.registry.ts`  — id / 名称 / 参数 / 模态
- *   2. `gateway-prompt.ts`       — 送给模型的提示词 (PROMPTS 字典)
- *   3. `channel-config.defs.ts`  — CAPABILITY_IDS (手工复制的 id 列表)
+ *   2. 旧 providers 层的提示词字典 — 送给模型的提示词
+ *   3. 旧 providers 层的能力 id 列表 — 手工复制的 CAPABILITY_IDS
  *
  * 漏改第 2 处的症状最恶劣: `PROMPTS[capability]?.(…) ?? capability`
  * 会把**裸能力 id 当提示词发给真实模型** (如把字符串 "matting" 当提示词),
@@ -83,6 +84,56 @@ export interface CapabilityParam {
  */
 export type PromptBuilder = (params: Record<string, any>, refCount: number) => string;
 
+/** 本次请求携带的参考素材数量（由 `inputAssetIds` 统计，不是能力声明的上限） */
+export interface CapabilityModelInputs {
+  image: number;
+  video: number;
+}
+
+/**
+ * 一次生成中的一张图（`outputPlan` 的元素）。
+ *
+ * 声明了 `outputPlan` 的能力，一次提交会在服务端拆成 N 个任务:
+ * **每张各自计费**（各持一份账单，单价 = 能力 creditCost），失败 / 取消各自
+ * 按自己的账单退款; 全部任务共享同一个 `batchId` / `batchIndex` / `batchSize`
+ * 参数, 前端按批次聚合成「一次生成」。
+ */
+export interface CapabilityOutput {
+  /** 本张图的稳定键（同一批次内唯一） */
+  key: string;
+  /** 展示名（结果行里图片下方的标签） */
+  label: string;
+  /**
+   * 叠加到该张任务参数上的字段。
+   *
+   * 只用于服务端构造子任务参数与提示词, 不经过 `sanitizeParams`;
+   * 需要持久化展示的字段（如 `section` / `sectionLabel`）仍要在 `params` 里
+   * 声明为 hidden, 否则后台改参数或前端复用时会被当成未知字段丢掉。
+   */
+  params: Record<string, any>;
+}
+
+/**
+ * 能力 → 模型请求的映射声明（`docs/channel-model-design.md` §8.1）。
+ *
+ * 生成链路不再按能力 id 猜参数：准入时用这里的 `intent` 把**用户参数**
+ * 转成模型请求意图（操作 / 参考素材 / 尺寸与画质），再用它去匹配前台模型
+ * 的能力合同、选价格档、选线路。三项必须是同一份意图，否则会出现
+ * 「匹配通过但报价选不到档」。
+ *
+ * 声明是**必填**的：漏写会让该能力无法提交（而不是悄悄退化成另一种请求）。
+ */
+export interface CapabilityModelContract {
+  /** 模型能力类型；装配期校验必须与插件 `modality` 一致 */
+  capability: 'image' | 'video' | 'text' | 'audio';
+  /** 默认操作；`intent` 可按参考素材改判（如带图 → `image_to_image`） */
+  operation?: string;
+  /** 能力参数 + 参考素材数量 → 模型请求意图 */
+  intent(params: Record<string, any>, inputs: CapabilityModelInputs): ModelRequestIntent;
+  /** 能力参数 → 请求参数覆盖（尺寸 / 质量等）；默认由 `intent` 给出 */
+  options?(params: Record<string, any>): Record<string, unknown>;
+}
+
 export interface CapabilityPlugin {
   /** 稳定标识; 路由配置项 gateway.route.<id> 由它派生 */
   id: string;
@@ -97,8 +148,19 @@ export interface CapabilityPlugin {
   mode: CapabilityMode;
   /** 产出模态。与 mode 正交: mode 说实现程度, modality 说产出类型 */
   modality: Modality;
+  /** 模型请求映射。**必填** —— 缺声明即装配期失败 */
+  model: CapabilityModelContract;
   /** 送给真实模型的提示词。**必填** —— 缺失即装配期失败 */
   buildPrompt: PromptBuilder;
+  /**
+   * 一次提交要产出的多张图（可选）。
+   *
+   * 未声明 = 一次生成一张图。声明后准入层按本函数把提交拆成 N 个任务,
+   * 每张各建一张账单、各扣一份 `creditCost`（勾 6 个模块 = 6 份）。
+   * 一个任务只调一次上游, 产不出不同版式的图; 逐张建任务才能让每张图
+   * 独立成功 / 失败 / 退款。
+   */
+  outputPlan?: (params: Record<string, any>) => CapabilityOutput[];
   /**
    * 代码默认消耗积分。
    *
@@ -168,6 +230,23 @@ export function assertCapabilityIntegrity(plugins: CapabilityPlugin[]): void {
 
     if (!p.modality) {
       errors.push(`能力 ${tag} 未声明 modality`);
+    }
+
+    // 模型映射缺失会让该能力在准入时无参数可映射（提交必失败），属声明错误
+    if (!p.model) {
+      errors.push(`能力 ${tag} 未声明 model —— 准入无法把该能力的参数映射成模型请求意图`);
+    } else {
+      if (typeof p.model.intent !== 'function') {
+        errors.push(`能力 ${tag} 的 model.intent 必须是函数`);
+      }
+      if (!p.model.capability) {
+        errors.push(`能力 ${tag} 的 model.capability 缺失`);
+      } else if (String(p.model.capability) !== String(p.modality)) {
+        errors.push(`能力 ${tag} 的 model.capability(${p.model.capability}) 与 modality(${p.modality}) 不一致`);
+      }
+      if (p.model.operation !== undefined && !String(p.model.operation).trim()) {
+        errors.push(`能力 ${tag} 的 model.operation 不能是空串`);
+      }
     }
 
     // 参数重名会让 sanitizeParams 静默覆盖后一项, 属声明错误

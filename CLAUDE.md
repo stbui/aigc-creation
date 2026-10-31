@@ -14,8 +14,10 @@
 | 权限点 | `backend/src/admin/permissions.ts` |
 | 退款与站点设置默认值 | `backend/src/common/setting-defs.ts` 的 `SETTING_DEFS` |
 | 工单状态机 | `backend/src/tickets/tickets.service.ts` 的 `TRANSITIONS` |
-| 厂商与推荐模型 | `backend/src/providers/vendors/vendor.catalog.ts` / `vendor.presets.ts` |
-| 启动期环境变量 | `backend/src/config/env.validation.ts` 的 `ENV_SPECS`；网关通道变量另见 `providers/channel-config.defs.ts` |
+| 协议与推荐模型 | `backend/plugins/<plugin>/manifest.json`（107 个可用包；目录下另有 3 个 `src-*` 源目录镜像，运行时不生效）；服务商目录见 `src/model/plugins/provider-catalog.service.ts` |
+| 渠道 / 前台模型 / 价格档 | 数据库（后台「渠道工作台」「前台模型」「用户分组」）—— 代码里没有默认线路表 |
+| 账单状态机 | `backend/src/model/billing/billing.service.ts` 的 `BILLING_STATUSES` |
+| 启动期环境变量 | `backend/src/config/env.validation.ts` 的 `ENV_SPECS` |
 | 设计令牌 | `frontend/src/styles/global.css` 的 `:root` |
 | AIGC 角标默认样式 | `backend/src/common/aigc-label.config.ts` 的 `AIGC_LABEL_DEFAULTS`；运行期由后台「AI 标识」页覆盖 |
 | 后台侧栏与页面分组 | `frontend/src/components/admin/adminNav.ts` 的 `ADMIN_MENU` |
@@ -49,8 +51,8 @@ uat@admin.com
 当前形态 = **C 端创作站 + 独立后台管理端 + 商业运营域 + 账户合规/服务域**：
 
 - **16 项能力**（全部 `real`，0 `mock` / 0 `planned`，12 项进工作台）。**图像、文本、视频都只允许真实模型产出**：无模型线路即失败并退款，不交付伪结果。
-- **生成通道**为「模态 × 协议 × 厂商」三层可插拔。`auto/remote` 只调度真实模型线路，存量 `route=local` 明确判不可用；新写入不再接受 `local`。
-- **后台管理端**（`/admin`）30 个页面，权限点 + 审计 + 定时任务 + 备份 + 存储切换。
+- **生成通道**：唯一链路是 `src/model/**` —— 渠道 → 渠道模型 → 前台模型 revision/线路 → 路由/冷却 → 任务执行 → 账单。建任务必带 `logicalModelId`（来自 `GET /models`）；协议来自 `plugins/` 内置插件清单（107 个可用包 / 115 个 provider），代码里没有手写协议实现。旧三层（`src/providers/**`、`GATEWAY_*`、`ModelCallLog`、`/admin/model-config`）已整体删除，**不存在并存期**。
+- **后台管理端**（`/admin`）35 个页面，权限点 + 审计 + 定时任务 + 备份 + 存储切换。
 - **商业域**：商品 / 订单 / 支付 / 退款 / 积分账本 / 会员 / 优惠券 / 限时活动 / 邀请签到 / 发票 / 渠道对账。
 - **账户与合规域**：找回密码 / 短信登录 / 扫码登录 / 第三方登录（OAuth2 / OIDC）/ 自助注销与数据导出 / 法务版本化与同意留痕 / 站内消息 / AIGC 标识 / 限流 / 健康检查 / 请求追踪。
 - **服务域**：工单、后台全局搜索、批量动作与 CSV 导入导出。
@@ -86,7 +88,7 @@ aigc-creation/
 ├── docs/                     # 需求 / 产品 / 技术 / 测试 / 规划五类，地图见 docs/README.md
 │   ├── prd.md                # ★ 需求：整站产品需求、数据模型、非功能要求
 │   ├── environments.md       # ★ 技术：三环境变量矩阵 / 加载优先级 / 生产门禁 / Docker / 排查
-│   ├── model-architecture.md # ★ 技术：通道分层 / 协议矩阵 / 调度 / 扩展 SOP
+│   ├── model-architecture.md # ★ 技术：渠道/前台模型/路由/计费/代理 / 选路与失败语义 / 扩展 SOP
 │   ├── api-contract.md       # ★ 技术：响应信封 / 错误码 / 接口清单 / 令牌时长
 │   ├── runtime-infrastructure.md # ★ 技术：AIGC 标识 / 签名 URL / 限流 / 健康 / 追踪 / 日志
 │   ├── testing.md            # ★ 测试：四层测试、闸口清单、覆盖矩阵、已知缺口
@@ -111,11 +113,13 @@ aigc-creation/
 │       ├── common/           # guards / 限流 / 签名 URL / AIGC 标识 / 请求追踪 / 日志
 │       │                     # filters / AppError / csv / batch / test-support
 │       ├── capabilities/     # registry 门面 + definitions/<id>.ts（能力唯一事实源）
-│       ├── providers/        # modality（叶子）/ unified / vendors / protocols / 各协议实现
-│       ├── generate/         # 任务创建 + 轮询（generate / tasks controller）
+│       ├── model/            # 模型层唯一实现：channels / catalog / routing / intent / protocol
+│       │                     # tasks / billing / user-groups / plugins / proxy / media
+│       ├── generate/         # 建任务入口（controller + DTO）+ 任务查询，实现落在 model/tasks
 │       ├── admin/            # 后台：guards / 权限点 / 审计 / 调度 / 备份 / 各管理 controller
 │       ├── payments/         # 支付三层：沙箱 / 支付宝 RSA2 / 微信 v3 + 回调
 │       ├── account/ legal/ aigc-label/ notifications/ tickets/ channels/ health/
+│       │                     # ↑ channels 是通知出口（sms / email），不是模型渠道
 │       ├── auth/ projects/ assets/ stats/ storage/ invoices/ prompt-tools/ mobile-upload/
 │       └── credits/ orders/ membership/ marketing/ products/
 └── frontend/                 # Vite SPA，端口 5100（测试档同端口）
@@ -127,7 +131,7 @@ aigc-creation/
         ├── admin-ui/         # 后台 UI：shell/AdminBoardLayout · primitives · controls · widgets · providers · lib
         ├── vendor/boardui/   # BoardUI 免费层源码（MIT，上游原样；来源见 PROVENANCE.md）
         ├── components/       # AppLayout / SideRail / ToolShell / QrLoginPanel / admin/（控件入口 + adminNav + AlertCenter + DutyBand + statusMeta）
-        ├── pages/            # 35 个 C 端页面 + pages/admin/ 30 个后台页面
+        ├── pages/            # 35 个 C 端页面 + pages/admin/ 35 个后台页面
         ├── lib/              # api.ts（request 拆信封）/ http / auth / capabilities / aigc-label / constants
         ├── context/          # AuthContext / AdminContext（权限点）/ CreditsContext
         ├── hooks/            # useToolTask / useProject / useCapabilities / usePollAbort / 上传相关
@@ -181,79 +185,77 @@ npm run e2e                 # Playwright
 
 - `mode`（实现程度）：`real` 已接真实模型；`mock` / `planned` 保留枚举但当前 0 项。
 - `modality`（产出介质），与 `mode` 正交：`image` / `text` / `video`。当前 15 项 image + 1 项 video；`text` 用于提示词工具等非能力项。
-- 新任务 `task.provider` 恒为 `gateway`（初值 `pending`）；`local` 只表示存量历史产出的来源。
+- 新任务 `task.provider` 恒为 `gateway`，`status` 初值 `queued`；`local` 只表示存量历史产出的来源。
 - 新增能力时按实际实现程度声明 `mode`：未实现写 `planned`，不得补本地占位或伪模型结果。
 
 ### 能力运行时真相（`runtime`）
 
-`GET /capabilities` 每项追加 `runtime: { enabled, route, remoteAvailable, localQuality, effective, reason }`：
+`GET /capabilities` 每项追加 `runtime: { enabled, remoteAvailable, effective, reason }`：
 
 | `effective` | 含义 |
 | --- | --- |
 | `remote` | 有可用模型线路，按下去走真实模型 |
 | `disabled` | 后台已下线（`CapabilityControl.enabled=false`） |
-| `unavailable` | 没有可用模型线路（或存在已停用的存量 `route=local`）：不可提交 / 任务失败并退款 |
+| `unavailable` | 该能力没有配到任何可用的前台模型 / 线路：不可提交 |
 
 - 由 `capability-availability.service.ts` 合成，3s 缓存，后台写入即 `invalidate()`；**没有 `CapabilityControl` 行 = 启用**。
 - 下架必须填原因；`generate.service` 在**扣费之前**拦截并返回 `40005`，原因原样下发到 C 端。
 - 界面标注看 `effective`，不看 `mode`；`effective` 是事前预期，实际失败不回落本地产出。
 - **积分价**运行时一律走 `CreditPriceService.resolve()`（后台可改）；**限时免费**命中进行中的 `Campaign(type='limited_free')` 时直接返回 0，优先级高于后台覆盖价，缓存 3s 到点自动恢复。
 
-### 生成通道：模态 × 协议 × 厂商
+### 生成通道：渠道 → 前台模型 → 路由 → 账单
 
-> 完整分层、请求时序、扩展 SOP 见 **`docs/model-architecture.md`**；本节只保留必须记住的约束。
+> 完整分层、请求时序、选路规则、失败语义、计费口径见 **`docs/model-architecture.md`**；
+> 设计动机见 `docs/channel-model-design.md`。本节只留必须记住的约束。
 
-依赖方向单向（勿反转）：**应用层 → 统一能力层（unified）→ 厂商层（vendors）→ 协议层（protocols）→ `modality.ts`（叶子）**。
+**四张表就是四个事实源**：`ModelChannel`（渠道，凭证加密）→ `ChannelModel` + `ChannelModelPriceTier`（供应侧线路 + 价格档）→
+`LogicalModel` + `LogicalModelRevision` + `LogicalModelRoute`（C 端可见身份 + 发布快照 + 线路）。**代码里没有任何内置线路**，零配置 = 能力 `unavailable`。
 
-**协议清单**（协议名**跨模态复用**，任何「按协议名推断能力」的写法都是错的，必须看 `(modality, protocol)` 二元组）：
+**命名空间必须分清**：`ChannelModel.capability` 是供应侧模态（`image/text/video/audio`）；
+`LogicalModel.capability` 是 C 端能力 id（`free_create` / `expand` / …）。混用表现为「有这个能力的模型，但模型不可用」。
 
-| 模态 | 协议 | 端点 | 形态 | 参考图回传 |
-| --- | --- | --- | --- | --- |
-| image | `openai` | `POST {base}/v1/images/generations` | 同步，一次阻塞到出图 | base64 data URL |
-| image | `volcengine` | `POST {base}/images/generations` | 同步 | 公网 URL |
-| image | `minimax` | `POST {base}/v1/image_generation` | 同步 | 公网 URL（仅 1 张） |
-| text | `openai-chat` | `POST {base}/v1/chat/completions` | 同步 | 协议层不声明；多模态识图由工具层构造 base64 content 块 |
-| video | `minimax-video` | `POST {base}/v1/video_generation` → `/v1/query/video_generation` → `/v1/files/retrieve` → 下载 | 异步四段式 | 公网 URL |
+**渠道模型 `protocol` 存的是插件声明里的 provider id，不是插件 id**。`plugins/openai-images/manifest.json` 声明
+`providers[0].id = "openai-image"`，渠道模型必须写 `openai-image`；写成 `openai-images` 派发时报
+`channel_unavailable`（「协议尚未注册执行器」）。后台下拉读注册表，正常操作不会踩到 —— 手写库或导入时会。
 
-`modelverse` 保留为 `openai` 的**历史别名**，新配置请用 `openai`。默认协议：image 为 `openai`、text 为 `openai-chat`；`gateway.config.ts` 的空值兜底必须与之一致 —— 两处默认值不同会让「后台看到的默认」与「实际生效的默认」打架，极难排查。
+**任务状态与错误码**：`queued / running / succeeded / failed / cancelled`（`pending` 废止）；
+`42201` 生成失败 / `42202` 中断 / `42203` 标识失败 / `42204` 无可用线路 / `42205` 遮罩无 edits 线路 / `42206` **结果不明**。
 
-**图像协议的实测差异（踩坑高发区）**：
+### 选路与失败语义
 
-| 厂商 | 尺寸写法 | 响应结构 | 错误识别 |
-| --- | --- | --- | --- |
-| 优云智算 / 硅基流动 / OpenAI | `size: "2048x1152"` | `data[0].url` | `error.message` |
-| 火山方舟 | `size: "2K"`（档位，不接受像素） | `data[0].url` | `error.message` |
-| MiniMax | `aspect_ratio: "16:9"`（无 size 字段） | `data.image_urls[]`（**data 是对象**） | **HTTP 200 也可能是失败**，错误只在 `base_resp.status_code` |
+选路（`router.service.ts`）：产品能力合同匹配 → 候选池过滤（启用 / 权重 > 0 / 本轮未试 / 未冷却 / 分组可见 /
+`channel` 策略须命中价格档）→ **只保留最高 `priority` 一层** → 同层按 `weight` 加权随机（crypto + 拒绝采样）。
+选出来的 `RoutedModel` 一次带给任务快照、账单、调用日志，**下游任何一层都不许替换供应侧字段**。
 
-按 OpenAI 的 `data[0].url` 去取 MiniMax 会得到 `undefined`；MiniMax 失败不识别就会把「失败响应」当成「无产出图」，丢掉真实错误原因。共用骨架在 `image-provider-base.ts` 的 `BaseImageProvider`，各协议子类只声明端点 / 尺寸写法 / 响应字段三处差异。
+**切线只发生在 `rejected_no_job`**（请求没发出去 / 401 / 403 / 404 / 429）。超时、5xx、连接中断一律判
+**结果不明**（`42206`）：不切线、不自动退款，账单停 `uncertain` 等人工核对 —— 上游可能已经把图生成了，
+切线会二次计费、自动退款会白送一次产出。
 
-**格式必须按字节魔数判定，不能看 URL 后缀**。多家返回的链接 `.../d8021...` **无扩展名**；`generate.service` 按 `format` 决定落库扩展名与存储 mime，猜错会把 PNG 字节以 `image/jpeg` 入库 —— 用 `sniffImageFormat()`。
+**冷却只对明确可归因的失败生效**：401/403 冷却渠道 10min，404 冷却该渠道模型 10min，429 冷却
+`Retry-After` 或 30s；**超时与 5xx 永不冷却**（上游抖动时关 10 分钟会把一次偶发故障放大成整段不可用）。
+冷却存进程内存，多实例各自判定。
 
-**图像 / 文本协议当前都是同步的**：不存在「提交任务 + 轮询」的图像协议。`ProtocolSpec.mode` / `pollEndpoint?` 作为通用异步契约字段保留（视频走独立的 `VIDEO_PROTOCOL_SPECS`），故图像通道的 `GATEWAY_{MODALITY}_POLL_MS` / `_MAX_POLLS` 不参与出图。
+**切线必须换账单**：新线路的价格档可能不同，沿用旧账单等于「按 A 的价收、走 B 的线路」。
 
-### 失败策略：所有模态都不回落本地
+### 目录快照与例外
 
-| 模态 / 能力 | 失败时 | 错误码 |
-| --- | --- | --- |
-| image，无可用线路或存量 `route=local` | 任务失败并退款 | `42204` |
-| image，有线路但全部失败 | 任务失败并退款 | `42201` |
-| image，带遮罩但没有 edits 协议线路 | 任务失败并退款 | `42205` |
-| text | 返回 502 + 可读错误 | HTTP 502 |
-| video | 如实失败并退款 | 视频路由错误码 |
+`route-catalog.service.ts` 是唯一读供给的入口：TTL 30s，库短暂不可用时沿用旧快照最多 5min，
+首次装载失败直接报错（**不把空目录当「全部不可用」**）。本进程写入后 `invalidateLocal()`，多进程最多滞后一个 TTL。
+排障第一条：**改完模型层不看快照就等于没改**。
 
-本地图像生成算法已于 2026-10-25 删除；失败后不会合成、裁剪或占位出图，`generate.service` 按任务快照统一退款。
+**格式按字节魔数判定，不看 URL 后缀**（`src/model/media/image-format.ts`）：多家返回的链接无扩展名，
+猜错会把 PNG 字节以 `image/jpeg` 入库。
 
-**未知协议必须走失败路径**：`CapabilityRouterProvider.pickProtocol()` 对未知协议抛错，由调度器记为该线路失败并尝试下一条；全部失败时任务 `42201`，原因写入 `ModelCallLog.reason`，不静默换协议。
+**文本工具**（提示词润色 / 图文互转）不走任务与账单，但走同一条真实链路：无可用线路或全部失败抛 `50201`（HTTP 502），
+**不拼接模板文案**；每次尝试写一条 `ApiCallLog`（`source='tool'`、`billable=false`）。
 
-### 厂商目录与后台模型配置
+### 计费与钱包
 
-`vendor.catalog.ts` 是厂商唯一事实源（一家一条），`vendor.presets.ts` 派生「模态 × 厂商」视图。已内置 7 家：`modelverse` / `siliconflow` / `openai`（image+text）、`volcengine`（image）、`minimax`（image+video）、`deepseek` / `moonshot`（仅 text）。
-
-**DeepSeek / Moonshot 只进文本通道**：两者标称「OpenAI 兼容」指 `/v1/chat/completions` 的**文本**兼容，**没有图像生成端点**，配到生图通道必然 404。
-
-**通道配置优先级：环境变量 > 后台 `ModelChannelConfig`（DB）> 代码默认**。某模态一旦有线路，旧版 `gateway.<modality>.*` 的 baseUrl/token/model/provider 不再参与调度（超时 / 轮询仍生效）。存量单前缀 `GATEWAY_BASE_URL` / `GATEWAY_TOKEN` 仅对 image 继续生效；默认零配置时能力显示不可用，**不会本地生成**。
-
-多渠道灾备由 `channel-scheduler.ts` 负责：按 `priority` 升序选通道、跳过冷却中的通道、失败记一笔并试下一条，连续失败达阈值即熔断冷却（刻意不做权重随机 —— 排障要能说出「刚才走的是哪条」）。变量矩阵见 `docs/model-architecture.md` §8 与 `docs/environments.md`。
+- **建单与预留同一事务**：先建单后预留失败会留下永远不结算的账单。扣费在**建任务时**，任务快照 `creditCost` 与账单金额同源。
+- 已结算账单不许自动退款、已退款账单不许再结算。**`uncertain` 只能人工 `settle` / `refund`**，必须填原因并写审计。
+- Token 结算以上游 usage 为准；上游没给用量时，视频按提交时的公式快照，其余显式失败转人工 —— **绝不按预授权金额静默结清**。
+- `CreditAccount.available == Σ CreditLot.remaining` 恒成立；退款按 `CreditReservationItem` **原路**退回原批次（保留原到期时间），不造新批次。
+- 用户分组倍率与货币换算在同一处折算，**目录展示价与账单必须用同一组因子**。
 
 ### 配置层 + 三环境体系
 
@@ -263,7 +265,7 @@ npm run e2e                 # Playwright
 2. **类型错误即启动失败**（`PORT=abc` 直接抛 `EnvValidationError` 并指名变量，不再静默绑随机端口）。
 3. **默认值逐项抄自现有硬编码兜底值**，不擅自改默认行为。
 
-`ENV_SPECS` 是启动期校验变量的唯一事实源。网关变量 `GATEWAY_{MODALITY}_*` / `GATEWAY_ROUTE_<ID>` 由 `providers/channel-config.defs.ts` 动态生成，**不经过 `validateEnv`**；改键名要同步该文件。
+`ENV_SPECS` 是启动期校验变量的唯一事实源。模型层的 `MODEL_*`（密钥 / 插件目录 / 并发 / 超时 / 租约 / 私网上游 / 代理）全部经由它校验，**没有 `GATEWAY_*`**。
 
 **三环境（开发 / 测试 / 生产）完整说明见 `docs/environments.md`**，只列必须记住的：
 
@@ -280,12 +282,12 @@ npm run e2e                 # Playwright
 
 **权限链**：`AdminGuard`（身份）→ `PermissionGuard`（权限点）→ controller → `AuditInterceptor`（落 `AdminAuditLog`）。权限点定义在 `src/admin/permissions.ts`。**前端 `AdminContext.can()` 只用于隐藏无权限按钮，不是安全边界**；真正的校验必须在后端。
 
-30 个页面、8 个侧栏分组以 `adminNav.ts` 的 `ADMIN_MENU` 为准；页面功能、接口与交互见 `docs/admin-console-design.md` / `admin-detailed-design.md`。
+35 个页面、8 个侧栏分组以 `adminNav.ts` 的 `ADMIN_MENU` 为准；页面功能、接口与交互见 `docs/admin-console-design.md` / `admin-detailed-design.md`。
 
-- 高危动作（删除 / 重置密码 / 退款 / 手动调整积分 / 模型配置写入 / 角色与系统设置写入 / 手动备份）须填原因并写审计（`HIGH_RISK_PERMISSIONS`）。
+- 高危动作（删除 / 重置密码 / 退款 / 手动调整积分 / 渠道 / 前台模型写入 / 角色与系统设置写入 / 手动备份）须填原因并写审计（`HIGH_RISK_PERMISSIONS`）。
 - 批量动作：`ids ≤ 100`，`runBatch` 串行、**不包事务**，逐条返回结果；路由挂较弱读权限，处理器内再判动作权限。
 - CSV 统一走 `common/csv.ts`（BOM + RFC4180 + 公式注入前导 `'`）；前端 `downloadCsv()` 不走 JSON 信封。
-- **后台整站是 BoardUI**（2026-10-30 完成，30 页 + 外壳全部切换）：`pages/admin` / `components/admin` / `admin-ui` 三目录 `from 'antd'` 为 0，legacy 实现与 `VITE_ADMIN_UI` 开关已删除、无回滚。新页面直接写 `admin-ui/`，不要引 antd，也不要退回自绘 `div/button/input/select`。vendor 源码在 `frontend/src/vendor/boardui/`，保持上游原样不改，来源见 `PROVENANCE.md`。
+- **后台整站是 BoardUI**（2026-10-30 完成 30 页迁移，现 35 页 + 外壳全部是 BoardUI）：`pages/admin` / `components/admin` / `admin-ui` 三目录 `from 'antd'` 为 0，legacy 实现与 `VITE_ADMIN_UI` 开关已删除、无回滚。新页面直接写 `admin-ui/`，不要引 antd，也不要退回自绘 `div/button/input/select`。vendor 源码在 `frontend/src/vendor/boardui/`，保持上游原样不改，来源见 `PROVENANCE.md`。
 - **外壳**：`admin-ui/shell/AdminBoardLayout` —— 单栏（侧栏 232 / 折叠 60，≤1280 自动折叠），无顶栏、无值班带；导航 / ⌘K 搜索 / 告警铃 / 密度 / 用户菜单都在侧栏。值班塔只出现在概览首屏（`admin-ui/widgets/DutyStrip`）。`global.css` 的 `.adm-*` 只剩外壳骨架（`adm-layout` / `adm-content` / `adm-skip-link`）与值班塔（`adm-tower*` / `adm-dot` / `adm-empty-inline`），页面内新增 `adm-*` 类是错的。
 - **共享控件**：`components/admin/PageHeader.tsx` 与 `AdminWidgets.tsx` 是单一路径的再导出（→ `admin-ui/widgets/AdminChrome` / `primitives`），页面 import 不变；改外观只改 `AdminChrome`。表格 `admin-ui/primitives/DataTable`（密度走 `admin-ui/lib/density` 的 `DensityContext`，由外壳下发），状态色 `components/admin/statusMeta.ts`。
 - **e2e 锚点**：共享控件与页面关键节点挂 `data-testid="admin-*"`，表单控件用 `aria-label`；测试一律 `getByTestId` / `getByLabel` / 角色名，不追 Tailwind 工具类与已删除的 `adm-*` 类。
@@ -307,7 +309,7 @@ npm run e2e                 # Playwright
 - **第三方登录**：`accessToken` 不进 URL，只下发 60 秒票据；只有 `emailVerified` 的邮箱才自动绑定已有账号；`returnTo` 只接受站内绝对路径。
 - **站内消息**：`notify()` **永不抛异常**，模板缺失回落内置文案；已接支付成功、任务失败退款、会员到期、工单回复。
 - **工单**：状态机只在 `TRANSITIONS` 定义，**新增状态必须同时补边**；越权一律 **404 而非 403**。
-- **提示词工具**：走 text 模态，通道不可用返回 502，**不回落**。
+- **提示词工具**：走 text 模态渠道模型，无可用线路或全部失败返回 502（`50201`），**不拼接模板文案**。
 
 ### 前端路由与接口
 
@@ -322,11 +324,10 @@ npm run e2e                 # Playwright
 
 | 要做什么 | 必改的文件 | 同步/校验 |
 | --- | --- | --- |
-| 新增一项能力 | `capabilities/definitions/<id>.ts` + `definitions/index.ts` | 启动期 `assertCapabilityIntegrity`；`verify-capability-*` |
-| 新增厂商 | `providers/vendors/vendor.catalog.ts` 加一条 | `vendor.presets.ts` 自动派生；`verify-vendor-aggregation` |
-| 新增协议 | `protocol.spec.ts` 加协议形状 + `provider-factory.ts` 加映射 + provider 实现 | 图像能力继承 `BaseImageProvider` 只声明三处差异；未知协议**显式抛错** |
+| 新增一项能力 | `capabilities/definitions/<id>.ts` + `definitions/index.ts` | 启动期 `assertCapabilityIntegrity`；`verify-capability-bootstrap`。之后还要在后台配前台模型，否则 `runtime.effective = unavailable` |
+| 接入一家厂商 | 新增 `backend/plugins/<plugin>/manifest.json`（或后台上传安装） | `verify-plugin-manifests` / `verify-protocol-runtime`；协议下拉按能力过滤自动可见 |
 | 新增后台页 | `admin/permissions.ts` → controller 挂 `@RequirePermission` → `adminNav.ts` → `pages/admin/*.tsx` → 路由 → `lib/api.ts` | 前端 `can()` 只隐藏按钮，权限必须在后端 |
-| 新增环境变量 | `ENV_SPECS` + `.env.example` + 三档 env；通道类再加 `channel-config.defs.ts` | `probe-environments.ts`；`docs/environments.md` |
+| 新增环境变量 | `ENV_SPECS` + `.env.example` + 三档 env | `probe-environments.ts`；`docs/environments.md` |
 | 调整积分价 / 退款规则 | `definitions/<id>.ts` 的 `creditCost` / `common/setting-defs.ts` 的 `SETTING_DEFS` | 运行时走 `resolve()` 与设置读取，不写死 |
 
 ### 样式：语义化 token，禁止硬编码色值
@@ -388,7 +389,7 @@ npm run e2e                 # Playwright
 | 类别 | 文档 |
 | --- | --- |
 | 需求 | `docs/prd.md`（整站）、`admin-prd.md`（后台）、`agent-prd.md`（规划） |
-| 产品 | `admin-suite/console/detailed/ui-design.md`、`commerce-design.md`、`workbench/topnav/login/library-design.md` |
+| 产品 | `admin-suite/console/detailed/ui-design.md`、`commerce-design.md`、`landing/workbench/topnav/login/library-design.md` |
 | 技术 | `environments.md`、`docker-deployment.md`、`model-architecture.md`、`api-contract.md`、`runtime-infrastructure.md`、`typography.md`、`agent-integration-design.md`（规划） |
 | 测试 | `docs/testing.md`（四层测试、闸口清单、覆盖矩阵、已知缺口） |
 | 流程 | `docs/development-workflow.md`（Agent 执行手册：指令映射、执行卡、闸口矩阵、证据标准、交人边界） |

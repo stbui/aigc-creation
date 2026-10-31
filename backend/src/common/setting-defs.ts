@@ -130,29 +130,12 @@ export const SETTING_DEFS: SettingDef[] = [
     readOnly: true,
     linkTo: '/admin/membership-plans',
   },
-  {
-    key: 'generate.pollIntervalMs',
-    label: '轮询间隔',
-    description: '前端查询任务状态的间隔（毫秒）',
-    type: 'number',
-    default: 1200,
-    min: 500,
-    max: 10000,
-    group: 'generate',
-    public: true,
-  },
-  {
-    key: 'generate.maxPolls',
-    label: '最大轮询次数',
-    description: '超出视为超时。按模态分别在「模型配置」页配置（图像 60 / 视频 300）',
-    type: 'number',
-    default: 60,
-    min: 5,
-    max: 300,
-    group: 'generate',
-    readOnly: true,
-    linkTo: '/admin/model-config',
-  },
+  /*
+   * 旧的 `generate.pollIntervalMs` / `generate.maxPolls` 随 P6 删除：
+   * 轮询节奏由协议运行时决定（渠道模型上的 pollIntervalMs / maxPolls），
+   * 不再有「按模态在后台调一个全局值」这层配置。C 端查询任务的间隔是
+   * 前端常量 `POLL_INTERVAL_MS`。
+   */
 
   // ── 退款 ────────────────────────────────────────────────────────────
   {

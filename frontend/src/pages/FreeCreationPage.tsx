@@ -2,13 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { App, Modal, Spin } from 'antd';
 import { ChevronLeft, ChevronRight, ImagePlus, Maximize2, Plus, Sparkles, X } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
-import { assetSrc, assetsApi, generateApi, toAbsoluteUrl } from '../lib/api';
+import { assetSrc, assetThumbUrl, assetsApi, generateApi, toAbsoluteUrl } from '../lib/api';
+import { resolveModelId } from '../lib/models';
 
 import { ToolSubmitBar } from '../components/ToolSubmitBar';
 import { ResultGalleryPane } from '../components/ResultGalleryPane';
 import { useCreditLabel } from '../hooks/useCreditLabel';
 import { useResultGallery, type GalleryItem } from '../hooks/useResultGallery';
 import { ToolSettingsPopover } from '../components/ToolSettingsPopover';
+import { ModelPicker } from '../components/ModelPicker';
 import { AssetLibraryModal, useAssetLibrary } from '../components/AssetLibraryModal';
 import { PromptPolishModal } from '../components/PromptPolishModal';
 import { ImageToPromptModal } from '../components/ImageToPromptModal';
@@ -400,9 +402,11 @@ export function FreeCreationPage() {
     setResult(null);
     try {
       const projectId = await ensureProject();
+      const logicalModelId = await resolveModelId(capability);
       const { taskId } = await generateApi.start({
         projectId,
         capability,
+        logicalModelId,
         // 参考图选填 0~4 张; 顺序即构图顺序 (provider 顶部条带按序横排)
         inputAssetIds: images.map((x) => x.id),
         params: {
@@ -532,7 +536,12 @@ export function FreeCreationPage() {
                       <div className="fc-thumb-grid">
                         {images.map((img, i) => (
                           <div key={img.id} className="fc-thumb">
-                            <img src={img.url} alt={img.name} loading="lazy" decoding="async" />
+                            <img
+                              src={assetThumbUrl(img.url, 320) ?? img.url}
+                              alt={img.name}
+                              loading="lazy"
+                              decoding="async"
+                            />
                             <div className="fc-thumb-order">
                               <button
                                 type="button"
@@ -654,6 +663,7 @@ export function FreeCreationPage() {
                   resolution={resolution}
                   onResolutionChange={setResolution}
                   capabilityId={capability}
+                  modelPicker={<ModelPicker capability={capability} options={{ ratio, resolution }} />}
                   popoverClassName="fc-settings-popover"
                   popoverRole="dialog"
                   popoverAriaLabel="高级设置"

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
-import { toAbsoluteUrl, statsApi } from '../lib/api';
+import { assetThumbUrl, statsApi } from '../lib/api';
 import { capabilityById, isCapabilityVisible, toolPath } from '../lib/capabilities';
 import { CapabilityIcon } from '../components/AppLayout';
 import { StateError, StateSkeleton } from '../components/StateViews';
@@ -324,7 +324,7 @@ export function WorkbenchPage({
                   {stats.recentTasks.slice(0, 4).map((t) => (
                     <button key={t.id} type="button" className="wb-job" onClick={() => navigate('/works')}>
                       <span className="wb-job-thumb">
-                        {t.thumbnailUrl ? <img src={toAbsoluteUrl(t.thumbnailUrl)} alt="" loading="lazy" /> : <CapabilityIcon id={t.capability} size={18} />}
+                        {t.thumbnailUrl ? <img src={assetThumbUrl(t.thumbnailUrl, 96)} alt="" loading="lazy" /> : <CapabilityIcon id={t.capability} size={18} />}
                       </span>
                       <span className="wb-job-copy">
                         <b>{t.name}</b>

@@ -13,8 +13,9 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { generateApi, assetSrc } from '../lib/api';
+import { generateApi, assetSrc, assetThumbSrc } from '../lib/api';
 import { capabilityById, capabilityName, toolPath } from '../lib/capabilities';
+import { resolveModelId } from '../lib/models';
 import { useCapabilities } from '../hooks/useCapabilities';
 import { usePollAbort } from '../hooks/usePollAbort';
 import { useGenerateError } from '../hooks/useGenerateError';
@@ -377,7 +378,11 @@ export function WorksPage() {
       return;
     }
 
-    const costText = def.creditCost > 0 ? `本次将消耗 ${def.creditCost} 积分` : '本次免费';
+    // 多图产出按张计费: 原任务参数里带着 batchSize（当初勾了几个模块），
+    // 重试会还原整批，合计价必须乘上去，否则提示的金额比实际扣的少
+    const shots = Math.max(1, Number(t.params?.batchSize) || 1);
+    const totalCost = def.creditCost * shots;
+    const costText = totalCost > 0 ? `本次将消耗 ${totalCost} 积分` : '本次免费';
     modal.confirm({
       title: `重新生成「${def.name}」？`,
       content: `将沿用原任务的输入图与参数新建一次生成。${costText}；原失败任务已退回的积分不受影响。`,
@@ -386,9 +391,13 @@ export function WorksPage() {
       onOk: async () => {
         setRetryingId(t.id);
         try {
+          // 沿用原任务的模型：同一提示词换模型往往出完全不同的图，
+          // 用户点的是「重新生成」而不是「换个模型试」。
+          const logicalModelId = t.logicalModelId || (await resolveModelId(t.capability));
           const { taskId } = await generateApi.start({
             projectId: t.projectId,
             capability: t.capability,
+            logicalModelId,
             inputAssetIds: inputs,
             params: t.params ?? {},
           });
@@ -398,7 +407,8 @@ export function WorksPage() {
               id: taskId,
               projectId: t.projectId,
               capability: t.capability,
-              status: 'pending',
+              status: 'queued',
+              logicalModelId,
               inputAssetIds: inputs,
               params: t.params ?? {},
               createdAt: new Date().toISOString(),
@@ -842,9 +852,11 @@ export function WorksPage() {
         <>
           <div className="my-works-grid">
             {visible.map((t, cardIndex) => {
-              const url = t.outputAsset ? assetSrc(t.outputAsset) : undefined;
+              const fullUrl = t.outputAsset ? assetSrc(t.outputAsset) : undefined;
               const isSel = selected.includes(t.id);
               const isVideo = taskModality(t) === 'video';
+              // 网格只显示缩略图；点开查看器 / 下载仍走完整地址 (lightboxItems / downloadSelected)
+              const url = isVideo ? fullUrl : assetThumbSrc(t.outputAsset, 640) ?? fullUrl;
               const def = cardOf(t);
               // 大图列表里的下标: 只有图片作品进查看器, 视频没有可翻的静态原图
               const previewAt = url && !isVideo ? lightboxItems.findIndex((x) => x.id === t.id) : -1;

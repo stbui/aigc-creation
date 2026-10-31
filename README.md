@@ -1,21 +1,23 @@
 # 货觉AI
 
-面向电商团队的智能视觉创作平台：上传商品图或输入提示词，由真实模型通道产出可上架的主图、详情图、修图结果与短视频。
+面向电商团队的智能视觉创作平台：上传商品图或输入提示词，由真实模型线路产出可上架的主图、详情图、修图结果与短视频。
 
 - 后端：NestJS 12 + Prisma 7 + 自研 `node:sqlite` driver adapter（零原生编译依赖）
 - 前端：Vite 8 + React 19 + antd 6 + lucide-react；**后台另起一套 UI**：BoardUI 免费层（vendor 源码）+ Tailwind v4 + React Aria Components，后台树内不引 antd
-- 图像生成：仅真实模型通道（OpenAI 兼容 / 火山方舟 / MiniMax）；无可用线路时任务失败 `42204` 并退款，不生成伪结果
-- 视频生成：MiniMax 四段式异步，同样只走模型通道（未配通道时如实标注不可用）
+- 模型层：渠道 → 渠道模型（含价格档）→ 前台模型 revision / 线路 → 路由与冷却 → 任务执行 → 账单退款，唯一实现在 `backend/src/model/**`
+- 协议：内置插件声明（`backend/plugins/**`，107 个可用包 / 115 个 provider），代码里没有手写协议；图像 / 文本同步，视频异步轮询
+- 图像生成：仅真实模型线路；无可用线路时任务失败 `42204` 并退款，不生成伪结果
+- 视频生成：按插件声明的异步契约轮询取产物，同样只走模型线路（未配线路时如实标注不可用）
 - Jimp 1.6 仅用于上传图片校验、尺寸探测与 AIGC 角标合成，不承担任何图像生成
 
 > **本文定位**：只写现状——页面结构、能力清单、目录、启动、接口与环境约束。代码与本文冲突时以代码为准，并顺手改本文。
 
 **配套文档**：
-`CLAUDE.md`（目录树、能力与通道约束速查）｜
+`CLAUDE.md`（目录树、能力与模型层约束速查）｜
 `docs/README.md`（需求 / 产品 / 技术 / 测试 / 规划五类地图）｜
 `docs/api-contract.md`（响应信封、错误码、接口全表）｜
 `docs/environments.md`（三环境变量与门禁）｜
-`docs/model-architecture.md`（通道分层与协议矩阵）｜
+`docs/model-architecture.md`（渠道/前台模型/路由/计费）｜
 `docs/testing.md`（测试分层、闸口清单与覆盖矩阵）｜
 `docs/development-workflow.md`（交付流程与证据标准）。
 
@@ -34,11 +36,11 @@
 | 区域 | 内容 |
 | --- | --- |
 | 顶部导航 | 品牌｜首页｜电商生图▾｜AI修图▾｜AI视频▾｜我的作品｜购买套餐｜邀请有奖｜联系客服｜算力位｜用户菜单。「联系客服」直达 `/tickets?type=consultation&compose=1`；未登录点「登录/注册」唤起登录弹窗，不跳页 |
-| 侧边能力轨 | 宽度随视口在 176px 横排 / 100px 垂直轨之间切换（≤900px 收起为汉堡抽屉）；条目含 24×24 图标 + 能力名；hover 弹出预览卡（`radius 16px`，`shadow 0 10px 24px rgba(35,39,74,.16)`），显示该能力最近一次真实产出，无产出时显示一句话说明 |
-| 营销首页 `/` | 七段结构：hero（双层渐变 + 40px/500 `#171A2B` 标题）/ 业务场景 3 卡 / 修图工具 8 入口 / 套餐与加油包（真实价目 4 卡 + 加油包 tab）/ 优秀案例（7 tab × 16 图网格）/ 产品特性 / 页脚。全站免鉴权、无侧栏；资源自托管于 `public/landing/`；能力入口按可见性口径过滤 |
+| 侧边能力轨 | 宽度随视口在 176px 横排 / 100px 垂直轨之间切换（≤900px 收起为汉堡抽屉）；条目含 24×24 图标 + 能力名；hover 只做高亮，不弹任何浮层 |
+| 营销首页 `/` | 八段结构：首屏（左文案 + 双 CTA + 三条保障，右 2×2 真实产出拼贴）/ 核心场景 3 卡 / 修图工具 8 入口 / 使用流程 3 步 / 优秀案例（7 个分类平铺长式，每类 5 张，无页签，排套餐之前）/ 套餐与积分（真实价目 6 卡 + 加油包 tab 4 卡，全量在 `/packages`）/ 产品特性 / 底部行动区 + 页脚。全站免鉴权、无侧栏；资源自托管于 `public/landing/`；能力入口按可见性口径过滤 |
 | 工作台 `/workbench` | 212px 浅蓝渐变 hero（标题 32px/500 + 副标题 17px `#667085`，右侧真实产出拼贴）+ 12 张工具卡（radius16 / 2:1 缩略图 / 40×40 白底浮图标块 / 免费角标 / 单行省略描述）+ 数据区 3 面板（2:1 双面板 + 通栏创作数据） |
 | 商品主图 `/product-kit` | 上传商品图（≤5 张，点击/拖拽/粘贴）+ 生成设置（名称/品牌/平台/语言）+ 商品描述（AI 分析/放大编辑）+ 自定义配置（白底/场景/卖点/其他四类计数，按计数批量生成）+ 高级设置（比例 8 项 / 画质）+ 渐变提交；右侧结果网格 |
-| 商品详情 `/product-detail` | 上传 + 生成设置 + 商品描述 + 包含模块（多选，16 选 ≤10，已选 N/10）+ 高级设置（仅画质）；按模块选择渲染详情长图 |
+| 商品详情 `/product-detail` | 上传 + 生成设置 + 商品描述 + 包含模块（多选，16 选 ≤10，已选 N/10）+ 高级设置（仅画质）；**一次提交按模块拆成 N 张独立版块图**（按张计费，每张 10 积分，勾 N 个模块扣 N×10）。右侧为「功能示例 / 创作结果」双页签：功能示例展示「素材 → 分区版块」；创作结果**一次生成占一行**（行头日期 + 提示词，行内第一格是原图并标商品名称，之后每格一张模块图并标模块名称，生成中显示占位、失败标注失败模块）；已有产出或刚提交时自动落在创作结果 |
 | 爆款复刻 `/viral-clone` | 上传商品图（≤5 张）+ 上传参考图（≤1 张）+ 生成设置（名称/品牌选填/平台/语言）+ 复刻要求（文本域 ≤1000 字）+ 复刻程度（参考风格/高度复刻）+ 高级设置；商品图、参考图与要求一起进入模型提示词 |
 | 自由创作 `/free-creation` | 上传参考图（≤4 张选填，缩略图 80×80 + 排序箭头）+ 创作提示词（必填，AI 润色/图片转提示词，≤4000 字，框高随左栏撑满）+ 高级设置；右侧结果栏按每行 3/4/5/6 张展示本页成功产出，点缩略图开整屏查看器（缩放、拖拽、翻页、下载、右键菜单） |
 | 多图融合 `/multi-image-fusion` | 两步流：场景网关（15 场景 2 组：表面附着 7 + 空间摆放 8）→ 工作区（主体图 1 张 + 搭配图 1-5 张 + AI 分析 + 变体张数 + 高级设置）；结果联络图 + 重新生成/一键下载 |
@@ -67,16 +69,16 @@
 
 能力清单只在后端 `src/capabilities/definitions/<id>.ts` 逐项声明，由 `capability.registry.ts` 门面聚合，通过 `GET /api/v1/capabilities` 下发给前端；侧栏、卡片、表单、统计分布全部由这份数据渲染，新增能力不需要改前端。
 
-当前 16 项全部 `real`，0 `mock` / 0 `planned`。新任务产出恒来自模型通道（`task.provider='gateway'`）；`local` 只表示历史产出。能力当前能否提交看 `runtime.effective`，不靠 `mode` 猜。
+当前 16 项全部 `real`，0 `mock` / 0 `planned`。新任务产出恒来自模型线路（`task.provider='gateway'`）；`local` 只表示历史产出。能力当前能否提交看 `runtime.effective`，不靠 `mode` 猜。
 
-**入口可见性口径**（`frontend/src/lib/capabilities.ts` 的 `isCapabilityVisible()`）：`planned` 与运营下线的能力（`runtime.effective === 'disabled'`）从顶导 / 侧栏 / 工作台 / 首页案例页签 / 站点地图一并隐藏；`unavailable`（代码已实现、但此刻无可用通道）保留入口，页面内说明原因并只拦截已登录用户的提交——访客点击仍走登录流程。
+**入口可见性口径**（`frontend/src/lib/capabilities.ts` 的 `isCapabilityVisible()`）：`planned` 与运营下线的能力（`runtime.effective === 'disabled'`）从顶导 / 侧栏 / 工作台 / 首页案例页签 / 站点地图一并隐藏；`unavailable`（代码已实现、但此刻没有配到可用前台模型）保留入口，页面内说明原因并只拦截已登录用户的提交——访客点击仍走登录流程。
 
 | 分组 | 能力 | 实现程度 | 模态 | 默认积分 | 工作台 | 说明 |
 | --- | --- | --- | --- | ---: | --- | --- |
 | 电商生图 | 商品主图 | real | image | 10 | 是 | 商品图 + 名称/品牌/平台/语言/描述/四类变体计数/比例/画质 |
-| | 商品详情图 | real | image | 10 | 是 | 名称/品牌/平台/语言/描述/包含模块 16 选 ≤10/SKU/画质 |
+| | 商品详情图 | real | image | 10（每张；一次提交勾 N 个模块扣 N×10） | 是 | 名称/品牌/平台/语言/描述/包含模块 16 选 ≤10/SKU/画质 |
 | | 爆款复刻 | real | image | 10 | 是 | 名称/品牌选填/平台/语言/复刻要求/复刻程度/比例/画质 |
-| | 创意生图 | real | image | 10 | 是 | 提示词 + 比例；必须配图像通道 |
+| | 创意生图 | real | image | 10 | 是 | 提示词 + 比例；必须配图像线路 |
 | | 多图融合 | real | image | 40 | 否 | 场景 15 项/变体张数/比例/画质；主体与搭配图交给模型融合 |
 | | 商品SKU图 | real | image | 0 | 否 | 模板图 + 最多 3 个框选区域 + SKU 名称/颜色；按行批量提交 |
 | AI修图 | 局部重绘 | real | image | 5 | 是 | 画布涂抹遮罩 / 6 位置兜底 / 描述 / 比例 / 画质 |
@@ -88,7 +90,7 @@
 | | 商品换色 | real | image | 5 | 是 | 商品颜色 6 项含自定义 HEX |
 | | 旋转角度 | real | image | 5 | 是 | yaw -90..90 / pitch -30..60 / zoom 0.8..1.2 |
 | AI视频 | 自由创作 | real | image | 10 | 否 | 参考图 0~4 张 + 创作提示词 + 比例 / 画质 |
-| | 图生视频 | real | video | 20 | 否 | MiniMax 四段式异步；未配视频通道时 `unavailable` |
+| | 图生视频 | real | video | 20 | 否 | 四段式异步轮询；未配视频线路时 `unavailable` |
 
 `creditCost` 是代码默认值，运行时一律经 `CreditPriceService.resolve()` 取生效价（后台可调，限时活动可为 0）。页面展示的消耗数与实际扣费一致。
 
@@ -107,19 +109,23 @@ aigc-creation/
 ├── docker-compose.production.yml # 生产单机编排（自动建表 / 健康探针 / 持久卷）
 ├── test/                       # 零依赖仿真模型网关（本地联调与失败注入）
 ├── backend/                    # NestJS 服务，端口 4100（测试档同端口），全局前缀 /api/v1
-│   ├── prisma/schema.prisma    # 43 个模型；SQLite 无 enum，状态类字段 String + DTO 白名单
+│   ├── prisma/schema.prisma    # 57 个模型；SQLite 无 enum，状态类字段 String + DTO 白名单
 │   ├── prisma.config.ts        # Prisma 7 连接配置（datasource url 移出 schema，按 NODE_ENV 选档）
-│   ├── scripts/                # seed-* / smoke-*（21 个）/ verify-* / probe / db-url
+│   ├── plugins/                # ★ 协议插件 107 个（manifest.json；不执行包内代码）
+│   ├── plugins-installed/      # 后台上传安装的插件（运行期产物，不入库）
+│   ├── scripts/                # seed-* / smoke-*（20 个）/ verify-*（16 个）/ probe / db-url
 │   ├── src/
 │   │   ├── capabilities/       # ★ 能力唯一事实源（definitions/<id>.ts → registry → GET /capabilities）
-│   │   ├── providers/          # ★ 模态 × 协议 × 厂商（modality / unified / vendors / protocols）
-│   │   ├── generate/           # 任务创建、轮询、扣费与失败退款
+│   │   ├── model/              # ★ 模型层唯一实现：channels / catalog / routing / intent / protocol
+│   │   │                       #   tasks / billing / user-groups / plugins / proxy / media
+│   │   ├── generate/           # 建任务入口与任务查询（实现落在 model/tasks）
 │   │   ├── admin/              # 后台：权限点 / 审计 / 调度 / 备份 / 对账 / 各管理 controller
 │   │   ├── auth/ account/ legal/ aigc-label/ notifications/ tickets/
 │   │   ├── credits/ orders/ payments/ invoices/ membership/ marketing/ products/
 │   │   ├── common/             # JWT 守卫 / 限流 / 签名 URL / AIGC 标识 / 文件日志 / 请求追踪 / CSV
 │   │   ├── config/             # 三环境档位（env-files.ts）+ 启动期校验（ENV_SPECS）
 │   │   └── health/ channels/ storage/ stats/ projects/ assets/ prompt-tools/ mobile-upload/
+│   │                           # ↑ channels 是通知出口（sms / email），不是模型渠道
 │   ├── uploads/{original,generated}/   # 静态服务 GET /uploads/*（UPLOAD_DIR 可改）
 │   └── dev.db                  # 开发库（test.db / 生产库各自独立）
 └── frontend/                   # Vite SPA，端口 5100（测试档同端口）
@@ -127,10 +133,10 @@ aigc-creation/
     ├── vitest.config.ts        # 单元 / 组件测试（jsdom，`npm test`）
     └── src/
         ├── **/__tests__/       # Vitest 用例（*.test.ts / *.test.tsx）
-        ├── pages/              # 35 个 C 端页面 + pages/admin/ 30 个后台页面
+        ├── pages/              # 35 个 C 端页面 + pages/admin/ 35 个后台页面
         ├── admin-ui/           # 后台 UI：shell（单栏外壳）/ primitives / controls / widgets / providers / lib
         ├── vendor/boardui/     # BoardUI 免费层源码（MIT，保持上游原样，见 PROVENANCE.md）
-        ├── components/         # AppLayout / SideRail / RailPreview / ToolShell；admin/（共享控件入口、adminNav、AlertCenter、DutyBand、statusMeta）
+        ├── components/         # AppLayout / SideRail / ToolShell；admin/（共享控件入口、adminNav、AlertCenter、DutyBand、statusMeta）
         ├── lib/                # api.ts（拆信封）/ http.ts / auth.ts / capabilities.ts / constants.ts
         ├── context/ hooks/     # AuthContext / AdminContext（权限点）/ CreditsContext；useToolTask 等
         └── styles/             # global.css（★ 设计令牌）+ boardui.css（后台 Tailwind 入口，无 preflight）
@@ -311,15 +317,23 @@ node scripts/verify-deps.js --quiet   # 仅输出结论，有致命问题则 exi
 
 ## 接入真实模型
 
-模型接入是配置，不是改代码：
+模型接入是**配置，不是改代码**。整条链路只有一套：渠道 → 渠道模型（含价格档）→ 前台模型 revision / 线路，
+实现在 `backend/src/model/**`，协议来自 `backend/plugins/` 的内置插件（107 个可用包）。设计与排障见 `docs/model-architecture.md`。
 
-1. 后台 `/admin/model-config` 新增线路（选厂商自动填基址 / 协议 / 推荐模型，令牌手填），或按模态配置 `GATEWAY_{IMAGE,TEXT,VIDEO}_*` 环境变量。优先级：环境变量 > 后台 DB > 代码默认。
-2. 同模态多线路按 `priority` 升序做主备；失败记一笔并试下一条，连续失败达阈值熔断冷却（`channel-scheduler.ts`）。
-3. 生效范围看 `GET /capabilities` 的 `runtime.effective`：有可用模型线路为 `remote`，否则为 `unavailable`；不出现 `effective='local'`。
+1. 后台「渠道工作台」`/admin/channels` 新建渠道（基址只填根域，不要带 `/v1`），加渠道模型时协议选
+   **provider id**（如 `openai-image` / `chat-completion` / `minimax-video`），再配价格档。
+2. 后台「前台模型」`/admin/logical-models` 建模型并挂线路（优先级 + 权重）。高优先级层只要还有可用线路，
+   低优先级不分流；同层按权重随机。保存即发布新 revision，可用 `simulate` 验证一组参数落到哪条线路。
+3. 后台「用户分组」`/admin/user-groups` 控制哪些渠道对哪些用户可见，以及倍率与货币换算。
 
-失败策略统一为「显式失败 + 退款」：无可用线路 `42204`，线路全部失败 `42201`，遮罩任务没有支持 edits 的线路 `42205`；文本返回 502、视频如实失败。任何模态都不回落本地算法，也不编造产出。
+生效范围看 `GET /api/v1/capabilities` 的 `runtime.effective`：该能力配到了可用线路为 `remote`，否则 `unavailable`。
+**零配置 = 没有可用线路**，不存在任何内置默认线路，也不回落本地算法。
 
-`mode` 只表示代码实现程度（`real` / `planned`），与单次请求无关——新任务的 `task.provider` 恒为 `gateway`；建任务初值 `pending`。
+失败策略统一为「显式失败 + 退款」：无可用线路 `42204`，有线路但全部 `rejected_no_job` `42201`，
+遮罩任务没有支持 edits 的线路 `42205`；超时 / 5xx / 连接中断判结果不明 `42206`（**不切线、不自动退款**，
+账单停 `uncertain` 等人工核对）。文本工具无可用线路返回 502，不拼接模板文案。
+
+`mode` 只表示代码实现程度（`real` / `planned`），与单次请求无关——新任务的 `task.provider` 恒为 `gateway`，建任务初值 `queued`。
 
 **本地联调：仿真模型网关**（`test/`，零依赖）——没有真实凭据时用它把渠道配置测通：
 
@@ -327,7 +341,9 @@ node scripts/verify-deps.js --quiet   # 仅输出结论，有致命问题则 exi
 cd test && node server.js     # http://127.0.0.1:3900
 ```
 
-文本协议填 `openai-chat` / 模型 `gpt-4o`，图像填 `openai` / 模型 `gpt-image-2`（或 `minimax` / `image-01`），视频填 `minimax-video` / 模型 `MiniMax-Hailuo-2.3`；基址只填根域，不要带 `/v1`。产物是真实 PNG 与可解码 MP4（内容为仿真画面），支持 `[[fail]]` / `[[401]]` / `[[429]]` 失败注入。详见 `test/README.md`。
+渠道基址填 `http://127.0.0.1:3900`；文本选协议 `chat-completion` / 模型 `gpt-4o`，图像选 `openai-image` /
+模型 `gpt-image-2`（或 `minimax-image` / `image-01`），视频选 `minimax-video` / 模型 `MiniMax-Hailuo-2.3`。
+产物是真实 PNG 与可解码 MP4（内容为仿真画面），支持 `[[fail]]` / `[[401]]` / `[[429]]` 失败注入。详见 `test/README.md`。
 
 ## 工具页规格
 
@@ -352,7 +368,7 @@ cd test && node server.js     # http://127.0.0.1:3900
 | product-sku | 模板图卡（≤1 张，从素材库导入 + 手机上传 + 模板图上拖拽框选最多 3 个区域）+ 使用步骤卡（4 步）+ SKU 行编辑器（名称/颜色）按行批量提交 N 个任务，框选坐标与 SKU 信息进入模型提示词 |
 | local-redraw | 画布涂抹导出遮罩 PNG，最多 3 个区域并逐区填写描述/参考图；必须配支持 edits 的图像线路，无线路 `42204`、无编辑协议 `42205`，均退款 |
 | background-remove | 背景颜色卡 7 项：透明底（棋盘格，默认）/ 白 / 浅蓝 rgb(130,206,243) / 蓝 rgb(57,136,233) / 红 rgb(255,11,34) / 深红 rgb(168,0,27) / 自定义；背景色与透明底要求进入模型参数 |
-| watermark-remove | 上传 + 处理方式（自动识别 / 指定区域 + 五宫格位置）；区域遮罩与处理方式进入模型参数，通道不支持遮罩时 `42205` 并退款 |
+| watermark-remove | 上传 + 处理方式（自动识别 / 指定区域 + 五宫格位置）；区域遮罩与处理方式进入模型参数，线路不支持遮罩时 `42205` 并退款 |
 | product-retouch | 精修模式 6 项（综合精修默认 / 质感增强 / 瑕疵修复 / 色彩校正 / 提升清晰度 / 材质强化）+ 补充要求 ≤200 字；模式与要求映射为模型提示词 |
 | image-translate | 目标语言 select 10 项（zh-CN 默认）+ 保护商品主体开关（默认开）；目标语言与开关进入模型提示词 |
 | image-expand | 原图占比（100/80/60/50 + 1-99% 自由输入，默认 80）+ 原图位置九宫格（居中默认）；占比与位置作为参数和提示词发送给模型 |

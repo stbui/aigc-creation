@@ -104,13 +104,17 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
   {
     name: '模型',
     items: [
-      {
-        path: '/admin/model-config',
-        label: '模型配置',
-        permission: 'model.config_read',
-      },
-      { path: '/admin/model-calls', label: '调用记录', permission: 'model.call_read' },
+      // 供应侧 → 产品侧 → 运营侧：先配渠道，再把能力暴露成前台模型，最后按人群与账单核对
+      { path: '/admin/channels', label: '渠道工作台', short: '渠道', permission: 'channel.read' },
+      { path: '/admin/logical-models', label: '前台模型', short: '前台', permission: 'logical_model.read' },
+      { path: '/admin/user-groups', label: '用户分组', short: '分组', permission: 'user_group.read' },
+      { path: '/admin/plugins', label: '插件', permission: 'plugin.read' },
       { path: '/admin/capabilities', label: '能力管控', short: '管控', permission: 'capability.read' },
+      { path: '/admin/model-calls', label: '调用记录', permission: 'model.call_read' },
+      // 「调用记录」与「生成账单」前两字不同，折叠态沿用默认取字
+      { path: '/admin/billing-orders', label: '生成账单', permission: 'billing_order.read' },
+      // 运营侧：账单口径的财务汇总（实收只算已结算，挂账单列）
+      { path: '/admin/finance', label: '财务分析', short: '财务', permission: 'model.analytics_read' },
     ],
   },
   {

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcryptjs';
 import { AppError } from '../common/app.exception';
 import { PrismaService } from '../prisma/prisma.service';
+import { microcreditsToCredits, projectEntry } from '../credits/credit.service';
 import { AccountLifecycleService } from './account-lifecycle.service';
 
 /** 与注册/重置保持一致的成本因子，否则同一账号的哈希强度会漂移 */
@@ -161,8 +162,10 @@ export class AccountService {
             paidAt: true,
           },
         }),
+        // 批次与流水在库里是 BigInt 微积分，导出前必须投影成积分口径，
+        // 否则 `JSON.stringify` 会在 BigInt 上直接抛错（导出接口 500）
         this.prisma.creditLot.findMany({ where: { userId } }),
-        this.prisma.creditLedger.findMany({
+        this.prisma.creditLedgerEntry.findMany({
           where: { userId },
           orderBy: { createdAt: 'desc' },
           take: 2000,
@@ -184,7 +187,18 @@ export class AccountService {
       assets,
       tasks,
       orders,
-      credits: { lots: credits, ledger },
+      credits: {
+        lots: credits.map((lot) => ({
+          id: lot.id,
+          source: lot.source,
+          orderId: lot.orderId,
+          totalCredits: microcreditsToCredits(lot.totalMicrocredits),
+          remainingCredits: microcreditsToCredits(lot.remainingMicrocredits),
+          expireAt: lot.expireAt,
+          createdAt: lot.createdAt,
+        })),
+        ledger: ledger.map(projectEntry),
+      },
       memberships,
       consents,
       notifications,

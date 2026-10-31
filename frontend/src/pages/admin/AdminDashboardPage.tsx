@@ -16,7 +16,7 @@ import { PageHeader } from '../../components/admin/PageHeader';
 import { AdminStaleError, useAdminResource } from '../../components/admin/AdminWidgets';
 import { DutyChannelTower, duration, earliestFailure } from '../../components/admin/DutyBand';
 import { AdminDutyProvider, useDuty, type DutyTask } from '../../components/admin/DutyContext';
-import { toAbsoluteUrl } from '../../lib/api';
+import { assetThumbUrl } from '../../lib/api';
 import { taskErrorLabel } from '../../lib/admin-error-codes';
 import { adminOrderDetailHref, adminTaskHref } from '../../lib/admin-links';
 import { Button } from '../../vendor/boardui/components/base/buttons/button';
@@ -59,13 +59,35 @@ const AdminSchedulerPage = lazyAdminPage(
   () => import('./AdminSchedulerPage'),
   'AdminSchedulerPage',
 );
-const AdminModelConfigPage = lazyAdminPage(
-  () => import('./AdminModelConfigPage'),
-  'AdminModelConfigPage',
-);
 const AdminModelCallsPage = lazyAdminPage(
   () => import('./AdminModelCallsPage'),
   'AdminModelCallsPage',
+);
+// 新模型层后台六页（P5）：渠道工作台 / 前台模型 / 用户分组 / 插件 / 调用记录 / 账单
+const AdminChannelsPage = lazyAdminPage(
+  () => import('./AdminChannelsPage'),
+  'AdminChannelsPage',
+);
+const AdminLogicalModelsPage = lazyAdminPage(
+  () => import('./AdminLogicalModelsPage'),
+  'AdminLogicalModelsPage',
+);
+const AdminUserGroupsPage = lazyAdminPage(
+  () => import('./AdminUserGroupsPage'),
+  'AdminUserGroupsPage',
+);
+const AdminPluginsPage = lazyAdminPage(
+  () => import('./AdminPluginsPage'),
+  'AdminPluginsPage',
+);
+const AdminBillingOrdersPage = lazyAdminPage(
+  () => import('./AdminBillingOrdersPage'),
+  'AdminBillingOrdersPage',
+);
+// P6 运营页：按账单口径的财务分析
+const AdminFinancePage = lazyAdminPage(
+  () => import('./AdminFinancePage'),
+  'AdminFinancePage',
 );
 const AdminCapabilitiesPage = lazyAdminPage(
   () => import('./AdminCapabilitiesPage'),
@@ -262,9 +284,9 @@ function DashboardContent() {
                   : '读取中…'
             }
             action={
-              !isFinance && can('model.config_read') ? (
-                <Link className="text-accent-600 hover:underline" to="/admin/model-config">
-                  模型配置
+              !isFinance && can('channel.read') ? (
+                <Link className="text-accent-600 hover:underline" to="/admin/channels">
+                  渠道工作台
                 </Link>
               ) : undefined
             }
@@ -654,7 +676,7 @@ function OutputStrip({ tasks }: { tasks: DutyTask[] }) {
           >
             <img
               className="block size-full object-cover transition-transform duration-300 group-hover:scale-105"
-              src={toAbsoluteUrl(t.thumbnailUrl!)}
+              src={assetThumbUrl(t.thumbnailUrl, 320)}
               alt=""
               loading="lazy"
             />
@@ -1092,8 +1114,13 @@ export function AdminShell() {
               <Route path="campaigns" element={<AdminCampaignsPage />} />
               <Route path="marketing-rules" element={<AdminMarketingRulesPage />} />
               <Route path="scheduler" element={<AdminSchedulerPage />} />
-              {/* 模型配置与调用记录 (2026-10-20) */}
-              <Route path="model-config" element={<AdminModelConfigPage />} />
+              {/* 新模型层 (P5)：渠道 → 前台模型 → 分组 → 插件 → 调用记录 → 账单 */}
+              <Route path="channels" element={<AdminChannelsPage />} />
+              <Route path="logical-models" element={<AdminLogicalModelsPage />} />
+              <Route path="user-groups" element={<AdminUserGroupsPage />} />
+              <Route path="plugins" element={<AdminPluginsPage />} />
+              <Route path="billing-orders" element={<AdminBillingOrdersPage />} />
+              <Route path="finance" element={<AdminFinancePage />} />
               <Route path="model-calls" element={<AdminModelCallsPage />} />
               {/* 能力管控 (B6): 单项能力上下线 */}
               <Route path="capabilities" element={<AdminCapabilitiesPage />} />

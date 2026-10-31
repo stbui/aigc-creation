@@ -186,14 +186,14 @@ Body
 
 ## 4. 页面原型
 
-30 个页面归为四类。同一类共享布局，只变列与操作，新增页面照原型走。
+35 个页面归为四类。同一类共享布局，只变列与操作，新增页面照原型走。
 
 | 原型 | 页面 | 结构 |
 | --- | --- | --- |
 | 看板页 | 平台概览 | 指标卡栅格 + 趋势图 + 交易概览 + 最近任务列表 |
 | 告警页 | 告警中心 | 级别统计卡 + 级别筛选 + 告警卡片列表 + 口径说明 |
 | 列表页 | 用户 / 素材 / 任务 / 工单 / 订单 / 积分 / 优惠券 / 活动 / 邀请与签到 / 商品 / 能力消耗价 / 发票 / 对账 / 操作审计 / 调用记录 / 数据备份 | 页头 → 筛选条 → 批量条（可选）→ 表格 → 分页；行操作走抽屉或确认弹窗 |
-| 配置页 | 系统设置 / 存储配置 / AI 标识 / 角色权限 / 能力管控 / 模型配置 / 定时任务 / 保留期清理 / 法务文档 / 站内消息 | 分区表单或页签；底部署固定操作条（保存 / 重置） |
+| 配置页 | 系统设置 / 存储配置 / AI 标识 / 角色权限 / 能力管控 / 渠道工作台 / 前台模型 / 用户分组 / 定时任务 / 保留期清理 / 法务文档 / 站内消息 | 分区表单或页签；底部署固定操作条（保存 / 重置），渠道与前台模型用列表 + 抽屉 |
 | 只读诊断页 | 支付渠道 | 状态卡分组 + 风险告警条 + 说明文本，无写入控件 |
 
 ### 4.1 各页特殊约定
@@ -201,7 +201,8 @@ Body
 | 页面 | 约定 |
 | --- | --- |
 | 平台概览 | 主指标卡用 `is-primary`；成功率无流水时显示「—」而非 0%；积压数字超阈值用 `is-warn` |
-| 模型配置 | antd `Tabs`（线路管理 / 可用模型 / 逐能力路由 / 全局设置）+ `Table` + `Drawer` 编辑 + `Segmented`；线路按模态分组，健康状态用 `StatusTag` |
+| 渠道工作台 | `DataTable` + `Drawer`：渠道列表 → 渠道模型抽屉（模态 / 协议 / 权重 / 优先级 / 价格档）；健康列用 `StatusTag`，连通性测试在抽屉内发起 |
+| 前台模型 | `DataTable` + `Drawer`：模型 → revision → 线路三段；`simulate` 结果在抽屉内展开，不跳页 |
 | AI 标识 | 左编辑、右预览两栏；上层是 CSS 还原的角标外观，下层是 Canvas 按服务端几何规则画在示例底图上的效果；关闭态预览显示「可见角标已关闭」而非空白；顶部开关配法律风险提示 |
 | 能力管控 | 16 行能力表，下架必须填原因（表单内联校验，不是弹窗里的单行输入） |
 | 支付渠道 | 三类风险（真实通道缺凭据 / 生产走沙箱 / 未配回调基址）用 `--warn-bg` 提示条，文案写清后果 |
@@ -246,7 +247,7 @@ Body
 
 | 项 | 现状（2026-10-30 代码） |
 | --- | --- |
-| 后台页面 | 30 页 / 16,666 行（`frontend/src/pages/admin`） |
+| 后台页面 | 迁移基线 30 页 / 16,666 行（`frontend/src/pages/admin`）；模型组随后新增 5 页，现共 35 页 |
 | antd 依赖面 | 迁移前基线：44 个文件 `from 'antd'`、约 171 处 `message.*`、29 处 `<Table>`、13 处 Drawer、17 处 Form、49 处 Select、30 处 Tag、24 处 Tooltip、11 处 Card、20 处 Alert、32 处 `App.useApp()`。**迁移后**：`pages/admin` + `components/admin` + `admin-ui` 三个目录 `from 'antd'` 均为 **0**；全仓仍有 48 个文件引 antd，全部在 C 端 |
 | BoardUI 免费层缺口 | 无通用 Drawer / Toast / Confirm / Form / Card / Empty / Skeleton / Result / Descriptions / Steps，需先建约 10 个基础件 |
 | 测试 | 后台组件单测、共享 `StateViews` 单测、Playwright admin e2e，选择器需重写 |
@@ -260,7 +261,7 @@ Body
   - `providers/`：Toast、Confirm、Direction（zh-CN）、light-only theme。
   - `shell/`：`AdminBoardLayout`，复用 `AdminShell` 鉴权链与路由表；单栏结构（导航 + 内容），不含值班带。
   - `primitives/`：BoardUI 缺的 Drawer / Toast / Confirm / Card / Empty / Skeleton / Result / Descriptions / Steps / FormField；DataTable / Pagination / FilterBar 适配层。
-  - `pages/`：30 页的页面级布局与业务编排；控件全部取自 `primitives/controls/widgets`，页面内不再出现 `adm-*` 类。
+  - `pages/`：35 页的页面级布局与业务编排（迁移期 30 页，模型组随后新增 5 页）；控件全部取自 `primitives/controls/widgets`，页面内不再出现 `adm-*` 类。
 - `frontend/src/styles/boardui.css`：只导入 `tailwindcss/theme.css` + `tailwindcss/utilities.css`，**不导入 preflight**；`@source` 指向 `admin-ui` / `pages/admin` / `components/admin` / `vendor/boardui`（`utilities.css` 用 `source(none)` 关掉自动探测，四个目录缺一个，该目录的工具类就不生成且构建不报错）；`--color-accent-*` 重映射品牌紫 `#5546d8`；不导入 `.dark`。只在 admin 入口 chunk 加载，C 端不下载。三条非显然的约定：
   - **`* { border: 0 solid }` 必须是全局规则，不能收进 `.bui-admin`**：Tailwind 的边框工具类只写宽度，样式靠 preflight；而抽屉 / 弹层 / Toast 渲染在 `body` 的 portal 里，收进作用域会让浮层独自丢掉所有边线，且只在打开弹层时才看得见。宽度为 0 的边框本来不渲染，对现有样式无副作用；global.css 未分层，冲突时仍以它为准。
   - **portal 浮层根节点要挂 `.bui-scope`**：它只带字体与控件重置、不带底色。`bui-scope` 与 `.bui-admin` 的区别是后者还会上页面底色，挂到遮罩上会把半透明遮罩刷成实色。
@@ -291,8 +292,8 @@ Body
 - **反馈**：约 171 处 `message.*` → `toast`；`Modal.confirm` / `ConfirmAction` → `confirm()`；32 处 `App.useApp()` 移除；以 grep 闸口保证 admin 内 `message.` 清零。
 - **图标**：BoardUI 的 Remix 图标换 lucide 等价图标，保持一套 16px/1.5 图标语言；若保留 Remix，只限 vendor 内部。
 - **值班带**：不保留（2026-10-30 决策）。外壳改为 BoardUI 单栏结构；`.adm-band-*` 样式已删除，`DutyBand.tsx` **保留**（概览首屏的值班塔 `.adm-tower*` 与 `duration` / `earliestFailure` 格式化工具仍从这里导出）。信息面不跟着丢，按以下三条改挂：
-  - 100 根产出刻度 + 四个计数（任务模式为排队 / 异常 / 线路冷却；财务模式为待付 / 退款 / 发票 / 对账）+「接手最早异常」主动作 → 概览页首屏（`admin-ui/widgets/DutyStrip.tsx`）。`DutyContext` 数据层保留，轮询从「外壳常驻」改为「只挂在概览路由」，其余 28 页不再陪着每 30 秒拉一次任务列表。
-  - 其余 28 页不再常驻这条带；异常提醒由侧栏告警铃承担。
+  - 100 根产出刻度 + 四个计数（任务模式为排队 / 异常 / 线路冷却；财务模式为待付 / 退款 / 发票 / 对账）+「接手最早异常」主动作 → 概览页首屏（`admin-ui/widgets/DutyStrip.tsx`）。`DutyContext` 数据层保留，轮询从「外壳常驻」改为「只挂在概览路由」，其余 34 页不再陪着每 30 秒拉一次任务列表。
+  - 其余 34 页不再常驻这条带；异常提醒由侧栏告警铃承担。
   - 环境标识、密度切换、用户菜单在侧栏底部（`AdminBoardLayout.tsx` 的 sider 尾部）。
 - **权限/审计**：`AdminGuard` / `PermissionGuard` / `AuditInterceptor` 不动；高危动作的原因输入与审计编号逐页保留。
 - **视觉方向**：原「值班台」方向卡（`.oil-ui`）已删除，不再另立方向卡；C 的后台视觉即 BoardUI 免费层默认语言 + 品牌紫 `#5546d8` 重映射，以 §7.3 的 `boardui.css` 为唯一落点。
@@ -366,7 +367,7 @@ Body
 | 表单控件 | `admin-ui/controls/`：`TextInput`（allowClear / 回车提交 / `showCount` / `disabled` / `type=date\|datetime-local`）、`SelectBox`（React Aria Select 包成 `string \| undefined` + 「全部」哨兵；**必须渲染静态 `SelectItem` 元素**，vendor 的 `Select.children` 收 `ReactNode`，传 `(item) => …` 渲染函数会被当普通子节点交给 Provider，React 每帧报 function-as-child）、`NumberInput`（含步进）、`TextArea`（含计数与 `disabled`）、`SwitchBox`（把 RAC 的 `isSelected` 收成 `checked`）、`SegmentedBox`（分段切换，单选不可空）、`CheckBox`（含半选）、`FilePick`（只选文件不发请求，选完再点导入）、`HoverTip`（可聚焦的说明气泡） |
 | 全局件挂载 | `admin-ui/providers/AdminUIProvider` 统一挂 Toast + Confirm，在 `AdminShell`（`AdminDashboardPage` 内导出）里包住全部 `/admin/*` 路由；两个 Provider 只在真正弹提示 / 确认时才渲染 portal |
 | 状态语义映射 | `components/admin/statusMeta.ts`：`STATUS_META` 唯一事实源 |
-| 值班条 | `admin-ui/widgets/DutyStrip.tsx`：100 刻度 + 四计数 + 「接手最早异常」，落在概览首屏；`DutyContext` 从外壳移到概览路由，其余 28 页不再轮询 |
+| 值班条 | `admin-ui/widgets/DutyStrip.tsx`：100 刻度 + 四计数 + 「接手最早异常」，落在概览首屏；`DutyContext` 从外壳移到概览路由，其余 34 页不再轮询 |
 | 密度 | `admin-ui/lib/density.ts` 的 `DensityContext`：外壳左栏底部开关写 `localStorage`，`AdminDataTable` 读它决定行高（`h-9` / `h-11`）；表格仍可用 `density` prop 覆盖 |
 | 测试锚点 | 共享控件与页面关键节点统一挂 `data-testid="admin-*"`（`admin-filter` / `admin-filter-chip` / `admin-table` / `admin-table-row` / `admin-table-expanded` / `admin-drawer` / `admin-modal` / `admin-confirm-action` / `admin-toast` / `admin-sider` / `admin-panel` / `admin-bulk-bar` / `admin-asset-cell` / `admin-storage-card` / `admin-task-row`）；表单控件用 `aria-label` 而非 `id`，e2e 一律 `getByLabel` / `getByTestId`，不追 Tailwind 工具类 |
 | 旧样式清理 | `global.css` 的 `.adm-*`：364 条选择器 → 30 条（外壳骨架 `adm-layout` / `adm-content` / `adm-skip-link`、值班塔 `adm-tower*` / `adm-dot` / `adm-empty-inline`、限宽令牌 `--adm-page-max`）。同时删掉只服务 antd 后台的 4 个令牌（`--brand-bg-tint` / `--brand-border-soft` / `--info-text` / `--info-border`）与 3 个无人引用的 `@keyframes` |

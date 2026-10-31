@@ -4,11 +4,11 @@
  * 守住四条承诺:
  *   1. 无会员用户完全不受影响 (免费档权益 = 兜底权益)
  *   2. 并发上限: 超限拒绝建任务, 且不扣费
- *   3. 加油包 95 折: 会员有折扣, 买会员本身不吃折扣
+ *   3. 加油包折扣: 会员有折扣 (按套餐权益), 买会员本身不吃折扣
  *   4. 权益快照: 运营改套餐不影响存量会员
  */
 /**
- * 接口与库都可覆盖 —— 与 smoke-model-channels.js 同一套约定。
+ * 接口与库都可覆盖 —— 与 smoke-admin.js 同一套约定。
  *   API_BASE        后端地址 (默认 http://127.0.0.1:4100)
  *   NODE_ENV        决定连哪个库 (走 scripts/db-url.js, 与后端同源)
  *   ADMIN_EMAIL / ADMIN_PASSWORD  后台账号 (development/test 使用统一预设)
@@ -20,6 +20,7 @@ const BASE = (process.env.API_BASE || 'http://127.0.0.1:4100').replace(/\/$/, ''
 const { PrismaClient } = require('@prisma/client');
 const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
 const { resolveDbUrl } = require('./db-url');
+const { clearCredits } = require('./credit-fixture');
 const prisma = new PrismaClient({ adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }) });
 const { email: ADMIN_EMAIL, password: ADMIN_PASSWORD } = require('./admin-credentials').getAdminCredentials();
 
@@ -133,8 +134,12 @@ function check(name, ok, detail = '') {
   const me1 = await call('GET', '/membership/me', T);
   check('已是会员', me1.data?.isMember === true, `${me1.data?.planName}`);
   check('快速通道已解锁', me1.data?.perks?.fastChannel === true);
-  check('并发上限生效', me1.data?.perks?.maxConcurrent === 5, `上限 ${me1.data?.perks?.maxConcurrent}`);
-  check('加油包 95 折生效', me1.data?.perks?.addonDiscountBps === 9500);
+  // 断言对套餐自身声明取值: 档位配额与折扣会随运营调整, 写死 5 / 9500 会让用例随调价失效
+  const proPerks = JSON.parse(pro.perks || '{}');
+  check('并发上限生效', me1.data?.perks?.maxConcurrent === proPerks.maxConcurrent,
+    `上限 ${me1.data?.perks?.maxConcurrent} (套餐声明 ${proPerks.maxConcurrent})`);
+  check('套餐折扣生效', me1.data?.perks?.addonDiscountBps === proPerks.addonDiscountBps,
+    `${me1.data?.perks?.addonDiscountBps} bps`);
 
   console.log('\n【订阅积分发放】');
   const bal = await call('GET', '/credits/balance', T);
@@ -181,8 +186,8 @@ function check(name, ok, detail = '') {
   const finalCents = order.data?.totalCents;
   check('订单金额已打折', finalCents < originalCents,
     `原价 ¥${originalCents / 100} → 会员价 ¥${finalCents / 100}`);
-  check('折扣符合 95 折', finalCents === Math.round(originalCents * 0.95),
-    `${finalCents} 分 = ${(finalCents / originalCents * 100).toFixed(1)}%`);
+  check('折扣符合套餐权益', finalCents === Math.round(originalCents * proPerks.addonDiscountBps / 10000),
+    `${finalCents} 分 = ${(finalCents / originalCents * 100).toFixed(1)}% (套餐 ${proPerks.addonDiscountBps} bps)`);
 
   console.log('\n【折扣不适用于订阅本身】');
   const { applyDiscount } = require('../dist/membership/membership.service');
@@ -205,7 +210,8 @@ function check(name, ok, detail = '') {
       data: { perks: JSON.stringify({ fastChannel: false, maxConcurrent: 99, addonDiscountBps: 5000 }) },
     });
     const me2 = await call('GET', '/membership/me', T);
-    check('存量会员权益不变', me2.data?.perks?.maxConcurrent === 5 && me2.data?.perks?.fastChannel === true,
+    check('存量会员权益不变',
+      me2.data?.perks?.maxConcurrent === proPerks.maxConcurrent && me2.data?.perks?.fastChannel === true,
       `并发仍 ${me2.data?.perks?.maxConcurrent} (套餐已改为 99)`);
 
     // 新开通的用户才用新权益
@@ -265,9 +271,8 @@ function check(name, ok, detail = '') {
 
   // 清理
   const uids = user2 ? [user.id, user2.id] : [user.id];
+  await clearCredits(prisma, { in: uids });
   await prisma.$transaction([
-    prisma.creditLedger.deleteMany({ where: { userId: { in: uids } } }),
-    prisma.creditLot.deleteMany({ where: { userId: { in: uids } } }),
     prisma.generationTask.deleteMany({ where: { ownerId: { in: uids } } }),
     prisma.membershipUsage.deleteMany({ where: { userId: { in: uids } } }),
     prisma.membership.deleteMany({ where: { userId: { in: uids } } }),

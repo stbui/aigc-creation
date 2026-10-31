@@ -1,6 +1,6 @@
-import { lazy, Suspense, useEffect, useMemo, useState, type ComponentType } from 'react';
+import { lazy, Suspense, type ComponentType } from 'react';
 import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider } from './context/AuthContext';
 import { AdminProvider } from './context/AdminContext';
 import { CreditsProvider } from './context/CreditsContext';
 import { AppLayout } from './components/AppLayout';
@@ -10,9 +10,7 @@ import { ExceptionPage, NotFoundPage } from './components/ExceptionPage';
 import { RouteExperience } from './components/RouteExperience';
 import { useCapabilities } from './hooks/useCapabilities';
 import { StateLoading } from './components/StateViews';
-import { statsApi, toAbsoluteUrl } from './lib/api';
 import { registerRoutePreload } from './lib/routePreload';
-import type { StatsOverview } from './types/api';
 
 /**
  * 2026-10-19「路由对外开放」: 移除 RequireAuth 包裹 —— 未登录用户可直接浏览
@@ -68,7 +66,7 @@ const SitemapPage = lazyRoute('/sitemap.html', () => import('./pages/SitemapPage
 const LegalPage = lazyRoute('/legal/*', () => import('./pages/LegalPage'), 'LegalPage');
 const WorkbenchPage = lazyRoute('/workbench', () => import('./pages/WorkbenchPage'), 'WorkbenchPage');
 const ProductKitPage = lazyRoute('/product-kit', () => import('./pages/ProductKitPage'), 'ProductKitPage');
-const ProductDetailPage = lazyRoute('/product-detail', () => import('./pages/ProductDetailPage'), 'ProductDetailPage');
+const ProductDetailPage = lazyRoute('/product-detail', () => import('./pages/product-detail'), 'ProductDetailPage');
 const ViralClonePage = lazyRoute('/viral-clone', () => import('./pages/ViralClonePage'), 'ViralClonePage');
 const FreeCreationPage = lazyRoute('/free-creation', () => import('./pages/FreeCreationPage'), 'FreeCreationPage');
 const MobileUploadPage = lazyRoute('/mobile-upload', () => import('./pages/MobileUploadPage'), 'MobileUploadPage');
@@ -122,49 +120,13 @@ function RouteFallback() {
 }
 
 function Shell() {
-  const { token } = useAuth();
   const { data, loading, error } = useCapabilities();
-  // 侧栏 hover 预览图与角标数量都来自真实的统计数据
-  const [stats, setStats] = useState<StatsOverview | null>(null);
   const location = useLocation();
   // 营销首页 / 站点索引 / 法务页走独立全宽外壳 (无侧栏), 与参考站一致
   const isBare =
     location.pathname === '/' ||
     location.pathname.startsWith('/sitemap.html') ||
     location.pathname.startsWith('/legal/');
-
-  useEffect(() => {
-    // 无侧栏的裸页面不消费统计 (侧栏预览/作品数), 无需发起这次请求
-    if (isBare) return;
-    // guest 不发: 统计接口需鉴权, 未登录时侧栏预览/作品数天然为空 (路由已对外开放)
-    if (!token) {
-      setStats(null);
-      return;
-    }
-    let alive = true;
-    statsApi
-      .overview()
-      .then((s) => {
-        if (alive) setStats(s);
-      })
-      .catch((e: unknown) => {
-        // 不静默吞错: 侧栏预览/作品数会退化为空态, 但失败原因必须可见
-        console.warn('[shell] 统计数据加载失败, 侧栏预览与作品数回退为空', e);
-        if (alive) setStats(null);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [isBare, token]); // token 变化 = 登录成功/退出, 此时重新拉取统计
-
-  const thumbs = useMemo(() => {
-    const map: Record<string, string | null> = {};
-    for (const b of stats?.byCapability ?? []) {
-      // 必须转绝对地址: sourceUrl 是 /uploads/... 相对路径, 渲染到别的容器/站点时会解析到错误的主机
-      map[b.capability] = toAbsoluteUrl(b.thumbnailUrl) ?? null;
-    }
-    return map;
-  }, [stats]);
 
   if (isBare) {
     return (
@@ -407,7 +369,7 @@ function Shell() {
     );
 
   return (
-    <AppLayout groups={groups} items={items} thumbs={thumbs}>
+    <AppLayout groups={groups} items={items}>
       {content}
     </AppLayout>
   );

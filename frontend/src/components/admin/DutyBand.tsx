@@ -19,10 +19,11 @@ import { isCooling, useDuty, type DutyChannel, type DutyTask } from './DutyConte
  * 那份实现随 P4 一并删除，本模块只留下仍在被消费的纯函数。
  */
 
-const MODALITY_LABEL: Record<string, string> = {
+const CAPABILITY_LABEL: Record<string, string> = {
   image: '文生图',
   text: '文生文',
   video: '文生视频',
+  audio: '音频',
 };
 
 /**
@@ -69,10 +70,10 @@ export function DutyChannelTower({ limit = 3 }: { limit?: number }) {
               className={`adm-dot${coolingNow ? ' is-warn' : !c.enabled ? ' is-off' : !c.protocolKnown ? ' is-warn' : ' is-ok'}`}
               aria-hidden="true"
             />
-            <span className="adm-tower-name" title={c.name}>
+            <span className="adm-tower-name" title={`${c.channelName} · ${c.name}`}>
               {c.name}
             </span>
-            <span className="adm-tower-modality">{MODALITY_LABEL[c.modality] ?? c.modality}</span>
+            <span className="adm-tower-modality">{CAPABILITY_LABEL[c.modality] ?? c.modality}</span>
             <span className="adm-tower-state">
               {coolingNow
                 ? `冷却 ${countdown(remaining)}`
@@ -92,7 +93,7 @@ export function DutyChannelTower({ limit = 3 }: { limit?: number }) {
       })}
       {channels.length > limit && (
         <li className="adm-tower-more">
-          <Link to="/admin/model-config">还有 {channels.length - limit} 条线路</Link>
+          <Link to="/admin/channels">还有 {channels.length - limit} 条线路</Link>
         </li>
       )}
     </ul>

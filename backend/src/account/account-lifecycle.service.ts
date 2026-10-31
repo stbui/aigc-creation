@@ -46,9 +46,9 @@ export class AccountLifecycleService {
    *   · 「作品、素材与积分将被清除」 → 删任务、素材、项目、积分批次（含文件）；
    *   · 「订单、支付与积分流水会以匿名化形式保留」 → 资金相关记录与积分流水保留。
    *
-   * 两条承诺在这里相遇：积分流水必须留，积分批次必须删。流水上的 `lotId`
-   * 指向批次，故先断开引用再删批次 —— 余额永远从批次推导，批次清空即余额归零，
-   * 而"某笔积分当初发过多少、用在哪里"的流水证据仍在。
+   * 两条承诺在这里相遇：积分流水必须留，积分批次必须删。余额永远从批次推导，
+   * 批次清空即余额归零，而"某笔积分当初发过多少、用在哪里"的流水证据仍在
+   * （流水不引用批次，只引用账单 / 充值订单）。
    */
   async softDelete(userId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -66,9 +66,16 @@ export class AccountLifecycleService {
       await tx.asset.deleteMany({ where: { ownerId: userId } });
       await tx.project.deleteMany({ where: { ownerId: userId } });
 
-      // 积分：先断开流水对批次的引用（流水保留），再删批次
-      await tx.creditLedger.updateMany({ where: { userId }, data: { lotId: null } });
+      /*
+       * 积分：批次必须删（注销承诺「积分清零」），流水必须留（资金证据）。
+       * 流水只通过 billingOrderId / paymentOrderId 关联，不引用批次；
+       * 批次一删，可用余额的推导来源就没了，因此账户行也一并删除 ——
+       * 留着它只会是一个与批次不再相等的孤儿余额。
+       */
+      const lotIds = await tx.creditLot.findMany({ where: { userId }, select: { id: true } });
+      await tx.creditReservationItem.deleteMany({ where: { lotId: { in: lotIds.map((lot) => lot.id) } } });
       await tx.creditLot.deleteMany({ where: { userId } });
+      await tx.creditAccount.deleteMany({ where: { userId } });
 
       /*
        * 会员必须在同一次注销里终止。

@@ -4,6 +4,8 @@ import {
 } from '@nestjs/platform-express';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { NextFunction, Request, Response } from 'express';
+import * as express from 'express';
 import { join, resolve } from 'path';
 import * as fs from 'fs';
 import { AppModule } from './app.module';
@@ -13,6 +15,8 @@ import { buildCorsAllowList } from './common/cors-allow-list';
 import { AppFileLogger } from './common/logger/file-logger';
 import { requestContextMiddleware } from './common/request-context';
 import { createSignedAssetMiddleware } from './common/signed-asset.middleware';
+import { createAssetThumbnailMiddleware } from './assets/asset-thumbnail.middleware';
+import { isProxyRequestPath } from './model/proxy/proxy.paths';
 
 function flattenValidationErrors(errors: any[]): string {
   for (const error of errors) {
@@ -31,17 +35,51 @@ async function bootstrap(): Promise<void> {
   // bufferLogs: DI 初始化期间的启动日志先缓存, 待 useLogger 换成落盘logger后
   // 一次性 flush —— 否则那批最关键的「谁在启动时失败了」会丢在默认 logger 里
   //
-  // rawBody: 支付渠道回调必须基于**原始报文字节**验签 (微信 v3 的签名串里
-  // 直接拼 body 字节)。用 JSON.stringify(parsed) 重新序列化会因为键顺序、
-  // 空格、数字格式的差异得到不同字节, 表现为「签名永远验不过」。
+  // bodyParser: false —— 请求体解析改为下方自行注册, 以便**跳过中转路径**:
+  // 中转要原样转发数 MB 的 JSON (多模态 messages 内嵌 base64), 内置解析器的
+  // 100KB 上限会在业务代码之前直接 413。解析器与 rawBody 的语义保持与 Nest
+  // 默认完全一致 (同一个 express.json / urlencoded + verify 挂 rawBody)。
+  //
+  // rawBody 仍然必须保留: 支付渠道回调要基于**原始报文字节**验签 (微信 v3 的
+  // 签名串里直接拼 body 字节)。用 JSON.stringify(parsed) 重新序列化会因为键
+  // 顺序、空格、数字格式的差异得到不同字节, 表现为「签名永远验不过」。
   // 该选项不会影响上传: multipart 由 multer 处理, 与 bodyParser 无关。
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     bufferLogs: true,
-    rawBody: true,
+    bodyParser: false,
   });
   const config = app.get(ConfigService);
   const logger = app.get(AppFileLogger);
   app.useLogger(logger);
+  const apiPrefix = config.get<string>('app.prefix') ?? 'api/v1';
+
+  /*
+   * 请求体解析。默认行为与 Nest 内置一致 (json + urlencoded, 各 100KB,
+   * `req.rawBody` 为原始字节); 唯一例外是**中转路径完全不解析** ——
+   * 由 `readProxyBody` 按 `MODEL_PROXY_*` 的上限自行读取原始流。
+   *
+   * 判定必须与短路径中转控制器共用同一份保留前缀清单 (`isProxyRequestPath`),
+   * 否则会出现「路由认为是中转、解析器认为是业务接口」的错位: 请求体被
+   * 100KB 卡死, 或者被解析成对象后再也拿不到原始字节。
+   */
+  const captureRawBody = (req: Request, _res: Response, buf: Buffer) => {
+    if (buf?.length) (req as Request & { rawBody?: Buffer }).rawBody = Buffer.from(buf);
+  };
+  const jsonParser = express.json({ limit: '100kb', verify: captureRawBody });
+  const urlencodedParser = express.urlencoded({ extended: true, limit: '100kb', verify: captureRawBody });
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (isProxyRequestPath(req.path, apiPrefix)) {
+      next();
+      return;
+    }
+    jsonParser(req, res, (error?: unknown) => {
+      if (error) {
+        next(error);
+        return;
+      }
+      urlencodedParser(req, res, next);
+    });
+  });
 
   /*
    * 请求上下文必须最先注册: 它开 AsyncLocalStorage, 后续任何中间件、
@@ -70,7 +108,7 @@ async function bootstrap(): Promise<void> {
 
   // 全局路由前缀: 前端 constants.ts API_PREFIX = '/api/v1'
   // (静态资源 /uploads/* 是 Express 中间件, 不受此前缀影响)
-  app.setGlobalPrefix(config.get<string>('app.prefix') ?? 'api/v1');
+  app.setGlobalPrefix(apiPrefix);
 
   // CORS: 来源由 buildCorsAllowList 决定 (CORS_ORIGINS 显式白名单优先,
   // 默认放行本机 5100, 私有网段需显式开启) —— 见 src/common/cors-allow-list.ts
@@ -85,7 +123,21 @@ async function bootstrap(): Promise<void> {
      * 而本地同源开发 (Vite 代理) 一切正常 —— 典型的只在部署后复现的缺陷。
      */
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    /*
+     * x-canvas-* 是自定义渠道中转的对外契约（上游地址 / 格式 / 密钥 / 附加头），
+     * x-idempotency-key 用于重放同一笔调用 —— 浏览器侧 SDK 直接调用时必须能
+     * 通过预检，否则只在跨域部署下失败。常量定义见 `model/proxy/proxy.constants.ts`。
+     */
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Canvas-Upstream-URL',
+      'X-Canvas-Upstream-Format',
+      'X-Canvas-Upstream-Key',
+      'X-Canvas-Headers',
+      'X-Canvas-Scene',
+      'X-Idempotency-Key',
+    ],
   });
 
   /*
@@ -94,6 +146,12 @@ async function bootstrap(): Promise<void> {
    * ASSET_SIGNING_SECRET 为空时该中间件直接放行（保持原有公开行为）。
    */
   app.use(createSignedAssetMiddleware(config.get<string>('asset.signingSecret') ?? ''));
+
+  /*
+   * 缩略图中间件同样必须在静态服务之前: 带 `?w=` 的请求若先被静态命中,
+   * 拿到的还是原图。未带参数 / 非图片时它直接放行, 回落静态服务。
+   */
+  app.use(createAssetThumbnailMiddleware(uploadsDir));
 
   // 静态服务: GET /uploads/* 直接返回图片
   app.useStaticAssets(uploadsDir, { prefix: '/uploads' });

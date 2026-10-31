@@ -31,9 +31,16 @@
     "smoke:marketing": "node scripts/smoke-marketing.js",
     "seed:legal": "ts-node -T scripts/seed-legal.ts",
     "seed:messages": "ts-node -T scripts/seed-message-templates.ts",
+    "verify:billing": "ts-node -T scripts/verify-billing.ts",
     "verify:credits": "ts-node -T scripts/verify-credit-deduction.ts",
     "verify:credit-price": "ts-node -T scripts/verify-credit-price.ts",
-    "verify:tool-contracts": "ts-node -T scripts/verify-tool-contracts.ts"
+    "verify:tool-contracts": "ts-node -T scripts/verify-tool-contracts.ts",
+    "verify:plugin-manifests": "ts-node -T scripts/verify-plugin-manifests.ts",
+    "verify:model-consistency": "ts-node -T scripts/verify-model-consistency.ts",
+    "verify:channel-flow": "ts-node -T scripts/verify-channel-flow.ts",
+    "verify:protocol-runtime": "ts-node -T scripts/verify-protocol-runtime.ts",
+    "verify:route-catalog": "ts-node -T scripts/verify-route-catalog.ts",
+    "verify:task-runtime": "ts-node -T scripts/verify-task-runtime.ts"
   },
   "dependencies": {
     "@nestjs/common": "12.1.3",

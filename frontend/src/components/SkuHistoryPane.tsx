@@ -2,6 +2,7 @@ import { useContext, useEffect, useRef, useState } from 'react';
 import { Spin } from 'antd';
 import { ChevronRight, ChevronUp, Download, Eye, History, Pencil, Trash2 } from 'lucide-react';
 import { ToolTrailingContext } from './ToolShell';
+import { assetThumbUrl } from '../lib/api';
 import { groupContainsTask, type SkuBatchGroup } from '../lib/skuBatches';
 
 const PAGE_SIZE = 10;
@@ -79,7 +80,7 @@ function HistoryList({
               onClick={() => onOpen(group)}
             >
               {cover?.url ? (
-                <img src={cover.url} alt={`${name}历史结果`} loading="lazy" />
+                <img src={assetThumbUrl(cover.url, 320) ?? cover.url} alt={`${name}历史结果`} loading="lazy" />
               ) : (
                 <span className="product-sku-thumb-placeholder" />
               )}

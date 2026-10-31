@@ -38,7 +38,8 @@ const TICK_COLOR: Record<DutyTask['status'], string> = {
   succeeded: 'bg-neutral-300',
   failed: 'bg-rose-500',
   running: 'bg-accent-500',
-  pending: 'bg-amber-400',
+  queued: 'bg-amber-400',
+  cancelled: 'bg-neutral-200',
 };
 
 const MODE_LABEL: Record<string, string> = {

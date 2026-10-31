@@ -1,7 +1,8 @@
 import { useContext, useEffect, useRef, useState } from 'react';
 import { App, Drawer, Spin } from 'antd';
 import { ChevronUp, Download, History, ImageOff, Maximize2, RefreshCw } from 'lucide-react';
-import { assetSrc, generateApi } from '../lib/api';
+import { assetSrc, assetThumbSrc, generateApi } from '../lib/api';
+import { loadModels, modelsSync } from '../lib/models';
 import { useAuth } from '../context/AuthContext';
 import { ImageLightbox } from './ImageLightbox';
 import { ToolTrailingContext } from './ToolShell';
@@ -104,6 +105,15 @@ export function ToolHistoryGrid({
     .filter((item) => item.url);
   const previewIndex = previewUrl ? previewItems.findIndex((item) => item.url === previewUrl) : -1;
 
+  /**
+   * 历史卡上如实标出「用了哪个模型、扣了多少积分」。
+   *
+   * 只显示前台模型名，不显示渠道 / 上游：渠道是实现细节，用户买的是产品；
+   * 但价格必须对照任务快照（`task.creditCost`），不按当前价重算 —— 改价后
+   * 历史记录回看时金额会与当时扣费不一致，那是最难解释的一类客诉。
+   */
+  const modelNames = useModelNames();
+
   const reuse = async (task: ToolHistoryTask) => {
     if (!trailing?.reuseTask || reusingRef.current) return;
     reusingRef.current = true;
@@ -140,7 +150,9 @@ export function ToolHistoryGrid({
         ) : (
           <div className="redraw-history-grid">
             {tasks.map((task) => {
-              const src = assetSrc(task.outputAsset) ?? '';
+              const fullSrc = assetSrc(task.outputAsset) ?? '';
+              // 卡片只显示缩略图; 预览器 / 复用下载仍用完整地址
+              const src = assetThumbSrc(task.outputAsset, 480) ?? fullSrc;
               const busy = reusingId === task.id;
               const extension =
                 (task.outputAsset?.format || 'png')
@@ -150,13 +162,13 @@ export function ToolHistoryGrid({
                   .replace(/\+.*$/, '') || 'png';
               return (
                 <article key={task.id} className="redraw-history-card tool-history-card">
-                  {src ? (
+                  {fullSrc ? (
                     <button
                       type="button"
                       className="tool-history-preview"
                       aria-label="预览历史结果"
                       title="预览"
-                      onClick={() => setPreviewUrl(src)}
+                      onClick={() => setPreviewUrl(fullSrc)}
                     >
                       <img src={src} alt="历史生成结果" loading="lazy" />
                       <span className="tool-history-preview-icon" aria-hidden="true">
@@ -169,8 +181,25 @@ export function ToolHistoryGrid({
                     </div>
                   )}
                   <div className="tool-history-meta">
-                    <span>{task.createdAt ? new Date(task.createdAt).toLocaleString() : '已生成'}</span>
-                    {src && (
+                    <span>
+                      {task.createdAt ? new Date(task.createdAt).toLocaleString() : '已生成'}
+                    </span>
+                    <span
+                      style={{ display: 'block', fontSize: 11, color: 'var(--text-desc)' }}
+                      title="按任务创建时的价格快照，不随改价变化"
+                    >
+                      {[
+                        task.logicalModelId ? modelNames.get(task.logicalModelId) || '自定义模型' : '',
+                        typeof task.creditCost === 'number'
+                          ? task.creditCost === 0
+                            ? '限时免费'
+                            : `${task.creditCost} 积分`
+                          : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
+                    {fullSrc && (
                       <span className="tool-history-meta-actions">
                         {trailing?.reuseTask && (
                           <button
@@ -185,7 +214,7 @@ export function ToolHistoryGrid({
                           </button>
                         )}
                         <a
-                          href={src}
+                          href={fullSrc}
                           download={`history-${task.id.slice(-6)}.${extension}`}
                           target="_blank"
                           rel="noreferrer"
@@ -291,4 +320,30 @@ export function ToolHistoryPane({
       </Drawer>
     </>
   );
+}
+
+/**
+ * 前台模型 id → 名称。
+ *
+ * 历史任务只存 id；名称取自目录（5s 短 TTL，已加载时同步可用，不闪空）。
+ * 目录拉取失败时保留空 Map —— 卡片回落显示「自定义模型」，不阻塞历史列表。
+ */
+function useModelNames(): Map<string, string> {
+  const [names, setNames] = useState<Map<string, string>>(
+    () => new Map(modelsSync().map((model) => [model.id, model.name])),
+  );
+
+  useEffect(() => {
+    let alive = true;
+    void loadModels()
+      .then((list) => {
+        if (alive) setNames(new Map(list.map((model) => [model.id, model.name])));
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  return names;
 }

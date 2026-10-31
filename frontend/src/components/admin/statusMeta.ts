@@ -33,7 +33,7 @@ export const STATUS_META: Record<string, { label: string; tone: TagTone }> = {
   succeeded: { label: '已完成', tone: 'success' },
   failed: { label: '失败', tone: 'danger' },
   running: { label: '进行中', tone: 'brand' },
-  pending: { label: '等待', tone: 'warn' },
+  queued: { label: '排队中', tone: 'warn' },
   cancelled: { label: '已取消', tone: 'muted' },
   // 账号状态 (后端 Prisma User.status)
   active: { label: '正常', tone: 'success' },
@@ -44,9 +44,9 @@ export const STATUS_META: Record<string, { label: string; tone: TagTone }> = {
   admin: { label: '管理员', tone: 'brand' },
   operator: { label: '运营', tone: 'success' },
   finance: { label: '财务', tone: 'success' },
-  // 订单状态。`pending` 与任务状态共用同一个键，订单页通过
-  // <StatusTag label="待支付"> 覆盖文案 —— 改这里的 label 会连带把任务页的
-  // “等待”也改掉。
+  // 订单状态。任务状态改用 `queued` 后，`pending` 只服务订单与发票，
+  // 两页都通过 <StatusTag label="待支付/待开具"> 覆盖文案。
+  pending: { label: '等待', tone: 'warn' },
   paid: { label: '已支付', tone: 'success' },
   refunded: { label: '已退款', tone: 'danger' },
   partial_refunded: { label: '部分退款', tone: 'warn' },

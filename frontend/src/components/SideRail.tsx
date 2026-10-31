@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useId, useMemo, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   BarChart3,
@@ -19,7 +19,6 @@ import {
   Wand2,
   type LucideIcon,
 } from 'lucide-react';
-import { RailPreview } from './RailPreview';
 import type { CapabilityDef, CapabilityGroup } from '../types/api';
 import { isCapabilityVisible, toolPath } from '../lib/capabilities';
 
@@ -34,8 +33,8 @@ import { isCapabilityVisible, toolPath } from '../lib/capabilities';
  *   - ≤1366px：100px 垂直轨，条目 77×60、10px 标签、分组标题 24px；
  *   - ≤900px：本地保留抽屉导航（参考站在 ≤768px 才隐藏侧栏，差异见文档）。
  *
- * 本地保留的真实差异：图生视频入口、数据看板入口、hover 预览优先使用用户最近产出；
- * 没有用户产出时回退到与参考站一致的演示图。
+ * 本地保留的真实差异：图生视频入口、数据看板入口。
+ * 侧栏不提供 hover 提示 / 预览 —— 悬停属导航行为，任何浮层都会遮挡主区。
  */
 
 const SIDEBAR_GROUP_ORDER = ['ai_video', 'ecommerce_gen', 'ai_retouch'];
@@ -90,22 +89,6 @@ const SIDEBAR_ICONS: Record<string, string> = {
   rotate: '/menu/m_jdxz.svg',
 };
 
-/** hover 预览图：参考站桌面端使用 `/static/work/*.webp`，本地已随工作台资产下载。 */
-const SIDEBAR_PREVIEWS: Record<string, string> = {
-  main_image: '/workbench/spzt.webp',
-  detail_image: '/workbench/spxq.webp',
-  hot_remake: '/workbench/bkfk.webp',
-  creative_image: '/workbench/cyst.webp',
-  local_redraw: '/workbench/jbch.webp',
-  matting: '/workbench/bjxc.webp',
-  remove_watermark: '/workbench/qcsy.webp',
-  enhance: '/workbench/cpjx.webp',
-  image_translate: '/workbench/tpfy.webp',
-  expand: '/workbench/znkt.webp',
-  recolor: '/workbench/sphs.webp',
-  rotate: '/workbench/xzjd.webp',
-};
-
 const ICONS: Record<string, LucideIcon> = {
   main_image: LayoutGrid,
   detail_image: LayoutPanelLeft,
@@ -131,13 +114,11 @@ export function CapabilityIcon({ id, size = 16 }: { id: string; size?: number })
 interface Props {
   groups: CapabilityGroup[];
   items: CapabilityDef[];
-  /** 每项能力最近一次成功产出；作为 hover 预览优先图。 */
-  thumbs: Record<string, string | null>;
   activePath: string;
   onNavigate?: (to: string) => void;
 }
 
-export function SideRail({ groups, items, thumbs, activePath, onNavigate }: Props) {
+export function SideRail({ groups, items, activePath, onNavigate }: Props) {
   const uid = useId();
   const location = useLocation();
   const activeLocation = `${location.pathname}${location.search}`;
@@ -180,7 +161,6 @@ export function SideRail({ groups, items, thumbs, activePath, onNavigate }: Prop
       cap={cap}
       label={SIDEBAR_LABELS[cap.id] ?? cap.name}
       iconSrc={SIDEBAR_ICONS[cap.id]}
-      previewImage={thumbs[cap.id] ?? SIDEBAR_PREVIEWS[cap.id] ?? null}
       active={toolIsActive(cap.id)}
       onNavigate={onNavigate}
     />
@@ -308,7 +288,6 @@ function SideMenuItem({
   active,
   onNavigate,
   cap,
-  previewImage,
 }: {
   to?: string;
   label: string;
@@ -317,10 +296,7 @@ function SideMenuItem({
   active: boolean;
   onNavigate?: (to: string) => void;
   cap?: CapabilityDef;
-  previewImage?: string | null;
 }) {
-  const [open, setOpen] = useState(false);
-  const anchorRef = useRef<HTMLDivElement>(null);
   const planned = cap?.mode === 'planned';
   const path = to ?? (planned ? '#' : toolPath(cap!.id));
   const glyph = iconSrc ? <img src={iconSrc} alt="" /> : icon ?? <CapabilityIcon id={cap!.id} size={20} />;
@@ -337,46 +313,21 @@ function SideMenuItem({
     </>
   );
 
-  return (
-    <div
-      ref={anchorRef}
-      className="side-menu-btn-wrap"
-      onMouseEnter={() => cap && setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-      onFocus={() => cap && setOpen(true)}
-      onBlur={() => setOpen(false)}
+  return planned ? (
+    <span
+      className={`workspace-side-menu-btn side-menu-disabled${active ? ' active' : ''}`}
+      aria-disabled
     >
-      {planned ? (
-        <span
-          className={`workspace-side-menu-btn side-menu-disabled${active ? ' active' : ''}`}
-          aria-disabled
-        >
-          {body}
-        </span>
-      ) : (
-        <Link
-          to={path}
-          onClick={() => {
-            // The pointer stays over the rail after SPA navigation, so leaving
-            // the preview open would cover the destination page's form.
-            setOpen(false);
-            onNavigate?.(path);
-          }}
-          className={`workspace-side-menu-btn${active ? ' active' : ''}`}
-          aria-current={active ? 'page' : undefined}
-        >
-          {body}
-        </Link>
-      )}
-
-      {open && anchorRef.current && cap && (
-        <RailPreview
-          anchor={anchorRef.current}
-          title={label}
-          imageUrl={previewImage ?? null}
-          fallbackText={cap.sidebarHint ?? cap.summary}
-        />
-      )}
-    </div>
+      {body}
+    </span>
+  ) : (
+    <Link
+      to={path}
+      onClick={() => onNavigate?.(path)}
+      className={`workspace-side-menu-btn${active ? ' active' : ''}`}
+      aria-current={active ? 'page' : undefined}
+    >
+      {body}
+    </Link>
   );
 }

@@ -99,34 +99,20 @@ export const RUNTIME_LABELS: Record<CapabilityRuntime['effective'], string> = {
 };
 
 /**
- * 取能力的运行时状态；后端未下发时按定义兜底（兼容旧后端 / 旧缓存）。
+ * 取能力的运行时状态；后端未下发时按定义兜底。
  *
- * 兜底刻意保守：没有 runtime 就当作「暂不可用」，不假称云端可用，
- * 也不能让界面承诺一条可能不存在的通道。
+ * 兜底刻意保守：没有 runtime 就当作「暂不可用」，不假称模型线路可用，
+ * 也不能让界面承诺一条可能不存在的线路。
  */
 export function runtimeOf(
   def: Pick<CapabilityDef, 'mode' | 'runtime'>,
 ): CapabilityRuntime {
-  if (def.runtime) {
-    // 旧后端/旧缓存可能仍下发 local；本地生成已删除，必须按不可用处理，
-    // 不能让它绕过提交拦截去执行一条必然失败的任务。
-    if ((def.runtime.effective as string) === 'local') {
-      return {
-        ...def.runtime,
-        localQuality: 'none',
-        effective: 'unavailable',
-        reason: '本地生成已停用，请配置可用的模型通道',
-      };
-    }
-    return def.runtime;
-  }
+  if (def.runtime) return def.runtime;
   return {
     enabled: def.mode !== 'planned',
-    route: 'auto',
     remoteAvailable: false,
-    localQuality: 'none',
     effective: def.mode === 'planned' ? 'disabled' : 'unavailable',
-    reason: '尚未获取模型通道状态，请刷新后重试',
+    reason: '尚未获取模型线路状态，请刷新后重试',
   };
 }
 
@@ -153,3 +139,22 @@ export function taskErrorText(code?: string | null): string {
   if (!code) return '未知错误';
   return TASK_ERROR_TEXT[code] ?? code;
 }
+
+/**
+ * 会员套餐的视觉标签 (仅文案与推荐位, 不含价格 / 积分)。
+ *
+ * 按 `sortOrder` 位置与在售付费档一一对应 —— **刻意不按 code 匹配**:
+ * 套餐编码由后端种子定义, 前端再抄一份 code 等于把后端标识硬编码进来,
+ * 后台改编码时这里会静默错位。价目与权益一律读 `/membership/plans`。
+ *
+ * 当前在售付费档 6 个 (标准 / 进阶 / 专业 / 尊享 / 旗舰 / 至尊)。首页与
+ * 积分商城共用这一份, 避免两个页面各写一套标签后逐渐不一致。
+ */
+export const PLAN_VISUALS: ReadonlyArray<{ tag: string; recommended: boolean }> = [
+  { tag: '入门试用', recommended: false },
+  { tag: '首购推荐', recommended: false },
+  { tag: '最热门', recommended: true },
+  { tag: '团队使用', recommended: false },
+  { tag: '超高算力', recommended: false },
+  { tag: '企业使用', recommended: false },
+];

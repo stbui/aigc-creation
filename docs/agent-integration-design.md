@@ -16,7 +16,7 @@
 1. **Agent 只做规划，不直接执行任意工具。** LLM 输出声明式计划，服务端校验后由 `StepExecutor` 调用既有服务。
 2. **能力清单仍以 `capability.registry.ts` 为唯一事实源。** 新能力自动进入 Agent 可规划范围，不维护第二份能力表。
 3. **生成必须复用 `GenerateService.createTask`。** 扣积分、建任务、路由、回落、退款、AIGC 标识、产出入库全部沿用现有链路。
-4. **LLM 走现有 `TEXT_PROVIDER`。** 不新增 LangChain、OpenAI SDK 或第二套模型客户端；规划调用写 `ModelCallLog`。
+4. **LLM 走现有文本链路。** 不新增 LangChain、OpenAI SDK 或第二套模型客户端：规划调用走 `src/model/text` 的文本工具链路（text 模态渠道模型 → 前台模型线路），每次调用写 `ApiCallLog`（`source='agent'`、`billable=false`）。
 
 `agent/` 目录中的 Codex Web 是**本机研发工具**：它允许受控沙箱内的文件与命令操作，只有单进程内存会话和可选静态 Token，没有货觉账号、项目、积分、素材归属与审计体系。它可以作为交互与 SSE 的实现参考，但不应部署为面向用户的 Agent 服务。
 
@@ -53,7 +53,7 @@
 | 基础 | 现状 | 对 Agent 的价值 |
 | --- | --- | --- |
 | 能力注册表 | `backend/src/capabilities/capability.registry.ts` 聚合 16 项能力，参数、提示词、模态、积分价均自包含 | 直接派生计划目录与校验规则 |
-| 文生文通道 | `TEXT_PROVIDER` / `TextCapabilityRouter` 已支持 OpenAI 兼容 `chat/completions`、多渠道调度和文本调用日志 | 规划不需要新建 LLM 基础设施 |
+| 文生文通道 | `src/model/text` 的 `TextToolService` 走 text 模态渠道模型（OpenAI 兼容 `chat/completions` 等协议），多候选依次尝试并写 `ApiCallLog` | 规划不需要新建 LLM 基础设施 |
 | 生成任务 | `GenerateService.createTask` 已统一校验、扣费、建任务、路由、回落、退款与入库 | Agent 不再造平行任务体系 |
 | 异步执行 | `GenerationTask` 有心跳、孤儿恢复、失败退款 | Agent 步骤可围绕任务状态做恢复 |
 | 账号与归属 | `JwtAuthGuard`、`Project`、`Asset.ownerId` 均已存在 | 所有查询与写入都可按当前用户强隔离 |
@@ -63,7 +63,7 @@
 
 本方案按以下现状设计，与早期设想不同：
 
-- 文本模型通道已落地（`TEXT_PROVIDER` 与后台模型配置），不需要新建 LLM Provider；应扩展现有 `TextProvider` 的上下文参数与埋点，而不是再造一层。
+- 文本模型通道已落地（`src/model/text` + 后台渠道工作台的 text 模态渠道模型），不需要新建 LLM Provider；应扩展 `TextToolCall` 的上下文参数与埋点，而不是再造一层。
 - 能力 `mode` 只有 `real | planned`，占位实现已删除，Agent 的工具清单必须来自真实能力。
 - 注册表包含视频能力，Agent 规划按 `modality` 分支，不写死「只出图」。
 
@@ -78,7 +78,7 @@ Agent 是**新增入口，不是替代入口**。现有工作台、工具页、�
 | 生成任务 | `POST /generate` | `StepExecutor → GenerateService` | 是，同一 `GenerationTask` |
 | 积分与退款 | `GenerateService` | `GenerateService` | 是，同一账本与退款规则 |
 | 产出 | `Asset` | `Asset` | 是，同时出现在素材库与我的作品 |
-| 上下线/改价 | 后台能力管理与模型配置 | 同一运行时目录 | 是，后台操作对两端同时生效 |
+| 上下线/改价 | 后台能力管控与渠道工作台 | 同一运行时目录 | 是，后台操作对两端同时生效 |
 
 因此不允许出现以下分叉：
 
@@ -157,7 +157,7 @@ Agent 是**新增入口，不是替代入口**。现有工作台、工具页、�
 │  ├─ CatalogService  由 registry 派生目录          │  │
 │  └─ SessionService  会话 / 消息 / 风格锁           │  │
 │                                                 │  │
-│ 复用：TEXT_PROVIDER · GenerateService            │  │
+│ 复用：TextToolService · GenerateService          │  │
 └──────────────────────────┬──────────────────────┘  │
                            │ createTask / 任务查询    │ createTask / 上传
                            └──────────────┬───────────┘
@@ -194,7 +194,7 @@ Agent 的职责只有三件事：
 PlannerService
   ├─ 读取最近 N 条消息
   ├─ 读取 CatalogService 的可用能力目录
-  ├─ 调 TEXT_PROVIDER.generate('agent_plan', ...)
+  ├─ 调 TextToolService.generate({ operation: 'agent_plan', ... })
   └─ 解析为 PlanDraft
         │
         ▼
@@ -669,14 +669,12 @@ model AgentStep {
 
 同步给 `User`、`Project` 增加反向关系字段即可，不改既有字段含义。
 
-`ModelCallLog` 增加 nullable 字段（历史记录保持 `null`，不回填猜测值）：
+`ApiCallLog` 增加 nullable 字段（历史记录保持 `null`，不回填猜测值）。token 用量已由既有 `inputTokens` / `outputTokens` / `usageAvailable` 承载，不再新增列：
 
 ```prisma
-model ModelCallLog {
+model ApiCallLog {
   // ...既有字段
-  agentRunId        String?
-  promptTokens      Int?
-  completionTokens  Int?
+  agentRunId String?
 
   @@index([agentRunId])
 }
@@ -699,23 +697,24 @@ model ModelCallLog {
 
 ### 10.2 LLM 调用记录
 
-复用 `ModelCallLog` 与 `TextCapabilityRouter` 的日志能力，并补齐以下信息：
+复用 `TextToolService.generate` 的日志能力：每次尝试写一条 `ApiCallLog`（`source='tool'`、`billable=false`），并补齐以下信息：
 
-- 写入既有 `ownerId`：用于按用户核算 Agent 成本。当前 `ImageCallLogger` 未写入该列。
-- 新增 `agentRunId`、`promptTokens`、`completionTokens`：关联规划运行与成本。
+- `TextToolCall.userId` 写入既有 `ApiCallLog.userId`：用于按用户核算 Agent 成本。
+- 新增 `agentRunId` 列：关联规划运行与成本。
+- token 用量直接复用既有 `inputTokens` / `outputTokens` / `usageAvailable`，不新增列。
 
-实现方式建议扩展 `TextProvider.generate` 的可选第四参数：
+实现方式建议扩展 `TextToolCall` 的可选字段：
 
 ```ts
-interface TextCallContext {
-  ownerId?: string;
+interface TextToolCall {
+  operation: string;   // 如 `agent_plan`
+  userId?: string;
   agentRunId?: string;
+  // ...既有 instructions / prompt / messages / images
 }
-
-generate(capability, messages, params, context?: TextCallContext): Promise<TextOutcome>;
 ```
 
-现有调用方不传即可保持行为不变；`TextCapabilityRouter` 将 context 传给 logger，并写 `capability='agent_plan'`、`modality='text'`。
+现有调用方不传 `agentRunId` 即可保持行为不变；`TextToolService` 把 `agentRunId` 原样写进调用记录。
 
 ### 10.3 运行指标
 
@@ -829,7 +828,7 @@ generate(capability, messages, params, context?: TextCallContext): Promise<TextO
 | AG-09 | 越权素材/项目 | 403/404，不泄露存在性 |
 | AG-10 | 前端断线后重进 | 快照状态与后台一致 |
 | AG-11 | 进程重启 | 不重复执行已完成步骤 |
-| AG-12 | 规划调用 | `ModelCallLog` 可按 `agentRunId` 查到模型、耗时、token |
+| AG-12 | 规划调用 | `ApiCallLog` 可按 `agentRunId` 查到模型、耗时、token |
 | AG-13 | 能力覆盖矩阵 | 遍历 `SUBMITTABLE_CAPABILITY_IDS`，每项都能生成可校验的最小计划或显式 handoff |
 | AG-14 | 局部重绘精确涂抹 | 返回 handoff，路由为 `/local-redraw`，不创建任务、不扣积分 |
 | AG-15 | 新增能力 | 只改 `definitions/` 后，目录覆盖测试与 Agent 可规划列表自动更新 |
@@ -839,7 +838,7 @@ generate(capability, messages, params, context?: TextCallContext): Promise<TextO
 
 - 单元测试：`PlanValidator`、`CatalogService`、状态机与条件更新。
 - 覆盖测试：以 `SUBMITTABLE_CAPABILITY_IDS` 为输入逐个生成最小合法计划；任何能力只能在「可执行」或「可 handoff」中二选一，不允许从 Agent 视野消失。
-- 集成测试：假 `TEXT_PROVIDER` + 假生成任务，覆盖规划、确认、失败、重试、恢复。
+- 集成测试：假文本上游 + 假生成任务，覆盖规划、确认、失败、重试、恢复。
 - HTTP 冒烟：`smoke-agent.js`，验证鉴权、幂等、归属与响应形状。
 - 浏览器 E2E：登录 → 建会话 → 发消息 → 确认 → 看到步骤与产出 → 刷新恢复。
 - 回归：原有 `/generate`、`/tasks`、`/capabilities`、`/works` 不受影响。

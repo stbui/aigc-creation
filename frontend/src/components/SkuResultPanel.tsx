@@ -3,6 +3,7 @@ import { Download, ImageIcon, Maximize2, RefreshCw, RotateCcw } from 'lucide-rea
 import { ImageLightbox } from './ImageLightbox';
 import type { TaskStatus } from '../types/api';
 import { taskErrorText } from '../lib/constants';
+import { assetThumbUrl } from '../lib/api';
 
 export interface SkuResultItem {
   id: string;
@@ -114,13 +115,13 @@ export function SkuResultPanel({
       ) : (
         <>
           <div className="product-sku-stage">
-            {!active || active.status === 'pending' || active.status === 'running' ? (
+            {!active || active.status === 'queued' || active.status === 'running' ? (
               <div className="product-sku-generating" aria-live="polite">
                 <span className="product-sku-generating-pulse" aria-hidden="true" />
                 <strong>正在生成 {active?.label ?? 'SKU 图'}…</strong>
                 <span>模型正在保持版式并替换框选区域</span>
               </div>
-            ) : active.status === 'failed' ? (
+            ) : active.status === 'failed' || active.status === 'cancelled' ? (
               <div className="product-sku-generating is-error">
                 <strong>{active.label} 生成失败</strong>
                 <span>{active.errorCode ? taskErrorText(active.errorCode) : '任务未能完成，可重试这一张'}</span>
@@ -174,7 +175,11 @@ export function SkuResultPanel({
                 title={item.label}
                 onClick={() => onActiveChange(item.id)}
               >
-                {item.url ? <img src={item.url} alt="" loading="lazy" /> : <span className="product-sku-thumb-placeholder" />}
+                {item.url ? (
+                  <img src={assetThumbUrl(item.url, 240) ?? item.url} alt="" loading="lazy" />
+                ) : (
+                  <span className="product-sku-thumb-placeholder" />
+                )}
                 <span>{item.label}</span>
               </button>
             ))}

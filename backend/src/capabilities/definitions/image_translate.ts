@@ -9,6 +9,7 @@
  */
 
 import type { CapabilityPlugin } from '../capability-plugin.type';
+import { editImageIntent } from '../model-mapping';
 import { LANGUAGES, QUALITY_OPTIONS } from './param-options';
 
 export const ImageTranslate: CapabilityPlugin = {
@@ -31,6 +32,7 @@ export const ImageTranslate: CapabilityPlugin = {
     `只替换文字内容${p.protectSubject ? '，商品主体像素不得改动' : ''}。` +
     `不得改变画幅、构图、商品与背景，不得新增或删除画面元素。`,
   modality: 'image',
+  model: { capability: 'image', operation: 'image_to_image', intent: editImageIntent },
   inputs: 1,
   inputImageMode: 'edit',
   inWorkbench: true,

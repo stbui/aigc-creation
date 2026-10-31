@@ -73,7 +73,7 @@
 **US-05 产出可追溯（P0）**
 > 每个 Agent 产出的图，我要能看出它用了哪个能力、什么提示词、花了多少积分。
 
-验收：Agent 任务在详情页展示 steps 明细，与 `ModelCallLog` 打通。
+验收：Agent 任务在详情页展示 steps 明细，与 `ApiCallLog` 打通。
 
 **US-06 失败可控（P0）**
 > 中间某步失败（网关挂了），Agent 要能告诉我失败在哪、能否只重跑这一步，而不是整条链路白跑。
@@ -94,10 +94,10 @@
 | F-04 | 参数澄清 | 歧义参数反问用户，可跳过取默认 |
 | F-05 | 风格锁定 | 会话级 style lock，保证多图产出风格一致 |
 | F-06 | 步骤级执行与状态机 | 每个 step 独立状态，失败可单步重跑 |
-| F-07 | 积分计费与退款 | 沿用 `CreditLedger`，Agent 沿用现有 `GenerationTask.creditCost` 语义；失败步自动退款 |
+| F-07 | 积分计费与退款 | 沿用积分钱包（`CreditAccount` / `CreditLot` / `CreditReservationItem`）与 `GenerationTask.creditCost` 快照语义；失败步自动退款 |
 | F-08 | 来源如实标注 | 新任务 `provider` 恒为 `gateway`；无可用模型线路时如实失败并退款，不产出占位结果 |
 | F-09 | 产出入库 | Agent 产出一律落 `Asset` + `GenerationTask`，进「我的作品」 |
-| F-10 | 可观测 | 每次 LLM 调用写 `ModelCallLog`（复用现有表，新增 `channel: 'llm'` 区分） |
+| F-10 | 可观测 | 每次 LLM 调用写 `ApiCallLog`（复用现有表，`source='agent'`、`billable=false`） |
 
 ### 3.2 次期范围（P1）
 
@@ -155,8 +155,8 @@ Agent：▸ ② 完成 → 产出图（真实模型 / 占位效果）
 
 - Agent **本身不额外收费**，只对实际调用的能力扣积分（复用 `GenerationTask.creditCost`）
 - 计划被用户调整后，未执行的步骤不扣费
-- 失败步骤自动退款，写 `CreditLedger`
-- LLM token 成本本期**不向用户计费**，仅通过 `ModelCallLog` 做成本核算
+- 失败步骤自动退款，按 `CreditReservationItem` 原路退回并写 `CreditLedgerEntry`
+- LLM token 成本本期**不向用户计费**，仅通过 `ApiCallLog` 做成本核算
 
 ### 5.2 数据留存
 
@@ -174,7 +174,7 @@ Agent：▸ ② 完成 → 产出图（真实模型 / 占位效果）
 | 降级可用性 | LLM 通道全挂时功能降级但**不报错**，回到表单模式 | 与现有「无线路即失败退款、不伪造产出」口径一致 |
 | 依赖纪律 | **不引入重型 Agent 框架**（LangChain 等），LLM 调用用轻量自研 | 项目依赖树纪律，`npm` 大批量安装会 5 分钟硬超时 |
 | 版本锁定 | 所有新增依赖精确锁版本，无 `^`/`~` | `CLAUDE.md` 技术栈约定 |
-| 可观测 | 每次 LLM 调用落 `ModelCallLog`，含耗时/token/成败/回落原因 | 复用现有表 |
+| 可观测 | 每次 LLM 调用落 `ApiCallLog`，含耗时/token/成败/回落原因 | 复用现有表 |
 | 风格一致 | 同会话 style lock 下产出风格一致（这是工作流编排的核心价值） | — |
 
 ---
@@ -191,7 +191,7 @@ Agent：▸ ② 完成 → 产出图（真实模型 / 占位效果）
 | A-04 | 步骤级失败可单步重跑，已成功步骤不重复扣费 | 断网/断网关场景实测 |
 | A-05 | 无可用模型线路时 Agent 步骤如实失败并退款，不产出占位图 | 停掉通道实测 + 查积分流水 |
 | A-06 | LLM 通道不可用时降级为表单模式，不 5xx、不白屏 | 停掉通道实测 |
-| A-07 | 每次 LLM 调用在 `ModelCallLog` 可查 | 查库 |
+| A-07 | 每次 LLM 调用在 `ApiCallLog` 可查 | 查库 |
 | A-08 | 新增依赖通过 `npm run verify:deps:critical` | 闸口实跑 |
 
 ---
@@ -223,7 +223,7 @@ Agent：▸ ② 完成 → 产出图（真实模型 / 占位效果）
 
 ## 10. 待评审确认项
 
-1. **LLM 通道走哪个服务**：现有 `GATEWAY_BASE_URL` 网关是否提供 LLM（chat/completions）能力？若无，是复用网关还是直连第三方模型 API？
+1. **LLM 通道走哪个模型**：文本工具已走 text 模态渠道模型（后台渠道工作台配置），Agent 复用同一条链路即可；需确认规划用的模型与前台提示词工具是否共用同一个前台模型 / 线路，还是单独建一个逻辑模型做成本隔离。
 2. **token 是否计价**：本期规划不向用户收费，需确认是否符合商业预期。
 3. **会话是否入 `Project`**：建议 Agent 会话挂到 Project 下（复用现有归属模型），需确认。
 4. **P1 优先级**：工作流模板与多智能体协作，先做哪个。

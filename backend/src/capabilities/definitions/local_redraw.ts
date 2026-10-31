@@ -9,6 +9,7 @@
  */
 
 import type { CapabilityPlugin } from '../capability-plugin.type';
+import { editImageIntent } from '../model-mapping';
 import { QUALITY_OPTIONS, RATIOS_WITH_ORIGINAL } from './param-options';
 
 /** 参考图动态描述的合计上限：描述是增强信息，不能挤掉主修改要求。 */
@@ -174,6 +175,7 @@ export const LocalRedraw: CapabilityPlugin = {
     return `局部重绘：只重绘${area}，其余像素保持不变。修改要求：${p.prompt || '按描述局部修改'}${hintText}${p.imageRatio ? `；输出比例 ${p.imageRatio}` : ''}`;
   },
   modality: 'image',
+  model: { capability: 'image', operation: 'image_to_image', intent: editImageIntent },
   inputs: 1,
   inputImageMode: 'edit',
   inWorkbench: true,

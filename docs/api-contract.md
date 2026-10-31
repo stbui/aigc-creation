@@ -28,9 +28,11 @@
 | `40302` | 第三方登录命中的本地账号非 `active` | `auth/oauth/` |
 | `40905` / `40906` / `40907` | 退款：超时间窗 / 超可退比例 / 积分已消耗且扣不回 | `orders/order.service.ts` |
 | `40908` | 该订单有退款仍在渠道处理中（`Refund.status='processing'`），不接受新的退款 | 同上 |
-| `42202` / `42203` | 任务中断回收失败 / AIGC 显式角标失败（均退款） | `generate/generate.service.ts` |
-| `42204` | 无可用模型线路、或存量 `route=local`（任务失败，退款，不交付任何产出） | `providers/capability-router.provider.ts` 抛 `NoModelChannelError`，`generate.service` 落码 |
-| `42205` | 任务带遮罩但所有通道的协议都没有图像编辑端点（`maskSupport !== 'edits'`），**不忽略遮罩整图重绘**（任务失败，退款） | 同上，抛 `MaskUnsupportedError`，`generate.service` 落码 |
+| `42201` | 有线路但全部失败（任务失败，退款） | `model/tasks/task-lifecycle.service.ts` |
+| `42202` / `42203` | 任务中断回收失败 / AIGC 显式角标失败（均退款） | 同上 |
+| `42204` | 无可用线路：所有线路都明确未接单，或存量 `route=local`（任务失败，退款，不交付任何产出） | `model/tasks/task-worker.service.ts` |
+| `42205` | 带遮罩但所有线路都不支持遮罩重绘，**不忽略遮罩整图重绘**（任务失败，退款） | `model/tasks/task-admission.service.ts` / `task-worker.service.ts` |
+| `42206` | 上游已受理但超时/结果不明，转人工核对：**不切线、不退款**，冻结保留 | `model/tasks/task-lifecycle.service.ts` |
 | `42901` | 触发限流，附 `Retry-After` | `common/rate-limit.guard.ts` |
 | `50301` / `50302` | 支付通道未配置（缺凭据，绝不回落沙箱）/ **渠道退款未完成**（HTTP 502；订单状态与积分不变，可用同一退款单重试） | `payments/payment.factory.ts` / `orders/order.service.ts` |
 
@@ -53,11 +55,17 @@
 | GET | `/api/v1/assets` | 素材库列表（`kind`/`capability`/`limit`/`offset`） |
 | PATCH | `/api/v1/assets/move` | 批量移动素材到另一项目（`{ ids: string[], projectId }`，≤100），返回 `{ moved, missing, projectId }`；只改素材分组，不动任务归属 |
 | DELETE | `/api/v1/assets/:id` | 删除素材（生成图连带删除产出它的任务） |
-| POST | `/api/v1/generate` | 创建生成任务，返回 `{ taskId, status, creditCost }`，异步执行 |
-| GET | `/api/v1/tasks/:id` | 轮询任务，`outputAsset.sourceUrl` 为结果图 |
+| POST | `/api/v1/generate` | 创建生成任务，返回 `{ taskId, status, creditCost, batchId?, batchSize? }`，异步执行。`logicalModelId` 必填（前台模型 id，来自 `/models`）；`status` 初值 `queued`，词表 `queued / running / succeeded / failed / cancelled`。能力声明了 `outputPlan` 时（当前只有商品详情图）一次提交拆成 N 个任务：每张各建一条账单、各扣一份价（**按张计费**），返回的 `creditCost` 是本次合计；`taskId` 是父任务，其余任务 `parentTaskId` 指向它，`batchId` 标识整批；删除父任务会连带删除整批 |
+| GET | `/api/v1/tasks/:id` | 轮询任务，`outputAsset.sourceUrl` 为结果图；`errorCode` 取 `42201`–`42206` |
 | GET | `/api/v1/tasks` | 任务列表（含 `outputAsset`，历史页缩略图依赖它） |
 | DELETE | `/api/v1/tasks/:id` | 删除作品（连带产物与磁盘文件） |
 | GET | `/api/v1/stats/overview` | 数据中心聚合（含按能力缩略图） |
+| GET | `/api/v1/models` | 前台模型目录（匿名可读；带 token 时按会员分组过滤线路并折算价格，不暴露渠道字段） |
+| POST | `/api/v1/models/available` | 按请求意图（`capability` / `inputs` / `options`）筛选可用模型 |
+| POST | `/api/v1/models/:id/quote` | 前台模型报价，返回 `{ quote: { amountMicrocredits, billingMode, estimated, ... } }`；`estimated=true` 表示按估算用量报价 |
+| GET | `/api/v1/model-catalog` | 渠道模型目录（供应视角）：`models` 恒为空数组，模型在 `channels[].models` 内；渠道名恒为空串，不带凭证 |
+| POST | `/api/v1/model-catalog/available` | 按请求意图筛选可用的渠道模型 |
+| POST | `/api/v1/model-catalog/quote` | 渠道模型报价（`channelId` + `modelKey` + 意图），供渠道工作台预览价格 |
 | GET | `/api/v1/credits/{balance,lots,ledger}` | 积分余额 / 批次 / 流水 |
 | GET | `/api/v1/membership/plans`、`/me` | 会员套餐 / 我的会员 |
 | POST | `/api/v1/membership/{subscribe,cancel}` | 订阅 / 取消自动续费（取消后 `status='cancelled'`，已付周期保留至 `expiresAt`，到期由调度任务失效；续费可重新激活并顺延） |
@@ -80,7 +88,7 @@
 | GET/POST | `/api/v1/tickets`、`/tickets/:id`、`/tickets/:id/replies`、`/tickets/:id/close` | 我的工单 / 详情 / 回复 / 关闭（越权 404） |
 | GET | `/api/v1/health`、`/health/ready` | 健康分项（db/storage/channels）/ 就绪探针（未就绪 503），均免登录 |
 | POST | `/api/v1/test/rate-limit/reset` | **仅测试档**（其他环境 404）+ `x-test-token`，清空限流计数 |
-| GET | `/uploads/*` | 静态图片（Express 静态中间件，不受 `/api/v1` 前缀影响） |
+| GET | `/uploads/*` | 静态图片（Express 静态中间件，不受 `/api/v1` 前缀影响）；带 `?w=&h=` 时返回方形 JPEG 缩略图（本地存储按需生成并缓存，失败回落原文件） |
 
 ### 3.2 后台
 
@@ -95,19 +103,64 @@
 | GET/PUT/POST | `/api/v1/admin/{coupons,campaigns,marketing-rules}*` | 营销管理 |
 | GET/POST | `/api/v1/admin/{reconciliation,invoices}*` | 对账导入 / 批次与明细 / 差异处置 / 导出；发票审核与开具 |
 | GET | `/api/v1/admin/payment-channels` | 支付渠道状态（只读：生效通道 / 凭据缺失项 / 回调地址 / 风险告警，`payment.read`） |
-| GET/POST/PATCH/DELETE | `/api/v1/admin/model-channels*` | 模型线路 CRUD / 排序 / 测试；写需 `channel.route`，测试需 `channel.test` |
+| GET/POST/PATCH/DELETE | `/api/v1/admin/channels*`、`/admin/channel-models` | 渠道 / 渠道模型 / 价格档 / 排序 / 复制 / 导入导出 / 连通性测试；写需 `channel.write` / `channel.model_write`，测试写 `ApiCallLog(billable=false)` |
+| GET | `/api/v1/admin/channels/protocols` | 可选协议目录（按 `capability` 过滤）；渠道模型表单的协议来源，`channel.model_read` |
+| GET | `/api/v1/admin/channels/health` | 线路健康：一行 = 一条渠道模型（能力 / 启停 / 协议是否已注册 / 进程内冷却截止），值班塔与渠道工作台共用，`channel.read` |
+| GET/POST/PATCH/DELETE | `/api/v1/admin/logical-models*` | 前台模型列表 / 保存（新 revision + 线路重建）/ 归档；`logical_model.read` / `logical_model.write` |
+| POST | `/api/v1/admin/logical-models/:id/simulate` | 路由模拟（只读）：返回产品能力匹配结果与逐条线路的判定原因；需 `logical_model.read` |
+| GET/POST/PATCH/DELETE | `/api/v1/admin/user-groups*` | 用户分组（倍率 / 可见渠道 / 按模型覆盖）；`user_group.read` / `user_group.write`，`code` 创建后不可改 |
+| GET/PATCH/POST/DELETE | `/api/v1/admin/plugins*`、`/plugins/:id/verify`、`/plugins/install` | 插件清单 / 启停（立即重注册协议）/ 契约校验 / 上传安装（multipart `file`，`origin='installed'`）/ 卸载（内置包 40001，仍被渠道模型引用 40909）；`plugin.read` / `plugin.write`，装卸写审计 |
+| GET/POST | `/api/v1/admin/provider-catalog`、`/refresh`、`/:id/{verify,install}` | 服务商目录（插件包上游清单）：未配置 `MODEL_PROVIDER_CATALOG_URL` 时返回空态与原因；安装走与上传安装同一套校验；`plugin.read` / `plugin.write` |
+| GET | `/api/v1/admin/analytics/finance?from&to` | 财务汇总：实收 = 已结算 `actualAmountMicrocredits`，已退 = `refundedAmountMicrocredits`，净收入 = 实收 − 已退；预留 / 运行 / 待核对单列挂账**不计入实收**；区间默认 30 天、上限 366 天，`model.analytics_read` |
+| GET/POST | `/api/v1/admin/billing-orders*`、`/billing-orders/:id/resolve` | 生成账单列表 / 详情 / 人工核对（`settle` \| `refund`，原因必填 + 审计，`billing_order.read` / `billing_order.resolve`） |
+| GET | `/api/v1/admin/api-logs` | 上游调用记录（`ApiCallLog`）：含 `billable=false` 的连通性测试；筛选状态 / 类型 / 渠道 / 模型 / 时间，附汇总统计，`model.call_read` |
+| GET | `/api/v1/admin/api-logs/export` | 调用记录 CSV（与列表同筛选口径，上限 5000 行；**不含请求体 / 响应体**），`data.export` + 审计 |
 | GET/PUT | `/api/v1/admin/capabilities*` | 能力上下线；下架必须填原因，写需 `capability.write`（高危，走审计） |
 | GET/PUT | `/api/v1/admin/aigc-label` | 读 / 改角标样式（`setting.read` / `setting.write`，PUT 需原因 + 审计 `aigc.label_update`） |
 | GET | `/api/v1/admin/tickets`、`/tickets/stats`、`/tickets/export` | 工单列表 / 状态计数 / CSV 导出 |
 | GET/POST/PATCH | `/api/v1/admin/tickets/:id`、`/tickets/:id/replies` | 工单详情与回复 / 改状态或指派（`ticket.handle`） |
 | GET | `/api/v1/admin/search?q=` | 全局搜索五组各前 5 条（`data.search`，`q` < 2 返回空） |
 | POST | `/api/v1/admin/{users,assets,tasks,orders}/batch` | 批量动作，逐条结果（≤ 100 条，`data.batch`） |
-| GET | `/api/v1/admin/{users,assets,tickets,orders,payments,credits,tasks,audit-logs,model-calls,invoices,coupons,campaigns}/export` | CSV 导出（BOM，`data.export` + `data.export` 审计；上限 5000 行，筛选口径与列表一致） |
+| GET | `/api/v1/admin/{users,assets,tickets,orders,payments,credits,tasks,audit-logs,invoices,coupons,campaigns}/export` | CSV 导出（BOM，`data.export` + `data.export` 审计；上限 5000 行，筛选口径与列表一致）。调用记录是 `/admin/api-logs/export` |
 | POST | `/api/v1/admin/credits/import` | 积分 CSV 导入（multipart，按邮箱匹配，`data.import`） |
 | GET/PUT/POST | `/api/v1/admin/legal*` | 法务版本列表 / 新建草稿 / 发布（`legal.write`，发布需填原因） |
 | GET/POST | `/api/v1/admin/notifications/{broadcast,templates}` | 全站广播 / 消息模板（`message.write`） |
 | GET | `/api/v1/admin/notifications/channels` | 邮件 / 短信**实际生效实现**（`provider` / `delivers` / `configured`，不含凭据；`message.write`） |
-| GET/POST | `/api/v1/admin/{model-config,model-calls,storage,scheduler,backups,audit-logs,roles,settings}*` | 系统与模型管理 |
+| GET/POST | `/api/v1/admin/{storage,scheduler,backups,audit-logs,roles,settings}*` | 系统管理 |
+
+### 3.3 模型中转（代理）
+
+中转接口**不走响应信封**：成功时原样透传上游状态码、内容类型（含 SSE 流）与 body；失败才用本仓信封 `{ code, message }` 写出（`writeProxyError`）。全部需登录（`JwtAuthGuard`）。
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| 任意 | `/api/v1/ai/system/:channelId/*path` | 系统渠道中转：按渠道转发到上游，`*path` 至少一段。**仅 POST 计费**（`BillingOrder.taskId=''`，`reserved → running → settled / refunded / uncertain`）；GET 等只透传 |
+| 任意 | `/api/v1/:channelId/*path` | 短路径中转：等价于 `/ai/system/:channelId/*path`，渠道 id 前置；命中保留前缀时 404 |
+| 任意 | `/api/v1/ai/custom` | 用户自带上游中转：地址 / 格式 / key 全部由请求头给出，**不计费** |
+| POST | `/api/v1/ai/models` | 自定义渠道模型列表。这是**普通业务接口**（DTO 校验 + 信封，body 上限 100KB），不是中转 |
+
+自定义中转的请求头：
+
+| 头 | 用途 |
+| --- | --- |
+| `x-canvas-upstream-url` | 上游 base URL（必填，严格 SSRF 校验） |
+| `x-canvas-upstream-format` | `openai` / `gemini` / `claude` |
+| `x-canvas-upstream-key` | 上游密钥，≤ 512 字节且禁 CRLF |
+| `x-canvas-headers` | 额外头，base64 的 JSON `[{ name, value }]` |
+| `x-canvas-scene` | 账单 / 调用记录的场景标识（缺省 `proxy`） |
+| `x-idempotency-key` | 幂等键：同键复用同一张预留账单 |
+
+请求处理顺序固定，**不要重排**：身份 → 分组渠道访问 → 限流 → body 上限 → 提取 `model` / 协议 → 协议授权 → SSRF → 剥离客户端 `key` / `api_key` / `access_token` / `token` → 渠道自定义头 → 并发槽 → （仅 POST）预留计费并置 `running` → 上游请求 → 状态码 / 调用日志 / 流式透传 → 结算 / `uncertain` / 退款。先预留再请求保证「上游已扣费」与「本地已挂账」不会出现空隙；反过来（先请求后计费）在流式响应下无法回滚。
+
+| 状态 / 码 | 含义 |
+| --- | --- |
+| `503` / `50303` | `MODEL_PROXY_ENABLED=false`，或并发槽等待超时 |
+| `404` / `40401` | 系统渠道不存在 / 已停用 |
+| `403` / `40301` | 该渠道未授权该模型或协议；自定义中转 SSRF 校验拒绝 |
+| `400` / `40001` | 缺 `model` / 协议非法 / 请求体超限（413）/ 上游密钥格式错误 |
+| `401` / `40101` | 自定义中转 `x-canvas-upstream-key` 缺失或非法 |
+| `429` / `42901` | 并发槽已满（系统渠道按渠道并发，自定义按用户 `MODEL_PROXY_CUSTOM_CONCURRENCY`） |
+| `502` / `50201` | 上游不可达 / 响应读取失败 / 内容类型不支持 |
 
 ## 4. 鉴权与时长
 

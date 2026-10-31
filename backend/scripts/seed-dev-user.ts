@@ -90,23 +90,32 @@ async function main(): Promise<void> {
     if (CREDITS > 0) {
       const lotCount = await prisma.creditLot.count({ where: { userId: user.id } });
       if (lotCount === 0) {
+        // 金额在库里是微积分；批次与账户必须同生共死，否则余额接口读不到
+        const amount = BigInt(CREDITS) * 1_000_000n;
         const lot = await prisma.creditLot.create({
           data: {
             userId: user.id,
             source: 'grant',
-            totalCredits: CREDITS,
-            remainingCredits: CREDITS,
+            totalMicrocredits: amount,
+            remainingMicrocredits: amount,
             expireAt: null,
           },
         });
-        await prisma.creditLedger.create({
+        const account = await prisma.creditAccount.upsert({
+          where: { userId: user.id },
+          create: { userId: user.id, availableMicrocredits: amount },
+          update: { availableMicrocredits: { increment: amount }, version: { increment: 1 } },
+        });
+        await prisma.creditLedgerEntry.create({
           data: {
             userId: user.id,
             type: 'grant',
-            amount: CREDITS,
-            balanceAfter: CREDITS,
+            amountMicrocredits: amount,
+            availableDeltaMicrocredits: amount,
+            availableAfterMicrocredits: account.availableMicrocredits,
+            reservedAfterMicrocredits: account.reservedMicrocredits,
             lotId: lot.id,
-            reason: '开发账号初始积分（SEED_USER_CREDITS）',
+            note: '开发账号初始积分（SEED_USER_CREDITS）',
           },
         });
         console.log(`[seed] 已发放初始积分: ${CREDITS}（永久有效）`);

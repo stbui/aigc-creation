@@ -9,7 +9,7 @@ import {
   type ParamType,
 } from './capability-plugin.type';
 import { parseDetailSections } from './definitions/param-options';
-import type { Modality } from '../providers/modality';
+import type { Modality } from '../common/modality';
 import { AppError } from '../common/app.exception';
 
 /**
@@ -19,13 +19,13 @@ import { AppError } from '../common/app.exception';
  *
  * 改造前能力定义**本体**在这里 (791 行, 15 项)。它的问题是: 一项能力的信息
  * 还散落在另外两处 ——
- *   - 提示词在 `providers/gateway-prompt.ts` 的 PROMPTS 字典
- *   - 路由配置项的 id 列表在 `providers/channel-config.defs.ts` 的 CAPABILITY_IDS
+ *   - 提示词在旧 `providers` 层的 PROMPTS 字典
+ *   - 路由配置项的 id 列表在旧 `providers` 层的 CAPABILITY_IDS
  *
  * 于是新增一项能力要改四个文件, 而**漏改不报错**:
  *   漏提示词 → `PROMPTS[cap]?.() ?? cap` 把裸能力 id 当提示词发给真实模型,
  *              不报错不回落, 只是模型收到一句莫名其妙的话, 产出垃圾图
- *   漏 id    → 后台模型配置页少一行路由, 无处可配
+ *   漏 id    → 后台渠道工作台少一行可选能力, 无处可配
  *
  * 现在每项能力是一个自包含对象 (`definitions/<id>.ts`), 元信息 + 提示词 +
  * 模态 + 积分价都在一处声明, 漏声明由装配期断言拦下。
@@ -41,7 +41,7 @@ import { AppError } from '../common/app.exception';
  *   planned —— 参考站有、本项目暂未实现, 界面标「规划中」且不可提交
  *
  * modality (2026-10-20) 与 mode **正交**: mode 回答「实现到什么程度」,
- * modality 回答「产出是什么」。当前 15 项能力全部产出图片。
+ * modality 回答「产出是什么」。当前 16 项能力中 15 项产出图片、1 项产出视频。
  */
 
 export type {

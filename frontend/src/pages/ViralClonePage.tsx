@@ -3,12 +3,14 @@ import { App, Modal } from 'antd';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ImagePlus, Maximize2 } from 'lucide-react';
 import { assetsApi, generateApi, assetSrc, toAbsoluteUrl } from '../lib/api';
+import { resolveModelId } from '../lib/models';
 import { languageOptions, platformOptions } from '../lib/optionSets';
 
 import { ToolWorkflowSteps } from '../components/ToolEmptyState';
 import { ToolSubmitBar } from '../components/ToolSubmitBar';
 import { ToolImageDropzone } from '../components/ToolImageDropzone';
 import { ToolSettingsPopover } from '../components/ToolSettingsPopover';
+import { ModelPicker } from '../components/ModelPicker';
 import { AssetLibraryModal, useAssetLibrary } from '../components/AssetLibraryModal';
 import { MobileUploadModal } from '../components/MobileUploadModal';
 import { ResultGalleryPane } from '../components/ResultGalleryPane';
@@ -391,9 +393,11 @@ export function ViralClonePage() {
     setResult(null);
     try {
       const projectId = await ensureProject();
+      const logicalModelId = await resolveModelId('hot_remake');
       const { taskId } = await generateApi.start({
         projectId,
         capability: 'hot_remake',
+        logicalModelId,
         // 顺序即语义: [0]=商品图, [1]=参考图 (后端 processTask 按提交序保序)
         inputAssetIds: [...images.map((x) => x.id), reference.id],
         params: {
@@ -661,6 +665,7 @@ export function ViralClonePage() {
                 resolution={resolution}
                 onResolutionChange={setResolution}
                 capabilityId="hot_remake"
+                modelPicker={<ModelPicker capability="hot_remake" options={{ ratio, resolution }} />}
               />
             }
             onSubmit={() => void submit()}

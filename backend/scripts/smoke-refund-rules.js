@@ -2,9 +2,9 @@
  * 退款规则与系统设置写入冒烟 (B8)。
  *
  * 守住四件事:
- *   1. 系统设置**读到的字段名就是写入时要用的字段名** —— 曾经读回 `site.name`
- *      而写入接口只认 `siteName`, 前端照着 key 回传被白名单静默剥掉,
- *      结果是「保存成功但什么都没变」(实际是 400 没有需要更新的设置项)
+ *   1. 系统设置**读到的 key 就是写入时要用的 key** —— kv 契约下两边都是
+ *      `SETTING_DEFS` 的点号键; 曾经读回 `field` 而写入只认驼峰字段名,
+ *      前端照着读到的值回传被白名单静默剥掉, 结果是「保存成功但什么都没变」
  *   2. 退款时间窗: 超过 windowDays 的订单拒绝退 (40905)
  *   3. 可退比例上限: 超过实付 × maxRatioBps 的金额拒绝退 (40906)
  *   4. 已消耗积分: allowConsumedTask=false 时, 积分已被花掉的订单拒绝退 (40907)
@@ -16,6 +16,7 @@
 const { PrismaClient } = require('@prisma/client');
 const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
 const { loadEnvOnce, resolveDbUrl } = require('./db-url');
+const { clearCredits } = require('./credit-fixture');
 
 loadEnvOnce();
 
@@ -116,7 +117,13 @@ async function ensureAdminRole() {
   }
 }
 
-const DEFAULTS = { refundWindowDays: 7, refundMaxRatioBps: 10000, refundAllowConsumedTask: true };
+// 键名直接取 SETTING_DEFS 的点号键 —— 读到的 key 就是写入时用的 key
+const DEFAULTS = {
+  'refund.windowDays': 7,
+  'refund.maxRatioBps': 10000,
+  'refund.allowConsumedTask': true,
+};
+const REFUND_KEYS = Object.keys(DEFAULTS);
 let seq = 0;
 const idem = (tag) => `rf-${tag}-${Date.now()}-${seq++}`;
 
@@ -140,8 +147,7 @@ async function cleanupTestData() {
     await prisma.orderItem.deleteMany({ where: { orderId: { in: orderIds } } });
     await prisma.membership.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.order.deleteMany({ where: { id: { in: orderIds } } });
-    await prisma.creditLedger.deleteMany({ where: { userId: { in: userIds } } });
-    await prisma.creditLot.deleteMany({ where: { userId: { in: userIds } } });
+    await clearCredits(prisma, { in: userIds });
     await prisma.notification.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.loginLog.updateMany({ where: { userId: { in: userIds } }, data: { userId: null } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
@@ -178,8 +184,16 @@ async function cleanupTestData() {
     return { id: user.id, email, token: login.data?.accessToken };
   };
 
+  // kv 载荷: { settings: { '<点号键>': 值 }, clears?: [...], reason }
   const setRules = (patch) =>
-    call('PATCH', '/admin/settings', A.token, { ...patch, reason: '退款规则冒烟' });
+    call('PATCH', '/admin/settings', A.token, { settings: patch, reason: '退款规则冒烟' });
+  // 恢复默认走 clears（删覆盖行回落代码默认值），而不是再写一遍"默认值"
+  const clearRules = () =>
+    call('PATCH', '/admin/settings', A.token, {
+      settings: {},
+      clears: REFUND_KEYS,
+      reason: '退款规则冒烟还原',
+    });
 
   /** 下单 → 沙箱支付, 返回订单详情 */
   const paidOrder = async (body) => {
@@ -247,36 +261,55 @@ async function cleanupTestData() {
   const settings = await call('GET', '/admin/settings', A.token);
   const refundGroup = (settings.data?.groups ?? []).find((g) => g.key === 'refund');
   check('退款规则分组已下发', Boolean(refundGroup), refundGroup?.label);
+  /*
+   * 读到的 key 必须就是写入时用的 key。此前下发 `field` 而写入只认驼峰
+   * 字段名，前端照着读到的值回传被静默剥离，表现为「保存成功但什么都没变」。
+   */
   check(
-    '每项同时下发 key 与写入用 field',
+    '每项都下发点号 key',
     (settings.data?.groups ?? [])
       .flatMap((g) => g.items ?? [])
-      .every((i) => typeof i.key === 'string' && typeof i.field === 'string' && i.field.length > 0),
+      .every((i) => typeof i.key === 'string' && i.key.includes('.')),
+    (settings.data?.groups ?? []).flatMap((g) => g.items ?? []).length + ' 项',
   );
   check(
     '退款三项齐全且带默认值',
     (refundGroup?.items ?? []).length === 3 &&
       refundGroup.items.every((i) => i.value !== undefined && i.type !== undefined),
-    (refundGroup?.items ?? []).map((i) => `${i.field}=${i.value}`).join(' '),
+    (refundGroup?.items ?? []).map((i) => `${i.key}=${i.value}`).join(' '),
   );
 
-  const dotted = await call('PATCH', '/admin/settings', A.token, { 'refund.windowDays': 7 });
+  // 旧扁平载荷（键直接挂在顶层）已不被接受：settings/clears 都为空即 400
+  const flat = await call('PATCH', '/admin/settings', A.token, { 'refund.windowDays': 7 });
   check(
-    '按点号键写入被拒（白名单只认扁平字段名）',
-    dotted.httpStatus === 400,
-    `${dotted.httpStatus} ${dotted.message ?? ''}`,
+    '扁平载荷不再被接受',
+    flat.httpStatus === 400,
+    `${flat.httpStatus} ${flat.message ?? ''}`,
+  );
+
+  // 未知键必须在 settings 内被指名拒绝，而不是静默忽略
+  const unknown = await call('PATCH', '/admin/settings', A.token, {
+    settings: { 'refund.nope': 1 },
+    reason: '退款规则冒烟',
+  });
+  check(
+    '未知设置项被指名拒绝',
+    unknown.httpStatus === 400 && String(unknown.message ?? '').includes('refund.nope'),
+    `${unknown.httpStatus} ${unknown.message ?? ''}`,
   );
 
   const saved = await setRules(DEFAULTS);
   check(
-    '按 field 写入成功',
-    saved.httpStatus === 200 && (saved.data?.updated ?? []).length === 3,
+    '按点号键写入成功',
+    saved.httpStatus === 200 &&
+      (saved.data?.updated ?? []).length === 3 &&
+      REFUND_KEYS.every((k) => saved.data.updated.includes(k)),
     JSON.stringify(saved.data?.updated ?? saved.message),
   );
 
   // ── 规则一：可退比例上限 ────────────────────────────────────────────
   console.log('\n【可退比例上限】');
-  await setRules({ refundMaxRatioBps: 5000 });
+  await setRules({ 'refund.maxRatioBps': 5000 });
   const o1 = await paidOrder({ productId: product.id, quantity: 1 });
   const half = Math.floor(o1.paidCents / 2);
 
@@ -308,7 +341,7 @@ async function cleanupTestData() {
 
   // ── 规则二：时间窗 ──────────────────────────────────────────────────
   console.log('\n【可退款时间窗】');
-  await setRules({ refundMaxRatioBps: 10000, refundWindowDays: 7 });
+  await setRules({ 'refund.maxRatioBps': 10000, 'refund.windowDays': 7 });
   const o2 = await paidOrder({ productId: product.id, quantity: 1 });
   // 把支付时间拨回 10 天前, 模拟超出时间窗的存量订单
   await prisma.order.update({
@@ -325,7 +358,7 @@ async function cleanupTestData() {
     `${expired.httpStatus} ${expired.message ?? ''}`,
   );
 
-  await setRules({ refundWindowDays: 0 });
+  await setRules({ 'refund.windowDays': 0 });
   const noWindow = await call('POST', `/admin/orders/${o2.id}/refund`, A.token, {
     amountCents: 1,
     reason: '不限时间窗',
@@ -338,18 +371,25 @@ async function cleanupTestData() {
 
   // ── 规则三：已消耗积分 ──────────────────────────────────────────────
   console.log('\n【已消耗积分】');
-  await setRules({ refundWindowDays: 7, refundAllowConsumedTask: false });
+  await setRules({ 'refund.windowDays': 7, 'refund.allowConsumedTask': false });
   const o3 = await paidOrder({ productId: product.id, quantity: 1 });
   const lot = await prisma.creditLot.findFirst({ where: { orderId: o3.id } });
-  check('订单积分批次已生成', Boolean(lot), `remaining=${lot?.remainingCredits}`);
+  check('订单积分批次已生成', Boolean(lot), `remaining=${lot?.remainingMicrocredits}`);
   /*
    * 把该用户**全部**批次余额清零 = 模拟积分已被生成任务花掉。
    * 规则按「该用户名下可用余额」与「本单发放量」比较, 只清本单批次不足以
    * 触发 —— 前面两单退款后仍有剩余积分, 会被判定为「能扣回」。
+   *
+   * 账户可用余额一并清零: 真实消耗是从批次扣减后同步账户, 只清一侧会破掉
+   * 「available == Σ remaining」的不变量。
    */
   await prisma.creditLot.updateMany({
     where: { userId: user.id },
-    data: { remainingCredits: 0 },
+    data: { remainingMicrocredits: 0n },
+  });
+  await prisma.creditAccount.updateMany({
+    where: { userId: user.id },
+    data: { availableMicrocredits: 0n },
   });
 
   const consumed = await call('POST', `/admin/orders/${o3.id}/refund`, A.token, {
@@ -362,7 +402,7 @@ async function cleanupTestData() {
     `${consumed.httpStatus} ${consumed.message ?? ''}`,
   );
 
-  await setRules({ refundAllowConsumedTask: true });
+  await setRules({ 'refund.allowConsumedTask': true });
   const allowed = await call('POST', `/admin/orders/${o3.id}/refund`, A.token, {
     amountCents: o3.paidCents,
     reason: '允许已消耗退款',
@@ -402,18 +442,23 @@ async function cleanupTestData() {
   );
 
   // ── 还原设置 ────────────────────────────────────────────────────────
-  const restored = await setRules(DEFAULTS);
+  const restored = await clearRules();
   const readBack = await call('GET', '/admin/settings', A.token);
   const back = (readBack.data?.groups ?? [])
     .flatMap((g) => g.items ?? [])
     .filter((i) => i.key.startsWith('refund.'))
-    .reduce((acc, i) => ({ ...acc, [i.field]: i.value }), {});
+    .reduce((acc, i) => ({ ...acc, [i.key]: i.value }), {});
+  const overridden = (readBack.data?.groups ?? [])
+    .flatMap((g) => g.items ?? [])
+    .filter((i) => i.key.startsWith('refund.') && i.overridden);
   check(
-    '规则已还原为默认值',
-    (restored.httpStatus === 200) &&
-      back.refundWindowDays === 7 &&
-      back.refundMaxRatioBps === 10000 &&
-      back.refundAllowConsumedTask === true,
+    '规则已还原为代码默认值',
+    restored.httpStatus === 200 &&
+      (restored.data?.cleared ?? []).length === 3 &&
+      back['refund.windowDays'] === 7 &&
+      back['refund.maxRatioBps'] === 10000 &&
+      back['refund.allowConsumedTask'] === true &&
+      overridden.length === 0,
     JSON.stringify(back),
   );
 

@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { App } from 'antd';
 import { ApiError, generateApi, newIdempotencyKey } from '../lib/api';
+import { resolveModelId } from '../lib/models';
 import { useProject } from './useProject';
 import { useGenerateError } from './useGenerateError';
 import { useTaskPoller, type ToolAsset, type ToolResult } from '../components/ToolShell';
@@ -43,9 +44,13 @@ export function useToolTask({ capability, successMessage, minInputs = 1 }: UseTo
       setResult(null);
       try {
         const projectId = await ensureProject();
+        // 模型 id 与项目 id 一样是服务端解析的输入，必须先进 payload 再算指纹：
+        // 换模型等于换线路与价格，复用旧幂等键会把任务钉在旧模型上。
+        const logicalModelId = await resolveModelId(capability);
         const payload = {
           projectId,
           capability,
+          logicalModelId,
           inputAssetIds: inputs.map((i) => i.id),
           params,
         };

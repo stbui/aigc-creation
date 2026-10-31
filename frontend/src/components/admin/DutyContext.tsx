@@ -9,19 +9,15 @@ import {
   type ReactNode,
 } from 'react';
 import {
+  adminChannelsApi,
   adminInvoicesApi,
-  adminModelChannelsApi,
   adminOrdersApi,
   adminReconciliationApi,
   adminTasksApi,
 } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
-import type {
-  AdminModelChannelsSnapshot,
-  AdminOrderRow,
-  AdminTaskCongestion,
-  Modality,
-} from '../../types/api';
+import type { AdminOrderRow, AdminTaskCongestion } from '../../types/api';
+import type { ChannelHealthRowView } from '../../types/model';
 
 /**
  * 值班带数据源（后台视觉方向「值班台」）。
@@ -58,7 +54,7 @@ export interface DutyCounter {
 /** 值班带刻度用的任务快照，字段只保留画刻度与排异常队列需要的 */
 export interface DutyTask {
   id: string;
-  status: 'pending' | 'running' | 'succeeded' | 'failed';
+  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
   capabilityName: string;
   errorCode: string | null;
   provider: string | null;
@@ -67,16 +63,23 @@ export interface DutyTask {
   thumbnailUrl: string | null;
 }
 
+/**
+ * 一条线路 = 一条**渠道模型**（新模型层的最小调度单位）。
+ *
+ * 渠道停用会连坐其下模型，所以 `enabled` 是两者相与后的结果；渠道模型各自
+ * 冷却 —— 404 只冻结那一条模型，不冻结整家渠道。
+ */
 export interface DutyChannel {
   id: string;
   name: string;
-  modality: Modality;
+  /** 所属渠道名，用于同模态下区分来源 */
+  channelName: string;
+  /** 渠道模型的能力：text / image / video，协议目录里还可能有 audio */
+  modality: string;
   enabled: boolean;
-  /** 协议在项目里是否有实现；false 的线路一旦启用必然失败 */
+  /** 协议在当前进程的注册表里是否存在；false 的线路一旦启用必然失败 */
   protocolKnown: boolean;
   coolingUntil: string | null;
-  failCount: number;
-  lastFailureAt: string | null;
 }
 
 export interface DutyData {
@@ -103,8 +106,6 @@ interface DutyContextValue {
 
 const DutyContext = createContext<DutyContextValue | null>(null);
 
-const MODALITIES: Modality[] = ['image', 'text', 'video'];
-
 /** 轮询间隔。任务页的拥堵条也是 30 秒，两处节奏一致，排障时不会对不上 */
 const POLL_MS = 30_000;
 
@@ -112,7 +113,7 @@ export function AdminDutyProvider({ children }: { children: ReactNode }) {
   const { can } = useAdmin();
   const canTasks = can('task.read');
   const canOrders = can('order.read');
-  const canChannels = can('model.config_read');
+  const canChannels = can('channel.read');
 
   const mode: DutyMode | null = canTasks ? 'tasks' : canOrders ? 'finance' : null;
 
@@ -182,7 +183,7 @@ export function useDuty(): DutyContextValue {
 async function fetchTaskDuty(fetchChannels: boolean): Promise<DutyData> {
   const [list, channelSnapshot] = await Promise.all([
     adminTasksApi.list({ page: 1, pageSize: 100 }),
-    fetchChannels ? adminModelChannelsApi.list().catch(() => null) : Promise.resolve(null),
+    fetchChannels ? adminChannelsApi.health().catch(() => null) : Promise.resolve(null),
   ]);
 
   const tasks: DutyTask[] = list.result.items.map((t) => ({
@@ -196,7 +197,7 @@ async function fetchTaskDuty(fetchChannels: boolean): Promise<DutyData> {
     thumbnailUrl: t.thumbnailUrl,
   }));
 
-  const channels = flattenChannels(channelSnapshot);
+  const channels = toDutyChannels(channelSnapshot);
   const cooling = channels.filter((c) => isCooling(c)).length;
   const congestion = list.congestion;
 
@@ -204,11 +205,11 @@ async function fetchTaskDuty(fetchChannels: boolean): Promise<DutyData> {
     mode: 'tasks',
     counters: [
       {
-        key: 'pending',
+        key: 'queued',
         label: '等待',
-        value: congestion.pending,
-        tone: congestion.pending > 0 ? 'warn' : undefined,
-        to: '/admin/tasks?status=pending',
+        value: congestion.queued,
+        tone: congestion.queued > 0 ? 'warn' : undefined,
+        to: '/admin/tasks?status=queued',
       },
       {
         key: 'running',
@@ -230,7 +231,7 @@ async function fetchTaskDuty(fetchChannels: boolean): Promise<DutyData> {
         short: '冷却',
         value: fetchChannels ? cooling : null,
         tone: cooling > 0 ? 'warn' : undefined,
-        to: '/admin/model-config',
+        to: '/admin/channels',
       },
     ],
     tasks,
@@ -253,10 +254,10 @@ async function fetchFinanceDuty(fetchChannels: boolean): Promise<DutyData> {
     adminOrdersApi.list({ refundState: 'processing', pageSize: 1, page: 1 }),
     adminInvoicesApi.list({ status: 'pending', limit: 1 }),
     adminReconciliationApi.batches({ status: 'imported', limit: 1 }),
-    fetchChannels ? adminModelChannelsApi.list().catch(() => null) : Promise.resolve(null),
+    fetchChannels ? adminChannelsApi.health().catch(() => null) : Promise.resolve(null),
   ]);
 
-  const channels = flattenChannels(channelSnapshot);
+  const channels = toDutyChannels(channelSnapshot);
 
   return {
     mode: 'finance',
@@ -302,26 +303,23 @@ async function fetchFinanceDuty(fetchChannels: boolean): Promise<DutyData> {
   };
 }
 
-function flattenChannels(snapshot: AdminModelChannelsSnapshot | null): DutyChannel[] {
+/**
+ * 线路健康投影 → 塔上的行。
+ *
+ * 取不到数据时给空数组：值班塔显示「还没有配置模型线路」比一直转圈诚实，
+ * 而且渠道读权失败本就不该把整条带子打掉。
+ */
+function toDutyChannels(snapshot: { items: ChannelHealthRowView[] } | null): DutyChannel[] {
   if (!snapshot) return [];
-  const rows: DutyChannel[] = [];
-  for (const modality of MODALITIES) {
-    const group = snapshot.modalities?.[modality];
-    if (!group) continue;
-    for (const ch of group.channels) {
-      rows.push({
-        id: ch.id,
-        name: ch.name || ch.model || ch.protocol,
-        modality,
-        enabled: ch.enabled,
-        protocolKnown: ch.protocolKnown,
-        coolingUntil: ch.cooldownUntil,
-        failCount: ch.failCount,
-        lastFailureAt: ch.lastFailureAt,
-      });
-    }
-  }
-  return rows;
+  return snapshot.items.map((row) => ({
+    id: row.id,
+    name: row.name,
+    channelName: row.channelName,
+    modality: row.capability,
+    enabled: row.enabled,
+    protocolKnown: row.protocolKnown,
+    coolingUntil: row.coolingUntil,
+  }));
 }
 
 export function isCooling(channel: DutyChannel, now = Date.now()): boolean {

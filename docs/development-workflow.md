@@ -138,14 +138,14 @@
 
 **动作**
 
-1. **定位层**：应用层 → unified → vendors → protocols → modality，依赖方向不可反转；说明错在哪层、改在哪层。
-2. **指到事实源**：对照 `CLAUDE.md` 单一事实源表，写出具体文件（如能力价 `definitions/<id>.ts`、退款 `SETTING_DEFS`、状态机 `TRANSITIONS`、厂商 `vendor.catalog.ts`）。
+1. **定位层**：能力（`capabilities/definitions`）→ 模型层（`model/intent` → `model/routing` → `model/tasks` → `model/protocol` → `model/channels`）→ 计费（`model/billing`）；依赖方向不可反转，说明错在哪层、改在哪层。
+2. **指到事实源**：对照 `CLAUDE.md` 单一事实源表，写出具体文件（如能力价 `definitions/<id>.ts`、退款 `SETTING_DEFS`、任务状态机 `TRANSITIONS`、账单状态机 `BILLING_STATUSES`、协议 `plugins/<plugin>/manifest.json`）。
 3. **数据模型**：新增字段 / 表 / 索引、是否需要迁移存量数据；计费字段一律快照。
-4. **配置同步**：环境变量四处（`ENV_SPECS`、`.env.example`、三档 env、`docs/environments.md`），通道变量另改 `channel-config.defs.ts`。
+4. **配置同步**：环境变量四处（`ENV_SPECS`、`.env.example`、三档 env、`docs/environments.md`）；模型层变量统一 `MODEL_*`，渠道与价格在后台配置，不改代码。
 5. **风险分级**：涉及钱 / 权限 / 合规 / 后台高危配置的，写明审计、原因填写、拒绝路径用例。
 6. **验证命令**：用哪层闸口、哪条专项冒烟、需要什么前置数据。
 
-非功能项（受影响才写）：并发与幂等（重复回调 / 并发轮询 / SQLite 单写者）、性能（图 120s / 视频 600s 超时预算、全表 `LIKE` 入口）、容量（上传目录、备份份数、日志轮转）、失败可见性（`[rid=]`、`ModelCallLog.reason`）、安全合规（签名 URL、限流、越权 404、AIGC 标识）、回滚可行性（`db push` 不可回滚）。
+非功能项（受影响才写）：并发与幂等（重复回调 / 并发轮询 / SQLite 单写者）、性能（图 120s / 视频 600s 超时预算、全表 `LIKE` 入口）、容量（上传目录、备份份数、日志轮转）、失败可见性（`[rid=]`、`RouteAttempt.failureCode` / `ApiCallLog` 错误摘要）、安全合规（签名 URL、限流、越权 404、AIGC 标识）、回滚可行性（`db push` 不可回滚）。
 
 **退出检查**：每项改动都指到文件；写不出验证命令的方案不通过。
 
@@ -203,7 +203,7 @@ NODE_ENV=test npm run db:reset:test
 1. 确认档位与库路径（见 §0.2），与后端启动日志一致。
 2. 真实起服务、真实调接口、真实查库；不读代码推断行为。
 3. 每条链路五类用例 + 三身份，直接拿请求打后端（前端隐藏按钮不算校验）。
-4. 跑测试档脚本必须给对基址：多数 `API_BASE=http://127.0.0.1:4100`（测试档与开发档同端口，先 `./start.sh --env test` 起测试档）；`smoke-model-channels.js` 用 `SMOKE_BASE`；`smoke-marketing.js` 用 `MARKETING_API_BASE`；`verify-asset-filters.js` / `verify-prompt-tools.js` 用 `VERIFY_BASE`。
+4. 跑测试档脚本必须给对基址：多数 `API_BASE=http://127.0.0.1:4100`（测试档与开发档同端口，先 `./start.sh --env test` 起测试档）；`smoke-marketing.js` 用 `MARKETING_API_BASE`；`verify-asset-filters.js` / `verify-prompt-tools.js` 用 `VERIFY_BASE`。
 5. 每条结论带三件套：命令、关键输出、库或磁盘记录。
 6. 一轮结束清理现场（`clear-ops-data.js`，或按 `docs/testing.md` 的外键顺序），避免残留把下一轮伪造成通过。
 
@@ -245,7 +245,7 @@ duplicate：并入主卡，指向主卡编号
 1. 先跑红：用缺陷卡里的命令让失败稳定出现（需授权执行）。
 2. 最小修订；改完用同一条命令转绿，贴真实输出。
 3. 只做缺陷卡上的事；新问题开新卡，不当场扩修。
-4. 高危动作（删除、退款、手动改积分、权限与系统设置、模型配置写入、AIGC 角标、能力上下线）补：原因填写、`AdminAuditLog`、拒绝路径用例。
+4. 高危动作（删除、退款、手动改积分、权限与系统设置、渠道 / 前台模型写入、AIGC 角标、能力上下线）补：原因填写、`AdminAuditLog`、拒绝路径用例。
 
 **产出**：改动清单（`file:line`）+ 同命令的前后输出。
 
@@ -361,8 +361,8 @@ duplicate：并入主卡，指向主卡编号
 
 | 改动域 | 必跑 |
 | --- | --- |
-| 能力 / 生成 | `smoke-capabilities`、`smoke-capability-runtime`、相关页面冒烟、`verify-credit-deduction`、`verify-image-pipeline` |
-| 模型通道 | `smoke-gateway-channel`、`smoke-model-channels`、`verify-failover`、`verify-channel-scheduler`、`verify-modality-config` |
+| 能力 / 生成 | `smoke-capability-runtime`、相关页面冒烟、`verify-credit-deduction`、`verify-route-catalog`、`verify-task-runtime` |
+| 模型层 | `verify-plugin-manifests`、`verify-model-consistency`、`verify-channel-flow`、`verify-protocol-runtime`、`verify-billing`、`verify-task-runtime`，以及 `frontend npm run e2e -- admin-model-suite` |
 | 交易与权益 | `smoke-commerce`、`smoke-payments`、`smoke-membership*`、`smoke-refund-rules` |
 | 账户与合规 | `smoke-auth`、`smoke-account`、`smoke-qr-login`、`smoke-aigc`、`smoke-signed-url` |
 | 后台与运维 | `smoke-admin`、`smoke-backup`、`smoke-scheduler`、`smoke-storage`、`smoke-tickets-search` |
@@ -434,7 +434,7 @@ BUG-<轮次>-<序号> [open|fixed|verified|closed|reopened|deferred] <标题>
 | 观测竞态 | 同步链路在往返内完成，拿不到中间态 | 断言持久证据（流水条数、快照字段），余额只作附注 |
 | 脚本漂移 | 实现改了、断言没跟，红灯指向脚本 | 按 `docs/testing.md` 第 5 节定性后修脚本，不迁就断言改产品 |
 | 空串覆盖 | `CORS_ORIGINS=""` 让 env 值静默失效 | 按需注入变量，不无脑导出空串 |
-| 静默失败 | HTTP 200 但业务失败；失败不退款；无 `[rid=]` | 断言业务字段；看 `task.provider` 与 `ModelCallLog.reason` |
+| 静默失败 | HTTP 200 但业务失败；失败不退款；无 `[rid=]` | 断言业务字段；看 `task.state` / `errorCode` 与 `ApiCallLog` 的错误摘要 |
 | 跨阶段夹带 | 修复轮顺手重构，回归结果无法归因 | 每轮一个主题；重构单独成批 |
 | 文档先行 | 文档写了代码没做，下轮按文档验证得出错误结论 | 文档与代码同批；冲突以代码为准 |
 | 产品确认走过场 | 只看功能存在，不按验收标准判定 | 阶段 12 逐项勾选，不过签 |

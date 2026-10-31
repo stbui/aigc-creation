@@ -1,17 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { App, Popconfirm } from 'antd';
 import {
   Check,
   Download,
   FolderPlus,
-  Link2,
   Loader2,
   RefreshCw,
   Trash2,
   Upload,
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { assetsApi, assetSrc, projectsApi } from '../lib/api';
+import { assetsApi, assetSrc, assetThumbSrc, projectsApi } from '../lib/api';
 import {
   MAX_IMAGE_BYTES,
   MAX_IMAGE_MB,
@@ -53,6 +52,12 @@ import type { Asset, Project } from '../types/api';
  *   .asset-library-empty > strong 14px/16 #333
  *   .asset-library-notice      fixed bottom 28 居中 / #272B48EB / radius 10 / pad `10px 17px`
  *
+ * 差异（2026-10-31 纯图卡）:
+ *   - 卡片只保留封面图：去掉标题、尺寸/体积、类型与来源文案（`card-content` 一并移除）。
+ *   - 去掉 hover 背景效果：卡片不再变色/上浮/放大，封面遮罩层删除；操作按钮仍靠 hover/
+ *     键盘聚焦/触屏显示。
+ *   - 卡片直角（radius 0）。
+ *
  * 差异（2026-10-21 B8 收口）:
  *   - 分组改为**客户端真实聚合**（按项目 / 能力 / 日期），不再弹「未实现」提示。
  *     后端没有素材文件夹契约，也不该为此造一个 —— 分组是视图，素材本身没有归属
@@ -82,20 +87,6 @@ function dateBucket(iso: string): { key: string; label: string; sort: number } {
   if (ts >= today - 86400000) return { key: 'yesterday', label: '昨天', sort: 1 };
   if (ts >= today - 6 * 86400000) return { key: 'week', label: '近 7 天', sort: 2 };
   return { key: 'earlier', label: '更早', sort: 3 };
-}
-
-/**
- * 来源站点的显示名：优先用后端归一化后的 `sourceSite`，缺失时从页面 URL 兜底。
- * `sourcePageUrl` 由服务端校验过 http/https，但老数据/手改库仍可能不合法 ——
- * 渲染期不能因为一个坏 URL 抛异常把整个素材库打白。
- */
-function sourceHost(a: Asset): string {
-  if (a.sourceSite) return a.sourceSite;
-  try {
-    return new URL(a.sourcePageUrl ?? '').hostname.replace(/^www\./, '') || '来源';
-  } catch {
-    return '来源';
-  }
 }
 
 export function LibraryPage() {
@@ -161,7 +152,14 @@ export function LibraryPage() {
     setGroupKey(projectIdParam);
   }, [projectIdParam]);
 
+  /**
+   * 每次加载的序号。翻页在后台继续跑, 用户换筛选 / 刷新后旧循环必须立刻停写,
+   * 否则「全部来源」的旧结果会覆盖新筛选出来的列表。
+   */
+  const loadSeq = useRef(0);
+
   const load = useCallback(async () => {
+    const seq = ++loadSeq.current;
     // guest 不发请求: 素材接口要鉴权, 401 会被渲染成「素材加载失败」。
     // 不动 loading: 登录后直接进骨架屏, 不会先闪一下「素材库还是空的」
     if (!token) {
@@ -173,38 +171,60 @@ export function LibraryPage() {
     }
     setLoading(true);
     setError(null);
+    const params = {
+      kind: kind === 'all' ? undefined : kind,
+      capability: capability === 'all' ? undefined : capability,
+      limit: 200,
+    };
+
+    /*
+     * 首屏只等第一页 (最多 200 条) 就退出骨架屏; 剩余元数据在后台补齐。
+     * 此前要等 `while` 把所有页翻完才 setItems —— 素材上千时要串行请求十几次,
+     * 首屏白白空等, 而图片本来就只渲染前 20 张。
+     */
+    let first: Awaited<ReturnType<typeof assetsApi.list>>;
     try {
-      const params = {
-        kind: kind === 'all' ? undefined : kind,
-        capability: capability === 'all' ? undefined : capability,
-        limit: 200,
-      };
-      const first = await assetsApi.list(params);
-      let all = first.items;
-      /*
-       * 后端单页上限 200, 素材更多时必须继续翻页。
-       * 此前只拉一页就结束: 标题按 `total` 显示「共 N 个素材」, 网格与分组统计
-       * 却只有前 200 张, 剩下的在界面上永远够不到 —— 三个数各说各话。
-       */
-      while (all.length < first.total) {
-        const next = await assetsApi.list({ ...params, offset: all.length });
-        if (next.items.length === 0) break; // 翻页期间素材被删时避免死循环
-        all = all.concat(next.items);
-      }
-      setItems(all);
-      setTotal(first.total);
-      setVisible(PAGE_SIZE);
+      first = await assetsApi.list(params);
     } catch (e) {
+      if (seq !== loadSeq.current) return;
       // 保留上一次数据: 刷新失败不该把已看到的素材清空
       setError((e as Error).message || '素材加载失败');
-    } finally {
       setLoading(false);
+      return;
+    }
+    if (seq !== loadSeq.current) return;
+    setItems(first.items);
+    setTotal(first.total);
+    setVisible(PAGE_SIZE);
+    setLoading(false);
+
+    /*
+     * 后端单页上限 200, 分组计数与「加载更多」仍需要全量元数据。
+     * 这里继续翻页, 但每页到达就追加渲染; 中途失败静默停止 ——
+     * 首屏已经可用了, 不该因为第 5 页超时把整个素材库换成错误页。
+     */
+    let all = first.items;
+    try {
+      while (all.length < first.total) {
+        const next = await assetsApi.list({ ...params, offset: all.length });
+        if (seq !== loadSeq.current) return;
+        if (next.items.length === 0) break; // 翻页期间素材被删时避免死循环
+        all = all.concat(next.items);
+        setItems(all);
+      }
+    } catch {
+      /* 已展示首屏, 后台补齐失败不打扰用户 */
     }
   }, [kind, capability, token]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  // 页面卸载后后台翻页可能还在跑: 让序号失效, 停止后续 setState
+  useEffect(() => () => {
+    loadSeq.current += 1;
+  }, []);
 
   /** 单个素材的所属分组（键 / 显示名 / 排序位） */
   const groupOf = useCallback(
@@ -479,25 +499,29 @@ export function LibraryPage() {
       ) : (
         <>
           <div className="asset-library-grid">
-            {shown.slice(0, visible).map((a) => {
+            {shown.slice(0, visible).map((a, index) => {
               const url = assetSrc(a);
+              const isVideo = modalityOfFormat(a.format) === 'video';
+              /*
+               * 网格只加载缩略图; 视频没有缩略图管线, 直接用原文件 (卡片是懒加载)。
+               * 首行优先加载, 让首屏尽早出图。
+               */
+              const previewUrl = isVideo ? url : assetThumbSrc(a, 640) ?? url;
               const isSel = selected.includes(a.id);
               return (
                 <article
                   key={a.id}
-                  className={`asset-library-card${isSel ? ' is-selected' : ''}${
-                    selected.length > 0 ? ' is-selection-mode' : ''
-                  }`}
+                  className={`asset-library-card${isSel ? ' is-selected' : ''}`}
                 >
                   <div className="asset-library-cover">
-                    {url && (
+                    {previewUrl && (
                       <ResultMedia
-                        url={url}
+                        url={previewUrl}
                         modality={modalityOfFormat(a.format)}
                         alt={a.sourceUrl}
+                        priority={index < 5}
                       />
                     )}
-                    <span className="asset-library-card-overlay" />
                     <button
                       type="button"
                       className={`asset-library-check${isSel ? ' on' : ''}`}
@@ -542,32 +566,6 @@ export function LibraryPage() {
                         </button>
                       </Popconfirm>
                     </div>
-                  </div>
-                  <div className="asset-library-card-content">
-                    <span className="asset-library-card-title">
-                      {a.kind === 'generated'
-                        ? capabilityName(a.capability)
-                        : a.sourceTitle || '原图素材'}
-                    </span>
-                    <span className="asset-library-card-meta">
-                      <span>
-                        {a.width ?? '—'}×{a.height ?? '—'} · {(a.sizeBytes / 1024).toFixed(0)}KB
-                      </span>
-                      <span>{a.kind === 'generated' ? '生成图' : '原图'}</span>
-                    </span>
-                    {/* 扩展采集的素材才有来源: 站点名链回原页面, 供溯源与回访 */}
-                    {a.sourcePageUrl && (
-                      <a
-                        className="asset-library-card-source"
-                        href={a.sourcePageUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={a.sourcePageUrl}
-                      >
-                        <Link2 size={11} />
-                        {sourceHost(a)}
-                      </a>
-                    )}
                   </div>
                 </article>
               );

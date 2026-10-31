@@ -194,8 +194,8 @@ test.describe('后台高频动线', () => {
     for (const [path, heading] of [
       ['/admin/orders', '订单管理'],
       ['/admin/tasks', '任务监控'],
-      ['/admin/model-calls', '模型调用记录'],
-      ['/admin/model-config', '模型配置'],
+      ['/admin/model-calls', '调用记录'],
+      ['/admin/channels', '渠道工作台'],
     ] as const) {
       await page.goto(`${UI}${path}`);
       await expect(page.getByRole('heading', { name: heading })).toBeVisible({ timeout: 15000 });

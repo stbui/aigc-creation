@@ -24,10 +24,11 @@ const CLEANUP_TABLES = [
   'AdminAuditLog',
   'CleanupLog',
   'BackupRecord',
-  // 模型调用记录是排障数据, 不承载交易事实, 故可按时间清理。
+  // 调用记录 (任务 / 中转 / 文本工具共用) 是排障数据, 不承载交易事实,
+  // 故可按时间清理；交易事实在 BillingOrder 与积分流水里。
   // 加入时须同步 admin/retention.controller.ts 的 TARGETS —— 两处不一致
   // 会让界面上能选的表被后端拒绝 (或被后端接受却不在界面里)。
-  'ModelCallLog',
+  'ApiCallLog',
 ] as const;
 
 export interface BackupRow {

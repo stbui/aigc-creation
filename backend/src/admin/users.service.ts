@@ -215,7 +215,7 @@ export class AdminUsersService {
           succeeded: statusCount['succeeded'] ?? 0,
           failed: statusCount['failed'] ?? 0,
           running: statusCount['running'] ?? 0,
-          pending: statusCount['pending'] ?? 0,
+          queued: statusCount['queued'] ?? 0,
         },
       },
       recentTasks: recentTasks.map((t) => {
@@ -420,18 +420,20 @@ export class AdminUsersService {
        * 账号的孤儿数据 —— 既对不了账，也举不了证，比"留着账号"更糟。
        * 这类账号只能走注销（软删除）：匿名化 + 保留资金记录。
        */
-      const [orderCount, paymentCount, refundCount, invoiceCount, ledgerCount] = await Promise.all([
+      const [orderCount, paymentCount, refundCount, invoiceCount, ledgerCount, billingCount] = await Promise.all([
         this.prisma.order.count({ where: { userId: id } }),
         this.prisma.payment.count({ where: { userId: id } }),
         this.prisma.refund.count({ where: { userId: id } }),
         this.prisma.invoice.count({ where: { userId: id } }),
-        this.prisma.creditLedger.count({ where: { userId: id } }),
+        this.prisma.creditLedgerEntry.count({ where: { userId: id } }),
+        this.prisma.billingOrder.count({ where: { userId: id } }),
       ]);
-      if (orderCount + paymentCount + refundCount + invoiceCount + ledgerCount > 0) {
+      if (orderCount + paymentCount + refundCount + invoiceCount + ledgerCount + billingCount > 0) {
         throw new AppError(
           40001,
           `该账号存在 ${orderCount} 笔订单、${paymentCount} 笔支付、${refundCount} 笔退款、` +
-            `${invoiceCount} 张发票、${ledgerCount} 条积分流水，依法不能物理删除；请改用注销（保留资金记录）`,
+            `${invoiceCount} 张发票、${billingCount} 笔生成账单、${ledgerCount} 条积分流水，` +
+            '依法不能物理删除；请改用注销（保留资金记录）',
           400,
         );
       }
@@ -451,6 +453,7 @@ export class AdminUsersService {
         await tx.membershipUsage.deleteMany({ where: { userId: id } });
         await tx.membership.deleteMany({ where: { userId: id } });
         await tx.creditLot.deleteMany({ where: { userId: id } });
+        await tx.creditAccount.deleteMany({ where: { userId: id } });
         await tx.inviteRelation.deleteMany({
           where: { OR: [{ inviterId: id }, { inviteeId: id }] },
         });

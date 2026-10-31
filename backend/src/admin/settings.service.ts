@@ -85,8 +85,7 @@ export class AdminSettingsService {
    * 批量写入 / 恢复默认。
    *
    * @param settings 要设置的键值对。键必须是 SETTING_DEFS 里的键
-   * @param clears   要恢复默认的键。语义照抄 `model-config.service.ts` 的成熟实现：
-   *                 删除 SystemSetting 行 → 回落代码默认值
+   * @param clears   要恢复默认的键：删除 SystemSetting 行 → 回落代码默认值
    * @param actor    操作人标识（写入 SystemSetting.updatedBy，供审计追溯）
    * @param reason   操作原因（写入审计）
    */

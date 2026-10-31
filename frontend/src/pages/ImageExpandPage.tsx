@@ -7,6 +7,7 @@ import { PositionGrid } from '../components/ToolWidgets';
 import { ToolHistoryPane } from '../components/ToolHistoryPane';
 import { ExpandLayoutPreview } from '../components/ExpandLayoutPreview';
 import { computeExpandPlacement, loadImageSize } from '../lib/expandGeometry';
+import { assetThumbUrl } from '../lib/api';
 
 /**
  * 智能扩图 —— 1:1 复刻参考站 https://ijihua.cn/image-expand。
@@ -107,7 +108,7 @@ export function ImageExpandPage() {
               aria-label="预览待扩图图片"
               onClick={() => controls.preview(image)}
             >
-              <img src={image.url} alt="待扩图原图" draggable={false} />
+              <img src={assetThumbUrl(image.url, 320) ?? image.url} alt="待扩图原图" draggable={false} />
             </button>
             <button
               type="button"

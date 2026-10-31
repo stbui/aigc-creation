@@ -2,6 +2,7 @@ import { useState, type RefObject } from 'react';
 import { Spin } from 'antd';
 import { ImagePlus, Plus, X } from 'lucide-react';
 import { SUPPORTED_IMAGE_ACCEPT } from '../lib/constants';
+import { assetThumbUrl } from '../lib/api';
 
 /**
  * 工具页图片上传区 —— 2026-10-19 从 4 个大页面抽出。
@@ -149,7 +150,12 @@ export function ToolImageDropzone({
           <div className={`pk-thumb-grid${single ? ' pk-thumb-grid-single' : ''}`}>
             {images.map((img) => (
               <div key={img.id} className="pk-thumb">
-                <img src={img.url} alt={img.name} loading="lazy" decoding="async" />
+                <img
+                  src={assetThumbUrl(img.url, 320) ?? img.url}
+                  alt={img.name}
+                  loading="lazy"
+                  decoding="async"
+                />
                 <button
                   type="button"
                   className="pk-thumb-remove"

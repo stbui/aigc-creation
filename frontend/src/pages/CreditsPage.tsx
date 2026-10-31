@@ -32,6 +32,8 @@ const LEDGER_LABEL: Record<string, string> = {
   grant: '发放',
   consume: '生成消耗',
   refund_reclaim: '退款扣回',
+  reserve: '预授权冻结',
+  refund: '预授权退回',
   expire: '到期回收',
   admin_adjust: '客服调整',
 };

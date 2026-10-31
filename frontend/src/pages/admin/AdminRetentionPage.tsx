@@ -38,7 +38,7 @@ function fmtTime(v: string | null): string {
 /** 清理目标的中文名。后端已给 label, 这里只在日志表里兜底 */
 const TARGET_LABELS: Record<string, string> = {
   AdminAuditLog: '后台操作审计',
-  ModelCallLog: '模型调用记录',
+  ApiCallLog: '模型调用记录',
   BackupRecord: '备份记录',
   CleanupLog: '清理日志',
 };

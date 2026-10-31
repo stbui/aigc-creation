@@ -11,9 +11,9 @@
  *
  * 本文件的三条硬约束
  * ------------------
- * 1. **绝不改写 process.env。** validate 只产出配置树，现有 5 处直接读
- *    `process.env.X` 的代码（jwt.service / gateway.config / storage.service /
- *    model-config.service / main.ts）行为保持 1:1 不变，不因引入配置层被改语义。
+ * 1. **绝不改写 process.env。** validate 只产出配置树，现有直接读
+ *    `process.env.X` 的代码（jwt.service / storage.service / main.ts）行为保持
+ *    1:1 不变，不因引入配置层被改语义。
  * 2. **类型错误即启动失败。** `PORT=abc` 这类值在旧代码里会变成 NaN 传给
  *    app.listen()，静默绑到随机端口且极难排查；这里直接抛错并指名变量。
  * 3. **默认值与现有代码逐项一致。** 表中的 default 必须与各处硬编码的兜底
@@ -189,26 +189,9 @@ export const ENV_SPECS: readonly Spec[] = [
   { key: 'log.console', env: 'LOG_CONSOLE', type: 'boolean', def: true },
   { key: 'log.errorFile', env: 'LOG_ERROR_FILE', type: 'boolean', def: true },
 
-  // ── 图像生成网关（默认值取自 providers/gateway.config.ts）──────────────
-  { key: 'gateway.baseUrl', env: 'GATEWAY_BASE_URL', type: 'string', def: '' },
-  { key: 'gateway.token', env: 'GATEWAY_TOKEN', type: 'string', def: '' },
-  { key: 'gateway.model', env: 'GATEWAY_MODEL', type: 'string', def: '' },
-  {
-    key: 'gateway.provider',
-    env: 'GATEWAY_PROVIDER',
-    type: 'string',
-    // 默认 openai: 新部署应走主流协议; 存量 modelverse 值已在
-    // CapabilityRouterProvider.pickProtocol 里作为 openai 的历史别名兼容。
-    // oneOf 把取值锁死 —— 填错协议的表现会是上游 404,
-    // 在启动时就拒掉比在生成时才暴露好得多。
-    def: 'openai',
-    oneOf: ['openai', 'modelverse', 'volcengine', 'minimax'],
-  },
-  { key: 'gateway.vendor', env: 'GATEWAY_VENDOR', type: 'string', def: '' },
-  { key: 'gateway.enabled', env: 'GATEWAY_ENABLED', type: 'boolean', def: false },
-  { key: 'gateway.timeoutMs', env: 'GATEWAY_TIMEOUT_MS', type: 'number', def: 120000, min: 1000 },
-  { key: 'gateway.pollMs', env: 'GATEWAY_POLL_MS', type: 'number', def: 2000, min: 100 },
-  { key: 'gateway.maxPolls', env: 'GATEWAY_MAX_POLLS', type: 'number', def: 60, min: 1 },
+  // 模型通道（渠道 / 渠道模型 / 前台模型 / 价格档）全部由后台配置，走数据库，
+  // 不再有 GATEWAY_* 环境变量：P6 起旧 providers 层已删除，环境变量配通道会
+  // 出现「填了却不生效」的静默配置错误，故启动期直接不再声明这些键。
   { key: 'asset.publicBase', env: 'ASSET_PUBLIC_BASE', type: 'string', def: '' },
 
   // ── 安全与可观测（B5, 2026-10-21）──────────────────────────────────────
@@ -236,6 +219,43 @@ export const ENV_SPECS: readonly Spec[] = [
   { key: 'storage.minioAccessKey', env: 'MINIO_ACCESS_KEY', type: 'string', def: '' },
   { key: 'storage.minioSecretKey', env: 'MINIO_SECRET_KEY', type: 'string', def: '' },
   { key: 'storage.minioBucket', env: 'MINIO_BUCKET', type: 'string', def: 'huojue' },
+
+  // ── 渠道与模型子系统（移植自 open-ai-canvas）───────────────────────────
+  // 渠道凭证加密密钥（base64 编码的 32 字节）。留空 = 开发态自动生成并落盘；
+  // 生产必须显式配置 —— 换密钥等于全部上游凭证作废。
+  { key: 'model.secretKey', env: 'MODEL_SECRET_KEY', type: 'string', def: '' },
+  // 插件包目录（相对进程 cwd）。启动期扫描其中的 <id>/manifest.json。
+  { key: 'model.pluginDir', env: 'MODEL_PLUGIN_DIR', type: 'string', def: 'plugins' },
+  // 后台上传插件的安装目录（与 `MODEL_PLUGIN_DIR` 分开：内置包随代码入库不可卸载）
+  { key: 'model.pluginInstallDir', env: 'MODEL_PLUGIN_INSTALL_DIR', type: 'string', def: 'plugins-installed' },
+  // 服务商目录（远端 JSON 清单）。留空 = 目录为空态，不内置任何假条目
+  { key: 'model.providerCatalogUrl', env: 'MODEL_PROVIDER_CATALOG_URL', type: 'string', def: '' },
+  // 单账号并发任务上限（替代旧会员 maxConcurrent 的硬编码兜底）
+  { key: 'model.activeTaskLimit', env: 'MODEL_ACTIVE_TASK_LIMIT', type: 'number', def: 2, min: 1, max: 64 },
+  // 上游请求默认超时与产物下载超时
+  { key: 'model.httpTimeoutMs', env: 'MODEL_HTTP_TIMEOUT_MS', type: 'number', def: 120000, min: 1000 },
+  { key: 'model.mediaTimeoutMs', env: 'MODEL_MEDIA_TIMEOUT_MS', type: 'number', def: 180000, min: 1000 },
+  // worker 轮询间隔与单次租约时长
+  { key: 'model.workerIntervalMs', env: 'MODEL_WORKER_INTERVAL_MS', type: 'number', def: 1000, min: 100 },
+  { key: 'model.leaseMs', env: 'MODEL_LEASE_MS', type: 'number', def: 120000, min: 10000 },
+  // 冷却、并发槽与目录版本都是进程内存实现：多实例部署时每台各自判定（见 docs/model-architecture.md）
+  // SSRF 逃生开关：仅部署者使用，且自定义渠道不受其影响（需逐个点名主机）
+  { key: 'model.allowPrivateUpstreams', env: 'MODEL_ALLOW_PRIVATE_UPSTREAMS', type: 'boolean', def: false },
+  { key: 'model.allowedPrivateUpstreamHosts', env: 'MODEL_ALLOWED_PRIVATE_UPSTREAM_HOSTS', type: 'csv', def: [] },
+
+  // ── 代理中转（`model/proxy/proxy.constants.ts` 的 PROXY_LIMIT_DEFAULTS）──
+  // 默认值与代码常量必须逐字一致：两处不同会让「文档写的上限」与「实际生效的上限」打架
+  { key: 'model.proxy.enabled', env: 'MODEL_PROXY_ENABLED', type: 'boolean', def: true },
+  { key: 'model.proxy.systemRequestMb', env: 'MODEL_PROXY_SYSTEM_REQUEST_MB', type: 'number', def: 32, min: 1, max: 512 },
+  { key: 'model.proxy.systemResponseMb', env: 'MODEL_PROXY_SYSTEM_RESPONSE_MB', type: 'number', def: 64, min: 1, max: 512 },
+  { key: 'model.proxy.systemTimeoutMs', env: 'MODEL_PROXY_SYSTEM_TIMEOUT_MS', type: 'number', def: 600000, min: 1000 },
+  { key: 'model.proxy.customRequestMb', env: 'MODEL_PROXY_CUSTOM_REQUEST_MB', type: 'number', def: 32, min: 1, max: 512 },
+  { key: 'model.proxy.customResponseMb', env: 'MODEL_PROXY_CUSTOM_RESPONSE_MB', type: 'number', def: 64, min: 1, max: 512 },
+  { key: 'model.proxy.customTimeoutMs', env: 'MODEL_PROXY_CUSTOM_TIMEOUT_MS', type: 'number', def: 600000, min: 1000 },
+  // 单用户自定义中转并发：0 = 不限（仅限自建部署）
+  { key: 'model.proxy.customConcurrency', env: 'MODEL_PROXY_CUSTOM_CONCURRENCY', type: 'number', def: 2, min: 0, max: 64 },
+  // 代理账单兜底清扫：开启后 reserved 超时自动退款、running 超时转人工核对
+  { key: 'model.billingSweepEnabled', env: 'MODEL_BILLING_SWEEP_ENABLED', type: 'boolean', def: true },
 ];
 
 /** 配置树（ConfigService.get('app.port') 等的载体） */
@@ -254,15 +274,6 @@ export interface AppConfigTree {
     console: boolean;
     errorFile: boolean;
   };
-  gateway: {
-    baseUrl: string;
-    token: string;
-    model: string;
-    enabled: boolean;
-    timeoutMs: number;
-    pollMs: number;
-    maxPolls: number;
-  };
   asset: { publicBase: string; signingSecret: string };
   rateLimit: { enabled: boolean; trustProxy: boolean };
   observability: { errorWebhookUrl: string };
@@ -280,9 +291,34 @@ export interface AppConfigTree {
     minioSecretKey: string;
     minioBucket: string;
   };
+  model: {
+    secretKey: string;
+    pluginDir: string;
+    pluginInstallDir: string;
+    providerCatalogUrl: string;
+    activeTaskLimit: number;
+    httpTimeoutMs: number;
+    mediaTimeoutMs: number;
+    workerIntervalMs: number;
+    leaseMs: number;
+    redisUrl: string;
+    allowPrivateUpstreams: boolean;
+    allowedPrivateUpstreamHosts: string[];
+    proxy: {
+      enabled: boolean;
+      systemRequestMb: number;
+      systemResponseMb: number;
+      systemTimeoutMs: number;
+      customRequestMb: number;
+      customResponseMb: number;
+      customTimeoutMs: number;
+      customConcurrency: number;
+    };
+    billingSweepEnabled: boolean;
+  };
 }
 
-/** 真值判定，与 gateway.config.ts 的 bool() 保持同义 */
+/** 真值判定：`1/true/yes/on` 为真，其余为假 */
 function parseBool(raw: string): boolean {
   const v = raw.trim().toLowerCase();
   return v === '1' || v === 'true' || v === 'yes' || v === 'on';

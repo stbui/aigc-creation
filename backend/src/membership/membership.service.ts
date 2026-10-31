@@ -177,7 +177,10 @@ export class MembershipService {
     return this.prisma.generationTask.count({
       // ⚠ GenerationTask 用 ownerId 而非 userId (与 Asset 一致)。
       // 写成 userId 时 Prisma 报 `Unknown argument 'userId'` → 500, 而非 400。
-      where: { ownerId: userId, status: { in: ['pending', 'running'] } },
+      //
+      // 只数用户真正发起的生成: 批量生成的第 2..N 张挂在父任务下 (parentTaskId),
+      // 算成一个并发会让「一次生成」按 6 个任务占额度, 会员套餐的并发权益直接失效。
+      where: { ownerId: userId, status: { in: ['queued', 'running'] }, parentTaskId: null },
     });
   }
 
@@ -573,7 +576,8 @@ export class MembershipService {
  */
 export function buildPerkLabels(perks: Perks, monthlyCredits = 0): string[] {
   const labels: string[] = [];
-  labels.push(monthlyCredits > 0 ? `每月赠送 ${monthlyCredits} 积分` : '订阅期内含积分');
+  // 0 配额不发积分 —— 免费档写「订阅期内含积分」是假话, 直接不出这条
+  if (monthlyCredits > 0) labels.push(`每月赠送 ${monthlyCredits} 积分`);
   if (perks.fastChannel) labels.push('专享快速生成通道');
   if (perks.maxConcurrent > 0) labels.push(`同时处理 ${perks.maxConcurrent} 个任务`);
   else labels.push('不限并发任务数');

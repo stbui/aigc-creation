@@ -156,7 +156,7 @@
 
 ### 4.6 后台管理
 
-后台 30 个页面，权限点定义在 `backend/src/admin/permissions.ts`；侧栏分组唯一事实源是 `frontend/src/components/admin/adminNav.ts` 的 `ADMIN_MENU`。
+后台 35 个页面，权限点定义在 `backend/src/admin/permissions.ts`；侧栏分组唯一事实源是 `frontend/src/components/admin/adminNav.ts` 的 `ADMIN_MENU`。
 
 | 分组 | 页面 |
 | --- | --- |
@@ -166,7 +166,7 @@
 | 交易 | 商品管理 / 订单管理 / 积分账本 / 能力消耗价 / 优惠券 / 限时活动 / 邀请与签到 |
 | 财务 | 支付渠道 / 发票管理 / 渠道对账 |
 | 系统 | 角色权限 / 系统设置 / 存储配置 / 定时任务 / 操作审计 |
-| 模型 | 模型配置 / 调用记录 / 能力管控 |
+| 模型 | 渠道工作台 / 前台模型 / 用户分组 / 插件 / 能力管控 / 调用记录 / 生成账单 / 财务分析 |
 | 数据安全 | 数据备份 / 保留期清理 |
 
 核心能力：
@@ -208,14 +208,14 @@
 | 用户与权限 | `User` / `AdminRole` / `AdminAuditLog` / `SystemSetting` |
 | 创作 | `Project` / `Asset` / `GenerationTask` |
 | 交易 | `Product` / `Order` / `OrderItem` / `Payment` / `Refund` |
-| 权益 | `CreditLot` / `CreditLedger` / `MembershipPlan` / `Membership` / `MembershipUsage` |
+| 权益 | `CreditAccount` / `CreditLot` / `CreditLedgerEntry` / `CreditReservationItem` / `MembershipPlan` / `Membership` / `MembershipUsage` |
 | 增长 | `Coupon` / `Campaign` / `InviteRelation` / `InviteRewardRule` / `CheckinRecord` / `CheckinRule` |
 | 财务 | `Invoice` / `ReconciliationBatch` / `ReconciliationItem` |
 | 身份安全 | `AccountToken`（一次性令牌：重置密码等）/ `LoginLog` / `LoginSession`（扫码登录票据，**只存 SHA-256 哈希**，`confirmed → consumed` 一次性兑换）/ `OAuthIdentity`（第三方绑定：`provider` + `subject` 联合唯一，`lastLoginAt` 记录最近登录） |
 | 内容与合规 | `LegalDocument`（按 slug + version 版本化）/ `ConsentRecord`（同意留痕）/ `Notification` / `MessageTemplate` / `AigcLabelConfig`（单行 `id='default'`：`specJson` 样式 + `pngBase64` 浏览器渲染位图 + `specKey` 过期判定） |
 | 服务 | `Ticket`（`ticketNo @unique`，状态机见 `tickets.service.ts` 的 `TRANSITIONS`）/ `TicketReply` |
-| 模型通道 | `ModelChannel` / `ModelChannelConfig` / `ModelCallLog` / `CapabilityControl`（能力上下线，**无行 = 启用**） |
-| 运维 | `BackupRecord` / `CleanupLog` |
+| 模型层 | `ModelChannel` / `ChannelModel` / `ChannelModelPriceTier` / `LogicalModel` / `LogicalModelRevision` / `LogicalModelRoute` / `RouteAttempt` / `UserGroup` / `UserGroupChannel` / `BillingOrder` / `ApiCallLog` / `CapabilityControl`（能力上下线，**无行 = 启用**） |
+| 运维 | `BackupRecord` / `CleanupLog` / `PluginPlatformState` / `UserPluginState` / `RouteCatalogVersion` |
 
 SQLite 不支持 Prisma enum，状态类字段一律 String + DTO 白名单。`Asset.kind` = `original` | `generated`；`Asset.outputOfTask` 是 1:1 反向关系。计费相关字段以快照为准（`GenerationTask.creditCost`、`OrderItem.priceCentsSnapshot` / `creditsSnapshot`），不按当前价重算。
 

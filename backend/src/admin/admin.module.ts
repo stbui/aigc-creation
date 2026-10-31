@@ -5,7 +5,6 @@ import { StorageModule } from '../storage/storage.module';
 import { OrdersModule } from '../orders/orders.module';
 import { CreditsModule } from '../credits/credits.module';
 import { MembershipModule } from '../membership/membership.module';
-import { ProvidersModule } from '../providers/providers.module';
 import { AdminController } from './admin.controller';
 import { AdminUsersController } from './users.controller';
 import { AdminRolesController, AdminSettingsController } from './roles.controller';
@@ -35,8 +34,6 @@ import { AdminSearchService } from './search.service';
 import { TicketsModule } from '../tickets/tickets.module';
 import { AdminCommerceService } from './commerce-admin.service';
 import { AdminSchedulerController } from './scheduler.controller';
-import { AdminModelConfigController, AdminModelCallsController } from './model.controller';
-import { AdminModelChannelsController } from './model-channel.controller';
 import { AdminTasksController } from './tasks-admin.controller';
 import { AdminAlertsController } from './alerts.controller';
 import { AdminAlertsService } from './alerts.service';
@@ -58,9 +55,6 @@ import { AdminSettingsService } from './settings.service';
 import { AdminAuditService } from './audit.service';
 import { BackupService } from './backup.service';
 import { AdminAssetsService } from './assets-admin.service';
-import { ModelConfigService } from './model-config.service';
-import { ModelCallService } from './model-call.service';
-import { ModelChannelService } from './model-channel.service';
 import { TasksAdminService } from './tasks-admin.service';
 import { MarketingCoreModule } from '../marketing/marketing-core.module';
 import { GenerateModule } from '../generate/generate.module';
@@ -76,9 +70,6 @@ import { SchedulerService } from './scheduler.service';
  * 三者内部都对非 /admin 路径直接放行, 因此 C 端链路不受影响。
  * 执行顺序: AdminGuard (身份) → PermissionGuard (权限点) → controller → AuditInterceptor。
  *
- * ProvidersModule: ModelConfigService 保存配置后要主动失效运行时缓存,
- * 需注入同一个 CapabilityRouterProvider 实例 (否则缓存不失效, 改动要等 3s 才生效)。
- *
  * CreditsModule / OrdersModule: 商品订单页需要它们提供的 service。
  * MarketingCoreModule: 营销判定(券/活动)被后台配置、下单核销与 C 端试算共用。
  * 依赖是单向的 —— MarketingCoreModule 不反向依赖本模块, 因此无循环。
@@ -91,7 +82,6 @@ import { SchedulerService } from './scheduler.service';
   imports: [
     PrismaModule,
     StorageModule,
-    ProvidersModule,
     CreditsModule,
     OrdersModule,
     MembershipModule,
@@ -138,9 +128,6 @@ import { SchedulerService } from './scheduler.service';
     // 工单处理中心 + 全局搜索 (B7)
     AdminTicketsController,
     AdminSearchController,
-    AdminModelConfigController,
-    AdminModelCallsController,
-    AdminModelChannelsController,
     // 任务监控 (B-28~B-33)
     AdminTasksController,
     // 顶栏告警中心：按权限聚合待处理工单 / 失败任务 / 对账差异 / 备份状态
@@ -165,9 +152,6 @@ import { SchedulerService } from './scheduler.service';
     AdminAssetsService,
     AdminCommerceService,
     AdminMembershipPlansService,
-    ModelConfigService,
-    ModelCallService,
-    ModelChannelService,
     TasksAdminService,
     AdminAlertsService,
     AdminSearchService,

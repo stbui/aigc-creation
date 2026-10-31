@@ -1,0 +1,40 @@
+本目录（backend/src/model）的渠道与模型子系统移植自 open-ai-canvas。
+
+来源项目：open-ai-canvas
+许可：MIT License
+版权：Copyright (c) 2026 ddcat and Open AI Canvas contributors
+
+派生范围（按源文件到目标文件的大致对应）：
+  internal/model/*                     → domain/（能力合同、选择器）
+  internal/app/*（channels / pricing）  → channels/
+  internal/protocol/*（registry 形态）  → protocol/
+  internal/outbound/outbound.go         → infra/outbound.ts
+  internal/settings.go（密文格式）      → infra/secret-cipher.ts
+  internal/kernel/token_billing.go      → infra/microcredits.ts
+
+上述文件已改写为 TypeScript 并适配 NestJS + Prisma + SQLite，
+行为语义（校验顺序、软删除唯一键、向上取整、选择器匹配规则）保持一致。
+
+以下为上游许可全文：
+
+MIT License
+
+Copyright (c) 2026 ddcat and Open AI Canvas contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

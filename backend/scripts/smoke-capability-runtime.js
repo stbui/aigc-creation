@@ -2,8 +2,9 @@
  * 能力运行时真相冒烟 (B6, 2026-10-21)。
  *
  * 覆盖三件事：
- *   1. GET /capabilities 每项都带 runtime；2026-10-25 起本地生成算法已删除，
- *      localQuality 恒为 none、effective 不得为 local，没模型通道时必须是 unavailable
+ *   1. GET /capabilities 每项都带 runtime；本地生成算法已删除，P6 起
+ *      runtime 只下发 enabled / remoteAvailable / effective / reason，
+ *      没有模型线路时必须是 unavailable
  *   2. 后台能力管控：下线无原因被拒、下线后 C 端不可提交（40005）、恢复后复原
  *   3. 限时免费：进行中的活动把生效价压到 0，活动停用后自动恢复原价
  *
@@ -74,12 +75,20 @@ const VALID_EFFECTIVE = ['remote', 'disabled', 'unavailable'];
   const noReason = items.filter((c) => !c.runtime?.reason);
   check('每项都有可读的 reason', noReason.length === 0, noReason.map((c) => c.id).join(',') || '全部有');
 
-  // 本地生成算法已删除。localQuality 仅为兼容旧前端保留，必须恒为 none。
-  const qualityWrong = items.filter((c) => c.runtime.localQuality !== 'none');
+  /*
+   * P6 删除了旧 providers 层，runtime 里不再有 `route` / `localQuality`
+   * 这类兼容字段。断言在这里是防回归：漏回来一个就说明有人在按旧契约
+   * 给前端喂「可能走本地」的信号。
+   */
+  const staleRuntime = items.filter(
+    (c) =>
+      Object.prototype.hasOwnProperty.call(c.runtime, 'route') ||
+      Object.prototype.hasOwnProperty.call(c.runtime, 'localQuality'),
+  );
   check(
-    'localQuality 恒为 none',
-    qualityWrong.length === 0,
-    qualityWrong.map((c) => `${c.id}=${c.runtime.localQuality}`).join(',') || `${items.length} 项`,
+    'runtime 不残留 route / localQuality',
+    staleRuntime.length === 0,
+    staleRuntime.map((c) => c.id).join(',') || `${items.length} 项`,
   );
   const legacyFields = items.filter(
     (c) => Object.prototype.hasOwnProperty.call(c, 'localImpl') ||
@@ -165,6 +174,9 @@ const VALID_EFFECTIVE = ['remote', 'disabled', 'unavailable'];
 
   const gen = await call('POST', '/generate', U, {
     projectId,
+    // DTO 层要求 logicalModelId 非空；这里故意给一个不存在的 id，
+    // 用来证明「下线」在模型解析与素材校验之前就把它拦下了。
+    logicalModelId: 'smoke-offline-model',
     inputAssetIds: ['no-such-asset'],
     capability: TARGET,
     params: {},

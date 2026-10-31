@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { App, Modal } from 'antd';
 import { ChevronDown, Search, X } from 'lucide-react';
-import { assetSrc, assetsApi } from '../lib/api';
+import { assetSrc, assetThumbSrc, assetsApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { StateEmpty, StateError, StateLoading } from './StateViews';
 import { ResultMedia, modalityOfFormat } from './ResultMedia';
@@ -398,6 +398,10 @@ export function AssetLibraryModal({
                 <div className="alp-grid">
                   {visible.map((a) => {
                     const on = selected.includes(a.id);
+                    const modality = modalityOfFormat(a.format);
+                    // 视频没有缩略图通道, 原样交给 <video>; 图片走方形 JPEG 缩略图
+                    const previewUrl =
+                      (modality === 'video' ? assetSrc(a) : assetThumbSrc(a, 480)) ?? '';
                     return (
                       <button
                         key={a.id}
@@ -408,11 +412,7 @@ export function AssetLibraryModal({
                       >
                         <div className="alp-cover">
                           {/* 视频素材用 <video> —— 浏览器会把 mp4 当图片解码, 表现为空白缩略图 */}
-                          <ResultMedia
-                            url={assetSrc(a) ?? ''}
-                            modality={modalityOfFormat(a.format)}
-                            alt={a.sourceUrl}
-                          />
+                          <ResultMedia url={previewUrl} modality={modality} alt={a.sourceUrl} />
                           {on && (
                             <span className="alp-check" aria-label="已选择">
                               ✓

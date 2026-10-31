@@ -95,6 +95,18 @@ class CreateMembershipPlanDto {
   @IsInt()
   sortOrder?: number;
 
+  /**
+   * 会员等级映射的用户分组。
+   *
+   * 分组决定该等级用户可见的渠道与价格倍率（`docs/channel-model-design.md` §6.4）。
+   * 留空 = 落 `default` 分组。**运营必须显式配**：不配的话所有等级都落默认组，
+   * 分组倍率与模型级覆盖在真实数据下永不生效 —— 界面上却看不出任何异常。
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  userGroupCode?: string;
+
   /** 高危配置变更必须留原因，审计要能回答「谁为什么改」 */
   @IsString()
   @IsNotEmpty({ message: '必须填写变更原因' })
@@ -140,6 +152,17 @@ class UpdateMembershipPlanDto {
   @IsInt()
   sortOrder?: number;
 
+  /**
+   * 会员等级映射的用户分组；留空 = 落 `default` 分组。
+   *
+   * 改这一项等于改「这一等级能看到哪些渠道、按什么倍率计价」，属于高危变更，
+   * 与其它高危字段一样必须留原因。
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  userGroupCode?: string;
+
   @IsString()
   @IsNotEmpty({ message: '必须填写变更原因' })
   @MaxLength(200)
@@ -177,6 +200,7 @@ function planView(plan: {
   perks: string;
   status: string;
   sortOrder: number;
+  userGroupCode: string;
   createdAt: Date;
   updatedAt: Date;
   _count?: { memberships: number; orders: number };
@@ -195,6 +219,8 @@ function planView(plan: {
     perkLabels: buildPerkLabels(perks, plan.monthlyCredits),
     status: plan.status,
     sortOrder: plan.sortOrder,
+    /** 会员等级映射的用户分组；空串 = 落 `default` 分组 */
+    userGroupCode: plan.userGroupCode ?? '',
     memberCount: plan._count?.memberships ?? 0,
     orderCount: plan._count?.orders ?? 0,
     createdAt: plan.createdAt.toISOString(),
@@ -225,6 +251,7 @@ export class AdminMembershipPlansService {
     const perks = normalizePerks(dto.perks);
     const exists = await this.prisma.membershipPlan.findUnique({ where: { code: dto.code } });
     if (exists) throw new AppError(40901, `套餐编码 ${dto.code} 已存在`, 409);
+    const userGroupCode = await this.resolveUserGroupCode(dto.userGroupCode);
 
     const plan = await this.prisma.membershipPlan.create({
       data: {
@@ -238,6 +265,7 @@ export class AdminMembershipPlansService {
         // 默认下架：运营建完套餐应先核对价目与权益，再手动上架
         status: dto.status ?? 'offline',
         sortOrder: dto.sortOrder ?? 0,
+        userGroupCode,
       },
       include: { _count: { select: { memberships: true, orders: true } } },
     });
@@ -267,6 +295,9 @@ export class AdminMembershipPlansService {
       // 修改权益只影响新订单；存量会员用 Membership.perksSnapshot，不会被追溯改价
       data.perks = JSON.stringify(normalizePerks(dto.perks));
     }
+    if (dto.userGroupCode !== undefined) {
+      data.userGroupCode = await this.resolveUserGroupCode(dto.userGroupCode);
+    }
 
     const plan = await this.prisma.membershipPlan.update({
       where: { id },
@@ -274,6 +305,25 @@ export class AdminMembershipPlansService {
       include: { _count: { select: { memberships: true, orders: true } } },
     });
     return planView(plan);
+  }
+
+  /**
+   * 校验并归一会员等级要映射的用户分组。
+   *
+   * 空串 = 不映射 = 落 `default` 分组（合法的兜底）。
+   * 非空时**必须存在**：写一个不存在的分组编码不会报错，只会让所有该等级的用户
+   * 在取分组时静默回落默认组 —— 运营以为配了专属分组，实际倍率与渠道可见性
+   * 一点都没生效。故在这里显式拒绝。
+   */
+  private async resolveUserGroupCode(raw: string | undefined): Promise<string> {
+    const code = String(raw ?? '').trim().toLowerCase();
+    if (code === '') return '';
+    const group = await this.prisma.userGroup.findFirst({
+      where: { activeKey: code, deletedAt: null },
+      select: { id: true },
+    });
+    if (!group) throw new AppError(40001, `用户分组 ${code} 不存在，请先在「用户分组」中创建`, 400);
+    return code;
   }
 
   async setStatus(id: string, dto: PlanStatusDto) {

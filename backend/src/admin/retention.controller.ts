@@ -37,8 +37,8 @@ const TARGETS: RetentionTarget[] = [
     note: '合规要求可追溯, 默认保留半年; 实际天数取系统设置 retention.auditLogDays',
   },
   {
-    table: 'ModelCallLog',
-    label: '模型调用记录',
+    table: 'ApiCallLog',
+    label: '调用记录',
     defaultDays: 90,
     note: '排障窗口通常为一周, 保留三个月足够定位问题且不至于无限增长',
   },

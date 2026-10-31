@@ -228,6 +228,8 @@ export class AssetsService {
     if (asset.storageKey) {
       const p = this.storage.get((asset.storageBackend as StorageBackend) ?? 'local');
       await p?.delete(asset.storageKey);
+      // 缩略图缓存也是磁盘垃圾: 原图删除后一并清掉所有尺寸变体
+      await removeThumbnailCache(asset.storageKey).catch(() => undefined);
     }
 
     return { id, removedTasks: producedTasks.length };
@@ -356,6 +358,20 @@ function parseDateInput(raw: string): Date | null {
   }
   const t = Date.parse(s);
   return Number.isNaN(t) ? null : new Date(t);
+}
+
+/**
+ * 删除素材的缩略图缓存 (`<UPLOAD_DIR>/.thumbs/<w>x<h>/<key>.jpg`)。
+ *
+ * 缓存目录按尺寸分组, 删除时枚举现有尺寸子目录即可; 缺失就跳过 ——
+ * 清理失败绝不回滚已经完成的素材删除。
+ */
+async function removeThumbnailCache(storageKey: string): Promise<void> {
+  const root = join(resolveUploadsDir(), '.thumbs');
+  const sizes = await fsp.readdir(root).catch(() => [] as string[]);
+  await Promise.all(
+    sizes.map((size) => fsp.unlink(join(root, size, `${storageKey}.jpg`)).catch(() => undefined)),
+  );
 }
 
 /** 安全解析 aigcMeta JSON: 坏数据不该让素材列表整个 500 */

@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { App, Spin } from 'antd';
 import { ImagePlus, Plus, Upload, X } from 'lucide-react';
-import { assetsApi, generateApi, assetSrc, newIdempotencyKey, toAbsoluteUrl } from '../lib/api';
+import { assetsApi, generateApi, assetSrc, assetThumbUrl, newIdempotencyKey, toAbsoluteUrl } from '../lib/api';
+import { resolveModelId } from '../lib/models';
 import { AssetLibraryModal, useAssetLibrary } from '../components/AssetLibraryModal';
 import { MobileUploadModal } from '../components/MobileUploadModal';
 import { ImageLightbox } from '../components/ImageLightbox';
@@ -469,7 +470,7 @@ export function ProductSkuPage() {
         id: pendingId(planIndex),
         planIndex,
         label: labelOf(planIndex),
-        status: 'pending' as TaskStatus,
+        status: 'queued' as TaskStatus,
       }));
       setBatchItems(pending);
       setActiveResultId(pending[0]?.id ?? null);
@@ -477,7 +478,7 @@ export function ProductSkuPage() {
       setBatchItems((current) => current.map((entry) => targets.includes(entry.planIndex) ? {
         ...entry,
         id: pendingId(entry.planIndex),
-        status: 'pending',
+        status: 'queued',
         url: undefined,
         errorCode: undefined,
       } : entry));
@@ -486,6 +487,9 @@ export function ProductSkuPage() {
 
     try {
       const projectId = await ensureProject();
+      // 整批 SKU 共用同一个模型：版式一致性依赖同一线路，逐张解析可能在
+      // 目录缓存过期时把一批图拆到两个模型上
+      const logicalModelId = await resolveModelId('sku_image');
       const startResults = await Promise.allSettled(targets.map(async (planIndex) => {
         const item = plan.items[planIndex];
         const label = labelOf(planIndex);
@@ -512,6 +516,7 @@ export function ProductSkuPage() {
         const { taskId } = await generateApi.start({
           projectId,
           capability: 'sku_image',
+          logicalModelId,
           idempotencyKey,
           inputAssetIds: [plan.template.id, ...uniqueReferences.map((reference) => reference.id)],
           params: {
@@ -540,7 +545,7 @@ export function ProductSkuPage() {
         if (targetPosition < 0) return entry;
         const result = startResults[targetPosition];
         if (result.status === 'rejected') return { ...entry, status: 'failed' };
-        return { ...entry, id: result.value.taskId, label: result.value.label, status: 'running' };
+        return { ...entry, id: result.value.taskId, label: result.value.label, status: 'queued' };
       }));
       if (started[0]) setActiveResultId(started[0].taskId);
 
@@ -600,7 +605,7 @@ export function ProductSkuPage() {
       }
     } catch (error) {
       reportError(error);
-      setBatchItems((current) => current.map((entry) => targets.includes(entry.planIndex) && (entry.status === 'pending' || entry.status === 'running')
+      setBatchItems((current) => current.map((entry) => targets.includes(entry.planIndex) && (entry.status === 'queued' || entry.status === 'running')
         ? { ...entry, status: 'failed' }
         : entry));
       setFailedNotice((error as Error).message || 'SKU 图生成失败');
@@ -859,7 +864,7 @@ export function ProductSkuPage() {
             {template ? (
               <div className="product-sku-template-ready">
                 <button type="button" className="product-sku-template-thumb" aria-label="预览模板图" onClick={() => setPreviewUrl(template.url)}>
-                  <img src={template.url} alt={template.name} />
+                  <img src={assetThumbUrl(template.url, 320) ?? template.url} alt={template.name} />
                 </button>
                 <div>
                   <button type="button" onClick={() => setEditorOpen(true)}>重新框选</button>
@@ -980,7 +985,7 @@ export function ProductSkuPage() {
                               <X size={18} />
                             </button>
                             <img
-                              src={variant.reference.url}
+                              src={assetThumbUrl(variant.reference.url, 240) ?? variant.reference.url}
                               alt={`SKU ${itemIndex + 1} 区域 ${regionIndex + 1} 参考图`}
                               onClick={() => setPreviewUrl(variant.reference!.url)}
                             />

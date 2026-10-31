@@ -18,6 +18,7 @@ if (!ADMIN_PASSWORD) {
 const { PrismaClient } = require('@prisma/client');
 const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
 const { resolveDbUrl } = require('./db-url');
+const { clearCredits } = require('./credit-fixture');
 const prisma = new PrismaClient({ adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }) });
 
 async function call(method, path, token, body) {
@@ -62,8 +63,10 @@ function check(name, ok, detail = '') {
   const AT = admin.data.accessToken;
 
   const products = await prisma.product.findMany({ where: { status: 'active' } });
-  const starter = products.find((p) => p.sku === 'CREDITS_STARTER');
-  const standard = products.find((p) => p.sku === 'CREDITS_STANDARD');
+  // 取最便宜的付费包下单: 积分包档位会随运营调整, 按 SKU 写死会让用例随改价失效
+  const starter = products
+    .filter((p) => p.priceCents > 0)
+    .sort((a, b) => a.priceCents - b.priceCents)[0];
 
   console.log('\n【商品 B-34】');
   check('商品已上架', products.length >= 4, `${products.length} 个`);
@@ -121,7 +124,11 @@ function check(name, ok, detail = '') {
   console.log('\n【余额推导 §5 无冗余字段】');
   const bal = (await call('GET', '/credits/balance', T)).data;
   const lots = await prisma.creditLot.findMany({ where: { userId: user.id } });
-  const expected = lots.filter((l) => !l.expireAt || l.expireAt > new Date()).reduce((s, l) => s + l.remainingCredits, 0);
+  // 批次金额是微积分，接口是积分口径：先汇总再除以 1e6
+  const sumMicro = lots
+    .filter((l) => !l.expireAt || l.expireAt > new Date())
+    .reduce((s, l) => s + l.remainingMicrocredits, 0n);
+  const expected = Number(sumMicro) / 1_000_000;
   check('余额 = Σ批次剩余', bal.balance === expected, `接口 ${bal.balance} / 批次汇总 ${expected}`);
   check('批次与流水数匹配', lots.length >= 1, `${lots.length} 个批次`);
 
@@ -198,10 +205,9 @@ function check(name, ok, detail = '') {
   check('退款已记审计', actions.some((a) => a?.includes('refund') || a?.includes('order')),
     actions.filter((a) => /order|credit|refund/.test(a ?? '')).slice(0, 3).join(', '));
 
-  // 清理
+  // 清理（积分数据由夹具按依赖顺序清）
+  await clearCredits(prisma, user.id);
   await prisma.$transaction([
-    prisma.creditLedger.deleteMany({ where: { userId: user.id } }),
-    prisma.creditLot.deleteMany({ where: { userId: user.id } }),
     prisma.payment.deleteMany({ where: { userId: user.id } }),
     prisma.refund.deleteMany({ where: { userId: user.id } }),
     prisma.orderItem.deleteMany({ where: { order: { userId: user.id } } }),

@@ -17,8 +17,9 @@ import {
 import type { UploadFile } from 'antd';
 import { ArrowLeft, Upload as UploadIcon, Trash2, RefreshCw, Check, X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { assetsApi, generateApi, assetSrc } from '../lib/api';
+import { assetsApi, generateApi, assetSrc, assetThumbSrc } from '../lib/api';
 import { capabilityById } from '../lib/capabilities';
+import { resolveModelId } from '../lib/models';
 import { useProject } from '../hooks/useProject';
 import { usePollAbort } from '../hooks/usePollAbort';
 import { useGenerateError } from '../hooks/useGenerateError';
@@ -99,7 +100,7 @@ export function ToolPage() {
         detail={
           IS_PROD
             ? undefined
-            : `runtime: ${runtime.effective} · route=${runtime.route} · remoteAvailable=${runtime.remoteAvailable}`
+            : `runtime: ${runtime.effective} · remoteAvailable=${runtime.remoteAvailable}`
         }
         action={{ to: '/workbench', label: '返回工作台' }}
       />
@@ -151,6 +152,8 @@ function ToolPageContent({ capability, def }: { capability: string; def: Capabil
         name: `素材-${asset.id.slice(0, 6)}.${asset.format}`,
         status: 'done',
         url: assetSrc(asset),
+        // picture-card 只有 100 多像素; 原图留给后续查看 / 提交
+        thumbUrl: assetThumbSrc(asset, 320),
       } as UploadFile,
     ]);
     return true;
@@ -189,10 +192,12 @@ function ToolPageContent({ capability, def }: { capability: string; def: Capabil
     try {
       const params = form.getFieldsValue();
       const projectId = await ensureProject();
+      const logicalModelId = await resolveModelId(def.id);
       const { taskId } = await generateApi.start({
         projectId,
         inputAssetIds: assets.map((a) => a.id),
         capability: def.id,
+        logicalModelId,
         params,
       });
       const done = await pollTask(taskId);

@@ -1560,9 +1560,6 @@ body {
   color: #5546d8;
   background: #f1efff;
 }
-.side-menu-btn-wrap {
-  position: relative;
-}
 .workspace-menu-icon,
 .product-suggestion-sidebar-icon {
   flex: 0 0 24px;
@@ -1643,71 +1640,6 @@ body {
   display: block;
 }
 
-/* hover 预览大图 —— 本地自有功能: 优先展示真实用户产出, 无产出时回退参考站演示图。
-   尺寸、渐变、箭头与阴影对齐参考站 workspace-menu-guide-popover。 */
-.rail-preview {
-  position: fixed;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 30;
-  box-sizing: border-box;
-  width: 376px;
-  padding: 14px 16px 16px;
-  border-radius: 16px;
-  background: linear-gradient(110deg, #fff 0% 38%, #eeedff 100%);
-  box-shadow: 0 10px 24px rgba(35, 39, 74, 0.16);
-  pointer-events: none;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  animation: rail-preview-in 0.16s ease-out;
-}
-.rail-preview::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: -12px;
-  width: 0;
-  height: 0;
-  border-top: 9px solid transparent;
-  border-bottom: 9px solid transparent;
-  border-right: 12px solid #fff;
-  transform: translateY(-50%);
-}
-.rail-preview[data-flip='true']::before {
-  right: -12px;
-  left: auto;
-  border-right: 0;
-  border-left: 12px solid #fff;
-}
-@keyframes rail-preview-in {
-  from {
-    opacity: 0;
-    transform: translateY(-50%) translateX(-4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(-50%) translateX(0);
-  }
-}
-.rail-preview-img {
-  width: 344px;
-  height: 172px;
-  object-fit: cover;
-  border-radius: 10px;
-  display: block;
-}
-.rail-preview-desc {
-  display: block;
-  width: 344px;
-  overflow: hidden;
-  color: #333;
-  font-size: 14px;
-  line-height: 22px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .app-content {
   padding: 24px 24px 32px;
   overflow: auto;
@@ -1724,7 +1656,7 @@ body {
    本地父级 .app-content 带 24px/24px/32px, 页面再带一层就右移 24px、窄 48px。
    实测 @1280 (参考站目标: 内容列 x=108 / 宽 1148):
      library   x=132 / 1100   ← 双重padding
-     my-works  ✅ 已改为 1120 内容列 (2026-10-30), 不参与逃逸
+     my-works  ✅ 已与素材库同骨架逃逸 (2026-10-31), 自有 padding 24px
      invite    x=108 / 1148   ✅ 自身横向 0, 无需动
      pkg-shop  x=108 / 1148   ✅ 自身无 padding, 无需动
      mif       x=108 / 1141   ✅ 已有逃逸规则
@@ -3676,6 +3608,494 @@ img[data-broken='1'] {
 }
 .pk-result-download:hover {
   background: var(--brand-bg);
+}
+
+/* ── 商品详情页右侧: 功能示例 / 创作结果 ─────────────────────────────
+ * 结果区在首访时是空的, 用「功能示例」把能力讲清楚; 换页签不换位置,
+ * 两个面板都吃掉与结果网格相同的高度 (.pk-workspace 的行高锁定)。 */
+.pd-right-pane {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pd-tabs {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+.pd-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+}
+.pd-tabs button:hover {
+  color: var(--brand);
+}
+.pd-tabs button:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+.pd-tabs button.is-active {
+  background: #fff;
+  color: var(--text-strong);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--text-strong) 10%, transparent);
+}
+.pd-tab-count {
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-bg);
+  color: var(--brand);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+}
+.pd-tabs button.is-active .pd-tab-count {
+  background: var(--brand);
+  color: #fff;
+}
+.pd-right-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.pd-right-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  /* 纵向: 结果网格与示例面板都撑满整列, 否则空态卡会缩成内容宽度 */
+  flex-direction: column;
+}
+
+/* 示例面板: 白卡与结果区的 .pk-result-body 同款 (radius 16 / padding 16) */
+.pd-demo {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px;
+  background: #fff;
+  border-radius: var(--radius-panel);
+}
+.pd-demo-intro h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--text-strong);
+}
+.pd-demo-intro > p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+.pd-demo-steps {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.pd-demo-step {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+.pd-demo-step-no {
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+  color: var(--brand);
+}
+.pd-demo-step strong {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 20px;
+  color: var(--text-body);
+}
+.pd-demo-step small {
+  display: block;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--text-desc);
+}
+
+.pd-demo-cards {
+  display: grid;
+  gap: 14px;
+}
+.pd-demo-card {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+.pd-demo-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.pd-demo-card-head h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.pd-demo-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--brand);
+}
+.pd-demo-tag {
+  flex: none;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-bg);
+  color: var(--brand);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* 1. 素材 */
+.pd-demo-source {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.pd-demo-shot {
+  position: relative;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+  background: #fff;
+}
+.pd-demo-shot img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  /* 白底商品图: contain 保留完整轮廓, 裁切会把沙发两端切掉 */
+  object-fit: contain;
+}
+.pd-demo-shot figcaption {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-strong) 68%, transparent);
+  color: #fff;
+  font-size: 11px;
+}
+.pd-demo-facts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 7px;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text-muted);
+}
+.pd-demo-facts strong {
+  font-weight: 600;
+  color: var(--text-body);
+}
+
+/* 2. 单图切图 */
+.pd-demo-slices {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+.pd-demo-slices img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.pd-demo-note {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--text-desc);
+}
+
+@media (max-width: 1024px) {
+  /* 窄屏是单列文档流: 右侧不再是满高列, 交给内容自然增高 */
+  .pd-right-pane,
+  .pd-right-panel {
+    height: auto;
+  }
+  .pd-demo {
+    overflow: visible;
+  }
+  .pd-demo-steps {
+    grid-template-columns: 1fr;
+  }
+  .pd-demo-source {
+    grid-template-columns: 96px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .pd-demo {
+    padding: 16px;
+  }
+  /* 手机宽度下 96px 图 + 长参数会把每行挤成两三个字: 图与文字改成上下排 */
+  .pd-demo-source {
+    grid-template-columns: 1fr;
+  }
+  .pd-demo-shot {
+    width: 132px;
+  }
+  /* 5 列在 390 下每张只有 50px, 看不出内容 */
+  .pd-demo-slices {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* ── 详情图「创作结果」批次行 (pages/product-detail/result-list.tsx) ──────
+ * 一次生成 = 一行: 行头「日期 + 提示词」, 行内第一格是上传的原图
+ * (下方标商品名称), 之后每格是一张模块图 (下方标模块名称)。
+ * 图横排且可能多达 11 格 (原图 + 10 个模块), 溢出交给行内横向滚动,
+ * 页面本身不产生横向滚动条。 */
+
+.pd-result-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 4px;
+}
+.pd-result-row {
+  flex: none;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card-bg);
+}
+
+.pd-result-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin-bottom: 10px;
+}
+.pd-result-date {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-body);
+}
+/* 提示词单行省略: 5000 字描述会把行头撑成半屏, 全文走 title 悬浮 */
+.pd-result-prompt {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+.pd-result-delete {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-desc);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.pd-result-delete:hover:not(:disabled) {
+  color: var(--danger-text);
+  background: var(--danger-soft-bg);
+}
+.pd-result-delete:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pd-result-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+/* 列宽可伸缩: 默认 6 个模块 + 原图正好铺满一行; 选到 10 个模块时
+   每格收到 84px 后开始横向滚动, 而不是把图压成看不清的窄条 */
+.pd-result-cell {
+  flex: 1 1 84px;
+  min-width: 84px;
+  max-width: 124px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 缩略图统一 3:4: 原图与模块图同高, 标签才会落在同一基线上 */
+.pd-result-thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.pd-result-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pd-result-thumb:hover:not(:disabled) {
+  border-color: var(--brand-light);
+}
+.pd-result-thumb:disabled {
+  cursor: default;
+}
+/* 原图是参照物, 与产出区分: 稍深的描边 */
+.pd-result-cell-source .pd-result-thumb {
+  border-color: var(--border);
+}
+/* 非图状态 (生成中 / 失败 / 原图缺失) 与图片同框同尺寸, 行内保持对齐 */
+.pd-result-thumb.is-pending,
+.pd-result-thumb.is-failed,
+.pd-result-thumb.is-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-desc);
+  cursor: default;
+}
+/* 非图状态没有「悬停变紫」, 否则会被读成可点 */
+.pd-result-thumb.is-pending:hover,
+.pd-result-thumb.is-failed:hover {
+  border-color: var(--border-soft);
+}
+.pd-result-thumb.is-pending {
+  border-style: dashed;
+  color: var(--text-muted);
+}
+.pd-result-thumb.is-failed {
+  border-color: transparent;
+  background: var(--danger-soft-bg);
+  color: var(--danger-soft-text);
+}
+.pd-result-thumb.is-empty {
+  border-style: dashed;
+}
+
+.pd-result-thumb-wrap {
+  position: relative;
+}
+/* 下载键叠在缩略图右下: 悬停才出现, 触屏常显 */
+.pd-result-download {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: var(--radius-control);
+  /* 深底取自 --text-strong 的透明度, 不写裸 rgba (与全站色值收拢一致) */
+  background: color-mix(in srgb, var(--text-strong) 72%, transparent);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.pd-result-thumb-wrap:hover .pd-result-download,
+.pd-result-download:focus-visible {
+  opacity: 1;
+}
+
+.pd-result-label {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (hover: none) {
+  .pd-result-download {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 1024px) {
+  /* 窄屏右栏不再是满高列, 列表回到内容高度 */
+  .pd-result-list {
+    overflow: visible;
+  }
+}
+
+@media (max-width: 640px) {
+  .pd-result-row {
+    padding: 10px 12px 12px;
+  }
+  /* 手机宽度再收一档, 两格半可见即可 */
+  .pd-result-cell {
+    min-width: 96px;
+    max-width: 108px;
+  }
 }
 
 /* 素材库弹窗 */
@@ -10652,528 +11072,736 @@ html[data-promo='off'] .multi-image-fusion-page {
   display: none;
 }
 
-/* hero: 全宽 x 238, padding 64px 24px 48px; 背景双层渐变 (底部淡出到页面底色) */
-.home-v2-hero {
-  box-sizing: border-box;
-  min-height: 238px;
-  padding: 64px 24px 48px;
-  background:
-    linear-gradient(rgba(246, 247, 251, 0) 72%, #f6f7fb 100%),
-    linear-gradient(90deg, #eeedfd 0%, #fbfcff 48%, #ebf2fe 100%);
-  text-align: center;
+/* ───────── 首页 (2026-10-31 改版) ─────────
+   容器 1200, 段落节奏 88px; 颜色只取 :root 令牌。
+   类名前缀 lp- (landing page) —— 旧 home-v2-* 已随本次改版删除, 不要复用。 */
+.landing-page {
+  background: var(--page-bg);
 }
-.home-v2-hero h1 {
-  margin: 0;
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 8px;
-  letter-spacing: -1.2px;
-  font-size: 40px;
-  font-weight: 500;
-  line-height: 63px;
+
+/* 1. 首屏: 左文案 / 右真实产出拼贴 */
+.lp-hero {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(760px 420px at 8% -8%, var(--brand-bg) 0%, transparent 68%),
+    radial-gradient(680px 380px at 96% 4%, var(--hero-grad-3) 0%, transparent 64%),
+    var(--page-bg);
+}
+.lp-hero-inner {
+  box-sizing: border-box;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 56px 24px 48px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  align-items: center;
+  gap: 56px;
+}
+.lp-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--card-bg);
+  color: var(--brand);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.lp-hero h1 {
+  margin: 20px 0 0;
+  font-size: 50px;
+  font-weight: 700;
+  line-height: 1.18;
+  letter-spacing: -1.5px;
   color: var(--text-strong);
 }
-.home-v2-hero h1 span {
+.lp-hero h1 em {
+  font-style: normal;
   color: transparent;
-  background: linear-gradient(90deg, #5546d8, #a13dd8);
+  background: linear-gradient(96deg, var(--brand) 10%, var(--brand-light) 90%);
   -webkit-background-clip: text;
   background-clip: text;
 }
-.home-v2-hero h1 strong {
-  color: #333;
-  font-size: inherit;
-  font-weight: inherit;
-}
-.home-v2-hero p {
-  margin: 8px 0 0;
-  font-size: 17px;
-  line-height: 31px;
-  color: var(--text-muted);
-}
-
-/* 段标题: 1200x62 (h2 24px/700 + 副标 16px) */
-.home-v2-section-heading {
-  text-align: center;
-}
-.home-v2-section-heading h2 {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--text-strong);
-}
-.home-v2-section-heading p {
-  margin: 6px 0 0;
-  font-size: 16px;
-  color: var(--text-muted);
-}
-
-/* 业务场景: 3 列 389px gap16, 卡片 389x323 radius24 padding24 */
-.home-v2-businesses,
-.home-v2-tools,
-.home-v2-packages,
-.home-v2-cases,
-.home-v2-features {
-  max-width: 1226px;
-  margin: 0 auto;
-}
-.home-v2-businesses,
-.home-v2-tools {
-  box-sizing: border-box;
-  width: 100%;
-  max-width: none;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding-left: 24px;
-  padding-right: 24px;
-}
-.home-v2-businesses {
-  padding-bottom: 16px;
-}
-.home-v2-business-grid {
-  width: min(1200px, 100%);
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-}
-.home-v2-business-card {
-  background: #fff;
-  border-radius: var(--radius-hero);
-  padding: 24px;
+.lp-hero-copy {
   min-width: 0;
-  overflow: hidden;
 }
-.home-v2-business-media {
-  border-radius: var(--radius-control);
-  overflow: hidden;
-  background: var(--surface);
-}
-.home-v2-business-media img {
-  width: 100%;
-  aspect-ratio: 1712 / 800;
-  object-fit: cover;
-  display: block;
-}
-.home-v2-business-copy h3 {
-  margin: 16px 0 0;
-  font-size: 18px;
-  font-weight: 500;
-  line-height: 25px;
-  color: var(--text-strong);
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.home-v2-business-icon {
-  width: 24px;
-  height: 24px;
-  object-fit: contain;
-}
-.home-v2-business-copy p {
-  margin: 4px 0 0;
-  font-size: 14px;
-  line-height: 20px;
+.lp-hero-sub {
+  margin: 18px 0 0;
+  max-width: 520px;
+  font-size: 15.5px;
+  line-height: 1.8;
   color: var(--text-muted);
 }
-.home-v2-cta {
-  margin-top: 16px;
-  height: 34px;
-  padding: 0 16px;
-  border: 0;
-  border-radius: var(--radius-control);
-  background: var(--brand-strong);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-}
-.home-v2-cta:hover {
-  background: var(--brand-hover);
-}
-
-/* 修图工具入口: 1200 白底容器 + 4 列 276px 卡片 */
-.home-v2-tools {
-  padding-bottom: 32px;
-}
-.home-v2-tool-grid {
-  box-sizing: border-box;
-  width: min(1200px, 100%);
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-  padding: 24px;
-  background: #fff;
-  border-radius: var(--radius-hero);
-}
-.home-v2-tool-card {
-  height: auto;
-  padding: 24px 40px;
-  background: var(--surface);
-  border: 0;
-  border-radius: var(--radius-control);
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  font-size: 18px;
-  font-weight: 500;
-  line-height: 25px;
-  color: var(--text-strong);
-  cursor: pointer;
-  transition: background 0.2s, box-shadow 0.2s, transform 0.2s;
-}
-.home-v2-tool-card:hover {
-  background: #fff;
-  transform: translateY(-1px);
-  box-shadow: 0 8px 18px rgba(23, 26, 43, 0.1);
-}
-.home-v2-tool-card img {
-  box-sizing: content-box;
-  width: 24px;
-  height: 24px;
-  padding: 8px;
-  background: #fff;
-  border-radius: var(--radius-control);
-  object-fit: contain;
-  flex-shrink: 0;
-  transition: background 0.2s;
-}
-.home-v2-tool-card:hover img {
-  background: #5546d8;
-  filter: brightness(0) invert(1);
-}
-
-/* 套餐: column gap32, tabs 328x38 胶囊, 价格 32px/700 */
-.home-v2-packages {
-  padding: 0 24px 32px;
-  display: flex;
-  flex-direction: column;
-  gap: 32px;
-}
-.home-v2-package-tabs {
-  display: inline-flex;
-  align-self: center;
-  gap: 0;
-  background: var(--border-soft);
-  border-radius: var(--radius-pill);
-  padding: 3px;
-}
-.home-v2-package-tabs button {
-  height: 32px;
-  /* 实拍 tabs 328x38 / 3 项 → 每项约 107 */
-  padding: 0 26px;
-  border: 0;
-  border-radius: var(--radius-pill);
-  background: transparent;
-  font-size: 13px;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-.home-v2-package-tabs button.is-active {
-  background: #fff;
-  color: var(--text-strong);
-  font-weight: 500;
-}
-.home-v2-package-tabs button.is-soon {
-  color: #b6bcc9;
-  cursor: not-allowed;
-}
-.home-v2-package-row {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-}
-.home-v2-package-card {
-  position: relative;
-  background: #fff;
-  border: 2px solid #e5e7ef;
-  border-radius: var(--radius-panel);
-  padding: 24px 20px 20px;
-  display: flex;
-  flex-direction: column;
-}
-/* 套餐卡 hover 组: 对齐参考站 .home-v2-package-card:hover (2026-10-18 交互态对拍补充) */
-.home-v2-package-card:hover {
-  box-shadow: 0 12px 28px rgba(54, 50, 125, 0.1);
-}
-.home-v2-package-card:hover .home-v2-package-price {
-  color: #5546d8;
-}
-.home-v2-package-card:hover .home-v2-package-price del {
-  color: #8f82e8;
-}
-/* 订阅 tab (参考 .home-v2-package-grid--subscription): hover 边框转品牌紫 */
-.home-v2-package-row .home-v2-package-card:hover {
-  border-color: #5546d8;
-  box-shadow: 0 8px 24px rgba(85, 70, 216, 0.08);
-}
-.home-v2-package-card.is-recommended {
-  border-color: var(--brand-strong);
-  box-shadow: 0 8px 24px rgba(108, 92, 231, 0.12);
-}
-.home-v2-package-tag {
-  position: absolute;
-  top: 0;
-  right: 0;
-  padding: 3px 10px;
-  border-bottom-left-radius: 10px;
-  background: var(--brand-strong);
-  color: #fff;
-  font-size: 12px;
-}
-.home-v2-package-card.is-recommended .home-v2-package-tag {
-  background: var(--danger-ref);
-}
-.home-v2-package-card h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-strong);
-}
-.home-v2-package-price {
-  margin-top: 8px;
-  display: flex;
-  align-items: baseline;
-  gap: 2px;
-  color: #333;
-}
-.home-v2-package-price .cur,
-.home-v2-addon-price .cur {
-  font-size: 16px;
-  font-weight: 700;
-}
-.home-v2-package-price .num,
-.home-v2-addon-price .num {
-  font-size: 32px;
-  font-weight: 700;
-}
-.home-v2-package-price del,
-.home-v2-addon-price del {
-  margin-left: 8px;
-  font-size: 12px;
-  color: var(--text-desc);
-}
-.home-v2-package-credits {
-  margin: 10px 0 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--brand-strong);
-}
-.home-v2-package-list,
-.home-v2-package-extras {
-  margin: 12px 0 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.home-v2-package-list li,
-.home-v2-package-extras li {
-  position: relative;
-  padding-left: 14px;
-  font-size: 13px;
-  color: var(--text-body);
-}
-.home-v2-package-list li::before,
-.home-v2-package-extras li::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 7px;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--brand-strong);
-}
-.home-v2-package-extras li::before {
-  background: #cbd1dd;
-}
-.home-v2-package-buy {
-  margin-top: 20px;
-  height: 36px;
-  border: 0;
-  border-radius: var(--radius-control);
-  background: var(--brand-strong);
-  color: #fff;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-}
-.home-v2-package-buy:hover {
-  background: var(--brand-hover);
-}
-.home-v2-addon-row {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-}
-.home-v2-addon-card {
-  background: #fff;
-  border: 2px solid #e5e7ef;
-  border-radius: var(--radius-panel);
-  padding: 24px 20px 20px;
-  text-align: center;
-}
-/* 加油包 tab (参考 .home-v2-package-grid--top_up): hover 边框/价格转加油橙 #fe9800 (2026-10-18 交互态对拍补充) */
-.home-v2-addon-row .home-v2-addon-card:hover {
-  border-color: #fe9800;
-  box-shadow: 0 8px 18px rgba(254, 152, 0, 0.12);
-}
-.home-v2-addon-row .home-v2-addon-card:hover .home-v2-addon-price,
-.home-v2-addon-row .home-v2-addon-card:hover .home-v2-addon-price del {
-  color: #fe9800;
-}
-.home-v2-addon-card img {
-  width: 40px;
-  height: 40px;
-  object-fit: contain;
-}
-/* 限时活动卡 (2026-10-21): 复用加油包卡形制, 只加类型角标 —— 活动内容是真实配置, 不另做皮肤 */
-.home-v2-campaign-card {
-  position: relative;
-}
-.home-v2-campaign-tag {
-  position: absolute;
-  top: -10px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 2px 12px;
-  border-radius: var(--radius-pill);
-  background: var(--brand);
-  color: #fff;
-  font-size: 12px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-.home-v2-addon-card h3 {
-  margin: 10px 0 0;
-  font-size: 16px;
-  font-weight: 600;
-  color: var(--text-strong);
-}
-.home-v2-addon-price {
-  margin-top: 6px;
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 2px;
-  color: #333;
-}
-.home-v2-addon-card p {
-  margin: 10px 0 0;
-  font-size: 13px;
-  color: var(--text-muted);
-}
-
-/* 案例: h2 左对齐, tabs 614x53, grid 4 列 288px gap16, 卡片 288x384 radius16 */
-.home-v2-cases {
-  padding: 32px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 32px;
-}
-.home-v2-cases h2 {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 700;
-  color: var(--text-strong);
-  text-align: start;
-}
-.home-v2-case-tabs {
+.lp-hero-actions {
+  margin-top: 30px;
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
 }
-.home-v2-case-tabs button {
-  height: 32px;
-  padding: 0 18px;
-  border: 1px solid var(--border-soft);
-  border-radius: var(--radius-pill);
-  background: #fff;
-  font-size: 13px;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-.home-v2-case-tabs button.is-active {
-  background: var(--brand-strong);
-  border-color: var(--brand-strong);
-  color: #fff;
-  font-weight: 500;
-}
-.home-v2-case-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-}
-.home-v2-case-card {
-  position: relative;
-  aspect-ratio: 600 / 800;
+.lp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 46px;
+  padding: 0 22px;
   border: 0;
+  border-radius: var(--radius-control);
+  font-size: 14.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s, box-shadow 0.18s, transform 0.18s, border-color 0.18s;
+}
+.lp-btn-primary {
+  background: var(--brand);
+  color: #fff;
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--brand) 26%, transparent);
+}
+.lp-btn-primary:hover {
+  background: var(--brand-hover);
+  transform: translateY(-1px);
+}
+.lp-btn-ghost {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  color: var(--text-strong);
+}
+.lp-btn-ghost:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+.lp-btn-on-brand {
+  background: var(--card-bg);
+  color: var(--brand);
+}
+.lp-btn-on-brand:hover {
+  transform: translateY(-1px);
+}
+.lp-hero-proof {
+  margin: 26px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  font-size: 13px;
+  color: var(--text-body);
+}
+.lp-hero-proof li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.lp-hero-proof svg {
+  color: var(--brand);
+  flex-shrink: 0;
+}
+.lp-hero-visual {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding: 24px 0;
+}
+.lp-hero-shot {
+  position: relative;
+  margin: 0;
   border-radius: var(--radius-panel);
   overflow: hidden;
   background: var(--surface);
-  cursor: pointer;
-  padding: 0;
+  box-shadow: 0 18px 40px color-mix(in srgb, var(--text-strong) 12%, transparent);
 }
-.home-v2-case-card img {
+.lp-hero-shot img {
+  width: 100%;
+  height: 100%;
+  /* 案例原图 3:4; 拼贴用 4:5 只裁掉少量上下留白, 换来首屏能完整露出 */
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  display: block;
+}
+.lp-hero-shot.is-1 {
+  transform: translateY(18px) rotate(-1.2deg);
+}
+.lp-hero-shot.is-2 {
+  transform: translateY(-10px) rotate(1deg);
+}
+.lp-hero-shot.is-3 {
+  transform: translateY(6px) rotate(1deg);
+}
+.lp-hero-shot.is-4 {
+  transform: translateY(-22px) rotate(-1deg);
+}
+.lp-hero-shot figcaption {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-strong) 66%, transparent);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 500;
+  backdrop-filter: blur(6px);
+}
+
+/* 段落骨架 */
+.lp-section {
+  box-sizing: border-box;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 88px 24px 0;
+}
+.lp-section-tight {
+  padding-top: 56px;
+}
+.lp-section-head {
+  max-width: 640px;
+}
+.lp-section-head.is-center {
+  margin: 0 auto;
+  text-align: center;
+}
+.lp-kicker {
+  display: inline-block;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--brand);
+}
+.lp-section-head h2,
+.lp-tools-head h2,
+.lp-packages-head h2,
+.lp-cases-head h2 {
+  margin: 10px 0 0;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.6px;
+  color: var(--text-strong);
+}
+.lp-section-head p,
+.lp-packages-head p {
+  margin: 10px 0 0;
+  font-size: 14.5px;
+  line-height: 1.75;
+  color: var(--text-muted);
+}
+
+/* 2. 核心场景 */
+.lp-scene-grid {
+  margin-top: 32px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.lp-scene-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-hero);
+  transition: transform 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+.lp-scene-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--brand);
+  box-shadow: var(--shadow-card);
+}
+.lp-scene-media {
+  aspect-ratio: 1712 / 800;
+  overflow: hidden;
+  background: var(--surface);
+}
+.lp-scene-media img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
-  transition: transform 0.2s;
+  transition: transform 0.3s;
 }
-.home-v2-case-card:hover img {
+.lp-scene-card:hover .lp-scene-media img {
   transform: scale(1.03);
 }
-.home-v2-case-cta {
-  position: absolute;
-  left: 50%;
-  bottom: 16px;
-  transform: translateX(-50%);
-  height: 32px;
-  padding: 0 20px;
-  border-radius: var(--radius-pill);
-  background: rgba(29, 33, 41, 0.66);
-  color: #fff;
-  font-size: 13px;
-  line-height: 32px;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-.home-v2-case-card:hover .home-v2-case-cta {
-  opacity: 1;
-}
-
-/* 特性: wide 1200x541 grid 400/728; grid 2 列 592px, 卡片 radius24 padding24 */
-.home-v2-features {
-  padding: 32px 24px;
+.lp-scene-body {
+  padding: 20px 22px 18px;
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 6px;
+  flex: 1;
 }
-.home-v2-feature-wide {
-  background: #fff;
-  border-radius: var(--radius-hero);
-  padding: 24px;
-  display: grid;
-  grid-template-columns: 400px 1fr;
-  gap: 24px;
-}
-.home-v2-feature-copy h3,
-.home-v2-feature-card h3 {
+.lp-scene-body h3 {
   margin: 0;
-  font-size: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 17px;
   font-weight: 600;
   color: var(--text-strong);
 }
-.home-v2-feature-copy ul,
-.home-v2-feature-card ul {
+.lp-scene-icon {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+.lp-scene-body p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+.lp-scene-link {
+  margin-top: 14px;
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--brand);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: gap 0.18s, color 0.18s;
+}
+.lp-scene-link:hover {
+  gap: 6px;
+  color: var(--brand-hover);
+}
+
+/* 3. 修图工具 */
+.lp-tools-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+.lp-text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--brand);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.lp-text-link:hover {
+  color: var(--brand-hover);
+}
+.lp-tool-grid {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.lp-tool {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 60px;
+  padding: 0 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card-bg);
+  color: var(--text-strong);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.18s, box-shadow 0.18s, color 0.18s, transform 0.18s;
+}
+.lp-tool img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+.lp-tool:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+  box-shadow: var(--shadow-card);
+  transform: translateY(-1px);
+}
+
+/* 4. 使用流程 */
+.lp-flow-panel {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 28px;
+  padding: 36px 40px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-hero);
+  background: linear-gradient(120deg, var(--brand-bg) 0%, var(--card-bg) 72%);
+}
+.lp-step {
+  display: flex;
+  gap: 14px;
+}
+.lp-step-index {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card-bg);
+  color: var(--brand);
+  font-size: 13px;
+  font-weight: 700;
+}
+.lp-step-copy h3 {
+  margin: 2px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15.5px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.lp-step-copy h3 svg {
+  color: var(--brand);
+}
+.lp-step-copy p {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
+/* 6. 套餐与积分 */
+.lp-packages-head,
+.lp-cases-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.lp-tabs {
+  margin-top: 28px;
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+.lp-tabs button {
+  height: 34px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+}
+.lp-tabs button:hover {
+  color: var(--text-strong);
+}
+.lp-tabs button.is-active {
+  background: var(--card-bg);
+  color: var(--text-strong);
+  box-shadow: 0 1px 4px color-mix(in srgb, var(--text-strong) 10%, transparent);
+}
+.lp-packages-body {
+  margin-top: 24px;
+}
+.lp-empty {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 36px 12px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.lp-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.lp-plan-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 24px 22px 20px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.lp-plan-card:hover {
+  border-color: var(--brand);
+  box-shadow: var(--shadow-card);
+  transform: translateY(-2px);
+}
+.lp-plan-card.is-recommended {
+  border-color: var(--brand);
+  box-shadow: 0 14px 34px color-mix(in srgb, var(--brand) 14%, transparent);
+}
+.lp-plan-tag {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-bg);
+  color: var(--brand);
+  font-size: 11.5px;
+  font-weight: 600;
+}
+.lp-plan-tag.is-hot {
+  background: var(--brand);
+  color: #fff;
+}
+.lp-plan-card h3 {
+  margin: 0;
+  padding-right: 64px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.lp-plan-price {
+  margin-top: 14px;
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  color: var(--text-strong);
+}
+.lp-plan-price .cur {
+  font-size: 16px;
+  font-weight: 700;
+}
+.lp-plan-price strong {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+.lp-plan-price em {
+  font-style: normal;
+  font-size: 12.5px;
+  color: var(--text-desc);
+}
+.lp-plan-credits {
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--brand);
+}
+.lp-plan-perks {
+  margin: 16px 0 20px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.lp-plan-perks li {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-body);
+}
+.lp-plan-perks svg {
+  margin-top: 2px;
+  flex-shrink: 0;
+  color: var(--brand);
+}
+.lp-plan-buy {
+  margin-top: auto;
+  height: 40px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--brand);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s;
+}
+.lp-plan-buy:hover {
+  background: var(--brand-hover);
+}
+.lp-addon-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+.lp-addon-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 20px 20px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  text-align: center;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.lp-addon-card:hover {
+  border-color: var(--brand);
+  box-shadow: var(--shadow-card);
+  transform: translateY(-2px);
+}
+.lp-addon-icon {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+.lp-addon-card h3 {
+  margin: 12px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.lp-addon-price {
+  margin-top: 8px;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 2px;
+  color: var(--text-strong);
+}
+.lp-addon-price .cur {
+  font-size: 14px;
+  font-weight: 700;
+}
+.lp-addon-price strong {
+  font-size: 28px;
+  font-weight: 700;
+}
+.lp-addon-price del {
+  margin-left: 6px;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+.lp-addon-meta {
+  margin: 10px 0 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+.lp-addon-card .lp-plan-buy {
+  width: 100%;
+  margin-top: 18px;
+}
+.lp-addon-card.is-campaign {
+  border-color: color-mix(in srgb, var(--brand) 22%, var(--border));
+}
+.lp-campaign-tag {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* 5. 优秀案例 —— 平铺长式: 7 个分类依次陈列, 不切页签 */
+.lp-case-groups {
+  margin-top: 36px;
+  display: grid;
+  gap: 40px;
+}
+.lp-case-group-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.lp-case-group-head h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: var(--text-strong);
+}
+.lp-case-strip {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 14px;
+}
+.lp-case-card {
+  position: relative;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  background: var(--surface);
+  /* 案例源图统一 600x800: 3/4 与源图同比例, cover 不再裁掉详情图与对比图的内容 */
+  aspect-ratio: 3 / 4;
+  cursor: pointer;
+}
+.lp-case-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.3s;
+}
+.lp-case-card:hover img {
+  transform: scale(1.04);
+}
+/* 35 张图常驻标签会变成噪音: 悬停 / 键盘聚焦才浮出「做同款」 */
+.lp-case-label {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-strong) 70%, transparent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 500;
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.2s, transform 0.2s;
+}
+.lp-case-card:hover .lp-case-label,
+.lp-case-card:focus-visible .lp-case-label {
+  opacity: 1;
+  transform: none;
+}
+
+/* 7. 产品特性 */
+.lp-feature-wide {
+  margin-top: 32px;
+  padding: 28px;
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  align-items: center;
+  gap: 32px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-hero);
+}
+.lp-feature-copy h3,
+.lp-feature-card h3 {
+  margin: 0;
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: var(--text-strong);
+}
+.lp-feature-copy ul,
+.lp-feature-card ul {
   margin: 16px 0 0;
   padding: 0;
   list-style: none;
@@ -11181,15 +11809,16 @@ html[data-promo='off'] .multi-image-fusion-page {
   flex-direction: column;
   gap: 10px;
 }
-.home-v2-feature-copy li,
-.home-v2-feature-card li {
+.lp-feature-copy li,
+.lp-feature-card li {
   position: relative;
-  padding-left: 16px;
-  font-size: 14px;
+  padding-left: 18px;
+  font-size: 13.5px;
+  line-height: 1.6;
   color: var(--text-muted);
 }
-.home-v2-feature-copy li::before,
-.home-v2-feature-card li::before {
+.lp-feature-copy li::before,
+.lp-feature-card li::before {
   content: '';
   position: absolute;
   left: 0;
@@ -11197,43 +11826,84 @@ html[data-promo='off'] .multi-image-fusion-page {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--brand-strong);
+  background: var(--brand);
 }
-.home-v2-feature-media {
-  position: relative;
-  /* 实拍 wide 卡 1200x541: 图区 ~493 高 → 4 列 2 行, 主图跨 2x2 */
+.lp-feature-copy .lp-btn {
+  margin-top: 24px;
+  height: 42px;
+}
+.lp-feature-media {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: repeat(2, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 10px;
 }
-.home-v2-feature-media img {
-  border-radius: var(--radius-card);
-  object-fit: cover;
+.lp-feature-media img {
   width: 100%;
   height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: var(--radius-card);
   background: var(--surface);
 }
-.home-v2-feature-main {
-  grid-column: 1 / 3;
-  grid-row: 1 / 3;
+.lp-feature-main {
+  grid-column: span 2;
+  grid-row: span 2;
 }
-.home-v2-feature-grid {
+.lp-feature-grid {
+  margin-top: 20px;
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
 }
-.home-v2-feature-card {
-  background: #fff;
+.lp-feature-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 28px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
   border-radius: var(--radius-hero);
-  padding: 24px;
+}
+.lp-feature-card .lp-text-link {
+  margin-top: auto;
+  padding-top: 22px;
 }
 
-/* 页脚: 白底 padding 32px 32px 28px */
+/* 8. 底部行动区 */
+.lp-cta {
+  box-sizing: border-box;
+  max-width: 1200px;
+  margin: 96px auto 0;
+  padding: 0 24px;
+}
+.lp-cta-inner {
+  padding: 56px 32px;
+  border-radius: var(--radius-hero);
+  background: linear-gradient(120deg, var(--brand) 0%, var(--brand-light) 100%);
+  color: #fff;
+  text-align: center;
+}
+.lp-cta h2 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.6px;
+}
+.lp-cta p {
+  margin: 12px 0 0;
+  font-size: 14.5px;
+  opacity: 0.86;
+}
+.lp-cta .lp-btn {
+  margin-top: 26px;
+}
+
+/* 页脚 */
 .landing-footer {
-  background: #fff;
+  background: var(--card-bg);
   padding: 32px 32px 28px;
-  margin-top: 32px;
+  margin-top: 96px;
 }
 .landing-footer-inner {
   max-width: 1226px;
@@ -11291,71 +11961,99 @@ html[data-promo='off'] .multi-image-fusion-page {
   color: var(--text-desc);
 }
 
-/* 窄屏: 与参考站同策略降列 */
-@media (max-width: 1024px) {
-  .home-v2-package-row,
-  .home-v2-addon-row,
-  .home-v2-case-grid {
-    grid-template-columns: repeat(2, 1fr);
+@media (max-width: 1080px) {
+  .lp-hero h1 {
+    font-size: 42px;
   }
-  .home-v2-feature-wide {
-    grid-template-columns: 1fr;
+  .lp-hero-inner {
+    gap: 36px;
   }
-  .home-v2-feature-grid,
-  .landing-footer-inner {
+  .lp-plan-grid,
+  .lp-addon-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .lp-feature-wide {
     grid-template-columns: 1fr;
   }
 }
-@media (max-width: 820px) {
-  .home-v2-hero {
+@media (max-width: 900px) {
+  .lp-hero-inner {
+    grid-template-columns: 1fr;
     padding: 48px 20px 40px;
   }
-  .home-v2-hero h1 {
-    flex-direction: column;
-    align-items: center;
-    gap: 0;
-    font-size: 32px;
-    line-height: 44px;
+  .lp-hero-visual {
+    max-width: 520px;
+    margin: 8px auto 0;
   }
-  .home-v2-hero h1 strong {
-    font-size: 28px;
+  .lp-hero h1 {
+    font-size: 38px;
   }
-  .home-v2-hero p {
-    font-size: 14px;
-    line-height: 24px;
-  }
-  .home-v2-business-grid {
+  .lp-scene-grid {
     grid-template-columns: 1fr;
   }
-  .home-v2-tool-grid {
+  .lp-tool-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  /* 平板宽度下 5 列会把案例压成小方块: 降 3 列 */
+  .lp-case-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .lp-flow-panel {
+    grid-template-columns: 1fr;
+    gap: 22px;
+    padding: 28px;
+  }
+  .lp-section {
+    padding: 64px 20px 0;
+  }
+  .lp-section-tight {
+    padding-top: 44px;
+  }
+  .lp-tools-head,
+  .lp-packages-head,
+  .lp-cases-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
   }
 }
 @media (max-width: 640px) {
-  .home-v2-package-row,
-  .home-v2-addon-row,
-  .home-v2-case-grid {
+  .lp-hero h1 {
+    font-size: 32px;
+    letter-spacing: -0.8px;
+  }
+  .lp-hero-shot.is-1,
+  .lp-hero-shot.is-2,
+  .lp-hero-shot.is-3,
+  .lp-hero-shot.is-4 {
+    transform: none;
+  }
+  .lp-tool-grid,
+  .lp-plan-grid,
+  .lp-addon-grid,
+  .lp-feature-grid {
     grid-template-columns: 1fr;
   }
-}
-@media (max-width: 560px) {
-  .home-v2-businesses,
-  .home-v2-tools {
-    padding-left: 16px;
-    padding-right: 16px;
+  .lp-case-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
   }
-  .home-v2-business-card {
-    border-radius: 18px;
-    padding: 16px;
+  .lp-case-groups {
+    margin-top: 28px;
+    gap: 30px;
   }
-  .home-v2-tool-grid {
+  .lp-feature-wide,
+  .lp-feature-card {
+    padding: 20px;
+  }
+  .lp-cta-inner {
+    padding: 40px 24px;
+  }
+  .lp-cta h2 {
+    font-size: 25px;
+  }
+  .landing-footer-inner {
     grid-template-columns: 1fr;
-    border-radius: 18px;
-    padding: 16px;
-  }
-  .home-v2-tool-card {
-    padding: 18px 20px;
-    font-size: 16px;
   }
 }
 
@@ -12439,15 +13137,15 @@ html[data-promo='off'] .multi-image-fusion-page {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   我的作品 (2026-10-30 重排版)
+   我的作品 (2026-10-30 重排版; 2026-10-31 与素材库对齐版面)
 
-   此前该页是参考站 (ijihua.cn/my-works) 的逐像素复刻: 逃逸 .app-content 内边距的
-   整幅灰底、40px 标题、#6254ED 页签 / #6C5CE7 按钮 / #399DE8 筛选器蓝, 卡片信息
-   (能力名角标 + 深色渐变日期条) 全压在图片上, 且行高随产出比例参差 —— 与订单 /
-   数据中心等个人域页面的 1120 内容列 + 24px 标题 + 令牌配色完全不在同一体系。
+   内容网格页的版面基准是素材库 / 工作台: 逃逸 .app-content 内边距拿整幅宽度,
+   页面自报 padding, 网格按容器宽度分档 (5/4/3/2/1 列)。此前本页固定 1120 内容列,
+   大屏两侧留出上百像素空档, 与小屏 4 列、大屏 6 列, 与素材库的栅格节奏都不一致。
 
    现统一为:
-   - 版面回到全站骨架 (1120 内容列, 标题 24/600, 说明 13px), 页脚由 .app-content 兜底;
+   - 版面与 .asset-library-page 同骨架 (逃逸 + 自有 padding), 标题 28/700, 说明 13px;
+   - 网格断点与素材库一致 (≤1200 4 列 / ≤980 3 列 / ≤640 2 列 / ≤380 1 列);
    - 卡片 = 方形缩略图 + 白底文案脚注, 能力名 / 时间 / 尺寸移到图片下方, 网格行高一致;
    - 所有颜色回落设计令牌 (--brand / --border / --surface / --text-*), 不写裸 hex。
    ───────────────────────────────────────────────────────────────────────────── */
@@ -12455,10 +13153,34 @@ html[data-promo='off'] .multi-image-fusion-page {
   display: flex;
   flex-direction: column;
   width: 100%;
-  max-width: 1120px;
-  margin: 0 auto;
-  padding: 4px 0 48px;
+  padding: 24px 24px 56px;
   box-sizing: border-box;
+}
+/* 内边距与 .asset-library-page 实际渲染值同档: >700 → 24/24/56, ≤700 → 18/12/36 */
+@media (max-width: 700px) {
+  .my-works-page {
+    padding: 18px 12px 36px;
+  }
+}
+
+/*
+ * 逃逸 .app-content 的 padding, 与 .asset-library-page 同源:
+ * 页面自带内边距, 负数 margin 只在能精确抵消外壳 padding 的断点生效
+ * (≤900px 外壳 padding 变成 16px 10px 24px, 固定 -24 会反冲)。
+ * width:auto 必须显式写 —— width:100% 会锁在 app-content 内容盒宽度,
+ * 负 margin 只平移不变宽, 右侧会留出外壳 padding 的空档。
+ */
+@media (min-width: 901px) {
+  .app-content > .my-works-page {
+    margin: -24px -24px -32px;
+    width: auto;
+  }
+}
+@media (max-width: 900px) {
+  .app-content > .my-works-page {
+    margin: -16px -10px -24px;
+    width: auto;
+  }
 }
 
 /* 页头: 标题 + 说明在左, 刷新在右 (与 .personal-page-head 同一套度量) */
@@ -12477,9 +13199,10 @@ html[data-promo='off'] .multi-image-fusion-page {
 }
 .my-works-heading h1 {
   margin: 0;
-  font-size: 24px;
-  font-weight: 600;
-  line-height: 1.3;
+  /* 与素材库标题同一度量: 28/700/lh40 */
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 40px;
   color: var(--text-strong);
 }
 .my-works-heading p {
@@ -12924,11 +13647,34 @@ html[data-promo='off'] .multi-image-fusion-page {
 }
 
 /* 网格: 列宽由容器决定 (1120 内 6 列 ≈ 175px, 390 手机 2 列), 不再按断点硬切 */
+/* 网格列数与 .asset-library-grid 同档: 5 / 4 / 3 / 2 / 1。
+   不再用 auto-fill —— 168px 下限会在 1920 铺出 8 列小图, 与素材库的大卡节奏不一致。 */
 .my-works-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
-  gap: 14px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
   align-items: start;
+}
+@media (max-width: 1200px) {
+  .my-works-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (max-width: 980px) {
+  .my-works-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 640px) {
+  .my-works-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+@media (max-width: 380px) {
+  .my-works-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* 单卡: 描边白卡 = 图 + 文案脚注 */
@@ -13584,17 +14330,6 @@ html[data-promo='off'] .multi-image-fusion-page {
   .asset-library-header-actions {
     flex-wrap: wrap;
   }
-  /* 两列卡 (≤165px) 下 meta 两段会各自折行 (实测卡高被撑高 17px):
-     左段允许截断、右段(kind)保持整词, 与 title 的 ellipsis 策略一致 */
-  .asset-library-card-meta > *:first-child {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .asset-library-card-meta > *:last-child {
-    white-space: nowrap;
-  }
 }
 @media (max-width: 380px) {
   .asset-library-grid {
@@ -13607,41 +14342,20 @@ html[data-promo='off'] .multi-image-fusion-page {
     align-items: stretch;
   }
 }
-/* 卡片: #FFF / border var(--border-soft) / radius14 / shadow 0 5px 16 #2A315709 */
+/* 卡片: 直角纯图卡。标题 / 尺寸 / 体积 / 来源文案已移除, 只保留封面 (2026-10-31)。
+   hover 不再变色、上浮、放大, 也没有封面遮罩背景; 操作按钮仍按 hover / 聚焦 / 触屏显示。 */
 .asset-library-card {
   position: relative;
   min-width: 0;
   background: #fff;
   border: 1px solid var(--border-soft);
-  border-radius: 14px;
+  border-radius: 0;
   overflow: hidden;
-  box-shadow: 0 5px 16px rgba(42, 49, 87, 0.03);
-  transition:
-    border-color 0.18s,
-    box-shadow 0.18s,
-    transform 0.18s;
 }
-/* hover/选中对齐参考站 (.asset-library-card:hover,.is-selected 同规则): #8275ef + 上浮 + #4d40b71c (2026-10-18 对拍修正, 旧值为 var(--border) 灰边框) */
-.asset-library-card:hover,
+/* 选中态只描边提示, 不做位移或投影变化 */
 .asset-library-card.is-selected {
   border-color: #8275ef;
-  box-shadow: 0 10px 25px rgba(77, 64, 183, 0.11);
-  transform: translateY(-2px);
-}
-/* 封面 hover 放大: 参考 .asset-library-card:hover .asset-library-cover>img → scale(1.035) */
-.asset-library-card:hover .asset-library-cover > img {
-  transform: scale(1.035);
-}
-/* 多选模式 (参考 .is-selection-mode, 本地以"已有选中项"为等价态, JSX 挂载): hover 不高亮/不放大 */
-.asset-library-card.is-selection-mode:hover {
-  transform: none;
-}
-.asset-library-card.is-selection-mode:hover .asset-library-cover > img {
-  transform: none;
-}
-.asset-library-card.is-selection-mode:not(.is-selected):hover {
-  border-color: var(--border-soft);
-  box-shadow: 0 5px 16px rgba(42, 49, 87, 0.03);
+  box-shadow: 0 0 0 1px #8275ef;
 }
 .asset-library-cover {
   position: relative;
@@ -13654,19 +14368,6 @@ html[data-promo='off'] .multi-image-fusion-page {
   height: 100%;
   object-fit: cover;
   display: block;
-  transition: transform 0.18s ease;
-}
-.asset-library-card-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 3;
-  pointer-events: none;
-  opacity: 0;
-  background: linear-gradient(180deg, rgba(24, 32, 51, 0.16) 0%, rgba(24, 32, 51, 0) 42%);
-  transition: opacity 0.18s;
-}
-.asset-library-card:hover .asset-library-card-overlay {
-  opacity: 1;
 }
 /* 勾选: 22x22 / top10 left10 / bg #262B413D / border 2px #FFF / radius7 (对齐参考站, 2026-10-18: radius 8→7, 去本地 hover 加深, on 态对齐 #6353eb) */
 .asset-library-check {
@@ -13726,44 +14427,6 @@ html[data-promo='off'] .multi-image-fusion-page {
 .asset-library-hover-actions button:hover {
   background: rgba(78, 64, 207, 0.9);
 }
-.asset-library-card-content {
-  padding: 12px 13px 13px;
-}
-.asset-library-card-title {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 20px;
-  color: var(--text-strong);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.asset-library-card-meta {
-  margin-top: 4px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  font-size: 11px;
-  line-height: 17px;
-  color: #a0a7b6;
-}
-/* 采集来源: 只有扩展采集的素材才有，站点名链回原页面（溯源用） */
-.asset-library-card-source {
-  margin-top: 6px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  max-width: 100%;
-  font-size: 11px;
-  line-height: 16px;
-  color: var(--text-desc);
-  text-decoration: none;
-}
-.asset-library-card-source:hover {
-  color: var(--brand);
-}
 /* 状态与空态: strong 14/16 #333
    .asset-library-state 已移除 (2026-10-20): 素材库加载态改用 StateSkeleton 骨架屏 */
 .asset-library-empty {
@@ -13803,35 +14466,6 @@ html[data-promo='off'] .multi-image-fusion-page {
 }
 /* .asset-library-load-more-spinner 已移除 (2026-10-20): 加载态改用 StateSkeleton */
 
-/* ── 参考站交互态对齐 (2026-10-17 偏差普查, 取参考站产物 CSS 字面值) ── */
-/* landing 业务卡 CTA hover (参考 .home-v2-business-card button:hover) */
-.home-v2-business-card button:hover {
-  background: #5546d8;
-  transform: translateY(-1px);
-}
-/* landing 案例 tab (参考 .home-v2-case-tabs button: padding 8 / radius 8 / 14px;
-   active = 紫字 + 浅紫底, 非紫底白字胶囊) */
-.home-v2-case-tabs button {
-  position: relative;
-  height: auto;
-  padding: 8px;
-  border: 0;
-  border-radius: var(--radius-control);
-  background: none;
-  font-size: 14px;
-  line-height: 13px;
-  color: #667085;
-}
-.home-v2-case-tabs button::after {
-  content: '';
-  position: absolute;
-  inset: -7px -2px;
-}
-.home-v2-case-tabs button.is-active {
-  background: #f1efff;
-  color: #5546d8;
-  font-weight: 400;
-}
 /* ── 工作台数据区移动适配 (2026-10-19; 参考站登录后移动态未取到, 本地决策) ──
    放在全部 wb base 规则之后: 媒体查询不增特异性, 必须靠源顺序压过 base 的
    repeat(6) / 1fr 1fr 1.35fr, 否则 390px 下指标块被压成 40px 级 */
@@ -14111,9 +14745,8 @@ html[data-promo='off'] .multi-image-fusion-page {
   --pkg-card: var(--card-bg);
   animation: 0.35s both fadeIn;
 }
+/* 不设最大宽度: 积分商城随外壳内容区铺满, 卡片自身的 max-width 负责行内留白。 */
 .pkg-shop-container {
-  max-width: 1200px;
-  margin: 0 auto;
   padding: 24px 24px 40px;
 }
 .pkg-back-btn {
@@ -14240,6 +14873,49 @@ html[data-promo='off'] .multi-image-fusion-page {
   line-height: 20px;
   color: var(--pkg-muted);
 }
+/* 有效期筛选: 分段按钮, 与页签同一套胶囊语言 */
+.pkg-filter {
+  display: inline-flex;
+  flex: none;
+  gap: 4px;
+  padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+.pkg-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--pkg-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.pkg-filter-btn span {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-desc);
+  font-variant-numeric: tabular-nums;
+}
+.pkg-filter-btn:hover {
+  color: var(--pkg-text);
+}
+.pkg-filter-btn.is-active {
+  background: var(--pkg-card);
+  color: var(--brand);
+  box-shadow: 0 1px 3px rgba(34, 41, 67, 0.1);
+}
+.pkg-filter-btn.is-active span {
+  color: var(--brand);
+}
 /* 当前会员状态: 只在已登录且是会员时出现 */
 .pkg-section-note {
   flex: none;
@@ -14253,12 +14929,42 @@ html[data-promo='off'] .multi-image-fusion-page {
 
 /* ── 商品卡 ───────────────────────────────────────────────────────────── */
 /* 弹性行: 每张卡从 208px 起伸展 (上限 280), 一行放不下就换行并居中,
-   这样 5 张卡在 1152 内容列里是一整行, 在 900 左右是 3+2 而不是 4+1。 */
+   这样 15 张积分包在宽屏是整齐的 5 列, 在 900 左右是 3 列。 */
 .pkg-grid {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 16px;
+}
+/* 付费档固定 6 张 (免费档已压成基线行): 3 列正好排成 3×2。
+   沿用 208px 基准会被挤成 5+1, 末行只剩一张卡。 */
+.pkg-grid.is-plans .pkg-card {
+  flex: 0 1 calc(33.333% - 11px);
+  min-width: 240px;
+  max-width: none;
+}
+/* 免费档基线: 一行说清「免费能用到什么」, 不占卡片位 */
+.pkg-free-strip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-bottom: 16px;
+  padding: 12px 18px;
+  background: var(--pkg-card);
+  border: 1px dashed var(--pkg-line);
+  border-radius: var(--radius-card);
+}
+.pkg-free-strip-name {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+  color: var(--pkg-text);
+}
+.pkg-free-strip-desc {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--pkg-muted);
 }
 .pkg-card {
   position: relative;
@@ -14285,6 +14991,10 @@ html[data-promo='off'] .multi-image-fusion-page {
 .pkg-card.is-current {
   border-color: var(--pkg-primary);
   box-shadow: 0 0 0 3px rgba(85, 70, 216, 0.08);
+}
+/* 推荐档: 与「当前方案」同色但更轻; 两者同时命中时 is-current 的高亮优先 */
+.pkg-card.is-recommended {
+  border-color: var(--pkg-primary);
 }
 /* 当前方案角标: 脱离文档流压在卡片上沿, 不占标题行 */
 .pkg-card-flag {
@@ -14356,6 +15066,13 @@ html[data-promo='off'] .multi-image-fusion-page {
   line-height: 18px;
   color: var(--pkg-muted);
 }
+/* 有效期 + 折合单价: 同一行, 换行时保持 4px 行距 */
+.pkg-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 12px;
+}
 .pkg-card-validity {
   display: inline-flex;
   align-items: center;
@@ -14367,6 +15084,12 @@ html[data-promo='off'] .multi-image-fusion-page {
 .pkg-card-validity svg {
   flex: none;
   color: var(--text-desc);
+}
+.pkg-card-unit {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-desc);
+  font-variant-numeric: tabular-nums;
 }
 .pkg-card-perks {
   display: flex;
@@ -14438,15 +15161,6 @@ html[data-promo='off'] .multi-image-fusion-page {
   color: var(--pkg-muted);
   cursor: not-allowed;
 }
-/* 落地页套餐区空态 (接口未就绪/无在售商品时如实显示, 不回落硬编码价) */
-.home-v2-addon-empty {
-  grid-column: 1 / -1;
-  padding: 28px 12px;
-  text-align: center;
-  font-size: 13px;
-  color: var(--text-muted, #667085);
-}
-
 /* 购买说明: 用户口径 (有效期 / 扣费 / 退款), 不再写后台配置路径 */
 .pkg-shop-disclosure {
   margin: 8px 0 0;
@@ -14496,6 +15210,11 @@ html[data-promo='off'] .multi-image-fusion-page {
     flex-basis: 100%;
     max-width: none;
     padding: 18px 16px 16px;
+  }
+  /* 覆盖 is-plans 的 4 列均分 (选择器优先级更高, 必须同权重重置) */
+  .pkg-grid.is-plans .pkg-card {
+    flex-basis: 100%;
+    min-width: 0;
   }
   .pkg-grid.is-products .pkg-card {
     flex-grow: 0;
@@ -15440,24 +16159,6 @@ html[data-promo='off'] .multi-image-fusion-page {
   .order-invoice-actions .ant-btn {
     flex: 1;
   }
-}
-
-/* landing 套餐区入口 → /packages (参考站该区 CTA 进入积分商城) */
-.home-v2-packages-entry {
-  align-self: center;
-  margin-bottom: 12px;
-  padding: 8px 18px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-pill);
-  background: var(--card-bg);
-  color: var(--brand);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-}
-.home-v2-packages-entry:hover {
-  border-color: var(--brand);
-  background: var(--brand-bg);
 }
 
 /* ── 全局无障碍: 尊重系统"减少动态效果"设置 ──
@@ -18498,16 +19199,6 @@ html[data-promo='off'] .multi-image-fusion-page {
  * 这一组规则放在文件末尾, 用于压过后文里那些「1:1 实拍」的桌面覆盖层 ——
  * 它们特异性相同、源顺序更靠后, 媒体查询本身又不增加特异性, 提前写会被反压。
  * ──────────────────────────────────────────────────────────────────────────── */
-
-/* 首页案例区: 640 以下沿用其它区块的「一刀切 1 列」会让 17 个 600×800 案例
-   变成 7,700px 长的单列瀑布, 整页高度超过 13,000px。案例是图墙, 2 列在
-   390 宽下每张仍有 163px, 可辨认且符合浏览预期。 */
-@media (max-width: 640px) {
-  .home-v2-case-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-  }
-}
 
 /* 工作台 hero: 32px/20px 是桌面单行实拍值, 窄屏标题换成两行后会上下重叠
    (文字行高只有 20px)。同时把英雄区改为内容高度, 避免多行文案溢出。 */
@@ -23039,7 +23730,7 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
 }
 
 /* 素材库: 页面自带 24px 内边距, 仍逃逸 .app-content 的 padding 以拿到整幅宽度。
-   我的作品 (2026-10-30) 已回到 1120 内容列, 不再逃逸 —— 见 .my-works-page。 */
+   我的作品 (2026-10-31) 与素材库同规则逃逸 —— 见 .app-content > .my-works-page。 */
 @media (min-width: 901px) {
   .app-content > .asset-library-page {
     margin: -24px -24px -32px;

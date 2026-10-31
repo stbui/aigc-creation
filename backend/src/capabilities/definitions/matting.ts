@@ -8,6 +8,7 @@
  */
 
 import type { CapabilityPlugin } from '../capability-plugin.type';
+import { editImageIntent } from '../model-mapping';
 import { BG_COLOR_OPTIONS, MATTING_COLOR_OPTIONS, RATIOS_WITH_ORIGINAL } from './param-options';
 
 export const Matting: CapabilityPlugin = {
@@ -77,6 +78,7 @@ export const Matting: CapabilityPlugin = {
     );
   },
   modality: 'image',
+  model: { capability: 'image', operation: 'image_to_image', intent: editImageIntent },
   inputs: 1,
   inputImageMode: 'edit',
   inWorkbench: true,

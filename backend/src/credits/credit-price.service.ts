@@ -27,8 +27,13 @@ export class CreditPriceService {
 
   /** key: `creditPrice.<capabilityId>` → 积分数 */
   private cache = new Map<string, number>();
-  /** 进行中的限时免费活动覆盖的能力 id（命中即 0 积分） */
-  private freeIds = new Set<string>();
+  /**
+   * 进行中的限时免费活动覆盖的能力 id → 活动 id。
+   *
+   * 记活动 id 而不只记能力 id：账单要把命中活动写进 `promotionId`，
+   * 事后核对「这笔为什么是 0 积分」必须能追到具体活动。
+   */
+  private freeCampaigns = new Map<string, string>();
   private cacheAt = 0;
 
   constructor(private readonly prisma: PrismaService) {}
@@ -36,8 +41,16 @@ export class CreditPriceService {
   /** 后台改价后立即失效缓存。不调也能等 TTL, 但改价应即时生效。 */
   invalidate(): void {
     this.cache.clear();
-    this.freeIds.clear();
+    this.freeCampaigns.clear();
     this.cacheAt = 0;
+  }
+
+  /** 该能力命中的限时免费活动 id；未命中返回空串（账单 `promotionId` 用） */
+  async freeCampaignIdOf(capabilityId: string): Promise<string> {
+    if (Date.now() - this.cacheAt > CACHE_TTL_MS) {
+      await this.refresh();
+    }
+    return this.freeCampaigns.get(String(capabilityId ?? '')) ?? '';
   }
 
   /** setting 的 key 命名 —— 与后台设置项一一对应 */
@@ -63,7 +76,7 @@ export class CreditPriceService {
      * 缓存 TTL 同时管住活动起止：到点后最多 3 秒自动恢复原价，
      * 不需要调度任务去「把价格改回来」（那类补偿逻辑最容易漏）。
      */
-    if (this.freeIds.has(capabilityId)) return 0;
+    if (this.freeCampaigns.has(capabilityId)) return 0;
     return this.cache.get(CreditPriceService.keyOf(capabilityId)) ?? defaultCreditCostOf(capabilityId);
   }
 
@@ -72,7 +85,7 @@ export class CreditPriceService {
     await this.refresh();
     const out: Record<string, number> = {};
     for (const c of CAPABILITIES) {
-      out[c.id] = this.freeIds.has(c.id)
+      out[c.id] = this.freeCampaigns.has(c.id)
         ? 0
         : this.cache.get(CreditPriceService.keyOf(c.id)) ?? defaultCreditCostOf(c.id);
     }
@@ -102,7 +115,7 @@ export class CreditPriceService {
       const key = CreditPriceService.keyOf(c.id);
       const settingValue = this.cache.get(key);
       const overridden = settingValue !== undefined;
-      const free = this.freeIds.has(c.id);
+      const free = this.freeCampaigns.has(c.id);
       return {
         capabilityId: c.id,
         capabilityName: c.name,
@@ -184,20 +197,20 @@ export class CreditPriceService {
     const now = new Date();
     const campaigns = await this.prisma.campaign.findMany({
       where: { type: 'limited_free', status: 'active', startAt: { lte: now }, endAt: { gte: now } },
-      select: { payload: true },
+      select: { id: true, payload: true },
     });
-    const free = new Set<string>();
+    const free = new Map<string, string>();
     for (const c of campaigns) {
       try {
         const payload = JSON.parse(c.payload || '{}') as { capabilityIds?: string[] };
-        for (const id of payload.capabilityIds ?? []) free.add(id);
+        for (const id of payload.capabilityIds ?? []) free.set(id, c.id);
       } catch {
         // 手的 payload 解析失败不能拖垮定价 —— 跳过这一个活动
       }
     }
 
     this.cache = next;
-    this.freeIds = free;
+    this.freeCampaigns = free;
     this.cacheAt = Date.now();
   }
 }

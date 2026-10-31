@@ -35,10 +35,12 @@
 
 | 文档 | 对应页面 |
 | --- | --- |
+| [`landing-design.md`](landing-design.md) | `/` 营销首页：首屏、场景与工具入口、使用流程、套餐、案例、底部行动区 |
 | [`workbench-design.md`](workbench-design.md) | `/workbench`、应用外壳、侧栏与响应式 |
 | [`topnav-design.md`](topnav-design.md) | 全站顶部导航与移动端抽屉 |
 | [`login-design.md`](login-design.md) | `/login`、登录弹窗、扫码登录入口 |
 | [`library-design.md`](library-design.md) | `/library`（别名 `/asset-library`） |
+| [`packages-design.md`](packages-design.md) | `/packages` 积分商城：参考站 SeeAny `/vip` 的套餐与积分策略基准 + 本站现状对照（档位与积分包已对齐，充值赠送 / 子账号 / 滚存为待立项功能） |
 
 ## 3. 技术文档（Technical）
 
@@ -48,7 +50,7 @@
 | --- | --- |
 | [`environments.md`](environments.md) | 三环境变量矩阵、加载优先级、生产门禁、Docker、排查 |
 | [`docker-deployment.md`](docker-deployment.md) | 本地 / 测试 / 生产容器编排、TLS 边界、备份恢复、升级回滚、排障 |
-| [`model-architecture.md`](model-architecture.md) | 模型通道分层、协议矩阵、调度与配置、请求时序、扩展 SOP |
+| [`model-architecture.md`](model-architecture.md) | 模型层：渠道 / 前台模型 / 路由与冷却 / 任务执行 / 账单退款 / 代理中转、扩展 SOP |
 | [`api-contract.md`](api-contract.md) | 统一响应信封、跨模块错误码、主要接口清单、令牌时长 |
 | [`runtime-infrastructure.md`](runtime-infrastructure.md) | AIGC 标识、签名 URL、限流、健康检查、请求追踪、日志落盘 |
 | [`development-workflow.md`](development-workflow.md) | Agent 执行手册：阶段执行卡、闸口命令、证据标准、交人边界 |
@@ -70,6 +72,8 @@
 | --- | --- | --- |
 | [`agent-prd.md`](agent-prd.md) | AI 智能体产品需求 | 规划中，不在本轮交付范围 |
 | [`agent-integration-design.md`](agent-integration-design.md) | AI 智能体集成方案 v2：双入口、API、SSE、数据模型、安全边界 | 规划中，未实施 |
+| [`channel-model-design.md`](channel-model-design.md) | 渠道与模型子系统整体移植方案（对齐 open-ai-canvas）：渠道/渠道模型/价格档/前台模型/路由/微积分计费/分组/协议插件/代理 —— 现模型层的设计依据与取舍记录 | 已实施（P0–P6） |
+| [`payment-refactor-design.md`](payment-refactor-design.md) | 支付域重构方案：多渠道配置版本化与加密托管、查单/关单、回调收件箱与 worker、T+1 对账自动补发、后台 `/admin/payments` 四标签页规格 | 规划中，未实施 |
 
 ## 6. 文档命名与放置规范
 

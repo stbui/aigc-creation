@@ -42,6 +42,13 @@ export interface ToolSettingsPopoverProps {
   popoverRole?: string;
   popoverAriaLabel?: string;
   onClose?: () => void;
+  /**
+   * 模型选择器（P5）。由 `ModelPicker` 提供，渲染在比例 / 画质之上。
+   *
+   * 放在高级设置里而不是提交区：工具页的左栏宽度固定，再加一行常驻控件会挤掉
+   * 上传区；而「换模型 = 换价」与画质档位是同一类决策，放在一起用户才会同时看到。
+   */
+  modelPicker?: ReactNode;
 }
 
 export function ToolSettingsPopover({
@@ -62,6 +69,7 @@ export function ToolSettingsPopover({
   popoverRole,
   popoverAriaLabel,
   onClose,
+  modelPicker,
 }: ToolSettingsPopoverProps) {
   const shellRef = useRef<HTMLDivElement>(null);
 
@@ -85,7 +93,7 @@ export function ToolSettingsPopover({
     };
   }, [onClose, onToggle, open]);
 
-  if (!showRatio && !showResolution) return null;
+  if (!showRatio && !showResolution && !modelPicker) return null;
 
   return (
     <div className="pk-settings-shell" ref={shellRef}>
@@ -121,6 +129,7 @@ export function ToolSettingsPopover({
               </button>
             </div>
           )}
+          {modelPicker}
           {showRatio && (
             <div className="pk-settings-group">
               <strong className="pk-settings-group-label">图片比例</strong>

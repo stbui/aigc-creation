@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
-import { toAbsoluteUrl, statsApi } from '../lib/api';
+import { assetThumbUrl, statsApi } from '../lib/api';
 import { MODE_LABELS } from '../lib/constants';
 import { useAuth } from '../context/AuthContext';
 import { PersonalPage } from '../components/PersonalPage';
@@ -254,7 +254,7 @@ export function StatsPage() {
                     {t.thumbnailUrl ? (
                       <img
                         className="stats-recent-thumb"
-                        src={toAbsoluteUrl(t.thumbnailUrl)}
+                        src={assetThumbUrl(t.thumbnailUrl, 128)}
                         alt={t.name}
                         loading="lazy"
                         decoding="async"
@@ -298,7 +298,7 @@ export function StatsPage() {
                       {c.thumbnailUrl ? (
                         <img
                           className="stats-cap-thumb"
-                          src={toAbsoluteUrl(c.thumbnailUrl)}
+                          src={assetThumbUrl(c.thumbnailUrl, 128)}
                           alt=""
                           loading="lazy"
                           decoding="async"

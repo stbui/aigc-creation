@@ -140,11 +140,12 @@ Hero 右半幅是本站自有的能力产出拼贴，不做外链图片。素材
 - 菜单图标是 `frontend/public/menu/*.svg`，运行时只请求同源 `/menu/*`。默认 `grayscale + opacity(.62)`，active / hover 用品牌紫 filter。
 - 分组标题与底部入口没有额外的折叠按钮。
 
-### 6.2 Hover 预览
+### 6.2 Hover 无提示（2026-10-31）
 
-`.rail-preview`：376px 宽，`padding: 14px 16px 16px`，gap 12，radius 16，渐变 `linear-gradient(110deg, #fff 0% 38%, #eeedff 100%)`，阴影 `0 10px 24px #23274a29`，左侧 12px 三角箭头，图片 344×172 / radius 10 / cover。右侧空间不足时翻到左侧，箭头同步换向。
+侧栏条目不挂任何 hover 浮层：不弹说明、不弹示例图、不弹用户最近产出。悬停属导航行为，浮层会遮挡主区且要到移出为止，收益低于干扰。
 
-图片优先取用户该能力最近一次真实产出；无产出时用内置演示图。
+- 能力说明只出现在工作台能力卡片与工具页标题下（`sidebarHint` / `summary`），不在侧栏复用。
+- 原先的 `.rail-preview` 浮层、`SIDEBAR_PREVIEWS` 演示图表、以及为预览图拉取 `stats/overview` 的请求全部移除。
 
 ### 6.3 底部入口
 

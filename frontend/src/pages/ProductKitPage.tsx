@@ -3,12 +3,14 @@ import { App, Input, Modal, Select } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { Maximize2, Minus, Plus, Sparkles } from 'lucide-react';
 import { generateApi, promptToolsApi } from '../lib/api';
+import { resolveModelId } from '../lib/models';
 import { MAX_IMAGE_MB, taskErrorText } from '../lib/constants';
 import { languageOptions, platformOptions } from '../lib/optionSets';
 
 import { ToolSubmitBar } from '../components/ToolSubmitBar';
 import { ToolImageDropzone } from '../components/ToolImageDropzone';
 import { ToolSettingsPopover } from '../components/ToolSettingsPopover';
+import { ModelPicker } from '../components/ModelPicker';
 import { AssetLibraryModal } from '../components/AssetLibraryModal';
 import { MobileUploadModal } from '../components/MobileUploadModal';
 import { ToolWorkflowSteps } from '../components/ToolEmptyState';
@@ -17,7 +19,6 @@ import { useImageUpload } from '../hooks/useImageUpload';
 import { useProject } from '../hooks/useProject';
 import { usePollAbort } from '../hooks/usePollAbort';
 import { useCreditLabel } from '../hooks/useCreditLabel';
-import { useCapabilityRuntime } from '../hooks/useCapabilityRuntime';
 import { useGenerateError } from '../hooks/useGenerateError';
 import { useResultGallery, type GalleryItem } from '../hooks/useResultGallery';
 import { useAuth } from '../context/AuthContext';
@@ -128,7 +129,11 @@ export function ProductKitPage() {
   const [submitting, setSubmitting] = useState(false);
   // 实时价来自能力清单（后台可调价），按钮文案不能再写死「免费生图」
   const creditLabel = useCreditLabel('main_image');
-  const { blocked: capabilityBlocked, reason: capabilityReason } = useCapabilityRuntime('main_image');
+  /*
+   * 不再读取 capability runtime 在此页展示「该能力需要真实模型才能生成，当前暂不可用」。
+   * 该提示是运营/配置侧的内部原因，C 端工作台不展示；真正的可用性仍由后端把关
+   * （下架走 40005，无线路由 resolveModelId 在提交时如实报错）。
+   */
   const [results, setResults] = useState<PkResult[]>([]);
   /** 本次提交的变体清单: 生成期间在结果网格首位画等量占位卡 */
   const [pending, setPending] = useState<Array<{ key: string; label?: string }>>([]);
@@ -203,16 +208,14 @@ export function ProductKitPage() {
 
   const submit = async () => {
     if (!formValid || generating) return;
-    // guest 点击仍应走登录弹窗（generateApi 的 401 → auth:required 契约）；
-    // 已登录时才把「能力不可用」作为硬拦截。
-    if (token && capabilityBlocked) {
-      message.warning(capabilityReason || '该能力当前不可提交');
-      return;
-    }
+    // guest 点击仍应走登录弹窗（generateApi 的 401 → auth:required 契约）
     setSubmitting(true);
     setResults([]);
     try {
       const projectId = await ensureProject();
+      // 一批变体必须落在同一个模型上，解析一次即可；循环里再解析会让
+      // 目录缓存过期的瞬间出现「同一批用了两个模型」
+      const logicalModelId = await resolveModelId('main_image');
       // 自定义配置计数 → 每类变体生成 count 张 (与参考站批量出图行为一致)
       const plan: string[] = [];
       for (const v of VARIANT_FIELDS) {
@@ -238,6 +241,7 @@ export function ProductKitPage() {
         const { taskId } = await generateApi.start({
           projectId,
           capability: 'main_image',
+          logicalModelId,
           inputAssetIds: images.map((x) => x.id),
           params: { ...baseParams, variant },
         });
@@ -473,14 +477,9 @@ export function ProductKitPage() {
           {/* 高级设置 + 提交 (sticky 底部) */}
           <ToolSubmitBar
             submitting={generating}
-            disabled={!formValid || (Boolean(token) && capabilityBlocked)}
+            disabled={!formValid}
             label="立即生成"
             creditLabel={creditLabel ?? undefined}
-            hint={
-              capabilityBlocked && token ? (
-                <span className="tool-submit-notice tool-submit-notice-error">{capabilityReason}</span>
-              ) : undefined
-            }
             settings={
               <ToolSettingsPopover
                 open={settingsOpen}
@@ -490,6 +489,7 @@ export function ProductKitPage() {
                 resolution={resolution}
                 onResolutionChange={setResolution}
                 capabilityId="main_image"
+                modelPicker={<ModelPicker capability="main_image" options={{ ratio, resolution }} />}
               />
             }
             onSubmit={() => void submit()}

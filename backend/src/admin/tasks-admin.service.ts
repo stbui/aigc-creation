@@ -4,8 +4,7 @@ import { GenerateService } from '../generate/generate.service';
 import { AppError } from '../common/app.exception';
 import { runBatch } from '../common/batch';
 import { CSV_EXPORT_MAX_ROWS, toCsv } from '../common/csv';
-import { getCapability } from '../capabilities/capability.registry';
-import { CAPABILITY_IDS } from '../providers/channel-config.defs';
+import { CAPABILITIES, getCapability } from '../capabilities/capability.registry';
 import { buildPage, paginate, type PageResult } from './dto/page-query.dto';
 import type { TaskListQueryDto } from './dto/task.dto';
 import { SignedUrlService } from '../common/signed-url.service';
@@ -86,7 +85,7 @@ export class TasksAdminService {
   async list(query: TaskListQueryDto): Promise<{
     result: PageResult<unknown>;
     congestion: {
-      pending: number;
+      queued: number;
       running: number;
       failedLastHour: number;
       runningThreshold: number;
@@ -257,15 +256,15 @@ export class TasksAdminService {
    * 拥堵指标 (B-31)。
    *
    * 三个数字答三个不同的问题:
-   *   pending      —— 提交了还没开始, 说明根本没被调度起来
+   *   queued       —— 提交了还没开始, 说明根本没被调度起来
    *   running      —— 正在跑, 超阈值说明通道吞吐跟不上提交速度
    *   failedLastHour —— 近 1 小时失败数, 失败率突增往往先于拥堵出现
    *
    * 独立方法而非在 list 里内联: 顶部告警条要高频刷新, 不该为它重算列表。
    */
   async congestion() {
-    const [pending, running, failedLastHour] = await Promise.all([
-      this.prisma.generationTask.count({ where: { status: 'pending' } }),
+    const [queued, running, failedLastHour] = await Promise.all([
+      this.prisma.generationTask.count({ where: { status: 'queued' } }),
       this.prisma.generationTask.count({ where: { status: 'running' } }),
       this.prisma.generationTask.count({
         where: {
@@ -274,7 +273,7 @@ export class TasksAdminService {
         },
       }),
     ]);
-    return { pending, running, failedLastHour, runningThreshold: RUNNING_ALERT_THRESHOLD };
+    return { queued, running, failedLastHour, runningThreshold: RUNNING_ALERT_THRESHOLD };
   }
 
   /**
@@ -335,11 +334,13 @@ export class TasksAdminService {
               ? '完成'
               : task.status === 'failed'
                 ? '失败'
-                : task.status === 'running'
-                  ? '执行中'
-                  : '等待中',
-          at: task.status === 'pending' || task.status === 'running' ? null : task.updatedAt,
-          done: task.status === 'succeeded' || task.status === 'failed',
+                : task.status === 'cancelled'
+                  ? '已终止'
+                  : task.status === 'running'
+                    ? '执行中'
+                    : '等待中',
+          at: task.status === 'queued' || task.status === 'running' ? null : task.updatedAt,
+          done: task.status === 'succeeded' || task.status === 'failed' || task.status === 'cancelled',
         },
       ],
       params: safeParse<Record<string, unknown>>(task.params, {}),
@@ -360,68 +361,27 @@ export class TasksAdminService {
   /**
    * 失败重试 (B-32)。
    *
-   * **新建任务而非原地复活**: outputAssetId 有 @unique 的 1:1 约束,
-   * 原地复活会让新产出图与旧产出图抢同一个唯一键, 必然冲突。
-   *
-   * ⚠ 重试**不二次扣费**, 因此新任务的 `creditCost` 必须记 0。
-   *
-   * 原任务失败时已按快照退款, 若这里沿用原值, 新任务再失败会触发
-   * `refundForFailure` 第二次退款 —— 用户没有为这次重试付过钱, 等于白送。
-   * `retriedFromId` 保留可追溯性; 后台展示原价请查原任务。
+   * 语义全部收在 `GenerateService.retryTask`：新建任务、复用模型快照、
+   * `routeRun + 1`、不二次扣费。这里只补一条审计日志 —— 重试改变的是
+   * 用户可见的任务状态，事后必须能回答「这个失败任务是谁重跑的」。
    */
   async retry(id: string) {
-    const origin = await this.prisma.generationTask.findUnique({ where: { id } });
-    if (!origin) throw new AppError(40400, '任务不存在', 404);
-    if (origin.status !== 'failed') {
-      throw new AppError(40000, '仅失败任务可重试', 400);
-    }
-
-    const next = await this.prisma.generationTask.create({
-      data: {
-        projectId: origin.projectId,
-        ownerId: origin.ownerId,
-        capability: origin.capability,
-        status: 'running',
-        inputAssetIds: origin.inputAssetIds,
-        params: origin.params,
-        // 与 generate.service.createTask 一致: 建任务时写 pending,
-        // 跑完后由 processTask 改写成实际通道
-        provider: 'pending',
-        creditCost: 0,
-        retriedFromId: origin.id,
-      },
-    });
-
-    this.generate.enqueue(next.id);
-    this.logger.log(`任务 ${id} 重试为新任务 ${next.id}`);
-
-    return { taskId: next.id, retriedFromId: origin.id };
+    const result = await this.generate.retryTask(id);
+    this.logger.log(`任务 ${id} 重试为新任务 ${result.taskId}`);
+    return result;
   }
 
   /**
    * 终止任务 (B-33)。
    *
-   * ⚠ **本方法只改数据库状态, 不中断正在跑的进程**。彻底解决需要给
-   * processTask 加 AbortSignal —— 本期通过 processTask 的落库前状态检查
-   * (见 generate.service) 兜底: 已被终止的任务不会再写入产出图,
-   * 但已经发出的模型调用仍会跑完并计费。
-   *
-   * 限制可终止状态: 已完成的任务再改成 failed 会让成功率统计与产出对不上。
+   * 是否退款由 `TaskLifecycleService` 按 attempt 的派发状态决定：请求还没
+   * 发出去的直接退款，已经发出去的任务置 `cancelled` 并把账单转人工核对 ——
+   * 上游可能正在生成并计费，自动退款会让平台白付一次调用。
    */
   async cancel(id: string) {
-    const task = await this.prisma.generationTask.findUnique({ where: { id } });
-    if (!task) throw new AppError(40400, '任务不存在', 404);
-    if (task.status !== 'pending' && task.status !== 'running') {
-      throw new AppError(40000, '仅等待中或执行中的任务可终止', 400);
-    }
-
-    const updated = await this.prisma.generationTask.update({
-      where: { id },
-      data: { status: 'failed', errorCode: 'cancelled_by_admin', updatedAt: new Date() },
-    });
-
-    this.logger.warn(`任务 ${id} 被后台终止 (原状态 ${task.status})`);
-    return { id, status: updated.status, errorCode: updated.errorCode };
+    const result = await this.generate.cancelTask(id);
+    this.logger.warn(`任务 ${id} 被后台终止，计费状态 ${result.billing}`);
+    return result;
   }
 
   /**
@@ -439,10 +399,7 @@ export class TasksAdminService {
 
   /** 已知能力 id 全集 (供前端筛选下拉, 与后端校验口径一致) */
   capabilityOptions() {
-    return CAPABILITY_IDS.map((id) => {
-      const def = getCapability(id);
-      return { id, name: def?.name ?? id };
-    });
+    return CAPABILITIES.map((def) => ({ id: def.id, name: def.name }));
   }
 }
 

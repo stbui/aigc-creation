@@ -23,6 +23,7 @@ const BASE = (process.env.API_BASE || 'http://127.0.0.1:4100').replace(/\/$/, ''
 const { PrismaClient } = require('@prisma/client');
 const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
 const { resolveDbUrl, loadEnvOnce } = require('./db-url');
+const { clearCredits } = require('./credit-fixture');
 loadEnvOnce();
 const prisma = new PrismaClient({ adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }) });
 
@@ -267,11 +268,10 @@ function phoneTail() {
 
   // 清理
   const uids = [reg.data?.user?.id, phoneUser?.id].filter(Boolean);
+  await clearCredits(prisma, { in: uids });
   await prisma.$transaction([
     prisma.accountToken.deleteMany({ where: { userId: { in: uids } } }),
     prisma.loginLog.deleteMany({ where: { userId: { in: uids } } }),
-    prisma.creditLedger.deleteMany({ where: { userId: { in: uids } } }),
-    prisma.creditLot.deleteMany({ where: { userId: { in: uids } } }),
     prisma.project.deleteMany({ where: { ownerId: { in: uids } } }),
     prisma.user.deleteMany({ where: { id: { in: uids } } }),
   ]).catch(() => undefined);

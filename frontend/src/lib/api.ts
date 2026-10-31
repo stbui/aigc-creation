@@ -7,18 +7,6 @@ import type {
   AdminBackupStats,
   AdminCleanupLog,
   AdminMe,
-  AdminModelCall,
-  AdminModelCallListResult,
-  AdminModelConfig,
-  AdminModelConfigTestAllResult,
-  AdminModelConfigTestResult,
-  AdminModelChannelRecord,
-  AdminModelChannelsSnapshot,
-  AdminModelListResult,
-  AdminChannelTestResult,
-  AdminChannelTestAllResult,
-  AdminVendorFillPlan,
-  Modality,
   AdminOverview,
   AdminAlertsResult,
   AdminPasswordReset,
@@ -133,6 +121,35 @@ import type {
   BatchSummary,
   CreditImportResult,
 } from '../types/api';
+import type {
+  AdminChannelModelView,
+  AdminChannelView,
+  AdminLogicalModelView,
+  ApiLogListResult,
+  BillingOrderListResult,
+  BillingOrderView,
+  ChannelHealthRowView,
+  ChannelModelFetchResultView,
+  ChannelOrderItemView,
+  ChannelPageResult,
+  FinanceAnalyticsView,
+  ModelIntentPayload,
+  ModelQuoteView,
+  PluginListResult,
+  PluginVerifyResultView,
+  PluginView,
+  ProviderCatalogView,
+  ProviderVerifyResult,
+  ProtocolCatalogEntryView,
+  ProtocolTestResultView,
+  PublicModelCatalogResult,
+  SimulateResultView,
+  SystemChannelExportView,
+  SystemChannelImportResultView,
+  UpstreamModelPreview,
+  UserGroupView,
+} from '../types/model';
+import type { PublicLogicalModel } from './models';
 
 export class ApiError extends Error {
   status: number;
@@ -701,6 +718,54 @@ export function assetSrc(
 }
 
 /**
+ * 素材**缩略图**地址（列表 / 网格用）。
+ *
+ * 列表卡片只有 200 多像素，原图常见 1–3.5MB —— 首屏 20 张就是几十 MB。
+ * 本地存储的 `/uploads/*` 由后端按 `w` / `h` 生成方形 JPEG 并缓存；
+ * 云端存储（OSS / MinIO）的 URL 自带签名，追加参数会破坏签名，故原样返回。
+ *
+ * ⚠ 只用于预览。下载 / 查看原图 / 提交给生成链路仍必须用 `assetSrc()`。
+ */
+export function assetThumbSrc(
+  asset?: {
+    sourceUrl?: string | null;
+    signedUrl?: string | null;
+    storageBackend?: string | null;
+  } | null,
+  size = 640,
+): string | undefined {
+  const src = assetSrc(asset);
+  if (!src) return undefined;
+  if (asset?.storageBackend === 'local') return appendThumbParams(src, size);
+  // 明确声明了云端后端: 签名地址追加参数会破坏签名, 原样返回
+  if (asset?.storageBackend) return src;
+  // 未声明后端 (任务接口的 outputAsset 不带该字段): 按 URL 自身判断是否本地 /uploads
+  return assetThumbUrl(src, size);
+}
+
+/**
+ * 原始 URL 字符串版本的缩略图地址（后端只给 `thumbnailUrl` 等字符串时用）。
+ *
+ * 与 `assetThumbSrc()` 同一套语义，但无法得知 `storageBackend`，因此按
+ * URL 自身判断：只有落在**本地存储 `/uploads/`** 下才追加 `w` / `h`。
+ * 云端（OSS / MinIO）签名地址、`data:` / `blob:` 一律原样返回 ——
+ * 追加参数会破坏云端签名。
+ *
+ * ⚠ 只用于 `<img>` 预览。下载 / 查看原图仍必须用 `toAbsoluteUrl()`。
+ */
+export function assetThumbUrl(url?: string | null, size = 640): string | undefined {
+  const abs = toAbsoluteUrl(url);
+  if (!abs) return undefined;
+  // 相对路径由 toAbsoluteUrl 拼接 API_BASE 得到，已确定指向本服务
+  const isOwnUploads = abs.startsWith('/uploads/') || (Boolean(API_BASE) && abs.startsWith(`${API_BASE}/uploads/`));
+  return isOwnUploads ? appendThumbParams(abs, size) : abs;
+}
+
+function appendThumbParams(src: string, size: number): string {
+  return `${src}${src.includes('?') ? '&' : '?'}w=${size}&h=${size}`;
+}
+
+/**
  * 用户与账户管理。
  * 高危动作 (禁用/角色/重置密码/删除) 均对应独立权限点, 便于单独回收。
  */
@@ -804,193 +869,6 @@ export const adminAigcLabelApi = {
     badgePngBase64: string;
     reason: string;
   }) => request<AdminAigcLabel>('/admin/aigc-label', { method: 'PUT', body: payload }),
-};
-
-/**
- * 模型配置与调用记录。
- *
- * 凭据类字段 (gateway.token) 的写入语义特殊: **留空 = 保持原值**,
- * 不是清空 —— 页面回读时拿不到明文, 用户每次打开表单看到的都是空输入框,
- * 若按常规语义提交就会把已有凭据清掉。清除须走显式的 clears 列表。
- */
-export const adminModelApi = {
-  config: () => request<AdminModelConfig>('/admin/model-config'),
-
-  updateConfig: (settings: Record<string, unknown>, clears: string[] = [], reason?: string) =>
-    request<{ updated: string[]; cleared: string[]; reason?: string }>('/admin/model-config', {
-      method: 'PATCH',
-      body: { settings, clears, ...(reason ? { reason } : {}) },
-    }),
-
-  /**
-   * 连通性测试: 只探测可达性, 不发真实生成任务 (不消耗额度/不产垃圾图)。
-   *
-   * modality 决定探测哪个端点 (文 → /v1/chat/completions, 图 → 协议层声明的图像端点),
-   * 缺省 image 与改造前行为一致。
-   */
-  testConfig: (
-    modality?: Modality,
-    overrides?: {
-      protocol?: string;
-      baseUrl?: string;
-      token?: string;
-      model?: string;
-      enabled?: boolean;
-    },
-  ) =>
-    request<AdminModelConfigTestResult>('/admin/model-config/test', {
-      method: 'POST',
-      body: { ...(modality ? { modality } : {}), ...(overrides ? { overrides } : {}) },
-    }),
-
-  /**
-   * 批量测试全部通道 (2026-10-20)。
-   *
-   * 三个模态各有独立通道, 逐个点测试慢且易漏; 且「没配」在界面上
-   * 看不出来的 (未接入 = 调用必然失败)。
-   */
-  testAllChannels: () =>
-    request<AdminModelConfigTestAllResult>('/admin/model-config/test-all', {
-      method: 'POST',
-    }),
-
-  /**
-   * 厂商联动填充方案 (2026-10-20 厂商聚合后新增)。
-   *
-   * 厂商聚合后, 同一家的多个模态共享基址 (如硅基流动的图与文都是
-   * api.siliconflow.cn), 但配置项仍按模态分开 (存量键不改名)。
-   * 选厂商时一次性取回各模态该填什么, 免得手动在三个模态里填同一个基址。
-   *
-   * ⚠️ 不含令牌 —— 凭据仍按模态分开配置 (用户可能给图和文用不同的 key)。
-   */
-  vendorFillPlan: (vendorKey: string) =>
-    request<AdminVendorFillPlan>(`/admin/model-config/vendor/${vendorKey}/fill-plan`),
-
-  calls: (params: {    page?: number;
-    pageSize?: number;
-    capability?: string;
-    modality?: string;
-    source?: string;
-    success?: boolean;
-    fallback?: boolean;
-    from?: string;
-    to?: string;
-  } = {}) => {
-    const qs = new URLSearchParams();
-    for (const [k, v] of Object.entries(params)) {
-      if (v !== undefined && v !== '') qs.set(k, String(v));
-    }
-    const suffix = qs.toString() ? `?${qs.toString()}` : '';
-    return request<AdminModelCallListResult>(`/admin/model-calls${suffix}`);
-  },
-
-  /** 导出当前筛选结果 (CSV, 上限 5000 行) */
-  exportCsv: (params: {
-    capability?: string;
-    modality?: string;
-    source?: string;
-    success?: boolean;
-    fallback?: boolean;
-    from?: string;
-    to?: string;
-  } = {}) => downloadCsv(`/admin/model-calls/export${toQuery(params)}`),
-
-  callDetail: (id: string) => request<AdminModelCall>(`/admin/model-calls/${id}`),
-};
-
-/**
- * 模型线路（多渠道）。
- *
- * 与 adminModelApi 的分工:
- *   - adminModelApi 管「旧版单通道参数 + 超时 + 路由」;
- *   - 本对象管「一条线路」的增删改/排序/启停/测试。
- * 一旦某模态有了线路，旧版单通道参数不再参与调度。
- */
-export const adminModelChannelsApi = {
-  list: () => request<AdminModelChannelsSnapshot>('/admin/model-channels'),
-
-  create: (body: {
-    modality: Modality;
-    name: string;
-    protocol: string;
-    baseUrl?: string;
-    token?: string;
-    model?: string;
-    enabled?: boolean;
-    reason?: string;
-  }) =>
-    request<{ channel: AdminModelChannelRecord; materialized: boolean }>('/admin/model-channels', {
-      method: 'POST',
-      body,
-    }),
-
-  update: (
-    id: string,
-    body: {
-      name?: string;
-      protocol?: string;
-      baseUrl?: string;
-      token?: string;
-      clearToken?: boolean;
-      model?: string;
-      enabled?: boolean;
-      expectedUpdatedAt?: string;
-      reason?: string;
-    },
-  ) =>
-    request<{ channel: AdminModelChannelRecord }>(`/admin/model-channels/${id}`, {
-      method: 'PATCH',
-      body,
-    }),
-
-  remove: (id: string, reason?: string) =>
-    request<{ deleted: boolean; remaining: number; sourceAfter: 'channels' | 'legacy' | 'none' }>(
-      `/admin/model-channels/${id}`,
-      { method: 'DELETE', body: reason ? { reason } : {} },
-    ),
-
-  move: (id: string, dir: 'up' | 'down') =>
-    request<{ channels: AdminModelChannelRecord[] }>(`/admin/model-channels/${id}/move`, {
-      method: 'POST',
-      body: { dir },
-    }),
-
-  materialize: (modality: Modality, reason?: string) =>
-    request<{ materialized: boolean; channels: AdminModelChannelRecord[] }>(
-      '/admin/model-channels/materialize',
-      { method: 'POST', body: { modality, ...(reason ? { reason } : {}) } },
-    ),
-
-  testSaved: (id: string) =>
-    request<AdminChannelTestResult>(`/admin/model-channels/${id}/test`, { method: 'POST' }),
-
-  testDraft: (body: {
-    modality: Modality;
-    id?: string;
-    protocol?: string;
-    baseUrl?: string;
-    token?: string;
-    model?: string;
-    enabled?: boolean;
-  }) => request<AdminChannelTestResult>('/admin/model-channels/test', { method: 'POST', body }),
-
-  /**
-   * 拉取厂商模型清单：内置预设 + 用令牌实时拉取的真实清单。
-   * 只读，不落库、不改健康状态。
-   */
-  listModels: (body: {
-    modality: Modality;
-    id?: string;
-    protocol?: string;
-    baseUrl?: string;
-    token?: string;
-  }) => request<AdminModelListResult>('/admin/model-channels/models', { method: 'POST', body }),
-
-  testAll: (modality?: Modality) =>
-    request<AdminChannelTestAllResult>('/admin/model-channels/test-all', {
-      method: 'POST',
-      body: modality ? { modality } : {},
-    }),
 };
 
 /**
@@ -1415,8 +1293,13 @@ export const adminSchedulerApi = {
 // 交易后台 (B1): 商品 / 订单 / 支付流水 / 积分账本 / 保留期清理
 // ────────────────────────────────────────────────────────────────────
 
-/** 把对象拼成 query string, 空值一律跳过 (空串会让后端把筛选条件当成"等于空") */
-function toQuery(params: Record<string, string | number | boolean | undefined>): string {
+/**
+ * 把对象拼成 query string, 空值一律跳过 (空串会让后端把筛选条件当成"等于空")。
+ *
+ * 用泛型约束而非 `Record<...>`: 各查询条件以 `interface` 声明, 而 interface 不会
+ * 生成隐式索引签名, 收窄成 Record 会把它们全部挡在门外 (见 `AdminApiLogQuery`)。
+ */
+function toQuery<T extends object>(params: T): string {
   const qs = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
     if (v !== undefined && v !== '') qs.set(k, String(v));
@@ -1921,4 +1804,303 @@ export const adminTicketsApi = {
 export const adminSearchApi = {
   search: (q: string, signal?: AbortSignal) =>
     request<AdminSearchResult>(`/admin/search${toQuery({ q })}`, { signal }),
+};
+
+/* ══════════════════════ 渠道与模型域（`src/model/**`） ══════════════════════ */
+
+/**
+ * 后台渠道（`/admin/channels`）。
+ *
+ * open-ai-canvas 移植后的渠道工作台：一条渠道可以挂任意模态的模型，
+ * 模型是线路的最小单位（各自启停、各自冷却）。
+ */
+export const adminChannelsApi = {
+  list: (params: { keyword?: string; status?: string; page?: number; limit?: number } = {}) =>
+    request<ChannelPageResult>(`/admin/channels${toQuery(params)}`),
+
+  order: () => request<ChannelOrderItemView[]>('/admin/channels/order'),
+
+  /** 线路健康（一行 = 一条渠道模型，含进程内冷却快照） */
+  health: () => request<{ items: ChannelHealthRowView[] }>('/admin/channels/health'),
+
+  /** 可选协议目录；`capability` 用于按模态过滤（图像 / 文本 / 视频 / 音频） */
+  protocols: (capability?: string) =>
+    request<{ protocols: ProtocolCatalogEntryView[] }>(
+      `/admin/channels/protocols${toQuery({ capability })}`,
+    ),
+
+  /** 整表排序：`expectedIds` 是并发保护，与后台当前顺序不一致时整单拒绝 */
+  saveOrder: (ids: string[], expectedIds: string[], reason?: string) =>
+    request<{ ok: boolean }>('/admin/channels/order', {
+      method: 'PUT',
+      body: { ids, expectedIds, ...(reason ? { reason } : {}) },
+    }),
+
+  exportAll: (ids?: string[]) =>
+    request<SystemChannelExportView>('/admin/channels/export', {
+      method: 'POST',
+      body: ids && ids.length > 0 ? { ids } : {},
+    }),
+
+  importAll: (payload: SystemChannelExportView & { reason?: string }) =>
+    request<SystemChannelImportResultView>('/admin/channels/import', { method: 'POST', body: payload }),
+
+  get: (id: string) => request<AdminChannelView>(`/admin/channels/${id}`),
+
+  create: (body: Record<string, unknown>) =>
+    request<AdminChannelView>('/admin/channels', { method: 'POST', body }),
+
+  update: (id: string, body: Record<string, unknown>) =>
+    request<AdminChannelView>(`/admin/channels/${id}`, { method: 'PATCH', body }),
+
+  remove: (id: string, reason?: string) =>
+    request<{ ok: boolean }>(`/admin/channels/${id}`, {
+      method: 'DELETE',
+      ...(reason ? { body: { reason } } : {}),
+    }),
+
+  duplicate: (id: string) =>
+    request<AdminChannelView>(`/admin/channels/${id}/duplicate`, { method: 'POST' }),
+
+  models: (id: string) => request<AdminChannelModelView[]>(`/admin/channels/${id}/models`),
+
+  modelOrder: (id: string) => request<ChannelOrderItemView[]>(`/admin/channels/${id}/models/order`),
+
+  saveModelOrder: (id: string, ids: string[], expectedIds: string[], reason?: string) =>
+    request<{ ok: boolean }>(`/admin/channels/${id}/models/order`, {
+      method: 'PUT',
+      body: { ids, expectedIds, ...(reason ? { reason } : {}) },
+    }),
+
+  createModel: (id: string, body: Record<string, unknown>) =>
+    request<AdminChannelModelView>(`/admin/channels/${id}/models`, { method: 'POST', body }),
+
+  updateModel: (id: string, modelId: string, body: Record<string, unknown>) =>
+    request<AdminChannelModelView>(`/admin/channels/${id}/models/${modelId}`, {
+      method: 'PATCH',
+      body,
+    }),
+
+  removeModel: (id: string, modelId: string, reason?: string) =>
+    request<{ deleted: number }>(`/admin/channels/${id}/models/${modelId}`, {
+      method: 'DELETE',
+      ...(reason ? { body: { reason } } : {}),
+    }),
+
+  batchDeleteModels: (id: string, ids: string[], reason?: string) =>
+    request<{ deleted: number }>(`/admin/channels/${id}/models/batch-delete`, {
+      method: 'POST',
+      body: { ids, ...(reason ? { reason } : {}) },
+    }),
+
+  /** 读取上游模型目录（只读）：用已保存凭证在服务端拉取，密钥不经过浏览器 */
+  fetchModels: (id: string) =>
+    request<{ models: UpstreamModelPreview[] }>(`/admin/channels/${id}/models/fetch`, {
+      method: 'POST',
+    }),
+
+  importModels: (id: string, models: string[], reason?: string) =>
+    request<ChannelModelFetchResultView>(`/admin/channels/${id}/models/import`, {
+      method: 'POST',
+      body: { models, ...(reason ? { reason } : {}) },
+    }),
+
+  testModel: (id: string, body: Record<string, unknown>) =>
+    request<ProtocolTestResultView>(`/admin/channels/${id}/models/test`, { method: 'POST', body }),
+
+  setModelEnabled: (id: string, modelId: string, enabled: boolean, reason?: string) =>
+    request<{ ok: boolean }>(`/admin/channels/${id}/models/${modelId}/enabled`, {
+      method: 'PATCH',
+      body: { enabled, ...(reason ? { reason } : {}) },
+    }),
+
+  setModelSort: (id: string, modelId: string, sortOrder: number, reason?: string) =>
+    request<{ ok: boolean }>(`/admin/channels/${id}/models/${modelId}/sort`, {
+      method: 'PATCH',
+      body: { sortOrder, ...(reason ? { reason } : {}) },
+    }),
+};
+
+/** 跨渠道的模型只读视图（选路下拉与全局排查用） */
+export const adminChannelModelsApi = {
+  list: (channelId?: string) =>
+    request<AdminChannelModelView[]>(`/admin/channel-models${toQuery({ channelId })}`),
+};
+
+/** 后台前台模型（`/admin/logical-models`）：保存即写新 revision 并重建线路 */
+export const adminLogicalModelsApi = {
+  list: (includeArchived = false) =>
+    request<AdminLogicalModelView[]>(
+      `/admin/logical-models${toQuery({ includeArchived: includeArchived ? '1' : undefined })}`,
+    ),
+
+  get: (id: string) => request<AdminLogicalModelView>(`/admin/logical-models/${id}`),
+
+  create: (body: Record<string, unknown>) =>
+    request<AdminLogicalModelView>('/admin/logical-models', { method: 'POST', body }),
+
+  update: (id: string, body: Record<string, unknown>) =>
+    request<AdminLogicalModelView>(`/admin/logical-models/${id}`, { method: 'PATCH', body }),
+
+  archive: (id: string) =>
+    request<{ ok: boolean }>(`/admin/logical-models/${id}`, { method: 'DELETE' }),
+
+  /** 路由模拟（只读）：回答「这组参数会落到哪条线路、为什么没落」 */
+  simulate: (id: string, body: ModelIntentPayload & { reason?: string }) =>
+    request<SimulateResultView>(`/admin/logical-models/${id}/simulate`, { method: 'POST', body }),
+};
+
+/** 用户分组：倍率、渠道可见范围与按模型的价格覆盖 */
+export const adminUserGroupsApi = {
+  list: () => request<UserGroupView[]>('/admin/user-groups'),
+
+  get: (id: string) => request<UserGroupView>(`/admin/user-groups/${id}`),
+
+  create: (body: Record<string, unknown>) =>
+    request<UserGroupView>('/admin/user-groups', { method: 'POST', body }),
+
+  update: (id: string, body: Record<string, unknown>) =>
+    request<UserGroupView>(`/admin/user-groups/${id}`, { method: 'PATCH', body }),
+
+  remove: (id: string) =>
+    request<{ ok: boolean }>(`/admin/user-groups/${id}`, { method: 'DELETE' }),
+};
+
+/** 内置插件：启停立即重注册协议；校验只查契约不发上游请求 */
+export const adminPluginsApi = {
+  list: () => request<PluginListResult>('/admin/plugins'),
+
+  get: (id: string) => request<PluginView>(`/admin/plugins/${id}`),
+
+  setEnabled: (id: string, enabled: boolean, reason?: string) =>
+    request<PluginView>(`/admin/plugins/${id}`, {
+      method: 'PATCH',
+      body: { enabled, ...(reason ? { reason } : {}) },
+    }),
+
+  /** 契约校验只返回校验结果（不返回插件视图），页面据此提示通过/失败 */
+  verify: (id: string) =>
+    request<PluginVerifyResultView>(`/admin/plugins/${id}/verify`, { method: 'POST' }),
+
+  /**
+   * 上传安装插件包（zip）。
+   *
+   * 走 multipart 而不是 base64 JSON：插件包上限 48MB，base64 会再多三分之一，
+   * 且需求本来就是一个文件选择框。
+   */
+  install: (file: File, reason?: string) => {
+    const form = new FormData();
+    form.append('file', file);
+    if (reason) form.append('reason', reason);
+    return request<PluginView>('/admin/plugins/install', { method: 'POST', body: form });
+  },
+
+  uninstall: (id: string, reason?: string) =>
+    request<{ id: string; removed: boolean }>(`/admin/plugins/${id}`, {
+      method: 'DELETE',
+      body: reason ? { reason } : {},
+    }),
+};
+
+/** 服务商目录：远端清单 + 一键安装对应厂商插件 */
+export const adminProviderCatalogApi = {
+  list: () => request<ProviderCatalogView>('/admin/provider-catalog'),
+
+  refresh: () => request<ProviderCatalogView>('/admin/provider-catalog/refresh', { method: 'POST' }),
+
+  verify: (id: string) =>
+    request<ProviderVerifyResult>(`/admin/provider-catalog/${id}/verify`, { method: 'POST' }),
+
+  install: (id: string) =>
+    request<PluginView>(`/admin/provider-catalog/${id}/install`, { method: 'POST', body: {} }),
+};
+
+/** 生成账单：只读列表 + 人工核对（`settle` / `refund`，原因必填） */
+export const adminBillingOrdersApi = {
+  list: (params: {
+    status?: string;
+    userId?: string;
+    taskId?: string;
+    model?: string;
+    channelId?: string;
+    billingMode?: string;
+    group?: string;
+    from?: string;
+    to?: string;
+    page?: number;
+    pageSize?: number;
+  } = {}) => request<BillingOrderListResult>(`/admin/billing-orders${toQuery(params)}`),
+
+  get: (id: string) => request<BillingOrderView>(`/admin/billing-orders/${id}`),
+
+  resolve: (id: string, action: 'settle' | 'refund', reason: string) =>
+    request<BillingOrderView>(`/admin/billing-orders/${id}/resolve`, {
+      method: 'POST',
+      body: { action, reason },
+    }),
+};
+
+/** 调用记录的筛选条件：列表与导出共用（导出忽略分页） */
+export interface AdminApiLogQuery {
+  status?: string;
+  requestKind?: string;
+  channelId?: string;
+  taskId?: string;
+  userId?: string;
+  model?: string;
+  billable?: string;
+  from?: string;
+  to?: string;
+}
+
+/** 上游调用记录（`ApiCallLog` 维度，含后台连通性测试的非计费调用） */
+export const adminApiLogsApi = {
+  list: (params: AdminApiLogQuery & { page?: number; pageSize?: number } = {}) =>
+    request<ApiLogListResult>(`/admin/api-logs${toQuery(params)}`),
+
+  /**
+   * 导出当前筛选结果（CSV，上限 5000 行）。
+   *
+   * 刻意不含请求体 / 响应体：那是排查用的明细，落成可转发的文件就等于把上游密钥
+   * 片段与用户提示词一起散出去。需要看细节走详情抽屉。
+   */
+  exportCsv: (params: AdminApiLogQuery = {}) =>
+    downloadCsv(`/admin/api-logs/export${toQuery(params)}`),
+};
+
+/** 财务分析（只读聚合）：实收 / 已退 / 净收入，未结算单独列为挂账 */
+export const adminAnalyticsApi = {
+  finance: (params: { from?: string; to?: string } = {}) =>
+    request<FinanceAnalyticsView>(`/admin/analytics/finance${toQuery(params)}`),
+};
+
+/** 前台模型目录（产品视角，`/models*`） */
+export const modelsApi = {
+  list: () => request<{ models: PublicLogicalModel[] }>('/models'),
+
+  available: (intent: ModelIntentPayload) =>
+    request<{ models: PublicLogicalModel[] }>('/models/available', { method: 'POST', body: intent }),
+
+  quote: (id: string, intent: ModelIntentPayload) =>
+    request<{ quote: ModelQuoteView }>(`/models/${id}/quote`, { method: 'POST', body: intent }),
+};
+
+/**
+ * 渠道模型目录（供应视角，`/model-catalog*`）。
+ *
+ * `models` 恒为空数组，模型在 `channels[].models` 内；渠道名恒为空串，
+ * 前端统一显示「系统模型」。报价必须带 `channelId` + `modelKey` ——
+ * 不同渠道的同名模型价格与协议都可能不同，不接受按 modelKey 全局搜索。
+ */
+export const modelCatalogApi = {
+  catalog: () => request<PublicModelCatalogResult>('/model-catalog'),
+
+  available: (intent: ModelIntentPayload) =>
+    request<PublicModelCatalogResult>('/model-catalog/available', { method: 'POST', body: intent }),
+
+  quote: (channelId: string, modelKey: string, intent: ModelIntentPayload) =>
+    request<{ quote: ModelQuoteView }>('/model-catalog/quote', {
+      method: 'POST',
+      body: { ...intent, channelId, modelKey },
+    }),
 };

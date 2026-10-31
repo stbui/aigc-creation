@@ -24,17 +24,21 @@ async function call(method, path, token, body) {
 /**
  * CSV 导出是 text/csv 而不是 JSON 信封, 不能用 call() 解析。
  * 同时校验 BOM: 没有它 Excel 打开中文表头会乱码。
+ *
+ * BOM 必须按**字节**判断: Node 的 Response.text() 会按 UTF-8 解码并丢掉前导
+ * U+FEFF, charCodeAt(0) 永远拿不到 0xfeff —— 那样检查会一直红, 让人误以为
+ * 服务端没写 BOM。
  */
 async function fetchCsv(path, token) {
   const res = await fetch(`${BASE}${path}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
-  const text = await res.text();
+  const buf = Buffer.from(await res.arrayBuffer());
   return {
     status: res.status,
     contentType: res.headers.get('content-type') || '',
-    hasBom: text.charCodeAt(0) === 0xfeff,
-    text,
+    hasBom: buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf,
+    text: buf.toString('utf8'),
   };
 }
 
@@ -140,22 +144,33 @@ const { resolveDbUrl } = require('./db-url');
   check('非白名单排序字段回落默认值', badSort.status === 200, '未报错');
 
   console.log('\n【系统设置校验】');
-  // 扁平结构: 全局 ValidationPipe whitelist:true 会剥离未声明字段,
-  // 未声明的 evilKey 应被静默剥离 -> 最终表现为"没有可更新项"400
-  const unknownKey = await call('PATCH', '/admin/settings', T, { evilKey: 1 });
-  check('未声明字段被剥离后返回 400', unknownKey.status === 400, unknownKey.message);
+  // kv 结构: { settings: { '<SETTING_DEFS key>': value }, clears?, reason }。
+  // 未知键由 service 按 SETTING_DEFS 直接 400（不再静默剥离）。
+  const unknownKey = await call('PATCH', '/admin/settings', T, {
+    settings: { evilKey: 1 },
+    reason: '冒烟测试',
+  });
+  check('未知设置项被拒', unknownKey.status === 400, unknownKey.message);
 
-  const empty = await call('PATCH', '/admin/settings', T, { reason: '无变更' });
+  const empty = await call('PATCH', '/admin/settings', T, { settings: {}, reason: '无变更' });
   check('空提交返回 400', empty.status === 400, empty.message);
 
-  const outOfRange = await call('PATCH', '/admin/settings', T, { uploadMaxSizeMb: 9999 });
-  check('越界值被 DTO 层拦截', outOfRange.status === 400, outOfRange.message);
+  const outOfRange = await call('PATCH', '/admin/settings', T, {
+    settings: { 'upload.maxSizeMb': 9999 },
+    reason: '冒烟测试',
+  });
+  check('越界值被 service 层拦截', outOfRange.status === 400, outOfRange.message);
 
-  const wrongType = await call('PATCH', '/admin/settings', T, { siteMaintenance: 'maybe' });
-  check('类型错误被 DTO 层拦截', wrongType.status === 400, wrongType.message);
+  // 用可写的布尔项验类型校验: site.maintenance 是只读项, 拿它测会先被
+  // 「只读」拦下, 断言看似通过却根本没走到类型校验。
+  const wrongType = await call('PATCH', '/admin/settings', T, {
+    settings: { 'refund.allowConsumedTask': 'maybe' },
+    reason: '冒烟测试',
+  });
+  check('类型错误被 service 层拦截', wrongType.status === 400, wrongType.message);
 
   const okSet = await call('PATCH', '/admin/settings', T, {
-    uploadMaxSizeMb: 30,
+    settings: { 'upload.maxSizeMb': 30 },
     reason: '冒烟测试',
   });
   check('合法写入成功', okSet.status === 200, `updated: ${okSet.data?.updated?.join(',')}`);
@@ -164,8 +179,12 @@ const { resolveDbUrl } = require('./db-url');
     .find((g) => g.key === 'upload').items.find((i) => i.key === 'upload.maxSizeMb');
   check('写入值真实落库', verify.value === 30, `当前值 ${verify.value}, overridden=${verify.overridden}`);
 
-  // 还原
-  await call('PATCH', '/admin/settings', T, { uploadMaxSizeMb: 20, reason: '还原' });
+  // 还原：删除覆盖行回落到 SETTING_DEFS 默认值，而不是再写一个猜测的旧值
+  await call('PATCH', '/admin/settings', T, {
+    settings: {},
+    clears: ['upload.maxSizeMb'],
+    reason: '还原',
+  });
 
   console.log('\n【角色权限更新】');
   const badPerm = await call('PATCH', '/admin/roles/operator/permissions', T, {
@@ -213,7 +232,7 @@ const { resolveDbUrl } = require('./db-url');
   // data.export 审计。这里只验「内容类型 + BOM + 表头」, 具体列由各页断言。
   for (const [label, path] of [
     ['审计日志', '/admin/audit-logs/export'],
-    ['模型调用记录', '/admin/model-calls/export'],
+    ['调用记录', '/admin/api-logs/export'],
     ['发票', '/admin/invoices/export'],
     ['优惠券', '/admin/coupons/export'],
     ['限时活动', '/admin/campaigns/export'],

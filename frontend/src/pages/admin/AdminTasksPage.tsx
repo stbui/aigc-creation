@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { Link, useSearchParams } from 'react-router-dom';
 import { AlertTriangle, Download } from 'lucide-react';
 import { Button } from '../../vendor/boardui/components/base/buttons/button';
-import { adminTasksApi, toAbsoluteUrl } from '../../lib/api';
+import { adminTasksApi, assetThumbUrl, toAbsoluteUrl } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
 import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
@@ -71,10 +71,11 @@ const PROVIDER_LABELS: Record<string, string> = {
 
 /** 状态筛选的可选值。与后端 DTO 白名单一致 */
 const STATUS_OPTIONS = [
-  { value: 'pending', label: '等待' },
+  { value: 'queued', label: '排队中' },
   { value: 'running', label: '执行中' },
   { value: 'succeeded', label: '已完成' },
   { value: 'failed', label: '失败' },
+  { value: 'cancelled', label: '已终止' },
 ];
 
 const PROVIDER_OPTIONS = [
@@ -440,7 +441,7 @@ export function AdminTasksPage() {
               {row.thumbnailUrl ? (
                 <img
                   className="size-7 shrink-0 rounded border border-border-table object-cover"
-                  src={toAbsoluteUrl(row.thumbnailUrl)}
+                  src={assetThumbUrl(row.thumbnailUrl, 96)}
                   alt=""
                   loading="lazy"
                 />
@@ -506,7 +507,7 @@ export function AdminTasksPage() {
          * 会与同一行的「失败」互相矛盾, 读起来像任务没开始跑; 这类行一律显示「—」。
          */
         render: (row: Row) =>
-          !row.provider || (row.provider === 'pending' && row.status !== 'pending') ? (
+          !row.provider || (row.provider === 'pending' && row.status !== 'queued') ? (
             <span className="text-text-placeholder">—</span>
           ) : (
             <span className="rounded bg-background-secondary-default px-1.5 py-0.5 text-[11px] text-text-secondary">
@@ -578,7 +579,7 @@ export function AdminTasksPage() {
                 重试
               </Button>
             )}
-            {(row.status === 'pending' || row.status === 'running') && can('task.cancel') && (
+            {(row.status === 'queued' || row.status === 'running') && can('task.cancel') && (
               <Button
                 variant="dangerGhost"
                 size="small"
@@ -838,7 +839,7 @@ export function AdminTasksPage() {
                   重试此任务
                 </Button>
               )}
-              {(d.status === 'pending' || d.status === 'running') && can('task.cancel') && (
+              {(d.status === 'queued' || d.status === 'running') && can('task.cancel') && (
                 <Button variant="danger" size="small" onClick={() => openConfirm('cancel', row)}>
                   终止此任务
                 </Button>
@@ -888,7 +889,7 @@ export function AdminTasksPage() {
                     /* 与列表列同一规则：`pending` 是建任务的初值，任务已经失败时
                      * 再写「待执行」会和上面的「失败」互相矛盾。 */
                     value:
-                      !d.provider || (d.provider === 'pending' && d.status !== 'pending')
+                      !d.provider || (d.provider === 'pending' && d.status !== 'queued')
                         ? '—'
                         : (PROVIDER_LABELS[d.provider] ?? d.provider),
                   },
@@ -963,7 +964,7 @@ export function AdminTasksPage() {
                 items={d.timeline.map((n) => ({
                   title: n.label,
                   done: n.done,
-                  active: !n.done && d.status !== 'pending',
+                  active: !n.done && d.status !== 'queued',
                   /*
                    * 没有时间的节点不能一律写「进行中」——
                    * pending 任务的终态节点会因此被误读成"已经开跑了"。
@@ -972,7 +973,7 @@ export function AdminTasksPage() {
                     ? new Date(n.at).toLocaleString('zh-CN')
                     : n.done
                       ? '未记录具体时间'
-                      : d.status === 'pending'
+                      : d.status === 'queued'
                         ? '尚未开始'
                         : '进行中',
                 }))}
@@ -1018,7 +1019,7 @@ export function AdminTasksPage() {
                     <img
                       key={a.id}
                       className="aspect-square w-full rounded-md border border-border-table object-cover"
-                      src={toAbsoluteUrl(a.sourceUrl)}
+                      src={assetThumbUrl(a.sourceUrl, 240)}
                       alt={`输入素材 ${i + 1}`}
                       loading="lazy"
                     />

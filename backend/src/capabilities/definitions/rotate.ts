@@ -8,6 +8,7 @@
  */
 
 import type { CapabilityPlugin } from '../capability-plugin.type';
+import { editImageIntent } from '../model-mapping';
 import { QUALITY_OPTIONS, RATIOS_WITH_ORIGINAL } from './param-options';
 
 export const Rotate: CapabilityPlugin = {
@@ -37,6 +38,7 @@ export const Rotate: CapabilityPlugin = {
     `按新视角重建商品展示，背景保持不变${p.imageRatio ? `；输出比例 ${p.imageRatio}` : ''}。` +
     `必须保持输入图中的同一件商品、数量、轮廓、部件、材质与颜色，不得替换商品或生成无关主体。`,
   modality: 'image',
+  model: { capability: 'image', operation: 'image_to_image', intent: editImageIntent },
   inputs: 1,
   inputImageMode: 'edit',
   inWorkbench: true,

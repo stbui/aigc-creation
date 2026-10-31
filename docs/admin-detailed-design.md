@@ -36,15 +36,17 @@ backend/src/admin/
 ├── marketing.controller.ts
 ├── invoices-admin.controller.ts / reconciliation.controller.ts / reconciliation.service.ts
 ├── payment-channels.controller.ts
-├── model.controller.ts / model-config.service.ts / model-call.service.ts
-├── model-channel.controller.ts / model-channel.service.ts
 ├── capability.controller.ts
 ├── roles.controller.ts / settings.service.ts / ../common/setting-defs.ts
 ├── storage.controller.ts / scheduler.controller.ts / scheduler.service.ts
 ├── backup.controller.ts / backup.service.ts / retention.controller.ts
 ├── audit.controller.ts / audit.service.ts
 └── search.controller.ts / search.service.ts
+```
 
+模型层的后台接口不在这里：渠道 / 前台模型 / 用户分组 / 插件 / 账单 / 分析 / 调用记录分别由 `backend/src/model/**` 下的 controller 提供（`channel.controller.ts`、`admin-logical-model.controller.ts`、`user-group.controller.ts`、`plugin.controller.ts`、`billing-admin.controller.ts`、`analytics.controller.ts`），路由与权限见 `docs/model-architecture.md` 的「后台页面 / 接口」表。
+
+```text
 frontend/src/admin-ui/              # 后台 UI（BoardUI）
 ├── shell/AdminBoardLayout.tsx      # 外壳（侧栏 + 内容区，无顶栏无值班带）
 ├── shell/AdminSearchPalette.tsx    # ⌘K 全局搜索
@@ -63,7 +65,7 @@ frontend/src/components/admin/
 ├── DutyBand.tsx / DutyContext.tsx   # 值班塔渲染与耗时格式化工具；轮询只挂在概览路由
 └── statusMeta.ts                    # 状态 → 文案 / 色调映射
 
-frontend/src/pages/admin/            # 30 个页面 + modelConfig/ 子组件目录
+frontend/src/pages/admin/            # 35 个页面 + channels/ 子组件目录
 ```
 
 ### 0.2 守卫链与审计
@@ -127,7 +129,7 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 
 ### 0.6 高危操作确认
 
-`ConfirmAction`（页内确认条，`admin-ui/widgets/AdminChrome`，`role="region"`）用于删除、退款、重置密码、手动调整积分、模型配置写入、角色与系统设置写入、备份。文案必须写明**影响量**（`impact` 数组，如「将删除 12 个素材」），不能只写「确定删除吗」。高危动作的原因输入仍走各页表单字段并落审计；2026-10-30 起不再要求输入确认词（`requireTyping` / `typingText` 仅保留入参兼容）。
+`ConfirmAction`（页内确认条，`admin-ui/widgets/AdminChrome`，`role="region"`）用于删除、退款、重置密码、手动调整积分、渠道 / 前台模型写入、角色与系统设置写入、备份。文案必须写明**影响量**（`impact` 数组，如「将删除 12 个素材」），不能只写「确定删除吗」。高危动作的原因输入仍走各页表单字段并落审计；2026-10-30 起不再要求输入确认词（`requireTyping` / `typingText` 仅保留入参兼容）。
 
 ### 0.7 批量动作
 
@@ -419,7 +421,7 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 - 角色不可增删改名，`builtIn` 恒为 `true`；三个角色的权限点都能改，包括 `admin`。
 - 未知权限点整体拒绝（400 `40001`），不静默丢弃 —— 否则调用方会以为保存成功。
 - 改动立即生效：`AdminGuard` / `PermissionGuard` 每次请求查库，不需要重启或重新登录。操作者把自己权限改没了也会当场生效（可由其他 admin 恢复）。
-- 前端 `AdminRolesPage` 用 `can('role.write')` 控制可编辑态，按 54 个权限点分组勾选，高危权限点单独标注。
+- 前端 `AdminRolesPage` 用 `can('role.write')` 控制可编辑态，按 64 个权限点分组勾选，高危权限点单独标注。
 
 ---
 
@@ -465,34 +467,88 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 
 ---
 
-## 18. 模型配置与调用记录
+## 18. 模型层后台
 
-### 18.1 模型配置 `/admin/model-config`
+模型组共 8 页，按「供应侧 → 产品侧 → 运营侧」排列：`/admin/channels` · `/admin/logical-models` · `/admin/user-groups` · `/admin/plugins` · `/admin/model-calls` · `/admin/billing-orders` · `/admin/finance`，外加 `/admin/capabilities`（见第 19 节）。接口实现全部在 `backend/src/model/**`，`src/admin/` 只保留能力管控与通用后台。
 
-页签：线路管理 / 可用模型 / 逐能力路由 / 全局设置。
+### 18.1 渠道工作台 `/admin/channels`
 
-| 能力 | 接口 |
-| --- | --- |
-| 线路 CRUD、排序、启停 | `GET|POST|PATCH|DELETE /admin/model-channels*` |
-| 单条 / 全部连通性测试 | `POST /admin/model-channels/test`、`/test-all`、`/:id/test` |
-| 测草稿（未保存也可测） | `POST /admin/model-channels/test` 带草稿体 |
-| 厂商实时模型清单 | `POST /admin/model-channels/models` |
-| 旧版单体配置读写与测试 | `GET|PATCH /admin/model-config`、`POST /admin/model-config/test` |
+供应侧配置：渠道（凭证加密存储）+ 渠道模型（模态 / 协议 / 权重 / 优先级 / 价格档）。
+
+| 能力 | 接口（前缀 `/admin/channels`） | 权限点 |
+| --- | --- | --- |
+| 渠道列表 / 详情 / 创建 / 更新 / 删除 / 复制 | `GET /`、`GET /:id`、`POST /`、`PATCH /:id`、`DELETE /:id`、`POST /:id/duplicate` | `channel.read` / `channel.write` |
+| 排序、整包导出 / 导入 | `PUT /order`、`POST /export`、`POST /import` | `channel.write` |
+| 线路健康 | `GET /health` | `channel.read` |
+| 协议下拉 | `GET /protocols` | `channel.model_read` |
+| 渠道模型 CRUD / 排序 / 启停 / 批量删除 | `GET|POST /:id/models*`、`PATCH /:id/models/:modelId*`、`DELETE /:id/models/:modelId`、`POST /:id/models/batch-delete` | `channel.model_read` / `channel.model_write` |
+| 上游模型目录读取与导入 | `POST /:id/models/fetch`、`POST /:id/models/import` | `channel.model_read` / `channel.model_write` |
+| 连通性测试（可测未保存草稿） | `POST /:id/models/test` | `channel.model_write` |
+| 跨渠道只读视图 | `GET /admin/channel-models` | `channel.model_read` |
 
 规则：
 
-- 某模态一旦有线路，旧版 `gateway.<modality>.*` 的 baseUrl / token / model / provider 不再参与调度（超时与轮询仍生效）。
-- 模型清单两条来源：内置预设（`vendor.catalog.ts`，离线可用带中文说明）与厂商实时清单（用线路已保存令牌请求协议声明的 `modelListEndpoints`）。令牌只在请求内使用，不落库、不进审计。
-- 保存后主动失效运行时缓存，不能等 3s 自然过期。
-- 写 `channel.route` / `model.config_write`（admin 专属），测 `channel.test`（运营也有）。
+- `ChannelModel.protocol` 存**插件声明的 provider id**（如 `openai-image`），不是插件 id（`openai-images`）；下拉读协议注册表，手写库或导入时才可能写错，表现为派发报 `channel_unavailable`。
+- 凭证只以密文落库（`MODEL_SECRET_KEY` 派生密钥）；读取接口只回显掩码。上游模型目录与连通性测试都在服务端使用已保存凭证发请求，密钥不进浏览器、不落审计。
+- 连通性测试走与正式任务相同的协议、出站策略与鉴权，差异只有「不建任务、不扣费」；结果写 `ApiCallLog`（`billable=false`），后台「调用记录」页可查。
+- 写入后主动失效目录快照（`CatalogVersionService`），不等 TTL 自然过期。
+- `channel.write` / `channel.model_write` 覆盖渠道凭证与价格档：后端没有「只改线路不改价」的独立权限点，前端也不宣称有。
 
-### 18.2 调用记录 `/admin/model-calls`
+### 18.2 前台模型 `/admin/logical-models`
 
-`GET /admin/model-calls`、`/admin/model-calls/:id`（`model.call_read`）。记录线上每次通道调用：模态、通道、模型、耗时、结果、失败原因与回落链路，可按能力 / 模态 / 通道 / 成败 / 历史回落筛选。用于回答「刚才走的是哪条线路」。
+C 端可见身份（`LogicalModel`）+ 发布快照（`LogicalModelRevision`）+ 线路（`LogicalModelRoute`）。
 
-`taskId` 列历史上存放的是渠道/厂商任务号，不保证命中本地 `GenerationTask`。详情接口会校验后分别下发 `generationTaskId`（可深链）与 `gatewayTaskId`（仅文本展示），前端不得直接把原始 `taskId` 拼成任务详情链接。
+| 能力 | 接口 | 权限点 |
+| --- | --- | --- |
+| 列表 / 详情 | `GET /admin/logical-models`、`/:id`（`includeArchived` 可选） | `logical_model.read` |
+| 创建 / 更新 / 归档 | `POST /admin/logical-models`、`PATCH /:id`、`DELETE /:id` | `logical_model.write` |
+| 选路模拟 | `POST /admin/logical-models/:id/simulate` | `logical_model.read` |
 
-`GET /admin/model-calls/export`（`data.export` + 审计）导出同一筛选口径的 CSV（含提示词）；上限 5000 行。路由必须声明在 `:id` 之前。
+规则：
+
+- 保存即发布一条 revision；任务建单时快照该 revision 的线路与价格，事后改配置不会改已建任务。
+- 图像能力的遮罩支持声明在 `capabilityConfig.maskSupported`，下发为 `inputs.mask`；未声明的模型收到遮罩请求返回 `42205`。
+- `simulate` 用系统分组身份跑一遍真实选路，返回命中线路与原因，不建任务、不扣费。
+
+### 18.3 用户分组 `/admin/user-groups`
+
+| 能力 | 接口 | 权限点 |
+| --- | --- | --- |
+| 列表 / 详情 | `GET /admin/user-groups`、`/:id` | `user_group.read` |
+| 创建 / 更新 / 删除 | `POST /admin/user-groups`、`PATCH /:id`、`DELETE /:id` | `user_group.write` |
+
+- 分组决定倍率（`ratioBasisPoints`）、货币兑换、可见渠道与按模型的覆盖价格。
+- 本仓没有 `users.user_group` 列：分组由会员套餐的 `userGroupCode` 映射，没有有效会员的用户落在 `default`，默认分组不可删除。
+- 写入必须同时失效分组缓存与目录快照，否则出现「展示按新倍率、扣费按旧倍率」。
+
+### 18.4 插件 `/admin/plugins`
+
+| 能力 | 接口 | 权限点 |
+| --- | --- | --- |
+| 列表 / 详情 | `GET /admin/plugins`、`/:id` | `plugin.read` |
+| 启停 | `PATCH /admin/plugins/:id` | `plugin.write` |
+| 校验 / 安装 / 卸载 | `POST /admin/plugins/:id/verify`、`POST /admin/plugins/install`、`DELETE /admin/plugins/:id` | `plugin.write` |
+| 服务商目录 | `GET /admin/provider-catalog`、`POST /refresh`、`POST /:id/verify`、`POST /:id/install`（`provider-catalog.controller.ts`） | `plugin.read` / `plugin.write` |
+
+- 插件是协议来源：启停即重建协议注册表，渠道模型可选的协议列表随之变化。
+- 内置插件在 `backend/plugins/`（107 个可用包 / 115 个 provider，另有 3 个 `src-*` 源目录镜像不参与运行），后台上传安装的落在 `MODEL_PLUGIN_INSTALL_DIR`。
+
+### 18.5 调用记录 `/admin/api-logs`
+
+`GET /admin/api-logs`（`model.call_read`）记录每次上游调用：`requestKind`（task / tool / test / proxy）、渠道、模型、协议、耗时、结果、`RouteAttempt.failureCode` 与错误摘要，可按状态 / 类型 / 渠道 / 任务 / 用户 / 模型筛选。用于回答「这次扣的是谁、走的是哪条线路、为什么失败」。
+
+`GET /admin/api-logs/export`（`data.export` + 审计）导出同一筛选口径的 CSV；列表与导出共用一个查询构造函数，不会出现两个口径，导出**不含请求体 / 响应体**，上限 5000 行。路由必须声明在 `:id` 之前。
+
+### 18.6 生成账单 `/admin/billing-orders` 与财务分析 `/admin/finance`
+
+| 能力 | 接口 | 权限点 |
+| --- | --- | --- |
+| 账单列表 / 详情 | `GET /admin/billing-orders`、`/:id` | `billing_order.read` |
+| 人工核对 | `POST /admin/billing-orders/:id/resolve`（`action: settle \| refund` + `reason`，高危） | `billing_order.resolve` |
+| 财务汇总 | `GET /admin/analytics/finance` | `model.analytics_read` |
+
+- 账单状态机：`reserved / running / settled / refunded / uncertain`。`uncertain`（超时、5xx、连接中断）不自动退款、不切线，只能人工 `settle` 或 `refund`，必填原因并写审计。
+- 财务口径固定三条：实收 = 已结算账单实际金额；已退 = 订单退款金额；净收入 = 实收 − 已退。预留 / 运行 / 待核对单列为「挂账」，**不计入实收**。
 
 ---
 

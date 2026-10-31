@@ -25,6 +25,7 @@ const fs = require('fs');
 const path = require('path');
 const { Jimp, JimpMime } = require('jimp');
 const { loadEnvOnce, resolveDbUrl } = require('./db-url');
+const { grantCredits, clearCredits } = require('./credit-fixture');
 const { labelGeneratedImage, inspectAigcLabel, crc32 } = require('../dist/common/aigc-label');
 const {
   AIGC_LABEL_DEFAULTS,
@@ -237,8 +238,18 @@ async function api() {
   const userId = reg.data?.user?.id;
   if (!token || !userId) throw new Error(`注册失败: ${JSON.stringify(reg).slice(0, 200)}`);
 
+  /** 只删本脚本造的数据；成功、跳过、断言失败都要走到 */
+  const cleanup = async () => {
+    await clearCredits(prisma, userId).catch(() => {});
+    await prisma.generationTask.deleteMany({ where: { ownerId: userId } }).catch(() => {});
+    await prisma.asset.deleteMany({ where: { ownerId: userId } }).catch(() => {});
+    await prisma.project.deleteMany({ where: { ownerId: userId } }).catch(() => {});
+    await prisma.user.deleteMany({ where: { id: userId } }).catch(() => {});
+    await prisma.$disconnect();
+  };
+
   // 直接发一批积分：本脚本只验证标识链路，不想把订单/支付也拖进来
-  await prisma.creditLot.create({ data: { userId, source: 'grant', totalCredits: 50, remainingCredits: 50 } });
+  await grantCredits(prisma, { userId, credits: 50, reason: 'AIGC 冒烟发放' });
 
   const project = await call('POST', '/projects', token, { name: `aigc-${run}` });
   const projectId = project.data?.id;
@@ -253,9 +264,24 @@ async function api() {
   const sourceAssetId = up?.data?.id;
   if (!sourceAssetId) throw new Error(`上传失败: ${JSON.stringify(up).slice(0, 200)}`);
 
+  /*
+   * 新模型层：建任务必须带前台模型 id。先问一次「现在能跑 main_image 的模型」；
+   * 没有配置线路时如实跳过端到端段（离屏标识断言已经在上面跑完了），
+   * 不伪造产出、不把缺线路说成通过。
+   */
+  const available = await call('POST', '/models/available', token, { capability: 'main_image' });
+  const model = (available.data?.models ?? []).find((m) => m.capability === 'main_image');
+  if (!model) {
+    console.log('  SKIP  端到端生成：没有可用于 main_image 的模型线路');
+    console.log('        在后台「渠道工作台」配置一条 image 线路后重跑本脚本');
+    await cleanup();
+    return;
+  }
+
   const created = await call('POST', '/generate', token, {
     projectId,
     capability: 'main_image',
+    logicalModelId: model.id,
     inputAssetIds: [sourceAssetId],
     params: { platform: 'taobao', size: '1k', ratio: '1:1' },
   });
@@ -294,14 +320,7 @@ async function api() {
     }
   }
 
-  // 清理：只删本脚本造的数据
-  await prisma.creditLedger.deleteMany({ where: { userId } }).catch(() => {});
-  await prisma.creditLot.deleteMany({ where: { userId } }).catch(() => {});
-  await prisma.generationTask.deleteMany({ where: { ownerId: userId } }).catch(() => {});
-  await prisma.asset.deleteMany({ where: { ownerId: userId } }).catch(() => {});
-  await prisma.project.deleteMany({ where: { ownerId: userId } }).catch(() => {});
-  await prisma.user.deleteMany({ where: { id: userId } }).catch(() => {});
-  await prisma.$disconnect();
+  await cleanup();
 }
 
 (async () => {

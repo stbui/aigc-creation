@@ -4,7 +4,7 @@ import { ChevronRight, ChevronUp, Circle, Columns2, Eraser, Hand, History, Minus
 import { useToolTask } from '../hooks/useToolTask';
 import { useProject } from '../hooks/useProject';
 import { useAuth } from '../context/AuthContext';
-import { assetsApi, assetSrc, generateApi } from '../lib/api';
+import { assetsApi, assetSrc, assetThumbUrl, generateApi } from '../lib/api';
 import { ToolShell, type ToolAsset } from '../components/ToolShell';
 import { ToolCard } from '../components/ToolWidgets';
 import { ToolHistoryGrid } from '../components/ToolHistoryPane';
@@ -1103,7 +1103,7 @@ export function LocalRedrawPage() {
               aria-label="预览待重绘商品"
               onClick={() => controls.preview(image)}
             >
-              <img src={image.url} alt="待重绘商品" draggable={false} />
+              <img src={assetThumbUrl(image.url, 320) ?? image.url} alt="待重绘商品" draggable={false} />
             </button>
             <div>
               <button
@@ -1320,7 +1320,7 @@ export function LocalRedrawPage() {
                   >
                     {references[index] && (
                       <>
-                        <img src={references[index]!.url} alt={`标注${index + 1}参考图`} />
+                        <img src={assetThumbUrl(references[index]!.url, 240) ?? references[index]!.url} alt={`标注${index + 1}参考图`} />
                         <button
                           type="button"
                           className="remove-reference"

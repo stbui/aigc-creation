@@ -4,6 +4,7 @@ import { AppError } from '../common/app.exception';
 import { getCapability } from '../capabilities/capability.registry';
 import { ALL_PERMISSIONS, ROLE_LABELS, ROLE_PERMISSIONS } from './permissions';
 import { SignedUrlService } from '../common/signed-url.service';
+import { microcreditsToCredits } from '../credits/credit.service';
 
 /**
  * 平台概览聚合 (admin-prd.md B-07~B-12)。
@@ -143,17 +144,17 @@ export class AdminOverviewService {
       this.prisma.membership.count({ where: { createdAt: { gte: since } } }),
       // 只统计"发出去"的三种流水 (均为正数)。refund_reclaim/expire 不是发放,
       // 混进来会让「本期发放」这个指标失去意义
-      this.prisma.creditLedger.aggregate({
+      this.prisma.creditLedgerEntry.aggregate({
         where: {
           createdAt: { gte: since },
           type: { in: ['purchase', 'grant', 'admin_adjust'] },
         },
-        _sum: { amount: true },
+        _sum: { amountMicrocredits: true },
       }),
       // consume 流水的 amount 是负数, 取绝对值即累计消耗
-      this.prisma.creditLedger.aggregate({
+      this.prisma.creditLedgerEntry.aggregate({
         where: { createdAt: { gte: since }, type: 'consume' },
-        _sum: { amount: true },
+        _sum: { amountMicrocredits: true },
       }),
 
       // ── 上一窗口（环比）──
@@ -179,7 +180,7 @@ export class AdminOverviewService {
       succeeded: 0,
       failed: 0,
       running: 0,
-      pending: 0,
+      queued: 0,
     };
     for (const g of taskGroups) {
       const n = g._count._all;
@@ -271,7 +272,7 @@ export class AdminOverviewService {
         succeeded: tasks.succeeded,
         failed: tasks.failed,
         running: tasks.running,
-        pending: tasks.pending,
+        queued: tasks.queued,
         successRate,
         assets: assets.total,
         originals: assets.original,
@@ -327,8 +328,9 @@ export class AdminOverviewService {
         paymentSuccessRate,
         members: { active: activeMembers, newInWindow: newMembers },
         credits: {
-          grantedInWindow: creditGranted._sum.amount ?? 0,
-          consumedInWindow: Math.abs(creditConsumed._sum.amount ?? 0),
+          // 流水存微积分，概览按积分展示
+          grantedInWindow: microcreditsToCredits(creditGranted._sum.amountMicrocredits ?? 0n),
+          consumedInWindow: microcreditsToCredits(abs(creditConsumed._sum.amountMicrocredits ?? 0n)),
         },
         /** 窗口内收入按支付渠道拆分，用于看营收结构而不只是总额 */
         channelMix,
@@ -410,4 +412,9 @@ export class AdminOverviewService {
     }
     return Array.from(map.entries()).map(([date, v]) => ({ date, ...v }));
   }
+}
+
+/** 微积分取绝对值：consume 流水金额为负数 */
+function abs(value: bigint): bigint {
+  return value < 0n ? -value : value;
 }

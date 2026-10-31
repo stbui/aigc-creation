@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
 import { CreditService } from '../credits/credit.service';
+import { formatCredits } from '../model/infra/microcredits';
 import { MembershipService } from '../membership/membership.service';
 import { MarketingService } from '../marketing/marketing.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -962,12 +963,13 @@ export class OrderService {
     const agg = await this.prisma.creditLot.aggregate({
       where: {
         userId,
-        remainingCredits: { gt: 0 },
+        remainingMicrocredits: { gt: 0n },
         OR: [{ expireAt: null }, { expireAt: { gt: now } }],
       },
-      _sum: { remainingCredits: true },
+      _sum: { remainingMicrocredits: true },
     });
-    const available = agg._sum.remainingCredits ?? 0;
+    // 批次是微积分口径，规则入参是积分口径，换算只在这一处发生
+    const available = Number(formatCredits(agg._sum.remainingMicrocredits ?? 0n));
     return Math.max(0, grantedCredits - available);
   }
 

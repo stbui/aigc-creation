@@ -11,6 +11,7 @@
  */
 
 import type { CapabilityPlugin } from '../capability-plugin.type';
+import { generateImageIntent } from '../model-mapping';
 import { QUALITY_OPTIONS, RATIOS, ratioText, refCountText, sizeText } from './param-options';
 
 export const FreeCreate: CapabilityPlugin = {
@@ -35,6 +36,7 @@ export const FreeCreate: CapabilityPlugin = {
     `自由创作：${p.prompt || '按描述创作电商视觉'}` +
     `${refCountText(refCount)}，保持主体一致${ratioText(p.ratio)}${sizeText(p.size)}`,
   modality: 'image',
+  model: { capability: 'image', operation: 'text_to_image', intent: generateImageIntent },
   inputs: 0,
   inWorkbench: false,
 };

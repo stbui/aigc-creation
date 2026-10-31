@@ -103,20 +103,10 @@ test.describe('左侧菜单复原', () => {
     await expect(service).toHaveAttribute('href', '/tickets?type=consultation&compose=1');
     await expect(service).toBeInViewport();
 
+    // 侧栏不挂任何 hover 浮层: 悬停后不得出现提示 / 预览图
     await page.locator('.app-sider-wrap').getByRole('link', { name: '商品主图' }).hover();
-    const preview = page.locator('.rail-preview');
-    await expect(preview).toBeVisible();
-    const previewBox = await preview.boundingBox();
-    expect(previewBox?.width).toBe(376);
-    expect(previewBox?.height).toBe(236);
-    await expect(preview.locator('.rail-preview-desc')).toHaveCSS('line-height', '22px');
-    await expect(preview.locator('.rail-preview-img')).toHaveAttribute(
-      'src',
-      '/workbench/spzt.webp',
-    );
-    const imageBox = await preview.locator('.rail-preview-img').boundingBox();
-    expect(imageBox?.width).toBe(344);
-    expect(imageBox?.height).toBe(172);
+    await expect(page.locator('.rail-preview')).toHaveCount(0);
+    await expect(page.locator('.app-sider-wrap [role="tooltip"]')).toHaveCount(0);
 
     expect(foreignRequests, '侧栏资源必须本地化，不得请求参考站').toEqual([]);
   });

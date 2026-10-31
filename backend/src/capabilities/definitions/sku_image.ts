@@ -8,6 +8,7 @@
  */
 
 import type { CapabilityPlugin } from '../capability-plugin.type';
+import { generateImageIntent } from '../model-mapping';
 import { BG_COLOR_OPTIONS, QUALITY_OPTIONS, RATIOS, ratioText, sizeText } from './param-options';
 
 /** 前端框选区域：归一化坐标 (0~1)，与模板图原始像素尺寸无关。 */
@@ -205,6 +206,7 @@ export const SkuImage: CapabilityPlugin = {
     );
   },
   modality: 'image',
+  model: { capability: 'image', operation: 'image_to_image', intent: generateImageIntent },
   inputs: 1,
   inWorkbench: false,
 };

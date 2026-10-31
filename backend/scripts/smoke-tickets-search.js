@@ -15,6 +15,7 @@
 const { PrismaClient } = require('@prisma/client');
 const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
 const { resolveDbUrl } = require('./db-url');
+const { clearCredits } = require('./credit-fixture');
 
 const BASE = (process.env.API_BASE || 'http://127.0.0.1:4100').replace(/\/$/, '') + '/api/v1';
 const prisma = new PrismaClient({ adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }) });
@@ -393,8 +394,7 @@ async function ensureAdminRole() {
   console.log('\n【清理】');
   await prisma.ticketReply.deleteMany({ where: { ticketId: { in: createdTicketIds } } });
   await prisma.ticket.deleteMany({ where: { id: { in: createdTicketIds } } });
-  await prisma.creditLot.deleteMany({ where: { userId: u1Id } });
-  await prisma.creditLedger.deleteMany({ where: { userId: u1Id } });
+  await clearCredits(prisma, u1Id);
   await prisma.notification.deleteMany({ where: { userId: { in: createdUserIds } } });
   await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
   await prisma.$disconnect();

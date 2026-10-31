@@ -2,31 +2,42 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
+import { CreditWalletService } from '../model/billing/credit-wallet.service';
+import {
+  MicrocreditError,
+  formatCredits,
+  parseCredits,
+  toMicrocredits,
+} from '../model/infra/microcredits';
 
 /**
  * 积分账本 (admin-prd.md §3.9B-49~B-52 / §5 数据口径)。
  *
  * 三条不可动摇的约定:
  *
- * **1. 余额唯一由 CreditLot 汇总推导, 不存冗余余额字段。**
- *    冗余余额必然与批次不一致 —— 任何一次扣减失败、任何一次并发竞争都会留下偏差,
- *    而对账时根本无从判断该信哪个。冗余余额是负债, 不是优化。
+ * **1. 金额以微积分为唯一运算单位。** 1 积分 = 1,000,000 微积分；
+ *    对外（C 端 / 后台）仍按积分展示，换算只发生在 API 边界。
+ *    生成账单按微积分预留与结算，批次若停留在整积分就永远扣不平。
  *
- * **2. 扣减按FEFO (First Expire First Out)**: 按 expireAt 升序逐批扣,
- *    为空视为最晚到期。Prisma 的 orderBy 对 null 的排序在 SQLite 与 PostgreSQL
- *    上不一致, 所以这里用 `sortByExpiryRaw` 显式指定 SQL。
+ * **2. 余额由 `CreditAccount` 权威、`CreditLot` 批次权威共同支撑。**
+ *    两者必须相等，写入统一走 `CreditWalletService` —— 任何一处绕过它
+ *    直接改批次，都会在每日对账里变成查不出来源的差额。
  *
- * **3. 金额一律整数, 积分同理。** 浮点会在累加时产生分位误差。
+ * **3. 扣减按 FEFO (First Expire First Out)**：按 expireAt 升序逐批扣，
+ *    为空视为最晚到期（钱包层已统一处理）。
+ *
+ * 业务侧（充值发放 / 人工调整 / 退款扣回 / 到期回收）只使用本服务；
+ * 生成账单的预留与结算走 `model/billing`，不经过这里。
  */
 
 export interface BalanceSummary {
-  /** 可用余额 = Σ未过期批次的 remainingCredits */
+  /** 可用余额 = 账户可用微积分折算的积分 */
   balance: number;
   /** 即将过期量: 30 天内到期的批次剩余积分 */
   expiringSoon: number;
   /** 累计获得 */
   totalEarned: number;
-  /** 累计消耗 (不含退款回收与到期) */
+  /** 累计消耗 (不含退款、人工调整与到期) */
   totalConsumed: number;
   /** 有效批次数 */
   activeLots: number;
@@ -34,62 +45,71 @@ export interface BalanceSummary {
   nearestExpiry: string | null;
 }
 
+/** 积分（可带 6 位小数）→ 微积分；拒绝负数与超精度 */
+export function creditsToMicrocredits(credits: number | string): bigint {
+  try {
+    const micro = parseCredits(credits);
+    if (micro < 0n) throw new AppError(40001, '积分金额不能为负数', 400);
+    return micro;
+  } catch (error) {
+    if (error instanceof MicrocreditError) throw new AppError(40001, `积分金额无效：${credits}`, 400);
+    throw error;
+  }
+}
+
+/** 微积分 → 积分。整数额度不产生小数尾巴，其余保留至 6 位 */
+export function microcreditsToCredits(micro: bigint | number): number {
+  return Number(formatCredits(toMicrocredits(micro)));
+}
+
 @Injectable()
 export class CreditService {
   private readonly logger = new Logger(CreditService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly wallet: CreditWalletService,
+  ) {}
 
   // ── 查询 ──────────────────────────────────────────────────────────
 
-  /**
-   * 余额总览 (B-49)。
-   *
-   * 全部由 CreditLot 聚合得出, 不读任何冗余字段。
-   */
+  /** 余额总览 (B-49)：账户可用余额 + 批次到期信息 */
   async balanceOf(userId: string): Promise<BalanceSummary> {
     const now = new Date();
     const soon = new Date(now.getTime() + 30 * 24 * 3600 * 1000);
 
-    const [lots, earnedAgg] = await Promise.all([
+    const [account, lots, earnedAgg, consumedAgg] = await Promise.all([
+      this.prisma.creditAccount.findUnique({ where: { userId } }),
       this.prisma.creditLot.findMany({
-        where: { userId, remainingCredits: { gt: 0 } },
-        select: { remainingCredits: true, expireAt: true },
+        where: { userId, remainingMicrocredits: { gt: 0n } },
+        select: { remainingMicrocredits: true, expireAt: true },
       }),
-      // 累计获得是终身口径: 已用尽 / 已过期的批次也曾到账。只汇总
-      // remainingCredits > 0 的批次会让「累计获得 - 累计消耗」小于余额，
-      // 用户拿三个数字一对就以为账错了。
-      this.prisma.creditLot.aggregate({
-        where: { userId },
-        _sum: { totalCredits: true },
+      // 累计获得是终身口径: 已用尽 / 已过期的批次也曾到账
+      this.prisma.creditLedgerEntry.aggregate({
+        where: { userId, type: { in: ['purchase', 'grant', 'admin_adjust'] } },
+        _sum: { amountMicrocredits: true },
+      }),
+      this.prisma.creditLedgerEntry.aggregate({
+        where: { userId, type: 'consume' },
+        _sum: { amountMicrocredits: true },
       }),
     ]);
 
-    // 已过期批次不计入余额 —— 但不删记录, 保留供对账追溯
     const valid = lots.filter((l) => !l.expireAt || l.expireAt > now);
-
-    const balance = valid.reduce((sum, l) => sum + l.remainingCredits, 0);
-    const totalEarned = earnedAgg._sum.totalCredits ?? 0;
     const expiringSoon = valid
       .filter((l) => l.expireAt && l.expireAt <= soon)
-      .reduce((sum, l) => sum + l.remainingCredits, 0);
-
-    const consumedAgg = await this.prisma.creditLedger.aggregate({
-      where: { userId, type: 'consume' },
-      _sum: { amount: true },
-    });
-
+      .reduce((sum, l) => sum + l.remainingMicrocredits, 0n);
     const expiries = valid
       .map((l) => l.expireAt)
       .filter((d): d is Date => d !== null)
       .sort((a, b) => a.getTime() - b.getTime());
 
     return {
-      balance,
-      expiringSoon,
-      totalEarned,
+      balance: microcreditsToCredits(account?.availableMicrocredits ?? 0n),
+      expiringSoon: microcreditsToCredits(expiringSoon),
+      totalEarned: microcreditsToCredits(earnedAgg._sum.amountMicrocredits ?? 0n),
       // consume 流水的 amount 是负数, 取绝对值即为累计消耗
-      totalConsumed: Math.abs(consumedAgg._sum.amount ?? 0),
+      totalConsumed: microcreditsToCredits(abs(consumedAgg._sum.amountMicrocredits ?? 0n)),
       activeLots: valid.length,
       nearestExpiry: expiries[0]?.toISOString() ?? null,
     };
@@ -98,37 +118,45 @@ export class CreditService {
   /** 批次明细 (B-50) */
   async lotsOf(userId: string, includeExpired = true) {
     const lots = await this.prisma.creditLot.findMany({
-      where: { userId, ...(includeExpired ? {} : { remainingCredits: { gt: 0 } }) },
+      where: { userId, ...(includeExpired ? {} : { remainingMicrocredits: { gt: 0n } }) },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
     const now = Date.now();
-    return lots.map((l) => ({
-      id: l.id,
-      source: l.source,
-      orderId: l.orderId,
-      totalCredits: l.totalCredits,
-      remainingCredits: l.remainingCredits,
-      expireAt: l.expireAt,
-      createdAt: l.createdAt,
-      // 状态: active 可用 / expired 已过期 / exhausted 已用尽
-      status:
-        l.remainingCredits <= 0
-          ? 'exhausted'
-          : l.expireAt && l.expireAt.getTime() <= now
-            ? 'expired'
-            : 'active',
-    }));
+    return lots.map((l) => {
+      const remaining = microcreditsToCredits(l.remainingMicrocredits);
+      return {
+        id: l.id,
+        source: l.source,
+        orderId: l.orderId,
+        totalCredits: microcreditsToCredits(l.totalMicrocredits),
+        remainingCredits: remaining,
+        expireAt: l.expireAt,
+        createdAt: l.createdAt,
+        // 状态: active 可用 / expired 已过期 / exhausted 已用尽
+        status:
+          remaining <= 0
+            ? 'exhausted'
+            : l.expireAt && l.expireAt.getTime() <= now
+              ? 'expired'
+              : 'active',
+      };
+    });
   }
 
-  /** 流水查询 (B-51) */
-  async ledgerOf(userId: string, limit = 50) {
-    return this.prisma.creditLedger.findMany({
-      where: { userId },
+  /**
+   * 流水查询 (B-51)
+   *
+   * 读 `CreditLedgerEntry`（微积分）并投影成积分口径。`reserve` 是任务预授权，
+   * 随后会以 consume/refund 结清；C 端默认不展示中间态，由调用方按需过滤。
+   */
+  async ledgerOf(userId: string, limit = 50, options: { includeReserve?: boolean } = {}) {
+    const rows = await this.prisma.creditLedgerEntry.findMany({
+      where: { userId, ...(options.includeReserve ? {} : { type: { not: 'reserve' } }) },
       orderBy: { createdAt: 'desc' },
       take: limit,
-      include: { lot: { select: { source: true, expireAt: true } } },
     });
+    return rows.map(projectEntry);
   }
 
   // ── 发放 ──────────────────────────────────────────────────────────
@@ -140,9 +168,7 @@ export class CreditService {
    * 合并会让"这笔积分什么时候过期"变得无法回答, 而退款必须按批次精确扣回。
    *
    * @param tx 可选事务客户端。会员开通等「一次性权益」场景需要把
-   *           「抢占订单 + 延期会员 + 发积分」放进同一个事务, 否则中途失败会
-   *           留下"会员已延期但积分没发"或重试后"积分发两遍"的半成品状态。
-   *           给了 tx 就在该事务内读写, 不另开连接。
+   *           「抢占订单 + 延期会员 + 发积分」放进同一个事务。
    */
   async grant(
     params: {
@@ -159,108 +185,53 @@ export class CreditService {
     },
     tx?: Prisma.TransactionClient,
   ): Promise<{ lotId: string; balance: number; idempotentHit?: boolean }> {
-    const { userId, credits, source } = params;
-    if (credits <= 0) throw new AppError(40001, '发放积分数必须大于 0', 400);
+    const amount = creditsToMicrocredits(params.credits);
+    if (amount <= 0n) throw new AppError(40001, '发放积分数必须大于 0', 400);
 
     // validDays=0 或未指定 → 永久有效(expireAt 为空, FEFO 排最后)
     const expireAt =
       params.validDays && params.validDays > 0
         ? new Date(Date.now() + params.validDays * 24 * 3600 * 1000)
         : null;
+    const type = params.source === 'purchase' ? 'purchase' : params.source === 'grant' ? 'grant' : 'admin_adjust';
+    const referenceKey = params.idempotencyKey ? `credit-grant:${params.idempotencyKey}` : null;
 
-    const execute = async (db: any) => {
-      if (params.idempotencyKey) {
-        const existing = await db.creditLedger.findUnique({
-          where: { idempotencyKey: params.idempotencyKey },
-          select: { userId: true, lotId: true },
+    const execute = async (db: Prisma.TransactionClient) => {
+      if (referenceKey) {
+        const existing = await db.creditLedgerEntry.findUnique({
+          where: { referenceKey },
+          select: { userId: true },
         });
         if (existing) {
-          if (existing.userId !== userId) {
-            throw new AppError(40001, '积分幂等键冲突', 400);
-          }
-          return {
-            lotId: existing.lotId ?? '',
-            balance: await this.balanceWithin(db, userId),
-            idempotentHit: true,
-          };
+          if (existing.userId !== params.userId) throw new AppError(40001, '积分幂等键冲突', 400);
+          const balance = await this.wallet.balanceOf(db, params.userId);
+          return { lotId: '', balance: microcreditsToCredits(balance.availableMicrocredits), idempotentHit: true };
         }
       }
-
-      const lot = await db.creditLot.create({
-        data: {
-          userId,
-          source,
-          orderId: params.orderId,
-          totalCredits: credits,
-          remainingCredits: credits,
-          expireAt,
+      const result = await this.wallet.grant(db, {
+        userId: params.userId,
+        amountMicrocredits: amount,
+        source: params.source,
+        type,
+        expireAt,
+        orderId: params.orderId,
+        meta: {
+          paymentOrderId: params.orderId ?? '',
+          taskId: params.taskId ?? '',
+          actorUserId: params.operatorId ?? '',
+          note: params.reason ?? '',
+          referenceKey: referenceKey ?? undefined,
         },
       });
-
-      // 始终用当前事务客户端计算余额：事务外另开连接既读不到未提交行，
-      // 也可能在 SQLite 上等待写锁。
-      const balance = await this.balanceWithin(db, userId);
-      await db.creditLedger.create({
-        data: {
-          userId,
-          type: source === 'purchase' ? 'purchase' : source === 'grant' ? 'grant' : 'admin_adjust',
-          amount: credits,
-          // balanceAfter 是**快照**, 仅供流水展示与快速核对;
-          // 余额永远从 CreditLot 推导, 两者不一致时以批次为准
-          balanceAfter: balance,
-          lotId: lot.id,
-          orderId: params.orderId,
-          taskId: params.taskId,
-          idempotencyKey: params.idempotencyKey,
-          reason: params.reason,
-          operatorId: params.operatorId,
-        },
-      });
-
-      return { lotId: lot.id, balance, idempotentHit: false };
+      return {
+        lotId: result.lotId,
+        balance: microcreditsToCredits(result.balance.availableMicrocredits),
+        idempotentHit: false,
+      };
     };
 
     if (tx) return execute(tx);
-
-    try {
-      return await this.prisma.$transaction(execute);
-    } catch (error) {
-      /*
-       * 并发重试会在唯一键上撞车。此时整个事务已回滚（不会留下无流水的批次），
-       * 再读一次既有流水即可返回同一结果。只有幂等键明确时才走该分支。
-       */
-      if (
-        params.idempotencyKey &&
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2002'
-      ) {
-        const existing = await this.prisma.creditLedger.findUnique({
-          where: { idempotencyKey: params.idempotencyKey },
-          select: { userId: true, lotId: true },
-        });
-        if (existing && existing.userId === userId) {
-          return {
-            lotId: existing.lotId ?? '',
-            balance: (await this.balanceOf(userId)).balance,
-            idempotentHit: true,
-          };
-        }
-      }
-      throw error;
-    }
-  }
-
-  /** 与 balanceOf 同口径的余额计算, 但在给定客户端(通常是事务)内执行 */
-  private async balanceWithin(db: any, userId: string): Promise<number> {
-    const lots = await db.creditLot.findMany({
-      where: { userId, remainingCredits: { gt: 0 } },
-      select: { remainingCredits: true, expireAt: true },
-    });
-    const now = new Date();
-    return lots.reduce(
-      (sum: number, l: any) => sum + (!l.expireAt || l.expireAt > now ? l.remainingCredits : 0),
-      0,
-    );
+    return this.prisma.$transaction(execute);
   }
 
   // ── 扣减 ──────────────────────────────────────────────────────────
@@ -268,116 +239,59 @@ export class CreditService {
   /**
    * 扣减积分, FEFO 逐批扣。
    *
-   * ⚠ **并发安全**: 每批次用条件更新 `remaining >= n` 而非"读后写"。
-   * SQLite 单写者已串行化, 但这段逻辑在迁到 PostgreSQL 后仍需成立 ——
-   * 先读后写会丢失更新 (lost update), 两个并发请求都读到 100, 各扣 80, 余额成 -60。
-   *
-   * 扣减与流水在**同一事务**内: 只扣了批次没记流水等于凭空消失积分, 对账时无法解释。
+   * 用于人工扣减等非账单场景；生成任务的扣费走 `BillingService` 的预留/结算，
+   * 不经过这里（否则同一笔消耗会出现两条口径不同的流水）。
    */
-  async consume(params: {
-    userId: string;
-    credits: number;
-    taskId?: string;
-    orderId?: string;
-    /** 允许透支时为 true (如新用户赠送)。默认 false */
-    allowNegative?: boolean;
-    /**
-     * 流水的业务类型。人工扣减必须传 `admin_adjust` —— 否则账本上会出现一条
-     * 没有原因的「生成消耗」，与真实任务消耗混在一起无法对账。
-     */
-    ledgerType?: 'consume' | 'admin_adjust';
-    /** 写进流水的说明（人工调整必填） */
-    reason?: string;
-    operatorId?: string;
-  }, tx?: Prisma.TransactionClient): Promise<{ consumed: number; balance: number; lotId: string | null }> {
-    const { userId, credits } = params;
-    if (credits <= 0) return { consumed: 0, balance: (await this.balanceOf(userId)).balance, lotId: null };
-
-    const now = new Date();
-
+  async consume(
+    params: {
+      userId: string;
+      credits: number;
+      taskId?: string;
+      orderId?: string;
+      allowNegative?: boolean;
+      /** 流水的业务类型。人工扣减必须传 `admin_adjust`。 */
+      ledgerType?: 'consume' | 'admin_adjust';
+      reason?: string;
+      operatorId?: string;
+    },
+    tx?: Prisma.TransactionClient,
+  ): Promise<{ consumed: number; balance: number; lotId: string | null }> {
+    const amount = creditsToMicrocredits(params.credits);
+    if (params.allowNegative) {
+      throw new AppError(40001, '不允许透支扣减积分', 400);
+    }
+    const type = params.ledgerType ?? 'consume';
     const execute = async (db: Prisma.TransactionClient) => {
-      /*
-       * FEFO 排序: expireAt 升序, NULL 排最后。
-       * SQLite 的 NULL 默认排最前, 与"NULL 视为最晚到期"相反,
-       * 故显式写 CASE WHEN。
-       */
-      const lots = await db.creditLot.findMany({
-        where: {
-          userId,
-          remainingCredits: { gt: 0 },
-          OR: [{ expireAt: null }, { expireAt: { gt: now } }],
+      if (amount <= 0n) {
+        const balance = await this.wallet.balanceOf(db, params.userId);
+        return { consumed: 0, balance: microcreditsToCredits(balance.availableMicrocredits), lotId: null };
+      }
+      // 余额不足由钱包抛 40002；调用方按语义决定是否转成 402
+      const result = await this.wallet.debit(db, {
+        userId: params.userId,
+        amountMicrocredits: amount,
+        type,
+        meta: {
+          taskId: params.taskId ?? '',
+          paymentOrderId: params.orderId ?? '',
+          actorUserId: params.operatorId ?? '',
+          note: params.reason ?? '',
         },
-        select: { id: true, remainingCredits: true },
-        orderBy: { expireAt: { sort: 'asc', nulls: 'last' } },
       });
-
-      let remaining = credits;
-      let lastLotId: string | null = null;
-      const takenByLot: Array<{ lotId: string; taken: number }> = [];
-
-      for (const lot of lots) {
-        if (remaining <= 0) break;
-        const take = Math.min(lot.remainingCredits, remaining);
-
-        // 条件更新: 影响 0 行说明并发下已被扣空, 换下一批
-        const res = await db.creditLot.updateMany({
-          where: { id: lot.id, remainingCredits: { gte: take } },
-          data: { remainingCredits: { decrement: take } },
-        });
-        if (res.count === 0) continue;
-
-        takenByLot.push({ lotId: lot.id, taken: take });
-        lastLotId = lot.id;
-        remaining -= take;
-      }
-
-      if (remaining > 0 && !params.allowNegative) {
-        // 余额不足: 整体回滚, 一分不扣
-        const available = lots.reduce((s, l) => s + l.remainingCredits, 0);
-        throw new AppError(40002, `积分不足: 需要 ${credits}, 可用 ${available}`, 400);
-      }
-
-      // 扣减完成后重算余额(必须在事务内, 避免与并发写入竞争)
-      const agg = await db.creditLot.aggregate({
-        where: { userId, remainingCredits: { gt: 0 }, OR: [{ expireAt: null }, { expireAt: { gt: now } }] },
-        _sum: { remainingCredits: true },
-      });
-      const balance = agg._sum.remainingCredits ?? 0;
-
-      if (credits > 0) {
-        await db.creditLedger.create({
-          data: {
-            userId,
-            type: params.ledgerType ?? 'consume',
-            amount: -credits, // 消耗记负, 与获得记正形成单一符号约定
-            balanceAfter: balance,
-            lotId: lastLotId,
-            orderId: params.orderId,
-            taskId: params.taskId,
-            reason: params.reason,
-            operatorId: params.operatorId,
-          },
-        });
-      }
-
-      return { consumed: credits, balance, lotId: lastLotId, takenByLot };
+      return {
+        consumed: microcreditsToCredits(amount),
+        balance: microcreditsToCredits(result.balance.availableMicrocredits),
+        lotId: result.items[result.items.length - 1]?.lotId ?? null,
+      };
     };
-
-    /*
-     * 建任务需要把「扣费 + 建任务」放进同一个事务: 任务唯一键冲突或建任务
-     * 失败时, 扣减与流水必须一起回滚。否则只能靠跨事务补偿, 而补偿与重试
-     * 之间没有任何原子边界 —— 补偿成功后再重试会既扣不到费又建出任务。
-     */
-    const result = tx ? await execute(tx) : await this.prisma.$transaction(execute);
-
-    return { consumed: result.consumed, balance: result.balance, lotId: result.lotId };
+    return tx ? execute(tx) : this.prisma.$transaction(execute);
   }
 
   /** 余额是否足够 */
   async hasEnough(userId: string, credits: number): Promise<boolean> {
     if (credits <= 0) return true;
-    const s = await this.balanceOf(userId);
-    return s.balance >= credits;
+    const account = await this.prisma.creditAccount.findUnique({ where: { userId } });
+    return (account?.availableMicrocredits ?? 0n) >= creditsToMicrocredits(credits);
   }
 
   // ── 人工调整 (B-52) ──────────────────────────────────────────────
@@ -412,13 +326,7 @@ export class CreditService {
         operatorId: params.operatorId,
       });
     } else {
-      /*
-       * 扣减走同一套 FEFO, 保证人工扣减与消耗的口径一致。
-       *
-       * 流水**只记一条** `admin_adjust`：此前先 consume 写一条 `consume -N`，
-       * 再补一条 `admin_adjust -N`，账本合计是 -2N，余额却只减 N —— 用户会看到
-       * 一条无原因的「生成消耗」，`totalConsumed` 也被放大一倍。
-       */
+      // 人工扣减只记一条 admin_adjust 流水；再补一条 consume 会让账本合计翻倍
       await this.consume({
         userId: params.userId,
         credits: -params.delta,
@@ -458,6 +366,7 @@ export class CreditService {
     });
     if (!order) throw new AppError(40400, '订单不存在', 404);
 
+    const target = creditsToMicrocredits(order.grantedCredits);
     const now = new Date();
 
     const result = await this.prisma.$transaction(async (tx) => {
@@ -465,64 +374,66 @@ export class CreditService {
       const lots = await tx.creditLot.findMany({
         where: {
           userId: order.userId,
-          remainingCredits: { gt: 0 },
+          remainingMicrocredits: { gt: 0n },
           OR: [{ expireAt: null }, { expireAt: { gt: now } }],
         },
-        select: { id: true, remainingCredits: true, orderId: true, expireAt: true },
+        select: { id: true, remainingMicrocredits: true, orderId: true },
         // 同订单的优先, 组内按 FEFO
         orderBy: [{ orderId: 'asc' }, { expireAt: { sort: 'asc', nulls: 'last' } }],
       });
 
-      let toReclaim = order.grantedCredits;
+      let toReclaim = target;
       const detail: Array<{ lotId: string; taken: number }> = [];
-      let reclaimed = 0;
+      let reclaimed = 0n;
 
       for (const lot of lots) {
-        if (toReclaim <= 0) break;
-        const take = Math.min(lot.remainingCredits, toReclaim);
+        if (toReclaim <= 0n) break;
+        const take = lot.remainingMicrocredits < toReclaim ? lot.remainingMicrocredits : toReclaim;
         const res = await tx.creditLot.updateMany({
-          where: { id: lot.id, remainingCredits: { gte: take } },
-          data: { remainingCredits: { decrement: take } },
+          where: { id: lot.id, remainingMicrocredits: { gte: take } },
+          data: { remainingMicrocredits: { decrement: take } },
         });
         if (res.count === 0) continue;
-        detail.push({ lotId: lot.id, taken: take });
+        detail.push({ lotId: lot.id, taken: microcreditsToCredits(take) });
         reclaimed += take;
         toReclaim -= take;
       }
 
-      const unreclaimable = toReclaim;
-      const agg = await tx.creditLot.aggregate({
-        where: { userId: order.userId, remainingCredits: { gt: 0 }, OR: [{ expireAt: null }, { expireAt: { gt: now } }] },
-        _sum: { remainingCredits: true },
-      });
-      const balance = agg._sum.remainingCredits ?? 0;
-
-      if (reclaimed > 0) {
-        await tx.creditLedger.create({
+      if (reclaimed > 0n) {
+        // 批次已经逐笔扣过，这里只同步账户并写一条流水
+        const balance = await this.wallet.debitAccountOnly(tx, order.userId, reclaimed);
+        await tx.creditLedgerEntry.create({
           data: {
             userId: order.userId,
             type: 'refund_reclaim',
-            amount: -reclaimed,
-            balanceAfter: balance,
-            orderId,
-            reason,
-            operatorId,
+            amountMicrocredits: -reclaimed,
+            availableDeltaMicrocredits: -reclaimed,
+            reservedDeltaMicrocredits: 0n,
+            availableAfterMicrocredits: balance.availableMicrocredits,
+            reservedAfterMicrocredits: balance.reservedMicrocredits,
+            paymentOrderId: orderId,
+            actorUserId: operatorId,
+            note: reason,
           },
         });
       }
 
-      return { reclaimed, unreclaimable, detail, balance };
+      return { reclaimed, unreclaimable: toReclaim, detail };
     });
 
-    if (result.unreclaimable > 0) {
+    if (result.unreclaimable > 0n) {
       // 这是必须让人看见的事实, 不能静默吞掉
       this.logger.warn(
-        `退款扣回不完整: order=${orderId} 应扣 ${order.grantedCredits} 实扣 ${result.reclaimed}，` +
-          `${result.unreclaimable} 因已消耗无法追回`,
+        `退款扣回不完整: order=${orderId} 应扣 ${microcreditsToCredits(target)} 实扣 ${microcreditsToCredits(result.reclaimed)}，` +
+          `${microcreditsToCredits(result.unreclaimable)} 因已消耗无法追回`,
       );
     }
 
-    return result;
+    return {
+      reclaimed: microcreditsToCredits(result.reclaimed),
+      unreclaimable: microcreditsToCredits(result.unreclaimable),
+      detail: result.detail,
+    };
   }
 
   // ── 到期回收 ──────────────────────────────────────────────────────
@@ -530,44 +441,64 @@ export class CreditService {
   /**
    * 到期批次回收 (M9.5 调度器)。
    *
-   * 回收后 remainingCredits 归零, 记 expire 流水。
+   * 回收后 remainingMicrocredits 归零、账户可用余额同步减少，记 expire 流水。
    * ⚠ **不删批次** —— 删了就无法回答"这笔积分原本有多少、什么时候过期的"。
    */
   async expireLots(): Promise<{ expiredLots: number; expiredCredits: number }> {
     const now = new Date();
     const due = await this.prisma.creditLot.findMany({
-      where: { remainingCredits: { gt: 0 }, expireAt: { lte: now } },
-      select: { id: true, userId: true, remainingCredits: true },
+      where: { remainingMicrocredits: { gt: 0n }, expireAt: { lte: now } },
+      select: { id: true, userId: true, remainingMicrocredits: true },
     });
 
-    let expiredCredits = 0;
+    let expiredMicro = 0n;
+    let expiredLots = 0;
     for (const lot of due) {
-      const res = await this.prisma.creditLot.updateMany({
-        where: { id: lot.id, remainingCredits: { gt: 0 } },
-        data: { remainingCredits: 0 },
-      });
-      if (res.count === 0) continue;
-
-      expiredCredits += lot.remainingCredits;
-      const agg = await this.prisma.creditLot.aggregate({
-        where: { userId: lot.userId, remainingCredits: { gt: 0 }, OR: [{ expireAt: null }, { expireAt: { gt: now } }] },
-        _sum: { remainingCredits: true },
-      });
-      await this.prisma.creditLedger.create({
-        data: {
-          userId: lot.userId,
-          type: 'expire',
-          amount: -lot.remainingCredits,
-          balanceAfter: agg._sum.remainingCredits ?? 0,
-          lotId: lot.id,
-          reason: '积分到期回收',
-        },
-      });
+      const done = await this.prisma.$transaction((tx) => this.wallet.expireLot(tx, lot));
+      if (!done) continue;
+      expiredLots += 1;
+      expiredMicro += lot.remainingMicrocredits;
     }
 
-    if (due.length > 0) {
-      this.logger.log(`积分到期回收: ${due.length} 个批次, 共 ${expiredCredits} 积分`);
+    if (expiredLots > 0) {
+      this.logger.log(
+        `积分到期回收: ${expiredLots} 个批次, 共 ${microcreditsToCredits(expiredMicro)} 积分`,
+      );
     }
-    return { expiredLots: due.length, expiredCredits };
+    return { expiredLots, expiredCredits: microcreditsToCredits(expiredMicro) };
   }
+}
+
+/** 流水的积分口径投影（C 端与后台共用同一份字段名） */
+export function projectEntry(row: {
+  id: string;
+  userId: string;
+  type: string;
+  amountMicrocredits: bigint;
+  availableAfterMicrocredits: bigint;
+  paymentOrderId: string;
+  billingOrderId: string;
+  lotId: string;
+  taskId: string;
+  note: string;
+  actorUserId: string;
+  createdAt: Date;
+}) {
+  return {
+    id: row.id,
+    userId: row.userId,
+    type: row.type,
+    amount: microcreditsToCredits(row.amountMicrocredits),
+    balanceAfter: microcreditsToCredits(row.availableAfterMicrocredits),
+    lotId: row.lotId || null,
+    orderId: row.paymentOrderId || row.billingOrderId || null,
+    taskId: row.taskId || null,
+    reason: row.note || null,
+    operatorId: row.actorUserId || null,
+    createdAt: row.createdAt,
+  };
+}
+
+function abs(value: bigint): bigint {
+  return value < 0n ? -value : value;
 }
