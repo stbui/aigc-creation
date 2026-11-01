@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button } from '../../vendor/boardui/components/base/buttons/button';
+import { Button } from '../../admin-ui/shadcn/kit';
 import {
   AlertOctagon,
   AlertTriangle,

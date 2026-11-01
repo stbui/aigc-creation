@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { CheckCircle2 } from 'lucide-react';
-import { Button } from '../../vendor/boardui/components/base/buttons/button';
-import { Chip } from '../../vendor/boardui/components/base/badges/chip';
+import { Button, Chip } from '../../admin-ui/shadcn/kit';
 import { PageHeader, Panel, StatCard } from '../../components/admin/PageHeader';
 import {
   ALERT_SEVERITY_META,

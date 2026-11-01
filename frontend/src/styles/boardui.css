@@ -29,6 +29,15 @@
  */
 @import '../vendor/boardui/styles/theme.css';
 @import '../vendor/boardui/styles/typography.css';
+/*
+ * shadcn/ui 主题桥接（2026-11-01）。
+ *
+ * 必须排在 vendor 主题**之后**：本文件用 `@theme inline` 定义 shadcn 的
+ * `--color-*` 工具类来源，inline 形式不产出 `:root` 声明，工具类直接内联
+ * 变量引用 —— 所以这里只影响后台 chunk 里的 shadcn 组件，不会覆盖
+ * global.css 已有的 `--color-primary` / `--color-card` / `--color-border`。
+ */
+@import '../admin-ui/styles/shadcn-theme.css';
 
 @source '../vendor/boardui';
 @source '../admin-ui';
@@ -39,6 +48,58 @@
   /* 字体沿用全站栈：BoardUI 默认 Inter，中文会掉到系统字体且字重不一致 */
   --font-sans:
     'Noto Sans SC', Inter, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+
+  /*
+   * 圆角阶梯对齐全站档位（global.css 的 `--radius-tag/control/card/panel/hero`）。
+   *
+   * Tailwind v4 默认阶梯是 2/4/6/8/12/16/24，与项目规定的 5 档对不齐：
+   * `rounded-md` = 6px 不在任何一档上（项目控件档是 8px），`rounded-lg` = 8px
+   * 也低于项目 card 档 12px。
+   *
+   * 这里把 Tailwind 的 radius 命名空间重新指向项目档位，于是：
+   *   rounded-sm → 4px  (--radius-tag)
+   *   rounded-md → 8px  (--radius-control)  ← shadcn 按钮/输入框
+   *   rounded-lg → 12px (--radius-card)     ← shadcn 卡片 / 现有后台卡片
+   *   rounded-xl → 16px (--radius-panel)
+   *   rounded-2xl → 24px (--radius-hero)
+   * 结果：shadcn 组件原生符合项目圆角规范，且现有后台的卡片圆角（原先 8px）
+   * 一并归位到 12px —— 此前是低于项目规范的偏差。
+   *
+   * 用 `var()` 引用 global.css 的令牌而非抄字面值：圆角档位只定义一处。
+   */
+  --radius-sm: var(--radius-tag);
+  --radius-md: var(--radius-control);
+  --radius-lg: var(--radius-card);
+  --radius-xl: var(--radius-panel);
+  --radius-2xl: var(--radius-hero);
+  /* 3xl/4xl 无对应项目档位（hero 之上），保留默认量级但不与 2xl 重复 */
+  --radius-3xl: 32px;
+  --radius-4xl: 40px;
+
+  /*
+   * 阴影接上项目令牌。
+   *
+   * `--shadow-card` 是 global.css 里的 CSS 变量（不是 Tailwind 的
+   * `--shadow-*` 命名空间），直接写 `shadow-card` 不会生成工具类。
+   * 在这里把它登记进命名空间，`shadow-card` 就成为可用工具类，
+   * 且阴影值仍只在 global.css 定义一处。
+   */
+  --shadow-card: var(--shadow-card);
+
+  /*
+   * 品牌色登记成工具类。
+   *
+   * global.css 的 `--brand` 同样是裸 CSS 变量（不在 Tailwind 命名空间），
+   * `bg-brand` 因此不可用。登记后 `bg-brand` / `text-brand` / `border-brand`
+   * 都能用，且值仍只由 global.css 一处定义。
+   *
+   * 注意与 BoardUI 的 `accent-*` 色阶区分：accent 是**交互色阶**（有 50–950
+   * 十档，用于 hover / focus / 选中态），brand 是**单一品牌色**。
+   * 图表、进度条这类「量的示意」用 brand，控件状态用 accent-*。
+   */
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-bg: var(--brand-bg);
 
   /*
    * accent 色阶整体重映射为品牌紫 #5546d8。

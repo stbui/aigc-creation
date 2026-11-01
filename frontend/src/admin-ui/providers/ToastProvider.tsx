@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import { CheckCircle2, Info, TriangleAlert, X, XCircle } from 'lucide-react';
-import { cx } from '../lib/cn';
+import { cn } from '../lib/cn';
 
 /**
  * 全局轻提示。
@@ -52,7 +52,7 @@ const TONE_META: Record<ToastTone, { icon: typeof Info; className: string }> = {
   success: { icon: CheckCircle2, className: 'text-emerald-600' },
   error: { icon: XCircle, className: 'text-rose-600' },
   warning: { icon: TriangleAlert, className: 'text-amber-600' },
-  info: { icon: Info, className: 'text-accent-600' },
+  info: { icon: Info, className: 'text-primary' },
 };
 
 const MAX_TOASTS = 4;
@@ -119,19 +119,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 key={item.id}
                 data-testid="admin-toast"
                 role={item.tone === 'error' ? 'alert' : 'status'}
-                className="pointer-events-auto flex items-start gap-2.5 rounded-xl border border-border-table bg-white p-3 shadow-lg"
+                className="pointer-events-auto flex items-start gap-2.5 rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-lg"
               >
-                <Icon className={cx('mt-0.5 size-4 shrink-0', className)} aria-hidden />
+                <Icon className={cn('mt-0.5 size-4 shrink-0', className)} aria-hidden />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-text-primary">{item.message}</p>
+                  <p className="text-sm font-medium text-foreground">{item.message}</p>
                   {item.description && (
-                    <p className="mt-0.5 text-xs leading-5 text-text-tertiary">{item.description}</p>
+                    <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{item.description}</p>
                   )}
                 </div>
                 <button
                   type="button"
                   aria-label="关闭提示"
-                  className="rounded-md p-0.5 text-text-tertiary transition-colors hover:bg-background-secondary-hover hover:text-text-primary"
+                  className="rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                   onClick={() => dismiss(item.id)}
                 >
                   <X className="size-3.5" aria-hidden />

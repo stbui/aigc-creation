@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Calculator, RefreshCw } from 'lucide-react';
+import { Calculator } from 'lucide-react';
 import { adminChannelsApi } from './api';
 import {
   Button,
@@ -22,7 +22,7 @@ import {
   repriceBlockingModels,
   saleInputValue,
   type RepriceRow,
-} from '../../../lib/channelReprice';
+} from './utils';
 import type { AdminChannelModelView, ChannelModelRepriceInput } from '../../../types/model';
 
 /**
@@ -271,7 +271,6 @@ function buildPayload(
   models: AdminChannelModelView[],
   rows: RepriceRow[],
 ): ChannelModelRepriceInput[] {
-  const byKey = new Map(rows.map((row) => [row.key, row]));
   return models.map((model) => {
     const tiers = model.priceTiers.filter((tier) => tier.enabled);
     return {

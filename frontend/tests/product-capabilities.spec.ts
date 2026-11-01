@@ -6,7 +6,7 @@ import { test, expect, type APIRequestContext, type Page } from '@playwright/tes
  * 覆盖本次收口的四条真实契约:
  *   1. 运营下线的能力从顶导/侧栏/工作台/首页/站点地图一起消失；
  *   2. 仅「暂无通道」的能力保留入口，并在工作台标注「暂不可用」；
- *   3. 创意生图与自由创作共用 /free-creation，但入口携带能力上下文并提交 creative_image；
+ *   3. 创意生图走独立路由 /creative-image，提交能力 creative_image；自由创作仍走 /free-creation；
  *   4. 我的作品失败任务重试沿用原任务的能力、输入素材与参数；
  *   5. ToolShell 页面只拦截已登录用户的不可用提交，访客仍能触发登录流程。
  *
@@ -118,11 +118,11 @@ test.describe('能力可见性与运行态', () => {
     await page.goto(`${UI}/sitemap.html`);
     await expect(page.locator('a.sitemap-item[href="/background-remove"]')).toHaveCount(0);
     await expect(
-      page.locator('a.sitemap-item[href="/free-creation?capability=creative_image"]'),
+      page.locator('a.sitemap-item[href="/creative-image"]'),
     ).toBeVisible();
   });
 
-  test('创意生图入口携带能力上下文，提交 capability=creative_image', async ({ page, request }) => {
+  test('创意生图独立路由，提交 capability=creative_image', async ({ page, request }) => {
     const { token, email } = await register(request);
     const caps = await fetchCaps(request);
     // 本机测试环境没有真实模型通道；该用例验证的是入口上下文与请求映射，
@@ -198,7 +198,7 @@ test.describe('能力可见性与运行态', () => {
 
     await authed(page, '/workbench', token, email);
     await page.locator('.wb-card').filter({ hasText: '创意生图' }).click();
-    await expect(page).toHaveURL(/\/free-creation\?capability=creative_image$/);
+    await expect(page).toHaveURL(/\/creative-image$/);
 
     await page.locator('textarea').first().fill('清晨窗边的木质桌面');
     await expect(page.getByRole('button', { name: /立即生成/ })).toBeEnabled();

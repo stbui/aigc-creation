@@ -9,7 +9,7 @@
 
 import type { CapabilityPlugin } from '../capability-plugin.type';
 import { generateImageIntent } from '../model-mapping';
-import { LANGUAGES, MAIN_IMAGE_VARIANTS, PLATFORMS, QUALITY_OPTIONS, RATIOS, ratioText, sizeText, subjectText } from './param-options';
+import { LANGUAGES, MAIN_IMAGE_VARIANTS, PLATFORMS, QUALITY_OPTIONS, RATIOS, languageText, platformSpecText, ratioText, sizeText, subjectText } from './param-options';
 
 export const MainImage: CapabilityPlugin = {
   id: 'main_image',
@@ -37,7 +37,7 @@ export const MainImage: CapabilityPlugin = {
   buildPrompt: (p) =>
     `电商商品主图生成：${subjectText(p)}，${p.description || '突出卖点与质感'}。` +
     `需要白底图、场景图、卖点图三类主图，画面干净、主体突出${ratioText(p.ratio)}${sizeText(p.size)}` +
-    (p.platform ? `，适配 ${p.platform} 平台` : ''),
+    `${platformSpecText(p)}${languageText(p.language)}`,
   modality: 'image',
   model: { capability: 'image', operation: 'text_to_image', intent: generateImageIntent },
   inputs: 1,

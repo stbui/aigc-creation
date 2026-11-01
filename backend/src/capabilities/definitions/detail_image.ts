@@ -18,7 +18,9 @@ import {
   LANGUAGES,
   PLATFORMS,
   QUALITY_OPTIONS,
+  languageText,
   parseDetailSections,
+  platformDetailSpecText,
   ratioText,
   sizeText,
   subjectText,
@@ -61,7 +63,8 @@ export function detailSectionLabel(key: string): string {
 function legacyPrompt(p: Record<string, any>): string {
   return (
     `电商详情长图生成：${subjectText(p)}，${p.description || '把参数与卖点转成可视化内容'}。` +
-    `按模块分区排版（首屏主视觉 / 卖点 / 参数细节 / 售后），纵向长图${ratioText(p.ratio)}${sizeText(p.size)}`
+    `按模块分区排版（首屏主视觉 / 卖点 / 参数细节 / 售后），纵向长图${ratioText(p.ratio)}${sizeText(p.size)}` +
+    `${platformDetailSpecText(p)}${languageText(p.language)}`
   );
 }
 
@@ -111,7 +114,7 @@ export const DetailImage: CapabilityPlugin = {
       `电商详情页版块图生成：${subjectText(p)}，${p.description || '把参数与卖点转成可视化内容'}。` +
       `本次只产出一张「${label}」版块图：${brief}。` +
       `与同一商品的其它版块保持一致的配色与风格，画面完整、可独立上架使用` +
-      `${ratioText(p.ratio)}${sizeText(p.size)}`
+      `${ratioText(p.ratio)}${sizeText(p.size)}${platformDetailSpecText(p)}${languageText(p.language)}`
     );
   },
   // 勾选 N 个模块 → N 张模块图；每张各计一次 creditCost (见 outputPlan 注释)

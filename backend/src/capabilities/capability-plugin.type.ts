@@ -35,6 +35,36 @@ export type ParamType = 'enum' | 'number' | 'text' | 'boolean';
 export interface ParamOption {
   value: string | number;
   label: string;
+  /**
+   * 枚举项附加数据，随 `GET /capabilities` 原样下发。
+   *
+   * 当前用于平台选项：前端按它切换默认比例/画质，后端按它生成平台规格
+   * 提示词。放在选项上而不是另开一张表，保证「下拉里有什么」与
+   * 「规格是什么」永远同一份数据。
+   */
+  meta?: ParamOptionMeta;
+}
+
+export interface ParamOptionMeta {
+  /** 平台主图推荐比例（如 `1:1` / `3:4`） */
+  ratio?: string;
+  /** 平台主图推荐画质档（`1k` / `2k` / `4k`） */
+  size?: string;
+  /** 平台主图最短边要求（px），仅用于展示与提示词 */
+  minPx?: number;
+  /** 提示词里的一句话规格说明 */
+  spec?: string;
+  /** 详情长图规格（详情页专用；主图没有该语义） */
+  detail?: PlatformDetailMeta;
+}
+
+export interface PlatformDetailMeta {
+  /** 推荐画质档 */
+  size?: string;
+  /** 建议宽度（px） */
+  widthPx?: number;
+  /** 提示词里的一句话说明 */
+  spec?: string;
 }
 
 export interface CapabilityParam {

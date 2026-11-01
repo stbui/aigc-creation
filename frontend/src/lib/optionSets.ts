@@ -1,5 +1,5 @@
 import { capabilityById } from './capabilities';
-import type { ParamOption } from '../types/api';
+import type { ParamOption, PlatformDetailSpec } from '../types/api';
 
 /**
  * 参数选项集 —— 从后端能力清单读回，消除前端重复定义。
@@ -25,6 +25,41 @@ function optionsOf(capabilityId: string, paramKey: string): ParamOption[] {
 /** 平台下拉（淘宝/京东/抖音/… 共 9 项）。取自商品主图能力。 */
 export function platformOptions(): ParamOption[] {
   return optionsOf('main_image', 'platform');
+}
+
+/** 平台主图规格（比例 / 画质 / 最短边 / 提示词说明） */
+export interface PlatformSpec {
+  ratio: string;
+  size: string;
+  minPx?: number;
+  spec?: string;
+}
+
+/**
+ * 读取平台主图规格。
+ *
+ * 数据来自后端 `PLATFORMS[].meta`：切换平台时用它带出默认比例与画质，
+ * 用户手动改过就不再覆盖。读不到时返回 `null`，调用方保持当前选择。
+ */
+export function platformSpec(value: string | undefined): PlatformSpec | null {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  const meta = platformOptions().find((o) => String(o.value) === raw)?.meta;
+  if (!meta?.ratio || !meta?.size) return null;
+  return { ratio: meta.ratio, size: meta.size, minPx: meta.minPx, spec: meta.spec };
+}
+
+/**
+ * 读取平台详情长图规格（详情页用）。
+ *
+ * 详情长图没有「比例」语义，只有推荐宽度 / 画质；数据同样来自后端
+ * `PLATFORMS[].meta.detail`。读不到时返回 `null`，页面保持当前画质。
+ */
+export function platformDetailSpec(value: string | undefined): PlatformDetailSpec | null {
+  const raw = String(value ?? '').trim();
+  if (!raw) return null;
+  const detail = platformOptions().find((o) => String(o.value) === raw)?.meta?.detail;
+  return detail?.size ? detail : null;
 }
 
 /** 输出语言下拉（10 项）。取自商品主图能力。 */

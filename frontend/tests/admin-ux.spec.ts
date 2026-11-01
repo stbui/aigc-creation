@@ -55,11 +55,7 @@ test.describe('后台高频动线', () => {
   test('其余深链列表页同样回显已生效筛选', async ({ page }) => {
     const cases = [
       ['/admin/audit-logs?action=user.delete&success=false', '操作审计', ['动作：删除用户', '结果：失败']],
-      [
-        '/admin/model-calls?source=gateway&success=false&modality=image',
-        '模型调用记录',
-        ['模态：图像', '通道：真实模型', '结果：失败'],
-      ],
+      ['/admin/model-calls?status=failed&requestKind=poll', '调用记录', ['状态：失败', '类型：轮询']],
       ['/admin/invoices?status=pending&keyword=INV', '发票管理', ['状态：待开具', '关键词：INV']],
       ['/admin/coupons?type=full_cut&status=on', '优惠券', ['类型：满减', '状态：启用']],
       ['/admin/campaigns?status=active', '限时活动', ['状态：进行中']],
@@ -86,81 +82,138 @@ test.describe('后台高频动线', () => {
     }
   });
 
-  test('模型调用详情区分离线任务与渠道任务号，不为渠道号渲染坏链', async ({ page }) => {
-    const base = {
-      createdAt: '2026-10-31T08:00:00.000Z',
-      capability: 'free_create',
-      route: 'auto',
+  test('调用详情按当前行渲染，不为渠道任务号拼本地任务页坏链', async ({ page }) => {
+    const row = {
+      id: 'test-gateway-task',
+      userId: 'u-1',
+      traceId: 'trace-1',
+      requestId: 'req-1',
+      channelId: 'ch-1',
+      channelName: 'a6api',
+      taskId: '1793119194',
+      billingOrderId: 'bill-1',
       source: 'gateway',
-      fallback: false,
-      reason: '渠道返回失败',
+      capability: 'free_create',
+      operation: 'images.generate',
+      requestKind: 'create',
+      billable: true,
+      apiFormat: 'openai-image',
+      method: 'POST',
+      path: '/v1/images/generations',
       model: 'gpt-image-1',
-      prompt: '一只猫',
+      status: 'failed',
+      statusCode: 500,
       durationMs: 179,
-      success: false,
-      outputBytes: 0,
-      width: null,
-      height: null,
+      pollCount: 0,
+      providerStatus: 'failed',
+      inputTokens: 0,
+      outputTokens: 0,
+      cachedTokens: 0,
+      usageAvailable: false,
+      mediaCount: 0,
+      videoSeconds: 0,
+      providerRequestId: 'prov-1',
+      estimatedCostMicros: 0,
+      costAvailable: false,
+      currency: 'USD',
       errorCode: '42201',
+      error: '渠道返回失败',
+      createdAt: '2026-10-31T08:00:00.000Z',
     };
-    const detail = (id: string, generationTaskId: string | null, gatewayTaskId: string | null) =>
-      JSON.stringify({
-        code: 0,
-        data: {
-          ...base,
-          id,
-          taskId: generationTaskId ?? gatewayTaskId,
-          generationTaskId,
-          gatewayTaskId,
-        },
-      });
 
-    await page.route('**/api/v1/admin/model-calls/test-gateway-task', (route) =>
+    await page.route(/\/api\/v1\/admin\/api-logs(\?|$)/, (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: detail('test-gateway-task', null, '1793119194'),
-      }),
-    );
-    await page.route('**/api/v1/admin/model-calls/test-local-task', (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: detail('test-local-task', 'cm-local-task', null),
+        body: JSON.stringify({
+          code: 0,
+          data: {
+            items: [row],
+            total: 1,
+            page: 1,
+            pageSize: 20,
+            summary: { total: 1, success: 0, failed: 1, other: 0, avgDurationMs: 179 },
+          },
+        }),
       }),
     );
 
     // 渠道任务号只做文本展示，不能拼成本地任务页链接（历史实现会稳定 404）
     await page.goto(`${UI}/admin/model-calls?id=test-gateway-task`);
     await expect(drawer(page)).toBeVisible({ timeout: 15000 });
-    await expect(drawer(page).getByText('渠道任务 ID')).toBeVisible();
     await expect(drawer(page).getByText('1793119194')).toBeVisible();
-    await expect(drawer(page).getByRole('link', { name: '1793119194' })).toHaveCount(0);
-
-    // 真正命中本地任务时才显示可点击的「生成任务」
-    await page.goto(`${UI}/admin/model-calls?id=test-local-task`);
-    await expect(drawer(page)).toBeVisible({ timeout: 15000 });
-    const taskLink = drawer(page).getByRole('link', { name: 'cm-local-task' });
-    await expect(taskLink).toHaveAttribute('href', '/admin/tasks?id=cm-local-task');
-    await expect(drawer(page).getByText('生成任务', { exact: true })).toBeVisible();
+    await expect(drawer(page).getByText('a6api（ch-1）')).toBeVisible();
+    await expect(drawer(page).getByRole('link')).toHaveCount(0);
   });
 
-  test('模型调用统计卡与筛选同口径，通道计数之和不超过筛选总数', async ({ page }) => {
-    await page.goto(`${UI}/admin/model-calls?modality=image`);
-    await expect(page.getByRole('heading', { name: '模型调用记录' })).toBeVisible({
+  test('调用统计卡与 summary 同口径，成功与失败条数之和不超过总数', async ({ page }) => {
+    const summary = { total: 7, success: 4, failed: 2, other: 1, avgDurationMs: 321 };
+    const row = {
+      id: 'summary-row',
+      userId: 'u-1',
+      traceId: 'trace-1',
+      requestId: 'req-1',
+      channelId: 'ch-1',
+      channelName: 'a6api',
+      taskId: 'task-1',
+      billingOrderId: 'bill-1',
+      source: 'gateway',
+      capability: 'free_create',
+      operation: 'images.generate',
+      requestKind: 'create',
+      billable: true,
+      apiFormat: 'openai-image',
+      method: 'POST',
+      path: '/v1/images/generations',
+      model: 'gpt-image-1',
+      status: 'canceled',
+      statusCode: 200,
+      durationMs: 321,
+      pollCount: 0,
+      providerStatus: 'canceled',
+      inputTokens: 0,
+      outputTokens: 0,
+      cachedTokens: 0,
+      usageAvailable: false,
+      mediaCount: 1,
+      videoSeconds: 0,
+      providerRequestId: 'prov-1',
+      estimatedCostMicros: 0,
+      costAvailable: false,
+      currency: 'USD',
+      errorCode: '',
+      error: '',
+      createdAt: '2026-10-31T08:00:00.000Z',
+    };
+
+    await page.route(/\/api\/v1\/admin\/api-logs(\?|$)/, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0,
+          data: { items: [row], total: 1, page: 1, pageSize: 20, summary },
+        }),
+      }),
+    );
+
+    await page.goto(`${UI}/admin/model-calls`);
+    await expect(page.getByRole('heading', { name: '调用记录' })).toBeVisible({
       timeout: 15000,
     });
     await expect(rows(page).first()).toBeVisible();
 
-    const card = (label: string) => page.getByText(label, { exact: true }).locator('..');
-    const total = Number((await card('调用总数').locator('div').nth(1).textContent()) ?? '0');
-    const hint = (await card('真实模型占比').locator('div').nth(2).textContent()) ?? '';
-    const match = hint.match(/远程 (\d+) · 历史本地 (\d+)/);
+    // StatCard 的结构：标签 / 数值 / 可选提示，三者都是根节点的直接子 div
+    const card = (label: string) => page.getByText(label, { exact: true }).first().locator('..');
+    const value = async (label: string) =>
+      Number((await card(label).locator('div').nth(1).textContent()) ?? '0');
 
-    expect(match, `真实模型占比提示格式异常: ${hint}`).not.toBeNull();
-    const [gateway, local] = [Number(match![1]), Number(match![2])];
-    expect(gateway + local).toBe(total);
-    expect(total).toBeGreaterThan(0);
+    expect(await value('调用总数')).toBe(summary.total);
+    expect(await value('成功')).toBe(summary.success);
+    expect(await value('失败 / 取消')).toBe(summary.failed);
+    // 「其它」只出现在平均耗时卡片的提示行：总数 − 成功 − 失败 的部分不会被吞掉
+    await expect(card('平均耗时')).toContainText(`其它状态 ${summary.other} 条`);
+    expect(summary.success + summary.failed + summary.other).toBe(summary.total);
   });
 
   test('告警级别从地址栏恢复，并随切换同步', async ({ page }) => {

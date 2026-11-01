@@ -1,8 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Download, Upload } from 'lucide-react';
-import { Button } from '../../vendor/boardui/components/base/buttons/button';
-import { Pagination } from '../../vendor/boardui/components/base/pagination/pagination';
+import { Button, Pagination } from '../../admin-ui/shadcn/kit';
 import { adminCreditsApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';

@@ -5,9 +5,16 @@
  * 页面用到的共享控件集中可见, 替换或加埋点只改一处。
  * 目录内新增共享组件引用时在这里补一行 re-export。
  *
- * 本页自己的板块组件 (`section-picker` / `result-list` / `example-panel`) 不在此转出:
- * 它们依赖本页的 hooks 与接口, 反向 re-export 会形成循环引用。
+ * 本页自己的板块组件 (`DetailSectionPicker` / `DetailResultList` /
+ * `DetailExamplePanel` / `FormSelect`) 不在此转出: 它们依赖本页的 hooks 与接口,
+ * 反向 re-export 会形成循环引用。
+ *
+ * 第三方 UI 库 (antd / lucide-react) 不经本文件 —— 它们不是本项目的共享控件,
+ * 与 `channels/` 的做法一致。
  */
+
+/** 选项结构类型 (下拉的 value / label 形态) */
+export type { ParamOption } from '../../types/api';
 
 /** 上传区 (拖拽 / 粘贴 / 素材库 / 手机上传入口) */
 export { ToolImageDropzone } from '../../components/ToolImageDropzone';

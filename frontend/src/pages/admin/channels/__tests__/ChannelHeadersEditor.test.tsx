@@ -2,10 +2,12 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
   ChannelHeadersEditor,
+} from '../ChannelHeadersEditor';
+import {
   DEFAULT_USER_AGENT,
   normalizeChannelHeaders,
   validateChannelHeaders,
-} from '../ChannelHeadersEditor';
+} from '../utils';
 
 /**
  * 自定义请求头编辑器的校验口径。

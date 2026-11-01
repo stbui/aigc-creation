@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Bell,
@@ -11,34 +11,33 @@ import {
   Search,
   User,
 } from 'lucide-react';
-import { IconButton } from '../../vendor/boardui/components/base/buttons/icon-button';
 import {
   Dropdown,
   DropdownDivider,
   DropdownItem,
   DropdownPopover,
   DropdownTrigger,
-} from '../../vendor/boardui/components/base/dropdown/dropdown';
-import { Popover } from 'react-aria-components';
+  IconButton,
+} from '../shadcn/kit';
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui';
 import { useAdmin } from '../../context/AdminContext';
 import { useAuth } from '../../context/AuthContext';
 import { ADMIN_MENU } from '../../components/admin/adminNav';
 import { useAdminAlerts, ALERT_SEVERITY_META, alertTime } from '../../components/admin/AlertCenter';
 import { hasUnsavedChanges } from '../../lib/unsaved-guard';
 import { APP_ENV, IS_PROD } from '../../lib/constants';
-import { cx } from '../lib/cn';
+import { cn } from '../lib/cn';
 import { DensityContext } from '../lib/density';
 import { useConfirm } from '../providers/ConfirmProvider';
 import { AdminSearchPalette } from './AdminSearchPalette';
 
 /**
- * 后台外壳（BoardUI）。
+ * 后台外壳（shadcn）。
  *
- * ## 与旧外壳的关系
+ * ## 结构
  *
- * 旧版是 `adm-shell`：216px 左栏 + 顶部值班带（概览 128px / 其余 44px）。
- * 2026-10-30 决策去掉值班带，外壳改为 BoardUI 的单栏结构：左栏导航 + 内容区，
- * 机器状态不再常驻 28 个页面，而是回到概览页首屏。
+ * 单栏：左栏导航 + 内容区（232 / 折叠 60，≤1280 自动折叠）。无顶栏、无值班带
+ * —— 机器状态只在概览首屏出现，不常驻 35 个页面。
  *
  * ## 保留的行为（不能因为换壳丢）
  *
@@ -47,6 +46,15 @@ import { AdminSearchPalette } from './AdminSearchPalette';
  * - 密度偏好存 localStorage，经 `DensityContext` 下发给所有表格（行高随之收紧）；
  * - 环境标识只在非生产出现，避免把测试库当生产看；
  * - 告警铃 60 秒轮询，页面不可见时跳过。
+ *
+ * ## 颜色
+ *
+ * 全部吃 shadcn 语义令牌（`bg-card` / `border-border` / `text-muted-foreground`
+ * / `bg-accent`），由 `styles/shadcn-theme.css` 桥接到 `global.css` 的既有令牌，
+ * 因此外壳与页面内组件是同一套灰阶与圆角。
+ *
+ * `bui-admin` / `adm-layout` / `adm-content` / `adm-skip-link` 是 `global.css`
+ * 里的外壳骨架（见该文件后台外壳段），**由页面结构持有，不在这里重画**。
  */
 const DENSITY_KEY = 'huojue.admin.density';
 
@@ -56,7 +64,7 @@ function EnvironmentTag({ dotOnly = false }: { dotOnly?: boolean }) {
   const label = import.meta.env.VITE_ENV_LABEL || fallback;
   return (
     <span
-      className="inline-flex items-center gap-1.5 rounded-md bg-background-secondary-default px-2 py-1 text-xs text-text-secondary"
+      className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground"
       title={`当前环境: ${APP_ENV} (${label})`}
       aria-label={`当前环境: ${label}`}
     >
@@ -71,45 +79,37 @@ function AlertBell() {
   const navigate = useNavigate();
   const { data, error, loading, reload } = useAdminAlerts();
   const [open, setOpen] = useState(false);
-  const triggerRef = useRef<HTMLButtonElement>(null);
 
   const items = data?.items ?? [];
   const count = items.length;
 
   return (
-    <>
-      <button
-        ref={triggerRef}
-        type="button"
-        aria-label={count > 0 ? `告警中心，${count} 项待处理` : '告警中心，暂无待处理'}
-        className={cx(
-          'relative inline-flex size-8 items-center justify-center rounded-lg text-text-secondary transition-colors',
-          'hover:bg-background-secondary-hover hover:text-text-primary',
-        )}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <Bell className="size-4" aria-hidden />
-        {count > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-rose-600 px-1 text-[10px] font-medium leading-4 text-white">
-            {count > 9 ? '9+' : count}
-          </span>
-        )}
-      </button>
-      <Popover
-        triggerRef={triggerRef}
-        isOpen={open}
-        onOpenChange={setOpen}
-        placement="bottom end"
-        offset={6}
-        className="bui-scope w-[340px] rounded-xl border border-border-table bg-white p-0 shadow-xl outline-none"
-      >
-        <div className="flex items-center justify-between border-b border-border-table px-3 py-2.5">
-          <strong className="text-sm text-text-primary">待处理告警</strong>
-          <span className="text-xs text-text-tertiary">{count > 0 ? `${count} 项` : '暂无'}</span>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          aria-label={count > 0 ? `告警中心，${count} 项待处理` : '告警中心，暂无待处理'}
+          className={cn(
+            'relative inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors',
+            'hover:bg-accent hover:text-foreground outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+          )}
+        >
+          <Bell className="size-4" aria-hidden />
+          {count > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-medium leading-4 text-white">
+              {count > 9 ? '9+' : count}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="end" sideOffset={6} className="w-[340px] gap-0 overflow-hidden p-0">
+        <div className="flex items-center justify-between border-b border-border px-3 py-2.5">
+          <strong className="text-sm text-foreground">待处理告警</strong>
+          <span className="text-xs text-muted-foreground">{count > 0 ? `${count} 项` : '暂无'}</span>
         </div>
 
         {error && (
-          <div className="flex items-center justify-between gap-2 border-b border-border-table bg-rose-50 px-3 py-2 text-xs text-rose-700">
+          <div className="flex items-center justify-between gap-2 border-b border-border bg-danger-soft px-3 py-2 text-xs text-danger-text">
             <span className="min-w-0 truncate">{error}</span>
             <button type="button" className="shrink-0 underline" onClick={() => void reload()}>
               重试
@@ -119,9 +119,9 @@ function AlertBell() {
 
         <div className="max-h-[320px] overflow-y-auto">
           {loading && !data ? (
-            <p className="px-3 py-6 text-center text-xs text-text-tertiary">正在检查待处理事项…</p>
+            <p className="px-3 py-6 text-center text-xs text-muted-foreground">正在检查待处理事项…</p>
           ) : items.length === 0 ? (
-            <p className="px-3 py-6 text-center text-xs text-text-tertiary">
+            <p className="px-3 py-6 text-center text-xs text-muted-foreground">
               {data ? `截至 ${alertTime(data.generatedAt)} · 每 60 秒检查` : '每 60 秒检查一次'}
             </p>
           ) : (
@@ -133,23 +133,25 @@ function AlertBell() {
                   key={item.key}
                   type="button"
                   title={item.detail}
-                  className="flex w-full items-start gap-2 border-b border-border-table px-3 py-2.5 text-left last:border-b-0 hover:bg-background-secondary-default"
+                  className="flex w-full items-start gap-2 border-b border-border px-3 py-2.5 text-left last:border-b-0 hover:bg-muted"
                   onClick={() => {
                     setOpen(false);
                     navigate(item.link);
                   }}
                 >
-                  <Icon className="mt-0.5 size-4 shrink-0 text-text-tertiary" aria-hidden />
+                  <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-medium text-text-primary">
+                    <span className="block truncate text-xs font-medium text-foreground">
                       {item.title}
                     </span>
-                    <span className="mt-0.5 block truncate text-[11px] text-text-tertiary">
+                    <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
                       {item.detail}
                     </span>
                   </span>
                   {item.count !== null && (
-                    <span className="shrink-0 text-xs font-medium text-text-secondary">{item.count}</span>
+                    <span className="shrink-0 text-xs font-medium text-muted-foreground">
+                      {item.count}
+                    </span>
                   )}
                 </button>
               );
@@ -159,7 +161,7 @@ function AlertBell() {
 
         <button
           type="button"
-          className="w-full border-t border-border-table px-3 py-2 text-center text-xs text-accent-600 hover:bg-background-secondary-default"
+          className="w-full border-t border-border px-3 py-2 text-center text-xs text-primary hover:bg-muted"
           onClick={() => {
             setOpen(false);
             navigate('/admin/alerts');
@@ -167,8 +169,8 @@ function AlertBell() {
         >
           查看全部
         </button>
-      </Popover>
-    </>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -242,7 +244,7 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
       {groups.map((group) => (
         <div key={group.name}>
           {!collapsed && (
-            <div className="px-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-text-tertiary">
+            <div className="px-2 pb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
               {group.name}
             </div>
           )}
@@ -257,11 +259,12 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
                   aria-current={isActive ? 'page' : undefined}
                   aria-label={collapsed ? `${item.label}${item.planned ? ' (待开放)' : ''}` : undefined}
                   title={collapsed ? `${item.label}${item.planned ? ' (待开放)' : ''}` : undefined}
-                  className={cx(
-                    'flex h-8 items-center gap-2 rounded-lg px-2 text-left text-[13px] transition-colors',
+                  className={cn(
+                    'flex h-8 items-center gap-2 rounded-md px-2 text-left text-[13px] transition-colors outline-none',
+                    'focus-visible:ring-[3px] focus-visible:ring-ring/50',
                     isActive
-                      ? 'bg-accent-100 font-medium text-accent-700'
-                      : 'text-text-secondary hover:bg-background-secondary-hover hover:text-text-primary',
+                      ? 'bg-accent font-medium text-accent-foreground'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground',
                     collapsed && 'justify-center px-0',
                   )}
                 >
@@ -273,7 +276,7 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
                     <>
                       <span className="min-w-0 flex-1 truncate">{item.label}</span>
                       {item.planned && (
-                        <span className="shrink-0 rounded bg-background-secondary-default px-1 text-[10px] text-text-tertiary">
+                        <span className="shrink-0 rounded bg-muted px-1 text-[10px] text-muted-foreground">
                           待建
                         </span>
                       )}
@@ -300,18 +303,17 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
       <div className="flex min-h-screen">
         <aside
           data-testid="admin-sider"
-          className={cx(
-            'sticky top-0 flex h-screen shrink-0 flex-col border-r border-border-table bg-white transition-[width] duration-150',
+          className={cn(
+            'sticky top-0 flex h-screen shrink-0 flex-col border-r border-border bg-card transition-[width] duration-150',
             collapsed ? 'w-[60px]' : 'w-[232px]',
           )}
           aria-label="后台导航栏"
         >
-          <div data-testid="admin-sider-head" className="flex h-14 items-center gap-2 border-b border-border-table px-3">
+          <div data-testid="admin-sider-head" className="flex h-14 items-center gap-2 border-b border-border px-3">
             <IconButton
               icon={collapsed ? PanelLeftOpen : PanelLeftClose}
               size="small"
               aria-label={collapsed ? '展开侧栏' : '收起侧栏'}
-              className="border-0 bg-transparent shadow-none"
               onClick={() => setCollapsed((value) => !value)}
             />
             <button
@@ -322,8 +324,8 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
             >
               <img className="size-6 shrink-0" src="/brand/huojue-mark.svg" alt="" />
               {!collapsed && (
-                <span className="truncate text-sm font-semibold text-text-primary">
-                  货觉<span className="text-text-tertiary"> 运营后台</span>
+                <span className="truncate text-sm font-semibold text-foreground">
+                  货觉<span className="text-muted-foreground"> 运营后台</span>
                 </span>
               )}
             </button>
@@ -334,7 +336,7 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
               <button
                 type="button"
                 aria-label="搜索（展开侧栏）"
-                className="flex size-8 items-center justify-center rounded-lg text-text-secondary hover:bg-background-secondary-hover"
+                className="flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-accent hover:text-foreground"
                 onClick={() => {
                   setCollapsed(false);
                   setSearchOpen(true);
@@ -345,12 +347,12 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
             ) : (
               <button
                 type="button"
-                className="flex h-8 w-full items-center gap-2 rounded-lg border border-border-button-default bg-background-primary-default px-2 text-xs text-text-placeholder hover:border-border-button-hover"
+                className="flex h-8 w-full items-center gap-2 rounded-md border border-input bg-background px-2 text-xs text-muted-foreground transition-colors hover:border-ring/40"
                 onClick={() => setSearchOpen(true)}
               >
                 <Search className="size-3.5" aria-hidden />
                 <span className="flex-1 text-left">搜索用户 / 订单 / 任务</span>
-                <kbd className="rounded border border-border-table bg-background-secondary-default px-1 text-[10px] text-text-tertiary">
+                <kbd className="rounded border border-border bg-muted px-1 text-[10px] text-muted-foreground">
                   ⌘K
                 </kbd>
               </button>
@@ -361,8 +363,8 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
             {navList}
           </div>
 
-          <div className="flex flex-col gap-1 border-t border-border-table p-2">
-            <div className={cx('flex items-center gap-1', collapsed ? 'flex-col' : 'justify-between')}>
+          <div className="flex flex-col gap-1 border-t border-border p-2">
+            <div className={cn('flex items-center gap-1', collapsed ? 'flex-col' : 'justify-between')}>
               <EnvironmentTag dotOnly={collapsed} />
               {!collapsed && (
                 <div className="flex items-center gap-1">
@@ -371,7 +373,7 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
                     type="button"
                     aria-label={compact ? '切换为宽松列表' : '切换为紧凑列表'}
                     aria-pressed={compact}
-                    className="inline-flex size-8 items-center justify-center rounded-lg text-text-secondary hover:bg-background-secondary-hover hover:text-text-primary"
+                    className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                     onClick={() => {
                       const next = !compact;
                       setCompact(next);
@@ -386,26 +388,26 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
 
             <Dropdown>
               <DropdownTrigger
-                className={cx(
-                  'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left hover:bg-background-secondary-hover',
+                className={cn(
+                  'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-accent',
                   collapsed && 'justify-center px-0',
                 )}
                 aria-label="打开用户菜单"
               >
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent-100 text-xs font-semibold text-accent-700">
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-semibold text-accent-foreground">
                   {(me?.email ?? 'A').charAt(0).toUpperCase()}
                 </span>
                 {!collapsed && (
                   <>
-                    <span className="min-w-0 flex-1 truncate text-xs text-text-secondary">
+                    <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
                       {me?.roleLabel ?? '加载中'}
                     </span>
-                    <ChevronDown className="size-3.5 shrink-0 text-text-tertiary" aria-hidden />
+                    <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
                   </>
                 )}
               </DropdownTrigger>
-              <DropdownPopover aria-label="用户菜单" placement="top start" className="bui-scope">
-                <div className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-text-tertiary">
+              <DropdownPopover aria-label="用户菜单" placement="top start" className="w-56">
+                <div className="flex items-center gap-1.5 px-2 py-1.5 text-xs text-muted-foreground">
                   <User className="size-3.5" aria-hidden />
                   <span className="truncate">{me?.email ?? ''}</span>
                 </div>
@@ -429,7 +431,7 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
 
         {/*
          * `.adm-content` 承担两件事（见 styles/global.css 的后台外壳段）：
-         * 给宽表一个自己的横向滚动区，`> *` 统一限宽 1600px 居中。
+         * 给宽表一个自己的横向滚动区；不设内容限宽，页面铺满可用宽度。
          *
          * 密度偏好经 `DensityContext` 只包页面内容：外壳自身没有表格，挂在外层
          * 没有额外收益，反而让「开关作用域」变得含糊。

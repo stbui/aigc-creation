@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Archive, FlaskConical, Plus, Trash2 } from 'lucide-react';
-import { Button } from '../../vendor/boardui/components/base/buttons/button';
+import { Button } from '../../admin-ui/shadcn/kit';
 import { adminChannelModelsApi, adminChannelsApi, adminLogicalModelsApi } from '../../lib/api';
 import { useCapabilities } from '../../hooks/useCapabilities';
 import { useAdmin } from '../../context/AdminContext';

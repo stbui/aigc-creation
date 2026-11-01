@@ -8,15 +8,18 @@
  * 本目录自己的板块组件 (`ChannelListPanel` / `ChannelDetailPanel` / `ChannelModelManager` /
  * `ChannelModelTable` / 各弹窗) 不在此转出: 它们依赖本目录的 hooks 与接口,
  * 反向 re-export 会形成循环引用。
+ *
+ * 2026-11-01: 整页换成 shadcn 观感。改动只有这一处 —— `admin-ui/shadcn/kit`
+ * 导出件与本文件原先的 BoardUI 版**同名同签名**, 17 个文件、4400 行业务代码
+ * 没有任何一行需要跟着改。这就是这个文件存在的理由。
  */
 
-/** 主 / 次按钮 (BoardUI) */
-export { Button } from '../../../vendor/boardui/components/base/buttons/button';
-/** 图标按钮 (排序列表的行操作) */
-export { IconButton } from '../../../vendor/boardui/components/base/buttons/icon-button';
-
-/** 表单控件 */
+/** 控件套件（shadcn 版，签名与 BoardUI 版一致） */
 export {
+  /* 按钮 */
+  Button,
+  IconButton,
+  /* 表单控件 */
   CheckBox,
   FilePick,
   HoverTip,
@@ -28,30 +31,29 @@ export {
   TextInput,
   type SegmentedOption,
   type SelectOption,
-} from '../../../admin-ui/controls';
-
-/** 展示原语 (空态 / 键值表 / 提示条 / 表单行) */
-export {
+  /* 展示原语 */
   Descriptions,
   EmptyState,
   FormField,
   Notice,
-} from '../../../admin-ui/primitives';
-/** 数据表格与列定义 */
-export { AdminDataTable, type AdminColumn } from '../../../admin-ui/primitives/DataTable';
-/** 弹窗 (上游导入 / 模型编辑 / 调价) */
-export { ModalDialog } from '../../../admin-ui/primitives/Dialog';
-/** 抽屉 (渠道新建 / 编辑) */
-export { Drawer } from '../../../admin-ui/primitives/Drawer';
-
-/** 页头 / 面板 / 状态标签 / 筛选条 */
-export {
+  Skeleton,
+  /* 数据表格与列定义 */
+  AdminDataTable,
+  type AdminColumn,
+  /* 弹窗 / 抽屉 / 二次确认 */
+  ModalDialog,
+  Drawer,
+  ConfirmAction,
+  /* 页头 / 面板 / 状态标签 / 筛选条 */
   AppliedFilters,
   FilterActions,
   FilterBar,
   PageHeader,
   Panel,
+  SaveBar,
   StatusTag,
-} from '../../../components/admin/PageHeader';
-/** 后台通用数据态与二次确认 */
-export { AdminStaleError, ConfirmAction } from '../../../components/admin/AdminWidgets';
+  /* 数据态 */
+  AdminEmpty,
+  AdminListError,
+  AdminStaleError,
+} from '../../../admin-ui/shadcn/kit';

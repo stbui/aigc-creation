@@ -1,7 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { Button } from '../../vendor/boardui/components/base/buttons/button';
-import { IconButton } from '../../vendor/boardui/components/base/buttons/icon-button';
+import { Button, IconButton } from '../../admin-ui/shadcn/kit';
 import { marketingApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';

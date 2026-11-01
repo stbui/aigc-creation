@@ -25,9 +25,13 @@ import { ChannelFormDrawer } from './ChannelFormDrawer';
 import { ChannelListPanel } from './ChannelListPanel';
 import { ChannelModelHealthPanel } from './ChannelModelHealthPanel';
 import { ChannelOrderDialog } from './ChannelOrderDialog';
-import { normalizeChannelHeaders, validateChannelHeaders } from './ChannelHeadersEditor';
 import { Field } from './ChannelField';
-import { CHANNEL_VIEW_OPTIONS, EMPTY_DRAFT, toDraft, type ChannelDraft } from './constants';
+import {
+  CHANNEL_VIEW_OPTIONS,
+  EMPTY_CHANNEL_DRAFT,
+  type ChannelDraft,
+} from './constants';
+import { normalizeChannelHeaders, toChannelDraft, validateChannelHeaders } from './utils';
 import type { AdminChannelView, SystemChannelExportView } from '../../../types/model';
 
 /**
@@ -91,8 +95,8 @@ export function AdminChannelsPage() {
 
   const [editing, setEditing] = useState<AdminChannelView | null>(null);
   const [creating, setCreating] = useState(false);
-  const [draft, setDraft] = useState<ChannelDraft>(EMPTY_DRAFT);
-  const [draftBase, setDraftBase] = useState<ChannelDraft>(EMPTY_DRAFT);
+  const [draft, setDraft] = useState<ChannelDraft>(EMPTY_CHANNEL_DRAFT);
+  const [draftBase, setDraftBase] = useState<ChannelDraft>(EMPTY_CHANNEL_DRAFT);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AdminChannelView | null>(null);
   const [deleteReason, setDeleteReason] = useState('');
@@ -147,14 +151,14 @@ export function AdminChannelsPage() {
   };
 
   const openCreate = () => {
-    setDraft(EMPTY_DRAFT);
-    setDraftBase(EMPTY_DRAFT);
+    setDraft(EMPTY_CHANNEL_DRAFT);
+    setDraftBase(EMPTY_CHANNEL_DRAFT);
     setEditing(null);
     setCreating(true);
   };
 
   const openEdit = (channel: AdminChannelView) => {
-    const next = toDraft(channel);
+    const next = toChannelDraft(channel);
     setDraft(next);
     setDraftBase(next);
     setEditing(channel);
@@ -386,7 +390,7 @@ export function AdminChannelsPage() {
         </div>
       ) : (
         <div
-          className="grid grid-cols-[260px_minmax(0,1fr)] items-start gap-3"
+          className="grid grid-cols-[240px_minmax(0,1fr)] items-start gap-3"
           data-testid="admin-channel-workspace"
         >
           <ChannelListPanel

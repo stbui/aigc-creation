@@ -12,15 +12,21 @@ import { DutyStrip } from '../../admin-ui/widgets/DutyStrip';
 import '../../styles/boardui.css';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { ExceptionPage } from '../../components/ExceptionPage';
-import { PageHeader } from '../../components/admin/PageHeader';
-import { AdminStaleError, useAdminResource } from '../../components/admin/AdminWidgets';
+import { useAdminResource } from '../../components/admin/AdminWidgets';
 import { DutyChannelTower, duration, earliestFailure } from '../../components/admin/DutyBand';
 import { AdminDutyProvider, useDuty, type DutyTask } from '../../components/admin/DutyContext';
 import { assetThumbUrl } from '../../lib/api';
 import { taskErrorLabel } from '../../lib/admin-error-codes';
 import { adminOrderDetailHref, adminTaskHref } from '../../lib/admin-links';
-import { Button } from '../../vendor/boardui/components/base/buttons/button';
-import { SegmentedBox } from '../../admin-ui/controls';
+import { Button } from '../../admin-ui/shadcn/kit';
+import { Card, CardContent, CardHeader } from '../../admin-ui/components/ui';
+import {
+  ActionButton,
+  AdminStaleError,
+  PageTitle,
+  SegmentedTabs,
+} from '../../admin-ui/shadcn';
+import { TrendBarChart } from '../../admin-ui/widgets/TrendBarChart';
 import { cx } from '../../admin-ui/lib/cn';
 import type { AdminOrderRow, AdminOverview } from '../../types/api';
 
@@ -197,28 +203,28 @@ function DashboardContent() {
 
   return (
     <>
-      <PageHeader
+      <PageTitle
         title="平台概览"
         description={`${isFinance ? '经营' : '生成与经营'} · 近 ${days} 天 · 截至 ${hhmm(
           data.generatedAt,
         )} · 每 ${data.cacheTtlSeconds} 秒刷新`}
         actions={
           <>
-            <SegmentedBox
+            <SegmentedTabs
               ariaLabel="统计时间窗"
               value={String(days)}
               onChange={(value) => setDays(Number(value))}
               options={[7, 30, 90].map((value) => ({ value: String(value), label: `近 ${value} 天` }))}
             />
-            <Button
-              variant="secondary"
-              size="small"
-              leadingIcon={RefreshCw}
+            <ActionButton
+              variant="outline"
+              size="sm"
+              icon={RefreshCw}
               disabled={loading}
               onClick={() => void reload()}
             >
               {loading ? '刷新中…' : '刷新'}
-            </Button>
+            </ActionButton>
           </>
         }
       />
@@ -333,14 +339,13 @@ function DashboardContent() {
       {!isFinance && (
         <Fold>
           <Block title="任务趋势" note={`近 ${days} 天 · 有失败的日子标红`}>
-            <TrendChart
+            <TrendBarChart
               ariaLabel={`近 ${days} 天每日任务量`}
               empty="所选窗口内没有任务记录"
               items={data.trend.map((d) => ({
                 key: d.date,
                 date: d.date,
                 value: d.total,
-                text: String(d.total),
                 title: `${d.date} · ${d.total} 个任务 · 失败 ${d.failed}`,
                 warn: d.failed > 0,
               }))}
@@ -399,14 +404,14 @@ function DashboardContent() {
           <div className="grid grid-cols-1 items-start gap-7 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
             <div className="min-w-0">
               <Subhead title="收入趋势" note="按支付时间 · 单位: 元" />
-              <TrendChart
+              <TrendBarChart
                 ariaLabel={`近 ${days} 天每日收入`}
                 empty="所选窗口内没有支付记录"
+                valueFormatter={(value) => `¥${yuan(value, 0)}`}
                 items={c.revenueTrend.map((d) => ({
                   key: d.date,
                   date: d.date,
                   value: d.gmvCents,
-                  text: yuan(d.gmvCents, 0),
                   title: `${d.date} · ¥${yuan(d.gmvCents)} · ${d.orders} 单`,
                 }))}
               />
@@ -430,7 +435,7 @@ function DashboardContent() {
                         aria-hidden="true"
                       >
                         <span
-                          className="block h-full rounded-full bg-neutral-400"
+                          className="block h-full rounded-full bg-brand"
                           style={{
                             width: `${Math.max((ch.gmvCents / Math.max(c.gmvWindowCents, 1)) * 100, 2)}%`,
                           }}
@@ -468,7 +473,10 @@ const PROVIDER_LABELS: Record<string, string> = {
 /**
  * 区块：一行标题 + 说明 + 右侧入口。
  *
- * 不画卡片：区块之间只隔一条发丝线，页面读起来是一张工作表而不是一堆盒子。
+ * 卡片外壳（2026-11-01）：此前区块之间只隔一条发丝线，页面读起来像一张
+ * 工作表。改成 shadcn `Card` 后每块有明确边界与 12px 圆角，配合白底与
+ * 发丝边框，层级比「一堆线段」清楚 —— 首屏的队列、通道、产出三块能一眼
+ * 分开。
  */
 function Block({
   title,
@@ -482,29 +490,34 @@ function Block({
   children: ReactNode;
 }) {
   return (
-    <section>
-      <header className="mb-2.5 flex items-baseline gap-2.5">
-        <h2 className="shrink-0 text-[13px] font-semibold leading-[18px] text-text-primary">
+    /*
+     * `gap-0 py-0` 是必要的：shadcn 的 `Card` 基类带 `py-6`（上下 24px）与
+     * `gap-6`（头尾之间 24px），而后台卡片密度更紧（全局主导字号 12/13/14），
+     * 头尾的内距由下面的 `CardHeader` / `CardContent` 各自给出。
+     */
+    <Card className="gap-0 border-border bg-card py-0 shadow-card">
+      <CardHeader className="flex-row items-baseline gap-2.5 px-4 py-3">
+        <h2 className="shrink-0 text-[13px] font-semibold leading-[18px] text-card-foreground">
           {title}
         </h2>
         {note && (
-          <span className="min-w-0 flex-1 truncate text-[11.5px] text-text-tertiary">{note}</span>
+          <span className="min-w-0 flex-1 truncate text-[11.5px] text-muted-foreground">{note}</span>
         )}
         {action && <span className="shrink-0 text-[11.5px]">{action}</span>}
-      </header>
-      {children}
-    </section>
+      </CardHeader>
+      <CardContent className="px-4 pb-4">{children}</CardContent>
+    </Card>
   );
 }
 
 /**
  * 首屏以下的折叠区。
  *
- * 与首屏之间隔一条发丝线 + 一段留白，不套卡片 —— 卡片会让「需要动作」和
- * 「历史累计」看起来是同一优先级。
+ * 与首屏之间隔一段留白，不套卡片 —— 卡片会让「需要动作」和「历史累计」
+ * 看起来是同一优先级。
  */
 function Fold({ children }: { children: ReactNode }) {
-  return <div className="mt-5 border-t border-border-table pt-4">{children}</div>;
+  return <div className="mt-5">{children}</div>;
 }
 
 /** 小节副标题：标题 + 口径说明 */
@@ -868,70 +881,6 @@ function WindowStrip({ data, isFinance }: { data: AdminOverview; isFinance: bool
         </div>
       ))}
     </dl>
-  );
-}
-
-/**
- * 柱状趋势。
- *
- * 网格线给柱子一个基准，否则高度无从判断；有失败的日子整根柱子转警示色 ——
- * 趋势图不能只展示成功的一面。
- */
-function TrendChart({
-  items,
-  empty,
-  ariaLabel,
-}: {
-  items: Array<{ key: string; date: string; value: number; text: string; title: string; warn?: boolean }>;
-  empty: string;
-  ariaLabel: string;
-}) {
-  if (items.every((i) => i.value === 0)) {
-    return <EmptyInline>{empty}</EmptyInline>;
-  }
-  const peak = Math.max(...items.map((i) => i.value), 1);
-
-  return (
-    <div className="relative flex h-32 items-end gap-1.5 pt-5" role="img" aria-label={ariaLabel}>
-      <div className="pointer-events-none absolute inset-x-0 bottom-6 top-5" aria-hidden="true">
-        {[100, 75, 50, 25, 0].map((p) => (
-          <div
-            key={p}
-            className={cx(
-              'absolute inset-x-0 h-px bg-border-table',
-              p === 0 && 'bg-border-button-default',
-            )}
-            style={{ bottom: `${p}%` }}
-          />
-        ))}
-      </div>
-      {items.map((d) => {
-        const h = Math.round((d.value / peak) * 100);
-        return (
-          <div key={d.key} className="relative z-[1] flex h-full min-w-0 flex-1 flex-col items-center gap-1.5">
-            <div className="flex w-full flex-1 items-end justify-center">
-              <div
-                className={cx(
-                  'relative flex w-full max-w-[30px] items-start justify-center rounded-t bg-neutral-400 transition-[filter]',
-                  d.warn && 'bg-rose-500',
-                )}
-                style={{ height: `${Math.max(h, d.value > 0 ? 3 : 0)}%` }}
-                title={d.title}
-              >
-                {d.value > 0 && (
-                  <span className="absolute -top-[18px] text-[11px] tabular-nums text-text-tertiary">
-                    {d.text}
-                  </span>
-                )}
-              </div>
-            </div>
-            <div className="whitespace-nowrap text-[11px] tabular-nums text-text-tertiary">
-              {d.date.slice(5).replace('-', '/')}
-            </div>
-          </div>
-        );
-      })}
-    </div>
   );
 }
 

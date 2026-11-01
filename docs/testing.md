@@ -52,7 +52,7 @@ npm run test:watch      # watch
 npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitignore）
 ```
 
-当前 24 个用例文件：
+当前 41 个用例文件：
 
 | 用例 | 守住什么 |
 | --- | --- |
@@ -76,10 +76,27 @@ npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitig
 | `lib/skuBatches.test.ts` | SKU 行批量展开与坐标映射 |
 | `lib/unsaved-guard.test.ts` | 离开页面时的未保存拦截 |
 | `lib/zip.test.ts` | 浏览器内批量下载打包 |
-| `pages/admin/admin-modules.test.ts` | 后台目录具名导入 / 导出对账：相对导入的每个名字都必须在目标模块导出（防 `/admin` 整块白屏） |
+| `pages/admin/admin-modules.test.ts` | 后台目录具名导入 / 导出对账：相对导入的每个名字都必须在目标模块导出（防 `/admin` 整块白屏）。判据实现与 C 端共用 `src/test/namedImportAudit.ts` |
 | `pages/admin/channels/ChannelHeadersEditor.test.tsx` | 自定义请求头编辑器：系统托管的头（鉴权 / 协议 / `x-canvas-*` / `x-forwarded-*`）一律拒绝且文案点名，名称大小写不敏感去重，值里只允许可打印 ASCII 与制表符，名称 / 值 / 总大小上限拦截，**空行不算错误**（点了「添加请求头」还没填不该报错），只有名称的行保留（空值是合法请求头），疑似凭据的值渲染为密码框 |
 | `pages/admin/channels/ChannelModelHealthCell.test.tsx` | 「全部模型」视图的稳定性单元格：**无样本时显示「近 24 小时无调用」而不是 0%**、成功率三档（≥95% / ≥80% / 其余）、接近 100% 时不显示小数尾巴且 99.5% 不得进位成 100%、无健康数据时给可读文案 |
 | `pages/admin/channels/ChannelModelHealthPanel.test.tsx` | 线路健康面板：成功率语义分档、**无终态样本时显示「无样本」而不是 0%**（「没数据」≠「全失败」）、样本被截断时提示「按最近部分统计」、停用 / 协议未注册 / 冷却三个状态标记、最近样本错误码、空态 |
+| `pages/product-detail/product-detail-modules.test.ts` | C 端目录具名导入 / 导出对账（`product-detail/` / `components/` / `hooks/` / `lib/` / `context/`）：相对导入的每个名字都必须在目标模块导出（防功能页整块白屏） |
+| `pages/product-detail/detailUtils.test.ts` | 详情图结果归组与展示口径：**一次生成 = 一行**（页签角标按批次计而非任务数）、批内按 `batchIndex` 排序、原图取任务输入素材而非产出素材、生成中标记 `pending`（删除按钮据此置灰）、下载扩展名跟真实格式走（缺格式兜底 png 不猜 jpg）、时间格式化与非法值回落 |
+| `pages/product-kit/product-kit-modules.test.ts` | 商品主图目录具名导入 / 导出对账（`product-kit/` / `components/` / `hooks/` / `lib/` / `context/`）：入口文件与分层模块之间的每个具名导入都必须真实存在 |
+| `pages/viral-clone/viral-clone-modules.test.ts` | 爆款复刻目录具名导入 / 导出对账（`viral-clone/` / `components/` / `hooks/` / `lib/` / `context/`）：入口文件与分层模块之间的每个具名导入都必须真实存在 |
+| `pages/creative-image/creative-image-modules.test.ts` | 创意生图 / 自由创作目录具名导入 / 导出对账（`creative-image/` / `components/` / `hooks/` / `lib/` / `context/`）：入口文件与分层模块之间的每个具名导入都必须真实存在 |
+| `pages/product-sku/product-sku-modules.test.ts` | 商品 SKU 图目录具名导入 / 导出对账（`product-sku/` / `components/` / `hooks/` / `lib/` / `context/`）：入口文件与分层模块之间的每个具名导入都必须真实存在 |
+| `pages/local-redraw/local-redraw-modules.test.ts` | 局部重绘目录具名导入 / 导出对账（`local-redraw/` / `components/` / `hooks/` / `lib/` / `context/`）：页面与 `MaskPainter` 画布组件之间的每个相对导入都必须真实存在 |
+| `pages/background-remove/background-remove-modules.test.ts` | 一键抠图目录具名导入 / 导出对账（`background-remove/` / `components/` / `hooks/` / `lib/` / `context/`）：入口文件与分层模块之间的每个具名导入都必须真实存在 |
+| `pages/watermark-remove/watermark-remove-modules.test.ts` | 去除水印目录具名导入 / 导出对账（`watermark-remove/` / `components/` / `hooks/` / `lib/` / `context/`）：页面与 `WatermarkMaskEditor` 遮罩画布之间的每个相对导入都必须真实存在 |
+| `pages/product-retouch/product-retouch-modules.test.ts` | 产品精修目录具名导入 / 导出对账（`product-retouch/` / `components/` / `hooks/` / `lib/` / `context/`）：入口文件与分层模块之间的每个具名导入都必须真实存在 |
+| `pages/image-translate/image-translate-modules.test.ts` | 图片翻译目录具名导入 / 导出对账（`image-translate/` / `components/` / `hooks/` / `lib/` / `context/`）：入口文件与分层模块之间的每个具名导入都必须真实存在 |
+| `pages/image-expand/image-expand-modules.test.ts` | 智能扩图目录具名导入 / 导出对账（`image-expand/` / `components/` / `hooks/` / `lib/` / `context/`）：入口文件与分层模块之间的每个具名导入都必须真实存在 |
+| `pages/product-recolor/product-recolor-modules.test.ts` | 商品换色目录具名导入 / 导出对账（`product-recolor/` / `components/` / `hooks/` / `lib/` / `context/`）：入口文件与分层模块之间的每个具名导入都必须真实存在 |
+| `pages/rotate-angle/rotate-angle-modules.test.ts` | 旋转角度目录具名导入 / 导出对账（`rotate-angle/` / `components/` / `hooks/` / `lib/` / `context/`）：入口文件与分层模块之间的每个具名导入都必须真实存在 |
+| `pages/multi-image-fusion/multi-image-fusion-modules.test.ts` | 多图融合目录具名导入 / 导出对账（`multi-image-fusion/` / `components/` / `hooks/` / `lib/` / `context/`）：入口文件与分层模块之间的每个具名导入都必须真实存在 |
+| `pages/account/account-modules.test.ts` | 账户中心目录具名导入 / 导出对账（`account/` / `components/` / `hooks/` / `lib/` / `context/`）：入口文件与分层模块之间的每个具名导入都必须真实存在 |
+| `pages/checkout/checkout-modules.test.ts` | 结算页目录具名导入 / 导出对账（`checkout/` / `components/` / `hooks/` / `lib/` / `context/`）：入口文件与分层模块之间的每个具名导入都必须真实存在 |
 
 边界：Vitest 只跑 jsdom，不替代 L3/L4。真实后端、真实浏览器、真实库与磁盘的记录仍以 `smoke-*` / `verify-*` / Playwright 为准。Playwright 只收集 `tests/*.spec.ts`，Vitest 只收集 `src/**/*.test.*`，两边互不重叠。
 
@@ -91,7 +108,7 @@ npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitig
 
 | 脚本 | 断言什么 |
 | --- | --- |
-| `verify-capability-bootstrap.ts` | 能力定义能真实加载并通过 `assertCapabilityIntegrity`，且没有能力再声明本地图像实现 |
+| `verify-capability-bootstrap.ts` | 能力定义能真实加载并通过 `assertCapabilityIntegrity`，且没有能力再声明本地图像实现；平台 / 语言必须换成展示名进入提示词（`main_image` / `detail_image` / `hot_remake`）；9 个平台都必须声明主图规格（比例 / 画质 / 最短边）与详情图规格（宽度 / 画质），主图与爆款复刻在比例、画质与平台常规一致时补规格、冲突时不硬拗，详情图同理；图片翻译的目标语言同理 |
 | `verify-credit-deduction.ts` | 生成扣费 / 失败退款 / 余额一致性（同进程起 Nest 打真实 HTTP）：建任务即预留并落账单、余额不足不产生任务 |
 | `verify-credit-price.ts` | 后台改价 → `/capabilities` 与生成扣费同步生效 |
 | `verify-tool-contracts.ts` | 8 个修图工具的能力定义、默认值、hidden 字段、严格参数校验、标注解析、上传头与遮罩尺寸校验 |
@@ -183,7 +200,7 @@ cd test && npm run smoke:spawn  # 起网关跑联网冒烟
 
 运行：`cd frontend && npm run e2e`（默认 `playwright.admin.config.ts`，`ADMIN_UI` 可覆盖 baseURL）。后台套件先用 `admin-auth.setup.ts` 登录一次并落盘 `playwright/.auth/admin.json`，其余用例复用 `storageState`；这样不会因每条用例重复登录而撞上认证限流。需要验证访客或普通用户的用例会主动清空会话。
 
-后台用例的选择器契约（2026-10-30 换 BoardUI 后）：共享控件与页面关键节点挂 `data-testid="admin-*"` —— `admin-filter` / `admin-filter-actions` / `admin-filter-chips` / `admin-filter-chip` / `admin-table` / `admin-table-scroll` / `admin-table-row` / `admin-table-expanded` / `admin-drawer` / `admin-modal` / `admin-confirm-action` / `admin-toast` / `admin-panel` / `admin-page-loading` / `admin-sider` / `admin-sider-head` / `admin-nav-scroll` / `admin-bulk-bar` / `admin-asset-cell` / `admin-storage-card` / `admin-task-row` / `admin-role-save-bar`。表单控件没有 `id`，用 `aria-label` 配 `getByLabel`；React Aria 的下拉要「点触发器 → 点 `option`」，不能用 `selectOption`。**不要把 Tailwind 工具类或 `adm-*` 类写进断言** —— 前者随视觉调整变动，后者已随旧设计系统删除。
+后台用例的选择器契约（2026-11-01 换 shadcn 后；此前是 BoardUI）：共享控件与页面关键节点挂 `data-testid="admin-*"` —— `admin-filter` / `admin-filter-actions` / `admin-filter-chips` / `admin-filter-chip` / `admin-table` / `admin-table-scroll` / `admin-table-row` / `admin-table-expanded` / `admin-drawer` / `admin-modal` / `admin-confirm-action` / `admin-toast` / `admin-panel` / `admin-page-loading` / `admin-sider` / `admin-sider-head` / `admin-nav-scroll` / `admin-bulk-bar` / `admin-asset-cell` / `admin-storage-card` / `admin-task-row` / `admin-role-save-bar`。表单控件没有 `id`，用 `aria-label` 配 `getByLabel`；下拉（radix）要「点触发器 → 点 `menuitem` / `option`」，不能用 `selectOption`，且**触发器按角色区分**：`SelectBox` 是 `combobox`（无障碍名 = `aria-label`），`Dropdown*` 是 `button`（菜单名由 `DropdownPopover` 的 `aria-label` 给出，`role` 为 `menu`）。**不要把 Tailwind 工具类或 `adm-*` 类写进断言** —— 前者随视觉调整变动，后者已随旧设计系统删除。
 
 `frontend/e2e/` 下只有脚手架示例与一次性审计脚本，不是本项目用例目录。
 

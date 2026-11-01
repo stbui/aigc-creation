@@ -23,11 +23,10 @@ async function login(page: Page) {
   await ensureAdminLogin(page);
 }
 
-/** 单值下拉（RAC Select）：点触发器 → 选选项 */
+/** 单值下拉（shadcn Select）：点触发器 → 选选项 */
 async function pick(page: Page, label: string, option: string) {
-  // RAC Select 的触发器是 button，可见名由「当前值 + 字段名」组成；
-  // getByLabel 只覆盖原生表单控件，找不到它。
-  await page.getByRole('button', { name: new RegExp(`${label}$`) }).first().click();
+  // 触发器是 combobox，无障碍名就是 SelectBox 的 aria-label（字段名本身）。
+  await page.getByRole('combobox', { name: label, exact: true }).first().click();
   await page.getByRole('option', { name: option, exact: true }).click();
 }
 
@@ -49,11 +48,11 @@ test.describe('营销中心', () => {
 
     const panel = page.getByRole('dialog', { name: '新建优惠券' });
     await expect(panel).toBeVisible();
-    // 关键字段。类型是 RAC Select 触发器，不是原生输入框。
+    // 关键字段。类型是下拉触发器（combobox），不是原生输入框。
     for (const label of ['券码', '券名称', '面额', '生效时间', '失效时间']) {
       await expect(panel.getByLabel(label)).toBeVisible();
     }
-    await expect(panel.getByRole('button', { name: /类型$/ })).toBeVisible();
+    await expect(panel.getByRole('combobox', { name: '类型', exact: true })).toBeVisible();
   });
 
   test('折扣类型的面额标签随之变化', async ({ page }) => {

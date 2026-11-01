@@ -1,14 +1,15 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { ChannelModelHealthCell, formatRate, healthTone } from '../ChannelModelHealthCell';
+import { ChannelModelHealthCell } from '../ChannelModelHealthCell';
+import { formatRate, healthTone } from '../utils';
 import type { ChannelModelHealthRowView } from '../../../../types/model';
 
 /**
  * 稳定性单元格的展示口径。
  *
  * 锁住三条不变量：
- *   1. **「没调用过」不算不健康** —— 无样本时显示「近 24 小时无调用」，
- *      而不是 0%（后者会被读成「这条线全挂了」）；
+ *   1. **「没调用过」不算不健康** —— 无样本时显示「无调用」（完整说明
+ *      「近 24 小时」在 tooltip），而不是 0%（后者会被读成「这条线全挂了」）；
  *   2. 成功率分档：≥95% 成功 / ≥80% 警告 / 其余危险；
  *   3. 接近 100% 时不显示小数尾巴（99.5% 而不是 99.50%）。
  */
@@ -84,9 +85,9 @@ describe('formatRate', () => {
 });
 
 describe('ChannelModelHealthCell', () => {
-  it('无样本时显示「近 24 小时无调用」而不是 0%', () => {
+  it('无样本时显示「无调用」而不是 0%', () => {
     render(<ChannelModelHealthCell health={health()} />);
-    expect(screen.getByText('近 24 小时无调用')).toBeTruthy();
+    expect(screen.getByText('无调用')).toBeTruthy();
   });
 
   it('有样本时显示成功率与次数', () => {
@@ -114,6 +115,6 @@ describe('ChannelModelHealthCell', () => {
 
   it('没有任何健康数据时也给出可读文案', () => {
     render(<ChannelModelHealthCell />);
-    expect(screen.getByText('近 24 小时无调用')).toBeTruthy();
+    expect(screen.getByText('无调用')).toBeTruthy();
   });
 });

@@ -25,6 +25,10 @@ export { useGenerateError } from '../../hooks/useGenerateError';
 export { useResultGallery, type GalleryItem } from '../../hooks/useResultGallery';
 /** 实时积分单价 (后台可调价) */
 export { useCreditCost } from '../../hooks/useCreditLabel';
+/** 登录态: 判断是否已登录 (访客点提交先走登录弹窗) */
+export { useAuth } from '../../context/AuthContext';
+/** 余额变更通知: 扣费 / 退款后通知积分上下文刷新 */
+export { notifyCreditsChanged } from '../../context/CreditsContext';
 
 /** 右侧面板页签 */
 export type RightTab = 'demo' | 'results';

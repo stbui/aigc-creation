@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, RefreshCw } from 'lucide-react';
 import { adminChannelsApi } from './api';
-import { Button, ConfirmAction, Notice, TextInput } from './components';
+import { ConfirmAction, Notice, TextInput } from './components';
 import { useToast } from './hooks';
 import { ChannelModelFormDialog } from './ChannelModelFormDialog';
 import { ChannelModelRepriceDialog } from './ChannelModelRepriceDialog';
@@ -9,15 +8,8 @@ import { ChannelModelTable } from './ChannelModelTable';
 import { ChannelOrderDialog } from './ChannelOrderDialog';
 import { ChannelUpstreamDialog } from './ChannelUpstreamDialog';
 import { Field } from './ChannelField';
-import {
-  EMPTY_DRAFT,
-  EMPTY_TIER,
-  parseSelector,
-  priceOf,
-  textToTags,
-  toDraft,
-  type ModelDraft,
-} from './modelDraft';
+import { EMPTY_MODEL_DRAFT, EMPTY_TIER, type ModelDraft } from './constants';
+import { parseSelector, priceOf, textToTags, toModelDraft } from './utils';
 import { useChannelModelHealth, useChannelModels, useProtocolCatalog } from './useChannelModels';
 import type {
   AdminChannelModelView,
@@ -41,7 +33,7 @@ import type {
  *
  * ## 模块划分
  *
- * - `modelDraft.ts`：草稿类型、常量与纯转换（选择器 / 标签 / 价格）；
+ * - `constants.ts` / `utils.ts`：草稿类型与默认值、纯转换（选择器 / 标签 / 价格）；
  * - `useChannelModels.ts`：清单、健康、协议目录三份数据；
  * - `ChannelModelTable` / `ChannelModelFormDialog` / `ChannelUpstreamDialog`：三块 UI；
  * - 本文件只保留编排与写操作（保存、启停、测试、导入、删除）。
@@ -68,7 +60,7 @@ export function ChannelModelManager({
 
   const [editing, setEditing] = useState<AdminChannelModelView | null>(null);
   const [creating, setCreating] = useState(false);
-  const [draft, setDraft] = useState<ModelDraft>(EMPTY_DRAFT);
+  const [draft, setDraft] = useState<ModelDraft>(EMPTY_MODEL_DRAFT);
   const [saving, setSaving] = useState(false);
 
   const [upstream, setUpstream] = useState<UpstreamModelPreview[] | null>(null);
@@ -119,7 +111,7 @@ export function ChannelModelManager({
     if (!focusModelId || !models) return;
     const target = models.find((model) => model.id === focusModelId);
     if (target) {
-      setDraft(toDraft(target));
+      setDraft(toModelDraft(target));
       setEditing(target);
       setCreating(false);
       setTestResult(null);
@@ -142,7 +134,7 @@ export function ChannelModelManager({
   );
 
   const openCreate = () => {
-    const next = { ...EMPTY_DRAFT, tiers: [{ ...EMPTY_TIER }] };
+    const next = { ...EMPTY_MODEL_DRAFT, tiers: [{ ...EMPTY_TIER }] };
     setDraft(next);
     setEditing(null);
     setCreating(true);
@@ -150,7 +142,7 @@ export function ChannelModelManager({
   };
 
   const openEdit = (model: AdminChannelModelView) => {
-    setDraft(toDraft(model));
+    setDraft(toModelDraft(model));
     setEditing(model);
     setCreating(false);
     setTestResult(null);
@@ -168,7 +160,7 @@ export function ChannelModelManager({
     let index = 2;
     while (existing.has(modelKey)) modelKey = `${model.modelKey}-copy-${index++}`;
     setDraft({
-      ...toDraft(model),
+      ...toModelDraft(model),
       modelKey,
       displayName: model.displayName ? `${model.displayName} 副本` : '',
       enabled: false,
@@ -402,23 +394,6 @@ export function ChannelModelManager({
   return (
     <>
       <div className="flex flex-col gap-4">
-        {formOpen === false && (
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button
-              variant="secondary"
-              size="small"
-              leadingIcon={RefreshCw}
-              disabled={fetching || !writable}
-              onClick={() => void fetchUpstream()}
-            >
-              {fetching ? '拉取中…' : '拉取上游目录'}
-            </Button>
-            <Button variant="primary" size="small" leadingIcon={Plus} disabled={!writable} onClick={openCreate}>
-              新建模型
-            </Button>
-          </div>
-        )}
-
         <ChannelModelFormDialog
           open={formOpen}
           editing={editing}
@@ -483,6 +458,9 @@ export function ChannelModelManager({
               setBatchDeleteOpen(true);
             }}
             onOpenReprice={() => setRepriceOpen(true)}
+            onOpenCreate={openCreate}
+            onFetchUpstream={() => void fetchUpstream()}
+            fetching={fetching}
           />
 
           <ConfirmAction

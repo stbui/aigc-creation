@@ -10,7 +10,7 @@
 
 import type { CapabilityPlugin } from '../capability-plugin.type';
 import { editImageIntent } from '../model-mapping';
-import { LANGUAGES, QUALITY_OPTIONS } from './param-options';
+import { LANGUAGES, QUALITY_OPTIONS, optionLabel } from './param-options';
 
 export const ImageTranslate: CapabilityPlugin = {
   id: 'image_translate',
@@ -28,7 +28,7 @@ export const ImageTranslate: CapabilityPlugin = {
     { key: 'targetLanguage', label: '目标语言（参考站字段）', type: 'enum', default: 'zh-CN', options: LANGUAGES, hidden: true },
   ],
   buildPrompt: (p) =>
-    `图片内文字翻译为 ${p.targetLanguage || p.targetLang || 'zh-CN'}：保持原版式、字号与颜色不变，` +
+    `图片内文字翻译为 ${optionLabel(LANGUAGES, p.targetLanguage || p.targetLang) || '简体中文'}：保持原版式、字号与颜色不变，` +
     `只替换文字内容${p.protectSubject ? '，商品主体像素不得改动' : ''}。` +
     `不得改变画幅、构图、商品与背景，不得新增或删除画面元素。`,
   modality: 'image',

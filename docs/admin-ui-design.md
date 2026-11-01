@@ -2,14 +2,14 @@
 
 后台管理端 `/admin` 的视觉与布局规格：令牌、外壳几何、通用结构与页面原型。功能与接口见 `docs/admin-console-design.md` 与 `docs/admin-detailed-design.md`。
 
-> **2026-10-30 已整站替换为 BoardUI**，方案与实施记录见 §7。第 0–6 节是旧外壳的视觉规格，其中 `adm-*` 类名与 antd 组件已不存在于代码 —— 现值以 §7 与上表「事实源」为准。
+> **2026-11-01 已整站替换为 shadcn/ui**（含外壳、35 页、全部浮层），记录见 §8；§7 的 BoardUI 迁移是它的前一站，保留为历史。第 0–6 节是更早外壳的视觉规格，其中 `adm-*` 类名与 antd 组件已不存在于代码 —— 现值以下表「事实源」为准。
 
 | 项 | 事实源 |
 | --- | --- |
 | 外壳组件 | `frontend/src/admin-ui/shell/AdminBoardLayout.tsx` |
 | 菜单数据 | `frontend/src/components/admin/adminNav.ts` |
-| 通用结构 | `frontend/src/admin-ui/widgets/AdminChrome.tsx`（经 `components/admin/PageHeader.tsx` / `AdminWidgets.tsx` 再导出） |
-| 基础件 / 表单控件 / 数据表 | `frontend/src/admin-ui/primitives/` · `controls/` · `primitives/DataTable.tsx` |
+| 通用结构 | `frontend/src/admin-ui/widgets/AdminChrome.tsx`（经 `components/admin/PageHeader.tsx` / `AdminWidgets.tsx` 再导出）→ 实现在 `admin-ui/shadcn/kit` |
+| 基础件 / 表单控件 / 数据表 | `frontend/src/admin-ui/components/ui/`（shadcn 源码）· `admin-ui/shadcn`（新页面）· `admin-ui/shadcn/kit`（存量页） |
 | 样式 | `global.css` 的 `:root` 令牌 + `frontend/src/styles/boardui.css`（后台 Tailwind 入口） |
 | 跨页微规格 | `docs/typography.md` |
 
@@ -45,13 +45,7 @@
 
 ### 1.2 后台专属 token
 
-在 `global.css` 的后台区块内定义，不复用到 C 端：
-
-| token | 值 | 用途 |
-| --- | --- | --- |
-| `--adm-page-max` | `1600px` | 内容区最大宽度，居中 |
-| `--adm-hairline` | `color-mix(border 72%, transparent)` | 表格与卡片的分隔线 |
-| `--adm-card-shadow` | `0 1px 2px (text-strong 4%)` | 卡片唯一投影 |
+**当前不存在后台专属 token**。旧外壳的 `--adm-page-max`（内容区限宽）/ `--adm-hairline` / `--adm-card-shadow` 已随 antd 后台一并删除，后台与 C 端共用 `global.css` 的 `:root` 语义 token；间距、描边、投影由 Tailwind 工具类与 vendor 组件承担。
 
 ### 1.3 禁令
 
@@ -73,7 +67,7 @@ Sider 232px（折叠 60px，≤1280px 自动折叠；sticky，h-screen）
 ├── 导航：8 个分组（总览 / 运营 / 内容 / 交易 / 财务 / 系统 / 模型 / 数据安全），按权限点过滤
 └── 底：环境标识 + 告警铃 + 密度开关 + 用户菜单
 
-Content（.adm-content）：padding 18 / 26 / 56，子块统一限宽 1600 居中，横向滚动限在该区内
+Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不设统一限宽），横向滚动限在该区内
 ```
 
 旧版骨架（历史）：
@@ -120,7 +114,7 @@ Body
 
 ### 2.4 Content
 
-`padding: 24px 28px 40px`，背景 `--page-bg`；直接子块（页头 / 筛选条 / 面板 / 指标卡 / 批量条 / 提示条）统一 `max-width: var(--adm-page-max)` 居中。`id="adm-main"`、`tabIndex={-1}`，配合顶部「跳到主要内容」跳链。
+背景 `--page-bg`；直接子块（页头 / 筛选条 / 面板 / 指标卡 / 批量条 / 提示条）铺满内容区，不做统一限宽 —— 后台以宽表与「列表 + 详情」双栏为主，限宽只会挤压表格。需要窄版的地方由页面自己约束（`Panel` 的 `isNarrow`、`SaveBar` 的 `narrow`，宽 760px 左对齐）。`id="adm-main"`、`tabIndex={-1}`，配合顶部「跳到主要内容」跳链。
 
 ### 2.5 断点
 
@@ -370,7 +364,7 @@ Body
 | 值班条 | `admin-ui/widgets/DutyStrip.tsx`：100 刻度 + 四计数 + 「接手最早异常」，落在概览首屏；`DutyContext` 从外壳移到概览路由，其余 34 页不再轮询 |
 | 密度 | `admin-ui/lib/density.ts` 的 `DensityContext`：外壳左栏底部开关写 `localStorage`，`AdminDataTable` 读它决定行高（`h-9` / `h-11`）；表格仍可用 `density` prop 覆盖 |
 | 测试锚点 | 共享控件与页面关键节点统一挂 `data-testid="admin-*"`（`admin-filter` / `admin-filter-chip` / `admin-table` / `admin-table-row` / `admin-table-expanded` / `admin-drawer` / `admin-modal` / `admin-confirm-action` / `admin-toast` / `admin-sider` / `admin-panel` / `admin-bulk-bar` / `admin-asset-cell` / `admin-storage-card` / `admin-task-row`）；表单控件用 `aria-label` 而非 `id`，e2e 一律 `getByLabel` / `getByTestId`，不追 Tailwind 工具类 |
-| 旧样式清理 | `global.css` 的 `.adm-*`：364 条选择器 → 30 条（外壳骨架 `adm-layout` / `adm-content` / `adm-skip-link`、值班塔 `adm-tower*` / `adm-dot` / `adm-empty-inline`、限宽令牌 `--adm-page-max`）。同时删掉只服务 antd 后台的 4 个令牌（`--brand-bg-tint` / `--brand-border-soft` / `--info-text` / `--info-border`）与 3 个无人引用的 `@keyframes` |
+| 旧样式清理 | `global.css` 的 `.adm-*`：364 条选择器 → 30 条（外壳骨架 `adm-layout` / `adm-content` / `adm-skip-link`、值班塔 `adm-tower*` / `adm-dot` / `adm-empty-inline`）。同时删掉只服务 antd 后台的 4 个令牌（`--brand-bg-tint` / `--brand-border-soft` / `--info-text` / `--info-border`）与 3 个无人引用的 `@keyframes`。内容区限宽令牌 `--adm-page-max` 与 `.adm-content > :where(*)` 限宽规则此后删除，所有后台页铺满可用宽度 |
 
 未落地（按 §7.5 继续）：
 
@@ -388,13 +382,12 @@ Body
 #### 窄版面板与保存条
 
 - 表单型页面（系统设置、AI 标识、营销规则）的 `Panel isNarrow` 限宽 760px，
-  **一律左对齐**。外壳的 `.adm-content > :where(*)` 会把直接子块居中，
-  若窄面板跟着居中，同页两块面板的左边缘会差出 190px 以上。
-  实现上用 `inline style={{ maxWidth: 760, marginInline: 0 }}`，不要用
-  `max-w-[760px]` 工具类 —— 宽度会被外壳规则按加载顺序盖掉。
+  **一律左对齐**；内容区不限宽（`.adm-content` 不做统一限宽），窄面板收窄后
+  自然贴左，与同页其它内容区左边缘齐平。
+  实现上用 `inline style={{ maxWidth: 760 }}`；不要用 `max-w-[760px]` 工具类
+  拼 `mx-auto` —— 居中会把同页两块面板的左边缘拉开。
 - 底部保存条用 `SaveBar narrow`（`admin-ui/primitives`），宽度与左边缘必须和
   上方面板严格一致；宽版页面（AI 标识的双栏布局）用 `<SaveBar>`，铺满内容区。
-- 回归用例：`tests/admin-layout.spec.ts` 的「窄版表单页的面板与保存条左对齐且同宽」。
 
 #### 筛选条
 
@@ -428,3 +421,81 @@ Body
   spinner，否则两套箭头叠在圆角边框上。
 - 空表默认带 `Inbox` 图标（`AdminDataTable` 内置），不要只留一行小字。
 - 不可手动触发的定时任务在行尾标「定时执行」，不要留空白。
+
+## 8. 已实施：shadcn/ui 全量替换（2026-11-01）
+
+> 状态：**已完成**。外壳、35 个页面、全部浮层与提示都渲染自 shadcn/ui 组件；
+> `vendor/boardui/components/**` 的引用**归零**，`admin-ui/controls`、`primitives`、
+> `primitives/DataTable|Dialog|Drawer`、`widgets/AdminChrome` 全部退化为转发层。
+
+### 8.1 为什么要换
+
+§7 的 BoardUI 迁移解决了「离开 antd」，但没解决「观感不统一」：BoardUI 免费层
+缺 Drawer / Toast / Confirm / Empty / Skeleton / Result / Descriptions / Steps，
+这些由自绘件补足，圆角 10 / 12、描边两套色、阴影三档各自成体系。页面越多，
+「这一块像另一个产品」越明显。shadcn/ui 的价值是**源码自持 + 一套语义令牌**，
+缺什么就补什么，补出来的东西和原生的属于同一套。
+
+### 8.2 三层结构与各自的职责
+
+| 层 | 路径 | 谁用 |
+| --- | --- | --- |
+| shadcn 原始件 | `admin-ui/components/ui/` | **只允许** `admin-ui/shadcn` 与 `shadcn/kit` 引用；页面不直连 |
+| 新设计出口 | `admin-ui/shadcn/`（`layout` / `forms` / `shadcn`） | 新写的后台页面 |
+| 换皮层 | `admin-ui/shadcn/kit/` | 存量 35 页；导出件与旧 BoardUI 版**同名同签名** |
+
+换皮层的存在意义只有一个：**整页换观感 = 换一个 re-export 文件**。
+`pages/admin/channels/components.ts` 是第一个这样做的模块（4400 行、17 个文件，
+业务代码零改动）。2026-11-01 之后 `admin-ui/controls` / `primitives` /
+`widgets/AdminChrome` / `components/admin/PageHeader|AdminWidgets` 也变成了这类
+re-export 文件 —— 35 页的 `import` 一行没改，渲染整体换掉。
+
+### 8.3 令牌桥接
+
+`admin-ui/styles/shadcn-theme.css` 只做映射，不引入新颜色：
+
+- `--background` / `--card` / `--popover` → `--card-bg`；
+- `--foreground` → `--text-strong`；`--muted-foreground` → `--color-text-tertiary`；
+- `--primary` → `--brand`（#5546d8）；`--accent` → `--brand-bg`（悬停淡底，**不是**品牌强调色）；
+- `--destructive` → `--danger-text`；`--border` 直接沿用 `global.css` 的 `--border`；
+- 业务语义色 `--status-success|warn|danger-soft|text` → `global.css` 里对应的 `--success-*` / `--warn-*` / `--danger-*`。
+
+两条必须记住的实现约束：
+
+1. **`@theme inline`，不是 `@theme`**。普通 `@theme` 会把 `--color-primary` 写进
+   `:root`，覆盖 C 端同名变量（`--color-border` 两处差 3 个色阶）。`inline` 不产出
+   `:root` 声明，工具类直接内联 `var(--primary)`。
+2. **没有 preflight**，裸 `border` 退回 `currentColor`，所以 `[data-slot]` 的描边
+   兜底写在 `@layer base`（unlayered 会压过所有 `@layer`，`border-transparent` 就失效）。
+
+### 8.4 两套类名词汇并存（刻意，不是遗漏）
+
+存量页面的 markup 里还有约 840 处 BoardUI 的颜色工具类
+（`text-text-tertiary` 261 处、`border-border-table` 78 处、
+`bg-background-secondary-default` 42 处 …）。它们由 `styles/boardui.css` 里
+vendor `theme.css` 的 token 提供，值是**同一套色**，所以视觉上没有第二套灰。
+
+- 新代码**只写 shadcn 类**：`bg-card` / `text-muted-foreground` / `border-border` / `bg-accent`。
+- 不做批量重命名：`--color-text-secondary` 与 `--color-text-tertiary` 两档灰在
+  shadcn 里只有 `--muted-foreground` 一个对应名字，硬换会把两档塌成一档，
+  「次要信息」与「辅助信息」的层级就没了。逐页替换时按语义挑 `text-secondary-foreground`
+  或 `text-muted-foreground`，一次一页。
+
+### 8.5 浮层与高危确认
+
+| 场景 | 组件 | 形态 |
+| --- | --- | --- |
+| 不离开当前页看完一段内容（导入结果、调价） | `ModalDialog` | 居中弹窗，radix 管焦点锁定与 Esc |
+| 从列表进入一条记录的完整上下文（渠道新建 / 编辑） | `Drawer` | 右侧抽屉，宽度可配 |
+| 页面内高危动作（删除渠道、退款） | `ConfirmAction` | **贴底操作条，不是弹层** —— 运营要能一边看被影响的行一边确认后果 |
+| 跨页面复用的二次确认（离开未保存页、批量动作） | `useConfirm()` | shadcn Dialog；需要原因时聚焦输入框，原因写入审计 |
+
+`ConfirmAction` 曾经被误改成 `AlertDialog`，是违反产品决策的：高危动作不许弹阻塞层。
+
+### 8.6 验收方式
+
+- `npx tsc --noEmit`：后台 0 错；
+- `npx vitest run src/pages/admin src/admin-ui src/components/admin`：62 条全过
+  （`DataTable.density` 守密度、`admin-modules` 守导出对账）；
+- `node scripts/sweep-admin.mjs`：35 条路由逐页打开，控制台错误 0；
+- `node scripts/shot-admin.mjs`：概览 / 设置 / 渠道 / 用户 / 订单 / 积分 / 告警截图落 `/tmp`。

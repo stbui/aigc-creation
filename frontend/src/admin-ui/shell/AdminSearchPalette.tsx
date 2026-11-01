@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Dialog, Modal, ModalOverlay } from 'react-aria-components';
+import { Dialog, DialogContent, DialogTitle } from '../components/ui';
 import { Search } from 'lucide-react';
 import { adminSearchApi } from '../../lib/api';
 import type { AdminSearchGroup } from '../../types/api';
-import { cx } from '../lib/cn';
+import { cn } from '../lib/cn';
 
 /**
  * 后台全局搜索面板。
@@ -116,11 +116,6 @@ export function AdminSearchPalette({
   );
 
   const onKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      onOpenChange(false);
-      return;
-    }
     if (hits.length === 0) return;
     if (event.key === 'ArrowDown') {
       event.preventDefault();
@@ -135,111 +130,114 @@ export function AdminSearchPalette({
     }
   };
 
-  const activeHit = hits[activeIndex];
   let hitCursor = 0;
 
   return (
-    <ModalOverlay
-      isOpen={open}
-      onOpenChange={onOpenChange}
-      isDismissable
-      className="bui-scope fixed inset-0 z-[1050] flex items-start justify-center bg-neutral-950/40 px-6 pt-[12vh]"
-    >
-      <Modal className="w-full max-w-[640px] outline-none">
-        <Dialog aria-label="后台全局搜索" className="outline-none">
-        <div
-          className="overflow-hidden rounded-2xl border border-border-table bg-white shadow-2xl"
-          onKeyDown={onKeyDown}
-        >
-          <div className="flex items-center gap-2 border-b border-border-table px-4 py-3">
-            <Search className="size-4 shrink-0 text-text-tertiary" aria-hidden />
-            <input
-              ref={inputRef}
-              value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
-              placeholder="搜索用户 / 订单 / 工单 / 任务 / 素材"
-              aria-label="后台全局搜索"
-              className="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-placeholder"
-            />
-            <kbd className="rounded border border-border-table bg-background-secondary-default px-1.5 py-0.5 text-[10px] text-text-tertiary">
-              Esc
-            </kbd>
-          </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        data-testid="admin-search-palette"
+        showCloseButton={false}
+        aria-describedby={undefined}
+        className="top-[12vh] w-full max-w-[640px] translate-y-0 gap-0 overflow-hidden p-0"
+        onKeyDown={onKeyDown}
+      >
+        <DialogTitle className="sr-only">后台全局搜索</DialogTitle>
 
-          <div className="max-h-[52vh] overflow-y-auto p-2">
-            {error && (
-              <div className="flex items-center justify-between gap-2 rounded-lg bg-rose-50 px-3 py-2 text-xs text-rose-700">
-                <span className="min-w-0 truncate">{error}</span>
-                <button type="button" className="shrink-0 underline" onClick={() => setRetryNonce((n) => n + 1)}>
-                  重试
-                </button>
-              </div>
-            )}
-
-            {!error && q.length < 2 && (
-              <p className="px-3 py-8 text-center text-xs text-text-tertiary">
-                输入至少 2 个字符开始搜索
-              </p>
-            )}
-
-            {!error && q.length >= 2 && loading && hits.length === 0 && (
-              <p className="px-3 py-8 text-center text-xs text-text-tertiary">搜索中…</p>
-            )}
-
-            {!error && q.length >= 2 && !loading && hits.length === 0 && (
-              <p className="px-3 py-8 text-center text-xs text-text-tertiary">
-                没有匹配「{q}」的结果
-              </p>
-            )}
-
-            {groups.map((group) => {
-              const groupHits = group.items;
-              return (
-                <div key={group.key} className="mb-1">
-                  <div className="flex items-center justify-between px-3 py-1.5 text-[11px] text-text-tertiary">
-                    <span>{group.label}</span>
-                    <span>{group.total > groupHits.length ? `前 ${groupHits.length} / 共 ${group.total}` : group.total}</span>
-                  </div>
-                  {groupHits.map((item) => {
-                    const index = hitCursor++;
-                    const isActive = index === activeIndex;
-                    return (
-                      <button
-                        key={`${group.key}-${item.id}`}
-                        ref={isActive ? activeItemRef : undefined}
-                        type="button"
-                        onMouseEnter={() => setActiveIndex(index)}
-                        onClick={() => go(item.link)}
-                        className={cx(
-                          'flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left',
-                          isActive ? 'bg-accent-100' : 'hover:bg-background-secondary-default',
-                        )}
-                      >
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm text-text-primary">{item.title}</span>
-                          <span className="mt-0.5 block truncate text-xs text-text-tertiary">
-                            {item.subtitle}
-                          </span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="flex items-center justify-between border-t border-border-table px-4 py-2 text-[11px] text-text-tertiary">
-            <span>{q.length >= 2 ? `共 ${total} 条结果` : '支持用户、订单、工单、任务、素材'}</span>
-            <span className="flex items-center gap-2">
-              <span>↑↓ 选择</span>
-              <span>Enter 打开</span>
-              <span>Esc 关闭</span>
-            </span>
-          </div>
+        <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+          <Search className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          <input
+            ref={inputRef}
+            value={keyword}
+            onChange={(event) => setKeyword(event.target.value)}
+            placeholder="搜索用户 / 订单 / 工单 / 任务 / 素材"
+            aria-label="后台全局搜索"
+            className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/70"
+          />
+          <kbd className="rounded border border-border bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+            Esc
+          </kbd>
         </div>
-        </Dialog>
-      </Modal>
-    </ModalOverlay>
+
+        <div className="max-h-[52vh] overflow-y-auto p-2">
+          {error && (
+            <div className="flex items-center justify-between gap-2 rounded-md bg-danger-soft px-3 py-2 text-xs text-danger-text">
+              <span className="min-w-0 truncate">{error}</span>
+              <button
+                type="button"
+                className="shrink-0 underline"
+                onClick={() => setRetryNonce((n) => n + 1)}
+              >
+                重试
+              </button>
+            </div>
+          )}
+
+          {!error && q.length < 2 && (
+            <p className="px-3 py-8 text-center text-xs text-muted-foreground">
+              输入至少 2 个字符开始搜索
+            </p>
+          )}
+
+          {!error && q.length >= 2 && loading && hits.length === 0 && (
+            <p className="px-3 py-8 text-center text-xs text-muted-foreground">搜索中…</p>
+          )}
+
+          {!error && q.length >= 2 && !loading && hits.length === 0 && (
+            <p className="px-3 py-8 text-center text-xs text-muted-foreground">
+              没有匹配「{q}」的结果
+            </p>
+          )}
+
+          {groups.map((group) => {
+            const groupHits = group.items;
+            return (
+              <div key={group.key} className="mb-1">
+                <div className="flex items-center justify-between px-3 py-1.5 text-[11px] text-muted-foreground">
+                  <span>{group.label}</span>
+                  <span>
+                    {group.total > groupHits.length
+                      ? `前 ${groupHits.length} / 共 ${group.total}`
+                      : group.total}
+                  </span>
+                </div>
+                {groupHits.map((item) => {
+                  const index = hitCursor++;
+                  const isActive = index === activeIndex;
+                  return (
+                    <button
+                      key={`${group.key}-${item.id}`}
+                      ref={isActive ? activeItemRef : undefined}
+                      type="button"
+                      onMouseEnter={() => setActiveIndex(index)}
+                      onClick={() => go(item.link)}
+                      className={cn(
+                        'flex w-full items-center gap-2 rounded-md px-3 py-2 text-left',
+                        isActive ? 'bg-accent' : 'hover:bg-muted',
+                      )}
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm text-foreground">{item.title}</span>
+                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                          {item.subtitle}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="flex items-center justify-between border-t border-border px-4 py-2 text-[11px] text-muted-foreground">
+          <span>{q.length >= 2 ? `共 ${total} 条结果` : '支持用户、订单、工单、任务、素材'}</span>
+          <span className="flex items-center gap-2">
+            <span>↑↓ 选择</span>
+            <span>Enter 打开</span>
+            <span>Esc 关闭</span>
+          </span>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

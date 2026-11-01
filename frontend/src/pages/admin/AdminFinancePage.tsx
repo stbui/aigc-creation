@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Button } from '../../vendor/boardui/components/base/buttons/button';
+import { Button } from '../../admin-ui/shadcn/kit';
 import { adminAnalyticsApi } from '../../lib/api';
 import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
 import { useAdminResource, AdminStaleError } from '../../components/admin/AdminWidgets';

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { RefreshCw } from 'lucide-react';
-import { Button } from '../../vendor/boardui/components/base/buttons/button';
+import { Button } from '../../admin-ui/shadcn/kit';
 import { adminPaymentChannelsApi } from '../../lib/api';
 import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
 import { Notice } from '../../admin-ui/primitives';

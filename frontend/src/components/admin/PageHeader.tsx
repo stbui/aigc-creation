@@ -4,13 +4,12 @@ import { Panel as BoardUIPanel } from '../../admin-ui/primitives';
 /**
  * 后台页面骨架控件。
  *
- * 29 个页面都从这里取页头、筛选条、面板、统计卡、状态标签。渲染层只有一份：
- * `admin-ui/widgets/AdminChrome`（BoardUI）。
+ * 35 个页面都从这里取页头、筛选条、面板、统计卡、状态标签。渲染层只有一份：
+ * `admin-ui/widgets/AdminChrome`，实现在 `admin-ui/shadcn/kit`（shadcn）。
  *
- * 2026-10-30：此前这里按 `VITE_ADMIN_UI` 在 BoardUI 与 antd 两份实现之间分流。
- * 29 页全部迁完后那份 antd 实现已无调用方（纯 C 决策不允许交付「页面是新的、
- * 外壳是旧的」中间态），随 P4 一并删除，切换开关 `VITE_ADMIN_UI` 同时下线。
- * 页面 import 不变，签名不变。
+ * 2026-11-01：整站换 shadcn。这一层保持**导出名与签名不变**，只把实现从
+ * BoardUI 换成 `shadcn/kit` —— 页面 import 与业务代码一行不改。此后不再存在
+ * 「页面是新的、外壳是旧的」中间态，也不需要任何切换开关。
  */
 export const PageHeader = boardui.PageHeader;
 export const FilterBar = boardui.FilterBar;

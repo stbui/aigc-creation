@@ -335,6 +335,12 @@ export function AllChannelModelsPanel({
             <Button
               variant={row.enabled ? 'dangerGhost' : 'ghost'}
               size="xs"
+              // 与按渠道视图一致：压平 ghost 自带的淡紫底，破坏性只靠红字表达
+              className={
+                row.enabled
+                  ? '!bg-transparent hover:!bg-rose-50'
+                  : '!bg-transparent hover:!bg-background-secondary-default'
+              }
               leadingIcon={Power}
               disabled={!writable || togglingId === row.id || (togglingId !== null && togglingId !== row.id)}
               onClick={() => void toggleEnabled(row)}

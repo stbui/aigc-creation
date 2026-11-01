@@ -151,10 +151,10 @@ test.describe('后台布局', () => {
       .first()
       .getByRole('button', { name: '更多' })
       .click();
-    // Dropdown 基于 DialogTrigger，动作是普通 button 而不是 menuitem
-    const menu = page.getByRole('dialog', { name: '更多操作' });
+    // radix DropdownMenu：弹层是 role=menu，动作是 menuitem（2026-11-01 换 shadcn）
+    const menu = page.getByRole('menu', { name: '更多操作' });
     await expect(menu).toBeVisible();
-    expect(await menu.getByRole('button').count()).toBeGreaterThanOrEqual(2);
+    expect(await menu.getByRole('menuitem').count()).toBeGreaterThanOrEqual(2);
   });
 
   test('审计详情在行内展开，不使用抽屉或确认弹窗', async ({ page }) => {

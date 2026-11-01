@@ -18,10 +18,13 @@ import {
   AdminMembershipPlansService,
 } from './membership-plans.controller';
 import { AdminRetentionController } from './retention.controller';
-import { AdminReconciliationController } from './reconciliation.controller';
-import { AdminReconciliationService } from './reconciliation.service';
 import { AdminInvoicesController } from './invoices-admin.controller';
-import { AdminPaymentChannelsController } from './payment-channels.controller';
+import {
+  AdminPaymentConfigController,
+  AdminPaymentOrdersController,
+  AdminPaymentReconciliationController,
+} from './payments/payment-admin.controller';
+import { AdminPaymentsService } from './payments/payment-admin.service';
 import { PaymentsModule } from '../payments/payments.module';
 import { InvoicesModule } from '../invoices/invoices.module';
 import { LegalModule } from '../legal/legal.module';
@@ -87,7 +90,7 @@ import { SchedulerService } from './scheduler.service';
     MembershipModule,
     MarketingCoreModule,
     GenerateModule,
-    // 支付渠道状态页: 通道清单与凭据判定直接复用 PaymentProviderFactory,
+    // 支付充值页: 渠道配置、支付订单、对账全部复用支付域服务,
     // 不在后台另写一份「哪些通道可用」的规则 (两处判定必然漂移)
     PaymentsModule,
     // 发票: 复用 C 端的开票/渲染逻辑, 后台只做审核动作
@@ -117,11 +120,13 @@ import { SchedulerService } from './scheduler.service';
     // 保留期清理 (B-96)
     AdminRetentionController,
     // 渠道对账 (B3)
-    AdminReconciliationController,
+    AdminPaymentConfigController,
+    AdminPaymentOrdersController,
+    AdminPaymentReconciliationController,
     // 发票审核 (B3)
     AdminInvoicesController,
     // 支付渠道状态 (只读): 凭据只从环境变量读
-    AdminPaymentChannelsController,
+
     // 法务文档版本管理 + 站内消息广播/模板 (B4)
     AdminLegalController,
     AdminNotificationsController,
@@ -142,7 +147,7 @@ import { SchedulerService } from './scheduler.service';
     AdminSchedulerController,
   ],
   providers: [
-    AdminReconciliationService,
+    AdminPaymentsService,
     AdminRoleService,
     AdminOverviewService,
     AdminUsersService,

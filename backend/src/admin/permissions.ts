@@ -66,6 +66,10 @@ export const PERMISSIONS = {
   orderMarkPaid: 'order.mark_paid',
   orderRefund: 'order.refund',
   paymentRead: 'payment.read',
+  /** 渠道配置写入。高危: 保存时必须带 reason 并写审计 */
+  paymentWrite: 'payment.write',
+  /** 查单/关单。只推进渠道已发生的事实, 不能凭空造钱, 故非高危 */
+  paymentOperate: 'payment.operate',
   financeDashboard: 'finance.dashboard',
   invoiceWrite: 'invoice.write',
   /** 渠道对账导入与差异处置。只给财务: 处置会让「账对不上」从看板上消失 */
@@ -200,6 +204,8 @@ export const ROLE_PERMISSIONS: Record<AdminRoleCode, Permission[]> = {
     PERMISSIONS.orderMarkPaid,
     PERMISSIONS.orderRefund,
     PERMISSIONS.paymentRead,
+    // 财务可查单/关单(推进渠道事实), 但不能改收款通道配置
+    PERMISSIONS.paymentOperate,
     PERMISSIONS.financeDashboard,
     PERMISSIONS.invoiceWrite,
     PERMISSIONS.financeReconcile,
@@ -233,6 +239,7 @@ export const HIGH_RISK_PERMISSIONS: Permission[] = [
   PERMISSIONS.creditAdjust,
   PERMISSIONS.complianceTakedown,
   PERMISSIONS.capabilityWrite,
+  PERMISSIONS.paymentWrite,
   PERMISSIONS.channelWrite,
   PERMISSIONS.channelModelWrite,
   PERMISSIONS.logicalModelWrite,

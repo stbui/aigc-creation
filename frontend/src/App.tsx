@@ -65,31 +65,35 @@ const LandingPage = lazyRoute('/', () => import('./pages/LandingPage'), 'Landing
 const SitemapPage = lazyRoute('/sitemap.html', () => import('./pages/SitemapPage'), 'SitemapPage');
 const LegalPage = lazyRoute('/legal/*', () => import('./pages/LegalPage'), 'LegalPage');
 const WorkbenchPage = lazyRoute('/workbench', () => import('./pages/WorkbenchPage'), 'WorkbenchPage');
-const ProductKitPage = lazyRoute('/product-kit', () => import('./pages/ProductKitPage'), 'ProductKitPage');
+const ProductKitPage = lazyRoute('/product-kit', () => import('./pages/product-kit'), 'ProductKitPage');
 const ProductDetailPage = lazyRoute('/product-detail', () => import('./pages/product-detail'), 'ProductDetailPage');
-const ViralClonePage = lazyRoute('/viral-clone', () => import('./pages/ViralClonePage'), 'ViralClonePage');
-const FreeCreationPage = lazyRoute('/free-creation', () => import('./pages/FreeCreationPage'), 'FreeCreationPage');
+const ViralClonePage = lazyRoute('/viral-clone', () => import('./pages/viral-clone'), 'ViralClonePage');
+const CreativeImagePage = lazyRoute(
+  ['/creative-image', '/free-creation'],
+  () => import('./pages/creative-image'),
+  'CreativeImagePage',
+);
 const MobileUploadPage = lazyRoute('/mobile-upload', () => import('./pages/MobileUploadPage'), 'MobileUploadPage');
-const MultiFusionPage = lazyRoute('/multi-image-fusion', () => import('./pages/MultiFusionPage'), 'MultiFusionPage');
-const ProductSkuPage = lazyRoute('/product-sku', () => import('./pages/ProductSkuPage'), 'ProductSkuPage');
-const LocalRedrawPage = lazyRoute('/local-redraw', () => import('./pages/LocalRedrawPage'), 'LocalRedrawPage');
-const BackgroundRemovePage = lazyRoute('/background-remove', () => import('./pages/BackgroundRemovePage'), 'BackgroundRemovePage');
-const WatermarkRemovePage = lazyRoute('/watermark-remove', () => import('./pages/WatermarkRemovePage'), 'WatermarkRemovePage');
-const ProductRetouchPage = lazyRoute('/product-retouch', () => import('./pages/ProductRetouchPage'), 'ProductRetouchPage');
-const ImageTranslatePage = lazyRoute('/image-translate', () => import('./pages/ImageTranslatePage'), 'ImageTranslatePage');
-const ImageExpandPage = lazyRoute('/image-expand', () => import('./pages/ImageExpandPage'), 'ImageExpandPage');
-const ProductRecolorPage = lazyRoute('/product-recolor', () => import('./pages/ProductRecolorPage'), 'ProductRecolorPage');
-const RotateAnglePage = lazyRoute('/rotate-angle', () => import('./pages/RotateAnglePage'), 'RotateAnglePage');
+const MultiFusionPage = lazyRoute('/multi-image-fusion', () => import('./pages/multi-image-fusion'), 'MultiFusionPage');
+const ProductSkuPage = lazyRoute('/product-sku', () => import('./pages/product-sku'), 'ProductSkuPage');
+const LocalRedrawPage = lazyRoute('/local-redraw', () => import('./pages/local-redraw'), 'LocalRedrawPage');
+const BackgroundRemovePage = lazyRoute('/background-remove', () => import('./pages/background-remove'), 'BackgroundRemovePage');
+const WatermarkRemovePage = lazyRoute('/watermark-remove', () => import('./pages/watermark-remove'), 'WatermarkRemovePage');
+const ProductRetouchPage = lazyRoute('/product-retouch', () => import('./pages/product-retouch'), 'ProductRetouchPage');
+const ImageTranslatePage = lazyRoute('/image-translate', () => import('./pages/image-translate'), 'ImageTranslatePage');
+const ImageExpandPage = lazyRoute('/image-expand', () => import('./pages/image-expand'), 'ImageExpandPage');
+const ProductRecolorPage = lazyRoute('/product-recolor', () => import('./pages/product-recolor'), 'ProductRecolorPage');
+const RotateAnglePage = lazyRoute('/rotate-angle', () => import('./pages/rotate-angle'), 'RotateAnglePage');
 const ToolPage = lazyRoute('/tools/*', () => import('./pages/ToolPage'), 'ToolPage');
 const WorksPage = lazyRoute(['/works', '/my-works'], () => import('./pages/WorksPage'), 'WorksPage');
 const LibraryPage = lazyRoute(['/library', '/asset-library'], () => import('./pages/LibraryPage'), 'LibraryPage');
 const StatsPage = lazyRoute('/stats', () => import('./pages/StatsPage'), 'StatsPage');
 const InvitationsPage = lazyRoute('/invitations', () => import('./pages/InvitationsPage'), 'InvitationsPage');
 const PackagesPage = lazyRoute('/packages', () => import('./pages/PackagesPage'), 'PackagesPage');
-const CheckoutPage = lazyRoute('/checkout/*', () => import('./pages/CheckoutPage'), 'CheckoutPage');
+const CheckoutPage = lazyRoute('/checkout/*', () => import('./pages/checkout'), 'CheckoutPage');
 const CreditsPage = lazyRoute('/credits', () => import('./pages/CreditsPage'), 'CreditsPage');
 const OrdersPage = lazyRoute('/orders', () => import('./pages/OrdersPage'), 'OrdersPage');
-const AccountPage = lazyRoute('/account', () => import('./pages/AccountPage'), 'AccountPage');
+const AccountPage = lazyRoute('/account', () => import('./pages/account'), 'AccountPage');
 const TicketsPage = lazyRoute('/tickets', () => import('./pages/TicketsPage'), 'TicketsPage');
 
 // 后台管理端: 独立外壳与鉴权, 不走 C 端 Shell (侧栏/顶导/促销条均为 C 端语义)
@@ -209,9 +213,15 @@ function Shell() {
               }
             />
             <Route
+              path="/creative-image"
+              element={
+                  <CreativeImagePage capability="creative_image" />
+              }
+            />
+            <Route
               path="/free-creation"
               element={
-                  <FreeCreationPage />
+                  <CreativeImagePage />
               }
             />
             <Route

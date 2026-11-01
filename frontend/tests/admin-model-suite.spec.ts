@@ -670,7 +670,7 @@ test.describe('渠道与模型 P5', () => {
 
     // 状态筛选：停用项计数来自与列表同一份数据（分页后总数仍在页脚）
     const disabledCount = models.filter((item) => !item.enabled).length;
-    await detail.getByRole('button', { name: '模型状态' }).click();
+    await detail.getByRole('combobox', { name: '模型状态' }).click();
     await page.getByRole('option', { name: '已停用', exact: true }).click();
     if (disabledCount > 0) {
       await expect(detail.getByText(`共 ${disabledCount} 个模型`)).toBeVisible();
@@ -838,19 +838,19 @@ test.describe('渠道与模型 P5', () => {
     await expect(allModelRows().first()).toContainText(expectedOrder[0].modelKey);
 
     // 停用筛选只留停用项（模型停用或渠道停用都算停用）
-    await page.getByRole('button', { name: '模型状态' }).click();
+    await page.getByRole('combobox', { name: '模型状态' }).click();
     await page.getByRole('option', { name: '停用', exact: true }).click();
     await expect.poll(async () => allModelRows().count(), { timeout: 15000 }).toBe(
       all.filter((item) => !item.enabled || !item.channelEnabled).length,
     );
 
     // 切回全部后恢复
-    await page.getByRole('button', { name: '模型状态' }).click();
+    await page.getByRole('combobox', { name: '模型状态' }).click();
     await page.getByRole('option', { name: '全部', exact: true }).click();
     await expect.poll(async () => allModelRows().count(), { timeout: 15000 }).toBe(all.length);
 
     // 停用不是纯展示开关：跨渠道视图同样要二次确认，取消不改库
-    await page.getByRole('button', { name: '模型状态' }).click();
+    await page.getByRole('combobox', { name: '模型状态' }).click();
     await page.getByRole('option', { name: '启用', exact: true }).click();
     const usable = all.filter((item) => item.enabled && item.channelEnabled);
     await expect.poll(async () => allModelRows().count(), { timeout: 15000 }).toBe(usable.length);
@@ -862,7 +862,7 @@ test.describe('渠道与模型 P5', () => {
       await expect(confirmDialog).toHaveCount(0);
       await expect.poll(async () => allModelRows().count(), { timeout: 15000 }).toBe(usable.length);
     }
-    await page.getByRole('button', { name: '模型状态' }).click();
+    await page.getByRole('combobox', { name: '模型状态' }).click();
     await page.getByRole('option', { name: '全部', exact: true }).click();
     await expect.poll(async () => allModelRows().count(), { timeout: 15000 }).toBe(all.length);
 

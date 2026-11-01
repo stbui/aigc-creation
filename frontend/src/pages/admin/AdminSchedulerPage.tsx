@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, Clock, Play, RefreshCw, XCircle } from 'lucide-react';
-import { Button } from '../../vendor/boardui/components/base/buttons/button';
-import { Chip } from '../../vendor/boardui/components/base/badges/chip';
+import { Button, Chip } from '../../admin-ui/shadcn/kit';
 import { adminSchedulerApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';

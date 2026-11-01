@@ -3890,7 +3890,7 @@ img[data-broken='1'] {
   }
 }
 
-/* ── 详情图「创作结果」批次行 (pages/product-detail/result-list.tsx) ──────
+/* ── 详情图「创作结果」批次行 (pages/product-detail/DetailResultList.tsx) ──────
  * 一次生成 = 一行: 行头「日期 + 提示词」, 行内第一格是上传的原图
  * (下方标商品名称), 之后每格是一张模块图 (下方标模块名称)。
  * 图横排且可能多达 11 格 (原图 + 10 个模块), 溢出交给行内横向滚动,
@@ -24067,11 +24067,6 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
       `DensityContext` 下发，表格据此收紧行高。
    ════════════════════════════════════════════════════════════════════════════ */
 
-:root {
-  /* `.adm-content > *` 的限宽：1600px 之外再加宽只会让表格横向漂移 */
-  --adm-page-max: 1600px;
-}
-
 .adm-layout {
   min-height: 100vh;
   background: var(--page-bg);
@@ -24080,6 +24075,10 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
 /*
  * 内容区。flex:1 与 min-width:0 缺一不可 —— 少了 min-width，宽表会把父容器顶宽，
  * 整页出现横向滚动条；`overflow-x` 把滚动限制在这个区块内部。
+ *
+ * 直接子块铺满整个内容区，不设统一限宽：后台以数据密集页为主（宽表、
+ * 列表 + 详情双栏），限宽会让两侧留白挤压表格，反而逼出更多横向滚动。
+ * 需要窄版的地方由页面自己约束（`Panel` / `SaveBar` 的 `isNarrow` / `narrow`）。
  */
 .adm-content {
   flex: 1 1 auto;
@@ -24103,18 +24102,6 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   appearance: textfield;
 }
 
-/*
- * 所有直接子块统一限宽居中。
- *
- * 用 :where() 把选择器权重降到与普通工具类相同 —— 否则 `.adm-content > *`
- * 会压过 `max-w-[760px]`，让表单页的窄版面板仍被拉成 1600px，
- * 页面里出现「第一块 760、下一块 1141」的错位。
- */
-.adm-content > :where(*) {
-  width: 100%;
-  max-width: var(--adm-page-max);
-  margin-inline: auto;
-}
 /* 跳过导航的落点：main 收焦，但不需要焦点框 */
 .adm-content:focus-visible {
   outline: none;

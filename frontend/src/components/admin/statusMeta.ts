@@ -1,9 +1,9 @@
 /**
  * 状态值的语义色映射（唯一事实源）。
  *
- * 从 `PageHeader.tsx` 抽出来是因为状态标签有两套渲染实现：antd 版（legacy
- * 外壳）与 BoardUI 版。映射表若各存一份，同一个 `refunded` 会在切换外壳后
- * 从红变灰，排查时会以为是样式问题。
+ * 从 `PageHeader.tsx` 抽出来是因为状态标签出现在多处（表格、抽屉、概览卡片）。
+ * 映射表若各存一份，同一个 `refunded` 会在一处红、一处灰，排查时会以为是
+ * 样式问题。
  *
  * 双编码：色块 + 中文文字。只靠颜色对色觉障碍用户不可读，只靠颜色也让扫视
  * 效率低下。未登记的状态回退到原值而不是隐藏 —— 隐藏会让「未知状态」看起来
@@ -13,11 +13,12 @@
 export type TagTone = 'success' | 'danger' | 'warn' | 'brand' | 'muted';
 
 /**
- * tone → BoardUI Chip 颜色。
+ * tone → 彩色标签（Chip）颜色名。
  *
- * 放在这里而不是各页自己写映射：同一套语义色在 Chip（表格内）与 antd Tag
- * （legacy 回滚路径）之间必须一一对应，否则切换外壳后同一个状态会变色。
- * success 用 lime 而不是 green —— BoardUI 的颜色阶里 lime 才是正向态。
+ * `Chip` 的入参名保留了 BoardUI 的十档写法（`lime` / `rose` / …），实现已折叠到
+ * 五档语义色（见 `shadcn/kit/display` 的 `CHIP_COLOR_CLASS`）。放在这里而不是
+ * 各页自己写映射：同一套语义色在表格、抽屉、卡片之间必须一一对应。
+ * success 用 lime 而不是 green —— 历史上 lime 才是正向态，改名会动 30 多处调用。
  */
 export const TONE_CHIP_COLOR: Record<TagTone, 'lime' | 'rose' | 'yellow' | 'purple' | 'neutral'> =
   {

@@ -84,12 +84,17 @@ export function ChannelDetailPanel({
           }
           extra={
             <div className="flex items-center gap-1">
-              <Button variant="ghost" size="xs" disabled={!writable} onClick={() => onEdit(selected)}>
+              <Button variant="secondary" size="xs" disabled={!writable} onClick={() => onEdit(selected)}>
                 编辑
               </Button>
+              {/*
+               * ghost / dangerGhost 自带淡紫底：五个按钮并排会变成一排色块，
+               * 看起来像五个都处于选中态。这里压平底色，只保留文字色与悬停反馈。
+               */}
               <Button
                 variant="ghost"
                 size="xs"
+                className="!bg-transparent hover:!bg-background-secondary-default"
                 leadingIcon={Copy}
                 disabled={!writable || saving}
                 onClick={() => onDuplicate(selected)}
@@ -99,6 +104,7 @@ export function ChannelDetailPanel({
               <Button
                 variant="ghost"
                 size="xs"
+                className="!bg-transparent hover:!bg-background-secondary-default"
                 leadingIcon={Download}
                 disabled={exporting}
                 title="导出该渠道（不含凭证）"
@@ -107,8 +113,13 @@ export function ChannelDetailPanel({
                 导出
               </Button>
               <Button
-                variant="ghost"
+                variant={selected.enabled ? 'dangerGhost' : 'ghost'}
                 size="xs"
+                className={
+                  selected.enabled
+                    ? '!bg-transparent hover:!bg-rose-50'
+                    : '!bg-transparent hover:!bg-background-secondary-default'
+                }
                 leadingIcon={Power}
                 disabled={!writable || saving}
                 onClick={() => onToggle(selected)}
@@ -116,8 +127,9 @@ export function ChannelDetailPanel({
                 {selected.enabled ? '停用' : '启用'}
               </Button>
               <Button
-                variant="ghost"
+                variant="dangerGhost"
                 size="xs"
+                className="!bg-transparent hover:!bg-rose-50"
                 leadingIcon={Trash2}
                 disabled={!writable}
                 onClick={() => onDelete(selected)}

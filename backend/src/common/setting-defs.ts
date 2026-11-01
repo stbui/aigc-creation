@@ -29,6 +29,8 @@ export interface SettingDef {
   maxLength?: number;
   /** 允许取值的枚举。命中时优先于 min/max —— 调度器等消费方按白名单判定 */
   enum?: number[];
+  /** 字符串型可选值白名单（如币种 CNY / USD）。命中时按枚举校验 */
+  options?: string[];
   /** 分组, 前端按此渲染 Tab */
   group: SettingGroup;
   /** 只读项：真实旋钮在别处，页面上只作「配置地图」并给出跳转 */
@@ -52,6 +54,7 @@ export type SettingGroup =
   | 'upload'
   | 'generate'
   | 'refund'
+  | 'payment'
   | 'backup'
   | 'retention'
   | 'security';
@@ -136,6 +139,19 @@ export const SETTING_DEFS: SettingDef[] = [
    * 不再有「按模态在后台调一个全局值」这层配置。C 端查询任务的间隔是
    * 前端常量 `POLL_INTERVAL_MS`。
    */
+
+  // ── 支付 ────────────────────────────────────────────────────────────
+  {
+    key: 'payment.defaultCurrency',
+    label: '默认币种',
+    description:
+      '决定新建充值商品的默认币种与 C 端充值面板的默认标签页。不会改写历史商品价格',
+    type: 'string',
+    options: ['CNY', 'USD'],
+    default: 'CNY',
+    group: 'payment',
+    public: true,
+  },
 
   // ── 退款 ────────────────────────────────────────────────────────────
   {
@@ -228,6 +244,7 @@ export const SETTING_GROUP_LABELS: Record<SettingGroup, string> = {
   upload: '上传',
   generate: '生成',
   refund: '退款',
+  payment: '支付',
   backup: '备份',
   retention: '保留期',
   security: '安全',
@@ -275,6 +292,9 @@ export function validateSettingValue(
   }
 
   const s = String(raw ?? '').trim();
+  if (def.options && def.options.length > 0 && !def.options.includes(s)) {
+    throw new AppError(40001, `${def.label} 只能是 ${def.options.join(' / ')}`, 400);
+  }
   if (def.maxLength !== undefined && s.length > def.maxLength) {
     throw new AppError(40001, `${def.label} 长度不得超过 ${def.maxLength}`, 400);
   }

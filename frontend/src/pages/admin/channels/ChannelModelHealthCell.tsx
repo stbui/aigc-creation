@@ -1,5 +1,12 @@
 import { HoverTip, StatusTag } from './components';
-import { formatMarkupPercent, formatAmount, tierPriceLines } from '../../../lib/channelCost';
+import {
+  formatAmount,
+  formatMarkupPercent,
+  formatRate,
+  healthTone,
+  markupPercent,
+  tierPriceLines,
+} from './utils';
 import type {
   AdminChannelModelListItem,
   ChannelModelHealthRowView,
@@ -20,26 +27,6 @@ import type {
  * 与参考实现一致：最右是最新一次。空槽（不足 10 次）留白而不是补灰 ——
  * 补灰会被读成「失败过」。
  */
-
-/** 成功率 → 语义色 */
-export function healthTone(rate: number | null, samples: number): 'success' | 'warn' | 'danger' | 'muted' {
-  if (rate === null || samples === 0) return 'muted';
-  if (rate >= 0.95) return 'success';
-  if (rate >= 0.8) return 'warn';
-  return 'danger';
-}
-
-/**
- * 成功率展示。
- *
- * 只有**恰好 100%** 时才省略小数尾巴 —— 参考实现的口径是「≥ 99.5% 显示
- * 0 位小数」，那会让 99.5% 显示成 `100%`：一条十天挂一次的线在界面上
- * 读起来像是「从没失败过」。1 位小数在这个量级下足够精确，且不会说谎。
- */
-export function formatRate(rate: number | null): string {
-  if (rate === null) return '—';
-  return `${(rate * 100).toFixed(rate === 0 || rate === 1 ? 0 : 1)}%`;
-}
 
 function formatDuration(ms: number | null): string {
   if (ms === null) return '—';
@@ -64,7 +51,12 @@ export function ChannelModelHealthCell({
     return <span className="text-[11px] text-text-tertiary">读取中…</span>;
   }
   if (!health || health.windows.day.samples === 0) {
-    return <span className="text-[11px] text-text-tertiary">近 24 小时无调用</span>;
+    // 这一列只有 100px 出头：长句「近 24 小时无调用」会吃掉整列，细因放进提示
+    return (
+      <span className="text-[11px] text-text-tertiary" title="近 24 小时没有终态调用">
+        无调用
+      </span>
+    );
   }
 
   const window = health.windows.day;
@@ -121,6 +113,10 @@ export function ChannelModelHealthCell({
  *
  * 只列**已启用**的价格档，且最多 3 条 —— 列表行的高度不能随规格数爆炸。
  * 其余规格折叠成一行「其余 N 个规格」提示，不静默丢弃。
+ *
+ * 每条价格档占**一行**：规格名在左（截断），「成本 → 售价 加价率」在右。
+ * 两行式（规格一行、价格一行）在 180px 列里会把两档价格撑成四行，行高翻倍
+ * 且看不出哪行属于哪档；完整口径（成本 / 售价 / 加价率原值）放在 title 里。
  */
 export function ChannelModelCostSummary({
   model,
@@ -139,23 +135,52 @@ export function ChannelModelCostSummary({
 
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
-      {shown.map((line) => (
-        <div key={`${line.tierId}:${line.field.key}`} className="min-w-0 text-[11px]">
-          <span className="truncate text-text-secondary">{line.specLabel}</span>
-          <span className="mx-1 text-text-placeholder">·</span>
-          <span className="tabular-nums text-text-primary">成本 {formatAmount(line.cost)}</span>
-          <span className="mx-1 text-text-placeholder">/</span>
-          <span className="tabular-nums text-text-primary">售价 {formatAmount(line.sale)}</span>
-          {model.priceCurrency && model.priceCurrency !== 'credits' ? (
-            <span className="ml-1 text-text-tertiary">售价币种 {model.priceCurrency}</span>
-          ) : (
-            <span className="ml-1 text-text-tertiary">
-              加价 {formatMarkupPercent(line.cost, line.sale)}
+      {shown.map((line) => {
+        const percent = markupPercent(line.cost, line.sale);
+        const cost = formatAmount(line.cost);
+        const sale = formatAmount(line.sale);
+        const markupText = percent === null ? '—' : `${percent >= 0 ? '+' : ''}${compactPercent(percent)}`;
+        const full = `${line.specLabel} · 成本 ${cost} / 售价 ${sale}${
+          percent === null ? '' : ` · 加价 ${formatMarkupPercent(line.cost, line.sale)}`
+        }`;
+        return (
+          <div
+            key={`${line.tierId}:${line.field.key}`}
+            className="flex min-w-0 items-baseline gap-2 whitespace-nowrap text-[11px] leading-4 tabular-nums"
+            title={full}
+          >
+            <span className="min-w-0 truncate text-text-tertiary">{line.specLabel}</span>
+            <span className="ml-auto flex shrink-0 items-baseline gap-1">
+              <span className="text-text-secondary">{cost}</span>
+              <span className="text-text-placeholder" aria-hidden>
+                →
+              </span>
+              <span className="font-medium text-text-primary">{sale}</span>
+              {model.priceCurrency && model.priceCurrency !== 'credits' ? (
+                <span className="text-text-tertiary">{model.priceCurrency}</span>
+              ) : (
+                <span
+                  className={
+                    percent === null
+                      ? 'text-text-placeholder'
+                      : percent < 0
+                        ? 'text-rose-600'
+                        : 'text-emerald-600'
+                  }
+                >
+                  {markupText}
+                </span>
+              )}
             </span>
-          )}
-        </div>
-      ))}
+          </div>
+        );
+      })}
       {rest > 0 && <div className="text-[11px] text-text-tertiary">其余 {rest} 个规格</div>}
     </div>
   );
+}
+
+/** 列内加价率只留一位小数：`20.00%` 在 180px 列里会把规格名挤到截断 */
+function compactPercent(percent: number): string {
+  return `${percent.toFixed(1).replace(/\.0$/, '')}%`;
 }

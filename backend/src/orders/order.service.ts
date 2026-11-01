@@ -6,8 +6,8 @@ import { formatCredits } from '../model/infra/microcredits';
 import { MembershipService } from '../membership/membership.service';
 import { MarketingService } from '../marketing/marketing.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { PaymentProviderFactory } from '../payments/payment.factory';
-import type { PaymentRefundResult } from '../payments/payment-provider.interface';
+import { PaymentGateway } from '../payments/payment-gateway';
+import type { RefundResult } from '../payments/adapters/types';
 
 /**
  * 订单与沙箱支付 (admin-prd.md §3.7 B-39~B-44 / M8)。
@@ -66,13 +66,13 @@ export class OrderService {
     private readonly membership: MembershipService,
     private readonly notifications: NotificationsService,
     /**
-     * 支付通道工厂（2026-10-22）。
+     * 支付网关（2026-11 支付重构）。
      *
      * 退款必须真的打回渠道, 故订单域要能拿到通道实现。依赖的是
-     * `PaymentCoreModule`（只含这个无依赖的工厂）, 不是 `PaymentsModule` ——
-     * 后者反过来 import 了本模块, 直接依赖只是把循环依赖藏起来。
+     * `PaymentCoreModule`（配置 + 适配器 + 网关, 只依赖 Prisma/Config）,
+     * 不是 `PaymentsModule` —— 后者反过来 import 了本模块。
      */
-    private readonly paymentFactory: PaymentProviderFactory,
+    private readonly gateway: PaymentGateway,
   ) {}
 
   // ── 下单 ──────────────────────────────────────────────────────────
@@ -133,6 +133,10 @@ export class OrderService {
     let campaignId: string | null = null;
     let couponSnapshot: Record<string, unknown> = {};
     let couponWarning: string | null = null;
+    /** 订单币种。商品单取商品币种, 会员单固定 CNY; 混合币种直接 400 */
+    let orderCurrency = 'CNY';
+    /** 需要占用库存的商品项 (saleStrategy=inventory) */
+    let stockItems: Array<{ productId: string; quantity: number }> = [];
     let snapshots: Array<{
       productId: string;
       skuSnapshot: string;
@@ -176,6 +180,30 @@ export class OrderService {
         where: { id: { in: items.map((i) => i.productId) } },
       });
       const byId = new Map(products.map((p) => [p.id, p]));
+
+      /*
+       * 币种与商品策略校验（支付重构）。
+       *
+       * 一个订单只能有一个币种：混合币种无法用单一渠道收款, 也无法对账。
+       * 策略校验放在金额计算之前, 避免「价格算完了才发现库存不足」时,
+       * 调用方仍看到部分成功的结果。
+       */
+      const currencies = new Set(products.map((p) => p.currency || 'CNY'));
+      if (currencies.size > 1) {
+        throw new AppError(40001, '同一订单内的商品币种必须一致', 400);
+      }
+      orderCurrency = [...currencies][0] ?? 'CNY';
+      for (const item of items) {
+        const p = byId.get(item.productId);
+        if (!p) continue; // 下方会抛 404, 此处不重复
+        if ((p.kind || 'credits') !== 'credits') {
+          throw new AppError(40001, `商品类型暂不支持购买: ${p.name}`, 400);
+        }
+        await this.assertProductPurchasable(p, item.quantity, params.userId);
+        if (p.saleStrategy === 'inventory') {
+          stockItems.push({ productId: p.id, quantity: item.quantity });
+        }
+      }
 
       /*
        * 会员加油包折扣 (落地页承诺「加油包会员专享95 折」)。
@@ -235,25 +263,50 @@ export class OrderService {
     const expiresAt = new Date(Date.now() + ORDER_TTL_MINUTES * 60 * 1000);
 
     try {
-      const order = await this.prisma.order.create({
-        data: {
-          orderNo: this.genOrderNo(),
-          userId: params.userId,
-          idempotencyKey: params.idempotencyKey,
-          totalCents,
-          discountCents,
-          paidCents,
-          couponId,
-          campaignId,
-          couponSnapshot: JSON.stringify(couponSnapshot),
-          grantedCredits: 0, // 支付成功后才确定
-          expiresAt,
-          // 会员单不带 OrderItem: 它买的不是"多少积分", 而是一段权益周期
-          membershipPlanId: isMembershipOrder ? params.membershipPlanId! : null,
-          ...(snapshots.length > 0 ? { items: { create: snapshots } } : {}),
-        },
-        include: this.orderInclude(),
+      const order = await this.prisma.$transaction(async (tx) => {
+        const created = await tx.order.create({
+          data: {
+            orderNo: this.genOrderNo(),
+            userId: params.userId,
+            idempotencyKey: params.idempotencyKey,
+            totalCents,
+            discountCents,
+            paidCents,
+            currency: orderCurrency,
+            couponId,
+            campaignId,
+            couponSnapshot: JSON.stringify(couponSnapshot),
+            grantedCredits: 0, // 支付成功后才确定
+            expiresAt,
+            // 会员单不带 OrderItem: 它买的不是"多少积分", 而是一段权益周期
+            membershipPlanId: isMembershipOrder ? params.membershipPlanId! : null,
+            ...(snapshots.length > 0 ? { items: { create: snapshots } } : {}),
+          },
+          include: this.orderInclude(),
+        });
+
+        /*
+         * 库存占用与订单创建同一事务 + 条件 SQL 防并发超卖。
+         * Prisma 的 where 无法表达 `stockTotal - stockSold - stockReserved >= ?`,
+         * 故用一条条件 UPDATE 让数据库裁决; 影响 0 行即库存不足, 整笔回滚。
+         */
+        if (stockItems.length > 0) {
+          for (const item of stockItems) {
+            const affected = await tx.$executeRaw`
+              UPDATE "Product"
+              SET "stockReserved" = "stockReserved" + ${item.quantity}
+              WHERE id = ${item.productId}
+                AND status = 'active'
+                AND "stockTotal" - "stockSold" - "stockReserved" >= ${item.quantity}`;
+            if (affected === 0) {
+              throw new AppError(40001, '库存不足', 400);
+            }
+          }
+          await tx.order.update({ where: { id: created.id }, data: { stockReserved: true } });
+        }
+        return created;
       });
+
       return {
         ...this.toOrderView(order),
         idempotentHit: false,
@@ -357,8 +410,7 @@ export class OrderService {
      * POST 一次就能免费拿积分/会员；生产环境更不该存在这条路径。
      * 按「不存在」处理（404），不对外暴露端点存在性。
      */
-    const configuredProvider = process.env.PAYMENT_PROVIDER || 'sandbox';
-    if (process.env.NODE_ENV === 'production' || configuredProvider !== 'sandbox') {
+    if (process.env.NODE_ENV === 'production') {
       throw new AppError(40400, '订单不存在', 404);
     }
 
@@ -446,6 +498,16 @@ export class OrderService {
     userId: string;
     payTransactionId: string;
     channel: string;
+    /** 渠道币种; 传入时必须与订单币种一致 */
+    currency?: string;
+    providerConfigId?: string | null;
+    providerConfigVersion?: number | null;
+    providerStatus?: string | null;
+    providerPaidAt?: Date;
+    /** intent 阶段已创建的 pending Payment; 有则原地更新, 不再新建 */
+    paymentId?: string;
+    /** 渠道实收金额; 传入时必须与订单应付一致 */
+    amountCents?: number;
     sandboxScenario?: string;
     /** 渠道原始回调报文 (真实通道; 沙箱为空)。只落库, 不进接口响应 */
     rawPayload?: string;
@@ -473,22 +535,63 @@ export class OrderService {
       throw new AppError(40901, `订单当前状态不可支付: ${order.status}`, 409);
     }
 
-    await this.prisma.$transaction(async (tx) => {
-      await tx.payment.create({
-        data: {
-          orderId: order.id,
-          userId: params.userId,
-          payTransactionId: params.payTransactionId,
-          channel: params.channel,
-          // 流水金额记**实付**, 不是订单原价。记原价会让对账看起来"收了全价",
-          // 而用户实际少付了优惠部分 —— 财务对账时这个差额无法解释
-          amountCents: order.paidCents,
-          status: 'succeeded',
-          paidAt: new Date(),
-          sandboxScenario: params.sandboxScenario,
-          rawPayload: params.rawPayload ?? '',
-        },
-      });
+    /*
+     * 金额与币种校验必须在这里, 不能只依赖调用方。
+     * `markPaid` 是唯一入账入口, 任何新增调用方 (回调/查单/对账/后台补发)
+     * 漏校验都会变成资损: 少收钱记成全额, 或把 USD 单按 CNY 入账。
+     */
+    if (params.currency && params.currency !== (order.currency || 'CNY')) {
+      throw new AppError(
+        40901,
+        `币种不一致: 渠道 ${params.currency} / 订单 ${order.currency || 'CNY'}`,
+        409,
+      );
+    }
+    if (params.amountCents !== undefined && params.amountCents !== order.paidCents) {
+      throw new AppError(
+        40901,
+        `金额不一致: 渠道 ${params.amountCents} 分 / 订单 ${order.paidCents} 分`,
+        409,
+      );
+    }
+
+    const succeededFields = {
+      // 流水金额记**实付**, 不是订单原价。记原价会让对账看起来"收了全价",
+      // 而用户实际少付了优惠部分 —— 财务对账时这个差额无法解释
+      payTransactionId: params.payTransactionId,
+      channel: params.channel,
+      amountCents: order.paidCents,
+      status: 'succeeded',
+      paidAt: new Date(),
+      currency: order.currency || 'CNY',
+      providerConfigId: params.providerConfigId ?? order.providerConfigId ?? null,
+      providerConfigVersion: params.providerConfigVersion ?? order.providerConfigVersion ?? null,
+      providerStatus: params.providerStatus ?? null,
+      lastError: null,
+      closedAt: null,
+      sandboxScenario: params.sandboxScenario ?? null,
+      rawPayload: params.rawPayload ?? '',
+    };
+
+    try {
+      await this.prisma.$transaction(async (tx) => {
+      /*
+       * 有 pending 尝试就原地更新 (保留本次支付尝试的创建时间与 id),
+       * 否则新建。更新 0 行说明该尝试已被关单/并发入账, 回退为 create。
+       */
+      let updatedExisting = 0;
+      if (params.paymentId) {
+        const result = await tx.payment.updateMany({
+          where: { id: params.paymentId, orderId: order.id, status: 'pending' },
+          data: succeededFields,
+        });
+        updatedExisting = result.count;
+      }
+      if (!params.paymentId || updatedExisting === 0) {
+        await tx.payment.create({
+          data: { orderId: order.id, userId: params.userId, ...succeededFields },
+        });
+      }
 
       /*
        * 本单会发放的积分总额 = 商品批次积分 + 会员首期积分。
@@ -530,8 +633,40 @@ export class OrderService {
           status: 'paid',
           paidAt: new Date(),
           grantedCredits,
+          providerTradeNo: params.payTransactionId,
+          providerStatus: params.providerStatus ?? null,
+          providerConfigId: params.providerConfigId ?? order.providerConfigId ?? null,
+          providerConfigVersion: params.providerConfigVersion ?? order.providerConfigVersion ?? null,
+          providerPaidAt: params.providerPaidAt ?? new Date(),
+          // 终态必须清空 checkoutValue, 否则页面会把过期链接当可用
+          checkoutValue: '',
+          lastError: null,
+          closeStartedAt: null,
+          stockReserved: false,
         },
       });
+
+      /*
+       * 库存占用转已售: 与订单置 paid 同一事务, 否则「已支付但库存仍占用」
+       * 会让该商品永久少卖一份。
+       */
+      if (order.stockReserved) {
+        for (const item of order.items) {
+          if (!item.productId) continue;
+          const product = await tx.product.findUnique({
+            where: { id: item.productId },
+            select: { saleStrategy: true },
+          });
+          if (product?.saleStrategy !== 'inventory') continue;
+          await tx.product.update({
+            where: { id: item.productId },
+            data: {
+              stockSold: { increment: item.quantity },
+              stockReserved: { decrement: item.quantity },
+            },
+          });
+        }
+      }
 
       for (const item of autoGrantItems) {
         await this.credit.grant({
@@ -542,7 +677,19 @@ export class OrderService {
           orderId: order.id,
         }, tx);
       }
-    });
+      });
+    } catch (e) {
+      /*
+       * 并发重复回调可能同时通过前面的交易号查重, 最终由 Payment.payTransactionId
+       * 唯一约束裁决。P2002 说明另一条通知已经入账成功, 这里按幂等成功返回,
+       * 绝不能把重复通知抛成 500 —— 那会让渠道持续重试到死信。
+       */
+      if ((e as { code?: string })?.code === 'P2002') {
+        const current = await this.detail(params.orderId);
+        return { order: current, idempotentHit: true, message: '重复回调, 已忽略' };
+      }
+      throw e;
+    }
 
     /*
      * 营销副作用放在事务**之外**。
@@ -780,7 +927,7 @@ export class OrderService {
     }
 
     /*
-     * 先解析通道再落退款单: 凭据缺失时 `byChannel` 抛 50301, 此时库里
+     * 先解析通道再落退款单: 凭据缺失时网关返回 failed, 此时库里
      * 还没有任何退款行, 运营看到的是一条干净的「通道未配置」而不是
      * 一条半截的 processing 记录。
      *
@@ -788,8 +935,8 @@ export class OrderService {
      * 不调渠道 —— 但仍要回收积分、迁移订单状态。
      */
     const channel = (payment.channel || 'sandbox').trim();
+    // `manual` 是后台「标记已支付」写入的通道, 没有真实资金进出, 不调渠道
     const manualMark = channel === 'manual';
-    const provider = manualMark ? null : this.paymentFactory.byChannel(channel);
 
     // 首次退款才扣积分; 部分退款的二次调用不应重复扣
     const firstRefund = order.refundedCents === 0;
@@ -816,24 +963,20 @@ export class OrderService {
       },
     });
 
-    let channelResult: PaymentRefundResult = {
+    let channelResult: RefundResult = {
       state: 'succeeded',
       raw: '手工标记已支付的订单，无渠道资金往来',
     };
-    if (provider) {
-      try {
-        channelResult = await provider.refund({
-          orderNo: order.orderNo,
-          outRefundNo: refund.id,
-          amountCents: params.amountCents,
-          // 微信 v3 要求同时给「原订单总额」; 历史订单 amountCents 为 0 时回落实付
-          totalCents: payment.amountCents > 0 ? payment.amountCents : paidBase,
-          reason,
-        });
-      } catch (e) {
-        // provider 契约是不抛异常; 真抛了按「结果未知」处理, 绝不能当成功
-        channelResult = { state: 'failed', error: `渠道退款调用异常: ${(e as Error).message || e}` };
-      }
+    if (!manualMark) {
+      channelResult = await this.gateway.refund({
+        order: { channel: order.channel, providerConfigId: order.providerConfigId },
+        orderNo: order.orderNo,
+        outRefundNo: refund.id,
+        amountCents: params.amountCents,
+        // 微信 v3 要求同时给「原订单总额」; 历史订单 amountCents 为 0 时回落实付
+        totalCents: payment.amountCents > 0 ? payment.amountCents : paidBase,
+        reason,
+      });
     }
 
     if (channelResult.state === 'failed') {
@@ -974,6 +1117,105 @@ export class OrderService {
   }
 
   // ── 状态机 ────────────────────────────────────────────────────────
+
+  /**
+   * 商品可购买性校验（支付重构）。
+   *
+   * 与后台「销售中」徽标同一套口径：限时窗口按 Asia/Shanghai 解释后台输入的时间，
+   * 库存按「总量 - 已售 - 已占用」计算，周期购买按窗口内非取消订单数。
+   * 页面的「销售中」不等于可购买，最终以这里为准。
+   */
+  private async assertProductPurchasable(
+    product: {
+      id: string;
+      name: string;
+      saleStrategy: string;
+      periodDays: number;
+      periodPurchaseLimit: number;
+      stockTotal: number;
+      stockSold: number;
+      stockReserved: number;
+      saleStartAt: Date | null;
+      saleEndAt: Date | null;
+    },
+    quantity: number,
+    userId: string,
+  ): Promise<void> {
+    const now = Date.now();
+
+    if (product.saleStrategy === 'timed') {
+      if (product.saleStartAt && now < product.saleStartAt.getTime()) {
+        throw new AppError(40001, `商品尚未开售: ${product.name}`, 400);
+      }
+      if (product.saleEndAt && now > product.saleEndAt.getTime()) {
+        throw new AppError(40001, `商品已结束销售: ${product.name}`, 400);
+      }
+    }
+
+    if (product.saleStrategy === 'inventory') {
+      const remaining = product.stockTotal - product.stockSold - product.stockReserved;
+      if (remaining < quantity) {
+        throw new AppError(40001, `库存不足: ${product.name}（剩余 ${Math.max(remaining, 0)}）`, 400);
+      }
+    }
+
+    if (product.saleStrategy === 'periodic' && product.periodDays > 0 && product.periodPurchaseLimit > 0) {
+      const since = new Date(now - product.periodDays * 24 * 3600 * 1000);
+      const used = await this.prisma.order.count({
+        where: {
+          userId,
+          status: { not: 'cancelled' },
+          createdAt: { gte: since },
+          items: { some: { productId: product.id } },
+        },
+      });
+      if (used + quantity > product.periodPurchaseLimit) {
+        throw new AppError(
+          40001,
+          `该商品每 ${product.periodDays} 天最多购买 ${product.periodPurchaseLimit} 件，当前已达上限`,
+          400,
+        );
+      }
+    }
+  }
+
+  /**
+   * 释放库存占用（取消/超时/关单）。
+   *
+   * 幂等：先条件更新 `stockReserved: true → false` 抢占，抢不到直接返回，
+   * 避免重复释放把 `stockReserved` 减成负数。
+   */
+  async releaseReservation(orderId: string): Promise<void> {
+    const order = await this.prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        stockReserved: true,
+        items: { select: { productId: true, quantity: true } },
+      },
+    });
+    if (!order || !order.stockReserved) return;
+
+    await this.prisma.$transaction(async (tx) => {
+      const flag = await tx.order.updateMany({
+        where: { id: orderId, stockReserved: true },
+        data: { stockReserved: false },
+      });
+      if (flag.count === 0) return;
+      for (const item of order.items) {
+        if (!item.productId) continue;
+        const product = await tx.product.findUnique({
+          where: { id: item.productId },
+          select: { saleStrategy: true },
+        });
+        if (product?.saleStrategy !== 'inventory') continue;
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stockReserved: { decrement: item.quantity } },
+        });
+      }
+    });
+  }
 
   /** 校验并执行状态迁移。非法迁移抛 409, 绝不静默通过 */
   async transition(orderId: string, to: OrderStatus): Promise<void> {

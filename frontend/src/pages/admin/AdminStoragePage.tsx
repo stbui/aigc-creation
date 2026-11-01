@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { CheckCircle2, Cloud, HardDrive, Lock, RefreshCw, Server, XCircle } from 'lucide-react';
-import { Button } from '../../vendor/boardui/components/base/buttons/button';
-import { Chip } from '../../vendor/boardui/components/base/badges/chip';
+import { Button, Chip } from '../../admin-ui/shadcn/kit';
 import { adminStorageApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';

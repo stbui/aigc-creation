@@ -7,10 +7,18 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { Dialog, Heading, Modal, ModalOverlay } from 'react-aria-components';
 import { AlertTriangle } from 'lucide-react';
-import { Button } from '../../vendor/boardui/components/base/buttons/button';
-import { cx } from '../lib/cn';
+import { Button } from '../shadcn/kit';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Textarea,
+} from '../components/ui';
+import { cn } from '../lib/cn';
 
 /**
  * 二次确认。
@@ -88,75 +96,66 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   return (
     <ConfirmContext.Provider value={confirm}>
       {children}
-      <ModalOverlay
-        isOpen={pending !== null}
-        isDismissable
+      <Dialog
+        open={pending !== null}
         onOpenChange={(open) => {
           if (!open) close(null);
         }}
-        className="bui-scope fixed inset-0 z-[1100] flex items-center justify-center bg-neutral-950/40 p-6"
       >
-        <Modal className="w-full max-w-[480px] outline-none">
-          <Dialog
-            className="flex flex-col gap-4 rounded-2xl border border-border-table bg-white p-6 shadow-xl outline-none"
-            aria-label={pending?.options.title}
-          >
+        <DialogContent
+          data-testid="admin-confirm-dialog"
+          className="max-w-[480px] gap-4"
+          aria-describedby={undefined}
+        >
+          <DialogHeader>
             <div className="flex items-start gap-3">
               {pending?.options.danger && (
-                <span className="mt-0.5 rounded-full bg-rose-50 p-1.5 text-rose-600">
+                <span className="mt-0.5 rounded-full bg-danger-soft p-1.5 text-danger-text">
                   <AlertTriangle className="size-4" aria-hidden />
                 </span>
               )}
               <div className="min-w-0 flex-1">
-                <Heading slot="title" className="text-base font-semibold text-text-primary">
-                  {pending?.options.title}
-                </Heading>
+                <DialogTitle className="text-base">{pending?.options.title}</DialogTitle>
                 {pending?.options.description && (
-                  <div className="mt-1.5 text-sm leading-6 text-text-secondary">
+                  <DialogDescription className="mt-1.5 text-sm leading-6">
                     {pending.options.description}
-                  </div>
+                  </DialogDescription>
                 )}
               </div>
             </div>
+          </DialogHeader>
 
-            {pending?.options.requireReason && (
-              <label className="flex flex-col gap-1.5">
-                <span className="text-xs font-medium text-text-secondary">
-                  {pending.options.reasonLabel ?? '操作原因'}
-                </span>
-                <textarea
-                  ref={reasonRef}
-                  value={reason}
-                  onChange={(event) => {
-                    setReason(event.target.value);
-                    if (error) setError(null);
-                  }}
-                  rows={3}
-                  placeholder={pending.options.reasonPlaceholder ?? '说明为什么执行这个操作'}
-                  className={cx(
-                    'w-full resize-none rounded-lg border bg-white px-3 py-2 text-sm text-text-primary outline-none',
-                    'placeholder:text-text-placeholder focus:border-accent-500 focus:ring-2 focus:ring-accent-200',
-                    error ? 'border-red-500' : 'border-border-button-default',
-                  )}
-                />
-                {error && <span className="text-xs text-rose-600">{error}</span>}
-              </label>
-            )}
+          {pending?.options.requireReason && (
+            <label className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-foreground">
+                {pending.options.reasonLabel ?? '操作原因'}
+              </span>
+              <Textarea
+                ref={reasonRef}
+                value={reason}
+                onChange={(event) => {
+                  setReason(event.target.value);
+                  if (error) setError(null);
+                }}
+                rows={3}
+                placeholder={pending.options.reasonPlaceholder ?? '说明为什么执行这个操作'}
+                aria-invalid={error ? true : undefined}
+                className={cn('resize-none text-sm', error && 'border-destructive')}
+              />
+              {error && <span className="text-xs text-danger-text">{error}</span>}
+            </label>
+          )}
 
-            <div className="mt-1 flex justify-end gap-2">
-              <Button variant="secondary" onClick={() => close(null)}>
-                {pending?.options.cancelText ?? '取消'}
-              </Button>
-              <Button
-                variant={pending?.options.danger ? 'danger' : 'primary'}
-                onClick={submit}
-              >
-                {pending?.options.confirmText ?? '确认'}
-              </Button>
-            </div>
-          </Dialog>
-        </Modal>
-      </ModalOverlay>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => close(null)}>
+              {pending?.options.cancelText ?? '取消'}
+            </Button>
+            <Button variant={pending?.options.danger ? 'danger' : 'primary'} onClick={submit}>
+              {pending?.options.confirmText ?? '确认'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </ConfirmContext.Provider>
   );
 }

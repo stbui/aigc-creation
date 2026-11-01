@@ -18,6 +18,30 @@ export type ParamType = 'enum' | 'number' | 'text' | 'boolean';
 export interface ParamOption {
   value: string | number;
   label: string;
+  /** 枚举项附加数据（随 /capabilities 下发）：平台主图规格等 */
+  meta?: ParamOptionMeta;
+}
+
+export interface ParamOptionMeta {
+  /** 平台主图推荐比例 */
+  ratio?: string;
+  /** 平台主图推荐画质档 */
+  size?: string;
+  /** 平台主图最短边要求（px） */
+  minPx?: number;
+  /** 一句话规格说明 */
+  spec?: string;
+  /** 详情长图规格（详情页专用） */
+  detail?: PlatformDetailSpec;
+}
+
+export interface PlatformDetailSpec {
+  /** 推荐画质档 */
+  size?: string;
+  /** 建议宽度（px） */
+  widthPx?: number;
+  /** 一句话说明 */
+  spec?: string;
 }
 
 /** 参数声明: 工具页表单按此渲染, 新增能力无需改前端 */

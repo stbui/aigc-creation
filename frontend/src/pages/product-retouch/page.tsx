@@ -1,0 +1,96 @@
+import { useState } from 'react';
+
+import { MODE_LABEL, MODE_OPTIONS, NOTE_MAX_LENGTH } from './constants';
+import {
+  PillOptions,
+  ProductSourceResult,
+  ProductSourceUploadPreview,
+  ToolCard,
+  ToolHistoryPane,
+  ToolShell,
+} from './components';
+import { useToolTask } from './hooks';
+import { retouchPayload } from './utils';
+
+/**
+ * 产品精修 —— 1:1 复刻参考站 https://ijihua.cn/product-retouch。
+ *
+ * 实拍结构 (product-retouch-page):
+ *   上传卡: * 上传图片
+ *   精修模式卡 (retouch-mode-options): 6 项单选 pill, 默认"综合精修" ——
+ *     综合精修 / 质感增强 / 瑕疵修复 / 色彩校正 / 提升清晰度 / 材质强化
+ *   补充要求卡: textarea, placeholder "如：去掉电镀件上的指纹，让皮革看起来更有光泽", maxlength 200
+ *   高级设置: 比例 原比例 / 画质 1K
+ *   提交: 立即生成 (消耗价由后端下发); 描述: 商品图去瑕疵，提高清晰度
+ *
+ * 诚实披露: enhance 只走真实图像模型；6 个模式映射参考站模板码并进入提示词，
+ * 本地不执行亮度/锐化等像素处理，也不会在无模型通道时伪造精修结果。
+ */
+
+export function ProductRetouchPage() {
+  const { submitting, result, setResult, run } = useToolTask({ capability: 'enhance', successMessage: '精修结果已生成' });
+
+  const [mode, setMode] = useState('comprehensive');
+  const [note, setNote] = useState('');
+  const [sourceUrl, setSourceUrl] = useState('');
+
+  const handleHistoryReuse = () => {
+    setSourceUrl('');
+    setResult(null);
+  };
+
+  return (
+    <ToolShell
+      capability="enhance"
+      pageClass="product-retouch-page product-retouch-main-page"
+      title="产品精修"
+      desc="商品图去瑕疵，提高清晰度"
+      upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
+      replaceUpload
+      renderUploadPreview={(uploads, controls) => {
+        const image = uploads[0];
+        return image ? (
+          <ProductSourceUploadPreview image={image} controls={controls} alt="待精修商品图" />
+        ) : null;
+      }}
+      settings={{ ratio: true, resolution: true }}
+      submitLabel="立即生成"
+      emptyVideo="/static/mp4/04_cpjx.mp4"
+      emptyDesc="上传图片并选择精修模式后，结果将在此处展示"
+      formValid
+      submitting={submitting}
+      result={result}
+      resultTag={MODE_LABEL[mode]}
+      resultCompare={
+        result?.status === 'succeeded' && result.url && sourceUrl
+          ? { beforeUrl: sourceUrl, beforeLabel: '原图', afterLabel: '精修后' }
+          : undefined
+      }
+      onSubmit={(inputs, settings) => {
+        setSourceUrl(inputs[0]?.url ?? '');
+        return run(inputs, retouchPayload(mode, note, settings));
+      }}
+      sourcePane={(images) => {
+        const image = images[0];
+        return image ? <ProductSourceResult image={image} alt="待精修商品图" /> : null;
+      }}
+      onHistoryReuse={handleHistoryReuse}
+      trailingPane={
+        <ToolHistoryPane capability="enhance" refreshKey={result?.url} emptyText="暂无精修记录" />
+      }
+    >
+      <ToolCard title="精修模式" className="product-retouch-card">
+        <PillOptions options={MODE_OPTIONS} value={mode} onChange={setMode} ariaLabel="精修模式" />
+      </ToolCard>
+
+      <ToolCard title="补充要求（选填）" className="product-retouch-card">
+        <textarea
+          maxLength={NOTE_MAX_LENGTH}
+          value={note}
+          placeholder="如：去掉电镀件上的指纹，让皮革看起来更有光泽"
+          onChange={(e) => setNote(e.target.value)}
+        />
+      </ToolCard>
+    </ToolShell>
+  );
+}

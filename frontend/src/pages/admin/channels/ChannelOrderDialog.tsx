@@ -10,7 +10,7 @@ import {
   SelectBox,
 } from './components';
 import { useToast } from './hooks';
-import { moveOrderItem, orderChanged, type OrderItem } from '../../../lib/channelOrder';
+import { moveOrderItem, orderChanged, type OrderItem } from './utils';
 import type { ChannelOrderItemView } from '../../../types/model';
 
 /**

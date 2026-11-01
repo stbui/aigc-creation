@@ -1,8 +1,7 @@
 import { useCallback, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Download, Plus } from 'lucide-react';
-import { Button } from '../../vendor/boardui/components/base/buttons/button';
-import { Chip } from '../../vendor/boardui/components/base/badges/chip';
+import { Button, Chip } from '../../admin-ui/shadcn/kit';
 import { marketingApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';

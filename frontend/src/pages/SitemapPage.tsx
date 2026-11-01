@@ -43,8 +43,9 @@ const SECTIONS: SitemapSection[] = [
       { name: '爆款复刻', to: '/viral-clone', path: '/viral-clone', capability: 'hot_remake' },
       {
         name: '创意生图',
-        to: '/free-creation?capability=creative_image',
-        path: '/free-creation',
+        to: '/creative-image',
+        path: '/creative-image',
+        capability: 'creative_image',
       },
       { name: '自由创作', to: '/free-creation', path: '/free-creation', capability: 'free_create' },
     ],

@@ -2,8 +2,6 @@ import { useCallback, useMemo, useState } from 'react';
 import { App, Modal } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { Maximize2, Sparkles } from 'lucide-react';
-import { languageOptions, platformOptions } from '../../lib/optionSets';
-import type { ParamOption } from '../../types/api';
 
 import { MAX_DESC_LEN, MAX_IMAGE_MB, MAX_IMAGES, MAX_NAME_LEN } from './constants';
 import {
@@ -15,10 +13,13 @@ import {
   ToolSubmitBar,
   ToolWorkflowSteps,
 } from './components';
-import { DetailExamplePanel } from './example-panel';
-import { DetailResultList, countGenerations } from './result-list';
-import { DetailSectionPicker } from './section-picker';
+import { DetailExamplePanel } from './DetailExamplePanel';
+import { DetailResultList } from './DetailResultList';
+import { DetailSectionPicker } from './DetailSectionPicker';
+import { FormSelect } from './FormSelect';
 import {
+  notifyCreditsChanged,
+  useAuth,
   useCapabilityRuntime,
   useDetailCreditLabel,
   useGenerateError,
@@ -36,8 +37,7 @@ import {
   resolveModelId,
   startDetailGeneration,
 } from './api';
-import { useAuth } from '../../context/AuthContext';
-import { notifyCreditsChanged } from '../../context/CreditsContext';
+import { countGenerations, languageOptions, platformDetailSpec, platformOptions, sectionCaption } from './utils';
 
 /**
  * 商品详情图工作台
@@ -55,44 +55,11 @@ import { notifyCreditsChanged } from '../../context/CreditsContext';
  * 画质 → size 参数 (1K/2K/4K; 4K 需要可用的模型通道支持, 否则置灰并说明)。
  *
  * 文件分工: 接口面见 `./api`, 本页状态见 `./hooks`, 常量见 `./constants`,
- * 共享控件见 `./components`, 三个板块组件各自成文件。
+ * 共享控件见 `./components`, 纯函数与外部工具见 `./utils`,
+ * 四个板块组件各自成文件 (`DetailSectionPicker` / `DetailResultList` /
+ * `DetailExamplePanel` / `FormSelect`)。分层约定见
+ * `docs/frontend-module-conventions.md`。
  */
-
-interface FormSelectProps {
-  label: string;
-  value: string;
-  options: ParamOption[];
-  onChange: (value: string) => void;
-}
-
-/** 生成设置里的下拉 (平台 / 语言) —— 两处结构相同, 抽成一个避免复制粘贴 */
-function FormSelect({ label, value, options, onChange }: FormSelectProps) {
-  return (
-    <label className="pk-field">
-      <span className="pk-field-label">{label}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)}>
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-/**
- * 任务参数里的模块清单 → 缩略图标签。
- *
- * 按模块出图后, 每张图自己的标签由 `sectionLabel` 提供; 这个函数只用于
- * 改造前「一次出一张长图」的存量任务 —— 它们没有 sectionLabel, 用模块数说明版面。
- */
-function sectionCaption(params: Record<string, unknown>): string | undefined {
-  const raw = params?.sections;
-  if (typeof raw !== 'string') return undefined;
-  const n = raw.split(',').filter(Boolean).length;
-  return n > 0 ? `${n} 个模块` : undefined;
-}
 
 export function ProductDetailPage() {
   const { message, modal } = App.useApp();
@@ -120,9 +87,11 @@ export function ProductDetailPage() {
   const [platform, setPlatform] = useState('taobao');
   const [language, setLanguage] = useState('zh-CN');
   const [description, setDescription] = useState('');
-  // 包含模块: 上限、顺序归一化与默认勾选都在 useSectionSelection + section-picker
+  // 包含模块: 上限、顺序归一化与默认勾选都在 useSectionSelection + DetailSectionPicker
   const { sections, toggle: toggleSection } = useSectionSelection();
   const [resolution, setResolution] = useState('1k');
+  /** 用户手动改过画质后，切换平台不再覆盖 */
+  const [resolutionTouched, setResolutionTouched] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   /** AI 分析进行中 (按钮禁用 + 文案切换, 防止连点时重复请求文本通道) */
   const [analyzing, setAnalyzing] = useState(false);
@@ -183,6 +152,13 @@ export function ProductDetailPage() {
       sections.length > 0,
     [images.length, productName, description, sections.length],
   );
+
+  /** 切换平台：用户没手动改过画质时，带出该平台的详情长图规格 */
+  const changePlatform = (value: string) => {
+    setPlatform(value);
+    const spec = platformDetailSpec(value);
+    if (spec?.size && !resolutionTouched) setResolution(spec.size);
+  };
 
   // ── AI分析: 走文本通道的「图片转提示词」, 对首张商品图做真实识别 ──
   //
@@ -373,7 +349,7 @@ export function ProductDetailPage() {
                       onChange={(e) => setBrand(e.target.value)}
                     />
                   </label>
-                  <FormSelect label="平台" value={platform} options={platformOptions()} onChange={setPlatform} />
+                  <FormSelect label="平台" value={platform} options={platformOptions()} onChange={changePlatform} />
                   <FormSelect label="语言" value={language} options={languageOptions()} onChange={setLanguage} />
                 </div>
               </div>
@@ -435,7 +411,10 @@ export function ProductDetailPage() {
                 open={settingsOpen}
                 onToggle={toggleSettings}
                 resolution={resolution}
-                onResolutionChange={setResolution}
+                onResolutionChange={(v) => {
+                  setResolutionTouched(true);
+                  setResolution(v);
+                }}
                 capabilityId={DETAIL_CAPABILITY}
                 showRatio={false}
                 modelPicker={<ModelPicker capability={DETAIL_CAPABILITY} options={{ resolution }} />}

@@ -1,6 +1,6 @@
 import { useRef, useState, type ReactNode } from 'react';
 import { RefreshCw, ShieldCheck, Upload } from 'lucide-react';
-import { Button } from '../../vendor/boardui/components/base/buttons/button';
+import { Button } from '../../admin-ui/shadcn/kit';
 import { adminPluginsApi, adminProviderCatalogApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';

@@ -168,8 +168,17 @@ export class AdminAlertsService {
     return items;
   }
 
+  /**
+   * 对账差异告警（2026-11 支付重构）。
+   *
+   * 数据源从旧 `ReconciliationItem.status='open'` 改为新对账体系的
+   * `PaymentReconciliationItem.result NOT IN ('matched','recovered')`：
+   * 旧批次表只读保留，新差异全部落在 `PaymentReconciliationRun/Item`。
+   */
   private async reconciliationAlerts(): Promise<AdminAlert[]> {
-    const open = await this.prisma.reconciliationItem.count({ where: { status: 'open' } });
+    const open = await this.prisma.paymentReconciliationItem.count({
+      where: { result: { notIn: ['matched', 'recovered'] } },
+    });
     if (open === 0) return [];
     return [
       {
@@ -177,9 +186,9 @@ export class AdminAlertsService {
         severity: open >= 5 ? 'critical' : 'warning',
         category: 'finance',
         title: '对账差异待处置',
-        detail: '差异涉及真实资金，请逐笔核对后标记处置或忽略',
+        detail: '差异涉及真实资金，请到支付对账页逐笔核对',
         count: open,
-        link: '/admin/reconciliation',
+        link: '/admin/payments?tab=reconciliation',
       },
     ];
   }

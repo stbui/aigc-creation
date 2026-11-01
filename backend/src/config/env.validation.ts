@@ -152,18 +152,14 @@ export const ENV_SPECS: readonly Spec[] = [
     oneOf: ['0', '1'],
   },
 
-  // ── 支付通道（B3）──────────────────────────────────────────────────
-  // 默认 sandbox：不产生真实资金流转。
-  // ⚠ 与邮件/短信不同，支付**不会**在凭据缺失时回落沙箱：
+  // ── 支付通道（2026-11 支付重构）────────────────────────────────────
+  // ⚠ 支付**不会**在凭据缺失时回落沙箱：
   //   生产环境静默降级的表现是「支付一直成功、账上一分钱没有」。
-  //   缺凭据时发起支付返回 503（见 payments/payment.factory.ts）。
-  {
-    key: 'payment.provider',
-    env: 'PAYMENT_PROVIDER',
-    type: 'string',
-    def: 'sandbox',
-    oneOf: ['sandbox', 'alipay', 'wechat'],
-  },
+  //   凭据缺失时发起支付返回 503（见 payments/payment-config.service.ts）。
+  //   2026-11 起渠道不再由 env 单选：渠道配置存库并版本化，后台「支付充值」页维护；
+  //   下列 env 只在首次启动导入为 v1，之后以库内配置为准。
+  /** 支付配置加密密钥（base64 的 32 字节）。生产必须显式配置 */
+  { key: 'payment.secretKey', env: 'PAYMENT_SECRET_KEY', type: 'string', def: '' },
   /** 渠道异步通知的基址（渠道能访问到的公网地址）；留空用 HOST:PORT */
   { key: 'payment.notifyBase', env: 'PAYMENT_NOTIFY_BASE', type: 'string', def: '' },
   // 支付宝（网页支付, RSA2）

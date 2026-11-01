@@ -168,7 +168,7 @@ test.describe('素材管理', () => {
     await page.goto(`${UI}/admin/assets`);
     await cells(page).first().waitFor({ state: 'visible', timeout: 20000 });
 
-    await page.getByRole('button', { name: /按类型筛选/ }).click();
+    await page.getByRole('combobox', { name: /按类型筛选/ }).click();
     await page.getByRole('option', { name: '原始上传' }).click();
     await page.getByRole('button', { name: '查询' }).click();
 
@@ -177,7 +177,7 @@ test.describe('素材管理', () => {
     await expect(page.getByTestId('admin-filter-chip')).toHaveCount(1);
     await expect(chipList).toContainText(/原始上传|生成图/);
 
-    await chipList.getByRole('button', { name: '全部清除' }).click();
+    await chipList.getByRole('button', { name: '清除全部' }).click();
     await expect(page.getByTestId('admin-filter-chip')).toHaveCount(0);
   });
 

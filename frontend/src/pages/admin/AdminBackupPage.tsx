@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { DatabaseBackup, ShieldAlert, Trash2 } from 'lucide-react';
-import { Button } from '../../vendor/boardui/components/base/buttons/button';
+import { Button } from '../../admin-ui/shadcn/kit';
 import { adminBackupsApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';

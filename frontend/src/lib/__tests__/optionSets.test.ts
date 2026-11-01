@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { loadCapabilities } from '../capabilities';
-import { ratioOptions, resolutionOptions } from '../optionSets';
+import { platformDetailSpec, platformSpec, ratioOptions, resolutionOptions } from '../optionSets';
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -43,6 +43,70 @@ describe('ratioOptions', () => {
       '4:3',
     ]);
     expect(ratioOptions('main_image').map((option) => option.value)).toEqual(['1:1', '4:3']);
+  });
+});
+
+describe('platformSpec', () => {
+  it('按后端 meta 读取平台主图规格，缺规格时返回 null', async () => {
+    const platforms = [
+      {
+        value: 'taobao',
+        label: '淘宝',
+        meta: {
+          ratio: '1:1',
+          size: '1k',
+          minPx: 800,
+          spec: '主图常规 1:1、边长 ≥800px',
+          detail: { size: '1k', widthPx: 750, spec: '详情长图建议宽度 750px' },
+        },
+      },
+      {
+        value: 'amazon',
+        label: 'Amazon',
+        meta: {
+          ratio: '1:1',
+          size: '2k',
+          minPx: 1600,
+          spec: '主图常规 1:1、最短边 ≥1600px',
+          detail: { size: '2k', widthPx: 1000, spec: '详情图建议宽度 ≥1000px' },
+        },
+      },
+      { value: 'legacy', label: '旧平台' },
+    ];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            code: 0,
+            message: '',
+            data: {
+              groups: [],
+              workbenchIds: [],
+              items: [{ id: 'main_image', params: [{ key: 'platform', options: platforms }] }],
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      ),
+    );
+
+    await loadCapabilities(true);
+
+    expect(platformSpec('amazon')).toEqual({
+      ratio: '1:1',
+      size: '2k',
+      minPx: 1600,
+      spec: '主图常规 1:1、最短边 ≥1600px',
+    });
+    expect(platformSpec('legacy')).toBeNull();
+    expect(platformSpec(undefined)).toBeNull();
+    expect(platformDetailSpec('amazon')).toEqual({
+      size: '2k',
+      widthPx: 1000,
+      spec: '详情图建议宽度 ≥1000px',
+    });
+    expect(platformDetailSpec('legacy')).toBeNull();
   });
 });
 

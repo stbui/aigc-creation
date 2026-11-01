@@ -566,7 +566,7 @@ model PaymentReconciliationItem {
 - 顶部提示条（info）：**平台不提供支付退款** → 本仓库改写为：**本页不提供退款；退款请到订单管理。管理端提供查单、关单和对账。关单前始终先向渠道查单；对账发现已支付未入账订单时会幂等补发积分。**
 - 四个标签：`支付渠道` / `充值商品` / `支付订单` / `支付对账`
 - URL 同步：`?tab=providers|products|orders|reconciliation`，默认 `providers`；`?tab=reconciliation&runId=<id>` 可直接打开明细抽屉（告警深链），`?tab=orders&orderId=<id>` 可直接打开订单详情。
-- 页面内容区沿用 `.adm-content` 的 1600px 限宽；宽表由 `AdminDataTable` 的 `minWidth` 提供横向滚动。
+- 页面内容区沿用 `.adm-content`（不限宽，铺满可用宽度）；宽表由 `AdminDataTable` 的 `minWidth` 提供横向滚动。
 
 ### 8.2 支付渠道标签
 

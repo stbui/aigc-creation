@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Download } from 'lucide-react';
-import { Button } from '../../vendor/boardui/components/base/buttons/button';
+import { Button } from '../../admin-ui/shadcn/kit';
 import { adminApiLogsApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
@@ -12,6 +13,7 @@ import {
   AdminStaleError,
   useAdminDetailParam,
   useAdminList,
+  useAdminUrlFilterSync,
 } from '../../components/admin/AdminWidgets';
 import {
   AppliedFilters,
@@ -56,15 +58,32 @@ const STATUS_TONES: Record<string, 'success' | 'danger' | 'warn' | 'brand' | 'mu
 };
 
 export function AdminModelCallsPage() {
-  const [status, setStatus] = useState<string | undefined>(undefined);
-  const [requestKind, setRequestKind] = useState<string | undefined>(undefined);
-  const [billable, setBillable] = useState<string | undefined>(undefined);
-  const [model, setModel] = useState('');
-  const [channelId, setChannelId] = useState('');
-  const [taskId, setTaskId] = useState('');
-  const [userId, setUserId] = useState('');
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
+  /*
+   * 筛选条件可从地址栏恢复：把结果页链接发给同事时，对方打开必须是同一份数据。
+   * 读取放在 useState 初始化里同步完成，避免先按空条件查一次再查第二次。
+   */
+  const [searchParams] = useSearchParams();
+  const initial = {
+    status: searchParams.get('status') ?? undefined,
+    requestKind: searchParams.get('requestKind') ?? undefined,
+    billable: searchParams.get('billable') ?? undefined,
+    model: searchParams.get('model') ?? '',
+    channelId: searchParams.get('channelId') ?? '',
+    taskId: searchParams.get('taskId') ?? '',
+    userId: searchParams.get('userId') ?? '',
+    from: searchParams.get('from') ?? '',
+    to: searchParams.get('to') ?? '',
+  };
+
+  const [status, setStatus] = useState<string | undefined>(initial.status);
+  const [requestKind, setRequestKind] = useState<string | undefined>(initial.requestKind);
+  const [billable, setBillable] = useState<string | undefined>(initial.billable);
+  const [model, setModel] = useState(initial.model);
+  const [channelId, setChannelId] = useState(initial.channelId);
+  const [taskId, setTaskId] = useState(initial.taskId);
+  const [userId, setUserId] = useState(initial.userId);
+  const [from, setFrom] = useState(initial.from);
+  const [to, setTo] = useState(initial.to);
 
   const fetcher = useCallback(
     (params: Record<string, unknown>) =>
@@ -84,7 +103,22 @@ export function AdminModelCallsPage() {
     [],
   );
 
-  const { data, loading, error, params, setQuery, setPage, reload } = useAdminList<ApiLogListResult>(fetcher);
+  const { data, loading, error, params, setQuery, setPage, reload } = useAdminList<ApiLogListResult>(
+    fetcher,
+    initial,
+  );
+  /** 页面内改筛选后回写地址栏；`id`（详情抽屉）由 `useAdminDetailParam` 自己维护 */
+  useAdminUrlFilterSync({
+    status: params.status as string | undefined,
+    requestKind: params.requestKind as string | undefined,
+    billable: params.billable as string | undefined,
+    model: params.model as string | undefined,
+    channelId: params.channelId as string | undefined,
+    taskId: params.taskId as string | undefined,
+    userId: params.userId as string | undefined,
+    from: params.from as string | undefined,
+    to: params.to as string | undefined,
+  });
   const rows = data?.items ?? [];
   const summary = data?.summary;
 

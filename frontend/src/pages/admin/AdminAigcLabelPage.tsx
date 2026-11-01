@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Button } from '../../vendor/boardui/components/base/buttons/button';
+import { Button } from '../../admin-ui/shadcn/kit';
 import { adminAigcLabelApi } from '../../lib/api';
 import { hexToRgba } from '../../lib/aigc-label';
 import { useAdmin } from '../../context/AdminContext';

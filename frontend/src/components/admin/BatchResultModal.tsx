@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button } from '../../vendor/boardui/components/base/buttons/button';
+import { Button } from '../../admin-ui/shadcn/kit';
 import { ModalDialog } from '../../admin-ui/primitives/Dialog';
 import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
 import { StatusTag } from './PageHeader';

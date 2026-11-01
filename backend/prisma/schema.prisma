@@ -162,12 +162,27 @@ model Product {
   /// 排序权重, 小的靠前
   sortOrder Int    @default(0)
 
+  /// CNY | USD
+  currency            String   @default("CNY")
+  /// credits（本轮唯一启用）| storage（后续）
+  kind                String   @default("credits")
+  /// unlimited | periodic | inventory | timed
+  saleStrategy        String   @default("unlimited")
+  periodDays          Int      @default(0)
+  periodPurchaseLimit Int      @default(0)
+  stockTotal          Int      @default(0)
+  stockReserved       Int      @default(0)
+  stockSold           Int      @default(0)
+  saleStartAt         DateTime?
+  saleEndAt           DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   orderItems OrderItem[]
 
   @@index([status, sortOrder])
+  @@index([status, kind, sortOrder])
 }
 
 /// 订单。
@@ -213,6 +228,38 @@ model Order {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
+  /// 订单币种；金额始终是最小单位（CNY 分 / USD 美分）
+  currency              String   @default("CNY")
+
+  /// 下单意图时固定的渠道配置版本。历史订单为空时回调按同渠道最新版兜底
+  providerConfigId      String?
+  providerConfigVersion Int?
+
+  /// 渠道交易号。回调/查单/对账均可反查；唯一约束是重复入账的第二道防线
+  providerTradeNo       String?  @unique
+  /// 渠道原始状态文本，仅展示与排障，不参与本地状态机
+  providerStatus        String?
+
+  /// redirect | qrcode | sandbox
+  checkoutMode          String?
+  /// 跳转 URL 或二维码载荷。终态必须清空为 ''，避免页面把过期链接当可用
+  checkoutValue         String?  @default("")
+  checkoutExpiresAt     DateTime?
+  /// 最近一次向渠道查单的时间；用于 2 秒防抖与 worker 30 秒轮询
+  lastQueriedAt         DateTime?
+
+  /// 最近一次下单/查单/关单失败原因，截断 200 字；仅页面排障用
+  lastError             String?
+  /// 关单租约。条件更新抢占，防止用户手动关单与 worker 同时执行
+  closeStartedAt        DateTime?
+  closedAt              DateTime?
+
+  /// 渠道侧支付时间；paidAt 仍是本地入账时间
+  providerPaidAt        DateTime?
+
+  /// 是否仍占用库存。库存性商品下单时 true，支付/取消时释放
+  stockReserved         Boolean  @default(false)
+
   user     User        @relation(fields: [userId], references: [id])
   items    OrderItem[]
   payments Payment[]
@@ -242,6 +289,15 @@ model Order {
   @@index([createdAt])
   @@index([couponId])
   @@index([campaignId])
+  @@index([channel, status, createdAt])
+  @@index([channel, providerPaidAt])
+  @@index([channel, paidAt])
+  @@index([status, paidAt])
+  @@index([providerPaidAt])
+  @@index([status, expiresAt])
+  @@index([providerConfigId])
+  @@index([paidAt])
+  @@index([closedAt])
 }
 
 /// 订单项 —— **全字段快照**。
@@ -295,6 +351,17 @@ model Payment {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
+  /// 本次支付尝试的币种（必须与订单一致）
+  currency              String   @default("CNY")
+  /// 本次尝试固定的渠道配置版本；渠道配置轮换后仍可回溯
+  providerConfigId      String?
+  providerConfigVersion Int?
+  /// 渠道原始状态文本，仅排障展示
+  providerStatus        String?
+  /// 单次支付尝试的失败原因
+  lastError             String?
+  closedAt              DateTime?
+
   order   Order    @relation(fields: [orderId], references: [id])
   user    User     @relation(fields: [userId], references: [id])
   refunds Refund[]
@@ -302,6 +369,7 @@ model Payment {
   @@index([orderId])
   @@index([status, createdAt])
   @@index([userId])
+  @@index([orderId, status])
 }
 
 /// 退款单。
@@ -1941,4 +2009,113 @@ model RouteCatalogVersion {
   id      String @id @default("catalog")
   version Int    @default(0)
   updatedAt DateTime @updatedAt
+}
+
+/// 支付渠道配置。**追加写、不原地修改**。
+/// 订单与 Payment 固定 providerConfigId/version，历史订单回调验签必须还能取到当时的密钥。
+model PaymentProviderConfig {
+  id                String   @id @default(cuid())
+  /// 适配器 id：sandbox | alipay | wechat
+  providerId        String
+  /// 渠道内单调递增版本，从 1 开始
+  version           Int
+  enabled           Boolean  @default(false)
+  closeAfterMinutes Int      @default(30)
+  /// AES-256-GCM 密文；明文是 Record<string,string> 的 JSON，含密钥
+  configCipher      String   @default("")
+  /// 配置的规范化摘要（sha256），用于识别「无改动保存」
+  configDigest      String   @default("")
+  /// 管理员 id；首次 env 引导为 'bootstrap'
+  createdBy         String?
+  createdAt         DateTime @default(now())
+
+  @@unique([providerId, version])
+  @@index([providerId, createdAt])
+}
+
+/// 渠道异步通知收件箱。验签通过后、入账前落库，保证进程重启不丢通知。
+model PaymentNotification {
+  id               String   @id @default(cuid())
+  providerId       String
+  /// 渠道事件 id；渠道不提供时用 sha256(providerId + ':' + rawBody)
+  providerEventId  String
+  /// 回调 URL 固定下来的配置版本
+  providerConfigId String
+  merchantOrderNo  String
+  orderId          String?
+  /// sha256(rawBody)，用于排障与日志关联，不落明文
+  payloadDigest    String
+  /// 验签通过的原始报文 AES-256-GCM 密文
+  payloadCipher    String   @default("")
+  /// 适配器归一化后的业务字段 JSON；不得含密钥，可含渠道交易字段
+  normalizedJson   String   @default("{}")
+  /// pending | processing | processed | failed
+  status           String   @default("pending")
+  attempts         Int      @default(0)
+  lastError        String?
+  nextAttemptAt    DateTime @default(now())
+  processedAt      DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([providerId, providerEventId])
+  @@index([status, nextAttemptAt])
+  @@index([merchantOrderNo])
+  @@index([orderId])
+}
+
+/// 单次对账运行。失败可在同一账单日重跑，attempt 递增，历史运行不覆盖。
+model PaymentReconciliationRun {
+  id             String   @id @default(cuid())
+  providerId     String
+  /// 运行时使用的配置版本；证据链不依赖「当前最新版」
+  configId       String?
+  billDate       String
+  /// 同一渠道同一账单日的第几次运行，从 1 开始
+  attempt        Int      @default(1)
+  /// provider（渠道自动下载）| csv（人工上传兜底）
+  source         String   @default("provider")
+  fileName       String?
+  /// running | completed | failed
+  status         String   @default("running")
+  totalItems     Int      @default(0)
+  matchItems     Int      @default(0)
+  recoveredItems Int      @default(0)
+  errorItems     Int      @default(0)
+  error          String?
+  startedBy      String?
+  startedAt      DateTime @default(now())
+  completedAt    DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  items PaymentReconciliationItem[]
+
+  @@unique([providerId, billDate, attempt])
+  @@index([providerId, billDate, status])
+  @@index([status, createdAt])
+}
+
+model PaymentReconciliationItem {
+  id              String   @id @default(cuid())
+  runId           String
+  providerId      String
+  orderId         String?
+  merchantOrderNo String
+  providerTradeNo String?
+  amountCents     Int
+  currency        String   @default("CNY")
+  /// matched | recovered | local_order_not_found | provider_record_missing
+  /// | amount_mismatch | trade_no_mismatch | credit_failed
+  result          String
+  /// 该差异是否已由本次运行自动处理；不表示人工结案
+  resolved        Boolean  @default(false)
+  detail          String?
+  createdAt       DateTime @default(now())
+
+  run PaymentReconciliationRun @relation(fields: [runId], references: [id])
+
+  @@unique([runId, merchantOrderNo])
+  @@index([result])
+  @@index([providerId, merchantOrderNo])
 }

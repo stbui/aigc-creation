@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Download } from 'lucide-react';
-import { Button } from '../../vendor/boardui/components/base/buttons/button';
 import {
+  Button,
   Dropdown,
   DropdownGroup,
   DropdownItem,
   DropdownPopover,
   DropdownTrigger,
-} from '../../vendor/boardui/components/base/dropdown/dropdown';
+} from '../../admin-ui/shadcn/kit';
 import { adminUsersApi } from '../../lib/api';
 import { assetThumbUrl } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';

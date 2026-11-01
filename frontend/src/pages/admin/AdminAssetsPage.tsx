@@ -12,9 +12,7 @@ import {
   Maximize2,
   Trash2,
 } from 'lucide-react';
-import { Button } from '../../vendor/boardui/components/base/buttons/button';
-import { IconButton } from '../../vendor/boardui/components/base/buttons/icon-button';
-import { Pagination } from '../../vendor/boardui/components/base/pagination/pagination';
+import { Button, IconButton, Pagination } from '../../admin-ui/shadcn/kit';
 import { adminAssetsApi, assetThumbUrl, toAbsoluteUrl } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';

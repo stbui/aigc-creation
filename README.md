@@ -3,7 +3,7 @@
 面向电商团队的智能视觉创作平台：上传商品图或输入提示词，由真实模型线路产出可上架的主图、详情图、修图结果与短视频。
 
 - 后端：NestJS 12 + Prisma 7 + 自研 `node:sqlite` driver adapter（零原生编译依赖）
-- 前端：Vite 8 + React 19 + antd 6 + lucide-react；**后台另起一套 UI**：BoardUI 免费层（vendor 源码）+ Tailwind v4 + React Aria Components，后台树内不引 antd
+- 前端：Vite 8 + React 19 + antd 6 + lucide-react；**后台另起一套 UI**：shadcn/ui（源码自持）+ radix-ui + Tailwind v4，后台树内不引 antd
 - 模型层：渠道 → 渠道模型（含价格档）→ 前台模型 revision / 线路 → 路由与冷却 → 任务执行 → 账单退款，唯一实现在 `backend/src/model/**`
 - 协议：内置插件声明（`backend/plugins/**`，107 个可用包 / 115 个 provider），代码里没有手写协议；图像 / 文本同步，视频异步轮询
 - 图像生成：仅真实模型线路；无可用线路时任务失败 `42204` 并退款，不生成伪结果
@@ -53,7 +53,7 @@
 | 智能扩图 `/image-expand` | 上传 + 原图占比（100/80/60/50 快捷 + 1-99% 自由输入，默认 80）+ 原图位置（九宫格，默认居中）+ 高级设置 |
 | 商品换色 `/product-recolor` | 上传 + 商品颜色（白默认 / 浅蓝 / 蓝 / 红 / 深红 / 自定义 HEX）+ 高级设置 |
 | 旋转角度 `/rotate-angle` | 上传（JPG/PNG/WebP）+ 主体/摄像头双 tab 预览 + 三个滑杆（旋转 -90..90 / 倾斜 -30..60 / 缩放 0.8..1.2）+ 高级设置 |
-| 工具页 `/tools/:capability` | 上传区（单图/双图按能力声明，PNG/JPEG/WebP、单张 ≤10MB）+ 按参数声明自动渲染的表单 + 结果区（尺寸/格式/重新生成/清空）；创意生图走 `?capability=creative_image`，提交不会误写成 `free_create` |
+| 工具页 `/tools/:capability` | 上传区（单图/双图按能力声明，PNG/JPEG/WebP、单张 ≤10MB）+ 按参数声明自动渲染的表单 + 结果区（尺寸/格式/重新生成/清空）；创意生图走独立工作台 `/creative-image`，自由创作走 `/free-creation`，两者提交的能力不会互相写错 |
 | 我的作品 `/works` | 全部生成任务，状态筛选、预览、再做一张、删除；失败任务可原地重试（沿用原任务的 `capability` / `inputAssetIds` / `params`，重试前二次确认积分消耗） |
 | 素材库 `/library`（别名 `/asset-library`） | 原图与生成图，kind/能力筛选、分组、分页、删除 |
 | 数据中心 `/stats` | 6 项指标 + 近 7 天产出柱状图 + 按能力分布（含成功率）+ 最近任务 |
@@ -135,7 +135,7 @@ aigc-creation/
         ├── **/__tests__/       # Vitest 用例（*.test.ts / *.test.tsx）
         ├── pages/              # 35 个 C 端页面 + pages/admin/ 35 个后台页面
         ├── admin-ui/           # 后台 UI：shell（单栏外壳）/ primitives / controls / widgets / providers / lib
-        ├── vendor/boardui/     # BoardUI 免费层源码（MIT，保持上游原样，见 PROVENANCE.md）
+        ├── vendor/boardui/     # BoardUI 源码（MIT，上游原样；组件已零引用，仅剩 cx 与颜色 token）
         ├── components/         # AppLayout / SideRail / ToolShell；admin/（共享控件入口、adminNav、AlertCenter、DutyBand、statusMeta）
         ├── lib/                # api.ts（拆信封）/ http.ts / auth.ts / capabilities.ts / constants.ts
         ├── context/ hooks/     # AuthContext / AdminContext（权限点）/ CreditsContext；useToolTask 等

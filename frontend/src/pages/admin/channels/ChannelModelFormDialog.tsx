@@ -1,6 +1,6 @@
 import { Button, ModalDialog } from './components';
 import { ChannelModelForm } from './ChannelModelForm';
-import type { ModelDraft } from './modelDraft';
+import type { ModelDraft } from './constants';
 import type { AdminChannelModelView, ProtocolTestResultView } from '../../../types/model';
 
 interface ChannelModelFormDialogProps {

@@ -19,7 +19,7 @@ import {
   EMPTY_TIER,
   type ModelDraft,
   type TierDraft,
-} from './modelDraft';
+} from './constants';
 import type { ProtocolTestResultView } from '../../../types/model';
 
 interface ChannelModelFormProps {

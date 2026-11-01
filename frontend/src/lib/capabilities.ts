@@ -87,8 +87,9 @@ export function isCapabilityVisible(
 
 /**
  * 能力入口路径。商品主图 (main_image) / 商品详情图 (detail_image) / 爆款复刻 (hot_remake) /
- * 自由创作 (free_create) 分别走 1:1 复刻参考站的 product-kit / product-detail / viral-clone /
- * free-creation 工作台页; 多图融合/商品SKU图/修图系 8 项同样按参考站 URL 复刻独立页面;
+ * 自由创作 (free_create) / 创意生图 (creative_image) 分别走 1:1 复刻参考站的
+ * product-kit / product-detail / viral-clone / free-creation / creative-image 工作台页;
+ * 多图融合/商品SKU图/修图系 8 项同样按参考站 URL 复刻独立页面;
  * 其余能力走通用工具页。
  * 侧栏 / 顶导 / 工作台卡片共用同一映射, 避免多处漂移。
  */
@@ -97,9 +98,9 @@ export function toolPath(id: string): string {
   if (id === 'detail_image') return '/product-detail';
   if (id === 'hot_remake') return '/viral-clone';
   if (id === 'free_create') return '/free-creation';
-  // 参考站「创意生图」与「自由创作」共用同一页 (实拍: 侧栏点击创意生图 → /free-creation)。
-  // 查询参数保留入口语义: 页面外观相同，但提交的任务能力必须仍是 creative_image。
-  if (id === 'creative_image') return '/free-creation?capability=creative_image';
+  // 创意生图从「与自由创作共用 /free-creation + 查询参数」改为独立路由;
+  // 两页外观同构, 但提交的能力分别是 creative_image / free_create。
+  if (id === 'creative_image') return '/creative-image';
   if (id === 'multi_fusion') return '/multi-image-fusion';
   if (id === 'sku_image') return '/product-sku';
   if (id === 'local_redraw') return '/local-redraw';

@@ -18,7 +18,7 @@
 | 渠道 / 前台模型 / 价格档 | 数据库（后台「渠道工作台」「前台模型」「用户分组」）—— 代码里没有默认线路表 |
 | 账单状态机 | `backend/src/model/billing/billing.service.ts` 的 `BILLING_STATUSES` |
 | 启动期环境变量 | `backend/src/config/env.validation.ts` 的 `ENV_SPECS` |
-| 设计令牌 | `frontend/src/styles/global.css` 的 `:root` |
+| 设计令牌 | `frontend/src/styles/global.css` 的 `:root`；shadcn 语义变量经 `frontend/src/admin-ui/styles/shadcn-theme.css` 桥接，不另定义色值 |
 | AIGC 角标默认样式 | `backend/src/common/aigc-label.config.ts` 的 `AIGC_LABEL_DEFAULTS`；运行期由后台「AI 标识」页覆盖 |
 | 后台侧栏与页面分组 | `frontend/src/components/admin/adminNav.ts` 的 `ADMIN_MENU` |
 | 接口清单 / 错误码 / 响应信封 | `docs/api-contract.md` |
@@ -69,7 +69,8 @@ uat@admin.com
 | 鉴权/加密 | jsonwebtoken / bcryptjs | 9.0.3 / 3.0.3 |
 | 前端 | Vite + React + antd + lucide-react + react-router-dom | 8.3.4 / 19.3.0 / 6.6.6 / 1.57.0 / 7.18.4 |
 | 前端其他 | qrcode（邀请海报 / 扫码登录）/ Playwright（e2e） | 1.5.4 / `^1.64.1`（仅 e2e 允许 `^`） |
-| 后台 UI | BoardUI 免费层（vendor 源码）+ Tailwind v4 + React Aria Components | 源码锁 `ec5c5eb` / 4.3.3 / 1.22.1 |
+| 后台 UI | shadcn/ui 源码自持 + radix-ui + cva + clsx + tailwind-merge + Tailwind v4 | 自持 / 1.8.1 / 0.7.1 / 2.1.1 / 3.7.0 / 4.3.3 |
+| 后台 UI（遗留） | BoardUI 免费层（vendor 源码，**组件已零引用**，仅剩 `cx` 与颜色 token 词汇） | 源码锁 `ec5c5eb` |
 | 前端测试 | Vitest + jsdom + Testing Library | 5.0.5 / 30.1.3 / 16.3.3 |
 | 语言 | TypeScript | 后端 5.7.2 / 前端 7.0.2 |
 
@@ -129,7 +130,7 @@ aigc-creation/
     └── src/
         ├── App.tsx           # 28 条壳内路由 + 9 条独立页 + /admin/* 子应用
         ├── admin-ui/         # 后台 UI：shell/AdminBoardLayout · primitives · controls · widgets · providers · lib
-        ├── vendor/boardui/   # BoardUI 免费层源码（MIT，上游原样；来源见 PROVENANCE.md）
+        ├── vendor/boardui/   # BoardUI 源码（MIT，上游原样；组件已零引用，仅剩 cx 与 token 词汇）
         ├── components/       # AppLayout / SideRail / ToolShell / QrLoginPanel / admin/（控件入口 + adminNav + AlertCenter + DutyBand + statusMeta）
         ├── pages/            # 35 个 C 端页面 + pages/admin/ 35 个后台页面
         ├── lib/              # api.ts（request 拆信封）/ http / auth / capabilities / aigc-label / constants
@@ -287,9 +288,15 @@ npm run e2e                 # Playwright
 - 高危动作（删除 / 重置密码 / 退款 / 手动调整积分 / 渠道 / 前台模型写入 / 角色与系统设置写入 / 手动备份）须填原因并写审计（`HIGH_RISK_PERMISSIONS`）。
 - 批量动作：`ids ≤ 100`，`runBatch` 串行、**不包事务**，逐条返回结果；路由挂较弱读权限，处理器内再判动作权限。
 - CSV 统一走 `common/csv.ts`（BOM + RFC4180 + 公式注入前导 `'`）；前端 `downloadCsv()` 不走 JSON 信封。
-- **后台整站是 BoardUI**（2026-10-30 完成 30 页迁移，现 35 页 + 外壳全部是 BoardUI）：`pages/admin` / `components/admin` / `admin-ui` 三目录 `from 'antd'` 为 0，legacy 实现与 `VITE_ADMIN_UI` 开关已删除、无回滚。新页面直接写 `admin-ui/`，不要引 antd，也不要退回自绘 `div/button/input/select`。vendor 源码在 `frontend/src/vendor/boardui/`，保持上游原样不改，来源见 `PROVENANCE.md`。
+- **后台组件是一套 shadcn**（2026-11-01 完成全量迁移，无并存、无开关、无回滚）。35 个页面 + 外壳 + 浮层全部渲染自 `admin-ui/components/ui`（shadcn 源码自持）。
+  - 页面**不直连** `components/ui`。控件一律经 `admin-ui/shadcn`（新页面直写）或 `admin-ui/shadcn/kit`（存量页整页换皮层）取用；`kit` 的导出件与旧 BoardUI 版**同名同签名**，所以迁移时页面业务代码零改动。
+  - `admin-ui/controls` / `primitives` / `primitives/DataTable|Dialog|Drawer` / `widgets/AdminChrome` / `components/admin/PageHeader|AdminWidgets` 现在**都只是转发层**（→ `shadcn/kit`）。它们存在的唯一理由是让 35 页的 import 不用改；新代码直接用 `admin-ui/shadcn`。
+  - vendor `frontend/src/vendor/boardui/` 保持上游原样不改（来源见 `PROVENANCE.md`）。**组件引用已归零**（`grep vendor/boardui/components` 应为 0），目前只剩两处依赖：`admin-ui/lib/cn.ts` 的 `cx`，以及 `styles/boardui.css` 里 vendor `theme.css` 提供的颜色 token 词汇（存量页面的 `text-text-tertiary` / `border-border-table` 等类名仍用它，见下条）。
+  - 颜色仍只在一处定义：`styles/global.css` 的 `:root` 是令牌源，`admin-ui/styles/shadcn-theme.css` 把 shadcn 语义变量（`--background` / `--primary` / `--ring` …）桥接到那些令牌；改品牌色不改 shadcn 侧。**两套词汇不要混写**：新代码只写 shadcn 类（`bg-card` / `text-muted-foreground` / `border-border` / `bg-accent`），存量页里的 BoardUI 类名（`bg-background-secondary-default` / `text-text-tertiary` …）由同一套令牌提供等值颜色，逐页替换按需进行，不做批量重命名（`secondary/tertiary` 两档灰在 shadcn 里没有一一对应的名字，硬换会塌掉层级）。
+  - Tailwind 只引 `theme.css` + `utilities.css`，**没有 preflight**：裸 `border` 会退回 `currentColor`，故 `[data-slot]` 的描边兜底写在 `@layer base`（unlayered 规则会压过所有 `@layer`，`border-transparent` 就失效）。
+  - 高危动作确认：页面内用 `ConfirmAction`（贴底操作条，不弹阻塞层）；需要跨页面复用的二次确认走 `useConfirm()`（`providers/ConfirmProvider`，shadcn Dialog）。
 - **外壳**：`admin-ui/shell/AdminBoardLayout` —— 单栏（侧栏 232 / 折叠 60，≤1280 自动折叠），无顶栏、无值班带；导航 / ⌘K 搜索 / 告警铃 / 密度 / 用户菜单都在侧栏。值班塔只出现在概览首屏（`admin-ui/widgets/DutyStrip`）。`global.css` 的 `.adm-*` 只剩外壳骨架（`adm-layout` / `adm-content` / `adm-skip-link`）与值班塔（`adm-tower*` / `adm-dot` / `adm-empty-inline`），页面内新增 `adm-*` 类是错的。
-- **共享控件**：`components/admin/PageHeader.tsx` 与 `AdminWidgets.tsx` 是单一路径的再导出（→ `admin-ui/widgets/AdminChrome` / `primitives`），页面 import 不变；改外观只改 `AdminChrome`。表格 `admin-ui/primitives/DataTable`（密度走 `admin-ui/lib/density` 的 `DensityContext`，由外壳下发），状态色 `components/admin/statusMeta.ts`。
+- **共享控件**：`components/admin/PageHeader.tsx` 与 `AdminWidgets.tsx` 是单一路径的再导出（→ `admin-ui/widgets/AdminChrome` → `shadcn/kit`），页面 import 不变；改外观只改 `shadcn/kit`。表格 `shadcn/kit/table`（密度走 `admin-ui/lib/density` 的 `DensityContext`，由外壳下发），状态色 `components/admin/statusMeta.ts`。
 - **e2e 锚点**：共享控件与页面关键节点挂 `data-testid="admin-*"`，表单控件用 `aria-label`；测试一律 `getByTestId` / `getByLabel` / 角色名，不追 Tailwind 工具类与已删除的 `adm-*` 类。
 
 ### 商业域
@@ -327,6 +334,7 @@ npm run e2e                 # Playwright
 | 新增一项能力 | `capabilities/definitions/<id>.ts` + `definitions/index.ts` | 启动期 `assertCapabilityIntegrity`；`verify-capability-bootstrap`。之后还要在后台配前台模型，否则 `runtime.effective = unavailable` |
 | 接入一家厂商 | 新增 `backend/plugins/<plugin>/manifest.json`（或后台上传安装） | `verify-plugin-manifests` / `verify-protocol-runtime`；协议下拉按能力过滤自动可见 |
 | 新增后台页 | `admin/permissions.ts` → controller 挂 `@RequirePermission` → `adminNav.ts` → `pages/admin/*.tsx` → 路由 → `lib/api.ts` | 前端 `can()` 只隐藏按钮，权限必须在后端 |
+| 拆分 / 新增后台功能目录 | `pages/<域>/` 下按 `index` / `page` / `components` / `api` / `hooks` / `utils` / `constants` 分层，目录内只从入口文件取外部依赖 | `docs/frontend-module-conventions.md`；`admin-modules.test.ts` 具名导入对账 |
 | 新增环境变量 | `ENV_SPECS` + `.env.example` + 三档 env | `probe-environments.ts`；`docs/environments.md` |
 | 调整积分价 / 退款规则 | `definitions/<id>.ts` 的 `creditCost` / `common/setting-defs.ts` 的 `SETTING_DEFS` | 运行时走 `resolve()` 与设置读取，不写死 |
 
@@ -390,6 +398,6 @@ npm run e2e                 # Playwright
 | --- | --- |
 | 需求 | `docs/prd.md`（整站）、`admin-prd.md`（后台）、`agent-prd.md`（规划） |
 | 产品 | `admin-suite/console/detailed/ui-design.md`、`commerce-design.md`、`landing/workbench/topnav/login/library-design.md` |
-| 技术 | `environments.md`、`docker-deployment.md`、`model-architecture.md`、`api-contract.md`、`runtime-infrastructure.md`、`typography.md`、`agent-integration-design.md`（规划） |
+| 技术 | `environments.md`、`docker-deployment.md`、`model-architecture.md`、`api-contract.md`、`runtime-infrastructure.md`、`frontend-module-conventions.md`、`typography.md`、`agent-integration-design.md`（规划） |
 | 测试 | `docs/testing.md`（四层测试、闸口清单、覆盖矩阵、已知缺口） |
 | 流程 | `docs/development-workflow.md`（Agent 执行手册：指令映射、执行卡、闸口矩阵、证据标准、交人边界） |

@@ -1,4 +1,4 @@
-import type { ParamOption } from '../capability-plugin.type';
+import type { ParamOption, ParamOptionMeta, PlatformDetailMeta } from '../capability-plugin.type';
 
 /**
  * 跨能力复用的参数选项集 (2026-10-20 抽离)。
@@ -11,18 +11,113 @@ import type { ParamOption } from '../capability-plugin.type';
  * 取值来源均为参考站实拍 (见各常量注释), 与上游一一对应, 不得擅自增删。
  */
 
-/** 平台清单与参考站 product-kit 一致 (9 项, value 与参考站 data 属性相同) */
-export const PLATFORMS: ParamOption[] = [
-  { value: 'taobao', label: '淘宝' },
-  { value: 'jd', label: '京东' },
-  { value: 'douyin', label: '抖音' },
-  { value: 'pdd', label: '拼多多' },
-  { value: 'xiaohongshu', label: '小红书' },
-  { value: 'amazon', label: 'Amazon' },
-  { value: 'tiktok-shop', label: 'TikTok' },
-  { value: 'shopify', label: 'Shopify' },
-  { value: 'temu', label: 'Temu' },
+/**
+ * 平台清单与参考站 product-kit 一致 (9 项, value 与参考站 data 属性相同)。
+ *
+ * `meta` 是平台主图规格（2026-11 复核各平台商家后台的公开建议值）：
+ *   - 前端据此在切换平台时带出默认比例 / 画质（用户手动改过则不再覆盖）；
+ *   - 后端据此在提示词里补一句平台规格，避免「选了京东却按 9:16 出图」。
+ *
+ * 这里只表达**建议值与常规规格**，不是平台审核口径；规则变化时改这一处，
+ * 不要再在前端/提示词里各写一份。minPx 用于展示，不参与选路。
+ */
+const PLATFORM_ROWS: Array<{
+  value: string;
+  label: string;
+  ratio: string;
+  size: string;
+  minPx: number;
+  spec: string;
+  detail: { size: string; widthPx: number; spec: string };
+}> = [
+  {
+    value: 'taobao',
+    label: '淘宝',
+    ratio: '1:1',
+    size: '1k',
+    minPx: 800,
+    spec: '主图常规 1:1、边长 ≥800px',
+    detail: { size: '1k', widthPx: 750, spec: '详情长图建议宽度 750px' },
+  },
+  {
+    value: 'jd',
+    label: '京东',
+    ratio: '1:1',
+    size: '1k',
+    minPx: 800,
+    spec: '主图常规 1:1、边长 ≥800px',
+    detail: { size: '1k', widthPx: 750, spec: '详情长图建议宽度 750px' },
+  },
+  {
+    value: 'douyin',
+    label: '抖音',
+    ratio: '1:1',
+    size: '1k',
+    minPx: 600,
+    spec: '商品主图常规 1:1、边长 ≥600px',
+    detail: { size: '1k', widthPx: 750, spec: '详情长图建议宽度 750px' },
+  },
+  {
+    value: 'pdd',
+    label: '拼多多',
+    ratio: '1:1',
+    size: '1k',
+    minPx: 480,
+    spec: '主图常规 1:1、边长 ≥480px',
+    detail: { size: '1k', widthPx: 750, spec: '详情长图建议宽度 750px' },
+  },
+  {
+    value: 'xiaohongshu',
+    label: '小红书',
+    ratio: '3:4',
+    size: '1k',
+    minPx: 1080,
+    spec: '竖版封面常规 3:4、建议 1080×1440',
+    detail: { size: '1k', widthPx: 1080, spec: '详情长图建议宽度 1080px' },
+  },
+  {
+    value: 'amazon',
+    label: 'Amazon',
+    ratio: '1:1',
+    size: '2k',
+    minPx: 1600,
+    spec: '主图常规 1:1、最短边 ≥1600px',
+    detail: { size: '2k', widthPx: 1000, spec: '详情图建议宽度 ≥1000px' },
+  },
+  {
+    value: 'tiktok-shop',
+    label: 'TikTok',
+    ratio: '1:1',
+    size: '1k',
+    minPx: 800,
+    spec: '商品主图常规 1:1、边长 ≥800px',
+    detail: { size: '1k', widthPx: 1080, spec: '详情长图建议宽度 1080px' },
+  },
+  {
+    value: 'shopify',
+    label: 'Shopify',
+    ratio: '1:1',
+    size: '2k',
+    minPx: 2048,
+    spec: '主图常规 1:1、建议 2048×2048',
+    detail: { size: '2k', widthPx: 2048, spec: '详情图建议宽度 2048px' },
+  },
+  {
+    value: 'temu',
+    label: 'Temu',
+    ratio: '1:1',
+    size: '1k',
+    minPx: 800,
+    spec: '主图常规 1:1、边长 ≥800px',
+    detail: { size: '1k', widthPx: 750, spec: '详情长图建议宽度 750px' },
+  },
 ];
+
+export const PLATFORMS: ParamOption[] = PLATFORM_ROWS.map(({ value, label, ...spec }) => ({
+  value,
+  label,
+  meta: spec,
+}));
 
 /**
  * 输出语言 (参考站「语言」下拉 10 项)
@@ -214,6 +309,86 @@ export const QUALITY_OPTIONS: ParamOption[] = [
  */
 export const ratioText = (r?: string): string => (r ? `，画面比例 ${r}` : '');
 export const sizeText = (s?: string): string => (s ? `，输出规格 ${String(s).toUpperCase()}` : '');
+
+/**
+ * 枚举值 → 展示名。
+ *
+ * 参数里存的是稳定英文键（`taobao` / `zh-CN`），提示词里必须换成用户看到的
+ * 展示名（`淘宝` / `English`）—— 把键直接拼进中文句子，模型容易把它当成
+ * 无关 token，平台与语言的约束就形同虚设。
+ *
+ * 认不出的值原样返回，不吞信息：新增平台/语言却漏配 label 时，
+ * 提示词里至少还能看到原值，而不是被悄悄丢掉。
+ */
+export function optionLabel(options: ParamOption[], value: unknown): string {
+  const raw = String(value ?? '').trim();
+  if (!raw) return '';
+  return options.find((o) => String(o.value) === raw)?.label ?? raw;
+}
+
+/** 平台枚举值 → 主图规格（未配置时返回 `undefined`，调用方按无规格处理） */
+export function platformSpec(value: unknown): ParamOptionMeta | undefined {
+  const raw = String(value ?? '').trim();
+  if (!raw) return undefined;
+  return PLATFORMS.find((o) => String(o.value) === raw)?.meta;
+}
+
+/** 平台枚举值 → 详情长图规格（详情页专用） */
+export function platformDetailSpec(value: unknown): PlatformDetailMeta | undefined {
+  return platformSpec(value)?.detail;
+}
+
+/** 投放平台 → 提示词片段（如 `，适配淘宝平台`） */
+export const platformText = (platform: unknown): string => {
+  const label = optionLabel(PLATFORMS, platform);
+  return label ? `，适配${label}平台` : '';
+};
+
+/**
+ * 投放平台 + 主图规格 → 提示词片段（如 `，适配京东平台（主图常规 1:1、边长 ≥800px）`）。
+ *
+ * 只给「单张商品图」类能力用（商品主图 / 爆款复刻）；详情长图用
+ * `platformDetailSpecText`（宽度口径不同，不能套主图比例）。
+ *
+ * 参数里已显式选了与平台常规不一致的比例/更低画质时**不再补规格**：
+ * 用户意图优先，避免同一句提示词里出现「画面比例 16:9 … 主图常规 1:1」。
+ * 前端切换平台时会自动带出规格，正常点击路径两者是一致的。
+ */
+const SIZE_RANK: Record<string, number> = { '1k': 1, '1.5k': 2, '2k': 3, '4k': 4 };
+
+export const platformSpecText = (p: Record<string, any>): string => {
+  const label = optionLabel(PLATFORMS, p?.platform);
+  if (!label) return '';
+  const spec = platformSpec(p.platform);
+  if (!spec?.spec) return `，适配${label}平台`;
+  const ratio = String(p.ratio ?? '').trim();
+  const size = String(p.size ?? '').trim().toLowerCase();
+  const ratioOk = !ratio || !spec.ratio || ratio === spec.ratio;
+  const sizeOk = !size || !spec.size || (SIZE_RANK[size] ?? 0) >= (SIZE_RANK[spec.size] ?? 0);
+  return ratioOk && sizeOk ? `，适配${label}平台（${spec.spec}）` : `，适配${label}平台`;
+};
+
+/**
+ * 投放平台 + 详情长图规格 → 提示词片段（如 `，适配淘宝平台（详情长图建议宽度 750px）`）。
+ *
+ * 与主图规格同一套收敛原则：用户显式选了低于平台建议的画质时不再补规格。
+ * 详情长图没有「比例」语义，只有宽度，故不比较 ratio。
+ */
+export const platformDetailSpecText = (p: Record<string, any>): string => {
+  const label = optionLabel(PLATFORMS, p?.platform);
+  if (!label) return '';
+  const spec = platformDetailSpec(p.platform);
+  if (!spec?.spec) return `，适配${label}平台`;
+  const size = String(p.size ?? '').trim().toLowerCase();
+  const sizeOk = !size || !spec.size || (SIZE_RANK[size] ?? 0) >= (SIZE_RANK[spec.size] ?? 0);
+  return sizeOk ? `，适配${label}平台（${spec.spec}）` : `，适配${label}平台`;
+};
+
+/** 输出语言 → 提示词片段（如 `，画面内文字使用 English`） */
+export const languageText = (language: unknown): string => {
+  const label = optionLabel(LANGUAGES, language);
+  return label ? `，画面内文字使用 ${label}` : '';
+};
 
 export const subjectText = (p: Record<string, any>): string => {
   const name = p.productName ? `商品「${p.productName}」` : '商品主体';

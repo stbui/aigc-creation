@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button } from '../../vendor/boardui/components/base/buttons/button';
-import { Chip } from '../../vendor/boardui/components/base/badges/chip';
+import { Button, Chip } from '../../admin-ui/shadcn/kit';
 import { adminApi, adminRolesApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';

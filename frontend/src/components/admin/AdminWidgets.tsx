@@ -12,11 +12,9 @@ import { PageHeader } from './PageHeader';
  * 无关，只保留一份 —— 两条渲染路径若各存一份逻辑，「失败不清空数据」「筛选
  * 变更重置页码」这类行为迟早会分叉。
  *
- * 渲染层此前有两份：`admin-ui/widgets/AdminChrome`（BoardUI）与
- * `AdminWidgets.legacy`（antd 回滚路径），由 `VITE_ADMIN_UI` 决定。29 页全部
- * 迁完后 legacy 已无调用方，随 P4 删除（纯 C 决策：不允许交付中间态），
- * 切换开关 `VITE_ADMIN_UI` 同时下线。
- * 页面只 `import ... from '../../components/admin/AdminWidgets'`，不感知差异。
+ * 渲染层只有一份：`admin-ui/widgets/AdminChrome`，实现在 `admin-ui/shadcn/kit`。
+ * 2026-11-01 整站换 shadcn 时这一层保持导出名与签名不变 —— 页面只
+ * `import ... from '../../components/admin/AdminWidgets'`，不感知实现换过。
  */
 /*
  * 显式标注类型而不是让 TS 推导联合类型。

@@ -1,6 +1,13 @@
-import type { AdminChannelView } from '../../../types/model';
 import type { SegmentedOption, SelectOption } from './components';
-import type { ChannelHeader } from './ChannelHeadersEditor';
+
+/* ------------------------------------------------------------------------- */
+/* 渠道                                                                      */
+/* ------------------------------------------------------------------------- */
+
+export interface ChannelHeader {
+  name: string;
+  value: string;
+}
 
 /**
  * 渠道新建 / 编辑表单的本地草稿。
@@ -21,7 +28,7 @@ export interface ChannelDraft {
   reason: string;
 }
 
-export const EMPTY_DRAFT: ChannelDraft = {
+export const EMPTY_CHANNEL_DRAFT: ChannelDraft = {
   name: '',
   baseUrl: '',
   apiKey: '',
@@ -34,23 +41,6 @@ export const EMPTY_DRAFT: ChannelDraft = {
   headers: [],
   reason: '',
 };
-
-export function toDraft(channel: AdminChannelView): ChannelDraft {
-  return {
-    name: channel.name,
-    baseUrl: channel.baseUrl,
-    apiKey: '',
-    secretKey: '',
-    proxyUrl: channel.proxyUrl,
-    // 并发 0 表示跟随全局上限
-    useGlobalConcurrency: channel.concurrencyLimit === 0,
-    concurrencyLimit: String(channel.concurrencyLimit || 8),
-    enabled: channel.enabled,
-    sortOrder: String(channel.sortOrder ?? 0),
-    headers: channel.headers ?? [],
-    reason: '',
-  };
-}
 
 /** 渠道级健康汇总：把该渠道下各线路的 24h 样本加总，左列一眼看出哪家在坏 */
 export interface ChannelHealthSummary {
@@ -68,3 +58,113 @@ export const CHANNEL_STATUS_OPTIONS: SelectOption[] = [
   { value: 'enabled', label: '启用' },
   { value: 'disabled', label: '停用' },
 ];
+
+/* ------------------------------------------------------------------------- */
+/* 渠道模型                                                                  */
+/* ------------------------------------------------------------------------- */
+
+/** 供应侧模态：与 `ChannelModel.capability` 同一命名空间（不是 C 端能力 id） */
+export const CAPABILITY_OPTIONS = [
+  { value: 'image', label: '图像' },
+  { value: 'text', label: '文本' },
+  { value: 'video', label: '视频' },
+  { value: 'audio', label: '音频' },
+];
+
+/**
+ * 清单状态筛选。
+ *
+ * 「未定价」是本仓特有的一档：没有已配置价格档的模型不会被报价，也不该被
+ * 线路选用。导入上游目录后模型默认停用且未定价，这一档就是补价工作队列。
+ */
+export const STATUS_FILTER_OPTIONS = [
+  { value: 'enabled', label: '已启用' },
+  { value: 'disabled', label: '已停用' },
+  { value: 'unpriced', label: '未定价' },
+];
+
+export const PAGE_SIZE = 20;
+
+export const BILLING_MODE_OPTIONS = [
+  { value: 'fixed_request', label: '按次' },
+  { value: 'per_second', label: '按时长（秒）' },
+  { value: 'token', label: '按 Token 用量' },
+];
+
+export const CURRENCY_OPTIONS = [
+  { value: 'credits', label: '积分' },
+  { value: 'USD', label: '美元' },
+  { value: 'CNY', label: '人民币' },
+];
+
+export const TAG_COLOR_OPTIONS = ['purple', 'blue', 'green', 'gold', 'orange', 'pink'];
+
+export interface TierDraft {
+  selector: string;
+  resolution: string;
+  videoSeconds: string;
+  providerModelKey: string;
+  billingMode: string;
+  unit: string;
+  input: string;
+  output: string;
+  cached: string;
+  costConfigured: boolean;
+  costUnit: string;
+  costInput: string;
+  costOutput: string;
+  costCached: string;
+  priceConfigured: boolean;
+  enabled: boolean;
+}
+
+export interface ModelDraft {
+  modelKey: string;
+  providerModelKey: string;
+  displayName: string;
+  channelLabel: string;
+  description: string;
+  icon: string;
+  capability: string;
+  protocol: string;
+  priceCurrency: string;
+  tags: string;
+  capabilityConfig: string;
+  enabled: boolean;
+  tiers: TierDraft[];
+}
+
+export const EMPTY_TIER: TierDraft = {
+  selector: '',
+  resolution: '*',
+  videoSeconds: '0',
+  providerModelKey: '',
+  billingMode: 'fixed_request',
+  unit: '0',
+  input: '0',
+  output: '0',
+  cached: '0',
+  costConfigured: false,
+  costUnit: '0',
+  costInput: '0',
+  costOutput: '0',
+  costCached: '0',
+  priceConfigured: false,
+  enabled: true,
+};
+
+export const EMPTY_MODEL_DRAFT: ModelDraft = {
+  modelKey: '',
+  providerModelKey: '',
+  displayName: '',
+  channelLabel: '',
+  description: '',
+  icon: '',
+  capability: 'image',
+  protocol: '',
+  priceCurrency: 'credits',
+  tags: '',
+  capabilityConfig: '',
+  enabled: true,
+  tiers: [{ ...EMPTY_TIER }],
+};

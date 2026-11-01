@@ -4,65 +4,106 @@ import {
   Get,
   Param,
   Post,
+  Query,
   RawBodyRequest,
   Req,
   Res,
   UseGuards,
 } from '@nestjs/common';
+import { IsOptional, IsString, MaxLength } from 'class-validator';
 import { Request, Response } from 'express';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/current-user.decorator';
-import { PaymentsService } from './payments.service';
+import { AppError } from '../common/app.exception';
+import { PaymentOrderService } from './payment-order.service';
+import { PaymentConfigService } from './payment-config.service';
+import { PaymentNotificationService } from './payment-notification.service';
+import { PAYMENT_CURRENCIES, PaymentCurrency, PaymentProviderId } from './adapters/types';
+
+export class CreateIntentDto {
+  /** 渠道 id。多个可用渠道时必传 */
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  providerId?: string;
+}
 
 /**
- * 支付接口。
+ * C 端支付接口。
  *
- * `/payments/callback/:channel` 是**公开**路由 —— 渠道服务器不带我们的 JWT,
- * 身份靠验签证明。因此它绝不能挂 JwtAuthGuard, 也绝不能依赖「谁能调通」
- * 来判定请求是否可信。
+ * `/payments/callback/:providerId/:configId` 是**公开**路由 —— 渠道服务器不带
+ * 我们的 JWT，身份靠验签证明。它绝不能挂 JwtAuthGuard，也不能依赖「谁能调通」
+ * 判断请求是否可信。
  */
 @Controller('payments')
 export class PaymentsController {
-  constructor(private readonly payments: PaymentsService) {}
+  constructor(
+    private readonly orders: PaymentOrderService,
+    private readonly configs: PaymentConfigService,
+    private readonly notifications: PaymentNotificationService,
+  ) {}
 
-  /** 发起支付: 返回跳转地址或二维码内容 */
+  /** 可选支付渠道（按订单币种或指定币种过滤） */
+  @Get('providers')
+  @UseGuards(JwtAuthGuard)
+  async providers(@Query('currency') currency?: string) {
+    const target = this.normalizeCurrency(currency);
+    const items = await this.configs.available(target);
+    return { items, total: items.length, page: 1, pageSize: items.length };
+  }
+
+  /** 发起支付：返回跳转地址或二维码内容 */
   @Post(':orderId/intent')
   @UseGuards(JwtAuthGuard)
-  createIntent(@Param('orderId') orderId: string, @CurrentUser() user: AuthUser) {
-    return this.payments.createIntent(orderId, user.id);
+  createIntent(
+    @Param('orderId') orderId: string,
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateIntentDto,
+  ) {
+    return this.orders.createIntent({ orderId, userId: user.id, providerId: dto.providerId });
   }
 
   /** 支付状态轮询 */
   @Get(':orderId/status')
   @UseGuards(JwtAuthGuard)
   status(@Param('orderId') orderId: string, @CurrentUser() user: AuthUser) {
-    return this.payments.status(orderId, user.id);
+    return this.orders.query({ orderId, actor: { kind: 'user', userId: user.id } });
+  }
+
+  /** 主动查单（刷新动作，不是状态变更） */
+  @Post(':orderId/query')
+  @UseGuards(JwtAuthGuard)
+  query(@Param('orderId') orderId: string, @CurrentUser() user: AuthUser) {
+    return this.orders.query({ orderId, actor: { kind: 'user', userId: user.id } });
   }
 
   /**
    * 渠道异步回调。
    *
-   * 必须用**原始报文**验签 (微信的签名覆盖 body 字节; 支付宝的表单参数
-   * 经 URL 解码后拼串)。故 main.ts 建应用时开启了 `rawBody: true`;
-   * 若这里拿到的是 `JSON.stringify(body)`, 微信验签会稳定失败。
+   * 必须用**原始报文**验签（微信签名覆盖 body 字节；支付宝表单参数经 URL
+   * 解码后拼串），故 main.ts 建应用时开启了 `rawBody: true`。
    *
-   * 响应格式由通道决定 (支付宝纯文本 / 微信 JSON), 故用 @Res 直接写,
+   * 响应格式由通道决定（支付宝纯文本 / 微信 JSON），用 @Res 直接写，
    * 不经过统一响应信封 —— 渠道不认识 `{code,data,message}`。
    */
-  @Post('callback/:channel')
+  @Post('callback/:providerId/:configId')
   async callback(
-    @Param('channel') channel: string,
+    @Param('providerId') providerId: string,
+    @Param('configId') configId: string,
     @Req() req: RawBodyRequest<Request>,
     @Body() body: Record<string, unknown>,
     @Res() res: Response,
   ): Promise<void> {
+    if (!['sandbox', 'alipay', 'wechat'].includes(providerId)) {
+      throw new AppError(40400, `未知支付渠道: ${providerId}`, 404);
+    }
     const rawBody = req.rawBody
-      ? req.rawBody.toString('utf8')
-      : typeof body === 'object' && body !== null
-        ? JSON.stringify(body)
-        : '';
+      ? req.rawBody
+      : Buffer.from(typeof body === 'object' && body !== null ? JSON.stringify(body) : '');
 
-    const ack = await this.payments.handleCallback(channel, {
+    const ack = await this.notifications.ingest({
+      providerId: providerId as PaymentProviderId,
+      configId,
       headers: req.headers as Record<string, string | string[] | undefined>,
       rawBody,
       body: body ?? {},
@@ -71,5 +112,31 @@ export class PaymentsController {
     res.status(ack.status);
     res.setHeader('Content-Type', ack.contentType);
     res.send(ack.body);
+  }
+
+  private normalizeCurrency(currency?: string): PaymentCurrency {
+    if (!currency) return 'CNY';
+    if (!(PAYMENT_CURRENCIES as string[]).includes(currency)) {
+      throw new AppError(40001, `不支持的币种: ${currency}`, 400);
+    }
+    return currency as PaymentCurrency;
+  }
+}
+
+/**
+ * 用户取消未支付订单。
+ *
+ * 独立成 controller 而不是塞回 `OrdersController`：取消订单现在必须**先向
+ * 渠道查单**（渠道可能已经收了钱），这条链路依赖支付域；让订单域反向依赖
+ * 支付域会形成循环。路由仍是 `POST /orders/:id/cancel`，对前端无感。
+ */
+@Controller('orders')
+@UseGuards(JwtAuthGuard)
+export class OrderCancelController {
+  constructor(private readonly orders: PaymentOrderService) {}
+
+  @Post(':id/cancel')
+  cancel(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.orders.close({ orderId: id, actor: { kind: 'user', userId: user.id }, reason: '用户取消' });
   }
 }

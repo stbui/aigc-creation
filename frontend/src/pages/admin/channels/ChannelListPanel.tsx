@@ -6,10 +6,9 @@ import {
   FilePick,
   Panel,
   SelectBox,
-  StatusTag,
   TextInput,
 } from './components';
-import { formatRate, healthTone } from './ChannelModelHealthCell';
+import { formatRate, healthTone } from './utils';
 import { CHANNEL_STATUS_OPTIONS, type ChannelHealthSummary } from './constants';
 import type { AdminChannelView } from '../../../types/model';
 
@@ -178,9 +177,12 @@ export function ChannelListPanel({
                 data-testid="admin-channel-item"
                 aria-pressed={active}
                 aria-controls="admin-channel-detail"
-                className={`h-auto w-full justify-start whitespace-normal px-3 py-2.5 text-left ${
-                  /* ghost 自带底色，选中态只能靠描边加深 + 背景提亮区分，单给背景会被底色调平 */
-                  active ? 'bg-accent-100 ring-2 ring-accent-400' : ''
+                /*
+                 * ghost 自带 accent-100 底色：这里必须用 `!` 压平，否则未选中项
+                 * 与选中项同色，整列看起来都像选中。选中态只给浅底 + 内描边。
+                 */
+                className={`h-auto w-full justify-start whitespace-normal px-3 py-2.5 text-left !bg-transparent hover:!bg-background-secondary-default ${
+                  active ? '!bg-accent-50 ring-1 ring-inset ring-accent-300 hover:!bg-accent-50' : ''
                 }`}
                 onClick={() => onSelect(row.id)}
               >
@@ -192,13 +194,18 @@ export function ChannelListPanel({
                     >
                       {row.name}
                     </span>
-                    <StatusTag
-                      status={row.enabled ? 'enabled' : 'disabled'}
-                      tone={row.enabled ? 'success' : 'muted'}
-                      label={row.enabled ? '启用' : '停用'}
-                    />
                   </span>
                   <span className="flex items-center gap-2 text-[11px] text-text-tertiary">
+                    {/* 状态用圆点：每行一颗绿色「启用」胶囊会把整列刷成绿色，异常项反而看不见 */}
+                    <span className="inline-flex items-center gap-1">
+                      <span
+                        className={`size-1.5 shrink-0 rounded-full ${
+                          row.enabled ? 'bg-emerald-500' : 'bg-text-placeholder'
+                        }`}
+                        aria-hidden
+                      />
+                      {row.enabled ? '启用' : '停用'}
+                    </span>
                     <span className="tabular-nums">{row.modelCosts?.length ?? 0} 个模型</span>
                     {rate !== null && (
                       <span
