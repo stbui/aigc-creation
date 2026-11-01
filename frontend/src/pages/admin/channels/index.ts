@@ -1,0 +1,1 @@
+export { AdminChannelsPage } from './page';

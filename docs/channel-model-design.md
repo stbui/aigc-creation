@@ -227,6 +227,8 @@ backend/src/model/
 
 所有写接口挂权限点（§9.3），高危动作写 `AdminAuditLog`。参考实现只有 `RequireAdmin` 粗粒度校验，本仓按现有权限体系细化——**这是移植时必须补强的一处**。
 
+**服务商目录的口径差异（有意为之，不是缺口）**：参考实现的目录（`catalog.go`，`schemaVersion 1`）携带 `providers[].models[]` + CNY 价格档 + `keyGuide`，`install` 直接建渠道并带模型与定价，前端因此有「选服务商 → 填 Key → 模型与定价」三步向导。本仓的目录是**插件包上游清单**（`ProviderCatalogEntry`：名称 / 厂商 / `apiFormat` / `baseUrl` / `protocols` / `packageUrl`），`install` 复用 `PluginAdminService.install` 安装协议插件，落在后台「插件」页；建渠道与定价仍在「渠道工作台」手工完成。移植向导需要先引入一整套外部的厂商模型目录与人民币价格档，而本仓没有任何订阅源（`MODEL_PROVIDER_CATALOG_URL` 三档均为空），内置一份假目录只会让人误以为「已经支持 N 家厂商」——因此不做。
+
 ### 4.3 代理路由
 
 | 路径 | 语义 |
@@ -516,7 +518,7 @@ model: {
 | P2 | 协议与执行：manifest 适配器、表达式 DSL、内置协议、测试调用、上游拉取 | 用真实密钥对至少 1 家 image + 1 家 video 完成连通性测试；`api-logs` 有记录 |
 | P3 ✅ 已交付 | 前台模型与路由：revision/route、目录快照、意图匹配、选路、报价。落地 `src/model/{intent,routing,catalog,user-groups}`，公开 `/models`、`/models/available`、`/models/:id/quote` 与后台 `POST /admin/logical-models/:id/simulate`；`/model-catalog*`（原始渠道模型目录）按 P5 与 C 端选型一起交付，避免半成品接口 | `npm run verify:route-catalog`：priority 分层与下沉、同层加权分布、SKU 选择（精确/通配/1.5K 相邻/停用档）、冷却三键、`simulate` 与 `resolve` 选中同一线路与价格档、目录投影的渠道可见性与换算顺序；后半段起 Nest 打真实 HTTP 校验四个端点的接线与守卫 |
 | P4 ✅ 已交付 | 任务与计费：准入改造、worker/租约/轮询、attempt 状态机、预留/结算/退款。落地 `src/model/billing/{billing,credit-wallet}.service`（含 `CreditLedgerEntry.lotId`）与 `src/model/tasks/*`（准入 / 执行 / 尝试 / 生命周期 / 轮询 / 并发槽） | `npm run verify:billing`：预留幂等、固定价结算、Token 差额退回 / 超预授权补扣 / 授权上限截断、按秒重算、失败退款幂等、已结算拒绝自动退款、`uncertain` 转人工、余额不足 `40002`，每步校验 `available == Σ remaining`。`npm run verify:task-runtime`：本机 HTTP mock 上游跑端到端——同步成功（产物落盘 + `settled` + 按目录价扣费）、401 切线（旧账单退回、新账单按新线路价结算、`task.creditCost` 同步）、轮询超时（`42206`、`uncertain`、**不切线**、上游零调用）、唯一线路 429（`42204`、全额退款、余额回正），并校验「可用余额 == Σ 批次剩余」 |
-| P5 ✅ 已交付 | 后台页面与 C 端选型：`AdminChannelsPage`（渠道 + 模型抽屉 + 导入导出）、`AdminLogicalModelsPage`（revision / 线路 / 路由模拟）、`AdminUserGroupsPage`、`AdminPluginsPage`、`AdminBillingOrdersPage`、`AdminModelCallsPage`（改走 `/admin/api-logs`）；C 端 `ModelPicker` + `lib/modelSelection`（按能力记忆）+ `resolveModelId` 记忆优先，历史卡显示模型名与 `creditCost` 快照；`/model-catalog*` 公开 | `frontend/tests/admin-model-suite.spec.ts`：配置 → 选型 → 报价 → 生成 → 账单核对。生成段需要一条可用 image 线路（`cd test && node server.js` 仿真网关，或真实密钥），无线路时该段如实跳过并断言 C 端给出「当前没有可用线路」 |
+| P5 ✅ 已交付 | 后台页面与 C 端选型：`AdminChannelsPage`（渠道主从布局 + 左列承载新建 / 导入 / 导出全部 / 排序，详情头部承载编辑 / 复制 / 导出 / 启停 / 删除，内联模型管理 + 全部模型视图 + 结构化请求头编辑）、`AdminLogicalModelsPage`（revision / 线路 / 路由模拟）、`AdminUserGroupsPage`、`AdminPluginsPage`、`AdminBillingOrdersPage`、`AdminModelCallsPage`（改走 `/admin/api-logs`）；C 端 `ModelPicker` + `lib/modelSelection`（按能力记忆）+ `resolveModelId` 记忆优先，历史卡显示模型名与 `creditCost` 快照；`/model-catalog*` 公开 | `frontend/tests/admin-model-suite.spec.ts`：配置 → 选型 → 报价 → 生成 → 账单核对。生成段需要一条可用 image 线路（`cd test && node server.js` 仿真网关，或真实密钥），无线路时该段如实跳过并断言 C 端给出「当前没有可用线路」 |
 | P6 ✅ 已交付 | 代理与运营：系统中转、短路径、自定义中转、分组、插件管理、财务分析、自动退款。落地 `src/model/proxy/**`（路径授权 / SSRF 出站 / 计费 / 调用记录 / 并发槽 / 清扫）与 `src/model/{billing/finance-analytics,plugins,user-groups}` | `npm run verify:proxy-runtime`：A 段纯逻辑——`validateCustomRelayUrl` 与 `resolveOutboundHost` 的回环 / 私网 / 链路本地 / 云 metadata / 保留网段 / IPv6 / `localhost` / HTTP 仅可信主机、路径白名单与密钥查询参数、并发槽、插件包解析拒绝分支；B 段自起 Nest + 本机 mock 上游——`GET /models` 不计费并剥离客户端密钥、`POST` 的 `reserved → settled` 与调用记录、SSE 透传、500 退款、524 `uncertain` 不退款、渠道与用户并发槽 `429`、自定义中转 401/403 与 JSON/SSE 双路径脱敏、系统中转限流 `42901`、分组可见性 `40301` 且不建账单、清扫两条迁移且不碰任务账单、钱包恒等式、财务口径与 `BillingOrder` 聚合逐项一致、插件安装/重复 `40909`/被引用拒卸 `40909`/内置 `40001`/卸载成功。未覆盖项见 `docs/testing.md` §5.6 |
 
 ### 10.1 删除清单（P6 完成后一次性执行）

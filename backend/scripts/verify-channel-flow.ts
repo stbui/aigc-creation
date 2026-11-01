@@ -221,6 +221,19 @@ async function main() {
     ok('导入渠道不自带凭证', importedChannel?.hasApiKey === false, importedChannel?.hasApiKey);
 
     /* ── 8. 删除与占用校验 ─────────────────────────────── */
+    /*
+     * 删除是高危写（`channel.write` / `channel.model_write`）：空原因必须被拒。
+     * 放行会让审计只能记下一条 `reason=null` 的删除 —— 「谁为什么删」永久丢失，
+     * 且事后无法与误操作区分。拒收后下面两条成功的删除仍然成立，反证前两次没删掉东西。
+     */
+    const noReasonDelete = await call('DELETE', `/admin/channels/${duplicateId}`, token, { reason: '' });
+    ok('删除渠道：缺少变更原因被拒绝', noReasonDelete.code === 40001, noReasonDelete);
+    const noReasonBatchDelete = await call('POST', `/admin/channels/${duplicateId}/models/batch-delete`, token, {
+      ids: (duplicateModels.data ?? []).map((item: any) => item.id),
+      reason: '',
+    });
+    ok('批量删除模型：缺少变更原因被拒绝', noReasonBatchDelete.code === 40001, noReasonBatchDelete);
+
     const batchDeleted = await call('POST', `/admin/channels/${duplicateId}/models/batch-delete`, token, {
       ids: (duplicateModels.data ?? []).map((item: any) => item.id),
       reason: '验收脚本删除模型',

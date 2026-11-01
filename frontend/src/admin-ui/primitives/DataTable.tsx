@@ -59,6 +59,11 @@ export interface AdminDataTableProps<T> {
   onSelectedChange?: (keys: string[]) => void;
   /** 逐行判断是否可选（如已注销账号不可改状态） */
   isRowSelectable?: (row: T) => boolean;
+  /**
+   * 行勾选框的可访问名。默认「选择此行」；同一页多张表时给业务名，
+   * 否则读屏与测试都无法区分「选的是哪一行的哪个东西」。
+   */
+  rowSelectLabel?: (row: T) => string;
   pagination?: {
     current: number;
     pageSize: number;
@@ -104,6 +109,7 @@ export function AdminDataTable<T>({
   selected = [],
   onSelectedChange,
   isRowSelectable,
+  rowSelectLabel,
   pagination,
   minWidth,
   density: densityProp,
@@ -297,7 +303,7 @@ export function AdminDataTable<T>({
                       <input
                         type="checkbox"
                         className="size-3.5 cursor-pointer accent-accent-600 disabled:cursor-not-allowed"
-                        aria-label="选择此行"
+                        aria-label={rowSelectLabel?.(row) ?? '选择此行'}
                         checked={checked}
                         disabled={!canSelect}
                         onChange={() => toggleOne(key)}

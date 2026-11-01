@@ -106,6 +106,8 @@ export interface AdminChannelView {
   models: string[];
   modelCosts: PublicChannelModelCostView[];
   headers?: Array<{ name: string; value: string }>;
+  /** 由「服务商目录」安装的渠道才有值；手工新建的渠道为空 */
+  catalogProviderId?: string;
   hasApiKey: boolean;
   hasSecretKey: boolean;
   createdAt: string;
@@ -305,6 +307,20 @@ export interface AdminChannelModelView {
   priceTiers: ChannelModelPriceTierView[];
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * 跨渠道的渠道模型（`GET /admin/channel-models`）。
+ *
+ * 比 `AdminChannelModelView` 多两项：所属渠道名与渠道启停状态。
+ * 渠道停用与模型停用是两件事 —— 模型 `enabled` 为真但渠道被停用时，
+ * 这条线同样不进路由，两种状态要分得开显示。
+ */
+export interface AdminChannelModelListItem extends AdminChannelModelView {
+  /** 所属渠道名 */
+  channelName: string;
+  /** 所属渠道是否启用 */
+  channelEnabled: boolean;
 }
 
 /** 上游目录里的一条模型（只读预览） */

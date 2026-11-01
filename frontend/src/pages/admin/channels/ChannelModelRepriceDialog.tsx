@@ -1,11 +1,16 @@
 import { useMemo, useState } from 'react';
 import { Calculator, RefreshCw } from 'lucide-react';
-import { Button } from '../../../vendor/boardui/components/base/buttons/button';
-import { adminChannelsApi } from '../../../lib/api';
-import { useToast } from '../../../admin-ui/providers/ToastProvider';
-import { FormField, Notice } from '../../../admin-ui/primitives';
-import { ModalDialog } from '../../../admin-ui/primitives/Dialog';
-import { NumberInput, SelectBox, TextInput } from '../../../admin-ui/controls';
+import { adminChannelsApi } from './api';
+import {
+  Button,
+  FormField,
+  ModalDialog,
+  Notice,
+  NumberInput,
+  SelectBox,
+  TextInput,
+  useToast,
+} from './components';
 import {
   buildRepriceRows,
   computeRepriceSale,

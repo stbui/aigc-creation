@@ -127,7 +127,8 @@ export class ChannelSortBodyDto {
 
 export class ChannelBatchDeleteBodyDto {
   @IsArray() @IsString({ each: true }) ids!: string[];
-  @IsOptional() @IsString() reason?: string;
+  /** 删除是高危写操作（`channel.model_write`），原因必填并写审计 */
+  @IsNotEmpty({ message: '必须填写变更原因' }) @IsString() @MaxLength(200) reason!: string;
 }
 
 /** 批量调价入参；嵌套结构由 `ChannelModelService.repriceMany` 逐项校验 */
@@ -137,14 +138,14 @@ export class ChannelModelRepriceBodyDto {
   @IsNotEmpty({ message: '必须填写变更原因' }) @IsString() @MaxLength(200) reason!: string;
 }
 
-/** 单条渠道删除：DELETE 也允许带原因，审计要能回答「为什么删」 */
+/** 单条渠道删除：删除是高危写操作（`channel.write`），原因必填并写审计 */
 export class ChannelDeleteBodyDto {
-  @IsOptional() @IsString() reason?: string;
+  @IsNotEmpty({ message: '必须填写变更原因' }) @IsString() @MaxLength(200) reason!: string;
 }
 
-/** 单条渠道模型删除：DELETE 也允许带原因，审计要能回答「为什么删」 */
+/** 单条渠道模型删除：删除是高危写操作（`channel.model_write`），原因必填并写审计 */
 export class ChannelModelDeleteBodyDto {
-  @IsOptional() @IsString() reason?: string;
+  @IsNotEmpty({ message: '必须填写变更原因' }) @IsString() @MaxLength(200) reason!: string;
 }
 
 export class ChannelOrderBodyDto {
@@ -411,10 +412,23 @@ export class AdminChannelModelsController {
     private readonly metrics: ChannelModelMetricsService,
   ) {}
 
+  /**
+   * 跨渠道模型列表。
+   *
+   * `includeDisabled=1` 时含已停用的模型（后台「全部模型」视图用 —— 那里
+   * 要能看到并重新启用停用项）；默认只给启用的模型（前台模型的线路选择器
+   * 用 —— 停用线路进了下拉会让人以为「选了就能用」）。
+   */
   @Get()
   @RequirePermission(PERMISSIONS.channelModelRead)
-  list(@Query('channelId') channelId?: string) {
-    return this.channelModels.listAll(channelId ? String(channelId) : undefined);
+  list(
+    @Query('channelId') channelId?: string,
+    @Query('includeDisabled') includeDisabled?: string,
+  ) {
+    return this.channelModels.listAll(
+      channelId ? String(channelId) : undefined,
+      String(includeDisabled ?? '') === '1',
+    );
   }
 
   /**

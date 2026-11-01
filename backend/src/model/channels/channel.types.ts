@@ -219,6 +219,24 @@ export interface ChannelModelView {
   updatedAt: string;
 }
 
+/**
+ * 跨渠道的渠道模型投影（`GET /admin/channel-models`）。
+ *
+ * 与 `ChannelModelView` 的差别只有两点，但这两点都是「全部模型」视图必需的：
+ *   1. 带**渠道名与渠道启停状态** —— 跨渠道看时不知道一行属于谁，等于没看；
+ *   2. **含已停用的模型** —— 停用的模型在渠道抽屉里看得到，但在跨渠道
+ *      视图里看不到的话，就没有任何入口能把它重新启用。
+ *
+ * 渠道停用与模型停用是两件事：`enabled` 是模型自身开关，`channelEnabled`
+ * 是渠道开关。两者都为真才真正进入路由。
+ */
+export interface ChannelModelListItem extends ChannelModelView {
+  /** 所属渠道名 */
+  channelName: string;
+  /** 所属渠道是否启用 */
+  channelEnabled: boolean;
+}
+
 /** 渠道 / 渠道模型的排序列表项 */
 export interface ChannelOrderItem {
   id: string;

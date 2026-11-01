@@ -54,6 +54,7 @@ import {
   type ChannelModelRepriceRequest,
   type ChannelModelRequest,
   type ChannelModelSalePriceField,
+  type ChannelModelListItem,
   type ChannelModelView,
 } from './channel.types';
 
@@ -92,20 +93,45 @@ export class ChannelModelService {
     return rows.map((row) => channelModelView(row, tiers.filter((tier) => tier.channelModelId === row.id)));
   }
 
-  /** 跨渠道模型列表（全量模型页）；`channelId` 给出时只查该渠道 */
-  async listAll(channelId?: string): Promise<ChannelModelView[]> {
+  /**
+   * 跨渠道模型列表（后台「全部模型」视图）。
+   *
+   * 与 `list()`（渠道抽屉内）的三点差别：
+   *   1. **带渠道名与渠道启停状态** —— 跨渠道看时不知道一行属于谁等于没看；
+   *   2. `includeDisabled` 为真时**含已停用的模型与已停用的渠道** ——
+   *      跨渠道视图是排查入口，看不到停用项就等于没有「重新启用」的入口；
+   *   3. 不分页 —— 一次取回全部，由前端按关键词 / 能力 / 状态筛选并分页。
+   *
+   * `includeDisabled` 默认关闭：前台模型的线路选择器只应列出可用线路，
+   * 把停用线路塞进下拉会让运营以为「选了就能用」。
+   */
+  async listAll(channelId?: string, includeDisabled = false): Promise<ChannelModelListItem[]> {
     const rows = await this.prisma.channelModel.findMany({
-      where: { deletedAt: null, enabled: true, ...(channelId ? { channelId } : {}) },
+      where: {
+        deletedAt: null,
+        ...(includeDisabled ? {} : { enabled: true }),
+        ...(channelId ? { channelId } : {}),
+      },
       orderBy: [{ channelId: 'asc' }, { sortOrder: 'asc' }, { createdAt: 'asc' }],
     });
-    const tiers =
-      rows.length > 0
-        ? await this.prisma.channelModelPriceTier.findMany({
-            where: { channelModelId: { in: rows.map((row) => row.id) }, deletedAt: null },
-            orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-          })
-        : [];
-    return rows.map((row) => channelModelView(row, tiers.filter((tier) => tier.channelModelId === row.id)));
+    if (rows.length === 0) return [];
+    const channels = await this.prisma.modelChannel.findMany({
+      where: { id: { in: [...new Set(rows.map((row) => row.channelId))] } },
+      select: { id: true, name: true, enabled: true },
+    });
+    const channelById = new Map(channels.map((row) => [row.id, row]));
+    const tiers = await this.prisma.channelModelPriceTier.findMany({
+      where: { channelModelId: { in: rows.map((row) => row.id) }, deletedAt: null },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+    return rows.map((row) => {
+      const channel = channelById.get(row.channelId);
+      return {
+        ...channelModelView(row, tiers.filter((tier) => tier.channelModelId === row.id)),
+        channelName: channel?.name ?? '',
+        channelEnabled: channel?.enabled ?? false,
+      };
+    });
   }
 
   /** 按模型标识查（含停用，不含已删除） */

@@ -56,7 +56,7 @@ function exportsOf(file: string): Set<string> {
   };
 
   for (const match of source.matchAll(
-    /export\s+(?:declare\s+)?(?:abstract\s+)?(?:const|function|class|let|var|interface|type|enum)\s+([A-Za-z0-9_$]+)/g,
+    /export\s+(?:declare\s+)?(?:abstract\s+)?(?:async\s+)?(?:const|function|class|let|var|interface|type|enum)\s+([A-Za-z0-9_$]+)/g,
   )) {
     names.add(match[1]);
   }

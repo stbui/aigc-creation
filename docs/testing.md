@@ -52,7 +52,7 @@ npm run test:watch      # watch
 npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitignore）
 ```
 
-当前 19 个用例文件：
+当前 24 个用例文件：
 
 | 用例 | 守住什么 |
 | --- | --- |
@@ -65,6 +65,8 @@ npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitig
 | `hooks/useCreditLabel.test.tsx` | 积分文案与生效价、限时免费的展示 |
 | `lib/admin-links.test.ts` | 跨模块深链的参数编码（邮箱、任务 id 等） |
 | `lib/aigc-label.test.ts` | 角标参数缓存、失败回退默认值、色值还原 |
+| `lib/channelCost.test.ts` | 成本 / 售价 / 加价率的展示口径：参与售价的字段随计费方式取子集（与 `channelReprice` 同口径）、成本为 0 时加价率为 `null` 而非无穷大、未配置显示「未配置」而不是 0、规格标签翻译 |
+| `lib/channelOrder.test.ts` | 排序纯函数：越界 / 找不到 / 原地不动返回**原数组引用**（React 不多渲染一次）、移动后其余元素相对顺序不变、`orderChanged` 逐项比对 id 序列（只比长度会漏掉换位） |
 | `lib/channelReprice.test.ts` | 统一调价的金额换算：售价字段按计费方式取子集、加价率校验、成本加价的 half-up 取整（含 0.0002 积分量级）、售价文本互逆、缺成本价/售价未配置的模型被拦截 |
 | `lib/expandGeometry.test.ts` | 扩图占比与原图位置几何换算 |
 | `lib/multiFusionBilling.test.ts` | 多图融合变体数 × 积分计费 |
@@ -75,6 +77,8 @@ npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitig
 | `lib/unsaved-guard.test.ts` | 离开页面时的未保存拦截 |
 | `lib/zip.test.ts` | 浏览器内批量下载打包 |
 | `pages/admin/admin-modules.test.ts` | 后台目录具名导入 / 导出对账：相对导入的每个名字都必须在目标模块导出（防 `/admin` 整块白屏） |
+| `pages/admin/channels/ChannelHeadersEditor.test.tsx` | 自定义请求头编辑器：系统托管的头（鉴权 / 协议 / `x-canvas-*` / `x-forwarded-*`）一律拒绝且文案点名，名称大小写不敏感去重，值里只允许可打印 ASCII 与制表符，名称 / 值 / 总大小上限拦截，**空行不算错误**（点了「添加请求头」还没填不该报错），只有名称的行保留（空值是合法请求头），疑似凭据的值渲染为密码框 |
+| `pages/admin/channels/ChannelModelHealthCell.test.tsx` | 「全部模型」视图的稳定性单元格：**无样本时显示「近 24 小时无调用」而不是 0%**、成功率三档（≥95% / ≥80% / 其余）、接近 100% 时不显示小数尾巴且 99.5% 不得进位成 100%、无健康数据时给可读文案 |
 | `pages/admin/channels/ChannelModelHealthPanel.test.tsx` | 线路健康面板：成功率语义分档、**无终态样本时显示「无样本」而不是 0%**（「没数据」≠「全失败」）、样本被截断时提示「按最近部分统计」、停用 / 协议未注册 / 冷却三个状态标记、最近样本错误码、空态 |
 
 边界：Vitest 只跑 jsdom，不替代 L3/L4。真实后端、真实浏览器、真实库与磁盘的记录仍以 `smoke-*` / `verify-*` / Playwright 为准。Playwright 只收集 `tests/*.spec.ts`，Vitest 只收集 `src/**/*.test.*`，两边互不重叠。
@@ -95,7 +99,7 @@ npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitig
 | `verify-channel-signatures.ts` | 阿里云短信 / 邮件 RPC 签名（HMAC-SHA1 + sorted canonical query）独立复算；只验签名与请求形状，不代表已真实投递 |
 | `verify-plugin-manifests.ts` | 内置插件清单解析（`plugins/` 107 个可用包 / 115 个 provider；`src-*` 源目录镜像跳过）：id 唯一、能力与后端类型分布 |
 | `verify-model-consistency.ts` | 渠道/模型数据层不变量：activeKey 软删除唯一键、selectorKey 规范 JSON、档位不越能力合同、模型摘要与档位汇总一致、`modelsJson` 与启用模型一致 |
-| `verify-channel-flow.ts` | 渠道全链路（同进程起 Nest 打真实 HTTP）：建渠道 → 建模型含两档价格 → 上游键改名级联 → 复制 → 导出断言无凭证 → 改名导入 → **批量调价（缺少变更原因拒绝 / `priceVersion` 过期整批拒绝 / 售价字段与计费方式不匹配拒绝 / 规格提交不完整拒绝，且四次拒绝后售价未被改动；成功调价后档位售价生效、模型与档位 `priceVersion` 各 +1、成本价不变）** → 批量删除 → 删渠道 → **公开渠道连接信息脱敏（匿名视角渠道名 / 归属账号 / provider id / 并发配额 / 凭证标记全不下发、地址改写为中转入口、凭证恒为 `system`；管理员视角给出真实名称与上游地址但仍不回显凭证）** → **线路健康指标（按渠道模型出表、带两个观测窗口、无样本时成功率为 `null`、支持按 `channelId` 过滤）** |
+| `verify-channel-flow.ts` | 渠道全链路（同进程起 Nest 打真实 HTTP）：建渠道 → 建模型含两档价格 → 上游键改名级联 → 复制 → 导出断言无凭证 → 改名导入 → **批量调价（缺少变更原因拒绝 / `priceVersion` 过期整批拒绝 / 售价字段与计费方式不匹配拒绝 / 规格提交不完整拒绝，且四次拒绝后售价未被改动；成功调价后档位售价生效、模型与档位 `priceVersion` 各 +1、成本价不变）** → **删除的审计原因必填（空原因删渠道 / 批量删模型各一条 40001，且拒收后数据仍在）** → 批量删除 → 删渠道 → **公开渠道连接信息脱敏（匿名视角渠道名 / 归属账号 / provider id / 并发配额 / 凭证标记全不下发、地址改写为中转入口、凭证恒为 `system`；管理员视角给出真实名称与上游地址但仍不回显凭证）** → **线路健康指标（按渠道模型出表、带两个观测窗口、无样本时成功率为 `null`、支持按 `channelId` 过滤）** |
 | `verify-protocol-runtime.ts` | 协议运行时：115 个已注册 provider 的 `buildCreate` 冒烟、成功 / 异步 / 失败三类响应归一化；本地假上游走真实接口跑通 `POST /admin/channels/:id/models/test`（image 同步 + video 轮询）与 `POST /admin/channels/:id/models/{fetch,import}`，校验 `ApiCallLog`（`billable=false` / 无明文凭证）、导入默认停用未定价、重复导入不新增、审计动作落库；假上游只在回环地址，脚本内临时打开 `MODEL_ALLOW_PRIVATE_UPSTREAMS` |
 | `verify-billing.ts` | 计费账本：预留（含幂等）、固定价结算、Token 差额退回 / 超预授权补扣 / 授权上限截断、按秒计费按实际时长重算、失败全额退款（幂等）、已结算拒绝自动退款、`uncertain` 保留冻结后人工核对、余额不足 `40002`；每一步后校验 `CreditAccount.available == Σ CreditLot.remaining` |
 | `verify-route-catalog.ts` | 前台模型与选路：priority 硬分层与下沉、同层加权分布、SKU 选择（精确 / 通配 / 1.5K 相邻 / 停用档）、冷却三键与不冷却码、`simulate` 与 `resolve` 选中同一条线路与价格档、目录投影的渠道可见性与「先换货币再乘倍率」；后半段同进程起 Nest 打真实 HTTP 校验 `/models`、`/models/available`、`/models/:id/quote` 与后台模拟接口的接线与守卫。`VERIFY_HTTP=0` 可只跑纯逻辑 |
@@ -165,7 +169,7 @@ cd test && npm run smoke:spawn  # 起网关跑联网冒烟
 | `admin-backup.spec.ts` | 未通过恢复验证的备份不可下载 |
 | `admin-layout.spec.ts` | 后台布局回归 |
 | `admin-marketing.spec.ts` | 营销中心三条约束 |
-| `admin-model-suite.spec.ts` | 渠道 / 模型 P5 五页与 C 端选型：渠道工作台列表与模型抽屉、**统一调价（勾选模型 → 按成本重算 → 填变更原因 → 保存 → 回读断言新售价 = 成本 × 1.1）**、前台模型的路由模拟、用户分组与插件页渲染、生成账单与调用记录的筛选和详情、工具页 `ModelPicker` 选型后报价随之变化；生成段需要可用 image 线路，无线路时该段跳过 |
+| `admin-model-suite.spec.ts` | 渠道 / 模型 P5 五页与 C 端选型：渠道工作台的主从布局（左列渠道导航 `admin-channel-item`、`aria-pressed` 标记选中、右侧 `#admin-channel-detail` 内联模型清单，不出现抽屉）、**新建渠道的三道必填前置（名称 → Base URL → API Key，留空逐级调用人话原因）与结构化请求头（`authorization` 这类系统托管的头在提交前拦下并指出是哪一行）**、**渠道详情头部的完整动作集（编辑 / 复制 / 导出 / 停用|启用 / 删除），停用先出页内确认条并说明「退出路由目录但保留在列表」、取消不落库**、**模型清单的检索、筛选与稳定性列（关键字无命中给空态文案；状态筛选后的页脚总数与接口数据一致；重置恢复；清单带「稳定性（24h）」列，与「全部模型」同源）、复制模型（弹窗预填 `-copy` 标识且默认停用，取消不落库）、停用前确认（点击行内「停用」先出影响范围，不直接断电）**、**上游目录导入弹窗（已存在的模型带标记且默认不勾选、导入按钮只数新模型、搜索后「全选匹配的 / 取消选中匹配的」只作用于匹配项）**、**统一调价（勾选模型 → 按成本重算 → 填变更原因 → 保存 → 回读断言新售价 = 成本 × 1.1）**、**渠道排序（弹窗可开合；顺序没变时保存按钮禁用，移动后启用）**、**排序的并发保护（`expectedIds` 与库中不一致 → HTTP 409 / `40900`，一致才 `{ ok: true }`）**、**模型详情区的批量删除入口（未勾选时禁用；勾选后可用，且删除确认在填原因前保持禁用 —— 删除是高危写，空原因不得落库）**、**全部模型视图（跨渠道行数与 `GET /admin/channel-models?includeDisabled=1` 一致、渠道列可解析、按模型状态筛选、工具条计数形如「N 个模型 · M 个可用」、排序与参考实现同序（显示名 → 模型标识 → 渠道名，按同一比较器在测试里重算期望首行）、停用先出确认且取消不落库、「编辑」一步切回「按渠道」并弹出该模型的编辑器、点渠道名一步跳回「按渠道」并选中该渠道；行数按 `admin-all-models` 容器取，避免算进同页「线路健康」表格）**、前台模型的路由模拟、用户分组与插件页渲染、生成账单与调用记录的筛选和详情、工具页 `ModelPicker` 选型后报价随之变化；生成段需要可用 image 线路，无线路时该段跳过 |
 | `admin-scheduler.spec.ts` | 定时任务可观测（静默失败可见） |
 | `admin-screenshots.spec.ts` | 后台逐页截图取证 |
 | `admin-ux.spec.ts` | 筛选深链与逐条清除（含工单/商品/对账/能力/告警）、订单/任务/模型线路宽表在 1440px 无横向滚动、页面/编辑抽屉/工单回复/积分调整的未保存保护、角色权限未保存拦截、概览任务直达、任务详情到积分账本及项目筛选的跨模块深链、详情 `?id=` 刷新恢复与关闭移除 |

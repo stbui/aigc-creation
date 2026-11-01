@@ -65,7 +65,7 @@ const AdminModelCallsPage = lazyAdminPage(
 );
 // 新模型层后台六页（P5）：渠道工作台 / 前台模型 / 用户分组 / 插件 / 调用记录 / 账单
 const AdminChannelsPage = lazyAdminPage(
-  () => import('./AdminChannelsPage'),
+  () => import('./channels'),
   'AdminChannelsPage',
 );
 const AdminLogicalModelsPage = lazyAdminPage(

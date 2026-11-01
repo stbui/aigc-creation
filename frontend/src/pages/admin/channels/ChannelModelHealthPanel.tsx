@@ -1,7 +1,5 @@
 import { useMemo } from 'react';
-import { AdminDataTable, type AdminColumn } from '../../../admin-ui/primitives/DataTable';
-import { HoverTip } from '../../../admin-ui/controls';
-import { StatusTag } from '../../../components/admin/PageHeader';
+import { AdminDataTable, HoverTip, StatusTag, type AdminColumn } from './components';
 import type { ChannelModelHealthRowView } from '../../../types/model';
 
 /**
@@ -9,7 +7,7 @@ import type { ChannelModelHealthRowView } from '../../../types/model';
  *
  * ## 为什么放在渠道工作台而不是独立页面
  *
- * 值班时的动线是「看渠道工作台 → 发现某条线不对 → 点进模型抽屉看定价」。
+ * 值班时的动线是「看渠道工作台 → 发现某条线不对 → 点开该渠道看模型与定价」。
  * 健康数据夹在两者中间会打断动线；做成独立页则多一次跳转，而且线路级
  * 的问题（模型 A 挂了但模型 B 正常）在渠道维度看是看不出来的。
  *

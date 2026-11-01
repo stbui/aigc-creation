@@ -28,6 +28,7 @@
 | `40302` | 第三方登录命中的本地账号非 `active` | `auth/oauth/` |
 | `40905` / `40906` / `40907` | 退款：超时间窗 / 超可退比例 / 积分已消耗且扣不回 | `orders/order.service.ts` |
 | `40908` | 该订单有退款仍在渠道处理中（`Refund.status='processing'`），不接受新的退款 | 同上 |
+| `40900` | 排序列表已变化：`expectedIds` 与库中不一致，整单拒绝，需重新加载后再保存 | `model/channels/channel.service.ts` |
 | `42201` | 有线路但全部失败（任务失败，退款） | `model/tasks/task-lifecycle.service.ts` |
 | `42202` / `42203` | 任务中断回收失败 / AIGC 显式角标失败（均退款） | 同上 |
 | `42204` | 无可用线路：所有线路都明确未接单，或存量 `route=local`（任务失败，退款，不交付任何产出） | `model/tasks/task-worker.service.ts` |
@@ -104,7 +105,9 @@
 | GET/PUT/POST | `/api/v1/admin/{coupons,campaigns,marketing-rules}*` | 营销管理 |
 | GET/POST | `/api/v1/admin/{reconciliation,invoices}*` | 对账导入 / 批次与明细 / 差异处置 / 导出；发票审核与开具 |
 | GET | `/api/v1/admin/payment-channels` | 支付渠道状态（只读：生效通道 / 凭据缺失项 / 回调地址 / 风险告警，`payment.read`） |
-| GET/POST/PATCH/DELETE | `/api/v1/admin/channels*`、`/admin/channel-models` | 渠道 / 渠道模型 / 价格档 / 排序 / 复制 / 导入导出 / 连通性测试；写需 `channel.write` / `channel.model_write`，测试写 `ApiCallLog(billable=false)` |
+| GET/POST/PATCH/DELETE | `/api/v1/admin/channels*`、`/admin/channel-models` | 渠道 / 渠道模型 / 价格档 / 复制 / 导入导出 / 连通性测试；写需 `channel.write` / `channel.model_write`，测试写 `ApiCallLog(billable=false)`。**删除必填 `reason`**（`DELETE /admin/channels/:id`、`DELETE /admin/channels/:id/models/:modelId`、`POST /admin/channels/:id/models/batch-delete` 三处都是高危写，空原因一律 `40001`），原因只进审计不回显 |
+| GET | `/api/v1/admin/channel-models?channelId=&includeDisabled=` | 跨渠道模型视图（一行 = 一条渠道模型，条目带 `channelName` / `channelEnabled`）。`includeDisabled=1` 含已停用线路 —— 后台「全部模型」视图要用；不传时只给启用线路（前台模型的线路选择器用，停用线路进了下拉会让人以为选了就能用），`channel.model_read` |
+| GET/PUT | `/api/v1/admin/channels/order`、`/api/v1/admin/channels/:id/models/order` | 渠道排序 / 渠道内模型排序。`GET` 返回当前顺序的 id 数组；`PUT` 请求体 `{ ids, expectedIds }` —— `expectedIds` 是**读取时看到的顺序**，与库中不一致说明期间有人改过，整单拒绝 **409**（`code 40900`，「排序列表已变化，请重新加载后再保存」），不做部分落库。权限 `channel.write` / `channel.model_write`，写审计 `channel.order` / `channel_model.order` |
 | GET | `/api/v1/admin/channels/protocols` | 可选协议目录（按 `capability` 过滤）；渠道模型表单的协议来源，`channel.model_read` |
 | GET | `/api/v1/admin/channels/health` | 线路健康（一行 = 一条渠道模型：能力 / 启停 / 协议是否已注册 / 进程内冷却截止），值班塔与渠道工作台共用，`channel.read` |
 | GET | `/api/v1/admin/channel-models/health?channelId=` | 线路**历史表现**：一行 = 一条渠道模型，给 24h / 7d 两个窗口的成功率与 P95 耗时 + 最近 10 条终态样本，`channel.model_read`。与 `/admin/channels/health` 的分工：后者是「现在」（启停 / 协议 / 冷却），本端点是「过去」（成功率 / 耗时），值班时两个都要看。成功率 = `success` ÷ 终态次数（`pending` / `canceled` 不计入分母），**无终态样本时为 `null`**（不是 0 ——「没数据」与「全失败」要分得开）；P95 用最近邻法（不插值），样本被采样上限截断时 `sampled=true` |

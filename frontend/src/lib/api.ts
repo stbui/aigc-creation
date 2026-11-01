@@ -122,6 +122,7 @@ import type {
   CreditImportResult,
 } from '../types/api';
 import type {
+  AdminChannelModelListItem,
   AdminChannelModelView,
   AdminChannelView,
   AdminLogicalModelView,
@@ -1856,10 +1857,16 @@ export const adminChannelsApi = {
   update: (id: string, body: Record<string, unknown>) =>
     request<AdminChannelView>(`/admin/channels/${id}`, { method: 'PATCH', body }),
 
-  remove: (id: string, reason?: string) =>
+  /**
+   * 删除渠道（软删除）。
+   *
+   * `reason` **必填**：删除是高危写操作（`channel.write`），审计要能回答
+   * 「谁为什么删」；后端会拒收空原因（40001）。
+   */
+  remove: (id: string, reason: string) =>
     request<{ ok: boolean }>(`/admin/channels/${id}`, {
       method: 'DELETE',
-      ...(reason ? { body: { reason } } : {}),
+      body: { reason },
     }),
 
   duplicate: (id: string) =>
@@ -1884,23 +1891,33 @@ export const adminChannelsApi = {
       body,
     }),
 
-  removeModel: (id: string, modelId: string, reason?: string) =>
+  /**
+   * 删除单条渠道模型（软删除）。
+   *
+   * `reason` **必填**：删除是高危写操作（`channel.model_write`），后端拒收空原因。
+   */
+  removeModel: (id: string, modelId: string, reason: string) =>
     request<{ deleted: number }>(`/admin/channels/${id}/models/${modelId}`, {
       method: 'DELETE',
-      ...(reason ? { body: { reason } } : {}),
+      body: { reason },
     }),
 
-  batchDeleteModels: (id: string, ids: string[], reason?: string) =>
+  /**
+   * 批量删除渠道模型（全有或全无）。
+   *
+   * `reason` **必填**：删除是高危写操作（`channel.model_write`），后端拒收空原因。
+   */
+  batchDeleteModels: (id: string, ids: string[], reason: string) =>
     request<{ deleted: number }>(`/admin/channels/${id}/models/batch-delete`, {
       method: 'POST',
-      body: { ids, ...(reason ? { reason } : {}) },
+      body: { ids, reason },
     }),
 
   /** 批量调价：提交最终售价，价格版本过期时后端整批拒绝 */
-  batchRepriceModels: (id: string, models: ChannelModelRepriceInput[], reason?: string) =>
+  batchRepriceModels: (id: string, models: ChannelModelRepriceInput[], reason: string) =>
     request<{ updated: number }>(`/admin/channels/${id}/models/batch-reprice`, {
       method: 'POST',
-      body: { models, ...(reason ? { reason } : {}) },
+      body: { models, reason },
     }),
 
   /** 读取上游模型目录（只读）：用已保存凭证在服务端拉取，密钥不经过浏览器 */
@@ -1933,8 +1950,17 @@ export const adminChannelsApi = {
 
 /** 跨渠道的模型只读视图（选路下拉与全局排查用） */
 export const adminChannelModelsApi = {
-  list: (channelId?: string) =>
-    request<AdminChannelModelView[]>(`/admin/channel-models${toQuery({ channelId })}`),
+  /**
+   * 跨渠道模型列表。
+   *
+   * `includeDisabled` 为真时含已停用的模型（后台「全部模型」视图用）；
+   * 默认只给启用的模型（前台模型的线路选择器用 —— 停用线路进了下拉会
+   * 让人以为「选了就能用」）。
+   */
+  list: (channelId?: string, includeDisabled = false) =>
+    request<AdminChannelModelListItem[]>(
+      `/admin/channel-models${toQuery({ channelId, includeDisabled: includeDisabled ? '1' : undefined })}`,
+    ),
 
   /** 线路健康指标（24h / 7d 成功率、P95、最近样本） */
   health: (channelId?: string) =>
