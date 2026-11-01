@@ -1860,6 +1860,9 @@ model ApiCallLog {
 
   channelId   String @default("")
   channelName String @default("")
+  /// 渠道模型 id：线路级健康指标（成功率 / P95）的归属键。
+  /// 空串 = 该次调用没有落到具体渠道模型（如渠道级 `GET /models`）。
+  channelModelId String @default("")
   taskId      String @default("")
   billingOrderId String @default("")
 
@@ -1905,6 +1908,7 @@ model ApiCallLog {
 
   @@index([userId, createdAt])
   @@index([channelId, createdAt])
+  @@index([channelModelId, createdAt])
   @@index([model, createdAt])
   @@index([taskId])
   @@index([status, createdAt])

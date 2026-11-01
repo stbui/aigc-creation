@@ -387,7 +387,9 @@ export function AdminLogicalModelsPage() {
     setSimulating(true);
     try {
       const result = await adminLogicalModelsApi.simulate(simulateFor.id, {
-        capability: simulateFor.capability,
+        // 意图的 capability 是**模态**（image / video），不是产品能力 id
+        // （expand / main_image）。后端缺省时按模型自己的能力合同取，
+        // 这里不传 —— 传产品 id 会让后端拒绝（命名空间不同）。
         operation: simulateOperation.trim() || undefined,
         options: options as Record<string, unknown>,
       });

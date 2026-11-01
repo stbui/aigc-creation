@@ -1,0 +1,42 @@
+# NOTICE
+
+本项目包含移植自第三方开源项目的代码与数据。以下按来源分别声明。
+
+## open-ai-canvas（MIT）
+
+本项目的渠道与模型子系统移植自 open-ai-canvas：
+
+- `backend/src/model/**` —— 渠道 / 渠道模型 / 前台模型 / 路由 / 协议插件 / 计费 / 代理中转
+- `backend/plugins/**` —— 插件清单包（`yingce.plugin/v2`）
+
+来源项目：open-ai-canvas
+许可：MIT License
+版权：Copyright (c) 2026 ddcat and Open AI Canvas contributors
+
+本仓的修改限于语言与框架适配（Go → TypeScript、Gin/GORM → NestJS/Prisma），
+上游的校验顺序、软删除唯一键、向上取整与选择器匹配规则保持语义一致。
+逐目录的派生范围说明见 `backend/src/model/NOTICE` 与 `backend/plugins/NOTICE`。
+
+以下为上游许可全文：
+
+MIT License
+
+Copyright (c) 2026 ddcat and Open AI Canvas contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

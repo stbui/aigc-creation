@@ -17,9 +17,10 @@
  */
 
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ChannelUnavailableError } from '../channels/channel-runtime.service';
 
-/** 等槽位的上限；超过即按「渠道忙」切线，不无限排队 */
+/** 等槽位的上限兜底值（`MODEL_SLOT_WAIT_MS` 覆盖）；超过即按「渠道忙」切线，不无限排队 */
 const SLOT_WAIT_MS = 60_000;
 const BACKOFF_START_MS = 200;
 const BACKOFF_MAX_MS = 2_000;
@@ -28,6 +29,19 @@ const BACKOFF_MAX_MS = 2_000;
 export class ChannelSlotService {
   /** channelId → 已占用的槽位数 */
   private readonly used = new Map<string, number>();
+
+  constructor(private readonly config: ConfigService) {}
+
+  /**
+   * 等槽位上限。
+   *
+   * 走配置层而不是写死常量：验收脚本要把「渠道忙」的判定压到百毫秒级，
+   * 否则一次断言要等满 60 秒；生产默认值不变。
+   */
+  private get waitMs(): number {
+    const value = this.config.get<number>('model.slotWaitMs');
+    return typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : SLOT_WAIT_MS;
+  }
 
   /**
    * 占用一个槽位。
@@ -39,7 +53,7 @@ export class ChannelSlotService {
   async acquire(channelId: string, limit: number): Promise<() => void> {
     if (!(limit > 0)) return () => undefined;
 
-    const deadline = Date.now() + SLOT_WAIT_MS;
+    const deadline = Date.now() + this.waitMs;
     let delay = BACKOFF_START_MS;
     for (;;) {
       const current = this.used.get(channelId) ?? 0;

@@ -363,6 +363,7 @@ duplicate：并入主卡，指向主卡编号
 | --- | --- |
 | 能力 / 生成 | `smoke-capability-runtime`、相关页面冒烟、`verify-credit-deduction`、`verify-route-catalog`、`verify-task-runtime` |
 | 模型层 | `verify-plugin-manifests`、`verify-model-consistency`、`verify-channel-flow`、`verify-protocol-runtime`、`verify-billing`、`verify-task-runtime`，以及 `frontend npm run e2e -- admin-model-suite` |
+| 中转 / 插件 / 财务 | `verify-proxy-runtime`（`VERIFY_HTTP=0` 只跑纯逻辑段）；改 `src/model/proxy/**`、`src/model/plugins/**`、`finance-analytics`、`billing-sweeper` 时必跑 |
 | 交易与权益 | `smoke-commerce`、`smoke-payments`、`smoke-membership*`、`smoke-refund-rules` |
 | 账户与合规 | `smoke-auth`、`smoke-account`、`smoke-qr-login`、`smoke-aigc`、`smoke-signed-url` |
 | 后台与运维 | `smoke-admin`、`smoke-backup`、`smoke-scheduler`、`smoke-storage`、`smoke-tickets-search` |

@@ -504,6 +504,30 @@ export async function runHttpChecks(): Promise<void> {
         options: { size: '1024x1024' },
       });
       eq('模拟接口对未知模型返回业务错误而非 404', simulated.code, 40001);
+
+      /*
+       * 命名空间回归：产品能力 id（`expand` / `main_image`）与模态
+       * （`image` / `video`）是两套东西。页面很容易把产品能力 id 传上来，
+       * 后端必须按模型自己的能力合同兜底，而不是报「缺少有效的模型能力类型」。
+       */
+      const models = (
+        (await (await call('GET', '/admin/logical-models', token)).data ?? [])
+      ) as Array<{ id: string; capability: string }>;
+      const target = models.find((item) => Boolean(item?.id));
+      if (target) {
+        const withoutCapability = await call('POST', `/admin/logical-models/${target.id}/simulate`, token, {
+          inputs: {},
+          options: {},
+        });
+        ok('模拟：省略 capability 时按模型合同取模态', withoutCapability.code === 0, withoutCapability);
+
+        const withProductId = await call('POST', `/admin/logical-models/${target.id}/simulate`, token, {
+          capability: target.capability,
+          inputs: {},
+          options: {},
+        });
+        ok('模拟：传产品能力 id 也按省略处理（不报「缺少有效的模型能力类型」）', withProductId.code === 0, withProductId);
+      }
     }
   } finally {
     await app.close();

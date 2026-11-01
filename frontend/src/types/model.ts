@@ -112,6 +112,39 @@ export interface AdminChannelView {
   updatedAt: string;
 }
 
+/**
+ * 公开的系统渠道投影（`/channels/system` 的非管理员视角）。
+ *
+ * 与 `AdminChannelView` 的差别不是「字段少一点」，而是**内部拓扑被抹掉**：
+ *   · `name` / `userId` / `catalogProviderId` 固定空 —— 渠道名会泄漏供应商与
+ *     中转站身份，provider id 等于报出协议与厂商；
+ *   · `baseUrl` 改写成中转入口 `/api/v1/ai/system/{id}`，`apiKey` 恒为 `'system'`
+ *     （由服务端注入真实凭证）；
+ *   · `concurrencyLimit` / `hasApiKey` / `hasSecretKey` 恒为 0 / false。
+ *
+ * 管理员走同一端点但拿到后台视角（真实名称与上游地址），凭证任何情况都不下发。
+ */
+export interface PublicChannelView {
+  id: string;
+  userId: string;
+  scope: string;
+  enabled: boolean;
+  name: string;
+  sortOrder: number;
+  baseUrl: string;
+  apiKey: string;
+  apiFormat: string;
+  concurrencyLimit: number;
+  proxyUrl: string;
+  models: string[];
+  modelCosts: PublicChannelModelCostView[];
+  headers?: Array<{ name: string; value: string }>;
+  hasApiKey: boolean;
+  hasSecretKey: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ChannelPageResult {
   channels: AdminChannelView[];
   total: number;
@@ -134,6 +167,46 @@ export interface ChannelHealthRowView {
   enabled: boolean;
   protocolKnown: boolean;
   coolingUntil: string | null;
+}
+
+/** 单个观测窗口的线路健康指标 */
+export interface ChannelModelHealthWindowView {
+  /** 该窗口内的终态样本数（success + failed） */
+  samples: number;
+  success: number;
+  failed: number;
+  /** 成功率（0–1）；没有终态样本时为 null（「没数据」与「全失败」要分得开） */
+  successRate: number | null;
+  /** P95 耗时（毫秒）；没有终态样本时为 null */
+  p95DurationMs: number | null;
+  avgDurationMs: number | null;
+  /** 是否因超过采样上限而只统计了最近的一部分 */
+  sampled: boolean;
+}
+
+/** 最近一次终态调用样本 */
+export interface ChannelModelHealthSampleView {
+  status: string;
+  statusCode: number;
+  durationMs: number;
+  errorCode: string;
+  error: string;
+  at: string;
+}
+
+/**
+ * 一条线路（渠道模型）的健康指标。
+ *
+ * 与 `ChannelHealthRowView` 的分工：后者是**当前状态**（启停 / 协议 / 冷却），
+ * 本类型是**历史表现**（成功率 / 耗时）。值班时两个都要看。
+ */
+export interface ChannelModelHealthRowView extends ChannelHealthRowView {
+  windows: {
+    day: ChannelModelHealthWindowView;
+    week: ChannelModelHealthWindowView;
+  };
+  recent: ChannelModelHealthSampleView[];
+  lastErrorCode: string;
 }
 
 /** 渠道 / 渠道模型的排序项 */
@@ -185,6 +258,24 @@ export interface ChannelModelPriceTierView {
   priceConfigured: boolean;
   enabled: boolean;
   priceVersion: number;
+}
+
+/** 售价字段（按计费方式取子集） */
+export type ChannelModelSalePriceField =
+  | 'unitPriceMicrocredits'
+  | 'inputTokenPriceMicrocredits'
+  | 'outputTokenPriceMicrocredits'
+  | 'cachedTokenPriceMicrocredits';
+
+/** 批量调价请求项：最终售价 + 乐观并发版本 */
+export interface ChannelModelRepriceInput {
+  modelId: string;
+  priceVersion: number;
+  priceTiers: Array<{
+    id: string;
+    priceVersion: number;
+    prices: Partial<Record<ChannelModelSalePriceField, number>>;
+  }>;
 }
 
 export interface AdminChannelModelView {
@@ -456,6 +547,14 @@ export interface PluginView {
   enabled: boolean;
   activeProtocols: number;
   runtime: { backend: string; web: string };
+  /**
+   * 当前环境可用性。
+   *
+   * `available=false` 时 `reason` 必填且是人话说明（如「该插件声明了 `host:`
+   * 宿主执行引擎，本环境未内置该引擎，协议不会注册」）—— 页面直接展示，
+   * 不允许插件列在那里却不生效却没有任何交代。
+   */
+  availability: { available: boolean; reason: string };
   surfaces: string[];
   permissions: string[];
   configuration: PluginManifestFieldView[];
@@ -481,7 +580,8 @@ export interface PluginView {
 
 export interface PluginProtocolStatusView {
   registered: number;
-  hostBacked: number;
+  /** 声明了 `host:<engine>` 但本环境未内置该引擎的 provider（`pluginId:backend` 形式） */
+  hostBacked: string[];
   skippedPlugins: string[];
   disabledPlugins: string[];
 }
@@ -752,9 +852,17 @@ export interface ProviderVerifyResult {
   reason: string;
 }
 
-/** 构建意图的入参（三个目录端点共用） */
+/**
+ * 构建意图的入参（三个目录端点共用）
+ *
+ * `capability` 是**模态**（`image` / `video` / `text`），不是产品能力 id
+ * （`expand` / `main_image`）—— 两层命名空间不能混。
+ *
+ * 路由模拟端点允许省略：后端按模型自己的能力合同取模态。页面不应该
+ * 替后端猜「这个产品能力对应哪个模态」，那正是命名空间容易踩坑的地方。
+ */
 export interface ModelIntentPayload {
-  capability: string;
+  capability?: string;
   operation?: string;
   inputs?: Record<string, number>;
   options?: Record<string, unknown>;

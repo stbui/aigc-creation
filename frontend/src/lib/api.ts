@@ -130,6 +130,8 @@ import type {
   BillingOrderView,
   ChannelHealthRowView,
   ChannelModelFetchResultView,
+  ChannelModelHealthRowView,
+  ChannelModelRepriceInput,
   ChannelOrderItemView,
   ChannelPageResult,
   FinanceAnalyticsView,
@@ -142,6 +144,7 @@ import type {
   ProviderVerifyResult,
   ProtocolCatalogEntryView,
   ProtocolTestResultView,
+  PublicChannelView,
   PublicModelCatalogResult,
   SimulateResultView,
   SystemChannelExportView,
@@ -1893,6 +1896,13 @@ export const adminChannelsApi = {
       body: { ids, ...(reason ? { reason } : {}) },
     }),
 
+  /** 批量调价：提交最终售价，价格版本过期时后端整批拒绝 */
+  batchRepriceModels: (id: string, models: ChannelModelRepriceInput[], reason?: string) =>
+    request<{ updated: number }>(`/admin/channels/${id}/models/batch-reprice`, {
+      method: 'POST',
+      body: { models, ...(reason ? { reason } : {}) },
+    }),
+
   /** 读取上游模型目录（只读）：用已保存凭证在服务端拉取，密钥不经过浏览器 */
   fetchModels: (id: string) =>
     request<{ models: UpstreamModelPreview[] }>(`/admin/channels/${id}/models/fetch`, {
@@ -1925,6 +1935,12 @@ export const adminChannelsApi = {
 export const adminChannelModelsApi = {
   list: (channelId?: string) =>
     request<AdminChannelModelView[]>(`/admin/channel-models${toQuery({ channelId })}`),
+
+  /** 线路健康指标（24h / 7d 成功率、P95、最近样本） */
+  health: (channelId?: string) =>
+    request<{ items: ChannelModelHealthRowView[] }>(
+      `/admin/channel-models/health${toQuery({ channelId })}`,
+    ),
 };
 
 /** 后台前台模型（`/admin/logical-models`）：保存即写新 revision 并重建线路 */
@@ -2103,4 +2119,17 @@ export const modelCatalogApi = {
       method: 'POST',
       body: { ...intent, channelId, modelKey },
     }),
+};
+
+/**
+ * 公开的系统渠道连接信息（`/channels/system`）。
+ *
+ * 与 `/model-catalog` 的分工：目录给「有哪些模型、什么价」，本端点给
+ * 「有哪些渠道、怎么连（中转入口）」。两者都不下发凭证与上游地址。
+ *
+ * 管理员走同一端点拿到后台视角（真实名称与上游地址），因此返回类型用
+ * `PublicChannelView` 的宽松基线：非管理员视角下 `name` 恒为空串。
+ */
+export const publicChannelsApi = {
+  system: () => request<{ channels: PublicChannelView[] }>('/channels/system'),
 };

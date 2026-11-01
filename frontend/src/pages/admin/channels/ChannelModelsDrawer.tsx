@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Plus, RefreshCw, Trash2, UploadCloud, Zap } from 'lucide-react';
+import { Plus, RefreshCw, Trash2, TrendingUp, UploadCloud, Zap } from 'lucide-react';
 import { Button } from '../../../vendor/boardui/components/base/buttons/button';
 import { adminChannelsApi } from '../../../lib/api';
 import { parseCredits, toCreditsInput } from '../../../lib/microcredits';
 import { useToast } from '../../../admin-ui/providers/ToastProvider';
 import { Descriptions, FormField, Notice } from '../../../admin-ui/primitives';
 import { Drawer } from '../../../admin-ui/primitives/Drawer';
+import { ChannelModelRepriceDialog } from './ChannelModelRepriceDialog';
 import {
   CheckBox,
   HoverTip,
@@ -265,6 +266,10 @@ export function ChannelModelsDrawer({
   const [deleteTarget, setDeleteTarget] = useState<AdminChannelModelView | null>(null);
   const [deleteReason, setDeleteReason] = useState('');
 
+  /** 统一调价：勾选的模型 id；空数组 = 未打开调价弹窗 */
+  const [repriceIds, setRepriceIds] = useState<string[]>([]);
+  const [repriceOpen, setRepriceOpen] = useState(false);
+
   const load = useCallback(async () => {
     if (!channelId) return;
     setLoading(true);
@@ -286,6 +291,9 @@ export function ChannelModelsDrawer({
     setUpstream(null);
     setSelectedUpstream([]);
     setTestResult(null);
+    // 重新打开抽屉时不沿用上一次的勾选：价格版本可能已变，旧勾选会让调价整批被拒
+    setRepriceIds([]);
+    setRepriceOpen(false);
     void load();
   }, [open, channelId, load]);
 
@@ -502,6 +510,7 @@ export function ChannelModelsDrawer({
   const rows = models ?? [];
 
   return (
+    <>
     <Drawer
       open={open}
       onOpenChange={(next) => {
@@ -624,6 +633,17 @@ export function ChannelModelsDrawer({
           <Panel
             title={`模型清单（${rows.length}）`}
             note={writable ? '停用后的模型不会进入路由，但历史账单与调用记录仍保留' : '当前账号只有渠道模型读权限'}
+            extra={
+              <Button
+                variant="secondary"
+                size="xs"
+                leadingIcon={TrendingUp}
+                disabled={!writable || repriceIds.length === 0}
+                onClick={() => setRepriceOpen(true)}
+              >
+                {repriceIds.length > 0 ? `统一调价（${repriceIds.length}）` : '统一调价'}
+              </Button>
+            }
           >
             {loading && rows.length === 0 ? (
               <p className="py-8 text-center text-xs text-text-tertiary">加载中…</p>
@@ -635,6 +655,17 @@ export function ChannelModelsDrawer({
               <div className="flex flex-col divide-y divide-border-table">
                 {rows.map((model) => (
                   <div key={model.id} className="flex items-center gap-3 py-2.5">
+                    <CheckBox
+                      size="sm"
+                      checked={repriceIds.includes(model.id)}
+                      disabled={!writable}
+                      ariaLabel={`选择模型 ${model.modelKey}`}
+                      onChange={(checked) =>
+                        setRepriceIds((prev) =>
+                          checked ? [...prev, model.id] : prev.filter((id) => id !== model.id),
+                        )
+                      }
+                    />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-[12px] text-text-primary">{model.modelKey}</span>
@@ -748,7 +779,26 @@ export function ChannelModelsDrawer({
           />
         </div>
       )}
+
     </Drawer>
+
+      {/*
+        调价弹窗与抽屉**平级**（不是抽屉的子节点）：两个 React Aria 模态嵌套时
+        焦点作用域会互相抢，关掉弹窗后焦点回不到触发它的那个复选框。
+      */}
+      {repriceOpen && channelId && (
+        <ChannelModelRepriceDialog
+          channelId={channelId}
+          channelName={channel?.name ?? ''}
+          models={rows.filter((model) => repriceIds.includes(model.id))}
+          onClose={() => setRepriceOpen(false)}
+          onSaved={() => {
+            setRepriceIds([]);
+            return load();
+          }}
+        />
+      )}
+    </>
   );
 }
 

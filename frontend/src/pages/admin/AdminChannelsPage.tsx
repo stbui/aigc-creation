@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { Copy, Download, Plus, Trash2 } from 'lucide-react';
 import { Button } from '../../vendor/boardui/components/base/buttons/button';
-import { adminChannelsApi } from '../../lib/api';
+import { adminChannelsApi, adminChannelModelsApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
 import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
@@ -13,6 +13,7 @@ import {
   ConfirmAction,
   useAdminDetailParam,
   useAdminList,
+  useAdminResource,
 } from '../../components/admin/AdminWidgets';
 import {
   AppliedFilters,
@@ -24,6 +25,7 @@ import {
   type AppliedFilter,
 } from '../../components/admin/PageHeader';
 import { ChannelModelsDrawer } from './channels/ChannelModelsDrawer';
+import { ChannelModelHealthPanel } from './channels/ChannelModelHealthPanel';
 import type { AdminChannelView, ChannelPageResult, SystemChannelExportView } from '../../types/model';
 
 /**
@@ -143,6 +145,13 @@ export function AdminChannelsPage() {
 
   const rows = data?.channels ?? [];
   const total = data?.total ?? 0;
+
+  /*
+   * 线路健康指标与渠道列表是两份数据：列表按页取，健康按线路全量取
+   * （运营要看的是「哪条线在坏」，不是「当前页里的哪条线在坏」）。
+   */
+  const health = useAdminResource(() => adminChannelModelsApi.health());
+  const healthRows = health.data?.items ?? [];
 
   const appliedKeyword = params.keyword as string | undefined;
   const appliedStatus = params.status as string | undefined;
@@ -554,6 +563,17 @@ export function AdminChannelsPage() {
             onChange: (page, pageSize) => setPage(page, pageSize),
           }}
         />
+      </Panel>
+
+      <Panel
+        title="线路健康"
+        note="按渠道模型统计：24h / 7d 成功率与 P95 耗时来自调用记录。样本少时 P95 参考意义有限，请同时看样本数。"
+      >
+        {health.error && healthRows.length === 0 ? (
+          <AdminStaleError error={health.error} onRetry={() => void health.reload()} />
+        ) : (
+          <ChannelModelHealthPanel rows={healthRows} loading={health.loading} />
+        )}
       </Panel>
 
       <Drawer

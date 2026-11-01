@@ -83,6 +83,7 @@ ALIPAY_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\nMIIBI...\n-----END PUBLIC KEY----
 | `MODEL_ACTIVE_TASK_LIMIT` | `2` | `2` | 按实例配额调 | 本进程同时执行的任务数（1–64） |
 | `MODEL_HTTP_TIMEOUT_MS` / `MODEL_MEDIA_TIMEOUT_MS` | `120000` / `180000` | `30000` / `60000` | 按上游调 | 单次上游请求 / 产物下载超时 |
 | `MODEL_WORKER_INTERVAL_MS` / `MODEL_LEASE_MS` | `1000` / `120000` | `200` / `30000` | 同开发 | 调度节拍与任务租约（租约另有 45s 代码下限） |
+| `MODEL_SLOT_WAIT_MS` | `60000` | `60000` | `60000` | 渠道并发槽等槽上限；超时即切线（任务）或 `429`（中转），验收脚本会压到百毫秒级 |
 | `MODEL_ALLOW_PRIVATE_UPSTREAMS` / `MODEL_ALLOWED_PRIVATE_UPSTREAM_HOSTS` | `false` / 空 | `false` / 空 | `false` / 按需 | SSRF 逃生开关，**自定义渠道不受其影响**（必须逐个点名主机） |
 | `MODEL_PROXY_ENABLED` | `true` | `true` | 按需 | 中转总开关，`false` 时系统 / 自定义中转一律 503 |
 | `MODEL_PROXY_*_{REQUEST,RESPONSE}_MB` / `_TIMEOUT_MS` | 32 / 64 / 600000 | 同开发 | 按需 | 系统与自定义中转各一组，调大前先确认反代 `client_max_body_size` |

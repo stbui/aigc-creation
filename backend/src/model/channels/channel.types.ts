@@ -27,6 +27,8 @@ export const MAX_CHANNEL_CONCURRENCY = 999;
 export const MAX_SORT_ORDER = 999_999;
 /** 单次批量删除渠道模型上限 */
 export const MAX_CHANNEL_MODEL_BATCH_DELETE = 100;
+/** 单次批量调价渠道模型上限（与参考实现一致） */
+export const MAX_CHANNEL_MODEL_BATCH_REPRICE = 100;
 
 export interface ChannelModelTag {
   text: string;
@@ -95,6 +97,33 @@ export interface ChannelModelRequest {
   capabilityConfig?: ModelCapabilityConfig | null;
   priceTiers?: ChannelModelPriceTierRequest[] | null;
 }
+
+/**
+ * 批量调价入参。
+ *
+ * 前端按「售价 = 成本 × (1 + 加价率)」算出最终售价后提交，服务端只做校验与
+ * 落库；`priceVersion` 是乐观并发令牌，任一模型或档位的版本已经变化就整批拒绝，
+ * 避免两次批量改写互相覆盖。
+ */
+export interface ChannelModelRepriceRequest {
+  modelId: string;
+  priceVersion: number;
+  priceTiers: ChannelModelTierRepriceRequest[];
+}
+
+export interface ChannelModelTierRepriceRequest {
+  id: string;
+  priceVersion: number;
+  /** 只提交当前计费方式需要的字段，且必须提交全部字段 */
+  prices: Record<string, number | string | null | undefined>;
+}
+
+/** 售价字段（按计费方式取子集） */
+export type ChannelModelSalePriceField =
+  | 'unitPriceMicrocredits'
+  | 'inputTokenPriceMicrocredits'
+  | 'outputTokenPriceMicrocredits'
+  | 'cachedTokenPriceMicrocredits';
 
 /* ───────────────────────── 响应投影 ───────────────────────── */
 

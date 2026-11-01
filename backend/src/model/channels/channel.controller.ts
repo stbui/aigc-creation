@@ -25,10 +25,12 @@ import {
   IsArray,
   IsBoolean,
   IsInt,
+  IsNotEmpty,
   IsObject,
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 import { AdminUser, AuditAction, RequirePermission } from '../../admin/admin.decorator';
@@ -39,6 +41,7 @@ import { ModelCatalogService } from '../catalog/model-catalog.service';
 import { ChannelModelService } from './channel-model.service';
 import { ChannelService } from './channel.service';
 import { ChannelHealthService } from './channel-health.service';
+import { ChannelModelMetricsService } from './channel-model-metrics.service';
 import {
   MAX_CHANNEL_CONCURRENCY,
   MAX_SORT_ORDER,
@@ -125,6 +128,13 @@ export class ChannelSortBodyDto {
 export class ChannelBatchDeleteBodyDto {
   @IsArray() @IsString({ each: true }) ids!: string[];
   @IsOptional() @IsString() reason?: string;
+}
+
+/** 批量调价入参；嵌套结构由 `ChannelModelService.repriceMany` 逐项校验 */
+export class ChannelModelRepriceBodyDto {
+  @IsArray() models!: unknown[];
+  /** 调价是高危写操作（`channel.model_write`），原因必填并写审计 */
+  @IsNotEmpty({ message: '必须填写变更原因' }) @IsString() @MaxLength(200) reason!: string;
 }
 
 /** 单条渠道删除：DELETE 也允许带原因，审计要能回答「为什么删」 */
@@ -347,6 +357,18 @@ export class AdminChannelsController {
   }
 
   /**
+   * 批量调价：前端按「成本 × (1 + 加价率)」算好最终售价后提交。
+   * 价格版本不一致（期间有人改过价）时整批拒绝，不部分落库。
+   */
+  @Post(':id/models/batch-reprice')
+  @RequirePermission(PERMISSIONS.channelModelWrite)
+  @AuditAction('channel_model.batch_reprice')
+  async batchRepriceModels(@Param('id') id: string, @Body() body: ChannelModelRepriceBodyDto) {
+    const updated = await this.channelModels.repriceMany(id, body.models ?? []);
+    return { updated };
+  }
+
+  /**
    * 连通性测试：用渠道真实凭证发一次最小请求。
    *
    * 走的是与正式任务完全相同的协议、出站策略与鉴权，唯一区别是不建任务、
@@ -384,11 +406,28 @@ export class AdminChannelsController {
 /** 全量渠道模型（跨渠道只读视图） */
 @Controller('admin/channel-models')
 export class AdminChannelModelsController {
-  constructor(private readonly channelModels: ChannelModelService) {}
+  constructor(
+    private readonly channelModels: ChannelModelService,
+    private readonly metrics: ChannelModelMetricsService,
+  ) {}
 
   @Get()
   @RequirePermission(PERMISSIONS.channelModelRead)
   list(@Query('channelId') channelId?: string) {
     return this.channelModels.listAll(channelId ? String(channelId) : undefined);
+  }
+
+  /**
+   * 线路健康指标（24h / 7d 成功率、P95、最近样本）。
+   *
+   * 与 `/admin/channels/health` 的区别：后者是**当前状态**（启停 / 协议 /
+   * 冷却），本端点是**历史表现**（成功率 / 耗时）。值班时两个都要看 ——
+   * 「现在没冷却但 24h 成功率 40%」和「现在冷却中但 7d 成功率 99%」
+   * 要做的动作完全不同。
+   */
+  @Get('health')
+  @RequirePermission(PERMISSIONS.channelModelRead)
+  async health(@Query('channelId') channelId?: string) {
+    return { items: await this.metrics.list(channelId ? String(channelId) : undefined) };
   }
 }

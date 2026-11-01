@@ -64,6 +64,17 @@ export interface PluginView {
   /** 注册表里实际生效的协议数（停用后为 0） */
   activeProtocols: number;
   runtime: { backend: string; web: string };
+  /**
+   * 当前环境可用性。
+   *
+   * `available=false` 时 `reason` 必填且是**人话**说明（如「该插件声明了
+   * `rpc` 支付后端，本环境未内置该执行引擎，支付服务不会生效」），
+   * 页面直接展示 —— 不允许「插件列在那里但就是不工作」这种静默缺失。
+   */
+  availability: {
+    available: boolean;
+    reason: string;
+  };
   surfaces: string[];
   permissions: string[];
   configuration: ManifestField[];
@@ -302,6 +313,7 @@ export class PluginAdminService {
         backend: String(manifest.runtime?.backend ?? 'declarative').trim() || 'declarative',
         web: String(manifest.runtime?.web ?? '').trim(),
       },
+      availability: pluginAvailability(plugin, state?.enabled ?? true),
       surfaces: manifest.surfaces ?? [],
       permissions: manifest.permissions ?? [],
       configuration: manifest.configuration?.fields ?? [],
@@ -328,6 +340,63 @@ export class PluginAdminService {
 }
 
 /* ────────────────────────── 纯函数 ────────────────────────── */
+
+/**
+ * 判定插件在**当前环境**是否可用，并给出人话原因。
+ *
+ * 设计文档 §7.3：「宿主无法用 TS 复刻的插件在后台标『当前环境不可用』并
+ * 展示原因，不允许静默消失」。
+ *
+ * 本仓的判定分三类：
+ *
+ *  1. **停用**：管理员关掉了系统级开关 —— 这是**主动**停用，不是环境问题，
+ *     原因说「已被管理员停用」；
+ *  2. **`host:<engine>` 后端**：清单要求宿主原生执行引擎，本仓没有内置，
+ *     所以这个 provider 不会注册（见 `PluginProtocolService.registerAll`）；
+ *  3. **`rpc` / `wasm` 后端且没有 provider 贡献**：这类插件贡献的是支付 /
+ *     短信等**非模型能力**。本仓的支付与短信通道是独立实现的
+ *     （`src/payments/**` 的 sandbox / 支付宝 / 微信，`src/channels/**` 的
+ *     sms / email），不读插件清单 —— 所以这些插件在当前环境**不会生效**。
+ *
+ * 关键点：第 3 类不是「插件坏了」，而是「宿主用另一套实现覆盖了它」。
+ * 必须说清楚，否则运营会以为装了这个插件就能用对应的支付方式。
+ */
+function pluginAvailability(
+  plugin: LoadedPlugin,
+  enabled: boolean,
+): { available: boolean; reason: string } {
+  if (!enabled) {
+    return { available: false, reason: '已被管理员停用（系统级开关关闭）' };
+  }
+
+  const backend = String(plugin.manifest.runtime?.backend ?? 'declarative').trim() || 'declarative';
+  const contributes = plugin.manifest.contributes ?? {};
+  const providerCount = (contributes.providers ?? []).length;
+
+  if (backend.startsWith('host:')) {
+    return {
+      available: false,
+      reason: `该插件声明了 \`${backend}\` 宿主执行引擎，本环境未内置该引擎，协议不会注册`,
+    };
+  }
+
+  if (providerCount === 0) {
+    // 没有 provider 贡献 = 它只贡献非模型能力。本仓的支付 / 短信是独立实现，
+    // 不读插件清单，因此这些插件在当前环境不生效。
+    const surfaces: string[] = [];
+    if ((contributes.paymentProviders ?? []).length > 0) surfaces.push('支付');
+    if ((contributes.smsProviders ?? []).length > 0) surfaces.push('短信');
+    const what = surfaces.length > 0 ? surfaces.join(' / ') : '非模型能力';
+    return {
+      available: false,
+      reason:
+        `该插件只贡献${what}，且后端为 \`${backend}\`；` +
+        '本环境的支付与短信通道是独立实现的，不读取插件清单，因此这份贡献不会生效',
+    };
+  }
+
+  return { available: true, reason: '' };
+}
 
 function notFound(): AppError {
   return new AppError(40400, '插件不存在', 404);

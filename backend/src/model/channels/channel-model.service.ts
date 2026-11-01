@@ -25,6 +25,7 @@ import {
   normalizeChannelModelTierSelector,
   validateChannelModelTierCapabilities,
   validateChannelModelTierPricing,
+  type TierSummarySource,
 } from '../domain/selector';
 import { CatalogVersionService } from '../infra/catalog-version.service';
 import { ProtocolCatalogService } from '../protocol/protocol-catalog.service';
@@ -47,9 +48,12 @@ import {
 import {
   CHANNEL_SCOPE_SYSTEM,
   MAX_CHANNEL_MODEL_BATCH_DELETE,
+  MAX_CHANNEL_MODEL_BATCH_REPRICE,
   MAX_SORT_ORDER,
   type ChannelModelPriceTierRequest,
+  type ChannelModelRepriceRequest,
   type ChannelModelRequest,
+  type ChannelModelSalePriceField,
   type ChannelModelView,
 } from './channel.types';
 
@@ -276,6 +280,134 @@ export class ChannelModelService {
     }
     await this.catalogVersion.invalidate();
     return deleted;
+  }
+
+  /**
+   * 批量调价：只改售价，不动成本、能力、启停与上游模型键。
+   *
+   * 前端提交的是**最终售价**（由「成本 × (1 + 加价率)」四舍五入得出，也可手动
+   * 改写），服务端不复算加价率。校验顺序：
+   *   1. 请求形状与数量上限；
+   *   2. 模型归属与价格版本（乐观并发令牌）；
+   *   3. 已启用档位必须完整提交，且每个档位的版本未变；
+   *   4. 只允许提交当前计费方式需要的售价字段；
+   *   5. 售价合法性与计费约束。
+   * 任一条不满足即整批拒绝 —— 半批成功会让「看到的价」与「扣费的价」分叉。
+   */
+  async repriceMany(channelId: string, requests: unknown[]): Promise<number> {
+    await this.requireChannel(channelId);
+    const selected = normalizeRepriceRequests(requests);
+    const ids = [...selected.keys()];
+    const rows = await this.prisma.channelModel.findMany({
+      where: { channelId, id: { in: ids }, deletedAt: null },
+    });
+    if (rows.length !== ids.length) {
+      throw badRequest('所选模型已删除或不属于当前渠道，请刷新后重试；本次未修改任何价格');
+    }
+    const tiers = await this.prisma.channelModelPriceTier.findMany({
+      where: { channelModelId: { in: ids }, deletedAt: null },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+    });
+
+    const updates: RepriceUpdate[] = [];
+    // 固定加锁顺序：并发批量请求按同一顺序更新，避免互相等待
+    for (const row of [...rows].sort((a, b) => a.id.localeCompare(b.id))) {
+      const request = selected.get(row.id)!;
+      if (request.priceVersion !== row.priceVersion) {
+        throw badRequest('模型价格已变化，请刷新后重新调价；本次未修改任何价格');
+      }
+      const active = tiers.filter((tier) => tier.channelModelId === row.id && tier.enabled);
+      if (active.length === 0) throw badRequest(`模型 ${row.modelKey} 没有已启用的价格档，无法调价`);
+      if (request.tiers.size !== active.length) {
+        throw badRequest(`模型 ${row.modelKey} 的规格提交不完整或包含无效规格；本次未修改任何价格`);
+      }
+
+      const nextTiers: TierSummarySource[] = [];
+      const tierUpdates: RepriceTierUpdate[] = [];
+      for (const tier of active) {
+        const input = request.tiers.get(tier.id);
+        if (!input) {
+          throw badRequest(`模型 ${row.modelKey} 的规格提交不完整或包含无效规格；本次未修改任何价格`);
+        }
+        if (input.priceVersion !== tier.priceVersion) {
+          throw badRequest('规格价格已变化，请刷新后重新调价；本次未修改任何价格');
+        }
+        if (!tier.costConfigured || !tier.priceConfigured) {
+          throw badRequest(`模型 ${row.modelKey}（规格 ${tier.selectorKey}）：请先保存完整的规格成本价和销售价配置`);
+        }
+        const fields = salePriceFields(row.capability, tier.billingMode);
+        const keys = Object.keys(input.prices);
+        if (keys.length !== fields.length || fields.some((field) => !(field in input.prices))) {
+          throw badRequest(
+            `模型 ${row.modelKey}（规格 ${tier.selectorKey}）：必须提交当前计费方式的全部销售价，且不能包含其他字段`,
+          );
+        }
+        const prices = {
+          billingMode: tier.billingMode,
+          unitPriceMicrocredits: toNumber(tier.unitPriceMicrocredits),
+          inputTokenPriceMicrocredits: toNumber(tier.inputTokenPriceMicrocredits),
+          outputTokenPriceMicrocredits: toNumber(tier.outputTokenPriceMicrocredits),
+          cachedTokenPriceMicrocredits: toNumber(tier.cachedTokenPriceMicrocredits),
+        };
+        const submitted: Partial<Record<ChannelModelSalePriceField, number>> = {};
+        for (const field of fields) {
+          submitted[field] = toSafeAmount(input.prices[field], '销售价');
+          prices[field] = submitted[field];
+        }
+        validateChannelModelTierPricing(row.capability, tier.billingMode, prices, {
+          billingMode: tier.billingMode,
+          configured: tier.costConfigured,
+          unitPriceMicrocredits: toNumber(tier.costUnitPriceMicrocredits),
+          inputTokenPriceMicrocredits: toNumber(tier.costInputTokenPriceMicrocredits),
+          outputTokenPriceMicrocredits: toNumber(tier.costOutputTokenPriceMicrocredits),
+          cachedTokenPriceMicrocredits: toNumber(tier.costCachedTokenPriceMicrocredits),
+        });
+        tierUpdates.push({ id: tier.id, priceVersion: tier.priceVersion, prices: submitted });
+        nextTiers.push({ enabled: tier.enabled, priceConfigured: tier.priceConfigured, ...prices });
+      }
+      updates.push({
+        row,
+        priceVersion: request.priceVersion,
+        tierUpdates,
+        summary: summarizeRepricedTiers(nextTiers),
+      });
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      for (const update of updates) {
+        const claimed = await tx.channelModel.updateMany({
+          where: { id: update.row.id, channelId, priceVersion: update.priceVersion, deletedAt: null },
+          data: {
+            priceVersion: { increment: 1 },
+            priceConfigured: update.summary.priceConfigured,
+            billingMode: update.summary.billingMode,
+            unitPriceMicrocredits: BigInt(update.summary.unitPriceMicrocredits),
+            inputTokenPriceMicrocredits: BigInt(update.summary.inputTokenPriceMicrocredits),
+            outputTokenPriceMicrocredits: BigInt(update.summary.outputTokenPriceMicrocredits),
+            cachedTokenPriceMicrocredits: BigInt(update.summary.cachedTokenPriceMicrocredits),
+          },
+        });
+        if (claimed.count !== 1) {
+          throw badRequest('模型价格已被其他操作修改，请刷新后重试；本次未修改任何价格');
+        }
+        for (const tier of update.tierUpdates) {
+          const claimedTier = await tx.channelModelPriceTier.updateMany({
+            where: {
+              id: tier.id,
+              channelModelId: update.row.id,
+              priceVersion: tier.priceVersion,
+              deletedAt: null,
+            },
+            data: { ...tier.prices, priceVersion: { increment: 1 } },
+          });
+          if (claimedTier.count !== 1) {
+            throw badRequest('规格价格已被其他操作修改，请刷新后重试；本次未修改任何价格');
+          }
+        }
+      }
+    });
+    await this.catalogVersion.invalidate();
+    return updates.length;
   }
 
   /* ───────────────────────── 初始化 ───────────────────────── */
@@ -506,6 +638,92 @@ function summarizeTiers(tiers: PriceTierWrite[]): TierSummary {
     },
     source,
   );
+}
+
+interface RepriceTierUpdate {
+  id: string;
+  priceVersion: number;
+  prices: Partial<Record<ChannelModelSalePriceField, number>>;
+}
+
+interface RepriceUpdate {
+  row: { id: string; modelKey: string; capability: string; priceVersion: number };
+  priceVersion: number;
+  tierUpdates: RepriceTierUpdate[];
+  summary: TierSummary;
+}
+
+/** 该计费方式下必须提交的售价字段（与参考实现一致） */
+function salePriceFields(capability: string, billingMode: string): ChannelModelSalePriceField[] {
+  if (billingMode !== 'token') return ['unitPriceMicrocredits'];
+  if (capability === 'video') return ['outputTokenPriceMicrocredits'];
+  return ['inputTokenPriceMicrocredits', 'outputTokenPriceMicrocredits', 'cachedTokenPriceMicrocredits'];
+}
+
+/** 调价后的模型级价格摘要：与保存、列表展示同一口径 */
+function summarizeRepricedTiers(tiers: TierSummarySource[]): TierSummary {
+  return applyChannelModelPriceTierSummary<TierSummary>(
+    {
+      priceConfigured: false,
+      billingMode: 'fixed_request',
+      unitPriceMicrocredits: 0,
+      inputTokenPriceMicrocredits: 0,
+      outputTokenPriceMicrocredits: 0,
+      cachedTokenPriceMicrocredits: 0,
+    },
+    tiers,
+  );
+}
+
+interface NormalizedRepriceRequest {
+  priceVersion: number;
+  tiers: Map<string, { priceVersion: number; prices: Record<string, unknown> }>;
+}
+
+/** 调价入参规范化：形状错误一次说清，不在循环里逐条报 */
+function normalizeRepriceRequests(requests: unknown[]): Map<string, NormalizedRepriceRequest> {
+  if (!Array.isArray(requests) || requests.length === 0) {
+    throw badRequest('单次请选择 1 到 100 个渠道模型');
+  }
+  if (requests.length > MAX_CHANNEL_MODEL_BATCH_REPRICE) {
+    throw badRequest(`单次最多调整 ${MAX_CHANNEL_MODEL_BATCH_REPRICE} 个渠道模型`);
+  }
+  const result = new Map<string, NormalizedRepriceRequest>();
+  for (const raw of requests) {
+    const item = (raw ?? {}) as Record<string, unknown>;
+    const modelId = String(item.modelId ?? '').trim();
+    const priceVersion = Number(item.priceVersion);
+    if (
+      !modelId ||
+      result.has(modelId) ||
+      !Number.isInteger(priceVersion) ||
+      priceVersion < 1
+    ) {
+      throw badRequest('渠道模型 ID 或价格版本无效，且模型不能重复');
+    }
+    const tiers = new Map<string, { priceVersion: number; prices: Record<string, unknown> }>();
+    const rawTiers = Array.isArray(item.priceTiers) ? item.priceTiers : [];
+    for (const rawTier of rawTiers) {
+      const tier = (rawTier ?? {}) as Record<string, unknown>;
+      const id = String(tier.id ?? '').trim();
+      const tierVersion = Number(tier.priceVersion);
+      const prices = tier.prices;
+      if (
+        !id ||
+        tiers.has(id) ||
+        !Number.isInteger(tierVersion) ||
+        tierVersion < 1 ||
+        !prices ||
+        typeof prices !== 'object' ||
+        Array.isArray(prices)
+      ) {
+        throw badRequest('规格 ID 不能为空或重复，销售价格式需为对象');
+      }
+      tiers.set(id, { priceVersion: tierVersion, prices: prices as Record<string, unknown> });
+    }
+    result.set(modelId, { priceVersion, tiers });
+  }
+  return result;
 }
 
 /** 批量删除的 id 规范化：去空去重，1..100 */

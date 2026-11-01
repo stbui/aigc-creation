@@ -199,10 +199,10 @@ running ──nextPollAt 到期──► 回查上游
 
 | 页面 | 前缀 | 要点 |
 | --- | --- | --- |
-| 渠道工作台 | `/admin/channels` | 渠道 CRUD、复制、排序、导入导出、渠道模型与价格档、协议连通性测试、**线路健康**（`GET /admin/channels/health`） |
+| 渠道工作台 | `/admin/channels` | 渠道 CRUD、复制、排序、导入导出、渠道模型与价格档、协议连通性测试、**线路当前状态**（`GET /admin/channels/health`：启停 / 协议 / 冷却）、**线路历史表现**（`GET /admin/channel-models/health`：24h / 7d 成功率、P95、最近样本，按渠道模型出表） |
 | 前台模型 | `/admin/logical-models` | 保存即发布 revision；线路优先级 / 权重；`POST /:id/simulate` 回答「这组参数会落到哪条线路、为什么没落」 |
 | 用户分组 | `/admin/user-groups` | 可见渠道集合、倍率、货币换算、按模型覆盖 |
-| 插件 | `/admin/plugins` | 内置包只读；上传包可校验 / 安装 / 卸载 |
+| 插件 | `/admin/plugins` | 内置包只读；上传包可校验 / 安装 / 卸载；每项带**当前环境可用性**（停用 / 宿主引擎未内置 / 只贡献支付短信等非模型能力）与人话原因 |
 | 调用记录 | `/admin/model-calls`（数据源 `/admin/api-logs`） | 逐次上游 HTTP，含后台连通性测试（`billable=false`）；`GET /admin/api-logs/export` 导出 CSV（不含请求 / 响应体） |
 | 生成账单 | `/admin/billing-orders` | `uncertain` 只能人工 `settle` / `refund`，必须填原因并写审计 |
 | 财务分析 | `/admin/finance` | `GET /admin/analytics/finance`：实收只算已结算，挂账单单列 |
@@ -262,6 +262,7 @@ C 端目录接口：`GET /models`（可选身份，登录后按分组过滤并�
 | `MODEL_MEDIA_TIMEOUT_MS` | 180000 | 媒体下载超时 |
 | `MODEL_WORKER_INTERVAL_MS` | 1000 | 调度节拍 |
 | `MODEL_LEASE_MS` | 120000 | 任务租约（代码内含 45s 的下限保护） |
+| `MODEL_SLOT_WAIT_MS` | 60000 | 渠道并发槽等槽上限；超时即切线 / `429` |
 | `MODEL_ALLOW_PRIVATE_UPSTREAMS` / `MODEL_ALLOWED_PRIVATE_UPSTREAM_HOSTS` | false / 空 | 是否允许私网上游（本地联调才开） |
 | `MODEL_PROXY_*` | 见 env.validation | 中转的开关、体积、超时、并发 |
 | `ASSET_PUBLIC_BASE` | 空 | 参考图回传基址；留空取 `http://localhost:<PORT>` |

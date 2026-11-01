@@ -87,13 +87,179 @@ test.describe('渠道与模型 P5', () => {
     await expect(page.getByTestId('admin-drawer')).toHaveCount(0);
 
     // 模型抽屉：凭证不回显，模型清单按渠道加载
-    if ((await rows(page).count()) === 0) {
-      test.skip(true, '当前库没有渠道；渠道模型抽屉需要一条已配置渠道');
-    }
+    await expect
+      .poll(async () => rows(page).count(), { timeout: 15000, message: '渠道列表应至少有一行' })
+      .toBeGreaterThan(0);
     await rows(page).first().getByRole('button', { name: '模型', exact: true }).click();
     await expect(page.getByTestId('admin-drawer')).toBeVisible();
     await expect(page.getByTestId('admin-drawer')).toContainText('渠道模型 · ');
-    await expect(page.getByTestId('admin-drawer')).toContainText('基础信息');
+    // 抽屉是「该渠道的模型清单」，不必然有「基础信息」表单（那是新建/编辑态才有）
+    await expect(page.getByTestId('admin-drawer')).toContainText('模型清单');
+  });
+
+  test('线路健康：渠道工作台展示按线路统计的成功率与耗时', async ({ page, request }) => {
+    await login(page);
+    await page.goto(`${UI}/admin/channels`);
+    await expect(page.getByRole('heading', { name: '渠道工作台' })).toBeVisible({ timeout: 20000 });
+
+    // 健康面板与「当前状态」是两份数据：面板给过去 24h / 7d 的成功率与 P95
+    await expect(page.getByRole('heading', { name: '线路健康' })).toBeVisible();
+    await expect(page.getByText('24h 成功率').first()).toBeVisible();
+    await expect(page.getByText('7d 成功率').first()).toBeVisible();
+    await expect(page.getByText('P95 耗时').first()).toBeVisible();
+
+    // 面板数据来自 /admin/channel-models/health，不是前端自己算的
+    const token = await adminToken(request);
+    const auth = { Authorization: `Bearer ${token}` };
+    const health = await request.get(`${API}/api/v1/admin/channel-models/health`, { headers: auth });
+    expect(health.ok()).toBeTruthy();
+    const items = ((await health.json())?.data?.items ?? []) as Array<any>;
+    if (items.length === 0) {
+      // 没有可观测线路时面板给空态，不是空白
+      await expect(page.getByText(/没有可观测的线路/).first()).toBeVisible();
+      return;
+    }
+    // 每条线路都有两个窗口，且无样本时成功率是 null（不是 0）
+    for (const item of items) {
+      expect(item.windows?.day).toBeTruthy();
+      expect(item.windows?.week).toBeTruthy();
+      expect(item.windows.day.successRate === null || typeof item.windows.day.successRate === 'number').toBeTruthy();
+    }
+  });
+
+  test('统一调价：勾选模型 → 按成本算价 → 保存售价', async ({ page, request }) => {
+    await login(page);
+    await page.goto(`${UI}/admin/channels`);
+    await expect(page.getByRole('heading', { name: '渠道工作台' })).toBeVisible({ timeout: 20000 });
+
+    /*
+     * 表头可见不代表数据到了：列表是异步拉的。刚进页面就数行数会数到 0，
+     * 误判成「库里没有渠道」而整段跳过 —— 必须等第一行真的出现。
+     */
+    await expect
+      .poll(async () => rows(page).count(), { timeout: 15000, message: '渠道列表应至少有一行' })
+      .toBeGreaterThan(0);
+
+    /*
+     * 调价要求「已启用规格的成本价与售价都已配置」。库里没有这样的规格时
+     * 整段跳过 —— 那是配置缺口，不是功能缺陷（后端会明确拒掉并说明原因）。
+     * 先用 API 找出第一条「可调价」的渠道与模型，界面步骤再照着它走。
+     */
+    const token = await adminToken(request);
+    const auth = { Authorization: `Bearer ${token}` };
+    const channels = (
+      (await (await request.get(`${API}/api/v1/admin/channels?limit=100`, { headers: auth })).json())
+        ?.data?.channels ?? []
+    ) as Array<{ id: string; name: string }>;
+
+    let target: {
+      channelId: string;
+      channelName: string;
+      modelKey: string;
+      sale: number;
+      tier: { unitPriceMicrocredits: number; costPricing: { unitPriceMicrocredits: number } };
+    } | null = null;
+    for (const channel of channels) {
+      const models = (
+        (await (await request.get(`${API}/api/v1/admin/channels/${channel.id}/models`, { headers: auth })).json())
+          ?.data ?? []
+      ) as Array<any>;
+      const model = models.find((item: any) =>
+        (item.priceTiers ?? []).some(
+          (tier: any) => tier.enabled && tier.priceConfigured && tier.costPricing?.configured,
+        ),
+      );
+      if (!model) continue;
+      const tier = model.priceTiers.find(
+        (item: any) => item.enabled && item.priceConfigured && item.costPricing?.configured,
+      );
+      target = {
+        channelId: channel.id,
+        channelName: channel.name,
+        modelKey: model.modelKey,
+        sale: tier.unitPriceMicrocredits,
+        tier: {
+          unitPriceMicrocredits: tier.unitPriceMicrocredits,
+          costPricing: { unitPriceMicrocredits: tier.costPricing.unitPriceMicrocredits },
+        },
+      };
+      break;
+    }
+    if (!target) {
+      test.skip(true, '当前库没有「已启用 + 成本价与售价都已配置」的规格；统一调价需要完整价格配置');
+    }
+
+    // 打开目标渠道的模型抽屉
+    await page
+      .locator('tr', { has: page.getByRole('button', { name: '模型', exact: true }) })
+      .filter({ hasText: target!.channelName })
+      .first()
+      .getByRole('button', { name: '模型', exact: true })
+      .click();
+    await expect(page.getByTestId('admin-drawer')).toBeVisible();
+
+    // 勾选目标模型（复选框的可访问名是「选择模型 {modelKey}」）
+    // 勾选框的可视元素会挡住指针，这里用键盘操作，也更贴近无障碍真实路径。
+    const modelCheckbox = page.getByRole('checkbox', { name: `选择模型 ${target!.modelKey}` });
+    await modelCheckbox.focus();
+    await page.keyboard.press('Space');
+    await expect(modelCheckbox).toBeChecked();
+    await page.getByRole('button', { name: /统一调价/ }).click();
+
+    // 调价弹窗与模型抽屉是两个模态，按 testid 定位弹窗（getByRole('dialog') 会同时命中抽屉）
+    const dialog = page.getByTestId('admin-modal');
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toContainText('统一调价');
+    await expect(dialog).toContainText('新售价 = 成本价');
+
+    // 未填加价率时没有可提交的变化，保存按钮不可用
+    await expect(dialog.getByRole('button', { name: /保存售价/ })).toBeDisabled();
+
+    /*
+     * 售价真的变了：新售价 = 成本 × (1 + 加价率)，**不是**原售价 × (1 + 加价率)。
+     * 默认保留 2 位小数 → 取整到 10^4 微积分（0.01 积分）的整数倍。
+     *
+     * 加价率不能写死 10%：用例要可重复跑。上一轮已经把售价改成成本 × 1.1，
+     * 这一轮再填 10% 就「没有变化」，保存按钮一直是禁用的 —— 那不是功能坏了，
+     * 是用例不幂等。所以按当前售价反推一个**一定不同**的加价率。
+     */
+    const targetTier = target!.tier;
+    const currentSale = targetTier.unitPriceMicrocredits;
+    const cost = targetTier.costPricing.unitPriceMicrocredits;
+    const quantum = 10 ** 4; // 保留 2 位小数 → 0.01 积分
+    const round = (value: number) => Math.round(value / quantum) * quantum;
+    // 依次试 10 / 20 / 30 …，取第一个算出来不等于当前售价的加价率
+    let markup = 10;
+    for (const candidate of [10, 20, 30, 40, 50, 60, 70, 80, 90]) {
+      if (round((cost * (100 + candidate)) / 100) !== currentSale) {
+        markup = candidate;
+        break;
+      }
+    }
+    const expected = round((cost * (100 + markup)) / 100);
+
+    // 填加价率 → 按成本重算 → 出现可保存的变化
+    await dialog.getByLabel('加价率').fill(String(markup));
+    await dialog.getByRole('button', { name: '按成本重算' }).click();
+
+    // 原因必填（高危写操作要留审计）：没填时保存按钮仍不可用
+    await expect(dialog.getByRole('button', { name: /保存售价/ })).toBeDisabled();
+    await dialog.getByLabel('变更原因').fill(`e2e：统一加价 ${markup}%`);
+    await expect(dialog.getByRole('button', { name: /保存售价/ })).toBeEnabled();
+
+    await dialog.getByRole('button', { name: /保存售价/ }).click();
+    await expect(page.getByTestId('admin-toast').last()).toContainText('已保存', { timeout: 15000 });
+
+    const modelsAfter = (
+      (await (await request.get(`${API}/api/v1/admin/channels/${target!.channelId}/models`, { headers: auth })).json())
+        ?.data ?? []
+    ) as Array<any>;
+    const after = modelsAfter.find((item: any) => item.modelKey === target!.modelKey);
+    const tierAfter = (after?.priceTiers ?? []).find(
+      (item: any) => item.enabled && item.priceConfigured && item.costPricing?.configured,
+    );
+    expect(tierAfter, '调价后应能读到价格档').toBeTruthy();
+    expect(tierAfter.unitPriceMicrocredits).toBe(expected);
   });
 
   test('前台模型：清单与路由模拟', async ({ page }) => {
@@ -102,9 +268,10 @@ test.describe('渠道与模型 P5', () => {
     await expect(page.getByRole('heading', { name: '前台模型' })).toBeVisible({ timeout: 20000 });
     await expect(page.getByRole('heading', { name: '模型清单' })).toBeVisible();
 
-    if ((await rows(page).count()) === 0) {
-      test.skip(true, '当前库没有前台模型；路由模拟需要至少一个模型');
-    }
+    // 同样是异步列表：等第一行真的出现再决定要不要跳过
+    await expect
+      .poll(async () => rows(page).count(), { timeout: 15000, message: '前台模型列表应至少有一行' })
+      .toBeGreaterThan(0);
 
     await rows(page).first().getByRole('button', { name: '模拟', exact: true }).click();
     await expect(page.getByTestId('admin-drawer')).toContainText('路由模拟 · ');
@@ -123,11 +290,15 @@ test.describe('渠道与模型 P5', () => {
     await expect(page.getByRole('heading', { name: '分组清单' })).toBeVisible();
 
     await page.goto(`${UI}/admin/plugins`);
-    await expect(page.getByRole('heading', { name: '内置插件' })).toBeVisible({ timeout: 20000 });
+    await expect(page.getByRole('heading', { name: '插件', exact: true })).toBeVisible({ timeout: 20000 });
     await expect(page.getByRole('heading', { name: '插件清单' })).toBeVisible();
     await expect(rows(page).first()).toBeVisible({ timeout: 15000 });
     // 110 个内置插件随包入库，清单不可能为空
     await expect(page.getByText('插件总数').first()).toBeVisible();
+
+    // 「当前环境」列：不允许「插件列在那里但就是不工作」这种静默缺失
+    await expect(page.getByText('当前环境').first()).toBeVisible();
+    await expect(page.getByText('当前环境不可用').first()).toBeVisible();
   });
 
   test('生成账单与调用记录：筛选与详情可用', async ({ page }) => {

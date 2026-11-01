@@ -66,6 +66,7 @@
 | GET | `/api/v1/model-catalog` | 渠道模型目录（供应视角）：`models` 恒为空数组，模型在 `channels[].models` 内；渠道名恒为空串，不带凭证 |
 | POST | `/api/v1/model-catalog/available` | 按请求意图筛选可用的渠道模型 |
 | POST | `/api/v1/model-catalog/quote` | 渠道模型报价（`channelId` + `modelKey` + 意图），供渠道工作台预览价格 |
+| GET | `/api/v1/channels/system` | 系统渠道连接信息（匿名可读）。**非管理员视角只给「有哪些渠道、怎么连」**：`name` / `userId` / `catalogProviderId` 固定空串（渠道名会泄漏供应商与中转站身份），`baseUrl` 改写为中转入口 `/api/v1/ai/system/{channelId}`，`apiKey` 恒为 `'system'`（服务端注入真实凭证），`concurrencyLimit` / `hasApiKey` / `hasSecretKey` 恒为 0 / false。**管理员**（实时查库判角色）额外拿到渠道真实名称与上游地址，但凭证任何情况都不下发 |
 | GET | `/api/v1/credits/{balance,lots,ledger}` | 积分余额 / 批次 / 流水 |
 | GET | `/api/v1/membership/plans`、`/me` | 会员套餐 / 我的会员 |
 | POST | `/api/v1/membership/{subscribe,cancel}` | 订阅 / 取消自动续费（取消后 `status='cancelled'`，已付周期保留至 `expiresAt`，到期由调度任务失效；续费可重新激活并顺延） |
@@ -105,11 +106,13 @@
 | GET | `/api/v1/admin/payment-channels` | 支付渠道状态（只读：生效通道 / 凭据缺失项 / 回调地址 / 风险告警，`payment.read`） |
 | GET/POST/PATCH/DELETE | `/api/v1/admin/channels*`、`/admin/channel-models` | 渠道 / 渠道模型 / 价格档 / 排序 / 复制 / 导入导出 / 连通性测试；写需 `channel.write` / `channel.model_write`，测试写 `ApiCallLog(billable=false)` |
 | GET | `/api/v1/admin/channels/protocols` | 可选协议目录（按 `capability` 过滤）；渠道模型表单的协议来源，`channel.model_read` |
-| GET | `/api/v1/admin/channels/health` | 线路健康：一行 = 一条渠道模型（能力 / 启停 / 协议是否已注册 / 进程内冷却截止），值班塔与渠道工作台共用，`channel.read` |
+| GET | `/api/v1/admin/channels/health` | 线路健康（一行 = 一条渠道模型：能力 / 启停 / 协议是否已注册 / 进程内冷却截止），值班塔与渠道工作台共用，`channel.read` |
+| GET | `/api/v1/admin/channel-models/health?channelId=` | 线路**历史表现**：一行 = 一条渠道模型，给 24h / 7d 两个窗口的成功率与 P95 耗时 + 最近 10 条终态样本，`channel.model_read`。与 `/admin/channels/health` 的分工：后者是「现在」（启停 / 协议 / 冷却），本端点是「过去」（成功率 / 耗时），值班时两个都要看。成功率 = `success` ÷ 终态次数（`pending` / `canceled` 不计入分母），**无终态样本时为 `null`**（不是 0 ——「没数据」与「全失败」要分得开）；P95 用最近邻法（不插值），样本被采样上限截断时 `sampled=true` |
+| POST | `/api/v1/admin/channels/:id/models/batch-reprice` | 批量调价：只改**已启用规格的售价**，不动成本价 / 启停 / 上游键。请求体 `{ models: [{ modelId, priceVersion, priceTiers: [{ id, priceVersion, prices }] }], reason }`（`reason` **必填**，高危写操作要留审计），单次 ≤ 100 个模型。`priceVersion` 是乐观并发令牌：任一模型或规格版本过期 → **整批拒绝**（40001，不部分落库）；`prices` 必须恰好是当前计费方式的全部售价字段（按次/按时长 → `unitPriceMicrocredits`；Token 非视频 → 输入/输出/缓存三项；Token 视频 → 仅输出），少一项或多夹一项都拒绝；规格缺成本价或售价未配置时拒绝。成功返回 `{ updated }`，写审计 `channel_model.batch_reprice`，`channel.model_write` |
 | GET/POST/PATCH/DELETE | `/api/v1/admin/logical-models*` | 前台模型列表 / 保存（新 revision + 线路重建）/ 归档；`logical_model.read` / `logical_model.write` |
-| POST | `/api/v1/admin/logical-models/:id/simulate` | 路由模拟（只读）：返回产品能力匹配结果与逐条线路的判定原因；需 `logical_model.read` |
+| POST | `/api/v1/admin/logical-models/:id/simulate` | 路由模拟（只读）：返回产品能力匹配结果与逐条线路的判定原因；需 `logical_model.read`。入参 `capability` 是**模态**（`image` / `video` / `text`），不是产品能力 id（`expand` / `main_image`）——两层命名空间不能混；省略时**按模型自己的能力合同取模态**，传了产品能力 id 也按省略处理（模型是权威源，客户端不该改） |
 | GET/POST/PATCH/DELETE | `/api/v1/admin/user-groups*` | 用户分组（倍率 / 可见渠道 / 按模型覆盖）；`user_group.read` / `user_group.write`，`code` 创建后不可改 |
-| GET/PATCH/POST/DELETE | `/api/v1/admin/plugins*`、`/plugins/:id/verify`、`/plugins/install` | 插件清单 / 启停（立即重注册协议）/ 契约校验 / 上传安装（multipart `file`，`origin='installed'`）/ 卸载（内置包 40001，仍被渠道模型引用 40909）；`plugin.read` / `plugin.write`，装卸写审计 |
+| GET/PATCH/POST/DELETE | `/api/v1/admin/plugins*`、`/plugins/:id/verify`、`/plugins/install` | 插件清单 / 启停（立即重注册协议）/ 契约校验 / 上传安装（multipart `file`，`origin='installed'`）/ 卸载（内置包 40001，仍被渠道模型引用 40909）；`plugin.read` / `plugin.write`，装卸写审计。清单每项带 `availability: { available, reason }`：本环境不可用时 `reason` 是**人话**说明（停用 / 声明了本仓未内置的 `host:<engine>` 引擎 / 只贡献支付短信等非模型能力而本仓独立实现），不允许「插件列在那里但就是不工作」这种静默缺失 |
 | GET/POST | `/api/v1/admin/provider-catalog`、`/refresh`、`/:id/{verify,install}` | 服务商目录（插件包上游清单）：未配置 `MODEL_PROVIDER_CATALOG_URL` 时返回空态与原因；安装走与上传安装同一套校验；`plugin.read` / `plugin.write` |
 | GET | `/api/v1/admin/analytics/finance?from&to` | 财务汇总：实收 = 已结算 `actualAmountMicrocredits`，已退 = `refundedAmountMicrocredits`，净收入 = 实收 − 已退；预留 / 运行 / 待核对单列挂账**不计入实收**；区间默认 30 天、上限 366 天，`model.analytics_read` |
 | GET/POST | `/api/v1/admin/billing-orders*`、`/billing-orders/:id/resolve` | 生成账单列表 / 详情 / 人工核对（`settle` \| `refund`，原因必填 + 审计，`billing_order.read` / `billing_order.resolve`） |

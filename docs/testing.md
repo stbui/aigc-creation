@@ -52,7 +52,7 @@ npm run test:watch      # watch
 npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitignore）
 ```
 
-当前 18 个用例文件：
+当前 19 个用例文件：
 
 | 用例 | 守住什么 |
 | --- | --- |
@@ -65,6 +65,7 @@ npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitig
 | `hooks/useCreditLabel.test.tsx` | 积分文案与生效价、限时免费的展示 |
 | `lib/admin-links.test.ts` | 跨模块深链的参数编码（邮箱、任务 id 等） |
 | `lib/aigc-label.test.ts` | 角标参数缓存、失败回退默认值、色值还原 |
+| `lib/channelReprice.test.ts` | 统一调价的金额换算：售价字段按计费方式取子集、加价率校验、成本加价的 half-up 取整（含 0.0002 积分量级）、售价文本互逆、缺成本价/售价未配置的模型被拦截 |
 | `lib/expandGeometry.test.ts` | 扩图占比与原图位置几何换算 |
 | `lib/multiFusionBilling.test.ts` | 多图融合变体数 × 积分计费 |
 | `lib/optionSets.test.ts` | 平台/语言/比例等选项集合的默认值与排序 |
@@ -74,12 +75,13 @@ npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitig
 | `lib/unsaved-guard.test.ts` | 离开页面时的未保存拦截 |
 | `lib/zip.test.ts` | 浏览器内批量下载打包 |
 | `pages/admin/admin-modules.test.ts` | 后台目录具名导入 / 导出对账：相对导入的每个名字都必须在目标模块导出（防 `/admin` 整块白屏） |
+| `pages/admin/channels/ChannelModelHealthPanel.test.tsx` | 线路健康面板：成功率语义分档、**无终态样本时显示「无样本」而不是 0%**（「没数据」≠「全失败」）、样本被截断时提示「按最近部分统计」、停用 / 协议未注册 / 冷却三个状态标记、最近样本错误码、空态 |
 
 边界：Vitest 只跑 jsdom，不替代 L3/L4。真实后端、真实浏览器、真实库与磁盘的记录仍以 `smoke-*` / `verify-*` / Playwright 为准。Playwright 只收集 `tests/*.spec.ts`，Vitest 只收集 `src/**/*.test.*`，两边互不重叠。
 
 ### 3.3 架构与纯逻辑断言（L2）
 
-`backend/scripts/` 下共 17 个验证脚本：13 个 `verify-*.ts` + 1 个 `probe-environments.ts`，以及 3 个需要后端已启动的 `verify-*.js`。
+`backend/scripts/` 下共 18 个验证脚本：14 个 `verify-*.ts` + 1 个 `probe-environments.ts`，以及 3 个需要后端已启动的 `verify-*.js`。
 
 #### 3.3.1 纯逻辑 / 自起服务
 
@@ -93,11 +95,12 @@ npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitig
 | `verify-channel-signatures.ts` | 阿里云短信 / 邮件 RPC 签名（HMAC-SHA1 + sorted canonical query）独立复算；只验签名与请求形状，不代表已真实投递 |
 | `verify-plugin-manifests.ts` | 内置插件清单解析（`plugins/` 107 个可用包 / 115 个 provider；`src-*` 源目录镜像跳过）：id 唯一、能力与后端类型分布 |
 | `verify-model-consistency.ts` | 渠道/模型数据层不变量：activeKey 软删除唯一键、selectorKey 规范 JSON、档位不越能力合同、模型摘要与档位汇总一致、`modelsJson` 与启用模型一致 |
-| `verify-channel-flow.ts` | 渠道全链路（同进程起 Nest 打真实 HTTP）：建渠道 → 建模型含两档价格 → 上游键改名级联 → 复制 → 导出断言无凭证 → 改名导入 → 批量删除 → 删渠道 |
+| `verify-channel-flow.ts` | 渠道全链路（同进程起 Nest 打真实 HTTP）：建渠道 → 建模型含两档价格 → 上游键改名级联 → 复制 → 导出断言无凭证 → 改名导入 → **批量调价（缺少变更原因拒绝 / `priceVersion` 过期整批拒绝 / 售价字段与计费方式不匹配拒绝 / 规格提交不完整拒绝，且四次拒绝后售价未被改动；成功调价后档位售价生效、模型与档位 `priceVersion` 各 +1、成本价不变）** → 批量删除 → 删渠道 → **公开渠道连接信息脱敏（匿名视角渠道名 / 归属账号 / provider id / 并发配额 / 凭证标记全不下发、地址改写为中转入口、凭证恒为 `system`；管理员视角给出真实名称与上游地址但仍不回显凭证）** → **线路健康指标（按渠道模型出表、带两个观测窗口、无样本时成功率为 `null`、支持按 `channelId` 过滤）** |
 | `verify-protocol-runtime.ts` | 协议运行时：115 个已注册 provider 的 `buildCreate` 冒烟、成功 / 异步 / 失败三类响应归一化；本地假上游走真实接口跑通 `POST /admin/channels/:id/models/test`（image 同步 + video 轮询）与 `POST /admin/channels/:id/models/{fetch,import}`，校验 `ApiCallLog`（`billable=false` / 无明文凭证）、导入默认停用未定价、重复导入不新增、审计动作落库；假上游只在回环地址，脚本内临时打开 `MODEL_ALLOW_PRIVATE_UPSTREAMS` |
 | `verify-billing.ts` | 计费账本：预留（含幂等）、固定价结算、Token 差额退回 / 超预授权补扣 / 授权上限截断、按秒计费按实际时长重算、失败全额退款（幂等）、已结算拒绝自动退款、`uncertain` 保留冻结后人工核对、余额不足 `40002`；每一步后校验 `CreditAccount.available == Σ CreditLot.remaining` |
 | `verify-route-catalog.ts` | 前台模型与选路：priority 硬分层与下沉、同层加权分布、SKU 选择（精确 / 通配 / 1.5K 相邻 / 停用档）、冷却三键与不冷却码、`simulate` 与 `resolve` 选中同一条线路与价格档、目录投影的渠道可见性与「先换货币再乘倍率」；后半段同进程起 Nest 打真实 HTTP 校验 `/models`、`/models/available`、`/models/:id/quote` 与后台模拟接口的接线与守卫。`VERIFY_HTTP=0` 可只跑纯逻辑 |
 | `verify-task-runtime.ts` | 任务运行时端到端：起本机 HTTP mock 上游，经真实 `ProtocolExecutor` / 出站层跑四条路径——同步成功（产物落盘、格式按字节嗅探、AIGC 标识、`settled`、按目录价扣费）、上游 401 切线（`rejected_no_job` + `upstream_401`、旧账单退回、新账单按新线路价结算、`task.creditCost` 同步）、轮询超时（`42206` / `uncertain`、**不切线**、备份线路零调用）、唯一线路 429（`42204`、全额退款、余额回正），末尾校验「可用余额 == Σ 批次剩余」；夹具全部自建并按外键序清理（含产物文件） |
+| `verify-proxy-runtime.ts` | 中转与运营（P6）：**A 段纯逻辑**（`validateCustomRelayUrl` 的 SSRF 判定 / `resolveOutboundHost` 的 IPv6 与 localhost 拦截 / 路径白名单与密钥查询参数 / 并发槽 / 插件包解析拒绝分支）、**B 段同进程起 Nest + 本机 mock 上游**（`GET /models` 不计费、密钥查询参数剥离、渠道自定义头、服务端凭证注入；`POST` 的 `reserved → settled` 与调用记录；SSE 透传；500 退款；524 `uncertain` 不退款；渠道并发槽 `429`；自定义中转成功 / JSON 与 SSE 脱敏 / 不计费、401 `40101`、SSRF `40301`、上游错误原样透传、用户并发槽 `429`；系统中转限流 `42901`；分组可见性 `40301` 且不建账单；清扫 `reserved → refunded` / `running → uncertain` 且不碰任务账单；钱包恒等式；财务口径与 `BillingOrder` 聚合逐项一致；插件安装 / 重复 `40909` / 被引用拒卸 `40909` / 内置 `40001` / 卸载成功）。`VERIFY_HTTP=0` 只跑 A 段 |
 | `probe-environments.ts` | 三环境解析：档位顺序、不回落 `.env`、空串语义等（不连数据库） |
 
 #### 3.3.2 需先起服务的 HTTP 验证
@@ -162,7 +165,7 @@ cd test && npm run smoke:spawn  # 起网关跑联网冒烟
 | `admin-backup.spec.ts` | 未通过恢复验证的备份不可下载 |
 | `admin-layout.spec.ts` | 后台布局回归 |
 | `admin-marketing.spec.ts` | 营销中心三条约束 |
-| `admin-model-suite.spec.ts` | 渠道 / 模型 P5 五页与 C 端选型：渠道工作台列表与模型抽屉、前台模型的路由模拟、用户分组与插件页渲染、生成账单与调用记录的筛选和详情、工具页 `ModelPicker` 选型后报价随之变化；生成段需要可用 image 线路，无线路时该段跳过 |
+| `admin-model-suite.spec.ts` | 渠道 / 模型 P5 五页与 C 端选型：渠道工作台列表与模型抽屉、**统一调价（勾选模型 → 按成本重算 → 填变更原因 → 保存 → 回读断言新售价 = 成本 × 1.1）**、前台模型的路由模拟、用户分组与插件页渲染、生成账单与调用记录的筛选和详情、工具页 `ModelPicker` 选型后报价随之变化；生成段需要可用 image 线路，无线路时该段跳过 |
 | `admin-scheduler.spec.ts` | 定时任务可观测（静默失败可见） |
 | `admin-screenshots.spec.ts` | 后台逐页截图取证 |
 | `admin-ux.spec.ts` | 筛选深链与逐条清除（含工单/商品/对账/能力/告警）、订单/任务/模型线路宽表在 1440px 无横向滚动、页面/编辑抽屉/工单回复/积分调整的未保存保护、角色权限未保存拦截、概览任务直达、任务详情到积分账本及项目筛选的跨模块深链、详情 `?id=` 刷新恢复与关闭移除 |
@@ -200,7 +203,7 @@ node scripts/verify-deps.js --quiet   # 仅结论，有致命问题 exit 1
 | 交易与权益 | credit-deduction、credit-price、payment-signatures | commerce、membership、membership-order、payments、refund-rules | admin、admin-marketing |
 | 营销 | — | marketing | admin-marketing |
 | 后台与运维 | — | admin、backup、scheduler、storage、tickets-search | admin-*、admin-screenshots、sidebar |
-| 中转与运营（P6） | — | 暂无自动化闸口（见 5.6） | — |
+| 中转与运营（P6） | proxy-runtime（含 B 段自起服务） | 暂无 L3 冒烟（见 5.6） | 暂无 |
 | 合规与基础设施 | probe-environments、channel-signatures | aigc、signed-url、health-tracing、notifications | state-contract |
 | 工作台 / 素材库 | — | — | workspace-pages、sidebar |
 | 局部重绘遮罩（`42205`） | tool-contracts | 暂无自动化闸口（见 5.1） | — |
@@ -253,13 +256,11 @@ L1.5 不按功能域铺矩阵，覆盖清单见 3.2。新增纯逻辑、共享 h
 
 ### 5.6 中转与运营（P6）
 
-P6 的三条链路（系统渠道中转 / 短路径中转 / 自定义上游中转）、插件上传安装与卸载、服务商目录、财务分析、预留超时自动退款**目前没有自动化闸口**，只有代码层实现。缺口逐条列明，补测前不得引用为已验证：
+P6 的判据由 `verify-proxy-runtime.ts` 钉住（`npm run verify:proxy-runtime`，自起 Nest + 本机 mock 上游，夹具自建自清）。它**只跑服务层**，不经过后台 HTTP 端点与真实厂商：
 
-- **中转计费**：`reserved → running → settled / refunded / uncertain` 的迁移依赖真实上游（或 `test/` 仿真网关）+ 一条启用且有价格的线路。流式（SSE）透传、客户端 `key/api_key` 剥离、渠道自定义头覆盖、并发槽 `429` 都需要实跑观察；
-- **SSRF**：自定义中转的地址校验是纯函数（`validateCustomRelayUrl`），可直接补 L2 断言，目前未覆盖；
-- **插件装卸**：`POST /admin/plugins/install` 的包解析拒绝分支（非 zip、路径穿越、同 id 40909）、`DELETE` 的「内置包 40001 / 仍被渠道模型引用 40909」需要构造插件包，目前只做了手工验证；
-- **财务分析**：口径由 `verify-billing.ts` 的账本不变量间接保证，页面上「挂账不计入实收」等数字本身无断言；补测应直接比对 `BillingOrder` 聚合与接口返回；
-- **自动退款**：`BillingSweeperService` 需 `MODEL_BILLING_SWEEP_ENABLED=true` 且等过 `reserved` 30 分钟 / `running` 60 分钟 TTL，未进常规闸口；补测应把 TTL 做成可注入参数再断言两条迁移。
+- **已覆盖**：三条转发的迁移与安全语义（`GET /models` 不计费并剥离客户端密钥、`POST` 的 `reserved → settled`、SSE 透传、500 退款、524 `uncertain` 不退款、渠道与用户并发槽 `429`、自定义中转 401/403/上游错误透传与 JSON/SSE 双路径脱敏、分组可见性 `40301` 且不建账单、系统中转限流 `42901`）；`validateCustomRelayUrl` / `resolveOutboundHost` 的 SSRF 判定（回环、私网、链路本地、云 metadata、保留网段、IPv6、`localhost`、HTTP 仅可信主机）；插件包解析拒绝分支与安装 / 卸载的 `40001` / `40909` / `40400` 分支；`BillingSweeperService` 的两条迁移（TTL 由参数注入，不改生产常量）与「不碰任务账单」；财务口径与 `BillingOrder` 聚合逐项相等；钱包恒等式。
+- **仍未覆盖**：① **后台插件的 HTTP 端点与审计**（脚本直接调 `PluginAdminService`，控制器层的权限点 / 审计 / 上传字段由 `admin-model-suite.spec.ts` 的插件页用例兜底）；② **财务页面的 HTTP 接口**（脚本调 `FinanceAnalyticsService.summary()`，与页面同样的聚合函数，但少了 DTO 与权限链）；③ **服务商目录**（`MODEL_PROVIDER_CATALOG_URL` 远端 JSON 的拉取与容错）无断言；④ **真实厂商差异**——SSE 分块边界、`Retry-After`、超长响应截断、各家错误体形状只由本机 mock 模拟，接真实线路时须再跑一次；⑤ 冷却、并发槽与目录版本是**进程内存**，多实例下每台各自判定，无法在单进程断言。
+- 该脚本会改开发/测试库：`NODE_ENV=test` 时连 `test.db`，否则连 `dev.db`。它只清理自己建的夹具（用户 / 渠道 / 渠道模型 / 分组 / 套餐 / 账单 / 调用记录），插件装在 `mkdtemp` 临时目录并在结束时删除。
 
 ## 6. 测试数据与清理
 

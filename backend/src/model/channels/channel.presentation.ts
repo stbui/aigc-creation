@@ -234,6 +234,18 @@ export interface ChannelRowLike {
  *
  * `admin=false` 时系统渠道只暴露中转地址（`/api/ai/system/:id`），
  * 上游真实地址与并发配置属于内部拓扑信息，不下发。
+ *
+ * ## 非管理员视角的脱敏口径
+ *
+ * 与 `PublicModelCatalogService` 一致：渠道名会泄漏供应商与中转站身份
+ * （运营建渠道时填的 `name` 常常就是上游域名），所以非管理员视角下
+ * 渠道 `name` 固定空串，前端统一显示为「系统渠道」。同理：
+ *
+ *   · `catalogProviderId` —— 指向插件清单里的 provider id，等于报出协议与厂商；
+ *   · `concurrencyLimit`  —— 并发配额属于内部拓扑；
+ *
+ * 三者都不下发。`id` / `sortOrder` / `models` / `modelCosts` 保留 ——
+ * C 端要用它们选线路、算价格。
  */
 export function publicChannel(row: ChannelRowLike, admin: boolean, models: ChannelModelRowLike[]): PublicModelChannel {
   const enabledModels = models.filter((item) => item.enabled);
@@ -276,22 +288,26 @@ export function publicChannel(row: ChannelRowLike, admin: boolean, models: Chann
 
   return {
     id: row.id,
-    userId: row.userId,
+    // 渠道归属人属于内部账号信息，非管理员视角不下发
+    userId: admin ? row.userId : '',
     scope: row.scope,
     enabled: row.enabled,
-    name: row.name,
+    // 渠道名会泄漏供应商身份：非管理员视角固定空串
+    name: admin ? row.name : '',
     sortOrder: row.sortOrder,
     baseUrl,
     apiKey,
     apiFormat: row.apiFormat,
-    concurrencyLimit: row.concurrencyLimit,
+    concurrencyLimit: admin ? row.concurrencyLimit : 0,
     proxyUrl,
     models: names.length > 0 ? names : channelModelNames(row),
     modelCosts,
     headers,
-    hasApiKey: String(row.apiKey ?? '').trim() !== '',
-    hasSecretKey: String(row.secretKey ?? '').trim() !== '',
-    catalogProviderId: row.catalogProviderId || undefined,
+    // 是否配了凭证也是内部拓扑的一部分；对外恒为 false
+    hasApiKey: admin && String(row.apiKey ?? '').trim() !== '',
+    hasSecretKey: admin && String(row.secretKey ?? '').trim() !== '',
+    // provider id 等于报出协议与厂商，非管理员视角不下发
+    catalogProviderId: admin ? row.catalogProviderId || undefined : undefined,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

@@ -6,6 +6,10 @@ https://www.pixpix.com/zh-CN/tools/product-set
 
 
 
+http://localhost:3000/admin/logs
+http://localhost:3000/admin/payments
+复刻功能流程
+
 
 todo：
 - 将后端功能迁移到本项目

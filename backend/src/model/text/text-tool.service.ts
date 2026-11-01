@@ -254,6 +254,7 @@ export class TextToolService {
           userId: input.call.userId ?? '',
           channelId: input.channel.channelId,
           channelName: input.channel.channelName,
+          channelModelId: input.channel.channelModelId,
           source: 'tool',
           capability: 'text',
           operation: input.call.operation,

@@ -158,6 +158,22 @@ export class ChannelService {
     return result;
   }
 
+  /**
+   * 管理员视角的系统渠道目录：含渠道真实名称与上游地址。
+   *
+   * 凭证仍然不下发 —— `publicChannel(row, true)` 对系统渠道恒给 `apiKey: ''`，
+   * 只保留 `hasApiKey` / `hasSecretKey` 标记（后台投影的既有约定）。
+   */
+  async adminSystemChannels(): Promise<PublicModelChannel[]> {
+    const rows = await this.prisma.modelChannel.findMany({
+      where: { scope: CHANNEL_SCOPE_SYSTEM, enabled: true, deletedAt: null },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+    });
+    const result: PublicModelChannel[] = [];
+    for (const row of rows) result.push(await this.project(row, true));
+    return result;
+  }
+
   /* ───────────────────────── 写入 ───────────────────────── */
 
   async create(req: ChannelRequest): Promise<PublicModelChannel> {

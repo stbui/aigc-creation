@@ -18,6 +18,8 @@ import { Allow, IsArray, IsBoolean, IsInt, IsOptional, IsString, Max, Min } from
 import { AdminUser, AuditAction, RequirePermission } from '../../admin/admin.decorator';
 import type { AdminUser as AdminUserContext } from '../../admin/admin.decorator';
 import { PERMISSIONS } from '../../admin/permissions';
+import { normalizeCapability } from '../domain/capability-config';
+import { badRequest } from '../domain/json';
 import { buildModelRequestIntent } from '../intent/model-intent';
 import { RouterService } from '../routing/router.service';
 import { UserGroupService } from '../user-groups/user-group.service';
@@ -88,13 +90,32 @@ export class AdminLogicalModelsController {
     return this.models.save('', body as LogicalModelRequest, user?.id ?? '');
   }
 
-  /** 静态段 `:id/simulate` 与 `:id` 分属不同 HTTP 方法，不冲突 */
+  /**
+   * 静态段 `:id/simulate` 与 `:id` 分属不同 HTTP 方法，不冲突。
+   *
+   * ## 意图的 capability 以模型自己的能力合同为准
+   *
+   * 命名空间有两层，混用会直接被拒：
+   *   · `LogicalModel.capability` 是**产品能力 id**（`expand` / `main_image` / …）；
+   *   · 能力合同里的 `capability` 是**模态**（`image` / `video` / `text`）。
+   *
+   * `buildModelRequestIntent` 只认模态（它要与 `spec.capability` 比对），
+   * 而页面很容易把产品能力 id 传上来 —— 直接透传会得到
+   * 「请求缺少有效的模型能力类型」。
+   *
+   * 所以这里**以模型自己的合同为准**：读出产品合同的模态后再建意图。
+   * 入参的 `capability` 只在它本身是合法模态时才算数（显式模拟别的模态），
+   * 传了产品 id 就当没传 —— 模型的模态是权威源，客户端不该改。
+   */
   @Post(':id/simulate')
   @RequirePermission(PERMISSIONS.logicalModelRead)
   async simulate(@Param('id') id: string, @Body() body: SimulateBodyDto) {
     const access = await this.groups.systemAccess();
+    const model = await this.router.findModel(id);
+    if (!model) throw badRequest('所选模型不可用');
+    const requested = normalizeCapability(body?.capability);
     const intent = buildModelRequestIntent({
-      capability: body?.capability,
+      capability: requested || model.productSpec.capability,
       operation: body?.operation,
       inputs: body?.inputs,
       options: body?.options,

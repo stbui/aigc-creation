@@ -458,6 +458,7 @@ export class SystemProxyService {
         userId: input.userId,
         channelId: channel.id,
         channelName: channel.name,
+        channelModelId: channelModel?.id ?? '',
         billingOrderId: entry.billingOrderId,
         capability: channelModel?.capability ?? '',
         billable: String(input.method).toUpperCase() === 'POST',

@@ -28,11 +28,13 @@ import { ModelCatalogClient } from './catalog/model-catalog.client';
 import { ModelCatalogService } from './catalog/model-catalog.service';
 import { PluginManifestStore } from './plugins/plugin-manifest.store';
 import { ChannelHealthService } from './channels/channel-health.service';
+import { ChannelModelMetricsService } from './channels/channel-model-metrics.service';
 import { ChannelService } from './channels/channel.service';
 import { ChannelModelService } from './channels/channel-model.service';
 import { ChannelRuntimeService } from './channels/channel-runtime.service';
 import { TextToolService } from './text/text-tool.service';
 import { AdminChannelModelsController, AdminChannelsController } from './channels/channel.controller';
+import { PublicChannelsController } from './channels/public-channels.controller';
 import { RouteCatalogService } from './catalog/route-catalog.service';
 import { CatalogService } from './catalog/catalog.service';
 import { QuoteService } from './catalog/quote.service';
@@ -92,6 +94,7 @@ export class ModelBootstrapService implements OnModuleInit {
   controllers: [
     AdminChannelsController,
     AdminChannelModelsController,
+    PublicChannelsController,
     AdminLogicalModelsController,
     AdminUserGroupsController,
     AdminPluginsController,
@@ -119,6 +122,7 @@ export class ModelBootstrapService implements OnModuleInit {
     TextToolService,
     ChannelService,
     ChannelHealthService,
+    ChannelModelMetricsService,
     UserGroupService,
     UserGroupAdminService,
     PluginAdminService,

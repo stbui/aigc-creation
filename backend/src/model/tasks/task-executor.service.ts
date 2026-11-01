@@ -281,6 +281,7 @@ export class TaskExecutorService {
           userId: input.userId,
           channelId: input.channel.channelId,
           channelName: input.channel.channelName,
+          channelModelId: input.channel.channelModelId,
           taskId: input.taskId,
           billingOrderId: input.billingOrderId,
           source: 'task',

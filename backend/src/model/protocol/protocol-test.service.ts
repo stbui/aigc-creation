@@ -220,6 +220,8 @@ export class ProtocolTestService {
         userId: actorId,
         channelId,
         channelName: String(channel.name ?? ''),
+        // 线路级健康指标的归属键：能定位到已保存的渠道模型就记它的 id
+        channelModelId: String(saved?.id ?? ''),
         source: 'admin',
         capability,
         operation: 'admin_model_test',

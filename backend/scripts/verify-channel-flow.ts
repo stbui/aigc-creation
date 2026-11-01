@@ -145,6 +145,8 @@ async function main() {
           unitPriceMicrocredits: 5_000_000,
           priceConfigured: true,
           enabled: true,
+          // 调价要求「已启用规格的成本价与售价都已配置」，两档都要填成本价
+          costPricing: { configured: true, unitPriceMicrocredits: 3_000_000 },
         },
       ],
     };
@@ -230,9 +232,148 @@ async function main() {
     const afterRemove = await call('GET', `/admin/channels/${duplicateId}`, token);
     ok('删除后渠道不可见', afterRemove.status === 404 || afterRemove.code === 40400, afterRemove);
 
-    /* ── 9. 未配置 Base URL 的保存必须被拒绝 ───────────── */
+    /* ── 10. 批量调价（整批拒绝语义） ─────────────────── */
+    /*
+     * 调价的三条硬语义（参考实现一致）：
+     *   1. `priceVersion` 不匹配 → 整批拒绝，不部分落库；
+     *   2. 售价字段必须是「当前计费方式的全部字段」，少一个或夹带别的 → 拒绝；
+     *   3. 成本价或售价未配置的规格 → 拒绝（先补齐再调）。
+     */
+    const current = await call('GET', `/admin/channels/${channelId}/models`, token);
+    const repriceModel = (current.data ?? []).find((item: any) => item.id === modelId);
+    const enabledTiers = (repriceModel?.priceTiers ?? []).filter((tier: any) => tier.enabled);
+    const repricePayload = (over: Record<string, unknown> = {}) => ({
+      models: [
+        {
+          modelId,
+          priceVersion: repriceModel?.priceVersion,
+          priceTiers: enabledTiers.map((tier: any) => ({
+            id: tier.id,
+            priceVersion: tier.priceVersion,
+            prices: { unitPriceMicrocredits: 3_000_000 },
+          })),
+          ...over,
+        },
+      ],
+      reason: '验收脚本批量调价',
+    });
+
+    const noReason = await call('POST', `/admin/channels/${channelId}/models/batch-reprice`, token, {
+      models: repricePayload().models,
+    });
+    ok('调价：缺少变更原因被拒绝', noReason.code === 40001, noReason);
+
+    const staleVersion = await call('POST', `/admin/channels/${channelId}/models/batch-reprice`, token, {
+      ...repricePayload(),
+      models: [
+        {
+          modelId,
+          priceVersion: (repriceModel?.priceVersion ?? 1) + 5,
+          priceTiers: enabledTiers.map((tier: any) => ({
+            id: tier.id,
+            priceVersion: tier.priceVersion,
+            prices: { unitPriceMicrocredits: 3_000_000 },
+          })),
+        },
+      ],
+    });
+    ok('调价：模型价格版本过期被拒绝', staleVersion.code === 40001, staleVersion);
+
+    const missingField = await call('POST', `/admin/channels/${channelId}/models/batch-reprice`, token, {
+      ...repricePayload(),
+      models: [
+        {
+          modelId,
+          priceVersion: repriceModel?.priceVersion,
+          priceTiers: enabledTiers.map((tier: any) => ({
+            id: tier.id,
+            priceVersion: tier.priceVersion,
+            // 夹带不属于当前计费方式的字段 → 必须整批拒绝
+            prices: { unitPriceMicrocredits: 3_000_000, inputTokenPriceMicrocredits: 1 },
+          })),
+        },
+      ],
+    });
+    ok('调价：售价字段与计费方式不匹配被拒绝', missingField.code === 40001, missingField);
+
+    const incompleteTier = await call('POST', `/admin/channels/${channelId}/models/batch-reprice`, token, {
+      ...repricePayload(),
+      models: [
+        {
+          modelId,
+          priceVersion: repriceModel?.priceVersion,
+          priceTiers: enabledTiers.slice(0, 1).map((tier: any) => ({
+            id: tier.id,
+            priceVersion: tier.priceVersion,
+            prices: { unitPriceMicrocredits: 3_000_000 },
+          })),
+        },
+      ],
+    });
+    ok('调价：规格提交不完整被拒绝', incompleteTier.code === 40001, incompleteTier);
+
+    // 上述三次拒绝都不能落库：售价必须仍是原值
+    const afterRejects = await call('GET', `/admin/channels/${channelId}/models`, token);
+    const unchangedModel = (afterRejects.data ?? []).find((item: any) => item.id === modelId);
+    const unchangedTier = (unchangedModel?.priceTiers ?? []).find((tier: any) => tier.id === enabledTiers[0]?.id);
+    ok('调价：整批拒绝后售价未被改动', unchangedTier?.unitPriceMicrocredits === enabledTiers[0]?.unitPriceMicrocredits, {
+      before: enabledTiers[0]?.unitPriceMicrocredits,
+      after: unchangedTier?.unitPriceMicrocredits,
+    });
+
+    const repriced = await call('POST', `/admin/channels/${channelId}/models/batch-reprice`, token, repricePayload());
+    ok('批量调价成功', repriced.code === 0 && repriced.data?.updated === 1, repriced);
+
+    const afterReprice = await call('GET', `/admin/channels/${channelId}/models`, token);
+    const repricedModel = (afterReprice.data ?? []).find((item: any) => item.id === modelId);
+    const repricedTier = (repricedModel?.priceTiers ?? []).find((tier: any) => tier.id === enabledTiers[0]?.id);
+    ok('调价后档位售价生效', repricedTier?.unitPriceMicrocredits === 3_000_000, repricedTier?.unitPriceMicrocredits);
+    ok('调价后模型价格版本递增', repricedModel?.priceVersion === (repriceModel?.priceVersion ?? 0) + 1, {
+      before: repriceModel?.priceVersion,
+      after: repricedModel?.priceVersion,
+    });
+    ok('调价后档位价格版本递增', repricedTier?.priceVersion === (enabledTiers[0]?.priceVersion ?? 0) + 1, {
+      before: enabledTiers[0]?.priceVersion,
+      after: repricedTier?.priceVersion,
+    });
+    ok('调价不改成本价', repricedTier?.costPricing?.unitPriceMicrocredits === enabledTiers[0]?.costPricing?.unitPriceMicrocredits, repricedTier?.costPricing);
+
+    /* ── 11. 未配置 Base URL 的保存必须被拒绝 ───────────── */
     const invalid = await call('POST', '/admin/channels', token, { baseUrl: BASE_URL });
     ok('缺少渠道名称被拒绝', invalid.code === 40001, invalid);
+
+    /* ── 12. 公开系统渠道连接信息（脱敏口径） ───────────── */
+    // 匿名视角：只给「有哪些渠道、怎么连」，内部拓扑一律不下发
+    const publicChannels = await call('GET', '/channels/system', null);
+    const publicRows = (publicChannels.data?.channels ?? []) as any[];
+    const publicRow = publicRows.find((row) => row?.id === channelId);
+    ok('公开渠道目录可匿名访问', publicChannels.code === 0 && publicRows.length > 0, publicChannels.code);
+    ok('公开视角只列启用渠道', !publicRows.some((row) => row?.id !== channelId && row?.enabled === false));
+    ok('公开视角渠道名脱敏', publicRow !== undefined && publicRow.name === '', publicRow?.name);
+    ok('公开视角上游地址改写为中转入口', publicRow?.baseUrl === `/api/ai/system/${channelId}`, publicRow?.baseUrl);
+    ok('公开视角凭证恒为 system', publicRow?.apiKey === 'system', publicRow?.apiKey);
+    ok('公开视角不下发归属账号', publicRow?.userId === '', publicRow?.userId);
+    ok('公开视角不下发并发配额', publicRow?.concurrencyLimit === 0, publicRow?.concurrencyLimit);
+    ok('公开视角不下发凭证存在标记', publicRow?.hasApiKey === false && publicRow?.hasSecretKey === false);
+    ok('公开视角不下发 provider id', publicRow?.catalogProviderId === undefined, publicRow?.catalogProviderId);
+
+    // 管理员视角：真实名称与上游地址，凭证仍然不下发
+    const adminChannels = await call('GET', '/channels/system', token);
+    const adminRow = (adminChannels.data?.channels ?? []).find((row: any) => row?.id === channelId);
+    ok('管理员视角给出渠道真实名称', adminRow?.name === channelName, adminRow?.name);
+    ok('管理员视角给出上游地址', adminRow?.baseUrl === BASE_URL, adminRow?.baseUrl);
+    ok('管理员视角仍不回显凭证', adminRow?.apiKey === '', adminRow?.apiKey);
+    ok('管理员视角给出凭证存在标记', adminRow?.hasApiKey === true, adminRow?.hasApiKey);
+
+    /* ── 13. 线路健康指标 ───────────────────────────────── */
+    const health = await call('GET', '/admin/channel-models/health', token);
+    ok('线路健康端点可访问', health.code === 0 && Array.isArray(health.data?.items), health.code);
+    const healthRows = (health.data?.items ?? []) as any[];
+    ok('线路健康按渠道模型出表', healthRows.every((row) => Boolean(row?.id)), healthRows.length);
+    ok('线路健康带两个观测窗口', healthRows.every((row) => row?.windows?.day && row?.windows?.week));
+    ok('线路健康无样本时成功率为 null', healthRows.every((row) => row?.windows?.day?.successRate === null || typeof row?.windows?.day?.successRate === 'number'));
+    const scoped = await call('GET', `/admin/channel-models/health?channelId=${channelId}`, token);
+    ok('线路健康支持按渠道过滤', scoped.code === 0 && (scoped.data?.items ?? []).every((row: any) => row?.channelId === channelId));
 
     /* 供人工核对：保留主渠道，便于在后台页面查看配置结果 */
     console.log(`\n验收渠道已保留：${channelName}（id=${channelId}，模型 id=${modelId}，排序 ${JSON.stringify(orderIds)}）`);

@@ -23,6 +23,8 @@ export interface ProxyCallLogEntry {
   userId: string;
   channelId: string;
   channelName: string;
+  /** 渠道模型 id：线路级健康指标的归属键；渠道级调用（如 `GET /models`）为空 */
+  channelModelId?: string;
   billingOrderId?: string;
   capability: string;
   billable: boolean;
@@ -73,6 +75,7 @@ export class ProxyCallLogService {
           requestId: currentRequestId() ?? '',
           channelId: entry.channelId,
           channelName: entry.channelName,
+          channelModelId: entry.channelModelId ?? '',
           billingOrderId: entry.billingOrderId ?? '',
           source: entry.source,
           capability: entry.capability,

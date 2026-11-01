@@ -238,6 +238,9 @@ export const ENV_SPECS: readonly Spec[] = [
   // worker 轮询间隔与单次租约时长
   { key: 'model.workerIntervalMs', env: 'MODEL_WORKER_INTERVAL_MS', type: 'number', def: 1000, min: 100 },
   { key: 'model.leaseMs', env: 'MODEL_LEASE_MS', type: 'number', def: 120000, min: 10000 },
+  // 渠道并发槽等槽上限：超过即按「渠道忙」切线（任务侧）或 429（中转侧），不无限排队。
+  // 默认 60s；验收脚本压到百毫秒级，否则一次断言要等满一分钟。
+  { key: 'model.slotWaitMs', env: 'MODEL_SLOT_WAIT_MS', type: 'number', def: 60000, min: 100, max: 600000 },
   // 冷却、并发槽与目录版本都是进程内存实现：多实例部署时每台各自判定（见 docs/model-architecture.md）
   // SSRF 逃生开关：仅部署者使用，且自定义渠道不受其影响（需逐个点名主机）
   { key: 'model.allowPrivateUpstreams', env: 'MODEL_ALLOW_PRIVATE_UPSTREAMS', type: 'boolean', def: false },
@@ -301,6 +304,7 @@ export interface AppConfigTree {
     mediaTimeoutMs: number;
     workerIntervalMs: number;
     leaseMs: number;
+    slotWaitMs: number;
     redisUrl: string;
     allowPrivateUpstreams: boolean;
     allowedPrivateUpstreamHosts: string[];

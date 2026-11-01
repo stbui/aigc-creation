@@ -7,7 +7,7 @@ import { useToast } from '../../admin-ui/providers/ToastProvider';
 import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
 import { Drawer } from '../../admin-ui/primitives/Drawer';
 import { Descriptions, Notice } from '../../admin-ui/primitives';
-import { TextInput } from '../../admin-ui/controls';
+import { TextInput, HoverTip } from '../../admin-ui/controls';
 import {
   AdminListLoading,
   AdminStaleError,
@@ -80,6 +80,8 @@ export function AdminPluginsPage() {
   const { data, loading, error, reload } = useAdminResource(() => adminPluginsApi.list());
   const items = data?.items ?? [];
   const summary = data?.summary;
+  /** 当前环境不可用的插件数（清单已入库但本环境不执行其贡献） */
+  const unavailableCount = items.filter((item) => !item.availability?.available).length;
 
   const [detail, setDetail] = useState<PluginView | null>(null);
   const [toggleTarget, setToggleTarget] = useState<PluginView | null>(null);
@@ -245,6 +247,19 @@ export function AdminPluginsPage() {
       width: 90,
       align: 'right',
       render: (row) => <span className="tabular-nums">{row.activeProtocols}</span>,
+    },
+    {
+      key: 'availability',
+      title: '当前环境',
+      width: 150,
+      render: (row) =>
+        row.availability?.available ? (
+          <StatusTag status="available" tone="success" label="可用" />
+        ) : (
+          <HoverTip tip={row.availability?.reason || '当前环境不可用'}>
+            <StatusTag status="unavailable" tone="warn" label="不可用" />
+          </HoverTip>
+        ),
     },
     {
       key: 'providers',
@@ -479,18 +494,22 @@ export function AdminPluginsPage() {
           <StatCard
             label="已注册协议"
             value={summary.protocol.registered}
-            hint={`宿主内置 ${summary.protocol.hostBacked}`}
+            hint={
+              summary.protocol.hostBacked.length > 0
+                ? `宿主引擎未内置 ${summary.protocol.hostBacked.length} 个`
+                : '声明式插件全部注册'
+            }
             tone={summary.protocol.registered === 0 ? 'danger' : undefined}
           />
           <StatCard
-            label="异常插件"
-            value={summary.protocol.skippedPlugins.length}
+            label="当前环境不可用"
+            value={unavailableCount}
             hint={
-              summary.protocol.skippedPlugins.length > 0
-                ? `跳过：${summary.protocol.skippedPlugins.join('、')}`
-                : '全部正常注册'
+              unavailableCount > 0
+                ? '清单已入库，但本环境不执行其贡献'
+                : '全部插件在本环境可用'
             }
-            tone={summary.protocol.skippedPlugins.length > 0 ? 'warn' : undefined}
+            tone={unavailableCount > 0 ? 'warn' : undefined}
           />
         </div>
       )}
@@ -577,10 +596,21 @@ export function AdminPluginsPage() {
                 { label: '来源', value: detail.source },
                 { label: '可安装', value: detail.installable ? '是' : '否（随代码入库）' },
                 { label: '运行时', value: `backend ${detail.runtime.backend} · web ${detail.runtime.web}` },
+                {
+                  label: '当前环境',
+                  value: detail.availability?.available ? '可用' : '不可用',
+                },
                 { label: '最近更新', value: detail.updatedAt ? new Date(detail.updatedAt).toLocaleString('zh-CN') : '—' },
               ]}
               columns={2}
             />
+
+            {/* 不可用原因必须说清楚：清单入库 ≠ 本环境会执行它 */}
+            {!detail.availability?.available && detail.availability?.reason && (
+              <Notice tone="warn" title="当前环境不可用">
+                {detail.availability.reason}
+              </Notice>
+            )}
 
             {detail.description && (
               <p className="text-xs leading-5 text-text-secondary">{detail.description}</p>
