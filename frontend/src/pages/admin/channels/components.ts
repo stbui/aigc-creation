@@ -44,10 +44,6 @@ export { ModalDialog } from '../../../admin-ui/primitives/Dialog';
 /** 抽屉 (渠道新建 / 编辑) */
 export { Drawer } from '../../../admin-ui/primitives/Drawer';
 
-/** 反馈入口 */
-export { useToast } from '../../../admin-ui/providers/ToastProvider';
-export { useConfirm } from '../../../admin-ui/providers/ConfirmProvider';
-
 /** 页头 / 面板 / 状态标签 / 筛选条 */
 export {
   AppliedFilters,
@@ -58,9 +54,4 @@ export {
   StatusTag,
 } from '../../../components/admin/PageHeader';
 /** 后台通用数据态与二次确认 */
-export {
-  AdminStaleError,
-  ConfirmAction,
-  useAdminDetailParam,
-  useAdminResource,
-} from '../../../components/admin/AdminWidgets';
+export { AdminStaleError, ConfirmAction } from '../../../components/admin/AdminWidgets';

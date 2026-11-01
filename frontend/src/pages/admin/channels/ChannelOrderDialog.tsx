@@ -8,8 +8,8 @@ import {
   ModalDialog,
   NumberInput,
   SelectBox,
-  useToast,
 } from './components';
+import { useToast } from './hooks';
 import { moveOrderItem, orderChanged, type OrderItem } from '../../../lib/channelOrder';
 import type { ChannelOrderItemView } from '../../../types/model';
 

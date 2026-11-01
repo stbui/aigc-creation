@@ -1,6 +1,4 @@
 import { useCallback, useState } from 'react';
-import { useAdmin } from '../../../context/AdminContext';
-import { useDiscardConfirm, useUnsavedGuard } from '../../../hooks/useUnsavedGuard';
 import { adminChannelsApi } from './api';
 import {
   AdminStaleError,
@@ -9,10 +7,18 @@ import {
   Panel,
   SegmentedBox,
   TextInput,
-  useAdminDetailParam,
-  useConfirm,
-  useToast,
 } from './components';
+import {
+  useAdmin,
+  useAdminDetailParam,
+  useChannelFilters,
+  useChannelHealth,
+  useChannelList,
+  useConfirm,
+  useDiscardConfirm,
+  useToast,
+  useUnsavedGuard,
+} from './hooks';
 import { AllChannelModelsPanel } from './AllChannelModelsPanel';
 import { ChannelDetailPanel } from './ChannelDetailPanel';
 import { ChannelFormDrawer } from './ChannelFormDrawer';
@@ -22,7 +28,6 @@ import { ChannelOrderDialog } from './ChannelOrderDialog';
 import { normalizeChannelHeaders, validateChannelHeaders } from './ChannelHeadersEditor';
 import { Field } from './ChannelField';
 import { CHANNEL_VIEW_OPTIONS, EMPTY_DRAFT, toDraft, type ChannelDraft } from './constants';
-import { useChannelFilters, useChannelHealth, useChannelList } from './hooks';
 import type { AdminChannelView, SystemChannelExportView } from '../../../types/model';
 
 /**

@@ -10,6 +10,9 @@ http://localhost:3000/admin/logs
 http://localhost:3000/admin/payments
 复刻功能流程
 
+后台页面功能完善
+后台页面设计完善
+
 
 todo：
 - 将后端功能迁移到本项目

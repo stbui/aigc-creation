@@ -1,8 +1,33 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useConfirm } from '../../../admin-ui/providers/ConfirmProvider';
+import { useToast } from '../../../admin-ui/providers/ToastProvider';
+import { useAdminDetailParam, useAdminResource } from '../../../components/admin/AdminWidgets';
+import { useAdmin } from '../../../context/AdminContext';
+import { useDiscardConfirm, useUnsavedGuard } from '../../../hooks/useUnsavedGuard';
 import type { AdminChannelView } from '../../../types/model';
-import { useAdminResource } from './components';
 import { fetchAllChannels, fetchChannelHealth } from './api';
 import type { ChannelHealthSummary } from './constants';
+
+/**
+ * 渠道工作台的 hook 入口 —— 目录内文件的唯一外部 hook 来源。
+ *
+ * 约定: `channels/` 下的文件不从 `src/admin-ui/providers` / `src/context` /
+ * `src/hooks` / `src/components` 直接取 hook, 一律经由本文件 —— 页面用到的
+ * 外部 hook 集中可见, 换实现或加埋点只改一处。
+ * 目录内新增外部 hook 引用时在这里补一行 re-export。
+ *
+ * 本文件自己的 `useChannelList` / `useChannelFilters` / `useChannelHealth`
+ * 只服务渠道工作台, 与外部 hook 一起从这里出去。
+ */
+export {
+  useAdmin,
+  useAdminDetailParam,
+  useAdminResource,
+  useConfirm,
+  useDiscardConfirm,
+  useToast,
+  useUnsavedGuard,
+};
 
 /**
  * 渠道列表：全量拉取 + 手动刷新。

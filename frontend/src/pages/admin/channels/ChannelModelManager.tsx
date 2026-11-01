@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, RefreshCw } from 'lucide-react';
 import { adminChannelsApi } from './api';
-import { Button, ConfirmAction, Notice, TextInput, useToast } from './components';
+import { Button, ConfirmAction, Notice, TextInput } from './components';
+import { useToast } from './hooks';
 import { ChannelModelFormDialog } from './ChannelModelFormDialog';
 import { ChannelModelRepriceDialog } from './ChannelModelRepriceDialog';
 import { ChannelModelTable } from './ChannelModelTable';
