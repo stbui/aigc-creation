@@ -48,7 +48,7 @@ export function ProductSkuWorkspace({
   validationMessage: string | null;
   submitting: boolean;
   formValid: boolean;
-  onSubmit: (inputs: ToolAsset[], settings: ToolSettings) => void;
+  onSubmit: (inputs: ToolAsset[], settings: ToolSettings) => Promise<void>;
   batchItems: SkuBatchResult[];
   galleryLoading: boolean;
   galleryError: string | null;

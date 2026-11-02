@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { App, Modal, Spin } from 'antd';
 import { RefreshCw, X } from 'lucide-react';
 import QRCode from 'qrcode';
 import { mobileUploadApi } from '../lib/api';
 import { useProject } from '../hooks/useProject';
 import type { MobileUploadAsset } from '../types/api';
+import { useApp, Modal, Spin } from '../ui';
 
 /**
  * 手机上传二维码弹窗 —— 1:1 复刻参考站 (ijihua.cn/free-creation) 的
@@ -51,7 +51,7 @@ export interface MobileUploadModalProps {
 }
 
 export function MobileUploadModal({ open, onReceived, onCancel }: MobileUploadModalProps) {
-  const { message } = App.useApp();
+  const { message } = useApp();
   const { ensureProject } = useProject();
 
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);

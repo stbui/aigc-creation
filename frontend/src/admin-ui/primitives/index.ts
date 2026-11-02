@@ -17,6 +17,8 @@ export {
   Panel,
   StatCard,
   SaveBar,
+  DetailSection,
+  BatchBar,
   EmptyState,
   ListError,
   StaleError,

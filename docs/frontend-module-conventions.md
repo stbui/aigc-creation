@@ -1,6 +1,14 @@
 # 前端功能目录分层约定
 
-状态：现行（与 `frontend/src/pages/admin/channels/`、`frontend/src/pages/admin/payments/`、`frontend/src/pages/product-detail/`、`frontend/src/pages/product-kit/`、`frontend/src/pages/viral-clone/`、`frontend/src/pages/creative-image/`、`frontend/src/pages/product-sku/`、`frontend/src/pages/local-redraw/`、`frontend/src/pages/background-remove/`、`frontend/src/pages/watermark-remove/`、`frontend/src/pages/product-retouch/`、`frontend/src/pages/image-translate/`、`frontend/src/pages/image-expand/`、`frontend/src/pages/product-recolor/`、`frontend/src/pages/rotate-angle/`、`frontend/src/pages/multi-image-fusion/`、`frontend/src/pages/account/`、`frontend/src/pages/checkout/` 同步维护）。
+状态：现行（与 `frontend/src/pages/admin/channels/`、`frontend/src/pages/admin/payments/`、
+`frontend/src/pages/admin/credits/`、`frontend/src/pages/admin/tasks/`、
+`frontend/src/pages/admin/orders/`、`frontend/src/pages/admin/users/`、
+`frontend/src/pages/admin/assets/`、`frontend/src/pages/admin/tickets/`、
+`frontend/src/pages/admin/logical-models/`、`frontend/src/pages/admin/plugins/`、
+`frontend/src/pages/admin/coupons/`、`frontend/src/pages/admin/aigc-label/`、
+`frontend/src/pages/admin/billing-orders/`、`frontend/src/pages/admin/campaigns/`、
+`frontend/src/pages/admin/user-groups/`、`frontend/src/pages/admin/membership-plans/`、
+`frontend/src/pages/admin/products/`、`frontend/src/pages/admin/backups/`、`frontend/src/pages/product-detail/`、`frontend/src/pages/product-kit/`、`frontend/src/pages/viral-clone/`、`frontend/src/pages/creative-image/`、`frontend/src/pages/product-sku/`、`frontend/src/pages/local-redraw/`、`frontend/src/pages/background-remove/`、`frontend/src/pages/watermark-remove/`、`frontend/src/pages/product-retouch/`、`frontend/src/pages/image-translate/`、`frontend/src/pages/image-expand/`、`frontend/src/pages/product-recolor/`、`frontend/src/pages/rotate-angle/`、`frontend/src/pages/multi-image-fusion/`、`frontend/src/pages/account/`、`frontend/src/pages/checkout/` 同步维护）。
 
 适用于 `frontend/src/pages/**` 下**多文件**的功能目录。单文件页面不强制套用；
 当页面长到需要拆分时，按本约定落位。参考实现见
@@ -75,8 +83,9 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
   `src/hooks` / `src/lib`（只有入口文件可以）。
 - `src/types/model` 是例外：纯类型模块，不产生运行期依赖，各文件直接
   `import type`，不必再包一层。
-- **第三方 UI 库（antd / lucide-react / react-router-dom）不经入口转出** ——
-  它们不是本项目的共享控件，直接引即可（`channels/` 与 `product-detail/` 一致）。
+- **第三方库（lucide-react / react-router-dom）不经入口转出** —— 它们不是本项目的
+  共享控件，直接引即可（`channels/` 与 `product-detail/` 一致）。项目 UI 控件统一从
+  `src/admin-ui/primitives` 取件，不从模块入口再包一层。
 - 入口之间是单向的：`utils` → `constants`；`hooks` → `api` / `constants`；
   `constants` → `components`（只取选项类型）。业务组件与 `page` 可以依赖全部入口；
   `index` 只依赖 `page`。

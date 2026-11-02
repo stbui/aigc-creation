@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Form, Input, Button, App } from 'antd';
+import { Button, Form, FormItem, Input, useApp } from '../ui';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Lock, ShieldCheck } from 'lucide-react';
 import { authApi } from '../lib/api';
@@ -14,7 +14,7 @@ import { useDocumentMeta } from '../hooks/useDocumentMeta';
  */
 export function ResetPasswordPage() {
   useDocumentMeta('重置密码 · 货觉AI', '设置货觉AI账号的新密码。');
-  const { message } = App.useApp();
+  const { message } = useApp();
   const [params] = useSearchParams();
   const token = (params.get('token') || '').trim();
   const [submitting, setSubmitting] = useState(false);
@@ -70,7 +70,7 @@ export function ResetPasswordPage() {
             <h1>设置新密码</h1>
             <p className="auth-plain-desc">请设置至少 6 位的新密码。提交后旧密码立即失效。</p>
             <Form layout="vertical" onFinish={onFinish} requiredMark={false} className="login-form">
-              <Form.Item
+              <FormItem
                 name="password"
                 label="新密码"
                 className="login-field"
@@ -85,20 +85,19 @@ export function ResetPasswordPage() {
                   autoComplete="new-password"
                   autoFocus
                 />
-              </Form.Item>
-              <Form.Item
+              </FormItem>
+              <FormItem
                 name="confirm"
                 label="确认新密码"
                 className="login-field"
-                dependencies={['password']}
                 rules={[
                   { required: true, message: '请再次输入新密码' },
-                  ({ getFieldValue }) => ({
-                    validator(_rule, value) {
-                      if (!value || getFieldValue('password') === value) return Promise.resolve();
-                      return Promise.reject(new Error('两次输入的密码不一致'));
+                  {
+                    validator: (_rule, value, form) => {
+                      if (!value || form.getFieldValue('password') === value) return;
+                      throw new Error('两次输入的密码不一致');
                     },
-                  }),
+                  },
                 ]}
               >
                 <Input.Password
@@ -106,7 +105,7 @@ export function ResetPasswordPage() {
                   placeholder="再次输入"
                   autoComplete="new-password"
                 />
-              </Form.Item>
+              </FormItem>
               <Button
                 type="primary"
                 htmlType="submit"

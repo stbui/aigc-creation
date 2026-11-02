@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { App } from 'antd';
 import { assetsApi, assetSrc, toAbsoluteUrl } from '../lib/api';
 import { useProject } from './useProject';
 import { usePasteUpload } from './usePasteUpload';
 import { useAssetLibrary } from '../components/AssetLibraryModal';
 import { SUPPORTED_IMAGE_LABEL, isSupportedImageFile } from '../lib/constants';
 import type { Asset, MobileUploadAsset } from '../types/api';
+import { useApp } from '../ui';
 
 export interface UploadedImage {
   id: string;
@@ -37,7 +37,7 @@ interface Options {
  * 不碰提交流程，两者在 `hooks/` 下并列。
  */
 export function useImageUpload({ max, maxMb, noun = '商品图片', initial = [] }: Options) {
-  const { message } = App.useApp();
+  const { message } = useApp();
   const { ensureProject } = useProject();
 
   const fileInputRef = useRef<HTMLInputElement>(null);

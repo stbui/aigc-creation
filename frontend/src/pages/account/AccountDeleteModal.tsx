@@ -1,7 +1,7 @@
-import { Alert, Input, Modal } from 'antd';
 
 import type { DeletionPreview } from '../../types/api';
 import { DELETE_CONFIRM_WORD } from './constants';
+import { Alert, Input, Modal } from '../../ui';
 
 /**
  * 注销账号弹窗。

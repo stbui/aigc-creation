@@ -6,7 +6,6 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import { App, Spin } from 'antd';
 import {
   Columns2,
   Download,
@@ -19,6 +18,7 @@ import {
   Undo2,
   Wrench,
 } from 'lucide-react';
+import { Spin, useApp } from '../ui';
 
 /**
  * 一键抠图结果编辑器 —— 对齐参考站 background-remove 的结果态。
@@ -167,7 +167,7 @@ export function MattingResultEditor({
   customAlpha: number;
   outputRatio: string;
 }) {
-  const { message } = App.useApp();
+  const { message } = useApp();
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const baseCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const frameRef = useRef<HTMLDivElement | null>(null);

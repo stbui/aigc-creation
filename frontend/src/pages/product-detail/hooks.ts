@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App } from 'antd';
 import { useCreditCost } from '../../hooks/useCreditLabel';
 import { DEFAULT_SECTIONS, MAX_SECTIONS, SECTION_VALUES } from './constants';
+import { useApp } from '../../ui';
 
 /**
  * 商品详情图页面的 hooks —— 目录内文件的唯一 hooks 入口。
@@ -40,7 +40,7 @@ export type RightTab = 'demo' | 'results';
  * 页面一起重渲染。顺序按模块固定顺序归一化, 不按点击先后重排。
  */
 export function useSectionSelection() {
-  const { message } = App.useApp();
+  const { message } = useApp();
   const [sections, setSections] = useState<string[]>(DEFAULT_SECTIONS);
 
   const toggle = useCallback(

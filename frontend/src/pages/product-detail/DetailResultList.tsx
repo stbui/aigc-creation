@@ -1,5 +1,4 @@
 import { memo, useMemo, useState, type ReactNode } from 'react';
-import { App, Spin } from 'antd';
 import { Download, ImagePlus, RefreshCw, Trash2, X } from 'lucide-react';
 import { ImageLightbox, ToolEmptyState, type LightboxItem } from './components';
 import {
@@ -12,6 +11,7 @@ import {
   type ResultRow,
 } from './utils';
 import type { GalleryItem } from './hooks';
+import { useApp, Spin } from '../../ui';
 
 /**
  * 商品详情图「创作结果」批次列表。
@@ -82,7 +82,7 @@ function DetailResultListImpl({
   onDeleteRow,
   downloadNamePrefix = 'product-detail',
 }: DetailResultListProps) {
-  const { message } = App.useApp();
+  const { message } = useApp();
   const rows = useMemo(() => buildRows(items), [items]);
   const [preview, setPreview] = useState<{ items: LightboxItem[]; index: number } | null>(null);
 

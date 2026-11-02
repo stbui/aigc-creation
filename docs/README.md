@@ -55,7 +55,7 @@
 | [`runtime-infrastructure.md`](runtime-infrastructure.md) | AIGC 标识、签名 URL、限流、健康检查、请求追踪、日志落盘 |
 | [`development-workflow.md`](development-workflow.md) | Agent 执行手册：阶段执行卡、闸口命令、证据标准、交人边界 |
 | [`frontend-module-conventions.md`](frontend-module-conventions.md) | 前端多文件功能目录的分层、入口文件、导入方向与新增文件落位 |
-| [`typography.md`](typography.md) | 字体、antd 主题、圆角阴影与组件微规格 |
+| [`typography.md`](typography.md) | 字体、主题桥接、圆角阴影与组件微规格 |
 
 目录结构、能力清单、环境坑等与代码强相关的坐标速查表放在仓库根 `CLAUDE.md`；接口清单与错误码在 [`api-contract.md`](api-contract.md)。
 

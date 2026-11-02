@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Button, Input, Select } from 'antd';
 import {
   CheckCircle2,
   ChevronRight,
@@ -16,6 +15,7 @@ import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { PersonalPage } from '../components/PersonalPage';
 import { StateButton, StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
 import type { Ticket, TicketPriority, TicketStatus, TicketType } from '../types/api';
+import { Button, Input, Select } from '../ui';
 
 /**
  * 我的工单 / 反馈。
@@ -399,15 +399,17 @@ export function TicketsPage() {
             <h2>新建工单</h2>
             <p>说明发生了什么、在哪一步发生。信息越具体，客服越不必来回追问。</p>
           </div>
-          <label>
+          {/* Select 不用 <label> 包裹：label 会把点击二次转发给触发按钮（打开即关闭） */}
+          <div>
             问题类型
             <Select
               value={form.type}
               onChange={(value) => setForm({ ...form, type: value })}
               options={TYPE_OPTIONS}
+              aria-label="问题类型"
             />
-          </label>
-          <label>
+          </div>
+          <div>
             优先级
             <Select
               value={form.priority}
@@ -416,8 +418,9 @@ export function TicketsPage() {
                 value: p,
                 label: PRIORITY_LABELS[p],
               }))}
+              aria-label="优先级"
             />
-          </label>
+          </div>
           <label className="is-full">
             标题
             <Input

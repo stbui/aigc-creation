@@ -6,11 +6,11 @@ import {
   isSupportedImageFile,
 } from '../lib/constants';
 import { useEffect, useRef, useState } from 'react';
-import { App, Modal, Spin } from 'antd';
 import { ImagePlus, X } from 'lucide-react';
 import { assetsApi, promptToolsApi, toAbsoluteUrl } from '../lib/api';
 import { useProject } from '../hooks/useProject';
 import type { PromptToolResult } from '../types/api';
+import { useApp, Modal, Spin } from '../ui';
 
 /**
  * 图片转提示词弹窗 —— 1:1 复刻参考站 (ijihua.cn/free-creation) 的同名弹窗。
@@ -50,7 +50,7 @@ export interface ImageToPromptModalProps {
 /** 单张上限 —— 与参考站文案一致 (10MB) */
 
 export function ImageToPromptModal({ open, onApply, onCancel }: ImageToPromptModalProps) {
-  const { message } = App.useApp();
+  const { message } = useApp();
   const { ensureProject } = useProject();
   const fileInputRef = useRef<HTMLInputElement>(null);
 

@@ -1,9 +1,10 @@
 import type { RefObject } from 'react';
-import { Spin } from 'antd';
 import { ImagePlus, X } from 'lucide-react';
 
-import { SUPPORTED_IMAGE_ACCEPT, type ToolAsset } from './constants';
+import { SUPPORTED_IMAGE_ACCEPT } from './constants';
+import type { ToolAsset } from './components';
 import { assetThumbUrl } from './api';
+import { Spin } from '../../ui';
 
 /**
  * 模板图卡片：上传 / 拖拽 / 素材库 / 手机上传与重新框选。

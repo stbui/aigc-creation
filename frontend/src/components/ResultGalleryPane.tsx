@@ -7,7 +7,6 @@ import {
   type MouseEvent as ReactMouseEvent,
   type ReactNode,
 } from 'react';
-import { App, Spin } from 'antd';
 import {
   Copy,
   Download,
@@ -25,6 +24,7 @@ import { assetThumbUrl } from '../lib/api';
 import { ImageContextMenu, type ImageMenuItem } from './ImageContextMenu';
 import { ToolEmptyState } from './ToolEmptyState';
 import type { GalleryItem } from '../hooks/useResultGallery';
+import { useApp, Spin } from '../ui';
 
 /**
  * 结果栏「全部生成图」网格。
@@ -219,7 +219,7 @@ export function ResultGalleryPane({
   extraActions,
   downloadNamePrefix = 'generated',
 }: ResultGalleryPaneProps) {
-  const { message, modal } = App.useApp();
+  const { message, modal } = useApp();
   const [cols, setCols] = useState<number>(readGridCols);
   /*
    * 大图预览与右键菜单都按**素材/任务 id** 保存，而不是索引。

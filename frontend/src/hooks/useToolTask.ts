@@ -1,11 +1,11 @@
 import { useCallback, useRef, useState } from 'react';
-import { App } from 'antd';
 import { ApiError, generateApi, newIdempotencyKey } from '../lib/api';
 import { resolveModelId } from '../lib/models';
 import { useProject } from './useProject';
 import { useGenerateError } from './useGenerateError';
 import { useTaskPoller, type ToolAsset, type ToolResult } from '../components/ToolShell';
 import { notifyCreditsChanged } from '../context/CreditsContext';
+import { useApp } from '../ui';
 
 interface UseToolTaskOptions {
   /** 能力 id (与后端 capability.registry 一致) */
@@ -27,7 +27,7 @@ interface UseToolTaskOptions {
  * 仍各自维护提交流程, 不复用此 hook。
  */
 export function useToolTask({ capability, successMessage, minInputs = 1 }: UseToolTaskOptions) {
-  const { message } = App.useApp();
+  const { message } = useApp();
   const reportError = useGenerateError();
   const { ensureProject } = useProject();
   const poll = useTaskPoller();

@@ -3,7 +3,7 @@
 面向电商团队的智能视觉创作平台：上传商品图或输入提示词，由真实模型线路产出可上架的主图、详情图、修图结果与短视频。
 
 - 后端：NestJS 12 + Prisma 7 + 自研 `node:sqlite` driver adapter（零原生编译依赖）
-- 前端：Vite 8 + React 19 + antd 6 + lucide-react；**后台另起一套 UI**：shadcn/ui（源码自持，radix 底座）+ Tailwind v4，后台树内不引 antd
+- 前端：Vite 8 + React 19 + lucide-react；**前台页面只从 `frontend/src/ui` 取件**，其底层复用后台 shadcn/radix 原子件（shadcn/ui 源码自持 + Tailwind v4），**不引 antd**
 - 模型层：渠道 → 渠道模型（含价格档）→ 前台模型 revision / 线路 → 路由与冷却 → 任务执行 → 账单退款，唯一实现在 `backend/src/model/**`
 - 协议：内置插件声明（`backend/plugins/**`，107 个可用包 / 115 个 provider），代码里没有手写协议；图像 / 文本同步，视频异步轮询
 - 图像生成：仅真实模型线路；无可用线路时任务失败 `42204` 并退款，不生成伪结果

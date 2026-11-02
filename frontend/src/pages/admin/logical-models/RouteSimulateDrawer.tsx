@@ -1,0 +1,154 @@
+import { useState } from 'react';
+import {
+  ActionButton,
+  Descriptions,
+  Drawer,
+  FormField,
+  StatusTag,
+  TextAreaField,
+  TextField,
+} from './components';
+import { adminLogicalModelsApi } from './api';
+import { useToast } from './hooks';
+import type { AdminLogicalModelView, SimulateResultView } from '../../../types/model';
+
+/**
+ * 路由模拟抽屉。
+ *
+ * 只读：按给定参数算一遍「会落到哪条线路、为什么没落」，不扣费、不建任务。
+ * 上线新模型前用它确认能力合同与线路优先级是否符合预期，比真发一单便宜得多。
+ *
+ * 组件由页面按模型 id 做 key 重挂载，因此内部状态可以按目标模型直接初始化。
+ */
+export function RouteSimulateDrawer({
+  model,
+  onClose,
+}: {
+  model: AdminLogicalModelView | null;
+  onClose: () => void;
+}) {
+  const toast = useToast();
+  const [operation, setOperation] = useState(
+    model?.capabilitySpec?.operations?.[0] ?? '',
+  );
+  const [options, setOptions] = useState(
+    JSON.stringify(model?.defaultOptions ?? {}, null, 2),
+  );
+  const [result, setResult] = useState<SimulateResultView | null>(null);
+  const [simulating, setSimulating] = useState(false);
+
+  const run = async () => {
+    if (!model) return;
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(options || '{}');
+    } catch {
+      toast.error('参数不是合法 JSON');
+      return;
+    }
+    setSimulating(true);
+    try {
+      const next = await adminLogicalModelsApi.simulate(model.id, {
+        // 意图的 capability 是**模态**（image / video），不是产品能力 id
+        // （expand / main_image）。后端缺省时按模型自己的能力合同取，
+        // 这里不传 —— 传产品 id 会让后端拒绝（命名空间不同）。
+        operation: operation.trim() || undefined,
+        options: parsed as Record<string, unknown>,
+      });
+      setResult(next);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '模拟失败');
+    } finally {
+      setSimulating(false);
+    }
+  };
+
+  return (
+    <Drawer
+      open={model !== null}
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
+      width={720}
+      title={`路由模拟 · ${model?.name ?? ''}`}
+      description="只读：按给定参数算一遍「会落到哪条线路、为什么没落」，不扣费、不建任务"
+      footer={
+        <>
+          <ActionButton variant="secondary" size="sm" onClick={onClose}>
+            关闭
+          </ActionButton>
+          <ActionButton variant="default" size="sm" disabled={simulating} onClick={run}>
+            {simulating ? '模拟中…' : '开始模拟'}
+          </ActionButton>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <FormField label="操作（operation）" hint="留空则用能力合同里的第一个操作">
+          <TextField
+            ariaLabel="操作"
+            value={operation}
+            onChange={setOperation}
+            placeholder="generate"
+          />
+        </FormField>
+        <FormField label="请求参数（options）" hint="JSON 对象；尺寸、数量等影响价格档的选择">
+          <TextAreaField ariaLabel="请求参数" value={options} onChange={setOptions} rows={6} />
+        </FormField>
+
+        {result && (
+          <div className="flex flex-col gap-3">
+            <Descriptions
+              items={[
+                { label: '候选线路', value: String(result.candidates) },
+                {
+                  label: '选中线路',
+                  value:
+                    result.routes.find((route) => route.selectedTier)?.channelModelKey ||
+                    result.selectedRouteId ||
+                    '无',
+                },
+                { label: '结论', value: result.reason || '—' },
+              ]}
+              columns={2}
+            />
+            <div className="rounded-lg border border-border">
+              <table className="w-full text-[12px]">
+                <thead className="bg-muted text-muted-foreground">
+                  <tr>
+                    <th className="px-2 py-1.5 text-left">线路</th>
+                    <th className="px-2 py-1.5 text-right">优先级</th>
+                    <th className="px-2 py-1.5 text-right">权重</th>
+                    <th className="px-2 py-1.5 text-left">价格档</th>
+                    <th className="px-2 py-1.5 text-left">结论</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.routes.map((route) => (
+                    <tr key={`${route.routeId}-${route.priceTierId}`} className="border-t border-border">
+                      <td className="px-2 py-1.5 font-mono">
+                        {route.channelModelKey || route.channelModelId}
+                      </td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">{route.priority}</td>
+                      <td className="px-2 py-1.5 text-right tabular-nums">{route.weight}</td>
+                      <td className="px-2 py-1.5">{route.priceTierId || '—'}</td>
+                      <td className="px-2 py-1.5">
+                        {route.eligible ? (
+                          <StatusTag status="ok" tone="success" label="可命中" />
+                        ) : (
+                          <span className="text-muted-foreground">
+                            {route.matchReasons.join('；') || '未命中'}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+    </Drawer>
+  );
+}

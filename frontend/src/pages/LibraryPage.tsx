@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { App, Popconfirm } from 'antd';
 import {
   Check,
   Download,
@@ -26,6 +25,7 @@ import { ResultMedia, modalityOfFormat } from '../components/ResultMedia';
 import { useCapabilities } from '../hooks/useCapabilities';
 import { StateError, StateSkeleton } from '../components/StateViews';
 import type { Asset, Project } from '../types/api';
+import { useApp, Popconfirm } from '../ui';
 
 /**
  * 素材库 —— 1:1 复刻参考站 `asset-library-*` 版式。
@@ -92,7 +92,7 @@ function dateBucket(iso: string): { key: string; label: string; sort: number } {
 
 export function LibraryPage() {
   useDocumentMeta('素材库 · 货觉AI', '管理上传的原图与生成图，支持分组、下载与删除。');
-  const { message } = App.useApp();
+  const { message } = useApp();
   const navigate = useNavigate();
   const { token, openLogin } = useAuth();
   const { ensureProject } = useProject();

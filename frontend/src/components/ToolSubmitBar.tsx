@@ -1,6 +1,6 @@
-import { Spin } from 'antd';
 import type { ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { Spin } from '../ui';
 
 /**
  * 提交区（sticky 底部）—— 工具页通用能力。

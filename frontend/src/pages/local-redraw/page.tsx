@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { App, Drawer } from 'antd';
 import { ChevronRight, ChevronUp, Columns2, History, Minus, Plus, Trash2, Undo2, Redo2, X } from 'lucide-react';
 
 import { MAX_ANNOTATIONS, TOOLS, type MaskPainterHandle, type PaintTool } from './constants';
@@ -11,6 +10,7 @@ import {
   useToolTask,
 } from './hooks';
 import { assetsApi, assetSrc, assetThumbUrl, generateApi } from './api';
+import { useApp, Drawer } from '../../ui';
 
 /**
  * 局部重绘 —— 1:1 复刻参考站 https://ijihua.cn/local-redraw。
@@ -36,7 +36,7 @@ import { assetsApi, assetSrc, assetThumbUrl, generateApi } from './api';
  */
 
 export function LocalRedrawPage() {
-  const { message } = App.useApp();
+  const { message } = useApp();
   const { ensureProject } = useProject();
   const { submitting, result, setResult, run } = useToolTask({ capability: 'local_redraw', successMessage: '重绘结果已生成' });
 

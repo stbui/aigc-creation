@@ -221,7 +221,7 @@ test.describe('能力可见性与运行态', () => {
     const menu = page.locator('.img-context-menu');
     await expect(menu).toContainText('查看提示词');
     await menu.getByText('查看提示词', { exact: true }).click();
-    const promptModal = page.locator('.ant-modal-confirm');
+    const promptModal = page.locator('[data-testid="ui-app-dialog"]');
     await expect(promptModal).toContainText('生成提示词');
     await expect(promptModal).toContainText('清晨窗边的木质桌面');
     await promptModal.getByRole('button', { name: /关\s*闭/ }).click();
@@ -289,7 +289,7 @@ test.describe('工具上传约束', () => {
     await page.goto(`${UI}/background-remove`);
     const input = page.locator('input[type=file]');
     await input.setInputFiles({ name: 'animated.gif', mimeType: 'image/gif', buffer: Buffer.from('GIF89a') });
-    await expect(page.locator('.ant-message')).toContainText(
+    await expect(page.locator('[data-testid="admin-toast"]')).toContainText(
       '请选择图片文件（PNG / JPG / WebP）',
     );
 
@@ -298,7 +298,7 @@ test.describe('工具上传约束', () => {
       mimeType: 'image/png',
       buffer: Buffer.alloc(10 * 1024 * 1024 + 1),
     });
-    await expect(page.locator('.ant-message')).toContainText('单张不超过 10MB');
+    await expect(page.locator('[data-testid="admin-toast"]')).toContainText('单张不超过 10MB');
     expect(uploadRequests).toBe(0);
   });
 });
@@ -374,7 +374,7 @@ test.describe('失败任务重试', () => {
     await authed(page, '/works', token, email);
     await expect(page.getByText('生成失败')).toBeVisible();
     await page.getByRole('button', { name: '重试' }).click();
-    const dialog = page.locator('.ant-modal-confirm');
+    const dialog = page.locator('[data-testid="ui-app-dialog"]');
     await expect(dialog).toContainText('本次将消耗 10 积分');
     await dialog.getByRole('button', { name: '重新生成' }).click();
 
@@ -738,7 +738,7 @@ test.describe('局部重绘画布', () => {
     await expect(submit).toBeEnabled();
     await submit.click();
 
-    const dialog = page.locator('.ant-modal-confirm');
+    const dialog = page.locator('[data-testid="ui-app-dialog"]');
     await expect(dialog).toContainText('积分不足');
     await expect(dialog).toContainText('需要 10, 可用 0');
     await expect(dialog.getByRole('button', { name: '去充值' })).toBeVisible();

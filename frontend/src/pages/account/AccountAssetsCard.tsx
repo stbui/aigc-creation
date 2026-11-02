@@ -1,8 +1,8 @@
-import { Button } from 'antd';
 import { Wallet } from 'lucide-react';
 
 import type { CreditBalance, MyMembership } from '../../types/api';
 import { fmtDate } from './utils';
+import { Button } from '../../ui';
 
 /**
  * 积分与会员卡。

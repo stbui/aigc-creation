@@ -1,6 +1,6 @@
-import { Modal } from 'antd';
 
 import { MAX_DESC_LEN } from './constants';
+import { Modal } from '../../ui';
 
 /** 商品描述放大编辑弹窗；打开状态与文案仍由页面持有。 */
 export function ProductKitDescriptionModal({

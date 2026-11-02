@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { App, Button, Modal } from 'antd';
 import QRCode from 'qrcode';
 import {
   BadgeCheck,
@@ -23,6 +22,7 @@ import { notifyCreditsChanged } from '../context/CreditsContext';
 import { PersonalPage } from '../components/PersonalPage';
 import { StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
 import type { CheckinStatus, MyInvites } from '../types/api';
+import { useApp, Button, Modal } from '../ui';
 
 /** 邀请记录的状态文案与色板: pending 不能被写成「已发放」 */
 const REWARD_STATUS: Record<
@@ -65,7 +65,7 @@ function formatBoundDay(iso: string): string {
  */
 export function InvitationsPage() {
   useDocumentMeta('邀请有奖 · 货觉AI', '邀请好友注册并首次付费，双方获得积分奖励。');
-  const { message } = App.useApp();
+  const { message } = useApp();
   const { token, openLogin } = useAuth();
   const [data, setData] = useState<MyInvites | null>(null);
   const [loading, setLoading] = useState(true);

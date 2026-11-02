@@ -1,6 +1,6 @@
-import { Input, Modal } from 'antd';
 
 import { MIN_PASSWORD_LENGTH } from './constants';
+import { Input, Modal } from '../../ui';
 
 /**
  * 修改密码弹窗。

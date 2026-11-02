@@ -1,8 +1,8 @@
-import { Avatar, Button, Input } from 'antd';
 import { Gem, Gift, LifeBuoy, Wallet } from 'lucide-react';
 
 import type { MyProfile } from '../../types/api';
 import { fmtDate, fmtDateTime } from './utils';
+import { Avatar, Button, Input } from '../../ui';
 
 /**
  * 身份与资料卡。

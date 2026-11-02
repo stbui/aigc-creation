@@ -35,7 +35,7 @@ AppHeader 64px（≤900px 54px）sticky top:0 z-index 20
 | 布局 | flex，gap 24，`align-items: center` |
 | 行高 | `normal` |
 
-`line-height: normal` 是必需的：antd `<Header>` 默认 `line-height: 64px`，会被 `.app-quota` / 用户菜单继承，把行盒撑到 64px 再加 padding 即 72px，上下各溢出 4px。
+`line-height: normal` 是必需的：旧 antd `<Header>` 曾默认 `line-height: 64px` 并被继承；顶栏已改为原生 `header`，仍显式写 `normal`，否则会被 `.app-quota` / 用户菜单继承，把行盒撑到 64px 再加 padding 即 72px，上下各溢出 4px。
 
 ### 2.2 品牌区
 
@@ -72,13 +72,15 @@ AppHeader 64px（≤900px 54px）sticky top:0 z-index 20
 | hover | `#5546d8` 文字 on `#f1efff` 底 |
 | 换行 | `white-space: nowrap`，`flex: none` |
 
-窄档不换行：64px 定高顶栏一旦换行就破版，靠「右侧减重」腾宽度 —— ≤1199 隐藏 `.app-user-email`，≤1099 隐藏 `.app-quota` 与 `.app-header-divider`。
+窄档不换行：64px 定高顶栏一旦换行就破版，靠「右侧减重」腾宽度 —— ≤1249 隐藏 `.app-user-email`，≤1149 隐藏 `.app-quota` 与 `.app-header-divider`。
+
+阈值按 8 项导航实测：导航右缘固定在 869px，右侧动作区含邮箱 350px / 不含邮箱 230px，加 24px 间距后分别需要 1267 / 1147 视口。原阈值 1199 / 1099 会在 1200–1266 与 1100–1122 两段顶出文档级横向滚动（`scrollWidth > clientWidth`），调整后各档位均无溢出。
 
 ### 2.5 分组下拉
 
 | 元素 | 值 |
 | --- | --- |
-| 容器 | `.app-topnav-dropdown .ant-dropdown-menu`，`min-width: 137px`，`padding: 10px 8px`，radius 12，`border: 1px solid #e5e7f0`，`box-shadow: 0 18px 42px rgba(31,41,55,.14)` |
+| 容器 | `.app-topnav-dropdown.ui-dropdown-content`，`min-width: 137px`，`padding: 10px 8px`，radius 12，`border: 1px solid var(--border-2)`，`box-shadow: 0 18px 42px rgba(31,41,55,.14)` |
 | 条目 | 高 36，radius 9，`padding: 0 12px`；图标 20×20 |
 | 文字 | 13px / 600 / `#475467` |
 | 条目 hover | 底 `#f2efff`，字 `#5b4df5` |
@@ -87,7 +89,7 @@ AppHeader 64px（≤900px 54px）sticky top:0 z-index 20
 
 条目内容：能力图标 + 能力名（+ 规划中标签）。点击导航到 `toolPath(id)`。
 
-**覆写特异性**：antd cssinjs 注入顺序不可控，下拉覆写必须高于 `.ant-dropdown .ant-dropdown-menu-item`（0,2,0），写成 `.app-topnav-dropdown .ant-dropdown-menu .ant-dropdown-menu-item`（0,3,0）。少写一层会被 antd 反压，只剩 hover 因为多了 `:not()` 侥幸生效。
+**覆写边界**：下拉由 `ui` 的 `Dropdown`（radix）承载，条目样式在组件内统一定义。外壳只通过 `.app-topnav-dropdown` 调整容器层级，**不要写 `.ant-*` 覆写**，也不要改 `ui` 私有类来迁就单个入口。
 
 ### 2.6 用户动作区
 
@@ -96,7 +98,7 @@ AppHeader 64px（≤900px 54px）sticky top:0 z-index 20
 | 已登录 | 消息铃铛 + `.app-quota` 算力胶囊（指向 `/credits`）+ 1px 分割线 + 用户菜单（头像 / 邮箱、账户设置、我的工单、进入运营后台、退出登录） |
 | 游客 | `.app-guest-login`：68×32，`padding: 8px`，radius 6，13px / 700 / `#667085`，**纯文字无底**；hover `#5546d8` on `#f1efff` |
 
-游客按钮不得用 antd 实底主按钮：外壳里唯一的实底主色留给页面内的提交动作。
+游客按钮不得用 UI 层的实底主按钮（`type="primary"`）：外壳里唯一的实底主色留给页面内的提交动作。
 
 已登录动作区统一为 32px 控件带，间距 8（2026-10-30 收拢）：
 
@@ -116,11 +118,11 @@ AppHeader 64px（≤900px 54px）sticky top:0 z-index 20
 | > 900 | 完整桌面顶栏 |
 | ≤ 900 | 顶栏 54px，`padding: 0 14px`；`.app-topnav`、`.app-quota`、`.app-header-divider`、`.app-user-email`、`.app-sider-wrap` 全部 `display:none`；右侧只留消息铃铛、头像（含展开箭头）与 `.app-mobile-toggle` 汉堡（36×36，icon 20，radius 8） |
 
-汉堡点击打开 antd `Drawer` 承载完整的 `SideRail`；抽屉内恢复 280px 宽横排菜单，点菜单即导航并关闭抽屉。
+汉堡点击打开 `ui` 的 `Drawer`（radix Sheet）承载完整的 `SideRail`；抽屉内恢复 280px 宽横排菜单，点菜单即导航并关闭抽屉。
 
 **汉堡必须是 header 直系子元素**：放进任何会在移动断点被 `display:none` 的容器里，按钮即使自身 `display:inline-flex` 也不可点击。
 
-移动端品牌不显示 AI 后缀，只留标记与主名。
+移动端品牌保留「货觉 AI」完整字样（与桌面一致，`≤900` 未隐藏后缀）。
 
 ## 4. 实现约束
 

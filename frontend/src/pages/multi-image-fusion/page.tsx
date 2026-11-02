@@ -1,5 +1,4 @@
 import { useRef, useState } from 'react';
-import { App, Spin } from 'antd';
 import { ChevronDown, ChevronLeft, Download, ImagePlus, Layers, RefreshCw, Sparkles, X } from 'lucide-react';
 
 import {
@@ -58,6 +57,7 @@ import {
   sceneLabel,
 } from './utils';
 import type { Asset, MobileUploadAsset } from '../../types/api';
+import { useApp, Spin } from '../../ui';
 
 /**
  * 多图融合 —— 严格 1:1 复刻参考站 https://ijihua.cn/multi-image-fusion。
@@ -84,7 +84,7 @@ export function MultiFusionPage() {
   // 基础价读后端下发的 creditCost，再按画质倍率计算本次真实扣费。
   const baseCreditCost = useCreditCost('multi_fusion');
   const { blocked: capabilityBlocked, reason: capabilityReason } = useCapabilityRuntime('multi_fusion');
-  const { message } = App.useApp();
+  const { message } = useApp();
   const reportError = useGenerateError();
   const { ensureProject } = useProject();
   const { token, openLogin } = useAuth();

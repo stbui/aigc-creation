@@ -175,6 +175,19 @@ async function main() {
     logicalModelIds: [] as string[],
   };
 
+  /** 建用户 + 项目（余额不足场景只需要账号，不发放积分） */
+  async function makeUser(label: string) {
+    const row = await prisma.user.create({
+      data: {
+        email: `verify-task-runtime-${label}-${stamp}@test.local`,
+        passwordHash: await bcrypt.hash('test123456', 10),
+        name: `任务运行时验收 ${label}`,
+      },
+    });
+    created.userIds.push(row.id);
+    return row;
+  }
+
   /** 建渠道：系统渠道，凭证明文即可（SecretCipher 对无前缀值按明文读） */
   async function makeChannel(name: string) {
     const channel = await prisma.modelChannel.create({
@@ -600,6 +613,8 @@ async function main() {
     console.log('\n[E] 余额不足：任务与账单一起回滚');
     {
       const poor = await makeUser('rt-poor');
+      const poorProject = await prisma.project.create({ data: { ownerId: poor.id, name: '任务运行时验收 余额不足' } });
+      created.projectIds.push(poorProject.id);
       const channel = await makeChannel('rt-poor-route');
       const channelModel = await makeChannelModel(channel.id, `mock-ok-e-${stamp}`, 50);
       const model = await makeLogicalModel({
@@ -612,7 +627,7 @@ async function main() {
       const beforeOrders = await prisma.billingOrder.count({ where: { userId: poor.id } });
       let code = 0;
       try {
-        await admitTask(poor.id, project.id, model.id, 'E');
+        await admitTask(poor.id, poorProject.id, model.id, 'E');
       } catch (error: any) {
         code = error?.code ?? 0;
       }

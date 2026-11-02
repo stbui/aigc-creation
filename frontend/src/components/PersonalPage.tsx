@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
-import { Button, Typography } from 'antd';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { Button, Typography } from '../ui';
 
 const { Title, Text } = Typography;
 

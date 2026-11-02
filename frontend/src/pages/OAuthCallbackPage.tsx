@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Button, Spin } from 'antd';
+import { Button, Spin } from '../ui';
 import { authApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { safeInternalPath } from '../lib/safePath';

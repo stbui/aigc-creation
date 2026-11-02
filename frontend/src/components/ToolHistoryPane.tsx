@@ -1,5 +1,4 @@
 import { useContext, useEffect, useRef, useState } from 'react';
-import { App, Drawer, Spin } from 'antd';
 import { ChevronUp, Download, History, ImageOff, Maximize2, RefreshCw } from 'lucide-react';
 import { assetSrc, assetThumbSrc, generateApi } from '../lib/api';
 import { loadModels, modelsSync } from '../lib/models';
@@ -7,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { ImageLightbox } from './ImageLightbox';
 import { ToolTrailingContext } from './ToolShell';
 import { StateError } from './StateViews';
+import { useApp, Drawer, Spin } from '../ui';
 
 /**
  * 修图工具的通用历史侧栏。
@@ -88,7 +88,7 @@ export function ToolHistoryGrid({
   emptyText: string;
   onRetry: () => void;
 }) {
-  const { message } = App.useApp();
+  const { message } = useApp();
   const trailing = useContext(ToolTrailingContext);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [reusingId, setReusingId] = useState<string | null>(null);
@@ -181,8 +181,21 @@ export function ToolHistoryGrid({
                     </div>
                   )}
                   <div className="tool-history-meta">
-                    <span>
-                      {task.createdAt ? new Date(task.createdAt).toLocaleString() : '已生成'}
+                    {/*
+                      176px 的历史栏扣掉内边距只剩 130px 左右，默认 toLocaleString()
+                      带秒会稳定截成「2026/10/25 08:56:…」。这里只留到分钟（秒在历史卡里
+                      没有决策价值），完整时间放 title，需要精确时间时悬停可见。
+                    */}
+                    <span title={task.createdAt ? new Date(task.createdAt).toLocaleString('zh-CN') : undefined}>
+                      {task.createdAt
+                        ? new Date(task.createdAt).toLocaleString('zh-CN', {
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false,
+                          })
+                        : '已生成'}
                     </span>
                     <span
                       style={{ display: 'block', fontSize: 12, color: 'var(--text-desc)' }}

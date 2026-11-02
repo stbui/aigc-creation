@@ -1,9 +1,9 @@
 import { useContext, useEffect, useRef, useState } from 'react';
-import { Spin } from 'antd';
 import { ChevronRight, ChevronUp, Download, Eye, History, Pencil, Trash2 } from 'lucide-react';
 import { ToolTrailingContext } from './ToolShell';
 import { assetThumbUrl } from '../lib/api';
 import { groupContainsTask, type SkuBatchGroup } from '../lib/skuBatches';
+import { Spin } from '../ui';
 
 const PAGE_SIZE = 10;
 

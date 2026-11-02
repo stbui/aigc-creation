@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Card, Col, Pagination, Row, Table, Tabs, Tag } from 'antd';
 import { ShoppingBag, Wallet } from 'lucide-react';
 import { creditsApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
@@ -9,6 +8,7 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { PersonalPage } from '../components/PersonalPage';
 import { StateButton, StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
 import type { CreditBalance, CreditLedgerEntry, CreditLot } from '../types/api';
+import { Button, Card, Col, Pagination, Row, Table, Tabs, Tag } from '../ui';
 
 /**
  * 积分明细 (余额 / 批次 / 流水)。

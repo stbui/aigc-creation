@@ -1,5 +1,4 @@
 import type { RefObject } from 'react';
-import { Input, Select } from 'antd';
 import { Maximize2, Sparkles } from 'lucide-react';
 
 import {
@@ -11,6 +10,7 @@ import {
 import { ToolImageDropzone } from './components';
 import type { UploadedImage } from './hooks';
 import { languageOptions, platformOptions } from './utils';
+import { Input, Select } from '../../ui';
 
 /**
  * 生成设置卡：上传商品图 + 名称/品牌/平台/语言 + 商品描述。

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Badge, Button, Empty, Popover, Spin } from 'antd';
+import { Badge, Button, Empty, Popover, Spin } from '../ui';
 import { Bell, CheckCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { notificationsApi } from '../lib/api';
@@ -50,7 +50,28 @@ export function NotificationBell() {
       return;
     }
     void load(false);
-    const timer = window.setInterval(() => void load(false), 60_000);
+    let timer = 0;
+    const startPolling = () => {
+      if (timer) return;
+      timer = window.setInterval(() => {
+        if (document.visibilityState === 'visible') void load(false);
+      }, 60_000);
+    };
+    const stopPolling = () => {
+      if (!timer) return;
+      window.clearInterval(timer);
+      timer = 0;
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        void load(false);
+        startPolling();
+      } else {
+        stopPolling();
+      }
+    };
+    startPolling();
+    document.addEventListener('visibilitychange', onVisibility);
     /*
      * 账户页 / 其它入口标记已读后广播该事件。没有它, 铃铛只能等下一轮
      * 60s 轮询才更新, 用户会以为“全部已读”没生效。
@@ -58,7 +79,8 @@ export function NotificationBell() {
     const onChanged = () => void load(false);
     window.addEventListener('notifications:changed', onChanged);
     return () => {
-      window.clearInterval(timer);
+      stopPolling();
+      document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('notifications:changed', onChanged);
     };
   }, [token, load]);
@@ -108,7 +130,7 @@ export function NotificationBell() {
             <Spin size="small" />
           </div>
         ) : items.length === 0 ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="暂无消息" />
+          <Empty description="暂无消息" />
         ) : (
           items.map((n) => (
             <button
@@ -136,9 +158,8 @@ export function NotificationBell() {
         setOpen(v);
         if (v) void load(true);
       }}
-      placement="bottomRight"
-      arrow={false}
-      classNames={{ root: 'app-notif-popover' }}
+      placement="bottom"
+      className="app-notif-popover"
     >
       <button type="button" className="app-notif-trigger" aria-label={unread ? `消息通知，${unread} 条未读` : '消息通知'}>
         <Badge count={unread} size="small" offset={[0, -2]}>

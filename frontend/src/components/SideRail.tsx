@@ -1,4 +1,4 @@
-import { useId, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   BarChart3,
@@ -123,6 +123,27 @@ export function SideRail({ groups, items, activePath, onNavigate }: Props) {
   const location = useLocation();
   const activeLocation = `${location.pathname}${location.search}`;
   const [closedSections, setClosedSections] = useState<Record<string, boolean>>({});
+  /*
+   * 菜单内容在 900px 高的视口上放不下（全部展开约 1164px），中间区是滚动容器。
+   * macOS 默认 overlay 滚动条不滚动时不出现，截断处会像排版错误 —— 用底部渐隐
+   * 提示「下面还有」。滚到底后立刻撤掉，不遮住最后一个入口。
+   */
+  const sectionsRef = useRef<HTMLDivElement | null>(null);
+  const [hasMoreBelow, setHasMoreBelow] = useState(false);
+
+  const syncSectionsOverflow = () => {
+    const element = sectionsRef.current;
+    if (!element) return;
+    setHasMoreBelow(element.scrollHeight - element.scrollTop - element.clientHeight > 4);
+  };
+
+  useEffect(() => {
+    syncSectionsOverflow();
+    const element = sectionsRef.current;
+    if (!element) return;
+    window.addEventListener('resize', syncSectionsOverflow);
+    return () => window.removeEventListener('resize', syncSectionsOverflow);
+  }, [closedSections, groups, items]);
 
   const toolIsActive = (id: string) => {
     const target = toolPath(id);
@@ -170,7 +191,11 @@ export function SideRail({ groups, items, activePath, onNavigate }: Props) {
 
   return (
     <nav className="workspace-side-menu-v2" aria-label="侧边导航">
-      <div className="workspace-side-menu-sections">
+      <div
+        ref={sectionsRef}
+        className={`workspace-side-menu-sections${hasMoreBelow ? ' has-more' : ''}`}
+        onScroll={syncSectionsOverflow}
+      >
         <section className="workspace-menu-section open workspace-menu-root-items">
           <div className="workspace-side-menu-list">
             <SideMenuItem

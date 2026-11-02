@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Form, Input, Button, App } from 'antd';
+import { Button, Form, FormItem, Input, useApp } from '../ui';
 import { Link } from 'react-router-dom';
 import { Mail, ShieldCheck } from 'lucide-react';
 import { authApi } from '../lib/api';
@@ -17,7 +17,7 @@ import { useDocumentMeta } from '../hooks/useDocumentMeta';
  */
 export function ForgotPasswordPage() {
   useDocumentMeta('找回密码 · 货觉AI', '通过注册邮箱重置货觉AI账号密码。');
-  const { message } = App.useApp();
+  const { message } = useApp();
   const [submitting, setSubmitting] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
 
@@ -62,7 +62,7 @@ export function ForgotPasswordPage() {
               输入注册时使用的邮箱，我们会发送一封包含重置链接的邮件。
             </p>
             <Form layout="vertical" onFinish={onFinish} requiredMark={false} className="login-form">
-              <Form.Item
+              <FormItem
                 name="email"
                 label="邮箱"
                 className="login-field"
@@ -77,7 +77,7 @@ export function ForgotPasswordPage() {
                   autoComplete="username"
                   autoFocus
                 />
-              </Form.Item>
+              </FormItem>
               <Button
                 type="primary"
                 htmlType="submit"

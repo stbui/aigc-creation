@@ -1,0 +1,199 @@
+import { Plus } from 'lucide-react';
+import { ActionButton, AdminDataTable, Meter, StatusTag, type AdminColumn } from './components';
+import {
+  EFFECTIVE_META,
+  SCOPE_LABEL,
+  TYPE_LABEL,
+  type TagTone,
+} from './constants';
+import { faceValue, yuan } from './utils';
+import type { AdminCoupon } from '../../../types/api';
+
+/**
+ * 券列表。
+ *
+ * 状态列优先展示派生生效态：过期 / 未开始 / 售罄不是人工停用，
+ * 混在一起会让运营以为开关被谁动过。
+ */
+export function CouponTable({
+  rows,
+  loading,
+  error,
+  hasFilter,
+  current,
+  pageSize,
+  total,
+  writable,
+  busy,
+  onEdit,
+  onToggle,
+  onPageChange,
+  onRetry,
+  onResetFilters,
+  onCreate,
+}: {
+  rows: AdminCoupon[];
+  loading: boolean;
+  error: string | null;
+  hasFilter: boolean;
+  current: number;
+  pageSize: number;
+  total: number;
+  writable: boolean;
+  busy: boolean;
+  onEdit: (row: AdminCoupon) => void;
+  onToggle: (row: AdminCoupon) => void;
+  onPageChange: (page: number, size?: number) => void;
+  onRetry: () => void;
+  onResetFilters: () => void;
+  onCreate: () => void;
+}) {
+  const columns: Array<AdminColumn<AdminCoupon>> = [
+    {
+      key: 'code',
+      title: '券码',
+      width: 125,
+      render: (row) => (
+        <button
+          type="button"
+          className="rounded font-mono text-xs font-medium text-brand hover:underline"
+          onClick={() => onEdit(row)}
+        >
+          {row.code}
+        </button>
+      ),
+    },
+    { key: 'name', title: '名称', width: 140, render: (row) => <span>{row.name}</span> },
+    {
+      key: 'type',
+      title: '类型',
+      width: 70,
+      render: (row) => <span className="text-xs">{TYPE_LABEL[row.type] ?? row.type}</span>,
+    },
+    {
+      key: 'value',
+      title: '面额',
+      width: 90,
+      render: (row) => (
+        <span className="font-medium text-brand">
+          {faceValue({ type: row.type, value: row.value })}
+        </span>
+      ),
+    },
+    {
+      key: 'threshold',
+      title: '门槛',
+      width: 90,
+      render: (row) =>
+        row.thresholdCents > 0 ? (
+          <span className="tabular-nums">满 ¥{yuan(row.thresholdCents)}</span>
+        ) : (
+          <span className="text-[12px] text-muted-foreground">无门槛</span>
+        ),
+    },
+    {
+      key: 'scope',
+      title: '适用范围',
+      width: 110,
+      render: (row) => <span className="text-xs">{SCOPE_LABEL[row.scope] ?? row.scope}</span>,
+    },
+    {
+      key: 'used',
+      title: '核销',
+      width: 100,
+      render: (row) => {
+        const total = row.totalCount === 0 ? null : row.totalCount;
+        const pct = total ? Math.round((row.usedCount / total) * 100) : null;
+        return (
+          <div className="flex flex-col gap-1">
+            <span className="tabular-nums">
+              {row.usedCount}
+              {total ? ` / ${total}` : ' / 不限'}
+            </span>
+            {pct !== null && (
+              <Meter value={Math.min(pct, 100)} className="h-1 w-16" decorative />
+            )}
+          </div>
+        );
+      },
+    },
+    {
+      key: 'valid',
+      title: '有效期',
+      width: 170,
+      render: (row) => (
+        <span className="text-[12px] tabular-nums text-muted-foreground">
+          {new Date(row.validFrom).toLocaleDateString('zh-CN')} ~{' '}
+          {new Date(row.validTo).toLocaleDateString('zh-CN')}
+        </span>
+      ),
+    },
+    {
+      key: 'status',
+      title: '状态',
+      width: 80,
+      render: (row) => {
+        const meta =
+          EFFECTIVE_META[row.effective] ?? { label: row.status, tone: 'muted' as TagTone };
+        return <StatusTag status={row.status} label={meta.label} tone={meta.tone} />;
+      },
+    },
+    {
+      key: 'ops',
+      title: '',
+      width: 110,
+      fixed: 'right',
+      render: (row) =>
+        writable ? (
+          <div className="flex items-center gap-1">
+            <ActionButton variant="ghost" size="sm" onClick={() => onEdit(row)}>
+              编辑
+            </ActionButton>
+            <ActionButton
+              variant={row.status === 'on' ? 'destructive' : 'ghost'}
+              size="sm"
+              disabled={busy}
+              onClick={() => onToggle(row)}
+            >
+              {row.status === 'on' ? '停用' : '启用'}
+            </ActionButton>
+          </div>
+        ) : null,
+    },
+  ];
+
+  return (
+    <AdminDataTable<AdminCoupon>
+      rows={rows}
+      columns={columns}
+      rowKey={(row) => row.id}
+      loading={loading}
+      error={error}
+      onRetry={onRetry}
+      minWidth={1060}
+      pagination={{
+        current,
+        pageSize,
+        total,
+        unit: '张',
+        onChange: onPageChange,
+      }}
+      emptyText={
+        hasFilter
+          ? '没有匹配的优惠券。清除筛选条件后再试。'
+          : '还没有优惠券。新建第一张券，C 端结算页才会出现可用的抵扣项。'
+      }
+      emptyAction={
+        hasFilter ? (
+          <ActionButton variant="secondary" size="sm" onClick={onResetFilters}>
+            清除筛选
+          </ActionButton>
+        ) : writable ? (
+          <ActionButton variant="default" size="sm" icon={Plus} onClick={onCreate}>
+            创建第一张券
+          </ActionButton>
+        ) : undefined
+      }
+    />
+  );
+}

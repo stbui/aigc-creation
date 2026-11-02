@@ -191,7 +191,10 @@ const REQUIRED_NESTING = [
   ['multer/node_modules/type-is', '1.6.18', 'multer@2.4.0 需要 type-is ^1.6.18'],
   ['multer/node_modules/type-is/node_modules/media-typer', '0.3.0', 'type-is@1.6.18 需要 media-typer ^0.3.0 (1.x API 不兼容, 错版会让 multer 静默不解析 multipart)'],
   ['multer/node_modules/append-field', '1.0.0', 'multer@2.4.0 需要 append-field ^1.0.0'],
-  ['webpack/node_modules/mime-types', '2.1.35', 'webpack@5 需要 mime-types ^2.1.x, 与 express 5 的 ^3.0.0 冲突'],
+  // webpack 5.97.1 由 @nestjs/cli 精确 pin，npm 把它嵌在 `@nestjs/cli/node_modules/webpack`，
+  // 其 `mime-types@2.1.x` 与 webpack 同级提升（`@nestjs/cli/node_modules/mime-types`）。
+  // 顶层 `webpack@5.112.2` 由 fork-ts-checker-webpack-plugin 引入，本身不再依赖 mime-types。
+  ['@nestjs/cli/node_modules/mime-types', '2.1.35', 'webpack@5.97.1（@nestjs/cli 内嵌）需要 mime-types ^2.1.x, 与 express 5 的 ^3.0.0 冲突'],
   ['@nestjs/config/node_modules/dotenv', '18.0.3', '@nestjs/config@12.0.1 精确 pin dotenv 18.0.3, 顶层 17.4.2 是 prisma/@prisma/config 的, 缺嵌套会静默降级到 17.x'],
   // 反例留档: raw-body@3.0.2 要 iconv-lite ~0.7.0, 顶层 0.7.3 已满足,
   // 早期误以为它精确依赖 0.6.3 而嵌套安装, 结果遮蔽了正确版本 —— 故此处不再要求嵌套。

@@ -191,6 +191,72 @@ export function SaveBar({
   );
 }
 
+/* ────────────────────────── 详情小节 ────────────────────────── */
+
+/**
+ * 抽屉 / 详情页里的小节：标题 + 一句口径说明 + 内容。
+ *
+ * 四个后台详情抽屉此前各写一份 `Section` / `SectionTitle`，标题字号与分隔线
+ * 位置互不一致（有的画在标题下方、有的画在上方）。统一成「上边框分隔、
+ * 首个不画线」的形态：相邻小节之间恰好一条线，不会出现双线。
+ */
+export function DetailSection({
+  title,
+  note,
+  className,
+  children,
+}: {
+  title: ReactNode;
+  note?: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section
+      data-testid="admin-detail-section"
+      className={cn('border-t border-border pt-3 first:border-t-0 first:pt-0', className)}
+    >
+      <div className="mb-2 flex items-baseline gap-2">
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        {note && <span className="text-[12px] text-muted-foreground">{note}</span>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/* ────────────────────────── 批量操作条 ────────────────────────── */
+
+/**
+ * 表格上方的批量操作条。
+ *
+ * `count` 为 0 时不渲染 —— 让调用方少写一层 `selected.length > 0 &&`，
+ * 也避免四个页面各自决定「已选 N 项」的单位与位置。
+ */
+export function BatchBar({
+  count,
+  unit = '项',
+  children,
+}: {
+  count: number;
+  unit?: string;
+  children: ReactNode;
+}) {
+  if (count <= 0) return null;
+  return (
+    <div
+      role="status"
+      data-testid="admin-batch-bar"
+      className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-accent px-3 py-2"
+    >
+      <span className="text-xs font-medium text-accent-foreground">
+        已选 {count} {unit}
+      </span>
+      {children}
+    </div>
+  );
+}
+
 /* ────────────────────────── 列表态 ────────────────────────── */
 
 /** 空态：说明为什么空 + 下一步能做什么，不留一片白。 */

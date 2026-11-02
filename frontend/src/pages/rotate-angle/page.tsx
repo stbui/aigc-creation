@@ -1,5 +1,4 @@
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { App } from 'antd';
 import { Info, RotateCcw } from 'lucide-react';
 
 import {
@@ -31,6 +30,7 @@ import {
   resultTagOf,
   rotatePayload,
 } from './utils';
+import { useApp } from '../../ui';
 
 /**
  * 旋转角度 —— 1:1 复刻参考站 https://ijihua.cn/rotate-angle。
@@ -64,7 +64,7 @@ interface DragOrigin {
 }
 
 export function RotateAnglePage() {
-  const { message } = App.useApp();
+  const { message } = useApp();
   const { submitting, result, setResult, run } = useToolTask({ capability: 'rotate', successMessage: '旋转结果已生成' });
 
   const [tab, setTab] = useState<'subject' | 'camera'>('subject');

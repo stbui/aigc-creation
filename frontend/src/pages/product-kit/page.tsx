@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { App } from 'antd';
 import { useNavigate } from 'react-router-dom';
 
 import {
@@ -40,6 +39,7 @@ import {
   taskErrorText,
   variantCaption,
 } from './utils';
+import { useApp } from '../../ui';
 
 /**
  * 商品主图工作台 —— 1:1 复刻参考站 https://ijihua.cn/product-kit。
@@ -62,7 +62,7 @@ import {
  */
 
 export function ProductKitPage() {
-  const { message, modal } = App.useApp();
+  const { message, modal } = useApp();
   const reportError = useGenerateError();
   const navigate = useNavigate();
   const { ensureProject } = useProject();

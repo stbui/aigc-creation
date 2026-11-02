@@ -79,7 +79,7 @@ export default defineConfig(({ mode }) => {
     build: {
       // 首屏体积优化: 框架/组件库/图标拆成稳定 chunk, 业务页面各自按路由懒加载。
       // 版本不变的 vendor chunk 可长期缓存, 业务改动不再让用户重下依赖。
-      // vendor-antd ≈1.1MB (gzip ~360KB) 是 antd 6 主题引擎的固有体积, 故阈值放宽到 1200。
+      // 迁移到 shadcn 后组件库体积显著下降, 阈值仍保留以约束业务 chunk 膨胀。
       chunkSizeWarningLimit: 1200,
       // 生产不产 sourcemap: 产物会公开到 CDN, 源码映射等于把源码送出去。
       // 非生产保留, 便于在浏览器里对照排查。
@@ -90,9 +90,6 @@ export default defineConfig(({ mode }) => {
             if (!id.includes('node_modules')) return;
             if (/[\\/]node_modules[\\/](react|react-dom|react-router|react-router-dom|scheduler)[\\/]/.test(id)) {
               return 'vendor-react';
-            }
-            if (/[\\/]node_modules[\\/](antd|@ant-design|rc-|@rc-component)/.test(id)) {
-              return 'vendor-antd';
             }
             if (/[\\/]node_modules[\\/]lucide-react[\\/]/.test(id)) {
               return 'vendor-icons';

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Form, Input, Button, App, Checkbox } from 'antd';
-import type { InputRef } from 'antd';
+import { Button, Checkbox, Form, FormItem, Input, useApp, useForm, useWatch } from '../ui';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, X, Smartphone, ShieldCheck } from 'lucide-react';
 import { authApi, legalApi, oauthAuthorizeUrl, type OAuthProviderInfo } from '../lib/api';
@@ -88,13 +87,13 @@ export interface AuthCardProps {
 }
 
 export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
-  const { message } = App.useApp();
+  const { message } = useApp();
   const { login } = useAuth();
   const navigate = useNavigate();
   const [mode, setMode] = useState<Mode>('login');
   const [submitting, setSubmitting] = useState(false);
-  const [form] = Form.useForm<AuthForm>();
-  const emailRef = useRef<InputRef>(null);
+  const [form] = useForm<AuthForm>();
+  const emailRef = useRef<HTMLInputElement>(null);
 
   // 验证码发送状态
   const [sendingSms, setSendingSms] = useState(false);
@@ -102,7 +101,7 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
   const [oauthProviders, setOauthProviders] = useState<OAuthProviderInfo[]>([]);
 
   // 注册模式下手机号是选填的；只有填了才显示验证码输入框
-  const phoneValue = Form.useWatch('phone', form);
+  const phoneValue = useWatch('phone', form);
   const needPhoneCode = mode === 'register' && Boolean(phoneValue);
 
   /*
@@ -167,7 +166,7 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
    */
   const handleSendSms = useCallback(
     async (purpose: SmsPurpose) => {
-      const phone = form.getFieldValue('phone');
+      const phone = String(form.getFieldValue('phone') ?? '');
       if (!phone) {
         message.error('请先填写手机号');
         return;
@@ -238,7 +237,7 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
 
   /** 验证码输入框 + 获取按钮。两个用途共用同一段 UI */
   const codeField = (purpose: SmsPurpose) => (
-    <Form.Item
+    <FormItem
       name="smsCode"
       label="验证码"
       className="login-field"
@@ -261,7 +260,7 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
           {countdown > 0 ? `${countdown}s` : '获取验证码'}
         </Button>
       </div>
-    </Form.Item>
+    </FormItem>
   );
 
   return (
@@ -351,7 +350,7 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
              * 邀请与订单等所有对外位置, 缺省值拼得难看还会撞名。
              */}
             {mode === 'register' && (
-              <Form.Item
+              <FormItem
                 name="name"
                 label="昵称"
                 className="login-field"
@@ -361,11 +360,11 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
                 ]}
               >
                 <Input prefix={<User size={15} />} placeholder="展示名称" maxLength={20} />
-              </Form.Item>
+              </FormItem>
             )}
 
             {mode !== 'sms' && (
-              <Form.Item
+              <FormItem
                 name="email"
                 label="邮箱"
                 className="login-field"
@@ -380,11 +379,11 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
                   placeholder="账号（邮箱）"
                   autoComplete="username"
                 />
-              </Form.Item>
+              </FormItem>
             )}
 
             {mode === 'sms' && (
-              <Form.Item
+              <FormItem
                 name="phone"
                 label="手机号"
                 className="login-field"
@@ -400,11 +399,11 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
                   inputMode="tel"
                   autoComplete="tel"
                 />
-              </Form.Item>
+              </FormItem>
             )}
 
             {mode !== 'sms' && (
-              <Form.Item
+              <FormItem
                 name="password"
                 label="密码"
                 className="login-field"
@@ -418,12 +417,12 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
                   placeholder="请输入密码"
                   autoComplete={mode === 'register' ? 'new-password' : 'current-password'}
                 />
-              </Form.Item>
+              </FormItem>
             )}
 
             {/* 注册时的可选手机号 —— 填了才出现验证码（后端强校验归属才能绑定） */}
             {mode === 'register' && (
-              <Form.Item
+              <FormItem
                 name="phone"
                 label="手机号（选填）"
                 className="login-field"
@@ -436,14 +435,14 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
                   inputMode="tel"
                   autoComplete="tel"
                 />
-              </Form.Item>
+              </FormItem>
             )}
 
             {mode === 'sms' && codeField('login')}
             {needPhoneCode && codeField('verify')}
 
             {mode === 'register' && (
-              <Form.Item
+              <FormItem
                 name="agreed"
                 valuePropName="checked"
                 className="login-field login-agree-field"
@@ -460,7 +459,7 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
                   我已阅读并同意<a href="/legal/user-agreement.html">用户协议</a>与
                   <a href="/legal/privacy-policy.html">个人信息保护政策</a>
                 </Checkbox>
-              </Form.Item>
+              </FormItem>
             )}
 
             {/* 参考站 .auth-submit: 340x48 / linear-gradient(90deg,#8064f6,#5546d8) / 14px 600 / radius 8 */}

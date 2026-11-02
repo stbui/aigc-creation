@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { App } from 'antd';
 import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ImagePlus, Upload } from 'lucide-react';
 import { mobileUploadApi } from '../lib/api';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
@@ -9,6 +8,7 @@ import {
   SUPPORTED_IMAGE_LABEL,
   isSupportedImageFile,
 } from '../lib/constants';
+import { useApp } from '../ui';
 
 /**
  * 手机端上传落地页 —— 1:1 复刻参考站 (ijihua.cn) 扫码后打开的
@@ -67,7 +67,7 @@ interface Picked {
 
 export function MobileUploadPage() {
   useDocumentMeta('手机上传 · 货觉AI', '扫码后从手机选择图片并回传到电脑端参考图位。');
-  const { message } = App.useApp();
+  const { message } = useApp();
   const [params] = useSearchParams();
   const sessionId = params.get('session') ?? '';
   const token = params.get('token') ?? '';

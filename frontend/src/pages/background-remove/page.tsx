@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { App } from 'antd';
 import { Plus } from 'lucide-react';
 
 import { BackgroundSourcePreview } from './BackgroundSourcePreview';
@@ -15,6 +14,7 @@ import {
 import { useCreditCost, useToolTask } from './hooks';
 import { assetThumbUrl } from './api';
 import { colorLabelOf } from './utils';
+import { useApp } from '../../ui';
 
 /**
  * 一键抠图 —— 1:1 复刻参考站 https://ijihua.cn/background-remove。
@@ -32,7 +32,7 @@ import { colorLabelOf } from './utils';
  */
 
 export function BackgroundRemovePage() {
-  const { message } = App.useApp();
+  const { message } = useApp();
   const { submitting, result, run } = useToolTask({ capability: 'matting', successMessage: '抠图结果已生成' });
 
   const [selectedColor, setSelectedColor] = useState('transparent');

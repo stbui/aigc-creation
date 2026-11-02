@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { App } from 'antd';
 import { Plus } from 'lucide-react';
 
 import { DEFAULT_OCCUPY, QUICK_PERCENTS } from './constants';
@@ -14,6 +13,7 @@ import {
   loadImageSize,
   positionLabelOf,
 } from './utils';
+import { useApp } from '../../ui';
 
 /**
  * 智能扩图 —— 1:1 复刻参考站 https://ijihua.cn/image-expand。
@@ -31,7 +31,7 @@ import {
  */
 
 export function ImageExpandPage() {
-  const { message } = App.useApp();
+  const { message } = useApp();
   const { submitting, result, setResult, run } = useToolTask({ capability: 'expand', successMessage: '扩图结果已生成' });
 
   const [occupy, setOccupy] = useState(DEFAULT_OCCUPY);

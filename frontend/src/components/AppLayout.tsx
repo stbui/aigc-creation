@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Layout, Button, Avatar, Dropdown, Drawer } from 'antd';
+import { Avatar, Button, Drawer, Dropdown } from '../ui';
 import {
   ChevronDown,
   LifeBuoy,
@@ -24,8 +24,6 @@ import { GuestPromoDialog } from './GuestPromoDialog';
 import { NotificationBell } from './NotificationBell';
 
 export { CapabilityIcon };
-
-const { Header, Content } = Layout;
 
 interface Props {
   groups: CapabilityGroup[];
@@ -90,13 +88,13 @@ export function AppLayout({ groups, items, children }: Props) {
   );
 
   return (
-    <Layout className="app-layout">
+    <div className="app-layout">
       <a className="skip-to-content" href="#main-content">
         跳到主要内容
       </a>
       <PromoBar />
       <GuestPromoDialog />
-      <Header className={`app-header${headerElevated ? ' is-scrolled' : ''}`}>
+      <header className={`app-header${headerElevated ? ' is-scrolled' : ''}`}>
         <Link to="/workbench" className="app-brand">
           {/* 品牌标记: 货觉AI「觉眼」logo (2026-10-19, 见 docs/brand/brand-basics.md) */}
           <span className="app-brand-mark">
@@ -208,7 +206,7 @@ export function AppLayout({ groups, items, children }: Props) {
                     icon: <LifeBuoy size={14} />,
                     onClick: () => navigate('/tickets'),
                   },
-                  { type: 'divider' as const },
+                  { key: 'divider-account', type: 'divider' as const },
                   // 后台入口仅对后台角色显示。角色来自 /admin/me, 普通用户不请求该端点,
                   // 因此这里用 isAdminRole 静态判断而非读异步状态 —— 未加载时先不显示。
                   ...(isAdminRole
@@ -219,7 +217,7 @@ export function AppLayout({ groups, items, children }: Props) {
                           icon: <ShieldCheck size={14} />,
                           onClick: () => navigate('/admin'),
                         },
-                        { type: 'divider' as const },
+                        { key: 'divider-admin', type: 'divider' as const },
                       ]
                     : []),
                   {
@@ -268,9 +266,9 @@ export function AppLayout({ groups, items, children }: Props) {
             <Menu size={20} />
           </button>
         </div>
-      </Header>
+      </header>
 
-      <Layout className="app-body">
+      <div className="app-body">
         {/* 宽度由 CSS 托管: 桌面 176px 横排 / ≤1366px 自动塌缩 100px 垂直轨 / ≤900px 隐藏。
             曾经由 JSX inline width 注入, 会压过媒体查询导致响应式失效 (2026-10-19 修正) */}
         <div className="app-sider-wrap">
@@ -281,10 +279,10 @@ export function AppLayout({ groups, items, children }: Props) {
             onNavigate={go}
           />
         </div>
-        <Content className="app-content" id="main-content" data-route-stage tabIndex={-1}>
+        <main className="app-content" id="main-content" data-route-stage tabIndex={-1}>
           {children}
-        </Content>
-      </Layout>
+        </main>
+      </div>
 
       <Drawer
         title="导航菜单"
@@ -317,6 +315,6 @@ export function AppLayout({ groups, items, children }: Props) {
           onNavigate={() => setMobileNavOpen(false)}
         />
       </Drawer>
-    </Layout>
+    </div>
   );
 }

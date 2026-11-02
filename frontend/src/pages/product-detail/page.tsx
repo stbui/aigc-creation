@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { App, Modal } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { Maximize2, Sparkles } from 'lucide-react';
 
@@ -39,6 +38,7 @@ import {
   startDetailGeneration,
 } from './api';
 import { countGenerations, languageOptions, platformDetailSpec, platformOptions, sectionCaption } from './utils';
+import { useApp, Modal } from '../../ui';
 
 /**
  * 商品详情图工作台
@@ -63,7 +63,7 @@ import { countGenerations, languageOptions, platformDetailSpec, platformOptions,
  */
 
 export function ProductDetailPage() {
-  const { message, modal } = App.useApp();
+  const { message, modal } = useApp();
   const reportError = useGenerateError();
   const navigate = useNavigate();
   const { ensureProject } = useProject();

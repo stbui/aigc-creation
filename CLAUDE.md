@@ -68,7 +68,8 @@
 | 数据库 | SQLite（`backend/dev.db`），`node:sqlite` 内置模块 | 需 Node ≥ 22.12 |
 | 图像 | Jimp（仅上传校验 / 尺寸探测 / AIGC 角标，不生成图片） | 1.6.1 |
 | 鉴权/加密 | jsonwebtoken / bcryptjs | 9.0.3 / 3.0.3 |
-| 前端 | Vite + React + antd + lucide-react + react-router-dom | 8.3.4 / 19.3.0 / 6.6.6 / 1.57.0 / 7.18.4 |
+| 前端 | Vite + React + lucide-react + react-router-dom | 8.3.4 / 19.3.0 / 1.57.0 / 7.18.4 |
+| 前台 UI | `frontend/src/ui` 兼容层（页面只从该 barrel 取件），底层复用 `admin-ui/components/ui` 的 shadcn/radix 原子件 | 自持，antd 已移除 |
 | 前端其他 | qrcode（邀请海报 / 扫码登录）/ Playwright（e2e） | 1.5.4 / `^1.64.1`（仅 e2e 允许 `^`） |
 | 后台 UI | shadcn/ui 源码自持（`radix-ui` 底座，`new-york`）+ cva + `cn`（官方包）+ Tailwind v4 + tw-animate-css | 自持 / 1.8.1 / 0.7.1 / 0.5.1 / 4.3.3 / 1.4.0 |
 | 前端测试 | Vitest + jsdom + Testing Library | 5.0.5 / 30.1.3 / 16.3.3 |

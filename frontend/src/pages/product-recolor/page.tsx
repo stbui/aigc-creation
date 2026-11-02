@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { App } from 'antd';
 
 import {
   ColorStudio,
@@ -14,6 +13,7 @@ import {
 } from './components';
 import { useToolTask } from './hooks';
 import { colorLabelOf, measureImageAspect, recolorPayload } from './utils';
+import { useApp } from '../../ui';
 
 /**
  * 商品换色 —— 1:1 复刻参考站 https://ijihua.cn/product-recolor。
@@ -31,7 +31,7 @@ import { colorLabelOf, measureImageAspect, recolorPayload } from './utils';
  */
 
 export function ProductRecolorPage() {
-  const { message } = App.useApp();
+  const { message } = useApp();
   const { submitting, result, setResult, run } = useToolTask({ capability: 'recolor', successMessage: '换色结果已生成' });
 
   const [color, setColor] = useState('#FFFFFF');

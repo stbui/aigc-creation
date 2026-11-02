@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, Modal, message } from 'antd';
 import { BarChart3 } from 'lucide-react';
 
 import {
@@ -29,6 +28,7 @@ import { AccountOrdersCard } from './AccountOrdersCard';
 import { AccountPasswordModal } from './AccountPasswordModal';
 import { AccountSecurityCard } from './AccountSecurityCard';
 import { AccountStatsCard } from './AccountStatsCard';
+import { Button, useApp } from '../../ui';
 import type {
   CreditBalance,
   DeletionPreview,
@@ -58,6 +58,7 @@ export function AccountPage() {
   useDocumentMeta('账户设置 · 货觉AI', '管理账号资料、安全、数据导出与注销。');
   const navigate = useNavigate();
   const { token, logout, openLogin } = useAuth();
+  const { message, modal } = useApp();
 
   const [profile, setProfile] = useState<MyProfile | null>(null);
   const [credits, setCredits] = useState<CreditBalance | null>(null);
@@ -130,7 +131,7 @@ export function AccountPage() {
 
   /** 取消自动续费：已付周期保留，到期后不再发放下一周期权益。 */
   const cancelMembership = () => {
-    Modal.confirm({
+    modal.confirm({
       title: '取消会员自动续费？',
       content: `取消后不再自动续费。当前周期权益保留至 ${
         membership?.expiresAt ? fmtDate(membership.expiresAt) : '到期日'

@@ -1,4 +1,4 @@
-import { Modal } from 'antd';
+import { Modal } from '../ui';
 import { AuthCard } from './AuthCard';
 import { useAuth } from '../context/AuthContext';
 
@@ -28,14 +28,8 @@ export function LoginModal({ open, onClose, authEpoch }: Props) {
       mask={{ closable: true }}
       keyboard
       width={840}
-      centered
-      destroyOnHidden
       className="login-modal"
-      styles={{
-        // antd 6 把 v5 的 `content` 语义键改名为 `container` (见 ModalSemanticType)
-        container: { padding: 0, background: 'transparent', boxShadow: 'none' },
-        mask: { background: 'rgba(24, 32, 51, 0.55)' },
-      }}
+      styles={{ container: { background: 'transparent', boxShadow: 'none', border: 'none' } }}
     >
       {/* key 绑定身份版本: 每次登录成功都重建卡片, 清空内部表单态 */}
       <AuthCard key={authEpoch} onSuccess={onClose} />

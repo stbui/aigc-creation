@@ -1,0 +1,95 @@
+/**
+ * C 端 shadcn 运行时样式。
+ *
+ * 后台的 `styles/admin.css` 只扫描 `admin-ui` / `pages/admin` / `components/admin`，
+ * C 端组件不在它的 source 白名单里，因此这里单独生成 utilities。扫描范围 =
+ * C 端目录 + `admin-ui/components/ui` + `admin-ui/providers`（ui 兼容层组合了它们）。
+ * 主题变量沿用 admin.css 的映射，不新增颜色。
+ */
+@layer theme, base, components, utilities;
+
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities) source(none);
+@import 'tw-animate-css';
+
+@source '../ui';
+@source '../components';
+@source '../pages';
+/*
+ * C 端 ui 兼容层直接组合 admin-ui 的 shadcn 原子件与 toast 实现，
+ * 这些文件里用到的工具类（fixed / inset-y-0 / bg-popover …）必须一并扫描，
+ * 否则会被当成"页面没用到"而裁掉：抽屉会退回文档流、toast 会失去定位。
+ */
+@source '../admin-ui/components/ui';
+@source '../admin-ui/providers';
+
+@theme inline {
+  --font-sans: 'Noto Sans SC', Inter, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+
+  --radius-sm: var(--radius-tag);
+  --radius-md: var(--radius-control);
+  --radius-lg: var(--radius-card);
+  --radius-xl: var(--radius-panel);
+  --radius-2xl: var(--radius-hero);
+
+  --shadow-card: var(--shadow-card);
+
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-bg: var(--brand-bg);
+
+  --color-background: var(--card-bg);
+  --color-foreground: var(--text-strong);
+  --color-page: var(--page-bg);
+
+  --color-card: var(--card-bg);
+  --color-card-foreground: var(--text-strong);
+  --color-popover: var(--card-bg);
+  --color-popover-foreground: var(--text-strong);
+
+  --color-primary: var(--brand);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: var(--surface);
+  --color-secondary-foreground: var(--text-body);
+  --color-muted: var(--surface);
+  --color-muted-foreground: var(--text-muted);
+  --color-accent: var(--brand-bg);
+  --color-accent-foreground: var(--brand-hover);
+  --color-destructive: var(--danger-text);
+  --color-destructive-foreground: #ffffff;
+
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--brand);
+
+  --color-success-soft: var(--success-soft-bg);
+  --color-success-text: var(--success-text);
+  --color-success-border: var(--success-border);
+  --color-warn-soft: var(--warn-bg);
+  --color-warn-border: var(--warn-border);
+  --color-warn-text: var(--warn-text);
+  --color-danger-soft: var(--danger-soft-bg);
+  --color-danger-text: var(--danger-text);
+}
+
+@layer base {
+  /*
+   * 与 admin.css 同一套兜底：本项目不导 preflight，Tailwind 的 `border`
+   * 只写宽度，没有 `solid` 与颜色兜底时控件/弹层会丢边线或退回 near-black。
+   * `[data-slot]` 只命中 shadcn 原子件；portal 里的弹层同样适用。
+   */
+  *,
+  ::before,
+  ::after {
+    border: 0 solid;
+  }
+  [data-slot] {
+    border-color: var(--border);
+  }
+  /* Toast / Dialog 渲染在 body 的 portal 中，不在页面字体作用域内 */
+  .admin-portal {
+    font-family: var(--font-sans);
+    color: var(--text-strong);
+    -webkit-font-smoothing: antialiased;
+  }
+}

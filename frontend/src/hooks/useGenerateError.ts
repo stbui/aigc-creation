@@ -1,6 +1,6 @@
-import { App } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { ApiError } from '../lib/api';
+import { useApp } from '../ui';
 
 /**
  * 生成任务提交失败的统一出口。
@@ -13,7 +13,7 @@ import { ApiError } from '../lib/api';
  * 提交流程，但「失败之后该显示什么」必须全站一致。
  */
 export function useGenerateError(): (e: unknown) => void {
-  const { message, modal } = App.useApp();
+  const { message, modal } = useApp();
   const navigate = useNavigate();
 
   return (e: unknown) => {

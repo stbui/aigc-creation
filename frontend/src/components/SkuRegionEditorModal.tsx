@@ -7,7 +7,6 @@ import {
   type CSSProperties,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { App } from 'antd';
 import {
   Brush,
   Check,
@@ -23,6 +22,7 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
+import { useApp } from '../ui';
 
 export type SkuRegionType = 'rect' | 'ellipse' | 'brush';
 
@@ -176,7 +176,7 @@ export function SkuRegionEditorModal({
   onClose,
   onConfirm,
 }: Props) {
-  const { message } = App.useApp();
+  const { message } = useApp();
   const frameRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const draftRef = useRef<Draft | null>(null);

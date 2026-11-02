@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { App, Button } from 'antd';
+import { Button, useApp } from '../ui';
 import { CheckCircle2, MonitorSmartphone, ShieldAlert, XCircle } from 'lucide-react';
 import { authApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
@@ -24,7 +24,7 @@ export function QrLoginPage() {
   useDocumentMeta('扫码登录确认 · 货觉AI', '确认是否允许该设备登录。');
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { message } = App.useApp();
+  const { message } = useApp();
   const { token } = useAuth();
   const ticket = params.get('ticket') ?? '';
 

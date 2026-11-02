@@ -105,23 +105,24 @@
 | 4 | 自定义中转路径先解码/`path.Clean`/长度上限再判定 | `backend/src/model/proxy/custom-relay.service.ts` | `verify-proxy-runtime` A 段 |
 | 5 | 自定义中转补 IPv6 `100::/64`、`2001:db8::/32` 拦截 | `backend/src/model/infra/outbound.ts` | `outbound.spec.ts` 4 条 |
 | 6 | 密钥文件用临时文件 + `link` 原子发布，避免并发首启生成两把密钥 | `backend/src/model/infra/secret-cipher.ts` | 类型检查 / 构建 |
-| 7 | `markRunning` 失败即停止派发并转 uncertain | `backend/src/model/tasks/task-worker.service.ts` | `verify-task-runtime` 39 项 |
-| 8 | 落盘重试用尽、大结果无法暂存、暂存损坏、找不到 attempt 一律转 uncertain，不再自动退款 | `backend/src/model/tasks/task-worker.service.ts` | `verify-task-runtime` 39 项 |
+| 7 | `markRunning` 失败即停止派发并转 uncertain | `backend/src/model/tasks/task-worker.service.ts` | `verify-task-runtime` 46 项 |
+| 8 | 落盘重试用尽、大结果无法暂存、暂存损坏、找不到 attempt 一律转 uncertain，不再自动退款 | `backend/src/model/tasks/task-worker.service.ts` | `verify-task-runtime` 46 项 |
 | 9 | `uncertain` 任务禁止直接重试，避免二次计费 | `backend/src/generate/generate.service.ts` | 类型检查 / 构建 |
 | 10 | 模型启停不再递增 `priceVersion`，值未变化直接返回 | `backend/src/model/channels/channel-model.service.ts` | `verify-channel-flow` 65 项 |
 | 11 | `/models/available` 增加产品合同匹配；公开目录过滤非法价格档 | `backend/src/model/catalog/catalog.service.ts`、`public-model-catalog.service.ts` | `verify-route-catalog` 48 项 |
-| 12 | **建任务 + 建账单 + 预留积分合并进同一个 Prisma 事务** | `backend/src/model/tasks/task-admission.service.ts`、`billing.service.ts` | `verify-task-runtime` 43 项 |
+| 12 | **建任务 + 建账单 + 预留积分合并进同一个 Prisma 事务** | `backend/src/model/tasks/task-admission.service.ts`、`billing.service.ts` | `verify-task-runtime` 46 项（含余额不足回滚） |
 | 13 | 退款按归类记账：换线重预留（`route_switch`）**不计入「已退」**，财务净收入不再失真 | `billing.service.ts`、`finance-analytics.service.ts`、`schema.prisma`（新增 `BillingOrder.refundReason`） | `verify-task-runtime` 4 条 + `verify-proxy-runtime` 口径断言 |
 | 14 | 「待核对」队列口径（`status=review`）+ 批量核对接口与页面 | `billing-admin.service.ts` / `.controller.ts`、`AdminBillingOrdersPage.tsx` | `verify-billing` 11 条 |
 | 15 | 失败通知不再把换线退款算成「已退回」 | `task-lifecycle.service.ts` | `verify-task-runtime` |
 | 16 | 后台表格注册 `columnVisibilityFeature`，表头与表体共用可见列集 | `frontend/src/admin-ui/primitives/table.tsx` | `table.test.tsx` 2 条 |
+| 17 | 冻结积分自动退回：后台开关 `generate.billingAutoRefund`（默认关闭）+ 每分钟清扫「待核对」队列，排除已出作品 / 补交付中的订单 | `setting-defs.ts`、`billing-sweeper.service.ts` | `verify-billing` 5 条 |
+| 18 | 建任务-预留同事务的回滚断言：余额不足时不残留任务与账单 | `verify-task-runtime.ts` 场景 E | `verify-task-runtime` 46 项 |
 
 ### 本轮仍需产品确认的项
 
 | 项 | 现状 | 待确认 |
 | --- | --- | --- |
 | 换线改为「同账单差额调整」 | 仍走「退旧单 + 建新单」，但**财务口径已修正**（不再计入「已退」），资金流与上游一致 | 是否要改成上游的单账单差额调整（改动面大，需重写切线事务） |
-| 冻结积分自动退回开关 | 未做 | 开关默认开还是关；哪些状态自动退；已出作品的任务是否排除 |
 | 视频 Token 计费 | `billingMode=token` + video 直接拒绝 | 是否接 Seedance 公式；与按秒计费的边界 |
 | 前台模型线路合法性 | 仍可保存停用 / 跨能力 / 重复线路、无线路仍启用 | 是否强制「启用前至少一条可路由线路」 |
 

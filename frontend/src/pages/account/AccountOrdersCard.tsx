@@ -1,9 +1,9 @@
-import { Button } from 'antd';
 import { Receipt } from 'lucide-react';
 
 import type { Order } from '../../types/api';
 import { ORDER_STATUS_LABEL } from './constants';
 import { fmtDateTime, fmtYuan } from './utils';
+import { Button } from '../../ui';
 
 /**
  * 最近订单卡。

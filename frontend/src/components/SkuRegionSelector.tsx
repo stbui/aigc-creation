@@ -1,6 +1,6 @@
 import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { App } from 'antd';
 import { RotateCcw, X } from 'lucide-react';
+import { useApp } from '../ui';
 
 /** 归一化坐标 (0~1)，与模板图原始像素尺寸无关。 */
 export interface SkuRegionBox {
@@ -49,7 +49,7 @@ function normalizeDraft(draft: DraftBox): SkuRegionBox {
 }
 
 export function SkuRegionSelector({ url, alt = 'SKU 模板图', regions, max = 3, onChange }: Props) {
-  const { message } = App.useApp();
+  const { message } = useApp();
   const [draft, setDraft] = useState<DraftBox | null>(null);
   const draftRef = useRef<DraftBox | null>(null);
   const pointerIdRef = useRef<number | null>(null);

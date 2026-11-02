@@ -7,7 +7,6 @@ import {
   type CSSProperties,
   type ReactNode,
 } from 'react';
-import { App, Modal, Spin } from 'antd';
 import { Download, ImagePlus, Maximize2, Plus, RefreshCw, X } from 'lucide-react';
 import { assetsApi, assetSrc, assetThumbUrl, toAbsoluteUrl } from '../lib/api';
 
@@ -38,6 +37,7 @@ import {
   taskErrorText,
 } from '../lib/constants';
 import type { Asset, MobileUploadAsset, Modality, Task, TaskStatus } from '../types/api';
+import { useApp, Modal, Spin } from '../ui';
 
 /**
  * 修图系工具页共享骨架 —— 1:1 复刻参考站 local-redraw / background-remove 等页的公共结构:
@@ -399,7 +399,7 @@ export function ToolShell(props: Props) {
     trailingPane,
   } = props;
 
-  const { message } = App.useApp();
+  const { message } = useApp();
   const { ensureProject } = useProject();
   const fileInputRef = useRef<HTMLInputElement>(null);
 

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { App, Modal } from 'antd';
 import { ChevronDown, Search, X } from 'lucide-react';
 import { assetSrc, assetThumbSrc, assetsApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { StateEmpty, StateError, StateLoading } from './StateViews';
 import { ResultMedia, modalityOfFormat } from './ResultMedia';
 import type { Asset } from '../types/api';
+import { useApp, Modal } from '../ui';
 
 /**
  * 素材库导入选择器 —— 1:1 复刻参考站 (ijihua.cn/free-creation) 的
@@ -81,7 +81,7 @@ export function useAssetLibrary(onPick: (asset: Asset) => void | boolean): UseAs
    * 用户以为是自己没上传过, 真相是接口没连上。
    */
   const [error, setError] = useState<string | null>(null);
-  const { message } = App.useApp();
+  const { message } = useApp();
   const { token, openLogin } = useAuth();
 
   const openLibrary = useCallback(() => {
@@ -181,7 +181,7 @@ export function AssetLibraryModal({
   onPick,
   maxSelectable,
 }: AssetLibraryModalProps) {
-  const { message } = App.useApp();
+  const { message } = useApp();
   /** 侧栏当前维度 */
   const [kind, setKind] = useState<PickerKind>('all');
   /** 工具栏日期筛选 */

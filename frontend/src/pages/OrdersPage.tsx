@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { App, Button, Input, Select } from 'antd';
 import { ShoppingBag } from 'lucide-react';
 import { ordersApi, invoicesApi, paymentsApi } from '../lib/api';
 import { notifyCreditsChanged } from '../context/CreditsContext';
@@ -9,6 +8,7 @@ import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { PersonalPage } from '../components/PersonalPage';
 import { StateButton, StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
 import type { Invoice, Order, OrderStatus } from '../types/api';
+import { useApp, Button, Input, Select } from '../ui';
 
 /**
  * 我的订单。
@@ -75,7 +75,7 @@ function canPay(o: Order): boolean {
 export function OrdersPage() {
   useDocumentMeta('我的订单 · 货觉AI', '查看订单、支付记录与开票进度。');
   const navigate = useNavigate();
-  const { modal, message } = App.useApp();
+  const { modal, message } = useApp();
   const { token, openLogin } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [total, setTotal] = useState(0);
@@ -558,7 +558,9 @@ export function OrdersPage() {
                   </span>
                 </div>
                 <div className="order-invoice-grid">
-                  <label className="order-field">
+                  {/* Select 不能包在 <label> 里：label 会把点击二次转发给触发按钮，
+                      表现为「点开立刻关闭」。无障碍名走 aria-label。 */}
+                  <div className="order-field">
                     <span>抬头类型</span>
                     <Select
                       value={form.kind}
@@ -567,8 +569,9 @@ export function OrdersPage() {
                         { value: 'personal', label: '个人' },
                         { value: 'company', label: '企业' },
                       ]}
+                      aria-label="抬头类型"
                     />
-                  </label>
+                  </div>
                   <label className="order-field">
                     <span>发票抬头</span>
                     <Input

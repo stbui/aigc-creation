@@ -201,6 +201,18 @@ running ──nextPollAt 到期──► 回查上游
 - 结算：按 FEFO 从批次扣减并记 `consume`；预授权多收的部分同步退回。
 - 用户分组倍率与货币换算（`user-group.service.ts`）在同一处折算，目录展示价与账单必须用同一组因子。
 
+**退款归类（`BillingOrder.refundReason`）**：`failure` / `manual` / `proxy_timeout` / `auto_sweep`
+都算真实退款；`route_switch`（线路切换的内部重预留）**不计入「已退」**，也不进失败通知的
+「已退回积分」。财务页的「已退」与「净收入」都按这个口径算。
+
+**兜底清扫（`billing-sweeper.service.ts`）**：
+
+- 代理账单（`taskId=''`）无条件兜底：`reserved` 超 30 分钟退款，`running` 超 60 分钟转人工；
+- 任务账单只在后台打开 **`generate.billingAutoRefund`（冻结积分自动退回，默认关闭）** 时处理，
+  口径与「待核对」队列一致（uncertain / running 超 40 分钟 / 任务已失败但仍预留），
+  已出作品或正在补交付（`pendingResult` / `mediaRecoveryError`）的订单排除；
+- 开关默认关闭：待核对订单可能已在上游产生费用，退与不退是运营口径，不是技术默认。
+
 ## 9. 后台页面与接口
 
 | 页面 | 前缀 | 要点 |

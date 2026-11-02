@@ -1,8 +1,8 @@
-import { Button } from 'antd';
 import { Bell, CheckCheck } from 'lucide-react';
 
 import type { NotificationItem } from '../../types/api';
 import { fmtDateTime } from './utils';
+import { Button } from '../../ui';
 
 /**
  * 最近消息卡。

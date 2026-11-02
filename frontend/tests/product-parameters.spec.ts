@@ -1105,7 +1105,7 @@ test.describe('移动端布局烟测', () => {
     await authed(page, '/local-redraw', env.token, env.email);
 
     await page.locator('.redraw-history-float-toggle').click();
-    const drawer = page.locator('.ant-drawer');
+    const drawer = page.locator('[data-testid="ui-drawer"]');
     await expect(drawer).toBeVisible();
     await expect(drawer.getByRole('button', { name: '使用历史结果继续创作' })).toBeVisible();
     await drawer.getByRole('button', { name: '使用历史结果继续创作' }).click();

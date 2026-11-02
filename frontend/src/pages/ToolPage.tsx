@@ -1,20 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Button,
-  Card,
-  Form,
-  Input,
-  InputNumber,
-  Radio,
-  Select,
-  Slider,
-  Switch,
-  Typography,
-  Upload,
-  App,
-  Tag,
-} from 'antd';
-import type { UploadFile } from 'antd';
 import { ArrowLeft, Upload as UploadIcon, Trash2, RefreshCw, Check, X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
@@ -53,6 +37,7 @@ import { ResultMedia, formatDuration } from '../components/ResultMedia';
 import { ProviderBadge } from '../components/ProviderBadge';
 import { StateEmpty, StateSkeleton } from '../components/StateViews';
 import type { Asset, CapabilityDef, CapabilityParam, Task } from '../types/api';
+import { Button, Card, Form, Input, InputNumber, Radio, Select, Slider, Switch, Typography, Upload, useApp, Tag, type UploadFile } from '../ui';
 
 const { Title, Paragraph, Text } = Typography;
 
@@ -121,7 +106,7 @@ export function ToolPage() {
 function ToolPageContent({ capability, def }: { capability: string; def: CapabilityDef }) {
   useDocumentMeta(`${def.name} · 货觉AI`, def.summary);
   const navigate = useNavigate();
-  const { message } = App.useApp();
+  const { message } = useApp();
   const reportError = useGenerateError();
   const { ensureProject } = useProject();
   const [form] = Form.useForm();
@@ -322,7 +307,19 @@ function ToolPageContent({ capability, def }: { capability: string; def: Capabil
                 .then((asset) => {
                   assetsRef.current = [...assetsRef.current, asset];
                   setAssets((prev) => [...prev, asset]);
-                  setFileList((prev) => [...prev, file]);
+                  // 必须落成 UploadFile：直接塞原生 File 时没有 uid / 预览地址，
+                  // 缩略图与「移除」都会错位（antd 会自动补 uid 与 thumbUrl）。
+                  setFileList((prev) => [
+                    ...prev,
+                    {
+                      uid: asset.id,
+                      name: file.name,
+                      status: 'done',
+                      url: assetSrc(asset),
+                      thumbUrl: assetThumbSrc(asset, 320),
+                      originFileObj: file,
+                    },
+                  ]);
                   message.success(`${file.name} 上传成功`);
                 })
                 .catch((e: Error) => message.error(e.message || '上传失败'))

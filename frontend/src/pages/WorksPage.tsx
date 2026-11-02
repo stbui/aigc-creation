@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { App } from 'antd';
 import {
   Check,
   ChevronDown,
@@ -28,6 +27,7 @@ import { StateError, StateSkeleton } from '../components/StateViews';
 import { ResultMedia } from '../components/ResultMedia';
 import { ImageLightbox, type LightboxItem } from '../components/ImageLightbox';
 import type { Modality, Task } from '../types/api';
+import { useApp } from '../ui';
 
 /**
  * 我的作品。
@@ -141,7 +141,7 @@ function taskModality(t: Task): Modality {
 
 export function WorksPage() {
   useDocumentMeta('我的作品 · 货觉AI', '查看与管理你生成的全部作品。');
-  const { message, modal } = App.useApp();
+  const { message, modal } = useApp();
   const navigate = useNavigate();
   const { token, openLogin } = useAuth();
   const { data: caps } = useCapabilities();

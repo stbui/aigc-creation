@@ -1,5 +1,5 @@
-import { Button } from 'antd';
 import { Download, KeyRound, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { Button } from '../../ui';
 
 /**
  * 安全与数据卡。

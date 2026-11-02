@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { App } from 'antd';
 import { Columns2, Hand, Minus, Plus, Redo2, Square, Trash2, Undo2, X } from 'lucide-react';
 
 import { ZOOM_DEFAULT, ZOOM_STEP } from './constants';
@@ -16,6 +15,7 @@ import {
 import { useCreditCost, useProject, useToolTask } from './hooks';
 import { assetThumbUrl, assetsApi } from './api';
 import { clampZoom, previewStyleOf } from './utils';
+import { useApp } from '../../ui';
 
 /**
  * 去除水印 —— 对齐参考站 watermark-remove 的上传态交互。
@@ -25,7 +25,7 @@ import { clampZoom, previewStyleOf } from './utils';
  */
 
 export function WatermarkRemovePage() {
-  const { message } = App.useApp();
+  const { message } = useApp();
   const { ensureProject } = useProject();
   const { submitting, result, setResult, run } = useToolTask({ capability: 'remove_watermark', successMessage: '处理结果已生成' });
   const creditCost = useCreditCost('remove_watermark');

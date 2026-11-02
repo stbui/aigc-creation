@@ -82,7 +82,7 @@
 
 | 触发 | 行为 |
 | --- | --- |
-| 顶栏「登录 / 注册」 | `openLogin()` 打开 antd `Modal` 承载 `AuthCard`，遮罩 `rgba(24,32,51,.55)`，居中，`maskClosable` + `keyboard` 可关 |
+| 顶栏「登录 / 注册」 | `openLogin()` 打开 `ui` 的 `Modal`（radix Dialog 壳）承载 `AuthCard`，遮罩 `rgba(24,32,51,.55)`，居中，`maskClosable` + `keyboard` 可关 |
 | 未登录访问受限动作 | `lib/api.ts` 收到 401 且**本地无 token** → 广播 `auth:required`，开弹窗，文案「请先登录」 |
 | 登录态失效 | 401 且**本地有 token** → 清凭证并广播登出，不弹窗 |
 | `/login` 深链接 | 渲染独立页版本的同一张卡 |
@@ -90,7 +90,7 @@
 
 `401` 的两种语义**不能混**：本来没登录和登录态失效是两条路径，前者弹窗、后者登出。
 
-弹窗打开后聚焦账号输入框（延迟约 60ms），避免 antd 默认聚焦激活 tab 时的蓝色 outline 与品牌紫冲突。
+弹窗打开后聚焦账号输入框（延迟约 60ms），避免浏览器默认聚焦激活 tab 时的蓝色 outline 与品牌紫冲突。
 
 登录成功后弹窗自动关闭并留在原页面，页面随后自行刷新数据（`AuthContext` 的 `token` 变化会驱动依赖它的请求）。
 
@@ -107,7 +107,7 @@
 ## 7. 实现约束
 
 1. 卡片只有 `AuthCard` 一处实现，两个宿主都渲染它；不要在 `/login` 另写一套表单。
-2. 表单提交态、错误提示、倒计时都走 antd `Form` / `App.useApp().message`，不自绘。
+2. 表单提交态、错误提示、倒计时都走 `ui` 的 `Form` / `useApp().message`，不自绘。
 3. 协议勾选是注册的必要条件，法务链接指向 `/legal/*` 的真实 slug（见 `legal.service.ts` 的 `LEGAL_SLUGS`）。
 4. 不要在登录卡里硬编码任何账号密码，也不提供「填充演示账号」入口。
 

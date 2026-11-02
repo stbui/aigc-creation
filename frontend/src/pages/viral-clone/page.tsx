@@ -1,35 +1,27 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { App, Modal } from 'antd';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ImagePlus, Maximize2 } from 'lucide-react';
+import { useCallback, useRef, useState } from 'react';
 
 import {
-  CLONE_DEGREES,
   MAX_IMAGE_BYTES,
   MAX_IMAGE_MB,
   MAX_IMAGES,
-  MAX_NAME_LEN,
-  MAX_REQUIREMENT_LEN,
   SUPPORTED_IMAGE_LABEL,
   type PkAsset,
   type PkResult,
 } from './constants';
-import {
-  AssetLibraryModal,
-  MobileUploadModal,
-  ModelPicker,
-  ResultGalleryPane,
-  ToolImageDropzone,
-  ToolSettingsPopover,
-  ToolSubmitBar,
-  ToolWorkflowSteps,
-  type ImageMenuItem,
-} from './components';
+import { AssetLibraryModal, MobileUploadModal } from './components';
+import { ViralCloneConfig } from './ViralCloneConfig';
+import { ViralCloneDegreeCard } from './ViralCloneDegreeCard';
+import { ViralCloneRequirementCard } from './ViralCloneRequirementCard';
+import { ViralCloneRequirementModal } from './ViralCloneRequirementModal';
+import { ViralCloneResultPane } from './ViralCloneResultPane';
+import { ViralCloneSubmitBar } from './ViralCloneSubmitBar';
+import { ViralCloneTabs } from './ViralCloneTabs';
 import {
   notifyCreditsChanged,
   useAssetLibrary,
   useAuth,
   useCapabilities,
+  useCollectedReferenceAsset,
   useCreditLabel,
   useGenerateError,
   usePasteUpload,
@@ -49,13 +41,12 @@ import {
 import {
   degreeCaption,
   isSupportedImageFile,
-  languageOptions,
-  platformOptions,
   platformSpec,
   pollToResult,
   taskErrorText,
 } from './utils';
 import type { Asset, MobileUploadAsset } from '../../types/api';
+import { useApp } from '../../ui';
 
 /**
  * 爆款复刻工作台 —— 1:1 复刻参考站 https://ijihua.cn/viral-clone。
@@ -83,9 +74,8 @@ import type { Asset, MobileUploadAsset } from '../../types/api';
  */
 
 export function ViralClonePage() {
-  const { message, modal } = App.useApp();
+  const { message, modal } = useApp();
   const reportError = useGenerateError();
-  const navigate = useNavigate();
   const { ensureProject } = useProject();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const referenceInputRef = useRef<HTMLInputElement>(null);
@@ -154,59 +144,8 @@ export function ViralClonePage() {
     if (!resolutionTouched) setResolution(spec.size);
   };
 
-  /*
-   * ── 外部入口: 浏览器扩展「图片复刻」直接带参考图进来 ──
-   *
-   * 扩展只拿得到素材 id (生成接口吃 inputAssetIds, 不是 URL), 故约定
-   * `/viral-clone?referenceAssetId=xxx`: 进来按 id 取回素材回填参考图,
-   * 用完即从地址栏摘掉 —— 保留会让刷新/后退重复拉取, 也会让用户复制链接
-   * 给别人时莫名其妙多带一张图。
-   *
-   * 未登录时不发请求 (C 端路由开放浏览, 此时必然 401); 参数留在地址上,
-   * 登录回来 token 到位后本 effect 自然再次触发。
-   */
-  const [searchParams, setSearchParams] = useSearchParams();
-  const referenceAssetId = searchParams.get('referenceAssetId');
-  /** 已处理过的 id, 防止 token 变化等依赖抖动导致重复拉取 */
-  const handledReferenceAssetId = useRef<string | null>(null);
-
-  useEffect(() => {
-    if (!referenceAssetId || !token) return;
-    if (handledReferenceAssetId.current === referenceAssetId) return;
-    handledReferenceAssetId.current = referenceAssetId;
-
-    let cancelled = false;
-    void (async () => {
-      try {
-        const asset = await assetsApi.get(referenceAssetId);
-        if (cancelled) return;
-        setReference({
-          id: asset.id,
-          url: assetSrc(asset) ?? '',
-          name: asset.sourceTitle || asset.sourceUrl.split('/').pop() || '参考图',
-        });
-        message.success('已带入采集的参考图');
-      } catch (e) {
-        if (cancelled) return;
-        message.error((e as Error).message || '参考图读取失败');
-      } finally {
-        if (!cancelled) {
-          setSearchParams(
-            (prev) => {
-              const next = new URLSearchParams(prev);
-              next.delete('referenceAssetId');
-              return next;
-            },
-            { replace: true },
-          );
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [referenceAssetId, token, message, setSearchParams]);
+  // 浏览器扩展「图片复刻」直接带参考图进来（地址参数由 hook 自行清理）
+  useCollectedReferenceAsset(setReference);
 
   /*
    * 该能力此刻能不能生成。
@@ -506,236 +445,76 @@ export function ViralClonePage() {
       {/* ── 左: 输入栏 ── */}
       <aside className="pk-input-pane">
         <div className="pk-form-card">
-          {/* 业务类型 tab: 参考站仅窄屏显示 (桌面端 display:none 实拍确认) */}
-          <div className="pk-editor-tabs" role="tablist" aria-label="业务类型">
-            <button type="button" role="tab" aria-selected={false} className="pk-editor-tab" onClick={() => navigate('/product-kit')}>
-              商品主图
-            </button>
-            <button type="button" role="tab" aria-selected={false} className="pk-editor-tab" onClick={() => navigate('/product-detail')}>
-              商品详情
-            </button>
-            <button type="button" role="tab" aria-selected className="pk-editor-tab pk-editor-tab-active">
-              爆款复刻
-            </button>
-          </div>
+          <ViralCloneTabs />
 
           <div className="pk-form-scroll">
-            {/* 上传商品图 + 上传参考图 + 生成设置 (参考站同一张卡片) */}
-            <section className="pk-config-card">
-              <ToolImageDropzone
-                title="上传商品图"
-                images={images}
-                max={MAX_IMAGES}
-                maxMb={MAX_IMAGE_MB}
-                uploading={uploading}
-                fileInputRef={fileInputRef}
-                onFiles={(f) => void uploadFiles(f)}
-                onRemove={removeImage}
-                onOpenLibrary={() => openLibraryFor('product')}
-                onOpenMobile={() => openMobileFor('product')}
-                noun="商品图片"
-              />
+            <ViralCloneConfig
+              images={images}
+              reference={reference}
+              uploading={uploading}
+              fileInputRef={fileInputRef}
+              referenceInputRef={referenceInputRef}
+              productName={productName}
+              brand={brand}
+              platform={platform}
+              language={language}
+              onProductFiles={(files) => void uploadFiles(files)}
+              onReferenceFiles={(files) => void uploadReference(files)}
+              onRemoveImage={removeImage}
+              onRemoveReference={() => setReference(null)}
+              onOpenLibrary={openLibraryFor}
+              onOpenMobile={openMobileFor}
+              onProductNameChange={setProductName}
+              onBrandChange={setBrand}
+              onPlatformChange={changePlatform}
+              onLanguageChange={setLanguage}
+            />
 
-              {/* 上传参考图（爆款图）: 独立 section, 单张上传, 标题行无计数器 */}
-              <ToolImageDropzone
-                title="上传参考图（爆款图）"
-                images={reference ? [reference] : []}
-                max={1}
-                maxMb={MAX_IMAGE_MB}
-                uploading={uploading}
-                fileInputRef={referenceInputRef}
-                onFiles={(f) => void uploadReference(f)}
-                onRemove={() => setReference(null)}
-                onOpenLibrary={() => openLibraryFor('reference')}
-                onOpenMobile={() => openMobileFor('reference')}
-                noun="参考图片"
-                sectionClassName="vc-reference-section"
-                dropzoneClassName="pk-dropzone-reference"
-                single
-                showCount={false}
-                emptyHint={`上传或粘贴要复刻风格的参考图，最多 1 张，单张不超过 ${MAX_IMAGE_MB}MB`}
-              />
+            <ViralCloneRequirementCard
+              requirement={requirement}
+              onRequirementChange={setRequirement}
+              onExpand={() => setExpandOpen(true)}
+            />
 
-              <div className="pk-section">
-                <strong className="pk-section-title">生成设置</strong>
-                <div className="pk-form-grid">
-                  <label className="pk-field">
-                    <span className="pk-field-label">商品名称（选填）</span>
-                    <input
-                      value={productName}
-                      maxLength={MAX_NAME_LEN}
-                      placeholder="请输入商品名称（选填）"
-                      onChange={(e) => setProductName(e.target.value)}
-                    />
-                  </label>
-                  <label className="pk-field">
-                    <span className="pk-field-label">品牌（选填）</span>
-                    <input
-                      value={brand}
-                      maxLength={MAX_NAME_LEN}
-                      placeholder="请输入品牌（选填）"
-                      onChange={(e) => setBrand(e.target.value)}
-                    />
-                  </label>
-                  <label className="pk-field">
-                    <span className="pk-field-label">平台</span>
-                    <select value={platform} onChange={(e) => changePlatform(e.target.value)}>
-                      {platformOptions().map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="pk-field">
-                    <span className="pk-field-label">语言</span>
-                    <select value={language} onChange={(e) => setLanguage(e.target.value)}>
-                      {languageOptions().map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              </div>
-            </section>
-
-            {/* 复刻要求 (独立卡) */}
-            <section className="pk-config-card vc-requirement-card">
-              <div className="pk-section">
-                <strong className="pk-section-title">复刻要求</strong>
-                <div className="pk-desc-editor">
-                  <textarea
-                    className="vc-requirement-textarea"
-                    rows={3}
-                    maxLength={MAX_REQUIREMENT_LEN}
-                    value={requirement}
-                    placeholder="例如：文案统一用英文、模特保持完全不变、参考图不变只替换商品。"
-                    onChange={(e) => setRequirement(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    className="pk-desc-expand"
-                    aria-label="放大编辑复刻要求"
-                    title="放大编辑"
-                    onClick={() => setExpandOpen(true)}
-                  >
-                    <Maximize2 size={14} />
-                  </button>
-                </div>
-              </div>
-            </section>
-
-            {/* 复刻程度 (独立卡, 默认高度复刻) */}
-            <section className="pk-config-card vc-degree-card">
-              <div className="pk-section">
-                <strong className="pk-section-title">复刻程度</strong>
-                <div className="pk-section-picker vc-degree-options" role="radiogroup" aria-label="复刻程度">
-                  {CLONE_DEGREES.map((d) => {
-                    const active = d.value === degree;
-                    return (
-                      <button
-                        key={d.value}
-                        type="button"
-                        role="radio"
-                        aria-checked={active}
-                        className={`vc-degree-option${active ? ' vc-degree-option-active' : ''}`}
-                        onClick={() => setDegree(d.value)}
-                      >
-                        <span className="vc-degree-title">
-                          <i className="vc-degree-dot" aria-hidden />
-                          {d.label}
-                        </span>
-                        <small>{d.desc}</small>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </section>
+            <ViralCloneDegreeCard degree={degree} onDegreeChange={setDegree} />
           </div>
 
-
-          {/* 高级设置 + 提交 (sticky 底部) */}
-          {/* 无可用模型通道: 提前说明, 而不是让用户点下去等一次 42204 */}
-          {unavailableReason && !generating && (
-            <p className="tool-submit-notice tool-submit-notice-error">{unavailableReason}</p>
-          )}
-          <ToolSubmitBar
-            submitting={generating}
-            disabled={!formValid || Boolean(unavailableReason)}
-            label="立即生成"
-            creditLabel={creditLabel ?? undefined}
-            settings={
-              <ToolSettingsPopover
-                open={settingsOpen}
-                onToggle={() => setSettingsOpen((v) => !v)}
-                ratio={ratio}
-                onRatioChange={(v) => {
-                  setRatioTouched(true);
-                  setRatio(v);
-                }}
-                resolution={resolution}
-                onResolutionChange={(v) => {
-                  setResolutionTouched(true);
-                  setResolution(v);
-                }}
-                capabilityId="hot_remake"
-                modelPicker={
-                  <ModelPicker
-                    capability="hot_remake"
-                    options={{ ratio, resolution }}
-                    onQuoteChange={setModelQuoteCredits}
-                  />
-                }
-              />
-            }
+          <ViralCloneSubmitBar
+            generating={generating}
+            formValid={formValid}
+            unavailableReason={unavailableReason}
+            creditLabel={creditLabel}
+            settingsOpen={settingsOpen}
+            ratio={ratio}
+            resolution={resolution}
+            onToggleSettings={() => setSettingsOpen((v) => !v)}
+            onRatioChange={(value) => {
+              setRatioTouched(true);
+              setRatio(value);
+            }}
+            onResolutionChange={(value) => {
+              setResolutionTouched(true);
+              setResolution(value);
+            }}
+            onModelQuoteChange={setModelQuoteCredits}
             onSubmit={() => void submit()}
           />
         </div>
       </aside>
 
-      {/* ── 右: 结果栏 (本能力全部生成图) ──
-          与创意生图页同构的全部产出网格, 用户可以并排比较
-          「参考风格」与「高度复刻」两档的差异。
-          本次出图由 gallery.prepend 插到榜首, 生成中画一张占位卡。 */}
-      <ResultGalleryPane
-        title={generating ? '生成中…' : '全部生成图'}
-        items={gallery.items}
-        loading={gallery.loading}
-        error={gallery.error}
-        notice={
-          result && result.status === 'failed' ? (
-            <p className="tool-submit-notice tool-submit-notice-error">
-              本次生成失败：{taskErrorText(result.errorCode)}，可重新生成
-            </p>
-          ) : null
-        }
-        pending={submitting ? [{ key: 'clone', label: '爆款复刻图' }] : []}
-        emptyTitle="效果图预览"
-        emptyDesc={
-          token
-            ? '提交任务后，生成结果将在此处展示，本页生成过的图都会保留在这里'
-            : '登录后，你在这个页面生成过的图都会显示在这里'
-        }
-        emptyChildren={<ToolWorkflowSteps />}
+      <ViralCloneResultPane
+        token={token}
+        gallery={gallery}
+        generating={generating}
+        submitting={submitting}
+        result={result}
         onRefresh={() => void gallery.reload()}
         onDelete={deleteImage}
-        extraActions={(item): ImageMenuItem[] => [
-          {
-            key: 'reference',
-            label: '用作参考图',
-            icon: ImagePlus,
-            onSelect: () => useAsReference(item),
-          },
-        ]}
-        downloadNamePrefix="viral-clone"
+        onUseAsReference={useAsReference}
       />
 
-      {/* 素材库选择弹窗 (真实数据; 按 libraryTarget 决定写入商品图还是参考图)
-          参考图是**单张位** → maxSelectable=1, 选择器自动退化为单选语义;
-          商品图是多张位 → 上限 MAX_IMAGES。 */}
+      {/* 素材库选择弹窗 (按 libraryTarget 决定写入商品图还是参考图;
+          参考图是单张位 → maxSelectable=1) */}
       <AssetLibraryModal
         open={libraryOpen}
         loading={libraryLoading}
@@ -746,27 +525,15 @@ export function ViralClonePage() {
         maxSelectable={libraryTarget === 'reference' ? 1 : MAX_IMAGES}
       />
 
-      {/* 手机上传弹窗 (二维码方案; 按 mobileTarget 决定写入商品图还是参考图) */}
+      {/* 手机上传弹窗 (按 mobileTarget 决定写入商品图还是参考图) */}
       <MobileUploadModal open={mobileOpen} onReceived={addMobileAssets} onCancel={() => setMobileOpen(false)} />
 
-      {/* 复刻要求放大编辑 */}
-      <Modal
+      <ViralCloneRequirementModal
         open={expandOpen}
-        title="编辑复刻要求"
-        okText="确定"
-        cancelText="取消"
-        onOk={() => setExpandOpen(false)}
-        onCancel={() => setExpandOpen(false)}
-      >
-        <textarea
-          className="pk-expand-textarea"
-          rows={10}
-          maxLength={MAX_REQUIREMENT_LEN}
-          value={requirement}
-          placeholder="例如：文案统一用英文、模特保持完全不变、参考图不变只替换商品。"
-          onChange={(e) => setRequirement(e.target.value)}
-        />
-      </Modal>
+        requirement={requirement}
+        onRequirementChange={setRequirement}
+        onClose={() => setExpandOpen(false)}
+      />
     </div>
   );
 }

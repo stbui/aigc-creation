@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Button } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
 import { assetThumbUrl, statsApi } from '../lib/api';
@@ -9,6 +8,7 @@ import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { PersonalPage } from '../components/PersonalPage';
 import { StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
 import type { StatsOverview } from '../types/api';
+import { Button } from '../ui';
 
 const WEEKDAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
 

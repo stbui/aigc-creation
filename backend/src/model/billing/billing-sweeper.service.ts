@@ -5,25 +5,32 @@
  * 调用会**永远不会走到收尾**——积分冻结在 `reserved` / `running`，用户看到
  * 「扣了但没结果」，后台看到一堆挂账。任务路径有自己的租约恢复，代理路径没有。
  *
- * 因此本清扫**只处理 `taskId=''`（代理中转）的账单**，绝不触碰任务账单：
- * 任务侧由 `task-recover` 按 dispatchState 分流，两套补偿同时跑会重复退款。
+ * 两段职责，边界不能混：
+ *   1. **代理账单**（`taskId=''`）：无条件兜底。`reserved` 超 30 分钟直接退款
+ *      （预留后立即置 running，仍是 reserved 说明请求没发出去）；`running`
+ *      超 60 分钟转人工（上游可能已计费，不能自动退）。
+ *   2. **任务账单**（`taskId!=''`）：**只有运营显式打开
+ *      `generate.billingAutoRefund` 才执行**。口径与后台「待核对」队列一致：
+ *      uncertain / running 超 40 分钟 / 任务已失败但仍预留。已出作品或正在
+ *      补交付（`pendingResult` / `mediaRecoveryError`）的订单必须排除 ——
+ *      自动退款会让平台白付上游费用、用户也失去「重试保存」。
  *
- * 两种状态的处置刻意不同：
- *   · `reserved` —— 请求还没发出（预留后立即置 running，仍是 reserved 说明进程
- *     在预留与派发之间就死了），**确定没有消耗**，直接原额退款；
- *   · `running` —— 请求可能已经到达上游并计费，**结果不明**，只能转人工核对。
- *     自动退款等于把可能已经花掉的钱送出去，这里不做。
+ * 默认关闭的原因：待核对订单**可能已经在上游产生费用**，退与不退是运营口径，
+ * 不是技术默认。开关打开后每轮重新读，关掉立即停。
  */
 
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SettingsService } from '../../common/settings.service';
 import { BillingService } from './billing.service';
 
 /** 预留超过这么久仍未置运行态 = 派发前就中断了 */
 export const RESERVED_TTL_MS = 30 * 60 * 1000;
 /** 运行态超过这么久没有收尾 = 执行者已死（上游可能已经计费） */
 export const RUNNING_TTL_MS = 60 * 60 * 1000;
+/** 任务账单进入「待核对」的 running 超时（与后台 review 队列同口径） */
+export const TASK_REVIEW_RUNNING_TTL_MS = 40 * 60 * 1000;
 /** 单轮处理上限：一轮扫太多会长时间占住事件循环，剩余留到下一轮 */
 const BATCH_SIZE = 200;
 const SWEEP_INTERVAL_MS = 5 * 60 * 1000;
@@ -54,6 +61,7 @@ export class BillingSweeperService implements OnModuleInit, OnModuleDestroy {
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
     private readonly billing: BillingService,
+    private readonly settings: SettingsService,
   ) {}
 
   onModuleInit(): void {
@@ -124,13 +132,81 @@ export class BillingSweeperService implements OnModuleInit, OnModuleDestroy {
         }
       }
 
-      if (refunded > 0 || uncertain > 0) {
-        this.log.log(`账单清扫：自动退款 ${refunded} 笔，转人工核对 ${uncertain} 笔`);
+      // 任务账单的自动退回：只有运营显式打开开关才执行
+      const autoRefundTasks = await this.settings.getBoolean('generate.billingAutoRefund');
+      const taskRefunded = autoRefundTasks ? await this.sweepTaskReview(now, batchSize) : 0;
+
+      if (refunded > 0 || uncertain > 0 || taskRefunded > 0) {
+        this.log.log(
+          `账单清扫：代理自动退款 ${refunded} 笔，代理转人工 ${uncertain} 笔，任务账单自动退回 ${taskRefunded} 笔`,
+        );
       }
       return { refunded, uncertain };
     } finally {
       this.running = false;
     }
+  }
+
+  /**
+   * 任务账单的自动退回（「待核对」队列里确定没有交付的那部分）。
+   *
+   * 排除已出作品 / 正在补交付的订单：上游可能已经产出，自动退款会让平台
+   * 白付上游费用，用户也失去「重试保存」。这类订单只能人工处置。
+   */
+  private async sweepTaskReview(now: Date, batchSize: number): Promise<number> {
+    const staleBefore = new Date(now.getTime() - TASK_REVIEW_RUNNING_TTL_MS);
+    const failedTasks = await this.prisma.generationTask.findMany({
+      where: { status: { in: ['failed', 'cancelled'] } },
+      select: { id: true },
+    });
+    const candidates = await this.prisma.billingOrder.findMany({
+      where: {
+        taskId: { not: '' },
+        OR: [
+          { status: 'uncertain' },
+          { status: 'running', updatedAt: { lt: staleBefore } },
+          { status: 'reserved', taskId: { in: failedTasks.map((task) => task.id) } },
+        ],
+      },
+      select: { id: true, taskId: true },
+      orderBy: { createdAt: 'asc' },
+      take: batchSize,
+    });
+    if (candidates.length === 0) return 0;
+
+    // 已出作品 / 正在补交付的任务不自动退：它们可能稍后交付成功
+    const taskIds = [...new Set(candidates.map((item) => item.taskId).filter((id) => id !== ''))];
+    const protectedTasks =
+      taskIds.length > 0
+        ? await this.prisma.generationTask.findMany({
+            where: {
+              id: { in: taskIds },
+              OR: [
+                { outputAssetId: { not: null } },
+                { pendingResult: { not: null } },
+                { mediaRecoveryError: { not: null } },
+              ],
+            },
+            select: { id: true },
+          })
+        : [];
+    const protectedIds = new Set(protectedTasks.map((task) => task.id));
+
+    let refunded = 0;
+    for (const order of candidates) {
+      if (protectedIds.has(order.taskId)) continue;
+      try {
+        await this.billing.refund(order.id, '系统自动退回：冻结积分自动退回已开启', 'auto_sweep');
+        await this.prisma.billingOrder.updateMany({
+          where: { id: order.id, resolvedBy: '' },
+          data: { resolvedBy: 'system:auto-refund', resolutionNote: '冻结积分自动退回' },
+        });
+        refunded += 1;
+      } catch (error) {
+        this.log.warn(`任务账单自动退款失败（账单 ${order.id}）：${messageOf(error)}`);
+      }
+    }
+    return refunded;
   }
 }
 

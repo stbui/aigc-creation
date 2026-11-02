@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { App, Modal, Spin } from 'antd';
 import { ChevronLeft, ChevronRight, ImagePlus, Maximize2, Plus, Sparkles, X } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 
@@ -55,6 +54,7 @@ import {
   taskErrorText,
 } from './utils';
 import type { Asset, MobileUploadAsset } from '../../types/api';
+import { useApp, Modal, Spin } from '../../ui';
 
 /**
  * 创意生图 / 自由创作工作台 —— 1:1 复刻参考站，同一套版面服务两个能力:
@@ -115,7 +115,7 @@ import type { Asset, MobileUploadAsset } from '../../types/api';
  */
 
 export function CreativeImagePage({ capability: capabilityProp }: { capability?: CreationCapability } = {}) {
-  const { message, modal } = App.useApp();
+  const { message, modal } = useApp();
   const reportError = useGenerateError();
   const { ensureProject } = useProject();
   const { token, openLogin } = useAuth();

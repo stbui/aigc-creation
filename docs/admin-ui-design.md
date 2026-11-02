@@ -7,7 +7,8 @@
 > 仓库内不再有残留引用。历史决策过程见 `docs/README.md`；本文只写现状。
 >
 > 后台 34 个页面全部走 shadcn 原子件（`admin-ui/components/ui/*`），经 `admin-ui/primitives/*`
-> 这一层组合件供给页面。C 端（前台）**不受影响**：仍是 antd，样式在 `styles/global.css`。
+> 这一层组合件供给页面。C 端（前台）不复用这套组合件，页面只从 `frontend/src/ui` 兼容层取件；
+> 该层底层同样复用 `admin-ui/components/ui` 的 shadcn/radix 原子件，**antd 已从依赖与源码中移除**。
 
 | 项 | 事实源 |
 | --- | --- |

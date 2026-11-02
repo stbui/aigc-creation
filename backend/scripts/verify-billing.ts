@@ -25,6 +25,8 @@ const { PrismaService } = require('../dist/prisma/prisma.service');
 const { BillingService } = require('../dist/model/billing/billing.service');
 const { CreditWalletService } = require('../dist/model/billing/credit-wallet.service');
 const { BillingAdminService } = require('../dist/model/billing/billing-admin.service');
+const { BillingSweeperService } = require('../dist/model/billing/billing-sweeper.service');
+const { SettingsService } = require('../dist/common/settings.service');
 const bcrypt = require('bcryptjs');
 
 /** 1 积分 = 1e6 微积分 */
@@ -485,6 +487,83 @@ async function errorCode(fn: () => Promise<unknown>): Promise<{ code?: number; m
 
     await prisma.generationTask.deleteMany({ where: { id: failedTaskOrder.order.taskId } });
     await prisma.project.deleteMany({ where: { id: reviewProject.id } });
+  }
+
+  // ── 自动退回开关（任务账单）────────────────────────────────────────
+  console.log('\n【冻结积分自动退回（任务账单）】');
+  {
+    const settings = app.get(SettingsService);
+    const sweeper = app.get(BillingSweeperService);
+    const autoProject = await prisma.project.create({ data: { ownerId: userId, name: '自动退回验收项目' } });
+
+    // 1) 结果不明 + 任务无产出 → 应自动退回
+    const refundable = await reserve('auto-refund-yes', {});
+    await billing.markUncertain(refundable.order.id, '验收：结果不明');
+    await prisma.generationTask.create({
+      data: {
+        id: refundable.order.taskId,
+        projectId: autoProject.id,
+        ownerId: userId,
+        capability: 'expand',
+        status: 'failed',
+        inputAssetIds: '[]',
+        params: '{}',
+        provider: 'gateway',
+        creditCost: 5,
+      },
+    });
+
+    // 2) 结果不明但任务有 pendingResult（上游已产出、正在补交付）→ 不得自动退
+    const protectedOrder = await reserve('auto-refund-protected', {});
+    await billing.markUncertain(protectedOrder.order.id, '验收：结果不明但正在补交付');
+    await prisma.generationTask.create({
+      data: {
+        id: protectedOrder.order.taskId,
+        projectId: autoProject.id,
+        ownerId: userId,
+        capability: 'expand',
+        status: 'failed',
+        inputAssetIds: '[]',
+        params: '{}',
+        provider: 'gateway',
+        creditCost: 5,
+        pendingResult: JSON.stringify({ result: { images: [] }, retries: 1 }),
+      },
+    });
+
+    // 开关默认关闭：扫一轮不应退任何一条
+    const beforeOff = await prisma.billingOrder.findUnique({ where: { id: refundable.order.id } });
+    await sweeper.sweep(new Date(), { batchSize: 100 });
+    const afterOff = await prisma.billingOrder.findUnique({ where: { id: refundable.order.id } });
+    check('默认关闭时任务账单不被自动退回', afterOff?.status === beforeOff?.status, afterOff?.status);
+
+    // 打开开关后再扫一轮
+    await prisma.systemSetting.upsert({
+      where: { key: 'generate.billingAutoRefund' },
+      update: { value: 'true' },
+      create: { key: 'generate.billingAutoRefund', value: 'true' },
+    });
+    settings.invalidate();
+    await sweeper.sweep(new Date(), { batchSize: 100 });
+
+    const autoRefunded = await prisma.billingOrder.findUnique({ where: { id: refundable.order.id } });
+    check('开启后结果不明的任务账单自动退回', autoRefunded?.status === 'refunded', autoRefunded?.status);
+    check('自动退回记录退款归类', autoRefunded?.refundReason === 'auto_sweep', autoRefunded?.refundReason);
+    check(
+      '自动退回留下系统操作人',
+      autoRefunded?.resolvedBy === 'system:auto-refund',
+      autoRefunded?.resolvedBy,
+    );
+    const stillProtected = await prisma.billingOrder.findUnique({ where: { id: protectedOrder.order.id } });
+    check('正在补交付的订单不被自动退回', stillProtected?.status === 'uncertain', stillProtected?.status);
+
+    // 清理：关闭开关，删掉夹具
+    await prisma.systemSetting.deleteMany({ where: { key: 'generate.billingAutoRefund' } });
+    settings.invalidate();
+    await prisma.generationTask.deleteMany({
+      where: { id: { in: [refundable.order.taskId, protectedOrder.order.taskId] } },
+    });
+    await prisma.project.deleteMany({ where: { id: autoProject.id } });
   }
 
   // ── 清理 ────────────────────────────────────────────────────────────

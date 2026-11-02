@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { App, Modal, Spin } from 'antd';
 import { RefreshCw, X } from 'lucide-react';
 import { promptToolsApi } from '../lib/api';
 import type { PromptToolResult } from '../types/api';
+import { useApp, Modal, Spin } from '../ui';
 
 /**
  * AI 润色弹窗 —— 1:1 复刻参考站 (ijihua.cn/free-creation) 的「AI润色」弹窗。
@@ -48,7 +48,7 @@ export interface PromptPolishModalProps {
 }
 
 export function PromptPolishModal({ open, value, onApply, onCancel }: PromptPolishModalProps) {
-  const { message } = App.useApp();
+  const { message } = useApp();
   const [output, setOutput] = useState('');
   const [textOnly, setTextOnly] = useState(false);
   const [loading, setLoading] = useState(false);

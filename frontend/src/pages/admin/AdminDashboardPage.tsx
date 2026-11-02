@@ -48,79 +48,79 @@ function lazyAdminPage<T extends Record<string, ComponentType<any>>>(
   return lazy(() => loader().then((m) => ({ default: m[name] })));
 }
 
-const AdminUsersPage = lazyAdminPage(() => import('./AdminUsersPage'), 'AdminUsersPage');
-const AdminRolesPage = lazyAdminPage(() => import('./AdminRolesPage'), 'AdminRolesPage');
-const AdminSettingsPage = lazyAdminPage(() => import('./AdminSettingsPage'), 'AdminSettingsPage');
-const AdminAuditPage = lazyAdminPage(() => import('./AdminAuditPage'), 'AdminAuditPage');
-const AdminBackupPage = lazyAdminPage(() => import('./AdminBackupPage'), 'AdminBackupPage');
-const AdminAssetsPage = lazyAdminPage(() => import('./AdminAssetsPage'), 'AdminAssetsPage');
-const AdminStoragePage = lazyAdminPage(() => import('./AdminStoragePage'), 'AdminStoragePage');
-const AdminCouponsPage = lazyAdminPage(() => import('./AdminCouponsPage'), 'AdminCouponsPage');
+const AdminUsersPage = lazyAdminPage(() => import('./users'), 'AdminUsersPage');
+const AdminRolesPage = lazyAdminPage(() => import('./roles'), 'AdminRolesPage');
+const AdminSettingsPage = lazyAdminPage(() => import('./settings'), 'AdminSettingsPage');
+const AdminAuditPage = lazyAdminPage(() => import('./audit-logs'), 'AdminAuditPage');
+const AdminBackupPage = lazyAdminPage(() => import('./backups'), 'AdminBackupPage');
+const AdminAssetsPage = lazyAdminPage(() => import('./assets'), 'AdminAssetsPage');
+const AdminStoragePage = lazyAdminPage(() => import('./storage'), 'AdminStoragePage');
+const AdminCouponsPage = lazyAdminPage(() => import('./coupons'), 'AdminCouponsPage');
 const AdminCampaignsPage = lazyAdminPage(
-  () => import('./AdminCampaignsPage'),
+  () => import('./campaigns'),
   'AdminCampaignsPage',
 );
 const AdminMarketingRulesPage = lazyAdminPage(
-  () => import('./AdminMarketingRulesPage'),
+  () => import('./marketing-rules'),
   'AdminMarketingRulesPage',
 );
 const AdminSchedulerPage = lazyAdminPage(
-  () => import('./AdminSchedulerPage'),
+  () => import('./scheduler'),
   'AdminSchedulerPage',
 );
 const AdminModelCallsPage = lazyAdminPage(
-  () => import('./AdminModelCallsPage'),
+  () => import('./model-calls'),
   'AdminModelCallsPage',
 );
 // 模型层后台六页：渠道工作台 / 前台模型 / 用户分组 / 插件 / 账单
 const AdminChannelsPage = lazyAdminPage(() => import('./channels'), 'AdminChannelsPage');
 const AdminLogicalModelsPage = lazyAdminPage(
-  () => import('./AdminLogicalModelsPage'),
+  () => import('./logical-models'),
   'AdminLogicalModelsPage',
 );
 const AdminUserGroupsPage = lazyAdminPage(
-  () => import('./AdminUserGroupsPage'),
+  () => import('./user-groups'),
   'AdminUserGroupsPage',
 );
-const AdminPluginsPage = lazyAdminPage(() => import('./AdminPluginsPage'), 'AdminPluginsPage');
+const AdminPluginsPage = lazyAdminPage(() => import('./plugins'), 'AdminPluginsPage');
 const AdminBillingOrdersPage = lazyAdminPage(
-  () => import('./AdminBillingOrdersPage'),
+  () => import('./billing-orders'),
   'AdminBillingOrdersPage',
 );
-const AdminFinancePage = lazyAdminPage(() => import('./AdminFinancePage'), 'AdminFinancePage');
+const AdminFinancePage = lazyAdminPage(() => import('./finance'), 'AdminFinancePage');
 const AdminCapabilitiesPage = lazyAdminPage(
-  () => import('./AdminCapabilitiesPage'),
+  () => import('./capabilities'),
   'AdminCapabilitiesPage',
 );
-const AdminTasksPage = lazyAdminPage(() => import('./AdminTasksPage'), 'AdminTasksPage');
-const AdminTicketsPage = lazyAdminPage(() => import('./AdminTicketsPage'), 'AdminTicketsPage');
+const AdminTasksPage = lazyAdminPage(() => import('./tasks'), 'AdminTasksPage');
+const AdminTicketsPage = lazyAdminPage(() => import('./tickets'), 'AdminTicketsPage');
 const AdminCreditPricesPage = lazyAdminPage(
-  () => import('./AdminCreditPricesPage'),
+  () => import('./credit-prices'),
   'AdminCreditPricesPage',
 );
-const AdminProductsPage = lazyAdminPage(() => import('./AdminProductsPage'), 'AdminProductsPage');
+const AdminProductsPage = lazyAdminPage(() => import('./products'), 'AdminProductsPage');
 const AdminMembershipPlansPage = lazyAdminPage(
-  () => import('./AdminMembershipPlansPage'),
+  () => import('./membership-plans'),
   'AdminMembershipPlansPage',
 );
-const AdminOrdersPage = lazyAdminPage(() => import('./AdminOrdersPage'), 'AdminOrdersPage');
-const AdminCreditsPage = lazyAdminPage(() => import('./AdminCreditsPage'), 'AdminCreditsPage');
+const AdminOrdersPage = lazyAdminPage(() => import('./orders'), 'AdminOrdersPage');
+const AdminCreditsPage = lazyAdminPage(() => import('./credits'), 'AdminCreditsPage');
 const AdminRetentionPage = lazyAdminPage(
-  () => import('./AdminRetentionPage'),
+  () => import('./retention'),
   'AdminRetentionPage',
 );
-const AdminInvoicesPage = lazyAdminPage(() => import('./AdminInvoicesPage'), 'AdminInvoicesPage');
+const AdminInvoicesPage = lazyAdminPage(() => import('./invoices'), 'AdminInvoicesPage');
 const AdminPaymentsPage = lazyAdminPage(() => import('./payments'), 'AdminPaymentsPage');
-const AdminLegalPage = lazyAdminPage(() => import('./AdminLegalPage'), 'AdminLegalPage');
+const AdminLegalPage = lazyAdminPage(() => import('./legal'), 'AdminLegalPage');
 const AdminNotificationsPage = lazyAdminPage(
-  () => import('./AdminNotificationsPage'),
+  () => import('./notifications'),
   'AdminNotificationsPage',
 );
 const AdminAigcLabelPage = lazyAdminPage(
-  () => import('./AdminAigcLabelPage'),
+  () => import('./aigc-label'),
   'AdminAigcLabelPage',
 );
-const AdminAlertsPage = lazyAdminPage(() => import('./AdminAlertsPage'), 'AdminAlertsPage');
+const AdminAlertsPage = lazyAdminPage(() => import('./alerts'), 'AdminAlertsPage');
 
 /**
  * 平台概览（值班台）。
