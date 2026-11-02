@@ -13,13 +13,14 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { generateApi, assetSrc, assetThumbSrc } from '../lib/api';
+import { generateApi, assetSrc, assetThumbSrc, newIdempotencyKey } from '../lib/api';
 import { capabilityById, capabilityName, toolPath } from '../lib/capabilities';
 import { resolveModelId } from '../lib/models';
 import { useCapabilities } from '../hooks/useCapabilities';
 import { usePollAbort } from '../hooks/usePollAbort';
 import { useGenerateError } from '../hooks/useGenerateError';
 import { useAuth } from '../context/AuthContext';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { notifyCreditsChanged } from '../context/CreditsContext';
 import { runtimeOf, taskErrorText } from '../lib/constants';
 import { waitForTask } from '../lib/poll';
@@ -50,6 +51,8 @@ import type { Modality, Task } from '../types/api';
 type DatePreset = 'all' | 'today' | 'yesterday' | '7d' | 'custom';
 
 const PAGE_SIZE = 24;
+/** 服务端每页条数：大于首屏可见数，切换筛选时不必立刻再请求 */
+const SERVER_PAGE_SIZE = 50;
 
 /**
  * 作品卡里的图片。
@@ -137,6 +140,7 @@ function taskModality(t: Task): Modality {
 }
 
 export function WorksPage() {
+  useDocumentMeta('我的作品 · 货觉AI', '查看与管理你生成的全部作品。');
   const { message, modal } = App.useApp();
   const navigate = useNavigate();
   const { token, openLogin } = useAuth();
@@ -145,7 +149,11 @@ export function WorksPage() {
   const retrySignal = usePollAbort();
 
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [totalTasks, setTotalTasks] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  /** 已加载条数（加载更多时作为 offset） */
+  const loadedTasksRef = useRef(0);
   /**
    * 加载失败必须与「没有作品」分开存。
    *
@@ -178,12 +186,18 @@ export function WorksPage() {
   const [previewIndex, setPreviewIndex] = useState<number | null>(null);
   /** 正在重试的任务 id：按钮显示进度，避免连点重复建单。 */
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  /** 重试建单的幂等键：同一次重试的网络抖动复用，拿到 taskId 后清空 */
+  const pendingRetryRef = useRef<{ fingerprint: string; key: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      setTasks(await generateApi.list());
+      const page = await generateApi.listPage({ limit: SERVER_PAGE_SIZE, offset: 0 });
+      setTasks(page.items);
+      setTotalTasks(page.total);
+      loadedTasksRef.current = page.items.length;
+      setVisibleCount(PAGE_SIZE);
     } catch (e) {
       // 保留上一次数据: 刷新失败不该把已看到的作品清空
       setError((e as Error).message || '作品列表加载失败');
@@ -192,11 +206,33 @@ export function WorksPage() {
     }
   }, []);
 
+  const loadMore = useCallback(async () => {
+    if (loadingMore || loadedTasksRef.current >= totalTasks) return;
+    setLoadingMore(true);
+    try {
+      const page = await generateApi.listPage({
+        limit: SERVER_PAGE_SIZE,
+        offset: loadedTasksRef.current,
+      });
+      setTasks((prev) => [...prev, ...page.items]);
+      loadedTasksRef.current += page.items.length;
+      setTotalTasks(page.total);
+      // 新加载的一页默认只展示首屏数量，用户再点一次即可看到下一批
+      setVisibleCount((count) => count + PAGE_SIZE);
+    } catch (e) {
+      message.error((e as Error).message || '作品加载失败');
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [loadingMore, message, totalTasks]);
+
   // 依赖 token: 登录 / 退出都要重新拉取 (与 StatsPage 同构)
   useEffect(() => {
     if (!token) {
       // guest: 作品接口需鉴权, 不发无谓请求 —— 否则首屏会先闪一次「加载失败」
       setTasks([]);
+      setTotalTasks(0);
+      loadedTasksRef.current = 0;
       setLoading(false);
       return;
     }
@@ -351,6 +387,29 @@ export function WorksPage() {
   };
 
   /**
+   * 单张作品下载。
+   *
+   * 必须用 `assetSrc()` 的完整地址，不能用网格里的 640px 缩略图；
+   * 鼠标与键盘走同一个函数，避免键盘回车变成“新标签预览”。
+   */
+  const downloadWork = (t: Task) => {
+    const fullUrl = t.outputAsset ? assetSrc(t.outputAsset) : undefined;
+    if (!fullUrl) {
+      message.warning('该作品没有可下载的产出');
+      return;
+    }
+    const isVideo = taskModality(t) === 'video';
+    const ext =
+      (t.outputAsset?.format || '').toLowerCase().replace(/^\./, '') ||
+      (isVideo ? 'mp4' : 'jpg');
+    const a = document.createElement('a');
+    a.href = fullUrl;
+    a.download = `${t.capability}-${t.id.slice(-6)}.${ext}`;
+    a.rel = 'noopener';
+    a.click();
+  };
+
+  /**
    * 失败任务重试（PRD F-20）。
    *
    * 直接用原任务的 capability / inputAssetIds / params 新建一次任务，
@@ -394,13 +453,21 @@ export function WorksPage() {
           // 沿用原任务的模型：同一提示词换模型往往出完全不同的图，
           // 用户点的是「重新生成」而不是「换个模型试」。
           const logicalModelId = t.logicalModelId || (await resolveModelId(t.capability));
-          const { taskId } = await generateApi.start({
+          const payload = {
             projectId: t.projectId,
             capability: t.capability,
             logicalModelId,
             inputAssetIds: inputs,
             params: t.params ?? {},
-          });
+          };
+          const fingerprint = JSON.stringify(payload);
+          const idempotencyKey =
+            pendingRetryRef.current?.fingerprint === fingerprint
+              ? pendingRetryRef.current.key
+              : newIdempotencyKey();
+          pendingRetryRef.current = { fingerprint, key: idempotencyKey };
+          const { taskId } = await generateApi.start({ ...payload, idempotencyKey });
+          pendingRetryRef.current = null;
           // 先插一张进行中的卡，用户立刻能看到重试已被受理。
           setTasks((prev) => [
             {
@@ -454,17 +521,25 @@ export function WorksPage() {
     message.success(`已下载 ${list.length} 个文件`);
   };
 
-  // 作品页只按「电商生图 / AI修图」分组, 与顶导/落地页口径一致 (参考站这两处均两组)。
-    // 分组名直接取后端下发的 g.name, 不在前端硬编码中文名。
-    // 业务类型随页签走: 图片页列出「电商生图 / AI修图」两组 (参考站口径),
-    // 视频页列「AI视频」。不跟着切会让用户在视频页勾「商品主图」后永远筛出空。
+  /*
+     * 业务类型按**产出模态**收集，而不是写死 group id。
+     *
+     * 之前图片页写死 ecommerce_gen/ai_retouch，导致 group 为 ai_video、
+     * 但 modality=image 的 free_create 在图片页没有筛选项；视频页又会出现
+     * 一个永远筛出空结果的组。现在从能力清单的 modality 推导分组，
+     * 并对「图片页里的 ai_video 组」如实改名为「自由创作」，避免名实不符。
+     */
     const bizGroups = useMemo(() => {
       const items = caps?.items ?? [];
-      const groupIds =
-        tab === 'video' ? ['ai_video'] : ['ecommerce_gen', 'ai_retouch'];
-      return (caps?.groups ?? [])
-        .filter((g) => groupIds.includes(g.id))
-        .map((g) => ({ name: g.name, items: items.filter((i) => i.group === g.id) }))
+      const groups = caps?.groups ?? [];
+      const modalItems = items.filter((i) => (i.modality ?? 'image') === tab);
+      const groupIds = new Set(modalItems.map((i) => i.group));
+      return groups
+        .filter((g) => groupIds.has(g.id))
+        .map((g) => ({
+          name: tab === 'image' && g.id === 'ai_video' ? '自由创作' : g.name,
+          items: modalItems.filter((i) => i.group === g.id),
+        }))
         .filter((g) => g.items.length > 0);
     }, [caps, tab]);
 
@@ -475,8 +550,18 @@ export function WorksPage() {
   const switchTab = (next: 'image' | 'video') => {
     setTab(next);
     setBiz([]);
+    // 勾选状态跟着视图走：否则切到视频页后“下载所选”仍会带上图片
+    setSelected([]);
     setVisibleCount(PAGE_SIZE);
   };
+
+  /*
+   * 任一筛选条件变化都清空勾选。批量下载/删除必须只作用于当前可见集合，
+   * 否则用户会下载到屏幕上看不到、无法核对的条目。
+   */
+  useEffect(() => {
+    setSelected([]);
+  }, [tab, biz, status, taskPick, datePreset, customRange]);
 
   const matchedTasks = useMemo(() => {
     const q = taskQuery.trim();
@@ -622,13 +707,20 @@ export function WorksPage() {
                   <input
                     type="date"
                     value={customRange[0]}
-                    onChange={(e) => setCustomRange([e.target.value, customRange[1]])}
+                    onChange={(e) => {
+                      setCustomRange([e.target.value, customRange[1]]);
+                      // 之前只更新范围、不切换 preset，过滤分支永远不会读它
+                      setDatePreset('custom');
+                    }}
                   />
                   <span>至</span>
                   <input
                     type="date"
                     value={customRange[1]}
-                    onChange={(e) => setCustomRange([customRange[0], e.target.value])}
+                    onChange={(e) => {
+                      setCustomRange([customRange[0], e.target.value]);
+                      setDatePreset('custom');
+                    }}
                   />
                 </div>
                 <span className="my-works-custom-date-hint">包含开始日和结束日</span>
@@ -962,20 +1054,11 @@ export function WorksPage() {
                           <span
                             role="button"
                             tabIndex={0}
-                            onClick={() => {
-                              // 真下载: 用 a[download] 触发, 移动端也能保存
-                              const ext =
-                                (t.outputAsset!.format || '').toLowerCase().replace(/^\./, '') ||
-                                (isVideo ? 'mp4' : 'jpg');
-                              const a = document.createElement('a');
-                              a.href = url;
-                              a.download = `${t.capability}-${t.id.slice(-6)}.${ext}`;
-                              a.click();
-                            }}
+                            onClick={() => downloadWork(t)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
-                                window.open(url, '_blank', 'noopener');
+                                downloadWork(t);
                               }
                             }}
                           >
@@ -1044,13 +1127,23 @@ export function WorksPage() {
             />
           )}
 
-          {visibleCount < sorted.length && (
+          {(visibleCount < sorted.length || tasks.length < totalTasks) && (
             <button
               type="button"
               className="my-works-load-more"
-              onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+              disabled={loadingMore}
+              onClick={() => {
+                if (visibleCount < sorted.length) {
+                  setVisibleCount((c) => c + PAGE_SIZE);
+                } else {
+                  void loadMore();
+                }
+              }}
             >
-              <ChevronDown size={14} /> 加载更多（剩余 {sorted.length - visibleCount} 个）
+              <ChevronDown size={14} />
+              {loadingMore
+                ? '加载中…'
+                : `加载更多（还有 ${Math.max(0, sorted.length - visibleCount) + Math.max(0, totalTasks - tasks.length)} 个）`}
             </button>
           )}
         </>

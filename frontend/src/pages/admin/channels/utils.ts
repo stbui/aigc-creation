@@ -188,6 +188,44 @@ export function tierToDraft(tier: ChannelModelPriceTierView): TierDraft {
   };
 }
 
+/**
+ * 价格档的前端硬校验（与后端 `validateChannelModelTierPricing` 同口径）。
+ *
+ * 后端会兜住，但只在保存时报错。运营填完一整屏再被拒是浪费；
+ * 这里在提交前先拦下最常见的三类问题：
+ *   1. 多个「通配规格」（selector 为空）默认档 —— 选价时不知道命中哪个；
+ *   2. 计费方式与产出能力不匹配（图片按秒、图像按 Token）；
+ *   3. Token 计费缺输出价（必然报 0 价）。
+ */
+export function validateModelTiers(
+  capability: string,
+  tiers: Array<{ selector: string; billingMode: string; enabled: boolean; output: string }>,
+): string | null {
+  const active = tiers.filter((tier) => tier.enabled);
+  if (active.length === 0) return '至少保留一个启用档位';
+
+  const wildcards = active.filter((tier) => tier.selector.trim() === '');
+  if (wildcards.length > 1) {
+    return '只能有一个默认（通配）规格档：其余档位要写明规格条件';
+  }
+
+  for (const tier of active) {
+    const mode = tier.billingMode;
+    if (mode === 'per_second' && capability !== 'video' && capability !== 'audio') {
+      return `按秒计费只适用于视频 / 音频，${capability} 能力不能用「按秒」`;
+    }
+    if (mode === 'token') {
+      if (capability !== 'text') {
+        return 'Token 计费目前只开放给文本能力';
+      }
+      if (!tier.output || tier.output.trim() === '0') {
+        return 'Token 计费必须填写输出 Token 单价';
+      }
+    }
+  }
+  return null;
+}
+
 /** 渠道模型实体 → 表单草稿；没有价格档时给一条继承上游键的通配档 */
 export function toModelDraft(model: AdminChannelModelView): ModelDraft {
   return {
@@ -200,13 +238,47 @@ export function toModelDraft(model: AdminChannelModelView): ModelDraft {
     capability: model.capability || 'image',
     protocol: model.protocol,
     priceCurrency: model.priceCurrency || 'credits',
-    tags: tagsToText(model.tags),
+    tags: (model.tags ?? []).map((tag) => ({ text: tag.text, color: tag.color })),
     capabilityConfig: model.capabilityConfig ? JSON.stringify(model.capabilityConfig, null, 2) : '',
     enabled: model.enabled,
     tiers:
       model.priceTiers.length > 0
         ? model.priceTiers.map(tierToDraft)
         : [{ ...EMPTY_TIER, providerModelKey: model.providerModelKey }],
+  };
+}
+
+/**
+ * 档位仍指向旧上游模型 key 的档位。
+ *
+ * 模型级上游键改名后，档位级的 `providerModelKey` 不会自动跟随 ——
+ * 请求仍会发到旧的上游 SKU。用户表现为「改了上游却不生效」，且界面
+ * 没有任何提示。参考实现（open-ai-canvas `channel-model-price-tier-fields.tsx`）
+ * 会算出这批档位并给出「清除并跟随模型」的入口。
+ *
+ * 只有「档位上游键 == 旧模型上游键」这种**隐式跟随**才算过时；
+ * 管理员显式配的其它上游 SKU 不受影响。
+ */
+export function staleTierUpstream(
+  draft: ModelDraft,
+  previousProviderModelKey: string,
+): number[] {
+  const previous = previousProviderModelKey.trim();
+  if (!previous) return [];
+  const current = draft.providerModelKey.trim();
+  if (!current || current === previous) return [];
+  return draft.tiers
+    .map((tier, index) => (tier.providerModelKey.trim() === previous ? index : -1))
+    .filter((index) => index >= 0);
+}
+
+/** 把这批档位的上游键清空，改回「跟随模型默认」 */
+export function clearStaleTierUpstream(draft: ModelDraft, indexes: number[]): ModelDraft {
+  return {
+    ...draft,
+    tiers: draft.tiers.map((tier, index) =>
+      indexes.includes(index) ? { ...tier, providerModelKey: '' } : tier,
+    ),
   };
 }
 
@@ -232,6 +304,12 @@ export function formatSelector(selector: Record<string, string>): string {
     .join(', ');
 }
 
+/**
+ * 标签文本 ⇄ 结构化标签。
+ *
+ * 仅用于**读取历史数据**（旧库里存的是「文字:颜色」文本）；新写入一律走
+ * 结构化数组。保留转换函数以便导入旧配置时兼容。
+ */
 export function tagsToText(tags: Array<{ text: string; color: string }>): string {
   return (tags ?? []).map((tag) => `${tag.text}:${tag.color}`).join(', ');
 }
@@ -250,6 +328,35 @@ export function textToTags(text: string): Array<{ text: string; color: string }>
       return { text: String(rawText ?? '').trim(), color };
     })
     .filter((tag) => tag.text !== '');
+}
+
+/** 标签颜色（与参考实现 `lib/model-tags.ts` 的 6 色一致） */
+export const TAG_COLOR_LABELS: Record<string, string> = {
+  purple: '紫色',
+  blue: '蓝色',
+  green: '绿色',
+  gold: '金色',
+  orange: '橙色',
+  pink: '粉色',
+};
+
+/** 展示标签：最多 5 个，每个 1–12 字，文字不可重复（与后端校验同口径） */
+export const MAX_MODEL_TAGS = 5;
+export const MAX_TAG_TEXT_LENGTH = 12;
+
+/** 标签校验：返回错误文案，无错返回 null */
+export function validateModelTags(tags: Array<{ text: string; color: string }>): string | null {
+  const list = (tags ?? []).filter((tag) => tag.text.trim() !== '');
+  if (list.length > MAX_MODEL_TAGS) return `最多添加 ${MAX_MODEL_TAGS} 个标签`;
+  for (const tag of list) {
+    const length = [...tag.text.trim()].length;
+    if (length < 1 || length > MAX_TAG_TEXT_LENGTH) {
+      return `标签文字须为 1–${MAX_TAG_TEXT_LENGTH} 字`;
+    }
+  }
+  const texts = list.map((tag) => tag.text.trim());
+  if (new Set(texts).size !== texts.length) return '标签文字不能重复';
+  return null;
 }
 
 export function priceOf(text: string, label: string): number {

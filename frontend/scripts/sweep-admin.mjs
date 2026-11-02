@@ -15,7 +15,7 @@ const ROUTES = [
   'coupons', 'campaigns', 'marketing-rules', 'scheduler', 'channels', 'logical-models',
   'user-groups', 'plugins', 'billing-orders', 'finance', 'model-calls', 'capabilities',
   'tasks', 'tickets', 'credit-prices', 'products', 'membership-plans', 'orders', 'credits',
-  'retention', 'payment-channels', 'invoices', 'reconciliation', 'legal', 'notifications',
+  'retention', 'payments', 'invoices', 'legal', 'notifications',
   'aigc-label',
 ];
 

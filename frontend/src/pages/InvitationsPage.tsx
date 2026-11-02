@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { App, Button, Modal } from 'antd';
 import QRCode from 'qrcode';
 import {
@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { myMarketingApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
+import { notifyCreditsChanged } from '../context/CreditsContext';
 import { PersonalPage } from '../components/PersonalPage';
 import { StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
 import type { CheckinStatus, MyInvites } from '../types/api';
@@ -62,6 +64,7 @@ function formatBoundDay(iso: string): string {
  *   构成虚假宣传 —— 本页的所有数字都必须来自真实数据, 不允许占位值。
  */
 export function InvitationsPage() {
+  useDocumentMeta('邀请有奖 · 货觉AI', '邀请好友注册并首次付费，双方获得积分奖励。');
   const { message } = App.useApp();
   const { token, openLogin } = useAuth();
   const [data, setData] = useState<MyInvites | null>(null);
@@ -74,6 +77,9 @@ export function InvitationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [checkin, setCheckin] = useState<CheckinStatus | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  /** 已加载的邀请关系条数（加载更多时作为 offset） */
+  const loadedRelationsRef = useRef(0);
   // 邀请海报: 生成结果与弹窗开关。state 必须声明在早退分支之前 (Rules of Hooks)
   const [posterUrl, setPosterUrl] = useState<string | null>(null);
   const [posterOpen, setPosterOpen] = useState(false);
@@ -87,13 +93,18 @@ export function InvitationsPage() {
     if (!token) {
       setData(null);
       setCheckin(null);
+      loadedRelationsRef.current = 0;
       return;
     }
     setLoading(true);
     setError(null);
-    Promise.all([myMarketingApi.invites(), myMarketingApi.checkinStatus()])
+    Promise.all([
+      myMarketingApi.invites({ limit: 20, offset: 0 }),
+      myMarketingApi.checkinStatus(),
+    ])
       .then(([inv, ci]) => {
         setData(inv);
+        loadedRelationsRef.current = inv.relations.length;
         setCheckin(ci);
       })
       .catch((e: unknown) => {
@@ -107,6 +118,31 @@ export function InvitationsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  /** 加载更多邀请记录；metrics 用最新响应覆盖，relations 追加 */
+  const loadMore = useCallback(async () => {
+    if (!data || loadingMore) return;
+    setLoadingMore(true);
+    try {
+      const next = await myMarketingApi.invites({
+        limit: 20,
+        offset: loadedRelationsRef.current,
+      });
+      setData((prev) =>
+        prev
+          ? {
+              ...next,
+              relations: [...prev.relations, ...next.relations],
+            }
+          : next,
+      );
+      loadedRelationsRef.current += next.relations.length;
+    } catch (e) {
+      message.error((e as Error).message || '邀请记录加载失败');
+    } finally {
+      setLoadingMore(false);
+    }
+  }, [data, loadingMore, message]);
 
   /*
    * 邀请链接带码: `/invitations?inv=CODE`。
@@ -229,7 +265,11 @@ export function InvitationsPage() {
     try {
       const r = await myMarketingApi.checkin();
       if (r.alreadyCheckedIn) message.info('今天已经签过到了');
-      else message.success(`签到成功，获得 ${r.credits} 积分`);
+      else {
+        message.success(`签到成功，获得 ${r.credits} 积分`);
+        // 顶栏余额由 CreditsContext 持有：不发广播会一直显示签到前的数字
+        notifyCreditsChanged();
+      }
       load();
     } catch {
       message.error('签到失败，请稍后重试');
@@ -487,13 +527,18 @@ export function InvitationsPage() {
         </ol>
       </section>
 
-      {data.relations.length > 0 && (
+      {data.metrics.totalInvited > 0 && (
         <section className="invite-block">
           <div className="invite-block-head">
             <h2>
               <UserCheck size={16} aria-hidden /> 邀请记录
             </h2>
-            <span className="invite-block-sub">共 {data.relations.length} 人</span>
+            <span className="invite-block-sub">
+              共 {data.metrics.totalInvited} 人
+              {data.relations.length < data.metrics.totalInvited
+                ? `（已显示 ${data.relations.length} 条）`
+                : ''}
+            </span>
           </div>
           <ul className="invite-relations">
             {data.relations.map((r) => {
@@ -509,6 +554,13 @@ export function InvitationsPage() {
               );
             })}
           </ul>
+          {data.relations.length < data.metrics.totalInvited && (
+            <div className="invite-load-more">
+              <Button loading={loadingMore} onClick={() => void loadMore()}>
+                加载更多记录（已显示 {data.relations.length} / {data.metrics.totalInvited}）
+              </Button>
+            </div>
+          )}
         </section>
       )}
 

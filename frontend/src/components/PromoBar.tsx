@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Gift, X } from 'lucide-react';
 import { useCampaignCountdown } from '../hooks/useCampaignCountdown';
 import { myMarketingApi } from '../lib/api';
+import { safeInternalPath } from '../lib/safePath';
 import type { PopupCampaign } from '../types/api';
 
 const DISMISS_KEY = 'ecom-promo-dismissed-v1';
@@ -93,14 +94,9 @@ export function PromoBar() {
   if (hidden) return null;
 
   const goCampaign = () => {
-    const url = campaign?.ctaUrl;
-    // ctaUrl 后端已限定站内相对路径, 前端再兜一层: 拒绝 "//" 开头的协议相对地址,
-    // 否则配置一旦被绕过就会把用户引离本站
-    if (url && url.startsWith('/') && !url.startsWith('//')) {
-      navigate(url);
-      return;
-    }
-    navigate('/packages');
+    // ctaUrl 后端已限定站内相对路径, 前端再兜一层: 反斜杠 / 控制字符等
+    // 变体同样拒绝, 否则配置一旦被绕过就会把用户引离本站
+    navigate(safeInternalPath(campaign?.ctaUrl, '/packages'));
   };
 
   return (

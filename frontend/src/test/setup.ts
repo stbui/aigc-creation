@@ -51,8 +51,8 @@ if (!window.scrollTo) {
  * 指针捕获（pointer capture）补齐。
  *
  * jsdom 没有实现 `hasPointerCapture` / `setPointerCapture` /
- * `releasePointerCapture`。radix-ui 的 `Select` 在打开浮层时调用这三个方法
- * 来跟踪指针 —— 不补会在点击下拉时抛
+ * `releasePointerCapture`。浮层类 Select（打开浮层时调用这三个方法来跟踪
+ * 指针）依赖它们 —— 不补会在点击下拉时抛
  * "target.hasPointerCapture is not a function"，把用例变成「组件坏了」。
  *
  * 真实浏览器里这三个方法只用于「指针按在浮层外时仍继续收事件」，jsdom 里

@@ -5,6 +5,7 @@ import { membershipApi, productsApi } from '../lib/api';
 import { PLAN_VISUALS } from '../lib/constants';
 import { useAuth } from '../context/AuthContext';
 import { useCredits } from '../context/CreditsContext';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { StateError, StateSkeleton } from '../components/StateViews';
 import type { MembershipPlan, MyMembership, Product } from '../types/api';
 
@@ -71,6 +72,7 @@ function pickBestValueId(products: Product[]): string | null {
 }
 
 export function PackagesPage() {
+  useDocumentMeta('积分商城 · 货觉AI', '购买积分包与会员套餐，解锁全部 AI 创作能力。');
   const navigate = useNavigate();
   const { token, openLogin } = useAuth();
   const { balance } = useCredits();

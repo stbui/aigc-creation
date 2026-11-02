@@ -38,7 +38,14 @@ import {
   useResultGallery,
   type GalleryItem,
 } from './hooks';
-import { assetsApi, assetSrc, generateApi, resolveModelId, toAbsoluteUrl } from './api';
+import {
+  assetsApi,
+  assetSrc,
+  generateApi,
+  newIdempotencyKey,
+  resolveModelId,
+  toAbsoluteUrl,
+} from './api';
 import {
   degreeCaption,
   isSupportedImageFile,
@@ -82,6 +89,8 @@ export function ViralClonePage() {
   const { ensureProject } = useProject();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const referenceInputRef = useRef<HTMLInputElement>(null);
+  /** 同一次提交的网络重试复用幂等键，避免重复建单扣费 */
+  const pendingStartRef = useRef<{ fingerprint: string; key: string } | null>(null);
 
   // ── 表单状态 ──
   const [images, setImages] = useState<PkAsset[]>([]);
@@ -110,8 +119,15 @@ export function ViralClonePage() {
 
   // ── 任务状态 ──
   const [submitting, setSubmitting] = useState(false);
-  // 实时价来自能力清单（后台可调价），按钮文案不能再写死「免费生图」
-  const creditLabel = useCreditLabel('hot_remake');
+  // 实时价优先用所选模型报价，取不到才回落到能力基础价
+  const [modelQuoteCredits, setModelQuoteCredits] = useState<number | null>(null);
+  const baseCreditLabel = useCreditLabel('hot_remake');
+  const creditLabel =
+    modelQuoteCredits == null
+      ? baseCreditLabel
+      : modelQuoteCredits === 0
+        ? '免费'
+        : `本次约 ${modelQuoteCredits} 积分（按所选模型）`;
   /** 最近这一次提交的结果 (只用于提示行; 历史产出由 gallery 维护) */
   const [result, setResult] = useState<PkResult | null>(null);
   const pollSignal = usePollAbort();
@@ -379,7 +395,7 @@ export function ViralClonePage() {
     try {
       const projectId = await ensureProject();
       const logicalModelId = await resolveModelId('hot_remake');
-      const { taskId } = await generateApi.start({
+      const payload = {
         projectId,
         capability: 'hot_remake',
         logicalModelId,
@@ -395,7 +411,15 @@ export function ViralClonePage() {
           ratio,
           size: resolution,
         },
-      });
+      };
+      const fingerprint = JSON.stringify(payload);
+      const idempotencyKey =
+        pendingStartRef.current?.fingerprint === fingerprint
+          ? pendingStartRef.current.key
+          : newIdempotencyKey();
+      pendingStartRef.current = { fingerprint, key: idempotencyKey };
+      const { taskId } = await generateApi.start({ ...payload, idempotencyKey });
+      pendingStartRef.current = null;
       const done = await pollTask(taskId);
       setResult(done);
       /*
@@ -406,6 +430,8 @@ export function ViralClonePage() {
         const fresh: GalleryItem = {
           id: taskId,
           url: done.url,
+          assetId: done.assetId,
+          format: done.format,
           width: done.width ?? null,
           height: done.height ?? null,
           createdAt: new Date().toISOString(),
@@ -656,7 +682,13 @@ export function ViralClonePage() {
                   setResolution(v);
                 }}
                 capabilityId="hot_remake"
-                modelPicker={<ModelPicker capability="hot_remake" options={{ ratio, resolution }} />}
+                modelPicker={
+                  <ModelPicker
+                    capability="hot_remake"
+                    options={{ ratio, resolution }}
+                    onQuoteChange={setModelQuoteCredits}
+                  />
+                }
               />
             }
             onSubmit={() => void submit()}

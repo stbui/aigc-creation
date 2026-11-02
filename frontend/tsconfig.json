@@ -7,7 +7,6 @@
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "paths": {
-      "@/*": ["./src/vendor/boardui/*"],
       "~/*": ["./src/*"]
     },
     "allowImportingTsExtensions": true,

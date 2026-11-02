@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { App, Input, Modal, Select } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { Maximize2, Minus, Plus, Sparkles } from 'lucide-react';
@@ -25,7 +25,7 @@ import {
 import {
   notifyCreditsChanged,
   useAuth,
-  useCreditLabel,
+  useCreditCost,
   useGenerateError,
   useImageUpload,
   usePollAbort,
@@ -33,7 +33,7 @@ import {
   useResultGallery,
   type GalleryItem,
 } from './hooks';
-import { generateApi, promptToolsApi, resolveModelId } from './api';
+import { generateApi, newIdempotencyKey, promptToolsApi, resolveModelId } from './api';
 import {
   languageOptions,
   platformOptions,
@@ -109,8 +109,16 @@ export function ProductKitPage() {
 
   // ── 任务状态 ──
   const [submitting, setSubmitting] = useState(false);
-  // 实时价来自能力清单（后台可调价），按钮文案不能再写死「免费生图」
-  const creditLabel = useCreditLabel('main_image');
+  /** 所选模型的实时单张报价（积分）；null = 未取到，回落到能力基础价 */
+  const [modelQuoteCredits, setModelQuoteCredits] = useState<number | null>(null);
+  /**
+   * 最近一次“尚未拿到全部 taskId”的提交。
+   *
+   * 顺序建单时如果第 k 个请求网络失败，前 k-1 个任务已在服务端创建；
+   * 用户重试必须复用同一批幂等键，让后端返回既有任务而不是再扣一次钱。
+   * 拿到全部 taskId 后清空，之后的主动“再生成一次”才是新任务。
+   */
+  const pendingBatchRef = useRef<{ fingerprint: string; keys: string[] } | null>(null);
   /*
    * 不再读取 capability runtime 在此页展示「该能力需要真实模型才能生成，当前暂不可用」。
    * 该提示是运营/配置侧的内部原因，C 端工作台不展示；真正的可用性仍由后端把关
@@ -134,6 +142,20 @@ export function ProductKitPage() {
     () => VARIANT_FIELDS.reduce((sum, v) => sum + (counts[v.key] ?? 0), 0),
     [counts],
   );
+  /*
+   * 价签必须按“本次要出几张”计算。此前只显示单张单价，用户选 3 个变体时
+   * 按钮仍写“本次消耗 10 积分”，实际扣 30 —— 属于计费披露错误。
+   */
+  const unitCreditCost = useCreditCost('main_image');
+  const creditLabel = useMemo(() => {
+    const unit = modelQuoteCredits ?? unitCreditCost;
+    if (unit == null) return null;
+    if (unit === 0) return '免费';
+    const total = unit * Math.max(totalCount, 1);
+    return modelQuoteCredits == null
+      ? `本次消耗 ${total} 积分`
+      : `本次约 ${total} 积分（按所选模型）`;
+  }, [unitCreditCost, modelQuoteCredits, totalCount]);
   const formValid = images.length > 0 && productName.trim().length > 0 && description.trim().length > 0 && totalCount > 0;
 
   /** 切换平台：用户没手动改过比例/画质时，带出该平台的主图规格 */
@@ -202,6 +224,32 @@ export function ProductKitPage() {
     // guest 点击仍应走登录弹窗（generateApi 的 401 → auth:required 契约）
     setSubmitting(true);
     setResults([]);
+    /** 已成功创建的任务。即使后续某个请求失败，这些任务也已经扣过费，必须展示。 */
+    const taskIds: Array<{ taskId: string; variant: string }> = [];
+
+    const applyResults = (done: PkResult[]) => {
+      setResults(done);
+      /*
+       * 成功的图**直接插到网格首位**, 不回头重拉列表 (与创意生图页同款):
+       * 重拉会多一次往返, 占位撤下与新图到位之间出现回弹闪烁。
+       * 成功的按任务参数补上变体标签 → 网格里能一眼区分白底图/场景图/卖点图。
+       */
+      const fresh: GalleryItem[] = done
+        .filter((r) => r.status === 'succeeded' && r.url)
+        .map((r) => ({
+          id: r.taskId,
+          url: r.url as string,
+          assetId: r.assetId,
+          format: r.format,
+          width: r.width ?? null,
+          height: r.height ?? null,
+          createdAt: new Date().toISOString(),
+          caption: VARIANT_LABELS[r.variant] ?? r.variant,
+        }));
+      gallery.prepend(fresh);
+      return done.filter((r) => r.status !== 'succeeded').length;
+    };
+
     try {
       const projectId = await ensureProject();
       // 一批变体必须落在同一个模型上，解析一次即可；循环里再解析会让
@@ -225,43 +273,61 @@ export function ProductKitPage() {
         ratio,
         size: resolution,
       };
+      const inputAssetIds = images.map((x) => x.id);
+
+      /*
+       * 幂等键按“本次输入指纹”复用：某次建单请求在网络层失败后，用户重试
+       * 会拿到同一个 key，服务端返回已创建的任务而不是再扣一次钱。
+       * 全部 taskId 都拿到后清空，之后的主动再生成才是新任务。
+       */
+      const fingerprint = JSON.stringify({
+        capability: 'main_image',
+        projectId,
+        logicalModelId,
+        inputAssetIds,
+        baseParams,
+        plan,
+      });
+      const keys =
+        pendingBatchRef.current?.fingerprint === fingerprint
+          ? pendingBatchRef.current.keys
+          : plan.map(() => newIdempotencyKey());
+      pendingBatchRef.current = { fingerprint, keys };
 
       // 顺序创建任务: 并行创建曾触发 broker IPC EPIPE, 顺序提交更稳
-      const taskIds: Array<{ taskId: string; variant: string }> = [];
-      for (const variant of plan) {
+      for (let i = 0; i < plan.length; i += 1) {
+        const variant = plan[i];
         const { taskId } = await generateApi.start({
           projectId,
           capability: 'main_image',
           logicalModelId,
-          inputAssetIds: images.map((x) => x.id),
+          inputAssetIds,
+          idempotencyKey: keys[i],
           params: { ...baseParams, variant },
         });
         taskIds.push({ taskId, variant });
       }
+      // 全部 taskId 已到手: 后续轮询/网络失败都不需要重放建单请求
+      pendingBatchRef.current = null;
 
       const done = await Promise.all(taskIds.map((t) => pollTask(t.taskId, t.variant)));
-      setResults(done);
-      /*
-       * 成功的图**直接插到网格首位**, 不回头重拉列表 (与创意生图页同款):
-       * 重拉会多一次往返, 占位撤下与新图到位之间出现回弹闪烁。
-       * 成功的按任务参数补上变体标签 → 网格里能一眼区分白底图/场景图/卖点图。
-       */
-      const fresh: GalleryItem[] = done
-        .filter((r) => r.status === 'succeeded' && r.url)
-        .map((r) => ({
-          id: r.taskId,
-          url: r.url as string,
-          width: r.width ?? null,
-          height: r.height ?? null,
-          createdAt: new Date().toISOString(),
-          caption: VARIANT_LABELS[r.variant] ?? r.variant,
-        }));
-      gallery.prepend(fresh);
-      const failed = done.filter((r) => r.status !== 'succeeded').length;
+      const failed = applyResults(done);
       if (failed > 0) message.error(`${failed} 张生成失败，请重试`);
       else message.success(`已生成 ${done.length} 张商品主图`);
     } catch (e) {
       reportError(e);
+      /*
+       * 中途建单失败：已创建的任务不回滚（服务端已扣费），这里继续把它们
+       * 轮询完并展示出来，避免用户看到“整批失败”却还有幽灵任务占着积分。
+       * 幂等键保留在 pendingBatchRef，用户点重试会复用既有任务。
+       */
+      if (taskIds.length > 0) {
+        const done = await Promise.all(taskIds.map((t) => pollTask(t.taskId, t.variant)));
+        const failed = applyResults(done);
+        message.warning(
+          `已创建 ${taskIds.length} 个任务，其中 ${failed} 个未成功；可重试补齐。`,
+        );
+      }
     } finally {
       setSubmitting(false);
       setPending([]);
@@ -486,7 +552,13 @@ export function ProductKitPage() {
                   setResolution(v);
                 }}
                 capabilityId="main_image"
-                modelPicker={<ModelPicker capability="main_image" options={{ ratio, resolution }} />}
+                modelPicker={
+                  <ModelPicker
+                    capability="main_image"
+                    options={{ ratio, resolution }}
+                    onQuoteChange={setModelQuoteCredits}
+                  />
+                }
               />
             }
             onSubmit={() => void submit()}

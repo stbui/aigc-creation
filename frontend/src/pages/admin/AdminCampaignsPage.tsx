@@ -1,26 +1,34 @@
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Download, Plus } from 'lucide-react';
-import { Button, Chip } from '../../admin-ui/shadcn/kit';
 import { marketingApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
-import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
-import { Drawer } from '../../admin-ui/primitives/Drawer';
-import { Notice } from '../../admin-ui/primitives';
-import { SelectBox, SwitchBox, TextArea, TextInput } from '../../admin-ui/controls';
-import { AdminStaleError, useAdminList, useAdminUrlFilterSync } from '../../components/admin/AdminWidgets';
 import {
+  ActionButton,
+  AdminDataTable,
   AppliedFilters,
+  ClearableField,
+  Drawer,
   FilterActions,
   FilterBar,
+  FormField,
+  Notice,
   PageHeader,
   Panel,
+  SelectField,
   StatusTag,
+  StaleError,
+  SwitchField,
+  TextAreaField,
+  TextField,
+  ToneBadge,
+  useAdminList,
+  useAdminUrlFilterSync,
+  type AdminColumn,
   type AppliedFilter,
-  type TagTone,
-} from '../../components/admin/PageHeader';
+} from '../../admin-ui/primitives';
 import type {
   AdminCampaign,
   CampaignStatus,
@@ -42,6 +50,9 @@ const STATUS_LABEL: Record<CampaignStatus, { label: string; tone: string }> = {
   ended: { label: '已结束', tone: 'warn' },
   off: { label: '已下线', tone: 'muted' },
 };
+
+/** 状态标签色调，与 `StatusTag` 的 `tone` 同形 */
+type TagTone = 'success' | 'danger' | 'warn' | 'brand' | 'muted';
 
 /**
  * 派生生效态优先于人工 status 展示。
@@ -79,17 +90,6 @@ function payloadSummary(c: AdminCampaign): string {
 function inWindow(c: AdminCampaign): boolean {
   const now = Date.now();
   return now >= new Date(c.startAt).getTime() && now <= new Date(c.endAt).getTime();
-}
-
-/** 表单字段：标签 + 控件 + 一句说明 */
-function Field({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium text-text-secondary">{label}</span>
-      {children}
-      {hint && <p className="text-[11px] leading-4 text-text-tertiary">{hint}</p>}
-    </div>
-  );
 }
 
 interface FormState {
@@ -357,7 +357,7 @@ export function AdminCampaignsPage() {
       key: 'payload',
       title: '内容',
       width: 150,
-      render: (row) => <span className="text-[11px] text-text-tertiary">{payloadSummary(row)}</span>,
+      render: (row) => <span className="text-[11px] text-muted-foreground">{payloadSummary(row)}</span>,
     },
     {
       key: 'audience',
@@ -367,7 +367,7 @@ export function AdminCampaignsPage() {
         row.audience?.onlyNewUsers ? (
           <span className="text-xs">仅新用户</span>
         ) : (
-          <span className="text-[11px] text-text-tertiary">全站</span>
+          <span className="text-[11px] text-muted-foreground">全站</span>
         ),
     },
     {
@@ -378,16 +378,12 @@ export function AdminCampaignsPage() {
         const live = inWindow(row);
         return (
           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-            <span className="text-[11px] tabular-nums text-text-tertiary">
+            <span className="text-[11px] tabular-nums text-muted-foreground">
               {new Date(row.startAt).toLocaleDateString('zh-CN')} ~{' '}
               {new Date(row.endAt).toLocaleDateString('zh-CN')}
             </span>
             {/* active 但不在窗内: 配置生效了却不会展示, 必须让人看见 */}
-            {row.status === 'active' && !live && (
-              <Chip variant="caption" color="yellow">
-                未在窗内
-              </Chip>
-            )}
+            {row.status === 'active' && !live && <ToneBadge tone="warn">未在窗内</ToneBadge>}
           </div>
         );
       },
@@ -409,12 +405,12 @@ export function AdminCampaignsPage() {
       render: (row) =>
         writable ? (
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="small" onClick={() => openEdit(row)}>
+            <ActionButton variant="ghost" size="sm" onClick={() => openEdit(row)}>
               编辑
-            </Button>
-            <Button variant="ghost" size="small" disabled={busy} onClick={() => void doToggle(row)}>
+            </ActionButton>
+            <ActionButton variant="ghost" size="sm" disabled={busy} onClick={() => void doToggle(row)}>
               切换
-            </Button>
+            </ActionButton>
           </div>
         ) : null,
     },
@@ -426,43 +422,42 @@ export function AdminCampaignsPage() {
         title="限时活动"
         description="限时价 / 限时免费 / 弹窗位。状态为「进行中」但不在时间窗内，活动不会展示。"
         actions={
-          <div className="flex items-center gap-2">
+          <>
             {can('data.export') && (
-              <Button
+              <ActionButton
                 variant="secondary"
-                size="small"
-                leadingIcon={Download}
+                size="sm"
+                icon={Download}
                 disabled={exporting}
                 onClick={() => void exportCsv()}
               >
                 {exporting ? '导出中…' : '导出 CSV'}
-              </Button>
+              </ActionButton>
             )}
             {writable ? (
-              <Button variant="primary" size="small" leadingIcon={Plus} onClick={openCreate}>
+              <ActionButton variant="default" size="sm" icon={Plus} onClick={openCreate}>
                 新建活动
-              </Button>
+              </ActionButton>
             ) : (
-              <span className="text-[11px] text-text-tertiary">当前账号无 marketing.write 权限，仅可查看</span>
+              <span className="text-[11px] text-muted-foreground">当前账号无 marketing.write 权限，仅可查看</span>
             )}
-          </div>
+          </>
         }
       />
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
-      {error && data && <AdminStaleError error={error} onRetry={reload} />}
+      {error && data && <StaleError error={error} onRetry={reload} />}
 
       <FilterBar>
-        <TextInput
+        <ClearableField
           className="w-56"
           ariaLabel="按活动名称搜索"
           placeholder="活动名称"
           value={keyword}
           onChange={setKeyword}
           onEnter={applyFilters}
-          allowClear
         />
-        <SelectBox
+        <SelectField
           className="w-32"
           ariaLabel="按状态筛选"
           placeholder="状态"
@@ -472,12 +467,12 @@ export function AdminCampaignsPage() {
           options={Object.entries(STATUS_LABEL).map(([value, item]) => ({ value, label: item.label }))}
         />
         <FilterActions>
-          <Button variant="primary" size="small" onClick={applyFilters}>
+          <ActionButton variant="default" onClick={applyFilters}>
             查询
-          </Button>
-          <Button variant="secondary" size="small" onClick={resetFilters}>
+          </ActionButton>
+          <ActionButton variant="secondary" onClick={resetFilters}>
             重置
-          </Button>
+          </ActionButton>
         </FilterActions>
         <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
       </FilterBar>
@@ -505,13 +500,13 @@ export function AdminCampaignsPage() {
           }
           emptyAction={
             hasFilter ? (
-              <Button variant="secondary" size="small" onClick={resetFilters}>
+              <ActionButton variant="secondary" size="sm" onClick={resetFilters}>
                 清除筛选
-              </Button>
+              </ActionButton>
             ) : writable ? (
-              <Button variant="primary" size="small" leadingIcon={Plus} onClick={openCreate}>
+              <ActionButton variant="default" size="sm" icon={Plus} onClick={openCreate}>
                 创建第一个活动
-              </Button>
+              </ActionButton>
             ) : undefined
           }
         />
@@ -527,12 +522,12 @@ export function AdminCampaignsPage() {
         description={formDirty ? '有未保存修改' : undefined}
         footer={
           <>
-            <Button variant="secondary" size="small" onClick={requestCloseForm} disabled={busy}>
+            <ActionButton variant="secondary" size="sm" onClick={requestCloseForm} disabled={busy}>
               取消
-            </Button>
-            <Button variant="primary" size="small" disabled={busy} onClick={() => void save()}>
+            </ActionButton>
+            <ActionButton variant="default" size="sm" disabled={busy} onClick={() => void save()}>
               {busy ? '保存中…' : '保存'}
-            </Button>
+            </ActionButton>
           </>
         }
       >
@@ -543,71 +538,71 @@ export function AdminCampaignsPage() {
             </Notice>
           )}
 
-          <Field label="活动名称">
-            <TextInput
+          <FormField label="活动名称">
+            <TextField
               ariaLabel="活动名称"
               value={form.name}
               placeholder="如: 双十一大促"
               maxLength={60}
               onChange={(value) => setForm({ ...form, name: value })}
             />
-          </Field>
+          </FormField>
 
-          <Field label="类型" hint="类型决定 payload 字段，切换类型后原有的内容不会保留">
-            <SelectBox
+          <FormField label="类型" hint="类型决定 payload 字段，切换类型后原有的内容不会保留">
+            <SelectField
               ariaLabel="活动类型"
               value={form.type}
               onChange={(value) => setForm({ ...form, type: value as CampaignType })}
               options={Object.entries(TYPE_LABEL).map(([value, label]) => ({ value, label }))}
             />
-          </Field>
+          </FormField>
 
           {/* payload 字段随类型切换, 避免看到不相关的输入框 */}
           {form.type === 'limited_price' && (
             <>
-              <Field label="目标商品 ID">
-                <TextInput
+              <FormField label="目标商品 ID">
+                <TextField
                   ariaLabel="目标商品 ID"
                   value={form.productId}
                   placeholder="商品 ID"
                   onChange={(value) => setForm({ ...form, productId: value })}
                 />
-              </Field>
-              <Field label="活动价 (元)" hint="表单内填元，入库换算成分">
-                <TextInput
+              </FormField>
+              <FormField label="活动价 (元)" hint="表单内填元，入库换算成分">
+                <TextField
                   ariaLabel="活动价"
                   inputMode="decimal"
                   value={form.priceCents}
                   placeholder="9.90"
                   onChange={(value) => setForm({ ...form, priceCents: value })}
                 />
-              </Field>
+              </FormField>
             </>
           )}
 
           {form.type === 'limited_free' && (
-            <Field label="能力 ID (逗号分隔)" hint="这些能力在活动期内免费使用">
-              <TextInput
+            <FormField label="能力 ID (逗号分隔)" hint="这些能力在活动期内免费使用">
+              <TextField
                 ariaLabel="能力 ID"
                 value={form.capabilityIds}
                 placeholder="main_image, detail_image"
                 onChange={(value) => setForm({ ...form, capabilityIds: value })}
               />
-            </Field>
+            </FormField>
           )}
 
           {form.type === 'popup' && (
             <>
-              <Field label="弹窗标题">
-                <TextInput
+              <FormField label="弹窗标题">
+                <TextField
                   ariaLabel="弹窗标题"
                   value={form.title}
                   maxLength={60}
                   onChange={(value) => setForm({ ...form, title: value })}
                 />
-              </Field>
-              <Field label="正文">
-                <TextArea
+              </FormField>
+              <FormField label="正文">
+                <TextAreaField
                   ariaLabel="弹窗正文"
                   rows={3}
                   value={form.body}
@@ -615,50 +610,50 @@ export function AdminCampaignsPage() {
                   showCount
                   onChange={(value) => setForm({ ...form, body: value })}
                 />
-              </Field>
+              </FormField>
               <div className="grid grid-cols-2 gap-4">
-                <Field label="按钮文案">
-                  <TextInput
+                <FormField label="按钮文案">
+                  <TextField
                     ariaLabel="按钮文案"
                     value={form.ctaText}
                     maxLength={12}
                     onChange={(value) => setForm({ ...form, ctaText: value })}
                   />
-                </Field>
-                <Field label="跳转地址" hint="仅支持站内相对路径">
-                  <TextInput
+                </FormField>
+                <FormField label="跳转地址" hint="仅支持站内相对路径">
+                  <TextField
                     ariaLabel="跳转地址"
                     value={form.ctaUrl}
                     placeholder="/workbench"
                     onChange={(value) => setForm({ ...form, ctaUrl: value })}
                   />
-                </Field>
+                </FormField>
               </div>
             </>
           )}
 
           <div className="grid grid-cols-2 gap-4">
-            <Field label="开始时间">
-              <TextInput
+            <FormField label="开始时间">
+              <TextField
                 ariaLabel="开始时间"
                 type="datetime-local"
                 value={form.startAt}
                 onChange={(value) => setForm({ ...form, startAt: value })}
               />
-            </Field>
-            <Field label="结束时间">
-              <TextInput
+            </FormField>
+            <FormField label="结束时间">
+              <TextField
                 ariaLabel="结束时间"
                 type="datetime-local"
                 value={form.endAt}
                 onChange={(value) => setForm({ ...form, endAt: value })}
               />
-            </Field>
+            </FormField>
           </div>
 
           <div className="grid grid-cols-2 items-start gap-4">
-            <Field label="状态">
-              <SelectBox
+            <FormField label="状态">
+              <SelectField
                 ariaLabel="状态"
                 value={form.status}
                 onChange={(value) => setForm({ ...form, status: value as CampaignStatus })}
@@ -667,9 +662,9 @@ export function AdminCampaignsPage() {
                   label: item.label,
                 }))}
               />
-            </Field>
+            </FormField>
             <div className="pt-6">
-              <SwitchBox
+              <SwitchField
                 checked={form.onlyNewUsers}
                 onChange={(checked) => setForm({ ...form, onlyNewUsers: checked })}
                 label={form.onlyNewUsers ? '仅投放新用户' : '投放全站用户'}
@@ -678,7 +673,7 @@ export function AdminCampaignsPage() {
           </div>
 
           {editing && (
-            <p className="text-[11px] leading-4 text-text-tertiary">
+            <p className="text-[11px] leading-4 text-muted-foreground">
               当前派生状态：{EFFECTIVE_META[editing.effective]?.label ?? editing.statusLabel}
               {editing.status === 'active' && !inWindow(editing) && '（不在时间窗内，实际不会曝光）'}
             </p>

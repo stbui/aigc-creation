@@ -80,6 +80,8 @@ export function MobileUploadModal({ open, onReceived, onCancel }: MobileUploadMo
       timerRef.current = window.setTimeout(async () => {
         try {
           const st = await mobileUploadApi.status(id);
+          // 弹窗已关闭：丢弃这次在途结果，也不要把定时器重新挂上
+          if (!openedRef.current) return;
           if (st.status === 'received' && (st.assets?.length ?? 0) > 0) {
             if (!deliveredRef.current) {
               deliveredRef.current = true;
@@ -95,6 +97,7 @@ export function MobileUploadModal({ open, onReceived, onCancel }: MobileUploadMo
           }
           poll(id);
         } catch {
+          if (!openedRef.current) return;
           // 轮询失败不弹窗刷屏 (每 1.2s 一次) —— 下一轮继续试
           poll(id);
         }
@@ -111,6 +114,11 @@ export function MobileUploadModal({ open, onReceived, onCancel }: MobileUploadMo
     try {
       const projectId = await ensureProject();
       const s = await mobileUploadApi.create(projectId);
+      // 用户在请求途中关闭了弹窗：作废会话，不再写状态
+      if (!openedRef.current) {
+        void mobileUploadApi.cancel(s.sessionId).catch(() => undefined);
+        return;
+      }
       setSessionId(s.sessionId);
       setExpiresAt(s.expiresAt);
 
@@ -122,12 +130,16 @@ export function MobileUploadModal({ open, onReceived, onCancel }: MobileUploadMo
         errorCorrectionLevel: 'M',
         color: { dark: '#171A2B', light: '#FFFFFF' },
       });
+      if (!openedRef.current) {
+        void mobileUploadApi.cancel(s.sessionId).catch(() => undefined);
+        return;
+      }
       setQrDataUrl(dataUrl);
       poll(s.sessionId);
     } catch (e) {
-      message.error((e as Error).message || '二维码生成失败');
+      if (openedRef.current) message.error((e as Error).message || '二维码生成失败');
     } finally {
-      setLoading(false);
+      if (openedRef.current) setLoading(false);
     }
   }, [ensureProject, message, poll]);
 

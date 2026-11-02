@@ -2,11 +2,11 @@ import { chromium } from '@playwright/test';
 import { existsSync } from 'node:fs';
 
 /**
- * 后台浮层与交互态截图（2026-11-01，shadcn 迁移期）。
+ * 后台浮层与交互态截图。
  *
  * 截图覆盖：告警铃弹层、侧栏用户菜单、渠道删除确认条、新建渠道抽屉。
  * 这些态在静态截图里看不到，而它们正是「换皮只换了一半」最容易露馅的地方
- * —— 弹层仍带 `.bui-scope` 就会是旧圆角配新描边。
+ * —— 浮层若还带旧的圆角或描边口径，就会与页面主体对不上。
  */
 
 const LOCAL_CHROMIUM_PATH =

@@ -1,32 +1,33 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Download } from 'lucide-react';
-import { Button } from '../../admin-ui/shadcn/kit';
-import { adminOrdersApi } from '../../lib/api';
-import { useAdmin } from '../../context/AdminContext';
-import { useToast } from '../../admin-ui/providers/ToastProvider';
-import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
-import { Descriptions } from '../../admin-ui/primitives';
-import { SelectBox, TextInput } from '../../admin-ui/controls';
-import { cx } from '../../admin-ui/lib/cn';
 import {
+  ActionButton,
+  AdminDataTable,
   AdminDrawer,
-  AdminStaleError,
-  ConfirmAction,
-  useAdminDetailParam,
-  useAdminList,
-  useAdminUrlFilterSync,
-} from '../../components/admin/AdminWidgets';
-import {
   AppliedFilters,
+  BatchResultModal,
+  ClearableField,
+  ConfirmAction,
+  Descriptions,
   FilterActions,
   FilterBar,
   PageHeader,
   Panel,
+  SelectField,
+  StaleError,
   StatusTag,
+  TextField,
+  useAdminDetailParam,
+  useAdminList,
+  useAdminUrlFilterSync,
+  type AdminColumn,
   type AppliedFilter,
-} from '../../components/admin/PageHeader';
-import { BatchResultModal } from '../../components/admin/BatchResultModal';
+} from '../../admin-ui/primitives';
+import { adminOrdersApi } from '../../lib/api';
+import { useAdmin } from '../../context/AdminContext';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
+import { cn } from '../../admin-ui/lib/cn';
 import {
   adminCreditHref,
   adminOrderDetailHref,
@@ -115,9 +116,9 @@ const CHANNEL_LABELS: Record<string, string> = {
 /** 详情抽屉里的小节标题：标题 + 一句口径说明 */
 function SectionTitle({ title, note }: { title: string; note?: string }) {
   return (
-    <div className="mb-2 flex items-baseline gap-2 border-b border-border-table pb-1.5">
-      <strong className="text-xs font-semibold text-text-primary">{title}</strong>
-      {note && <span className="text-[11px] text-text-tertiary">{note}</span>}
+    <div className="mb-2 flex items-baseline gap-2 border-b border-border pb-1.5">
+      <strong className="text-xs font-semibold text-foreground">{title}</strong>
+      {note && <span className="text-[11px] text-muted-foreground">{note}</span>}
     </div>
   );
 }
@@ -136,15 +137,15 @@ function RecordRow({
   return (
     <li className="flex items-start gap-2.5 px-3 py-2">
       <span
-        className={cx(
+        className={cn(
           'mt-1.5 size-1.5 shrink-0 rounded-full',
-          state === 'done' ? 'bg-accent-500' : 'bg-neutral-300',
+          state === 'done' ? 'bg-success-text' : 'bg-muted-foreground/40',
         )}
         aria-hidden
       />
       <span className="min-w-0 flex-1">
-        <span className="block text-xs text-text-primary">{head}</span>
-        <span className="mt-0.5 block text-[11px] leading-4 text-text-tertiary">{meta}</span>
+        <span className="block text-xs text-foreground">{head}</span>
+        <span className="mt-0.5 block text-[11px] leading-4 text-muted-foreground">{meta}</span>
       </span>
     </li>
   );
@@ -499,12 +500,12 @@ export function AdminOrdersPage() {
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           <Link
-            className="truncate rounded font-mono text-xs font-medium text-accent-700 hover:underline"
+            className="truncate rounded font-mono text-xs font-medium text-brand hover:underline"
             to={adminOrderDetailHref(row.id)}
           >
             {row.orderNo}
           </Link>
-          <span className="text-[11px] text-text-tertiary">
+          <span className="text-[11px] text-muted-foreground">
             {new Date(row.createdAt).toLocaleString('zh-CN')}
           </span>
         </div>
@@ -516,7 +517,7 @@ export function AdminOrdersPage() {
       width: 170,
       render: (row) => (
         <Link
-          className="block max-w-[160px] truncate text-xs text-accent-700 hover:underline"
+          className="block max-w-[160px] truncate text-xs text-brand hover:underline"
           to={adminUserDetailHref(row.userId)}
         >
           {row.userEmail}
@@ -530,7 +531,7 @@ export function AdminOrdersPage() {
       render: (row) => (
         <div className="flex flex-col items-start gap-0.5">
           <StatusTag status={row.status} label={STATUS_LABEL_OVERRIDE[row.status]} />
-          <span className="max-w-[110px] truncate text-[11px] text-text-tertiary">
+          <span className="max-w-[110px] truncate text-[11px] text-muted-foreground">
             {row.channel ? CHANNEL_LABELS[row.channel] ?? row.channel : '—'}
           </span>
         </div>
@@ -553,8 +554,8 @@ export function AdminOrdersPage() {
             <span
               className={
                 row.refundedCents > 0
-                  ? 'max-w-[140px] truncate text-[11px] text-rose-600'
-                  : 'max-w-[140px] truncate text-[11px] text-text-tertiary'
+                  ? 'max-w-[140px] truncate text-[11px] text-danger-text'
+                  : 'max-w-[140px] truncate text-[11px] text-muted-foreground'
               }
               title={extra || undefined}
             >
@@ -576,14 +577,14 @@ export function AdminOrdersPage() {
               {row.membershipPlanName}
             </span>
             <span
-              className="max-w-[170px] truncate text-[11px] text-text-tertiary"
+              className="max-w-[170px] truncate text-[11px] text-muted-foreground"
               title={`${row.membershipPlanCode} · ${credits}`}
             >
               {row.membershipPlanCode} · {credits}
             </span>
           </div>
         ) : (
-          <div className="flex flex-col gap-0.5 text-[11px] text-text-tertiary">
+          <div className="flex flex-col gap-0.5 text-[11px] text-muted-foreground">
             <span>{row.itemCount} 件商品</span>
             <span>{credits}</span>
           </div>
@@ -598,7 +599,7 @@ export function AdminOrdersPage() {
         row.paidAt ? (
           <span className="text-xs tabular-nums">{new Date(row.paidAt).toLocaleString('zh-CN')}</span>
         ) : (
-          <span className="text-[11px] text-text-tertiary">未支付</span>
+          <span className="text-[11px] text-muted-foreground">未支付</span>
         ),
     },
     {
@@ -609,28 +610,28 @@ export function AdminOrdersPage() {
       fixed: 'right',
       render: (row) => (
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="small" onClick={() => setDetailId(row.id)}>
+          <ActionButton variant="ghost" size="sm" onClick={() => setDetailId(row.id)}>
             详情
-          </Button>
+          </ActionButton>
           {/*
            * 动作按状态出现而非置灰: 「未支付才能核销」「已支付才能退款」都是
            * 后端硬校验, 给一个点不动的按钮只会让人反复试。
            */}
           {row.status === 'pending' && can('order.mark_paid') && (
-            <Button variant="ghost" size="small" onClick={() => openAction('markPaid', row)}>
+            <ActionButton variant="ghost" size="sm" onClick={() => openAction('markPaid', row)}>
               核销
-            </Button>
+            </ActionButton>
           )}
           {(row.status === 'paid' || row.status === 'partial_refunded') &&
             row.paidCents > row.refundedCents &&
             can('order.refund') && (
-              <Button
-                variant="dangerGhost"
-                size="small"
+              <ActionButton
+                variant="destructive"
+                size="sm"
                 onClick={() => openAction('refund', row)}
               >
                 退款
-              </Button>
+              </ActionButton>
             )}
         </div>
       ),
@@ -649,21 +650,21 @@ export function AdminOrdersPage() {
         description="订单、支付与退款。核销与退款会写入操作审计，并即时回收或发放积分。"
         actions={
           can('data.export') ? (
-            <Button
+            <ActionButton
               variant="secondary"
-              size="small"
-              leadingIcon={Download}
+              size="sm"
+              icon={Download}
               disabled={exporting}
               onClick={() => void exportCsv()}
             >
               {exporting ? '导出中…' : '导出 CSV'}
-            </Button>
+            </ActionButton>
           ) : undefined
         }
       />
 
       <FilterBar>
-        <SelectBox
+        <SelectField
           className="w-28"
           ariaLabel="按状态筛选"
           placeholder="状态"
@@ -672,29 +673,27 @@ export function AdminOrdersPage() {
           onChange={setStatus}
           options={STATUS_OPTIONS}
         />
-        <TextInput
+        <ClearableField
           className="w-36"
           ariaLabel="按订单号搜索"
           placeholder="订单号"
           value={orderNo}
           onChange={setOrderNo}
           onEnter={applyQuery}
-          allowClear
         />
         {/*
          * 邮箱而非用户 ID: 客服拿到的是用户自报的邮箱。用 ID 意味着先查用户
          * 再查订单, 多一步且该用户未必记得自己的 id。
          */}
-        <TextInput
+        <ClearableField
           className="w-40"
           ariaLabel="按用户邮箱搜索"
           placeholder="用户邮箱"
           value={email}
           onChange={setEmail}
           onEnter={applyQuery}
-          allowClear
         />
-        <SelectBox
+        <SelectField
           className="w-28"
           ariaLabel="按渠道筛选"
           placeholder="渠道"
@@ -707,7 +706,7 @@ export function AdminOrdersPage() {
          * 退款状态是 Refund 维度，订单仍可能显示 paid —— 这正是渠道异步退款
          * 需要人工核对的场景。告警中心 `?refundState=processing` 直达这里。
          */}
-        <SelectBox
+        <SelectField
           className="w-28"
           ariaLabel="按退款状态筛选"
           placeholder="退款状态"
@@ -716,40 +715,42 @@ export function AdminOrdersPage() {
           onChange={setRefundState}
           options={REFUND_STATE_OPTIONS}
         />
-        <TextInput
+        <TextField
           className="w-32"
           ariaLabel="开始日期"
           type="date"
           value={from}
           onChange={setFrom}
         />
-        <TextInput className="w-32" ariaLabel="结束日期" type="date" value={to} onChange={setTo} />
+        <TextField className="w-32" ariaLabel="结束日期" type="date" value={to} onChange={setTo} />
         <FilterActions>
-          <Button variant="primary" size="small" onClick={applyQuery}>
+          <ActionButton variant="default" size="sm" onClick={applyQuery}>
             查询
-          </Button>
-          <Button variant="secondary" size="small" onClick={reset}>
+          </ActionButton>
+          <ActionButton variant="secondary" size="sm" onClick={reset}>
             重置
-          </Button>
+          </ActionButton>
         </FilterActions>
         <AppliedFilters items={appliedChips} onClearAll={reset} />
       </FilterBar>
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
-      {error && data && <AdminStaleError error={error} onRetry={reload} />}
+      {error && data && <StaleError error={error} onRetry={reload} />}
 
       <Panel title="订单列表" note="日期筛选含结束当天；导出口径与当前筛选一致">
         {/* 批量条贴在表头上方: 勾选后要立即看到「能动多少笔」 */}
         {selected.length > 0 && (
           <div
             role="status"
-            className="mb-3 flex items-center gap-3 rounded-lg border border-accent-200 bg-accent-50 px-3 py-2"
+            className="mb-3 flex items-center gap-3 rounded-lg border border-border bg-accent px-3 py-2"
           >
-            <span className="min-w-0 flex-1 text-xs text-accent-900">已选 {selected.length} 单</span>
+            <span className="min-w-0 flex-1 text-xs text-accent-foreground">
+              已选 {selected.length} 单
+            </span>
             {can('order.mark_paid') && (
-              <Button
-                variant="primary"
-                size="small"
+              <ActionButton
+                variant="default"
+                size="sm"
                 disabled={busy}
                 onClick={() => {
                   setReason('');
@@ -757,11 +758,11 @@ export function AdminOrdersPage() {
                 }}
               >
                 批量核销
-              </Button>
+              </ActionButton>
             )}
-            <Button variant="ghost" size="small" onClick={() => setSelected([])}>
+            <ActionButton variant="ghost" size="sm" onClick={() => setSelected([])}>
               清空选择
-            </Button>
+            </ActionButton>
           </div>
         )}
 
@@ -796,9 +797,9 @@ export function AdminOrdersPage() {
           }
           emptyAction={
             hasFilter ? (
-              <Button variant="secondary" size="small" onClick={reset}>
+              <ActionButton variant="secondary" size="sm" onClick={reset}>
                 清除筛选
-              </Button>
+              </ActionButton>
             ) : undefined
           }
         />
@@ -822,18 +823,22 @@ export function AdminOrdersPage() {
           return (
             <>
               {canMarkPaid && (
-                <Button
-                  variant="primary"
-                  size="small"
+                <ActionButton
+                  variant="default"
+                  size="sm"
                   onClick={() => openAction('markPaid', row)}
                 >
                   标记为已支付
-                </Button>
+                </ActionButton>
               )}
               {canRefund && (
-                <Button variant="danger" size="small" onClick={() => openAction('refund', row)}>
+                <ActionButton
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => openAction('refund', row)}
+                >
                   退款
-                </Button>
+                </ActionButton>
               )}
             </>
           );
@@ -861,20 +866,20 @@ export function AdminOrdersPage() {
                         <span>
                           {d.user.name ? `${d.user.name} · ` : ''}
                           <Link
-                            className="text-accent-700 hover:underline"
+                            className="text-brand hover:underline"
                             to={adminUserDetailHref(d.userId)}
                           >
                             {d.user.email}
                           </Link>
                         </span>
                         <Link
-                          className="text-[11px] text-accent-600 hover:underline"
+                          className="text-[11px] text-brand hover:underline"
                           to={adminCreditHref({ userId: d.userId, email: d.user.email })}
                         >
                           积分账本
                         </Link>
                         <Link
-                          className="text-[11px] text-accent-600 hover:underline"
+                          className="text-[11px] text-brand hover:underline"
                           to={adminTasksHref({ userId: d.userId })}
                         >
                           任务记录
@@ -925,9 +930,9 @@ export function AdminOrdersPage() {
                               {d.membershipPlan.name}（{d.membershipPlan.durationDays} 天 · 每月{' '}
                               {d.membershipPlan.monthlyCredits} 积分）
                               {d.membershipAppliedAt ? (
-                                <span className="text-[11px] text-text-tertiary"> · 权益已发放</span>
+                                <span className="text-[11px] text-muted-foreground"> · 权益已发放</span>
                               ) : (
-                                <span className="text-[11px] text-rose-600"> · 权益尚未发放</span>
+                                <span className="text-[11px] text-danger-text"> · 权益尚未发放</span>
                               )}
                             </>
                           ),
@@ -941,14 +946,14 @@ export function AdminOrdersPage() {
             {d.items.length > 0 && (
               <section>
                 <SectionTitle title="商品明细" note="下单时的快照，不随后续改价变化" />
-                <ul className="divide-y divide-border-table rounded-lg border border-border-table">
+                <ul className="divide-y divide-border rounded-lg border border-border">
                   {d.items.map((it) => (
                     <RecordRow
                       key={it.id}
                       head={
                         <>
                           {it.nameSnapshot}{' '}
-                          <code className="font-mono text-[11px] text-text-tertiary">
+                          <code className="font-mono text-[11px] text-muted-foreground">
                             {it.skuSnapshot}
                           </code>
                         </>
@@ -968,11 +973,11 @@ export function AdminOrdersPage() {
             <section>
               <SectionTitle title="支付流水" note="渠道回调的原始记录" />
               {d.payments.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-border-table px-3 py-4 text-center text-xs text-text-tertiary">
+                <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
                   尚无支付记录。订单未支付，或渠道回调尚未到达。
                 </p>
               ) : (
-                <ul className="divide-y divide-border-table rounded-lg border border-border-table">
+                <ul className="divide-y divide-border rounded-lg border border-border">
                   {d.payments.map((p) => (
                     <RecordRow
                       key={p.id}
@@ -999,7 +1004,7 @@ export function AdminOrdersPage() {
             {d.refunds.length > 0 && (
               <section>
                 <SectionTitle title="退款记录" />
-                <ul className="divide-y divide-border-table rounded-lg border border-border-table">
+                <ul className="divide-y divide-border rounded-lg border border-border">
                   {d.refunds.map((r) => (
                     <RecordRow
                       key={r.id}
@@ -1009,7 +1014,7 @@ export function AdminOrdersPage() {
                           ¥ {yuan(r.amountCents)}
                           {/* 失败/处理中的退款行必须显示状态: 它们没有动过订单与积分 */}
                           {r.status !== 'succeeded' && (
-                            <span className="text-[11px] text-amber-700">
+                            <span className="text-[11px] text-warn-text">
                               {' '}
                               · {REFUND_STATUS_LABELS[r.status] ?? r.status}
                             </span>
@@ -1045,7 +1050,7 @@ export function AdminOrdersPage() {
                 <p>
                   将先生成一条 <b>channel=manual</b> 的支付流水，再把订单置为已支付并发放积分/会员权益。
                 </p>
-                <p className="text-[11px] text-text-tertiary">
+                <p className="text-[11px] text-muted-foreground">
                   订单 {action.row.orderNo} · ¥ {yuan(action.row.paidCents)} ·{' '}
                   {action.row.membershipPlanName ?? `${action.row.itemCount} 件商品`}
                 </p>
@@ -1055,7 +1060,7 @@ export function AdminOrdersPage() {
                 <p>
                   退款会回收本单发放且<b>尚未被消耗</b>的积分；已被用掉的部分无法扣回，结果会如实提示。
                 </p>
-                <p className="text-[11px] text-text-tertiary">
+                <p className="text-[11px] text-muted-foreground">
                   订单 {action.row.orderNo} · 实付 ¥ {yuan(action.row.paidCents)} · 已退 ¥{' '}
                   {yuan(action.row.refundedCents)} · 可退上限 ¥{' '}
                   {yuan(Math.max(action.row.paidCents - action.row.refundedCents, 0))}
@@ -1082,8 +1087,8 @@ export function AdminOrdersPage() {
             <>
               {action.kind === 'refund' && (
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-xs text-text-secondary">退款金额（元）</span>
-                  <TextInput
+                  <span className="text-xs text-muted-foreground">退款金额（元）</span>
+                  <TextField
                     ariaLabel="退款金额"
                     inputMode="decimal"
                     value={refundYuan}
@@ -1093,8 +1098,8 @@ export function AdminOrdersPage() {
                 </div>
               )}
               <div className="flex flex-col gap-1.5">
-                <span className="text-xs text-text-secondary">操作原因（强制，写入审计）：</span>
-                <TextInput
+                <span className="text-xs text-muted-foreground">操作原因（强制，写入审计）：</span>
+                <TextField
                   ariaLabel="操作原因"
                   value={reason}
                   onChange={setReason}
@@ -1127,7 +1132,7 @@ export function AdminOrdersPage() {
               <p>
                 将为每笔订单生成一条 <b>channel=manual</b> 的支付流水，置为已支付并发放对应积分 / 会员权益。
               </p>
-              <p className="text-[11px] text-text-tertiary">
+              <p className="text-[11px] text-muted-foreground">
                 只处理「待支付」状态的订单；已是已支付的订单会返回幂等命中而不重复发放。
               </p>
             </>
@@ -1140,8 +1145,8 @@ export function AdminOrdersPage() {
           ]}
           extra={
             <div className="flex flex-col gap-1.5">
-              <span className="text-xs text-text-secondary">操作原因（强制，写入审计）：</span>
-              <TextInput
+              <span className="text-xs text-muted-foreground">操作原因（强制，写入审计）：</span>
+              <TextField
                 ariaLabel="批量核销原因"
                 value={reason}
                 onChange={setReason}

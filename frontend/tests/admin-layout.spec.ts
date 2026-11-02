@@ -11,7 +11,7 @@ import { HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
  * 断言用几何量测而非截图比对 —— 截图会被无关的样式改动弄红,
  * 而"内容区宽度 =视口 -侧栏" 与 "行高 ≤ 46" 是硬约束, 不会因视觉微调而失效。
  *
- * 2026-10-30 外壳换成 BoardUI 单栏结构：没有顶部 header，侧栏自带品牌头，
+ * 2026-10-30 外壳换成单栏结构：没有顶部 header，侧栏自带品牌头，
  * 导航区独立滚动。选择器统一走 `data-testid="admin-*"`。
  */
 
@@ -115,7 +115,7 @@ test.describe('后台布局', () => {
       };
     });
 
-    // BoardUI small 按钮是 32px，单元格 py-2.5 ⇒ 单行行高约 52px；
+    // 小号按钮是 32px，单元格 py-2.5 ⇒ 单行行高约 52px；
     // 换行会把行高撑到 70+，所以「所有行等高且 ≤60」就是没换行。
     const max = Math.max(...m.heights);
     const min = Math.min(...m.heights);
@@ -151,7 +151,8 @@ test.describe('后台布局', () => {
       .first()
       .getByRole('button', { name: '更多' })
       .click();
-    // radix DropdownMenu：弹层是 role=menu，动作是 menuitem（2026-11-01 换 shadcn）
+    // shadcn DropdownMenu（radix 底座）：弹层是 role=menu，动作是 menuitem。
+    // 菜单的可访问名由 RowMenu 显式给成「更多操作」，radix 默认会取触发器文字「更多」。
     const menu = page.getByRole('menu', { name: '更多操作' });
     await expect(menu).toBeVisible();
     expect(await menu.getByRole('menuitem').count()).toBeGreaterThanOrEqual(2);

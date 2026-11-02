@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { isCapabilityVisible } from '../lib/capabilities';
 import { useCapabilities } from '../hooks/useCapabilities';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 
 /**
  * 网站地图 —— 复刻参考站 https://ijihua.cn/sitemap.html
@@ -102,6 +103,7 @@ const SECTIONS: SitemapSection[] = [
 ];
 
 export function SitemapPage() {
+  useDocumentMeta('网站地图 · 货觉AI', '货觉AI 全部页面与工具入口索引。');
   const { data } = useCapabilities();
   const sections = useMemo(() => {
     if (!data) return SECTIONS;

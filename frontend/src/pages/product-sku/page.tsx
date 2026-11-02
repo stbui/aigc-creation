@@ -452,6 +452,8 @@ export function ProductSkuPage() {
         id: task.taskId,
         status: 'succeeded',
         url: result.url!,
+        assetId: result.assetId,
+        format: result.format,
         width: result.width ?? null,
         height: result.height ?? null,
         createdAt: new Date().toISOString(),

@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Pencil, Power } from 'lucide-react';
 import { adminChannelModelsApi, adminChannelsApi } from './api';
 import {
   AdminDataTable,
-  AdminStaleError,
-  Button,
+  StaleError,
+  ActionButton,
+  ClearableField,
   FilterActions,
   FilterBar,
-  SelectBox,
+  SelectField,
   StatusTag,
-  SwitchBox,
-  TextInput,
   type AdminColumn,
 } from './components';
-import { useConfirm, useToast } from './hooks';
+import { useConfirm, useToast, useAdminUrlFilterSync } from './hooks';
 import { ChannelModelCostSummary, ChannelModelHealthCell } from './ChannelModelHealthCell';
 import type {
   AdminChannelModelListItem,
@@ -51,7 +51,7 @@ const UNHEALTHY_RATE = 0.8;
 /** 每页条数 */
 const PAGE_SIZE = 50;
 
-type StatusFilter = 'all' | 'enabled' | 'disabled' | 'unhealthy';
+type StatusFilter = 'all' | 'enabled' | 'disabled' | 'unhealthy' | 'unpriced';
 
 const CAPABILITY_OPTIONS = [
   { value: 'image', label: '图像' },
@@ -60,11 +60,19 @@ const CAPABILITY_OPTIONS = [
   { value: 'audio', label: '音频' },
 ];
 
+/**
+ * 状态筛选。
+ *
+ * `unpriced`（未定价）是本仓比参考实现多的一档 —— 补价工作队列。
+ * 单渠道视图已有这一档，跨渠道视图也必须有，否则运营在「全部模型」里
+ * 看不到漏定价的线路。
+ */
 const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
   { value: 'all', label: '全部' },
   { value: 'enabled', label: '启用' },
   { value: 'disabled', label: '停用' },
   { value: 'unhealthy', label: '不健康' },
+  { value: 'unpriced', label: '未定价' },
 ];
 
 export function AllChannelModelsPanel({
@@ -90,18 +98,42 @@ export function AllChannelModelsPanel({
   const [error, setError] = useState<string | null>(null);
   const [togglingId, setTogglingId] = useState<string | null>(null);
 
-  const [keyword, setKeyword] = useState('');
-  const [capability, setCapability] = useState<string | undefined>(undefined);
-  const [status, setStatus] = useState<StatusFilter>('all');
-  const [channelFilter, setChannelFilter] = useState<string | undefined>(undefined);
+  /*
+   * 筛选从地址栏初始化：把「不健康 + 某渠道」视图发给同事要能直达。
+   * 只在首次挂载读取，之后由组件 state 主导并回写 URL。
+   */
+  const [initialSearch] = useSearchParams();
+  const [keyword, setKeyword] = useState(() => initialSearch.get('keyword') ?? '');
+  const [capability, setCapability] = useState<string | undefined>(
+    () => initialSearch.get('capability') ?? undefined,
+  );
+  const [status, setStatus] = useState<StatusFilter>(() => {
+    const value = initialSearch.get('status');
+    return STATUS_OPTIONS.some((option) => option.value === value)
+      ? (value as StatusFilter)
+      : 'all';
+  });
+  const [channelFilter, setChannelFilter] = useState<string | undefined>(
+    () => initialSearch.get('channel') ?? undefined,
+  );
   const [page, setPage] = useState(1);
+  /*
+   * 筛选写进地址栏：跨渠道排查经常要把「不健康 + 某渠道」这个视图发给同事，
+   * 只存在组件 state 里的筛选点开链接就丢了（参考实现同口径）。
+   */
+  useAdminUrlFilterSync({
+    keyword: keyword || undefined,
+    capability,
+    status: status === 'all' ? undefined : status,
+    channel: channelFilter,
+  });
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       // 含停用项：跨渠道视图是排查入口，看不到停用的模型就没有重新启用的入口
-      const list = await adminChannelModelsApi.list(undefined, true);
-      setModels(list);
+      const res = await adminChannelModelsApi.list(undefined, true);
+      setModels(res.models);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败');
@@ -119,7 +151,7 @@ export function AllChannelModelsPanel({
       .catch(() => setHealth([]));
     void adminChannelsApi
       .order()
-      .then(setChannels)
+      .then((res) => setChannels(res.items))
       .catch(() => setChannels([]));
   }, [load]);
 
@@ -169,6 +201,8 @@ export function AllChannelModelsPanel({
           // 无样本不算不健康
           if (rate === null || rate === undefined || rate >= UNHEALTHY_RATE) return false;
         }
+        // 未定价：模型存在但没有任何可用价格档 —— 补价工作队列
+        if (status === 'unpriced' && item.priceConfigured) return false;
         return true;
       })
       .sort(
@@ -239,10 +273,11 @@ export function AllChannelModelsPanel({
         width: 230,
         render: (row) => (
           <div className="min-w-0">
-            <div className="truncate font-medium text-text-primary" title={row.displayName || row.modelKey}>
+            <div className="truncate font-medium text-foreground" title={row.displayName || row.modelKey}>
+              {row.icon ? `${row.icon} ` : ''}
               {row.displayName || row.modelKey}
             </div>
-            <div className="mt-0.5 truncate font-mono text-[11px] text-text-tertiary" title={row.modelKey}>
+            <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground" title={row.modelKey}>
               {row.modelKey}
             </div>
           </div>
@@ -260,18 +295,18 @@ export function AllChannelModelsPanel({
               {onOpenChannel ? (
                 <button
                   type="button"
-                  className="block max-w-full truncate text-accent-700 hover:underline"
+                  className="block max-w-full truncate text-brand hover:underline"
                   title="在渠道中查看"
                   onClick={() => onOpenChannel(row.channelId)}
                 >
                   {name}
                 </button>
               ) : (
-                <div className="truncate text-text-secondary" title={name}>
+                <div className="truncate text-muted-foreground" title={name}>
                   {name}
                 </div>
               )}
-              {!row.channelEnabled && <div className="text-[11px] text-text-tertiary">渠道已停用</div>}
+              {!row.channelEnabled && <div className="text-[11px] text-muted-foreground">渠道已停用</div>}
             </div>
           );
         },
@@ -322,31 +357,29 @@ export function AllChannelModelsPanel({
           <div className="flex items-center gap-1">
             {/* 编辑直接打开这条模型的编辑器，不必先回到渠道再翻一遍清单 */}
             {onEditModel && (
-              <Button
+              <ActionButton
                 variant="secondary"
                 size="xs"
-                leadingIcon={Pencil}
+                icon={Pencil}
                 disabled={!writable}
                 onClick={() => onEditModel(row.channelId, row.id)}
               >
                 编辑
-              </Button>
+              </ActionButton>
             )}
-            <Button
-              variant={row.enabled ? 'dangerGhost' : 'ghost'}
+            <ActionButton
+              variant="ghost"
               size="xs"
-              // 与按渠道视图一致：压平 ghost 自带的淡紫底，破坏性只靠红字表达
+              // 与按渠道视图一致：破坏性只靠红字表达，不铺底色
               className={
-                row.enabled
-                  ? '!bg-transparent hover:!bg-rose-50'
-                  : '!bg-transparent hover:!bg-background-secondary-default'
+                row.enabled ? 'text-danger-text hover:text-danger-text' : 'hover:bg-muted'
               }
-              leadingIcon={Power}
+              icon={Power}
               disabled={!writable || togglingId === row.id || (togglingId !== null && togglingId !== row.id)}
               onClick={() => void toggleEnabled(row)}
             >
               {row.enabled ? '停用' : '启用'}
-            </Button>
+            </ActionButton>
           </div>
         ),
       },
@@ -364,45 +397,49 @@ export function AllChannelModelsPanel({
   return (
     <div className="flex flex-col gap-3">
       <FilterBar>
-        <TextInput
+        <ClearableField
           ariaLabel="搜索模型"
           value={keyword}
           onChange={(value) => updateFilter(() => setKeyword(value))}
           placeholder="搜索模型标识、显示名或渠道"
-          allowClear
           className="min-w-[220px]"
         />
-        <SelectBox
+        <SelectField
           ariaLabel="模型能力"
           value={capability}
           onChange={(value) => updateFilter(() => setCapability(value))}
           options={CAPABILITY_OPTIONS}
           placeholder="全部能力"
+          clearLabel="全部能力"
           allowClear
         />
-        <SelectBox
+        <SelectField
           ariaLabel="模型状态"
           value={status === 'all' ? undefined : status}
           onChange={(value) => updateFilter(() => setStatus((value as StatusFilter) ?? 'all'))}
           options={STATUS_OPTIONS.filter((item) => item.value !== 'all')}
           placeholder="全部状态"
+          // 复位项就叫「全部」：它是「不按状态筛」的通用说法，各页统一，
+          // 运营不用逐页记这一格叫「全部状态」还是「全部模型」。
+          clearLabel="全部"
           allowClear
         />
-        <SelectBox
+        <SelectField
           ariaLabel="所属渠道"
           value={channelFilter}
           onChange={(value) => updateFilter(() => setChannelFilter(value))}
           options={channelOptions}
           placeholder="全部渠道"
+          clearLabel="全部渠道"
           allowClear
         />
         <FilterActions>
-          <span className="text-xs tabular-nums text-text-tertiary">
+          <span className="text-xs tabular-nums text-muted-foreground">
             {loading ? '读取中…' : `${filtered.length} 个模型 · ${enabledCount} 个可用`}
           </span>
-          <Button
+          <ActionButton
             variant="secondary"
-            size="small"
+            size="sm"
             onClick={() => {
               setKeyword('');
               setCapability(undefined);
@@ -412,11 +449,11 @@ export function AllChannelModelsPanel({
             }}
           >
             重置
-          </Button>
+          </ActionButton>
         </FilterActions>
       </FilterBar>
 
-      {error && rows.length === 0 && <AdminStaleError error={error} onRetry={() => void load()} />}
+      {error && rows.length === 0 && <StaleError error={error} onRetry={() => void load()} />}
 
       <AdminDataTable<AdminChannelModelListItem>
         rows={paged}

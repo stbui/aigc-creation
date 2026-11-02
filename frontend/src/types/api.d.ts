@@ -453,6 +453,14 @@ export interface TaskOutputAsset extends Pick<
 
 export type TaskListResult = Task[];
 
+/** GET /tasks/page?limit=&offset=&capability= */
+export interface TaskPageResult {
+  items: Task[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
 /* ────────────────────────────────────────────────────────────────
    后台管理端类型 (docs/admin-prd.md §3功能需求)
    端点均在 /api/v1/admin/* 下, 由 AdminGuard + PermissionGuard 双重校验。
@@ -907,11 +915,24 @@ export interface RefundView {
   createdAt: string;
 }
 
+/** GET /orders?limit=&offset= */
+export interface OrderListResult {
+  items: Order[];
+  total: number;
+  limit: number;
+  offset: number;
+  statusCounts: Partial<Record<OrderStatus, number>>;
+}
+
 export interface Order {
   id: string;
   orderNo: string;
   status: OrderStatus;
+  /** 商品原价小计（会员订阅单为套餐原价） */
+  itemsSubtotalCents?: number;
   totalCents: number;
+  /** 会员加油包折扣（非会员为 0） */
+  memberDiscountCents?: number;
   discountCents: number;
   /** 实付 (优惠后)。历史订单无此值时后端回落原价 */
   paidCents: number;
@@ -969,6 +990,14 @@ export interface CreditLedgerEntry {
   taskId: string | null;
   reason: string | null;
   createdAt: string;
+}
+
+/** GET /credits/ledger?limit=&offset= */
+export interface CreditLedgerPage {
+  items: CreditLedgerEntry[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 /** 能力消耗价一行 (后台改价用) */
@@ -1278,34 +1307,6 @@ export interface AdminStorageStatus {
   editable: false;
 }
 
-/** 支付通道标识, 与后端 PAYMENT_CHANNELS 一致 */
-export type PaymentChannelId = 'sandbox' | 'alipay' | 'wechat';
-
-/**
- * GET /api/v1/admin/payment-channels
- *
- * 只读状态: 当前生效通道 / 各通道凭据是否齐全 / 缺失的变量名 / 回调地址。
- * **不含任何凭据值** —— 缺失项只给变量名。
- */
-export interface AdminPaymentChannelStatus {
-  active: PaymentChannelId;
-  environment: string;
-  channels: Array<{
-    channel: PaymentChannelId;
-    label: string;
-    configured: boolean;
-    active: boolean;
-    /** 缺失的环境变量名 (不含值) */
-    missing: string[];
-    /** 渠道异步通知地址; 沙箱没有渠道侧回调, 为 null */
-    notifyUrl: string | null;
-  }>;
-  credentialSource: string;
-  editable: false;
-  /** 后端判定的风险提示: 真实通道缺凭据 / 生产仍走沙箱 / 回调地址可能不可达 */
-  warnings: Array<{ level: 'danger' | 'warn'; message: string }>;
-}
-
 /* ────────────────────────────────────────────────────────────────
    营销中心 (admin-prd.md §3.12 B-64~B67 / M11)
    ──────────────────────────────────────────────────────────────── */
@@ -1540,6 +1541,9 @@ export interface CheckinStatus {
 /** POST /api/v1/marketing/quote */
 export interface MarketingQuote {
   subtotalCents: number;
+  /** 会员加油包折扣（非会员为 0），与券/活动优惠分开展示 */
+  memberDiscountCents: number;
+  /** 券 / 限时活动优惠（不含会员折扣） */
   discountCents: number;
   payableCents: number;
   appliedSource: 'coupon' | 'campaign' | null;
@@ -1825,22 +1829,6 @@ export interface AdminOrderDetail {
   } | null;
 }
 
-/** GET /api/v1/admin/payments */
-export interface AdminPaymentRow {
-  id: string;
-  orderNo: string;
-  orderId: string;
-  userEmail: string;
-  channel: string;
-  payTransactionId: string;
-  amountCents: number;
-  status: string;
-  message: string | null;
-  sandboxScenario: string | null;
-  paidAt: string | null;
-  createdAt: string;
-}
-
 /** GET /api/v1/admin/credits —— 用户余额总览 */
 export interface AdminCreditRow {
   userId: string;
@@ -1925,6 +1913,17 @@ export interface AdminRetentionTarget {
  *   sandbox  → 走站内沙箱模拟 (`POST /orders/:id/pay`)
  *   free     → 0 元订单已由后端直接入账，前端只需展示结果
  */
+/** GET /payments/providers 的可用支付渠道 */
+export interface PaymentProviderInfo {
+  id: string;
+  name: string;
+  icon: string | null;
+  /** redirect=跳转收银台 / qrcode=扫码 / sandbox=站内模拟 */
+  checkoutMode: 'redirect' | 'qrcode' | 'sandbox';
+  supportedCurrencies: string[];
+  sandbox: boolean;
+}
+
 export interface PaymentIntent {
   orderId: string;
   orderNo: string;
@@ -1994,52 +1993,6 @@ export interface CreateInvoicePayload {
 export interface AdminInvoice extends Invoice {
   userEmail: string | null;
   userName: string | null;
-}
-
-/** 对账差异类型 */
-export type ReconciliationDiffType =
-  | 'matched'
-  | 'amount_mismatch'
-  | 'missing_local'
-  | 'missing_channel'
-  | 'duplicate';
-
-/** 一次对账导入 */
-export interface ReconciliationBatch {
-  id: string;
-  channel: string;
-  billDate: string;
-  fileName: string | null;
-  channelCount: number;
-  channelAmountCents: number;
-  localCount: number;
-  localAmountCents: number;
-  matchedCount: number;
-  diffCount: number;
-  status: 'imported' | 'resolved';
-  operatorId: string | null;
-  createdAt: string;
-}
-
-/** 对账差异行 */
-export interface ReconciliationItem {
-  id: string;
-  batchId: string;
-  tradeNo: string;
-  paymentId: string | null;
-  orderId: string | null;
-  diffType: ReconciliationDiffType;
-  channelAmountCents: number;
-  localAmountCents: number;
-  status: 'open' | 'resolved' | 'ignored';
-  note: string | null;
-  resolvedBy: string | null;
-  resolvedAt: string | null;
-}
-
-export interface ReconciliationBatchDetail {
-  batch: ReconciliationBatch;
-  items: ReconciliationItem[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -2201,6 +2154,8 @@ export interface Ticket {
 export interface TicketListResult {
   items: Ticket[];
   total: number;
+  /** 当前用户全量工单按状态计数（不受分页影响） */
+  statusCounts?: Partial<Record<TicketStatus, number>>;
 }
 
 export interface CreateTicketPayload {

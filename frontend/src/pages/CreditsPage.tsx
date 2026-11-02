@@ -4,6 +4,7 @@ import { Button, Card, Col, Pagination, Row, Table, Tabs, Tag } from 'antd';
 import { ShoppingBag, Wallet } from 'lucide-react';
 import { creditsApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { PersonalPage } from '../components/PersonalPage';
 import { StateButton, StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
@@ -133,11 +134,14 @@ function LotList({ rows }: { rows: CreditLot[] }) {
 }
 
 export function CreditsPage() {
+  useDocumentMeta('积分明细 · 货觉AI', '查看积分余额、批次与每一笔流水。');
   const navigate = useNavigate();
   const { token, openLogin } = useAuth();
   const [tab, setTab] = useState<Tab>('ledger');
   const [balance, setBalance] = useState<CreditBalance | null>(null);
   const [ledger, setLedger] = useState<CreditLedgerEntry[]>([]);
+  const [ledgerTotal, setLedgerTotal] = useState(0);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
   const [lots, setLots] = useState<CreditLot[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -149,6 +153,24 @@ export function CreditsPage() {
   const [ledgerPage, setLedgerPage] = useState(1);
   const [lotsPage, setLotsPage] = useState(1);
 
+  /** 只切流水页：不重取余额/批次，也不整页闪骨架 */
+  const loadLedgerPage = useCallback(async (page: number) => {
+    setLedgerLoading(true);
+    try {
+      const res = await creditsApi.ledger({
+        limit: PAGE_SIZE,
+        offset: Math.max(0, (page - 1) * PAGE_SIZE),
+      });
+      setLedger(res.items);
+      setLedgerTotal(res.total);
+      setLedgerPage(page);
+    } catch (e) {
+      setError((e as Error)?.message || '积分流水加载失败');
+    } finally {
+      setLedgerLoading(false);
+    }
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -157,12 +179,13 @@ export function CreditsPage() {
       // 余额取不到时用户仍该看到批次与流水
       const [b, l, k] = await Promise.allSettled([
         creditsApi.balance(),
-        creditsApi.ledger(100),
+        creditsApi.ledger({ limit: PAGE_SIZE, offset: 0 }),
         creditsApi.lots(),
       ]);
       if (b.status === 'fulfilled') setBalance(b.value);
       if (l.status === 'fulfilled') {
-        setLedger(l.value);
+        setLedger(l.value.items);
+        setLedgerTotal(l.value.total);
         // 重新取数后回到第一页, 免得停在一个已经不存在的页码上
         setLedgerPage(1);
       }
@@ -184,6 +207,7 @@ export function CreditsPage() {
       // guest: 三个积分接口都要鉴权, 不发就会连着 401 且渲染成「加载失败」
       setBalance(null);
       setLedger([]);
+      setLedgerTotal(0);
       setLots([]);
       setLoading(false);
       return;
@@ -302,8 +326,8 @@ export function CreditsPage() {
     { label: '30 天内到期', value: balance?.expiringSoon, warn: (balance?.expiringSoon ?? 0) > 0 },
   ];
 
-  // 窄屏列表自己分页; 桌面表格沿用 antd 内部的分页状态
-  const ledgerView = ledger.slice((ledgerPage - 1) * PAGE_SIZE, ledgerPage * PAGE_SIZE);
+  // 流水已经是服务端分页的当前页；批次仍是一次取回后前端分页
+  const ledgerView = ledger;
   const lotsView = lots.slice((lotsPage - 1) * PAGE_SIZE, lotsPage * PAGE_SIZE);
 
   return (
@@ -393,15 +417,15 @@ export function CreditsPage() {
               ) : narrow ? (
                 <>
                   <LedgerList rows={ledgerView} />
-                  {ledger.length > PAGE_SIZE && (
+                  {ledgerTotal > PAGE_SIZE && (
                     <div className="credits-mobile-pager">
                       <Pagination
                         simple
                         size="small"
                         current={ledgerPage}
                         pageSize={PAGE_SIZE}
-                        total={ledger.length}
-                        onChange={setLedgerPage}
+                        total={ledgerTotal}
+                        onChange={(page) => void loadLedgerPage(page)}
                       />
                     </div>
                   )}
@@ -410,9 +434,17 @@ export function CreditsPage() {
                 <Table
                   rowKey="id"
                   size="small"
+                  loading={ledgerLoading}
                   columns={ledgerColumns}
                   dataSource={ledger}
-                  pagination={{ pageSize: PAGE_SIZE, hideOnSinglePage: true, showSizeChanger: false }}
+                  pagination={{
+                    current: ledgerPage,
+                    pageSize: PAGE_SIZE,
+                    total: ledgerTotal,
+                    hideOnSinglePage: true,
+                    showSizeChanger: false,
+                    onChange: (page) => void loadLedgerPage(page),
+                  }}
                   scroll={{ x: 680 }}
                 />
               ),

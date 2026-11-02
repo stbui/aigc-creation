@@ -1,21 +1,31 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { Button } from '../../admin-ui/shadcn/kit';
 import { adminChannelsApi, adminUserGroupsApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
-import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
-import { Drawer } from '../../admin-ui/primitives/Drawer';
-import { Notice } from '../../admin-ui/primitives';
-import { CheckBox, NumberInput, SelectBox, SwitchBox, TextArea, TextInput } from '../../admin-ui/controls';
-import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import {
-  AdminListLoading,
-  AdminStaleError,
+  ActionButton,
+  AdminDataTable,
+  CheckboxField,
   ConfirmAction,
+  Drawer,
+  FormField,
+  IconButton,
+  Notice,
+  NumberField,
+  PageHeader,
+  Panel,
+  SelectField,
+  Skeleton,
+  StatusTag,
+  StaleError,
+  SwitchField,
+  TextAreaField,
+  TextField,
   useAdminResource,
-} from '../../components/admin/AdminWidgets';
-import { PageHeader, Panel, StatusTag } from '../../components/admin/PageHeader';
+  type AdminColumn,
+} from '../../admin-ui/primitives';
+import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import { parseCredits, toCreditsInput } from '../../lib/microcredits';
 import type { ChannelOrderItemView, UserGroupView } from '../../types/model';
 
@@ -104,16 +114,6 @@ function toDraft(group: UserGroupView): GroupDraft {
   };
 }
 
-function Field({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium text-text-secondary">{label}</span>
-      {children}
-      {hint && <p className="text-[11px] leading-4 text-text-tertiary">{hint}</p>}
-    </div>
-  );
-}
-
 export function AdminUserGroupsPage() {
   const { can } = useAdmin();
   const toast = useToast();
@@ -124,7 +124,7 @@ export function AdminUserGroupsPage() {
 
   const [channels, setChannels] = useState<ChannelOrderItemView[]>([]);
   useEffect(() => {
-    void adminChannelsApi.order().then(setChannels).catch(() => undefined);
+    void adminChannelsApi.order().then((res) => setChannels(res.items)).catch(() => undefined);
   }, []);
 
   const [creating, setCreating] = useState(false);
@@ -297,7 +297,7 @@ export function AdminUserGroupsPage() {
       render: (row) => (
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="truncate font-medium text-text-primary">{row.name}</span>
+            <span className="truncate font-medium text-foreground">{row.name}</span>
             {row.isDefault && <StatusTag status="default" tone="brand" label="默认" />}
             {row.badgeStyle !== 'none' && (
               <StatusTag
@@ -307,7 +307,7 @@ export function AdminUserGroupsPage() {
               />
             )}
           </div>
-          <div className="mt-0.5 truncate font-mono text-[11px] text-text-tertiary">{row.code}</div>
+          <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{row.code}</div>
         </div>
       ),
     },
@@ -334,7 +334,7 @@ export function AdminUserGroupsPage() {
       render: (row) => (
         <div className="flex flex-col gap-0.5 text-[11px] tabular-nums">
           <span>1 USD = {toCreditsInput(row.pointsPerUsdMicrocredits)} 积分</span>
-          <span className="text-text-tertiary">1 CNY = {toCreditsInput(row.pointsPerCnyMicrocredits)} 积分</span>
+          <span className="text-muted-foreground">1 CNY = {toCreditsInput(row.pointsPerCnyMicrocredits)} 积分</span>
         </div>
       ),
     },
@@ -347,7 +347,7 @@ export function AdminUserGroupsPage() {
           <StatusTag status="all" tone="success" label="全部渠道" />
         ) : (
           <span
-            className="truncate text-[11px] text-text-secondary"
+            className="truncate text-[11px] text-muted-foreground"
             title={row.channelIds.map((id) => channelNameById.get(id) ?? id).join('、')}
           >
             {row.channelIds.length} 条：
@@ -369,18 +369,18 @@ export function AdminUserGroupsPage() {
       fixed: 'right',
       render: (row) => (
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="xs" disabled={!writable} onClick={() => openEdit(row)}>
+          <ActionButton variant="ghost" size="xs" disabled={!writable} onClick={() => openEdit(row)}>
             编辑
-          </Button>
-          <Button
+          </ActionButton>
+          <ActionButton
             variant="ghost"
             size="xs"
-            leadingIcon={Trash2}
+            icon={Trash2}
             disabled={!writable || row.isDefault}
             onClick={() => setDeleteTarget(row)}
           >
             删除
-          </Button>
+          </ActionButton>
         </div>
       ),
     },
@@ -392,9 +392,9 @@ export function AdminUserGroupsPage() {
         title="用户分组"
         description="决定倍率、可见渠道与按模型的覆盖价格。分组由会员套餐映射，没有有效会员的用户落在默认分组。"
         actions={
-          <Button variant="primary" size="small" leadingIcon={Plus} disabled={!writable} onClick={openCreate}>
+          <ActionButton variant="default" size="sm" icon={Plus} disabled={!writable} onClick={openCreate}>
             新建分组
-          </Button>
+          </ActionButton>
         }
       />
 
@@ -403,10 +403,13 @@ export function AdminUserGroupsPage() {
         note="保存后目录快照与报价缓存同时失效；只刷新其中一个会出现「展示按新倍率、扣费按旧倍率」。"
       >
         {loading && rows.length === 0 ? (
-          <AdminListLoading />
+          <div className="flex flex-col gap-2 py-2">
+            <Skeleton rows={4} />
+            <p className="text-center text-xs text-muted-foreground">加载中…</p>
+          </div>
         ) : (
           <>
-            {error && <AdminStaleError error={error} onRetry={() => void reload()} />}
+            {error && <StaleError error={error} onRetry={() => void reload()} />}
             <AdminDataTable<UserGroupView>
               rows={rows}
               columns={columns}
@@ -431,19 +434,19 @@ export function AdminUserGroupsPage() {
         description={formDirty ? '有未保存修改' : editing ? '编码创建后不可修改' : '编码用于会员套餐映射'}
         footer={
           <>
-            <Button variant="secondary" size="small" onClick={requestCloseForm} disabled={saving}>
+            <ActionButton variant="secondary" size="sm" onClick={requestCloseForm} disabled={saving}>
               取消
-            </Button>
-            <Button variant="primary" size="small" disabled={saving || !writable} onClick={() => void submit()}>
+            </ActionButton>
+            <ActionButton variant="default" size="sm" disabled={saving || !writable} onClick={() => void submit()}>
               {saving ? '保存中…' : editing ? '保存修改' : '创建'}
-            </Button>
+            </ActionButton>
           </>
         }
       >
         <div className="flex flex-col gap-4">
           <div className="grid grid-cols-3 gap-3">
-            <Field label="编码" hint={editing ? '不可修改' : '小写字母 / 数字 / _ / -'}>
-              <TextInput
+            <FormField label="编码" hint={editing ? '不可修改' : '小写字母 / 数字 / _ / -'}>
+              <TextField
                 ariaLabel="分组编码"
                 value={draft.code}
                 onChange={(value) => patchDraft({ code: value })}
@@ -451,93 +454,93 @@ export function AdminUserGroupsPage() {
                 disabled={!!editing?.isDefault}
                 maxLength={40}
               />
-            </Field>
-            <Field label="名称">
-              <TextInput
+            </FormField>
+            <FormField label="名称">
+              <TextField
                 ariaLabel="分组名称"
                 value={draft.name}
                 onChange={(value) => patchDraft({ name: value })}
                 placeholder="普通用户"
                 maxLength={40}
               />
-            </Field>
-            <Field label="排序值">
-              <NumberInput
+            </FormField>
+            <FormField label="排序值">
+              <NumberField
                 ariaLabel="排序值"
                 value={Number(draft.sortOrder) || 0}
                 min={0}
                 onChange={(value) => patchDraft({ sortOrder: String(value ?? 0) })}
               />
-            </Field>
+            </FormField>
           </div>
 
-          <Field label="描述">
-            <TextArea
+          <FormField label="描述">
+            <TextAreaField
               ariaLabel="分组描述"
               value={draft.description}
               onChange={(value) => patchDraft({ description: value })}
               rows={2}
               maxLength={200}
             />
-          </Field>
+          </FormField>
 
           <div className="grid grid-cols-2 gap-3">
-            <Field label="徽标文字" hint="用户侧展示，如「VIP」">
-              <TextInput
+            <FormField label="徽标文字" hint="用户侧展示，如「VIP」">
+              <TextField
                 ariaLabel="徽标文字"
                 value={draft.badgeLabel}
                 onChange={(value) => patchDraft({ badgeLabel: value })}
                 placeholder="VIP"
                 maxLength={16}
               />
-            </Field>
-            <Field label="徽标样式">
-              <SelectBox
+            </FormField>
+            <FormField label="徽标样式">
+              <SelectField
                 ariaLabel="徽标样式"
                 value={draft.badgeStyle}
                 options={BADGE_STYLE_OPTIONS}
                 onChange={(value) => patchDraft({ badgeStyle: value ?? 'none' })}
               />
-            </Field>
+            </FormField>
           </div>
 
-          <div className="rounded-lg border border-border-table p-3">
-            <div className="mb-2 text-xs font-semibold text-text-primary">价格</div>
+          <div className="rounded-lg border border-border p-3">
+            <div className="mb-2 text-xs font-semibold text-foreground">价格</div>
             <div className="grid grid-cols-3 gap-3">
-              <Field label="倍率（%）" hint="100 = 原价；50 = 五折">
-                <TextInput
+              <FormField label="倍率（%）" hint="100 = 原价；50 = 五折">
+                <TextField
                   ariaLabel="倍率"
                   inputMode="numeric"
                   value={draft.ratioPercent}
                   onChange={(value) => patchDraft({ ratioPercent: value })}
                 />
-              </Field>
-              <Field label="1 USD = 积分">
-                <TextInput
+              </FormField>
+              <FormField label="1 USD = 积分">
+                <TextField
                   ariaLabel="美元点数汇率"
                   inputMode="decimal"
                   value={draft.pointsPerUsd}
                   onChange={(value) => patchDraft({ pointsPerUsd: value })}
                 />
-              </Field>
-              <Field label="1 CNY = 积分">
-                <TextInput
+              </FormField>
+              <FormField label="1 CNY = 积分">
+                <TextField
                   ariaLabel="人民币点数汇率"
                   inputMode="decimal"
                   value={draft.pointsPerCny}
                   onChange={(value) => patchDraft({ pointsPerCny: value })}
                 />
-              </Field>
+              </FormField>
             </div>
           </div>
 
-          <div className="rounded-lg border border-border-table p-3">
+          <div className="rounded-lg border border-border p-3">
             <div className="mb-2 flex items-center justify-between">
               <div>
-                <div className="text-xs font-semibold text-text-primary">可见渠道</div>
-                <div className="text-[11px] text-text-tertiary">不在可见范围内的渠道，其模型不会出现在该分组的目录里</div>
+                <div className="text-xs font-semibold text-foreground">可见渠道</div>
+                <div className="text-[11px] text-muted-foreground">不在可见范围内的渠道，其模型不会出现在该分组的目录里</div>
               </div>
-              <SwitchBox
+              <SwitchField
                 checked={draft.allChannels}
                 label="全部渠道"
                 ariaLabel="全部渠道可见"
@@ -547,10 +550,10 @@ export function AdminUserGroupsPage() {
             {!draft.allChannels && (
               <div className="grid grid-cols-2 gap-2">
                 {channels.length === 0 ? (
-                  <p className="text-[11px] text-text-tertiary">尚无渠道可勾选</p>
+                  <p className="text-[11px] text-muted-foreground">尚无渠道可勾选</p>
                 ) : (
                   channels.map((channel) => (
-                    <CheckBox
+                    <CheckboxField
                       key={channel.id}
                       checked={draft.channelIds.includes(channel.id)}
                       label={channel.name}
@@ -562,52 +565,50 @@ export function AdminUserGroupsPage() {
             )}
           </div>
 
-          <div className="rounded-lg border border-border-table p-3">
+          <div className="rounded-lg border border-border p-3">
             <div className="mb-2 flex items-center justify-between">
               <div>
-                <div className="text-xs font-semibold text-text-primary">按模型覆盖</div>
-                <div className="text-[11px] text-text-tertiary">按前台模型编码覆盖倍率与汇率；未命中时用分组默认值</div>
+                <div className="text-xs font-semibold text-foreground">按模型覆盖</div>
+                <div className="text-[11px] text-muted-foreground">按前台模型编码覆盖倍率与汇率；未命中时用分组默认值</div>
               </div>
-              <Button variant="secondary" size="xs" leadingIcon={Plus} disabled={!writable} onClick={addOverride}>
+              <ActionButton variant="secondary" size="xs" icon={Plus} disabled={!writable} onClick={addOverride}>
                 添加覆盖
-              </Button>
+              </ActionButton>
             </div>
             {draft.overrides.length === 0 ? (
-              <p className="py-2 text-center text-[11px] text-text-tertiary">没有覆盖项</p>
+              <p className="py-2 text-center text-[11px] text-muted-foreground">没有覆盖项</p>
             ) : (
               <div className="flex flex-col gap-2">
                 {draft.overrides.map((item, index) => (
                   <div key={index} className="grid grid-cols-[1fr_70px_90px_90px_32px] items-end gap-2">
-                    <TextInput
+                    <TextField
                       ariaLabel="模型编码"
                       value={item.modelKey}
                       onChange={(value) => updateOverride(index, { modelKey: value })}
                       placeholder="ecom-image-pro"
                     />
-                    <TextInput
+                    <TextField
                       ariaLabel="覆盖倍率"
                       inputMode="numeric"
                       value={item.ratioPercent}
                       onChange={(value) => updateOverride(index, { ratioPercent: value })}
                     />
-                    <TextInput
+                    <TextField
                       ariaLabel="覆盖美元汇率"
                       inputMode="decimal"
                       value={item.pointsPerUsd}
                       onChange={(value) => updateOverride(index, { pointsPerUsd: value })}
                     />
-                    <TextInput
+                    <TextField
                       ariaLabel="覆盖人民币汇率"
                       inputMode="decimal"
                       value={item.pointsPerCny}
                       onChange={(value) => updateOverride(index, { pointsPerCny: value })}
                     />
-                    <Button
-                      variant="ghost"
+                    <IconButton
+                      icon={Trash2}
+                      label="删除覆盖"
                       size="xs"
-                      iconOnly
-                      leadingIcon={Trash2}
-                      aria-label="删除覆盖"
                       onClick={() => removeOverride(index)}
                     />
                   </div>
@@ -622,15 +623,15 @@ export function AdminUserGroupsPage() {
             </Notice>
           )}
 
-          <Field label="变更原因" hint="写入审计">
-            <TextInput
+          <FormField label="变更原因" hint="写入审计">
+            <TextField
               ariaLabel="变更原因"
               value={draft.reason}
               onChange={(value) => patchDraft({ reason: value })}
               placeholder="如：会员权益调整"
               maxLength={200}
             />
-          </Field>
+          </FormField>
         </div>
       </Drawer>
 

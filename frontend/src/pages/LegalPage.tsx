@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { ExceptionPage } from '../components/ExceptionPage';
 import { StateLoading } from '../components/StateViews';
 import { legalApi } from '../lib/api';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import type { LegalDoc as RemoteLegalDoc } from '../types/api';
 
 /**
@@ -193,24 +194,40 @@ export function LegalPage() {
    * 而用户读的是法律条文，闪一下比慢一点更糟。
    */
   const [remote, setRemote] = useState<RemoteLegalDoc | null | undefined>(undefined);
+  /** remote 对应的 slug：切换文档时旧 state 会晚一帧清空，渲染必须按 slug 校验 */
+  const [loadedSlug, setLoadedSlug] = useState<string | null>(null);
 
   useEffect(() => {
     if (!slug) return;
     let alive = true;
     setRemote(undefined);
+    setLoadedSlug(null);
     legalApi
       .current(slug)
       .then((doc) => {
-        if (alive) setRemote(doc ?? null);
+        if (alive) {
+          setRemote(doc ?? null);
+          setLoadedSlug(slug);
+        }
       })
       .catch(() => {
         // 后端不可达 / 未发布 → 走内置文本，页面不能白屏
-        if (alive) setRemote(null);
+        if (alive) {
+          setRemote(null);
+          setLoadedSlug(slug);
+        }
       });
     return () => {
       alive = false;
     };
   }, [slug]);
+
+  // 渲染只用与当前 slug 匹配的远端结果，避免先显示上一篇正文
+  const currentRemote = loadedSlug === slug ? remote : undefined;
+  useDocumentMeta(
+    `${currentRemote?.title ?? fallback?.title ?? '法务文本'} · 货觉AI`,
+    `${currentRemote?.title ?? fallback?.title ?? '法务文本'}（货觉AI）`,
+  );
 
   /*
    * ⚠ 2026-10-20 行为变更: 此前是 `DOCS[slug] ?? DOCS['user-agreement']` ——
@@ -224,7 +241,7 @@ export function LegalPage() {
    * 前台永远 404 —— 而未成年人保护政策属于对外必须可查的合规文本。
    * 现在: 远端有正文 → 渲染; 远端明确没有且本地也无兜底 → 才 404。
    */
-  if (remote === undefined && !fallback) {
+  if (currentRemote === undefined && !fallback) {
     return (
       <div className="legal-page">
         <StateLoading tip="正在读取文档…" full />
@@ -232,7 +249,7 @@ export function LegalPage() {
     );
   }
 
-  if (remote === null && !fallback) {
+  if (currentRemote === null && !fallback) {
     return (
       <ExceptionPage
         kind="not-found"
@@ -254,8 +271,8 @@ export function LegalPage() {
     );
   }
 
-  const blocks = remote ? parseBlocks(remote.content) : [];
-  const title = remote?.title ?? fallback?.title ?? '文档';
+  const blocks = currentRemote ? parseBlocks(currentRemote.content) : [];
+  const title = currentRemote?.title ?? fallback?.title ?? '文档';
 
   return (
     <div className="legal-page">
@@ -279,7 +296,7 @@ export function LegalPage() {
       <article className="legal-doc">
         <h1>{title}</h1>
 
-        {remote ? (
+        {currentRemote ? (
           <>
             {blocks.map((b, i) =>
               b.kind === 'heading' ? (
@@ -293,8 +310,8 @@ export function LegalPage() {
               ),
             )}
             <p className="legal-updated">
-              版本 {remote.version}
-              {remote.publishedAt ? ` · 生效于 ${formatDate(remote.publishedAt)}` : ''}
+              版本 {currentRemote.version}
+              {currentRemote.publishedAt ? ` · 生效于 ${formatDate(currentRemote.publishedAt)}` : ''}
             </p>
           </>
         ) : fallback ? (

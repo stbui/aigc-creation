@@ -186,6 +186,8 @@ export function AssetLibraryModal({
   const [kind, setKind] = useState<PickerKind>('all');
   /** 工具栏日期筛选 */
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
+  /** 日期菜单展开状态（受控，保证 aria-expanded 与实际一致） */
+  const [dateOpen, setDateOpen] = useState(false);
   /** 工具栏搜索词 */
   const [keyword, setKeyword] = useState('');
   /** 已勾选的素材 id —— 参考站是多选语义 */
@@ -196,6 +198,7 @@ export function AssetLibraryModal({
     if (open) {
       setKind('all');
       setDateFilter('all');
+      setDateOpen(false);
       setKeyword('');
       setSelected([]);
     }
@@ -221,7 +224,19 @@ export function AssetLibraryModal({
     }
     const kw = keyword.trim().toLowerCase();
     if (kw) {
-      list = list.filter((a) => a.sourceUrl.toLowerCase().includes(kw));
+      // placeholder 写的是“素材名称”，但 Asset 没有独立名称字段；
+      // 用文件名/来源标题/能力名/来源站点一起匹配，避免用户按名字搜不到。
+      list = list.filter((a) =>
+        [
+          a.sourceUrl,
+          a.sourceTitle ?? '',
+          a.sourceSite ?? '',
+          a.capability ?? '',
+        ]
+          .join(' ')
+          .toLowerCase()
+          .includes(kw),
+      );
     }
     return list;
   }, [items, kind, dateFilter, keyword]);
@@ -314,24 +329,33 @@ export function AssetLibraryModal({
           </div>
 
           <div className="alp-toolbar-right">
-            <div className="alp-date-filter" role="group" aria-label="日期筛选">
+            <div
+              className={`alp-date-filter${dateOpen ? ' is-open' : ''}`}
+              role="group"
+              aria-label="日期筛选"
+            >
               <button
                 type="button"
                 className="alp-date-trigger"
-                aria-expanded={false}
-                onClick={() => setDateFilter((v) => (v === 'all' ? 'today' : 'all'))}
+                aria-haspopup="menu"
+                aria-expanded={dateOpen}
+                aria-controls="alp-date-menu"
+                onClick={() => setDateOpen((open) => !open)}
               >
                 <span>{DATE_LABELS.find((d) => d.id === dateFilter)?.label ?? '全部'}</span>
                 <ChevronDown size={13} />
               </button>
-              <div className="alp-date-menu" role="menu">
+              <div id="alp-date-menu" className="alp-date-menu" role="menu">
                 {DATE_LABELS.map((d) => (
                   <button
                     key={d.id}
                     type="button"
                     role="menuitem"
                     className={`alp-date-item${dateFilter === d.id ? ' is-active' : ''}`}
-                    onClick={() => setDateFilter(d.id)}
+                    onClick={() => {
+                      setDateFilter(d.id);
+                      setDateOpen(false);
+                    }}
                   >
                     {d.label}
                   </button>
@@ -343,7 +367,7 @@ export function AssetLibraryModal({
               <Search size={14} />
               <input
                 value={keyword}
-                placeholder="搜索素材名称"
+                placeholder="搜索素材名称 / 地址"
                 onChange={(e) => setKeyword(e.target.value)}
               />
               {keyword && (

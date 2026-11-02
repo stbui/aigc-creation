@@ -10,7 +10,7 @@ import { ensureAdminLogin } from './support/admin-login';
  *   2. 已下架素材用户端不可见, 管理端可见
  *   3. 凭据只读: 界面不提供任何写凭据的输入框
  *
- * ## 选择器约定（2026-10-30 换 BoardUI 后）
+ * ## 选择器约定（2026-10-30 后台改版后）
  *
  * 网格单元 / 批量条 / 存储卡片走 `data-testid="admin-*"`；视图切换、筛选与
  * 行内动作走 `aria-label` 与按钮名。预览灯箱 `ImageLightbox` 是 C 端共用组件，

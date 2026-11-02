@@ -383,7 +383,7 @@
      此前全站有 44 处裸 hex, 其中的 #fff / #fafbfd 各重复十几次, 想调一次底色
      就得全文搜 hex。下面两个是这几处裸 hex 的语义归属。
      （同批的 --brand-bg-tint / --brand-border-soft / --info-text / --info-border
-      只服务 antd 后台，2026-10-30 后台换 BoardUI 后已无消费者，一并删除。） */
+      只服务 antd 后台，2026-10-30 后台改版后已无消费者，一并删除。） */
   --on-brand: #ffffff; /* 实心色块 (品牌紫/危险红) 上的文字与图标 */
   --surface-tint: #fafbfd; /* 表头底 / 表格行悬停底 (比 --surface 更浅一档) */
 }
@@ -1797,6 +1797,26 @@ html[data-promo='off'] {
   .app-mobile-toggle:hover {
     background: #f1efff;
     color: #5546d8;
+  }
+  /* 抽屉顶部补桌面顶导里的三个入口（首页/套餐/邀请） */
+  .app-mobile-links {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    padding: 12px 12px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .app-mobile-links a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 38px;
+    border-radius: var(--radius-control);
+    background: var(--brand-bg);
+    color: var(--brand);
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
   }
   /* Drawer 内恢复完整横排菜单: 不受桌面窄轨的 77×60 / 10px 标签影响。 */
   .app-mobile-drawer .workspace-side-menu-v2 {
@@ -13854,8 +13874,13 @@ html[data-promo='off'] .multi-image-fusion-page {
    */
   pointer-events: none;
 }
-.my-work-card:hover .my-work-hover-actions {
+.my-work-card:hover .my-work-hover-actions,
+.my-work-card:focus-within .my-work-hover-actions {
   opacity: 1;
+}
+.my-work-hover-actions [role='button']:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
 }
 .my-work-hover-top,
 .my-work-hover-bottom {
@@ -15409,6 +15434,11 @@ html[data-promo='off'] .multi-image-fusion-page {
 }
 
 /* ── 支付方式 ─────────────────────────────────────────────────────────── */
+.co-pay-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 .co-pay-option {
   display: flex;
   align-items: center;
@@ -15418,6 +15448,42 @@ html[data-promo='off'] .multi-image-fusion-page {
   border: 1px solid var(--brand);
   border-radius: var(--radius-card);
   background: var(--brand-bg);
+}
+.co-pay-option.is-selectable {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  border-color: var(--border);
+  background: var(--card-bg);
+  transition: border-color 0.15s, background 0.15s;
+}
+.co-pay-option.is-selectable:hover {
+  border-color: var(--brand);
+}
+.co-pay-option.is-selectable.is-active {
+  border-color: var(--brand);
+  background: var(--brand-bg);
+}
+.co-pay-option.is-muted {
+  border-color: var(--border);
+  background: var(--surface);
+}
+.order-load-more,
+.ticket-load-more,
+.invite-load-more {
+  display: flex;
+  justify-content: center;
+  margin: 16px 0 8px;
+}
+.co-blocked {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+.co-blocked .co-btn {
+  text-align: center;
+  text-decoration: none;
 }
 .co-pay-icon {
   display: grid;
@@ -17294,7 +17360,8 @@ html[data-promo='off'] .multi-image-fusion-page {
   box-shadow: 0 12px 28px #282b4c1f;
 }
 .alp-date-filter:hover .alp-date-menu,
-.alp-date-filter:focus-within .alp-date-menu {
+.alp-date-filter:focus-within .alp-date-menu,
+.alp-date-filter.is-open .alp-date-menu {
   display: flex;
   flex-direction: column;
   gap: 2px;
@@ -19164,7 +19231,7 @@ html[data-promo='off'] .multi-image-fusion-page {
 }
 
 /* 抽屉宽度不得超过视口: antd Drawer 的 width/size 是固定像素, 不会自动收缩
-   （C 端仍在用 antd；后台已换 BoardUI，抽屉宽度由 RAC Modal 自己管） */
+   （C 端仍在用 antd；后台用 shadcn Drawer，宽度由原语自己管） */
 @media (max-width: 760px) {
   .ant-drawer-right > .ant-drawer-content-wrapper,
   .ant-drawer-left > .ant-drawer-content-wrapper {
@@ -24051,185 +24118,12 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   }
 }
 
-/* ════════════════════════════════════════════════════════════════════════════
-   后台外壳（BoardUI）— docs/admin-ui-design.md
-   ────────────────────────────────────────────────────────────────────────────
-   2026-10-30 后台整站换成 BoardUI（vendor/boardui + admin-ui/primitives）。
-   按 antd 定制的那套 `.adm-*` 设计系统随之作废：364 条选择器只剩下面三类还有
-   消费者，其余（页头 / 面板 / 筛选条 / 统计卡 / 值班带 / 表格微调等约 840 条规则）
-   已删除。页面内样式改由 Tailwind 与 vendor 组件承担，颜色仍取 `:root` 令牌。
-
-   还活着的三类：
-   1. `.adm-layout` / `.adm-content` / `.adm-skip-link`：外壳骨架本身；
-   2. `.adm-tower*` / `.adm-dot` / `.adm-empty-inline`：概览首屏的值班塔，
-      `components/admin/DutyBand.tsx` 也从这里导出耗时格式化工具；
-   3. 密度：不再写 `is-compact` 类，由 `admin-ui/lib/density` 的
-      `DensityContext` 下发，表格据此收紧行高。
-   ════════════════════════════════════════════════════════════════════════════ */
-
-.adm-layout {
-  min-height: 100vh;
-  background: var(--page-bg);
-}
-
-/*
- * 内容区。flex:1 与 min-width:0 缺一不可 —— 少了 min-width，宽表会把父容器顶宽，
- * 整页出现横向滚动条；`overflow-x` 把滚动限制在这个区块内部。
- *
- * 直接子块铺满整个内容区，不设统一限宽：后台以数据密集页为主（宽表、
- * 列表 + 详情双栏），限宽会让两侧留白挤压表格，反而逼出更多横向滚动。
- * 需要窄版的地方由页面自己约束（`Panel` / `SaveBar` 的 `isNarrow` / `narrow`）。
- */
-.adm-content {
-  flex: 1 1 auto;
-  min-width: 0;
-  align-self: flex-start;
-  overflow-x: auto;
-  padding: 18px 26px 56px;
-  background: var(--page-bg);
-}
-/*
- * 后台数字输入。组件自己画了 ▲▼ 步进按钮，浏览器原生 spinner 会在右侧
- * 再叠一组黑色三角（Chrome 上还会溢出圆角边框），必须关掉。
- */
-.adm-number-input::-webkit-outer-spin-button,
-.adm-number-input::-webkit-inner-spin-button {
-  -webkit-appearance: none;
-  margin: 0;
-}
-.adm-number-input {
-  -moz-appearance: textfield;
-  appearance: textfield;
-}
-
-/* 跳过导航的落点：main 收焦，但不需要焦点框 */
-.adm-content:focus-visible {
-  outline: none;
-}
-
-/* 键盘用户可跳过重复导航，直接到主内容 */
-.adm-skip-link {
-  position: fixed;
-  top: 8px;
-  left: 8px;
-  z-index: 1200;
-  padding: 8px 12px;
-  border-radius: var(--radius-control);
-  background: var(--text-strong);
-  color: var(--on-brand);
-  font-size: 13px;
-  text-decoration: none;
-  transform: translateY(calc(-100% - 16px));
-  transition: transform 0.16s ease;
-}
-.adm-skip-link:focus-visible {
-  transform: translateY(0);
-  outline: 2px solid var(--on-brand);
-  outline-offset: 2px;
-}
-
-/* ── 值班塔（概览首屏） ───────────────────────────────────────────────── */
-
-.adm-empty-inline {
-  padding: 26px 0 22px;
-  color: var(--text-muted);
-  font-size: 13px;
-  line-height: 20px;
-}
-
-.adm-dot {
-  width: 6px;
-  height: 6px;
-  flex: 0 0 6px;
-  border-radius: 50%;
-  background: var(--border-dot);
-}
-.adm-dot.is-ok {
-  background: var(--success-text);
-}
-.adm-dot.is-warn {
-  background: var(--accent-amber);
-}
-.adm-dot.is-off {
-  background: var(--border-dot);
-}
-.adm-tower {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-.adm-tower-row {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 9px 0;
-  border-top: 1px solid var(--border-row);
-  font-size: 12px;
-}
-.adm-tower-row:first-child {
-  border-top: 0;
-}
-.adm-tower-name {
-  flex: 0 1 auto;
-  max-width: 46%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--text-body);
-  font-weight: 500;
-}
-.adm-tower-modality {
-  flex: 0 0 auto;
-  color: var(--text-muted);
-  font-size: 10.5px;
-}
-.adm-tower-state {
-  flex: 0 0 auto;
-  margin-left: auto;
-  color: var(--text-muted);
-  font-size: 11px;
-}
-.adm-tower-row.is-cooling .adm-tower-state {
-  color: var(--warn-text);
-}
-.adm-tower-line {
-  flex: 1 0 100%;
-  height: 1px;
-  background: var(--border-row);
-  overflow: hidden;
-}
-.adm-tower-line > span {
-  display: block;
-  height: 1px;
-  background: var(--accent-amber);
-  transition: width 0.9s linear;
-}
-.adm-tower-more {
-  padding-top: 8px;
-  border-top: 1px solid var(--border-row);
-  font-size: 11.5px;
-}
-/* 11–12px 的说明文字统一用 --text-muted（对白底 ≥ 4.5:1）；
-   --text-desc 只留给序号、边界线这类非文字信息，不再承担正文。 */
-.adm-tower-more a {
-  color: var(--text-muted);
-  text-decoration: none;
-}
-.adm-tower-more a:hover {
-  color: var(--brand);
-}
-
 @media (prefers-reduced-motion: reduce) {
   [data-route-stage].is-route-entering,
   .route-fallback-progress::after,
   .route-skeleton-line,
   .route-skeleton-card,
   .skip-to-content {
-    animation: none;
-    transition: none;
-  }
-  .adm-tower-line > span {
     animation: none;
     transition: none;
   }

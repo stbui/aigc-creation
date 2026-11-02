@@ -139,6 +139,9 @@ function Shell() {
           <Route path="/" element={<LandingPage />} />
           <Route path="/sitemap.html" element={<SitemapPage />} />
           <Route path="/legal/:slug" element={<LegalPage />} />
+          {/* 前缀匹配会把 /legal/、/legal/a/b、/sitemap.html/x 也送进裸外壳；
+              没有 catch-all 时 <Routes> 返回 null，整页空白且无返回入口 */}
+          <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </Suspense>
     );
@@ -149,7 +152,9 @@ function Shell() {
    * 不依赖它 —— 清单接口挂了不能让它们一起白屏 (曾整壳拦截)。
    */
   const capabilityIndependent =
-    /^\/(account|credits|orders|tickets|packages|checkout)(\/|$)/.test(location.pathname);
+    /^\/(account|credits|orders|tickets|packages|checkout|works|my-works|library|asset-library|stats)(\/|$)/.test(
+      location.pathname,
+    );
 
   // 加载中 data/error 都还是 null，不能把「尚未返回」当成「加载失败」。
   // 账户/交易页会先渲染骨架并继续等清单返回，这里只在请求真正结束后告警。

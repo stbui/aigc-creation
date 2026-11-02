@@ -1,4 +1,4 @@
-import { Button, ModalDialog } from './components';
+import { ActionButton, ModalDialog } from './components';
 import { ChannelModelForm } from './ChannelModelForm';
 import type { ModelDraft } from './constants';
 import type { AdminChannelModelView, ProtocolTestResultView } from '../../../types/model';
@@ -16,6 +16,10 @@ interface ChannelModelFormDialogProps {
   onTest: () => Promise<void>;
   onClose: () => void;
   onSubmit: () => void;
+  /** 编辑前的模型级上游键（用于检测仍指向旧上游的档位） */
+  previousProviderModelKey?: string;
+  /** 一键让这批档位跟随模型默认上游 */
+  onFollowModelUpstream?: () => void;
 }
 
 /** 模型编辑器弹窗：右侧详情区保持「这条渠道有哪些模型」的稳定视图 */
@@ -32,6 +36,8 @@ export function ChannelModelFormDialog({
   onTest,
   onClose,
   onSubmit,
+  previousProviderModelKey,
+  onFollowModelUpstream,
 }: ChannelModelFormDialogProps) {
   return (
     <ModalDialog
@@ -44,12 +50,12 @@ export function ChannelModelFormDialog({
       description="价格按「积分」输入，最多 6 位小数；保存后立即进入路由目录"
       footer={
         <>
-          <Button variant="secondary" size="small" onClick={onClose} disabled={saving}>
+          <ActionButton variant="secondary" size="sm" onClick={onClose} disabled={saving}>
             取消
-          </Button>
-          <Button variant="primary" size="small" disabled={saving || !writable} onClick={onSubmit}>
+          </ActionButton>
+          <ActionButton variant="default" size="sm" disabled={saving || !writable} onClick={onSubmit}>
             {saving ? '保存中…' : '保存模型'}
-          </Button>
+          </ActionButton>
         </>
       }
     >
@@ -60,6 +66,8 @@ export function ChannelModelFormDialog({
         testResult={testResult}
         testing={testing}
         onTest={onTest}
+        previousProviderModelKey={previousProviderModelKey}
+        onFollowModelUpstream={onFollowModelUpstream}
       />
     </ModalDialog>
   );

@@ -10,7 +10,7 @@
  */
 
 /** 素材上传 / 地址换算 / 生成任务 */
-export { assetsApi, assetSrc, generateApi, toAbsoluteUrl } from '../../lib/api';
+export { assetsApi, assetSrc, generateApi, newIdempotencyKey, toAbsoluteUrl } from '../../lib/api';
 
 /** 前台模型目录数据层: 建任务必须解析出 `logicalModelId` */
 export { resolveModelId } from '../../lib/models';

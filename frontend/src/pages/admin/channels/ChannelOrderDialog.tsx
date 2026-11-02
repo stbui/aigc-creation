@@ -2,12 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowDown, ArrowUp, GripVertical } from 'lucide-react';
 import { adminChannelsApi } from './api';
 import {
-  Button,
+  ActionButton,
   EmptyState,
   IconButton,
   ModalDialog,
-  NumberInput,
-  SelectBox,
+  NumberField,
+  SelectField,
 } from './components';
 import { useToast } from './hooks';
 import { moveOrderItem, orderChanged, type OrderItem } from './utils';
@@ -59,8 +59,8 @@ export function ChannelOrderDialog({
     setLoading(true);
     try {
       const list: ChannelOrderItemView[] = channelId
-        ? await adminChannelsApi.modelOrder(channelId)
-        : await adminChannelsApi.order();
+        ? (await adminChannelsApi.modelOrder(channelId)).items
+        : (await adminChannelsApi.order()).items;
       setItems(list);
       setOriginalIds(list.map((item) => item.id));
       setTargetId(undefined);
@@ -137,24 +137,24 @@ export function ChannelOrderDialog({
       description="拖拽或用上下箭头调整顺序，也可输入目标位置。这里包含全部条目，不受列表筛选和分页影响。"
       footer={
         <>
-          <Button variant="secondary" size="small" onClick={onClose} disabled={saving || loading}>
+          <ActionButton variant="secondary" size="sm" onClick={onClose} disabled={saving || loading}>
             取消
-          </Button>
-          <Button
-            variant="primary"
-            size="small"
+          </ActionButton>
+          <ActionButton
+            variant="default"
+            size="sm"
             disabled={!changed || loading || saving}
             onClick={() => void save()}
           >
             {saving ? '保存中…' : '保存排序'}
-          </Button>
+          </ActionButton>
         </>
       }
     >
       <div className="flex flex-col gap-3">
         <div className="flex items-end gap-2">
           <div className="min-w-0 flex-1">
-            <SelectBox
+            <SelectField
               ariaLabel={channelId ? '选择要排序的模型' : '选择要排序的渠道'}
               value={targetId}
               onChange={(value) => {
@@ -173,7 +173,7 @@ export function ChannelOrderDialog({
             />
           </div>
           <div className="w-24">
-            <NumberInput
+            <NumberField
               ariaLabel="目标位置"
               value={targetPosition}
               min={1}
@@ -182,9 +182,9 @@ export function ChannelOrderDialog({
               disabled={loading || saving || !targetId}
             />
           </div>
-          <Button
+          <ActionButton
             variant="secondary"
-            size="small"
+            size="sm"
             disabled={
               loading ||
               saving ||
@@ -199,11 +199,11 @@ export function ChannelOrderDialog({
             }}
           >
             移动到此位置
-          </Button>
+          </ActionButton>
         </div>
 
         {loading && items.length === 0 ? (
-          <p className="py-8 text-center text-xs text-text-tertiary">加载中…</p>
+          <p className="py-8 text-center text-xs text-muted-foreground">加载中…</p>
         ) : items.length === 0 ? (
           <EmptyState title="暂无可排序条目" />
         ) : (
@@ -229,23 +229,23 @@ export function ChannelOrderDialog({
                   if (!saving && source) move(source, index);
                   draggedId.current = null;
                 }}
-                className="flex items-center gap-2.5 rounded-lg border border-border-table bg-white px-3 py-2"
+                className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2"
               >
-                <GripVertical aria-hidden className="shrink-0 cursor-grab text-text-placeholder" size={14} />
-                <span className="shrink-0 text-xs tabular-nums text-text-tertiary">{index + 1}</span>
-                <span className="min-w-0 flex-1 truncate text-sm text-text-primary">{item.name}</span>
-                {!item.enabled && <span className="shrink-0 text-[11px] text-text-tertiary">已停用</span>}
+                <GripVertical aria-hidden className="shrink-0 cursor-grab text-muted-foreground" size={14} />
+                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{index + 1}</span>
+                <span className="min-w-0 flex-1 truncate text-sm text-foreground">{item.name}</span>
+                {!item.enabled && <span className="shrink-0 text-[11px] text-muted-foreground">已停用</span>}
                 <IconButton
                   icon={ArrowUp}
-                  size="small"
-                  aria-label={`上移 ${item.name}`}
+                  size="sm"
+                  label={`上移 ${item.name}`}
                   disabled={saving || index === 0}
                   onClick={() => move(item.id, index - 1)}
                 />
                 <IconButton
                   icon={ArrowDown}
-                  size="small"
-                  aria-label={`下移 ${item.name}`}
+                  size="sm"
+                  label={`下移 ${item.name}`}
                   disabled={saving || index === items.length - 1}
                   onClick={() => move(item.id, index + 1)}
                 />

@@ -5,8 +5,8 @@ import { fileURLToPath } from 'node:url';
 /**
  * 具名导入 / 导出的源码级对账工具。
  *
- * 2026-10-30 出过一次真实故障：`AdminDashboardPage` 从 `AdminWidgets` import 了
- * `AdminPageLoading`，而 BoardUI 版再导出没有这个名字 —— 浏览器里是 ESM 链接失败，
+ * 2026-10-30 出过一次真实故障：`AdminDashboardPage` 从共享控件 barrel import 了
+ * `AdminPageLoading`，而那一版 barrel 没有再导出这个名字 —— 浏览器里是 ESM 链接失败，
  * 整块 `/admin` 白屏，连骨架都不出。
  *
  * 这种错**单文件转译看不出来**（esbuild / tsc 单文件只校验语法），Vitest 也看不出来：

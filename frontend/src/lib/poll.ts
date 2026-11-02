@@ -21,6 +21,10 @@ import type { Modality, Task, TaskStatus } from '../types/api';
 export interface PolledResult {
   status: TaskStatus;
   url?: string;
+  /** 产出素材 id —— 结果卡“用作参考图”需要它，不能用任务 id 代替 */
+  assetId?: string;
+  /** 产出真实格式（png/jpeg/webp），下载扩展名据此决定 */
+  format?: string;
   width?: number;
   height?: number;
   errorCode?: string | null;
@@ -51,6 +55,8 @@ export interface PolledResult {
 
 export interface PolledOutput {
   url: string;
+  /** 产出素材 id（后端 outputAssets/ outputAsset 上的 asset.id） */
+  assetId?: string;
   width?: number;
   height?: number;
   format?: string;
@@ -97,9 +103,29 @@ export async function waitForTask(taskId: string, options: PollOptions = {}): Pr
         // 多变体在同一次任务内并发调用模型，耗时上限高于普通单图能力。
         maxTries = options.maxTries ?? POLL_MULTI_FUSION_MAX_TRIES;
       }
-      if (task.status === 'succeeded' || task.status === 'failed') return { ok: true, task };
-    } catch {
-      /* 网络抖动: 不中断, 下一轮重试 */
+      /*
+       * cancelled 也是终态：后端在管理员终止 / 恢复超时时会置 cancelled，
+       * 继续轮询只会拖到超时，然后给用户一个假的“生成超时”。
+       */
+      if (
+        task.status === 'succeeded' ||
+        task.status === 'failed' ||
+        task.status === 'cancelled'
+      ) {
+        return { ok: true, task };
+      }
+    } catch (e) {
+      /*
+       * 会话失效 / 明确拒绝不应被当成网络抖动吞掉，否则用户要等完整超时。
+       * 这里不 instanceof ApiError：poll 的单测会 mock ./api，引入类会让
+       * 所有既有 mock 需要额外导出；按 status 鸭子类型判断即可。
+       */
+      const status =
+        typeof e === 'object' && e !== null && 'status' in e
+          ? Number((e as { status: unknown }).status)
+          : 0;
+      if (status === 401 || status === 403) throw e;
+      /* 其余网络抖动: 不中断, 下一轮重试 */
     }
     if (signal?.aborted) return PENDING;
     await sleep(intervalMs);
@@ -112,6 +138,14 @@ export async function pollToResult(taskId: string, options: PollOptions = {}): P
   const outcome = await waitForTask(taskId, options);
   if (!outcome.ok) return { status: 'failed', errorCode: outcome.errorCode };
   const { task } = outcome;
+  // 统一把 cancelled 映射为 failed + 明确错误码，所有消费方都能走失败分支
+  if (task.status === 'cancelled') {
+    return {
+      status: 'failed',
+      errorCode: task.errorCode ?? 'CANCELLED',
+      provider: task.provider ?? null,
+    };
+  }
   const taskOutputs = task.outputAssets?.length ? task.outputAssets : task.outputAsset ? [task.outputAsset] : [];
   const outputs = taskOutputs.flatMap((output): PolledOutput[] => {
     const url = assetSrc(output);
@@ -119,9 +153,12 @@ export async function pollToResult(taskId: string, options: PollOptions = {}): P
     return [
       {
         url,
+        // 旧 mock / 旧后端可能没有 id/format；只在真实存在时补字段，
+        // 避免把 undefined 也塞进结果对象影响既有调用方与快照
+        ...(output.id ? { assetId: output.id } : {}),
         width: output.width ?? undefined,
         height: output.height ?? undefined,
-        format: output.format,
+        ...(output.format ? { format: output.format } : {}),
         modality: output.modality,
         durationMs: output.durationMs ?? undefined,
       },
@@ -131,6 +168,8 @@ export async function pollToResult(taskId: string, options: PollOptions = {}): P
   return {
     status: task.status,
     url: primary?.url,
+    ...(primary?.assetId ? { assetId: primary.assetId } : {}),
+    ...(primary?.format ? { format: primary.format } : {}),
     width: primary?.width,
     height: primary?.height,
     errorCode: task.errorCode ?? null,

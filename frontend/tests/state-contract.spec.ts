@@ -162,7 +162,10 @@ test.describe('状态契约 · 加载失败必须呈现失败态', () => {
   test('工具历史: /tasks 500 → 失败态 + 重试, 不得显示「暂无局部重绘记录」', async ({ page, request }) => {
     const { token, email } = await fetchToken(request);
     let calls = 0;
-    await page.route(/\/api\/v1\/tasks(?:\?.*)?$/, (route) => {
+    // 历史列表走的是分页接口 `/tasks/page`（`/tasks` 是旧的整量列表）。
+    // 两个都要拦：只拦旧的会让注入的 500 落不到真实请求上，页面走「加载成功」
+    // 分支，失败态永远不出现。
+    await page.route(/\/api\/v1\/tasks(?:\/page)?(?:\?.*)?$/, (route) => {
       calls += 1;
       return route.fulfill({
         status: 500,

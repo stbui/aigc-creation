@@ -12,33 +12,37 @@ import {
   Maximize2,
   Trash2,
 } from 'lucide-react';
-import { Button, IconButton, Pagination } from '../../admin-ui/shadcn/kit';
+import {
+  ActionButton,
+  AdminDataTable,
+  AppliedFilters,
+  BatchResultModal,
+  CheckboxField,
+  ClearableField,
+  EmptyState,
+  FilterActions,
+  FilterBar,
+  IconButton,
+  ListError,
+  PageHeader,
+  Pagination,
+  Panel,
+  SegmentedGroup,
+  SelectField,
+  Skeleton,
+  StatCard,
+  StatusTag,
+  StaleError,
+  useAdminList,
+  useAdminUrlFilterSync,
+  type AdminColumn,
+  type AppliedFilter,
+} from '../../admin-ui/primitives';
 import { adminAssetsApi, assetThumbUrl, toAbsoluteUrl } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
-import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
-import { CheckBox, SegmentedBox, SelectBox, TextInput } from '../../admin-ui/controls';
-import { cx } from '../../admin-ui/lib/cn';
+import { cn } from '../../admin-ui/lib/cn';
 import { ImageLightbox, type LightboxItem } from '../../components/ImageLightbox';
-import {
-  AdminListError,
-  AdminListLoading,
-  AdminStaleError,
-  useAdminList,
-  useAdminUrlFilterSync,
-} from '../../components/admin/AdminWidgets';
-import {
-  AdminEmpty,
-  AppliedFilters,
-  FilterActions,
-  FilterBar,
-  PageHeader,
-  Panel,
-  StatCard,
-  StatusTag,
-  type AppliedFilter,
-} from '../../components/admin/PageHeader';
-import { BatchResultModal } from '../../components/admin/BatchResultModal';
 import type {
   AdminAssetListResult,
   AdminAssetStats,
@@ -113,8 +117,8 @@ function AssetThumb({
   if (failed) {
     return (
       <span
-        className={cx(
-          'flex items-center justify-center bg-background-secondary-default text-text-placeholder',
+        className={cn(
+          'flex items-center justify-center bg-muted text-muted-foreground',
           className,
         )}
         role="img"
@@ -126,7 +130,7 @@ function AssetThumb({
   }
   return (
     <img
-      className={cx('bg-background-secondary-default object-cover', className)}
+      className={cn('bg-muted object-cover', className)}
       src={src}
       alt={alt}
       loading="lazy"
@@ -419,7 +423,7 @@ export function AdminAssetsPage() {
         render: (row: Row) => (
           <button
             type="button"
-            className="block size-9 overflow-hidden rounded-md border border-border-table"
+            className="block size-9 overflow-hidden rounded-md border border-border"
             title="查看大图"
             aria-label={`查看大图：${assetLabel(row)}`}
             onClick={() => setPreviewId(row.id)}
@@ -444,14 +448,14 @@ export function AdminAssetsPage() {
         width: 130,
         cellTitle: (row: Row) => row.capability ?? undefined,
         render: (row: Row) =>
-          row.capability ?? <span className="text-text-placeholder">—</span>,
+          row.capability ?? <span className="text-muted-foreground">—</span>,
       },
       {
         key: 'dim',
         title: '尺寸',
         width: 110,
         render: (row: Row) => (
-          <span className="text-text-secondary">
+          <span className="text-muted-foreground">
             {row.width && row.height ? `${row.width}×${row.height}` : '—'}
           </span>
         ),
@@ -460,7 +464,9 @@ export function AdminAssetsPage() {
         key: 'format',
         title: '格式',
         width: 68,
-        render: (row: Row) => <span className="text-text-secondary">{fmtFormat(row.format)}</span>,
+        render: (row: Row) => (
+          <span className="text-muted-foreground">{fmtFormat(row.format)}</span>
+        ),
       },
       {
         key: 'sizeBytes',
@@ -516,25 +522,25 @@ export function AdminAssetsPage() {
         render: (row: Row) => (
           <div className="flex items-center gap-1">
             {can('asset.hide') && (
-              <Button
+              <ActionButton
                 variant="ghost"
-                size="small"
+                size="sm"
                 disabled={statusBusyId !== null}
                 onClick={() =>
                   void toggleStatus(row, row.status === 'visible' ? 'hidden' : 'visible')
                 }
               >
                 {statusBusyId === row.id ? '处理中…' : row.status === 'visible' ? '下架' : '恢复'}
-              </Button>
+              </ActionButton>
             )}
             {can('asset.delete') && (
-              <Button
-                variant="dangerGhost"
-                size="small"
+              <ActionButton
+                variant="destructive"
+                size="sm"
                 onClick={() => void openDelete(row)}
               >
                 删除
-              </Button>
+              </ActionButton>
             )}
           </div>
         ),
@@ -555,7 +561,7 @@ export function AdminAssetsPage() {
         description="管理全平台用户的上传与生成素材；下架后用户端不可见但可恢复"
         actions={
           <>
-            <SegmentedBox
+            <SegmentedGroup
               ariaLabel="切换视图"
               value={view}
               onChange={(next) => handleViewChange(next as 'grid' | 'table')}
@@ -581,14 +587,13 @@ export function AdminAssetsPage() {
               ]}
             />
             {can('data.export') && (
-              <Button
+              <ActionButton
                 variant="secondary"
-                size="small"
-                leadingIcon={Download}
+                icon={Download}
                 onClick={() => void exportAssets()}
               >
                 导出 CSV
-              </Button>
+              </ActionButton>
             )}
           </>
         }
@@ -616,7 +621,7 @@ export function AdminAssetsPage() {
             label="存储分布"
             value={
               <span className="flex items-center gap-1.5 text-[15px] leading-6">
-                <HardDrive className="size-4 text-text-tertiary" aria-hidden />
+                <HardDrive className="size-4 text-muted-foreground" aria-hidden />
                 {Object.entries(stats.byBackend)
                   .map(([k, v]) => `${BACKEND_LABEL[k] ?? k} ${v}`)
                   .join(' · ') || '—'}
@@ -628,23 +633,23 @@ export function AdminAssetsPage() {
       )}
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
-      {error && data && <AdminStaleError error={error} onRetry={reload} />}
+      {error && data && <StaleError error={error} onRetry={reload} />}
 
       <FilterBar>
-        <TextInput
+        <ClearableField
           className="w-56"
           placeholder="ID / 能力关键词"
           ariaLabel="按素材 ID 或能力关键词筛选"
-          allowClear
           value={keyword}
           onChange={setKeyword}
           onEnter={applyFilters}
         />
-        <SelectBox
+        <SelectField
           className="w-32"
           ariaLabel="按类型筛选"
           placeholder="类型"
           allowClear
+          clearLabel="全部类型"
           value={kind}
           onChange={setKind}
           options={[
@@ -652,11 +657,12 @@ export function AdminAssetsPage() {
             { value: 'generated', label: '生成图' },
           ]}
         />
-        <SelectBox
+        <SelectField
           className="w-32"
           ariaLabel="按状态筛选"
           placeholder="状态"
           allowClear
+          clearLabel="全部状态"
           value={status}
           onChange={setStatus}
           options={[
@@ -664,27 +670,27 @@ export function AdminAssetsPage() {
             { value: 'hidden', label: '已下架' },
           ]}
         />
-        <SelectBox
+        <SelectField
           className="w-36"
           ariaLabel="按存储后端筛选"
           placeholder="存储后端"
           allowClear
+          clearLabel="全部存储后端"
           value={backend}
           onChange={setBackend}
           options={Object.entries(BACKEND_LABEL).map(([value, label]) => ({ value, label }))}
         />
         <FilterActions>
-          <Button variant="primary" size="small" onClick={applyFilters}>
+          <ActionButton variant="default" onClick={applyFilters}>
             查询
-          </Button>
-          <Button
+          </ActionButton>
+          <ActionButton
             variant="secondary"
-            size="small"
             onClick={resetFilters}
             disabled={appliedChips.length === 0 && !keyword && !kind && !status && !backend}
           >
             重置
-          </Button>
+          </ActionButton>
         </FilterActions>
         <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
       </FilterBar>
@@ -692,12 +698,14 @@ export function AdminAssetsPage() {
       {selected.length > 0 && (
         <div
           data-testid="admin-bulk-bar"
-          className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-accent-200 bg-accent-50 px-3 py-2"
+          className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-accent px-3 py-2"
           role="status"
         >
-          <span className="text-xs font-medium text-accent-900">已选 {selected.length} 张素材</span>
+          <span className="text-xs font-medium text-accent-foreground">
+            已选 {selected.length} 张素材
+          </span>
           {view === 'grid' && (
-            <CheckBox
+            <CheckboxField
               size="sm"
               checked={allPageSelected}
               indeterminate={somePageSelected}
@@ -707,37 +715,34 @@ export function AdminAssetsPage() {
           )}
           {can('asset.hide') && (
             <>
-              <Button
+              <ActionButton
                 variant="secondary"
-                size="small"
                 onClick={() => void runBatch('hide')}
                 disabled={busy}
               >
                 批量下架
-              </Button>
-              <Button
+              </ActionButton>
+              <ActionButton
                 variant="secondary"
-                size="small"
                 onClick={() => void runBatch('show')}
                 disabled={busy}
               >
                 批量恢复
-              </Button>
+              </ActionButton>
             </>
           )}
           {can('asset.delete') && (
-            <Button
-              variant="danger"
-              size="small"
+            <ActionButton
+              variant="destructive"
               onClick={() => void runBatch('delete')}
               disabled={busy}
             >
               批量删除
-            </Button>
+            </ActionButton>
           )}
-          <Button variant="ghost" size="small" onClick={() => setSelected([])}>
+          <ActionButton variant="ghost" onClick={() => setSelected([])}>
             清空选择
-          </Button>
+          </ActionButton>
         </div>
       )}
 
@@ -746,7 +751,7 @@ export function AdminAssetsPage() {
         note={`${total} 张`}
         extra={
           view === 'grid' && items.length > 0 ? (
-            <span className="flex items-center gap-1.5 text-[11px] text-text-tertiary">
+            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <FolderOpen className="size-3.5" aria-hidden />
               每页 {pageSize} 张
             </span>
@@ -755,11 +760,15 @@ export function AdminAssetsPage() {
       >
         {view === 'grid' ? (
           loading && items.length === 0 ? (
-            <AdminListLoading tip="加载素材…" />
+            <div className="flex flex-col gap-2 py-2">
+              <Skeleton rows={4} />
+              <p className="text-center text-xs text-muted-foreground">加载素材…</p>
+            </div>
           ) : error && items.length === 0 ? (
-            <AdminListError error={error} onRetry={reload} />
+            <ListError error={error} onRetry={reload} />
           ) : items.length === 0 ? (
-            <AdminEmpty
+            <EmptyState
+              title={appliedChips.length > 0 ? '没有符合条件的素材' : '暂无素材'}
               description={
                 appliedChips.length > 0
                   ? '没有符合当前筛选条件的素材。清除筛选后可查看全部素材。'
@@ -767,16 +776,16 @@ export function AdminAssetsPage() {
               }
               action={
                 appliedChips.length > 0 ? (
-                  <Button variant="secondary" size="small" onClick={resetFilters}>
+                  <ActionButton variant="secondary" onClick={resetFilters}>
                     清除筛选
-                  </Button>
+                  </ActionButton>
                 ) : undefined
               }
             />
           ) : (
             <>
               <div
-                className={cx(
+                className={cn(
                   'grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]',
                   loading && 'opacity-60',
                 )}
@@ -789,9 +798,9 @@ export function AdminAssetsPage() {
                       key={a.id}
                       data-testid="admin-asset-cell"
                       data-status={a.status}
-                      className={cx(
-                        'group overflow-hidden rounded-xl border bg-white transition-colors',
-                        checked ? 'border-accent-400 ring-1 ring-accent-200' : 'border-border-table',
+                      className={cn(
+                        'group overflow-hidden rounded-xl border bg-card transition-colors',
+                        checked ? 'border-brand ring-1 ring-brand/20' : 'border-border',
                         a.status === 'hidden' && 'opacity-75',
                       )}
                     >
@@ -810,40 +819,38 @@ export function AdminAssetsPage() {
                         </button>
 
                         {selectable && (
-                          <label className="absolute left-2 top-2 flex size-5 cursor-pointer items-center justify-center rounded bg-white/90 shadow-xs">
-                            <input
-                              type="checkbox"
-                              className="size-3.5 cursor-pointer accent-accent-600"
+                          <span className="absolute left-2 top-2 flex size-5 items-center justify-center rounded bg-card/90 shadow-xs">
+                            <CheckboxField
+                              ariaLabel={`选择 ${assetLabel(a)}`}
                               checked={checked}
-                              aria-label={`选择 ${assetLabel(a)}`}
-                              onChange={(event) => toggleSelected(a.id, event.target.checked)}
+                              onChange={(next) => toggleSelected(a.id, next)}
                             />
-                          </label>
+                          </span>
                         )}
 
                         {a.status === 'hidden' && (
-                          <span className="absolute right-2 top-2 rounded bg-neutral-900/80 px-1.5 py-0.5 text-[10px] text-white">
+                          <span className="absolute right-2 top-2 rounded bg-foreground/80 px-1.5 py-0.5 text-[10px] text-background">
                             已下架
                           </span>
                         )}
 
                         <div
-                          className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-black/55 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
+                          className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-foreground/55 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
                           role="group"
                           aria-label="素材快捷操作"
                         >
                           <IconButton
-                            size="small"
+                            size="sm"
                             icon={Maximize2}
-                            aria-label={`查看大图：${assetLabel(a)}`}
+                            label={`查看大图：${assetLabel(a)}`}
                             title="查看大图"
                             onClick={() => setPreviewId(a.id)}
                           />
                           {can('asset.hide') && (
                             <IconButton
-                              size="small"
+                              size="sm"
                               icon={a.status === 'visible' ? EyeOff : Eye}
-                              aria-label={a.status === 'visible' ? '下架素材' : '恢复上架'}
+                              label={a.status === 'visible' ? '下架素材' : '恢复上架'}
                               title={a.status === 'visible' ? '下架素材' : '恢复上架'}
                               disabled={statusBusyId === a.id}
                               onClick={() =>
@@ -856,11 +863,11 @@ export function AdminAssetsPage() {
                           )}
                           {can('asset.delete') && (
                             <IconButton
-                              size="small"
+                              size="sm"
                               icon={Trash2}
-                              aria-label="永久删除素材"
+                              label="永久删除素材"
                               title="永久删除"
-                              style={{ color: 'var(--color-rose-600)' }}
+                              className="text-danger-text hover:text-danger-text"
                               onClick={() => void openDelete(a)}
                             />
                           )}
@@ -868,11 +875,11 @@ export function AdminAssetsPage() {
                       </div>
 
                       <div className="px-2 py-1.5">
-                        <div className="truncate text-xs font-medium text-text-primary" title={assetLabel(a)}>
+                        <div className="truncate text-xs font-medium text-foreground" title={assetLabel(a)}>
                           {assetLabel(a)}
                         </div>
                         <div
-                          className="truncate text-[11px] text-text-tertiary"
+                          className="truncate text-[11px] text-muted-foreground"
                           title={`${fmtFormat(a.format)}${
                             a.width && a.height ? ` · ${a.width}×${a.height}` : ''
                           } · ${fmtBytes(a.sizeBytes)}`}
@@ -882,7 +889,7 @@ export function AdminAssetsPage() {
                           {fmtBytes(a.sizeBytes)}
                         </div>
                         <div
-                          className="truncate text-[11px] text-text-tertiary"
+                          className="truncate text-[11px] text-muted-foreground"
                           title={`${a.ownerEmail} · ${a.projectName}`}
                         >
                           {a.ownerEmail} · {a.projectName}
@@ -894,8 +901,8 @@ export function AdminAssetsPage() {
               </div>
 
               {total > 0 && (
-                <div className="mt-3 flex items-center justify-between border-t border-border-table pt-3">
-                  <span className="text-xs text-text-tertiary">共 {total} 张</span>
+                <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
+                  <span className="text-xs text-muted-foreground">共 {total} 张</span>
                   <Pagination
                     page={Math.min(page, totalPages)}
                     totalPages={totalPages}
@@ -921,7 +928,7 @@ export function AdminAssetsPage() {
             error={error}
             onRetry={reload}
             minWidth={1300}
-            rowClassName={(row) => (row.status === 'hidden' ? 'bg-amber-50/40' : undefined)}
+            rowClassName={(row) => (row.status === 'hidden' ? 'bg-warn-soft/40' : undefined)}
             selectable={selectable}
             selected={selected}
             onSelectedChange={setSelected}
@@ -932,9 +939,9 @@ export function AdminAssetsPage() {
             }
             emptyAction={
               appliedChips.length > 0 ? (
-                <Button variant="secondary" size="small" onClick={resetFilters}>
+                <ActionButton variant="secondary" onClick={resetFilters}>
                   清除筛选
-                </Button>
+                </ActionButton>
               ) : undefined
             }
             pagination={

@@ -1,18 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Chip } from '../../admin-ui/shadcn/kit';
 import { adminApi, adminRolesApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
-import { CheckBox } from '../../admin-ui/controls';
-import {
-  AdminListError,
-  AdminListLoading,
-  AdminStaleError,
-  useAdminResource,
-} from '../../components/admin/AdminWidgets';
-import { AdminEmpty, PageHeader, Panel } from '../../components/admin/PageHeader';
 import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
-import { cx } from '../../admin-ui/lib/cn';
+import {
+  ActionButton,
+  CheckboxField,
+  EmptyState,
+  ListError,
+  PageHeader,
+  Panel,
+  Skeleton,
+  StaleError,
+  ToneBadge,
+  useAdminResource,
+} from '../../admin-ui/primitives';
+import { cn } from '../../admin-ui/lib/cn';
 
 /** 权限点 → 中文说明。未登记的权限点原样显示 id, 不静默消失 */
 const PERMISSION_LABELS: Record<string, string> = {
@@ -287,9 +290,16 @@ export function AdminRolesPage() {
     }
   };
 
-  if (loading && !data) return <AdminListLoading tip="加载角色权限…" />;
-  if (error && !data) return <AdminListError error={error} onRetry={() => void reload()} />;
-  if (roles.length === 0) return <AdminEmpty description="未配置任何后台角色" />;
+  if (loading && !data) {
+    return (
+      <div className="flex flex-col gap-3" aria-busy="true" aria-live="polite">
+        <Skeleton rows={4} />
+        <p className="text-center text-xs text-muted-foreground">加载角色权限…</p>
+      </div>
+    );
+  }
+  if (error && !data) return <ListError error={error} onRetry={() => void reload()} />;
+  if (roles.length === 0) return <EmptyState title="未配置任何后台角色" />;
 
   return (
     <>
@@ -303,24 +313,24 @@ export function AdminRolesPage() {
       />
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
-      {error && <AdminStaleError error={error} onRetry={reload} />}
+      {error && <StaleError error={error} onRetry={reload} />}
 
       {editable && dirtyRoles.length > 0 && (
         <div
           role="status"
           data-testid="admin-role-save-bar"
-          className="mb-3 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50/60 px-3.5 py-2.5"
+          className="mb-3 flex items-center gap-3 rounded-xl border border-warn-border bg-warn-soft px-3.5 py-2.5"
         >
-          <span className="min-w-0 flex-1 text-xs text-amber-900">
+          <span className="min-w-0 flex-1 text-xs text-warn-text">
             有 {dirtyRoles.length} 个角色未保存：
             {dirtyRoles.map((role) => `${role.label} ${role.changedCount} 项`).join('、')}
           </span>
-          <Button variant="secondary" size="small" disabled={busy} onClick={resetDraft}>
+          <ActionButton variant="secondary" size="sm" disabled={busy} onClick={resetDraft}>
             放弃变更
-          </Button>
-          <Button variant="primary" size="small" disabled={busy} onClick={() => void saveAll()}>
+          </ActionButton>
+          <ActionButton variant="default" size="sm" disabled={busy} onClick={() => void saveAll()}>
             {busy ? '保存中…' : '保存全部变更'}
-          </Button>
+          </ActionButton>
         </div>
       )}
 
@@ -329,11 +339,11 @@ export function AdminRolesPage() {
         note={`共 ${allPermissions.length} 个权限点，内置角色不可删除，仅可调整权限`}
       >
         {/* 图例：每个角色当前勾了多少，与右侧模块表同一份草稿 */}
-        <div className="mb-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 border-b border-border-table pb-3">
+        <div className="mb-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 border-b border-border pb-3">
           {roles.map((r) => (
-            <span key={r.code} className="flex items-baseline gap-1.5 text-xs text-text-secondary">
+            <span key={r.code} className="flex items-baseline gap-1.5 text-xs text-muted-foreground">
               {r.label}
-              <em className="font-medium not-italic tabular-nums text-text-primary">
+              <em className="font-medium not-italic tabular-nums text-foreground">
                 {(draft[r.code] ?? new Set()).size} / {allPermissions.length}
               </em>
             </span>
@@ -344,8 +354,8 @@ export function AdminRolesPage() {
           {modules.map((mod) => (
             <section key={mod.module}>
               {/* 模块头：每个角色一个「全选 / 全不选」的快捷切换 */}
-              <div className="flex items-center gap-3 border-b border-border-table pb-1.5">
-                <strong className="min-w-0 flex-1 text-xs font-semibold text-text-primary">
+              <div className="flex items-center gap-3 border-b border-border pb-1.5">
+                <strong className="min-w-0 flex-1 text-xs font-semibold text-foreground">
                   {mod.label}
                 </strong>
                 <div className="flex shrink-0">
@@ -354,20 +364,26 @@ export function AdminRolesPage() {
                     const all = mod.codes.every((c) => set.has(c));
                     const none = mod.codes.every((c) => !set.has(c));
                     return (
-                      <div key={r.code} className={cx(ROLE_COL, 'shrink-0')}>
-                        <Button
-                          variant="ghost"
-                          size="xs"
+                      <div key={r.code} className={cn(ROLE_COL, 'shrink-0')}>
+                        {/*
+                         * `ActionButton` 不透传 `aria-pressed`；这一枚需要把
+                         * 「当前模块已全选」暴露给读屏，用原生按钮保留该状态。
+                         */}
+                        <button
+                          type="button"
                           disabled={!editable}
                           aria-pressed={all}
-                          className={cx(
-                            all && 'text-accent-700',
-                            none && 'text-text-placeholder',
-                          )}
                           onClick={() => toggleModule(r.code, mod.codes)}
+                          className={cn(
+                            'inline-flex h-6 items-center justify-center rounded-md px-2 text-xs font-medium transition-colors',
+                            'outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50',
+                            'disabled:cursor-not-allowed disabled:opacity-50',
+                            all && 'text-brand',
+                            none && 'text-muted-foreground/60',
+                          )}
                         >
                           {all ? '全不选' : '全选'}
-                        </Button>
+                        </button>
                       </div>
                     );
                   })}
@@ -377,26 +393,26 @@ export function AdminRolesPage() {
               {mod.codes.map((code) => (
                 <div
                   key={code}
-                  className={cx(
-                    'flex items-center gap-3 border-b border-border-table/60 py-1.5 last:border-b-0',
-                    HIGH_RISK.has(code) && 'bg-rose-50/30',
+                  className={cn(
+                    'flex items-center gap-3 border-b border-border/60 py-1.5 last:border-b-0',
+                    HIGH_RISK.has(code) && 'bg-danger-soft/30',
                   )}
                 >
                   <div className="flex min-w-0 flex-1 items-center gap-1.5">
-                    <span className="truncate text-xs text-text-primary">
+                    <span className="truncate text-xs text-foreground">
                       {PERMISSION_LABELS[code] ?? code}
                     </span>
                     {HIGH_RISK.has(code) && (
-                      <Chip variant="caption" color="orange">
+                      <ToneBadge tone="warn">
                         高危
-                      </Chip>
+                      </ToneBadge>
                     )}
-                    <code className="truncate font-mono text-[11px] text-text-placeholder">{code}</code>
+                    <code className="truncate font-mono text-[11px] text-muted-foreground/60">{code}</code>
                   </div>
                   <div className="flex shrink-0">
                     {roles.map((r) => (
-                      <div key={r.code} className={cx(ROLE_COL, 'shrink-0')}>
-                        <CheckBox
+                      <div key={r.code} className={cn(ROLE_COL, 'shrink-0')}>
+                        <CheckboxField
                           size="sm"
                           checked={(draft[r.code] ?? new Set()).has(code)}
                           disabled={!editable}

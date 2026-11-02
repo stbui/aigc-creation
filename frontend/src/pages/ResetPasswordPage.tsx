@@ -3,6 +3,7 @@ import { Form, Input, Button, App } from 'antd';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Lock, ShieldCheck } from 'lucide-react';
 import { authApi } from '../lib/api';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 
 /**
  * 重置密码 —— 邮件里的链接落地页。
@@ -12,6 +13,7 @@ import { authApi } from '../lib/api';
  * 而不是让用户填完两次密码才收到一个「链接无效」。
  */
 export function ResetPasswordPage() {
+  useDocumentMeta('重置密码 · 货觉AI', '设置货觉AI账号的新密码。');
   const { message } = App.useApp();
   const [params] = useSearchParams();
   const token = (params.get('token') || '').trim();

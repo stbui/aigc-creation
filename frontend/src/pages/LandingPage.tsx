@@ -24,6 +24,7 @@ import {
   toolPath,
 } from '../lib/capabilities';
 import { useCapabilities } from '../hooks/useCapabilities';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { PromoBar } from '../components/PromoBar';
 import { useAuth } from '../context/AuthContext';
 import { productsApi, membershipApi, myMarketingApi } from '../lib/api';
@@ -450,6 +451,10 @@ function formatCampaignEnd(iso: string): string {
 }
 
 export function LandingPage() {
+  useDocumentMeta(
+    '货觉AI · 电商视觉创作平台',
+    '上传商品图，生成能上架的图。商品主图、详情页、营销视觉，一站生成。',
+  );
   const navigate = useNavigate();
   const { data: capabilityData } = useCapabilities();
   const [pkgTab, setPkgTab] = useState<'sub' | 'addon' | 'campaign'>('sub');
@@ -542,6 +547,10 @@ export function LandingPage() {
         : CASE_GROUPS,
     [visibleCapabilityIds],
   );
+
+  /** 能力清单已到达时，CTA 也必须跟随时运行时可见性，不能指向已下线工具 */
+  const canUse = (capability: string) =>
+    !visibleCapabilityIds || visibleCapabilityIds.has(capability);
 
   /** 案例卡点击: 跳对应工具页 (未登录能力走工具页, 由 App 层鉴权兜底) */
   const caseTarget = (key: string) => {
@@ -980,10 +989,12 @@ export function LandingPage() {
               <li>一张图延展多套视觉，快速测试点击率</li>
               <li>风格统一，适合店铺、广告、详情页同步使用</li>
             </ul>
-            <button type="button" className="lp-btn lp-btn-primary" onClick={() => navigate('/product-kit')}>
-              去试试
-              <ArrowRight size={15} aria-hidden />
-            </button>
+            {canUse('main_image') && (
+              <button type="button" className="lp-btn lp-btn-primary" onClick={() => navigate('/product-kit')}>
+                去试试
+                <ArrowRight size={15} aria-hidden />
+              </button>
+            )}
           </div>
           <div className="lp-feature-media">
             {/* 参考站该区是 banner 背景图内嵌, 本项目改用真实产出拼贴(诚实替代)。
@@ -1003,10 +1014,12 @@ export function LandingPage() {
               <li>模块化输出，方便直接排版落地</li>
               <li>提升页面完整度，减少设计制作时间</li>
             </ul>
-            <button type="button" className="lp-text-link" onClick={() => navigate('/product-detail')}>
-              去试试
-              <ArrowRight size={14} aria-hidden />
-            </button>
+            {canUse('detail_image') && (
+              <button type="button" className="lp-text-link" onClick={() => navigate('/product-detail')}>
+                去试试
+                <ArrowRight size={14} aria-hidden />
+              </button>
+            )}
           </article>
           <article className="lp-feature-card">
             <h3>复刻爆款图的设计风格</h3>
@@ -1015,10 +1028,12 @@ export function LandingPage() {
               <li>跟款上新更快，趋势不掉队</li>
               <li>保留原图氛围，替换主体不违和</li>
             </ul>
-            <button type="button" className="lp-text-link" onClick={() => navigate('/viral-clone')}>
-              去试试
-              <ArrowRight size={14} aria-hidden />
-            </button>
+            {canUse('hot_remake') && (
+              <button type="button" className="lp-text-link" onClick={() => navigate('/viral-clone')}>
+                去试试
+                <ArrowRight size={14} aria-hidden />
+              </button>
+            )}
           </article>
         </div>
       </section>
@@ -1053,8 +1068,8 @@ export function LandingPage() {
           </div>
           <div className="landing-footer-col">
             <h4>AI工具</h4>
-            <Link to="/product-kit">商品主图</Link>
-            <Link to="/viral-clone">爆款复刻</Link>
+            {canUse('main_image') && <Link to="/product-kit">商品主图</Link>}
+            {canUse('hot_remake') && <Link to="/viral-clone">爆款复刻</Link>}
             <Link to="/workbench">更多工具</Link>
           </div>
           <div className="landing-footer-col">

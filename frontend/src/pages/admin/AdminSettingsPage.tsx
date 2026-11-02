@@ -6,32 +6,26 @@ import { adminSettingsApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
 import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
-import { useAdminResource } from '../../components/admin/AdminWidgets';
 import {
   ActionButton,
-  AdminEmpty,
-  AdminListError,
-  AdminStaleError,
   ClearableField,
+  EmptyState,
   FormField,
+  ListError,
+  ModalDialog,
   NumberField,
-  PageTitle,
+  PageHeader,
   Panel,
   SaveBar,
   SegmentedTabs,
   SelectField,
+  Skeleton,
+  StaleError,
   SwitchField,
   TextField,
   ToneBadge,
-} from '../../admin-ui/shadcn';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '../../admin-ui/components/ui';
+  useAdminResource,
+} from '../../admin-ui/primitives';
 import type { AdminSettings, AdminSettingValue } from '../../types/api';
 
 type SettingItem = AdminSettings['groups'][number]['items'][number];
@@ -43,7 +37,7 @@ function displayValue(value: AdminSettingValue, type: SettingItem['type']): stri
 }
 
 /**
- * 系统设置（shadcn 版样板页，2026-11-01）。
+ * 系统设置。
  *
  * ## 契约
  *
@@ -56,15 +50,6 @@ function displayValue(value: AdminSettingValue, type: SettingItem['type']): stri
  *
  * 表单改动只落在本地 `draft`，点「保存变更」才提交。只读项不渲染控件：
  * 一个能拖动却不生效的开关，比没有这个开关更糟。
- *
- * ## 为什么换骨架
- *
- * 这是 shadcn 迁移的第二个样板页（第一个是概览）。旧版用 BoardUI 的
- * 发丝线页头 + 描边面板 + 下划线页签；新版用卡片容器 + 弱投影 + 胶囊页签，
- * 层级靠留白与投影表达，不靠线条堆叠。
- *
- * 页面内**不混用**两套控件：一个页面要么全用旧控件，要么全用新的 ——
- * 混用会在同一张表单里出现两套圆角与两套描边色。
  */
 export function AdminSettingsPage() {
   const toast = useToast();
@@ -82,12 +67,14 @@ export function AdminSettingsPage() {
   const [saveReason, setSaveReason] = useState('');
   const [reasonError, setReasonError] = useState(false);
 
-  const { data: settings, loading, error, reload } = useAdminResource(() => adminSettingsApi.read());
+  const { data: settings, loading, error, reload } = useAdminResource(() =>
+    adminSettingsApi.read(),
+  );
 
   /*
-   * 首次拿到配置后落到第一个分组。必须放 effect 而不能塞进 fetcher:
-   * 保存后 `reload()` 会重新拉一次, 塞进 fetcher 就会把用户当前停留的
-   * 分页签冲回第一组。
+   * 首次拿到配置后落到第一个分组。必须放 effect 而不能塞进 fetcher：
+   * 保存后 `reload()` 会重新拉一次，塞进 fetcher 就会把用户当前停留的
+   * 分组页签冲回第一组。
    */
   useEffect(() => {
     if (!settings) return;
@@ -170,7 +157,7 @@ export function AdminSettingsPage() {
     }
   };
 
-  /** 变更说明: 逐项对比已保存值与草稿值 */
+  /** 变更说明：逐项对比已保存值与草稿值 */
   const changeSummary = useMemo(() => {
     if (!settings) return [];
     const all = settings.groups.flatMap((g) => g.items);
@@ -194,19 +181,13 @@ export function AdminSettingsPage() {
   if (loading && !settings) {
     return (
       <div className="flex flex-col gap-3" aria-busy="true" aria-live="polite">
-        {Array.from({ length: 4 }, (_, index) => (
-          <div
-            key={index}
-            className="h-16 animate-pulse rounded-xl bg-muted"
-            style={{ animationDelay: `${index * 80}ms` }}
-          />
-        ))}
+        <Skeleton rows={4} />
         <p className="text-center text-xs text-muted-foreground">加载系统设置…</p>
       </div>
     );
   }
-  if (error && !settings) return <AdminListError error={error} onRetry={() => void reload()} />;
-  if (!settings) return <AdminEmpty description="暂无配置项" />;
+  if (error && !settings) return <ListError error={error} onRetry={() => void reload()} />;
+  if (!settings) return <EmptyState title="暂无配置项" />;
 
   const renderControl = (item: SettingItem) => {
     if (item.readOnly) {
@@ -225,7 +206,7 @@ export function AdminSettingsPage() {
           checked={Boolean(value)}
           onChange={(checked) => setValue(item.key, checked)}
           disabled={!editable}
-          aria-label={item.label}
+          ariaLabel={item.label}
         />
       );
     }
@@ -271,7 +252,7 @@ export function AdminSettingsPage() {
 
   return (
     <>
-      <PageTitle
+      <PageHeader
         title="系统设置"
         description={
           editable
@@ -280,13 +261,13 @@ export function AdminSettingsPage() {
         }
       />
 
-      {/* 刷新失败但配置还在: 页面必须让用户知道「屏幕上这份可能已过期」 */}
-      {error && <AdminStaleError error={error} onRetry={() => void reload()} />}
+      {/* 刷新失败但配置还在：页面必须让用户知道「屏幕上这份可能已过期」 */}
+      {error && <StaleError error={error} onRetry={() => void reload()} />}
 
       {/*
-       * 分组页签用胶囊式（shadcn）而不是下划线式：分组是「同一批配置按领域切」，
+       * 分组页签用胶囊式而不是下划线式：分组是「同一批配置按领域切」，
        * 胶囊的选中态比下划线更显眼 —— 运营在长表单里最容易丢的是
-       「我正在改哪一组」。
+       * 「我正在改哪一组」。
        */}
       <SegmentedTabs
         value={activeGroup}
@@ -301,19 +282,17 @@ export function AdminSettingsPage() {
 
       {activeGroupData && (
         <Panel
-          isNarrow
+          narrow
           className="mb-0"
           title={`${activeGroupData.label} · 共 ${activeGroupData.items.length} 项`}
-          note={`${
-            activeGroupData.items.filter((item) => !item.readOnly).length
-          } 项可编辑${
+          note={`${activeGroupData.items.filter((item) => !item.readOnly).length} 项可编辑${
             activeGroupData.items.some((item) => item.readOnly)
               ? '，其余为只读配置地图'
               : ''
           }`}
         >
           {activeGroupData.items.length === 0 ? (
-            <AdminEmpty description="该分组暂无配置项" />
+            <EmptyState title="该分组暂无配置项" />
           ) : (
             <div className="flex flex-col">
               {activeGroupData.items.map((item) => {
@@ -327,9 +306,7 @@ export function AdminSettingsPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm font-medium text-foreground">{item.label}</span>
-                        {item.readOnly && (
-                          <ToneBadge tone="neutral">只读</ToneBadge>
-                        )}
+                        {item.readOnly && <ToneBadge tone="neutral">只读</ToneBadge>}
                         {item.overridden && !isClearing && (
                           <ToneBadge tone="brand" className="cursor-help">
                             <span title="已覆盖代码默认值">已自定义</span>
@@ -357,7 +334,7 @@ export function AdminSettingsPage() {
                           </span>
                         )}
                         {item.linkTo && (
-                          <Link className="text-primary hover:underline" to={item.linkTo}>
+                          <Link className="text-brand hover:underline" to={item.linkTo}>
                             前往配置 →
                           </Link>
                         )}
@@ -394,22 +371,22 @@ export function AdminSettingsPage() {
         </Panel>
       )}
 
-      <Panel isNarrow title="相关管理入口">
+      <Panel narrow title="相关管理入口" className="mt-4">
         <ul className="flex flex-col gap-2.5">
           <li className="flex items-baseline gap-2">
-            <Link className="text-sm font-medium text-primary hover:underline" to="/admin/channels">
+            <Link className="text-sm font-medium text-brand hover:underline" to="/admin/channels">
               渠道工作台
             </Link>
             <span className="text-xs text-muted-foreground">上游渠道、渠道模型与协议</span>
           </li>
           <li className="flex items-baseline gap-2">
-            <Link className="text-sm font-medium text-primary hover:underline" to="/admin/backups">
+            <Link className="text-sm font-medium text-brand hover:underline" to="/admin/backups">
               数据备份
             </Link>
             <span className="text-xs text-muted-foreground">备份频次、恢复验证与保留份数</span>
           </li>
           <li className="flex items-baseline gap-2">
-            <Link className="text-sm font-medium text-primary hover:underline" to="/admin/legal">
+            <Link className="text-sm font-medium text-brand hover:underline" to="/admin/legal">
               法务文档
             </Link>
             <span className="text-xs text-muted-foreground">
@@ -417,7 +394,7 @@ export function AdminSettingsPage() {
             </span>
           </li>
           <li className="flex items-baseline gap-2">
-            <Link className="text-sm font-medium text-primary hover:underline" to="/admin/tickets">
+            <Link className="text-sm font-medium text-brand hover:underline" to="/admin/tickets">
               工单处理
             </Link>
             <span className="text-xs text-muted-foreground">用户投诉、举报与咨询的受理和答复</span>
@@ -437,7 +414,6 @@ export function AdminSettingsPage() {
           <div className="flex shrink-0 items-center gap-2">
             <ActionButton
               variant="secondary"
-              size="sm"
               disabled={dirtyCount === 0 || busy}
               onClick={() => {
                 setDraft({});
@@ -447,7 +423,6 @@ export function AdminSettingsPage() {
               放弃变更
             </ActionButton>
             <ActionButton
-              size="sm"
               disabled={dirtyCount === 0 || busy}
               onClick={() => {
                 setSaveReason('');
@@ -462,11 +437,10 @@ export function AdminSettingsPage() {
       )}
 
       {/*
-       * 保存确认用 shadcn `Dialog`（弹层）而不是旧 `ConfirmAction`（页面内嵌条）：
-       * 旧形态是贴在页面底部的一块横幅，会把设置项列表顶走；弹层不改变文档流，
-       * 用户能对照着看「影响范围」里的每一项。
+       * 保存确认用弹层而不是页面内确认条：确认条会插在保存条上方改变文档流，
+       * 用户无法对照着看「影响范围」里的每一项；弹层不改变文档流。
        */}
-      <Dialog
+      <ModalDialog
         open={confirming}
         onOpenChange={(open) => {
           if (!open && !busy) {
@@ -475,48 +449,13 @@ export function AdminSettingsPage() {
             setReasonError(false);
           }
         }}
-      >
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>保存系统设置</DialogTitle>
-            <DialogDescription>以下配置变更将立即生效，影响所有用户。</DialogDescription>
-          </DialogHeader>
-
-          {changeSummary.length > 0 && (
-            <div className="rounded-lg border border-warn-soft bg-warn-soft px-3 py-2 text-xs text-warn-text">
-              <div className="font-medium">影响范围</div>
-              <ul className="mt-1 list-disc pl-4">
-                {changeSummary.map((change) => (
-                  <li key={change.label}>
-                    {change.label}：{change.from} → {change.to}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          <FormField
-            label="变更原因（写入审计）"
-            htmlFor="adm-setting-reason"
-            required
-            error={
-              reasonError ? '请填写变更原因，审计记录需要能回答「谁为什么改」。' : null
-            }
-          >
-            <ClearableField
-              value={saveReason}
-              onChange={(next) => {
-                setSaveReason(next);
-                if (next.trim()) setReasonError(false);
-              }}
-              placeholder="如：退款窗口由 7 天调整为 15 天"
-            />
-          </FormField>
-
-          <DialogFooter>
+        title="保存系统设置"
+        description="以下配置变更将立即生效，影响所有用户。"
+        width={560}
+        footer={
+          <>
             <ActionButton
               variant="outline"
-              size="sm"
               disabled={busy}
               onClick={() => {
                 setConfirming(false);
@@ -526,13 +465,43 @@ export function AdminSettingsPage() {
             >
               取消
             </ActionButton>
-            <ActionButton size="sm" disabled={busy} onClick={() => void save()}>
+            <ActionButton disabled={busy} onClick={() => void save()}>
               <RotateCcw className={busy ? 'animate-spin' : undefined} />
               {busy ? '保存中…' : '确认保存'}
             </ActionButton>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </>
+        }
+      >
+        {changeSummary.length > 0 && (
+          <div className="mb-4 rounded-lg border border-warn-border bg-warn-soft px-3 py-2 text-xs text-warn-text">
+            <div className="font-medium">影响范围</div>
+            <ul className="mt-1 list-disc pl-4">
+              {changeSummary.map((change) => (
+                <li key={change.label}>
+                  {change.label}：{change.from} → {change.to}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        <FormField
+          label="变更原因（写入审计）"
+          htmlFor="adm-setting-reason"
+          required
+          error={reasonError ? '请填写变更原因，审计记录需要能回答「谁为什么改」。' : null}
+        >
+          <ClearableField
+            id="adm-setting-reason"
+            value={saveReason}
+            onChange={(next) => {
+              setSaveReason(next);
+              if (next.trim()) setReasonError(false);
+            }}
+            placeholder="如：退款窗口由 7 天调整为 15 天"
+          />
+        </FormField>
+      </ModalDialog>
     </>
   );
 }

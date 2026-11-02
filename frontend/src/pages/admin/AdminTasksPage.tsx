@@ -1,34 +1,37 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, Download } from 'lucide-react';
-import { Button } from '../../admin-ui/shadcn/kit';
-import { adminTasksApi, assetThumbUrl, toAbsoluteUrl } from '../../lib/api';
-import { useAdmin } from '../../context/AdminContext';
-import { useToast } from '../../admin-ui/providers/ToastProvider';
-import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
-import { Descriptions, Steps } from '../../admin-ui/primitives';
-import { SelectBox, TextInput } from '../../admin-ui/controls';
+import { Check, Download } from 'lucide-react';
 import {
+  ActionButton,
+  AdminDataTable,
   AdminDrawer,
-  AdminStaleError,
+  AppliedFilters,
+  BatchResultModal,
+  ClearableField,
   ConfirmAction,
+  Descriptions,
+  FilterActions,
+  FilterBar,
+  FormField,
+  Notice,
+  PageHeader,
+  Panel,
+  SelectField,
+  StatusTag,
+  StaleError,
+  TextField,
+  formatDuration as fmtDuration,
   useAdminDetailParam,
   useAdminList,
   useAdminUrlFilterSync,
-} from '../../components/admin/AdminWidgets';
-import {
-  AppliedFilters,
-  FilterActions,
-  FilterBar,
-  PageHeader,
-  Panel,
-  StatusTag,
+  type AdminColumn,
   type AppliedFilter,
-} from '../../components/admin/PageHeader';
-import { BatchResultModal } from '../../components/admin/BatchResultModal';
+} from '../../admin-ui/primitives';
+import { cn } from '../../admin-ui/lib/cn';
+import { adminTasksApi, assetThumbUrl, toAbsoluteUrl } from '../../lib/api';
+import { useAdmin } from '../../context/AdminContext';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
 import { useDuty } from '../../components/admin/DutyContext';
-/* 耗时的写法与值班带共用一份：卡住的失败任务可能跑了几十小时，两边不能各写一套 */
-import { duration as fmtDuration } from '../../components/admin/DutyBand';
 import { taskErrorLabel } from '../../lib/admin-error-codes';
 import {
   adminAssetHref,
@@ -108,23 +111,61 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="border-t border-border-table pt-3 first:border-t-0 first:pt-0">
+    <section className="border-t border-border pt-3 first:border-t-0 first:pt-0">
       <div className="mb-2 flex items-baseline gap-2">
-        <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
-        {note && <span className="text-[11px] text-text-tertiary">{note}</span>}
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        {note && <span className="text-[11px] text-muted-foreground">{note}</span>}
       </div>
       {children}
     </section>
   );
 }
 
-/** 表单字段：标签 + 控件 */
-function Field({ label, children }: { label: string; children: ReactNode }) {
+/**
+ * 状态流转时间线。
+ *
+ * 新 primitives 层没有 Steps，这里按详情抽屉的需要本地实现：节点用序号 /
+ * 对勾双编码，颜色仍走语义令牌（完成绿、进行中品牌紫、未开始灰）。
+ */
+function Steps({
+  items,
+}: {
+  items: Array<{ title: string; done: boolean; active: boolean; description: ReactNode }>;
+}) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium text-text-secondary">{label}</span>
-      {children}
-    </div>
+    <ol className="flex flex-col gap-3">
+      {items.map((node, index) => (
+        <li key={index} className="flex gap-3">
+          <span
+            className={cn(
+              'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border text-[11px] tabular-nums',
+              node.done
+                ? 'border-success-text bg-success-soft text-success-text'
+                : node.active
+                  ? 'border-brand bg-accent text-brand'
+                  : 'border-border bg-muted text-muted-foreground',
+            )}
+          >
+            {node.done ? <Check className="size-3" aria-hidden /> : index + 1}
+          </span>
+          <div className="min-w-0">
+            <div
+              className={cn(
+                'text-sm',
+                node.done || node.active
+                  ? 'font-medium text-foreground'
+                  : 'text-muted-foreground',
+              )}
+            >
+              {node.title}
+            </div>
+            <div className="mt-0.5 text-[11px] text-muted-foreground tabular-nums">
+              {node.description}
+            </div>
+          </div>
+        </li>
+      ))}
+    </ol>
   );
 }
 
@@ -440,20 +481,20 @@ export function AdminTasksPage() {
             <div className="flex items-center gap-2">
               {row.thumbnailUrl ? (
                 <img
-                  className="size-7 shrink-0 rounded border border-border-table object-cover"
+                  className="size-7 shrink-0 rounded border border-border object-cover"
                   src={assetThumbUrl(row.thumbnailUrl, 96)}
                   alt=""
                   loading="lazy"
                 />
               ) : (
-                <div className="size-7 shrink-0 rounded border border-dashed border-border-table bg-background-secondary-default" />
+                <div className="size-7 shrink-0 rounded border border-dashed border-border bg-muted" />
               )}
-              <code className="font-mono text-[11px] text-text-secondary" title={row.id}>
+              <code className="font-mono text-[11px] text-muted-foreground" title={row.id}>
                 {shortId(row.id)}
               </code>
             </div>
             {row.retriedFromId && (
-              <span className="text-[11px] text-text-tertiary">
+              <span className="text-[11px] text-muted-foreground">
                 重试自 {shortId(row.retriedFromId)}
               </span>
             )}
@@ -471,7 +512,7 @@ export function AdminTasksPage() {
               {row.capabilityName}
             </span>
             <code
-              className="block max-w-[120px] truncate font-mono text-[11px] text-text-tertiary"
+              className="block max-w-[120px] truncate font-mono text-[11px] text-muted-foreground"
               title={row.capability}
             >
               {row.capability}
@@ -491,7 +532,7 @@ export function AdminTasksPage() {
           <div className="flex flex-col gap-0.5">
             <StatusTag status={row.status} />
             {row.status === 'failed' && row.errorCode && (
-              <span className="text-[11px] text-text-tertiary" title={row.errorCode}>
+              <span className="text-[11px] text-muted-foreground" title={row.errorCode}>
                 {taskErrorLabel(row.errorCode)}
               </span>
             )}
@@ -508,9 +549,9 @@ export function AdminTasksPage() {
          */
         render: (row: Row) =>
           !row.provider || (row.provider === 'pending' && row.status !== 'queued') ? (
-            <span className="text-text-placeholder">—</span>
+            <span className="text-muted-foreground">—</span>
           ) : (
-            <span className="rounded bg-background-secondary-default px-1.5 py-0.5 text-[11px] text-text-secondary">
+            <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
               {PROVIDER_LABELS[row.provider] ?? row.provider}
             </span>
           ),
@@ -522,16 +563,16 @@ export function AdminTasksPage() {
         render: (row: Row) => (
           <div className="flex flex-col gap-0.5">
             <Link
-              className="block max-w-[250px] truncate text-accent-700 hover:underline"
+              className="block max-w-[250px] truncate text-brand hover:underline"
               title={row.user.email}
               to={adminUserDetailHref(row.user.id)}
             >
               {row.user.email}
             </Link>
-            <span className="block max-w-[250px] truncate text-[11px] text-text-tertiary" title={row.project.name}>
+            <span className="block max-w-[250px] truncate text-[11px] text-muted-foreground" title={row.project.name}>
               项目 ·{' '}
               <Link
-                className="text-accent-700 hover:underline"
+                className="text-brand hover:underline"
                 to={adminTasksHref({ projectId: row.project.id })}
               >
                 {row.project.name}
@@ -550,10 +591,10 @@ export function AdminTasksPage() {
               {fmtDuration(row.durationMs)}
               {/* running 的耗时仍在增长, 不加标注会被当成已完成的耗时读 */}
               {row.status === 'running' && (
-                <span className="text-[11px] text-text-tertiary"> · 进行中</span>
+                <span className="text-[11px] text-muted-foreground"> · 进行中</span>
               )}
             </span>
-            <span className="text-[11px] tabular-nums text-text-tertiary">
+            <span className="text-[11px] tabular-nums text-muted-foreground">
               {new Date(row.createdAt).toLocaleString('zh-CN')}
             </span>
           </div>
@@ -567,26 +608,26 @@ export function AdminTasksPage() {
         fixed: 'right',
         render: (row: Row) => (
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="small" onClick={() => setDetailId(row.id)}>
+            <ActionButton variant="ghost" size="sm" onClick={() => setDetailId(row.id)}>
               详情
-            </Button>
+            </ActionButton>
             {/*
              * 重试/终止按状态出现, 而不是一律置灰:
              * 「仅失败任务可重试」是后端硬校验, 给一个点不动的按钮只会让人反复试。
              */}
             {row.status === 'failed' && can('task.retry') && (
-              <Button variant="ghost" size="small" onClick={() => openConfirm('retry', row)}>
+              <ActionButton variant="ghost" size="sm" onClick={() => openConfirm('retry', row)}>
                 重试
-              </Button>
+              </ActionButton>
             )}
             {(row.status === 'queued' || row.status === 'running') && can('task.cancel') && (
-              <Button
-                variant="dangerGhost"
-                size="small"
+              <ActionButton
+                variant="destructive"
+                size="sm"
                 onClick={() => openConfirm('cancel', row)}
               >
                 终止
-              </Button>
+              </ActionButton>
             )}
           </div>
         ),
@@ -632,39 +673,31 @@ export function AdminTasksPage() {
         } · 状态、输入产出与失败重试`}
         actions={
           can('data.export') ? (
-            <Button
+            <ActionButton
               variant="secondary"
-              size="small"
-              leadingIcon={Download}
+              size="sm"
+              icon={Download}
               disabled={exporting}
               onClick={() => void exportCsv()}
             >
               {exporting ? '导出中…' : '导出 CSV'}
-            </Button>
+            </ActionButton>
           ) : undefined
         }
       />
 
       {/* 超阈值只在真的超了才出现：常亮的阈值提示会变成装饰 */}
       {overloaded && (
-        <div
-          className="mb-3 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs text-amber-900"
-          role="status"
+        <Notice
+          tone="warn"
+          title={`执行中 ${liveCongestion?.running} 已超阈值 ${liveCongestion?.runningThreshold}`}
         >
-          <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-          <div className="min-w-0 flex-1">
-            <strong className="font-medium">
-              执行中 {liveCongestion?.running} 已超阈值 {liveCongestion?.runningThreshold}
-            </strong>
-            <div className="mt-0.5 text-amber-800">
-              通道可能跟不上提交速度，先看概览页的线路状态与冷却通道。
-            </div>
-          </div>
-        </div>
+          通道可能跟不上提交速度，先看概览页的线路状态与冷却通道。
+        </Notice>
       )}
 
       <FilterBar>
-        <SelectBox
+        <SelectField
           className="w-28"
           ariaLabel="按状态筛选"
           placeholder="状态"
@@ -673,7 +706,7 @@ export function AdminTasksPage() {
           onChange={setStatus}
           options={STATUS_OPTIONS}
         />
-        <SelectBox
+        <SelectField
           className="w-28"
           ariaLabel="按能力筛选"
           placeholder="能力"
@@ -682,7 +715,7 @@ export function AdminTasksPage() {
           onChange={setCapability}
           options={capOptions}
         />
-        <SelectBox
+        <SelectField
           className="w-28"
           ariaLabel="按通道筛选"
           placeholder="通道"
@@ -696,23 +729,21 @@ export function AdminTasksPage() {
          * 后台用户可能有成千上万, 下拉搜索反而不如粘贴 id 快
          * (运营手上通常正有从工单/日志里复制的 id)。
          */}
-        <TextInput
+        <ClearableField
           className="w-32"
           placeholder="用户 ID"
-          allowClear
           value={owner}
           onChange={setOwner}
           onEnter={applyQuery}
         />
-        <TextInput
+        <ClearableField
           className="w-32"
           placeholder="项目 ID"
-          allowClear
           value={project}
           onChange={setProject}
           onEnter={applyQuery}
         />
-        <TextInput
+        <TextField
           className="w-44"
           type="datetime-local"
           ariaLabel="开始时间"
@@ -720,7 +751,7 @@ export function AdminTasksPage() {
           onChange={setFrom}
           onEnter={applyQuery}
         />
-        <TextInput
+        <TextField
           className="w-44"
           type="datetime-local"
           ariaLabel="结束时间"
@@ -729,27 +760,27 @@ export function AdminTasksPage() {
           onEnter={applyQuery}
         />
         <FilterActions>
-          <Button variant="primary" size="small" onClick={applyQuery}>
+          <ActionButton variant="default" size="sm" onClick={applyQuery}>
             查询
-          </Button>
-          <Button variant="secondary" size="small" onClick={reset}>
+          </ActionButton>
+          <ActionButton variant="secondary" size="sm" onClick={reset}>
             重置
-          </Button>
+          </ActionButton>
         </FilterActions>
         <AppliedFilters items={appliedChips} onClearAll={reset} />
       </FilterBar>
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
-      {error && data && <AdminStaleError error={error} onRetry={reload} />}
+      {error && data && <StaleError error={error} onRetry={reload} />}
 
       <Panel title="任务列表" note={list ? `${list.total.toLocaleString('zh-CN')} 条` : undefined}>
         {selected.length > 0 && (
-          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-accent-200 bg-accent-50 px-3 py-2">
-            <span className="text-xs font-medium text-accent-900">已选 {selected.length} 项</span>
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-accent px-3 py-2">
+            <span className="text-xs font-medium text-accent-foreground">已选 {selected.length} 项</span>
             {can('task.retry') && (
-              <Button
+              <ActionButton
                 variant="secondary"
-                size="small"
+                size="sm"
                 disabled={busy}
                 onClick={() => {
                   setReason('');
@@ -757,12 +788,12 @@ export function AdminTasksPage() {
                 }}
               >
                 批量重试
-              </Button>
+              </ActionButton>
             )}
             {can('task.cancel') && (
-              <Button
-                variant="danger"
-                size="small"
+              <ActionButton
+                variant="destructive"
+                size="sm"
                 disabled={busy}
                 onClick={() => {
                   setReason('');
@@ -770,11 +801,11 @@ export function AdminTasksPage() {
                 }}
               >
                 批量终止
-              </Button>
+              </ActionButton>
             )}
-            <Button variant="ghost" size="small" onClick={() => setSelected([])}>
+            <ActionButton variant="ghost" size="sm" onClick={() => setSelected([])}>
               清空选择
-            </Button>
+            </ActionButton>
           </div>
         )}
 
@@ -802,9 +833,9 @@ export function AdminTasksPage() {
           }
           emptyAction={
             hasFilter ? (
-              <Button variant="secondary" size="small" onClick={reset}>
+              <ActionButton variant="secondary" size="sm" onClick={reset}>
                 清除筛选
-              </Button>
+              </ActionButton>
             ) : undefined
           }
           pagination={
@@ -835,14 +866,14 @@ export function AdminTasksPage() {
           return (
             <div className="flex items-center justify-end gap-2">
               {d.status === 'failed' && can('task.retry') && (
-                <Button variant="primary" size="small" onClick={() => openConfirm('retry', row)}>
+                <ActionButton variant="default" size="sm" onClick={() => openConfirm('retry', row)}>
                   重试此任务
-                </Button>
+                </ActionButton>
               )}
               {(d.status === 'queued' || d.status === 'running') && can('task.cancel') && (
-                <Button variant="danger" size="small" onClick={() => openConfirm('cancel', row)}>
+                <ActionButton variant="destructive" size="sm" onClick={() => openConfirm('cancel', row)}>
                   终止此任务
-                </Button>
+                </ActionButton>
               )}
             </div>
           );
@@ -863,7 +894,7 @@ export function AdminTasksPage() {
                     value: (
                       <span className="flex flex-col">
                         {d.capabilityName}
-                        <code className="font-mono text-[11px] text-text-tertiary">
+                        <code className="font-mono text-[11px] text-muted-foreground">
                           {d.capability}
                         </code>
                       </span>
@@ -875,7 +906,7 @@ export function AdminTasksPage() {
                       <span className="flex flex-col gap-0.5">
                         <StatusTag status={d.status} />
                         {d.errorCode && (
-                          <span className="text-[11px] text-text-tertiary">
+                          <span className="text-[11px] text-muted-foreground">
                             {taskErrorLabel(d.errorCode) === d.errorCode
                               ? d.errorCode
                               : `${d.errorCode} · ${taskErrorLabel(d.errorCode)}`}
@@ -898,20 +929,20 @@ export function AdminTasksPage() {
                     value: (
                       <span className="flex flex-col gap-1">
                         <Link
-                          className="text-accent-700 hover:underline"
+                          className="text-brand hover:underline"
                           to={adminUserDetailHref(d.user.id)}
                         >
                           {d.user.email}
                         </Link>
                         <span className="flex gap-3 text-[11px]">
                           <Link
-                            className="text-accent-700 hover:underline"
+                            className="text-brand hover:underline"
                             to={adminCreditHref({ userId: d.user.id, email: d.user.email })}
                           >
                             积分账本
                           </Link>
                           <Link
-                            className="text-accent-700 hover:underline"
+                            className="text-brand hover:underline"
                             to={adminOrderHref({ email: d.user.email })}
                           >
                             订单记录
@@ -924,7 +955,7 @@ export function AdminTasksPage() {
                     label: '项目',
                     value: (
                       <Link
-                        className="text-accent-700 hover:underline"
+                        className="text-brand hover:underline"
                         to={adminTasksHref({ projectId: d.project.id })}
                       >
                         {d.project.name}
@@ -946,7 +977,7 @@ export function AdminTasksPage() {
                           label: '重试来源',
                           value: (
                             <Link
-                              className="text-accent-700 hover:underline"
+                              className="text-brand hover:underline"
                               to={adminTaskHref(d.retriedFromId)}
                             >
                               <code className="font-mono text-xs">{d.retriedFromId}</code>
@@ -985,18 +1016,18 @@ export function AdminTasksPage() {
                 <>
                   {/* 产出图尺寸不一, 限高避免撑爆抽屉; 原图去素材库看 */}
                   <img
-                    className="max-h-[320px] w-auto rounded-lg border border-border-table"
+                    className="max-h-[320px] w-auto rounded-lg border border-border"
                     src={toAbsoluteUrl(d.outputAsset.sourceUrl)}
                     alt="产出图"
                   />
-                  <div className="mt-1.5 text-[11px] text-text-tertiary">
+                  <div className="mt-1.5 text-[11px] text-muted-foreground">
                     {d.outputAsset.width && d.outputAsset.height
                       ? `${d.outputAsset.width}×${d.outputAsset.height}`
                       : '尺寸未知'}{' '}
                     · {d.outputAsset.format} · {fmtBytes(d.outputAsset.sizeBytes)}
                     {' · '}
                     <Link
-                      className="text-accent-700 hover:underline"
+                      className="text-brand hover:underline"
                       to={adminAssetHref(d.outputAsset.id)}
                     >
                       在素材库查看
@@ -1004,7 +1035,7 @@ export function AdminTasksPage() {
                   </div>
                 </>
               ) : (
-                <p className="text-xs text-text-tertiary">
+                <p className="text-xs text-muted-foreground">
                   {d.status === 'succeeded'
                     ? '任务已完成但未关联产出图，数据可能异常，请核对任务记录。'
                     : '任务尚未产出图片。'}
@@ -1018,7 +1049,7 @@ export function AdminTasksPage() {
                   {d.inputAssets.map((a, i) => (
                     <img
                       key={a.id}
-                      className="aspect-square w-full rounded-md border border-border-table object-cover"
+                      className="aspect-square w-full rounded-md border border-border object-cover"
                       src={assetThumbUrl(a.sourceUrl, 240)}
                       alt={`输入素材 ${i + 1}`}
                       loading="lazy"
@@ -1029,7 +1060,7 @@ export function AdminTasksPage() {
             )}
 
             <Section title="生成参数">
-              <pre className="max-h-[320px] overflow-auto rounded-lg border border-border-table bg-background-secondary-default p-3 text-[11px] leading-5 text-text-secondary">
+              <pre className="max-h-[320px] overflow-auto rounded-lg border border-border bg-muted p-3 text-[11px] leading-5 text-muted-foreground">
                 {JSON.stringify(d.params, null, 2)}
               </pre>
             </Section>
@@ -1052,7 +1083,7 @@ export function AdminTasksPage() {
                 <p>
                   将用<b>原任务的参数与输入素材</b>新建一个任务并重新执行，原任务与其记录保留。
                 </p>
-                <p className="mt-1 text-text-tertiary">
+                <p className="mt-1 text-muted-foreground">
                   任务 {shortId(confirm.task.id)} · {confirm.task.capabilityName}
                 </p>
               </>
@@ -1062,7 +1093,7 @@ export function AdminTasksPage() {
                   任务将被置为失败，用户端立即看到失败状态。
                   <b>已发出的模型调用仍会跑完并计费</b>，但产出图不会再入库。
                 </p>
-                <p className="mt-1 text-text-tertiary">
+                <p className="mt-1 text-muted-foreground">
                   任务 {shortId(confirm.task.id)} · {confirm.task.capabilityName}
                 </p>
               </>
@@ -1083,8 +1114,8 @@ export function AdminTasksPage() {
              * 写进操作审计表。事后有人问"这个任务为什么被终止"时,
              * 这一行字就是唯一答案。
              */
-            <Field label="操作原因（会记入操作审计）">
-              <TextInput
+            <FormField label="操作原因（会记入操作审计）">
+              <TextField
                 ariaLabel="操作原因"
                 value={reason}
                 onChange={setReason}
@@ -1093,7 +1124,7 @@ export function AdminTasksPage() {
                 }
                 maxLength={200}
               />
-            </Field>
+            </FormField>
           }
         />
       )}
@@ -1122,7 +1153,7 @@ export function AdminTasksPage() {
                   将为每个<b>失败</b>任务用原参数新建一个任务。非失败状态的行会被跳过，
                   原因会在结果里逐条列出。
                 </p>
-                <p className="mt-1 text-text-tertiary">
+                <p className="mt-1 text-muted-foreground">
                   重试会真实消耗模型额度，批量执行请先确认数量。
                 </p>
               </>
@@ -1132,7 +1163,7 @@ export function AdminTasksPage() {
                   选中的<b>等待中 / 执行中</b>任务会被置为失败并立即对用户可见。
                   已完成的或已失败的行会被跳过。
                 </p>
-                <p className="mt-1 text-text-tertiary">
+                <p className="mt-1 text-muted-foreground">
                   已发出的模型调用仍会跑完并计费，但产出图不再入库。
                 </p>
               </>
@@ -1144,8 +1175,8 @@ export function AdminTasksPage() {
               : ['目标任务状态变为失败', '不可撤销（需重新发起生成）']
           }
           extra={
-            <Field label="操作原因（会记入操作审计）">
-              <TextInput
+            <FormField label="操作原因（会记入操作审计）">
+              <TextField
                 ariaLabel="操作原因"
                 value={reason}
                 onChange={setReason}
@@ -1154,7 +1185,7 @@ export function AdminTasksPage() {
                 }
                 maxLength={200}
               />
-            </Field>
+            </FormField>
           }
         />
       )}

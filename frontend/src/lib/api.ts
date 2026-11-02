@@ -25,7 +25,6 @@ import type {
   AdminAssetStats,
   AdminProjectListResult,
   AdminStorageStatus,
-  AdminPaymentChannelStatus,
   AssetStatus,
   StorageBackendId,
   AdminTask,
@@ -51,7 +50,6 @@ import type {
   CreateAdminMembershipPlanPayload,
   AdminOrderListResult,
   AdminOrderDetail,
-  AdminPaymentRow,
   AdminCreditListResult,
   AdminCreditLotRow,
   AdminCreditLedgerRow,
@@ -78,22 +76,26 @@ import type {
   StatsOverview,
   Task,
   TaskListResult,
+  TaskPageResult,
   Product,
   ProductsResponse,
   Order,
+  OrderListResult,
   CreditBalance,
   CreditLot,
   CreditLedgerEntry,
+  CreditLedgerPage,
   SandboxPayResult,
   PaymentIntent,
+  PaymentProviderInfo,
   PaymentStatusResult,
   Invoice,
   InvoiceStatus,
   CreateInvoicePayload,
   AdminInvoice,
-  ReconciliationBatch,
-  ReconciliationBatchDetail,
-  ReconciliationItem,
+  
+  
+  
   AdminCreditPrice,
   AdminCapabilityControl,
   MembershipPlan,
@@ -121,6 +123,20 @@ import type {
   BatchSummary,
   CreditImportResult,
 } from '../types/api';
+import type {
+  AdminPageResult,
+  AdminPaymentOrderDetail,
+  AdminPaymentOrderRow,
+  AdminPaymentProductView,
+  AdminPaymentProviderView,
+  AdminPaymentSettings,
+  AdminReconciliationItem,
+  AdminReconciliationRun,
+  PaymentCurrency,
+  PaymentProductInput,
+  PaymentProviderConfigUpdate,
+  PaymentProviderId,
+} from '../types/payment';
 import type {
   AdminChannelModelListItem,
   AdminChannelModelView,
@@ -441,6 +457,20 @@ export const generateApi = {
   },
   getTask: (id: string) => request<Task>(`/tasks/${id}`),
   list: () => request<TaskListResult>('/tasks').then((r) => asList<Task>(r)),
+  /** 分页任务列表（作品页 / 结果栏用，避免拉全量） */
+  listPage: (params: {
+    limit?: number;
+    offset?: number;
+    capability?: string;
+    projectId?: string;
+  } = {}) => {
+    const qs = new URLSearchParams();
+    qs.set('limit', String(params.limit ?? 50));
+    qs.set('offset', String(params.offset ?? 0));
+    if (params.capability) qs.set('capability', params.capability);
+    if (params.projectId) qs.set('projectId', params.projectId);
+    return request<TaskPageResult>(`/tasks/page?${qs.toString()}`);
+  },
   remove: (id: string) => request<{ id: string; removedAsset: boolean }>(`/tasks/${id}`, { method: 'DELETE' }),
 };
 
@@ -549,7 +579,12 @@ export const productsApi = {
 export const creditsApi = {
   balance: () => request<CreditBalance>('/credits/balance'),
   lots: () => request<CreditLot[]>('/credits/lots'),
-  ledger: (limit = 50) => request<CreditLedgerEntry[]>(`/credits/ledger?limit=${limit}`),
+  ledger: (params: { limit?: number; offset?: number } = {}) => {
+    const qs = new URLSearchParams();
+    qs.set('limit', String(params.limit ?? 50));
+    qs.set('offset', String(params.offset ?? 0));
+    return request<CreditLedgerPage>(`/credits/ledger?${qs.toString()}`);
+  },
 };
 
 /**
@@ -598,6 +633,9 @@ export const adminCapabilitiesApi = {
  */
 export const membershipApi = {
   plans: () => request<MembershipPlan[]>('/membership/plans'),
+  /** 单个套餐（含已下架），仅用于续付既有订单 */
+  plan: (id: string) =>
+    request<MembershipPlan | null>(`/membership/plans/${encodeURIComponent(id)}`),
   me: () => request<MyMembership>('/membership/me'),
   cancel: () => request<{ expiresAt: string }>('/membership/cancel', { method: 'POST' }),
 };
@@ -632,7 +670,13 @@ export const ordersApi = {
         ...(params.couponCode ? { couponCode: params.couponCode } : {}),
       },
     }),
-  list: () => request<Order[]>('/orders'),
+  /** 我的订单（服务端分页，返回 total 与各状态真实计数） */
+  list: (params: { limit?: number; offset?: number } = {}) => {
+    const qs = new URLSearchParams();
+    qs.set('limit', String(params.limit ?? 20));
+    qs.set('offset', String(params.offset ?? 0));
+    return request<OrderListResult>(`/orders?${qs.toString()}`);
+  },
   detail: (id: string) => request<Order>(`/orders/${id}`),
 
   /** 关闭未支付订单。已支付订单只能走退款，后端会拒绝 */
@@ -659,8 +703,22 @@ export const ordersApi = {
  * 暂不可用」, 不能回落到沙箱装作成功。
  */
 export const paymentsApi = {
-  intent: (orderId: string) =>
-    request<PaymentIntent>(`/payments/${orderId}/intent`, { method: 'POST' }),
+  /**
+   * 当前可用支付渠道。
+   *
+   * 后端在可用渠道 > 1 时要求 `intent` 显式传 providerId；不拉列表就无法
+   * 让用户选择，最终只能拿到 400「存在多个可用支付渠道」。
+   */
+  providers: (currency?: string) => {
+    const qs = currency ? `?currency=${encodeURIComponent(currency)}` : '';
+    return request<{ items: PaymentProviderInfo[]; total: number }>(`/payments/providers${qs}`);
+  },
+
+  intent: (orderId: string, providerId?: string) =>
+    request<PaymentIntent>(`/payments/${orderId}/intent`, {
+      method: 'POST',
+      body: providerId ? { providerId } : {},
+    }),
 
   status: (orderId: string) => request<PaymentStatusResult>(`/payments/${orderId}/status`),
 };
@@ -1127,17 +1185,6 @@ export const adminStorageApi = {
 };
 
 /**
- * 支付渠道状态 (只读)。
- *
- * 与存储配置同一安全边界: 凭据只从部署环境变量读, 页面没有任何写端点。
- * 切换通道 = 改 PAYMENT_PROVIDER 并重启, 不在界面里做 —— 支付通道改错
- * 的表现是「收款成功但账上没有钱」, 不能做成随手可点。
- */
-export const adminPaymentChannelsApi = {
-  status: () => request<AdminPaymentChannelStatus>('/admin/payment-channels'),
-};
-
-/**
  * 营销中心 (admin-prd.md §3.12 B-64~B67 / M11)。
  *
  * 券不提供删除端点 —— 已核销订单仍引用该券, 删了历史订单悬空。
@@ -1245,7 +1292,12 @@ export const marketingApi = {
  */
 export const myMarketingApi = {
   /** 我的邀请码与邀请数据 */
-  invites: () => request<MyInvites>('/marketing/invites'),
+  invites: (params: { limit?: number; offset?: number } = {}) => {
+    const qs = new URLSearchParams();
+    qs.set('limit', String(params.limit ?? 20));
+    qs.set('offset', String(params.offset ?? 0));
+    return request<MyInvites>(`/marketing/invites?${qs.toString()}`);
+  },
 
   /** 绑定邀请关系。注册成功后由前端调用 */
   bindInvite: (inviteCode: string) =>
@@ -1481,14 +1533,13 @@ export const adminOrdersApi = {
     }),
 };
 
-/** 支付流水 (B-45)。只读 —— 钱的动作一律在订单上做, 流水是既成事实 */
-export const adminPaymentsApi = {
-  list: (params: { status?: string; pageSize?: number; from?: string; to?: string } = {}) =>
-    request<AdminPaymentRow[]>(`/admin/payments${toQuery(params)}`),
-
-  exportCsv: (params: { status?: string; from?: string; to?: string } = {}) =>
-    downloadCsv(`/admin/payments/export${toQuery(params)}`),
-};
+/**
+ * 支付流水 (B-45)。只读 —— 钱的动作一律在订单上做, 流水是既成事实。
+ *
+ * 旧实现请求 `/admin/payments` 与 `/admin/payments/export`，后端支付域重构后
+ * 这两条路径已不存在（改为 `/admin/payments/orders*`），故移除；
+ * 支付订单改用 `adminPaymentOrdersApi`。
+ */
 
 /** 积分账本 (B-49~B-52) */
 export const adminCreditsApi = {
@@ -1582,48 +1633,150 @@ export const adminInvoicesApi = {
 };
 
 /**
- * 渠道对账 (B3)。
+ * 支付域后台 API（`/admin/payments` 四标签页）。
  *
- * 读取用 payment.read (运营排障), 导入与处置用 finance.reconcile (仅财务) ——
- * 处置会让差异从看板上消失, 这是财务口径的责任。
+ * 与旧的 `adminPaymentChannelsApi` / `adminReconciliationApi` 是两代模型：
+ * 旧版从环境变量读凭据、单一 PAYMENT_PROVIDER、人工导入账单逐笔处置；
+ * 新版渠道配置**加密落库并版本化**、多渠道并存、对账由 worker 自动下载并
+ * 自动补发。后端旧控制器已删除，故这里只有新契约。
+ *
+ * 分四组对应四个标签：渠道 / 商品 / 订单 / 对账。
  */
-export const adminReconciliationApi = {
-  batches: (params: {
-    limit?: number;
-    offset?: number;
-    channel?: string;
+
+/** 支付渠道与站点设置 */
+export const adminPaymentProvidersApi = {
+  list: () =>
+    request<{ items: AdminPaymentProviderView[] }>('/admin/payments/providers'),
+
+  /**
+   * 保存渠道配置（追加新版本，历史订单继续用旧版本）。
+   *
+   * 高危动作：后端要求带 `reason`，并写审计日志。
+   */
+  saveConfig: (providerId: string, body: PaymentProviderConfigUpdate) =>
+    request<{ provider: AdminPaymentProviderView; unchanged: boolean }>(
+      `/admin/payments/providers/${providerId}/config`,
+      { method: 'PUT', body },
+    ),
+
+  settings: () => request<AdminPaymentSettings>('/admin/payments/settings'),
+
+  saveSettings: (body: { defaultCurrency: PaymentCurrency; reason: string }) =>
+    request<AdminPaymentSettings>('/admin/payments/settings', { method: 'PUT', body }),
+};
+
+/** 充值商品 */
+export const adminPaymentProductsApi = {
+  list: () => request<{ items: AdminPaymentProductView[] }>('/admin/payments/products'),
+
+  create: (body: PaymentProductInput) =>
+    request<{ product: AdminPaymentProductView }>('/admin/payments/products', {
+      method: 'POST',
+      body,
+    }),
+
+  update: (id: string, body: PaymentProductInput) =>
+    request<{ product: AdminPaymentProductView }>(`/admin/payments/products/${id}`, {
+      method: 'PUT',
+      body,
+    }),
+};
+
+/** 支付订单 */
+export const adminPaymentOrdersApi = {
+  list: (params: {
+    status?: string;
+    keyword?: string;
+    providerId?: string;
+    timeField?: 'created' | 'paid' | 'credited';
+    from?: string;
+    to?: string;
+    page?: number;
+    pageSize?: number;
+  } = {}) =>
+    request<AdminPageResult<AdminPaymentOrderRow>>(
+      `/admin/payments/orders${toQuery(params)}`,
+    ),
+
+  detail: (id: string) =>
+    request<{ order: AdminPaymentOrderDetail }>(`/admin/payments/orders/${id}`),
+
+  /** 向渠道查单：已支付则立即入账，否则不动本地状态 */
+  query: (id: string, body: { reason?: string } = {}) =>
+    request<{ order: { id: string; status: string }; view: unknown }>(
+      `/admin/payments/orders/${id}/query`,
+      { method: 'POST', body },
+    ),
+
+  /**
+   * 关单。
+   *
+   * **不会退款**：关单只停止这笔未支付订单继续挂着；已付款的订单要走退款流程，
+   * 退款在订单管理里，不在支付域。
+   */
+  close: (id: string, body: { reason?: string } = {}) =>
+    request<{ order: { id: string; status: string }; view: unknown }>(
+      `/admin/payments/orders/${id}/close`,
+      { method: 'POST', body },
+    ),
+
+  exportCsv: (params: {
+    status?: string;
+    keyword?: string;
+    providerId?: string;
+    timeField?: 'created' | 'paid' | 'credited';
+    from?: string;
+    to?: string;
+  } = {}) => downloadCsv(`/admin/payments/orders/export.csv${toQuery(params)}`),
+};
+
+/** 支付对账 */
+export const adminPaymentReconciliationApi = {
+  /** 运行列表 */
+  list: (params: {
+    providerId?: string;
     status?: string;
     from?: string;
     to?: string;
+    page?: number;
+    pageSize?: number;
   } = {}) =>
-    request<{ items: ReconciliationBatch[]; total: number }>(
-      `/admin/reconciliation/batches${toQuery(params)}`,
+    request<AdminPageResult<AdminReconciliationRun>>(
+      `/admin/payments/reconciliations${toQuery(params)}`,
     ),
 
-  batch: (id: string) => request<ReconciliationBatchDetail>(`/admin/reconciliation/batches/${id}`),
+  /** 差异明细 */
+  items: (runId: string, params: { result?: string; page?: number; pageSize?: number } = {}) =>
+    request<AdminPageResult<AdminReconciliationItem>>(
+      `/admin/payments/reconciliations/${runId}/items${toQuery(params)}`,
+    ),
 
-  /** 导入渠道账单 (multipart: file + channel + billDate) */
-  importFile: (file: File, channel: string, billDate: string) => {
+  /** 手动执行对账（渠道账单下载失败时的重跑入口） */
+  run: (body: { providerId: PaymentProviderId; billDate: string; reason: string }) =>
+    request<{ run: AdminReconciliationRun; reused: boolean }>('/admin/payments/reconciliations', {
+      method: 'POST',
+      body,
+    }),
+
+  /** CSV 兜底导入（渠道不支持账单下载时用） */
+  importCsv: (file: File, body: { providerId: PaymentProviderId; billDate: string; reason: string }) => {
     const fd = new FormData();
     fd.append('file', file);
-    fd.append('channel', channel);
-    fd.append('billDate', billDate);
-    return request<ReconciliationBatchDetail>('/admin/reconciliation/import', {
+    fd.append('providerId', body.providerId);
+    fd.append('billDate', body.billDate);
+    fd.append('reason', body.reason);
+    return request<{ run: AdminReconciliationRun }>('/admin/payments/reconciliations/import', {
       method: 'POST',
       body: fd,
     });
   },
 
-  resolve: (itemId: string, status: 'resolved' | 'ignored', note: string) =>
-    request<ReconciliationItem>(`/admin/reconciliation/items/${itemId}/resolve`, {
-      method: 'POST',
-      body: { status, note },
-    }),
+  exportCsv: (params: { providerId?: string; status?: string; from?: string; to?: string } = {}) =>
+    downloadCsv(`/admin/payments/reconciliations/export.csv${toQuery(params)}`),
 
-  exportCsv: (batchId: string) =>
-    downloadCsv(`/admin/reconciliation/batches/${batchId}/export`),
+  exportItemsCsv: (runId: string, params: { result?: string } = {}) =>
+    downloadCsv(`/admin/payments/reconciliations/${runId}/items/export.csv${toQuery(params)}`),
 };
-
 
 /**
  * 账户自助 (B4)。
@@ -1822,7 +1975,7 @@ export const adminChannelsApi = {
   list: (params: { keyword?: string; status?: string; page?: number; limit?: number } = {}) =>
     request<ChannelPageResult>(`/admin/channels${toQuery(params)}`),
 
-  order: () => request<ChannelOrderItemView[]>('/admin/channels/order'),
+  order: () => request<{ items: ChannelOrderItemView[] }>('/admin/channels/order'),
 
   /** 线路健康（一行 = 一条渠道模型，含进程内冷却快照） */
   health: () => request<{ items: ChannelHealthRowView[] }>('/admin/channels/health'),
@@ -1872,9 +2025,10 @@ export const adminChannelsApi = {
   duplicate: (id: string) =>
     request<AdminChannelView>(`/admin/channels/${id}/duplicate`, { method: 'POST' }),
 
-  models: (id: string) => request<AdminChannelModelView[]>(`/admin/channels/${id}/models`),
+  models: (id: string) => request<{ models: AdminChannelModelView[] }>(`/admin/channels/${id}/models`),
 
-  modelOrder: (id: string) => request<ChannelOrderItemView[]>(`/admin/channels/${id}/models/order`),
+  modelOrder: (id: string) =>
+    request<{ items: ChannelOrderItemView[] }>(`/admin/channels/${id}/models/order`),
 
   saveModelOrder: (id: string, ids: string[], expectedIds: string[], reason?: string) =>
     request<{ ok: boolean }>(`/admin/channels/${id}/models/order`, {
@@ -1958,7 +2112,7 @@ export const adminChannelModelsApi = {
    * 让人以为「选了就能用」）。
    */
   list: (channelId?: string, includeDisabled = false) =>
-    request<AdminChannelModelListItem[]>(
+    request<{ models: AdminChannelModelListItem[] }>(
       `/admin/channel-models${toQuery({ channelId, includeDisabled: includeDisabled ? '1' : undefined })}`,
     ),
 

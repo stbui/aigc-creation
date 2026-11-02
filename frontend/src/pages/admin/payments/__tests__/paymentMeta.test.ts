@@ -1,0 +1,214 @@
+import { describe, expect, it } from 'vitest';
+import {
+  CHECKOUT_MODE_LABELS,
+  PAYMENT_STATUS_META,
+  PROVIDER_LABELS,
+  paymentActions,
+} from '../constants';
+import {
+  creditsText,
+  moneyText,
+  productSaleStatusOf,
+  strategyText,
+} from '../utils';
+
+/**
+ * 支付充值的展示口径。
+ *
+ * 锁住三件事：
+ *   1. 状态文案**只在服务端给的展示状态上翻译**，前端不再二次推导 ——
+ *      推导一遍就会与后端不一致，翻页时同一单忽绿忽灰；
+ *   2. 金额按分存、按元展示，USD 与 CNY 的符号不能错；
+ *   3. 终态订单（已入账 / 已退款 / 已关闭）不再提供查单与关单 ——
+ *      对着已入账订单点「关闭」是自相矛盾的操作。
+ */
+
+describe('PAYMENT_STATUS_META', () => {
+  it('覆盖后端给的全部展示状态', () => {
+    const statuses = [
+      'created',
+      'pending',
+      'closing',
+      'create_failed',
+      'closed',
+      'credited',
+      'refunded',
+      'partial_refunded',
+    ] as const;
+    for (const status of statuses) {
+      expect(PAYMENT_STATUS_META[status]).toBeTruthy();
+      expect(PAYMENT_STATUS_META[status].label).toBeTruthy();
+    }
+  });
+
+  it('已入账是成功色，已退款是危险色', () => {
+    expect(PAYMENT_STATUS_META.credited.tone).toBe('success');
+    expect(PAYMENT_STATUS_META.refunded.tone).toBe('danger');
+  });
+});
+
+describe('paymentActions', () => {
+  it('未终态订单可查单可关单', () => {
+    for (const status of ['created', 'pending', 'create_failed', 'closing'] as const) {
+      expect(paymentActions(status)).toEqual({ canQuery: true, canClose: true });
+    }
+  });
+
+  it('终态订单两个动作都没有', () => {
+    for (const status of ['closed', 'credited', 'refunded', 'partial_refunded'] as const) {
+      expect(paymentActions(status)).toEqual({ canQuery: false, canClose: false });
+    }
+  });
+});
+
+describe('标签映射', () => {
+  it('三个支付适配器都有短名', () => {
+    expect(PROVIDER_LABELS.sandbox).toBe('沙箱');
+    expect(PROVIDER_LABELS.alipay).toBe('支付宝');
+    expect(PROVIDER_LABELS.wechat).toBe('微信支付');
+  });
+
+  it('三种支付方式都有文案', () => {
+    expect(CHECKOUT_MODE_LABELS.sandbox).toBe('站内模拟');
+    expect(CHECKOUT_MODE_LABELS.redirect).toBe('网站跳转');
+    expect(CHECKOUT_MODE_LABELS.qrcode).toBe('扫码支付');
+  });
+});
+
+describe('moneyText', () => {
+  it('CNY 用 ¥、USD 用 $，都是两位小数', () => {
+    expect(moneyText(1000, 'CNY')).toBe('¥10.00');
+    expect(moneyText(1000, 'USD')).toBe('$10.00');
+    expect(moneyText(0, 'CNY')).toBe('¥0.00');
+    expect(moneyText(5, 'CNY')).toBe('¥0.05');
+  });
+});
+
+describe('creditsText', () => {
+  it('有效期 0 表示永久', () => {
+    expect(creditsText({ credits: 2000, creditsValidDays: 0 })).toBe('2,000 积分（永久有效）');
+  });
+
+  it('有有效期时写天数', () => {
+    expect(creditsText({ credits: 2000, creditsValidDays: 30 })).toBe('2,000 积分（30 天有效）');
+  });
+});
+
+describe('strategyText', () => {
+  it('不限量', () => {
+    expect(
+      strategyText({
+        saleStrategy: 'unlimited',
+        periodDays: 0,
+        periodPurchaseLimit: 0,
+        stockTotal: 0,
+        stockRemaining: 0,
+        saleStartAt: null,
+        saleEndAt: null,
+      }),
+    ).toBe('不限量');
+  });
+
+  it('周期策略给天数与限购次数', () => {
+    expect(
+      strategyText({
+        saleStrategy: 'periodic',
+        periodDays: 30,
+        periodPurchaseLimit: 2,
+        stockTotal: 0,
+        stockRemaining: 0,
+        saleStartAt: null,
+        saleEndAt: null,
+      }),
+    ).toBe('周期 30 天 · 限 2 次');
+  });
+
+  it('库存策略给剩余与总量', () => {
+    expect(
+      strategyText({
+        saleStrategy: 'inventory',
+        periodDays: 0,
+        periodPurchaseLimit: 0,
+        stockTotal: 100,
+        stockRemaining: 7,
+        saleStartAt: null,
+        saleEndAt: null,
+      }),
+    ).toBe('库存 7 / 100');
+  });
+
+  it('限时策略截到日期', () => {
+    expect(
+      strategyText({
+        saleStrategy: 'timed',
+        periodDays: 0,
+        periodPurchaseLimit: 0,
+        stockTotal: 0,
+        stockRemaining: 0,
+        saleStartAt: '2026-11-01T00:00:00.000Z',
+        saleEndAt: '2026-11-30T00:00:00.000Z',
+      }),
+    ).toBe('限时 2026-11-01 ~ 2026-11-30');
+  });
+});
+
+describe('productSaleStatusOf', () => {
+  it('非 active 一律停用', () => {
+    expect(
+      productSaleStatusOf({
+        status: 'offline',
+        saleStrategy: 'unlimited',
+        saleStartAt: null,
+        saleEndAt: null,
+        stockRemaining: 10,
+      }),
+    ).toBe('disabled');
+  });
+
+  it('库存售罄', () => {
+    expect(
+      productSaleStatusOf({
+        status: 'active',
+        saleStrategy: 'inventory',
+        saleStartAt: null,
+        saleEndAt: null,
+        stockRemaining: 0,
+      }),
+    ).toBe('sold_out');
+  });
+
+  it('限时未开始与已结束分开', () => {
+    const future = new Date(Date.now() + 86400000).toISOString();
+    const past = new Date(Date.now() - 86400000).toISOString();
+    expect(
+      productSaleStatusOf({
+        status: 'active',
+        saleStrategy: 'timed',
+        saleStartAt: future,
+        saleEndAt: null,
+        stockRemaining: 10,
+      }),
+    ).toBe('upcoming');
+    expect(
+      productSaleStatusOf({
+        status: 'active',
+        saleStrategy: 'timed',
+        saleStartAt: null,
+        saleEndAt: past,
+        stockRemaining: 10,
+      }),
+    ).toBe('ended');
+  });
+
+  it('其余情况在售', () => {
+    expect(
+      productSaleStatusOf({
+        status: 'active',
+        saleStrategy: 'unlimited',
+        saleStartAt: null,
+        saleEndAt: null,
+        stockRemaining: 10,
+      }),
+    ).toBe('on_sale');
+  });
+});

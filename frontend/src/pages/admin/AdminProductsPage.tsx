@@ -1,29 +1,31 @@
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
-import { Button } from '../../admin-ui/shadcn/kit';
 import { adminProductsApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
-import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
-import { Drawer } from '../../admin-ui/primitives/Drawer';
-import { SelectBox, TextArea, TextInput } from '../../admin-ui/controls';
 import {
-  AdminStaleError,
-  useAdminList,
-  useAdminUrlFilterSync,
-} from '../../components/admin/AdminWidgets';
-import {
+  ActionButton,
+  AdminDataTable,
   AppliedFilters,
+  Drawer,
   FilterActions,
   FilterBar,
+  FormField,
   PageHeader,
   Panel,
+  SelectField,
+  StaleError,
   StatCard,
   StatusTag,
+  TextAreaField,
+  TextField,
+  useAdminList,
+  useAdminUrlFilterSync,
+  type AdminColumn,
   type AppliedFilter,
-} from '../../components/admin/PageHeader';
+} from '../../admin-ui/primitives';
 import type { AdminProduct } from '../../types/api';
 
 /**
@@ -99,17 +101,6 @@ function toDraft(p: AdminProduct): ProductDraft {
 /** 积分有效期的人类可读文案。0 是「永久」而不是「0 天」 */
 function validDaysText(days: number): string {
   return days === 0 ? '永久有效' : `${days} 天`;
-}
-
-/** 表单字段：标签 + 控件 + 一句说明 */
-function Field({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium text-text-secondary">{label}</span>
-      {children}
-      {hint && <p className="text-[11px] leading-4 text-text-tertiary">{hint}</p>}
-    </div>
-  );
 }
 
 export function AdminProductsPage() {
@@ -290,7 +281,7 @@ export function AdminProductsPage() {
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           <span>{row.name}</span>
-          <code className="font-mono text-[11px] text-text-tertiary">{row.sku}</code>
+          <code className="font-mono text-[11px] text-muted-foreground">{row.sku}</code>
         </div>
       ),
     },
@@ -302,7 +293,9 @@ export function AdminProductsPage() {
         <div className="flex flex-col gap-0.5">
           <span className="tabular-nums">¥ {centsToYuanText(row.priceCents)}</span>
           {/* 分的口径同时给出: 财务回查流水时看到的是分, 免得每次心算 */}
-          <span className="text-[11px] tabular-nums text-text-tertiary">{row.priceCents} 分</span>
+          <span className="text-[11px] tabular-nums text-muted-foreground">
+            {row.priceCents} 分
+          </span>
         </div>
       ),
     },
@@ -312,11 +305,11 @@ export function AdminProductsPage() {
       width: 90,
       render: (row) =>
         row.originalPriceCents !== null ? (
-          <span className="tabular-nums text-text-tertiary line-through">
+          <span className="tabular-nums text-muted-foreground line-through">
             ¥ {centsToYuanText(row.originalPriceCents)}
           </span>
         ) : (
-          <span className="text-text-placeholder">—</span>
+          <span className="text-muted-foreground/60">—</span>
         ),
     },
     {
@@ -326,7 +319,9 @@ export function AdminProductsPage() {
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           <span className="tabular-nums">{row.credits} 积分</span>
-          <span className="text-[11px] text-text-tertiary">{validDaysText(row.creditsValidDays)}</span>
+          <span className="text-[11px] text-muted-foreground">
+            {validDaysText(row.creditsValidDays)}
+          </span>
         </div>
       ),
     },
@@ -335,7 +330,7 @@ export function AdminProductsPage() {
       title: '发放方式',
       width: 90,
       render: (row) => (
-        <span className="text-[11px] text-text-tertiary">
+        <span className="text-[11px] text-muted-foreground">
           {row.grantType === 'immediate' ? '支付即发放' : '人工发放'}
         </span>
       ),
@@ -370,17 +365,17 @@ export function AdminProductsPage() {
       render: (row) =>
         writable ? (
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="small" onClick={() => openEdit(row)}>
+            <ActionButton variant="ghost" size="sm" onClick={() => openEdit(row)}>
               编辑
-            </Button>
-            <Button
-              variant={row.status === 'active' ? 'dangerGhost' : 'ghost'}
-              size="small"
+            </ActionButton>
+            <ActionButton
+              variant={row.status === 'active' ? 'destructive' : 'ghost'}
+              size="sm"
               disabled={saving}
               onClick={() => void runToggle(row)}
             >
               {row.status === 'active' ? '下架' : '上架'}
-            </Button>
+            </ActionButton>
           </div>
         ) : null,
     },
@@ -398,11 +393,11 @@ export function AdminProductsPage() {
         description="积分包与增值商品的价目表。改价只影响之后的下单，历史订单按下单时的快照结算。"
         actions={
           writable ? (
-            <Button variant="primary" size="small" leadingIcon={Plus} onClick={openCreate}>
+            <ActionButton icon={Plus} onClick={openCreate}>
               新建商品
-            </Button>
+            </ActionButton>
           ) : (
-            <span className="text-[11px] text-text-tertiary">
+            <span className="text-[11px] text-muted-foreground">
               当前账号无 product.write 权限，仅可查看
             </span>
           )
@@ -422,11 +417,12 @@ export function AdminProductsPage() {
       </div>
 
       <FilterBar>
-        <SelectBox
+        <SelectField
           className="w-32"
           ariaLabel="按状态筛选"
           placeholder="状态"
           allowClear
+          clearLabel="全部状态"
           value={status}
           onChange={(value) => {
             const next = value as 'active' | 'offline' | undefined;
@@ -439,15 +435,15 @@ export function AdminProductsPage() {
           ]}
         />
         <FilterActions>
-          <Button variant="secondary" size="small" onClick={reload}>
+          <ActionButton variant="secondary" onClick={reload}>
             刷新
-          </Button>
+          </ActionButton>
         </FilterActions>
         <AppliedFilters items={appliedChips} onClearAll={clearStatus} />
       </FilterBar>
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
-      {error && data && <AdminStaleError error={error} onRetry={reload} />}
+      {error && data && <StaleError error={error} onRetry={reload} />}
 
       <Panel
         title="全部商品"
@@ -468,9 +464,9 @@ export function AdminProductsPage() {
           }
           emptyAction={
             status ? (
-              <Button variant="secondary" size="small" onClick={clearStatus}>
+              <ActionButton variant="secondary" onClick={clearStatus}>
                 清除筛选
-              </Button>
+              </ActionButton>
             ) : undefined
           }
         />
@@ -486,17 +482,21 @@ export function AdminProductsPage() {
         description={formDirty ? '有未保存修改' : undefined}
         footer={
           <>
-            <Button variant="secondary" size="small" onClick={requestCloseForm} disabled={saving}>
+            <ActionButton
+              variant="secondary"
+              onClick={requestCloseForm}
+              disabled={saving}
+            >
               取消
-            </Button>
-            <Button variant="primary" size="small" disabled={saving} onClick={() => void submit()}>
+            </ActionButton>
+            <ActionButton disabled={saving} onClick={() => void submit()}>
               {saving ? '保存中…' : editing ? '保存修改' : '创建'}
-            </Button>
+            </ActionButton>
           </>
         }
       >
         <div className="flex flex-col gap-4">
-          <Field
+          <FormField
             label="SKU"
             hint={
               editing
@@ -504,7 +504,7 @@ export function AdminProductsPage() {
                 : '只允许字母、数字与连字符，创建后不可修改'
             }
           >
-            <TextInput
+            <TextField
               ariaLabel="SKU"
               value={draft.sku}
               disabled={editing !== null}
@@ -512,20 +512,20 @@ export function AdminProductsPage() {
               placeholder="如 credits-100"
               maxLength={40}
             />
-          </Field>
+          </FormField>
 
-          <Field label="商品名称">
-            <TextInput
+          <FormField label="商品名称">
+            <TextField
               ariaLabel="商品名称"
               value={draft.name}
               onChange={(value) => setDraft({ ...draft, name: value })}
               placeholder="如 100 积分包"
               maxLength={80}
             />
-          </Field>
+          </FormField>
 
-          <Field label="商品描述">
-            <TextArea
+          <FormField label="商品描述">
+            <TextAreaField
               ariaLabel="商品描述"
               value={draft.description}
               onChange={(value) => setDraft({ ...draft, description: value })}
@@ -533,10 +533,10 @@ export function AdminProductsPage() {
               maxLength={500}
               placeholder="展示在结算页的补充说明，可留空"
             />
-          </Field>
+          </FormField>
 
           <div className="grid grid-cols-2 gap-4">
-            <Field
+            <FormField
               label="售价（元）"
               hint={
                 yuanTextToCents(draft.priceYuan) !== null
@@ -544,49 +544,52 @@ export function AdminProductsPage() {
                   : '两位小数'
               }
             >
-              <TextInput
+              <TextField
                 ariaLabel="售价"
                 inputMode="decimal"
                 value={draft.priceYuan}
                 onChange={(value) => setDraft({ ...draft, priceYuan: value })}
                 placeholder="9.90"
               />
-            </Field>
-            <Field label="划线价（元）" hint="仅用于展示对比，不参与结算">
-              <TextInput
+            </FormField>
+            <FormField label="划线价（元）" hint="仅用于展示对比，不参与结算">
+              <TextField
                 ariaLabel="划线价"
                 inputMode="decimal"
                 value={draft.originalPriceYuan}
                 onChange={(value) => setDraft({ ...draft, originalPriceYuan: value })}
                 placeholder="留空表示不展示"
               />
-            </Field>
+            </FormField>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <Field label="赠送积分">
-              <TextInput
+            <FormField label="赠送积分">
+              <TextField
                 ariaLabel="赠送积分"
                 inputMode="numeric"
                 value={draft.credits}
                 onChange={(value) => setDraft({ ...draft, credits: value })}
                 placeholder="100"
               />
-            </Field>
-            <Field label="积分有效期（天）" hint="0 表示永久有效，不参与到期回收">
-              <TextInput
+            </FormField>
+            <FormField label="积分有效期（天）" hint="0 表示永久有效，不参与到期回收">
+              <TextField
                 ariaLabel="积分有效期天数"
                 inputMode="numeric"
                 value={draft.creditsValidDays}
                 onChange={(value) => setDraft({ ...draft, creditsValidDays: value })}
                 placeholder="0"
               />
-            </Field>
+            </FormField>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <Field label="发放方式">
-              <SelectBox
+            <FormField
+              label="发放方式"
+              hint={draft.grantType === 'manual' ? '需运营在积分账本中手动发放' : undefined}
+            >
+              <SelectField
                 ariaLabel="发放方式"
                 value={draft.grantType}
                 onChange={(value) =>
@@ -597,25 +600,20 @@ export function AdminProductsPage() {
                   { value: 'manual', label: '人工发放' },
                 ]}
               />
-              {draft.grantType === 'manual' && (
-                <p className="text-[11px] leading-4 text-text-tertiary">
-                  需运营在积分账本中手动发放
-                </p>
-              )}
-            </Field>
-            <Field label="排序权重" hint="数字越小越靠前">
-              <TextInput
+            </FormField>
+            <FormField label="排序权重" hint="数字越小越靠前">
+              <TextField
                 ariaLabel="排序权重"
                 inputMode="numeric"
                 value={draft.sortOrder}
                 onChange={(value) => setDraft({ ...draft, sortOrder: value })}
                 placeholder="0"
               />
-            </Field>
+            </FormField>
           </div>
 
           {editing && (
-            <p className="text-[11px] leading-4 text-text-tertiary">
+            <p className="text-[11px] leading-4 text-muted-foreground">
               上次更新：{new Date(editing.updatedAt).toLocaleString('zh-CN')} · 改价会写入操作审计
             </p>
           )}

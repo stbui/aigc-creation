@@ -17,16 +17,15 @@ import { cn } from '../lib/cn';
  *
  * ## 为什么自己写
  *
- * 后台原先用 antd 的 `message.*`（约 171 处调用）。整站换到 BoardUI 后
- * antd 的 message 容器会随 `<App>` 一起撤掉，因此这里提供一个同语义的
- * `toast.success/error/info/warning`，调用点只改函数名，不改心智。
+ * 后台有约 170 处「操作完给个反馈」。一条 toast 需要的东西很少（堆叠上限、
+ * 自动消失、读屏播报），引一个库反而要多带一套主题变量。这里只依赖
+ * `portal` + 项目的语义色令牌。
  *
  * ## 几条固定规则
  *
- * - 成功 4s、失败 6s：失败信息通常更长，需要更多阅读时间。
- * - 同时最多堆 4 条，超出时挤掉最早的一条 —— 运营连点批量操作时不至于
- *   让提示铺满右半屏。
- * - `aria-live="polite"`，错误用 `role="alert"`；读屏用户能听到结果。
+ * - 成功 4s、警示 5s、失败 6s —— 失败信息通常更长，需要更多阅读时间；
+ * - 同时最多 4 条，超出挤掉最早的一条 —— 连点批量操作时不至于铺满右半屏；
+ * - `aria-live="polite"`，错误用 `role="alert"`，读屏用户能听到结果。
  */
 
 type ToastTone = 'success' | 'error' | 'info' | 'warning';
@@ -38,7 +37,7 @@ interface ToastItem {
   description?: string;
 }
 
-interface ToastApi {
+export interface ToastApi {
   success: (message: string, description?: string) => void;
   error: (message: string, description?: string) => void;
   info: (message: string, description?: string) => void;
@@ -49,10 +48,10 @@ interface ToastApi {
 const ToastContext = createContext<ToastApi | null>(null);
 
 const TONE_META: Record<ToastTone, { icon: typeof Info; className: string }> = {
-  success: { icon: CheckCircle2, className: 'text-emerald-600' },
-  error: { icon: XCircle, className: 'text-rose-600' },
-  warning: { icon: TriangleAlert, className: 'text-amber-600' },
-  info: { icon: Info, className: 'text-primary' },
+  success: { icon: CheckCircle2, className: 'text-success-text' },
+  error: { icon: XCircle, className: 'text-danger-text' },
+  warning: { icon: TriangleAlert, className: 'text-warn-text' },
+  info: { icon: Info, className: 'text-brand' },
 };
 
 const MAX_TOASTS = 4;
@@ -109,7 +108,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {children}
       {createPortal(
         <div
-          className="bui-scope bui-toast-viewport pointer-events-none fixed bottom-6 right-6 z-[1200] flex w-[380px] max-w-[calc(100vw-32px)] flex-col gap-2"
+          className="admin-portal pointer-events-none fixed right-6 bottom-6 z-[1200] flex w-[380px] max-w-[calc(100vw-32px)] flex-col gap-2"
           aria-live="polite"
         >
           {items.map((item) => {
@@ -125,7 +124,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-foreground">{item.message}</p>
                   {item.description && (
-                    <p className="mt-0.5 text-xs leading-5 text-muted-foreground">{item.description}</p>
+                    <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                      {item.description}
+                    </p>
                   )}
                 </div>
                 <button

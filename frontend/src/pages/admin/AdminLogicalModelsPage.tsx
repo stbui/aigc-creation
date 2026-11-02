@@ -1,22 +1,33 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Archive, FlaskConical, Plus, Trash2 } from 'lucide-react';
-import { Button } from '../../admin-ui/shadcn/kit';
 import { adminChannelModelsApi, adminChannelsApi, adminLogicalModelsApi } from '../../lib/api';
 import { useCapabilities } from '../../hooks/useCapabilities';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
-import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
-import { Drawer } from '../../admin-ui/primitives/Drawer';
-import { Descriptions, Notice } from '../../admin-ui/primitives';
-import { NumberInput, SelectBox, SwitchBox, TextArea, TextInput } from '../../admin-ui/controls';
-import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import {
-  AdminListLoading,
-  AdminStaleError,
+  ActionButton,
+  AdminDataTable,
   ConfirmAction,
+  Descriptions,
+  Drawer,
+  FilterBar,
+  FormField,
+  IconButton,
+  Notice,
+  NumberField,
+  PageHeader,
+  Panel,
+  SelectField,
+  Skeleton,
+  StatusTag,
+  StaleError,
+  SwitchField,
+  TextAreaField,
+  TextField,
   useAdminResource,
-} from '../../components/admin/AdminWidgets';
-import { FilterBar, PageHeader, Panel, StatusTag } from '../../components/admin/PageHeader';
+  type AdminColumn,
+} from '../../admin-ui/primitives';
+import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import { parseCredits, toCreditsInput } from '../../lib/microcredits';
 import type {
   AdminChannelModelView,
@@ -138,17 +149,6 @@ function toDraft(model: AdminLogicalModelView): ModelDraft {
   };
 }
 
-/** 表单字段容器 */
-function Field({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium text-text-secondary">{label}</span>
-      {children}
-      {hint && <p className="text-[11px] leading-4 text-text-tertiary">{hint}</p>}
-    </div>
-  );
-}
-
 export function AdminLogicalModelsPage() {
   const { can } = useAdmin();
   const toast = useToast();
@@ -166,8 +166,11 @@ export function AdminLogicalModelsPage() {
   const [channels, setChannels] = useState<ChannelOrderItemView[]>([]);
   useEffect(() => {
     // 线路选择器需要「渠道名 / 模型名」；任一请求失败不阻塞列表
-    void adminChannelModelsApi.list().then(setChannelModels).catch(() => undefined);
-    void adminChannelsApi.order().then(setChannels).catch(() => undefined);
+    void adminChannelModelsApi
+      .list()
+      .then((res) => setChannelModels(res.models))
+      .catch(() => undefined);
+    void adminChannelsApi.order().then((res) => setChannels(res.items)).catch(() => undefined);
   }, []);
 
   const channelNameById = useMemo(
@@ -410,10 +413,10 @@ export function AdminLogicalModelsPage() {
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             {row.icon && <span aria-hidden>{row.icon}</span>}
-            <span className="truncate font-medium text-text-primary">{row.name}</span>
+            <span className="truncate font-medium text-foreground">{row.name}</span>
             {row.archivedAt && <StatusTag status="archived" tone="muted" label="已归档" />}
           </div>
-          <div className="mt-0.5 truncate font-mono text-[11px] text-text-tertiary">{row.code}</div>
+          <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{row.code}</div>
         </div>
       ),
     },
@@ -423,8 +426,8 @@ export function AdminLogicalModelsPage() {
       width: 140,
       render: (row) => (
         <div className="flex flex-col gap-0.5 text-[11px]">
-          <span className="text-text-primary">{row.capabilitySpec?.capability || '—'}</span>
-          <span className="text-text-tertiary">{row.capability}</span>
+          <span className="text-foreground">{row.capabilitySpec?.capability || '—'}</span>
+          <span className="text-muted-foreground">{row.capability}</span>
         </div>
       ),
     },
@@ -434,11 +437,11 @@ export function AdminLogicalModelsPage() {
       width: 170,
       render: (row) => (
         <div className="flex flex-col gap-0.5 text-[11px]">
-          <span className="text-text-primary">
+          <span className="text-foreground">
             {PRICE_POLICY_LABELS[row.pricePolicy] ?? row.pricePolicy} ·{' '}
             {BILLING_MODE_LABELS[row.billingMode] ?? row.billingMode}
           </span>
-          <span className="tabular-nums text-text-tertiary">
+          <span className="tabular-nums text-muted-foreground">
             {row.displayPrice === null ? '按渠道价格档' : `${row.displayPrice} 积分`}
             {row.priceTiers.length > 1 ? ` · ${row.priceTiers.length} 档` : ''}
           </span>
@@ -453,11 +456,11 @@ export function AdminLogicalModelsPage() {
         const available = row.routes.filter((route) => route.available).length;
         return (
           <div className="flex flex-col gap-0.5 text-[11px]">
-            <span className="tabular-nums text-text-primary">
+            <span className="tabular-nums text-foreground">
               {available} / {row.routes.length} 可用
             </span>
             {row.routes.length > 0 && (
-              <span className="truncate text-text-tertiary" title={row.routes.map((r) => `${r.channelName} / ${r.channelModelName}`).join('、')}>
+              <span className="truncate text-muted-foreground" title={row.routes.map((r) => `${r.channelName} / ${r.channelModelName}`).join('、')}>
                 {row.routes[0].channelName} / {row.routes[0].channelModelName}
                 {row.routes.length > 1 ? ' 等' : ''}
               </span>
@@ -494,7 +497,7 @@ export function AdminLogicalModelsPage() {
       title: 'Revision',
       width: 90,
       align: 'right',
-      render: (row) => <span className="tabular-nums text-text-secondary">v{row.revisionVersion}</span>,
+      render: (row) => <span className="tabular-nums text-muted-foreground">v{row.revisionVersion}</span>,
     },
     {
       key: 'ops',
@@ -503,26 +506,26 @@ export function AdminLogicalModelsPage() {
       fixed: 'right',
       render: (row) => (
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="xs" disabled={!writable || !!row.archivedAt} onClick={() => openEdit(row)}>
+          <ActionButton variant="ghost" size="xs" disabled={!writable || !!row.archivedAt} onClick={() => openEdit(row)}>
             编辑
-          </Button>
-          <Button
+          </ActionButton>
+          <ActionButton
             variant="ghost"
             size="xs"
-            leadingIcon={FlaskConical}
+            icon={FlaskConical}
             onClick={() => openSimulate(row)}
           >
             模拟
-          </Button>
-          <Button
+          </ActionButton>
+          <ActionButton
             variant="ghost"
             size="xs"
-            leadingIcon={Archive}
+            icon={Archive}
             disabled={!writable || !!row.archivedAt}
             onClick={() => setArchiveTarget(row)}
           >
             归档
-          </Button>
+          </ActionButton>
         </div>
       ),
     },
@@ -538,14 +541,14 @@ export function AdminLogicalModelsPage() {
         title="前台模型"
         description="用户看到的产品：名称、图标、价格与能力合同。模型经「线路」指向渠道模型，只换供应不改产品。"
         actions={
-          <Button variant="primary" size="small" leadingIcon={Plus} disabled={!writable} onClick={openCreate}>
+          <ActionButton variant="default" size="sm" icon={Plus} disabled={!writable} onClick={openCreate}>
             新建前台模型
-          </Button>
+          </ActionButton>
         }
       />
 
       <FilterBar>
-        <SwitchBox
+        <SwitchField
           checked={includeArchived}
           label="显示已归档"
           ariaLabel="显示已归档"
@@ -558,10 +561,13 @@ export function AdminLogicalModelsPage() {
         note="保存即生成新 revision 并重建线路；旧 revision 保留，历史账单可回溯到当时的能力合同。"
       >
         {loading && rows.length === 0 ? (
-          <AdminListLoading />
+          <div className="flex flex-col gap-2 py-2">
+            <Skeleton rows={4} />
+            <p className="text-center text-xs text-muted-foreground">加载中…</p>
+          </div>
         ) : (
           <>
-            {error && <AdminStaleError error={error} onRetry={() => void reload()} />}
+            {error && <StaleError error={error} onRetry={() => void reload()} />}
             <AdminDataTable<AdminLogicalModelView>
               rows={rows}
               columns={columns}
@@ -588,12 +594,12 @@ export function AdminLogicalModelsPage() {
         }
         footer={
           <>
-            <Button variant="secondary" size="small" onClick={requestCloseForm} disabled={saving}>
+            <ActionButton variant="secondary" size="sm" onClick={requestCloseForm} disabled={saving}>
               取消
-            </Button>
-            <Button variant="primary" size="small" disabled={saving || !writable} onClick={() => void submit()}>
+            </ActionButton>
+            <ActionButton variant="default" size="sm" disabled={saving || !writable} onClick={() => void submit()}>
               {saving ? '保存中…' : editing ? '保存（新 revision）' : '创建'}
-            </Button>
+            </ActionButton>
           </>
         }
       >
@@ -609,8 +615,8 @@ export function AdminLogicalModelsPage() {
           )}
 
           <div className="grid grid-cols-3 gap-3">
-            <Field label="编码" hint={editing ? '创建后不可修改' : '小写字母 / 数字 / . _ -'}>
-              <TextInput
+            <FormField label="编码" hint={editing ? '创建后不可修改' : '小写字母 / 数字 / . _ -'}>
+              <TextField
                 ariaLabel="编码"
                 value={draft.code}
                 onChange={(value) => patchDraft({ code: value })}
@@ -618,29 +624,29 @@ export function AdminLogicalModelsPage() {
                 disabled={!!editing}
                 maxLength={80}
               />
-            </Field>
-            <Field label="名称">
-              <TextInput
+            </FormField>
+            <FormField label="名称">
+              <TextField
                 ariaLabel="名称"
                 value={draft.name}
                 onChange={(value) => patchDraft({ name: value })}
                 placeholder="电商主图 Pro"
                 maxLength={60}
               />
-            </Field>
-            <Field label="图标" hint="emoji 或短字符">
-              <TextInput
+            </FormField>
+            <FormField label="图标" hint="emoji 或短字符">
+              <TextField
                 ariaLabel="图标"
                 value={draft.icon}
                 onChange={(value) => patchDraft({ icon: value })}
                 placeholder="🎨"
                 maxLength={8}
               />
-            </Field>
+            </FormField>
           </div>
 
-          <Field label="描述" hint="面向用户展示的一句话说明">
-            <TextArea
+          <FormField label="描述" hint="面向用户展示的一句话说明">
+            <TextAreaField
               ariaLabel="描述"
               value={draft.description}
               onChange={(value) => patchDraft({ description: value })}
@@ -648,169 +654,167 @@ export function AdminLogicalModelsPage() {
               maxLength={200}
               placeholder="高质量商品主图生成，支持多尺寸"
             />
-          </Field>
+          </FormField>
 
           <div className="grid grid-cols-3 gap-3">
-            <Field label="C 端能力" hint="准入按这个 id 选模型">
-              <SelectBox
+            <FormField label="C 端能力" hint="准入按这个 id 选模型">
+              <SelectField
                 ariaLabel="C 端能力"
                 value={draft.capability || undefined}
                 options={capabilityOptions}
                 onChange={(value) => patchDraft({ capability: value ?? '' })}
                 placeholder="选择能力"
               />
-            </Field>
-            <Field label="排序值" hint="数字越小越靠前">
-              <NumberInput
+            </FormField>
+            <FormField label="排序值" hint="数字越小越靠前">
+              <NumberField
                 ariaLabel="排序值"
                 value={Number(draft.sortOrder) || 0}
                 min={0}
                 onChange={(value) => patchDraft({ sortOrder: String(value ?? 0) })}
               />
-            </Field>
-            <Field label="上架">
+            </FormField>
+            <FormField label="上架">
               <div className="flex h-8 items-center">
-                <SwitchBox
+                <SwitchField
                   checked={draft.enabled}
                   label="对用户可见"
                   ariaLabel="上架"
                   onChange={(checked) => patchDraft({ enabled: checked })}
                 />
               </div>
-            </Field>
+            </FormField>
           </div>
 
-          <div className="rounded-lg border border-border-table p-3">
-            <div className="mb-2 text-xs font-semibold text-text-primary">计费</div>
+          <div className="rounded-lg border border-border p-3">
+            <div className="mb-2 text-xs font-semibold text-foreground">计费</div>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="价格策略" hint="「跟随渠道」按渠道模型的价格档计费">
-                <SelectBox
+              <FormField label="价格策略" hint="「跟随渠道」按渠道模型的价格档计费">
+                <SelectField
                   ariaLabel="价格策略"
                   value={draft.pricePolicy}
                   options={PRICE_POLICY_OPTIONS}
                   onChange={(value) => patchDraft({ pricePolicy: value ?? 'channel' })}
                 />
-              </Field>
-              <Field label="计费方式">
-                <SelectBox
+              </FormField>
+              <FormField label="计费方式">
+                <SelectField
                   ariaLabel="计费方式"
                   value={draft.billingMode}
                   options={BILLING_MODE_OPTIONS}
                   onChange={(value) => patchDraft({ billingMode: value ?? 'fixed_request' })}
                 />
-              </Field>
+              </FormField>
             </div>
             {draft.pricePolicy === 'unified' && (
               <div className="mt-3 grid grid-cols-4 gap-3">
-                <Field label="单价（积分）">
-                  <TextInput
+                <FormField label="单价（积分）">
+                  <TextField
                     ariaLabel="单价"
                     inputMode="decimal"
                     value={draft.unitPrice}
                     onChange={(value) => patchDraft({ unitPrice: value })}
                   />
-                </Field>
-                <Field label="输入 Token 价">
-                  <TextInput
+                </FormField>
+                <FormField label="输入 Token 价">
+                  <TextField
                     ariaLabel="输入 Token 价"
                     inputMode="decimal"
                     value={draft.inputPrice}
                     onChange={(value) => patchDraft({ inputPrice: value })}
                   />
-                </Field>
-                <Field label="输出 Token 价">
-                  <TextInput
+                </FormField>
+                <FormField label="输出 Token 价">
+                  <TextField
                     ariaLabel="输出 Token 价"
                     inputMode="decimal"
                     value={draft.outputPrice}
                     onChange={(value) => patchDraft({ outputPrice: value })}
                   />
-                </Field>
-                <Field label="缓存 Token 价">
-                  <TextInput
+                </FormField>
+                <FormField label="缓存 Token 价">
+                  <TextField
                     ariaLabel="缓存 Token 价"
                     inputMode="decimal"
                     value={draft.cachedPrice}
                     onChange={(value) => patchDraft({ cachedPrice: value })}
                   />
-                </Field>
+                </FormField>
               </div>
             )}
           </div>
 
-          <Field
+          <FormField
             label="能力合同（capabilitySpec）"
             hint="声明本模型接受的 input / operation / 参数范围；线路按它做匹配，写错会让模型选不到线路"
           >
-            <TextArea
+            <TextAreaField
               ariaLabel="能力合同"
               value={draft.capabilitySpecText}
               onChange={(value) => patchDraft({ capabilitySpecText: value })}
               rows={8}
               placeholder='{"version": 1, "capability": "image", "operations": ["generate"]}'
             />
-          </Field>
+          </FormField>
 
-          <Field label="默认参数" hint="用户未显式给出时使用的默认值（JSON 对象）">
-            <TextArea
+          <FormField label="默认参数" hint="用户未显式给出时使用的默认值（JSON 对象）">
+            <TextAreaField
               ariaLabel="默认参数"
               value={draft.defaultOptionsText}
               onChange={(value) => patchDraft({ defaultOptionsText: value })}
               rows={4}
             />
-          </Field>
+          </FormField>
 
-          <div className="rounded-lg border border-border-table p-3">
+          <div className="rounded-lg border border-border p-3">
             <div className="mb-2 flex items-center justify-between">
               <div>
-                <div className="text-xs font-semibold text-text-primary">线路</div>
-                <div className="text-[11px] text-text-tertiary">
+                <div className="text-xs font-semibold text-foreground">线路</div>
+                <div className="text-[11px] text-muted-foreground">
                   同一 priority 内按 weight 随机；priority 更小的层先被尝试
                 </div>
               </div>
-              <Button variant="secondary" size="xs" leadingIcon={Plus} disabled={!writable} onClick={addRoute}>
+              <ActionButton variant="secondary" size="xs" icon={Plus} disabled={!writable} onClick={addRoute}>
                 添加线路
-              </Button>
+              </ActionButton>
             </div>
             {draft.routes.length === 0 ? (
-              <p className="py-3 text-center text-[11px] text-text-tertiary">
+              <p className="py-3 text-center text-[11px] text-muted-foreground">
                 没有线路时模型永远不可用（C 端会收到 42204）。
               </p>
             ) : (
               <div className="flex flex-col gap-2">
                 {draft.routes.map((route) => (
                   <div key={route.key} className="grid grid-cols-[1fr_64px_64px_72px_32px] items-end gap-2">
-                    <SelectBox
+                    <SelectField
                       ariaLabel="线路渠道模型"
                       value={route.channelModelId || undefined}
                       options={channelModelOptions}
                       onChange={(value) => updateRoute(route.key, { channelModelId: value ?? '' })}
                       placeholder="选择渠道模型"
                     />
-                    <NumberInput
+                    <NumberField
                       ariaLabel="优先级"
                       value={Number(route.priority) || 0}
                       min={0}
                       onChange={(value) => updateRoute(route.key, { priority: String(value ?? 0) })}
                     />
-                    <NumberInput
+                    <NumberField
                       ariaLabel="权重"
                       value={Number(route.weight) || 0}
                       min={0}
                       onChange={(value) => updateRoute(route.key, { weight: String(value ?? 0) })}
                     />
-                    <SwitchBox
+                    <SwitchField
                       checked={route.enabled}
                       label="启用"
                       ariaLabel="线路启用"
                       onChange={(checked) => updateRoute(route.key, { enabled: checked })}
                     />
-                    <Button
-                      variant="ghost"
+                    <IconButton
+                      icon={Trash2}
+                      label="删除线路"
                       size="xs"
-                      iconOnly
-                      leadingIcon={Trash2}
-                      aria-label="删除线路"
                       onClick={() => removeRoute(route.key)}
                     />
                   </div>
@@ -819,15 +823,15 @@ export function AdminLogicalModelsPage() {
             )}
           </div>
 
-          <Field label="变更原因" hint="写入审计">
-            <TextInput
+          <FormField label="变更原因" hint="写入审计">
+            <TextField
               ariaLabel="变更原因"
               value={draft.reason}
               onChange={(value) => patchDraft({ reason: value })}
               placeholder="如：新增备用线路"
               maxLength={200}
             />
-          </Field>
+          </FormField>
         </div>
       </Drawer>
 
@@ -841,27 +845,27 @@ export function AdminLogicalModelsPage() {
         description="只读：按给定参数算一遍「会落到哪条线路、为什么没落」，不扣费、不建任务"
         footer={
           <>
-            <Button variant="secondary" size="small" onClick={() => setSimulateFor(null)}>
+            <ActionButton variant="secondary" size="sm" onClick={() => setSimulateFor(null)}>
               关闭
-            </Button>
-            <Button variant="primary" size="small" disabled={simulating} onClick={() => void runSimulate()}>
+            </ActionButton>
+            <ActionButton variant="default" size="sm" disabled={simulating} onClick={() => void runSimulate()}>
               {simulating ? '模拟中…' : '开始模拟'}
-            </Button>
+            </ActionButton>
           </>
         }
       >
         <div className="flex flex-col gap-4">
-          <Field label="操作（operation）" hint="留空则用能力合同里的第一个操作">
-            <TextInput
+          <FormField label="操作（operation）" hint="留空则用能力合同里的第一个操作">
+            <TextField
               ariaLabel="操作"
               value={simulateOperation}
               onChange={setSimulateOperation}
               placeholder="generate"
             />
-          </Field>
-          <Field label="请求参数（options）" hint="JSON 对象；尺寸、数量等影响价格档的选择">
-            <TextArea ariaLabel="请求参数" value={simulateOptions} onChange={setSimulateOptions} rows={6} />
-          </Field>
+          </FormField>
+          <FormField label="请求参数（options）" hint="JSON 对象；尺寸、数量等影响价格档的选择">
+            <TextAreaField ariaLabel="请求参数" value={simulateOptions} onChange={setSimulateOptions} rows={6} />
+          </FormField>
 
           {simulateResult && (
             <div className="flex flex-col gap-3">
@@ -879,9 +883,9 @@ export function AdminLogicalModelsPage() {
                 ]}
                 columns={2}
               />
-              <div className="rounded-lg border border-border-table">
+              <div className="rounded-lg border border-border">
                 <table className="w-full text-[11px]">
-                  <thead className="bg-background-secondary-default text-text-secondary">
+                  <thead className="bg-muted text-muted-foreground">
                     <tr>
                       <th className="px-2 py-1.5 text-left">线路</th>
                       <th className="px-2 py-1.5 text-right">优先级</th>
@@ -892,7 +896,7 @@ export function AdminLogicalModelsPage() {
                   </thead>
                   <tbody>
                     {simulateResult.routes.map((route) => (
-                      <tr key={`${route.routeId}-${route.priceTierId}`} className="border-t border-border-table">
+                      <tr key={`${route.routeId}-${route.priceTierId}`} className="border-t border-border">
                         <td className="px-2 py-1.5 font-mono">{route.channelModelKey || route.channelModelId}</td>
                         <td className="px-2 py-1.5 text-right tabular-nums">{route.priority}</td>
                         <td className="px-2 py-1.5 text-right tabular-nums">{route.weight}</td>
@@ -901,7 +905,7 @@ export function AdminLogicalModelsPage() {
                           {route.eligible ? (
                             <StatusTag status="ok" tone="success" label="可命中" />
                           ) : (
-                            <span className="text-text-tertiary">{route.matchReasons.join('；') || '未命中'}</span>
+                            <span className="text-muted-foreground">{route.matchReasons.join('；') || '未命中'}</span>
                           )}
                         </td>
                       </tr>

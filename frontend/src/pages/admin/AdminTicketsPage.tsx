@@ -1,34 +1,35 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Download, Send, UserCheck } from 'lucide-react';
-import { Button } from '../../admin-ui/shadcn/kit';
-import { adminTicketsApi } from '../../lib/api';
-import { useAdmin } from '../../context/AdminContext';
-import { useToast } from '../../admin-ui/providers/ToastProvider';
-import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
-import { Drawer } from '../../admin-ui/primitives/Drawer';
-import { Descriptions } from '../../admin-ui/primitives';
-import { SelectBox, TextArea, TextInput } from '../../admin-ui/controls';
-import { cx } from '../../admin-ui/lib/cn';
 import {
-  AdminListError,
-  AdminListLoading,
-  AdminStaleError,
+  ActionButton,
+  AdminDataTable,
+  AppliedFilters,
+  ClearableField,
+  Descriptions,
+  Drawer,
+  EmptyState,
+  FilterActions,
+  FilterBar,
+  ListError,
+  PageHeader,
+  Panel,
+  SelectField,
+  Skeleton,
+  StatCard,
+  StatusTag,
+  StaleError,
+  TextAreaField,
   useAdminDetailParam,
   useAdminList,
   useAdminUrlFilterSync,
-} from '../../components/admin/AdminWidgets';
-import {
-  AdminEmpty,
-  AppliedFilters,
-  FilterActions,
-  FilterBar,
-  PageHeader,
-  Panel,
-  StatCard,
-  StatusTag,
+  type AdminColumn,
   type AppliedFilter,
-} from '../../components/admin/PageHeader';
+} from '../../admin-ui/primitives';
+import { adminTicketsApi } from '../../lib/api';
+import { useAdmin } from '../../context/AdminContext';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
+import { cn } from '../../admin-ui/lib/cn';
 import type { TagTone } from '../../components/admin/statusMeta';
 import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import {
@@ -134,10 +135,10 @@ function transitionLabel(to: TicketStatus): string {
 /** 详情里的小节标题 */
 function Section({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
   return (
-    <section className="border-t border-border-table pt-3">
+    <section className="border-t border-border pt-3">
       <div className="mb-2 flex items-baseline gap-2">
-        <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
-        {note && <span className="text-[11px] text-text-tertiary">{note}</span>}
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        {note && <span className="text-[11px] text-muted-foreground">{note}</span>}
       </div>
       {children}
     </section>
@@ -158,16 +159,16 @@ function Message({
 }) {
   return (
     <div
-      className={cx(
+      className={cn(
         'rounded-lg border px-3 py-2',
-        fromAdmin ? 'ml-10 border-accent-200 bg-accent-50' : 'border-border-table bg-white',
+        fromAdmin ? 'ml-10 border-brand/20 bg-accent' : 'border-border bg-card',
       )}
     >
       <div className="flex items-baseline justify-between gap-3">
-        <span className="text-xs font-medium text-text-primary">{author}</span>
-        <span className="shrink-0 text-[11px] tabular-nums text-text-tertiary">{at}</span>
+        <span className="text-xs font-medium text-foreground">{author}</span>
+        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{at}</span>
       </div>
-      <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-text-secondary">{body}</p>
+      <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{body}</p>
     </div>
   );
 }
@@ -374,13 +375,13 @@ export function AdminTicketsPage() {
         <div className="flex flex-col gap-0.5">
           <button
             type="button"
-            className="max-w-[260px] truncate rounded text-left text-accent-700 hover:underline"
+            className="max-w-[260px] truncate rounded text-left text-brand hover:underline"
             title={row.subject}
             onClick={() => setDetailId(row.id)}
           >
             {row.subject}
           </button>
-          <span className="text-[11px] text-text-tertiary">
+          <span className="text-[11px] text-muted-foreground">
             <code className="font-mono">{row.ticketNo}</code> ·{' '}
             {row.typeLabel || TYPE_LABELS[row.type]}
           </span>
@@ -395,7 +396,7 @@ export function AdminTicketsPage() {
         <div className="flex flex-col gap-0.5">
           <span>{row.userName || '—'}</span>
           <Link
-            className="block max-w-[170px] truncate text-[11px] text-accent-700 hover:underline"
+            className="block max-w-[170px] truncate text-[11px] text-brand hover:underline"
             title={row.userEmail}
             to={adminUserDetailHref(row.userId)}
           >
@@ -433,14 +434,16 @@ export function AdminTicketsPage() {
       title: '回复',
       width: 70,
       align: 'right',
-      render: (row) => <span className="tabular-nums text-text-secondary">{row.replyCount} 条</span>,
+      render: (row) => (
+        <span className="tabular-nums text-muted-foreground">{row.replyCount} 条</span>
+      ),
     },
     {
       key: 'time',
       title: '提交 / 更新',
       width: 170,
       render: (row) => (
-        <div className="flex flex-col gap-0.5 text-[11px] tabular-nums text-text-tertiary">
+        <div className="flex flex-col gap-0.5 text-[11px] tabular-nums text-muted-foreground">
           <span>{new Date(row.createdAt).toLocaleString('zh-CN')}</span>
           <span>{new Date(row.updatedAt).toLocaleString('zh-CN')}</span>
         </div>
@@ -452,9 +455,9 @@ export function AdminTicketsPage() {
       width: 90,
       fixed: 'right',
       render: (row) => (
-        <Button variant="ghost" size="small" onClick={() => setDetailId(row.id)}>
+        <ActionButton variant="ghost" size="sm" onClick={() => setDetailId(row.id)}>
           处理
-        </Button>
+        </ActionButton>
       ),
     },
   ];
@@ -543,10 +546,9 @@ export function AdminTicketsPage() {
         description="用户提交的问题、投诉与咨询集中在这里。关联订单与素材只读展示，退款与积分补偿请回订单模块执行。"
         actions={
           can('data.export') ? (
-            <Button
+            <ActionButton
               variant="secondary"
-              size="small"
-              leadingIcon={Download}
+              icon={Download}
               onClick={() =>
                 void adminTicketsApi
                   .exportCsv({
@@ -560,7 +562,7 @@ export function AdminTicketsPage() {
               }
             >
               导出 CSV
-            </Button>
+            </ActionButton>
           ) : undefined
         }
       />
@@ -579,14 +581,15 @@ export function AdminTicketsPage() {
       </div>
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
-      {error && data && <AdminStaleError error={error} onRetry={reload} />}
+      {error && data && <StaleError error={error} onRetry={reload} />}
 
       <FilterBar>
-        <SelectBox
+        <SelectField
           className="w-32"
           ariaLabel="按状态筛选"
           placeholder="全部状态"
           allowClear
+          clearLabel="全部状态"
           value={appliedStatus}
           onChange={(value) => {
             appliedUrlStatus.current = value;
@@ -594,20 +597,22 @@ export function AdminTicketsPage() {
           }}
           options={Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }))}
         />
-        <SelectBox
+        <SelectField
           className="w-32"
           ariaLabel="按类型筛选"
           placeholder="全部类型"
           allowClear
+          clearLabel="全部类型"
           value={appliedType}
           onChange={(value) => setQuery({ type: value })}
           options={Object.entries(TYPE_LABELS).map(([value, label]) => ({ value, label }))}
         />
-        <SelectBox
+        <SelectField
           className="w-32"
           ariaLabel="按优先级筛选"
           placeholder="全部优先级"
           allowClear
+          clearLabel="全部优先级"
           value={appliedPriority}
           onChange={(value) => setQuery({ priority: value })}
           options={[
@@ -616,30 +621,31 @@ export function AdminTicketsPage() {
             { value: 'low', label: '低' },
           ]}
         />
-        <SelectBox
+        <SelectField
           className="w-32"
           ariaLabel="按归属筛选"
           placeholder="全部归属"
           allowClear
+          clearLabel="全部归属"
           value={appliedAssignee}
           onChange={(value) => setQuery({ assigneeId: value })}
           options={[{ value: 'unassigned', label: '仅未指派' }]}
         />
-        <TextInput
+        <ClearableField
           className="w-56"
           placeholder="工单号 / 标题 / 正文"
-          allowClear
+          ariaLabel="工单号 / 标题 / 正文"
           value={qDraft}
           onChange={setQDraft}
           onEnter={applyKeyword}
         />
         <FilterActions>
-          <Button variant="primary" size="small" onClick={applyKeyword}>
+          <ActionButton variant="default" onClick={applyKeyword}>
             查询
-          </Button>
-          <Button variant="secondary" size="small" onClick={resetFilters}>
+          </ActionButton>
+          <ActionButton variant="secondary" onClick={resetFilters}>
             重置
-          </Button>
+          </ActionButton>
         </FilterActions>
         <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
       </FilterBar>
@@ -656,9 +662,9 @@ export function AdminTicketsPage() {
           emptyText={hasFilter ? '当前筛选下没有工单。' : '还没有工单。'}
           emptyAction={
             hasFilter ? (
-              <Button variant="secondary" size="small" onClick={resetFilters}>
+              <ActionButton variant="secondary" onClick={resetFilters}>
                 清除筛选
-              </Button>
+              </ActionButton>
             ) : undefined
           }
           pagination={
@@ -685,9 +691,12 @@ export function AdminTicketsPage() {
         description={replyDirty ? '有未发送的回复' : undefined}
       >
         {detailLoading ? (
-          <AdminListLoading tip="加载工单详情…" />
+          <div className="flex flex-col gap-2 py-2">
+            <Skeleton rows={4} />
+            <p className="text-center text-xs text-muted-foreground">加载工单详情…</p>
+          </div>
         ) : detailError ? (
-          <AdminListError
+          <ListError
             error={detailError}
             onRetry={() => detailId && void loadDetail(detailId)}
           />
@@ -705,7 +714,7 @@ export function AdminTicketsPage() {
                         label={STATUS_LABELS[detail.status as TicketStatus]}
                         tone={STATUS_TONE[detail.status as TicketStatus]}
                       />
-                      <span className="text-[11px] text-text-tertiary">
+                      <span className="text-[11px] text-muted-foreground">
                         {detail.assigneeId ? '已指派' : '未指派'}
                       </span>
                     </span>
@@ -714,9 +723,8 @@ export function AdminTicketsPage() {
                 {
                   label: '优先级',
                   value: (
-                    <SelectBox
+                    <SelectField
                       className="w-24"
-                      size="md"
                       ariaLabel="优先级"
                       value={detail.priority}
                       disabled={!can('ticket.handle') || busy}
@@ -738,7 +746,7 @@ export function AdminTicketsPage() {
                       <span className="flex flex-wrap items-center gap-1.5">
                         {detail.user.name || '—'} ·{' '}
                         <Link
-                          className="text-accent-700 hover:underline"
+                          className="text-brand hover:underline"
                           to={adminUserDetailHref(detail.user.id)}
                         >
                           {detail.user.email}
@@ -746,7 +754,7 @@ export function AdminTicketsPage() {
                       </span>
                       <span className="flex gap-3 text-[11px]">
                         <Link
-                          className="text-accent-700 hover:underline"
+                          className="text-brand hover:underline"
                           to={adminCreditHref({
                             userId: detail.user.id,
                             email: detail.user.email,
@@ -755,7 +763,7 @@ export function AdminTicketsPage() {
                           积分账本
                         </Link>
                         <Link
-                          className="text-accent-700 hover:underline"
+                          className="text-brand hover:underline"
                           to={adminOrderHref({ email: detail.user.email })}
                         >
                           全部订单
@@ -795,12 +803,12 @@ export function AdminTicketsPage() {
                         value: (
                           <span className="flex flex-wrap items-baseline gap-1.5">
                             <Link
-                              className="text-accent-700 hover:underline"
+                              className="text-brand hover:underline"
                               to={adminOrderDetailHref(detail.related.order.id)}
                             >
                               {detail.related.order.orderNo}
                             </Link>
-                            <span className="text-[11px] text-text-tertiary">
+                            <span className="text-[11px] text-muted-foreground">
                               {detail.related.order.status} · ¥
                               {(detail.related.order.paidCents / 100).toFixed(2)}
                             </span>
@@ -816,14 +824,14 @@ export function AdminTicketsPage() {
                         value: (
                           <span className="flex flex-wrap items-baseline gap-1.5">
                             <Link
-                              className="text-accent-700 hover:underline"
+                              className="text-brand hover:underline"
                               to={adminAssetHref(detail.related.asset.id)}
                             >
                               <code className="font-mono text-xs">
                                 {detail.related.asset.id}
                               </code>
                             </Link>
-                            <span className="text-[11px] text-text-tertiary">
+                            <span className="text-[11px] text-muted-foreground">
                               {detail.related.asset.width}×{detail.related.asset.height}
                             </span>
                           </span>
@@ -853,7 +861,7 @@ export function AdminTicketsPage() {
                   />
                 ))}
                 {detail.replies.length === 0 && (
-                  <p className="text-[11px] text-text-tertiary">
+                  <p className="text-[11px] text-muted-foreground">
                     还没有回复。在下方向用户说明处理进展。
                   </p>
                 )}
@@ -862,7 +870,7 @@ export function AdminTicketsPage() {
 
             {can('ticket.handle') ? (
               <Section title="回复用户">
-                <TextArea
+                <TextAreaField
                   ariaLabel="回复内容"
                   rows={4}
                   maxLength={2000}
@@ -873,40 +881,37 @@ export function AdminTicketsPage() {
                   placeholder="说明处理结论或需要用户补充的信息。回复后用户会在站内消息里收到通知。"
                 />
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <Button
-                    variant="primary"
-                    size="small"
-                    leadingIcon={Send}
+                  <ActionButton
+                    variant="default"
+                    icon={Send}
                     disabled={busy || !reply.trim()}
                     onClick={() => void sendReply()}
                   >
                     发送回复
-                  </Button>
+                  </ActionButton>
                   {!detail.assigneeId && (
-                    <Button
+                    <ActionButton
                       variant="secondary"
-                      size="small"
-                      leadingIcon={UserCheck}
+                      icon={UserCheck}
                       disabled={busy}
                       onClick={() => void assignSelf()}
                     >
                       认领
-                    </Button>
+                    </ActionButton>
                   )}
                   {detail.assigneeId && (
-                    <Button
+                    <ActionButton
                       variant="secondary"
-                      size="small"
                       disabled={busy}
                       onClick={() => void unassign()}
                     >
                       取消指派
-                    </Button>
+                    </ActionButton>
                   )}
                 </div>
               </Section>
             ) : (
-              <p className="text-[11px] text-text-tertiary">
+              <p className="text-[11px] text-muted-foreground">
                 你没有工单处理权限（ticket.handle），当前为只读视图。
               </p>
             )}
@@ -915,25 +920,24 @@ export function AdminTicketsPage() {
               <Section title="状态流转">
                 <div className="flex flex-wrap items-center gap-2">
                   {nextStatuses.map((to) => (
-                    <Button
+                    <ActionButton
                       key={to}
-                      variant={to === 'closed' ? 'danger' : 'secondary'}
-                      size="small"
+                      variant={to === 'closed' ? 'destructive' : 'secondary'}
                       disabled={busy}
                       onClick={() => void changeStatus(to)}
                     >
                       {transitionLabel(to)}
-                    </Button>
+                    </ActionButton>
                   ))}
                 </div>
-                <p className="mt-2 text-[11px] text-text-tertiary">
+                <p className="mt-2 text-[11px] text-muted-foreground">
                   关闭后用户无法继续回复，只能新建工单；如问题仍在，可重新打开接回原上下文。
                 </p>
               </Section>
             )}
           </div>
         ) : (
-          <AdminEmpty description="没有可展示的工单详情。" />
+          <EmptyState title="暂无工单详情" description="没有可展示的工单详情。" />
         )}
       </Drawer>
     </>

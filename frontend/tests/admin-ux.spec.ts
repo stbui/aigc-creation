@@ -14,7 +14,7 @@ import { ADMIN_PASSWORD, HAS_ADMIN_CREDENTIALS } from './support/admin-credentia
  *
  * ## 选择器约定
  *
- * 2026-10-30 外壳与共享控件换成 BoardUI 后，后台只保证两类钩子：
+ * 2026-10-30 后台改版后，后台只保证两类钩子：
  * `data-testid="admin-*"`（共享控件）与 `aria-label`（表单控件）。不再使用
  * antd 的 `.ant-*`、也不再依赖旧版 `adm-*` 组件类。
  */
@@ -67,10 +67,9 @@ test.describe('后台高频动线', () => {
       ],
       ['/admin/products?status=active', '商品管理', ['状态：在售']],
       [
-        '/admin/reconciliation?channel=alipay&status=imported&from=2026-10-01&to=2026-10-31',
-        '渠道对账',
-        ['渠道：支付宝', '状态：待处置', '账单日 ≥ 2026-10-01', '账单日 ≤ 2026-10-31'],
-      ],
+        '/admin/payments?tab=reconciliation&providerId=alipay&status=failed&from=2026-10-01&to=2026-10-31',
+        '支付充值',
+        ['渠道：支付宝', '状态：失败', '起始：2026-10-01', '截止：2026-10-31'],      ],
       ['/admin/capabilities?q=image&runtime=unavailable', '能力管控', ['关键词：image', '运行结论：暂不可用']],
     ] as const;
 

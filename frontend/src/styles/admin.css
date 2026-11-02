@@ -1,0 +1,236 @@
+/**
+ * 后台样式入口（shadcn / Tailwind v4）。
+ *
+ * ## 与前台的关系
+ *
+ * 前台（C 端）的全部样式在 `styles/global.css`，24,000+ 行，**本文件不碰它**。
+ * 本文件只被后台 chunk 导入（`pages/admin/AdminDashboardPage.tsx`），C 端不下载。
+ * 两者共享的只有 `global.css` 的 `:root` 设计令牌（品牌紫、中性色、圆角档、状态色）。
+ *
+ * ## 为什么不是 `@import "tailwindcss"`
+ *
+ * 完整入口会带 preflight —— 它会重置全站的 border / box-sizing / 标题字号，
+ * 直接打断 `global.css` 与 C 端页面。这里只取 theme + utilities。
+ *
+ * ## 作用域
+ *
+ * - `@source` 白名单只扫后台目录（`admin-ui` / `pages/admin` / `components/admin`），
+ *   C 端类名不进产物。`utilities.css` 用了 `source(none)` 关掉自动探测 ——
+ *   漏列一个目录，该目录里的工具类（`tabular-nums` / `w-32` / `border-t` 之类）
+ *   就不会生成，页面看着「样式丢了一半」但构建不报错。
+ * - base 规则限定 `.admin-root`，不写全局元素选择器。
+ */
+
+@layer theme, base, components, utilities;
+
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities) source(none);
+@import 'tw-animate-css';
+
+@source '../admin-ui';
+@source '../pages/admin';
+@source '../components/admin';
+
+@theme inline {
+  /* 字体沿用全站栈：Tailwind 默认 Inter，中文会掉到系统字体且字重不一致 */
+  --font-sans:
+    'Noto Sans SC', Inter, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+
+  /*
+   * 圆角阶梯对齐全站五档（global.css 的 `--radius-tag/control/card/panel/hero`）。
+   *
+   * Tailwind v4 默认阶梯 2/4/6/8/12/16/24 与项目规定对不齐：
+   * `rounded-md` = 6px 不在任何一档（项目控件档是 8px）。重映射后：
+   *   rounded-sm → 4px  (--radius-tag)
+   *   rounded-md → 8px  (--radius-control)  ← 按钮 / 输入框
+   *   rounded-lg → 12px (--radius-card)     ← 卡片 / 面板
+   *   rounded-xl → 16px (--radius-panel)
+   *   rounded-2xl → 24px (--radius-hero)
+   *
+   * 用 `var()` 引用而非抄字面值：圆角档位只定义一处。
+   * `inline` 保证不产出 `:root` 声明（global.css 已定义同名 `--radius`）。
+   */
+  --radius-sm: var(--radius-tag);
+  --radius-md: var(--radius-control);
+  --radius-lg: var(--radius-card);
+  --radius-xl: var(--radius-panel);
+  --radius-2xl: var(--radius-hero);
+
+  /* shadow-card 登记进命名空间，`shadow-card` 才成为可用工具类。
+     值仍只在 global.css 的 `:root` 定义一处；inline 避免自引用。 */
+  --shadow-card: var(--shadow-card);
+
+  /* 品牌色登记成工具类：`bg-brand` / `text-brand` / `border-brand` */
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-bg: var(--brand-bg);
+
+  /* ── shadcn 语义变量 → 项目令牌 ──────────────────────────────
+   *
+   * shadcn 组件只认固定的一套变量名（`--background` / `--primary` / `--border` …）。
+   * 这里**只做映射，不引入新颜色**，改品牌色仍然只改 global.css 一处。
+   *
+   * 必须用 `inline`：global.css 已在 `:root` 定义 `--color-primary` / `--color-card` /
+   * `--color-border` 三枚同名变量，普通 `@theme` 会把本文件的值写进 `:root`，
+   * 覆盖全站同名值，C 端跟着变色。
+   */
+  --color-background: var(--card-bg);
+  --color-foreground: var(--text-strong);
+
+  /* 页面底色（卡片浮在其上）。shadcn 的 `background` 语义是「内容底」，
+     在后台这里等于卡片白；整页底色另给一个名字，避免与卡片混用。 */
+  --color-page: var(--page-bg);
+
+  --color-card: var(--card-bg);
+  --color-card-foreground: var(--text-strong);
+
+  --color-popover: var(--card-bg);
+  --color-popover-foreground: var(--text-strong);
+
+  --color-primary: var(--brand);
+  --color-primary-foreground: #ffffff;
+
+  /* secondary / muted 都是「次级灰底」，接 --surface（#f2f4f7） */
+  --color-secondary: var(--surface);
+  --color-secondary-foreground: var(--text-body);
+  --color-muted: var(--surface);
+  --color-muted-foreground: var(--text-muted);
+
+  /* shadcn 的 `accent` 是「悬停淡底」，不是品牌强调色 —— 两者同名不同义 */
+  --color-accent: var(--brand-bg);
+  --color-accent-foreground: var(--brand-hover);
+
+  --color-destructive: var(--danger-text);
+  --color-destructive-foreground: #ffffff;
+
+  /* `--border` 在 global.css 已存在且语义一致，直接消费，不重新定义 */
+  --color-border: var(--border);
+  --color-input: var(--border);
+  --color-ring: var(--brand);
+
+  /*
+   * 业务语义色（成功 / 警示 / 危险）。
+   *
+   * shadcn 默认只有 destructive 一档，后台需要区分三档。值取 global.css 已有令牌，
+   * 不新造颜色。名字加 `status-` 前缀是必须的：global.css 已有 `--danger-text` /
+   * `--warn-text` / `--success-text`，同名会变成自引用循环，变量解析失败后
+   * 退回继承值，表现是「颜色随页面上下文乱变」。
+   */
+  --color-success-soft: var(--success-soft-bg);
+  --color-success-text: var(--success-text);
+  --color-success-border: var(--success-border);
+  --color-warn-soft: var(--warn-bg);
+  --color-warn-border: var(--warn-border);
+  --color-warn-text: var(--warn-text);
+  --color-danger-soft: var(--danger-soft-bg);
+  --color-danger-text: var(--danger-text);
+}
+
+@layer base {
+  /*
+   * ① 外壳骨架的 `.adm-*` 钩子。
+   *
+   * 这三个类名是后台外壳的**几何契约**，不是样式装饰：
+   *   - `.adm-layout`  —— 外壳根，e2e 用它确认后台外壳已挂载；
+   *   - `.adm-content` —— 内容区，e2e 量它的宽度与左边缘，验证「内容区 = 视口 − 侧栏」
+   *                     且没有横向溢出；
+   *   - `.adm-skip-link` —— 键盘用户的跳转入口。
+   *
+   * 布局本身走 Tailwind 工具类，这里只补两件工具类表达不了的事：
+   * 跳转链接的位移动画（未聚焦时移出视口）和内容区收焦时去掉焦点框。
+   */
+  .adm-skip-link {
+    position: fixed;
+    top: 8px;
+    left: 8px;
+    z-index: 1200;
+    padding: 8px 12px;
+    border-radius: var(--radius-control);
+    background: var(--text-strong);
+    color: var(--on-brand);
+    font-size: 13px;
+    text-decoration: none;
+    transform: translateY(calc(-100% - 16px));
+    transition: transform 0.16s ease;
+  }
+  .adm-skip-link:focus-visible {
+    transform: translateY(0);
+    outline: 2px solid var(--on-brand);
+    outline-offset: 2px;
+  }
+
+  /* 跳过导航的落点：main 收焦，但不需要焦点框 */
+  .adm-content:focus-visible {
+    outline: none;
+  }
+
+  /*
+   * ② border-style 兜底 —— 必须是**全局**规则。
+   *
+   * Tailwind 的 `border` / `border-b` 只写宽度，样式靠 preflight 给的 `solid`；
+   * 本项目刻意不导 preflight，没有这条，所有卡片、输入框、表头的边线都不显示。
+   *
+   * 不能只写在 `.admin-root` 下：抽屉、弹层、Toast 都渲染在 `document.body` 的
+   * portal 里，不在作用域内 —— 浮层会独自丢掉全部边线，而这种问题只在打开弹层
+   * 时才看得见。
+   *
+   * global.css 是未分层样式，优先级高于本层，冲突时仍以它为准。
+   */
+  *,
+  ::before,
+  ::after {
+    border: 0 solid;
+  }
+
+  /*
+   * ③ 描边颜色兜底：只作用于 shadcn 组件（`components/ui/*` 都带 `data-slot`）。
+   *
+   * `border` 单独出现时颜色会退回 `currentColor`（近黑），在浅色卡片上像描了黑边。
+   * 放进 base 层，utilities 层的显式颜色类（`border-input` / `border-transparent`）
+   * 仍然优先；未分层的规则会压过所有 `@layer`，所以不能写在层外。
+   */
+  [data-slot] {
+    border-color: var(--border);
+  }
+
+  /* ④ 后台作用域：字体与底色。`.admin-portal` 供 portal 浮层复用（不带底色） */
+  .admin-root,
+  .admin-portal {
+    font-family: var(--font-sans);
+    color: var(--text-strong);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .admin-root {
+    background: var(--page-bg);
+  }
+
+  /* 控件重置：按钮/输入框不能带系统灰底与默认边框 */
+  :is(.admin-root, .admin-portal) :where(button, input, select, textarea) {
+    font: inherit;
+    color: inherit;
+    background: transparent;
+  }
+
+  :is(.admin-root, .admin-portal) :where(img, svg, video) {
+    display: block;
+    vertical-align: middle;
+  }
+
+  :is(.admin-root, .admin-portal) :focus-visible {
+    outline: 2px solid var(--brand);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :is(.admin-root, .admin-portal) *,
+    :is(.admin-root, .admin-portal) *::before,
+    :is(.admin-root, .admin-portal) *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}

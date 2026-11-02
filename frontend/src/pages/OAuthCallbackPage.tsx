@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Spin } from 'antd';
 import { authApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { safeInternalPath } from '../lib/safePath';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 
 /**
  * 通用 OAuth 回调落地页。
@@ -12,14 +14,14 @@ import { useAuth } from '../context/AuthContext';
  * 可直接长期使用的 accessToken。
  */
 export function OAuthCallbackPage() {
+  useDocumentMeta('第三方登录 · 货觉AI', '正在完成第三方登录。');
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { login } = useAuth();
   const [error, setError] = useState<string | null>(null);
   const started = useRef(false);
 
-  const rawReturnTo = params.get('returnTo') ?? '';
-  const target = rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//') ? rawReturnTo : '/workbench';
+  const target = safeInternalPath(params.get('returnTo'), '/workbench');
 
   useEffect(() => {
     if (started.current) return;

@@ -20,6 +20,7 @@ import {
 } from '../lib/constants';
 import { capabilityName, toolPath } from '../lib/capabilities';
 import { useAuth } from '../context/AuthContext';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useProject } from '../hooks/useProject';
 import { ResultMedia, modalityOfFormat } from '../components/ResultMedia';
 import { useCapabilities } from '../hooks/useCapabilities';
@@ -90,6 +91,7 @@ function dateBucket(iso: string): { key: string; label: string; sort: number } {
 }
 
 export function LibraryPage() {
+  useDocumentMeta('素材库 · 货觉AI', '管理上传的原图与生成图，支持分组、下载与删除。');
   const { message } = App.useApp();
   const navigate = useNavigate();
   const { token, openLogin } = useAuth();
@@ -111,6 +113,7 @@ export function LibraryPage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+
   /*
    * 外部入口: 浏览器扩展保存后跳 `/asset-library?projectId=xxx`，直接落在
    * 刚采集进的那个分组上。惰性初始化是为了首帧就分组，不闪一下「全部」。
@@ -123,6 +126,14 @@ export function LibraryPage() {
   const [groupKey, setGroupKey] = useState<string | null>(projectIdParam);
   /** 项目名映射：按项目分组时要显示名字，只有 id 的分组没人看得懂 */
   const [projects, setProjects] = useState<Project[]>([]);
+
+  /*
+   * 切换维度/能力/分组后清空勾选：批量下载只应作用于当前可见集合，
+   * 否则用户会把屏幕上看不到、无法核对的素材一起下载。
+   */
+  useEffect(() => {
+    setSelected([]);
+  }, [kind, capability, groupBy, groupKey]);
 
   // 项目列表只在真的要按项目分组时拉: 素材页的主路径是看图，不为一个辅助视图多发一次请求
   useEffect(() => {
@@ -330,10 +341,12 @@ export function LibraryPage() {
     list.forEach((a, i) => {
       const url = assetSrc(a);
       if (!url) return;
+      const ext = (a.format || 'png').toLowerCase().replace(/^\./, '') || 'png';
       window.setTimeout(() => {
         const el = document.createElement('a');
         el.href = url;
-        el.download = `asset-${a.id.slice(-6)}.${a.format === 'png' ? 'png' : 'jpg'}`;
+        el.download = `asset-${a.id.slice(-6)}.${ext}`;
+        el.rel = 'noopener';
         el.click();
       }, i * 200);
     });
@@ -518,7 +531,7 @@ export function LibraryPage() {
                       <ResultMedia
                         url={previewUrl}
                         modality={modalityOfFormat(a.format)}
-                        alt={a.sourceUrl}
+                        alt={`${capabilityName(a.capability)} 素材`}
                         priority={index < 5}
                       />
                     )}

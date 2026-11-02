@@ -1,16 +1,17 @@
 import { useCallback, useState } from 'react';
-import { Button } from '../../admin-ui/shadcn/kit';
 import { adminAnalyticsApi } from '../../lib/api';
-import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
-import { useAdminResource, AdminStaleError } from '../../components/admin/AdminWidgets';
 import {
+  ActionButton,
+  AdminDataTable,
   FilterActions,
   FilterBar,
   PageHeader,
   Panel,
   StatCard,
-} from '../../components/admin/PageHeader';
-import { TextInput } from '../../admin-ui/controls';
+  TextField,
+  useAdminResource,
+  type AdminColumn,
+} from '../../admin-ui/primitives';
 import { toCredits } from '../../lib/microcredits';
 import type { FinanceAnalyticsView, FinanceBreakdownRow, FinanceDayRow } from '../../types/model';
 
@@ -83,7 +84,7 @@ export function AdminFinancePage() {
       title: '实收（积分）',
       width: 130,
       align: 'right',
-      render: (row) => <span className="tabular-nums text-text-primary">{toCredits(row.chargedMicrocredits)}</span>,
+      render: (row) => <span className="tabular-nums text-foreground">{toCredits(row.chargedMicrocredits)}</span>,
     },
     {
       key: 'refundedAmount',
@@ -91,7 +92,7 @@ export function AdminFinancePage() {
       width: 130,
       align: 'right',
       render: (row) => (
-        <span className="tabular-nums text-amber-700">{toCredits(row.refundedMicrocredits)}</span>
+        <span className="tabular-nums text-warn-text">{toCredits(row.refundedMicrocredits)}</span>
       ),
     },
     {
@@ -107,7 +108,7 @@ export function AdminFinancePage() {
     {
       key: 'label',
       title: label,
-      render: (row) => <span className="font-mono text-[11px] text-text-primary">{row.label || '—'}</span>,
+      render: (row) => <span className="font-mono text-[11px] text-foreground">{row.label || '—'}</span>,
     },
     { key: 'orders', title: '订单', width: 80, align: 'right', render: (row) => row.orders },
     {
@@ -172,9 +173,9 @@ export function AdminFinancePage() {
         title="财务分析"
         description="按账单口径汇总：实收只算已结算，挂账单列。金额单位为积分，保留 6 位小数。"
         actions={
-          <Button variant="secondary" size="small" onClick={() => void reload()} disabled={loading}>
+          <ActionButton variant="secondary" size="sm" onClick={() => void reload()} disabled={loading}>
             刷新
-          </Button>
+          </ActionButton>
         }
       />
 
@@ -205,15 +206,15 @@ export function AdminFinancePage() {
         }
       >
         <FilterBar>
-          <TextInput ariaLabel="开始日期" type="date" value={from} onChange={setFrom} />
-          <TextInput ariaLabel="结束日期" type="date" value={to} onChange={setTo} />
+          <TextField ariaLabel="开始日期" type="date" value={from} onChange={setFrom} />
+          <TextField ariaLabel="结束日期" type="date" value={to} onChange={setTo} />
           <FilterActions>
-            <Button variant="primary" size="small" onClick={apply} disabled={loading}>
+            <ActionButton onClick={apply} disabled={loading}>
               查询
-            </Button>
-            <Button variant="secondary" size="small" onClick={reset}>
+            </ActionButton>
+            <ActionButton variant="secondary" size="sm" onClick={reset}>
               近 30 天
-            </Button>
+            </ActionButton>
           </FilterActions>
         </FilterBar>
         <AdminDataTable<FinanceDayRow>

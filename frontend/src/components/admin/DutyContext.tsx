@@ -12,7 +12,7 @@ import {
   adminChannelsApi,
   adminInvoicesApi,
   adminOrdersApi,
-  adminReconciliationApi,
+  adminPaymentReconciliationApi,
   adminTasksApi,
 } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
@@ -253,7 +253,7 @@ async function fetchFinanceDuty(fetchChannels: boolean): Promise<DutyData> {
     adminOrdersApi.list({ status: 'pending', pageSize: 6, page: 1 }),
     adminOrdersApi.list({ refundState: 'processing', pageSize: 1, page: 1 }),
     adminInvoicesApi.list({ status: 'pending', limit: 1 }),
-    adminReconciliationApi.batches({ status: 'imported', limit: 1 }),
+    adminPaymentReconciliationApi.list({ status: 'failed', pageSize: 1, page: 1 }),
     fetchChannels ? adminChannelsApi.health().catch(() => null) : Promise.resolve(null),
   ]);
 
@@ -286,11 +286,11 @@ async function fetchFinanceDuty(fetchChannels: boolean): Promise<DutyData> {
       },
       {
         key: 'reconcile',
-        label: '未处置对账',
-        short: '待对账',
+        label: '对账失败',
+        short: '对账失败',
         value: reconcile.total,
         tone: reconcile.total > 0 ? 'warn' : undefined,
-        to: '/admin/reconciliation?status=imported',
+        to: '/admin/payments?tab=reconciliation&status=failed',
       },
     ],
     tasks: [],

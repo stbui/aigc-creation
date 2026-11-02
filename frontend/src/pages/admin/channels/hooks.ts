@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useConfirm } from '../../../admin-ui/providers/ConfirmProvider';
 import { useToast } from '../../../admin-ui/providers/ToastProvider';
-import { useAdminDetailParam, useAdminResource } from '../../../components/admin/AdminWidgets';
+import { useAdminDetailParam, useAdminResource, useAdminUrlFilterSync } from '../../../admin-ui/primitives';
 import { useAdmin } from '../../../context/AdminContext';
 import { useDiscardConfirm, useUnsavedGuard } from '../../../hooks/useUnsavedGuard';
 import type { AdminChannelView } from '../../../types/model';
@@ -23,6 +23,7 @@ export {
   useAdmin,
   useAdminDetailParam,
   useAdminResource,
+  useAdminUrlFilterSync,
   useConfirm,
   useDiscardConfirm,
   useToast,

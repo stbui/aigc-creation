@@ -1,7 +1,7 @@
 /**
  * 状态值的语义色映射（唯一事实源）。
  *
- * 从 `PageHeader.tsx` 抽出来是因为状态标签出现在多处（表格、抽屉、概览卡片）。
+ * 单独成文件是因为状态标签出现在多处（表格、抽屉、概览卡片）。
  * 映射表若各存一份，同一个 `refunded` 会在一处红、一处灰，排查时会以为是
  * 样式问题。
  *
@@ -11,23 +11,6 @@
  */
 
 export type TagTone = 'success' | 'danger' | 'warn' | 'brand' | 'muted';
-
-/**
- * tone → 彩色标签（Chip）颜色名。
- *
- * `Chip` 的入参名保留了 BoardUI 的十档写法（`lime` / `rose` / …），实现已折叠到
- * 五档语义色（见 `shadcn/kit/display` 的 `CHIP_COLOR_CLASS`）。放在这里而不是
- * 各页自己写映射：同一套语义色在表格、抽屉、卡片之间必须一一对应。
- * success 用 lime 而不是 green —— 历史上 lime 才是正向态，改名会动 30 多处调用。
- */
-export const TONE_CHIP_COLOR: Record<TagTone, 'lime' | 'rose' | 'yellow' | 'purple' | 'neutral'> =
-  {
-    success: 'lime',
-    danger: 'rose',
-    warn: 'yellow',
-    brand: 'purple',
-    muted: 'neutral',
-  };
 
 export const STATUS_META: Record<string, { label: string; tone: TagTone }> = {
   // 任务状态 (后端 Prisma GenerationTask.status)

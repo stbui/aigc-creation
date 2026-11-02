@@ -1,4 +1,4 @@
-import type { SegmentedOption, SelectOption } from './components';
+import type { SelectFieldOption } from './components';
 
 /* ------------------------------------------------------------------------- */
 /* 渠道                                                                      */
@@ -49,12 +49,12 @@ export interface ChannelHealthSummary {
 }
 
 /** 视图切换：`channels` = 按渠道配置，`models` = 跨渠道排查 */
-export const CHANNEL_VIEW_OPTIONS: SegmentedOption[] = [
+export const CHANNEL_VIEW_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'channels', label: '按渠道' },
   { value: 'models', label: '全部模型' },
 ];
 
-export const CHANNEL_STATUS_OPTIONS: SelectOption[] = [
+export const CHANNEL_STATUS_OPTIONS: SelectFieldOption[] = [
   { value: 'enabled', label: '启用' },
   { value: 'disabled', label: '停用' },
 ];
@@ -128,7 +128,14 @@ export interface ModelDraft {
   capability: string;
   protocol: string;
   priceCurrency: string;
-  tags: string;
+  /**
+   * 展示标签（结构化）。
+   *
+   * 此前是「文字:颜色, 文字:颜色」的自由文本，运营容易写错颜色名
+   * （非法颜色静默回落紫色），也无法看到最终效果。改为结构化数组后
+   * 由标签编辑器渲染，颜色从固定 6 色里选。
+   */
+  tags: Array<{ text: string; color: string }>;
   capabilityConfig: string;
   enabled: boolean;
   tiers: TierDraft[];
@@ -163,7 +170,7 @@ export const EMPTY_MODEL_DRAFT: ModelDraft = {
   capability: 'image',
   protocol: '',
   priceCurrency: 'credits',
-  tags: '',
+  tags: [],
   capabilityConfig: '',
   enabled: true,
   tiers: [{ ...EMPTY_TIER }],

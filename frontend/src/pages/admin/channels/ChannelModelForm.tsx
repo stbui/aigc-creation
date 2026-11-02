@@ -1,17 +1,19 @@
 import { Plus, Trash2, Zap } from 'lucide-react';
 import {
-  Button,
-  CheckBox,
+  ActionButton,
+  CheckboxField,
   Descriptions,
   Notice,
-  NumberInput,
+  NumberField,
   Panel,
-  SelectBox,
-  SwitchBox,
-  TextArea,
-  TextInput,
+  SelectField,
+  SwitchField,
+  TextAreaField,
+  TextField,
 } from './components';
 import { Field } from './ChannelField';
+import { ChannelModelTagsEditor } from './ChannelModelTagsEditor';
+import { staleTierUpstream } from './utils';
 import {
   BILLING_MODE_OPTIONS,
   CAPABILITY_OPTIONS,
@@ -29,6 +31,15 @@ interface ChannelModelFormProps {
   testResult: ProtocolTestResultView | null;
   testing: boolean;
   onTest: () => Promise<void>;
+  /**
+   * 编辑前的模型级上游键。
+   *
+   * 改了上游名后，仍指向旧上游的档位要提示出来 —— 否则「改了上游却不生效」
+   * 会被当成玄学问题排查很久。
+   */
+  previousProviderModelKey?: string;
+  /** 一键让这批档位跟随模型默认上游 */
+  onFollowModelUpstream?: () => void;
 }
 
 /**
@@ -44,6 +55,8 @@ export function ChannelModelForm({
   testResult,
   testing,
   onTest,
+  previousProviderModelKey = '',
+  onFollowModelUpstream,
 }: ChannelModelFormProps) {
   const setTier = (index: number, patch: Partial<TierDraft>) => {
     setDraft({
@@ -52,12 +65,18 @@ export function ChannelModelForm({
     });
   };
 
+  /** 仍指向旧上游的档位（模型级上游改名后才有） */
+  const staleTiers = staleTierUpstream(draft, previousProviderModelKey);
+
   return (
     <div className="flex flex-col gap-4">
       <Panel title="基础信息">
         <div className="grid grid-cols-2 gap-3">
-          <Field label="模型标识（对外 modelKey）">
-            <TextInput
+          <Field
+            label="模型标识（对外 modelKey）"
+            hint="不同渠道下同名标识会被归为同一产品模型；创建后建议保持稳定"
+          >
+            <TextField
               ariaLabel="模型标识"
               value={draft.modelKey}
               onChange={(value) => setDraft({ ...draft, modelKey: value })}
@@ -65,30 +84,34 @@ export function ChannelModelForm({
             />
           </Field>
           <Field label="上游模型名" hint="与 modelKey 不同时填写；留空则同 modelKey">
-            <TextInput
+            <TextField
               ariaLabel="上游模型名"
               value={draft.providerModelKey}
               onChange={(value) => setDraft({ ...draft, providerModelKey: value })}
               placeholder="如 doubao-seedream-4-0"
             />
           </Field>
-          <Field label="展示名" hint="C 端模型选择器显示的名称">
-            <TextInput
+          <Field
+            label="展示名"
+            hint="C 端模型选择器显示的名称；同名会归到同一产品分组，勿给同一模型在不同渠道起不同名"
+          >
+            <TextField
               ariaLabel="展示名"
               value={draft.displayName}
               onChange={(value) => setDraft({ ...draft, displayName: value })}
               placeholder="如 即梦 4.0"
             />
           </Field>
-          <Field label="渠道展示名" hint="留空则沿用展示名">
-            <TextInput
+          <Field label="渠道展示名" hint="留空则沿用展示名；同一模型在不同渠道用它区分来源">
+            <TextField
               ariaLabel="渠道展示名"
               value={draft.channelLabel}
+              maxLength={80}
               onChange={(value) => setDraft({ ...draft, channelLabel: value })}
             />
           </Field>
           <Field label="产出能力">
-            <SelectBox
+            <SelectField
               ariaLabel="产出能力"
               value={draft.capability}
               options={CAPABILITY_OPTIONS}
@@ -96,7 +119,7 @@ export function ChannelModelForm({
             />
           </Field>
           <Field label="请求协议" hint="按能力过滤；空选项说明该能力没有可用协议">
-            <SelectBox
+            <SelectField
               ariaLabel="请求协议"
               value={draft.protocol || undefined}
               options={protocolOptions}
@@ -105,43 +128,40 @@ export function ChannelModelForm({
             />
           </Field>
           <Field label="计价货币" hint="通道按 USD/CNY 报价时，展示价按分组汇率折算">
-            <SelectBox
+            <SelectField
               ariaLabel="计价货币"
               value={draft.priceCurrency}
               options={CURRENCY_OPTIONS}
               onChange={(value) => setDraft({ ...draft, priceCurrency: value ?? 'credits' })}
             />
           </Field>
-          <Field label="标签" hint="最多 5 个，格式「文字:颜色」，颜色可选 purple/blue/green/gold/orange/pink">
-            <TextInput
-              ariaLabel="标签"
-              value={draft.tags}
-              onChange={(value) => setDraft({ ...draft, tags: value })}
-              placeholder="如 高清:blue, 推荐:purple"
-            />
-          </Field>
-          <Field label="描述">
-            <TextInput
+          <ChannelModelTagsEditor
+            tags={draft.tags}
+            onChange={(tags) => setDraft({ ...draft, tags })}
+          />
+          <Field label="描述" hint="在 C 端模型选项中常驻显示，最多 500 字">
+            <TextAreaField
               ariaLabel="描述"
               value={draft.description}
               onChange={(value) => setDraft({ ...draft, description: value })}
               maxLength={500}
+              rows={3}
             />
           </Field>
           <Field label="图标" hint="C 端选择器图标标识，可留空">
-            <TextInput
+            <TextField
               ariaLabel="图标"
               value={draft.icon}
               onChange={(value) => setDraft({ ...draft, icon: value })}
             />
           </Field>
         </div>
-        <div className="mt-3 flex items-center justify-between rounded-lg border border-border-table px-3 py-2.5">
+        <div className="mt-3 flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
           <div>
-            <div className="text-xs font-medium text-text-primary">启用该模型</div>
-            <div className="text-[11px] text-text-tertiary">停用后不进入路由目录，不影响历史数据</div>
+            <div className="text-xs font-medium text-foreground">启用该模型</div>
+            <div className="text-[11px] text-muted-foreground">停用后不进入路由目录，不影响历史数据</div>
           </div>
-          <SwitchBox
+          <SwitchField
             checked={draft.enabled}
             ariaLabel="启用该模型"
             onChange={(value) => setDraft({ ...draft, enabled: value })}
@@ -153,42 +173,42 @@ export function ChannelModelForm({
         title="价格档"
         note="每一档对应一类规格（分辨率 / 时长 / 尺寸）。全部删除会回落为一个通配档。"
         extra={
-          <Button
+          <ActionButton
             variant="ghost"
             size="xs"
-            leadingIcon={Plus}
+            icon={Plus}
             onClick={() => setDraft({ ...draft, tiers: [...draft.tiers, { ...EMPTY_TIER }] })}
           >
             添加档位
-          </Button>
+          </ActionButton>
         }
       >
         <div className="flex flex-col gap-3">
           {draft.tiers.map((tier, index) => (
-            <div key={index} className="rounded-lg border border-border-table p-3">
+            <div key={index} className="rounded-lg border border-border p-3">
               <div className="mb-2 flex items-center gap-2">
-                <span className="text-xs font-medium text-text-secondary">档位 {index + 1}</span>
+                <span className="text-xs font-medium text-muted-foreground">档位 {index + 1}</span>
                 <span className="flex-1" />
-                <SwitchBox
+                <SwitchField
                   checked={tier.enabled}
                   ariaLabel={`档位 ${index + 1} 启用`}
                   onChange={(checked) => setTier(index, { enabled: checked })}
                 />
-                <Button
+                <ActionButton
                   variant="ghost"
                   size="xs"
-                  leadingIcon={Trash2}
+                  icon={Trash2}
                   disabled={draft.tiers.length <= 1}
                   onClick={() =>
                     setDraft({ ...draft, tiers: draft.tiers.filter((_, i) => i !== index) })
                   }
                 >
                   移除
-                </Button>
+                </ActionButton>
               </div>
               <div className="grid grid-cols-4 gap-3">
                 <Field label="规格条件" hint="key=value，逗号分隔；留空 = 通配">
-                  <TextInput
+                  <TextField
                     ariaLabel={`档位 ${index + 1} 规格条件`}
                     value={tier.selector}
                     onChange={(value) => setTier(index, { selector: value })}
@@ -196,7 +216,7 @@ export function ChannelModelForm({
                   />
                 </Field>
                 <Field label="分辨率档">
-                  <TextInput
+                  <TextField
                     ariaLabel={`档位 ${index + 1} 分辨率`}
                     value={tier.resolution}
                     onChange={(value) => setTier(index, { resolution: value })}
@@ -204,7 +224,7 @@ export function ChannelModelForm({
                   />
                 </Field>
                 <Field label="视频秒数" hint="按时长计费时必填">
-                  <NumberInput
+                  <NumberField
                     ariaLabel={`档位 ${index + 1} 视频秒数`}
                     value={Number(tier.videoSeconds) || 0}
                     min={0}
@@ -212,7 +232,7 @@ export function ChannelModelForm({
                   />
                 </Field>
                 <Field label="计费方式">
-                  <SelectBox
+                  <SelectField
                     ariaLabel={`档位 ${index + 1} 计费方式`}
                     value={tier.billingMode}
                     options={BILLING_MODE_OPTIONS}
@@ -220,7 +240,7 @@ export function ChannelModelForm({
                   />
                 </Field>
                 <Field label="单价（积分）" hint="按次 / 按秒使用">
-                  <TextInput
+                  <TextField
                     ariaLabel={`档位 ${index + 1} 单价`}
                     value={tier.unit}
                     onChange={(value) => setTier(index, { unit: value })}
@@ -228,7 +248,7 @@ export function ChannelModelForm({
                   />
                 </Field>
                 <Field label="输入 Token 价">
-                  <TextInput
+                  <TextField
                     ariaLabel={`档位 ${index + 1} 输入 Token 价`}
                     value={tier.input}
                     onChange={(value) => setTier(index, { input: value })}
@@ -236,7 +256,7 @@ export function ChannelModelForm({
                   />
                 </Field>
                 <Field label="输出 Token 价">
-                  <TextInput
+                  <TextField
                     ariaLabel={`档位 ${index + 1} 输出 Token 价`}
                     value={tier.output}
                     onChange={(value) => setTier(index, { output: value })}
@@ -244,7 +264,7 @@ export function ChannelModelForm({
                   />
                 </Field>
                 <Field label="缓存 Token 价">
-                  <TextInput
+                  <TextField
                     ariaLabel={`档位 ${index + 1} 缓存 Token 价`}
                     value={tier.cached}
                     onChange={(value) => setTier(index, { cached: value })}
@@ -253,13 +273,13 @@ export function ChannelModelForm({
                 </Field>
               </div>
               <div className="mt-2 flex items-center gap-4">
-                <CheckBox
+                <CheckboxField
                   size="sm"
                   checked={tier.priceConfigured}
                   label="价格已确认"
                   onChange={(checked) => setTier(index, { priceConfigured: checked })}
                 />
-                <CheckBox
+                <CheckboxField
                   size="sm"
                   checked={tier.costConfigured}
                   label="记录成本价"
@@ -269,7 +289,7 @@ export function ChannelModelForm({
               {tier.costConfigured && (
                 <div className="mt-2 grid grid-cols-4 gap-3">
                   <Field label="成本单价">
-                    <TextInput
+                    <TextField
                       ariaLabel={`档位 ${index + 1} 成本单价`}
                       value={tier.costUnit}
                       onChange={(value) => setTier(index, { costUnit: value })}
@@ -277,7 +297,7 @@ export function ChannelModelForm({
                     />
                   </Field>
                   <Field label="输入 Token 成本">
-                    <TextInput
+                    <TextField
                       ariaLabel={`档位 ${index + 1} 输入 Token 成本`}
                       value={tier.costInput}
                       onChange={(value) => setTier(index, { costInput: value })}
@@ -285,7 +305,7 @@ export function ChannelModelForm({
                     />
                   </Field>
                   <Field label="输出 Token 成本">
-                    <TextInput
+                    <TextField
                       ariaLabel={`档位 ${index + 1} 输出 Token 成本`}
                       value={tier.costOutput}
                       onChange={(value) => setTier(index, { costOutput: value })}
@@ -293,7 +313,7 @@ export function ChannelModelForm({
                     />
                   </Field>
                   <Field label="缓存 Token 成本">
-                    <TextInput
+                    <TextField
                       ariaLabel={`档位 ${index + 1} 缓存 Token 成本`}
                       value={tier.costCached}
                       onChange={(value) => setTier(index, { costCached: value })}
@@ -311,7 +331,7 @@ export function ChannelModelForm({
         title="能力合同（可选）"
         note="JSON，声明支持的输入素材数量、选项范围与图片尺寸；留空使用能力默认合同"
       >
-        <TextArea
+        <TextAreaField
           ariaLabel="能力合同 JSON"
           value={draft.capabilityConfig}
           onChange={(value) => setDraft({ ...draft, capabilityConfig: value })}
@@ -320,12 +340,31 @@ export function ChannelModelForm({
         />
       </Panel>
 
+      {staleTiers.length > 0 && (
+        <Notice
+          tone="warn"
+          title={`${staleTiers.length} 个价格档仍指向旧的上游模型`}
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <span>
+              模型级上游已改为「{draft.providerModelKey}」，但这些档位仍写着旧的上游名
+              （{previousProviderModelKey}），保存后请求仍会发到旧供应商模型。
+            </span>
+            {onFollowModelUpstream && (
+              <ActionButton variant="secondary" size="xs" onClick={onFollowModelUpstream}>
+                清除并跟随模型
+              </ActionButton>
+            )}
+          </div>
+        </Notice>
+      )}
+
       <div className="flex items-center gap-3">
-        <Button variant="secondary" size="small" leadingIcon={Zap} disabled={testing} onClick={() => void onTest()}>
+        <ActionButton variant="secondary" size="sm" icon={Zap} disabled={testing} onClick={() => void onTest()}>
           {testing ? '测试中…' : '连通性测试'}
-        </Button>
-        <span className="text-[11px] text-text-tertiary">
-          用渠道已保存凭证发一次最小请求，不建任务、不扣费；结果记入调用记录（非计费）。
+        </ActionButton>
+        <span className="text-[11px] text-muted-foreground">
+          用渠道已保存凭证向上游发一次最小请求，可能产生供应商费用；不建任务、不扣用户积分，结果记入调用记录（非计费）。
         </span>
       </div>
 

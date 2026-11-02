@@ -186,6 +186,9 @@ describe('pollToResult', () => {
     await expect(pollToResult('task-1')).resolves.toEqual({
       status: 'succeeded',
       url: '/uploads/a.png?sign=1',
+      // 新字段：结果卡“用作参考图”与下载扩展名都依赖它们
+      assetId: 'asset-1',
+      format: 'png',
       width: 1024,
       height: 768,
       errorCode: null,
@@ -195,6 +198,7 @@ describe('pollToResult', () => {
       outputs: [
         {
           url: '/uploads/a.png?sign=1',
+          assetId: 'asset-1',
           width: 1024,
           height: 768,
           format: 'png',

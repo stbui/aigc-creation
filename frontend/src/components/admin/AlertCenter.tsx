@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Button } from '../../admin-ui/shadcn/kit';
+import { Button } from '../../admin-ui/components/ui/button';
 import {
   AlertOctagon,
   AlertTriangle,
@@ -80,9 +80,8 @@ export function alertTime(iso: string): string {
 /**
  * 告警页的刷新按钮复用同一份轮询数据，避免两个入口各算一套。
  *
- * 用 BoardUI 的 `Button`（而非 antd 的 `type="default"` + `loading`）：
- * 它渲染在 BoardUI 页头的操作区里，混用两套按钮会让同一行里出现两种高度与圆角。
- * vendor 的 Button 没有 `loading`，用「禁用 + 改文案」表达同一件事。
+ * shadcn `Button` 没有 `loading`，用「禁用 + 改文案」表达同一件事 ——
+ * 禁用态已经自带 50% 透明度，不必再叠一个 spinner。
  */
 export function AlertRefreshButton({
   loading,
@@ -92,13 +91,8 @@ export function AlertRefreshButton({
   onRefresh: () => void;
 }) {
   return (
-    <Button
-      variant="secondary"
-      size="small"
-      leadingIcon={RefreshCw}
-      disabled={loading}
-      onClick={onRefresh}
-    >
+    <Button variant="secondary" size="sm" disabled={loading} onClick={onRefresh}>
+      <RefreshCw className="size-4" aria-hidden />
       {loading ? '刷新中…' : '刷新'}
     </Button>
   );

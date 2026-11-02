@@ -1,43 +1,45 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { CheckCircle2 } from 'lucide-react';
-import { Button, Chip } from '../../admin-ui/shadcn/kit';
-import { PageHeader, Panel, StatCard } from '../../components/admin/PageHeader';
+
+import {
+  ActionButton,
+  EmptyState,
+  ListError,
+  PageHeader,
+  Panel,
+  SegmentedGroup,
+  Skeleton,
+  StatCard,
+  StaleError,
+  StatusTag,
+  ToneBadge,
+  useAdminUrlFilterSync,
+} from '../../admin-ui/primitives';
 import {
   ALERT_SEVERITY_META,
   AlertRefreshButton,
   alertTime,
   useAdminAlerts,
 } from '../../components/admin/AlertCenter';
-import {
-  AdminListError,
-  AdminListLoading,
-  AdminStaleError,
-  useAdminUrlFilterSync,
-} from '../../components/admin/AdminWidgets';
-import { EmptyState } from '../../admin-ui/primitives';
-import { SegmentedBox } from '../../admin-ui/controls';
-import { cx } from '../../admin-ui/lib/cn';
 import type { AdminAlertSeverity } from '../../types/api';
 
 /**
- * 告警级别 → 卡片配色。
+ * 告警级别 → 行卡片外观。
  *
- * 与 `StatCard` / `Notice` 用同一套 Tailwind 语义色（不是 `global.css` 的
- * `--token`：后台的 BoardUI 作用域里承载状态色的是 vendor 主题），
- * 所以同一个「紧急」在统计卡、列表卡片、标签上是一组颜色。
+ * 颜色只走语义令牌（`danger` / `warn` / `brand`），与统计卡、标签同源 ——
+ * 同一个「紧急」在三种形态上必须是同一组颜色，否则运营要靠读文字确认级别。
  */
 const SEVERITY_SURFACE: Record<AdminAlertSeverity, { card: string; icon: string }> = {
-  critical: { card: 'border-rose-200 bg-rose-50/40', icon: 'text-rose-600' },
-  warning: { card: 'border-amber-200 bg-amber-50/40', icon: 'text-amber-600' },
-  info: { card: 'border-border-table bg-white', icon: 'text-sky-600' },
+  critical: { card: 'border-danger-soft bg-danger-soft/40', icon: 'text-danger-text' },
+  warning: { card: 'border-warn-soft bg-warn-soft/40', icon: 'text-warn-text' },
+  info: { card: 'border-border bg-card', icon: 'text-brand' },
 };
 
-const SEVERITY_CHIP: Record<AdminAlertSeverity, 'rose' | 'yellow' | 'blue'> = {
-  critical: 'rose',
-  warning: 'yellow',
-  info: 'blue',
-};
+const SEVERITY_BADGE = {
+  critical: 'danger',
+  warning: 'warn',
+  info: 'brand',
+} as const;
 
 /** 统计卡的色调：只有要人动手的两级才染色，提示级保持中性 */
 const SEVERITY_TONE: Record<AdminAlertSeverity, 'danger' | 'warn' | undefined> = {
@@ -46,28 +48,30 @@ const SEVERITY_TONE: Record<AdminAlertSeverity, 'danger' | 'warn' | undefined> =
   info: undefined,
 };
 
+type SeverityFilter = 'all' | AdminAlertSeverity;
+
+function readSeverity(raw: string | null): SeverityFilter {
+  return raw === 'critical' || raw === 'warning' || raw === 'info' ? raw : 'all';
+}
+
 /**
- * 告警中心（/admin/alerts，BoardUI）。
+ * 告警中心（/admin/alerts）。
  *
  * 顶栏铃铛只放前 5 条，这里给完整列表与口径说明。数据与铃铛同源：
  * 都来自 `GET /admin/alerts`，且按当前角色权限过滤 —— 财务看不到工单告警，
  * 运营看不到对账差异。没有待处理项时不制造「0 条告警」的噪音。
+ *
+ * 筛选级别同时写回地址栏（`?severity=`），告警深链从铃铛点进来时直接带着级别。
  */
 export function AdminAlertsPage() {
   const { data, loading, error, reload } = useAdminAlerts();
   const [searchParams] = useSearchParams();
-  const rawSeverity = searchParams.get('severity');
-  const initialFilter: 'all' | AdminAlertSeverity =
-    rawSeverity === 'critical' || rawSeverity === 'warning' || rawSeverity === 'info'
-      ? rawSeverity
-      : 'all';
-  const [filter, setFilter] = useState<'all' | AdminAlertSeverity>(initialFilter);
-  const appliedUrlFilter = useRef<'all' | AdminAlertSeverity>(initialFilter);
+  const initialFilter = readSeverity(searchParams.get('severity'));
+  const [filter, setFilter] = useState<SeverityFilter>(initialFilter);
+  const appliedUrlFilter = useRef<SeverityFilter>(initialFilter);
 
   useEffect(() => {
-    const raw = searchParams.get('severity');
-    const next: 'all' | AdminAlertSeverity =
-      raw === 'critical' || raw === 'warning' || raw === 'info' ? raw : 'all';
+    const next = readSeverity(searchParams.get('severity'));
     if (next === appliedUrlFilter.current) return;
     appliedUrlFilter.current = next;
     setFilter(next);
@@ -75,7 +79,7 @@ export function AdminAlertsPage() {
 
   useAdminUrlFilterSync({ severity: filter === 'all' ? undefined : filter });
 
-  const chooseFilter = (next: 'all' | AdminAlertSeverity) => {
+  const chooseFilter = (next: SeverityFilter) => {
     appliedUrlFilter.current = next;
     setFilter(next);
   };
@@ -88,7 +92,9 @@ export function AdminAlertsPage() {
 
   const items = useMemo(
     () =>
-      filter === 'all' ? (data?.items ?? []) : (data?.items ?? []).filter((i) => i.severity === filter),
+      filter === 'all'
+        ? (data?.items ?? [])
+        : (data?.items ?? []).filter((item) => item.severity === filter),
     [data, filter],
   );
 
@@ -100,10 +106,10 @@ export function AdminAlertsPage() {
         actions={<AlertRefreshButton loading={loading} onRefresh={() => void reload()} />}
       />
 
-      {error && data && <AdminStaleError error={error} onRetry={() => void reload()} />}
+      {error && data && <StaleError error={error} onRetry={() => void reload()} />}
 
-      {/* 四张卡固定一行: 数字之间要能横向比较「哪一级在涨」, 折行就断了这层对照 */}
-      <div className="mb-3 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]">
+      {/* 四张卡固定一行：数字之间要能横向比较「哪一级在涨」，折行就断了这层对照 */}
+      <div className="mb-4 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]">
         <StatCard
           label="待处理告警"
           value={data?.total ?? '—'}
@@ -130,10 +136,10 @@ export function AdminAlertsPage() {
         title="待处理清单"
         note="来源按当前角色权限过滤，无权访问的模块不会出现在这里"
         extra={
-          <SegmentedBox
+          <SegmentedGroup
             ariaLabel="按告警级别筛选"
             value={filter}
-            onChange={(value) => chooseFilter(value as 'all' | AdminAlertSeverity)}
+            onChange={(value) => chooseFilter(value as SeverityFilter)}
             options={[
               { value: 'all', label: `全部 ${data?.total ?? 0}` },
               { value: 'critical', label: `紧急 ${counts.critical}` },
@@ -144,12 +150,16 @@ export function AdminAlertsPage() {
         }
       >
         {loading && !data ? (
-          <AdminListLoading tip="正在检查待处理事项…" />
+          <div className="flex flex-col gap-2" aria-busy="true" aria-live="polite">
+            <Skeleton rows={1} />
+            <Skeleton rows={1} />
+            <Skeleton rows={1} />
+            <p className="text-center text-xs text-muted-foreground">正在检查待处理事项…</p>
+          </div>
         ) : error && !data ? (
-          <AdminListError error={error} onRetry={() => void reload()} />
+          <ListError error={error} onRetry={() => void reload()} />
         ) : items.length === 0 ? (
           <EmptyState
-            icon={<CheckCircle2 aria-hidden />}
             title={filter === 'all' ? '当前没有待处理告警' : '该级别下没有告警'}
             description={
               filter === 'all'
@@ -158,64 +168,70 @@ export function AdminAlertsPage() {
             }
             action={
               filter !== 'all' ? (
-                <Button variant="secondary" size="small" onClick={() => chooseFilter('all')}>
+                <ActionButton variant="secondary" onClick={() => chooseFilter('all')}>
                   查看全部
-                </Button>
+                </ActionButton>
               ) : undefined
             }
           />
         ) : (
-          <div className="flex flex-col gap-2">
+          <ul className="flex flex-col gap-2">
             {items.map((item) => {
               const meta = ALERT_SEVERITY_META[item.severity];
               const Icon = meta.icon;
               const surface = SEVERITY_SURFACE[item.severity];
               return (
-                <Link
-                  key={item.key}
-                  to={item.link}
-                  className={cx(
-                    'flex items-center gap-3 rounded-xl border px-3.5 py-2.5 transition-colors',
-                    'hover:border-border-button-hover hover:bg-background-secondary-default/60',
-                    surface.card,
-                  )}
-                >
-                  <span className={cx('shrink-0', surface.icon)}>
-                    <Icon size={18} aria-hidden />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center gap-2">
-                      <span className="truncate text-sm font-medium text-text-primary">{item.title}</span>
-                      <Chip variant="caption" color={SEVERITY_CHIP[item.severity]}>
-                        {meta.label}
-                      </Chip>
+                <li key={item.key}>
+                  <Link
+                    to={item.link}
+                    className={`flex items-center gap-3 rounded-lg border px-3.5 py-2.5 transition-colors hover:bg-accent ${surface.card}`}
+                    data-testid="admin-alert-row"
+                  >
+                    <span className={`shrink-0 ${surface.icon}`}>
+                      <Icon className="size-[18px]" aria-hidden />
                     </span>
-                    <span className="mt-0.5 block truncate text-xs text-text-tertiary" title={item.detail}>
-                      {item.detail}
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-center gap-2">
+                        <span className="truncate text-sm font-medium text-foreground">
+                          {item.title}
+                        </span>
+                        <ToneBadge tone={SEVERITY_BADGE[item.severity]}>{meta.label}</ToneBadge>
+                      </span>
+                      <span
+                        className="mt-0.5 block truncate text-xs text-muted-foreground"
+                        title={item.detail}
+                      >
+                        {item.detail}
+                      </span>
                     </span>
-                  </span>
-                  {item.count !== null && (
-                    <span className="shrink-0 text-lg font-semibold tabular-nums text-text-primary">
-                      {item.count}
-                    </span>
-                  )}
-                </Link>
+                    {item.count !== null && (
+                      <span className="shrink-0 text-lg font-semibold text-foreground tabular-nums">
+                        {item.count}
+                      </span>
+                    )}
+                  </Link>
+                </li>
               );
             })}
-          </div>
+          </ul>
         )}
       </Panel>
 
       <Panel title="告警口径" note="计数是「当前待处理数」，被处理后自然消失">
-        <ul className="flex list-disc flex-col gap-1.5 pl-4 text-xs leading-5 text-text-secondary">
-          <li>工单：存在尚未受理的「待回复」工单；已受理但仍在处理中的不重复告警；最早一条等待超过 24 小时升为紧急。</li>
+        <ul className="flex list-disc flex-col gap-1.5 pl-4 text-xs leading-5 text-muted-foreground">
+          <li>
+            工单：存在尚未受理的「待回复」工单；已受理但仍在处理中的不重复告警；最早一条等待超过
+            24 小时升为紧急。
+          </li>
           <li>任务：近 24 小时有失败任务，或运行中任务超过 50 个；失败达到 10 个升为紧急。</li>
           <li>对账：仍有状态为「待处置」的差异；达到 5 笔升为紧急。</li>
-          <li>退款：渠道返回异步处理后超过 30 分钟仍未落账；最早一笔超过 24 小时升为紧急。点击直达订单列表的「渠道处理中」筛选。</li>
+          <li>
+            退款：渠道返回异步处理后超过 30 分钟仍未落账；最早一笔超过 24 小时升为紧急。点击直达订单列表的「渠道处理中」筛选。
+          </li>
           <li>备份：最近一次备份失败，或超过 48 小时没有成功备份；未验证的备份单独提示。</li>
           <li>发票：存在待开具申请。</li>
         </ul>
-        <p className="mt-3 text-[11px] leading-4 text-text-tertiary">
+        <p className="mt-3 text-[11px] leading-4 text-muted-foreground">
           不引入「已读」状态：事项被处理后自然消失，避免出现「点过就算解决」的假象。
         </p>
       </Panel>

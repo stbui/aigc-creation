@@ -79,16 +79,11 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
     name: '财务',
     items: [
       {
-        path: '/admin/payment-channels',
-        label: '支付渠道',
+        path: '/admin/payments',
+        label: '支付充值',
         permission: 'payment.read',
       },
       { path: '/admin/invoices', label: '发票管理', permission: 'invoice.write' },
-      {
-        path: '/admin/reconciliation',
-        label: '渠道对账',
-        permission: 'payment.read',
-      },
     ],
   },
   {

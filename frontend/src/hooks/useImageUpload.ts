@@ -43,6 +43,8 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [images, setImages] = useState<UploadedImage[]>(initial);
   const [uploading, setUploading] = useState(false);
+  /** 上传互斥：拖拽/粘贴/选择文件可能在一次上传途中再次触发 */
+  const uploadingRef = useRef(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   /**
@@ -59,12 +61,17 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
 
   const uploadFiles = useCallback(
     async (files: FileList | File[]) => {
+      if (uploadingRef.current) {
+        message.info('正在上传上一批图片，请稍候');
+        return;
+      }
       const list = Array.from(files).filter(isSupportedImageFile);
       if (list.length === 0) {
         message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
         return;
       }
-      const room = max - images.length;
+      // 用同步镜像计算剩余额度：连续触发两次时 state 还是旧值
+      const room = max - imagesRef.current.length;
       if (room <= 0) {
         message.warning(`最多上传 ${max} 张${noun}`);
         return;
@@ -77,6 +84,7 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
         return;
       }
 
+      uploadingRef.current = true;
       setUploading(true);
       try {
         const projectId = await ensureProject();
@@ -85,21 +93,24 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
           const asset = await assetsApi.upload(file, projectId);
           uploaded.push({ id: asset.id, url: assetSrc(asset) ?? '', name: file.name });
         }
+        // 同步镜像先落，避免上传完成到 setState 之间又触发一次上传
+        imagesRef.current = [...imagesRef.current, ...uploaded];
         setImages((prev) => [...prev, ...uploaded]);
         message.success(`已上传 ${uploaded.length} 张${noun}`);
       } catch (e) {
         message.error((e as Error).message || '上传失败');
       } finally {
+        uploadingRef.current = false;
         setUploading(false);
       }
     },
-    [images.length, max, maxMb, noun, ensureProject, message],
+    [max, maxMb, noun, ensureProject, message],
   );
 
-  const removeImage = useCallback(
-    (id: string) => setImages((prev) => prev.filter((x) => x.id !== id)),
-    [],
-  );
+  const removeImage = useCallback((id: string) => {
+    imagesRef.current = imagesRef.current.filter((x) => x.id !== id);
+    setImages((prev) => prev.filter((x) => x.id !== id));
+  }, []);
 
   // 参考站支持点击 / 拖拽 / 粘贴三种上传方式（拖拽高亮态在 ToolImageDropzone 内部）
   usePasteUpload(uploadFiles);

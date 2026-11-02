@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { App, Modal } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { Maximize2, Sparkles } from 'lucide-react';
@@ -33,6 +33,7 @@ import {
 import {
   analyzeImageToPrompt,
   DETAIL_CAPABILITY,
+  newIdempotencyKey,
   removeDetailGeneration,
   resolveModelId,
   startDetailGeneration,
@@ -101,8 +102,17 @@ export function ProductDetailPage() {
 
   // ── 任务状态 ──
   const [submitting, setSubmitting] = useState(false);
-  // 实时价来自能力清单 (后台可调价), 按钮文案不能再写死「免费生图」
-  const creditLabel = useDetailCreditLabel(sections.length);
+  /** 一次详情图提交会拆成 N 个任务，网络重试必须复用同一个幂等键 */
+  const pendingStartRef = useRef<{ fingerprint: string; key: string } | null>(null);
+  /** 所选模型的实时单张报价（积分） */
+  const [modelQuoteCredits, setModelQuoteCredits] = useState<number | null>(null);
+  // 实时价优先取模型报价，取不到才回落到能力清单基础价
+  const baseCreditLabel = useDetailCreditLabel(sections.length);
+  const creditLabel = useMemo(() => {
+    if (modelQuoteCredits == null) return baseCreditLabel;
+    if (modelQuoteCredits === 0) return '限时免费';
+    return `本次约 ${modelQuoteCredits * Math.max(sections.length, 1)} 积分（按所选模型）`;
+  }, [baseCreditLabel, modelQuoteCredits, sections.length]);
   const { blocked: capabilityBlocked, reason: capabilityReason } = useCapabilityRuntime(DETAIL_CAPABILITY);
   // ── 右侧结果栏 ──
   //
@@ -222,7 +232,7 @@ export function ProductDetailPage() {
        * 首张完成不代表整套图完成; 重拉一次列表拿到全部占位卡,
        * 之后 useResultGallery 会一直轮询到整批任务都到终态。
        */
-      const started = await startDetailGeneration({
+      const input = {
         projectId,
         logicalModelId,
         inputAssetIds: images.map((x) => x.id),
@@ -233,8 +243,17 @@ export function ProductDetailPage() {
         description,
         sections,
         resolution,
-      });
+      };
+      const fingerprint = JSON.stringify(input);
+      const idempotencyKey =
+        pendingStartRef.current?.fingerprint === fingerprint
+          ? pendingStartRef.current.key
+          : newIdempotencyKey();
+      pendingStartRef.current = { fingerprint, key: idempotencyKey };
+      const started = await startDetailGeneration({ ...input, idempotencyKey });
       await gallery.reload();
+      // 任务已创建且列表已刷新成功；之后的主动再生成才是新批次
+      pendingStartRef.current = null;
       const shotCount = started.batchSize ?? 1;
       // 金额以后端返回的合计为准：限时免费 / 后台改价时前端自己算的价会不准
       message.success(
@@ -417,7 +436,13 @@ export function ProductDetailPage() {
                 }}
                 capabilityId={DETAIL_CAPABILITY}
                 showRatio={false}
-                modelPicker={<ModelPicker capability={DETAIL_CAPABILITY} options={{ resolution }} />}
+                modelPicker={
+                  <ModelPicker
+                    capability={DETAIL_CAPABILITY}
+                    options={{ resolution }}
+                    onQuoteChange={setModelQuoteCredits}
+                  />
+                }
               />
             }
             onSubmit={() => void submit()}

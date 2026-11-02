@@ -1,17 +1,21 @@
 import { useEffect, useState } from 'react';
-import { Button } from '../../admin-ui/shadcn/kit';
 import { adminCreditPricesApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
-import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
-import { HoverTip, NumberInput } from '../../admin-ui/controls';
 import {
-  AdminStaleError,
+  ActionButton,
+  AdminDataTable,
   ConfirmAction,
+  HelpTip,
+  NumberField,
+  PageHeader,
+  Panel,
+  StatusTag,
+  StaleError,
   useAdminResource,
-} from '../../components/admin/AdminWidgets';
-import { PageHeader, Panel, StatusTag } from '../../components/admin/PageHeader';
+  type AdminColumn,
+} from '../../admin-ui/primitives';
 import type { AdminCreditPrice } from '../../types/api';
 
 /**
@@ -26,7 +30,7 @@ import type { AdminCreditPrice } from '../../types/api';
  * 实际是自己在改一个不生效的层 (或反之)。
  *
  * 改造 (2026-10-30) 只换渲染层: 草稿 / 脏标记 / 未保存拦截 / 回落二次确认
- * 逐条保留。来源标记从 `adm-tag` 换成 `StatusTag` 并用 `HoverTip` 解释，
+ * 逐条保留。来源标记从 `adm-tag` 换成 `StatusTag` 并用 `HelpTip` 解释，
  * 原 antd Tooltip 只在鼠标悬停时出现，键盘用户看不到说明。
  */
 export function AdminCreditPricesPage() {
@@ -98,7 +102,7 @@ export function AdminCreditPricesPage() {
       title: '能力 ID',
       width: 160,
       render: (row) => (
-        <code className="font-mono text-[11px] text-text-secondary">{row.capabilityId}</code>
+        <code className="font-mono text-[11px] text-muted-foreground">{row.capabilityId}</code>
       ),
     },
     {
@@ -106,18 +110,26 @@ export function AdminCreditPricesPage() {
       title: '生效消耗价（积分）',
       width: 200,
       render: (row) => (
-        <NumberInput
+        /*
+         * `NumberField` 没有 onEnter：回车提交由外层 div 捕获后冒泡上来的 keydown。
+         * 保留回车即保存，运营改完价不用再找按钮。
+         */
+        <div
           className="w-[110px]"
-          ariaLabel={`${row.capabilityName} 生效消耗价`}
-          min={0}
-          max={10000}
-          value={draft[row.capabilityId]}
-          disabled={!writable}
-          onChange={(v) => setDraft((d) => ({ ...d, [row.capabilityId]: v ?? 0 }))}
-          onEnter={() => {
-            if (writable) void save(row);
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' && writable) void save(row);
           }}
-        />
+        >
+          <NumberField
+            className="w-full"
+            ariaLabel={`${row.capabilityName} 生效消耗价`}
+            min={0}
+            max={10000}
+            value={draft[row.capabilityId]}
+            disabled={!writable}
+            onChange={(v) => setDraft((d) => ({ ...d, [row.capabilityId]: v ?? 0 }))}
+          />
+        </div>
       ),
     },
     {
@@ -125,7 +137,7 @@ export function AdminCreditPricesPage() {
       title: '代码默认值',
       width: 110,
       align: 'right',
-      render: (row) => <span className="tabular-nums text-text-tertiary">{row.registryDefault}</span>,
+      render: (row) => <span className="tabular-nums text-muted-foreground">{row.registryDefault}</span>,
     },
     {
       key: 'source',
@@ -138,17 +150,17 @@ export function AdminCreditPricesPage() {
            * **不会生效**（活动到点后自动恢复）。不标来源的话，这段表现为
            * 「改了没反应」，会被当成改价 bug。
            */
-          <HoverTip tip="进行中的限时免费活动覆盖了这项能力，活动结束后自动恢复原价">
+          <HelpTip tip="进行中的限时免费活动覆盖了这项能力，活动结束后自动恢复原价">
             <StatusTag status="campaign" tone="danger" label="限时免费" />
-          </HoverTip>
+          </HelpTip>
         ) : row.source === 'setting' ? (
-          <HoverTip tip="后台覆盖中。回落默认后恢复为 registry 的值">
+          <HelpTip tip="后台覆盖中。回落默认后恢复为 registry 的值">
             <StatusTag status="setting" tone="warn" label="后台设置" />
-          </HoverTip>
+          </HelpTip>
         ) : (
-          <HoverTip tip="未覆盖，使用代码里的 registry.creditCost">
+          <HelpTip tip="未覆盖，使用代码里的 registry.creditCost">
             <StatusTag status="registry" tone="muted" label="代码默认" />
-          </HoverTip>
+          </HelpTip>
         ),
     },
     {
@@ -159,24 +171,22 @@ export function AdminCreditPricesPage() {
         const dirty = draft[row.capabilityId] !== undefined && draft[row.capabilityId] !== row.cost;
         return (
           <div className="flex items-center gap-2">
-            <Button
-              size="small"
-              variant="primary"
+            <ActionButton
+              variant="default"
               disabled={!writable || !dirty || saving === row.capabilityId}
               onClick={() => void save(row)}
             >
               {saving === row.capabilityId ? '保存中…' : '保存'}
-            </Button>
+            </ActionButton>
             {row.overridden ? (
               <>
-                <Button
-                  size="small"
-                  variant="danger"
+                <ActionButton
+                  variant="destructive"
                   disabled={!writable || saving === row.capabilityId}
                   onClick={() => setRowForReset(row)}
                 >
                   回落默认
-                </Button>
+                </ActionButton>
                 <ConfirmAction
                   open={rowForReset?.capabilityId === row.capabilityId}
                   title="回落到代码默认值？"
@@ -189,9 +199,9 @@ export function AdminCreditPricesPage() {
                 />
               </>
             ) : (
-              <Button size="small" variant="secondary" disabled>
+              <ActionButton variant="secondary" disabled>
                 回落默认
-              </Button>
+              </ActionButton>
             )}
           </div>
         );
@@ -215,7 +225,7 @@ export function AdminCreditPricesPage() {
         note="0 表示该能力免费。价格为整数，不支持小数积分。"
       >
         {error && rows.length > 0 && (
-          <AdminStaleError error={error} onRetry={() => void reload()} />
+          <StaleError error={error} onRetry={() => void reload()} />
         )}
         {/* 三态分家由表格内部处理: 失败态不渲染成空态, 否则「没连上」会被读成「没有可配置的能力」 */}
         <AdminDataTable<AdminCreditPrice>

@@ -1,42 +1,38 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Download } from 'lucide-react';
-import {
-  Button,
-  Dropdown,
-  DropdownGroup,
-  DropdownItem,
-  DropdownPopover,
-  DropdownTrigger,
-} from '../../admin-ui/shadcn/kit';
 import { adminUsersApi } from '../../lib/api';
 import { assetThumbUrl } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
-import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
-import { SelectBox, TextInput } from '../../admin-ui/controls';
-import { cx } from '../../admin-ui/lib/cn';
 import {
+  ActionButton,
+  AdminDataTable,
   AdminDrawer,
-  AdminListError,
-  AdminListLoading,
-  AdminStaleError,
+  AppliedFilters,
+  BatchResultModal,
+  ClearableField,
   ConfirmAction,
+  EmptyState,
+  FilterActions,
+  FilterBar,
+  FormField,
+  ListError,
+  PageHeader,
+  Panel,
+  RowMenu,
+  SelectField,
+  Skeleton,
+  StatusTag,
+  StaleError,
+  TextField,
+  formatDateTime,
   useAdminDetailParam,
   useAdminList,
   useAdminUrlFilterSync,
-} from '../../components/admin/AdminWidgets';
-import {
-  AdminEmpty,
-  AppliedFilters,
-  FilterActions,
-  FilterBar,
-  PageHeader,
-  Panel,
-  StatusTag,
+  type AdminColumn,
   type AppliedFilter,
-} from '../../components/admin/PageHeader';
-import { BatchResultModal } from '../../components/admin/BatchResultModal';
+} from '../../admin-ui/primitives';
 import {
   adminAssetHref,
   adminCreditHref,
@@ -52,23 +48,23 @@ import type {
 } from '../../types/api';
 
 /**
- * 用户管理 (B-27~B-33)。
+ * 用户管理。
  *
  * ## 选择状态不跨翻页保留
  *
- * 运营切到另一页继续勾选时, 上一页选中的账号仍在选中集里 —— 界面上看不见
- * 它们, 此时点「批量禁用」会禁用一批肉眼不可见的账号。每次重新查询就清空,
+ * 运营切到另一页继续勾选时，上一页选中的账号仍在选中集里 —— 界面上看不见
+ * 它们，此时点「批量禁用」会禁用一批肉眼不可见的账号。每次重新查询就清空，
  * 是更安全的默认。
  *
- * ## 删除不弹确认, 禁用/变更角色要
+ * ## 删除不弹确认，禁用 / 变更角色要
  *
- * 删除按产品要求直接执行 (接口本身写审计原因); 禁用与变更角色会切断在线凭证,
- * 用页内确认条承载原因输入, 原因随请求落审计。
+ * 删除按产品要求直接执行（接口本身写审计原因）；禁用与变更角色会切断在线凭证，
+ * 用页内确认条承载原因输入，原因随请求落审计。
  *
  * ## 登录记录单独取数
  *
  * `GET /admin/users/:id/logins` 需要 `audit.read`。并进详情会让没有审计权限
- * 的角色顺带看到全站登录 IP, 所以单独请求, 403 按「不可见」渲染说明。
+ * 的角色顺带看到全站登录 IP，所以单独请求，403 按「不可见」渲染说明。
  */
 
 type Row = AdminUserListResult['items'][number];
@@ -86,7 +82,7 @@ const STATUS_OPTIONS = [
   { value: 'deleted', label: '已注销' },
 ];
 
-/** 列表默认排序。后端默认与之一致, 显式传参是为了让表头箭头与请求口径对得上 */
+/** 列表默认排序。后端默认与之一致，显式传参是为了让表头箭头与请求口径对得上 */
 const DEFAULT_SORT = 'createdAt:desc';
 
 /** 详情抽屉里的小节标题：标题 + 一句口径说明 */
@@ -100,35 +96,25 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <section className="border-t border-border-table pt-3 first:border-t-0 first:pt-0">
+    <section className="border-t border-border pt-3 first:border-t-0 first:pt-0">
       <div className="mb-2 flex items-baseline gap-2">
-        <h3 className="text-sm font-semibold text-text-primary">{title}</h3>
-        {note && <span className="text-[11px] text-text-tertiary">{note}</span>}
+        <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+        {note && <span className="text-[11px] text-muted-foreground">{note}</span>}
       </div>
       {children}
     </section>
   );
 }
 
-/** 抽屉里的小计数格。不用 StatCard: 那套是列表页首屏用的, 96px 高度在抽屉里太占 */
+/** 抽屉里的小计数格。不用 StatCard：那套是列表页首屏用的，96px 高度在抽屉里太占 */
 function MiniStat({ label, value, hint }: { label: string; value: ReactNode; hint?: ReactNode }) {
   return (
-    <div className="rounded-lg border border-border-table px-3 py-2">
-      <div className="text-[11px] text-text-tertiary">{label}</div>
-      <div className="mt-0.5 text-lg font-semibold leading-6 tabular-nums text-text-primary">
+    <div className="rounded-lg border border-border px-3 py-2">
+      <div className="text-[11px] text-muted-foreground">{label}</div>
+      <div className="mt-0.5 text-lg leading-6 font-semibold text-foreground tabular-nums">
         {value}
       </div>
-      {hint && <div className="text-[11px] text-text-tertiary">{hint}</div>}
-    </div>
-  );
-}
-
-/** 表单字段：标签 + 控件 */
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium text-text-secondary">{label}</span>
-      {children}
+      {hint && <div className="text-[11px] text-muted-foreground">{hint}</div>}
     </div>
   );
 }
@@ -146,7 +132,7 @@ export function AdminUsersPage() {
     ? (searchParams.get('status') as string)
     : undefined;
 
-  // 筛选输入与已提交的查询分离: 不做每键即查, 避免无意义请求
+  // 筛选输入与已提交的查询分离：不做每键即查，避免无意义请求
   const [keyword, setKeyword] = useState(initialKeyword);
   const [role, setRole] = useState<string | undefined>(initialRole);
   const [status, setStatus] = useState<string | undefined>(initialStatus);
@@ -159,7 +145,7 @@ export function AdminUsersPage() {
         keyword: params.keyword as string | undefined,
         role: params.role as string | undefined,
         status: params.status as string | undefined,
-        // 排序必须真的发给后端: 少了这一行表头箭头会变而顺序不变
+        // 排序必须真的发给后端：少了这一行表头箭头会变而顺序不变
         sort: (params.sort as string | undefined) ?? DEFAULT_SORT,
       }),
     [],
@@ -174,8 +160,8 @@ export function AdminUsersPage() {
 
   /*
    * 顶栏全局搜索带 `?q=` 跳过来时自动套用筛选。
-   * 用 ref 记录"已应用过哪一个值"而不是直接比较 state —— 用户在页内改筛选后
-   * URL 不变, 若每次渲染都按 URL 覆盖, 页内筛选会被打回原样。
+   * 用 ref 记录「已应用过哪一个值」而不是直接比较 state —— 用户在页内改筛选后
+   * URL 不变，若每次渲染都按 URL 覆盖，页内筛选会被打回原样。
    */
   const urlQ = searchParams.get('q') ?? '';
   const appliedQ = useRef(initialKeyword);
@@ -216,7 +202,7 @@ export function AdminUsersPage() {
     if (tip) toast.success(tip);
   };
 
-  /** 翻页 / 改筛选都会清空选择, 避免对不可见的行下手 */
+  /** 翻页 / 改筛选都会清空选择，避免对不可见的行下手 */
   const queryAndClear = useCallback(
     (next: Record<string, unknown>, resetPage = true) => {
       setSelected([]);
@@ -363,6 +349,7 @@ export function AdminUsersPage() {
     key: string;
     label: string;
     danger?: boolean;
+    separator?: boolean;
     onClick: () => void;
   }
 
@@ -382,7 +369,7 @@ export function AdminUsersPage() {
         ? { key: 'pwd', label: '重置密码', onClick: () => void doResetPassword(row) }
         : null,
       can('user.delete')
-        ? { key: 'del', label: '删除用户', danger: true, onClick: () => void openDelete(row) }
+        ? { key: 'del', label: '删除用户', danger: true, separator: true, onClick: () => void openDelete(row) }
         : null,
     ].filter(Boolean) as RowAction[];
 
@@ -393,12 +380,12 @@ export function AdminUsersPage() {
         title: '邮箱',
         width: 230,
         sortable: true,
-        // 邮箱常被截断, 悬停给出完整值
+        // 邮箱常被截断，悬停给出完整值
         cellTitle: (row: Row) => row.email,
         render: (row: Row) => (
           <button
             type="button"
-            className="max-w-[220px] truncate rounded text-left text-accent-700 hover:underline"
+            className="max-w-[220px] truncate rounded text-left text-brand hover:underline"
             onClick={() => setDetailId(row.id)}
           >
             {row.email}
@@ -444,9 +431,7 @@ export function AdminUsersPage() {
         width: 160,
         sortable: true,
         render: (row: Row) => (
-          <span className="text-[12px] tabular-nums">
-            {new Date(row.createdAt).toLocaleString('zh-CN')}
-          </span>
+          <span className="text-[12px] tabular-nums">{formatDateTime(row.createdAt)}</span>
         ),
       },
       {
@@ -454,10 +439,10 @@ export function AdminUsersPage() {
         title: '最近登录',
         width: 160,
         sortable: true,
-        // 无登录记录显示「—」而非空单元格: 空白会被误读为加载中
+        // 无登录记录显示「—」而非空单元格：空白会被误读为加载中
         render: (row: Row) => (
-          <span className="text-[12px] tabular-nums text-text-secondary">
-            {row.lastLoginAt ? new Date(row.lastLoginAt).toLocaleString('zh-CN') : '—'}
+          <span className="text-[12px] text-muted-foreground tabular-nums">
+            {row.lastLoginAt ? formatDateTime(row.lastLoginAt) : '—'}
           </span>
         ),
       },
@@ -467,22 +452,30 @@ export function AdminUsersPage() {
         width: 150,
         fixed: 'right',
         /*
-         * 只直显「详情」+「更多」, 其余动作收进下拉。
+         * 只直显「详情」+「更多」，其余动作收进下拉。
          *
-         * 实测: 5 个动作平铺需~340px, 把整行撑高且右侧被裁。与
+         * 实测：5 个动作平铺需约 340px，把整行撑高且右侧被裁。与
          * docs/admin-ui-design.md §2.3「操作列最多直显 2 个」一致。
          */
         render: (row: Row) => (
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="small" onClick={() => setDetailId(row.id)}>
+            <ActionButton variant="ghost" size="sm" onClick={() => setDetailId(row.id)}>
               详情
-            </Button>
-            <RowMenu items={rowMenuItems(row)} />
+            </ActionButton>
+            <RowMenu
+              items={rowMenuItems(row).map((item) => ({
+                key: item.key,
+                label: item.label,
+                danger: item.danger,
+                separator: item.separator,
+                onSelect: item.onClick,
+              }))}
+            />
           </div>
         ),
       },
     ],
-    // rowMenuItems 依赖 can() 与 busy 捕获的 setter, 均为稳定引用
+    // rowMenuItems 依赖 can() 与 busy 捕获的 setter，均为稳定引用
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [can, busy],
   );
@@ -496,16 +489,11 @@ export function AdminUsersPage() {
         description="管理注册用户的账号状态、角色与资源"
         actions={
           can('data.export') ? (
-            <Button
-              variant="secondary"
-              size="small"
-              leadingIcon={Download}
-              onClick={() => void exportUsers()}
-            >
+            <ActionButton variant="secondary" icon={Download} onClick={() => void exportUsers()}>
               导出 CSV
-            </Button>
+            </ActionButton>
           ) : (
-            <span className="text-[11px] text-text-tertiary">
+            <span className="text-[11px] text-muted-foreground">
               当前账号无 data.export 权限，不可导出
             </span>
           )
@@ -513,76 +501,77 @@ export function AdminUsersPage() {
       />
 
       <FilterBar>
-        <TextInput
+        <ClearableField
           className="w-56"
           placeholder="邮箱关键词"
-          allowClear
           value={keyword}
           onChange={setKeyword}
           onEnter={applyFilters}
         />
-        <SelectBox
+        <SelectField
           className="w-32"
           ariaLabel="按角色筛选"
           placeholder="角色"
           allowClear
+          clearLabel="全部角色"
           value={role}
           onChange={setRole}
           options={ROLE_OPTIONS}
         />
-        <SelectBox
+        <SelectField
           className="w-32"
           ariaLabel="按状态筛选"
           placeholder="状态"
           allowClear
+          clearLabel="全部状态"
           value={status}
           onChange={setStatus}
           options={STATUS_OPTIONS}
         />
         <FilterActions>
-          <Button variant="primary" size="small" onClick={applyFilters}>
+          <ActionButton variant="default" onClick={applyFilters}>
             查询
-          </Button>
-          <Button variant="secondary" size="small" onClick={resetFilters}>
+          </ActionButton>
+          <ActionButton variant="secondary" onClick={resetFilters}>
             重置
-          </Button>
+          </ActionButton>
         </FilterActions>
         <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
       </FilterBar>
 
-      {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
-      {error && data && <AdminStaleError error={error} onRetry={reload} />}
+      {/* 刷新失败但手上还有上一次的数据：只挂提示，不把整个列表藏起来 */}
+      {error && data && <StaleError error={error} onRetry={reload} />}
 
       <Panel
         title="用户列表"
-        note="已注销账号不可再改状态，但仍可勾选——批量操作会逐条返回失败原因"
+        note="已注销账号不可再改状态，但仍可勾选 —— 批量操作会逐条返回失败原因"
       >
         {selected.length > 0 && (
-          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-accent-200 bg-accent-50 px-3 py-2">
-            <span className="text-xs font-medium text-accent-900">已选 {selected.length} 项</span>
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-accent px-3 py-2">
+            <span className="text-xs font-medium text-accent-foreground">
+              已选 {selected.length} 项
+            </span>
             {can('user.disable') && (
               <>
-                <Button
-                  variant="danger"
-                  size="small"
+                <ActionButton
+                  variant="destructive"
                   disabled={busy}
                   onClick={() => void runBatch('disable')}
                 >
                   批量禁用
-                </Button>
-                <Button
+                </ActionButton>
+                <ActionButton
                   variant="secondary"
-                  size="small"
                   disabled={busy}
                   onClick={() => void runBatch('enable')}
                 >
                   批量启用
-                </Button>
+                </ActionButton>
               </>
             )}
-            <Button variant="ghost" size="small" onClick={() => setSelected([])}>
+            <ActionButton variant="ghost" onClick={() => setSelected([])}>
               清空选择
-            </Button>
+            </ActionButton>
           </div>
         )}
 
@@ -599,7 +588,7 @@ export function AdminUsersPage() {
           selectable
           selected={selected}
           onSelectedChange={setSelected}
-          // 已注销账号不能再改状态, 但仍允许选中 (批量启用会逐条返回失败原因)
+          // 已注销账号不能再改状态，但仍允许选中（批量启用会逐条返回失败原因）
           isRowSelectable={(row) => row.status !== 'deleted'}
           emptyText={
             hasFilter
@@ -608,9 +597,9 @@ export function AdminUsersPage() {
           }
           emptyAction={
             hasFilter ? (
-              <Button variant="secondary" size="small" onClick={resetFilters}>
+              <ActionButton variant="secondary" onClick={resetFilters}>
                 清除筛选
-              </Button>
+              </ActionButton>
             ) : undefined
           }
           pagination={
@@ -620,7 +609,7 @@ export function AdminUsersPage() {
                   pageSize: data.pageSize,
                   total: data.total,
                   unit: '位用户',
-                  // 翻页时清空选择 (见 selected 处的说明)
+                  // 翻页时清空选择（见 selected 处的说明）
                   onChange: (page, size) => {
                     setSelected([]);
                     setPage(page, size);
@@ -643,20 +632,20 @@ export function AdminUsersPage() {
             <Section title="基本信息">
               <dl className="grid grid-cols-2 gap-x-6 gap-y-2.5">
                 <div className="col-span-2 min-w-0">
-                  <dt className="text-[11px] text-text-tertiary">邮箱</dt>
-                  <dd className="mt-0.5 break-all text-sm text-text-primary">{d.email}</dd>
+                  <dt className="text-[11px] text-muted-foreground">邮箱</dt>
+                  <dd className="mt-0.5 text-sm break-all text-foreground">{d.email}</dd>
                 </div>
                 <div className="col-span-2 min-w-0">
-                  <dt className="text-[11px] text-text-tertiary">关联记录</dt>
+                  <dt className="text-[11px] text-muted-foreground">关联记录</dt>
                   <dd className="mt-0.5 flex flex-wrap gap-3 text-xs">
-                    <Link className="text-accent-700 hover:underline" to={adminTasksHref({ userId: d.id })}>
+                    <Link className="text-brand hover:underline" to={adminTasksHref({ userId: d.id })}>
                       任务记录
                     </Link>
-                    <Link className="text-accent-700 hover:underline" to={adminOrderHref({ email: d.email })}>
+                    <Link className="text-brand hover:underline" to={adminOrderHref({ email: d.email })}>
                       订单记录
                     </Link>
                     <Link
-                      className="text-accent-700 hover:underline"
+                      className="text-brand hover:underline"
                       to={adminCreditHref({ userId: d.id, email: d.email })}
                     >
                       积分账本
@@ -672,7 +661,7 @@ export function AdminUsersPage() {
                     d.phone ? (
                       <span className="flex items-center gap-1.5">
                         {d.phone}
-                        <span className="text-[11px] text-text-tertiary">
+                        <span className="text-[11px] text-muted-foreground">
                           {d.phoneVerifiedAt ? '已验证' : '未验证'}
                         </span>
                       </span>
@@ -681,12 +670,10 @@ export function AdminUsersPage() {
                     )
                   }
                 />
-                <InfoItem label="注册时间" value={new Date(d.createdAt).toLocaleString('zh-CN')} />
+                <InfoItem label="注册时间" value={formatDateTime(d.createdAt)} />
                 <InfoItem
                   label="最近登录"
-                  value={
-                    d.lastLoginAt ? new Date(d.lastLoginAt).toLocaleString('zh-CN') : '从未登录'
-                  }
+                  value={d.lastLoginAt ? formatDateTime(d.lastLoginAt) : '从未登录'}
                 />
               </dl>
             </Section>
@@ -708,31 +695,31 @@ export function AdminUsersPage() {
 
             <Section title="最近任务" note="20 条">
               {d.recentTasks.length === 0 ? (
-                <AdminEmpty description="暂无任务记录" />
+                <EmptyState title="暂无任务记录" />
               ) : (
-                <ul className="flex flex-col divide-y divide-border-table">
+                <ul className="flex flex-col divide-y divide-border">
                   {d.recentTasks.map((t) => (
                     <li key={t.id}>
                       <Link
-                        className="flex items-center gap-2.5 py-1.5 hover:bg-background-secondary-default/70"
+                        className="flex items-center gap-2.5 py-1.5 hover:bg-muted/60"
                         to={adminTaskHref(t.id)}
                         aria-label={`查看任务详情：${t.capabilityName} ${t.id.slice(-8)}`}
                       >
                         {t.thumbnailUrl ? (
                           <img
-                            className="size-9 shrink-0 rounded-md border border-border-table object-cover"
+                            className="size-9 shrink-0 rounded-md border border-border object-cover"
                             src={assetThumbUrl(t.thumbnailUrl, 96)}
                             alt=""
                           />
                         ) : (
-                          <div className="size-9 shrink-0 rounded-md border border-dashed border-border-table bg-background-secondary-default" />
+                          <div className="size-9 shrink-0 rounded-md border border-dashed border-border bg-muted" />
                         )}
-                        <span className="min-w-0 flex-1 truncate text-sm text-text-primary">
+                        <span className="min-w-0 flex-1 truncate text-sm text-foreground">
                           {t.capabilityName}
                         </span>
                         <StatusTag status={t.status} />
-                        <span className="shrink-0 text-[11px] tabular-nums text-text-tertiary">
-                          {new Date(t.createdAt).toLocaleString('zh-CN')}
+                        <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+                          {formatDateTime(t.createdAt)}
                         </span>
                       </Link>
                     </li>
@@ -743,13 +730,13 @@ export function AdminUsersPage() {
 
             <Section title="最近素材" note="20 张">
               {d.recentAssets.length === 0 ? (
-                <AdminEmpty description="暂无素材" />
+                <EmptyState title="暂无素材" />
               ) : (
                 <div className="grid grid-cols-5 gap-1.5">
                   {d.recentAssets.map((a) => (
                     <Link
                       key={a.id}
-                      className="block overflow-hidden rounded-md border border-border-table"
+                      className="block overflow-hidden rounded-md border border-border"
                       to={adminAssetHref(a.id)}
                       aria-label={`在素材库查看素材 ${a.id.slice(-8)}`}
                     >
@@ -768,7 +755,7 @@ export function AdminUsersPage() {
         )}
       </AdminDrawer>
 
-      {/* 禁用/启用 */}
+      {/* 禁用 / 启用 */}
       {statusTarget && (
         <StatusPanel
           target={statusTarget}
@@ -788,7 +775,7 @@ export function AdminUsersPage() {
         />
       )}
 
-      {/* 临时密码: 仅展示一次 */}
+      {/* 临时密码：仅展示一次 */}
       {tempPassword && (
         <ConfirmAction
           open
@@ -797,20 +784,19 @@ export function AdminUsersPage() {
           loading={busy}
           description="请立即复制并安全转交给用户，此密码关闭后无法再次查看。"
           extra={
-            <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-              <code className="min-w-0 flex-1 break-all font-mono text-sm text-text-primary">
+            <div className="flex items-center gap-2 rounded-lg border border-warn-border bg-warn-soft px-3 py-2">
+              <code className="min-w-0 flex-1 font-mono text-sm break-all text-foreground">
                 {tempPassword}
               </code>
-              <Button
+              <ActionButton
                 variant="secondary"
-                size="small"
                 onClick={() => {
                   void navigator.clipboard?.writeText(tempPassword);
                   toast.success('已复制');
                 }}
               >
                 复制
-              </Button>
+              </ActionButton>
             </div>
           }
           onCancel={() => setTempPassword(null)}
@@ -832,56 +818,13 @@ export function AdminUsersPage() {
 function InfoItem({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] text-text-tertiary">{label}</dt>
-      <dd className="mt-0.5 text-sm text-text-primary">{value}</dd>
+      <dt className="text-[11px] text-muted-foreground">{label}</dt>
+      <dd className="mt-0.5 text-sm text-foreground">{value}</dd>
     </div>
   );
 }
 
-/**
- * 行内「更多」菜单。
- *
- * 受控展开: 选中一项后必须收起, 否则删完用户菜单还浮在空行上。
- * 无可用动作时整个触发器不渲染 —— 留一个点开是空的菜单比没有更糟。
- */
-function RowMenu({ items }: { items: Array<{ key: string; label: string; danger?: boolean; onClick: () => void }> }) {
-  const [open, setOpen] = useState(false);
-
-  if (items.length === 0) return null;
-
-  return (
-    <Dropdown isOpen={open} onOpenChange={setOpen}>
-      {/*
-       * 与同列的「详情」保持同一形态（ghost 按钮）。
-       * 之前这里是纯文字链，同一列里一个带底色一个不带，
-       * 读起来像两个不同层级的操作。
-       */}
-      <DropdownTrigger
-        className="inline-flex h-8 items-center rounded-lg bg-button-ghost-background px-2 text-xs text-button-ghost-foreground transition-colors hover:bg-button-ghost-hover"
-      >
-        更多
-      </DropdownTrigger>
-      <DropdownPopover aria-label="更多操作" placement="bottom end" className="w-40">
-        <DropdownGroup>
-          {items.map((item) => (
-            <DropdownItem
-              key={item.key}
-              className={item.danger ? 'text-rose-600' : undefined}
-              onSelect={() => {
-                setOpen(false);
-                item.onClick();
-              }}
-            >
-              {item.label}
-            </DropdownItem>
-          ))}
-        </DropdownGroup>
-      </DropdownPopover>
-    </Dropdown>
-  );
-}
-
-/** 禁用/启用操作条 */
+/** 禁用 / 启用操作条 */
 function StatusPanel({
   target,
   loading,
@@ -909,21 +852,21 @@ function StatusPanel({
             用户：<strong>{target.email}</strong>
           </p>
           {next === 'disabled' && (
-            <p className="mt-1 text-rose-700">
+            <p className="mt-1 text-danger-text">
               禁用后该用户的登录凭证立即失效，无法再登录或调用接口。
             </p>
           )}
         </>
       }
       extra={
-        <Field label="操作原因（建议填写）">
-          <TextInput
+        <FormField label="操作原因（建议填写）">
+          <TextField
             ariaLabel="操作原因"
             placeholder="如：违规使用"
             value={reason}
             onChange={setReason}
           />
-        </Field>
+        </FormField>
       }
       onCancel={onCancel}
       onConfirm={() => onConfirm(next, reason)}
@@ -943,7 +886,7 @@ function RolePanel({
   onCancel: () => void;
   onConfirm: (role: string, reason: string) => void;
 }) {
-  // 默认值必须等于当前角色：管理员/财务账号打开时不能预选「运营」，
+  // 默认值必须等于当前角色：管理员 / 财务账号打开时不能预选「运营」，
   // 否则直接点确认就把人降权了
   const currentAssignable = target.role === 'user' ? 'operator' : target.role;
   const [next, setNext] = useState<string>(currentAssignable);
@@ -972,10 +915,9 @@ function RolePanel({
       ]}
       extra={
         <>
-          <Field label="目标角色">
-            <SelectBox
+          <FormField label="目标角色">
+            <SelectField
               ariaLabel="目标角色"
-              size="md"
               value={next}
               onChange={(value) => {
                 if (value) setNext(value);
@@ -986,15 +928,15 @@ function RolePanel({
                 { value: 'admin', label: '管理员' },
               ]}
             />
-          </Field>
-          <Field label="操作原因">
-            <TextInput
+          </FormField>
+          <FormField label="操作原因">
+            <TextField
               ariaLabel="操作原因"
               placeholder="如：岗位调整"
               value={reason}
               onChange={setReason}
             />
-          </Field>
+          </FormField>
         </>
       }
       onCancel={onCancel}
@@ -1003,7 +945,7 @@ function RolePanel({
   );
 }
 
-/** 登录方式/失败原因 -> 中文。未知值原样展示，免得新原因被吞成「其他」 */
+/** 登录方式 / 失败原因 → 中文。未知值原样展示，免得新原因被吞成「其他」 */
 const LOGIN_REASON_LABEL: Record<string, string> = {
   password: '密码登录',
   sms: '短信登录',
@@ -1017,7 +959,7 @@ const LOGIN_REASON_LABEL: Record<string, string> = {
  * 详情抽屉里的「最近登录」区块。
  *
  * 单独取数（GET /admin/users/:id/logins，权限 audit.read）而不是并进 detail：
- * 只有运营/管理员持有 audit.read，塞进详情会让其他角色顺带看到全站登录 IP。
+ * 只有运营 / 管理员持有 audit.read，塞进详情会让其他角色顺带看到全站登录 IP。
  * 403 时按「不可见」渲染说明 —— 这是权限边界，不是错误。
  */
 function RecentLoginsSection({ userId }: { userId: string }) {
@@ -1055,34 +997,34 @@ function RecentLoginsSection({ userId }: { userId: string }) {
           : undefined
       }
     >
-      {state === 'loading' ? <AdminListLoading tip="加载登录记录…" /> : null}
+      {state === 'loading' ? <Skeleton rows={3} /> : null}
       {state === 'forbidden' ? (
-        <p className="text-[11px] text-text-tertiary">
+        <p className="text-[11px] text-muted-foreground">
           当前角色没有审计权限（audit.read），无法查看登录记录。
         </p>
       ) : null}
       {state === 'error' ? (
-        <AdminListError error="登录记录加载失败" onRetry={() => setReloadKey((n) => n + 1)} />
+        <ListError error="登录记录加载失败" onRetry={() => setReloadKey((n) => n + 1)} />
       ) : null}
       {state === 'ready' && data ? (
         data.items.length === 0 ? (
-          <AdminEmpty description="暂无登录记录" />
+          <EmptyState title="暂无登录记录" />
         ) : (
-          <ul className="flex flex-col divide-y divide-border-table">
+          <ul className="flex flex-col divide-y divide-border">
             {data.items.map((item) => (
               <li key={item.id} className="flex items-center gap-2.5 py-1.5">
                 <StatusTag
                   status={item.success ? 'success' : 'failed'}
                   label={item.success ? '成功' : '失败'}
                 />
-                <span className="min-w-0 flex-1 truncate text-xs text-text-primary">
+                <span className="min-w-0 flex-1 truncate text-xs text-foreground">
                   {LOGIN_REASON_LABEL[item.reason] ?? item.reason}
                 </span>
-                <span className={cx('shrink-0 text-[11px] tabular-nums text-text-tertiary')}>
+                <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
                   {item.ip || '未知 IP'}
                 </span>
-                <span className="shrink-0 text-[11px] tabular-nums text-text-tertiary">
-                  {new Date(item.createdAt).toLocaleString('zh-CN')}
+                <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+                  {formatDateTime(item.createdAt)}
                 </span>
               </li>
             ))}

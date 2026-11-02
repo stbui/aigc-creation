@@ -10,7 +10,7 @@ import { ensureAdminLogin } from './support/admin-login';
  *   2. 编辑时券码不可改 —— 改了等于让用户手里的券集体失效
  *   3. 无 marketing.write 权限时只读 (财务角色看不到写入口)
  *
- * ## 选择器约定（2026-10-30 换 BoardUI 后）
+ * ## 选择器约定（2026-10-30 后台改版后）
  *
  * 表单字段没有 `id` 了，一律用 `aria-label`（`getByLabel`）定位；弹层用
  * `getByRole('dialog', { name })`；列表行用 `data-testid="admin-table-row"`。

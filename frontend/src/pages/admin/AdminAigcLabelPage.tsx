@@ -1,27 +1,30 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Button } from '../../admin-ui/shadcn/kit';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { adminAigcLabelApi } from '../../lib/api';
 import { hexToRgba } from '../../lib/aigc-label';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
 import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import {
-  AdminListError,
-  AdminListLoading,
-  AdminStaleError,
+  ActionButton,
+  ColorField,
   ConfirmAction,
+  EmptyState,
+  FormField,
+  ListError,
+  Notice,
+  NumberField,
+  PageHeader,
+  Panel,
+  RangeField,
+  SaveBar,
+  Skeleton,
+  StaleError,
+  SuggestField,
+  SwitchField,
+  TextField,
   useAdminResource,
-} from '../../components/admin/AdminWidgets';
-import { AdminEmpty, PageHeader, Panel } from '../../components/admin/PageHeader';
-import { FormField, Notice, SaveBar } from '../../admin-ui/primitives';
-import {
-  ColorBox,
-  NumberInput,
-  RangeBox,
-  SuggestInput,
-  SwitchBox,
-  TextInput,
-} from '../../admin-ui/controls';
+} from '../../admin-ui/primitives';
+import { cn } from '../../admin-ui/lib/cn';
 import type { AigcLabelPosition, AigcLabelSpec } from '../../types/api';
 
 /**
@@ -177,6 +180,43 @@ function drawPreview(canvas: HTMLCanvasElement, spec: AigcLabelSpec, badge: HTML
   ctx.globalAlpha = 1;
 }
 
+/**
+ * 单选按钮组的一枚。
+ *
+ * `ActionButton` 不透传 `aria-pressed`，而字重 / 位置这两组按钮需要把当前
+ * 选中态暴露给读屏与 e2e —— 用原生按钮并沿用同一套语义色，不退回旧控件。
+ */
+function ChoiceButton({
+  pressed,
+  disabled,
+  onClick,
+  children,
+}: {
+  pressed: boolean;
+  disabled: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={pressed}
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        'inline-flex h-8 items-center justify-center rounded-md border px-3 text-sm font-medium shadow-xs transition-colors',
+        'outline-none focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
+        'disabled:cursor-not-allowed disabled:opacity-50',
+        pressed
+          ? 'border-primary bg-primary text-primary-foreground hover:bg-primary/90'
+          : 'border-border bg-card text-foreground hover:bg-accent',
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
 export function AdminAigcLabelPage() {
   const toast = useToast();
   const { can } = useAdmin();
@@ -280,9 +320,16 @@ export function AdminAigcLabelPage() {
    * canvas 节点就被卸载, 位图要靠 effect 重画才回来 —— 明明只是重试一次
    * 请求, 视觉上却像样式被重置了。数据在手时保持页面不动, 只换内容。
    */
-  if (loading && !data) return <AdminListLoading tip="加载 AI 标识配置…" />;
-  if (error && !data) return <AdminListError error={error} onRetry={() => void reload()} />;
-  if (!data || !spec) return <AdminEmpty description="暂无配置" />;
+  if (loading && !data) {
+    return (
+      <div className="flex flex-col gap-3" aria-busy="true" aria-live="polite">
+        <Skeleton rows={4} />
+        <p className="text-center text-xs text-muted-foreground">加载 AI 标识配置…</p>
+      </div>
+    );
+  }
+  if (error && !data) return <ListError error={error} onRetry={() => void reload()} />;
+  if (!data || !spec) return <EmptyState title="暂无配置" />;
 
   return (
     <>
@@ -296,7 +343,7 @@ export function AdminAigcLabelPage() {
       />
 
       {/* 刷新失败但草稿还在: 不能把编辑中的样式清掉, 只提示「配置可能已过期」 */}
-      {error && <AdminStaleError error={error} onRetry={() => void reload()} />}
+      {error && <StaleError error={error} onRetry={() => void reload()} />}
 
       {data.badge.stale && (
         <Notice tone="warn">
@@ -312,13 +359,13 @@ export function AdminAigcLabelPage() {
               hint="关闭后产出图不再合成角标，但文件内的隐式标识（XMP / IPTC DigitalSourceType）仍照常写入。按《人工智能生成合成内容标识办法》，显式标识属法定义务，关闭前请自行确认适用场景与法律风险。"
             >
               <div className="flex items-center gap-2">
-                <SwitchBox
+                <SwitchField
                   checked={spec.enabled}
                   onChange={(checked) => patch({ enabled: checked })}
                   disabled={!editable}
                   ariaLabel="显示可见角标"
                 />
-                <span className="text-xs text-text-secondary">
+                <span className="text-xs text-muted-foreground">
                   {spec.enabled ? '开启（默认）' : '已关闭：产出图不显示角标'}
                 </span>
               </div>
@@ -330,7 +377,7 @@ export function AdminAigcLabelPage() {
             </FormField>
 
             <FormField label="角标文案" hint="最多 20 个字。用户下载/转发图片时会一起带走">
-              <TextInput
+              <TextField
                 value={spec.text}
                 maxLength={20}
                 onChange={(next) => patch({ text: next })}
@@ -343,7 +390,7 @@ export function AdminAigcLabelPage() {
               label="字体"
               hint="使用你本机已安装的字体；不同运营电脑的预览可能略有差异"
             >
-              <SuggestInput
+              <SuggestField
                 value={spec.fontFamily}
                 suggestions={FONT_PRESETS}
                 onChange={(next) => patch({ fontFamily: next })}
@@ -353,7 +400,7 @@ export function AdminAigcLabelPage() {
             </FormField>
 
             <FormField label="字号">
-              <RangeBox
+              <RangeField
                 value={spec.fontSize}
                 min={12}
                 max={80}
@@ -367,22 +414,20 @@ export function AdminAigcLabelPage() {
             <FormField label="字重">
               <div className="flex gap-2">
                 {[400, 500, 600, 700].map((w) => (
-                  <Button
+                  <ChoiceButton
                     key={w}
-                    variant={spec.fontWeight === w ? 'primary' : 'secondary'}
-                    size="small"
-                    onClick={() => patch({ fontWeight: w })}
+                    pressed={spec.fontWeight === w}
                     disabled={!editable}
-                    aria-pressed={spec.fontWeight === w}
+                    onClick={() => patch({ fontWeight: w })}
                   >
                     {w}
-                  </Button>
+                  </ChoiceButton>
                 ))}
               </div>
             </FormField>
 
             <FormField label="字距">
-              <RangeBox
+              <RangeField
                 value={spec.letterSpacing}
                 min={0}
                 max={12}
@@ -395,7 +440,7 @@ export function AdminAigcLabelPage() {
             </FormField>
 
             <FormField label="文字颜色">
-              <ColorBox
+              <ColorField
                 value={spec.textColor}
                 onChange={(v) => patch({ textColor: v })}
                 disabled={!editable}
@@ -404,7 +449,7 @@ export function AdminAigcLabelPage() {
             </FormField>
 
             <FormField label="底色">
-              <ColorBox
+              <ColorField
                 value={spec.backgroundColor}
                 onChange={(v) => patch({ backgroundColor: v })}
                 disabled={!editable}
@@ -413,7 +458,7 @@ export function AdminAigcLabelPage() {
             </FormField>
 
             <FormField label="底色不透明度">
-              <RangeBox
+              <RangeField
                 value={spec.backgroundOpacity}
                 min={0}
                 max={100}
@@ -425,7 +470,7 @@ export function AdminAigcLabelPage() {
             </FormField>
 
             <FormField label="圆角">
-              <RangeBox
+              <RangeField
                 value={spec.radius}
                 min={0}
                 max={60}
@@ -437,7 +482,7 @@ export function AdminAigcLabelPage() {
             </FormField>
 
             <FormField label="水平内边距">
-              <RangeBox
+              <RangeField
                 value={spec.paddingX}
                 min={0}
                 max={80}
@@ -449,7 +494,7 @@ export function AdminAigcLabelPage() {
             </FormField>
 
             <FormField label="圆点" hint="留空 = 不画圆点">
-              <ColorBox
+              <ColorField
                 value={spec.dotColor}
                 onChange={(v) => patch({ dotColor: v })}
                 disabled={!editable || !spec.dotColor}
@@ -468,9 +513,9 @@ export function AdminAigcLabelPage() {
               className="block h-auto w-full rounded-xl"
             />
             {previewError && (
-              <p className="mt-2 text-xs text-rose-600">{previewError}</p>
+              <p className="mt-2 text-xs text-danger-text">{previewError}</p>
             )}
-            <p className="mt-2.5 text-xs leading-5 text-text-tertiary">
+            <p className="mt-2.5 text-xs leading-5 text-muted-foreground">
               预览只影响你看到的画面；用户拿到的图片由服务端按同一组参数合成。
             </p>
           </Panel>
@@ -480,22 +525,20 @@ export function AdminAigcLabelPage() {
               <FormField label="位置">
                 <div className="flex flex-wrap gap-2">
                   {(Object.keys(POSITION_LABELS) as AigcLabelPosition[]).map((p) => (
-                    <Button
+                    <ChoiceButton
                       key={p}
-                      variant={spec.position === p ? 'primary' : 'secondary'}
-                      size="small"
-                      onClick={() => patch({ position: p })}
+                      pressed={spec.position === p}
                       disabled={!editable}
-                      aria-pressed={spec.position === p}
+                      onClick={() => patch({ position: p })}
                     >
                       {POSITION_LABELS[p]}
-                    </Button>
+                    </ChoiceButton>
                   ))}
                 </div>
               </FormField>
 
               <FormField label="宽度（占图片宽度的比例）">
-                <RangeBox
+                <RangeField
                   value={spec.scalePercent}
                   min={4}
                   max={60}
@@ -511,7 +554,7 @@ export function AdminAigcLabelPage() {
                 hint="缩略图不至于被角标糊掉，大图上也不会小到看不见"
               >
                 <div className="flex items-center gap-2">
-                  <NumberInput
+                  <NumberField
                     value={spec.minWidthPx}
                     min={16}
                     max={2048}
@@ -520,8 +563,8 @@ export function AdminAigcLabelPage() {
                     ariaLabel="最小宽度"
                     className="w-24"
                   />
-                  <span className="text-xs text-text-tertiary">~</span>
-                  <NumberInput
+                  <span className="text-xs text-muted-foreground">~</span>
+                  <NumberField
                     value={spec.maxWidthPx}
                     min={16}
                     max={4096}
@@ -530,12 +573,12 @@ export function AdminAigcLabelPage() {
                     ariaLabel="最大宽度"
                     className="w-24"
                   />
-                  <span className="text-xs text-text-tertiary">px</span>
+                  <span className="text-xs text-muted-foreground">px</span>
                 </div>
               </FormField>
 
               <FormField label="边距（占图片宽度的比例，至少 6px）">
-                <RangeBox
+                <RangeField
                   value={spec.marginPercent}
                   min={0}
                   max={10}
@@ -551,7 +594,7 @@ export function AdminAigcLabelPage() {
                 label="整体不透明度"
                 hint="低于 20% 在浅色图上几乎不可见，服务端会按下限夹紧"
               >
-                <RangeBox
+                <RangeField
                   value={spec.opacity}
                   min={20}
                   max={100}
@@ -579,7 +622,7 @@ export function AdminAigcLabelPage() {
                   className="max-w-full"
                 />
               </div>
-              <p className="mt-2 text-xs text-text-tertiary">
+              <p className="mt-2 text-xs text-muted-foreground">
                 {data.badge.width}×{data.badge.height}px
                 {data.badge.updatedAt
                   ? ` · 更新于 ${new Date(data.badge.updatedAt).toLocaleString('zh-CN')}`
@@ -592,34 +635,34 @@ export function AdminAigcLabelPage() {
 
       {editable && (
         <SaveBar>
-          <span className="min-w-0 flex-1 text-xs text-text-secondary">
+          <span className="min-w-0 flex-1 text-xs text-muted-foreground">
             {dirty ? '有未保存的变更' : '当前配置已保存'}
           </span>
           <div className="flex shrink-0 items-center gap-2">
-            <Button
+            <ActionButton
               variant="secondary"
-              size="small"
+              size="sm"
               disabled={busy || !dirty}
               onClick={() => setSpec(data.spec)}
             >
               放弃变更
-            </Button>
-            <Button
+            </ActionButton>
+            <ActionButton
               variant="secondary"
-              size="small"
+              size="sm"
               disabled={busy}
               onClick={() => setSpec(data.defaults)}
             >
               恢复默认样式
-            </Button>
-            <Button
-              variant="primary"
-              size="small"
+            </ActionButton>
+            <ActionButton
+              variant="default"
+              size="sm"
               disabled={busy || (!dirty && !data.badge.stale)}
               onClick={openConfirm}
             >
               保存并应用
-            </Button>
+            </ActionButton>
           </div>
         </SaveBar>
       )}
@@ -643,7 +686,7 @@ export function AdminAigcLabelPage() {
           ]}
           extra={
             <FormField label="变更原因（写入审计日志）" required>
-              <TextInput
+              <TextField
                 value={reason}
                 onChange={setReason}
                 placeholder="例如：按品牌规范调整角标配色"

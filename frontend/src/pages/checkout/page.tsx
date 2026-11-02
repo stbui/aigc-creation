@@ -13,6 +13,7 @@ import {
 import { StateError, StateSkeleton } from './components';
 import { notifyCreditsChanged } from './hooks';
 import {
+  ApiError,
   creditsApi,
   membershipApi,
   myMarketingApi,
@@ -30,9 +31,13 @@ import type {
   MarketingQuote,
   MembershipPlan,
   Order,
+  OrderStatus,
   PaymentIntent,
+  PaymentProviderInfo,
   Product,
 } from '../../types/api';
+import { useAuth } from '../../context/AuthContext';
+import { useDocumentMeta } from '../../hooks/useDocumentMeta';
 
 /**
  * 结算页: 下单确认 → 沙箱支付 → 结果。
@@ -50,10 +55,33 @@ import type {
  *    不粉饰成「稍后再试」这类模糊话术。
  */
 
+const ORDER_STATUS_TEXT: Record<OrderStatus, string> = {
+  pending: '待支付',
+  paid: '已支付',
+  cancelled: '已取消',
+  refunded: '已退款',
+  partial_refunded: '部分退款',
+};
+
+/** 只有待支付且未过期的订单才能继续发起支付 */
+function isOrderPayable(order: Order): boolean {
+  return order.status === 'pending' && new Date(order.expiresAt).getTime() > Date.now();
+}
+
+function blockedReasonOf(order: Order): string | null {
+  if (isOrderPayable(order)) return null;
+  if (order.status !== 'pending') {
+    return `该订单当前状态为「${ORDER_STATUS_TEXT[order.status] ?? order.status}」，不能继续支付。`;
+  }
+  return '该订单已超过支付时限，请回到积分商城重新下单。';
+}
+
 export function CheckoutPage() {
+  useDocumentMeta('确认订单 · 货觉AI', '确认商品与支付方式，完成积分或会员购买。');
   const { sku = '' } = useParams();
   const [search] = useSearchParams();
   const navigate = useNavigate();
+  const { token } = useAuth();
 
   /**
    * 从「我的订单 → 继续支付」进来时携带 orderId。
@@ -85,6 +113,16 @@ export function CheckoutPage() {
   const [onlineIntent, setOnlineIntent] = useState<PaymentIntent | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   /**
+   * 可用支付渠道。
+   *
+   * 后端在渠道 > 1 时要求 intent 显式传 providerId；不加载列表就无法选择，
+   * 用户会看到「存在多个可用支付渠道，请指定 providerId」而无法下单。
+   */
+  const [providers, setProviders] = useState<PaymentProviderInfo[]>([]);
+  const [selectedProviderId, setSelectedProviderId] = useState('');
+  const [providersLoading, setProvidersLoading] = useState(false);
+  const [providersError, setProvidersError] = useState<string | null>(null);
+  /**
    * 结算试算（券 / 限时活动）。
    *
    * 只在**还没建单**时试算：一旦下单，金额与优惠以订单快照为准，
@@ -108,13 +146,54 @@ export function CheckoutPage() {
    */
   const idemKeyRef = useRef<string>(newIdempotencyKey());
 
+  /*
+   * 支付渠道是全局配置，不依赖具体商品；进入结算页就拉一次。
+   * 未登录不请求（/payments/providers 需鉴权），避免结算页首屏多一个 401。
+   */
+  useEffect(() => {
+    if (!token) {
+      setProviders([]);
+      setSelectedProviderId('');
+      setProvidersError(null);
+      return;
+    }
+    let alive = true;
+    setProvidersLoading(true);
+    setProvidersError(null);
+    paymentsApi
+      .providers()
+      .then((res) => {
+        if (!alive) return;
+        setProviders(res.items);
+        setSelectedProviderId((prev) => {
+          if (prev && res.items.some((p) => p.id === prev)) return prev;
+          return res.items[0]?.id ?? '';
+        });
+      })
+      .catch((e: unknown) => {
+        if (!alive) return;
+        setProviders([]);
+        setSelectedProviderId('');
+        setProvidersError((e as Error).message || '支付渠道加载失败');
+      })
+      .finally(() => {
+        if (alive) setProvidersLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [token]);
+
   useEffect(() => {
     let alive = true;
     setLoading(true);
 
     const loadPlan = async (id: string) => {
       const plans = await membershipApi.plans();
-      const found = plans.find((p) => p.id === id || p.code === id);
+      // 公开列表只有 active；续付已下架套餐时回退到单套餐接口
+      const found =
+        plans.find((p) => p.id === id || p.code === id) ??
+        (await membershipApi.plan(id).catch(() => null));
       if (!found) throw new Error('会员套餐不存在或已下架');
       if (alive) setPlan(found);
     };
@@ -133,7 +212,23 @@ export function CheckoutPage() {
           }
           const item = o.items?.[0];
           if (!item) throw new Error('订单无商品明细');
-          const p = await productsApi.detail(item.sku);
+          /*
+           * 订单快照本身就是可支付依据。商品下架/改价后仍要能续付，
+           * 因此 detail 失败时用订单快照构造展示对象，而不是整页报错。
+           */
+          const snapshotProduct: Product = {
+            id: item.productId,
+            sku: item.sku,
+            name: item.name,
+            description: '',
+            priceCents: item.priceCents,
+            originalPriceCents: null,
+            credits: item.credits,
+            creditsValidDays: item.validDays,
+            type: 'credits',
+            isFree: item.priceCents === 0,
+          };
+          const p = await productsApi.detail(item.sku).catch(() => snapshotProduct);
           if (alive) setProduct(p);
         })
         .catch((e: Error) => {
@@ -272,18 +367,32 @@ export function CheckoutPage() {
    * 订单也已经不该被当作有效支付, 用户需要去订单页确认。
    */
   const startPolling = useCallback(
-    (orderId: string) => {
+    (orderId: string, expiresAt?: string) => {
       stopPolling();
-      const startedAt = Date.now();
+      const parsedDeadline = expiresAt ? new Date(expiresAt).getTime() : NaN;
+      const deadline = Number.isFinite(parsedDeadline)
+        ? parsedDeadline
+        : Date.now() + PAYMENT_POLL_TIMEOUT_MS;
       pollRef.current = window.setInterval(async () => {
-        if (Date.now() - startedAt > PAYMENT_POLL_TIMEOUT_MS) {
+        if (Date.now() > deadline) {
           stopPolling();
+          setQrDataUrl(null);
+          setOnlineIntent(null);
           setError('支付确认超时。若已扣款，请稍后在「我的订单」查看状态');
           return;
         }
         try {
           const st = await paymentsApi.status(orderId);
-          if (st.status !== 'paid') return;
+          if (st.status !== 'paid') {
+            // 渠道侧取消 / 关单后停止轮询，不要继续空转到截止时间
+            if (st.status === 'cancelled' || st.status === 'refunded') {
+              stopPolling();
+              setQrDataUrl(null);
+              setOnlineIntent(null);
+              setError(`订单已${st.status === 'cancelled' ? '取消' : '退款'}，本次未完成支付。`);
+            }
+            return;
+          }
           stopPolling();
           const fresh = await ordersApi.detail(orderId);
           setOrder(fresh);
@@ -302,8 +411,18 @@ export function CheckoutPage() {
             balance,
           });
           setPhase('result');
-        } catch {
-          // 单次轮询失败 (网络抖动) 不应该中断, 下一轮继续
+        } catch (e) {
+          /*
+           * 401/403 不是网络抖动：会话已失效或账号被禁用，继续轮询只会让
+           * 用户等满整个订单有效期。网络/5xx 才继续下一轮。
+           */
+          if (e instanceof ApiError && (e.status === 401 || e.status === 403)) {
+            stopPolling();
+            setQrDataUrl(null);
+            setOnlineIntent(null);
+            setError(e.message || '登录状态已失效，请重新登录后到「我的订单」查看结果');
+          }
+          // 其余单次失败不中断
         }
       }, PAYMENT_POLL_INTERVAL_MS);
     },
@@ -323,7 +442,22 @@ export function CheckoutPage() {
     setError(null);
     try {
       const o = order ?? (await placeOrder());
-      const intent = await paymentsApi.intent(o.id);
+      const blocked = blockedReasonOf(o);
+      if (blocked) {
+        setError(blocked);
+        return;
+      }
+      if (providersLoading) {
+        setError('正在读取支付渠道，请稍候再试');
+        return;
+      }
+      if (providers.length > 1 && !selectedProviderId) {
+        setError('请先选择支付方式');
+        return;
+      }
+      // 多通道路由：providers 已在进页面时加载；单渠道可留空由后端兜底，
+      // 多渠道必须显式传，否则后端 400。
+      const intent = await paymentsApi.intent(o.id, selectedProviderId || undefined);
 
       /*
        * 0 元单（免费体验包 / 100% 优惠）：后端在 createIntent 里已经直接入账，
@@ -366,7 +500,8 @@ export function CheckoutPage() {
         const dataUrl = await QRCode.toDataURL(intent.codeUrl, { width: 220, margin: 1 });
         setQrDataUrl(dataUrl);
         setOnlineIntent(intent);
-        startPolling(o.id);
+        // 以渠道返回的订单过期时间为轮询截止，而不是固定的 5 分钟
+        startPolling(o.id, intent.expiresAt);
         return;
       }
       setError('支付通道返回了无法识别的方式，请联系客服');
@@ -388,6 +523,11 @@ export function CheckoutPage() {
     setError(null);
     try {
       const o = order ?? (await placeOrder());
+      const blocked = blockedReasonOf(o);
+      if (blocked) {
+        setError(blocked);
+        return;
+      }
       const res = await ordersApi.sandboxPay(o.id, scenario);
       const paid = res.order;
       setOrder(paid);
@@ -484,10 +624,27 @@ export function CheckoutPage() {
    * 试算还没回来时退回商品原价。三层兜底保证界面永远有数可显示，
    * 但绝不会在已下单后显示一个与服务端不一致的金额。
    */
-  const subtotalCents = order ? item?.priceCents ?? unitCents : quotePreview?.subtotalCents ?? unitCents;
+  const orderItemsSubtotal =
+    order?.itemsSubtotalCents ??
+    (order?.items?.length
+      ? order.items.reduce((sum, oi) => sum + oi.priceCents * oi.quantity, 0)
+      : undefined);
+  const subtotalCents = order
+    ? orderItemsSubtotal ?? item?.priceCents ?? unitCents
+    : quotePreview?.subtotalCents ?? unitCents;
   const payAmount = order?.paidCents ?? quotePreview?.payableCents ?? unitCents;
-  const discount = order?.discountCents ?? quotePreview?.discountCents ?? 0;
+  const memberDiscount = order
+    ? order.memberDiscountCents ?? 0
+    : quotePreview?.memberDiscountCents ?? 0;
+  const couponDiscount = order
+    ? order.discountCents
+    : quotePreview?.discountCents ?? 0;
   const title = plan ? '确认订阅' : '确认订单';
+  /*
+   * 续付链接 / 旧标签页可能指向已支付、已取消或已过期的订单。
+   * 这些状态都必须在前端先拦下，不能等用户点了支付再吃一个 409。
+   */
+  const payBlockedReason = order ? blockedReasonOf(order) : null;
 
   return (
     <div className="pkg-checkout-page">
@@ -510,7 +667,14 @@ export function CheckoutPage() {
       <div className="co-layout">
         <div className="co-main">
           <CheckoutOrderCard product={product} plan={plan} />
-          <CheckoutPaymentMethodCard onlineIntent={onlineIntent} />
+          <CheckoutPaymentMethodCard
+            onlineIntent={onlineIntent}
+            providers={providers}
+            selectedProviderId={selectedProviderId}
+            onSelectProvider={setSelectedProviderId}
+            providersLoading={providersLoading}
+            providersError={providersError}
+          />
         </div>
 
         <CheckoutAmountCard
@@ -522,10 +686,12 @@ export function CheckoutPage() {
           onCouponChange={setCouponCode}
           subtotalCents={subtotalCents}
           payAmount={payAmount}
-          discount={discount}
+          memberDiscountCents={memberDiscount}
+          couponDiscountCents={couponDiscount}
           qrDataUrl={qrDataUrl}
           paying={paying}
           error={error}
+          payBlockedReason={payBlockedReason}
           onlineIntent={onlineIntent}
           onPayOnline={() => void payOnline()}
           onCancelQr={() => {

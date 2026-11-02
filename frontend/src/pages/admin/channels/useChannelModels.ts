@@ -17,8 +17,8 @@ export function useChannelModels(channelId: string) {
     if (!channelId) return;
     setLoading(true);
     try {
-      const list = await adminChannelsApi.models(channelId);
-      setModels(list);
+      const res = await adminChannelsApi.models(channelId);
+      setModels(res.models);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : '加载失败');

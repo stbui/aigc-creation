@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Dialog, DialogContent, DialogTitle } from '../components/ui';
+import { Dialog, DialogContent, DialogTitle } from '../components/ui/dialog';
 import { Search } from 'lucide-react';
 import { adminSearchApi } from '../../lib/api';
 import type { AdminSearchGroup } from '../../types/api';

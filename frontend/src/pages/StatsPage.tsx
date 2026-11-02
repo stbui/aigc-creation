@@ -5,6 +5,7 @@ import { RefreshCw } from 'lucide-react';
 import { assetThumbUrl, statsApi } from '../lib/api';
 import { MODE_LABELS } from '../lib/constants';
 import { useAuth } from '../context/AuthContext';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { PersonalPage } from '../components/PersonalPage';
 import { StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
 import type { StatsOverview } from '../types/api';
@@ -51,6 +52,7 @@ function formatTaskTime(iso: string): string {
  * - 最近任务并入右栏, 与趋势图等高, 不再独占一条满宽列表。
  */
 export function StatsPage() {
+  useDocumentMeta('数据中心 · 货觉AI', '查看累计生成、成功率与近 7 天任务趋势。');
   const navigate = useNavigate();
   const { token, openLogin } = useAuth();
   const [stats, setStats] = useState<StatsOverview | null>(null);
@@ -99,10 +101,10 @@ export function StatsPage() {
 
   if (!token) {
     return (
-      <PersonalPage title="数据中心" description="查看累计生成、成功率与近 7 天产出。">
+      <PersonalPage title="数据中心" description="查看累计生成、成功率与近 7 天任务趋势。">
         <StateEmpty
           title="登录后查看你的创作数据"
-          desc="创作数据与账号绑定，登录后即可查看累计生成、成功率与近 7 天产出。"
+          desc="创作数据与账号绑定，登录后即可查看累计生成、成功率与近 7 天任务趋势。"
           action={
             <Button type="primary" onClick={openLogin}>
               登录/注册
@@ -115,14 +117,14 @@ export function StatsPage() {
 
   if (loading) {
     return (
-      <PersonalPage title="数据中心" description="查看累计生成、成功率与近 7 天产出。">
+      <PersonalPage title="数据中心" description="查看累计生成、成功率与近 7 天任务趋势。">
         <StateSkeleton variant="panel" count={5} />
       </PersonalPage>
     );
   }
   if (error) {
     return (
-      <PersonalPage title="数据中心" description="查看累计生成、成功率与近 7 天产出。">
+      <PersonalPage title="数据中心" description="查看累计生成、成功率与近 7 天任务趋势。">
         <StateError
           title="统计数据加载失败"
           desc="没能取回你的创作数据。可能是后端未启动或网络异常，重试一次即可。"
@@ -134,7 +136,7 @@ export function StatsPage() {
   }
   if (!stats) {
     return (
-      <PersonalPage title="数据中心" description="查看累计生成、成功率与近 7 天产出。">
+      <PersonalPage title="数据中心" description="查看累计生成、成功率与近 7 天任务趋势。">
         <StateEmpty title="暂无统计数据" desc="完成一次创作后，这里会出现你的数据分布。" />
       </PersonalPage>
     );
@@ -189,7 +191,7 @@ export function StatsPage() {
         </article>
 
         <article className="stats-kpi">
-          <span className="stats-kpi-label">近 7 天产出</span>
+          <span className="stats-kpi-label">近 7 天任务</span>
           <span className="stats-kpi-value">{total7}</span>
           <span className="stats-kpi-sub">
             <span>峰值 <b>{peak7}</b></span>
@@ -201,7 +203,7 @@ export function StatsPage() {
       <section className="stats-split">
         <article className="stats-panel">
           <header className="stats-panel-head">
-            <h4 className="stats-panel-title">产出趋势</h4>
+            <h4 className="stats-panel-title">任务趋势</h4>
             {hasRecentOutput && (
               <span className="stats-panel-meta">峰值 {peak7} 次 · 共 {total7} 次</span>
             )}
@@ -230,7 +232,7 @@ export function StatsPage() {
               })}
             </div>
           ) : (
-            <StateEmpty compact title="近 7 天还没有产出" desc="完成一次生成后，这里会显示每天的产出数量。" />
+            <StateEmpty compact title="近 7 天还没有任务" desc="提交一次生成后，这里会显示每天的任务数量（含失败/进行中）。" />
           )}
         </article>
 

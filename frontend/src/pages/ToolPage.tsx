@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Button,
   Card,
@@ -17,7 +17,14 @@ import {
 import type { UploadFile } from 'antd';
 import { ArrowLeft, Upload as UploadIcon, Trash2, RefreshCw, Check, X } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { assetsApi, generateApi, assetSrc, assetThumbSrc } from '../lib/api';
+import {
+  ApiError,
+  assetsApi,
+  generateApi,
+  assetSrc,
+  assetThumbSrc,
+  newIdempotencyKey,
+} from '../lib/api';
 import { capabilityById } from '../lib/capabilities';
 import { resolveModelId } from '../lib/models';
 import { useProject } from '../hooks/useProject';
@@ -38,6 +45,7 @@ import {
   taskErrorText,
 } from '../lib/constants';
 import { useCreditLabel } from '../hooks/useCreditLabel';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { AssetLibraryModal, useAssetLibrary } from '../components/AssetLibraryModal';
 import { CapabilityIcon } from '../components/AppLayout';
 import { ExceptionPage } from '../components/ExceptionPage';
@@ -111,6 +119,7 @@ export function ToolPage() {
 }
 
 function ToolPageContent({ capability, def }: { capability: string; def: CapabilityDef }) {
+  useDocumentMeta(`${def.name} · 货觉AI`, def.summary);
   const navigate = useNavigate();
   const { message } = App.useApp();
   const reportError = useGenerateError();
@@ -119,9 +128,20 @@ function ToolPageContent({ capability, def }: { capability: string; def: Capabil
 
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [submitting, setSubmitting] = useState(false);
+  /*
+   * 上传与生成必须分开计数。
+   *
+   * 之前共用一个 submitting 布尔：上传请求的 finally 会把“生成中”复位，
+   * 此时轮询仍在跑，按钮却恢复可点 —— 再点一次就是第二个任务、第二次扣费。
+   */
+  const [generating, setGenerating] = useState(false);
+  const [uploadingCount, setUploadingCount] = useState(0);
   const [task, setTask] = useState<Task | null>(null);
   const pollSignal = usePollAbort();
+  /** 图片位的同步镜像：素材库一次确定多张时，渲染闭包里的 assets.length 是旧的 */
+  const assetsRef = useRef<Asset[]>([]);
+  /** 建单请求的幂等键：同一次提交的网络重试复用，避免重复扣费 */
+  const pendingStartRef = useRef<{ fingerprint: string; key: string } | null>(null);
 
   const inputs = def.inputs;
   /*
@@ -136,15 +156,18 @@ function ToolPageContent({ capability, def }: { capability: string; def: Capabil
    * 弹窗保持打开让用户改选。
    */
   const library = useAssetLibrary((asset) => {
-    if (assets.length >= inputs) {
+    const current = assetsRef.current;
+    if (current.length >= inputs) {
       message.warning(`最多 ${inputs} 张`);
       return false;
     }
-    if (assets.some((a) => a.id === asset.id)) {
+    if (current.some((a) => a.id === asset.id)) {
       message.warning('这张素材已经在列表里了');
       return false;
     }
-    setAssets((prev) => [...prev, asset]);
+    // 同步更新镜像，保证同一批多选时第二张看到第一张已占用额度
+    assetsRef.current = [...current, asset];
+    setAssets((prev) => (prev.some((a) => a.id === asset.id) ? prev : [...prev, asset]));
     setFileList((prev) => [
       ...prev,
       {
@@ -164,7 +187,9 @@ function ToolPageContent({ capability, def }: { capability: string; def: Capabil
     form.setFieldsValue(def.defaultParams as Record<string, unknown>);
     setFileList([]);
     setAssets([]);
+    assetsRef.current = [];
     setTask(null);
+    pendingStartRef.current = null;
   }, [def.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const originalThumb = assets[0] ? assetSrc(assets[0]) : undefined;
@@ -183,33 +208,55 @@ function ToolPageContent({ capability, def }: { capability: string; def: Capabil
   }
 
   async function onSubmit() {
+    if (generating || uploadingCount > 0) return;
     if (fileList.length < inputs) {
       message.warning(`请先上传 ${inputs} 张图片`);
       return;
     }
-    setSubmitting(true);
+    setGenerating(true);
     setTask(null);
     try {
       const params = form.getFieldsValue();
       const projectId = await ensureProject();
       const logicalModelId = await resolveModelId(def.id);
+      const inputAssetIds = assetsRef.current.map((a) => a.id);
+      const fingerprint = JSON.stringify({
+        projectId,
+        capability: def.id,
+        logicalModelId,
+        inputAssetIds,
+        params,
+      });
+      const idempotencyKey =
+        pendingStartRef.current?.fingerprint === fingerprint
+          ? pendingStartRef.current.key
+          : newIdempotencyKey();
+      pendingStartRef.current = { fingerprint, key: idempotencyKey };
+
       const { taskId } = await generateApi.start({
         projectId,
-        inputAssetIds: assets.map((a) => a.id),
+        inputAssetIds,
         capability: def.id,
         logicalModelId,
         params,
+        idempotencyKey,
       });
+      // 已拿到任务句柄：后续轮询失败不应复用建单键
+      pendingStartRef.current = null;
       const done = await pollTask(taskId);
-      if (done.status === 'failed') {
-        message.error(`生成失败：${taskErrorText(done.errorCode)}`);
+      if (done.status !== 'succeeded') {
+        message.error(`${def.name}未完成：${taskErrorText(done.errorCode)}`);
       } else {
         message.success(`${def.name} 已完成`);
       }
     } catch (e) {
+      // 4xx 是确定性拒绝，复用 key 只会再次失败；网络错误/5xx 保留 key
+      if (e instanceof ApiError && e.status >= 400 && e.status < 500) {
+        pendingStartRef.current = null;
+      }
       reportError(e);
     } finally {
-      setSubmitting(false);
+      setGenerating(false);
       // 扣费在建任务时发生、失败会自动退还，两个方向都改了余额
       notifyCreditsChanged();
     }
@@ -258,7 +305,9 @@ function ToolPageContent({ capability, def }: { capability: string; def: Capabil
             accept={SUPPORTED_IMAGE_ACCEPT}
             multiple={inputs > 1}
             maxCount={inputs}
+            disabled={generating}
             beforeUpload={(file) => {
+              if (generating) return Upload.LIST_IGNORE;
               if (!isSupportedImageFile(file)) {
                 message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
                 return Upload.LIST_IGNORE;
@@ -268,20 +317,25 @@ function ToolPageContent({ capability, def }: { capability: string; def: Capabil
                 message.error(`单张不超过 ${MAX_IMAGE_MB}MB：${file.name}`);
                 return Upload.LIST_IGNORE;
               }
-              setSubmitting(true);
+              setUploadingCount((n) => n + 1);
               doUpload(file)
                 .then((asset) => {
+                  assetsRef.current = [...assetsRef.current, asset];
                   setAssets((prev) => [...prev, asset]);
                   setFileList((prev) => [...prev, file]);
                   message.success(`${file.name} 上传成功`);
                 })
                 .catch((e: Error) => message.error(e.message || '上传失败'))
-                .finally(() => setSubmitting(false));
+                .finally(() => setUploadingCount((n) => Math.max(0, n - 1)));
               return false; // 阻止 antd 自动请求, 走自己的上传逻辑
             }}
             onRemove={(f) => {
+              if (generating) return false;
               const idx = fileList.findIndex((x) => x.uid === f.uid);
-              if (idx >= 0) setAssets((prev) => prev.filter((_, i) => i !== idx));
+              if (idx >= 0) {
+                assetsRef.current = assetsRef.current.filter((_, i) => i !== idx);
+                setAssets((prev) => prev.filter((_, i) => i !== idx));
+              }
               setFileList((prev) => prev.filter((x) => x.uid !== f.uid));
             }}
           >
@@ -294,7 +348,12 @@ function ToolPageContent({ capability, def }: { capability: string; def: Capabil
             </div>
           </Upload>
 
-          <Button type="link" size="small" onClick={library.openLibrary} disabled={submitting}>
+          <Button
+            type="link"
+            size="small"
+            onClick={library.openLibrary}
+            disabled={generating || uploadingCount > 0}
+          >
             从素材库导入
           </Button>
 
@@ -311,18 +370,18 @@ function ToolPageContent({ capability, def }: { capability: string; def: Capabil
             type="primary"
             size="large"
             block
-            loading={submitting}
-            disabled={assets.length < inputs}
+            loading={generating}
+            disabled={generating || uploadingCount > 0 || assets.length < inputs}
             onClick={onSubmit}
             className="tool-submit"
           >
-            {submitting ? '生成中…' : '立即生成'}
+            {generating ? '生成中…' : uploadingCount > 0 ? '上传中…' : '立即生成'}
           </Button>
           {creditLabel && <Text type="secondary" className="tool-credit-hint">{creditLabel}</Text>}
         </Card>
 
         <Card className="tool-result-card" title="生成结果">
-          {submitting && !resultUrl ? (
+          {generating && !resultUrl ? (
             /* 生成中 → 骨架占位 (与工具页结果栏同构), 不退回空态 */
             <div className="tool-result-loading">
               <StateSkeleton variant="block" count={1} />
@@ -355,7 +414,7 @@ function ToolPageContent({ capability, def }: { capability: string; def: Capabil
                     size="small"
                     icon={<RefreshCw size={13} />}
                     onClick={onSubmit}
-                    loading={submitting}
+                    loading={generating}
                   >
                     重新生成
                   </Button>
@@ -389,7 +448,7 @@ function ToolPageContent({ capability, def }: { capability: string; def: Capabil
         error={library.error}
         onCancel={library.closeLibrary}
         onPick={library.pick}
-        maxSelectable={inputs}
+        maxSelectable={Math.max(0, inputs - assets.length)}
       />
     </div>
   );

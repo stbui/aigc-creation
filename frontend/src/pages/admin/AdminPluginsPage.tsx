@@ -1,20 +1,27 @@
-import { useRef, useState, type ReactNode } from 'react';
+import { useRef, useState } from 'react';
 import { RefreshCw, ShieldCheck, Upload } from 'lucide-react';
-import { Button } from '../../admin-ui/shadcn/kit';
 import { adminPluginsApi, adminProviderCatalogApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
-import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
-import { Drawer } from '../../admin-ui/primitives/Drawer';
-import { Descriptions, Notice } from '../../admin-ui/primitives';
-import { TextInput, HoverTip } from '../../admin-ui/controls';
 import {
-  AdminListLoading,
-  AdminStaleError,
+  ActionButton,
+  AdminDataTable,
   ConfirmAction,
+  Descriptions,
+  Drawer,
+  FormField,
+  HelpTip,
+  Notice,
+  PageHeader,
+  Panel,
+  Skeleton,
+  StatCard,
+  StatusTag,
+  StaleError,
+  TextField,
   useAdminResource,
-} from '../../components/admin/AdminWidgets';
-import { PageHeader, Panel, StatCard, StatusTag } from '../../components/admin/PageHeader';
+  type AdminColumn,
+} from '../../admin-ui/primitives';
 import type {
   PluginListResult,
   PluginView,
@@ -39,16 +46,6 @@ import type {
  * 服务商目录（下半页）是插件包的上游清单：配置了 `MODEL_PROVIDER_CATALOG_URL`
  * 才可用，未配置时展示空态与原因，不伪造一份假目录。
  */
-
-function Field({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium text-text-secondary">{label}</span>
-      {children}
-      {hint && <p className="text-[11px] leading-4 text-text-tertiary">{hint}</p>}
-    </div>
-  );
-}
 
 /** 贡献项 → 非零条目文本 */
 function contributionText(plugin: PluginView): string {
@@ -217,7 +214,7 @@ export function AdminPluginsPage() {
       render: (row) => (
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="truncate font-medium text-text-primary">{row.name}</span>
+            <span className="truncate font-medium text-foreground">{row.name}</span>
             {row.enabled ? (
               <StatusTag status="enabled" tone="success" label="启用" />
             ) : (
@@ -229,7 +226,7 @@ export function AdminPluginsPage() {
               label={row.origin === 'installed' ? '上传' : '内置'}
             />
           </div>
-          <div className="mt-0.5 truncate font-mono text-[11px] text-text-tertiary">
+          <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
             {row.id} · v{row.version}
           </div>
         </div>
@@ -239,7 +236,7 @@ export function AdminPluginsPage() {
       key: 'vendor',
       title: '厂商',
       width: 120,
-      render: (row) => <span className="text-text-secondary">{row.vendor || '—'}</span>,
+      render: (row) => <span className="text-muted-foreground">{row.vendor || '—'}</span>,
     },
     {
       key: 'protocols',
@@ -256,9 +253,9 @@ export function AdminPluginsPage() {
         row.availability?.available ? (
           <StatusTag status="available" tone="success" label="可用" />
         ) : (
-          <HoverTip tip={row.availability?.reason || '当前环境不可用'}>
+          <HelpTip tip={row.availability?.reason || '当前环境不可用'}>
             <StatusTag status="unavailable" tone="warn" label="不可用" />
-          </HoverTip>
+          </HelpTip>
         ),
     },
     {
@@ -268,7 +265,7 @@ export function AdminPluginsPage() {
       render: (row) => (
         <div className="flex flex-wrap gap-1">
           {row.providers.length === 0 ? (
-            <span className="text-text-placeholder">—</span>
+            <span className="text-muted-foreground">—</span>
           ) : (
             row.providers.map((provider) => (
               <StatusTag
@@ -286,7 +283,9 @@ export function AdminPluginsPage() {
       key: 'contributions',
       title: '贡献',
       render: (row) => (
-        <span className="line-clamp-2 text-[11px] text-text-secondary">{contributionText(row)}</span>
+        <span className="line-clamp-2 text-[11px] text-muted-foreground">
+          {contributionText(row)}
+        </span>
       ),
     },
     {
@@ -301,12 +300,12 @@ export function AdminPluginsPage() {
             ) : (
               <StatusTag status="fail" tone="danger" label="未通过" />
             )}
-            <span className="tabular-nums text-text-tertiary">
+            <span className="tabular-nums text-muted-foreground">
               {new Date(row.verify.checkedAt).toLocaleDateString('zh-CN')}
             </span>
           </div>
         ) : (
-          <span className="text-text-placeholder">未校验</span>
+          <span className="text-muted-foreground">未校验</span>
         ),
     },
     {
@@ -316,19 +315,19 @@ export function AdminPluginsPage() {
       fixed: 'right',
       render: (row) => (
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="xs" onClick={() => setDetail(row)}>
+          <ActionButton variant="ghost" size="xs" onClick={() => setDetail(row)}>
             详情
-          </Button>
-          <Button
+          </ActionButton>
+          <ActionButton
             variant="ghost"
             size="xs"
-            leadingIcon={ShieldCheck}
+            icon={ShieldCheck}
             disabled={busy === row.id}
             onClick={() => void runVerify(row)}
           >
             校验
-          </Button>
-          <Button
+          </ActionButton>
+          <ActionButton
             variant="ghost"
             size="xs"
             disabled={!writable || busy === row.id}
@@ -338,11 +337,16 @@ export function AdminPluginsPage() {
             }}
           >
             {row.enabled ? '停用' : '启用'}
-          </Button>
+          </ActionButton>
           {row.removable && (
-            <Button
-              variant="dangerGhost"
+            /*
+             * 行内危险动作保持 ghost + 红字：实心红按钮在一列四颗动作里
+             * 会盖过状态列，运营反而看不出哪个插件更该处理。
+             */
+            <ActionButton
+              variant="ghost"
               size="xs"
+              className="text-danger-text hover:text-danger-text"
               disabled={!writable || busy === row.id}
               onClick={() => {
                 setActionReason('');
@@ -350,7 +354,7 @@ export function AdminPluginsPage() {
               }}
             >
               卸载
-            </Button>
+            </ActionButton>
           )}
         </div>
       ),
@@ -364,8 +368,8 @@ export function AdminPluginsPage() {
       width: 220,
       render: (row) => (
         <div className="min-w-0">
-          <div className="truncate font-medium text-text-primary">{row.name}</div>
-          <div className="mt-0.5 truncate font-mono text-[11px] text-text-tertiary">{row.id}</div>
+          <div className="truncate font-medium text-foreground">{row.name}</div>
+          <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{row.id}</div>
         </div>
       ),
     },
@@ -373,7 +377,7 @@ export function AdminPluginsPage() {
       key: 'vendor',
       title: '厂商',
       width: 120,
-      render: (row) => <span className="text-text-secondary">{row.vendor || '—'}</span>,
+      render: (row) => <span className="text-muted-foreground">{row.vendor || '—'}</span>,
     },
     {
       key: 'version',
@@ -387,8 +391,8 @@ export function AdminPluginsPage() {
       width: 280,
       render: (row) => (
         <div className="min-w-0 text-[11px]">
-          <div className="text-text-secondary">{row.apiFormat || '—'}</div>
-          <div className="truncate font-mono text-text-tertiary" title={row.baseUrl}>
+          <div className="text-muted-foreground">{row.apiFormat || '—'}</div>
+          <div className="truncate font-mono text-muted-foreground" title={row.baseUrl}>
             {row.baseUrl || '—'}
           </div>
         </div>
@@ -400,9 +404,11 @@ export function AdminPluginsPage() {
       width: 200,
       render: (row) =>
         row.protocols.length === 0 ? (
-          <span className="text-text-placeholder">—</span>
+          <span className="text-muted-foreground">—</span>
         ) : (
-          <span className="line-clamp-2 text-[11px] text-text-secondary">{row.protocols.join(' · ')}</span>
+          <span className="line-clamp-2 text-[11px] text-muted-foreground">
+            {row.protocols.join(' · ')}
+          </span>
         ),
     },
     {
@@ -423,22 +429,22 @@ export function AdminPluginsPage() {
       fixed: 'right',
       render: (row) => (
         <div className="flex items-center gap-1">
-          <Button
+          <ActionButton
             variant="ghost"
             size="xs"
             disabled={busy === `catalog:${row.id}`}
             onClick={() => void runCatalogVerify(row)}
           >
             校验
-          </Button>
-          <Button
+          </ActionButton>
+          <ActionButton
             variant="ghost"
             size="xs"
             disabled={!writable || row.installed || busy === `catalog:${row.id}`}
             onClick={() => void runCatalogInstall(row)}
           >
             {row.installed ? '已安装' : '安装'}
-          </Button>
+          </ActionButton>
         </div>
       ),
     },
@@ -452,8 +458,8 @@ export function AdminPluginsPage() {
         actions={
           <>
             {/*
-              文件选择框隐藏在外壳后面：原生 input 无法贴 BoardUI 的按钮样式，
-              而上传动作必须由按钮触发，否则页头会出现一个突兀的浏览器控件。
+              文件选择框隐藏在外壳后面：上传动作必须由按钮触发，否则页头会出现
+              一个突兀的浏览器控件。`data-testid` 是安装流程的 e2e 锚点。
             */}
             <input
               ref={fileInput}
@@ -470,15 +476,15 @@ export function AdminPluginsPage() {
                 setInstallTarget(file);
               }}
             />
-            <Button
+            <ActionButton
               variant="secondary"
-              size="small"
-              leadingIcon={Upload}
+              size="sm"
+              icon={Upload}
               disabled={!writable}
               onClick={() => fileInput.current?.click()}
             >
               上传安装
-            </Button>
+            </ActionButton>
           </>
         }
       />
@@ -519,10 +525,13 @@ export function AdminPluginsPage() {
         note="停用只影响新建调用的协议解析：引用该协议的渠道模型会在调用时失败并退款。"
       >
         {loading && items.length === 0 ? (
-          <AdminListLoading />
+          <div className="flex flex-col gap-2 py-2">
+            <Skeleton rows={4} />
+            <p className="text-center text-xs text-muted-foreground">加载插件清单…</p>
+          </div>
         ) : (
           <>
-            {error && <AdminStaleError error={error} onRetry={() => void reload()} />}
+            {error && <StaleError error={error} onRetry={() => void reload()} />}
             <AdminDataTable<PluginView>
               rows={items}
               columns={columns}
@@ -541,15 +550,15 @@ export function AdminPluginsPage() {
         title="服务商目录"
         note="插件包的上游清单。安装会下载包并走与上传安装同一套校验，成功后立即注册协议。"
         extra={
-          <Button
+          <ActionButton
             variant="secondary"
-            size="small"
-            leadingIcon={RefreshCw}
+            size="sm"
+            icon={RefreshCw}
             disabled={!writable || busy === 'catalog:refresh'}
             onClick={() => void runCatalogRefresh()}
           >
             重新拉取
-          </Button>
+          </ActionButton>
         }
       >
         {catalog.data && !catalog.data.configured ? (
@@ -558,7 +567,9 @@ export function AdminPluginsPage() {
           </Notice>
         ) : (
           <>
-            {catalog.error && <AdminStaleError error={catalog.error} onRetry={() => void catalog.reload()} />}
+            {catalog.error && (
+              <StaleError error={catalog.error} onRetry={() => void catalog.reload()} />
+            )}
             <AdminDataTable<ProviderCatalogEntry>
               rows={catalogItems}
               columns={catalogColumns}
@@ -582,9 +593,9 @@ export function AdminPluginsPage() {
         title={detail ? `${detail.name} · ${detail.id}` : '插件详情'}
         description={detail ? `v${detail.version} · ${detail.vendor || '未知厂商'} · API ${detail.apiVersion}` : undefined}
         footer={
-          <Button variant="secondary" size="small" onClick={() => setDetail(null)}>
+          <ActionButton variant="secondary" size="sm" onClick={() => setDetail(null)}>
             关闭
-          </Button>
+          </ActionButton>
         }
       >
         {detail && (
@@ -613,13 +624,13 @@ export function AdminPluginsPage() {
             )}
 
             {detail.description && (
-              <p className="text-xs leading-5 text-text-secondary">{detail.description}</p>
+              <p className="text-xs leading-5 text-muted-foreground">{detail.description}</p>
             )}
 
             <div>
-              <div className="mb-1 text-xs font-semibold text-text-primary">Provider</div>
+              <div className="mb-1 text-xs font-semibold text-foreground">Provider</div>
               <table className="w-full text-[11px]">
-                <thead className="bg-background-secondary-default text-text-secondary">
+                <thead className="bg-muted text-muted-foreground">
                   <tr>
                     <th className="px-2 py-1.5 text-left">ID</th>
                     <th className="px-2 py-1.5 text-left">名称</th>
@@ -629,7 +640,7 @@ export function AdminPluginsPage() {
                 </thead>
                 <tbody>
                   {detail.providers.map((provider) => (
-                    <tr key={provider.id} className="border-t border-border-table">
+                    <tr key={provider.id} className="border-t border-border">
                       <td className="px-2 py-1.5 font-mono">{provider.id}</td>
                       <td className="px-2 py-1.5">{provider.label}</td>
                       <td className="px-2 py-1.5">{provider.capabilities.join(', ') || '—'}</td>
@@ -647,21 +658,21 @@ export function AdminPluginsPage() {
             </div>
 
             <div>
-              <div className="mb-1 text-xs font-semibold text-text-primary">配置项</div>
+              <div className="mb-1 text-xs font-semibold text-foreground">配置项</div>
               {detail.configuration.length === 0 ? (
-                <p className="text-[11px] text-text-tertiary">该插件没有声明配置项。</p>
+                <p className="text-[11px] text-muted-foreground">该插件没有声明配置项。</p>
               ) : (
                 <ul className="flex flex-col gap-1.5">
                   {detail.configuration.map((field) => (
-                    <li key={field.name} className="rounded-lg border border-border-table px-2.5 py-2 text-[11px]">
+                    <li key={field.name} className="rounded-lg border border-border px-2.5 py-2 text-[11px]">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-mono text-text-primary">{field.name}</span>
-                        <span className="text-text-tertiary">{field.type}</span>
+                        <span className="font-mono text-foreground">{field.name}</span>
+                        <span className="text-muted-foreground">{field.type}</span>
                         {field.required && <StatusTag status="required" tone="warn" label="必填" />}
                         {field.secret && <StatusTag status="secret" tone="muted" label="密钥" />}
                       </div>
-                      {field.label && <div className="mt-0.5 text-text-secondary">{field.label}</div>}
-                      {field.description && <div className="text-text-tertiary">{field.description}</div>}
+                      {field.label && <div className="mt-0.5 text-muted-foreground">{field.label}</div>}
+                      {field.description && <div className="text-muted-foreground">{field.description}</div>}
                     </li>
                   ))}
                 </ul>
@@ -715,14 +726,14 @@ export function AdminPluginsPage() {
         onCancel={() => setToggleTarget(null)}
         onConfirm={() => void runToggle()}
         extra={
-          <Field label="操作原因" hint="写入审计">
-            <TextInput
+          <FormField label="操作原因" hint="写入审计">
+            <TextField
               ariaLabel="操作原因"
               value={toggleReason}
               onChange={setToggleReason}
               placeholder="如：上游维护，临时停用"
             />
-          </Field>
+          </FormField>
         }
       />
 
@@ -739,14 +750,14 @@ export function AdminPluginsPage() {
         onCancel={() => setInstallTarget(null)}
         onConfirm={() => void runInstall()}
         extra={
-          <Field label="操作原因" hint="写入审计">
-            <TextInput
+          <FormField label="操作原因" hint="写入审计">
+            <TextField
               ariaLabel="安装原因"
               value={actionReason}
               onChange={setActionReason}
               placeholder="如：新增 MiniMax 视频厂商"
             />
-          </Field>
+          </FormField>
         }
       />
 
@@ -764,14 +775,14 @@ export function AdminPluginsPage() {
         onCancel={() => setUninstallTarget(null)}
         onConfirm={() => void runUninstall()}
         extra={
-          <Field label="操作原因" hint="写入审计">
-            <TextInput
+          <FormField label="操作原因" hint="写入审计">
+            <TextField
               ariaLabel="卸载原因"
               value={actionReason}
               onChange={setActionReason}
               placeholder="如：厂商已下线，改用新插件包"
             />
-          </Field>
+          </FormField>
         }
       />
     </>

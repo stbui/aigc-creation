@@ -39,7 +39,14 @@ import {
   useResultGallery,
   type GalleryItem,
 } from './hooks';
-import { assetsApi, assetSrc, generateApi, resolveModelId, toAbsoluteUrl } from './api';
+import {
+  assetsApi,
+  assetSrc,
+  generateApi,
+  newIdempotencyKey,
+  resolveModelId,
+  toAbsoluteUrl,
+} from './api';
 import {
   assetThumbUrl,
   isSupportedImageFile,
@@ -118,8 +125,20 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
   const capability = capabilityProp ?? resolveCreationCapability(searchParams.get('capability'));
   const capabilityLabel = CREATION_CAPABILITY_LABELS[capability];
   const fileInputRef = useRef<HTMLInputElement>(null);
-  // 消耗价读后端下发的 creditCost, 不再在本页写死「10 积分」
-  const creditLabel = useCreditLabel(capability);
+  /**
+   * 建单幂等键。请求超时/连接重置但服务端已落单时，用户重试必须复用同一个 key，
+   * 否则同一个提示词会生成两次、扣两次费；拿到 taskId 后清空。
+   */
+  const pendingStartRef = useRef<{ fingerprint: string; key: string } | null>(null);
+  // 消耗价优先用所选模型实时报价，取不到才回落到能力基础价
+  const [modelQuoteCredits, setModelQuoteCredits] = useState<number | null>(null);
+  const baseCreditLabel = useCreditLabel(capability);
+  const creditLabel =
+    modelQuoteCredits == null
+      ? baseCreditLabel
+      : modelQuoteCredits === 0
+        ? '免费'
+        : `本次约 ${modelQuoteCredits} 积分（按所选模型）`;
 
   // ── 表单状态 ──
   const [images, setImages] = useState<PkAsset[]>([]);
@@ -402,7 +421,7 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
     try {
       const projectId = await ensureProject();
       const logicalModelId = await resolveModelId(capability);
-      const { taskId } = await generateApi.start({
+      const payload = {
         projectId,
         capability,
         logicalModelId,
@@ -413,7 +432,15 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
           ratio,
           size: resolution,
         },
-      });
+      };
+      const fingerprint = JSON.stringify(payload);
+      const idempotencyKey =
+        pendingStartRef.current?.fingerprint === fingerprint
+          ? pendingStartRef.current.key
+          : newIdempotencyKey();
+      pendingStartRef.current = { fingerprint, key: idempotencyKey };
+      const { taskId } = await generateApi.start({ ...payload, idempotencyKey });
+      pendingStartRef.current = null;
       const done = await pollTask(taskId);
       setResult(done);
       /*
@@ -429,6 +456,8 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
           {
             id: taskId,
             url: done.url,
+            assetId: done.assetId,
+            format: done.format,
             width: done.width ?? null,
             height: done.height ?? null,
             createdAt: new Date().toISOString(),
@@ -662,7 +691,13 @@ export function CreativeImagePage({ capability: capabilityProp }: { capability?:
                   resolution={resolution}
                   onResolutionChange={setResolution}
                   capabilityId={capability}
-                  modelPicker={<ModelPicker capability={capability} options={{ ratio, resolution }} />}
+                  modelPicker={
+                    <ModelPicker
+                      capability={capability}
+                      options={{ ratio, resolution }}
+                      onQuoteChange={setModelQuoteCredits}
+                    />
+                  }
                   popoverClassName="fc-settings-popover"
                   popoverRole="dialog"
                   popoverAriaLabel="高级设置"

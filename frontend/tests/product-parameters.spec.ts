@@ -82,13 +82,20 @@ async function setup(page: Page, request: APIRequestContext, capability: string)
       body: JSON.stringify({ code: 0, data: [{ id: 'project-e2e', name: '参数测试' }], message: '' }),
     }),
   );
-  await page.route(/\/api\/v1\/tasks(?:\?.*)?$/, (route) =>
-    route.fulfill({
+  // 历史列表走分页接口 `/tasks/page`（旧 `/tasks` 返回整量数组）。
+  // 两个都拦，形状各自对上，避免漏拦时打到真实后端拿回真数据。
+  await page.route(/\/api\/v1\/tasks(?:\/page)?(?:\?.*)?$/, (route) => {
+    const isPaged = route.request().url().includes('/api/v1/tasks/page');
+    return route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ code: 0, data: [], message: '' }),
-    }),
-  );
+      body: JSON.stringify({
+        code: 0,
+        data: isPaged ? { items: [], total: 0, limit: 50, offset: 0 } : [],
+        message: '',
+      }),
+    });
+  });
   await page.route('**/uploads/**', (route) =>
     route.fulfill({ status: 200, contentType: 'image/png', body: SOURCE_PNG }),
   );
@@ -782,36 +789,38 @@ test.describe('8 个工具页参数与结果态', () => {
 
   test('历史结果：支持灯箱预览、复用为当前输入，并清理旧结果态', async ({ page, request }) => {
     const env = await setup(page, request, 'enhance');
-    await page.unroute(/\/api\/v1\/tasks(?:\?.*)?$/);
-    await page.route(/\/api\/v1\/tasks(?:\?.*)?$/, (route) =>
-      route.fulfill({
+    // 历史列表走分页接口 `/tasks/page`（旧 `/tasks` 返回整量数组），两个都拦，
+    // 形状各自对上。
+    const historyTask = {
+      id: 'task-history-e2e',
+      projectId: 'project-e2e',
+      capability: 'enhance',
+      status: 'succeeded',
+      inputAssetIds: ['asset-old'],
+      params: {},
+      createdAt: '2026-10-25T12:00:00.000Z',
+      outputAsset: {
+        id: 'asset-history',
+        sourceUrl: '/uploads/generated/history.png',
+        signedUrl: null,
+        width: 240,
+        height: 160,
+        format: 'image/png',
+      },
+    };
+    await page.unroute(/\/api\/v1\/tasks(?:\/page)?(?:\?.*)?$/);
+    await page.route(/\/api\/v1\/tasks(?:\/page)?(?:\?.*)?$/, (route) => {
+      const isPaged = route.request().url().includes('/api/v1/tasks/page');
+      return route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           code: 0,
-          data: [
-            {
-              id: 'task-history-e2e',
-              projectId: 'project-e2e',
-              capability: 'enhance',
-              status: 'succeeded',
-              inputAssetIds: ['asset-old'],
-              params: {},
-              createdAt: '2026-10-25T12:00:00.000Z',
-              outputAsset: {
-                id: 'asset-history',
-                sourceUrl: '/uploads/generated/history.png',
-                signedUrl: null,
-                width: 240,
-                height: 160,
-                format: 'image/png',
-              },
-            },
-          ],
+          data: isPaged ? { items: [historyTask], total: 1, limit: 50, offset: 0 } : [historyTask],
           message: '',
         }),
-      }),
-    );
+      });
+    });
     await authed(page, '/product-retouch', env.token, env.email);
 
     const pane = page.locator('.redraw-history-pane');
@@ -1057,34 +1066,42 @@ test.describe('移动端布局烟测', () => {
 
   test('局部重绘移动历史抽屉位于共享上下文内，可预览并复用', async ({ page, request }) => {
     const env = await setup(page, request, 'local_redraw');
-    await page.unroute(/\/api\/v1\/tasks(?:\?.*)?$/);
-    await page.route(/\/api\/v1\/tasks(?:\?.*)?$/, (route) =>
-      route.fulfill({
+    const historyTask = {
+      id: 'task-redraw-history',
+      projectId: 'project-e2e',
+      capability: 'local_redraw',
+      status: 'succeeded',
+      createdAt: '2026-10-25T12:00:00.000Z',
+      outputAsset: {
+        id: 'asset-redraw-history',
+        sourceUrl: '/uploads/generated/redraw-history.png',
+        signedUrl: null,
+        width: 240,
+        height: 160,
+        format: 'image/png',
+      },
+    };
+    /*
+     * 历史列表走分页接口 `/tasks/page`，返回信封是 `{items,total,limit,offset}`；
+     * 旧的 `/tasks` 返回整量数组。两个都拦，形状各自对上 ——
+     * 只拦旧的，页面请求 `/tasks/page` 会拿到 setup() 里的空数组，历史抽屉里
+     * 就没有「使用历史结果继续创作」可点。
+     */
+    await page.unroute(/\/api\/v1\/tasks(?:\/page)?(?:\?.*)?$/);
+    await page.route(/\/api\/v1\/tasks(?:\/page)?(?:\?.*)?$/, (route) => {
+      const isPaged = route.request().url().includes('/api/v1/tasks/page');
+      return route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           code: 0,
-          data: [
-            {
-              id: 'task-redraw-history',
-              projectId: 'project-e2e',
-              capability: 'local_redraw',
-              status: 'succeeded',
-              createdAt: '2026-10-25T12:00:00.000Z',
-              outputAsset: {
-                id: 'asset-redraw-history',
-                sourceUrl: '/uploads/generated/redraw-history.png',
-                signedUrl: null,
-                width: 240,
-                height: 160,
-                format: 'image/png',
-              },
-            },
-          ],
+          data: isPaged
+            ? { items: [historyTask], total: 1, limit: 50, offset: 0 }
+            : [historyTask],
           message: '',
         }),
-      }),
-    );
+      });
+    });
     await authed(page, '/local-redraw', env.token, env.email);
 
     await page.locator('.redraw-history-float-toggle').click();

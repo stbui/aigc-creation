@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { App } from 'antd';
 import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ImagePlus, Upload } from 'lucide-react';
 import { mobileUploadApi } from '../lib/api';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import {
   SUPPORTED_IMAGE_ACCEPT,
   SUPPORTED_IMAGE_LABEL,
@@ -65,6 +66,7 @@ interface Picked {
 }
 
 export function MobileUploadPage() {
+  useDocumentMeta('手机上传 · 货觉AI', '扫码后从手机选择图片并回传到电脑端参考图位。');
   const { message } = App.useApp();
   const [params] = useSearchParams();
   const sessionId = params.get('session') ?? '';
@@ -75,15 +77,27 @@ export function MobileUploadPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  /** 当前列表的同步镜像：分两批选图时避免读到陈旧的 picked.length */
+  const pickedRef = useRef<Picked[]>([]);
 
   const missingParams = !sessionId || !token;
 
-  // 卸载时释放 objectURL
+  useEffect(() => {
+    pickedRef.current = picked;
+  }, [picked]);
+
+  /*
+   * 只在**真正卸载**时释放 objectURL。
+   *
+   * 之前依赖 [picked]，每次新增/删除/排序都会先执行 cleanup，把上一轮
+   * 所有 URL 撤销 —— 但旧条目仍留在新数组里继续被 <img> 引用，
+   * 添加第二批图片后前面的预览就会变成破图。
+   */
   useEffect(
     () => () => {
-      for (const p of picked) URL.revokeObjectURL(p.url);
+      for (const p of pickedRef.current) URL.revokeObjectURL(p.url);
     },
-    [picked],
+    [],
   );
 
   /** 选择图片 (可多选) */
@@ -95,8 +109,13 @@ export function MobileUploadPage() {
         setError(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
         return;
       }
-      if (files.length > MAX_FILES) {
-        setError(`一次最多上传 ${MAX_FILES} 张`);
+      const remaining = MAX_FILES - pickedRef.current.length;
+      if (remaining <= 0) {
+        setError(`最多上传 ${MAX_FILES} 张，请先移除部分图片`);
+        return;
+      }
+      if (files.length > remaining) {
+        setError(`最多上传 ${MAX_FILES} 张，本次还可添加 ${remaining} 张`);
         return;
       }
       setError(null);
@@ -124,6 +143,7 @@ export function MobileUploadPage() {
           edge: c.edge,
         });
       }
+      pickedRef.current = [...pickedRef.current, ...results];
       setPicked((prev) => [...prev, ...results]);
       if (compressedCount > 0) {
         setNotice(
@@ -139,7 +159,10 @@ export function MobileUploadPage() {
   const removeAt = (idx: number) => {
     setPicked((prev) => {
       const target = prev[idx];
-      if (target) URL.revokeObjectURL(target.url);
+      if (target) {
+        URL.revokeObjectURL(target.url);
+        pickedRef.current = pickedRef.current.filter((p) => p.url !== target.url);
+      }
       return prev.filter((_, i) => i !== idx);
     });
   };

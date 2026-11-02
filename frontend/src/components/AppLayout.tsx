@@ -295,6 +295,21 @@ export function AppLayout({ groups, items, children }: Props) {
         className="app-mobile-drawer"
         styles={{ body: { padding: 0 } }}
       >
+        {/*
+         * 桌面顶导在 ≤900px 被隐藏；抽屉里的 SideRail 只有工作台/作品/工具，
+         * 首页、购买套餐、邀请有奖会失去入口。这里补齐同一组高频导航。
+         */}
+        <nav className="app-mobile-links" aria-label="快捷导航">
+          <Link to="/" onClick={() => setMobileNavOpen(false)}>
+            首页
+          </Link>
+          <Link to="/packages" onClick={() => setMobileNavOpen(false)}>
+            购买套餐
+          </Link>
+          <Link to="/invitations" onClick={() => setMobileNavOpen(false)}>
+            邀请有奖
+          </Link>
+        </nav>
         <SideRail
           groups={groups}
           items={visibleItems}

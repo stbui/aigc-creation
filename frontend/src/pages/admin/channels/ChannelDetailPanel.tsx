@@ -1,5 +1,5 @@
 import { Copy, Download, Plus, Power, Trash2 } from 'lucide-react';
-import { Button, EmptyState, Panel, StatusTag } from './components';
+import { ActionButton, EmptyState, Panel, StatusTag } from './components';
 import { ChannelModelManager } from './ChannelModelManager';
 import type { AdminChannelView } from '../../../types/model';
 
@@ -10,6 +10,8 @@ interface ChannelDetailPanelProps {
   hasFilters: boolean;
   writable: boolean;
   modelWritable: boolean;
+  /** 是否可发起连通性测试（`channel.test` 权限） */
+  canTest: boolean;
   saving: boolean;
   exporting: boolean;
   pendingModelId: string | null;
@@ -31,6 +33,7 @@ export function ChannelDetailPanel({
   hasFilters,
   writable,
   modelWritable,
+  canTest,
   saving,
   exporting,
   pendingModelId,
@@ -84,58 +87,55 @@ export function ChannelDetailPanel({
           }
           extra={
             <div className="flex items-center gap-1">
-              <Button variant="secondary" size="xs" disabled={!writable} onClick={() => onEdit(selected)}>
+              <ActionButton variant="secondary" size="xs" disabled={!writable} onClick={() => onEdit(selected)}>
                 编辑
-              </Button>
-              {/*
-               * ghost / dangerGhost 自带淡紫底：五个按钮并排会变成一排色块，
-               * 看起来像五个都处于选中态。这里压平底色，只保留文字色与悬停反馈。
-               */}
-              <Button
+              </ActionButton>
+              <ActionButton
                 variant="ghost"
                 size="xs"
-                className="!bg-transparent hover:!bg-background-secondary-default"
-                leadingIcon={Copy}
+                className="hover:bg-muted"
+                icon={Copy}
                 disabled={!writable || saving}
                 onClick={() => onDuplicate(selected)}
               >
                 复制
-              </Button>
-              <Button
+              </ActionButton>
+              <span title="导出该渠道（不含凭证）">
+                <ActionButton
+                  variant="ghost"
+                  size="xs"
+                  className="hover:bg-muted"
+                  icon={Download}
+                  disabled={exporting}
+                  onClick={() => onExport(selected)}
+                >
+                  导出
+                </ActionButton>
+              </span>
+              <ActionButton
                 variant="ghost"
-                size="xs"
-                className="!bg-transparent hover:!bg-background-secondary-default"
-                leadingIcon={Download}
-                disabled={exporting}
-                title="导出该渠道（不含凭证）"
-                onClick={() => onExport(selected)}
-              >
-                导出
-              </Button>
-              <Button
-                variant={selected.enabled ? 'dangerGhost' : 'ghost'}
                 size="xs"
                 className={
                   selected.enabled
-                    ? '!bg-transparent hover:!bg-rose-50'
-                    : '!bg-transparent hover:!bg-background-secondary-default'
+                    ? 'text-danger-text hover:text-danger-text'
+                    : 'hover:bg-muted'
                 }
-                leadingIcon={Power}
+                icon={Power}
                 disabled={!writable || saving}
                 onClick={() => onToggle(selected)}
               >
                 {selected.enabled ? '停用' : '启用'}
-              </Button>
-              <Button
-                variant="dangerGhost"
+              </ActionButton>
+              <ActionButton
+                variant="ghost"
                 size="xs"
-                className="!bg-transparent hover:!bg-rose-50"
-                leadingIcon={Trash2}
+                className="text-danger-text hover:text-danger-text"
+                icon={Trash2}
                 disabled={!writable}
                 onClick={() => onDelete(selected)}
               >
                 删除
-              </Button>
+              </ActionButton>
             </div>
           }
         >
@@ -143,6 +143,7 @@ export function ChannelDetailPanel({
             key={selected.id}
             channel={selected}
             writable={modelWritable}
+            canTest={canTest}
             onChanged={onChanged}
             focusModelId={pendingModelId}
             onFocusConsumed={onFocusConsumed}
@@ -171,9 +172,9 @@ export function ChannelDetailPanel({
             }
             action={
               !hasFilters && !loading && !error ? (
-                <Button variant="primary" size="small" leadingIcon={Plus} disabled={!writable} onClick={onCreate}>
+                <ActionButton variant="default" size="sm" icon={Plus} disabled={!writable} onClick={onCreate}>
                   新建渠道
-                </Button>
+                </ActionButton>
               ) : undefined
             }
           />

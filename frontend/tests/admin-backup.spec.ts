@@ -8,7 +8,7 @@ import { ensureAdminLogin } from './support/admin-login';
  * 重点守住 B-97 的核心约束: **未通过恢复验证的备份不可下载** ——
  * 这条如果失效, 运维会在事故时拿到一份损坏的备份却毫不知情。
  *
- * ## 选择器约定（2026-10-30 换 BoardUI 后）
+ * ## 选择器约定（2026-10-30 后台改版后）
  *
  * 列表行 `data-testid="admin-table-row"`，行内展开 `data-testid="admin-table-expanded"`，
  * 页面内确认条 `data-testid="admin-confirm-action"`，侧栏 `data-testid="admin-sider"`。

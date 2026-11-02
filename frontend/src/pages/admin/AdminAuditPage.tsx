@@ -1,30 +1,31 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Download } from 'lucide-react';
-import { Button } from '../../admin-ui/shadcn/kit';
+
 import { adminAuditApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
-import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
-import { SelectBox, TextInput } from '../../admin-ui/controls';
 import {
-  AdminStaleError,
-  useAdminList,
-  useAdminUrlFilterSync,
-} from '../../components/admin/AdminWidgets';
-import {
+  ActionButton,
+  AdminDataTable,
   AppliedFilters,
+  ClearableField,
   FilterActions,
   FilterBar,
   PageHeader,
   Panel,
+  SelectField,
   StatusTag,
+  StaleError,
+  useAdminList,
+  useAdminUrlFilterSync,
+  type AdminColumn,
   type AppliedFilter,
-} from '../../components/admin/PageHeader';
+} from '../../admin-ui/primitives';
 import type { AdminAuditListResult } from '../../types/api';
 
 /**
- * 操作审计（BoardUI）。
+ * 操作审计。
  *
  * 页面职责不变：只读，记录后台全部写操作，用于事后追责与举证。
  * 本次改造只换渲染层 —— 筛选条件、URL 同步、导出、行内展开的行为逐条保留：
@@ -101,8 +102,8 @@ function AuditExpandedDetail({ row }: { row: Row }) {
     <div className="flex flex-col gap-3">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className="text-xs font-semibold text-text-primary">审计详情</div>
-          <div className="mt-0.5 text-[11px] text-text-tertiary">
+          <div className="text-xs font-semibold text-foreground">审计详情</div>
+          <div className="mt-0.5 text-[11px] text-muted-foreground">
             记录只追加，不支持修改或删除
           </div>
         </div>
@@ -116,7 +117,7 @@ function AuditExpandedDetail({ row }: { row: Row }) {
         <Field label="时间">{new Date(row.createdAt).toLocaleString('zh-CN')}</Field>
         <Field label="操作人">
           {row.actorEmail}
-          <span className="ml-1.5 text-text-tertiary">{row.actorRole}</span>
+          <span className="ml-1.5 text-muted-foreground">{row.actorRole}</span>
         </Field>
         <Field label="动作">{ACTION_LABELS[row.action] ?? row.action}</Field>
         <Field label="对象">
@@ -132,8 +133,8 @@ function AuditExpandedDetail({ row }: { row: Row }) {
 
       {row.reason && (
         <div>
-          <div className="mb-1 text-[11px] text-text-tertiary">操作原因</div>
-          <div className="rounded-lg border border-border-table bg-amber-50/60 px-2.5 py-2 text-xs text-text-primary">
+          <div className="mb-1 text-[11px] text-muted-foreground">操作原因</div>
+          <div className="rounded-lg border border-border bg-warn-soft px-2.5 py-2 text-xs text-foreground">
             {row.reason}
           </div>
         </div>
@@ -141,30 +142,30 @@ function AuditExpandedDetail({ row }: { row: Row }) {
 
       <div>
         <div className="mb-1 flex items-baseline gap-2">
-          <span className="text-[11px] text-text-tertiary">变更内容</span>
-          <span className="text-[11px] text-text-placeholder">
+          <span className="text-[11px] text-muted-foreground">变更内容</span>
+          <span className="text-[11px] text-muted-foreground">
             仅记录白名单字段，密码与凭据类内容不写入审计
           </span>
         </div>
         {detailEntries.length === 0 ? (
-          <div className="text-xs text-text-tertiary">本条操作没有可展示的变更字段。</div>
+          <div className="text-xs text-muted-foreground">本条操作没有可展示的变更字段。</div>
         ) : (
           <table className="w-auto border-collapse text-xs">
             <thead>
-              <tr className="border-b border-border-table bg-background-secondary-default/60">
-                <th scope="col" className="px-2 py-1 text-left font-medium text-text-secondary">
+              <tr className="border-b border-border bg-muted/60">
+                <th scope="col" className="px-2 py-1 text-left font-medium text-muted-foreground">
                   字段
                 </th>
-                <th scope="col" className="px-2 py-1 text-left font-medium text-text-secondary">
+                <th scope="col" className="px-2 py-1 text-left font-medium text-muted-foreground">
                   值
                 </th>
               </tr>
             </thead>
             <tbody>
               {detailEntries.map(([key, value]) => (
-                <tr key={key} className="border-b border-border-table/70">
-                  <td className="px-2 py-1 align-top text-text-secondary">{key}</td>
-                  <td className="px-2 py-1 align-top text-text-primary">
+                <tr key={key} className="border-b border-border/70">
+                  <td className="px-2 py-1 align-top text-muted-foreground">{key}</td>
+                  <td className="px-2 py-1 align-top text-foreground">
                     {typeof value === 'object' ? JSON.stringify(value) : String(value)}
                   </td>
                 </tr>
@@ -180,8 +181,8 @@ function AuditExpandedDetail({ row }: { row: Row }) {
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] text-text-tertiary">{label}</dt>
-      <dd className="truncate text-xs text-text-primary" title={typeof children === 'string' ? children : undefined}>
+      <dt className="text-[11px] text-muted-foreground">{label}</dt>
+      <dd className="truncate text-xs text-foreground" title={typeof children === 'string' ? children : undefined}>
         {children}
       </dd>
     </div>
@@ -189,7 +190,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function Mono({ children }: { children: ReactNode }) {
-  return <code className="font-mono text-[11px] text-text-secondary">{children}</code>;
+  return <code className="font-mono text-[11px] text-muted-foreground">{children}</code>;
 }
 
 export function AdminAuditPage() {
@@ -274,7 +275,7 @@ export function AdminAuditPage() {
         render: (row) => (
           <div>
             <div>{row.actorEmail}</div>
-            <div className="text-[11px] text-text-tertiary">{row.actorRole}</div>
+            <div className="text-[11px] text-muted-foreground">{row.actorRole}</div>
           </div>
         ),
       },
@@ -323,14 +324,14 @@ export function AdminAuditPage() {
         title: '',
         width: 76,
         render: (row) => (
-          <Button
+          <ActionButton
             variant="ghost"
-            size="small"
+            size="sm"
             aria-expanded={expandedId === row.id}
             onClick={() => setExpandedId(expandedId === row.id ? null : row.id)}
           >
             {expandedId === row.id ? '收起' : '详情'}
-          </Button>
+          </ActionButton>
         ),
       },
     ],
@@ -417,26 +418,25 @@ export function AdminAuditPage() {
         description="记录所有后台写操作，用于事后追责与举证。只读，不可删除或修改。"
         actions={
           can('data.export') ? (
-            <Button
+            <ActionButton
               variant="secondary"
-              size="small"
-              leadingIcon={Download}
+              size="sm"
+              icon={Download}
               disabled={exporting}
               onClick={() => void exportCsv()}
             >
               {exporting ? '导出中…' : '导出 CSV'}
-            </Button>
+            </ActionButton>
           ) : undefined
         }
       />
 
       <FilterBar>
         {/*
-         * 动作下拉不再带搜索框（BoardUI 的 Select 是 React Aria 组合件，没有
-         * ComboBox 变体）。动作总数取自后端聚合，量级在十几条；RAC 的 ListBox
-         * 自带首字母跳转，键盘仍然可用，因此不再自造搜索框。
+         * 动作下拉不做搜索框：动作总数取自后端聚合，量级在十几条，
+         * radix Select 自带键盘首字母跳转，再加搜索框只是多一层操作。
          */}
-        <SelectBox
+        <SelectField
           className="w-48"
           ariaLabel="按动作筛选"
           placeholder="动作"
@@ -445,15 +445,14 @@ export function AdminAuditPage() {
           onChange={setAction}
           allowClear
         />
-        <TextInput
+        <ClearableField
           className="w-48"
           placeholder="对象 ID"
           value={targetId}
           onChange={setTargetId}
           onEnter={applyFilters}
-          allowClear
         />
-        <SelectBox
+        <SelectField
           className="w-28"
           ariaLabel="按结果筛选"
           placeholder="结果"
@@ -466,18 +465,18 @@ export function AdminAuditPage() {
           allowClear
         />
         <FilterActions>
-          <Button variant="primary" size="small" onClick={applyFilters}>
+          <ActionButton variant="default" size="sm" onClick={applyFilters}>
             查询
-          </Button>
-          <Button variant="secondary" size="small" onClick={resetFilters}>
+          </ActionButton>
+          <ActionButton variant="secondary" size="sm" onClick={resetFilters}>
             重置
-          </Button>
+          </ActionButton>
         </FilterActions>
         <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
       </FilterBar>
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
-      {error && data && <AdminStaleError error={error} onRetry={reload} />}
+      {error && data && <StaleError error={error} onRetry={reload} />}
 
       <Panel>
         <AdminDataTable<Row>
@@ -495,9 +494,9 @@ export function AdminAuditPage() {
           }
           emptyAction={
             hasFilter ? (
-              <Button variant="secondary" size="small" onClick={resetFilters}>
+              <ActionButton variant="secondary" size="sm" onClick={resetFilters}>
                 清除筛选
-              </Button>
+              </ActionButton>
             ) : undefined
           }
           expandedKeys={expandedId ? [expandedId] : []}

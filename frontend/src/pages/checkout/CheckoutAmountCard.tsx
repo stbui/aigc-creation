@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import type { MarketingQuote, MembershipPlan, Order, PaymentIntent } from '../../types/api';
 import { COUPON_MAX_LENGTH, IS_PROD } from './constants';
 import { formatYuan } from './utils';
@@ -20,10 +21,12 @@ export function CheckoutAmountCard({
   onCouponChange,
   subtotalCents,
   payAmount,
-  discount,
+  memberDiscountCents,
+  couponDiscountCents,
   qrDataUrl,
   paying,
   error,
+  payBlockedReason,
   onlineIntent,
   onPayOnline,
   onCancelQr,
@@ -37,10 +40,15 @@ export function CheckoutAmountCard({
   onCouponChange: (value: string) => void;
   subtotalCents: number;
   payAmount: number;
-  discount: number;
+  /** 会员加油包折扣 */
+  memberDiscountCents: number;
+  /** 券 / 活动优惠 */
+  couponDiscountCents: number;
   qrDataUrl: string | null;
   paying: boolean;
   error: string | null;
+  /** 非空表示当前订单不可支付（已支付 / 已取消 / 已过期） */
+  payBlockedReason: string | null;
   onlineIntent: PaymentIntent | null;
   onPayOnline: () => void;
   onCancelQr: () => void;
@@ -110,10 +118,15 @@ export function CheckoutAmountCard({
           <span>应付金额</span>
           <strong>{payAmount <= 0 ? '免费' : formatYuan(payAmount)}</strong>
         </div>
-        {discount > 0 && (
+        {(memberDiscountCents > 0 || couponDiscountCents > 0) && (
           <div className="co-sub">
             <span>原价 {formatYuan(subtotalCents)}</span>
-            <span>已优惠 -{formatYuan(discount)}</span>
+            {memberDiscountCents > 0 && (
+              <span>会员优惠 -{formatYuan(memberDiscountCents)}</span>
+            )}
+            {couponDiscountCents > 0 && (
+              <span>券/活动优惠 -{formatYuan(couponDiscountCents)}</span>
+            )}
           </div>
         )}
 
@@ -121,10 +134,19 @@ export function CheckoutAmountCard({
           二维码态: 微信 Native 支付。轮询在页面的 startPolling 里, 到账后自动跳结果页 ——
           用户扫完码不需要再点任何按钮。
         */}
-        {qrDataUrl ? (
+        {payBlockedReason ? (
+          <div className="co-blocked">
+            <p className="co-hint is-error" role="status">
+              {payBlockedReason}
+            </p>
+            <Link className="co-btn" to="/packages">
+              返回积分商城
+            </Link>
+          </div>
+        ) : qrDataUrl ? (
           <div className="co-qr">
-            <img src={qrDataUrl} alt="微信支付二维码" width={210} height={210} />
-            <p className="co-hint">请使用微信扫码支付，完成后本页会自动刷新结果</p>
+            <img src={qrDataUrl} alt="支付二维码" width={210} height={210} />
+            <p className="co-hint">请使用对应渠道扫码支付，完成后本页会自动刷新结果</p>
             <button type="button" className="co-btn" onClick={onCancelQr}>
               取消扫码
             </button>
@@ -143,7 +165,7 @@ export function CheckoutAmountCard({
          * 本身已按 404 处理 (见 OrderService.sandboxPay), 继续渲染按钮
          * 只会让用户点到一个「订单不存在」。
          */}
-        {!IS_PROD && (!onlineIntent || onlineIntent.sandbox) && (
+        {!payBlockedReason && !IS_PROD && (!onlineIntent || onlineIntent.sandbox) && (
           <div className="co-sandbox">
             <span className="co-sandbox-label">沙箱联调</span>
             <div className="co-sandbox-actions">

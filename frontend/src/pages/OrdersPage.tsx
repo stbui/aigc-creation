@@ -5,6 +5,7 @@ import { ShoppingBag } from 'lucide-react';
 import { ordersApi, invoicesApi, paymentsApi } from '../lib/api';
 import { notifyCreditsChanged } from '../context/CreditsContext';
 import { useAuth } from '../context/AuthContext';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { PersonalPage } from '../components/PersonalPage';
 import { StateButton, StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
 import type { Invoice, Order, OrderStatus } from '../types/api';
@@ -16,9 +17,12 @@ import type { Invoice, Order, OrderStatus } from '../types/api';
  * (后端 ORDER_TTL_MINUTES), 订单列表是用户回来继续付款的唯一入口 ——
  * 用户离开结算页再回来时, 不该只能重新下单。
  *
- * 列表按状态切片在客户端完成: 订单接口一次返回全部, 切档位不再请求 ——
- * 与工单页同一套筛选交互, 计数直接来自已加载数据, 不伪造。
+ * 列表由服务端分页（limit/offset + total）。状态筛选在当前已加载页上切片，
+ * 「加载更多」会继续取下一页；筛选标签上的数量来自后端 statusCounts，
+ * 不再是“已加载这 20 条里有多少”的误导性数字。
  */
+
+const PAGE_SIZE = 20;
 
 const STATUS_LABEL: Record<OrderStatus, string> = {
   pending: '待支付',
@@ -69,12 +73,18 @@ function canPay(o: Order): boolean {
 }
 
 export function OrdersPage() {
+  useDocumentMeta('我的订单 · 货觉AI', '查看订单、支付记录与开票进度。');
   const navigate = useNavigate();
   const { modal, message } = App.useApp();
   const { token, openLogin } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
+  const [total, setTotal] = useState(0);
+  const [statusCounts, setStatusCounts] = useState<Partial<Record<OrderStatus, number>>>({});
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** 已加载条数（同步镜像，加载更多时作为 offset，避免闭包读到旧 state） */
+  const loadedCountRef = useRef(0);
 
   /** 已存在的发票按 orderId 索引 —— 一单一票, 后端 orderId 唯一 */
   const [invoices, setInvoices] = useState<Record<string, Invoice>>({});
@@ -100,24 +110,38 @@ export function OrdersPage() {
    * 这两处若也走 loading 态，整页会在每次切换标签时闪一次骨架屏 ——
    * 用户只是切出去看了一眼支付渠道，回来列表被清空重画。
    */
-  const load = useCallback(async (opts?: { silent?: boolean }) => {
+  const load = useCallback(async (opts?: { silent?: boolean; append?: boolean }) => {
     // guest 不发请求: 订单接口要鉴权, 发了只会连着 401 又被渲染成「加载失败」。
     // 刻意不动 loading: 登录后下一帧直接是骨架屏, 不会先闪一下「还没有订单」
     if (!token) {
       setOrders([]);
+      setTotal(0);
+      setStatusCounts({});
+      loadedCountRef.current = 0;
       setInvoices({});
       return;
     }
-    if (!opts?.silent) setLoading(true);
+    const append = Boolean(opts?.append);
+    const offset = append ? loadedCountRef.current : 0;
+    /*
+     * 静默刷新（切回标签页 / 支付轮询）要保留用户已经加载的页数，
+     * 否则会把“加载更多”拉出来的历史订单又缩回第一页。
+     */
+    const limit = append ? PAGE_SIZE : Math.max(PAGE_SIZE, loadedCountRef.current);
+    if (append) setLoadingMore(true);
+    else if (!opts?.silent) setLoading(true);
     setError(null);
     try {
-      const list = await ordersApi.list();
-      setOrders(list);
+      const res = await ordersApi.list({ limit, offset });
+      setOrders((prev) => (append ? [...prev, ...res.items] : res.items));
+      loadedCountRef.current = offset + res.items.length;
+      setTotal(res.total);
+      setStatusCounts(res.statusCounts ?? {});
       // 发票只做展示用: 拉取失败不应该让整页报错 (订单才是主体)
       try {
-        const res = await invoicesApi.list();
+        const invoiceRes = await invoicesApi.list();
         const map: Record<string, Invoice> = {};
-        for (const inv of res.items) map[inv.orderId] = inv;
+        for (const inv of invoiceRes.items) map[inv.orderId] = inv;
         setInvoices(map);
       } catch {
         /* 忽略 */
@@ -126,6 +150,7 @@ export function OrdersPage() {
       setError((e as Error).message || '订单加载失败');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [token]);
 
@@ -196,13 +221,23 @@ export function OrdersPage() {
     };
   }, [load]);
 
-  /** 各状态计数: 直接来自已加载列表, 与卡片上的状态一一对应 */
+  /**
+   * 各状态计数来自后端 statusCounts（全量真实数量），
+   * 不是对当前已加载页做本地统计 —— 后者会随着分页把数量越报越少。
+   */
   const counts = useMemo(() => {
-    // 计数复用 matchesFilter, 保证「标签上的数字」与「点进去看到的卡片数」永远一致
     const acc = {} as Record<FilterValue, number>;
-    for (const f of FILTERS) acc[f.value] = orders.filter((o) => matchesFilter(o, f.value)).length;
+    for (const f of FILTERS) {
+      if (f.value === 'all') {
+        acc[f.value] = total;
+      } else if (f.value === 'refund') {
+        acc[f.value] = (statusCounts.refunded ?? 0) + (statusCounts.partial_refunded ?? 0);
+      } else {
+        acc[f.value] = statusCounts[f.value] ?? 0;
+      }
+    }
     return acc;
-  }, [orders]);
+  }, [statusCounts, total]);
 
   const visibleOrders = useMemo(
     () => (filter === 'all' ? orders : orders.filter((o) => matchesFilter(o, filter))),
@@ -585,6 +620,14 @@ export function OrdersPage() {
           </article>
         );
       })}
+
+      {!loading && !error && orders.length > 0 && orders.length < total && (
+        <div className="order-load-more">
+          <Button loading={loadingMore} onClick={() => void load({ append: true })}>
+            加载更多订单（已加载 {orders.length} / {total}）
+          </Button>
+        </div>
+      )}
     </PersonalPage>
   );
 }

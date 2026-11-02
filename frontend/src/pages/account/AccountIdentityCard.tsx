@@ -103,7 +103,7 @@ export function AccountIdentityCard({
           <span className="account-field-label">手机号</span>
           <div className="account-field-value">
             <span className="account-field-text">{profile?.phone ?? '未绑定'}</span>
-            <span className="account-hint">绑定与更换需短信验证，请前往登录页使用短信登录后绑定</span>
+            <span className="account-hint">暂不支持自助绑定/更换；如需协助请联系客服</span>
           </div>
         </div>
       </div>

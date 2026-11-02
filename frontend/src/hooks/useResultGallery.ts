@@ -92,6 +92,13 @@ export function useResultGallery({ capability, token, captionOf, includeFailed =
   const [error, setError] = useState<string | null>(null);
   /** 上一次成功拉取到的生成中任务数: 轮询遇到网络抖动时据此继续, 不把占位卡卡死 */
   const activeRef = useRef(0);
+  /** 请求序号：切换筛选/登出/重拉后，旧请求返回不得再写状态 */
+  const loadSeqRef = useRef(0);
+  /** 发起请求时的 token；响应回来时与当前 token 不一致则丢弃（跨账号串号） */
+  const tokenRef = useRef(token);
+  useEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
 
   // captionOf 通常是内联箭头函数, 每次渲染都是新引用; 放进依赖会让 load 反复重建并重拉列表
   const captionRef = useRef(captionOf);
@@ -100,6 +107,7 @@ export function useResultGallery({ capability, token, captionOf, includeFailed =
   }, [captionOf]);
 
   const load = useCallback(async (silent = false): Promise<number> => {
+    const seq = ++loadSeqRef.current;
     if (!token) {
       setItems([]);
       setError(null);
@@ -107,7 +115,20 @@ export function useResultGallery({ capability, token, captionOf, includeFailed =
     }
     if (!silent) setLoading(true);
     try {
-      const tasks = await generateApi.list();
+      const requestToken = token;
+      /*
+       * 结果栏只关心当前能力，交给服务端按 capability 过滤并限制 100 条。
+       * 之前拉全量任务再在前端 filter，用户任务多时每次轮询都要传整张表。
+       */
+      const page = await generateApi.listPage({ capability, limit: 100, offset: 0 });
+      const tasks = page.items;
+      /*
+       * 用户可能在请求期间登出 / 切号 / 重新拉取。旧响应如果直接 setItems,
+       * 会把上一账号的作品写进新会话；序号与 token 双校验兜住。
+       */
+      if (seq !== loadSeqRef.current || tokenRef.current !== requestToken) {
+        return activeRef.current;
+      }
       const next: GalleryItem[] = [];
       for (const t of tasks) {
         if (t.capability !== capability) continue;
@@ -147,12 +168,14 @@ export function useResultGallery({ capability, token, captionOf, includeFailed =
       activeRef.current = active;
       return active;
     } catch (e) {
+      // 旧请求的失败不覆盖新一轮的状态
+      if (seq !== loadSeqRef.current) return activeRef.current;
       // 保留上一次结果: 刷新失败不该把已看到的图清空
       setError((e as Error).message || '历史生成图加载失败');
       return activeRef.current;
     } finally {
       // 静默轮询不置 true, 但首次静默加载要把初始的 true 收掉
-      setLoading(false);
+      if (seq === loadSeqRef.current) setLoading(false);
     }
   }, [capability, token, includeFailed]);
 

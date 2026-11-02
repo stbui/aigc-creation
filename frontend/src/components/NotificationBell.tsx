@@ -4,6 +4,7 @@ import { Bell, CheckCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { notificationsApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { safeInternalPath } from '../lib/safePath';
 import type { NotificationItem } from '../types/api';
 
 /**
@@ -50,7 +51,16 @@ export function NotificationBell() {
     }
     void load(false);
     const timer = window.setInterval(() => void load(false), 60_000);
-    return () => window.clearInterval(timer);
+    /*
+     * 账户页 / 其它入口标记已读后广播该事件。没有它, 铃铛只能等下一轮
+     * 60s 轮询才更新, 用户会以为“全部已读”没生效。
+     */
+    const onChanged = () => void load(false);
+    window.addEventListener('notifications:changed', onChanged);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('notifications:changed', onChanged);
+    };
   }, [token, load]);
 
   if (!token) return null;
@@ -76,7 +86,12 @@ export function NotificationBell() {
       }
     }
     setOpen(false);
-    if (n.link) navigate(n.link);
+    if (n.link) {
+      // 服务端下发的 link 也当作不可信输入：只允许站内绝对路径，
+      // 非法值直接忽略（停留在当前页），与 PromoBar 的口径一致。
+      const target = safeInternalPath(n.link, '');
+      if (target) navigate(target);
+    }
   };
 
   const content = (

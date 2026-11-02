@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { modelsApi } from '../lib/api';
 import { toCredits } from '../lib/microcredits';
 import { loadModels, modelsForCapability, type PublicLogicalModel } from '../lib/models';
@@ -30,6 +30,13 @@ export interface ModelPickerProps {
    * 让「换模型 = 换价」在点提交前就看见。
    */
   options?: Record<string, unknown>;
+  /**
+   * 实时报价（单次/单张，积分）。null = 未取到报价。
+   *
+   * 页面提交按钮的价签应优先用这份报价，而不是能力清单里的基础价 ——
+   * 用户选了更贵的模型时，两个数字并存会直接造成“按钮一个价、实际扣另一个价”。
+   */
+  onQuoteChange?: (credits: number | null) => void;
   className?: string;
 }
 
@@ -40,11 +47,21 @@ function priceText(model: PublicLogicalModel): string {
   return '按渠道价格档';
 }
 
-export function ModelPicker({ capability, options, className }: ModelPickerProps) {
+export function ModelPicker({
+  capability,
+  options,
+  onQuoteChange,
+  className,
+}: ModelPickerProps) {
   const [models, setModels] = useState<PublicLogicalModel[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
   const [quote, setQuote] = useState<ModelQuoteView | null>(null);
   const [quoteFailed, setQuoteFailed] = useState(false);
+  // 回调通常是内联 setState，用 ref 避免它进入报价 effect 依赖导致重复请求
+  const onQuoteChangeRef = useRef(onQuoteChange);
+  useEffect(() => {
+    onQuoteChangeRef.current = onQuoteChange;
+  }, [onQuoteChange]);
 
   const candidates = useMemo(() => modelsForCapability(capability, models), [capability, models]);
 
@@ -97,6 +114,7 @@ export function ModelPicker({ capability, options, className }: ModelPickerProps
   useEffect(() => {
     if (!selectedId || !options) {
       setQuote(null);
+      onQuoteChangeRef.current?.(null);
       return;
     }
     let alive = true;
@@ -105,12 +123,20 @@ export function ModelPicker({ capability, options, className }: ModelPickerProps
       modelsApi
         .quote(selectedId, { capability, options })
         .then((result) => {
-          if (alive) setQuote(result.quote);
+          if (alive) {
+            setQuote(result.quote);
+            onQuoteChangeRef.current?.(
+              result.quote.amountMicrocredits === null
+                ? null
+                : Number(toCredits(result.quote.amountMicrocredits)),
+            );
+          }
         })
         .catch(() => {
           if (alive) {
             setQuote(null);
             setQuoteFailed(true);
+            onQuoteChangeRef.current?.(null);
           }
         });
     }, 400);

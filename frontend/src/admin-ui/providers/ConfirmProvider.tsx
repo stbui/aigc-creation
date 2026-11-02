@@ -8,7 +8,9 @@ import {
   type ReactNode,
 } from 'react';
 import { AlertTriangle } from 'lucide-react';
-import { Button } from '../shadcn/kit';
+
+import { cn } from '../lib/cn';
+import { Button } from '../components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -16,21 +18,19 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  Textarea,
-} from '../components/ui';
-import { cn } from '../lib/cn';
+} from '../components/ui/dialog';
+import { Textarea } from '../components/ui/textarea';
 
 /**
  * 二次确认。
  *
  * 后台的高危动作（退款 / 删除 / 重置密码 / 调整积分）都必须先说明后果再执行，
- * 其中一部分还要求填写原因并落审计。这套语义原先由 antd `Modal.confirm`
- * 与页面内的 `<ConfirmAction>` 承担；换掉 antd 后统一收敛到 `useConfirm()`。
+ * 其中一部分还要求填写原因并落审计。
  *
  * 返回值约定：
  * - `null`  → 用户取消；
  * - `''`    → 用户确认且该动作不需要原因；
- * - `'…'`   → 用户确认并填写的原因（需要原因时不会空串返回）。
+ * - `'…'`   → 用户确认并填写的原因（需要原因时不会返回空串）。
  */
 export interface ConfirmOptions {
   title: string;
@@ -150,7 +150,7 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             <Button variant="secondary" onClick={() => close(null)}>
               {pending?.options.cancelText ?? '取消'}
             </Button>
-            <Button variant={pending?.options.danger ? 'danger' : 'primary'} onClick={submit}>
+            <Button variant={pending?.options.danger ? 'destructive' : 'default'} onClick={submit}>
               {pending?.options.confirmText ?? '确认'}
             </Button>
           </DialogFooter>
@@ -169,9 +169,8 @@ export function useConfirm(): ConfirmFn {
 /**
  * 可选版本：不在 `ConfirmProvider` 内时返回 `null`。
  *
- * 给共享 hook 用 —— `hooks/useUnsavedGuard` 的丢弃确认既要服务已切到
- * BoardUI 的页面，也不能在没挂 Provider 的环境里抛错（那样连「有没有改过」
- * 都问不出来，会直接白屏）。
+ * 给共享 hook 用 —— 丢弃未保存变更的确认既要服务后台页面，也不能在没挂
+ * Provider 的环境里抛错（那样连「有没有改过」都问不出来，会直接白屏）。
  */
 export function useOptionalConfirm(): ConfirmFn | null {
   return useContext(ConfirmContext);

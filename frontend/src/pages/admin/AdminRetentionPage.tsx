@@ -1,19 +1,24 @@
 import { useEffect, useState } from 'react';
 import { ShieldAlert } from 'lucide-react';
-import { Button } from '../../admin-ui/shadcn/kit';
 import { adminRetentionApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
-import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
-import { Notice } from '../../admin-ui/primitives';
-import { NumberInput, TextInput } from '../../admin-ui/controls';
 import {
-  AdminStaleError,
+  ActionButton,
+  AdminDataTable,
   ConfirmAction,
+  NumberField,
+  Notice,
+  PageHeader,
+  Panel,
+  StatCard,
+  StatusTag,
+  StaleError,
+  TextField,
   useAdminResource,
-} from '../../components/admin/AdminWidgets';
-import { PageHeader, Panel, StatCard, StatusTag } from '../../components/admin/PageHeader';
+  type AdminColumn,
+} from '../../admin-ui/primitives';
 import type { AdminCleanupLog, AdminRetentionTarget } from '../../types/api';
 
 /**
@@ -119,14 +124,14 @@ export function AdminRetentionPage() {
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           <span>{row.label}</span>
-          <code className="font-mono text-[11px] text-text-tertiary">{row.table}</code>
+          <code className="font-mono text-[11px] text-muted-foreground">{row.table}</code>
         </div>
       ),
     },
     {
       key: 'note',
       title: '说明',
-      render: (row) => <span className="text-[11px] text-text-tertiary">{row.note}</span>,
+      render: (row) => <span className="text-[11px] text-muted-foreground">{row.note}</span>,
     },
     {
       key: 'total',
@@ -140,7 +145,7 @@ export function AdminRetentionPage() {
       title: '保留天数',
       width: 120,
       render: (row) => (
-        <NumberInput
+        <NumberField
           ariaLabel={`${row.label}保留天数`}
           className="w-[90px]"
           value={days[row.table] ?? row.retentionDays}
@@ -161,13 +166,13 @@ export function AdminRetentionPage() {
           <div className="flex flex-col gap-0.5">
             <span
               className={
-                row.expiring > 0 ? 'tabular-nums font-medium text-rose-600' : 'tabular-nums'
+                row.expiring > 0 ? 'tabular-nums font-medium text-danger-text' : 'tabular-nums'
               }
             >
               {row.expiring} 条
             </span>
             {dirty && (
-              <span className="text-[11px] text-text-tertiary">按 {row.retentionDays} 天估算，已改动</span>
+              <span className="text-[11px] text-muted-foreground">按 {row.retentionDays} 天估算，已改动</span>
             )}
           </div>
         );
@@ -177,7 +182,7 @@ export function AdminRetentionPage() {
       key: 'oldestAt',
       title: '最早记录',
       width: 170,
-      render: (row) => <span className="text-[11px] text-text-tertiary">{fmtTime(row.oldestAt)}</span>,
+      render: (row) => <span className="text-[11px] text-muted-foreground">{fmtTime(row.oldestAt)}</span>,
     },
     {
       key: 'ops',
@@ -186,9 +191,9 @@ export function AdminRetentionPage() {
       fixed: 'right',
       render: (row) =>
         writable ? (
-          <Button variant="ghost" size="small" onClick={() => openCleanup(row)}>
+          <ActionButton variant="ghost" size="sm" onClick={() => openCleanup(row)}>
             清理
-          </Button>
+          </ActionButton>
         ) : null,
     },
   ];
@@ -205,7 +210,7 @@ export function AdminRetentionPage() {
       title: '目标',
       width: 150,
       render: (row) => (
-        <span className="text-[11px] text-text-tertiary">{TARGET_LABELS[row.target] ?? row.target}</span>
+        <span className="text-[11px] text-muted-foreground">{TARGET_LABELS[row.target] ?? row.target}</span>
       ),
     },
     {
@@ -233,7 +238,7 @@ export function AdminRetentionPage() {
       key: 'msg',
       title: '说明',
       render: (row) => (
-        <span className="text-[11px] text-text-tertiary">{row.errorMessage ?? '—'}</span>
+        <span className="text-[11px] text-muted-foreground">{row.errorMessage ?? '—'}</span>
       ),
     },
   ];
@@ -256,16 +261,16 @@ export function AdminRetentionPage() {
         />
       </div>
 
-      {error && data && <AdminStaleError error={error} onRetry={() => void reload()} />}
+      {error && data && <StaleError error={error} onRetry={() => void reload()} />}
 
       <Panel
         title="清理目标"
         note="每次清理都写入清理日志与操作审计"
         extra={
           writable && dirtyCount > 0 ? (
-            <Button variant="ghost" size="small" onClick={() => setDays({ ...daysBase })}>
+            <ActionButton variant="ghost" size="sm" onClick={() => setDays({ ...daysBase })}>
               放弃 {dirtyCount} 项改动
-            </Button>
+            </ActionButton>
           ) : undefined
         }
       >
@@ -302,8 +307,6 @@ export function AdminRetentionPage() {
           title={`清理${pending.label}`}
           confirmText="确认清理"
           danger
-          requireTyping
-          typingText={pending.table}
           loading={busy}
           onCancel={() => setPending(null)}
           onConfirm={() => void runCleanup()}
@@ -320,8 +323,8 @@ export function AdminRetentionPage() {
           ]}
           extra={
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-text-secondary">清理原因（强制，写入审计）：</label>
-              <TextInput
+              <label className="text-xs text-muted-foreground">清理原因（强制，写入审计）：</label>
+              <TextField
                 ariaLabel="清理原因"
                 value={reason}
                 onChange={setReason}

@@ -1,36 +1,42 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Download, Upload } from 'lucide-react';
-import { Button, Pagination } from '../../admin-ui/shadcn/kit';
 import { adminCreditsApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
 import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import { adminOrderHref, adminTasksHref, adminUserDetailHref } from '../../lib/admin-links';
 import {
-  AdminListError,
-  AdminListLoading,
-  AdminStaleError,
+  ActionButton,
+  AdminDataTable,
+  AppliedFilters,
+  ClearableField,
+  Descriptions,
+  Drawer,
+  EmptyState,
+  FilePicker,
+  FilterActions,
+  FilterBar,
+  FormField,
+  ListError,
+  Notice,
+  PageHeader,
+  Pagination,
+  Panel,
+  SelectField,
+  Skeleton,
+  StatCard,
+  StatusTag,
+  StaleError,
+  TextAreaField,
+  TextField,
   useAdminList,
   useAdminResource,
   useAdminUrlFilterSync,
-} from '../../components/admin/AdminWidgets';
-import {
-  AdminEmpty,
-  AppliedFilters,
-  FilterActions,
-  FilterBar,
-  PageHeader,
-  Panel,
-  StatCard,
-  StatusTag,
+  type AdminColumn,
   type AppliedFilter,
-} from '../../components/admin/PageHeader';
-import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
-import { Drawer } from '../../admin-ui/primitives/Drawer';
-import { Descriptions, FormField, Notice } from '../../admin-ui/primitives';
-import { FilePick, SelectBox, TextArea, TextInput } from '../../admin-ui/controls';
-import { cx } from '../../admin-ui/lib/cn';
+} from '../../admin-ui/primitives';
+import { cn } from '../../admin-ui/lib/cn';
 import type {
   AdminCreditLedgerRow,
   AdminCreditListResult,
@@ -202,14 +208,14 @@ export function AdminCreditsPage() {
       width: 230,
       render: (row) => (
         <div className="flex flex-col gap-0.5">
-          <span className="text-sm text-text-primary">{row.name || row.email}</span>
-          <span className="text-[11px] text-text-tertiary">
-            <Link className="text-accent-700 hover:underline" to={adminUserDetailHref(row.userId)}>
+          <span className="text-sm text-foreground">{row.name || row.email}</span>
+          <span className="text-[11px] text-muted-foreground">
+            <Link className="text-brand hover:underline" to={adminUserDetailHref(row.userId)}>
               {row.email}
             </Link>
             {row.name ? '' : ' · 无昵称'}
           </span>
-          <code className="text-[11px] text-text-tertiary" title={row.userId}>
+          <code className="text-[11px] text-muted-foreground" title={row.userId}>
             {row.userId}
           </code>
         </div>
@@ -227,9 +233,9 @@ export function AdminCreditsPage() {
       width: 120,
       render: (row) =>
         row.expiringSoon > 0 ? (
-          <span className="tabular-nums text-amber-700">{row.expiringSoon}</span>
+          <span className="tabular-nums text-warn-text">{row.expiringSoon}</span>
         ) : (
-          <span className="text-[11px] text-text-tertiary">—</span>
+          <span className="text-[11px] text-muted-foreground">—</span>
         ),
     },
     {
@@ -255,7 +261,7 @@ export function AdminCreditsPage() {
       title: '最近到期',
       width: 160,
       render: (row) => (
-        <span className="text-[11px] text-text-tertiary">{fmtTime(row.nearestExpiry)}</span>
+        <span className="text-[11px] text-muted-foreground">{fmtTime(row.nearestExpiry)}</span>
       ),
     },
     {
@@ -264,9 +270,9 @@ export function AdminCreditsPage() {
       width: 80,
       fixed: 'right',
       render: (row) => (
-        <Button variant="ghost" size="xs" onClick={() => setDetail(row)}>
+        <ActionButton variant="ghost" size="xs" onClick={() => setDetail(row)}>
           明细
-        </Button>
+        </ActionButton>
       ),
     },
   ];
@@ -279,29 +285,28 @@ export function AdminCreditsPage() {
         actions={
           <>
             {can('credit.adjust') && (
-              <Button variant="secondary" size="small" leadingIcon={Upload} onClick={() => setBatchOpen(true)}>
+              <ActionButton variant="secondary" icon={Upload} onClick={() => setBatchOpen(true)}>
                 批量调整
-              </Button>
+              </ActionButton>
             )}
             {/* CSV 导入走邮箱而非用户 ID: 运营手里的补偿名单通常是邮箱表, 不是 cuid */}
             {/* 后端 /admin/credits/import 的权限点是 credit.adjust（导入会改余额，
                 与人工调整同一套规则）。此前这里用 data.import，导致有 credit.adjust
                 的财务看不到入口，而只有 data.import 的角色点进去反而 403。 */}
             {can('credit.adjust') && (
-              <Button variant="secondary" size="small" leadingIcon={Upload} onClick={() => setImportOpen(true)}>
+              <ActionButton variant="secondary" icon={Upload} onClick={() => setImportOpen(true)}>
                 导入 CSV
-              </Button>
+              </ActionButton>
             )}
             {can('data.export') && (
-              <Button
+              <ActionButton
                 variant="secondary"
-                size="small"
-                leadingIcon={Download}
+                icon={Download}
                 onClick={() => void exportCsv()}
                 disabled={exporting}
               >
                 {exporting ? '导出中…' : '导出 CSV'}
-              </Button>
+              </ActionButton>
             )}
           </>
         }
@@ -319,51 +324,52 @@ export function AdminCreditsPage() {
       </div>
 
       <FilterBar>
-        <TextInput
+        <ClearableField
           className="w-52"
           ariaLabel="按邮箱筛选"
           placeholder="邮箱"
           value={email}
           onChange={setEmail}
           onEnter={applyQuery}
-          allowClear
         />
-        <TextInput
+        <ClearableField
           className="w-52"
           ariaLabel="按用户 ID 筛选"
           placeholder="用户 ID（精确）"
           value={userId}
           onChange={setUserId}
           onEnter={applyQuery}
-          allowClear
         />
         <FilterActions>
-          <Button variant="primary" size="small" onClick={applyQuery}>
+          <ActionButton variant="default" onClick={applyQuery}>
             查询
-          </Button>
-          <Button variant="secondary" size="small" onClick={reset}>
+          </ActionButton>
+          <ActionButton variant="secondary" onClick={reset}>
             重置
-          </Button>
+          </ActionButton>
         </FilterActions>
         <AppliedFilters items={appliedChips} onClearAll={reset} />
       </FilterBar>
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
-      {error && data && <AdminStaleError error={error} onRetry={reload} />}
+      {error && data && <StaleError error={error} onRetry={reload} />}
 
       <Panel title="用户积分总览" note="按注册时间倒序">
         {loading && !data ? (
-          <AdminListLoading tip="加载积分总览…" />
+          <div className="flex flex-col gap-2" aria-busy="true" aria-live="polite">
+            <Skeleton rows={4} />
+            <p className="text-center text-xs text-muted-foreground">加载积分总览…</p>
+          </div>
         ) : error && !data ? (
-          <AdminListError error={error} onRetry={reload} />
+          <ListError error={error} onRetry={reload} />
         ) : rows.length === 0 ? (
-          <AdminEmpty
-            description={hasFilter ? '没有符合条件的用户。' : '还没有可查看的用户。'}
+          <EmptyState
+            title={hasFilter ? '没有符合条件的用户。' : '还没有可查看的用户。'}
             action={
               hasFilter ? (
-                <Button variant="secondary" size="small" onClick={reset}>
+                <ActionButton variant="secondary" onClick={reset}>
                   清除筛选
-                </Button>
+                </ActionButton>
               ) : undefined
             }
           />
@@ -535,16 +541,16 @@ function CreditDetailDrawer({
       width: 170,
       render: (row) =>
         row.expireAt ? (
-          <span className="text-[11px] text-text-secondary">{fmtTime(row.expireAt)}</span>
+          <span className="text-[11px] text-muted-foreground">{fmtTime(row.expireAt)}</span>
         ) : (
-          <span className="text-[11px] text-text-tertiary">永久</span>
+          <span className="text-[11px] text-muted-foreground">永久</span>
         ),
     },
     {
       key: 'createdAt',
       title: '创建时间',
       render: (row) => (
-        <span className="text-[11px] text-text-secondary">{fmtTime(row.createdAt)}</span>
+        <span className="text-[11px] text-muted-foreground">{fmtTime(row.createdAt)}</span>
       ),
     },
   ];
@@ -555,7 +561,7 @@ function CreditDetailDrawer({
       title: '时间',
       width: 170,
       render: (row) => (
-        <span className="text-[11px] tabular-nums text-text-secondary">{fmtTime(row.createdAt)}</span>
+        <span className="text-[11px] tabular-nums text-muted-foreground">{fmtTime(row.createdAt)}</span>
       ),
     },
     {
@@ -569,7 +575,7 @@ function CreditDetailDrawer({
       title: '变动',
       width: 90,
       render: (row) => (
-        <b className={cx('tabular-nums', row.amount > 0 ? 'text-emerald-600' : 'text-rose-600')}>
+        <b className={cn('tabular-nums', row.amount > 0 ? 'text-success-text' : 'text-danger-text')}>
           {signed(row.amount)}
         </b>
       ),
@@ -584,7 +590,7 @@ function CreditDetailDrawer({
       key: 'reason',
       title: '说明',
       render: (row) => (
-        <span className="text-[11px] text-text-tertiary">
+        <span className="text-[11px] text-muted-foreground">
           {row.reason ?? '—'}
           {row.taskId ? ` · 任务 ${row.taskId.slice(-8)}` : ''}
           {row.orderId ? ` · 订单 ${row.orderId.slice(-8)}` : ''}
@@ -602,7 +608,7 @@ function CreditDetailDrawer({
         if (!next) requestClose();
       }}
     >
-      {error && data && <AdminStaleError error={error} onRetry={() => void reload()} />}
+      {error && data && <StaleError error={error} onRetry={() => void reload()} />}
 
       <section className="mb-6">
         <SectionTitle title="账户概要" />
@@ -612,7 +618,7 @@ function CreditDetailDrawer({
             {
               label: '用户',
               value: (
-                <Link className="text-accent-700 hover:underline" to={adminUserDetailHref(user.userId)}>
+                <Link className="text-brand hover:underline" to={adminUserDetailHref(user.userId)}>
                   {user.email}
                 </Link>
               ),
@@ -622,10 +628,10 @@ function CreditDetailDrawer({
               label: '关联记录',
               value: (
                 <span className="flex flex-wrap gap-x-3">
-                  <Link className="text-accent-700 hover:underline" to={adminOrderHref({ email: user.email })}>
+                  <Link className="text-brand hover:underline" to={adminOrderHref({ email: user.email })}>
                     订单记录
                   </Link>
-                  <Link className="text-accent-700 hover:underline" to={adminTasksHref({ userId: user.userId })}>
+                  <Link className="text-brand hover:underline" to={adminTasksHref({ userId: user.userId })}>
                     任务记录
                   </Link>
                 </span>
@@ -638,7 +644,7 @@ function CreditDetailDrawer({
               value: (
                 <span className="tabular-nums">
                   {user.totalEarned} / {user.totalConsumed}
-                  <span className="ml-1 text-[11px] text-text-tertiary">
+                  <span className="ml-1 text-[11px] text-muted-foreground">
                     不含到期回收与退款扣回，故与余额不构成等式
                   </span>
                 </span>
@@ -656,7 +662,7 @@ function CreditDetailDrawer({
             <div className="flex flex-wrap gap-3">
               <div className="w-40">
                 <FormField label="变动量（积分）" htmlFor="c-delta">
-                  <TextInput
+                  <TextField
                     value={delta}
                     onChange={setDelta}
                     placeholder="如 100 或 -50"
@@ -667,7 +673,7 @@ function CreditDetailDrawer({
               </div>
               <div className="w-40">
                 <FormField label="有效天数（可选）" htmlFor="c-valid">
-                  <TextInput
+                  <TextField
                     value={validDays}
                     onChange={setValidDays}
                     placeholder="留空 = 永久"
@@ -678,7 +684,7 @@ function CreditDetailDrawer({
               </div>
             </div>
             <FormField label="调整原因（强制）" htmlFor="c-reason">
-              <TextInput
+              <TextField
                 value={reason}
                 onChange={setReason}
                 placeholder="如：工单 #123 补偿生成失败"
@@ -687,14 +693,13 @@ function CreditDetailDrawer({
               />
             </FormField>
             <div>
-              <Button
-                variant="primary"
-                size="small"
+              <ActionButton
+                variant="default"
                 disabled={!deltaValid}
                 onClick={() => void submitAdjust()}
               >
                 提交调整
-              </Button>
+              </ActionButton>
             </div>
           </div>
         </section>
@@ -703,11 +708,14 @@ function CreditDetailDrawer({
       <section className="mb-6">
         <SectionTitle title="批次" note="消耗按先到期先扣（FEFO），空到期视为最晚" />
         {loading && !data ? (
-          <AdminListLoading tip="加载积分批次…" />
+          <div className="flex flex-col gap-2" aria-busy="true" aria-live="polite">
+            <Skeleton rows={4} />
+            <p className="text-center text-xs text-muted-foreground">加载积分批次…</p>
+          </div>
         ) : error && !data ? (
-          <AdminListError error={error} onRetry={() => void reload()} />
+          <ListError error={error} onRetry={() => void reload()} />
         ) : lots.length === 0 ? (
-          <AdminEmpty description="该用户没有积分批次。" />
+          <EmptyState title="该用户没有积分批次。" />
         ) : (
           <AdminDataTable<AdminCreditLotRow>
             rows={lots}
@@ -723,7 +731,7 @@ function CreditDetailDrawer({
       <section>
         <SectionTitle title="流水" />
         <FilterBar>
-          <SelectBox
+          <SelectField
             className="w-36"
             ariaLabel="按流水类型筛选"
             placeholder="类型"
@@ -732,12 +740,12 @@ function CreditDetailDrawer({
             onChange={setType}
             options={LEDGER_OPTIONS}
           />
-          <TextInput className="w-40" ariaLabel="开始日期" type="date" value={from} onChange={setFrom} />
-          <TextInput className="w-40" ariaLabel="结束日期" type="date" value={to} onChange={setTo} />
+          <TextField className="w-40" ariaLabel="开始日期" type="date" value={from} onChange={setFrom} />
+          <TextField className="w-40" ariaLabel="结束日期" type="date" value={to} onChange={setTo} />
           <FilterActions>
-            <Button variant="secondary" size="small" onClick={() => void reload()} disabled={loading}>
+            <ActionButton variant="secondary" onClick={() => void reload()} disabled={loading}>
               刷新
-            </Button>
+            </ActionButton>
           </FilterActions>
         </FilterBar>
         {/*
@@ -745,9 +753,12 @@ function CreditDetailDrawer({
           同一个错误在抽屉里出现两次只会让人以为两处各自坏了。
         */}
         {loading && !data ? (
-          <AdminListLoading tip="加载积分流水…" />
+          <div className="flex flex-col gap-2" aria-busy="true" aria-live="polite">
+            <Skeleton rows={4} />
+            <p className="text-center text-xs text-muted-foreground">加载积分流水…</p>
+          </div>
         ) : error && !data ? null : ledger.length === 0 ? (
-          <AdminEmpty description="没有符合条件的流水。" />
+          <EmptyState title="没有符合条件的流水。" />
         ) : (
           <AdminDataTable<AdminCreditLedgerRow>
             rows={ledger}
@@ -866,7 +877,7 @@ function BatchAdjustDrawer({
       key: 'userId',
       title: '用户 ID',
       render: (row) => (
-        <code className="font-mono text-[11px] text-text-secondary">{row.userId}</code>
+        <code className="font-mono text-[11px] text-muted-foreground">{row.userId}</code>
       ),
     },
     {
@@ -884,7 +895,7 @@ function BatchAdjustDrawer({
       key: 'msg',
       title: '说明',
       render: (row) => (
-        <span className="text-[11px] text-text-tertiary">
+        <span className="text-[11px] text-muted-foreground">
           {row.success ? `余额 ${row.balance}` : (row.message ?? '未知原因')}
         </span>
       ),
@@ -901,22 +912,21 @@ function BatchAdjustDrawer({
       }}
       footer={
         <>
-          <Button variant="secondary" size="small" onClick={requestClose} disabled={busy}>
+          <ActionButton variant="secondary" onClick={requestClose} disabled={busy}>
             {result ? '关闭' : '取消'}
-          </Button>
+          </ActionButton>
           {result ? (
-            <Button variant="primary" size="small" onClick={done}>
+            <ActionButton variant="default" onClick={done}>
               完成
-            </Button>
+            </ActionButton>
           ) : (
-            <Button
-              variant="primary"
-              size="small"
+            <ActionButton
+              variant="default"
               onClick={() => void submit()}
               disabled={busy || parsed.items.length === 0}
             >
               {busy ? '提交中…' : `提交 ${parsed.items.length} 条`}
-            </Button>
+            </ActionButton>
           )}
         </>
       }
@@ -941,7 +951,7 @@ function BatchAdjustDrawer({
             label="调整清单"
             hint="正数增加、负数扣减，单次最多 100 条；逐条独立执行，一条失败不影响其余"
           >
-            <TextArea
+            <TextAreaField
               value={text}
               onChange={setText}
               rows={8}
@@ -961,7 +971,7 @@ function BatchAdjustDrawer({
             label="整批原因（强制）"
             hint="逐行未填原因时使用该文案；每一条都会写入审计"
           >
-            <TextInput
+            <TextField
               value={reason}
               onChange={setReason}
               placeholder="如：2026-10 故障补偿"
@@ -1069,7 +1079,7 @@ function CsvImportDrawer({
     {
       key: 'email',
       title: '邮箱',
-      render: (row) => <span className="text-[11px] text-text-tertiary">{row.email || '—'}</span>,
+      render: (row) => <span className="text-[11px] text-muted-foreground">{row.email || '—'}</span>,
     },
     {
       key: 'delta',
@@ -1096,7 +1106,7 @@ function CsvImportDrawer({
       key: 'msg',
       title: '说明',
       render: (row) => (
-        <span className="text-[11px] text-text-tertiary">
+        <span className="text-[11px] text-muted-foreground">
           {row.success ? `余额 ${row.balance}` : (row.message ?? '未知原因')}
         </span>
       ),
@@ -1113,22 +1123,21 @@ function CsvImportDrawer({
       }}
       footer={
         <>
-          <Button variant="secondary" size="small" onClick={requestClose} disabled={busy}>
+          <ActionButton variant="secondary" onClick={requestClose} disabled={busy}>
             {result ? '关闭' : '取消'}
-          </Button>
+          </ActionButton>
           {result ? (
-            <Button variant="primary" size="small" onClick={done}>
+            <ActionButton variant="default" onClick={done}>
               完成
-            </Button>
+            </ActionButton>
           ) : (
-            <Button
-              variant="primary"
-              size="small"
+            <ActionButton
+              variant="default"
               onClick={() => void submit()}
               disabled={busy || !file}
             >
               {busy ? '导入中…' : '开始导入'}
-            </Button>
+            </ActionButton>
           )}
         </>
       }
@@ -1169,7 +1178,7 @@ function CsvImportDrawer({
             label="CSV 文件"
             hint="每行 邮箱,变动量[,原因]，首行可带表头；单次最多 500 行。正数增加、负数扣减。"
           >
-            <FilePick
+            <FilePicker
               file={file}
               accept=".csv,text/csv"
               label="选择 CSV"
@@ -1179,7 +1188,7 @@ function CsvImportDrawer({
           </FormField>
 
           <FormField label="整批原因" hint="会写入每一条的审计记录">
-            <TextInput
+            <TextField
               value={reason}
               onChange={setReason}
               placeholder="如：2026-10 故障补偿（行内未填原因时使用该文案）"
@@ -1189,7 +1198,7 @@ function CsvImportDrawer({
           </FormField>
 
           <FormField label="有效期（天，可选）">
-            <TextInput
+            <TextField
               value={validDays}
               onChange={setValidDays}
               placeholder="留空表示永久有效"
@@ -1210,9 +1219,9 @@ function CsvImportDrawer({
 /** 抽屉里的小节标题：标题 + 一句口径说明 */
 function SectionTitle({ title, note }: { title: string; note?: string }) {
   return (
-    <div className="mb-2 flex items-baseline gap-2 border-b border-border-table pb-1.5">
-      <strong className="text-xs font-semibold text-text-primary">{title}</strong>
-      {note && <span className="text-[11px] text-text-tertiary">{note}</span>}
+    <div className="mb-2 flex items-baseline gap-2 border-b border-border pb-1.5">
+      <strong className="text-xs font-semibold text-foreground">{title}</strong>
+      {note && <span className="text-[11px] text-muted-foreground">{note}</span>}
     </div>
   );
 }

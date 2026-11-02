@@ -15,7 +15,7 @@ export { useProject } from '../../hooks/useProject';
 /** 轮询中止信号 (离开页面 / 重新提交时停掉旧轮询) */
 export { usePollAbort } from '../../hooks/usePollAbort';
 /** 实时积分单价 (后台可调价) */
-export { useCreditLabel } from '../../hooks/useCreditLabel';
+export { useCreditLabel, useCreditCost } from '../../hooks/useCreditLabel';
 /** 错误提示: 把接口错误码翻译成用户可读文案 */
 export { useGenerateError } from '../../hooks/useGenerateError';
 /** 结果列表轮询; `GalleryItem` 是结果网格的数据类型 */

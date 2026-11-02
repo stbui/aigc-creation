@@ -1,30 +1,32 @@
-import { useCallback, useState, type ReactNode } from 'react';
+import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Download, Plus } from 'lucide-react';
-import { Button } from '../../admin-ui/shadcn/kit';
 import { marketingApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
-import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
-import { Drawer } from '../../admin-ui/primitives/Drawer';
-import { Notice } from '../../admin-ui/primitives';
-import { SelectBox, TextInput } from '../../admin-ui/controls';
 import {
-  AdminStaleError,
-  useAdminList,
-  useAdminUrlFilterSync,
-} from '../../components/admin/AdminWidgets';
-import {
+  ActionButton,
+  AdminDataTable,
   AppliedFilters,
+  ClearableField,
+  Drawer,
   FilterActions,
   FilterBar,
+  FormField,
+  Meter,
+  Notice,
   PageHeader,
   Panel,
+  SelectField,
   StatusTag,
+  StaleError,
+  TextField,
+  useAdminList,
+  useAdminUrlFilterSync,
+  type AdminColumn,
   type AppliedFilter,
-  type TagTone,
-} from '../../components/admin/PageHeader';
+} from '../../admin-ui/primitives';
 import type {
   AdminCoupon,
   CouponScope,
@@ -65,17 +67,6 @@ function toLocalInput(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/** 表单字段：标签 + 控件 + 一句说明 */
-function Field({ label, hint, children }: { label: ReactNode; hint?: ReactNode; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium text-text-secondary">{label}</span>
-      {children}
-      {hint && <p className="text-[11px] leading-4 text-text-tertiary">{hint}</p>}
-    </div>
-  );
-}
-
 interface FormState {
   code: string;
   name: string;
@@ -109,6 +100,9 @@ function emptyForm(): FormState {
     status: 'on',
   };
 }
+
+/** 状态标签色调，与 `StatusTag` 的 `tone` 同形 */
+type TagTone = 'success' | 'danger' | 'warn' | 'brand' | 'muted';
 
 /** 券的派生生效态：优先于人工开关展示，过期/未开始/售罄不是「停用」 */
 const EFFECTIVE_META: Record<AdminCoupon['effective'], { label: string; tone: TagTone }> = {
@@ -379,7 +373,7 @@ export function AdminCouponsPage() {
       render: (row) => (
         <button
           type="button"
-          className="rounded font-mono text-xs font-medium text-accent-700 hover:underline"
+          className="rounded font-mono text-xs font-medium text-brand hover:underline"
           onClick={() => openEdit(row)}
         >
           {row.code}
@@ -398,7 +392,7 @@ export function AdminCouponsPage() {
       title: '面额',
       width: 90,
       render: (row) => (
-        <span className="font-medium text-accent-700">{faceValue({ type: row.type, value: row.value })}</span>
+        <span className="font-medium text-brand">{faceValue({ type: row.type, value: row.value })}</span>
       ),
     },
     {
@@ -409,7 +403,7 @@ export function AdminCouponsPage() {
         row.thresholdCents > 0 ? (
           <span className="tabular-nums">满 ¥{yuan(row.thresholdCents)}</span>
         ) : (
-          <span className="text-[11px] text-text-tertiary">无门槛</span>
+          <span className="text-[11px] text-muted-foreground">无门槛</span>
         ),
     },
     {
@@ -432,15 +426,7 @@ export function AdminCouponsPage() {
               {total ? ` / ${total}` : ' / 不限'}
             </span>
             {pct !== null && (
-              <span
-                className="block h-1 w-16 overflow-hidden rounded-full bg-background-secondary-default"
-                aria-hidden
-              >
-                <span
-                  className="block h-full rounded-full bg-accent-500"
-                  style={{ width: `${Math.min(pct, 100)}%` }}
-                />
-              </span>
+              <Meter value={Math.min(pct, 100)} className="h-1 w-16" decorative />
             )}
           </div>
         );
@@ -451,7 +437,7 @@ export function AdminCouponsPage() {
       title: '有效期',
       width: 170,
       render: (row) => (
-        <span className="text-[11px] tabular-nums text-text-tertiary">
+        <span className="text-[11px] tabular-nums text-muted-foreground">
           {new Date(row.validFrom).toLocaleDateString('zh-CN')} ~{' '}
           {new Date(row.validTo).toLocaleDateString('zh-CN')}
         </span>
@@ -474,17 +460,17 @@ export function AdminCouponsPage() {
       render: (row) =>
         writable ? (
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="small" onClick={() => openEdit(row)}>
+            <ActionButton variant="ghost" size="sm" onClick={() => openEdit(row)}>
               编辑
-            </Button>
-            <Button
-              variant={row.status === 'on' ? 'dangerGhost' : 'ghost'}
-              size="small"
+            </ActionButton>
+            <ActionButton
+              variant={row.status === 'on' ? 'destructive' : 'ghost'}
+              size="sm"
               disabled={busy}
               onClick={() => void doToggle(row)}
             >
               {row.status === 'on' ? '停用' : '启用'}
-            </Button>
+            </ActionButton>
           </div>
         ) : null,
     },
@@ -496,45 +482,44 @@ export function AdminCouponsPage() {
         title="优惠券"
         description="发放范围、使用条件、有效期与限用。券不提供删除 —— 已核销订单仍引用它，只能停用。"
         actions={
-          <div className="flex items-center gap-2">
+          <>
             {can('data.export') && (
-              <Button
+              <ActionButton
                 variant="secondary"
-                size="small"
-                leadingIcon={Download}
+                size="sm"
+                icon={Download}
                 disabled={exporting}
                 onClick={() => void exportCsv()}
               >
                 {exporting ? '导出中…' : '导出 CSV'}
-              </Button>
+              </ActionButton>
             )}
             {writable ? (
-              <Button variant="primary" size="small" leadingIcon={Plus} onClick={openCreate}>
+              <ActionButton variant="default" size="sm" icon={Plus} onClick={openCreate}>
                 新建优惠券
-              </Button>
+              </ActionButton>
             ) : (
-              <span className="text-[11px] text-text-tertiary">
+              <span className="text-[11px] text-muted-foreground">
                 当前账号无 marketing.write 权限，仅可查看
               </span>
             )}
-          </div>
+          </>
         }
       />
 
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
-      {error && data && <AdminStaleError error={error} onRetry={reload} />}
+      {error && data && <StaleError error={error} onRetry={reload} />}
 
       <FilterBar>
-        <TextInput
+        <ClearableField
           className="w-56"
           ariaLabel="按券码或名称搜索"
           placeholder="券码 / 名称"
           value={keyword}
           onChange={setKeyword}
           onEnter={applyFilters}
-          allowClear
         />
-        <SelectBox
+        <SelectField
           className="w-32"
           ariaLabel="按类型筛选"
           placeholder="类型"
@@ -543,7 +528,7 @@ export function AdminCouponsPage() {
           onChange={setType}
           options={Object.entries(TYPE_LABEL).map(([value, label]) => ({ value, label }))}
         />
-        <SelectBox
+        <SelectField
           className="w-32"
           ariaLabel="按状态筛选"
           placeholder="状态"
@@ -556,12 +541,12 @@ export function AdminCouponsPage() {
           ]}
         />
         <FilterActions>
-          <Button variant="primary" size="small" onClick={applyFilters}>
+          <ActionButton variant="default" onClick={applyFilters}>
             查询
-          </Button>
-          <Button variant="secondary" size="small" onClick={resetFilters}>
+          </ActionButton>
+          <ActionButton variant="secondary" onClick={resetFilters}>
             重置
-          </Button>
+          </ActionButton>
         </FilterActions>
         <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
       </FilterBar>
@@ -589,13 +574,13 @@ export function AdminCouponsPage() {
           }
           emptyAction={
             hasFilter ? (
-              <Button variant="secondary" size="small" onClick={resetFilters}>
+              <ActionButton variant="secondary" size="sm" onClick={resetFilters}>
                 清除筛选
-              </Button>
+              </ActionButton>
             ) : writable ? (
-              <Button variant="primary" size="small" leadingIcon={Plus} onClick={openCreate}>
+              <ActionButton variant="default" size="sm" icon={Plus} onClick={openCreate}>
                 创建第一张券
-              </Button>
+              </ActionButton>
             ) : undefined
           }
         />
@@ -612,12 +597,12 @@ export function AdminCouponsPage() {
         description={formDirty ? '有未保存修改' : undefined}
         footer={
           <>
-            <Button variant="secondary" size="small" onClick={requestCloseForm} disabled={busy}>
+            <ActionButton variant="secondary" size="sm" onClick={requestCloseForm} disabled={busy}>
               取消
-            </Button>
-            <Button variant="primary" size="small" disabled={busy} onClick={() => void save()}>
+            </ActionButton>
+            <ActionButton variant="default" size="sm" disabled={busy} onClick={() => void save()}>
               {busy ? '保存中…' : '保存'}
-            </Button>
+            </ActionButton>
           </>
         }
       >
@@ -629,30 +614,30 @@ export function AdminCouponsPage() {
           )}
 
           {!editing && (
-            <Field label="券码" hint="用户手动输入此码。创建后不可修改。">
-              <TextInput
+            <FormField label="券码" hint="用户手动输入此码。创建后不可修改。">
+              <TextField
                 ariaLabel="券码"
                 value={form.code}
                 placeholder="4~24 位大写字母或数字"
                 maxLength={24}
                 onChange={(value) => setForm({ ...form, code: value.toUpperCase() })}
               />
-            </Field>
+            </FormField>
           )}
 
-          <Field label="券名称">
-            <TextInput
+          <FormField label="券名称">
+            <TextField
               ariaLabel="券名称"
               value={form.name}
               placeholder="如: 新客立减 10 元"
               maxLength={60}
               onChange={(value) => setForm({ ...form, name: value })}
             />
-          </Field>
+          </FormField>
 
           <div className="grid grid-cols-2 gap-4">
-            <Field label="类型">
-              <SelectBox
+            <FormField label="类型">
+              <SelectField
                 ariaLabel="类型"
                 value={form.type}
                 // 换类型要清空面额: 折扣的万分比与金额的分是两套单位, 留着旧值必然算错
@@ -661,86 +646,86 @@ export function AdminCouponsPage() {
                 }
                 options={Object.entries(TYPE_LABEL).map(([value, label]) => ({ value, label }))}
               />
-            </Field>
-            <Field
+            </FormField>
+            <FormField
               label={form.type === 'discount' ? '折扣 (万分比)' : '减免金额 (元)'}
               hint={form.type === 'discount' ? '8500 表示 8.5 折' : '表单内填元，入库换算成分'}
             >
-              <TextInput
+              <TextField
                 ariaLabel="面额"
                 inputMode="decimal"
                 value={form.value}
                 placeholder={form.type === 'discount' ? '8500 = 8.5折' : '10.00'}
                 onChange={(value) => setForm({ ...form, value })}
               />
-            </Field>
+            </FormField>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <Field label="使用门槛 (元)" hint="0 表示无门槛">
-              <TextInput
+            <FormField label="使用门槛 (元)" hint="0 表示无门槛">
+              <TextField
                 ariaLabel="使用门槛"
                 inputMode="decimal"
                 value={form.threshold}
                 onChange={(value) => setForm({ ...form, threshold: value })}
               />
-            </Field>
-            <Field label="适用范围">
-              <SelectBox
+            </FormField>
+            <FormField label="适用范围">
+              <SelectField
                 ariaLabel="适用范围"
                 value={form.scope}
                 onChange={(value) => setForm({ ...form, scope: value as CouponScope })}
                 options={Object.entries(SCOPE_LABEL).map(([value, label]) => ({ value, label }))}
               />
-            </Field>
+            </FormField>
           </div>
 
           {form.scope === 'product' && (
-            <p className="rounded-lg border border-border-table bg-background-secondary-default/60 px-3 py-2 text-[11px] leading-4 text-text-tertiary">
+            <p className="rounded-lg border border-border bg-muted/60 px-3 py-2 text-[11px] leading-4 text-muted-foreground">
               商品范围由后端按订单明细校验，此处留空表示不限具体商品（仅限制在指定范围订单内）。
             </p>
           )}
 
           <div className="grid grid-cols-2 gap-4">
-            <Field label="发行总量" hint="0 表示不限量">
-              <TextInput
+            <FormField label="发行总量" hint="0 表示不限量">
+              <TextField
                 ariaLabel="发行总量"
                 inputMode="numeric"
                 value={form.totalCount}
                 onChange={(value) => setForm({ ...form, totalCount: value })}
               />
-            </Field>
-            <Field label="每人限用" hint="0 表示不限">
-              <TextInput
+            </FormField>
+            <FormField label="每人限用" hint="0 表示不限">
+              <TextField
                 ariaLabel="每人限用"
                 inputMode="numeric"
                 value={form.perUserLimit}
                 onChange={(value) => setForm({ ...form, perUserLimit: value })}
               />
-            </Field>
+            </FormField>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <Field label="生效时间">
-              <TextInput
+            <FormField label="生效时间">
+              <TextField
                 ariaLabel="生效时间"
                 type="datetime-local"
                 value={form.validFrom}
                 onChange={(value) => setForm({ ...form, validFrom: value })}
               />
-            </Field>
-            <Field label="失效时间">
-              <TextInput
+            </FormField>
+            <FormField label="失效时间">
+              <TextField
                 ariaLabel="失效时间"
                 type="datetime-local"
                 value={form.validTo}
                 onChange={(value) => setForm({ ...form, validTo: value })}
               />
-            </Field>
+            </FormField>
           </div>
 
-          <Field label="状态" hint="过期、未开始、售罄由时间与库存派生，列表里优先展示派生结果">
-            <SelectBox
+          <FormField label="状态" hint="过期、未开始、售罄由时间与库存派生，列表里优先展示派生结果">
+            <SelectField
               ariaLabel="状态"
               value={form.status}
               onChange={(value) => setForm({ ...form, status: value as CouponStatus })}
@@ -749,10 +734,10 @@ export function AdminCouponsPage() {
                 { value: 'off', label: '停用' },
               ]}
             />
-          </Field>
+          </FormField>
 
           {editing && (
-            <p className="text-[11px] leading-4 text-text-tertiary">
+            <p className="text-[11px] leading-4 text-muted-foreground">
               已核销 {editing.usedCount} 张 · 券码不可修改，停用后已发放的券立即失效
             </p>
           )}

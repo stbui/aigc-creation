@@ -1,16 +1,18 @@
 import { useCallback, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { adminChannelsApi } from './api';
 import {
-  AdminStaleError,
+  StaleError,
   ConfirmAction,
   PageHeader,
   Panel,
-  SegmentedBox,
-  TextInput,
+  SegmentedGroup,
+  TextField,
 } from './components';
 import {
   useAdmin,
   useAdminDetailParam,
+  useAdminUrlFilterSync,
   useChannelFilters,
   useChannelHealth,
   useChannelList,
@@ -90,8 +92,19 @@ export function AdminChannelsPage() {
     useChannelFilters(rows);
   const health = useChannelHealth();
 
-  /** 视图切换：`channels` = 按渠道配置，`models` = 跨渠道排查 */
-  const [view, setView] = useState<'channels' | 'models'>('channels');
+  /**
+   * 视图切换：`channels` = 按渠道配置，`models` = 跨渠道排查。
+   *
+   * 写进地址栏：运营排查时经常把「全部模型 + 不健康」视图发给同事，
+   * 视图只存在组件 state 里的��，链接过去就丢了（参考实现把视图与筛选
+   * 都落在 `useSearchParams` 上）。
+   */
+  const [searchParams] = useSearchParams();
+  const [view, setViewState] = useState<'channels' | 'models'>(
+    searchParams.get('view') === 'models' ? 'models' : 'channels',
+  );
+  useAdminUrlFilterSync({ view });
+  const setView = useCallback((next: 'channels' | 'models') => setViewState(next), []);
 
   const [editing, setEditing] = useState<AdminChannelView | null>(null);
   const [creating, setCreating] = useState(false);
@@ -365,7 +378,7 @@ export function AdminChannelsPage() {
       />
 
       <div className="mb-3 flex items-center gap-2">
-        <SegmentedBox
+        <SegmentedGroup
           ariaLabel="渠道工作台视图"
           value={view}
           onChange={(value) => setView(value === 'models' ? 'models' : 'channels')}
@@ -427,6 +440,7 @@ export function AdminChannelsPage() {
             hasFilters={hasFilters}
             writable={writable}
             modelWritable={can('channel.model_write')}
+            canTest={can('channel.test')}
             saving={saving}
             exporting={exporting}
             pendingModelId={pendingModelId}
@@ -451,7 +465,7 @@ export function AdminChannelsPage() {
           note="按渠道模型统计：24h / 7d 成功率与 P95 耗时来自调用记录。样本少时 P95 参考意义有限，请同时看样本数。"
         >
           {health.error && health.rows.length === 0 ? (
-            <AdminStaleError error={health.error} onRetry={() => void health.reload()} />
+            <StaleError error={health.error} onRetry={() => void health.reload()} />
           ) : (
             <ChannelModelHealthPanel rows={health.rows} loading={health.loading} />
           )}
@@ -524,7 +538,7 @@ export function AdminChannelsPage() {
             hint="写入审计：审计要能回答「谁为什么删」"
             error={deleteReason.trim().length === 0 ? '删除是高危操作，必须填写原因' : null}
           >
-            <TextInput
+            <TextField
               ariaLabel="删除原因"
               value={deleteReason}
               onChange={setDeleteReason}

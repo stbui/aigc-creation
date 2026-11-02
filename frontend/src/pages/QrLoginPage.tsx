@@ -4,6 +4,7 @@ import { App, Button } from 'antd';
 import { CheckCircle2, MonitorSmartphone, ShieldAlert, XCircle } from 'lucide-react';
 import { authApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import type { QrStatusResult } from '../types/api';
 
 /**
@@ -20,6 +21,7 @@ import type { QrStatusResult } from '../types/api';
  * 一点确认，攻击者的电脑就登进了受害者的账号。
  */
 export function QrLoginPage() {
+  useDocumentMeta('扫码登录确认 · 货觉AI', '确认是否允许该设备登录。');
   const [params] = useSearchParams();
   const navigate = useNavigate();
   const { message } = App.useApp();

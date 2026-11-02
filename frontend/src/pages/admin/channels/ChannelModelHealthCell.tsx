@@ -1,4 +1,4 @@
-import { HoverTip, StatusTag } from './components';
+import { HelpTip, StatusTag } from './components';
 import {
   formatAmount,
   formatMarkupPercent,
@@ -48,12 +48,12 @@ export function ChannelModelHealthCell({
   loading?: boolean;
 }) {
   if (loading && !health) {
-    return <span className="text-[11px] text-text-tertiary">读取中…</span>;
+    return <span className="text-[11px] text-muted-foreground">读取中…</span>;
   }
   if (!health || health.windows.day.samples === 0) {
     // 这一列只有 100px 出头：长句「近 24 小时无调用」会吃掉整列，细因放进提示
     return (
-      <span className="text-[11px] text-text-tertiary" title="近 24 小时没有终态调用">
+      <span className="text-[11px] text-muted-foreground" title="近 24 小时没有终态调用">
         无调用
       </span>
     );
@@ -79,7 +79,7 @@ export function ChannelModelHealthCell({
   );
 
   return (
-    <HoverTip tip={tip}>
+    <HelpTip tip={tip}>
       <div
         className="flex min-w-0 cursor-default flex-col gap-1"
         tabIndex={0}
@@ -87,7 +87,7 @@ export function ChannelModelHealthCell({
       >
         <div className="flex items-center gap-1.5">
           <StatusTag status="rate" tone={tone} label={formatRate(window.successRate)} />
-          <span className="text-[11px] tabular-nums text-text-tertiary">{window.samples} 次</span>
+          <span className="text-[11px] tabular-nums text-muted-foreground">{window.samples} 次</span>
         </div>
         <div className="flex items-center gap-0.5" aria-hidden>
           {slots.map((sample, index) => (
@@ -95,16 +95,16 @@ export function ChannelModelHealthCell({
               key={index}
               className={
                 sample === null
-                  ? 'h-1.5 w-2 rounded-[2px] bg-background-secondary-default'
+                  ? 'h-1.5 w-2 rounded-[2px] bg-muted'
                   : sample.status === 'success'
-                    ? 'h-1.5 w-2 rounded-[2px] bg-emerald-500'
-                    : 'h-1.5 w-2 rounded-[2px] bg-rose-500'
+                    ? 'h-1.5 w-2 rounded-[2px] bg-success-text'
+                    : 'h-1.5 w-2 rounded-[2px] bg-danger-text'
               }
             />
           ))}
         </div>
       </div>
-    </HoverTip>
+    </HelpTip>
   );
 }
 
@@ -128,10 +128,10 @@ export function ChannelModelCostSummary({
 }) {
   const lines = tierPriceLines(model.capability, tiers);
   if (lines.length === 0) {
-    return <span className="text-[11px] text-text-tertiary">无已启用规格</span>;
+    return <span className="text-[11px] text-muted-foreground">无已启用规格</span>;
   }
   const shown = lines.slice(0, 3);
-  const rest = lines.length - shown.length;
+  const rest = lines.slice(3);
 
   return (
     <div className="flex min-w-0 flex-col gap-0.5">
@@ -149,23 +149,30 @@ export function ChannelModelCostSummary({
             className="flex min-w-0 items-baseline gap-2 whitespace-nowrap text-[11px] leading-4 tabular-nums"
             title={full}
           >
-            <span className="min-w-0 truncate text-text-tertiary">{line.specLabel}</span>
+            <span className="min-w-0 truncate text-muted-foreground">{line.specLabel}</span>
             <span className="ml-auto flex shrink-0 items-baseline gap-1">
-              <span className="text-text-secondary">{cost}</span>
-              <span className="text-text-placeholder" aria-hidden>
+              <span className="text-muted-foreground">{cost}</span>
+              <span className="text-muted-foreground" aria-hidden>
                 →
               </span>
-              <span className="font-medium text-text-primary">{sale}</span>
+              <span className="font-medium text-foreground">{sale}</span>
               {model.priceCurrency && model.priceCurrency !== 'credits' ? (
-                <span className="text-text-tertiary">{model.priceCurrency}</span>
+                /*
+                 * 货币计价：成本恒是积分、售价是该货币单位，加价率依赖分组兑换比例，
+                 * 这里推算不出来。两侧单位必须分开标注，否则「0.8 → 0.5」
+                 * 会被误读成同一单位的两个数。
+                 */
+                <span className="text-muted-foreground">
+                  积分 → {model.priceCurrency}
+                </span>
               ) : (
                 <span
                   className={
                     percent === null
-                      ? 'text-text-placeholder'
+                      ? 'text-muted-foreground'
                       : percent < 0
-                        ? 'text-rose-600'
-                        : 'text-emerald-600'
+                        ? 'text-danger-text'
+                        : 'text-success-text'
                   }
                 >
                   {markupText}
@@ -175,7 +182,35 @@ export function ChannelModelCostSummary({
           </div>
         );
       })}
-      {rest > 0 && <div className="text-[11px] text-text-tertiary">其余 {rest} 个规格</div>}
+      {rest.length > 0 && (
+        /*
+         * 其余规格**可展开**：规格多的模型（token 计费 3 个字段 × 3 档 = 9 行）
+         * 折叠成一行静态文字后，后面 6 行永远看不到 —— 调价前无法核对。
+         * 用原生 <details>，不引额外组件。
+         */
+        <details className="text-[11px] text-muted-foreground">
+          <summary className="cursor-pointer">其余 {rest.length} 个规格</summary>
+          <div className="mt-0.5 flex flex-col gap-0.5">
+            {rest.map((line) => {
+              const percent = markupPercent(line.cost, line.sale);
+              return (
+                <div
+                  key={`${line.tierId}:${line.field.key}`}
+                  className="flex min-w-0 items-baseline gap-2 whitespace-nowrap tabular-nums"
+                  title={`${line.specLabel} · 成本 ${formatAmount(line.cost)} / 售价 ${formatAmount(line.sale)}`}
+                >
+                  <span className="min-w-0 truncate">{line.specLabel}</span>
+                  <span className="ml-auto flex shrink-0 items-baseline gap-1">
+                    <span>{formatAmount(line.cost)}</span>
+                    <span aria-hidden>→</span>
+                    <span className="font-medium">{formatAmount(line.sale)}</span>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </details>
+      )}
     </div>
   );
 }

@@ -1,30 +1,24 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
-import { Button, IconButton } from '../../admin-ui/shadcn/kit';
 import { marketingApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
-import { NumberInput, SelectBox, SwitchBox } from '../../admin-ui/controls';
 import {
-  AdminListError,
-  AdminListLoading,
-  AdminStaleError,
+  ActionButton,
+  FormField,
+  IconButton,
+  ListError,
+  NumberField,
+  PageHeader,
+  Panel,
+  SelectField,
+  Skeleton,
+  StaleError,
+  SwitchField,
   useAdminResource,
-} from '../../components/admin/AdminWidgets';
-import { PageHeader, Panel } from '../../components/admin/PageHeader';
+} from '../../admin-ui/primitives';
 import type { CheckinRule, InviteRule } from '../../types/api';
-
-/** 表单字段的标签，统一字号与灰阶 */
-function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-xs font-medium text-text-secondary">{label}</span>
-      {children}
-      {hint && <p className="text-[11px] leading-4 text-text-tertiary">{hint}</p>}
-    </div>
-  );
-}
 
 /**
  * 单条全局规则的保存条。
@@ -48,19 +42,19 @@ function RuleActions({
   saveText: string;
 }) {
   return (
-    <div className="mt-4 flex items-center gap-2 border-t border-border-table pt-3">
-      <span className="mr-auto text-[11px] text-text-tertiary">
-        {dirty && <span className="text-amber-700">有未保存修改 · </span>}
+    <div className="mt-4 flex items-center gap-2 border-t border-border pt-3">
+      <span className="mr-auto text-[11px] text-muted-foreground">
+        {dirty && <span className="text-warn-text">有未保存修改 · </span>}
         {hint}
       </span>
       {dirty && (
-        <Button variant="secondary" size="small" disabled={busy} onClick={onDiscard}>
+        <ActionButton variant="secondary" size="sm" disabled={busy} onClick={onDiscard}>
           放弃变更
-        </Button>
+        </ActionButton>
       )}
-      <Button variant="primary" size="small" disabled={busy} onClick={onSave}>
+      <ActionButton variant="default" size="sm" disabled={busy} onClick={onSave}>
         {busy ? '保存中…' : saveText}
-      </Button>
+      </ActionButton>
     </div>
   );
 }
@@ -113,9 +107,16 @@ export function AdminMarketingRulesPage() {
   useUnsavedGuard(writable && dirtyCount > 0);
 
   // 只有完全没有数据时才塌整页; 已有草稿时保留表单, 由下方 stale 提示交代刷新失败
-  if (loading && !data) return <AdminListLoading tip="加载营销规则…" />;
+  if (loading && !data) {
+    return (
+      <div className="flex flex-col gap-2" aria-busy="true" aria-live="polite">
+        <Skeleton rows={4} />
+        <p className="text-center text-xs text-muted-foreground">加载营销规则…</p>
+      </div>
+    );
+  }
   // 重试只重跑本页的两次请求, 不整页刷新 —— reload 会丢掉 C 端的路由参数与滚动位置
-  if (error && !data) return <AdminListError error={error} onRetry={() => void reload()} />;
+  if (error && !data) return <ListError error={error} onRetry={() => void reload()} />;
 
   const saveInvite = async () => {
     if (!invite) return;
@@ -154,44 +155,44 @@ export function AdminMarketingRulesPage() {
         description="邀请分销与每日签到的积分规则。保存后立即生效，已发放的积分不受影响。"
         actions={
           !writable ? (
-            <span className="text-[11px] text-text-tertiary">
+            <span className="text-[11px] text-muted-foreground">
               当前账号无 marketing.write 权限，仅可查看
             </span>
           ) : undefined
         }
       />
 
-      {error && <AdminStaleError error={error} onRetry={() => void reload()} />}
+      {error && <StaleError error={error} onRetry={() => void reload()} />}
 
       {/* 邀请规则 */}
-      <Panel isNarrow title="邀请分销规则" note="奖励在触发条件满足时自动发放">
+      <Panel narrow title="邀请分销规则" note="奖励在触发条件满足时自动发放">
         {invite && (
           <div className="flex flex-col gap-4">
             <div className="grid grid-cols-2 gap-4">
-              <Field label="邀请人奖励 (积分)">
-                <NumberInput
+              <FormField label="邀请人奖励 (积分)">
+                <NumberField
                   ariaLabel="邀请人奖励积分"
                   value={invite.inviterCredits}
                   disabled={!writable}
                   onChange={(value) => setInvite({ ...invite, inviterCredits: value ?? 0 })}
                 />
-              </Field>
-              <Field label="被邀请人奖励 (积分)">
-                <NumberInput
+              </FormField>
+              <FormField label="被邀请人奖励 (积分)">
+                <NumberField
                   ariaLabel="被邀请人奖励积分"
                   value={invite.inviteeCredits}
                   disabled={!writable}
                   onChange={(value) => setInvite({ ...invite, inviteeCredits: value ?? 0 })}
                 />
-              </Field>
+              </FormField>
             </div>
 
             <div className="grid grid-cols-2 items-start gap-4">
-              <Field
+              <FormField
                 label="发放时机"
                 hint="选「注册后」奖励门槛低但易被刷，选「首次支付」更稳妥"
               >
-                <SelectBox
+                <SelectField
                   ariaLabel="发放时机"
                   value={invite.triggerOn}
                   disabled={!writable}
@@ -203,9 +204,9 @@ export function AdminMarketingRulesPage() {
                     { value: 'register', label: '被邀请人注册后' },
                   ]}
                 />
-              </Field>
+              </FormField>
               <div className="pt-6">
-                <SwitchBox
+                <SwitchField
                   checked={invite.valid}
                   disabled={!writable}
                   onChange={(checked) => setInvite({ ...invite, valid: checked })}
@@ -229,29 +230,29 @@ export function AdminMarketingRulesPage() {
       </Panel>
 
       {/* 签到规则 */}
-      <Panel isNarrow title="签到规则" note="连续签到到指定天数可获得额外加成">
+      <Panel narrow title="签到规则" note="连续签到到指定天数可获得额外加成">
         {checkin && (
           <div className="flex flex-col gap-4">
-            <Field label="每日基础积分">
-              <NumberInput
+            <FormField label="每日基础积分">
+              <NumberField
                 ariaLabel="每日基础积分"
                 className="w-[180px]"
                 value={checkin.baseCredits}
                 disabled={!writable}
                 onChange={(value) => setCheckin({ ...checkin, baseCredits: value ?? 0 })}
               />
-            </Field>
+            </FormField>
 
             <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-text-secondary">连续加成</span>
-              <p className="text-[11px] leading-4 text-text-tertiary">
+              <span className="text-xs font-medium text-foreground">连续加成</span>
+              <p className="text-[11px] leading-4 text-muted-foreground">
                 到达指定连续天数时，额外获得 bonus 积分
               </p>
               <div className="flex flex-col gap-2">
                 {checkin.bonusRules.map((b, i) => (
                   <div key={i} className="flex items-center gap-2">
-                    <span className="text-xs text-text-tertiary">连续</span>
-                    <NumberInput
+                    <span className="text-xs text-muted-foreground">连续</span>
+                    <NumberField
                       ariaLabel={`第 ${i + 1} 档连续天数`}
                       className="w-[90px]"
                       min={1}
@@ -263,8 +264,8 @@ export function AdminMarketingRulesPage() {
                         setCheckin({ ...checkin, bonusRules: next });
                       }}
                     />
-                    <span className="text-xs text-text-tertiary">天，加成</span>
-                    <NumberInput
+                    <span className="text-xs text-muted-foreground">天，加成</span>
+                    <NumberField
                       ariaLabel={`第 ${i + 1} 档加成积分`}
                       className="w-[90px]"
                       value={b.bonus}
@@ -275,13 +276,13 @@ export function AdminMarketingRulesPage() {
                         setCheckin({ ...checkin, bonusRules: next });
                       }}
                     />
-                    <span className="text-xs text-text-tertiary">积分</span>
+                    <span className="text-xs text-muted-foreground">积分</span>
                     {writable && (
                       <IconButton
                         icon={Trash2}
-                        size="small"
-                        aria-label={`删除第 ${i + 1} 档加成`}
-                        className="border-0 bg-transparent shadow-none text-text-tertiary hover:text-rose-600"
+                        size="sm"
+                        label={`删除第 ${i + 1} 档加成`}
+                        className="border-0 bg-transparent text-muted-foreground hover:text-danger-text"
                         onClick={() =>
                           setCheckin({
                             ...checkin,
@@ -294,10 +295,10 @@ export function AdminMarketingRulesPage() {
                 ))}
               </div>
               {writable && (
-                <Button
+                <ActionButton
                   variant="secondary"
-                  size="small"
-                  leadingIcon={Plus}
+                  size="sm"
+                  icon={Plus}
                   className="mt-1 self-start"
                   onClick={() =>
                     setCheckin({
@@ -307,11 +308,11 @@ export function AdminMarketingRulesPage() {
                   }
                 >
                   添加加成档位
-                </Button>
+                </ActionButton>
               )}
             </div>
 
-            <SwitchBox
+            <SwitchField
               checked={checkin.enabled}
               disabled={!writable}
               onChange={(checked) => setCheckin({ ...checkin, enabled: checked })}

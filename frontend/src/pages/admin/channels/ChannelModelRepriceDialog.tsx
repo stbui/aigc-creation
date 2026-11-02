@@ -2,13 +2,13 @@ import { useMemo, useState } from 'react';
 import { Calculator } from 'lucide-react';
 import { adminChannelsApi } from './api';
 import {
-  Button,
+  ActionButton,
   FormField,
   ModalDialog,
   Notice,
-  NumberInput,
-  SelectBox,
-  TextInput,
+  NumberField,
+  SelectField,
+  TextField,
 } from './components';
 import { useToast } from './hooks';
 import {
@@ -165,17 +165,17 @@ export function ChannelModelRepriceDialog({
       description={`渠道 ${channelName}：只改已启用规格的售价，不改成本与启停状态`}
       footer={
         <>
-          <Button variant="secondary" size="small" disabled={saving} onClick={onClose}>
+          <ActionButton variant="secondary" size="sm" disabled={saving} onClick={onClose}>
             取消
-          </Button>
-          <Button
-            variant="primary"
-            size="small"
+          </ActionButton>
+          <ActionButton
+            variant="default"
+            size="sm"
             disabled={saving || Boolean(validationError) || reasonMissing || changed === 0}
             onClick={() => void save()}
           >
             {saving ? '保存中…' : changed > 0 ? `保存售价（${changed} 项）` : '保存售价'}
-          </Button>
+          </ActionButton>
         </>
       }
     >
@@ -183,7 +183,7 @@ export function ChannelModelRepriceDialog({
         <div className="flex flex-wrap items-end gap-3">
           <div className="w-[180px]">
             <FormField label="加价率" hint="0–1000%，最多两位小数">
-              <NumberInput
+              <NumberField
                 ariaLabel="加价率"
                 value={markup}
                 min={0}
@@ -195,7 +195,7 @@ export function ChannelModelRepriceDialog({
           </div>
           <div className="w-[150px]">
             <FormField label="保留小数位" hint="按此精度一次四舍五入">
-              <SelectBox
+              <SelectField
                 ariaLabel="保留小数位"
                 value={String(decimalPlaces)}
                 options={DECIMAL_OPTIONS}
@@ -206,18 +206,18 @@ export function ChannelModelRepriceDialog({
               />
             </FormField>
           </div>
-          <Button
+          <ActionButton
             variant="secondary"
-            size="small"
-            leadingIcon={Calculator}
+            size="sm"
+            icon={Calculator}
             disabled={saving || markup === undefined}
             onClick={() => recalculate(markup, decimalPlaces)}
           >
             按成本重算
-          </Button>
-          <div className="flex-1 text-[11px] leading-4 text-text-tertiary">
+          </ActionButton>
+          <div className="flex-1 text-[11px] leading-4 text-muted-foreground">
             新售价 = 成本价 ×（1 + 加价率）。改加价率或小数位会按成本重算全部规格售价，
-            <strong className="font-medium text-text-secondary">覆盖手动修改</strong>；重算后仍可逐项编辑，保存以输入框的最终值为准。
+            <strong className="font-medium text-muted-foreground">覆盖手动修改</strong>；重算后仍可逐项编辑，保存以输入框的最终值为准。
           </div>
         </div>
 
@@ -234,7 +234,7 @@ export function ChannelModelRepriceDialog({
         } />
 
         <div className="flex items-center justify-between gap-3">
-          <span className="text-[11px] text-text-tertiary">
+          <span className="text-[11px] text-muted-foreground">
             {rows.length} 个计费项 · 已修改 {changed} 项 ·
             四舍五入及手动修改可能使实际加价率偏离目标；价格配置发生变化时整批拒绝保存，请刷新后重试。
           </span>
@@ -245,7 +245,7 @@ export function ChannelModelRepriceDialog({
               hint="写入审计，建议写清加价口径"
               error={reasonMissing ? '调价是高危写操作，必须填写原因' : null}
             >
-              <TextInput
+              <TextField
                 ariaLabel="变更原因"
                 value={reason}
                 disabled={saving}
@@ -310,25 +310,25 @@ function RepriceTable({
 
   if (rows.length === 0) {
     return (
-      <p className="rounded-lg border border-border-table px-3 py-6 text-center text-xs text-text-tertiary">
+      <p className="rounded-lg border border-border px-3 py-6 text-center text-xs text-muted-foreground">
         所选模型没有已启用的价格档，无法调价。
       </p>
     );
   }
 
   return (
-    <div className="flex max-h-[420px] flex-col gap-2 overflow-y-auto rounded-lg border border-border-table p-2">
+    <div className="flex max-h-[420px] flex-col gap-2 overflow-y-auto rounded-lg border border-border p-2">
       {groups.map((group) => (
-        <div key={group[0].modelId} className="rounded-lg border border-border-table">
-          <div className="flex items-center gap-2 border-b border-border-table px-3 py-2">
-            <span className="font-mono text-[12px] text-text-primary">{group[0].modelKey}</span>
-            <span className="text-[11px] text-text-tertiary">
+        <div key={group[0].modelId} className="rounded-lg border border-border">
+          <div className="flex items-center gap-2 border-b border-border px-3 py-2">
+            <span className="font-mono text-[12px] text-foreground">{group[0].modelKey}</span>
+            <span className="text-[11px] text-muted-foreground">
               {group[0].modelName}
               {group[0].channelLabel ? ` · ${group[0].channelLabel}` : ''}
               {group[0].providerModelKey ? ` · 上游 ${group[0].providerModelKey}` : ''}
             </span>
           </div>
-          <div className="flex flex-col divide-y divide-border-table">
+          <div className="flex flex-col divide-y divide-border">
             {group.map((row) => {
               let sale: number | null = null;
               try {
@@ -340,14 +340,14 @@ function RepriceTable({
               return (
                 <div key={row.key} className="flex items-center gap-3 px-3 py-2">
                   <div className="min-w-0 w-[240px]">
-                    <div className="truncate text-[12px] text-text-primary">{row.specLabel}</div>
-                    <div className="truncate text-[11px] text-text-tertiary">
+                    <div className="truncate text-[12px] text-foreground">{row.specLabel}</div>
+                    <div className="truncate text-[11px] text-muted-foreground">
                       {row.field.label ? `${row.field.label} · ` : ''}
                       成本 {row.cost === null ? '未配置' : saleInputValue(row.cost)}
                     </div>
                   </div>
                   <div className="w-[160px]">
-                    <TextInput
+                    <TextField
                       ariaLabel={`${row.modelName} ${row.specLabel} ${row.field.label} 销售价`}
                       value={row.sale}
                       disabled={disabled}
@@ -355,9 +355,9 @@ function RepriceTable({
                       inputMode="decimal"
                     />
                   </div>
-                  <div className="flex-1 text-[11px] text-text-tertiary">
+                  <div className="flex-1 text-[11px] text-muted-foreground">
                     {sale === null ? (
-                      <span className="text-rose-600">售价无效</span>
+                      <span className="text-danger-text">售价无效</span>
                     ) : (
                       <>
                         {row.manual ? '手动修改 · ' : ''}

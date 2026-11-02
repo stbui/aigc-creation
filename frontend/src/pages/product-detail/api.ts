@@ -13,7 +13,7 @@ import type { GenerateResponse, KnownCapability } from '../../types/api';
  */
 
 /** 通用接口模块 (生成 / 提示词工具) */
-export { generateApi, promptToolsApi } from '../../lib/api';
+export { generateApi, newIdempotencyKey, promptToolsApi } from '../../lib/api';
 
 /** 前台模型目录数据层: 建任务必须解析出 `logicalModelId` */
 export { resolveModelId } from '../../lib/models';
@@ -35,6 +35,8 @@ export interface DetailGenerationInput {
   sections: string[];
   /** 画质档位 (1k / 2k / 4k) → 任务参数 `size` */
   resolution: string;
+  /** 用户提交意图的幂等键；同一次提交的网络重试必须复用 */
+  idempotencyKey?: string;
 }
 
 /**
@@ -49,6 +51,7 @@ export function startDetailGeneration(input: DetailGenerationInput): Promise<Gen
     capability: DETAIL_CAPABILITY,
     logicalModelId: input.logicalModelId,
     inputAssetIds: input.inputAssetIds,
+    idempotencyKey: input.idempotencyKey,
     params: {
       productName: input.productName.trim(),
       brand: input.brand.trim(),

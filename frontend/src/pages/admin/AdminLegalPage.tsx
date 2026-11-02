@@ -1,19 +1,27 @@
 import { useState, type ReactNode } from 'react';
-import { Button } from '../../admin-ui/shadcn/kit';
+import {
+  ActionButton,
+  AdminDataTable,
+  ConfirmAction,
+  Drawer,
+  FilterActions,
+  FilterBar,
+  FormField,
+  ModalDialog,
+  PageHeader,
+  Panel,
+  SelectField,
+  StatusTag,
+  StaleError,
+  TextAreaField,
+  TextField,
+  useAdminResource,
+  type AdminColumn,
+} from '../../admin-ui/primitives';
 import { adminLegalApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
-import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
-import { Drawer } from '../../admin-ui/primitives/Drawer';
-import { ModalDialog } from '../../admin-ui/primitives/Dialog';
-import { SelectBox, TextArea, TextInput } from '../../admin-ui/controls';
-import {
-  AdminStaleError,
-  ConfirmAction,
-  useAdminResource,
-} from '../../components/admin/AdminWidgets';
-import { FilterActions, FilterBar, PageHeader, Panel, StatusTag } from '../../components/admin/PageHeader';
 import type { AdminLegalDoc, LegalSlug, LegalStatus } from '../../types/api';
 
 const SLUGS: { value: LegalSlug; label: string }[] = [
@@ -58,16 +66,15 @@ interface FormState {
 }
 
 /**
- * 法务文档（BoardUI）。
+ * 法务文档（后台）。
  *
  * 版本化的三条硬约束不能因为换界面而松动：
  *   1. 已发布的版本不可原地覆盖 —— 编辑只对草稿与归档版本开放；
  *   2. 保存只建草稿，发布走独立接口（它负责归档同文档的旧版本）；
  *   3. 发布是高危动作，必须填原因并写审计。
  *
- * 渲染层变化：读原文预览从 antd Modal 换成 `ModalDialog`，编辑表单从 antd
- * Drawer 换成 `Drawer` 原语（带固定操作区，长正文滚动时按钮不跑），未保存
- * 拦截与关闭确认沿用同一套 hook。
+ * 渲染层：读原文预览用 `ModalDialog`，编辑表单用 `Drawer` 原语（带固定操作区，
+ * 长正文滚动时按钮不跑），未保存拦截与关闭确认沿用同一套 hook。
  */
 export function AdminLegalPage() {
   const toast = useToast();
@@ -187,7 +194,7 @@ export function AdminLegalPage() {
       key: 'version',
       title: '版本',
       width: 120,
-      render: (row) => <code className="font-mono text-[11px] text-text-secondary">{row.version}</code>,
+      render: (row) => <code className="font-mono text-[11px] text-muted-foreground">{row.version}</code>,
     },
     {
       key: 'title',
@@ -215,30 +222,30 @@ export function AdminLegalPage() {
       fixed: 'right',
       render: (row) => (
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="small" onClick={() => setPreview(row)}>
+          <ActionButton variant="ghost" size="sm" onClick={() => setPreview(row)}>
             查看
-          </Button>
+          </ActionButton>
           {writable && row.status !== 'published' && (
-            <Button variant="ghost" size="small" onClick={() => openEdit(row)}>
+            <ActionButton variant="ghost" size="sm" onClick={() => openEdit(row)}>
               编辑
-            </Button>
+            </ActionButton>
           )}
           {writable && row.status !== 'published' && (
-            <Button
+            <ActionButton
               variant="ghost"
-              size="small"
+              size="sm"
               onClick={() => {
                 setPublishReason('');
                 setPublishTarget(row);
               }}
             >
               发布
-            </Button>
+            </ActionButton>
           )}
           {writable && (
-            <Button variant="ghost" size="small" onClick={() => openCreate(row)}>
+            <ActionButton variant="ghost" size="sm" onClick={() => openCreate(row)}>
               新版本
-            </Button>
+            </ActionButton>
           )}
         </div>
       ),
@@ -252,15 +259,15 @@ export function AdminLegalPage() {
         description="协议文本按版本管理：已发布的版本不可覆盖，修改须新建版本后发布；发布新版本时同文档的旧版本自动归档。"
         actions={
           writable ? (
-            <Button variant="primary" size="small" onClick={() => openCreate()}>
+            <ActionButton variant="default" size="sm" onClick={() => openCreate()}>
               新建版本
-            </Button>
+            </ActionButton>
           ) : undefined
         }
       />
 
       <FilterBar>
-        <SelectBox
+        <SelectField
           className="w-48"
           ariaLabel="按文档筛选"
           placeholder="全部文档"
@@ -270,15 +277,15 @@ export function AdminLegalPage() {
           options={SLUGS}
         />
         <FilterActions>
-          <Button variant="secondary" size="small" onClick={() => void reload()}>
+          <ActionButton variant="secondary" size="sm" onClick={() => void reload()}>
             刷新
-          </Button>
+          </ActionButton>
         </FilterActions>
       </FilterBar>
 
       <Panel>
         {error && rows.length > 0 && (
-          <AdminStaleError error={error} onRetry={() => void reload()} />
+          <StaleError error={error} onRetry={() => void reload()} />
         )}
         {/*
          * 法务文档总量小（4 类 × 若干版本），后端一次全量返回，因此不做分页：
@@ -308,7 +315,7 @@ export function AdminLegalPage() {
         }
       >
         {preview && (
-          <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-6 text-text-primary">
+          <pre className="whitespace-pre-wrap break-words font-mono text-xs leading-6 text-foreground">
             {preview.content}
           </pre>
         )}
@@ -324,24 +331,23 @@ export function AdminLegalPage() {
         description={formDirty ? '有未保存修改' : undefined}
         footer={
           <>
-            <Button variant="secondary" size="small" onClick={requestCloseForm}>
+            <ActionButton variant="secondary" size="sm" onClick={requestCloseForm}>
               取消
-            </Button>
-            <Button
-              variant="primary"
-              size="small"
+            </ActionButton>
+            <ActionButton
+              variant="default"
+              size="sm"
               disabled={busy}
               onClick={() => void save()}
             >
               {busy ? '保存中…' : '保存草稿'}
-            </Button>
+            </ActionButton>
           </>
         }
       >
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-text-secondary">文档类型</label>
-            <SelectBox
+          <FormField label="文档类型">
+            <SelectField
               ariaLabel="文档类型"
               className="w-56"
               value={form.slug}
@@ -349,11 +355,13 @@ export function AdminLegalPage() {
               onChange={(value) => setForm((f) => ({ ...f, slug: value as LegalSlug }))}
               options={SLUGS}
             />
-          </div>
+          </FormField>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-text-secondary">版本号</label>
-            <TextInput
+          <FormField
+            label="版本号"
+            hint="版本号一经使用即固定：已发布的版本不允许改正文，要改请用新版本号；同一 (文档, 版本) 的草稿可反复保存。"
+          >
+            <TextField
               ariaLabel="版本号"
               className="w-56"
               value={form.version}
@@ -362,39 +370,38 @@ export function AdminLegalPage() {
               maxLength={40}
               onChange={(value) => setForm((f) => ({ ...f, version: value }))}
             />
-            <p className="text-[11px] leading-4 text-text-tertiary">
-              版本号一经使用即固定：已发布的版本不允许改正文，要改请用新版本号；同一 (文档, 版本) 的草稿可反复保存。
-            </p>
-          </div>
+          </FormField>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-text-secondary">标题</label>
-            <TextInput
+          <FormField label="标题">
+            <TextField
               ariaLabel="标题"
               value={form.title}
               maxLength={80}
               onChange={(value) => setForm((f) => ({ ...f, title: value }))}
             />
-          </div>
+          </FormField>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-text-secondary">正文</label>
-            <TextArea
+          <FormField
+            label="正文"
+            hint={
+              <>
+                支持轻量 Markdown：<Code>## 标题</Code>、<Code>&gt; 提示</Code>、空行分段、
+                <Code>**粗体**</Code>。前台按这四种形态渲染。
+              </>
+            }
+          >
+            <TextAreaField
               ariaLabel="正文"
               value={form.content}
               rows={18}
               onChange={(value) => setForm((f) => ({ ...f, content: value }))}
             />
-            <p className="text-[11px] leading-4 text-text-tertiary">
-              支持轻量 Markdown：<Code>## 标题</Code>、<Code>&gt; 提示</Code>、空行分段、
-              <Code>**粗体**</Code>。前台按这四种形态渲染。
-            </p>
-          </div>
+          </FormField>
 
           {formError && (
             <div
               role="alert"
-              className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800"
+              className="rounded-lg border border-danger-soft bg-danger-soft px-3 py-2 text-xs text-danger-text"
             >
               {formError}
             </div>
@@ -413,11 +420,8 @@ export function AdminLegalPage() {
         confirmText="发布"
         loading={busy}
         extra={
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="lg-publish-reason" className="text-xs text-text-secondary">
-              操作原因（必填，写入审计）
-            </label>
-            <TextArea
+          <FormField label="操作原因（必填，写入审计）">
+            <TextAreaField
               ariaLabel="操作原因"
               rows={2}
               maxLength={200}
@@ -425,7 +429,7 @@ export function AdminLegalPage() {
               placeholder="如：V2 补充未成年人保护条款，法务 2026-10-21 定稿"
               onChange={setPublishReason}
             />
-          </div>
+          </FormField>
         }
         onConfirm={() => void doPublish()}
         onCancel={() => setPublishTarget(null)}
@@ -435,5 +439,5 @@ export function AdminLegalPage() {
 }
 
 function Code({ children }: { children: ReactNode }) {
-  return <code className="rounded bg-background-secondary-default px-1 font-mono text-[11px]">{children}</code>;
+  return <code className="rounded bg-muted px-1 font-mono text-[11px]">{children}</code>;
 }

@@ -222,19 +222,23 @@ export function ResultGalleryPane({
   const { message, modal } = App.useApp();
   const [cols, setCols] = useState<number>(readGridCols);
   /*
-   * 大图预览按**索引**保存, 而不是按对象: 查看器要支持 ←/→ 翻页,
-   * 索引天然跟随同一个列表; 按对象保存翻页时还得反查下标, 列表刷新后
-   * 还可能指向一个已经不在页面上的旧对象。
+   * 大图预览与右键菜单都按**素材/任务 id** 保存，而不是索引。
+   *
+   * 轮询 reload 或新图 prepend 会改变数组顺序；若保存的是下标，菜单/预览会
+   * 悄悄指向另一张图，用户点“删除/下载/用作参考图”就可能操作错对象。
    */
-  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
-  /** 右键菜单的锚点与目标图 (index 指向 items) */
-  const [menu, setMenu] = useState<{ index: number; x: number; y: number } | null>(null);
+  const [previewId, setPreviewId] = useState<string | null>(null);
+  /** 右键菜单的锚点与目标图 id */
+  const [menu, setMenu] = useState<{ itemId: string; x: number; y: number } | null>(null);
   /**
    * 已完成 (有 url) 的项。生成中的任务也会出现在 items 里 (离开页面再回来时
    * 由服务端状态回填), 它们没有 url, 只能渲染成占位卡, 也不能进大图查看器。
    */
   const readyItems = useMemo(() => items.filter((item) => Boolean(item.url)), [items]);
   const activeCount = items.length - readyItems.length;
+  const previewIndex = previewId
+    ? readyItems.findIndex((item) => item.id === previewId)
+    : -1;
 
   const changeCols = useCallback((next: number) => {
     setCols(next);
@@ -245,17 +249,14 @@ export function ResultGalleryPane({
     }
   }, []);
 
-  // 列表变化后, 越界的预览索引要收敛, 否则删完最后一张查看器会指向 undefined
+  // 列表变化时按 id 重新定位；目标被删除后自动关闭，而不是指向下一张
   useEffect(() => {
-    setPreviewIndex((prev) => {
-      if (prev === null) return null;
-      if (readyItems.length === 0) return null;
-      return Math.min(prev, readyItems.length - 1);
-    });
-  }, [readyItems.length]);
+    if (menu && !items.some((item) => item.id === menu.itemId)) setMenu(null);
+    if (previewId && !readyItems.some((item) => item.id === previewId)) setPreviewId(null);
+  }, [items, readyItems, menu, previewId]);
 
-  const openMenu = useCallback((x: number, y: number, index: number) => {
-    setMenu({ index, x, y });
+  const openMenu = useCallback((x: number, y: number, itemId: string) => {
+    setMenu({ itemId, x, y });
   }, []);
 
   const copyImageUrl = async (item: GalleryItem) => {
@@ -379,8 +380,8 @@ export function ResultGalleryPane({
                   key={item.id}
                   item={item}
                   priority={i < PRIORITY_THUMBS}
-                  onOpen={() => setPreviewIndex(readyItems.findIndex((x) => x.id === item.id))}
-                  onContextMenu={(e) => openMenu(e.clientX, e.clientY, i)}
+                  onOpen={() => setPreviewId(item.id)}
+                  onContextMenu={(e) => openMenu(e.clientX, e.clientY, item.id)}
                 />
               ) : (
                 <div
@@ -401,22 +402,21 @@ export function ResultGalleryPane({
       )}
 
       {/* 生成图大图查看器 (点缩略图打开; 整屏、可缩放、可翻页) */}
-      {previewIndex !== null && readyItems[previewIndex] && (
+      {previewIndex >= 0 && readyItems[previewIndex] && (
         <ImageLightbox
           items={readyItems}
           index={previewIndex}
-          onIndexChange={setPreviewIndex}
-          onClose={() => setPreviewIndex(null)}
+          onIndexChange={(next) => setPreviewId(readyItems[next]?.id ?? null)}
+          onClose={() => setPreviewId(null)}
           onItemContextMenu={(pos, i) => {
             const target = readyItems[i];
-            const fullIndex = target ? items.findIndex((x) => x.id === target.id) : -1;
-            if (fullIndex >= 0) openMenu(pos.x, pos.y, fullIndex);
+            if (target) openMenu(pos.x, pos.y, target.id);
           }}
         />
       )}
 
       {/* 结果图右键菜单 (缩略图与查看器共用同一套动作) */}
-      {menu && items[menu.index] && (
+      {menu && items.some((item) => item.id === menu.itemId) && (
         <ImageContextMenu
           x={menu.x}
           y={menu.y}
@@ -429,7 +429,7 @@ export function ResultGalleryPane({
 
   function buildMenuItems(): ImageMenuItem[] {
     if (!menu) return [];
-    const item = items[menu.index];
+    const item = items.find((entry) => entry.id === menu.itemId);
     if (!item) return [];
     const extras = extraActions?.(item) ?? [];
     return [
@@ -438,8 +438,7 @@ export function ResultGalleryPane({
         label: '查看大图',
         icon: Maximize2,
         onSelect: () => {
-          const index = readyItems.findIndex((x) => x.id === item.id);
-          if (index >= 0) setPreviewIndex(index);
+          if (item.url) setPreviewId(item.id);
         },
       },
       ...(item.prompt

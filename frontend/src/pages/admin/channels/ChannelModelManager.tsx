@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { adminChannelsApi } from './api';
-import { ConfirmAction, Notice, TextInput } from './components';
+import { ConfirmAction, Notice, TextField } from './components';
 import { useToast } from './hooks';
 import { ChannelModelFormDialog } from './ChannelModelFormDialog';
 import { ChannelModelRepriceDialog } from './ChannelModelRepriceDialog';
@@ -9,7 +9,15 @@ import { ChannelOrderDialog } from './ChannelOrderDialog';
 import { ChannelUpstreamDialog } from './ChannelUpstreamDialog';
 import { Field } from './ChannelField';
 import { EMPTY_MODEL_DRAFT, EMPTY_TIER, type ModelDraft } from './constants';
-import { parseSelector, priceOf, textToTags, toModelDraft } from './utils';
+import {
+  parseSelector,
+  priceOf,
+  toModelDraft,
+  staleTierUpstream,
+  clearStaleTierUpstream,
+  validateModelTags,
+  validateModelTiers,
+} from './utils';
 import { useChannelModelHealth, useChannelModels, useProtocolCatalog } from './useChannelModels';
 import type {
   AdminChannelModelView,
@@ -41,12 +49,15 @@ import type {
 export function ChannelModelManager({
   channel,
   writable,
+  canTest = true,
   onChanged,
   focusModelId,
   onFocusConsumed,
 }: {
   channel: AdminChannelView;
   writable: boolean;
+  /** 是否可发起连通性测试（`channel.test` 权限，与改配置权限分开） */
+  canTest?: boolean;
   onChanged: () => void;
   /** 从「全部模型」跳过来时要直接打开的模型 id；消费后由父级清空 */
   focusModelId?: string | null;
@@ -159,11 +170,20 @@ export function ChannelModelManager({
     let modelKey = `${model.modelKey}-copy`;
     let index = 2;
     while (existing.has(modelKey)) modelKey = `${model.modelKey}-copy-${index++}`;
+    const base = toModelDraft(model);
+    /*
+     * 副本清空「档位级上游键」，保留「模型级上游键」。
+     *
+     * 档位级上游键是显式指向某个上游 SKU 的；照抄过来会让副本继续打旧上游，
+     * 改模型级上游名时又出现「档位没跟随」的老问题。模型级上游键是这份配置的
+     * 主体（同价换 SKU 的常见用法），保留。
+     */
     setDraft({
-      ...toModelDraft(model),
+      ...base,
       modelKey,
       displayName: model.displayName ? `${model.displayName} 副本` : '',
       enabled: false,
+      tiers: base.tiers.map((tier) => ({ ...tier, providerModelKey: '' })),
     });
     setEditing(null);
     setCreating(true);
@@ -199,6 +219,11 @@ export function ChannelModelManager({
     }
     let priceTiers;
     try {
+      const tierError = validateModelTiers(draft.capability, draft.tiers);
+      if (tierError) {
+        toast.error(tierError);
+        return;
+      }
       priceTiers = draft.tiers
         .filter((tier) => tier.enabled || tier.unit !== '0' || tier.output !== '0')
         .map((tier) => ({
@@ -227,17 +252,25 @@ export function ChannelModelManager({
       toast.error(e instanceof Error ? e.message : '价格格式不正确');
       return;
     }
-    const body = {
-      modelKey,
-      providerModelKey: draft.providerModelKey.trim() || modelKey,
-      displayName: draft.displayName.trim(),
-      channelLabel: draft.channelLabel.trim(),
-      description: draft.description.trim(),
-      icon: draft.icon.trim(),
-      capability: draft.capability,
-      protocol: draft.protocol,
-      priceCurrency: draft.priceCurrency,
-      tags: textToTags(draft.tags),
+      // 标签已在编辑器里结构化维护；提交前再校验一次，避免绕过界面的写入
+      const tagError = validateModelTags(draft.tags);
+      if (tagError) {
+        toast.error(tagError);
+        return;
+      }
+      const body = {
+        modelKey,
+        providerModelKey: draft.providerModelKey.trim() || modelKey,
+        displayName: draft.displayName.trim(),
+        channelLabel: draft.channelLabel.trim(),
+        description: draft.description.trim(),
+        icon: draft.icon.trim(),
+        capability: draft.capability,
+        protocol: draft.protocol,
+        priceCurrency: draft.priceCurrency,
+        tags: draft.tags
+          .map((tag) => ({ text: tag.text.trim(), color: tag.color }))
+          .filter((tag) => tag.text !== ''),
       capabilityConfig,
       enabled: draft.enabled,
       priceTiers,
@@ -413,6 +446,13 @@ export function ChannelModelManager({
           }}
           onClose={closeForm}
           onSubmit={() => void submit()}
+          previousProviderModelKey={editing?.providerModelKey ?? ''}
+          onFollowModelUpstream={() => {
+            const stale = staleTierUpstream(draft, editing?.providerModelKey ?? '');
+            if (stale.length === 0) return;
+            setDraft(clearStaleTierUpstream(draft, stale));
+            toast.success(`已清除 ${stale.length} 个档位的独立上游名，改为跟随模型`);
+          }}
         />
 
         <ChannelUpstreamDialog
@@ -440,6 +480,7 @@ export function ChannelModelManager({
             healthLoading={healthLoading}
             selectedIds={selectedIds}
             writable={writable}
+            canTest={canTest}
             testing={testing}
             testResult={testResult}
             onSelectedChange={setSelectedIds}
@@ -482,7 +523,7 @@ export function ChannelModelManager({
                 hint="写入审计，建议写清替代模型或下线原因"
                 error={deleteReason.trim().length === 0 ? '删除是高危操作，必须填写原因' : null}
               >
-                <TextInput
+                <TextField
                   ariaLabel="删除原因"
                   value={deleteReason}
                   onChange={setDeleteReason}
@@ -511,7 +552,7 @@ export function ChannelModelManager({
                 hint="写入审计"
                 error={batchDeleteReason.trim().length === 0 ? '删除是高危操作，必须填写原因' : null}
               >
-                <TextInput
+                <TextField
                   ariaLabel="批量删除原因"
                   value={batchDeleteReason}
                   onChange={setBatchDeleteReason}

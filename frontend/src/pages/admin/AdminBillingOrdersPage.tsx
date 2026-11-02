@@ -1,29 +1,31 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Button } from '../../admin-ui/shadcn/kit';
-import { adminBillingOrdersApi } from '../../lib/api';
-import { useAdmin } from '../../context/AdminContext';
-import { useToast } from '../../admin-ui/providers/ToastProvider';
-import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
-import { Drawer } from '../../admin-ui/primitives/Drawer';
-import { Descriptions, Notice } from '../../admin-ui/primitives';
-import { SelectBox, TextArea, TextInput } from '../../admin-ui/controls';
-import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import {
-  AdminStaleError,
+  ActionButton,
+  AdminDataTable,
+  AppliedFilters,
+  Descriptions,
+  Drawer,
+  FilterActions,
+  FilterBar,
+  Notice,
+  PageHeader,
+  Panel,
+  SelectField,
+  StatCard,
+  StatusTag,
+  StaleError,
+  TextAreaField,
+  TextField,
   useAdminDetailParam,
   useAdminList,
   useAdminResource,
-} from '../../components/admin/AdminWidgets';
-import {
-  AppliedFilters,
-  FilterActions,
-  FilterBar,
-  PageHeader,
-  Panel,
-  StatCard,
-  StatusTag,
+  type AdminColumn,
   type AppliedFilter,
-} from '../../components/admin/PageHeader';
+} from '../../admin-ui/primitives';
+import { adminBillingOrdersApi } from '../../lib/api';
+import { useAdmin } from '../../context/AdminContext';
+import { useToast } from '../../admin-ui/providers/ToastProvider';
+import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import { toCredits, toCreditsInput } from '../../lib/microcredits';
 import type { BillingOrderListResult, BillingOrderView } from '../../types/model';
 
@@ -211,7 +213,7 @@ export function AdminBillingOrdersPage() {
         title: '时间',
         width: 150,
         render: (row) => (
-          <span className="text-[11px] tabular-nums text-text-secondary">
+          <span className="text-[11px] tabular-nums text-muted-foreground">
             {new Date(row.createdAt).toLocaleString('zh-CN')}
           </span>
         ),
@@ -222,8 +224,8 @@ export function AdminBillingOrdersPage() {
         width: 180,
         render: (row) => (
           <div className="min-w-0">
-            <div className="truncate text-[11px] text-text-primary">{row.userEmail || '—'}</div>
-            <div className="truncate font-mono text-[10px] text-text-tertiary">{row.userId}</div>
+            <div className="truncate text-[11px] text-foreground">{row.userEmail || '—'}</div>
+            <div className="truncate font-mono text-[10px] text-muted-foreground">{row.userId}</div>
           </div>
         ),
       },
@@ -233,8 +235,8 @@ export function AdminBillingOrdersPage() {
         width: 170,
         render: (row) => (
           <div className="min-w-0">
-            <div className="truncate font-mono text-[11px] text-text-primary">{row.model || '—'}</div>
-            <div className="truncate text-[10px] text-text-tertiary">
+            <div className="truncate font-mono text-[11px] text-foreground">{row.model || '—'}</div>
+            <div className="truncate text-[10px] text-muted-foreground">
               {row.capability}
               {row.scene ? ` · ${row.scene}` : ''}
             </div>
@@ -247,8 +249,8 @@ export function AdminBillingOrdersPage() {
         width: 180,
         render: (row) => (
           <div className="min-w-0">
-            <div className="truncate text-[11px] text-text-primary">{row.channelName || '—'}</div>
-            <div className="truncate text-[10px] text-text-tertiary">{row.channelModelName || '—'}</div>
+            <div className="truncate text-[11px] text-foreground">{row.channelName || '—'}</div>
+            <div className="truncate text-[10px] text-muted-foreground">{row.channelModelName || '—'}</div>
           </div>
         ),
       },
@@ -258,8 +260,8 @@ export function AdminBillingOrdersPage() {
         width: 120,
         render: (row) => (
           <div className="flex flex-col gap-0.5 text-[11px]">
-            <span className="text-text-primary">{BILLING_MODE_LABELS[row.billingMode] ?? row.billingMode}</span>
-            <span className="tabular-nums text-text-tertiary">
+            <span className="text-foreground">{BILLING_MODE_LABELS[row.billingMode] ?? row.billingMode}</span>
+            <span className="tabular-nums text-muted-foreground">
               数量 {row.quantity}
               {row.multiplierBasisPoints !== 10000 ? ` · 倍率 ${row.multiplierBasisPoints / 100}%` : ''}
             </span>
@@ -273,9 +275,9 @@ export function AdminBillingOrdersPage() {
         align: 'right',
         render: (row) => (
           <div className="flex flex-col gap-0.5 text-[11px] tabular-nums">
-            <span className="text-text-primary">{toCredits(row.actualAmountMicrocredits || row.reservedAmountMicrocredits)}</span>
+            <span className="text-foreground">{toCredits(row.actualAmountMicrocredits || row.reservedAmountMicrocredits)}</span>
             {row.refundedAmountMicrocredits > 0 && (
-              <span className="text-amber-700">退 {toCredits(row.refundedAmountMicrocredits)}</span>
+              <span className="text-warn-text">退 {toCredits(row.refundedAmountMicrocredits)}</span>
             )}
           </div>
         ),
@@ -298,7 +300,7 @@ export function AdminBillingOrdersPage() {
         width: 80,
         fixed: 'right',
         render: (row) => (
-          <Button
+          <ActionButton
             variant="ghost"
             size="xs"
             onClick={() => {
@@ -308,7 +310,7 @@ export function AdminBillingOrdersPage() {
             }}
           >
             详情
-          </Button>
+          </ActionButton>
         ),
       },
     ],
@@ -333,61 +335,61 @@ export function AdminBillingOrdersPage() {
         ))}
       </div>
 
-      <Panel title="账单列表" note="「结果不明」既不切线也不退款，需要人工核对后落到结算或退款。">
-        <FilterBar>
-          <SelectBox
-            ariaLabel="账单状态"
-            value={status}
-            options={STATUS_OPTIONS}
-            allowClear
-            onChange={setStatus}
-          />
-          <SelectBox
-            ariaLabel="计费方式"
-            value={billingMode}
-            options={[
-              { value: 'fixed_request', label: '按次' },
-              { value: 'per_second', label: '按秒' },
-              { value: 'token', label: '按 Token' },
-            ]}
-            allowClear
-            onChange={setBillingMode}
-          />
-          <TextInput
-            ariaLabel="模型编码"
-            value={model}
-            onChange={setModel}
-            placeholder="前台模型编码"
-            onEnter={applyFilters}
-          />
-          <TextInput
-            ariaLabel="用户 ID"
-            value={userId}
-            onChange={setUserId}
-            placeholder="用户 ID"
-            onEnter={applyFilters}
-          />
-          <TextInput
-            ariaLabel="任务 ID"
-            value={taskId}
-            onChange={setTaskId}
-            placeholder="任务 ID"
-            onEnter={applyFilters}
-          />
-          <TextInput ariaLabel="开始日期" type="date" value={from} onChange={setFrom} />
-          <TextInput ariaLabel="结束日期" type="date" value={to} onChange={setTo} />
-          <FilterActions>
-            <Button variant="primary" size="small" onClick={applyFilters}>
-              查询
-            </Button>
-            <Button variant="secondary" size="small" onClick={resetFilters}>
-              重置
-            </Button>
-          </FilterActions>
-          <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
-        </FilterBar>
+      <FilterBar>
+        <SelectField
+          ariaLabel="账单状态"
+          value={status}
+          options={STATUS_OPTIONS}
+          allowClear
+          onChange={setStatus}
+        />
+        <SelectField
+          ariaLabel="计费方式"
+          value={billingMode}
+          options={[
+            { value: 'fixed_request', label: '按次' },
+            { value: 'per_second', label: '按秒' },
+            { value: 'token', label: '按 Token' },
+          ]}
+          allowClear
+          onChange={setBillingMode}
+        />
+        <TextField
+          ariaLabel="模型编码"
+          value={model}
+          onChange={setModel}
+          placeholder="前台模型编码"
+          onEnter={applyFilters}
+        />
+        <TextField
+          ariaLabel="用户 ID"
+          value={userId}
+          onChange={setUserId}
+          placeholder="用户 ID"
+          onEnter={applyFilters}
+        />
+        <TextField
+          ariaLabel="任务 ID"
+          value={taskId}
+          onChange={setTaskId}
+          placeholder="任务 ID"
+          onEnter={applyFilters}
+        />
+        <TextField ariaLabel="开始日期" type="date" value={from} onChange={setFrom} />
+        <TextField ariaLabel="结束日期" type="date" value={to} onChange={setTo} />
+        <FilterActions>
+          <ActionButton variant="default" size="sm" onClick={applyFilters}>
+            查询
+          </ActionButton>
+          <ActionButton variant="secondary" size="sm" onClick={resetFilters}>
+            重置
+          </ActionButton>
+        </FilterActions>
+        <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
+      </FilterBar>
 
-        {error && rows.length > 0 && <AdminStaleError error={error} onRetry={() => void reload()} />}
+      <Panel title="账单列表" note="「结果不明」既不切线也不退款，需要人工核对后落到结算或退款。">
+        {error && rows.length > 0 && <StaleError error={error} onRetry={() => void reload()} />}
         <AdminDataTable<BillingOrderView>
           rows={rows}
           columns={columns}
@@ -416,18 +418,23 @@ export function AdminBillingOrdersPage() {
         description={detail ? `${STATUS_LABELS[detail.status] ?? detail.status} · ${detail.id}` : undefined}
         footer={
           <>
-            <Button variant="secondary" size="small" onClick={requestCloseDetail} disabled={resolving}>
+            <ActionButton
+              variant="secondary"
+              size="sm"
+              onClick={requestCloseDetail}
+              disabled={resolving}
+            >
               关闭
-            </Button>
+            </ActionButton>
             {resolvable && detail && (detail.status === 'uncertain' || detail.status === 'reserved' || detail.status === 'running') && (
-              <Button
-                variant="primary"
-                size="small"
+              <ActionButton
+                variant="default"
+                size="sm"
                 disabled={resolving || !reason.trim()}
                 onClick={() => void runResolve()}
               >
                 {resolving ? '处理中…' : action === 'refund' ? '确认退款' : '确认结算'}
-              </Button>
+              </ActionButton>
             )}
           </>
         }
@@ -487,25 +494,25 @@ export function AdminBillingOrdersPage() {
 
             {resolvable &&
               (detail.status === 'uncertain' || detail.status === 'reserved' || detail.status === 'running') && (
-                <div className="rounded-lg border border-border-table p-3">
-                  <div className="mb-2 text-xs font-semibold text-text-primary">人工核对</div>
+                <div className="rounded-lg border border-border p-3">
+                  <div className="mb-2 text-xs font-semibold text-foreground">人工核对</div>
                   <div className="mb-2 flex gap-2">
-                    <Button
-                      variant={action === 'settle' ? 'primary' : 'secondary'}
-                      size="small"
+                    <ActionButton
+                      variant={action === 'settle' ? 'default' : 'secondary'}
+                      size="sm"
                       onClick={() => setAction('settle')}
                     >
                       按现有用量结算
-                    </Button>
-                    <Button
-                      variant={action === 'refund' ? 'danger' : 'secondary'}
-                      size="small"
+                    </ActionButton>
+                    <ActionButton
+                      variant={action === 'refund' ? 'destructive' : 'secondary'}
+                      size="sm"
                       onClick={() => setAction('refund')}
                     >
                       全额退款
-                    </Button>
+                    </ActionButton>
                   </div>
-                  <TextArea
+                  <TextAreaField
                     ariaLabel="核对依据"
                     value={reason}
                     onChange={setReason}
@@ -514,7 +521,7 @@ export function AdminBillingOrdersPage() {
                     placeholder="写清核对依据，如：上游确认出图成功但回调丢失"
                   />
                   {action === 'refund' && (
-                    <p className="mt-1 text-[11px] text-rose-700">
+                    <p className="mt-1 text-[11px] text-danger-text">
                       退款会按预留金额原额退回用户积分，且不可撤销。
                     </p>
                   )}
@@ -522,7 +529,7 @@ export function AdminBillingOrdersPage() {
               )}
           </div>
         ) : (
-          <p className="py-6 text-center text-xs text-text-tertiary">
+          <p className="py-6 text-center text-xs text-muted-foreground">
             该账单不在当前页。请回到列表按任务 ID 或用户 ID 定位。
           </p>
         )}

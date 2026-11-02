@@ -30,10 +30,13 @@ export interface ResultView {
 export const PAYMENT_POLL_INTERVAL_MS = 2000;
 
 /**
- * 支付结果轮询上限 —— 与订单过期时间一致。
- * 超过之后即使到账，订单也已经不该被当作有效支付。
+ * 支付结果轮询兜底上限。
+ *
+ * 正常情况下页面会用 `PaymentIntent.expiresAt`（后端订单过期时间）作为截止；
+ * 该常量只在渠道没有返回 expiresAt 时兜底。它必须与后端 ORDER_TTL_MINUTES
+ * 一致（30 分钟），否则用户在 5 分钟后完成支付，页面会提前放弃查询。
  */
-export const PAYMENT_POLL_TIMEOUT_MS = 5 * 60 * 1000;
+export const PAYMENT_POLL_TIMEOUT_MS = 30 * 60 * 1000;
 
 /** 券码试算防抖 (输入停止后再请求，避免每敲一个字打一次接口) */
 export const QUOTE_DEBOUNCE_MS = 350;

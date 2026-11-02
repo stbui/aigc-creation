@@ -1,18 +1,25 @@
 import { useEffect, useState } from 'react';
-import { Button } from '../../admin-ui/shadcn/kit';
 import { adminNotificationsApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useDiscardConfirm, useUnsavedGuard } from '../../hooks/useUnsavedGuard';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
-import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
-import { Drawer } from '../../admin-ui/primitives/Drawer';
-import { Notice } from '../../admin-ui/primitives';
-import { SelectBox, SwitchBox, TextArea, TextInput } from '../../admin-ui/controls';
 import {
-  AdminStaleError,
+  ActionButton,
+  AdminDataTable,
+  Drawer,
+  FormField,
+  Notice,
+  PageHeader,
+  Panel,
+  SelectField,
+  StaleError,
+  StatusTag,
+  SwitchField,
+  TextAreaField,
+  TextField,
   useAdminResource,
-} from '../../components/admin/AdminWidgets';
-import { PageHeader, Panel, StatusTag } from '../../components/admin/PageHeader';
+  type AdminColumn,
+} from '../../admin-ui/primitives';
 import type { DeliveryChannelStatusMap, MessageTemplateItem } from '../../types/api';
 
 const CHANNEL_LABEL: Record<string, string> = {
@@ -39,7 +46,7 @@ function fmt(iso: string): string {
 }
 
 /**
- * 站内消息（BoardUI）。
+ * 站内消息。
  *
  * 三块互不相干的数据放在一页，但失败域必须彼此隔离：
  *   · 投递通道是**只读事实**，拉取失败就整块不渲染 —— 绝不能让「读失败」
@@ -47,9 +54,9 @@ function fmt(iso: string): string {
  *   · 广播按活跃账号逐条写入，不可撤回，因此按钮在缺少标题或正文时保持禁用；
  *   · 模板列表失败只影响模板区，不影响上面两块。
  *
- * 渲染层变化：antd Table → `AdminDataTable`（自带骨架 / 错误 / 空态），
- * antd Drawer → `Drawer` 原语（操作区固定，长正文不把按钮滚走），
- * antd Switch → `SwitchBox`（`isSelected` 与 `checked` 的命名差异收在控件层）。
+ * 渲染层：模板表 → `AdminDataTable`（自带骨架 / 错误 / 空态），
+ * 右侧抽屉 → `Drawer` 原语（操作区固定，长正文不把按钮滚走），
+ * 开关 → `SwitchField`（`isSelected` 与 `checked` 的命名差异收在控件层）。
  */
 export function AdminNotificationsPage() {
   const toast = useToast();
@@ -161,7 +168,7 @@ export function AdminNotificationsPage() {
       key: 'code',
       title: '编码',
       width: 180,
-      render: (row) => <code className="font-mono text-[11px] text-text-primary">{row.code}</code>,
+      render: (row) => <code className="font-mono text-[11px] text-foreground">{row.code}</code>,
     },
     {
       key: 'channel',
@@ -183,7 +190,7 @@ export function AdminNotificationsPage() {
       key: 'body',
       title: '正文',
       render: (row) => (
-        <span className="block max-w-[420px] truncate text-text-secondary" title={row.body}>
+        <span className="block max-w-[420px] truncate text-muted-foreground" title={row.body}>
           {row.body}
         </span>
       ),
@@ -204,9 +211,9 @@ export function AdminNotificationsPage() {
       fixed: 'right',
       render: (row) =>
         writable ? (
-          <Button variant="ghost" size="small" onClick={() => openCreate(row)}>
+          <ActionButton variant="ghost" size="sm" onClick={() => openCreate(row)}>
             编辑
-          </Button>
+          </ActionButton>
         ) : null,
     },
   ];
@@ -220,9 +227,9 @@ export function AdminNotificationsPage() {
         description="向全站活跃账号发送公告，或维护业务通知的文案模板。消息写入后用户可在顶栏铃铛查看。"
         actions={
           writable ? (
-            <Button variant="primary" size="small" onClick={() => openCreate()}>
+            <ActionButton variant="default" size="sm" onClick={() => openCreate()}>
               新建模板
-            </Button>
+            </ActionButton>
           ) : undefined
         }
       />
@@ -241,16 +248,16 @@ export function AdminNotificationsPage() {
               ] as const
             ).map(({ label, st, target }) => (
               <li key={label} className="flex flex-wrap items-center gap-2 text-xs">
-                <span className="w-10 shrink-0 font-medium text-text-primary">{label}</span>
+                <span className="w-10 shrink-0 font-medium text-foreground">{label}</span>
                 <StatusTag
                   status={st.delivers ? 'active' : 'disabled'}
                   label={st.delivers ? `真实投递 · ${st.provider}` : `${st.provider} · 不真实投递`}
                 />
                 {target ? (
-                  <span className="font-mono text-[11px] text-text-tertiary">{target}</span>
+                  <span className="font-mono text-[11px] text-muted-foreground">{target}</span>
                 ) : null}
                 {!st.configured ? (
-                  <span className="text-status-yellow-text">凭据不全，已回落控制台（日志有 WARN）</span>
+                  <span className="text-warn-text">凭据不全，已回落控制台（日志有 WARN）</span>
                 ) : null}
               </li>
             ))}
@@ -260,11 +267,8 @@ export function AdminNotificationsPage() {
 
       <Panel title="全站广播" note="按当前活跃账号逐个写入，不可撤回">
         <div className="flex max-w-[760px] flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-text-secondary">
-              标题
-            </label>
-            <TextInput
+          <FormField label="标题">
+            <TextField
               ariaLabel="广播标题"
               value={title}
               maxLength={80}
@@ -273,13 +277,10 @@ export function AdminNotificationsPage() {
               placeholder="如：双十一活动将于 11 月 1 日开启"
               onChange={setTitle}
             />
-          </div>
+          </FormField>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-text-secondary">
-              正文
-            </label>
-            <TextArea
+          <FormField label="正文">
+            <TextAreaField
               ariaLabel="广播正文"
               value={body}
               rows={4}
@@ -289,13 +290,13 @@ export function AdminNotificationsPage() {
               placeholder="写清楚时间、范围与用户要做什么"
               onChange={setBody}
             />
-          </div>
+          </FormField>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-text-secondary">
-              跳转路径（可选）
-            </label>
-            <TextInput
+          <FormField
+            label="跳转路径（可选）"
+            hint="留空表示消息不可点击。只接受站内路径，外链请勿填写。"
+          >
+            <TextField
               ariaLabel="跳转路径"
               className="w-[320px]"
               value={link}
@@ -304,30 +305,27 @@ export function AdminNotificationsPage() {
               placeholder="站内相对路径，如 /packages"
               onChange={setLink}
             />
-            <p className="text-[11px] leading-4 text-text-tertiary">
-              留空表示消息不可点击。只接受站内路径，外链请勿填写。
-            </p>
-          </div>
+          </FormField>
 
           {/* 预览按用户实际看到的顺序排：标题在上、正文在下、可点击时整条可点 */}
           {broadcastReady && (
-            <div className="rounded-lg border border-border-table bg-background-secondary-default px-3 py-2.5 text-xs leading-5 text-text-secondary">
-              <strong className="block text-text-primary">{title}</strong>
+            <div className="rounded-lg border border-border bg-muted px-3 py-2.5 text-xs leading-5 text-muted-foreground">
+              <strong className="block text-foreground">{title}</strong>
               <p className="mt-1 whitespace-pre-wrap">{body}</p>
             </div>
           )}
 
           <div className="flex items-center gap-2">
-            <Button
-              variant="danger"
-              size="small"
+            <ActionButton
+              variant="destructive"
+              size="sm"
               disabled={!writable || !broadcastReady || sending}
               onClick={() => void doBroadcast()}
             >
               {sending ? '发送中…' : '发送广播'}
-            </Button>
+            </ActionButton>
             {sentResult && (
-              <span className="text-[11px] text-text-tertiary">
+              <span className="text-[11px] text-muted-foreground">
                 上次发送：{sentResult.users} 个账号，共 {sentResult.sent} 条。
               </span>
             )}
@@ -337,7 +335,7 @@ export function AdminNotificationsPage() {
 
       <Panel title="消息模板" note="站内通知优先使用这里的文案；模板缺失或停用时回落到代码内置文案">
         {error && templates.length > 0 && (
-          <AdminStaleError error={error} onRetry={() => void reload()} />
+          <StaleError error={error} onRetry={() => void reload()} />
         )}
         {/*
          * 模板总量小（内置 5 条 + 运营自建），后端一次全量返回，因此不做分页：
@@ -353,7 +351,7 @@ export function AdminNotificationsPage() {
           minWidth={860}
           emptyText="还没有模板，执行 npm run seed:messages 可灌入五条内置文案"
         />
-        <p className="mt-3 text-[11px] leading-4 text-text-tertiary">
+        <p className="mt-3 text-[11px] leading-4 text-muted-foreground">
           变量用 <code className="font-mono">{'{name}'}</code> 占位，仅替换通知调用方传入的字段。当前实际生效的编码：
           {BUILTIN_CODES.map((c) => ` ${c.code}`).join('、')}。本页模板只驱动站内消息（channel=inapp）；
           验证码与重置密码的邮件 / 短信走独立通道（console / http / aliyun，见环境变量），不读这些模板。
@@ -370,19 +368,21 @@ export function AdminNotificationsPage() {
         description={formDirty ? '有未保存修改' : undefined}
         footer={
           <>
-            <Button variant="secondary" size="small" onClick={requestCloseForm}>
+            <ActionButton variant="secondary" size="sm" onClick={requestCloseForm}>
               取消
-            </Button>
-            <Button variant="primary" size="small" disabled={saving} onClick={() => void saveTemplate()}>
+            </ActionButton>
+            <ActionButton variant="default" size="sm" disabled={saving} onClick={() => void saveTemplate()}>
               {saving ? '保存中…' : '保存'}
-            </Button>
+            </ActionButton>
           </>
         }
       >
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-text-secondary">模板编码</label>
-            <TextInput
+          <FormField
+            label="模板编码"
+            hint={`编码与业务事件绑定，建好后不要改。可用编码：${BUILTIN_CODES.map((c) => c.code).join('、')}`}
+          >
+            <TextField
               ariaLabel="模板编码"
               className="w-[240px]"
               value={form.code}
@@ -391,14 +391,10 @@ export function AdminNotificationsPage() {
               placeholder="如 task_failed"
               onChange={(value) => setForm((f) => ({ ...f, code: value }))}
             />
-            <p className="text-[11px] leading-4 text-text-tertiary">
-              编码与业务事件绑定，建好后不要改。可用编码：{BUILTIN_CODES.map((c) => c.code).join('、')}
-            </p>
-          </div>
+          </FormField>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-text-secondary">通道</label>
-            <SelectBox
+          <FormField label="通道">
+            <SelectField
               ariaLabel="通道"
               className="w-[200px]"
               value={form.channel}
@@ -407,43 +403,40 @@ export function AdminNotificationsPage() {
               }
               options={CHANNEL_OPTIONS}
             />
-          </div>
+          </FormField>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-text-secondary">标题</label>
-            <TextInput
+          <FormField label="标题">
+            <TextField
               ariaLabel="模板标题"
               value={form.subject}
               maxLength={120}
               onChange={(value) => setForm((f) => ({ ...f, subject: value }))}
             />
-          </div>
+          </FormField>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-text-secondary">正文</label>
-            <TextArea
+          <FormField
+            label="正文"
+            hint={`变量占位：${BUILTIN_CODES.map((c) => `${c.code} → ${c.hint}`).join('；')}。未提供的变量原样保留，便于发现漏传。`}
+          >
+            <TextAreaField
               ariaLabel="模板正文"
               value={form.body}
               rows={6}
               maxLength={2000}
               onChange={(value) => setForm((f) => ({ ...f, body: value }))}
             />
-            <p className="text-[11px] leading-4 text-text-tertiary">
-              变量占位：{BUILTIN_CODES.map((c) => `${c.code} → ${c.hint}`).join('；')}。
-              未提供的变量原样保留，便于发现漏传。
-            </p>
-          </div>
+          </FormField>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-text-secondary">启用</label>
-            <SwitchBox
+          <FormField
+            label="启用"
+            hint={form.enabled ? '启用中：站内通知会使用本模板的文案。' : '已停用：回落到代码内置文案。'}
+          >
+            <SwitchField
+              ariaLabel="启用"
               checked={form.enabled}
               onChange={(value) => setForm((f) => ({ ...f, enabled: value }))}
             />
-            <p className="text-[11px] leading-4 text-text-tertiary">
-              {form.enabled ? '启用中：站内通知会使用本模板的文案。' : '已停用：回落到代码内置文案。'}
-            </p>
-          </div>
+          </FormField>
 
           {formError && (
             <Notice tone="danger">

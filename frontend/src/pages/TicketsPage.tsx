@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button, Input, Select } from 'antd';
 import {
@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { ticketsApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { PersonalPage } from '../components/PersonalPage';
 import { StateButton, StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
 import type { Ticket, TicketPriority, TicketStatus, TicketType } from '../types/api';
@@ -77,15 +78,21 @@ function fmt(iso: string | null): string {
 }
 
 export function TicketsPage() {
+  useDocumentMeta('我的工单 · 货觉AI', '提交问题反馈并跟踪客服处理进度。');
   const navigate = useNavigate();
   const { token, openLogin } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [items, setItems] = useState<Ticket[]>([]);
+  const [total, setTotal] = useState(0);
+  const [statusCounts, setStatusCounts] = useState<Partial<Record<TicketStatus, number>>>({});
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** 列表状态筛选; 只影响当前视图, 不改动已加载的数据 */
   const [filter, setFilter] = useState<'all' | TicketStatus>('all');
+  /** 已加载条数（加载更多时作为 offset） */
+  const loadedCountRef = useRef(0);
 
   const [activeId, setActiveId] = useState<string | null>(() => searchParams.get('id'));
   const [detail, setDetail] = useState<Ticket | null>(null);
@@ -126,21 +133,31 @@ export function TicketsPage() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (opts?: { append?: boolean }) => {
+    const append = Boolean(opts?.append);
+    const offset = append ? loadedCountRef.current : 0;
+    if (append) setLoadingMore(true);
+    else setLoading(true);
     setError(null);
     try {
-      const res = await ticketsApi.list();
-      setItems(res.items);
+      const res = await ticketsApi.list({ limit: 20, offset });
+      setItems((prev) => (append ? [...prev, ...res.items] : res.items));
+      loadedCountRef.current = offset + res.items.length;
+      setTotal(res.total);
+      setStatusCounts(res.statusCounts ?? {});
     } catch (e) {
       setError(e instanceof Error ? e.message : '工单列表加载失败');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, []);
 
   useEffect(() => {
     if (!token) {
+      loadedCountRef.current = 0;
+      setTotal(0);
+      setStatusCounts({});
       setLoading(false);
       return;
     }
@@ -247,12 +264,8 @@ export function TicketsPage() {
     }
   };
 
-  /** 各状态计数: 筛选标签上的数字直接来自已加载列表, 不伪造 */
-  const counts = useMemo(() => {
-    const acc: Partial<Record<TicketStatus, number>> = {};
-    for (const t of items) acc[t.status] = (acc[t.status] ?? 0) + 1;
-    return acc;
-  }, [items]);
+  /** 各状态计数来自后端全量 groupBy，不受当前分页影响 */
+  const counts = useMemo(() => statusCounts, [statusCounts]);
 
   const visibleItems = useMemo(
     () => (filter === 'all' ? items : items.filter((t) => t.status === filter)),
@@ -506,6 +519,13 @@ export function TicketsPage() {
                   </span>
                 </button>
               ))}
+            </div>
+          )}
+          {!loading && items.length > 0 && items.length < total && (
+            <div className="ticket-load-more">
+              <Button loading={loadingMore} onClick={() => void load({ append: true })}>
+                加载更多工单（已加载 {items.length} / {total}）
+              </Button>
             </div>
           )}
         </>

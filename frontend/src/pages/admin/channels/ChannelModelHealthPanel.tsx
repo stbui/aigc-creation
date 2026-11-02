@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { AdminDataTable, HoverTip, StatusTag, type AdminColumn } from './components';
+import { AdminDataTable, HelpTip, StatusTag, type AdminColumn } from './components';
 import type { ChannelModelHealthRowView } from '../../../types/model';
 
 /**
@@ -54,20 +54,20 @@ export function ChannelModelHealthPanel({
         render: (row) => (
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="truncate font-medium text-text-primary">{row.name}</span>
+              <span className="truncate font-medium text-foreground">{row.name}</span>
               {!row.enabled && <StatusTag status="disabled" tone="muted" label="停用" />}
               {!row.protocolKnown && (
-                <HoverTip tip="该线路声明的协议在当前进程没有注册执行器，调用必定失败">
+                <HelpTip tip="该线路声明的协议在当前进程没有注册执行器，调用必定失败">
                   <StatusTag status="protocol-unknown" tone="danger" label="协议未注册" />
-                </HoverTip>
+                </HelpTip>
               )}
               {row.coolingUntil && (
-                <HoverTip tip={`冷却到 ${new Date(row.coolingUntil).toLocaleString('zh-CN')}`}>
+                <HelpTip tip={`冷却到 ${new Date(row.coolingUntil).toLocaleString('zh-CN')}`}>
                   <StatusTag status="cooling" tone="warn" label="冷却中" />
-                </HoverTip>
+                </HelpTip>
               )}
             </div>
-            <div className="mt-0.5 truncate font-mono text-[11px] text-text-tertiary">
+            <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
               {row.channelName} · {row.capability}
             </div>
           </div>
@@ -86,7 +86,7 @@ export function ChannelModelHealthPanel({
                 tone={rateTone(window.successRate)}
                 label={rateLabel(window.successRate)}
               />
-              <div className="mt-0.5 text-[11px] text-text-tertiary">
+              <div className="mt-0.5 text-[11px] text-muted-foreground">
                 {window.samples > 0 ? `${window.samples} 次样本` : '窗口内没有终态调用'}
                 {window.sampled ? ' · 按最近部分统计' : ''}
               </div>
@@ -107,7 +107,7 @@ export function ChannelModelHealthPanel({
                 tone={rateTone(window.successRate)}
                 label={rateLabel(window.successRate)}
               />
-              <div className="mt-0.5 text-[11px] text-text-tertiary">{window.samples} 次样本</div>
+              <div className="mt-0.5 text-[11px] text-muted-foreground">{window.samples} 次样本</div>
             </div>
           );
         },
@@ -120,7 +120,7 @@ export function ChannelModelHealthPanel({
         render: (row) => (
           <div className="tabular-nums">
             <div>{formatDuration(row.windows.day.p95DurationMs)}</div>
-            <div className="text-[11px] text-text-tertiary">
+            <div className="text-[11px] text-muted-foreground">
               均 {formatDuration(row.windows.day.avgDurationMs)}
             </div>
           </div>
@@ -133,18 +133,18 @@ export function ChannelModelHealthPanel({
         render: (row) => {
           const sample = row.recent[0];
           if (!sample) {
-            return <span className="text-text-placeholder">窗口内没有终态调用</span>;
+            return <span className="text-muted-foreground">窗口内没有终态调用</span>;
           }
           return (
             <div className="min-w-0">
-              <div className="truncate text-[11px] text-text-secondary">
+              <div className="truncate text-[11px] text-muted-foreground">
                 {sample.status === 'success' ? '成功' : '失败'} · {formatDuration(sample.durationMs)} ·{' '}
                 {new Date(sample.at).toLocaleString('zh-CN')}
               </div>
               {row.lastErrorCode && (
-                <HoverTip tip={row.recent.find((item) => item.error)?.error || row.lastErrorCode}>
-                  <div className="truncate text-[11px] text-text-tertiary">最近错误 {row.lastErrorCode}</div>
-                </HoverTip>
+                <HelpTip tip={row.recent.find((item) => item.error)?.error || row.lastErrorCode}>
+                  <div className="truncate text-[11px] text-muted-foreground">最近错误 {row.lastErrorCode}</div>
+                </HelpTip>
               )}
             </div>
           );

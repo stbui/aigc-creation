@@ -44,11 +44,20 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidUpdate(prev: Props): void {
     if (!this.state.error) return;
+    /*
+     * 只有**两端都显式提供 resetKeys** 且内容变化时才重置。
+     *
+     * 此前用 `!prev.resetKeys || !this.props.resetKeys || ...` 判断, 导致
+     * 未传 resetKeys 的边界 (`App.tsx` 顶层) 在每次 componentDidUpdate 都
+     * 判定为 true: 捕获错误 → setState(stack) → didUpdate → reset → 子树
+     * 再次抛错 → 再捕获, 形成高频循环, 兜底页无法稳定停留。
+     */
+    const prevKeys = prev.resetKeys;
+    const nextKeys = this.props.resetKeys;
+    if (!prevKeys || !nextKeys) return;
     const changed =
-      !prev.resetKeys ||
-      !this.props.resetKeys ||
-      prev.resetKeys.length !== this.props.resetKeys.length ||
-      this.props.resetKeys.some((k, i) => k !== prev.resetKeys![i]);
+      prevKeys.length !== nextKeys.length ||
+      nextKeys.some((k, i) => k !== prevKeys[i]);
     if (changed) this.reset();
   }
 

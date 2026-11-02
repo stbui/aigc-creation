@@ -13,15 +13,16 @@ import {
 import {
   AdminDataTable,
   AppliedFilters,
-  Button,
+  ActionButton,
+  ClearableField,
   Descriptions,
   FilterActions,
   FilterBar,
-  HoverTip,
+  HelpTip,
+  IconButton,
   Panel,
-  SelectBox,
+  SelectField,
   StatusTag,
-  TextInput,
   type AdminColumn,
 } from './components';
 import { ChannelModelCostSummary, ChannelModelHealthCell } from './ChannelModelHealthCell';
@@ -40,6 +41,14 @@ interface ChannelModelTableProps {
   healthLoading: boolean;
   selectedIds: string[];
   writable: boolean;
+  /**
+   * 是否可发起连通性测试（`channel.test` 权限）。
+   *
+   * 与 `writable`（`channel.model_write`）分开：测试只探测、不写配置，
+   * 参考实现把它当独立权限点。只读排障角色（operator）有测试权但没有改价权，
+   * 用 `writable` 门禁会把这条能力一起挡掉。
+   */
+  canTest?: boolean;
   testing: boolean;
   testResult: ProtocolTestResultView | null;
   onSelectedChange: (ids: string[]) => void;
@@ -73,6 +82,7 @@ export function ChannelModelTable({
   healthLoading,
   selectedIds,
   writable,
+  canTest = true,
   testing,
   testResult,
   onSelectedChange,
@@ -138,11 +148,13 @@ export function ChannelModelTable({
       render: (model) => (
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="truncate font-mono text-[12px] text-text-primary">{model.modelKey}</span>
+            <span className="truncate font-mono text-[12px] text-foreground">{model.modelKey}</span>
             {/* 价格版本放在这里而不是单独一列：详情区宽度有限，v7 这类单值列不值 80px */}
-            <span className="shrink-0 tabular-nums text-[10px] text-text-placeholder">v{model.priceVersion}</span>
+            <span className="shrink-0 tabular-nums text-[10px] text-muted-foreground">v{model.priceVersion}</span>
           </div>
-          <div className="truncate text-[11px] text-text-tertiary">
+          <div className="truncate text-[11px] text-muted-foreground">
+            {/* 图标是 C 端选择器的视觉标识，后台必须能看到「运营配的是什么」 */}
+            {model.icon ? `${model.icon} ` : ''}
             {model.displayName || '未命名'}
             {model.providerModelKey && model.providerModelKey !== model.modelKey
               ? ` · 上游 ${model.providerModelKey}`
@@ -180,7 +192,7 @@ export function ChannelModelTable({
       cellTitle: (model) => model.protocol,
       render: (model) =>
         model.protocol ? (
-          <span className="block truncate font-mono text-[11px] text-text-secondary">{model.protocol}</span>
+          <span className="block truncate font-mono text-[11px] text-muted-foreground">{model.protocol}</span>
         ) : (
           <StatusTag status="unset" tone="warn" label="待配置" />
         ),
@@ -206,9 +218,9 @@ export function ChannelModelTable({
         }
         if (!model.priceConfigured) {
           return (
-            <HoverTip tip="没有任何已配置的价格档：该模型不会被报价，也不应被线路选用">
+            <HelpTip tip="没有任何已配置的价格档：该模型不会被报价，也不应被线路选用">
               <StatusTag status="unpriced" tone="warn" label="未定价" />
-            </HoverTip>
+            </HelpTip>
           );
         }
         return <StatusTag status="channel-model-enabled" tone="success" label="已启用" />;
@@ -220,65 +232,52 @@ export function ChannelModelTable({
       width: 144,
       fixed: 'right',
       /*
-       * 行内动作保持 5 个直显（e2e 与运营动线都按名字找按钮），但去掉 ghost
-       * 自带的淡紫底：整列 5 个色块会盖过模型名，成为整张表最抢眼的东西。
-       * 停用与删除用 dangerGhost 的红字标识破坏性，底色同样压平。
+       * 行内动作保持 5 个直显（e2e 与运营动线都按名字找按钮）。
+       * 图标按钮一律走 IconButton：`label` 同时作为无障碍名与悬停提示。
+       * 停用与删除用 danger 文字色标识破坏性。
        */
       render: (model) => (
         <div className="flex items-center justify-end">
-          <Button
-            variant="ghost"
+          <IconButton
             size="xs"
-            iconOnly
-            className="!bg-transparent hover:!bg-background-secondary-default"
-            leadingIcon={Zap}
-            disabled={testing}
+            icon={Zap}
+            label={`测试模型 ${model.modelKey}`}
             title="连通性测试"
-            aria-label={`测试模型 ${model.modelKey}`}
+            disabled={testing || !canTest}
             onClick={() => onTest(model)}
           />
-          <Button
-            variant="ghost"
+          <IconButton
             size="xs"
-            iconOnly
-            className="!bg-transparent hover:!bg-background-secondary-default"
-            leadingIcon={Pencil}
-            disabled={!writable}
+            icon={Pencil}
+            label={`编辑模型 ${model.modelKey}`}
             title="编辑"
-            aria-label={`编辑模型 ${model.modelKey}`}
+            disabled={!writable}
             onClick={() => onEdit(model)}
           />
-          <Button
-            variant={model.enabled ? 'dangerGhost' : 'ghost'}
+          <IconButton
             size="xs"
-            iconOnly
-            className="!bg-transparent hover:!bg-rose-50"
-            leadingIcon={Power}
-            disabled={!writable}
+            icon={Power}
+            label={`${model.enabled ? '停用' : '启用'}模型 ${model.modelKey}`}
             title={model.enabled ? '停用' : '启用'}
-            aria-label={`${model.enabled ? '停用' : '启用'}模型 ${model.modelKey}`}
+            className={model.enabled ? 'text-danger-text hover:text-danger-text' : undefined}
+            disabled={!writable}
             onClick={() => onToggle(model, !model.enabled)}
           />
-          <Button
-            variant="ghost"
+          <IconButton
             size="xs"
-            iconOnly
-            className="!bg-transparent hover:!bg-background-secondary-default"
-            leadingIcon={Copy}
-            disabled={!writable}
+            icon={Copy}
+            label={`复制模型 ${model.modelKey}`}
             title="复制模型"
-            aria-label={`复制模型 ${model.modelKey}`}
+            disabled={!writable}
             onClick={() => onCopy(model)}
           />
-          <Button
-            variant="dangerGhost"
+          <IconButton
             size="xs"
-            iconOnly
-            className="!bg-transparent hover:!bg-rose-50"
-            leadingIcon={Trash2}
-            disabled={!writable}
+            icon={Trash2}
+            label={`删除模型 ${model.modelKey}`}
             title="删除模型"
-            aria-label={`删除模型 ${model.modelKey}`}
+            className="text-danger-text hover:text-danger-text"
+            disabled={!writable}
             onClick={() => onDelete(model)}
           />
         </div>
@@ -293,12 +292,12 @@ export function ChannelModelTable({
        * 会形成「卡片里再开一张卡片 + 筛选框」三级边框。分区改用标题 + 发丝线。
        */}
       <section className="flex flex-col gap-3" aria-labelledby="admin-model-list-title">
-        <div className="flex flex-wrap items-start gap-3 border-b border-border-table pb-3">
+        <div className="flex flex-wrap items-start gap-3 border-b border-border pb-3">
           <div className="min-w-0 flex-1">
-            <h3 id="admin-model-list-title" className="text-sm font-semibold text-text-primary">
+            <h3 id="admin-model-list-title" className="text-sm font-semibold text-foreground">
               模型清单（{(models ?? []).length}）
             </h3>
-            <p className="mt-0.5 text-xs text-text-tertiary">
+            <p className="mt-0.5 text-xs text-muted-foreground">
               {writable
                 ? '停用后的模型不会进入路由，但历史账单与调用记录仍保留'
                 : '当前账号只有渠道模型读权限'}
@@ -306,29 +305,29 @@ export function ChannelModelTable({
           </div>
           {/* 模型级入口跟着清单位置走：原先在详情顶部单独占一行，页面会被拉出一条空白工具条 */}
           <div className="flex shrink-0 items-center gap-2">
-            <Button
+            <ActionButton
               variant="secondary"
-              size="small"
-              leadingIcon={RefreshCw}
+              size="sm"
+              icon={RefreshCw}
               disabled={fetching || !writable}
               onClick={onFetchUpstream}
             >
               {fetching ? '拉取中…' : '拉取上游目录'}
-            </Button>
-            <Button
-              variant="primary"
-              size="small"
-              leadingIcon={Plus}
+            </ActionButton>
+            <ActionButton
+              variant="default"
+              size="sm"
+              icon={Plus}
               disabled={!writable}
               onClick={onOpenCreate}
             >
               新建模型
-            </Button>
+            </ActionButton>
           </div>
         </div>
 
-        <FilterBar className="rounded-lg border-0 bg-background-secondary-default/60">
-          <TextInput
+        <FilterBar className="rounded-lg border-0 bg-muted/60">
+          <ClearableField
             ariaLabel="搜索模型"
             value={keyword}
             onChange={(value) => {
@@ -336,10 +335,9 @@ export function ChannelModelTable({
               setPage(1);
             }}
             placeholder="搜索模型标识、显示名或上游键"
-            allowClear
             className="min-w-[220px]"
           />
-          <SelectBox
+          <SelectField
             ariaLabel="模型能力"
             value={capabilityFilter}
             onChange={(value) => {
@@ -348,9 +346,10 @@ export function ChannelModelTable({
             }}
             options={CAPABILITY_OPTIONS}
             placeholder="全部能力"
+            clearLabel="全部能力"
             allowClear
           />
-          <SelectBox
+          <SelectField
             ariaLabel="模型状态"
             value={statusFilter}
             onChange={(value) => {
@@ -359,39 +358,40 @@ export function ChannelModelTable({
             }}
             options={STATUS_FILTER_OPTIONS}
             placeholder="全部状态"
+            clearLabel="全部状态"
             allowClear
           />
           <FilterActions>
-            <Button
+            <ActionButton
               variant="secondary"
               size="xs"
-              leadingIcon={ListOrdered}
+              icon={ListOrdered}
               disabled={!writable}
               onClick={onOpenOrder}
             >
               排序
-            </Button>
-            <Button
+            </ActionButton>
+            <ActionButton
               variant="secondary"
               size="xs"
-              leadingIcon={Trash2}
+              icon={Trash2}
               disabled={!writable || selectedIds.length === 0}
               onClick={onOpenBatchDelete}
             >
               {selectedIds.length > 0 ? `批量删除（${selectedIds.length}）` : '批量删除'}
-            </Button>
-            <Button
+            </ActionButton>
+            <ActionButton
               variant="secondary"
               size="xs"
-              leadingIcon={TrendingUp}
+              icon={TrendingUp}
               disabled={!writable || selectedIds.length === 0}
               onClick={onOpenReprice}
             >
               {selectedIds.length > 0 ? `统一调价（${selectedIds.length}）` : '统一调价'}
-            </Button>
-            <Button variant="secondary" size="xs" disabled={!hasFilters} onClick={resetFilters}>
+            </ActionButton>
+            <ActionButton variant="secondary" size="xs" disabled={!hasFilters} onClick={resetFilters}>
               重置
-            </Button>
+            </ActionButton>
           </FilterActions>
           <AppliedFilters
             items={[
@@ -501,7 +501,7 @@ export function ChannelModelTable({
             ]}
           />
           {testResult.responsePreview && (
-            <pre className="mt-3 max-h-[200px] overflow-auto rounded-lg bg-background-secondary-default p-3 font-mono text-[11px] text-text-secondary">
+            <pre className="mt-3 max-h-[200px] overflow-auto rounded-lg bg-muted p-3 font-mono text-[11px] text-muted-foreground">
               {testResult.responsePreview}
             </pre>
           )}

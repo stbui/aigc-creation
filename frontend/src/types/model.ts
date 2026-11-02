@@ -698,12 +698,27 @@ export interface ApiLogView {
   mediaCount: number;
   videoSeconds: number;
   providerRequestId: string;
-  estimatedCostMicros: number;
-  costAvailable: boolean;
-  currency: string;
+  /**
+   * 上游美元成本估算三列已废弃（恒为空）。
+   *
+   * 本仓的成本口径是**渠道模型价格档的成本价**（微积分），建单时随账单快照，
+   * 在「账单」页按同一口径核算；调用记录不再下发这三列，避免出现「有这一列
+   * 却恒为空」的误导。
+   */
   errorCode: string;
   error: string;
   createdAt: string;
+  /** 关联投影：用户昵称 / 账号 */
+  userDisplayName?: string;
+  userAccount?: string;
+  /** 关联投影：任务状态 */
+  taskStatus?: string;
+  /** 关联投影：账单状态 */
+  billingStatus?: string;
+  /** 关联投影：账单预授权金额（微积分） */
+  billingReservedMicrocredits?: number | null;
+  /** 关联投影：账单实收金额（微积分） */
+  billingSettledMicrocredits?: number | null;
 }
 
 export interface ApiLogSummaryView {
@@ -768,6 +783,20 @@ export interface PublicCatalogModelView {
   displayPrice: number | null;
   priceLabel: string;
   available: boolean;
+  /**
+   * 可用性摘要（24h / 7d 成功率）。
+   *
+   * 此前目录只有 `available`（= 有有效价格档），C 端无法区分
+   * 「这条线最近在挂」与「这条线只是没配价」。
+   */
+  availability: {
+    /** 24 小时成功率（0–1）；无样本为 null */
+    rate24h: number | null;
+    sampleCount24h: number;
+    /** 7 天成功率（0–1）；无样本为 null */
+    rate7d: number | null;
+    dataState: 'ok' | 'no_data';
+  };
 }
 
 export interface PublicCatalogChannelView {

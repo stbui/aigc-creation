@@ -7,7 +7,7 @@ import { HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
  * 覆盖的是「权限链路 + 四页渲染」, 不是像素级视觉回归。
  * 前置: 后端与前端 dev server 已在 BASE 指向的端口运行, 且已 seed 管理员。
  *
- * ## 选择器约定（2026-10-30 外壳换 BoardUI 后）
+ * ## 选择器约定（2026-10-30 外壳换单栏结构后）
  *
  * 后台共享控件只暴露 `data-testid="admin-*"`, 不再依赖 antd 的 `.ant-*` 与
  * 旧版 `adm-*` 组件类。DOM 结构、Tailwind 类名可以随时改, 这些钩子不能改 ——

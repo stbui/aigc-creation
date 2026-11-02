@@ -115,12 +115,12 @@ export function LocalRedrawPage() {
     setHistoryLoading(true);
     setHistoryError(null);
     void generateApi
-      .list()
-      .then((items) => {
+      .listPage({ capability: 'local_redraw', limit: 50, offset: 0 })
+      .then((page) => {
         if (cancelled) return;
         setHistory(
-          items
-            .filter((task) => task.capability === 'local_redraw' && task.status === 'succeeded' && task.outputAsset)
+          page.items
+            .filter((task) => task.status === 'succeeded' && task.outputAsset)
             .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
             .slice(0, 20),
         );

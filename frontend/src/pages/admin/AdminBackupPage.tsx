@@ -1,40 +1,32 @@
 import { useState } from 'react';
 import { DatabaseBackup, ShieldAlert, Trash2 } from 'lucide-react';
-import { Button } from '../../admin-ui/shadcn/kit';
+
 import { adminBackupsApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
 import {
-  AdminListError,
-  AdminStaleError,
-  AdminListLoading,
+  ActionButton,
+  AdminDataTable,
   ConfirmAction,
+  Descriptions,
+  EmptyState,
+  FormField,
+  ListError,
+  Notice,
+  NumberField,
+  PageHeader,
+  Panel,
+  Skeleton,
+  StatCard,
+  StatusTag,
+  StaleError,
+  TextField,
+  formatBytes,
+  formatRelative,
   useAdminResource,
-} from '../../components/admin/AdminWidgets';
-import { AdminEmpty, PageHeader, Panel, StatCard, StatusTag } from '../../components/admin/PageHeader';
-import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
-import { Descriptions, FormField, Notice } from '../../admin-ui/primitives';
-import { NumberInput, TextInput } from '../../admin-ui/controls';
+  type AdminColumn,
+} from '../../admin-ui/primitives';
 import type { AdminBackup } from '../../types/api';
-
-/** 字节数 → 人类可读 */
-function formatBytes(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / 1024 / 1024).toFixed(2)} MB`;
-}
-
-/** 相对时间 */
-function formatRelative(iso: string | null): string {
-  if (!iso) return '从未';
-  const diff = Date.now() - new Date(iso).getTime();
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return '刚刚';
-  if (min < 60) return `${min} 分钟前`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `${h} 小时前`;
-  return `${Math.floor(h / 24)} 天前`;
-}
 
 /**
  * 数据备份。
@@ -163,8 +155,8 @@ export function AdminBackupPage() {
       width: 230,
       render: (row) => (
         <div className="flex flex-col gap-0.5">
-          <code className="font-mono text-xs text-text-primary">{row.filename}</code>
-          <span className="text-[11px] text-text-tertiary">{formatBytes(row.sizeBytes)}</span>
+          <code className="font-mono text-xs text-foreground">{row.filename}</code>
+          <span className="text-[11px] text-muted-foreground">{formatBytes(row.sizeBytes)}</span>
         </div>
       ),
     },
@@ -173,7 +165,7 @@ export function AdminBackupPage() {
       title: '触发',
       width: 80,
       render: (row) => (
-        <span className="text-xs text-text-secondary">
+        <span className="text-xs text-muted-foreground">
           {row.trigger === 'manual' ? '手动' : '自动'}
         </span>
       ),
@@ -195,7 +187,7 @@ export function AdminBackupPage() {
       width: 110,
       render: (row) => {
         if (row.status !== 'succeeded') {
-          return <span className="text-[11px] text-text-tertiary">—</span>;
+          return <span className="text-[11px] text-muted-foreground">—</span>;
         }
         return row.verified ? (
           <StatusTag status="verified" label="已验证" tone="success" />
@@ -210,7 +202,7 @@ export function AdminBackupPage() {
       width: 110,
       render: (row) => (
         <span
-          className="text-xs text-text-secondary"
+          className="text-xs text-muted-foreground"
           title={new Date(row.createdAt).toLocaleString('zh-CN')}
         >
           {formatRelative(row.createdAt)}
@@ -228,7 +220,7 @@ export function AdminBackupPage() {
            * 行内详情（SHA-256 / 验证报告）必须可达：B-97 的举证就在这一层。
            * antd 表格自带展开图标，换表后没有了，这里补回显式入口。
            */}
-          <Button
+          <ActionButton
             variant="ghost"
             size="xs"
             onClick={() =>
@@ -238,42 +230,49 @@ export function AdminBackupPage() {
             }
           >
             {expanded.includes(row.id) ? '收起' : '详情'}
-          </Button>
+          </ActionButton>
           {can('backup.run') && row.status === 'succeeded' && (
-            <Button variant="ghost" size="xs" onClick={() => void verify(row)} disabled={busy}>
+            <ActionButton variant="ghost" size="xs" onClick={() => void verify(row)} disabled={busy}>
               验证
-            </Button>
+            </ActionButton>
           )}
           {row.verified ? (
-            <Button variant="ghost" size="xs" onClick={() => void download(row)}>
+            <ActionButton variant="ghost" size="xs" onClick={() => void download(row)}>
               下载
-            </Button>
+            </ActionButton>
           ) : (
             /* B-97: 无验证记录的备份视为无效, 不给下载入口 */
             <span
-              className="cursor-not-allowed text-[11px] text-text-placeholder"
+              className="cursor-not-allowed text-[11px] text-muted-foreground"
               title="未通过恢复验证的备份不可下载"
             >
               下载
             </span>
           )}
           {can('backup.run') && (
-            <Button
-              variant="dangerGhost"
+            <ActionButton
+              variant="destructive"
               size="xs"
               onClick={() => void doDelete(row)}
               disabled={busy}
             >
               删除
-            </Button>
+            </ActionButton>
           )}
         </div>
       ),
     },
   ];
 
-  if (loading && !data) return <AdminListLoading tip="加载备份记录…" />;
-  if (error && !data) return <AdminListError error={error} onRetry={() => void reload()} />;
+  if (loading && !data) {
+    return (
+      <div className="flex flex-col gap-3" aria-busy="true" aria-live="polite">
+        <Skeleton rows={4} />
+        <p className="text-center text-xs text-muted-foreground">加载备份记录…</p>
+      </div>
+    );
+  }
+  if (error && !data) return <ListError error={error} onRetry={() => void reload()} />;
 
   return (
     <>
@@ -283,19 +282,19 @@ export function AdminBackupPage() {
         actions={
           can('backup.run') ? (
             <>
-              <Button
+              <ActionButton
                 variant="secondary"
-                size="small"
-                leadingIcon={Trash2}
+                size="sm"
+                icon={Trash2}
                 onClick={() => setPruneOpen(true)}
                 disabled={busy || rows.length === 0}
               >
                 保留份数清理
-              </Button>
-              <Button
-                variant="primary"
-                size="small"
-                leadingIcon={DatabaseBackup}
+              </ActionButton>
+              <ActionButton
+                variant="default"
+                size="sm"
+                icon={DatabaseBackup}
                 onClick={() => {
                   setRunReason('');
                   setRunReasonError(false);
@@ -304,7 +303,7 @@ export function AdminBackupPage() {
                 disabled={busy}
               >
                 {busy ? '执行中…' : '立即备份'}
-              </Button>
+              </ActionButton>
             </>
           ) : undefined
         }
@@ -355,17 +354,18 @@ export function AdminBackupPage() {
       )}
 
       {/* 刷新失败但手上还有上一次的数据: 备份是出事时才来的页面, 更不能假装数据是新的 */}
-      {error && <AdminStaleError error={error} onRetry={() => void reload()} />}
+      {error && <StaleError error={error} onRetry={() => void reload()} />}
 
       <Panel title="备份记录" note="未验证的备份视为无效，不可下载">
         {rows.length === 0 ? (
-          <AdminEmpty
-            description="还没有任何备份记录"
+          <EmptyState
+            title="还没有任何备份记录"
+            description="备份是恢复能力的前提；先执行一次手动备份，再开启定时备份。"
             action={
               can('backup.run') ? (
-                <Button
-                  variant="primary"
-                  size="small"
+                <ActionButton
+                  variant="default"
+                  size="sm"
                   onClick={() => {
                     setRunReason('');
                     setRunReasonError(false);
@@ -374,7 +374,7 @@ export function AdminBackupPage() {
                   disabled={busy}
                 >
                   立即执行一次备份
-                </Button>
+                </ActionButton>
               ) : undefined
             }
           />
@@ -416,7 +416,7 @@ export function AdminBackupPage() {
                     ? [
                         {
                           label: '验证告警',
-                          value: <span className="text-amber-700">{row.verifyWarnings}</span>,
+                          value: <span className="text-warn-text">{row.verifyWarnings}</span>,
                         },
                       ]
                     : []),
@@ -424,7 +424,7 @@ export function AdminBackupPage() {
                     ? [
                         {
                           label: '失败原因',
-                          value: <span className="text-rose-600">{row.errorMessage}</span>,
+                          value: <span className="text-danger-text">{row.errorMessage}</span>,
                         },
                       ]
                     : []),
@@ -439,9 +439,9 @@ export function AdminBackupPage() {
 
       <Panel title="清理留痕" note="到期数据清理是不可逆操作，全部留痕">
         {logs.length === 0 ? (
-          <AdminEmpty description="暂无清理记录" />
+          <EmptyState title="暂无清理记录" />
         ) : (
-          <ul className="flex flex-col divide-y divide-border-table">
+          <ul className="flex flex-col divide-y divide-border">
             {logs.map((log) => (
               <li key={log.id} className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
                 <StatusTag
@@ -449,12 +449,12 @@ export function AdminBackupPage() {
                   label={log.success ? '成功' : '失败'}
                   tone={log.success ? 'success' : 'danger'}
                 />
-                <span className="min-w-0 flex-1 truncate text-xs text-text-primary">{log.target}</span>
-                <span className="shrink-0 text-[11px] text-text-tertiary">
+                <span className="min-w-0 flex-1 truncate text-xs text-foreground">{log.target}</span>
+                <span className="shrink-0 text-[11px] text-muted-foreground">
                   删除 {log.deletedCount} 条 · 保留 {log.retentionDays} 天 ·{' '}
                   {log.trigger === 'manual' ? '手动' : '自动'}
                 </span>
-                <span className="shrink-0 text-[11px] tabular-nums text-text-tertiary">
+                <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
                   {new Date(log.createdAt).toLocaleString('zh-CN')}
                 </span>
               </li>
@@ -497,7 +497,7 @@ export function AdminBackupPage() {
                   : null
               }
             >
-              <TextInput
+              <TextField
                 value={runReason}
                 onChange={(next) => {
                   setRunReason(next);
@@ -524,7 +524,7 @@ export function AdminBackupPage() {
           description={<p>超出保留份数的旧备份将被自动删除（仅删除已验证的备份）。</p>}
           extra={
             <FormField label="保留份数" htmlFor="adm-keep">
-              <NumberInput
+              <NumberField
                 value={keepCount}
                 min={1}
                 max={100}

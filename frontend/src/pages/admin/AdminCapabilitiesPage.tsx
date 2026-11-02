@@ -1,26 +1,28 @@
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Button } from '../../admin-ui/shadcn/kit';
 import { adminCapabilitiesApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
-import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
-import { HoverTip, SelectBox, TextArea, TextInput } from '../../admin-ui/controls';
 import {
-  AdminStaleError,
-  ConfirmAction,
-  useAdminResource,
-  useAdminUrlFilterSync,
-} from '../../components/admin/AdminWidgets';
-import {
+  ActionButton,
+  AdminDataTable,
   AppliedFilters,
+  ClearableField,
+  ConfirmAction,
   FilterActions,
   FilterBar,
+  HelpTip,
   PageHeader,
   Panel,
+  SelectField,
   StatusTag,
+  StaleError,
+  TextAreaField,
+  useAdminResource,
+  useAdminUrlFilterSync,
+  type AdminColumn,
   type AppliedFilter,
-} from '../../components/admin/PageHeader';
+} from '../../admin-ui/primitives';
 import { RUNTIME_LABELS } from '../../lib/constants';
 import type { AdminCapabilityControl } from '../../types/api';
 
@@ -169,7 +171,7 @@ export function AdminCapabilitiesPage() {
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           <span className="font-medium">{row.name}</span>
-          <code className="font-mono text-[11px] text-text-tertiary">{row.capabilityId}</code>
+          <code className="font-mono text-[11px] text-muted-foreground">{row.capabilityId}</code>
         </div>
       ),
     },
@@ -179,7 +181,7 @@ export function AdminCapabilitiesPage() {
       title: '模态',
       width: 90,
       render: (row) => (
-        <code className="font-mono text-[11px] text-text-secondary">{row.modality}</code>
+        <code className="font-mono text-[11px] text-muted-foreground">{row.modality}</code>
       ),
     },
     {
@@ -187,13 +189,13 @@ export function AdminCapabilitiesPage() {
       title: '实现程度',
       width: 110,
       render: (row) => (
-        <HoverTip tip={row.mode === 'real' ? '已接入真实模型通道' : '参考站有、本项目未实现'}>
+        <HelpTip tip={row.mode === 'real' ? '已接入真实模型通道' : '参考站有、本项目未实现'}>
           <StatusTag
             status="mode"
             tone={row.mode === 'real' ? 'success' : 'warn'}
             label={row.mode === 'real' ? '已接入' : '规划中'}
           />
-        </HoverTip>
+        </HelpTip>
       ),
     },
     {
@@ -203,13 +205,13 @@ export function AdminCapabilitiesPage() {
       render: (row) => {
         const eff = row.runtime?.effective ?? 'unavailable';
         return (
-          <HoverTip tip={row.runtime?.reason || '尚无运行结论'}>
+          <HelpTip tip={row.runtime?.reason || '尚无运行结论'}>
             <StatusTag
               status="runtime"
               tone={eff === 'remote' ? 'success' : 'danger'}
               label={RUNTIME_LABELS[eff] ?? eff}
             />
-          </HoverTip>
+          </HelpTip>
         );
       },
     },
@@ -221,9 +223,9 @@ export function AdminCapabilitiesPage() {
         row.enabled ? (
           <StatusTag status="enabled" tone="success" label="上线中" />
         ) : (
-          <HoverTip tip={row.reason || '未填写下线原因'}>
+          <HelpTip tip={row.reason || '未填写下线原因'}>
             <StatusTag status="disabled" tone="danger" label="已下线" />
-          </HoverTip>
+          </HelpTip>
         ),
     },
     {
@@ -234,10 +236,10 @@ export function AdminCapabilitiesPage() {
         row.updatedAt ? (
           <div className="flex flex-col text-xs">
             <span>{new Date(row.updatedAt).toLocaleString('zh-CN')}</span>
-            <span className="text-[11px] text-text-tertiary">{row.updatedBy ?? '-'}</span>
+            <span className="text-[11px] text-muted-foreground">{row.updatedBy ?? '-'}</span>
           </div>
         ) : (
-          <span className="text-text-placeholder">从未调整</span>
+          <span className="text-muted-foreground">从未调整</span>
         ),
     },
     {
@@ -245,15 +247,16 @@ export function AdminCapabilitiesPage() {
       title: '操作',
       width: 120,
       render: (row) => {
+        /*
+         * 与其它表的行内动作保持一致：ghost 小按钮 + 危险动作用红字。
+         * 之前每行一颗实心红按钮，16 行下来整页最抢眼的是「下线」，
+         * 反而看不出真正的状态列。
+         */
         const button = (
-          <Button
-            size="small"
-            /*
-             * 与其它表的行内动作保持一致：ghost 小按钮 + 危险动作用红字。
-             * 之前每行一颗实心红按钮，16 行下来整页最抢眼的是「下线」，
-             * 反而看不出真正的状态列。
-             */
-            variant={row.enabled ? 'dangerGhost' : 'ghost'}
+          <ActionButton
+            size="sm"
+            variant="ghost"
+            className={row.enabled ? 'text-danger-text hover:text-danger-text' : undefined}
             disabled={!writable || saving === row.capabilityId}
             onClick={() => {
               if (row.enabled) {
@@ -265,10 +268,10 @@ export function AdminCapabilitiesPage() {
             }}
           >
             {saving === row.capabilityId ? '处理中…' : row.enabled ? '下线' : '上线'}
-          </Button>
+          </ActionButton>
         );
         // 无写权限时把「为什么点不动」说清楚，不留一个灰按钮
-        return writable ? button : <HoverTip tip="当前账号无 capability.write 权限">{button}</HoverTip>;
+        return writable ? button : <HelpTip tip="当前账号无 capability.write 权限">{button}</HelpTip>;
       },
     },
   ];
@@ -289,27 +292,28 @@ export function AdminCapabilitiesPage() {
         note={`显示 ${filteredRows.length} / ${rows.length} 项 ·「当前结论」由后台开关、逐能力路由与该模态的云端通道共同决定`}
       >
         <FilterBar>
-          <TextInput
+          <ClearableField
             className="w-56"
             placeholder="能力名称 / ID / 模态"
-            allowClear
             value={q}
             onChange={setQ}
           />
-          <SelectBox
+          <SelectField
             className="w-40"
             ariaLabel="按分组筛选"
             placeholder="全部分组"
             allowClear
+            clearLabel="全部分组"
             value={group || undefined}
             onChange={(value) => setGroup(value ?? '')}
             options={groupOptions}
           />
-          <SelectBox
+          <SelectField
             className="w-40"
             ariaLabel="按运行结论筛选"
             placeholder="全部运行结论"
             allowClear
+            clearLabel="全部运行结论"
             value={runtime}
             onChange={(value) =>
               setRuntime(value as 'remote' | 'disabled' | 'unavailable' | undefined)
@@ -321,9 +325,9 @@ export function AdminCapabilitiesPage() {
             ]}
           />
           <FilterActions>
-            <Button variant="secondary" size="small" onClick={resetFilters}>
+            <ActionButton variant="secondary" size="sm" onClick={resetFilters}>
               重置
-            </Button>
+            </ActionButton>
           </FilterActions>
           <AppliedFilters items={appliedFilters} onClearAll={resetFilters} />
         </FilterBar>
@@ -334,7 +338,7 @@ export function AdminCapabilitiesPage() {
           现在由表格统一处理：失败态带重试，空态说明「为什么空」。
         */}
         {error && rows.length > 0 && (
-          <AdminStaleError error={error} onRetry={() => void reload()} />
+          <StaleError error={error} onRetry={() => void reload()} />
         )}
         <AdminDataTable<AdminCapabilityControl>
           rows={filteredRows}
@@ -351,9 +355,9 @@ export function AdminCapabilitiesPage() {
           }
           emptyAction={
             rows.length > 0 && hasFilter ? (
-              <Button variant="secondary" size="small" onClick={resetFilters}>
+              <ActionButton variant="secondary" size="sm" onClick={resetFilters}>
                 清除筛选
-              </Button>
+              </ActionButton>
             ) : undefined
           }
         />
@@ -368,13 +372,13 @@ export function AdminCapabilitiesPage() {
         onCancel={() => setOffline(null)}
         onConfirm={() => void submitOffline()}
         description={
-          <p className="text-xs text-text-secondary">
+          <p className="text-xs text-muted-foreground">
             下架后用户在 C 端会看到下方填写的「下线原因」，同时该能力不可提交。此操作会写入审计日志。
           </p>
         }
         impact={['C 端停止提交该能力', '下线原因展示给用户', '写操作审计（含操作人）']}
         extra={
-          <TextArea
+          <TextAreaField
             value={reason}
             onChange={setReason}
             rows={3}

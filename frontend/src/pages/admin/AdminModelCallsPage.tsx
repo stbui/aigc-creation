@@ -1,30 +1,31 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Download } from 'lucide-react';
-import { Button } from '../../admin-ui/shadcn/kit';
 import { adminApiLogsApi } from '../../lib/api';
 import { useAdmin } from '../../context/AdminContext';
 import { useToast } from '../../admin-ui/providers/ToastProvider';
-import { AdminDataTable, type AdminColumn } from '../../admin-ui/primitives/DataTable';
-import { Drawer } from '../../admin-ui/primitives/Drawer';
-import { Descriptions, Notice } from '../../admin-ui/primitives';
-import { SelectBox, TextInput } from '../../admin-ui/controls';
 import {
-  AdminStaleError,
+  ActionButton,
+  AdminDataTable,
+  AppliedFilters,
+  Descriptions,
+  Drawer,
+  FilterActions,
+  FilterBar,
+  Notice,
+  PageHeader,
+  Panel,
+  SelectField,
+  StatCard,
+  StatusTag,
+  StaleError,
+  TextField,
   useAdminDetailParam,
   useAdminList,
   useAdminUrlFilterSync,
-} from '../../components/admin/AdminWidgets';
-import {
-  AppliedFilters,
-  FilterActions,
-  FilterBar,
-  PageHeader,
-  Panel,
-  StatCard,
-  StatusTag,
+  type AdminColumn,
   type AppliedFilter,
-} from '../../components/admin/PageHeader';
+} from '../../admin-ui/primitives';
 import type { ApiLogListResult, ApiLogView } from '../../types/model';
 
 /**
@@ -228,7 +229,7 @@ export function AdminModelCallsPage() {
         title: '时间',
         width: 150,
         render: (row) => (
-          <span className="text-[11px] tabular-nums text-text-secondary">
+          <span className="text-[11px] tabular-nums text-muted-foreground">
             {new Date(row.createdAt).toLocaleString('zh-CN')}
           </span>
         ),
@@ -244,7 +245,7 @@ export function AdminModelCallsPage() {
               tone={STATUS_TONES[row.status] ?? 'muted'}
               label={STATUS_LABELS[row.status] ?? row.status}
             />
-            <span className="tabular-nums text-text-tertiary">HTTP {row.statusCode || '—'}</span>
+            <span className="tabular-nums text-muted-foreground">HTTP {row.statusCode || '—'}</span>
           </div>
         ),
       },
@@ -254,8 +255,8 @@ export function AdminModelCallsPage() {
         width: 100,
         render: (row) => (
           <div className="flex flex-col gap-0.5 text-[11px]">
-            <span className="text-text-primary">{REQUEST_KIND_LABELS[row.requestKind] ?? row.requestKind}</span>
-            <span className={row.billable ? 'text-text-tertiary' : 'text-amber-700'}>
+            <span className="text-foreground">{REQUEST_KIND_LABELS[row.requestKind] ?? row.requestKind}</span>
+            <span className={row.billable ? 'text-muted-foreground' : 'text-warn-text'}>
               {row.billable ? '计费' : '不计费'}
             </span>
           </div>
@@ -267,8 +268,8 @@ export function AdminModelCallsPage() {
         width: 220,
         render: (row) => (
           <div className="min-w-0">
-            <div className="truncate text-[11px] text-text-primary">{row.channelName || row.channelId || '—'}</div>
-            <div className="truncate font-mono text-[10px] text-text-tertiary">{row.model || '—'}</div>
+            <div className="truncate text-[11px] text-foreground">{row.channelName || row.channelId || '—'}</div>
+            <div className="truncate font-mono text-[10px] text-muted-foreground">{row.model || '—'}</div>
           </div>
         ),
       },
@@ -277,15 +278,15 @@ export function AdminModelCallsPage() {
         title: '用量',
         width: 160,
         render: (row) => (
-          <div className="flex flex-col gap-0.5 text-[11px] tabular-nums text-text-secondary">
+          <div className="flex flex-col gap-0.5 text-[11px] tabular-nums text-muted-foreground">
             <span>{row.durationMs} ms{row.pollCount > 1 ? ` · 轮询 ${row.pollCount}` : ''}</span>
             {row.usageAvailable && (
-              <span className="text-text-tertiary">
+              <span className="text-muted-foreground">
                 输入 {row.inputTokens} / 输出 {row.outputTokens}
               </span>
             )}
-            {row.mediaCount > 0 && <span className="text-text-tertiary">产出 {row.mediaCount} 个</span>}
-            {row.videoSeconds > 0 && <span className="text-text-tertiary">{row.videoSeconds}s 视频</span>}
+            {row.mediaCount > 0 && <span className="text-muted-foreground">产出 {row.mediaCount} 个</span>}
+            {row.videoSeconds > 0 && <span className="text-muted-foreground">{row.videoSeconds}s 视频</span>}
           </div>
         ),
       },
@@ -296,13 +297,13 @@ export function AdminModelCallsPage() {
         render: (row) =>
           row.error || row.errorCode ? (
             <div className="min-w-0 text-[11px]">
-              {row.errorCode && <span className="font-mono text-rose-700">{row.errorCode}</span>}
-              <span className="ml-1 line-clamp-1 text-text-secondary" title={row.error}>
+              {row.errorCode && <span className="font-mono text-danger-text">{row.errorCode}</span>}
+              <span className="ml-1 line-clamp-1 text-muted-foreground" title={row.error}>
                 {row.error}
               </span>
             </div>
           ) : (
-            <span className="text-text-placeholder">—</span>
+            <span className="text-muted-foreground">—</span>
           ),
       },
       {
@@ -311,9 +312,9 @@ export function AdminModelCallsPage() {
         width: 80,
         fixed: 'right',
         render: (row) => (
-          <Button variant="ghost" size="xs" onClick={() => setDetailId(row.id)}>
+          <ActionButton variant="ghost" size="xs" onClick={() => setDetailId(row.id)}>
             详情
-          </Button>
+          </ActionButton>
         ),
       },
     ],
@@ -328,19 +329,19 @@ export function AdminModelCallsPage() {
         actions={
           <>
             {can('data.export') && (
-              <Button
+              <ActionButton
                 variant="secondary"
-                size="small"
-                leadingIcon={Download}
+                size="sm"
+                icon={Download}
                 disabled={exporting}
                 onClick={() => void exportCsv()}
               >
                 {exporting ? '导出中…' : '导出 CSV'}
-              </Button>
+              </ActionButton>
             )}
-            <Button variant="secondary" size="small" onClick={() => void reload()}>
+            <ActionButton variant="secondary" size="sm" onClick={() => void reload()}>
               刷新
-            </Button>
+            </ActionButton>
           </>
         }
       />
@@ -356,7 +357,7 @@ export function AdminModelCallsPage() {
 
       <Panel title="调用明细">
         <FilterBar>
-          <SelectBox
+          <SelectField
             ariaLabel="调用状态"
             value={status}
             options={[
@@ -367,7 +368,7 @@ export function AdminModelCallsPage() {
             allowClear
             onChange={setStatus}
           />
-          <SelectBox
+          <SelectField
             ariaLabel="请求类型"
             value={requestKind}
             options={[
@@ -378,7 +379,7 @@ export function AdminModelCallsPage() {
             allowClear
             onChange={setRequestKind}
           />
-          <SelectBox
+          <SelectField
             ariaLabel="是否计费"
             value={billable}
             options={[
@@ -388,30 +389,30 @@ export function AdminModelCallsPage() {
             allowClear
             onChange={setBillable}
           />
-          <TextInput ariaLabel="模型" value={model} onChange={setModel} placeholder="模型编码" onEnter={applyFilters} />
-          <TextInput
+          <TextField ariaLabel="模型" value={model} onChange={setModel} placeholder="模型编码" onEnter={applyFilters} />
+          <TextField
             ariaLabel="渠道 ID"
             value={channelId}
             onChange={setChannelId}
             placeholder="渠道 ID"
             onEnter={applyFilters}
           />
-          <TextInput ariaLabel="任务 ID" value={taskId} onChange={setTaskId} placeholder="任务 ID" onEnter={applyFilters} />
-          <TextInput ariaLabel="用户 ID" value={userId} onChange={setUserId} placeholder="用户 ID" onEnter={applyFilters} />
-          <TextInput ariaLabel="开始日期" type="date" value={from} onChange={setFrom} />
-          <TextInput ariaLabel="结束日期" type="date" value={to} onChange={setTo} />
+          <TextField ariaLabel="任务 ID" value={taskId} onChange={setTaskId} placeholder="任务 ID" onEnter={applyFilters} />
+          <TextField ariaLabel="用户 ID" value={userId} onChange={setUserId} placeholder="用户 ID" onEnter={applyFilters} />
+          <TextField ariaLabel="开始日期" type="date" value={from} onChange={setFrom} />
+          <TextField ariaLabel="结束日期" type="date" value={to} onChange={setTo} />
           <FilterActions>
-            <Button variant="primary" size="small" onClick={applyFilters}>
+            <ActionButton variant="default" size="sm" onClick={applyFilters}>
               查询
-            </Button>
-            <Button variant="secondary" size="small" onClick={resetFilters}>
+            </ActionButton>
+            <ActionButton variant="secondary" size="sm" onClick={resetFilters}>
               重置
-            </Button>
+            </ActionButton>
           </FilterActions>
           <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
         </FilterBar>
 
-        {error && rows.length > 0 && <AdminStaleError error={error} onRetry={() => void reload()} />}
+        {error && rows.length > 0 && <StaleError error={error} onRetry={() => void reload()} />}
         <AdminDataTable<ApiLogView>
           rows={rows}
           columns={columns}
@@ -439,9 +440,9 @@ export function AdminModelCallsPage() {
         title="调用详情"
         description={detail ? `${detail.method} ${detail.path}` : undefined}
         footer={
-          <Button variant="secondary" size="small" onClick={() => setDetailId(null)}>
+          <ActionButton variant="secondary" size="sm" onClick={() => setDetailId(null)}>
             关闭
-          </Button>
+          </ActionButton>
         }
       >
         {detail ? (
@@ -476,19 +477,13 @@ export function AdminModelCallsPage() {
                     : '无用量数据',
                 },
                 { label: '产出', value: `${detail.mediaCount} 个媒体${detail.videoSeconds > 0 ? ` · ${detail.videoSeconds}s` : ''}` },
-                {
-                  label: '预估成本',
-                  value: detail.costAvailable
-                    ? `${(detail.estimatedCostMicros / 1_000_000).toFixed(6)} ${detail.currency || ''}`
-                    : '未配置成本价',
-                },
                 { label: '时间', value: new Date(detail.createdAt).toLocaleString('zh-CN') },
               ]}
               columns={2}
             />
           </div>
         ) : (
-          <p className="py-6 text-center text-xs text-text-tertiary">
+          <p className="py-6 text-center text-xs text-muted-foreground">
             该记录不在当前页。请回到列表按任务 ID 或渠道 ID 定位。
           </p>
         )}

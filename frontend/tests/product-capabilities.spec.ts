@@ -328,13 +328,20 @@ test.describe('失败任务重试', () => {
       createdAt: new Date().toISOString(),
     };
 
-    await page.route(/\/api\/v1\/tasks$/, (route) =>
-      route.fulfill({
+    // 历史列表走分页接口 `/tasks/page`（旧 `/tasks` 返回整量数组），两个都拦，
+    // 形状各自对上；漏拦就会打到真实后端，拿到的是该账号的真任务。
+    await page.route(/\/api\/v1\/tasks(?:\/page)?$/, (route) => {
+      const isPaged = route.request().url().includes('/api/v1/tasks/page');
+      return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ code: 0, data: [failed], message: '' }),
-      }),
-    );
+        body: JSON.stringify({
+          code: 0,
+          data: isPaged ? { items: [failed], total: 1, limit: 50, offset: 0 } : [failed],
+          message: '',
+        }),
+      });
+    });
     let posted: any = null;
     await page.route('**/api/v1/generate', async (route) => {
       posted = route.request().postDataJSON();
@@ -461,13 +468,19 @@ test.describe('局部重绘画布', () => {
         body: JSON.stringify({ code: 0, data: [{ id: 'project-redraw-e2e', name: '测试项目' }], message: '' }),
       }),
     );
-    await page.route(/\/api\/v1\/tasks$/, (route) =>
-      route.fulfill({
+    // 历史列表走分页接口 `/tasks/page`（旧 `/tasks` 返回整量数组），两个都拦。
+    await page.route(/\/api\/v1\/tasks(?:\/page)?$/, (route) => {
+      const isPaged = route.request().url().includes('/api/v1/tasks/page');
+      return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ code: 0, data: [], message: '' }),
-      }),
-    );
+        body: JSON.stringify({
+          code: 0,
+          data: isPaged ? { items: [], total: 0, limit: 50, offset: 0 } : [],
+          message: '',
+        }),
+      });
+    });
     await page.route('**/uploads/**', (route) =>
       route.fulfill({ status: 200, contentType: 'image/png', body: REDRAW_PNG }),
     );
@@ -650,13 +663,19 @@ test.describe('局部重绘画布', () => {
         body: JSON.stringify({ code: 0, data: [{ id: 'project-redraw-e2e', name: '测试项目' }], message: '' }),
       }),
     );
-    await page.route(/\/api\/v1\/tasks$/, (route) =>
-      route.fulfill({
+    // 历史列表走分页接口 `/tasks/page`（旧 `/tasks` 返回整量数组），两个都拦。
+    await page.route(/\/api\/v1\/tasks(?:\/page)?$/, (route) => {
+      const isPaged = route.request().url().includes('/api/v1/tasks/page');
+      return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ code: 0, data: [], message: '' }),
-      }),
-    );
+        body: JSON.stringify({
+          code: 0,
+          data: isPaged ? { items: [], total: 0, limit: 50, offset: 0 } : [],
+          message: '',
+        }),
+      });
+    });
     await page.route('**/uploads/**', (route) =>
       route.fulfill({ status: 200, contentType: 'image/png', body: REDRAW_PNG }),
     );

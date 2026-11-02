@@ -212,7 +212,7 @@ test.describe('渠道与模型 P5', () => {
     for (const channel of channels) {
       const models = (
         (await (await request.get(`${API}/api/v1/admin/channels/${channel.id}/models`, { headers: auth })).json())
-          ?.data ?? []
+          ?.data?.models ?? []
       ) as Array<any>;
       const model = models.find((item: any) =>
         (item.priceTiers ?? []).some(
@@ -297,7 +297,7 @@ test.describe('渠道与模型 P5', () => {
 
     const modelsAfter = (
       (await (await request.get(`${API}/api/v1/admin/channels/${target!.channelId}/models`, { headers: auth })).json())
-        ?.data ?? []
+        ?.data?.models ?? []
     ) as Array<any>;
     const after = modelsAfter.find((item: any) => item.modelKey === target!.modelKey);
     const tierAfter = (after?.priceTiers ?? []).find(
@@ -493,7 +493,7 @@ test.describe('渠道与模型 P5', () => {
     const auth = { Authorization: `Bearer ${token}` };
     const orderRes = await request.get(`${API}/api/v1/admin/channels/order`, { headers: auth });
     expect(orderRes.ok()).toBeTruthy();
-    const order = (await orderRes.json()).data as Array<{ id: string; name: string }>;
+    const order = (await orderRes.json()).data.items as Array<{ id: string; name: string }>;
     if (order.length === 0) {
       test.skip(true, '当前库没有渠道，排序弹窗无条目可排');
     }
@@ -523,7 +523,7 @@ test.describe('渠道与模型 P5', () => {
     const auth = { Authorization: `Bearer ${token}` };
     const orderRes = await request.get(`${API}/api/v1/admin/channels/order`, { headers: auth });
     expect(orderRes.ok()).toBeTruthy();
-    const order = (await orderRes.json()).data as Array<{ id: string }>;
+    const order = (await orderRes.json()).data.items as Array<{ id: string }>;
     if (order.length === 0) {
       test.skip(true, '当前库没有渠道，排序 CAS 无从验证');
     }
@@ -572,7 +572,7 @@ test.describe('渠道与模型 P5', () => {
     for (const channel of channels) {
       const models = (
         (await (await request.get(`${API}/api/v1/admin/channels/${channel.id}/models`, { headers: auth })).json())
-          ?.data ?? []
+          ?.data?.models ?? []
       ) as Array<any>;
       if (models.length > 0) {
         target = { id: channel.id, name: channel.name };
@@ -640,7 +640,7 @@ test.describe('渠道与模型 P5', () => {
     for (const channel of channels) {
       const list = (
         (await (await request.get(`${API}/api/v1/admin/channels/${channel.id}/models`, { headers: auth })).json())
-          ?.data ?? []
+          ?.data?.models ?? []
       ) as Array<{ modelKey: string; enabled: boolean; protocol: string }>;
       if (list.length > 0) {
         target = { id: channel.id, name: channel.name };
@@ -722,7 +722,7 @@ test.describe('渠道与模型 P5', () => {
     }
     const localModels = (
       (await (await request.get(`${API}/api/v1/admin/channels/${channel!.id}/models`, { headers: auth })).json())
-        ?.data ?? []
+        ?.data?.models ?? []
     ) as Array<{ modelKey: string }>;
     if (localModels.length === 0) {
       test.skip(true, '当前库没有「带模型的渠道」，上游目录导入无从验证');
@@ -801,7 +801,7 @@ test.describe('渠道与模型 P5', () => {
       headers: auth,
     });
     expect(listRes.ok()).toBeTruthy();
-    const all = (await listRes.json()).data as Array<{
+    const all = (await listRes.json()).data.models as Array<{
       id: string;
       modelKey: string;
       displayName?: string;

@@ -11,6 +11,7 @@ import {
 } from './constants';
 import { PersonalPage, StateButton, StateEmpty, StateSkeleton } from './components';
 import { useAuth } from './hooks';
+import { useDocumentMeta } from '../../hooks/useDocumentMeta';
 import {
   creditsApi,
   membershipApi,
@@ -54,6 +55,7 @@ import type {
  */
 
 export function AccountPage() {
+  useDocumentMeta('账户设置 · 货觉AI', '管理账号资料、安全、数据导出与注销。');
   const navigate = useNavigate();
   const { token, logout, openLogin } = useAuth();
 
@@ -116,7 +118,7 @@ export function AccountPage() {
       }
       if (t.status === 'fulfilled') setTicketTotal(t.value.total);
       // 只展示最近三笔；后端已按创建时间倒序返回
-      if (o.status === 'fulfilled') setRecentOrders(o.value.slice(0, RECENT_ORDER_LIMIT));
+      if (o.status === 'fulfilled') setRecentOrders(o.value.items.slice(0, RECENT_ORDER_LIMIT));
     } finally {
       setLoading(false);
     }
@@ -304,6 +306,8 @@ export function AccountPage() {
       const res = await notificationsApi.readAll();
       setUnread(res.unread);
       setMessages((prev) => prev.map((it) => ({ ...it, readAt: it.readAt ?? new Date().toISOString() })));
+      // 顶栏铃铛持有独立状态，广播后立即刷新，不必等 60s 轮询
+      window.dispatchEvent(new Event('notifications:changed'));
       message.success('已全部标为已读');
     } catch (e) {
       message.error(e instanceof Error ? e.message : '操作失败');

@@ -32,10 +32,11 @@ const WORKBENCH_TITLES = [
 
 const GUEST_PROMO_DISMISS_KEY = 'ecom-guest-promo-dismissed-v1';
 
-function trackApi(page: Page, path: string) {
+function trackApi(page: Page, path: string | string[]) {
+  const paths = Array.isArray(path) ? path : [path];
   let count = 0;
   page.on('request', (request) => {
-    if (new URL(request.url()).pathname === path) count += 1;
+    if (paths.includes(new URL(request.url()).pathname)) count += 1;
   });
   return () => count;
 }
@@ -135,7 +136,9 @@ test.describe('工作台复原', () => {
 test.describe('我的作品复原', () => {
   test('游客态直接显示筛选器与空态，不请求任务接口', async ({ page }) => {
     await skipGuestPromo(page);
-    const taskRequests = trackApi(page, '/api/v1/tasks');
+    // 作品页取的是分页接口 `/tasks/page`；旧的整量列表 `/tasks` 同样不许发。
+    // 两个都盯着，任一路径被调用都会让断言失败。
+    const taskRequests = trackApi(page, ['/api/v1/tasks', '/api/v1/tasks/page']);
     await page.goto(`${UI}/works`);
 
     await expect(page.locator('.my-works-intro h1')).toHaveText('我的作品');

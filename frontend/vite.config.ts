@@ -37,17 +37,11 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react(), tailwindcss()],
     /*
-     * BoardUI 源码保持上游写法（`@/components/...`、`@/utils/...`），不做批量改写。
-     * 把 `@` 指向 vendor 根，vendor 目录内就是一份自洽的仓库克隆，升级时可直接覆盖文件。
-     * 业务代码一律用相对路径，避免与这个别名混淆。
-     *
-     * `~` 是 shadcn/ui 基座的别名：shadcn CLI 默认写 `@/components/ui`，
-     * 而 `@` 已被 BoardUI vendor 占用，直接用会把组件写进 vendor 目录、
-     * 污染上游源码（升级时无法直接覆盖）。故 shadcn 一律走 `~/`。
+     * `~` 是 `src` 的别名，供 shadcn 组件与后台代码使用（`components.json` 的
+     * `aliases` 全指向 `~/...`）。C 端页面一律写相对路径，不依赖别名。
      */
     resolve: {
       alias: {
-        '@': fileURLToPath(new URL('./src/vendor/boardui', import.meta.url)),
         '~': fileURLToPath(new URL('./src', import.meta.url)),
       },
     },

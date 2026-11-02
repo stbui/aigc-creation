@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { UploadCloud } from 'lucide-react';
-import { Button, CheckBox, ModalDialog, StatusTag, TextInput } from './components';
+import {
+  ActionButton,
+  CheckboxField,
+  ClearableField,
+  ModalDialog,
+  StatusTag,
+} from './components';
 import type { UpstreamModelPreview } from '../../../types/model';
 
 interface ChannelUpstreamDialogProps {
@@ -62,37 +68,36 @@ export function ChannelUpstreamDialog({
       description="只写入勾选项；导入后默认停用，需要补能力合同与价格后再启用"
       footer={
         <>
-          <Button variant="secondary" size="small" disabled={importing} onClick={onClose}>
+          <ActionButton variant="secondary" size="sm" disabled={importing} onClick={onClose}>
             取消
-          </Button>
-          <Button
-            variant="primary"
-            size="small"
-            leadingIcon={UploadCloud}
+          </ActionButton>
+          <ActionButton
+            variant="default"
+            size="sm"
+            icon={UploadCloud}
             disabled={importing || selectedNew.length === 0}
             onClick={() => onImport(selected)}
           >
             {importing ? '导入中…' : `导入 ${selectedNew.length} 个新模型`}
-          </Button>
+          </ActionButton>
         </>
       }
     >
       <div className="flex flex-col gap-3">
-        <TextInput
+        <ClearableField
           ariaLabel="搜索上游模型"
           value={keyword}
           onChange={setKeyword}
           placeholder="搜索模型标识或显示名"
-          allowClear
         />
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border-table px-3 py-2">
-          <span className="text-xs text-text-secondary">
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border px-3 py-2">
+          <span className="text-xs text-muted-foreground">
             已选 {selected.length} / {models.length}
             {keyword.trim() ? `，当前匹配 ${visible.length}` : ''}
             {selectedExisting > 0 ? `（其中 ${selectedExisting} 个已存在，不会重复导入）` : ''}
           </span>
           <div className="flex items-center gap-1.5">
-            <Button
+            <ActionButton
               variant="secondary"
               size="xs"
               disabled={importing || allVisibleSelected || visible.length === 0}
@@ -104,8 +109,8 @@ export function ChannelUpstreamDialog({
               }
             >
               {keyword.trim() ? `全选匹配的 ${visible.length} 个` : '全选'}
-            </Button>
-            <Button
+            </ActionButton>
+            <ActionButton
               variant="secondary"
               size="xs"
               disabled={importing || selectedVisibleCount === 0}
@@ -114,40 +119,43 @@ export function ChannelUpstreamDialog({
               }
             >
               {keyword.trim() ? '取消选中匹配的' : '取消全选'}
-            </Button>
+            </ActionButton>
           </div>
         </div>
-        <div className="flex max-h-[360px] flex-col gap-1 overflow-y-auto rounded-lg border border-border-table p-2">
+        <div className="flex max-h-[360px] flex-col gap-1 overflow-y-auto rounded-lg border border-border p-2">
           {visible.length === 0 ? (
-            <p className="py-6 text-center text-xs text-text-tertiary">
+            <p className="py-6 text-center text-xs text-muted-foreground">
               {keyword.trim() ? `没有匹配「${keyword.trim()}」的模型` : '上游没有返回可用模型'}
             </p>
           ) : (
             visible.map((item) => {
               const exists = existingKeys.has(item.id.toLowerCase());
               return (
-                <label
+                <CheckboxField
                   key={item.id}
-                  className="flex items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-background-secondary-default"
-                >
-                  <CheckBox
-                    size="sm"
-                    checked={selected.includes(item.id)}
-                    onChange={(checked) =>
-                      setSelected((prev) =>
-                        checked ? [...prev, item.id] : prev.filter((id) => id !== item.id),
-                      )
-                    }
-                    ariaLabel={`选择上游模型 ${item.id}`}
-                  />
-                  <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-text-primary">
-                    {item.id}
-                  </span>
-                  {exists && <StatusTag status="upstream-existing" tone="muted" label="已存在" />}
-                  <span className="shrink-0 text-[11px] text-text-tertiary">
-                    {item.displayName || item.modelType || ''}
-                  </span>
-                </label>
+                  size="sm"
+                  checked={selected.includes(item.id)}
+                  onChange={(checked) =>
+                    setSelected((prev) =>
+                      checked ? [...prev, item.id] : prev.filter((id) => id !== item.id),
+                    )
+                  }
+                  ariaLabel={`选择上游模型 ${item.id}`}
+                  className="w-full rounded-lg px-2 py-1.5 hover:bg-muted"
+                  label={
+                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                      <span className="min-w-0 flex-1 truncate font-mono text-[12px] text-foreground">
+                        {item.id}
+                      </span>
+                      {exists && (
+                        <StatusTag status="upstream-existing" tone="muted" label="已存在" />
+                      )}
+                      <span className="shrink-0 text-[11px] text-muted-foreground">
+                        {item.displayName || item.modelType || ''}
+                      </span>
+                    </span>
+                  }
+                />
               );
             })
           )}

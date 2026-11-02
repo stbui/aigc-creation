@@ -1,6 +1,8 @@
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthCard } from '../components/AuthCard';
 import { useAuth } from '../context/AuthContext';
+import { safeInternalPath } from '../lib/safePath';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 
 /**
  * 登录独立页 —— 登录卡的**兜底宿主**。
@@ -12,6 +14,7 @@ import { useAuth } from '../context/AuthContext';
  * 视觉与弹窗完全一致 —— 同一个 `AuthCard` 组件, 不存在两套实现。
  */
 export function LoginPage() {
+  useDocumentMeta('登录 · 货觉AI', '登录或注册货觉AI，开始生成电商视觉素材。');
   const navigate = useNavigate();
   const { token } = useAuth();
   const [params] = useSearchParams();
@@ -23,11 +26,7 @@ export function LoginPage() {
    * **绝对路径**：`//evil.com` 会被浏览器当成协议相对 URL 跳走，是开放重定向的
    * 经典写法，必须挡掉。非法值一律回落工作台。
    */
-  const redirect = params.get('redirect') ?? '';
-  const target =
-    redirect.startsWith('/') && !redirect.startsWith('//') && redirect !== '/login'
-      ? redirect
-      : '/workbench';
+  const target = safeInternalPath(params.get('redirect'), '/workbench');
 
   // 已登录用户点到旧登录链接时直接回到目标页，避免误以为登录态丢失。
   if (token) return <Navigate to={target} replace />;

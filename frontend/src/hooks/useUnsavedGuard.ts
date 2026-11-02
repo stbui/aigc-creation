@@ -36,7 +36,7 @@ export function useUnsavedGuard(dirty: boolean): void {
  * `useUnsavedGuard` 负责路由跳转与刷新，但关闭抽屉不会触发路由变化。
  * 有修改时先问一句，没有修改则直接关闭。
  *
- * 确认走 BoardUI 的 `ConfirmProvider`（后台已挂载）。Provider 不在时退回
+ * 确认走 `ConfirmProvider`（后台已挂载）。Provider 不在时退回
  * 浏览器原生 `confirm` —— 不能让「问一句」这件事本身依赖某个外壳，
  * 更不能因为没有 Provider 就白屏。
  */

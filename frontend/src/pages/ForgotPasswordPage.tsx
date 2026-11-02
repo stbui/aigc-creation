@@ -3,6 +3,7 @@ import { Form, Input, Button, App } from 'antd';
 import { Link } from 'react-router-dom';
 import { Mail, ShieldCheck } from 'lucide-react';
 import { authApi } from '../lib/api';
+import { useDocumentMeta } from '../hooks/useDocumentMeta';
 
 /**
  * 找回密码 —— 独立页（无侧栏、无登录卡左栏）。
@@ -15,6 +16,7 @@ import { authApi } from '../lib/api';
  * 而账号根本不存在。
  */
 export function ForgotPasswordPage() {
+  useDocumentMeta('找回密码 · 货觉AI', '通过注册邮箱重置货觉AI账号密码。');
   const { message } = App.useApp();
   const [submitting, setSubmitting] = useState(false);
   const [sentTo, setSentTo] = useState<string | null>(null);
