@@ -1179,7 +1179,13 @@ async function runHttpChecks(): Promise<void> {
       const to = new Date(summary.range.to);
       const rows = await prisma.billingOrder.findMany({ where: { createdAt: { gte: from, lt: to } } });
       const charged = rows.filter((row) => row.status === 'settled').reduce((sum, row) => sum + row.actualAmountMicrocredits, 0n);
-      const refunded = rows.reduce((sum, row) => sum + (row.refundedAmountMicrocredits ?? 0n), 0n);
+      // 换线的旧账单退款是内部重预留，不算「用户拿回的钱」
+      const refunded = rows
+        .filter((row) => row.refundReason !== 'route_switch')
+        .reduce((sum, row) => sum + (row.refundedAmountMicrocredits ?? 0n), 0n);
+      const routeSwitchRefunded = rows
+        .filter((row) => row.refundReason === 'route_switch')
+        .reduce((sum, row) => sum + (row.refundedAmountMicrocredits ?? 0n), 0n);
       const outstandingRows = rows.filter((row) => ['reserved', 'running', 'uncertain'].includes(row.status));
       const outstanding = outstandingRows.reduce((sum, row) => sum + (row.reservedAmountMicrocredits ?? 0n), 0n);
       const uncertain = rows.filter((row) => row.status === 'uncertain').length;
@@ -1189,9 +1195,10 @@ async function runHttpChecks(): Promise<void> {
         api: summary.totals.chargedMicrocredits,
         db: charged.toString(),
       });
-      check('已退 = 全部账单 refundedAmount 之和', BigInt(summary.totals.refundedMicrocredits) === refunded, {
+      check('已退 = 真实退款的 refundedAmount 之和（不含换线重预留）', BigInt(summary.totals.refundedMicrocredits) === refunded, {
         api: summary.totals.refundedMicrocredits,
         db: refunded.toString(),
+        routeSwitchRefunded: routeSwitchRefunded.toString(),
       });
       check('挂账 = reserved/running/uncertain 的预授权之和', BigInt(summary.totals.outstandingMicrocredits) === outstanding, {
         api: summary.totals.outstandingMicrocredits,

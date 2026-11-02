@@ -86,6 +86,27 @@ export function csvFilename(prefix: string, now = new Date()): string {
   return `${prefix}-${stamp}.csv`;
 }
 
+import { TextDecoder } from 'node:util';
+
+/**
+ * 账单 CSV 字节 → 文本。
+ *
+ * 支付宝交易明细通常是 GBK/GB18030，微信是 UTF-8；直接 `toString('utf8')`
+ * 会让中文表头变成乱码，列名匹配全部失败，最后被当成「账单没有交易记录」。
+ * 先严格按 UTF-8 解码，失败再回退 GB18030；带 BOM 的文件按 UTF-8 处理。
+ */
+export function decodeCsvBuffer(data: Buffer): string {
+  if (!data || data.length === 0) return '';
+  if (data[0] === 0xef && data[1] === 0xbb && data[2] === 0xbf) {
+    return data.subarray(3).toString('utf8');
+  }
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(data);
+  } catch {
+    return new TextDecoder('gb18030').decode(data);
+  }
+}
+
 /**
  * 解析 CSV (RFC 4180, 零依赖)。
  *

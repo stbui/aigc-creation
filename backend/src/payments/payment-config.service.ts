@@ -113,7 +113,9 @@ export class PaymentConfigService implements OnModuleInit {
       const row = await this.prisma.paymentProviderConfig.findUnique({
         where: { id: order.providerConfigId },
       });
-      if (row) return this.toResolved(row);
+      // 必须同时校验渠道：跨渠道重试后 Order.channel 与旧配置可能不属于同一渠道，
+      // 拿错配置去验签/退款会直接失败，甚至把 A 渠道的密钥交给 B 适配器。
+      if (row && row.providerId === order.channel) return this.toResolved(row);
     }
     const adapter = getAdapter(order.channel);
     if (!adapter) return null;

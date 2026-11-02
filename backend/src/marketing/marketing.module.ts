@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { MarketingCoreModule } from './marketing-core.module';
+import { MembershipModule } from '../membership/membership.module';
 import { MarketingPublicController, MarketingMeController } from './marketing.controller';
 
 /**
@@ -13,7 +14,7 @@ import { MarketingPublicController, MarketingMeController } from './marketing.co
  * 打破 AdminModule ↔ OrdersModule 的循环依赖, 详见其文件注释)。
  */
 @Module({
-  imports: [MarketingCoreModule],
+  imports: [MarketingCoreModule, MembershipModule],
   controllers: [MarketingPublicController, MarketingMeController],
 })
 export class MarketingModule {}

@@ -9,8 +9,8 @@ import {
   EmptyState,
   ListError,
   PageHeader,
+  PageSkeleton,
   Panel,
-  Skeleton,
   StaleError,
   ToneBadge,
   useAdminResource,
@@ -290,12 +290,23 @@ export function AdminRolesPage() {
     }
   };
 
+  /*
+   * 页头照常渲染：加载期间标题与说明就该在位。
+   * 之前的守卫整页替换，首屏先闪一段没有标题的灰条，再冒出完整页面 ——
+   * 骨架该占住位置，不是把版面清空。
+   */
   if (loading && !data) {
     return (
-      <div className="flex flex-col gap-3" aria-busy="true" aria-live="polite">
-        <Skeleton rows={4} />
-        <p className="text-center text-xs text-muted-foreground">加载角色权限…</p>
-      </div>
+      <PageSkeleton
+        title="角色权限"
+        description={
+          editable
+            ? '勾选变更后使用保存条提交；保存立即生效，无需重启或重新登录'
+            : '当前账号无 role.write 权限，仅可查看'
+        }
+        panels={1}
+        panelRows={6}
+      />
     );
   }
   if (error && !data) return <ListError error={error} onRetry={() => void reload()} />;
@@ -407,7 +418,7 @@ export function AdminRolesPage() {
                         高危
                       </ToneBadge>
                     )}
-                    <code className="truncate font-mono text-[11px] text-muted-foreground/60">{code}</code>
+                    <code className="truncate font-mono text-[12px] text-muted-foreground/60">{code}</code>
                   </div>
                   <div className="flex shrink-0">
                     {roles.map((r) => (

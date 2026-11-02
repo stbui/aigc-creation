@@ -124,14 +124,14 @@ export function AdminRetentionPage() {
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           <span>{row.label}</span>
-          <code className="font-mono text-[11px] text-muted-foreground">{row.table}</code>
+          <code className="font-mono text-[12px] text-muted-foreground">{row.table}</code>
         </div>
       ),
     },
     {
       key: 'note',
       title: '说明',
-      render: (row) => <span className="text-[11px] text-muted-foreground">{row.note}</span>,
+      render: (row) => <span className="text-[12px] text-muted-foreground">{row.note}</span>,
     },
     {
       key: 'total',
@@ -172,7 +172,7 @@ export function AdminRetentionPage() {
               {row.expiring} 条
             </span>
             {dirty && (
-              <span className="text-[11px] text-muted-foreground">按 {row.retentionDays} 天估算，已改动</span>
+              <span className="text-[12px] text-muted-foreground">按 {row.retentionDays} 天估算，已改动</span>
             )}
           </div>
         );
@@ -182,7 +182,7 @@ export function AdminRetentionPage() {
       key: 'oldestAt',
       title: '最早记录',
       width: 170,
-      render: (row) => <span className="text-[11px] text-muted-foreground">{fmtTime(row.oldestAt)}</span>,
+      render: (row) => <span className="text-[12px] text-muted-foreground">{fmtTime(row.oldestAt)}</span>,
     },
     {
       key: 'ops',
@@ -210,7 +210,7 @@ export function AdminRetentionPage() {
       title: '目标',
       width: 150,
       render: (row) => (
-        <span className="text-[11px] text-muted-foreground">{TARGET_LABELS[row.target] ?? row.target}</span>
+        <span className="text-[12px] text-muted-foreground">{TARGET_LABELS[row.target] ?? row.target}</span>
       ),
     },
     {
@@ -238,7 +238,7 @@ export function AdminRetentionPage() {
       key: 'msg',
       title: '说明',
       render: (row) => (
-        <span className="text-[11px] text-muted-foreground">{row.errorMessage ?? '—'}</span>
+        <span className="text-[12px] text-muted-foreground">{row.errorMessage ?? '—'}</span>
       ),
     },
   ];

@@ -34,6 +34,9 @@ _trash_*/
 reference/ijihua/index.js
 reference/ijihua/index.css
 
+# Test coverage
+coverage/
+
 # Logs
 logs
 npm-debug.log*

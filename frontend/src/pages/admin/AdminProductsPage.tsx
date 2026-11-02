@@ -281,7 +281,7 @@ export function AdminProductsPage() {
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           <span>{row.name}</span>
-          <code className="font-mono text-[11px] text-muted-foreground">{row.sku}</code>
+          <code className="font-mono text-[12px] text-muted-foreground">{row.sku}</code>
         </div>
       ),
     },
@@ -293,7 +293,7 @@ export function AdminProductsPage() {
         <div className="flex flex-col gap-0.5">
           <span className="tabular-nums">¥ {centsToYuanText(row.priceCents)}</span>
           {/* 分的口径同时给出: 财务回查流水时看到的是分, 免得每次心算 */}
-          <span className="text-[11px] tabular-nums text-muted-foreground">
+          <span className="text-[12px] tabular-nums text-muted-foreground">
             {row.priceCents} 分
           </span>
         </div>
@@ -319,7 +319,7 @@ export function AdminProductsPage() {
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           <span className="tabular-nums">{row.credits} 积分</span>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-[12px] text-muted-foreground">
             {validDaysText(row.creditsValidDays)}
           </span>
         </div>
@@ -330,7 +330,7 @@ export function AdminProductsPage() {
       title: '发放方式',
       width: 90,
       render: (row) => (
-        <span className="text-[11px] text-muted-foreground">
+        <span className="text-[12px] text-muted-foreground">
           {row.grantType === 'immediate' ? '支付即发放' : '人工发放'}
         </span>
       ),
@@ -397,7 +397,7 @@ export function AdminProductsPage() {
               新建商品
             </ActionButton>
           ) : (
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-[12px] text-muted-foreground">
               当前账号无 product.write 权限，仅可查看
             </span>
           )
@@ -613,7 +613,7 @@ export function AdminProductsPage() {
           </div>
 
           {editing && (
-            <p className="text-[11px] leading-4 text-muted-foreground">
+            <p className="text-[12px] leading-4 text-muted-foreground">
               上次更新：{new Date(editing.updatedAt).toLocaleString('zh-CN')} · 改价会写入操作审计
             </p>
           )}

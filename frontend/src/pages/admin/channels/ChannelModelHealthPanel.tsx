@@ -67,7 +67,7 @@ export function ChannelModelHealthPanel({
                 </HelpTip>
               )}
             </div>
-            <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
+            <div className="mt-0.5 truncate font-mono text-[12px] text-muted-foreground">
               {row.channelName} · {row.capability}
             </div>
           </div>
@@ -86,7 +86,7 @@ export function ChannelModelHealthPanel({
                 tone={rateTone(window.successRate)}
                 label={rateLabel(window.successRate)}
               />
-              <div className="mt-0.5 text-[11px] text-muted-foreground">
+              <div className="mt-0.5 text-[12px] text-muted-foreground">
                 {window.samples > 0 ? `${window.samples} 次样本` : '窗口内没有终态调用'}
                 {window.sampled ? ' · 按最近部分统计' : ''}
               </div>
@@ -107,7 +107,7 @@ export function ChannelModelHealthPanel({
                 tone={rateTone(window.successRate)}
                 label={rateLabel(window.successRate)}
               />
-              <div className="mt-0.5 text-[11px] text-muted-foreground">{window.samples} 次样本</div>
+              <div className="mt-0.5 text-[12px] text-muted-foreground">{window.samples} 次样本</div>
             </div>
           );
         },
@@ -120,7 +120,7 @@ export function ChannelModelHealthPanel({
         render: (row) => (
           <div className="tabular-nums">
             <div>{formatDuration(row.windows.day.p95DurationMs)}</div>
-            <div className="text-[11px] text-muted-foreground">
+            <div className="text-[12px] text-muted-foreground">
               均 {formatDuration(row.windows.day.avgDurationMs)}
             </div>
           </div>
@@ -137,13 +137,13 @@ export function ChannelModelHealthPanel({
           }
           return (
             <div className="min-w-0">
-              <div className="truncate text-[11px] text-muted-foreground">
+              <div className="truncate text-[12px] text-muted-foreground">
                 {sample.status === 'success' ? '成功' : '失败'} · {formatDuration(sample.durationMs)} ·{' '}
                 {new Date(sample.at).toLocaleString('zh-CN')}
               </div>
               {row.lastErrorCode && (
                 <HelpTip tip={row.recent.find((item) => item.error)?.error || row.lastErrorCode}>
-                  <div className="truncate text-[11px] text-muted-foreground">最近错误 {row.lastErrorCode}</div>
+                  <div className="truncate text-[12px] text-muted-foreground">最近错误 {row.lastErrorCode}</div>
                 </HelpTip>
               )}
             </div>

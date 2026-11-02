@@ -102,7 +102,7 @@ export function AdminCreditPricesPage() {
       title: '能力 ID',
       width: 160,
       render: (row) => (
-        <code className="font-mono text-[11px] text-muted-foreground">{row.capabilityId}</code>
+        <code className="font-mono text-[12px] text-muted-foreground">{row.capabilityId}</code>
       ),
     },
     {

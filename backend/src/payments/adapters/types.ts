@@ -184,3 +184,23 @@ export function normalizePem(raw: string | undefined): string {
   if (!value) return '';
   return value.includes('\\n') ? value.replace(/\\n/g, '\n') : value;
 }
+
+/**
+ * 渠道回调公网地址校验。
+ *
+ * 生产必须是 HTTPS；开发/测试允许 http://localhost / 127.0.0.1，方便本机联调。
+ * 不限制具体域名 —— 这是商户自己的回调域名，平台不替它做白名单。
+ */
+export function isAllowedPublicBase(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol === 'https:') return true;
+    if (process.env.NODE_ENV === 'production') return false;
+    return (
+      parsed.protocol === 'http:' &&
+      (parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1')
+    );
+  } catch {
+    return false;
+  }
+}

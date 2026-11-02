@@ -96,11 +96,14 @@ TaskWorkerService（领取 / 轮询 / 切线 / 收尾）
 | 5 | 遮罩与参数白名单（`sanitizeParams` + 能力合同） | `40001` |
 | 6 | 解析 `logicalModelId` 并选中线路（`RouterService.resolve`） | `40005`（缺失 / 已下线 / 参数不匹配） |
 | 7 | 遮罩任务必须有带 edits 的线路 | `42205` |
-| 8 | 计价（`BillingService.draft`）并建任务 + 建单 + 预留，同一事务 | `40201`（余额不足） |
+| 8 | 计价（`BillingService.draft`）并**建任务 + 建单 + 预留，同一事务** | `40201`（余额不足） |
 
 - 扣费发生在**建任务时**，任务快照 `creditCost` 与账单金额同源。
 - 任何一步失败都不产生任务，也不动积分。
 - 并发 / 余额不足排在选路之后：用户先看到「这个模型能不能跑」，再看到「钱够不够」。
+- **建任务与预留是一个 Prisma 事务**：账单要挂 `taskId`，直觉上只能「先建任务再预留」，
+  但那样进程在两步之间崩溃会留下「排队中但没有账单」的任务（用户已授权、任务却永远不动）。
+  三步合并后，余额不足整批回滚、崩溃整体回滚，要么全有要么全无。
 
 **多图产出（`outputPlan`）**：能力插件可声明 `outputPlan(params)`，把一次提交拆成 N 个任务（当前只有商品详情图：勾选几个模块出几张版块图）。**按张计费**：每张任务都有一条自己的账单，各扣一份 `creditCost`（勾 6 个模块 = 6 × 单价，接口返回的 `creditCost` 是合计）；其余任务 `parentTaskId` 指向父任务，整批共享 `batchId / batchIndex / batchSize` 参数：
 
@@ -172,6 +175,9 @@ running ──nextPollAt 到期──► 回查上游
 | 成功 | `succeeded` | 结算（Token 模式按上游 usage 补扣 / 退差额） |
 
 **切线必须换账单**：新线路的价格档可能与原线路不同，沿用旧账单等于「按 A 的价收、走 B 的线路」。
+旧账单退款后**标记为 `refundReason='route_switch'`** —— 这笔钱只是从旧线路的预授权挪到新线路的
+预授权，用户没拿回钱、平台也没多收，**不计入财务口径的「已退」**（否则一次 9 分换 4 分的
+成功任务会显示净收入 −5）。失败通知里的「已退回 N 积分」同样跳过这一类。
 
 冷却（`route-health.service.ts`）只对**明确可归因**的失败生效；超时与 5xx 一律不冷却 ——
 上游抖动时关 10 分钟会把一次偶发故障放大成整段时间不可用。冷却只存进程内存（本仓没有 Redis），
@@ -181,7 +187,7 @@ running ──nextPollAt 到期──► 回查上游
 
 四条不可违背的规则（`billing.service.ts`）：
 
-1. **建单与预留同一事务**：先建单后预留失败会留下永远不结算的账单。
+1. **建任务 + 建单 + 预留同一事务**：先建任务后预留失败会留下永远不结算的账单与「排队但无账单」的任务。
 2. 已结算账单不允许自动退款；已退款账单不允许再结算。
 3. Token 结算以上游 usage 为准；上游没给用量时，视频按提交时的公式快照，其余显式失败转人工 ——
    绝不按预授权金额静默结清。
@@ -204,7 +210,7 @@ running ──nextPollAt 到期──► 回查上游
 | 用户分组 | `/admin/user-groups` | 可见渠道集合、倍率、货币换算、按模型覆盖 |
 | 插件 | `/admin/plugins` | 内置包只读；上传包可校验 / 安装 / 卸载；每项带**当前环境可用性**（停用 / 宿主引擎未内置 / 只贡献支付短信等非模型能力）与人话原因 |
 | 调用记录 | `/admin/model-calls`（数据源 `/admin/api-logs`） | 逐次上游 HTTP，含后台连通性测试（`billable=false`）；`GET /admin/api-logs/export` 导出 CSV（不含请求 / 响应体） |
-| 生成账单 | `/admin/billing-orders` | `uncertain` 只能人工 `settle` / `refund`，必须填原因并写审计 |
+| 生成账单 | `/admin/billing-orders` | `uncertain` 只能人工 `settle` / `refund`，必须填原因并写审计；**「待核对」队列**（`?status=review`：uncertain ∪ running 超 40 分钟 ∪ reserved 但任务已失败/取消）让运营一眼看到该处置哪些单；**批量核对** `POST /admin/billing-orders/batch-resolve` 逐条独立处置，单条失败不影响其余并回显失败原因 |
 | 财务分析 | `/admin/finance` | `GET /admin/analytics/finance`：实收只算已结算，挂账单单列 |
 
 C 端目录接口：`GET /models`（可选身份，登录后按分组过滤并折算价格）、`POST /models/available`、

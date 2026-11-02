@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import { UseGuards } from '@nestjs/common';
 import { IsNotEmpty, IsString } from 'class-validator';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
@@ -38,6 +38,18 @@ export class MembershipController {
   @Get('plans')
   plans() {
     return this.membership.listPlans();
+  }
+
+  /**
+   * 单个套餐（含已下架）。
+   *
+   * 续付会员订单时，套餐可能已从公开列表下架；订单仍在有效期内就应可支付。
+   * 需要登录，避免把下架套餐当公开商品继续售卖。
+   */
+  @Get('plans/:id')
+  @UseGuards(JwtAuthGuard)
+  plan(@Param('id') id: string) {
+    return this.membership.planById(id);
   }
 
   /** 我的会员详情 */

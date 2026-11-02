@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { App, Spin } from 'antd';
-import { ImagePlus, Plus, Upload, X } from 'lucide-react';
 
 import {
   MAX_REGIONS,
@@ -21,14 +20,15 @@ import {
   AssetLibraryModal,
   ImageLightbox,
   MobileUploadModal,
-  SkuHistoryPane,
   SkuRegionEditorModal,
-  SkuResultPanel,
-  ToolShell,
   type SkuRegion,
   type ToolAsset,
   type ToolSettings,
 } from './components';
+import { ProductSkuList } from './ProductSkuList';
+import { ProductSkuStepsCard } from './ProductSkuStepsCard';
+import { ProductSkuTemplateCard } from './ProductSkuTemplateCard';
+import { ProductSkuWorkspace } from './ProductSkuWorkspace';
 import {
   notifyCreditsChanged,
   useAssetLibrary,

@@ -159,7 +159,7 @@ export function ChannelModelForm({
         <div className="mt-3 flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
           <div>
             <div className="text-xs font-medium text-foreground">启用该模型</div>
-            <div className="text-[11px] text-muted-foreground">停用后不进入路由目录，不影响历史数据</div>
+            <div className="text-[12px] text-muted-foreground">停用后不进入路由目录，不影响历史数据</div>
           </div>
           <SwitchField
             checked={draft.enabled}
@@ -363,7 +363,7 @@ export function ChannelModelForm({
         <ActionButton variant="secondary" size="sm" icon={Zap} disabled={testing} onClick={() => void onTest()}>
           {testing ? '测试中…' : '连通性测试'}
         </ActionButton>
-        <span className="text-[11px] text-muted-foreground">
+        <span className="text-[12px] text-muted-foreground">
           用渠道已保存凭证向上游发一次最小请求，可能产生供应商费用；不建任务、不扣用户积分，结果记入调用记录（非计费）。
         </span>
       </div>

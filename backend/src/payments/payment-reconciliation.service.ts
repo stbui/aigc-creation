@@ -1,7 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
-import { parseCsv } from '../common/csv';
+import { decodeCsvBuffer, parseCsv } from '../common/csv';
+import { readFirstCsvFromZip } from '../common/archive/zip-reader';
 import { PaymentConfigService } from './payment-config.service';
 import { PaymentOrderService } from './payment-order.service';
 import { getAdapter } from './adapters';
@@ -19,6 +20,12 @@ export const RECONCILIATION_RESULTS = [
 ] as const;
 
 export type ReconciliationResult = (typeof RECONCILIATION_RESULTS)[number];
+
+/** 对账运行超过该时长视为进程中断，允许重跑 */
+export const RECONCILIATION_RUN_STALE_MS = 30 * 60_000;
+
+/** 对账导出行数上限；超过必须报错而不是静默截断 */
+export const RECONCILIATION_EXPORT_LIMIT = 10_000;
 
 export interface RunView {
   id: string;
@@ -94,7 +101,9 @@ export class PaymentReconciliationService {
       orderBy: { attempt: 'desc' },
     });
     if (latest?.status === 'running') {
-      throw new AppError(40901, '该账单日的对账正在执行中', 409);
+      if (!(await this.recoverIfStale(latest))) {
+        throw new AppError(40901, '该账单日的对账正在执行中', 409);
+      }
     }
     if (latest?.status === 'completed' && !input.retryFailed) {
       return { run: toRunView(latest), reused: true };
@@ -110,16 +119,14 @@ export class PaymentReconciliationService {
     if (!config) throw new AppError(50301, '渠道未完成配置，无法对账', 503);
 
     const attempt = (latest?.attempt ?? 0) + 1;
-    let run = await this.prisma.paymentReconciliationRun.create({
-      data: {
-        providerId: input.providerId,
-        configId: config.id,
-        billDate: input.billDate,
-        attempt,
-        source: 'provider',
-        status: 'running',
-        startedBy: input.actorId,
-      },
+    let run = await this.createRunRow({
+      providerId: input.providerId,
+      configId: config.id,
+      billDate: input.billDate,
+      attempt,
+      source: 'provider',
+      status: 'running',
+      startedBy: input.actorId,
     });
 
     let records: BillRecord[];
@@ -157,7 +164,10 @@ export class PaymentReconciliationService {
     const adapter = getAdapter(input.providerId);
     if (!adapter) throw new AppError(40400, `未知支付渠道: ${input.providerId}`, 404);
 
-    const records = parseBillCsv(input.file.toString('utf8'), input.providerId);
+    const records = parseBillCsv(
+      decodeCsvBuffer(extractImportCsv(input.file, input.providerId)),
+      input.providerId,
+    );
     if (records.length === 0) throw new AppError(40001, '账单没有交易记录', 400);
 
     const config = await this.configs.latest(input.providerId);
@@ -165,19 +175,19 @@ export class PaymentReconciliationService {
       where: { providerId: input.providerId, billDate: input.billDate },
       orderBy: { attempt: 'desc' },
     });
-    if (latest?.status === 'running') throw new AppError(40901, '该账单日的对账正在执行中', 409);
+    if (latest?.status === 'running' && !(await this.recoverIfStale(latest))) {
+      throw new AppError(40901, '该账单日的对账正在执行中', 409);
+    }
 
-    const run = await this.prisma.paymentReconciliationRun.create({
-      data: {
-        providerId: input.providerId,
-        configId: config?.id ?? null,
-        billDate: input.billDate,
-        attempt: (latest?.attempt ?? 0) + 1,
-        source: 'csv',
-        fileName: input.fileName,
-        status: 'running',
-        startedBy: input.actorId,
-      },
+    const run = await this.createRunRow({
+      providerId: input.providerId,
+      configId: config?.id ?? null,
+      billDate: input.billDate,
+      attempt: (latest?.attempt ?? 0) + 1,
+      source: 'csv',
+      fileName: input.fileName,
+      status: 'running',
+      startedBy: input.actorId,
     });
 
     const compared = await this.compare(
@@ -272,10 +282,19 @@ export class PaymentReconciliationService {
         ...(query.to ? [{ billDate: { lte: query.to } }] : []),
       ];
     }
+    // 超过上限直接报错，避免财务拿到被截断的对账运行清单
+    const total = await this.prisma.paymentReconciliationRun.count({ where });
+    if (total > RECONCILIATION_EXPORT_LIMIT) {
+      throw new AppError(
+        40001,
+        `筛选结果共 ${total} 条，超过单次导出上限 ${RECONCILIATION_EXPORT_LIMIT} 条，请缩小时间范围后重试`,
+        400,
+      );
+    }
     return this.prisma.paymentReconciliationRun.findMany({
       where,
       orderBy: [{ billDate: 'desc' }, { attempt: 'desc' }],
-      take: 10_000,
+      take: RECONCILIATION_EXPORT_LIMIT,
     });
   }
 
@@ -290,10 +309,18 @@ export class PaymentReconciliationService {
       if (result === 'abnormal') where.result = { notIn: ['matched', 'recovered'] };
       else where.result = result;
     }
+    const total = await this.prisma.paymentReconciliationItem.count({ where });
+    if (total > RECONCILIATION_EXPORT_LIMIT) {
+      throw new AppError(
+        40001,
+        `本次对账共 ${total} 条明细，超过单次导出上限 ${RECONCILIATION_EXPORT_LIMIT} 条，请按结果筛选后分批导出`,
+        400,
+      );
+    }
     return this.prisma.paymentReconciliationItem.findMany({
       where,
       orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-      take: 10_000,
+      take: RECONCILIATION_EXPORT_LIMIT,
     });
   }
 
@@ -477,6 +504,68 @@ export class PaymentReconciliationService {
     }
   }
 
+  /**
+   * 并发 claim 的兜底：两个请求同时通过 `latest` 检查时，唯一约束
+   * `(providerId, billDate, attempt)` 只会让一个成功；另一个返回 409
+   * 而不是 500。换 Postgres 多实例时仍建议改成行锁。
+   */
+  private async createRunRow(data: {
+    providerId: string;
+    configId: string | null;
+    billDate: string;
+    attempt: number;
+    source: string;
+    fileName?: string;
+    status: string;
+    startedBy: string;
+  }) {
+    try {
+      return await this.prisma.paymentReconciliationRun.create({ data });
+    } catch (e) {
+      if ((e as { code?: string })?.code === 'P2002') {
+        throw new AppError(40901, '该账单日的对账正在执行中', 409);
+      }
+      throw e;
+    }
+  }
+
+  /**
+   * 回收超时未完成的运行（进程崩溃/重启后一直占着「执行中」）。
+   * 定时 worker 与手动重跑前都会调用；只处理超过阈值的行。
+   */
+  async recoverStaleRuns(): Promise<number> {
+    const result = await this.prisma.paymentReconciliationRun.updateMany({
+      where: {
+        status: 'running',
+        startedAt: { lt: new Date(Date.now() - RECONCILIATION_RUN_STALE_MS) },
+      },
+      data: {
+        status: 'failed',
+        error: '执行超时（进程中断或长时间未完成），已自动回收，可重新执行',
+        completedAt: new Date(),
+      },
+    });
+    if (result.count > 0) {
+      this.logger.warn(`回收超时未完成的对账运行: ${result.count} 条`);
+    }
+    return result.count;
+  }
+
+  /** 返回 true 表示该 running 行已过期并被回收，可以继续新建 attempt */
+  private async recoverIfStale(run: { id: string; startedAt: Date }): Promise<boolean> {
+    if (run.startedAt.getTime() > Date.now() - RECONCILIATION_RUN_STALE_MS) return false;
+    await this.prisma.paymentReconciliationRun.update({
+      where: { id: run.id },
+      data: {
+        status: 'failed',
+        error: '执行超时（进程中断或长时间未完成），已自动回收，可重新执行',
+        completedAt: new Date(),
+      },
+    });
+    this.logger.warn(`对账运行超时回收: ${run.id}`);
+    return true;
+  }
+
   private assertBillDate(billDate: string): void {
     parseDateStrict(billDate);
     const start = startOfShanghaiDay(billDate).getTime();
@@ -489,6 +578,16 @@ export class PaymentReconciliationService {
       throw new AppError(40001, '只能对账最近 90 天的账单', 400);
     }
   }
+}
+
+function extractImportCsv(data: Buffer, providerId: PaymentProviderId): Buffer {
+  const isZip =
+    data.length >= 4 && data[0] === 0x50 && data[1] === 0x4b && data[2] === 0x03 && data[3] === 0x04;
+  if (!isZip) return data;
+  if (providerId !== 'alipay') {
+    throw new AppError(40001, '只有支付宝账单支持 ZIP 格式，微信请上传 CSV', 400);
+  }
+  return readFirstCsvFromZip(data);
 }
 
 function parseBillCsv(text: string, providerId: PaymentProviderId): BillRecord[] {

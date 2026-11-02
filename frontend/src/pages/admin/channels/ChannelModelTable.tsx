@@ -150,9 +150,9 @@ export function ChannelModelTable({
           <div className="flex items-center gap-1.5">
             <span className="truncate font-mono text-[12px] text-foreground">{model.modelKey}</span>
             {/* 价格版本放在这里而不是单独一列：详情区宽度有限，v7 这类单值列不值 80px */}
-            <span className="shrink-0 tabular-nums text-[10px] text-muted-foreground">v{model.priceVersion}</span>
+            <span className="shrink-0 tabular-nums text-[12px] text-muted-foreground">v{model.priceVersion}</span>
           </div>
-          <div className="truncate text-[11px] text-muted-foreground">
+          <div className="truncate text-[12px] text-muted-foreground">
             {/* 图标是 C 端选择器的视觉标识，后台必须能看到「运营配的是什么」 */}
             {model.icon ? `${model.icon} ` : ''}
             {model.displayName || '未命名'}
@@ -192,7 +192,7 @@ export function ChannelModelTable({
       cellTitle: (model) => model.protocol,
       render: (model) =>
         model.protocol ? (
-          <span className="block truncate font-mono text-[11px] text-muted-foreground">{model.protocol}</span>
+          <span className="block truncate font-mono text-[12px] text-muted-foreground">{model.protocol}</span>
         ) : (
           <StatusTag status="unset" tone="warn" label="待配置" />
         ),
@@ -501,7 +501,7 @@ export function ChannelModelTable({
             ]}
           />
           {testResult.responsePreview && (
-            <pre className="mt-3 max-h-[200px] overflow-auto rounded-lg bg-muted p-3 font-mono text-[11px] text-muted-foreground">
+            <pre className="mt-3 max-h-[200px] overflow-auto rounded-lg bg-muted p-3 font-mono text-[12px] text-muted-foreground">
               {testResult.responsePreview}
             </pre>
           )}

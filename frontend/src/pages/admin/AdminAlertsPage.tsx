@@ -8,7 +8,7 @@ import {
   PageHeader,
   Panel,
   SegmentedGroup,
-  Skeleton,
+  SkeletonBody,
   StatCard,
   StaleError,
   StatusTag,
@@ -150,12 +150,8 @@ export function AdminAlertsPage() {
         }
       >
         {loading && !data ? (
-          <div className="flex flex-col gap-2" aria-busy="true" aria-live="polite">
-            <Skeleton rows={1} />
-            <Skeleton rows={1} />
-            <Skeleton rows={1} />
-            <p className="text-center text-xs text-muted-foreground">正在检查待处理事项…</p>
-          </div>
+          /* 面板外壳已经是实的，只替内容行 —— 再套一层骨架就多了一道假边框 */
+          <SkeletonBody rows={3} />
         ) : error && !data ? (
           <ListError error={error} onRetry={() => void reload()} />
         ) : items.length === 0 ? (
@@ -231,7 +227,7 @@ export function AdminAlertsPage() {
           <li>备份：最近一次备份失败，或超过 48 小时没有成功备份；未验证的备份单独提示。</li>
           <li>发票：存在待开具申请。</li>
         </ul>
-        <p className="mt-3 text-[11px] leading-4 text-muted-foreground">
+        <p className="mt-3 text-[12px] leading-4 text-muted-foreground">
           不引入「已读」状态：事项被处理后自然消失，避免出现「点过就算解决」的假象。
         </p>
       </Panel>

@@ -197,7 +197,7 @@ export function ChannelListPanel({
                       {row.name}
                     </span>
                   </span>
-                  <span className="flex items-center gap-2 text-[11px] text-muted-foreground">
+                  <span className="flex items-center gap-2 text-[12px] text-muted-foreground">
                     {/* 状态用圆点：每行一颗绿色「启用」胶囊会把整列刷成绿色，异常项反而看不见 */}
                     <span className="inline-flex items-center gap-1">
                       <span
@@ -218,7 +218,7 @@ export function ChannelListPanel({
                               ? 'text-warn-text'
                               : 'text-danger-text'
                         }
-                        title={`近 24 小时 ${stats!.samples} 次生成请求，成功 ${stats!.success} 次`}
+                        title={`近 24 小时 ${stats?.samples ?? 0} 次生成请求，成功 ${stats?.success ?? 0} 次`}
                       >
                         {formatRate(rate)}
                       </span>

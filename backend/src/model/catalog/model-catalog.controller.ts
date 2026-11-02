@@ -22,18 +22,28 @@ import { UserGroupService } from '../user-groups/user-group.service';
 import { ModelIntentBodyDto } from './models.controller';
 import { PublicModelCatalogService } from './public-model-catalog.service';
 
-/** 渠道模型报价入参：渠道 + 模型标识 + 意图 */
+/**
+ * 渠道模型报价入参：渠道 + 模型标识 + 意图。
+ *
+ * ⚠ 意图既接受**平铺**字段（`capability` / `operation` / …，本仓原口径），
+ * 也接受**嵌套** `intent` 对象（参考实现 open-ai-canvas 的
+ * `{ channelId, modelKey, intent: {...} }`）。两种都归一到同一份意图，
+ * 迁移过来的客户端不会被 400 挡下。
+ */
 export class ChannelModelQuoteBodyDto extends ModelIntentBodyDto {
   @IsString() channelId: string;
   @IsString() modelKey: string;
+  /** 嵌套意图（参考实现口径）；与平铺字段合并，平铺优先 */
+  intent?: ModelIntentBodyDto;
 }
 
-function toIntent(body: ModelIntentBodyDto | undefined): ModelRequestIntent {
+function toIntent(body: (ModelIntentBodyDto & { intent?: ModelIntentBodyDto }) | undefined): ModelRequestIntent {
+  const nested = body?.intent;
   return buildModelRequestIntent({
-    capability: body?.capability,
-    operation: body?.operation,
-    inputs: body?.inputs,
-    options: body?.options,
+    capability: body?.capability ?? nested?.capability,
+    operation: body?.operation ?? nested?.operation,
+    inputs: body?.inputs ?? nested?.inputs,
+    options: body?.options ?? nested?.options,
   });
 }
 

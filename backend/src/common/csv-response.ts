@@ -14,7 +14,17 @@ import { csvFilename } from './csv';
  *     `@AuditAction('data.export')`, 导出即把用户数据带出系统。
  */
 export function sendCsv(res: Response, prefix: string, csv: string): void {
+  const filename = csvFilename(prefix);
+  /*
+   * Node/HTTP 头只允许 ASCII。中文文件名直接塞进 Content-Disposition 会抛
+   * `ERR_INVALID_CHAR`，表现为「导出接口 500、响应体是 JSON」。
+   * 用 RFC 5987：ASCII 兜底名给老浏览器，filename* 用 UTF-8 百分号编码给新浏览器。
+   */
+  const asciiFallback = filename.replace(/[^\x20-\x7e]/g, '_');
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-  res.setHeader('Content-Disposition', `attachment; filename="${csvFilename(prefix)}"`);
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+  );
   res.send(csv);
 }

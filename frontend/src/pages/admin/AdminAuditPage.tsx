@@ -103,7 +103,7 @@ function AuditExpandedDetail({ row }: { row: Row }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-xs font-semibold text-foreground">审计详情</div>
-          <div className="mt-0.5 text-[11px] text-muted-foreground">
+          <div className="mt-0.5 text-[12px] text-muted-foreground">
             记录只追加，不支持修改或删除
           </div>
         </div>
@@ -133,7 +133,7 @@ function AuditExpandedDetail({ row }: { row: Row }) {
 
       {row.reason && (
         <div>
-          <div className="mb-1 text-[11px] text-muted-foreground">操作原因</div>
+          <div className="mb-1 text-[12px] text-muted-foreground">操作原因</div>
           <div className="rounded-lg border border-border bg-warn-soft px-2.5 py-2 text-xs text-foreground">
             {row.reason}
           </div>
@@ -142,8 +142,8 @@ function AuditExpandedDetail({ row }: { row: Row }) {
 
       <div>
         <div className="mb-1 flex items-baseline gap-2">
-          <span className="text-[11px] text-muted-foreground">变更内容</span>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-[12px] text-muted-foreground">变更内容</span>
+          <span className="text-[12px] text-muted-foreground">
             仅记录白名单字段，密码与凭据类内容不写入审计
           </span>
         </div>
@@ -181,7 +181,7 @@ function AuditExpandedDetail({ row }: { row: Row }) {
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] text-muted-foreground">{label}</dt>
+      <dt className="text-[12px] text-muted-foreground">{label}</dt>
       <dd className="truncate text-xs text-foreground" title={typeof children === 'string' ? children : undefined}>
         {children}
       </dd>
@@ -190,7 +190,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 function Mono({ children }: { children: ReactNode }) {
-  return <code className="font-mono text-[11px] text-muted-foreground">{children}</code>;
+  return <code className="font-mono text-[12px] text-muted-foreground">{children}</code>;
 }
 
 export function AdminAuditPage() {
@@ -275,7 +275,7 @@ export function AdminAuditPage() {
         render: (row) => (
           <div>
             <div>{row.actorEmail}</div>
-            <div className="text-[11px] text-muted-foreground">{row.actorRole}</div>
+            <div className="text-[12px] text-muted-foreground">{row.actorRole}</div>
           </div>
         ),
       },

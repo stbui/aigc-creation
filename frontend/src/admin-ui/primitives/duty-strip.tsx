@@ -196,7 +196,7 @@ function Ruler({ ticks }: { ticks: DutyTask[] }) {
   const last = ticks[ticks.length - 1];
   return (
     <div
-      className="mt-1 flex items-center justify-between text-[10px] text-muted-foreground"
+      className="mt-1 flex items-center justify-between text-[12px] text-muted-foreground"
       aria-hidden
     >
       <span>{stamp(first.createdAt)}</span>
@@ -221,7 +221,7 @@ function Counter({ counter }: { counter: DutyCounter }) {
             : 'border-border bg-muted/40 hover:border-ring/40',
       )}
     >
-      <span className="truncate text-[11px] text-muted-foreground">{counter.label}</span>
+      <span className="truncate text-[12px] text-muted-foreground">{counter.label}</span>
       <span
         key={show}
         className={cn(

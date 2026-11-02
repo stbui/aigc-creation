@@ -10,9 +10,9 @@ import {
   ListError,
   Notice,
   NumberField,
+  PageSkeleton,
   Panel,
   SelectField,
-  Skeleton,
   StaleError,
   StatusTag,
   SwitchField,
@@ -121,7 +121,7 @@ export function PaymentsProvidersTab({ refreshNonce }: { refreshNonce: number })
           <ProviderIcon icon={row.icon} />
           <div className="flex min-w-0 flex-col gap-0.5">
             <span className="truncate font-medium">{row.name}</span>
-            <code className="font-mono text-[11px] text-muted-foreground">{row.id}</code>
+            <code className="font-mono text-[12px] text-muted-foreground">{row.id}</code>
           </div>
         </div>
       ),
@@ -145,7 +145,7 @@ export function PaymentsProvidersTab({ refreshNonce }: { refreshNonce: number })
               tone={usable ? 'success' : 'muted'}
               label={usable ? '可用' : '不可用'}
             />
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-[12px] text-muted-foreground">
               配置{row.enabled ? '已启用' : '已停用'} ·{' '}
               {row.configured ? '密钥已配齐' : `缺 ${row.missing.length} 项`}
             </span>
@@ -186,12 +186,13 @@ export function PaymentsProvidersTab({ refreshNonce }: { refreshNonce: number })
     },
   ];
 
+  /*
+   * 标签页内的加载骨架只占**这一块面板**的位置：页头、页签、提示条都在上面，
+   * 已经渲染好了，不该跟着塌。面板限宽与真实 `Panel` 一致（不限宽）。
+   */
   if (loading && !data) {
     return (
-      <div className="flex flex-col gap-2 py-2" aria-busy="true" aria-live="polite">
-        <Skeleton rows={4} />
-        <p className="text-center text-xs text-muted-foreground">加载支付渠道…</p>
-      </div>
+      <PageSkeleton panels={1} panelRows={5} />
     );
   }
   if (error && !data) return <ListError error={error} onRetry={() => void reload()} />;

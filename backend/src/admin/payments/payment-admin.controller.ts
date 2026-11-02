@@ -314,7 +314,11 @@ export class AdminPaymentReconciliationController {
   ) {
     if (!file?.buffer?.length) throw new AppError(40001, '请上传对账单文件 (字段名 file)', 400);
     const name = file.originalname ?? 'bill.csv';
-    if (!/\.csv$/i.test(name)) throw new AppError(40001, '目前只支持 CSV 对账单', 400);
+    const isCsv = /\.csv$/i.test(name);
+    const isAlipayZip = /\.zip$/i.test(name) && dto.providerId === 'alipay';
+    if (!isCsv && !isAlipayZip) {
+      throw new AppError(40001, '对账单只支持 .csv，或支付宝渠道的 .zip', 400);
+    }
     return this.reconciliation.importCsv({
       providerId: dto.providerId,
       billDate: dto.billDate,

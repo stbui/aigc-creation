@@ -625,7 +625,13 @@ export function LandingPage() {
           <div className="lp-hero-visual" aria-hidden>
             {HERO_SHOTS.map((shot, i) => (
               <figure key={shot.src} className={`lp-hero-shot is-${i + 1}`}>
-                <img src={shot.src} alt="" loading={i < 2 ? 'eager' : 'lazy'} />
+                <img
+                  src={shot.src}
+                  alt=""
+                  width={600}
+                  height={800}
+                  loading={i < 2 ? 'eager' : 'lazy'}
+                />
                 <figcaption>{shot.label}</figcaption>
               </figure>
             ))}
@@ -644,7 +650,7 @@ export function LandingPage() {
           {bizCards.map((b) => (
             <article key={b.title} className="lp-scene-card">
               <div className="lp-scene-media">
-                <img src={b.img} alt={b.title} loading="lazy" />
+                <img src={b.img} alt="" width={1712} height={800} loading="lazy" />
               </div>
               <div className="lp-scene-body">
                 <h3>
@@ -744,7 +750,14 @@ export function LandingPage() {
                         aria-label={`${group.label}示例，做同款`}
                         onClick={() => navigate(target)}
                       >
-                        <img src={`${A}/case/${f}`} alt={group.label} loading="lazy" />
+                        {/* 按钮已有 aria-label, 图片作为卡面内容不再重复同一句 alt */}
+                        <img
+                          src={`${A}/case/${f}`}
+                          alt=""
+                          width={600}
+                          height={800}
+                          loading="lazy"
+                        />
                         <span className="lp-case-label">做同款</span>
                       </button>
                     ))}
@@ -999,11 +1012,18 @@ export function LandingPage() {
           <div className="lp-feature-media">
             {/* 参考站该区是 banner 背景图内嵌, 本项目改用真实产出拼贴(诚实替代)。
                 网格为 4 列 2 行: 主图跨 2x2 占 4 格, 余 4 格各放一张 → 共 5 张, 不留空行 */}
-            <img className="lp-feature-main" src={`${A}/feat/top_01.png`} alt="" loading="lazy" />
-            <img src={`${A}/feat/left_01.png`} alt="" loading="lazy" />
-            <img src={`${A}/feat/right_02.png`} alt="" loading="lazy" />
-            <img src={`${A}/feat/top_02.png`} alt="" loading="lazy" />
-            <img src={`${A}/feat/top_03.png`} alt="" loading="lazy" />
+            <img
+              className="lp-feature-main"
+              src={`${A}/feat/top_01.png`}
+              alt=""
+              width={1254}
+              height={1254}
+              loading="lazy"
+            />
+            <img src={`${A}/feat/left_01.png`} alt="" width={800} height={800} loading="lazy" />
+            <img src={`${A}/feat/right_02.png`} alt="" width={800} height={800} loading="lazy" />
+            <img src={`${A}/feat/top_02.png`} alt="" width={1254} height={1254} loading="lazy" />
+            <img src={`${A}/feat/top_03.png`} alt="" width={1254} height={1254} loading="lazy" />
           </div>
         </article>
         <div className="lp-feature-grid">
@@ -1061,9 +1081,9 @@ export function LandingPage() {
             <strong>货觉AI · 电商视觉创作平台</strong>
             <p>好图，好卖 —— 商品图 · 详情页 · 营销视觉，一站生成</p>
             <div className="landing-footer-logos">
-              <img src={`${A}/logos/t_y01.png`} alt="客户 logo" loading="lazy" />
-              <img src={`${A}/logos/t_y02.png`} alt="客户 logo" loading="lazy" />
-              <img src={`${A}/logos/t_y03.png`} alt="客户 logo" loading="lazy" />
+              <img src={`${A}/logos/t_y01.png`} alt="客户 logo" width={190} height={40} loading="lazy" />
+              <img src={`${A}/logos/t_y02.png`} alt="客户 logo" width={160} height={38} loading="lazy" />
+              <img src={`${A}/logos/t_y03.png`} alt="客户 logo" width={93} height={28} loading="lazy" />
             </div>
           </div>
           <div className="landing-footer-col">

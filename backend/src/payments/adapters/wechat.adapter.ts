@@ -15,6 +15,7 @@ import {
   QueryOrderInput,
   RefundInput,
   RefundResult,
+  isAllowedPublicBase,
   normalizePem,
   yuanToCents,
 } from './types';
@@ -69,6 +70,14 @@ export class WechatAdapter implements PaymentAdapter {
         default: 'https://api.mch.weixin.qq.com',
         description: '只允许官方域名',
       },
+      {
+        name: 'publicBaseUrl',
+        label: '回调公网地址（可选）',
+        type: 'url',
+        required: false,
+        default: '',
+        description: '例如 https://pay.example.com；留空使用 PAYMENT_NOTIFY_BASE',
+      },
     ],
   };
 
@@ -82,6 +91,8 @@ export class WechatAdapter implements PaymentAdapter {
     }
     const base = values.apiBase?.trim();
     if (base && !isAllowedApiBase(base)) missing.push('apiBase');
+    const publicBaseUrl = values.publicBaseUrl?.trim();
+    if (publicBaseUrl && !isAllowedPublicBase(publicBaseUrl)) missing.push('publicBaseUrl');
     return Array.from(new Set(missing));
   }
 

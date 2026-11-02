@@ -877,6 +877,9 @@ export function ToolShell(props: Props) {
                 <video
                   className="image-tool-empty-state-media"
                   src={emptyVideo}
+                  /* 受限浏览器 (无 H.264 解码) 会报 MEDIA_ERR_SRC_NOT_SUPPORTED,
+                     留下 480×480 的纯黑块; 首帧 poster 保证此时仍有内容可看。 */
+                  poster={emptyVideo.replace(/\.mp4$/, '-poster.jpg')}
                   autoPlay
                   loop
                   muted

@@ -15,7 +15,7 @@ import {
   PageHeader,
   Panel,
   SelectField,
-  Skeleton,
+  SkeletonBody,
   StatCard,
   StatusTag,
   StaleError,
@@ -138,7 +138,7 @@ function Section({ title, note, children }: { title: string; note?: string; chil
     <section className="border-t border-border pt-3">
       <div className="mb-2 flex items-baseline gap-2">
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-        {note && <span className="text-[11px] text-muted-foreground">{note}</span>}
+        {note && <span className="text-[12px] text-muted-foreground">{note}</span>}
       </div>
       {children}
     </section>
@@ -166,7 +166,7 @@ function Message({
     >
       <div className="flex items-baseline justify-between gap-3">
         <span className="text-xs font-medium text-foreground">{author}</span>
-        <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">{at}</span>
+        <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground">{at}</span>
       </div>
       <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{body}</p>
     </div>
@@ -381,7 +381,7 @@ export function AdminTicketsPage() {
           >
             {row.subject}
           </button>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-[12px] text-muted-foreground">
             <code className="font-mono">{row.ticketNo}</code> ·{' '}
             {row.typeLabel || TYPE_LABELS[row.type]}
           </span>
@@ -396,7 +396,7 @@ export function AdminTicketsPage() {
         <div className="flex flex-col gap-0.5">
           <span>{row.userName || '—'}</span>
           <Link
-            className="block max-w-[170px] truncate text-[11px] text-brand hover:underline"
+            className="block max-w-[170px] truncate text-[12px] text-brand hover:underline"
             title={row.userEmail}
             to={adminUserDetailHref(row.userId)}
           >
@@ -443,7 +443,7 @@ export function AdminTicketsPage() {
       title: '提交 / 更新',
       width: 170,
       render: (row) => (
-        <div className="flex flex-col gap-0.5 text-[11px] tabular-nums text-muted-foreground">
+        <div className="flex flex-col gap-0.5 text-[12px] tabular-nums text-muted-foreground">
           <span>{new Date(row.createdAt).toLocaleString('zh-CN')}</span>
           <span>{new Date(row.updatedAt).toLocaleString('zh-CN')}</span>
         </div>
@@ -691,10 +691,8 @@ export function AdminTicketsPage() {
         description={replyDirty ? '有未发送的回复' : undefined}
       >
         {detailLoading ? (
-          <div className="flex flex-col gap-2 py-2">
-            <Skeleton rows={4} />
-            <p className="text-center text-xs text-muted-foreground">加载工单详情…</p>
-          </div>
+          /* 抽屉外壳已经是实的，只替内容行 */
+          <SkeletonBody rows={4} />
         ) : detailError ? (
           <ListError
             error={detailError}
@@ -714,7 +712,7 @@ export function AdminTicketsPage() {
                         label={STATUS_LABELS[detail.status as TicketStatus]}
                         tone={STATUS_TONE[detail.status as TicketStatus]}
                       />
-                      <span className="text-[11px] text-muted-foreground">
+                      <span className="text-[12px] text-muted-foreground">
                         {detail.assigneeId ? '已指派' : '未指派'}
                       </span>
                     </span>
@@ -752,7 +750,7 @@ export function AdminTicketsPage() {
                           {detail.user.email}
                         </Link>
                       </span>
-                      <span className="flex gap-3 text-[11px]">
+                      <span className="flex gap-3 text-[12px]">
                         <Link
                           className="text-brand hover:underline"
                           to={adminCreditHref({
@@ -808,7 +806,7 @@ export function AdminTicketsPage() {
                             >
                               {detail.related.order.orderNo}
                             </Link>
-                            <span className="text-[11px] text-muted-foreground">
+                            <span className="text-[12px] text-muted-foreground">
                               {detail.related.order.status} · ¥
                               {(detail.related.order.paidCents / 100).toFixed(2)}
                             </span>
@@ -831,7 +829,7 @@ export function AdminTicketsPage() {
                                 {detail.related.asset.id}
                               </code>
                             </Link>
-                            <span className="text-[11px] text-muted-foreground">
+                            <span className="text-[12px] text-muted-foreground">
                               {detail.related.asset.width}×{detail.related.asset.height}
                             </span>
                           </span>
@@ -861,7 +859,7 @@ export function AdminTicketsPage() {
                   />
                 ))}
                 {detail.replies.length === 0 && (
-                  <p className="text-[11px] text-muted-foreground">
+                  <p className="text-[12px] text-muted-foreground">
                     还没有回复。在下方向用户说明处理进展。
                   </p>
                 )}
@@ -911,7 +909,7 @@ export function AdminTicketsPage() {
                 </div>
               </Section>
             ) : (
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 你没有工单处理权限（ticket.handle），当前为只读视图。
               </p>
             )}
@@ -930,7 +928,7 @@ export function AdminTicketsPage() {
                     </ActionButton>
                   ))}
                 </div>
-                <p className="mt-2 text-[11px] text-muted-foreground">
+                <p className="mt-2 text-[12px] text-muted-foreground">
                   关闭后用户无法继续回复，只能新建工单；如问题仍在，可重新打开接回原上下文。
                 </p>
               </Section>

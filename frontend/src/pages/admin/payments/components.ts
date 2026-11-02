@@ -27,6 +27,7 @@ export {
   EmptyState,
   Notice,
   Panel,
+  PageSkeleton,
   Skeleton,
   StatCard,
   StatusTag,

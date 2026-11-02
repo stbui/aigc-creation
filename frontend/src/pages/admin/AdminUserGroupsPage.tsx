@@ -16,7 +16,7 @@ import {
   PageHeader,
   Panel,
   SelectField,
-  Skeleton,
+  SkeletonBody,
   StatusTag,
   StaleError,
   SwitchField,
@@ -307,7 +307,7 @@ export function AdminUserGroupsPage() {
               />
             )}
           </div>
-          <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{row.code}</div>
+          <div className="mt-0.5 truncate font-mono text-[12px] text-muted-foreground">{row.code}</div>
         </div>
       ),
     },
@@ -332,7 +332,7 @@ export function AdminUserGroupsPage() {
       title: '点数汇率',
       width: 170,
       render: (row) => (
-        <div className="flex flex-col gap-0.5 text-[11px] tabular-nums">
+        <div className="flex flex-col gap-0.5 text-[12px] tabular-nums">
           <span>1 USD = {toCreditsInput(row.pointsPerUsdMicrocredits)} 积分</span>
           <span className="text-muted-foreground">1 CNY = {toCreditsInput(row.pointsPerCnyMicrocredits)} 积分</span>
         </div>
@@ -347,7 +347,7 @@ export function AdminUserGroupsPage() {
           <StatusTag status="all" tone="success" label="全部渠道" />
         ) : (
           <span
-            className="truncate text-[11px] text-muted-foreground"
+            className="truncate text-[12px] text-muted-foreground"
             title={row.channelIds.map((id) => channelNameById.get(id) ?? id).join('、')}
           >
             {row.channelIds.length} 条：
@@ -403,10 +403,8 @@ export function AdminUserGroupsPage() {
         note="保存后目录快照与报价缓存同时失效；只刷新其中一个会出现「展示按新倍率、扣费按旧倍率」。"
       >
         {loading && rows.length === 0 ? (
-          <div className="flex flex-col gap-2 py-2">
-            <Skeleton rows={4} />
-            <p className="text-center text-xs text-muted-foreground">加载中…</p>
-          </div>
+          /* 面板外壳已经是实的，只替内容行 */
+          <SkeletonBody rows={4} />
         ) : (
           <>
             {error && <StaleError error={error} onRetry={() => void reload()} />}
@@ -538,7 +536,7 @@ export function AdminUserGroupsPage() {
             <div className="mb-2 flex items-center justify-between">
               <div>
                 <div className="text-xs font-semibold text-foreground">可见渠道</div>
-                <div className="text-[11px] text-muted-foreground">不在可见范围内的渠道，其模型不会出现在该分组的目录里</div>
+                <div className="text-[12px] text-muted-foreground">不在可见范围内的渠道，其模型不会出现在该分组的目录里</div>
               </div>
               <SwitchField
                 checked={draft.allChannels}
@@ -550,7 +548,7 @@ export function AdminUserGroupsPage() {
             {!draft.allChannels && (
               <div className="grid grid-cols-2 gap-2">
                 {channels.length === 0 ? (
-                  <p className="text-[11px] text-muted-foreground">尚无渠道可勾选</p>
+                  <p className="text-[12px] text-muted-foreground">尚无渠道可勾选</p>
                 ) : (
                   channels.map((channel) => (
                     <CheckboxField
@@ -569,14 +567,14 @@ export function AdminUserGroupsPage() {
             <div className="mb-2 flex items-center justify-between">
               <div>
                 <div className="text-xs font-semibold text-foreground">按模型覆盖</div>
-                <div className="text-[11px] text-muted-foreground">按前台模型编码覆盖倍率与汇率；未命中时用分组默认值</div>
+                <div className="text-[12px] text-muted-foreground">按前台模型编码覆盖倍率与汇率；未命中时用分组默认值</div>
               </div>
               <ActionButton variant="secondary" size="xs" icon={Plus} disabled={!writable} onClick={addOverride}>
                 添加覆盖
               </ActionButton>
             </div>
             {draft.overrides.length === 0 ? (
-              <p className="py-2 text-center text-[11px] text-muted-foreground">没有覆盖项</p>
+              <p className="py-2 text-center text-[12px] text-muted-foreground">没有覆盖项</p>
             ) : (
               <div className="flex flex-col gap-2">
                 {draft.overrides.map((item, index) => (

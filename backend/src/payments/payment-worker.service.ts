@@ -70,6 +70,7 @@ export class PaymentWorkerService implements OnModuleInit, OnModuleDestroy {
     try {
       await this.recycleStaleNotifications();
       await this.processDueNotifications();
+      await this.reconciliation.recoverStaleRuns();
       await this.closeExpiredOrders();
       await this.queryPendingOrders();
       await this.autoReconcile();
@@ -103,26 +104,10 @@ export class PaymentWorkerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async closeExpiredOrders(): Promise<void> {
-    const expired = await this.prisma.order.findMany({
-      where: {
-        status: 'pending',
-        expiresAt: { lte: new Date() },
-        OR: [
-          { closeStartedAt: null },
-          { closeStartedAt: { lte: new Date(Date.now() - 5 * 60_000) } },
-        ],
-      },
-      take: 50,
-      select: { id: true },
-    });
-    for (const item of expired) {
-      try {
-        await this.orders.close({ orderId: item.id, actor: { kind: 'worker' }, reason: '超时自动关闭' });
-      } catch (e) {
-        // 已支付会抛 409，属正常竞态；其它错误记日志继续
-        this.logger.warn(`关闭超时订单 ${item.id} 未完成: ${(e as Error).message}`);
-      }
-    }
+    // 统一走 PaymentOrderService.closeExpired：关单前逐个渠道查单、失败不本地关单。
+    // 不要在 worker 里直接 updateMany 改 cancelled（旧调度器正是这么漏掉已付款订单的）。
+    const closed = await this.orders.closeExpired(50);
+    if (closed > 0) this.logger.log(`超时订单已关闭: ${closed} 笔`);
   }
 
   private async queryPendingOrders(): Promise<void> {

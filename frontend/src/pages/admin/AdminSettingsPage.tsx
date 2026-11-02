@@ -15,11 +15,13 @@ import {
   ModalDialog,
   NumberField,
   PageHeader,
+  PageSkeleton,
+  SkeletonPanel,
+  SkeletonTabs,
   Panel,
   SaveBar,
   SegmentedTabs,
   SelectField,
-  Skeleton,
   StaleError,
   SwitchField,
   TextField,
@@ -178,12 +180,34 @@ export function AdminSettingsPage() {
     });
   }, [settings, draft, clears, changedKeys]);
 
+  /*
+   * 页头照常渲染：加载期间标题与说明就该在位。
+   * 之前的守卫整页替换，首屏先闪一段没有标题的灰条，再冒出完整页面 ——
+   * 骨架该占住位置，不是把版面清空。
+   *
+   * 面板限宽 760：与真实窄版 `Panel` 同宽，数据到位时不会横向缩一下。
+   */
   if (loading && !settings) {
     return (
-      <div className="flex flex-col gap-3" aria-busy="true" aria-live="polite">
-        <Skeleton rows={4} />
-        <p className="text-center text-xs text-muted-foreground">加载系统设置…</p>
-      </div>
+      <PageSkeleton
+        title="系统设置"
+        description={
+          editable
+            ? '修改后点右下角「保存变更」提交；配置立即生效，已自定义的项可恢复默认'
+            : '当前账号无 setting.write 权限，仅可查看'
+        }
+        /*
+         * 设置页的版面是「分组页签 + 窄面板 + 一块静态入口面板」。分组页签
+         * 的选项来自接口，加载期没有 —— 用一根灰条占位，宽度对得上胶囊排布。
+         */
+        body={
+          <>
+            <SkeletonTabs />
+            <SkeletonPanel rows={6} narrow />
+            <SkeletonPanel rows={4} narrow />
+          </>
+        }
+      />
     );
   }
   if (error && !settings) return <ListError error={error} onRetry={() => void reload()} />;
@@ -317,7 +341,7 @@ export function AdminSettingsPage() {
                       <p className="mt-1 text-xs leading-5 text-muted-foreground">
                         {item.description}
                       </p>
-                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted-foreground">
                         <span>默认值：{displayValue(item.default, item.type)}</span>
                         {item.type === 'number' &&
                           (item.min !== undefined || item.max !== undefined) && (

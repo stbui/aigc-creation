@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Pencil, Power } from 'lucide-react';
-import { adminChannelModelsApi, adminChannelsApi } from './api';
+import { adminChannelModelsApi, adminChannelsApi, fetchChannelHealth } from './api';
 import {
   AdminDataTable,
   StaleError,
@@ -15,6 +15,12 @@ import {
 } from './components';
 import { useConfirm, useToast, useAdminUrlFilterSync } from './hooks';
 import { ChannelModelCostSummary, ChannelModelHealthCell } from './ChannelModelHealthCell';
+import {
+  ALL_MODELS_PAGE_SIZE,
+  ALL_MODELS_STATUS_OPTIONS,
+  CAPABILITY_OPTIONS,
+  type AllModelsStatusFilter,
+} from './constants';
 import type {
   AdminChannelModelListItem,
   ChannelModelHealthRowView,
@@ -33,11 +39,12 @@ import type {
  *
  * ## 筛选口径
  *
- * · **状态**分四档：全部 / 启用 / 停用 / 不健康。
+ * · **状态**分五档：全部 / 启用 / 停用 / 不健康 / 未定价。
  *   「启用」= 模型自身启用 **且** 所属渠道启用（两者都为真才进路由）；
  *   「停用」= 其一不满足；
  *   「不健康」= 24h 成功率低于 80%（**无样本不算不健康** ——
- *   「没调用过」与「在挂」是两件事，混在一起会让刚上线的线全部标红）。
+ *   「没调用过」与「在挂」是两件事，混在一起会让刚上线的线全部标红）；
+ *   「未定价」= 没有任何已配置价格档（补价工作队列）。
  *
  * ## 一次取回全部，前端筛选
  *
@@ -47,33 +54,6 @@ import type {
 
 /** 「不健康」的阈值：24h 成功率低于 80% */
 const UNHEALTHY_RATE = 0.8;
-
-/** 每页条数 */
-const PAGE_SIZE = 50;
-
-type StatusFilter = 'all' | 'enabled' | 'disabled' | 'unhealthy' | 'unpriced';
-
-const CAPABILITY_OPTIONS = [
-  { value: 'image', label: '图像' },
-  { value: 'text', label: '文本' },
-  { value: 'video', label: '视频' },
-  { value: 'audio', label: '音频' },
-];
-
-/**
- * 状态筛选。
- *
- * `unpriced`（未定价）是本仓比参考实现多的一档 —— 补价工作队列。
- * 单渠道视图已有这一档，跨渠道视图也必须有，否则运营在「全部模型」里
- * 看不到漏定价的线路。
- */
-const STATUS_OPTIONS: Array<{ value: StatusFilter; label: string }> = [
-  { value: 'all', label: '全部' },
-  { value: 'enabled', label: '启用' },
-  { value: 'disabled', label: '停用' },
-  { value: 'unhealthy', label: '不健康' },
-  { value: 'unpriced', label: '未定价' },
-];
 
 export function AllChannelModelsPanel({
   writable,
@@ -107,10 +87,10 @@ export function AllChannelModelsPanel({
   const [capability, setCapability] = useState<string | undefined>(
     () => initialSearch.get('capability') ?? undefined,
   );
-  const [status, setStatus] = useState<StatusFilter>(() => {
+  const [status, setStatus] = useState<AllModelsStatusFilter>(() => {
     const value = initialSearch.get('status');
-    return STATUS_OPTIONS.some((option) => option.value === value)
-      ? (value as StatusFilter)
+    return ALL_MODELS_STATUS_OPTIONS.some((option) => option.value === value)
+      ? (value as AllModelsStatusFilter)
       : 'all';
   });
   const [channelFilter, setChannelFilter] = useState<string | undefined>(
@@ -145,8 +125,7 @@ export function AllChannelModelsPanel({
   useEffect(() => {
     void load();
     // 健康与渠道名是辅助数据：读取失败不阻塞列表
-    void adminChannelModelsApi
-      .health()
+    void fetchChannelHealth()
       .then((res) => setHealth(res.items))
       .catch(() => setHealth([]));
     void adminChannelsApi
@@ -214,7 +193,7 @@ export function AllChannelModelsPanel({
   }, [rows, keyword, capability, channelFilter, status, healthByModelId, channelNameById]);
 
   const paged = useMemo(
-    () => filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    () => filtered.slice((page - 1) * ALL_MODELS_PAGE_SIZE, page * ALL_MODELS_PAGE_SIZE),
     [filtered, page],
   );
 
@@ -277,7 +256,7 @@ export function AllChannelModelsPanel({
               {row.icon ? `${row.icon} ` : ''}
               {row.displayName || row.modelKey}
             </div>
-            <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground" title={row.modelKey}>
+            <div className="mt-0.5 truncate font-mono text-[12px] text-muted-foreground" title={row.modelKey}>
               {row.modelKey}
             </div>
           </div>
@@ -306,7 +285,7 @@ export function AllChannelModelsPanel({
                   {name}
                 </div>
               )}
-              {!row.channelEnabled && <div className="text-[11px] text-muted-foreground">渠道已停用</div>}
+              {!row.channelEnabled && <div className="text-[12px] text-muted-foreground">渠道已停用</div>}
             </div>
           );
         },
@@ -375,7 +354,8 @@ export function AllChannelModelsPanel({
                 row.enabled ? 'text-danger-text hover:text-danger-text' : 'hover:bg-muted'
               }
               icon={Power}
-              disabled={!writable || togglingId === row.id || (togglingId !== null && togglingId !== row.id)}
+              // 有任意一行在切换时就整体禁用，避免并发请求把状态写串
+              disabled={!writable || togglingId !== null}
               onClick={() => void toggleEnabled(row)}
             >
               {row.enabled ? '停用' : '启用'}
@@ -416,8 +396,8 @@ export function AllChannelModelsPanel({
         <SelectField
           ariaLabel="模型状态"
           value={status === 'all' ? undefined : status}
-          onChange={(value) => updateFilter(() => setStatus((value as StatusFilter) ?? 'all'))}
-          options={STATUS_OPTIONS.filter((item) => item.value !== 'all')}
+          onChange={(value) => updateFilter(() => setStatus((value as AllModelsStatusFilter) ?? 'all'))}
+          options={ALL_MODELS_STATUS_OPTIONS.filter((item) => item.value !== 'all')}
           placeholder="全部状态"
           // 复位项就叫「全部」：它是「不按状态筛」的通用说法，各页统一，
           // 运营不用逐页记这一格叫「全部状态」还是「全部模型」。
@@ -470,7 +450,7 @@ export function AllChannelModelsPanel({
         minWidth={1080}
         pagination={{
           current: page,
-          pageSize: PAGE_SIZE,
+          pageSize: ALL_MODELS_PAGE_SIZE,
           total: filtered.length,
           onChange: (next) => setPage(next),
         }}

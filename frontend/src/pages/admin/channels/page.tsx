@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { adminChannelsApi } from './api';
 import {
@@ -7,7 +7,6 @@ import {
   PageHeader,
   Panel,
   SegmentedGroup,
-  TextField,
 } from './components';
 import {
   useAdmin,
@@ -27,7 +26,7 @@ import { ChannelFormDrawer } from './ChannelFormDrawer';
 import { ChannelListPanel } from './ChannelListPanel';
 import { ChannelModelHealthPanel } from './ChannelModelHealthPanel';
 import { ChannelOrderDialog } from './ChannelOrderDialog';
-import { Field } from './ChannelField';
+import { DeleteReasonConfirm } from './DeleteReasonConfirm';
 import {
   CHANNEL_VIEW_OPTIONS,
   EMPTY_CHANNEL_DRAFT,
@@ -100,11 +99,10 @@ export function AdminChannelsPage() {
    * 都落在 `useSearchParams` 上）。
    */
   const [searchParams] = useSearchParams();
-  const [view, setViewState] = useState<'channels' | 'models'>(
+  const [view, setView] = useState<'channels' | 'models'>(
     searchParams.get('view') === 'models' ? 'models' : 'channels',
   );
   useAdminUrlFilterSync({ view });
-  const setView = useCallback((next: 'channels' | 'models') => setViewState(next), []);
 
   const [editing, setEditing] = useState<AdminChannelView | null>(null);
   const [creating, setCreating] = useState(false);
@@ -150,7 +148,11 @@ export function AdminChannelsPage() {
   const selected = rows.find((row) => row.id === selectedId) ?? null;
 
   const formOpen = creating || editing !== null;
-  const formDirty = formOpen && JSON.stringify(draft) !== JSON.stringify(draftBase);
+  // 序列化只在草稿变化时做一次：表单输入密集，逐次渲染比对整份草稿没有意义
+  const formDirty = useMemo(
+    () => formOpen && JSON.stringify(draft) !== JSON.stringify(draftBase),
+    [formOpen, draft, draftBase],
+  );
   useUnsavedGuard(formDirty);
 
   const resetForm = () => {
@@ -519,7 +521,7 @@ export function AdminChannelsPage() {
         onConfirm={() => void runToggle()}
       />
 
-      <ConfirmAction
+      <DeleteReasonConfirm
         open={deleteTarget !== null}
         title={`删除渠道「${deleteTarget?.name ?? ''}」？`}
         description="软删除：凭证立即清空、渠道与全部模型退出路由；账单与调用记录保留。"
@@ -527,25 +529,13 @@ export function AdminChannelsPage() {
           `该渠道下的 ${deleteTarget?.modelCosts?.length ?? 0} 个模型一并作废`,
           '引用这些模型的前台线路会变为不可用，需要重新选路',
         ]}
-        danger
+        reason={deleteReason}
+        reasonAriaLabel="删除原因"
+        reasonPlaceholder="如：上游账号停用"
         loading={saving}
-        confirmDisabled={deleteReason.trim().length === 0}
+        onReasonChange={setDeleteReason}
         onCancel={() => setDeleteTarget(null)}
         onConfirm={() => void runDelete()}
-        extra={
-          <Field
-            label="删除原因"
-            hint="写入审计：审计要能回答「谁为什么删」"
-            error={deleteReason.trim().length === 0 ? '删除是高危操作，必须填写原因' : null}
-          >
-            <TextField
-              ariaLabel="删除原因"
-              value={deleteReason}
-              onChange={setDeleteReason}
-              placeholder="如：上游账号停用"
-            />
-          </Field>
-        }
       />
     </>
   );

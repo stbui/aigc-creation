@@ -23,7 +23,7 @@ import { SignedUrlService } from '../common/signed-url.service';
 import { resolveUploadsDir } from '../config/env-files';
 import type { StorageBackend } from '../storage/storage.provider';
 import { TaskAdmissionService } from '../model/tasks/task-admission.service';
-import { TaskLifecycleService } from '../model/tasks/task-lifecycle.service';
+import { TaskLifecycleService, TASK_ERROR } from '../model/tasks/task-lifecycle.service';
 import { TaskWorkerService } from '../model/tasks/task-worker.service';
 
 @Injectable()
@@ -72,6 +72,10 @@ export class GenerateService {
     const origin = await this.prisma.generationTask.findUnique({ where: { id } });
     if (!origin) throw new AppError(40400, '任务不存在', 404);
     if (origin.status !== 'failed') throw new AppError(40000, '仅失败任务可重试', 400);
+    if (origin.errorCode === TASK_ERROR.uncertain) {
+      // 上游可能已经受理并计费；直接重试会二次计费，必须先人工核对账单
+      throw new AppError(40000, '结果不明的任务不能直接重试，请先核对上游账单', 400);
+    }
     if (!origin.logicalModelId) {
       throw new AppError(40000, '改造前创建的存量任务没有模型快照，无法重试', 400);
     }
@@ -237,6 +241,44 @@ export class GenerateService {
       orderBy: { createdAt: 'desc' },
       include: { outputAsset: true },
     });
+    return this.serializeTasks(tasks);
+  }
+
+  /**
+   * 分页任务列表。
+   *
+   * `/tasks` 旧接口保留全量数组（修图历史等小范围使用）；作品页和结果栏
+   * 改用这个分页接口，避免用户任务积累到几千条后每次进页面都拉全量。
+   */
+  async listTasksPage(
+    ownerId: string,
+    params: { projectId?: string; capability?: string; limit?: number; offset?: number } = {},
+  ) {
+    const take = Math.min(Math.max(Number(params.limit) || 50, 1), 100);
+    const skip = Math.max(Number(params.offset) || 0, 0);
+    const where: Prisma.GenerationTaskWhereInput = { ownerId };
+    if (params.projectId) where.projectId = params.projectId;
+    if (params.capability) where.capability = params.capability;
+    const [tasks, total] = await Promise.all([
+      this.prisma.generationTask.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+        include: { outputAsset: true },
+      }),
+      this.prisma.generationTask.count({ where }),
+    ]);
+    return {
+      items: await this.serializeTasks(tasks),
+      total,
+      limit: take,
+      offset: skip,
+    };
+  }
+
+  /** 把任务行及其输入/产出素材一次性组装成前端稳定形状 */
+  private async serializeTasks(tasks: any[]) {
     const allOutputIds = Array.from(
       new Set(tasks.flatMap((task) => orderedOutputIds(task.outputAssetId, task.outputAssetIds))),
     );

@@ -185,7 +185,7 @@ export function ToolHistoryGrid({
                       {task.createdAt ? new Date(task.createdAt).toLocaleString() : '已生成'}
                     </span>
                     <span
-                      style={{ display: 'block', fontSize: 11, color: 'var(--text-desc)' }}
+                      style={{ display: 'block', fontSize: 12, color: 'var(--text-desc)' }}
                       title="按任务创建时的价格快照，不随改价变化"
                     >
                       {[

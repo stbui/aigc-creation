@@ -11,9 +11,9 @@ import {
   ListError,
   NumberField,
   PageHeader,
+  PageSkeleton,
   Panel,
   SelectField,
-  Skeleton,
   StaleError,
   SwitchField,
   useAdminResource,
@@ -43,7 +43,7 @@ function RuleActions({
 }) {
   return (
     <div className="mt-4 flex items-center gap-2 border-t border-border pt-3">
-      <span className="mr-auto text-[11px] text-muted-foreground">
+      <span className="mr-auto text-[12px] text-muted-foreground">
         {dirty && <span className="text-warn-text">有未保存修改 · </span>}
         {hint}
       </span>
@@ -106,13 +106,22 @@ export function AdminMarketingRulesPage() {
   const dirtyCount = Number(inviteDirty) + Number(checkinDirty);
   useUnsavedGuard(writable && dirtyCount > 0);
 
-  // 只有完全没有数据时才塌整页; 已有草稿时保留表单, 由下方 stale 提示交代刷新失败
+  /*
+   * 只有完全没有数据时才塌**正文**; 已有草稿时保留表单, 由下方 stale 提示交代刷新失败。
+   *
+   * 页头照常渲染：加载期间标题与说明就该在位，否则首屏先闪一段没有标题的灰条，
+   * 再冒出完整页面 —— 骨架该占住位置，不是把版面清空。
+   * 两块面板限宽 760，与真实窄版 `Panel` 同宽。
+   */
   if (loading && !data) {
     return (
-      <div className="flex flex-col gap-2" aria-busy="true" aria-live="polite">
-        <Skeleton rows={4} />
-        <p className="text-center text-xs text-muted-foreground">加载营销规则…</p>
-      </div>
+      <PageSkeleton
+        title="邀请与签到"
+        description="邀请分销与每日签到的积分规则。保存后立即生效，已发放的积分不受影响。"
+        panels={2}
+        panelRows={4}
+        narrow
+      />
     );
   }
   // 重试只重跑本页的两次请求, 不整页刷新 —— reload 会丢掉 C 端的路由参数与滚动位置
@@ -155,7 +164,7 @@ export function AdminMarketingRulesPage() {
         description="邀请分销与每日签到的积分规则。保存后立即生效，已发放的积分不受影响。"
         actions={
           !writable ? (
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-[12px] text-muted-foreground">
               当前账号无 marketing.write 权限，仅可查看
             </span>
           ) : undefined
@@ -245,7 +254,7 @@ export function AdminMarketingRulesPage() {
 
             <div className="flex flex-col gap-1.5">
               <span className="text-xs font-medium text-foreground">连续加成</span>
-              <p className="text-[11px] leading-4 text-muted-foreground">
+              <p className="text-[12px] leading-4 text-muted-foreground">
                 到达指定连续天数时，额外获得 bonus 积分
               </p>
               <div className="flex flex-col gap-2">

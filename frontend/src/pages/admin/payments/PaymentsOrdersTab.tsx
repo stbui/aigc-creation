@@ -36,6 +36,8 @@ import type {
 } from '../../../types/payment';
 import {
   CHECKOUT_MODE_LABELS,
+  FILTERABLE_PROVIDER_IDS,
+  FILTERABLE_PROVIDERS,
   PAYMENT_STATUS_META,
   PROVIDER_LABELS,
 } from './constants';
@@ -83,7 +85,7 @@ export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
   })();
   const initialProvider = (() => {
     const raw = searchParams.get('providerId');
-    return raw && raw in PROVIDER_LABELS ? raw : undefined;
+    return raw && (FILTERABLE_PROVIDER_IDS as string[]).includes(raw) ? raw : undefined;
   })();
   const initialTimeField = (() => {
     const raw = searchParams.get('timeField');
@@ -238,7 +240,7 @@ export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
         row.user ? (
           <div className="flex flex-col gap-0.5">
             <span className="truncate">{row.user.name || row.user.email}</span>
-            <span className="truncate text-[11px] text-muted-foreground">{row.user.email}</span>
+            <span className="truncate text-[12px] text-muted-foreground">{row.user.email}</span>
           </div>
         ) : (
           <span className="text-muted-foreground">用户不存在</span>
@@ -250,8 +252,8 @@ export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
       width: 220,
       render: (row) => (
         <div className="flex flex-col gap-0.5">
-          <code className="font-mono text-[11px]">{row.orderNo}</code>
-          <span className="truncate text-[11px] text-muted-foreground">{row.productName}</span>
+          <code className="font-mono text-[12px]">{row.orderNo}</code>
+          <span className="truncate text-[12px] text-muted-foreground">{row.productName}</span>
         </div>
       ),
     },
@@ -272,7 +274,7 @@ export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           <span className="tabular-nums">{moneyText(row.amountCents, row.currency)}</span>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-[12px] text-muted-foreground">
             {row.credits.toLocaleString('zh-CN')} 积分
           </span>
         </div>
@@ -298,7 +300,7 @@ export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
       title: '创建时间',
       width: 110,
       render: (row) => (
-        <span className="text-[11px] text-muted-foreground tabular-nums">
+        <span className="text-[12px] text-muted-foreground tabular-nums">
           {row.createdAt.slice(5, 16).replace('T', ' ')}
         </span>
       ),
@@ -373,7 +375,7 @@ export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
         <SelectField
           value={providerId}
           onChange={setProviderId}
-          options={Object.entries(PROVIDER_LABELS).map(([value, label]) => ({ value, label }))}
+          options={FILTERABLE_PROVIDERS}
           allowClear
           className="w-[120px]"
           ariaLabel="支付渠道"
@@ -553,10 +555,10 @@ function PaymentOrderDetailDrawer({
   onClose: () => void;
   onChanged: () => void;
 }) {
-  const toast = useToast();
   const [data, setData] = useState<AdminPaymentOrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -578,7 +580,7 @@ function PaymentOrderDetailDrawer({
     return () => {
       cancelled = true;
     };
-  }, [orderId]);
+  }, [orderId, reloadKey]);
 
   const order = data;
 
@@ -600,7 +602,7 @@ function PaymentOrderDetailDrawer({
       {loading && !order ? (
         <p className="text-sm text-muted-foreground">加载中…</p>
       ) : error && !order ? (
-        <ListError error={error} onRetry={() => setData(null)} />
+        <ListError error={error} onRetry={() => setReloadKey((k) => k + 1)} />
       ) : order ? (
         <div className="flex flex-col gap-4">
           {order.lastError && (
@@ -747,10 +749,12 @@ function PaymentOrderDetailDrawer({
           </Notice>
 
           <div className="flex justify-end">
-            <ActionButton onClick={() => {
-              onChanged();
-              toast.success('已刷新');
-            }}>
+            <ActionButton
+              onClick={() => {
+                setReloadKey((k) => k + 1);
+                onChanged();
+              }}
+            >
               刷新
             </ActionButton>
           </div>

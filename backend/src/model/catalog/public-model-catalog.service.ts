@@ -19,7 +19,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { decodeCapabilityConfig, normalizeCapability } from '../domain/capability-config';
 import { badRequest } from '../domain/json';
-import { decodeSkuSelector, type SkuSelector } from '../domain/selector';
+import { decodeSkuSelector, validateChannelModelPrice, type SkuSelector } from '../domain/selector';
+import { validateImageParameterPriceSelector } from '../domain/image-parameters';
 import { creditAmount, convertCurrencyPrice, toSafeNumber } from '../infra/microcredits';
 import { capabilitySpecFromModelCapabilityConfig, decodeLogicalDefaults } from '../intent/capability-spec';
 import { matchCapability } from '../intent/capability-match';
@@ -27,6 +28,10 @@ import { resolveModelRequestIntent } from '../intent/model-intent';
 import type { ModelRequestIntent } from '../intent/spec-types';
 import type { CachedChannelModel, CachedPriceTier } from '../routing/routing.types';
 import { toNumber } from '../channels/channel.presentation';
+import {
+  ChannelModelMetricsService,
+  type ChannelModelHealthRow,
+} from '../channels/channel-model-metrics.service';
 import { QuoteService, type ModelQuote } from './quote.service';
 import type { UserGroupAccess } from '../user-groups/user-group.service';
 
@@ -41,6 +46,27 @@ export interface PublicCatalogPriceTier {
   inputTokenPriceMicrocredits: number;
   outputTokenPriceMicrocredits: number;
   cachedTokenPriceMicrocredits: number;
+}
+
+/**
+ * 公开目录里的可用性摘要。
+ *
+ * 参考实现（open-ai-canvas `app/model_catalog.go`）在公开目录里带
+ * `availability{ rate24h, sampleCount24h, trend7d, recentResults, dataState }`，
+ * C 端据此把不稳定或正在冷却的线路置灰。
+ *
+ * 本仓此前只有 `available`（= 有有效价格档），C 端无法区分
+ * 「这条线最近在挂」和「这条线只是没配价」。
+ */
+export interface PublicCatalogAvailability {
+  /** 24 小时成功率（0–1）；无样本为 null */
+  rate24h: number | null;
+  /** 24 小时终态样本数 */
+  sampleCount24h: number;
+  /** 7 天成功率（0–1）；无样本为 null */
+  rate7d: number | null;
+  /** 数据状态：'ok' 有样本 / 'no_data' 无样本 */
+  dataState: 'ok' | 'no_data';
 }
 
 /** 公开渠道模型（脱敏） */
@@ -62,6 +88,8 @@ export interface PublicCatalogModel {
   displayPrice: number | null;
   priceLabel: string;
   available: boolean;
+  /** 可用性摘要（24h / 7d 成功率）；无数据时 dataState='no_data' */
+  availability: PublicCatalogAvailability;
 }
 
 /** 公开渠道目录（名称恒为空串） */
@@ -87,6 +115,7 @@ export class PublicModelCatalogService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly quotes: QuoteService,
+    private readonly metrics: ChannelModelMetricsService,
   ) {}
 
   /** 目录：按分组可见渠道投影，`intent` 给出时只保留能承接该意图的模型 */
@@ -107,10 +136,21 @@ export class PublicModelCatalogService {
     });
 
     const result: PublicCatalogChannel[] = [];
+    /*
+     * 可用性摘要：一次取回全部线路的 24h / 7d 成功率，投影进公开目录。
+     * 失败不影响目录本身（可用性是辅助信息，不能因为它拿不到就让整个目录挂掉）。
+     */
+    const availabilityById = await this.availabilityIndex();
     for (const channel of visible) {
       const projected: PublicCatalogModel[] = [];
       for (const model of models.filter((row) => row.channelId === channel.id)) {
-        const view = this.projectModel(access, model, tiers.filter((tier) => tier.channelModelId === model.id), intent);
+        const view = this.projectModel(
+          access,
+          model,
+          tiers.filter((tier) => tier.channelModelId === model.id),
+          intent,
+          availabilityById,
+        );
         if (view) projected.push(view);
       }
       if (projected.length === 0) continue;
@@ -143,6 +183,22 @@ export class PublicModelCatalogService {
     return this.quotes.quoteChannelModel(access, channelModel, resolved);
   }
 
+  /**
+   * 线路可用性索引（id → 健康行）。
+   *
+   * 取不到就返回空表：可用性是辅助信息，拿不到时目录照常可用，
+   * 只是 `availability.dataState` 变成 `no_data`。
+   */
+  private async availabilityIndex(): Promise<Map<string, ChannelModelHealthRow>> {
+    try {
+      const rows = await this.metrics.list();
+      return new Map(rows.map((row) => [row.id, row]));
+    } catch (error) {
+      this.log.warn(`读取线路可用性失败，公开目录不带可用性摘要：${describe(error)}`);
+      return new Map();
+    }
+  }
+
   /* ───────────────────────── 内部 ───────────────────────── */
 
   /** 目录投影：能力合同损坏时隔离该模型并记一次告警，不影响其它模型 */
@@ -151,6 +207,7 @@ export class PublicModelCatalogService {
     row: ChannelModelRow,
     tierRows: PriceTierRow[],
     intent?: ModelRequestIntent,
+    availabilityById?: Map<string, ChannelModelHealthRow>,
   ): PublicCatalogModel | null {
     try {
       const cached = this.toCachedChannelModel(row, tierRows);
@@ -182,6 +239,7 @@ export class PublicModelCatalogService {
         displayPrice: display.displayPrice,
         priceLabel: display.priceLabel,
         available: priceTiers.length > 0,
+        availability: availabilityOf(availabilityById.get(cached.id) ?? null),
       };
     } catch (error) {
       this.log.warn(`渠道模型被排除出公开目录 id=${row.id}：${describe(error)}`);
@@ -320,7 +378,23 @@ function publicTiers(
   const seen = new Set<string>();
   for (const row of tierRows) {
     if (!row.enabled || !row.priceConfigured) continue;
+    const pricingValid = validateChannelModelPrice(row.billingMode, {
+      billingMode: row.billingMode,
+      unitPriceMicrocredits: toNumber(row.unitPriceMicrocredits),
+      inputTokenPriceMicrocredits: toNumber(row.inputTokenPriceMicrocredits),
+      outputTokenPriceMicrocredits: toNumber(row.outputTokenPriceMicrocredits),
+      cachedTokenPriceMicrocredits: toNumber(row.cachedTokenPriceMicrocredits),
+    });
+    if (!pricingValid) continue;
     const selector = decodeSkuSelector(row.selectorJson || row.selectorKey);
+    const imageParameters = channelModel.capabilitySpec.imageParameters;
+    if (imageParameters) {
+      try {
+        validateImageParameterPriceSelector(imageParameters, selector);
+      } catch {
+        continue;
+      }
+    }
     const tier: PublicCatalogPriceTier = {
       id: row.id,
       selector,
@@ -362,6 +436,27 @@ function publicTiers(
 function applyMultiplier(price: number, multiplierBasisPoints: bigint): number {
   if (price <= 0) return price;
   return toSafeNumber(creditAmount(price, 1, multiplierBasisPoints));
+}
+
+/**
+ * 健康行 → 公开目录的可用性摘要。
+ *
+ * 「没调用过」（无样本）与「全失败」要分得开：无样本时 rate 为 null、
+ * dataState='no_data'，C 端不能因此把线路判成不可用。
+ */
+export function availabilityOf(row: ChannelModelHealthRow | null): PublicCatalogAvailability {
+  if (!row) {
+    return { rate24h: null, sampleCount24h: 0, rate7d: null, dataState: 'no_data' };
+  }
+  const day = row.windows.day;
+  const week = row.windows.week;
+  const samples = day?.samples ?? 0;
+  return {
+    rate24h: day?.successRate ?? null,
+    sampleCount24h: samples,
+    rate7d: week?.successRate ?? null,
+    dataState: samples > 0 ? 'ok' : 'no_data',
+  };
 }
 
 /**

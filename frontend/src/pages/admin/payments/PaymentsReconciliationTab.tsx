@@ -34,7 +34,7 @@ import type {
   AdminReconciliationRun,
   PaymentProviderId,
 } from '../../../types/payment';
-import { PROVIDER_LABELS } from './constants';
+import { FILTERABLE_PROVIDER_IDS, FILTERABLE_PROVIDERS, PROVIDER_LABELS } from './constants';
 import { moneyText } from './utils';
 import { RECONCILIATION_RESULT_LABELS } from '../../../types/payment';
 
@@ -63,18 +63,19 @@ const RUN_STATUS_META: Record<string, { label: string; tone: 'success' | 'danger
   failed: { label: '失败', tone: 'danger' },
 };
 
-/** 昨天（YYYY-MM-DD），对账只能选昨天及更早 */
+/** 昨天（YYYY-MM-DD，上海时区）。对账只能选昨天及更早 */
 function yesterday(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10);
+  // 必须按上海时区切日：用 toISOString 会在东八区 00:00–08:00 默认成前天
+  const shifted = new Date(Date.now() + 8 * 3600 * 1000);
+  shifted.setUTCDate(shifted.getUTCDate() - 1);
+  return shifted.toISOString().slice(0, 10);
 }
 
 /** 90 天前的日期，对账最早回溯范围 */
 function ninetyDaysAgo(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - 90);
-  return d.toISOString().slice(0, 10);
+  const shifted = new Date(Date.now() + 8 * 3600 * 1000);
+  shifted.setUTCDate(shifted.getUTCDate() - 90);
+  return shifted.toISOString().slice(0, 10);
 }
 
 export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: number }) {
@@ -87,7 +88,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
 
   const initialProvider = (() => {
     const raw = searchParams.get('providerId');
-    return raw && raw in PROVIDER_LABELS ? raw : undefined;
+    return raw && (FILTERABLE_PROVIDER_IDS as string[]).includes(raw) ? raw : undefined;
   })();
   const initialStatus = (() => {
     const raw = searchParams.get('status');
@@ -101,6 +102,13 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
   const [billDate, setBillDate] = useState(yesterday());
   const [runReason, setRunReason] = useState('');
   const [runOpen, setRunOpen] = useState(false);
+
+  // CSV / ZIP 兜底导入
+  const [importOpen, setImportOpen] = useState(false);
+  const [importProvider, setImportProvider] = useState<string>('');
+  const [importBillDate, setImportBillDate] = useState<string>(yesterday());
+  const [importReason, setImportReason] = useState('');
+  const [importFile, setImportFile] = useState<File | null>(null);
 
   // 列表筛选草稿
   const [filterProvider, setFilterProvider] = useState<string | undefined>(initialProvider);
@@ -262,7 +270,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
       title: '完成时间',
       width: 150,
       render: (row) => (
-        <span className="text-[11px] text-muted-foreground tabular-nums">
+        <span className="text-[12px] text-muted-foreground tabular-nums">
           {row.completedAt ? row.completedAt.replace('T', ' ').slice(0, 19) : '—'}
         </span>
       ),
@@ -312,6 +320,18 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
           >
             执行对账
           </ActionButton>
+          <ActionButton
+            onClick={() => {
+              setImportProvider(reconcilableProviders[0]?.value ?? '');
+              setImportBillDate(yesterday());
+              setImportReason('');
+              setImportFile(null);
+              setImportOpen(true);
+            }}
+            disabled={!canReconcile || reconcilableProviders.length === 0}
+          >
+            导入 CSV
+          </ActionButton>
         </div>
       </Panel>
 
@@ -319,7 +339,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
         <SelectField
           value={filterProvider}
           onChange={setFilterProvider}
-          options={Object.entries(PROVIDER_LABELS).map(([value, label]) => ({ value, label }))}
+          options={FILTERABLE_PROVIDERS}
           allowClear
           className="w-[130px]"
           ariaLabel="筛选渠道"
@@ -461,6 +481,83 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
         }
       />
 
+      <ConfirmAction
+        open={importOpen}
+        title="导入对账单"
+        description="渠道账单接口不可用时的兜底入口。导入后仍会逐笔核对，不一致的行进入差异列表。"
+        impact={['按商户订单号与本地订单比对', '支付宝支持 ZIP 内的 CSV', '超过 10000 行会拒绝导出']}
+        confirmText="确认导入"
+        confirmDisabled={
+          !importFile ||
+          !importProvider ||
+          !importBillDate ||
+          importReason.trim().length < 2
+        }
+        loading={busy}
+        onCancel={() => setImportOpen(false)}
+        onConfirm={async () => {
+          if (!importFile) return;
+          setBusy(true);
+          try {
+            await adminPaymentReconciliationApi.importCsv(importFile, {
+              providerId: importProvider as PaymentProviderId,
+              billDate: importBillDate,
+              reason: importReason.trim(),
+            });
+            toast.success('对账单已导入');
+            setImportOpen(false);
+            reload();
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : '导入失败');
+          } finally {
+            setBusy(false);
+          }
+        }}
+        extra={
+          <div className="flex flex-col gap-3">
+            <FormField label="渠道" required>
+              <SelectField
+                value={importProvider || undefined}
+                onChange={(value) => setImportProvider(value ?? '')}
+                options={reconcilableProviders}
+                placeholder="选择渠道"
+                ariaLabel="导入对账渠道"
+              />
+            </FormField>
+            <FormField label="账单日期" required hint="最早 90 天前，最晚昨天">
+              <TextField
+                type="date"
+                value={importBillDate}
+                onChange={setImportBillDate}
+                ariaLabel="导入账单日期"
+              />
+            </FormField>
+            <FormField
+              label="对账单文件"
+              required
+              hint={importProvider === 'alipay' ? 'CSV，或支付宝导出的 ZIP' : 'CSV'}
+            >
+              <input
+                type="file"
+                accept={importProvider === 'alipay' ? '.csv,.zip' : '.csv'}
+                onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
+                className="block w-full text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:text-foreground"
+                aria-label="对账单文件"
+              />
+            </FormField>
+            <FormField label="导入原因" required hint="原因会写入操作审计。">
+              <TextAreaField
+                value={importReason}
+                onChange={setImportReason}
+                maxLength={200}
+                placeholder="例如：渠道账单接口不可用，手工下载后导入"
+                ariaLabel="导入原因"
+              />
+            </FormField>
+          </div>
+        }
+      />
+
       {detailId && (
         <ReconciliationDetailDrawer
           runId={detailId}
@@ -508,7 +605,7 @@ function ReconciliationDetailDrawer({
       title: '商户订单号',
       width: 200,
       render: (row) => (
-        <code className="font-mono text-[11px]">{row.merchantOrderNo}</code>
+        <code className="font-mono text-[12px]">{row.merchantOrderNo}</code>
       ),
     },
     {
@@ -516,7 +613,7 @@ function ReconciliationDetailDrawer({
       title: '渠道交易号',
       width: 200,
       render: (row) => (
-        <code className="font-mono text-[11px]">{row.providerTradeNo ?? '—'}</code>
+        <code className="font-mono text-[12px]">{row.providerTradeNo ?? '—'}</code>
       ),
     },
     {

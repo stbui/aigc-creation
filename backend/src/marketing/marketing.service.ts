@@ -1291,16 +1291,19 @@ export class MarketingService {
     await this.grantInviteReward(relation.id);
   }
 
-  /** 我的邀请数据 (C 端 /invitations) */
-  async myInvites(userId: string) {
+  /** 我的邀请数据 (C 端 /invitations，支持 limit/offset 分页) */
+  async myInvites(userId: string, options: { limit?: number; offset?: number } = {}) {
     const inviteCode = await this.ensureInviteCode(userId);
     const rule = await this.getInviteRule();
+    const take = Math.min(Math.max(Number(options.limit) || 20, 1), 100);
+    const skip = Math.max(Number(options.offset) || 0, 0);
 
     const [relations, total, granted, pending] = await Promise.all([
       this.prisma.inviteRelation.findMany({
         where: { inviterId: userId },
         orderBy: { boundAt: 'desc' },
-        take: 50,
+        skip,
+        take,
         include: { invitee: { select: { id: true, name: true, email: true, createdAt: true } } },
       }),
       this.prisma.inviteRelation.count({ where: { inviterId: userId } }),

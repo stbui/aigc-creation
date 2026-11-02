@@ -150,13 +150,32 @@ export class CreditService {
    * 读 `CreditLedgerEntry`（微积分）并投影成积分口径。`reserve` 是任务预授权，
    * 随后会以 consume/refund 结清；C 端默认不展示中间态，由调用方按需过滤。
    */
-  async ledgerOf(userId: string, limit = 50, options: { includeReserve?: boolean } = {}) {
-    const rows = await this.prisma.creditLedgerEntry.findMany({
-      where: { userId, ...(options.includeReserve ? {} : { type: { not: 'reserve' } }) },
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-    });
-    return rows.map(projectEntry);
+  async ledgerOf(
+    userId: string,
+    limit = 50,
+    options: { includeReserve?: boolean; offset?: number } = {},
+  ) {
+    const take = Math.min(Math.max(Number(limit) || 50, 1), 200);
+    const skip = Math.max(Number(options.offset) || 0, 0);
+    const where = {
+      userId,
+      ...(options.includeReserve ? {} : { type: { not: 'reserve' } }),
+    };
+    const [rows, total] = await Promise.all([
+      this.prisma.creditLedgerEntry.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      this.prisma.creditLedgerEntry.count({ where }),
+    ]);
+    return {
+      items: rows.map(projectEntry),
+      total,
+      limit: take,
+      offset: skip,
+    };
   }
 
   // ── 发放 ──────────────────────────────────────────────────────────

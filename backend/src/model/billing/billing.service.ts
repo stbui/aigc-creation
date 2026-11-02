@@ -31,6 +31,21 @@ import { estimateTextTokens, requestedBillingQuantity } from '../catalog/quote.s
 export const BILLING_STATUSES = ['reserved', 'running', 'settled', 'refunded', 'uncertain'] as const;
 export type BillingStatus = (typeof BILLING_STATUSES)[number];
 
+/**
+ * 退款归类 —— 决定这笔退款算不算「用户拿回的钱」。
+ *
+ * `route_switch` 是唯一**不计入「已退」**的一类：线路切换时旧账单的预授权
+ * 只是挪到新账单，钱没有离开平台。把它算进已退会让一次成功的换线任务显示
+ * 净收入为负。其余分类都是真实退款。
+ */
+export type RefundReason =
+  | 'failure'
+  | 'manual'
+  | 'proxy_timeout'
+  | 'auto_sweep'
+  | 'route_switch'
+  | '';
+
 /** 结算用量来源：上游 usage 优先，视频可退到提交时的公式快照 */
 export const USAGE_SOURCE_PROVIDER = 'provider';
 export const USAGE_SOURCE_VIDEO_FORMULA = 'video_formula';
@@ -71,6 +86,21 @@ export interface BillingDraft {
   outputTokens: bigint;
   cachedTokens: bigint;
   videoFormulaTokens: bigint;
+  /**
+   * 成本价快照（仅后台可见，不叠倍率、不参与售价）。
+   *
+   * 与参考实现 `BillingCostSnapshot` 同口径：建单时把命中价格档的成本写入账单，
+   * 换线时随线路一起更新 —— 毛利分析才是真实的。
+   * `costConfigured=false` 表示该档位未配成本，账单成本留空而不是记 0。
+   */
+  costConfigured: boolean;
+  costUnitPriceMicrocredits: bigint;
+  costInputTokenPriceMicrocredits: bigint;
+  costOutputTokenPriceMicrocredits: bigint;
+  costCachedTokenPriceMicrocredits: bigint;
+  costBillingMode: string;
+  costQuantity: bigint;
+  costVideoFormulaTokens: bigint;
 }
 
 /** 预估文本用量；图片 / 视频固定价通道不使用 */
@@ -172,6 +202,14 @@ export class BillingService {
       outputTokens: 0n,
       cachedTokens: 0n,
       videoFormulaTokens: 0n,
+      costConfigured: false,
+      costUnitPriceMicrocredits: 0n,
+      costInputTokenPriceMicrocredits: 0n,
+      costOutputTokenPriceMicrocredits: 0n,
+      costCachedTokenPriceMicrocredits: 0n,
+      costBillingMode: '',
+      costQuantity: 0n,
+      costVideoFormulaTokens: 0n,
     };
 
     // 分组是账单的强校验边界：目录里看不到的渠道，即使被直接提交也不能预留积分
@@ -198,6 +236,13 @@ export class BillingService {
         outputTokenPriceMicrocredits: convertCurrencyPrice(tier.outputTokenPriceMicrocredits, pricing.rateMicrocredits),
         cachedTokenPriceMicrocredits: convertCurrencyPrice(tier.cachedTokenPriceMicrocredits, pricing.rateMicrocredits),
         amountMicrocredits: 0n,
+        // 成本价恒为微积分：不叠分组倍率、不做货币换算，也不参与售价计算
+        costConfigured: tier.costConfigured,
+        costUnitPriceMicrocredits: BigInt(tier.costUnitPriceMicrocredits),
+        costInputTokenPriceMicrocredits: BigInt(tier.costInputTokenPriceMicrocredits),
+        costOutputTokenPriceMicrocredits: BigInt(tier.costOutputTokenPriceMicrocredits),
+        costCachedTokenPriceMicrocredits: BigInt(tier.costCachedTokenPriceMicrocredits),
+        costBillingMode: tier.billingMode,
       };
       return this.withAmount(draft, routed.intent, true);
     }
@@ -270,6 +315,15 @@ export class BillingService {
       outputTokens: 0n,
       cachedTokens: 0n,
       videoFormulaTokens: 0n,
+      // 成本价恒为微积分：不叠分组倍率、不做货币换算，也不参与售价计算
+      costConfigured: tier.costConfigured,
+      costUnitPriceMicrocredits: BigInt(tier.costUnitPriceMicrocredits),
+      costInputTokenPriceMicrocredits: BigInt(tier.costInputTokenPriceMicrocredits),
+      costOutputTokenPriceMicrocredits: BigInt(tier.costOutputTokenPriceMicrocredits),
+      costCachedTokenPriceMicrocredits: BigInt(tier.costCachedTokenPriceMicrocredits),
+      costBillingMode: tier.billingMode,
+      costQuantity: 0n,
+      costVideoFormulaTokens: 0n,
     };
     return this.withAmount(draft, intent, true);
   }
@@ -303,6 +357,8 @@ export class BillingService {
         quantity: usage.inputTokens + usage.outputTokens,
         inputTokens: usage.inputTokens,
         outputTokens: usage.outputTokens,
+        // 成本侧同样记录用量口径，便于按实际用量核算毛利
+        costQuantity: usage.inputTokens + usage.outputTokens,
       };
     }
 
@@ -313,6 +369,8 @@ export class BillingService {
         ...draft,
         quantity: BigInt(quantity),
         amountMicrocredits: creditAmount(draft.unitPriceMicrocredits, quantity, draft.multiplierBasisPoints),
+        // 按秒计费的成本随秒数放大
+        costQuantity: BigInt(quantity),
       };
     }
 
@@ -377,6 +435,9 @@ export class BillingService {
    * 不能逐张调 `reserveTaskBilling`：第 3 张余额不足时，前 2 张的预授权已经落库，
    * 调用方只能再退一次账 —— 多一组「已退款但任务已被删」的死账单。整批放在一个
    * 事务里，余额不足就是整批不成立，任务与账单一起回滚。
+   *
+   * `tx` 可由调用方传入：任务准入要把「建任务 + 建账单 + 预留积分」放进**同一个**
+   * 事务（见 `TaskAdmissionService`），避免中间崩溃留下「排队但无账单」的任务。
    */
   async reserveBatchBilling(params: {
     userId: string;
@@ -384,9 +445,11 @@ export class BillingService {
     items: Array<{ taskId: string; idempotencyKey: string }>;
     draft: BillingDraft;
     promotionId?: string;
+    /** 复用调用方的事务；不传则自开一个 */
+    tx?: Prisma.TransactionClient;
   }): Promise<Array<{ taskId: string; order: BillingOrderRow; reserved: bigint }>> {
     const amount = params.draft.amountMicrocredits;
-    return this.prisma.$transaction(async (tx) => {
+    const run = async (tx: Prisma.TransactionClient) => {
       const results: Array<{ taskId: string; order: BillingOrderRow; reserved: bigint }> = [];
       for (const item of params.items) {
         const reserved = await this.createReservedOrder(tx, {
@@ -401,7 +464,8 @@ export class BillingService {
         results.push({ taskId: item.taskId, ...reserved });
       }
       return results;
-    });
+    };
+    return params.tx ? run(params.tx) : this.prisma.$transaction(run);
   }
 
   /**
@@ -454,6 +518,15 @@ export class BillingService {
         outputTokens: params.draft.outputTokens,
         cachedTokens: params.draft.cachedTokens,
         videoFormulaTokens: params.draft.videoFormulaTokens,
+        // 成本快照：毛利核算的真实来源（不叠倍率、不参与售价）
+        costConfigured: params.draft.costConfigured,
+        costUnitPriceMicrocredits: params.draft.costUnitPriceMicrocredits,
+        costInputTokenPriceMicrocredits: params.draft.costInputTokenPriceMicrocredits,
+        costOutputTokenPriceMicrocredits: params.draft.costOutputTokenPriceMicrocredits,
+        costCachedTokenPriceMicrocredits: params.draft.costCachedTokenPriceMicrocredits,
+        costBillingMode: params.draft.costBillingMode,
+        costQuantity: params.draft.costQuantity,
+        costVideoFormulaTokens: params.draft.costVideoFormulaTokens,
         promotionId: params.promotionId ?? '',
         status: 'reserved',
       },
@@ -620,8 +693,17 @@ export class BillingService {
   /**
    * 退款：未结算账单把冻结金额全额退回。
    * 已结算账单只能人工退款（`resolve` 之前先核对）—— 自动退款会与结算流水冲突。
+   *
+   * `reason` 决定这笔退款在财务口径里的归类：
+   *   · `route_switch` —— 线路切换的内部重预留，钱没离开平台，
+   *     **不计入「已退」**（否则一次 9 分换 4 分会显示净收入 −5）；
+   *   · 其余（失败 / 人工 / 超时）—— 真实退款，计入「已退」。
    */
-  async refund(billingOrderId: string, errorText = ''): Promise<BillingOrderRow> {
+  async refund(
+    billingOrderId: string,
+    errorText = '',
+    reason: RefundReason = 'failure',
+  ): Promise<BillingOrderRow> {
     return this.prisma.$transaction(async (tx) => {
       const order = await tx.billingOrder.findUnique({ where: { id: billingOrderId } });
       if (!order) throw new AppError(40400, '账单不存在', 404);
@@ -644,6 +726,7 @@ export class BillingService {
           refundedAt: new Date(),
           refundedAmountMicrocredits: amount,
           errorText,
+          refundReason: reason,
         },
       });
     });
@@ -680,7 +763,7 @@ export class BillingService {
     const updated =
       action === 'settle'
         ? await this.settle(billingOrderId, { providerRequestId: order.providerRequestId })
-        : await this.refund(billingOrderId, reason);
+        : await this.refund(billingOrderId, reason, 'manual');
     return this.prisma.billingOrder.update({
       where: { id: updated.id },
       data: { resolvedBy: actorUserId, resolutionNote: reason },

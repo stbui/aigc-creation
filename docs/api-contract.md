@@ -59,6 +59,7 @@
 | POST | `/api/v1/generate` | 创建生成任务，返回 `{ taskId, status, creditCost, batchId?, batchSize? }`，异步执行。`logicalModelId` 必填（前台模型 id，来自 `/models`）；`status` 初值 `queued`，词表 `queued / running / succeeded / failed / cancelled`。能力声明了 `outputPlan` 时（当前只有商品详情图）一次提交拆成 N 个任务：每张各建一条账单、各扣一份价（**按张计费**），返回的 `creditCost` 是本次合计；`taskId` 是父任务，其余任务 `parentTaskId` 指向它，`batchId` 标识整批；删除父任务会连带删除整批 |
 | GET | `/api/v1/tasks/:id` | 轮询任务，`outputAsset.sourceUrl` 为结果图；`errorCode` 取 `42201`–`42206` |
 | GET | `/api/v1/tasks` | 任务列表（含 `outputAsset`，历史页缩略图依赖它） |
+| GET | `/api/v1/tasks/page` | 任务列表分页（`projectId` / `capability` / `limit` / `offset`），返回 `{ items, total, limit, offset }`。**必须注册在 `/tasks/:id` 之前**，否则 `page` 会被当成 id |
 | DELETE | `/api/v1/tasks/:id` | 删除作品（连带产物与磁盘文件） |
 | GET | `/api/v1/stats/overview` | 数据中心聚合（含按能力缩略图） |
 | GET | `/api/v1/models` | 前台模型目录（匿名可读；带 token 时按会员分组过滤线路并折算价格，不暴露渠道字段） |
@@ -103,8 +104,20 @@
 | GET/POST/PATCH | `/api/v1/admin/membership-plans*` | 会员套餐列表 / 新建 / 改价改权益 / 上下架（`product.read` / `product.write`，写需原因 + 审计；下架不影响存量会员） |
 | POST | `/api/v1/admin/orders/:id/refund` | 渠道退款（**先调渠道再改本地账**；渠道失败 `50302` 且订单/积分不变，在途退款 `40908`，`order.refund` 权限 + 必填原因 + 审计） |
 | GET/PUT/POST | `/api/v1/admin/{coupons,campaigns,marketing-rules}*` | 营销管理 |
-| GET/POST | `/api/v1/admin/{reconciliation,invoices}*` | 对账导入 / 批次与明细 / 差异处置 / 导出；发票审核与开具 |
-| GET | `/api/v1/admin/payment-channels` | 支付渠道状态（只读：生效通道 / 凭据缺失项 / 回调地址 / 风险告警，`payment.read`） |
+| GET/POST | `/api/v1/admin/invoices*` | 发票审核与开具（`invoice.read` / `invoice.write`） |
+| GET | `/api/v1/admin/payments/providers` | 支付适配器视图列表（沙箱 / 支付宝 / 微信）：启用状态、是否配置齐、缺哪几项、checkoutMode、关单分钟、配置版本、字段元数据、风险告警。**只回配置状态不回密钥明文**（`secretConfigured` 只给布尔），`payment.read` |
+| PUT | `/api/v1/admin/payments/providers/:id/config` | 保存支付适配器配置（版本化 + 加密 + 追加写）。请求体 `{ enabled, closeAfterMinutes, values, reason }`，`reason` 必填并写审计；密钥字段留空表示沿用旧值，身份类字段锁定不可改，`payment.write` |
+| GET/PUT | `/api/v1/admin/payments/settings` | 后台默认币种设置，`setting.read` / 写需 `payment.write` + 原因 |
+| GET/POST/PUT | `/api/v1/admin/payments/products*` | 充值商品列表 / 新建 / 改（价格按分存，展示按元解析；库存 / 周期 / 限时策略随类型切换），`product.read` / `product.write` |
+| GET | `/api/v1/admin/payments/orders` | 支付订单列表（服务端分页，默认 30）：筛选 `status` / `providerId` / `keyword` / `timeField` / `from` / `to` / `sort`，`payment.read` |
+| GET | `/api/v1/admin/payments/orders/:id` | 订单详情（含最近 50 次支付尝试），`payment.read` |
+| POST | `/api/v1/admin/payments/orders/:id/query` | 向渠道查单并同步状态（关单前必先查单），`payment.operate` + 原因 + 审计 |
+| POST | `/api/v1/admin/payments/orders/:id/close` | 关闭未支付订单（**不等于退款**），已入账返回 `409`；`payment.operate` + 原因 + 审计 |
+| GET | `/api/v1/admin/payments/orders/export.csv` | 支付订单导出（`data.export`） |
+| GET/POST | `/api/v1/admin/payments/reconciliations` | 对账运行列表 / 手动执行。列表筛 `providerId` / `status`（`running` / `completed` / `failed`）/ `from` / `to`；执行请求体 `{ providerId, billDate, reason }`，`finance.reconcile` + 原因 + 审计 |
+| GET | `/api/v1/admin/payments/reconciliations/:id/items` | 对账差异明细（按 `result` 筛，默认 50 条/页），`payment.read` |
+| POST | `/api/v1/admin/payments/reconciliations/import` | 渠道账单 CSV 兜底导入（multipart `file` + `providerId` / `billDate` / `reason`），`finance.reconcile` |
+| GET | `/api/v1/admin/payments/reconciliations/export.csv`、`/:id/items/export.csv` | 对账汇总 / 明细导出（`data.export`） |
 | GET/POST/PATCH/DELETE | `/api/v1/admin/channels*`、`/admin/channel-models` | 渠道 / 渠道模型 / 价格档 / 复制 / 导入导出 / 连通性测试；写需 `channel.write` / `channel.model_write`，测试写 `ApiCallLog(billable=false)`。**删除必填 `reason`**（`DELETE /admin/channels/:id`、`DELETE /admin/channels/:id/models/:modelId`、`POST /admin/channels/:id/models/batch-delete` 三处都是高危写，空原因一律 `40001`），原因只进审计不回显 |
 | GET | `/api/v1/admin/channel-models?channelId=&includeDisabled=` | 跨渠道模型视图（一行 = 一条渠道模型，条目带 `channelName` / `channelEnabled`）。`includeDisabled=1` 含已停用线路 —— 后台「全部模型」视图要用；不传时只给启用线路（前台模型的线路选择器用，停用线路进了下拉会让人以为选了就能用），`channel.model_read` |
 | GET/PUT | `/api/v1/admin/channels/order`、`/api/v1/admin/channels/:id/models/order` | 渠道排序 / 渠道内模型排序。`GET` 返回当前顺序的 id 数组；`PUT` 请求体 `{ ids, expectedIds }` —— `expectedIds` 是**读取时看到的顺序**，与库中不一致说明期间有人改过，整单拒绝 **409**（`code 40900`，「排序列表已变化，请重新加载后再保存」），不做部分落库。权限 `channel.write` / `channel.model_write`，写审计 `channel.order` / `channel_model.order` |
@@ -118,7 +131,7 @@
 | GET/PATCH/POST/DELETE | `/api/v1/admin/plugins*`、`/plugins/:id/verify`、`/plugins/install` | 插件清单 / 启停（立即重注册协议）/ 契约校验 / 上传安装（multipart `file`，`origin='installed'`）/ 卸载（内置包 40001，仍被渠道模型引用 40909）；`plugin.read` / `plugin.write`，装卸写审计。清单每项带 `availability: { available, reason }`：本环境不可用时 `reason` 是**人话**说明（停用 / 声明了本仓未内置的 `host:<engine>` 引擎 / 只贡献支付短信等非模型能力而本仓独立实现），不允许「插件列在那里但就是不工作」这种静默缺失 |
 | GET/POST | `/api/v1/admin/provider-catalog`、`/refresh`、`/:id/{verify,install}` | 服务商目录（插件包上游清单）：未配置 `MODEL_PROVIDER_CATALOG_URL` 时返回空态与原因；安装走与上传安装同一套校验；`plugin.read` / `plugin.write` |
 | GET | `/api/v1/admin/analytics/finance?from&to` | 财务汇总：实收 = 已结算 `actualAmountMicrocredits`，已退 = `refundedAmountMicrocredits`，净收入 = 实收 − 已退；预留 / 运行 / 待核对单列挂账**不计入实收**；区间默认 30 天、上限 366 天，`model.analytics_read` |
-| GET/POST | `/api/v1/admin/billing-orders*`、`/billing-orders/:id/resolve` | 生成账单列表 / 详情 / 人工核对（`settle` \| `refund`，原因必填 + 审计，`billing_order.read` / `billing_order.resolve`） |
+| GET/POST | `/api/v1/admin/billing-orders*`、`/billing-orders/:id/resolve`、`/billing-orders/batch-resolve` | 生成账单列表 / 详情 / 人工核对（`settle` \| `refund`，原因必填 + 审计，`billing_order.read` / `billing_order.resolve`）；列表支持 `?status=review`「待核对」队列口径；批量核对逐条独立处置并回显失败原因 |
 | GET | `/api/v1/admin/api-logs` | 上游调用记录（`ApiCallLog`）：含 `billable=false` 的连通性测试；筛选状态 / 类型 / 渠道 / 模型 / 时间，附汇总统计，`model.call_read` |
 | GET | `/api/v1/admin/api-logs/export` | 调用记录 CSV（与列表同筛选口径，上限 5000 行；**不含请求体 / 响应体**），`data.export` + 审计 |
 | GET/PUT | `/api/v1/admin/capabilities*` | 能力上下线；下架必须填原因，写需 `capability.write`（高危，走审计） |

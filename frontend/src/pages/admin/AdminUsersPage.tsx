@@ -22,7 +22,7 @@ import {
   Panel,
   RowMenu,
   SelectField,
-  Skeleton,
+  SkeletonBody,
   StatusTag,
   StaleError,
   TextField,
@@ -99,7 +99,7 @@ function Section({
     <section className="border-t border-border pt-3 first:border-t-0 first:pt-0">
       <div className="mb-2 flex items-baseline gap-2">
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-        {note && <span className="text-[11px] text-muted-foreground">{note}</span>}
+        {note && <span className="text-[12px] text-muted-foreground">{note}</span>}
       </div>
       {children}
     </section>
@@ -110,11 +110,11 @@ function Section({
 function MiniStat({ label, value, hint }: { label: string; value: ReactNode; hint?: ReactNode }) {
   return (
     <div className="rounded-lg border border-border px-3 py-2">
-      <div className="text-[11px] text-muted-foreground">{label}</div>
+      <div className="text-[12px] text-muted-foreground">{label}</div>
       <div className="mt-0.5 text-lg leading-6 font-semibold text-foreground tabular-nums">
         {value}
       </div>
-      {hint && <div className="text-[11px] text-muted-foreground">{hint}</div>}
+      {hint && <div className="text-[12px] text-muted-foreground">{hint}</div>}
     </div>
   );
 }
@@ -493,7 +493,7 @@ export function AdminUsersPage() {
               导出 CSV
             </ActionButton>
           ) : (
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-[12px] text-muted-foreground">
               当前账号无 data.export 权限，不可导出
             </span>
           )
@@ -632,11 +632,11 @@ export function AdminUsersPage() {
             <Section title="基本信息">
               <dl className="grid grid-cols-2 gap-x-6 gap-y-2.5">
                 <div className="col-span-2 min-w-0">
-                  <dt className="text-[11px] text-muted-foreground">邮箱</dt>
+                  <dt className="text-[12px] text-muted-foreground">邮箱</dt>
                   <dd className="mt-0.5 text-sm break-all text-foreground">{d.email}</dd>
                 </div>
                 <div className="col-span-2 min-w-0">
-                  <dt className="text-[11px] text-muted-foreground">关联记录</dt>
+                  <dt className="text-[12px] text-muted-foreground">关联记录</dt>
                   <dd className="mt-0.5 flex flex-wrap gap-3 text-xs">
                     <Link className="text-brand hover:underline" to={adminTasksHref({ userId: d.id })}>
                       任务记录
@@ -661,7 +661,7 @@ export function AdminUsersPage() {
                     d.phone ? (
                       <span className="flex items-center gap-1.5">
                         {d.phone}
-                        <span className="text-[11px] text-muted-foreground">
+                        <span className="text-[12px] text-muted-foreground">
                           {d.phoneVerifiedAt ? '已验证' : '未验证'}
                         </span>
                       </span>
@@ -718,7 +718,7 @@ export function AdminUsersPage() {
                           {t.capabilityName}
                         </span>
                         <StatusTag status={t.status} />
-                        <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+                        <span className="shrink-0 text-[12px] text-muted-foreground tabular-nums">
                           {formatDateTime(t.createdAt)}
                         </span>
                       </Link>
@@ -818,7 +818,7 @@ export function AdminUsersPage() {
 function InfoItem({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] text-muted-foreground">{label}</dt>
+      <dt className="text-[12px] text-muted-foreground">{label}</dt>
       <dd className="mt-0.5 text-sm text-foreground">{value}</dd>
     </div>
   );
@@ -997,9 +997,9 @@ function RecentLoginsSection({ userId }: { userId: string }) {
           : undefined
       }
     >
-      {state === 'loading' ? <Skeleton rows={3} /> : null}
+      {state === 'loading' ? <SkeletonBody rows={3} /> : null}
       {state === 'forbidden' ? (
-        <p className="text-[11px] text-muted-foreground">
+        <p className="text-[12px] text-muted-foreground">
           当前角色没有审计权限（audit.read），无法查看登录记录。
         </p>
       ) : null}
@@ -1020,10 +1020,10 @@ function RecentLoginsSection({ userId }: { userId: string }) {
                 <span className="min-w-0 flex-1 truncate text-xs text-foreground">
                   {LOGIN_REASON_LABEL[item.reason] ?? item.reason}
                 </span>
-                <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+                <span className="shrink-0 text-[12px] text-muted-foreground tabular-nums">
                   {item.ip || '未知 IP'}
                 </span>
-                <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+                <span className="shrink-0 text-[12px] text-muted-foreground tabular-nums">
                   {formatDateTime(item.createdAt)}
                 </span>
               </li>

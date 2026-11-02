@@ -48,12 +48,12 @@ export function ChannelModelHealthCell({
   loading?: boolean;
 }) {
   if (loading && !health) {
-    return <span className="text-[11px] text-muted-foreground">读取中…</span>;
+    return <span className="text-[12px] text-muted-foreground">读取中…</span>;
   }
   if (!health || health.windows.day.samples === 0) {
     // 这一列只有 100px 出头：长句「近 24 小时无调用」会吃掉整列，细因放进提示
     return (
-      <span className="text-[11px] text-muted-foreground" title="近 24 小时没有终态调用">
+      <span className="text-[12px] text-muted-foreground" title="近 24 小时没有终态调用">
         无调用
       </span>
     );
@@ -65,7 +65,7 @@ export function ChannelModelHealthCell({
   const slots = Array.from({ length: 10 }, (_, index) => recent[index] ?? null);
 
   const tip = (
-    <div className="flex flex-col gap-1 text-[11px]">
+    <div className="flex flex-col gap-1 text-[12px]">
       <div>
         近 24 小时：{window.samples} 次，成功 {window.success}，失败 {window.failed}
       </div>
@@ -87,7 +87,7 @@ export function ChannelModelHealthCell({
       >
         <div className="flex items-center gap-1.5">
           <StatusTag status="rate" tone={tone} label={formatRate(window.successRate)} />
-          <span className="text-[11px] tabular-nums text-muted-foreground">{window.samples} 次</span>
+          <span className="text-[12px] tabular-nums text-muted-foreground">{window.samples} 次</span>
         </div>
         <div className="flex items-center gap-0.5" aria-hidden>
           {slots.map((sample, index) => (
@@ -128,7 +128,7 @@ export function ChannelModelCostSummary({
 }) {
   const lines = tierPriceLines(model.capability, tiers);
   if (lines.length === 0) {
-    return <span className="text-[11px] text-muted-foreground">无已启用规格</span>;
+    return <span className="text-[12px] text-muted-foreground">无已启用规格</span>;
   }
   const shown = lines.slice(0, 3);
   const rest = lines.slice(3);
@@ -146,7 +146,7 @@ export function ChannelModelCostSummary({
         return (
           <div
             key={`${line.tierId}:${line.field.key}`}
-            className="flex min-w-0 items-baseline gap-2 whitespace-nowrap text-[11px] leading-4 tabular-nums"
+            className="flex min-w-0 items-baseline gap-2 whitespace-nowrap text-[12px] leading-4 tabular-nums"
             title={full}
           >
             <span className="min-w-0 truncate text-muted-foreground">{line.specLabel}</span>
@@ -188,26 +188,23 @@ export function ChannelModelCostSummary({
          * 折叠成一行静态文字后，后面 6 行永远看不到 —— 调价前无法核对。
          * 用原生 <details>，不引额外组件。
          */
-        <details className="text-[11px] text-muted-foreground">
+        <details className="text-[12px] text-muted-foreground">
           <summary className="cursor-pointer">其余 {rest.length} 个规格</summary>
           <div className="mt-0.5 flex flex-col gap-0.5">
-            {rest.map((line) => {
-              const percent = markupPercent(line.cost, line.sale);
-              return (
-                <div
-                  key={`${line.tierId}:${line.field.key}`}
-                  className="flex min-w-0 items-baseline gap-2 whitespace-nowrap tabular-nums"
-                  title={`${line.specLabel} · 成本 ${formatAmount(line.cost)} / 售价 ${formatAmount(line.sale)}`}
-                >
-                  <span className="min-w-0 truncate">{line.specLabel}</span>
-                  <span className="ml-auto flex shrink-0 items-baseline gap-1">
-                    <span>{formatAmount(line.cost)}</span>
-                    <span aria-hidden>→</span>
-                    <span className="font-medium">{formatAmount(line.sale)}</span>
-                  </span>
-                </div>
-              );
-            })}
+            {rest.map((line) => (
+              <div
+                key={`${line.tierId}:${line.field.key}`}
+                className="flex min-w-0 items-baseline gap-2 whitespace-nowrap tabular-nums"
+                title={`${line.specLabel} · 成本 ${formatAmount(line.cost)} / 售价 ${formatAmount(line.sale)}`}
+              >
+                <span className="min-w-0 truncate">{line.specLabel}</span>
+                <span className="ml-auto flex shrink-0 items-baseline gap-1">
+                  <span>{formatAmount(line.cost)}</span>
+                  <span aria-hidden>→</span>
+                  <span className="font-medium">{formatAmount(line.sale)}</span>
+                </span>
+              </div>
+            ))}
           </div>
         </details>
       )}

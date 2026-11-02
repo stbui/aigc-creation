@@ -194,7 +194,7 @@ export function ModelPicker({
         })}
       </div>
       {selected && options && (
-        <p style={{ fontSize: 11, color: 'var(--text-desc)', margin: '6px 0 0' }} data-testid="model-quote">
+        <p style={{ fontSize: 12, color: 'var(--text-desc)', margin: '6px 0 0' }} data-testid="model-quote">
           {quote && quote.amountMicrocredits !== null
             ? `本次约 ${toCredits(quote.amountMicrocredits)} 积分${quote.estimated ? '（预估）' : ''}`
             : quoteFailed

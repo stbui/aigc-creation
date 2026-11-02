@@ -5,7 +5,7 @@ import type {
   ProtocolCatalogEntryView,
 } from '../../../types/model';
 
-import { adminChannelModelsApi, adminChannelsApi } from './api';
+import { adminChannelsApi, fetchChannelHealth } from './api';
 
 /** 渠道下的模型清单：读取与手动刷新 */
 export function useChannelModels(channelId: string) {
@@ -48,8 +48,7 @@ export function useChannelModelHealth(channelId: string) {
   useEffect(() => {
     let active = true;
     setHealthLoading(true);
-    void adminChannelModelsApi
-      .health()
+    void fetchChannelHealth()
       .then((res) => {
         if (active) setHealthById(new Map(res.items.map((row) => [row.id, row])));
       })

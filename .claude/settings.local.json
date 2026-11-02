@@ -28,7 +28,8 @@
       "Read(//Users/bright/github/open-ai-canvas/**)",
       "WebFetch(domain:www.seeany.com)",
       "Bash(rm .claude/skills)",
-      "Bash(ln -s ../.agents/skills .claude/skills)"
+      "Bash(ln -s ../.agents/skills .claude/skills)",
+      "WebFetch(domain:ui.shadcn.com)"
     ],
     "additionalDirectories": [
       "/tmp/arch-audit",

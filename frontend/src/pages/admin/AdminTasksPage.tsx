@@ -114,7 +114,7 @@ function Section({
     <section className="border-t border-border pt-3 first:border-t-0 first:pt-0">
       <div className="mb-2 flex items-baseline gap-2">
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-        {note && <span className="text-[11px] text-muted-foreground">{note}</span>}
+        {note && <span className="text-[12px] text-muted-foreground">{note}</span>}
       </div>
       {children}
     </section>
@@ -138,7 +138,7 @@ function Steps({
         <li key={index} className="flex gap-3">
           <span
             className={cn(
-              'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border text-[11px] tabular-nums',
+              'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border text-[12px] tabular-nums',
               node.done
                 ? 'border-success-text bg-success-soft text-success-text'
                 : node.active
@@ -159,7 +159,7 @@ function Steps({
             >
               {node.title}
             </div>
-            <div className="mt-0.5 text-[11px] text-muted-foreground tabular-nums">
+            <div className="mt-0.5 text-[12px] text-muted-foreground tabular-nums">
               {node.description}
             </div>
           </div>
@@ -489,12 +489,12 @@ export function AdminTasksPage() {
               ) : (
                 <div className="size-7 shrink-0 rounded border border-dashed border-border bg-muted" />
               )}
-              <code className="font-mono text-[11px] text-muted-foreground" title={row.id}>
+              <code className="font-mono text-[12px] text-muted-foreground" title={row.id}>
                 {shortId(row.id)}
               </code>
             </div>
             {row.retriedFromId && (
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-[12px] text-muted-foreground">
                 重试自 {shortId(row.retriedFromId)}
               </span>
             )}
@@ -512,7 +512,7 @@ export function AdminTasksPage() {
               {row.capabilityName}
             </span>
             <code
-              className="block max-w-[120px] truncate font-mono text-[11px] text-muted-foreground"
+              className="block max-w-[120px] truncate font-mono text-[12px] text-muted-foreground"
               title={row.capability}
             >
               {row.capability}
@@ -532,7 +532,7 @@ export function AdminTasksPage() {
           <div className="flex flex-col gap-0.5">
             <StatusTag status={row.status} />
             {row.status === 'failed' && row.errorCode && (
-              <span className="text-[11px] text-muted-foreground" title={row.errorCode}>
+              <span className="text-[12px] text-muted-foreground" title={row.errorCode}>
                 {taskErrorLabel(row.errorCode)}
               </span>
             )}
@@ -551,7 +551,7 @@ export function AdminTasksPage() {
           !row.provider || (row.provider === 'pending' && row.status !== 'queued') ? (
             <span className="text-muted-foreground">—</span>
           ) : (
-            <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">
+            <span className="rounded bg-muted px-1.5 py-0.5 text-[12px] text-muted-foreground">
               {PROVIDER_LABELS[row.provider] ?? row.provider}
             </span>
           ),
@@ -569,7 +569,7 @@ export function AdminTasksPage() {
             >
               {row.user.email}
             </Link>
-            <span className="block max-w-[250px] truncate text-[11px] text-muted-foreground" title={row.project.name}>
+            <span className="block max-w-[250px] truncate text-[12px] text-muted-foreground" title={row.project.name}>
               项目 ·{' '}
               <Link
                 className="text-brand hover:underline"
@@ -591,10 +591,10 @@ export function AdminTasksPage() {
               {fmtDuration(row.durationMs)}
               {/* running 的耗时仍在增长, 不加标注会被当成已完成的耗时读 */}
               {row.status === 'running' && (
-                <span className="text-[11px] text-muted-foreground"> · 进行中</span>
+                <span className="text-[12px] text-muted-foreground"> · 进行中</span>
               )}
             </span>
-            <span className="text-[11px] tabular-nums text-muted-foreground">
+            <span className="text-[12px] tabular-nums text-muted-foreground">
               {new Date(row.createdAt).toLocaleString('zh-CN')}
             </span>
           </div>
@@ -894,7 +894,7 @@ export function AdminTasksPage() {
                     value: (
                       <span className="flex flex-col">
                         {d.capabilityName}
-                        <code className="font-mono text-[11px] text-muted-foreground">
+                        <code className="font-mono text-[12px] text-muted-foreground">
                           {d.capability}
                         </code>
                       </span>
@@ -906,7 +906,7 @@ export function AdminTasksPage() {
                       <span className="flex flex-col gap-0.5">
                         <StatusTag status={d.status} />
                         {d.errorCode && (
-                          <span className="text-[11px] text-muted-foreground">
+                          <span className="text-[12px] text-muted-foreground">
                             {taskErrorLabel(d.errorCode) === d.errorCode
                               ? d.errorCode
                               : `${d.errorCode} · ${taskErrorLabel(d.errorCode)}`}
@@ -934,7 +934,7 @@ export function AdminTasksPage() {
                         >
                           {d.user.email}
                         </Link>
-                        <span className="flex gap-3 text-[11px]">
+                        <span className="flex gap-3 text-[12px]">
                           <Link
                             className="text-brand hover:underline"
                             to={adminCreditHref({ userId: d.user.id, email: d.user.email })}
@@ -1020,7 +1020,7 @@ export function AdminTasksPage() {
                     src={toAbsoluteUrl(d.outputAsset.sourceUrl)}
                     alt="产出图"
                   />
-                  <div className="mt-1.5 text-[11px] text-muted-foreground">
+                  <div className="mt-1.5 text-[12px] text-muted-foreground">
                     {d.outputAsset.width && d.outputAsset.height
                       ? `${d.outputAsset.width}×${d.outputAsset.height}`
                       : '尺寸未知'}{' '}
@@ -1060,7 +1060,7 @@ export function AdminTasksPage() {
             )}
 
             <Section title="生成参数">
-              <pre className="max-h-[320px] overflow-auto rounded-lg border border-border bg-muted p-3 text-[11px] leading-5 text-muted-foreground">
+              <pre className="max-h-[320px] overflow-auto rounded-lg border border-border bg-muted p-3 text-[12px] leading-5 text-muted-foreground">
                 {JSON.stringify(d.params, null, 2)}
               </pre>
             </Section>

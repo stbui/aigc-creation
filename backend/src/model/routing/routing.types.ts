@@ -26,6 +26,19 @@ export interface CachedPriceTier extends TierSummarySource {
   enabled: boolean;
   /** 价格档版本：改价时递增，账单用它区分「同一档位的哪一版价格」 */
   priceVersion: number;
+  /**
+   * 成本价（仅后台可见，不叠倍率、不参与售价）。
+   *
+   * 与参考实现 `CreditCostPricing` 同口径：建单时快照进账单，用于毛利核算。
+   * 缺失时 `costConfigured=false`，账单成本留空而不是按 0 记账。
+   *
+   * 可选：公开目录（`public-model-catalog`）刻意不带成本，故这里不设为必填。
+   */
+  costConfigured?: boolean;
+  costUnitPriceMicrocredits?: number;
+  costInputTokenPriceMicrocredits?: number;
+  costOutputTokenPriceMicrocredits?: number;
+  costCachedTokenPriceMicrocredits?: number;
 }
 
 /** 快照里的渠道模型（含能力合同与价格档） */

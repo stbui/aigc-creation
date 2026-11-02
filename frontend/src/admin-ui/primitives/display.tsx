@@ -6,7 +6,6 @@ import { Alert } from '../components/ui/alert';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Progress } from '../components/ui/progress';
-import { Skeleton as SkeletonBar } from '../components/ui/skeleton';
 import { STATUS_META, type TagTone } from '../../components/admin/statusMeta';
 import { EmptyState } from './layout';
 
@@ -136,7 +135,7 @@ export function StatusTag({
       variant="secondary"
       data-status={status}
       className={cn(
-        'h-5 rounded-md border-transparent px-1.5 text-[11px] font-medium',
+        'h-5 rounded-md border-transparent px-1.5 text-[12px] font-medium',
         TAG_TONE_CLASS[tone ?? meta.tone],
       )}
     >
@@ -267,22 +266,6 @@ export function Descriptions({
         </div>
       ))}
     </dl>
-  );
-}
-
-/* ────────────────────────── 骨架 ────────────────────────── */
-
-export function Skeleton({ rows = 3, className }: { rows?: number; className?: string }) {
-  return (
-    <div className={cn('flex flex-col gap-2', className)} aria-busy="true" aria-live="polite">
-      {Array.from({ length: rows }, (_, index) => (
-        <SkeletonBar
-          key={index}
-          className="h-9"
-          style={{ animationDelay: `${index * 80}ms` }}
-        />
-      ))}
-    </div>
   );
 }
 

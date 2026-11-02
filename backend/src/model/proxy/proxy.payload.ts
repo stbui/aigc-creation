@@ -50,6 +50,34 @@ export function sanitizeCallPayload(data: Buffer, contentType = ''): string {
   return truncate(text);
 }
 
+/**
+ * Token 计费的流式 Chat Completions 请求强制开启最终 usage 块。
+ *
+ * OpenAI 兼容上游默认不在流式响应里返回 usage；账单按 Token 结算时拿不到
+ * 用量只能转 uncertain。非流式请求原样返回，避免改变普通接口合同；已有的
+ * `stream_options` 保留其余字段，只补 `include_usage=true`。
+ */
+export function ensureChatCompletionStreamUsage(body: Buffer): Buffer {
+  let payload: Record<string, unknown>;
+  try {
+    const parsed = JSON.parse(body.toString('utf8'));
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error('请求报文必须是 JSON 对象');
+    }
+    payload = parsed as Record<string, unknown>;
+  } catch (error) {
+    if (error instanceof Error && error.message === '请求报文必须是 JSON 对象') throw error;
+    throw new Error('请求报文不是合法 JSON');
+  }
+  if (payload.stream !== true) return body;
+  const current = payload.stream_options;
+  if (current !== undefined && current !== null && (typeof current !== 'object' || Array.isArray(current))) {
+    throw new Error('stream_options 必须是 JSON 对象');
+  }
+  payload.stream_options = { ...(current as Record<string, unknown> | undefined), include_usage: true };
+  return Buffer.from(JSON.stringify(payload));
+}
+
 /** 从响应体提取用量：整段 JSON 或 SSE 的最后一条 usage 事件 */
 export function extractProxyUsage(body: Buffer, streamed: boolean): ProxyUsage | null {
   if (!body || body.length === 0) return null;

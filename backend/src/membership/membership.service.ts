@@ -545,6 +545,30 @@ export class MembershipService {
   }
 
   /** 套餐列表 (C 端展示) */
+  /**
+   * 单个套餐（含已下架）。
+   *
+   * 只用于「续付既有会员订单」：订单已经按套餐快照创建，套餐后来下架
+   * 不应让 pending 订单永久无法支付。公开列表仍只返回 active。
+   */
+  async planById(planId: string) {
+    const p = await this.prisma.membershipPlan.findUnique({ where: { id: planId } });
+    if (!p) return null;
+    const perks = parsePerks(p.perks);
+    return {
+      id: p.id,
+      code: p.code,
+      name: p.name,
+      description: p.description,
+      priceCents: p.priceCents,
+      priceYuan: (p.priceCents / 100).toFixed(2),
+      durationDays: p.durationDays,
+      monthlyCredits: p.monthlyCredits,
+      perks,
+      perkLabels: buildPerkLabels(perks, p.monthlyCredits),
+    };
+  }
+
   async listPlans() {
     const plans = await this.prisma.membershipPlan.findMany({
       where: { status: 'active' },

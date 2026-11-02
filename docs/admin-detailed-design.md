@@ -7,7 +7,7 @@
 | 后端模块注册与守卫顺序 | `backend/src/admin/admin.module.ts` |
 | 权限点与内置角色 | `backend/src/admin/permissions.ts` |
 | 菜单分组 | `frontend/src/components/admin/adminNav.ts` |
-| 通用组件与列表 hook | `frontend/src/components/admin/AdminWidgets.tsx` |
+| 通用组件与列表 hook | `frontend/src/admin-ui/primitives/index.ts`（控件 + hook 统一出口） |
 | 请求层 | `frontend/src/lib/api.ts` 的 `adminApi` |
 
 ---
@@ -34,8 +34,8 @@ backend/src/admin/
 ├── legal.controller.ts / notifications.controller.ts
 ├── commerce.controller.ts / commerce-admin.service.ts     # 商品/订单/支付/积分
 ├── marketing.controller.ts
-├── invoices-admin.controller.ts / reconciliation.controller.ts / reconciliation.service.ts
-├── payment-channels.controller.ts
+├── invoices-admin.controller.ts
+├── payments/payment-admin.controller.ts             # 支付域：渠道/商品/订单/对账
 ├── capability.controller.ts
 ├── roles.controller.ts / settings.service.ts / ../common/setting-defs.ts
 ├── storage.controller.ts / scheduler.controller.ts / scheduler.service.ts
@@ -47,25 +47,21 @@ backend/src/admin/
 模型层的后台接口不在这里：渠道 / 前台模型 / 用户分组 / 插件 / 账单 / 分析 / 调用记录分别由 `backend/src/model/**` 下的 controller 提供（`channel.controller.ts`、`admin-logical-model.controller.ts`、`user-group.controller.ts`、`plugin.controller.ts`、`billing-admin.controller.ts`、`analytics.controller.ts`），路由与权限见 `docs/model-architecture.md` 的「后台页面 / 接口」表。
 
 ```text
-frontend/src/admin-ui/              # 后台 UI（BoardUI）
-├── shell/AdminBoardLayout.tsx      # 外壳（侧栏 + 内容区，无顶栏无值班带）
-├── shell/AdminSearchPalette.tsx    # ⌘K 全局搜索
-├── primitives/                     # DataTable / Drawer / Dialog / Panel / EmptyState / Skeleton / Result ...
-├── controls/                       # TextInput / SelectBox / NumberInput / TextArea / SwitchBox / SegmentedBox / CheckBox ...
-├── widgets/                        # AdminChrome（页头 / 筛选条 / 统计卡 / 状态标签…）+ DutyStrip
+frontend/src/admin-ui/              # 后台 UI（shadcn · radix 底座）
+├── components/ui/                  # shadcn 原子件（只被 primitives 引用）
+├── shell/AdminBoardLayout.tsx      # 外壳（顶栏 + 侧栏 + 内容区，上左右结构）
+├── primitives/                     # 页面唯一取用层：layout / form / display / fields / table / overlay / drawer / batch-result / duty-* / chart
 ├── providers/                      # Toast / Confirm / AdminUIProvider
-└── lib/                            # cn（tailwind-merge）、density（DensityContext）
+├── hooks/useAdminList.ts           # useAdminList / useAdminResource / useAdminUrlFilterSync / useAdminDetailParam
+└── lib/                            # cn（官方 cn 包 + 补登表）、density（DensityContext）、format（时间 / 金额 / 字节）
 
 frontend/src/components/admin/
-├── adminNav.ts                      # ADMIN_MENU 单一事实源
-├── AdminWidgets.tsx                 # useAdminList / useAdminUrlFilterSync / useAdminDetailParam + 控件再导出
-├── PageHeader.tsx                   # 页头 / 筛选条 / 统计卡等入口（再导出 admin-ui/widgets）
-├── BatchResultModal.tsx             # 批量动作结果（失败项排最前）
-├── AlertCenter.tsx                  # 告警铃 + 来源聚合
-├── DutyBand.tsx / DutyContext.tsx   # 值班塔渲染与耗时格式化工具；轮询只挂在概览路由
-└── statusMeta.ts                    # 状态 → 文案 / 色调映射
+├── adminNav.ts                     # ADMIN_MENU 单一事实源
+├── AlertCenter.tsx                 # 告警来源聚合（告警中心页）
+├── DutyContext.tsx                 # 概览首屏值班塔的数据轮询
+└── statusMeta.ts                   # 状态 → 文案 / 色调映射
 
-frontend/src/pages/admin/            # 35 个页面 + channels/ 子组件目录
+frontend/src/pages/admin/            # 34 个页面 + channels/、payments/ 子目录
 ```
 
 ### 0.2 守卫链与审计
@@ -106,7 +102,7 @@ providers: [
 
 ### 0.4 列表页通用模式
 
-`AdminWidgets.tsx` 的 `useAdminList` 统一处理分页、筛选、刷新与失败态：
+`admin-ui/hooks/useAdminList.ts` 的 `useAdminList` 统一处理分页、筛选、刷新与失败态（随 `admin-ui/primitives` 导出）：
 
 ```ts
 const { data, total, loading, error, reload, setPage, setFilters } = useAdminList(fetcher, {
@@ -129,7 +125,7 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 
 ### 0.6 高危操作确认
 
-`ConfirmAction`（页内确认条，`admin-ui/widgets/AdminChrome`，`role="region"`）用于删除、退款、重置密码、手动调整积分、渠道 / 前台模型写入、角色与系统设置写入、备份。文案必须写明**影响量**（`impact` 数组，如「将删除 12 个素材」），不能只写「确定删除吗」。高危动作的原因输入仍走各页表单字段并落审计；2026-10-30 起不再要求输入确认词（`requireTyping` / `typingText` 仅保留入参兼容）。
+`ConfirmAction`（页内确认条，`admin-ui/primitives/overlay`，`role="region"`）用于删除、退款、重置密码、手动调整积分、渠道 / 前台模型写入、角色与系统设置写入、备份。文案必须写明**影响量**（`impact` 数组，如「将删除 12 个素材」），不能只写「确定删除吗」。高危动作的原因输入仍走各页表单字段并落审计；2026-10-30 起不再要求输入确认词（`requireTyping` / `typingText` 仅保留入参兼容）。
 
 ### 0.7 批量动作
 
@@ -138,7 +134,7 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 - `ids` 去重，上限 100；
 - **串行**执行，**不包事务**——一条失败不该回滚另外 99 条；
 - 逐条返回 `{ id, ok, message?, data? }`；
-- 前端 `BatchResultModal` 把失败项排在最前。
+- 前端 `admin-ui/primitives/batch-result` 的 `BatchResultModal` 把失败项排在最前。
 
 路由挂较弱读权限，处理器内再用 `AdminRoleService.hasPermission()` 判动作权限（`40301`）。
 
@@ -350,30 +346,24 @@ partial_refunded → refunded | partial_refunded
 
 ## 11. 支付与财务
 
-### 11.1 支付渠道（只读）
+### 11.1 支付充值 `/admin/payments`
 
-`GET /admin/payment-channels`（`payment.read`）。数据直接复用 `PaymentProviderFactory.status()` 与 `PaymentsService.notifyUrl()`，不另写一套通道判定。展示生效通道、各通道凭据是否齐全、缺失变量名、回调地址，并对三类静默故障告警：
+四标签共用一个页面（`frontend/src/pages/admin/payments/`）：**支付渠道 / 充值商品 / 支付订单 / 支付对账**。URL 的 `?tab=` 是标签的事实源，非法值回落到「支付渠道」；旧路由 `/admin/payment-channels` 与 `/admin/reconciliation` 改为重定向。
 
-| 告警 | 后果 |
-| --- | --- |
-| 真实通道缺凭据 | 发起支付返回 503（绝不回落沙箱） |
-| 生产仍走沙箱 | 真实收款不会到账 |
-| 未配 `PAYMENT_NOTIFY_BASE` | 回调地址不可公网访问，订单卡在 pending |
+| 标签 | 接口 | 规则 |
+| --- | --- | --- |
+| 支付渠道 | `GET /admin/payments/providers`、`PUT /admin/payments/providers/:id/config` | 每个适配器一份**版本化 + 加密**配置（`PaymentProviderConfig`），追加写不覆盖。密钥字段只回「是否已配置」，留空表示沿用旧值；身份类字段（商户号等）锁定不可改。`reason` 必填并写审计 |
+| 充值商品 | `GET/POST/PUT /admin/payments/products*` | 复用 `Order` / `Product`，**不新建** `TopupProduct` 表；售价按分存、周期 / 库存 / 限时策略随类型切换 |
+| 支付订单 | `GET /admin/payments/orders*` | 列表服务端分页（默认 30）；查单与关单是 `payment.operate` 高危写，必填原因。关单前始终先向渠道查单；已入账订单关单返回 `409` |
+| 支付对账 | `GET/POST /admin/payments/reconciliations*` | T+1 自动对账（每天 10:15 跑昨日账单）；差异分七类，已支付未入账经签名查单二次确认后**自动补发积分**（幂等） |
 
-页面无写端点：凭据只从环境变量读，切换通道须改 env 并重启。
+**本页不提供退款**：退款在订单管理，涉及积分与优惠券回滚，放在支付域会让人以为「关单 = 退款」。
+
+对账运行状态只有 `running` / `completed` / `failed`；旧的 `imported` / `resolved` 语义已随新模型下线（人工处置走订单退款流程，不在页面上改钱）。
 
 ### 11.2 发票
 
 `/admin/invoices`（`invoice.write`）。一单一票（`orderId @unique`），金额取 `paidCents - refundedCents` 快照；输出可打印 HTML（零 PDF 依赖）。开具与驳回必填原因并写审计。`GET /admin/invoices/export` 导出同一 `status` / `keyword` 口径的 CSV（金额同时给分与元，`data.export` + 审计）。
-
-### 11.3 渠道对账
-
-`/admin/reconciliation`（`finance.reconcile`，只给财务）。
-
-- CSV 解析手写 RFC4180 + 表头别名；金额单位按表头是否含 `cent|分` 判定。
-- 差异五类：`matched` / `amount_mismatch` / `missing_local` / `missing_channel` / `duplicate`。
-- **处置只改状态与备注，不改钱**。处置权只给财务：处置会让「账对不上」从看板上消失。
-- 批次与明细可导出。
 
 ---
 

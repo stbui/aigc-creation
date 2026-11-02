@@ -252,7 +252,7 @@ export class ChannelService {
   }
 
   /** 复制渠道：连同渠道模型与价格档一起复制，新渠道默认停用由管理员确认 */
-  async duplicate(id: string): Promise<PublicModelChannel> {
+  async duplicate(id: string, actorId = ''): Promise<PublicModelChannel> {
     const source = await this.requireChannel(id);
     const sourceModels = await this.prisma.channelModel.findMany({
       where: { channelId: source.id, deletedAt: null },
@@ -264,11 +264,16 @@ export class ChannelService {
             where: { channelModelId: { in: sourceModels.map((row) => row.id) }, deletedAt: null },
           })
         : [];
+    // 兼容旧数据：只配了 `modelsJson` 名单、没有渠道模型行的渠道，复制时按名单补
+    // 停用骨架行。否则下面的 refreshChannelModelNames 会把名单覆写成 []，副本看
+    // 起来「一个模型都没有」。与上游 admin_channels.go 的复制语义一致。
+    const skeletonNames = sourceModels.length === 0 ? channelModelNames(source) : [];
 
     const created = await this.prisma.$transaction(async (tx) => {
       const channel = await tx.modelChannel.create({
         data: {
-          userId: '',
+          // 归属人 = 执行复制的管理员：审计与追责链要能查到「这条渠道是谁建的」
+          userId: actorId,
           scope: CHANNEL_SCOPE_SYSTEM,
           enabled: source.enabled,
           name: duplicateChannelName(source.name),
@@ -285,63 +290,83 @@ export class ChannelService {
           catalogProviderId: source.catalogProviderId,
         },
       });
-      for (const model of sourceModels) {
-        const copy = await tx.channelModel.create({
-          data: {
-            channelId: channel.id,
-            modelKey: model.modelKey,
-            activeKey: model.activeKey,
-            providerModelKey: model.providerModelKey,
-            displayName: model.displayName,
-            channelLabel: model.channelLabel,
-            tags: model.tags,
-            description: model.description,
-            sortOrder: model.sortOrder,
-            icon: model.icon,
-            capability: model.capability,
-            protocol: model.protocol,
-            billingMode: model.billingMode,
-            unitPriceMicrocredits: model.unitPriceMicrocredits,
-            inputTokenPriceMicrocredits: model.inputTokenPriceMicrocredits,
-            outputTokenPriceMicrocredits: model.outputTokenPriceMicrocredits,
-            cachedTokenPriceMicrocredits: model.cachedTokenPriceMicrocredits,
-            priceConfigured: model.priceConfigured,
-            enabled: model.enabled,
-            priceVersion: model.priceVersion,
-            priceCurrency: model.priceCurrency,
-            capabilityConfigJson: model.capabilityConfigJson,
-            capabilityVersion: model.capabilityVersion,
-            catalogModelKey: model.catalogModelKey,
-          },
-        });
-        for (const tier of sourceTiers.filter((row) => row.channelModelId === model.id)) {
-          await tx.channelModelPriceTier.create({
+      if (sourceModels.length === 0) {
+        for (const [index, name] of skeletonNames.entries()) {
+          await tx.channelModel.create({
             data: {
-              channelModelId: copy.id,
-              activeKey: tier.activeKey,
-              selectorKey: tier.selectorKey,
-              selectorJson: tier.selectorJson,
-              resolution: tier.resolution,
-              videoSeconds: tier.videoSeconds,
-              providerModelKey: tier.providerModelKey,
-              billingMode: tier.billingMode,
-              costConfigured: tier.costConfigured,
-              costUnitPriceMicrocredits: tier.costUnitPriceMicrocredits,
-              costInputTokenPriceMicrocredits: tier.costInputTokenPriceMicrocredits,
-              costOutputTokenPriceMicrocredits: tier.costOutputTokenPriceMicrocredits,
-              costCachedTokenPriceMicrocredits: tier.costCachedTokenPriceMicrocredits,
-              unitPriceMicrocredits: tier.unitPriceMicrocredits,
-              inputTokenPriceMicrocredits: tier.inputTokenPriceMicrocredits,
-              outputTokenPriceMicrocredits: tier.outputTokenPriceMicrocredits,
-              cachedTokenPriceMicrocredits: tier.cachedTokenPriceMicrocredits,
-              priceConfigured: tier.priceConfigured,
-              enabled: tier.enabled,
-              priceVersion: tier.priceVersion,
+              channelId: channel.id,
+              modelKey: name,
+              activeKey: name.toLowerCase(),
+              providerModelKey: name,
+              displayName: name,
+              capability: '',
+              protocol: '',
+              billingMode: 'fixed_request',
+              enabled: false,
+              priceVersion: 1,
+              sortOrder: index,
             },
           });
         }
+      } else {
+        for (const model of sourceModels) {
+          const copy = await tx.channelModel.create({
+            data: {
+              channelId: channel.id,
+              modelKey: model.modelKey,
+              activeKey: model.activeKey,
+              providerModelKey: model.providerModelKey,
+              displayName: model.displayName,
+              channelLabel: model.channelLabel,
+              tags: model.tags,
+              description: model.description,
+              sortOrder: model.sortOrder,
+              icon: model.icon,
+              capability: model.capability,
+              protocol: model.protocol,
+              billingMode: model.billingMode,
+              unitPriceMicrocredits: model.unitPriceMicrocredits,
+              inputTokenPriceMicrocredits: model.inputTokenPriceMicrocredits,
+              outputTokenPriceMicrocredits: model.outputTokenPriceMicrocredits,
+              cachedTokenPriceMicrocredits: model.cachedTokenPriceMicrocredits,
+              priceConfigured: model.priceConfigured,
+              enabled: model.enabled,
+              priceVersion: model.priceVersion,
+              priceCurrency: model.priceCurrency,
+              capabilityConfigJson: model.capabilityConfigJson,
+              capabilityVersion: model.capabilityVersion,
+              catalogModelKey: model.catalogModelKey,
+            },
+          });
+          for (const tier of sourceTiers.filter((row) => row.channelModelId === model.id)) {
+            await tx.channelModelPriceTier.create({
+              data: {
+                channelModelId: copy.id,
+                activeKey: tier.activeKey,
+                selectorKey: tier.selectorKey,
+                selectorJson: tier.selectorJson,
+                resolution: tier.resolution,
+                videoSeconds: tier.videoSeconds,
+                providerModelKey: tier.providerModelKey,
+                billingMode: tier.billingMode,
+                costConfigured: tier.costConfigured,
+                costUnitPriceMicrocredits: tier.costUnitPriceMicrocredits,
+                costInputTokenPriceMicrocredits: tier.costInputTokenPriceMicrocredits,
+                costOutputTokenPriceMicrocredits: tier.costOutputTokenPriceMicrocredits,
+                costCachedTokenPriceMicrocredits: tier.costCachedTokenPriceMicrocredits,
+                unitPriceMicrocredits: tier.unitPriceMicrocredits,
+                inputTokenPriceMicrocredits: tier.inputTokenPriceMicrocredits,
+                outputTokenPriceMicrocredits: tier.outputTokenPriceMicrocredits,
+                cachedTokenPriceMicrocredits: tier.cachedTokenPriceMicrocredits,
+                priceConfigured: tier.priceConfigured,
+                enabled: tier.enabled,
+                priceVersion: tier.priceVersion,
+              },
+            });
+          }
+        }
+        await refreshChannelModelNames(tx, channel.id);
       }
-      await refreshChannelModelNames(tx, channel.id);
       return channel;
     });
     await this.catalogVersion.invalidate();

@@ -6,7 +6,7 @@ import {
   HttpStatus,
   Injectable,
 } from '@nestjs/common';
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { AppError } from './app.exception';
 import { currentRequestId } from './request-context';
 import { AppFileLogger } from './logger/file-logger';

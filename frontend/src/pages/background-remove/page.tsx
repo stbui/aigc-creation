@@ -103,6 +103,7 @@ export function BackgroundRemovePage() {
               <div className="background-remove-empty">
                 <video
                   src="/static/mp4/background-remove.mp4"
+                  poster="/static/mp4/background-remove-poster.jpg"
                   autoPlay
                   loop
                   muted

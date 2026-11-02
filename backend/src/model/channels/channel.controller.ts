@@ -34,6 +34,8 @@ import {
   Min,
 } from 'class-validator';
 import { AdminUser, AuditAction, RequirePermission } from '../../admin/admin.decorator';
+import { AppError } from '../../common/app.exception';
+import { RateLimit, type RateLimitOptions } from '../../common/rate-limit.guard';
 import { PERMISSIONS } from '../../admin/permissions';
 import { ProtocolCatalogService } from '../protocol/protocol-catalog.service';
 import { ProtocolTestService, type ProtocolTestRequest } from '../protocol/protocol-test.service';
@@ -126,9 +128,21 @@ export class ChannelSortBodyDto {
 }
 
 export class ChannelBatchDeleteBodyDto {
-  @IsArray() @IsString({ each: true }) ids!: string[];
+  /**
+   * 待删除的渠道模型 id 列表。
+   *
+   * 兼容两个字段名：`ids`（本仓）与 `modelIds`（参考实现 open-ai-canvas）。
+   * 两个都缺才报错 —— 迁移过来的脚本按 `modelIds` 提交不该被 400 挡下。
+   */
+  @IsOptional() @IsArray() @IsString({ each: true }) ids?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) modelIds?: string[];
   /** 删除是高危写操作（`channel.model_write`），原因必填并写审计 */
   @IsNotEmpty({ message: '必须填写变更原因' }) @IsString() @MaxLength(200) reason!: string;
+
+  /** 归一化后的 id 列表（两个别名取并集去重） */
+  targets(): string[] {
+    return [...new Set([...(this.ids ?? []), ...(this.modelIds ?? [])].map((v) => String(v ?? '').trim()).filter((v) => v !== ''))];
+  }
 }
 
 /** 批量调价入参；嵌套结构由 `ChannelModelService.repriceMany` 逐项校验 */
@@ -158,6 +172,39 @@ export class ChannelExportBodyDto {
   @IsOptional() @IsArray() @IsString({ each: true }) ids?: string[];
   @IsOptional() @IsString() reason?: string;
 }
+
+/*
+ * 会真实调用上游的三个端点必须限流。
+ *
+ * 拉取目录 / 导入模型 / 连通性测试都会用**渠道里的真实凭证**打上游，
+ * 每次调用都产生供应商成本并占用上游并发槽。没有限流时，
+ * 拿到 `channel.model_write` 的账号可以把它当刷上游的通道 ——
+ * 与 `/ai/models` 已有的 30 次/分保护自相矛盾。
+ *
+ * 配额与参考实现一致（open-ai-canvas `handler/finance.go`）：
+ * fetch/import 各 10 次/分，test 5 次/分，均按用户维度。
+ */
+const RL_CHANNEL_FETCH: RateLimitOptions = {
+  name: 'channel-model-fetch',
+  limit: 10,
+  windowSec: 60,
+  scope: 'user',
+};
+
+const RL_CHANNEL_IMPORT: RateLimitOptions = {
+  name: 'channel-model-import',
+  limit: 10,
+  windowSec: 60,
+  scope: 'user',
+};
+
+const RL_CHANNEL_TEST: RateLimitOptions = {
+  name: 'channel-model-test',
+  limit: 5,
+  windowSec: 60,
+  scope: 'user',
+};
+
 
 /** 导入文件即导出文件本身，允许附带 reason */
 export class ChannelImportBodyDto {
@@ -195,8 +242,13 @@ export class AdminChannelsController {
   /** 静态路由必须排在 `:id` 之前 */
   @Get('order')
   @RequirePermission(PERMISSIONS.channelRead)
-  order() {
-    return this.channels.order('');
+  async order() {
+    // 包裹成 { items }：与参考实现的路由顺序端点契约一致，
+    // 前端读 .items 而不是裸数组。
+    //
+    // 必须 await：`{ items: promise }` 会被 JSON 序列化成 `{"items":{}}`，
+    // 前端拿到空对象后再 .map 就是「Cannot read properties of undefined」。
+    return { items: await this.channels.order('') };
   }
 
   /**
@@ -277,22 +329,25 @@ export class AdminChannelsController {
   @Post(':id/duplicate')
   @RequirePermission(PERMISSIONS.channelWrite)
   @AuditAction('channel.duplicate')
-  duplicate(@Param('id') id: string) {
-    return this.channels.duplicate(id);
+  duplicate(@Param('id') id: string, @AdminUser() actor: AdminUser) {
+    // 归属人写进渠道：复制出的渠道要能查到「是谁建的」
+    return this.channels.duplicate(id, actor?.id ?? '');
   }
 
   /* ── 渠道模型 ─────────────────────────────────────────── */
 
   @Get(':id/models')
   @RequirePermission(PERMISSIONS.channelModelRead)
-  models(@Param('id') id: string) {
-    return this.channelModels.list(id);
+  async models(@Param('id') id: string) {
+    // 包裹成 { models }：与参考实现契约一致，前端读 .models
+    // 必须 await，否则序列化成 `{"models":{}}`。
+    return { models: await this.channelModels.list(id) };
   }
 
   @Get(':id/models/order')
   @RequirePermission(PERMISSIONS.channelModelRead)
-  modelOrder(@Param('id') id: string) {
-    return this.channels.order(id);
+  async modelOrder(@Param('id') id: string) {
+    return { items: await this.channels.order(id) };
   }
 
   @Put(':id/models/order')
@@ -317,6 +372,7 @@ export class AdminChannelsController {
   @Post(':id/models/fetch')
   @RequirePermission(PERMISSIONS.channelModelRead)
   @AuditAction('channel_model.fetch')
+  @RateLimit(RL_CHANNEL_FETCH)
   async fetchModels(@Param('id') id: string) {
     return { models: await this.catalog.preview(id) };
   }
@@ -325,6 +381,7 @@ export class AdminChannelsController {
   @Post(':id/models/import')
   @RequirePermission(PERMISSIONS.channelModelWrite)
   @AuditAction('channel_model.import')
+  @RateLimit(RL_CHANNEL_IMPORT)
   importModels(@Param('id') id: string, @Body() body: ChannelModelImportBodyDto) {
     return this.catalog.import(id, body.models ?? []);
   }
@@ -346,15 +403,20 @@ export class AdminChannelsController {
   ) {
     // 原因只进审计（AuditInterceptor 读 body.reason），不回显给前端
     const deleted = await this.channelModels.removeMany(id, [modelId]);
-    return { deleted };
+    return { ok: true, deleted };
   }
 
   @Post(':id/models/batch-delete')
   @RequirePermission(PERMISSIONS.channelModelWrite)
   @AuditAction('channel_model.batch_delete')
   async batchDeleteModels(@Param('id') id: string, @Body() body: ChannelBatchDeleteBodyDto) {
-    const deleted = await this.channelModels.removeMany(id, body.ids ?? []);
-    return { deleted };
+    const targets = body.targets();
+    if (targets.length === 0) {
+      throw new AppError(40001, '请选择要删除的渠道模型', 400);
+    }
+    const deleted = await this.channelModels.removeMany(id, targets);
+    // 同时给出 ok 与 deleted：参考实现读 ok，本仓前端读 deleted
+    return { ok: true, deleted };
   }
 
   /**
@@ -377,8 +439,9 @@ export class AdminChannelsController {
    * 页据此展示。可测未保存的模型草稿，因此入参允许携带表单当前值。
    */
   @Post(':id/models/test')
-  @RequirePermission(PERMISSIONS.channelModelWrite)
+  @RequirePermission(PERMISSIONS.channelTest)
   @AuditAction('channel_model.test')
+  @RateLimit(RL_CHANNEL_TEST)
   testModel(@Param('id') id: string, @Body() body: ChannelModelTestBodyDto, @AdminUser() user: AdminUser) {
     return this.protocolTest.test(id, body as ProtocolTestRequest, user?.id ?? 'unknown');
   }
@@ -421,14 +484,18 @@ export class AdminChannelModelsController {
    */
   @Get()
   @RequirePermission(PERMISSIONS.channelModelRead)
-  list(
+  async list(
     @Query('channelId') channelId?: string,
     @Query('includeDisabled') includeDisabled?: string,
   ) {
-    return this.channelModels.listAll(
-      channelId ? String(channelId) : undefined,
-      String(includeDisabled ?? '') === '1',
-    );
+    // 包裹成 { models }：与参考实现契约一致，前端读 .models
+    // 必须 await，否则序列化成 `{"models":{}}`。
+    return {
+      models: await this.channelModels.listAll(
+        channelId ? String(channelId) : undefined,
+        String(includeDisabled ?? '') === '1',
+      ),
+    };
   }
 
   /**

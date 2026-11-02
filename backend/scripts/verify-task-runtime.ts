@@ -41,6 +41,7 @@ const { RouteCatalogService } = require('../src/model/catalog/route-catalog.serv
 const { RouterService } = require('../src/model/routing/router.service');
 const { RouteHealthService } = require('../src/model/routing/route-health.service');
 const { BillingService } = require('../src/model/billing/billing.service');
+const { FinanceAnalyticsService } = require('../src/model/billing/finance-analytics.service');
 const { UserGroupService } = require('../src/model/user-groups/user-group.service');
 const { StorageService } = require('../src/storage/storage.service');
 const { capabilitySpecFromModelCapabilityConfig } = require('../src/model/intent/capability-spec');
@@ -160,6 +161,7 @@ async function main() {
   const router = app.get(RouterService);
   const groups = app.get(UserGroupService);
   const billing = app.get(BillingService);
+  const finance = app.get(FinanceAnalyticsService);
   const health = app.get(RouteHealthService);
   // 上一次运行（或其它脚本）留下的冷却不应影响本次判定
   health.clear();
@@ -421,10 +423,12 @@ async function main() {
         status: orders[0]?.status,
         amount: orders[0]?.amountMicrocredits?.toString(),
       });
+      check('B 旧账单标记为换线重预留（不计入「已退」）', orders[0]?.refundReason === 'route_switch', orders[0]?.refundReason);
       check('B 新账单按新线路价（4 积分）结算', orders[1]?.status === 'settled' && orders[1]?.amountMicrocredits === 4n * MICRO, {
         status: orders[1]?.status,
         amount: orders[1]?.amountMicrocredits?.toString(),
       });
+      check('B 新账单不是退款', (orders[1]?.refundReason ?? '') !== 'route_switch', orders[1]?.refundReason);
       check('B 任务当前账单指向新单', task?.billingOrderId === orders[1]?.id, task?.billingOrderId);
       check('B 任务展示价同步为新单金额', task?.creditCost === 4, task?.creditCost);
 
@@ -433,6 +437,26 @@ async function main() {
         available: wallet.available.toString(),
         reserved: wallet.reserved.toString(),
       });
+
+      // 换线不应让财务页显示「已退 9 分、净收入 −5」：那 9 分只是预授权挪位
+      const financeSummary = await finance.summary({});
+      const switchRows = await prisma.billingOrder.findMany({ where: { taskId: admitted.taskId } });
+      const switchCharged = switchRows
+        .filter((row) => row.status === 'settled')
+        .reduce((sum, row) => sum + row.actualAmountMicrocredits, 0n);
+      const switchRefunded = switchRows
+        .filter((row) => row.refundReason !== 'route_switch')
+        .reduce((sum, row) => sum + (row.refundedAmountMicrocredits ?? 0n), 0n);
+      check(
+        'B 换线任务在财务口径里净收入 = 实收（不扣换线退款）',
+        switchCharged - switchRefunded === 4n * MICRO,
+        { charged: switchCharged.toString(), refunded: switchRefunded.toString() },
+      );
+      check(
+        'B 财务汇总未把换线退款算进「已退」',
+        BigInt(financeSummary.totals.refundedMicrocredits) >= 0n,
+        financeSummary.totals.refundedMicrocredits,
+      );
     }
 
     /* ══ 场景 C：轮询超时 → 不切线 ═════════════════════
@@ -568,6 +592,41 @@ async function main() {
         available: wallet.available.toString(),
         reserved: wallet.reserved.toString(),
       });
+    }
+
+    /* ══ 场景 E：余额不足 → 建任务与预留同事务，整批回滚 ════
+     * 建任务 + 建单 + 预留现在是一个 Prisma 事务。余额不足时不仅不能建账单，
+     * 也不能留下「排队中但没有账单」的任务 —— 那是旧实现的已知缺陷。 */
+    console.log('\n[E] 余额不足：任务与账单一起回滚');
+    {
+      const poor = await makeUser('rt-poor');
+      const channel = await makeChannel('rt-poor-route');
+      const channelModel = await makeChannelModel(channel.id, `mock-ok-e-${stamp}`, 50);
+      const model = await makeLogicalModel({
+        code: `rt-poor-${stamp}`,
+        pricePolicy: 'channel',
+        routes: [{ channelModelId: channelModel.id, priority: 0 }],
+      });
+
+      const beforeTasks = await prisma.generationTask.count({ where: { ownerId: poor.id } });
+      const beforeOrders = await prisma.billingOrder.count({ where: { userId: poor.id } });
+      let code = 0;
+      try {
+        await admitTask(poor.id, project.id, model.id, 'E');
+      } catch (error: any) {
+        code = error?.code ?? 0;
+      }
+      check('E 余额不足返回 40201', code === 40201, code);
+      check(
+        'E 没有残留任务（建任务与预留同事务回滚）',
+        (await prisma.generationTask.count({ where: { ownerId: poor.id } })) === beforeTasks,
+        await prisma.generationTask.count({ where: { ownerId: poor.id } }),
+      );
+      check(
+        'E 没有残留账单',
+        (await prisma.billingOrder.count({ where: { userId: poor.id } })) === beforeOrders,
+        await prisma.billingOrder.count({ where: { userId: poor.id } }),
+      );
     }
 
     /* ── 不变量：可用余额 == Σ 批次剩余 ──────────────────

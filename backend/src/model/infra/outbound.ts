@@ -240,9 +240,47 @@ function ipIsForbidden(address: string, strict: boolean): boolean {
     if (/^f[cd][0-9a-f]{2}:/.test(normalized)) return true; // unique local fc00::/7
     if (/^fe[89ab][0-9a-f]:/.test(normalized)) return true; // link-local fe80::/10
     if (/^ff[0-9a-f]{2}:/.test(normalized)) return true; // multicast
+    if (strict) {
+      // 自定义中转额外拒绝保留/文档网段，与参考实现保持一致：
+      // 100::/64（discard-only）与 2001:db8::/32（documentation）
+      if (ipv6InPrefix(normalized, '100::', 64)) return true;
+      if (ipv6InPrefix(normalized, '2001:db8::', 32)) return true;
+    }
     return false;
   }
   return true;
+}
+
+/** IPv6 是否落在指定前缀内；地址/前缀均按 `::` 压缩形式解析 */
+function ipv6InPrefix(address: string, prefix: string, bits: number): boolean {
+  const shift = BigInt(128 - bits);
+  return ipv6ToBigInt(address) >> shift === ipv6ToBigInt(prefix) >> shift;
+}
+
+function ipv6ToBigInt(address: string): bigint {
+  let text = String(address ?? '').toLowerCase();
+  const zone = text.indexOf('%');
+  if (zone >= 0) text = text.slice(0, zone);
+  // 内嵌 IPv4（如 `::ffff:192.168.0.1`、`2001:db8::192.168.0.1`）先换成两个十六进制组
+  const embedded = /^(.*:)(\d+\.\d+\.\d+\.\d+)$/.exec(text);
+  if (embedded) {
+    const value = ipv4ToInt(embedded[2]);
+    text = `${embedded[1]}${((value >>> 16) & 0xffff).toString(16)}:${(value & 0xffff).toString(16)}`;
+  }
+  const halves = text.split('::');
+  if (halves.length > 2) throw new Error(`无效 IPv6：${address}`);
+  const head = halves[0] ? halves[0].split(':') : [];
+  const tail = halves.length === 2 && halves[1] ? halves[1].split(':') : [];
+  const missing = 8 - head.length - tail.length;
+  if (halves.length === 1 && missing !== 0) throw new Error(`无效 IPv6：${address}`);
+  const groups = [...head, ...Array<string>(Math.max(0, missing)).fill('0'), ...tail];
+  if (groups.length !== 8) throw new Error(`无效 IPv6：${address}`);
+  let value = 0n;
+  for (const group of groups) {
+    if (!/^[0-9a-f]{1,4}$/.test(group)) throw new Error(`无效 IPv6：${address}`);
+    value = (value << 16n) + BigInt(parseInt(group, 16));
+  }
+  return value;
 }
 
 function ipv4ToInt(address: string): number {

@@ -96,7 +96,7 @@ export class ProxyBillingService {
 
   /** 上游明确失败（请求确实发出过）→ 原额退款 */
   async refund(orderId: string, reason: string): Promise<void> {
-    await this.billing.refund(orderId, reason);
+    await this.billing.refund(orderId, reason, 'failure');
   }
 
   /** 结果不明 / 本地写入失败 → 转人工，不自动退款 */

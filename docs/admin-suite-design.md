@@ -21,12 +21,12 @@
 | 运营 | 用户 / 素材 / 任务 / 工单 | `/admin/users` · `/admin/assets` · `/admin/tasks` · `/admin/tickets` |
 | 内容 | 法务文档 / 站内消息 / AI 标识 | `/admin/legal` · `/admin/notifications` · `/admin/aigc-label` |
 | 交易 | 商品 / 会员套餐 / 订单 / 积分账本 / 能力消耗价 / 优惠券 / 限时活动 / 邀请与签到 | `/admin/products` 等 8 页 |
-| 财务 | 支付渠道 / 发票 / 渠道对账 | `/admin/payment-channels` · `/admin/invoices` · `/admin/reconciliation` |
+| 财务 | 支付充值 / 发票 | `/admin/payments` · `/admin/invoices` |
 | 系统 | 角色权限 / 系统设置 / 存储配置 / 定时任务 / 操作审计 | `/admin/roles` 等 5 页 |
 | 模型 | 渠道工作台 / 前台模型 / 用户分组 / 插件 / 能力管控 / 调用记录 / 生成账单 / 财务分析 | `/admin/channels` · `/admin/logical-models` · `/admin/user-groups` · `/admin/plugins` · `/admin/capabilities` · `/admin/model-calls` · `/admin/billing-orders` · `/admin/finance` |
 | 数据安全 | 数据备份 / 保留期清理 | `/admin/backups` · `/admin/retention` |
 
-合计 35 页、8 组。菜单项的 `permission` 字段决定可见性，外壳 `AdminBoardLayout` 只渲染当前角色有权限的项。
+合计 34 页、8 组。菜单项的 `permission` 字段决定可见性，外壳 `AdminBoardLayout` 只渲染当前角色有权限的项。
 
 ### 1.1 分组理由
 
@@ -163,8 +163,7 @@ SQLite provider 不支持 Prisma enum，`kind` / `status` / `type` 一律 String
 | 法务 `/admin/legal*` | `legal.controller.ts` |
 | 消息 `/admin/notifications*` | `notifications.controller.ts` |
 | 发票 `/admin/invoices*` | `invoices-admin.controller.ts` |
-| 对账 `/admin/reconciliation*` | `reconciliation.controller.ts` |
-| 支付渠道 `/admin/payment-channels`（只读） | `payment-channels.controller.ts` |
+| 支付域 `/admin/payments*`（渠道 / 商品 / 订单 / 对账） | `admin/payments/payment-admin.controller.ts` |
 | 渠道 `/admin/channels*`、`/admin/channel-models*` | `model/channels/channel.controller.ts` |
 | 前台模型 `/admin/logical-models*` | `model/catalog/admin-logical-model.controller.ts` |
 | 用户分组 `/admin/user-groups*` | `model/user-groups/user-group.controller.ts` |
@@ -184,8 +183,8 @@ SQLite provider 不支持 Prisma enum，`kind` / `status` / `type` 一律 String
 
 | 层 | 规范 |
 | --- | --- |
-| 外壳 | 单一 `admin-ui/shell/AdminBoardLayout`（BoardUI 单栏：侧栏 + 内容区）。**禁止**复用 `AppLayout` / `SideRail` / `PromoBar`（C 端语义） |
-| 组件底座 | 通用骨架走 `admin-ui/widgets/AdminChrome` 与 `admin-ui/primitives`（`PageHeader` / `FilterBar` / `StatCard` / `Panel` / `Empty` / `StatusTag`），表单控件走 `admin-ui/controls`；后台树内**不引 antd**，也不要把通用组件退回自绘 `div/button/input`。`adm-*` 只剩外壳骨架与值班塔，页面内不新增 |
+| 外壳 | 单一 `admin-ui/shell/AdminBoardLayout`（上左右：顶栏 + 侧栏 + 内容区）。**禁止**复用 `AppLayout` / `SideRail` / `PromoBar`（C 端语义） |
+| 组件底座 | 页面**只从 `admin-ui/primitives` 取件**（`PageHeader` / `FilterBar` / `StatCard` / `Panel` / `EmptyState` / `StatusTag` / 表单控件 / `AdminDataTable`），底层是 shadcn 原子件（`admin-ui/components/ui`）；后台树内**不引 antd**，也不要把通用组件退回自绘 `div/button/input`。`.adm-*` 只剩外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`），页面内不新增 |
 | 侧栏 | 分组折叠菜单，图标 lucide 20px，选中态 `var(--brand)` + `var(--brand-bg)`；数据源 `adminNav.ts` |
 | 列表页 | 页头（标题 + 主操作）→ 筛选条 → 表格 → 分页；`rowKey="id"`、`size="small"` |
 | 详情 | 一律抽屉，不跳独立路由，便于保留筛选态 |
@@ -207,5 +206,5 @@ SQLite provider 不支持 Prisma enum，`kind` / `status` / `type` 一律 String
 | 多租户 / 企业席位 / 代理分销 | 单轨制：`User` 不加 `orgId`，`Product` 不加 `seats`。改为多租户要改全部查询，须在有真实付费数据后单独评估 |
 | 邮件 / 短信真实投递的界面 | 通道实现由环境变量决定（`EMAIL_PROVIDER` / `SMS_PROVIDER`），后台只读展示生效实现，无写入端点 |
 | 第三方内容安全 API 送审 | 未接入即如实显示「未接入」，不做假审核记录 |
-| 支付渠道切换的前端入口 | 凭据只从环境变量读，切换须改 env 并重启；「支付渠道」页只读 + 风险告警 |
+| 支付渠道启停的前端入口 | 后台「支付充值 / 支付渠道」标签可启停适配器并维护版本化配置（密钥留空即沿用）；凭据本身仍不从页面回显 |
 | 后台数据分析看板 | `platform.dashboard` 只做概览聚合；漏斗 / 留存 / LTV 无独立页面 |

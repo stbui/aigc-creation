@@ -6,6 +6,7 @@ import { OrderService } from '../orders/order.service';
 import { CreditService } from '../credits/credit.service';
 import { MembershipService } from '../membership/membership.service';
 import { GenerateService } from '../generate/generate.service';
+import { PaymentOrderService } from '../payments/payment-order.service';
 
 /** 调度检查间隔: 10 分钟 */
 const TICK_MS = 10 * 60 * 1000;
@@ -77,6 +78,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
     private readonly credit: CreditService,
     private readonly membership: MembershipService,
     private readonly generate: GenerateService,
+    private readonly payments: PaymentOrderService,
   ) {}
 
   onModuleInit(): void {
@@ -226,8 +228,11 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   /**
    * 关闭超时未支付订单。
    *
-   * 节流: 每 5 分钟最多一次。订单过期判定本身很轻(一条 where 查询),
-   * 但没必要每 10 分钟都跑 —— 订单超时是 30 分钟粒度, 5 分钟足够及时。
+   * ⚠ 必须走支付域的 `closeExpired()`：它会先逐个渠道查单，已支付则入账，
+   * 查单/关单失败则保留 pending 等下一轮。直接在订单域 `updateMany` 改
+   * cancelled 会绕过渠道，把「已付款但回调未到」的订单误关成未支付。
+   *
+   * 节流: 每 5 分钟最多一次。订单超时是 30 分钟粒度, 5 分钟足够及时。
    */
   private async maybeCancelExpiredOrders(): Promise<void> {
     if (!this.shouldRun('order-expire', 5 * 60 * 1000)) return;
@@ -235,7 +240,7 @@ export class SchedulerService implements OnModuleInit, OnModuleDestroy {
   }
 
   private async doCancelExpiredOrders(): Promise<void> {
-    const closed = await this.orders.cancelExpired();
+    const closed = await this.payments.closeExpired(50);
     if (closed > 0) {
       this.logger.log(`订单超时关闭: ${closed} 笔`);
     }

@@ -187,8 +187,15 @@ export async function deleteChannelModels(
     });
     if (references > 0) throw new ChannelModelInUseError();
   }
-  // 进行中任务引用：任务表在 P4 增加 channelModelId 列后一并校验，
-  // 现在任务还不写这一列，强行 JOIN 只会得到恒为 0 的假保护。
+  // 进行中任务引用：排队 / 执行中的任务正在用这些线路，删掉会让任务派发失败、
+  // 上游已消耗成本而用户只能退款。任务表已有 channelModelId 列，这里做真实校验。
+  const runningTasks = await tx.generationTask.count({
+    where: {
+      channelModelId: { in: unique },
+      status: { in: ['queued', 'running'] },
+    },
+  });
+  if (runningTasks > 0) throw new ChannelModelInUseError();
 
   const now = new Date();
   await tx.channelModelPriceTier.updateMany({

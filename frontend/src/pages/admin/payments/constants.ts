@@ -31,11 +31,21 @@ export const CHECKOUT_MODE_LABELS: Record<string, string> = {
 };
 
 /** 渠道 id → 中文名。后端也返回 name，那是展示用品牌名；这份是筛选下拉用的短名。 */
-export const PROVIDER_LABELS: Record<PaymentProviderId, string> = {
+export const PROVIDER_LABELS: Record<string, string> = {
   sandbox: '沙箱',
   alipay: '支付宝',
   wechat: '微信支付',
+  // 非渠道值，仅用于订单/支付尝试展示：
+  manual: '手工核销',
+  free: '免费',
 };
+
+/** 只有真实渠道可以用于后端筛选（后端 assertProviderId 不接受 manual/free） */
+export const FILTERABLE_PROVIDER_IDS: PaymentProviderId[] = ['sandbox', 'alipay', 'wechat'];
+export const FILTERABLE_PROVIDERS = FILTERABLE_PROVIDER_IDS.map((id) => ({
+  value: id,
+  label: PROVIDER_LABELS[id],
+}));
 
 /**
  * 订单状态 → 可执行动作。

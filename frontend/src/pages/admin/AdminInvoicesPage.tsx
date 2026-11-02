@@ -194,8 +194,8 @@ export function AdminInvoicesPage() {
       width: 180,
       render: (row) => (
         <div className="flex flex-col gap-0.5">
-          <code className="font-mono text-[11px] text-foreground">{row.invoiceNo}</code>
-          <span className="text-[11px] text-muted-foreground">
+          <code className="font-mono text-[12px] text-foreground">{row.invoiceNo}</code>
+          <span className="text-[12px] text-muted-foreground">
             {new Date(row.createdAt).toLocaleString('zh-CN')}
           </span>
         </div>
@@ -207,7 +207,7 @@ export function AdminInvoicesPage() {
       width: 180,
       render: (row) => (
         <Link className="text-brand hover:underline" to={adminOrderDetailHref(row.orderId)}>
-          <code className="font-mono text-[11px]">{row.orderNo ?? row.orderId}</code>
+          <code className="font-mono text-[12px]">{row.orderNo ?? row.orderId}</code>
         </Link>
       ),
     },
@@ -218,7 +218,7 @@ export function AdminInvoicesPage() {
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           {row.userName && <span>{row.userName}</span>}
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-[12px] text-muted-foreground">
             {row.userEmail ? (
               <Link className="hover:underline" to={adminUserHref(row.userEmail)}>
                 {row.userEmail}
@@ -238,13 +238,13 @@ export function AdminInvoicesPage() {
         <div className="flex flex-col gap-0.5">
           <span>
             {row.title}
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-[12px] text-muted-foreground">
               {' '}
               · {KIND_LABELS[row.kind] ?? row.kind}
             </span>
           </span>
           {row.taxNo && (
-            <code className="font-mono text-[11px] text-muted-foreground">{row.taxNo}</code>
+            <code className="font-mono text-[12px] text-muted-foreground">{row.taxNo}</code>
           )}
         </div>
       ),
@@ -264,7 +264,7 @@ export function AdminInvoicesPage() {
         <div className="flex flex-col gap-0.5">
           <StatusTag status={row.status} label={STATUS_LABELS[row.status]} />
           {row.status === 'rejected' && row.rejectReason && (
-            <span className="text-[11px] text-muted-foreground">{row.rejectReason}</span>
+            <span className="text-[12px] text-muted-foreground">{row.rejectReason}</span>
           )}
         </div>
       ),
@@ -393,14 +393,14 @@ export function AdminInvoicesPage() {
             action.kind === 'issue' ? (
               <>
                 <p>将为该申请生成正式票号并输出可打印发票文件，同时邮件通知用户。</p>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[12px] text-muted-foreground">
                   {action.row.invoiceNo} · {action.row.title} · ¥ {yuan(action.row.amountCents)}
                 </p>
               </>
             ) : (
               <>
                 <p>驳回后用户会看到驳回原因，可重新提交申请（将占用新的票号）。</p>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[12px] text-muted-foreground">
                   {action.row.invoiceNo} · {action.row.title} · ¥ {yuan(action.row.amountCents)}
                 </p>
               </>

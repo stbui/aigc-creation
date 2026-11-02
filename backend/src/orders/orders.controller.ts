@@ -93,11 +93,20 @@ export class OrdersController {
     });
   }
 
-  /** 我的订单 */
+  /** 我的订单（limit/offset 分页，返回 total 与各状态计数） */
   @Get()
-  list(@CurrentUser() user: AuthUser, @Query('limit') limit?: string) {
+  list(
+    @CurrentUser() user: AuthUser,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
     const n = Number(limit ?? 20);
-    return this.orders.listByUser(user.id, Number.isFinite(n) ? Math.min(n, 100) : 20);
+    const skip = Number(offset ?? 0);
+    return this.orders.listByUser(
+      user.id,
+      Number.isFinite(n) ? Math.min(n, 100) : 20,
+      Number.isFinite(skip) ? Math.max(skip, 0) : 0,
+    );
   }
 
   @Get(':id')

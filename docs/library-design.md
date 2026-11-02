@@ -39,7 +39,7 @@
 | 封面 | `aspect-ratio: 1`，底 `#f1f3f8` |
 | 卡片内容 | `padding: 12px 13px 13px` |
 | 卡片标题 | 13px / 600 / `#30364a`，单行省略 |
-| 卡片 meta | 11px / 行高 17 / `#a0a7b6`，`justify-content: space-between` |
+| 卡片 meta | 12px / 行高 17 / `#a0a7b6`，`justify-content: space-between` |
 | 选中标记 | 22×22 |
 | hover / 选中 | 封面 `scale`，操作区玻璃底浮层 |
 

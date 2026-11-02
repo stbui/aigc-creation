@@ -7,7 +7,10 @@
  *
  * 三个口径定义（页面文案必须与之一致，否则运营会按自己的理解算第二套）：
  *   · **实收** = `status='settled'` 的 `actualAmountMicrocredits` 之和；
- *   · **已退** = 全部订单的 `refundedAmountMicrocredits` 之和（含人工退款）；
+ *   · **已退** = **真实退款**（失败 / 人工 / 超时）的 `refundedAmountMicrocredits` 之和。
+ *     线路切换的旧账单退款**不计入**：那笔钱只是从旧线路的预授权挪到新线路的预授权，
+ *     用户没拿回钱、平台也没多收 —— 算进去会让一次 9 分换 4 分的成功任务显示
+ *     净收入 −5（明明收了 4 分）；
  *   · **净收入** = 实收 - 已退。
  * 未结算（reserved / running / uncertain）单独列为「挂账」，绝不并入实收 ——
  * 把不确定的钱算成收入是财务页最不能犯的错。
@@ -20,6 +23,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { badRequest } from '../domain/json';
+import { billingCreditCost } from './cost-amount';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** 默认看最近 30 天；单次查询上限 366 天（超过说明该用导出而不是在线聚合） */
@@ -111,14 +115,19 @@ export class FinanceAnalyticsService {
         actualAmountMicrocredits: true,
         reservedAmountMicrocredits: true,
         refundedAmountMicrocredits: true,
+        refundReason: true,
         costConfigured: true,
         costUnitPriceMicrocredits: true,
         costInputTokenPriceMicrocredits: true,
         costOutputTokenPriceMicrocredits: true,
+        costCachedTokenPriceMicrocredits: true,
+        costBillingMode: true,
         costQuantity: true,
+        costVideoFormulaTokens: true,
         inputTokens: true,
         outputTokens: true,
         cachedTokens: true,
+        quantity: true,
         createdAt: true,
       },
       orderBy: { createdAt: 'asc' },
@@ -147,26 +156,32 @@ export class FinanceAnalyticsService {
     for (const row of rows) {
       statusCounts[row.status] = (statusCounts[row.status] ?? 0) + 1;
       const charged = row.status === 'settled' ? row.actualAmountMicrocredits : 0n;
-      const refunded = row.refundedAmountMicrocredits ?? 0n;
+      // 换线的旧账单退款不是「用户拿回的钱」：预授权只是从旧线路挪到新线路
+      const isRouteSwitch = row.refundReason === 'route_switch';
+      const refunded = isRouteSwitch ? 0n : (row.refundedAmountMicrocredits ?? 0n);
 
       if (row.status === 'settled') totals.settledOrders += 1;
-      if (row.status === 'refunded') totals.refundedOrders += 1;
+      // 换线的旧账单不算「退款订单」：它是内部重预留，不是用户拿回钱
+      if (row.status === 'refunded' && row.refundReason !== 'route_switch') totals.refundedOrders += 1;
       if (row.status === 'uncertain') totals.uncertainOrders += 1;
       if (row.status === 'reserved' || row.status === 'running' || row.status === 'uncertain') {
         totals.outstanding += row.reservedAmountMicrocredits ?? 0n;
       }
       totals.charged += charged;
       totals.refunded += refunded;
-      if (row.status === 'settled' && row.costConfigured) totals.cost += costAmount(row);
+      if (row.status === 'settled' && row.costConfigured) {
+        const cost = costAmount(row);
+        if (cost !== null) totals.cost += cost;
+      }
       totals.inputTokens += Number(row.inputTokens ?? 0n);
       totals.outputTokens += Number(row.outputTokens ?? 0n);
       totals.cachedTokens += Number(row.cachedTokens ?? 0n);
 
-      accumulate(dayMap, dayKey(row.createdAt), row.status, charged, refunded);
-      accumulate(modelMap, row.model || '(未命名模型)', row.status, charged, refunded);
-      accumulate(channelMap, row.channelId || '(无渠道)', row.status, charged, refunded);
-      accumulate(capabilityMap, row.capability || '(未声明)', row.status, charged, refunded);
-      accumulate(sceneMap, row.scene || '(未声明)', row.status, charged, refunded);
+      accumulate(dayMap, dayKey(row.createdAt), row.status, charged, refunded, isRouteSwitch);
+      accumulate(modelMap, row.model || '(未命名模型)', row.status, charged, refunded, isRouteSwitch);
+      accumulate(channelMap, row.channelId || '(无渠道)', row.status, charged, refunded, isRouteSwitch);
+      accumulate(capabilityMap, row.capability || '(未声明)', row.status, charged, refunded, isRouteSwitch);
+      accumulate(sceneMap, row.scene || '(未声明)', row.status, charged, refunded, isRouteSwitch);
     }
 
     const net = totals.charged - totals.refunded;
@@ -239,6 +254,8 @@ function accumulate(
   status: string,
   charged: bigint,
   refunded: bigint,
+  /** 换线的旧账单退款不计「退款订单」 */
+  isRouteSwitchRefund = false,
 ): void {
   let bucket = target.get(key);
   if (!bucket) {
@@ -247,7 +264,7 @@ function accumulate(
   }
   bucket.orders += 1;
   if (status === 'settled') bucket.settledOrders += 1;
-  if (status === 'refunded') bucket.refundedOrders += 1;
+  if (status === 'refunded' && !isRouteSwitchRefund) bucket.refundedOrders += 1;
   bucket.charged += charged;
   bucket.refunded += refunded;
 }
@@ -275,20 +292,40 @@ function dayKey(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-/** 成本快照：与 `BillingAdminService` 同一口径（固定价 × 数量，或 Token 单价 × 用量） */
+/**
+ * 成本快照金额：与 `BillingAdminService` 共用 `billingCreditCost`（同一口径）。
+ * 未配置成本 / 未结算时返回 null —— 财务汇总不能把「不知道」写成 0。
+ */
 function costAmount(row: {
+  status?: string | null;
+  costConfigured?: boolean | null;
   costBillingMode?: string | null;
   costUnitPriceMicrocredits: bigint;
   costQuantity: bigint;
   costInputTokenPriceMicrocredits: bigint;
   costOutputTokenPriceMicrocredits: bigint;
+  costCachedTokenPriceMicrocredits: bigint;
+  costVideoFormulaTokens?: bigint | null;
   inputTokens: bigint;
   outputTokens: bigint;
-}): bigint {
-  const tokenCost = row.costInputTokenPriceMicrocredits * row.inputTokens + row.costOutputTokenPriceMicrocredits * row.outputTokens;
-  if (tokenCost > 0n) return tokenCost;
-  const quantity = row.costQuantity > 0n ? row.costQuantity : 1n;
-  return row.costUnitPriceMicrocredits * quantity;
+  cachedTokens?: bigint | null;
+  quantity?: bigint;
+}): bigint | null {
+  return billingCreditCost({
+    costConfigured: Boolean(row.costConfigured),
+    costBillingMode: row.costBillingMode ?? 'fixed_request',
+    costUnitPriceMicrocredits: row.costUnitPriceMicrocredits,
+    costInputTokenPriceMicrocredits: row.costInputTokenPriceMicrocredits,
+    costOutputTokenPriceMicrocredits: row.costOutputTokenPriceMicrocredits,
+    costCachedTokenPriceMicrocredits: row.costCachedTokenPriceMicrocredits,
+    costQuantity: row.costQuantity,
+    costVideoFormulaTokens: row.costVideoFormulaTokens ?? 0n,
+    inputTokens: row.inputTokens,
+    outputTokens: row.outputTokens,
+    cachedTokens: row.cachedTokens ?? 0n,
+    quantity: row.quantity ?? 0n,
+    status: row.status ?? '',
+  });
 }
 
 /** BigInt 微积分 → 数值（微积分到 1e15 仍在安全整数范围内） */

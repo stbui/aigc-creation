@@ -171,7 +171,7 @@ export function AdminCapabilitiesPage() {
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           <span className="font-medium">{row.name}</span>
-          <code className="font-mono text-[11px] text-muted-foreground">{row.capabilityId}</code>
+          <code className="font-mono text-[12px] text-muted-foreground">{row.capabilityId}</code>
         </div>
       ),
     },
@@ -181,7 +181,7 @@ export function AdminCapabilitiesPage() {
       title: '模态',
       width: 90,
       render: (row) => (
-        <code className="font-mono text-[11px] text-muted-foreground">{row.modality}</code>
+        <code className="font-mono text-[12px] text-muted-foreground">{row.modality}</code>
       ),
     },
     {
@@ -236,7 +236,7 @@ export function AdminCapabilitiesPage() {
         row.updatedAt ? (
           <div className="flex flex-col text-xs">
             <span>{new Date(row.updatedAt).toLocaleString('zh-CN')}</span>
-            <span className="text-[11px] text-muted-foreground">{row.updatedBy ?? '-'}</span>
+            <span className="text-[12px] text-muted-foreground">{row.updatedBy ?? '-'}</span>
           </div>
         ) : (
           <span className="text-muted-foreground">从未调整</span>

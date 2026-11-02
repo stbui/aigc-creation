@@ -15,8 +15,8 @@ import {
   Notice,
   NumberField,
   PageHeader,
+  PageSkeleton,
   Panel,
-  Skeleton,
   StatCard,
   StatusTag,
   StaleError,
@@ -156,7 +156,7 @@ export function AdminBackupPage() {
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           <code className="font-mono text-xs text-foreground">{row.filename}</code>
-          <span className="text-[11px] text-muted-foreground">{formatBytes(row.sizeBytes)}</span>
+          <span className="text-[12px] text-muted-foreground">{formatBytes(row.sizeBytes)}</span>
         </div>
       ),
     },
@@ -187,7 +187,7 @@ export function AdminBackupPage() {
       width: 110,
       render: (row) => {
         if (row.status !== 'succeeded') {
-          return <span className="text-[11px] text-muted-foreground">—</span>;
+          return <span className="text-[12px] text-muted-foreground">—</span>;
         }
         return row.verified ? (
           <StatusTag status="verified" label="已验证" tone="success" />
@@ -243,7 +243,7 @@ export function AdminBackupPage() {
           ) : (
             /* B-97: 无验证记录的备份视为无效, 不给下载入口 */
             <span
-              className="cursor-not-allowed text-[11px] text-muted-foreground"
+              className="cursor-not-allowed text-[12px] text-muted-foreground"
               title="未通过恢复验证的备份不可下载"
             >
               下载
@@ -264,12 +264,20 @@ export function AdminBackupPage() {
     },
   ];
 
+  /*
+   * 页头照常渲染：加载期间标题与动作区就该在位。
+   * 之前的守卫整页替换，首屏先闪一段没有标题的灰条，再冒出完整页面 ——
+   * 骨架该占住位置，不是把版面清空。
+   */
   if (loading && !data) {
     return (
-      <div className="flex flex-col gap-3" aria-busy="true" aria-live="polite">
-        <Skeleton rows={4} />
-        <p className="text-center text-xs text-muted-foreground">加载备份记录…</p>
-      </div>
+      <PageSkeleton
+        title="数据备份"
+        description="数据库定期全量备份 · 每份备份须通过恢复验证后才可下载"
+        stats={5}
+        panels={2}
+        panelRows={5}
+      />
     );
   }
   if (error && !data) return <ListError error={error} onRetry={() => void reload()} />;
@@ -395,7 +403,7 @@ export function AdminBackupPage() {
                   {
                     label: 'SHA-256',
                     value: (
-                      <code className="break-all font-mono text-[11px]">{row.sha256 || '—'}</code>
+                      <code className="break-all font-mono text-[12px]">{row.sha256 || '—'}</code>
                     ),
                   },
                   {
@@ -450,11 +458,11 @@ export function AdminBackupPage() {
                   tone={log.success ? 'success' : 'danger'}
                 />
                 <span className="min-w-0 flex-1 truncate text-xs text-foreground">{log.target}</span>
-                <span className="shrink-0 text-[11px] text-muted-foreground">
+                <span className="shrink-0 text-[12px] text-muted-foreground">
                   删除 {log.deletedCount} 条 · 保留 {log.retentionDays} 天 ·{' '}
                   {log.trigger === 'manual' ? '手动' : '自动'}
                 </span>
-                <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
+                <span className="shrink-0 text-[12px] tabular-nums text-muted-foreground">
                   {new Date(log.createdAt).toLocaleString('zh-CN')}
                 </span>
               </li>

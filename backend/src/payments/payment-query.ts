@@ -205,7 +205,9 @@ export function buildAdminPaymentOrderWhere(
   }
 
   const range = shanghaiDayRange(q.from, q.to);
-  if (range) parts.push({ [timeFieldColumn(q.timeField)]: range });
+  // 即使没有日期范围也要校验 timeField，避免非法字段被静默忽略
+  const timeField = timeFieldColumn(q.timeField);
+  if (range) parts.push({ [timeField]: range });
 
   return { AND: parts };
 }

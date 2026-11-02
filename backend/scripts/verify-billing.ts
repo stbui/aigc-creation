@@ -24,6 +24,7 @@ const { AppModule } = require('../dist/app.module');
 const { PrismaService } = require('../dist/prisma/prisma.service');
 const { BillingService } = require('../dist/model/billing/billing.service');
 const { CreditWalletService } = require('../dist/model/billing/credit-wallet.service');
+const { BillingAdminService } = require('../dist/model/billing/billing-admin.service');
 const bcrypt = require('bcryptjs');
 
 /** 1 积分 = 1e6 微积分 */
@@ -421,6 +422,70 @@ async function errorCode(fn: () => Promise<unknown>): Promise<{ code?: number; m
     },
   });
   check('已有成功调用则要求人工', await billing.failureRequiresReview(reviewOrder.order.id, reviewOrder.order.taskId, new Error('bad request')));
+
+  // ── 待核对队列与批量核对 ────────────────────────────────────────────
+  console.log('\n【待核对队列（review）与批量核对】');
+  {
+    const admin = app.get(BillingAdminService);
+    // 一条 uncertain：进队列
+    const uncertainOrder = await reserve('review-queue', {});
+    await billing.markUncertain(uncertainOrder.order.id, '验收：结果不明');
+    // 一条 reserved 但任务已失败：进队列
+    const failedTaskOrder = await reserve('review-failed-task', {});
+    const reviewProject = await prisma.project.create({
+      data: { ownerId: userId, name: '待核对验收项目' },
+    });
+    await prisma.generationTask.create({
+      data: {
+        id: failedTaskOrder.order.taskId,
+        projectId: reviewProject.id,
+        ownerId: userId,
+        capability: 'expand',
+        status: 'failed',
+        inputAssetIds: '[]',
+        params: '{}',
+        provider: 'gateway',
+        creditCost: 5,
+      },
+    });
+    // 一条正常 reserved、任务未失败：不进队列
+    const normalOrder = await reserve('review-normal', {});
+
+    const queue = await admin.listOrders({ status: 'review', pageSize: 100 });
+    const queuedIds = queue.items.map((item: any) => item.id);
+    check('待核对队列含 uncertain 单', queuedIds.includes(uncertainOrder.order.id), queuedIds.length);
+    check('待核对队列含「任务失败但仍预留」单', queuedIds.includes(failedTaskOrder.order.id));
+    check('待核对队列不含正常预留单', !queuedIds.includes(normalOrder.order.id));
+
+    // 批量核对：逐条独立处置，单条失败不影响其余
+    const batch = await admin.batchResolveOrders(
+      [uncertainOrder.order.id, failedTaskOrder.order.id, 'not-exist-id'],
+      'refund',
+      '验收脚本批量核对',
+      'verify-admin',
+    );
+    check('批量核对逐条返回结果', batch.total === 3 && batch.results.length === 3, batch.total);
+    check('批量核对成功 2 条', batch.resolved === 2, batch.resolved);
+    check('批量核对失败 1 条并带原因', batch.failed === 1 && Boolean(batch.results[2]?.error), batch.results[2]?.error);
+    const afterBatch = await prisma.billingOrder.findUnique({ where: { id: uncertainOrder.order.id } });
+    check('批量核对后账单已退款', afterBatch?.status === 'refunded', afterBatch?.status);
+    const afterBatch2 = await prisma.billingOrder.findUnique({ where: { id: failedTaskOrder.order.id } });
+    check('批量核对后第二笔也退款', afterBatch2?.status === 'refunded', afterBatch2?.status);
+    check(
+      '批量核对留下核对人与依据',
+      afterBatch?.resolvedBy === 'verify-admin' && afterBatch?.resolutionNote === '验收脚本批量核对',
+      { by: afterBatch?.resolvedBy, note: afterBatch?.resolutionNote },
+    );
+    const batchError = await errorCode(() => admin.batchResolveOrders([], 'refund', 'x', 'verify-admin'));
+    check('批量核对拒绝空列表', batchError.code === 40001, `${batchError.code} ${batchError.message}`);
+    const batchError2 = await errorCode(() =>
+      admin.batchResolveOrders([uncertainOrder.order.id], 'refund', '', 'verify-admin'),
+    );
+    check('批量核对缺原因被拒', batchError2.code === 40001, `${batchError2.code} ${batchError2.message}`);
+
+    await prisma.generationTask.deleteMany({ where: { id: failedTaskOrder.order.taskId } });
+    await prisma.project.deleteMany({ where: { id: reviewProject.id } });
+  }
 
   // ── 清理 ────────────────────────────────────────────────────────────
   const userIds = [userId, poorUser.id];

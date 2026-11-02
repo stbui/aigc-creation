@@ -131,7 +131,7 @@ Hero 右半幅是本站自有的能力产出拼贴，不做外链图片。素材
 | sections | 139px，gap 16，`padding-top: 8` | 83px，gap 14，`padding-top: 6` |
 | 列表 | 133px，gap 4，`padding-top: 4` | 77px，gap 4 |
 | 条目 | 133×45，flex row，`padding: 8px 4px`，gap 12 | 77×60，flex column，`padding: 5px 2px`，gap 2 |
-| 标签 | 13px / 行高 20 | 10px / 行高 14 |
+| 标签 | 13px / 行高 20 | 12px / 行高 14 |
 | 分组标题 | 133×28，14px / 行高 20 | 77×24，12px / 行高 18 |
 | 底部入口 | 139×44 | 83×60 |
 

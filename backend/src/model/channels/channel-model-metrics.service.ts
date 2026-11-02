@@ -19,6 +19,8 @@
  *
  * · **成功率** = `success` 次数 ÷ 终态次数（`success` + `failed`）。
  *   `pending` / `canceled` 不计入分母：它们不是「这条线坏了」的证据。
+ *   分母只含**上游生成请求**（`requestKind=create`）：轮询与记账类请求
+ *   的失败不代表线路不可用，计进去会把值班的人引到一条没坏的线上。
  * · **P95 耗时** = 终态样本里耗时第 95 百分位的值。用最近邻法（不做插值）：
  *   样本量小的时候插值出来的数没有实际含义。
  * · **最近样本** = 最近 10 条终态调用的状态 / 耗时 / 错误码 / 时间，
@@ -94,10 +96,25 @@ export interface ChannelModelHealthRow extends ChannelHealthRow {
 
 @Injectable()
 export class ChannelModelMetricsService {
+  /**
+   * 短 TTL 缓存。
+   *
+   * `list()` 现在同时服务后台健康页**和**公开目录（C 端每次选模型都会读）。
+   * 每请求都扫一遍 7 天日志会拖垮公开入口。30s 足够让运营改完配置看到变化，
+   * 又不会让匿名流量反复打日志表。
+   */
+  private cache: { at: number; rows: ChannelModelHealthRow[] } | null = null;
+  private static readonly CACHE_TTL_MS = 30_000;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly health: ChannelHealthService,
   ) {}
+
+  /** 外部写入（启停 / 改价）后主动失效，避免后台看到旧指标 */
+  invalidate(): void {
+    this.cache = null;
+  }
 
   /**
    * 全量线路健康指标；`channelId` 给出时只算该渠道的线路。
@@ -107,8 +124,18 @@ export class ChannelModelMetricsService {
    * 一次取回更省。
    */
   async list(channelId?: string): Promise<ChannelModelHealthRow[]> {
+    const now = Date.now();
+    if (!this.cache || now - this.cache.at > ChannelModelMetricsService.CACHE_TTL_MS) {
+      this.cache = { at: now, rows: await this.buildList() };
+    }
+    const base = this.cache.rows;
+    return channelId ? base.filter((row) => row.channelId === channelId) : base;
+  }
+
+  /** 真实计算（未缓存）：一次取回全部线路 + 窗口内日志，在内存里分组 */
+  private async buildList(): Promise<ChannelModelHealthRow[]> {
     const base = await this.health.list();
-    const rows = channelId ? base.filter((row) => row.channelId === channelId) : base;
+    const rows = base;
     if (rows.length === 0) return [];
 
     const windowStart = new Date(Date.now() - WINDOWS[WINDOWS.length - 1].hours * 3600_000);
@@ -116,6 +143,15 @@ export class ChannelModelMetricsService {
       where: {
         channelModelId: { in: rows.map((row) => row.id) },
         createdAt: { gte: windowStart },
+        /*
+         * 成功率只统计**上游生成请求**（requestKind=create）。
+         *
+         * 轮询（poll）、素材上传（upload）、内部记账（bookkeeping）失败也会
+         * 落日志，把它们算进分母会让「线路成功率」被轮询抖动拉低 ——
+         * 值班的人会去查一条其实没坏的线。参考实现用同样的口径
+         * （`repository/analytics.go` 的 `request_kind = 'create'`）。
+         */
+        requestKind: 'create',
       },
       select: {
         channelModelId: true,

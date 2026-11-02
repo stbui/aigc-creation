@@ -403,7 +403,7 @@ export function AdminCouponsPage() {
         row.thresholdCents > 0 ? (
           <span className="tabular-nums">满 ¥{yuan(row.thresholdCents)}</span>
         ) : (
-          <span className="text-[11px] text-muted-foreground">无门槛</span>
+          <span className="text-[12px] text-muted-foreground">无门槛</span>
         ),
     },
     {
@@ -437,7 +437,7 @@ export function AdminCouponsPage() {
       title: '有效期',
       width: 170,
       render: (row) => (
-        <span className="text-[11px] tabular-nums text-muted-foreground">
+        <span className="text-[12px] tabular-nums text-muted-foreground">
           {new Date(row.validFrom).toLocaleDateString('zh-CN')} ~{' '}
           {new Date(row.validTo).toLocaleDateString('zh-CN')}
         </span>
@@ -499,7 +499,7 @@ export function AdminCouponsPage() {
                 新建优惠券
               </ActionButton>
             ) : (
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-[12px] text-muted-foreground">
                 当前账号无 marketing.write 权限，仅可查看
               </span>
             )}
@@ -681,7 +681,7 @@ export function AdminCouponsPage() {
           </div>
 
           {form.scope === 'product' && (
-            <p className="rounded-lg border border-border bg-muted/60 px-3 py-2 text-[11px] leading-4 text-muted-foreground">
+            <p className="rounded-lg border border-border bg-muted/60 px-3 py-2 text-[12px] leading-4 text-muted-foreground">
               商品范围由后端按订单明细校验，此处留空表示不限具体商品（仅限制在指定范围订单内）。
             </p>
           )}
@@ -737,7 +737,7 @@ export function AdminCouponsPage() {
           </FormField>
 
           {editing && (
-            <p className="text-[11px] leading-4 text-muted-foreground">
+            <p className="text-[12px] leading-4 text-muted-foreground">
               已核销 {editing.usedCount} 张 · 券码不可修改，停用后已发放的券立即失效
             </p>
           )}

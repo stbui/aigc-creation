@@ -80,12 +80,12 @@ export function DutyChannelTower({ limit = 3 }: { limit?: number }) {
             >
               {c.name}
             </span>
-            <span className="flex-none text-[10.5px] text-muted-foreground">
+            <span className="flex-none text-[12px] text-muted-foreground">
               {CAPABILITY_LABEL[c.modality] ?? c.modality}
             </span>
             <span
               className={cn(
-                'ml-auto flex-none text-[11px] text-muted-foreground',
+                'ml-auto flex-none text-[12px] text-muted-foreground',
                 coolingNow && 'text-warn-text',
               )}
             >
@@ -109,7 +109,7 @@ export function DutyChannelTower({ limit = 3 }: { limit?: number }) {
         );
       })}
       {channels.length > limit && (
-        <li className="border-t border-border pt-2 text-[11.5px]">
+        <li className="border-t border-border pt-2 text-[12px]">
           <Link
             to="/admin/channels"
             className="text-muted-foreground no-underline hover:text-brand"

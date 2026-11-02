@@ -13,12 +13,14 @@
 
 import { Injectable } from '@nestjs/common';
 import { convertCurrencyPrice, creditAmount, toSafeNumber } from '../infra/microcredits';
-import { decodeSkuSelector, type SkuSelector } from '../domain/selector';
+import { decodeSkuSelector, validateChannelModelPrice, type SkuSelector } from '../domain/selector';
+import { validateImageParameterPriceSelector } from '../domain/image-parameters';
 import {
   capabilityFingerprint,
   capabilitySpecWithRoutePresets,
   logicalModelCapabilityCovered,
 } from '../intent/capability-spec';
+import { matchCapability } from '../intent/capability-match';
 import type { CapabilitySpec, ModelRequestIntent } from '../intent/spec-types';
 import type { UserGroupAccess } from '../user-groups/user-group.service';
 import { RouteCatalogService } from './route-catalog.service';
@@ -160,6 +162,7 @@ export class CatalogService {
     const healthy = this.router.hasHealthyRoute(cached.routes);
     if (!intent) return coverageValid && healthy;
     if (!coverageValid) return false;
+    if (!matchCapability(cached.productSpec, intent).matched) return false;
     const resolved = this.router.resolveIntent(cached, intent);
     return this.router.hasCompatibleRoute(access, cached, resolved);
   }
@@ -216,7 +219,17 @@ export class CatalogService {
       const parameters = route.channelModel.capabilitySpec.imageParameters;
       for (const tier of route.channelModel.priceTiers) {
         if (!tier.enabled || !tier.priceConfigured) continue;
+        // 发布前做价格合法性校验：历史脏档（按秒非视频、token 非 text/video）
+        // 不能被目录展示成「可成交」，否则展示价与选路结果会分叉。
+        if (!validateChannelModelPrice(tier.billingMode, tier)) continue;
         const selector = parameters ? decodeSkuSelector(tier.selectorJson) : tier.selector;
+        if (parameters) {
+          try {
+            validateImageParameterPriceSelector(parameters, selector as Record<string, string>);
+          } catch {
+            continue;
+          }
+        }
         const key = JSON.stringify({
           selector,
           billingMode: tier.billingMode,

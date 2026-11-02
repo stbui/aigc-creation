@@ -357,7 +357,7 @@ export function AdminCampaignsPage() {
       key: 'payload',
       title: '内容',
       width: 150,
-      render: (row) => <span className="text-[11px] text-muted-foreground">{payloadSummary(row)}</span>,
+      render: (row) => <span className="text-[12px] text-muted-foreground">{payloadSummary(row)}</span>,
     },
     {
       key: 'audience',
@@ -367,7 +367,7 @@ export function AdminCampaignsPage() {
         row.audience?.onlyNewUsers ? (
           <span className="text-xs">仅新用户</span>
         ) : (
-          <span className="text-[11px] text-muted-foreground">全站</span>
+          <span className="text-[12px] text-muted-foreground">全站</span>
         ),
     },
     {
@@ -378,7 +378,7 @@ export function AdminCampaignsPage() {
         const live = inWindow(row);
         return (
           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-            <span className="text-[11px] tabular-nums text-muted-foreground">
+            <span className="text-[12px] tabular-nums text-muted-foreground">
               {new Date(row.startAt).toLocaleDateString('zh-CN')} ~{' '}
               {new Date(row.endAt).toLocaleDateString('zh-CN')}
             </span>
@@ -439,7 +439,7 @@ export function AdminCampaignsPage() {
                 新建活动
               </ActionButton>
             ) : (
-              <span className="text-[11px] text-muted-foreground">当前账号无 marketing.write 权限，仅可查看</span>
+              <span className="text-[12px] text-muted-foreground">当前账号无 marketing.write 权限，仅可查看</span>
             )}
           </>
         }
@@ -673,7 +673,7 @@ export function AdminCampaignsPage() {
           </div>
 
           {editing && (
-            <p className="text-[11px] leading-4 text-muted-foreground">
+            <p className="text-[12px] leading-4 text-muted-foreground">
               当前派生状态：{EFFECTIVE_META[editing.effective]?.label ?? editing.statusLabel}
               {editing.status === 'active' && !inWindow(editing) && '（不在时间窗内，实际不会曝光）'}
             </p>

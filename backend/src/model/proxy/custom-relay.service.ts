@@ -19,7 +19,7 @@ import { OutboundError, outboundRequest, parseOutboundHeaders, validateCustomRel
 import { ModelCatalogClient } from '../catalog/model-catalog.client';
 import { ModelDomainError } from '../domain/json';
 import type { ChannelModelCatalogItem } from '../catalog/model-catalog.types';
-import { authorizeCustomRelay, mediaTypeOf, type CustomRelayFormat } from './proxy.paths';
+import { authorizeCustomRelay, mediaTypeOf, normalizeProxyPath, type CustomRelayFormat } from './proxy.paths';
 import {
   CUSTOM_RELAY_FORMAT_HEADER,
   CUSTOM_RELAY_HEADERS_HEADER,
@@ -96,9 +96,13 @@ export class CustomRelayService {
       return;
     }
     try {
+      // 先规范化再判定：解码百分号、拒绝反斜杠/NUL、要求 path.Clean 不变形，
+      // 与系统渠道入口共用同一套语义；自定义入口额外限制路径长度。
+      const relayPath = normalizeProxyPath(target.pathname);
+      if (Buffer.byteLength(relayPath, 'utf8') > 2048) throw new Error('请求路径过长');
       authorizeCustomRelay({
         method,
-        path: target.pathname,
+        path: relayPath,
         query: target.searchParams,
         format,
         contentType: input.contentType,

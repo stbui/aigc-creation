@@ -16,10 +16,12 @@ import {
   RefundInput,
   RefundResult,
   centsToYuan,
+  isAllowedPublicBase,
   normalizePem,
   yuanToCents,
 } from './types';
-import { parseCsv } from '../../common/csv';
+import { decodeCsvBuffer, parseCsv } from '../../common/csv';
+import { readFirstCsvFromZip } from '../../common/archive/zip-reader';
 
 /**
  * 支付宝（电脑网站支付）适配器 —— RSA2 签名，零新增依赖。
@@ -67,6 +69,14 @@ export class AlipayAdapter implements PaymentAdapter {
         default: 'https://openapi.alipay.com/gateway.do',
         description: '只允许官方生产 / 沙箱域名',
       },
+      {
+        name: 'publicBaseUrl',
+        label: '回调公网地址（可选）',
+        type: 'url',
+        required: false,
+        default: '',
+        description: '例如 https://pay.example.com；留空使用 PAYMENT_NOTIFY_BASE',
+      },
     ],
   };
 
@@ -77,6 +87,8 @@ export class AlipayAdapter implements PaymentAdapter {
     if (!values.alipayPublicKey?.trim()) missing.push('alipayPublicKey');
     const gateway = values.gateway?.trim();
     if (gateway && !isAllowedGateway(gateway)) missing.push('gateway');
+    const publicBaseUrl = values.publicBaseUrl?.trim();
+    if (publicBaseUrl && !isAllowedPublicBase(publicBaseUrl)) missing.push('publicBaseUrl');
     return missing;
   }
 
@@ -252,8 +264,10 @@ export class AlipayAdapter implements PaymentAdapter {
   /**
    * 下载对账单（`alipay.data.dataservice.bill.downloadurl.query`）。
    *
-   * 支付宝返回的是**临时下载链接**，账单本身是 CSV（或 ZIP 打包）。这里只取
-   * CSV 形式：`bill_type=trade`。任何一步失败都抛错，由对账服务把 run 置 failed，
+   * 支付宝返回的是**临时下载链接**。账单可能是：
+   *   · 直接 CSV；
+   *   · 或 ZIP 包内的 CSV（GBK/GB18030 编码）。
+   * 两种都要支持；任何一步失败都抛错，由对账服务把 run 置 failed，
    * 绝不返回空数组伪装「当天没有交易」。
    */
   async downloadTradeBill(config: PaymentContext, billDate: string): Promise<BillRecord[]> {
@@ -267,8 +281,8 @@ export class AlipayAdapter implements PaymentAdapter {
 
     const res = await fetch(url, { signal: AbortSignal.timeout(30000) });
     if (!res.ok) throw new Error(`支付宝账单下载失败: HTTP ${res.status}`);
-    const text = await res.text();
-    return parseAlipayBillCsv(text);
+    const data = Buffer.from(await res.arrayBuffer());
+    return parseAlipayBill(data);
   }
 
   /** 统一网关调用：签名 → POST → 验签 → 取业务节点 */
@@ -310,16 +324,34 @@ export class AlipayAdapter implements PaymentAdapter {
       return { ok: false, code: 'BAD_JSON', message: '网关响应不是合法 JSON', node: {}, raw };
     }
 
-    // 响应验签：不验就信任 code=10000，中间人可把「失败」改成「成功」
+    /*
+     * 响应验签：不验就信任 code=10000，中间人可把「失败」改成「成功」。
+     *
+     * 交易类接口（下单/查单/关单/退款）必须**失败关闭**：缺签名或取不到待验签
+     * 节点时直接拒绝，不能只 warning 后继续信任响应。账单下载地址接口保持宽松
+     * （支付宝部分账单响应不带签名），但若带了签名仍会校验。
+     */
+    const requiresSignature = method.startsWith('alipay.trade.');
     const signed = extractSignedNode(raw, nodeKey);
     const sign = (JSON.parse(raw) as { sign?: string }).sign;
-    if (signed && sign) {
+    if (!sign || !signed) {
+      if (requiresSignature) {
+        return {
+          ok: false,
+          code: 'MISSING_SIGN',
+          message: '网关响应缺少签名，拒绝信任',
+          node: {},
+          raw,
+        };
+      }
+      if (method !== 'alipay.data.dataservice.bill.downloadurl.query') {
+        this.logger.warn(`支付宝网关响应缺少签名: ${method}`);
+      }
+    } else {
       const ok = verifyWithPublicKey(signed, sign, normalizePem(v.alipayPublicKey));
       if (!ok) {
         return { ok: false, code: 'BAD_SIGN', message: '网关响应验签失败', node: {}, raw };
       }
-    } else if (method !== 'alipay.data.dataservice.bill.downloadurl.query') {
-      this.logger.warn(`支付宝网关响应缺少签名: ${method}`);
     }
 
     const code = String(node.code ?? '');
@@ -363,10 +395,25 @@ function mapTradeStatus(
   return { ...base, state: 'failed', error: `未知交易状态: ${tradeStatus || 'empty'}` };
 }
 
+export function parseAlipayBill(data: Buffer): BillRecord[] {
+  const csv = isZipArchive(data) ? readFirstCsvFromZip(data) : data;
+  return parseAlipayBillCsv(decodeCsvBuffer(csv));
+}
+
+function isZipArchive(data: Buffer): boolean {
+  return data.length >= 4 && data[0] === 0x50 && data[1] === 0x4b && data[2] === 0x03 && data[3] === 0x04;
+}
+
 function parseAlipayBillCsv(text: string): BillRecord[] {
   const rows = parseCsv(text);
   if (rows.length < 2) return [];
-  const header = rows[0].map((h) => h.trim());
+
+  // 真实账单可能带说明行/汇总行，不能假设第一行就是表头。
+  const headerIndex = rows.findIndex(
+    (row) => row.some((cell) => cell.includes('商户订单号')) && row.some((cell) => cell.includes('交易号')),
+  );
+  if (headerIndex < 0) throw new Error('支付宝账单表头无法识别');
+  const header = rows[headerIndex].map((h) => h.trim());
   const col = (name: string) => header.findIndex((h) => h.includes(name));
   const iOrderNo = col('商户订单号');
   const iTradeNo = col('支付宝交易号');
@@ -376,8 +423,9 @@ function parseAlipayBillCsv(text: string): BillRecord[] {
   if (iOrderNo < 0 || iTradeNo < 0 || iAmount < 0) {
     throw new Error('支付宝账单表头无法识别');
   }
+
   const out: BillRecord[] = [];
-  for (const row of rows.slice(1)) {
+  for (const row of rows.slice(headerIndex + 1)) {
     const status = iStatus >= 0 ? (row[iStatus] ?? '').trim() : '交易成功';
     if (status && !status.includes('成功')) continue;
     const merchantOrderNo = (row[iOrderNo] ?? '').trim();

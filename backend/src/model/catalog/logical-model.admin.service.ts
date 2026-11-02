@@ -207,6 +207,24 @@ export class LogicalModelAdminService {
         legacyModelIdsJson: bundle.data.legacyModelIdsJson,
       };
       if (!logicalModelId) {
+        /*
+         * 一个渠道模型最多投影出一个未归档前台模型。
+         *
+         * 参考实现用部分唯一索引保证（`source_channel_model_id` 非空且未归档）。
+         * SQLite / Prisma 不支持部分唯一索引，这里在事务内做应用层等价校验 ——
+         * 不校验会让同一渠道模型被两条前台线路重复计入，成本与可用性都算错。
+         */
+        if (bundle.data.sourceChannelModelId) {
+          const duplicated = await tx.logicalModel.count({
+            where: {
+              sourceChannelModelId: bundle.data.sourceChannelModelId,
+              archivedAt: null,
+            },
+          });
+          if (duplicated > 0) {
+            throw badRequest('该渠道模型已投影出前台模型，请直接编辑既有前台模型');
+          }
+        }
         // 首个 revision 版本从 1 开始；更新路径走 increment，两条路径的版本单调递增
         const created = await tx.logicalModel.create({ data: { ...shared, revisionSequence: 1 } });
         logicalModelId = created.id;

@@ -74,7 +74,7 @@ export function TrendBarChart({
             dataKey="date"
             tickLine={false}
             axisLine={false}
-            tick={{ fill: 'var(--text-desc)', fontSize: 11 }}
+            tick={{ fill: 'var(--text-desc)', fontSize: 12 }}
             tickFormatter={(value: string) => value.slice(5).replace('-', '/')}
             interval="preserveStartEnd"
             minTickGap={16}
@@ -83,7 +83,7 @@ export function TrendBarChart({
             tickLine={false}
             axisLine={false}
             width={44}
-            tick={{ fill: 'var(--text-desc)', fontSize: 11 }}
+            tick={{ fill: 'var(--text-desc)', fontSize: 12 }}
             tickFormatter={format}
           />
           <Tooltip

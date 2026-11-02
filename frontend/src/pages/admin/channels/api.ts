@@ -26,16 +26,35 @@ const CHANNEL_PAGE_SIZE = 100;
  */
 export async function fetchAllChannels(): Promise<AdminChannelView[]> {
   const first = await adminChannelsApi.list({ page: 1, limit: CHANNEL_PAGE_SIZE });
-  const all = [...first.channels];
-  for (let page = 2; all.length < first.total; page += 1) {
-    const next = await adminChannelsApi.list({ page, limit: CHANNEL_PAGE_SIZE });
-    if (next.channels.length === 0) break;
-    all.push(...next.channels);
-  }
+  const remainingPages = Math.max(0, Math.ceil(first.total / CHANNEL_PAGE_SIZE) - 1);
+  // 首页拿到总数后并发取其余页：渠道量级不大，串行翻页只会白等网络往返
+  const rest = await Promise.all(
+    Array.from({ length: remainingPages }, (_, index) =>
+      adminChannelsApi
+        .list({ page: index + 2, limit: CHANNEL_PAGE_SIZE })
+        .then((res) => res.channels),
+    ),
+  );
+  const all = [...first.channels, ...rest.flat()];
   return Array.from(new Map(all.map((row) => [row.id, row])).values());
 }
 
-/** 线路健康指标（一行 = 一条渠道模型，含进程内冷却快照） */
-export function fetchChannelHealth() {
-  return adminChannelModelsApi.health();
+type ChannelHealthResponse = Awaited<ReturnType<typeof adminChannelModelsApi.health>>;
+
+let healthRequest: Promise<ChannelHealthResponse> | null = null;
+
+/**
+ * 线路健康指标（一行 = 一条渠道模型，含进程内冷却快照）。
+ *
+ * 同一时刻左列、详情区与「全部模型」会各取一次，数据完全相同；
+ * 这里共用在途请求，避免同一屏发出多份相同查询。请求结束即释放，
+ * 下一次刷新仍拿最新数据。
+ */
+export function fetchChannelHealth(): Promise<ChannelHealthResponse> {
+  if (!healthRequest) {
+    healthRequest = adminChannelModelsApi.health().finally(() => {
+      healthRequest = null;
+    });
+  }
+  return healthRequest;
 }

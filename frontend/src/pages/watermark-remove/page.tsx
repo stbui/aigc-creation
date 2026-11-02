@@ -300,6 +300,7 @@ export function WatermarkRemovePage() {
               <video
                 className="redraw-intro-video"
                 src="/static/mp4/03_qcsy.mp4"
+                poster="/static/mp4/03_qcsy-poster.jpg"
                 autoPlay
                 loop
                 muted

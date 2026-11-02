@@ -27,6 +27,14 @@ export class BillingResolveBodyDto {
   @IsString() reason: string;
 }
 
+/** 批量核对入参：逐条给出动作与原因，单条失败不影响其它条目 */
+export class BillingBatchResolveBodyDto {
+  /** 单次最多核对的条数（与前端批量上限一致） */
+  @IsString() ids?: string;
+  @IsString() action?: string;
+  @IsString() reason?: string;
+}
+
 @Controller('admin/billing-orders')
 export class AdminBillingOrdersController {
   constructor(private readonly billing: BillingAdminService) {}
@@ -81,6 +89,26 @@ export class AdminBillingOrdersController {
     @AdminUser() user: AdminUserContext,
   ) {
     return this.billing.resolveOrder(id, body?.action, body?.reason, user?.id ?? '');
+  }
+
+  /**
+   * 批量核对：一次处理多张待核对账单。
+   *
+   * 逐条独立处置 —— 一张失败不影响其余：批量场景常常是「同一批挂账」，
+   * 其中一两条状态已经变了就整批重试会很烦。返回每条的结果，失败原因逐条可读。
+   */
+  @Post('batch-resolve')
+  @RequirePermission(PERMISSIONS.billingOrderResolve)
+  @AuditAction('billing_order.batch_resolve')
+  async batchResolve(
+    @Body() body: BillingBatchResolveBodyDto,
+    @AdminUser() user: AdminUserContext,
+  ) {
+    const ids = String(body?.ids ?? '')
+      .split(',')
+      .map((item) => item.trim())
+      .filter((item) => item !== '');
+    return this.billing.batchResolveOrders(ids, body?.action, body?.reason, user?.id ?? '');
   }
 }
 

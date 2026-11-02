@@ -97,7 +97,7 @@ export class BillingSweeperService implements OnModuleInit, OnModuleDestroy {
       let refunded = 0;
       for (const order of staleReserved) {
         try {
-          await this.billing.refund(order.id, '预留超时未执行，自动退款');
+          await this.billing.refund(order.id, '预留超时未执行，自动退款', 'auto_sweep');
           refunded += 1;
         } catch (error) {
           this.log.warn(`自动退款失败（账单 ${order.id}）：${messageOf(error)}`);

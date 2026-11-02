@@ -118,7 +118,7 @@ function SectionTitle({ title, note }: { title: string; note?: string }) {
   return (
     <div className="mb-2 flex items-baseline gap-2 border-b border-border pb-1.5">
       <strong className="text-xs font-semibold text-foreground">{title}</strong>
-      {note && <span className="text-[11px] text-muted-foreground">{note}</span>}
+      {note && <span className="text-[12px] text-muted-foreground">{note}</span>}
     </div>
   );
 }
@@ -145,7 +145,7 @@ function RecordRow({
       />
       <span className="min-w-0 flex-1">
         <span className="block text-xs text-foreground">{head}</span>
-        <span className="mt-0.5 block text-[11px] leading-4 text-muted-foreground">{meta}</span>
+        <span className="mt-0.5 block text-[12px] leading-4 text-muted-foreground">{meta}</span>
       </span>
     </li>
   );
@@ -505,7 +505,7 @@ export function AdminOrdersPage() {
           >
             {row.orderNo}
           </Link>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-[12px] text-muted-foreground">
             {new Date(row.createdAt).toLocaleString('zh-CN')}
           </span>
         </div>
@@ -531,7 +531,7 @@ export function AdminOrdersPage() {
       render: (row) => (
         <div className="flex flex-col items-start gap-0.5">
           <StatusTag status={row.status} label={STATUS_LABEL_OVERRIDE[row.status]} />
-          <span className="max-w-[110px] truncate text-[11px] text-muted-foreground">
+          <span className="max-w-[110px] truncate text-[12px] text-muted-foreground">
             {row.channel ? CHANNEL_LABELS[row.channel] ?? row.channel : '—'}
           </span>
         </div>
@@ -554,8 +554,8 @@ export function AdminOrdersPage() {
             <span
               className={
                 row.refundedCents > 0
-                  ? 'max-w-[140px] truncate text-[11px] text-danger-text'
-                  : 'max-w-[140px] truncate text-[11px] text-muted-foreground'
+                  ? 'max-w-[140px] truncate text-[12px] text-danger-text'
+                  : 'max-w-[140px] truncate text-[12px] text-muted-foreground'
               }
               title={extra || undefined}
             >
@@ -577,14 +577,14 @@ export function AdminOrdersPage() {
               {row.membershipPlanName}
             </span>
             <span
-              className="max-w-[170px] truncate text-[11px] text-muted-foreground"
+              className="max-w-[170px] truncate text-[12px] text-muted-foreground"
               title={`${row.membershipPlanCode} · ${credits}`}
             >
               {row.membershipPlanCode} · {credits}
             </span>
           </div>
         ) : (
-          <div className="flex flex-col gap-0.5 text-[11px] text-muted-foreground">
+          <div className="flex flex-col gap-0.5 text-[12px] text-muted-foreground">
             <span>{row.itemCount} 件商品</span>
             <span>{credits}</span>
           </div>
@@ -599,7 +599,7 @@ export function AdminOrdersPage() {
         row.paidAt ? (
           <span className="text-xs tabular-nums">{new Date(row.paidAt).toLocaleString('zh-CN')}</span>
         ) : (
-          <span className="text-[11px] text-muted-foreground">未支付</span>
+          <span className="text-[12px] text-muted-foreground">未支付</span>
         ),
     },
     {
@@ -873,13 +873,13 @@ export function AdminOrdersPage() {
                           </Link>
                         </span>
                         <Link
-                          className="text-[11px] text-brand hover:underline"
+                          className="text-[12px] text-brand hover:underline"
                           to={adminCreditHref({ userId: d.userId, email: d.user.email })}
                         >
                           积分账本
                         </Link>
                         <Link
-                          className="text-[11px] text-brand hover:underline"
+                          className="text-[12px] text-brand hover:underline"
                           to={adminTasksHref({ userId: d.userId })}
                         >
                           任务记录
@@ -930,9 +930,9 @@ export function AdminOrdersPage() {
                               {d.membershipPlan.name}（{d.membershipPlan.durationDays} 天 · 每月{' '}
                               {d.membershipPlan.monthlyCredits} 积分）
                               {d.membershipAppliedAt ? (
-                                <span className="text-[11px] text-muted-foreground"> · 权益已发放</span>
+                                <span className="text-[12px] text-muted-foreground"> · 权益已发放</span>
                               ) : (
-                                <span className="text-[11px] text-danger-text"> · 权益尚未发放</span>
+                                <span className="text-[12px] text-danger-text"> · 权益尚未发放</span>
                               )}
                             </>
                           ),
@@ -953,7 +953,7 @@ export function AdminOrdersPage() {
                       head={
                         <>
                           {it.nameSnapshot}{' '}
-                          <code className="font-mono text-[11px] text-muted-foreground">
+                          <code className="font-mono text-[12px] text-muted-foreground">
                             {it.skuSnapshot}
                           </code>
                         </>
@@ -1014,7 +1014,7 @@ export function AdminOrdersPage() {
                           ¥ {yuan(r.amountCents)}
                           {/* 失败/处理中的退款行必须显示状态: 它们没有动过订单与积分 */}
                           {r.status !== 'succeeded' && (
-                            <span className="text-[11px] text-warn-text">
+                            <span className="text-[12px] text-warn-text">
                               {' '}
                               · {REFUND_STATUS_LABELS[r.status] ?? r.status}
                             </span>
@@ -1050,7 +1050,7 @@ export function AdminOrdersPage() {
                 <p>
                   将先生成一条 <b>channel=manual</b> 的支付流水，再把订单置为已支付并发放积分/会员权益。
                 </p>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[12px] text-muted-foreground">
                   订单 {action.row.orderNo} · ¥ {yuan(action.row.paidCents)} ·{' '}
                   {action.row.membershipPlanName ?? `${action.row.itemCount} 件商品`}
                 </p>
@@ -1060,7 +1060,7 @@ export function AdminOrdersPage() {
                 <p>
                   退款会回收本单发放且<b>尚未被消耗</b>的积分；已被用掉的部分无法扣回，结果会如实提示。
                 </p>
-                <p className="text-[11px] text-muted-foreground">
+                <p className="text-[12px] text-muted-foreground">
                   订单 {action.row.orderNo} · 实付 ¥ {yuan(action.row.paidCents)} · 已退 ¥{' '}
                   {yuan(action.row.refundedCents)} · 可退上限 ¥{' '}
                   {yuan(Math.max(action.row.paidCents - action.row.refundedCents, 0))}
@@ -1132,7 +1132,7 @@ export function AdminOrdersPage() {
               <p>
                 将为每笔订单生成一条 <b>channel=manual</b> 的支付流水，置为已支付并发放对应积分 / 会员权益。
               </p>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[12px] text-muted-foreground">
                 只处理「待支付」状态的订单；已是已支付的订单会返回幂等命中而不重复发放。
               </p>
             </>

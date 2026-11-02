@@ -24,6 +24,7 @@ const { NestFactory } = require('@nestjs/core');
 const { ValidationPipe } = require('@nestjs/common');
 const { AppModule } = require('../src/app.module');
 const { ResponseInterceptor } = require('../src/common/response.interceptor');
+const { PrismaService } = require('../src/prisma/prisma.service');
 
 let pass = 0;
 const fails: string[] = [];
@@ -50,6 +51,7 @@ async function main() {
     }),
   );
   await app.listen(0, '127.0.0.1');
+  const prisma = app.get(PrismaService);
   const address = app.getHttpServer().address();
   const base = `http://127.0.0.1:${address.port}/api/v1`;
 
@@ -80,6 +82,8 @@ async function main() {
     const login = await call('POST', '/auth/login', null, { email: 'admin@admin.com', password: '123456789' });
     ok('管理员登录', login.code === 0 && Boolean(login.data?.accessToken), login);
     const token: string = login.data?.accessToken;
+    const modelRows = (response: any): any[] =>
+      Array.isArray(response?.data) ? response.data : (response?.data?.models ?? []);
     if (!token) throw new Error('无法取得管理员令牌，后续用例终止');
 
     // 清理上一轮遗留的验收渠道，保证脚本可重复运行且不堆积脏数据
@@ -164,6 +168,27 @@ async function main() {
     const wildcardTier = (savedModel.data?.priceTiers ?? []).find((tier: any) => Object.keys(tier.selector).length === 0);
     ok('成本价只属于后台投影', wildcardTier?.costPricing?.unitPriceMicrocredits === 1_200_000, wildcardTier?.costPricing);
 
+    /* ── 2.1 图片价格档必须落在协议声明的计价参数内 ───── */
+    // 调用方省略 capabilityConfig.image.parameters 时，保存路径必须先用协议
+    // 清单归一化合同再校验价格档；否则会保存一个永远命中不了的档位。
+    const contractGuard = await call('POST', `/admin/channels/${channelId}/models`, token, {
+      ...modelBody,
+      modelKey: `verify-image-contract-${stamp}`,
+      providerModelKey: 'gpt-image-1',
+      protocol: 'openai-image',
+      priceTiers: [
+        {
+          selector: { imageResolution: '2k' },
+          billingMode: 'fixed_request',
+          unitPriceMicrocredits: 1_000_000,
+          priceConfigured: true,
+          enabled: true,
+        },
+      ],
+      reason: '验收图片合同',
+    });
+    ok('图片价格档必须落在协议声明的计价参数内', contractGuard.code === 40001, contractGuard);
+
     /* ── 3. 重复模型的保存必须报错 ─────────────────────── */
     const duplicatedModel = await call('POST', `/admin/channels/${channelId}/models`, token, { ...modelBody });
     ok('同渠道重复模型被拒绝', duplicatedModel.code === 40001, duplicatedModel);
@@ -181,8 +206,9 @@ async function main() {
 
     /* ── 5. 排序 CAS ──────────────────────────────────── */
     const order = await call('GET', `/admin/channels/${channelId}/models/order`, token);
-    ok('读取模型排序', order.code === 0 && Array.isArray(order.data), order);
-    const orderIds = (order.data ?? []).map((item: any) => item.id);
+    const orderItems = Array.isArray(order.data) ? order.data : (order.data?.items ?? []);
+    ok('读取模型排序', order.code === 0 && Array.isArray(orderItems), order);
+    const orderIds = orderItems.map((item: any) => item.id);
 
     /* ── 6. 复制渠道（连带价格档） ─────────────────────── */
     const duplicated = await call('POST', `/admin/channels/${channelId}/duplicate`, token, { reason: '验收脚本复制' });
@@ -190,8 +216,11 @@ async function main() {
     const duplicateId: string = duplicated.data?.id;
     ok('复制渠道名称带副本后缀', String(duplicated.data?.name ?? '').endsWith(' - 副本'), duplicated.data?.name);
     const duplicateModels = await call('GET', `/admin/channels/${duplicateId}/models`, token);
-    ok('复制渠道携带模型', (duplicateModels.data ?? []).length === 1, duplicateModels.data?.length);
-    ok('复制渠道携带价格档', (duplicateModels.data?.[0]?.priceTiers ?? []).length === 2, duplicateModels.data?.[0]?.priceTiers?.length);
+    const duplicateModelList = Array.isArray(duplicateModels.data)
+      ? duplicateModels.data
+      : (duplicateModels.data?.models ?? []);
+    ok('复制渠道携带模型', duplicateModelList.length === 1, duplicateModelList.length);
+    ok('复制渠道携带价格档', (duplicateModelList[0]?.priceTiers ?? []).length === 2, duplicateModelList[0]?.priceTiers?.length);
 
     /* ── 7. 导出 / 导入 ───────────────────────────────── */
     const exported = await call('POST', '/admin/channels/export', token, { ids: [duplicateId] });
@@ -229,13 +258,13 @@ async function main() {
     const noReasonDelete = await call('DELETE', `/admin/channels/${duplicateId}`, token, { reason: '' });
     ok('删除渠道：缺少变更原因被拒绝', noReasonDelete.code === 40001, noReasonDelete);
     const noReasonBatchDelete = await call('POST', `/admin/channels/${duplicateId}/models/batch-delete`, token, {
-      ids: (duplicateModels.data ?? []).map((item: any) => item.id),
+      ids: duplicateModelList.map((item: any) => item.id),
       reason: '',
     });
     ok('批量删除模型：缺少变更原因被拒绝', noReasonBatchDelete.code === 40001, noReasonBatchDelete);
 
     const batchDeleted = await call('POST', `/admin/channels/${duplicateId}/models/batch-delete`, token, {
-      ids: (duplicateModels.data ?? []).map((item: any) => item.id),
+      ids: duplicateModelList.map((item: any) => item.id),
       reason: '验收脚本删除模型',
     });
     ok('批量删除渠道模型', batchDeleted.code === 0 && batchDeleted.data?.deleted === 1, batchDeleted);
@@ -253,7 +282,7 @@ async function main() {
      *   3. 成本价或售价未配置的规格 → 拒绝（先补齐再调）。
      */
     const current = await call('GET', `/admin/channels/${channelId}/models`, token);
-    const repriceModel = (current.data ?? []).find((item: any) => item.id === modelId);
+    const repriceModel = modelRows(current).find((item: any) => item.id === modelId);
     const enabledTiers = (repriceModel?.priceTiers ?? []).filter((tier: any) => tier.enabled);
     const repricePayload = (over: Record<string, unknown> = {}) => ({
       models: [
@@ -327,7 +356,7 @@ async function main() {
 
     // 上述三次拒绝都不能落库：售价必须仍是原值
     const afterRejects = await call('GET', `/admin/channels/${channelId}/models`, token);
-    const unchangedModel = (afterRejects.data ?? []).find((item: any) => item.id === modelId);
+    const unchangedModel = modelRows(afterRejects).find((item: any) => item.id === modelId);
     const unchangedTier = (unchangedModel?.priceTiers ?? []).find((tier: any) => tier.id === enabledTiers[0]?.id);
     ok('调价：整批拒绝后售价未被改动', unchangedTier?.unitPriceMicrocredits === enabledTiers[0]?.unitPriceMicrocredits, {
       before: enabledTiers[0]?.unitPriceMicrocredits,
@@ -338,7 +367,7 @@ async function main() {
     ok('批量调价成功', repriced.code === 0 && repriced.data?.updated === 1, repriced);
 
     const afterReprice = await call('GET', `/admin/channels/${channelId}/models`, token);
-    const repricedModel = (afterReprice.data ?? []).find((item: any) => item.id === modelId);
+    const repricedModel = modelRows(afterReprice).find((item: any) => item.id === modelId);
     const repricedTier = (repricedModel?.priceTiers ?? []).find((tier: any) => tier.id === enabledTiers[0]?.id);
     ok('调价后档位售价生效', repricedTier?.unitPriceMicrocredits === 3_000_000, repricedTier?.unitPriceMicrocredits);
     ok('调价后模型价格版本递增', repricedModel?.priceVersion === (repriceModel?.priceVersion ?? 0) + 1, {
@@ -387,6 +416,45 @@ async function main() {
     ok('线路健康无样本时成功率为 null', healthRows.every((row) => row?.windows?.day?.successRate === null || typeof row?.windows?.day?.successRate === 'number'));
     const scoped = await call('GET', `/admin/channel-models/health?channelId=${channelId}`, token);
     ok('线路健康支持按渠道过滤', scoped.code === 0 && (scoped.data?.items ?? []).every((row: any) => row?.channelId === channelId));
+
+    /* ── 14. 复制「只有兼容清单、没有模型行」的旧渠道 ───── */
+    /*
+     * 旧数据只配了 modelsJson 名单、没有 channel_models 行。复制时必须按名单补
+     * 停用骨架行，并保留兼容清单；否则 refreshChannelModelNames 会把 modelsJson
+     * 覆写成 []，副本看起来一个模型都没有。
+     */
+    const legacyName = `验收旧清单-${stamp}`;
+    const legacy = await call('POST', '/admin/channels', token, {
+      name: legacyName,
+      baseUrl: BASE_URL,
+      apiKey: 'sk-verify-legacy',
+      models: [],
+    });
+    const legacyId: string = legacy.data?.id;
+    await prisma.modelChannel.update({
+      where: { id: legacyId },
+      data: { modelsJson: JSON.stringify(['legacy-a', 'legacy-b']) },
+    });
+    const legacyDuplicate = await call('POST', `/admin/channels/${legacyId}/duplicate`, token, {
+      reason: '验收旧清单复制',
+    });
+    const legacyDuplicateId: string = legacyDuplicate.data?.id;
+    const legacyModels = modelRows(await call('GET', `/admin/channels/${legacyDuplicateId}/models`, token));
+    ok('复制旧清单渠道补两条骨架模型', legacyModels.length === 2, legacyModels.length);
+    ok(
+      '骨架模型默认停用且展示名沿用清单',
+      legacyModels.every((item: any) => item.enabled === false) &&
+        legacyModels.map((item: any) => item.displayName).sort().join(',') === 'legacy-a,legacy-b',
+      legacyModels.map((item: any) => ({ key: item.modelKey, name: item.displayName, enabled: item.enabled })),
+    );
+    const legacyDuplicateRow = await prisma.modelChannel.findUnique({ where: { id: legacyDuplicateId } });
+    ok(
+      '复制旧清单渠道保留兼容名单',
+      legacyDuplicateRow?.modelsJson === JSON.stringify(['legacy-a', 'legacy-b']),
+      legacyDuplicateRow?.modelsJson,
+    );
+    await call('DELETE', `/admin/channels/${legacyDuplicateId}`, token, { reason: '验收清理旧清单副本' });
+    await call('DELETE', `/admin/channels/${legacyId}`, token, { reason: '验收清理旧清单渠道' });
 
     /* 供人工核对：保留主渠道，便于在后台页面查看配置结果 */
     console.log(`\n验收渠道已保留：${channelName}（id=${channelId}，模型 id=${modelId}，排序 ${JSON.stringify(orderIds)}）`);

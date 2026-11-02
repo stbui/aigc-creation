@@ -194,7 +194,7 @@ export function AdminLegalPage() {
       key: 'version',
       title: '版本',
       width: 120,
-      render: (row) => <code className="font-mono text-[11px] text-muted-foreground">{row.version}</code>,
+      render: (row) => <code className="font-mono text-[12px] text-muted-foreground">{row.version}</code>,
     },
     {
       key: 'title',
@@ -439,5 +439,5 @@ export function AdminLegalPage() {
 }
 
 function Code({ children }: { children: ReactNode }) {
-  return <code className="rounded bg-muted px-1 font-mono text-[11px]">{children}</code>;
+  return <code className="rounded bg-muted px-1 font-mono text-[12px]">{children}</code>;
 }

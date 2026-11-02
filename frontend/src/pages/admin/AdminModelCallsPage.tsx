@@ -229,7 +229,7 @@ export function AdminModelCallsPage() {
         title: '时间',
         width: 150,
         render: (row) => (
-          <span className="text-[11px] tabular-nums text-muted-foreground">
+          <span className="text-[12px] tabular-nums text-muted-foreground">
             {new Date(row.createdAt).toLocaleString('zh-CN')}
           </span>
         ),
@@ -239,7 +239,7 @@ export function AdminModelCallsPage() {
         title: '状态',
         width: 100,
         render: (row) => (
-          <div className="flex flex-col gap-0.5 text-[11px]">
+          <div className="flex flex-col gap-0.5 text-[12px]">
             <StatusTag
               status={row.status}
               tone={STATUS_TONES[row.status] ?? 'muted'}
@@ -254,7 +254,7 @@ export function AdminModelCallsPage() {
         title: '类型',
         width: 100,
         render: (row) => (
-          <div className="flex flex-col gap-0.5 text-[11px]">
+          <div className="flex flex-col gap-0.5 text-[12px]">
             <span className="text-foreground">{REQUEST_KIND_LABELS[row.requestKind] ?? row.requestKind}</span>
             <span className={row.billable ? 'text-muted-foreground' : 'text-warn-text'}>
               {row.billable ? '计费' : '不计费'}
@@ -268,8 +268,8 @@ export function AdminModelCallsPage() {
         width: 220,
         render: (row) => (
           <div className="min-w-0">
-            <div className="truncate text-[11px] text-foreground">{row.channelName || row.channelId || '—'}</div>
-            <div className="truncate font-mono text-[10px] text-muted-foreground">{row.model || '—'}</div>
+            <div className="truncate text-[12px] text-foreground">{row.channelName || row.channelId || '—'}</div>
+            <div className="truncate font-mono text-[12px] text-muted-foreground">{row.model || '—'}</div>
           </div>
         ),
       },
@@ -278,7 +278,7 @@ export function AdminModelCallsPage() {
         title: '用量',
         width: 160,
         render: (row) => (
-          <div className="flex flex-col gap-0.5 text-[11px] tabular-nums text-muted-foreground">
+          <div className="flex flex-col gap-0.5 text-[12px] tabular-nums text-muted-foreground">
             <span>{row.durationMs} ms{row.pollCount > 1 ? ` · 轮询 ${row.pollCount}` : ''}</span>
             {row.usageAvailable && (
               <span className="text-muted-foreground">
@@ -296,7 +296,7 @@ export function AdminModelCallsPage() {
         width: 220,
         render: (row) =>
           row.error || row.errorCode ? (
-            <div className="min-w-0 text-[11px]">
+            <div className="min-w-0 text-[12px]">
               {row.errorCode && <span className="font-mono text-danger-text">{row.errorCode}</span>}
               <span className="ml-1 line-clamp-1 text-muted-foreground" title={row.error}>
                 {row.error}

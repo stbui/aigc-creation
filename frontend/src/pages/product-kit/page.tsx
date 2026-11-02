@@ -1,13 +1,10 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { App, Input, Modal, Select } from 'antd';
+import { App } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { Maximize2, Minus, Plus, Sparkles } from 'lucide-react';
 
 import {
-  MAX_DESC_LEN,
   MAX_IMAGE_MB,
   MAX_IMAGES,
-  MAX_NAME_LEN,
   VARIANT_FIELDS,
   VARIANT_LABELS,
   type PkResult,
@@ -17,11 +14,14 @@ import {
   MobileUploadModal,
   ModelPicker,
   ResultGalleryPane,
-  ToolImageDropzone,
   ToolSettingsPopover,
   ToolSubmitBar,
   ToolWorkflowSteps,
 } from './components';
+import { ProductKitConfig } from './ProductKitConfig';
+import { ProductKitDescriptionModal } from './ProductKitDescriptionModal';
+import { ProductKitSettings } from './ProductKitSettings';
+import { ProductKitTabs } from './ProductKitTabs';
 import {
   notifyCreditsChanged,
   useAuth,
@@ -35,8 +35,6 @@ import {
 } from './hooks';
 import { generateApi, newIdempotencyKey, promptToolsApi, resolveModelId } from './api';
 import {
-  languageOptions,
-  platformOptions,
   platformSpec,
   pollToResult,
   taskErrorText,
@@ -374,160 +372,38 @@ export function ProductKitPage() {
       <aside className="pk-input-pane">
         <div className="pk-form-card">
           {/* 业务类型 tab: 参考站仅窄屏显示 (桌面端 display:none 实拍确认) */}
-          <div className="pk-editor-tabs" role="tablist" aria-label="业务类型">
-            <button type="button" role="tab" aria-selected className="pk-editor-tab pk-editor-tab-active">
-              商品主图
-            </button>
-            <button type="button" role="tab" aria-selected={false} className="pk-editor-tab" onClick={() => navigate('/product-detail')}>
-              商品详情
-            </button>
-            <button type="button" role="tab" aria-selected={false} className="pk-editor-tab" onClick={() => navigate('/viral-clone')}>
-              爆款复刻
-            </button>
-          </div>
+          <ProductKitTabs />
 
           <div className="pk-form-scroll">
             {/* 上传商品图 + 生成设置 + 商品描述 (参考站同一张卡片) */}
-            <section className="pk-config-card">
-              <ToolImageDropzone
-                title="上传商品图"
-                images={images}
-                max={MAX_IMAGES}
-                maxMb={MAX_IMAGE_MB}
-                uploading={uploading}
-                fileInputRef={fileInputRef}
-                onFiles={(f) => void uploadFiles(f)}
-                onRemove={removeImage}
-                onOpenLibrary={openLibrary}
-                onOpenMobile={mobile.openMobile}
-                noun="商品图片"
-              />
-
-              <div className="pk-section">
-                <strong className="pk-section-title">
-                  <i className="pk-required-mark">*</i>生成设置
-                </strong>
-                <div className="pk-form-grid">
-                  <label className="pk-field">
-                    <span className="pk-field-label">
-                      <i className="pk-required-mark">*</i>商品名称
-                    </span>
-                    <Input
-                      value={productName}
-                      maxLength={MAX_NAME_LEN}
-                      placeholder="* 请输入商品名称"
-                      onChange={(e) => setProductName(e.target.value)}
-                    />
-                  </label>
-                  <label className="pk-field">
-                    <span className="pk-field-label">品牌（选填）</span>
-                    <Input
-                      value={brand}
-                      maxLength={MAX_NAME_LEN}
-                      placeholder="请输入品牌（选填）"
-                      onChange={(e) => setBrand(e.target.value)}
-                    />
-                  </label>
-                  {/* Select 不用 <label> 包裹: label 会把点击转发给内部 input,
-                      已知会让下拉"打开即关闭"; 无障碍名走 aria-label */}
-                  <div className="pk-field">
-                    <span className="pk-field-label">平台</span>
-                    <Select
-                      value={platform}
-                      onChange={changePlatform}
-                      options={platformOptions().map((o) => ({ value: o.value, label: o.label }))}
-                      aria-label="平台"
-                    />
-                  </div>
-                  <div className="pk-field">
-                    <span className="pk-field-label">语言</span>
-                    <Select
-                      value={language}
-                      onChange={setLanguage}
-                      options={languageOptions().map((o) => ({ value: o.value, label: o.label }))}
-                      aria-label="语言"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="pk-section">
-                <div className="pk-field-label-row">
-                  <span className="pk-section-title">
-                    <i className="pk-required-mark">*</i>商品描述
-                  </span>
-                  <div className="pk-desc-actions">
-                    <button
-                      type="button"
-                      className="pk-ai-btn"
-                      disabled={analyzing}
-                      onClick={() => void runAiAnalyze()}
-                    >
-                      <Sparkles size={12} />
-                      <span>{analyzing ? '分析中…' : 'AI分析'}</span>
-                    </button>
-                  </div>
-                </div>
-                <div className="pk-desc-editor">
-                  <textarea
-                    rows={3}
-                    maxLength={MAX_DESC_LEN}
-                    value={description}
-                    placeholder="* 请输入商品描述"
-                    onChange={(e) => setDescription(e.target.value)}
-                  />
-                  <button
-                    type="button"
-                    className="pk-desc-expand"
-                    aria-label="放大编辑商品描述"
-                    title="放大编辑"
-                    onClick={() => setExpandOpen(true)}
-                  >
-                    <Maximize2 size={14} />
-                  </button>
-                </div>
-              </div>
-            </section>
+            <ProductKitSettings
+              images={images}
+              uploading={uploading}
+              fileInputRef={fileInputRef}
+              onFiles={(f) => void uploadFiles(f)}
+              onRemove={removeImage}
+              onOpenLibrary={openLibrary}
+              onOpenMobile={mobile.openMobile}
+              productName={productName}
+              onProductNameChange={setProductName}
+              brand={brand}
+              onBrandChange={setBrand}
+              platform={platform}
+              onPlatformChange={changePlatform}
+              language={language}
+              onLanguageChange={setLanguage}
+              description={description}
+              onDescriptionChange={setDescription}
+              analyzing={analyzing}
+              onAnalyze={() => void runAiAnalyze()}
+              onExpandDescription={() => setExpandOpen(true)}
+            />
 
             {/* 自定义配置 */}
-            <section className="pk-config-card">
-              <div className="pk-section">
-                <strong className="pk-section-title">自定义配置</strong>
-                <div className="pk-count-grid">
-                  {VARIANT_FIELDS.map((v) => (
-                    <label key={v.key} className="pk-count-field">
-                      <span className="pk-count-label">{v.label}</span>
-                      <div className="pk-number-control">
-                        <button
-                          type="button"
-                          aria-label={`减少${v.label}`}
-                          onClick={() => setCounts((c) => ({ ...c, [v.key]: Math.max(0, (c[v.key] ?? 0) - 1) }))}
-                        >
-                          <Minus size={13} />
-                        </button>
-                        <input
-                          type="number"
-                          min={0}
-                          max={5}
-                          value={counts[v.key] ?? 0}
-                          onChange={(e) => {
-                            const n = Number(e.target.value);
-                            setCounts((c) => ({ ...c, [v.key]: Number.isFinite(n) ? Math.min(5, Math.max(0, Math.round(n))) : 0 }));
-                          }}
-                        />
-                        <button
-                          type="button"
-                          aria-label={`增加${v.label}`}
-                          onClick={() => setCounts((c) => ({ ...c, [v.key]: Math.min(5, (c[v.key] ?? 0) + 1) }))}
-                        >
-                          <Plus size={13} />
-                        </button>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </section>
+            <ProductKitConfig
+              counts={counts}
+              onCountChange={(key, value) => setCounts((c) => ({ ...c, [key]: value }))}
+            />
           </div>
 
 
@@ -609,23 +485,12 @@ export function ProductKitPage() {
       <MobileUploadModal open={mobile.open} onReceived={mobile.addAssets} onCancel={mobile.closeMobile} />
 
       {/* 商品描述放大编辑 */}
-      <Modal
+      <ProductKitDescriptionModal
         open={expandOpen}
-        title="编辑商品描述"
-        okText="确定"
-        cancelText="取消"
-        onOk={() => setExpandOpen(false)}
-        onCancel={() => setExpandOpen(false)}
-      >
-        <textarea
-          className="pk-expand-textarea"
-          rows={10}
-          maxLength={MAX_DESC_LEN}
-          value={description}
-          placeholder="* 请输入商品描述"
-          onChange={(e) => setDescription(e.target.value)}
-        />
-      </Modal>
+        description={description}
+        onChange={setDescription}
+        onClose={() => setExpandOpen(false)}
+      />
     </div>
   );
 }

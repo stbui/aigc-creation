@@ -80,13 +80,13 @@ export function ChannelModelTagsEditor({
 
         {tags.some((tag) => tag.text.trim() !== '') && (
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] text-muted-foreground">展示预览</span>
+            <span className="text-[12px] text-muted-foreground">展示预览</span>
             {tags
               .filter((tag) => tag.text.trim() !== '')
               .map((tag, index) => (
                 <span
                   key={`${tag.text}-${index}`}
-                  className="rounded-full border border-border px-2 py-0.5 text-[11px]"
+                  className="rounded-full border border-border px-2 py-0.5 text-[12px]"
                   style={{
                     color: `var(--tag-${tag.color}, var(--brand))`,
                     borderColor: `var(--tag-${tag.color}-border, var(--border))`,

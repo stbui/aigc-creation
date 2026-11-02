@@ -61,7 +61,7 @@ export function BatchResultModal<T = unknown>({
       key: 'message',
       title: '原因',
       render: (row) => (
-        <span className="text-[11px] text-muted-foreground">{row.message ?? '—'}</span>
+        <span className="text-[12px] text-muted-foreground">{row.message ?? '—'}</span>
       ),
     },
   ];

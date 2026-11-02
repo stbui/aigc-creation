@@ -654,10 +654,22 @@ export interface BillingOrderView {
   errorText: string;
   resolutionNote: string;
   resolvedBy: string;
+  /**
+   * 退款归类。`route_switch` = 线路切换的内部重预留（钱没离开平台，
+   * **不计入「已退」**）；其余为真实退款。
+   */
+  refundReason: string;
   startedAt: string | null;
   settledAt: string | null;
   refundedAt: string | null;
   createdAt: string;
+}
+
+export interface BillingBatchResolveResult {
+  total: number;
+  resolved: number;
+  failed: number;
+  results: Array<{ id: string; ok: boolean; error?: string }>;
 }
 
 export interface BillingOrderListResult {

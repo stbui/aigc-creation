@@ -16,7 +16,7 @@ import { Injectable } from '@nestjs/common';
 import { ModelDomainError } from '../domain/json';
 import { PluginManifestStore } from '../plugins/plugin-manifest.store';
 import { ProtocolRegistry } from './registry';
-import type { ManifestCapability, ManifestProvider } from './types';
+import type { ManifestCapability, ManifestImageParameter, ManifestProvider } from './types';
 
 /** 后台渠道可挂载的表面（参考实现 `ManifestSurface`） */
 export const ADMIN_SURFACE = 'admin.system-channel';
@@ -39,6 +39,8 @@ export interface ProtocolCatalogEntry {
   selectable: boolean;
   /** 清单声明的可挂载表面；空数组 = 未声明（视为可挂载） */
   surfaces: string[];
+  /** 协议声明的图片参数合同（渠道模型默认能力配置的来源） */
+  imageParameters: ManifestImageParameter[];
 }
 
 @Injectable()
@@ -114,6 +116,7 @@ export class ProtocolCatalogService {
         pluginId: item.pluginId,
         selectable: true,
         surfaces: [...(provider.scopes ?? [])],
+        imageParameters: [...(provider.imageParameters ?? [])],
       });
     }
 
@@ -131,6 +134,7 @@ export class ProtocolCatalogService {
         pluginId: metadata.pluginId ?? (metadata.source === 'builtin' ? 'builtin' : ''),
         selectable: true,
         surfaces: existing?.surfaces ?? [],
+        imageParameters: metadata.imageParameters ?? existing?.imageParameters ?? [],
       });
     }
 

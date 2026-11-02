@@ -63,7 +63,7 @@ export function AdminFinancePage() {
   };
 
   const dayColumns: Array<AdminColumn<FinanceDayRow>> = [
-    { key: 'date', title: '日期', width: 120, render: (row) => <span className="font-mono text-[11px]">{row.date}</span> },
+    { key: 'date', title: '日期', width: 120, render: (row) => <span className="font-mono text-[12px]">{row.date}</span> },
     { key: 'orders', title: '订单', width: 90, align: 'right', render: (row) => row.orders },
     {
       key: 'settled',
@@ -108,7 +108,7 @@ export function AdminFinancePage() {
     {
       key: 'label',
       title: label,
-      render: (row) => <span className="font-mono text-[11px] text-foreground">{row.label || '—'}</span>,
+      render: (row) => <span className="font-mono text-[12px] text-foreground">{row.label || '—'}</span>,
     },
     { key: 'orders', title: '订单', width: 80, align: 'right', render: (row) => row.orders },
     {

@@ -141,7 +141,7 @@ export class TicketsService {
     const where = { userId, ...(query.status ? { status: query.status } : {}) };
     const take = Math.min(Math.max(Number(query.limit) || 20, 1), 50);
     const skip = Math.max(Number(query.offset) || 0, 0);
-    const [items, total] = await Promise.all([
+    const [items, total, statusGroups] = await Promise.all([
       this.prisma.ticket.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -150,10 +150,19 @@ export class TicketsService {
         include: { _count: { select: { replies: true } } },
       }),
       this.prisma.ticket.count({ where }),
+      // 筛选标签需要“全量各状态数量”，不能只统计当前页
+      this.prisma.ticket.groupBy({
+        by: ['status'],
+        where: { userId },
+        _count: { _all: true },
+      }),
     ]);
     return {
       items: items.map((t) => ({ ...this.shape(t), replyCount: t._count.replies })),
       total,
+      statusCounts: Object.fromEntries(
+        statusGroups.map((row) => [row.status, row._count._all]),
+      ),
     };
   }
 

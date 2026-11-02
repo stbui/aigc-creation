@@ -106,7 +106,7 @@ export function Panel({
               </h2>
             )}
             {note && (
-              <CardDescription className="mt-0.5 text-[11.5px]">{note}</CardDescription>
+              <CardDescription className="mt-0.5 text-[12px]">{note}</CardDescription>
             )}
           </div>
           {extra && <div className="flex shrink-0 items-center gap-2">{extra}</div>}
@@ -155,7 +155,7 @@ export function StatCard({
       >
         {value}
       </div>
-      {hint && <div className="mt-0.5 text-[11px] leading-4 text-muted-foreground">{hint}</div>}
+      {hint && <div className="mt-0.5 text-[12px] leading-4 text-muted-foreground">{hint}</div>}
     </Card>
   );
 }

@@ -150,7 +150,7 @@ export function ChannelUpstreamDialog({
                       {exists && (
                         <StatusTag status="upstream-existing" tone="muted" label="已存在" />
                       )}
-                      <span className="shrink-0 text-[11px] text-muted-foreground">
+                      <span className="shrink-0 text-[12px] text-muted-foreground">
                         {item.displayName || item.modelType || ''}
                       </span>
                     </span>

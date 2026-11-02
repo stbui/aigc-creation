@@ -17,6 +17,7 @@ import type { ModelChannel, Prisma } from '@prisma/client';
 import { AppError } from '../../common/app.exception';
 import { PrismaService } from '../../prisma/prisma.service';
 import { normalizeCapability, normalizeModelCapabilityConfig } from '../domain/capability-config';
+import type { ModelCapabilityConfig } from '../domain/capability-config';
 import type { ImageParameter } from '../domain/image-parameters';
 import { badRequest, normalizeModelKey, toSafeAmount, uniqueNonEmpty } from '../domain/json';
 import {
@@ -151,7 +152,7 @@ export class ChannelModelService {
     if ([...description].length > 500) throw badRequest('模型描述不能超过 500 字');
 
     const contract = this.normalizeContract(channel, req);
-    const { modelKey, providerModelKey, capability, protocol } = contract;
+    const { modelKey, providerModelKey, capability, protocol, imageParameters } = contract;
     const channelLabel = channelLabelInput === providerModelKey ? '' : channelLabelInput;
     if ([...channelLabel].length > 80) throw badRequest('渠道展示名不能超过 80 字');
 
@@ -168,11 +169,12 @@ export class ChannelModelService {
           protocol,
           model: providerModelKey,
           input: req.capabilityConfig ?? null,
+          imageParameterDefinitions: imageParameters,
         })
       : null;
     const capabilityConfigJson = capabilityConfig ? JSON.stringify(capabilityConfig) : '';
 
-    const tiers = this.normalizePriceTiers(req, capability, providerModelKey);
+    const tiers = this.normalizePriceTiers(req, capability, providerModelKey, capabilityConfig);
     const previousProviderModelKey = existing ? normalizeModelKey(existing.providerModelKey) : '';
     if (previousProviderModelKey && providerModelKey !== previousProviderModelKey) {
       for (const tier of tiers) {
@@ -255,10 +257,24 @@ export class ChannelModelService {
 
   async setEnabled(channelId: string, id: string, enabled: boolean): Promise<void> {
     const model = await this.requireModel(channelId, id);
+    const next = Boolean(enabled);
+    if (model.enabled === next) return;
+    /*
+     * 启用前必须已配置能力与协议。
+     *
+     * 参考实现把这条当硬约束（`app/admin_channel_model_health.go`）：没有协议的
+     * 空壳模型一旦启用，就会进入路由目录成为一条必然失败的线路 ——
+     * 值班时表现为「线路挂了」，而不是「配置没填完」。
+     */
+    if (next && (!model.capability || !model.protocol)) {
+      throw badRequest('模型尚未配置能力与请求协议，请先补全后再启用');
+    }
     await this.prisma.$transaction(async (tx) => {
+      // 启停只改可见性，不动 priceVersion：否则一次无关的开关会让并发批量调价
+      // 误报「价格已变化」。与上游 admin_channel_model_health.go 一致。
       await tx.channelModel.update({
         where: { id: model.id },
-        data: { enabled: Boolean(enabled), priceVersion: model.priceVersion + 1 },
+        data: { enabled: next },
       });
       await refreshChannelModelNames(tx, channelId);
     });
@@ -541,7 +557,7 @@ export class ChannelModelService {
     if (protocol.requiresSecretKey && String(channel.secretKey ?? '').trim() === '') {
       throw badRequest(`${protocol.label} 需要先在渠道中配置 Access Key 与 Secret Key`);
     }
-    return { modelKey, providerModelKey, capability, protocol: protocol.id };
+    return { modelKey, providerModelKey, capability, protocol: protocol.id, imageParameters: protocol.imageParameters };
   }
 
   /**
@@ -554,9 +570,12 @@ export class ChannelModelService {
     req: ChannelModelRequest,
     capability: string,
     fallbackProviderModelKey: string,
+    capabilityConfig: ModelCapabilityConfig | null,
   ): PriceTierWrite[] {
+    // 必须用「归一化后」的合同校验价格档；直接读 req 会在调用方省略 parameters 时
+    // 跳过图片参数校验，保存出与协议不匹配的选择器（对齐上游 channel_models.go）。
     const imageParameters: ImageParameter[] | undefined =
-      capability === 'image' ? req.capabilityConfig?.image?.parameters : undefined;
+      capability === 'image' ? capabilityConfig?.image?.parameters : undefined;
     const inputs: ChannelModelPriceTierRequest[] =
       req.priceTiers && req.priceTiers.length > 0
         ? req.priceTiers

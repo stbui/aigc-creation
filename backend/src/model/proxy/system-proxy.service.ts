@@ -26,7 +26,7 @@ import { UserGroupService } from '../user-groups/user-group.service';
 import { ChannelSlotService } from '../tasks/channel-slot.service';
 import { ChannelUnavailableError } from '../channels/channel-runtime.service';
 import { OutboundError, outboundRequest, validateOutboundUrl } from '../infra/outbound';
-import { sanitizeCallPayload } from './proxy.payload';
+import { ensureChatCompletionStreamUsage, sanitizeCallPayload } from './proxy.payload';
 import {
   ProxyPathError,
   authorizeSystemProxy,
@@ -122,6 +122,17 @@ export class SystemProxyService {
       return;
     }
     const { channelModel, authorization } = resolved;
+
+    // Token 计费的流式 Chat Completions 必须让上游回最终 usage，否则账单只能转
+    // uncertain。只改这一种路径，非流式/非 Token 请求原样透传。
+    if (method === 'POST' && channelModel?.billingMode === 'token' && path.endsWith('/chat/completions')) {
+      try {
+        input.body = ensureChatCompletionStreamUsage(input.body);
+      } catch (error) {
+        writeProxyError(res, 400, 40001, messageOf(error));
+        return;
+      }
+    }
 
     // 目标地址：先拼版本前缀，再附上剥离密钥后的查询串
     let target: string;

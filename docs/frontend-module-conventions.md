@@ -1,10 +1,14 @@
 # 前端功能目录分层约定
 
-状态：现行（与 `frontend/src/pages/admin/channels/`、`frontend/src/pages/product-detail/`、`frontend/src/pages/product-kit/`、`frontend/src/pages/viral-clone/`、`frontend/src/pages/creative-image/`、`frontend/src/pages/product-sku/`、`frontend/src/pages/local-redraw/`、`frontend/src/pages/background-remove/`、`frontend/src/pages/watermark-remove/`、`frontend/src/pages/product-retouch/`、`frontend/src/pages/image-translate/`、`frontend/src/pages/image-expand/`、`frontend/src/pages/product-recolor/`、`frontend/src/pages/rotate-angle/`、`frontend/src/pages/multi-image-fusion/`、`frontend/src/pages/account/`、`frontend/src/pages/checkout/` 同步维护）。
+状态：现行（与 `frontend/src/pages/admin/channels/`、`frontend/src/pages/admin/payments/`、`frontend/src/pages/product-detail/`、`frontend/src/pages/product-kit/`、`frontend/src/pages/viral-clone/`、`frontend/src/pages/creative-image/`、`frontend/src/pages/product-sku/`、`frontend/src/pages/local-redraw/`、`frontend/src/pages/background-remove/`、`frontend/src/pages/watermark-remove/`、`frontend/src/pages/product-retouch/`、`frontend/src/pages/image-translate/`、`frontend/src/pages/image-expand/`、`frontend/src/pages/product-recolor/`、`frontend/src/pages/rotate-angle/`、`frontend/src/pages/multi-image-fusion/`、`frontend/src/pages/account/`、`frontend/src/pages/checkout/` 同步维护）。
 
 适用于 `frontend/src/pages/**` 下**多文件**的功能目录。单文件页面不强制套用；
 当页面长到需要拆分时，按本约定落位。参考实现见
-[`frontend/src/pages/admin/channels/`](../frontend/src/pages/admin/channels/)（后台）
+[`frontend/src/pages/admin/channels/`](../frontend/src/pages/admin/channels/)、
+[`frontend/src/pages/admin/payments/`](../frontend/src/pages/admin/payments/)（后台；
+后者是**多标签页**形态：`page.tsx` 只做标签切换与 URL 同步，四个标签各自
+一个 `<业务组件>.tsx`，状态文案与动作判定放在 `constants.ts`，金额/积分等
+展示函数放在 `utils.ts`）
 与 [`frontend/src/pages/product-detail/`](../frontend/src/pages/product-detail/)、
 [`frontend/src/pages/product-kit/`](../frontend/src/pages/product-kit/)、
 [`frontend/src/pages/viral-clone/`](../frontend/src/pages/viral-clone/)、
@@ -154,7 +158,7 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
 - 分层改动后跑：
 
   ```bash
-  cd frontend && npx vitest run src/pages/admin/__tests__/admin-modules.test.ts src/pages/product-detail src/pages/product-kit src/pages/viral-clone src/pages/creative-image src/pages/product-sku src/pages/local-redraw src/pages/background-remove src/pages/watermark-remove src/pages/product-retouch src/pages/image-translate src/pages/image-expand src/pages/product-recolor src/pages/rotate-angle src/pages/multi-image-fusion src/pages/account src/pages/checkout
+  cd frontend && npx vitest run src/pages/admin/__tests__/admin-modules.test.ts src/pages/product-detail src/pages/product-kit src/pages/viral-clone src/pages/creative-image src/pages/product-sku src/pages/local-redraw src/pages/background-remove src/pages/watermark-remove src/pages/product-retouch src/pages/image-translate src/pages/image-expand src/pages/product-recolor src/pages/rotate-angle src/pages/multi-image-fusion src/pages/account src/pages/checkout src/pages/admin/payments
   ```
 
 - 类型校验以 `npm run typecheck` 为准。

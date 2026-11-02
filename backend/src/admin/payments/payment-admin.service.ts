@@ -12,6 +12,14 @@ import {
 } from '../../payments/payment-query';
 import { PAYMENT_CURRENCIES, PaymentCurrency } from '../../payments/adapters/types';
 
+/**
+ * 支付域导出上限。
+ *
+ * 财务导出是对账的正式交付物，超过上限必须报错而不是静默截断 ——
+ * 少几行的账单比直接失败更危险。
+ */
+export const PAYMENT_EXPORT_LIMIT = 10_000;
+
 /** 列表投影：只取页面用到的字段，禁止 include 全量关联造成 N+1 */
 const ORDER_LIST_SELECT = {
   id: true,
@@ -229,10 +237,22 @@ export class AdminPaymentsService {
 
   async ordersForExport(query: Parameters<AdminPaymentsService['orders']>[0]) {
     const where = buildAdminPaymentOrderWhere(query, new Date());
+    /*
+     * 导出是财务的正式交付物，超过上限**必须报错**，不能静默截断。
+     * 静默截断会让人拿着一份缺行的账单去对账，比直接失败危险得多。
+     */
+    const total = await this.prisma.order.count({ where });
+    if (total > PAYMENT_EXPORT_LIMIT) {
+      throw new AppError(
+        40001,
+        `筛选结果共 ${total} 笔，超过单次导出上限 ${PAYMENT_EXPORT_LIMIT} 笔，请缩小时间范围或分批导出`,
+        400,
+      );
+    }
     const rows = await this.prisma.order.findMany({
       where,
       orderBy: orderByOf(query.sort),
-      take: 10_000,
+      take: PAYMENT_EXPORT_LIMIT,
       select: ORDER_LIST_SELECT,
     });
     const now = new Date();
@@ -404,17 +424,54 @@ export class AdminPaymentsService {
       if (Number(data.periodDays) <= 0 || Number(data.periodPurchaseLimit) <= 0) {
         throw new AppError(40001, '周期购买需要同时填写周期天数与限购次数', 400);
       }
+      if (Number(data.periodDays) > 365) throw new AppError(40001, '周期天数不能超过 365 天', 400);
+      if (Number(data.periodPurchaseLimit) > 999) {
+        throw new AppError(40001, '周期限购次数不能超过 999', 400);
+      }
     }
     if (strategy === 'timed') {
       if (!data.saleStartAt || !data.saleEndAt) {
         throw new AppError(40001, '限时商品必须填写开始与结束时间', 400);
       }
     }
+    if (strategy === 'inventory') {
+      /*
+       * 0 不是「不限量」：下单校验按 `stockTotal - stockSold - stockReserved`
+       * 计算，0 会让任何购买都报库存不足。库存商品必须显式填写正数。
+       */
+      if (Number(data.stockTotal) < 1) {
+        throw new AppError(40001, '库存商品必须填写大于 0 的库存总量', 400);
+      }
+      if (Number(data.stockTotal) > 1_000_000) {
+        throw new AppError(40001, '库存总量不能超过 1,000,000', 400);
+      }
+    }
     if (!PAYMENT_CURRENCIES.includes(data.currency as PaymentCurrency)) {
       throw new AppError(40001, '币种只支持 CNY / USD', 400);
     }
     if (Number(data.priceCents) < 1) throw new AppError(40001, '售价最低 1 分', 400);
+    if (Number(data.priceCents) > 10_000_000) {
+      throw new AppError(40001, '售价不能超过 100,000 元', 400);
+    }
+    if (
+      data.originalPriceCents !== null &&
+      Number(data.originalPriceCents) < Number(data.priceCents)
+    ) {
+      throw new AppError(40001, '划线价不能低于售价', 400);
+    }
     if (Number(data.credits) < 1) throw new AppError(40001, '积分最低 1', 400);
+    if (Number(data.credits) > 10_000_000) {
+      throw new AppError(40001, '单商品积分不能超过 10,000,000', 400);
+    }
+    if (Number(data.creditsValidDays) < 0 || Number(data.creditsValidDays) > 3650) {
+      throw new AppError(40001, '积分有效期必须在 0–3650 天之间', 400);
+    }
+    if (Number(data.sortOrder) < 0 || Number(data.sortOrder) > 9999) {
+      throw new AppError(40001, '排序值必须在 0–9999 之间', 400);
+    }
+    if (!['unlimited', 'periodic', 'inventory', 'timed'].includes(strategy)) {
+      throw new AppError(40001, '上架策略非法', 400);
+    }
     return data;
   }
 }

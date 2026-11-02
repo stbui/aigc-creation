@@ -143,6 +143,7 @@ import type {
   AdminChannelView,
   AdminLogicalModelView,
   ApiLogListResult,
+  BillingBatchResolveResult,
   BillingOrderListResult,
   BillingOrderView,
   ChannelHealthRowView,
@@ -703,6 +704,10 @@ export const ordersApi = {
  * 暂不可用」, 不能回落到沙箱装作成功。
  */
 export const paymentsApi = {
+  /** C 端支付设置：默认币种 + 该币种下可用渠道（公开） */
+  settings: () =>
+    request<{ defaultCurrency: string; providers: PaymentProviderInfo[] }>('/payments/settings'),
+
   /**
    * 当前可用支付渠道。
    *
@@ -1381,14 +1386,18 @@ async function downloadCsv(path: string, filename?: string): Promise<void> {
     const body = await res.json().catch(() => ({}));
     throw new Error(extractErrorMessage(body, '导出失败'));
   }
-  // 文件名以后端 Content-Disposition 为准, 没给才用调用方兜底
+  // 文件名以后端 Content-Disposition 为准, 没给才用调用方兜底。
+  // 优先 filename*=UTF-8''...（RFC 5987，中文文件名正确解码），再退回 ASCII filename。
   const disposition = res.headers.get('Content-Disposition') ?? '';
-  const matched = /filename="?([^";]+)"?/.exec(disposition);
+  const utf8Match = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
+  const asciiMatch = /filename="?([^";]+)"?/i.exec(disposition);
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = matched?.[1] ?? filename ?? 'export.csv';
+  a.download = utf8Match
+    ? decodeURIComponent(utf8Match[1])
+    : asciiMatch?.[1] ?? filename ?? 'export.csv';
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -2233,6 +2242,13 @@ export const adminBillingOrdersApi = {
     request<BillingOrderView>(`/admin/billing-orders/${id}/resolve`, {
       method: 'POST',
       body: { action, reason },
+    }),
+
+  /** 批量核对：逐条独立处置，返回每条结果 */
+  batchResolve: (ids: string[], action: 'settle' | 'refund', reason: string) =>
+    request<BillingBatchResolveResult>(`/admin/billing-orders/batch-resolve`, {
+      method: 'POST',
+      body: { ids: ids.join(','), action, reason },
     }),
 };
 

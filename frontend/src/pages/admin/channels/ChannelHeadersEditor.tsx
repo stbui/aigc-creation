@@ -38,7 +38,7 @@ export function ChannelHeadersEditor({
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <div className="text-xs font-medium text-foreground">自定义请求头</div>
-          <div className="mt-0.5 break-all text-[11px] leading-4 text-muted-foreground">
+          <div className="mt-0.5 break-all text-[12px] leading-4 text-muted-foreground">
             默认发送 {DEFAULT_USER_AGENT}；添加 User-Agent 后会覆盖默认值。
           </div>
         </div>
@@ -95,7 +95,7 @@ export function ChannelHeadersEditor({
         >
           添加请求头
         </ActionButton>
-        <span className={validation ? 'text-[11px] text-danger-text' : 'text-[11px] text-muted-foreground'}>
+        <span className={validation ? 'text-[12px] text-danger-text' : 'text-[12px] text-muted-foreground'}>
           {validation || `${headers.length}/${MAX_HEADER_COUNT}`}
         </span>
       </div>

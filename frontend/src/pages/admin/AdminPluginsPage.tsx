@@ -14,7 +14,7 @@ import {
   Notice,
   PageHeader,
   Panel,
-  Skeleton,
+  SkeletonBody,
   StatCard,
   StatusTag,
   StaleError,
@@ -226,7 +226,7 @@ export function AdminPluginsPage() {
               label={row.origin === 'installed' ? '上传' : '内置'}
             />
           </div>
-          <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">
+          <div className="mt-0.5 truncate font-mono text-[12px] text-muted-foreground">
             {row.id} · v{row.version}
           </div>
         </div>
@@ -283,7 +283,7 @@ export function AdminPluginsPage() {
       key: 'contributions',
       title: '贡献',
       render: (row) => (
-        <span className="line-clamp-2 text-[11px] text-muted-foreground">
+        <span className="line-clamp-2 text-[12px] text-muted-foreground">
           {contributionText(row)}
         </span>
       ),
@@ -294,7 +294,7 @@ export function AdminPluginsPage() {
       width: 130,
       render: (row) =>
         row.verify ? (
-          <div className="flex flex-col gap-0.5 text-[11px]">
+          <div className="flex flex-col gap-0.5 text-[12px]">
             {row.verify.ok ? (
               <StatusTag status="ok" tone="success" label="通过" />
             ) : (
@@ -369,7 +369,7 @@ export function AdminPluginsPage() {
       render: (row) => (
         <div className="min-w-0">
           <div className="truncate font-medium text-foreground">{row.name}</div>
-          <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{row.id}</div>
+          <div className="mt-0.5 truncate font-mono text-[12px] text-muted-foreground">{row.id}</div>
         </div>
       ),
     },
@@ -383,14 +383,14 @@ export function AdminPluginsPage() {
       key: 'version',
       title: '版本',
       width: 80,
-      render: (row) => <span className="font-mono text-[11px]">v{row.version}</span>,
+      render: (row) => <span className="font-mono text-[12px]">v{row.version}</span>,
     },
     {
       key: 'endpoint',
       title: '接口',
       width: 280,
       render: (row) => (
-        <div className="min-w-0 text-[11px]">
+        <div className="min-w-0 text-[12px]">
           <div className="text-muted-foreground">{row.apiFormat || '—'}</div>
           <div className="truncate font-mono text-muted-foreground" title={row.baseUrl}>
             {row.baseUrl || '—'}
@@ -406,7 +406,7 @@ export function AdminPluginsPage() {
         row.protocols.length === 0 ? (
           <span className="text-muted-foreground">—</span>
         ) : (
-          <span className="line-clamp-2 text-[11px] text-muted-foreground">
+          <span className="line-clamp-2 text-[12px] text-muted-foreground">
             {row.protocols.join(' · ')}
           </span>
         ),
@@ -525,10 +525,8 @@ export function AdminPluginsPage() {
         note="停用只影响新建调用的协议解析：引用该协议的渠道模型会在调用时失败并退款。"
       >
         {loading && items.length === 0 ? (
-          <div className="flex flex-col gap-2 py-2">
-            <Skeleton rows={4} />
-            <p className="text-center text-xs text-muted-foreground">加载插件清单…</p>
-          </div>
+          /* 面板外壳已经是实的，只替内容行 */
+          <SkeletonBody rows={4} />
         ) : (
           <>
             {error && <StaleError error={error} onRetry={() => void reload()} />}
@@ -629,7 +627,7 @@ export function AdminPluginsPage() {
 
             <div>
               <div className="mb-1 text-xs font-semibold text-foreground">Provider</div>
-              <table className="w-full text-[11px]">
+              <table className="w-full text-[12px]">
                 <thead className="bg-muted text-muted-foreground">
                   <tr>
                     <th className="px-2 py-1.5 text-left">ID</th>
@@ -660,11 +658,11 @@ export function AdminPluginsPage() {
             <div>
               <div className="mb-1 text-xs font-semibold text-foreground">配置项</div>
               {detail.configuration.length === 0 ? (
-                <p className="text-[11px] text-muted-foreground">该插件没有声明配置项。</p>
+                <p className="text-[12px] text-muted-foreground">该插件没有声明配置项。</p>
               ) : (
                 <ul className="flex flex-col gap-1.5">
                   {detail.configuration.map((field) => (
-                    <li key={field.name} className="rounded-lg border border-border px-2.5 py-2 text-[11px]">
+                    <li key={field.name} className="rounded-lg border border-border px-2.5 py-2 text-[12px]">
                       <div className="flex items-center gap-1.5">
                         <span className="font-mono text-foreground">{field.name}</span>
                         <span className="text-muted-foreground">{field.type}</span>

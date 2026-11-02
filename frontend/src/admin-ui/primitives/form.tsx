@@ -157,7 +157,7 @@ export function TextField({
         className="h-8 bg-background text-sm disabled:bg-muted"
       />
       {showCount && maxLength !== undefined && (
-        <span className="pointer-events-none absolute right-0 -bottom-4 text-[10px] text-muted-foreground tabular-nums">
+        <span className="pointer-events-none absolute right-0 -bottom-4 text-[12px] text-muted-foreground tabular-nums">
           {value.length}/{maxLength}
         </span>
       )}
@@ -203,7 +203,7 @@ export function TextAreaField({
         className="resize-none text-sm"
       />
       {showCount && maxLength !== undefined && (
-        <span className="pointer-events-none absolute right-0 -bottom-4 text-[10px] text-muted-foreground tabular-nums">
+        <span className="pointer-events-none absolute right-0 -bottom-4 text-[12px] text-muted-foreground tabular-nums">
           {value.length}/{maxLength}
         </span>
       )}
@@ -683,3 +683,34 @@ export function ActionButton({
     </Button>
   );
 }
+
+/*
+ * shadcn 官方 `Field` 组合件：FieldSet / FieldGroup / Field + Label /
+ * Description / Error。与上面的 `FormField` 并存 —— `FormField` 是后台既有的
+ * 单字段容器，`Field*` 用于需要自定义排布（分组、横向、分隔）的表单。
+ */
+export {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSeparator,
+  FieldSet,
+  FieldTitle,
+} from '../components/ui/field';
+
+/*
+ * shadcn 官方 `InputGroup` 组合件：输入框 + 前后缀 / 行内按钮 / 文本。
+ * 用于「一个输入框里带单位、搜索图标或操作按钮」的形态；单纯一个输入框仍用 `TextField`。
+ */
+export {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+  InputGroupText,
+  InputGroupTextarea,
+} from '../components/ui/input-group';

@@ -85,6 +85,20 @@ export const STATUS_FILTER_OPTIONS = [
 
 export const PAGE_SIZE = 20;
 
+/** 「全部模型」视图的状态筛选：比单渠道清单多「不健康」一档 */
+export type AllModelsStatusFilter = 'all' | 'enabled' | 'disabled' | 'unhealthy' | 'unpriced';
+
+export const ALL_MODELS_STATUS_OPTIONS: Array<{ value: AllModelsStatusFilter; label: string }> = [
+  { value: 'all', label: '全部' },
+  { value: 'enabled', label: '启用' },
+  { value: 'disabled', label: '停用' },
+  { value: 'unhealthy', label: '不健康' },
+  { value: 'unpriced', label: '未定价' },
+];
+
+/** 跨渠道清单每页条数：数据已全量在内存，页大一点少翻页 */
+export const ALL_MODELS_PAGE_SIZE = 50;
+
 export const BILLING_MODE_OPTIONS = [
   { value: 'fixed_request', label: '按次' },
   { value: 'per_second', label: '按时长（秒）' },
@@ -96,8 +110,6 @@ export const CURRENCY_OPTIONS = [
   { value: 'USD', label: '美元' },
   { value: 'CNY', label: '人民币' },
 ];
-
-export const TAG_COLOR_OPTIONS = ['purple', 'blue', 'green', 'gold', 'orange', 'pink'];
 
 export interface TierDraft {
   selector: string;

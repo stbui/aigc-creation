@@ -11,8 +11,8 @@
  *   2. 素材归属 / 遮罩 / 标注校验先于计价：遮罩不属于本人却先扣了积分，
  *      用户会为一次注定失败的任务付费；
  *   3. 模型解析先于计价：价格档挂在具体线路上，没选出线路就没有价；
- *   4. 计价先于预留，预留先于建任务：建完任务却预留失败会留下「排队中但
- *      永远不动」的任务（worker 有兜底，但那只是补偿，不是设计）。
+ *   4. 计价之后，**建任务 + 建单 + 预留在一个事务里完成**：分两步会留下
+ *      「排队中但永远不动」的任务（worker 有兜底，但那只是补偿，不是设计）。
  *
  * 失败语义
  * --------
@@ -23,6 +23,7 @@
 
 import { randomUUID } from 'node:crypto';
 import { Injectable, Logger } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
 import { AppError } from '../../common/app.exception';
 import { getCapability, sanitizeParams, validateCapabilityParams } from '../../capabilities/capability.registry';
@@ -206,7 +207,7 @@ export class TaskAdmissionService {
       ...(batchId ? { batchId, batchIndex: index + 1, batchSize } : {}),
     });
     /** 子任务与父任务共用同一份线路与价格快照，各自承担一份计费 */
-    const taskBase = {
+    const taskBase: Omit<Prisma.GenerationTaskUncheckedCreateInput, 'params'> = {
       projectId: dto.projectId,
       ownerId,
       capability: dto.capability,
@@ -223,19 +224,30 @@ export class TaskAdmissionService {
       heartbeatAt: new Date(),
     };
 
-    // 13. 建任务（先建后预留：账单需要 taskId）
-    let task: { id: string; status: string; creditCost: number };
-    try {
-      task = await this.prisma.generationTask.create({
-        data: {
-          ...taskBase,
-          params: JSON.stringify(paramsFor(0)),
-          idempotencyKey,
-          creditCost,
-        },
-        select: { id: true, status: true, creditCost: true },
-      });
-    } catch (error) {
+    /*
+     * 13. 建任务 + 建账单 + 预留积分：**同一个事务**。
+     *
+     * 为什么必须同事务：账单要挂 taskId，所以看起来只能「先建任务再预留」。
+     * 但那样进程在两步之间崩溃会留下「排队中但没有账单」的任务 ——
+     * 用户已授权、任务却永远不动。旧实现靠 `recoverUnbilledQueued` 补偿，
+     * 那是兜底不是设计。现在把三步放进一个 Prisma 事务：
+     *   · 余额不足 → 整批任务与账单一起回滚，不留半个任务；
+     *   · 崩溃 → 事务整体回滚，要么全有要么全无。
+     *
+     * 幂等键的并发处理留在事务外：唯一约束冲突时要回查赢家任务，
+     * 在事务内回查会看到未提交的行。
+     */
+    const taskIds = await this.createTasksWithBilling({
+      ownerId,
+      idempotencyKey,
+      creditCost,
+      taskBase,
+      paramsFor,
+      outputs,
+      draft,
+      amountMicrocredits,
+      freeCampaignId,
+    }).catch(async (error: unknown): Promise<string[] | AdmissionResult> => {
       // 同一幂等键的并发请求：唯一约束只放一个进来，失败方拿回赢家任务
       if (idempotencyKey && (error as { code?: string })?.code === 'P2002') {
         const existing = await this.prisma.generationTask.findUnique({
@@ -243,46 +255,90 @@ export class TaskAdmissionService {
         });
         if (existing) return toResult(existing, true);
       }
+      if (error instanceof AppError && error.code === 40002) {
+        throw new AppError(40201, error.message, 402);
+      }
       throw error;
-    }
+    });
+    if (!Array.isArray(taskIds)) return taskIds; // 幂等命中：直接返回赢家任务
 
-    // 其余 N-1 张：逐个建（后续要按任务 id 各建一张账单），中途失败整批删掉
-    const batchTaskIds = [task.id];
-    try {
+    // 事务提交后取回首张任务（返回体需要状态与展示价）
+    const task = await this.prisma.generationTask.findUnique({
+      where: { id: taskIds[0] },
+      select: { id: true, status: true, creditCost: true },
+    });
+    if (!task) throw new AppError(50001, '任务创建后读取失败', 500);
+
+    return {
+      taskId: task.id,
+      status: 'queued',
+      // 本次合计：N 张各自一张账单，前端按这个数提示用户付了多少
+      creditCost: creditCost * taskIds.length,
+      idempotentHit: false,
+      ...(batchId ? { batchId, batchSize } : {}),
+    };
+  }
+
+  /**
+   * 建任务 + 建账单 + 预留积分，**同一个事务**。
+   *
+   * 账单要挂 taskId，所以直觉上只能「先建任务再预留」。但那样进程在两步之间
+   * 崩溃会留下「排队中但没有账单」的任务 —— 用户已授权、任务却永远不动。
+   * 旧实现靠 `recoverUnbilledQueued` 补偿，那是兜底不是设计。三步放进一个
+   * Prisma 事务后：
+   *   · 余额不足 → 整批任务与账单一起回滚，不留半个任务；
+   *   · 进程崩溃 → 事务整体回滚，要么全有要么全无。
+   *
+   * 多图产出每张一条账单、各自独立结算与退款，但**整批同生共死**。
+   */
+  private async createTasksWithBilling(params: {
+    ownerId: string;
+    idempotencyKey?: string;
+    creditCost: number;
+    taskBase: Omit<Prisma.GenerationTaskUncheckedCreateInput, 'params'>;
+    paramsFor: (index: number) => Record<string, any>;
+    outputs: Array<{ params: Record<string, any> }> | null;
+    draft: BillingDraft;
+    amountMicrocredits: bigint;
+    freeCampaignId?: string;
+  }): Promise<string[]> {
+    const { ownerId, idempotencyKey, creditCost, taskBase, paramsFor, outputs, draft } = params;
+    return this.prisma.$transaction(async (tx) => {
+      const ids: string[] = [];
+      const parent = await tx.generationTask.create({
+        data: {
+          ...taskBase,
+          params: JSON.stringify(paramsFor(0)),
+          idempotencyKey,
+          creditCost,
+        },
+        select: { id: true },
+      });
+      ids.push(parent.id);
       for (let index = 1; outputs && index < outputs.length; index += 1) {
-        const child = await this.prisma.generationTask.create({
+        const child = await tx.generationTask.create({
           data: {
             ...taskBase,
             params: JSON.stringify(paramsFor(index)),
             creditCost,
-            parentTaskId: task.id,
+            parentTaskId: parent.id,
           },
           select: { id: true },
         });
-        batchTaskIds.push(child.id);
+        ids.push(child.id);
       }
-    } catch (error) {
-      await this.deleteBatch(task.id);
-      throw error;
-    }
 
-    /*
-     * 14. 预留积分：每张图一条账单，整批在一个事务里预留。
-     *
-     * 余额不够付整批时整批不成立（账单与预授权一起回滚），不会出现「只付了
-     * 前几张的钱」。事务提交后才把 billingOrderId 写回任务；这一步若中断，
-     * `recoverUnbilledQueued` 会按 taskId 找回账单重新挂上。
-     */
-    try {
+      // 每张图一条账单，整批在**同一个事务**里预留：余额不够付整批就是整批不成立
       const reserved = await this.billing.reserveBatchBilling({
         userId: ownerId,
         // 首轮账单的幂等键按任务区分：切线时的替换账单用另一套键
-        items: batchTaskIds.map((taskId) => ({ taskId, idempotencyKey: `task:${taskId}` })),
-        draft: { ...draft, amountMicrocredits },
-        promotionId: freeCampaignId || undefined,
+        items: ids.map((taskId) => ({ taskId, idempotencyKey: `task:${taskId}` })),
+        draft: { ...draft, amountMicrocredits: params.amountMicrocredits },
+        promotionId: params.freeCampaignId || undefined,
+        tx,
       });
       for (const item of reserved) {
-        await this.prisma.generationTask.update({
+        await tx.generationTask.update({
           where: { id: item.taskId },
           data: {
             billingOrderId: item.order.id,
@@ -290,25 +346,11 @@ export class TaskAdmissionService {
           },
         });
       }
-    } catch (error) {
-      await this.deleteBatch(task.id);
-      if (error instanceof AppError && error.code === 40002) {
-        throw new AppError(40201, error.message, 402);
-      }
-      throw error;
-    }
-
-    return {
-      taskId: task.id,
-      status: 'queued',
-      // 本次合计：N 张各自一张账单，前端按这个数提示用户付了多少
-      creditCost: creditCost * batchTaskIds.length,
-      idempotentHit: false,
-      ...(batchId ? { batchId, batchSize } : {}),
-    };
+      return ids;
+    });
   }
 
-  /** 整批删除（父任务 + 其子任务）。建单失败时不能留下半套任务 */
+  /** 整批删除（父任务 + 其子任务）。仅用于存量数据清理；新建路径已改为同事务，不再需要补偿删除 */
   private async deleteBatch(parentTaskId: string): Promise<void> {
     await this.prisma.generationTask
       .deleteMany({ where: { OR: [{ id: parentTaskId }, { parentTaskId }] } })

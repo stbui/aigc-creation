@@ -1,6 +1,12 @@
 # CLAUDE.md
 
-本文件为 Claude Code (claude.ai/code) 在本仓库工作时提供上下文。定位：**建立坐标 + 单向约束 + 易踩坑**；实现细节指路到代码与 `docs/`，不在此复述。
+本文件是 Claude Code 在本仓库的作业上下文。定位：**坐标 + 硬约束 + 踩坑**；实现细节指路到代码与 `docs/`，不在此复述。
+
+三句话记住这个仓库：
+
+1. 模型调用只有 `backend/src/model/**` 一条链路。
+2. 能力清单只在 `capabilities/definitions/` 定义。
+3. 后台组件只有 shadcn 一套，页面只从 `admin-ui/primitives` 取件。
 
 ## 先读这里
 
@@ -14,11 +20,11 @@
 | 权限点 | `backend/src/admin/permissions.ts` |
 | 退款与站点设置默认值 | `backend/src/common/setting-defs.ts` 的 `SETTING_DEFS` |
 | 工单状态机 | `backend/src/tickets/tickets.service.ts` 的 `TRANSITIONS` |
-| 协议与推荐模型 | `backend/plugins/<plugin>/manifest.json`（107 个可用包；目录下另有 3 个 `src-*` 源目录镜像，运行时不生效）；服务商目录见 `src/model/plugins/provider-catalog.service.ts` |
+| 协议与推荐模型 | `backend/plugins/<plugin>/manifest.json`（107 个可用包 / 115 个 provider；另有 3 个 `src-*` 源目录镜像，运行时不生效）；服务商目录见 `src/model/plugins/provider-catalog.service.ts` |
 | 渠道 / 前台模型 / 价格档 | 数据库（后台「渠道工作台」「前台模型」「用户分组」）—— 代码里没有默认线路表 |
 | 账单状态机 | `backend/src/model/billing/billing.service.ts` 的 `BILLING_STATUSES` |
 | 启动期环境变量 | `backend/src/config/env.validation.ts` 的 `ENV_SPECS` |
-| 设计令牌 | `frontend/src/styles/global.css` 的 `:root`；shadcn 语义变量经 `frontend/src/admin-ui/styles/shadcn-theme.css` 桥接，不另定义色值 |
+| 设计令牌 | `frontend/src/styles/global.css` 的 `:root`；shadcn 语义变量经 `frontend/src/styles/admin.css` 的 `@theme inline` 桥接，不另定义色值 |
 | AIGC 角标默认样式 | `backend/src/common/aigc-label.config.ts` 的 `AIGC_LABEL_DEFAULTS`；运行期由后台「AI 标识」页覆盖 |
 | 后台侧栏与页面分组 | `frontend/src/components/admin/adminNav.ts` 的 `ADMIN_MENU` |
 | 接口清单 / 错误码 / 响应信封 | `docs/api-contract.md` |
@@ -26,23 +32,18 @@
 
 ## 账号
 
-开发 / 测试后台预设账号
-admin@admin.com	123456789
-
-生产环境不设默认账号密码，必须通过 `ADMIN_EMAIL` / `ADMIN_PASSWORD` 或 `seed:admin` 生成并保存一次性密码。
-
-可用的测试账号
-test@admin.com
-dev@admin.com
-uat@admin.com
+- **后台管理员（development / test）**：`admin@admin.com` / `123456789`。
+- **普通测试账号**：`test@admin.com`、`dev@admin.com`、`uat@admin.com`。
+- **生产环境不设默认账号密码**：必须通过 `ADMIN_EMAIL` / `ADMIN_PASSWORD` 或 `seed:admin` 生成并保存一次性密码。
 
 ## 开发要点
 
-- 优先使用成熟开源库，如果不满足需求才考虑自研
-- 页面注释参照 JSDoc
-- 开发阶段，不写兼容代码
-- 工业级代码，完整产品
-- 后台页面不要设计移动端，不做响应式设计
+- **组件优先用 shadcn，禁止重复造轮子**：先查 `admin-ui/components/ui` 是否已有；缺的用 `shadcn add` 拉官方件（**拉完必须跑 `frontend/scripts/post-shadcn.mjs`** 改写 `cn` 引用）；官方确实没有、或改造成本明显高于收益才手写。手写件按用途落进 `admin-ui/primitives/layout|form|display|table|overlay|fields`，再从 `primitives/index.ts` 导出。
+- 优先使用成熟开源库，不满足需求才考虑自研。
+- 页面注释参照 JSDoc。
+- 开发阶段不写兼容代码。
+- 工业级代码，完整产品。
+- 后台页面不做移动端、不做响应式设计。
 
 ## 项目概览
 
@@ -50,10 +51,10 @@ uat@admin.com
 
 当前形态 = **C 端创作站 + 独立后台管理端 + 商业运营域 + 账户合规/服务域**：
 
-- **16 项能力**（全部 `real`，0 `mock` / 0 `planned`，12 项进工作台）。**图像、文本、视频都只允许真实模型产出**：无模型线路即失败并退款，不交付伪结果。
-- **生成通道**：唯一链路是 `src/model/**` —— 渠道 → 渠道模型 → 前台模型 revision/线路 → 路由/冷却 → 任务执行 → 账单。建任务必带 `logicalModelId`（来自 `GET /models`）；协议来自 `plugins/` 内置插件清单（107 个可用包 / 115 个 provider），代码里没有手写协议实现。旧三层（`src/providers/**`、`GATEWAY_*`、`ModelCallLog`、`/admin/model-config`）已整体删除，**不存在并存期**。
-- **后台管理端**（`/admin`）35 个页面，权限点 + 审计 + 定时任务 + 备份 + 存储切换。
-- **商业域**：商品 / 订单 / 支付 / 退款 / 积分账本 / 会员 / 优惠券 / 限时活动 / 邀请签到 / 发票 / 渠道对账。
+- **16 项能力**（全部 `real`，0 `mock` / 0 `planned`；15 项 image + 1 项 video；12 项进工作台）。**图像、文本、视频都只允许真实模型产出**：无模型线路即失败并退款，不交付伪结果。
+- **生成通道**：唯一链路是 `src/model/**` —— 渠道 → 渠道模型 → 前台模型 revision/线路 → 路由/冷却 → 任务执行 → 账单。建任务必带 `logicalModelId`（来自 `GET /models`）；协议来自 `plugins/` 内置插件清单，代码里没有手写协议实现。旧三层（`src/providers/**`、`GATEWAY_*`、`ModelCallLog`、`/admin/model-config`）已整体删除，**不存在并存期**。
+- **后台管理端**（`/admin`）34 个页面、8 个侧栏分组，权限点 + 审计 + 定时任务 + 备份 + 存储切换。
+- **商业域**：商品 / 订单 / 支付 / 退款 / 积分账本 / 会员 / 优惠券 / 限时活动 / 邀请签到 / 发票 / 支付对账。
 - **账户与合规域**：找回密码 / 短信登录 / 扫码登录 / 第三方登录（OAuth2 / OIDC）/ 自助注销与数据导出 / 法务版本化与同意留痕 / 站内消息 / AIGC 标识 / 限流 / 健康检查 / 请求追踪。
 - **服务域**：工单、后台全局搜索、批量动作与 CSV 导入导出。
 
@@ -69,9 +70,9 @@ uat@admin.com
 | 鉴权/加密 | jsonwebtoken / bcryptjs | 9.0.3 / 3.0.3 |
 | 前端 | Vite + React + antd + lucide-react + react-router-dom | 8.3.4 / 19.3.0 / 6.6.6 / 1.57.0 / 7.18.4 |
 | 前端其他 | qrcode（邀请海报 / 扫码登录）/ Playwright（e2e） | 1.5.4 / `^1.64.1`（仅 e2e 允许 `^`） |
-| 后台 UI | shadcn/ui 源码自持 + radix-ui + cva + clsx + tailwind-merge + Tailwind v4 | 自持 / 1.8.1 / 0.7.1 / 2.1.1 / 3.7.0 / 4.3.3 |
-| 后台 UI（遗留） | BoardUI 免费层（vendor 源码，**组件已零引用**，仅剩 `cx` 与颜色 token 词汇） | 源码锁 `ec5c5eb` |
+| 后台 UI | shadcn/ui 源码自持（`radix-ui` 底座，`new-york`）+ cva + `cn`（官方包）+ Tailwind v4 + tw-animate-css | 自持 / 1.8.1 / 0.7.1 / 0.5.1 / 4.3.3 / 1.4.0 |
 | 前端测试 | Vitest + jsdom + Testing Library | 5.0.5 / 30.1.3 / 16.3.3 |
+| 后端测试 | Vitest + @nestjs/testing + supertest（node 环境） | 5.0.5 / 12.1.3 / 7.1.4 |
 | 语言 | TypeScript | 后端 5.7.2 / 前端 7.0.2 |
 
 **版本必须精确锁定**。本机 npm 走 broker 代理，大批量安装会触发 5 分钟硬超时，依赖实际是用 `curl` + `tar` 直装 registry 装出来的 —— 详见「环境注意事项」第 4 条。
@@ -85,7 +86,7 @@ TS 配置差异（勿统一）：后端 `strict: false` / `strictNullChecks: fal
 ```
 aigc-creation/
 ├── start.sh                  # 一键启动（--env development|test|prod；处理端口占用/CORS/建表/种子）
-├── README.md                 # 现状速查：页面结构 / 能力清单 / 启动 / 接口 / 页面规格 / 环境坑
+├── README.md                 # 现状速查：页面结构 / 能力清单 / 启动 / 接口 / 环境坑
 ├── docs/                     # 需求 / 产品 / 技术 / 测试 / 规划五类，地图见 docs/README.md
 │   ├── prd.md                # ★ 需求：整站产品需求、数据模型、非功能要求
 │   ├── environments.md       # ★ 技术：三环境变量矩阵 / 加载优先级 / 生产门禁 / Docker / 排查
@@ -94,9 +95,10 @@ aigc-creation/
 │   ├── runtime-infrastructure.md # ★ 技术：AIGC 标识 / 签名 URL / 限流 / 健康 / 追踪 / 日志
 │   ├── testing.md            # ★ 测试：四层测试、闸口清单、覆盖矩阵、已知缺口
 │   ├── development-workflow.md # ★ Agent 执行手册：执行卡 / 闸口命令 / 证据标准 / 交人边界
-│   ├── admin-*.md            # 需求 + 产品：后台 PRD / 功能 / 详细 / 界面 / 总体设计
+│   ├── admin-*.md            # 需求 + 产品：后台 PRD / 总体 / 功能 / 详细 / 界面
 │   ├── commerce-design.md    # 产品：支付 / 积分 / 订单 / 商品 / 会员 / 营销
-│   ├── <页面>-design.md      # 产品：C 端页面规格（workbench / topnav / login / library）
+│   ├── <页面>-design.md      # 产品：C 端页面规格（landing / workbench / topnav / login / library / packages）
+│   ├── channel-model-design.md / payment-refactor-design.md # 设计记录（已实施 / 部分实施）
 │   └── agent-*.md            # 规划：AI 智能体需求与集成方案（未实施）
 ├── docker-compose.yml        # 本地编排：默认=dev，--profile test=test（不同卷、不同库）
 ├── docker-compose.production.yml # 生产单机编排：migrate 门禁 / 健康探针 / 持久卷 / 仅本机监听
@@ -106,6 +108,8 @@ aigc-creation/
 │   ├── prisma.config.ts      # Prisma 7 连接配置（datasource url 移出 schema；按 NODE_ENV 选档）
 │   ├── Dockerfile            # 三阶段镜像（node:24-slim；deps → build → prod）
 │   ├── scripts/              # seed* / smoke* / verify* / db-url
+│   ├── vitest.config.mts     # 后端 Vitest（node 环境；src 下 *.spec.ts）
+│   ├── tsconfig.spec.json    # 测试专用类型检查（不参与 nest build）
 │   ├── .env.development / .env.test / .env.production.example  # 三档 env（前两份入库）
 │   ├── .env.example          # 环境变量总清单（唯一事实源在 src/config/env.validation.ts）
 │   └── src/
@@ -128,15 +132,14 @@ aigc-creation/
     ├── nginx.conf.template   # SPA 回退 + /api 反代 + /uploads 直出（envsubst 模板）
     ├── .env.development / .env.test / .env.production.example
     └── src/
-        ├── App.tsx           # 28 条壳内路由 + 9 条独立页 + /admin/* 子应用
-        ├── admin-ui/         # 后台 UI：shell/AdminBoardLayout · primitives · controls · widgets · providers · lib
-        ├── vendor/boardui/   # BoardUI 源码（MIT，上游原样；组件已零引用，仅剩 cx 与 token 词汇）
-        ├── components/       # AppLayout / SideRail / ToolShell / QrLoginPanel / admin/（控件入口 + adminNav + AlertCenter + DutyBand + statusMeta）
-        ├── pages/            # 35 个 C 端页面 + pages/admin/ 35 个后台页面
+        ├── App.tsx           # 29 条壳内路由 + 3 条裸外壳页 + 6 条独立页 + /admin/* 子应用
+        ├── admin-ui/         # 后台 UI：components/ui（shadcn 原子件）· primitives（页面唯一取用层）· shell · providers · hooks · lib
+        ├── components/       # AppLayout / SideRail / ToolShell / QrLoginPanel / admin/（adminNav + AlertCenter + DutyContext + statusMeta）
+        ├── pages/            # 35 个 C 端页面 + pages/admin/ 34 个后台页面
         ├── lib/              # api.ts（request 拆信封）/ http / auth / capabilities / aigc-label / constants
         ├── context/          # AuthContext / AdminContext（权限点）/ CreditsContext
         ├── hooks/            # useToolTask / useProject / useCapabilities / usePollAbort / 上传相关
-        └── styles/           # global.css（设计令牌 + 全站规则）+ boardui.css（后台 Tailwind 入口）
+        └── styles/           # global.css（设计令牌 + 全站规则）+ admin.css（后台 Tailwind 入口 + shadcn 语义桥接）
 ```
 
 `backend/uploads`（UPLOAD_DIR）、`backend/logs`（LOG_DIR）、`backend/backups`（BACKUP_DIR）均为运行期产物，不入库。
@@ -150,15 +153,19 @@ aigc-creation/
                             #      --backend-only / --frontend-only / --no-follow
                             #      --daemon（PID 记 .run/start.pids）/ --stop（只停）
 
-# 工程门禁（根目录；Node 版本 + 依赖审计 + 构建 + 前端/agent 单测 + 仿真网关）
+# 工程门禁（根目录；Node 版本 + 依赖审计 + 构建 + 后端/前端/agent 单测 + 仿真网关）
 npm run check
 
-# 手动
+# 后端
 cd backend && npm run build && node dist/main.js   # 不要用 nest start（会拒绝清空 dist）
 npm run prisma:push         # 建表（首次或 schema 变更后）
 npm run db:reset:test       # ★ 删测试库+测试目录 → 重建 → 重灌种子（带安全门禁）
 npm run seed                # 需 SEED_USER_EMAIL；未设置则什么都不建
 npm run seed:admin          # 后台管理员（dev/test 预设 admin@admin.com / 123456789；生产随机密码）
+npm test                    # 先 tsc -p tsconfig.spec.json，再 Vitest（node，无需起服务）
+npm run test:typecheck      # 只做 spec 类型检查
+npm run test:watch          # 后端 watch
+npm run test:coverage       # 后端覆盖率（v8）
 
 # 前端
 cd frontend
@@ -170,6 +177,8 @@ npm run e2e                 # Playwright
 ```
 
 - **种子与冒烟都连当前 `NODE_ENV` 对应的库**（`scripts/db-url.js`）：在测试档跑必须先 `NODE_ENV=test`，否则写的是开发库。
+- **后端单测/集成约定**：`backend/src/**/*.spec.ts`，Vitest node 环境。纯函数与可 mock 的 service 逻辑直接测；需要真实 SQLite 的 HTTP 集成用 `@nestjs/testing` + `supertest` + 临时库（参考 `payments.integration.spec.ts`），不碰 dev.db/test.db、不依赖已启动服务。真实渠道与部署级链路仍走 `scripts/verify-*` / `smoke-*`，两者不互相替代。
+- 根目录 `npm test` 依次跑 `test:backend` / `test:frontend` / `test:agent` / `test:gateway`；只跑后端用 `npm --prefix backend test`。
 - 冒烟 / verify 脚本按域分组，完整清单与执行前置见 `docs/testing.md`；依赖一致性审计用 `npm run verify:deps:critical`。
 - 环境体系自检：`cd backend && npx ts-node -T scripts/probe-environments.ts`。
 - Docker 与生产编排见 `docs/docker-deployment.md`；其余命令见 `docs/environments.md`。
@@ -185,7 +194,7 @@ npm run e2e                 # Playwright
 关键字段：`id / name / group / summary / sidebarHint / badge / mode / modality / buildPrompt / creditCost / inputs(0|1|2) / inWorkbench / help / params[]`。**不存在 `localImpl` / `localFallback`**。
 
 - `mode`（实现程度）：`real` 已接真实模型；`mock` / `planned` 保留枚举但当前 0 项。
-- `modality`（产出介质），与 `mode` 正交：`image` / `text` / `video`。当前 15 项 image + 1 项 video；`text` 用于提示词工具等非能力项。
+- `modality`（产出介质），与 `mode` 正交：当前 15 项 `image` + 1 项 `video`；`text` 用于提示词工具等非能力项。
 - 新任务 `task.provider` 恒为 `gateway`，`status` 初值 `queued`；`local` 只表示存量历史产出的来源。
 - 新增能力时按实际实现程度声明 `mode`：未实现写 `planned`，不得补本地占位或伪模型结果。
 
@@ -209,50 +218,35 @@ npm run e2e                 # Playwright
 > 完整分层、请求时序、选路规则、失败语义、计费口径见 **`docs/model-architecture.md`**；
 > 设计动机见 `docs/channel-model-design.md`。本节只留必须记住的约束。
 
-**四张表就是四个事实源**：`ModelChannel`（渠道，凭证加密）→ `ChannelModel` + `ChannelModelPriceTier`（供应侧线路 + 价格档）→
-`LogicalModel` + `LogicalModelRevision` + `LogicalModelRoute`（C 端可见身份 + 发布快照 + 线路）。**代码里没有任何内置线路**，零配置 = 能力 `unavailable`。
+**四张表就是四个事实源**：`ModelChannel`（渠道，凭证加密）→ `ChannelModel` + `ChannelModelPriceTier`（供应侧线路 + 价格档）→ `LogicalModel` + `LogicalModelRevision` + `LogicalModelRoute`（C 端可见身份 + 发布快照 + 线路）。**代码里没有任何内置线路**，零配置 = 能力 `unavailable`。
 
-**命名空间必须分清**：`ChannelModel.capability` 是供应侧模态（`image/text/video/audio`）；
-`LogicalModel.capability` 是 C 端能力 id（`free_create` / `expand` / …）。混用表现为「有这个能力的模型，但模型不可用」。
+**命名空间必须分清**：`ChannelModel.capability` 是供应侧模态（`image/text/video/audio`）；`LogicalModel.capability` 是 C 端能力 id（`free_create` / `expand` / …）。混用表现为「有这个能力的模型，但模型不可用」。
 
-**渠道模型 `protocol` 存的是插件声明里的 provider id，不是插件 id**。`plugins/openai-images/manifest.json` 声明
-`providers[0].id = "openai-image"`，渠道模型必须写 `openai-image`；写成 `openai-images` 派发时报
-`channel_unavailable`（「协议尚未注册执行器」）。后台下拉读注册表，正常操作不会踩到 —— 手写库或导入时会。
+**渠道模型 `protocol` 存的是插件声明里的 provider id，不是插件 id**。`plugins/openai-images/manifest.json` 声明 `providers[0].id = "openai-image"`，渠道模型必须写 `openai-image`；写成 `openai-images` 派发时报 `channel_unavailable`（「协议尚未注册执行器」）。后台下拉读注册表，正常操作不会踩到 —— 手写库或导入时会。
 
-**任务状态与错误码**：`queued / running / succeeded / failed / cancelled`（`pending` 废止）；
-`42201` 生成失败 / `42202` 中断 / `42203` 标识失败 / `42204` 无可用线路 / `42205` 遮罩无 edits 线路 / `42206` **结果不明**。
+**任务状态与错误码**：`queued / running / succeeded / failed / cancelled`（`pending` 废止）；`42201` 生成失败 / `42202` 中断 / `42203` 标识失败 / `42204` 无可用线路 / `42205` 遮罩无 edits 线路 / `42206` **结果不明**。
 
 ### 选路与失败语义
 
-选路（`router.service.ts`）：产品能力合同匹配 → 候选池过滤（启用 / 权重 > 0 / 本轮未试 / 未冷却 / 分组可见 /
-`channel` 策略须命中价格档）→ **只保留最高 `priority` 一层** → 同层按 `weight` 加权随机（crypto + 拒绝采样）。
-选出来的 `RoutedModel` 一次带给任务快照、账单、调用日志，**下游任何一层都不许替换供应侧字段**。
+选路（`router.service.ts`）：产品能力合同匹配 → 候选池过滤（启用 / 权重 > 0 / 本轮未试 / 未冷却 / 分组可见 / `channel` 策略须命中价格档）→ **只保留最高 `priority` 一层** → 同层按 `weight` 加权随机（crypto + 拒绝采样）。选出来的 `RoutedModel` 一次带给任务快照、账单、调用日志，**下游任何一层都不许替换供应侧字段**。
 
-**切线只发生在 `rejected_no_job`**（请求没发出去 / 401 / 403 / 404 / 429）。超时、5xx、连接中断一律判
-**结果不明**（`42206`）：不切线、不自动退款，账单停 `uncertain` 等人工核对 —— 上游可能已经把图生成了，
-切线会二次计费、自动退款会白送一次产出。
+**切线只发生在 `rejected_no_job`**（请求没发出去 / 401 / 403 / 404 / 429）。超时、5xx、连接中断一律判 **结果不明**（`42206`）：不切线、不自动退款，账单停 `uncertain` 等人工核对 —— 上游可能已经把图生成了，切线会二次计费、自动退款会白送一次产出。
 
-**冷却只对明确可归因的失败生效**：401/403 冷却渠道 10min，404 冷却该渠道模型 10min，429 冷却
-`Retry-After` 或 30s；**超时与 5xx 永不冷却**（上游抖动时关 10 分钟会把一次偶发故障放大成整段不可用）。
-冷却存进程内存，多实例各自判定。
+**冷却只对明确可归因的失败生效**：401/403 冷却渠道 10min，404 冷却该渠道模型 10min，429 冷却 `Retry-After` 或 30s；**超时与 5xx 永不冷却**（上游抖动时关 10 分钟会把一次偶发故障放大成整段不可用）。冷却存进程内存，多实例各自判定。
 
 **切线必须换账单**：新线路的价格档可能不同，沿用旧账单等于「按 A 的价收、走 B 的线路」。
 
 ### 目录快照与例外
 
-`route-catalog.service.ts` 是唯一读供给的入口：TTL 30s，库短暂不可用时沿用旧快照最多 5min，
-首次装载失败直接报错（**不把空目录当「全部不可用」**）。本进程写入后 `invalidateLocal()`，多进程最多滞后一个 TTL。
-排障第一条：**改完模型层不看快照就等于没改**。
+`route-catalog.service.ts` 是唯一读供给的入口：TTL 30s，库短暂不可用时沿用旧快照最多 5min，首次装载失败直接报错（**不把空目录当「全部不可用」**）。本进程写入后 `invalidateLocal()`，多进程最多滞后一个 TTL。排障第一条：**改完模型层不看快照就等于没改**。
 
-**格式按字节魔数判定，不看 URL 后缀**（`src/model/media/image-format.ts`）：多家返回的链接无扩展名，
-猜错会把 PNG 字节以 `image/jpeg` 入库。
+**格式按字节魔数判定，不看 URL 后缀**（`src/model/media/image-format.ts`）：多家返回的链接无扩展名，猜错会把 PNG 字节以 `image/jpeg` 入库。
 
-**文本工具**（提示词润色 / 图文互转）不走任务与账单，但走同一条真实链路：无可用线路或全部失败抛 `50201`（HTTP 502），
-**不拼接模板文案**；每次尝试写一条 `ApiCallLog`（`source='tool'`、`billable=false`）。
+**文本工具**（提示词润色 / 图文互转）不走任务与账单，但走同一条真实链路：无可用线路或全部失败抛 `50201`（HTTP 502），**不拼接模板文案**；每次尝试写一条 `ApiCallLog`（`source='tool'`、`billable=false`）。
 
 ### 计费与钱包
 
-- **建单与预留同一事务**：先建单后预留失败会留下永远不结算的账单。扣费在**建任务时**，任务快照 `creditCost` 与账单金额同源。
+- **建任务 + 建单 + 预留同一事务**：先建任务后预留失败会留下永远不结算的账单与「排队但无账单」的任务。扣费在**建任务时**，任务快照 `creditCost` 与账单金额同源。
 - 已结算账单不许自动退款、已退款账单不许再结算。**`uncertain` 只能人工 `settle` / `refund`**，必须填原因并写审计。
 - Token 结算以上游 usage 为准；上游没给用量时，视频按提交时的公式快照，其余显式失败转人工 —— **绝不按预授权金额静默结清**。
 - `CreditAccount.available == Σ CreditLot.remaining` 恒成立；退款按 `CreditReservationItem` **原路**退回原批次（保留原到期时间），不造新批次。
@@ -283,20 +277,22 @@ npm run e2e                 # Playwright
 
 **权限链**：`AdminGuard`（身份）→ `PermissionGuard`（权限点）→ controller → `AuditInterceptor`（落 `AdminAuditLog`）。权限点定义在 `src/admin/permissions.ts`。**前端 `AdminContext.can()` 只用于隐藏无权限按钮，不是安全边界**；真正的校验必须在后端。
 
-35 个页面、8 个侧栏分组以 `adminNav.ts` 的 `ADMIN_MENU` 为准；页面功能、接口与交互见 `docs/admin-console-design.md` / `admin-detailed-design.md`。
+34 个页面、8 个侧栏分组以 `adminNav.ts` 的 `ADMIN_MENU` 为准；页面功能、接口与交互见 `docs/admin-console-design.md` / `admin-detailed-design.md`。
 
 - 高危动作（删除 / 重置密码 / 退款 / 手动调整积分 / 渠道 / 前台模型写入 / 角色与系统设置写入 / 手动备份）须填原因并写审计（`HIGH_RISK_PERMISSIONS`）。
 - 批量动作：`ids ≤ 100`，`runBatch` 串行、**不包事务**，逐条返回结果；路由挂较弱读权限，处理器内再判动作权限。
 - CSV 统一走 `common/csv.ts`（BOM + RFC4180 + 公式注入前导 `'`）；前端 `downloadCsv()` 不走 JSON 信封。
-- **后台组件是一套 shadcn**（2026-11-01 完成全量迁移，无并存、无开关、无回滚）。35 个页面 + 外壳 + 浮层全部渲染自 `admin-ui/components/ui`（shadcn 源码自持）。
-  - 页面**不直连** `components/ui`。控件一律经 `admin-ui/shadcn`（新页面直写）或 `admin-ui/shadcn/kit`（存量页整页换皮层）取用；`kit` 的导出件与旧 BoardUI 版**同名同签名**，所以迁移时页面业务代码零改动。
-  - `admin-ui/controls` / `primitives` / `primitives/DataTable|Dialog|Drawer` / `widgets/AdminChrome` / `components/admin/PageHeader|AdminWidgets` 现在**都只是转发层**（→ `shadcn/kit`）。它们存在的唯一理由是让 35 页的 import 不用改；新代码直接用 `admin-ui/shadcn`。
-  - vendor `frontend/src/vendor/boardui/` 保持上游原样不改（来源见 `PROVENANCE.md`）。**组件引用已归零**（`grep vendor/boardui/components` 应为 0），目前只剩两处依赖：`admin-ui/lib/cn.ts` 的 `cx`，以及 `styles/boardui.css` 里 vendor `theme.css` 提供的颜色 token 词汇（存量页面的 `text-text-tertiary` / `border-border-table` 等类名仍用它，见下条）。
-  - 颜色仍只在一处定义：`styles/global.css` 的 `:root` 是令牌源，`admin-ui/styles/shadcn-theme.css` 把 shadcn 语义变量（`--background` / `--primary` / `--ring` …）桥接到那些令牌；改品牌色不改 shadcn 侧。**两套词汇不要混写**：新代码只写 shadcn 类（`bg-card` / `text-muted-foreground` / `border-border` / `bg-accent`），存量页里的 BoardUI 类名（`bg-background-secondary-default` / `text-text-tertiary` …）由同一套令牌提供等值颜色，逐页替换按需进行，不做批量重命名（`secondary/tertiary` 两档灰在 shadcn 里没有一一对应的名字，硬换会塌掉层级）。
-  - Tailwind 只引 `theme.css` + `utilities.css`，**没有 preflight**：裸 `border` 会退回 `currentColor`，故 `[data-slot]` 的描边兜底写在 `@layer base`（unlayered 规则会压过所有 `@layer`，`border-transparent` 就失效）。
+- **后台组件是一套 shadcn**（2026-11-02 推倒重建：旧组件套件 / kit / 转发层全部删除，无并存、无开关、无回滚）。
+  - **底座是 radix（`radix-ui` 统一包 1.8.1），官方 `new-york` 风格**。`frontend/components.json` 决定底座与别名：`style: "new-york"`、`ui → ~/admin-ui/components/ui`、`utils → ~/admin-ui/lib/cn`。`shadcn add` 会连同底座一起装；**不要引回 `@base-ui/react`**。
+  - 组合写法是 radix 的 `asChild`（不是 Base UI 的 `render={<button/>}`）。Base UI 专属的 `indeterminate: boolean` / TooltipProvider `delay` / 无 `PopoverAnchor` 等差异已不适用。
+  - **类名合并只走 `admin-ui/lib/cn.ts`**：实现是官方 npm 包 `cn` 的 `createCn`，在默认合并表上补登本项目 `@theme` 自造 token（`shadow-card`、`brand` / `success-*` / `warn-*` / `danger-*` 颜色组）。改 `styles/admin.css` 的 `@theme inline` 时必须同步补登，否则 `shadow-none` 盖不掉 `shadow-card`。`shadcn add` 之后必须跑 `scripts/post-shadcn.mjs`，它统一把组件的 `import { cn } from 'cn'` 改写成本文件。
+  - **页面只从 `admin-ui/primitives` 取件**（barrel：`primitives/index.ts`），不直连 `components/ui`。原子件（`components/ui/*`）只被 primitives 引用。
+  - **没有转发层**：`admin-ui/shadcn`、`admin-ui/controls`、`admin-ui/widgets`、`admin-ui/primitives/DataTable|Dialog`、`components/admin/PageHeader|AdminWidgets` 均已删除。新增控件按用途落进 `primitives/layout|form|display|table|overlay|fields`，再从 barrel 导出。
+  - 颜色仍只在一处定义：`styles/global.css` 的 `:root` 是令牌源，`styles/admin.css` 的 `@theme inline` 把 shadcn 语义变量（`--background` / `--primary` / `--ring` …）桥接到那些令牌；改品牌色不改 shadcn 侧。页面只写 shadcn 类（`bg-card` / `text-muted-foreground` / `border-border` / `bg-accent` / `text-brand` / `bg-warn-soft`），旧套件那套 `text-text-tertiary` / `border-border-table` 词汇已随 vendor 一并删除。
+  - Tailwind 只引 `theme.css` + `utilities.css`，**没有 preflight**：裸 `border` 会退回 `currentColor`，故兜底写在 `styles/admin.css` 的 `@layer base`（unlayered 规则会压过所有 `@layer`，`border-transparent` 就失效）。
   - 高危动作确认：页面内用 `ConfirmAction`（贴底操作条，不弹阻塞层）；需要跨页面复用的二次确认走 `useConfirm()`（`providers/ConfirmProvider`，shadcn Dialog）。
-- **外壳**：`admin-ui/shell/AdminBoardLayout` —— 单栏（侧栏 232 / 折叠 60，≤1280 自动折叠），无顶栏、无值班带；导航 / ⌘K 搜索 / 告警铃 / 密度 / 用户菜单都在侧栏。值班塔只出现在概览首屏（`admin-ui/widgets/DutyStrip`）。`global.css` 的 `.adm-*` 只剩外壳骨架（`adm-layout` / `adm-content` / `adm-skip-link`）与值班塔（`adm-tower*` / `adm-dot` / `adm-empty-inline`），页面内新增 `adm-*` 类是错的。
-- **共享控件**：`components/admin/PageHeader.tsx` 与 `AdminWidgets.tsx` 是单一路径的再导出（→ `admin-ui/widgets/AdminChrome` → `shadcn/kit`），页面 import 不变；改外观只改 `shadcn/kit`。表格 `shadcn/kit/table`（密度走 `admin-ui/lib/density` 的 `DensityContext`，由外壳下发），状态色 `components/admin/statusMeta.ts`。
+- **外壳**：`admin-ui/shell/AdminBoardLayout` —— 经典「上左右」：顶栏 56px（左品牌 + 当前位置（分组 / 页面），右环境标识 + 用户菜单）+ 侧栏 232（折叠 60，≤1280 自动折叠；图标 + 标签导航，底部折叠按钮）+ 内容区；无值班带。值班塔只出现在概览首屏（`primitives/duty-strip` 与 `duty-tower`）。`.adm-*` 只剩外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`），规则在 **`styles/admin.css`** 的 `@layer base`（不再在 `global.css`）；值班塔改用 Tailwind 工具类，没有 `adm-tower*` / `adm-dot` / `adm-empty-inline` 了。页面内新增 `adm-*` 类是错的。
+- **共享件**：表格 `primitives/table`（密度走 `admin-ui/lib/density` 的 `DensityContext`，由外壳下发）；状态色 `components/admin/statusMeta.ts`（`STATUS_META` 是状态→文案/色调的唯一映射）。
 - **e2e 锚点**：共享控件与页面关键节点挂 `data-testid="admin-*"`，表单控件用 `aria-label`；测试一律 `getByTestId` / `getByLabel` / 角色名，不追 Tailwind 工具类与已删除的 `adm-*` 类。
 
 ### 商业域
@@ -334,6 +330,7 @@ npm run e2e                 # Playwright
 | 新增一项能力 | `capabilities/definitions/<id>.ts` + `definitions/index.ts` | 启动期 `assertCapabilityIntegrity`；`verify-capability-bootstrap`。之后还要在后台配前台模型，否则 `runtime.effective = unavailable` |
 | 接入一家厂商 | 新增 `backend/plugins/<plugin>/manifest.json`（或后台上传安装） | `verify-plugin-manifests` / `verify-protocol-runtime`；协议下拉按能力过滤自动可见 |
 | 新增后台页 | `admin/permissions.ts` → controller 挂 `@RequirePermission` → `adminNav.ts` → `pages/admin/*.tsx` → 路由 → `lib/api.ts` | 前端 `can()` 只隐藏按钮，权限必须在后端 |
+| 新增 / 复用 UI 组件 | 先查 `admin-ui/components/ui`；缺的 `shadcn add` 后跑 `scripts/post-shadcn.mjs`；官方没有才手写进 `admin-ui/primitives/*` | 页面只从 `primitives` barrel 取件；禁止重复实现已有控件 |
 | 拆分 / 新增后台功能目录 | `pages/<域>/` 下按 `index` / `page` / `components` / `api` / `hooks` / `utils` / `constants` 分层，目录内只从入口文件取外部依赖 | `docs/frontend-module-conventions.md`；`admin-modules.test.ts` 具名导入对账 |
 | 新增环境变量 | `ENV_SPECS` + `.env.example` + 三档 env | `probe-environments.ts`；`docs/environments.md` |
 | 调整积分价 / 退款规则 | `definitions/<id>.ts` 的 `creditCost` / `common/setting-defs.ts` 的 `SETTING_DEFS` | 运行时走 `resolve()` 与设置读取，不写死 |
@@ -351,6 +348,8 @@ npm run e2e                 # Playwright
 ```
 
 **色值冲突的真实 bug 警示**：`--color-primary` 曾是蓝色 `#2563eb`，与紫系页面混用导致 hover 时蓝紫跳变，现已归位为品牌紫。新增颜色前先查是否已有语义合适的 token；确需新增则定义 token 并全站替换，不留同义簇。
+
+**最小字号 12px（全站硬规范）**：任何页面、组件、图表刻度与内联样式都不得出现小于 12px 的文字 —— Tailwind `text-[10px]` / `text-[11px]`、CSS `font-size: 11px`、内联 `fontSize: 10` 一律禁止。字号规格见 `docs/typography.md`。
 
 **设计一致性优先**：品牌紫 `#5546D8`、冷灰中性色族、五档圆角优先于任何单页的局部数值。判断「某页与其它页不一致」时先按全站令牌校准；页面规格文档与 `global.css` 冲突时以 `global.css` 为准。
 
@@ -396,8 +395,9 @@ npm run e2e                 # Playwright
 
 | 类别 | 文档 |
 | --- | --- |
-| 需求 | `docs/prd.md`（整站）、`admin-prd.md`（后台）、`agent-prd.md`（规划） |
-| 产品 | `admin-suite/console/detailed/ui-design.md`、`commerce-design.md`、`landing/workbench/topnav/login/library-design.md` |
-| 技术 | `environments.md`、`docker-deployment.md`、`model-architecture.md`、`api-contract.md`、`runtime-infrastructure.md`、`frontend-module-conventions.md`、`typography.md`、`agent-integration-design.md`（规划） |
+| 需求 | `prd.md`（整站）、`admin-prd.md`（后台） |
+| 产品 | 后台：`admin-suite-design.md` / `admin-console-design.md` / `admin-detailed-design.md` / `admin-ui-design.md`；商业：`commerce-design.md`；C 端：`landing` / `workbench` / `topnav` / `login` / `library` / `packages-design.md` |
+| 技术 | `environments.md`、`docker-deployment.md`、`model-architecture.md`、`api-contract.md`、`runtime-infrastructure.md`、`frontend-module-conventions.md`、`typography.md` |
 | 测试 | `docs/testing.md`（四层测试、闸口清单、覆盖矩阵、已知缺口） |
 | 流程 | `docs/development-workflow.md`（Agent 执行手册：指令映射、执行卡、闸口矩阵、证据标准、交人边界） |
+| 规划 / 设计记录 | `agent-prd.md`、`agent-integration-design.md`（规划）；`channel-model-design.md`（已实施）、`payment-refactor-design.md`（部分实施） |

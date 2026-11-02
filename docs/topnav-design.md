@@ -102,7 +102,7 @@ AppHeader 64px（≤900px 54px）sticky top:0 z-index 20
 
 | 元素 | 值 |
 | --- | --- |
-| 铃铛 | `.app-notif-trigger` 32×32，radius 8；icon 18；未读角标 16×16 / 10px / 600 / 2px 白描边 |
+| 铃铛 | `.app-notif-trigger` 32×32，radius 8；icon 18；未读角标 16×16 / 12px / 600 / 2px 白描边 |
 | 算力胶囊 | `.app-quota` 高 32，`padding: 0 12px`，白底 + `1px solid var(--border)`，radius pill；图标 14 `--text-desc`；数字 13 / 700 `--text-strong` + tabular-nums；「积分」12 / `--text-muted`；hover 字色与描边转 `--brand`、底 `--brand-bg` |
 | 分割线 | `.app-header-divider` 1×16 `var(--border)`，仅出现在算力胶囊与用户菜单之间 |
 | 用户菜单 | `.app-user` 高 32，`padding: 0 8px 0 4px`，radius 8；头像 28；邮箱 13 `--text-body`，`max-width: 168px` 超长省略；右侧 `ChevronDown` 14 `--text-desc`，展开旋转 180°；hover / 展开底 `#f1efff` |

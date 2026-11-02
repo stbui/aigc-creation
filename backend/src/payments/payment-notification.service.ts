@@ -134,6 +134,19 @@ export class PaymentNotificationService {
 
     const outcome = await this.processNotification(row!.id, result);
     if (outcome.ok) return adapter.ack(result);
+    if (outcome.permanent) {
+      /*
+       * 业务终态（订单不存在 / 金额不符 / 配置不匹配）：差异已落对账，
+       * 让渠道停止重试。继续 ack failure 只会让渠道反复轰同一条通知，
+       * 而本地已经无法通过重试自动修复。
+       */
+      return adapter.ack({
+        ...result,
+        ok: true,
+        ackSuccess: true,
+        reason: outcome.reason ?? '业务终态',
+      });
+    }
     return adapter.ack({
       ok: false,
       ackSuccess: false,
@@ -230,7 +243,33 @@ export class PaymentNotificationService {
       return { ok: false, permanent: true, reason: '订单不存在' };
     }
 
-    if (order.providerConfigId && order.providerConfigId !== row.providerConfigId) {
+    /*
+     * 回调必须能匹配到**任意一次**支付尝试，而不只是订单当前绑定的渠道。
+     * 用户可能先发起支付宝、后改选微信；订单上的 channel/config 是最后一次，
+     * 但他实际付款的可能是更早那次。只看订单级配置会把已收款回调判成不一致。
+     */
+    const attempt = await this.prisma.payment.findFirst({
+      where: {
+        orderId: order.id,
+        channel: row.providerId,
+        providerConfigId: row.providerConfigId,
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    const configMatchesOrder =
+      !order.providerConfigId || order.providerConfigId === row.providerConfigId;
+    if (!configMatchesOrder && !attempt) {
+      await this.recordException({
+        providerId: row.providerId,
+        orderId: order.id,
+        merchantOrderNo: row.merchantOrderNo,
+        providerTradeNo: result.providerTradeNo,
+        amountCents: result.amountCents,
+        currency: result.currency,
+        result: 'credit_failed',
+        detail: '回调配置版本与订单及其支付尝试均不匹配',
+      });
       await this.markFailed(notificationId, '回调配置版本与订单不一致');
       return { ok: false, permanent: true, reason: '回调配置版本与订单不一致' };
     }
@@ -240,6 +279,7 @@ export class PaymentNotificationService {
         orderId: order.id,
         providerId: row.providerId as PaymentProviderId,
         configId: row.providerConfigId,
+        paymentId: attempt?.id,
         tradeNo: result.providerTradeNo,
         amountCents: result.amountCents,
         currency: result.currency,

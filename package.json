@@ -14,13 +14,16 @@
     "build:backend": "npm --prefix backend run build",
     "build:frontend": "npm --prefix frontend run build:prod",
     "typecheck": "npm --prefix frontend run typecheck",
-    "test": "npm run test:frontend && npm run test:agent && npm run test:gateway",
+    "test": "npm run test:backend && npm run test:frontend && npm run test:agent && npm run test:gateway",
+    "test:backend": "npm --prefix backend test",
     "test:frontend": "npm --prefix frontend test",
     "test:agent": "npm --prefix agent test",
     "test:gateway": "npm --prefix test test",
     "test:e2e:smoke": "npm --prefix frontend run e2e:smoke",
     "verify:deps": "npm --prefix backend run verify:deps:critical",
     "verify:compose": "node scripts/verify-compose.mjs",
+    "verify:payment-bills": "npm --prefix backend run verify:payment-bills",
+    "verify:payment-signatures": "npm --prefix backend run verify:payment-signatures",
     "check:node": "node scripts/check-node-version.mjs",
     "check": "npm run check:node && npm run verify:deps && npm run build && npm run test"
   }

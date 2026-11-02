@@ -14,10 +14,11 @@ import {
   Notice,
   NumberField,
   PageHeader,
+  PageSkeleton,
+  SkeletonPanel,
   Panel,
   RangeField,
   SaveBar,
-  Skeleton,
   StaleError,
   SuggestField,
   SwitchField,
@@ -320,12 +321,33 @@ export function AdminAigcLabelPage() {
    * canvas 节点就被卸载, 位图要靠 effect 重画才回来 —— 明明只是重试一次
    * 请求, 视觉上却像样式被重置了。数据在手时保持页面不动, 只换内容。
    */
+  /*
+   * 页头照常渲染：加载期间标题与说明就该在位。
+   * 之前的守卫整页替换，首屏先闪一段没有标题的灰条，再冒出完整页面 ——
+   * 骨架该占住位置，不是把版面清空。
+   */
   if (loading && !data) {
     return (
-      <div className="flex flex-col gap-3" aria-busy="true" aria-live="polite">
-        <Skeleton rows={4} />
-        <p className="text-center text-xs text-muted-foreground">加载 AI 标识配置…</p>
-      </div>
+      <PageSkeleton
+        title="AI 标识"
+        description={
+          editable
+            ? '生成图片的显式 AIGC 角标：可改样式，也可整体关闭（关闭后仅保留文件内隐式标识）。文案与字体由浏览器渲染成位图后保存，位置与缩放实时生效'
+            : '当前账号无 setting.write 权限，仅可查看'
+        }
+        /*
+         * 真实版面是 2×2 的面板网格（样式 / 预览 / 位置缩放 / 当前位图），
+         * 叠成上下两块的话数据到位时整页会重排一次。
+         */
+        body={
+          <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
+            <SkeletonPanel rows={5} />
+            <SkeletonPanel rows={5} />
+            <SkeletonPanel rows={4} />
+            <SkeletonPanel rows={4} />
+          </div>
+        }
+      />
     );
   }
   if (error && !data) return <ListError error={error} onRetry={() => void reload()} />;

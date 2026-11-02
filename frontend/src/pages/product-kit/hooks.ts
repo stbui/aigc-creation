@@ -9,7 +9,7 @@
  */
 
 /** 上传 (三重校验 / 素材库回填 / 粘贴) */
-export { useImageUpload } from '../../hooks/useImageUpload';
+export { useImageUpload, type UploadedImage } from '../../hooks/useImageUpload';
 /** 项目归属 (上传与建任务都要求 projectId) */
 export { useProject } from '../../hooks/useProject';
 /** 轮询中止信号 (离开页面 / 重新提交时停掉旧轮询) */

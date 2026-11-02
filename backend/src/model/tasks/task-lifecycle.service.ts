@@ -270,7 +270,7 @@ export class TaskLifecycleService {
     };
     try {
       if (task.billingOrderId) {
-        await this.billing.refund(task.billingOrderId, message || labels[reason]);
+        await this.billing.refund(task.billingOrderId, message || labels[reason], 'failure');
       } else if (task.creditCost > 0) {
         // P4-b 之前的存量任务：积分由旧 CreditService 扣，没有账单行
         await this.credit.grant({
@@ -314,9 +314,13 @@ export class TaskLifecycleService {
     }
     const orders = await this.prisma.billingOrder.findMany({
       where: { taskId: { in: taskIds }, status: 'refunded' },
-      select: { refundedAmountMicrocredits: true },
+      select: { refundedAmountMicrocredits: true, refundReason: true },
     });
-    return orders.reduce((sum, order) => sum + Number(order.refundedAmountMicrocredits / 1_000_000n), 0);
+    // 换线的旧账单退款不是「用户拿回钱」：那是预授权从旧线路挪到新线路，
+    // 算进通知金额会让用户看到「已退 N 分」但余额没变。
+    return orders
+      .filter((order) => order.refundReason !== 'route_switch')
+      .reduce((sum, order) => sum + Number(order.refundedAmountMicrocredits / 1_000_000n), 0);
   }
 
   private async toUncertain(taskId: string, billingOrderId: string | null, message: string): Promise<void> {

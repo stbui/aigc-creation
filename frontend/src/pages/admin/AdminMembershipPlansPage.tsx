@@ -14,9 +14,9 @@ import {
   ListError,
   NumberField,
   PageHeader,
+  PageSkeleton,
   Panel,
   SelectField,
-  Skeleton,
   StatCard,
   StatusTag,
   StaleError,
@@ -271,10 +271,10 @@ export function AdminMembershipPlansPage() {
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           <span className="font-medium">{row.name}</span>
-          <code className="font-mono text-[11px] text-muted-foreground">{row.code}</code>
+          <code className="font-mono text-[12px] text-muted-foreground">{row.code}</code>
           {row.description && (
             <span
-              className="max-w-[220px] truncate text-[11px] text-muted-foreground"
+              className="max-w-[220px] truncate text-[12px] text-muted-foreground"
               title={row.description}
             >
               {row.description}
@@ -290,7 +290,7 @@ export function AdminMembershipPlansPage() {
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           <span className="tabular-nums">¥ {centsToYuan(row.priceCents)}</span>
-          <span className="text-[11px] tabular-nums text-muted-foreground">
+          <span className="text-[12px] tabular-nums text-muted-foreground">
             {row.priceCents} 分
           </span>
         </div>
@@ -317,7 +317,7 @@ export function AdminMembershipPlansPage() {
           {row.perkLabels.map((label) => (
             <span
               key={label}
-              className="rounded-md bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground"
+              className="rounded-md bg-muted px-1.5 py-0.5 text-[12px] text-muted-foreground"
             >
               {label}
             </span>
@@ -362,7 +362,7 @@ export function AdminMembershipPlansPage() {
           </ActionButton>
           {row.code === 'free' ? (
             <span
-              className="px-1.5 text-[11px] text-muted-foreground"
+              className="px-1.5 text-[12px] text-muted-foreground"
               title="free 套餐由系统内置，不能下架"
             >
               内置
@@ -386,12 +386,22 @@ export function AdminMembershipPlansPage() {
     },
   ];
 
+  /*
+   * 页头照常渲染：加载期间标题与说明就该在位。
+   * 之前的守卫整页替换，首屏先闪一段没有标题的灰条，再冒出完整页面 ——
+   * 骨架该占住位置，不是把版面清空。
+   *
+   * 四张统计卡 + 一块列表面板，与真实版面同构。
+   */
   if (loading && !data) {
     return (
-      <div className="flex flex-col gap-3" aria-busy="true" aria-live="polite">
-        <Skeleton rows={4} />
-        <p className="text-center text-xs text-muted-foreground">加载会员套餐…</p>
-      </div>
+      <PageSkeleton
+        title="会员套餐"
+        description="会员按周期生效，权益在下单时快照到用户订阅上；改价或改权益只影响之后的订单。"
+        stats={4}
+        panels={1}
+        panelRows={5}
+      />
     );
   }
   if (error && !data) return <ListError error={error} onRetry={() => void reload()} />;
@@ -408,7 +418,7 @@ export function AdminMembershipPlansPage() {
               新建套餐
             </ActionButton>
           ) : (
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-[12px] text-muted-foreground">
               当前账号无 product.write 权限，仅可查看
             </span>
           )
@@ -571,7 +581,7 @@ export function AdminMembershipPlansPage() {
           <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
             <div>
               <div className="text-xs font-medium text-foreground">专享快速通道</div>
-              <div className="text-[11px] text-muted-foreground">开启后该套餐会员走快速生成队列</div>
+              <div className="text-[12px] text-muted-foreground">开启后该套餐会员走快速生成队列</div>
             </div>
             <SwitchField
               checked={draft.fastChannel}

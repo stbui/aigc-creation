@@ -18,7 +18,7 @@ import {
   PageHeader,
   Panel,
   SelectField,
-  Skeleton,
+  SkeletonBody,
   StatusTag,
   StaleError,
   SwitchField,
@@ -416,7 +416,7 @@ export function AdminLogicalModelsPage() {
             <span className="truncate font-medium text-foreground">{row.name}</span>
             {row.archivedAt && <StatusTag status="archived" tone="muted" label="已归档" />}
           </div>
-          <div className="mt-0.5 truncate font-mono text-[11px] text-muted-foreground">{row.code}</div>
+          <div className="mt-0.5 truncate font-mono text-[12px] text-muted-foreground">{row.code}</div>
         </div>
       ),
     },
@@ -425,7 +425,7 @@ export function AdminLogicalModelsPage() {
       title: '能力',
       width: 140,
       render: (row) => (
-        <div className="flex flex-col gap-0.5 text-[11px]">
+        <div className="flex flex-col gap-0.5 text-[12px]">
           <span className="text-foreground">{row.capabilitySpec?.capability || '—'}</span>
           <span className="text-muted-foreground">{row.capability}</span>
         </div>
@@ -436,7 +436,7 @@ export function AdminLogicalModelsPage() {
       title: '价格',
       width: 170,
       render: (row) => (
-        <div className="flex flex-col gap-0.5 text-[11px]">
+        <div className="flex flex-col gap-0.5 text-[12px]">
           <span className="text-foreground">
             {PRICE_POLICY_LABELS[row.pricePolicy] ?? row.pricePolicy} ·{' '}
             {BILLING_MODE_LABELS[row.billingMode] ?? row.billingMode}
@@ -455,7 +455,7 @@ export function AdminLogicalModelsPage() {
       render: (row) => {
         const available = row.routes.filter((route) => route.available).length;
         return (
-          <div className="flex flex-col gap-0.5 text-[11px]">
+          <div className="flex flex-col gap-0.5 text-[12px]">
             <span className="tabular-nums text-foreground">
               {available} / {row.routes.length} 可用
             </span>
@@ -561,10 +561,8 @@ export function AdminLogicalModelsPage() {
         note="保存即生成新 revision 并重建线路；旧 revision 保留，历史账单可回溯到当时的能力合同。"
       >
         {loading && rows.length === 0 ? (
-          <div className="flex flex-col gap-2 py-2">
-            <Skeleton rows={4} />
-            <p className="text-center text-xs text-muted-foreground">加载中…</p>
-          </div>
+          /* 面板外壳已经是实的，只替内容行 */
+          <SkeletonBody rows={4} />
         ) : (
           <>
             {error && <StaleError error={error} onRetry={() => void reload()} />}
@@ -770,7 +768,7 @@ export function AdminLogicalModelsPage() {
             <div className="mb-2 flex items-center justify-between">
               <div>
                 <div className="text-xs font-semibold text-foreground">线路</div>
-                <div className="text-[11px] text-muted-foreground">
+                <div className="text-[12px] text-muted-foreground">
                   同一 priority 内按 weight 随机；priority 更小的层先被尝试
                 </div>
               </div>
@@ -779,7 +777,7 @@ export function AdminLogicalModelsPage() {
               </ActionButton>
             </div>
             {draft.routes.length === 0 ? (
-              <p className="py-3 text-center text-[11px] text-muted-foreground">
+              <p className="py-3 text-center text-[12px] text-muted-foreground">
                 没有线路时模型永远不可用（C 端会收到 42204）。
               </p>
             ) : (
@@ -884,7 +882,7 @@ export function AdminLogicalModelsPage() {
                 columns={2}
               />
               <div className="rounded-lg border border-border">
-                <table className="w-full text-[11px]">
+                <table className="w-full text-[12px]">
                   <thead className="bg-muted text-muted-foreground">
                     <tr>
                       <th className="px-2 py-1.5 text-left">线路</th>

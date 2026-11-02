@@ -215,7 +215,7 @@ export function ChannelModelRepriceDialog({
           >
             按成本重算
           </ActionButton>
-          <div className="flex-1 text-[11px] leading-4 text-muted-foreground">
+          <div className="flex-1 text-[12px] leading-4 text-muted-foreground">
             新售价 = 成本价 ×（1 + 加价率）。改加价率或小数位会按成本重算全部规格售价，
             <strong className="font-medium text-muted-foreground">覆盖手动修改</strong>；重算后仍可逐项编辑，保存以输入框的最终值为准。
           </div>
@@ -234,7 +234,7 @@ export function ChannelModelRepriceDialog({
         } />
 
         <div className="flex items-center justify-between gap-3">
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-[12px] text-muted-foreground">
             {rows.length} 个计费项 · 已修改 {changed} 项 ·
             四舍五入及手动修改可能使实际加价率偏离目标；价格配置发生变化时整批拒绝保存，请刷新后重试。
           </span>
@@ -322,7 +322,7 @@ function RepriceTable({
         <div key={group[0].modelId} className="rounded-lg border border-border">
           <div className="flex items-center gap-2 border-b border-border px-3 py-2">
             <span className="font-mono text-[12px] text-foreground">{group[0].modelKey}</span>
-            <span className="text-[11px] text-muted-foreground">
+            <span className="text-[12px] text-muted-foreground">
               {group[0].modelName}
               {group[0].channelLabel ? ` · ${group[0].channelLabel}` : ''}
               {group[0].providerModelKey ? ` · 上游 ${group[0].providerModelKey}` : ''}
@@ -341,7 +341,7 @@ function RepriceTable({
                 <div key={row.key} className="flex items-center gap-3 px-3 py-2">
                   <div className="min-w-0 w-[240px]">
                     <div className="truncate text-[12px] text-foreground">{row.specLabel}</div>
-                    <div className="truncate text-[11px] text-muted-foreground">
+                    <div className="truncate text-[12px] text-muted-foreground">
                       {row.field.label ? `${row.field.label} · ` : ''}
                       成本 {row.cost === null ? '未配置' : saleInputValue(row.cost)}
                     </div>
@@ -355,7 +355,7 @@ function RepriceTable({
                       inputMode="decimal"
                     />
                   </div>
-                  <div className="flex-1 text-[11px] text-muted-foreground">
+                  <div className="flex-1 text-[12px] text-muted-foreground">
                     {sale === null ? (
                       <span className="text-danger-text">售价无效</span>
                     ) : (

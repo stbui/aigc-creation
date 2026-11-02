@@ -1,5 +1,7 @@
 # 支付域重构与后台「支付充值」页实施方案
 
+> **UI 前提**：后台 UI 为 shadcn（页面只从 `admin-ui/primitives` 取件，见 `docs/admin-ui-design.md`）。接口、数据流与业务约束不受影响。
+>
 > 状态：**部分实施（基线 commit 505319c）**。后端支付域主链路已落地；C 端支付方式选择、后台 `/admin/payments` 页面、存储商品与部分可靠性/测试项仍待补齐，详见 §25。
 > 目标页面：`/admin/payments`，以 `open-ai-canvas/web/src/pages/admin/payments/payments-page.tsx` 为交互与信息架构基准。
 > 参考后端：`open-ai-canvas/backend/internal/app/payment*.go`、`backend/internal/repository/payment.go`、`backend/payment-plugins/`。
@@ -23,7 +25,7 @@
 | D7 | 存储扩容商品（`kind=storage`）**不进本轮**，页面保留该选项但禁用并说明原因 | 本仓库没有存储配额与上传容量校验，先做会变成「卖了容量但不限流」的假功能 |
 | D8 | 支付通知收件箱 + **独立 15s worker**；不复用 10 分钟一次的 `SchedulerService.tick()` | 现有调度间隔是 10 分钟（`scheduler.service.ts:11`），用它消费回调会把「已付款」晾十分钟 |
 | D9 | 对账新建 `PaymentReconciliationRun/Item`，旧 `ReconciliationBatch/Item` 停止写入 | 新模型需要「每个渠道每天一次运行、自动补发、失败原因」；旧模型是人工导入批次，语义不同 |
-| D10 | 后台页面使用本仓库 BoardUI + `admin-ui` 原语，**不引入 antd** | 后台 35 页已统一为 BoardUI；参考页的 antd 组件只作为交互参照，不照搬实现 |
+| D10 | 后台页面使用本仓库 shadcn + `admin-ui` 原语，**不引入 antd** | 后台 34 页已统一为 shadcn；参考页的 antd 组件只作为交互参照，不照搬实现 |
 
 > 仍未定的两项（建议按上表执行，评审时只需确认）：
 > 1. **USD 商品是否本轮开放**：建议开放字段与校验，但没有支持 USD 的渠道时前后端都拒绝上架/支付；
@@ -121,7 +123,7 @@ OrderService.create()                      订单快照 + 优惠 + 幂等键    
 | 回调 | `/api/payments/notify/:provider/:configId` | `/api/v1/payments/callback/:channel/:configId` | 回调必须能定位到下单时的配置版本 |
 | 后端 worker | 15s 独立循环 | 15s `PaymentWorkerService` | 不用 10 分钟的调度器 |
 | 对账 | `PaymentReconciliationRun/Item` | 同名新表，替换旧批次表 | 旧表只读保留一个版本周期 |
-| 后台 UI | antd + 自定义 admin-ui | BoardUI + `admin-ui` | 视觉语言按本仓库，不引 antd |
+| 后台 UI | antd + 自定义 admin-ui | shadcn + `admin-ui` | 视觉语言按本仓库，不引 antd |
 | 退款 | 本页不提供 | 保留在订单管理 | 参考页的「平台不提供支付退款」提示需改写（本仓库有退款） |
 | 存储商品 | 支持 | 本轮不做，选项禁用 | 缺配额子系统 |
 
@@ -917,7 +919,7 @@ npm run check
 
 ## 14. 验收标准
 
-- [ ] `/admin/payments` 四个标签页与参考页的信息架构、列、抽屉、筛选、分页、导出一致；使用 BoardUI，无 antd 新引用。
+- [ ] `/admin/payments` 四个标签页与参考页的信息架构、列、抽屉、筛选、分页、导出一致；使用 shadcn，无 antd 新引用。
 - [ ] 渠道配置可保存新版本；密钥不回显；历史订单固定版本；回调 configId 与订单一致。
 - [ ] 多渠道同时可用；C 端可选择支付方式；缺凭据 503，不降级沙箱；生产过滤沙箱。
 - [ ] 查单/关单顺序正确；关单前已支付会入账；失败保持 pending 并可重试。
@@ -950,7 +952,7 @@ npm run check
 - 页面事实源：`open-ai-canvas/web/src/pages/admin/payments/payments-page.tsx`。参考站当前不可达，因此复刻依据是源码中的列、筛选、抽屉、空态、导出与按钮启用条件，不以截图猜测。
 - 后端事实源：`open-ai-canvas/backend/internal/app/payment*.go` 与 `backend/payment-plugins/`；协议细节仍以支付宝/微信官方文档为准。
 - 本仓库现状事实源：`backend/src/payments/*`、`backend/src/orders/order.service.ts`、`backend/prisma/schema.prisma`、`frontend/src/admin-ui/*`。
-- “完整复刻”的范围是四个标签页的**信息架构与可操作项**：列、工具栏、筛选口径、分页、导出、详情/配置/商品抽屉、五态与按钮禁用条件。视觉不照搬 antd，改用本仓库 BoardUI；不新增 antd 引用。
+- “完整复刻”的范围是四个标签页的**信息架构与可操作项**：列、工具栏、筛选口径、分页、导出、详情/配置/商品抽屉、五态与按钮禁用条件。视觉不照搬 antd，改用本仓库 shadcn 原语；不新增 antd 引用。
 - 本轮仍不实现存储扩容商品、聚合支付渠道、支付页内退款。
 
 ### 16.2 参考字段到本仓库字段的映射
@@ -2514,7 +2516,7 @@ frontend/tests/admin-payments.spec.ts
 
 约束：
 
-- 只引用 `frontend/src/admin-ui/*`、`vendor/boardui`、`lucide-react`、现有 `components/admin/PageHeader`；不新增 antd 引用。
+- 只引用 `frontend/src/admin-ui/*`、`lucide-react`；不新增 antd 引用。
 - 不新增状态管理库；列表状态用现有 `useAdminList` / `useAdminResource`，页签状态直接用 URL。
 - 金额格式化统一 `${currency === 'USD' ? '$' : '¥'}${(cents / 100).toFixed(2)}`；积分整数用千分位。
 
@@ -3394,7 +3396,7 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 - 参考文件：`open-ai-canvas/web/src/pages/admin/payments/payments-page.tsx`（1180 行）与其引用的 `admin-ui` 组件；以当前工作区版本为准。
 - 「一致」指：标签顺序、可见文案、列顺序与含义、筛选默认值、空/错/加载态、抽屉标题与宽度、按钮可用条件一致。
 - 「偏差」指：本仓库没有对应概念，或照搬会与本仓库安全/资金规则冲突；每一条都必须登记，不能默默改。
-- 视觉上使用 BoardUI + `admin-ui` 原语，不追求与 antd 像素级相同；间距、圆角、字体跟随现有后台页面。
+- 视觉上使用 shadcn + `admin-ui` 原语，不追求与 antd 像素级相同；间距、圆角、字体跟随现有后台页面。
 
 ### 24.2 逐屏对照
 
@@ -3478,7 +3480,7 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 - 参考页每个可见字符串都能在 §24.2 找到「一致」或 §24.3 的偏差编号；没有未登记的改动。
 - 四个标签均可 URL 直达，刷新不丢筛选与详情。
 - 三档权限、五态、八个订单状态、七种对账结果都有可见验收记录。
-- 不新增 antd、不新增状态管理库；组件全部复用 `admin-ui`/BoardUI。
+- 不新增 antd、不新增状态管理库；组件全部复用 `admin-ui`/shadcn。
 - 浏览器控制台无未处理异常，接口失败时页面保留旧数据并给出可重试提示。
 - 截图与验收记录附在 PR 描述中；偏差项由产品/设计确认后再合并。
 
@@ -3517,11 +3519,19 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 
 ### 25.3 P0：当前可用性缺口
 
-1. **后台 `/admin/payments` 四标签页缺失**
+1. **后台 `/admin/payments` 四标签页缺失** ✅ 已落地（2026-11-02）
    - 参考：`web/src/pages/admin/payments/payments-page.tsx`（渠道 / 商品 / 订单 / 对账）。
-   - 现状：`frontend/src/pages/admin/AdminPaymentChannelsPage.tsx`、`AdminReconciliationPage.tsx` 仍是旧只读页 / 旧人工对账页；`adminNav.ts:82`、`AdminDashboardPage.tsx:1089-1091` 仍指向旧路由。
-   - 后端旧 `/admin/payment-channels`、`/admin/reconciliation` 控制器已删除，这两个页面当前不可用。
-   - 需要：新建 `AdminPaymentsPage.tsx` 及四个 Tab，按 §21 / §24 落地；旧路由改为重定向。
+   - 落地：`frontend/src/pages/admin/payments/` 下 `AdminPaymentsPage.tsx` + 四个 Tab
+     （`PaymentsProvidersTab` / `PaymentsProductsTab` / `PaymentsOrdersTab` /
+     `PaymentsReconciliationTab`），配套 `paymentStatusMeta.ts` / `paymentProductMeta.ts`；
+     类型在 `frontend/src/types/payment.ts`。
+   - 旧路由 `/admin/payment-channels` / `/admin/reconciliation` 已改为
+     `Navigate` 重定向到 `/admin/payments?tab=providers` / `?tab=reconciliation`；
+     侧栏「财务」组合并为「支付充值」（`adminNav.ts`）。
+   - 旧页面 `AdminPaymentChannelsPage.tsx` / `AdminReconciliationPage.tsx` 与
+     `src/types/api.d.ts` 里的旧类型（`AdminPaymentChannelStatus` /
+     `ReconciliationBatch` / `ReconciliationItem` / `AdminPaymentRow`）已删除。
+   - 值班带的对账计数改读新模型的 `failed` 运行数（旧的 `imported` 状态不存在了）。
 2. **C 端不能选择支付方式**
    - 参考：`workspace-wallet-topup.tsx` 的商品卡 + provider 单选。
    - 现状：`CheckoutPaymentMethodCard.tsx` 是写死的单选项；`checkout/page.tsx:326` 调用 `paymentsApi.intent(o.id)` 不传 `providerId`。
@@ -3530,25 +3540,28 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 3. **支付结果动作不完整**
    - 参考：下单弹层支持「我已完成支付」「关闭订单」「重新生成支付入口」，支付宝返回 `/wallet?paymentOrder=...` 后自动恢复订单。
    - 现状：统一回 `/orders`，只做 30 秒轮询；没有主动重试收银台、没有结果弹层恢复。
-4. **后台前端 API 客户端与类型未跟进**
-   - `frontend/src/lib/api.ts` 的 `adminPaymentsApi` 仍请求 `/admin/payments`、`/admin/payments/export`，后端实际为 `/admin/payments/orders`、`/admin/payments/orders/export.csv`。
-   - `PaymentIntent` 类型仍是旧结构，缺 `providerId`、`configId`、`configVersion`、`currency`、`checkoutValue`。
+4. **后台前端 API 客户端与类型未跟进** ✅ 已落地（2026-11-02）
+   - `frontend/src/lib/api.ts` 现为四组：`adminPaymentProvidersApi` /
+     `adminPaymentProductsApi` / `adminPaymentOrdersApi` /
+     `adminPaymentReconciliationApi`，路径与后端一致。
+   - `frontend/src/types/payment.ts` 承载支付域契约（provider 视图、商品视图、
+     订单行 / 详情、对账运行 / 明细、显示状态与结果文案映射）。
 
 ### 25.4 P1：功能与可靠性差距
 
 | # | 差距 | 参考实现 | 本仓库现状 / 待办 |
 | --- | --- | --- | --- |
 | 1 | 存储空间商品 | `TopupProductKind = credits \| storage` + `UserStorageGrant` | `Product.kind` 字段存在，但后台 `normalizeProductInput()` 强制 `credits`，订单创建也拒绝非 credits；无存储发放模型 |
-| 2 | C 端支付设置 | `GET /payments/settings` | 只有后台 `settingsView()`；C 端无法按默认币种排序商品 |
-| 3 | 未支付订单上限 | 每用户 5 笔 active | 无限制 |
-| 4 | 导出超限 | 超过 10000 行报错 | `take: 10_000` 静默截断，财务可能拿到不完整文件 |
-| 5 | 渠道公网地址 | 每个 provider 配置 `publicBaseUrl` 并校验 | 使用全局 `PAYMENT_NOTIFY_BASE` / `WEB_BASE_URL`，后台不能按渠道维护 |
-| 6 | 查单 `not_found` 语义 | 只记录渠道状态，不直接关单 | `applyQueryResult()` 在 `not_found` 时直接 `localClose()` |
-| 7 | 关单失败二次查单 | 关单失败后再查一次，防止支付竞态漏单 | 关单前查一次，失败后只写 `lastError` |
+| 2 | C 端支付设置 | `GET /payments/settings` | ✅ 已提供公开的 `GET /payments/settings`（默认币种 + 可用渠道） |
+| 3 | 未支付订单上限 | 每用户 5 笔 active | ✅ 已限制每用户 5 笔 pending（2026-11-02） |
+| 4 | 导出超限 | 超过 10000 行报错 | ✅ 支付订单 / 对账运行 / 对账明细均改为超限报错（2026-11-02） |
+| 5 | 渠道公网地址 | 每个 provider 配置 `publicBaseUrl` 并校验 | ✅ 已支持按渠道配置 `publicBaseUrl`，未配置时回落 `PAYMENT_NOTIFY_BASE`（2026-11-02） |
+| 6 | 查单 `not_found` 语义 | 只记录渠道状态，不直接关单 | ✅ 查单路径不再按 `not_found` 本地关单；只有关单路径确认后才关闭 |
+| 7 | 关单失败二次查单 | 关单失败后再查一次，防止支付竞态漏单 | ✅ 查单/关单失败保留 pending 并释放租约，不再本地关单；下一轮 worker 会重试 |
 | 8 | 邀请返佣 | 积分充值入账后 `grantReferralCommission()` | 无对应逻辑 |
-| 9 | 商品后台校验 | 类型、金额上限、库存、周期、限时、描述长度全套 | kind 固定、金额无上限、库存/描述校验不足 |
+| 9 | 商品后台校验 | 类型、金额上限、库存、周期、限时、描述长度全套 | ✅ 已补金额上限、库存必须 >0、周期/限时、划线价、积分与有效期上限；描述长度由 DTO 限制 |
 | 10 | 插件级启停 | `pluginEnabled` 与 `configEnabled` 分离 | 只有配置启用 |
-| 11 | 后端测试 | 25+ 个支付相关 Go 测试 | 后端支付域 0 个 spec；smoke 仍测旧路由 |
+| 11 | 后端测试 | 25+ 个支付相关 Go 测试 | ✅ Vitest L1.6（57 条：payment-query / payment-order.close + notifyUrl / HTTP 集成含并发 / csv / zip-reader）+ `smoke-payments.js` 82 项；更细的多实例 spec 仍待补 |
 
 ### 25.5 P2：架构级差距（需产品决策）
 
@@ -3562,12 +3575,12 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 
 - **不新建 `PaymentOrder` / `TopupProduct` 表**：复用 `Order` / `Product`，避免打断优惠券、会员、退款、发票、积分回收链路（D1）。
 - **不引入微积分**：本仓库积分为整数，参考实现 `creditsMicrocredits` 不适用（D6）。
-- **不引入 antd**：后台继续用 BoardUI / `admin-ui`（D10）。
+- **不引入 antd**：后台继续用 shadcn / `admin-ui`（D10）。
 - **插件运行时不是当前阻塞项**：只接支付宝/微信时内置适配器足够；接聚合支付或插件市场时再立项。
 
 ### 25.7 建议实施顺序
 
-1. **P0-1**：后台 `/admin/payments` 四标签页 + 旧路由重定向 + `adminPaymentsApi` / 类型补齐。
+1. **P0-1**：后台 `/admin/payments` 四标签页 + 旧路由重定向 + API 客户端 / 类型补齐 —— ✅ 已完成 2026-11-02。
 2. **P0-2**：C 端 provider 列表、支付方式单选、`providerId` 透传、结果动作与返回恢复。
 3. **P1**：存储商品、`GET /payments/settings`、active 订单上限、导出超限报错、`publicBaseUrl`、`not_found` / 关单二次查单、返佣、商品校验。
 4. **P1-测试**：按参考实现补后端 spec，至少覆盖幂等入账、金额/币种不一致、交易号唯一、配置版本、周期限购、库存并发、对账补发与导出快照。
@@ -3578,3 +3591,46 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 - `backend`：`npx tsc --noEmit` 通过；`npx prisma validate` 通过。
 - `frontend`：`npx tsc --noEmit` 通过；checkout + channelOrder 测试 9 条通过。
 - `backend` 支付域无 spec；`scripts/smoke-payments.js` 未覆盖新后台支付接口，需在 P0 完成后同步更新。
+
+### 25.9 验证结果（2026-11-02，P0-1 完成后）
+
+- `frontend`：`npx tsc --noEmit` 通过；`npm test` 41 文件 / 203 条通过。
+- `frontend`：`npx playwright test --config=playwright.admin.config.ts` 全绿
+  （含新增 `tests/admin-payments.spec.ts` 8 条：标签切换 / 深链 / 旧路由重定向 /
+  三适配器渲染 / 无退款入口 / 对账执行区 / 状态深链回显）。
+- `frontend`：`node scripts/sweep-admin.mjs` 35 条后台路由全部渲染，控制台零错误
+  （`payments` 已加入 `ROUTES`）。
+- `backend` 支付域仍无 spec，`scripts/smoke-payments.js` 仍测旧路径 —— 缺口未消。
+
+### 25.10 复核修复结果（2026-11-02 第二轮）
+
+本轮按支付链路复核结论修复了以下问题：
+
+- **超时关单统一入口**：删除 `OrderService.cancelExpired()` 的直接改状态；旧调度器与支付 worker 都改走 `PaymentOrderService.closeExpired()`，先逐渠道查单，失败保留 pending。
+- **关单失败不再本地误关**：查单异常、`closeOrder` 返回失败、渠道金额/交易号缺失时均保留 pending 并释放关单租约。
+- **跨渠道尝试**：`query/close` 遍历订单全部 `Payment` 尝试；回调可匹配任意一次尝试的配置版本；`markPaid` 用 `status='pending'` 条件更新抢占，并记录实际成功渠道。
+- **退款幂等**：查在途与建退款单同事务；同金额失败重试复用原 `outRefundNo`；退款渠道改用实际成功支付的 `Payment.channel/providerConfigId`。
+- **0 元单退款**：`channel='free'` 的成功流水不再回落到原价，退款上限为 0。
+- **支付宝账单**：支持 ZIP（stored/deflate）与 GB18030，表头前说明行可跳过；手工导入支持支付宝 `.zip`。新增 `common/archive/zip-reader.ts`。
+- **对账运行回收**：超过 30 分钟的 `running` 运行自动标记 failed，worker 与手动重跑前都会回收。
+- **支付宝响应验签**：交易类接口缺签名直接拒绝，不再 fail-open。
+- **后台商品保存**：补 `kind` / `reason` 必填字段；限时商品时间按本地时区正确回显与提交。
+- **未支付订单上限**：每用户最多 5 笔 pending；超限返回 400，避免长期占库存。
+- **导出超限报错**：支付订单 / 对账运行 / 对账明细超过 10000 行直接报错，不再静默截断。
+- **对账默认日期**：前端按上海时区取昨天，避免东八区凌晨默认成前天。
+- **CSV 下载响应**：中文文件名改用 RFC 5987（`filename*=UTF-8''…`），修复导出接口因非 ASCII 头直接 500 的问题。
+- **C 端支付设置**：新增公开 `GET /payments/settings`（默认币种 + 可用渠道），前端 `paymentsApi.settings()` 已接入。
+- **后台对账导入**：`/admin/payments?tab=reconciliation` 新增 CSV/ZIP 导入入口，支付宝支持 ZIP。
+- **渠道公网地址**：支付宝/微信配置新增 `publicBaseUrl`（HTTPS；开发可 localhost HTTP），回调地址优先使用该渠道值，未配置回落 `PAYMENT_NOTIFY_BASE`。
+- **商品校验**：补金额上限、划线价不得低于售价、库存商品必须 >0、周期/限时/积分/有效期/排序边界；前端同步校验与提示。
+
+验证：
+
+- `backend`：`npx tsc --noEmit`、`npm run build` 通过。
+- `backend`：`npm test`（Vitest L1.6）**57 条通过**：`payment-query`、`payment-order.close`（查单/关单失败不本地关单、多渠道尝试、`publicBaseUrl` 优先级）、`payments.integration`（临时 SQLite + 真实 Nest HTTP：回调/幂等/并发入账/关单/退款/并发退款/库存并发/0 元/订单上限/权限/DTO/CSV 导出）、`csv`、`zip-reader`。
+- `backend`：新增 `npm run verify:payment-bills`（6 项：ZIP stored/deflate、直接 CSV、GB18030、路径穿越、缺少 CSV）通过。
+- `backend`：`scripts/smoke-payments.js` 已重写为新接口，并在开发档跑通 **82 项 / 0 失败**（渠道列表、C 端设置、intent、回调入账/幂等、金额不符、未知单、关单、全额/部分退款、并发回调只入账一次、周期限购、库存并发不超卖、未支付订单上限、0 元单不可退、后台渠道/商品/订单、CSV 导出、对账导入与超时运行回收）。
+- `backend`：`npm run verify:payment-signatures` 已按新适配器重写并跑通 **25 项 / 0 失败**（支付宝 RSA2 回调/响应签名、微信 v3 验签+AES-GCM 解密/防重放、回调公网地址校验、沙箱生产环境拒绝）。
+- `frontend`：`npx tsc --noEmit` 通过；`npm test` 42 文件 / 220 条通过。
+
+仍缺：后端支付域仍需更细的单元/集成 spec（并发库存、周期限购、对账自动补发等边界），当前由 smoke 覆盖主链路。

@@ -29,7 +29,7 @@ import {
   Panel,
   SegmentedGroup,
   SelectField,
-  Skeleton,
+  SkeletonBody,
   StatCard,
   StatusTag,
   StaleError,
@@ -751,7 +751,7 @@ export function AdminAssetsPage() {
         note={`${total} 张`}
         extra={
           view === 'grid' && items.length > 0 ? (
-            <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
               <FolderOpen className="size-3.5" aria-hidden />
               每页 {pageSize} 张
             </span>
@@ -760,10 +760,8 @@ export function AdminAssetsPage() {
       >
         {view === 'grid' ? (
           loading && items.length === 0 ? (
-            <div className="flex flex-col gap-2 py-2">
-              <Skeleton rows={4} />
-              <p className="text-center text-xs text-muted-foreground">加载素材…</p>
-            </div>
+            /* 面板外壳已经是实的，只替内容行 */
+            <SkeletonBody rows={4} />
           ) : error && items.length === 0 ? (
             <ListError error={error} onRetry={reload} />
           ) : items.length === 0 ? (
@@ -829,7 +827,7 @@ export function AdminAssetsPage() {
                         )}
 
                         {a.status === 'hidden' && (
-                          <span className="absolute right-2 top-2 rounded bg-foreground/80 px-1.5 py-0.5 text-[10px] text-background">
+                          <span className="absolute right-2 top-2 rounded bg-foreground/80 px-1.5 py-0.5 text-[12px] text-background">
                             已下架
                           </span>
                         )}
@@ -879,7 +877,7 @@ export function AdminAssetsPage() {
                           {assetLabel(a)}
                         </div>
                         <div
-                          className="truncate text-[11px] text-muted-foreground"
+                          className="truncate text-[12px] text-muted-foreground"
                           title={`${fmtFormat(a.format)}${
                             a.width && a.height ? ` · ${a.width}×${a.height}` : ''
                           } · ${fmtBytes(a.sizeBytes)}`}
@@ -889,7 +887,7 @@ export function AdminAssetsPage() {
                           {fmtBytes(a.sizeBytes)}
                         </div>
                         <div
-                          className="truncate text-[11px] text-muted-foreground"
+                          className="truncate text-[12px] text-muted-foreground"
                           title={`${a.ownerEmail} · ${a.projectName}`}
                         >
                           {a.ownerEmail} · {a.projectName}

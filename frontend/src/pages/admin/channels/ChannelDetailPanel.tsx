@@ -66,7 +66,7 @@ export function ChannelDetailPanel({
           }
           note={
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="font-mono text-[11px]" title={selected.baseUrl}>
+              <span className="font-mono text-[12px]" title={selected.baseUrl}>
                 {selected.baseUrl}
               </span>
               <span>

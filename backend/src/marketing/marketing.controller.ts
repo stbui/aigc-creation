@@ -5,6 +5,7 @@ import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../common/optional-jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/current-user.decorator';
 import { MarketingService } from './marketing.service';
+import { MembershipService } from '../membership/membership.service';
 
 /** 邀请链接带参: /?inv=CODE */
 class InviteBindDto {
@@ -81,12 +82,24 @@ export class MarketingPublicController {
 @Controller('marketing')
 @UseGuards(JwtAuthGuard)
 export class MarketingMeController {
-  constructor(private readonly marketing: MarketingService) {}
+  constructor(
+    private readonly marketing: MarketingService,
+    private readonly membership: MembershipService,
+  ) {}
 
-  /** 我的邀请码与邀请数据 */
+  /** 我的邀请码与邀请数据（limit/offset 分页） */
   @Get('invites')
-  myInvites(@CurrentUser() user: AuthUser) {
-    return this.marketing.myInvites(user.id);
+  myInvites(
+    @CurrentUser() user: AuthUser,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    const n = Number(limit ?? 20);
+    const skip = Number(offset ?? 0);
+    return this.marketing.myInvites(user.id, {
+      limit: Number.isFinite(n) ? n : 20,
+      offset: Number.isFinite(skip) ? skip : 0,
+    });
   }
 
   /**
@@ -127,8 +140,13 @@ export class MarketingMeController {
     if (!dto.productIds?.length) {
       return {
         subtotalCents: 0,
+        memberDiscountCents: 0,
         discountCents: 0,
         payableCents: 0,
+        appliedSource: null,
+        appliedCouponCode: null,
+        appliedCampaignId: null,
+        notStackedNotice: null,
         coupons: [],
         items: [],
       };
@@ -153,6 +171,20 @@ export class MarketingMeController {
 
     const subtotalCents = validItems.reduce((s, i) => s + i.priceCents * i.quantity, 0);
 
+    /*
+     * 会员加油包折扣必须进入试算。
+     *
+     * 下单链路 (OrdersService.create) 先执行 membership.quoteOrder, 再叠加
+     * 券/活动; 试算如果只算券, 会员看到的"应付金额"会比实际扣款高,
+     * 下单后金额突然变小。这里与下单保持同一顺序, 并单独返回会员优惠金额,
+     * 让前端能逐行解释"原价 - 会员优惠 - 券优惠 = 应付"。
+     */
+    const memberQuote = await this.membership.quoteOrder(user.id, subtotalCents, {
+      isSubscription: false,
+    });
+    const memberDiscountCents = Math.max(0, subtotalCents - memberQuote.finalCents);
+    const afterMemberCents = memberQuote.finalCents;
+
     const discount = await this.marketing.settleDiscount({
       userId: user.id,
       items: validItems,
@@ -160,12 +192,16 @@ export class MarketingMeController {
       campaignIds: dto.campaignIds,
     });
 
+    const couponDiscountCents = Math.min(discount.discountCents, afterMemberCents);
     const coupons = await this.marketing.previewCoupons({ userId: user.id, items: validItems });
 
     return {
       subtotalCents,
-      discountCents: discount.discountCents,
-      payableCents: Math.max(0, subtotalCents - discount.discountCents),
+      /** 会员加油包折扣（非会员为 0） */
+      memberDiscountCents,
+      /** 券 / 限时活动优惠（不含会员折扣） */
+      discountCents: couponDiscountCents,
+      payableCents: Math.max(0, afterMemberCents - couponDiscountCents),
       // 明确告知取的是哪一个优惠, 以及另一个被放弃了 —— 用户自己能核对
       appliedSource: discount.source,
       appliedCouponCode: discount.couponCode,

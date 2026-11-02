@@ -14,9 +14,11 @@ import {
   ActionButton,
   Meter,
   PageHeader,
+  PageSkeleton,
   Panel,
   SegmentedTabs,
   Skeleton,
+  SkeletonDutyStrip,
   StaleError,
   DutyChannelTower,
   DutyStrip,
@@ -149,8 +151,54 @@ function DashboardContent() {
   /* 财务没有任务读权：队列、产出条、任务趋势整体换成交易视角 */
   const isFinance = !can('task.read');
 
-  // 首屏骨架：只有完全没有数据时才塌整页
-  if (loading && !data) return <AdminLoading tip="加载统计数据…" />;
+  /*
+   * 首屏骨架：只有完全没有数据时才塌**正文**。
+   *
+   * 页头照常渲染 —— 概览页是后台的门面，加载期间连标题都没有的话，用户会以为
+   * 后台没打开。时间窗分段与「刷新」按钮也在位（禁用），数据到位后它们不动。
+   */
+  if (loading && !data) {
+    return (
+      <PageSkeleton
+        title="平台概览"
+        description={`${isFinance ? '经营' : '生成与经营'} · 近 ${days} 天`}
+        actions={
+          <>
+            <SegmentedTabs
+              ariaLabel="统计时间窗"
+              value={String(days)}
+              onChange={(value) => setDays(Number(value))}
+              options={[7, 30, 90].map((value) => ({
+                value: String(value),
+                label: `近 ${value} 天`,
+              }))}
+            />
+            <ActionButton variant="outline" icon={RefreshCw} disabled>
+              刷新
+            </ActionButton>
+          </>
+        }
+        /*
+         * 概览页的真实版面不是「面板上下排」：值班条 + 62/38 双栏 + 一串
+         * 折叠小节。用通用面板骨架顶上去，数据到位时整页会横向重排一次 ——
+         * 所以这里自己画一份同构的骨架。
+         */
+        body={
+          <>
+            <SkeletonDutyStrip />
+            <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,62fr)_minmax(0,38fr)]">
+              <Panel title="队列" note="读取中…">
+                <Skeleton rows={4} />
+              </Panel>
+              <Panel title="机器状态" note="读取中…">
+                <Skeleton rows={3} />
+              </Panel>
+            </div>
+          </>
+        }
+      />
+    );
+  }
   if (error && !data) {
     return (
       <ExceptionPage
@@ -436,7 +484,7 @@ function Subhead({ title, note }: { title: string; note: string }) {
   return (
     <div className="mb-2.5 flex items-baseline gap-2 text-xs font-semibold text-foreground">
       <span>{title}</span>
-      <span className="text-[11px] font-normal text-muted-foreground">{note}</span>
+      <span className="text-[12px] font-normal text-muted-foreground">{note}</span>
     </div>
   );
 }
@@ -512,7 +560,7 @@ function FailureQueue({ tasks, loading }: { tasks: DutyTask[]; loading: boolean 
               className="grid min-h-11 grid-cols-[22px_minmax(0,1fr)_auto_14px] items-center gap-2.5 rounded-md border-t border-border px-1.5 py-1 text-inherit no-underline transition-colors first:border-t-0 hover:bg-muted focus-visible:outline-2 focus-visible:outline-brand focus-visible:-outline-offset-2"
               to={adminTaskHref(t.id)}
             >
-              <span className="text-[11px] font-semibold text-muted-foreground">
+              <span className="text-[12px] font-semibold text-muted-foreground">
                 {String(i + 1).padStart(2, '0')}
               </span>
               <span className="flex min-w-0 flex-col gap-px">
@@ -524,7 +572,7 @@ function FailureQueue({ tasks, loading }: { tasks: DutyTask[]; loading: boolean 
                   />
                   {t.capabilityName}
                 </span>
-                <span className="overflow-hidden text-[11.5px] leading-4 text-ellipsis whitespace-nowrap text-muted-foreground">
+                <span className="overflow-hidden text-[12px] leading-4 text-ellipsis whitespace-nowrap text-muted-foreground">
                   {/* 错误码放在原因前面：排障时先拿码去查日志 */}
                   {t.errorCode ? `${t.errorCode} · ` : ''}
                   {taskErrorLabel(t.errorCode)}
@@ -539,7 +587,7 @@ function FailureQueue({ tasks, loading }: { tasks: DutyTask[]; loading: boolean 
                 </span>
               </span>
               <span
-                className="text-[11.5px] text-muted-foreground"
+                className="text-[12px] text-muted-foreground"
                 title={new Date(t.createdAt).toLocaleString('zh-CN')}
               >
                 {queueTime(t.createdAt)}
@@ -550,7 +598,7 @@ function FailureQueue({ tasks, loading }: { tasks: DutyTask[]; loading: boolean 
         ))}
       </ol>
       {failures.length > shown.length && (
-        <p className="mt-2.5 border-t border-border pt-2.5 text-[11.5px]">
+        <p className="mt-2.5 border-t border-border pt-2.5 text-[12px]">
           <Link className="text-brand hover:underline" to="/admin/tasks?status=failed">
             另有 {failures.length - shown.length} 条失败任务 →
           </Link>
@@ -581,7 +629,7 @@ function MachineStats({ tasks }: { tasks: DutyTask[] }) {
       <div className="min-w-0">
         {/* 「近期」是要紧的限定：下面还有一条近 N 天的成功率，不区分会被读成打架 */}
         <dt
-          className="mb-0.5 overflow-hidden text-[10.5px] text-ellipsis whitespace-nowrap text-muted-foreground"
+          className="mb-0.5 overflow-hidden text-[12px] text-ellipsis whitespace-nowrap text-muted-foreground"
           title={`最近 ${tasks.length} 条任务中的已结算项`}
         >
           近期成功率
@@ -597,7 +645,7 @@ function MachineStats({ tasks }: { tasks: DutyTask[] }) {
         </dd>
       </div>
       <div className="min-w-0">
-        <dt className="mb-0.5 overflow-hidden text-[10.5px] text-ellipsis whitespace-nowrap text-muted-foreground">
+        <dt className="mb-0.5 overflow-hidden text-[12px] text-ellipsis whitespace-nowrap text-muted-foreground">
           中位耗时
         </dt>
         <dd className="text-base leading-5 font-semibold tracking-tight text-foreground">
@@ -605,7 +653,7 @@ function MachineStats({ tasks }: { tasks: DutyTask[] }) {
         </dd>
       </div>
       <div className="min-w-0">
-        <dt className="mb-0.5 overflow-hidden text-[10.5px] text-ellipsis whitespace-nowrap text-muted-foreground">
+        <dt className="mb-0.5 overflow-hidden text-[12px] text-ellipsis whitespace-nowrap text-muted-foreground">
           样本
         </dt>
         <dd className="text-base leading-5 font-semibold tracking-tight text-foreground">
@@ -640,7 +688,7 @@ function OutputStrip({ tasks }: { tasks: DutyTask[] }) {
               alt=""
               loading="lazy"
             />
-            <span className="pointer-events-none absolute bottom-1 left-1 rounded bg-foreground/70 px-1 text-[10px] leading-[15px] text-background opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+            <span className="pointer-events-none absolute bottom-1 left-1 rounded bg-foreground/70 px-1 text-[12px] leading-[15px] text-background opacity-0 transition-opacity duration-150 group-hover:opacity-100">
               {hhmm(t.createdAt)}
             </span>
           </Link>
@@ -663,14 +711,14 @@ function OrderQueue({ orders, loading }: { orders: AdminOrderRow[]; loading: boo
             className="grid min-h-11 grid-cols-[22px_minmax(0,1fr)_auto_auto_14px] items-center gap-2.5 rounded-md border-t border-border px-1.5 py-1 text-inherit no-underline transition-colors first:border-t-0 hover:bg-muted focus-visible:outline-2 focus-visible:outline-brand focus-visible:-outline-offset-2"
             to={adminOrderDetailHref(o.id)}
           >
-            <span className="text-[11px] font-semibold text-muted-foreground">
+            <span className="text-[12px] font-semibold text-muted-foreground">
               {String(i + 1).padStart(2, '0')}
             </span>
             <span className="flex min-w-0 flex-col gap-px">
               <span className="overflow-hidden text-[13px] leading-[18px] font-semibold text-ellipsis whitespace-nowrap text-foreground">
                 {o.orderNo}
               </span>
-              <span className="overflow-hidden text-[11.5px] leading-4 text-ellipsis whitespace-nowrap text-muted-foreground">
+              <span className="overflow-hidden text-[12px] leading-4 text-ellipsis whitespace-nowrap text-muted-foreground">
                 {o.userEmail}
               </span>
             </span>
@@ -678,7 +726,7 @@ function OrderQueue({ orders, loading }: { orders: AdminOrderRow[]; loading: boo
               ¥{yuan(o.totalCents, 0)}
             </span>
             <span
-              className="text-[11.5px] text-muted-foreground"
+              className="text-[12px] text-muted-foreground"
               title={new Date(o.createdAt).toLocaleString('zh-CN')}
             >
               {hhmm(o.createdAt)}
@@ -716,7 +764,7 @@ function FinanceGrid({ commerce, days }: { commerce: AdminOverview['commerce']; 
     <dl className="grid grid-cols-2 gap-x-4 gap-y-3.5">
       {items.map((item) => (
         <div key={item.label} className="min-w-0">
-          <dt className="mb-0.5 overflow-hidden text-[10.5px] text-ellipsis whitespace-nowrap text-muted-foreground">
+          <dt className="mb-0.5 overflow-hidden text-[12px] text-ellipsis whitespace-nowrap text-muted-foreground">
             {item.label}
           </dt>
           <dd
@@ -815,7 +863,7 @@ function WindowStrip({ data, isFinance }: { data: AdminOverview; isFinance: bool
               : 'min-w-0 border-l border-border px-4'
           }
         >
-          <dt className="mb-1.5 text-[11px] text-muted-foreground">{item.label}</dt>
+          <dt className="mb-1.5 text-[12px] text-muted-foreground">{item.label}</dt>
           <dd className="flex items-baseline gap-1.5">
             <span
               className={
@@ -826,9 +874,9 @@ function WindowStrip({ data, isFinance }: { data: AdminOverview; isFinance: bool
             >
               {item.value}
             </span>
-            <span className="text-[11px]">{item.delta}</span>
+            <span className="text-[12px]">{item.delta}</span>
           </dd>
-          <span className="mt-0.5 block text-[11px] text-muted-foreground">{item.hint}</span>
+          <span className="mt-0.5 block text-[12px] text-muted-foreground">{item.hint}</span>
         </div>
       ))}
     </dl>
@@ -942,7 +990,13 @@ function yuan(cents: number, digits = 2): string {
   });
 }
 
-/** 后台通用加载态：页头骨架 + 内容骨架，加载期间不闪白。 */
+/**
+ * 通用加载态：标题占位 + 内容占位，加载期间不闪白。
+ *
+ * 用在**还知道自己在加载哪一页**之前的两处：路由 chunk 的 Suspense 兜底、
+ * 以及后台身份校验期间的骨架。这两处都不知道页面标题，所以标题只能是灰条；
+ * 等页面自己渲染后，它会换成真实标题（见各页的 `PageSkeleton`）。
+ */
 function AdminLoading({ tip }: { tip: string }) {
   return (
     <div className="flex flex-col gap-4" aria-busy="true" aria-live="polite">

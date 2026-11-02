@@ -157,6 +157,14 @@ export interface PriceTierRowLike {
   priceVersion: number;
 }
 
+/**
+ * 渠道模型后台视图（含成本价）。
+ *
+ * ⚠ **只在后台路径使用**：这个投影带 `costPricing`（上游成本价），
+ * 公开目录另有 `public-model-catalog.service.ts` 的无成本投影。
+ * 参考实现靠 `json:"-"` 在实体层兜底，本仓靠「公开路径不调这个函数」——
+ * 新增公开端点时**不要**复用它，否则上游成本会泄漏给普通用户。
+ */
 export function channelModelView(row: ChannelModelRowLike, tiers: PriceTierRowLike[]): ChannelModelView {
   return {
     id: row.id,

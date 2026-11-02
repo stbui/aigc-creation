@@ -16,7 +16,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createCipheriv, createDecipheriv, randomBytes } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, linkSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
 const CIPHER_PREFIX = 'enc:v1:';
@@ -94,18 +94,38 @@ export class SecretCipher {
     const uploadDir = resolve(this.config.get<string>('path.uploads') ?? 'uploads');
     const keyPath = join(dirname(uploadDir), 'data', '.model-secret-key');
     try {
-      if (existsSync(keyPath)) {
-        const data = readFileSync(keyPath);
-        if (data.length === KEY_BYTES) return data;
-        throw new Error(`渠道加密密钥长度无效：${keyPath}`);
-      }
+      if (existsSync(keyPath)) return this.readKeyFile(keyPath);
       mkdirSync(dirname(keyPath), { recursive: true });
+      // 原子发布：先写同目录临时文件，再用 link 抢占目标名。两个进程同时首启时
+      // 只有一个 link 成功，另一个会拿到 EEXIST 并读取赢家写好的完整密钥 ——
+      // 绝不能直接 writeFileSync 覆盖，否则两边各缓存一把钥匙，互相解不开凭证。
+      const tempPath = `${keyPath}.${process.pid}.${randomBytes(6).toString('hex')}.tmp`;
       const key = randomBytes(KEY_BYTES);
-      writeFileSync(keyPath, key, { mode: 0o600 });
-      this.log.warn(`未配置 MODEL_SECRET_KEY，已生成开发用密钥：${keyPath}（生产请显式配置）`);
-      return key;
+      writeFileSync(tempPath, key, { mode: 0o600, flag: 'wx' });
+      try {
+        linkSync(tempPath, keyPath);
+        this.log.warn(`未配置 MODEL_SECRET_KEY，已生成开发用密钥：${keyPath}（生产请显式配置）`);
+        return key;
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'EEXIST') {
+          return this.readKeyFile(keyPath);
+        }
+        throw error;
+      } finally {
+        try {
+          unlinkSync(tempPath);
+        } catch {
+          // 临时文件清理失败不影响密钥本身
+        }
+      }
     } catch (error) {
       throw new Error(`读取渠道加密密钥失败：${(error as Error).message}`);
     }
+  }
+
+  private readKeyFile(keyPath: string): Buffer {
+    const data = readFileSync(keyPath);
+    if (data.length !== KEY_BYTES) throw new Error(`渠道加密密钥长度无效：${keyPath}`);
+    return data;
   }
 }

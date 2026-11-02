@@ -10,6 +10,7 @@ import {
   ListError,
   Notice,
   PageHeader,
+  PageSkeleton,
   Skeleton,
   StaleError,
   ToneBadge,
@@ -104,15 +105,47 @@ export function AdminStoragePage() {
   };
 
   /*
-   * 守卫只在「还没有数据」时替换整页。探测/切换后端之后要重拉状态 ——
+   * 守卫只在「还没有数据」时替换**正文**。探测/切换后端之后要重拉状态 ——
    * 无条件替换会让用户刚点的后端卡片闪一下消失，看起来像操作失败重载。
+   *
+   * 页头照常渲染：加载期间标题与「刷新」按钮就该在位，否则首屏先闪一段
+   * 没有标题的灰条，再突然冒出完整页面 —— 版面跳两次比跳一次更难接受。
+   *
+   * 凭据提示是**固定文案**（与数据无关），所以骨架态也照常渲染：它占着
+   * 页头与卡片之间的位置，数据到位时卡片不会往上跳一截。只有末行的
+   * `credentialSource` 来自接口 —— 加载期间用一根灰条占位，高度对得上。
    */
+  const credentialNotice = (loading: boolean) => (
+    <Notice
+      tone="locked"
+      title="凭据不在界面配置。"
+      icon={<Lock className="size-4 shrink-0" aria-hidden />}
+    >
+      <p>出于安全考虑，OSS / MinIO 的密钥只从部署环境变量读取，页面仅显示是否配置与脱敏值。</p>
+      {loading ? (
+        <Skeleton className="mt-1 h-3 w-72" />
+      ) : (
+        <code className="mt-1 block font-mono text-[12px] break-all text-muted-foreground">
+          {data?.credentialSource}
+        </code>
+      )}
+    </Notice>
+  );
+
   if (loading && !data) {
     return (
-      <div className="flex flex-col gap-3" aria-busy="true" aria-live="polite">
-        <Skeleton rows={4} />
-        <p className="text-center text-xs text-muted-foreground">加载存储配置…</p>
-      </div>
+      <PageSkeleton
+        title="存储配置"
+        description="素材文件的存放位置。切换只影响新上传，已写入的素材仍按原后端读取。"
+        actions={
+          <ActionButton variant="secondary" icon={RefreshCw} disabled>
+            刷新
+          </ActionButton>
+        }
+        notice={credentialNotice(true)}
+        panels={0}
+        cards={3}
+      />
     );
   }
   if (error && !data) return <ListError error={error} onRetry={() => void reload()} />;
@@ -137,16 +170,12 @@ export function AdminStoragePage() {
 
       {error && <StaleError error={error} onRetry={() => void reload()} />}
 
-      <Notice
-        tone="locked"
-        title="凭据不在界面配置。"
-        icon={<Lock className="size-4 shrink-0" aria-hidden />}
-      >
-        <p>出于安全考虑，OSS / MinIO 的密钥只从部署环境变量读取，页面仅显示是否配置与脱敏值。</p>
-        <code className="mt-1 block font-mono text-[11px] break-all text-muted-foreground">
-          {data.credentialSource}
-        </code>
-      </Notice>
+      {/*
+       * 有数据时的刷新**不塌页面**：卡片留在原位，只是「刷新」按钮禁用。
+       * 探测/切换后端之后要重拉状态 —— 无条件替换会让用户刚点的后端卡片闪一下
+       * 消失，看起来像操作失败重载。
+       */}
+      {credentialNotice(false)}
 
       {/*
        * auto-fit 而非固定三列：后端清单未来会随 STORAGE_BACKEND 增加，
@@ -186,7 +215,7 @@ export function AdminStoragePage() {
                       </ToneBadge>
                     )}
                   </div>
-                  <p className="mt-0.5 text-[11px] leading-4 text-muted-foreground">{meta.desc}</p>
+                  <p className="mt-0.5 text-[12px] leading-4 text-muted-foreground">{meta.desc}</p>
                 </div>
               </div>
 
@@ -208,12 +237,12 @@ export function AdminStoragePage() {
               </div>
 
               {b.probeMessage && (
-                <p className="mt-2 font-mono text-[11px] leading-4 break-all text-muted-foreground">
+                <p className="mt-2 font-mono text-[12px] leading-4 break-all text-muted-foreground">
                   {b.probeMessage}
                 </p>
               )}
 
-              <dl className="mt-3 grid grid-cols-[40px_1fr] gap-x-2 gap-y-1 text-[11px] leading-4">
+              <dl className="mt-3 grid grid-cols-[40px_1fr] gap-x-2 gap-y-1 text-[12px] leading-4">
                 <dt className="text-muted-foreground">凭据</dt>
                 <dd className="min-w-0 truncate font-mono text-foreground">
                   {b.masked ? (
@@ -232,12 +261,12 @@ export function AdminStoragePage() {
 
               {!b.configured && b.backend !== 'local' && (
                 <div className="mt-3">
-                  <div className="text-[11px] text-muted-foreground">启用所需环境变量：</div>
+                  <div className="text-[12px] text-muted-foreground">启用所需环境变量：</div>
                   <div data-testid="admin-storage-env" className="mt-1 flex flex-wrap gap-1">
                     {meta.envKeys.map((key) => (
                       <code
                         key={key}
-                        className="rounded-sm border border-border bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground"
+                        className="rounded-sm border border-border bg-muted px-1.5 py-0.5 font-mono text-[12px] text-foreground"
                       >
                         {key}
                       </code>

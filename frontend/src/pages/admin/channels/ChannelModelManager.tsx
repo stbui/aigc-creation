@@ -1,22 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { adminChannelsApi } from './api';
-import { ConfirmAction, Notice, TextField } from './components';
+import { ConfirmAction, Notice } from './components';
 import { useToast } from './hooks';
 import { ChannelModelFormDialog } from './ChannelModelFormDialog';
 import { ChannelModelRepriceDialog } from './ChannelModelRepriceDialog';
 import { ChannelModelTable } from './ChannelModelTable';
 import { ChannelOrderDialog } from './ChannelOrderDialog';
 import { ChannelUpstreamDialog } from './ChannelUpstreamDialog';
-import { Field } from './ChannelField';
+import { DeleteReasonConfirm } from './DeleteReasonConfirm';
 import { EMPTY_MODEL_DRAFT, EMPTY_TIER, type ModelDraft } from './constants';
 import {
-  parseSelector,
-  priceOf,
+  buildPriceTiers,
   toModelDraft,
   staleTierUpstream,
   clearStaleTierUpstream,
   validateModelTags,
-  validateModelTiers,
 } from './utils';
 import { useChannelModelHealth, useChannelModels, useProtocolCatalog } from './useChannelModels';
 import type {
@@ -112,6 +110,13 @@ export function ChannelModelManager({
     setDisableTarget(null);
   }, [channelId]);
 
+  const openEdit = useCallback((model: AdminChannelModelView) => {
+    setDraft(toModelDraft(model));
+    setEditing(model);
+    setCreating(false);
+    setTestResult(null);
+  }, []);
+
   /**
    * 跨渠道视图的「编辑」动线：清单加载完成后直接打开这条模型的编辑器。
    *
@@ -121,16 +126,12 @@ export function ChannelModelManager({
   useEffect(() => {
     if (!focusModelId || !models) return;
     const target = models.find((model) => model.id === focusModelId);
-    if (target) {
-      setDraft(toModelDraft(target));
-      setEditing(target);
-      setCreating(false);
-      setTestResult(null);
-    }
+    if (target) openEdit(target);
     onFocusConsumed?.();
-    // openEdit 每次渲染都是新函数，不进依赖；这里只认「清单 + 目标 id」
+    // openEdit 依赖稳定；onFocusConsumed 每次渲染都是新函数，不纳入依赖 ——
+    // 目标 id 消费后父级会立即清空，不会重复触发
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [models, focusModelId]);
+  }, [models, focusModelId, openEdit]);
 
   /** 本地已有的上游键：上游 id 命中它就不算「新模型」，勾了也不会重复写入 */
   const existingUpstreamKeys = useMemo(
@@ -149,13 +150,6 @@ export function ChannelModelManager({
     setDraft(next);
     setEditing(null);
     setCreating(true);
-    setTestResult(null);
-  };
-
-  const openEdit = (model: AdminChannelModelView) => {
-    setDraft(toModelDraft(model));
-    setEditing(model);
-    setCreating(false);
     setTestResult(null);
   };
 
@@ -217,63 +211,33 @@ export function ChannelModelManager({
         return;
       }
     }
-    let priceTiers;
-    try {
-      const tierError = validateModelTiers(draft.capability, draft.tiers);
-      if (tierError) {
-        toast.error(tierError);
-        return;
-      }
-      priceTiers = draft.tiers
-        .filter((tier) => tier.enabled || tier.unit !== '0' || tier.output !== '0')
-        .map((tier) => ({
-          selector: parseSelector(tier.selector),
-          resolution: tier.resolution.trim() || '*',
-          videoSeconds: Number(tier.videoSeconds) || 0,
-          providerModelKey: tier.providerModelKey.trim() || draft.providerModelKey.trim() || modelKey,
-          billingMode: tier.billingMode,
-          unitPriceMicrocredits: priceOf(tier.unit, '单价'),
-          inputTokenPriceMicrocredits: priceOf(tier.input, '输入 Token 单价'),
-          outputTokenPriceMicrocredits: priceOf(tier.output, '输出 Token 单价'),
-          cachedTokenPriceMicrocredits: priceOf(tier.cached, '缓存 Token 单价'),
-          priceConfigured: tier.priceConfigured,
-          enabled: tier.enabled,
-          costPricing: tier.costConfigured
-            ? {
-                configured: true,
-                unitPriceMicrocredits: priceOf(tier.costUnit, '成本单价'),
-                inputTokenPriceMicrocredits: priceOf(tier.costInput, '输入 Token 成本'),
-                outputTokenPriceMicrocredits: priceOf(tier.costOutput, '输出 Token 成本'),
-                cachedTokenPriceMicrocredits: priceOf(tier.costCached, '缓存 Token 成本'),
-              }
-            : null,
-        }));
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '价格格式不正确');
+    const tierResult = buildPriceTiers(draft);
+    if ('error' in tierResult) {
+      toast.error(tierResult.error);
       return;
     }
-      // 标签已在编辑器里结构化维护；提交前再校验一次，避免绕过界面的写入
-      const tagError = validateModelTags(draft.tags);
-      if (tagError) {
-        toast.error(tagError);
-        return;
-      }
-      const body = {
-        modelKey,
-        providerModelKey: draft.providerModelKey.trim() || modelKey,
-        displayName: draft.displayName.trim(),
-        channelLabel: draft.channelLabel.trim(),
-        description: draft.description.trim(),
-        icon: draft.icon.trim(),
-        capability: draft.capability,
-        protocol: draft.protocol,
-        priceCurrency: draft.priceCurrency,
-        tags: draft.tags
-          .map((tag) => ({ text: tag.text.trim(), color: tag.color }))
-          .filter((tag) => tag.text !== ''),
+    // 标签已在编辑器里结构化维护；提交前再校验一次，避免绕过界面的写入
+    const tagError = validateModelTags(draft.tags);
+    if (tagError) {
+      toast.error(tagError);
+      return;
+    }
+    const body = {
+      modelKey,
+      providerModelKey: draft.providerModelKey.trim() || modelKey,
+      displayName: draft.displayName.trim(),
+      channelLabel: draft.channelLabel.trim(),
+      description: draft.description.trim(),
+      icon: draft.icon.trim(),
+      capability: draft.capability,
+      protocol: draft.protocol,
+      priceCurrency: draft.priceCurrency,
+      tags: draft.tags
+        .map((tag) => ({ text: tag.text.trim(), color: tag.color }))
+        .filter((tag) => tag.text !== ''),
       capabilityConfig,
       enabled: draft.enabled,
-      priceTiers,
+      priceTiers: tierResult.tiers,
     };
     setSaving(true);
     try {
@@ -504,36 +468,22 @@ export function ChannelModelManager({
             fetching={fetching}
           />
 
-          <ConfirmAction
+          <DeleteReasonConfirm
             open={deleteTarget !== null}
             title={`删除模型 ${deleteTarget?.modelKey ?? ''}？`}
             description="删除后从路由目录移除；引用该模型的前台线路会变为不可用。历史账单与调用记录保留。"
-            impact={[
-              '该渠道模型的价格档一并作废',
-              '引用它的前台模型线路需要重新选路',
-            ]}
-            danger
+            impact={['该渠道模型的价格档一并作废', '引用它的前台模型线路需要重新选路']}
+            reason={deleteReason}
+            reasonAriaLabel="删除原因"
+            reasonHint="写入审计，建议写清替代模型或下线原因"
+            reasonPlaceholder="如：上游已下线该模型"
             loading={saving}
-            confirmDisabled={deleteReason.trim().length === 0}
+            onReasonChange={setDeleteReason}
             onCancel={() => setDeleteTarget(null)}
             onConfirm={() => void runDelete()}
-            extra={
-              <Field
-                label="删除原因"
-                hint="写入审计，建议写清替代模型或下线原因"
-                error={deleteReason.trim().length === 0 ? '删除是高危操作，必须填写原因' : null}
-              >
-                <TextField
-                  ariaLabel="删除原因"
-                  value={deleteReason}
-                  onChange={setDeleteReason}
-                  placeholder="如：上游已下线该模型"
-                />
-              </Field>
-            }
           />
 
-          <ConfirmAction
+          <DeleteReasonConfirm
             open={batchDeleteOpen}
             title={`批量删除 ${selectedIds.length} 个模型？`}
             description="软删除：所选模型从路由目录移除，价格档一并作废；历史账单与调用记录保留。"
@@ -541,25 +491,14 @@ export function ChannelModelManager({
               '任一模型仍被前台线路或进行中任务使用时，本次不删除任何模型',
               '引用这些模型的前台线路需要重新选路',
             ]}
-            danger
+            reason={batchDeleteReason}
+            reasonAriaLabel="批量删除原因"
+            reasonHint="写入审计"
+            reasonPlaceholder="如：批量下线旧版本模型"
             loading={saving}
-            confirmDisabled={batchDeleteReason.trim().length === 0}
+            onReasonChange={setBatchDeleteReason}
             onCancel={() => setBatchDeleteOpen(false)}
             onConfirm={() => void runBatchDelete()}
-            extra={
-              <Field
-                label="删除原因"
-                hint="写入审计"
-                error={batchDeleteReason.trim().length === 0 ? '删除是高危操作，必须填写原因' : null}
-              >
-                <TextField
-                  ariaLabel="批量删除原因"
-                  value={batchDeleteReason}
-                  onChange={setBatchDeleteReason}
-                  placeholder="如：批量下线旧版本模型"
-                />
-              </Field>
-            }
           />
 
           <ConfirmAction

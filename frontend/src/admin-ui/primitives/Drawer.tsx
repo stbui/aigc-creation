@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { RotateCcw } from 'lucide-react';
 
 import { Button } from '../components/ui/button';
-import { Skeleton } from './display';
+import { Skeleton } from './skeleton';
 import { EmptyState } from './layout';
 import { Drawer } from './overlay';
 

@@ -243,7 +243,12 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
   /**
    * 处理「已建任务但没挂上账单」的排队任务。
    *
-   * 建任务与预留在两个事务里：进程在建完任务、预留之前崩溃会留下这种行。
+   * **这是存量数据的安全网，不是新建路径的设计**。建任务 + 建单 + 预留现在在
+   * 同一个 Prisma 事务里（`TaskAdmissionService.createTasksWithBilling`），
+   * 新任务不会出现「有任务没账单」。这里的行只可能来自：
+   *   · 事务合并之前的历史数据；
+   *   · 手工改库或迁移脚本留下的行。
+   *
    * 先按 taskId 找账单补挂（预留其实成功了）；找不到且已超时，说明从未扣费，
    * 直接判失败即可 —— 不需要退款。
    */
@@ -291,10 +296,13 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       const task = await this.prisma.generationTask.findUnique({ where: { id: taskId } });
       if (!task || task.status !== 'running' || task.leaseOwner !== this.owner) return;
       if (task.billingOrderId) {
-        // 预留 → 运行中；CAS 失败说明账单已被结算 / 退款，不能再扣
-        await this.billing.markRunning(task.billingOrderId).catch((error: Error) => {
-          this.log.warn(`任务 ${taskId} 账单进入运行中失败: ${error.message}`);
-        });
+        // 预留 → 运行中；CAS 失败说明账单已被结算 / 退款，不能再扣，也不能再派发
+        try {
+          await this.billing.markRunning(task.billingOrderId);
+        } catch (error) {
+          await this.lifecycle.uncertain(taskId, `账单无法进入运行中：${(error as Error).message}`);
+          return;
+        }
       }
       // 先续做落盘：上游已产出、只是上次没写进存储
       if (task.pendingResult) {
@@ -500,17 +508,38 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     }
 
     if (task.billingOrderId) {
-      await this.billing.refund(task.billingOrderId, '线路切换，替换账单').catch((error: Error) => {
+      await this.billing.refund(task.billingOrderId, '线路切换，替换账单', 'route_switch').catch((error: Error) => {
         this.log.warn(`任务 ${task.id} 旧账单退款失败: ${error.message}`);
       });
     }
     try {
+      /*
+       * 换线**不能突破用户原始授权上限**。
+       *
+       * 之前把新账单的授权上限设成新金额本身，等于「换线即重新授权」：
+       * 用户为 A 线路付 10 分授权，切到更贵的 B 线路后会被扣 50。
+       * 参考实现（open-ai-canvas）在原账单上做差额调整，并用
+       * `validateBillingChargeLimit` 卡住「换线后金额不得超过原授权」。
+       *
+       * 这里按同一口径：上限取**首次建单的授权额**（`authorizedChargeMicrocredits`）。
+       * 新线路更贵时直接拒绝切换（任务失败并退款），不静默多扣。
+       * 限时免费单的原始授权是 0，换到收费线路同样被拒 —— 用户不该因为换线被收费。
+       */
+      const authorizedLimit = await this.resolveAuthorizedLimit(task);
+      if (draft.amountMicrocredits > authorizedLimit) {
+        await this.lifecycle.fail(task.id, {
+          errorCode: TASK_ERROR.generationFailed,
+          errorMessage: '新线路价格超出本次请求的授权上限，未继续切换',
+          reason: 'generation_failed',
+        });
+        return false;
+      }
       const reserved = await this.billing.reserveTaskBilling({
         userId: task.ownerId,
         taskId: task.id,
         idempotencyKey: `task:${task.id}:run${task.routeRun}:attempt${attemptNumber}`,
         draft,
-        chargeLimitMicrocredits: draft.amountMicrocredits,
+        chargeLimitMicrocredits: authorizedLimit,
       });
       await this.prisma.generationTask.update({
         where: { id: task.id },
@@ -529,6 +558,26 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       });
       return false;
     }
+  }
+
+  /**
+   * 本次任务的用户授权上限。
+   *
+   * 首选任务上的 `authorizedChargeMicrocredits`（首次建单时写入）。
+   * 老任务可能没有该字段（0），此时回退到旧账单的预授权额；
+   * 两者都拿不到时按 0 处理 —— 换线到收费线路会被拒，宁可失败也不多扣。
+   */
+  private async resolveAuthorizedLimit(task: GenerationTask): Promise<bigint> {
+    if (task.authorizedChargeMicrocredits > 0n) return task.authorizedChargeMicrocredits;
+    if (!task.billingOrderId) return 0n;
+    const old = await this.prisma.billingOrder
+      .findUnique({
+        where: { id: task.billingOrderId },
+        select: { reservedAmountMicrocredits: true, amountMicrocredits: true },
+      })
+      .catch(() => null);
+    if (!old) return 0n;
+    return old.reservedAmountMicrocredits > 0n ? old.reservedAmountMicrocredits : old.amountMicrocredits;
   }
 
   // ── 派发 ──────────────────────────────────────────────────────────
@@ -853,12 +902,8 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
   private async deferMedia(taskId: string, result: ProtocolResult, message: string): Promise<void> {
     const payload = JSON.stringify(result);
     if (payload.length > 4 * 1024 * 1024) {
-      // 内联大结果不适合进库：如实失败并退款，避免把整个库撑大
-      await this.lifecycle.fail(taskId, {
-        errorCode: TASK_ERROR.generationFailed,
-        errorMessage: `产出落盘失败且无法暂存：${message}`,
-        reason: 'generation_failed',
-      });
+      // 内联大结果不适合进库：上游已成功，绝不能按普通失败退款，转人工核对
+      await this.lifecycle.uncertain(taskId, `产出落盘失败且无法暂存：${message}`);
       return;
     }
     this.log.warn(`任务 ${taskId} 产出落盘失败，${MEDIA_RETRY_DELAY_MS / 1000}s 后重试：${message}`);
@@ -885,21 +930,13 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       result = parsed?.result ?? parsed;
       retries = Number(parsed?.retries ?? 0);
     } catch {
-      await this.lifecycle.fail(task.id, {
-        errorCode: TASK_ERROR.interrupted,
-        errorMessage: '暂存的上游结果已损坏',
-        reason: 'generation_failed',
-      });
+      await this.lifecycle.uncertain(task.id, '暂存的上游结果已损坏，产物状态待核对');
       return;
     }
 
     const attempt = await this.attempts.latest(task.id, task.routeRun);
     if (!attempt) {
-      await this.lifecycle.fail(task.id, {
-        errorCode: TASK_ERROR.interrupted,
-        errorMessage: '找不到产出对应的线路尝试',
-        reason: 'generation_failed',
-      });
+      await this.lifecycle.uncertain(task.id, '找不到产出对应的线路尝试，产物状态待核对');
       return;
     }
     let channel: ChannelExecution;
@@ -943,11 +980,8 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
 
   private async retryOrFail(task: GenerationTask, result: ProtocolResult, retries: number, message: string): Promise<void> {
     if (retries >= MAX_MEDIA_RETRIES) {
-      await this.lifecycle.fail(task.id, {
-        errorCode: TASK_ERROR.generationFailed,
-        errorMessage: `产出落盘连续失败 ${retries} 次：${message}`,
-        reason: 'generation_failed',
-      });
+      // 上游已经成功且计费，只是本地落盘失败；按普通失败退款会造成「双损」
+      await this.lifecycle.uncertain(task.id, `产出落盘连续失败 ${retries} 次：${message}`);
       return;
     }
     await this.prisma.generationTask.updateMany({

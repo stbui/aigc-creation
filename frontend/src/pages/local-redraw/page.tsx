@@ -442,6 +442,7 @@ export function LocalRedrawPage() {
               <video
                 className="redraw-intro-video"
                 src="/static/mp4/local-redraw.mp4"
+                poster="/static/mp4/local-redraw-poster.jpg"
                 autoPlay
                 loop
                 muted

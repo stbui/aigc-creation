@@ -3,7 +3,7 @@
 面向电商团队的智能视觉创作平台：上传商品图或输入提示词，由真实模型线路产出可上架的主图、详情图、修图结果与短视频。
 
 - 后端：NestJS 12 + Prisma 7 + 自研 `node:sqlite` driver adapter（零原生编译依赖）
-- 前端：Vite 8 + React 19 + antd 6 + lucide-react；**后台另起一套 UI**：shadcn/ui（源码自持）+ radix-ui + Tailwind v4，后台树内不引 antd
+- 前端：Vite 8 + React 19 + antd 6 + lucide-react；**后台另起一套 UI**：shadcn/ui（源码自持，radix 底座）+ Tailwind v4，后台树内不引 antd
 - 模型层：渠道 → 渠道模型（含价格档）→ 前台模型 revision / 线路 → 路由与冷却 → 任务执行 → 账单退款，唯一实现在 `backend/src/model/**`
 - 协议：内置插件声明（`backend/plugins/**`，107 个可用包 / 115 个 provider），代码里没有手写协议；图像 / 文本同步，视频异步轮询
 - 图像生成：仅真实模型线路；无可用线路时任务失败 `42204` 并退款，不生成伪结果
@@ -133,13 +133,12 @@ aigc-creation/
     ├── vitest.config.ts        # 单元 / 组件测试（jsdom，`npm test`）
     └── src/
         ├── **/__tests__/       # Vitest 用例（*.test.ts / *.test.tsx）
-        ├── pages/              # 35 个 C 端页面 + pages/admin/ 35 个后台页面
-        ├── admin-ui/           # 后台 UI：shell（单栏外壳）/ primitives / controls / widgets / providers / lib
-        ├── vendor/boardui/     # BoardUI 源码（MIT，上游原样；组件已零引用，仅剩 cx 与颜色 token）
-        ├── components/         # AppLayout / SideRail / ToolShell；admin/（共享控件入口、adminNav、AlertCenter、DutyBand、statusMeta）
+        ├── pages/              # 35 个 C 端页面 + pages/admin/ 34 个后台页面
+        ├── admin-ui/           # 后台 UI：components/ui（shadcn 原子件）/ primitives（页面唯一取用层）/ shell / providers / hooks / lib
+        ├── components/         # AppLayout / SideRail / ToolShell；admin/（adminNav、AlertCenter、DutyContext、statusMeta）
         ├── lib/                # api.ts（拆信封）/ http.ts / auth.ts / capabilities.ts / constants.ts
         ├── context/ hooks/     # AuthContext / AdminContext（权限点）/ CreditsContext；useToolTask 等
-        └── styles/             # global.css（★ 设计令牌）+ boardui.css（后台 Tailwind 入口，无 preflight）
+        └── styles/             # global.css（★ 设计令牌）+ admin.css（后台 Tailwind 入口，无 preflight）
 ```
 
 逐模块注释的完整目录树见 `CLAUDE.md`「目录结构」。

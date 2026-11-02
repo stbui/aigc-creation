@@ -115,7 +115,7 @@ export function FilePicker({
         {label}
       </Button>
       {file ? (
-        <span className="flex min-w-0 items-center gap-1 text-[11px] text-muted-foreground">
+        <span className="flex min-w-0 items-center gap-1 text-[12px] text-muted-foreground">
           <span className="max-w-[240px] truncate" title={file.name}>
             {file.name}
           </span>

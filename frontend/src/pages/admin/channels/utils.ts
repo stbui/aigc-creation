@@ -31,7 +31,6 @@ import type {
 } from '../../../types/model';
 import {
   EMPTY_TIER,
-  TAG_COLOR_OPTIONS,
   type ChannelDraft,
   type ChannelHeader,
   type ModelDraft,
@@ -226,6 +225,72 @@ export function validateModelTiers(
   return null;
 }
 
+/** 价格档提交体：金额已从「积分」换算为微积分 */
+export interface PriceTierPayload {
+  selector: Record<string, string>;
+  resolution: string;
+  videoSeconds: number;
+  providerModelKey: string;
+  billingMode: string;
+  unitPriceMicrocredits: number;
+  inputTokenPriceMicrocredits: number;
+  outputTokenPriceMicrocredits: number;
+  cachedTokenPriceMicrocredits: number;
+  priceConfigured: boolean;
+  enabled: boolean;
+  costPricing: {
+    configured: boolean;
+    unitPriceMicrocredits: number;
+    inputTokenPriceMicrocredits: number;
+    outputTokenPriceMicrocredits: number;
+    cachedTokenPriceMicrocredits: number;
+  } | null;
+}
+
+/**
+ * 草稿里的价格档 → 提交体。
+ *
+ * 校验与换算放在一处：先过 `validateModelTiers`（计费方式 / 通配档），
+ * 再逐档换算微积分。任一价格格式错误都把文案原样返回，由页面提示。
+ */
+export function buildPriceTiers(
+  draft: ModelDraft,
+): { error: string } | { tiers: PriceTierPayload[] } {
+  const tierError = validateModelTiers(draft.capability, draft.tiers);
+  if (tierError) return { error: tierError };
+
+  const modelKey = draft.modelKey.trim();
+  try {
+    const tiers = draft.tiers
+      .filter((tier) => tier.enabled || tier.unit !== '0' || tier.output !== '0')
+      .map((tier) => ({
+        selector: parseSelector(tier.selector),
+        resolution: tier.resolution.trim() || '*',
+        videoSeconds: Number(tier.videoSeconds) || 0,
+        providerModelKey: tier.providerModelKey.trim() || draft.providerModelKey.trim() || modelKey,
+        billingMode: tier.billingMode,
+        unitPriceMicrocredits: priceOf(tier.unit, '单价'),
+        inputTokenPriceMicrocredits: priceOf(tier.input, '输入 Token 单价'),
+        outputTokenPriceMicrocredits: priceOf(tier.output, '输出 Token 单价'),
+        cachedTokenPriceMicrocredits: priceOf(tier.cached, '缓存 Token 单价'),
+        priceConfigured: tier.priceConfigured,
+        enabled: tier.enabled,
+        costPricing: tier.costConfigured
+          ? {
+              configured: true,
+              unitPriceMicrocredits: priceOf(tier.costUnit, '成本单价'),
+              inputTokenPriceMicrocredits: priceOf(tier.costInput, '输入 Token 成本'),
+              outputTokenPriceMicrocredits: priceOf(tier.costOutput, '输出 Token 成本'),
+              cachedTokenPriceMicrocredits: priceOf(tier.costCached, '缓存 Token 成本'),
+            }
+          : null,
+      }));
+    return { tiers };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : '价格格式不正确' };
+  }
+}
+
 /** 渠道模型实体 → 表单草稿；没有价格档时给一条继承上游键的通配档 */
 export function toModelDraft(model: AdminChannelModelView): ModelDraft {
   return {
@@ -302,32 +367,6 @@ export function formatSelector(selector: Record<string, string>): string {
   return Object.entries(selector ?? {})
     .map(([key, value]) => `${key}=${value}`)
     .join(', ');
-}
-
-/**
- * 标签文本 ⇄ 结构化标签。
- *
- * 仅用于**读取历史数据**（旧库里存的是「文字:颜色」文本）；新写入一律走
- * 结构化数组。保留转换函数以便导入旧配置时兼容。
- */
-export function tagsToText(tags: Array<{ text: string; color: string }>): string {
-  return (tags ?? []).map((tag) => `${tag.text}:${tag.color}`).join(', ');
-}
-
-/** 标签文本 → 请求体；颜色非法时回落 purple，不让一个笔误阻断保存 */
-export function textToTags(text: string): Array<{ text: string; color: string }> {
-  return String(text ?? '')
-    .split(',')
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .map((item) => {
-      const [rawText, rawColor] = item.split(':');
-      const color = TAG_COLOR_OPTIONS.includes(String(rawColor ?? '').trim())
-        ? String(rawColor).trim()
-        : 'purple';
-      return { text: String(rawText ?? '').trim(), color };
-    })
-    .filter((tag) => tag.text !== '');
 }
 
 /** 标签颜色（与参考实现 `lib/model-tags.ts` 的 6 色一致） */

@@ -22,10 +22,19 @@ export class CreditsController {
     return this.credit.lotsOf(user.id, include !== 'false');
   }
 
-  /** 流水查询 (B-51) */
+  /** 流水查询 (B-51，支持 limit/offset 分页) */
   @Get('ledger')
-  ledger(@CurrentUser() user: AuthUser, @Query('limit') limit?: string) {
+  ledger(
+    @CurrentUser() user: AuthUser,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
     const n = Number(limit ?? 50);
-    return this.credit.ledgerOf(user.id, Number.isFinite(n) ? Math.min(n, 200) : 50);
+    const skip = Number(offset ?? 0);
+    return this.credit.ledgerOf(
+      user.id,
+      Number.isFinite(n) ? Math.min(n, 200) : 50,
+      { offset: Number.isFinite(skip) ? Math.max(skip, 0) : 0 },
+    );
   }
 }

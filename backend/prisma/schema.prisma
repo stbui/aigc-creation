@@ -1673,6 +1673,10 @@ model LogicalModel {
   @@index([capability, enabled])
   @@index([sortOrder])
   @@index([archivedAt])
+  /// 目录加载按生效 revision 反查线路；没有索引会退化成全表扫
+  @@index([activeRevisionId])
+  /// 一个渠道模型最多投影出一个未归档前台模型（应用层另有校验）
+  @@index([sourceChannelModelId])
 }
 
 /// 前台模型 revision：一次发布的能力合同与默认参数，创建后不可变。
@@ -1736,6 +1740,12 @@ model RouteAttempt {
   @@index([taskId])
   @@index([channelModelId])
   @@index([status])
+  /// 按本轮尝试集合重建候选池
+  @@index([routeRun])
+  /// 扫描「上游是否已接单」的待恢复任务
+  @@index([dispatchState])
+  /// 按上游请求号反查尝试记录
+  @@index([providerRequestId])
 }
 
 /// 用户分组：统一倍率、货币兑换比例与可见渠道。
@@ -1757,7 +1767,10 @@ model UserGroup {
   pointsPerUsd     BigInt @default(0)
   pointsPerCny     BigInt @default(0)
   /// true = 可使用全部系统渠道，不读 UserGroupChannel
-  allChannels Boolean @default(true)
+  /// 可见全部系统渠道。默认 false —— 管理员新建分组时若漏传该字段，
+  /// 不应默认获得全部渠道可见性（参考实现同样是 false；
+  /// 默认分组由 `UserGroupService.ensureDefaultGroup` 显式置 true）。
+  allChannels Boolean @default(false)
   /// 模型级覆盖 JSON：[{ modelKey, ratioBasisPoints, pointsPerUsd, pointsPerCny }]
   modelOverridesJson String @default("[]")
 
@@ -1851,6 +1864,16 @@ model BillingOrder {
   startedAt  DateTime?
   settledAt  DateTime?
   refundedAt DateTime?
+  /// 退款原因分类。决定这笔退款算「用户拿回钱」还是「平台内部换线路重预留」。
+  ///
+  /// `route_switch` = 线路切换：钱没有离开平台，只是从旧线路的预授权挪到新线路的
+  /// 预授权。若把它算进「已退」，一次 9 分换 4 分的成功任务会显示净收入 −5 ——
+  /// 明明收了 4 分。财务口径必须把它排除在「已退」之外。
+  ///
+  /// 其余取值：`failure`（任务失败/取消退款）、`manual`（人工核对退款）、
+  /// `proxy_timeout`（中转超时退款）、`auto_sweep`（预留超时自动退款）、
+  /// 空串 = 未分类（按真实退款计入「已退」）。
+  refundReason String @default("")
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
@@ -1860,6 +1883,10 @@ model BillingOrder {
   @@index([channelId])
   @@index([channelModelId])
   @@index([status, createdAt])
+  /// 财务分析按模型 / 能力 / 场景三维分组聚合
+  @@index([model])
+  @@index([capability])
+  @@index([scene])
 }
 
 /// 积分账户：可用 / 预留余额的权威（批次 `CreditLot` 为批次维度权威）。
@@ -1959,6 +1986,20 @@ model ApiCallLog {
   videoSeconds      Int     @default(0)
   providerRequestId String  @default("")
 
+  /*
+   * 上游美元成本估算三列：**已废弃，恒为默认值**。
+   *
+   * 参考实现有一张独立的「模型定价」表（`ModelPricing`，美元口径）来估算
+   * 每次调用的上游成本。本仓的成本来源是**渠道模型价格档的成本价**（微积分口径），
+   * 建单时随账单快照（见 `BillingOrder.cost*`），口径唯一且是真实值。
+   *
+   * 这三列在全仓没有任何写入点，长期恒为 0 / false / ''。保留列是为了不做
+   * 破坏性迁移（drop column 会丢历史数据）；但**接口层已不再下发它们**，
+   * 以免日志页出现「有这一列却恒为空」的误导。
+   *
+   * 若将来要恢复美元口径的上游成本估算，应新增独立定价表 + 写入点，
+   * 而不是复活这三列。
+   */
   estimatedCostMicros BigInt  @default(0)
   costAvailable       Boolean @default(false)
   currency            String  @default("")
@@ -1981,6 +2022,8 @@ model ApiCallLog {
   @@index([taskId])
   @@index([status, createdAt])
   @@index([createdAt])
+  /// 可用率统计按「请求类型 + 状态 + 时间窗」过滤
+  @@index([requestKind, status, createdAt])
 }
 
 /// 系统级插件可用性（管理员启停内置/上传插件）。

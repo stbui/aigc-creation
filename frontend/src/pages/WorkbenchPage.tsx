@@ -200,7 +200,8 @@ export function WorkbenchPage({
                   {c.mode !== 'planned' && rt.effective === 'disabled' && <em>已下线</em>}
                   {c.mode !== 'planned' && rt.effective === 'unavailable' && <em>暂不可用</em>}
                 </div>
-                <span>{c.summary}</span>
+                {/* 卡片固定高 108px, 描述单行省略; 原句走原生 tooltip 兜底 */}
+                <span title={c.summary}>{c.summary}</span>
               </div>
             </button>
           );

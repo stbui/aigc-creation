@@ -33,6 +33,12 @@ export function projectCachedPriceTier(row: ChannelModelPriceTier): CachedPriceT
     priceConfigured: row.priceConfigured,
     enabled: row.enabled,
     priceVersion: row.priceVersion,
+    // 成本价随价格档一起快照；不叠倍率、不参与售价
+    costConfigured: row.costConfigured,
+    costUnitPriceMicrocredits: toNumber(row.costUnitPriceMicrocredits),
+    costInputTokenPriceMicrocredits: toNumber(row.costInputTokenPriceMicrocredits),
+    costOutputTokenPriceMicrocredits: toNumber(row.costOutputTokenPriceMicrocredits),
+    costCachedTokenPriceMicrocredits: toNumber(row.costCachedTokenPriceMicrocredits),
   };
 }
 

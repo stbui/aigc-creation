@@ -56,7 +56,24 @@ const STATUS_TONES: Record<string, 'success' | 'danger' | 'warn' | 'brand' | 'mu
   uncertain: 'danger',
 };
 
+/**
+ * 退款归类说明。
+ *
+ * `route_switch` 是唯一「钱没离开平台」的退款：线路切换时旧账单的预授权
+ * 只是挪到新账单。用户既没拿回钱、平台也没多收，所以财务口径不把它算「已退」——
+ * 页面必须能解释这一点，否则运营看到「退 9 分」会以为用户真拿走了 9 分。
+ */
+const REFUND_REASON_LABELS: Record<string, string> = {
+  route_switch: '线路切换（内部重预留，不计入已退）',
+  failure: '任务失败',
+  manual: '人工核对',
+  proxy_timeout: '中转超时',
+  auto_sweep: '预留超时自动退回',
+};
+
 const STATUS_OPTIONS = Object.entries(STATUS_LABELS).map(([value, label]) => ({ value, label }));
+/** 「待核对」是跨状态的队列口径（后端算），不是一个账单状态 */
+const REVIEW_OPTION = { value: 'review', label: '待核对（需人工处置）' };
 
 const BILLING_MODE_LABELS: Record<string, string> = {
   fixed_request: '按次',
@@ -107,6 +124,14 @@ export function AdminBillingOrdersPage() {
   const [action, setAction] = useState<'settle' | 'refund'>('settle');
   const [reason, setReason] = useState('');
   const [resolving, setResolving] = useState(false);
+  // 批量核对：勾选若干账单一次性处置，逐条结果回显
+  const [selected, setSelected] = useState<string[]>([]);
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [batchReason, setBatchReason] = useState('');
+  const [batchBusy, setBatchBusy] = useState(false);
+  const [batchResults, setBatchResults] = useState<
+    Array<{ id: string; ok: boolean; error?: string }> | null
+  >(null);
 
   const actionDirty = detailId !== null && reason.trim() !== '';
   useUnsavedGuard(actionDirty);
@@ -169,6 +194,33 @@ export function AdminBillingOrdersPage() {
     }
   };
 
+  /** 批量核对：逐条独立处置，失败的条目带原因回显 */
+  const runBatchResolve = async () => {
+    if (selected.length === 0) return;
+    if (!batchReason.trim()) {
+      toast.error('请填写核对依据');
+      return;
+    }
+    setBatchBusy(true);
+    setBatchResults(null);
+    try {
+      const result = await adminBillingOrdersApi.batchResolve(selected, action, batchReason.trim());
+      setBatchResults(result.results);
+      if (result.failed === 0) {
+        toast.success(`已核对 ${result.resolved} 条账单`);
+        setSelected([]);
+        setBatchReason('');
+      } else {
+        toast.error(`已核对 ${result.resolved} 条，${result.failed} 条失败（见下方明细）`);
+      }
+      await reload();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '批量核对失败');
+    } finally {
+      setBatchBusy(false);
+    }
+  };
+
   const appliedKeyword = params.model as string | undefined;
   const appliedUserId = params.userId as string | undefined;
   const appliedStatus = params.status as string | undefined;
@@ -177,7 +229,7 @@ export function AdminBillingOrdersPage() {
     appliedStatus
       ? {
           key: 'status',
-          label: `状态：${STATUS_LABELS[appliedStatus] ?? appliedStatus}`,
+          label: `状态：${appliedStatus === 'review' ? REVIEW_OPTION.label : (STATUS_LABELS[appliedStatus] ?? appliedStatus)}`,
           onClear: () => {
             setStatus(undefined);
             setQuery({ status: undefined });
@@ -213,7 +265,7 @@ export function AdminBillingOrdersPage() {
         title: '时间',
         width: 150,
         render: (row) => (
-          <span className="text-[11px] tabular-nums text-muted-foreground">
+          <span className="text-[12px] tabular-nums text-muted-foreground">
             {new Date(row.createdAt).toLocaleString('zh-CN')}
           </span>
         ),
@@ -224,8 +276,8 @@ export function AdminBillingOrdersPage() {
         width: 180,
         render: (row) => (
           <div className="min-w-0">
-            <div className="truncate text-[11px] text-foreground">{row.userEmail || '—'}</div>
-            <div className="truncate font-mono text-[10px] text-muted-foreground">{row.userId}</div>
+            <div className="truncate text-[12px] text-foreground">{row.userEmail || '—'}</div>
+            <div className="truncate font-mono text-[12px] text-muted-foreground">{row.userId}</div>
           </div>
         ),
       },
@@ -235,8 +287,8 @@ export function AdminBillingOrdersPage() {
         width: 170,
         render: (row) => (
           <div className="min-w-0">
-            <div className="truncate font-mono text-[11px] text-foreground">{row.model || '—'}</div>
-            <div className="truncate text-[10px] text-muted-foreground">
+            <div className="truncate font-mono text-[12px] text-foreground">{row.model || '—'}</div>
+            <div className="truncate text-[12px] text-muted-foreground">
               {row.capability}
               {row.scene ? ` · ${row.scene}` : ''}
             </div>
@@ -249,8 +301,8 @@ export function AdminBillingOrdersPage() {
         width: 180,
         render: (row) => (
           <div className="min-w-0">
-            <div className="truncate text-[11px] text-foreground">{row.channelName || '—'}</div>
-            <div className="truncate text-[10px] text-muted-foreground">{row.channelModelName || '—'}</div>
+            <div className="truncate text-[12px] text-foreground">{row.channelName || '—'}</div>
+            <div className="truncate text-[12px] text-muted-foreground">{row.channelModelName || '—'}</div>
           </div>
         ),
       },
@@ -259,7 +311,7 @@ export function AdminBillingOrdersPage() {
         title: '计费',
         width: 120,
         render: (row) => (
-          <div className="flex flex-col gap-0.5 text-[11px]">
+          <div className="flex flex-col gap-0.5 text-[12px]">
             <span className="text-foreground">{BILLING_MODE_LABELS[row.billingMode] ?? row.billingMode}</span>
             <span className="tabular-nums text-muted-foreground">
               数量 {row.quantity}
@@ -274,10 +326,13 @@ export function AdminBillingOrdersPage() {
         width: 130,
         align: 'right',
         render: (row) => (
-          <div className="flex flex-col gap-0.5 text-[11px] tabular-nums">
+          <div className="flex flex-col gap-0.5 text-[12px] tabular-nums">
             <span className="text-foreground">{toCredits(row.actualAmountMicrocredits || row.reservedAmountMicrocredits)}</span>
             {row.refundedAmountMicrocredits > 0 && (
-              <span className="text-warn-text">退 {toCredits(row.refundedAmountMicrocredits)}</span>
+              <span className="text-warn-text">
+                退 {toCredits(row.refundedAmountMicrocredits)}
+                {row.refundReason === 'route_switch' ? '（换线重预留）' : ''}
+              </span>
             )}
           </div>
         ),
@@ -339,7 +394,7 @@ export function AdminBillingOrdersPage() {
         <SelectField
           ariaLabel="账单状态"
           value={status}
-          options={STATUS_OPTIONS}
+          options={[REVIEW_OPTION, ...STATUS_OPTIONS]}
           allowClear
           onChange={setStatus}
         />
@@ -390,6 +445,28 @@ export function AdminBillingOrdersPage() {
 
       <Panel title="账单列表" note="「结果不明」既不切线也不退款，需要人工核对后落到结算或退款。">
         {error && rows.length > 0 && <StaleError error={error} onRetry={() => void reload()} />}
+        {resolvable && selected.length > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-accent px-3 py-2">
+            <span className="text-xs font-medium text-accent-foreground">
+              已选 {selected.length} 条账单
+            </span>
+            <ActionButton
+              variant="secondary"
+              size="sm"
+              disabled={batchBusy}
+              onClick={() => {
+                setBatchReason('');
+                setBatchResults(null);
+                setBatchOpen(true);
+              }}
+            >
+              批量核对
+            </ActionButton>
+            <ActionButton variant="ghost" size="sm" onClick={() => setSelected([])}>
+              取消选择
+            </ActionButton>
+          </div>
+        )}
         <AdminDataTable<BillingOrderView>
           rows={rows}
           columns={columns}
@@ -399,6 +476,9 @@ export function AdminBillingOrdersPage() {
           onRetry={() => void reload()}
           emptyText="没有账单。生成任务成功后才会产生账单记录。"
           minWidth={1220}
+          selectable={resolvable}
+          selected={selected}
+          onSelectedChange={setSelected}
           pagination={{
             current: Number(params.page ?? 1),
             pageSize: Number(params.pageSize ?? 20),
@@ -407,6 +487,74 @@ export function AdminBillingOrdersPage() {
           }}
         />
       </Panel>
+
+      <Drawer
+        open={batchOpen}
+        onOpenChange={(open) => {
+          if (!open) setBatchOpen(false);
+        }}
+        width={620}
+        title="批量核对账单"
+        description={`已选 ${selected.length} 条。逐条独立处置，单条失败不影响其余。`}
+        footer={
+          <>
+            <ActionButton
+              variant="secondary"
+              size="sm"
+              onClick={() => setBatchOpen(false)}
+              disabled={batchBusy}
+            >
+              关闭
+            </ActionButton>
+            <ActionButton
+              variant="default"
+              size="sm"
+              disabled={batchBusy || !batchReason.trim() || selected.length === 0}
+              onClick={() => void runBatchResolve()}
+            >
+              {batchBusy ? '处理中…' : action === 'refund' ? '确认批量退款' : '确认批量结算'}
+            </ActionButton>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3">
+          <div className="flex gap-2">
+            <ActionButton
+              variant={action === 'settle' ? 'default' : 'secondary'}
+              size="sm"
+              onClick={() => setAction('settle')}
+            >
+              按现有用量结算
+            </ActionButton>
+            <ActionButton
+              variant={action === 'refund' ? 'destructive' : 'secondary'}
+              size="sm"
+              onClick={() => setAction('refund')}
+            >
+              全额退款
+            </ActionButton>
+          </div>
+          <TextAreaField
+            ariaLabel="批量核对依据"
+            value={batchReason}
+            onChange={setBatchReason}
+            rows={3}
+            placeholder="写明为什么这样处置；会写入审计与账单备注"
+          />
+          {batchResults && (
+            <Notice tone={batchResults.some((item) => !item.ok) ? 'warn' : 'info'} title="处理结果">
+              <ul className="flex flex-col gap-1 text-xs">
+                {batchResults.map((item) => (
+                  <li key={item.id} className="font-mono">
+                    {item.ok ? '✓' : '✗'} {item.id}
+                    {item.error ? ` — ${item.error}` : ''}
+                  </li>
+                ))}
+              </ul>
+            </Notice>
+          )}
+        </div>
+      </Drawer>
 
       <Drawer
         open={detailId !== null}
@@ -461,6 +609,12 @@ export function AdminBillingOrdersPage() {
                 { label: '预留金额', value: `${toCredits(detail.reservedAmountMicrocredits)} 积分` },
                 { label: '实际金额', value: `${toCredits(detail.actualAmountMicrocredits)} 积分` },
                 { label: '已退金额', value: `${toCredits(detail.refundedAmountMicrocredits)} 积分` },
+                {
+                  label: '退款归类',
+                  value: detail.refundReason
+                    ? (REFUND_REASON_LABELS[detail.refundReason] ?? detail.refundReason)
+                    : '—',
+                },
                 {
                   label: '成本',
                   value: detail.costConfigured
@@ -521,7 +675,7 @@ export function AdminBillingOrdersPage() {
                     placeholder="写清核对依据，如：上游确认出图成功但回调丢失"
                   />
                   {action === 'refund' && (
-                    <p className="mt-1 text-[11px] text-danger-text">
+                    <p className="mt-1 text-[12px] text-danger-text">
                       退款会按预留金额原额退回用户积分，且不可撤销。
                     </p>
                   )}

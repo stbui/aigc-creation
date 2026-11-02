@@ -11,9 +11,9 @@ import {
   ListError,
   Notice,
   NumberField,
+  PageSkeleton,
   Panel,
   SelectField,
-  Skeleton,
   StatCard,
   StatusTag,
   SwitchField,
@@ -72,6 +72,8 @@ interface ProductDraft {
   saleEndAt: string;
   sortOrder: string;
   enabled: boolean;
+  /** 高危写操作原因（写入审计） */
+  reason: string;
 }
 
 const EMPTY_DRAFT: ProductDraft = {
@@ -91,10 +93,25 @@ const EMPTY_DRAFT: ProductDraft = {
   saleEndAt: '',
   sortOrder: '0',
   enabled: false,
+  reason: '',
 };
 
 function centsToText(cents: number): string {
   return (cents / 100).toFixed(2);
+}
+
+/**
+ * UTC ISO → `datetime-local` 值。
+ *
+ * 不能直接 slice ISO 字符串：后端存的是 UTC，`slice(0,16)` 会把 UTC 时间
+ * 当成浏览器本地时间显示，每次编辑保存都会把限时窗口平移时区差（国内 8 小时）。
+ */
+function isoToLocalInput(iso: string | null): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 function textToCents(text: string): number | null {
@@ -117,10 +134,11 @@ function toDraft(p: AdminPaymentProductView): ProductDraft {
     periodDays: String(p.periodDays || 30),
     periodPurchaseLimit: String(p.periodPurchaseLimit || 1),
     stockTotal: String(p.stockTotal || 0),
-    saleStartAt: p.saleStartAt ? p.saleStartAt.slice(0, 16) : '',
-    saleEndAt: p.saleEndAt ? p.saleEndAt.slice(0, 16) : '',
+    saleStartAt: isoToLocalInput(p.saleStartAt),
+    saleEndAt: isoToLocalInput(p.saleEndAt),
     sortOrder: String(p.sortOrder),
     enabled: p.status === 'active',
+    reason: '',
   };
 }
 
@@ -201,7 +219,7 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           <span className="font-medium">{row.name}</span>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-[12px] text-muted-foreground">
             {row.description || '无说明'}
           </span>
         </div>
@@ -215,7 +233,7 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
         <div className="flex flex-col gap-0.5">
           <span className="tabular-nums">{moneyText(row.priceCents, row.currency)}</span>
           {row.originalPriceCents !== null && (
-            <span className="text-[11px] text-muted-foreground line-through tabular-nums">
+            <span className="text-[12px] text-muted-foreground line-through tabular-nums">
               {moneyText(row.originalPriceCents, row.currency)}
             </span>
           )}
@@ -256,13 +274,12 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
     },
   ];
 
+  /*
+   * 标签页内的加载骨架只占**这一块面板**的位置：页头、页签、提示条都在上面，
+   * 已经渲染好了，不该跟着塌。
+   */
   if (loading && !data) {
-    return (
-      <div className="flex flex-col gap-2 py-2" aria-busy="true" aria-live="polite">
-        <Skeleton rows={4} />
-        <p className="text-center text-xs text-muted-foreground">加载充值商品…</p>
-      </div>
-    );
+    return <PageSkeleton panels={1} panelRows={5} />;
   }
   if (error && !data) return <ListError error={error} onRetry={() => void reload()} />;
   if (!data) return <EmptyState title="还没有充值商品" />;
@@ -280,6 +297,14 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
         toast.error('划线价格式不正确');
         return;
       }
+      if (originalPriceCents < priceCents) {
+        toast.error('划线价不能低于售价');
+        return;
+      }
+    }
+    if (draft.saleStrategy === 'inventory' && (Number(draft.stockTotal) || 0) < 1) {
+      toast.error('库存商品必须填写大于 0 的库存总量');
+      return;
     }
     const credits = Number(draft.credits);
     if (!Number.isInteger(credits) || credits < 0) {
@@ -295,8 +320,15 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
       toast.error('当前没有已配置的美元支付渠道，无法上架美元商品');
       return;
     }
+    const reason = draft.reason.trim();
+    if (reason.length < 2) {
+      toast.error('请填写至少 2 个字符的变更原因');
+      return;
+    }
 
     const payload = {
+      // DTO 必填：当前只支持积分商品
+      kind: 'credits' as const,
       name: draft.name.trim(),
       description: draft.description,
       currency: draft.currency,
@@ -323,6 +355,7 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
           }
         : {}),
       status: draft.enabled ? 'active' : 'offline',
+      reason,
     };
 
     setSaving(true);
@@ -450,7 +483,10 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
               <ActionButton onClick={closeForm} disabled={saving}>
                 取消
               </ActionButton>
-              <ActionButton onClick={submit} disabled={saving || !draft.name.trim()}>
+              <ActionButton
+                onClick={submit}
+                disabled={saving || !draft.name.trim() || draft.reason.trim().length < 2}
+              >
                 {saving ? '保存中…' : '保存'}
               </ActionButton>
             </div>
@@ -578,11 +614,11 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
             )}
 
             {draft.saleStrategy === 'inventory' && (
-              <FormField label="库存总量" required hint="0 视为不限量">
+              <FormField label="库存总量" required hint="必须大于 0；售罄后不可购买">
                 <NumberField
                   value={Number(draft.stockTotal) || 0}
                   onChange={(value) => setDraft({ ...draft, stockTotal: String(value ?? 0) })}
-                  min={0}
+                  min={1}
                   max={1_000_000}
                   disabled={!writable}
                   ariaLabel="库存总量"
@@ -610,7 +646,9 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
                     />
                   </FormField>
                 </div>
-                <p className="text-[11px] text-muted-foreground">时间按北京时间解释。</p>
+                <p className="text-[12px] text-muted-foreground">
+                  时间按浏览器本地时区显示，保存为绝对时间（中国区即北京时间）。
+                </p>
               </>
             )}
 
@@ -622,6 +660,17 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
                 max={9999}
                 disabled={!writable}
                 ariaLabel="排序"
+              />
+            </FormField>
+
+            <FormField label="变更原因" required hint="商品价格与权益变更属高危动作，原因会写入操作审计。">
+              <TextAreaField
+                value={draft.reason}
+                onChange={(value) => setDraft({ ...draft, reason: value })}
+                maxLength={200}
+                placeholder="例如：双十一调整积分包售价"
+                disabled={!writable}
+                ariaLabel="变更原因"
               />
             </FormField>
 

@@ -168,7 +168,7 @@ export function AdminNotificationsPage() {
       key: 'code',
       title: '编码',
       width: 180,
-      render: (row) => <code className="font-mono text-[11px] text-foreground">{row.code}</code>,
+      render: (row) => <code className="font-mono text-[12px] text-foreground">{row.code}</code>,
     },
     {
       key: 'channel',
@@ -254,7 +254,7 @@ export function AdminNotificationsPage() {
                   label={st.delivers ? `真实投递 · ${st.provider}` : `${st.provider} · 不真实投递`}
                 />
                 {target ? (
-                  <span className="font-mono text-[11px] text-muted-foreground">{target}</span>
+                  <span className="font-mono text-[12px] text-muted-foreground">{target}</span>
                 ) : null}
                 {!st.configured ? (
                   <span className="text-warn-text">凭据不全，已回落控制台（日志有 WARN）</span>
@@ -325,7 +325,7 @@ export function AdminNotificationsPage() {
               {sending ? '发送中…' : '发送广播'}
             </ActionButton>
             {sentResult && (
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-[12px] text-muted-foreground">
                 上次发送：{sentResult.users} 个账号，共 {sentResult.sent} 条。
               </span>
             )}
@@ -351,7 +351,7 @@ export function AdminNotificationsPage() {
           minWidth={860}
           emptyText="还没有模板，执行 npm run seed:messages 可灌入五条内置文案"
         />
-        <p className="mt-3 text-[11px] leading-4 text-muted-foreground">
+        <p className="mt-3 text-[12px] leading-4 text-muted-foreground">
           变量用 <code className="font-mono">{'{name}'}</code> 占位，仅替换通知调用方传入的字段。当前实际生效的编码：
           {BUILTIN_CODES.map((c) => ` ${c.code}`).join('、')}。本页模板只驱动站内消息（channel=inapp）；
           验证码与重置密码的邮件 / 短信走独立通道（console / http / aliyun，见环境变量），不读这些模板。

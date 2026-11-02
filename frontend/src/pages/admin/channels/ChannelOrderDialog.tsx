@@ -234,7 +234,7 @@ export function ChannelOrderDialog({
                 <GripVertical aria-hidden className="shrink-0 cursor-grab text-muted-foreground" size={14} />
                 <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{index + 1}</span>
                 <span className="min-w-0 flex-1 truncate text-sm text-foreground">{item.name}</span>
-                {!item.enabled && <span className="shrink-0 text-[11px] text-muted-foreground">已停用</span>}
+                {!item.enabled && <span className="shrink-0 text-[12px] text-muted-foreground">已停用</span>}
                 <IconButton
                   icon={ArrowUp}
                   size="sm"

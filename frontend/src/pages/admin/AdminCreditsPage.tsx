@@ -24,7 +24,7 @@ import {
   Pagination,
   Panel,
   SelectField,
-  Skeleton,
+  SkeletonBody,
   StatCard,
   StatusTag,
   StaleError,
@@ -209,13 +209,13 @@ export function AdminCreditsPage() {
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           <span className="text-sm text-foreground">{row.name || row.email}</span>
-          <span className="text-[11px] text-muted-foreground">
+          <span className="text-[12px] text-muted-foreground">
             <Link className="text-brand hover:underline" to={adminUserDetailHref(row.userId)}>
               {row.email}
             </Link>
             {row.name ? '' : ' · 无昵称'}
           </span>
-          <code className="text-[11px] text-muted-foreground" title={row.userId}>
+          <code className="text-[12px] text-muted-foreground" title={row.userId}>
             {row.userId}
           </code>
         </div>
@@ -235,7 +235,7 @@ export function AdminCreditsPage() {
         row.expiringSoon > 0 ? (
           <span className="tabular-nums text-warn-text">{row.expiringSoon}</span>
         ) : (
-          <span className="text-[11px] text-muted-foreground">—</span>
+          <span className="text-[12px] text-muted-foreground">—</span>
         ),
     },
     {
@@ -261,7 +261,7 @@ export function AdminCreditsPage() {
       title: '最近到期',
       width: 160,
       render: (row) => (
-        <span className="text-[11px] text-muted-foreground">{fmtTime(row.nearestExpiry)}</span>
+        <span className="text-[12px] text-muted-foreground">{fmtTime(row.nearestExpiry)}</span>
       ),
     },
     {
@@ -356,10 +356,8 @@ export function AdminCreditsPage() {
 
       <Panel title="用户积分总览" note="按注册时间倒序">
         {loading && !data ? (
-          <div className="flex flex-col gap-2" aria-busy="true" aria-live="polite">
-            <Skeleton rows={4} />
-            <p className="text-center text-xs text-muted-foreground">加载积分总览…</p>
-          </div>
+          /* 面板外壳已经是实的，只替内容行 */
+          <SkeletonBody rows={4} />
         ) : error && !data ? (
           <ListError error={error} onRetry={reload} />
         ) : rows.length === 0 ? (
@@ -541,16 +539,16 @@ function CreditDetailDrawer({
       width: 170,
       render: (row) =>
         row.expireAt ? (
-          <span className="text-[11px] text-muted-foreground">{fmtTime(row.expireAt)}</span>
+          <span className="text-[12px] text-muted-foreground">{fmtTime(row.expireAt)}</span>
         ) : (
-          <span className="text-[11px] text-muted-foreground">永久</span>
+          <span className="text-[12px] text-muted-foreground">永久</span>
         ),
     },
     {
       key: 'createdAt',
       title: '创建时间',
       render: (row) => (
-        <span className="text-[11px] text-muted-foreground">{fmtTime(row.createdAt)}</span>
+        <span className="text-[12px] text-muted-foreground">{fmtTime(row.createdAt)}</span>
       ),
     },
   ];
@@ -561,7 +559,7 @@ function CreditDetailDrawer({
       title: '时间',
       width: 170,
       render: (row) => (
-        <span className="text-[11px] tabular-nums text-muted-foreground">{fmtTime(row.createdAt)}</span>
+        <span className="text-[12px] tabular-nums text-muted-foreground">{fmtTime(row.createdAt)}</span>
       ),
     },
     {
@@ -590,7 +588,7 @@ function CreditDetailDrawer({
       key: 'reason',
       title: '说明',
       render: (row) => (
-        <span className="text-[11px] text-muted-foreground">
+        <span className="text-[12px] text-muted-foreground">
           {row.reason ?? '—'}
           {row.taskId ? ` · 任务 ${row.taskId.slice(-8)}` : ''}
           {row.orderId ? ` · 订单 ${row.orderId.slice(-8)}` : ''}
@@ -644,7 +642,7 @@ function CreditDetailDrawer({
               value: (
                 <span className="tabular-nums">
                   {user.totalEarned} / {user.totalConsumed}
-                  <span className="ml-1 text-[11px] text-muted-foreground">
+                  <span className="ml-1 text-[12px] text-muted-foreground">
                     不含到期回收与退款扣回，故与余额不构成等式
                   </span>
                 </span>
@@ -708,10 +706,7 @@ function CreditDetailDrawer({
       <section className="mb-6">
         <SectionTitle title="批次" note="消耗按先到期先扣（FEFO），空到期视为最晚" />
         {loading && !data ? (
-          <div className="flex flex-col gap-2" aria-busy="true" aria-live="polite">
-            <Skeleton rows={4} />
-            <p className="text-center text-xs text-muted-foreground">加载积分批次…</p>
-          </div>
+          <SkeletonBody rows={4} />
         ) : error && !data ? (
           <ListError error={error} onRetry={() => void reload()} />
         ) : lots.length === 0 ? (
@@ -753,10 +748,7 @@ function CreditDetailDrawer({
           同一个错误在抽屉里出现两次只会让人以为两处各自坏了。
         */}
         {loading && !data ? (
-          <div className="flex flex-col gap-2" aria-busy="true" aria-live="polite">
-            <Skeleton rows={4} />
-            <p className="text-center text-xs text-muted-foreground">加载积分流水…</p>
-          </div>
+          <SkeletonBody rows={4} />
         ) : error && !data ? null : ledger.length === 0 ? (
           <EmptyState title="没有符合条件的流水。" />
         ) : (
@@ -877,7 +869,7 @@ function BatchAdjustDrawer({
       key: 'userId',
       title: '用户 ID',
       render: (row) => (
-        <code className="font-mono text-[11px] text-muted-foreground">{row.userId}</code>
+        <code className="font-mono text-[12px] text-muted-foreground">{row.userId}</code>
       ),
     },
     {
@@ -895,7 +887,7 @@ function BatchAdjustDrawer({
       key: 'msg',
       title: '说明',
       render: (row) => (
-        <span className="text-[11px] text-muted-foreground">
+        <span className="text-[12px] text-muted-foreground">
           {row.success ? `余额 ${row.balance}` : (row.message ?? '未知原因')}
         </span>
       ),
@@ -1079,7 +1071,7 @@ function CsvImportDrawer({
     {
       key: 'email',
       title: '邮箱',
-      render: (row) => <span className="text-[11px] text-muted-foreground">{row.email || '—'}</span>,
+      render: (row) => <span className="text-[12px] text-muted-foreground">{row.email || '—'}</span>,
     },
     {
       key: 'delta',
@@ -1106,7 +1098,7 @@ function CsvImportDrawer({
       key: 'msg',
       title: '说明',
       render: (row) => (
-        <span className="text-[11px] text-muted-foreground">
+        <span className="text-[12px] text-muted-foreground">
           {row.success ? `余额 ${row.balance}` : (row.message ?? '未知原因')}
         </span>
       ),
@@ -1221,7 +1213,7 @@ function SectionTitle({ title, note }: { title: string; note?: string }) {
   return (
     <div className="mb-2 flex items-baseline gap-2 border-b border-border pb-1.5">
       <strong className="text-xs font-semibold text-foreground">{title}</strong>
-      {note && <span className="text-[11px] text-muted-foreground">{note}</span>}
+      {note && <span className="text-[12px] text-muted-foreground">{note}</span>}
     </div>
   );
 }

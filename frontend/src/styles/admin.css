@@ -165,6 +165,25 @@
   }
 
   /*
+   * 导航滚动条只在滚动时提示位置，不占视觉宽度。Firefox 保留细滚动条；
+   * WebKit 走透明轨道 + 浅色滑块，避免长菜单把侧栏压得像两张表格。
+   */
+  .adm-nav-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .adm-nav-scroll::-webkit-scrollbar {
+    width: 6px;
+  }
+  .adm-nav-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .adm-nav-scroll::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 999px;
+  }
+
+  /*
    * ② border-style 兜底 —— 必须是**全局**规则。
    *
    * Tailwind 的 `border` / `border-b` 只写宽度，样式靠 preflight 给的 `solid`；

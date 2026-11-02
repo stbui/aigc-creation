@@ -11,10 +11,11 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { IsOptional, IsString, MaxLength } from 'class-validator';
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/current-user.decorator';
 import { AppError } from '../common/app.exception';
+import { SettingsService } from '../common/settings.service';
 import { PaymentOrderService } from './payment-order.service';
 import { PaymentConfigService } from './payment-config.service';
 import { PaymentNotificationService } from './payment-notification.service';
@@ -41,7 +42,22 @@ export class PaymentsController {
     private readonly orders: PaymentOrderService,
     private readonly configs: PaymentConfigService,
     private readonly notifications: PaymentNotificationService,
+    private readonly settings: SettingsService,
   ) {}
+
+  /**
+   * C 端支付设置：默认币种 + 该币种下可用渠道。
+   *
+   * 公开接口：商品页/结算页在登录前就要按默认币种排序与过滤。
+   * 不返回任何凭据；渠道字段由 PaymentConfigService 的公开视图裁剪。
+   */
+  @Get('settings')
+  async settingsView() {
+    const currency = await this.settings.get<string>('payment.defaultCurrency');
+    const target = this.normalizeCurrency(String(currency || 'CNY'));
+    const providers = await this.configs.available(target);
+    return { defaultCurrency: target, providers };
+  }
 
   /** 可选支付渠道（按订单币种或指定币种过滤） */
   @Get('providers')

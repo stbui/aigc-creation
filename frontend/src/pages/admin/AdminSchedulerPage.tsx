@@ -10,8 +10,8 @@ import {
   ListError,
   Notice,
   PageHeader,
+  PageSkeleton,
   Panel,
-  Skeleton,
   StaleError,
   ToneBadge,
   useAdminResource,
@@ -97,12 +97,24 @@ export function AdminSchedulerPage() {
     }
   };
 
+  /*
+   * 页头照常渲染：加载期间标题与说明就该在位。
+   * 之前的守卫整页替换，首屏先闪一段没有标题的灰条，再冒出完整页面 ——
+   * 骨架该占住位置，不是把版面清空。
+   */
   if (loading && !data) {
     return (
-      <div className="flex flex-col gap-3" aria-busy="true" aria-live="polite">
-        <Skeleton rows={4} />
-        <p className="text-center text-xs text-muted-foreground">加载定时任务状态…</p>
-      </div>
+      <PageSkeleton
+        title="定时任务"
+        description="订单超时关闭、积分到期回收、备份与保留期清理的统一调度"
+        actions={
+          <ActionButton variant="secondary" icon={RefreshCw} disabled>
+            刷新
+          </ActionButton>
+        }
+        panels={2}
+        panelRows={5}
+      />
     );
   }
   if (error && !data) return <ListError error={error} onRetry={() => void reload()} />;
@@ -168,18 +180,18 @@ export function AdminSchedulerPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline gap-2">
                     <span className="text-sm font-medium text-foreground">{task.label}</span>
-                    <code className="font-mono text-[11px] text-muted-foreground">
+                    <code className="font-mono text-[12px] text-muted-foreground">
                       {task.name}
                     </code>
                   </div>
-                  <div className="mt-0.5 text-[11px] leading-4 text-muted-foreground">
+                  <div className="mt-0.5 text-[12px] leading-4 text-muted-foreground">
                     上次执行：{since(task.lastRunAt)}
                     {task.lastDurationMs !== null && ` · 耗时 ${task.lastDurationMs}ms`}
                     {task.totalRuns > 0 && ` · 累计 ${task.totalRuns} 次`}
                   </div>
                   {task.lastError && (
                     <div
-                      className="mt-1 truncate font-mono text-[11px] text-danger-text"
+                      className="mt-1 truncate font-mono text-[12px] text-danger-text"
                       title={task.lastError}
                     >
                       {task.lastError}
@@ -196,7 +208,7 @@ export function AdminSchedulerPage() {
                    * 会让人以为「按钮丢了」，补一句「定时执行」把空位说明白。
                    */}
                   {!data.manuallyRunnable.includes(task.name) ? (
-                    <span className="text-[11px] text-muted-foreground">定时执行</span>
+                    <span className="text-[12px] text-muted-foreground">定时执行</span>
                   ) : writable ? (
                     <ActionButton
                       variant="secondary"
@@ -207,7 +219,7 @@ export function AdminSchedulerPage() {
                       立即执行
                     </ActionButton>
                   ) : (
-                    <span className="text-[11px] text-muted-foreground">仅查看</span>
+                    <span className="text-[12px] text-muted-foreground">仅查看</span>
                   )}
                 </div>
               </div>

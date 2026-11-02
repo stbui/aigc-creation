@@ -154,7 +154,7 @@ export function ChannelFormDrawer({
         <div className="flex items-center justify-between rounded-lg border border-border px-3 py-2.5">
           <div>
             <div className="text-xs font-medium text-foreground">启用渠道</div>
-            <div className="text-[11px] text-muted-foreground">停用后该渠道的全部模型退出路由目录</div>
+            <div className="text-[12px] text-muted-foreground">停用后该渠道的全部模型退出路由目录</div>
           </div>
           <SwitchField
             checked={draft.enabled}
