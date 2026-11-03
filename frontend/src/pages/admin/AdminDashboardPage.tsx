@@ -340,6 +340,17 @@ function DashboardContent() {
         </Panel>
       </Fold>
 
+      {/*
+       * 累计指标只回答「平台现在有多大」，与上方窗口表现分开。
+       * 财务没有 task.read，因此不在这里重新引入任务成功率；改为累计实收，
+       * 保持交易视角完整，也不让同一页出现两套相互竞争的任务口径。
+       */}
+      <Fold>
+        <Panel title="平台存量" note="累计口径 · 不受上方时间窗影响">
+          <TotalsStrip data={data} isFinance={isFinance} />
+        </Panel>
+      </Fold>
+
       {!isFinance && (
         <Fold>
           <Panel
@@ -875,6 +886,93 @@ function WindowStrip({ data, isFinance }: { data: AdminOverview; isFinance: bool
               {item.value}
             </span>
             <span className="text-[12px]">{item.delta}</span>
+          </dd>
+          <span className="mt-0.5 block text-[12px] text-muted-foreground">{item.hint}</span>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+/**
+ * 累计规模。
+ *
+ * `totals` 一直是全量口径，不随页头的时间窗变化；它解决的是「平台现在有
+ * 多少用户 / 项目 / 素材」这类存量问题。任务状态与累计成功率只给有任务读权
+ * 的运营视角；财务视角用累计实收补位，避免与上方窗口营收混淆。
+ */
+function TotalsStrip({ data, isFinance }: { data: AdminOverview; isFinance: boolean }) {
+  const t = data.totals;
+  const items: Array<{
+    key: string;
+    label: string;
+    value: string;
+    hint: string;
+    danger?: boolean;
+  }> = [
+    {
+      key: 'users',
+      label: '用户总数',
+      value: t.users.toLocaleString('zh-CN'),
+      hint: `近 ${data.days} 天新增 ${t.newUsers.toLocaleString('zh-CN')}`,
+    },
+    {
+      key: 'projects',
+      label: '项目总数',
+      value: t.projects.toLocaleString('zh-CN'),
+      hint: '平台全部项目',
+    },
+    ...(isFinance
+      ? [
+          {
+            key: 'gmv',
+            label: '累计实收',
+            value: `¥${yuan(data.commerce.gmvCents)}`,
+            hint: `${data.commerce.orders.paid.toLocaleString('zh-CN')} 笔已支付订单`,
+          },
+        ]
+      : [
+          {
+            key: 'tasks',
+            label: '任务总数',
+            value: t.tasks.toLocaleString('zh-CN'),
+            hint: `运行中 ${t.running.toLocaleString('zh-CN')} · 排队 ${t.queued.toLocaleString('zh-CN')}`,
+          },
+          {
+            key: 'success',
+            label: '累计成功率',
+            value: t.successRate === null ? '—' : `${t.successRate}%`,
+            hint: `成功 ${t.succeeded.toLocaleString('zh-CN')} · 失败 ${t.failed.toLocaleString('zh-CN')}`,
+            danger: t.successRate !== null && t.successRate < 90,
+          },
+        ]),
+    {
+      key: 'assets',
+      label: '素材总量',
+      value: t.assets.toLocaleString('zh-CN'),
+      hint: `原始 ${t.originals.toLocaleString('zh-CN')} · 生成 ${t.generated.toLocaleString('zh-CN')}`,
+    },
+  ];
+
+  return (
+    <dl
+      data-testid="admin-overview-totals"
+      className="m-0 grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-x-0 gap-y-3.5"
+    >
+      {items.map((item, index) => (
+        <div
+          key={item.key}
+          className={index === 0 ? 'min-w-0 px-4 pl-0' : 'min-w-0 border-l border-border px-4'}
+        >
+          <dt className="mb-1.5 text-[12px] text-muted-foreground">{item.label}</dt>
+          <dd
+            className={
+              item.danger
+                ? 'text-xl leading-6 font-semibold tracking-tight text-danger-text tabular-nums'
+                : 'text-xl leading-6 font-semibold tracking-tight text-foreground tabular-nums'
+            }
+          >
+            {item.value}
           </dd>
           <span className="mt-0.5 block text-[12px] text-muted-foreground">{item.hint}</span>
         </div>

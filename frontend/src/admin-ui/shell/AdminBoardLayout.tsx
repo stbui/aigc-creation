@@ -25,6 +25,8 @@ import type { AdminMenuItem } from '../../components/admin/adminNav';
 import { hasUnsavedChanges } from '../../lib/unsaved-guard';
 import { APP_ENV, IS_PROD } from '../../lib/constants';
 import { useConfirm } from '../providers/ConfirmProvider';
+import { AdminAlertBell } from '../../components/admin/AlertBell';
+import { GlobalSearch } from './GlobalSearch';
 
 const SIDEBAR_GROUPS_KEY = 'huojue.admin.sidebar-groups';
 
@@ -243,7 +245,14 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
           </span>
         </button>
 
+        <div className="ml-6 min-w-0 flex-1">
+          {can('data.search') && (
+            <GlobalSearch onNavigate={(path) => void leave(path)} />
+          )}
+        </div>
+
         <div className="ml-auto flex items-center gap-3">
+          <AdminAlertBell onNavigate={(path) => void leave(path)} />
           <EnvironmentTag />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

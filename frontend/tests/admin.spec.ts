@@ -27,6 +27,8 @@ test.describe('后台管理端', () => {
     await expect(page.getByRole('region', { name: '值班条' })).toBeVisible();
     await expect(page.getByRole('heading', { name: '异常队列' })).toBeVisible();
     await expect(page.getByRole('heading', { name: '机器状态' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: '平台存量' })).toBeVisible();
+    await expect(page.getByTestId('admin-overview-totals')).toContainText('任务总数');
   });
 
   test('用户管理页渲染列表', async ({ page }) => {
