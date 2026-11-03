@@ -1,10 +1,4 @@
-import {
-  ActionButton,
-  Descriptions,
-  Drawer,
-  Notice,
-  TextAreaField,
-} from './components';
+import { ActionButton, Descriptions, Drawer, Notice } from './components';
 import { BILLING_MODE_LABELS, REFUND_REASON_LABELS, STATUS_LABELS } from './constants';
 import { canResolveStatus, formatTime, toCredits, toCreditsInput } from './utils';
 import type { BillingOrderView } from '../../../types/model';
@@ -15,8 +9,6 @@ interface BillingDetailDrawerProps {
   resolvable: boolean;
   action: 'settle' | 'refund';
   onActionChange: (action: 'settle' | 'refund') => void;
-  reason: string;
-  onReasonChange: (reason: string) => void;
   resolving: boolean;
   onClose: () => void;
   onResolve: () => void;
@@ -34,8 +26,6 @@ export function BillingDetailDrawer({
   resolvable,
   action,
   onActionChange,
-  reason,
-  onReasonChange,
   resolving,
   onClose,
   onResolve,
@@ -60,7 +50,7 @@ export function BillingDetailDrawer({
             <ActionButton
               variant="default"
               size="sm"
-              disabled={resolving || !reason.trim()}
+              disabled={resolving}
               onClick={onResolve}
             >
               {resolving ? '处理中…' : action === 'refund' ? '确认退款' : '确认结算'}
@@ -147,14 +137,6 @@ export function BillingDetailDrawer({
                   全额退款
                 </ActionButton>
               </div>
-              <TextAreaField
-                ariaLabel="核对依据"
-                value={reason}
-                onChange={onReasonChange}
-                rows={3}
-                maxLength={200}
-                placeholder="写清核对依据，如：上游确认出图成功但回调丢失"
-              />
               {action === 'refund' && (
                 <p className="mt-1 text-[12px] text-danger-text">
                   退款会按预留金额原额退回用户积分，且不可撤销。

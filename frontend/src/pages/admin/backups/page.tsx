@@ -13,6 +13,7 @@ import {
 import { useAdmin, useAdminResource, useToast } from './hooks';
 import { DEFAULT_KEEP_COUNT } from './constants';
 import { formatBytes } from './utils';
+import { auditReason } from '../../../admin-ui/lib/auditReason';
 import { BackupHealth } from './BackupHealth';
 import { BackupTable } from './BackupTable';
 import { BackupCleanupLog } from './BackupCleanupLog';
@@ -27,8 +28,8 @@ import type { AdminBackup } from '../../../types/api';
  *
  * 1. **未验证的备份不可下载**（B-97）。下载入口只在 `row.verified` 时出现，
  *    未验证的显示为置灰文字并说明原因，而不是给一个点了报错的按钮。
- * 2. **手动备份必须填原因**。`backup.run` 属高危权限，审计要能回答
- *    「这次备份是谁为什么做的」。
+ * 2. **手动备份写入自动审计原因**。`backup.run` 属高危权限，系统记录
+ *    操作人和操作上下文。
  * 3. **删除单份备份直接执行**，按产品要求不再弹二次确认（确认条只留给
  *    「保留份数清理」这种批量不可逆操作）。
  *
@@ -44,11 +45,7 @@ export function AdminBackupPage() {
 
   const [pruneOpen, setPruneOpen] = useState(false);
   const [keepCount, setKeepCount] = useState(DEFAULT_KEEP_COUNT);
-  const [pruneReason, setPruneReason] = useState('');
-  const [pruneReasonError, setPruneReasonError] = useState(false);
   const [runOpen, setRunOpen] = useState(false);
-  const [runReason, setRunReason] = useState('');
-  const [runReasonError, setRunReasonError] = useState(false);
   const [expanded, setExpanded] = useState<string[]>([]);
 
   /*
@@ -67,23 +64,12 @@ export function AdminBackupPage() {
   const stats = data?.stats ?? null;
   const logs = data?.logs ?? [];
 
-  /*
-   * 手动备份仍然要求填写原因（审计需要回答「谁为什么做」），但按产品要求
-   * 原因放在页面内操作条里，不再用弹窗；填完点「开始备份」直接执行。
-   */
   const runBackup = async () => {
-    const trimmed = runReason.trim();
-    if (trimmed.length < 2) {
-      setRunReasonError(true);
-      return;
-    }
     setBusy(true);
     try {
-      const rec = await adminBackupsApi.run(trimmed);
+      const rec = await adminBackupsApi.run(auditReason('手动备份数据库'));
       toast.success(`备份完成: ${rec.filename}`);
       setRunOpen(false);
-      setRunReason('');
-      setRunReasonError(false);
       await reload();
     } catch (e) {
       toast.error((e as Error).message);
@@ -133,17 +119,10 @@ export function AdminBackupPage() {
   };
 
   const doPrune = async () => {
-    const trimmed = pruneReason.trim();
-    if (trimmed.length < 2) {
-      setPruneReasonError(true);
-      return;
-    }
     setBusy(true);
     try {
-      const res = await adminBackupsApi.prune(keepCount, trimmed);
+      const res = await adminBackupsApi.prune(keepCount, auditReason('按保留份数清理旧备份'));
       setPruneOpen(false);
-      setPruneReason('');
-      setPruneReasonError(false);
       toast.success(`已清理 ${res.removed} 份, 释放 ${formatBytes(res.freedBytes)}`);
       await reload();
     } catch (e) {
@@ -182,11 +161,7 @@ export function AdminBackupPage() {
                 variant="secondary"
                 size="sm"
                 icon={Trash2}
-                onClick={() => {
-                  setPruneReason('');
-                  setPruneReasonError(false);
-                  setPruneOpen(true);
-                }}
+                onClick={() => setPruneOpen(true)}
                 disabled={busy || rows.length === 0}
               >
                 保留份数清理
@@ -195,11 +170,7 @@ export function AdminBackupPage() {
                 variant="default"
                 size="sm"
                 icon={DatabaseBackup}
-                onClick={() => {
-                  setRunReason('');
-                  setRunReasonError(false);
-                  setRunOpen(true);
-                }}
+                onClick={() => setRunOpen(true)}
                 disabled={busy}
               >
                 {busy ? '执行中…' : '立即备份'}
@@ -224,11 +195,7 @@ export function AdminBackupPage() {
                 <ActionButton
                   variant="default"
                   size="sm"
-                  onClick={() => {
-                    setRunReason('');
-                    setRunReasonError(false);
-                    setRunOpen(true);
-                  }}
+                  onClick={() => setRunOpen(true)}
                   disabled={busy}
                 >
                   立即执行一次备份
@@ -257,39 +224,19 @@ export function AdminBackupPage() {
 
       <BackupRunConfirm
         open={runOpen}
-        reason={runReason}
-        reasonError={runReasonError}
         busy={busy}
         stats={stats}
-        onReasonChange={(next) => {
-          setRunReason(next);
-          if (next.trim()) setRunReasonError(false);
-        }}
-        onCancel={() => {
-          setRunOpen(false);
-          setRunReason('');
-          setRunReasonError(false);
-        }}
+        onCancel={() => setRunOpen(false)}
         onConfirm={() => void runBackup()}
       />
 
       <BackupPruneConfirm
         open={pruneOpen}
         keepCount={keepCount}
-        reason={pruneReason}
-        reasonError={pruneReasonError}
         rowCount={rows.length}
         busy={busy}
         onKeepCountChange={setKeepCount}
-        onReasonChange={(next) => {
-          setPruneReason(next);
-          if (next.trim().length >= 2) setPruneReasonError(false);
-        }}
-        onCancel={() => {
-          setPruneOpen(false);
-          setPruneReason('');
-          setPruneReasonError(false);
-        }}
+        onCancel={() => setPruneOpen(false)}
         onConfirm={() => void doPrune()}
       />
     </>

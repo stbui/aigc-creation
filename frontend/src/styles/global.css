@@ -27,7 +27,7 @@
   --color-success-text: #117c39;
   --color-slate-100: #f1f5f9;
   /* 原 #94a3b8 在白底只有 2.56:1, 收到 #627693 后 4.63:1 */
-  --color-slate-400: #627693;
+  --color-slate-400: #5b6e89;
   --radius: 12px;
   --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.05);
 
@@ -69,7 +69,8 @@
   --page-bg: #f6f7fb;
   --card-bg: #ffffff;
   /* 参考站 own 强调 */
-  --danger-ref: #eb5757; /* 必填星号 / 失败 */
+  /* 必填星号 / 失败。2026-11-03 压到 AA: 原 #eb5757 在白底只有 3.48:1。 */
+  --danger-ref: #cb1c1c;
 
   /* 状态与提示色（收拢后集中定义, 各页不再散写） */
   --warn-bg: #fdf6e3;
@@ -81,7 +82,7 @@
   --danger-soft-bg: #fff1f2;
   /* 2026-11-03 压到 AA: 原 #ef4444 在 --danger-soft-bg 上 3.43:1、白底 3.76:1 */
   --danger-soft-text: #c5221f;
-  --danger-text: #e11d48;
+  --danger-text: #d81c45;
   --success-soft-bg: #eaf7f2;
   /* 2026-11-03 压到 AA: 原 #2f8f6b 在 --success-soft-bg 上 3.63:1、白底 3.99:1 */
   --success-text: #27795a;
@@ -142,26 +143,26 @@
   --wb-text-hero: #000000;
   --wb-text-strong: #171a2b;
   --wb-text-body: #4e5564;
-  --wb-text-muted: #667085;
+  --wb-text-muted: #636d82;
   --wb-text-desc: var(--text-desc);
   --wb-border: #e5e7ef;
   --wb-border-row: #eff0f4;
   --wb-surface: #f2f4f7;
   --wb-thumb-bg: #f2f3f7;
-  --wb-thumb-fg: #afb5c1;
+  --wb-thumb-fg: #696d74;
   --wb-visual-bg: #c9c9c9;
   --wb-visual-empty: #c7c7c7;
   --wb-brand: #5546d8;
   --wb-brand-bg: #f1efff;
   --wb-flow-income-fg: #6254ed;
   --wb-flow-income-bg: #f0edff;
-  --wb-flow-expense-fg: #818797;
+  --wb-flow-expense-fg: #686c79;
   --wb-flow-expense-bg: #f2f3f5;
   --wb-badge-bg: #f00024;
-  --wb-status-completed: #24a36d;
+  --wb-status-completed: #1b7b53;
   --wb-status-processing: #6254ed;
-  --wb-status-failed: #f53f3f;
-  --wb-empty: #98a0af;
+  --wb-status-failed: #c93434;
+  --wb-empty: #686d77;
   --wb-hover-shadow: 0 7px 20px rgba(33, 35, 65, 0.08);
   --wb-icon-shadow: 0 2px 6px rgba(107, 114, 128, 0.3);
 
@@ -189,24 +190,24 @@
   --mif-text-title-2: #2d2e42;      /* 场景分组 h2 */
   --mif-text-card: #292a3e;         /* 场景卡文字 / 场景名 strong */
   --mif-text-label: #46455d;        /* 字段标签 */
-  --mif-text-sub: #85869c;          /* 场景卡描述 / 工作区副标题 */
-  --mif-text-dim: #9897aa;          /* 结果卡副标题 */
-  --mif-text-dim-2: #aaa7ba;        /* 结果空态正文 */
-  --mif-text-dim-3: #aaa9ba;        /* 字段标签右侧 small */
-  --mif-text-dim-4: #b5b2c2;        /* 上传空态最弱提示 */
+  --mif-text-sub: #6b6b7d;          /* 场景卡描述 / 工作区副标题 */
+  --mif-text-dim: #6c6b79;          /* 结果卡副标题 */
+  --mif-text-dim-2: #6d6b78;        /* 结果空态正文 */
+  --mif-text-dim-3: #6c6b76;        /* 字段标签右侧 small */
+  --mif-text-dim-4: #6d6b75;        /* 上传空态最弱提示 */
   --mif-text-on-accent: #6157a7;    /* 上传空态主文案 */
-  --mif-text-accent: #7366d1;       /* 上传图标 */
+  --mif-text-accent: #6b5fc2;       /* 上传图标 */
   --mif-text-accent-3: #5d50c5;     /* 选中项文字 */
   --mif-text-accent-4: #5546d8;     /* hover / focus 强调 */
-  --mif-text-muted-btn: #77758c;    /* 未选中选项按钮 */
-  --mif-text-muted-btn-2: #716f86;  /* 结果区次按钮 */
+  --mif-text-muted-btn: #6c6a7f;    /* 未选中选项按钮 */
+  --mif-text-muted-btn-2: #6c6a81;  /* 结果区次按钮 */
   --mif-text-back: #3e4055;         /* 返回按钮 */
   --mif-text-on-dark: #67647b;      /* 预览区文字 */
-  --mif-text-on-dark-2: #aaa7b8;    /* 生成中文案弱化 */
-  --mif-text-art: #8c80d7;          /* 空态插画图标 */
+  --mif-text-on-dark-2: #6d6b76;    /* 生成中文案弱化 */
+  --mif-text-art: #6d64a8;          /* 空态插画图标 */
   --mif-text-art-2: #685bd0;        /* 空态插画中间层 */
-  --mif-text-count: #aeacbd;        /* 计数器 */
-  --mif-text-count-2: #aaa7bc;      /* 上传空态容器色 */
+  --mif-text-count: #6d6b76;        /* 计数器 */
+  --mif-text-count-2: #6d6b79;      /* 上传空态容器色 */
 
   /* 表面 / 背景 */
   --mif-surface-card: #fffffff0;      /* .multi-image-fusion-card 底 */
@@ -223,22 +224,22 @@
   --mif-surface-drag: #f8f6ff;        /* 拖拽悬停底 */
   --mif-surface-back-hover: #f7f5ff;  /* 返回按钮 hover 底 */
   --mif-surface-thumb: #f1eff8;       /* 缩略图底 */
-  --mif-surface-success: #19936c;      /* 消息 success 文字 */
-  --mif-surface-info: #7c6fbb;        /* 消息 info 文字 */
-  --mif-surface-error: #d75a70;       /* 消息 error 文字 */
+  --mif-surface-success: #157b5b;      /* 消息 success 文字 */
+  --mif-surface-info: #6f63a7;        /* 消息 info 文字 */
+  --mif-surface-error: #b24a5d;       /* 消息 error 文字 */
   --mif-surface-remove-hover: #ee6b83;
 
   /* 结果状态徽标：文字提供语义，颜色只做辅助区分 */
   --mif-status-generating-text: #5d50c5;
   --mif-status-generating-bg: #f1efff;
   --mif-status-generating-border: #dcd7ff;
-  --mif-status-complete-text: #157f5d;
+  --mif-status-complete-text: #157e5d;
   --mif-status-complete-bg: #eaf8f2;
   --mif-status-complete-border: #c9ebdf;
   --mif-status-partial-text: #9a6213;
   --mif-status-partial-bg: #fff6e3;
   --mif-status-partial-border: #f1ddb0;
-  --mif-status-failed-text: #c6455e;
+  --mif-status-failed-text: #bc4159;
   --mif-status-failed-bg: #fff0f3;
   --mif-status-failed-border: #f1ccd4;
 
@@ -354,17 +355,17 @@
   --mif-motion-pop: .2s;
 
   /* 共享组件 .image-output-settings-* 的字面值（参考站 §5.12） */
-  --mif-settings-summary: #687182;        /* 高级设置摘要按钮文字 */
+  --mif-settings-summary: #656d7e;        /* 高级设置摘要按钮文字 */
   --mif-settings-summary-label: #454c59; /* 「高级设置」文字 */
   --mif-settings-chip: #48505e;          /* 「比例 1:1」/「画质 1K」胶囊 */
   --mif-settings-chip-border: #e4e7ef;
-  --mif-settings-caret: #667184;         /* 展开箭头图标 */
+  --mif-settings-caret: #636d80;         /* 展开箭头图标 */
   --mif-settings-group-label: #4e5563;   /* 比例/画质分组标题 */
   --mif-settings-popover-shadow: 0 8px 24px #3d425633;
   --mif-settings-ratio-option: #5d47ea;  /* 画质选中态文字+描边 */
   --mif-resolution-option: #5d6472;      /* 画质未选中态文字 */
   --mif-resolution-option-border: #e4e6ef;
-  --mif-resolution-option-sub: #7c8493;  /* 画质副文案 */
+  --mif-resolution-option-sub: #666d79;  /* 画质副文案 */
   --mif-option-hover-text: #6255c5;       /* 选项按钮 hover 文字 */
   --mif-result-btn-hover-text: #5f51c6;   /* 结果区按钮 hover 文字 */
   --mif-surface-result-btn: #fffc;        /* 结果区按钮半透明白底 */
@@ -436,8 +437,8 @@
   --text-3: #475467;
   --text-4: #526077;
   --text-5: #596273;
-  --text-6: #656e81;
-  --text-7: #777181;
+  --text-6: #646d80;
+  --text-7: #706a79;
   /* 弱尾三级 (2026-11-03): 原 #8b94a3/#9aa1ad/#b6bcc8 在白底只有
      3.06/2.60/1.91:1, 且三级之间 ΔE<14、末级与边框灰同色 —— 视觉上
      已是"装饰灰"而非"文字灰"。三级改为指向 --text-muted (色值只定义一处),
@@ -475,7 +476,7 @@
   --sku-text-brand-2: #5d49ed;
   --sku-text-brand-3: #604bf1;
   --sku-text-brand-4: #6954e4;
-  --sku-text-danger: #d92d20;
+  --sku-text-danger: #d42c1f;
   --sku-text-1: #282739;
   --sku-text-2: #30313e;
   --sku-text-3: #333a49;
@@ -489,15 +490,15 @@
   --sku-text-11: #596678;
   --sku-text-12: #616b7c;
   --sku-text-13: #626c7d;
-  --sku-text-14: #7c8492;
-  --sku-text-15: #8f96a5;
-  --sku-text-16: #98a1af;
-  --sku-text-17: #98a2b1;
-  --sku-text-18: #a3aab7;
-  --sku-text-19: #a6adba;
-  --sku-text-20: #a8afbb;
-  --sku-text-21: #adb3c0;
-  --sku-text-22: #c1c8d3;
+  --sku-text-14: #676d79;
+  --sku-text-15: #676c77;
+  --sku-text-16: #676d77;
+  --sku-text-17: #676d77;
+  --sku-text-18: #686d75;
+  --sku-text-19: #686d75;
+  --sku-text-20: #686d74;
+  --sku-text-21: #696c74;
+  --sku-text-22: #696d73;
 
   /* 工具页族 (pk-* / fc-* / vc-* …) */
   --tool-border-brand-1: #6b4eff;
@@ -531,14 +532,14 @@
   --tool-surface-11: #f5f6fa;
   --tool-surface-12: #fafafa;
   --tool-text-brand-1: #5b3ff2;
-  --tool-text-brand-2: #6b4eff;
-  --tool-text-danger: #d93036;
+  --tool-text-brand-2: #694dfa;
+  --tool-text-danger: #d22e34;
   --tool-text-1: #1f2430;
-  --tool-text-2: #748093;
-  --tool-text-3: #7d8596;
-  --tool-text-4: #7d8797;
-  --tool-text-5: #8791a1;
-  --tool-text-6: #b4adc9;
+  --tool-text-2: #636d7e;
+  --tool-text-3: #666d7b;
+  --tool-text-4: #656d7a;
+  --tool-text-5: #666d7a;
+  --tool-text-6: #6f6a7c;
   --tool-text-7: #b8bec8;
 
   /* 素材库页 */
@@ -572,13 +573,13 @@
   --alp-text-4: #4d5568;
   --alp-text-5: #5f687b;
   --alp-text-6: #5f687d;
-  --alp-text-7: #69748a;
-  --alp-text-8: #7b8498;
-  --alp-text-9: #8d95a8;
-  --alp-text-10: #8f98a8;
-  --alp-text-11: #9ca4b4;
-  --alp-text-12: #a4aab8;
-  --alp-text-13: #a8afbd;
+  --alp-text-7: #636d82;
+  --alp-text-8: #656d7d;
+  --alp-text-9: #676c7a;
+  --alp-text-10: #676d79;
+  --alp-text-11: #676d77;
+  --alp-text-12: #686c75;
+  --alp-text-13: #686d75;
 
   /* 手机上传页 */
   --mup-border-brand: #bdb4e8;
@@ -592,16 +593,16 @@
   --mup-surface: #f3f2f6;
   --mup-surface-success: #edf8f1;
   --mup-text-brand-1: #6d55dc;
-  --mup-text-brand-2: #715cd2;
+  --mup-text-brand-2: #6f5ace;
   --mup-text-danger-1: #bd3540;
-  --mup-text-danger-2: #c34b57;
+  --mup-text-danger-2: #bb4854;
   --mup-text-1: #282431;
   --mup-text-2: #292533;
   --mup-text-3: #706b78;
-  --mup-text-4: #948ca9;
-  --mup-text-5: #9993a5;
-  --mup-text-success-1: #24824b;
-  --mup-text-success-2: #2fad63;
+  --mup-text-4: #6f697f;
+  --mup-text-5: #6f6a77;
+  --mup-text-success-1: #227c47;
+  --mup-text-success-2: #227c47;
 
   /* 手机上传合并页 */
   --mum-border: #ebe8f4;
@@ -612,14 +613,14 @@
   --mum-text-danger: #c33c45;
   --mum-text-1: #24212f;
   --mum-text-2: #666666;
-  --mum-text-3: #9893a3;
+  --mum-text-3: #6e6b76;
 
   /* 多图融合页 */
   --mif-border: #e6e4ee;
   --mif-text-1: #45435b;
   --mif-text-2: #59616e;
   --mif-text-3: #6c6a82;
-  --mif-text-4: #aaa8ba;
+  --mif-text-4: #6d6b77;
 
   /* 外壳 / 顶栏 / 侧栏 */
   --shell-surface-brand-1: #8a63ff;
@@ -629,7 +630,7 @@
   --shell-surface-2: #f9fafc;
   --shell-text-danger: #ffe4e6;
   --shell-text-1: #24212e;
-  --shell-text-2: #98a2b3;
+  --shell-text-2: #676d79;
 
   /* 登录页 */
   --login-border-brand: #c3bdf5;
@@ -643,7 +644,7 @@
   /* 首页 */
   --lp-border-brand: #d8d2ff;
   --lp-text-1: #1f2329;
-  --lp-text-2: #8a93a3;
+  --lp-text-2: #676d79;
 
   /* 工作台 */
   --wb-surface-brand: #fafaff;
@@ -3194,7 +3195,7 @@ html[data-promo='off'] {
   color: var(--wb-text);
 }
 .pk-field .ui-input::placeholder {
-  color: var(--border-dot);
+  color: var(--placeholder-text);
 }
 .pk-field input:not(.ui-input):not(.login-input-inner),
 .pk-field select {
@@ -3214,7 +3215,7 @@ html[data-promo='off'] {
   border-color: var(--brand-light);
 }
 .pk-field input:not(.ui-input):not(.login-input-inner)::placeholder {
-  color: var(--border-dot);
+  color: var(--placeholder-text);
 }
 
 /* 商品描述 */
@@ -3282,7 +3283,7 @@ html[data-promo='off'] {
   border-color: var(--brand-light);
 }
 .pk-desc-editor textarea::placeholder {
-  color: var(--border-dot);
+  color: var(--placeholder-text);
 }
 .pk-desc-expand {
   position: absolute;
@@ -6860,7 +6861,7 @@ img[data-broken='1'] {
 }
 .stats-cap-count em {
   font-style: normal;
-  font-size: 11px;
+  font-size: 12px;
   color: var(--text-desc);
   white-space: nowrap;
 }
@@ -17902,7 +17903,7 @@ ol.product-sku-steps {
   border-color: var(--brand-light);
 }
 .pt-polish-textarea::placeholder {
-  color: var(--border-dot);
+  color: var(--placeholder-text);
 }
 .pt-polish-loading {
   position: absolute;

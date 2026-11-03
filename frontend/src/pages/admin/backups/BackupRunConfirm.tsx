@@ -1,25 +1,19 @@
-import { ConfirmAction, FormField, TextField } from './components';
+import { ConfirmAction } from './components';
 import type { AdminBackupStats } from '../../../types/api';
 
 interface BackupRunConfirmProps {
   open: boolean;
-  reason: string;
-  reasonError: boolean;
   busy: boolean;
   stats: AdminBackupStats | null;
-  onReasonChange: (value: string) => void;
   onCancel: () => void;
   onConfirm: () => void;
 }
 
-/** 手动备份确认：原因强制填写并写入审计 */
+/** 手动备份确认：审计原因由页面按操作上下文生成 */
 export function BackupRunConfirm({
   open,
-  reason,
-  reasonError,
   busy,
   stats,
-  onReasonChange,
   onCancel,
   onConfirm,
 }: BackupRunConfirmProps) {
@@ -44,28 +38,8 @@ export function BackupRunConfirm({
           ? `当前已备份 ${stats.total} 份，占用 ${stats.totalMb} MB`
           : '将在备份完成后重新统计占用',
         '新备份初始状态为「未验证」，需再做一次恢复验证才能下载',
-        '本次操作原因会写入操作审计',
+        '本次操作会写入操作审计',
       ]}
-      extra={
-        <FormField
-          label="备份原因（强制，写入审计）："
-          htmlFor="adm-backup-reason"
-          required
-          error={
-            reasonError
-              ? '请至少填写 2 个字符，否则审计里无法回答「这次备份是谁为什么做的」。'
-              : null
-          }
-        >
-          <TextField
-            value={reason}
-            onChange={onReasonChange}
-            placeholder="如：本周例行备份 / 改动结构前留档"
-            maxLength={200}
-            ariaLabel="备份原因"
-          />
-        </FormField>
-      }
     />
   );
 }

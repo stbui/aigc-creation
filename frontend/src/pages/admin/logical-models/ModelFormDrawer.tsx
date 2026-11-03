@@ -317,15 +317,6 @@ export function ModelFormDrawer({
           )}
         </div>
 
-        <FormField label="变更原因" hint="写入审计">
-          <TextField
-            ariaLabel="变更原因"
-            value={draft.reason}
-            onChange={(value) => onChange({ reason: value })}
-            placeholder="如：新增备用线路"
-            maxLength={200}
-          />
-        </FormField>
       </div>
     </Drawer>
   );

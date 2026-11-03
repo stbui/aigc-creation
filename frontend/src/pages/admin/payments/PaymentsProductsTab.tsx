@@ -22,6 +22,7 @@ import {
   type AdminColumn,
 } from './components';
 import { useAdmin, useAdminResource, useToast } from './hooks';
+import { auditReason } from '../../../admin-ui/lib/auditReason';
 import type {
   AdminPaymentProductView,
   PaymentCurrency,
@@ -72,8 +73,6 @@ interface ProductDraft {
   saleEndAt: string;
   sortOrder: string;
   enabled: boolean;
-  /** 高危写操作原因（写入审计） */
-  reason: string;
 }
 
 const EMPTY_DRAFT: ProductDraft = {
@@ -93,7 +92,6 @@ const EMPTY_DRAFT: ProductDraft = {
   saleEndAt: '',
   sortOrder: '0',
   enabled: false,
-  reason: '',
 };
 
 function centsToText(cents: number): string {
@@ -138,7 +136,6 @@ function toDraft(p: AdminPaymentProductView): ProductDraft {
     saleEndAt: isoToLocalInput(p.saleEndAt),
     sortOrder: String(p.sortOrder),
     enabled: p.status === 'active',
-    reason: '',
   };
 }
 
@@ -176,7 +173,6 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
 
   const [currencyOpen, setCurrencyOpen] = useState(false);
   const [currencyDraft, setCurrencyDraft] = useState<PaymentCurrency>('CNY');
-  const [currencyReason, setCurrencyReason] = useState('');
 
   const formOpen = creating || editing !== null;
 
@@ -320,12 +316,6 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
       toast.error('当前没有已配置的美元支付渠道，无法上架美元商品');
       return;
     }
-    const reason = draft.reason.trim();
-    if (reason.length < 2) {
-      toast.error('请填写至少 2 个字符的变更原因');
-      return;
-    }
-
     const payload = {
       // DTO 必填：当前只支持积分商品
       kind: 'credits' as const,
@@ -355,7 +345,7 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
           }
         : {}),
       status: draft.enabled ? 'active' : 'offline',
-      reason,
+      reason: auditReason(editing ? '编辑充值商品' : '新建充值商品'),
     };
 
     setSaving(true);
@@ -414,7 +404,6 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
           <ActionButton
             onClick={() => {
               setCurrencyDraft(settings.data?.defaultCurrency ?? 'CNY');
-              setCurrencyReason('');
               setCurrencyOpen(true);
             }}
             disabled={!can('payment.write')}
@@ -429,14 +418,13 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
         title="更改默认充值货币"
         description="默认货币决定 C 端商品卡的展示顺序与结算币种。更改只影响展示与下单口径，已生成的订单按下单时的币种结算。"
         confirmText="确认更改"
-        confirmDisabled={currencyReason.trim().length < 2}
         onCancel={() => setCurrencyOpen(false)}
         onConfirm={async () => {
           setSaving(true);
           try {
             await adminPaymentProvidersApi.saveSettings({
               defaultCurrency: currencyDraft,
-              reason: currencyReason.trim(),
+              reason: auditReason('更改默认充值货币'),
             });
             toast.success('默认货币已更新');
             setCurrencyOpen(false);
@@ -458,13 +446,6 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
               ]}
               ariaLabel="默认充值货币"
             />
-            <TextAreaField
-              value={currencyReason}
-              onChange={setCurrencyReason}
-              maxLength={200}
-              placeholder="变更原因（写入审计）"
-              ariaLabel="变更原因"
-            />
           </div>
         }
       />
@@ -485,7 +466,7 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
               </ActionButton>
               <ActionButton
                 onClick={submit}
-                disabled={saving || !draft.name.trim() || draft.reason.trim().length < 2}
+                disabled={saving || !draft.name.trim()}
               >
                 {saving ? '保存中…' : '保存'}
               </ActionButton>
@@ -663,16 +644,6 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
               />
             </FormField>
 
-            <FormField label="变更原因" required hint="商品价格与权益变更属高危动作，原因会写入操作审计。">
-              <TextAreaField
-                value={draft.reason}
-                onChange={(value) => setDraft({ ...draft, reason: value })}
-                maxLength={200}
-                placeholder="例如：双十一调整积分包售价"
-                disabled={!writable}
-                ariaLabel="变更原因"
-              />
-            </FormField>
 
             <FormField label="上架" hint="下架的商品用户看不到也买不了">
               <SwitchField

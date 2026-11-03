@@ -11,7 +11,6 @@ import {
   ConfirmAction,
   FilterActions,
   FilterBar,
-  FormField,
   Notice,
   PageHeader,
   Panel,
@@ -23,6 +22,7 @@ import {
   type AppliedFilter,
 } from './components';
 import { assetThumbUrl, adminTasksApi } from './api';
+import { auditReason } from '../../../admin-ui/lib/auditReason';
 import {
   useAdmin,
   useAdminDetailParam,
@@ -108,7 +108,6 @@ export function AdminTasksPage() {
   const [detailId, setDetailId] = useAdminDetailParam();
 
   const [confirm, setConfirm] = useState<{ kind: TaskActionKind; task: Row } | null>(null);
-  const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
 
@@ -210,13 +209,14 @@ export function AdminTasksPage() {
 
   const runBatch = async (kind: TaskActionKind) => {
     if (selected.length === 0) return;
-    const trimmed = reason.trim();
     setBusy(true);
     try {
       const summary = await adminTasksApi.batch(
         selected,
         kind,
-        kind === 'delete' ? undefined : trimmed || undefined,
+        kind === 'delete'
+          ? undefined
+          : auditReason(kind === 'retry' ? '批量重试任务' : '批量终止任务'),
       );
       setBatchTitle(
         kind === 'retry'
@@ -227,7 +227,6 @@ export function AdminTasksPage() {
       );
       setBatchSummary(summary);
       setBatchKind(null);
-      setReason('');
       setSelected([]);
       reload();
     } catch (e) {
@@ -360,23 +359,20 @@ export function AdminTasksPage() {
       : null,
   ].filter(Boolean) as AppliedFilter[];
 
-  /** 打开确认条。重置原因输入, 避免上一次的内容被误提交 */
   const openConfirm = useCallback((kind: TaskActionKind, task: Row) => {
-    setReason('');
     setConfirm({ kind, task });
   }, []);
 
   /** 执行确认后的动作。三个动作都要刷新列表: 重试新增行, 终止改状态, 删除移除行 */
   const runConfirm = useCallback(async () => {
     if (!confirm) return;
-    const trimmed = reason.trim();
     setBusy(true);
     try {
       if (confirm.kind === 'retry') {
-        const r = await adminTasksApi.retry(confirm.task.id, trimmed || undefined);
+        const r = await adminTasksApi.retry(confirm.task.id, auditReason('重试任务'));
         toast.success(`已用原参数新建任务 ${shortId(r.taskId)}`);
       } else if (confirm.kind === 'cancel') {
-        await adminTasksApi.cancel(confirm.task.id, trimmed || undefined);
+        await adminTasksApi.cancel(confirm.task.id, auditReason('终止任务'));
         toast.success('任务已终止');
       } else {
         await adminTasksApi.remove(confirm.task.id);
@@ -390,7 +386,7 @@ export function AdminTasksPage() {
     } finally {
       setBusy(false);
     }
-  }, [confirm, reason, reload, setDetailId, toast]);
+  }, [confirm, reload, setDetailId, toast]);
 
   const columns: Array<AdminColumn<Row>> = useMemo(
     () => [
@@ -863,21 +859,6 @@ export function AdminTasksPage() {
                   '不可撤销（需重新发起生成）',
                 ]
           }
-          extra={
-            <FormField label="操作原因（会记入操作审计）">
-              <TextField
-                ariaLabel="操作原因"
-                value={reason}
-                onChange={setReason}
-                placeholder={
-                  confirm.kind === 'retry'
-                    ? '如：用户反馈重试一次'
-                    : '如：任务卡死，用户申请作废'
-                }
-                maxLength={200}
-              />
-            </FormField>
-          }
         />
       )}
 
@@ -904,10 +885,7 @@ export function AdminTasksPage() {
           confirmText={batchKind === 'retry' ? '确认重试' : '确认终止'}
           danger={batchKind === 'cancel'}
           loading={busy}
-          onCancel={() => {
-            setBatchKind(null);
-            setReason('');
-          }}
+          onCancel={() => setBatchKind(null)}
           onConfirm={() => void runBatch(batchKind)}
           description={
             batchKind === 'retry' ? (
@@ -936,21 +914,6 @@ export function AdminTasksPage() {
             batchKind === 'retry'
               ? [`最多新增 ${selected.length} 个任务`, '每个任务将真实消耗模型额度']
               : ['目标任务状态变为失败', '不可撤销（需重新发起生成）']
-          }
-          extra={
-            <FormField label="操作原因（会记入操作审计）">
-              <TextField
-                ariaLabel="操作原因"
-                value={reason}
-                onChange={setReason}
-                placeholder={
-                  batchKind === 'retry'
-                    ? '如：通道恢复后批量重试'
-                    : '如：批量清理卡死任务'
-                }
-                maxLength={200}
-              />
-            </FormField>
           }
         />
       )}

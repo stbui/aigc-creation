@@ -20,6 +20,7 @@ import {
 import { LEDGER_LABELS, LEDGER_OPTIONS, SOURCE_LABELS } from './constants';
 import { useCreditDetail, useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
 import { adminCreditsApi } from './api';
+import { auditReason } from '../../../admin-ui/lib/auditReason';
 import {
   adminOrderHref,
   adminTasksHref,
@@ -57,7 +58,6 @@ export function CreditDetailDrawer({
   const [to, setTo] = useState('');
 
   const [delta, setDelta] = useState('');
-  const [reason, setReason] = useState('');
   const [validDays, setValidDays] = useState('');
 
   const [busy, setBusy] = useState(false);
@@ -68,7 +68,7 @@ export function CreditDetailDrawer({
 
   const parsedDelta = Number(delta);
   const deltaValid = Number.isInteger(parsedDelta) && parsedDelta !== 0;
-  const adjustmentDirty = Boolean(delta.trim() || reason.trim() || validDays.trim());
+  const adjustmentDirty = Boolean(delta.trim() || validDays.trim());
   useUnsavedGuard(adjustmentDirty);
   const requestClose = useDiscardConfirm(adjustmentDirty, onClose);
 
@@ -77,22 +77,16 @@ export function CreditDetailDrawer({
       toast.warning('变动量必须是非零整数，正数增加、负数扣减');
       return;
     }
-    const trimmed = reason.trim();
-    if (!trimmed) {
-      toast.warning('请填写调整原因');
-      return;
-    }
     setBusy(true);
     try {
       const r = await adminCreditsApi.adjust({
         userId: user.userId,
         delta: parsedDelta,
-        reason: trimmed,
+        reason: auditReason('人工调整用户积分'),
         ...(validDays.trim() ? { validDays: Number(validDays) } : {}),
       });
       toast.success(`已调整 ${signed(parsedDelta)} 积分，当前余额 ${r.balance}`);
       setDelta('');
-      setReason('');
       setValidDays('');
       void reload({ silent: true });
       onChanged();
@@ -275,17 +269,7 @@ export function CreditDetailDrawer({
                   />
                 </FormField>
               </div>
-            </div>
-            <FormField label="调整原因（强制）" htmlFor="c-reason">
-              <TextField
-                value={reason}
-                onChange={setReason}
-                placeholder="如：工单 #123 补偿生成失败"
-                maxLength={200}
-                ariaLabel="调整原因"
-              />
-            </FormField>
-            <div>
+            </div>            <div>
               <ActionButton
                 variant="default"
                 disabled={!deltaValid || busy}

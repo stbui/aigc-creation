@@ -1,29 +1,25 @@
-import { ConfirmAction, FormField, TextField } from './components';
+import { ConfirmAction } from './components';
 import { POSITION_LABELS } from './constants';
 import type { AigcLabelSpec } from '../../../types/api';
 
 /**
  * 保存确认。
  *
- * 改的是全站每张产出图上的法定标识，因此对照展示「从什么变成什么」，
- * 并强制填写变更原因写入审计。
+ * 改的是全站每张产出图上的法定标识，因此对照展示「从什么变成什么」；
+ * 审计原因由页面按操作上下文自动生成。
  */
 export function SaveLabelConfirm({
   open,
   current,
   next,
-  reason,
   busy,
-  onReasonChange,
   onCancel,
   onConfirm,
 }: {
   open: boolean;
   current: AigcLabelSpec;
   next: AigcLabelSpec;
-  reason: string;
   busy: boolean;
-  onReasonChange: (value: string) => void;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
@@ -44,17 +40,6 @@ export function SaveLabelConfirm({
         `位置：${POSITION_LABELS[current.position]} → ${POSITION_LABELS[next.position]}`,
         `宽度：${current.scalePercent}% → ${next.scalePercent}%`,
       ]}
-      extra={
-        <FormField label="变更原因（写入审计日志）" required>
-          <TextField
-            value={reason}
-            onChange={onReasonChange}
-            placeholder="例如：按品牌规范调整角标配色"
-            maxLength={200}
-            ariaLabel="变更原因"
-          />
-        </FormField>
-      }
       onCancel={onCancel}
       onConfirm={onConfirm}
     />

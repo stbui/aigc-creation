@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ConfirmAction, FormField, SelectField, StatusTag, TextField } from './components';
+import { ConfirmAction, FormField, SelectField, StatusTag } from './components';
 import type { AdminUserListResult } from '../../../types/api';
 
 type Row = AdminUserListResult['items'][number];
@@ -19,11 +19,10 @@ export function UserRoleConfirm({
   target: Row;
   loading: boolean;
   onCancel: () => void;
-  onConfirm: (role: string, reason: string) => void;
+  onConfirm: (role: string) => void;
 }) {
   const currentAssignable = target.role === 'user' ? 'operator' : target.role;
   const [next, setNext] = useState<string>(currentAssignable);
-  const [reason, setReason] = useState('');
 
   return (
     <ConfirmAction
@@ -45,7 +44,7 @@ export function UserRoleConfirm({
       impact={[
         '变更立即生效，该用户的旧 token 下次请求即按新角色鉴权',
         '目标角色的权限点集合将整体生效',
-        '写操作审计（含操作人与原因）',
+        '写操作审计（含操作人）',
       ]}
       extra={
         <>
@@ -63,19 +62,10 @@ export function UserRoleConfirm({
               ]}
             />
           </FormField>
-          <FormField label="操作原因">
-            <TextField
-              ariaLabel="操作原因"
-              placeholder="如：岗位调整"
-              value={reason}
-              onChange={setReason}
-              maxLength={200}
-            />
-          </FormField>
         </>
       }
       onCancel={onCancel}
-      onConfirm={() => onConfirm(next, reason)}
+      onConfirm={() => onConfirm(next)}
     />
   );
 }

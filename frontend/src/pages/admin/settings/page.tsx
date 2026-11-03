@@ -9,6 +9,7 @@ import { adminSettingsApi } from '../../../lib/api';
 
 import { ActionButton, ClearableField, EmptyState, FormField, ListError, ModalDialog, NumberField, PageHeader, PageSkeleton, SkeletonPanel, SkeletonTabs, Panel, SaveBar, SegmentedTabs, SelectField, StaleError, SwitchField, TextField, ToneBadge } from './components';
 import type { AdminSettings, AdminSettingValue } from '../../../types/api';
+import { auditReason } from '../../../admin-ui/lib/auditReason';
 
 /** 值 → 展示文本。布尔值不能直接显示 true/false，运营看不懂 */
 
@@ -40,8 +41,6 @@ export function AdminSettingsPage() {
   /** 待恢复默认的 key。与 draft 互斥，保存前任一处修改都会把 key 从另一侧移走 */
   const [clears, setClears] = useState<Set<string>>(new Set());
   const [confirming, setConfirming] = useState(false);
-  const [saveReason, setSaveReason] = useState('');
-  const [reasonError, setReasonError] = useState(false);
 
   const { data: settings, loading, error, reload } = useAdminResource(() =>
     adminSettingsApi.read(),
@@ -101,11 +100,6 @@ export function AdminSettingsPage() {
   };
 
   const save = async () => {
-    const reason = saveReason.trim();
-    if (!reason) {
-      setReasonError(true);
-      return;
-    }
     setBusy(true);
     try {
       const res = await adminSettingsApi.update({
@@ -113,12 +107,10 @@ export function AdminSettingsPage() {
           Object.entries(draft).filter(([key]) => !clears.has(key)),
         ),
         clears: [...clears],
-        reason,
+        reason: auditReason('更新系统设置'),
       });
       setDraft({});
       setClears(new Set());
-      setSaveReason('');
-      setReasonError(false);
       await reload();
       setConfirming(false);
       toast.success(
@@ -422,11 +414,7 @@ export function AdminSettingsPage() {
             </ActionButton>
             <ActionButton
               disabled={dirtyCount === 0 || busy}
-              onClick={() => {
-                setSaveReason('');
-                setReasonError(false);
-                setConfirming(true);
-              }}
+              onClick={() => setConfirming(true)}
             >
               保存变更
             </ActionButton>
@@ -441,11 +429,7 @@ export function AdminSettingsPage() {
       <ModalDialog
         open={confirming}
         onOpenChange={(open) => {
-          if (!open && !busy) {
-            setConfirming(false);
-            setSaveReason('');
-            setReasonError(false);
-          }
+          if (!open && !busy) setConfirming(false);
         }}
         title="保存系统设置"
         description="以下配置变更将立即生效，影响所有用户。"
@@ -455,11 +439,7 @@ export function AdminSettingsPage() {
             <ActionButton
               variant="outline"
               disabled={busy}
-              onClick={() => {
-                setConfirming(false);
-                setSaveReason('');
-                setReasonError(false);
-              }}
+              onClick={() => setConfirming(false)}
             >
               取消
             </ActionButton>
@@ -483,22 +463,6 @@ export function AdminSettingsPage() {
           </div>
         )}
 
-        <FormField
-          label="变更原因（写入审计）"
-          htmlFor="adm-setting-reason"
-          required
-          error={reasonError ? '请填写变更原因，审计记录需要能回答「谁为什么改」。' : null}
-        >
-          <ClearableField
-            id="adm-setting-reason"
-            value={saveReason}
-            onChange={(next) => {
-              setSaveReason(next);
-              if (next.trim()) setReasonError(false);
-            }}
-            placeholder="如：退款窗口由 7 天调整为 15 天"
-          />
-        </FormField>
       </ModalDialog>
     </>
   );

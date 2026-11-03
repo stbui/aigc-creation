@@ -13,6 +13,7 @@ import { LogicalModelTable } from './LogicalModelTable';
 import { ModelFormDrawer } from './ModelFormDrawer';
 import { RouteSimulateDrawer } from './RouteSimulateDrawer';
 import { ArchiveConfirm } from './ArchiveConfirm';
+import { auditReason } from '../../../admin-ui/lib/auditReason';
 import type {
   AdminChannelModelView,
   AdminLogicalModelView,
@@ -218,7 +219,7 @@ export function AdminLogicalModelsPage() {
       capabilitySpec,
       defaultOptions,
       routes,
-      ...(draft.reason.trim() ? { reason: draft.reason.trim() } : {}),
+      reason: auditReason(editing ? '编辑前台模型' : '新建前台模型'),
     };
 
     setSaving(true);

@@ -10,14 +10,12 @@ import {
   Drawer,
   FilterActions,
   FilterBar,
-  FormField,
   ListError,
   Notice,
   Panel,
   SelectField,
   StaleError,
   StatusTag,
-  TextAreaField,
   TextField,
   type AdminColumn,
   type AppliedFilter,
@@ -42,6 +40,7 @@ import {
   PROVIDER_LABELS,
 } from './constants';
 import { moneyText } from './utils';
+import { auditReason } from '../../../admin-ui/lib/auditReason';
 
 /**
  * 支付订单标签。
@@ -225,7 +224,6 @@ export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
   const [action, setAction] = useState<{
     order: AdminPaymentOrderRow;
     kind: 'query' | 'close';
-    reason: string;
   } | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -326,13 +324,13 @@ export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
             {actionable && (
               <>
                 <ActionButton
-                  onClick={() => setAction({ order: row, kind: 'query', reason: '' })}
+                  onClick={() => setAction({ order: row, kind: 'query' })}
                   ariaLabel={`同步状态${row.orderNo}`}
                 >
                   同步状态
                 </ActionButton>
                 <ActionButton
-                  onClick={() => setAction({ order: row, kind: 'close', reason: '' })}
+                  onClick={() => setAction({ order: row, kind: 'close' })}
                   ariaLabel={`关闭订单${row.orderNo}`}
                 >
                   关闭
@@ -499,7 +497,6 @@ export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
             : ['若渠道已收款，积分会立即入账']
         }
         confirmText={action?.kind === 'close' ? '确认关闭' : '确认同步'}
-        confirmDisabled={!action?.reason.trim()}
         loading={busy}
         onCancel={() => setAction(null)}
         onConfirm={async () => {
@@ -507,10 +504,14 @@ export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
           setBusy(true);
           try {
             if (action.kind === 'query') {
-              await adminPaymentOrdersApi.query(action.order.id, { reason: action.reason.trim() });
+              await adminPaymentOrdersApi.query(action.order.id, {
+                reason: auditReason('向渠道同步支付订单状态'),
+              });
               toast.success('已同步渠道状态');
             } else {
-              await adminPaymentOrdersApi.close(action.order.id, { reason: action.reason.trim() });
+              await adminPaymentOrdersApi.close(action.order.id, {
+                reason: auditReason('关闭支付订单'),
+              });
               toast.success('订单已关闭');
             }
             setAction(null);
@@ -521,17 +522,6 @@ export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
             setBusy(false);
           }
         }}
-        extra={
-          <FormField label="操作原因" required hint="原因会写入操作审计。">
-            <TextAreaField
-              value={action?.reason ?? ''}
-              onChange={(value) => setAction((prev) => (prev ? { ...prev, reason: value } : prev))}
-              maxLength={200}
-              placeholder="例如：用户反馈已付款但页面未到账"
-              ariaLabel="操作原因"
-            />
-          </FormField>
-        }
       />
 
       {detailId && (

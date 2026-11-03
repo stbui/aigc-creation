@@ -8,6 +8,7 @@
 import { parseCredits, toCreditsInput } from '../../../lib/microcredits';
 import type { UserGroupView } from '../../../types/model';
 import type { GroupDraft } from './constants';
+import { auditReason } from '../../../admin-ui/lib/auditReason';
 
 export { parseCredits, toCreditsInput };
 
@@ -31,7 +32,6 @@ export function toDraft(group: UserGroupView): GroupDraft {
       pointsPerUsd: toCreditsInput(item.pointsPerUsdMicrocredits),
       pointsPerCny: toCreditsInput(item.pointsPerCnyMicrocredits),
     })),
-    reason: '',
   };
 }
 
@@ -98,7 +98,7 @@ export function buildGroupPayload(draft: GroupDraft): GroupPayloadResult {
     allChannels: draft.allChannels,
     channelIds: draft.allChannels ? [] : draft.channelIds,
     modelOverrides: overrides,
-    ...(draft.reason.trim() ? { reason: draft.reason.trim() } : {}),
+    reason: auditReason('保存用户分组'),
   };
   return { ok: true, body };
 }

@@ -258,15 +258,6 @@ export function UserGroupFormDrawer({
           </Notice>
         )}
 
-        <FormField label="变更原因" hint="写入审计">
-          <TextField
-            ariaLabel="变更原因"
-            value={draft.reason}
-            onChange={(value) => onPatch({ reason: value })}
-            placeholder="如：会员权益调整"
-            maxLength={200}
-          />
-        </FormField>
       </div>
     </Drawer>
   );

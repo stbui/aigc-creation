@@ -6,12 +6,11 @@ import {
   useAdminDetailParam,
   useAdminList,
   useAdminResource,
-  useDiscardConfirm,
   useToast,
-  useUnsavedGuard,
 } from './hooks';
 import { STATUS_LABELS, REVIEW_OPTION } from './constants';
 import { toCredits } from './utils';
+import { auditReason } from '../../../admin-ui/lib/auditReason';
 import { BillingStats } from './BillingStats';
 import { BillingFilterBar } from './BillingFilterBar';
 import { BillingOrderTable } from './BillingOrderTable';
@@ -75,28 +74,22 @@ export function AdminBillingOrdersPage() {
   );
   const detail = fetchedDetail ?? rows.find((row) => row.id === detailId) ?? null;
   const [action, setAction] = useState<'settle' | 'refund'>('settle');
-  const [reason, setReason] = useState('');
   const [resolving, setResolving] = useState(false);
   // 批量核对：勾选若干账单一次性处置，逐条结果回显
   const [selected, setSelected] = useState<string[]>([]);
   const [batchOpen, setBatchOpen] = useState(false);
-  const [batchReason, setBatchReason] = useState('');
   const [batchBusy, setBatchBusy] = useState(false);
   const [batchResults, setBatchResults] = useState<
     Array<{ id: string; ok: boolean; error?: string }> | null
   >(null);
 
-  const actionDirty = detailId !== null && reason.trim() !== '';
-  useUnsavedGuard(actionDirty);
-  const requestCloseDetail = useDiscardConfirm(actionDirty, () => {
+  const requestCloseDetail = () => {
     setDetailId(null);
-    setReason('');
     setAction('settle');
-  });
+  };
 
   const openDetail = useCallback(
     (row: BillingOrderView) => {
-      setReason('');
       setAction('settle');
       setDetailId(row.id);
     },
@@ -135,19 +128,18 @@ export function AdminBillingOrdersPage() {
 
   const runResolve = async () => {
     if (!detail) return;
-    if (!reason.trim()) {
-      toast.error('请填写核对依据');
-      return;
-    }
     setResolving(true);
     try {
-      const next = await adminBillingOrdersApi.resolve(detail.id, action, reason.trim());
+      const next = await adminBillingOrdersApi.resolve(
+        detail.id,
+        action,
+        auditReason(action === 'refund' ? '账单核对退款' : '账单按用量结算'),
+      );
       toast.success(
         action === 'refund'
           ? `已全额退款：${toCredits(next.refundedAmountMicrocredits)} 积分`
           : `已按现有用量结算：${toCredits(next.actualAmountMicrocredits)} 积分`,
       );
-      setReason('');
       await reload();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '核对失败');
@@ -159,19 +151,18 @@ export function AdminBillingOrdersPage() {
   /** 批量核对：逐条独立处置，失败的条目带原因回显 */
   const runBatchResolve = async () => {
     if (selected.length === 0) return;
-    if (!batchReason.trim()) {
-      toast.error('请填写核对依据');
-      return;
-    }
     setBatchBusy(true);
     setBatchResults(null);
     try {
-      const result = await adminBillingOrdersApi.batchResolve(selected, action, batchReason.trim());
+      const result = await adminBillingOrdersApi.batchResolve(
+        selected,
+        action,
+        auditReason(action === 'refund' ? '批量账单核对退款' : '批量账单按用量结算'),
+      );
       setBatchResults(result.results);
       if (result.failed === 0) {
         toast.success(`已核对 ${result.resolved} 条账单`);
         setSelected([]);
-        setBatchReason('');
       } else {
         toast.error(`已核对 ${result.resolved} 条，${result.failed} 条失败（见下方明细）`);
       }
@@ -296,8 +287,6 @@ export function AdminBillingOrdersPage() {
         count={selected.length}
         action={action}
         onActionChange={setAction}
-        reason={batchReason}
-        onReasonChange={setBatchReason}
         busy={batchBusy}
         results={batchResults}
         onClose={() => setBatchOpen(false)}
@@ -310,8 +299,6 @@ export function AdminBillingOrdersPage() {
         resolvable={resolvable}
         action={action}
         onActionChange={setAction}
-        reason={reason}
-        onReasonChange={setReason}
         resolving={resolving}
         onClose={requestCloseDetail}
         onResolve={() => void runResolve()}

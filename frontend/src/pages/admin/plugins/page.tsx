@@ -3,6 +3,7 @@ import { RefreshCw, Upload } from 'lucide-react';
 import { adminPluginsApi, adminProviderCatalogApi } from './api';
 import { ActionButton, Notice, PageHeader, Panel, SkeletonBody, StaleError } from './components';
 import { useAdmin, useAdminResource, useToast } from './hooks';
+import { auditReason } from '../../../admin-ui/lib/auditReason';
 import { PluginStats } from './PluginStats';
 import { PluginTable } from './PluginTable';
 import { CatalogTable } from './CatalogTable';
@@ -44,11 +45,8 @@ export function AdminPluginsPage() {
 
   const [detail, setDetail] = useState<PluginView | null>(null);
   const [toggleTarget, setToggleTarget] = useState<PluginView | null>(null);
-  const [toggleReason, setToggleReason] = useState('');
   const [installTarget, setInstallTarget] = useState<File | null>(null);
   const [uninstallTarget, setUninstallTarget] = useState<PluginView | null>(null);
-  /** 装卸共用：操作原因只进审计 */
-  const [actionReason, setActionReason] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -62,13 +60,12 @@ export function AdminPluginsPage() {
       const next = await adminPluginsApi.setEnabled(
         toggleTarget.id,
         !toggleTarget.enabled,
-        toggleReason.trim() || undefined,
+        auditReason(toggleTarget.enabled ? '停用插件' : '启用插件'),
       );
       toast.success(
         `插件「${next.name}」已${next.enabled ? '启用' : '停用'}，协议注册表已刷新（当前生效 ${next.activeProtocols} 个协议）`,
       );
       setToggleTarget(null);
-      setToggleReason('');
       await reload({ silent: true });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '操作失败');
@@ -99,10 +96,12 @@ export function AdminPluginsPage() {
     if (!installTarget) return;
     setBusy('install');
     try {
-      const next = await adminPluginsApi.install(installTarget, actionReason.trim() || undefined);
+      const next = await adminPluginsApi.install(
+        installTarget,
+        auditReason('安装插件'),
+      );
       toast.success(`插件「${next.name}」已安装（v${next.version}，默认启用）`);
       setInstallTarget(null);
-      setActionReason('');
       await reload({ silent: true });
       catalog.reload({ silent: true });
     } catch (e) {
@@ -116,10 +115,9 @@ export function AdminPluginsPage() {
     if (!uninstallTarget) return;
     setBusy(uninstallTarget.id);
     try {
-      await adminPluginsApi.uninstall(uninstallTarget.id, actionReason.trim() || undefined);
+      await adminPluginsApi.uninstall(uninstallTarget.id, auditReason('卸载插件'));
       toast.success(`插件「${uninstallTarget.name}」已卸载，协议注册表已刷新`);
       setUninstallTarget(null);
-      setActionReason('');
       await reload({ silent: true });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '卸载失败');
@@ -190,7 +188,6 @@ export function AdminPluginsPage() {
                 // 同一文件连续选择两次时清空，否则第二次不会触发 change
                 event.target.value = '';
                 if (!file) return;
-                setActionReason('');
                 setInstallTarget(file);
               }}
             />
@@ -228,11 +225,9 @@ export function AdminPluginsPage() {
               onDetail={setDetail}
               onVerify={(row) => void runVerify(row)}
               onToggle={(row) => {
-                setToggleReason('');
                 setToggleTarget(row);
               }}
               onUninstall={(row) => {
-                setActionReason('');
                 setUninstallTarget(row);
               }}
               onRetry={() => void reload()}
@@ -284,27 +279,21 @@ export function AdminPluginsPage() {
 
       <TogglePluginConfirm
         target={toggleTarget}
-        reason={toggleReason}
         loading={busy !== null}
-        onReasonChange={setToggleReason}
         onCancel={() => setToggleTarget(null)}
         onConfirm={() => void runToggle()}
       />
 
       <InstallPluginConfirm
         file={installTarget}
-        reason={actionReason}
         loading={busy === 'install'}
-        onReasonChange={setActionReason}
         onCancel={() => setInstallTarget(null)}
         onConfirm={() => void runInstall()}
       />
 
       <UninstallPluginConfirm
         target={uninstallTarget}
-        reason={actionReason}
         loading={busy === uninstallTarget?.id}
-        onReasonChange={setActionReason}
         onCancel={() => setUninstallTarget(null)}
         onConfirm={() => void runUninstall()}
       />

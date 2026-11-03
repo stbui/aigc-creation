@@ -21,6 +21,7 @@ import {
   type AppliedFilter,
 } from './components';
 import { adminOrdersApi } from './api';
+import { auditReason } from '../../../admin-ui/lib/auditReason';
 import { useAdmin, useAdminDetailParam, useAdminList, useAdminUrlFilterSync, useToast } from './hooks';
 import { adminOrderDetailHref, adminUserDetailHref, yuan, yuanToCents } from './utils';
 import {
@@ -45,8 +46,7 @@ import type { AdminOrderListResult, AdminOrderRow, BatchSummary } from '../../..
  * ## 核销与退款都是「钱的动作」
  *
  * 核销造一条 channel=manual 的支付流水 (交易号带管理员 id), 退款写 Refund 记录
- * 并回收积分。两者都进操作审计, 原因必填 —— 事后必须能回答「谁在什么时候、
- * 凭什么把这一单标成已付/退掉」。
+ * 并回收积分。两者都进操作审计，审计原因由系统按操作上下文生成。
  *
  * ## 模块划分
  *
@@ -93,7 +93,6 @@ export function AdminOrdersPage() {
   );
   /** 退款金额（元）。打开弹窗时预填可退上限 */
   const [refundYuan, setRefundYuan] = useState('');
-  const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
 
@@ -297,18 +296,12 @@ export function AdminOrdersPage() {
 
   const openAction = (kind: 'markPaid' | 'refund', row: AdminOrderRow) => {
     setAction({ kind, row });
-    setReason('');
     // 默认退款金额 = 可退上限 (实付 - 已退)。部分退款时运营只需改小
     setRefundYuan(kind === 'refund' ? yuan(Math.max(row.paidCents - row.refundedCents, 0)) : '');
   };
 
   const runAction = async () => {
     if (!action) return;
-    const trimmed = reason.trim();
-    if (!trimmed) {
-      toast.warning('请填写操作原因，它会写入操作审计');
-      return;
-    }
     setBusy(true);
     try {
       if (action.kind === 'markPaid') {
@@ -323,7 +316,7 @@ export function AdminOrdersPage() {
           setBusy(false);
           return;
         }
-        const r = await adminOrdersApi.refund(action.row.id, cents, trimmed);
+        const r = await adminOrdersApi.refund(action.row.id, cents, auditReason('退款订单'));
         /*
          * 渠道异步处理中 (微信可能返回 PROCESSING): 钱还没到账、积分也没回收,
          * 不能显示「已退款」。如实提示需要到渠道后台确认 —— 这是本仓库没有
@@ -375,15 +368,10 @@ export function AdminOrdersPage() {
   };
 
   const runBatchMarkPaid = async () => {
-    const trimmed = reason.trim();
-    if (!trimmed) {
-      toast.warning('请填写操作原因，它会写入操作审计');
-      return;
-    }
     if (selected.length === 0) return;
     setBusy(true);
     try {
-      const summary = await adminOrdersApi.batchMarkPaid(selected, trimmed);
+      const summary = await adminOrdersApi.batchMarkPaid(selected, auditReason('批量核销订单'));
       setBatchSummary(summary);
       setBatchOpen(false);
       setSelected([]);
@@ -766,20 +754,6 @@ export function AdminOrdersPage() {
                   />
                 </div>
               )}
-              <div className="flex flex-col gap-1.5">
-                <span className="text-xs text-muted-foreground">操作原因（强制，写入审计）：</span>
-                <TextField
-                  ariaLabel="操作原因"
-                  value={reason}
-                  onChange={setReason}
-                  placeholder={
-                    action.kind === 'markPaid'
-                      ? '如：用户线下转账，财务已确认到账'
-                      : '如：用户申请退款，商品未使用'
-                  }
-                  maxLength={200}
-                />
-              </div>
             </>
           }
         />
@@ -791,10 +765,7 @@ export function AdminOrdersPage() {
           title={`批量核销 ${selected.length} 笔订单`}
           confirmText="确认已收款"
           loading={busy}
-          onCancel={() => {
-            setBatchOpen(false);
-            setReason('');
-          }}
+          onCancel={() => setBatchOpen(false)}
           onConfirm={() => void runBatchMarkPaid()}
           description={
             <>
@@ -810,20 +781,8 @@ export function AdminOrdersPage() {
             `共 ${selected.length} 笔订单`,
             '每笔会生成一条手工核销流水',
             '发放对应的积分或会员权益',
-            '写操作审计（含操作人与原因）',
+            '写操作审计（含操作人）',
           ]}
-          extra={
-            <div className="flex flex-col gap-1.5">
-              <span className="text-xs text-muted-foreground">操作原因（强制，写入审计）：</span>
-              <TextField
-                ariaLabel="批量核销原因"
-                value={reason}
-                onChange={setReason}
-                placeholder="如：对公转账已到账，财务批量核销"
-                maxLength={200}
-              />
-            </div>
-          }
         />
       )}
 

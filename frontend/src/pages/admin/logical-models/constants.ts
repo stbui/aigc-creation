@@ -54,7 +54,6 @@ export interface ModelDraft {
   capabilitySpecText: string;
   defaultOptionsText: string;
   routes: RouteDraft[];
-  reason: string;
 }
 
 export const EMPTY_DRAFT: ModelDraft = {
@@ -74,7 +73,6 @@ export const EMPTY_DRAFT: ModelDraft = {
   capabilitySpecText: '',
   defaultOptionsText: '{}',
   routes: [],
-  reason: '',
 };
 
 /** 能力合同里预置的示例，只在新建时作为占位提示，不写入草稿 */

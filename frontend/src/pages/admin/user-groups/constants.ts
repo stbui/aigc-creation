@@ -38,7 +38,6 @@ export interface GroupDraft {
   allChannels: boolean;
   channelIds: string[];
   overrides: OverrideDraft[];
-  reason: string;
 }
 
 export const EMPTY_DRAFT: GroupDraft = {
@@ -54,5 +53,4 @@ export const EMPTY_DRAFT: GroupDraft = {
   allChannels: true,
   channelIds: [],
   overrides: [],
-  reason: '',
 };

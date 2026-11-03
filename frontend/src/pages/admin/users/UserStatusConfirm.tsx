@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { ConfirmAction, FormField, TextField } from './components';
+import { ConfirmAction } from './components';
 import type { AdminUserListResult } from '../../../types/api';
 
 type Row = AdminUserListResult['items'][number];
@@ -7,7 +6,7 @@ type Row = AdminUserListResult['items'][number];
 /**
  * 禁用 / 启用账号的操作条。
  *
- * 禁用会切断在线凭证，原因随请求落审计；启用不具破坏性，原因可留空。
+ * 禁用会切断在线凭证；系统按操作上下文写入审计。
  */
 export function UserStatusConfirm({
   target,
@@ -18,9 +17,8 @@ export function UserStatusConfirm({
   target: Row;
   loading: boolean;
   onCancel: () => void;
-  onConfirm: (next: 'active' | 'disabled', reason: string) => void;
+  onConfirm: (next: 'active' | 'disabled') => void;
 }) {
-  const [reason, setReason] = useState('');
   const next: 'active' | 'disabled' = target.status === 'active' ? 'disabled' : 'active';
 
   return (
@@ -47,19 +45,8 @@ export function UserStatusConfirm({
           ? ['该账号现有登录凭证立即失效', '已发布作品与历史订单不受影响', '写操作审计（含操作人）']
           : ['该账号恢复登录能力', '写操作审计（含操作人）']
       }
-      extra={
-        <FormField label="操作原因（建议填写）">
-          <TextField
-            ariaLabel="操作原因"
-            placeholder="如：违规使用"
-            value={reason}
-            onChange={setReason}
-            maxLength={200}
-          />
-        </FormField>
-      }
       onCancel={onCancel}
-      onConfirm={() => onConfirm(next, reason)}
+      onConfirm={() => onConfirm(next)}
     />
   );
 }

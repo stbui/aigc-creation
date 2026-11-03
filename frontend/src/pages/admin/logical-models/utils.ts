@@ -36,6 +36,5 @@ export function toDraft(model: AdminLogicalModelView): ModelDraft {
     capabilitySpecText: JSON.stringify(model.capabilitySpec ?? {}, null, 2),
     defaultOptionsText: JSON.stringify(model.defaultOptions ?? {}, null, 2),
     routes: model.routes.map(routeToDraft),
-    reason: '',
   };
 }

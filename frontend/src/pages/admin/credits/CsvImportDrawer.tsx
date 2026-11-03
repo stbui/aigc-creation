@@ -15,6 +15,7 @@ import {
 import { IMPORT_PAGE_SIZE } from './constants';
 import { adminCreditsApi } from './api';
 import { useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
+import { auditReason } from '../../../admin-ui/lib/auditReason';
 import { signed } from './utils';
 import type { CreditImportResult } from '../../../types/api';
 
@@ -29,7 +30,7 @@ import type { CreditImportResult } from '../../../types/api';
  *
  * ## 格式
  *
- * 首行可以是表头（`email,delta,reason` / `邮箱,变动量,原因`）, 也可以是
+ * 首行可以是表头（`email,delta` / `邮箱,变动量`）, 也可以是
  * 直接的数据行 —— 两种在 Excel 另存为 CSV 的场景里都很常见, 后端两种都认。
  * 逗号分隔、UTF-8（Excel 中文版另存的 CSV 常带 BOM, 后端会剥掉）。
  */
@@ -44,19 +45,17 @@ export function CsvImportDrawer({
 }) {
   const toast = useToast();
   const [file, setFile] = useState<File | null>(null);
-  const [reason, setReason] = useState('');
   const [validDays, setValidDays] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<CreditImportResult | null>(null);
   const [importPage, setImportPage] = useState(1);
-  const dirty = !result && Boolean(file || reason.trim() || validDays.trim());
+  const dirty = !result && Boolean(file || validDays.trim());
   useUnsavedGuard(open && dirty);
 
   /** 关闭时清空: 下次打开不该看到上次选的文件 */
   const close = () => {
     if (busy) return;
     setFile(null);
-    setReason('');
     setValidDays('');
     setResult(null);
     setImportPage(1);
@@ -65,7 +64,6 @@ export function CsvImportDrawer({
   const requestClose = useDiscardConfirm(open && dirty, close);
   const done = () => {
     setFile(null);
-    setReason('');
     setValidDays('');
     setResult(null);
     setImportPage(1);
@@ -96,7 +94,7 @@ export function CsvImportDrawer({
     setBusy(true);
     try {
       const r = await adminCreditsApi.importCsv(file, {
-        reason: reason.trim() || undefined,
+        reason: auditReason('CSV 导入用户积分'),
         validDays: days,
       });
       setResult(r);
@@ -215,7 +213,7 @@ export function CsvImportDrawer({
         <div className="flex flex-col gap-4">
           <FormField
             label="CSV 文件"
-            hint="每行 邮箱,变动量[,原因]，首行可带表头；单次最多 500 行。正数增加、负数扣减。"
+            hint="每行 邮箱,变动量，首行可带表头；单次最多 500 行。正数增加、负数扣减。"
           >
             <FilePicker
               file={file}
@@ -223,16 +221,6 @@ export function CsvImportDrawer({
               label="选择 CSV"
               onPick={setFile}
               onClear={() => setFile(null)}
-            />
-          </FormField>
-
-          <FormField label="整批原因" hint="会写入每一条的审计记录">
-            <TextField
-              value={reason}
-              onChange={setReason}
-              placeholder="如：2026-10 故障补偿（行内未填原因时使用该文案）"
-              maxLength={200}
-              ariaLabel="整批原因"
             />
           </FormField>
 

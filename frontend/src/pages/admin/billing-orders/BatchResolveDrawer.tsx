@@ -1,12 +1,10 @@
-import { ActionButton, Drawer, Notice, TextAreaField } from './components';
+import { ActionButton, Drawer, Notice } from './components';
 
 interface BatchResolveDrawerProps {
   open: boolean;
   count: number;
   action: 'settle' | 'refund';
   onActionChange: (action: 'settle' | 'refund') => void;
-  reason: string;
-  onReasonChange: (reason: string) => void;
   busy: boolean;
   results: Array<{ id: string; ok: boolean; error?: string }> | null;
   onClose: () => void;
@@ -21,8 +19,6 @@ export function BatchResolveDrawer({
   count,
   action,
   onActionChange,
-  reason,
-  onReasonChange,
   busy,
   results,
   onClose,
@@ -45,7 +41,7 @@ export function BatchResolveDrawer({
           <ActionButton
             variant="default"
             size="sm"
-            disabled={busy || !reason.trim() || count === 0}
+            disabled={busy || count === 0}
             onClick={onConfirm}
           >
             {busy ? '处理中…' : action === 'refund' ? '确认批量退款' : '确认批量结算'}
@@ -70,13 +66,6 @@ export function BatchResolveDrawer({
             全额退款
           </ActionButton>
         </div>
-        <TextAreaField
-          ariaLabel="批量核对依据"
-          value={reason}
-          onChange={onReasonChange}
-          rows={3}
-          placeholder="写明为什么这样处置；会写入审计与账单备注"
-        />
         {results && (
           <Notice tone={results.some((item) => !item.ok) ? 'warn' : 'info'} title="处理结果">
             <ul className="flex flex-col gap-1 text-xs">

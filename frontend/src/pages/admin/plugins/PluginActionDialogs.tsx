@@ -1,24 +1,20 @@
-import { ConfirmAction, FormField, TextField } from './components';
+import { ConfirmAction } from './components';
 import type { PluginView } from '../../../types/model';
 
 /**
  * 插件的三个写操作确认：启停、上传安装、卸载。
  *
- * 操作原因只进审计；启停与卸载都会立即影响协议注册表，因此确认框里
+ * 审计原因由页面按操作上下文生成；启停与卸载都会立即影响协议注册表，因此确认框里
  * 直接列出影响面，而不是等用户点完再看后端报错。
  */
 export function TogglePluginConfirm({
   target,
-  reason,
   loading,
-  onReasonChange,
   onCancel,
   onConfirm,
 }: {
   target: PluginView | null;
-  reason: string;
   loading: boolean;
-  onReasonChange: (value: string) => void;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
@@ -39,32 +35,18 @@ export function TogglePluginConfirm({
       loading={loading}
       onCancel={onCancel}
       onConfirm={onConfirm}
-      extra={
-        <FormField label="操作原因" hint="写入审计">
-          <TextField
-            ariaLabel="操作原因"
-            value={reason}
-            onChange={onReasonChange}
-            placeholder="如：上游维护，临时停用"
-          />
-        </FormField>
-      }
     />
   );
 }
 
 export function InstallPluginConfirm({
   file,
-  reason,
   loading,
-  onReasonChange,
   onCancel,
   onConfirm,
 }: {
   file: File | null;
-  reason: string;
   loading: boolean;
-  onReasonChange: (value: string) => void;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
@@ -81,32 +63,18 @@ export function InstallPluginConfirm({
       loading={loading}
       onCancel={onCancel}
       onConfirm={onConfirm}
-      extra={
-        <FormField label="操作原因" hint="写入审计">
-          <TextField
-            ariaLabel="安装原因"
-            value={reason}
-            onChange={onReasonChange}
-            placeholder="如：新增 MiniMax 视频厂商"
-          />
-        </FormField>
-      }
     />
   );
 }
 
 export function UninstallPluginConfirm({
   target,
-  reason,
   loading,
-  onReasonChange,
   onCancel,
   onConfirm,
 }: {
   target: PluginView | null;
-  reason: string;
   loading: boolean;
-  onReasonChange: (value: string) => void;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
@@ -124,16 +92,6 @@ export function UninstallPluginConfirm({
       loading={loading}
       onCancel={onCancel}
       onConfirm={onConfirm}
-      extra={
-        <FormField label="操作原因" hint="写入审计">
-          <TextField
-            ariaLabel="卸载原因"
-            value={reason}
-            onChange={onReasonChange}
-            placeholder="如：厂商已下线，改用新插件包"
-          />
-        </FormField>
-      }
     />
   );
 }

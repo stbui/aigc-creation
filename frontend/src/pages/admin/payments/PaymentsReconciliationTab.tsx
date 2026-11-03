@@ -16,7 +16,6 @@ import {
   SelectField,
   StaleError,
   StatusTag,
-  TextAreaField,
   TextField,
   type AdminColumn,
   type AppliedFilter,
@@ -40,6 +39,7 @@ import {
   RECONCILIATION_PROVIDERS,
 } from './constants';
 import { moneyText } from './utils';
+import { auditReason } from '../../../admin-ui/lib/auditReason';
 import { RECONCILIATION_RESULT_LABELS } from '../../../types/payment';
 
 /**
@@ -104,14 +104,12 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
   // 执行区草稿
   const [runProvider, setRunProvider] = useState<string>('');
   const [billDate, setBillDate] = useState(yesterday());
-  const [runReason, setRunReason] = useState('');
   const [runOpen, setRunOpen] = useState(false);
 
   // CSV / ZIP 兜底导入
   const [importOpen, setImportOpen] = useState(false);
   const [importProvider, setImportProvider] = useState<string>('');
   const [importBillDate, setImportBillDate] = useState<string>(yesterday());
-  const [importReason, setImportReason] = useState('');
   const [importFile, setImportFile] = useState<File | null>(null);
 
   // 列表筛选草稿
@@ -316,10 +314,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
             />
           </FormField>
           <ActionButton
-            onClick={() => {
-              setRunReason('');
-              setRunOpen(true);
-            }}
+            onClick={() => setRunOpen(true)}
             disabled={!canReconcile || !runProvider}
           >
             执行对账
@@ -328,7 +323,6 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
             onClick={() => {
               setImportProvider(reconcilableProviders[0]?.value ?? '');
               setImportBillDate(yesterday());
-              setImportReason('');
               setImportFile(null);
               setImportOpen(true);
             }}
@@ -450,7 +444,6 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
           '同一账单日重复执行会新增一次运行记录',
         ]}
         confirmText="确认执行"
-        confirmDisabled={runReason.trim().length < 2}
         loading={busy}
         onCancel={() => setRunOpen(false)}
         onConfirm={async () => {
@@ -459,7 +452,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
             const result = await adminPaymentReconciliationApi.run({
               providerId: runProvider as PaymentProviderId,
               billDate,
-              reason: runReason.trim(),
+              reason: auditReason('执行支付对账'),
             });
             toast.success(
               result.reused ? '该账单日已有一次成功的运行记录，已复用' : '对账已执行完成',
@@ -472,17 +465,6 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
             setBusy(false);
           }
         }}
-        extra={
-          <FormField label="执行原因" required hint="原因会写入操作审计。">
-            <TextAreaField
-              value={runReason}
-              onChange={setRunReason}
-              maxLength={200}
-              placeholder="例如：昨日自动对账失败，手工重跑"
-              ariaLabel="执行原因"
-            />
-          </FormField>
-        }
       />
 
       <ConfirmAction
@@ -491,12 +473,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
         description="渠道账单接口不可用时的兜底入口。导入后仍会逐笔核对，不一致的行进入差异列表。"
         impact={['按商户订单号与本地订单比对', '支付宝支持 ZIP 内的 CSV', '超过 10000 行会拒绝导出']}
         confirmText="确认导入"
-        confirmDisabled={
-          !importFile ||
-          !importProvider ||
-          !importBillDate ||
-          importReason.trim().length < 2
-        }
+        confirmDisabled={!importFile || !importProvider || !importBillDate}
         loading={busy}
         onCancel={() => setImportOpen(false)}
         onConfirm={async () => {
@@ -506,7 +483,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
             await adminPaymentReconciliationApi.importCsv(importFile, {
               providerId: importProvider as PaymentProviderId,
               billDate: importBillDate,
-              reason: importReason.trim(),
+              reason: auditReason('导入渠道对账单'),
             });
             toast.success('对账单已导入');
             setImportOpen(false);
@@ -547,15 +524,6 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
                 onChange={(event) => setImportFile(event.target.files?.[0] ?? null)}
                 className="block w-full text-sm text-foreground file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-1.5 file:text-sm file:text-foreground"
                 aria-label="对账单文件"
-              />
-            </FormField>
-            <FormField label="导入原因" required hint="原因会写入操作审计。">
-              <TextAreaField
-                value={importReason}
-                onChange={setImportReason}
-                maxLength={200}
-                placeholder="例如：渠道账单接口不可用，手工下载后导入"
-                ariaLabel="导入原因"
               />
             </FormField>
           </div>

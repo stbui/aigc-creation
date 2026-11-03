@@ -4,8 +4,9 @@ import { fmtTime } from './utils';
 import { useAdmin, useUnsavedGuard, useToast, useAdminResource } from './hooks';
 import { ShieldAlert } from 'lucide-react';
 import { adminRetentionApi } from '../../../lib/api';
+import { auditReason } from '../../../admin-ui/lib/auditReason';
 
-import { ActionButton, AdminDataTable, ConfirmAction, NumberField, Notice, PageHeader, Panel, StatCard, StatusTag, StaleError, TextField, type AdminColumn } from './components';
+import { ActionButton, AdminDataTable, ConfirmAction, NumberField, Notice, PageHeader, Panel, StatCard, StatusTag, StaleError, type AdminColumn } from './components';
 import type { AdminCleanupLog, AdminRetentionTarget } from '../../../types/api';
 
 /**
@@ -45,7 +46,6 @@ export function AdminRetentionPage() {
   const [days, setDays] = useState<Record<string, number>>({});
   const [daysBase, setDaysBase] = useState<Record<string, number>>({});
   const [pending, setPending] = useState<AdminRetentionTarget | null>(null);
-  const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [previewingTable, setPreviewingTable] = useState<string | null>(null);
 
@@ -74,7 +74,6 @@ export function AdminRetentionPage() {
     setPreviewingTable(t.table);
     try {
       const preview = await adminRetentionApi.preview(t.table, keep);
-      setReason('');
       setPending(preview);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '读取清理影响范围失败');
@@ -85,15 +84,14 @@ export function AdminRetentionPage() {
 
   const runCleanup = async () => {
     if (!pending) return;
-    const trimmed = reason.trim();
-    if (trimmed.length < 2) {
-      toast.warning('请至少填写 2 个字符的清理原因，它会写入操作审计');
-      return;
-    }
     const keep = days[pending.table] ?? pending.retentionDays;
     setBusy(true);
     try {
-      const r = await adminRetentionApi.cleanup(pending.table, keep, trimmed);
+      const r = await adminRetentionApi.cleanup(
+        pending.table,
+        keep,
+        auditReason('清理过期后台数据'),
+      );
       toast.success(`已清理 ${r.deleted} 条（保留 ${keep} 天）`);
       setPending(null);
       void reload({ silent: true });
@@ -317,18 +315,6 @@ export function AdminRetentionPage() {
             `按 ${pending.retentionDays} 天估算将删除 ${pending.expiring} 条`,
             '写入清理日志与操作审计',
           ]}
-          extra={
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs text-muted-foreground">清理原因（强制，写入审计）：</label>
-              <TextField
-                ariaLabel="清理原因"
-                value={reason}
-                onChange={setReason}
-                placeholder="如：季度合规清理"
-                maxLength={200}
-              />
-            </div>
-          }
         />
       )}
 

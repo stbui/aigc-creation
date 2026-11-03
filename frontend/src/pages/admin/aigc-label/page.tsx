@@ -18,6 +18,7 @@ import { PreviewPanel } from './PreviewPanel';
 import { PositionPanel } from './PositionPanel';
 import { CurrentBadgePanel } from './CurrentBadgePanel';
 import { SaveLabelConfirm } from './SaveLabelConfirm';
+import { auditReason } from '../../../admin-ui/lib/auditReason';
 import type { AigcLabelSpec } from '../../../types/api';
 
 /**
@@ -50,7 +51,6 @@ export function AdminAigcLabelPage() {
   const [spec, setSpec] = useState<AigcLabelSpec | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [reason, setReason] = useState('');
 
   /*
    * 只在还没有草稿时从服务端快照播种 (spec 一旦存在就不再覆盖)：
@@ -97,11 +97,6 @@ export function AdminAigcLabelPage() {
 
   const save = async () => {
     if (!spec) return;
-    const text = reason.trim();
-    if (!text) {
-      toast.warning('请填写变更原因（写入审计日志）');
-      return;
-    }
     setBusy(true);
     try {
       const badge = renderBadgeCanvas(spec);
@@ -110,10 +105,9 @@ export function AdminAigcLabelPage() {
       const next = await adminAigcLabelApi.update({
         spec,
         badgePngBase64: base64,
-        reason: text,
+        reason: auditReason('保存 AI 标识样式'),
       });
       setSpec(next.spec);
-      setReason('');
       setConfirming(false);
       // 服务端返回的就是最新快照，静默重取一次让 dirty 基线跟上，不闪骨架屏
       void reload({ silent: true });
@@ -231,13 +225,8 @@ export function AdminAigcLabelPage() {
         open={confirming}
         current={data.spec}
         next={spec}
-        reason={reason}
         busy={busy}
-        onReasonChange={setReason}
-        onCancel={() => {
-          setConfirming(false);
-          setReason('');
-        }}
+        onCancel={() => setConfirming(false)}
         onConfirm={() => void save()}
       />
     </>

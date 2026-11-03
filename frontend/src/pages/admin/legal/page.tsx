@@ -4,6 +4,7 @@ import { fmt } from './utils';
 import { useAdminResource, useAdmin, useDiscardConfirm, useUnsavedGuard, useToast } from './hooks';
 import { ActionButton, AdminDataTable, ConfirmAction, Drawer, FilterActions, FilterBar, FormField, ModalDialog, PageHeader, Panel, SelectField, StatusTag, StaleError, TextAreaField, TextField, type AdminColumn } from './components';
 import { adminLegalApi } from '../../../lib/api';
+import { auditReason } from '../../../admin-ui/lib/auditReason';
 
 import type { AdminLegalDoc, LegalSlug, LegalStatus } from '../../../types/api';
 
@@ -28,7 +29,7 @@ interface FormState {
  * 版本化的三条硬约束不能因为换界面而松动：
  *   1. 已发布的版本不可原地覆盖 —— 编辑只对草稿与归档版本开放；
  *   2. 保存只建草稿，发布走独立接口（它负责归档同文档的旧版本）；
- *   3. 发布是高危动作，必须填原因并写审计。
+ *   3. 发布是高危动作，系统自动记录操作上下文并写审计。
  *
  * 渲染层：读原文预览用 `ModalDialog`，编辑表单用 `Drawer` 原语（带固定操作区，
  * 长正文滚动时按钮不跑），未保存拦截与关闭确认沿用同一套 hook。
@@ -48,8 +49,6 @@ export function AdminLegalPage() {
   const [formBase, setFormBase] = useState<FormState | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [publishTarget, setPublishTarget] = useState<AdminLegalDoc | null>(null);
-  // 发布属高危动作（全站法律文本立即变更），必须填写原因并写入审计
-  const [publishReason, setPublishReason] = useState('');
 
   /*
    * 筛选条件是唯一的请求变量 —— 交给 useAdminResource 的依赖数组,
@@ -122,16 +121,15 @@ export function AdminLegalPage() {
 
   const doPublish = async () => {
     if (!publishTarget) return;
-    if (!publishReason.trim()) {
-      toast.warning('请填写发布原因（写入审计日志）');
-      return;
-    }
     setBusy(true);
     try {
-      await adminLegalApi.publish(publishTarget.slug, publishTarget.version, publishReason.trim());
+      await adminLegalApi.publish(
+        publishTarget.slug,
+        publishTarget.version,
+        auditReason('发布法务文档版本'),
+      );
       toast.success(`版本 ${publishTarget.version} 已发布，同文档的旧版本已归档`);
       setPublishTarget(null);
-      setPublishReason('');
       await reload();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '发布失败');
@@ -191,10 +189,7 @@ export function AdminLegalPage() {
             <ActionButton
               variant="ghost"
               size="sm"
-              onClick={() => {
-                setPublishReason('');
-                setPublishTarget(row);
-              }}
+              onClick={() => setPublishTarget(row)}
             >
               发布
             </ActionButton>
@@ -376,18 +371,6 @@ export function AdminLegalPage() {
         }
         confirmText="发布"
         loading={busy}
-        extra={
-          <FormField label="操作原因（必填，写入审计）">
-            <TextAreaField
-              ariaLabel="操作原因"
-              rows={2}
-              maxLength={200}
-              value={publishReason}
-              placeholder="如：V2 补充未成年人保护条款，法务 2026-10-21 定稿"
-              onChange={setPublishReason}
-            />
-          </FormField>
-        }
         onConfirm={() => void doPublish()}
         onCancel={() => setPublishTarget(null)}
       />
