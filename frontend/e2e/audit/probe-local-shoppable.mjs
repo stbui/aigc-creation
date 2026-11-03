@@ -22,7 +22,9 @@ const page = await context.newPage();
 
 const dump = await (async () => {
   await page.goto(LOCAL, { waitUntil: 'domcontentloaded', timeout: 60000 });
-  await page.waitForSelector('.sc-template-card', { timeout: 60000 });
+  // 用 attached 而非 visible: 卡片在滚动区内, Playwright 的 visible 判定
+  // 会因祖先的 mask 渐隐而误判不可见。
+  await page.waitForSelector('.sc-template-card', { state: 'attached', timeout: 60000 });
   await page.waitForTimeout(2500);
 
   return page.evaluate(() => {

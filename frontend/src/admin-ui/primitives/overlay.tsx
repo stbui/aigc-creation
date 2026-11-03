@@ -66,12 +66,14 @@ export function ModalDialog({
       <DialogContent
         data-testid="admin-modal"
         style={{ maxWidth: width }}
-        className="max-h-[calc(100vh-48px)] gap-0 overflow-hidden p-0"
+        className="admin-portal max-h-[calc(100vh-48px)] gap-0 overflow-hidden p-0"
       >
-        <DialogHeader className="border-b border-border px-5 py-3.5 pr-12">
-          <DialogTitle className="truncate text-base">{title}</DialogTitle>
+        <DialogHeader className="border-b border-border px-5 py-3.5">
+          <DialogTitle className="truncate pr-12 text-base">{title}</DialogTitle>
           {description && (
-            <DialogDescription className="text-xs">{description}</DialogDescription>
+            <DialogDescription className="text-pretty text-xs leading-5">
+              {description}
+            </DialogDescription>
           )}
         </DialogHeader>
 
@@ -112,11 +114,13 @@ export function Drawer({
         data-testid="admin-drawer"
         side="right"
         style={{ width, maxWidth: '100vw' }}
-        className="flex w-full flex-col gap-0 p-0 sm:max-w-none"
+        className="admin-portal flex w-full flex-col gap-0 p-0 sm:max-w-none"
       >
-        <SheetHeader className="border-b border-border px-5 py-4 pr-12">
-          <SheetTitle className="truncate text-base">{title}</SheetTitle>
-          {description && <p className="truncate text-xs text-muted-foreground">{description}</p>}
+        <SheetHeader className="border-b border-border px-5 py-4">
+          <SheetTitle className="truncate pr-12 text-base">{title}</SheetTitle>
+          {description && (
+            <p className="text-pretty text-xs leading-5 text-muted-foreground">{description}</p>
+          )}
         </SheetHeader>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
@@ -293,7 +297,7 @@ export function RowMenu({ items, label = '更多' }: { items: RowMenuItem[]; lab
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="w-40"
+        className="admin-portal w-40"
         aria-label="更多操作"
         aria-labelledby={undefined}
       >

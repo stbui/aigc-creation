@@ -9,7 +9,42 @@
 
 import type { CapabilityPlugin } from '../capability-plugin.type';
 import { generateImageIntent } from '../model-mapping';
-import { LANGUAGES, PLATFORMS, QUALITY_OPTIONS, RATIOS, languageText, platformSpecText, ratioText, sizeText } from './param-options';
+import {
+  LANGUAGES,
+  PLATFORMS,
+  QUALITY_OPTIONS,
+  RATIOS,
+  languageText,
+  platformSpecText,
+  ratioText,
+  sizeText,
+  subjectText,
+} from './param-options';
+
+function text(value: unknown): string {
+  return String(value ?? '').trim();
+}
+
+/** 参考图永远是最后一张；它前面的图片才是商品素材。 */
+function inputRoleText(refCount: number): string {
+  if (refCount < 2) return '上传图片中，商品素材用于锁定商品身份，最后一张爆款图只用于复刻画面。';
+  if (refCount === 2) return '共上传 2 张图：第 1 张为商品素材，最后 1 张为爆款参考图。';
+  const productCount = refCount - 1;
+  return `共上传 ${refCount} 张图：第 1-${productCount} 张为商品素材，最后 1 张为爆款参考图。`;
+}
+
+/**
+ * 两档不能只靠「偏重」区分。
+ *
+ * 高度复刻要尽量锁住参考图的几何关系；参考风格则允许重建场景，
+ * 否则两个选项最终会得到几乎相同的提示词，用户无法感知差异。
+ */
+function degreeText(degree: unknown): string {
+  if (degree === 'reference_style') {
+    return '参考风格：提取参考图的版式语言（构图节奏、镜头角度、主体占比、配色、光影与氛围）重建同风格场景；允许调整背景和道具，但商品卖点与画面层级必须一致。';
+  }
+  return '高度复刻参考图：保持构图、透视、主体位置与占比、背景、道具、光影、色调和文案留白区不变，只替换商品并修复遮挡；除商品相关细节外，场景尽量接近参考图。';
+}
 
 export const HotRemake: CapabilityPlugin = {
   id: 'hot_remake',
@@ -45,10 +80,20 @@ export const HotRemake: CapabilityPlugin = {
     { key: 'ratio', label: '画面比例', type: 'enum', default: '1:1', options: RATIOS },
     { key: 'size', label: '画质（输出边长）', type: 'enum', default: '1k', options: QUALITY_OPTIONS },
   ],
-  buildPrompt: (p) =>
-    `爆款风格复刻：参考上传的爆款图的构图、配色与氛围，替换主体为上传的商品，保持整体风格一致。` +
-    `${p.degree === 'reference_style' ? '偏重保留参考图版式' : '偏重高度还原参考图'}${ratioText(p.ratio)}${sizeText(p.size)}` +
-    `${platformSpecText(p)}${languageText(p.language)}`,
+  buildPrompt: (p, refCount = 0) => {
+    const requirement = text(p.requirement);
+    const subject = subjectText({ productName: text(p.productName), brand: text(p.brand) });
+    return (
+      `爆款复刻任务。${inputRoleText(refCount)}` +
+      `以商品素材为准，严格保持${subject}的轮廓、颜色、材质、纹理、图案、结构、数量和可见配件；` +
+      `多张商品图之间以最清晰完整的细节为准。除非用户复刻要求明确指定，否则不把参考图中的商品、品牌或价格信息带入结果。` +
+      `${degreeText(p.degree)}最终将主体替换为上传商品，保留参考图的主要留白和文案安全区；` +
+      `画面真实、干净、完整，商品边缘自然、接触阴影与场景光影一致，保持商业摄影级清晰度；` +
+      `无变形、无重复主体、无错字、无平台界面、无水印。` +
+      `${requirement ? `用户复刻要求（优先逐条执行）：${requirement}。` : ''}` +
+      `${ratioText(p.ratio)}${sizeText(p.size)}${platformSpecText(p)}${languageText(p.language)}`
+    );
+  },
   modality: 'image',
   model: { capability: 'image', operation: 'text_to_image', intent: generateImageIntent },
   inputs: 2,

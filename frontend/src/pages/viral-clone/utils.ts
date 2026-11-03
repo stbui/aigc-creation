@@ -28,3 +28,22 @@ export function degreeCaption(params: Record<string, unknown>): string | undefin
   const v = params?.degree;
   return typeof v === 'string' ? (DEGREE_LABEL[v] ?? v) : undefined;
 }
+
+
+/**
+ * 拆出爆款复刻任务的商品图与参考图。
+ *
+ * 提交顺序由后端保留为 `[商品图..., 参考图]`；历史任务若只拿到一张图，
+ * 无法可靠判断它是哪一端，按商品图展示，避免把商品误标成参考图。
+ */
+export function splitCloneInputs(inputUrls: string[] | undefined): {
+  productUrls: string[];
+  referenceUrl: string | null;
+} {
+  const urls = (inputUrls ?? []).filter(Boolean);
+  if (urls.length < 2) return { productUrls: urls, referenceUrl: null };
+  return {
+    productUrls: urls.slice(0, -1),
+    referenceUrl: urls[urls.length - 1] ?? null,
+  };
+}

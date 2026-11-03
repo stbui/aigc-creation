@@ -260,7 +260,8 @@ export function ShoppableCarouselConfig({
       {/* ── 5. 附加功能 ── */}
         <div className="pk-section">
           <strong className="pk-section-title">附加功能</strong>
-          <div className="sc-toggle-row">
+          {/* 参考站「附加功能」是**普通行**（无灰底块），只有「图片不加文字」带灰底 */}
+          <div className="sc-toggle-row sc-toggle-row-plain">
             <span className="sc-toggle-label">社媒帖子发布文案</span>
             <Switch checked={socialCaption} onChange={onSocialCaptionChange} aria-label="社媒帖子发布文案" />
           </div>

@@ -216,9 +216,11 @@ export function DetailSection({
       data-testid="admin-detail-section"
       className={cn('border-t border-border pt-3 first:border-t-0 first:pt-0', className)}
     >
-      <div className="mb-2 flex items-baseline gap-2">
+      <div className="mb-2 flex flex-wrap items-baseline gap-x-2 gap-y-1">
         <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-        {note && <span className="text-[12px] text-muted-foreground">{note}</span>}
+        {note && (
+          <span className="min-w-0 text-[12px] break-words text-muted-foreground">{note}</span>
+        )}
       </div>
       {children}
     </section>

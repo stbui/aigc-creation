@@ -212,7 +212,7 @@ export function TaskDetailDrawer({
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <StatusTag status={d.status} />
-                    <code className="rounded bg-card px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+                    <code className="rounded bg-card px-1.5 py-0.5 font-mono text-[12px] text-muted-foreground">
                       {d.capability}
                     </code>
                   </div>
@@ -241,7 +241,7 @@ export function TaskDetailDrawer({
               </div>
 
               <div className="mt-3 flex min-w-0 items-start gap-2 rounded-md border border-border bg-card px-3 py-2">
-                <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
+                <span className="shrink-0 text-[12px] font-medium text-muted-foreground">
                   任务 ID
                 </span>
                 <code className="min-w-0 break-all font-mono text-[12px] text-foreground">
@@ -452,7 +452,7 @@ export function TaskDetailDrawer({
                           loading="lazy"
                         />
                       </Link>
-                      <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                      <div className="mt-1 flex items-center justify-between gap-2 text-[12px] text-muted-foreground">
                         <span>素材 {i + 1}</span>
                         <span className="shrink-0 tabular-nums">
                           {a.width && a.height ? `${a.width}×${a.height}` : '尺寸未知'}
@@ -474,7 +474,7 @@ export function TaskDetailDrawer({
                     size="xs"
                     icon={Copy}
                     ariaLabel="复制生成参数 JSON"
-                    className="h-6 px-2 text-[11px]"
+                    className="h-6 px-2 text-[12px]"
                     onClick={() => void copyText('生成参数', paramsJson)}
                   >
                     复制 JSON

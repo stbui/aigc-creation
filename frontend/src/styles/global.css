@@ -4899,6 +4899,429 @@ img[data-broken='1'] {
   line-height: 20px;
 }
 
+
+/* ── 爆款复刻右侧对照结果 ─────────────────────────────────────────
+ * 每条生成记录固定三格: 商品上传图 → 参考图 → 生成图。
+ * 参考站原版只铺生成图；本页需要解释「商品换进参考场景」的前后关系，
+ * 所以历史也按一次任务一组展示，回看时不用再靠记忆猜输入是哪几张。 */
+.vc-result-body {
+  gap: 12px;
+}
+.vc-result-loading {
+  flex: 1;
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-desc);
+  font-size: 13px;
+}
+.vc-result-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 4px 4px 0;
+  scrollbar-gutter: stable;
+}
+.vc-result-starter {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: linear-gradient(110deg, var(--card-bg), var(--brand-bg));
+}
+.vc-result-starter-copy {
+  min-width: 0;
+}
+.vc-result-starter-copy strong {
+  display: block;
+  color: var(--wb-text);
+  font-size: 13px;
+  line-height: 20px;
+}
+.vc-result-starter-copy p {
+  margin: 2px 0 0;
+  color: var(--text-desc);
+  font-size: 12px;
+  line-height: 18px;
+}
+.vc-result-starter .pk-workflow-steps {
+  flex: none;
+  padding-top: 0;
+}
+.vc-result-row {
+  flex: none;
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--card-bg);
+}
+.vc-result-row.is-current {
+  border-color: var(--brand-light);
+  box-shadow: 0 0 0 2px var(--brand-bg);
+}
+.vc-result-row-head {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.vc-result-row-meta {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  color: var(--text-desc);
+  font-size: 12px;
+}
+.vc-result-row-meta strong {
+  flex: none;
+  color: var(--wb-text);
+  font-size: 13px;
+  line-height: 20px;
+}
+.vc-result-row-meta time {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+.vc-result-state {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-desc);
+  font-size: 11px;
+  line-height: 20px;
+}
+.vc-result-state.is-ready {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+.vc-result-state.is-generating {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+.vc-result-state.is-failed {
+  background: var(--danger-soft-bg);
+  color: var(--danger-soft-text);
+}
+.vc-result-degree {
+  flex: none;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: 11px;
+  line-height: 20px;
+}
+.vc-result-delete {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-desc);
+  cursor: pointer;
+}
+.vc-result-delete:hover {
+  background: var(--danger-soft-bg);
+  color: var(--danger-soft-text);
+}
+.vc-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
+}
+.vc-compare-card {
+  min-width: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.vc-compare-media {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+.vc-compare-card.is-reference .vc-compare-media {
+  border-color: color-mix(in srgb, var(--brand-light) 55%, var(--border-soft));
+  background: var(--brand-bg);
+}
+.vc-compare-card.is-output .vc-compare-media {
+  border-color: color-mix(in srgb, var(--brand) 32%, var(--border-soft));
+  background: var(--brand-bg);
+}
+.vc-compare-open {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+.vc-compare-open img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  transition: transform 0.2s ease;
+}
+.vc-compare-open:hover img {
+  transform: scale(1.025);
+}
+.vc-product-gallery {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  box-sizing: border-box;
+}
+.vc-product-gallery > .vc-compare-open {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border-radius: calc(var(--radius-control) - 2px);
+}
+.vc-product-rail {
+  flex: none;
+  width: 44px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+.vc-product-rail .vc-compare-open {
+  flex: 1 1 0;
+  max-height: 48px;
+  min-height: 0;
+  border-radius: 5px;
+}
+.vc-compare-open-mask {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--card-bg);
+  background: rgba(23, 26, 43, 0.32);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.vc-compare-open:hover .vc-compare-open-mask,
+.vc-compare-open:focus-visible .vc-compare-open-mask {
+  opacity: 1;
+}
+.vc-compare-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  box-sizing: border-box;
+  color: var(--text-desc);
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+}
+.vc-compare-placeholder.is-generating {
+  color: var(--brand);
+  background: linear-gradient(100deg, var(--brand-bg) 20%, var(--card-bg) 40%, var(--brand-bg) 60%);
+  background-size: 200% 100%;
+  animation: fc-result-shimmer 1.4s ease-in-out infinite;
+}
+.vc-compare-placeholder.is-failed {
+  color: var(--danger-soft-text);
+  background: var(--danger-soft-bg);
+}
+.vc-source-count {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 2;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: rgba(23, 26, 43, 0.66);
+  color: var(--card-bg);
+  font-size: 11px;
+  line-height: 18px;
+  pointer-events: none;
+}
+.vc-output-actions {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  z-index: 2;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.vc-compare-media:hover .vc-output-actions,
+.vc-compare-media:focus-within .vc-output-actions {
+  opacity: 1;
+  transform: translateY(0);
+}
+.vc-output-actions button {
+  width: 26px;
+  height: 26px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 7px;
+  background: rgba(23, 26, 43, 0.72);
+  color: var(--card-bg);
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+.vc-output-actions button:hover {
+  background: var(--brand);
+}
+.vc-compare-caption {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+}
+.vc-compare-step {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-body);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 18px;
+}
+.vc-compare-card.is-reference .vc-compare-step {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+.vc-compare-card.is-output .vc-compare-step {
+  background: var(--brand);
+  color: var(--card-bg);
+}
+.vc-compare-caption > span:last-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.vc-compare-caption strong {
+  color: var(--wb-text);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+.vc-compare-caption small {
+  color: var(--text-desc);
+  font-size: 11px;
+  line-height: 16px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vc-result-preview-hint {
+  display: block;
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: right;
+}
+.vc-spin {
+  animation: vc-spin 0.9s linear infinite;
+}
+@keyframes vc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (hover: none) {
+  .vc-output-actions {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .vc-compare-placeholder.is-generating,
+  .vc-spin {
+    animation: none;
+  }
+  .vc-compare-open img,
+  .vc-output-actions {
+    transition: none;
+  }
+}
+@media (max-width: 720px) {
+  .vc-result-starter {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .vc-result-starter .pk-workflow-steps {
+    padding-top: 0;
+  }
+  .vc-compare-grid {
+    gap: 6px;
+  }
+  .vc-result-row {
+    padding: 10px;
+  }
+  .vc-result-row-meta {
+    gap: 6px;
+  }
+  .vc-result-degree {
+    display: none;
+  }
+  .vc-compare-caption small,
+  .vc-result-preview-hint {
+    display: none;
+  }
+  .vc-compare-caption strong {
+    font-size: 11px;
+  }
+  .vc-compare-step {
+    width: 16px;
+    height: 16px;
+    line-height: 16px;
+  }
+}
+
 /* ───────── 自由创作页 (1:1 复刻 ijihua.cn/free-creation, 数值来自实拍 computed styles) ───────── */
 
 /* 窄屏标题头 (桌面 display:none 实拍确认; span 14px/700 #333 lh13 + h1 16px/700 #333 lh22) */
@@ -26719,4 +27142,198 @@ html[data-promo='off'] .sc-workspace {
 }
 .sc-history-template {
   color: var(--text-muted);
+}
+
+/*
+ * 带货图文: 左栏逐项对齐参考站实测 (docs/shoppable-carousel-design.md §3 / §12)。
+ *
+ * 1. 上传区: 参考站拖拽框 364×104 (2px dashed 虚线, 圆角 12), 站点工具页族的
+ *    .pk-dropzone 是 min-height 160 —— 差 56px, 把整栏往下推。
+ * 2. 底栏: 参考站 sidebarFooter 白底 + 上边框 1px #f1f5f9 + 内边距 16px 24px 20px,
+ *    步进按钮 24×24 圆角 6。
+ */
+.sc-sections .pk-dropzone {
+  min-height: 104px;
+  border-width: 2px;
+  border-style: dashed;
+  border-color: var(--border-2);
+  border-radius: var(--radius-card);
+  background: var(--card-bg);
+  padding: 12px;
+}
+.sc-sections .pk-upload-prompt small {
+  font-size: 14px;
+  color: var(--text-desc);
+}
+.sc-form-footer {
+  border-top-color: var(--border-row);
+  padding: 16px 24px 20px;
+}
+.sc-form-footer .pk-number-control button {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--surface-soft);
+  font-size: 18px;
+}
+
+/*
+ * 带货图文: 左栏控件尺寸逐项对齐参考站实测（2026-11-03 第三轮对拍）。
+ *
+ * 参考站实测: 上传拖拽框 364×104、下拉 177×40、底栏 415×125、主按钮 367×46。
+ * 本站工具页族的通用值（拖拽框 160、input 32、按钮 40）偏小/偏大,
+ * 按本页作用域覆盖, 不改其它工具页。
+ */
+/* 上传区: 104 高, 内容居中, 提示 14px */
+.sc-sections .pk-dropzone {
+  min-height: 104px;
+  padding: 8px;
+}
+.sc-sections .pk-upload-prompt {
+  min-height: 0;
+  gap: 6px;
+}
+.sc-sections .pk-upload-prompt span {
+  font-size: 14px;
+}
+/* 生成设置的四组下拉: 高 40 (参考站实测), 底 rgba(0,30,89,.04), 圆角 8 */
+.sc-sections .pk-field [class*='select'] button,
+.sc-sections .pk-field button[role='combobox'] {
+  height: 40px;
+  border-radius: var(--radius-control);
+  background: var(--surface-soft);
+  border-color: transparent;
+  padding: 0 12px;
+}
+/* 底栏: 参考站 415×125, 内边距 16 24 20, 上边框 1px #f1f5f9 */
+.sc-form-footer {
+  min-height: 125px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--border-row);
+}
+/* 主按钮: 参考站 367×46, 近黑底白字, 圆角 8 */
+.sc-form-footer .pk-primary-btn {
+  height: 46px;
+  border-radius: var(--radius-control);
+  background: var(--text-strong);
+  background-image: none;
+  color: var(--card-bg);
+  font-size: 15px;
+  font-weight: 600;
+}
+.sc-form-footer .pk-primary-btn:hover:not(:disabled) {
+  background: #000;
+  background-image: none;
+}
+.sc-form-footer .pk-primary-btn:disabled {
+  background: var(--surface-2);
+  background-image: none;
+  color: var(--text-desc);
+}
+
+/* 带货图文: 底栏第一行 = 张数步进器 + 高级设置入口（同一行, 对齐参考站 125 高） */
+.sc-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+}
+.sc-footer-row .pk-settings-shell {
+  flex: none;
+}
+.sc-footer-row .pk-settings-summary {
+  width: auto;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+.sc-footer-row .pk-settings-chip {
+  font-size: 12px;
+}
+
+/*
+ * 模板卡「选用」按钮: 对齐参考站 hover 交互。
+ *
+ * 参考站实测: 默认 opacity 0, hover 显示; 近黑底 (#1c1d1f) 白字, 13px, 圆角 8。
+ * 本站保留 focus-visible 可见, 键盘用户不会因为 hover 才出现而无法操作。
+ */
+.sc-template-use {
+  opacity: 0;
+  background: var(--text-strong);
+  transition: opacity 0.15s ease;
+}
+.sc-template-card:hover .sc-template-use,
+.sc-template-use:focus-visible,
+.sc-template-card.is-selected .sc-template-use {
+  opacity: 1;
+}
+.sc-template-card.is-selected .sc-template-use {
+  background: var(--brand);
+}
+/* 附加功能行: 参考站是普通行, 无灰底/内边距 (实测区块高 70) */
+.sc-toggle-row-plain {
+  margin-top: 0;
+  padding: 0;
+  min-height: 36px;
+  background: transparent;
+  border-radius: 0;
+}
+
+/* 底栏第一行必须单行放下: 张数 + 提示 + 步进器 + 高级设置 (参考站同款单行) */
+.sc-footer-row .sc-count-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+.sc-footer-row .sc-count-label {
+  white-space: nowrap;
+  min-width: 0;
+  flex: none;
+}
+.sc-footer-row .sc-count-label small {
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+.sc-footer-row .pk-number-control {
+  flex: none;
+}
+/* 提示文案可压缩, 保证步进器与高级设置不被挤出底栏 */
+.sc-footer-row .sc-count-label {
+  overflow: hidden;
+  flex: 0 1 auto;
+}
+.sc-footer-row .sc-count-label small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sc-footer-row .pk-settings-summary {
+  white-space: nowrap;
+}
+/* 底栏行必须被父级宽度约束住 (grid item 默认 min-width:auto 会被内容顶开) */
+.sc-form-footer {
+  min-width: 0;
+}
+.sc-footer-row {
+  width: 100%;
+  min-width: 0;
+}
+.sc-footer-row > * {
+  min-width: 0;
+}
+/*
+ * 底栏的高级设置触发收成「高级设置」+ 箭头。
+ *
+ * 参考站底栏同一行是「张数 + 热门图文多为 6 张 + 步进器」, 没有高级设置;
+ * 本站多一个入口, 再把「比例 / 画质」chip 放进来就会把提示挤成「热...」。
+ * 当前画质在浮层里可见, 触发按钮不必重复展示。
+ */
+.sc-footer-row .pk-settings-chip {
+  display: none;
 }

@@ -375,6 +375,8 @@ export function ViralClonePage() {
           height: done.height ?? null,
           createdAt: new Date().toISOString(),
           caption: degreeCaption({ degree }) ?? degree,
+          // 顺序与提交一致: 商品图在前, 参考图固定在末位。右侧结果靠它还原对照。
+          inputUrls: [...images.map((image) => image.url), reference.url].filter(Boolean),
         };
         gallery.prepend([fresh]);
       }
@@ -503,10 +505,11 @@ export function ViralClonePage() {
       </aside>
 
       <ViralCloneResultPane
-        token={token}
         gallery={gallery}
         generating={generating}
         submitting={submitting}
+        images={images}
+        reference={reference}
         result={result}
         onRefresh={() => void gallery.reload()}
         onDelete={deleteImage}

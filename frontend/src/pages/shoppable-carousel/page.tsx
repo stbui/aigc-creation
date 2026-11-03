@@ -430,7 +430,29 @@ export function ShoppableCarouselPage() {
 
           {/* 固定底栏: 张数步进器 + 高级设置 + 生成按钮（参考站 sidebarFooter, 415×125） */}
           <div className="sc-form-footer">
-            <ShoppableCarouselStepper count={count} onCountChange={onCountChange} />
+            {/* 参考站底栏只有一行「张数 + 生成按钮」(415×125)。
+                本站的「高级设置」与张数并排放在同一行, 不再单独占一行 ——
+                多一行会把底栏撑到 169, 与参考站的 125 明显不符。 */}
+            <div className="sc-footer-row">
+              <ShoppableCarouselStepper count={count} onCountChange={onCountChange} />
+              <ToolSettingsPopover
+                open={settingsOpen}
+                onToggle={() => setSettingsOpen((v) => !v)}
+                ratio={ratio}
+                onRatioChange={setRatio}
+                resolution={resolution}
+                onResolutionChange={setResolution}
+                capabilityId={CAPABILITY_ID}
+                showRatio={false}
+                modelPicker={
+                  <ModelPicker
+                    capability={CAPABILITY_ID}
+                    options={{ ratio, resolution }}
+                    onQuoteChange={setModelQuoteCredits}
+                  />
+                }
+              />
+            </div>
             <ToolSubmitBar
               submitting={generating}
               disabled={!formValid || blocked}
@@ -450,24 +472,6 @@ export function ShoppableCarouselPage() {
                   : mode === 'template' && !selectedTemplateId
                     ? '请先在右侧选择一个模板'
                     : undefined
-              }
-              settings={
-                <ToolSettingsPopover
-                  open={settingsOpen}
-                  onToggle={() => setSettingsOpen((v) => !v)}
-                  ratio={ratio}
-                  onRatioChange={setRatio}
-                  resolution={resolution}
-                  onResolutionChange={setResolution}
-                  capabilityId={CAPABILITY_ID}
-                  modelPicker={
-                    <ModelPicker
-                      capability={CAPABILITY_ID}
-                      options={{ ratio, resolution }}
-                      onQuoteChange={setModelQuoteCredits}
-                    />
-                  }
-                />
               }
               onSubmit={() => void submit()}
             />

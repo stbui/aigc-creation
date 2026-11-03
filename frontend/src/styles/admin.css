@@ -228,6 +228,19 @@
   }
 
   /*
+   * ⑤ 定义列表重置：后台不加载 preflight，浏览器会默认给 `dl` 上下 16px
+   * 外边距、给 `dd` 40px 左缩进，导致详情里的标签和值错位。详情组件的节奏
+   * 由 grid gap 与 spacing utilities 控制；这些工具类在更高层，仍可覆盖此处。
+   */
+  :where(.admin-root, .admin-portal) :where(dl, dd) {
+    margin-block: 0;
+  }
+
+  :where(.admin-root, .admin-portal) dd {
+    margin-inline-start: 0;
+  }
+
+  /*
    * 链接排版默认值：后台链接统一为品牌紫 + 500 字重；默认不显示下划线，
    * 悬停或键盘聚焦时显示，并加宽下划线距离。
    *

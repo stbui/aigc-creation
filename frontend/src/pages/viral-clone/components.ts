@@ -26,5 +26,8 @@ export { MobileUploadModal } from '../../components/MobileUploadModal';
 export { ToolWorkflowSteps } from '../../components/ToolEmptyState';
 /** 右侧结果网格 */
 export { ResultGalleryPane } from '../../components/ResultGalleryPane';
+/** 图片大图查看器与查看器条目类型 */
+export { ImageLightbox } from '../../components/ImageLightbox';
+export type { LightboxItem } from '../../components/ImageLightbox';
 /** 图片右键菜单的条目类型 */
 export type { ImageMenuItem } from '../../components/ImageContextMenu';

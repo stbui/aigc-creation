@@ -454,8 +454,17 @@ test.describe('后台高频动线', () => {
     const panel = page.getByRole('dialog', { name: '任务详情' });
     await expect(panel).toBeVisible({ timeout: 15000 });
 
+    // 后台不加载 preflight，必须显式清掉 dl / dd 的浏览器默认边距，避免值整体右缩。
+    const descriptions = panel.getByTestId('admin-desc').first();
+    await expect(descriptions).toHaveCSS('margin-top', '0px');
+    await expect(descriptions.locator('dd').first()).toHaveCSS('margin-left', '0px');
+
     const userLink = panel.locator('a[href^="/admin/users?id="]').first();
     await expect(userLink).toBeVisible();
+    // 抽屉挂在 body 下，必须带上 admin-portal 才能继承后台链接排版：
+    // 品牌紫、500 字重、默认无下划线（悬停/聚焦才出现）。
+    await expect(userLink).toHaveCSS('font-weight', '500');
+    await expect(userLink).toHaveCSS('text-decoration-line', 'none');
     const userHref = await userLink.getAttribute('href');
     const email = (await userLink.textContent())?.trim();
     expect(email).toBeTruthy();
@@ -505,6 +514,35 @@ test.describe('后台高频动线', () => {
     await expect(page).toHaveURL(new RegExp(`projectId=${encodeURIComponent(projectId!)}`));
     await expect(drawer(page)).toHaveCount(0);
     await expect(chips(page)).toContainText(`项目 ID：${projectId}`);
+  });
+
+  test('第二页任务直链仍显示详情与删除操作', async ({ page }) => {
+    await page.goto(`${UI}/admin/tasks`);
+    await expect(page.getByRole('heading', { name: '任务监控' })).toBeVisible({
+      timeout: 15000,
+    });
+
+    // 取一条不在默认第一页的已完成任务，覆盖“列表里没有该行”时由详情合成
+    // 操作行摘要的路径。直接读页面现有登录态，避免另起一套 API 鉴权。
+    const task = await page.evaluate(async () => {
+      const token = localStorage.getItem('ecom_vision_token');
+      const response = await fetch(
+        '/api/v1/admin/tasks?status=succeeded&page=2&pageSize=20',
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} },
+      );
+      if (!response.ok) return null;
+      const body = (await response.json()) as {
+        data?: { result?: { items?: Array<{ id: string }> } };
+      };
+      return body.data?.result?.items?.[0] ?? null;
+    });
+    test.skip(!task?.id, '当前库中暂无第二页已完成任务');
+
+    await page.goto(`${UI}/admin/tasks?id=${encodeURIComponent(task!.id)}`);
+    const panel = page.getByRole('dialog', { name: '任务详情' });
+    await expect(panel).toBeVisible({ timeout: 15000 });
+    await expect(panel.getByText('任务概要', { exact: true })).toBeVisible();
+    await expect(panel.getByRole('button', { name: '删除此任务' })).toBeVisible();
   });
 
   test('列表详情写入 id，刷新可恢复且关闭后移除', async ({ page }) => {

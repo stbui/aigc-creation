@@ -22,7 +22,9 @@ export function ShoppableCarouselStepper({
     <div className="sc-count-row">
       <span className="sc-count-label">
         张数
-        <small>热门图文多为 6 张</small>
+        {/* 参考站原文「热门图文多为 6 张」; 本站底栏同一行还放了高级设置入口,
+            全量文案会被挤成省略号, 故收成同义的短版。 */}
+        <small>多为 6 张</small>
       </span>
       <div className="pk-number-control">
         <button
