@@ -992,7 +992,7 @@ export interface CreditLedgerEntry {
   createdAt: string;
 }
 
-/** GET /credits/ledger?limit=&offset= */
+/** GET /credits/ledger?limit=&offset=&type=&direction=income|expense */
 export interface CreditLedgerPage {
   items: CreditLedgerEntry[];
   total: number;
@@ -2279,4 +2279,52 @@ export interface CreditImportResult {
     balance?: number;
     message?: string;
   }>;
+}
+
+/* ------------------------------------------------------------------------- */
+/* AI 带货图文（shoppable-carousel）                                            */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * 模板分类（参考站实拍 10 项 + 页面级「全部模板」）。
+ *
+ * 分类 id 是稳定英文键；「全部模板」是纯前端筛选态，不来自后端。
+ */
+export interface ShoppableCarouselCategory {
+  id: string;
+  label: string;
+}
+
+/**
+ * 一个带货图文模板。
+ *
+ * 模板是能力定义的一部分（决定提示词的三拍结构），事实源在后端
+ * `capabilities/definitions/shoppable-carousel.templates.ts`，
+ * 由 `GET /shoppable-carousel/templates` 整体下发 —— 前端不另存一份清单。
+ */
+export interface ShoppableCarouselTemplate {
+  id: string;
+  name: string;
+  /** 所属分类（可跨分类，一个模板可同时属于多个） */
+  categoryIds: string[];
+  /** 三拍叙事结构，如 ['开箱静物', '多场景上身', '细节收尾'] */
+  beats: string[];
+  /** 可执行的结构化提示词片段（由公开标题与三拍文案合成） */
+  promptFragment: string;
+  /** 卡片首图（本站静态资源相对路径） */
+  thumbFile: string;
+  /** 模板卡里的三张连续预览图，顺序与 beats 一致 */
+  thumbFiles: string[];
+}
+
+/** GET /api/v1/shoppable-carousel/templates */
+export interface ShoppableCarouselTemplatesResult {
+  /** 来源页面（仅追溯用，运行时不会请求它） */
+  sourceUrl: string;
+  /** 抓取时间 */
+  capturedAt: string;
+  /** 一次生成的张数区间 */
+  countRange: { min: number; max: number };
+  categories: ShoppableCarouselCategory[];
+  templates: ShoppableCarouselTemplate[];
 }

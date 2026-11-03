@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { CreditsModule } from '../credits/credits.module';
 import { ModelModule } from '../model/model.module';
 import { CapabilitiesController } from './capabilities.controller';
+import { ShoppableCarouselController } from './shoppable-carousel.controller';
 import { CapabilityAvailabilityService } from './capability-availability.service';
 
 /**
@@ -18,7 +19,7 @@ import { CapabilityAvailabilityService } from './capability-availability.service
  */
 @Module({
   imports: [CreditsModule, ModelModule],
-  controllers: [CapabilitiesController],
+  controllers: [CapabilitiesController, ShoppableCarouselController],
   providers: [CapabilityAvailabilityService],
   exports: [CapabilityAvailabilityService],
 })

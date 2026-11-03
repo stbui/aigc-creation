@@ -66,6 +66,11 @@ const SitemapPage = lazyRoute('/sitemap.html', () => import('./pages/SitemapPage
 const LegalPage = lazyRoute('/legal/*', () => import('./pages/LegalPage'), 'LegalPage');
 const WorkbenchPage = lazyRoute('/workbench', () => import('./pages/WorkbenchPage'), 'WorkbenchPage');
 const ProductKitPage = lazyRoute('/product-kit', () => import('./pages/product-kit'), 'ProductKitPage');
+const ShoppableCarouselPage = lazyRoute(
+  '/shoppable-carousel',
+  () => import('./pages/shoppable-carousel'),
+  'ShoppableCarouselPage',
+);
 const ProductDetailPage = lazyRoute('/product-detail', () => import('./pages/product-detail'), 'ProductDetailPage');
 const ViralClonePage = lazyRoute('/viral-clone', () => import('./pages/viral-clone'), 'ViralClonePage');
 const CreativeImagePage = lazyRoute(
@@ -203,6 +208,12 @@ function Shell() {
               path="/product-kit"
               element={
                   <ProductKitPage />
+              }
+            />
+            <Route
+              path="/shoppable-carousel"
+              element={
+                  <ShoppableCarouselPage />
               }
             />
             <Route

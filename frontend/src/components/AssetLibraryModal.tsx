@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, Search, X } from 'lucide-react';
+import { Search, X } from 'lucide-react';
 import { assetSrc, assetThumbSrc, assetsApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
+import { useCapabilities } from '../hooks/useCapabilities';
 import { StateButton, StateEmpty, StateError, StateLoading } from './StateViews';
 import { ResultMedia, modalityOfFormat } from './ResultMedia';
 import type { Asset } from '../types/api';
-import { useApp, Button, Dropdown, Input, Modal } from '../ui';
+import { useApp, Button, Input, Modal } from '../ui';
 
 /**
  * 素材库导入选择器
@@ -16,7 +17,7 @@ import { useApp, Button, Dropdown, Input, Modal } from '../ui';
  *   dialog     min(1180px, 100vw - 40px), 圆角 20, 白底, 阴影 0 24px 80px #282b4c33
  *              max-height min(760px, 100vh - 40px), 纵向 flex
  *   header     padding 22px 26px 18px, 下边框 #eef0f5
- *              eyebrow 12px/18 #8d95a8; h2 22px/30 #171a2b
+ *              h2 22px/30 #171a2b
  *              close 34x34 圆形, 底 #f3f4f7, 悬浮 #e9eaf0
  *   toolbar    底 #fbfcfe, padding 14px 26px, gap 16
  *              groups 横向滚动胶囊 (h34, 圆角 9, 边框 #e4e7ef, 选中 #f1efff/#5546d8)
@@ -26,7 +27,7 @@ import { useApp, Button, Dropdown, Input, Modal } from '../ui';
  *              nav button 13px, 圆角 10, 选中 白底+紫字+阴影
  *   content    padding 20px 26px 24px, 最小高 280, 纵向滚动
  *   grid       repeat(auto-fill, minmax(128px, 1fr)), gap 14
- *   card       圆角 12, 边框 #e3e6ee, 悬浮上浮 2px + 阴影
+ *   card       纯图片瓦片, 圆角 12, 边框 #e3e6ee, 悬浮上浮 2px + 阴影
  *              选中 2px #5546d8 + 外发光; 右上角勾选圆标 24x24
  *   footer     padding 14px 26px 18px, 上边框 #eef0f5, 12px #8d95a8
  *              cancel 描边 / confirm 品牌紫实心, 36 高, 圆角 9
@@ -34,8 +35,8 @@ import { useApp, Button, Dropdown, Input, Modal } from '../ui';
  * ## 与参考站的**刻意**差异
  *
  * 参考站侧栏的「素材分组」是**用户自建分组** (需 asset_group 表), 本项目素材库
- * 没有这个数据模型 —— 故侧栏用**本项目真实存在的维度**: 全部 / 原始图片 / 生成图片。
- * 不臆造分组表, 也不在界面上放点不动的假入口。
+ * 没有这个数据模型。侧栏改为两个真实维度: 来源 (全部 / 原始图片 / 生成图片)
+ * 与用途 (由素材的 capability 字段动态聚合)。不臆造分组表, 也不放点不动的假入口。
  *
  * ## 交互
  *
@@ -147,6 +148,9 @@ export interface AssetLibraryModalProps {
 /** 侧栏维度 —— 本项目素材库真实存在的分类 */
 type PickerKind = 'all' | 'original' | 'generated';
 
+/** 用途筛选中代表「没有关联能力」的哨兵值 */
+const NO_CAPABILITY = '__none';
+
 const KIND_LABELS: Array<{ id: PickerKind; label: string }> = [
   { id: 'all', label: '全部图片' },
   { id: 'original', label: '原始图片' },
@@ -173,8 +177,11 @@ export function AssetLibraryModal({
   maxSelectable,
 }: AssetLibraryModalProps) {
   const { message } = useApp();
+  const { data: capabilitiesData } = useCapabilities();
   /** 侧栏当前维度 */
   const [kind, setKind] = useState<PickerKind>('all');
+  /** 侧栏当前用途 */
+  const [capabilityFilter, setCapabilityFilter] = useState<string>('all');
   /** 工具栏日期筛选 */
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
   /** 工具栏搜索词 */
@@ -186,11 +193,65 @@ export function AssetLibraryModal({
   useEffect(() => {
     if (open) {
       setKind('all');
+      setCapabilityFilter('all');
       setDateFilter('all');
       setKeyword('');
       setSelected([]);
     }
   }, [open]);
+
+  /** capability id → 展示名。能力清单不可用时退回 id, 不隐藏真实分类。 */
+  const capabilityNames = useMemo(() => {
+    const names = new Map<string, string>();
+    for (const capability of capabilitiesData?.items ?? []) {
+      names.set(capability.id, capability.name);
+    }
+    return names;
+  }, [capabilitiesData]);
+
+  /**
+   * 只聚合当前素材中真实存在的用途, 避免侧栏出现永远筛不出内容的空分类。
+   * 顺序优先跟随后端能力清单; 清单里没有的历史 id 按名称排在后面。
+   */
+  const capabilityOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    let uncategorized = 0;
+    for (const item of items) {
+      if (!item.capability) {
+        uncategorized += 1;
+        continue;
+      }
+      counts.set(item.capability, (counts.get(item.capability) ?? 0) + 1);
+    }
+
+    const order = new Map(
+      (capabilitiesData?.items ?? []).map((capability, index) => [capability.id, index]),
+    );
+    const options = [...counts.entries()].map(([id, count]) => ({
+      id,
+      label: capabilityNames.get(id) ?? id,
+      count,
+      order: order.get(id) ?? Number.MAX_SAFE_INTEGER,
+    }));
+    options.sort(
+      (a, b) => a.order - b.order || a.label.localeCompare(b.label, 'zh-CN'),
+    );
+    if (uncategorized > 0) {
+      options.push({
+        id: NO_CAPABILITY,
+        label: '未关联用途',
+        count: uncategorized,
+        order: Number.MAX_SAFE_INTEGER,
+      });
+    }
+    return options;
+  }, [items, capabilitiesData, capabilityNames]);
+
+  /** 用途展示名; 卡片与搜索共用, 保证文案一致。 */
+  const capabilityLabel = useCallback(
+    (id: string | null | undefined) => (id ? capabilityNames.get(id) ?? id : '未关联用途'),
+    [capabilityNames],
+  );
 
   /**
    * 前端按维度过滤。
@@ -202,6 +263,11 @@ export function AssetLibraryModal({
   const visible = useMemo(() => {
     let list = items;
     if (kind !== 'all') list = list.filter((a) => a.kind === kind);
+    if (capabilityFilter === NO_CAPABILITY) {
+      list = list.filter((a) => !a.capability);
+    } else if (capabilityFilter !== 'all') {
+      list = list.filter((a) => a.capability === capabilityFilter);
+    }
     if (dateFilter !== 'all') {
       const from = startOfDay(dateFilter);
       const to = endOfDay(dateFilter);
@@ -220,6 +286,7 @@ export function AssetLibraryModal({
           a.sourceTitle ?? '',
           a.sourceSite ?? '',
           a.capability ?? '',
+          capabilityLabel(a.capability),
         ]
           .join(' ')
           .toLowerCase()
@@ -227,7 +294,7 @@ export function AssetLibraryModal({
       );
     }
     return list;
-  }, [items, kind, dateFilter, keyword]);
+  }, [items, kind, capabilityFilter, dateFilter, keyword, capabilityLabel]);
 
   /**
    * 是否已达选择上限。
@@ -305,63 +372,47 @@ export function AssetLibraryModal({
       title={
         <div className="alp-header">
           <div className="alp-header-main">
-            <span className="alp-eyebrow">我的素材库</span>
             <h2 className="alp-title">从素材库导入</h2>
           </div>
-          <button type="button" className="alp-close" aria-label="关闭素材库" onClick={onCancel}>
-            <X size={19} />
-          </button>
+          <Button type="text" className="alp-close" aria-label="关闭素材库" onClick={onCancel}>
+            <X size={19} className="size-[19px]" />
+          </Button>
         </div>
       }
     >
       <div className="alp-body">
-        {/* ── 工具栏: 维度胶囊 + 日期筛选 + 搜索 ── */}
+        {/* ── 工具栏: 来源胶囊 + 日期筛选 + 搜索 ── */}
         <div className="alp-toolbar">
-          <div className="alp-groups" role="tablist" aria-label="素材维度">
+          <div className="alp-groups" role="tablist" aria-label="素材来源">
             {KIND_LABELS.map((k) => (
-              <button
+              <Button
                 key={k.id}
-                type="button"
+                type="text"
                 role="tab"
                 aria-selected={kind === k.id}
                 className={`alp-chip${kind === k.id ? ' is-active' : ''}`}
                 onClick={() => setKind(k.id)}
               >
                 {k.label}
-              </button>
+              </Button>
             ))}
           </div>
 
           <div className="alp-toolbar-right">
-            {/*
-              日期筛选用共享的 `Dropdown` 兼容壳 (内部是 radix DropdownMenu)，
-              不再手写一套「relative 容器 + 绝对定位菜单」：
-                · 此前菜单靠 CSS `:hover` 展开、同时按钮又 toggle 一个 `is-open`，
-                  两者叠加导致点选后菜单**不关**（鼠标还悬在容器上，`:hover` 命中），
-                  只有把鼠标移开才消失；
-                · 手写版没有焦点管理、没有 Esc、点在弹窗空白处也不关。
-              radix 版带 keyboard 导航 / Esc / 点击外部关闭，且渲染到 portal，
-              不受 `.alp-content` 的 `overflow: auto` 裁剪。
-              外观由 `.alp-date-dropdown` 覆写回参考站数值，见 global.css。
-            */}
-            <Dropdown
-              classNames={{ root: 'alp-date-dropdown' }}
-              placement="bottomRight"
-              menu={{
-                items: DATE_LABELS.map((d) => ({
-                  key: d.id,
-                  label: d.label,
-                  // 选中态加在**条目**上 (整行胶囊), 不是包一层 span
-                  className: dateFilter === d.id ? 'is-active' : undefined,
-                  onClick: () => setDateFilter(d.id),
-                })),
-              }}
-            >
-              <button type="button" className="alp-date-trigger">
-                <span>{DATE_LABELS.find((d) => d.id === dateFilter)?.label ?? '全部'}</span>
-                <ChevronDown size={13} />
-              </button>
-            </Dropdown>
+            <div className="alp-date-flat" role="group" aria-label="日期筛选">
+              <span className="alp-filter-label">日期</span>
+              {DATE_LABELS.map((d) => (
+                <Button
+                  key={d.id}
+                  type="text"
+                  className={`alp-date-option${dateFilter === d.id ? ' is-active' : ''}`}
+                  aria-pressed={dateFilter === d.id}
+                  onClick={() => setDateFilter(d.id)}
+                >
+                  {d.label}
+                </Button>
+              ))}
+            </div>
 
             {/*
               搜索框走 `Input` 兼容壳的 prefix / suffix, 不再手写
@@ -380,7 +431,7 @@ export function AssetLibraryModal({
                     aria-label="清除搜索"
                     onClick={() => setKeyword('')}
                   >
-                    <X size={12} />
+                    <X size={12} className="size-[12px]" />
                   </Button>
                 ) : null
               }
@@ -391,23 +442,53 @@ export function AssetLibraryModal({
           </div>
         </div>
 
-        {/* ── 主体: 侧栏 + 内容区 ── */}
+        {/* ── 主体: 来源/用途侧栏 + 内容区 ── */}
         <div className="alp-layout">
           <aside className="alp-sidebar">
-            <strong>素材维度</strong>
-            <nav>
+            <strong>素材来源</strong>
+            <nav aria-label="素材来源">
               {KIND_LABELS.map((k) => (
-                <button
+                <Button
                   key={k.id}
-                  type="button"
+                  type="text"
                   className={kind === k.id ? 'is-active' : ''}
                   aria-current={kind === k.id}
                   onClick={() => setKind(k.id)}
                 >
                   {k.label}
-                </button>
+                </Button>
               ))}
             </nav>
+
+            {capabilityOptions.length > 0 && (
+              <section className="alp-sidebar-section">
+                <strong>用途分类</strong>
+                <nav aria-label="用途分类">
+                  <Button
+                    type="text"
+                    className={capabilityFilter === 'all' ? 'is-active' : ''}
+                    aria-current={capabilityFilter === 'all'}
+                    onClick={() => setCapabilityFilter('all')}
+                  >
+                    <span>全部用途</span>
+                    <em className="alp-sidebar-count">{items.length}</em>
+                  </Button>
+                  {capabilityOptions.map((option) => (
+                    <Button
+                      key={option.id}
+                      type="text"
+                      className={capabilityFilter === option.id ? 'is-active' : ''}
+                      aria-current={capabilityFilter === option.id}
+                      title={`${option.label}（${option.count}）`}
+                      onClick={() => setCapabilityFilter(option.id)}
+                    >
+                      <span>{option.label}</span>
+                      <em className="alp-sidebar-count">{option.count}</em>
+                    </Button>
+                  ))}
+                </nav>
+              </section>
+            )}
           </aside>
 
           <div className="alp-main">
@@ -445,6 +526,7 @@ export function AssetLibraryModal({
                         <StateButton
                           onClick={() => {
                             setKind('all');
+                            setCapabilityFilter('all');
                             setDateFilter('all');
                             setKeyword('');
                           }}
@@ -464,9 +546,9 @@ export function AssetLibraryModal({
                     const previewUrl =
                       (modality === 'video' ? assetSrc(a) : assetThumbSrc(a, 480)) ?? '';
                     return (
-                      <button
+                      <Button
                         key={a.id}
-                        type="button"
+                        type="text"
                         className={`alp-card${on ? ' is-selected' : ''}`}
                         aria-pressed={on}
                         disabled={!on && atLimit}
@@ -476,16 +558,31 @@ export function AssetLibraryModal({
                         <div className="alp-cover">
                           {/* 视频素材用 <video> —— 浏览器会把 mp4 当图片解码, 表现为空白缩略图 */}
                           <ResultMedia url={previewUrl} modality={modality} alt={a.sourceUrl} />
+                          {a.kind === 'original' && (
+                            <span className="alp-origin-badge is-original" title="用户上传的原始图片">
+                              用户上传
+                            </span>
+                          )}
+                          {a.kind === 'generated' && (
+                            <span className="alp-origin-badge is-generated" title="AI 生成的图片">
+                              AI 生成
+                            </span>
+                          )}
+                          {a.capability && (
+                            <span
+                              className="alp-capability"
+                              title={`用途：${capabilityLabel(a.capability)}`}
+                            >
+                              {capabilityLabel(a.capability)}
+                            </span>
+                          )}
                           {on && (
                             <span className="alp-check" aria-label="已选择">
                               ✓
                             </span>
                           )}
                         </div>
-                        <span className="alp-name">
-                          {a.width && a.height ? `${a.width}×${a.height}` : a.format}
-                        </span>
-                      </button>
+                      </Button>
                     );
                   })}
                 </div>
@@ -507,17 +604,17 @@ export function AssetLibraryModal({
               {maxSelectable !== undefined ? ` / 最多选择 ${maxSelectable} 张` : ' 张'}
             </span>
             {selected.length > 0 && (
-              <button type="button" className="alp-clear" onClick={() => setSelected([])}>
+              <Button type="text" className="alp-clear" onClick={() => setSelected([])}>
                 清除选择
-              </button>
+              </Button>
             )}
           </div>
           <div className="alp-footer-actions">
-            <button type="button" className="alp-btn alp-btn-cancel" onClick={onCancel}>
+            <Button type="text" className="alp-btn alp-btn-cancel" onClick={onCancel}>
               取消
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              type="text"
               className="alp-btn alp-btn-confirm"
               disabled={selected.length === 0}
               onClick={confirm}
@@ -525,7 +622,7 @@ export function AssetLibraryModal({
               {/* 单选入口（如 SKU 模板图）明确写「使用此素材」，避免用户
                   在已选 1 张后仍找不到完成导入的按钮。 */}
               {maxSelectable === 1 ? '使用此素材' : '可多选 · 选择'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

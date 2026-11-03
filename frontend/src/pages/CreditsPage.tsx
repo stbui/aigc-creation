@@ -8,7 +8,7 @@ import { useMediaQuery } from '../hooks/useMediaQuery';
 import { PersonalPage } from '../components/PersonalPage';
 import { StateButton, StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
 import type { CreditBalance, CreditLedgerEntry, CreditLot } from '../types/api';
-import { Button, Card, Col, Pagination, Row, Table, Tabs, Tag } from '../ui';
+import { Button, Card, Col, Pagination, Row, Select, Table, Tabs, Tag } from '../ui';
 
 /**
  * 积分明细 (余额 / 批次 / 流水)。
@@ -21,6 +21,15 @@ import { Button, Card, Col, Pagination, Row, Table, Tabs, Tag } from '../ui';
  */
 
 type Tab = 'ledger' | 'lots';
+
+type LedgerFilter =
+  | 'all'
+  | 'income'
+  | 'expense'
+  | 'purchase'
+  | 'consume'
+  | 'admin_adjust'
+  | 'expire';
 
 const SOURCE_LABEL: Record<string, string> = {
   purchase: '购买',
@@ -67,6 +76,25 @@ const LOT_STATUS: Record<CreditLot['status'], string> = {
 
 /** 每页条数: 桌面表格与窄屏列表共用, 换结构不改分页节奏 */
 const PAGE_SIZE = 20;
+
+const LEDGER_FILTER_OPTIONS: Array<{ value: LedgerFilter; label: string }> = [
+  { value: 'all', label: '全部流水' },
+  { value: 'income', label: '只看收入' },
+  { value: 'expense', label: '只看支出' },
+  { value: 'purchase', label: '购买获得' },
+  { value: 'consume', label: '生成消耗' },
+  { value: 'admin_adjust', label: '客服调整' },
+  { value: 'expire', label: '到期回收' },
+];
+
+function ledgerFilterParams(filter: LedgerFilter): {
+  type?: string;
+  direction?: 'income' | 'expense';
+} {
+  if (filter === 'all') return {};
+  if (filter === 'income' || filter === 'expense') return { direction: filter };
+  return { type: filter };
+}
 
 /**
  * 流水的备注口径: 后台人工调整的原文可能含工单号 / 客服姓名,
@@ -142,6 +170,8 @@ export function CreditsPage() {
   const [ledger, setLedger] = useState<CreditLedgerEntry[]>([]);
   const [ledgerTotal, setLedgerTotal] = useState(0);
   const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [ledgerError, setLedgerError] = useState<string | null>(null);
+  const [ledgerFilter, setLedgerFilter] = useState<LedgerFilter>('all');
   const [lots, setLots] = useState<CreditLot[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -154,32 +184,35 @@ export function CreditsPage() {
   const [lotsPage, setLotsPage] = useState(1);
 
   /** 只切流水页：不重取余额/批次，也不整页闪骨架 */
-  const loadLedgerPage = useCallback(async (page: number) => {
+  const loadLedgerPage = useCallback(async (page: number, filter: LedgerFilter) => {
     setLedgerLoading(true);
+    setLedgerError(null);
     try {
       const res = await creditsApi.ledger({
         limit: PAGE_SIZE,
         offset: Math.max(0, (page - 1) * PAGE_SIZE),
+        ...ledgerFilterParams(filter),
       });
       setLedger(res.items);
       setLedgerTotal(res.total);
       setLedgerPage(page);
     } catch (e) {
-      setError((e as Error)?.message || '积分流水加载失败');
+      setLedgerError((e as Error)?.message || '积分流水加载失败');
     } finally {
       setLedgerLoading(false);
     }
   }, []);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (filter: LedgerFilter = 'all') => {
     setLoading(true);
     setError(null);
+    setLedgerError(null);
     try {
       // 三个接口并发取, 任一失败不阻断其余两个 ——
       // 余额取不到时用户仍该看到批次与流水
       const [b, l, k] = await Promise.allSettled([
         creditsApi.balance(),
-        creditsApi.ledger({ limit: PAGE_SIZE, offset: 0 }),
+        creditsApi.ledger({ limit: PAGE_SIZE, offset: 0, ...ledgerFilterParams(filter) }),
         creditsApi.lots(),
       ]);
       if (b.status === 'fulfilled') setBalance(b.value);
@@ -188,6 +221,9 @@ export function CreditsPage() {
         setLedgerTotal(l.value.total);
         // 重新取数后回到第一页, 免得停在一个已经不存在的页码上
         setLedgerPage(1);
+      }
+      if (l.status === 'rejected') {
+        setLedgerError((l.reason as Error)?.message || '积分流水加载失败');
       }
       if (k.status === 'fulfilled') {
         setLots(k.value);
@@ -201,6 +237,13 @@ export function CreditsPage() {
     }
   }, []);
 
+  const handleLedgerFilterChange = (filter: LedgerFilter) => {
+    if (filter === ledgerFilter) return;
+    setLedgerFilter(filter);
+    setLedgerPage(1);
+    void loadLedgerPage(1, filter);
+  };
+
   // 依赖 token: 登录 / 退出都要重取 (与 StatsPage 同构)
   useEffect(() => {
     if (!token) {
@@ -208,11 +251,14 @@ export function CreditsPage() {
       setBalance(null);
       setLedger([]);
       setLedgerTotal(0);
+      setLedgerError(null);
+      setLedgerFilter('all');
       setLots([]);
       setLoading(false);
       return;
     }
-    void load();
+    setLedgerFilter('all');
+    void load('all');
   }, [token, load]);
 
   /*
@@ -398,55 +444,76 @@ export function CreditsPage() {
             {
               key: 'ledger',
               label: '积分流水',
-              children: loading ? (
-                <StateSkeleton variant="row" count={5} />
-              ) : error ? (
-                <StateError
-                  title="积分数据加载失败"
-                  desc="没能取回积分流水与批次信息。可能是后端未启动或网络异常，重试一次即可。"
-                  detail={error}
-                  onRetry={() => void load()}
-                />
-              ) : ledger.length === 0 ? (
-                <StateEmpty
-                  compact
-                  title="还没有积分流水"
-                  desc="购买积分、开通会员或完成签到后，每一笔变动都会记录在这里。"
-                  action={<StateButton onClick={() => navigate('/packages')}>去获取积分</StateButton>}
-                />
-              ) : narrow ? (
+              children: (
                 <>
-                  <LedgerList rows={ledgerView} />
-                  {ledgerTotal > PAGE_SIZE && (
-                    <div className="credits-mobile-pager">
-                      <Pagination
-                        simple
-                        size="small"
-                        current={ledgerPage}
-                        pageSize={PAGE_SIZE}
-                        total={ledgerTotal}
-                        onChange={(page) => void loadLedgerPage(page)}
-                      />
-                    </div>
+                  <div className="credits-ledger-toolbar">
+                    <Select
+                      value={ledgerFilter}
+                      onChange={(value) => handleLedgerFilterChange(value as LedgerFilter)}
+                      options={LEDGER_FILTER_OPTIONS}
+                      disabled={loading || ledgerLoading}
+                      aria-label="筛选积分流水"
+                    />
+                  </div>
+                  {loading ? (
+                    <StateSkeleton variant="row" count={5} />
+                  ) : ledgerError ? (
+                    <StateError
+                      title="积分流水加载失败"
+                      desc="没能取回当前筛选下的积分流水。可能是后端未启动或网络异常，重试一次即可。"
+                      detail={ledgerError}
+                      onRetry={() => void load(ledgerFilter)}
+                    />
+                  ) : ledger.length === 0 ? (
+                    <StateEmpty
+                      compact
+                      title={ledgerFilter === 'all' ? '还没有积分流水' : '当前筛选下没有流水'}
+                      desc={
+                        ledgerFilter === 'all'
+                          ? '购买积分、开通会员或完成签到后，每一笔变动都会记录在这里。'
+                          : '可以切换筛选条件，查看其他类型的积分变动。'
+                      }
+                      action={
+                        ledgerFilter === 'all' ? (
+                          <StateButton onClick={() => navigate('/packages')}>去获取积分</StateButton>
+                        ) : undefined
+                      }
+                    />
+                  ) : narrow ? (
+                    <>
+                      <LedgerList rows={ledgerView} />
+                      {ledgerTotal > PAGE_SIZE && (
+                        <div className="credits-mobile-pager">
+                          <Pagination
+                            simple
+                            size="small"
+                            current={ledgerPage}
+                            pageSize={PAGE_SIZE}
+                            total={ledgerTotal}
+                            onChange={(page) => void loadLedgerPage(page, ledgerFilter)}
+                          />
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <Table
+                      rowKey="id"
+                      size="small"
+                      loading={ledgerLoading}
+                      columns={ledgerColumns}
+                      dataSource={ledger}
+                      pagination={{
+                        current: ledgerPage,
+                        pageSize: PAGE_SIZE,
+                        total: ledgerTotal,
+                        hideOnSinglePage: true,
+                        showSizeChanger: false,
+                        onChange: (page) => void loadLedgerPage(page, ledgerFilter),
+                      }}
+                      scroll={{ x: 680 }}
+                    />
                   )}
                 </>
-              ) : (
-                <Table
-                  rowKey="id"
-                  size="small"
-                  loading={ledgerLoading}
-                  columns={ledgerColumns}
-                  dataSource={ledger}
-                  pagination={{
-                    current: ledgerPage,
-                    pageSize: PAGE_SIZE,
-                    total: ledgerTotal,
-                    hideOnSinglePage: true,
-                    showSizeChanger: false,
-                    onChange: (page) => void loadLedgerPage(page),
-                  }}
-                  scroll={{ x: 680 }}
-                />
               ),
             },
             {

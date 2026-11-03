@@ -50,7 +50,7 @@ export interface ResultRow {
   createdAt?: string;
   prompt?: string;
   productName?: string;
-  sourceUrl?: string;
+  sourceUrls: string[];
   cells: GalleryItem[];
   /** 批内还有没出图的格子 —— 决定删除按钮置灰 (生成中删会留下半套) */
   pending: boolean;
@@ -111,14 +111,16 @@ export function buildRows(items: GalleryItem[]): ResultRow[] {
         createdAt: item.createdAt,
         prompt: textParam(item, 'description'),
         productName: textParam(item, 'productName'),
-        sourceUrl: item.inputUrl,
+        sourceUrls: [...(item.inputUrls ?? [])],
         cells: [],
         pending: false,
       };
       byBatch.set(key, row);
       rows.push(row);
     }
-    if (!row.sourceUrl && item.inputUrl) row.sourceUrl = item.inputUrl;
+    if (row.sourceUrls.length === 0 && item.inputUrls?.length) {
+      row.sourceUrls = [...item.inputUrls];
+    }
     row.cells.push(item);
   }
   for (const row of rows) {

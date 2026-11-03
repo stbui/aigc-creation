@@ -24,6 +24,7 @@ import { Drawer } from './overlay';
 export function AdminDrawer<T>({
   open,
   title,
+  description,
   onClose,
   fetcher,
   children,
@@ -31,6 +32,7 @@ export function AdminDrawer<T>({
 }: {
   open: boolean;
   title: ReactNode;
+  description?: ReactNode;
   onClose: () => void;
   fetcher: () => Promise<T>;
   children: (data: T) => ReactNode;
@@ -76,6 +78,7 @@ export function AdminDrawer<T>({
         if (!next) onClose();
       }}
       title={title}
+      description={description}
       width={720}
       footer={data && footer ? footer(data) : undefined}
     >

@@ -45,6 +45,34 @@ export interface BalanceSummary {
   nearestExpiry: string | null;
 }
 
+/** 流水方向筛选：按有符号金额判断，兼容同为 admin_adjust 的增减流水 */
+export type LedgerDirection = 'income' | 'expense';
+
+/** C 端可见的流水类型。reserve 是生成任务的中间态，不直接暴露给用户。 */
+const C_END_LEDGER_TYPES = [
+  'purchase',
+  'grant',
+  'consume',
+  'admin_adjust',
+  'refund_reclaim',
+  'refund',
+  'expire',
+] as const;
+
+type CEndLedgerType = (typeof C_END_LEDGER_TYPES)[number];
+
+/** 无积分账户或账户无流水时的稳定返回，避免调用方分别兜底 null */
+export function emptyBalanceSummary(): BalanceSummary {
+  return {
+    balance: 0,
+    expiringSoon: 0,
+    totalEarned: 0,
+    totalConsumed: 0,
+    activeLots: 0,
+    nearestExpiry: null,
+  };
+}
+
 /** 积分（可带 6 位小数）→ 微积分；拒绝负数与超精度 */
 export function creditsToMicrocredits(credits: number | string): bigint {
   try {
@@ -73,56 +101,111 @@ export class CreditService {
 
   // ── 查询 ──────────────────────────────────────────────────────────
 
-  /** 余额总览 (B-49)：账户可用余额 + 批次到期信息 */
-  async balanceOf(userId: string): Promise<BalanceSummary> {
+  /**
+   * 批量余额总览。
+   *
+   * 后台总览与 CSV 导出此前逐用户调用 `balanceOf`，20 个用户就会产生 80 次
+   * 查询。这里按 userId 分组一次性聚合，列表查询次数从 O(用户数) 降为常量。
+   */
+  async balancesOf(userIds: string[]): Promise<Map<string, BalanceSummary>> {
+    const ids = [...new Set(userIds.map((id) => String(id ?? '').trim()).filter(Boolean))];
+    const summaries = new Map(ids.map((id) => [id, emptyBalanceSummary()]));
+    if (ids.length === 0) return summaries;
+
     const now = new Date();
     const soon = new Date(now.getTime() + 30 * 24 * 3600 * 1000);
+    const validLotWhere = {
+      userId: { in: ids },
+      remainingMicrocredits: { gt: 0n },
+      OR: [{ expireAt: null }, { expireAt: { gt: now } }],
+    };
 
-    const [account, lots, earnedAgg, consumedAgg] = await Promise.all([
-      this.prisma.creditAccount.findUnique({ where: { userId } }),
-      this.prisma.creditLot.findMany({
-        where: { userId, remainingMicrocredits: { gt: 0n } },
-        select: { remainingMicrocredits: true, expireAt: true },
+    const [accounts, activeLots, expiringLots, earned, consumed] = await Promise.all([
+      this.prisma.creditAccount.findMany({
+        where: { userId: { in: ids } },
+        select: { userId: true, availableMicrocredits: true },
       }),
-      // 累计获得是终身口径: 已用尽 / 已过期的批次也曾到账
-      this.prisma.creditLedgerEntry.aggregate({
-        where: { userId, type: { in: ['purchase', 'grant', 'admin_adjust'] } },
+      this.prisma.creditLot.groupBy({
+        by: ['userId'],
+        where: validLotWhere,
+        _count: { _all: true },
+        _min: { expireAt: true },
+      }),
+      this.prisma.creditLot.groupBy({
+        by: ['userId'],
+        where: {
+          ...validLotWhere,
+          expireAt: { gt: now, lte: soon },
+        },
+        _sum: { remainingMicrocredits: true },
+      }),
+      // 累计获得只统计正向到账；admin_adjust 同时承载增减，不能把负向调整冲减历史获得
+      this.prisma.creditLedgerEntry.groupBy({
+        by: ['userId'],
+        where: {
+          userId: { in: ids },
+          type: { in: ['purchase', 'grant', 'admin_adjust'] },
+          amountMicrocredits: { gt: 0n },
+        },
         _sum: { amountMicrocredits: true },
       }),
-      this.prisma.creditLedgerEntry.aggregate({
-        where: { userId, type: 'consume' },
+      this.prisma.creditLedgerEntry.groupBy({
+        by: ['userId'],
+        where: { userId: { in: ids }, type: 'consume' },
         _sum: { amountMicrocredits: true },
       }),
     ]);
 
-    const valid = lots.filter((l) => !l.expireAt || l.expireAt > now);
-    const expiringSoon = valid
-      .filter((l) => l.expireAt && l.expireAt <= soon)
-      .reduce((sum, l) => sum + l.remainingMicrocredits, 0n);
-    const expiries = valid
-      .map((l) => l.expireAt)
-      .filter((d): d is Date => d !== null)
-      .sort((a, b) => a.getTime() - b.getTime());
+    const accountByUser = new Map(accounts.map((row) => [row.userId, row.availableMicrocredits]));
+    const lotByUser = new Map(activeLots.map((row) => [row.userId, row]));
+    const expiringByUser = new Map(expiringLots.map((row) => [row.userId, row]));
+    const earnedByUser = new Map(earned.map((row) => [row.userId, row]));
+    const consumedByUser = new Map(consumed.map((row) => [row.userId, row]));
 
-    return {
-      balance: microcreditsToCredits(account?.availableMicrocredits ?? 0n),
-      expiringSoon: microcreditsToCredits(expiringSoon),
-      totalEarned: microcreditsToCredits(earnedAgg._sum.amountMicrocredits ?? 0n),
-      // consume 流水的 amount 是负数, 取绝对值即为累计消耗
-      totalConsumed: microcreditsToCredits(abs(consumedAgg._sum.amountMicrocredits ?? 0n)),
-      activeLots: valid.length,
-      nearestExpiry: expiries[0]?.toISOString() ?? null,
-    };
+    for (const id of ids) {
+      const lot = lotByUser.get(id);
+      summaries.set(id, {
+        balance: microcreditsToCredits(accountByUser.get(id) ?? 0n),
+        expiringSoon: microcreditsToCredits(
+          expiringByUser.get(id)?._sum.remainingMicrocredits ?? 0n,
+        ),
+        totalEarned: microcreditsToCredits(
+          earnedByUser.get(id)?._sum.amountMicrocredits ?? 0n,
+        ),
+        // consume 流水的 amount 是负数, 取绝对值即为累计消耗
+        totalConsumed: microcreditsToCredits(
+          abs(consumedByUser.get(id)?._sum.amountMicrocredits ?? 0n),
+        ),
+        activeLots: lot?._count._all ?? 0,
+        nearestExpiry: lot?._min.expireAt?.toISOString() ?? null,
+      });
+    }
+    return summaries;
+  }
+
+  /** 余额总览 (B-49)：账户可用余额 + 批次到期信息 */
+  async balanceOf(userId: string): Promise<BalanceSummary> {
+    const id = String(userId ?? '').trim();
+    return (await this.balancesOf([id])).get(id) ?? emptyBalanceSummary();
   }
 
   /** 批次明细 (B-50) */
   async lotsOf(userId: string, includeExpired = true) {
+    const now = new Date();
     const lots = await this.prisma.creditLot.findMany({
-      where: { userId, ...(includeExpired ? {} : { remainingMicrocredits: { gt: 0n } }) },
+      where: {
+        userId,
+        ...(includeExpired
+          ? {}
+          : {
+              remainingMicrocredits: { gt: 0n },
+              OR: [{ expireAt: null }, { expireAt: { gt: now } }],
+            }),
+      },
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
-    const now = Date.now();
+    const nowMs = now.getTime();
     return lots.map((l) => {
       const remaining = microcreditsToCredits(l.remainingMicrocredits);
       return {
@@ -137,7 +220,7 @@ export class CreditService {
         status:
           remaining <= 0
             ? 'exhausted'
-            : l.expireAt && l.expireAt.getTime() <= now
+            : l.expireAt && l.expireAt.getTime() <= nowMs
               ? 'expired'
               : 'active',
       };
@@ -153,14 +236,33 @@ export class CreditService {
   async ledgerOf(
     userId: string,
     limit = 50,
-    options: { includeReserve?: boolean; offset?: number } = {},
+    options: {
+      includeReserve?: boolean;
+      offset?: number;
+      type?: string;
+      direction?: LedgerDirection;
+    } = {},
   ) {
-    const take = Math.min(Math.max(Number(limit) || 50, 1), 200);
-    const skip = Math.max(Number(options.offset) || 0, 0);
-    const where = {
-      userId,
-      ...(options.includeReserve ? {} : { type: { not: 'reserve' } }),
-    };
+    const parsedLimit = Number(limit);
+    const take = Number.isFinite(parsedLimit)
+      ? Math.min(Math.max(Math.trunc(parsedLimit), 1), 200)
+      : 50;
+    const parsedOffset = Number(options.offset);
+    const skip = Number.isFinite(parsedOffset) ? Math.max(Math.trunc(parsedOffset), 0) : 0;
+
+    if (options.type && !(C_END_LEDGER_TYPES as readonly string[]).includes(options.type)) {
+      throw new AppError(40001, `未知积分流水类型：${options.type}`, 400);
+    }
+    if (options.direction && options.direction !== 'income' && options.direction !== 'expense') {
+      throw new AppError(40001, `未知积分流水方向：${options.direction}`, 400);
+    }
+
+    const where: Prisma.CreditLedgerEntryWhereInput = { userId };
+    if (options.type) where.type = options.type as CEndLedgerType;
+    else if (!options.includeReserve) where.type = { not: 'reserve' };
+    if (options.direction === 'income') where.amountMicrocredits = { gt: 0n };
+    if (options.direction === 'expense') where.amountMicrocredits = { lt: 0n };
+
     const [rows, total] = await Promise.all([
       this.prisma.creditLedgerEntry.findMany({
         where,

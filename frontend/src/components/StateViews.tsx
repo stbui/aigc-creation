@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { StateIllustration, type StateKind } from './illustrations';
+import { Button } from '../ui';
 
 /**
  * 全站统一状态组件。
@@ -169,10 +170,10 @@ export function StateError({
       {(onRetry || action) && (
         <div className="state-error-action">
           {onRetry && (
-            <button type="button" className="state-btn is-primary" onClick={onRetry}>
-              <RotateCcw size={14} />
+            <Button type="text" className="state-btn is-primary" onClick={onRetry}>
+              <RotateCcw size={14} className="size-[14px]" />
               重试
-            </button>
+            </Button>
           )}
           {action}
         </div>
@@ -194,13 +195,13 @@ export function StateButton({
   disabled?: boolean;
 }) {
   return (
-    <button
-      type="button"
+    <Button
+      type="text"
       className={`state-btn${variant === 'primary' ? ' is-primary' : ' is-ghost'}`}
       onClick={onClick}
       disabled={disabled}
     >
       {children}
-    </button>
+    </Button>
   );
 }

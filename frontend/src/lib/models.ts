@@ -1,6 +1,7 @@
 import { API_ROOT, unwrapEnvelope } from './http';
 import { getToken } from './auth';
 import { readSelectedModelId } from './modelSelection';
+import type { CapabilitySpecView } from '../types/model';
 
 /**
  * 前台模型目录数据层（`GET /api/v1/models`）。
@@ -42,8 +43,8 @@ export interface PublicLogicalModel {
   cachedPriceMicrocredits: number;
   priceTiers: ModelPriceTier[];
   legacyModelIds: string[];
-  capabilitySpec: Record<string, unknown>;
-  capabilityProfiles: Array<Record<string, unknown>>;
+  capabilitySpec: CapabilitySpecView;
+  capabilityProfiles: CapabilitySpecView[];
   defaultOptions: Record<string, unknown>;
   /** 当前分组与参数下是否真的能跑；false 的模型不应作为默认选中项 */
   available: boolean;
@@ -108,7 +109,7 @@ export function defaultModelFor(
 }
 
 /**
- * 解析建任务要带的 `logicalModelId`。
+ * 解析本次建任务实际会使用的模型对象。
  *
  * 优先用用户显式选过的模型（`lib/modelSelection`，按能力记忆）—— 但必须
  * 在当前目录里且可用：模型可能被下架、线路可能失效，此时静默回退到默认模型，
@@ -117,14 +118,33 @@ export function defaultModelFor(
  * 没有可用模型时抛错而不是发一个空 id 让后端回 40005 —— 前端先给出人话原因，
  * 用户知道是「这个能力暂时没有线路」而不是「提交失败」。
  */
-export async function resolveModelId(capability: string): Promise<string> {
+export async function resolveModel(capability: string): Promise<PublicLogicalModel> {
   const models = await loadModels();
   const selectedId = readSelectedModelId(capability);
   const selected = selectedId ? models.find((m) => m.id === selectedId && m.capability === capability) : null;
   const model = selected?.available ? selected : defaultModelFor(capability, models);
   if (!model) throw new Error('该能力当前没有可用模型，请稍后再试');
   if (!model.available) throw new Error('该能力当前没有可用线路，请稍后再试');
-  return model.id;
+  return model;
+}
+
+/** 解析建任务要带的 `logicalModelId`（见 `resolveModel`） */
+export async function resolveModelId(capability: string): Promise<string> {
+  return (await resolveModel(capability)).id;
+}
+
+/**
+ * 模型能力合同声明的图片输入上限。
+ *
+ * `GET /models` 的 `capabilitySpec` 是路由实际使用的同一份合同；读取这里
+ * 的数字才能保证上传区与后端匹配规则一致，不能前端另写一个固定上限。
+ * 合同缺失或字段非法时返回 null，让调用方保留页面上限作为兜底。
+ */
+export function modelImageInputLimit(
+  model: Pick<PublicLogicalModel, 'capabilitySpec'>,
+): number | null {
+  const max = model.capabilitySpec?.inputs?.image?.max;
+  return typeof max === 'number' && Number.isInteger(max) && max >= 0 ? max : null;
 }
 
 /** 目录里该能力的全部模型（含不可用项，选择器需要把它们置灰列出） */

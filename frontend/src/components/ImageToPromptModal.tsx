@@ -8,6 +8,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { ImagePlus, X } from 'lucide-react';
 import { assetsApi, promptToolsApi, toAbsoluteUrl } from '../lib/api';
+import { promptToolErrorMessage } from '../lib/promptToolMessages';
 import { useProject } from '../hooks/useProject';
 import type { PromptToolResult } from '../types/api';
 import { useApp, Modal, Spin } from '../ui';
@@ -112,9 +113,9 @@ export function ImageToPromptModal({ open, onApply, onCancel }: ImageToPromptMod
       const r = await promptToolsApi.imageToPrompt(asset.id);
       setOutput(r.text);
       setResult(r);
-      if (!r.text) message.warning('模型没有返回内容，请重试');
+      if (!r.text) message.warning('这次没有生成可用内容，请重试');
     } catch (e) {
-      message.error((e as Error).message || '解析失败');
+      message.error(promptToolErrorMessage(e, 'image'));
     } finally {
       setLoading(false);
     }
@@ -205,7 +206,7 @@ export function ImageToPromptModal({ open, onApply, onCancel }: ImageToPromptMod
         </div>
       </div>
 
-      {result?.model && <p className="pt-polish-source-note">由 {result.model} 生成</p>}
+      {result && <p className="pt-polish-source-note">内容由智能助手生成</p>}
     </Modal>
   );
 }

@@ -138,8 +138,14 @@ export class TaskAdmissionService {
     if (!project || project.ownerId !== ownerId) {
       throw new AppError(40001, '项目不存在或无权限', 403);
     }
+    /*
+     * 素材库按账号展示全部项目素材，用户可以在任意工作台选择历史素材。
+     * 项目是组织维度而不是鉴权边界，因此这里只校验 ownerId；若再要求
+     * asset.projectId === dto.projectId，跨项目选择会误报「不存在或无权限」。
+     * 任务产出仍写入 dto.projectId，输入素材保持原归属，便于用户追溯。
+     */
     const assets = await this.prisma.asset.findMany({
-      where: { id: { in: dto.inputAssetIds }, ownerId, projectId: dto.projectId },
+      where: { id: { in: dto.inputAssetIds }, ownerId },
     });
     if (assets.length !== dto.inputAssetIds.length) {
       throw new AppError(40001, '部分输入素材不存在或无权限', 400);

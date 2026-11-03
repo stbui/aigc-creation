@@ -385,16 +385,47 @@ export class TasksAdminService {
   }
 
   /**
-   * 批量重试 / 终止（B7）。
+   * 删除已结束任务。
+   *
+   * 复用用户端 `removeTask`：它会把父任务的子任务、产出素材记录与存储文件
+   * 一并清理，但保留输入素材。后台额外限制排队中/执行中的任务不可直接删，
+   * 必须先终止 —— 否则 worker 可能在删除后继续回写任务结果。
+   */
+  async remove(id: string) {
+    const task = await this.prisma.generationTask.findUnique({
+      where: { id },
+      select: { ownerId: true },
+    });
+    if (!task) throw new AppError(40400, '任务不存在', 404);
+
+    const family = await this.prisma.generationTask.findMany({
+      where: { OR: [{ id }, { parentTaskId: id }] },
+      select: { status: true },
+    });
+    if (family.some((row) => row.status === 'queued' || row.status === 'running')) {
+      throw new AppError(40000, '排队中或执行中的任务不能直接删除，请先终止', 400);
+    }
+
+    const result = await this.generate.removeTask(task.ownerId, id);
+    this.logger.warn(`任务 ${id} 被后台删除，产出素材已一并清理`);
+    return result;
+  }
+
+  /**
+   * 批量重试 / 终止 / 删除（B7）。
    *
    * 逐条复用单条实现，所以「仅失败任务可重试」「仅排队/执行中可终止」
-   * 这些状态限制对批量同样生效 —— 批量失败往往是选了不同状态的任务，
-   * 逐条原因正好把这件事讲清楚。
+   * 「仅已结束任务可删除」这些状态限制对批量同样生效 —— 批量失败往往是
+   * 选了不同状态的任务，逐条原因正好把这件事讲清楚。
    */
-  async batchAction(ids: string[], action: 'retry' | 'cancel') {
-    // 显式给 unknown: 两个动作的返回形状不同 (retry 回新任务 id, cancel 回状态),
-    // 让 TS 从第一个分支推断会把 cancel 判成类型不符
-    return runBatch<unknown>(ids, (id) => (action === 'retry' ? this.retry(id) : this.cancel(id)));
+  async batchAction(ids: string[], action: 'retry' | 'cancel' | 'delete') {
+    // 显式给 unknown: 三个动作的返回形状不同 (retry 回新任务 id, cancel 回状态,
+    // delete 回删除结果), 让 TS 从第一个分支推断会把后续分支判成类型不符
+    return runBatch<unknown>(ids, async (id) => {
+      if (action === 'retry') return this.retry(id);
+      if (action === 'cancel') return this.cancel(id);
+      return this.remove(id);
+    });
   }
 
   /** 已知能力 id 全集 (供前端筛选下拉, 与后端校验口径一致) */

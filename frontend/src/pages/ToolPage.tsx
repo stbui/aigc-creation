@@ -250,7 +250,12 @@ function ToolPageContent({ capability, def }: { capability: string; def: Capabil
   const resultUrl = task?.outputAsset ? assetSrc(task.outputAsset) : undefined;
 
   return (
-    <div className="tool-page">
+    /*
+     * `data-capability` 供按能力定制外层宽度 —— 通用工具页默认 1100px 居中，
+     * 个别表单较宽的能力（如带货图文的 2×2 生成设置 + 张数步进器）
+     * 在这个宽度里会挤成两行，需要去掉上限铺满可用宽度。
+     */
+    <div className="tool-page" data-capability={def.id}>
       <Button type="text" icon={<ArrowLeft size={15} />} onClick={() => navigate('/workbench')} className="tool-back">
         返回工作台
       </Button>

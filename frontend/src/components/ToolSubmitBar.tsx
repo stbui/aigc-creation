@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Spin } from '../ui';
+import { Button, Spin } from '../ui';
 
 /**
  * 提交区（sticky 底部）—— 工具页通用能力。
@@ -62,8 +62,8 @@ export function ToolSubmitBar({
       {settings}
       <div className="pk-submit-row">
         {extra}
-        <button
-          type="button"
+        <Button
+          type="primary"
           className="pk-primary-btn"
           disabled={btnDisabled}
           onClick={() => {
@@ -82,7 +82,7 @@ export function ToolSubmitBar({
               {!guest && creditLabel && <span className="pk-primary-credit">{creditLabel}</span>}
             </>
           )}
-        </button>
+        </Button>
       </div>
       {desc && <p className="tool-submit-desc">{desc}</p>}
     </div>

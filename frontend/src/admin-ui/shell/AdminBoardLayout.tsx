@@ -78,10 +78,10 @@ function SidebarItem({
       aria-label={collapsed ? `${item.label}${item.planned ? ' (待开放)' : ''}` : undefined}
       title={collapsed ? `${item.label}${item.planned ? ' (待开放)' : ''}` : undefined}
       className={cn(
-        'relative flex h-[34px] w-full items-center gap-2.5 rounded-md px-2.5 text-left text-[13px] transition-colors outline-none',
+        'relative flex h-[34px] w-full items-center gap-2.5 rounded-md px-2.5 text-left text-[13px] font-medium transition-colors outline-none',
         'focus-visible:ring-[3px] focus-visible:ring-ring/50',
         item.isActive
-          ? 'bg-accent font-medium text-accent-foreground'
+          ? 'bg-accent font-semibold text-accent-foreground'
           : 'text-muted-foreground hover:bg-muted hover:text-foreground',
         collapsed && 'justify-center px-0',
       )}

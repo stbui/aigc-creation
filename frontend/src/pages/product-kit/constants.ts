@@ -1,5 +1,3 @@
-import type { TaskStatus } from '../../types/api';
-
 /**
  * 商品主图工作台页面的常量 —— 目录内文件的唯一常量入口。
  *
@@ -42,18 +40,3 @@ export const VARIANT_LABELS: Record<string, string> = {
   selling_point: '卖点图',
   other: '其他图',
 };
-
-/** 一次变体任务的结果 (只用于本次提交的提示行与结果网格) */
-export interface PkResult {
-  taskId: string;
-  variant: string;
-  status: TaskStatus;
-  url?: string;
-  /** 产出素材 id（“用作参考图”需要） */
-  assetId?: string;
-  /** 产出真实格式（下载扩展名） */
-  format?: string;
-  width?: number;
-  height?: number;
-  errorCode?: string | null;
-}

@@ -4,7 +4,7 @@ import QRCode from 'qrcode';
 import { mobileUploadApi } from '../lib/api';
 import { useProject } from '../hooks/useProject';
 import type { MobileUploadAsset } from '../types/api';
-import { useApp, Modal, Spin } from '../ui';
+import { useApp, Button, Modal, Spin } from '../ui';
 
 /**
  * 手机上传二维码弹窗
@@ -194,9 +194,9 @@ export function MobileUploadModal({ open, onReceived, onCancel }: MobileUploadMo
       title={null}
     >
       <div className="mum">
-        <button type="button" className="mum-close" aria-label="取消手机上传" onClick={close}>
+        <Button type="text" className="mum-close" aria-label="取消手机上传" onClick={close}>
           <X size={16} />
-        </button>
+        </Button>
 
         <h2 className="mum-title">手机上传</h2>
         <p className="mum-desc">使用手机扫描二维码，选择或拍摄图片上传到电脑</p>
@@ -213,10 +213,10 @@ export function MobileUploadModal({ open, onReceived, onCancel }: MobileUploadMo
             <div className="mum-qr-box">
               <div className="mum-qr-state is-error">二维码已失效，请重新生成二维码</div>
             </div>
-            <button type="button" className="mum-refresh" onClick={() => void start()}>
-              <RefreshCw size={13} />
+            <Button type="text" className="mum-refresh" onClick={() => void start()}>
+              <RefreshCw size={13} className="size-[13px]" />
               刷新二维码
-            </button>
+            </Button>
           </>
         ) : (
           <>

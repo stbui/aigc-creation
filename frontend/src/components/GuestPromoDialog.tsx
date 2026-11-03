@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCampaignCountdown } from '../hooks/useCampaignCountdown';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 import { myMarketingApi } from '../lib/api';
 import type { PopupCampaign } from '../types/api';
 
@@ -92,6 +93,7 @@ export function GuestPromoDialog() {
 
   const { parts, expired } = useCampaignCountdown(campaign);
   const open = !token && !dismissed && autoOpen && !loginOpen && !expired;
+  useBodyScrollLock(open);
 
   const dismiss = useCallback(() => {
     setDismissed(true);
@@ -105,8 +107,6 @@ export function GuestPromoDialog() {
   useEffect(() => {
     if (!open) return;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     closeRef.current?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -136,7 +136,6 @@ export function GuestPromoDialog() {
     window.addEventListener('keydown', onKeyDown);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
-      document.body.style.overflow = previousOverflow;
       if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
     };
   }, [dismiss, open]);

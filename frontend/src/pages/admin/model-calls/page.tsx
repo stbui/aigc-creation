@@ -320,6 +320,8 @@ export function AdminModelCallsPage() {
         <FilterBar>
           <SelectField
             ariaLabel="调用状态"
+            placeholder="全部状态"
+            clearLabel="全部状态"
             value={status}
             options={[
               { value: 'success', label: '成功' },
@@ -328,9 +330,12 @@ export function AdminModelCallsPage() {
             ]}
             allowClear
             onChange={setStatus}
+            className="w-28"
           />
           <SelectField
             ariaLabel="请求类型"
+            placeholder="全部类型"
+            clearLabel="全部类型"
             value={requestKind}
             options={[
               { value: 'create', label: '创建' },
@@ -339,9 +344,12 @@ export function AdminModelCallsPage() {
             ]}
             allowClear
             onChange={setRequestKind}
+            className="w-32"
           />
           <SelectField
             ariaLabel="是否计费"
+            placeholder="全部计费方式"
+            clearLabel="全部计费方式"
             value={billable}
             options={[
               { value: 'true', label: '计费' },
@@ -349,19 +357,54 @@ export function AdminModelCallsPage() {
             ]}
             allowClear
             onChange={setBillable}
+            className="w-28"
           />
-          <TextField ariaLabel="模型" value={model} onChange={setModel} placeholder="模型编码" onEnter={applyFilters} />
+          <TextField
+            ariaLabel="模型"
+            value={model}
+            onChange={setModel}
+            placeholder="模型编码"
+            onEnter={applyFilters}
+            className="w-40"
+          />
           <TextField
             ariaLabel="渠道 ID"
             value={channelId}
             onChange={setChannelId}
             placeholder="渠道 ID"
             onEnter={applyFilters}
+            className="w-40"
           />
-          <TextField ariaLabel="任务 ID" value={taskId} onChange={setTaskId} placeholder="任务 ID" onEnter={applyFilters} />
-          <TextField ariaLabel="用户 ID" value={userId} onChange={setUserId} placeholder="用户 ID" onEnter={applyFilters} />
-          <TextField ariaLabel="开始日期" type="date" value={from} onChange={setFrom} />
-          <TextField ariaLabel="结束日期" type="date" value={to} onChange={setTo} />
+          <TextField
+            ariaLabel="任务 ID"
+            value={taskId}
+            onChange={setTaskId}
+            placeholder="任务 ID"
+            onEnter={applyFilters}
+            className="w-40"
+          />
+          <TextField
+            ariaLabel="用户 ID"
+            value={userId}
+            onChange={setUserId}
+            placeholder="用户 ID"
+            onEnter={applyFilters}
+            className="w-40"
+          />
+          <TextField
+            ariaLabel="开始日期"
+            type="date"
+            value={from}
+            onChange={setFrom}
+            className="w-36"
+          />
+          <TextField
+            ariaLabel="结束日期"
+            type="date"
+            value={to}
+            onChange={setTo}
+            className="w-36"
+          />
           <FilterActions>
             <ActionButton variant="default" size="sm" onClick={applyFilters}>
               查询

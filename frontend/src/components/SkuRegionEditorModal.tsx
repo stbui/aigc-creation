@@ -23,6 +23,7 @@ import {
   ZoomOut,
 } from 'lucide-react';
 import { useApp } from '../ui';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
 
 export type SkuRegionType = 'rect' | 'ellipse' | 'brush';
 
@@ -206,14 +207,7 @@ export function SkuRegionEditorModal({
     panRef.current = null;
   }, [initialRegions, open]);
 
-  useEffect(() => {
-    if (!open) return;
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  }, [open]);
+  useBodyScrollLock(open);
 
   const commit = useCallback(
     (next: SkuRegion[]) => {

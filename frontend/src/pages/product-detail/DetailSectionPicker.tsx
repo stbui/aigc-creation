@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { Checkbox } from '../../ui';
 import { MAX_SECTIONS, SECTION_MODULES } from './constants';
 
 /**
@@ -43,7 +44,13 @@ function DetailSectionPickerBase({ selected, onToggle }: DetailSectionPickerProp
                 className={`pk-section-option${checked ? ' pk-section-option-selected' : ''}${locked ? ' pk-section-option-limit' : ''}`}
                 title={locked ? `最多选择 ${MAX_SECTIONS} 个模块` : undefined}
               >
-                <input type="checkbox" checked={checked} disabled={locked} onChange={() => onToggle(m.value)} />
+                <Checkbox
+                  className="pk-section-check"
+                  checked={checked}
+                  disabled={locked}
+                  aria-label={m.label}
+                  onChange={() => onToggle(m.value)}
+                />
                 <span>
                   <strong>{m.label}</strong>
                   <small>{m.desc}</small>

@@ -296,7 +296,8 @@ test('generateText 中文/英文识别与 usage 自洽', () => {
     messages: [{ role: 'user', content: '帮我写一个紫砂壶的商品主图提示词' }],
   });
   assert.equal(zh.detectedLanguage, 'zh');
-  assert.ok(zh.content.includes('仿真'));
+  assert.ok(zh.content.includes('体验内容'));
+  assert.ok(!zh.content.includes('mock-model-gateway'));
   assert.equal(zh.usage.total_tokens, zh.usage.prompt_tokens + zh.usage.completion_tokens);
   assert.equal(zh.finishReason, 'stop');
 
@@ -305,7 +306,8 @@ test('generateText 中文/英文识别与 usage 自洽', () => {
     messages: [{ role: 'user', content: 'Write a prompt for a purple mug on marble' }],
   });
   assert.equal(en.detectedLanguage, 'en');
-  assert.ok(en.content.includes('SIMULATED'));
+  assert.ok(en.content.includes('DEMO CONTENT'));
+  assert.ok(!en.content.includes('mock-model-gateway'));
 
   const same = generateText({
     model: 'gpt-4o',

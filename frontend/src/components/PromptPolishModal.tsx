@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { RefreshCw, X } from 'lucide-react';
 import { promptToolsApi } from '../lib/api';
+import { promptToolErrorMessage } from '../lib/promptToolMessages';
 import type { PromptToolResult } from '../types/api';
 import { useApp, Modal, Spin } from '../ui';
 
@@ -34,8 +35,7 @@ import { useApp, Modal, Spin } from '../ui';
  *
  * ## 诚实披露
  *
- * 输出区下方标注产出来源与模型名 —— 文本没有本地兜底, 输出必来自真实模型,
- * 但**具体是哪个模型**要让用户知道 (不同模型的润色风格差别很大)。
+ * 输出区下方标注产出来源，不向前台暴露内部名称。
  */
 
 export interface PromptPolishModalProps {
@@ -76,9 +76,9 @@ export function PromptPolishModal({ open, value, onApply, onCancel }: PromptPoli
       const r = await promptToolsApi.polish(value.trim(), textOnly);
       setOutput(r.text);
       setResult(r);
-      if (!r.text) message.warning('模型没有返回内容，请重试');
+      if (!r.text) message.warning('这次没有生成可用内容，请重试');
     } catch (e) {
-      message.error((e as Error).message || '润色失败');
+      message.error(promptToolErrorMessage(e, 'polish'));
     } finally {
       setLoading(false);
     }
@@ -150,11 +150,7 @@ export function PromptPolishModal({ open, value, onApply, onCancel }: PromptPoli
         </div>
       </div>
 
-      {result?.model && (
-        <p className="pt-polish-source-note">
-          由 {result.model} 生成
-        </p>
-      )}
+      {result && <p className="pt-polish-source-note">内容由智能助手生成</p>}
     </Modal>
   );
 }

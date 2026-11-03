@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Download } from 'lucide-react';
+import { Download, RefreshCw } from 'lucide-react';
 import {
   ActionButton,
   AdminDataTable,
@@ -39,10 +39,13 @@ import {
   taskErrorLabel,
 } from './utils';
 import { PROVIDER_LABELS, PROVIDER_OPTIONS, STATUS_OPTIONS } from './constants';
+import { TaskDeleteDialog } from './TaskDeleteDialog';
 import { TaskDetailDrawer } from './TaskDetailDrawer';
+import { TaskStats } from './TaskStats';
 import type { AdminTask, AdminTaskListResult, BatchSummary } from '../../../types/api';
 
 type Row = AdminTask;
+type TaskActionKind = 'retry' | 'cancel' | 'delete';
 
 /**
  * 任务监控 (admin-prd.md B-28~B-33)。
@@ -104,13 +107,13 @@ export function AdminTasksPage() {
    */
   const [detailId, setDetailId] = useAdminDetailParam();
 
-  const [confirm, setConfirm] = useState<{ kind: 'retry' | 'cancel'; task: Row } | null>(null);
+  const [confirm, setConfirm] = useState<{ kind: TaskActionKind; task: Row } | null>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
 
   const [selected, setSelected] = useState<string[]>([]);
-  const [batchKind, setBatchKind] = useState<'retry' | 'cancel' | null>(null);
+  const [batchKind, setBatchKind] = useState<TaskActionKind | null>(null);
   const [batchSummary, setBatchSummary] = useState<BatchSummary<unknown> | null>(null);
   const [batchTitle, setBatchTitle] = useState('');
 
@@ -126,12 +129,14 @@ export function AdminTasksPage() {
         projectId: params.projectId as string | undefined,
         from: params.from as string | undefined,
         to: params.to as string | undefined,
+        sort: params.sort as string | undefined,
       }),
     [],
   );
 
   const { data, loading, error, params, setQuery, setPage, reload } =
     useAdminList<AdminTaskListResult>(fetcher, {
+      sort: 'createdAt:desc',
       ...(urlStatus ? { status: urlStatus } : {}),
       ...(initialCapability ? { capability: initialCapability } : {}),
       ...(initialProvider ? { provider: initialProvider } : {}),
@@ -190,13 +195,36 @@ export function AdminTasksPage() {
     [data],
   );
 
-  const runBatch = async (kind: 'retry' | 'cancel') => {
+  /** 通道选项跟着后端的全量聚合走，未知/历史值不会变成非法筛选项 */
+  const providerOptions = useMemo(() => {
+    const facets = data?.providers;
+    if (!facets?.length) return PROVIDER_OPTIONS;
+    const options = facets
+      .filter((item) => PROVIDER_OPTIONS.some((option) => option.value === item.provider))
+      .map((item) => ({
+        value: item.provider,
+        label: `${PROVIDER_LABELS[item.provider] ?? item.provider}（${item.count}）`,
+      }));
+    return options.length > 0 ? options : PROVIDER_OPTIONS;
+  }, [data]);
+
+  const runBatch = async (kind: TaskActionKind) => {
     if (selected.length === 0) return;
-    setBusy(true);
     const trimmed = reason.trim();
+    setBusy(true);
     try {
-      const summary = await adminTasksApi.batch(selected, kind, trimmed || undefined);
-      setBatchTitle(kind === 'retry' ? '批量重试结果' : '批量终止结果');
+      const summary = await adminTasksApi.batch(
+        selected,
+        kind,
+        kind === 'delete' ? undefined : trimmed || undefined,
+      );
+      setBatchTitle(
+        kind === 'retry'
+          ? '批量重试结果'
+          : kind === 'cancel'
+            ? '批量终止结果'
+            : '批量删除结果',
+      );
       setBatchSummary(summary);
       setBatchKind(null);
       setReason('');
@@ -333,23 +361,26 @@ export function AdminTasksPage() {
   ].filter(Boolean) as AppliedFilter[];
 
   /** 打开确认条。重置原因输入, 避免上一次的内容被误提交 */
-  const openConfirm = useCallback((kind: 'retry' | 'cancel', task: Row) => {
+  const openConfirm = useCallback((kind: TaskActionKind, task: Row) => {
     setReason('');
     setConfirm({ kind, task });
   }, []);
 
-  /** 执行确认后的动作。两个动作都要刷新列表: 重试会新增行, 终止会改状态 */
+  /** 执行确认后的动作。三个动作都要刷新列表: 重试新增行, 终止改状态, 删除移除行 */
   const runConfirm = useCallback(async () => {
     if (!confirm) return;
-    setBusy(true);
     const trimmed = reason.trim();
+    setBusy(true);
     try {
       if (confirm.kind === 'retry') {
         const r = await adminTasksApi.retry(confirm.task.id, trimmed || undefined);
         toast.success(`已用原参数新建任务 ${shortId(r.taskId)}`);
-      } else {
+      } else if (confirm.kind === 'cancel') {
         await adminTasksApi.cancel(confirm.task.id, trimmed || undefined);
         toast.success('任务已终止');
+      } else {
+        await adminTasksApi.remove(confirm.task.id);
+        toast.success('任务及其产出已删除');
       }
       setConfirm(null);
       setDetailId(null);
@@ -366,75 +397,47 @@ export function AdminTasksPage() {
       {
         key: 'task',
         title: '任务',
-        width: 188,
+        width: 132,
+        cellTitle: (row: Row) => row.id,
         render: (row: Row) => (
-          <div className="flex flex-col gap-0.5">
-            {/* 缩略图 + 短 id 并排: 排障时先认出图, 再对 id 查日志 */}
-            <div className="flex items-center gap-2">
-              {row.thumbnailUrl ? (
-                <img
-                  className="size-7 shrink-0 rounded border border-border object-cover"
-                  src={assetThumbUrl(row.thumbnailUrl, 96)}
-                  alt=""
-                  loading="lazy"
-                />
-              ) : (
-                <div className="size-7 shrink-0 rounded border border-dashed border-border bg-muted" />
-              )}
-              <code className="font-mono text-[12px] text-muted-foreground" title={row.id}>
-                {shortId(row.id)}
-              </code>
-            </div>
-            {row.retriedFromId && (
-              <span className="text-[12px] text-muted-foreground">
-                重试自 {shortId(row.retriedFromId)}
-              </span>
+          <div className="flex min-w-0 items-center gap-2">
+            {row.thumbnailUrl ? (
+              <img
+                className="size-7 shrink-0 rounded border border-border object-cover"
+                src={assetThumbUrl(row.thumbnailUrl, 96)}
+                alt=""
+                loading="lazy"
+              />
+            ) : (
+              <div className="size-7 shrink-0 rounded border border-dashed border-border bg-muted" />
             )}
+            <code className="truncate font-mono text-[12px] text-muted-foreground">
+              {shortId(row.id)}
+            </code>
           </div>
         ),
       },
       {
         key: 'capability',
         title: '能力',
-        width: 126,
-        render: (row: Row) => (
-          <div className="flex flex-col gap-0.5">
-            {/* 中文能力名为主, id 降为副信息 —— 运营看的是"爆款复刻"不是 hot_remake */}
-            <span className="block max-w-[120px] truncate" title={row.capabilityName}>
-              {row.capabilityName}
-            </span>
-            <code
-              className="block max-w-[120px] truncate font-mono text-[12px] text-muted-foreground"
-              title={row.capability}
-            >
-              {row.capability}
-            </code>
-          </div>
-        ),
+        width: 120,
+        sortable: true,
+        cellTitle: (row: Row) => `${row.capabilityName} · ${row.capability}`,
+        render: (row: Row) => <span className="block truncate">{row.capabilityName}</span>,
       },
       {
         key: 'status',
         title: '状态',
-        width: 126,
-        /*
-         * 失败原因直接进列表。此前只有「失败」二字, 原因要进详情抽屉才看得到,
-         * 而详情入口是最右侧一条被横向裁掉一半的文字链 —— 排障动线被迫拉长。
-         */
-        render: (row: Row) => (
-          <div className="flex flex-col gap-0.5">
-            <StatusTag status={row.status} />
-            {row.status === 'failed' && row.errorCode && (
-              <span className="text-[12px] text-muted-foreground" title={row.errorCode}>
-                {taskErrorLabel(row.errorCode)}
-              </span>
-            )}
-          </div>
-        ),
+        width: 92,
+        sortable: true,
+        cellTitle: (row: Row) =>
+          row.status === 'failed' && row.errorCode ? taskErrorLabel(row.errorCode) : undefined,
+        render: (row: Row) => <StatusTag status={row.status} />,
       },
       {
         key: 'provider',
         title: '通道',
-        width: 88,
+        width: 78,
         /*
          * `pending` 是建任务时的初值 (还没跑出真实通道)。对失败任务显示「待执行」
          * 会与同一行的「失败」互相矛盾, 读起来像任务没开始跑; 这类行一律显示「—」。
@@ -443,66 +446,70 @@ export function AdminTasksPage() {
           !row.provider || (row.provider === 'pending' && row.status !== 'queued') ? (
             <span className="text-muted-foreground">—</span>
           ) : (
-            <span className="rounded bg-muted px-1.5 py-0.5 text-[12px] text-muted-foreground">
+            <span className="rounded bg-muted px-1.5 py-0.5 text-[12px] whitespace-nowrap text-muted-foreground">
               {PROVIDER_LABELS[row.provider] ?? row.provider}
             </span>
           ),
       },
       {
-        key: 'owner',
-        title: '归属',
-        width: 276,
+        key: 'user',
+        title: '用户',
+        width: 156,
+        cellTitle: (row: Row) => row.user.email,
         render: (row: Row) => (
-          <div className="flex flex-col gap-0.5">
-            <Link
-              className="block max-w-[250px] truncate text-brand hover:underline"
-              title={row.user.email}
-              to={adminUserDetailHref(row.user.id)}
-            >
-              {row.user.email}
-            </Link>
-            <span
-              className="block max-w-[250px] truncate text-[12px] text-muted-foreground"
-              title={row.project.name}
-            >
-              项目 ·{' '}
-              <Link
-                className="text-brand hover:underline"
-                to={adminTasksHref({ projectId: row.project.id })}
-              >
-                {row.project.name}
-              </Link>
-            </span>
-          </div>
+          <Link
+            className="block truncate text-brand hover:underline"
+            to={adminUserDetailHref(row.user.id)}
+          >
+            {row.user.email}
+          </Link>
+        ),
+      },
+      {
+        key: 'project',
+        title: '项目',
+        width: 128,
+        cellTitle: (row: Row) => row.project.name,
+        render: (row: Row) => (
+          <Link
+            className="block truncate text-brand hover:underline"
+            to={adminTasksHref({ projectId: row.project.id })}
+          >
+            {row.project.name}
+          </Link>
         ),
       },
       {
         key: 'durationMs',
-        title: '耗时 / 创建时间',
-        width: 150,
+        title: '耗时',
+        width: 76,
+        cellTitle: (row: Row) =>
+          row.status === 'running' ? '任务执行中，耗时仍在增长' : undefined,
         render: (row: Row) => (
-          <div className="flex flex-col gap-0.5">
-            <span className="tabular-nums">
-              {fmtDuration(row.durationMs)}
-              {/* running 的耗时仍在增长, 不加标注会被当成已完成的耗时读 */}
-              {row.status === 'running' && (
-                <span className="text-[12px] text-muted-foreground"> · 进行中</span>
-              )}
-            </span>
-            <span className="text-[12px] tabular-nums text-muted-foreground">
-              {new Date(row.createdAt).toLocaleString('zh-CN')}
-            </span>
-          </div>
+          <span className="text-[12px] tabular-nums whitespace-nowrap">
+            {fmtDuration(row.durationMs)}
+          </span>
+        ),
+      },
+      {
+        key: 'createdAt',
+        title: '创建时间',
+        width: 140,
+        sortable: true,
+        render: (row: Row) => (
+          <span className="block truncate text-[12px] tabular-nums text-muted-foreground">
+            {new Date(row.createdAt).toLocaleString('zh-CN')}
+          </span>
         ),
       },
       {
         key: 'ops',
-        title: '',
-        width: 130,
+        title: '操作',
+        width: 148,
         /* 固定在最右, 保证滚动时主操作仍可见 */
         fixed: 'right',
         render: (row: Row) => (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 whitespace-nowrap">
             <ActionButton variant="ghost" size="sm" onClick={() => setDetailId(row.id)}>
               详情
             </ActionButton>
@@ -524,6 +531,20 @@ export function AdminTasksPage() {
                 终止
               </ActionButton>
             )}
+            {/* 仅终态可删；排队中/执行中必须先终止，避免 worker 回写已删除任务 */}
+            {(row.status === 'succeeded' ||
+              row.status === 'failed' ||
+              row.status === 'cancelled') &&
+              can('task.delete') && (
+                <ActionButton
+                  variant="ghost"
+                  size="sm"
+                  className="text-danger-text hover:text-danger-text"
+                  onClick={() => openConfirm('delete', row)}
+                >
+                  删除
+                </ActionButton>
+              )}
           </div>
         ),
       },
@@ -554,26 +575,13 @@ export function AdminTasksPage() {
 
   return (
     <>
-      <PageHeader
-        title="任务监控"
-        description={`${
-          list
-            ? `共 ${list.total.toLocaleString('zh-CN')} 条${hasFilter ? '符合筛选' : '任务'}`
-            : '生成任务的实时状态'
-        } · 状态、输入产出与失败重试`}
-        actions={
-          can('data.export') ? (
-            <ActionButton
-              variant="secondary"
-              size="sm"
-              icon={Download}
-              disabled={exporting}
-              onClick={() => void exportCsv()}
-            >
-              {exporting ? '导出中…' : '导出 CSV'}
-            </ActionButton>
-          ) : undefined
-        }
+      <PageHeader title="任务监控" />
+
+      <TaskStats
+        total={list?.total ?? null}
+        congestion={liveCongestion ?? null}
+        hasFilter={hasFilter}
+        loading={loading}
       />
 
       {/* 超阈值只在真的超了才出现：常亮的阈值提示会变成装饰 */}
@@ -612,7 +620,7 @@ export function AdminTasksPage() {
           allowClear
           value={provider}
           onChange={setProvider}
-          options={PROVIDER_OPTIONS}
+          options={providerOptions}
         />
         {/*
          * 用户/项目用 id 直填而非下拉:
@@ -665,39 +673,83 @@ export function AdminTasksPage() {
       {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
       {error && data && <StaleError error={error} onRetry={reload} />}
 
-      <Panel title="任务列表" note={list ? `${list.total.toLocaleString('zh-CN')} 条` : undefined}>
-        <BatchBar count={selected.length} unit="项">
-          {can('task.retry') && (
+      <Panel
+        title="任务列表"
+        extra={
+          <>
+            <BatchBar
+              count={selected.length}
+              unit="项"
+              className="mb-0 rounded-none border-0 bg-transparent p-0"
+            >
+              {can('task.retry') && (
+                <ActionButton
+                  variant="secondary"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => {
+                    setReason('');
+                    setBatchKind('retry');
+                  }}
+                >
+                  批量重试
+                </ActionButton>
+              )}
+              {can('task.cancel') && (
+                <ActionButton
+                  variant="destructive"
+                  size="sm"
+                  disabled={busy}
+                  onClick={() => {
+                    setReason('');
+                    setBatchKind('cancel');
+                  }}
+                >
+                  批量终止
+                </ActionButton>
+              )}
+              {can('task.delete') && (
+                <ActionButton
+                  variant="ghost"
+                  size="sm"
+                  className="text-danger-text hover:text-danger-text"
+                  disabled={busy}
+                  onClick={() => {
+                    setReason('');
+                    setBatchKind('delete');
+                  }}
+                >
+                  批量删除
+                </ActionButton>
+              )}
+              <ActionButton variant="ghost" size="sm" onClick={() => setSelected([])}>
+                清空选择
+              </ActionButton>
+            </BatchBar>
+            {selected.length > 0 && <span className="h-5 w-px bg-border" aria-hidden />}
             <ActionButton
               variant="secondary"
               size="sm"
-              disabled={busy}
-              onClick={() => {
-                setReason('');
-                setBatchKind('retry');
-              }}
+              icon={RefreshCw}
+              disabled={loading}
+              onClick={reload}
             >
-              批量重试
+              {loading ? '刷新中…' : '刷新'}
             </ActionButton>
-          )}
-          {can('task.cancel') && (
-            <ActionButton
-              variant="destructive"
-              size="sm"
-              disabled={busy}
-              onClick={() => {
-                setReason('');
-                setBatchKind('cancel');
-              }}
-            >
-              批量终止
-            </ActionButton>
-          )}
-          <ActionButton variant="ghost" size="sm" onClick={() => setSelected([])}>
-            清空选择
-          </ActionButton>
-        </BatchBar>
-
+            {can('data.export') && (
+              <ActionButton
+                variant="secondary"
+                size="sm"
+                icon={Download}
+                disabled={exporting}
+                onClick={() => void exportCsv()}
+              >
+                {exporting ? '导出中…' : '导出 CSV'}
+              </ActionButton>
+            )}
+          </>
+        }
+      >
         <AdminDataTable<Row>
           rows={list?.items ?? []}
           columns={columns}
@@ -705,8 +757,11 @@ export function AdminTasksPage() {
           loading={loading}
           error={error}
           onRetry={reload}
-          /* 1440px 视口下内容区约 1109px；1120 会多出 11px 横向滚动 */
+          sort={params.sort as string | undefined}
+          onSortChange={(next) => setQuery({ sort: next ?? 'createdAt:desc' }, false)}
+          /* 单字段单行展示: 固定列宽，避免内容把行高重新撑成两行 */
           minWidth={1080}
+          fixedLayout
           selectable
           selected={selected}
           onSelectedChange={setSelected}
@@ -749,18 +804,33 @@ export function AdminTasksPage() {
         rows={list?.items ?? []}
         canRetry={can('task.retry')}
         canCancel={can('task.cancel')}
+        canDelete={can('task.delete')}
         onClose={() => setDetailId(null)}
         onAction={openConfirm}
       />
 
-      {confirm && (
+      {confirm?.kind === 'delete' && (
+        <TaskDeleteDialog
+          open
+          title="删除任务及其产出"
+          target={`任务 ${shortId(confirm.task.id)} · ${confirm.task.capabilityName}`}
+          loading={busy}
+          onCancel={() => setConfirm(null)}
+          onConfirm={() => void runConfirm()}
+        />
+      )}
+
+      {confirm && confirm.kind !== 'delete' && (
         <ConfirmAction
           open
           title={confirm.kind === 'retry' ? '重试失败任务' : '终止任务'}
           confirmText={confirm.kind === 'retry' ? '新建任务并重试' : '确认终止'}
           danger={confirm.kind === 'cancel'}
           loading={busy}
-          onCancel={() => setConfirm(null)}
+          onCancel={() => {
+            setConfirm(null);
+            setReason('');
+          }}
           onConfirm={() => void runConfirm()}
           description={
             confirm.kind === 'retry' ? (
@@ -794,18 +864,15 @@ export function AdminTasksPage() {
                 ]
           }
           extra={
-            /*
-             * 操作原因不是强制项但强烈建议填 —— 它会被 AuditInterceptor
-             * 写进操作审计表。事后有人问"这个任务为什么被终止"时,
-             * 这一行字就是唯一答案。
-             */
             <FormField label="操作原因（会记入操作审计）">
               <TextField
                 ariaLabel="操作原因"
                 value={reason}
                 onChange={setReason}
                 placeholder={
-                  confirm.kind === 'retry' ? '如：用户反馈重试一次' : '如：任务卡死，用户申请作废'
+                  confirm.kind === 'retry'
+                    ? '如：用户反馈重试一次'
+                    : '如：任务卡死，用户申请作废'
                 }
                 maxLength={200}
               />
@@ -814,8 +881,19 @@ export function AdminTasksPage() {
         />
       )}
 
-      {/* 批量重试 / 终止: 一次作用于 N 条, 更需要理由留痕 */}
-      {batchKind && (
+      {/* 批量重试 / 终止 / 删除: 一次作用于 N 条, 更需要理由留痕 */}
+      {batchKind === 'delete' && (
+        <TaskDeleteDialog
+          open
+          title={`批量删除 ${selected.length} 个任务`}
+          target={`已选择 ${selected.length} 个任务；排队中、执行中或已不存在的任务会被跳过。`}
+          loading={busy}
+          onCancel={() => setBatchKind(null)}
+          onConfirm={() => void runBatch(batchKind)}
+        />
+      )}
+
+      {batchKind && batchKind !== 'delete' && (
         <ConfirmAction
           open
           title={
@@ -866,7 +944,9 @@ export function AdminTasksPage() {
                 value={reason}
                 onChange={setReason}
                 placeholder={
-                  batchKind === 'retry' ? '如：通道恢复后批量重试' : '如：批量清理卡死任务'
+                  batchKind === 'retry'
+                    ? '如：通道恢复后批量重试'
+                    : '如：批量清理卡死任务'
                 }
                 maxLength={200}
               />

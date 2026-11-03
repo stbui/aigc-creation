@@ -54,6 +54,7 @@ export const PERMISSIONS = {
   taskRead: 'task.read',
   taskRetry: 'task.retry',
   taskCancel: 'task.cancel',
+  taskDelete: 'task.delete',
 
   // 商品
   productRead: 'product.read',
@@ -171,6 +172,7 @@ export const ROLE_PERMISSIONS: Record<AdminRoleCode, Permission[]> = {
     PERMISSIONS.taskRead,
     PERMISSIONS.taskRetry,
     PERMISSIONS.taskCancel,
+    PERMISSIONS.taskDelete,
     PERMISSIONS.complianceRead,
     PERMISSIONS.contentRead,
     PERMISSIONS.capabilityRead,
@@ -237,6 +239,7 @@ export const HIGH_RISK_PERMISSIONS: Permission[] = [
   PERMISSIONS.userResetPassword,
   PERMISSIONS.assetDelete,
   PERMISSIONS.projectDelete,
+  PERMISSIONS.taskDelete,
   PERMISSIONS.orderRefund,
   PERMISSIONS.creditAdjust,
   PERMISSIONS.complianceTakedown,

@@ -26,11 +26,17 @@ export interface DropdownItem {
 }
 
 export interface DropdownProps {
-  menu: { items: DropdownItem[] };
+  menu: {
+    /** 菜单顶部的自定义信息区，不参与键盘菜单项导航。 */
+    header?: ReactNode;
+    items: DropdownItem[];
+  };
   children: ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   placement?: 'bottomLeft' | 'bottomRight' | 'topLeft' | 'topRight';
+  /** 是否锁定页面滚动。账户菜单这类大面板应保持页面可滚动。 */
+  modal?: boolean;
   classNames?: { root?: string };
 }
 
@@ -41,19 +47,21 @@ export function Dropdown({
   open,
   onOpenChange,
   placement = 'bottomLeft',
+  modal = true,
   classNames,
 }: DropdownProps) {
   const side = placement.startsWith('top') ? 'top' : 'bottom';
   const align = placement.endsWith('Right') ? 'end' : 'start';
 
   return (
-    <DropdownMenu open={open} onOpenChange={onOpenChange}>
+    <DropdownMenu open={open} onOpenChange={onOpenChange} modal={modal}>
       <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
       <DropdownMenuContent
         side={side}
         align={align}
         className={cn('ui-dropdown-content min-w-[180px]', classNames?.root)}
       >
+        {menu.header}
         {menu.items.map((item) =>
           item.type === 'divider' ? (
             <DropdownMenuSeparator key={item.key} />

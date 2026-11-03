@@ -1,3 +1,4 @@
+import { Select } from '../../ui';
 import type { ParamOption } from './components';
 
 /**
@@ -17,16 +18,12 @@ interface FormSelectProps {
 }
 
 export function FormSelect({ label, value, options, onChange }: FormSelectProps) {
+  // Select 不用 <label> 包裹: label 会把点击转发给触发按钮, 表现为「打开即关闭」;
+  // 无障碍名走 aria-label。
   return (
-    <label className="pk-field">
+    <div className="pk-field">
       <span className="pk-field-label">{label}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)}>
-        {options.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </label>
+      <Select value={value} onChange={onChange} options={options} aria-label={label} />
+    </div>
   );
 }

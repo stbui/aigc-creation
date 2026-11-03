@@ -12,5 +12,9 @@
 /** 通用接口模块 (生成 / 提示词工具 / 幂等键) */
 export { generateApi, newIdempotencyKey, promptToolsApi } from '../../lib/api';
 
-/** 前台模型目录数据层: 建任务必须解析出 `logicalModelId` */
-export { resolveModelId } from '../../lib/models';
+/** 素材读取 / 上传与地址换算: 提交前把跨项目输入复制到当前项目 */
+export { assetsApi, assetSrc, toAbsoluteUrl } from '../../lib/api';
+export type { Asset } from '../../types/api';
+
+/** 前台模型目录数据层: 建任务必须解析出真实模型与 `logicalModelId` */
+export { resolveModel, resolveModelId } from '../../lib/models';

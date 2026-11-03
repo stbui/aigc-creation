@@ -1,6 +1,7 @@
 import { ChevronDown, X } from 'lucide-react';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { ratioOptions, resolutionOptions } from '../lib/optionSets';
+import { Button } from '../ui';
 
 /**
  * 高级设置浮层（比例 + 画质）—— 工具页通用能力。
@@ -97,8 +98,8 @@ export function ToolSettingsPopover({
 
   return (
     <div className="pk-settings-shell" ref={shellRef}>
-      <button
-        type="button"
+      <Button
+        type="text"
         className={`pk-settings-summary${open ? ' pk-settings-summary-open' : ''}`}
         aria-expanded={open}
         onClick={onToggle}
@@ -106,8 +107,8 @@ export function ToolSettingsPopover({
         <span className="pk-settings-label">高级设置</span>
         {showRatio && ratio && <span className="pk-settings-chip">比例 {ratioLabel(ratio)}</span>}
         {showResolution && <span className="pk-settings-chip">画质 {resolution.toUpperCase()}</span>}
-        <ChevronDown size={15} className="pk-settings-chevron" />
-      </button>
+        <ChevronDown size={15} className="pk-settings-chevron size-[15px]" />
+      </Button>
 
       {open && (
         <div
@@ -118,15 +119,15 @@ export function ToolSettingsPopover({
           {header ?? (
             <div className="pk-settings-popover-head">
               <h2>高级设置</h2>
-              <button
-                type="button"
+              <Button
+                type="text"
                 className="pk-settings-close"
                 aria-label="关闭高级设置"
                 title="关闭"
                 onClick={onClose ?? onToggle}
               >
-                <X size={18} />
-              </button>
+                <X size={18} className="size-[18px]" />
+              </Button>
             </div>
           )}
           {modelPicker}
@@ -137,15 +138,15 @@ export function ToolSettingsPopover({
                 {ratioOptions(capabilityId).map((o) => {
                   const v = String(o.value);
                   return (
-                    <button
+                    <Button
                       key={v}
-                      type="button"
+                      type="text"
                       className={`pk-ratio-option${v === ratio ? ' pk-option-active' : ''}`}
                       aria-pressed={v === ratio}
                       onClick={() => onRatioChange?.(v)}
                     >
                       <small>{shortRatioLabel(o.label, v)}</small>
-                    </button>
+                    </Button>
                   );
                 })}
               </div>
@@ -156,9 +157,9 @@ export function ToolSettingsPopover({
               <strong className="pk-settings-group-label">{resolutionTitle}</strong>
               <div className="pk-resolution-grid">
                 {resolutionOptions(capabilityId).map((o) => (
-                  <button
+                  <Button
                     key={String(o.value)}
-                    type="button"
+                    type="text"
                     className={`pk-resolution-option${o.value === resolution ? ' pk-option-active' : ''}`}
                     aria-pressed={o.value === resolution}
                     disabled={o.disabled}
@@ -170,7 +171,7 @@ export function ToolSettingsPopover({
                         非 "1k/2k/4k" 形态的取值仍回落到后端 label, 不硬造缩写。 */}
                     <strong>{shortResolutionLabel(o.value, o.label)}</strong>
                     <span>{o.sub}</span>
-                  </button>
+                  </Button>
                 ))}
               </div>
             </div>

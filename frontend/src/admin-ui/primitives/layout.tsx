@@ -145,7 +145,7 @@ export function StatCard({
         tone === 'warn' && 'border-warn-soft bg-warn-soft/40',
       )}
     >
-      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
       <div
         className={cn(
           'mt-1 text-[22px] leading-7 font-semibold text-foreground tabular-nums',
@@ -236,10 +236,12 @@ export function DetailSection({
 export function BatchBar({
   count,
   unit = '项',
+  className,
   children,
 }: {
   count: number;
   unit?: string;
+  className?: string;
   children: ReactNode;
 }) {
   if (count <= 0) return null;
@@ -247,7 +249,10 @@ export function BatchBar({
     <div
       role="status"
       data-testid="admin-batch-bar"
-      className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-accent px-3 py-2"
+      className={cn(
+        'mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-accent px-3 py-2',
+        className,
+      )}
     >
       <span className="text-xs font-medium text-accent-foreground">
         已选 {count} {unit}

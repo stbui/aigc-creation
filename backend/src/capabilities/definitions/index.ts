@@ -17,6 +17,7 @@ import { Recolor } from './recolor';
 import { Rotate } from './rotate';
 import { FreeCreate } from './free_create';
 import { ImageToVideo } from './image_to_video';
+import { ShoppableCarousel } from './shoppable_carousel';
 
 /**
  * 能力清单聚合入口 (2026-10-20 抽离)。
@@ -51,6 +52,7 @@ export const CAPABILITY_PLUGINS: CapabilityPlugin[] = [
   Rotate,
   FreeCreate,
   ImageToVideo,
+  ShoppableCarousel,
 ];
 
 /*

@@ -4,7 +4,6 @@ import { Maximize2, Sparkles } from 'lucide-react';
 import {
   MAX_DESC_LEN,
   MAX_IMAGE_MB,
-  MAX_IMAGES,
   MAX_NAME_LEN,
 } from './constants';
 import { ToolImageDropzone } from './components';
@@ -20,6 +19,8 @@ import { Input, Select } from '../../ui';
  */
 export function ProductKitSettings({
   images,
+  maxImages,
+  imageLimitError,
   uploading,
   fileInputRef,
   onFiles,
@@ -41,6 +42,10 @@ export function ProductKitSettings({
   onExpandDescription,
 }: {
   images: UploadedImage[];
+  /** 当前模型能力合同允许的图片数（已与页面上限取较小值） */
+  maxImages: number;
+  /** 已选素材超过模型上限时的可读原因 */
+  imageLimitError?: string | null;
   uploading: boolean;
   fileInputRef: RefObject<HTMLInputElement | null>;
   onFiles: (files: FileList | File[]) => void;
@@ -66,7 +71,7 @@ export function ProductKitSettings({
       <ToolImageDropzone
         title="上传商品图"
         images={images}
-        max={MAX_IMAGES}
+        max={maxImages}
         maxMb={MAX_IMAGE_MB}
         uploading={uploading}
         fileInputRef={fileInputRef}
@@ -76,6 +81,11 @@ export function ProductKitSettings({
         onOpenMobile={onOpenMobile}
         noun="商品图片"
       />
+      {imageLimitError && (
+        <p className="pk-image-limit-error" role="alert">
+          {imageLimitError}
+        </p>
+      )}
 
       <div className="pk-section">
         <strong className="pk-section-title">

@@ -53,17 +53,23 @@ export function BillingFilterBar({
     <FilterBar>
       <SelectField
         ariaLabel="账单状态"
+        placeholder="全部状态"
+        clearLabel="全部状态"
         value={status}
         options={[REVIEW_OPTION, ...STATUS_OPTIONS]}
         allowClear
         onChange={onStatusChange}
+        className="w-36"
       />
       <SelectField
         ariaLabel="计费方式"
+        placeholder="全部计费方式"
+        clearLabel="全部计费方式"
         value={billingMode}
         options={BILLING_MODE_OPTIONS}
         allowClear
         onChange={onBillingModeChange}
+        className="w-32"
       />
       <TextField
         ariaLabel="模型编码"
@@ -71,6 +77,7 @@ export function BillingFilterBar({
         onChange={onModelChange}
         placeholder="前台模型编码"
         onEnter={onApply}
+        className="w-40"
       />
       <TextField
         ariaLabel="用户 ID"
@@ -78,6 +85,7 @@ export function BillingFilterBar({
         onChange={onUserIdChange}
         placeholder="用户 ID"
         onEnter={onApply}
+        className="w-40"
       />
       <TextField
         ariaLabel="任务 ID"
@@ -85,9 +93,22 @@ export function BillingFilterBar({
         onChange={onTaskIdChange}
         placeholder="任务 ID"
         onEnter={onApply}
+        className="w-40"
       />
-      <TextField ariaLabel="开始日期" type="date" value={from} onChange={onFromChange} />
-      <TextField ariaLabel="结束日期" type="date" value={to} onChange={onToChange} />
+      <TextField
+        ariaLabel="开始日期"
+        type="date"
+        value={from}
+        onChange={onFromChange}
+        className="w-36"
+      />
+      <TextField
+        ariaLabel="结束日期"
+        type="date"
+        value={to}
+        onChange={onToChange}
+        className="w-36"
+      />
       <FilterActions>
         <ActionButton variant="default" size="sm" onClick={onApply}>
           查询

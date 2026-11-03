@@ -1,25 +1,15 @@
-import { useRef, useState } from 'react';
-import { ChevronDown, ChevronLeft, Download, ImagePlus, Layers, RefreshCw, Sparkles, X } from 'lucide-react';
+import { useState } from 'react';
 
 import {
-  ALL_SCENES,
-  EMPTY_HINT,
-  EMPTY_TITLE,
   MAX_ACCENTS,
   MAX_IMAGE_BYTES,
   MAX_IMAGE_MB,
   MAX_TOTAL,
-  SCENE_GROUPS,
-  SUPPORTED_IMAGE_ACCEPT,
   SUPPORTED_IMAGE_LABEL,
-  UPLOAD_SUBJECT_HINT,
-  VARIANT_COUNTS,
 } from './constants';
 import {
   AssetLibraryModal,
   MobileUploadModal,
-  ProviderBadge,
-  ToolGeneratingState,
   type ToolAsset,
   type ToolResult,
 } from './components';
@@ -36,7 +26,6 @@ import {
 } from './hooks';
 import {
   assetSrc,
-  assetThumbUrl,
   assetsApi,
   generateApi,
   promptToolsApi,
@@ -50,14 +39,19 @@ import {
   multiFusionCreditCost,
   outputsOf,
   pollToResult,
-  ratioOptions,
+  promptToolErrorMessage,
   resolutionOptions,
   resultsOf,
-  sceneImage,
-  sceneLabel,
 } from './utils';
+import { MultiFusionAnalysisCard } from './MultiFusionAnalysisCard';
+import { MultiFusionEditorHeader } from './MultiFusionEditorHeader';
+import { MultiFusionParameterCard } from './MultiFusionParameterCard';
+import { MultiFusionResultPanel } from './MultiFusionResultPanel';
+import { MultiFusionSceneGateway } from './MultiFusionSceneGateway';
+import { MultiFusionSubmitBar } from './MultiFusionSubmitBar';
+import { MultiFusionUploadCard } from './MultiFusionUploadCard';
 import type { Asset, MobileUploadAsset } from '../../types/api';
-import { useApp, Spin } from '../../ui';
+import { useApp } from '../../ui';
 
 /**
  * 多图融合 —— 严格 1:1 复刻参考站 https://ijihua.cn/multi-image-fusion。
@@ -78,6 +72,8 @@ import { useApp, Spin } from '../../ui';
  *   - 比例项数/顺序、画质选项列表参考站无证据 → 沿用本地既有列表, 未按猜测调整
  *   - `.multi-image-fusion-step` / `-description*` / `-scene-state` 参考站当前流程不渲染
  *     → 本页不加入这些元素 (spec §4.2)
+ *
+ * 状态与写操作留在本页; 展示板块拆成 `MultiFusion*` 业务组件 (见同目录各文件)。
  */
 
 export function MultiFusionPage() {
@@ -88,8 +84,6 @@ export function MultiFusionPage() {
   const reportError = useGenerateError();
   const { ensureProject } = useProject();
   const { token, openLogin } = useAuth();
-  const subjectInputRef = useRef<HTMLInputElement>(null);
-  const accentInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<'gateway' | 'workspace'>('gateway');
   const [scene, setScene] = useState('print_pattern');
@@ -97,7 +91,6 @@ export function MultiFusionPage() {
   const [subject, setSubject] = useState<ToolAsset | null>(null);
   const [accents, setAccents] = useState<ToolAsset[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [dragging, setDragging] = useState(false);
   /**
    * 手机上传弹窗的目标位。
    *
@@ -138,11 +131,6 @@ export function MultiFusionPage() {
       ? null
       : multiFusionCreditCost(baseCreditCost, variantCount, resolutionMultiplier);
   const compactCreditLabel = compactCreditLabelOf(currentCreditCost);
-  /**
-   * 参考站搭配图空态只有一个添加入口，槽内文案明确剩余额度。
-   * 已满 5 张时不再渲染添加入口。
-   */
-  const accentRoom = Math.max(0, MAX_ACCENTS - accents.length);
   const activeResult = results[activeResultIndex] ?? results[0] ?? null;
 
   const uploadTo = async (files: FileList | File[], target: 'subject' | 'accent') => {
@@ -328,7 +316,7 @@ export function MultiFusionPage() {
       const { text } = await promptToolsApi.imageToPrompt(subject.id);
       const content = text?.trim();
       if (!content) {
-        const hint = '模型没有返回内容，请重试';
+        const hint = '这次没有生成可用内容，请重试';
         setAnalysisMessage({ kind: 'error', text: hint });
         message.warning(hint);
         return;
@@ -337,7 +325,7 @@ export function MultiFusionPage() {
       setDescriptionOpen(true);
       message.success('已按主体图生成画面描述，可继续编辑');
     } catch (e) {
-      const hint = (e as Error).message || '识图失败：文本通道未配置';
+      const hint = promptToolErrorMessage(e, 'image');
       setAnalysisMessage({ kind: 'error', text: hint });
       message.error(hint);
     } finally {
@@ -409,51 +397,16 @@ export function MultiFusionPage() {
   // ── 状态 1: 场景网关 (无 header / 无返回键, 见 §2) ──
   if (step === 'gateway') {
     return (
-      <div className="multi-image-fusion-page is-scene-selection">
-        <section className="multi-image-fusion-scene-selection">
-          {SCENE_GROUPS.map((g) => (
-            <section key={g.name} className="multi-image-fusion-scene-group">
-              <h2>{g.name}</h2>
-              <div className="multi-image-fusion-scene-grid">
-                {g.scenes.map((s) => (
-                  <button
-                    key={s.value}
-                    type="button"
-                    className="multi-image-fusion-scene-card"
-                    onClick={() => {
-                      setScene(s.value);
-                      setStep('workspace');
-                    }}
-                  >
-                    {/* 15 个场景各配一张 2:1 预览图；图标留在图片下层，加载失败时自然兜底 */}
-                    <span className="multi-image-fusion-scene-visual" aria-hidden>
-                      <Sparkles size={20} />
-                      <img
-                        src={sceneImage(s.value)}
-                        alt=""
-                        width={640}
-                        height={320}
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    </span>
-                    <span className="multi-image-fusion-scene-copy">
-                      <strong>{s.label}</strong>
-                      <small>{s.desc}</small>
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </section>
-          ))}
-        </section>
-      </div>
+      <MultiFusionSceneGateway
+        onSelect={(value) => {
+          setScene(value);
+          setStep('workspace');
+        }}
+      />
     );
   }
 
   // ── 状态 2: 工作区 ──
-  const sceneDef = ALL_SCENES.find((s) => s.value === scene);
-  const resolutionLabel = resolution.toUpperCase();
   const [ratioW, ratioH] = ratio.split(':').map(Number);
   // §1.3: --fusion-ratio-width/height 参考站 CSS 产物中无定义, 由 JS 按所选比例内联注入。
   // 注入在页面根 (而非仅 preview-stage), 因为参考站 rule #155 的自适应宽度规则
@@ -466,491 +419,74 @@ export function MultiFusionPage() {
 
   return (
     <div className="multi-image-fusion-page is-editor" style={fusionRatioVars}>
-      <header className="multi-image-fusion-editor-head">
-        <div className="multi-image-fusion-editor-title">
-          {/* S-13/D-90: 参考站是 30x30 纯图标方块, 无文字 */}
-          <button
-            type="button"
-            className="multi-image-fusion-scene-back"
-            aria-label="返回场景列表"
-            onClick={() => setStep('gateway')}
-          >
-            <ChevronLeft size={16} />
-          </button>
-          <div>
-            <h1>{sceneDef?.label ?? sceneLabel(scene)}</h1>
-            <p>上传主体图和搭配图，AI 将多张图片融合为一张新图</p>
-          </div>
-        </div>
-      </header>
+      <MultiFusionEditorHeader scene={scene} onBack={() => setStep('gateway')} />
 
       <div className="multi-image-fusion-layout">
         <section className="multi-image-fusion-control-column">
           {/* ── 卡片 1/4: 上传图片 ── */}
-          <div className="multi-image-fusion-card multi-image-fusion-upload-card">
-            <div className="multi-image-fusion-card-heading">
-              <div>
-                <h2>上传图片</h2>
-              </div>
-              {/* D-22: 参考站是 11px 弱化灰 #aeacbd, 不是 16px 深色强调 */}
-              <span className="multi-image-fusion-count">
-                {totalCount} / {MAX_TOTAL}
-              </span>
-            </div>
-
-            {/* 主体图: 必传 1 张 */}
-            <div className="multi-image-fusion-upload-section">
-              <div className="multi-image-fusion-field-label">
-                <span>主体图</span>
-                <small>必传 · 1 张</small>
-                <span className="multi-image-fusion-field-actions">
-                  <button
-                    type="button"
-                    className="multi-image-fusion-field-link"
-                    title="从已上传的素材里选一张作为主体图"
-                    onClick={() => openLibraryFor('subject')}
-                  >
-                    从素材库导入
-                  </button>
-                  <button
-                    type="button"
-                    className="multi-image-fusion-field-link multi-image-fusion-mobile-upload-link"
-                    title="扫码在手机上选择图片，接收后进入主体图位"
-                    onClick={() => openMobileUpload('subject')}
-                  >
-                    手机上传
-                  </button>
-                </span>
-              </div>
-              {subject ? (
-                <div className="multi-image-fusion-image-card">
-                  <img
-                    src={assetThumbUrl(subject.url, 320) ?? subject.url}
-                    alt={subject.name}
-                    loading="lazy"
-                    decoding="async"
-                  />
-                  <button
-                    type="button"
-                    className="multi-image-fusion-remove"
-                    aria-label="移除主体图"
-                    onClick={() => setSubject(null)}
-                  >
-                    <X size={12} />
-                  </button>
-                  {uploading && <span className="multi-image-fusion-uploading">上传中</span>}
-                </div>
-              ) : (
-                <button
-                  type="button"
-                  className="multi-image-fusion-upload-empty"
-                  onClick={() => subjectInputRef.current?.click()}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragging(true);
-                  }}
-                  onDragLeave={() => setDragging(false)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    setDragging(false);
-                    if (e.dataTransfer.files.length) void uploadTo(e.dataTransfer.files, 'subject');
-                  }}
-                >
-                  {/* D-31: 参考站有 36x36 圆角色块, 本地原先没有 */}
-                  <span className="multi-image-fusion-upload-icon">
-                    <ImagePlus size={18} />
-                  </span>
-                  <strong>上传主体图</strong>
-                  <span>{UPLOAD_SUBJECT_HINT}</span>
-                </button>
-              )}
-            </div>
-
-            {/* 搭配图: 必传 1-5 张, 参考站是网格小槽 (S-8) */}
-            <div className="multi-image-fusion-upload-section">
-              <div className="multi-image-fusion-field-label">
-                <span>搭配图</span>
-                <small>必传 · 1-5 张</small>
-                <span className="multi-image-fusion-field-actions">
-                  <button
-                    type="button"
-                    className="multi-image-fusion-field-link"
-                    title="从已上传的素材里挑选搭配图"
-                    onClick={() => openLibraryFor('accent')}
-                  >
-                    从素材库导入
-                  </button>
-                  <button
-                    type="button"
-                    className="multi-image-fusion-field-link multi-image-fusion-mobile-upload-link"
-                    title="扫码在手机上选择图片，接收后进入搭配图位"
-                    onClick={() => openMobileUpload('accent')}
-                  >
-                    手机上传
-                  </button>
-                </span>
-              </div>
-              <div
-                className={`multi-image-fusion-accessory-grid${dragging ? ' is-dragging' : ''}`}
-                onDragOver={(e) => e.preventDefault()}
-                onDragLeave={() => setDragging(false)}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  setDragging(false);
-                  if (e.dataTransfer.files.length) void uploadTo(e.dataTransfer.files, 'accent');
-                }}
-              >
-                {accents.map((a) => (
-                  <div key={a.id} className="multi-image-fusion-image-card">
-                    <img
-                      src={assetThumbUrl(a.url, 320) ?? a.url}
-                      alt={a.name}
-                      loading="lazy"
-                      decoding="async"
-                    />
-                    <button
-                      type="button"
-                      className="multi-image-fusion-remove"
-                      aria-label={`移除 ${a.name}`}
-                      onClick={() => setAccents((prev) => prev.filter((x) => x.id !== a.id))}
-                    >
-                      <X size={12} />
-                    </button>
-                    {uploading && <span className="multi-image-fusion-uploading">上传中</span>}
-                  </div>
-                ))}
-                {/* 参考站空态只有一个添加入口，并在槽内写明剩余额度 */}
-                {accentRoom > 0 && (
-                  <button
-                    type="button"
-                    className="multi-image-fusion-upload-empty"
-                    aria-label={`添加搭配图，还可添加 ${accentRoom} 张`}
-                    onClick={() => accentInputRef.current?.click()}
-                  >
-                    <span className="multi-image-fusion-upload-icon">
-                      <ImagePlus size={18} />
-                    </span>
-                    <strong>添加搭配图</strong>
-                    <span>还可添加 {accentRoom} 张</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
+          <MultiFusionUploadCard
+            subject={subject}
+            accents={accents}
+            uploading={uploading}
+            totalCount={totalCount}
+            onUploadFiles={(target, files) => void uploadTo(files, target)}
+            onRemoveSubject={() => setSubject(null)}
+            onRemoveAccent={(id) => setAccents((prev) => prev.filter((x) => x.id !== id))}
+            onOpenLibrary={openLibraryFor}
+            onOpenMobile={openMobileUpload}
+          />
 
           {/* ── 卡片 2/4: AI 分析 (S-7: 独立成卡) ── */}
-          <div className="multi-image-fusion-card multi-image-fusion-analysis-card">
-            <div className="multi-image-fusion-card-heading compact">
-              <div>
-                <h2>AI 分析</h2>
-              </div>
-            </div>
-            <button
-              type="button"
-              className="multi-image-fusion-analyze-button"
-              disabled={analyzing}
-              onClick={() => void runAiAnalyze()}
-            >
-              <Sparkles size={14} />
-              <span>{analyzing ? '分析中…' : 'AI 分析'}</span>
-            </button>
-            {analysisMessage && (
-              <p className={`multi-image-fusion-message ${analysisMessage.kind}`} role="status">
-                {analysisMessage.text}
-              </p>
-            )}
-            {/* 默认不占位；只有分析成功后才出现可编辑描述 */}
-            {descriptionOpen && (
-              <label className="multi-image-fusion-description">
-                <span>画面描述</span>
-                <textarea
-                  className="multi-image-fusion-description-editor"
-                  rows={6}
-                  maxLength={4000}
-                  value={prompt}
-                  placeholder="分析后生成场景描述，可继续修改"
-                  onChange={(e) => setPrompt(e.target.value)}
-                />
-              </label>
-            )}
-          </div>
+          <MultiFusionAnalysisCard
+            analyzing={analyzing}
+            message={analysisMessage}
+            descriptionOpen={descriptionOpen}
+            prompt={prompt}
+            onAnalyze={() => void runAiAnalyze()}
+            onPromptChange={setPrompt}
+          />
 
           {/* ── 卡片 3/4: 输出参数 ── */}
-          <div className="multi-image-fusion-card multi-image-fusion-parameter-card">
-            <div className="multi-image-fusion-card-heading compact">
-              <div>
-                <h2>输出参数</h2>
-              </div>
-            </div>
-            <div className="multi-image-fusion-parameter-group">
-              <div className="multi-image-fusion-field-label">
-                <span>变体张数</span>
-              </div>
-              <div className="multi-image-fusion-variant-options" role="radiogroup" aria-label="变体张数">
-                {VARIANT_COUNTS.map((v) => (
-                  <button
-                    key={v}
-                    type="button"
-                    role="radio"
-                    aria-checked={v === variantCount}
-                    className={v === variantCount ? 'selected' : undefined}
-                    onClick={() => setVariantCount(v)}
-                  >
-                    {v} 张
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
+          <MultiFusionParameterCard
+            variantCount={variantCount}
+            onVariantCountChange={setVariantCount}
+          />
 
           {/* ── 卡片 4/4: 提交区 (S-15: sticky 白底容器) ── */}
-          {/* §5.13: 本元素同时挂 image-tool-submit-area 与 multi-image-fusion-submit-area,
-               两者特异度相同, 后定义者胜 → 真实底色 #fff / z-index 10 (非 #f6f7fb / 5) */}
-          <div className="image-tool-submit-area multi-image-fusion-submit-area">
-            <div className="image-output-settings-shell">
-              <button
-                type="button"
-                className="image-output-settings-summary"
-                aria-expanded={settingsOpen}
-                onClick={() => setSettingsOpen((v) => !v)}
-              >
-                <span className="image-output-settings-summary-label">高级设置</span>
-                <span className="image-output-settings-chip">比例 {ratio}</span>
-                <span className="image-output-settings-chip">画质 {resolutionLabel}</span>
-                <ChevronDown size={14} className={settingsOpen ? 'is-open' : undefined} />
-              </button>
-              {settingsOpen && (
-                <div className="image-output-settings-popover">
-                  <div className="image-output-settings-popover-head">
-                    <h2>高级设置</h2>
-                    <button
-                      type="button"
-                      className="image-output-settings-close"
-                      aria-label="关闭高级设置"
-                      title="关闭"
-                      onClick={() => setSettingsOpen(false)}
-                    >
-                      <X size={18} />
-                    </button>
-                  </div>
-                  <div className="image-output-settings">
-                    <div className="image-output-settings-group">
-                      <span className="image-output-settings-label">图片比例</span>
-                      <div className="image-output-ratio-grid" aria-label="图片比例选项">
-                        {ratioOptions('multi_fusion').map((o) => {
-                          const r = String(o.value);
-                          return (
-                            <button
-                              key={r}
-                              type="button"
-                              className={`image-output-ratio-option${r === ratio ? ' active' : ''}`}
-                              aria-pressed={r === ratio}
-                              onClick={() => setRatio(r)}
-                            >
-                              <small>{r}</small>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                    <div className="image-output-settings-group">
-                      <span className="image-output-settings-label">分辨率（积分/权益消耗）</span>
-                      <div className="image-output-resolution-grid" aria-label="分辨率选项">
-                        {resolutionOptions('multi_fusion').map((o) => (
-                          <button
-                            key={o.value}
-                            type="button"
-                            className={`image-output-resolution-option${
-                              o.value === resolution ? ' active' : ''
-                            }`}
-                            aria-pressed={o.value === resolution}
-                            disabled={o.disabled}
-                            title={o.disabled ? o.disabledReason : undefined}
-                            onClick={() => setResolution(String(o.value))}
-                          >
-                            <strong>{o.shortLabel ?? o.label}</strong>
-                            <span>{o.sub}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-            <input
-              ref={subjectInputRef}
-              type="file"
-              accept={SUPPORTED_IMAGE_ACCEPT}
-              hidden
-              onChange={(e) => {
-                if (e.target.files) void uploadTo(e.target.files, 'subject');
-                e.target.value = '';
-              }}
-            />
-            <input
-              ref={accentInputRef}
-              type="file"
-              accept={SUPPORTED_IMAGE_ACCEPT}
-              multiple
-              hidden
-              onChange={(e) => {
-                if (e.target.files) void uploadTo(e.target.files, 'accent');
-                e.target.value = '';
-              }}
-            />
-            <button
-              type="button"
-              className="multi-image-fusion-submit-button"
-              disabled={!subject || accents.length === 0 || submitting || (Boolean(token) && capabilityBlocked)}
-              onClick={() => void submit()}
-            >
-              {submitting ? (
-                <>
-                  <Spin size="small" />
-                  <span>生成中…</span>
-                </>
-              ) : (
-                <>
-                  <span>立即生成</span>
-                  {/* creditLabel 为 null = 能力清单未到 (加载中)。
-                      此时不显示任何价格占位 —— "加载中…"放在价格位上会被读成价格文案,
-                      且用户点下按钮前看不到扣费提示。空着即可, 清单到达后会补上。 */}
-                  {compactCreditLabel && <small>{compactCreditLabel}</small>}
-                </>
-              )}
-            </button>
-            {capabilityBlocked && token && (
-              <p className="tool-submit-notice tool-submit-notice-error">{capabilityReason}</p>
-            )}
-          </div>
+          <MultiFusionSubmitBar
+            submitting={submitting}
+            disabled={
+              !subject || accents.length === 0 || submitting || (Boolean(token) && capabilityBlocked)
+            }
+            blockedReason={capabilityBlocked && token ? capabilityReason : null}
+            creditLabel={compactCreditLabel}
+            settingsOpen={settingsOpen}
+            ratio={ratio}
+            resolution={resolution}
+            onToggleSettings={() => setSettingsOpen((v) => !v)}
+            onRatioChange={setRatio}
+            onResolutionChange={setResolution}
+            onSubmit={() => void submit()}
+          />
         </section>
-
 
         {/* ── 结果面板 ── */}
-        <section className="multi-image-fusion-result-panel">
-          <div className="multi-image-fusion-result-heading">
-            <div>
-              <h2>生成结果</h2>
-              <p>
-                {results.length > 0
-                  ? `${results.length} 个融合变体 · ${ratio}`
-                  : '完成设置后，生成结果会显示在这里'}
-              </p>
-            </div>
-            <div className="multi-image-fusion-result-actions">
-              <button
-                type="button"
-                disabled={
-                  submitting || (Boolean(token) && capabilityBlocked) || results.length === 0
-                }
-                onClick={() => void submit()}
-              >
-                <RefreshCw size={13} />
-                重新生成
-              </button>
-              <button type="button" disabled={!activeResult?.url} onClick={download}>
-                <Download size={13} />
-                一键下载
-              </button>
-            </div>
-          </div>
-
-          {submitting && results.length === 0 && !lastFailure ? (
-            <div
-              className="multi-image-fusion-preview-stage multi-image-fusion-generating-stage"
-              style={{ aspectRatio: `${ratioW} / ${ratioH}` }}
-            >
-              <ToolGeneratingState />
-            </div>
-          ) : lastFailure && results.length === 0 ? (
-            <div
-              className="multi-image-fusion-preview-stage multi-image-fusion-failure-stage"
-              style={{ aspectRatio: `${ratioW} / ${ratioH}` }}
-            >
-              <div className="multi-image-fusion-result-empty">
-                <strong>生成失败</strong>
-                <p>{lastFailure.errorCode ?? '未知错误'}</p>
-              </div>
-            </div>
-          ) : results.length === 0 ? (
-            <div
-              className="multi-image-fusion-result-empty"
-              style={{ aspectRatio: `${ratioW} / ${ratioH}` }}
-            >
-                {/* D-84: 参考站是 96x78 三卡片斜叠插画 (-9deg / 0 / +9deg), 非共用插画组件 */}
-                <div className="multi-image-fusion-empty-art" aria-hidden>
-                  <span>
-                    <ImagePlus size={18} />
-                  </span>
-                  <span>
-                    <Sparkles size={16} />
-                  </span>
-                  <span>
-                    <Layers size={18} />
-                  </span>
-                </div>
-                <strong>{EMPTY_TITLE}</strong>
-                <p>{EMPTY_HINT}</p>
-            </div>
-          ) : activeResult?.url ? (
-            <>
-              {/* D-86: 参考站成功态是棋盘格预览舞台 + 缩略图网格, 不是本地详情卡 */}
-              <div
-                className="multi-image-fusion-preview-stage"
-                style={{
-                  aspectRatio:
-                    activeResult.width && activeResult.height
-                      ? `${activeResult.width} / ${activeResult.height}`
-                      : `${ratioW} / ${ratioH}`,
-                }}
-              >
-                <img
-                  className="multi-image-fusion-preview-image"
-                  src={activeResult.url}
-                  alt={`多图融合结果 ${activeResultIndex + 1}`}
-                />
-                {activeResult.width && activeResult.height && (
-                  <span className="multi-image-fusion-preview-size">
-                    {activeResult.width}×{activeResult.height}
-                  </span>
-                )}
-                {/* 以 pollToResult 的 provider 为准；新任务恒为模型，历史 local 如实保留 */}
-                <ProviderBadge provider={activeResult.provider} className="mif-provider" />
-              </div>
-              <div className="multi-image-fusion-thumbnails">
-                {results.map((item, index) => (
-                  <button
-                    key={item.url ?? index}
-                    type="button"
-                    className={index === activeResultIndex ? 'selected' : undefined}
-                    aria-label={`查看第 ${index + 1} 个融合变体`}
-                    aria-pressed={index === activeResultIndex}
-                    onClick={() => setActiveResultIndex(index)}
-                  >
-                    <img
-                      src={assetThumbUrl(item.url, 240) ?? item.url}
-                      alt={`融合结果缩略图 ${index + 1}`}
-                      loading="lazy"
-                      decoding="async"
-                    />
-                    <span>{index + 1}</span>
-                  </button>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div
-              className="multi-image-fusion-preview-stage"
-              style={{ aspectRatio: `${ratioW} / ${ratioH}` }}
-            >
-              <div className="multi-image-fusion-result-empty">
-                <strong>生成失败</strong>
-                <p>模型没有返回可用图片，请重试</p>
-              </div>
-            </div>
-          )}
-        </section>
+        <MultiFusionResultPanel
+          submitting={submitting}
+          results={results}
+          activeResult={activeResult}
+          activeResultIndex={activeResultIndex}
+          lastFailure={lastFailure}
+          ratio={ratio}
+          ratioWidth={ratioW}
+          ratioHeight={ratioH}
+          canRegenerate={
+            !submitting && !(Boolean(token) && capabilityBlocked) && results.length > 0
+          }
+          onRegenerate={() => void submit()}
+          onDownload={download}
+          onSelectResult={setActiveResultIndex}
+        />
       </div>
 
       {/* 手机上传: 主体位与搭配位共用同一次扫码流程 */}

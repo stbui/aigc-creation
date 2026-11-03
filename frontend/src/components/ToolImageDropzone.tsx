@@ -2,7 +2,7 @@ import { useState, type RefObject } from 'react';
 import { ImagePlus, Plus, X } from 'lucide-react';
 import { SUPPORTED_IMAGE_ACCEPT } from '../lib/constants';
 import { assetThumbUrl } from '../lib/api';
-import { Spin } from '../ui';
+import { Button, Spin } from '../ui';
 
 /**
  * 工具页图片上传区 —— 2026-10-19 从 4 个大页面抽出。
@@ -91,17 +91,17 @@ export function ToolImageDropzone({
           {title}
         </strong>
         <div className="pk-upload-title-actions">
-          <button type="button" className="pk-text-link" onClick={onOpenLibrary}>
+          <Button type="text" className="pk-text-link" onClick={onOpenLibrary}>
             从素材库导入
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            type="text"
             className="pk-text-link"
             title="用手机扫码上传，图片回填到上方"
             onClick={onOpenMobile}
           >
             手机上传
-          </button>
+          </Button>
           {showCount && (
             <span className="pk-upload-count">
               {images.length}/{max}
@@ -156,8 +156,8 @@ export function ToolImageDropzone({
                   loading="lazy"
                   decoding="async"
                 />
-                <button
-                  type="button"
+                <Button
+                  type="text"
                   className="pk-thumb-remove"
                   aria-label={`移除 ${img.name}`}
                   onClick={(e) => {
@@ -165,21 +165,21 @@ export function ToolImageDropzone({
                     onRemove(img.id);
                   }}
                 >
-                  <X size={12} />
-                </button>
+                  <X size={12} className="size-[12px]" />
+                </Button>
               </div>
             ))}
             {!single && images.length < max && (
-              <button
-                type="button"
+              <Button
+                type="text"
                 className="pk-thumb-add"
                 onClick={(e) => {
                   e.stopPropagation();
                   fileInputRef.current?.click();
                 }}
               >
-                <Plus size={18} />
-              </button>
+                <Plus size={18} className="size-[18px]" />
+              </Button>
             )}
           </div>
         )}

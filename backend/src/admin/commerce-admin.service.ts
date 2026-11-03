@@ -1,6 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreditService, microcreditsToCredits, projectEntry } from '../credits/credit.service';
+import {
+  CreditService,
+  emptyBalanceSummary,
+  microcreditsToCredits,
+  projectEntry,
+} from '../credits/credit.service';
 import { OrderService } from '../orders/order.service';
 import { AppError } from '../common/app.exception';
 import { runBatch } from '../common/batch';
@@ -487,23 +492,22 @@ export class AdminCommerceService {
       this.prisma.user.count({ where }),
     ]);
 
-    // 逐个用户汇总余额 —— SQLite 下 ∑(批次) 没有现成聚合接口, 用户量在分页内可控
-    const items = await Promise.all(
-      users.map(async (u) => {
-        const s = await this.credit.balanceOf(u.id);
-        return {
-          userId: u.id,
-          email: u.email,
-          name: u.name,
-          balance: s.balance,
-          expiringSoon: s.expiringSoon,
-          totalEarned: s.totalEarned,
-          totalConsumed: s.totalConsumed,
-          activeLots: s.activeLots,
-          nearestExpiry: s.nearestExpiry,
-        };
-      }),
-    );
+    // 当前页用户一次分组聚合；逐用户调用 balanceOf 会放大成 4×N 次查询
+    const summaries = await this.credit.balancesOf(users.map((u) => u.id));
+    const items = users.map((u) => {
+      const s = summaries.get(u.id);
+      return {
+        userId: u.id,
+        email: u.email,
+        name: u.name,
+        balance: s?.balance ?? 0,
+        expiringSoon: s?.expiringSoon ?? 0,
+        totalEarned: s?.totalEarned ?? 0,
+        totalConsumed: s?.totalConsumed ?? 0,
+        activeLots: s?.activeLots ?? 0,
+        nearestExpiry: s?.nearestExpiry ?? null,
+      };
+    });
     return paginate(items, total, page);
   }
 
@@ -771,9 +775,11 @@ export class AdminCommerceService {
       select: { id: true, email: true, name: true },
     });
 
-    const rows = await Promise.all(
-      users.map(async (u) => ({ ...u, summary: await this.credit.balanceOf(u.id) })),
-    );
+    const summaries = await this.credit.balancesOf(users.map((u) => u.id));
+    const rows = users.map((u) => ({
+      ...u,
+      summary: summaries.get(u.id) ?? emptyBalanceSummary(),
+    }));
     const columns: CsvColumn<(typeof rows)[number]>[] = [
       { label: '用户ID', value: (r) => r.id },
       { label: '邮箱', value: (r) => r.email },

@@ -17,11 +17,13 @@ export { ToolSubmitBar } from '../../components/ToolSubmitBar';
 export { ToolSettingsPopover } from '../../components/ToolSettingsPopover';
 /** 模型选择 */
 export { ModelPicker } from '../../components/ModelPicker';
+/** 模型选择器上报的前台模型类型 */
+export type { PublicLogicalModel } from '../../lib/models';
 /** 素材库选择弹窗 */
 export { AssetLibraryModal } from '../../components/AssetLibraryModal';
 /** 手机扫码上传弹窗 */
 export { MobileUploadModal } from '../../components/MobileUploadModal';
 /** 空态与工作流步骤说明 */
-export { ToolWorkflowSteps } from '../../components/ToolEmptyState';
-/** 右侧结果网格 */
-export { ResultGalleryPane } from '../../components/ResultGalleryPane';
+export { ToolEmptyState, ToolWorkflowSteps } from '../../components/ToolEmptyState';
+/** 大图查看器与它的数据类型 */
+export { ImageLightbox, type LightboxItem } from '../../components/ImageLightbox';

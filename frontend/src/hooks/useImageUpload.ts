@@ -11,6 +11,13 @@ export interface UploadedImage {
   id: string;
   url: string;
   name: string;
+  /**
+   * 素材所属项目。
+   *
+   * 素材库返回完整 Asset，可在这里带上项目归属；手机上传等旧数据可能没有
+   * 该字段，提交时会按 id 回查，避免把其他项目的素材直接送进当前任务。
+   */
+  projectId?: string | null;
 }
 
 interface Options {
@@ -91,7 +98,12 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
         const uploaded: UploadedImage[] = [];
         for (const file of accepted) {
           const asset = await assetsApi.upload(file, projectId);
-          uploaded.push({ id: asset.id, url: assetSrc(asset) ?? '', name: file.name });
+          uploaded.push({
+            id: asset.id,
+            url: assetSrc(asset) ?? '',
+            name: file.name,
+            projectId,
+          });
         }
         // 同步镜像先落，避免上传完成到 setState 之间又触发一次上传
         imagesRef.current = [...imagesRef.current, ...uploaded];
@@ -110,6 +122,17 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
   const removeImage = useCallback((id: string) => {
     imagesRef.current = imagesRef.current.filter((x) => x.id !== id);
     setImages((prev) => prev.filter((x) => x.id !== id));
+  }, []);
+
+  /**
+   * 原位替换一张图片。
+   *
+   * 商品主图提交前会把跨项目素材复制到当前项目；复制成功后立即更新同步镜像
+   * 与 state，既能让用户看到新素材，也能保证失败重试不会重复复制同一张图。
+   */
+  const replaceImage = useCallback((id: string, next: UploadedImage) => {
+    imagesRef.current = imagesRef.current.map((image) => (image.id === id ? next : image));
+    setImages((prev) => prev.map((image) => (image.id === id ? next : image)));
   }, []);
 
   // 参考站支持点击 / 拖拽 / 粘贴三种上传方式（拖拽高亮态在 ToolImageDropzone 内部）
@@ -138,6 +161,7 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
         id: asset.id,
         url: assetSrc(asset) ?? toAbsoluteUrl(asset.sourceUrl) ?? '',
         name: asset.sourceUrl.split('/').pop() ?? '素材',
+        projectId: asset.projectId,
       };
       imagesRef.current = [...current, next];
       setImages((prev) => (prev.some((x) => x.id === next.id) ? prev : [...prev, next]));
@@ -186,6 +210,7 @@ export function useImageUpload({ max, maxMb, noun = '商品图片', initial = []
     fileInputRef,
     uploadFiles,
     removeImage,
+    replaceImage,
     /** 素材库弹窗状态 (openLibrary / closeLibrary / pick) */
     library,
     /** 手机上传弹窗: 状态 + 打开 + 接收回调 (弹窗由页面渲染) */

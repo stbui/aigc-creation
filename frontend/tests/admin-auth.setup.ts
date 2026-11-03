@@ -17,7 +17,7 @@ setup('登录后台并保存会话', async ({ page }) => {
   setup.skip(!HAS_ADMIN_CREDENTIALS, '未提供后台管理员凭据');
 
   await page.goto(`${UI}/login`);
-  await page.locator('input[type="email"], input#email, input[name="email"]').first().fill(ADMIN_EMAIL);
+  await page.locator('input[placeholder="账号（邮箱）"]').first().fill(ADMIN_EMAIL);
   const password = page.locator('input[type="password"]').first();
   await password.fill(ADMIN_PASSWORD);
   await password.press('Enter');

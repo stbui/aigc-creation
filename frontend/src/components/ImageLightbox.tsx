@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Check, ChevronLeft, ChevronRight, Copy, Download, FileText, Minus, Plus, RotateCw, X } from 'lucide-react';
+import { useBodyScrollLock } from '../hooks/useBodyScrollLock';
+import { Button } from '../ui';
 
 /**
  * 生成图大图查看器。
@@ -392,14 +394,8 @@ export function ImageLightbox({
     return () => el.removeEventListener('wheel', onWheel);
   }, [zoomBy]);
 
-  // 打开期间锁住页面滚动，关闭时恢复原值（不假设它一定是空串）
-  useEffect(() => {
-    const previous = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previous;
-    };
-  }, []);
+  // 打开期间锁住页面滚动；弹层宽度补偿由共享 hook 处理。
+  useBodyScrollLock(Boolean(item));
 
   if (!item) return null;
 
@@ -431,37 +427,37 @@ export function ImageLightbox({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <button
+      <Button
         ref={closeRef}
-        type="button"
+        type="text"
         className="img-viewer-close"
         aria-label="关闭预览"
         title="关闭（Esc）"
         onClick={onClose}
       >
-        <X size={20} />
-      </button>
+        <X size={20} className="size-[20px]" />
+      </Button>
 
       {items.length > 1 && (
         <>
-          <button
-            type="button"
+          <Button
+            type="text"
             className="img-viewer-nav is-prev"
             aria-label="上一张"
             title="上一张（←）"
             onClick={() => go(-1)}
           >
-            <ChevronLeft size={22} />
-          </button>
-          <button
-            type="button"
+            <ChevronLeft size={22} className="size-[22px]" />
+          </Button>
+          <Button
+            type="text"
             className="img-viewer-nav is-next"
             aria-label="下一张"
             title="下一张（→）"
             onClick={() => go(1)}
           >
-            <ChevronRight size={22} />
-          </button>
+            <ChevronRight size={22} className="size-[22px]" />
+          </Button>
         </>
       )}
 
@@ -661,9 +657,9 @@ export function ImageLightbox({
           <div className="img-viewer-failed" role="alert" onClick={(e) => e.stopPropagation()}>
             <strong>原图加载失败</strong>
             <span>链接可能已过期或文件已被清理，可先重新加载一次。</span>
-            <button type="button" onClick={retry}>
+            <Button type="text" onClick={retry}>
               重新加载
-            </button>
+            </Button>
           </div>
         )}
       </div>
@@ -671,47 +667,47 @@ export function ImageLightbox({
       <div className="img-viewer-bar" onClick={(e) => e.stopPropagation()}>
         <span className="img-viewer-meta" aria-live="polite">{meta.join(' · ')}</span>
         <div className="img-viewer-zoom">
-          <button type="button" aria-label="缩小" title="缩小（-）" disabled={zoom <= MIN_ZOOM} onClick={() => zoomBy(-ZOOM_STEP)}>
+          <Button type="text" aria-label="缩小" title="缩小（-）" disabled={zoom <= MIN_ZOOM} onClick={() => zoomBy(-ZOOM_STEP)}>
             <Minus size={16} />
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            type="text"
             className="img-viewer-zoom-value"
             aria-label={zoom === 1 ? '适应窗口' : `当前缩放 ${Math.round(zoom * 100)}%，点击适应窗口`}
             title="适应窗口（0）"
             onClick={resetView}
           >
             {zoom === 1 ? '适应' : `${Math.round(zoom * 100)}%`}
-          </button>
-          <button type="button" aria-label="放大" title="放大（+）" disabled={zoom >= MAX_ZOOM} onClick={() => zoomBy(ZOOM_STEP)}>
+          </Button>
+          <Button type="text" aria-label="放大" title="放大（+）" disabled={zoom >= MAX_ZOOM} onClick={() => zoomBy(ZOOM_STEP)}>
             <Plus size={16} />
-          </button>
+          </Button>
         </div>
-        <button
-          type="button"
+        <Button
+          type="text"
           className="img-viewer-rotate"
           aria-label={`顺时针旋转图片${rotation ? `，当前 ${rotation}°` : ''}`}
           aria-keyshortcuts="R"
           title="顺时针旋转 90°（R）"
           onClick={rotate}
         >
-          <RotateCw size={15} />
-        </button>
+          <RotateCw size={15} className="size-[15px]" />
+        </Button>
         <a className="img-viewer-download" href={item.url} download target="_blank" rel="noreferrer" aria-label="下载原图" title="下载原图">
           <Download size={15} />
           <span className="img-viewer-download-text">下载原图</span>
         </a>
         {item.prompt && (
-          <button
-            type="button"
+          <Button
+            type="text"
             className="img-viewer-action"
             aria-label={promptOpen ? '收起提示词' : '查看提示词'}
             aria-expanded={promptOpen}
             onClick={() => setPromptOpen((open) => !open)}
           >
-            <FileText size={15} />
+            <FileText size={15} className="size-[15px]" />
             <span>提示词</span>
-          </button>
+          </Button>
         )}
         {renderActions?.(index)}
       </div>
@@ -720,10 +716,10 @@ export function ImageLightbox({
         <div className="img-viewer-prompt" role="region" aria-label="生成提示词" onClick={(e) => e.stopPropagation()}>
           <div className="img-viewer-prompt-head">
             <strong>生成提示词</strong>
-            <button type="button" onClick={() => void copyPrompt()}>
-              {promptCopied ? <Check size={14} /> : <Copy size={14} />}
+            <Button type="text" onClick={() => void copyPrompt()}>
+              {promptCopied ? <Check size={14} className="size-[14px]" /> : <Copy size={14} className="size-[14px]" />}
               {promptCopied ? '已复制' : '复制'}
-            </button>
+            </Button>
           </div>
           <p>{item.prompt}</p>
         </div>

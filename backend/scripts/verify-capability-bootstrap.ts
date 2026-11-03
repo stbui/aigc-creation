@@ -19,7 +19,7 @@ const ok = (name: string, cond: boolean, detail?: unknown) => {
 };
 
 ok('装配期完整性校验通过 (模块加载未抛错)', true);
-ok('注册表为 16 项 (15 项图像 + 1 项视频)', CAPABILITIES.length === 16, CAPABILITIES.length);
+ok('注册表为 17 项 (16 项图像 + 1 项视频)', CAPABILITIES.length === 17, CAPABILITIES.length);
 ok('definitions 直接导出与 registry 同一数组', CAPABILITY_PLUGINS === CAPABILITIES);
 
 assertCapabilityIntegrity(CAPABILITIES);
@@ -115,4 +115,4 @@ if (fails.length) {
   for (const f of fails) console.error('  ✗ ' + f);
   process.exit(1);
 }
-console.log('装配期自检通过：16 项能力模型-only，无本地生成入口');
+console.log('装配期自检通过：17 项能力模型-only，无本地生成入口');

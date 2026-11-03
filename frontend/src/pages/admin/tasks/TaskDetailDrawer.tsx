@@ -1,15 +1,17 @@
 import { useCallback, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { Check } from 'lucide-react';
+import { Check, Copy, ExternalLink, ImageOff, X } from 'lucide-react';
 import {
   ActionButton,
   AdminDrawer,
   Descriptions,
   DetailSection,
+  Notice,
   StatusTag,
 } from './components';
 import { adminTasksApi, assetThumbUrl, toAbsoluteUrl } from './api';
 import { PROVIDER_LABELS } from './constants';
+import { useToast } from './hooks';
 import {
   adminAssetHref,
   adminCreditHref,
@@ -26,6 +28,8 @@ import type { AdminTask, AdminTaskDetail } from '../../../types/api';
 
 type Row = AdminTask;
 
+type StepState = 'done' | 'active' | 'pending' | 'failed' | 'cancelled';
+
 /**
  * 状态流转时间线。
  *
@@ -35,31 +39,47 @@ type Row = AdminTask;
 function Steps({
   items,
 }: {
-  items: Array<{ title: string; done: boolean; active: boolean; description: ReactNode }>;
+  items: Array<{ title: string; state: StepState; description: ReactNode }>;
 }) {
   return (
-    <ol className="flex flex-col gap-3">
+    <ol className="flex flex-col gap-4">
       {items.map((node, index) => (
-        <li key={index} className="flex gap-3">
+        <li key={index} className="relative flex gap-3">
+          {index < items.length - 1 && (
+            <span
+              aria-hidden
+              className="absolute top-5 left-[9.5px] h-[calc(100%+8px)] w-px bg-border"
+            />
+          )}
           <span
             className={cn(
-              'mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border text-[12px] tabular-nums',
-              node.done
+              'relative z-10 mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border text-[12px] tabular-nums',
+              node.state === 'done'
                 ? 'border-success-text bg-success-soft text-success-text'
-                : node.active
-                  ? 'border-brand bg-accent text-brand'
-                  : 'border-border bg-muted text-muted-foreground',
+                : node.state === 'failed'
+                  ? 'border-danger-text bg-danger-soft text-danger-text'
+                  : node.state === 'active'
+                    ? 'border-brand bg-accent text-brand'
+                    : 'border-border bg-muted text-muted-foreground',
             )}
           >
-            {node.done ? <Check className="size-3" aria-hidden /> : index + 1}
+            {node.state === 'done' ? (
+              <Check className="size-3" aria-hidden />
+            ) : node.state === 'failed' || node.state === 'cancelled' ? (
+              <X className="size-3" aria-hidden />
+            ) : (
+              index + 1
+            )}
           </span>
           <div className="min-w-0">
             <div
               className={cn(
                 'text-sm',
-                node.done || node.active
-                  ? 'font-medium text-foreground'
-                  : 'text-muted-foreground',
+                node.state === 'failed'
+                  ? 'font-medium text-danger-text'
+                  : node.state === 'done' || node.state === 'active'
+                    ? 'font-medium text-foreground'
+                    : 'text-muted-foreground',
               )}
             >
               {node.title}
@@ -85,6 +105,7 @@ export function TaskDetailDrawer({
   rows,
   canRetry,
   canCancel,
+  canDelete,
   onClose,
   onAction,
 }: {
@@ -92,233 +113,382 @@ export function TaskDetailDrawer({
   rows: Row[];
   canRetry: boolean;
   canCancel: boolean;
+  canDelete: boolean;
   onClose: () => void;
-  onAction: (kind: 'retry' | 'cancel', task: Row) => void;
+  onAction: (kind: 'retry' | 'cancel' | 'delete', task: Row) => void;
 }) {
+  const toast = useToast();
   const detailFetcher = useCallback(async () => {
     if (!detailId) throw new Error('任务不存在');
     return adminTasksApi.detail(detailId);
   }, [detailId]);
 
+  const copyText = async (label: string, value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(`${label}已复制`);
+    } catch {
+      toast.error('复制失败', '浏览器未授权剪贴板访问，请手动选择文本复制。');
+    }
+  };
+
   return (
     <AdminDrawer<AdminTaskDetail>
       open={detailId !== null}
       title="任务详情"
+      description="查看执行状态、关联信息、输入素材与生成参数"
       onClose={onClose}
       fetcher={detailFetcher}
       footer={(d) => {
-        const row = rows.find((t) => t.id === d.id);
-        if (!row) return null;
+        /*
+         * 直链打开时详情任务不一定在当前分页里。用详情字段合成一行摘要，
+         * 保证重试 / 终止 / 删除动作仍然可用；列表里有时优先复用列表行。
+         */
+        const row: Row =
+          rows.find((t) => t.id === d.id) ?? {
+            id: d.id,
+            capability: d.capability,
+            capabilityName: d.capabilityName,
+            status: d.status,
+            provider: d.provider,
+            errorCode: d.errorCode,
+            creditCost: d.creditCost,
+            retriedFromId: d.retriedFromId,
+            user: d.user,
+            project: d.project,
+            durationMs: d.durationMs,
+            createdAt: d.createdAt,
+            updatedAt: d.updatedAt,
+            thumbnailUrl: null,
+          };
         return (
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex w-full flex-wrap items-center gap-2">
+            <ActionButton variant="ghost" size="sm" className="mr-auto" onClick={onClose}>
+              关闭
+            </ActionButton>
             {d.status === 'failed' && canRetry && (
               <ActionButton variant="default" size="sm" onClick={() => onAction('retry', row)}>
                 重试此任务
               </ActionButton>
             )}
             {(d.status === 'queued' || d.status === 'running') && canCancel && (
-              <ActionButton
-                variant="destructive"
-                size="sm"
-                onClick={() => onAction('cancel', row)}
-              >
+              <ActionButton variant="destructive" size="sm" onClick={() => onAction('cancel', row)}>
                 终止此任务
               </ActionButton>
             )}
+            {(d.status === 'succeeded' || d.status === 'failed' || d.status === 'cancelled') &&
+              canDelete && (
+                <ActionButton
+                  variant="ghost"
+                  size="sm"
+                  className="text-danger-text hover:text-danger-text"
+                  onClick={() => onAction('delete', row)}
+                >
+                  删除此任务
+                </ActionButton>
+              )}
           </div>
         );
       }}
     >
-      {(d) => (
-        <div className="flex flex-col gap-4">
-          <DetailSection title="任务概要">
-            <Descriptions
-              columns={2}
-              items={[
-                {
-                  label: '任务 ID',
-                  value: <code className="break-all font-mono text-xs">{d.id}</code>,
-                },
-                {
-                  label: '能力',
-                  value: (
-                    <span className="flex flex-col">
-                      {d.capabilityName}
-                      <code className="font-mono text-[12px] text-muted-foreground">
-                        {d.capability}
-                      </code>
+      {(d) => {
+        const providerLabel =
+          !d.provider || (d.provider === 'pending' && d.status !== 'queued')
+            ? '—'
+            : (PROVIDER_LABELS[d.provider] ?? d.provider);
+        const errorLabel = d.errorCode ? taskErrorLabel(d.errorCode) : null;
+        const createdAt = new Date(d.createdAt).toLocaleString('zh-CN');
+        const updatedAt = new Date(d.updatedAt).toLocaleString('zh-CN');
+        const paramsJson = JSON.stringify(d.params, null, 2) ?? '{}';
+        const paramCount = Object.keys(d.params).length;
+
+        return (
+          <div className="flex flex-col gap-5">
+            <section
+              aria-labelledby="task-detail-heading"
+              className="rounded-xl border border-border bg-muted/30 p-4"
+            >
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <StatusTag status={d.status} />
+                    <code className="rounded bg-card px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+                      {d.capability}
+                    </code>
+                  </div>
+                  <h2
+                    id="task-detail-heading"
+                    className="mt-2 text-lg font-semibold text-foreground"
+                  >
+                    {d.capabilityName}
+                  </h2>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    创建于{' '}
+                    <time className="tabular-nums" dateTime={d.createdAt}>
+                      {createdAt}
+                    </time>
+                  </p>
+                </div>
+                <ActionButton
+                  variant="outline"
+                  size="sm"
+                  icon={Copy}
+                  ariaLabel="复制任务 ID"
+                  onClick={() => void copyText('任务 ID', d.id)}
+                >
+                  复制 ID
+                </ActionButton>
+              </div>
+
+              <div className="mt-3 flex min-w-0 items-start gap-2 rounded-md border border-border bg-card px-3 py-2">
+                <span className="shrink-0 text-[11px] font-medium text-muted-foreground">
+                  任务 ID
+                </span>
+                <code className="min-w-0 break-all font-mono text-[12px] text-foreground">
+                  {d.id}
+                </code>
+              </div>
+            </section>
+
+            {d.status === 'failed' && (
+              <Notice tone="danger" title="任务失败" className="mb-0">
+                <div className="flex flex-col gap-1">
+                  <span>{errorLabel ?? '未登记错误说明，请结合生成参数与模型调用记录排查。'}</span>
+                  {d.errorCode && (
+                    <span>
+                      错误码：<code className="font-mono">{d.errorCode}</code>
                     </span>
-                  ),
-                },
-                {
-                  label: '状态',
-                  value: (
-                    <span className="flex flex-col gap-0.5">
-                      <StatusTag status={d.status} />
-                      {d.errorCode && (
-                        <span className="text-[12px] text-muted-foreground">
-                          {taskErrorLabel(d.errorCode) === d.errorCode
-                            ? d.errorCode
-                            : `${d.errorCode} · ${taskErrorLabel(d.errorCode)}`}
-                        </span>
-                      )}
-                    </span>
-                  ),
-                },
-                {
-                  label: '通道',
-                  /* 与列表列同一规则：`pending` 是建任务的初值，任务已经失败时
-                   * 再写「待执行」会和上面的「失败」互相矛盾。 */
-                  value:
-                    !d.provider || (d.provider === 'pending' && d.status !== 'queued')
-                      ? '—'
-                      : (PROVIDER_LABELS[d.provider] ?? d.provider),
-                },
-                {
-                  label: '用户',
-                  value: (
-                    <span className="flex flex-col gap-1">
-                      <Link
-                        className="text-brand hover:underline"
-                        to={adminUserDetailHref(d.user.id)}
-                      >
-                        {d.user.email}
-                      </Link>
-                      <span className="flex gap-3 text-[12px]">
+                  )}
+                </div>
+              </Notice>
+            )}
+
+            <DetailSection title="任务概要">
+              <Descriptions
+                columns={2}
+                items={[
+                  {
+                    label: '用户',
+                    value: (
+                      <span className="flex flex-col gap-1">
                         <Link
                           className="text-brand hover:underline"
-                          to={adminCreditHref({ userId: d.user.id, email: d.user.email })}
+                          to={adminUserDetailHref(d.user.id)}
                         >
-                          积分账本
+                          {d.user.email}
                         </Link>
-                        <Link
-                          className="text-brand hover:underline"
-                          to={adminOrderHref({ email: d.user.email })}
-                        >
-                          订单记录
-                        </Link>
-                      </span>
-                    </span>
-                  ),
-                },
-                {
-                  label: '项目',
-                  value: (
-                    <Link
-                      className="text-brand hover:underline"
-                      to={adminTasksHref({ projectId: d.project.id })}
-                    >
-                      {d.project.name}
-                    </Link>
-                  ),
-                },
-                {
-                  label: '耗时',
-                  value: <span className="tabular-nums">{formatDuration(d.durationMs)}</span>,
-                },
-                {
-                  label: '创建时间',
-                  value: (
-                    <span className="tabular-nums">
-                      {new Date(d.createdAt).toLocaleString('zh-CN')}
-                    </span>
-                  ),
-                },
-                ...(d.retriedFromId
-                  ? [
-                      {
-                        label: '重试来源',
-                        value: (
+                        <span className="flex gap-3 text-[12px]">
                           <Link
                             className="text-brand hover:underline"
-                            to={adminTaskHref(d.retriedFromId)}
+                            to={adminCreditHref({
+                              userId: d.user.id,
+                              email: d.user.email,
+                            })}
                           >
-                            <code className="font-mono text-xs">{d.retriedFromId}</code>
+                            积分账本
                           </Link>
-                        ),
-                      },
-                    ]
-                  : []),
-              ]}
-            />
-          </DetailSection>
-
-          <DetailSection title="状态流转">
-            <Steps
-              items={d.timeline.map((n) => ({
-                title: n.label,
-                done: n.done,
-                active: !n.done && d.status !== 'queued',
-                /*
-                 * 没有时间的节点不能一律写「进行中」——
-                 * pending 任务的终态节点会因此被误读成"已经开跑了"。
-                 */
-                description: n.at
-                  ? new Date(n.at).toLocaleString('zh-CN')
-                  : n.done
-                    ? '未记录具体时间'
-                    : d.status === 'queued'
-                      ? '尚未开始'
-                      : '进行中',
-              }))}
-            />
-          </DetailSection>
-
-          <DetailSection title="产出图">
-            {d.outputAsset ? (
-              <>
-                {/* 产出图尺寸不一, 限高避免撑爆抽屉; 原图去素材库看 */}
-                <img
-                  className="max-h-[320px] w-auto rounded-lg border border-border"
-                  src={toAbsoluteUrl(d.outputAsset.sourceUrl)}
-                  alt="产出图"
-                />
-                <div className="mt-1.5 text-[12px] text-muted-foreground">
-                  {d.outputAsset.width && d.outputAsset.height
-                    ? `${d.outputAsset.width}×${d.outputAsset.height}`
-                    : '尺寸未知'}{' '}
-                  · {d.outputAsset.format} · {fmtBytes(d.outputAsset.sizeBytes)}
-                  {' · '}
-                  <Link
-                    className="text-brand hover:underline"
-                    to={adminAssetHref(d.outputAsset.id)}
-                  >
-                    在素材库查看
-                  </Link>
-                </div>
-              </>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                {d.status === 'succeeded'
-                  ? '任务已完成但未关联产出图，数据可能异常，请核对任务记录。'
-                  : '任务尚未产出图片。'}
-              </p>
-            )}
-          </DetailSection>
-
-          {d.inputAssets.length > 0 && (
-            <DetailSection title="输入素材" note={`共 ${d.inputAssets.length} 张，按提交顺序排列`}>
-              <div className="grid grid-cols-5 gap-1.5">
-                {d.inputAssets.map((a, i) => (
-                  <img
-                    key={a.id}
-                    className="aspect-square w-full rounded-md border border-border object-cover"
-                    src={assetThumbUrl(a.sourceUrl, 240)}
-                    alt={`输入素材 ${i + 1}`}
-                    loading="lazy"
-                  />
-                ))}
-              </div>
+                          <Link
+                            className="text-brand hover:underline"
+                            to={adminOrderHref({ email: d.user.email })}
+                          >
+                            订单记录
+                          </Link>
+                        </span>
+                      </span>
+                    ),
+                  },
+                  {
+                    label: '项目',
+                    value: (
+                      <Link
+                        className="text-brand hover:underline"
+                        to={adminTasksHref({ projectId: d.project.id })}
+                      >
+                        {d.project.name}
+                      </Link>
+                    ),
+                  },
+                  { label: '通道', value: providerLabel },
+                  {
+                    label: '积分消耗',
+                    value: <span className="tabular-nums">{d.creditCost} 积分</span>,
+                  },
+                  {
+                    label: '耗时',
+                    value: <span className="tabular-nums">{formatDuration(d.durationMs)}</span>,
+                  },
+                  {
+                    label: '创建时间',
+                    value: (
+                      <time className="tabular-nums" dateTime={d.createdAt}>
+                        {createdAt}
+                      </time>
+                    ),
+                  },
+                  {
+                    label: '最后更新',
+                    value: (
+                      <time className="tabular-nums" dateTime={d.updatedAt}>
+                        {updatedAt}
+                      </time>
+                    ),
+                  },
+                  ...(d.retriedFromId
+                    ? [
+                        {
+                          label: '重试来源',
+                          value: (
+                            <Link
+                              className="text-brand hover:underline"
+                              to={adminTaskHref(d.retriedFromId)}
+                            >
+                              <code className="break-all font-mono text-xs">{d.retriedFromId}</code>
+                            </Link>
+                          ),
+                        },
+                      ]
+                    : []),
+                ]}
+              />
             </DetailSection>
-          )}
 
-          <DetailSection title="生成参数">
-            <pre className="max-h-[320px] overflow-auto rounded-lg border border-border bg-muted p-3 text-[12px] leading-5 text-muted-foreground">
-              {JSON.stringify(d.params, null, 2)}
-            </pre>
-          </DetailSection>
-        </div>
-      )}
+            <DetailSection
+              title="状态流转"
+              note={
+                d.status === 'queued'
+                  ? `已等待 ${formatDuration(d.durationMs)}`
+                  : d.status === 'running'
+                    ? `已执行 ${formatDuration(d.durationMs)}`
+                    : `总耗时 ${formatDuration(d.durationMs)}`
+              }
+            >
+              <Steps
+                items={d.timeline.map((n) => ({
+                  title: n.label,
+                  state:
+                    n.key === 'finished'
+                      ? n.done
+                        ? d.status === 'failed'
+                          ? 'failed'
+                          : d.status === 'cancelled'
+                            ? 'cancelled'
+                            : 'done'
+                        : d.status === 'queued'
+                          ? 'pending'
+                          : 'active'
+                      : 'done',
+                  description: n.at
+                    ? new Date(n.at).toLocaleString('zh-CN')
+                    : n.done
+                      ? '未记录具体时间'
+                      : d.status === 'queued'
+                        ? '尚未开始'
+                        : '进行中',
+                }))}
+              />
+            </DetailSection>
+
+            <DetailSection title="产出图">
+              {d.outputAsset ? (
+                <div className="flex flex-col gap-2.5">
+                  <Link
+                    className="flex max-h-[420px] items-center justify-center overflow-hidden rounded-lg border border-border bg-muted"
+                    to={adminAssetHref(d.outputAsset.id)}
+                    aria-label="在素材库查看产出图"
+                  >
+                    <img
+                      className="max-h-[420px] max-w-full object-contain"
+                      src={toAbsoluteUrl(d.outputAsset.sourceUrl)}
+                      alt="任务产出图"
+                    />
+                  </Link>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[12px] text-muted-foreground">
+                    <span className="rounded bg-muted px-1.5 py-0.5 tabular-nums">
+                      {d.outputAsset.width && d.outputAsset.height
+                        ? `${d.outputAsset.width}×${d.outputAsset.height}`
+                        : '尺寸未知'}
+                    </span>
+                    <span>{d.outputAsset.format}</span>
+                    <span className="tabular-nums">{fmtBytes(d.outputAsset.sizeBytes)}</span>
+                    <Link
+                      className="ml-auto inline-flex items-center gap-1 text-brand hover:underline"
+                      to={adminAssetHref(d.outputAsset.id)}
+                    >
+                      在素材库查看
+                      <ExternalLink className="size-3" aria-hidden />
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-start gap-2 rounded-lg border border-dashed border-border bg-muted/30 p-3 text-xs leading-5 text-muted-foreground">
+                  <ImageOff className="mt-0.5 size-4 shrink-0" aria-hidden />
+                  <p>
+                    {d.status === 'succeeded'
+                      ? '任务已完成但未关联产出图，数据可能异常，请核对任务记录。'
+                      : '任务尚未产出图片。'}
+                  </p>
+                </div>
+              )}
+            </DetailSection>
+
+            {d.inputAssets.length > 0 && (
+              <DetailSection
+                title="输入素材"
+                note={`共 ${d.inputAssets.length} 张，按提交顺序排列`}
+              >
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                  {d.inputAssets.map((a, i) => (
+                    <div key={a.id} className="min-w-0">
+                      <Link
+                        className="group block overflow-hidden rounded-lg border border-border bg-muted"
+                        to={adminAssetHref(a.id)}
+                        aria-label={`查看输入素材 ${i + 1}`}
+                        title={`输入素材 ${i + 1}`}
+                      >
+                        <img
+                          className="aspect-square w-full object-cover transition-transform duration-200 group-hover:scale-[1.02]"
+                          src={assetThumbUrl(a.sourceUrl, 400)}
+                          alt={`输入素材 ${i + 1}`}
+                          loading="lazy"
+                        />
+                      </Link>
+                      <div className="mt-1 flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+                        <span>素材 {i + 1}</span>
+                        <span className="shrink-0 tabular-nums">
+                          {a.width && a.height ? `${a.width}×${a.height}` : '尺寸未知'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </DetailSection>
+            )}
+
+            <DetailSection
+              title="生成参数"
+              note={
+                <span className="inline-flex items-center gap-2">
+                  {paramCount} 个字段
+                  <ActionButton
+                    variant="ghost"
+                    size="xs"
+                    icon={Copy}
+                    ariaLabel="复制生成参数 JSON"
+                    className="h-6 px-2 text-[11px]"
+                    onClick={() => void copyText('生成参数', paramsJson)}
+                  >
+                    复制 JSON
+                  </ActionButton>
+                </span>
+              }
+            >
+              <pre className="max-h-[360px] overflow-auto rounded-lg border border-border bg-muted/60 p-3 font-mono text-[12px] leading-5 whitespace-pre-wrap break-words text-foreground">
+                {paramsJson}
+              </pre>
+            </DetailSection>
+          </div>
+        );
+      }}
     </AdminDrawer>
   );
 }

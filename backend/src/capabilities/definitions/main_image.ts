@@ -33,6 +33,10 @@ export const MainImage: CapabilityPlugin = {
     { key: 'variant', label: '主图类型', type: 'enum', default: 'other', options: MAIN_IMAGE_VARIANTS },
     { key: 'ratio', label: '画面比例', type: 'enum', default: '1:1', options: RATIOS },
     { key: 'size', label: '画质（输出边长）', type: 'enum', default: '1k', options: QUALITY_OPTIONS },
+    // ── 批次技术字段 (页面按一次提交代填, 结果栏据此把多张图聚合成一行) ──
+    { key: 'batchId', label: '批次 ID', type: 'text', hidden: true, maxLength: 128 },
+    { key: 'batchIndex', label: '批次序号', type: 'number', hidden: true, min: 1, max: 20, step: 1 },
+    { key: 'batchSize', label: '批次数量', type: 'number', hidden: true, min: 1, max: 20, step: 1 },
   ],
   buildPrompt: (p) =>
     `电商商品主图生成：${subjectText(p)}，${p.description || '突出卖点与质感'}。` +

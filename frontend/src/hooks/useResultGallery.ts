@@ -32,12 +32,12 @@ export interface GalleryItem {
   /** 生成时提交的提示词；只对参数里带 prompt 的能力有值 */
   prompt?: string;
   /**
-   * 输入原图（任务的首张输入素材）。
+   * 输入原图地址，保持任务提交时的素材顺序。
    *
-   * 详情图结果行要展示「原图 + 各模块图」，原图不在产出里，只能从任务输入取。
-   * 素材被删或历史任务缺字段时为空，调用方按商品名称占位。
+   * 商品主图 / 详情图结果行要展示「原图 + 生成图」，原图不在产出里，只能从
+   * 任务输入取。素材被删或历史任务缺字段时为空数组，调用方按商品名称占位。
    */
-  inputUrl?: string;
+  inputUrls?: string[];
   /** 任务原始参数；SKU 批量历史按 batchId 聚合时使用。 */
   params?: Record<string, unknown>;
   /**
@@ -133,13 +133,16 @@ export function useResultGallery({ capability, token, captionOf, includeFailed =
       for (const t of tasks) {
         if (t.capability !== capability) continue;
         const params = t.params ?? {};
+        const inputUrls = (t.inputAssets ?? [])
+          .map((asset) => assetSrc(asset))
+          .filter((url): url is string => Boolean(url));
         const base = {
           id: t.id,
           createdAt: t.createdAt,
           params,
           prompt: promptOf(params),
           caption: captionRef.current?.(params) || undefined,
-          inputUrl: assetSrc(t.inputAssets?.[0]),
+          inputUrls,
         };
         if (t.status !== 'succeeded') {
           // 生成中的任务也要进列表: 离开页面再回来时, 占位卡由服务端状态回填

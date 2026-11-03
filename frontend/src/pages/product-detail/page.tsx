@@ -38,28 +38,11 @@ import {
   startDetailGeneration,
 } from './api';
 import { countGenerations, languageOptions, platformDetailSpec, platformOptions, sectionCaption } from './utils';
-import { useApp, Modal } from '../../ui';
+import { promptToolErrorMessage } from '../../lib/promptToolMessages';
+import { useApp, Button, Input, Modal, Textarea } from '../../ui';
 
 /**
  * 商品详情图工作台
- *
- * 版面数值来自参考站 computed styles 实拍 (1920×1080):
- *   主区/输入栏/卡片/上传区/生成设置/商品描述与 product-kit 完全一致 (同类 class)
- *   包含模块卡: 白底 radius 16 padding 16; 标题行 400x20 space-between, 计数器 12px #EB5757
- *   模块选择器: 2 列 x 192 gap 16; 选项 192x66, 底 #F2F4F7, radius 8,
- *              padding 8 8 8 16, flex gap 8; 复选框 14x14 accent #625DF5
- *              标题 14px #333 lh22 / 说明 12px #86909C lh20; 上限 10 个 (已选 N/10)
- *   高级设置: 仅"画质"chip (无比例); 提交按钮与 product-kit 同款紫色渐变
- *
- * 接线: 上传 → assets API; 包含模块 → detail_image 任务的 sections 参数
- * (逗号分隔模块键, 后端按每个模块各建一个任务、各出一张图, 按张计费);
- * 画质 → size 参数 (1K/2K/4K; 4K 需要可用的模型通道支持, 否则置灰并说明)。
- *
- * 文件分工: 接口面见 `./api`, 本页状态见 `./hooks`, 常量见 `./constants`,
- * 共享控件见 `./components`, 纯函数与外部工具见 `./utils`,
- * 四个板块组件各自成文件 (`DetailSectionPicker` / `DetailResultList` /
- * `DetailExamplePanel` / `FormSelect`)。分层约定见
- * `docs/frontend-module-conventions.md`。
  */
 
 export function ProductDetailPage() {
@@ -189,7 +172,7 @@ export function ProductDetailPage() {
       const { text } = await analyzeImageToPrompt(first.id);
       const content = text?.trim();
       if (!content) {
-        message.warning('模型没有返回内容，请重试');
+        message.warning('这次没有生成可用内容，请重试');
         return;
       }
       // 已填过描述时不静默覆盖, 先问一句
@@ -206,7 +189,7 @@ export function ProductDetailPage() {
       setDescription(content);
       message.success('已按首张商品图生成描述，可继续编辑');
     } catch (e) {
-      message.error((e as Error).message || '识图失败：文本通道未配置');
+      message.error(promptToolErrorMessage(e, 'image'));
     } finally {
       setAnalyzing(false);
     }
@@ -315,15 +298,15 @@ export function ProductDetailPage() {
         <div className="pk-form-card">
           {/* 业务类型 tab: 参考站仅窄屏显示 (桌面端 display:none 实拍确认) */}
           <div className="pk-editor-tabs" role="tablist" aria-label="业务类型">
-            <button type="button" role="tab" aria-selected={false} className="pk-editor-tab" onClick={() => navigate('/product-kit')}>
+            <Button type="text" role="tab" aria-selected={false} className="pk-editor-tab" onClick={() => navigate('/product-kit')}>
               商品主图
-            </button>
-            <button type="button" role="tab" aria-selected className="pk-editor-tab pk-editor-tab-active">
+            </Button>
+            <Button type="text" role="tab" aria-selected className="pk-editor-tab pk-editor-tab-active">
               商品详情
-            </button>
-            <button type="button" role="tab" aria-selected={false} className="pk-editor-tab" onClick={() => navigate('/viral-clone')}>
+            </Button>
+            <Button type="text" role="tab" aria-selected={false} className="pk-editor-tab" onClick={() => navigate('/viral-clone')}>
               爆款复刻
-            </button>
+            </Button>
           </div>
 
           <div className="pk-form-scroll">
@@ -352,7 +335,7 @@ export function ProductDetailPage() {
                     <span className="pk-field-label">
                       <i className="pk-required-mark">*</i>商品名称
                     </span>
-                    <input
+                    <Input
                       value={productName}
                       maxLength={MAX_NAME_LEN}
                       placeholder="* 请输入商品名称"
@@ -361,7 +344,7 @@ export function ProductDetailPage() {
                   </label>
                   <label className="pk-field">
                     <span className="pk-field-label">品牌（选填）</span>
-                    <input
+                    <Input
                       value={brand}
                       maxLength={MAX_NAME_LEN}
                       placeholder="请输入品牌（选填）"
@@ -379,34 +362,34 @@ export function ProductDetailPage() {
                     <i className="pk-required-mark">*</i>商品描述
                   </span>
                   <div className="pk-desc-actions">
-                    <button
-                      type="button"
+                    <Button
+                      type="text"
                       className="pk-ai-btn"
                       disabled={analyzing}
                       onClick={() => void runAiAnalyze()}
                     >
-                      <Sparkles size={12} />
+                      <Sparkles size={12} className="size-[12px]" />
                       <span>{analyzing ? '分析中…' : 'AI分析'}</span>
-                    </button>
+                    </Button>
                   </div>
                 </div>
                 <div className="pk-desc-editor">
-                  <textarea
+                  <Textarea
                     rows={3}
                     maxLength={MAX_DESC_LEN}
                     value={description}
                     placeholder="* 请输入商品描述"
                     onChange={(e) => setDescription(e.target.value)}
                   />
-                  <button
-                    type="button"
+                  <Button
+                    type="text"
                     className="pk-desc-expand"
                     aria-label="放大编辑商品描述"
                     title="放大编辑"
                     onClick={openExpand}
                   >
-                    <Maximize2 size={14} />
-                  </button>
+                    <Maximize2 size={14} className="size-[14px]" />
+                  </Button>
                 </div>
               </div>
             </section>
@@ -455,8 +438,8 @@ export function ProductDetailPage() {
           提交后重拉列表拿到整批占位卡, 由 useResultGallery 轮询到全部到终态。 */}
       <section className="pd-right-pane">
         <div className="pd-tabs" role="tablist" aria-label="右侧面板">
-          <button
-            type="button"
+          <Button
+            type="text"
             role="tab"
             id="pd-tab-demo"
             aria-selected={rightTab === 'demo'}
@@ -465,9 +448,9 @@ export function ProductDetailPage() {
             onClick={() => pickRightTab('demo')}
           >
             功能示例
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            type="text"
             role="tab"
             id="pd-tab-results"
             aria-selected={rightTab === 'results'}
@@ -477,7 +460,7 @@ export function ProductDetailPage() {
           >
             创作结果
             {generationCount > 0 && <span className="pd-tab-count">{generationCount}</span>}
-          </button>
+          </Button>
         </div>
 
         <div className="pd-right-body">
@@ -531,7 +514,7 @@ export function ProductDetailPage() {
         onOk={closeExpand}
         onCancel={closeExpand}
       >
-        <textarea
+        <Textarea
           className="pk-expand-textarea"
           rows={10}
           maxLength={MAX_DESC_LEN}

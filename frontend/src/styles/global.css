@@ -633,8 +633,9 @@ body,
 }
 
 html {
-  /* Keep the content column from shifting when drawers/modals lock body scroll. */
-  scrollbar-gutter: stable;
+  /* 不用 stable gutter: 无滚动条的页面会永久在右侧留下约 15px 空白。
+     弹窗锁定滚动时由 useBodyScrollLock 补 padding, 同样能避免内容横向跳动。 */
+  scrollbar-gutter: auto;
 }
 
 body {
@@ -2797,6 +2798,16 @@ html[data-promo='off'] {
   max-width: 1100px;
   margin: 0 auto;
 }
+/*
+ * 带货图文: 通用工具页去掉 1100px 上限。
+ *
+ * 该能力的表单比其它工具页宽（四组下拉 2×2 + 卖点文本域 + 模式两选一卡），
+ * 1100px 内会被挤成窄列, 与同能力的专用页 (/shoppable-carousel) 观感割裂。
+ * 只对本能力放开, 其它工具页的阅读宽度保持不变。
+ */
+.tool-page[data-capability='shoppable_carousel'] {
+  max-width: none;
+}
 .tool-back {
   margin-left: -8px;
   margin-bottom: 4px;
@@ -3020,6 +3031,16 @@ html[data-promo='off'] .pk-workspace {
 .pk-section {
   display: grid;
   gap: 16px;
+}
+/* 模型能力合同比页面上限小时，已选素材不能静默删除，也不能继续提交 */
+.pk-image-limit-error {
+  margin: -12px 0 0;
+  padding: 7px 10px;
+  border-radius: var(--radius-control);
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  font-size: 12px;
+  line-height: 18px;
 }
 .pk-section-title {
   font-size: 14px;
@@ -4316,8 +4337,74 @@ img[data-broken='1'] {
   cursor: default;
 }
 /* 原图是参照物, 与产出区分: 稍深的描边 */
-.pd-result-cell-source .pd-result-thumb {
+.pd-result-cell-source .pd-result-thumb,
+.pd-result-cell-source .pd-result-source-thumb {
   border-color: var(--border);
+}
+/*
+ * 多原图: 全部素材铺在同一格内, 但**不额外拉高整行** ——
+ * 早期做法是把这一格撑到 252px 宽 3 列, 结果后面的模块图被挤出可视区、
+ * 行高也被拉成两行。现在这一格定宽 132px (2 列方图, 每张 64px 可见),
+ * 2 行 = 132px 高, 与模块图 (84×112) 基本齐平, 行内仍然是一行。
+ */
+.pd-result-cell-source.is-multiple {
+  flex: 0 0 132px;
+  min-width: 132px;
+  max-width: 132px;
+}
+.pd-result-source-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+.pd-result-source-grid.is-single {
+  grid-template-columns: 1fr;
+}
+.pd-result-source-grid.is-pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.pd-result-source-thumb {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+/* 多原图用方图: 同宽下能排下更多张, 且总高度不超过模块图 */
+.pd-result-source-grid:not(.is-single) .pd-result-source-thumb {
+  aspect-ratio: 1;
+}
+.pd-result-source-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pd-result-source-thumb:hover {
+  border-color: var(--brand-light);
+}
+.pd-result-source-index {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--text-strong) 72%, transparent);
+  color: var(--card-bg);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 /* 非图状态 (生成中 / 失败 / 原图缺失) 与图片同框同尺寸, 行内保持对齐 */
 .pd-result-thumb.is-pending,
@@ -4492,6 +4579,9 @@ img[data-broken='1'] {
 .pk-section-option:hover {
   background: var(--border);
 }
+/* 复选框走 shadcn Checkbox（`data-slot='checkbox'` 是 radix 根节点标记）；
+   尺寸按参考站 14x14，未选中描边与选中底色由原子件的主题变量给出。 */
+.pk-section-option [data-slot='checkbox'],
 .pk-section-option input[type='checkbox'] {
   width: 14px;
   height: 14px;
@@ -4500,10 +4590,18 @@ img[data-broken='1'] {
   accent-color: var(--brand-accent);
   cursor: pointer;
 }
+.pk-section-option [data-slot='checkbox']:disabled,
 .pk-section-option input[type='checkbox']:disabled {
   cursor: not-allowed;
 }
-.pk-section-option span {
+/* 根节点 14px（含 1px 边框），勾选图标按内容区 12px 收，避免超出圆角 */
+.pk-section-option [data-slot='checkbox'] svg {
+  width: 12px;
+  height: 12px;
+}
+/* 只作用于文案容器；不带 `>` 会命中 radix 复选框内部的 indicator span，
+   把它的 grid 居中改成 flex 纵向，勾选图标会偏位 */
+.pk-section-option > span {
   display: flex;
   flex-direction: column;
   min-width: 0;
@@ -14561,6 +14659,7 @@ html[data-promo='off'] .multi-image-fusion-page {
 .asset-library-sub {
   margin: 6px 0 0;
   font-size: 13px;
+  line-height: 20px;
   color: var(--text-muted);
 }
 .asset-library-header-actions {
@@ -14626,15 +14725,18 @@ html[data-promo='off'] .multi-image-fusion-page {
   align-items: baseline;
   gap: 10px;
 }
-.asset-library-group-head strong {
+.asset-library-group-head .asset-library-group-title {
   flex: none;
   white-space: nowrap;
   font-size: 14px;
+  font-weight: 600;
+  line-height: 20px;
   color: var(--wb-text);
 }
-.asset-library-group-head span {
+.asset-library-group-head .asset-library-group-desc {
   min-width: 0;
   font-size: 12px;
+  line-height: 20px;
   color: var(--text-muted);
 }
 .asset-library-group-list {
@@ -14659,7 +14761,8 @@ html[data-promo='off'] .multi-image-fusion-page {
   cursor: pointer;
 }
 /* 分组选中态: 与批量条同一套品牌紫浅底, 不引入新色 */
-.asset-library-group-item.is-active {
+.asset-library-group-item.is-active,
+.asset-library-group-item[data-state='on'] {
   background: var(--brand-bg);
   border-color: var(--brand);
   color: var(--brand-hover);
@@ -14669,11 +14772,13 @@ html[data-promo='off'] .multi-image-fusion-page {
   font-size: 12px;
   color: var(--text-desc);
 }
-.asset-library-group-item.is-active .asset-library-group-count {
+.asset-library-group-item.is-active .asset-library-group-count,
+.asset-library-group-item[data-state='on'] .asset-library-group-count {
   color: var(--brand-hover);
 }
 /* 分组依据切换器 (2026-10-21): 未选中是虚线灰, 选中填实底 */
-.asset-library-new-group.is-active {
+.asset-library-new-group.is-active,
+.asset-library-new-group[data-state='on'] {
   border-style: solid;
   border-color: var(--brand);
   background: var(--brand-bg);
@@ -14793,11 +14898,18 @@ html[data-promo='off'] .multi-image-fusion-page {
    hover 不再变色、上浮、放大, 也没有封面遮罩背景; 操作按钮仍按 hover / 聚焦 / 触屏显示。 */
 .asset-library-card {
   position: relative;
+  display: block;
   min-width: 0;
+  gap: 0;
+  padding: 0;
   background: var(--card-bg);
   border: 1px solid var(--border-soft);
   border-radius: 0;
+  box-shadow: none;
   overflow: hidden;
+}
+.asset-library-card-body {
+  padding: 0;
 }
 /* 选中态只描边提示, 不做位移或投影变化 */
 .asset-library-card.is-selected {
@@ -14818,6 +14930,11 @@ html[data-promo='off'] .multi-image-fusion-page {
   border: 0;
   background: transparent;
   cursor: zoom-in;
+}
+.asset-library-cover-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: transparent;
+  color: inherit;
 }
 .asset-library-cover-button:focus-visible {
   outline: 2px solid var(--brand);
@@ -14855,9 +14972,20 @@ html[data-promo='off'] .multi-image-fusion-page {
   color: var(--card-bg);
   cursor: pointer;
 }
-.asset-library-check.on {
+.asset-library-check.on,
+.asset-library-check[data-state='checked'] {
   background: var(--alp-surface-brand-2);
   border-color: var(--alp-border-brand-1);
+}
+/* 上传原图标记: 纯图卡片中唯一常驻来源信息, 右上角不遮挡勾选与底部操作区 */
+.asset-library-source-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  height: 24px;
+  padding: 0 8px;
+  pointer-events: none;
 }
 /* hover 操作: 对齐参考站深色玻璃底白字 (31px / #181d34c4 / border #ffffff8c / radius8 / blur4 / flex1), 2026-10-18 对拍修正 */
 .asset-library-hover-actions {
@@ -14910,13 +15038,19 @@ html[data-promo='off'] .multi-image-fusion-page {
   gap: 10px;
   color: var(--text-muted);
 }
-.asset-library-empty > strong {
+.asset-library-empty [data-slot='empty-title'] {
   font-size: 14px;
-  line-height: 16px;
+  font-weight: 600;
+  line-height: 20px;
   color: var(--wb-text);
 }
-.asset-library-empty > span {
+.asset-library-empty [data-slot='empty-description'] {
   font-size: 12px;
+  line-height: 20px;
+  color: var(--text-desc);
+}
+.asset-library-empty [data-slot='empty-icon'] {
+  margin-bottom: 0;
 }
 /* 加载更多: min-height 52 / 12px var(--text-muted) */
 .asset-library-load-more {
@@ -16367,6 +16501,14 @@ html[data-promo='off'] .multi-image-fusion-page {
   color: var(--text-body);
   background: var(--surface);
 }
+.credits-ledger-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+.credits-ledger-toolbar .ui-select-trigger {
+  width: 148px;
+}
 /* ── 我的订单 ────────────────────────────────────────────────────────────
    2026-10-30 优化:
    - 卡片由「通栏四行 + 虚线」改为「订单号/状态 → 明细行 → 时间线与金额 →
@@ -17720,13 +17862,6 @@ html[data-promo='off'] .multi-image-fusion-page {
   flex-direction: column;
   gap: 4px;
 }
-.alp-eyebrow {
-  display: block;
-  font-size: 12px;
-  line-height: 18px;
-  font-weight: 400;
-  color: var(--alp-text-9);
-}
 .alp-title {
   margin: 0;
   font-size: 22px;
@@ -17758,7 +17893,6 @@ html[data-promo='off'] .multi-image-fusion-page {
   justify-content: space-between;
   align-items: center;
   gap: 16px;
-  align-items: stretch;
   padding: 14px 26px;
   background: var(--alp-surface-info);
   /* 参考站 .asset-library-picker-toolbar **无**下边框 (只有 #fbfcfe 底)",
@@ -17807,60 +17941,43 @@ html[data-promo='off'] .multi-image-fusion-page {
   flex: none;
 }
 
-/* 日期筛选: 参考站是 popover; 本站走共享 `Dropdown` (radix DropdownMenu)。
-   数值仍按参考站: 触发键 34 高 / r9 / 边 #e2e5ed; 菜单 min-width 112 / pad 5 /
-   r9 / 边 #e4e5ee / shadow 0 12 28。radix 默认给菜单的 rounded-md(8) / border /
-   shadow-md 与 p-1(4) 都在下面覆写回参考站值。
-   注意 `sideOffset` 由 Dropdown 默认的 4 给出, 参考站是 6 —— 故用 margin-top 补 2。 */
-.alp-date-trigger {
-  display: inline-flex;
+/* 日期筛选平铺展示, 不再藏进下拉菜单, 所有时间档位一眼可见。 */
+.alp-date-flat {
+  display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 1px;
   height: 34px;
-  padding: 0 12px;
-  font-size: 13px;
+  padding: 2px;
+  background: var(--surface-4);
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+}
+.alp-filter-label {
+  padding: 0 6px 0 5px;
+  font-size: 11px;
+  line-height: 28px;
+  color: var(--alp-text-10);
+}
+.alp-date-option {
+  height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 7px;
+  font-size: 12px;
   font-family: inherit;
   color: var(--alp-text-7);
-  background: var(--card-bg);
-  border: 1px solid var(--alp-border-4);
-  border-radius: 9px;
+  background: transparent;
+  white-space: nowrap;
   cursor: pointer;
 }
-.alp-date-dropdown.ui-dropdown-content {
-  display: flex;
-  flex-direction: column;
-  min-width: 112px;
-  margin-top: 2px;
-  padding: 5px;
-  gap: 2px;
+.alp-date-option:hover {
+  color: var(--brand);
+}
+.alp-date-option.is-active {
+  color: var(--brand);
   background: var(--card-bg);
-  border: 1px solid var(--alp-border-5);
-  border-radius: 9px;
-  box-shadow: 0 12px 28px rgb(40 43 76 / 0.1216);
-}
-.alp-date-dropdown.ui-dropdown-content .ui-dropdown-item {
-  gap: 0;
-  padding: 6px 10px;
-  border-radius: 6px;
-  cursor: pointer;
-  /* line-height 必须显式写 normal: radix 的 `text-sm` 带了 20px 行高,
-     不覆盖会让条目变成 12 + 20 = 32px (参考站是 12 + 17.5 ≈ 30px)。
-     行高 + 上下 6px padding = 29.5px, 与参考站一致; 不要额外写 min-height,
-     那会把条目顶到 30px 并把整个菜单撑高 2px。 */
-  font-size: 12px;
-  line-height: normal;
-  font-weight: 400;
-  color: var(--alp-text-5);
-}
-.alp-date-dropdown.ui-dropdown-content .ui-dropdown-item:hover,
-.alp-date-dropdown.ui-dropdown-content .ui-dropdown-item:focus {
-  background: var(--alp-surface-brand-5);
-  color: var(--brand);
-}
-.alp-date-dropdown.ui-dropdown-content .ui-dropdown-item.is-active {
-  color: var(--brand);
-  background: var(--brand-bg);
   font-weight: 600;
+  box-shadow: 0 1px 4px rgb(43 45 83 / 0.102);
 }
 
 /* 搜索 —— 结构由 `Input` 兼容壳给出 (`.login-input-wrap` 外壳 + `-prefix` / `-inner`
@@ -17947,7 +18064,8 @@ html[data-promo='off'] .multi-image-fusion-page {
   border-right: 1px solid var(--alp-border-8);
   overflow: auto;
 }
-.alp-sidebar > strong {
+.alp-sidebar > strong,
+.alp-sidebar-section > strong {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -17956,12 +18074,24 @@ html[data-promo='off'] .multi-image-fusion-page {
   line-height: 20px;
   color: var(--alp-text-2);
 }
+.alp-sidebar-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--alp-border-8);
+}
+.alp-sidebar-section > strong {
+  padding-bottom: 6px;
+}
 .alp-sidebar nav {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 .alp-sidebar nav button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   min-height: 38px;
   padding: 0 12px;
   text-align: left;
@@ -17973,6 +18103,25 @@ html[data-promo='off'] .multi-image-fusion-page {
   border-radius: 10px;
   cursor: pointer;
 }
+.alp-sidebar nav button > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.alp-sidebar-count {
+  flex: none;
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  color: var(--alp-text-10);
+  background: var(--surface-4);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 16px;
+  text-align: center;
+}
 .alp-sidebar nav button:hover {
   color: var(--brand);
   background: var(--alp-surface-brand-3);
@@ -17982,6 +18131,19 @@ html[data-promo='off'] .multi-image-fusion-page {
   background: var(--card-bg);
   font-weight: 600;
   box-shadow: 0 4px 14px rgb(43 45 83 / 0.0706);
+}
+.alp-sidebar nav button.is-active .alp-sidebar-count {
+  color: var(--brand);
+  background: var(--brand-bg);
+}
+/* 用途项数量多, 收紧行高让常见分类在 900px 高弹窗内一次看全 */
+.alp-sidebar-section nav {
+  gap: 1px;
+}
+.alp-sidebar-section nav button {
+  min-height: 31px;
+  padding: 0 10px;
+  font-size: 12px;
 }
 .alp-main {
   flex: auto;
@@ -18017,7 +18179,6 @@ html[data-promo='off'] .multi-image-fusion-page {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
   min-width: 0;
   padding: 0;
   text-align: left;
@@ -18065,6 +18226,25 @@ html[data-promo='off'] .multi-image-fusion-page {
   height: 100%;
   object-fit: cover;
 }
+.alp-origin-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  color: var(--card-bg);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  white-space: nowrap;
+  box-shadow: 0 1px 4px rgb(17 24 39 / 0.24);
+}
+.alp-origin-badge.is-original {
+  background: color-mix(in srgb, var(--brand) 88%, transparent);
+}
+.alp-origin-badge.is-generated {
+  background: color-mix(in srgb, var(--text-strong) 72%, transparent);
+}
 .alp-check {
   position: absolute;
   top: 8px;
@@ -18080,15 +18260,23 @@ html[data-promo='off'] .multi-image-fusion-page {
   line-height: 1;
   box-shadow: 0 2px 8px rgb(38 31 117 / 0.251);
 }
-.alp-name {
-  display: block;
-  padding: 0 10px 10px;
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--text-body);
+.alp-capability {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  max-width: calc(100% - 16px);
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  color: var(--brand);
+  background: color-mix(in srgb, var(--card-bg) 90%, transparent);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 16px;
+  box-shadow: 0 1px 4px rgb(17 24 39 / 0.18);
+  backdrop-filter: blur(4px);
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  overflow: hidden;
 }
 
 /* 底部 */
@@ -18176,9 +18364,6 @@ html[data-promo='off'] .multi-image-fusion-page {
   .alp-toolbar-right {
     width: 100%;
   }
-  .alp-date-trigger {
-    white-space: nowrap;
-  }
   .alp-search {
     width: auto;
     flex: 1 1 auto;
@@ -18190,7 +18375,8 @@ html[data-promo='off'] .multi-image-fusion-page {
     padding-left: 8px;
     padding-right: 8px;
   }
-  .alp-sidebar > strong {
+  .alp-sidebar > strong,
+  .alp-sidebar-section > strong {
     padding-left: 6px;
     padding-right: 6px;
     font-size: 12px;
@@ -25452,6 +25638,21 @@ html[data-promo='off'] .pk-workspace.product-retouch-page {
 .order-field .ui-select-trigger {
   width: 100%;
 }
+/*
+ * shadcn Button 的默认 size 带 `h-9`（36px）。下列皮肤的高度由内容或
+ * `aspect-ratio` 决定，页面 CSS 里没有写 height，`h-9` 会压过宽高比 ——
+ * 表现为图片型按钮被压成 36px 高的横条（结果缩略图、素材卡整张被裁掉）。
+ * 这些类只加显式高度，其余尺寸仍由各自皮肤决定。
+ */
+.pk-text-link.ui-btn,
+.pk-ai-btn.ui-btn,
+.pk-editor-tab.ui-btn,
+.pk-thumb-add.ui-btn,
+.pd-result-thumb.ui-btn,
+.pd-result-source-thumb.ui-btn,
+.alp-card.ui-btn {
+  height: auto;
+}
 .account-nick-input.ui-input {
   width: 220px;
 }
@@ -25520,6 +25721,265 @@ html[data-promo='off'] .pk-workspace.product-retouch-page {
   font-size: 12px;
   font-weight: 600;
 }
+
+/* 用户账户面板：身份、套餐与常用入口集中在一个下拉层里。 */
+.app-user-dropdown.ui-dropdown-content {
+  width: min(352px, calc(100vw - 24px));
+  padding: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: 18px;
+  background: var(--color-card);
+  box-shadow: 0 22px 60px rgba(31, 41, 55, 0.16);
+  /* 大面板不做缩放入场: 从 95% 放大到完整尺寸会让整块内容产生跳动感 */
+  animation: none !important;
+}
+.app-user-menu-head {
+  padding: 16px 16px 14px;
+  border-bottom: 1px solid var(--border-soft);
+  background:
+    radial-gradient(circle at 90% 0%, rgba(85, 70, 216, 0.1), transparent 42%),
+    linear-gradient(180deg, #f8f6ff 0%, #ffffff 100%);
+}
+.app-user-menu-identity {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+.app-user-menu-avatar {
+  flex: none;
+  background: linear-gradient(145deg, var(--brand) 0%, #7b5df1 100%);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  box-shadow: 0 6px 16px rgba(85, 70, 216, 0.22);
+}
+.app-user-menu-user-copy {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.app-user-menu-user-copy strong {
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-user-menu-user-copy span {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-user-menu-balance {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  padding-left: 8px;
+}
+.app-user-menu-balance span {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+.app-user-menu-balance strong {
+  color: var(--text-strong);
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 22px;
+}
+.app-user-menu-package {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid rgba(85, 70, 216, 0.15);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 8px 22px rgba(66, 55, 145, 0.06);
+}
+.app-user-menu-package-main {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.app-user-menu-package-icon {
+  width: 32px;
+  height: 32px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+.app-user-menu-package-copy {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.app-user-menu-package-copy span {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 16px;
+}
+.app-user-menu-package-copy strong {
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 20px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-user-menu-plan-state {
+  flex: none;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+}
+.app-user-menu-plan-state.is-active {
+  background: #eaf8ef;
+  color: #168447;
+}
+.app-user-menu-package-meta {
+  display: grid;
+  gap: 6px;
+  margin-top: 11px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-soft);
+}
+.app-user-menu-package-meta > span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+.app-user-menu-package-meta svg {
+  flex: none;
+  color: var(--text-desc);
+}
+.app-user-menu-package-meta strong {
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+  color: var(--text-body);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-user-menu-package-note {
+  margin: 9px 0 0;
+  color: #9a6700;
+  font-size: 11px;
+  line-height: 17px;
+}
+.app-user-menu-package-action {
+  width: 100%;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 10px;
+  border: 1px solid rgba(85, 70, 216, 0.18);
+  border-radius: 9px;
+  background: var(--brand-bg);
+  color: var(--brand);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+.app-user-menu-package-action:hover {
+  border-color: var(--brand);
+  background: #e9e5ff;
+}
+.app-user-dropdown.ui-dropdown-content .ui-dropdown-item {
+  min-height: 50px;
+  height: auto;
+  margin: 2px 8px;
+  padding: 7px 8px;
+  border-radius: 11px;
+  gap: 10px;
+  cursor: pointer;
+}
+.app-user-menu-head + .ui-dropdown-item {
+  margin-top: 8px;
+}
+.app-user-dropdown.ui-dropdown-content .ui-dropdown-item:hover,
+.app-user-dropdown.ui-dropdown-content .ui-dropdown-item:focus {
+  background: var(--surface-brand-4);
+}
+.app-user-dropdown.ui-dropdown-content .ui-dropdown-item[data-slot='dropdown-menu-item'] {
+  color: var(--text-body);
+}
+.app-user-menu-link-icon {
+  width: 30px;
+  height: 30px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text-desc);
+  transition: background 0.18s ease, color 0.18s ease;
+}
+.app-user-dropdown.ui-dropdown-content .ui-dropdown-item:hover .app-user-menu-link-icon,
+.app-user-dropdown.ui-dropdown-content .ui-dropdown-item:focus .app-user-menu-link-icon {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+.app-user-menu-link-copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.app-user-menu-link-copy strong {
+  color: var(--text-body);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+}
+.app-user-menu-link-copy small {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 16px;
+}
+.app-user-dropdown.ui-dropdown-content [data-slot='dropdown-menu-separator'] {
+  height: 1px;
+  margin: 6px 12px;
+  background: var(--border-soft);
+}
+.app-user-dropdown.ui-dropdown-content .ui-dropdown-item.text-danger-text,
+.app-user-dropdown.ui-dropdown-content .ui-dropdown-item.text-danger-text .app-user-menu-link-copy strong {
+  color: var(--danger-text);
+}
+.app-user-dropdown.ui-dropdown-content .ui-dropdown-item.text-danger-text .app-user-menu-link-icon {
+  background: var(--danger-soft-bg);
+  color: var(--danger-text);
+}
 .app-notif-trigger .ui-badge-count {
   min-width: 16px;
   height: 16px;
@@ -25586,4 +26046,677 @@ html[data-promo='off'] .pk-workspace.product-retouch-page {
     这条是兜底, 防止日后误开 closable 时冒出一个关闭键) */
 .login-modal .ui-modal-close {
   display: none;
+}
+
+/* ───────── AI 带货图文工作台 (sc-*) ─────────
+   复刻 designkit.cn/shoppable-carousel, 实测值见 docs/shoppable-carousel-design.md。
+
+   与工具页族 (pk-*) 的差异 (均为对齐参考站实拍, 非本地发挥):
+     · 左栏 416px (参考站实测固定值), 工具页族是 432px;
+     · 右栏是**模板网格**而不是结果栏, 页面不滚动、两个栏各自内部滚动;
+     · 分类 tab 与模板网格是右栏顶部的固定区, 网格自身可滚。
+
+   颜色一律引用 :root 令牌 —— 参考站的品牌蓝 (#3388ff) 不沿用,
+   选中/强调统一走 --brand 一族。 */
+
+/* 工作区: 两栏, 页面本身不滚动 (与参考站 documentElement.scrollHeight === innerHeight 一致) */
+.sc-workspace {
+  margin: -24px -24px -32px;
+  padding: 0;
+  box-sizing: border-box;
+  height: calc(100vh - 104px);
+  min-height: 620px;
+  display: grid;
+  /* 页面头 (54, 对应参考站顶栏) + 双栏主体 */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  gap: 0;
+  align-items: stretch;
+}
+.sc-page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 54px;
+  padding: 0 24px;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border);
+}
+.sc-page-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+.sc-body {
+  display: grid;
+  grid-template-columns: 416px minmax(0, 1fr);
+  min-height: 0;
+}
+html[data-promo='off'] .sc-workspace {
+  height: calc(100vh - 64px);
+}
+@media (max-width: 900px) {
+  .sc-workspace {
+    margin: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+}
+
+/* ── 左栏 ── */
+.sc-input-pane {
+  width: 416px;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--card-bg);
+  border-right: 1px solid var(--border);
+}
+.sc-form-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+.sc-new-task {
+  font-size: 13px;
+  color: var(--text-body);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  padding: 5px 12px;
+  cursor: pointer;
+}
+.sc-new-task:hover {
+  color: var(--brand);
+  border-color: var(--border-brand);
+}
+/*
+ * 左栏滚动区。
+ *
+ * 参考站实测 (social-media-sidebarScroll): clientH 721 / scrollH 826,
+ * 内边距 18px 16px 24px 24px, 5 个 section 直接排在**一块白底**上,
+ * 彼此无卡片边框与圆角, 区块间距 24px。
+ */
+.sc-form-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  gap: 24px;
+  align-content: start;
+  padding: 18px 16px 24px 24px;
+}
+/* 5 个区块: 无卡片边框, 直接落在左栏白底上 */
+.sc-sections {
+  display: grid;
+  gap: 24px;
+  align-content: start;
+  min-width: 0;
+}
+/* 区块标题 (参考站 15px / #0f172a / margin-bottom 12px) */
+.sc-sections .pk-section-title,
+.sc-sections .sc-section-title {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-strong);
+  margin-bottom: 12px;
+}
+/* 区块内的表单网格间距 (参考站 basicsGrid gap 12px 10px) */
+.sc-sections .pk-form-grid {
+  gap: 12px 10px;
+}
+.sc-sections .pk-section {
+  gap: 12px;
+}
+
+/*
+ * 固定底栏 (参考站 social-media-sidebarFooter, 实测 415×125 @ 底部)。
+ *
+ * 与滚动区是**两块独立白底**: 底栏有自己的上边界, 滚动内容在它上方被裁断。
+ */
+.sc-form-footer {
+  flex: none;
+  background: var(--card-bg);
+  border-top: 1px solid var(--border);
+  padding: 12px 24px 16px;
+  display: grid;
+  gap: 10px;
+}
+.sc-form-footer .pk-submit-actions {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  gap: 10px;
+}
+
+/* 开关行 (「图片不加文字」/「社媒帖子发布文案」) */
+.sc-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 36px;
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--surface-soft);
+  border-radius: var(--radius-control);
+}
+.sc-toggle-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sc-toggle-copy strong {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-strong);
+}
+.sc-toggle-copy small {
+  font-size: 12px;
+  color: var(--text-desc);
+  line-height: 18px;
+}
+.sc-toggle-label {
+  font-size: 14px;
+  color: var(--text-body);
+}
+
+/* 生成模式两选一卡片 */
+.sc-mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.sc-mode-option {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+  text-align: left;
+  padding: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+.sc-mode-option:hover {
+  border-color: var(--border-hover);
+}
+.sc-mode-option.is-active {
+  background: var(--brand-bg);
+  border-color: var(--brand);
+}
+.sc-mode-option strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+.sc-mode-option small {
+  font-size: 12px;
+  color: var(--text-desc);
+  line-height: 18px;
+}
+
+/* 张数步进行 */
+.sc-count-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* ── 右栏 ── */
+.sc-showcase {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--page-bg);
+}
+.sc-showcase-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 分类 tab */
+.sc-categories {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 20px;
+  padding: 10px 24px 0;
+}
+.sc-category {
+  padding: 6px 0 10px;
+  font-size: 14px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+.sc-category:hover {
+  color: var(--text-body);
+}
+.sc-category.is-active {
+  color: var(--brand);
+  border-bottom-color: var(--brand);
+  font-weight: 600;
+}
+
+/* 模板网格滚动区 */
+.sc-template-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 24px 24px;
+}
+.sc-template-grid {
+  display: grid;
+  /*
+   * 最小列宽 250 而不是 300。
+   *
+   * 参考站右栏宽 1024（1440 视口）→ 3 列；本站右栏 848（C 端能力轨占 176px）,
+   * 用 300 会掉到 2 列, 与参考站的版面密度明显不同。降到 250 后:
+   *   1440: (800+16)/(250+16) ≈ 3.07 → 3 列（与参考站一致）
+   *   1920: (1280+16)/(250+16) ≈ 4.87 → 4 列（与参考站一致）
+   * 卡片因此略窄于参考站（250 vs 307）, 但版面结构与浏览节奏一致。
+   */
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 16px;
+}
+.sc-template-grid-empty {
+  padding: 40px 0;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-desc);
+}
+
+/* 模板卡: 三张预览并排 + 标题 + 三拍副标题 */
+.sc-template-card {
+  display: flex;
+  flex-direction: column;
+  padding: 7px 7px 9px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  transition: border-color 0.15s ease;
+}
+.sc-template-card:hover {
+  border-color: var(--border-hover);
+}
+.sc-template-card.is-selected {
+  border-color: var(--brand);
+  box-shadow: inset 0 0 0 1px var(--brand);
+}
+.sc-template-gallery {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  overflow: hidden;
+  background: var(--surface-soft);
+  border-radius: var(--radius-control);
+}
+/*
+ * 缩略图槽按 3:4 自适应高度。
+ *
+ * 参考站实测槽位比例恒为 ~1.35 (1440: 94×127 / 1920: 108×146) ——
+ * 高度跟着列宽走, 不是写死的像素值。本站此前固定 127px, 在 1920 的
+ * 4 列下卡片比参考站矮 17px。改用 aspect-ratio 后两个视口都对得上。
+ */
+.sc-template-slot {
+  overflow: hidden;
+  aspect-ratio: 3 / 4;
+}
+.sc-template-slot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.sc-template-preview {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--text-strong);
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.sc-template-card:hover .sc-template-preview,
+.sc-template-preview:focus-visible {
+  opacity: 1;
+}
+.sc-template-content {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 1px 0;
+}
+.sc-template-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.sc-template-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sc-template-desc {
+  font-size: 12px;
+  color: var(--text-desc);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sc-template-use {
+  flex: none;
+  padding: 5px 12px;
+  font-size: 13px;
+  color: var(--card-bg);
+  background: var(--brand);
+  border: none;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+.sc-template-use:hover {
+  background: var(--brand-hover);
+}
+.sc-template-card.is-selected .sc-template-use {
+  background: var(--brand-hover);
+}
+
+/* 结果列表里的模板标签 */
+.pd-result-template {
+  flex: none;
+  font-size: 12px;
+  color: var(--brand);
+  background: var(--brand-bg);
+  border-radius: var(--radius-tag);
+  padding: 1px 6px;
+}
+
+/* 带货图文: 卖点文本域高度对齐参考站实测 (116px; .pk-desc-editor 默认 80px) */
+.sc-copy-editor textarea {
+  height: 116px;
+  font-size: 13px;
+  line-height: 22px;
+  color: var(--text-body);
+  background: var(--surface-soft);
+  border-color: transparent;
+  border-radius: var(--radius-card);
+  padding: 6px 12px;
+}
+.sc-copy-editor textarea:focus {
+  border-color: var(--brand);
+}
+
+/* 带货图文: 张数步进器标签 */
+.sc-count-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-body);
+}
+.sc-count-label small {
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+/*
+ * 带货图文: 张数步进器与提交区同属一块白底卡 (参考站实测: 左栏底部是
+ * 一整块白底区域, 步进器在主按钮正上方)。此前的实现把步进器单独放在
+ * 滚动区与提交卡之间, 两块白底相接处没有边界, 视觉上像错位。
+ */
+
+/*
+ * 带货图文: 左栏区块间距比工具页族略紧。
+ *
+ * 参考站实测左栏内容区 clientH 721 / scrollH 826 —— **同样需要滚动**才能看完
+ * 卖点区末尾, 不是一屏全放下。故本站保留滚动行为 (与参考站一致),
+ * 只把区块间距收到与参考站相近的观感, 不做过度压缩。
+ */
+
+/*
+ * 带货图文: 左栏滚动区底部渐隐。
+ *
+ * 参考站的左栏内容同样超出视口 (实测 clientH 721 / scrollH 826), 溢出内容
+ * 直接被固定底栏切断。加一层指向底部的渐隐, 让"下面还有内容"可读,
+ * 同时不在视觉上把半截区块当成完整的。
+ */
+.sc-form-scroll {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent 100%);
+}
+
+/*
+ * 带货图文: 已选模板回显（参考站实拍 social-media-selectedRecipe）。
+ *
+ * 实测: 364×82, 底 #f5f7f9, 圆角 12, 内边距 12; 结构 =
+ * 缩略图 + [模板名 / 三拍文案] + 「换一个」(12px 文字按钮)。
+ * 未选时同一容器只放两行文字（「暂未选择模板」/「请从右侧选择合适的模板」）。
+ * 颜色换成本站令牌: 底 --surface-soft, 「换一个」用 --brand。
+ */
+.sc-template-echo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: var(--surface-soft);
+  border-radius: var(--radius-card);
+}
+.sc-echo-thumb {
+  flex: none;
+  width: 44px;
+  height: 58px;
+  overflow: hidden;
+  border-radius: var(--radius-tag);
+  background: var(--surface-2);
+}
+.sc-echo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.sc-echo-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.sc-echo-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sc-echo-desc {
+  font-size: 12px;
+  color: var(--text-desc);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sc-echo-change {
+  flex: none;
+  font-size: 12px;
+  color: var(--brand);
+  background: transparent;
+  border: none;
+  padding: 4px 0;
+  cursor: pointer;
+}
+.sc-echo-change:hover {
+  color: var(--brand-hover);
+  text-decoration: underline;
+}
+
+/*
+ * 带货图文: 右栏底部「最近生成」历史条。
+ *
+ * 参考站的页面结构是「左侧配置栏 + 右侧模板展示 + 底部历史记录」——
+ * 模板展示**常驻**，历史在底部，两者不互斥。这里用固定高度（132px）
+ * 的常驻条承载最近批次，完整列表放「全部记录」抽屉。
+ */
+.sc-history {
+  flex: none;
+  border-top: 1px solid var(--border);
+  background: var(--card-bg);
+  padding: 10px 24px 12px;
+}
+.sc-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.sc-history-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.sc-history-count {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-desc);
+}
+.sc-history-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+.sc-history-link,
+.sc-history-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-body);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+.sc-history-link {
+  color: var(--brand);
+}
+.sc-history-link:hover,
+.sc-history-refresh:hover {
+  color: var(--brand-hover);
+}
+.sc-history-link:disabled,
+.sc-history-refresh:disabled {
+  color: var(--text-desc);
+  cursor: not-allowed;
+}
+.sc-history-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 62px;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+.sc-history-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.sc-history-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: none;
+  width: 90px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+.sc-history-thumb {
+  position: relative;
+  display: block;
+  width: 90px;
+  height: 64px;
+  overflow: hidden;
+  border-radius: var(--radius-control);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+}
+.sc-history-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.sc-history-card:hover .sc-history-thumb {
+  border-color: var(--brand);
+}
+.sc-history-thumb-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+.sc-history-badge {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 16px;
+  color: #fff;
+  background: rgba(23, 26, 43, 0.72);
+  border-radius: var(--radius-tag);
+}
+.sc-history-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.sc-history-meta small {
+  font-size: 12px;
+  color: var(--text-desc);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sc-history-template {
+  color: var(--text-muted);
 }

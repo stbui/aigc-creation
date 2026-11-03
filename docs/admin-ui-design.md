@@ -47,8 +47,9 @@
 | 卡片与面板 | `bg-card` | `--card-bg` `#ffffff` |
 | 主色 | `bg-primary` / `text-brand` | `--brand` `#5546d8` |
 | 悬停淡底 | `bg-accent` | `--brand-bg` `#f1efff` |
+| 链接 | `text-brand` / 500 | `--brand` `#5546d8` |
 | 正文 | `text-foreground` | `--text-strong` `#171a2b` |
-| 次要文字 | `text-muted-foreground` | `--text-muted` `#667085` |
+| 次要文字 | `text-muted-foreground` | `--text-body` `#4e5969` |
 | 描边 | `border-border` / `border-input` | `--border` `#e5e7ef` |
 | 灰底块 | `bg-muted` / `bg-secondary` | `--surface` `#f2f4f7` |
 | 成功 | `bg-success-soft` / `text-success-text` | `--success-soft-bg` / `--success-text` |
@@ -114,9 +115,9 @@ Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不�
 | 导航滚动区 | `data-testid="admin-nav-scroll"`，自身滚动（`overflow-y-auto`），顶栏与底部按钮不参与 |
 | 底部区 | 侧栏底、上边框分隔；非生产显示环境标识与折叠按钮，账号菜单固定在底部；折叠态只留图标 |
 | 分组标题 | 12px / 600 `text-muted-foreground` / `tracking-wider`，可点击折叠/展开；默认只展开当前页面所在组，展开状态记入 `localStorage`；侧栏折叠态隐藏标题并改用分隔线 |
-| 菜单项 | 高 34px，圆角 8px，13px 文字，padding `0 10px`，左侧 16px 图标 + 10px 间距 |
+| 菜单项 | 高 34px，圆角 8px，13px / 500 文字，padding `0 10px`，左侧 16px 图标 + 10px 间距 |
 | 悬停 | 底 `bg-muted`，字 `text-foreground` |
-| 选中 | 底 `bg-accent`、字 `text-accent-foreground` / 500，左侧 3px 品牌色竖条 |
+| 选中 | 底 `bg-accent`、字 `text-accent-foreground` / 600，左侧 3px 品牌色竖条 |
 | 折叠态 | 只留图标并居中，`aria-label` / `title` 给全称；分组之间用分隔线代替标题 |
 | 规划项 | 标「待建」小胶囊（`planned` 字段） |
 
@@ -150,6 +151,8 @@ Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不�
 
 `primitives/layout.PageHeader`：标题 + 副标题在左，操作在右。标题 `h1` / 20px / 600，副标题 13px `text-muted-foreground`（不截断 —— 它通常是一句话说明「这一页在管什么」）。操作区右对齐、可换行。
 
+正文与表格链接默认使用品牌紫、500 字重；悬停显示下划线并转到 `--brand-hover`。整行可点击条目与图片链接用 `text-inherit no-underline` 保留其容器语义，不受该默认值影响。
+
 ### 3.2 FilterBar
 
 `primitives/display.FilterBar`：筛选条与页头同宽，`flex-wrap` 自然换行，`FilterActions` 用 `ml-auto` 把「查询 / 重置」推到最右。`AppliedFilters` 独占一行（`basis-full`）回显已生效条件，每条可单独清除。
@@ -160,7 +163,7 @@ Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不�
 
 `primitives/table.AdminDataTable` —— 排序、批量勾选上限、固定操作列、行展开、分页、密度只有这一份实现。
 
-- 表格放在 `Panel` 内（白底卡片），表头 `bg-muted/40`，行 hover `bg-muted/50`。
+- 表格放在 `Panel` 内（白底卡片），表头 `bg-muted/40` + 12px / 600 `text-foreground`，行 hover `bg-muted/50`。
 - 行高由密度决定（紧凑 `h-9` / 宽松 `h-11`），**不由内容撑开** —— 否则换行的那行会明显更高。
 - 固定列（右侧操作列）用 `sticky right-0` + 不透明底色，否则内容会从列后透出。
 - 操作列直显最多两个动作，其余收进 `RowMenu`（「更多」）。五个动作平铺会把行撑高。
@@ -279,7 +282,7 @@ Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不�
 | 表格 | 表头 `scope="col"`，排序列给 `aria-sort`；展开行用 `aria-expanded` |
 | 状态 | 颜色 + 文字双编码；`aria-live` 用于加载与结果提示 |
 | 动效 | `prefers-reduced-motion: reduce` 时统一降级（`admin.css` 的 `@layer base`） |
-| 对比度 | 正文与次要文字只在 `--text-strong` / `--text-muted` 之上 |
+| 对比度 | 正文与次要文字只在 `--text-strong` / `--text-body` 之上 |
 
 ## 6. 已知限制
 

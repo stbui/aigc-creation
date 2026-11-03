@@ -152,7 +152,11 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
     `src/lib` / `src/context`）；
   - `frontend/src/pages/multi-image-fusion/__tests__/multi-image-fusion-modules.test.ts` ——
     C 端多图融合目录（`src/pages/multi-image-fusion` / `src/components` / `src/hooks` /
-    `src/lib` / `src/context`，含变体计费 `lib/multiFusionBilling` 的转出）；
+    `src/lib` / `src/context`，含变体计费 `lib/multiFusionBilling` 与提示词工具文案
+    `lib/promptToolMessages` 的转出；页面按板块拆成 `MultiFusionSceneGateway` /
+    `MultiFusionEditorHeader` / `MultiFusionUploadCard` / `MultiFusionAnalysisCard` /
+    `MultiFusionParameterCard` / `MultiFusionSubmitBar` / `MultiFusionResultPanel`
+    七个展示块，状态与写操作仍留在 `page.tsx`）；
   - `frontend/src/pages/account/__tests__/account-modules.test.ts` ——
     C 端账户中心目录（`src/pages/account` / `src/components` / `src/hooks` /
     `src/lib` / `src/context`，多接口并行取数与金额 / 日期格式化；页面按板块拆成

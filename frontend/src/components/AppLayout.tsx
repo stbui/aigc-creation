@@ -1,27 +1,18 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Avatar, Button, Drawer, Dropdown } from '../ui';
-import {
-  ChevronDown,
-  LifeBuoy,
-  LogOut,
-  Menu,
-  Settings,
-  ShieldCheck,
-  User as UserIcon,
-  Wallet,
-} from 'lucide-react';
+import { Button, Drawer, Dropdown } from '../ui';
+import { ChevronDown, Menu, Wallet } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import type { CapabilityDef, CapabilityGroup } from '../types/api';
 import { MODE_LABELS } from '../lib/constants';
 import { isCapabilityVisible, toolPath } from '../lib/capabilities';
 import { useAuth } from '../context/AuthContext';
-import { useAdmin } from '../context/AdminContext';
 import { useCredits } from '../context/CreditsContext';
 import { SideRail } from './SideRail';
 import { CapabilityIcon } from './SideRail';
 import { PromoBar } from './PromoBar';
 import { GuestPromoDialog } from './GuestPromoDialog';
 import { NotificationBell } from './NotificationBell';
+import { UserAccountMenu } from './UserAccountMenu';
 
 export { CapabilityIcon };
 
@@ -34,15 +25,12 @@ interface Props {
 export function AppLayout({ groups, items, children }: Props) {
   const location = useLocation();
   const navigate = useNavigate();
-  const { token, email, logout, openLogin } = useAuth();
-  const { me, loading: adminLoading } = useAdmin();
+  const { token, openLogin } = useAuth();
   const { balance } = useCredits();
   const [navOpen, setNavOpen] = useState<string | null>(null);
   // 移动端导航抽屉 (≤900px 侧栏 display:none, 参考站 390 实测同构)
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [headerElevated, setHeaderElevated] = useState(false);
-  /** 用户菜单展开态: 仅驱动触发器箭头翻转, 菜单本身仍由 antd 托管 */
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   useEffect(() => {
     setMobileNavOpen(false);
@@ -64,9 +52,6 @@ export function AppLayout({ groups, items, children }: Props) {
       window.removeEventListener('scroll', onScroll);
     };
   }, []);
-
-  /** 是否展示后台入口: 身份已加载且为后台角色 */
-  const isAdminRole = !adminLoading && me !== null;
 
   const go = (to: string) => {
     if (to === '#') return;
@@ -186,68 +171,7 @@ export function AppLayout({ groups, items, children }: Props) {
           {/* 细分割线把「工具 / 余额」与「身份」分开: 右侧只有一处需要强调的东西 —— 余额 */}
           {token && <span className="app-header-divider" aria-hidden="true" />}
           {token ? (
-            <Dropdown
-              placement="bottomRight"
-              onOpenChange={setUserMenuOpen}
-              menu={{
-                items: [
-                  { key: 'email', label: email ?? '', icon: <UserIcon size={14} />, disabled: true },
-                  {
-                    key: 'account',
-                    label: '账户设置',
-                    icon: <Settings size={14} />,
-                    onClick: () => navigate('/account'),
-                  },
-                  // 工单入口放在账户菜单里: 它不是高频创作动作, 但报障时必须找得到。
-                  // 站内消息里的 ticket_reply 通知也直接链到 /tickets。
-                  {
-                    key: 'tickets',
-                    label: '我的工单',
-                    icon: <LifeBuoy size={14} />,
-                    onClick: () => navigate('/tickets'),
-                  },
-                  { key: 'divider-account', type: 'divider' as const },
-                  // 后台入口仅对后台角色显示。角色来自 /admin/me, 普通用户不请求该端点,
-                  // 因此这里用 isAdminRole 静态判断而非读异步状态 —— 未加载时先不显示。
-                  ...(isAdminRole
-                    ? [
-                        {
-                          key: 'admin',
-                          label: '进入运营后台',
-                          icon: <ShieldCheck size={14} />,
-                          onClick: () => navigate('/admin'),
-                        },
-                        { key: 'divider-admin', type: 'divider' as const },
-                      ]
-                    : []),
-                  {
-                    key: 'logout',
-                    label: '退出登录',
-                    icon: <LogOut size={14} />,
-                    onClick: () => {
-                      logout();
-                      navigate('/login');
-                    },
-                  },
-                ],
-              }}
-            >
-              <button
-                className={`app-user${userMenuOpen ? ' is-open' : ''}`}
-                type="button"
-                aria-label="打开账户菜单"
-                aria-haspopup="menu"
-                aria-expanded={userMenuOpen}
-              >
-                <Avatar size={28} className="app-user-avatar">
-                  {(email ?? 'U').charAt(0).toUpperCase()}
-                </Avatar>
-                <span className="app-user-email" title={email ?? ''}>
-                  {email}
-                </span>
-                <ChevronDown size={14} className="app-user-chevron" aria-hidden="true" />
-              </button>
-            </Dropdown>
+            <UserAccountMenu />
           ) : (
             /* 参考站 #workspace-logout「登录/注册」是纯文字钮 (13/700 #667085, pad 8, radius 6),
                点开遮罩登录弹窗; 本地原为 antd Button type="primary" → 见 docs/topnav-design.md P2-3。

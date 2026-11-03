@@ -59,6 +59,7 @@ export interface TextToolResult {
 const MAX_TOKENS_DEFAULT = 1024;
 const BODY_PREVIEW_CHARS = 4000;
 const ERROR_PREVIEW_CHARS = 1000;
+const TEXT_TOOL_UNAVAILABLE_MESSAGE = '文字处理暂时不可用，请稍后再试';
 
 interface TextCandidate {
   channelModelId: string;
@@ -85,7 +86,8 @@ export class TextToolService {
   async generate(call: TextToolCall): Promise<TextToolResult> {
     const candidates = await this.candidates();
     if (candidates.length === 0) {
-      throw new AppError(50201, '没有可用的文本模型：请在后台渠道工作台配置 text 能力的渠道模型', 502);
+      this.log.warn('文本工具无可用线路：未找到启用的 text 渠道模型');
+      throw new AppError(50201, TEXT_TOOL_UNAVAILABLE_MESSAGE, 502);
     }
 
     let lastError = '';
@@ -149,7 +151,7 @@ export class TextToolService {
       }
     }
 
-    throw new AppError(50201, `文本模型调用失败：${lastError || '所有渠道均不可用'}`, 502);
+    throw new AppError(50201, TEXT_TOOL_UNAVAILABLE_MESSAGE, 502);
   }
 
   private buildRequest(channel: ChannelExecution, call: TextToolCall): GenerationRequest {

@@ -9,6 +9,7 @@ import {
   type ParamType,
 } from './capability-plugin.type';
 import { parseDetailSections } from './definitions/param-options';
+import { shoppableCarouselTemplate } from './definitions/shoppable_carousel';
 import type { Modality } from '../common/modality';
 import { AppError } from '../common/app.exception';
 
@@ -244,6 +245,21 @@ export function validateCapabilityParams(
     const targetColor = input.targetColor || input.customColor;
     if (targetColor === undefined || targetColor === null || targetColor === '') {
       throw new AppError(40001, '选择自定义颜色时必须填写有效的 HEX 颜色', 400);
+    }
+  }
+
+  /*
+   * 带货图文的模板 id 是**外部引用**（49 个模板的稳定 id），
+   * 声明成 text 是为了不让能力清单接口膨胀 49 倍。
+   * 代价是 enum 的「合法值白名单」在这里失效 —— 模板生成模式下
+   * 传一个不存在的模板 id 会静默走到 AI 生成分支，用户拿到的是
+   * 「不是我要的版式」的结果却看不出原因。这里补一道校验：
+   * 选了模板生成就必须给出真实存在的模板。
+   */
+  if (id === 'shoppable_carousel' && input.mode === 'template') {
+    const templateId = String(input.templateId ?? '').trim();
+    if (!templateId || !shoppableCarouselTemplate(templateId)) {
+      throw new AppError(40001, '请选择一个有效的模板', 400);
     }
   }
 }

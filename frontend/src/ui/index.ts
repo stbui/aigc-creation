@@ -1,9 +1,11 @@
 /** C 端 UI 唯一取用层。页面不直连 admin-ui 的原子件。 */
 export { AppProvider, useApp, type AppApi, type ConfirmOptions } from './providers/AppProvider';
 export { UiProvider } from './providers/UiProvider';
+export { cn } from './lib/cn';
 
 export { Button, type ButtonProps } from './primitives/button';
 export { Input, type InputProps } from './primitives/input';
+export { Textarea, type TextareaProps } from './primitives/textarea';
 export { Select, type SelectProps, type SelectOption } from './primitives/select';
 export { Checkbox, type CheckboxProps } from './primitives/checkbox';
 export { Radio } from './primitives/radio';
@@ -25,4 +27,24 @@ export { Pagination, type PaginationProps } from './primitives/pagination';
 export { Table, type TableProps, type TableColumn } from './primitives/table';
 export { Tag, Card, Row, Col, Alert, Typography } from './primitives/misc';
 export { UiDialog } from './primitives/dialog';
+export { ToggleGroup, type ToggleGroupOption, type ToggleGroupProps } from './primitives/toggle-group';
 export { Form, FormItem, useForm, useWatch } from './primitives/form';
+
+/* shadcn 组合式原子件的 C 端别名：避免与 antd 兼容壳 Card 同名冲突。 */
+export {
+  Card as Surface,
+  CardHeader as SurfaceHeader,
+  CardTitle as SurfaceTitle,
+  CardDescription as SurfaceDescription,
+  CardContent as SurfaceContent,
+  CardFooter as SurfaceFooter,
+} from '~/admin-ui/components/ui/card';
+export { Badge as StatusBadge } from '~/admin-ui/components/ui/badge';
+export {
+  Empty as EmptyState,
+  EmptyHeader as EmptyStateHeader,
+  EmptyMedia as EmptyStateMedia,
+  EmptyTitle as EmptyStateTitle,
+  EmptyDescription as EmptyStateDescription,
+  EmptyContent as EmptyStateContent,
+} from '~/admin-ui/components/ui/empty';

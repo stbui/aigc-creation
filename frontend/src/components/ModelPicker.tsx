@@ -8,6 +8,7 @@ import {
   writeSelectedModelId,
 } from '../lib/modelSelection';
 import type { ModelQuoteView } from '../types/model';
+import { Button } from '../ui';
 
 /**
  * 前台模型选择器。
@@ -37,6 +38,11 @@ export interface ModelPickerProps {
    * 用户选了更贵的模型时，两个数字并存会直接造成“按钮一个价、实际扣另一个价”。
    */
   onQuoteChange?: (credits: number | null) => void;
+  /**
+   * 当前真正会被 `resolveModel` 选中的模型。目录尚未加载或加载失败时为 null。
+   * 上传数量等模型相关约束应从这里读，不能假设前端的页面上限就等于模型上限。
+   */
+  onModelChange?: (model: PublicLogicalModel | null) => void;
   className?: string;
 }
 
@@ -51,6 +57,7 @@ export function ModelPicker({
   capability,
   options,
   onQuoteChange,
+  onModelChange,
   className,
 }: ModelPickerProps) {
   const [models, setModels] = useState<PublicLogicalModel[]>([]);
@@ -59,9 +66,13 @@ export function ModelPicker({
   const [quoteFailed, setQuoteFailed] = useState(false);
   // 回调通常是内联 setState，用 ref 避免它进入报价 effect 依赖导致重复请求
   const onQuoteChangeRef = useRef(onQuoteChange);
+  const onModelChangeRef = useRef(onModelChange);
   useEffect(() => {
     onQuoteChangeRef.current = onQuoteChange;
   }, [onQuoteChange]);
+  useEffect(() => {
+    onModelChangeRef.current = onModelChange;
+  }, [onModelChange]);
 
   const candidates = useMemo(() => modelsForCapability(capability, models), [capability, models]);
 
@@ -148,6 +159,12 @@ export function ModelPicker({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, capability, optionsKey]);
 
+  const selected = candidates.find((model) => model.id === selectedId) ?? null;
+
+  useEffect(() => {
+    onModelChangeRef.current?.(selected);
+  }, [selected]);
+
   if (candidates.length === 0) {
     return (
       <div className={`pk-settings-group${className ? ` ${className}` : ''}`} data-testid="model-picker">
@@ -159,8 +176,6 @@ export function ModelPicker({
     );
   }
 
-  const selected = candidates.find((model) => model.id === selectedId) ?? null;
-
   return (
     <div className={`pk-settings-group${className ? ` ${className}` : ''}`} data-testid="model-picker">
       <strong className="pk-settings-group-label">模型</strong>
@@ -168,9 +183,9 @@ export function ModelPicker({
         {candidates.map((model) => {
           const active = model.id === selectedId;
           return (
-            <button
+            <Button
               key={model.id}
-              type="button"
+              type="text"
               data-testid="model-option"
               data-model-id={model.id}
               data-available={model.available ? 'true' : 'false'}
@@ -189,7 +204,7 @@ export function ModelPicker({
                 {model.name}
               </strong>
               <span>{model.available ? priceText(model) : '暂不可用'}</span>
-            </button>
+            </Button>
           );
         })}
       </div>

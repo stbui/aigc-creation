@@ -131,9 +131,9 @@ describe('buildRows', () => {
 
   it('原图取任务输入素材，不是产出素材', () => {
     const rows = buildRows([
-      item({ id: 't1', url: '/uploads/out.png', inputUrl: '/uploads/in.png', params: { batchId: 'b1' } }),
+      item({ id: 't1', url: '/uploads/out.png', inputUrls: ['/uploads/in.png'], params: { batchId: 'b1' } }),
     ]);
-    expect(rows[0].sourceUrl).toBe('/uploads/in.png');
+    expect(rows[0].sourceUrls).toEqual(['/uploads/in.png']);
   });
 
   it('批内还有生成中的格子时标记 pending（删除按钮据此置灰）', () => {

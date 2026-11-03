@@ -94,7 +94,9 @@
   --color-secondary: var(--surface);
   --color-secondary-foreground: var(--text-body);
   --color-muted: var(--surface);
-  --color-muted-foreground: var(--text-muted);
+  /* 后台信息密度高、字号偏小，次级文字改用正文色而非更浅的 --text-muted，
+     避免表头、说明和导航在长时间使用时发灰难读。 */
+  --color-muted-foreground: var(--text-body);
 
   /* shadcn 的 `accent` 是「悬停淡底」，不是品牌强调色 —— 两者同名不同义 */
   --color-accent: var(--brand-bg);
@@ -225,6 +227,31 @@
     background: var(--page-bg);
   }
 
+  /*
+   * 链接排版默认值：后台链接统一为品牌紫 + 500 字重；默认不显示下划线，
+   * 悬停或键盘聚焦时显示，并加宽下划线距离。
+   *
+   * 页面里的 `text-inherit` / `no-underline` 等工具类仍可覆盖这些默认值，
+   * 因此概览页整行可点击条目和图片链接不会被误染成品牌色。
+   */
+  :is(.admin-root, .admin-portal) a[href]:not(.adm-skip-link) {
+    color: var(--brand);
+    font-weight: 500;
+    text-decoration: none;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+    transition: color 0.15s ease;
+  }
+
+  :is(.admin-root, .admin-portal) a[href]:not(.adm-skip-link):hover {
+    color: var(--brand-hover);
+    text-decoration: underline;
+  }
+
+  :is(.admin-root, .admin-portal) a[href]:not(.adm-skip-link):focus-visible {
+    text-decoration: underline;
+  }
+
   /* 控件重置：按钮/输入框不能带系统灰底与默认边框 */
   :is(.admin-root, .admin-portal) :where(button, input, select, textarea) {
     font: inherit;
@@ -251,5 +278,16 @@
       transition-duration: 0.01ms !important;
       scroll-behavior: auto !important;
     }
+  }
+}
+
+/*
+ * `text-brand` 属于 utilities 层，会覆盖 base 层的链接悬停色。这里用更具体的
+ * 工具层选择器补回悬停色，只作用于显式声明了品牌色的链接，不接管
+ * `text-inherit` 的整行入口或图片链接。
+ */
+@layer utilities {
+  :is(.admin-root, .admin-portal) a.text-brand:hover {
+    color: var(--brand-hover);
   }
 }

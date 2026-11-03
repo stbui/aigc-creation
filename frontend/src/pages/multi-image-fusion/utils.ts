@@ -18,6 +18,8 @@ export { ratioOptions, resolutionOptions } from '../../lib/optionSets';
 export { multiFusionCreditCost } from '../../lib/multiFusionBilling';
 /** 任务轮询到终态 */
 export { pollToResult, type PolledOutput, type PolledResult } from '../../lib/poll';
+/** 提示词工具失败文案: 把接口错误码翻译成用户可读文案 */
+export { promptToolErrorMessage } from '../../lib/promptToolMessages';
 
 /* ------------------------------------------------------------------------- */
 /* 场景                                                                      */

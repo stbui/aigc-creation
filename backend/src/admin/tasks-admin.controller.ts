@@ -1,6 +1,13 @@
-import { Body, Controller, Get, Param, Post, Query, Res } from '@nestjs/common';
-import type { Response } from 'express';
-import { ArrayMaxSize, IsArray, IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Body, Controller, Delete, Get, Param, Post, Query, Req, Res } from '@nestjs/common';
+import type { Request, Response } from 'express';
+import {
+  ArrayMaxSize,
+  IsArray,
+  IsIn,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 import { AdminUser, AuditAction, RequirePermission, type AdminUser as AdminUserType } from './admin.decorator';
 import { AdminRoleService } from './admin-role.service';
 import { TasksAdminService } from './tasks-admin.service';
@@ -26,23 +33,25 @@ export class TaskActionDto {
 /**
  * 任务监控 (admin-prd.md §3.5 B-28~B-33)。
  *
- * 权限三点分离:读 (task.read) / 重试 (task.retry) / 终止 (task.cancel)。
- * 运营需要读全部任务来回答用户"我的图怎么还没出来", 但重试会真实消耗
- * 模型额度、终止会作废用户的排队 —— 两者都超出「查看」范畴。
+ * 权限四点分离:读 (task.read) / 重试 (task.retry) / 终止 (task.cancel) /
+ * 删除 (task.delete)。运营需要读全部任务来回答用户"我的图怎么还没出来",
+ * 但重试会真实消耗模型额度、终止会作废排队、删除会清理产出,
+ * 三者都超出「查看」范畴。
  *
  * 路由顺序: 字面量路径 (`stats` / `capabilities`) 须在 `:id` 之前,
  * 否则被参数路由抢占。
  */
-/** 批量重试 / 终止 */
+/** 批量重试 / 终止 / 删除 */
 export class TaskBatchDto {
   @IsArray()
   @ArrayMaxSize(100, { message: '单次批量最多 100 条' })
   @IsString({ each: true })
   ids!: string[];
 
-  @IsIn(['retry', 'cancel'], { message: 'action 只能是 retry 或 cancel' })
-  action!: 'retry' | 'cancel';
+  @IsIn(['retry', 'cancel', 'delete'], { message: 'action 只能是 retry、cancel 或 delete' })
+  action!: 'retry' | 'cancel' | 'delete';
 
+  /** 重试/终止可选填操作原因; 删除原因由服务端自动记录 */
   @IsOptional()
   @IsString()
   @MaxLength(200)
@@ -71,17 +80,36 @@ export class AdminTasksController {
   }
 
   /**
-   * 批量重试 / 终止（B7）。
+   * 批量重试 / 终止 / 删除（B7）。
    *
-   * 权限按 action 判定：重试要 `task.retry`，终止要 `task.cancel`。
-   * 两者都会真实影响用户可见状态（重试消耗模型额度、终止作废排队），
+   * 权限按 action 判定：重试要 `task.retry`，终止要 `task.cancel`，
+   * 删除要 `task.delete`。三者都会真实影响用户可见状态或产出，
    * 所以批量入口不能只凭 `task.read` 就放行。
    */
   @Post('batch')
   @RequirePermission(PERMISSIONS.taskRead)
   @AuditAction('task.batch')
-  async batch(@Body() dto: TaskBatchDto, @AdminUser() actor: AdminUserType) {
-    const needed = dto.action === 'retry' ? PERMISSIONS.taskRetry : PERMISSIONS.taskCancel;
+  async batch(
+    @Body() dto: TaskBatchDto,
+    @AdminUser() actor: AdminUserType,
+    @Req()
+    req: Request & {
+      auditReason?: string;
+      auditExtra?: Record<string, unknown>;
+    },
+  ) {
+    // 删除无需运营填写原因，但审计仍要能回答“做了什么”，由服务端自动生成。
+    if (dto.action === 'delete') {
+      req.auditReason = `系统自动记录：批量删除 ${dto.ids.length} 个任务及其产出`;
+      req.auditExtra = { batchAction: 'delete', taskIds: dto.ids };
+    }
+
+    const needed =
+      dto.action === 'retry'
+        ? PERMISSIONS.taskRetry
+        : dto.action === 'cancel'
+          ? PERMISSIONS.taskCancel
+          : PERMISSIONS.taskDelete;
     if (!(await this.roles.hasPermission(actor.id, needed))) {
       throw new AppError(40301, `没有执行该批量动作的权限（${needed}）`, 403);
     }
@@ -114,6 +142,23 @@ export class AdminTasksController {
   @RequirePermission(PERMISSIONS.taskRead)
   detail(@Param('id') id: string) {
     return this.tasks.detail(id);
+  }
+
+  /**
+   * 删除已结束任务。
+   *
+   * 删除会清理任务记录、子任务、产出素材与存储文件, 不可恢复。
+   * 排队中/执行中的任务必须先终止, 避免 worker 继续操作已删除的任务。
+   */
+  @Delete(':id')
+  @RequirePermission(PERMISSIONS.taskDelete)
+  @AuditAction('task.delete')
+  remove(
+    @Param('id') id: string,
+    @Req() req: Request & { auditReason?: string },
+  ) {
+    req.auditReason = `系统自动记录：删除任务 ${id} 及其产出`;
+    return this.tasks.remove(id);
   }
 
   /**

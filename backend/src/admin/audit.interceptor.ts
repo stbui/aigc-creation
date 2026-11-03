@@ -101,6 +101,8 @@ export class AuditInterceptor implements NestInterceptor {
       url: string;
       ip?: string;
       body?: Record<string, unknown>;
+      /** 路由层生成的审计原因，优先于请求体里的用户输入 */
+      auditReason?: string;
       /** 路由/服务层组装的审计摘要（如设置项前后值），优先于请求体白名单 */
       auditExtra?: Record<string, unknown>;
     },
@@ -121,7 +123,7 @@ export class AuditInterceptor implements NestInterceptor {
           targetType,
           targetId,
           detail: JSON.stringify(this.buildDetail(request, success, err)),
-          reason: this.readReason(request.body),
+          reason: this.readReason(request),
           ip: request.ip ?? 'unknown',
           success,
         },
@@ -183,8 +185,15 @@ export class AuditInterceptor implements NestInterceptor {
    * 要求原因的动作由 DTO 做强校验；这里只负责在请求带 reason 时落库。
    * 不要求原因的业务操作（如渠道删除）仍会记录操作人、动作与结果。
    */
-  private readReason(body: Record<string, unknown> | undefined): string | null {
-    const raw = body?.['reason'];
+  private readReason(request: {
+    body?: Record<string, unknown>;
+    auditReason?: string;
+  }): string | null {
+    const automatic =
+      typeof request.auditReason === 'string' ? request.auditReason.trim() : '';
+    if (automatic) return automatic.slice(0, 200);
+
+    const raw = request.body?.['reason'];
     if (typeof raw === 'string' && raw.trim()) return raw.trim().slice(0, 200);
     return null;
   }

@@ -122,6 +122,7 @@ import type {
   AdminSearchResult,
   BatchSummary,
   CreditImportResult,
+  ShoppableCarouselTemplatesResult,
 } from '../types/api';
 import type {
   AdminPageResult,
@@ -197,6 +198,8 @@ interface RequestOptions {
   method?: string;
   headers?: HeadersInit;
   signal?: AbortSignal | null;
+  /** 是否把请求号拼进用户看到的错误文案；后台排障默认保留。 */
+  showRequestIdInMessage?: boolean;
   // 具体 DTO 类型 (LoginRequest 等) 没有索引签名, 不能直接赋值给 Record<string, unknown>,
   // 故用 unknown 收口后在运行时 JSON.stringify。
   body?: BodyInit | Record<string, unknown> | object | null;
@@ -289,7 +292,9 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
      * 可检索的 id; 4xx 是用户输入问题, 屏幕上糊一串 uuid 只会干扰。
      * 限流 (429) 单独透出等待秒数, 前端可做倒计时。
      */
-    if (res.status >= 500 && requestId) message = `${message}（请求号 ${requestId}）`;
+    if (res.status >= 500 && requestId && options.showRequestIdInMessage !== false) {
+      message = `${message}（请求号 ${requestId}）`;
+    }
     const retryAfter = Number(res.headers.get('Retry-After') ?? '');
     throw new ApiError(message, res.status, {
       requestId,
@@ -488,6 +493,20 @@ export const statsApi = {
 };
 
 /**
+ * AI 带货图文模板清单 (公开, 免登录)。
+ *
+ * 模板是能力定义的一部分 (决定提示词的三拍结构), 事实源在后端
+ * `capabilities/definitions/shoppable-carousel.templates.ts`。
+ * 前端不另存一份清单 —— 两份清单漂移时, 用户选中的模板会与后端查不到的
+ * 那份对不上, 表现为「版式不对但看不出原因」。
+ *
+ * 缩略图是**本仓库内的静态文件**, 接口只给相对路径, 运行时不请求外部站点。
+ */
+export const shoppableCarouselApi = {
+  templates: () => request<ShoppableCarouselTemplatesResult>('/shoppable-carousel/templates'),
+};
+
+/**
  * 提示词工具 (AI润色 / 图片转提示词)。
  *
  * ⚠️ 这两个接口**产出的是文字, 不是图片** —— 故不叫 generateApi, 也不进
@@ -500,6 +519,8 @@ export const promptToolsApi = {
   polish: (text: string, textOnly = false) =>
     request<PromptToolResult>('/prompt-tools/polish', {
       method: 'POST',
+      // 前台只给自然语言提示；请求号仍保留在 ApiError 中供日志关联。
+      showRequestIdInMessage: false,
       body: { text, textOnly },
     }),
 
@@ -507,6 +528,7 @@ export const promptToolsApi = {
   imageToPrompt: (assetId: string, extra?: string) =>
     request<PromptToolResult>('/prompt-tools/image-to-prompt', {
       method: 'POST',
+      showRequestIdInMessage: false,
       body: { assetId, ...(extra ? { extra } : {}) },
     }),
 };
@@ -580,10 +602,19 @@ export const productsApi = {
 export const creditsApi = {
   balance: () => request<CreditBalance>('/credits/balance'),
   lots: () => request<CreditLot[]>('/credits/lots'),
-  ledger: (params: { limit?: number; offset?: number } = {}) => {
+  ledger: (
+    params: {
+      limit?: number;
+      offset?: number;
+      type?: string;
+      direction?: 'income' | 'expense';
+    } = {},
+  ) => {
     const qs = new URLSearchParams();
     qs.set('limit', String(params.limit ?? 50));
     qs.set('offset', String(params.offset ?? 0));
+    if (params.type) qs.set('type', params.type);
+    if (params.direction) qs.set('direction', params.direction);
     return request<CreditLedgerPage>(`/credits/ledger?${qs.toString()}`);
   },
 };
@@ -964,6 +995,7 @@ export const adminTasksApi = {
     projectId?: string;
     from?: string;
     to?: string;
+    sort?: string;
   } = {}) => {
     const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) {
@@ -1008,8 +1040,14 @@ export const adminTasksApi = {
       body: reason ? { reason } : {},
     }),
 
-  /** 批量重试 / 终止。状态限制逐条生效，失败原因逐条回传 */
-  batch: (ids: string[], action: 'retry' | 'cancel', reason?: string) =>
+  /** 删除任务及其产出。仅已结束任务可删 */
+  remove: (id: string) =>
+    request<{ id: string; removedAsset: boolean }>(`/admin/tasks/${id}`, {
+      method: 'DELETE',
+    }),
+
+  /** 批量重试 / 终止 / 删除。状态限制逐条生效，失败原因逐条回传 */
+  batch: (ids: string[], action: 'retry' | 'cancel' | 'delete', reason?: string) =>
     request<BatchSummary<unknown>>('/admin/tasks/batch', {
       method: 'POST',
       body: { ids, action, ...(reason ? { reason } : {}) },

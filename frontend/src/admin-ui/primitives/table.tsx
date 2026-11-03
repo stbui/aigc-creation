@@ -21,6 +21,13 @@ import { ArrowDown, ArrowUp, ChevronsUpDown } from 'lucide-react';
 import { cn } from '../lib/cn';
 import { Button } from '../components/ui/button';
 import { Checkbox } from '../components/ui/checkbox';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
 import { Skeleton } from '../components/ui/skeleton';
 import {
   Table,
@@ -367,7 +374,7 @@ export function AdminDataTable<T>({
                             : undefined
                       }
                       className={cn(
-                        'h-9 whitespace-nowrap bg-muted/40 px-3 text-xs font-medium text-muted-foreground',
+                        'h-9 whitespace-nowrap bg-muted/40 px-3 text-xs font-semibold text-foreground',
                         ALIGN_CLASS[column.align ?? 'left'],
                         column.fixed === 'right' && 'sticky right-0 bg-muted',
                       )}
@@ -471,20 +478,29 @@ export function AdminDataTable<T>({
             共 {pagination.total} {pagination.unit ?? '条'}
           </span>
           <div className="flex items-center gap-3">
-            <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               每页
-              <select
-                className="h-7 rounded-md border border-input bg-background px-1.5 text-xs text-foreground"
-                value={pagination.pageSize}
-                onChange={(event) => pagination.onChange(1, Number(event.target.value))}
+              {/*
+               * 用 shadcn `Select` 而不是原生 `<select>`：原生控件的下拉面板
+               * 由浏览器绘制，深色模式与圆角/间距都不受项目令牌控制，与紧邻的
+               * 分页按钮拼在一起风格割裂。
+               */}
+              <Select
+                value={String(pagination.pageSize)}
+                onValueChange={(next) => pagination.onChange(1, Number(next))}
               >
-                {[20, 50, 100].map((size) => (
-                  <option key={size} value={size}>
-                    {size}
-                  </option>
-                ))}
-              </select>
-            </label>
+                <SelectTrigger size="sm" aria-label="每页条数" className="h-7 w-[68px] text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[20, 50, 100].map((size) => (
+                    <SelectItem key={size} value={String(size)}>
+                      {size}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <nav aria-label="分页" className="flex items-center gap-2">
               <Button
                 variant="outline"
@@ -556,7 +572,7 @@ function TableSkeleton({
                   scope="col"
                   style={column.width ? { width: column.width } : undefined}
                   className={cn(
-                    'h-9 whitespace-nowrap bg-muted/40 px-3 text-xs font-medium text-muted-foreground',
+                    'h-9 whitespace-nowrap bg-muted/40 px-3 text-xs font-semibold text-foreground',
                     ALIGN_CLASS[column.align ?? 'left'],
                     column.fixed === 'right' && 'sticky right-0 bg-muted',
                   )}

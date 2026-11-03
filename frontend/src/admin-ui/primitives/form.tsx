@@ -13,6 +13,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '../components/ui/input-group';
 import { Switch } from '../components/ui/switch';
 import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Textarea } from '../components/ui/textarea';
@@ -253,8 +259,9 @@ export function NumberField({
   };
 
   return (
-    <div className={cn('relative', className)}>
-      <Input
+    /* 输入框 + 尾部步进按钮：走 shadcn `InputGroup`，与 `ClearableField` 同一套组合件 */
+    <InputGroup className={cn('h-8 bg-background', className)}>
+      <InputGroupInput
         id={id}
         type="number"
         inputMode="numeric"
@@ -268,33 +275,34 @@ export function NumberField({
           onChange(raw === '' ? undefined : clamp(Number(raw)));
         }}
         className={cn(
-          'h-8 bg-background pr-7 text-right text-sm tabular-nums disabled:bg-muted',
+          'h-8 text-right text-sm tabular-nums',
           '[&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none',
         )}
       />
       {!disabled && (
-        <div className="absolute top-1 right-1 flex h-6 w-5 flex-col overflow-hidden rounded-sm border border-border">
-          <button
-            type="button"
+        /* 上下步进竖排：与原生 number 输入框的步进器一致，横排会被误读成两个独立按钮 */
+        <InputGroupAddon align="inline-end" className="flex-col gap-0 py-0 pr-0.5">
+          <InputGroupButton
+            size="icon-xs"
             aria-label="增加"
             tabIndex={-1}
-            className="flex flex-1 items-center justify-center text-muted-foreground hover:bg-muted hover:text-foreground"
             onClick={() => step(stepSize)}
+            className="h-3.5 text-muted-foreground hover:text-foreground [&_svg]:size-3"
           >
-            <ChevronUp className="size-3" aria-hidden />
-          </button>
-          <button
-            type="button"
+            <ChevronUp aria-hidden />
+          </InputGroupButton>
+          <InputGroupButton
+            size="icon-xs"
             aria-label="减少"
             tabIndex={-1}
-            className="flex flex-1 items-center justify-center border-t border-border text-muted-foreground hover:bg-muted hover:text-foreground"
             onClick={() => step(-stepSize)}
+            className="h-3.5 text-muted-foreground hover:text-foreground [&_svg]:size-3"
           >
-            <ChevronDown className="size-3" aria-hidden />
-          </button>
-        </div>
+            <ChevronDown aria-hidden />
+          </InputGroupButton>
+        </InputGroupAddon>
       )}
-    </div>
+    </InputGroup>
   );
 }
 
@@ -579,7 +587,17 @@ export function SegmentedGroup({
 
 /* ────────────────────────── 可清空输入 ────────────────────────── */
 
-/** 带右侧清空按钮的输入。筛选条件用：清空比逐字删快。 */
+/**
+ * 带右侧清空按钮的输入。筛选条件用：清空比逐字删快。
+ *
+ * 用 shadcn 官方 `InputGroup` 组合件（输入框 + 行内附加件）实现，不再手写
+ * 「relative 容器 + 绝对定位按钮」：手写那份要自己对齐图标、自己在有值时
+ * 让出 `pr-8`、自己复刻聚焦环，四处细节都得跟原子件同步。`InputGroup`
+ * 由官方维护聚焦态与错误态，这里只声明「输入框 + 尾部清空按钮」。
+ *
+ * 高度固定 `h-8`（后台筛选控件的统一基线；shadcn `InputGroup` 默认 `h-9`），
+ * 与 `SelectField` / `ActionButton` 同排时不出现参差。
+ */
 export function ClearableField({
   value,
   onChange,
@@ -600,8 +618,8 @@ export function ClearableField({
   onEnter?: () => void;
 }) {
   return (
-    <div className={cn('relative', className)}>
-      <input
+    <InputGroup className={cn('h-8 bg-background', className)}>
+      <InputGroupInput
         id={id}
         type="text"
         value={value}
@@ -615,25 +633,21 @@ export function ClearableField({
             onEnter();
           }
         }}
-        className={cn(
-          'flex h-8 w-full rounded-md border border-input bg-background px-3 py-1 text-sm text-foreground shadow-xs',
-          'transition-[color,box-shadow] outline-none placeholder:text-muted-foreground',
-          'focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50',
-          'disabled:cursor-not-allowed disabled:bg-muted disabled:text-muted-foreground',
-          value && 'pr-8',
-        )}
+        className="h-8 text-sm"
       />
       {value && !disabled && (
-        <button
-          type="button"
-          aria-label="清空"
-          onClick={() => onChange('')}
-          className="absolute top-1/2 right-2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-        >
-          <X className="size-3.5" aria-hidden />
-        </button>
+        <InputGroupAddon align="inline-end" className="pr-1.5">
+          <InputGroupButton
+            size="icon-xs"
+            aria-label="清空"
+            onClick={() => onChange('')}
+            className="text-muted-foreground hover:text-foreground"
+          >
+            <X aria-hidden />
+          </InputGroupButton>
+        </InputGroupAddon>
       )}
-    </div>
+    </InputGroup>
   );
 }
 

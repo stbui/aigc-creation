@@ -111,7 +111,7 @@ export function Drawer({
       <SheetContent
         data-testid="admin-drawer"
         side="right"
-        style={{ width }}
+        style={{ width, maxWidth: '100vw' }}
         className="flex w-full flex-col gap-0 p-0 sm:max-w-none"
       >
         <SheetHeader className="border-b border-border px-5 py-4 pr-12">

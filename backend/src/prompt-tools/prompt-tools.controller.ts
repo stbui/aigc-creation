@@ -15,9 +15,9 @@ import { ImageToPromptDto } from './dto/image-to-prompt.dto';
  *
  * ## 错误语义
  *
- * 没有可用文本线路 / 上游全部失败 → `50201` + 可读文案, **不回落**。
- * 该错误由 `TextToolService` 抛出, 带的是「上游为什么失败」的原因
- * (基址没配 / 令牌无效 / 超时), 运营据此可以直接判断处置动作。
+ * 没有可用文本线路 / 上游全部失败 → `50201` + 面向用户的通用文案, **不回落**。
+ * 上游失败的具体原因（基址没配 / 令牌无效 / 超时）只写进程日志与调用记录，
+ * 不返回给前台用户。
  */
 @Controller('prompt-tools')
 @UseGuards(JwtAuthGuard)
