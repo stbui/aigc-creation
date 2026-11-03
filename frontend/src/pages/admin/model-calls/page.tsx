@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useState } from 'react';
+import { REQUEST_KIND_LABELS, STATUS_LABELS, STATUS_TONES } from './constants';
 import { useAdmin, useToast, useAdminDetailParam, useAdminList, useAdminUrlFilterSync } from './hooks';
 import { useSearchParams } from 'react-router-dom';
 import { Download } from 'lucide-react';
 import { adminApiLogsApi } from '../../../lib/api';
-
 
 import { ActionButton, AdminDataTable, AppliedFilters, Descriptions, Drawer, FilterActions, FilterBar, Notice, PageHeader, Panel, SelectField, StatCard, StatusTag, StaleError, TextField, type AdminColumn, type AppliedFilter } from './components';
 import type { ApiLogListResult, ApiLogView } from '../../../types/model';
@@ -18,25 +18,6 @@ import type { ApiLogListResult, ApiLogView } from '../../../types/model';
  * 旧的 `ModelCallLog` 视图随 `src/providers/**` 在 P6 删除；本页已切到
  * `ApiCallLog`，两条链路不能共用同一路径。
  */
-
-const REQUEST_KIND_LABELS: Record<string, string> = {
-  create: '创建',
-  poll: '轮询',
-  task: '连通性测试',
-  proxy: '中转',
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  success: '成功',
-  failed: '失败',
-  canceled: '已取消',
-};
-
-const STATUS_TONES: Record<string, 'success' | 'danger' | 'warn' | 'brand' | 'muted'> = {
-  success: 'success',
-  failed: 'danger',
-  canceled: 'muted',
-};
 
 export function AdminModelCallsPage() {
   /*

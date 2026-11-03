@@ -7,7 +7,6 @@ import { ChannelModelRepriceDialog } from './ChannelModelRepriceDialog';
 import { ChannelModelTable } from './ChannelModelTable';
 import { ChannelOrderDialog } from './ChannelOrderDialog';
 import { ChannelUpstreamDialog } from './ChannelUpstreamDialog';
-import { DeleteReasonConfirm } from './DeleteReasonConfirm';
 import { EMPTY_MODEL_DRAFT, EMPTY_TIER, type ModelDraft } from './constants';
 import {
   buildPriceTiers,
@@ -80,7 +79,6 @@ export function ChannelModelManager({
   const [testing, setTesting] = useState(false);
 
   const [deleteTarget, setDeleteTarget] = useState<AdminChannelModelView | null>(null);
-  const [deleteReason, setDeleteReason] = useState('');
 
   /** 勾选的模型 id：统一调价与批量删除共用同一份勾选 */
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -90,7 +88,6 @@ export function ChannelModelManager({
   const [disableTarget, setDisableTarget] = useState<AdminChannelModelView | null>(null);
   /** 批量删除确认 */
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false);
-  const [batchDeleteReason, setBatchDeleteReason] = useState('');
   /** 模型排序弹窗 */
   const [orderOpen, setOrderOpen] = useState(false);
 
@@ -334,17 +331,11 @@ export function ChannelModelManager({
 
   const runDelete = async () => {
     if (!deleteTarget) return;
-    // 删除是高危动作（channel.model_write）：原因必填，后端也会拒收空原因
-    if (deleteReason.trim().length === 0) {
-      toast.error('必须填写变更原因');
-      return;
-    }
     setSaving(true);
     try {
-      await adminChannelsApi.removeModel(channelId, deleteTarget.id, deleteReason.trim());
+      await adminChannelsApi.removeModel(channelId, deleteTarget.id);
       toast.success(`已删除 ${deleteTarget.modelKey}`);
       setDeleteTarget(null);
-      setDeleteReason('');
       await load();
       onChanged();
     } catch (e) {
@@ -363,21 +354,11 @@ export function ChannelModelManager({
    */
   const runBatchDelete = async () => {
     if (selectedIds.length === 0) return;
-    // 删除是高危动作（channel.model_write）：原因必填，后端也会拒收空原因
-    if (batchDeleteReason.trim().length === 0) {
-      toast.error('必须填写变更原因');
-      return;
-    }
     setSaving(true);
     try {
-      const result = await adminChannelsApi.batchDeleteModels(
-        channelId,
-        selectedIds,
-        batchDeleteReason.trim(),
-      );
+      const result = await adminChannelsApi.batchDeleteModels(channelId, selectedIds);
       toast.success(`已删除 ${result.deleted} 个模型`);
       setBatchDeleteOpen(false);
-      setBatchDeleteReason('');
       setSelectedIds([]);
       await load();
       onChanged();
@@ -454,36 +435,29 @@ export function ChannelModelManager({
             onToggle={requestToggle}
             onCopy={openCopy}
             onDelete={(model) => {
-              setDeleteReason('');
               setDeleteTarget(model);
             }}
             onOpenOrder={() => setOrderOpen(true)}
-            onOpenBatchDelete={() => {
-              setBatchDeleteReason('');
-              setBatchDeleteOpen(true);
-            }}
+            onOpenBatchDelete={() => setBatchDeleteOpen(true)}
             onOpenReprice={() => setRepriceOpen(true)}
             onOpenCreate={openCreate}
             onFetchUpstream={() => void fetchUpstream()}
             fetching={fetching}
           />
 
-          <DeleteReasonConfirm
+          <ConfirmAction
             open={deleteTarget !== null}
             title={`删除模型 ${deleteTarget?.modelKey ?? ''}？`}
             description="删除后从路由目录移除；引用该模型的前台线路会变为不可用。历史账单与调用记录保留。"
             impact={['该渠道模型的价格档一并作废', '引用它的前台模型线路需要重新选路']}
-            reason={deleteReason}
-            reasonAriaLabel="删除原因"
-            reasonHint="写入审计，建议写清替代模型或下线原因"
-            reasonPlaceholder="如：上游已下线该模型"
+            danger
+            confirmText="确认删除"
             loading={saving}
-            onReasonChange={setDeleteReason}
             onCancel={() => setDeleteTarget(null)}
             onConfirm={() => void runDelete()}
           />
 
-          <DeleteReasonConfirm
+          <ConfirmAction
             open={batchDeleteOpen}
             title={`批量删除 ${selectedIds.length} 个模型？`}
             description="软删除：所选模型从路由目录移除，价格档一并作废；历史账单与调用记录保留。"
@@ -491,12 +465,9 @@ export function ChannelModelManager({
               '任一模型仍被前台线路或进行中任务使用时，本次不删除任何模型',
               '引用这些模型的前台线路需要重新选路',
             ]}
-            reason={batchDeleteReason}
-            reasonAriaLabel="批量删除原因"
-            reasonHint="写入审计"
-            reasonPlaceholder="如：批量下线旧版本模型"
+            danger
+            confirmText="确认删除"
             loading={saving}
-            onReasonChange={setBatchDeleteReason}
             onCancel={() => setBatchDeleteOpen(false)}
             onConfirm={() => void runBatchDelete()}
           />

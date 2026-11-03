@@ -38,37 +38,94 @@
 | 界面角标 | 「开发」 | 「测试」 | 不显示 |
 | Docker profile | 默认 | `--profile test` | 见下方「生产部署」 |
 
-## 支付通道（`PAYMENT_PROVIDER`）
+## 支付通道（后台多通道配置）
 
-支付通道是**按环境切换**的：开发/测试固定走沙箱，生产必须配真实商户号。变量定义在
-`backend/src/config/env.validation.ts` 的 `ENV_SPECS`（`payment.*` 段）。
+支付通道不再由单一 `PAYMENT_PROVIDER` 切换。当前支持站点内沙箱、支付宝、微信支付、
+PayPal、Stripe、易支付、ZPay。真实渠道在后台「支付充值 → 支付渠道」中启用并保存版本化配置；
+环境变量只在数据库**首次没有该渠道配置**时导入为 v1，后续轮换凭据以后台保存的新版本为准。
 
 | 变量 | 开发 | 测试 | 生产 | 说明 |
 |---|---|---|---|---|
-| `PAYMENT_PROVIDER` | `sandbox` | `sandbox` | `alipay` / `wechat` | 默认通道；缺省按 `sandbox` |
-| `PAYMENT_NOTIFY_BASE` | 空 | 空 | **必填** | 渠道异步通知的公网基址，拼成 `{base}/api/v1/payments/callback/{channel}`。空时退回 `ASSET_PUBLIC_BASE`，再空则无法发起真实支付 |
+| `PAYMENT_SECRET_KEY` | 空 | 空 | **必填** | base64 编码的 32 字节密钥，AES-256-GCM 加密渠道凭据。开发留空会在 `data/.payment-secret-key` 生成持久化密钥；生产留空会拒绝加解密 |
+| `PAYMENT_NOTIFY_BASE` | 空 | 空 | **必填** | 渠道异步通知的公网基址，拼成 `{base}/api/v1/payments/callback/{channel}/{configId}`。也可在单个渠道配置 `publicBaseUrl`；真实渠道两者都为空时发起支付返回 503 |
 | `ALIPAY_APP_ID` / `ALIPAY_PRIVATE_KEY` / `ALIPAY_PUBLIC_KEY` | 空 | 空 | 按需 | RSA2。私钥是**应用私钥**，公钥是**支付宝公钥**（不是应用公钥，填反表现为回调一律验签失败） |
 | `ALIPAY_GATEWAY` | 空 | 空 | 按需 | 空则用正式网关；沙箱联调用 `https://openapi-sandbox.dl.alipaydev.com/gateway.do` |
 | `WECHAT_MCH_ID` / `WECHAT_APP_ID` / `WECHAT_API_V3_KEY` / `WECHAT_SERIAL_NO` / `WECHAT_PRIVATE_KEY` / `WECHAT_PLATFORM_PUBLIC_KEY` | 空 | 空 | 按需 | API v3。`API_V3_KEY` 必须 **32 字节**；`PLATFORM_PUBLIC_KEY` 用于验回调 |
+| `PAYPAL_CLIENT_ID` / `PAYPAL_CLIENT_SECRET` | 空 | 空 | 按需 | PayPal REST App 凭据。生产用 Live App，联调可用 Sandbox App |
+| `PAYPAL_WEBHOOK_ID` | 空 | 空 | 按需 | PayPal 开发者后台 Webhook 的 ID，不是 URL；回调通过 PayPal 官方 `verify-webhook-signature` 验签 |
+| `PAYPAL_API_BASE` | 空 | 空 | 按需 | 留空用 `https://api-m.paypal.com`；Sandbox 显式填 `https://api-m.sandbox.paypal.com` |
+| `STRIPE_SECRET_KEY` | 空 | 空 | 按需 | `sk_live_...` 为生产，`sk_test_...` 为测试模式 |
+| `STRIPE_WEBHOOK_SECRET` | 空 | 空 | 按需 | Stripe Webhook Endpoint 的 `whsec_...`，用于本地 HMAC 验签 |
+| `STRIPE_API_BASE` | 空 | 空 | 按需 | 留空使用 `https://api.stripe.com`；测试/生产模式由 Secret Key 决定，不靠切换域名 |
+| `EPAY_API_BASE` | `https://epay.jylt.cc` | 同开发 | 同开发 | 易支付 API 基址；适配器自动拼接 `/api/createOrder` 与 `/api/getOrder` |
+| `EPAY_MCH_ID` / `EPAY_KEY` | 空 | 空 | 按需 | 易支付商户 ID 与通讯密钥；密钥用于创建订单和回调的 MD5 签名 |
+| `EPAY_TYPE` | `2` | 同开发 | 同开发 | 易支付支付类型：`1` 微信、`2` 支付宝。后续可在后台渠道配置中修改 |
+| `ZPAY_API_BASE` | `https://zpayz.cn` | 同开发 | 同开发 | ZPay API 基址；适配器自动拼接 `/mapi.php` 与 `/api.php` |
+| `ZPAY_PID` / `ZPAY_KEY` | 空 | 空 | 按需 | ZPay 商户 ID 与商户密钥；密钥用于下单、回调验签以及查单/退款认证 |
+| `ZPAY_TYPE` | `alipay` | 同开发 | 同开发 | ZPay 支付方式：`alipay` 支付宝、`wxpay` 微信支付。后续可在后台渠道配置中修改 |
 
-三条必须记住的规则：
+三条必须记住的规则（以及一条操作规则）：
 
-1. **凭据缺失返回 503，绝不静默降级为沙箱**。否则「生产漏配」会表现为「支付一直成功但一分钱没收到」。
+1. **凭据或真实回调地址缺失返回 503，绝不静默降级为沙箱**。否则「生产漏配」会表现为「支付一直成功但一分钱没收到」。
 2. **沙箱回调在生产环境拒收**（`SandboxPaymentProvider` 显式判 `NODE_ENV`），防止伪造支付。
 3. **多行 PEM 用字面 `\n` 写进 env**，`normalizePem()` 会还原。粘贴真实换行会让后续几行变成独立键值。
+4. 后台渠道列表会给出风险提示：缺少必填凭据、缺少回调公网地址、生产启用沙箱等都会直接标红。
 
 示例：
 
 ```bash
-PAYMENT_PROVIDER=alipay
+PAYMENT_SECRET_KEY=<base64-32-bytes>
 PAYMENT_NOTIFY_BASE=https://api.example.com
+
 ALIPAY_APP_ID=2021000000000001
 ALIPAY_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nMIIEv...\n-----END PRIVATE KEY-----"
 ALIPAY_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----\nMIIBI...\n-----END PUBLIC KEY-----"
+
+PAYPAL_CLIENT_ID=<paypal-client-id>
+PAYPAL_CLIENT_SECRET=<paypal-client-secret>
+PAYPAL_WEBHOOK_ID=<paypal-webhook-id>
+PAYPAL_API_BASE=https://api-m.paypal.com
+
+STRIPE_SECRET_KEY=sk_live_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_API_BASE=https://api.stripe.com
+
+EPAY_API_BASE=https://epay.jylt.cc
+EPAY_MCH_ID=1001
+EPAY_KEY=<epay-communication-key>
+EPAY_TYPE=2
+
+ZPAY_API_BASE=https://zpayz.cn
+ZPAY_PID=<zpay-pid>
+ZPAY_KEY=<zpay-merchant-key>
+ZPAY_TYPE=alipay
 ```
 
-支付宝 / 微信的签名与解密实现有离线交叉校验脚本（本地生成 RSA 密钥对，按公开规范独立复算签名串）：
-`cd backend && npx ts-node -T scripts/verify-payment-signatures.ts`。它不能替代真实商户号的端到端联调。
+### 回调地址与渠道后台配置
+
+后端生成并传给渠道的回调地址格式固定：
+
+```text
+https://域名/api/v1/payments/callback/paypal/{configId}
+https://域名/api/v1/payments/callback/stripe/{configId}
+https://域名/api/v1/payments/callback/epay/{configId}
+https://域名/api/v1/payments/callback/zpay/{configId}
+```
+
+- `{configId}` 是渠道配置版本 id。轮换凭据会生成新的 `configId`，渠道后台 Webhook 地址也必须切到新地址；旧版本及旧回调地址要保留到历史订单全部结束，否则旧 `configId` 的回调无法用当时密钥验签。
+- 回调路由同时接受 GET 与 POST：PayPal / Stripe Webhook 使用 POST，易支付与 ZPay 异步通知使用 GET。
+- Stripe Webhook 至少订阅：`checkout.session.completed`、`checkout.session.async_payment_succeeded`、`checkout.session.async_payment_failed`、`checkout.session.expired`。
+- PayPal 使用 Orders v2 `CAPTURE`：买家批准后订单只会到 `APPROVED`，结算页回跳或状态轮询会由服务端调用 capture 真正扣款；Webhook 至少订阅订单完成/作废与 capture 完成/失败事件，`PAYPAL_WEBHOOK_ID` 必须对应同一个 Webhook 配置。
+- 易支付采用 `epay.jylt.cc` 的 `createOrder` / `getOrder` 协议：异步通知是 **GET**，回调签名覆盖 `orderId + param + type + price + reallyPrice + key`；查单已支持，文档未提供关单和退款 API。
+- ZPay 下单走 `POST /mapi.php`（multipart form-data），必须由服务端注入用户真实 IP；查单走 `GET /api.php?act=order`，退款走 `POST /api.php?act=refund`。回调仅接受 `trade_status=TRADE_SUCCESS`，验签后还会主动查单复核，成功时必须返回纯文本 `success`。
+- ZPay 文档未提供关单接口，本地会明确返回不支持；退款按请求金额提交，但部分支付通道可能只支持全额退款，真实退款规则以商户后台和实际通道为准。
+- 旧变量 `EPAY_PID` / `EPAY_PAY_TYPE` 仅保留兼容读取，新部署请使用 `EPAY_MCH_ID` / `EPAY_TYPE`。
+- PayPal 不支持关闭未授权 Checkout Order；Stripe 通过 expire Checkout Session 关单。PayPal、Stripe、易支付与 ZPay 当前都**不参与自动渠道账单对账**。
+
+支付宝 / 微信的签名与解密实现有离线交叉校验脚本：
+`cd backend && npx ts-node -T scripts/verify-payment-signatures.ts`。Stripe HMAC、易支付 MD5 与 ZPay MD5
+另有 `adapters/*.adapter.spec.ts` 离线单测。这些测试不能替代真实商户号的端到端实扣、
+公网 HTTPS 回调和真实退款验收。
 
 ## 模型层（`MODEL_*`）
 

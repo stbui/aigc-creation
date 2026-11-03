@@ -3,8 +3,6 @@ import { useAdmin, useUnsavedGuard, useToast, useAdminResource } from './hooks';
 import { Plus, Trash2 } from 'lucide-react';
 import { marketingApi } from '../../../lib/api';
 
-
-
 import { ActionButton, FormField, IconButton, ListError, NumberField, PageHeader, PageSkeleton, Panel, SelectField, StaleError, SwitchField } from './components';
 import type { CheckinRule, InviteRule } from '../../../types/api';
 
@@ -14,7 +12,7 @@ import type { CheckinRule, InviteRule } from '../../../types/api';
  * 「有未保存修改」必须写在按钮左侧同一行：两块规则共用同一个 `busy`，
  * 保存一区时另一区的按钮同时变灰，用户需要知道哪一块真的改过。
  */
-function RuleActions({
+export function RuleActions({
   hint,
   dirty,
   busy,

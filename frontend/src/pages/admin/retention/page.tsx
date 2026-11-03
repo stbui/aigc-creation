@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
+import { TARGET_LABELS } from './constants';
+import { fmtTime } from './utils';
 import { useAdmin, useUnsavedGuard, useToast, useAdminResource } from './hooks';
 import { ShieldAlert } from 'lucide-react';
 import { adminRetentionApi } from '../../../lib/api';
-
-
 
 import { ActionButton, AdminDataTable, ConfirmAction, NumberField, Notice, PageHeader, Panel, StatCard, StatusTag, StaleError, TextField, type AdminColumn } from './components';
 import type { AdminCleanupLog, AdminRetentionTarget } from '../../../types/api';
@@ -23,17 +23,7 @@ import type { AdminCleanupLog, AdminRetentionTarget } from '../../../types/api';
  * 这一次会删掉多少。所以每行都按当前保留天数先 count 一次「将被删除」。
  */
 
-function fmtTime(v: string | null): string {
-  return v ? new Date(v).toLocaleString('zh-CN') : '—';
-}
-
 /** 清理目标的中文名。后端已给 label, 这里只在日志表里兜底 */
-const TARGET_LABELS: Record<string, string> = {
-  AdminAuditLog: '后台操作审计',
-  ApiCallLog: '模型调用记录',
-  BackupRecord: '备份记录',
-  CleanupLog: '清理日志',
-};
 
 export function AdminRetentionPage() {
   const toast = useToast();

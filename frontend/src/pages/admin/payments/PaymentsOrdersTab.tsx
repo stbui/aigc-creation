@@ -36,8 +36,8 @@ import type {
 } from '../../../types/payment';
 import {
   CHECKOUT_MODE_LABELS,
-  FILTERABLE_PROVIDER_IDS,
-  FILTERABLE_PROVIDERS,
+  ORDER_PROVIDER_IDS,
+  ORDER_PROVIDERS,
   PAYMENT_STATUS_META,
   PROVIDER_LABELS,
 } from './constants';
@@ -85,7 +85,7 @@ export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
   })();
   const initialProvider = (() => {
     const raw = searchParams.get('providerId');
-    return raw && (FILTERABLE_PROVIDER_IDS as string[]).includes(raw) ? raw : undefined;
+    return raw && (ORDER_PROVIDER_IDS as string[]).includes(raw) ? raw : undefined;
   })();
   const initialTimeField = (() => {
     const raw = searchParams.get('timeField');
@@ -375,7 +375,7 @@ export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
         <SelectField
           value={providerId}
           onChange={setProviderId}
-          options={FILTERABLE_PROVIDERS}
+          options={ORDER_PROVIDERS}
           allowClear
           className="w-[120px]"
           ariaLabel="支付渠道"
@@ -649,6 +649,10 @@ function PaymentOrderDetailDrawer({
                 value: <code className="font-mono text-xs">{order.providerTradeNo ?? '—'}</code>,
               },
               {
+                label: '渠道单据号',
+                value: <code className="font-mono text-xs break-all">{order.providerRef ?? '—'}</code>,
+              },
+              {
                 label: '配置版本',
                 value: order.providerConfigVersion === null ? '—' : `v${order.providerConfigVersion}`,
               },
@@ -714,6 +718,7 @@ function PaymentOrderDetailDrawer({
                     <tr>
                       <th className="px-3 py-2 text-left font-medium">状态</th>
                       <th className="px-3 py-2 text-left font-medium">渠道</th>
+                      <th className="px-3 py-2 text-left font-medium">渠道单据号</th>
                       <th className="px-3 py-2 text-left font-medium">交易号</th>
                       <th className="px-3 py-2 text-right font-medium">金额</th>
                       <th className="px-3 py-2 text-left font-medium">创建时间</th>
@@ -726,6 +731,11 @@ function PaymentOrderDetailDrawer({
                         <td className="px-3 py-2">
                           {PROVIDER_LABELS[payment.providerId as keyof typeof PROVIDER_LABELS] ??
                             payment.providerId}
+                        </td>
+                        <td className="px-3 py-2">
+                          <code className="font-mono text-xs break-all">
+                            {payment.providerRef ?? '—'}
+                          </code>
                         </td>
                         <td className="px-3 py-2">
                           <code className="font-mono text-xs">{payment.payTransactionId ?? '—'}</code>

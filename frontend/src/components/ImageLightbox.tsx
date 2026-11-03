@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Check, ChevronLeft, ChevronRight, Copy, Download, FileText, Minus, Plus, X } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Copy, Download, FileText, Minus, Plus, RotateCw, X } from 'lucide-react';
 
 /**
  * 生成图大图查看器。
@@ -7,7 +7,7 @@ import { Check, ChevronLeft, ChevronRight, Copy, Download, FileText, Minus, Plus
  * 整屏暗色查看器：
  *   - 适应屏幕（object-fit: contain），按原始比例完整显示，不裁切；
  *   - 点击图片 / 滚轮 / 工具条都能放大到 1~4 倍，放大后可拖拽查看局部；
- *   - ←/→ 翻页，Esc 关闭；底部显示序号、尺寸、时间与「下载原图」。
+ *   - ←/→ 翻页，Esc 关闭，R 旋转；底部显示序号与业务元信息。
  *
  * 只负责展示与缩放，不改动调用方的数据 —— 图片列表与当前索引都从外部传入，
  * 换图（`index` 变化）时自动复位缩放，避免把上一张的位移带到下一张。
@@ -15,9 +15,11 @@ import { Check, ChevronLeft, ChevronRight, Copy, Download, FileText, Minus, Plus
  * 交互约定：
  *   - 预加载左右相邻两张，翻页无需等待下载；
  *   - 加载中有提示，失败可原地重试（签名过期 / 文件清理都能自愈一次）；
- *   - 滚轮/点击缩放以**光标为锚点**；
+ *   - 滚轮/点击缩放以**光标为锚点**，触屏支持双指缩放；
+ *   - 支持 90° 顺时针旋转，旋转后按可视区域重新适配；
  *   - 拖拽有边界约束，放大后内容始终留在视野内；
- *   - 未放大时左右滑动翻页（触屏），已放大时滑动改为拖拽视图。
+ *   - 未放大时左右滑动翻页（触屏），已放大时单指滑动改为拖拽视图；
+ *   - 点击图片切换适应/2 倍预览，点击黑色背景关闭查看器。
  */
 export interface LightboxItem {
   id: string;
@@ -29,7 +31,7 @@ export interface LightboxItem {
   createdAt?: string;
   /** 生成时提交的提示词；有值时可在查看器内展开查看与复制 */
   prompt?: string;
-  /** 调用方补充的业务元信息，显示在尺寸/时间之前 */
+  /** 调用方补充的业务元信息；查看器不再自动展示尺寸与创建时间 */
   meta?: string[];
 }
 
@@ -56,21 +58,56 @@ const ZOOM_STEP = 0.5;
 /** 触屏横向滑动超过这个距离才翻页，避免把轻微抖动当成手势 */
 const SWIPE_THRESHOLD = 56;
 
+interface Point {
+  x: number;
+  y: number;
+}
+
+interface PinchStart {
+  distance: number;
+  midpoint: Point;
+  zoom: number;
+  offset: Point;
+  /** 图片未经 transform 时的中心点，用于把双指锚点换算回图片坐标 */
+  layoutCenter: Point;
+}
+
+function distanceBetween(a: Point, b: Point): number {
+  return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function midpointOf(a: Point, b: Point): Point {
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+}
+
 function clampZoom(value: number): number {
   return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, Number(value.toFixed(2))));
 }
 
 /**
- * 把位移夹在「放大后的图片边缘不越过它未缩放时的外框」范围内。
+ * 把位移夹在「放大后的图片边缘不越过舞台可视区」的范围内。
  *
- * 放大后图片会超出舞台；若不加约束，用户可以一路把图拖到视野之外，
- * 只剩一块黑底，还以为图没了。可平移量恰为 `未缩放尺寸 × (缩放比 - 1) / 2`：
- * 拖到边缘就停住，内容永远在视野内。只依赖图片自身尺寸，与舞台内边距无关。
+ * 旋转 90°/270° 后图片的视觉宽高会互换；如果仍按原布局尺寸计算，
+ * 横向拖拽会在竖图上提前停住，纵向则可能拖出空屏。这里按旋转后的
+ * 视觉尺寸与舞台内容区取交集，缩放和旋转共用同一套边界。
  */
-function clampOffset(next: { x: number; y: number }, zoom: number, img: HTMLImageElement | null) {
+function clampOffset(
+  next: { x: number; y: number },
+  zoom: number,
+  img: HTMLImageElement | null,
+  rotation = 0,
+) {
   if (!img) return next;
-  const limitX = Math.max(0, (img.offsetWidth * (zoom - 1)) / 2);
-  const limitY = Math.max(0, (img.offsetHeight * (zoom - 1)) / 2);
+  const stage = img.parentElement;
+  if (!stage) return next;
+  const style = getComputedStyle(stage);
+  const stageWidth = stage.clientWidth - (Number.parseFloat(style.paddingLeft) || 0) - (Number.parseFloat(style.paddingRight) || 0);
+  const stageHeight = stage.clientHeight - (Number.parseFloat(style.paddingTop) || 0) - (Number.parseFloat(style.paddingBottom) || 0);
+  const quarterTurn = rotation % 180 !== 0;
+  const visualWidth = (quarterTurn ? img.offsetHeight : img.offsetWidth) * zoom;
+  const visualHeight = (quarterTurn ? img.offsetWidth : img.offsetHeight) * zoom;
+  const limitX = Math.max(0, (visualWidth - stageWidth) / 2);
+  const limitY = Math.max(0, (visualHeight - stageHeight) / 2);
   return {
     x: Math.min(limitX, Math.max(-limitX, next.x)),
     y: Math.min(limitY, Math.max(-limitY, next.y)),
@@ -118,11 +155,13 @@ export function ImageLightbox({
    * (表现为「放大后图突然偏到一边」)。合并成一个对象后每次更新都是纯计算。
    */
   const [view, setView] = useState({ zoom: 1, x: 0, y: 0 });
+  const [rotation, setRotation] = useState(0);
   const [promptOpen, setPromptOpen] = useState(false);
   const [promptCopied, setPromptCopied] = useState(false);
   const zoom = view.zoom;
   const offset = { x: view.x, y: view.y };
   const [dragging, setDragging] = useState(false);
+  const [pinching, setPinching] = useState(false);
   /**
    * 加载状态**带着图片 id**。
    *
@@ -152,6 +191,10 @@ export function ImageLightbox({
   const movedRef = useRef(false);
   /** 触屏滑动起点（未放大时用于翻页） */
   const swipeRef = useRef<{ x: number; y: number } | null>(null);
+  /** 当前按在舞台上的触点，双指手势需要同时跟踪两个 pointerId */
+  const touchPointsRef = useRef<Map<number, Point>>(new Map());
+  /** 双指缩放起始快照；null 表示当前不是双指手势 */
+  const pinchRef = useRef<PinchStart | null>(null);
 
   const resetView = useCallback(() => {
     setView({ zoom: 1, x: 0, y: 0 });
@@ -168,6 +211,7 @@ export function ImageLightbox({
   if (renderedId !== item?.id) {
     setRenderedId(item?.id);
     setView({ zoom: 1, x: 0, y: 0 });
+    setRotation(0);
     setPromptCopied(false);
     setImageState({ id: item?.id, state: item && loadedIdsRef.current.has(item.id) ? 'loaded' : 'loading' });
     setRetryNonce(0);
@@ -189,6 +233,16 @@ export function ImageLightbox({
   useEffect(() => {
     if (imgState === 'loaded' && item) loadedIdsRef.current.add(item.id);
   }, [imgState, item]);
+
+  // 换图时终止尚未结束的手势，避免上一张的触点/拖拽状态污染下一张。
+  useEffect(() => {
+    touchPointsRef.current.clear();
+    pinchRef.current = null;
+    dragRef.current = null;
+    swipeRef.current = null;
+    setPinching(false);
+    setDragging(false);
+  }, [item?.id]);
 
   /*
    * 预加载相邻两张。
@@ -226,6 +280,24 @@ export function ImageLightbox({
     return () => previous?.focus?.();
   }, []);
 
+  /*
+   * 窗口旋转 / 分屏会改变适应后的图片尺寸，旧位移可能在新尺寸下越界。
+   * 图片尺寸落定后再收敛一次，避免放大中的内容被裁到视野之外。
+   */
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const observer = new ResizeObserver(() => {
+      setView((cur) => {
+        if (cur.zoom <= 1) return cur;
+        const clamped = clampOffset({ x: cur.x, y: cur.y }, cur.zoom, imgRef.current, rotation);
+        return clamped.x === cur.x && clamped.y === cur.y ? cur : { zoom: cur.zoom, ...clamped };
+      });
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [rotation]);
+
   /**
    * 缩放到 `next`，并让舞台内 `anchor` 点（视口坐标，缺省为正中）保持不动。
    *
@@ -239,14 +311,14 @@ export function ImageLightbox({
       if (value === 1) return { zoom: 1, x: 0, y: 0 };
       // 无锚点 (键盘/工具条) 保留原有位移并做边界收敛, 仍是「居中放大」
       if (!anchor || !imgRef.current) {
-        const clamped = clampOffset({ x: cur.x, y: cur.y }, value, imgRef.current);
+        const clamped = clampOffset({ x: cur.x, y: cur.y }, value, imgRef.current, rotation);
         return { zoom: value, x: clamped.x, y: clamped.y };
       }
       const delta = anchorDelta(anchor, imgRef.current, cur.zoom, value);
-      const clamped = clampOffset({ x: cur.x + delta.x, y: cur.y + delta.y }, value, imgRef.current);
+      const clamped = clampOffset({ x: cur.x + delta.x, y: cur.y + delta.y }, value, imgRef.current, rotation);
       return { zoom: value, x: clamped.x, y: clamped.y };
     });
-  }, []);
+  }, [rotation]);
 
   const zoomBy = useCallback(
     (delta: number, anchor?: { x: number; y: number }) => {
@@ -255,18 +327,24 @@ export function ImageLightbox({
         if (value === cur.zoom) return cur;
         if (value === 1) return { zoom: 1, x: 0, y: 0 };
         if (!anchor || !imgRef.current) {
-          const clamped = clampOffset({ x: cur.x, y: cur.y }, value, imgRef.current);
+          const clamped = clampOffset({ x: cur.x, y: cur.y }, value, imgRef.current, rotation);
           return { zoom: value, x: clamped.x, y: clamped.y };
         }
         const shift = anchorDelta(anchor, imgRef.current, cur.zoom, value);
-        const clamped = clampOffset({ x: cur.x + shift.x, y: cur.y + shift.y }, value, imgRef.current);
+        const clamped = clampOffset({ x: cur.x + shift.x, y: cur.y + shift.y }, value, imgRef.current, rotation);
         return { zoom: value, x: clamped.x, y: clamped.y };
       });
     },
-    [],
+    [rotation],
   );
 
-  // 键盘：Esc 关闭 / ←→ 翻页 / +/- 缩放
+  const rotate = useCallback(() => {
+    setRotation((current) => (current + 90) % 360);
+    // 旋转后保持当前倍率，但回到中心，避免上一方向的位移让图片突然跳到角落。
+    setView((current) => ({ ...current, x: 0, y: 0 }));
+  }, []);
+
+  // 键盘：Esc 关闭 / ←→ 翻页 / +/- 缩放 / R 旋转
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -286,11 +364,17 @@ export function ImageLightbox({
       } else if (e.key === '-') {
         e.preventDefault();
         zoomBy(-ZOOM_STEP);
+      } else if (e.key === '0') {
+        e.preventDefault();
+        resetView();
+      } else if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        rotate();
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [index, items.length, onClose, onIndexChange, zoomBy]);
+  }, [index, items.length, onClose, onIndexChange, resetView, rotate, zoomBy]);
 
   /*
    * 滚轮缩放必须绑原生监听：React 的 onWheel 在浏览器里是 passive 的，
@@ -320,12 +404,7 @@ export function ImageLightbox({
   if (!item) return null;
 
   const go = (dir: -1 | 1) => onIndexChange((index + dir + items.length) % items.length);
-  const meta = [
-    items.length > 1 ? `${index + 1} / ${items.length}` : null,
-    ...(item.meta ?? []),
-    item.width && item.height ? `${item.width}×${item.height}` : null,
-    item.createdAt ? new Date(item.createdAt).toLocaleString('zh-CN') : null,
-  ].filter(Boolean) as string[];
+  const meta = [items.length > 1 ? `${index + 1} / ${items.length}` : null, ...(item.meta ?? [])].filter(Boolean) as string[];
 
   const retry = () => {
     setImageState({ id: item.id, state: 'loading' });
@@ -388,7 +467,7 @@ export function ImageLightbox({
 
       <div
         ref={stageRef}
-        className={`img-viewer-stage${zoom > 1 ? ' is-zoomed' : ''}${dragging ? ' is-dragging' : ''}`}
+        className={`img-viewer-stage${zoom > 1 ? ' is-zoomed' : ''}${dragging ? ' is-dragging' : ''}${pinching ? ' is-pinching' : ''}${rotation % 180 !== 0 ? ' is-quarter-turn' : ''}`}
         onContextMenu={(e) => {
           if (!onItemContextMenu) return;
           e.preventDefault();
@@ -400,20 +479,59 @@ export function ImageLightbox({
             return;
           }
           const target = e.target as HTMLElement;
-          // 只响应舞台背景与图片本身；点工具条不触发缩放
-          if (target !== e.currentTarget && !target.dataset.viewerImg) return;
+          // 黑色留白是“关闭”热区；只有点图片本身才切换缩放，避免点在图旁边也乱放大。
+          if (target === e.currentTarget) {
+            onClose();
+            return;
+          }
+          if (!target.dataset.viewerImg) return;
           // 未加载/失败时不缩放: 点的是「重试」区域附近, 不该同时把空舞台放大
           if (imgState !== 'loaded') return;
           applyZoom(zoom > 1 ? 1 : 2, zoom > 1 ? undefined : { x: e.clientX, y: e.clientY });
         }}
         onPointerDown={(e) => {
-          // 触屏未放大时记录滑动起点 (翻页手势), 放大后照旧拖拽
-          if (zoom <= 1 && e.pointerType !== 'mouse') {
-            swipeRef.current = { x: e.clientX, y: e.clientY };
-            // 捕获指针: 手指滑出舞台边界时 pointerup 仍然落在舞台内, 否则漏掉翻页判定
+          if ((e.target as HTMLElement).closest('button')) return;
+
+          if (e.pointerType === 'touch') {
             e.currentTarget.setPointerCapture(e.pointerId);
+            touchPointsRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+            if (touchPointsRef.current.size >= 2) {
+              const [a, b] = [...touchPointsRef.current.values()];
+              const rect = imgRef.current?.getBoundingClientRect();
+              if (rect && rect.width > 0 && rect.height > 0) {
+                const startZoom = zoom;
+                const startOffset = { x: offset.x, y: offset.y };
+                pinchRef.current = {
+                  distance: Math.max(1, distanceBetween(a, b)),
+                  midpoint: midpointOf(a, b),
+                  zoom: startZoom,
+                  offset: startOffset,
+                  layoutCenter: {
+                    x: rect.left + rect.width / 2 - startOffset.x,
+                    y: rect.top + rect.height / 2 - startOffset.y,
+                  },
+                };
+                swipeRef.current = null;
+                dragRef.current = null;
+                movedRef.current = true;
+                setDragging(false);
+                setPinching(true);
+              }
+              return;
+            }
+
+            // 单指未放大时记录滑动起点 (翻页手势), 放大后改为拖拽视图
+            if (zoom <= 1) {
+              swipeRef.current = { x: e.clientX, y: e.clientY };
+              return;
+            }
+            dragRef.current = { startX: e.clientX, startY: e.clientY, originX: offset.x, originY: offset.y };
+            movedRef.current = false;
+            setDragging(true);
             return;
           }
+
           if (zoom <= 1) return;
           e.currentTarget.setPointerCapture(e.pointerId);
           dragRef.current = { startX: e.clientX, startY: e.clientY, originX: offset.x, originY: offset.y };
@@ -421,43 +539,100 @@ export function ImageLightbox({
           setDragging(true);
         }}
         onPointerMove={(e) => {
+          if (e.pointerType === 'touch') {
+            const previous = touchPointsRef.current.get(e.pointerId);
+            if (previous) touchPointsRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+            const pinch = pinchRef.current;
+            if (pinch && touchPointsRef.current.size >= 2) {
+              const [a, b] = [...touchPointsRef.current.values()];
+              const distance = Math.max(1, distanceBetween(a, b));
+              const midpoint = midpointOf(a, b);
+              const nextZoom = clampZoom(pinch.zoom * (distance / pinch.distance));
+              const startCenter = {
+                x: pinch.layoutCenter.x + pinch.offset.x,
+                y: pinch.layoutCenter.y + pinch.offset.y,
+              };
+              const local = {
+                x: (pinch.midpoint.x - startCenter.x) / pinch.zoom,
+                y: (pinch.midpoint.y - startCenter.y) / pinch.zoom,
+              };
+              const nextCenter = {
+                x: midpoint.x - local.x * nextZoom,
+                y: midpoint.y - local.y * nextZoom,
+              };
+              const clamped = clampOffset(
+                {
+                  x: nextCenter.x - pinch.layoutCenter.x,
+                  y: nextCenter.y - pinch.layoutCenter.y,
+                },
+                nextZoom,
+                imgRef.current,
+                rotation,
+              );
+              setView({ zoom: nextZoom, ...clamped });
+              return;
+            }
+            // 单指滑动时只记录；抬手后才判定翻页
+            if (swipeRef.current && Math.abs(e.clientY - swipeRef.current.y) > Math.abs(e.clientX - swipeRef.current.x)) {
+              swipeRef.current = null;
+            }
+          }
+
           const drag = dragRef.current;
           if (drag) {
             const dx = e.clientX - drag.startX;
             const dy = e.clientY - drag.startY;
             if (Math.abs(dx) + Math.abs(dy) > 3) movedRef.current = true;
-            const clamped = clampOffset({ x: drag.originX + dx, y: drag.originY + dy }, zoom, imgRef.current);
+            const clamped = clampOffset({ x: drag.originX + dx, y: drag.originY + dy }, zoom, imgRef.current, rotation);
             setView({ zoom, x: clamped.x, y: clamped.y });
-            return;
-          }
-          // 未放大时的触屏滑动: 只记录, 抬手时才判定翻页
-          if (swipeRef.current && Math.abs(e.clientY - swipeRef.current.y) > Math.abs(e.clientX - swipeRef.current.x)) {
-            // 竖向手势交给浏览器 (查看器本身禁用了页面滚动, 这里仅是防误判)
-            swipeRef.current = null;
           }
         }}
         onPointerUp={(e) => {
+          if (e.pointerType === 'touch') {
+            touchPointsRef.current.delete(e.pointerId);
+          }
+          if (pinchRef.current) {
+            pinchRef.current = null;
+            setPinching(false);
+            movedRef.current = true;
+            swipeRef.current = null;
+            const remaining = [...touchPointsRef.current.values()][0];
+            dragRef.current = remaining && zoom > 1
+              ? { startX: remaining.x, startY: remaining.y, originX: offset.x, originY: offset.y }
+              : null;
+            setDragging(remaining != null && zoom > 1);
+            return;
+          }
+
           const swipe = swipeRef.current;
           swipeRef.current = null;
           dragRef.current = null;
           setDragging(false);
           if (!swipe || items.length < 2) return;
           const dx = e.clientX - swipe.x;
-          // 轻点 (几乎没动) 仍然保留「点一下放大」; 拖了一点但不够翻页则什么都不做,
+          // 轻点 (几乎没动) 仍然保留“点一下放大”; 拖了一点但不够翻页则什么都不做,
           // 不能落到 click 里变成一次意外放大
           if (Math.abs(dx) < SWIPE_THRESHOLD) {
             if (Math.abs(dx) > 3) movedRef.current = true;
             return;
           }
-          // 滑动已经翻页, 随后浏览器补发的 click 不能再来一次「放大」
+          // 滑动已经翻页, 随后浏览器补发的 click 不能再来一次“放大”
           movedRef.current = true;
           // 左滑看下一张, 右滑看上一张 (与相册一致)
           go(dx < 0 ? 1 : -1);
         }}
-        onPointerCancel={() => {
-          swipeRef.current = null;
-          dragRef.current = null;
-          setDragging(false);
+        onPointerCancel={(e) => {
+          if (e.pointerType === 'touch') touchPointsRef.current.delete(e.pointerId);
+          if (touchPointsRef.current.size < 2) {
+            pinchRef.current = null;
+            setPinching(false);
+          }
+          if (touchPointsRef.current.size === 0) {
+            swipeRef.current = null;
+            dragRef.current = null;
+            setDragging(false);
+          }
         }}
       >
         <img
@@ -467,15 +642,18 @@ export function ImageLightbox({
           src={item.url}
           alt={item.alt ?? '生成图预览'}
           draggable={false}
+          decoding="async"
+          fetchPriority="high"
           className={imgState === 'loaded' ? 'is-loaded' : undefined}
           onLoad={() => setImageState({ id: item.id, state: 'loaded' })}
           onError={() => setImageState({ id: item.id, state: 'failed' })}
-          style={{ transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${zoom})` }}
+          style={{ transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${zoom}) rotate(${rotation}deg)` }}
         />
 
         {/* 加载态: 与缩略图同款淡底, 不闪白; 失败态给出可点重试的原因提示 */}
         {imgState === 'loading' && (
           <span className="img-viewer-hint" role="status">
+            <span className="img-viewer-spinner" aria-hidden="true" />
             正在加载原图…
           </span>
         )}
@@ -491,7 +669,7 @@ export function ImageLightbox({
       </div>
 
       <div className="img-viewer-bar" onClick={(e) => e.stopPropagation()}>
-        <span className="img-viewer-meta">{meta.join(' · ')}</span>
+        <span className="img-viewer-meta" aria-live="polite">{meta.join(' · ')}</span>
         <div className="img-viewer-zoom">
           <button type="button" aria-label="缩小" title="缩小（-）" disabled={zoom <= MIN_ZOOM} onClick={() => zoomBy(-ZOOM_STEP)}>
             <Minus size={16} />
@@ -499,36 +677,47 @@ export function ImageLightbox({
           <button
             type="button"
             className="img-viewer-zoom-value"
-            aria-label="恢复原始大小"
-            title="恢复原始大小"
+            aria-label={zoom === 1 ? '适应窗口' : `当前缩放 ${Math.round(zoom * 100)}%，点击适应窗口`}
+            title="适应窗口（0）"
             onClick={resetView}
           >
-            {Math.round(zoom * 100)}%
+            {zoom === 1 ? '适应' : `${Math.round(zoom * 100)}%`}
           </button>
           <button type="button" aria-label="放大" title="放大（+）" disabled={zoom >= MAX_ZOOM} onClick={() => zoomBy(ZOOM_STEP)}>
             <Plus size={16} />
           </button>
         </div>
-        <a className="img-viewer-download" href={item.url} download target="_blank" rel="noreferrer">
+        <button
+          type="button"
+          className="img-viewer-rotate"
+          aria-label={`顺时针旋转图片${rotation ? `，当前 ${rotation}°` : ''}`}
+          aria-keyshortcuts="R"
+          title="顺时针旋转 90°（R）"
+          onClick={rotate}
+        >
+          <RotateCw size={15} />
+        </button>
+        <a className="img-viewer-download" href={item.url} download target="_blank" rel="noreferrer" aria-label="下载原图" title="下载原图">
           <Download size={15} />
-          下载原图
+          <span className="img-viewer-download-text">下载原图</span>
         </a>
         {item.prompt && (
           <button
             type="button"
             className="img-viewer-action"
+            aria-label={promptOpen ? '收起提示词' : '查看提示词'}
             aria-expanded={promptOpen}
             onClick={() => setPromptOpen((open) => !open)}
           >
             <FileText size={15} />
-            提示词
+            <span>提示词</span>
           </button>
         )}
         {renderActions?.(index)}
       </div>
 
       {item.prompt && promptOpen && (
-        <div className="img-viewer-prompt" onClick={(e) => e.stopPropagation()}>
+        <div className="img-viewer-prompt" role="region" aria-label="生成提示词" onClick={(e) => e.stopPropagation()}>
           <div className="img-viewer-prompt-head">
             <strong>生成提示词</strong>
             <button type="button" onClick={() => void copyPrompt()}>

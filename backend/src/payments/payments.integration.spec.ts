@@ -84,6 +84,14 @@ function callback(orderNo: string, configId: string, tradeNo: string, amountCent
   });
 }
 
+function callbackGet(orderNo: string, configId: string, tradeNo: string, amountCents: number) {
+  return api('get', `/api/v1/payments/callback/sandbox/${configId}`).query({
+    orderNo,
+    tradeNo,
+    amountCents,
+  });
+}
+
 async function paidOrder(tag: string) {
   const order = await createOrder(tag);
   const intent = await intend(order.id);
@@ -219,6 +227,22 @@ describe('支付 HTTP 集成', () => {
     expect(balance.body.data.balance).toBe(100);
   });
 
+  it('GET 回调与 POST 共用公开回调链路', async () => {
+    const order = await createOrder('get-callback');
+    const intent = await intend(order.id);
+    const res = await callbackGet(
+      order.orderNo,
+      intent.configId,
+      `IT-GET-${run}`,
+      order.paidCents,
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+
+    const status = await api('get', `/api/v1/payments/${order.id}/status`, userToken);
+    expect(status.body.data.status).toBe('paid');
+  });
+
   it('金额不符/未知订单：业务终态 ack 成功并落对账差异', async () => {
     const order = await createOrder('mismatch');
     const intent = await intend(order.id);
@@ -345,7 +369,7 @@ describe('支付 HTTP 集成', () => {
 
     const admin = await api('get', '/api/v1/admin/payments/providers', adminToken);
     expect(admin.status).toBe(200);
-    expect(admin.body.data.items).toHaveLength(3);
+    expect(admin.body.data.items).toHaveLength(7);
 
     const invalid = await api('post', '/api/v1/admin/payments/products', adminToken).send({
       kind: 'credits',

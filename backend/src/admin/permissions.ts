@@ -101,6 +101,7 @@ export const PERMISSIONS = {
   // 它们的入口就是同一条 `PATCH`，拆成独立权限点却不在任何路由上校验，
   // 只会让人以为「没授予 secret_write 就改不了凭证」——实际能改。
   channelRead: 'channel.read',
+  /** 写操作均审计；渠道删除保留业务确认但不要求原因 */
   channelWrite: 'channel.write',
   channelModelRead: 'channel.model_read',
   channelModelWrite: 'channel.model_write',
@@ -227,8 +228,9 @@ export const ROLE_PERMISSIONS: Record<AdminRoleCode, Permission[]> = {
 };
 
 /**
- * 需填写「操作原因」的高危权限点。
- * 这些动作会写 AdminAuditLog.reason, 前端强制输入确认词。
+ * 高风险权限点，供权限展示与风险分级使用。
+ * 是否为请求体要求 `reason` 由各业务 DTO 决定：该列表本身不构成页面门槛，
+ * 删除等动作可以只做业务影响确认，审计仍会记录操作人、动作与结果。
  */
 export const HIGH_RISK_PERMISSIONS: Permission[] = [
   PERMISSIONS.userDelete,

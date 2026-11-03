@@ -503,7 +503,7 @@ model: {
 
 `channel.read / channel.write / channel.model_read / channel.model_write / logical_model.read / logical_model.write / user_group.read / user_group.write / plugin.read / plugin.write / billing_order.read / billing_order.resolve / model.analytics_read`
 
-高危（必须填原因 + 审计）：`channel.write`、`channel.model_write`、`logical_model.write`、`user_group.write`、`plugin.write`、`billing_order.resolve`。
+高危（写操作留审计）：`channel.write`、`channel.model_write`、`logical_model.write`、`user_group.write`、`plugin.write`、`billing_order.resolve`。其中调价、账单人工核对等确有业务依据要求的动作必须填写原因；删除渠道与渠道模型只保留业务影响确认，不要求填写原因。
 
 （实施口径：凭证、价格档与渠道模型连通性测试都挂在 `channel.write` / `channel.model_write` 上；没有独立的 `secret_write` / `price_write` / `model_test` 权限点——它们不在任何路由上校验，留着只会制造「已收窄权限」的错觉。）
 

@@ -3,6 +3,7 @@ import {
   Check,
   ChevronDown,
   Download,
+  Eye,
   ImageOff,
   Images,
   Loader2,
@@ -1050,6 +1051,21 @@ export function WorksPage() {
                         </span>
                       )}
                       <span className="my-work-hover-bottom">
+                        {url && previewAt >= 0 && (
+                          <span
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => setPreviewIndex(previewAt)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setPreviewIndex(previewAt);
+                              }
+                            }}
+                          >
+                            <Eye size={12} /> 查看
+                          </span>
+                        )}
                         {url && (
                           <span
                             role="button"

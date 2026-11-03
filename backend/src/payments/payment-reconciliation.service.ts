@@ -111,7 +111,7 @@ export class PaymentReconciliationService {
 
     const adapter = getAdapter(input.providerId);
     if (!adapter) throw new AppError(40400, `未知支付渠道: ${input.providerId}`, 404);
-    if (!adapter.downloadTradeBill) {
+    if (!adapter.descriptor.supportsReconciliation || !adapter.downloadTradeBill) {
       throw new AppError(40001, `渠道 ${input.providerId} 不支持自动对账`, 400);
     }
 
@@ -163,6 +163,9 @@ export class PaymentReconciliationService {
     this.assertBillDate(input.billDate);
     const adapter = getAdapter(input.providerId);
     if (!adapter) throw new AppError(40400, `未知支付渠道: ${input.providerId}`, 404);
+    if (!adapter.descriptor.supportsReconciliation) {
+      throw new AppError(40001, `渠道 ${input.providerId} 不支持对账导入`, 400);
+    }
 
     const records = parseBillCsv(
       decodeCsvBuffer(extractImportCsv(input.file, input.providerId)),

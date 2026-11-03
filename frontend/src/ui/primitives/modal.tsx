@@ -44,6 +44,25 @@ export interface ModalProps {
  *
  * 标题与关闭按钮交给 radix Dialog；内容区沿用调用方已有的 className / styles，
  * 让 `.mum-modal`、`.login-modal` 等页面级样式仍然命中。
+ *
+ * ## ⚠️ 页面级类与容器类挂在**同一个元素**上
+ *
+ * `className` 不是加在某个外层 div, 而是与容器类合并进**一个** div:
+ *
+ *   <div class="ui-modal-surface ant-modal-container ant-modal-content {className}">
+ *
+ * 因此 global.css 里所有针对容器的页面级规则**必须写成紧邻合并选择器**:
+ *
+ *   ✅  .alp-modal.ant-modal-container { ... }
+ *   ❌  .alp-modal .ant-modal-container { ... }   ← 后代形式恒不命中
+ *
+ * 写成后代形式不会报错, 只会静默失效 —— 表现为弹窗几何退回 `.ui-modal-surface`
+ * 的默认值, 内部三段高度不受约束, 底部操作条被撑到文档流末端。
+ * 素材库导入弹窗 (@2026-11-03) 与登录 / 手机上传弹窗都踩过这个坑,
+ * 三处容器规则一度全是死规则。
+ *
+ * 另注: `.ant-modal` 这个节点**不存在** (容器是 `.ui-modal-content`),
+ * 针对它的规则 (如 `.ant-modal.mum-modal`) 同样是死规则。
  */
 export function Modal({
   open,

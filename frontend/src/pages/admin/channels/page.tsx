@@ -26,7 +26,6 @@ import { ChannelFormDrawer } from './ChannelFormDrawer';
 import { ChannelListPanel } from './ChannelListPanel';
 import { ChannelModelHealthPanel } from './ChannelModelHealthPanel';
 import { ChannelOrderDialog } from './ChannelOrderDialog';
-import { DeleteReasonConfirm } from './DeleteReasonConfirm';
 import {
   CHANNEL_VIEW_OPTIONS,
   EMPTY_CHANNEL_DRAFT,
@@ -110,7 +109,6 @@ export function AdminChannelsPage() {
   const [draftBase, setDraftBase] = useState<ChannelDraft>(EMPTY_CHANNEL_DRAFT);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<AdminChannelView | null>(null);
-  const [deleteReason, setDeleteReason] = useState('');
   /** 启停确认：停用会让该渠道的模型整体退出路由目录，要二次确认 */
   const [toggleTarget, setToggleTarget] = useState<AdminChannelView | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -262,18 +260,12 @@ export function AdminChannelsPage() {
 
   const runDelete = async () => {
     if (!deleteTarget) return;
-    // 删除是高危动作（channel.write）：原因必填，后端也会拒收空原因
-    if (deleteReason.trim().length === 0) {
-      toast.error('必须填写变更原因');
-      return;
-    }
     setSaving(true);
     try {
-      await adminChannelsApi.remove(deleteTarget.id, deleteReason.trim());
+      await adminChannelsApi.remove(deleteTarget.id);
       toast.success(`已删除渠道「${deleteTarget.name}」，凭证已清空`);
       if (selectedId === deleteTarget.id) setSelectedId(null);
       setDeleteTarget(null);
-      setDeleteReason('');
       await reload();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '删除失败');
@@ -451,7 +443,6 @@ export function AdminChannelsPage() {
             onExport={(channel) => void runExport(channel)}
             onToggle={setToggleTarget}
             onDelete={(channel) => {
-              setDeleteReason('');
               setDeleteTarget(channel);
             }}
             onCreate={openCreate}
@@ -521,7 +512,7 @@ export function AdminChannelsPage() {
         onConfirm={() => void runToggle()}
       />
 
-      <DeleteReasonConfirm
+      <ConfirmAction
         open={deleteTarget !== null}
         title={`删除渠道「${deleteTarget?.name ?? ''}」？`}
         description="软删除：凭证立即清空、渠道与全部模型退出路由；账单与调用记录保留。"
@@ -529,11 +520,9 @@ export function AdminChannelsPage() {
           `该渠道下的 ${deleteTarget?.modelCosts?.length ?? 0} 个模型一并作废`,
           '引用这些模型的前台线路会变为不可用，需要重新选路',
         ]}
-        reason={deleteReason}
-        reasonAriaLabel="删除原因"
-        reasonPlaceholder="如：上游账号停用"
+        danger
+        confirmText="确认删除"
         loading={saving}
-        onReasonChange={setDeleteReason}
         onCancel={() => setDeleteTarget(null)}
         onConfirm={() => void runDelete()}
       />

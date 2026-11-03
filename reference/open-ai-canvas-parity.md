@@ -83,12 +83,12 @@
 1. Go → TypeScript、Gin → NestJS、GORM → Prisma/SQLite、可读前缀 ID → `cuid()`。
 2. 单实例部署：冷却、并发槽、目录快照为进程内存 + DB 版本号，无 Redis 跨实例协调。
 3. 服务商目录口径：本仓是插件包索引，不是“厂商推广 + 人民币成本/加价 + 一键建渠道”。
-4. 权限与审计更严：细粒度权限点、删除/调价/批量操作强制原因、`@AuditAction`（但审计失败不阻断业务）。
+4. 权限与审计更严：细粒度权限点、写操作 `@AuditAction`、调价等业务原因要求（但审计失败不阻断业务）。
 5. 匿名可浏览 `/models` 与 `/model-catalog`；上游要求登录后按分组投影。
 6. 渠道模型 `activeKey` 小写归一 + 软删唯一键；上游用 `WHERE deleted_at IS NULL` 部分唯一索引。
 7. 本仓多图产出按张建子任务、按张计费；上游一次任务一个结果。
 8. 本仓 C 端只暴露前台模型，不展示渠道/个人渠道；上游是“产品模型 → 渠道模型”两级选择。
-9. 本仓删除/调价强制审计原因；上游无原因。
+9. 本仓调价强制业务原因；渠道与渠道模型删除只做业务影响确认，不要求原因。
 10. 本仓把线路健康、财务分析做成独立面板/独立页；上游在单元格/分析面板内展示。
 
 ---
@@ -1060,7 +1060,7 @@
 
 ### 结论摘要
 
-1. 渠道主从工作台整体移植完整，且本仓在审计原因、删除原因、健康面板、连通性测试、未定价队列上更强；主要缺口在「模型编辑器的结构化能力/价格档」和「分享链接状态」。
+1. 渠道主从工作台整体移植完整，且本仓在写操作审计、健康面板、连通性测试、未定价队列上更强；主要缺口在「模型编辑器的结构化能力/价格档」和「分享链接状态」。
 2. 本仓模型价格档用自由文本 `selector` + 原始 JSON `capabilityConfig`，上游是结构化生成方式/分辨率/帧率/图片参数匹配与可视化能力合同编辑器；本仓还禁止视频 Token 计费，属于真实功能缺口。
 3. 前台模型（logical models）本仓允许选停用/跨能力线路、重复线路、启用但无线路，且不校验/重置能力合同；上游有来源能力合并、`capabilitySourceError`、启用前必须至少一条线路等硬校验。
 4. 调用记录详情缺请求/响应报文、按 id 深链、上游任务查询、视频转存、媒体恢复与计费拆解；账单处置缺批量结算/退款和自动退回开关（本地 API 也未封装）。
@@ -1072,14 +1072,14 @@
 
 | 上游文件 | 本仓对应 | 状态 | 具体功能/交互差异与证据 |
 |---|---|---|---|
-| `pages/admin/channels/channels-page.tsx` | `pages/admin/channels/page.tsx` + `ChannelListPanel.tsx` + `ChannelDetailPanel.tsx` + `ChannelFormDrawer.tsx` | 🔀 重构 | 主从布局、搜索/状态筛选、创建/复制/导出/导入/启停/删除均具备。差异：① 上游筛选、选中渠道、视图全在 URL（`filter/status/channel/view`，channels-page:54-57、81-95），本仓只同步 `view` 与详情 `id`（page.tsx:101-105、120），搜索词/状态切换后分享链接会丢；② 上游 `selectChannelWorkspace` 在未选中时回退到第一个可见渠道（channel-workspace-state.ts:11），本仓 `rows.find(id) ?? null`（page.tsx:148），进入页面右侧为空；③ 上游「新增渠道」先开服务商目录向导（channels-page:369、568-581），本仓直接开手填抽屉（page.tsx:168-173）——向导属任务约定的有意不移植；④ 上游删除/停用是无原因 Popconfirm（channels-page:322-336），本仓删除强制原因并列出影响（page.tsx:263-283、524-539，DeleteReasonConfirm.tsx:45-64），停用也有影响清单（page.tsx:497-522）；⑤ 本仓渠道表单多「排序值」「变更原因」字段（ChannelFormDrawer.tsx:63-71、166-174），上游无；⑥ 上游写后调用 `syncChannels` 刷新引用与 C 端配置（channels-page:127-135），本仓只 `reload()`，无客户端目录同步动作。 |
+| `pages/admin/channels/channels-page.tsx` | `pages/admin/channels/page.tsx` + `ChannelListPanel.tsx` + `ChannelDetailPanel.tsx` + `ChannelFormDrawer.tsx` | 🔀 重构 | 主从布局、搜索/状态筛选、创建/复制/导出/导入/启停/删除均具备。差异：① 上游筛选、选中渠道、视图全在 URL（`filter/status/channel/view`，channels-page:54-57、81-95），本仓只同步 `view` 与详情 `id`（page.tsx:101-105、120），搜索词/状态切换后分享链接会丢；② 上游 `selectChannelWorkspace` 在未选中时回退到第一个可见渠道（channel-workspace-state.ts:11），本仓 `rows.find(id) ?? null`（page.tsx:148），进入页面右侧为空；③ 上游「新增渠道」先开服务商目录向导（channels-page:369、568-581），本仓直接开手填抽屉（page.tsx:168-173）——向导属任务约定的有意不移植；④ 上游删除/停用是无原因 Popconfirm（channels-page:322-336），本仓删除保留业务影响确认但不要求原因（page.tsx:512-526），停用也有影响清单（page.tsx:487-505）；⑤ 本仓渠道表单多「排序值」「变更原因」字段（ChannelFormDrawer.tsx:63-71、166-174），上游无；⑥ 上游写后调用 `syncChannels` 刷新引用与 C 端配置（channels-page:127-135），本仓只 `reload()`，无客户端目录同步动作。 |
 | `pages/admin/channels/all-channel-models-panel.tsx` | `pages/admin/channels/AllChannelModelsPanel.tsx` | 🔀 重构 | 跨渠道表、按显示名/模型键/渠道排序、健康单元格、成本售价摘要、启停确认、渠道跳转均具备。差异：① 本仓状态筛选多「未定价」并在状态列显示（AllChannelModelsPanel.tsx:177-185、319-328、constants.ts:89-97），上游只有 all/enabled/disabled/unhealthy；② 本仓「编辑」跳回渠道视图并打开该模型（page.tsx:140-146、AllChannelModelsPanel.tsx:338-348），上游在同一视图内嵌 `ChannelModelEditor`（all-channel-models-panel.tsx:291-305）；③ 本仓 URL 参数为 `keyword/capability/status/channel`，上游为 `q/capability/modelStatus/modelChannel`；④ 本仓分页固定 50（constants.ts:100），上游有 pageSize 选择（all-channel-models-panel.tsx:57、278-289）；⑤ 上游模型列有 `ModelIcon`（all-channel-models-panel.tsx:170-172），本仓只显示 emoji 图标；⑥ 上游能力为空显示「待配置」，本仓直接回退原始值。 |
 | `pages/admin/channels/channel-workspace-state.ts` | `channels/hooks.ts` 的 `useChannelFilters` + `page.tsx` 选中逻辑 | 🔀 合并 | 关键字同时匹配名称/Base URL，两边一致；核心差异是「未选中回退首条」缺失（见上）。本仓另有 `useAdminDetailParam` 深链 `?id=`，上游用 `?channel=`。 |
 | `pages/admin/channels/provider-catalog-pricing.ts` | 无对应；本仓仅有 `lib/channelCost.ts` 的展示函数 | ❌ 有意不移植 | 上游 `applyMarkup`/`validMarkup`/`tierPriceLines`/`promotionExpiry`（provider-catalog-pricing.ts:4-66）用于向导中「成本 × 加价率」实时预览与推广期展示；本仓无该套逻辑。影响：渠道只能手工建，无法从服务商目录带价导入。 |
 | `pages/admin/channels/provider-catalog-wizard.tsx` | 无对应；`ChannelFormDrawer.tsx` 手填，`AdminPluginsPage` 只有插件包目录 | ❌ 有意不移植 | 上游三步向导（选服务商→填 Key/校验→选模型与统一/单独加价→一键接入，wizard:20-27、80-148、362-459）本仓完全没有。按任务约定「服务商目录向导不做」记为有意差异，但它是上游「新增渠道」默认入口，本仓动线退化为手工填 Base URL/Key/逐个建模型。 |
 | `pages/admin/components/channel-model-editor.tsx` | `channels/ChannelModelForm.tsx` + `ChannelModelFormDialog.tsx` | 🔀 重构 | 本仓是单页长表单弹窗，上游是 1120px 三 Tab（基本信息/能力与参数/积分定价，editor:258-483）。缺失：① 结构化 `ModelCapabilityEditor` 引用与参数编辑（editor:376-415），本仓只有原始 JSON 文本框（ChannelModelForm.tsx:330-341）；② `ModelIconPicker`（editor:317-319），本仓图标是自由文本（:151-157）；③ 展示名 `AutoComplete` 复用已有分组（editor:54、291-302），本仓自由文本；④ 协议浏览器与详情（editor:348-350），本仓普通下拉 `label（id）`（useChannelModels.ts:88-91）；⑤ 上游测试用**当前未保存表单值**（editor:169-193），本仓新建必须先保存（ChannelModelManager.tsx:404-410）且测试用库内配置；⑥ 上游关闭前确认未保存（editor:77-84），本仓 `ChannelModelFormDialog` 直接 `onClose`，无脏检查（ChannelModelFormDialog.tsx:43-47）；⑦ 上游按字段校验自动切 Tab/滚动（editor:109-124），本仓无。 |
 | `pages/admin/components/channel-model-editor-form.ts` | `channels/utils.ts` + `ChannelModelManager.submit` + `constants.ts` | 🔀 重构 | 上游切换能力会重置协议、能力合同、图片参数/工作流并按来源能力合并（editor-form:86-167），本仓切换能力只把 `protocol` 置空（ChannelModelForm.tsx:113-119），旧价格档 selector 与 `capabilityConfig` 原样保留；上游复制模型清空 `modelKey/providerModelKey` 并保留价格（editor-form:74-83），本仓自动加 `-copy` 后缀、设为停用并清空档位级上游键（ChannelModelManager.tsx:162-185）。本仓 `providerModelKey` 提交时回退到 `modelKey`，但 `displayName`/`channelLabel` 不做兜底（ChannelModelManager.tsx:225-241），上游分别兜底「未分类」和上游键（editor:140-141），列表中会出现空展示名/空渠道展示名。 |
-| `pages/admin/components/channel-model-manager.tsx` | `channels/ChannelModelManager.tsx` + `ChannelModelTable.tsx` + `ChannelUpstreamDialog.tsx` | 🔀 重构 | 清单、本地筛选、批量选择、调价、批量删除、排序、拉取上游、复制/编辑/启停均具备。差异：① 本仓每行多「连通性测试」并保留测试结果面板（ChannelModelTable.tsx:239-248、473-509；Manager:278-296），上游只有编辑器内测试；② 本仓批量删除/单删都强制原因（Manager:335-389、471-502），上游无原因（manager:202-227、282-284）；③ 本仓模型清单状态筛选是 enabled/disabled/unpriced（constants.ts:80-84），上游是 enabled/disabled/unhealthy（manager:417-430）；④ 本仓分页固定 20（constants.ts:86），上游可选 pageSize（manager:470-479）；⑤ 上游协议列显示协议名+create 路径与独立「版本」列（manager:250-266），本仓协议只显示原始 id、版本并入模型单元格（ChannelModelTable.tsx:151-153、193-198）；⑥ 本仓表格不显示 `channelLabel`（ChannelModelTable.tsx:155-161），上游显示「渠道展示名」（manager:242），无法在列表核对 C 端二级名称；⑦ 上游选择上限 100 并提示（manager:455-462），本仓无上限；且本仓 `load()` 后不裁剪已失效的 `selectedIds`（ChannelModelManager.tsx 只在切换渠道时清空 :99-111），删除单条后旧勾选仍可能计数。 |
+| `pages/admin/components/channel-model-manager.tsx` | `channels/ChannelModelManager.tsx` + `ChannelModelTable.tsx` + `ChannelUpstreamDialog.tsx` | 🔀 重构 | 清单、本地筛选、批量选择、调价、批量删除、排序、拉取上游、复制/编辑/启停均具备。差异：① 本仓每行多「连通性测试」并保留测试结果面板（ChannelModelTable.tsx:239-248、473-509；Manager:278-296），上游只有编辑器内测试；② 本仓批量删除/单删保留业务影响确认但不要求原因（Manager:333-360、448-477），上游无原因（manager:202-227、282-284）；③ 本仓模型清单状态筛选是 enabled/disabled/unpriced（constants.ts:80-84），上游是 enabled/disabled/unhealthy（manager:417-430）；④ 本仓分页固定 20（constants.ts:86），上游可选 pageSize（manager:470-479）；⑤ 上游协议列显示协议名+create 路径与独立「版本」列（manager:250-266），本仓协议只显示原始 id、版本并入模型单元格（ChannelModelTable.tsx:151-153、193-198）；⑥ 本仓表格不显示 `channelLabel`（ChannelModelTable.tsx:155-161），上游显示「渠道展示名」（manager:242），无法在列表核对 C 端二级名称；⑦ 上游选择上限 100 并提示（manager:455-462），本仓无上限；且本仓 `load()` 后不裁剪已失效的 `selectedIds`（ChannelModelManager.tsx 只在切换渠道时清空 :99-111），删除单条后旧勾选仍可能计数。 |
 | `pages/admin/components/channel-model-price-tier-fields.tsx` | `channels/ChannelModelForm.tsx` 价格档区 | ⚠️ 有意简化/部分缺失 | 上游每档有 default/advanced 两种匹配模式、生成方式、分辨率、帧率档、图片参数/画质/尺寸、命中后上游模型 ID（fields:96-163），并按协议决定 Token 能否计费（fields:179、fields:49）。本仓是「规格条件（key=value 逗号分隔）+ 分辨率 + 视频秒数 + 8 个价格框」（ChannelModelForm.tsx:209-274），没有字段级校验/取值约束，拼错 key 会保存成永不命中的档位。本仓「可供用户使用」被拆成档位启用、价格已确认、记录成本价三个开关（:192-196、275-288），上游单开关同时写 `priceConfigured`+`enabled`（fields:70-82），更不容易出现「启用但未确认价格」。上游档位级过期上游提示内联并一键清除（fields:221-240），本仓是表单底部全局提示+清除（ChannelModelForm.tsx:343-360），意图对齐。 |
 | `pages/admin/components/channel-model-price-tier-form.ts` | `channels/utils.ts` 的 `tierToDraft`/`buildPriceTiers`/`parseSelector` + `lib/channelReprice.ts` | 🔀 重构 | 上游把表单值映射为 selector/分辨率/视频秒数/成本对象，默认档不带上游键（tier-form:112-125、167-188）；本仓 `parseSelector` 拆 `key=value`（utils:355-370），`buildPriceTiers` 提交 `costPricing: null` 或完整对象（utils:278-286），价格档上游键回退到模型上游键（utils:270）。本仓校验比上游弱：只做「至少一个启用档、最多一个通配档、按秒仅视频/音频、Token 仅文本」（utils:199-226），上游还校验协议是否支持 Token、能力与生成方式匹配、高级档至少一个条件、金额上限 1,000,000（editor-form:175-210）。本仓因此**无法配置视频 Token 计费**（`mode === 'token'` 且 capability !== 'text' 直接报错，utils:218），与上游支持视频 Token（price-tier-fields:179、185-187）形成真实能力缺口。 |
 | `pages/admin/components/channel-model-pricing.ts` | `lib/channelReprice.ts` + `lib/channelCost.ts` | 🔀 重构 | 两边都用 BigInt/精确取整、0–1000%、0–6 位小数、最多 100 个模型、成本/售价缺失阻断。本仓把「加价率预览」和「调价提交」集中在 channelReprice.ts:60-105、198-260，且要求原因；上游 pricing.ts:26-57、82-122 同样按成本重算但无原因。本仓对金额上限 1,000,000 积分有校验（channelReprice:32、118-122），上游 token 售价上限 1,000,000 积分（pricing:115），大体一致。 |
@@ -1150,11 +1150,11 @@
 
 | # | 本仓能力/字段 | 证据 | 价值/备注 |
 |---|---|---|---|
-| C1 | 删除/调价强制填写审计原因，并在缺失时禁用确认 | 渠道 page.tsx:263-283；模型 Manager:335-389；批量 :364-389；调价 :110、174-177；DeleteReasonConfirm:45-64 | 比上游更符合高危写操作审计；属有意增强 |
+| C1 | 调价强制填写业务原因，并在缺失时禁用确认；删除只做业务影响确认 | 渠道 page.tsx:260-275、512-526；模型 Manager:333-360、448-477；调价 :110、174-177 | 调价原因作为业务依据保留；删除不把审计变成页面门槛 |
 | C2 | 渠道表单「排序值」「变更原因」 | ChannelFormDrawer.tsx:63-71、166-174；page.tsx:193-197、220 | 上游排序走独立弹窗、无原因 |
 | C3 | 独立「线路健康」面板：24h/7d/P95/均值/最近样本/协议未注册/冷却中 | ChannelModelHealthPanel.tsx:41-166；page.tsx:464-475 | 上游只在单元格 tooltip/渠道徽章展示 |
 | C4 | 渠道模型行级连通性测试 + 最近测试结果面板（含 logId、HTTP path、产出、responsePreview） | ChannelModelTable.tsx:241-248、473-509；Manager:278-296 | 上游测试只在编辑器内且不保留结果 |
-| C5 | 批量删除/统一调价的计数按钮与原因输入 | ChannelModelTable.tsx:374-391；Manager:486-502 | 上游批量操作无原因 |
+| C5 | 批量删除/统一调价的计数按钮；仅调价保留业务原因输入 | ChannelModelTable.tsx:374-391；Manager:448-477、482-495 | 删除不要求原因；调价原因作为业务依据保留 |
 | C6 | 「未定价」状态筛选与标签，作为补价队列 | constants.ts:80-84、89-97；AllChannelModelsPanel.tsx:319-328；ChannelModelTable.tsx:219-224 | 上游无此状态 |
 | C7 | 全部模型「编辑」跳回渠道并定位模型（focusModelId） | page.tsx:140-146；Manager:120-134；AllChannelModelsPanel.tsx:338-348 | 上游是原地内嵌编辑器 |
 | C8 | 渠道左列「未配置 Key」红字提醒、详情显示代理地址 | ChannelListPanel.tsx:226；ChannelDetailPanel.tsx:82 | 上游密钥状态只在详情 |
@@ -1184,7 +1184,7 @@
 | 统一调价 | 按成本×（1+加价率），小数位、逐项手改、按模型分组、CAS 整批拒绝 | 同样算法（BigInt half-up）+ 必填原因 + 模型缺失成本/售价阻断 | ✅ 对齐，本仓更严 |
 | 上游导入 | 拉取上游→预览弹窗→搜索/全选匹配/取消匹配→默认勾选已存在、新模型不勾选→导入 | 拉取上游→对象化预览（含 displayName/已存在徽章）→默认勾选新模型→导入 | ✅ 对齐，默认选择策略本仓更合理 |
 | 排序 | 拖拽/上下移/输入位置；保存带 original ids CAS；全部条目不受筛选影响 | 同左，拆成渠道排序与模型排序两个 API 入口 | ✅ 对齐 |
-| 删除原因 | 删除只需确认，无原因；后端可能不要求 | 渠道/模型/批量删除均强制原因并禁用确认；批量全有或全无 | ⚠️ 有意差异（本仓更严） |
+| 删除原因 | 删除只需确认，无原因；后端可能不要求 | 渠道/模型/批量删除均不要求原因，保留影响范围确认；后端审计仍记录操作人、动作与结果 | ✅ 对齐业务确认边界 |
 | 健康指标 | 24h 成功率+最近 10 次色块，tooltip 7d/P95/最近失败；渠道左列聚合徽章 | 同左，另有完整健康表；但 24h 无样本显示「无调用」会掩盖 7d 数据，同页两套阈值/格式不一致 | 🔀 大部分对齐，展示口径有瑕疵 |
 | 路由模拟 | 结构化 operation+inputs+options，展示能力匹配结论与候选线路 inPool/blocked/matched/低优先级及原因 | operation 文本+options JSON，无 inputs；结果显示候选数、选中线路、逐线 eligible/reason/价格档 | ⚠️ 可用但无法模拟输入约束，缺能力匹配结论 |
 | 分组编辑 | 编码/名称/说明/徽章+预览/小数倍率/汇率/全部渠道开关/渠道多选/模型覆盖下拉/排序；有会员禁删 | 编码/名称/说明/徽标（无预览）/百分比倍率（上限 1 倍）/汇率/渠道复选框/模型覆盖自由文本/排序；只禁默认分组删除 | 🔀 字段对齐，校验与上限退化 |
@@ -1211,7 +1211,7 @@
 
 1. 全部后台页面使用本仓 `admin-ui/primitives` + Tailwind，而不是上游 antd/自研 overlay；布局、表单控件、Modal/Drawer 外观不同但语义大多等价。
 2. 服务商目录三步向导（`provider-catalog-wizard.tsx`）与 `provider-catalog-pricing.ts` 不做；新增渠道走手填表单。代价是失去「目录带价一键接入」。
-3. 本仓删除/调价强制审计原因，属更严格的产品/后端契约，不是缺失。
+3. 本仓调价强制业务原因；删除只保留业务影响确认，不要求原因。审计在两种情况下都只做被动留痕。
 4. 本仓把「线路健康」做成独立面板、把「财务分析」做成独立页，属于信息架构重构，不是功能缺失。
 5. 本仓 C 端只暴露「前台模型」，不展示渠道/个人渠道，这是本仓产品架构（渠道信息不出 C 端），与上游「产品模型→渠道模型」两级选择不同；但分组展示、输入兼容与健康提示仍可按前台模型维度补齐。
 6. 本仓插件模型只有 builtin/installed 两种来源，没有 application/payment 分类与用户级启用；如果后端确实没有该概念，这是架构差异；若后端有而前端未接，则升级为真实缺口。

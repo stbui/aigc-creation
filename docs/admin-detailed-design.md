@@ -89,7 +89,7 @@ providers: [
 
 - 只记录 `POST / PATCH / PUT / DELETE`；GET 不落库。
 - `detail` 只取白名单字段（`status` / `role` / `name` / `priceCents` / `reason` 等），命中 `password|token|secret|hash|credential` 的字段一律不写。
-- 高危权限点要求请求体带 `reason`，落 `AdminAuditLog.reason`。
+- 需要业务原因的写操作由 DTO 要求请求体带 `reason` 并落 `AdminAuditLog.reason`；审计本身不作为页面确认门槛，删除渠道 / 渠道模型不要求原因。
 - 审计失败**不阻断业务**：让它阻断等于把审计变成单点故障，反而降低可追溯性。
 
 ### 0.3 权限点命名
@@ -125,7 +125,7 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 
 ### 0.6 高危操作确认
 
-`ConfirmAction`（页内确认条，`admin-ui/primitives/overlay`，`role="region"`）用于删除、退款、重置密码、手动调整积分、渠道 / 前台模型写入、角色与系统设置写入、备份。文案必须写明**影响量**（`impact` 数组，如「将删除 12 个素材」），不能只写「确定删除吗」。高危动作的原因输入仍走各页表单字段并落审计；2026-10-30 起不再要求输入确认词（`requireTyping` / `typingText` 仅保留入参兼容）。
+`ConfirmAction`（页内确认条，`admin-ui/primitives/overlay`，`role="region"`）用于删除、退款、重置密码、手动调整积分、渠道 / 前台模型写入、角色与系统设置写入、备份。文案必须写明**影响量**（`impact` 数组，如「将删除 12 个素材」），不能只写「确定删除吗」。业务原因输入只用于确有业务依据要求的动作；删除渠道 / 渠道模型不要求原因。审计始终在操作后被动留痕，不反向要求用户确认审计。2026-10-30 起不再要求输入确认词（`requireTyping` / `typingText` 仅保留入参兼容）。
 
 ### 0.7 批量动作
 
@@ -352,7 +352,7 @@ partial_refunded → refunded | partial_refunded
 
 | 标签 | 接口 | 规则 |
 | --- | --- | --- |
-| 支付渠道 | `GET /admin/payments/providers`、`PUT /admin/payments/providers/:id/config` | 每个适配器一份**版本化 + 加密**配置（`PaymentProviderConfig`），追加写不覆盖。密钥字段只回「是否已配置」，留空表示沿用旧值；身份类字段（商户号等）锁定不可改。`reason` 必填并写审计 |
+| 支付渠道 | `GET /admin/payments/providers`、`PUT /admin/payments/providers/:id/config` | 每个适配器一份**版本化 + 加密**配置（`PaymentProviderConfig`），追加写不覆盖。密钥字段只回「是否已配置」，留空表示沿用旧值；身份类字段（商户号等）锁定不可改。保存写审计，不要求填写原因 |
 | 充值商品 | `GET/POST/PUT /admin/payments/products*` | 复用 `Order` / `Product`，**不新建** `TopupProduct` 表；售价按分存、周期 / 库存 / 限时策略随类型切换 |
 | 支付订单 | `GET /admin/payments/orders*` | 列表服务端分页（默认 30）；查单与关单是 `payment.operate` 高危写，必填原因。关单前始终先向渠道查单；已入账订单关单返回 `409` |
 | 支付对账 | `GET/POST /admin/payments/reconciliations*` | T+1 自动对账（每天 10:15 跑昨日账单）；差异分七类，已支付未入账经签名查单二次确认后**自动补发积分**（幂等） |

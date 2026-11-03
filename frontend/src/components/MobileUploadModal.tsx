@@ -7,7 +7,7 @@ import type { MobileUploadAsset } from '../types/api';
 import { useApp, Modal, Spin } from '../ui';
 
 /**
- * 手机上传二维码弹窗 —— 1:1 复刻参考站 (ijihua.cn/free-creation) 的
+ * 手机上传二维码弹窗
  * `mobile-upload-modal` 弹窗。
  *
  * ## 参考站实拍数值 (2026-10-20 取证: 线上样式表 index-glaqVozH.css)
@@ -24,7 +24,7 @@ import { useApp, Modal, Spin } from '../ui';
  *   waiting    色 #6550c9, 13px, flex 居中 gap 7, margin-top 14
  *   refresh    底 #765ce7, 白字, 圆角 8, padding 8px 14px, margin-top 14
  *
- * ## 文案 (取自参考站 bundle 反混淆)
+ * ## 文案
  *
  *   标题「手机上传」/ 说明「使用手机扫描二维码…」/ 等待「手机扫码上传」
  *   状态「等待扫码完成」/ 过期「二维码已失效，请重新生成二维码」/ 「取消手机上传」
@@ -175,7 +175,14 @@ export function MobileUploadModal({ open, onReceived, onCancel }: MobileUploadMo
       open={open}
       onCancel={close}
       footer={null}
-      width={440}
+      /*
+       * 宽度写成 min() 而不是 440: 窄屏下容器要按 `100vw - 40px` 收窄。
+       * 旧写法靠 `.ant-modal.mum-modal { max-width: calc(100vw - 40px) }` 兜底,
+       * 但兼容壳的 DOM 里没有 `.ant-modal` 节点 (容器是 `.ui-modal-content`),
+       * 那条规则恒不命中 —— 窄屏时 `.mum` 按 440 排版而容器按 calc(100vw - 16px)
+       * 收窄, 右侧露出一条白色空带。这里直接由调用方给出宽度, 不依赖类名协商。
+       */
+      width="min(440px, calc(100vw - 40px))"
       centered
       className="mum-modal"
       closeIcon={null}

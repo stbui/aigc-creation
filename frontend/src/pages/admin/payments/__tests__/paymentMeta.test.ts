@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   CHECKOUT_MODE_LABELS,
+  ORDER_PROVIDER_IDS,
   PAYMENT_STATUS_META,
   PROVIDER_LABELS,
+  RECONCILIATION_PROVIDER_IDS,
   paymentActions,
 } from '../constants';
 import {
@@ -62,10 +64,27 @@ describe('paymentActions', () => {
 });
 
 describe('标签映射', () => {
-  it('三个支付适配器都有短名', () => {
+  it('七个支付适配器都有短名', () => {
     expect(PROVIDER_LABELS.sandbox).toBe('沙箱');
     expect(PROVIDER_LABELS.alipay).toBe('支付宝');
     expect(PROVIDER_LABELS.wechat).toBe('微信支付');
+    expect(PROVIDER_LABELS.paypal).toBe('PayPal');
+    expect(PROVIDER_LABELS.stripe).toBe('Stripe');
+    expect(PROVIDER_LABELS.epay).toBe('易支付');
+    expect(PROVIDER_LABELS.zpay).toBe('ZPay');
+  });
+
+  it('订单筛选包含七渠道，对账筛选仍只保留可自动对账渠道', () => {
+    expect(ORDER_PROVIDER_IDS).toEqual([
+      'sandbox',
+      'alipay',
+      'wechat',
+      'paypal',
+      'stripe',
+      'epay',
+      'zpay',
+    ]);
+    expect(RECONCILIATION_PROVIDER_IDS).toEqual(['sandbox', 'alipay', 'wechat']);
   });
 
   it('三种支付方式都有文案', () => {

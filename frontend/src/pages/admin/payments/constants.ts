@@ -35,14 +35,40 @@ export const PROVIDER_LABELS: Record<string, string> = {
   sandbox: '沙箱',
   alipay: '支付宝',
   wechat: '微信支付',
+  paypal: 'PayPal',
+  stripe: 'Stripe',
+  epay: '易支付',
+  zpay: 'ZPay',
   // 非渠道值，仅用于订单/支付尝试展示：
   manual: '手工核销',
   free: '免费',
 };
 
-/** 只有真实渠道可以用于后端筛选（后端 assertProviderId 不接受 manual/free） */
-export const FILTERABLE_PROVIDER_IDS: PaymentProviderId[] = ['sandbox', 'alipay', 'wechat'];
-export const FILTERABLE_PROVIDERS = FILTERABLE_PROVIDER_IDS.map((id) => ({
+/** 支付订单可筛选的渠道；后端 assertProviderId 不接受 manual/free */
+export const ORDER_PROVIDER_IDS: PaymentProviderId[] = [
+  'sandbox',
+  'alipay',
+  'wechat',
+  'paypal',
+  'stripe',
+  'epay',
+  'zpay',
+];
+export const ORDER_PROVIDERS = ORDER_PROVIDER_IDS.map((id) => ({
+  value: id,
+  label: PROVIDER_LABELS[id],
+}));
+
+/**
+ * 对账页保留原有可对账渠道筛选。PayPal / Stripe / 易支付 / ZPay 当前不参与自动
+ * 渠道账单下载，不把它们混进对账筛选，避免出现永远为空的选项。
+ */
+export const RECONCILIATION_PROVIDER_IDS: PaymentProviderId[] = [
+  'sandbox',
+  'alipay',
+  'wechat',
+];
+export const RECONCILIATION_PROVIDERS = RECONCILIATION_PROVIDER_IDS.map((id) => ({
   value: id,
   label: PROVIDER_LABELS[id],
 }));

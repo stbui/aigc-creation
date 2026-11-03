@@ -111,6 +111,7 @@ export class PaymentNotificationService {
             normalizedJson: JSON.stringify({
               state: result.state,
               providerTradeNo: result.providerTradeNo,
+              providerRef: result.providerRef ?? null,
               amountCents: result.amountCents,
               currency: result.currency,
               providerStatus: result.providerStatus,
@@ -176,6 +177,7 @@ export class PaymentNotificationService {
       const normalized = JSON.parse(row.normalizedJson || '{}') as {
         state?: string;
         providerTradeNo?: string;
+        providerRef?: string | null;
         amountCents?: number;
         currency?: string;
         providerStatus?: string;
@@ -190,6 +192,7 @@ export class PaymentNotificationService {
         eventId: row.providerEventId,
         merchantOrderNo: row.merchantOrderNo,
         providerTradeNo: normalized.providerTradeNo ?? '',
+        providerRef: normalized.providerRef ?? undefined,
         amountCents: normalized.amountCents ?? -1,
         currency: (normalized.currency as 'CNY' | 'USD') ?? 'CNY',
         state: 'paid',
@@ -247,16 +250,37 @@ export class PaymentNotificationService {
      * 回调必须能匹配到**任意一次**支付尝试，而不只是订单当前绑定的渠道。
      * 用户可能先发起支付宝、后改选微信；订单上的 channel/config 是最后一次，
      * 但他实际付款的可能是更早那次。只看订单级配置会把已收款回调判成不一致。
+     *
+     * PayPal/Stripe 在同一订单下会有多个独立渠道单据 id。回调带了
+     * providerRef 时必须精确命中对应 Payment，绝不能退化为「同渠道最新一条」，
+     * 否则旧 Session 的回调会被记到新 Session 上，查单和退款随后都会串单。
      */
+    const providerRef = result.providerRef?.trim() || undefined;
     const attempt = await this.prisma.payment.findFirst({
       where: {
         orderId: order.id,
         channel: row.providerId,
         providerConfigId: row.providerConfigId,
+        ...(providerRef ? { providerRef } : {}),
       },
-      orderBy: { createdAt: 'desc' },
+      ...(providerRef ? {} : { orderBy: { createdAt: 'desc' as const } }),
       select: { id: true },
     });
+    if (providerRef && !attempt) {
+      const detail = `回调渠道单据号 ${providerRef} 未匹配到支付尝试，禁止回落到最新支付记录`;
+      await this.recordException({
+        providerId: row.providerId,
+        orderId: order.id,
+        merchantOrderNo: row.merchantOrderNo,
+        providerTradeNo: result.providerTradeNo,
+        amountCents: result.amountCents,
+        currency: result.currency,
+        result: 'credit_failed',
+        detail,
+      });
+      await this.markFailed(notificationId, detail);
+      return { ok: false, permanent: true, reason: detail };
+    }
     const configMatchesOrder =
       !order.providerConfigId || order.providerConfigId === row.providerConfigId;
     if (!configMatchesOrder && !attempt) {
@@ -286,6 +310,7 @@ export class PaymentNotificationService {
         paidAt: result.paidAt ?? new Date(),
         providerStatus: result.providerStatus,
         rawPayload: result.rawPayload,
+        providerRef,
       });
       await this.markProcessed(notificationId, { applied: applied.applied, idempotentHit: applied.idempotentHit });
       await this.prisma.paymentNotification.update({

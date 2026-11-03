@@ -21,7 +21,14 @@ export interface AdminPageResult<T> {
 /* ────────────────────────── 支付渠道 ────────────────────────── */
 
 /** 支付通道标识，与后端 `PAYMENT_PROVIDER_IDS` 一致 */
-export type PaymentProviderId = 'sandbox' | 'alipay' | 'wechat';
+export type PaymentProviderId =
+  | 'sandbox'
+  | 'alipay'
+  | 'wechat'
+  | 'paypal'
+  | 'stripe'
+  | 'epay'
+  | 'zpay';
 
 /** 支持的结算币种 */
 export type PaymentCurrency = 'CNY' | 'USD';
@@ -85,7 +92,6 @@ export interface PaymentProviderConfigUpdate {
   enabled: boolean;
   closeAfterMinutes: number;
   values: Record<string, string>;
-  reason: string;
 }
 
 /** 站点支付设置 */
@@ -202,6 +208,8 @@ export interface AdminPaymentOrderRow {
 
 export interface AdminPaymentOrderDetail extends AdminPaymentOrderRow {
   rawOrderStatus: string;
+  /** 成功支付尝试对应的渠道单据号（PayPal Order ID / Stripe Session ID / 易支付订单号） */
+  providerRef: string | null;
   items: Array<{
     id: string;
     name: string;
@@ -216,6 +224,7 @@ export interface AdminPaymentOrderDetail extends AdminPaymentOrderRow {
     status: string;
     providerId: string;
     providerConfigVersion: number | null;
+    providerRef: string | null;
     payTransactionId: string | null;
     amountCents: number;
     createdAt: string;

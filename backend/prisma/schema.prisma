@@ -356,6 +356,9 @@ model Payment {
   /// 本次尝试固定的渠道配置版本；渠道配置轮换后仍可回溯
   providerConfigId      String?
   providerConfigVersion Int?
+  /// 渠道侧下单返回的单据 id（PayPal order id / Stripe Checkout Session id 等）。
+  /// 查单、关单和退款不能只依赖商户订单号，部分渠道必须用该 id 反查。
+  providerRef           String?
   /// 渠道原始状态文本，仅排障展示
   providerStatus        String?
   /// 单次支付尝试的失败原因

@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { isIP } from 'node:net';
 import type { Request, Response } from 'express';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/current-user.decorator';
@@ -19,6 +20,7 @@ import { SettingsService } from '../common/settings.service';
 import { PaymentOrderService } from './payment-order.service';
 import { PaymentConfigService } from './payment-config.service';
 import { PaymentNotificationService } from './payment-notification.service';
+import { getAdapter } from './adapters';
 import { PAYMENT_CURRENCIES, PaymentCurrency, PaymentProviderId } from './adapters/types';
 
 export class CreateIntentDto {
@@ -75,8 +77,14 @@ export class PaymentsController {
     @Param('orderId') orderId: string,
     @CurrentUser() user: AuthUser,
     @Body() dto: CreateIntentDto,
+    @Req() req: Request,
   ) {
-    return this.orders.createIntent({ orderId, userId: user.id, providerId: dto.providerId });
+    return this.orders.createIntent({
+      orderId,
+      userId: user.id,
+      providerId: dto.providerId,
+      clientIp: normalizeClientIp(req.ip || req.socket?.remoteAddress),
+    });
   }
 
   /** 支付状态轮询 */
@@ -90,7 +98,11 @@ export class PaymentsController {
   @Post(':orderId/query')
   @UseGuards(JwtAuthGuard)
   query(@Param('orderId') orderId: string, @CurrentUser() user: AuthUser) {
-    return this.orders.query({ orderId, actor: { kind: 'user', userId: user.id } });
+    return this.orders.query({
+      orderId,
+      actor: { kind: 'user', userId: user.id },
+      force: true,
+    });
   }
 
   /**
@@ -102,27 +114,65 @@ export class PaymentsController {
    * 响应格式由通道决定（支付宝纯文本 / 微信 JSON），用 @Res 直接写，
    * 不经过统一响应信封 —— 渠道不认识 `{code,data,message}`。
    */
+  @Get('callback/:providerId/:configId')
+  async callbackGet(
+    @Param('providerId') providerId: string,
+    @Param('configId') configId: string,
+    @Query() query: Record<string, unknown>,
+    @Req() req: Request,
+    @Res() res: Response,
+  ): Promise<void> {
+    const body = query ?? {};
+    await this.handleCallback(
+      providerId,
+      configId,
+      req.headers as Record<string, string | string[] | undefined>,
+      Buffer.from(JSON.stringify(body)),
+      body,
+      res,
+    );
+  }
+
   @Post('callback/:providerId/:configId')
-  async callback(
+  async callbackPost(
     @Param('providerId') providerId: string,
     @Param('configId') configId: string,
     @Req() req: RawBodyRequest<Request>,
     @Body() body: Record<string, unknown>,
     @Res() res: Response,
   ): Promise<void> {
-    if (!['sandbox', 'alipay', 'wechat'].includes(providerId)) {
-      throw new AppError(40400, `未知支付渠道: ${providerId}`, 404);
-    }
     const rawBody = req.rawBody
       ? req.rawBody
       : Buffer.from(typeof body === 'object' && body !== null ? JSON.stringify(body) : '');
 
+    await this.handleCallback(
+      providerId,
+      configId,
+      req.headers as Record<string, string | string[] | undefined>,
+      rawBody,
+      body ?? {},
+      res,
+    );
+  }
+
+  private async handleCallback(
+    providerId: string,
+    configId: string,
+    headers: Record<string, string | string[] | undefined>,
+    rawBody: Buffer,
+    body: Record<string, unknown>,
+    res: Response,
+  ): Promise<void> {
+    if (!getAdapter(providerId)) {
+      throw new AppError(40400, `未知支付渠道: ${providerId}`, 404);
+    }
+
     const ack = await this.notifications.ingest({
       providerId: providerId as PaymentProviderId,
       configId,
-      headers: req.headers as Record<string, string | string[] | undefined>,
+      headers,
       rawBody,
-      body: body ?? {},
+      body,
     });
 
     res.status(ack.status);
@@ -137,6 +187,14 @@ export class PaymentsController {
     }
     return currency as PaymentCurrency;
   }
+}
+
+/** ZPay 要求 clientip 必须来自服务端可验证的请求上下文，不能信任请求体。 */
+export function normalizeClientIp(raw?: string): string | undefined {
+  const value = raw?.trim();
+  if (!value) return undefined;
+  const candidate = value.startsWith('::ffff:') ? value.slice(7) : value;
+  return isIP(candidate) ? candidate : undefined;
 }
 
 /**

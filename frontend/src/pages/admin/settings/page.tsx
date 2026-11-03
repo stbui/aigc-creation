@@ -1,22 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
+import { SettingItem } from './constants';
+import { displayValue } from './utils';
 import { useAdmin, useToast, useUnsavedGuard, useAdminResource } from './hooks';
 import { Link } from 'react-router-dom';
 import { RotateCcw } from 'lucide-react';
 
 import { adminSettingsApi } from '../../../lib/api';
 
-
-
 import { ActionButton, ClearableField, EmptyState, FormField, ListError, ModalDialog, NumberField, PageHeader, PageSkeleton, SkeletonPanel, SkeletonTabs, Panel, SaveBar, SegmentedTabs, SelectField, StaleError, SwitchField, TextField, ToneBadge } from './components';
 import type { AdminSettings, AdminSettingValue } from '../../../types/api';
 
-type SettingItem = AdminSettings['groups'][number]['items'][number];
-
 /** 值 → 展示文本。布尔值不能直接显示 true/false，运营看不懂 */
-function displayValue(value: AdminSettingValue, type: SettingItem['type']): string {
-  if (type === 'boolean') return value ? '开启' : '关闭';
-  return String(value);
-}
 
 /**
  * 系统设置。

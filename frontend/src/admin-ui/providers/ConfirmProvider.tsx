@@ -24,8 +24,8 @@ import { Textarea } from '../components/ui/textarea';
 /**
  * 二次确认。
  *
- * 后台的高危动作（退款 / 删除 / 重置密码 / 调整积分）都必须先说明后果再执行，
- * 其中一部分还要求填写原因并落审计。
+ * 后台业务动作（退款 / 删除 / 重置密码 / 调整积分）可以先说明后果再执行；
+ * 只有确有业务依据要求的动作才填写原因，审计本身不作为确认门槛。
  *
  * 返回值约定：
  * - `null`  → 用户取消；
@@ -39,7 +39,7 @@ export interface ConfirmOptions {
   cancelText?: string;
   /** 危险动作用红色主按钮 */
   danger?: boolean;
-  /** 高危动作：必须填写原因，返回值即原因文本 */
+  /** 业务动作要求填写说明时启用；返回值即说明文本 */
   requireReason?: boolean;
   reasonLabel?: string;
   reasonPlaceholder?: string;

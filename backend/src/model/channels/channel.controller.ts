@@ -136,8 +136,6 @@ export class ChannelBatchDeleteBodyDto {
    */
   @IsOptional() @IsArray() @IsString({ each: true }) ids?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) modelIds?: string[];
-  /** 删除是高危写操作（`channel.model_write`），原因必填并写审计 */
-  @IsNotEmpty({ message: '必须填写变更原因' }) @IsString() @MaxLength(200) reason!: string;
 
   /** 归一化后的 id 列表（两个别名取并集去重） */
   targets(): string[] {
@@ -149,16 +147,6 @@ export class ChannelBatchDeleteBodyDto {
 export class ChannelModelRepriceBodyDto {
   @IsArray() models!: unknown[];
   /** 调价是高危写操作（`channel.model_write`），原因必填并写审计 */
-  @IsNotEmpty({ message: '必须填写变更原因' }) @IsString() @MaxLength(200) reason!: string;
-}
-
-/** 单条渠道删除：删除是高危写操作（`channel.write`），原因必填并写审计 */
-export class ChannelDeleteBodyDto {
-  @IsNotEmpty({ message: '必须填写变更原因' }) @IsString() @MaxLength(200) reason!: string;
-}
-
-/** 单条渠道模型删除：删除是高危写操作（`channel.model_write`），原因必填并写审计 */
-export class ChannelModelDeleteBodyDto {
   @IsNotEmpty({ message: '必须填写变更原因' }) @IsString() @MaxLength(200) reason!: string;
 }
 
@@ -320,8 +308,7 @@ export class AdminChannelsController {
   @Delete(':id')
   @RequirePermission(PERMISSIONS.channelWrite)
   @AuditAction('channel.delete')
-  async remove(@Param('id') id: string, @Body() body: ChannelDeleteBodyDto) {
-    // 原因只进审计（AuditInterceptor 读 body.reason），不回显给前端
+  async remove(@Param('id') id: string) {
     await this.channels.remove(id);
     return { ok: true };
   }
@@ -399,9 +386,7 @@ export class AdminChannelsController {
   async removeModel(
     @Param('id') id: string,
     @Param('modelId') modelId: string,
-    @Body() body: ChannelModelDeleteBodyDto,
   ) {
-    // 原因只进审计（AuditInterceptor 读 body.reason），不回显给前端
     const deleted = await this.channelModels.removeMany(id, [modelId]);
     return { ok: true, deleted };
   }

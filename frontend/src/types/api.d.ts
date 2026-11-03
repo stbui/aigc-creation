@@ -1928,30 +1928,44 @@ export interface PaymentIntent {
   orderId: string;
   orderNo: string;
   amountCents: number;
-  channel: 'sandbox' | 'alipay' | 'wechat' | 'free';
+  currency: string;
+  /** 实际固定下来的渠道配置；0 元单为 free */
+  providerId: 'sandbox' | 'alipay' | 'wechat' | 'paypal' | 'stripe' | 'epay' | 'zpay' | 'free';
+  configId: string | null;
+  configVersion: number | null;
   mode: 'redirect' | 'qrcode' | 'sandbox' | 'free';
   payUrl?: string;
   codeUrl?: string;
+  checkoutValue: string | null;
   expiresAt: string;
-  hint?: string;
+  hint?: string | null;
   /** 沙箱通道: 界面必须显式标注「不产生真实扣款」 */
   sandbox: boolean;
 }
 
-/** 支付状态轮询 (`GET /payments/:orderId/status`) */
+/** 支付状态轮询 (`GET /payments/:orderId/status` / `POST /payments/:orderId/query`) */
 export interface PaymentStatusResult {
   orderId: string;
   orderNo: string;
   status: OrderStatus;
-  paidCents: number;
-  paidAt: string | null;
+  displayStatus: string;
+  amountCents: number;
+  currency: string;
+  providerId: string;
+  checkoutMode: string | null;
+  checkoutValue: string | null;
+  expiresAt: string;
+  providerPaidAt: string | null;
+  creditedAt: string | null;
+  closedAt: string | null;
+  lastError: string | null;
   payments: Array<{
     id: string;
-    channel: string;
     status: string;
+    providerId: string;
+    providerRef: string | null;
+    providerTradeNo: string | null;
     amountCents: number;
-    payTransactionId: string | null;
-    paidAt: string | null;
     createdAt: string;
   }>;
 }

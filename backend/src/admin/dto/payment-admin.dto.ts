@@ -12,8 +12,9 @@ import {
   MinLength,
 } from 'class-validator';
 import { PageQueryDto } from './page-query.dto';
+import { PAYMENT_PROVIDER_IDS, PaymentProviderId } from '../../payments/adapters/types';
 
-/** 高危写操作统一要求原因（审计落 reason 列） */
+/** 需要填写变更原因的高危写操作（审计落 reason 列） */
 class ReasonedDto {
   @IsString({ message: '请填写变更原因' })
   @MinLength(2, { message: '变更原因至少 2 个字符' })
@@ -21,7 +22,7 @@ class ReasonedDto {
   reason!: string;
 }
 
-export class PaymentProviderConfigUpdateDto extends ReasonedDto {
+export class PaymentProviderConfigUpdateDto {
   @IsBoolean()
   enabled!: boolean;
 
@@ -159,8 +160,8 @@ export class PaymentOrderActionDto {
 }
 
 export class ReconciliationRunDto extends ReasonedDto {
-  @IsIn(['sandbox', 'alipay', 'wechat'], { message: '渠道非法' })
-  providerId!: 'sandbox' | 'alipay' | 'wechat';
+  @IsIn(PAYMENT_PROVIDER_IDS, { message: '渠道非法' })
+  providerId!: PaymentProviderId;
 
   @IsString()
   billDate!: string;
@@ -195,8 +196,8 @@ export class ReconciliationItemsQueryDto extends PageQueryDto {
 }
 
 export class ReconciliationImportDto extends ReasonedDto {
-  @IsIn(['sandbox', 'alipay', 'wechat'], { message: '渠道非法' })
-  providerId!: 'sandbox' | 'alipay' | 'wechat';
+  @IsIn(PAYMENT_PROVIDER_IDS, { message: '渠道非法' })
+  providerId!: PaymentProviderId;
 
   @IsString()
   billDate!: string;

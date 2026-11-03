@@ -42,23 +42,7 @@ import {
 import { useApp } from '../../ui';
 
 /**
- * 商品主图工作台 —— 1:1 复刻参考站 https://ijihua.cn/product-kit。
- *
- * 版面数值全部来自参考站 computed styles 实拍 (1920×1080):
- *   主区 grid gap 16, padding 24px 24px 24px 16px; 左输入栏 432px, 右结果栏 flex
- *   卡片白底 radius 16 padding 16, 区块 gap 24; 标题 14px/700 #333, 必填星号 14px #EB5757
- *   上传区 400×160 虚线 #E5E7EF / 底 #F2F4F7 / radius 8; 主文案 14px #1D2129, 副文案 12px #86909C
- *   表单项 196×32 (2 列 gap 8), 输入框 radius 4 / 边 #E5E7EF / padding 5px 12px / 14px #333
- *   商品描述 textarea 400×80, padding 5px 36px 5px 12px; 放大按钮 28×28 绝对定位 top/right 8
- *   自定义配置 2 列 × 192 (gap 16), 标签 14px #667085, 步进器 120×32 (32/56/32)
- *   高级设置条 400×34 radius 7 padding 0 10px; 标签 12px/600 #454C59; chip 11px #48505E
- *   主按钮 400×40, linear-gradient(90deg,#8064F6,#5546D8), radius 8, 13px/800 白字
- *   结果空态: 白底 radius 16 居中, 插画 160×160 + 标题 14px/700 + 描述 12px #86909C
- *
- * 每个控件都接到真实后端: 上传 → assets API; 自定义配置计数 → 按变体展开为
- * 多次 main_image 生成任务; 平台/比例/画质/名称/品牌/语言/描述 → 任务参数。
- * AI分析 走文本通道的「图片转提示词」(promptToolsApi.imageToPrompt), 由模型识别首图;
- * 文本通道未配置时后端 502, 界面如实报错, 不用文件名冒充识别结果。
+ * 商品主图工作台
  */
 
 export function ProductKitPage() {

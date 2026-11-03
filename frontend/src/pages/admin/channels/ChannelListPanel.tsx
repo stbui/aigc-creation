@@ -144,7 +144,18 @@ export function ChannelListPanel({
           </div>
         )}
 
-        <div className="flex max-h-[calc(100vh-420px)] flex-col gap-1 overflow-y-auto" aria-busy={loading}>
+        {/*
+         * 列表跟随页面滚动，不设内部滚动区。
+         *
+         * 原先写 `max-h-[calc(100vh-420px)]` + `overflow-y-auto`：那个魔法数把
+         * 「顶栏 + 页头 + 视图切换 + 按钮组」的高度硬编码进来，其中任何一块
+         * 改高（或浏览器放大字号）都会让列表底边错位；且它视口变高时不跟随
+         * 增长（900px 以上恒为 316px），长列表仍要在小窗里滚两次。
+         *
+         * 外壳内容区 `.adm-content` 是页面级滚动（`self-start` + `overflow-y-auto`），
+         * 后台其余 30 余个页面也都是这个动线；左列跟着整页滚才与它们一致。
+         */}
+        <div className="flex flex-col gap-1" aria-busy={loading}>
           {loading && rows.length === 0 && (
             <p className="py-6 text-center text-xs text-muted-foreground">加载中…</p>
           )}

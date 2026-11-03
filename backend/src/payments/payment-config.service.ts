@@ -131,7 +131,7 @@ export class PaymentConfigService implements OnModuleInit {
       if (d.id === 'sandbox' && process.env.NODE_ENV === 'production') continue;
       const row = await this.latestRow(d.id);
       if (!row || !row.enabled) continue;
-      const values = this.decode(row);
+      const values = this.valuesFor(d.id, row);
       if (adapter.validateConfig(values).length > 0) continue;
       out.push({
         id: d.id,
@@ -155,7 +155,7 @@ export class PaymentConfigService implements OnModuleInit {
     if (!adapter) throw new AppError(40400, `未知支付渠道: ${providerId}`, 404);
 
     const current = await this.latestRow(adapter.descriptor.id);
-    const previous = current ? this.decode(current) : {};
+    const previous = current ? this.valuesFor(adapter.descriptor.id, current) : {};
 
     // 合并：未提交的 secret 字段沿用上一版；显式空串同样视为沿用（不允许删除密钥）
     const merged: Record<string, string> = { ...previous };
@@ -205,6 +205,10 @@ export class PaymentConfigService implements OnModuleInit {
 
   /** env → v1；只执行一次。仅当库内完全没有该渠道配置时生效 */
   async bootstrapFromEnv(): Promise<void> {
+    const epayMchId = process.env.EPAY_MCH_ID || process.env.EPAY_PID || '';
+    const epayType = normalizeEpayType(
+      process.env.EPAY_TYPE || process.env.EPAY_PAY_TYPE || '2',
+    );
     const seeds: Array<{ id: PaymentProviderId; values: Record<string, string> }> = [
       {
         id: 'sandbox',
@@ -230,6 +234,41 @@ export class PaymentConfigService implements OnModuleInit {
           apiV3Key: process.env.WECHAT_API_V3_KEY ?? '',
           wechatPayPublicKey: process.env.WECHAT_PLATFORM_PUBLIC_KEY ?? '',
           apiBase: process.env.WECHAT_API_BASE ?? '',
+        },
+      },
+      {
+        id: 'paypal',
+        values: {
+          clientId: process.env.PAYPAL_CLIENT_ID ?? '',
+          clientSecret: process.env.PAYPAL_CLIENT_SECRET ?? '',
+          webhookId: process.env.PAYPAL_WEBHOOK_ID ?? '',
+          apiBase: process.env.PAYPAL_API_BASE ?? '',
+        },
+      },
+      {
+        id: 'stripe',
+        values: {
+          secretKey: process.env.STRIPE_SECRET_KEY ?? '',
+          webhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? '',
+          apiBase: process.env.STRIPE_API_BASE ?? '',
+        },
+      },
+      {
+        id: 'epay',
+        values: {
+          apiBase: process.env.EPAY_API_BASE || 'https://epay.jylt.cc',
+          mchId: epayMchId,
+          key: process.env.EPAY_KEY ?? '',
+          type: epayType,
+        },
+      },
+      {
+        id: 'zpay',
+        values: {
+          apiBase: process.env.ZPAY_API_BASE || 'https://zpayz.cn',
+          pid: process.env.ZPAY_PID ?? '',
+          key: process.env.ZPAY_KEY ?? '',
+          type: process.env.ZPAY_TYPE || 'alipay',
         },
       },
     ];
@@ -284,6 +323,13 @@ export class PaymentConfigService implements OnModuleInit {
     }
   }
 
+  private valuesFor(
+    providerId: string,
+    row: { configCipher: string },
+  ): Record<string, string> {
+    return normalizeProviderValues(providerId, this.decode(row));
+  }
+
   private toResolved(row: {
     id: string;
     providerId: string;
@@ -298,7 +344,7 @@ export class PaymentConfigService implements OnModuleInit {
       version: row.version,
       enabled: row.enabled,
       closeAfterMinutes: row.closeAfterMinutes,
-      values: this.decode(row),
+      values: this.valuesFor(row.providerId, row),
     };
   }
 
@@ -314,7 +360,7 @@ export class PaymentConfigService implements OnModuleInit {
     } | null,
   ): Promise<AdminPaymentProviderView> {
     const adapter = requireAdapter(descriptor.id);
-    const values = row ? this.decode(row) : {};
+    const values = row ? this.valuesFor(descriptor.id, row) : {};
     const missing = adapter.validateConfig(values);
     const locked = await this.identityLockedFields(descriptor);
     const hasOpenOrders = await this.hasOpenOrders(descriptor.id);
@@ -334,6 +380,30 @@ export class PaymentConfigService implements OnModuleInit {
       warnings.push({
         level: 'danger',
         message: `渠道已启用但缺少必填项：${missing.join(', ')}。发起支付会返回 503。`,
+      });
+    }
+    if (
+      row?.enabled &&
+      descriptor.id !== 'sandbox' &&
+      missing.length === 0 &&
+      !values.publicBaseUrl?.trim() &&
+      !process.env.PAYMENT_NOTIFY_BASE?.trim()
+    ) {
+      warnings.push({
+        level: 'danger',
+        message:
+          '渠道已启用但未配置回调公网地址：请在渠道配置填写 publicBaseUrl，或设置 PAYMENT_NOTIFY_BASE；否则发起支付会返回 503。',
+      });
+    }
+    if (
+      row?.enabled &&
+      descriptor.id !== 'sandbox' &&
+      process.env.NODE_ENV === 'production' &&
+      !process.env.PAYMENT_SECRET_KEY?.trim()
+    ) {
+      warnings.push({
+        level: 'danger',
+        message: '生产环境未配置 PAYMENT_SECRET_KEY，支付渠道凭据无法安全加密/解密。',
       });
     }
     if (descriptor.id === 'sandbox' && process.env.NODE_ENV === 'production') {
@@ -404,6 +474,28 @@ function digestOfConfig(
   return createHash('sha256')
     .update(`${providerId}\n${enabled ? 1 : 0}\n${closeAfterMinutes}\n${normalized}`)
     .digest('hex');
+}
+
+/** 兼容 2026-11 新版易支付字段上线前落库的 pid / payType 配置。 */
+function normalizeProviderValues(
+  providerId: string,
+  values: Record<string, string>,
+): Record<string, string> {
+  if (providerId !== 'epay') return values;
+  const normalized = { ...values };
+  if (!normalized.mchId?.trim() && normalized.pid?.trim()) {
+    normalized.mchId = normalized.pid.trim();
+  }
+  const type = normalizeEpayType(normalized.type || '') || normalizeEpayType(normalized.payType || '');
+  if (type) normalized.type = type;
+  return normalized;
+}
+
+function normalizeEpayType(value: string): string {
+  const normalized = value.trim().toLowerCase();
+  if (['1', 'wx', 'wxpay', 'wechat', 'weixin'].includes(normalized)) return '1';
+  if (['2', 'ali', 'alipay'].includes(normalized)) return '2';
+  return '';
 }
 
 export const PAYMENT_PROVIDER_ID_LIST = PAYMENT_PROVIDER_IDS;

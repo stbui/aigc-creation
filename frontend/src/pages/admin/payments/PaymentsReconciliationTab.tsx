@@ -34,7 +34,11 @@ import type {
   AdminReconciliationRun,
   PaymentProviderId,
 } from '../../../types/payment';
-import { FILTERABLE_PROVIDER_IDS, FILTERABLE_PROVIDERS, PROVIDER_LABELS } from './constants';
+import {
+  PROVIDER_LABELS,
+  RECONCILIATION_PROVIDER_IDS,
+  RECONCILIATION_PROVIDERS,
+} from './constants';
 import { moneyText } from './utils';
 import { RECONCILIATION_RESULT_LABELS } from '../../../types/payment';
 
@@ -88,7 +92,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
 
   const initialProvider = (() => {
     const raw = searchParams.get('providerId');
-    return raw && (FILTERABLE_PROVIDER_IDS as string[]).includes(raw) ? raw : undefined;
+    return raw && (RECONCILIATION_PROVIDER_IDS as string[]).includes(raw) ? raw : undefined;
   })();
   const initialStatus = (() => {
     const raw = searchParams.get('status');
@@ -339,7 +343,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
         <SelectField
           value={filterProvider}
           onChange={setFilterProvider}
-          options={FILTERABLE_PROVIDERS}
+          options={RECONCILIATION_PROVIDERS}
           allowClear
           className="w-[130px]"
           ariaLabel="筛选渠道"

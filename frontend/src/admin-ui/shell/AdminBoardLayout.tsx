@@ -396,13 +396,20 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
          * 横向滚动条；`overflow-x-auto` 把滚动限制在这一块内部。不设统一限宽：
          * 后台以数据密集页为主，限宽会让两侧留白挤压表格。
          *
+         * **不能加 `self-start`**：它在交叉轴（这里就是纵向）把 main 压成内容
+         * 高度，于是 `overflow-y-auto` 永远不会触发（元素自身比内容还高就没有
+         * 溢出），而根节点是 `h-screen overflow-hidden` —— 结果是页面长过视口
+         * 时底部被**直接裁掉且无法滚动**（34 个后台页在矮窗口下都会中招）。
+         * 去掉它让 main 在 flex 行里纵向拉伸到容器高度，内部滚动才成立。
+         * 横向不受影响：宽度由主轴（flex-1 + min-w-0）决定，与 `self-*` 无关。
+         *
          * 值班数据（DutyContext）不在这里挂：它每 30 秒拉一次最近 100 条任务，
          * 只有概览页消费。挂外壳上等于让 30 多个无关页面陪着轮询。
          */}
         <main
           id="adm-main"
           tabIndex={-1}
-          className="adm-content min-w-0 flex-1 self-start overflow-x-auto overflow-y-auto bg-page px-[26px] pt-[18px] pb-14 outline-none"
+          className="adm-content min-w-0 flex-1 overflow-x-auto overflow-y-auto bg-page px-[26px] pt-[18px] pb-14 outline-none"
         >
           {children}
         </main>

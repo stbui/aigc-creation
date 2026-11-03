@@ -51,6 +51,8 @@ export class PaymentGateway {
     amountCents: number;
     totalCents: number;
     reason?: string;
+    providerRef?: string;
+    providerTradeNo?: string;
   }): Promise<RefundResult> {
     const adapter = getAdapter(input.order.channel);
     if (!adapter) return { state: 'failed', error: `未知支付渠道: ${input.order.channel}` };
@@ -77,6 +79,8 @@ export class PaymentGateway {
       amountCents: input.amountCents,
       totalCents: input.totalCents,
       reason: input.reason,
+      providerRef: input.providerRef,
+      providerTradeNo: input.providerTradeNo,
     };
     try {
       return await adapter.refund(payload);

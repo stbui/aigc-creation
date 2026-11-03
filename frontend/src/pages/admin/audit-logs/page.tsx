@@ -1,10 +1,10 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { Row, ACTION_LABELS } from './constants';
 import { useAdmin, useToast, useAdminList, useAdminUrlFilterSync } from './hooks';
 import { useSearchParams } from 'react-router-dom';
 import { Download } from 'lucide-react';
 
 import { adminAuditApi } from '../../../lib/api';
-
 
 import { ActionButton, AdminDataTable, AppliedFilters, ClearableField, FilterActions, FilterBar, PageHeader, Panel, SelectField, StatusTag, StaleError, type AdminColumn, type AppliedFilter } from './components';
 import type { AdminAuditListResult } from '../../../types/api';
@@ -13,6 +13,8 @@ import type { AdminAuditListResult } from '../../../types/api';
  * 操作审计。
  *
  * 页面职责不变：只读，记录后台全部写操作，用于事后追责与举证。
+ * 审计只留痕，不承载任何操作确认：包括导出在内，均不弹二次确认；
+ * 高危动作的确认与原因输入属于业务页面，由业务动作自行负责。
  * 本次改造只换渲染层 —— 筛选条件、URL 同步、导出、行内展开的行为逐条保留：
  *
  * - 筛选值有「草稿 / 已生效」两态，只有点「查询」才改列表，URL 也只同步已生效的值；
@@ -20,67 +22,8 @@ import type { AdminAuditListResult } from '../../../types/api';
  * - 导出走**已生效**的筛选条件，与屏幕上的列表同口径。
  */
 
-type Row = AdminAuditListResult['items'][number];
-
-/** 动作 → 中文说明。未登记的动作原样显示, 便于发现未文档化的操作 */
-const ACTION_LABELS: Record<string, string> = {
-  'user.status_change': '禁用/启用账号',
-  'user.role_change': '变更用户角色',
-  'user.password_reset': '重置用户密码',
-  'user.delete': '删除用户',
-  'user.merge_accounts': '合并账号',
-  'role.permissions_update': '调整角色权限',
-  'setting.update': '修改系统设置',
-  'data.export': '导出数据',
-  'backup.download': '下载备份',
-  'backup.run': '手动备份',
-  'backup.verify': '验证备份',
-  'storage.probe': '探测存储',
-  'aigc.label_update': '修改 AI 标识',
-  'asset.status_change': '变更素材状态',
-  'asset.batch': '批量处理素材',
-  'asset.delete': '删除素材',
-  'credit.adjust': '调整积分',
-  'credit.price_update': '修改能力价格',
-  'credit.price_reset': '恢复能力价格',
-  'membership-plan.create': '新建会员套餐',
-  'membership-plan.update': '修改会员套餐',
-  'membership-plan.status': '上下架会员套餐',
-  'channel.create': '新增渠道',
-  'channel.update': '修改渠道',
-  'channel.delete': '删除渠道',
-  'channel.duplicate': '复制渠道',
-  'channel.order': '调整渠道顺序',
-  'channel.export': '导出渠道配置',
-  'channel.import': '导入渠道配置',
-  'channel_model.create': '新增渠道模型',
-  'channel_model.update': '修改渠道模型',
-  'channel_model.delete': '删除渠道模型',
-  'channel_model.batch_delete': '批量删除渠道模型',
-  'channel_model.order': '调整渠道模型顺序',
-  'channel_model.sort': '调整渠道模型排序',
-  'channel_model.enabled': '启停渠道模型',
-  'channel_model.fetch': '拉取上游模型清单',
-  'channel_model.import': '导入上游模型',
-  'channel_model.test': '渠道模型连通性测试',
-  'logical_model.create': '新增前台模型',
-  'logical_model.update': '修改前台模型',
-  'logical_model.archive': '归档前台模型',
-  'user_group.create': '新增用户分组',
-  'user_group.update': '修改用户分组',
-  'user_group.delete': '删除用户分组',
-  'plugin.toggle': '启停插件',
-  'plugin.verify': '校验插件',
-  'plugin.install': '安装插件',
-  'plugin.uninstall': '卸载插件',
-  'provider_catalog.refresh': '刷新服务商目录',
-  'provider_catalog.install': '安装服务商插件',
-  'billing_order.resolve': '处置生成账单',
-  'notification.broadcast': '发送站内广播',
-};
-
 /** 审计详情直接铺在表格行内，避免只读追溯被抽屉或弹窗打断 */
-function AuditExpandedDetail({ row }: { row: Row }) {
+export function AuditExpandedDetail({ row }: { row: Row }) {
   const detailEntries = Object.entries(row.detail);
 
   return (
@@ -163,7 +106,7 @@ function AuditExpandedDetail({ row }: { row: Row }) {
   );
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
+export function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0">
       <dt className="text-[12px] text-muted-foreground">{label}</dt>
@@ -174,7 +117,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-function Mono({ children }: { children: ReactNode }) {
+export function Mono({ children }: { children: ReactNode }) {
   return <code className="font-mono text-[12px] text-muted-foreground">{children}</code>;
 }
 

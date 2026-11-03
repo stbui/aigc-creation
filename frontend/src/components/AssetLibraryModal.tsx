@@ -2,22 +2,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronDown, Search, X } from 'lucide-react';
 import { assetSrc, assetThumbSrc, assetsApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
-import { StateEmpty, StateError, StateLoading } from './StateViews';
+import { StateButton, StateEmpty, StateError, StateLoading } from './StateViews';
 import { ResultMedia, modalityOfFormat } from './ResultMedia';
 import type { Asset } from '../types/api';
-import { useApp, Modal } from '../ui';
+import { useApp, Button, Dropdown, Input, Modal } from '../ui';
 
 /**
- * 素材库导入选择器 —— 1:1 复刻参考站 (ijihua.cn/free-creation) 的
- * 「从素材库导入」大弹窗 (参考站内部组件名 asset-library-picker)。
- *
- * ## 复刻依据 (2026-10-20 取证)
- *
- * 参考站该入口**未登录时是 disabled**, 且其账号体系与本仓独立 → 无法直接实拍。
- * 故改从两条**可验证的**来源取证:
- *   1. 参考站线上样式表 `index-glaqVozH.css` 的 `.asset-library-picker-*` 规则
- *      (尺寸/圆角/间距/字号全部有实值, 逐条抄录)
- *   2. 参考站前端 bundle 的反混淆结果 (类名/文案/交互语义)
+ * 素材库导入选择器
  *
  * ## 参考站形态 (CSS 实测)
  *
@@ -186,8 +177,6 @@ export function AssetLibraryModal({
   const [kind, setKind] = useState<PickerKind>('all');
   /** 工具栏日期筛选 */
   const [dateFilter, setDateFilter] = useState<DateFilter>('all');
-  /** 日期菜单展开状态（受控，保证 aria-expanded 与实际一致） */
-  const [dateOpen, setDateOpen] = useState(false);
   /** 工具栏搜索词 */
   const [keyword, setKeyword] = useState('');
   /** 已勾选的素材 id —— 参考站是多选语义 */
@@ -198,7 +187,6 @@ export function AssetLibraryModal({
     if (open) {
       setKind('all');
       setDateFilter('all');
-      setDateOpen(false);
       setKeyword('');
       setSelected([]);
     }
@@ -240,6 +228,15 @@ export function AssetLibraryModal({
     }
     return list;
   }, [items, kind, dateFilter, keyword]);
+
+  /**
+   * 是否已达选择上限。
+   *
+   * 达上限后未选中的卡片渲染为 `disabled` (CSS 里 `.alp-card:disabled` 早已写好,
+   * 此前却没有代码设置该属性 —— 卡片看起来完全可点, 点下去只弹一句 warning)。
+   * 只禁用**未选中**的卡片: 已选中的必须保持可点, 否则用户没法取消勾选来换一张。
+   */
+  const atLimit = maxSelectable !== undefined && selected.length >= maxSelectable;
 
   const toggle = (asset: Asset) => {
     setSelected((prev) => {
@@ -298,6 +295,13 @@ export function AssetLibraryModal({
         // 既更深又没有毛玻璃 —— 一眼能看出是两个站点的弹层。
         mask: { background: '#1c1e2d75', backdropFilter: 'blur(3px)' },
       }}
+      /*
+       * ⚠️ `className` 是给**容器几何**用的, 不是给内容用的:
+       * 兼容壳把它与 `ui-modal-surface` / `ant-modal-container` 挂在同一个 div 上,
+       * global.css 里的容器规则因此必须写紧邻合并选择器 `.alp-modal.ant-modal-container`。
+       * 改成后代形式 (` .alp-modal .ant-modal-container`) 会静默失效 ——
+       * 表现为整个弹窗退回默认几何、底部操作条被撑到屏外。@2026-11-03
+       */
       title={
         <div className="alp-header">
           <div className="alp-header-main">
@@ -329,53 +333,61 @@ export function AssetLibraryModal({
           </div>
 
           <div className="alp-toolbar-right">
-            <div
-              className={`alp-date-filter${dateOpen ? ' is-open' : ''}`}
-              role="group"
-              aria-label="日期筛选"
+            {/*
+              日期筛选用共享的 `Dropdown` 兼容壳 (内部是 radix DropdownMenu)，
+              不再手写一套「relative 容器 + 绝对定位菜单」：
+                · 此前菜单靠 CSS `:hover` 展开、同时按钮又 toggle 一个 `is-open`，
+                  两者叠加导致点选后菜单**不关**（鼠标还悬在容器上，`:hover` 命中），
+                  只有把鼠标移开才消失；
+                · 手写版没有焦点管理、没有 Esc、点在弹窗空白处也不关。
+              radix 版带 keyboard 导航 / Esc / 点击外部关闭，且渲染到 portal，
+              不受 `.alp-content` 的 `overflow: auto` 裁剪。
+              外观由 `.alp-date-dropdown` 覆写回参考站数值，见 global.css。
+            */}
+            <Dropdown
+              classNames={{ root: 'alp-date-dropdown' }}
+              placement="bottomRight"
+              menu={{
+                items: DATE_LABELS.map((d) => ({
+                  key: d.id,
+                  label: d.label,
+                  // 选中态加在**条目**上 (整行胶囊), 不是包一层 span
+                  className: dateFilter === d.id ? 'is-active' : undefined,
+                  onClick: () => setDateFilter(d.id),
+                })),
+              }}
             >
-              <button
-                type="button"
-                className="alp-date-trigger"
-                aria-haspopup="menu"
-                aria-expanded={dateOpen}
-                aria-controls="alp-date-menu"
-                onClick={() => setDateOpen((open) => !open)}
-              >
+              <button type="button" className="alp-date-trigger">
                 <span>{DATE_LABELS.find((d) => d.id === dateFilter)?.label ?? '全部'}</span>
                 <ChevronDown size={13} />
               </button>
-              <div id="alp-date-menu" className="alp-date-menu" role="menu">
-                {DATE_LABELS.map((d) => (
-                  <button
-                    key={d.id}
-                    type="button"
-                    role="menuitem"
-                    className={`alp-date-item${dateFilter === d.id ? ' is-active' : ''}`}
-                    onClick={() => {
-                      setDateFilter(d.id);
-                      setDateOpen(false);
-                    }}
-                  >
-                    {d.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            </Dropdown>
 
-            <div className="alp-search">
-              <Search size={14} />
-              <input
-                value={keyword}
-                placeholder="搜索素材名称 / 地址"
-                onChange={(e) => setKeyword(e.target.value)}
-              />
-              {keyword && (
-                <button type="button" className="alp-search-clear" aria-label="清除搜索" onClick={() => setKeyword('')}>
-                  <X size={12} />
-                </button>
-              )}
-            </div>
+            {/*
+              搜索框走 `Input` 兼容壳的 prefix / suffix, 不再手写
+              「div 包图标 + 裸 input + 条件清除键」—— 后者与 Input 的
+              `.ant-input-affix-wrapper` 是同一套结构的两份实现。
+              清除键用共享 `Button` (variant=ghost) 而不是裸 button。
+            */}
+            <Input
+              className="alp-search"
+              prefix={<Search size={14} />}
+              suffix={
+                keyword ? (
+                  <Button
+                    type="text"
+                    className="alp-search-clear"
+                    aria-label="清除搜索"
+                    onClick={() => setKeyword('')}
+                  >
+                    <X size={12} />
+                  </Button>
+                ) : null
+              }
+              value={keyword}
+              placeholder="搜索素材名称 / 地址"
+              onChange={(e) => setKeyword(e.target.value)}
+            />
           </div>
         </div>
 
@@ -415,8 +427,33 @@ export function AssetLibraryModal({
                   />
                 </div>
               ) : visible.length === 0 ? (
+                /*
+                 * ⚠️ 「筛完没剩」≠「库里没有」。两者原先共用一句「素材库暂无图片 /
+                 * 请先上传图片」—— 素材有 70 张、只是搜索词或日期档位筛空了时,
+                 * 这句话是**谎报**: 用户以为素材没了, 会去重复上传。
+                 * (StateViews.tsx 的空态注释本来就要求把这两种分开。)
+                 */
                 <div className="alp-state">
-                  <StateEmpty compact title="素材库暂无图片" desc="请先上传图片，再从这里导入。" />
+                  {items.length === 0 ? (
+                    <StateEmpty compact title="素材库暂无图片" desc="请先上传图片，再从这里导入。" />
+                  ) : (
+                    <StateEmpty
+                      compact
+                      title="没有符合条件的素材"
+                      desc="试试换个关键词，或把日期与维度放宽。"
+                      action={
+                        <StateButton
+                          onClick={() => {
+                            setKind('all');
+                            setDateFilter('all');
+                            setKeyword('');
+                          }}
+                        >
+                          清除筛选
+                        </StateButton>
+                      }
+                    />
+                  )}
                 </div>
               ) : (
                 <div className="alp-grid">
@@ -432,6 +469,8 @@ export function AssetLibraryModal({
                         type="button"
                         className={`alp-card${on ? ' is-selected' : ''}`}
                         aria-pressed={on}
+                        disabled={!on && atLimit}
+                        title={!on && atLimit ? `最多选择 ${maxSelectable} 张` : undefined}
                         onClick={() => toggle(a)}
                       >
                         <div className="alp-cover">

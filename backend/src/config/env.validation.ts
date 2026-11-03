@@ -160,7 +160,7 @@ export const ENV_SPECS: readonly Spec[] = [
   //   下列 env 只在首次启动导入为 v1，之后以库内配置为准。
   /** 支付配置加密密钥（base64 的 32 字节）。生产必须显式配置 */
   { key: 'payment.secretKey', env: 'PAYMENT_SECRET_KEY', type: 'string', def: '' },
-  /** 渠道异步通知的基址（渠道能访问到的公网地址）；留空用 HOST:PORT */
+  /** 渠道异步通知基址；只允许沙箱回落到 HOST:PORT，真实渠道缺失会拒绝发起支付 */
   { key: 'payment.notifyBase', env: 'PAYMENT_NOTIFY_BASE', type: 'string', def: '' },
   // 支付宝（网页支付, RSA2）
   { key: 'payment.alipay.appId', env: 'ALIPAY_APP_ID', type: 'string', def: '' },
@@ -175,6 +175,28 @@ export const ENV_SPECS: readonly Spec[] = [
   { key: 'payment.wechat.privateKey', env: 'WECHAT_PRIVATE_KEY', type: 'string', def: '' },
   // 回调验签用的是**微信支付平台证书公钥**，不是商户私钥
   { key: 'payment.wechat.platformPublicKey', env: 'WECHAT_PLATFORM_PUBLIC_KEY', type: 'string', def: '' },
+  // PayPal Orders v2（Webhook 通过官方 verify-webhook-signature 接口验签）
+  { key: 'payment.paypal.clientId', env: 'PAYPAL_CLIENT_ID', type: 'string', def: '' },
+  { key: 'payment.paypal.clientSecret', env: 'PAYPAL_CLIENT_SECRET', type: 'string', def: '' },
+  { key: 'payment.paypal.webhookId', env: 'PAYPAL_WEBHOOK_ID', type: 'string', def: '' },
+  { key: 'payment.paypal.apiBase', env: 'PAYPAL_API_BASE', type: 'string', def: '' },
+  // Stripe Checkout（测试/生产由 Secret Key 前缀决定）
+  { key: 'payment.stripe.secretKey', env: 'STRIPE_SECRET_KEY', type: 'string', def: '' },
+  { key: 'payment.stripe.webhookSecret', env: 'STRIPE_WEBHOOK_SECRET', type: 'string', def: '' },
+  { key: 'payment.stripe.apiBase', env: 'STRIPE_API_BASE', type: 'string', def: '' },
+  // 易支付（epay.jylt.cc）：微信 type=1、支付宝 type=2
+  { key: 'payment.epay.apiBase', env: 'EPAY_API_BASE', type: 'string', def: 'https://epay.jylt.cc' },
+  { key: 'payment.epay.mchId', env: 'EPAY_MCH_ID', type: 'string', def: '' },
+  { key: 'payment.epay.key', env: 'EPAY_KEY', type: 'string', def: '' },
+  { key: 'payment.epay.type', env: 'EPAY_TYPE', type: 'string', def: '2' },
+  // 兼容旧变量名；bootstrapFromEnv 会优先读取上面的新变量
+  { key: 'payment.epay.pid', env: 'EPAY_PID', type: 'string', def: '' },
+  { key: 'payment.epay.payType', env: 'EPAY_PAY_TYPE', type: 'string', def: 'alipay' },
+  // ZPay：支付宝 type=alipay、微信 type=wxpay；下单还要求服务端注入用户 IP
+  { key: 'payment.zpay.apiBase', env: 'ZPAY_API_BASE', type: 'string', def: 'https://zpayz.cn' },
+  { key: 'payment.zpay.pid', env: 'ZPAY_PID', type: 'string', def: '' },
+  { key: 'payment.zpay.key', env: 'ZPAY_KEY', type: 'string', def: '' },
+  { key: 'payment.zpay.type', env: 'ZPAY_TYPE', type: 'string', def: 'alipay' },
 
   // ── 日志（本文件引入的新配置面）────────────────────────────────────────
   { key: 'log.level', env: 'LOG_LEVEL', type: 'string', def: 'log', oneOf: LOG_LEVELS },

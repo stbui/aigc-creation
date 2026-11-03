@@ -1,34 +1,13 @@
 import { useEffect, useState } from 'react';
+import { CHANNEL_LABEL, CHANNEL_OPTIONS, BUILTIN_CODES } from './constants';
+import { fmt } from './utils';
 import { useAdmin, useDiscardConfirm, useUnsavedGuard, useToast, useAdminResource } from './hooks';
 import { adminNotificationsApi } from '../../../lib/api';
-
-
 
 import { ActionButton, AdminDataTable, Drawer, FormField, Notice, PageHeader, Panel, SelectField, StaleError, StatusTag, SwitchField, TextAreaField, TextField, type AdminColumn } from './components';
 import type { DeliveryChannelStatusMap, MessageTemplateItem } from '../../../types/api';
 
-const CHANNEL_LABEL: Record<string, string> = {
-  inapp: '站内消息',
-  email: '邮件',
-  sms: '短信',
-};
-
-const CHANNEL_OPTIONS = Object.entries(CHANNEL_LABEL).map(([value, label]) => ({ value, label }));
-
 /** 站内消息实际读取的模板编码 —— 与通知服务内置兜底文案一一对应 */
-const BUILTIN_CODES = [
-  { code: 'payment_success', hint: '支付成功（订单号 / 金额 / 积分）' },
-  { code: 'credit_granted', hint: '积分到账（积分）' },
-  { code: 'task_failed', hint: '任务失败退款（能力 / 原因 / 积分）' },
-  { code: 'membership_expired', hint: '会员到期（到期日）' },
-  { code: 'ticket_reply', hint: '工单回复（工单号）' },
-];
-
-function fmt(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('zh-CN', { hour12: false });
-}
 
 /**
  * 站内消息。

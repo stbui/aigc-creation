@@ -13,7 +13,7 @@
 | 场景 | 原因 |
 | --- | --- |
 | CSV 导出 `GET /admin/*/export` | 返回文件流；前端 `downloadCsv()` 独立于 `request()` |
-| 渠道回调 `POST /payments/callback/:channel` | 用 `@Res()` 直写渠道要求的回执格式，不能套 `{ code, data }` |
+| 渠道回调 `GET/POST /payments/callback/:providerId/:configId` | 用 `@Res()` 直写渠道要求的回执格式，不能套 `{ code, data }`；易支付与 ZPay 走 GET |
 
 ## 2. 跨模块错误码
 
@@ -75,7 +75,7 @@
 | GET | `/api/v1/products/:sku` | 商品详情（结算页用） |
 | GET | `/api/v1/orders/:id`、POST `/pay`、POST `/cancel` | 订单详情 / 发起沙箱支付 / 用户取消未支付订单（仅 `pending → cancelled`，幂等；已支付只能走退款） |
 | POST | `/api/v1/payments/:orderId/intent` | 发起真实渠道支付（返回 `redirect` 跳转或 `qrcode` 扫码） |
-| POST | `/api/v1/payments/callback/:channel` | **渠道异步回调（公开，无信封，`@Res()` 直写）**，验签 + 金额核对 + 幂等 |
+| GET/POST | `/api/v1/payments/callback/:providerId/:configId` | **渠道异步回调（公开，无信封，`@Res()` 直写）**，验签 + 金额核对 + 幂等；易支付与 ZPay 使用 GET，PayPal/Stripe 使用 POST |
 | GET | `/api/v1/payments/:orderId/status` | 支付状态轮询 |
 | POST/GET | `/api/v1/invoices`、`/invoices/:id/file` | 申请开票（一单一票）/ 列表 / 取可打印 HTML |
 | GET | `/api/v1/marketing/{popup,invites,checkin}` | 营销弹窗 / 邀请 / 签到 |
@@ -106,7 +106,7 @@
 | GET/PUT/POST | `/api/v1/admin/{coupons,campaigns,marketing-rules}*` | 营销管理 |
 | GET/POST | `/api/v1/admin/invoices*` | 发票审核与开具（`invoice.read` / `invoice.write`） |
 | GET | `/api/v1/admin/payments/providers` | 支付适配器视图列表（沙箱 / 支付宝 / 微信）：启用状态、是否配置齐、缺哪几项、checkoutMode、关单分钟、配置版本、字段元数据、风险告警。**只回配置状态不回密钥明文**（`secretConfigured` 只给布尔），`payment.read` |
-| PUT | `/api/v1/admin/payments/providers/:id/config` | 保存支付适配器配置（版本化 + 加密 + 追加写）。请求体 `{ enabled, closeAfterMinutes, values, reason }`，`reason` 必填并写审计；密钥字段留空表示沿用旧值，身份类字段锁定不可改，`payment.write` |
+| PUT | `/api/v1/admin/payments/providers/:id/config` | 保存支付适配器配置（版本化 + 加密 + 追加写）。请求体 `{ enabled, closeAfterMinutes, values }`，保存写审计但不要求填写原因；密钥字段留空表示沿用旧值，身份类字段锁定不可改，`payment.write` |
 | GET/PUT | `/api/v1/admin/payments/settings` | 后台默认币种设置，`setting.read` / 写需 `payment.write` + 原因 |
 | GET/POST/PUT | `/api/v1/admin/payments/products*` | 充值商品列表 / 新建 / 改（价格按分存，展示按元解析；库存 / 周期 / 限时策略随类型切换），`product.read` / `product.write` |
 | GET | `/api/v1/admin/payments/orders` | 支付订单列表（服务端分页，默认 30）：筛选 `status` / `providerId` / `keyword` / `timeField` / `from` / `to` / `sort`，`payment.read` |
@@ -118,7 +118,7 @@
 | GET | `/api/v1/admin/payments/reconciliations/:id/items` | 对账差异明细（按 `result` 筛，默认 50 条/页），`payment.read` |
 | POST | `/api/v1/admin/payments/reconciliations/import` | 渠道账单 CSV 兜底导入（multipart `file` + `providerId` / `billDate` / `reason`），`finance.reconcile` |
 | GET | `/api/v1/admin/payments/reconciliations/export.csv`、`/:id/items/export.csv` | 对账汇总 / 明细导出（`data.export`） |
-| GET/POST/PATCH/DELETE | `/api/v1/admin/channels*`、`/admin/channel-models` | 渠道 / 渠道模型 / 价格档 / 复制 / 导入导出 / 连通性测试；写需 `channel.write` / `channel.model_write`，测试写 `ApiCallLog(billable=false)`。**删除必填 `reason`**（`DELETE /admin/channels/:id`、`DELETE /admin/channels/:id/models/:modelId`、`POST /admin/channels/:id/models/batch-delete` 三处都是高危写，空原因一律 `40001`），原因只进审计不回显 |
+| GET/POST/PATCH/DELETE | `/api/v1/admin/channels*`、`/admin/channel-models` | 渠道 / 渠道模型 / 价格档 / 复制 / 导入导出 / 连通性测试；写需 `channel.write` / `channel.model_write`，测试写 `ApiCallLog(billable=false)`。渠道与渠道模型删除（含单删、批量删除）保留业务确认，但不要求原因；审计仍记录操作人、动作与结果 |
 | GET | `/api/v1/admin/channel-models?channelId=&includeDisabled=` | 跨渠道模型视图（一行 = 一条渠道模型，条目带 `channelName` / `channelEnabled`）。`includeDisabled=1` 含已停用线路 —— 后台「全部模型」视图要用；不传时只给启用线路（前台模型的线路选择器用，停用线路进了下拉会让人以为选了就能用），`channel.model_read` |
 | GET/PUT | `/api/v1/admin/channels/order`、`/api/v1/admin/channels/:id/models/order` | 渠道排序 / 渠道内模型排序。`GET` 返回当前顺序的 id 数组；`PUT` 请求体 `{ ids, expectedIds }` —— `expectedIds` 是**读取时看到的顺序**，与库中不一致说明期间有人改过，整单拒绝 **409**（`code 40900`，「排序列表已变化，请重新加载后再保存」），不做部分落库。权限 `channel.write` / `channel.model_write`，写审计 `channel.order` / `channel_model.order` |
 | GET | `/api/v1/admin/channels/protocols` | 可选协议目录（按 `capability` 过滤）；渠道模型表单的协议来源，`channel.model_read` |

@@ -1,32 +1,18 @@
 import { useEffect, useState } from 'react';
+import { FRESHNESS_STYLE } from './constants';
+import { since, freshness } from './utils';
 import { useAdmin, useToast, useAdminResource } from './hooks';
-import { AlertTriangle, CheckCircle2, Clock, Play, RefreshCw, XCircle } from 'lucide-react';
+import { AlertTriangle, Play, RefreshCw } from 'lucide-react';
 
 import { adminSchedulerApi } from '../../../lib/api';
-
 
 import { ActionButton, EmptyState, ListError, Notice, PageHeader, PageSkeleton, Panel, StaleError, ToneBadge } from './components';
 import { cn } from '../../../admin-ui/lib/cn';
 import type { AdminSchedulerTask } from '../../../types/api';
 
 /** 相对时间 —— 运维看的是「多久没跑了」，不是绝对时间 */
-function since(iso: string | null): string {
-  if (!iso) return '从未执行';
-  const diff = Date.now() - new Date(iso).getTime();
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return '刚刚';
-  if (min < 60) return `${min} 分钟前`;
-  const h = Math.floor(min / 60);
-  if (h < 24) return `${h} 小时前`;
-  return `${Math.floor(h / 24)} 天前`;
-}
 
 /** 上次没跑成功 → 用醒目色；从未跑过 → 灰色 */
-function freshness(t: AdminSchedulerTask): 'ok' | 'failed' | 'never' {
-  if (t.consecutiveFailures > 0) return 'failed';
-  if (!t.lastRunAt) return 'never';
-  return 'ok';
-}
 
 /**
  * 三态的视觉表达：边框色 + 图标。
@@ -34,14 +20,6 @@ function freshness(t: AdminSchedulerTask): 'ok' | 'failed' | 'never' {
  * 只有「失败」染红 —— 从未执行只是「还没到点」，多数是部署后首轮未触发，
  * 一律标红会让真正失败的条目失去分量。
  */
-const FRESHNESS_STYLE: Record<
-  'ok' | 'failed' | 'never',
-  { row: string; icon: string; Icon: typeof CheckCircle2 }
-> = {
-  ok: { row: 'border-border bg-card', icon: 'text-success-text', Icon: CheckCircle2 },
-  failed: { row: 'border-danger-soft bg-danger-soft/40', icon: 'text-danger-text', Icon: XCircle },
-  never: { row: 'border-border bg-card', icon: 'text-muted-foreground', Icon: Clock },
-};
 
 /**
  * 定时任务 (admin-prd.md §3.18 B-90 / M9.5)。

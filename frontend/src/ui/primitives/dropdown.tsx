@@ -15,6 +15,13 @@ export interface DropdownItem {
   disabled?: boolean;
   danger?: boolean;
   type?: 'divider';
+  /**
+   * 条目自身的类名 —— 用于「当前选中项」这类需要给**整行**上样式的场合。
+   *
+   * ⚠️ 选中态不要只包一层 `<span>` 再上样式: 行内元素拿不到整行的背景宽度,
+   * 表现为高亮只圈住几个字 (而非参考站那种整行胶囊)。@2026-11-03
+   */
+  className?: string;
   onClick?: () => void;
 }
 
@@ -57,6 +64,7 @@ export function Dropdown({
               className={cn(
                 'ui-dropdown-item',
                 item.danger && 'text-danger-text focus:text-danger-text',
+                item.className,
               )}
               onSelect={() => item.onClick?.()}
             >

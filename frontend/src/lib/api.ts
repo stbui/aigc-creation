@@ -726,6 +726,15 @@ export const paymentsApi = {
     }),
 
   status: (orderId: string) => request<PaymentStatusResult>(`/payments/${orderId}/status`),
+
+  /**
+   * 用户主动查单。
+   *
+   * 与 `status` 共用同一后端结果，但 POST 会绕过状态轮询的 2 秒节流，
+   * 用于“我已完成支付”以及渠道同步跳回后的立即确认。
+   */
+  query: (orderId: string) =>
+    request<PaymentStatusResult>(`/payments/${orderId}/query`, { method: 'POST' }),
 };
 
 /** 发票 (需登录)。一单一票, 开具后可在后台下载可打印 HTML */
@@ -1660,7 +1669,7 @@ export const adminPaymentProvidersApi = {
   /**
    * 保存渠道配置（追加新版本，历史订单继续用旧版本）。
    *
-   * 高危动作：后端要求带 `reason`，并写审计日志。
+   * 高危动作：后端写审计日志，但不要求填写变更原因。
    */
   saveConfig: (providerId: string, body: PaymentProviderConfigUpdate) =>
     request<{ provider: AdminPaymentProviderView; unchanged: boolean }>(
@@ -2022,14 +2031,11 @@ export const adminChannelsApi = {
   /**
    * 删除渠道（软删除）。
    *
-   * `reason` **必填**：删除是高危写操作（`channel.write`），审计要能回答
-   * 「谁为什么删」；后端会拒收空原因（40001）。
+   * 删除是业务操作，保留前端确认；审计由后端按操作人、动作和结果记录。
+   * 渠道模型删除同样不要求填写原因。
    */
-  remove: (id: string, reason: string) =>
-    request<{ ok: boolean }>(`/admin/channels/${id}`, {
-      method: 'DELETE',
-      body: { reason },
-    }),
+  remove: (id: string) =>
+    request<{ ok: boolean }>(`/admin/channels/${id}`, { method: 'DELETE' }),
 
   duplicate: (id: string) =>
     request<AdminChannelView>(`/admin/channels/${id}/duplicate`, { method: 'POST' }),
@@ -2057,23 +2063,22 @@ export const adminChannelsApi = {
   /**
    * 删除单条渠道模型（软删除）。
    *
-   * `reason` **必填**：删除是高危写操作（`channel.model_write`），后端拒收空原因。
+   * 删除保留业务确认；审计记录操作人、动作与结果，不要求填写原因。
    */
-  removeModel: (id: string, modelId: string, reason: string) =>
+  removeModel: (id: string, modelId: string) =>
     request<{ deleted: number }>(`/admin/channels/${id}/models/${modelId}`, {
       method: 'DELETE',
-      body: { reason },
     }),
 
   /**
    * 批量删除渠道模型（全有或全无）。
    *
-   * `reason` **必填**：删除是高危写操作（`channel.model_write`），后端拒收空原因。
+   * 删除保留业务确认；审计记录操作人、动作与结果，不要求填写原因。
    */
-  batchDeleteModels: (id: string, ids: string[], reason: string) =>
+  batchDeleteModels: (id: string, ids: string[]) =>
     request<{ deleted: number }>(`/admin/channels/${id}/models/batch-delete`, {
       method: 'POST',
-      body: { ids, reason },
+      body: { ids },
     }),
 
   /** 批量调价：提交最终售价，价格版本过期时后端整批拒绝 */

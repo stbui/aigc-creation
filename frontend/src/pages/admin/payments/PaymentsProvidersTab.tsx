@@ -45,13 +45,33 @@ function ProviderIcon({ icon }: { icon: string }) {
       ? 'bg-brand/10 text-brand'
       : icon === 'wechat'
         ? 'bg-success-soft text-success-text'
-        : 'bg-muted text-muted-foreground';
+        : icon === 'paypal'
+          ? 'bg-brand/10 text-brand'
+          : icon === 'stripe'
+            ? 'bg-brand/10 text-brand'
+            : icon === 'epay'
+              ? 'bg-warn-soft text-warn-text'
+              : icon === 'zpay'
+                ? 'bg-brand/10 text-brand'
+                : 'bg-muted text-muted-foreground';
   return (
     <span
       aria-hidden
       className={`inline-flex size-7 shrink-0 items-center justify-center rounded-md text-xs font-semibold ${tone}`}
     >
-      {icon === 'alipay' ? '支' : icon === 'wechat' ? '微' : '沙'}
+      {icon === 'alipay'
+        ? '支'
+        : icon === 'wechat'
+          ? '微'
+          : icon === 'paypal'
+            ? 'P'
+            : icon === 'stripe'
+              ? 'S'
+              : icon === 'epay'
+                ? '易'
+                : icon === 'zpay'
+                  ? 'Z'
+                  : '沙'}
     </span>
   );
 }
@@ -61,7 +81,6 @@ interface ConfigDraft {
   closeAfterMinutes: number;
   /** 字段名 → 输入值 */
   values: Record<string, string>;
-  reason: string;
 }
 
 /** 打开抽屉时的初始草稿：非密字段回填，密字段留空（空 = 沿用旧值） */
@@ -75,7 +94,6 @@ function toDraft(provider: AdminPaymentProviderView): ConfigDraft {
     enabled: provider.enabled,
     closeAfterMinutes: provider.closeAfterMinutes,
     values,
-    reason: '',
   };
 }
 
@@ -240,7 +258,6 @@ export function PaymentsProvidersTab({ refreshNonce }: { refreshNonce: number })
                 enabled: draft.enabled,
                 closeAfterMinutes: draft.closeAfterMinutes,
                 values: draft.values,
-                reason: draft.reason.trim(),
               });
               toast.success(
                 result.unchanged ? '配置未变化，未新增版本' : '已保存为新配置版本',
@@ -292,7 +309,6 @@ function ProviderConfigDrawer({
   const submitDisabled =
     !writable ||
     saving ||
-    draft.reason.trim().length < 2 ||
     draft.closeAfterMinutes < 5 ||
     draft.closeAfterMinutes > 1440;
 
@@ -435,19 +451,6 @@ function ProviderConfigDrawer({
           </div>
         )}
 
-        <FormField
-          label="变更原因"
-          required
-          hint="保存渠道配置是高危动作，原因会写入操作审计。"
-        >
-          <TextAreaField
-            value={draft.reason}
-            onChange={(value) => onDraftChange({ ...draft, reason: value })}
-            maxLength={200}
-            placeholder="例如：更换支付宝应用私钥"
-            disabled={!writable}
-          />
-        </FormField>
       </div>
     </Drawer>
   );

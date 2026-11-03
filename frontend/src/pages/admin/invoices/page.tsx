@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
+import { STATUS_OPTIONS, KIND_LABELS, STATUS_LABELS } from './constants';
+import { yuan } from './utils';
 import { useAdmin, useToast, useAdminList, useAdminUrlFilterSync } from './hooks';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Download } from 'lucide-react';
 import { adminInvoicesApi } from '../../../lib/api';
-
 
 import { ActionButton, AdminDataTable, AppliedFilters, ClearableField, ConfirmAction, FilterActions, FilterBar, PageHeader, Panel, SelectField, StatusTag, StaleError, TextField, type AdminColumn, type AppliedFilter } from './components';
 import { adminOrderDetailHref, adminUserHref } from '../../../lib/admin-links';
@@ -21,27 +22,6 @@ import type { AdminInvoice, InvoiceStatus } from '../../../types/api';
  * 3. **金额是快照** —— 展示的是申请时算出的 `paidCents - refundedCents`,
  *    不随后续退款变化。运营若要冲红, 必须走线下流程, 这一页不提供。
  */
-
-const STATUS_OPTIONS: Array<{ value: InvoiceStatus; label: string }> = [
-  { value: 'pending', label: '待开具' },
-  { value: 'issued', label: '已开具' },
-  { value: 'rejected', label: '已驳回' },
-];
-
-const KIND_LABELS: Record<string, string> = {
-  personal: '个人',
-  company: '企业',
-};
-
-const STATUS_LABELS: Record<string, string> = {
-  pending: '待开具',
-  issued: '已开具',
-  rejected: '已驳回',
-};
-
-function yuan(cents: number): string {
-  return (cents / 100).toFixed(2);
-}
 
 export function AdminInvoicesPage() {
   const toast = useToast();

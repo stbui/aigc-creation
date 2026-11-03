@@ -41,7 +41,7 @@ import { formatShanghai } from '../../payments/payment-query';
  *
  * 权限口径：
  *   · 读取  `payment.read`
- *   · 保存渠道配置 `payment.write`（高危，必须带 reason）
+ *   · 保存渠道配置 `payment.write`（高危，写审计）
  *   · 商品编辑 `product.write`
  */
 @Controller('admin/payments')

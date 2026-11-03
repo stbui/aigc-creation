@@ -90,7 +90,7 @@ async function main() {
     const stale = await call('GET', '/admin/channels?limit=100', token);
     for (const row of stale.data?.channels ?? []) {
       if (!/^验收(渠道|导入)-/.test(String(row.name ?? ''))) continue;
-      await call('DELETE', `/admin/channels/${row.id}`, token, { reason: '清理上一轮验收数据' });
+      await call('DELETE', `/admin/channels/${row.id}`, token);
     }
 
     /* ── 1. 创建渠道 ──────────────────────────────────── */
@@ -251,26 +251,16 @@ async function main() {
 
     /* ── 8. 删除与占用校验 ─────────────────────────────── */
     /*
-     * 删除是高危写（`channel.write` / `channel.model_write`）：空原因必须被拒。
-     * 放行会让审计只能记下一条 `reason=null` 的删除 —— 「谁为什么删」永久丢失，
-     * 且事后无法与误操作区分。拒收后下面两条成功的删除仍然成立，反证前两次没删掉东西。
+     * 渠道删除是业务操作：前端保留影响确认，但不要求原因；后端审计仍记录操作人、
+     * 动作与结果。渠道模型删除同样保留业务确认，但不要求填写原因。
      */
-    const noReasonDelete = await call('DELETE', `/admin/channels/${duplicateId}`, token, { reason: '' });
-    ok('删除渠道：缺少变更原因被拒绝', noReasonDelete.code === 40001, noReasonDelete);
-    const noReasonBatchDelete = await call('POST', `/admin/channels/${duplicateId}/models/batch-delete`, token, {
-      ids: duplicateModelList.map((item: any) => item.id),
-      reason: '',
-    });
-    ok('批量删除模型：缺少变更原因被拒绝', noReasonBatchDelete.code === 40001, noReasonBatchDelete);
-
     const batchDeleted = await call('POST', `/admin/channels/${duplicateId}/models/batch-delete`, token, {
       ids: duplicateModelList.map((item: any) => item.id),
-      reason: '验收脚本删除模型',
     });
     ok('批量删除渠道模型', batchDeleted.code === 0 && batchDeleted.data?.deleted === 1, batchDeleted);
 
-    const removed = await call('DELETE', `/admin/channels/${duplicateId}`, token, { reason: '验收脚本删除渠道' });
-    ok('删除渠道', removed.code === 0, removed);
+    const removed = await call('DELETE', `/admin/channels/${duplicateId}`, token);
+    ok('删除渠道无需填写原因', removed.code === 0, removed);
     const afterRemove = await call('GET', `/admin/channels/${duplicateId}`, token);
     ok('删除后渠道不可见', afterRemove.status === 404 || afterRemove.code === 40400, afterRemove);
 
@@ -453,8 +443,8 @@ async function main() {
       legacyDuplicateRow?.modelsJson === JSON.stringify(['legacy-a', 'legacy-b']),
       legacyDuplicateRow?.modelsJson,
     );
-    await call('DELETE', `/admin/channels/${legacyDuplicateId}`, token, { reason: '验收清理旧清单副本' });
-    await call('DELETE', `/admin/channels/${legacyId}`, token, { reason: '验收清理旧清单渠道' });
+    await call('DELETE', `/admin/channels/${legacyDuplicateId}`, token);
+    await call('DELETE', `/admin/channels/${legacyId}`, token);
 
     /* 供人工核对：保留主渠道，便于在后台页面查看配置结果 */
     console.log(`\n验收渠道已保留：${channelName}（id=${channelId}，模型 id=${modelId}，排序 ${JSON.stringify(orderIds)}）`);

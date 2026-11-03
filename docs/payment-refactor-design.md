@@ -713,7 +713,7 @@ model PaymentReconciliationItem {
 不可逆操作：
 
 - 关闭订单：页面内 `ConfirmAction`，必须写明「先查单，已支付则入账，否则关单；不会退款」。
-- 保存渠道配置：高危权限，提交时要求操作原因（沿用 `HIGH_RISK_PERMISSIONS` 的 reason 机制）。
+- 保存渠道配置：高危权限，写审计日志，但不要求填写操作原因。
 - 对账补发：由系统执行，不在页面直接提供「补发」按钮；人工处理走订单流程。
 
 ---
@@ -1937,7 +1937,7 @@ financeReconcile: 'finance.reconcile' // 已存在：执行对账/兜底导入
 | 财务 | ✅ | ❌（避免财务同时改收款通道与做账） | ✅ | ✅ |
 | 运营 | 默认 ❌（如业务确需排障，单独在角色页授予 `payment.read`） | ❌ | ❌ | ❌ |
 
-`payment.write` 加入 `HIGH_RISK_PERMISSIONS`，保存时必须带 `reason` 并写 `AdminAuditLog`。`payment.operate` 不是高危：它只推进渠道已经发生的事实，不能凭空造钱；但每次仍写普通审计。
+`payment.write` 加入 `HIGH_RISK_PERMISSIONS`，保存渠道配置仍写 `AdminAuditLog`，但不要求填写 `reason`；同权限下的站点设置接口仍要求原因。`payment.operate` 不是高危：它只推进渠道已经发生的事实，不能凭空造钱；但每次仍写普通审计。
 
 `seed:roles` 会用代码中的 `ROLE_PERMISSIONS` 覆盖内置角色权限（见 `backend/scripts/seed-roles.ts`）。生产若已在角色页手工调过权限，先导出/核对再执行，避免覆盖自定义授权。
 
@@ -2119,7 +2119,7 @@ interface AdminPaymentProviderView {
 
 #### `PUT /admin/payments/providers/:providerId/config`
 
-权限 `payment.write`，高危操作，必须带 `reason`。请求体见 §18.5。响应：
+权限 `payment.write`，高危操作，写审计但不要求填写原因。请求体见 §18.5。响应：
 
 ```json
 { "provider": { "id": "alipay", "version": 4, "configured": true }, "unchanged": false }
@@ -2574,7 +2574,7 @@ URL 同步：
 - `field.secret`：输入框 `type=password`，placeholder `已配置，留空沿用`；不把密文回显到 DOM。
 - `field.identity` 且在 `identityLockedFields` 中：禁用输入并说明「已有订单绑定，不能修改」。
 - 表单值只提交当前填写的字段；secret 空串交给后端沿用旧值。
-- 保存是高危操作，抽屉底部增加「变更原因」`TextArea`，长度 2–200；提交成功后关闭并刷新列表。
+- 保存成功后关闭并刷新列表；不要求填写变更原因。
 - 前端校验只做必填/长度；配置字段语义仍以后端 `validateConfig()` 为准。
 
 ### 21.4 `PaymentsProductsTab.tsx`
@@ -2878,7 +2878,7 @@ const AdminPaymentsPage = lazyAdminPage(
 | 能力 | 前端条件 | 无权限表现 |
 | --- | --- | --- |
 | 查看页面 | `payment.read` | 导航不显示；直接访问由后端 403，页面显示无权限态 |
-| 保存渠道配置 | `payment.write` | 「配置」按钮仍可查看，保存按钮/原因输入隐藏 |
+| 保存渠道配置 | `payment.write` | 「配置」按钮仍可查看，保存按钮隐藏 |
 | 查单/关单 | `payment.operate` | 行操作只留「详情」 |
 | 商品编辑 | `product.write` | 隐藏新增/编辑，保留只读列表 |
 | 执行对账/导入 | `finance.reconcile` | 执行区禁用并说明原因 |
@@ -3406,7 +3406,7 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 | 通知条 | 「平台不提供支付退款」 | 改为「退款请到订单管理」 | 有意偏差 E1 |
 | 标签 | 支付渠道 / 充值商品 / 支付订单 / 支付对账，默认渠道 | 同顺序同默认；`tab` 写 URL | 一致 + 增强 |
 | 渠道表 | 渠道图标/名称/id、支付方式、状态+插件副行、关闭分钟、版本、配置 | 同列；去掉插件副行，保留「配置/缺项」副行；空态「没有发现支付渠道」 | 偏差 E2 |
-| 渠道抽屉 | 620 宽、启用、关闭分钟、动态字段、保存新版本 | 同宽同字段；新增变更原因；secret 留空沿用 | 一致 + 安全增强 |
+| 渠道抽屉 | 620 宽、启用、关闭分钟、动态字段、保存新版本 | 同宽同字段；secret 留空沿用 | 一致 + 安全增强 |
 | 商品工具栏 | 默认充值货币、新增商品 | 同；切换货币前 ConfirmAction | 一致 |
 | 商品列 | 商品/说明、售价、权益、排序、上架策略、状态、操作 | 同列；权益用整数积分并附有效期；发放方式只在编辑抽屉中设置 | 偏差 E3 |
 | 商品空态 | 「还没有充值商品」 | 同文案 | 一致 |
@@ -3438,7 +3438,7 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 | E7 | 点用户跳 `/admin/users?id=`，不内嵌用户抽屉 | 用户详情抽屉目前内嵌在 `AdminUsersPage`，未抽成可复用组件；不为一个入口做跨页重构 | 多一次跳转 |
 | E8 | 订单详情增加 payments 历史、配置版本、失败原因 | 参考页缺少排障信息；本仓库有这些数据 | 详情更完整 |
 | E9 | 对账执行渠道只列 configured + supportsReconciliation | 参考页仍列出未配置项并置灰（不可选）；本方案直接不列，减少误操作。空列表要说明「没有可对账的渠道」 | 空列表需说明 |
-| E10 | 对账/关单/配置变更收集原因 | 本仓库高危操作要求审计原因 | 多一步确认 |
+| E10 | 对账/关单收集原因，配置变更不收集 | 对账/关单需要业务依据；渠道配置保存仍写审计，但不增加操作门槛 | 部分操作多一步确认 |
 | E11 | 订单筛选新增「重置」 | 参考页只能逐项清空 | 纯增强 |
 | E12 | 分页选项补 30 | 参考页 pageSize=30 但选项是 20/50/100，下拉值不在选项里 | 修正参考页缺陷 |
 

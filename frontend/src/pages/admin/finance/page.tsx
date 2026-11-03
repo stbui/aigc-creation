@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { defaultRange, isoDate } from './utils';
 import { useAdminResource } from './hooks';
 import { adminAnalyticsApi } from '../../../lib/api';
 import { ActionButton, AdminDataTable, FilterActions, FilterBar, PageHeader, Panel, StatCard, TextField, type AdminColumn } from './components';
@@ -15,17 +16,6 @@ import type { FinanceAnalyticsView, FinanceBreakdownRow, FinanceDayRow } from '.
  * 预留 / 运行 / 待核对单列为「挂账」，**不计入实收** —— 把不确定的钱算成收入
  * 是财务页最不能犯的错，页面上宁可多一列也不合并。
  */
-
-/** 默认区间：最近 30 天（与后端默认一致，避免首屏与刷新后口径不同） */
-function defaultRange(): { from: string; to: string } {
-  const today = new Date();
-  const start = new Date(today.getTime() - 29 * 24 * 60 * 60 * 1000);
-  return { from: isoDate(start), to: isoDate(today) };
-}
-
-function isoDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
 
 export function AdminFinancePage() {
   const initial = defaultRange();

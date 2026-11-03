@@ -205,9 +205,11 @@ export class AdminPaymentsService {
     );
 
     const actionable = row.status === 'created' || row.status === 'pending' || row.status === 'create_failed' || row.status === 'closing';
+    const providerRef = order.payments.find((p) => p.status === 'succeeded')?.providerRef ?? null;
     return {
       order: {
         ...row,
+        providerRef,
         rawOrderStatus: order.status,
         items: order.items.map((i) => ({
           id: i.id,
@@ -222,6 +224,7 @@ export class AdminPaymentsService {
           status: p.status,
           providerId: p.channel,
           providerConfigVersion: p.providerConfigVersion,
+          providerRef: p.providerRef,
           payTransactionId: p.payTransactionId,
           amountCents: p.amountCents,
           createdAt: p.createdAt.toISOString(),

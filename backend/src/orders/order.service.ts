@@ -572,6 +572,8 @@ export class OrderService {
     sandboxScenario?: string;
     /** 渠道原始回调报文 (真实通道; 沙箱为空)。只落库, 不进接口响应 */
     rawPayload?: string;
+    /** 渠道侧下单单据 id（PayPal order id / Stripe Checkout Session id 等） */
+    providerRef?: string | null;
   }) {
     // 1) 交易号已存在 = 重复回调
     const dupPayment = await this.prisma.payment.findUnique({
@@ -639,6 +641,7 @@ export class OrderService {
       closedAt: null,
       sandboxScenario: params.sandboxScenario ?? null,
       rawPayload: params.rawPayload ?? '',
+      ...(params.providerRef ? { providerRef: params.providerRef } : {}),
     };
 
     try {
@@ -1118,6 +1121,8 @@ export class OrderService {
         // 微信 v3 要求同时给「原订单总额」; 历史订单 amountCents 为 0 时回落实付
         totalCents: payment.amountCents > 0 ? payment.amountCents : claim.paidBase,
         reason,
+        providerRef: payment.providerRef ?? undefined,
+        providerTradeNo: payment.payTransactionId ?? undefined,
       });
     }
 

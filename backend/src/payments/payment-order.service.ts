@@ -29,6 +29,10 @@ interface AttemptContext {
   /** 对应 Payment 行；历史单可能没有，为 null */
   paymentId: string | null;
   providerId: PaymentProviderId;
+  /** 渠道侧下单返回的单据 id（PayPal order id / Stripe Checkout Session id 等） */
+  providerRef?: string;
+  /** 渠道侧支付流水号（PayPal capture id / Stripe PaymentIntent id 等） */
+  providerTradeNo?: string;
   config: PaymentContext;
   adapter: PaymentAdapter;
 }
@@ -69,6 +73,7 @@ export interface PaymentOrderView {
     id: string;
     status: string;
     providerId: string;
+    providerRef: string | null;
     providerTradeNo: string | null;
     amountCents: number;
     createdAt: string;
@@ -104,9 +109,16 @@ export class PaymentOrderService {
    * 每个渠道可以指向自己的公网入口，不必重启改环境变量。
    */
   notifyUrl(providerId: PaymentProviderId, configId: string, publicBaseUrl?: string): string {
+    const configuredBase = publicBaseUrl?.trim() || process.env.PAYMENT_NOTIFY_BASE?.trim();
+    if (providerId !== 'sandbox' && !configuredBase) {
+      throw new AppError(
+        50301,
+        '真实支付渠道缺少回调公网地址，请配置渠道 publicBaseUrl 或 PAYMENT_NOTIFY_BASE',
+        503,
+      );
+    }
     const base = (
-      publicBaseUrl?.trim() ||
-      process.env.PAYMENT_NOTIFY_BASE ||
+      configuredBase ||
       `http://${process.env.HOST || '127.0.0.1'}:${process.env.PORT || 4100}`
     ).replace(/\/$/, '');
     return `${base}/api/v1/payments/callback/${providerId}/${configId}`;
@@ -118,6 +130,7 @@ export class PaymentOrderService {
     orderId: string;
     userId: string;
     providerId?: string;
+    clientIp?: string;
   }): Promise<PaymentIntentView> {
     const order = await this.prisma.order.findUnique({
       where: { id: input.orderId },
@@ -228,8 +241,9 @@ export class PaymentOrderService {
         amountCents: order.paidCents,
         currency,
         subject: `货觉AI 订单 ${order.orderNo}`,
-        returnUrl: `${this.webBase()}/orders`,
+        returnUrl: this.checkoutReturnUrl(order),
         notifyUrl: this.notifyUrl(config.providerId, config.id, config.values.publicBaseUrl),
+        clientIp: input.clientIp,
         expiresAt,
       });
     } catch (e) {
@@ -247,6 +261,14 @@ export class PaymentOrderService {
     }
 
     const checkoutValue = checkout.payUrl ?? checkout.codeUrl ?? '';
+
+    // 先落渠道单据 id：即使随后订单状态已变化，也能定位并关闭本次渠道订单。
+    if (checkout.providerRef) {
+      await this.prisma.payment.updateMany({
+        where: { id: payment.id, status: 'pending' },
+        data: { providerRef: checkout.providerRef },
+      });
+    }
 
     /*
      * 条件更新只在订单仍 pending 时写入。
@@ -270,7 +292,11 @@ export class PaymentOrderService {
     if (updated.count === 0) {
       // 订单状态已变化：把刚创建的渠道订单关掉，避免用户再付一次
       try {
-        await adapter.closeOrder({ config: context, orderNo: order.orderNo });
+        await adapter.closeOrder({
+          config: context,
+          orderNo: order.orderNo,
+          providerRef: checkout.providerRef,
+        });
       } catch (e) {
         this.logger.warn(
           `订单状态已变化，关闭新渠道订单失败 (${providerId}): ${(e as Error).message}`,
@@ -312,12 +338,21 @@ export class PaymentOrderService {
 
   // ── 查单 ────────────────────────────────────────────────────────
 
-  async query(input: { orderId: string; actor: PaymentActor }): Promise<PaymentOrderView> {
+  async query(input: {
+    orderId: string;
+    actor: PaymentActor;
+    /** 用户主动点「刷新支付状态」时绕过 2 秒节流，轮询仍使用节流 */
+    force?: boolean;
+  }): Promise<PaymentOrderView> {
     const order = await this.loadOrder(input.orderId, input.actor);
 
     if (order.status !== 'pending') return this.view(order);
     if (!order.providerConfigId && !order.checkoutMode) return this.view(order);
-    if (order.lastQueriedAt && Date.now() - order.lastQueriedAt.getTime() < QUERY_THROTTLE_MS) {
+    if (
+      !input.force &&
+      order.lastQueriedAt &&
+      Date.now() - order.lastQueriedAt.getTime() < QUERY_THROTTLE_MS
+    ) {
       return this.view(order);
     }
 
@@ -348,7 +383,8 @@ export class PaymentOrderService {
         result = await attempt.adapter.queryOrder({
           config: attempt.config,
           orderNo: order.orderNo,
-          providerTradeNo: order.providerTradeNo ?? undefined,
+          providerRef: attempt.providerRef,
+          providerTradeNo: attempt.providerTradeNo,
         });
       } catch (e) {
         // 查询失败不改变本地状态，只写 lastError 供排障
@@ -371,6 +407,7 @@ export class PaymentOrderService {
             paidAt: result.paidAt ?? new Date(),
             providerStatus: result.providerStatus,
             rawPayload: result.rawPayload,
+            providerRef: attempt.providerRef,
           });
         } catch (e) {
           // 金额/币种/状态不符时保留 pending，交给对账/人工处理，不能静默吞掉
@@ -446,7 +483,8 @@ export class PaymentOrderService {
       const queryInput = {
         config: attempt.config,
         orderNo: order.orderNo,
-        providerTradeNo: order.providerTradeNo ?? undefined,
+        providerRef: attempt.providerRef,
+        providerTradeNo: attempt.providerTradeNo,
       };
 
       let queried: ProviderPaymentResult;
@@ -547,6 +585,8 @@ export class PaymentOrderService {
     paidAt: Date;
     providerStatus?: string;
     rawPayload: string;
+    /** 渠道侧下单单据 id；由已知的支付尝试或回调报文带入 */
+    providerRef?: string;
     /** 调用方已定位到的支付尝试；不传则按渠道取最新 pending */
     paymentId?: string;
   }): Promise<{ applied: boolean; idempotentHit: boolean }> {
@@ -589,6 +629,7 @@ export class PaymentOrderService {
       paymentId,
       amountCents: input.amountCents,
       rawPayload: input.rawPayload,
+      providerRef: input.providerRef,
     });
 
     return { applied: !result.idempotentHit, idempotentHit: result.idempotentHit };
@@ -596,19 +637,34 @@ export class PaymentOrderService {
 
   // ── 视图 ────────────────────────────────────────────────────────
 
-  /** 列出该订单所有可能的渠道尝试（按渠道 + 配置版本去重）。 */
+  /** 列出该订单所有可能的渠道尝试。渠道单据 id 不同的尝试不能合并。 */
   private async attemptContexts(order: {
     channel: string;
     providerConfigId: string | null;
     checkoutMode: string | null;
-    payments: Array<{ id: string; channel: string; providerConfigId: string | null }>;
+    payments: Array<{
+      id: string;
+      channel: string;
+      status: string;
+      providerConfigId: string | null;
+      providerRef: string | null;
+      payTransactionId: string | null;
+    }>;
   }): Promise<AttemptContext[]> {
     const contexts: AttemptContext[] = [];
     const seen = new Set<string>();
 
     for (const payment of order.payments) {
       if (!payment.channel || payment.channel === 'free') continue;
-      const key = `${payment.channel}:${payment.providerConfigId ?? 'latest'}`;
+      /*
+       * PayPal/Stripe 每次 intent 都有独立单据 id，必须逐条核对；只按渠道 + 配置
+       * 去重会漏掉更早的 Session。无 providerRef 的 pending 单也不能合并。
+       * 只有历史/支付宝/微信这类按商户订单号查询的已结束尝试可按渠道去重。
+       */
+      const key =
+        payment.providerRef || payment.status === 'pending' || !payment.payTransactionId
+          ? `${payment.channel}:${payment.providerConfigId ?? 'latest'}:${payment.providerRef ?? payment.id}`
+          : `${payment.channel}:${payment.providerConfigId ?? 'latest'}:order`;
       if (seen.has(key)) continue;
       seen.add(key);
 
@@ -624,6 +680,8 @@ export class PaymentOrderService {
       contexts.push({
         paymentId: payment.id,
         providerId: config.providerId,
+        providerRef: payment.providerRef ?? undefined,
+        providerTradeNo: payment.payTransactionId ?? undefined,
         config: {
           providerId: config.providerId,
           configId: config.id,
@@ -645,6 +703,8 @@ export class PaymentOrderService {
       contexts.push({
         paymentId: null,
         providerId: config.providerId,
+        providerRef: undefined,
+        providerTradeNo: undefined,
         config: {
           providerId: config.providerId,
           configId: config.id,
@@ -687,6 +747,7 @@ export class PaymentOrderService {
         paidAt: result.paidAt ?? new Date(),
         providerStatus: result.providerStatus,
         rawPayload: result.rawPayload,
+        providerRef: attempt.providerRef,
       });
     } catch (e) {
       await this.releaseCloseLease(order.id, `渠道已支付但入账失败: ${(e as Error).message}`);
@@ -780,6 +841,7 @@ export class PaymentOrderService {
       id: string;
       status: string;
       channel: string;
+      providerRef: string | null;
       payTransactionId: string | null;
       amountCents: number;
       createdAt: Date;
@@ -812,6 +874,7 @@ export class PaymentOrderService {
         id: p.id,
         status: p.status,
         providerId: p.channel,
+        providerRef: p.providerRef,
         providerTradeNo: p.payTransactionId,
         amountCents: p.amountCents,
         createdAt: p.createdAt.toISOString(),
@@ -821,6 +884,26 @@ export class PaymentOrderService {
 
   private webBase(): string {
     return (process.env.WEB_BASE_URL || 'http://localhost:5100').replace(/\/$/, '');
+  }
+
+  /**
+   * 渠道收银台完成后的返回地址。
+   *
+   * 必须回到“这张订单”的结算页，而不是订单列表：前端据此主动查单，
+   * 支付宝同步跳回时即使异步通知尚未到达，也能立即向渠道核实并展示结果。
+   */
+  private checkoutReturnUrl(order: {
+    id: string;
+    membershipPlanId?: string | null;
+    items?: Array<{ skuSnapshot: string }>;
+  }): string {
+    const query = new URLSearchParams({ orderId: order.id, paymentReturn: '1' });
+    const sku = order.items?.[0]?.skuSnapshot;
+    if (sku) return `${this.webBase()}/checkout/${encodeURIComponent(sku)}?${query.toString()}`;
+    if (order.membershipPlanId) {
+      return `${this.webBase()}/checkout/membership?${query.toString()}`;
+    }
+    return `${this.webBase()}/orders?${query.toString()}`;
   }
 }
 

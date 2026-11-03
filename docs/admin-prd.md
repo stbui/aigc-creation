@@ -91,7 +91,7 @@
 | 每次查库 | 权限校验实时读库，不信 token 内的 role（JWT TTL 7 天，只信 token 会导致降权后旧凭证仍可用） |
 | 禁止提权 | 只有 `admin` 能授予 `admin`（否则 403 `40301`）；不能变更自己的角色（400 `40001`） |
 | 最后一个 admin | 禁用与降级前统计启用中的 admin 数，`≤1` 返回 409 `40901` |
-| 高危动作 | `order.refund` `user.delete` `user.reset_password` `credit.adjust` `setting.write` `role.write` `channel.write` `channel.model_write` `logical_model.write` `billing_order.resolve` `capability.write` 二次确认 + 填原因 + 写审计 |
+| 高危动作 | `order.refund` `user.delete` `user.reset_password` `credit.adjust` `setting.write` `role.write` `channel.write` `channel.model_write` `logical_model.write` `billing_order.resolve` `capability.write` 写审计；业务影响确认与原因填写按动作语义执行，删除渠道 / 渠道模型不要求原因 |
 | 审计不可删 | 审计记录只读，无删除接口 |
 
 ### 2.4 管理员账号

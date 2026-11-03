@@ -104,7 +104,7 @@
 | 孤儿权限点 | 权限点从清单移除后，角色里残留的值 `getPermissions()` 读取时过滤，比对不上即等同无权；过滤只在内存生效，不回写库（回写属管理动作，由角色页显式保存完成） |
 | 防提权 | 只有 `admin` 能授予 `admin`，否则 403 `40301`；不能变更自己的角色，否则 400 `40001` |
 | 最后一个 admin | 禁用与降级前统计 `status='active'` 的 admin 数，`≤1` 时返回 409 `40901` |
-| 高危动作留痕 | `HIGH_RISK_PERMISSIONS` 内的动作必须填写操作原因，写 `AdminAuditLog.reason`，前端强制二次确认 |
+| 高危动作留痕 | 写操作必须留痕；要求原因的动作由 DTO 校验并写 `AdminAuditLog.reason`，前端只对业务操作做二次确认。渠道删除保留业务确认，但不要求填写原因 |
 
 高危权限点：`user.delete` / `user.reset_password` / `asset.delete` / `project.delete` / `order.refund` / `credit.adjust` / `compliance.takedown` / `capability.write` / `channel.write` / `channel.model_write` / `logical_model.write` / `user_group.write` / `plugin.write` / `billing_order.resolve` / `setting.write` / `legal.write` / `role.write` / `backup.run`。审计链路：`AdminGuard`（身份）→ `PermissionGuard`（权限点）→ controller → `AuditInterceptor`（落库）。
 
@@ -117,7 +117,7 @@
 | 工单 | C 端 `/tickets` + 后台工单中心 | 状态机只在 `tickets.service.ts` 的 `TRANSITIONS` 定义；越权一律 404；客服回复即受理并自动认领 |
 | 站内消息 | `notifications`（`@Global()`） | `notify()` 永不抛异常；模板缺失回落内置文案；已接支付成功、任务失败退款、会员到期、工单回复四类事件 |
 | 法务文档 | `legal` | 四类固定 slug（`user-agreement` / `privacy-policy` / `minors-policy` / `account-rules`），按 `(slug, version)` 版本化，已发布版本不可原地覆盖，升版本才可改文本 |
-| 操作审计 | `AdminAuditLog` + `AuditInterceptor` | 高危动作带原因；AI 标识、能力上下线、渠道 / 前台模型 / 价格写入、账单处置均落审计 |
+| 操作审计 | `AdminAuditLog` + `AuditInterceptor` | 写操作留审计；需要业务原因的动作带原因；AI 标识、能力上下线、渠道 / 前台模型 / 价格写入、账单处置均落审计 |
 
 **与订单的边界**：工单是沟通与记录通道，退款等财务动作一律跳转到订单模块执行，避免两处都能改钱。
 
@@ -188,7 +188,7 @@ SQLite provider 不支持 Prisma enum，`kind` / `status` / `type` 一律 String
 | 侧栏 | 分组折叠菜单，图标 lucide 20px，选中态 `var(--brand)` + `var(--brand-bg)`；数据源 `adminNav.ts` |
 | 列表页 | 页头（标题 + 主操作）→ 筛选条 → 表格 → 分页；`rowKey="id"`、`size="small"` |
 | 详情 | 一律抽屉，不跳独立路由，便于保留筛选态 |
-| 危险操作 | `ConfirmAction`（Modal + Alert + 输入确认词），写明影响条数；财务类与高危权限点必须填原因 |
+| 危险操作 | `ConfirmAction`（页面内确认条），写明影响条数；财务类及确有业务依据要求的动作必须填原因，删除渠道 / 渠道模型不要求原因 |
 | 空态 / 加载 | 空态给真实说明；列表 loading 与失败态走 `Skeleton` / `Result` |
 | 颜色 | 只用 `global.css` 已有 token，禁裸 hex |
 | 数字 | 金额内部存分、展示 `¥` 两位小数；积分整数千分位 |

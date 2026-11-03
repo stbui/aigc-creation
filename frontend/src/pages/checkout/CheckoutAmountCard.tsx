@@ -25,12 +25,15 @@ export function CheckoutAmountCard({
   couponDiscountCents,
   qrDataUrl,
   paying,
+  refreshingPayment,
   error,
+  paymentStatusNotice,
   payBlockedReason,
   onlineIntent,
   onPayOnline,
   onCancelQr,
   onSandboxPay,
+  onRefreshPayment,
 }: {
   order: Order | null;
   plan: MembershipPlan | null;
@@ -46,13 +49,17 @@ export function CheckoutAmountCard({
   couponDiscountCents: number;
   qrDataUrl: string | null;
   paying: boolean;
+  refreshingPayment: boolean;
   error: string | null;
+  /** 主动查单后仍待支付时的中性提示，不伪装成错误 */
+  paymentStatusNotice: string | null;
   /** 非空表示当前订单不可支付（已支付 / 已取消 / 已过期） */
   payBlockedReason: string | null;
   onlineIntent: PaymentIntent | null;
   onPayOnline: () => void;
   onCancelQr: () => void;
   onSandboxPay: (scenario: 'success' | 'failed' | 'timeout') => void;
+  onRefreshPayment: () => void;
 }) {
   return (
     <aside className="co-side">
@@ -147,14 +154,36 @@ export function CheckoutAmountCard({
           <div className="co-qr">
             <img src={qrDataUrl} alt="支付二维码" width={210} height={210} />
             <p className="co-hint">请使用对应渠道扫码支付，完成后本页会自动刷新结果</p>
-            <button type="button" className="co-btn" onClick={onCancelQr}>
-              取消扫码
-            </button>
+            <div className="co-pay-secondary-actions">
+              <button
+                type="button"
+                className="co-btn is-primary"
+                disabled={refreshingPayment}
+                onClick={onRefreshPayment}
+              >
+                {refreshingPayment ? '查询中…' : '我已完成支付，刷新状态'}
+              </button>
+              <button type="button" className="co-btn" onClick={onCancelQr}>
+                取消扫码
+              </button>
+            </div>
           </div>
         ) : (
-          <button type="button" className="co-pay-btn" disabled={paying} onClick={onPayOnline}>
-            {paying ? '处理中…' : payAmount <= 0 ? '免费领取' : `确认支付 ${formatYuan(payAmount)}`}
-          </button>
+          <>
+            <button type="button" className="co-pay-btn" disabled={paying} onClick={onPayOnline}>
+              {paying ? '处理中…' : payAmount <= 0 ? '免费领取' : `确认支付 ${formatYuan(payAmount)}`}
+            </button>
+            {order && (
+              <button
+                type="button"
+                className="co-refresh-payment"
+                disabled={refreshingPayment || paying}
+                onClick={onRefreshPayment}
+              >
+                {refreshingPayment ? '正在向渠道查询…' : '我已完成支付，刷新状态'}
+              </button>
+            )}
+          </>
         )}
 
         {/*
@@ -192,6 +221,12 @@ export function CheckoutAmountCard({
         {error && (
           <p className="co-hint is-error" role="alert">
             {error}
+          </p>
+        )}
+
+        {paymentStatusNotice && !error && (
+          <p className="co-hint" role="status">
+            {paymentStatusNotice}
           </p>
         )}
 

@@ -225,6 +225,8 @@ Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不�
 
 `ConfirmAction` 曾经被误改成 `AlertDialog`，是违反产品决策的：高危动作不许弹阻塞层。
 
+**确认只属于业务动作，审计页面永远不弹确认。** 操作审计页只查询、展开和导出，导出也直接执行；审计只被动记录业务操作的动作、原因与结果，不能反过来要求用户确认审计本身。高危确认发生在其业务页面，原因由业务操作收集后写入审计。
+
 ### 3.7 指标卡
 
 `primitives/layout.StatCard`：`Card` 承载，最小高 92px。数值 22px / 600 / `tabular-nums` —— 等宽数字才能让一排卡片上的数字对齐成列。警示变体走 `border-warn-soft` / `border-danger-soft` 淡底。

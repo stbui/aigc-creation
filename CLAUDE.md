@@ -280,7 +280,7 @@ npm run e2e                 # Playwright
 
 34 个页面、8 个侧栏分组以 `adminNav.ts` 的 `ADMIN_MENU` 为准；页面功能、接口与交互见 `docs/admin-console-design.md` / `admin-detailed-design.md`。
 
-- 高危动作（删除 / 重置密码 / 退款 / 手动调整积分 / 渠道 / 前台模型写入 / 角色与系统设置写入 / 手动备份）须填原因并写审计（`HIGH_RISK_PERMISSIONS`）。
+- 高危动作一律写审计（`HIGH_RISK_PERMISSIONS`）；退款、手动调整积分、权限与系统设置、调价等确有业务依据要求的动作再要求填写原因。删除渠道 / 渠道模型只保留业务影响确认，不要求原因，审计仍记录操作人、动作与结果。
 - 批量动作：`ids ≤ 100`，`runBatch` 串行、**不包事务**，逐条返回结果；路由挂较弱读权限，处理器内再判动作权限。
 - CSV 统一走 `common/csv.ts`（BOM + RFC4180 + 公式注入前导 `'`）；前端 `downloadCsv()` 不走 JSON 信封。
 - **后台组件是一套 shadcn**（2026-11-02 推倒重建：旧组件套件 / kit / 转发层全部删除，无并存、无开关、无回滚）。

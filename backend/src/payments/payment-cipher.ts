@@ -66,6 +66,9 @@ export class PaymentCipher {
       this.key = decoded;
       return this.key;
     }
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('生产环境必须配置 PAYMENT_SECRET_KEY（base64 编码的 32 字节密钥）');
+    }
     this.key = this.loadOrCreateFileKey();
     return this.key;
   }

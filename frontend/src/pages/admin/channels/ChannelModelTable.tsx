@@ -335,7 +335,7 @@ export function ChannelModelTable({
               setPage(1);
             }}
             placeholder="搜索模型标识、显示名或上游键"
-            className="min-w-[220px]"
+            className="w-64"
           />
           <SelectField
             ariaLabel="模型能力"
@@ -348,6 +348,7 @@ export function ChannelModelTable({
             placeholder="全部能力"
             clearLabel="全部能力"
             allowClear
+            className="w-32"
           />
           <SelectField
             ariaLabel="模型状态"
@@ -360,6 +361,7 @@ export function ChannelModelTable({
             placeholder="全部状态"
             clearLabel="全部状态"
             allowClear
+            className="w-32"
           />
           <FilterActions>
             <ActionButton

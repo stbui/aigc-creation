@@ -2,9 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Check,
   Download,
+  Eye,
   FolderPlus,
   Loader2,
   RefreshCw,
+  Sparkles,
   Trash2,
   Upload,
 } from 'lucide-react';
@@ -22,6 +24,7 @@ import { useAuth } from '../context/AuthContext';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useProject } from '../hooks/useProject';
 import { ResultMedia, modalityOfFormat } from '../components/ResultMedia';
+import { ImageLightbox, type LightboxItem } from '../components/ImageLightbox';
 import { useCapabilities } from '../hooks/useCapabilities';
 import { StateError, StateSkeleton } from '../components/StateViews';
 import type { Asset, Project } from '../types/api';
@@ -113,6 +116,8 @@ export function LibraryPage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
+  /** 大图查看器下标；null = 关闭。只收录图片素材，视频继续使用原生播放器。 */
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   /*
    * 外部入口: 浏览器扩展保存后跳 `/asset-library?projectId=xxx`，直接落在
@@ -275,6 +280,39 @@ export function LibraryPage() {
     [items, activeGroup, groupOf],
   );
 
+  /** 与作品页同源：查看器只收录当前筛选/分组下的图片，支持左右键连续翻看。 */
+  const lightboxItems = useMemo<LightboxItem[]>(
+    () =>
+      shown
+        .filter((a) => modalityOfFormat(a.format) !== 'video')
+        .flatMap((a) => {
+          const url = assetSrc(a);
+          if (!url) return [];
+          return [{
+            id: a.id,
+            url,
+            alt: `${capabilityName(a.capability)} 素材`,
+            width: a.width ?? null,
+            height: a.height ?? null,
+            createdAt: a.createdAt,
+            meta: [
+              a.kind === 'generated' ? '生成图' : '原图',
+              a.sourceTitle?.trim() || null,
+              a.capability ? capabilityName(a.capability) : null,
+            ].filter((value): value is string => Boolean(value)),
+          }];
+        }),
+    [shown],
+  );
+
+  // 筛选/分组切换或删除素材后，当前下标可能已失效；收敛到最近一张，列表为空则关闭。
+  useEffect(() => {
+    setPreviewIndex((prev) => {
+      if (prev === null) return null;
+      return prev < lightboxItems.length ? prev : lightboxItems.length > 0 ? lightboxItems.length - 1 : null;
+    });
+  }, [lightboxItems.length]);
+
   /*
    * 上传前先自检。此前素材库只按 MIME 过滤, 于是把任意文件改名为 .png 就能
    * "上传成功" —— 卡片是破图、尺寸显示 —×—、体积 12288KB, 还提示
@@ -336,19 +374,21 @@ export function LibraryPage() {
     }
   };
 
+  const downloadAsset = (a: Asset) => {
+    const url = assetSrc(a);
+    if (!url) return;
+    const ext = (a.format || 'png').toLowerCase().replace(/^\./, '') || 'png';
+    const el = document.createElement('a');
+    el.href = url;
+    el.download = `asset-${a.id.slice(-6)}.${ext}`;
+    el.rel = 'noopener';
+    el.click();
+  };
+
   const downloadSelected = () => {
     const list = items.filter((a) => selected.includes(a.id));
     list.forEach((a, i) => {
-      const url = assetSrc(a);
-      if (!url) return;
-      const ext = (a.format || 'png').toLowerCase().replace(/^\./, '') || 'png';
-      window.setTimeout(() => {
-        const el = document.createElement('a');
-        el.href = url;
-        el.download = `asset-${a.id.slice(-6)}.${ext}`;
-        el.rel = 'noopener';
-        el.click();
-      }, i * 200);
+      window.setTimeout(() => downloadAsset(a), i * 200);
     });
     message.success(`已下载 ${list.length} 张素材`);
   };
@@ -521,20 +561,44 @@ export function LibraryPage() {
                */
               const previewUrl = isVideo ? url : assetThumbSrc(a, 640) ?? url;
               const isSel = selected.includes(a.id);
+              const previewAt = isVideo ? -1 : lightboxItems.findIndex((item) => item.id === a.id);
+              const openMedia = () => {
+                if (previewAt >= 0) {
+                  setPreviewIndex(previewAt);
+                  return;
+                }
+                if (url) window.open(url, '_blank', 'noopener');
+              };
               return (
                 <article
                   key={a.id}
                   className={`asset-library-card${isSel ? ' is-selected' : ''}`}
                 >
                   <div className="asset-library-cover">
-                    {previewUrl && (
+                    {previewUrl && (isVideo ? (
                       <ResultMedia
                         url={previewUrl}
-                        modality={modalityOfFormat(a.format)}
+                        modality="video"
                         alt={`${capabilityName(a.capability)} 素材`}
                         priority={index < 5}
+                        aigc={a.aigc}
                       />
-                    )}
+                    ) : (
+                      <button
+                        type="button"
+                        className="asset-library-cover-button"
+                        aria-label={`查看${capabilityName(a.capability)}素材大图`}
+                        title="点击查看大图"
+                        onClick={openMedia}
+                      >
+                        <ResultMedia
+                          url={previewUrl}
+                          modality="image"
+                          alt={`${capabilityName(a.capability)} 素材`}
+                          priority={index < 5}
+                        />
+                      </button>
+                    ))}
                     <button
                       type="button"
                       className={`asset-library-check${isSel ? ' on' : ''}`}
@@ -546,17 +610,23 @@ export function LibraryPage() {
                     <div className="asset-library-hover-actions">
                       <button
                         type="button"
-                        aria-label="在新标签页查看原图"
-                        onClick={() => url && window.open(url, '_blank', 'noopener')}
+                        aria-label={isVideo ? '在新标签页查看视频' : '查看大图'}
+                        title={isVideo ? '在新标签页查看视频' : '查看大图'}
+                        onClick={openMedia}
                       >
-                        <Download size={12} /> 查看
+                        <Eye size={12} /> 查看
+                      </button>
+                      <button
+                        type="button"
+                        aria-label="下载素材"
+                        title="下载素材"
+                        onClick={() => downloadAsset(a)}
+                      >
+                        <Download size={12} /> 下载
                       </button>
                       {a.kind === 'generated' && a.capability && (
-                        <button
-                          type="button"
-                          onClick={() => navigate(toolPath(a.capability as string))}
-                        >
-                          再做一张
+                        <button type="button" onClick={() => navigate(toolPath(a.capability as string))}>
+                          <Sparkles size={12} /> 再来一张
                         </button>
                       )}
                       <Popconfirm
@@ -595,6 +665,16 @@ export function LibraryPage() {
             </button>
           )}
         </>
+      )}
+
+      {previewIndex !== null && lightboxItems[previewIndex] && (
+        <ImageLightbox
+          items={lightboxItems}
+          index={previewIndex}
+          onIndexChange={setPreviewIndex}
+          onClose={() => setPreviewIndex(null)}
+          ariaLabel="素材预览"
+        />
       )}
       </div>
     </div>

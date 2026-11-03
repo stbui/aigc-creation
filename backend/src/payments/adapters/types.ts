@@ -10,8 +10,23 @@
  * 「渠道确认查无此单」。两者不可混用 —— 只有 `not_found` 才允许本地关单。
  */
 
-export type PaymentProviderId = 'sandbox' | 'alipay' | 'wechat';
-export const PAYMENT_PROVIDER_IDS: PaymentProviderId[] = ['sandbox', 'alipay', 'wechat'];
+export type PaymentProviderId =
+  | 'sandbox'
+  | 'alipay'
+  | 'wechat'
+  | 'paypal'
+  | 'stripe'
+  | 'epay'
+  | 'zpay';
+export const PAYMENT_PROVIDER_IDS: PaymentProviderId[] = [
+  'sandbox',
+  'alipay',
+  'wechat',
+  'paypal',
+  'stripe',
+  'epay',
+  'zpay',
+];
 
 export type PaymentCurrency = 'CNY' | 'USD';
 export const PAYMENT_CURRENCIES: PaymentCurrency[] = ['CNY', 'USD'];
@@ -59,6 +74,8 @@ export interface CreateOrderInput {
   subject: string;
   returnUrl: string;
   notifyUrl: string;
+  /** 服务端从 req.ip 提取的用户 IP；禁止使用前端自报值 */
+  clientIp?: string;
   expiresAt: Date;
 }
 
@@ -75,6 +92,8 @@ export interface QueryOrderInput {
   config: PaymentContext;
   orderNo: string;
   providerTradeNo?: string;
+  /** 渠道侧下单返回的单据 id（PayPal order id / Stripe Checkout Session id 等） */
+  providerRef?: string;
 }
 
 export interface CloseOrderInput extends QueryOrderInput {}
@@ -107,6 +126,8 @@ export type NotificationResult =
       eventId: string;
       merchantOrderNo: string;
       providerTradeNo: string;
+      /** 渠道侧下单单据 id（PayPal order id / Stripe Checkout Session id 等） */
+      providerRef?: string;
       amountCents: number;
       currency: PaymentCurrency;
       state: 'paid' | 'closed' | 'pending' | 'failed';
@@ -139,6 +160,10 @@ export interface RefundInput {
   amountCents: number;
   totalCents: number;
   reason?: string;
+  /** 渠道侧下单返回的单据 id；部分渠道退款必须先据此反查支付流水 */
+  providerRef?: string;
+  /** 渠道侧支付流水号（PayPal capture id / Stripe PaymentIntent id 等） */
+  providerTradeNo?: string;
 }
 
 export interface RefundResult {

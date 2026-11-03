@@ -90,6 +90,8 @@ export function CheckoutPage() {
    * 用户付了其中一张, 另一张还挂着, 后续可能被误认为欠款。
    */
   const resumeOrderId = search.get('orderId');
+  /** 渠道收银台回跳标记：本页会自动主动查一次，不等异步通知。 */
+  const paymentReturnRequested = search.get('paymentReturn') === '1';
 
   /**
    * 会员订阅结算 (`/checkout/membership?planId=...`)。
@@ -112,6 +114,8 @@ export function CheckoutPage() {
   /** 真实通道的预下单结果 (微信二维码 / 支付宝跳转) */
   const [onlineIntent, setOnlineIntent] = useState<PaymentIntent | null>(null);
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  const [refreshingPayment, setRefreshingPayment] = useState(false);
+  const [paymentStatusNotice, setPaymentStatusNotice] = useState<string | null>(null);
   /**
    * 可用支付渠道。
    *
@@ -139,12 +143,94 @@ export function CheckoutPage() {
    */
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
+  /**
+   * 渠道回跳后的自动查单只对同一订单执行一次。
+   *
+   * React StrictMode 会重复执行 mount effect；若没有守卫，一次回跳会向渠道
+   * 连发两次强制查单。用户手动刷新不受此限制，仍可随时再次查单。
+   */
+  const autoQueriedOrderRef = useRef<string | null>(null);
 
   /**
    * ⚠ 必须用 ref 而非 state: 重渲染会让 state 拿到新 key,
    * 而幂等的前提是「同一次下单的所有重试用同一个 key」。
    */
   const idemKeyRef = useRef<string>(newIdempotencyKey());
+
+  const stopPolling = useCallback(() => {
+    if (pollRef.current !== null) {
+      window.clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, []);
+
+  /** 渠道已确认到账：统一拉订单、刷新余额并切到结果页。 */
+  const completePaidOrder = useCallback(
+    async (orderId: string) => {
+      stopPolling();
+      const fresh = await ordersApi.detail(orderId);
+      setOrder(fresh);
+      setQrDataUrl(null);
+      setOnlineIntent(null);
+      setPaymentStatusNotice(null);
+      notifyCreditsChanged();
+      let balance: CreditBalance | null = null;
+      try {
+        balance = await creditsApi.balance();
+      } catch {
+        /* 余额回查失败不阻断结果展示 */
+      }
+      setResult({
+        kind: 'success',
+        title: '支付成功',
+        desc: fresh.grantedCredits > 0 ? `${fresh.grantedCredits} 积分已到账` : '权益已生效',
+        order: fresh,
+        balance,
+      });
+      setPhase('result');
+    },
+    [stopPolling],
+  );
+
+  /**
+   * 主动向渠道查单。
+   *
+   * `silent` 用于渠道同步跳回时自动确认；手动点击则会展示“尚未到账”等反馈。
+   * 后端 POST /query 会绕过轮询节流，因此用户刚回来就点也能真正请求渠道。
+   */
+  const refreshPaymentStatus = useCallback(
+    async (orderId: string, silent = false) => {
+      if (!silent) {
+        setError(null);
+        setPaymentStatusNotice(null);
+      }
+      setRefreshingPayment(true);
+      try {
+        const state = await paymentsApi.query(orderId);
+        if (state.status === 'paid') {
+          await completePaidOrder(orderId);
+          return;
+        }
+        if (state.status === 'cancelled' || state.status === 'refunded') {
+          stopPolling();
+          setQrDataUrl(null);
+          setOnlineIntent(null);
+          setError(`订单已${state.status === 'cancelled' ? '取消' : '退款'}，本次未完成支付。`);
+          return;
+        }
+        if (!silent) {
+          setPaymentStatusNotice('暂未查询到到账结果。若刚完成支付，请等待几秒后再次刷新。');
+        }
+      } catch (e) {
+        const message = (e as Error).message || '支付状态查询失败，请稍后重试';
+        setPaymentStatusNotice(silent ? `自动查单失败：${message}` : message);
+        if (!silent) setError(message);
+      } finally {
+        setRefreshingPayment(false);
+      }
+    },
+    [completePaidOrder, stopPolling],
+  );
 
   /*
    * 支付渠道是全局配置，不依赖具体商品；进入结算页就拉一次。
@@ -205,6 +291,11 @@ export function CheckoutPage() {
         .then(async (o) => {
           if (!alive) return;
           setOrder(o);
+          // 从渠道收银台返回时，异步通知可能尚未到达；立即主动查一次渠道。
+          if (token && paymentReturnRequested && autoQueriedOrderRef.current !== o.id) {
+            autoQueriedOrderRef.current = o.id;
+            void refreshPaymentStatus(o.id, true);
+          }
           // 会员单没有 OrderItem, 套餐信息在 order.membershipPlanId 上
           if (o.membershipPlanId) {
             await loadPlan(o.membershipPlanId);
@@ -277,7 +368,7 @@ export function CheckoutPage() {
     return () => {
       alive = false;
     };
-  }, [sku, resumeOrderId, isMembership, planId]);
+  }, [sku, resumeOrderId, isMembership, planId, token, refreshPaymentStatus, paymentReturnRequested]);
 
   /*
    * 券 / 活动试算。
@@ -349,13 +440,6 @@ export function CheckoutPage() {
     return created;
   }, [product, plan, order, couponCode]);
 
-  const stopPolling = useCallback(() => {
-    if (pollRef.current !== null) {
-      window.clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-  }, []);
-
   // 组件卸载时务必停掉轮询 —— 否则离开页面后仍在打接口, 且会在已卸载组件上 setState
   useEffect(() => stopPolling, [stopPolling]);
 
@@ -394,23 +478,7 @@ export function CheckoutPage() {
             return;
           }
           stopPolling();
-          const fresh = await ordersApi.detail(orderId);
-          setOrder(fresh);
-          notifyCreditsChanged();
-          let balance: CreditBalance | null = null;
-          try {
-            balance = await creditsApi.balance();
-          } catch {
-            /* 余额回查失败不阻断结果展示 */
-          }
-          setResult({
-            kind: 'success',
-            title: '支付成功',
-            desc: fresh.grantedCredits > 0 ? `${fresh.grantedCredits} 积分已到账` : '权益已生效',
-            order: fresh,
-            balance,
-          });
-          setPhase('result');
+          await completePaidOrder(orderId);
         } catch (e) {
           /*
            * 401/403 不是网络抖动：会话已失效或账号被禁用，继续轮询只会让
@@ -426,7 +494,7 @@ export function CheckoutPage() {
         }
       }, PAYMENT_POLL_INTERVAL_MS);
     },
-    [stopPolling],
+    [completePaidOrder, stopPolling],
   );
 
   /**
@@ -690,7 +758,9 @@ export function CheckoutPage() {
           couponDiscountCents={couponDiscount}
           qrDataUrl={qrDataUrl}
           paying={paying}
+          refreshingPayment={refreshingPayment}
           error={error}
+          paymentStatusNotice={paymentStatusNotice}
           payBlockedReason={payBlockedReason}
           onlineIntent={onlineIntent}
           onPayOnline={() => void payOnline()}
@@ -700,6 +770,7 @@ export function CheckoutPage() {
             setOnlineIntent(null);
           }}
           onSandboxPay={(scenario) => void pay(scenario)}
+          onRefreshPayment={() => void refreshPaymentStatus(order!.id)}
         />
       </div>
     </div>

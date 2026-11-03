@@ -382,7 +382,7 @@ export function AllChannelModelsPanel({
           value={keyword}
           onChange={(value) => updateFilter(() => setKeyword(value))}
           placeholder="搜索模型标识、显示名或渠道"
-          className="min-w-[220px]"
+          className="w-64"
         />
         <SelectField
           ariaLabel="模型能力"
@@ -392,6 +392,7 @@ export function AllChannelModelsPanel({
           placeholder="全部能力"
           clearLabel="全部能力"
           allowClear
+          className="w-32"
         />
         <SelectField
           ariaLabel="模型状态"
@@ -403,6 +404,7 @@ export function AllChannelModelsPanel({
           // 运营不用逐页记这一格叫「全部状态」还是「全部模型」。
           clearLabel="全部"
           allowClear
+          className="w-32"
         />
         <SelectField
           ariaLabel="所属渠道"
@@ -412,6 +414,7 @@ export function AllChannelModelsPanel({
           placeholder="全部渠道"
           clearLabel="全部渠道"
           allowClear
+          className="w-40"
         />
         <FilterActions>
           <span className="text-xs tabular-nums text-muted-foreground">

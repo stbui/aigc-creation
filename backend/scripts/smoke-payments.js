@@ -81,6 +81,22 @@ async function raw(path, token) {
   };
 }
 
+async function reconciliationItems(runId, token, result) {
+  const items = [];
+  for (let page = 1; page <= 100; page += 1) {
+    const response = await call(
+      'GET',
+      `/admin/payments/reconciliations/${runId}/items?result=${result}&page=${page}&pageSize=100`,
+      token,
+    );
+    if (response.code !== 0) return [];
+    const batch = response.data?.items ?? [];
+    items.push(...batch);
+    if (batch.length === 0 || items.length >= (response.data?.total ?? 0)) break;
+  }
+  return items;
+}
+
 let pass = 0;
 let fail = 0;
 function check(name, ok, detail = '') {
@@ -495,12 +511,24 @@ function shanghaiDate(offsetDays) {
   // ── 7. 后台支付页 API ────────────────────────────────────────────
   console.log('\n【后台支付 API】');
   const adminProviders = await call('GET', '/admin/payments/providers', TADMIN);
-  check('管理员可读渠道配置', adminProviders.code === 0 && (adminProviders.data?.items ?? []).length === 3);
+  const providerItems = adminProviders.data?.items ?? [];
+  const expectedProviders = ['sandbox', 'alipay', 'wechat', 'paypal', 'stripe', 'epay', 'zpay'];
+  check(
+    '管理员可读七渠道配置',
+    adminProviders.code === 0 &&
+      providerItems.length === expectedProviders.length &&
+      expectedProviders.every((id) => providerItems.some((item) => item.id === id)),
+    providerItems.map((item) => item.id).join(','),
+  );
   const secretFieldNames = new Set([
     'merchantPrivateKey',
     'alipayPublicKey',
     'apiV3Key',
     'wechatPayPublicKey',
+    'clientSecret',
+    'secretKey',
+    'webhookSecret',
+    'key',
   ]);
   const leakedSecret = (adminProviders.data?.items ?? []).some((p) =>
     Object.entries(p.values ?? {}).some(
@@ -600,26 +628,41 @@ function shanghaiDate(offsetDays) {
   // ── 8. 对账 ──────────────────────────────────────────────────────
   console.log('\n【对账】');
   const billDate = shanghaiDate(1);
+  const channelOnlyOrderNo = `SMOKE-CHANNEL-ONLY-${RUN}`;
   const csv = [
     '商户订单号,渠道交易号,金额,状态,完成时间',
-    `${order1.orderNo},${cb1.tradeNo},${order1.paidCents},成功,${billDate} 10:00:00`,
-    `SMOKE-CHANNEL-ONLY-${RUN},SMOKE-TRADE-ONLY-${RUN},500,成功,${billDate} 10:01:00`,
+    `${channelOnlyOrderNo},SMOKE-TRADE-ONLY-${RUN},500,成功,${billDate} 10:01:00`,
   ].join('\n');
+  const unsupportedImport = await upload(
+    '/admin/payments/reconciliations/import',
+    TADMIN,
+    { name: `smoke-bill-unsupported-${RUN}.csv`, content: csv },
+    { providerId: 'sandbox', billDate, reason: '冒烟脚本校验不支持对账的渠道' },
+  );
+  check(
+    '不支持对账的渠道拒绝 CSV 导入',
+    unsupportedImport.code === 40001,
+    unsupportedImport.message,
+  );
   const imported = await upload(
     '/admin/payments/reconciliations/import',
     TADMIN,
     { name: `smoke-bill-${RUN}.csv`, content: csv },
-    { providerId: 'sandbox', billDate, reason: '冒烟脚本导入对账' },
+    { providerId: 'alipay', billDate, reason: '冒烟脚本导入对账' },
   );
   check('对账 CSV 导入成功', imported.code === 0 && imported.data?.run?.status === 'completed', imported.message);
   const runId = imported.data?.run?.id;
-  check('对账统计计数一致', imported.data?.run?.totalItems === 2, JSON.stringify(imported.data?.run));
+  const importedRun = imported.data?.run;
+  check(
+    '对账统计识别渠道独有订单',
+    importedRun?.totalItems === 1 && importedRun?.matchItems === 0 && importedRun?.errorItems === 1,
+    JSON.stringify(importedRun),
+  );
   if (runId) {
-    const items = await call('GET', `/admin/payments/reconciliations/${runId}/items`, TADMIN);
-    const results = (items.data?.items ?? []).map((i) => i.result);
-    check('识别一致行', results.includes('matched'), results.join(','));
-    check('识别本地缺单', results.includes('local_order_not_found'), results.join(','));
-    const runsCsv = await raw('/admin/payments/reconciliations/export.csv?providerId=sandbox', TADMIN);
+    const missingItems = await reconciliationItems(runId, TADMIN, 'local_order_not_found');
+    const missingOrderNos = missingItems.map((i) => i.merchantOrderNo);
+    check('识别本地缺单', missingOrderNos.includes(channelOnlyOrderNo), missingOrderNos.join(','));
+    const runsCsv = await raw('/admin/payments/reconciliations/export.csv?providerId=alipay', TADMIN);
     check(
       '对账运行可导出 CSV',
       runsCsv.httpStatus === 200 && runsCsv.contentType.includes('text/csv'),
@@ -633,7 +676,7 @@ function shanghaiDate(offsetDays) {
       '对账明细可导出 CSV',
       itemsCsv.httpStatus === 200 &&
         itemsCsv.contentType.includes('text/csv') &&
-        itemsCsv.text.includes(order1.orderNo),
+        itemsCsv.text.includes(channelOnlyOrderNo),
       itemsCsv.contentType,
     );
   }
@@ -644,18 +687,22 @@ function shanghaiDate(offsetDays) {
     reason: '冒烟脚本执行沙箱对账',
   });
   check(
-    '沙箱不支持自动对账时如实失败',
-    failedRun.code === 0 && failedRun.data?.run?.status === 'failed',
-    failedRun.data?.run?.error,
+    '沙箱不支持自动对账时返回明确错误',
+    failedRun.code === 40001 && failedRun.message?.includes('不支持自动对账'),
+    failedRun.message,
   );
 
   const staleDate = shanghaiDate(2);
+  const staleLatest = await prisma.paymentReconciliationRun.aggregate({
+    where: { providerId: 'sandbox', billDate: staleDate },
+    _max: { attempt: true },
+  });
   const staleRun = await prisma.paymentReconciliationRun.create({
     data: {
       providerId: 'sandbox',
       configId: null,
       billDate: staleDate,
-      attempt: 1,
+      attempt: (staleLatest._max.attempt ?? 0) + 1,
       source: 'provider',
       status: 'running',
       startedAt: new Date(Date.now() - 31 * 60_000),
@@ -669,15 +716,13 @@ function shanghaiDate(offsetDays) {
     reason: '冒烟脚本验证超时运行回收',
   });
   check(
-    '停止超过 30 分钟的 running 运行可被回收重跑',
-    recoveredRun.code === 0 && recoveredRun.data?.run?.status === 'failed',
+    '超时运行先被回收，再返回渠道不支持错误',
+    recoveredRun.code === 40001 && recoveredRun.message?.includes('不支持自动对账'),
     recoveredRun.message,
   );
   const staleAfter = await prisma.paymentReconciliationRun.findUnique({ where: { id: staleRun.id } });
   check('原 running 行被标记 failed', staleAfter?.status === 'failed', staleAfter?.status);
-  await prisma.paymentReconciliationRun.deleteMany({
-    where: { providerId: 'sandbox', billDate: staleDate },
-  });
+  await prisma.paymentReconciliationRun.deleteMany({ where: { id: staleRun.id } });
 
   const forbiddenProviders = await call('GET', '/admin/payments/providers', TA);
   check('普通用户不能读后台支付配置', forbiddenProviders.httpStatus === 403, forbiddenProviders.message);

@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { adapterMock } = vi.hoisted(() => ({
   adapterMock: {
+    validateConfig: vi.fn(),
+    createOrder: vi.fn(),
     queryOrder: vi.fn(),
     closeOrder: vi.fn(),
   },
@@ -26,6 +28,7 @@ function makeOrder(overrides: Record<string, unknown> = {}) {
     paidCents: 1000,
     currency: 'CNY',
     channel: 'sandbox',
+    membershipPlanId: null,
     providerConfigId: CONFIG_ID,
     providerConfigVersion: 1,
     checkoutMode: 'sandbox',
@@ -35,7 +38,9 @@ function makeOrder(overrides: Record<string, unknown> = {}) {
     paidAt: null,
     closedAt: null,
     lastError: null,
+    lastQueriedAt: null,
     closeStartedAt: null,
+    items: [{ skuSnapshot: 'credits-100' }],
     payments: [
       {
         id: 'pay_1',
@@ -60,6 +65,7 @@ function makeHarness(order = makeOrder()) {
     },
     payment: {
       findFirst: vi.fn().mockResolvedValue({ id: 'pay_1' }),
+      create: vi.fn().mockResolvedValue({ id: 'pay_new' }),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
   };
@@ -68,6 +74,15 @@ function makeHarness(order = makeOrder()) {
     releaseReservation: vi.fn().mockResolvedValue(undefined),
   };
   const configs = {
+    available: vi.fn().mockResolvedValue([{ id: 'sandbox' }]),
+    latest: vi.fn().mockResolvedValue({
+      id: CONFIG_ID,
+      providerId: 'sandbox',
+      version: 1,
+      enabled: true,
+      closeAfterMinutes: 30,
+      values: {},
+    }),
     resolveForOrder: vi.fn(async ({ providerConfigId }: { providerConfigId: string | null }) => ({
       id: providerConfigId ?? CONFIG_ID,
       providerId: 'sandbox',
@@ -90,6 +105,8 @@ function expectNoLocalClose(prisma: ReturnType<typeof makeHarness>['prisma']) {
 }
 
 describe('PaymentOrderService.close', () => {  beforeEach(() => {
+    adapterMock.validateConfig.mockReset().mockReturnValue([]);
+    adapterMock.createOrder.mockReset();
     adapterMock.queryOrder.mockReset();
     adapterMock.closeOrder.mockReset();
   });
@@ -260,6 +277,241 @@ describe('PaymentOrderService.close', () => {  beforeEach(() => {
   });
 });
 
+describe('PaymentOrderService.createIntent', () => {
+  const previousWebBase = process.env.WEB_BASE_URL;
+  const previousNotifyBase = process.env.PAYMENT_NOTIFY_BASE;
+
+  beforeEach(() => {
+    adapterMock.validateConfig.mockReset().mockReturnValue([]);
+    adapterMock.createOrder.mockReset();
+    adapterMock.queryOrder.mockReset();
+    adapterMock.closeOrder.mockReset();
+    process.env.WEB_BASE_URL = 'https://app.example.com';
+    process.env.PAYMENT_NOTIFY_BASE = 'https://api.example.com';
+  });
+
+  afterEach(() => {
+    if (previousWebBase === undefined) delete process.env.WEB_BASE_URL;
+    else process.env.WEB_BASE_URL = previousWebBase;
+    if (previousNotifyBase === undefined) delete process.env.PAYMENT_NOTIFY_BASE;
+    else process.env.PAYMENT_NOTIFY_BASE = previousNotifyBase;
+  });
+
+  it('真实渠道完成后回到原订单结算页，并带上主动查单标记', async () => {
+    const { service, configs } = makeHarness(
+      makeOrder({
+        channel: 'alipay',
+        checkoutMode: 'redirect',
+        items: [{ skuSnapshot: 'credits-100' }],
+      }),
+    );
+    configs.available.mockResolvedValue([{ id: 'alipay' }]);
+    configs.latest.mockResolvedValue({
+      id: CONFIG_ID,
+      providerId: 'alipay',
+      version: 1,
+      enabled: true,
+      closeAfterMinutes: 30,
+      values: {},
+    });
+    adapterMock.createOrder.mockResolvedValue({
+      mode: 'redirect',
+      payUrl: 'https://openapi.alipay.com/gateway.do?sign=test',
+      expiresAt: new Date(Date.now() + 10 * 60_000),
+    });
+
+    await service.createIntent({ orderId: ORDER_ID, userId: 'user_1', providerId: 'alipay' });
+
+    expect(adapterMock.createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        returnUrl:
+          'https://app.example.com/checkout/credits-100?orderId=order_1&paymentReturn=1',
+      }),
+    );
+  });
+
+  it('把渠道返回的 providerRef 持久化到对应 Payment', async () => {
+    const { service, prisma, configs } = makeHarness(
+      makeOrder({
+        channel: 'stripe',
+        checkoutMode: 'redirect',
+        items: [{ skuSnapshot: 'credits-100' }],
+      }),
+    );
+    configs.available.mockResolvedValue([{ id: 'stripe' }]);
+    configs.latest.mockResolvedValue({
+      id: CONFIG_ID,
+      providerId: 'stripe',
+      version: 1,
+      enabled: true,
+      closeAfterMinutes: 30,
+      values: {},
+    });
+    adapterMock.createOrder.mockResolvedValue({
+      mode: 'redirect',
+      payUrl: 'https://checkout.stripe.com/c/pay/cs_test_1',
+      providerRef: 'cs_test_1',
+      expiresAt: new Date(Date.now() + 10 * 60_000),
+    });
+
+    await service.createIntent({ orderId: ORDER_ID, userId: 'user_1', providerId: 'stripe' });
+
+    expect(prisma.payment.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: 'pay_new', status: 'pending' },
+        data: { providerRef: 'cs_test_1' },
+      }),
+    );
+  });
+
+  it('把服务端提取的客户端 IP 原样传给渠道下单', async () => {
+    const { service, configs } = makeHarness(
+      makeOrder({
+        channel: 'zpay',
+        checkoutMode: 'redirect',
+        items: [{ skuSnapshot: 'credits-100' }],
+      }),
+    );
+    configs.available.mockResolvedValue([{ id: 'zpay' }]);
+    configs.latest.mockResolvedValue({
+      id: CONFIG_ID,
+      providerId: 'zpay',
+      version: 1,
+      enabled: true,
+      closeAfterMinutes: 30,
+      values: { pid: 'merchant', key: 'secret', type: 'alipay' },
+    });
+    adapterMock.createOrder.mockResolvedValue({
+      mode: 'redirect',
+      payUrl: 'https://zpayz.cn/pay/1',
+      expiresAt: new Date(Date.now() + 10 * 60_000),
+    });
+
+    await service.createIntent({
+      orderId: ORDER_ID,
+      userId: 'user_1',
+      providerId: 'zpay',
+      clientIp: '203.0.113.10',
+    });
+
+    expect(adapterMock.createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ clientIp: '203.0.113.10' }),
+    );
+  });
+
+  it('会员订单完成后回到会员结算页', async () => {
+    const { service, configs } = makeHarness(
+      makeOrder({
+        channel: 'alipay',
+        checkoutMode: 'redirect',
+        membershipPlanId: 'plan_1',
+        items: [],
+      }),
+    );
+    configs.available.mockResolvedValue([{ id: 'alipay' }]);
+    configs.latest.mockResolvedValue({
+      id: CONFIG_ID,
+      providerId: 'alipay',
+      version: 1,
+      enabled: true,
+      closeAfterMinutes: 30,
+      values: {},
+    });
+    adapterMock.createOrder.mockResolvedValue({
+      mode: 'redirect',
+      payUrl: 'https://openapi.alipay.com/gateway.do?sign=test',
+      expiresAt: new Date(Date.now() + 10 * 60_000),
+    });
+
+    await service.createIntent({ orderId: ORDER_ID, userId: 'user_1', providerId: 'alipay' });
+
+    expect(adapterMock.createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        returnUrl:
+          'https://app.example.com/checkout/membership?orderId=order_1&paymentReturn=1',
+      }),
+    );
+  });
+});
+
+describe('PaymentOrderService.query', () => {
+  beforeEach(() => {
+    adapterMock.queryOrder.mockReset();
+    adapterMock.queryOrder.mockResolvedValue({
+      state: 'pending',
+      orderNo: 'HJ20261102120000ABC',
+      rawPayload: '',
+    });
+  });
+
+  it('主动刷新绕过 2 秒查单节流', async () => {
+    const { service } = makeHarness(makeOrder({ lastQueriedAt: new Date() }));
+
+    await service.query({
+      orderId: ORDER_ID,
+      actor: { kind: 'user', userId: 'user_1' },
+      force: true,
+    });
+
+    expect(adapterMock.queryOrder).toHaveBeenCalledTimes(1);
+  });
+
+  it('普通轮询在节流窗口内不发渠道请求', async () => {
+    const { service } = makeHarness(makeOrder({ lastQueriedAt: new Date() }));
+
+    await service.query({ orderId: ORDER_ID, actor: { kind: 'user', userId: 'user_1' } });
+
+    expect(adapterMock.queryOrder).not.toHaveBeenCalled();
+  });
+
+  it('不同 providerRef 的 pending 尝试分别查单并透传单据号', async () => {
+    const order = makeOrder({
+      providerConfigId: CONFIG_ID,
+      payments: [
+        {
+          id: 'pay_new',
+          status: 'pending',
+          channel: 'stripe',
+          providerConfigId: CONFIG_ID,
+          providerRef: 'cs_new',
+          payTransactionId: null,
+          amountCents: 1000,
+          createdAt: new Date(),
+        },
+        {
+          id: 'pay_old',
+          status: 'pending',
+          channel: 'stripe',
+          providerConfigId: CONFIG_ID,
+          providerRef: 'cs_old',
+          payTransactionId: null,
+          amountCents: 1000,
+          createdAt: new Date(Date.now() - 60_000),
+        },
+      ],
+    });
+    const { service, configs } = makeHarness(order);
+    configs.resolveForOrder.mockResolvedValue({
+      id: CONFIG_ID,
+      providerId: 'stripe',
+      version: 1,
+      enabled: true,
+      closeAfterMinutes: 30,
+      values: {},
+    });
+
+    await service.query({
+      orderId: ORDER_ID,
+      actor: { kind: 'user', userId: 'user_1' },
+      force: true,
+    });
+
+    expect(adapterMock.queryOrder).toHaveBeenCalledTimes(2);
+    expect(adapterMock.queryOrder.mock.calls[0][0]).toMatchObject({ providerRef: 'cs_new' });
+    expect(adapterMock.queryOrder.mock.calls[1][0]).toMatchObject({ providerRef: 'cs_old' });
+  });
+});
+
 describe('PaymentOrderService.notifyUrl', () => {
   const previous = process.env.PAYMENT_NOTIFY_BASE;
   const previousHost = process.env.HOST;
@@ -296,6 +548,14 @@ describe('PaymentOrderService.notifyUrl', () => {
     process.env.PORT = '4100';
     expect(service.notifyUrl('sandbox', 'cfg_3')).toBe(
       'http://127.0.0.1:4100/api/v1/payments/callback/sandbox/cfg_3',
+    );
+  });
+
+  it('真实渠道没有回调公网地址时拒绝发起支付', () => {
+    delete process.env.PAYMENT_NOTIFY_BASE;
+    const { service } = makeHarness();
+    expect(() => service.notifyUrl('alipay', 'cfg_1')).toThrow(
+      /真实支付渠道缺少回调公网地址/,
     );
   });
 });

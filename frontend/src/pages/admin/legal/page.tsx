@@ -1,45 +1,19 @@
 import { useState, type ReactNode } from 'react';
+import { SLUGS, SLUG_LABEL, STATUS_LABEL, STATUS_TONE_KEY } from './constants';
+import { fmt } from './utils';
 import { useAdminResource, useAdmin, useDiscardConfirm, useUnsavedGuard, useToast } from './hooks';
 import { ActionButton, AdminDataTable, ConfirmAction, Drawer, FilterActions, FilterBar, FormField, ModalDialog, PageHeader, Panel, SelectField, StatusTag, StaleError, TextAreaField, TextField, type AdminColumn } from './components';
 import { adminLegalApi } from '../../../lib/api';
 
-
-
 import type { AdminLegalDoc, LegalSlug, LegalStatus } from '../../../types/api';
 
-const SLUGS: { value: LegalSlug; label: string }[] = [
-  { value: 'user-agreement', label: '用户协议' },
-  { value: 'privacy-policy', label: '隐私政策' },
-  { value: 'minors-policy', label: '未成年人保护' },
-  { value: 'account-rules', label: '账号规则' },
-];
-
-const SLUG_LABEL: Record<string, string> = Object.fromEntries(SLUGS.map((s) => [s.value, s.label]));
-
 /** draft/archived 在 StatusTag 的通用语义表里没有对应项, 显式给标签 */
-const STATUS_LABEL: Record<LegalStatus, string> = {
-  draft: '草稿',
-  published: '生效中',
-  archived: '已归档',
-};
 
 /**
  * 状态 → StatusTag 的色板键。
  * 通用映射表里没有法务三态，借用语义最近的键（等待/正常/注销）来取色，
  * 文案仍由 STATUS_LABEL 覆盖 —— 直接把 `draft` 传进去会渲染成灰色裸文本。
  */
-const STATUS_TONE_KEY: Record<LegalStatus, string> = {
-  draft: 'pending',
-  published: 'active',
-  archived: 'deleted',
-};
-
-function fmt(iso: string | null): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('zh-CN', { hour12: false });
-}
 
 interface FormState {
   slug: LegalSlug;
@@ -421,6 +395,6 @@ export function AdminLegalPage() {
   );
 }
 
-function Code({ children }: { children: ReactNode }) {
+export function Code({ children }: { children: ReactNode }) {
   return <code className="rounded bg-muted px-1 font-mono text-[12px]">{children}</code>;
 }

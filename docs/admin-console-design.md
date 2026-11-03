@@ -184,7 +184,7 @@ JwtAuthGuard（身份）→ AdminGuard（后台身份 + 账号状态）→ Permi
 - **兜底默认拒**：`PermissionGuard` 未命中权限点即 403 `40301`。
 - **前端 `AdminContext.can()` 只用于隐藏按钮**，不是安全边界。
 - **批量与导出**：路由挂较弱读权限，处理器内用 `AdminRoleService.hasPermission()` 再判动作权限。
-- **审计**：高危动作（`HIGH_RISK_PERMISSIONS`）必须填原因，落 `AdminAuditLog`（含 IP 与请求 ID），审计页只读。
+- **审计**：写操作均落 `AdminAuditLog`（含 IP 与请求 ID），审计页只读；需要业务原因的动作才要求填原因，删除渠道 / 渠道模型不要求原因。
 
 ## 5. 数据访问约束
 

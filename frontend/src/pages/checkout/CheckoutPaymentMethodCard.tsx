@@ -101,8 +101,8 @@ export function CheckoutPaymentMethodCard({
           ) : (
             <>
               支付方式由后台通道配置决定：
-              <strong>未配置真实商户号时走站内沙箱，不产生真实扣款</strong>；配置{' '}
-              <code>PAYMENT_PROVIDER</code> 与商户凭据后由支付宝/微信完成真实扣款。
+              <strong>沙箱渠道会明确标注，且不产生真实扣款</strong>；真实渠道需在后台
+              「支付充值 → 支付渠道」启用并配齐商户凭据。
             </>
           )}
         </span>
@@ -120,5 +120,9 @@ function providerIcon(provider: PaymentProviderInfo): string {
   if (provider.sandbox) return '沙';
   if (provider.id === 'alipay') return '支';
   if (provider.id === 'wechat') return '微';
+  if (provider.id === 'paypal') return 'P';
+  if (provider.id === 'stripe') return 'S';
+  if (provider.id === 'epay') return '易';
+  if (provider.id === 'zpay') return 'Z';
   return provider.name.slice(0, 1);
 }

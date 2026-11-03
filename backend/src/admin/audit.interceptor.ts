@@ -180,8 +180,8 @@ export class AuditInterceptor implements NestInterceptor {
   /**
    * 提取操作原因。
    *
-   * 高危动作必须带原因 (前端强制输入确认词), 这里做二次兜底:
-   * 有 reason 字段就用, 没有则记录缺失标记, 便于后续补录。
+   * 要求原因的动作由 DTO 做强校验；这里只负责在请求带 reason 时落库。
+   * 不要求原因的业务操作（如渠道删除）仍会记录操作人、动作与结果。
    */
   private readReason(body: Record<string, unknown> | undefined): string | null {
     const raw = body?.['reason'];

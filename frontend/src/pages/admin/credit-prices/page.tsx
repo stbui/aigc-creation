@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useAdmin, useUnsavedGuard, useToast, useAdminResource } from './hooks';
 import { adminCreditPricesApi } from '../../../lib/api';
-
-
-
 import { ActionButton, AdminDataTable, ConfirmAction, HelpTip, NumberField, PageHeader, Panel, StatusTag, StaleError, type AdminColumn } from './components';
 import type { AdminCreditPrice } from '../../../types/api';
 

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { SEVERITY_SURFACE, SEVERITY_BADGE, SEVERITY_TONE, SeverityFilter } from './constants';
+import { readSeverity } from './utils';
 import { useAdminUrlFilterSync } from './hooks';
 import { Link, useSearchParams } from 'react-router-dom';
 
@@ -17,30 +19,8 @@ import type { AdminAlertSeverity } from '../../../types/api';
  * 颜色只走语义令牌（`danger` / `warn` / `brand`），与统计卡、标签同源 ——
  * 同一个「紧急」在三种形态上必须是同一组颜色，否则运营要靠读文字确认级别。
  */
-const SEVERITY_SURFACE: Record<AdminAlertSeverity, { card: string; icon: string }> = {
-  critical: { card: 'border-danger-soft bg-danger-soft/40', icon: 'text-danger-text' },
-  warning: { card: 'border-warn-soft bg-warn-soft/40', icon: 'text-warn-text' },
-  info: { card: 'border-border bg-card', icon: 'text-brand' },
-};
-
-const SEVERITY_BADGE = {
-  critical: 'danger',
-  warning: 'warn',
-  info: 'brand',
-} as const;
 
 /** 统计卡的色调：只有要人动手的两级才染色，提示级保持中性 */
-const SEVERITY_TONE: Record<AdminAlertSeverity, 'danger' | 'warn' | undefined> = {
-  critical: 'danger',
-  warning: 'warn',
-  info: undefined,
-};
-
-type SeverityFilter = 'all' | AdminAlertSeverity;
-
-function readSeverity(raw: string | null): SeverityFilter {
-  return raw === 'critical' || raw === 'warning' || raw === 'info' ? raw : 'all';
-}
 
 /**
  * 告警中心（/admin/alerts）。
