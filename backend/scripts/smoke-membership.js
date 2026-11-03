@@ -168,9 +168,14 @@ function check(name, ok, detail = '') {
   const balanceBefore = (await call('GET', '/credits/balance', T)).data.balance;
 
   const overLimit = await call('POST', '/generate', T, {
-    projectId: project.id, capability: 'main_image', inputAssetIds: [asset.id], params: {},
+    projectId: project.id,
+    capability: 'main_image',
+    logicalModelId: 'concurrency-probe',
+    inputAssetIds: [asset.id],
+    params: {},
   });
-  check(`超并发上限被拒 (上限 ${cap})`, overLimit.status === 400 || overLimit.status === 429,
+  check(`超并发上限被拒 (上限 ${cap})`,
+    (overLimit.status === 400 || overLimit.status === 429) && /并发上限/.test(overLimit.message ?? ''),
     `HTTP ${overLimit.status}: ${overLimit.message?.slice(0, 40)}`);
 
   const balanceAfter = (await call('GET', '/credits/balance', T)).data.balance;

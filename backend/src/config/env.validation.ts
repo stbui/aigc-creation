@@ -20,6 +20,8 @@
  *    值完全相同，否则等于偷偷改了默认行为。
  */
 
+import { STORAGE_BACKENDS } from '../storage/storage.provider';
+
 /** 日志级别，映射到 NestJS LoggerService 的方法优先级 */
 export type LogLevel = 'error' | 'warn' | 'log' | 'debug' | 'verbose';
 
@@ -224,8 +226,8 @@ export const ENV_SPECS: readonly Spec[] = [
   // 未处理异常的告警 webhook（可选）。留空则只落盘，不发外部请求。
   { key: 'observability.errorWebhookUrl', env: 'ERROR_WEBHOOK_URL', type: 'string', def: '' },
 
-  // ── 存储（默认值取自 storage/storage.service.ts）──────────────────────
-  { key: 'storage.backend', env: 'STORAGE_BACKEND', type: 'string', def: 'local', oneOf: ['local', 'oss', 'minio'] },
+  // ── 存储（后端白名单与默认值取自 storage/storage.provider.ts）──────────
+  { key: 'storage.backend', env: 'STORAGE_BACKEND', type: 'string', def: 'local', oneOf: STORAGE_BACKENDS },
   { key: 'storage.ossRegion', env: 'OSS_REGION', type: 'string', def: '' },
   { key: 'storage.ossBucket', env: 'OSS_BUCKET', type: 'string', def: '' },
   { key: 'storage.ossAccessKeyId', env: 'OSS_ACCESS_KEY_ID', type: 'string', def: '' },

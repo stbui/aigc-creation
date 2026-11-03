@@ -205,7 +205,7 @@ function check(name, ok, detail = '') {
   const finT = finLogin.data?.accessToken;
   if (finT) {
     const finStatus = await call('GET', '/admin/scheduler/status', finT);
-    check('finance 可看调度状态', finStatus.status === 200 || finStatus.status === 403,
+    check('finance 无 setting.read 不能查看调度状态', finStatus.status === 403,
       `HTTP ${finStatus.status}`);
     const finRun = await call('POST', '/admin/scheduler/run?task=order-expire', finT);
     check('finance 无 setting.write 不能触发', finRun.status === 403, finRun.message);

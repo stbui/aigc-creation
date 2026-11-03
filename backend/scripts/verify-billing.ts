@@ -463,7 +463,6 @@ async function errorCode(fn: () => Promise<unknown>): Promise<{ code?: number; m
     const batch = await admin.batchResolveOrders(
       [uncertainOrder.order.id, failedTaskOrder.order.id, 'not-exist-id'],
       'refund',
-      '验收脚本批量核对',
       'verify-admin',
     );
     check('批量核对逐条返回结果', batch.total === 3 && batch.results.length === 3, batch.total);
@@ -474,16 +473,12 @@ async function errorCode(fn: () => Promise<unknown>): Promise<{ code?: number; m
     const afterBatch2 = await prisma.billingOrder.findUnique({ where: { id: failedTaskOrder.order.id } });
     check('批量核对后第二笔也退款', afterBatch2?.status === 'refunded', afterBatch2?.status);
     check(
-      '批量核对留下核对人与依据',
-      afterBatch?.resolvedBy === 'verify-admin' && afterBatch?.resolutionNote === '验收脚本批量核对',
+      '批量核对留下核对人与系统依据',
+      afterBatch?.resolvedBy === 'verify-admin' && afterBatch?.resolutionNote === '人工核对：全额退款',
       { by: afterBatch?.resolvedBy, note: afterBatch?.resolutionNote },
     );
-    const batchError = await errorCode(() => admin.batchResolveOrders([], 'refund', 'x', 'verify-admin'));
+    const batchError = await errorCode(() => admin.batchResolveOrders([], 'refund', 'verify-admin'));
     check('批量核对拒绝空列表', batchError.code === 40001, `${batchError.code} ${batchError.message}`);
-    const batchError2 = await errorCode(() =>
-      admin.batchResolveOrders([uncertainOrder.order.id], 'refund', '', 'verify-admin'),
-    );
-    check('批量核对缺原因被拒', batchError2.code === 40001, `${batchError2.code} ${batchError2.message}`);
 
     await prisma.generationTask.deleteMany({ where: { id: failedTaskOrder.order.taskId } });
     await prisma.project.deleteMany({ where: { id: reviewProject.id } });

@@ -174,18 +174,22 @@ function check(name, ok, detail = '') {
 
   console.log('\n【人工调整 B-52】');
   const noReason = await call('POST', '/admin/credits/adjust', AT, {
-    userId: user.id, delta: 100, reason: '', operatorId: 'test',
+    userId: user.id, delta: 100,
   });
-  check('无理由调整被拒', noReason.status === 400, noReason.message);
+  check(
+    '无自由文本原因也可调整并自动留痕',
+    (noReason.status === 200 || noReason.status === 201) && noReason.data?.balance === 100,
+    `balance=${noReason.data?.balance ?? noReason.message}`,
+  );
   const zeroDelta = await call('POST', '/admin/credits/adjust', AT, {
     userId: user.id, delta: 0, reason: '测试', operatorId: 'test',
   });
   check('零调整被拒', zeroDelta.status === 400, zeroDelta.message);
 
   const adjust = await call('POST', '/admin/credits/adjust', AT, {
-    userId: user.id, delta: 250, reason: '客服补偿', operatorId: 'test',
+    userId: user.id, delta: 250,
   });
-  check('有理由调整成功', adjust.status === 200 || adjust.status === 201, `余额 ${adjust.data?.balance}`);
+  check('后续人工调整成功', adjust.status === 200 || adjust.status === 201, `余额 ${adjust.data?.balance}`);
 
   console.log('\n【超时关闭】');
   const o3 = await call('POST', '/orders', T, { idempotencyKey: `exp-${Date.now()}`, productId: starter.id, quantity: 1 });

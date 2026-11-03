@@ -104,7 +104,7 @@ async function main() {
   check('润色返回 201', polishRes.status === 201, `实际 ${polishRes.status} ${JSON.stringify(polishJson).slice(0, 300)}`);
   check('润色产出非空文本', typeof polish.text === 'string' && polish.text.length > 5, `长度 ${polish?.text?.length}`);
   check('润色产出明显长于原文 (扩写)', (polish.text || '').length > 20, `长度 ${polish?.text?.length}`);
-  check('来源标记为 gateway', polish.source === 'gateway', `实际 ${polish.source}`);
+  check('来源标记为 model', polish.source === 'model', `实际 ${polish.source}`);
   check('回报了模型名', typeof polish.model === 'string' && polish.model.length > 0, `实际 ${polish.model}`);
   check('回报了 token 用量', !!polish.usage, `实际 ${JSON.stringify(polish.usage)}`);
   console.log(`     产出: ${String(polish.text).slice(0, 90)}…`);
@@ -160,7 +160,7 @@ async function main() {
   const i2p = i2pJson.data ?? i2pJson;
   check('图片转提示词返回 201', i2pRes.status === 201, `实际 ${i2pRes.status} ${JSON.stringify(i2pJson).slice(0, 300)}`);
   check('产出非空文本', typeof i2p.text === 'string' && i2p.text.length > 5, `长度 ${i2p?.text?.length}`);
-  check('来源标记为 gateway', i2p.source === 'gateway', `实际 ${i2p.source}`);
+  check('来源标记为 model', i2p.source === 'model', `实际 ${i2p.source}`);
   // 关键: 纯红图, 模型应提到红/色 —— 证明它真的看了图而非凭空编
   check('输出与图像内容相关 (提到颜色)', /红|色|颜色|red/i.test(String(i2p.text)), `输出: ${String(i2p.text).slice(0, 120)}`);
   console.log(`     产出: ${String(i2p.text).slice(0, 120)}…`);

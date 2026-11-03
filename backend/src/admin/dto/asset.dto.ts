@@ -1,5 +1,6 @@
 import { Transform } from 'class-transformer';
 import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
+import { STORAGE_BACKENDS, type StorageBackend } from '../../storage/storage.provider';
 import { PageQueryDto } from './page-query.dto';
 
 /**
@@ -38,8 +39,8 @@ export class AssetListQueryDto extends PageQueryDto {
   projectId?: string;
 
   @IsOptional()
-  @IsIn(['local', 'oss', 'minio'])
-  backend?: string;
+  @IsIn(STORAGE_BACKENDS)
+  backend?: StorageBackend;
 
   @IsOptional()
   @Transform(({ value }) => (value === undefined ? undefined : new Date(value)))

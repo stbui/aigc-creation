@@ -3,7 +3,7 @@ import { AuditAction, RequirePermission } from './admin.decorator';
 import { AppError } from '../common/app.exception';
 import { StorageService } from '../storage/storage.service';
 import { PERMISSIONS } from './permissions';
-import type { StorageBackend } from '../storage/storage.provider';
+import { isStorageBackend, type StorageBackend } from '../storage/storage.provider';
 
 /**
  * 存储后端管理 (admin-prd.md §3.11 B-62/B-63)。
@@ -34,7 +34,12 @@ export class AdminStorageController {
   @RequirePermission(PERMISSIONS.channelTest)
   @AuditAction('storage.probe')
   async probe(@Query('backend') backend?: string) {
-    const p = backend ? this.storage.get(backend as StorageBackend) : this.storage.getActive();
+    if (backend !== undefined && !isStorageBackend(backend)) {
+      throw new AppError(40001, '非法后端', 400);
+    }
+    const p = backend !== undefined
+      ? this.storage.get(backend as StorageBackend)
+      : this.storage.getActive();
     if (!p) throw new AppError(40400, `后端未启用: ${backend}`, 404);
     return { backend: p.backend, ...(await p.probe()) };
   }
@@ -49,11 +54,13 @@ export class AdminStorageController {
   @RequirePermission(PERMISSIONS.settingWrite)
   @AuditAction('storage.switch')
   setActive(@Query('backend') backend: string) {
-    const b = backend as StorageBackend;
-    if (!['local', 'oss', 'minio'].includes(b)) {
+    if (backend !== 'local' && backend !== 'oss' && backend !== 'minio') {
       throw new AppError(40001, '非法后端', 400);
     }
-    this.storage.setActive(b);
-    return { active: b, note: '仅对新上传生效, 已写入的素材仍按原后端读取' };
+    if (!this.storage.get(backend)) {
+      throw new AppError(40001, `后端未启用: ${backend}`, 400);
+    }
+    this.storage.setActive(backend);
+    return { active: backend, note: '仅对新上传生效, 已写入的素材仍按原后端读取' };
   }
 }

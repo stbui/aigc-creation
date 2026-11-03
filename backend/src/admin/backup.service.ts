@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseSync } from 'node:sqlite';
-import { createHash } from 'crypto';
+import { createHash, randomBytes } from 'crypto';
 import { promises as fs } from 'fs';
 import { existsSync } from 'fs';
 import { join, resolve } from 'path';
@@ -97,7 +97,10 @@ export class BackupService {
       String(now.getMinutes()).padStart(2, '0'),
       String(now.getSeconds()).padStart(2, '0'),
     ].join('');
-    const filename = `${FILE_PREFIX}-${stamp}${FILE_SUFFIX}`;
+    // 时间戳只到秒；追加随机后缀，避免同一秒内的手动/定时备份撞上
+    // BackupRecord.filename 的唯一约束（相同内容也不影响文件可读性）。
+    const suffix = randomBytes(3).toString('hex');
+    const filename = `${FILE_PREFIX}-${stamp}-${suffix}${FILE_SUFFIX}`;
     const target = join(this.backupDir, filename);
 
     if (!existsSync(this.dbPath)) {

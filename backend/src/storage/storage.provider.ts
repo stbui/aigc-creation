@@ -17,7 +17,15 @@ import { join, resolve } from 'path';
  *      切换域名/CDN 后只需改配置, 不必刷库。
  */
 
-export type StorageBackend = 'local' | 'oss' | 'minio';
+/** 全部候选后端。顺序即后台展示顺序：本地优先，云端在后。 */
+export const STORAGE_BACKENDS = ['local', 'oss', 'minio'] as const;
+
+export type StorageBackend = (typeof STORAGE_BACKENDS)[number];
+
+/** 收窄运行时字符串，避免各入口重复维护后端白名单。 */
+export function isStorageBackend(value: string): value is StorageBackend {
+  return STORAGE_BACKENDS.includes(value as StorageBackend);
+}
 
 export interface StorageObject {
   /** 存储内的相对 key, 如 original/xxx.jpg —— 唯一真相, 不含域名 */

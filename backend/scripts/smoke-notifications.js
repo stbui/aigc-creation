@@ -314,10 +314,14 @@ async function ensureAdminRole() {
   check('可还原原版本', restore.status === 200 || restore.status === 201, `status=${restore.status}`);
 
   const reasonLogged = await prisma.adminAuditLog.findFirst({
-    where: { action: 'legal.publish', reason: { contains: '冒烟' } },
+    where: { action: 'legal.publish', actorId: adminId },
     orderBy: { createdAt: 'desc' },
   });
-  check('高危动作原因写入审计', Boolean(reasonLogged), reasonLogged?.reason);
+  check(
+    '高危动作写入稳定审计原因',
+    reasonLogged?.reason === '发布法务文档版本' && reasonLogged?.success === true,
+    reasonLogged ? `reason=${reasonLogged.reason} success=${reasonLogged.success}` : '无审计记录',
+  );
 
   // 清理: 逐个模型删并各自 catch —— 任何一张表漏删都只影响残留, 不该让脚本崩在收尾
   const cleanup = [

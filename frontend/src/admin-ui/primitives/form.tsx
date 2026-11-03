@@ -1,5 +1,6 @@
 import { useId, type AriaAttributes, type ReactNode } from 'react';
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
+import { ToggleGroup as ToggleGroupPrimitive } from 'radix-ui';
 
 import { cn } from '../lib/cn';
 import { findFirstControlId, injectPropsIntoFirstControl } from '../lib/control-injection';
@@ -564,12 +565,14 @@ export function SegmentedTabs({
 }
 
 /**
- * 分段单选组（胶囊式）。
+ * 分段选项组（胶囊式）。
  *
- * 语义是**单选组**而不是页签：切换后同一块区域换的是「过滤维度」，不是
- * 「另一块内容」。用 `tablist` 会让读屏用户以为下面跟着 tabpanel，而且
- * `aria-selected` 与筛选在语义上对不上。这里用 radiogroup + aria-checked，
- * 方向键切换、Tab 只落在当前项上都按单选组处理。
+ * 语义是**筛选维度**而不是页签：切换后同一块区域换的是过滤条件，不是
+ * 「另一块内容」。底层直接使用 Radix ToggleGroup 单选模式，由它负责
+ * `radiogroup` / `aria-checked`、roving focus、方向键与 `data-state`；
+ * 页面不再手写按钮键盘逻辑。
+ *
+ * 保留 `SegmentedGroup` 名称兼容既有调用点，后续可逐步改名为 `ToggleGroup`。
  */
 export function SegmentedGroup({
   value,
@@ -584,54 +587,31 @@ export function SegmentedGroup({
   ariaLabel?: string;
   className?: string;
 }) {
-  const index = options.findIndex((option) => option.value === value);
-
-  /** 方向键在组内移动并直接选中（单选组的惯例）；Tab 只停当前项 */
-  const onKeyDown = (event: React.KeyboardEvent<HTMLButtonElement>) => {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-    event.preventDefault();
-    const delta = event.key === 'ArrowRight' ? 1 : -1;
-    const next = options[(Math.max(0, index) + delta + options.length) % options.length];
-    if (!next) return;
-    onChange(next.value);
-    const group = event.currentTarget.parentElement;
-    const target = group?.querySelector<HTMLButtonElement>(
-      `[data-value="${CSS.escape(next.value)}"]`,
-    );
-    target?.focus();
-  };
-
   return (
-    <div
-      role="radiogroup"
+    <ToggleGroupPrimitive.Root
+      type="single"
+      value={value}
+      onValueChange={(next) => {
+        if (next) onChange(next);
+      }}
       aria-label={ariaLabel}
       className={cn('inline-flex h-9 items-center gap-1 rounded-lg bg-muted p-1', className)}
     >
-      {options.map((option, optionIndex) => {
-        const active = option.value === value;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            data-value={option.value}
-            tabIndex={active || (index < 0 && optionIndex === 0) ? 0 : -1}
-            onClick={() => onChange(option.value)}
-            onKeyDown={onKeyDown}
-            className={cn(
-              'inline-flex h-7 items-center justify-center rounded-md px-3 text-sm font-medium whitespace-nowrap transition-colors',
-              'outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
-              active
-                ? 'bg-background text-foreground shadow-xs'
-                : 'text-muted-foreground hover:text-foreground',
-            )}
-          >
-            {option.label}
-          </button>
-        );
-      })}
-    </div>
+      {options.map((option) => (
+        <ToggleGroupPrimitive.Item
+          key={option.value}
+          value={option.value}
+          className={cn(
+            'inline-flex h-7 items-center justify-center rounded-md px-3 text-sm font-medium whitespace-nowrap transition-colors',
+            'outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50',
+            'text-muted-foreground hover:text-foreground',
+            'data-[state=on]:bg-background data-[state=on]:text-foreground data-[state=on]:shadow-xs',
+          )}
+        >
+          {option.label}
+        </ToggleGroupPrimitive.Item>
+      ))}
+    </ToggleGroupPrimitive.Root>
   );
 }
 

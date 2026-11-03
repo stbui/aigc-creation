@@ -26,6 +26,12 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    /*
+     * 默认 forks 会为每个测试文件新建一次 jsdom；本仓 64 个前端测试文件
+     * 会把大量时间耗在环境初始化上。vmThreads 仍保持默认的文件级隔离，
+     * 但可在线程内复用 jsdom，实测全量用例从约 42s 降到约 10s。
+     */
+    pool: 'vmThreads',
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
     // 显式排除 e2e 目录：Playwright 用例依赖真实浏览器与服务，不能进 jsdom。

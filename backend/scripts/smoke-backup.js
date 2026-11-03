@@ -45,12 +45,17 @@ function check(name, ok, detail = '') {
   const T = login.data.accessToken;
 
   console.log('\n【手动备份 B-98】');
-  const missingReason = await call('POST', '/admin/backups', T, {});
-  check('手动备份缺少原因被拒', missingReason.status === 400, missingReason.message);
-  const backup = await call('POST', '/admin/backups', T, { reason: '冒烟测试：验证备份与恢复校验' });
-  check('手动备份成功', backup.status === 201 || backup.status === 200,
+  const backup = await call('POST', '/admin/backups', T);
+  check('手动备份无需自由文本原因', backup.status === 201 || backup.status === 200,
     `${backup.status} ${backup.data?.filename ?? backup.message}`);
   const rec = backup.data;
+  const secondBackup = await call('POST', '/admin/backups', T);
+  check(
+    '连续手动备份文件名唯一',
+    (secondBackup.status === 201 || secondBackup.status === 200) &&
+      Boolean(secondBackup.data?.filename) && secondBackup.data.filename !== rec?.filename,
+    `${secondBackup.status} ${secondBackup.data?.filename ?? secondBackup.message}`,
+  );
   if (rec) {
     check('备份状态为 succeeded', rec.status === 'succeeded', rec.status);
     check('记录了文件大小', rec.sizeBytes > 0, `${rec.sizeBytes} 字节`);
@@ -101,12 +106,9 @@ function check(name, ok, detail = '') {
   check('safePath 逻辑存在', true, '见 BackupService.safePath');
 
   console.log('\n【保留份数清理】');
-  const badPruneReason = await call('POST', '/admin/backups/prune', T, { keepCount: 1, reason: '   ' });
-  check('备份清理原因不能为空白', badPruneReason.status === 400, badPruneReason.message);
-  const prune = await call('POST', '/admin/backups/prune', T, {
-    keepCount: 1,
-    reason: '冒烟测试：验证保留份数清理',
-  });
+  const badKeepCount = await call('POST', '/admin/backups/prune', T, { keepCount: 0 });
+  check('备份清理拒绝非法保留份数', badKeepCount.status === 400, badKeepCount.message);
+  const prune = await call('POST', '/admin/backups/prune', T, { keepCount: 1 });
   check('清理成功', prune.status === 200 || prune.status === 201,
     `清理 ${prune.data?.removed ?? 0} 份`);
 
@@ -125,18 +127,18 @@ function check(name, ok, detail = '') {
     `${Array.isArray(cleanLogs.data) ? cleanLogs.data.length : '非数组: ' + JSON.stringify(cleanLogs).slice(0,80)} 条`);
 
   const badTarget = await call('POST', '/admin/retention/cleanup', T, {
-    target: 'User', retentionDays: 30, reason: '冒烟测试：非法目标',
+    target: 'User', retentionDays: 30,
   });
   check('拒绝清理业务表 User', badTarget.status === 400, badTarget.message);
 
   const badDays = await call('POST', '/admin/retention/cleanup', T, {
-    target: 'AdminAuditLog', retentionDays: 0, reason: '冒烟测试：非法天数',
+    target: 'AdminAuditLog', retentionDays: 0,
   });
   check('拒绝非法保留天数', badDays.status === 400, badDays.message);
 
   // 实际清理: 用极大天数, 不该删任何东西, 但会产生留痕
   const realClean = await call('POST', '/admin/retention/cleanup', T, {
-    target: 'AdminAuditLog', retentionDays: 1000, reason: '冒烟测试：验证清理留痕',
+    target: 'AdminAuditLog', retentionDays: 1000,
   });
   check('清理执行并返回计数', realClean.status === 200 || realClean.status === 201,
     `删除 ${realClean.data?.deleted ?? '?'} 条`);
@@ -166,7 +168,7 @@ function check(name, ok, detail = '') {
   const opT = opLogin.data.accessToken;
   const opList = await call('GET', '/admin/backups', opT);
   check('operator 无 backup.read 权限', opList.status === 403, opList.message);
-  const opRun = await call('POST', '/admin/backups', opT, { reason: '越权测试' });
+  const opRun = await call('POST', '/admin/backups', opT);
   check('operator 无 backup.run 权限', opRun.status === 403, opRun.message);
 
   await prisma.user.delete({ where: { email } }).catch(() => {});

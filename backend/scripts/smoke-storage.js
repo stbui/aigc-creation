@@ -169,8 +169,9 @@ function check(name, ok, detail = '') {
   const badSw = await call('POST', '/admin/storage/active?backend=s3', T);
   check('非法后端被拒', badSw.status === 400, badSw.message);
   const notEnabled = await call('POST', '/admin/storage/active?backend=minio', T);
-  check('未启用后端不可切换', notEnabled.status === 500 || notEnabled.status === 400,
-    notEnabled.message?.slice(0, 50));
+  check('未启用后端不可切换', notEnabled.status === 400 && notEnabled.code === 40001 &&
+    String(notEnabled.message).includes('后端未启用: minio'),
+  `HTTP ${notEnabled.status} ${notEnabled.code ?? ''} ${notEnabled.message ?? ''}`.trim());
 
   console.log('\n【参数校验】');
   const badStatus = await call('PATCH', `/admin/assets/${sample.id}/status`, T, { status: 'deleted' });

@@ -5,13 +5,11 @@ import {
   LocalStorageProvider,
   OssStorageProvider,
   MinioStorageProvider,
+  STORAGE_BACKENDS,
   maskSecret,
   type StorageBackend,
   type StorageProvider,
 } from './storage.provider';
-
-/** 全部候选后端。顺序即界面展示顺序: 本地优先, 云端在后 */
-const ALL_BACKENDS: StorageBackend[] = ['local', 'oss', 'minio'];
 
 export interface BackendStatus {
   backend: StorageBackend;
@@ -107,7 +105,9 @@ export class StorageService implements OnModuleInit {
       this.logger.warn(`存储后端 ${this.active} 不可用: ${probe.message}`);
     }
 
-    const missing = (['oss', 'minio'] as StorageBackend[]).filter((b) => !this.providers.has(b));
+    const missing = STORAGE_BACKENDS.filter(
+      (backend) => backend !== 'local' && !this.providers.has(backend),
+    );
     if (missing.length > 0) {
       this.logger.log(`未启用的后端: ${missing.join(', ')} (补齐对应环境变量即可启用)`);
     }
@@ -163,7 +163,7 @@ export class StorageService implements OnModuleInit {
    */
   async status(): Promise<BackendStatus[]> {
     const out: BackendStatus[] = [];
-    for (const backend of ALL_BACKENDS) {
+    for (const backend of STORAGE_BACKENDS) {
       const p = this.providers.get(backend);
       if (!p) {
         out.push({
