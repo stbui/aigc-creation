@@ -111,6 +111,10 @@ export function toolPath(id: string): string {
   if (id === 'expand') return '/image-expand';
   if (id === 'recolor') return '/product-recolor';
   if (id === 'rotate') return '/rotate-angle';
+  // 2026-11-03: 带货图文有独立工作台页（左配置 + 右模板 + 底部历史）。
+  // 漏这行会让侧栏 / 顶导 / 工作台 / 首页全部指向通用工具页 (/tools/<id>),
+  // 用户看到的是通用表单而不是复刻页面。
+  if (id === 'shoppable_carousel') return '/shoppable-carousel';
   return `/tools/${id}`;
 }
 

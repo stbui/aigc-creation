@@ -472,3 +472,25 @@ useBtn            ref opacity:0 #1c1d1f  local opacity:0 #171a2b
 | 右栏宽 | 1024 | 848 | 同上 |
 | 模板卡宽 | 307 | 256 | 同上（列数已对齐为 3 / 4） |
 | 顶部 | 54px（logo + 带货图文 + 新建任务） | 站点导航 + 页内 54px 头 | 本站是全站外壳，页内头承载标题与新建任务 |
+
+---
+
+## 16. 入口路由修正（2026-11-03）
+
+**问题**：侧栏 / 顶部导航 / 工作台卡片 / 首页案例都通过 `toolPath()` 生成链接。
+新增能力时**漏加映射**，`toolPath('shoppable_carousel')` 落到兜底分支
+`/tools/<id>`，用户点进去看到的是通用工具页（`ToolPage`），而不是新做的复刻页。
+表现为「页面设计根本不一致」——因为打开的确实不是这个页面。
+
+**修正**：`frontend/src/lib/capabilities.ts` 的 `toolPath()` 增加一行：
+
+```ts
+if (id === 'shoppable_carousel') return '/shoppable-carousel';
+```
+
+验证：侧栏「AI 带货图文」href = `/shoppable-carousel`；工作台卡片 href 同；
+点击后 `.sc-workspace` 存在（确实是新页面）。
+
+> 这是新增独立工作台页时**必须同步**的一步：路由（`App.tsx`）+ 入口映射
+> （`lib/capabilities.ts` 的 `toolPath`）缺一不可。只加路由不加映射，
+> 页面存在但所有入口都指向通用工具页。

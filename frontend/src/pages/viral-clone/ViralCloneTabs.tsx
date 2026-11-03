@@ -1,5 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 
+import { NavigationTabs, NavigationTabsList, NavigationTabsTrigger } from './components';
+
 /**
  * 业务类型切换 tab。
  *
@@ -10,28 +12,20 @@ export function ViralCloneTabs() {
   const navigate = useNavigate();
 
   return (
-    <div className="pk-editor-tabs" role="tablist" aria-label="业务类型">
-      <button
-        type="button"
-        role="tab"
-        aria-selected={false}
-        className="pk-editor-tab"
-        onClick={() => navigate('/product-kit')}
-      >
-        商品主图
-      </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={false}
-        className="pk-editor-tab"
-        onClick={() => navigate('/product-detail')}
-      >
-        商品详情
-      </button>
-      <button type="button" role="tab" aria-selected className="pk-editor-tab pk-editor-tab-active">
-        爆款复刻
-      </button>
-    </div>
+    <NavigationTabs
+      value="viral-clone"
+      onValueChange={(value) => {
+        if (value === 'product-kit') navigate('/product-kit');
+        if (value === 'product-detail') navigate('/product-detail');
+      }}
+      className="vc-editor-tabs"
+      aria-label="业务类型"
+    >
+      <NavigationTabsList className="grid w-full grid-cols-3">
+        <NavigationTabsTrigger value="product-kit">商品主图</NavigationTabsTrigger>
+        <NavigationTabsTrigger value="product-detail">商品详情</NavigationTabsTrigger>
+        <NavigationTabsTrigger value="viral-clone">爆款复刻</NavigationTabsTrigger>
+      </NavigationTabsList>
+    </NavigationTabs>
   );
 }

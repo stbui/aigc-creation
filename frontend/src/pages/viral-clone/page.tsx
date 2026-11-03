@@ -8,7 +8,18 @@ import {
   type PkAsset,
   type PkResult,
 } from './constants';
-import { AssetLibraryModal, MobileUploadModal } from './components';
+import {
+  AssetLibraryModal,
+  MobileUploadModal,
+  Separator,
+  StatusBadge,
+  Surface,
+  SurfaceContent,
+  SurfaceDescription,
+  SurfaceFooter,
+  SurfaceHeader,
+  SurfaceTitle,
+} from './components';
 import { ViralCloneConfig } from './ViralCloneConfig';
 import { ViralCloneDegreeCard } from './ViralCloneDegreeCard';
 import { ViralCloneRequirementCard } from './ViralCloneRequirementCard';
@@ -443,13 +454,26 @@ export function ViralClonePage() {
   };
 
   return (
-    <div className="pk-workspace">
+    <main className="vc-workspace">
       {/* ── 左: 输入栏 ── */}
-      <aside className="pk-input-pane">
-        <div className="pk-form-card">
-          <ViralCloneTabs />
+      <aside className="vc-input-pane" aria-label="爆款复刻设置">
+        <Surface className="vc-editor-card">
+          <SurfaceHeader className="vc-editor-header">
+            <ViralCloneTabs />
+            <div className="vc-editor-heading">
+              <div className="flex flex-col gap-1">
+                <SurfaceTitle className="text-base">爆款复刻</SurfaceTitle>
+                <SurfaceDescription>上传商品图与参考图，按每次生成结果逐组对照。</SurfaceDescription>
+              </div>
+              <StatusBadge variant="secondary">
+                {images.length}/{MAX_IMAGES} 商品图
+              </StatusBadge>
+            </div>
+          </SurfaceHeader>
 
-          <div className="pk-form-scroll">
+          <Separator />
+
+          <SurfaceContent className="vc-editor-content">
             <ViralCloneConfig
               images={images}
               reference={reference}
@@ -472,36 +496,44 @@ export function ViralClonePage() {
               onLanguageChange={setLanguage}
             />
 
+            <Separator />
+
             <ViralCloneRequirementCard
               requirement={requirement}
               onRequirementChange={setRequirement}
               onExpand={() => setExpandOpen(true)}
             />
 
-            <ViralCloneDegreeCard degree={degree} onDegreeChange={setDegree} />
-          </div>
+            <Separator />
 
-          <ViralCloneSubmitBar
-            generating={generating}
-            formValid={formValid}
-            unavailableReason={unavailableReason}
-            creditLabel={creditLabel}
-            settingsOpen={settingsOpen}
-            ratio={ratio}
-            resolution={resolution}
-            onToggleSettings={() => setSettingsOpen((v) => !v)}
-            onRatioChange={(value) => {
-              setRatioTouched(true);
-              setRatio(value);
-            }}
-            onResolutionChange={(value) => {
-              setResolutionTouched(true);
-              setResolution(value);
-            }}
-            onModelQuoteChange={setModelQuoteCredits}
-            onSubmit={() => void submit()}
-          />
-        </div>
+            <ViralCloneDegreeCard degree={degree} onDegreeChange={setDegree} />
+          </SurfaceContent>
+
+          <Separator />
+
+          <SurfaceFooter className="vc-editor-footer">
+            <ViralCloneSubmitBar
+              generating={generating}
+              formValid={formValid}
+              unavailableReason={unavailableReason}
+              creditLabel={creditLabel}
+              settingsOpen={settingsOpen}
+              ratio={ratio}
+              resolution={resolution}
+              onToggleSettings={() => setSettingsOpen((v) => !v)}
+              onRatioChange={(value) => {
+                setRatioTouched(true);
+                setRatio(value);
+              }}
+              onResolutionChange={(value) => {
+                setResolutionTouched(true);
+                setResolution(value);
+              }}
+              onModelQuoteChange={setModelQuoteCredits}
+              onSubmit={() => void submit()}
+            />
+          </SurfaceFooter>
+        </Surface>
       </aside>
 
       <ViralCloneResultPane
@@ -537,6 +569,6 @@ export function ViralClonePage() {
         onRequirementChange={setRequirement}
         onClose={() => setExpandOpen(false)}
       />
-    </div>
+    </main>
   );
 }

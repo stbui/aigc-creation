@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import {
+  CircleAlert,
   Download,
   ImagePlus,
+  Images,
   LoaderCircle,
   Maximize2,
   RefreshCw,
@@ -11,7 +13,30 @@ import {
 
 import type { PkAsset, PkResult } from './constants';
 import { assetThumbUrl, toAbsoluteUrl } from './api';
-import { ImageLightbox, ToolWorkflowSteps, type LightboxItem } from './components';
+import {
+  Button,
+  EmptyState,
+  EmptyStateContent,
+  EmptyStateDescription,
+  EmptyStateHeader,
+  EmptyStateMedia,
+  EmptyStateTitle,
+  ImageLightbox,
+  InlineAlert,
+  InlineAlertDescription,
+  Separator,
+  Skeleton,
+  StatusBadge,
+  Surface,
+  SurfaceAction,
+  SurfaceContent,
+  SurfaceDescription,
+  SurfaceHeader,
+  SurfaceTitle,
+  ToolWorkflowSteps,
+  cn,
+  type LightboxItem,
+} from './components';
 import type { GalleryItem, ResultGallery } from './hooks';
 import { splitCloneInputs, taskErrorText } from './utils';
 
@@ -83,6 +108,13 @@ function stateText(state: CompareState): string {
   if (state === 'failed') return '生成失败';
   if (state === 'ready') return '已完成';
   return '待生成';
+}
+
+function stateBadgeVariant(state: CompareState): 'default' | 'destructive' | 'outline' | 'secondary' {
+  if (state === 'ready') return 'default';
+  if (state === 'failed') return 'destructive';
+  if (state === 'generating') return 'outline';
+  return 'secondary';
 }
 
 /**
@@ -191,82 +223,106 @@ export function ViralCloneResultPane({
   };
 
   return (
-    <section className="pk-result-pane vc-result-pane">
-      <div className="pk-result-body vc-result-body">
-        <div className="pk-result-toolbar">
-          <div className="pk-result-title">
+    <Surface className="vc-result-pane">
+      <SurfaceHeader className="vc-result-header">
+        <div className="flex min-w-0 flex-col gap-1">
+          <SurfaceTitle className="flex flex-wrap items-center gap-2 text-base">
             复刻结果
-            <span className="pk-result-count">
+            <StatusBadge variant="secondary">
               {generating ? '正在生成' : historyRows.length > 0 ? `${historyRows.length} 次 · ${readyCount} 张` : '等待生成'}
-            </span>
-          </div>
-          <button type="button" className="pk-result-regen" disabled={gallery.loading} onClick={onRefresh}>
-            <RefreshCw size={13} />
-            {gallery.loading ? '刷新中' : '刷新'}
-          </button>
+            </StatusBadge>
+          </SurfaceTitle>
+          <SurfaceDescription>按任务对照商品上传图、参考图和最终生成图。</SurfaceDescription>
         </div>
+        <SurfaceAction>
+          <Button variant="outline" size="sm" disabled={gallery.loading} onClick={onRefresh}>
+            <RefreshCw className={gallery.loading ? 'vc-spin' : undefined} />
+            {gallery.loading ? '刷新中' : '刷新'}
+          </Button>
+        </SurfaceAction>
+      </SurfaceHeader>
 
+      <Separator />
+
+      <SurfaceContent className="vc-result-content">
         {gallery.error && (
-          <p className="tool-submit-notice tool-submit-notice-error">历史生成图加载失败：{gallery.error}</p>
+          <InlineAlert variant="destructive" className="vc-result-alert">
+            <CircleAlert />
+            <InlineAlertDescription>历史生成图加载失败：{gallery.error}</InlineAlertDescription>
+          </InlineAlert>
         )}
         {result?.status === 'failed' && (
-          <p className="tool-submit-notice tool-submit-notice-error">
-            本次生成失败：{taskErrorText(result.errorCode)}，可调整后重新生成
-          </p>
+          <InlineAlert variant="destructive" className="vc-result-alert">
+            <CircleAlert />
+            <InlineAlertDescription>
+              本次生成失败：{taskErrorText(result.errorCode)}，可调整后重新生成
+            </InlineAlertDescription>
+          </InlineAlert>
         )}
 
         {gallery.loading && rows.length === 0 ? (
           <div className="vc-result-loading" role="status" aria-label="正在加载复刻结果">
-            <LoaderCircle size={22} className="vc-spin" />
+            <div className="vc-result-loading-grid" aria-hidden>
+              <Skeleton className="aspect-square rounded-lg" />
+              <Skeleton className="aspect-square rounded-lg" />
+              <Skeleton className="aspect-square rounded-lg" />
+            </div>
             <span>正在加载复刻记录…</span>
           </div>
+        ) : showStarter ? (
+          <EmptyState className="vc-result-empty">
+            <EmptyStateHeader>
+              <EmptyStateMedia variant="icon">
+                <Images />
+              </EmptyStateMedia>
+              <EmptyStateTitle>上传商品图和参考图开始复刻</EmptyStateTitle>
+              <EmptyStateDescription>
+                每次生成都会保留一组「商品上传图 → 参考图 → 生成图」对照，方便回看与继续调整。
+              </EmptyStateDescription>
+            </EmptyStateHeader>
+            <EmptyStateContent>
+              <ToolWorkflowSteps />
+            </EmptyStateContent>
+          </EmptyState>
         ) : (
           <div className="vc-result-list">
-            {showStarter && (
-              <div className="vc-result-starter">
-                <div className="vc-result-starter-copy">
-                  <strong>上传商品图和参考图，生成结果会显示在这里</strong>
-                  <p>每次生成都会保留一组对照，方便回看商品、参考图和最终成品。</p>
-                </div>
-                <ToolWorkflowSteps />
-              </div>
-            )}
-
-            {(showStarter ? [currentRow] : rows).map((row) => {
+            {rows.map((row) => {
               const rowPreview = previewItemsOf(row);
               const isCurrent = row.key === 'current';
               return (
-                <article className={`vc-result-row${isCurrent ? ' is-current' : ''}`} key={row.key}>
-                  <header className="vc-result-row-head">
+                <Surface className={cn('vc-result-row', isCurrent && 'is-current')} key={row.key}>
+                  <SurfaceHeader className="vc-result-row-head">
                     <div className="vc-result-row-meta">
-                      <span className={`vc-result-state is-${row.state}`}>
+                      <StatusBadge variant={stateBadgeVariant(row.state)}>
                         {row.state === 'generating' && <LoaderCircle size={12} className="vc-spin" />}
                         {stateText(row.state)}
-                      </span>
-                      <strong>{isCurrent ? '本次复刻' : '复刻记录'}</strong>
-                      {row.caption && <span className="vc-result-degree">{row.caption}</span>}
+                      </StatusBadge>
+                      <strong className="text-sm font-semibold">{isCurrent ? '本次复刻' : '复刻记录'}</strong>
+                      {row.caption && <StatusBadge className="vc-degree-badge" variant="secondary">{row.caption}</StatusBadge>}
                       {row.createdAt && <time dateTime={row.createdAt}>{formatTime(row.createdAt)}</time>}
                     </div>
                     {row.item?.url && (
-                      <button
-                        type="button"
-                        className="vc-result-delete"
+                      <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        className="vc-result-delete-action"
                         aria-label="删除这次复刻结果"
                         title="删除这次复刻结果"
                         onClick={() => onDelete(row.item!)}
                       >
-                        <Trash2 size={14} />
-                      </button>
+                        <Trash2 />
+                      </Button>
                     )}
-                  </header>
+                  </SurfaceHeader>
 
-                  <div className="vc-compare-grid">
-                    <figure className="vc-compare-card is-product">
+                  <SurfaceContent className="vc-result-row-content">
+                    <div className="vc-compare-grid">
+                      <figure className="vc-compare-card is-product">
                       <div className="vc-compare-media">
                         {row.productUrls[0] ? (
                           <div className="vc-product-gallery">
-                            <button
-                              type="button"
+                            <Button
+                              variant="ghost"
                               className="vc-compare-open"
                               aria-label="查看商品上传图 1 大图"
                               title="查看商品上传图 1 大图"
@@ -280,12 +336,12 @@ export function ViralCloneResultPane({
                               <span className="vc-compare-open-mask">
                                 <Maximize2 size={16} />
                               </span>
-                            </button>
+                            </Button>
                             {row.productUrls.length > 1 && (
                               <div className="vc-product-rail" role="group" aria-label="其余商品上传图">
                                 {row.productUrls.slice(1, 5).map((url, index) => (
-                                  <button
-                                    type="button"
+                                  <Button
+                                    variant="ghost"
                                     className="vc-compare-open"
                                     aria-label={`查看商品上传图 ${index + 2} 大图`}
                                     title={`查看商品上传图 ${index + 2} 大图`}
@@ -300,7 +356,7 @@ export function ViralCloneResultPane({
                                     <span className="vc-compare-open-mask">
                                       <Maximize2 size={12} />
                                     </span>
-                                  </button>
+                                  </Button>
                                 ))}
                               </div>
                             )}
@@ -327,8 +383,8 @@ export function ViralCloneResultPane({
                     <figure className="vc-compare-card is-reference">
                       <div className="vc-compare-media">
                         {row.referenceUrl ? (
-                          <button
-                            type="button"
+                          <Button
+                            variant="ghost"
                             className="vc-compare-open"
                             aria-label="查看参考图大图"
                             title="查看参考图大图"
@@ -342,7 +398,7 @@ export function ViralCloneResultPane({
                             <span className="vc-compare-open-mask">
                               <Maximize2 size={16} />
                             </span>
-                          </button>
+                          </Button>
                         ) : (
                           <div className="vc-compare-placeholder">
                             <ImagePlus size={22} />
@@ -363,8 +419,8 @@ export function ViralCloneResultPane({
                       <div className="vc-compare-media">
                         {row.outputUrl ? (
                           <>
-                            <button
-                              type="button"
+                            <Button
+                              variant="ghost"
                               className="vc-compare-open"
                               aria-label="查看生成图大图"
                               title="查看生成图大图"
@@ -378,33 +434,36 @@ export function ViralCloneResultPane({
                               <span className="vc-compare-open-mask">
                                 <Maximize2 size={16} />
                               </span>
-                            </button>
+                            </Button>
                             {row.item && (
                               <div className="vc-output-actions">
-                                <button
-                                  type="button"
+                                <Button
+                                  variant="ghost"
+                                  size="icon-xs"
                                   aria-label="下载生成图"
                                   title="下载原图"
                                   onClick={() => download(row)}
                                 >
-                                  <Download size={14} />
-                                </button>
-                                <button
-                                  type="button"
+                                  <Download />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon-xs"
                                   aria-label="用作参考图"
                                   title="用作下一轮参考图"
                                   onClick={() => onUseAsReference(row.item!)}
                                 >
-                                  <ImagePlus size={14} />
-                                </button>
-                                <button
-                                  type="button"
+                                  <ImagePlus />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon-xs"
                                   aria-label="删除生成图"
                                   title="删除生成图"
                                   onClick={() => onDelete(row.item!)}
                                 >
-                                  <Trash2 size={14} />
-                                </button>
+                                  <Trash2 />
+                                </Button>
                               </div>
                             )}
                           </>
@@ -435,13 +494,16 @@ export function ViralCloneResultPane({
                     </figure>
                   </div>
 
-                  {rowPreview.length > 0 && <span className="vc-result-preview-hint">点击任意图片可对照查看大图</span>}
-                </article>
+                    {rowPreview.length > 0 && (
+                      <span className="vc-result-preview-hint">点击任意图片可对照查看大图</span>
+                    )}
+                  </SurfaceContent>
+                </Surface>
               );
             })}
           </div>
         )}
-      </div>
+      </SurfaceContent>
 
       {preview && preview.items.length > 0 && (
         <ImageLightbox
@@ -452,6 +514,6 @@ export function ViralCloneResultPane({
           onClose={() => setPreview(null)}
         />
       )}
-    </section>
+    </Surface>
   );
 }

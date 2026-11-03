@@ -5,15 +5,7 @@
  * `hooks.ts`; 这里只放不依赖 React 的金额、幂等键与试算错误文案换算。
  */
 
-/**
- * 分 → 「¥39.00」。
- *
- * 金额一律由后端下发整数分，前端只做展示格式化 ——
- * 不在这一层做任何汇率、折扣或优惠叠加计算。
- */
-export function formatYuan(cents: number): string {
-  return `¥${(cents / 100).toFixed(2)}`;
-}
+export { formatYuan } from '../../lib/money';
 
 /** 幂等键。crypto.randomUUID 在非安全上下文 (http) 下可能缺失, 故留兜底 */
 export function newIdempotencyKey(): string {

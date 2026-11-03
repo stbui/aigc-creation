@@ -1,6 +1,15 @@
 import { Maximize2 } from 'lucide-react';
 
 import { MAX_REQUIREMENT_LEN } from './constants';
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupTextarea,
+} from './components';
 
 /** 复刻要求（独立卡）+ 放大编辑入口。 */
 export function ViralCloneRequirementCard({
@@ -13,29 +22,36 @@ export function ViralCloneRequirementCard({
   onExpand: () => void;
 }) {
   return (
-    <section className="pk-config-card vc-requirement-card">
-      <div className="pk-section">
-        <strong className="pk-section-title">复刻要求</strong>
-        <div className="pk-desc-editor">
-          <textarea
-            className="vc-requirement-textarea"
-            rows={3}
-            maxLength={MAX_REQUIREMENT_LEN}
-            value={requirement}
-            placeholder="例如：文案统一用英文、模特保持完全不变、参考图不变只替换商品。"
-            onChange={(e) => onRequirementChange(e.target.value)}
-          />
-          <button
-            type="button"
-            className="pk-desc-expand"
-            aria-label="放大编辑复刻要求"
-            title="放大编辑"
-            onClick={onExpand}
-          >
-            <Maximize2 size={14} />
-          </button>
-        </div>
-      </div>
+    <section className="vc-requirement-section" aria-labelledby="vc-requirement-label">
+      <FieldGroup>
+        <Field className="gap-1.5">
+          <FieldLabel id="vc-requirement-label" htmlFor="vc-requirement" className="text-sm font-semibold">
+            复刻要求
+          </FieldLabel>
+          <InputGroup className="vc-requirement-input">
+            <InputGroupTextarea
+              id="vc-requirement"
+              className="min-h-24 resize-none pr-12"
+              rows={3}
+              maxLength={MAX_REQUIREMENT_LEN}
+              value={requirement}
+              placeholder="例如：文案统一用英文、模特保持完全不变、参考图不变只替换商品。"
+              onChange={(e) => onRequirementChange(e.target.value)}
+            />
+            <InputGroupAddon align="inline-end" className="absolute top-2 right-2">
+              <InputGroupButton
+                size="icon-xs"
+                variant="ghost"
+                aria-label="放大编辑复刻要求"
+                title="放大编辑"
+                onClick={onExpand}
+              >
+                <Maximize2 />
+              </InputGroupButton>
+            </InputGroupAddon>
+          </InputGroup>
+        </Field>
+      </FieldGroup>
     </section>
   );
 }

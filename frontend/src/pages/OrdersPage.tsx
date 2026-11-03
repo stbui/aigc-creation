@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShoppingBag } from 'lucide-react';
 import { ordersApi, invoicesApi, paymentsApi } from '../lib/api';
+import { formatYuan } from '../lib/money';
 import { notifyCreditsChanged } from '../context/CreditsContext';
 import { useAuth } from '../context/AuthContext';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
@@ -47,10 +48,6 @@ function matchesFilter(o: Order, filter: FilterValue): boolean {
   if (filter === 'all') return true;
   if (filter === 'refund') return o.status === 'refunded' || o.status === 'partial_refunded';
   return o.status === filter;
-}
-
-function formatYuan(cents: number): string {
-  return `¥${(cents / 100).toFixed(2)}`;
 }
 
 function formatDate(iso: string | null | undefined): string {

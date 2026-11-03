@@ -52,7 +52,7 @@
   /* 描述 / 路径类小字。原 #86909c 在白底 3.24:1、--surface 上 2.94:1，
      不满足小字号 4.5:1；收到 #667085 后为 4.98:1 / 4.5:1，与 --text-muted 同值，
      层级改由字号与字重承担。 */
-  --text-desc: #667085;
+  --text-desc: var(--text-muted);
   --border: #e5e7ef; /* 常规边框 */
   --border-soft: #e4e7ef; /* 次级边框 (与常规同族) */
   --surface: #f2f4f7; /* 灰底块 */
@@ -71,10 +71,12 @@
   --accent-orange: #ff7a45;
   --cta-text: #f7593a;
   --danger-soft-bg: #fff1f2;
-  --danger-soft-text: #ef4444;
+  /* 2026-11-03 压到 AA: 原 #ef4444 在 --danger-soft-bg 上 3.43:1、白底 3.76:1 */
+  --danger-soft-text: #c5221f;
   --danger-text: #e11d48;
   --success-soft-bg: #eaf7f2;
-  --success-text: #2f8f6b;
+  /* 2026-11-03 压到 AA: 原 #2f8f6b 在 --success-soft-bg 上 3.63:1、白底 3.99:1 */
+  --success-text: #27795a;
   /* 成功态描边 (2026-10-20 新增, 供产出来源徽标等场景;
      色相取 success-text 的浅调, 与 success-soft-bg 搭配不刺眼) */
   --success-border: #bfe6d6;
@@ -2898,24 +2900,8 @@ html[data-promo='off'] {
   gap: 12px;
   align-items: center;
 }
-.tool-submit.ant-btn {
-  background: var(--brand);
-  border-color: var(--brand);
-  font-weight: 600;
-  letter-spacing: 2px;
-}
-.tool-submit.ant-btn:hover:not(:disabled) {
-  background: var(--brand-hover) !important;
-  border-color: var(--brand-hover) !important;
-}
-/* 禁用态: AntD 默认灰字会压在品牌色底上, 几乎读不出文案。 */
-.tool-submit.ant-btn:disabled,
-.tool-submit.ant-btn[disabled] {
-  background: var(--brand-bg) !important;
-  border-color: var(--brand-bg) !important;
-  color: var(--brand) !important;
-  opacity: 0.65;
-}
+/* `.tool-submit` 的样式只在文件末尾「shadcn 适配层」定义一次（原 antd 版已删：
+   适配层不再输出 .ant-btn，此处规则永不命中，且曾导致迁移时漏抄字重/字距）。 */
 /* .tool-result-loading 的定义已移至文件末尾「通用工具页结果卡『生成中』骨架」小节 */
 .tool-result-img {
   width: 100%;
@@ -2947,8 +2933,9 @@ html[data-promo='off'] {
      纵向滚动，提交卡底部被视口裁掉（局部重绘 / 去水印早就单独立了 border-box，
      正是同一个原因）。统一在这里收口。 */
   box-sizing: border-box;
-  /* 64 头部 + 40 推广条; 推广条关闭后由 html[data-promo="off"] 修正 */
-  height: calc(100vh - 104px);
+  /* 顶栏高度只走 --workspace-topbar-height（它内部已含 --promo-topbar-height，
+     推广条关闭时该变量归零），页面不再另写 calc(100vh - 64px/104px)。 */
+  height: calc(100vh - var(--workspace-topbar-height));
   min-height: 620px;
   display: grid;
   grid-template-columns: 432px minmax(0, 1fr);
@@ -2958,9 +2945,6 @@ html[data-promo='off'] {
   grid-template-rows: minmax(0, 1fr);
   gap: 16px;
   align-items: start;
-}
-html[data-promo='off'] .pk-workspace {
-  height: calc(100vh - 64px);
 }
 /* 自由创作页: 参考站 .free-creation-page 内边距四边均为 16 (其余能力页右侧为 24,
    故右内边距单独收紧, 结果栏因此 784 宽而非 776 —— 实拍 [640,80,784,804]) */
@@ -5006,7 +4990,7 @@ img[data-broken='1'] {
   border-radius: var(--radius-pill);
   background: var(--surface);
   color: var(--text-desc);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 20px;
 }
 .vc-result-state.is-ready {
@@ -5026,7 +5010,7 @@ img[data-broken='1'] {
   padding: 0 7px;
   border-radius: var(--radius-pill);
   background: var(--surface);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 20px;
 }
 .vc-result-delete {
@@ -5173,7 +5157,7 @@ img[data-broken='1'] {
   border-radius: var(--radius-pill);
   background: rgba(23, 26, 43, 0.66);
   color: var(--card-bg);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 18px;
   pointer-events: none;
 }
@@ -5225,7 +5209,7 @@ img[data-broken='1'] {
   border-radius: 50%;
   background: var(--surface);
   color: var(--text-body);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 700;
   line-height: 18px;
 }
@@ -5250,7 +5234,7 @@ img[data-broken='1'] {
 }
 .vc-compare-caption small {
   color: var(--text-desc);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 16px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -5260,7 +5244,7 @@ img[data-broken='1'] {
   display: block;
   margin-top: 8px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 16px;
   text-align: right;
 }
@@ -5313,7 +5297,7 @@ img[data-broken='1'] {
     display: none;
   }
   .vc-compare-caption strong {
-    font-size: 11px;
+    font-size: 12px;
   }
   .vc-compare-step {
     width: 16px;
@@ -8634,7 +8618,7 @@ ol.product-sku-steps {
 
 .pk-workspace.product-sku-page {
   box-sizing: border-box;
-  height: calc(100vh - 104px);
+  height: calc(100vh - var(--workspace-topbar-height));
   min-height: 620px;
   grid-template-columns: minmax(360px, 432px) minmax(0, 1fr) 192px;
   grid-template-rows: minmax(0, 1fr);
@@ -8643,10 +8627,6 @@ ol.product-sku-steps {
   overflow: hidden;
   background: var(--page-bg);
   color: var(--sku-text-1);
-}
-
-html[data-promo='off'] .pk-workspace.product-sku-page {
-  height: calc(100vh - 64px);
 }
 
 .product-sku-page .pk-input-pane {
@@ -10117,7 +10097,7 @@ ol.product-sku-steps {
 @media (max-width: 1024px) {
   .pk-workspace.product-sku-page {
     height: auto;
-    min-height: calc(100vh - 64px);
+    min-height: calc(100vh - var(--workspace-topbar-height));
     grid-template-columns: minmax(0, 1fr);
     overflow: visible;
   }
@@ -11996,10 +11976,6 @@ ol.product-sku-steps {
 }
 .multi-image-fusion-page ::-webkit-scrollbar-thumb:hover {
   background: var(--mif-scrollbar-thumb-hover);
-}
-
-/* 推广条关闭时顶栏只剩 64px（对齐参考站 --promo-topbar-height 归零） */
-html[data-promo='off'] .multi-image-fusion-page {
 }
 
 /* 窄屏: 结果多列网格退化为单列（ToolShell 共享，非多图融合专属） */
@@ -18377,7 +18353,7 @@ html[data-promo='off'] .multi-image-fusion-page {
 }
 .alp-filter-label {
   padding: 0 6px 0 5px;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 28px;
   color: var(--alp-text-10);
 }
@@ -18539,7 +18515,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   border-radius: var(--radius-pill);
   color: var(--alp-text-10);
   background: var(--surface-4);
-  font-size: 10px;
+  font-size: 12px;
   font-style: normal;
   font-weight: 500;
   line-height: 16px;
@@ -18656,7 +18632,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   padding: 2px 7px;
   border-radius: var(--radius-pill);
   color: var(--card-bg);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 16px;
   white-space: nowrap;
@@ -18692,7 +18668,7 @@ html[data-promo='off'] .multi-image-fusion-page {
   border-radius: var(--radius-pill);
   color: var(--brand);
   background: color-mix(in srgb, var(--card-bg) 90%, transparent);
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 16px;
   box-shadow: 0 1px 4px rgb(17 24 39 / 0.18);
@@ -21362,9 +21338,9 @@ html[data-promo='off'] .multi-image-fusion-page {
 .pk-workspace.local-redraw-page,
 .pk-workspace.watermark-removal-page {
   box-sizing: border-box;
-  height: calc(100vh - 104px);
+  height: calc(100vh - var(--workspace-topbar-height));
   min-height: 0;
-  max-height: calc(100vh - 104px);
+  max-height: calc(100vh - var(--workspace-topbar-height));
   padding: 16px;
   gap: 16px;
   grid-template-columns: 432px minmax(560px, 1fr) 192px;
@@ -21373,11 +21349,6 @@ html[data-promo='off'] .multi-image-fusion-page {
   color: var(--wb-text);
   background: var(--page-bg);
   overflow: hidden;
-}
-html[data-promo='off'] .pk-workspace.local-redraw-page,
-html[data-promo='off'] .pk-workspace.watermark-removal-page {
-  height: calc(100vh - 64px);
-  max-height: calc(100vh - 64px);
 }
 .pk-workspace.local-redraw-page .pk-input-pane,
 .pk-workspace.watermark-removal-page .pk-input-pane,
@@ -21390,15 +21361,6 @@ html[data-promo='off'] .pk-workspace.watermark-removal-page {
 .pk-workspace.local-redraw-page {
   font-size: 16px;
   line-height: normal;
-  /* .app-body 的 min-height 只扣了 64px 顶栏；促销条开启时整页会多 40px
-   * (1440×900 实测 scrollHeight 940)。这页是固定视口工作台，按实际外壳
-   * 高度回填页面，避免出现假滚动；其他工具页不受影响。 */
-  height: calc(100vh - var(--workspace-topbar-height));
-  max-height: calc(100vh - var(--workspace-topbar-height));
-}
-html[data-promo='off'] .pk-workspace.local-redraw-page {
-  height: calc(100vh - 64px);
-  max-height: calc(100vh - 64px);
 }
 /* 外壳 .app-body 的 min-height 只扣 64px 顶栏；本页固定视口工作台在促销条
  * 开启时会因此多出 40px 页面滚动。仅在局部重绘页存在时校正外壳高度。 */
@@ -21470,9 +21432,9 @@ html[data-promo='off'] .pk-workspace.local-redraw-page {
 /* 一键抠图：参考站没有历史栏，固定两栏 */
 .pk-workspace.background-remove-page {
   box-sizing: border-box;
-  height: calc(100vh - 104px);
+  height: calc(100vh - var(--workspace-topbar-height));
   min-height: 0;
-  max-height: calc(100vh - 104px);
+  max-height: calc(100vh - var(--workspace-topbar-height));
   padding: 16px;
   gap: 16px;
   grid-template-columns: 432px minmax(560px, 1fr);
@@ -21481,10 +21443,6 @@ html[data-promo='off'] .pk-workspace.local-redraw-page {
   color: var(--wb-text);
   background: var(--page-bg);
   overflow: hidden;
-}
-html[data-promo='off'] .pk-workspace.background-remove-page {
-  height: calc(100vh - 64px);
-  max-height: calc(100vh - 64px);
 }
 .pk-workspace.background-remove-page .pk-input-pane,
 .pk-workspace.background-remove-page .pk-result-pane {
@@ -21631,11 +21589,6 @@ html[data-promo='off'] .pk-workspace.background-remove-page {
   color: var(--tool-text-1);
   background: var(--page-bg);
   overflow: hidden;
-}
-/* 促销条关闭时外壳 chrome 只剩 64px；变量本身仍按 64+40 计算，需显式回落。 */
-html[data-promo='off'] .pk-workspace.product-retouch-page {
-  height: calc(100vh - 64px);
-  min-height: calc(100vh - 64px);
 }
 .pk-workspace.product-retouch-page .pk-input-pane,
 .pk-workspace.product-retouch-page .pk-result-pane {
@@ -22168,14 +22121,12 @@ html[data-promo='off'] .pk-workspace.product-retouch-page {
   }
 }
 
-/* PromoBar 关闭时桌面高度规则 (html[data-promo='off'] .pk-workspace)
- * 比移动端单列的 height:auto 多一个元素选择器，必须显式覆盖，
- * 否则移动端页面仍被锁在 100vh-64px，画布/结果区会溢出页面盒。 */
+/* 桌面固定视口高度在移动单列下失效：画布/结果区会溢出页面盒，改成内容高度。 */
 @media (max-width: 900px) {
-  html[data-promo='off'] .pk-workspace.local-redraw-page,
-  html[data-promo='off'] .pk-workspace.watermark-removal-page,
-  html[data-promo='off'] .pk-workspace.background-remove-page,
-  html[data-promo='off'] .pk-workspace.product-retouch-page {
+  .pk-workspace.local-redraw-page,
+  .pk-workspace.watermark-removal-page,
+  .pk-workspace.background-remove-page,
+  .pk-workspace.product-retouch-page {
     height: auto;
     max-height: none;
   }
@@ -24252,11 +24203,6 @@ html[data-promo='off'] .pk-workspace.product-retouch-page {
     padding-left: 24px;
     overflow: hidden;
   }
-  html[data-promo='off'] .pk-workspace.product-sku-page,
-  html[data-promo='off'] .pk-workspace.product-sku-page.pk-workspace-trailing,
-  html[data-promo='off'] .pk-workspace.product-sku-page.pk-workspace-trailing-collapsed {
-    height: calc(100vh - 64px);
-  }
 
   .product-sku-page .pk-input-pane,
   .product-sku-page .pk-form-card,
@@ -24425,11 +24371,6 @@ html[data-promo='off'] .pk-workspace.product-retouch-page {
     gap: 10px;
     padding: 12px 16px 24px;
     overflow: visible;
-  }
-  html[data-promo='off'] .pk-workspace.product-sku-page,
-  html[data-promo='off'] .pk-workspace.product-sku-page.pk-workspace-trailing,
-  html[data-promo='off'] .pk-workspace.product-sku-page.pk-workspace-trailing-collapsed {
-    height: auto;
   }
   .product-sku-page .pk-input-pane,
   .product-sku-page .pk-form-card,
@@ -25271,30 +25212,19 @@ html[data-promo='off'] .pk-workspace.product-retouch-page {
 }
 
 /* ───────── 移动端工作台高度收口 (2026-11-02) ─────────
- * 桌面固定视口高度 (含 html[data-promo='off'] 的高特异性修正) 在 ≤1024 单列
- * 布局下仍把容器锁在 100vh: 390×844 实测 .pk-workspace 高 780px, 而左右栏
- * 内容共需 1547px, 提交按钮与结果区落在容器外, .app-content 只能内部滚动。
- * 这里用同等或更高特异性统一改为按内容增高。 */
+ * 桌面固定视口高度在 ≤1024 单列布局下仍把容器锁在 100vh: 390×844 实测
+ * .pk-workspace 高 780px, 而左右栏内容共需 1547px, 提交按钮与结果区落在
+ * 容器外, .app-content 只能内部滚动。这里统一改为按内容增高。 */
 @media (max-width: 1024px) {
-  html[data-promo='off'] .pk-workspace,
-  html[data-promo='off'] .pk-workspace.fc-workspace {
+  .pk-workspace,
+  .pk-workspace.fc-workspace {
     height: auto;
   }
-  html[data-promo='off'] .pk-workspace.product-sku-page,
-  html[data-promo='off'] .pk-workspace.product-sku-page.pk-workspace-trailing,
-  html[data-promo='off'] .pk-workspace.product-sku-page.pk-workspace-trailing-collapsed {
+  .pk-workspace.product-sku-page,
+  .pk-workspace.product-sku-page.pk-workspace-trailing,
+  .pk-workspace.product-sku-page.pk-workspace-trailing-collapsed {
     height: auto;
     min-height: 0;
-  }
-}
-
-@media (max-width: 900px) {
-  html[data-promo='off'] .pk-workspace.local-redraw-page,
-  html[data-promo='off'] .pk-workspace.watermark-removal-page,
-  html[data-promo='off'] .pk-workspace.background-remove-page,
-  html[data-promo='off'] .pk-workspace.product-retouch-page {
-    height: auto;
-    max-height: none;
   }
 }
 
@@ -25778,7 +25708,7 @@ html[data-promo='off'] .pk-workspace.product-retouch-page {
   border-radius: 999px;
   background: var(--danger-text);
   color: #fff;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 16px;
   text-align: center;
   font-variant-numeric: tabular-nums;
@@ -25975,6 +25905,9 @@ html[data-promo='off'] .pk-workspace.product-retouch-page {
 .tool-submit.ui-btn:hover:not(:disabled) {
   background: var(--brand);
   border-color: var(--brand);
+  /* 迁移 shadcn 时漏抄, 2026-11-03 补回: 提交主 CTA 的字重/字距 */
+  font-weight: 600;
+  letter-spacing: 2px;
 }
 .tool-submit.ui-btn:hover:not(:disabled) {
   background: var(--brand-hover) !important;
@@ -26210,7 +26143,7 @@ html[data-promo='off'] .pk-workspace.product-retouch-page {
 }
 .app-user-menu-balance span {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 16px;
 }
 .app-user-menu-balance strong {
@@ -26253,7 +26186,7 @@ html[data-promo='off'] .pk-workspace.product-retouch-page {
 }
 .app-user-menu-package-copy span {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 16px;
 }
 .app-user-menu-package-copy strong {
@@ -26271,7 +26204,7 @@ html[data-promo='off'] .pk-workspace.product-retouch-page {
   border-radius: var(--radius-pill);
   background: var(--surface);
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 16px;
 }
@@ -26312,7 +26245,7 @@ html[data-promo='off'] .pk-workspace.product-retouch-page {
 .app-user-menu-package-note {
   margin: 9px 0 0;
   color: #9a6700;
-  font-size: 11px;
+  font-size: 12px;
   line-height: 17px;
 }
 .app-user-menu-package-action {
@@ -26386,7 +26319,7 @@ html[data-promo='off'] .pk-workspace.product-retouch-page {
 }
 .app-user-menu-link-copy small {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 400;
   line-height: 16px;
 }
@@ -26487,7 +26420,7 @@ html[data-promo='off'] .pk-workspace.product-retouch-page {
   margin: -24px -24px -32px;
   padding: 0;
   box-sizing: border-box;
-  height: calc(100vh - 104px);
+  height: calc(100vh - var(--workspace-topbar-height));
   min-height: 620px;
   display: grid;
   /* 页面头 (54, 对应参考站顶栏) + 双栏主体 */
@@ -26516,9 +26449,6 @@ html[data-promo='off'] .pk-workspace.product-retouch-page {
   display: grid;
   grid-template-columns: 416px minmax(0, 1fr);
   min-height: 0;
-}
-html[data-promo='off'] .sc-workspace {
-  height: calc(100vh - 64px);
 }
 @media (max-width: 900px) {
   .sc-workspace {
@@ -27336,4 +27266,281 @@ html[data-promo='off'] .sc-workspace {
  */
 .sc-footer-row .pk-settings-chip {
   display: none;
+}
+
+/*
+ * 爆款复刻 · shadcn 工作台布局
+ *
+ * 页面骨架由 Card / CardHeader / CardContent / CardFooter 组合；
+ * 这里只负责复刻工作台视口尺寸与 Card 默认内边距的页面级覆盖，
+ * 结果对照缩略图、上传区等业务控件继续复用上方既有 .vc-* / .pk-* 样式。
+ */
+.vc-workspace {
+  margin: -24px -24px -32px;
+  padding: 16px 24px 16px 16px;
+  box-sizing: border-box;
+  height: calc(100vh - var(--workspace-topbar-height));
+  min-height: 620px;
+  display: grid;
+  grid-template-columns: 432px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.vc-input-pane {
+  width: 432px;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.vc-editor-card,
+.vc-result-pane {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.vc-editor-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.vc-editor-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.vc-editor-heading > div {
+  min-width: 0;
+}
+
+.vc-editor-tabs {
+  display: none;
+}
+
+.vc-editor-content {
+  flex: 1;
+  min-height: 0;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.vc-editor-content > [data-slot='separator'],
+.vc-editor-card > [data-slot='separator'] {
+  flex: none;
+}
+
+.vc-editor-footer {
+  display: block;
+  padding: 0;
+}
+
+.vc-editor-footer .pk-submit-actions {
+  border-radius: 0;
+}
+
+.vc-submit-alert {
+  margin: 12px 16px 0;
+}
+
+.vc-config-section,
+.vc-generation-settings,
+.vc-requirement-section,
+.vc-degree-section {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.vc-config-section {
+  gap: 16px;
+}
+
+.vc-generation-settings {
+  gap: 12px;
+}
+
+.vc-generation-settings-grid {
+  min-width: 0;
+}
+
+.vc-requirement-section {
+  gap: 0;
+}
+
+.vc-requirement-input {
+  min-height: 80px;
+  align-items: flex-start;
+  border-radius: var(--radius-control);
+  background: var(--card-bg);
+}
+
+.vc-requirement-input textarea {
+  min-height: 80px;
+  padding: 8px 44px 8px 12px;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.vc-degree-section {
+  gap: 12px;
+}
+
+.vc-degree-toggle {
+  min-height: 86px;
+  height: auto;
+  padding: 8px 16px;
+  justify-content: center;
+  text-align: left;
+  white-space: normal;
+  background: var(--surface);
+  border-color: transparent;
+  border-radius: var(--radius-control);
+}
+
+.vc-degree-toggle:hover {
+  background: var(--border);
+}
+
+.vc-degree-toggle[data-state='on'] {
+  background: var(--brand-bg);
+}
+
+.vc-result-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+}
+
+.vc-result-content {
+  flex: 1;
+  min-height: 0;
+  padding: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.vc-result-alert {
+  flex: none;
+}
+
+.vc-result-empty {
+  flex: 1;
+  border: 0;
+}
+
+.vc-result-loading-grid {
+  width: min(100%, 520px);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.vc-result-row {
+  min-width: 0;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.vc-result-row-head {
+  padding: 12px;
+  margin-bottom: 0;
+}
+
+.vc-result-row-content {
+  min-width: 0;
+  padding: 0 12px 12px;
+}
+
+.vc-result-delete-action {
+  flex: none;
+  color: var(--text-desc);
+}
+
+.vc-result-delete-action:hover {
+  color: var(--danger-soft-text);
+}
+
+@media (max-width: 1024px) {
+  .vc-workspace {
+    height: auto;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+  }
+
+  .vc-editor-tabs {
+    display: flex;
+  }
+
+  .vc-input-pane {
+    width: 100%;
+    height: auto;
+  }
+
+  .vc-editor-card {
+    height: auto;
+  }
+
+  .vc-editor-content {
+    overflow: visible;
+  }
+
+  .vc-result-pane {
+    height: auto;
+    min-height: 480px;
+  }
+
+  .vc-result-content {
+    min-height: 400px;
+  }
+
+  .vc-result-list {
+    overflow: visible;
+  }
+}
+
+@media (max-width: 900px) {
+  .vc-workspace {
+    margin: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .vc-result-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .vc-result-row-head {
+    padding: 10px 10px 8px;
+  }
+
+  .vc-result-row-content {
+    padding: 0 10px 10px;
+  }
+
+  .vc-result-loading-grid {
+    gap: 6px;
+  }
 }

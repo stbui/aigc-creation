@@ -6,7 +6,15 @@ import {
   MAX_NAME_LEN,
   type PkAsset,
 } from './constants';
-import { ToolImageDropzone } from './components';
+import {
+  Field,
+  FieldGroup,
+  FieldLabel,
+  Input,
+  Select,
+  Separator,
+  ToolImageDropzone,
+} from './components';
 import { languageOptions, platformOptions } from './utils';
 
 /**
@@ -56,7 +64,7 @@ export function ViralCloneConfig({
   onLanguageChange: (value: string) => void;
 }) {
   return (
-    <section className="pk-config-card">
+    <div className="vc-config-section">
       <ToolImageDropzone
         title="上传商品图"
         images={images}
@@ -91,49 +99,59 @@ export function ViralCloneConfig({
         emptyHint={`上传或粘贴要复刻风格的参考图，最多 1 张，单张不超过 ${MAX_IMAGE_MB}MB`}
       />
 
-      <div className="pk-section">
-        <strong className="pk-section-title">生成设置</strong>
-        <div className="pk-form-grid">
-          <label className="pk-field">
-            <span className="pk-field-label">商品名称（选填）</span>
-            <input
+      <Separator />
+
+      <section className="vc-generation-settings" aria-labelledby="vc-generation-settings-title">
+        <h3 id="vc-generation-settings-title" className="text-sm font-semibold text-foreground">
+          生成设置
+        </h3>
+        <FieldGroup className="vc-generation-settings-grid grid grid-cols-2 gap-3">
+          <Field className="gap-1.5">
+            <FieldLabel htmlFor="vc-product-name" className="text-xs text-muted-foreground">
+              商品名称（选填）
+            </FieldLabel>
+            <Input
+              id="vc-product-name"
               value={productName}
               maxLength={MAX_NAME_LEN}
-              placeholder="请输入商品名称（选填）"
+              placeholder="请输入商品名称"
               onChange={(e) => onProductNameChange(e.target.value)}
             />
-          </label>
-          <label className="pk-field">
-            <span className="pk-field-label">品牌（选填）</span>
-            <input
+          </Field>
+          <Field className="gap-1.5">
+            <FieldLabel htmlFor="vc-brand" className="text-xs text-muted-foreground">
+              品牌（选填）
+            </FieldLabel>
+            <Input
+              id="vc-brand"
               value={brand}
               maxLength={MAX_NAME_LEN}
-              placeholder="请输入品牌（选填）"
+              placeholder="请输入品牌"
               onChange={(e) => onBrandChange(e.target.value)}
             />
-          </label>
-          <label className="pk-field">
-            <span className="pk-field-label">平台</span>
-            <select value={platform} onChange={(e) => onPlatformChange(e.target.value)}>
-              {platformOptions().map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="pk-field">
-            <span className="pk-field-label">语言</span>
-            <select value={language} onChange={(e) => onLanguageChange(e.target.value)}>
-              {languageOptions().map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      </div>
-    </section>
+          </Field>
+          <Field className="gap-1.5">
+            <FieldLabel className="text-xs text-muted-foreground">平台</FieldLabel>
+            <Select
+              value={platform}
+              onChange={(value) => onPlatformChange(String(value))}
+              options={platformOptions()}
+              aria-label="平台"
+              className="w-full"
+            />
+          </Field>
+          <Field className="gap-1.5">
+            <FieldLabel className="text-xs text-muted-foreground">语言</FieldLabel>
+            <Select
+              value={language}
+              onChange={(value) => onLanguageChange(String(value))}
+              options={languageOptions()}
+              aria-label="语言"
+              className="w-full"
+            />
+          </Field>
+        </FieldGroup>
+      </section>
+    </div>
   );
 }

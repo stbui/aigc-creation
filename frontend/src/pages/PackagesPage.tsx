@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Check, ChevronRight, Clock3, Gem, Wallet } from 'lucide-react';
 import { membershipApi, productsApi } from '../lib/api';
 import { PLAN_VISUALS } from '../lib/constants';
+import { formatYuan } from '../lib/money';
 import { useAuth } from '../context/AuthContext';
 import { useCredits } from '../context/CreditsContext';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
@@ -19,11 +20,6 @@ import type { MembershipPlan, MyMembership, Product } from '../types/api';
  * 金额一律整数分由后端下发, 本页只做 `¥ + 分/100` 的格式化 ——
  * 边界转换只在一处发生, 避免各处四舍五入不一致。
  */
-
-/** 分 → 「¥39.00」。整数分不该出现小数抖动, 故先转元再保留两位 */
-function formatYuan(cents: number): string {
-  return `¥${(cents / 100).toFixed(2)}`;
-}
 
 /** 积分千分位 */
 function formatCredits(n: number): string {

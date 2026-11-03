@@ -536,8 +536,8 @@ export function LandingPage() {
   const toolEntries = visibleCapabilityIds
     ? TOOL_ENTRIES.filter((t) => visibleCapabilityIds.has(t.capability))
     : TOOL_ENTRIES;
-  /** 首屏文案里的能力数: 取运行时可见能力; 清单未到达时按项目声明数兜底 */
-  const totalCapabilities = visibleCapabilityIds?.size ?? 16;
+  /** 首屏文案里的能力数: 取运行时可见能力; 清单未到达时按 CAPABILITY_PLUGINS 声明数兜底 */
+  const totalCapabilities = visibleCapabilityIds?.size ?? 17;
 
   // 案例分组与商品卡、工具入口同口径：运营下线的能力整组不再展示。
   const caseGroups = useMemo(

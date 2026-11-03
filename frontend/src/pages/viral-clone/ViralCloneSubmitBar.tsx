@@ -1,4 +1,12 @@
-import { ModelPicker, ToolSettingsPopover, ToolSubmitBar } from './components';
+import { CircleAlert } from 'lucide-react';
+
+import {
+  InlineAlert,
+  InlineAlertDescription,
+  ModelPicker,
+  ToolSettingsPopover,
+  ToolSubmitBar,
+} from './components';
 
 /**
  * 高级设置 + 提交（sticky 底部）。
@@ -35,7 +43,10 @@ export function ViralCloneSubmitBar({
   return (
     <>
       {unavailableReason && !generating && (
-        <p className="tool-submit-notice tool-submit-notice-error">{unavailableReason}</p>
+        <InlineAlert variant="destructive" className="vc-submit-alert">
+          <CircleAlert />
+          <InlineAlertDescription>{unavailableReason}</InlineAlertDescription>
+        </InlineAlert>
       )}
       <ToolSubmitBar
         submitting={generating}

@@ -38,6 +38,7 @@ export {
   CardDescription as SurfaceDescription,
   CardContent as SurfaceContent,
   CardFooter as SurfaceFooter,
+  CardAction as SurfaceAction,
 } from '~/admin-ui/components/ui/card';
 export { Badge as StatusBadge } from '~/admin-ui/components/ui/badge';
 export {
@@ -48,3 +49,35 @@ export {
   EmptyDescription as EmptyStateDescription,
   EmptyContent as EmptyStateContent,
 } from '~/admin-ui/components/ui/empty';
+export {
+  Alert as InlineAlert,
+  AlertTitle as InlineAlertTitle,
+  AlertDescription as InlineAlertDescription,
+} from '~/admin-ui/components/ui/alert';
+export {
+  Tabs as NavigationTabs,
+  TabsList as NavigationTabsList,
+  TabsTrigger as NavigationTabsTrigger,
+} from '~/admin-ui/components/ui/tabs';
+export { Separator } from '~/admin-ui/components/ui/separator';
+export { Skeleton } from '~/admin-ui/components/ui/skeleton';
+export {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSeparator,
+  FieldSet,
+  FieldTitle,
+} from '~/admin-ui/components/ui/field';
+export {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+  InputGroupText,
+  InputGroupTextarea,
+} from '~/admin-ui/components/ui/input-group';

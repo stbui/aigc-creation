@@ -540,9 +540,10 @@ export function LibraryPage() {
 
         {/* 批量操作条（选中后出现） */}
         {selected.length > 0 && (
-          <Surface className="asset-library-batch-bar flex-row gap-3 py-0" role="status" aria-live="polite">
+          <Surface className="asset-library-batch-bar flex-row gap-3 py-0">
             <SurfaceContent className="flex flex-wrap items-center gap-3 p-0">
-              <span>已选 {selected.length} 个素材</span>
+              {/* 只播报选中个数；整条容器挂 role=status 会让内部按钮失去按钮语义 */}
+              <span aria-live="polite">已选 {selected.length} 个素材</span>
               <Button
                 type="text"
                 size="small"

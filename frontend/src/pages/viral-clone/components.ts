@@ -31,3 +31,46 @@ export { ImageLightbox } from '../../components/ImageLightbox';
 export type { LightboxItem } from '../../components/ImageLightbox';
 /** 图片右键菜单的条目类型 */
 export type { ImageMenuItem } from '../../components/ImageContextMenu';
+
+/** shadcn 组合件：页面布局、表单、结果状态与轻提示统一从 C 端 UI 入口取用。 */
+export {
+  Button,
+  EmptyState,
+  EmptyStateContent,
+  EmptyStateDescription,
+  EmptyStateHeader,
+  EmptyStateMedia,
+  EmptyStateTitle,
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+  InlineAlert,
+  InlineAlertDescription,
+  InlineAlertTitle,
+  Input,
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupTextarea,
+  NavigationTabs,
+  NavigationTabsList,
+  NavigationTabsTrigger,
+  Select,
+  Separator,
+  Skeleton,
+  StatusBadge,
+  Surface,
+  SurfaceAction,
+  SurfaceContent,
+  SurfaceDescription,
+  SurfaceFooter,
+  SurfaceHeader,
+  SurfaceTitle,
+  Textarea,
+  ToggleGroup,
+  cn,
+} from '../../ui';
+export type { SelectOption } from '../../ui';

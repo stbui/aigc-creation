@@ -384,13 +384,7 @@ export function ShoppableCarouselPage() {
 
   return (
     <div className="sc-workspace">
-      {/* ── 页面头（参考站顶栏的「带货图文 + 新建任务」，本站外壳是全局导航，故落在页内） ── */}
-      <header className="sc-page-head">
-        <h1 className="sc-page-title">AI 带货图文</h1>
-        <button type="button" className="sc-new-task" onClick={resetTask}>
-          新建任务
-        </button>
-      </header>
+      
 
       <div className="sc-body">
         {/* ── 左: 配置栏 ── */}

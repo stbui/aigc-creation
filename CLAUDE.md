@@ -338,12 +338,12 @@ npm run e2e                 # Playwright
 
 ### 样式：语义化 token，禁止硬编码色值
 
-全站样式在 `frontend/src/styles/global.css` 的 `:root` 定义令牌（含主题/暗色块），页面**一律引用 `var(--token)`，不写裸 hex**：
+全站样式在 `frontend/src/styles/global.css` 的 `:root` 定义令牌（单一浅色主题，当前**没有**暗色块），页面**一律引用 `var(--token)`，不写裸 hex**：
 
 ```
 品牌紫（唯一主色 #5546d8）  --brand / --brand-light（仅渐变浅端）/ --brand-hover / --brand-bg
 中性色（单一冷灰族）        --text-strong #171a2b / --text-body #4e5969 / --text-muted #667085
-                            --text-desc #86909c / --border #e5e7ef / --surface #f2f4f7
+                            --text-desc = --text-muted（同值别名）/ --border #e5e7ef / --surface #f2f4f7
 圆角（只用这 5 档 + 胶囊）  --radius-tag 4 / --radius-control 8 / --radius-card 12
                             --radius-panel 16 / --radius-hero 24 / --radius-pill 999
 ```
