@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { AdminDataTable, HelpTip, StatusTag, type AdminColumn } from './components';
+import { AdminDataTable, HelpTip, StatusTag, type AdminColumn } from '~/admin-ui/primitives';
 import type { ChannelModelHealthRowView } from '../../../types/model';
 
 /**

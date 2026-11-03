@@ -6,7 +6,7 @@ import { Download } from 'lucide-react';
 
 import { adminAuditApi } from '../../../lib/api';
 
-import { ActionButton, AdminDataTable, AppliedFilters, ClearableField, FilterActions, FilterBar, PageHeader, Panel, SelectField, StatusTag, StaleError, type AdminColumn, type AppliedFilter } from './components';
+import { ActionButton, AdminDataTable, AppliedFilters, ClearableField, FilterActions, FilterBar, PageHeader, Panel, SelectField, StatusTag, StaleError, type AdminColumn, type AppliedFilter } from '~/admin-ui/primitives';
 import type { AdminAuditListResult } from '../../../types/api';
 
 /**

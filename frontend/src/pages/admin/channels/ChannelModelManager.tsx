@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { adminChannelsApi } from './api';
-import { ConfirmAction, Notice } from './components';
+import { ConfirmAction, Notice } from '~/admin-ui/primitives';
 import { useToast } from './hooks';
 import { ChannelModelFormDialog } from './ChannelModelFormDialog';
 import { ChannelModelRepriceDialog } from './ChannelModelRepriceDialog';

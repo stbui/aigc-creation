@@ -1,5 +1,5 @@
 import { Copy, Download, Plus, Power, Trash2 } from 'lucide-react';
-import { ActionButton, EmptyState, Panel, StatusTag } from './components';
+import { ActionButton, EmptyState, Panel, StatusTag } from '~/admin-ui/primitives';
 import { ChannelModelManager } from './ChannelModelManager';
 import type { AdminChannelView } from '../../../types/model';
 

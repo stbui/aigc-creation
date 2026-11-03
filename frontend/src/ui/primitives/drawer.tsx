@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import {
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetHeader,
   SheetTitle,
 } from '~/admin-ui/components/ui/sheet';
@@ -39,12 +38,9 @@ export function Drawer({
         className={className}
         style={{ width: width ?? size }}
       >
-        {title && (
-          <SheetHeader>
-            <SheetTitle>{title}</SheetTitle>
-            <SheetDescription className="sr-only">{title}</SheetDescription>
-          </SheetHeader>
-        )}
+        <SheetHeader>
+          <SheetTitle className={!title ? 'sr-only' : undefined}>{title ?? '抽屉'}</SheetTitle>
+        </SheetHeader>
         <div className="ui-drawer-body" style={styles?.body}>
           {children}
         </div>

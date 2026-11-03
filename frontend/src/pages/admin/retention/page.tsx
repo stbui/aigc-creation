@@ -4,9 +4,8 @@ import { fmtTime } from './utils';
 import { useAdmin, useUnsavedGuard, useToast, useAdminResource } from './hooks';
 import { ShieldAlert } from 'lucide-react';
 import { adminRetentionApi } from '../../../lib/api';
-import { auditReason } from '../../../admin-ui/lib/auditReason';
 
-import { ActionButton, AdminDataTable, ConfirmAction, NumberField, Notice, PageHeader, Panel, StatCard, StatusTag, StaleError, type AdminColumn } from './components';
+import { ActionButton, AdminDataTable, ConfirmAction, NumberField, Notice, PageHeader, Panel, StatCard, StatusTag, StaleError, type AdminColumn } from '~/admin-ui/primitives';
 import type { AdminCleanupLog, AdminRetentionTarget } from '../../../types/api';
 
 /**
@@ -87,11 +86,7 @@ export function AdminRetentionPage() {
     const keep = days[pending.table] ?? pending.retentionDays;
     setBusy(true);
     try {
-      const r = await adminRetentionApi.cleanup(
-        pending.table,
-        keep,
-        auditReason('清理过期后台数据'),
-      );
+      const r = await adminRetentionApi.cleanup(pending.table, keep);
       toast.success(`已清理 ${r.deleted} 条（保留 ${keep} 天）`);
       setPending(null);
       void reload({ silent: true });

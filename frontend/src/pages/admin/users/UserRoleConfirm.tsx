@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ConfirmAction, FormField, SelectField, StatusTag } from './components';
+import { ConfirmAction, FormField, SelectField, StatusTag } from '~/admin-ui/primitives';
 import type { AdminUserListResult } from '../../../types/api';
 
 type Row = AdminUserListResult['items'][number];

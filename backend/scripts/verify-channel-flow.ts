@@ -99,7 +99,6 @@ async function main() {
       baseUrl: BASE_URL,
       apiKey: 'sk-verify-secret',
       concurrencyLimit: 3,
-      reason: '验收脚本创建渠道',
     });
     ok('创建渠道', created.code === 0 && Boolean(created.data?.id), created);
     const channelId: string = created.data?.id;
@@ -154,10 +153,7 @@ async function main() {
         },
       ],
     };
-    const savedModel = await call('POST', `/admin/channels/${channelId}/models`, token, {
-      ...modelBody,
-      reason: '验收脚本创建模型',
-    });
+    const savedModel = await call('POST', `/admin/channels/${channelId}/models`, token, modelBody);
     ok('创建渠道模型', savedModel.code === 0 && Boolean(savedModel.data?.id), savedModel);
     const modelId: string = savedModel.data?.id;
     ok('价格档落库两档', (savedModel.data?.priceTiers ?? []).length === 2, savedModel.data?.priceTiers?.length);
@@ -185,7 +181,6 @@ async function main() {
           enabled: true,
         },
       ],
-      reason: '验收图片合同',
     });
     ok('图片价格档必须落在协议声明的计价参数内', contractGuard.code === 40001, contractGuard);
 
@@ -197,7 +192,6 @@ async function main() {
     const renamed = await call('PATCH', `/admin/channels/${channelId}/models/${modelId}`, token, {
       ...modelBody,
       providerModelKey: 'flux-schnell-v2',
-      reason: '验收脚本改名',
     });
     const renamedWildcard = (renamed.data?.priceTiers ?? []).find((tier: any) => Object.keys(tier.selector).length === 0);
     ok('改名后通配档跟随新上游键', renamedWildcard?.providerModelKey === 'flux-schnell-v2', renamedWildcard?.providerModelKey);
@@ -211,7 +205,7 @@ async function main() {
     const orderIds = orderItems.map((item: any) => item.id);
 
     /* ── 6. 复制渠道（连带价格档） ─────────────────────── */
-    const duplicated = await call('POST', `/admin/channels/${channelId}/duplicate`, token, { reason: '验收脚本复制' });
+    const duplicated = await call('POST', `/admin/channels/${channelId}/duplicate`, token, {});
     ok('复制渠道', duplicated.code === 0 && duplicated.data?.id !== channelId, duplicated.code);
     const duplicateId: string = duplicated.data?.id;
     ok('复制渠道名称带副本后缀', String(duplicated.data?.name ?? '').endsWith(' - 副本'), duplicated.data?.name);
@@ -287,13 +281,7 @@ async function main() {
           ...over,
         },
       ],
-      reason: '验收脚本批量调价',
     });
-
-    const noReason = await call('POST', `/admin/channels/${channelId}/models/batch-reprice`, token, {
-      models: repricePayload().models,
-    });
-    ok('调价：缺少变更原因被拒绝', noReason.code === 40001, noReason);
 
     const staleVersion = await call('POST', `/admin/channels/${channelId}/models/batch-reprice`, token, {
       ...repricePayload(),
@@ -425,9 +413,7 @@ async function main() {
       where: { id: legacyId },
       data: { modelsJson: JSON.stringify(['legacy-a', 'legacy-b']) },
     });
-    const legacyDuplicate = await call('POST', `/admin/channels/${legacyId}/duplicate`, token, {
-      reason: '验收旧清单复制',
-    });
+    const legacyDuplicate = await call('POST', `/admin/channels/${legacyId}/duplicate`, token, {});
     const legacyDuplicateId: string = legacyDuplicate.data?.id;
     const legacyModels = modelRows(await call('GET', `/admin/channels/${legacyDuplicateId}/models`, token));
     ok('复制旧清单渠道补两条骨架模型', legacyModels.length === 2, legacyModels.length);

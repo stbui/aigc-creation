@@ -25,12 +25,10 @@ import {
   IsArray,
   IsBoolean,
   IsInt,
-  IsNotEmpty,
   IsObject,
   IsOptional,
   IsString,
   Max,
-  MaxLength,
   Min,
 } from "class-validator";
 import {
@@ -82,8 +80,6 @@ export class ChannelWriteBodyDto {
   @IsOptional() @Allow() headers?: unknown;
   @IsOptional() @IsBoolean() enabled?: boolean | null;
   @IsOptional() @IsString() proxyUrl?: string | null;
-  /** 高危动作原因（写审计） */
-  @IsOptional() @IsString() reason?: string;
 }
 
 /** 渠道模型创建 / 更新入参 */
@@ -107,7 +103,6 @@ export class ChannelModelWriteBodyDto {
   @IsOptional() @IsBoolean() enabled?: boolean | null;
   @IsOptional() @Allow() capabilityConfig?: unknown;
   @IsOptional() @IsArray() priceTiers?: unknown[];
-  @IsOptional() @IsString() reason?: string;
 }
 
 /** 渠道模型连通性测试入参（可带未保存的表单草稿） */
@@ -122,25 +117,19 @@ export class ChannelModelTestBodyDto {
   /** 异步协议是否等待结果；默认 true */
   @IsOptional() @IsBoolean() waitForResult?: boolean;
   @IsOptional() @IsInt() @Min(1000) @Max(10 * 60 * 1000) timeoutMs?: number;
-  /** 高危动作原因（写审计） */
-  @IsOptional() @IsString() reason?: string;
 }
 
 /** 上游目录导入入参：只导入管理员明确勾选的模型 */
 export class ChannelModelImportBodyDto {
   @IsArray() @IsString({ each: true }) models!: string[];
-  /** 高危动作原因（写审计） */
-  @IsOptional() @IsString() reason?: string;
 }
 
 export class ChannelEnabledBodyDto {
   @IsBoolean() enabled!: boolean;
-  @IsOptional() @IsString() reason?: string;
 }
 
 export class ChannelSortBodyDto {
   @IsInt() @Min(0) @Max(MAX_SORT_ORDER) sortOrder!: number;
-  @IsOptional() @IsString() reason?: string;
 }
 
 export class ChannelBatchDeleteBodyDto {
@@ -168,22 +157,15 @@ export class ChannelBatchDeleteBodyDto {
 /** 批量调价入参；嵌套结构由 `ChannelModelService.repriceMany` 逐项校验 */
 export class ChannelModelRepriceBodyDto {
   @IsArray() models!: unknown[];
-  /** 调价是高危写操作（`channel.model_write`），原因必填并写审计 */
-  @IsNotEmpty({ message: "必须填写变更原因" })
-  @IsString()
-  @MaxLength(200)
-  reason!: string;
 }
 
 export class ChannelOrderBodyDto {
   @IsArray() @IsString({ each: true }) ids!: string[];
   @IsArray() @IsString({ each: true }) expectedIds!: string[];
-  @IsOptional() @IsString() reason?: string;
 }
 
 export class ChannelExportBodyDto {
   @IsOptional() @IsArray() @IsString({ each: true }) ids?: string[];
-  @IsOptional() @IsString() reason?: string;
 }
 
 /*
@@ -218,13 +200,12 @@ const RL_CHANNEL_TEST: RateLimitOptions = {
   scope: "user",
 };
 
-/** 导入文件即导出文件本身，允许附带 reason */
+/** 导入文件即导出文件本身 */
 export class ChannelImportBodyDto {
   @IsOptional() @IsString() format?: string;
   @IsOptional() @IsInt() version?: number;
   @IsOptional() @IsArray() channels?: unknown[];
   @IsOptional() @IsObject() @Allow() exportedAt?: unknown;
-  @IsOptional() @IsString() reason?: string;
 }
 
 @Controller("admin/channels")

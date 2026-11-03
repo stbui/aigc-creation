@@ -2,6 +2,7 @@ import * as React from 'react';
 import {
   Select as ShadcnSelect,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -70,16 +71,18 @@ export function Select({
         <SelectValue placeholder={placeholder} />
       </SelectTrigger>
       <SelectContent>
-        {allowClear && (
-          <SelectItem value={CLEAR_VALUE} onPointerDown={(event) => event.preventDefault()}>
-            {placeholder}
-          </SelectItem>
-        )}
-        {options.map((option) => (
-          <SelectItem key={String(option.value)} value={String(option.value)} disabled={option.disabled}>
-            {option.label}
-          </SelectItem>
-        ))}
+        <SelectGroup>
+          {allowClear && (
+            <SelectItem value={CLEAR_VALUE} onPointerDown={(event) => event.preventDefault()}>
+              {placeholder}
+            </SelectItem>
+          )}
+          {options.map((option) => (
+            <SelectItem key={String(option.value)} value={String(option.value)} disabled={option.disabled}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectGroup>
       </SelectContent>
     </ShadcnSelect>
   );

@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { ColorSwatchGrid, type ColorOption } from '../ToolWidgets';
+import { ColorSwatchGrid } from '../ToolWidgets';
+import type { ColorOption } from '../../lib/colorPalette';
 
 const OPTIONS: ColorOption[] = [
   { value: 'transparent', label: '透明底', css: 'transparent' },

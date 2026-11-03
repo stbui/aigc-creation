@@ -13,7 +13,7 @@ import {
   SelectField,
   StaleError,
   type AppliedFilter,
-} from './components';
+} from '~/admin-ui/primitives';
 import {
   useAdmin,
   useAdminList,

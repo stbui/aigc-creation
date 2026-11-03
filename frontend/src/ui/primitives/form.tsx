@@ -1,19 +1,17 @@
 import {
-  Children,
-  cloneElement,
   createContext,
-  isValidElement,
   useCallback,
   useContext,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
   useSyncExternalStore,
   type FormEvent,
-  type ReactElement,
   type ReactNode,
 } from 'react';
+import { findFirstControlId, injectPropsIntoFirstControl } from '~/admin-ui/lib/control-injection';
 import { cn } from '../lib/cn';
 
 /**
@@ -310,7 +308,7 @@ export function FormItem({
   valuePropName = 'value',
   tooltip,
   noStyle,
-  shouldUpdate: _shouldUpdate,
+  shouldUpdate,
 }: {
   name?: string;
   label?: ReactNode;
@@ -325,6 +323,17 @@ export function FormItem({
   const form = useContext(FormContext);
   if (!form) throw new Error('FormItem 必须在 Form 内使用');
 
+  const generatedId = useId();
+  const previousValues = useRef(form.values);
+  const renderedOnce = useRef(false);
+  const shouldRender =
+    !shouldUpdate || !renderedOnce.current || shouldUpdate(previousValues.current, form.values);
+
+  useEffect(() => {
+    previousValues.current = form.values;
+    renderedOnce.current = true;
+  }, [form.values]);
+
   // rules 每次都可能是新数组；注册是幂等的，清理时按字段移除即可。
   useEffect(() => {
     if (!name) return;
@@ -332,31 +341,44 @@ export function FormItem({
     return () => form.registerRules(name);
   }, [form, name, rules]);
 
+  if (!shouldRender) return null;
+
   if (typeof children === 'function') {
     return <>{children(form.instance)}</>;
   }
 
   const error = name ? form.errors[name] : undefined;
   const rawValue = name ? form.values[name] : undefined;
+  const controlId = findFirstControlId(children) ?? generatedId;
+  const errorId = `${controlId}-error`;
   const injected = name
-    ? injectControl(children, valuePropName, valuePropName === 'checked' ? Boolean(rawValue) : rawValue, (next) =>
-        form.setValue(name, next),
+    ? injectControl(
+        children,
+        valuePropName,
+        valuePropName === 'checked' ? Boolean(rawValue) : rawValue,
+        (next) => form.setValue(name, next),
+        controlId,
+        error ? { 'aria-invalid': true, 'aria-describedby': errorId } : undefined,
       )
-    : children;
+    : injectPropsIntoFirstControl(children, {}, controlId);
 
   if (noStyle) return <>{injected}</>;
 
   return (
     <div className={cn('ui-form-item', className)}>
       {label && (
-        <label className="ui-form-label ant-form-item-label">
+        <label htmlFor={controlId} className="ui-form-label ant-form-item-label">
           <span>{label}</span>
         </label>
       )}
       {tooltip && <span className="ui-form-tooltip">{tooltip}</span>}
       <div className="ui-form-control">
         {injected}
-        {error && <span className="ui-form-error ant-form-item-explain-error">{error}</span>}
+        {error && (
+          <span id={errorId} className="ui-form-error ant-form-item-explain-error">
+            {error}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -375,8 +397,11 @@ function injectControl(
   propName: string,
   value: unknown,
   onChange: (next: unknown) => void,
+  controlId: string,
+  stateProps?: Record<string, unknown>,
 ): ReactNode {
   const props: Record<string, unknown> = {
+    ...stateProps,
     [propName]: value,
     onChange: (eventOrValue: unknown) => {
       if (eventOrValue && typeof eventOrValue === 'object' && 'target' in eventOrValue) {
@@ -387,42 +412,7 @@ function injectControl(
       onChange(eventOrValue);
     },
   };
-  const [node, injected] = injectIntoFirst(children, props);
-  if (injected) return node;
-  return children;
-}
-
-function injectIntoFirst(
-  node: ReactNode,
-  props: Record<string, unknown>,
-): [ReactNode, boolean] {
-  if (Array.isArray(node)) {
-    let injected = false;
-    const mapped = node.map((child) => {
-      if (injected) return child;
-      const [next, did] = injectIntoFirst(child, props);
-      if (did) injected = true;
-      return next;
-    });
-    return [mapped, injected];
-  }
-  if (!isValidElement(node)) return [node, false];
-
-  const element = node as ReactElement<{ children?: ReactNode }>;
-  if (typeof element.type !== 'string') {
-    return [cloneElement(element as ReactElement<Record<string, any>>, props), true];
-  }
-
-  if (element.props.children === undefined) return [node, false];
-  let injected = false;
-  const mapped = Children.map(element.props.children, (child) => {
-    if (injected) return child;
-    const [next, did] = injectIntoFirst(child, props);
-    if (did) injected = true;
-    return next;
-  });
-  if (!injected) return [node, false];
-  return [cloneElement(element, {}, mapped), true];
+  return injectPropsIntoFirstControl(children, props, controlId);
 }
 
 Form.Item = FormItem;

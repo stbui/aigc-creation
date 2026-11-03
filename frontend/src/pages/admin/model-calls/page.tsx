@@ -5,7 +5,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Download } from 'lucide-react';
 import { adminApiLogsApi } from '../../../lib/api';
 
-import { ActionButton, AdminDataTable, AppliedFilters, Descriptions, Drawer, FilterActions, FilterBar, Notice, PageHeader, Panel, SelectField, StatCard, StatusTag, StaleError, TextField, type AdminColumn, type AppliedFilter } from './components';
+import { ActionButton, AdminDataTable, AppliedFilters, Descriptions, Drawer, FilterActions, FilterBar, Notice, PageHeader, Panel, SelectField, StatCard, StatusTag, StaleError, TextField, type AdminColumn, type AppliedFilter } from '~/admin-ui/primitives';
 import type { ApiLogListResult, ApiLogView } from '../../../types/model';
 
 /**

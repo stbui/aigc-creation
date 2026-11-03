@@ -1,5 +1,5 @@
 import { HardDrive } from 'lucide-react';
-import { StatCard } from './components';
+import { StatCard } from '~/admin-ui/primitives';
 import { BACKEND_LABEL } from './constants';
 import type { AdminAssetStats } from '../../../types/api';
 

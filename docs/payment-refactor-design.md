@@ -503,8 +503,8 @@ model PaymentReconciliationItem {
 | GET | `/orders` | `payment.read` | 支付订单分页：`status / keyword / providerId / timeField / from / to / page / pageSize` |
 | GET | `/orders/export.csv` | `payment.read + data.export` | 同筛选导出，上限 10000 |
 | GET | `/orders/:id` | `payment.read` | 支付订单详情 |
-| POST | `/orders/:id/query` | `payment.operate` | `{ reason }`；向渠道查单并应用结果，写审计 |
-| POST | `/orders/:id/close` | `payment.operate` | `{ reason }`；先查单，已支付则入账；否则关单，写审计 |
+| POST | `/orders/:id/query` | `payment.operate` | 空请求体；向渠道查单并应用结果，自动写审计 |
+| POST | `/orders/:id/close` | `payment.operate` | 空请求体；先查单，已支付则入账；否则关单，自动写审计 |
 | POST | `/reconciliations` | `finance.reconcile` | `{ providerId, billDate }`；唯一键冲突返回已有 run |
 | GET | `/reconciliations` | `payment.read` | 运行列表：`providerId / status / from / to / page / pageSize` |
 | GET | `/reconciliations/:id/items` | `payment.read` | 明细：`result / page / pageSize`；`result=abnormal` 表示所有非 matched/recovered |
@@ -1422,7 +1422,6 @@ export class PaymentOrderService {
   close(input: {
     orderId: string;
     actor: { kind: 'user'; userId: string } | { kind: 'admin'; adminId: string };
-    reason?: string;
   }): Promise<PaymentOrderView>;
 
   /** 回调/查单/对账共用：金额、币种、交易号校验后走 markPaid */
@@ -1458,13 +1457,10 @@ export class PaymentProviderConfigUpdateDto {
   @IsBoolean() enabled!: boolean;
   @Type(() => Number) @IsInt() @Min(5) @Max(1440) closeAfterMinutes!: number;
   @IsObject() values!: Record<string, string>;
-  /** 高危写操作原因；AuditInterceptor 落 reason 列 */
-  @IsString() @MinLength(2) @MaxLength(200) reason!: string;
 }
 
 export class PaymentSettingsUpdateDto {
   @IsIn(['CNY', 'USD']) defaultCurrency!: PaymentCurrency;
-  @IsString() @MinLength(2) @MaxLength(200) reason!: string;
 }
 
 export class PaymentProductCreateDto {
@@ -1486,7 +1482,6 @@ export class PaymentProductCreateDto {
   @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(9_000_000_000) stockTotal?: number;
   @IsOptional() @IsISO8601() saleStartAt?: string;
   @IsOptional() @IsISO8601() saleEndAt?: string;
-  @IsString() @MinLength(2) @MaxLength(200) reason!: string;
 }
 
 export class PaymentProductUpdateDto extends PartialType(PaymentProductCreateDto) {
@@ -1509,7 +1504,6 @@ export class PaymentReconciliationRunDto {
   @Matches(/^\d{4}-\d{2}-\d{2}$/) billDate!: string;
   /** 失败重跑：attempt+1；已完成/执行中的同日运行不重跑 */
   @IsOptional() @IsBoolean() retryFailed?: boolean;
-  @IsString() @MinLength(2) @MaxLength(200) reason!: string;
 }
 
 export class PaymentReconciliationListQueryDto extends PageQueryDto {
@@ -1937,7 +1931,7 @@ financeReconcile: 'finance.reconcile' // 已存在：执行对账/兜底导入
 | 财务 | ✅ | ❌（避免财务同时改收款通道与做账） | ✅ | ✅ |
 | 运营 | 默认 ❌（如业务确需排障，单独在角色页授予 `payment.read`） | ❌ | ❌ | ❌ |
 
-`payment.write` 加入 `HIGH_RISK_PERMISSIONS`，保存渠道配置仍写 `AdminAuditLog`，但不要求填写 `reason`；同权限下的站点设置接口仍要求原因。`payment.operate` 不是高危：它只推进渠道已经发生的事实，不能凭空造钱；但每次仍写普通审计。
+`payment.write` 加入 `HIGH_RISK_PERMISSIONS`，保存渠道配置仍自动写 `AdminAuditLog`，不要求填写 `reason`；同权限下的站点设置接口同样自动写审计。`payment.operate` 不是高危：它只推进渠道已经发生的事实，不能凭空造钱；但每次仍写普通审计。
 
 `seed:roles` 会用代码中的 `ROLE_PERMISSIONS` 覆盖内置角色权限（见 `backend/scripts/seed-roles.ts`）。生产若已在角色页手工调过权限，先导出/核对再执行，避免覆盖自定义授权。
 
@@ -2129,7 +2123,7 @@ interface AdminPaymentProviderView {
 
 #### `GET/PUT /admin/payments/settings`
 
-权限分别 `payment.read / payment.write`。GET 返回 `{ "defaultCurrency": "CNY" }`；PUT 请求 `{ defaultCurrency, reason }`，写现有 settings 服务和审计。
+权限分别 `payment.read / payment.write`。GET 返回 `{ "defaultCurrency": "CNY" }`；PUT 请求 `{ defaultCurrency }`，写现有 settings 服务并自动写审计。
 
 #### `GET /admin/payments/products`
 
@@ -2221,7 +2215,7 @@ interface PaymentOrderDetail extends AdminPaymentOrderRow {
 
 #### `POST /admin/payments/orders/:id/query`
 
-权限 `payment.operate`。请求 `{ reason }`，原因长度 2–200 字；调用 `PaymentOrderService.query({ actor: { kind:'admin', adminId } })`，审计动作 `payment.order_query`。返回：
+权限 `payment.operate`。空请求体；调用 `PaymentOrderService.query({ actor: { kind:'admin', adminId } })`，自动写审计动作 `payment.order_query`。返回：
 
 ```json
 { "order": { "id": "ord_x", "status": "credited" }, "view": { "orderId": "ord_x", "displayStatus": "credited" } }
@@ -2231,7 +2225,7 @@ interface PaymentOrderDetail extends AdminPaymentOrderRow {
 
 #### `POST /admin/payments/orders/:id/close`
 
-权限 `payment.operate`。请求 `{ reason }`，原因长度 2–200 字；审计动作 `payment.order_close`。顺序与 C 端取消一致；已支付时先入账再返回 `40901`，由前端刷新列表。已关闭返回幂等 200。
+权限 `payment.operate`。空请求体；自动写审计动作 `payment.order_close`。顺序与 C 端取消一致；已支付时先入账再返回 `40901`，由前端刷新列表。已关闭返回幂等 200。
 
 #### `GET /admin/payments/orders/export.csv`
 
@@ -2244,7 +2238,7 @@ interface PaymentOrderDetail extends AdminPaymentOrderRow {
 权限 `finance.reconcile`。请求：
 
 ```json
-{ "providerId": "alipay", "billDate": "2026-10-31", "retryFailed": false, "reason": "T+1 日终对账" }
+{ "providerId": "alipay", "billDate": "2026-10-31", "retryFailed": false }
 ```
 
 响应 200（复用）或 201（新建）：`{ run, reused }`。执行流程：
@@ -2269,7 +2263,7 @@ interface PaymentOrderDetail extends AdminPaymentOrderRow {
 
 #### `POST /admin/payments/reconciliations/import`
 
-权限 `finance.reconcile`。`multipart/form-data`：`file + providerId + billDate + reason`。只接受 `.csv` 或支付宝 `.zip`；≤ 20MB。解析出的记录走同一套比对逻辑，run.source 记为 `csv`。CSV 表头必须能被现有 `reconciliation.service.ts` 的解析器识别；支付宝 ZIP 复用 §17.1 的 `zip-reader.ts`。
+权限 `finance.reconcile`。`multipart/form-data`：`file + providerId + billDate`。只接受 `.csv` 或支付宝 `.zip`；≤ 20MB。解析出的记录走同一套比对逻辑，run.source 记为 `csv`。CSV 表头必须能被现有 `reconciliation.service.ts` 的解析器识别；支付宝 ZIP 复用 §17.1 的 `zip-reader.ts`。
 
 #### 对账导出
 
@@ -2397,7 +2391,6 @@ export class PaymentReconciliationService {
     billDate: string;
     retryFailed?: boolean;
     actorId: string;
-    reason: string;
   }): Promise<{ run: RunView; reused: boolean }>;
 
   list(query: ReconciliationListQueryDto): Promise<PageResult<RunView>>;
@@ -2419,7 +2412,6 @@ export class PaymentReconciliationService {
     file: Buffer;
     fileName: string;
     actorId: string;
-    reason: string;
   }): Promise<{ run: RunView }>;
 }
 ```
@@ -2581,7 +2573,7 @@ URL 同步：
 
 工具栏：
 
-- 左：「默认充值货币」`SelectBox`（CNY/USD），变更前弹出 `ConfirmAction` 收集原因；保存后刷新 C 端设置。
+- 左：「默认充值货币」`SelectBox`（CNY/USD），变更前弹出 `ConfirmAction` 说明影响；保存后刷新 C 端设置。
 - 右：「新增商品」按钮；无 `product.write` 时隐藏。
 
 列：
@@ -2599,7 +2591,7 @@ URL 同步：
 `ProductFormDrawer`：
 
 - 宽度 520；新建标题「新增商品」，编辑「编辑商品」。
-- 字段顺序：名称、说明、商品类型、售价币种、售价、到账积分、积分有效期、发放方式、上架策略、策略字段、排序、上架开关、变更原因。
+- 字段顺序：名称、说明、商品类型、售价币种、售价、到账积分、积分有效期、发放方式、上架策略、策略字段、排序、上架开关。
 - 商品类型：`credits` 可选；`storage` 选项保留但 `disabled`，说明「存储扩容商品将在配额子系统上线后开放」。
 - 币种：`USD` 在无可用 USD 渠道时仍可选择 `offline` 保存，但选择 `active` 时禁用保存并提示；CNY 始终可选。
 - 价格输入用「元/美元」小数，提交前 `Math.round(value * 100)`；禁止 0。
@@ -2745,7 +2737,7 @@ export const adminPaymentProvidersApi = {
       { method: 'PUT', body },
     ),
   settings: () => request<{ defaultCurrency: PaymentCurrency }>('/admin/payments/settings'),
-  saveSettings: (body: { defaultCurrency: PaymentCurrency; reason: string }) =>
+  saveSettings: (body: { defaultCurrency: PaymentCurrency }) =>
     request<{ defaultCurrency: PaymentCurrency }>('/admin/payments/settings', {
       method: 'PUT',
       body,
@@ -2767,22 +2759,22 @@ export const adminPaymentOrdersApi = {
   list: (params: PaymentOrderListParams) =>
     request<PageResult<AdminPaymentOrderRow>>(`/admin/payments/orders${toQuery(params)}`),
   detail: (id: string) => request<{ order: AdminPaymentOrderDetail }>(`/admin/payments/orders/${id}`),
-  query: (id: string, reason: string) =>
+  query: (id: string) =>
     request<{ order: AdminPaymentOrderRow; view: unknown }>(
       `/admin/payments/orders/${id}/query`,
-      { method: 'POST', body: { reason } },
+      { method: 'POST', body: {} },
     ),
-  close: (id: string, reason: string) =>
+  close: (id: string) =>
     request<{ order: AdminPaymentOrderRow; view: unknown }>(
       `/admin/payments/orders/${id}/close`,
-      { method: 'POST', body: { reason } },
+      { method: 'POST', body: {} },
     ),
   exportCsv: (params: PaymentOrderListParams) =>
     downloadCsv(`/admin/payments/orders/export.csv${toQuery(params)}`),
 };
 
 export const adminPaymentReconciliationApi = {
-  run: (body: { providerId: string; billDate: string; retryFailed?: boolean; reason: string }) =>
+  run: (body: { providerId: string; billDate: string; retryFailed?: boolean }) =>
     request<{ run: AdminReconciliationRun; reused: boolean }>('/admin/payments/reconciliations', {
       method: 'POST',
       body,
@@ -2799,12 +2791,11 @@ export const adminPaymentReconciliationApi = {
       page: number;
       pageSize: number;
     }>(`/admin/payments/reconciliations/${id}/items${toQuery(params)}`),
-  importFile: (file: File, providerId: string, billDate: string, reason: string) => {
+  importFile: (file: File, providerId: string, billDate: string) => {
     const fd = new FormData();
     fd.append('file', file);
     fd.append('providerId', providerId);
     fd.append('billDate', billDate);
-    fd.append('reason', reason);
     return request<{ run: AdminReconciliationRun }>('/admin/payments/reconciliations/import', {
       method: 'POST',
       body: fd,
@@ -3614,7 +3605,7 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 - **支付宝账单**：支持 ZIP（stored/deflate）与 GB18030，表头前说明行可跳过；手工导入支持支付宝 `.zip`。新增 `common/archive/zip-reader.ts`。
 - **对账运行回收**：超过 30 分钟的 `running` 运行自动标记 failed，worker 与手动重跑前都会回收。
 - **支付宝响应验签**：交易类接口缺签名直接拒绝，不再 fail-open。
-- **后台商品保存**：补 `kind` / `reason` 必填字段；限时商品时间按本地时区正确回显与提交。
+- **后台商品保存**：补 `kind` 必填字段；限时商品时间按本地时区正确回显与提交。
 - **未支付订单上限**：每用户最多 5 笔 pending；超限返回 400，避免长期占库存。
 - **导出超限报错**：支付订单 / 对账运行 / 对账明细超过 10000 行直接报错，不再静默截断。
 - **对账默认日期**：前端按上海时区取昨天，避免东八区凌晨默认成前天。

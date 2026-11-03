@@ -6,7 +6,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Download } from 'lucide-react';
 import { adminInvoicesApi } from '../../../lib/api';
 
-import { ActionButton, AdminDataTable, AppliedFilters, ClearableField, ConfirmAction, FilterActions, FilterBar, PageHeader, Panel, SelectField, StatusTag, StaleError, TextField, type AdminColumn, type AppliedFilter } from './components';
+import { ActionButton, AdminDataTable, AppliedFilters, ClearableField, ConfirmAction, FilterActions, FilterBar, PageHeader, Panel, SelectField, StatusTag, StaleError, TextField, type AdminColumn, type AppliedFilter } from '~/admin-ui/primitives';
 import { adminOrderDetailHref, adminUserHref } from '../../../lib/admin-links';
 import type { AdminInvoice, InvoiceStatus } from '../../../types/api';
 
@@ -128,14 +128,14 @@ export function AdminInvoicesPage() {
   const runAction = async () => {
     if (!action) return;
     const trimmed = reason.trim();
-    if (!trimmed) {
-      toast.warning('请填写说明，它会写入操作审计');
+    if (action.kind === 'reject' && !trimmed) {
+      toast.warning('请填写驳回原因');
       return;
     }
     setBusy(true);
     try {
       if (action.kind === 'issue') {
-        const r = await adminInvoicesApi.issue(action.row.id, trimmed);
+        const r = await adminInvoicesApi.issue(action.row.id);
         toast.success(`已开具 ${r.invoiceNo}`);
       } else {
         await adminInvoicesApi.reject(action.row.id, trimmed);
@@ -375,23 +375,21 @@ export function AdminInvoicesPage() {
               : [`发票 ${action.row.invoiceNo} → 已驳回`, '用户可重新申请', '写操作审计（含操作人）']
           }
           extra={
-            <div className="flex flex-col gap-1.5">
-              <label htmlFor="adm-invoice-reason" className="text-xs text-muted-foreground">
-                {action.kind === 'issue' ? '开具说明（强制，写入审计）：' : '驳回原因（会展示给用户）：'}
-              </label>
-              <TextField
-                id="adm-invoice-reason"
-                ariaLabel="说明"
-                value={reason}
-                onChange={setReason}
-                placeholder={
-                  action.kind === 'issue'
-                    ? '如：已按申请抬头开具'
-                    : '如：抬头与税号不一致，请修改后重提'
-                }
-                maxLength={300}
-              />
-            </div>
+            action.kind === 'reject' ? (
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="adm-invoice-reason" className="text-xs text-muted-foreground">
+                  驳回原因（会展示给用户）：
+                </label>
+                <TextField
+                  id="adm-invoice-reason"
+                  ariaLabel="驳回原因"
+                  value={reason}
+                  onChange={setReason}
+                  placeholder="如：抬头与税号不一致，请修改后重提"
+                  maxLength={300}
+                />
+              </div>
+            ) : undefined
           }
         />
       )}

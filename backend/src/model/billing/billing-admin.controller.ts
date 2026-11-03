@@ -3,7 +3,7 @@
  *
  *   · `GET  /admin/billing-orders`              生成账单列表（筛选：状态 / 用户 / 任务 / 模型 / 渠道 / 分组 / 时间）
  *   · `GET  /admin/billing-orders/:id`          账单详情
- *   · `POST /admin/billing-orders/:id/resolve`  人工核对（settle | refund，高危，必填原因）
+ *   · `POST /admin/billing-orders/:id/resolve`  人工核对（settle | refund，高危）
  *   · `GET  /admin/api-logs`                    上游调用记录（`ApiCallLog`）
  *
  * 页面在 `/admin/model-calls`，走 `/admin/api-logs` —— 不能复用旧
@@ -29,19 +29,16 @@ import {
   type BillingOrderQuery,
 } from "./billing-admin.service";
 
-/** 人工核对入参：原因必填，动作只允许 settle / refund（语义校验在 service） */
+/** 人工核对入参：动作只允许 settle / refund（语义校验在 service） */
 export class BillingResolveBodyDto {
   @IsString() action: string;
-  /** 核对依据（高危动作必填，写审计） */
-  @IsString() reason: string;
 }
 
-/** 批量核对入参：逐条给出动作与原因，单条失败不影响其它条目 */
+/** 批量核对入参：单条失败不影响其它条目 */
 export class BillingBatchResolveBodyDto {
   /** 单次最多核对的条数（与前端批量上限一致） */
   @IsString() ids?: string;
   @IsString() action?: string;
-  @IsString() reason?: string;
 }
 
 @Controller("admin/billing-orders")
@@ -86,8 +83,8 @@ export class AdminBillingOrdersController {
   }
 
   /**
-   * 高危动作：必须填写原因并写审计。
-   * 后端不校验原因非空之外的内容 —— 金额口径完全由 `BillingService.resolve` 决定。
+   * 高危动作：写审计。
+   * 金额口径完全由 `BillingService.resolve` 决定。
    */
   @Post(":id/resolve")
   @RequirePermission(PERMISSIONS.billingOrderResolve)
@@ -97,12 +94,7 @@ export class AdminBillingOrdersController {
     @Body() body: BillingResolveBodyDto,
     @AdminUser() user: AdminUserContext,
   ) {
-    return this.billing.resolveOrder(
-      id,
-      body?.action,
-      body?.reason,
-      user?.id ?? "",
-    );
+    return this.billing.resolveOrder(id, body?.action, user?.id ?? "");
   }
 
   /**
@@ -122,12 +114,7 @@ export class AdminBillingOrdersController {
       .split(",")
       .map((item) => item.trim())
       .filter((item) => item !== "");
-    return this.billing.batchResolveOrders(
-      ids,
-      body?.action,
-      body?.reason,
-      user?.id ?? "",
-    );
+    return this.billing.batchResolveOrders(ids, body?.action, user?.id ?? "");
   }
 }
 

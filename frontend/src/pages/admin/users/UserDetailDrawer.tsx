@@ -7,7 +7,7 @@ import {
   ListError,
   SkeletonBody,
   StatusTag,
-} from './components';
+} from '~/admin-ui/primitives';
 import { adminUsersApi, assetThumbUrl } from './api';
 import { LOGIN_REASON_LABEL } from './constants';
 import {

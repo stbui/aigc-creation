@@ -4,15 +4,19 @@ import {
   ColorStudio,
   ProductSourceResult,
   ProductSourceUploadPreview,
-  RECOLOR_COLOR_SWATCHES,
   ToolCard,
   ToolHistoryPane,
   ToolShell,
-  isValidHexColor,
-  normalizeHexColor,
 } from './components';
+import { DEFAULT_CUSTOM_COLOR, RECOLOR_COLOR_SWATCHES } from './constants';
 import { useToolTask } from './hooks';
-import { colorLabelOf, measureImageAspect, recolorPayload } from './utils';
+import {
+  colorLabelOf,
+  isValidHexColor,
+  measureImageAspect,
+  normalizeHexColor,
+  recolorPayload,
+} from './utils';
 import { useApp } from '../../ui';
 
 /**
@@ -30,12 +34,15 @@ import { useApp } from '../../ui';
  * 诚实披露: recolor 由真实图像模型完成换色，要求保持材质、高光与阴影。
  */
 
+/** 默认选白色 —— 色板第一项，与参考站一致 */
+const DEFAULT_COLOR = RECOLOR_COLOR_SWATCHES[0].value;
+
 export function ProductRecolorPage() {
   const { message } = useApp();
   const { submitting, result, setResult, run } = useToolTask({ capability: 'recolor', successMessage: '换色结果已生成' });
 
-  const [color, setColor] = useState('#FFFFFF');
-  const [customColor, setCustomColor] = useState('#5546D8');
+  const [color, setColor] = useState(DEFAULT_COLOR);
+  const [customColor, setCustomColor] = useState(DEFAULT_CUSTOM_COLOR);
   const [sourceAspect, setSourceAspect] = useState<number>();
   const customColorValid = isValidHexColor(customColor);
 
@@ -97,7 +104,7 @@ export function ProductRecolorPage() {
           onCustomColor={setCustomColor}
           allowAlpha={false}
           clearLabel="无填充"
-          onClear={() => setColor('#FFFFFF')}
+          onClear={() => setColor(DEFAULT_COLOR)}
           ariaLabel="商品颜色"
         />
       </ToolCard>

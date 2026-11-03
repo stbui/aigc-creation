@@ -6,7 +6,7 @@ import {
   ClearableField,
   ModalDialog,
   StatusTag,
-} from './components';
+} from '~/admin-ui/primitives';
 import type { UpstreamModelPreview } from '../../../types/model';
 
 interface ChannelUpstreamDialogProps {

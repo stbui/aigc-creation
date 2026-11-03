@@ -1,4 +1,4 @@
-import { ActionButton, Descriptions, Drawer, Notice } from './components';
+import { ActionButton, Descriptions, Drawer, Notice } from '~/admin-ui/primitives';
 import { BILLING_MODE_LABELS, REFUND_REASON_LABELS, STATUS_LABELS } from './constants';
 import { canResolveStatus, formatTime, toCredits, toCreditsInput } from './utils';
 import type { BillingOrderView } from '../../../types/model';

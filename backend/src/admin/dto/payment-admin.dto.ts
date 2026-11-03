@@ -1,4 +1,4 @@
-import { Transform, Type } from 'class-transformer';
+import { Transform, Type } from "class-transformer";
 import {
   IsBoolean,
   IsIn,
@@ -10,18 +10,12 @@ import {
   MaxLength,
   Min,
   MinLength,
-} from 'class-validator';
-import { PageQueryDto } from './page-query.dto';
-import { PAYMENT_PROVIDER_IDS, PaymentProviderId } from '../../payments/adapters/types';
-
-/** 需要填写变更原因的高危写操作（审计落 reason 列） */
-class ReasonedDto {
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @IsString({ message: '请填写变更原因' })
-  @MinLength(2, { message: '变更原因至少 2 个字符' })
-  @MaxLength(200, { message: '变更原因最多 200 个字符' })
-  reason!: string;
-}
+} from "class-validator";
+import { PageQueryDto } from "./page-query.dto";
+import {
+  PAYMENT_PROVIDER_IDS,
+  PaymentProviderId,
+} from "../../payments/adapters/types";
 
 export class PaymentProviderConfigUpdateDto {
   @IsBoolean()
@@ -37,12 +31,12 @@ export class PaymentProviderConfigUpdateDto {
   values!: Record<string, string>;
 }
 
-export class PaymentSettingsUpdateDto extends ReasonedDto {
-  @IsIn(['CNY', 'USD'], { message: '币种只支持 CNY / USD' })
-  defaultCurrency!: 'CNY' | 'USD';
+export class PaymentSettingsUpdateDto {
+  @IsIn(["CNY", "USD"], { message: "币种只支持 CNY / USD" })
+  defaultCurrency!: "CNY" | "USD";
 }
 
-export class PaymentProductSaveDto extends ReasonedDto {
+export class PaymentProductSaveDto {
   @IsString()
   @MinLength(1)
   @MaxLength(60)
@@ -53,16 +47,16 @@ export class PaymentProductSaveDto extends ReasonedDto {
   @MaxLength(500)
   description?: string;
 
-  @IsIn(['credits'], { message: '目前只支持积分商品' })
-  kind!: 'credits';
+  @IsIn(["credits"], { message: "目前只支持积分商品" })
+  kind!: "credits";
 
-  @IsIn(['CNY', 'USD'], { message: '币种只支持 CNY / USD' })
-  currency!: 'CNY' | 'USD';
+  @IsIn(["CNY", "USD"], { message: "币种只支持 CNY / USD" })
+  currency!: "CNY" | "USD";
 
   /** 售价，整数分 */
   @Type(() => Number)
   @IsInt()
-  @Min(1, { message: '售价最低 1 分' })
+  @Min(1, { message: "售价最低 1 分" })
   priceCents!: number;
 
   @IsOptional()
@@ -73,7 +67,7 @@ export class PaymentProductSaveDto extends ReasonedDto {
 
   @Type(() => Number)
   @IsInt()
-  @Min(1, { message: '积分最低 1' })
+  @Min(1, { message: "积分最低 1" })
   credits!: number;
 
   @IsOptional()
@@ -83,11 +77,11 @@ export class PaymentProductSaveDto extends ReasonedDto {
   creditsValidDays?: number;
 
   @IsOptional()
-  @IsIn(['immediate', 'manual'])
-  grantType?: 'immediate' | 'manual';
+  @IsIn(["immediate", "manual"])
+  grantType?: "immediate" | "manual";
 
-  @IsIn(['active', 'offline'])
-  status!: 'active' | 'offline';
+  @IsIn(["active", "offline"])
+  status!: "active" | "offline";
 
   @IsOptional()
   @Type(() => Number)
@@ -95,8 +89,8 @@ export class PaymentProductSaveDto extends ReasonedDto {
   @Min(0)
   sortOrder?: number;
 
-  @IsIn(['unlimited', 'periodic', 'inventory', 'timed'])
-  saleStrategy!: 'unlimited' | 'periodic' | 'inventory' | 'timed';
+  @IsIn(["unlimited", "periodic", "inventory", "timed"])
+  saleStrategy!: "unlimited" | "periodic" | "inventory" | "timed";
 
   @IsOptional()
   @Type(() => Number)
@@ -141,8 +135,8 @@ export class PaymentOrderListQueryDto extends PageQueryDto {
   providerId?: string;
 
   @IsOptional()
-  @IsIn(['created', 'paid', 'credited'])
-  timeField?: 'created' | 'paid' | 'credited';
+  @IsIn(["created", "paid", "credited"])
+  timeField?: "created" | "paid" | "credited";
 
   @IsOptional()
   @IsString()
@@ -153,10 +147,9 @@ export class PaymentOrderListQueryDto extends PageQueryDto {
   to?: string;
 }
 
-export class PaymentOrderActionDto extends ReasonedDto {}
 
-export class ReconciliationRunDto extends ReasonedDto {
-  @IsIn(PAYMENT_PROVIDER_IDS, { message: '渠道非法' })
+export class ReconciliationRunDto {
+  @IsIn(PAYMENT_PROVIDER_IDS, { message: "渠道非法" })
   providerId!: PaymentProviderId;
 
   @IsString()
@@ -191,8 +184,8 @@ export class ReconciliationItemsQueryDto extends PageQueryDto {
   result?: string;
 }
 
-export class ReconciliationImportDto extends ReasonedDto {
-  @IsIn(PAYMENT_PROVIDER_IDS, { message: '渠道非法' })
+export class ReconciliationImportDto {
+  @IsIn(PAYMENT_PROVIDER_IDS, { message: "渠道非法" })
   providerId!: PaymentProviderId;
 
   @IsString()

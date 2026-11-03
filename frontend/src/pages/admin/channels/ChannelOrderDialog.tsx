@@ -8,7 +8,7 @@ import {
   ModalDialog,
   NumberField,
   SelectField,
-} from './components';
+} from '~/admin-ui/primitives';
 import { useToast } from './hooks';
 import { moveOrderItem, orderChanged, type OrderItem } from './utils';
 import type { ChannelOrderItemView } from '../../../types/model';

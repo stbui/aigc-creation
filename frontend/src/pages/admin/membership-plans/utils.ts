@@ -4,7 +4,7 @@
  * 三条约束的落点：
  * 1. 编码创建后不可改（订单与外部对账靠它认套餐）；
  * 2. `free` 套餐允许 0 天，其余可购买套餐周期必须大于 0；
- * 3. 改价 / 改权益 / 上下架都必须写原因 —— 审计要能回答「谁为什么改」。
+ * 3. 改价 / 改权益 / 上下架由后台审计自动记录动作。
  */
 
 import type {
@@ -13,7 +13,6 @@ import type {
   CreateAdminMembershipPlanPayload,
 } from '../../../types/api';
 import type { PlanDraft } from './constants';
-import { auditReason } from '../../../admin-ui/lib/auditReason';
 
 /** 分 → 元 */
 export function centsToYuan(cents: number): string {
@@ -93,8 +92,6 @@ export function buildPlanPayload(
   if (!Number.isInteger(discountPercent) || discountPercent < 1 || discountPercent > 100) {
     return { ok: false, error: '折扣必须是 1~100 的整数（100 表示无折扣）' };
   }
-  const reason = auditReason(opts.creating ? '新建会员套餐' : '编辑会员套餐');
-
   const perks = {
     fastChannel: draft.fastChannel,
     maxConcurrent,
@@ -110,7 +107,6 @@ export function buildPlanPayload(
     monthlyCredits,
     perks,
     sortOrder,
-    reason,
   };
 
   return {

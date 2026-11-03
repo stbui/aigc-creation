@@ -6,7 +6,6 @@ export interface PaginationProps {
   pageSize?: number;
   total?: number;
   onChange?: (page: number, pageSize: number) => void;
-  showSizeChanger?: boolean;
   simple?: boolean;
   hideOnSinglePage?: boolean;
   size?: 'small' | 'default' | 'middle' | 'large';
@@ -19,7 +18,6 @@ export function Pagination({
   pageSize = 20,
   total = 0,
   onChange,
-  showSizeChanger: _showSizeChanger,
   simple,
   hideOnSinglePage,
   className,

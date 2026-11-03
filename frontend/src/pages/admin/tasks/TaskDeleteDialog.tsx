@@ -1,4 +1,4 @@
-import { ActionButton, ModalDialog } from './components';
+import { ActionButton, ModalDialog } from '~/admin-ui/primitives';
 
 /**
  * 任务删除确认。

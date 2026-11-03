@@ -8,7 +8,10 @@
 `frontend/src/pages/admin/coupons/`、`frontend/src/pages/admin/aigc-label/`、
 `frontend/src/pages/admin/billing-orders/`、`frontend/src/pages/admin/campaigns/`、
 `frontend/src/pages/admin/user-groups/`、`frontend/src/pages/admin/membership-plans/`、
-`frontend/src/pages/admin/products/`、`frontend/src/pages/admin/backups/`、`frontend/src/pages/product-detail/`、`frontend/src/pages/product-kit/`、`frontend/src/pages/viral-clone/`、`frontend/src/pages/creative-image/`、`frontend/src/pages/product-sku/`、`frontend/src/pages/local-redraw/`、`frontend/src/pages/background-remove/`、`frontend/src/pages/watermark-remove/`、`frontend/src/pages/product-retouch/`、`frontend/src/pages/image-translate/`、`frontend/src/pages/image-expand/`、`frontend/src/pages/product-recolor/`、`frontend/src/pages/rotate-angle/`、`frontend/src/pages/multi-image-fusion/`、`frontend/src/pages/account/`、`frontend/src/pages/checkout/` 同步维护）。
+`frontend/src/pages/admin/products/`、`frontend/src/pages/admin/backups/`、`frontend/src/pages/product-detail/`、`frontend/src/pages/product-kit/`、`frontend/src/pages/viral-clone/`、`frontend/src/pages/creative-image/`、`frontend/src/pages/product-sku/`、`frontend/src/pages/local-redraw/`、`frontend/src/pages/background-remove/`、`frontend/src/pages/watermark-remove/`、`frontend/src/pages/product-retouch/`、`frontend/src/pages/image-translate/`、`frontend/src/pages/image-expand/`、`frontend/src/pages/product-recolor/`、`frontend/src/pages/rotate-angle/`、`frontend/src/pages/multi-image-fusion/`、`frontend/src/pages/landing/`、
+`frontend/src/pages/library/`、`frontend/src/pages/works/`、
+`frontend/src/pages/invitations/`、`frontend/src/pages/account/`、
+`frontend/src/pages/checkout/` 同步维护）。
 
 适用于 `frontend/src/pages/**` 下**多文件**的功能目录。单文件页面不强制套用；
 当页面长到需要拆分时，按本约定落位。参考实现见
@@ -31,6 +34,10 @@
 [`frontend/src/pages/product-recolor/`](../frontend/src/pages/product-recolor/)、
 [`frontend/src/pages/rotate-angle/`](../frontend/src/pages/rotate-angle/)、
 [`frontend/src/pages/multi-image-fusion/`](../frontend/src/pages/multi-image-fusion/)、
+[`frontend/src/pages/landing/`](../frontend/src/pages/landing/)、
+[`frontend/src/pages/library/`](../frontend/src/pages/library/)、
+[`frontend/src/pages/works/`](../frontend/src/pages/works/)、
+[`frontend/src/pages/invitations/`](../frontend/src/pages/invitations/)、
 [`frontend/src/pages/account/`](../frontend/src/pages/account/)、
 [`frontend/src/pages/checkout/`](../frontend/src/pages/checkout/)（C 端）。
 
@@ -157,6 +164,20 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
     `MultiFusionEditorHeader` / `MultiFusionUploadCard` / `MultiFusionAnalysisCard` /
     `MultiFusionParameterCard` / `MultiFusionSubmitBar` / `MultiFusionResultPanel`
     七个展示块，状态与写操作仍留在 `page.tsx`）；
+  - `frontend/src/pages/landing/__tests__/landing-modules.test.ts` ——
+    C 端营销首页目录（`src/pages/landing` / `src/components` / `src/hooks` /
+    `src/lib` / `src/context`；静态素材与案例清单落 `constants.ts`，去重与路径映射
+    落 `utils.ts`，顶导自实现落 `LandingHeader.tsx`）；
+  - `frontend/src/pages/library/__tests__/library-modules.test.ts` ——
+    C 端素材库目录（`src/pages/library` / `src/components` / `src/hooks` /
+    `src/lib` / `src/context`，日期分组与下载扩展名落 `utils.ts`）；
+  - `frontend/src/pages/works/__tests__/works-modules.test.ts` ——
+    C 端我的作品目录（`src/pages/works` / `src/components` / `src/hooks` /
+    `src/lib` / `src/context`，切日 / 模态判定 / 下载扩展名落 `utils.ts`，
+    作品卡图片落 `WorkImage.tsx`）；
+  - `frontend/src/pages/invitations/__tests__/invitations-modules.test.ts` ——
+    C 端邀请页目录（`src/pages/invitations` / `src/components` / `src/hooks` /
+    `src/lib` / `src/context`，邀请海报绘制与二维码配色落 `utils.ts`）；
   - `frontend/src/pages/account/__tests__/account-modules.test.ts` ——
     C 端账户中心目录（`src/pages/account` / `src/components` / `src/hooks` /
     `src/lib` / `src/context`，多接口并行取数与金额 / 日期格式化；页面按板块拆成
@@ -171,7 +192,7 @@ import { EMPTY_CHANNEL_DRAFT, type ChannelDraft } from './constants'; // 常量�
 - 分层改动后跑：
 
   ```bash
-  cd frontend && npx vitest run src/pages/admin/__tests__/admin-modules.test.ts src/pages/product-detail src/pages/product-kit src/pages/viral-clone src/pages/creative-image src/pages/product-sku src/pages/local-redraw src/pages/background-remove src/pages/watermark-remove src/pages/product-retouch src/pages/image-translate src/pages/image-expand src/pages/product-recolor src/pages/rotate-angle src/pages/multi-image-fusion src/pages/account src/pages/checkout src/pages/admin/payments
+  cd frontend && npx vitest run src/pages/admin/__tests__/admin-modules.test.ts src/pages/product-detail src/pages/product-kit src/pages/viral-clone src/pages/creative-image src/pages/product-sku src/pages/local-redraw src/pages/background-remove src/pages/watermark-remove src/pages/product-retouch src/pages/image-translate src/pages/image-expand src/pages/product-recolor src/pages/rotate-angle src/pages/multi-image-fusion src/pages/landing src/pages/library src/pages/works src/pages/invitations src/pages/account src/pages/checkout src/pages/admin/payments
   ```
 
 - 类型校验以 `npm run typecheck` 为准。

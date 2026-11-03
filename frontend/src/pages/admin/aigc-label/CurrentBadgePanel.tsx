@@ -1,4 +1,4 @@
-import { Panel } from './components';
+import { Panel } from '~/admin-ui/primitives';
 import type { AdminAigcLabel } from '../../../types/api';
 
 /**

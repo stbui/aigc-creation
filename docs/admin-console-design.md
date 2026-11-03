@@ -91,7 +91,7 @@
 
 ### 3.6 法务文档 `/admin/legal`
 
-四类固定 slug：`user-agreement` / `privacy-policy` / `minors-policy` / `account-rules`（`LEGAL_SLUGS`）。按 `(slug, version)` 版本化：`PUT` 新建草稿，`POST /:slug/:version/publish` 发布。已发布版本不可原地覆盖，改文本须升版本号；发布时同 slug 的其他已发布版本自动归档，保证「当前生效」唯一。读 `legal.read`、写 `legal.write`，发布必填原因。
+四类固定 slug：`user-agreement` / `privacy-policy` / `minors-policy` / `account-rules`（`LEGAL_SLUGS`）。按 `(slug, version)` 版本化：`PUT` 新建草稿，`POST /:slug/:version/publish` 发布。已发布版本不可原地覆盖，改文本须升版本号；发布时同 slug 的其他已发布版本自动归档，保证「当前生效」唯一。读 `legal.read`、写 `legal.write`，发布自动写审计。
 
 ### 3.7 站内消息 `/admin/notifications`
 
@@ -99,14 +99,14 @@
 
 ### 3.8 AI 标识 `/admin/aigc-label`
 
-顶部「显示可见角标」开关（关闭时给法律风险提示）；左侧编辑样式（文案、字体族 / 字号 / 字重 / 字距 / 字色、底色与不透明度、圆角、内边距、圆点色、位置、缩放、边距、整体不透明度），右侧两层预览——CSS 还原的外观与 Canvas 按服务端同一套几何规则画在示例底图上的效果。保存时浏览器 Canvas 以 2x 渲染 PNG，与 `specJson` 原子提交。关闭状态下仍渲染并保存位图，重新开启即恢复原样式。读 `setting.read`、写 `setting.write`，保存必填原因，审计动作 `aigc.label_update`。
+顶部「显示可见角标」开关（关闭时给法律风险提示）；左侧编辑样式（文案、字体族 / 字号 / 字重 / 字距 / 字色、底色与不透明度、圆角、内边距、圆点色、位置、缩放、边距、整体不透明度），右侧两层预览——CSS 还原的外观与 Canvas 按服务端同一套几何规则画在示例底图上的效果。保存时浏览器 Canvas 以 2x 渲染 PNG，与 `specJson` 原子提交。关闭状态下仍渲染并保存位图，重新开启即恢复原样式。读 `setting.read`、写 `setting.write`，保存自动写审计，审计动作 `aigc.label_update`。
 
 ### 3.9 交易与积分
 
 | 页面 | 功能 |
 | --- | --- |
 | 商品管理 | 积分包 SKU 新建 / 编辑 / 上下架（不提供删除，历史订单靠快照对账）；`product.publish` 控制上下架 |
-| 会员套餐 | 套餐列表、新建、改价 / 改权益 / 上下架；编码不可改，已付会员按 `perksSnapshot` 保留原权益；写操作必填原因并写审计 |
+| 会员套餐 | 套餐列表、新建、改价 / 改权益 / 上下架；编码不可改，已付会员按 `perksSnapshot` 保留原权益；写操作自动写审计 |
 | 订单管理 | 列表与详情、标记已支付、发起渠道退款（`order.refund`，必填原因） |
 | 积分账本 | 用户余额总览、批次与流水、人工增减（`credit.adjust`）、CSV 导入导出（导入走 `credit.adjust`，导出走 `credit.read + data.export`，按邮箱匹配逐行报结果） |
 | 能力消耗价 | 读写运行时积分价，生效来源显示 `override` / `campaign`；限时免活动命中时显示活动来源，运营据此判断「改了价没生效」是活动在起作用 |
@@ -128,7 +128,7 @@
 
 | 页面 | 功能 |
 | --- | --- |
-| 角色权限 | 查看与调整三个内置角色的权限点（含 `admin`，批量更新只校验权限点合法与角色存在，不阻止裁剪）；角色本身不可删除；多角色改动单事务提交，避免半保存；改动因守卫每次请求查库而立即生效；保存必须填写 2–200 字真实原因并写入审计；高危权限点单独标注；有未保存勾选时吸附显示保存条，站内跳转先确认 |
+| 角色权限 | 查看与调整三个内置角色的权限点（含 `admin`，批量更新只校验权限点合法与角色存在，不阻止裁剪）；角色本身不可删除；多角色改动单事务提交，避免半保存；改动因守卫每次请求查库而立即生效；保存自动写入审计；高危权限点单独标注；有未保存勾选时吸附显示保存条，站内跳转先确认 |
 | 系统设置 | 站点 / 上传 / 生成 / 退款规则等分组配置，默认值定义在 `common/setting-defs.ts` 的 `SETTING_DEFS` |
 | 存储配置 | 当前后端、容量统计、连通性探测、切换新上传的后端（已写入的素材仍按写入时记录的后端读取）；后端未就绪（SDK 未装或凭据缺失）时上传直接失败，不静默回退本地盘 |
 | 定时任务 | 各任务上次 / 下次执行、结果、手动触发 |
@@ -143,7 +143,7 @@
 | 用户分组 `/admin/user-groups` | 分组决定倍率、可见渠道与按模型的覆盖价格；没有有效会员的用户落在 `default` 分组，默认分组不可删除 |
 | 插件 `/admin/plugins` | 协议来源：启停即重注册协议，渠道模型可选的协议列表随之变化；支持安装、校验与查看服务商目录 |
 | 调用记录 `/admin/model-calls` | `ApiCallLog` 列表与详情：能力、协议、渠道、耗时、结果、`RouteAttempt.failureCode` 与错误摘要；CSV 导出与列表同口径（`model.call_read + data.export`），不含请求体 / 响应体 |
-| 生成账单 `/admin/billing-orders` | `BillingOrder` 列表与详情；`uncertain` 账单只能人工结算或退款，必填原因并写审计 |
+| 生成账单 `/admin/billing-orders` | `BillingOrder` 列表与详情；`uncertain` 账单只能人工结算或退款，操作自动写审计 |
 | 财务分析 `/admin/finance` | 实收 = 已结算账单、已退 = 订单退款、净收入 = 实收 − 已退；预留 / 运行 / 待核对单列为「挂账」，不计入实收 |
 | 能力管控 `/admin/capabilities` | 16 项能力的上下线，下架必填原因；下线后 C 端 `runtime.effective=disabled`，任务在扣费前被拦截并返回 `40005` |
 
@@ -184,7 +184,7 @@ JwtAuthGuard（身份）→ AdminGuard（后台身份 + 账号状态）→ Permi
 - **兜底默认拒**：`PermissionGuard` 未命中权限点即 403 `40301`。
 - **前端 `AdminContext.can()` 只用于隐藏按钮**，不是安全边界。
 - **批量与导出**：路由挂较弱读权限，处理器内用 `AdminRoleService.hasPermission()` 再判动作权限。
-- **审计**：写操作均落 `AdminAuditLog`（含 IP 与请求 ID），审计页只读；需要业务原因的动作才要求填原因，删除渠道 / 渠道模型不要求原因。
+- **审计**：写操作均落 `AdminAuditLog`（含系统生成原因、IP 与请求 ID），审计页只读；只有退款、发票驳回、能力下架等确有业务语义的动作才要求填写原因。
 
 ## 5. 数据访问约束
 

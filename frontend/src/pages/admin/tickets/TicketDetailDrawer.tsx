@@ -11,7 +11,7 @@ import {
   SkeletonBody,
   StatusTag,
   TextAreaField,
-} from './components';
+} from '~/admin-ui/primitives';
 import {
   PRIORITY_OPTIONS,
   STATUS_LABELS,

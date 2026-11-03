@@ -13,23 +13,45 @@
  * 缺省字段会按默认值落库，不要用它做「只改一个字段」的局部更新。
  */
 
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
-import { Allow, IsArray, IsBoolean, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-import { AdminUser, AuditAction, RequirePermission } from '../../admin/admin.decorator';
-import type { AdminUser as AdminUserContext } from '../../admin/admin.decorator';
-import { PERMISSIONS } from '../../admin/permissions';
-import { normalizeCapability } from '../domain/capability-config';
-import { badRequest } from '../domain/json';
-import { buildModelRequestIntent } from '../intent/model-intent';
-import { RouterService } from '../routing/router.service';
-import { UserGroupService } from '../user-groups/user-group.service';
-import { ModelIntentBodyDto } from './models.controller';
-import { LogicalModelAdminService, type LogicalModelRequest } from './logical-model.admin.service';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from "@nestjs/common";
+import {
+  Allow,
+  IsArray,
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from "class-validator";
+import {
+  AdminUser,
+  AuditAction,
+  RequirePermission,
+} from "../../admin/admin.decorator";
+import type { AdminUser as AdminUserContext } from "../../admin/admin.decorator";
+import { PERMISSIONS } from "../../admin/permissions";
+import { normalizeCapability } from "../domain/capability-config";
+import { badRequest } from "../domain/json";
+import { buildModelRequestIntent } from "../intent/model-intent";
+import { RouterService } from "../routing/router.service";
+import { UserGroupService } from "../user-groups/user-group.service";
+import { ModelIntentBodyDto } from "./models.controller";
+import {
+  LogicalModelAdminService,
+  type LogicalModelRequest,
+} from "./logical-model.admin.service";
 
-export class SimulateBodyDto extends ModelIntentBodyDto {
-  /** 高危动作原因（可选；模拟本身只读，不强制） */
-  @IsOptional() @IsString() reason?: string;
-}
+export class SimulateBodyDto extends ModelIntentBodyDto {}
 
 /** 线路入参：嵌套对象整体透传，语义校验在 service */
 export class LogicalRouteBodyDto {
@@ -54,16 +76,15 @@ export class LogicalModelWriteBodyDto {
   @IsOptional() @Allow() inputPriceMicrocredits?: number | string;
   @IsOptional() @Allow() outputPriceMicrocredits?: number | string;
   @IsOptional() @Allow() cachedPriceMicrocredits?: number | string;
-  @IsOptional() @IsArray() @IsString({ each: true }) legacyModelIds?: string[] | null;
+  @IsOptional() @IsArray() @IsString({ each: true }) legacyModelIds?:
+    string[] | null;
   @IsOptional() @Allow() capabilitySpec?: unknown;
   @IsOptional() @Allow() defaultOptions?: Record<string, unknown> | null;
   @IsOptional() @IsArray() @Allow() routes?: LogicalRouteBodyDto[];
   @IsOptional() @IsString() sourceChannelModelId?: string;
-  /** 高危动作原因（写审计） */
-  @IsOptional() @IsString() reason?: string;
 }
 
-@Controller('admin/logical-models')
+@Controller("admin/logical-models")
 export class AdminLogicalModelsController {
   constructor(
     private readonly models: LogicalModelAdminService,
@@ -73,21 +94,27 @@ export class AdminLogicalModelsController {
 
   @Get()
   @RequirePermission(PERMISSIONS.logicalModelRead)
-  list(@Query('includeArchived') includeArchived?: string) {
-    return this.models.list(String(includeArchived ?? '') === '1' || String(includeArchived ?? '') === 'true');
+  list(@Query("includeArchived") includeArchived?: string) {
+    return this.models.list(
+      String(includeArchived ?? "") === "1" ||
+        String(includeArchived ?? "") === "true",
+    );
   }
 
-  @Get(':id')
+  @Get(":id")
   @RequirePermission(PERMISSIONS.logicalModelRead)
-  get(@Param('id') id: string) {
+  get(@Param("id") id: string) {
     return this.models.get(id);
   }
 
   @Post()
   @RequirePermission(PERMISSIONS.logicalModelWrite)
-  @AuditAction('logical_model.create')
-  create(@Body() body: LogicalModelWriteBodyDto, @AdminUser() user: AdminUserContext) {
-    return this.models.save('', body as LogicalModelRequest, user?.id ?? '');
+  @AuditAction("logical_model.create")
+  create(
+    @Body() body: LogicalModelWriteBodyDto,
+    @AdminUser() user: AdminUserContext,
+  ) {
+    return this.models.save("", body as LogicalModelRequest, user?.id ?? "");
   }
 
   /**
@@ -107,12 +134,12 @@ export class AdminLogicalModelsController {
    * 入参的 `capability` 只在它本身是合法模态时才算数（显式模拟别的模态），
    * 传了产品 id 就当没传 —— 模型的模态是权威源，客户端不该改。
    */
-  @Post(':id/simulate')
+  @Post(":id/simulate")
   @RequirePermission(PERMISSIONS.logicalModelRead)
-  async simulate(@Param('id') id: string, @Body() body: SimulateBodyDto) {
+  async simulate(@Param("id") id: string, @Body() body: SimulateBodyDto) {
     const access = await this.groups.systemAccess();
     const model = await this.router.findModel(id);
-    if (!model) throw badRequest('所选模型不可用');
+    if (!model) throw badRequest("所选模型不可用");
     const requested = normalizeCapability(body?.capability);
     const intent = buildModelRequestIntent({
       capability: requested || model.productSpec.capability,
@@ -123,17 +150,21 @@ export class AdminLogicalModelsController {
     return this.router.simulate(access, id, intent);
   }
 
-  @Patch(':id')
+  @Patch(":id")
   @RequirePermission(PERMISSIONS.logicalModelWrite)
-  @AuditAction('logical_model.update')
-  update(@Param('id') id: string, @Body() body: LogicalModelWriteBodyDto, @AdminUser() user: AdminUserContext) {
-    return this.models.save(id, body as LogicalModelRequest, user?.id ?? '');
+  @AuditAction("logical_model.update")
+  update(
+    @Param("id") id: string,
+    @Body() body: LogicalModelWriteBodyDto,
+    @AdminUser() user: AdminUserContext,
+  ) {
+    return this.models.save(id, body as LogicalModelRequest, user?.id ?? "");
   }
 
-  @Delete(':id')
+  @Delete(":id")
   @RequirePermission(PERMISSIONS.logicalModelWrite)
-  @AuditAction('logical_model.archive')
-  async archive(@Param('id') id: string) {
+  @AuditAction("logical_model.archive")
+  async archive(@Param("id") id: string) {
     await this.models.archive(id);
     return { ok: true };
   }

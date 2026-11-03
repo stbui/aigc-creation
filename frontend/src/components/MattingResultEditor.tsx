@@ -19,6 +19,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import { Spin, useApp } from '../ui';
+import { COLOR_HEX, DEFAULT_CUSTOM_COLOR, normalizeHexColor } from '../lib/colorPalette';
 
 /**
  * 一键抠图结果编辑器 —— 对齐参考站 background-remove 的结果态。
@@ -63,16 +64,6 @@ interface PanGesture {
   target: ZoomTarget;
 }
 
-const COLOR_HEX: Record<string, string> = {
-  transparent: 'transparent',
-  white: '#FFFFFF',
-  'light-blue': '#82CEF3',
-  blue: '#3988E9',
-  red: '#FF0B22',
-  'dark-red': '#A8001B',
-};
-
-const DEFAULT_CUSTOM_COLOR = '#5546D8';
 const BRUSH_MIN = 10;
 const BRUSH_MAX = 60;
 const ZOOM_MIN = 50;
@@ -83,8 +74,7 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 function normalizeHex(value: string): string {
-  const match = /^#?([0-9a-f]{6})$/i.exec(value.trim());
-  return match ? `#${match[1].toUpperCase()}` : DEFAULT_CUSTOM_COLOR;
+  return normalizeHexColor(value) ?? DEFAULT_CUSTOM_COLOR;
 }
 
 function hexToRgba(hex: string, alpha: number): string {

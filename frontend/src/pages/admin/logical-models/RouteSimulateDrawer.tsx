@@ -7,7 +7,7 @@ import {
   StatusTag,
   TextAreaField,
   TextField,
-} from './components';
+} from '~/admin-ui/primitives';
 import { adminLogicalModelsApi } from './api';
 import { useToast } from './hooks';
 import type { AdminLogicalModelView, SimulateResultView } from '../../../types/model';

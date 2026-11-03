@@ -8,7 +8,7 @@ import {
   DetailSection,
   Notice,
   StatusTag,
-} from './components';
+} from '~/admin-ui/primitives';
 import { adminTasksApi, assetThumbUrl, toAbsoluteUrl } from './api';
 import { PROVIDER_LABELS } from './constants';
 import { useToast } from './hooks';

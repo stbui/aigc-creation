@@ -1,5 +1,5 @@
 import { ShieldAlert } from 'lucide-react';
-import { Notice, StatCard } from './components';
+import { Notice, StatCard } from '~/admin-ui/primitives';
 import { formatRelative } from './utils';
 import type { AdminBackupStats } from '../../../types/api';
 

@@ -61,7 +61,7 @@ const ResetPasswordPage = lazyRoute(
   () => import('./pages/ResetPasswordPage'),
   'ResetPasswordPage',
 );
-const LandingPage = lazyRoute('/', () => import('./pages/LandingPage'), 'LandingPage');
+const LandingPage = lazyRoute('/', () => import('./pages/landing'), 'LandingPage');
 const SitemapPage = lazyRoute('/sitemap.html', () => import('./pages/SitemapPage'), 'SitemapPage');
 const LegalPage = lazyRoute('/legal/*', () => import('./pages/LegalPage'), 'LegalPage');
 const WorkbenchPage = lazyRoute('/workbench', () => import('./pages/WorkbenchPage'), 'WorkbenchPage');
@@ -90,10 +90,10 @@ const ImageExpandPage = lazyRoute('/image-expand', () => import('./pages/image-e
 const ProductRecolorPage = lazyRoute('/product-recolor', () => import('./pages/product-recolor'), 'ProductRecolorPage');
 const RotateAnglePage = lazyRoute('/rotate-angle', () => import('./pages/rotate-angle'), 'RotateAnglePage');
 const ToolPage = lazyRoute('/tools/*', () => import('./pages/ToolPage'), 'ToolPage');
-const WorksPage = lazyRoute(['/works', '/my-works'], () => import('./pages/WorksPage'), 'WorksPage');
-const LibraryPage = lazyRoute(['/library', '/asset-library'], () => import('./pages/LibraryPage'), 'LibraryPage');
+const WorksPage = lazyRoute(['/works', '/my-works'], () => import('./pages/works'), 'WorksPage');
+const LibraryPage = lazyRoute(['/library', '/asset-library'], () => import('./pages/library'), 'LibraryPage');
 const StatsPage = lazyRoute('/stats', () => import('./pages/StatsPage'), 'StatsPage');
-const InvitationsPage = lazyRoute('/invitations', () => import('./pages/InvitationsPage'), 'InvitationsPage');
+const InvitationsPage = lazyRoute('/invitations', () => import('./pages/invitations'), 'InvitationsPage');
 const PackagesPage = lazyRoute('/packages', () => import('./pages/PackagesPage'), 'PackagesPage');
 const CheckoutPage = lazyRoute('/checkout/*', () => import('./pages/checkout'), 'CheckoutPage');
 const CreditsPage = lazyRoute('/credits', () => import('./pages/CreditsPage'), 'CreditsPage');

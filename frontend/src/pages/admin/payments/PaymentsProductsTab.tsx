@@ -20,9 +20,8 @@ import {
   TextAreaField,
   TextField,
   type AdminColumn,
-} from './components';
+} from '~/admin-ui/primitives';
 import { useAdmin, useAdminResource, useToast } from './hooks';
-import { auditReason } from '../../../admin-ui/lib/auditReason';
 import type {
   AdminPaymentProductView,
   PaymentCurrency,
@@ -345,7 +344,6 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
           }
         : {}),
       status: draft.enabled ? 'active' : 'offline',
-      reason: auditReason(editing ? '编辑充值商品' : '新建充值商品'),
     };
 
     setSaving(true);
@@ -422,10 +420,7 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
         onConfirm={async () => {
           setSaving(true);
           try {
-            await adminPaymentProvidersApi.saveSettings({
-              defaultCurrency: currencyDraft,
-              reason: auditReason('更改默认充值货币'),
-            });
+            await adminPaymentProvidersApi.saveSettings({ defaultCurrency: currencyDraft });
             toast.success('默认货币已更新');
             setCurrencyOpen(false);
             settings.reload();

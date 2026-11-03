@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { adminChannelModelsApi, adminChannelsApi, adminLogicalModelsApi } from './api';
-import { ActionButton, FilterBar, PageHeader, Panel, SkeletonBody, StaleError, SwitchField } from './components';
+import { ActionButton, FilterBar, PageHeader, Panel, SkeletonBody, StaleError, SwitchField } from '~/admin-ui/primitives';
 import { useAdmin, useAdminResource, useCapabilities, useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
 import {
   EMPTY_DRAFT,
@@ -13,7 +13,6 @@ import { LogicalModelTable } from './LogicalModelTable';
 import { ModelFormDrawer } from './ModelFormDrawer';
 import { RouteSimulateDrawer } from './RouteSimulateDrawer';
 import { ArchiveConfirm } from './ArchiveConfirm';
-import { auditReason } from '../../../admin-ui/lib/auditReason';
 import type {
   AdminChannelModelView,
   AdminLogicalModelView,
@@ -219,7 +218,6 @@ export function AdminLogicalModelsPage() {
       capabilitySpec,
       defaultOptions,
       routes,
-      reason: auditReason(editing ? '编辑前台模型' : '新建前台模型'),
     };
 
     setSaving(true);

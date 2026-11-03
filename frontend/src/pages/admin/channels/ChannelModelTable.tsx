@@ -24,7 +24,7 @@ import {
   SelectField,
   StatusTag,
   type AdminColumn,
-} from './components';
+} from '~/admin-ui/primitives';
 import { ChannelModelCostSummary, ChannelModelHealthCell } from './ChannelModelHealthCell';
 import { CAPABILITY_OPTIONS, PAGE_SIZE, STATUS_FILTER_OPTIONS } from './constants';
 import type {

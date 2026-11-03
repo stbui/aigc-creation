@@ -157,7 +157,6 @@ export class PaymentWorkerService implements OnModuleInit, OnModuleDestroy {
           providerId: adapter.descriptor.id,
           billDate,
           actorId: 'worker',
-          reason: '每日自动对账',
         });
       } catch (e) {
         this.logger.error(`自动对账失败 (${adapter.descriptor.id} ${billDate}): ${(e as Error).message}`);

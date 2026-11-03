@@ -4,7 +4,7 @@ import { fmt } from './utils';
 import { useAdmin, useDiscardConfirm, useUnsavedGuard, useToast, useAdminResource } from './hooks';
 import { adminNotificationsApi } from '../../../lib/api';
 
-import { ActionButton, AdminDataTable, Drawer, FormField, Notice, PageHeader, Panel, SelectField, StaleError, StatusTag, SwitchField, TextAreaField, TextField, type AdminColumn } from './components';
+import { ActionButton, AdminDataTable, Drawer, FormField, Notice, PageHeader, Panel, SelectField, StaleError, StatusTag, SwitchField, TextAreaField, TextField, type AdminColumn } from '~/admin-ui/primitives';
 import type { DeliveryChannelStatusMap, MessageTemplateItem } from '../../../types/api';
 
 /** 站内消息实际读取的模板编码 —— 与通知服务内置兜底文案一一对应 */

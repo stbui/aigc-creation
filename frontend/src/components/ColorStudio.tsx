@@ -1,6 +1,13 @@
 import { useMemo } from 'react';
 import { Pipette, RotateCcw } from 'lucide-react';
-import { ColorSwatchGrid, type ColorOption } from './ToolWidgets';
+
+import { ColorSwatchGrid } from './ToolWidgets';
+import {
+  DEFAULT_CUSTOM_COLOR,
+  isValidHexColor,
+  normalizeHexColor,
+  type ColorOption,
+} from '../lib/colorPalette';
 
 /**
  * 参考站色板 + 自定义颜色面板。
@@ -8,25 +15,11 @@ import { ColorSwatchGrid, type ColorOption } from './ToolWidgets';
  * 背景抠图与商品换色共用同一套交互：预设色、系统取色器、HEX、色相滑杆、
  * 透明度滑杆、12 个常用色与「无填充」。组件只负责呈现与换算，提交语义由
  * 页面决定：抠图把 custom 作为 selectedColor，换色则提交解析后的 HEX。
+ *
+ * 色板取值与 HEX 换算在 `src/lib/colorPalette`（全站唯一事实源）。
  */
 
-export const MATTING_COLOR_SWATCHES: ColorOption[] = [
-  { value: 'transparent', label: '透明底', css: 'transparent' },
-  { value: 'white', label: '白色', css: '#FFFFFF' },
-  { value: 'light-blue', label: '浅蓝', css: '#82CEF3' },
-  { value: 'blue', label: '蓝色', css: '#3988E9' },
-  { value: 'red', label: '红色', css: '#FF0B22' },
-  { value: 'dark-red', label: '深红', css: '#A8001B' },
-];
-
-export const RECOLOR_COLOR_SWATCHES: ColorOption[] = [
-  { value: '#FFFFFF', label: '白色', css: '#FFFFFF' },
-  { value: '#82CEF3', label: '浅蓝', css: '#82CEF3' },
-  { value: '#3988E9', label: '蓝色', css: '#3988E9' },
-  { value: '#FF0B22', label: '红色', css: '#FF0B22' },
-  { value: '#A8001B', label: '深红', css: '#A8001B' },
-];
-
+/** 自定义色下方的 12 个常用色（与预设色板正交，只是取色的快捷入口） */
 const COLOR_PRESETS = [
   '#000000',
   '#FFFFFF',
@@ -36,23 +29,14 @@ const COLOR_PRESETS = [
   '#FF0B22',
   '#A8001B',
   '#7B2FF7',
-  '#5546D8',
+  DEFAULT_CUSTOM_COLOR,
   '#3988E9',
   '#82CEF3',
   '#22C55E',
 ];
 
-export function normalizeHexColor(value: string): string | null {
-  const m = /^#?([0-9a-f]{6})$/i.exec(value.trim());
-  return m ? `#${m[1].toUpperCase()}` : null;
-}
-
-export function isValidHexColor(value: string): boolean {
-  return normalizeHexColor(value) !== null;
-}
-
 function hexToHsv(hex: string): { h: number; s: number; v: number } {
-  const normalized = normalizeHexColor(hex) ?? '#5546D8';
+  const normalized = normalizeHexColor(hex) ?? DEFAULT_CUSTOM_COLOR;
   const n = parseInt(normalized.slice(1), 16);
   const r = ((n >> 16) & 255) / 255;
   const g = ((n >> 8) & 255) / 255;
@@ -121,7 +105,7 @@ export function ColorStudio({
   onClear?: () => void;
   ariaLabel: string;
 }) {
-  const hex = normalizeHexColor(customColor) ?? '#5546D8';
+  const hex = normalizeHexColor(customColor) ?? DEFAULT_CUSTOM_COLOR;
   const customHexInvalid = value === 'custom' && !isValidHexColor(customColor);
   const hsv = useMemo(() => hexToHsv(hex), [hex]);
   const pickerSupported = typeof window !== 'undefined' && 'EyeDropper' in window;

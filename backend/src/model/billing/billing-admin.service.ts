@@ -11,13 +11,13 @@
  * 与审计，并把 BigInt 金额转成可序列化的数值。
  */
 
-import { Injectable } from '@nestjs/common';
-import type { BillingOrder, Prisma } from '@prisma/client';
-import { AppError } from '../../common/app.exception';
-import { CSV_EXPORT_MAX_ROWS, toCsv } from '../../common/csv';
-import { PrismaService } from '../../prisma/prisma.service';
-import { BillingService } from './billing.service';
-import { billingCreditCost } from './cost-amount';
+import { Injectable } from "@nestjs/common";
+import type { BillingOrder, Prisma } from "@prisma/client";
+import { AppError } from "../../common/app.exception";
+import { CSV_EXPORT_MAX_ROWS, toCsv } from "../../common/csv";
+import { PrismaService } from "../../prisma/prisma.service";
+import { BillingService } from "./billing.service";
+import { billingCreditCost } from "./cost-amount";
 
 /** 列表页单页上限：超过这个量级应当用筛选收窄，而不是翻页 */
 const MAX_PAGE_SIZE = 200;
@@ -126,35 +126,58 @@ export class BillingAdminService {
     const { page, pageSize, skip, take } = paging(query);
     const where = await orderWhere(this.prisma, query);
     const [rows, total, counts] = await Promise.all([
-      this.prisma.billingOrder.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take }),
+      this.prisma.billingOrder.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take,
+      }),
       this.prisma.billingOrder.count({ where }),
-      this.prisma.billingOrder.groupBy({ by: ['status'], where, _count: { _all: true } }),
+      this.prisma.billingOrder.groupBy({
+        by: ["status"],
+        where,
+        _count: { _all: true },
+      }),
     ]);
     const [channelNames, channelModelNames, userEmails] = await Promise.all([
       nameLookup(
         rows.map((row) => row.channelId),
         (ids) =>
-          this.prisma.modelChannel.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }),
+          this.prisma.modelChannel.findMany({
+            where: { id: { in: ids } },
+            select: { id: true, name: true },
+          }),
       ),
       nameLookup(
         rows.map((row) => row.channelModelId),
         (ids) =>
-          this.prisma.channelModel.findMany({
-            where: { id: { in: ids } },
-            select: { id: true, displayName: true, modelKey: true },
-          }).then((items) =>
-            items.map((item) => ({ id: item.id, name: item.displayName || item.modelKey })),
-          ),
+          this.prisma.channelModel
+            .findMany({
+              where: { id: { in: ids } },
+              select: { id: true, displayName: true, modelKey: true },
+            })
+            .then((items) =>
+              items.map((item) => ({
+                id: item.id,
+                name: item.displayName || item.modelKey,
+              })),
+            ),
       ),
       nameLookup(
         rows.map((row) => row.userId),
-        (ids) => this.prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, email: true } }),
+        (ids) =>
+          this.prisma.user.findMany({
+            where: { id: { in: ids } },
+            select: { id: true, email: true },
+          }),
       ),
     ]);
     const statusCounts: Record<string, number> = {};
     for (const item of counts) statusCounts[item.status] = item._count._all;
     return {
-      items: rows.map((row) => toOrderView(row, channelNames, channelModelNames, userEmails)),
+      items: rows.map((row) =>
+        toOrderView(row, channelNames, channelModelNames, userEmails),
+      ),
       total,
       page,
       pageSize,
@@ -163,19 +186,35 @@ export class BillingAdminService {
   }
 
   async getOrder(id: string): Promise<BillingOrderView> {
-    const row = await this.prisma.billingOrder.findUnique({ where: { id: String(id ?? '').trim() } });
-    if (!row) throw new AppError(40400, '账单不存在', 404);
+    const row = await this.prisma.billingOrder.findUnique({
+      where: { id: String(id ?? "").trim() },
+    });
+    if (!row) throw new AppError(40400, "账单不存在", 404);
     const [channelNames, channelModelNames, userEmails] = await Promise.all([
       nameLookup([row.channelId], (ids) =>
-        this.prisma.modelChannel.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }),
+        this.prisma.modelChannel.findMany({
+          where: { id: { in: ids } },
+          select: { id: true, name: true },
+        }),
       ),
       nameLookup([row.channelModelId], (ids) =>
         this.prisma.channelModel
-          .findMany({ where: { id: { in: ids } }, select: { id: true, displayName: true, modelKey: true } })
-          .then((items) => items.map((item) => ({ id: item.id, name: item.displayName || item.modelKey }))),
+          .findMany({
+            where: { id: { in: ids } },
+            select: { id: true, displayName: true, modelKey: true },
+          })
+          .then((items) =>
+            items.map((item) => ({
+              id: item.id,
+              name: item.displayName || item.modelKey,
+            })),
+          ),
       ),
       nameLookup([row.userId], (ids) =>
-        this.prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, email: true } }),
+        this.prisma.user.findMany({
+          where: { id: { in: ids } },
+          select: { id: true, email: true },
+        }),
       ),
     ]);
     return toOrderView(row, channelNames, channelModelNames, userEmails);
@@ -184,16 +223,24 @@ export class BillingAdminService {
   /**
    * 人工核对：`settle` 按现有用量结算，`refund` 全额退回。
    *
-   * 权限（`billing_order.resolve`）与原因必填由控制器 / 前端保证；金额与状态机
-   * 完全交给 `BillingService.resolve`，这里不重复实现任何资金逻辑。
+   * 权限（`billing_order.resolve`）由控制器保证；金额与状态机完全交给
+   * `BillingService.resolve`，这里不重复实现任何资金逻辑。
    */
-  async resolveOrder(id: string, action: string, reason: string, actorUserId: string): Promise<BillingOrderView> {
-    const normalized = String(action ?? '').trim().toLowerCase();
-    if (normalized !== 'settle' && normalized !== 'refund') {
-      throw new AppError(40001, '请选择结算或退款', 400);
+  async resolveOrder(
+    id: string,
+    action: string,
+    actorUserId: string,
+  ): Promise<BillingOrderView> {
+    const normalized = String(action ?? "")
+      .trim()
+      .toLowerCase();
+    if (normalized !== "settle" && normalized !== "refund") {
+      throw new AppError(40001, "请选择结算或退款", 400);
     }
-    const note = String(reason ?? '').trim();
-    if (note === '') throw new AppError(40001, '请填写核对依据', 400);
+    const note =
+      normalized === "settle"
+        ? "人工核对：按现有用量结算"
+        : "人工核对：全额退款";
     await this.billing.resolve(id, normalized, actorUserId, note);
     return this.getOrder(id);
   }
@@ -207,43 +254,70 @@ export class BillingAdminService {
   async batchResolveOrders(
     ids: string[],
     action: string,
-    reason: string,
     actorUserId: string,
-  ): Promise<{ total: number; resolved: number; failed: number; results: Array<{ id: string; ok: boolean; error?: string }> }> {
-    const unique = [...new Set(ids.map((item) => String(item ?? '').trim()).filter((item) => item !== ''))];
-    if (unique.length === 0) throw new AppError(40001, '请选择要核对的账单', 400);
+  ): Promise<{
+    total: number;
+    resolved: number;
+    failed: number;
+    results: Array<{ id: string; ok: boolean; error?: string }>;
+  }> {
+    const unique = [
+      ...new Set(
+        ids
+          .map((item) => String(item ?? "").trim())
+          .filter((item) => item !== ""),
+      ),
+    ];
+    if (unique.length === 0)
+      throw new AppError(40001, "请选择要核对的账单", 400);
     if (unique.length > MAX_BATCH_RESOLVE) {
-      throw new AppError(40001, `单次最多核对 ${MAX_BATCH_RESOLVE} 条账单`, 400);
+      throw new AppError(
+        40001,
+        `单次最多核对 ${MAX_BATCH_RESOLVE} 条账单`,
+        400,
+      );
     }
-    // 动作与依据在**请求级**校验：缺依据是整批的用法错误，不是逐条的失败。
+    // 动作在**请求级**校验：动作非法是整批的用法错误，不是逐条的失败。
     // 若放到循环里，用户会看到「3 条全部失败」，看不出是自己的入参漏了。
-    const normalized = String(action ?? '').trim().toLowerCase();
-    if (normalized !== 'settle' && normalized !== 'refund') {
-      throw new AppError(40001, '请选择结算或退款', 400);
+    const normalized = String(action ?? "")
+      .trim()
+      .toLowerCase();
+    if (normalized !== "settle" && normalized !== "refund") {
+      throw new AppError(40001, "请选择结算或退款", 400);
     }
-    const note = String(reason ?? '').trim();
-    if (note === '') throw new AppError(40001, '请填写核对依据', 400);
 
     const results: Array<{ id: string; ok: boolean; error?: string }> = [];
     for (const id of unique) {
       try {
-        await this.resolveOrder(id, normalized, note, actorUserId);
+        await this.resolveOrder(id, normalized, actorUserId);
         results.push({ id, ok: true });
       } catch (error) {
         results.push({ id, ok: false, error: (error as Error).message });
       }
     }
     const resolved = results.filter((item) => item.ok).length;
-    return { total: results.length, resolved, failed: results.length - resolved, results };
+    return {
+      total: results.length,
+      resolved,
+      failed: results.length - resolved,
+      results,
+    };
   }
 
   /* ───────────────────────── 调用记录 ───────────────────────── */
 
-  async listApiLogs(query: ApiLogQuery): Promise<PageResult<ApiLogView> & { summary: ApiLogSummary }> {
+  async listApiLogs(
+    query: ApiLogQuery,
+  ): Promise<PageResult<ApiLogView> & { summary: ApiLogSummary }> {
     const { page, pageSize, skip, take } = paging(query);
     const where = apiLogWhere(query);
     const [rows, total, summary] = await Promise.all([
-      this.prisma.apiCallLog.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take }),
+      this.prisma.apiCallLog.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take,
+      }),
       this.prisma.apiCallLog.count({ where }),
       this.apiLogSummary(where),
     ]);
@@ -256,7 +330,10 @@ export class BillingAdminService {
      */
     const related = await this.apiLogRelations(rows);
     return {
-      items: rows.map((row) => ({ ...toApiLogView(row), ...related.get(row.id) })),
+      items: rows.map((row) => ({
+        ...toApiLogView(row),
+        ...related.get(row.id),
+      })),
       total,
       page,
       pageSize,
@@ -270,11 +347,20 @@ export class BillingAdminService {
    * 只查当前页涉及的 id，不做全表扫描。
    */
   private async apiLogRelations(
-    rows: Array<{ id: string; userId: string; taskId: string; billingOrderId: string }>,
+    rows: Array<{
+      id: string;
+      userId: string;
+      taskId: string;
+      billingOrderId: string;
+    }>,
   ): Promise<Map<string, ApiLogRelation>> {
     const out = new Map<string, ApiLogRelation>();
     if (rows.length === 0) return out;
-    const uniq = (values: string[]) => [...new Set(values.map((v) => String(v ?? '').trim()).filter((v) => v !== ''))];
+    const uniq = (values: string[]) => [
+      ...new Set(
+        values.map((v) => String(v ?? "").trim()).filter((v) => v !== ""),
+      ),
+    ];
 
     const userIds = uniq(rows.map((r) => r.userId));
     const taskIds = uniq(rows.map((r) => r.taskId));
@@ -315,12 +401,16 @@ export class BillingAdminService {
       const task = taskById.get(row.taskId);
       const order = orderById.get(row.billingOrderId);
       out.set(row.id, {
-        userDisplayName: user?.name ?? '',
-        userAccount: user?.email ?? '',
-        taskStatus: task?.status ?? '',
-        billingStatus: order?.status ?? '',
-        billingReservedMicrocredits: order ? Number(order.reservedAmountMicrocredits) : null,
-        billingSettledMicrocredits: order ? Number(order.actualAmountMicrocredits) : null,
+        userDisplayName: user?.name ?? "",
+        userAccount: user?.email ?? "",
+        taskStatus: task?.status ?? "",
+        billingStatus: order?.status ?? "",
+        billingReservedMicrocredits: order
+          ? Number(order.reservedAmountMicrocredits)
+          : null,
+        billingSettledMicrocredits: order
+          ? Number(order.actualAmountMicrocredits)
+          : null,
       });
     }
     return out;
@@ -338,37 +428,45 @@ export class BillingAdminService {
   async exportApiLogsCsv(query: ApiLogQuery): Promise<string> {
     const rows = await this.prisma.apiCallLog.findMany({
       where: apiLogWhere(query),
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: CSV_EXPORT_MAX_ROWS,
     });
     return toCsv(
       [
-        { label: '时间', value: (r) => r.createdAt },
-        { label: '来源', value: (r) => r.source },
-        { label: '能力', value: (r) => r.capability },
-        { label: '操作', value: (r) => r.operation },
-        { label: '请求类型', value: (r) => r.requestKind },
-        { label: '渠道', value: (r) => r.channelName || r.channelId },
-        { label: '模型', value: (r) => r.model },
-        { label: '状态', value: (r) => r.status },
-        { label: 'HTTP', value: (r) => r.statusCode },
-        { label: '耗时(ms)', value: (r) => r.durationMs },
-        { label: '任务', value: (r) => r.taskId },
-        { label: '账单', value: (r) => r.billingOrderId },
-        { label: '用户', value: (r) => r.userId },
-        { label: '错误码', value: (r) => r.errorCode },
-        { label: '错误', value: (r) => r.error },
+        { label: "时间", value: (r) => r.createdAt },
+        { label: "来源", value: (r) => r.source },
+        { label: "能力", value: (r) => r.capability },
+        { label: "操作", value: (r) => r.operation },
+        { label: "请求类型", value: (r) => r.requestKind },
+        { label: "渠道", value: (r) => r.channelName || r.channelId },
+        { label: "模型", value: (r) => r.model },
+        { label: "状态", value: (r) => r.status },
+        { label: "HTTP", value: (r) => r.statusCode },
+        { label: "耗时(ms)", value: (r) => r.durationMs },
+        { label: "任务", value: (r) => r.taskId },
+        { label: "账单", value: (r) => r.billingOrderId },
+        { label: "用户", value: (r) => r.userId },
+        { label: "错误码", value: (r) => r.errorCode },
+        { label: "错误", value: (r) => r.error },
       ],
       rows,
     );
   }
 
   /** 概览：成功 / 失败条数与平均耗时。成本字段未配置时不能求和，故不提供成本合计 */
-  private async apiLogSummary(where: Prisma.ApiCallLogWhereInput): Promise<ApiLogSummary> {
+  private async apiLogSummary(
+    where: Prisma.ApiCallLogWhereInput,
+  ): Promise<ApiLogSummary> {
     const [success, failed, aggregate] = await Promise.all([
-      this.prisma.apiCallLog.count({ where: { ...where, status: 'success' } }),
-      this.prisma.apiCallLog.count({ where: { ...where, status: { in: ['failed', 'canceled'] } } }),
-      this.prisma.apiCallLog.aggregate({ where, _avg: { durationMs: true }, _count: { _all: true } }),
+      this.prisma.apiCallLog.count({ where: { ...where, status: "success" } }),
+      this.prisma.apiCallLog.count({
+        where: { ...where, status: { in: ["failed", "canceled"] } },
+      }),
+      this.prisma.apiCallLog.aggregate({
+        where,
+        _avg: { durationMs: true },
+        _count: { _all: true },
+      }),
     ]);
     return {
       total: aggregate._count._all,
@@ -456,22 +554,28 @@ function paging(query: { page?: number; pageSize?: number }): {
   take: number;
 } {
   const page = Math.max(1, Math.trunc(Number(query.page) || 1));
-  const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Math.trunc(Number(query.pageSize) || DEFAULT_PAGE_SIZE)));
+  const pageSize = Math.min(
+    MAX_PAGE_SIZE,
+    Math.max(1, Math.trunc(Number(query.pageSize) || DEFAULT_PAGE_SIZE)),
+  );
   return { page, pageSize, skip: (page - 1) * pageSize, take: pageSize };
 }
 
 function splitCsv(value: string | undefined): string[] {
-  return String(value ?? '')
-    .split(',')
+  return String(value ?? "")
+    .split(",")
     .map((item) => item.trim())
-    .filter((item) => item !== '');
+    .filter((item) => item !== "");
 }
 
 /** 时间筛选：`from` / `to` 都是闭区间，非法时间直接忽略而不是报错 */
-function dateRange(from?: string, to?: string): Prisma.DateTimeFilter | undefined {
+function dateRange(
+  from?: string,
+  to?: string,
+): Prisma.DateTimeFilter | undefined {
   const range: Prisma.DateTimeFilter = {};
-  const start = Date.parse(String(from ?? ''));
-  const end = Date.parse(String(to ?? ''));
+  const start = Date.parse(String(from ?? ""));
+  const end = Date.parse(String(to ?? ""));
   if (Number.isFinite(start)) range.gte = new Date(start);
   if (Number.isFinite(end)) range.lte = new Date(end);
   return range.gte || range.lte ? range : undefined;
@@ -492,20 +596,25 @@ async function orderWhere(
 ): Promise<Prisma.BillingOrderWhereInput> {
   const where: Prisma.BillingOrderWhereInput = {};
   const statuses = splitCsv(query.status);
-  if (statuses.includes('review')) {
-    const concrete = statuses.filter((item) => item !== 'review');
-    const staleBefore = new Date(Date.now() - REVIEW_RUNNING_STALE_MINUTES * 60_000);
+  if (statuses.includes("review")) {
+    const concrete = statuses.filter((item) => item !== "review");
+    const staleBefore = new Date(
+      Date.now() - REVIEW_RUNNING_STALE_MINUTES * 60_000,
+    );
     // 任务已失败/取消、但账单仍挂着预授权：用子查询而非 relation 过滤
     // （BillingOrder 与 GenerationTask 之间没有声明 relation）
     const failedTasks = await prisma.generationTask.findMany({
-      where: { status: { in: ['failed', 'cancelled'] } },
+      where: { status: { in: ["failed", "cancelled"] } },
       select: { id: true },
     });
     const reviewClause: Prisma.BillingOrderWhereInput = {
       OR: [
-        { status: 'uncertain' },
-        { status: 'running', updatedAt: { lt: staleBefore } },
-        { status: 'reserved', taskId: { in: failedTasks.map((task) => task.id) } },
+        { status: "uncertain" },
+        { status: "running", updatedAt: { lt: staleBefore } },
+        {
+          status: "reserved",
+          taskId: { in: failedTasks.map((task) => task.id) },
+        },
       ],
     };
     where.OR = [
@@ -536,8 +645,10 @@ function apiLogWhere(query: ApiLogQuery): Prisma.ApiCallLogWhereInput {
   if (query.taskId?.trim()) where.taskId = query.taskId.trim();
   if (query.userId?.trim()) where.userId = query.userId.trim();
   if (query.model?.trim()) where.model = query.model.trim();
-  if (query.billable === '1' || query.billable === 'true') where.billable = true;
-  if (query.billable === '0' || query.billable === 'false') where.billable = false;
+  if (query.billable === "1" || query.billable === "true")
+    where.billable = true;
+  if (query.billable === "0" || query.billable === "false")
+    where.billable = false;
   const range = dateRange(query.from, query.to);
   if (range) where.createdAt = range;
   return where;
@@ -546,12 +657,20 @@ function apiLogWhere(query: ApiLogQuery): Prisma.ApiCallLogWhereInput {
 /** 批量取名：空 id 直接跳过查询（`in: []` 在 SQLite 上会退化成全表扫描的风险没必要冒） */
 async function nameLookup(
   ids: string[],
-  load: (ids: string[]) => Promise<Array<{ id: string; name?: string; email?: string }>>,
+  load: (
+    ids: string[],
+  ) => Promise<Array<{ id: string; name?: string; email?: string }>>,
 ): Promise<Map<string, string>> {
-  const unique = [...new Set(ids.map((id) => String(id ?? '').trim()).filter((id) => id !== ''))];
+  const unique = [
+    ...new Set(
+      ids.map((id) => String(id ?? "").trim()).filter((id) => id !== ""),
+    ),
+  ];
   if (unique.length === 0) return new Map();
   const rows = await load(unique);
-  return new Map(rows.map((row) => [row.id, String(row.name ?? row.email ?? '')]));
+  return new Map(
+    rows.map((row) => [row.id, String(row.name ?? row.email ?? "")]),
+  );
 }
 
 function num(value: bigint): number {
@@ -581,7 +700,7 @@ function toOrderView(
   return {
     id: row.id,
     userId: row.userId,
-    userEmail: userEmails.get(row.userId) ?? '',
+    userEmail: userEmails.get(row.userId) ?? "",
     taskId: row.taskId,
     model: row.model,
     capability: row.capability,
@@ -589,9 +708,9 @@ function toOrderView(
     billingMode: row.billingMode,
     status: row.status,
     channelId: row.channelId,
-    channelName: channelNames.get(row.channelId) ?? '',
+    channelName: channelNames.get(row.channelId) ?? "",
     channelModelId: row.channelModelId,
-    channelModelName: channelModelNames.get(row.channelModelId) ?? '',
+    channelModelName: channelModelNames.get(row.channelModelId) ?? "",
     priceTierId: row.priceTierId,
     userGroup: row.userGroup,
     priceCurrency: row.priceCurrency,

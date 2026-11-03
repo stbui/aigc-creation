@@ -1,29 +1,17 @@
 import type { ReactNode } from 'react';
 import { Check } from 'lucide-react';
 
+import { DEFAULT_CUSTOM_COLOR, type ColorOption } from '../lib/colorPalette';
+
 /**
  * 修图系工具页共享控件 —— 数值均来自参考站 computed styles 实拍:
  *   背景颜色 (background-color-options): 7 项, 透明白底用棋盘格, 自定义带调色盘图标
  *   原图位置 (smart-expand-position-grid): 3x3 方向键九宫格
  *   滑杆 (rotate-angle-range): 标签 + 值 + range (--range-progress 驱动填充)
  *   胶囊选项 (retouch-mode-options / 变体张数): 单选 pill, active 用品牌紫
+ *
+ * 色板取值不在这里定义 —— 见 `src/lib/colorPalette`。
  */
-
-export interface ColorOption {
-  value: string;
-  label: string;
-  /** CSS 背景 (HEX 或 'transparent') */
-  css: string;
-}
-
-export const BG_COLOR_SWATCHES: ColorOption[] = [
-  { value: 'transparent', label: '透明底', css: 'transparent' },
-  { value: '#FFFFFF', label: '白色', css: '#FFFFFF' },
-  { value: '#82CEF3', label: '浅蓝', css: '#82CEF3' },
-  { value: '#3988E9', label: '蓝色', css: '#3988E9' },
-  { value: '#FF0B22', label: '红色', css: '#FF0B22' },
-  { value: '#A8001B', label: '深红', css: '#A8001B' },
-];
 
 /** 背景/商品颜色选择 (参考站 background-color-option 实拍)。 */
 export function ColorSwatchGrid({
@@ -70,7 +58,7 @@ export function ColorSwatchGrid({
           <button
             type="button"
             className={`background-color-option custom-trigger${customActive ? ' active custom-selected' : ''}`}
-            style={customActive ? { background: customColor ?? '#5546D8' } : undefined}
+            style={customActive ? { background: customColor ?? DEFAULT_CUSTOM_COLOR } : undefined}
             aria-label="自定义颜色"
             title="自定义颜色"
             aria-pressed={customActive}

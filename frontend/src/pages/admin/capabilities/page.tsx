@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useAdmin, useToast, useAdminResource, useAdminUrlFilterSync } from './hooks';
 import { useSearchParams } from 'react-router-dom';
 import { adminCapabilitiesApi } from '../../../lib/api';
-import { ActionButton, AdminDataTable, AppliedFilters, ClearableField, ConfirmAction, FilterActions, FilterBar, HelpTip, PageHeader, Panel, SelectField, StatusTag, StaleError, TextAreaField, type AdminColumn, type AppliedFilter } from './components';
+import { ActionButton, AdminDataTable, AppliedFilters, ClearableField, ConfirmAction, FilterActions, FilterBar, HelpTip, PageHeader, Panel, SelectField, StatusTag, StaleError, TextAreaField, type AdminColumn, type AppliedFilter } from '~/admin-ui/primitives';
 import { RUNTIME_LABELS } from '../../../lib/constants';
 import type { AdminCapabilityControl } from '../../../types/api';
 

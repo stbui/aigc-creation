@@ -15,41 +15,19 @@ import {
   UserCheck,
   Users,
 } from 'lucide-react';
-import { myMarketingApi } from '../lib/api';
-import { useAuth } from '../context/AuthContext';
-import { useDocumentMeta } from '../hooks/useDocumentMeta';
-import { notifyCreditsChanged } from '../context/CreditsContext';
-import { PersonalPage } from '../components/PersonalPage';
-import { StateEmpty, StateError, StateSkeleton } from '../components/StateViews';
-import type { CheckinStatus, MyInvites } from '../types/api';
-import { useApp, Button, Modal } from '../ui';
-
-/** 邀请记录的状态文案与色板: pending 不能被写成「已发放」 */
-const REWARD_STATUS: Record<
-  MyInvites['relations'][number]['rewardStatus'],
-  { label: string; className: string }
-> = {
-  granted: { label: '已发放', className: 'is-granted' },
-  pending: { label: '待发放', className: 'is-pending' },
-  rejected: { label: '未通过', className: 'is-rejected' },
-};
-
-/** 千分位: 收益/邀请数会上四位数, 裸数字难扫读 */
-function formatNumber(n: number): string {
-  return n.toLocaleString('zh-CN');
-}
-
-/** 签到日期只留「月/日」。按字符串切分, 避免时区把 10-31 显示成 10-30 */
-function formatForecastDay(day: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(day);
-  return m ? `${Number(m[2])}/${Number(m[3])}` : day;
-}
-
-/** 邀请记录的时间只留年月日 */
-function formatBoundDay(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString('zh-CN');
-}
+import { myMarketingApi } from './api';
+import { Button, Modal, PersonalPage, StateEmpty, StateError, StateSkeleton } from './components';
+import { notifyCreditsChanged, useApp, useAuth, useDocumentMeta } from './hooks';
+import { RELATION_PAGE_SIZE, REWARD_STATUS } from './constants';
+import {
+  buildInvitePoster,
+  formatBoundDay,
+  formatForecastDay,
+  formatNumber,
+  posterFileName,
+  qrColors,
+} from './utils';
+import type { CheckinStatus, MyInvites } from '../../types/api';
 
 /**
  * 邀请有奖 + 每日签到 (M11 · admin-detailed-design.md §12.3 / §12.4)。
@@ -99,7 +77,7 @@ export function InvitationsPage() {
     setLoading(true);
     setError(null);
     Promise.all([
-      myMarketingApi.invites({ limit: 20, offset: 0 }),
+      myMarketingApi.invites({ limit: RELATION_PAGE_SIZE, offset: 0 }),
       myMarketingApi.checkinStatus(),
     ])
       .then(([inv, ci]) => {
@@ -125,7 +103,7 @@ export function InvitationsPage() {
     setLoadingMore(true);
     try {
       const next = await myMarketingApi.invites({
-        limit: 20,
+        limit: RELATION_PAGE_SIZE,
         offset: loadedRelationsRef.current,
       });
       setData((prev) =>
@@ -188,7 +166,7 @@ export function InvitationsPage() {
     QRCode.toDataURL(inviteUrl, {
       width: 320,
       margin: 1,
-      color: { dark: '#171a2b', light: '#ffffff' },
+      color: qrColors(),
     })
       .then((url) => {
         if (alive) setQrUrl(url);
@@ -228,7 +206,7 @@ export function InvitationsPage() {
       const qr = await QRCode.toDataURL(inviteUrl, {
         width: 520,
         margin: 1,
-        color: { dark: '#171a2b', light: '#ffffff' },
+        color: qrColors(),
       });
       /* 文案跟随真实规则: 邀请人奖励为 0 时写「立赚 0 积分」等于空头承诺 */
       const claim = !enabled
@@ -254,7 +232,7 @@ export function InvitationsPage() {
     if (!posterUrl || !data) return;
     const a = document.createElement('a');
     a.href = posterUrl;
-    a.download = `货觉AI-邀请海报-${data.inviteCode}.png`;
+    a.download = posterFileName(data.inviteCode);
     a.rel = 'noopener';
     a.click();
   };
@@ -610,102 +588,4 @@ export function InvitationsPage() {
       </Modal>
     </PersonalPage>
   );
-}
-
-/**
- * 合成邀请海报 (640×880 PNG data URL)。
- *
- * 用 canvas 手绘而不是拼模板图: 文案随奖励规则变化 (规则关闭时不能承诺积分),
- * 拼图就得为每种状态准备一张模板。字体用系统栈, 中文在各平台都不会缺字。
- */
-async function buildInvitePoster(opts: {
-  qrDataUrl: string;
-  code: string;
-  claim: string;
-}): Promise<string> {
-  const W = 640;
-  const H = 880;
-  const canvas = document.createElement('canvas');
-  canvas.width = W;
-  canvas.height = H;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) throw new Error('当前浏览器不支持 canvas');
-
-  const font = (size: number, weight = '400') =>
-    `${weight} ${size}px system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif`;
-
-  // 背景: 品牌紫渐变
-  const grad = ctx.createLinearGradient(0, 0, W, H);
-  grad.addColorStop(0, '#5546d8');
-  grad.addColorStop(1, '#8064f6');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, W, H);
-
-  ctx.textAlign = 'center';
-  ctx.fillStyle = '#ffffff';
-  ctx.font = font(44, '700');
-  ctx.fillText('货觉AI', W / 2, 88);
-  ctx.font = font(18);
-  ctx.fillStyle = 'rgba(255,255,255,0.88)';
-  ctx.fillText('电商智能视觉创作平台', W / 2, 124);
-
-  // 白色主卡
-  roundRect(ctx, 40, 160, W - 80, H - 240, 28);
-  ctx.fillStyle = '#ffffff';
-  ctx.fill();
-
-  ctx.fillStyle = '#171a2b';
-  ctx.font = font(28, '700');
-  ctx.fillText(opts.claim, W / 2, 246);
-
-  // 二维码 (520px 源图缩到 260, 保证高清屏不糊)
-  const img = await loadImage(opts.qrDataUrl);
-  const qrSize = 260;
-  ctx.drawImage(img, (W - qrSize) / 2, 292, qrSize, qrSize);
-
-  ctx.fillStyle = '#4e5969';
-  ctx.font = font(18);
-  ctx.fillText('用手机扫码注册，自动绑定邀请关系', W / 2, 596);
-
-  // 邀请码胶囊
-  roundRect(ctx, 120, 626, W - 240, 78, 18);
-  ctx.fillStyle = '#f2f4f7';
-  ctx.fill();
-  ctx.fillStyle = '#5546d8';
-  ctx.font = font(26, '700');
-  ctx.fillText(`邀请码 ${opts.code}`, W / 2, 676);
-
-  ctx.fillStyle = '#86909c';
-  ctx.font = font(15);
-  ctx.fillText('货觉AI · 商品主图 / 详情图 / 抠图 / 精修，一站式完成', W / 2, 762);
-
-  return canvas.toDataURL('image/png');
-}
-
-/** 圆角矩形路径。不用 ctx.roundRect: 老版本 Safari 没有这个方法 */
-function roundRect(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  r: number,
-): void {
-  const radius = Math.min(r, w / 2, h / 2);
-  ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.arcTo(x + w, y, x + w, y + h, radius);
-  ctx.arcTo(x + w, y + h, x, y + h, radius);
-  ctx.arcTo(x, y + h, x, y, radius);
-  ctx.arcTo(x, y, x + w, y, radius);
-  ctx.closePath();
-}
-
-function loadImage(src: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('二维码图片加载失败'));
-    img.src = src;
-  });
 }

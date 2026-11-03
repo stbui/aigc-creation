@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -62,25 +63,27 @@ export function Dropdown({
         className={cn('ui-dropdown-content min-w-[180px]', classNames?.root)}
       >
         {menu.header}
-        {menu.items.map((item) =>
-          item.type === 'divider' ? (
-            <DropdownMenuSeparator key={item.key} />
-          ) : (
-            <DropdownMenuItem
-              key={item.key}
-              disabled={item.disabled}
-              className={cn(
-                'ui-dropdown-item',
-                item.danger && 'text-danger-text focus:text-danger-text',
-                item.className,
-              )}
-              onSelect={() => item.onClick?.()}
-            >
-              {item.icon}
-              {item.label}
-            </DropdownMenuItem>
-          ),
-        )}
+        <DropdownMenuGroup>
+          {menu.items.map((item) =>
+            item.type === 'divider' ? (
+              <DropdownMenuSeparator key={item.key} />
+            ) : (
+              <DropdownMenuItem
+                key={item.key}
+                disabled={item.disabled}
+                className={cn(
+                  'ui-dropdown-item',
+                  item.danger && 'text-danger-text focus:text-danger-text',
+                  item.className,
+                )}
+                onSelect={() => item.onClick?.()}
+              >
+                {item.icon}
+                {item.label}
+              </DropdownMenuItem>
+            ),
+          )}
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );

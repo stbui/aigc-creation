@@ -3,7 +3,7 @@ import { useAdmin, useUnsavedGuard, useToast, useAdminResource } from './hooks';
 import { Plus, Trash2 } from 'lucide-react';
 import { marketingApi } from '../../../lib/api';
 
-import { ActionButton, FormField, IconButton, ListError, NumberField, PageHeader, PageSkeleton, Panel, SelectField, StaleError, SwitchField } from './components';
+import { ActionButton, FormField, IconButton, ListError, NumberField, PageHeader, PageSkeleton, Panel, SelectField, StaleError, SwitchField } from '~/admin-ui/primitives';
 import type { CheckinRule, InviteRule } from '../../../types/api';
 
 /**

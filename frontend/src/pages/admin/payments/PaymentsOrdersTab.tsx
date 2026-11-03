@@ -19,7 +19,7 @@ import {
   TextField,
   type AdminColumn,
   type AppliedFilter,
-} from './components';
+} from '~/admin-ui/primitives';
 import {
   useAdmin,
   useAdminDetailParam,
@@ -40,7 +40,6 @@ import {
   PROVIDER_LABELS,
 } from './constants';
 import { moneyText } from './utils';
-import { auditReason } from '../../../admin-ui/lib/auditReason';
 
 /**
  * 支付订单标签。
@@ -504,14 +503,10 @@ export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
           setBusy(true);
           try {
             if (action.kind === 'query') {
-              await adminPaymentOrdersApi.query(action.order.id, {
-                reason: auditReason('向渠道同步支付订单状态'),
-              });
+              await adminPaymentOrdersApi.query(action.order.id);
               toast.success('已同步渠道状态');
             } else {
-              await adminPaymentOrdersApi.close(action.order.id, {
-                reason: auditReason('关闭支付订单'),
-              });
+              await adminPaymentOrdersApi.close(action.order.id);
               toast.success('订单已关闭');
             }
             setAction(null);

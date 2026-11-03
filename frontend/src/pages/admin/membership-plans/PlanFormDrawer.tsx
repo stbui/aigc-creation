@@ -5,7 +5,7 @@ import {
   NumberField,
   SwitchField,
   TextField,
-} from './components';
+} from '~/admin-ui/primitives';
 import type { PlanDraft } from './constants';
 import type { AdminMembershipPlan } from '../../../types/api';
 

@@ -12,7 +12,7 @@ import {
   SelectField,
   StatusTag,
   type AdminColumn,
-} from './components';
+} from '~/admin-ui/primitives';
 import { useConfirm, useToast, useAdminUrlFilterSync } from './hooks';
 import { ChannelModelCostSummary, ChannelModelHealthCell } from './ChannelModelHealthCell';
 import {

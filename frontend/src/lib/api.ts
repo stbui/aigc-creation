@@ -1,6 +1,6 @@
-import { API_BASE } from './constants';
-import { API_ROOT, extractErrorMessage, unwrapEnvelope } from './http';
-import { clearStoredEmail, clearToken, getToken } from './auth';
+import { API_BASE } from "./constants";
+import { API_ROOT, extractErrorMessage, unwrapEnvelope } from "./http";
+import { clearStoredEmail, clearToken, getToken } from "./auth";
 import type {
   AdminAuditListResult,
   AdminBackup,
@@ -93,9 +93,6 @@ import type {
   InvoiceStatus,
   CreateInvoicePayload,
   AdminInvoice,
-  
-  
-  
   AdminCreditPrice,
   AdminCapabilityControl,
   MembershipPlan,
@@ -123,7 +120,7 @@ import type {
   BatchSummary,
   CreditImportResult,
   ShoppableCarouselTemplatesResult,
-} from '../types/api';
+} from "../types/api";
 import type {
   AdminPageResult,
   AdminPaymentOrderDetail,
@@ -137,7 +134,7 @@ import type {
   PaymentProductInput,
   PaymentProviderConfigUpdate,
   PaymentProviderId,
-} from '../types/payment';
+} from "../types/payment";
 import type {
   AdminChannelModelListItem,
   AdminChannelModelView,
@@ -170,8 +167,8 @@ import type {
   SystemChannelImportResultView,
   UpstreamModelPreview,
   UserGroupView,
-} from '../types/model';
-import type { PublicLogicalModel } from './models';
+} from "../types/model";
+import type { PublicLogicalModel } from "./models";
 
 export class ApiError extends Error {
   status: number;
@@ -188,7 +185,7 @@ export class ApiError extends Error {
     this.status = status;
     this.requestId = extra.requestId ?? null;
     this.retryAfter = extra.retryAfter ?? null;
-    this.name = 'ApiError';
+    this.name = "ApiError";
   }
 }
 
@@ -205,16 +202,19 @@ interface RequestOptions {
   body?: BodyInit | Record<string, unknown> | object | null;
 }
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+async function request<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> {
   const headers = new Headers(options.headers);
   const token = getToken();
-  if (token) headers.set('Authorization', `Bearer ${token}`);
+  if (token) headers.set("Authorization", `Bearer ${token}`);
 
   let body: BodyInit | null | undefined;
   if (options.body && options.body instanceof FormData) {
     body = options.body;
   } else if (options.body) {
-    headers.set('Content-Type', 'application/json');
+    headers.set("Content-Type", "application/json");
     body = JSON.stringify(options.body);
   } else {
     body = undefined;
@@ -237,12 +237,12 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     //      「请先登录」, 避免页面上弹一个语义不清的「未认证」。
     //   b) 本地有 token 但失效 —— 清凭证并广播 `auth:unauthorized` 走登出。
     // 登录接口自身的 401 (密码错误) 不算会话失效, 排除。
-    if (res.status === 401 && path !== '/auth/login') {
+    if (res.status === 401 && path !== "/auth/login") {
       if (getToken()) {
         clearToken();
         clearStoredEmail();
-        window.dispatchEvent(new Event('auth:unauthorized'));
-      } else if ((options.method ?? 'GET').toUpperCase() !== 'GET') {
+        window.dispatchEvent(new Event("auth:unauthorized"));
+      } else if ((options.method ?? "GET").toUpperCase() !== "GET") {
         /*
          * 只有**用户主动触发的写动作** (提交生成 / 上传 / 建项目) 才弹登录框。
          *
@@ -251,17 +251,17 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
          * 自动糊一脸登录墙 (实测 /credits 会连弹三组), 与
          * 「guest 不被动弹登录」的契约直接冲突。
          */
-        window.dispatchEvent(new Event('auth:required'));
+        window.dispatchEvent(new Event("auth:required"));
       }
     }
     let message = `请求失败（${res.status}）`;
-    let requestId: string | null = res.headers.get('X-Request-Id');
+    let requestId: string | null = res.headers.get("X-Request-Id");
     let bodyCode: unknown;
     try {
       const body = (await res.json()) as Record<string, unknown>;
       bodyCode = body.code;
       message = extractErrorMessage(body, message);
-      if (typeof body.requestId === 'string') requestId = body.requestId;
+      if (typeof body.requestId === "string") requestId = body.requestId;
     } catch {
       /* 保留默认文案 */
     }
@@ -275,7 +275,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     if (res.status === 403 && Number(bodyCode) === 40302 && getToken()) {
       clearToken();
       clearStoredEmail();
-      window.dispatchEvent(new Event('auth:unauthorized'));
+      window.dispatchEvent(new Event("auth:unauthorized"));
     }
     /*
      * 兜底的「请先登录」只适用于**会话缺失的被动 401**。
@@ -285,20 +285,25 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
      * 「请先登录」—— 用户本来就以为自己在登录，这个提示自相矛盾，
      * 多数人会以为页面卡住而不是密码错。鉴权入口的 401 原样透出后端文案。
      */
-    const isAuthEntry = path.startsWith('/auth/');
-    if (res.status === 401 && !getToken() && !isAuthEntry) message = '请先登录';
+    const isAuthEntry = path.startsWith("/auth/");
+    if (res.status === 401 && !getToken() && !isAuthEntry) message = "请先登录";
     /*
      * 5xx 才把请求号拼进文案: 这类错误用户无法自行解决, 报障时必须带上
      * 可检索的 id; 4xx 是用户输入问题, 屏幕上糊一串 uuid 只会干扰。
      * 限流 (429) 单独透出等待秒数, 前端可做倒计时。
      */
-    if (res.status >= 500 && requestId && options.showRequestIdInMessage !== false) {
+    if (
+      res.status >= 500 &&
+      requestId &&
+      options.showRequestIdInMessage !== false
+    ) {
       message = `${message}（请求号 ${requestId}）`;
     }
-    const retryAfter = Number(res.headers.get('Retry-After') ?? '');
+    const retryAfter = Number(res.headers.get("Retry-After") ?? "");
     throw new ApiError(message, res.status, {
       requestId,
-      retryAfter: Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : null,
+      retryAfter:
+        Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter : null,
     });
   }
 
@@ -323,9 +328,9 @@ export interface OAuthProviderInfo {
 
 export const authApi = {
   login: (data: LoginRequest) =>
-    request<AuthResponse>('/auth/login', { method: 'POST', body: data }),
+    request<AuthResponse>("/auth/login", { method: "POST", body: data }),
   register: (data: RegisterRequest) =>
-    request<AuthResponse>('/auth/register', { method: 'POST', body: data }),
+    request<AuthResponse>("/auth/register", { method: "POST", body: data }),
 
   /**
    * 申请密码重置邮件。
@@ -334,24 +339,27 @@ export const authApi = {
    * 「如果该邮箱已注册，重置链接已发送」—— 不能承诺「已发送」。
    */
   forgotPassword: (email: string) =>
-    request<{ requested: true }>('/auth/password/forgot', { method: 'POST', body: { email } }),
+    request<{ requested: true }>("/auth/password/forgot", {
+      method: "POST",
+      body: { email },
+    }),
 
   /** 用邮件里的一次性令牌重置密码；成功后旧会话全部失效 */
   resetPassword: (token: string, password: string) =>
-    request<{ ok: true }>('/auth/password/reset', {
-      method: 'POST',
+    request<{ ok: true }>("/auth/password/reset", {
+      method: "POST",
       body: { token, password },
     }),
 
   /** 发送短信验证码。`delivered=false` 表示走了控制台通道（未真实投递） */
   sendSms: (phone: string, purpose: SmsPurpose) =>
-    request<{ sent: true; delivered: boolean }>('/auth/sms/send', {
-      method: 'POST',
+    request<{ sent: true; delivered: boolean }>("/auth/sms/send", {
+      method: "POST",
       body: { phone, purpose },
     }),
 
   smsLogin: (data: SmsLoginRequest) =>
-    request<AuthResponse>('/auth/sms/login', { method: 'POST', body: data }),
+    request<AuthResponse>("/auth/sms/login", { method: "POST", body: data }),
 
   /*
    * 扫码登录（B8）。四步：
@@ -361,37 +369,53 @@ export const authApi = {
    *   confirm 手机确认，唯一真正绑定账号的一步
    */
 
-  qrCreate: () => request<QrCreateResult>('/auth/qr/create', { method: 'POST' }),
+  qrCreate: () =>
+    request<QrCreateResult>("/auth/qr/create", { method: "POST" }),
 
   qrStatus: (ticket: string) =>
-    request<QrStatusResult>(`/auth/qr/status?ticket=${encodeURIComponent(ticket)}`),
+    request<QrStatusResult>(
+      `/auth/qr/status?ticket=${encodeURIComponent(ticket)}`,
+    ),
 
   qrScan: (ticket: string) =>
-    request<QrStatusResult>('/auth/qr/scan', { method: 'POST', body: { ticket } }),
+    request<QrStatusResult>("/auth/qr/scan", {
+      method: "POST",
+      body: { ticket },
+    }),
 
   qrConfirm: (ticket: string, approve: boolean) =>
-    request<QrStatusResult>('/auth/qr/confirm', { method: 'POST', body: { ticket, approve } }),
+    request<QrStatusResult>("/auth/qr/confirm", {
+      method: "POST",
+      body: { ticket, approve },
+    }),
 
   /** 通用 OAuth：列出已启用的 provider，登录页据此渲染按钮 */
-  oauthProviders: () => request<OAuthProviderInfo[]>('/auth/oauth/providers'),
+  oauthProviders: () => request<OAuthProviderInfo[]>("/auth/oauth/providers"),
 
   /** OAuth 回调拿到短时 ticket 后换取正式会话 */
   oauthComplete: (ticket: string) =>
-    request<AuthResponse>('/auth/oauth/complete', { method: 'POST', body: { ticket } }),
+    request<AuthResponse>("/auth/oauth/complete", {
+      method: "POST",
+      body: { ticket },
+    }),
 };
 
 /** OAuth 授权跳转地址。浏览器直接导航，不经过 fetch */
-export function oauthAuthorizeUrl(providerId: string, returnTo?: string): string {
+export function oauthAuthorizeUrl(
+  providerId: string,
+  returnTo?: string,
+): string {
   const params = new URLSearchParams();
-  if (returnTo) params.set('returnTo', returnTo);
-  const suffix = params.toString() ? `?${params.toString()}` : '';
+  if (returnTo) params.set("returnTo", returnTo);
+  const suffix = params.toString() ? `?${params.toString()}` : "";
   return `${API_ROOT}/auth/oauth/${encodeURIComponent(providerId)}/authorize${suffix}`;
 }
 
 export const projectsApi = {
-  list: () => request<TaskListResult>('/projects').then((r) => asList<Project>(r)),
+  list: () =>
+    request<TaskListResult>("/projects").then((r) => asList<Project>(r)),
   create: (name: string) =>
-    request<Project>('/projects', { method: 'POST', body: { name } }),
+    request<Project>("/projects", { method: "POST", body: { name } }),
 };
 
 /** 采集来源元数据 (浏览器扩展上传时提交, 站点内上传不需要) */
@@ -405,91 +429,108 @@ export const assetsApi = {
   // projectId 必传: 后端 assets.service.ts:21 校验缺失即 400
   upload: (file: File, projectId: string, source: AssetSourceFields = {}) => {
     const fd = new FormData();
-    fd.append('file', file);
-    fd.append('projectId', projectId);
-    if (source.sourceSite) fd.append('sourceSite', source.sourceSite);
-    if (source.sourceTitle) fd.append('sourceTitle', source.sourceTitle);
-    if (source.sourcePageUrl) fd.append('sourcePageUrl', source.sourcePageUrl);
-    return request<AssetUploadResponse>('/assets/upload', { method: 'POST', body: fd });
+    fd.append("file", file);
+    fd.append("projectId", projectId);
+    if (source.sourceSite) fd.append("sourceSite", source.sourceSite);
+    if (source.sourceTitle) fd.append("sourceTitle", source.sourceTitle);
+    if (source.sourcePageUrl) fd.append("sourcePageUrl", source.sourcePageUrl);
+    return request<AssetUploadResponse>("/assets/upload", {
+      method: "POST",
+      body: fd,
+    });
   },
 
   /** 批量移动素材到另一项目 (分组); 只改素材归属, 不动生成任务的历史记录 */
   move: (ids: string[], projectId: string) =>
-    request<{ moved: number; missing: string[]; projectId: string }>('/assets/move', {
-      method: 'PATCH',
-      body: { ids, projectId },
-    }),
+    request<{ moved: number; missing: string[]; projectId: string }>(
+      "/assets/move",
+      {
+        method: "PATCH",
+        body: { ids, projectId },
+      },
+    ),
 
   /** 读取单个素材。历史提交恢复需要用它找回当时使用的模板与参考图。 */
   get: (id: string) => request<Asset>(`/assets/${id}`),
 
   /** 素材库列表: kind=original|generated, capability 过滤, 分页 */
-  list: (params: {
-    kind?: string;
-    capability?: string;
-    limit?: number;
-    offset?: number;
-    /** 关键词: 按素材地址片段匹配 (参考站 picker 的搜索框) */
-    keyword?: string;
-    /** 起始日期 (含当天) */
-    from?: string;
-    /** 截止日期 (含当天) */
-    to?: string;
-  } = {}) => {
+  list: (
+    params: {
+      kind?: string;
+      capability?: string;
+      limit?: number;
+      offset?: number;
+      /** 关键词: 按素材地址片段匹配 (参考站 picker 的搜索框) */
+      keyword?: string;
+      /** 起始日期 (含当天) */
+      from?: string;
+      /** 截止日期 (含当天) */
+      to?: string;
+    } = {},
+  ) => {
     const qs = new URLSearchParams();
-    if (params.kind) qs.set('kind', params.kind);
-    if (params.capability) qs.set('capability', params.capability);
-    if (params.limit !== undefined) qs.set('limit', String(params.limit));
-    if (params.offset !== undefined) qs.set('offset', String(params.offset));
-    if (params.keyword) qs.set('keyword', params.keyword);
-    if (params.from) qs.set('from', params.from);
-    if (params.to) qs.set('to', params.to);
-    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    if (params.kind) qs.set("kind", params.kind);
+    if (params.capability) qs.set("capability", params.capability);
+    if (params.limit !== undefined) qs.set("limit", String(params.limit));
+    if (params.offset !== undefined) qs.set("offset", String(params.offset));
+    if (params.keyword) qs.set("keyword", params.keyword);
+    if (params.from) qs.set("from", params.from);
+    if (params.to) qs.set("to", params.to);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return request<AssetListResult>(`/assets${suffix}`);
   },
 
   /** 删除素材 (生成图会连带删除产出它的任务) */
-  remove: (id: string) => request<{ id: string; removedTasks: number }>(`/assets/${id}`, { method: 'DELETE' }),
+  remove: (id: string) =>
+    request<{ id: string; removedTasks: number }>(`/assets/${id}`, {
+      method: "DELETE",
+    }),
 };
 
 export const generateApi = {
   start: (data: GenerateRequest) => {
     const idempotencyKey = data.idempotencyKey || newIdempotencyKey();
-    return request<GenerateResponse>('/generate', {
-      method: 'POST',
-      headers: { 'Idempotency-Key': idempotencyKey },
+    return request<GenerateResponse>("/generate", {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
       body: { ...data, idempotencyKey },
     });
   },
   getTask: (id: string) => request<Task>(`/tasks/${id}`),
-  list: () => request<TaskListResult>('/tasks').then((r) => asList<Task>(r)),
+  list: () => request<TaskListResult>("/tasks").then((r) => asList<Task>(r)),
   /** 分页任务列表（作品页 / 结果栏用，避免拉全量） */
-  listPage: (params: {
-    limit?: number;
-    offset?: number;
-    capability?: string;
-    projectId?: string;
-  } = {}) => {
+  listPage: (
+    params: {
+      limit?: number;
+      offset?: number;
+      capability?: string;
+      projectId?: string;
+    } = {},
+  ) => {
     const qs = new URLSearchParams();
-    qs.set('limit', String(params.limit ?? 50));
-    qs.set('offset', String(params.offset ?? 0));
-    if (params.capability) qs.set('capability', params.capability);
-    if (params.projectId) qs.set('projectId', params.projectId);
+    qs.set("limit", String(params.limit ?? 50));
+    qs.set("offset", String(params.offset ?? 0));
+    if (params.capability) qs.set("capability", params.capability);
+    if (params.projectId) qs.set("projectId", params.projectId);
     return request<TaskPageResult>(`/tasks/page?${qs.toString()}`);
   },
-  remove: (id: string) => request<{ id: string; removedAsset: boolean }>(`/tasks/${id}`, { method: 'DELETE' }),
+  remove: (id: string) =>
+    request<{ id: string; removedAsset: boolean }>(`/tasks/${id}`, {
+      method: "DELETE",
+    }),
 };
 
 /** 浏览器端幂等键；不支持 randomUUID 的旧内核仍生成足够随机的回退值。 */
 export function newIdempotencyKey(): string {
   const cryptoApi = globalThis.crypto;
-  if (cryptoApi && typeof cryptoApi.randomUUID === 'function') return cryptoApi.randomUUID();
+  if (cryptoApi && typeof cryptoApi.randomUUID === "function")
+    return cryptoApi.randomUUID();
   const random = () => Math.random().toString(36).slice(2, 12);
   return `gen-${Date.now().toString(36)}-${random()}-${random()}`;
 }
 
 export const statsApi = {
-  overview: () => request<StatsOverview>('/stats/overview'),
+  overview: () => request<StatsOverview>("/stats/overview"),
 };
 
 /**
@@ -503,7 +544,8 @@ export const statsApi = {
  * 缩略图是**本仓库内的静态文件**, 接口只给相对路径, 运行时不请求外部站点。
  */
 export const shoppableCarouselApi = {
-  templates: () => request<ShoppableCarouselTemplatesResult>('/shoppable-carousel/templates'),
+  templates: () =>
+    request<ShoppableCarouselTemplatesResult>("/shoppable-carousel/templates"),
 };
 
 /**
@@ -517,8 +559,8 @@ export const shoppableCarouselApi = {
 export const promptToolsApi = {
   /** AI 润色。textOnly=true 表示只改措辞, 不增删画面要素 */
   polish: (text: string, textOnly = false) =>
-    request<PromptToolResult>('/prompt-tools/polish', {
-      method: 'POST',
+    request<PromptToolResult>("/prompt-tools/polish", {
+      method: "POST",
       // 前台只给自然语言提示；请求号仍保留在 ApiError 中供日志关联。
       showRequestIdInMessage: false,
       body: { text, textOnly },
@@ -526,8 +568,8 @@ export const promptToolsApi = {
 
   /** 图片转提示词。传站内素材 id, 不传图片本体 */
   imageToPrompt: (assetId: string, extra?: string) =>
-    request<PromptToolResult>('/prompt-tools/image-to-prompt', {
-      method: 'POST',
+    request<PromptToolResult>("/prompt-tools/image-to-prompt", {
+      method: "POST",
       showRequestIdInMessage: false,
       body: { assetId, ...(extra ? { extra } : {}) },
     }),
@@ -542,20 +584,25 @@ export const promptToolsApi = {
 export const mobileUploadApi = {
   /** 电脑端: 创建会话 */
   create: (projectId: string) =>
-    request<MobileUploadSessionCreated>('/mobile-upload/sessions', {
-      method: 'POST',
+    request<MobileUploadSessionCreated>("/mobile-upload/sessions", {
+      method: "POST",
       body: { projectId },
     }),
 
   /** 电脑端: 轮询会话状态 */
   status: (sessionId: string) =>
-    request<MobileUploadSessionStatus>(`/mobile-upload/sessions/${encodeURIComponent(sessionId)}`),
+    request<MobileUploadSessionStatus>(
+      `/mobile-upload/sessions/${encodeURIComponent(sessionId)}`,
+    ),
 
   /** 电脑端: 取消会话 */
   cancel: (sessionId: string) =>
-    request<{ ok: boolean }>(`/mobile-upload/sessions/${encodeURIComponent(sessionId)}`, {
-      method: 'DELETE',
-    }),
+    request<{ ok: boolean }>(
+      `/mobile-upload/sessions/${encodeURIComponent(sessionId)}`,
+      {
+        method: "DELETE",
+      },
+    ),
 
   /**
    * 手机端: 上传图片 (免登录, 凭令牌)。
@@ -568,15 +615,15 @@ export const mobileUploadApi = {
    */
   receive: (sessionId: string, token: string, files: File[]) => {
     const fd = new FormData();
-    for (const f of files) fd.append('file', f);
-    fd.append('token', token);
+    for (const f of files) fd.append("file", f);
+    fd.append("token", token);
     return request<{
       ok: boolean;
       status: string;
       assetId: string | null;
       assets: Array<{ id: string; url: string; filename: string }>;
     }>(`/mobile-upload/sessions/${encodeURIComponent(sessionId)}/receive`, {
-      method: 'POST',
+      method: "POST",
       body: fd,
     });
   },
@@ -589,8 +636,9 @@ export const mobileUploadApi = {
  * 与 /capabilities 同为公开接口: 用户没登录也要能看到卖什么。
  */
 export const productsApi = {
-  list: () => request<ProductsResponse>('/products'),
-  detail: (sku: string) => request<Product>(`/products/${encodeURIComponent(sku)}`),
+  list: () => request<ProductsResponse>("/products"),
+  detail: (sku: string) =>
+    request<Product>(`/products/${encodeURIComponent(sku)}`),
 };
 
 /**
@@ -600,21 +648,21 @@ export const productsApi = {
  * 否则会出现"顶导显示 100, 实际已扣光"这类不一致。
  */
 export const creditsApi = {
-  balance: () => request<CreditBalance>('/credits/balance'),
-  lots: () => request<CreditLot[]>('/credits/lots'),
+  balance: () => request<CreditBalance>("/credits/balance"),
+  lots: () => request<CreditLot[]>("/credits/lots"),
   ledger: (
     params: {
       limit?: number;
       offset?: number;
       type?: string;
-      direction?: 'income' | 'expense';
+      direction?: "income" | "expense";
     } = {},
   ) => {
     const qs = new URLSearchParams();
-    qs.set('limit', String(params.limit ?? 50));
-    qs.set('offset', String(params.offset ?? 0));
-    if (params.type) qs.set('type', params.type);
-    if (params.direction) qs.set('direction', params.direction);
+    qs.set("limit", String(params.limit ?? 50));
+    qs.set("offset", String(params.offset ?? 0));
+    if (params.type) qs.set("type", params.type);
+    if (params.direction) qs.set("direction", params.direction);
     return request<CreditLedgerPage>(`/credits/ledger?${qs.toString()}`);
   },
 };
@@ -627,17 +675,20 @@ export const creditsApi = {
  * 两处独立维护必然出现「后台改了、用户看到的没改」。
  */
 export const adminCreditPricesApi = {
-  list: () => request<AdminCreditPrice[]>('/admin/credit-prices'),
+  list: () => request<AdminCreditPrice[]>("/admin/credit-prices"),
   update: (items: Array<{ capabilityId: string; cost: number }>) =>
-    request<{ updated: Array<{ capabilityId: string; cost: number }> }>('/admin/credit-prices', {
-      method: 'PUT',
-      body: { items },
-    }),
+    request<{ updated: Array<{ capabilityId: string; cost: number }> }>(
+      "/admin/credit-prices",
+      {
+        method: "PUT",
+        body: { items },
+      },
+    ),
   /** 回落代码默认值 */
   reset: (capabilityId: string) =>
     request<{ capabilityId: string; cost: number }>(
       `/admin/credit-prices/${encodeURIComponent(capabilityId)}/reset`,
-      { method: 'POST' },
+      { method: "POST" },
     ),
 };
 
@@ -648,12 +699,12 @@ export const adminCreditPricesApi = {
  * 会让用户去问客服，写清「云端通道维护中」才是可自助的。
  */
 export const adminCapabilitiesApi = {
-  list: () => request<AdminCapabilityControl[]>('/admin/capabilities'),
+  list: () => request<AdminCapabilityControl[]>("/admin/capabilities"),
 
   set: (capabilityId: string, enabled: boolean, reason?: string) =>
     request<{ capabilityId: string; enabled: boolean; reason: string | null }>(
       `/admin/capabilities/${encodeURIComponent(capabilityId)}`,
-      { method: 'PUT', body: { enabled, reason } },
+      { method: "PUT", body: { enabled, reason } },
     ),
 };
 
@@ -664,12 +715,15 @@ export const adminCapabilitiesApi = {
  * 其余需登录。
  */
 export const membershipApi = {
-  plans: () => request<MembershipPlan[]>('/membership/plans'),
+  plans: () => request<MembershipPlan[]>("/membership/plans"),
   /** 单个套餐（含已下架），仅用于续付既有订单 */
   plan: (id: string) =>
-    request<MembershipPlan | null>(`/membership/plans/${encodeURIComponent(id)}`),
-  me: () => request<MyMembership>('/membership/me'),
-  cancel: () => request<{ expiresAt: string }>('/membership/cancel', { method: 'POST' }),
+    request<MembershipPlan | null>(
+      `/membership/plans/${encodeURIComponent(id)}`,
+    ),
+  me: () => request<MyMembership>("/membership/me"),
+  cancel: () =>
+    request<{ expiresAt: string }>("/membership/cancel", { method: "POST" }),
 };
 
 /**
@@ -693,11 +747,15 @@ export const ordersApi = {
     idempotencyKey: string;
     couponCode?: string;
   }) =>
-    request<Order>('/orders', {
-      method: 'POST',
+    request<Order>("/orders", {
+      method: "POST",
       body: {
-        ...(params.productId ? { productId: params.productId, quantity: params.quantity ?? 1 } : {}),
-        ...(params.membershipPlanId ? { membershipPlanId: params.membershipPlanId } : {}),
+        ...(params.productId
+          ? { productId: params.productId, quantity: params.quantity ?? 1 }
+          : {}),
+        ...(params.membershipPlanId
+          ? { membershipPlanId: params.membershipPlanId }
+          : {}),
         idempotencyKey: params.idempotencyKey,
         ...(params.couponCode ? { couponCode: params.couponCode } : {}),
       },
@@ -705,14 +763,15 @@ export const ordersApi = {
   /** 我的订单（服务端分页，返回 total 与各状态真实计数） */
   list: (params: { limit?: number; offset?: number } = {}) => {
     const qs = new URLSearchParams();
-    qs.set('limit', String(params.limit ?? 20));
-    qs.set('offset', String(params.offset ?? 0));
+    qs.set("limit", String(params.limit ?? 20));
+    qs.set("offset", String(params.offset ?? 0));
     return request<OrderListResult>(`/orders?${qs.toString()}`);
   },
   detail: (id: string) => request<Order>(`/orders/${id}`),
 
   /** 关闭未支付订单。已支付订单只能走退款，后端会拒绝 */
-  cancel: (id: string) => request<Order>(`/orders/${id}/cancel`, { method: 'POST' }),
+  cancel: (id: string) =>
+    request<Order>(`/orders/${id}/cancel`, { method: "POST" }),
 
   /**
    * 沙箱支付。
@@ -720,8 +779,11 @@ export const ordersApi = {
    * ⚠ 沙箱**不产生真实资金流转**, 仅用于开发联调。真实通道接入后此端点废弃。
    * 页面必须显式标注沙箱身份, 不做假支付 UI 蒙混 (commerce-design.md §6.2)。
    */
-  sandboxPay: (id: string, scenario: 'success' | 'failed' | 'timeout') =>
-    request<SandboxPayResult>(`/orders/${id}/pay`, { method: 'POST', body: { scenario } }),
+  sandboxPay: (id: string, scenario: "success" | "failed" | "timeout") =>
+    request<SandboxPayResult>(`/orders/${id}/pay`, {
+      method: "POST",
+      body: { scenario },
+    }),
 };
 
 /**
@@ -737,7 +799,9 @@ export const ordersApi = {
 export const paymentsApi = {
   /** C 端支付设置：默认币种 + 该币种下可用渠道（公开） */
   settings: () =>
-    request<{ defaultCurrency: string; providers: PaymentProviderInfo[] }>('/payments/settings'),
+    request<{ defaultCurrency: string; providers: PaymentProviderInfo[] }>(
+      "/payments/settings",
+    ),
 
   /**
    * 当前可用支付渠道。
@@ -746,17 +810,20 @@ export const paymentsApi = {
    * 让用户选择，最终只能拿到 400「存在多个可用支付渠道」。
    */
   providers: (currency?: string) => {
-    const qs = currency ? `?currency=${encodeURIComponent(currency)}` : '';
-    return request<{ items: PaymentProviderInfo[]; total: number }>(`/payments/providers${qs}`);
+    const qs = currency ? `?currency=${encodeURIComponent(currency)}` : "";
+    return request<{ items: PaymentProviderInfo[]; total: number }>(
+      `/payments/providers${qs}`,
+    );
   },
 
   intent: (orderId: string, providerId?: string) =>
     request<PaymentIntent>(`/payments/${orderId}/intent`, {
-      method: 'POST',
+      method: "POST",
       body: providerId ? { providerId } : {},
     }),
 
-  status: (orderId: string) => request<PaymentStatusResult>(`/payments/${orderId}/status`),
+  status: (orderId: string) =>
+    request<PaymentStatusResult>(`/payments/${orderId}/status`),
 
   /**
    * 用户主动查单。
@@ -765,15 +832,17 @@ export const paymentsApi = {
    * 用于“我已完成支付”以及渠道同步跳回后的立即确认。
    */
   query: (orderId: string) =>
-    request<PaymentStatusResult>(`/payments/${orderId}/query`, { method: 'POST' }),
+    request<PaymentStatusResult>(`/payments/${orderId}/query`, {
+      method: "POST",
+    }),
 };
 
 /** 发票 (需登录)。一单一票, 开具后可在后台下载可打印 HTML */
 export const invoicesApi = {
   create: (payload: CreateInvoicePayload) =>
-    request<Invoice>('/invoices', { method: 'POST', body: payload }),
+    request<Invoice>("/invoices", { method: "POST", body: payload }),
 
-  list: () => request<{ items: Invoice[]; total: number }>('/invoices'),
+  list: () => request<{ items: Invoice[]; total: number }>("/invoices"),
 
   detail: (id: string) => request<Invoice>(`/invoices/${id}`),
 
@@ -789,22 +858,23 @@ export const invoicesApi = {
  */
 export const adminApi = {
   /** 当前后台用户与权限清单。前端刷新后即反映后端的实时变更 */
-  me: () => request<AdminMe>('/admin/me'),
+  me: () => request<AdminMe>("/admin/me"),
 
   /** 权限点全集与内置角色默认配置 */
-  permissions: () => request<AdminPermissionCatalog>('/admin/permissions'),
+  permissions: () => request<AdminPermissionCatalog>("/admin/permissions"),
 
   /** 平台概览。days 建议只用 7 / 30 / 90, 其它值后端回落到 7 */
-  overview: (days: number) => request<AdminOverview>(`/admin/overview?days=${days}`),
+  overview: (days: number) =>
+    request<AdminOverview>(`/admin/overview?days=${days}`),
 
   /** 顶栏告警。后端按当前角色权限过滤来源 */
-  alerts: () => request<AdminAlertsResult>('/admin/alerts'),
+  alerts: () => request<AdminAlertsResult>("/admin/alerts"),
 };
 
 export function toAbsoluteUrl(path?: string | null): string | undefined {
   if (!path) return undefined;
   if (/^https?:\/\//.test(path)) return path;
-  return `${API_BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+  return `${API_BASE}${path.startsWith("/") ? "" : "/"}${path}`;
 }
 
 /**
@@ -843,7 +913,7 @@ export function assetThumbSrc(
 ): string | undefined {
   const src = assetSrc(asset);
   if (!src) return undefined;
-  if (asset?.storageBackend === 'local') return appendThumbParams(src, size);
+  if (asset?.storageBackend === "local") return appendThumbParams(src, size);
   // 明确声明了云端后端: 签名地址追加参数会破坏签名, 原样返回
   if (asset?.storageBackend) return src;
   // 未声明后端 (任务接口的 outputAsset 不带该字段): 按 URL 自身判断是否本地 /uploads
@@ -860,16 +930,21 @@ export function assetThumbSrc(
  *
  * ⚠ 只用于 `<img>` 预览。下载 / 查看原图仍必须用 `toAbsoluteUrl()`。
  */
-export function assetThumbUrl(url?: string | null, size = 640): string | undefined {
+export function assetThumbUrl(
+  url?: string | null,
+  size = 640,
+): string | undefined {
   const abs = toAbsoluteUrl(url);
   if (!abs) return undefined;
   // 相对路径由 toAbsoluteUrl 拼接 API_BASE 得到，已确定指向本服务
-  const isOwnUploads = abs.startsWith('/uploads/') || (Boolean(API_BASE) && abs.startsWith(`${API_BASE}/uploads/`));
+  const isOwnUploads =
+    abs.startsWith("/uploads/") ||
+    (Boolean(API_BASE) && abs.startsWith(`${API_BASE}/uploads/`));
   return isOwnUploads ? appendThumbParams(abs, size) : abs;
 }
 
 function appendThumbParams(src: string, size: number): string {
-  return `${src}${src.includes('?') ? '&' : '?'}w=${size}&h=${size}`;
+  return `${src}${src.includes("?") ? "&" : "?"}w=${size}&h=${size}`;
 }
 
 /**
@@ -877,22 +952,24 @@ function appendThumbParams(src: string, size: number): string {
  * 高危动作 (禁用/角色/重置密码/删除) 均对应独立权限点, 便于单独回收。
  */
 export const adminUsersApi = {
-  list: (params: {
-    keyword?: string;
-    role?: string;
-    status?: string;
-    page?: number;
-    pageSize?: number;
-    sort?: string;
-  } = {}) => {
+  list: (
+    params: {
+      keyword?: string;
+      role?: string;
+      status?: string;
+      page?: number;
+      pageSize?: number;
+      sort?: string;
+    } = {},
+  ) => {
     const qs = new URLSearchParams();
-    if (params.keyword) qs.set('keyword', params.keyword);
-    if (params.role) qs.set('role', params.role);
-    if (params.status) qs.set('status', params.status);
-    if (params.page) qs.set('page', String(params.page));
-    if (params.pageSize) qs.set('pageSize', String(params.pageSize));
-    if (params.sort) qs.set('sort', params.sort);
-    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    if (params.keyword) qs.set("keyword", params.keyword);
+    if (params.role) qs.set("role", params.role);
+    if (params.status) qs.set("status", params.status);
+    if (params.page) qs.set("page", String(params.page));
+    if (params.pageSize) qs.set("pageSize", String(params.pageSize));
+    if (params.sort) qs.set("sort", params.sort);
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return request<AdminUserListResult>(`/admin/users${suffix}`);
   },
 
@@ -904,21 +981,26 @@ export const adminUsersApi = {
   /** 删除前的连带影响预览, 供确认弹窗展示具体数量 */
   impact: (id: string) => request<AdminUserImpact>(`/admin/users/${id}/impact`),
 
-  changeStatus: (id: string, status: 'active' | 'disabled', reason?: string) =>
+  changeStatus: (id: string, status: "active" | "disabled") =>
     request<{ id: string; status: string }>(`/admin/users/${id}/status`, {
-      method: 'PATCH',
-      body: { status, reason },
+      method: "PATCH",
+      body: { status },
     }),
 
-  changeRole: (id: string, role: string, reason?: string) =>
-    request<{ id: string; role: string; roleLabel: string }>(`/admin/users/${id}/role`, {
-      method: 'PATCH',
-      body: { role, reason },
-    }),
+  changeRole: (id: string, role: string) =>
+    request<{ id: string; role: string; roleLabel: string }>(
+      `/admin/users/${id}/role`,
+      {
+        method: "PATCH",
+        body: { role },
+      },
+    ),
 
   /** 返回一次性临时密码明文 —— 关闭后不可再次查看 */
   resetPassword: (id: string) =>
-    request<AdminPasswordReset>(`/admin/users/${id}/password`, { method: 'POST' }),
+    request<AdminPasswordReset>(`/admin/users/${id}/password`, {
+      method: "POST",
+    }),
 
   /** 默认软删; hard=true 物理删除可删部分 (订单不在删除范围) */
   remove: (id: string, hard = false, confirm?: string) =>
@@ -928,47 +1010,55 @@ export const adminUsersApi = {
       deleted?: { projects: number; tasks: number; assets: number };
       removedFiles?: number;
       failedFiles?: number;
-    }>(`/admin/users/${id}${hard ? '?hard=true' : ''}`, {
-      method: 'DELETE',
+    }>(`/admin/users/${id}${hard ? "?hard=true" : ""}`, {
+      method: "DELETE",
       body: { confirm },
     }),
 
   /** 导出当前筛选结果 (CSV, 上限 5000 行) */
-  exportCsv: (params: {
-    keyword?: string;
-    role?: string;
-    status?: string;
-    from?: string;
-    to?: string;
-  } = {}) => downloadCsv(`/admin/users/export${toQuery(params)}`),
+  exportCsv: (
+    params: {
+      keyword?: string;
+      role?: string;
+      status?: string;
+      from?: string;
+      to?: string;
+    } = {},
+  ) => downloadCsv(`/admin/users/export${toQuery(params)}`),
 
   /** 批量启用/禁用。逐条结果 —— 一条失败不影响其余 */
-  batch: (ids: string[], action: 'disable' | 'enable', reason?: string) =>
-    request<BatchSummary<{ id: string; status: string }>>('/admin/users/batch', {
-      method: 'POST',
-      body: { ids, action, ...(reason ? { reason } : {}) },
-    }),
+  batch: (ids: string[], action: "disable" | "enable") =>
+    request<BatchSummary<{ id: string; status: string }>>(
+      "/admin/users/batch",
+      {
+        method: "POST",
+        body: { ids, action },
+      },
+    ),
 };
 
 /** 角色权限 */
 export const adminRolesApi = {
-  list: () => request<{ items: AdminRoleItem[] }>('/admin/roles'),
+  list: () => request<{ items: AdminRoleItem[] }>("/admin/roles"),
 
-  updatePermissions: (
-    roles: Array<{ code: string; permissions: string[] }>,
-    reason: string,
-  ) =>
-    request<{ roles: Array<{ code: string; permissions: string[] }> }>('/admin/roles', {
-      method: 'PATCH',
-      body: { roles, reason },
-    }),
+  updatePermissions: (roles: Array<{ code: string; permissions: string[] }>) =>
+    request<{ roles: Array<{ code: string; permissions: string[] }> }>(
+      "/admin/roles",
+      {
+        method: "PATCH",
+        body: { roles },
+      },
+    ),
 };
 
 /** 系统设置 (扁平结构提交, 字段名见后端 FIELD_TO_SETTING_KEY) */
 export const adminSettingsApi = {
-  read: () => request<AdminSettings>('/admin/settings'),
+  read: () => request<AdminSettings>("/admin/settings"),
   update: (payload: AdminSettingsUpdatePayload) =>
-    request<AdminSettingsUpdateResult>('/admin/settings', { method: 'PATCH', body: payload }),
+    request<AdminSettingsUpdateResult>("/admin/settings", {
+      method: "PATCH",
+      body: payload,
+    }),
 };
 
 /**
@@ -979,12 +1069,12 @@ export const adminSettingsApi = {
  * 「文案已改、图上还是旧字」的中间态。
  */
 export const adminAigcLabelApi = {
-  read: () => request<AdminAigcLabel>('/admin/aigc-label'),
-  update: (payload: {
-    spec: AigcLabelSpec;
-    badgePngBase64: string;
-    reason: string;
-  }) => request<AdminAigcLabel>('/admin/aigc-label', { method: 'PUT', body: payload }),
+  read: () => request<AdminAigcLabel>("/admin/aigc-label"),
+  update: (payload: { spec: AigcLabelSpec; badgePngBase64: string }) =>
+    request<AdminAigcLabel>("/admin/aigc-label", {
+      method: "PUT",
+      body: payload,
+    }),
 };
 
 /**
@@ -994,107 +1084,115 @@ export const adminAigcLabelApi = {
  * 误把 retry 当查询调用的代价是真跑一次生成。
  */
 export const adminTasksApi = {
-  list: (params: {
-    page?: number;
-    pageSize?: number;
-    status?: string;
-    capability?: string;
-    provider?: string;
-    userId?: string;
-    projectId?: string;
-    from?: string;
-    to?: string;
-    sort?: string;
-  } = {}) => {
+  list: (
+    params: {
+      page?: number;
+      pageSize?: number;
+      status?: string;
+      capability?: string;
+      provider?: string;
+      userId?: string;
+      projectId?: string;
+      from?: string;
+      to?: string;
+      sort?: string;
+    } = {},
+  ) => {
     const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(params)) {
-      if (v !== undefined && v !== '') qs.set(k, String(v));
+      if (v !== undefined && v !== "") qs.set(k, String(v));
     }
-    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return request<AdminTaskListResult>(`/admin/tasks${suffix}`);
   },
 
   /** 拥堵指标。独立拉取以便高频刷新告警条而不重载整页列表 */
-  stats: () => request<AdminTaskCongestion>('/admin/tasks/stats'),
+  stats: () => request<AdminTaskCongestion>("/admin/tasks/stats"),
 
   /** 导出当前筛选结果 (CSV, 上限 5000 行) */
-  exportCsv: (params: {
-    status?: string;
-    capability?: string;
-    provider?: string;
-    userId?: string;
-    projectId?: string;
-    from?: string;
-    to?: string;
-  } = {}) => downloadCsv(`/admin/tasks/export${toQuery(params)}`),
+  exportCsv: (
+    params: {
+      status?: string;
+      capability?: string;
+      provider?: string;
+      userId?: string;
+      projectId?: string;
+      from?: string;
+      to?: string;
+    } = {},
+  ) => downloadCsv(`/admin/tasks/export${toQuery(params)}`),
 
   detail: (id: string) => request<AdminTaskDetail>(`/admin/tasks/${id}`),
 
   /** 失败重试: 后端新建任务而非原地复活, 返回新任务 id */
-  retry: (id: string, reason?: string) =>
-    request<{ taskId: string; retriedFromId: string }>(`/admin/tasks/${id}/retry`, {
-      method: 'POST',
-      body: reason ? { reason } : {},
-    }),
+  retry: (id: string) =>
+    request<{ taskId: string; retriedFromId: string }>(
+      `/admin/tasks/${id}/retry`,
+      {
+        method: "POST",
+      },
+    ),
 
-  /**
-   * 终止等待中/执行中的任务。
-   *
-   * reason 会落进操作审计 —— 终止是作废用户已提交的动作, 事后必须能
-   * 回答"谁、为什么", 故与 retry 一样把原因透传给后端。
-   */
-  cancel: (id: string, reason?: string) =>
-    request<{ id: string; status: string; errorCode: string }>(`/admin/tasks/${id}/cancel`, {
-      method: 'POST',
-      body: reason ? { reason } : {},
-    }),
+  /** 终止等待中/执行中的任务。 */
+  cancel: (id: string) =>
+    request<{ id: string; status: string; errorCode: string }>(
+      `/admin/tasks/${id}/cancel`,
+      {
+        method: "POST",
+      },
+    ),
 
   /** 删除任务及其产出。仅已结束任务可删 */
   remove: (id: string) =>
     request<{ id: string; removedAsset: boolean }>(`/admin/tasks/${id}`, {
-      method: 'DELETE',
+      method: "DELETE",
     }),
 
   /** 批量重试 / 终止 / 删除。状态限制逐条生效，失败原因逐条回传 */
-  batch: (ids: string[], action: 'retry' | 'cancel' | 'delete', reason?: string) =>
-    request<BatchSummary<unknown>>('/admin/tasks/batch', {
-      method: 'POST',
-      body: { ids, action, ...(reason ? { reason } : {}) },
+  batch: (ids: string[], action: "retry" | "cancel" | "delete") =>
+    request<BatchSummary<unknown>>("/admin/tasks/batch", {
+      method: "POST",
+      body: { ids, action },
     }),
 };
 
 /** 操作审计 (只读, 后端无删除接口) */
 export const adminAuditApi = {
-  list: (params: {
-    actorId?: string;
-    action?: string;
-    targetId?: string;
-    success?: boolean;
-    page?: number;
-    pageSize?: number;
-  } = {}) => {
+  list: (
+    params: {
+      actorId?: string;
+      action?: string;
+      targetId?: string;
+      success?: boolean;
+      page?: number;
+      pageSize?: number;
+    } = {},
+  ) => {
     const qs = new URLSearchParams();
-    if (params.actorId) qs.set('actorId', params.actorId);
-    if (params.action) qs.set('action', params.action);
-    if (params.targetId) qs.set('targetId', params.targetId);
-    if (params.success !== undefined) qs.set('success', String(params.success));
-    if (params.page) qs.set('page', String(params.page));
-    if (params.pageSize) qs.set('pageSize', String(params.pageSize));
-    const suffix = qs.toString() ? `?${qs.toString()}` : '';
-    return request<{ result: AdminAuditListResult; actions: Array<{ action: string; count: number }> }>(
-      `/admin/audit-logs${suffix}`,
-    );
+    if (params.actorId) qs.set("actorId", params.actorId);
+    if (params.action) qs.set("action", params.action);
+    if (params.targetId) qs.set("targetId", params.targetId);
+    if (params.success !== undefined) qs.set("success", String(params.success));
+    if (params.page) qs.set("page", String(params.page));
+    if (params.pageSize) qs.set("pageSize", String(params.pageSize));
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return request<{
+      result: AdminAuditListResult;
+      actions: Array<{ action: string; count: number }>;
+    }>(`/admin/audit-logs${suffix}`);
   },
 
   /** 导出当前筛选结果 (CSV, 上限 5000 行) */
-  exportCsv: (params: {
-    actorId?: string;
-    action?: string;
-    targetId?: string;
-    success?: boolean;
-    from?: string;
-    to?: string;
-  } = {}) => downloadCsv(`/admin/audit-logs/export${toQuery(params)}`),
+  exportCsv: (
+    params: {
+      actorId?: string;
+      action?: string;
+      targetId?: string;
+      success?: boolean;
+      from?: string;
+      to?: string;
+    } = {},
+  ) => downloadCsv(`/admin/audit-logs/export${toQuery(params)}`),
 };
 
 /**
@@ -1103,35 +1201,32 @@ export const adminAuditApi = {
  * 下载走 blob 而非普通 request(): 响应是二进制, 走 JSON 剥壳逻辑会损坏内容。
  */
 export const adminBackupsApi = {
-  list: () => request<AdminBackup[]>('/admin/backups'),
+  list: () => request<AdminBackup[]>("/admin/backups"),
 
-  stats: () => request<AdminBackupStats>('/admin/backups/stats'),
+  stats: () => request<AdminBackupStats>("/admin/backups/stats"),
 
   detail: (id: string) => request<AdminBackup>(`/admin/backups/${id}`),
 
   /**
-   * 手动备份。reason 会写进操作审计 (backup.run 属高危权限), 不能省略。
-   * 重复点击由调用方的 busy 状态拦截；后端不承诺跨请求幂等。
+   * 手动备份。重复点击由调用方的 busy 状态拦截；后端不承诺跨请求幂等。
    */
-  run: (reason: string) =>
-    request<AdminBackup>('/admin/backups', {
-      method: 'POST',
-      body: { reason },
-    }),
+  run: () => request<AdminBackup>("/admin/backups", { method: "POST" }),
 
   /** 恢复验证 B-97: 只读打开备份文件做完整性检查, 不触碰生产库 */
   verify: (id: string) =>
-    request<AdminBackup>(`/admin/backups/${id}/verify`, { method: 'POST' }),
+    request<AdminBackup>(`/admin/backups/${id}/verify`, { method: "POST" }),
 
   /** 保留份数清理 */
-  prune: (keepCount: number, reason: string) =>
-    request<{ removed: number; freedBytes: number }>('/admin/backups/prune', {
-      method: 'POST',
-      body: { keepCount, reason },
+  prune: (keepCount: number) =>
+    request<{ removed: number; freedBytes: number }>("/admin/backups/prune", {
+      method: "POST",
+      body: { keepCount },
     }),
 
   remove: (id: string) =>
-    request<{ id: string; filename: string }>(`/admin/backups/${id}`, { method: 'DELETE' }),
+    request<{ id: string; filename: string }>(`/admin/backups/${id}`, {
+      method: "DELETE",
+    }),
 
   /**
    * 下载备份。
@@ -1141,15 +1236,15 @@ export const adminBackupsApi = {
    */
   download: async (id: string, filename: string): Promise<void> => {
     const res = await fetch(`${API_ROOT}/admin/backups/${id}/download`, {
-      headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+      headers: { Authorization: `Bearer ${getToken() ?? ""}` },
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      throw new Error(extractErrorMessage(body, '下载失败'));
+      throw new Error(extractErrorMessage(body, "下载失败"));
     }
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
     a.download = filename;
     a.click();
@@ -1163,13 +1258,13 @@ export const adminAssetsApi = {
   list: (params: Record<string, string | number | undefined> = {}) => {
     const qs = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== '') qs.set(k, String(v));
+      if (v !== undefined && v !== "") qs.set(k, String(v));
     });
-    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return request<AdminAssetListResult>(`/admin/assets${suffix}`);
   },
 
-  stats: () => request<AdminAssetStats>('/admin/assets/stats'),
+  stats: () => request<AdminAssetStats>("/admin/assets/stats"),
 
   impact: (id: string) =>
     request<{ sizeBytes: number; tasks: number; storageBackend: string }>(
@@ -1179,40 +1274,48 @@ export const adminAssetsApi = {
   /** 下架/恢复。文件与记录都保留, 误操作可恢复 */
   setStatus: (id: string, status: AssetStatus) =>
     request<{ id: string; status: AssetStatus }>(`/admin/assets/${id}/status`, {
-      method: 'PATCH',
+      method: "PATCH",
       body: { status },
     }),
 
   /** 批量下架。每条仍写审计 —— 批量不等于免审计 */
   batchStatus: (ids: string[], status: AssetStatus) =>
-    request<{ count: number; status: AssetStatus }>('/admin/assets/batch-status', {
-      method: 'POST',
-      body: { ids, status },
-    }),
+    request<{ count: number; status: AssetStatus }>(
+      "/admin/assets/batch-status",
+      {
+        method: "POST",
+        body: { ids, status },
+      },
+    ),
 
   remove: (id: string) =>
-    request<{ id: string; removedTasks: number }>(`/admin/assets/${id}`, { method: 'DELETE' }),
+    request<{ id: string; removedTasks: number }>(`/admin/assets/${id}`, {
+      method: "DELETE",
+    }),
 
   listProjects: (params: Record<string, string | number | undefined> = {}) => {
     const qs = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== '') qs.set(k, String(v));
+      if (v !== undefined && v !== "") qs.set(k, String(v));
     });
-    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return request<AdminProjectListResult>(`/admin/projects${suffix}`);
   },
 
   removeProject: (id: string, hard = false) =>
-    request<{ id: string; hard: boolean; impact: { assets: number; tasks: number; bytes: number } }>(
-      `/admin/projects/${id}${hard ? '?hard=true' : ''}`,
-      { method: 'DELETE' },
-    ),
+    request<{
+      id: string;
+      hard: boolean;
+      impact: { assets: number; tasks: number; bytes: number };
+    }>(`/admin/projects/${id}${hard ? "?hard=true" : ""}`, {
+      method: "DELETE",
+    }),
 
   /** 批量下架 / 恢复 / 删除。删除不可逆，权限单独校验 (asset.delete) */
-  batch: (ids: string[], action: 'hide' | 'show' | 'delete', reason?: string) =>
-    request<BatchSummary<unknown>>('/admin/assets/batch', {
-      method: 'POST',
-      body: { ids, action, ...(reason ? { reason } : {}) },
+  batch: (ids: string[], action: "hide" | "show" | "delete") =>
+    request<BatchSummary<unknown>>("/admin/assets/batch", {
+      method: "POST",
+      body: { ids, action },
     }),
 
   /** 导出当前筛选结果 (CSV) */
@@ -1222,18 +1325,25 @@ export const adminAssetsApi = {
 
 /** 存储后端管理 (B-62/B-63)。凭据只读, 界面不可编辑 */
 export const adminStorageApi = {
-  status: () => request<AdminStorageStatus>('/admin/storage/status'),
+  status: () => request<AdminStorageStatus>("/admin/storage/status"),
 
   probe: (backend?: string) =>
-    request<{ backend: string; ok: boolean; message: string; latencyMs?: number }>(
-      `/admin/storage/probe${backend ? `?backend=${backend}` : ''}`,
-      { method: 'POST' },
-    ),
+    request<{
+      backend: string;
+      ok: boolean;
+      message: string;
+      latencyMs?: number;
+    }>(`/admin/storage/probe${backend ? `?backend=${backend}` : ""}`, {
+      method: "POST",
+    }),
 
   setActive: (backend: StorageBackendId) =>
-    request<{ active: StorageBackendId; note: string }>(`/admin/storage/active?backend=${backend}`, {
-      method: 'POST',
-    }),
+    request<{ active: StorageBackendId; note: string }>(
+      `/admin/storage/active?backend=${backend}`,
+      {
+        method: "POST",
+      },
+    ),
 };
 
 /**
@@ -1247,67 +1357,89 @@ export const marketingApi = {
   coupons: (params: Record<string, string | number | undefined> = {}) => {
     const qs = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== '') qs.set(k, String(v));
+      if (v !== undefined && v !== "") qs.set(k, String(v));
     });
-    const suffix = qs.toString() ? `?${qs.toString()}` : '';
-    return request<{ items: AdminCoupon[]; total: number; page: number; pageSize: number }>(
-      `/admin/coupons${suffix}`,
-    );
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return request<{
+      items: AdminCoupon[];
+      total: number;
+      page: number;
+      pageSize: number;
+    }>(`/admin/coupons${suffix}`);
   },
 
   couponDetail: (id: string) => request<AdminCoupon>(`/admin/coupons/${id}`),
 
   createCoupon: (payload: UpsertCouponPayload) =>
-    request<AdminCoupon>('/admin/coupons', { method: 'POST', body: payload }),
+    request<AdminCoupon>("/admin/coupons", { method: "POST", body: payload }),
 
   updateCoupon: (id: string, payload: UpsertCouponPayload) =>
-    request<AdminCoupon>(`/admin/coupons/${id}`, { method: 'PATCH', body: payload }),
+    request<AdminCoupon>(`/admin/coupons/${id}`, {
+      method: "PATCH",
+      body: payload,
+    }),
 
   /** 启停切换。停用不影响已核销订单 */
   toggleCoupon: (id: string) =>
-    request<AdminCoupon>(`/admin/coupons/${id}/toggle`, { method: 'PATCH' }),
+    request<AdminCoupon>(`/admin/coupons/${id}/toggle`, { method: "PATCH" }),
 
   /** 导出当前筛选结果 (CSV, 上限 5000 行) */
-  exportCoupons: (params: { keyword?: string; type?: string; status?: string } = {}) =>
-    downloadCsv(`/admin/coupons/export${toQuery(params)}`),
+  exportCoupons: (
+    params: { keyword?: string; type?: string; status?: string } = {},
+  ) => downloadCsv(`/admin/coupons/export${toQuery(params)}`),
 
   // ── 限时活动 (B-65) ─────────────────────────────────────────────
   campaigns: (params: Record<string, string | number | undefined> = {}) => {
     const qs = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== '') qs.set(k, String(v));
+      if (v !== undefined && v !== "") qs.set(k, String(v));
     });
-    const suffix = qs.toString() ? `?${qs.toString()}` : '';
-    return request<{ items: AdminCampaign[]; total: number; page: number; pageSize: number }>(
-      `/admin/campaigns${suffix}`,
-    );
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    return request<{
+      items: AdminCampaign[];
+      total: number;
+      page: number;
+      pageSize: number;
+    }>(`/admin/campaigns${suffix}`);
   },
 
   createCampaign: (payload: UpsertCampaignPayload) =>
-    request<AdminCampaign>('/admin/campaigns', { method: 'POST', body: payload }),
+    request<AdminCampaign>("/admin/campaigns", {
+      method: "POST",
+      body: payload,
+    }),
 
   updateCampaign: (id: string, payload: UpsertCampaignPayload) =>
-    request<AdminCampaign>(`/admin/campaigns/${id}`, { method: 'PATCH', body: payload }),
+    request<AdminCampaign>(`/admin/campaigns/${id}`, {
+      method: "PATCH",
+      body: payload,
+    }),
 
   toggleCampaign: (id: string) =>
-    request<AdminCampaign>(`/admin/campaigns/${id}/toggle`, { method: 'PATCH' }),
+    request<AdminCampaign>(`/admin/campaigns/${id}/toggle`, {
+      method: "PATCH",
+    }),
 
   /** 导出当前筛选结果 (CSV, 上限 5000 行) */
-  exportCampaigns: (params: { keyword?: string; type?: string; status?: string } = {}) =>
-    downloadCsv(`/admin/campaigns/export${toQuery(params)}`),
+  exportCampaigns: (
+    params: { keyword?: string; type?: string; status?: string } = {},
+  ) => downloadCsv(`/admin/campaigns/export${toQuery(params)}`),
 
   // ── 邀请规则 (B-66) ─────────────────────────────────────────────
-  inviteRule: () => request<InviteRule>('/admin/invites/rules'),
+  inviteRule: () => request<InviteRule>("/admin/invites/rules"),
   updateInviteRule: (payload: InviteRule) =>
-    request<InviteRule>('/admin/invites/rules', { method: 'PUT', body: payload }),
+    request<InviteRule>("/admin/invites/rules", {
+      method: "PUT",
+      body: payload,
+    }),
 
   /** 邀请关系列表 */
   invites: (params: Record<string, string | number | undefined> = {}) => {
     const qs = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== '') qs.set(k, String(v));
+      if (v !== undefined && v !== "") qs.set(k, String(v));
     });
-    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return request<AdminInviteListResult>(`/admin/invites${suffix}`);
   },
 
@@ -1318,20 +1450,26 @@ export const marketingApi = {
    * 它直接给人发积分, 与后台调整积分同性质。前端按钮须据此隐藏。
    */
   grantInviteReward: (id: string) =>
-    request<{ granted: boolean; credits: number }>(`/admin/invites/${id}/grant`, { method: 'POST' }),
+    request<{ granted: boolean; credits: number }>(
+      `/admin/invites/${id}/grant`,
+      { method: "POST" },
+    ),
 
   // ── 签到规则 (B-67) ─────────────────────────────────────────────
-  checkinRule: () => request<CheckinRule>('/admin/checkin/rules'),
+  checkinRule: () => request<CheckinRule>("/admin/checkin/rules"),
   updateCheckinRule: (payload: CheckinRule) =>
-    request<CheckinRule>('/admin/checkin/rules', { method: 'PUT', body: payload }),
+    request<CheckinRule>("/admin/checkin/rules", {
+      method: "PUT",
+      body: payload,
+    }),
 
   /** 签到记录 (发放量对账用) */
   checkins: (params: Record<string, string | number | undefined> = {}) => {
     const qs = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
-      if (v !== undefined && v !== '') qs.set(k, String(v));
+      if (v !== undefined && v !== "") qs.set(k, String(v));
     });
-    const suffix = qs.toString() ? `?${qs.toString()}` : '';
+    const suffix = qs.toString() ? `?${qs.toString()}` : "";
     return request<AdminCheckinListResult>(`/admin/checkin${suffix}`);
   },
 };
@@ -1346,39 +1484,52 @@ export const myMarketingApi = {
   /** 我的邀请码与邀请数据 */
   invites: (params: { limit?: number; offset?: number } = {}) => {
     const qs = new URLSearchParams();
-    qs.set('limit', String(params.limit ?? 20));
-    qs.set('offset', String(params.offset ?? 0));
+    qs.set("limit", String(params.limit ?? 20));
+    qs.set("offset", String(params.offset ?? 0));
     return request<MyInvites>(`/marketing/invites?${qs.toString()}`);
   },
 
   /** 绑定邀请关系。注册成功后由前端调用 */
   bindInvite: (inviteCode: string) =>
-    request<{ bound: boolean; relationId?: string; reason?: string }>('/marketing/invites/bind', {
-      method: 'POST',
-      body: { inviteCode },
-    }),
+    request<{ bound: boolean; relationId?: string; reason?: string }>(
+      "/marketing/invites/bind",
+      {
+        method: "POST",
+        body: { inviteCode },
+      },
+    ),
 
   /** 签到状态 (今日是否已签 / 连签天数 / 未来 7 天可得) */
-  checkinStatus: () => request<CheckinStatus>('/marketing/checkin'),
+  checkinStatus: () => request<CheckinStatus>("/marketing/checkin"),
 
   /** 每日签到。重复调用幂等, 不重复发积分 */
   checkin: () =>
-    request<{ alreadyCheckedIn: boolean; credits: number; streak: number }>('/marketing/checkin', {
-      method: 'POST',
-    }),
+    request<{ alreadyCheckedIn: boolean; credits: number; streak: number }>(
+      "/marketing/checkin",
+      {
+        method: "POST",
+      },
+    ),
 
   /** 结算试算。不落库, 可反复调 */
-  quote: (payload: { productIds: string[]; quantities: number[]; couponCode?: string }) =>
-    request<MarketingQuote>('/marketing/quote', { method: 'POST', body: payload }),
+  quote: (payload: {
+    productIds: string[];
+    quantities: number[];
+    couponCode?: string;
+  }) =>
+    request<MarketingQuote>("/marketing/quote", {
+      method: "POST",
+      body: payload,
+    }),
 
   /**
    * 促销弹窗位。匿名也能取到 —— 落地页对未登录访客展示促销位是主要转化路径。
    * request() 在无 token 时不发 Authorization 头, 后端 OptionalJwtAuthGuard 放行
    */
-  popup: () => request<PopupCampaign | null>('/marketing/popup'),
+  popup: () => request<PopupCampaign | null>("/marketing/popup"),
 
   /** 进行中的限时活动（落地页「限时活动」页签）。匿名可访问 */
-  campaigns: () => request<PromoCampaign[]>('/marketing/campaigns'),
+  campaigns: () => request<PromoCampaign[]>("/marketing/campaigns"),
 };
 
 /**
@@ -1388,12 +1539,12 @@ export const myMarketingApi = {
  * 前端不自行判断哪些能跑。
  */
 export const adminSchedulerApi = {
-  status: () => request<AdminSchedulerStatus>('/admin/scheduler/status'),
+  status: () => request<AdminSchedulerStatus>("/admin/scheduler/status"),
 
   run: (task: string) =>
     request<{ name: string; skipped?: boolean; reason?: string }>(
       `/admin/scheduler/run?task=${task}`,
-      { method: 'POST' },
+      { method: "POST" },
     ),
 };
 
@@ -1410,9 +1561,9 @@ export const adminSchedulerApi = {
 function toQuery<T extends object>(params: T): string {
   const qs = new URLSearchParams();
   Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== '') qs.set(k, String(v));
+    if (v !== undefined && v !== "") qs.set(k, String(v));
   });
-  return qs.toString() ? `?${qs.toString()}` : '';
+  return qs.toString() ? `?${qs.toString()}` : "";
 }
 
 /**
@@ -1427,24 +1578,24 @@ function toQuery<T extends object>(params: T): string {
  */
 async function downloadCsv(path: string, filename?: string): Promise<void> {
   const res = await fetch(`${API_ROOT}${path}`, {
-    headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+    headers: { Authorization: `Bearer ${getToken() ?? ""}` },
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(extractErrorMessage(body, '导出失败'));
+    throw new Error(extractErrorMessage(body, "导出失败"));
   }
   // 文件名以后端 Content-Disposition 为准, 没给才用调用方兜底。
   // 优先 filename*=UTF-8''...（RFC 5987，中文文件名正确解码），再退回 ASCII filename。
-  const disposition = res.headers.get('Content-Disposition') ?? '';
+  const disposition = res.headers.get("Content-Disposition") ?? "";
   const utf8Match = /filename\*=UTF-8''([^;]+)/i.exec(disposition);
   const asciiMatch = /filename="?([^";]+)"?/i.exec(disposition);
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const a = document.createElement("a");
   a.href = url;
   a.download = utf8Match
     ? decodeURIComponent(utf8Match[1])
-    : asciiMatch?.[1] ?? filename ?? 'export.csv';
+    : (asciiMatch?.[1] ?? filename ?? "export.csv");
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
@@ -1458,15 +1609,15 @@ async function downloadCsv(path: string, filename?: string): Promise<void> {
  */
 async function openHtmlDocument(path: string): Promise<void> {
   const res = await fetch(`${API_ROOT}${path}`, {
-    headers: { Authorization: `Bearer ${getToken() ?? ''}` },
+    headers: { Authorization: `Bearer ${getToken() ?? ""}` },
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(extractErrorMessage(body, '打开失败'));
+    throw new Error(extractErrorMessage(body, "打开失败"));
   }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
-  window.open(url, '_blank', 'noopener');
+  window.open(url, "_blank", "noopener");
   // 打印/预览可能持续一段时间, 60s 后再回收, 过早回收会让新窗口空白
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
@@ -1478,71 +1629,81 @@ async function openHtmlDocument(path: string): Promise<void> {
  * 就再也查不到"这个 SKU 原来卖多少钱"了 —— 下架即够。
  */
 export const adminProductsApi = {
-  list: (status?: 'active' | 'offline') =>
+  list: (status?: "active" | "offline") =>
     request<AdminProduct[]>(`/admin/products${toQuery({ status })}`),
 
   create: (payload: CreateProductPayload) =>
-    request<AdminProduct>('/admin/products', { method: 'POST', body: payload }),
+    request<AdminProduct>("/admin/products", { method: "POST", body: payload }),
 
   /** sku 不可改, 故 payload 里没有该字段 */
   update: (id: string, payload: UpdateProductPayload) =>
-    request<AdminProduct>(`/admin/products/${id}`, { method: 'PATCH', body: payload }),
+    request<AdminProduct>(`/admin/products/${id}`, {
+      method: "PATCH",
+      body: payload,
+    }),
 
-  setStatus: (id: string, status: 'active' | 'offline', reason?: string) =>
+  setStatus: (id: string, status: "active" | "offline") =>
     request<{ id: string; status: string }>(`/admin/products/${id}/status`, {
-      method: 'PATCH',
-      body: { status, ...(reason ? { reason } : {}) },
+      method: "PATCH",
+      body: { status },
     }),
 };
 
 /** 会员套餐管理：C 端价目表的唯一写入入口 */
 export const adminMembershipPlansApi = {
-  list: () => request<AdminMembershipPlanList>('/admin/membership-plans'),
+  list: () => request<AdminMembershipPlanList>("/admin/membership-plans"),
 
   create: (payload: CreateAdminMembershipPlanPayload) =>
-    request<AdminMembershipPlan>('/admin/membership-plans', { method: 'POST', body: payload }),
-
-  update: (id: string, payload: AdminMembershipPlanPayload) =>
-    request<AdminMembershipPlan>(`/admin/membership-plans/${id}`, {
-      method: 'PATCH',
+    request<AdminMembershipPlan>("/admin/membership-plans", {
+      method: "POST",
       body: payload,
     }),
 
-  setStatus: (id: string, status: 'active' | 'offline', reason: string) =>
+  update: (id: string, payload: AdminMembershipPlanPayload) =>
+    request<AdminMembershipPlan>(`/admin/membership-plans/${id}`, {
+      method: "PATCH",
+      body: payload,
+    }),
+
+  setStatus: (id: string, status: "active" | "offline") =>
     request<AdminMembershipPlan>(`/admin/membership-plans/${id}/status`, {
-      method: 'PATCH',
-      body: { status, reason },
+      method: "PATCH",
+      body: { status },
     }),
 };
 
 /** 订单管理 (B-39~B-44) */
 export const adminOrdersApi = {
-  list: (params: {
-    status?: string;
-    orderNo?: string;
-    email?: string;
-    channel?: string;
-    /** processing / failed / succeeded —— 退款状态挂在 Refund 行上 */
-    refundState?: string;
-    from?: string;
-    to?: string;
-    userId?: string;
-    page?: number;
-    pageSize?: number;
-    sort?: string;
-  } = {}) => request<AdminOrderListResult>(`/admin/orders${toQuery(params)}`),
+  list: (
+    params: {
+      status?: string;
+      orderNo?: string;
+      email?: string;
+      channel?: string;
+      /** processing / failed / succeeded —— 退款状态挂在 Refund 行上 */
+      refundState?: string;
+      from?: string;
+      to?: string;
+      userId?: string;
+      page?: number;
+      pageSize?: number;
+      sort?: string;
+    } = {},
+  ) => request<AdminOrderListResult>(`/admin/orders${toQuery(params)}`),
 
   detail: (id: string) => request<AdminOrderDetail>(`/admin/orders/${id}`),
 
-  exportCsv: (params: {
-    status?: string;
-    orderNo?: string;
-    email?: string;
-    channel?: string;
-    refundState?: string;
-    from?: string;
-    to?: string;
-  } = {}) => downloadCsv(`/admin/orders/export${toQuery(params)}`),
+  exportCsv: (
+    params: {
+      status?: string;
+      orderNo?: string;
+      email?: string;
+      channel?: string;
+      refundState?: string;
+      from?: string;
+      to?: string;
+    } = {},
+  ) => downloadCsv(`/admin/orders/export${toQuery(params)}`),
 
   /**
    * 手工核销: 线下转账/渠道掉单时由财务确认。
@@ -1553,7 +1714,7 @@ export const adminOrdersApi = {
   markPaid: (id: string) =>
     request<{ order: Order; idempotentHit: boolean; message?: string }>(
       `/admin/orders/${id}/mark-paid`,
-      { method: 'POST' },
+      { method: "POST" },
     ),
 
   /**
@@ -1572,21 +1733,27 @@ export const adminOrdersApi = {
   refund: (id: string, amountCents: number, reason: string) =>
     request<{
       refundId: string;
-      state: 'succeeded' | 'processing';
+      state: "succeeded" | "processing";
       pending: boolean;
       refundedCents: number;
       fullyRefunded: boolean;
       creditsReclaimed: number;
       creditsUnreclaimable: number;
       message?: string;
-    }>(`/admin/orders/${id}/refund`, { method: 'POST', body: { amountCents, reason } }),
-
-  /** 批量核销。reason 必填（一次点错影响的人数比单笔多） */
-  batchMarkPaid: (ids: string[], reason: string) =>
-    request<BatchSummary<{ orderId: string; idempotentHit: boolean }>>('/admin/orders/batch', {
-      method: 'POST',
-      body: { ids, action: 'mark_paid', reason },
+    }>(`/admin/orders/${id}/refund`, {
+      method: "POST",
+      body: { amountCents, reason },
     }),
+
+  /** 批量核销。 */
+  batchMarkPaid: (ids: string[]) =>
+    request<BatchSummary<{ orderId: string; idempotentHit: boolean }>>(
+      "/admin/orders/batch",
+      {
+        method: "POST",
+        body: { ids, action: "mark_paid" },
+      },
+    ),
 };
 
 /**
@@ -1599,31 +1766,44 @@ export const adminOrdersApi = {
 
 /** 积分账本 (B-49~B-52) */
 export const adminCreditsApi = {
-  list: (params: { userId?: string; email?: string; page?: number; pageSize?: number } = {}) =>
-    request<AdminCreditListResult>(`/admin/credits${toQuery(params)}`),
+  list: (
+    params: {
+      userId?: string;
+      email?: string;
+      page?: number;
+      pageSize?: number;
+    } = {},
+  ) => request<AdminCreditListResult>(`/admin/credits${toQuery(params)}`),
 
   lots: (userId: string, params: { from?: string; to?: string } = {}) =>
-    request<AdminCreditLotRow[]>(`/admin/credits/${userId}/lots${toQuery(params)}`),
+    request<AdminCreditLotRow[]>(
+      `/admin/credits/${userId}/lots${toQuery(params)}`,
+    ),
 
   ledger: (
     userId: string,
     params: { type?: string; from?: string; to?: string; limit?: number } = {},
-  ) => request<AdminCreditLedgerRow[]>(`/admin/credits/${userId}/ledger${toQuery(params)}`),
+  ) =>
+    request<AdminCreditLedgerRow[]>(
+      `/admin/credits/${userId}/ledger${toQuery(params)}`,
+    ),
 
-  adjust: (payload: { userId: string; delta: number; reason: string; validDays?: number }) =>
-    request<{ userId: string; balance: number; delta: number }>('/admin/credits/adjust', {
-      method: 'POST',
-      body: payload,
-    }),
+  adjust: (payload: { userId: string; delta: number; validDays?: number }) =>
+    request<{ userId: string; balance: number; delta: number }>(
+      "/admin/credits/adjust",
+      {
+        method: "POST",
+        body: payload,
+      },
+    ),
 
   /** 批量调整。逐条独立执行, 返回每条结果 (一条失败不影响其余) */
   batchAdjust: (payload: {
-    items: Array<{ userId: string; delta: number; reason?: string }>;
-    reason: string;
+    items: Array<{ userId: string; delta: number }>;
     validDays?: number;
   }) =>
-    request<AdminBatchAdjustResult>('/admin/credits/batch-adjust', {
-      method: 'POST',
+    request<AdminBatchAdjustResult>("/admin/credits/batch-adjust", {
+      method: "POST",
       body: payload,
     }),
 
@@ -1636,48 +1816,66 @@ export const adminCreditsApi = {
    * multipart 上传: 走 FormData 而不是 JSON —— 运营手里的就是 Excel 导出的
    * 文件, 让他们自己转成 JSON 等于逼人在本地写脚本。
    */
-  importCsv: (file: File, opts: { reason?: string; validDays?: number } = {}) => {
+  importCsv: (file: File, opts: { validDays?: number } = {}) => {
     const form = new FormData();
-    form.append('file', file);
-    if (opts.reason) form.append('reason', opts.reason);
-    if (opts.validDays !== undefined) form.append('validDays', String(opts.validDays));
-    return request<CreditImportResult>('/admin/credits/import', {
-      method: 'POST',
+    form.append("file", file);
+    if (opts.validDays !== undefined)
+      form.append("validDays", String(opts.validDays));
+    return request<CreditImportResult>("/admin/credits/import", {
+      method: "POST",
       body: form,
     });
   },
 };
 
-/** 保留期清理 (B-96)。所有清理入口统一走这里，强制填写原因。 */
+/** 保留期清理 (B-96)。所有清理入口统一走这里。 */
 export const adminRetentionApi = {
-  targets: () => request<AdminRetentionTarget[]>('/admin/retention/targets'),
+  targets: () => request<AdminRetentionTarget[]>("/admin/retention/targets"),
 
   preview: (target: string, retentionDays: number) =>
-    request<AdminRetentionTarget>(`/admin/retention/preview${toQuery({ target, retentionDays })}`),
+    request<AdminRetentionTarget>(
+      `/admin/retention/preview${toQuery({ target, retentionDays })}`,
+    ),
 
-  logs: (pageSize = 50) => request<AdminCleanupLog[]>(`/admin/retention/logs?pageSize=${pageSize}`),
+  logs: (pageSize = 50) =>
+    request<AdminCleanupLog[]>(`/admin/retention/logs?pageSize=${pageSize}`),
 
-  cleanup: (target: string, retentionDays: number, reason: string) =>
-    request<{ target: string; deleted: number; cutoff: string }>('/admin/retention/cleanup', {
-      method: 'POST',
-      body: { target, retentionDays, reason },
-    }),
+  cleanup: (target: string, retentionDays: number) =>
+    request<{ target: string; deleted: number; cutoff: string }>(
+      "/admin/retention/cleanup",
+      {
+        method: "POST",
+        body: { target, retentionDays },
+      },
+    ),
 };
 
 /**
  * 后台发票审核 (B3)。权限 invoice.write。
  *
- * 开具与驳回都必须给说明 —— 票面金额与抬头是财务凭证, 事后要能解释。
+ * 驳回必须给原因 —— 退回说明会展示给用户。
  */
 export const adminInvoicesApi = {
-  list: (params: { status?: InvoiceStatus; keyword?: string; limit?: number; offset?: number } = {}) =>
-    request<{ items: AdminInvoice[]; total: number }>(`/admin/invoices${toQuery(params)}`),
+  list: (
+    params: {
+      status?: InvoiceStatus;
+      keyword?: string;
+      limit?: number;
+      offset?: number;
+    } = {},
+  ) =>
+    request<{ items: AdminInvoice[]; total: number }>(
+      `/admin/invoices${toQuery(params)}`,
+    ),
 
-  issue: (id: string, reason: string) =>
-    request<AdminInvoice>(`/admin/invoices/${id}/issue`, { method: 'POST', body: { reason } }),
+  issue: (id: string) =>
+    request<AdminInvoice>(`/admin/invoices/${id}/issue`, { method: "POST" }),
 
   reject: (id: string, reason: string) =>
-    request<AdminInvoice>(`/admin/invoices/${id}/reject`, { method: 'POST', body: { reason } }),
+    request<AdminInvoice>(`/admin/invoices/${id}/reject`, {
+      method: "POST",
+      body: { reason },
+    }),
 
   /** 导出当前筛选结果 (CSV, 上限 5000 行) */
   exportCsv: (params: { status?: InvoiceStatus; keyword?: string } = {}) =>
@@ -1700,7 +1898,7 @@ export const adminInvoicesApi = {
 /** 支付渠道与站点设置 */
 export const adminPaymentProvidersApi = {
   list: () =>
-    request<{ items: AdminPaymentProviderView[] }>('/admin/payments/providers'),
+    request<{ items: AdminPaymentProviderView[] }>("/admin/payments/providers"),
 
   /**
    * 保存渠道配置（追加新版本，历史订单继续用旧版本）。
@@ -1710,44 +1908,53 @@ export const adminPaymentProvidersApi = {
   saveConfig: (providerId: string, body: PaymentProviderConfigUpdate) =>
     request<{ provider: AdminPaymentProviderView; unchanged: boolean }>(
       `/admin/payments/providers/${providerId}/config`,
-      { method: 'PUT', body },
+      { method: "PUT", body },
     ),
 
-  settings: () => request<AdminPaymentSettings>('/admin/payments/settings'),
+  settings: () => request<AdminPaymentSettings>("/admin/payments/settings"),
 
-  saveSettings: (body: { defaultCurrency: PaymentCurrency; reason: string }) =>
-    request<AdminPaymentSettings>('/admin/payments/settings', { method: 'PUT', body }),
+  saveSettings: (body: { defaultCurrency: PaymentCurrency }) =>
+    request<AdminPaymentSettings>("/admin/payments/settings", {
+      method: "PUT",
+      body,
+    }),
 };
 
 /** 充值商品 */
 export const adminPaymentProductsApi = {
-  list: () => request<{ items: AdminPaymentProductView[] }>('/admin/payments/products'),
+  list: () =>
+    request<{ items: AdminPaymentProductView[] }>("/admin/payments/products"),
 
   create: (body: PaymentProductInput) =>
-    request<{ product: AdminPaymentProductView }>('/admin/payments/products', {
-      method: 'POST',
+    request<{ product: AdminPaymentProductView }>("/admin/payments/products", {
+      method: "POST",
       body,
     }),
 
   update: (id: string, body: PaymentProductInput) =>
-    request<{ product: AdminPaymentProductView }>(`/admin/payments/products/${id}`, {
-      method: 'PUT',
-      body,
-    }),
+    request<{ product: AdminPaymentProductView }>(
+      `/admin/payments/products/${id}`,
+      {
+        method: "PUT",
+        body,
+      },
+    ),
 };
 
 /** 支付订单 */
 export const adminPaymentOrdersApi = {
-  list: (params: {
-    status?: string;
-    keyword?: string;
-    providerId?: string;
-    timeField?: 'created' | 'paid' | 'credited';
-    from?: string;
-    to?: string;
-    page?: number;
-    pageSize?: number;
-  } = {}) =>
+  list: (
+    params: {
+      status?: string;
+      keyword?: string;
+      providerId?: string;
+      timeField?: "created" | "paid" | "credited";
+      from?: string;
+      to?: string;
+      page?: number;
+      pageSize?: number;
+    } = {},
+  ) =>
     request<AdminPageResult<AdminPaymentOrderRow>>(
       `/admin/payments/orders${toQuery(params)}`,
     ),
@@ -1756,10 +1963,10 @@ export const adminPaymentOrdersApi = {
     request<{ order: AdminPaymentOrderDetail }>(`/admin/payments/orders/${id}`),
 
   /** 向渠道查单：已支付则立即入账，否则不动本地状态 */
-  query: (id: string, body: { reason: string }) =>
+  query: (id: string) =>
     request<{ order: { id: string; status: string }; view: unknown }>(
       `/admin/payments/orders/${id}/query`,
-      { method: 'POST', body },
+      { method: "POST" },
     ),
 
   /**
@@ -1768,68 +1975,92 @@ export const adminPaymentOrdersApi = {
    * **不会退款**：关单只停止这笔未支付订单继续挂着；已付款的订单要走退款流程，
    * 退款在订单管理里，不在支付域。
    */
-  close: (id: string, body: { reason: string }) =>
+  close: (id: string) =>
     request<{ order: { id: string; status: string }; view: unknown }>(
       `/admin/payments/orders/${id}/close`,
-      { method: 'POST', body },
+      { method: "POST" },
     ),
 
-  exportCsv: (params: {
-    status?: string;
-    keyword?: string;
-    providerId?: string;
-    timeField?: 'created' | 'paid' | 'credited';
-    from?: string;
-    to?: string;
-  } = {}) => downloadCsv(`/admin/payments/orders/export.csv${toQuery(params)}`),
+  exportCsv: (
+    params: {
+      status?: string;
+      keyword?: string;
+      providerId?: string;
+      timeField?: "created" | "paid" | "credited";
+      from?: string;
+      to?: string;
+    } = {},
+  ) => downloadCsv(`/admin/payments/orders/export.csv${toQuery(params)}`),
 };
 
 /** 支付对账 */
 export const adminPaymentReconciliationApi = {
   /** 运行列表 */
-  list: (params: {
-    providerId?: string;
-    status?: string;
-    from?: string;
-    to?: string;
-    page?: number;
-    pageSize?: number;
-  } = {}) =>
+  list: (
+    params: {
+      providerId?: string;
+      status?: string;
+      from?: string;
+      to?: string;
+      page?: number;
+      pageSize?: number;
+    } = {},
+  ) =>
     request<AdminPageResult<AdminReconciliationRun>>(
       `/admin/payments/reconciliations${toQuery(params)}`,
     ),
 
   /** 差异明细 */
-  items: (runId: string, params: { result?: string; page?: number; pageSize?: number } = {}) =>
+  items: (
+    runId: string,
+    params: { result?: string; page?: number; pageSize?: number } = {},
+  ) =>
     request<AdminPageResult<AdminReconciliationItem>>(
       `/admin/payments/reconciliations/${runId}/items${toQuery(params)}`,
     ),
 
   /** 手动执行对账（渠道账单下载失败时的重跑入口） */
-  run: (body: { providerId: PaymentProviderId; billDate: string; reason: string }) =>
-    request<{ run: AdminReconciliationRun; reused: boolean }>('/admin/payments/reconciliations', {
-      method: 'POST',
-      body,
-    }),
+  run: (body: { providerId: PaymentProviderId; billDate: string }) =>
+    request<{ run: AdminReconciliationRun; reused: boolean }>(
+      "/admin/payments/reconciliations",
+      {
+        method: "POST",
+        body,
+      },
+    ),
 
   /** CSV 兜底导入（渠道不支持账单下载时用） */
-  importCsv: (file: File, body: { providerId: PaymentProviderId; billDate: string; reason: string }) => {
+  importCsv: (
+    file: File,
+    body: { providerId: PaymentProviderId; billDate: string },
+  ) => {
     const fd = new FormData();
-    fd.append('file', file);
-    fd.append('providerId', body.providerId);
-    fd.append('billDate', body.billDate);
-    fd.append('reason', body.reason);
-    return request<{ run: AdminReconciliationRun }>('/admin/payments/reconciliations/import', {
-      method: 'POST',
-      body: fd,
-    });
+    fd.append("file", file);
+    fd.append("providerId", body.providerId);
+    fd.append("billDate", body.billDate);
+    return request<{ run: AdminReconciliationRun }>(
+      "/admin/payments/reconciliations/import",
+      {
+        method: "POST",
+        body: fd,
+      },
+    );
   },
 
-  exportCsv: (params: { providerId?: string; status?: string; from?: string; to?: string } = {}) =>
+  exportCsv: (
+    params: {
+      providerId?: string;
+      status?: string;
+      from?: string;
+      to?: string;
+    } = {},
+  ) =>
     downloadCsv(`/admin/payments/reconciliations/export.csv${toQuery(params)}`),
 
   exportItemsCsv: (runId: string, params: { result?: string } = {}) =>
-    downloadCsv(`/admin/payments/reconciliations/${runId}/items/export.csv${toQuery(params)}`),
+    downloadCsv(
+      `/admin/payments/reconciliations/${runId}/items/export.csv${toQuery(params)}`,
+    ),
 };
 
 /**
@@ -1839,27 +2070,31 @@ export const adminPaymentReconciliationApi = {
  * 不可能因为漏校验 :id 而越权。
  */
 export const meApi = {
-  profile: () => request<MyProfile>('/me'),
+  profile: () => request<MyProfile>("/me"),
 
   update: (data: { name?: string }) =>
-    request<{ id: string; email: string; name: string }>('/me', { method: 'PATCH', body: data }),
+    request<{ id: string; email: string; name: string }>("/me", {
+      method: "PATCH",
+      body: data,
+    }),
 
   /** 改密成功后该账号全部旧 token 失效（含当前这把），调用方必须跳登录 */
   changePassword: (oldPassword: string, newPassword: string) =>
-    request<{ changed: true }>('/me/password', {
-      method: 'POST',
+    request<{ changed: true }>("/me/password", {
+      method: "POST",
       body: { oldPassword, newPassword },
     }),
 
   /** 个人数据导出（JSON）。调用方负责用 Blob 下载 */
-  exportData: () => request<Record<string, unknown>>('/me/export', { method: 'POST' }),
+  exportData: () =>
+    request<Record<string, unknown>>("/me/export", { method: "POST" }),
 
-  deletionPreview: () => request<DeletionPreview>('/me/deletion-preview'),
+  deletionPreview: () => request<DeletionPreview>("/me/deletion-preview"),
 
   /** 自助注销：密码 + 确认词「注销」 */
   deleteAccount: (password: string, confirm: string) =>
-    request<{ id: string; deleted: boolean }>('/me', {
-      method: 'DELETE',
+    request<{ id: string; deleted: boolean }>("/me", {
+      method: "DELETE",
       body: { password, confirm },
     }),
 };
@@ -1871,7 +2106,7 @@ export const meApi = {
  * 页面不能因为"没种数据"而白屏。
  */
 export const legalApi = {
-  index: () => request<LegalIndexItem[]>('/legal'),
+  index: () => request<LegalIndexItem[]>("/legal"),
   current: (slug: string) => request<LegalDoc | null>(`/legal/${slug}`),
 };
 
@@ -1880,55 +2115,64 @@ export const notificationsApi = {
   list: (params: { unreadOnly?: boolean; limit?: number } = {}) =>
     request<NotificationList>(`/notifications${toQuery(params)}`),
 
-  read: (id: string) => request<{ id: string; read: boolean; unread: number }>(`/notifications/${id}/read`, { method: 'POST' }),
+  read: (id: string) =>
+    request<{ id: string; read: boolean; unread: number }>(
+      `/notifications/${id}/read`,
+      { method: "POST" },
+    ),
 
-  readAll: () => request<{ updated: number; unread: number }>('/notifications/read-all', { method: 'POST' }),
+  readAll: () =>
+    request<{ updated: number; unread: number }>("/notifications/read-all", {
+      method: "POST",
+    }),
 };
 
 /** 后台：法务文档版本管理 */
 export const adminLegalApi = {
   versions: (slug?: string) =>
-    request<AdminLegalDoc[]>(`/admin/legal${slug ? `?slug=${encodeURIComponent(slug)}` : ''}`),
+    request<AdminLegalDoc[]>(
+      `/admin/legal${slug ? `?slug=${encodeURIComponent(slug)}` : ""}`,
+    ),
 
   upsert: (data: {
     slug: string;
     version: string;
     title: string;
     content: string;
-    status?: 'draft' | 'published' | 'archived';
-    /** 高危动作的操作原因，只落审计 */
-    reason?: string;
-  }) => request<AdminLegalDoc>('/admin/legal', { method: 'PUT', body: data }),
+    status?: "draft" | "published" | "archived";
+  }) => request<AdminLegalDoc>("/admin/legal", { method: "PUT", body: data }),
 
-  publish: (slug: string, version: string, reason?: string) =>
-    request<AdminLegalDoc>(`/admin/legal/${encodeURIComponent(slug)}/${encodeURIComponent(version)}/publish`, {
-      method: 'POST',
-      body: { reason: reason ?? '' },
-    }),
+  publish: (slug: string, version: string) =>
+    request<AdminLegalDoc>(
+      `/admin/legal/${encodeURIComponent(slug)}/${encodeURIComponent(version)}/publish`,
+      { method: "POST" },
+    ),
 };
 
 /** 后台：站内消息广播与模板 */
 export const adminNotificationsApi = {
   broadcast: (data: { title: string; body: string; link?: string }) =>
-    request<{ sent: number; users: number }>('/admin/notifications/broadcast', {
-      method: 'POST',
+    request<{ sent: number; users: number }>("/admin/notifications/broadcast", {
+      method: "POST",
       body: data,
     }),
 
-  templates: () => request<MessageTemplateItem[]>('/admin/notifications/templates'),
+  templates: () =>
+    request<MessageTemplateItem[]>("/admin/notifications/templates"),
 
   /** 邮件 / 短信通道实际生效的实现（console = 不真实投递） */
-  channels: () => request<DeliveryChannelStatusMap>('/admin/notifications/channels'),
+  channels: () =>
+    request<DeliveryChannelStatusMap>("/admin/notifications/channels"),
 
   upsertTemplate: (data: {
     code: string;
-    channel: 'inapp' | 'email' | 'sms';
+    channel: "inapp" | "email" | "sms";
     subject?: string;
     body: string;
     enabled?: boolean;
   }) =>
-    request<MessageTemplateItem>('/admin/notifications/templates', {
-      method: 'POST',
+    request<MessageTemplateItem>("/admin/notifications/templates", {
+      method: "POST",
       body: data,
     }),
 };
@@ -1948,37 +2192,43 @@ export const ticketsApi = {
     request<TicketListResult>(`/tickets${toQuery(params)}`),
 
   create: (payload: CreateTicketPayload) =>
-    request<Ticket>('/tickets', { method: 'POST', body: payload }),
+    request<Ticket>("/tickets", { method: "POST", body: payload }),
 
   detail: (id: string) => request<Ticket>(`/tickets/${id}`),
 
   /** 用户回复。resolved 会回落到 open；closed 后端拒绝 */
   reply: (id: string, content: string) =>
-    request<Ticket>(`/tickets/${id}/replies`, { method: 'POST', body: { content } }),
+    request<Ticket>(`/tickets/${id}/replies`, {
+      method: "POST",
+      body: { content },
+    }),
 
-  close: (id: string) => request<Ticket>(`/tickets/${id}/close`, { method: 'POST' }),
+  close: (id: string) =>
+    request<Ticket>(`/tickets/${id}/close`, { method: "POST" }),
 };
 
 /** 后台工单处理中心 */
 export const adminTicketsApi = {
-  stats: () => request<TicketStats>('/admin/tickets/stats'),
+  stats: () => request<TicketStats>("/admin/tickets/stats"),
 
-  list: (params: {
-    status?: string;
-    type?: string;
-    priority?: string;
-    assigneeId?: string;
-    q?: string;
-    limit?: number;
-    offset?: number;
-  } = {}) => request<AdminTicketListResult>(`/admin/tickets${toQuery(params)}`),
+  list: (
+    params: {
+      status?: string;
+      type?: string;
+      priority?: string;
+      assigneeId?: string;
+      q?: string;
+      limit?: number;
+      offset?: number;
+    } = {},
+  ) => request<AdminTicketListResult>(`/admin/tickets${toQuery(params)}`),
 
   detail: (id: string) => request<AdminTicketDetail>(`/admin/tickets/${id}`),
 
-  reply: (id: string, content: string, reason?: string) =>
+  reply: (id: string, content: string) =>
     request<AdminTicketDetail>(`/admin/tickets/${id}/replies`, {
-      method: 'POST',
-      body: { content, ...(reason ? { reason } : {}) },
+      method: "POST",
+      body: { content },
     }),
 
   /**
@@ -1993,17 +2243,22 @@ export const adminTicketsApi = {
       status?: string;
       priority?: string;
       assigneeId?: string | null;
-      reason?: string;
     },
-  ) => request<AdminTicketDetail>(`/admin/tickets/${id}`, { method: 'PATCH', body: payload }),
+  ) =>
+    request<AdminTicketDetail>(`/admin/tickets/${id}`, {
+      method: "PATCH",
+      body: payload,
+    }),
 
-  exportCsv: (params: {
-    status?: string;
-    type?: string;
-    priority?: string;
-    assigneeId?: string;
-    q?: string;
-  } = {}) => downloadCsv(`/admin/tickets/export${toQuery(params)}`),
+  exportCsv: (
+    params: {
+      status?: string;
+      type?: string;
+      priority?: string;
+      assigneeId?: string;
+      q?: string;
+    } = {},
+  ) => downloadCsv(`/admin/tickets/export${toQuery(params)}`),
 };
 
 /**
@@ -2026,13 +2281,21 @@ export const adminSearchApi = {
  * 模型是线路的最小单位（各自启停、各自冷却）。
  */
 export const adminChannelsApi = {
-  list: (params: { keyword?: string; status?: string; page?: number; limit?: number } = {}) =>
-    request<ChannelPageResult>(`/admin/channels${toQuery(params)}`),
+  list: (
+    params: {
+      keyword?: string;
+      status?: string;
+      page?: number;
+      limit?: number;
+    } = {},
+  ) => request<ChannelPageResult>(`/admin/channels${toQuery(params)}`),
 
-  order: () => request<{ items: ChannelOrderItemView[] }>('/admin/channels/order'),
+  order: () =>
+    request<{ items: ChannelOrderItemView[] }>("/admin/channels/order"),
 
   /** 线路健康（一行 = 一条渠道模型，含进程内冷却快照） */
-  health: () => request<{ items: ChannelHealthRowView[] }>('/admin/channels/health'),
+  health: () =>
+    request<{ items: ChannelHealthRowView[] }>("/admin/channels/health"),
 
   /** 可选协议目录；`capability` 用于按模态过滤（图像 / 文本 / 视频 / 音频） */
   protocols: (capability?: string) =>
@@ -2041,28 +2304,34 @@ export const adminChannelsApi = {
     ),
 
   /** 整表排序：`expectedIds` 是并发保护，与后台当前顺序不一致时整单拒绝 */
-  saveOrder: (ids: string[], expectedIds: string[], reason?: string) =>
-    request<{ ok: boolean }>('/admin/channels/order', {
-      method: 'PUT',
-      body: { ids, expectedIds, ...(reason ? { reason } : {}) },
+  saveOrder: (ids: string[], expectedIds: string[]) =>
+    request<{ ok: boolean }>("/admin/channels/order", {
+      method: "PUT",
+      body: { ids, expectedIds },
     }),
 
   exportAll: (ids?: string[]) =>
-    request<SystemChannelExportView>('/admin/channels/export', {
-      method: 'POST',
+    request<SystemChannelExportView>("/admin/channels/export", {
+      method: "POST",
       body: ids && ids.length > 0 ? { ids } : {},
     }),
 
-  importAll: (payload: SystemChannelExportView & { reason?: string }) =>
-    request<SystemChannelImportResultView>('/admin/channels/import', { method: 'POST', body: payload }),
+  importAll: (payload: SystemChannelExportView) =>
+    request<SystemChannelImportResultView>("/admin/channels/import", {
+      method: "POST",
+      body: payload,
+    }),
 
   get: (id: string) => request<AdminChannelView>(`/admin/channels/${id}`),
 
   create: (body: Record<string, unknown>) =>
-    request<AdminChannelView>('/admin/channels', { method: 'POST', body }),
+    request<AdminChannelView>("/admin/channels", { method: "POST", body }),
 
   update: (id: string, body: Record<string, unknown>) =>
-    request<AdminChannelView>(`/admin/channels/${id}`, { method: 'PATCH', body }),
+    request<AdminChannelView>(`/admin/channels/${id}`, {
+      method: "PATCH",
+      body,
+    }),
 
   /**
    * 删除渠道（软删除）。
@@ -2071,28 +2340,38 @@ export const adminChannelsApi = {
    * 渠道模型删除同样不要求填写原因。
    */
   remove: (id: string) =>
-    request<{ ok: boolean }>(`/admin/channels/${id}`, { method: 'DELETE' }),
+    request<{ ok: boolean }>(`/admin/channels/${id}`, { method: "DELETE" }),
 
   duplicate: (id: string) =>
-    request<AdminChannelView>(`/admin/channels/${id}/duplicate`, { method: 'POST' }),
+    request<AdminChannelView>(`/admin/channels/${id}/duplicate`, {
+      method: "POST",
+    }),
 
-  models: (id: string) => request<{ models: AdminChannelModelView[] }>(`/admin/channels/${id}/models`),
+  models: (id: string) =>
+    request<{ models: AdminChannelModelView[] }>(
+      `/admin/channels/${id}/models`,
+    ),
 
   modelOrder: (id: string) =>
-    request<{ items: ChannelOrderItemView[] }>(`/admin/channels/${id}/models/order`),
+    request<{ items: ChannelOrderItemView[] }>(
+      `/admin/channels/${id}/models/order`,
+    ),
 
-  saveModelOrder: (id: string, ids: string[], expectedIds: string[], reason?: string) =>
+  saveModelOrder: (id: string, ids: string[], expectedIds: string[]) =>
     request<{ ok: boolean }>(`/admin/channels/${id}/models/order`, {
-      method: 'PUT',
-      body: { ids, expectedIds, ...(reason ? { reason } : {}) },
+      method: "PUT",
+      body: { ids, expectedIds },
     }),
 
   createModel: (id: string, body: Record<string, unknown>) =>
-    request<AdminChannelModelView>(`/admin/channels/${id}/models`, { method: 'POST', body }),
+    request<AdminChannelModelView>(`/admin/channels/${id}/models`, {
+      method: "POST",
+      body,
+    }),
 
   updateModel: (id: string, modelId: string, body: Record<string, unknown>) =>
     request<AdminChannelModelView>(`/admin/channels/${id}/models/${modelId}`, {
-      method: 'PATCH',
+      method: "PATCH",
       body,
     }),
 
@@ -2103,7 +2382,7 @@ export const adminChannelsApi = {
    */
   removeModel: (id: string, modelId: string) =>
     request<{ deleted: number }>(`/admin/channels/${id}/models/${modelId}`, {
-      method: 'DELETE',
+      method: "DELETE",
     }),
 
   /**
@@ -2113,42 +2392,54 @@ export const adminChannelsApi = {
    */
   batchDeleteModels: (id: string, ids: string[]) =>
     request<{ deleted: number }>(`/admin/channels/${id}/models/batch-delete`, {
-      method: 'POST',
+      method: "POST",
       body: { ids },
     }),
 
   /** 批量调价：提交最终售价，价格版本过期时后端整批拒绝 */
-  batchRepriceModels: (id: string, models: ChannelModelRepriceInput[], reason: string) =>
+  batchRepriceModels: (id: string, models: ChannelModelRepriceInput[]) =>
     request<{ updated: number }>(`/admin/channels/${id}/models/batch-reprice`, {
-      method: 'POST',
-      body: { models, reason },
+      method: "POST",
+      body: { models },
     }),
 
   /** 读取上游模型目录（只读）：用已保存凭证在服务端拉取，密钥不经过浏览器 */
   fetchModels: (id: string) =>
-    request<{ models: UpstreamModelPreview[] }>(`/admin/channels/${id}/models/fetch`, {
-      method: 'POST',
-    }),
+    request<{ models: UpstreamModelPreview[] }>(
+      `/admin/channels/${id}/models/fetch`,
+      {
+        method: "POST",
+      },
+    ),
 
-  importModels: (id: string, models: string[], reason?: string) =>
-    request<ChannelModelFetchResultView>(`/admin/channels/${id}/models/import`, {
-      method: 'POST',
-      body: { models, ...(reason ? { reason } : {}) },
-    }),
+  importModels: (id: string, models: string[]) =>
+    request<ChannelModelFetchResultView>(
+      `/admin/channels/${id}/models/import`,
+      {
+        method: "POST",
+        body: { models },
+      },
+    ),
 
   testModel: (id: string, body: Record<string, unknown>) =>
-    request<ProtocolTestResultView>(`/admin/channels/${id}/models/test`, { method: 'POST', body }),
-
-  setModelEnabled: (id: string, modelId: string, enabled: boolean, reason?: string) =>
-    request<{ ok: boolean }>(`/admin/channels/${id}/models/${modelId}/enabled`, {
-      method: 'PATCH',
-      body: { enabled, ...(reason ? { reason } : {}) },
+    request<ProtocolTestResultView>(`/admin/channels/${id}/models/test`, {
+      method: "POST",
+      body,
     }),
 
-  setModelSort: (id: string, modelId: string, sortOrder: number, reason?: string) =>
+  setModelEnabled: (id: string, modelId: string, enabled: boolean) =>
+    request<{ ok: boolean }>(
+      `/admin/channels/${id}/models/${modelId}/enabled`,
+      {
+        method: "PATCH",
+        body: { enabled },
+      },
+    ),
+
+  setModelSort: (id: string, modelId: string, sortOrder: number) =>
     request<{ ok: boolean }>(`/admin/channels/${id}/models/${modelId}/sort`, {
-      method: 'PATCH',
-      body: { sortOrder, ...(reason ? { reason } : {}) },
+      method: "PATCH",
+      body: { sortOrder },
     }),
 };
 
@@ -2163,7 +2454,7 @@ export const adminChannelModelsApi = {
    */
   list: (channelId?: string, includeDisabled = false) =>
     request<{ models: AdminChannelModelListItem[] }>(
-      `/admin/channel-models${toQuery({ channelId, includeDisabled: includeDisabled ? '1' : undefined })}`,
+      `/admin/channel-models${toQuery({ channelId, includeDisabled: includeDisabled ? "1" : undefined })}`,
     ),
 
   /** 线路健康指标（24h / 7d 成功率、P95、最近样本） */
@@ -2177,56 +2468,73 @@ export const adminChannelModelsApi = {
 export const adminLogicalModelsApi = {
   list: (includeArchived = false) =>
     request<AdminLogicalModelView[]>(
-      `/admin/logical-models${toQuery({ includeArchived: includeArchived ? '1' : undefined })}`,
+      `/admin/logical-models${toQuery({ includeArchived: includeArchived ? "1" : undefined })}`,
     ),
 
-  get: (id: string) => request<AdminLogicalModelView>(`/admin/logical-models/${id}`),
+  get: (id: string) =>
+    request<AdminLogicalModelView>(`/admin/logical-models/${id}`),
 
   create: (body: Record<string, unknown>) =>
-    request<AdminLogicalModelView>('/admin/logical-models', { method: 'POST', body }),
+    request<AdminLogicalModelView>("/admin/logical-models", {
+      method: "POST",
+      body,
+    }),
 
   update: (id: string, body: Record<string, unknown>) =>
-    request<AdminLogicalModelView>(`/admin/logical-models/${id}`, { method: 'PATCH', body }),
+    request<AdminLogicalModelView>(`/admin/logical-models/${id}`, {
+      method: "PATCH",
+      body,
+    }),
 
   archive: (id: string) =>
-    request<{ ok: boolean }>(`/admin/logical-models/${id}`, { method: 'DELETE' }),
+    request<{ ok: boolean }>(`/admin/logical-models/${id}`, {
+      method: "DELETE",
+    }),
 
   /** 路由模拟（只读）：回答「这组参数会落到哪条线路、为什么没落」 */
-  simulate: (id: string, body: ModelIntentPayload & { reason?: string }) =>
-    request<SimulateResultView>(`/admin/logical-models/${id}/simulate`, { method: 'POST', body }),
+  simulate: (id: string, body: ModelIntentPayload) =>
+    request<SimulateResultView>(`/admin/logical-models/${id}/simulate`, {
+      method: "POST",
+      body,
+    }),
 };
 
 /** 用户分组：倍率、渠道可见范围与按模型的价格覆盖 */
 export const adminUserGroupsApi = {
-  list: () => request<UserGroupView[]>('/admin/user-groups'),
+  list: () => request<UserGroupView[]>("/admin/user-groups"),
 
   get: (id: string) => request<UserGroupView>(`/admin/user-groups/${id}`),
 
   create: (body: Record<string, unknown>) =>
-    request<UserGroupView>('/admin/user-groups', { method: 'POST', body }),
+    request<UserGroupView>("/admin/user-groups", { method: "POST", body }),
 
   update: (id: string, body: Record<string, unknown>) =>
-    request<UserGroupView>(`/admin/user-groups/${id}`, { method: 'PATCH', body }),
+    request<UserGroupView>(`/admin/user-groups/${id}`, {
+      method: "PATCH",
+      body,
+    }),
 
   remove: (id: string) =>
-    request<{ ok: boolean }>(`/admin/user-groups/${id}`, { method: 'DELETE' }),
+    request<{ ok: boolean }>(`/admin/user-groups/${id}`, { method: "DELETE" }),
 };
 
 /** 内置插件：启停立即重注册协议；校验只查契约不发上游请求 */
 export const adminPluginsApi = {
-  list: () => request<PluginListResult>('/admin/plugins'),
+  list: () => request<PluginListResult>("/admin/plugins"),
 
   get: (id: string) => request<PluginView>(`/admin/plugins/${id}`),
 
-  setEnabled: (id: string, enabled: boolean, reason?: string) =>
+  setEnabled: (id: string, enabled: boolean) =>
     request<PluginView>(`/admin/plugins/${id}`, {
-      method: 'PATCH',
-      body: { enabled, ...(reason ? { reason } : {}) },
+      method: "PATCH",
+      body: { enabled },
     }),
 
   /** 契约校验只返回校验结果（不返回插件视图），页面据此提示通过/失败 */
   verify: (id: string) =>
-    request<PluginVerifyResultView>(`/admin/plugins/${id}/verify`, { method: 'POST' }),
+    request<PluginVerifyResultView>(`/admin/plugins/${id}/verify`, {
+      method: "POST",
+    }),
 
   /**
    * 上传安装插件包（zip）。
@@ -2234,62 +2542,74 @@ export const adminPluginsApi = {
    * 走 multipart 而不是 base64 JSON：插件包上限 48MB，base64 会再多三分之一，
    * 且需求本来就是一个文件选择框。
    */
-  install: (file: File, reason?: string) => {
+  install: (file: File) => {
     const form = new FormData();
-    form.append('file', file);
-    if (reason) form.append('reason', reason);
-    return request<PluginView>('/admin/plugins/install', { method: 'POST', body: form });
+    form.append("file", file);
+    return request<PluginView>("/admin/plugins/install", {
+      method: "POST",
+      body: form,
+    });
   },
 
-  uninstall: (id: string, reason?: string) =>
+  uninstall: (id: string) =>
     request<{ id: string; removed: boolean }>(`/admin/plugins/${id}`, {
-      method: 'DELETE',
-      body: reason ? { reason } : {},
+      method: "DELETE",
     }),
 };
 
 /** 服务商目录：远端清单 + 一键安装对应厂商插件 */
 export const adminProviderCatalogApi = {
-  list: () => request<ProviderCatalogView>('/admin/provider-catalog'),
+  list: () => request<ProviderCatalogView>("/admin/provider-catalog"),
 
-  refresh: () => request<ProviderCatalogView>('/admin/provider-catalog/refresh', { method: 'POST' }),
+  refresh: () =>
+    request<ProviderCatalogView>("/admin/provider-catalog/refresh", {
+      method: "POST",
+    }),
 
   verify: (id: string) =>
-    request<ProviderVerifyResult>(`/admin/provider-catalog/${id}/verify`, { method: 'POST' }),
+    request<ProviderVerifyResult>(`/admin/provider-catalog/${id}/verify`, {
+      method: "POST",
+    }),
 
   install: (id: string) =>
-    request<PluginView>(`/admin/provider-catalog/${id}/install`, { method: 'POST', body: {} }),
+    request<PluginView>(`/admin/provider-catalog/${id}/install`, {
+      method: "POST",
+      body: {},
+    }),
 };
 
 /** 生成账单：只读列表 + 人工核对（`settle` / `refund`，原因必填） */
 export const adminBillingOrdersApi = {
-  list: (params: {
-    status?: string;
-    userId?: string;
-    taskId?: string;
-    model?: string;
-    channelId?: string;
-    billingMode?: string;
-    group?: string;
-    from?: string;
-    to?: string;
-    page?: number;
-    pageSize?: number;
-  } = {}) => request<BillingOrderListResult>(`/admin/billing-orders${toQuery(params)}`),
+  list: (
+    params: {
+      status?: string;
+      userId?: string;
+      taskId?: string;
+      model?: string;
+      channelId?: string;
+      billingMode?: string;
+      group?: string;
+      from?: string;
+      to?: string;
+      page?: number;
+      pageSize?: number;
+    } = {},
+  ) =>
+    request<BillingOrderListResult>(`/admin/billing-orders${toQuery(params)}`),
 
   get: (id: string) => request<BillingOrderView>(`/admin/billing-orders/${id}`),
 
-  resolve: (id: string, action: 'settle' | 'refund', reason: string) =>
+  resolve: (id: string, action: "settle" | "refund") =>
     request<BillingOrderView>(`/admin/billing-orders/${id}/resolve`, {
-      method: 'POST',
-      body: { action, reason },
+      method: "POST",
+      body: { action },
     }),
 
   /** 批量核对：逐条独立处置，返回每条结果 */
-  batchResolve: (ids: string[], action: 'settle' | 'refund', reason: string) =>
+  batchResolve: (ids: string[], action: "settle" | "refund") =>
     request<BillingBatchResolveResult>(`/admin/billing-orders/batch-resolve`, {
-      method: 'POST',
-      body: { ids: ids.join(','), action, reason },
+      method: "POST",
+      body: { ids: ids.join(","), action },
     }),
 };
 
@@ -2308,8 +2628,9 @@ export interface AdminApiLogQuery {
 
 /** 上游调用记录（`ApiCallLog` 维度，含后台连通性测试的非计费调用） */
 export const adminApiLogsApi = {
-  list: (params: AdminApiLogQuery & { page?: number; pageSize?: number } = {}) =>
-    request<ApiLogListResult>(`/admin/api-logs${toQuery(params)}`),
+  list: (
+    params: AdminApiLogQuery & { page?: number; pageSize?: number } = {},
+  ) => request<ApiLogListResult>(`/admin/api-logs${toQuery(params)}`),
 
   /**
    * 导出当前筛选结果（CSV，上限 5000 行）。
@@ -2329,13 +2650,19 @@ export const adminAnalyticsApi = {
 
 /** 前台模型目录（产品视角，`/models*`） */
 export const modelsApi = {
-  list: () => request<{ models: PublicLogicalModel[] }>('/models'),
+  list: () => request<{ models: PublicLogicalModel[] }>("/models"),
 
   available: (intent: ModelIntentPayload) =>
-    request<{ models: PublicLogicalModel[] }>('/models/available', { method: 'POST', body: intent }),
+    request<{ models: PublicLogicalModel[] }>("/models/available", {
+      method: "POST",
+      body: intent,
+    }),
 
   quote: (id: string, intent: ModelIntentPayload) =>
-    request<{ quote: ModelQuoteView }>(`/models/${id}/quote`, { method: 'POST', body: intent }),
+    request<{ quote: ModelQuoteView }>(`/models/${id}/quote`, {
+      method: "POST",
+      body: intent,
+    }),
 };
 
 /**
@@ -2346,14 +2673,17 @@ export const modelsApi = {
  * 不同渠道的同名模型价格与协议都可能不同，不接受按 modelKey 全局搜索。
  */
 export const modelCatalogApi = {
-  catalog: () => request<PublicModelCatalogResult>('/model-catalog'),
+  catalog: () => request<PublicModelCatalogResult>("/model-catalog"),
 
   available: (intent: ModelIntentPayload) =>
-    request<PublicModelCatalogResult>('/model-catalog/available', { method: 'POST', body: intent }),
+    request<PublicModelCatalogResult>("/model-catalog/available", {
+      method: "POST",
+      body: intent,
+    }),
 
   quote: (channelId: string, modelKey: string, intent: ModelIntentPayload) =>
-    request<{ quote: ModelQuoteView }>('/model-catalog/quote', {
-      method: 'POST',
+    request<{ quote: ModelQuoteView }>("/model-catalog/quote", {
+      method: "POST",
       body: { ...intent, channelId, modelKey },
     }),
 };
@@ -2368,5 +2698,5 @@ export const modelCatalogApi = {
  * `PublicChannelView` 的宽松基线：非管理员视角下 `name` 恒为空串。
  */
 export const publicChannelsApi = {
-  system: () => request<{ channels: PublicChannelView[] }>('/channels/system'),
+  system: () => request<{ channels: PublicChannelView[] }>("/channels/system"),
 };

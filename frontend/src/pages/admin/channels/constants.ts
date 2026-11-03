@@ -1,4 +1,4 @@
-import type { SelectFieldOption } from './components';
+import type { SelectFieldOption } from '~/admin-ui/primitives';
 
 /* ------------------------------------------------------------------------- */
 /* 渠道                                                                      */

@@ -16,7 +16,7 @@ import {
   SelectField,
   StaleError,
   type AppliedFilter,
-} from './components';
+} from '~/admin-ui/primitives';
 import { adminAssetsApi } from './api';
 import { useAdmin, useAdminList, useAdminUrlFilterSync, useToast } from './hooks';
 import {

@@ -8,7 +8,6 @@ import {
   Res,
 } from "@nestjs/common";
 import type { Response } from "express";
-import { Transform } from "class-transformer";
 import {
   AuditAction,
   RequireAllPermissions,
@@ -16,28 +15,7 @@ import {
 } from "./admin.decorator";
 import { BackupService } from "./backup.service";
 import { PERMISSIONS } from "./permissions";
-import {
-  IsInt,
-  IsString,
-  Max,
-  MaxLength,
-  Min,
-  MinLength,
-} from "class-validator";
-
-/** 手动触发备份 */
-export class RunBackupDto {
-  /**
-   * 操作原因。手动备份在高危权限清单 (HIGH_RISK_PERMISSIONS) 内,
-   * AuditInterceptor 只从 body.reason 取值 —— 不声明这个字段会被
-   * 全局 ValidationPipe(whitelist) 剥掉, 审计里永远记 null。
-   */
-  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
-  @IsString({ message: "请填写备份原因" })
-  @MinLength(2, { message: "备份原因至少 2 个字符" })
-  @MaxLength(200, { message: "备份原因最多 200 个字符" })
-  reason!: string;
-}
+import { IsInt, Max, Min } from "class-validator";
 
 /** 保留份数清理 */
 export class PruneBackupDto {
@@ -45,13 +23,6 @@ export class PruneBackupDto {
   @Min(1)
   @Max(100)
   keepCount!: number;
-
-  /** 批量删除备份不可逆，原因同时写入审计 */
-  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
-  @IsString({ message: "请填写清理原因" })
-  @MinLength(2, { message: "清理原因至少 2 个字符" })
-  @MaxLength(200, { message: "清理原因最多 200 个字符" })
-  reason!: string;
 }
 
 /**
@@ -97,7 +68,7 @@ export class AdminBackupController {
   @Post()
   @RequirePermission(PERMISSIONS.backupRun)
   @AuditAction("backup.run")
-  run(@Body() _dto: RunBackupDto) {
+  run() {
     return this.backup.run("manual");
   }
 

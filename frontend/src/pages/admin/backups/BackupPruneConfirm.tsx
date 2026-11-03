@@ -1,4 +1,4 @@
-import { ConfirmAction, FormField, NumberField } from './components';
+import { ConfirmAction, FormField, NumberField } from '~/admin-ui/primitives';
 
 interface BackupPruneConfirmProps {
   open: boolean;

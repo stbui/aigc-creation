@@ -2,9 +2,8 @@ import { useState, type ReactNode } from 'react';
 import { SLUGS, SLUG_LABEL, STATUS_LABEL, STATUS_TONE_KEY } from './constants';
 import { fmt } from './utils';
 import { useAdminResource, useAdmin, useDiscardConfirm, useUnsavedGuard, useToast } from './hooks';
-import { ActionButton, AdminDataTable, ConfirmAction, Drawer, FilterActions, FilterBar, FormField, ModalDialog, PageHeader, Panel, SelectField, StatusTag, StaleError, TextAreaField, TextField, type AdminColumn } from './components';
+import { ActionButton, AdminDataTable, ConfirmAction, Drawer, FilterActions, FilterBar, FormField, ModalDialog, PageHeader, Panel, SelectField, StatusTag, StaleError, TextAreaField, TextField, type AdminColumn } from '~/admin-ui/primitives';
 import { adminLegalApi } from '../../../lib/api';
-import { auditReason } from '../../../admin-ui/lib/auditReason';
 
 import type { AdminLegalDoc, LegalSlug, LegalStatus } from '../../../types/api';
 
@@ -123,11 +122,7 @@ export function AdminLegalPage() {
     if (!publishTarget) return;
     setBusy(true);
     try {
-      await adminLegalApi.publish(
-        publishTarget.slug,
-        publishTarget.version,
-        auditReason('发布法务文档版本'),
-      );
+      await adminLegalApi.publish(publishTarget.slug, publishTarget.version);
       toast.success(`版本 ${publishTarget.version} 已发布，同文档的旧版本已归档`);
       setPublishTarget(null);
       await reload();

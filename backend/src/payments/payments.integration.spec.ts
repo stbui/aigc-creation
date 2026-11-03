@@ -363,7 +363,7 @@ describe('支付 HTTP 集成', () => {
     }
   });
 
-  it('权限与 DTO：普通用户 403，缺 reason 400', async () => {
+  it('权限与 DTO：普通用户 403，审计原因不属于商品契约', async () => {
     const forbidden = await api('get', '/api/v1/admin/payments/providers', userToken);
     expect(forbidden.status).toBe(403);
 
@@ -371,16 +371,17 @@ describe('支付 HTTP 集成', () => {
     expect(admin.status).toBe(200);
     expect(admin.body.data.items).toHaveLength(7);
 
-    const invalid = await api('post', '/api/v1/admin/payments/products', adminToken).send({
+    const created = await api('post', '/api/v1/admin/payments/products', adminToken).send({
       kind: 'credits',
-      name: '缺原因商品',
+      name: '无需审计原因商品',
       currency: 'CNY',
       priceCents: 100,
       credits: 10,
       status: 'offline',
       saleStrategy: 'unlimited',
     });
-    expect(invalid.status).toBe(400);
+    expect(created.status).toBe(201);
+    expect(created.body.code).toBe(0);
   });
 
   it('订单 CSV 导出（中文文件名头）', async () => {

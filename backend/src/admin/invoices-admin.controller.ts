@@ -12,14 +12,6 @@ import { PERMISSIONS } from "./permissions";
 import { sendCsv } from "../common/csv-response";
 import { InvoicesService } from "../invoices/invoices.service";
 
-/** 开具发票: 必须写原因 (票面金额与抬头是财务凭证, 事后要能解释) */
-export class IssueInvoiceDto {
-  @IsString()
-  @IsNotEmpty({ message: "请填写开具说明" })
-  @MaxLength(300)
-  reason!: string;
-}
-
 export class RejectInvoiceDto {
   @IsString()
   @IsNotEmpty({ message: "请填写驳回原因" })
@@ -56,12 +48,8 @@ export class AdminInvoicesController {
   @Post(":id/issue")
   @RequirePermission(PERMISSIONS.invoiceWrite)
   @AuditAction("invoice.issue")
-  issue(
-    @Param("id") id: string,
-    @Body() dto: IssueInvoiceDto,
-    @AdminUser() admin: AdminUserType,
-  ) {
-    return this.invoices.issue(id, admin.id, dto.reason);
+  issue(@Param("id") id: string, @AdminUser() admin: AdminUserType) {
+    return this.invoices.issue(id, admin.id);
   }
 
   @Post(":id/reject")

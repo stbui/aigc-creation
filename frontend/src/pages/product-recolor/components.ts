@@ -13,12 +13,7 @@ export { ToolShell } from '../../components/ToolShell';
 /** 表单卡片 */
 export { ToolCard } from '../../components/ToolWidgets';
 /** 颜色工作台: 色板 + 自定义 HEX (本页不需要透明度) */
-export {
-  ColorStudio,
-  RECOLOR_COLOR_SWATCHES,
-  isValidHexColor,
-  normalizeHexColor,
-} from '../../components/ColorStudio';
+export { ColorStudio } from '../../components/ColorStudio';
 /** 历史产出面板 */
 export { ToolHistoryPane } from '../../components/ToolHistoryPane';
 /** 商品图上传预览与原图展示 (与精修 / 翻译共用) */

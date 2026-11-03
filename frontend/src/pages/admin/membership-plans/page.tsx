@@ -9,7 +9,7 @@ import {
   PageSkeleton,
   Panel,
   StaleError,
-} from './components';
+} from '~/admin-ui/primitives';
 import {
   useAdmin,
   useAdminResource,
@@ -24,7 +24,6 @@ import { PlanTable } from './PlanTable';
 import { PlanFormDrawer } from './PlanFormDrawer';
 import { PlanStatusConfirm } from './PlanStatusConfirm';
 import type { AdminMembershipPlan } from '../../../types/api';
-import { auditReason } from '../../../admin-ui/lib/auditReason';
 
 /**
  * 会员套餐管理（`/admin/membership-plans`）。
@@ -118,11 +117,7 @@ export function AdminMembershipPlansPage() {
     setSaving(true);
     try {
       const next = statusTarget.status === 'active' ? 'offline' : 'active';
-      await adminMembershipPlansApi.setStatus(
-        statusTarget.id,
-        next,
-        auditReason(next === 'active' ? '上架会员套餐' : '下架会员套餐'),
-      );
+      await adminMembershipPlansApi.setStatus(statusTarget.id, next);
       toast.success(next === 'active' ? '套餐已上架' : '套餐已下架，存量会员不受影响');
       setStatusTarget(null);
       void reload();

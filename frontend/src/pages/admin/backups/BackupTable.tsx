@@ -5,7 +5,7 @@ import {
   Descriptions,
   StatusTag,
   type AdminColumn,
-} from './components';
+} from '~/admin-ui/primitives';
 import { backupStatusLabel, formatBytes, formatRelative, triggerLabel } from './utils';
 import type { AdminBackup } from '../../../types/api';
 

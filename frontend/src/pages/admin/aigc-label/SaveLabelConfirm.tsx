@@ -1,4 +1,4 @@
-import { ConfirmAction } from './components';
+import { ConfirmAction } from '~/admin-ui/primitives';
 import { POSITION_LABELS } from './constants';
 import type { AigcLabelSpec } from '../../../types/api';
 

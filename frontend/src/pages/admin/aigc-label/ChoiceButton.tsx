@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { cn } from './components';
+import { cn } from '~/admin-ui/lib/cn';
 
 /**
  * 单选按钮组的一枚。

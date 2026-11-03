@@ -19,7 +19,7 @@ import {
   TextField,
   type AdminColumn,
   type AppliedFilter,
-} from './components';
+} from '~/admin-ui/primitives';
 import {
   useAdmin,
   useAdminDetailParam,
@@ -39,7 +39,6 @@ import {
   RECONCILIATION_PROVIDERS,
 } from './constants';
 import { moneyText } from './utils';
-import { auditReason } from '../../../admin-ui/lib/auditReason';
 import { RECONCILIATION_RESULT_LABELS } from '../../../types/payment';
 
 /**
@@ -452,7 +451,6 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
             const result = await adminPaymentReconciliationApi.run({
               providerId: runProvider as PaymentProviderId,
               billDate,
-              reason: auditReason('执行支付对账'),
             });
             toast.success(
               result.reused ? '该账单日已有一次成功的运行记录，已复用' : '对账已执行完成',
@@ -483,7 +481,6 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
             await adminPaymentReconciliationApi.importCsv(importFile, {
               providerId: importProvider as PaymentProviderId,
               billDate: importBillDate,
-              reason: auditReason('导入渠道对账单'),
             });
             toast.success('对账单已导入');
             setImportOpen(false);

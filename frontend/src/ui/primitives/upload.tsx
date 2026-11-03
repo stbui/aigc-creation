@@ -39,6 +39,7 @@ function UploadInner({
   disabled,
   className,
   beforeUpload,
+  onChange,
   onRemove,
   onPreview,
   showUploadList = true,
@@ -49,12 +50,20 @@ function UploadInner({
 
   const pick = async (files: FileList | null) => {
     if (!files || disabled) return;
-    const picked = Array.from(files).slice(0, maxCount ?? files.length);
-    for (const file of picked) {
+    const remaining = maxCount === undefined ? files.length : Math.max(0, maxCount - fileList.length);
+    const picked = Array.from(files).slice(0, remaining);
+    const accepted: UploadFile[] = [];
+    for (const [index, file] of picked.entries()) {
       const result = await beforeUpload?.(file, picked);
       if (result === false || result === LIST_IGNORE) continue;
-      if (typeof result === 'string' && result === LIST_IGNORE) continue;
+      accepted.push({
+        uid: `${Date.now()}-${index}-${file.name}`,
+        name: file.name,
+        status: 'uploading',
+        originFileObj: file,
+      });
     }
+    if (accepted.length > 0) onChange?.({ fileList: [...fileList, ...accepted] });
   };
 
   return (

@@ -2,18 +2,11 @@ import { useState } from 'react';
 import { Plus } from 'lucide-react';
 
 import { BackgroundSourcePreview } from './BackgroundSourcePreview';
-import {
-  ColorStudio,
-  MATTING_COLOR_SWATCHES,
-  MattingResultEditor,
-  ToolCard,
-  ToolShell,
-  isValidHexColor,
-  normalizeHexColor,
-} from './components';
+import { ColorStudio, MattingResultEditor, ToolCard, ToolShell } from './components';
+import { DEFAULT_CUSTOM_COLOR, MATTING_COLOR_SWATCHES } from './constants';
 import { useCreditCost, useToolTask } from './hooks';
 import { assetThumbUrl } from './api';
-import { colorLabelOf } from './utils';
+import { colorLabelOf, isValidHexColor, normalizeHexColor } from './utils';
 import { useApp } from '../../ui';
 
 /**
@@ -36,7 +29,7 @@ export function BackgroundRemovePage() {
   const { submitting, result, run } = useToolTask({ capability: 'matting', successMessage: '抠图结果已生成' });
 
   const [selectedColor, setSelectedColor] = useState('transparent');
-  const [customColor, setCustomColor] = useState('#5546D8');
+  const [customColor, setCustomColor] = useState(DEFAULT_CUSTOM_COLOR);
   const [customAlpha, setCustomAlpha] = useState(100);
   /*
    * 结果编辑器需要原图做对比；提交时记录本次实际输入与比例，避免用户随后

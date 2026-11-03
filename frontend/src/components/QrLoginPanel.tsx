@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { RotateCw } from 'lucide-react';
 import { authApi } from '../lib/api';
+import { qrColors } from '../lib/colorPalette';
 import type { QrSessionStatus } from '../types/api';
 
 /**
@@ -58,7 +59,7 @@ export function QrLoginPanel({ onSuccess }: QrLoginPanelProps) {
       const dataUrl = await QRCode.toDataURL(link, {
         width: 220,
         margin: 1,
-        color: { dark: '#171a2b', light: '#ffffff' },
+        color: qrColors(),
       });
       if (epoch !== epochRef.current) return;
       setView({

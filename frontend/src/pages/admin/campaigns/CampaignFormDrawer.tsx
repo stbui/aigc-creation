@@ -7,7 +7,7 @@ import {
   SwitchField,
   TextAreaField,
   TextField,
-} from './components';
+} from '~/admin-ui/primitives';
 import { EFFECTIVE_META, STATUS_OPTIONS, TYPE_OPTIONS, type FormState } from './constants';
 import { inWindow } from './utils';
 import type { AdminCampaign, CampaignStatus, CampaignType } from '../../../types/api';

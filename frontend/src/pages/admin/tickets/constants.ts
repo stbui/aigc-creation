@@ -5,7 +5,7 @@
  * 前端只用于决定显示哪些按钮，真正的合法性校验在后端。
  */
 
-import type { TagTone } from './components';
+import type { TagTone } from '~/components/admin/statusMeta';
 import type { TicketPriority, TicketStatus, TicketType } from '../../../types/api';
 
 export const TYPE_LABELS: Record<TicketType, string> = {

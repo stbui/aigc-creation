@@ -19,7 +19,7 @@ import {
   TextAreaField,
   TextField,
   type AdminColumn,
-} from './components';
+} from '~/admin-ui/primitives';
 import { useAdmin, useAdminResource, useToast } from './hooks';
 import type {
   AdminPaymentProviderView,

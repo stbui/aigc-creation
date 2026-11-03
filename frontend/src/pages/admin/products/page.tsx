@@ -8,7 +8,7 @@ import {
   Panel,
   StaleError,
   type AppliedFilter,
-} from './components';
+} from '~/admin-ui/primitives';
 import {
   useAdmin,
   useAdminList,

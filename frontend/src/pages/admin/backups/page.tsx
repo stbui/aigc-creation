@@ -9,11 +9,10 @@ import {
   PageSkeleton,
   Panel,
   StaleError,
-} from './components';
+} from '~/admin-ui/primitives';
 import { useAdmin, useAdminResource, useToast } from './hooks';
 import { DEFAULT_KEEP_COUNT } from './constants';
 import { formatBytes } from './utils';
-import { auditReason } from '../../../admin-ui/lib/auditReason';
 import { BackupHealth } from './BackupHealth';
 import { BackupTable } from './BackupTable';
 import { BackupCleanupLog } from './BackupCleanupLog';
@@ -67,7 +66,7 @@ export function AdminBackupPage() {
   const runBackup = async () => {
     setBusy(true);
     try {
-      const rec = await adminBackupsApi.run(auditReason('手动备份数据库'));
+      const rec = await adminBackupsApi.run();
       toast.success(`备份完成: ${rec.filename}`);
       setRunOpen(false);
       await reload();
@@ -121,7 +120,7 @@ export function AdminBackupPage() {
   const doPrune = async () => {
     setBusy(true);
     try {
-      const res = await adminBackupsApi.prune(keepCount, auditReason('按保留份数清理旧备份'));
+      const res = await adminBackupsApi.prune(keepCount);
       setPruneOpen(false);
       toast.success(`已清理 ${res.removed} 份, 释放 ${formatBytes(res.freedBytes)}`);
       await reload();

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { StatCard } from './components';
+import { StatCard } from '~/admin-ui/primitives';
 import type { AdminProduct } from '../../../types/api';
 
 /** 商品统计条：总数 / 在售 / 已下架 / 促销中 */

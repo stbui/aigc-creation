@@ -6,7 +6,7 @@ import {
   SelectField,
   TextField,
   type AppliedFilter,
-} from './components';
+} from '~/admin-ui/primitives';
 import { BILLING_MODE_OPTIONS, REVIEW_OPTION, STATUS_OPTIONS } from './constants';
 
 interface BillingFilterBarProps {

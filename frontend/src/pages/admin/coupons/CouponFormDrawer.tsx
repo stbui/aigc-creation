@@ -5,7 +5,7 @@ import {
   Notice,
   SelectField,
   TextField,
-} from './components';
+} from '~/admin-ui/primitives';
 import { SCOPE_OPTIONS, STATUS_OPTIONS, TYPE_OPTIONS, type FormState } from './constants';
 import type { AdminCoupon, CouponScope, CouponStatus, CouponType } from '../../../types/api';
 

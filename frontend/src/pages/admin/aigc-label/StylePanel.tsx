@@ -7,7 +7,7 @@ import {
   SuggestField,
   SwitchField,
   TextField,
-} from './components';
+} from '~/admin-ui/primitives';
 import { FONT_PRESETS } from './constants';
 import { ChoiceButton } from './ChoiceButton';
 import type { AigcLabelSpec } from '../../../types/api';

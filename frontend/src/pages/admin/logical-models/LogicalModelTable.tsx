@@ -1,5 +1,5 @@
 import { Archive, FlaskConical } from 'lucide-react';
-import { ActionButton, AdminDataTable, StatusTag, type AdminColumn } from './components';
+import { ActionButton, AdminDataTable, StatusTag, type AdminColumn } from '~/admin-ui/primitives';
 import { BILLING_MODE_LABELS, PRICE_POLICY_LABELS } from './constants';
 import type { AdminLogicalModelView } from '../../../types/model';
 

@@ -5,7 +5,7 @@
 | 项 | 现值 |
 | --- | --- |
 | 路由 | `/library`，别名 `/asset-library` |
-| 页面组件 | `frontend/src/pages/LibraryPage.tsx` |
+| 页面组件 | `frontend/src/pages/library/page.tsx` |
 | 样式 | `frontend/src/styles/global.css` 的 `.asset-library-*` 区块 |
 | 组件来源 | `frontend/src/ui`；底层使用 shadcn / Radix 组合件 |
 | 全站字体与令牌 | `docs/typography.md`、`frontend/src/styles/global.css` 的 `:root` |

@@ -413,10 +413,10 @@ test.describe('渠道与模型 P5', () => {
       test.skip(true, '目录里没有可用的 free_create 模型；生成段需要一条已配置的 image 线路');
     }
 
-    // 新账号没有积分：由管理员按「必须写原因」的既有入口发放
+    // 新账号没有积分：由管理员通过积分调整入口发放
     const adjustRes = await request.post(`${API}/api/v1/admin/credits/adjust`, {
       headers: { Authorization: `Bearer ${token}` },
-      data: { userId, delta: 200, reason: 'E2E：渠道与模型 P5 端到端验收' },
+      data: { userId, delta: 200 },
     });
     expect(adjustRes.ok(), `credit adjust ${adjustRes.status()}: ${await adjustRes.text()}`).toBeTruthy();
 

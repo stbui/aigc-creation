@@ -5,7 +5,7 @@ import {
   FilterBar,
   SelectField,
   type AppliedFilter,
-} from './components';
+} from '~/admin-ui/primitives';
 import { STATUS_OPTIONS } from './constants';
 
 interface ProductFilterBarProps {

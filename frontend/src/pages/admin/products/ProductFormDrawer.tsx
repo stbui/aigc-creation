@@ -5,7 +5,7 @@ import {
   SelectField,
   TextAreaField,
   TextField,
-} from './components';
+} from '~/admin-ui/primitives';
 import { GRANT_TYPE_OPTIONS, type ProductDraft } from './constants';
 import { yuanTextToCents } from './utils';
 import type { AdminProduct } from '../../../types/api';

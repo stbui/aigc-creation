@@ -1,9 +1,8 @@
 import { useRef, useState } from 'react';
 import { RefreshCw, Upload } from 'lucide-react';
 import { adminPluginsApi, adminProviderCatalogApi } from './api';
-import { ActionButton, Notice, PageHeader, Panel, SkeletonBody, StaleError } from './components';
+import { ActionButton, Notice, PageHeader, Panel, SkeletonBody, StaleError } from '~/admin-ui/primitives';
 import { useAdmin, useAdminResource, useToast } from './hooks';
-import { auditReason } from '../../../admin-ui/lib/auditReason';
 import { PluginStats } from './PluginStats';
 import { PluginTable } from './PluginTable';
 import { CatalogTable } from './CatalogTable';
@@ -57,11 +56,7 @@ export function AdminPluginsPage() {
     if (!toggleTarget) return;
     setBusy(toggleTarget.id);
     try {
-      const next = await adminPluginsApi.setEnabled(
-        toggleTarget.id,
-        !toggleTarget.enabled,
-        auditReason(toggleTarget.enabled ? '停用插件' : '启用插件'),
-      );
+      const next = await adminPluginsApi.setEnabled(toggleTarget.id, !toggleTarget.enabled);
       toast.success(
         `插件「${next.name}」已${next.enabled ? '启用' : '停用'}，协议注册表已刷新（当前生效 ${next.activeProtocols} 个协议）`,
       );
@@ -96,10 +91,7 @@ export function AdminPluginsPage() {
     if (!installTarget) return;
     setBusy('install');
     try {
-      const next = await adminPluginsApi.install(
-        installTarget,
-        auditReason('安装插件'),
-      );
+      const next = await adminPluginsApi.install(installTarget);
       toast.success(`插件「${next.name}」已安装（v${next.version}，默认启用）`);
       setInstallTarget(null);
       await reload({ silent: true });
@@ -115,7 +107,7 @@ export function AdminPluginsPage() {
     if (!uninstallTarget) return;
     setBusy(uninstallTarget.id);
     try {
-      await adminPluginsApi.uninstall(uninstallTarget.id, auditReason('卸载插件'));
+      await adminPluginsApi.uninstall(uninstallTarget.id);
       toast.success(`插件「${uninstallTarget.name}」已卸载，协议注册表已刷新`);
       setUninstallTarget(null);
       await reload({ silent: true });

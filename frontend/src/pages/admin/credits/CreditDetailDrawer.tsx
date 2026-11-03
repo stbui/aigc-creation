@@ -16,11 +16,10 @@ import {
   StaleError,
   TextField,
   type AdminColumn,
-} from './components';
+} from '~/admin-ui/primitives';
 import { LEDGER_LABELS, LEDGER_OPTIONS, SOURCE_LABELS } from './constants';
 import { useCreditDetail, useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
 import { adminCreditsApi } from './api';
-import { auditReason } from '../../../admin-ui/lib/auditReason';
 import {
   adminOrderHref,
   adminTasksHref,
@@ -82,7 +81,6 @@ export function CreditDetailDrawer({
       const r = await adminCreditsApi.adjust({
         userId: user.userId,
         delta: parsedDelta,
-        reason: auditReason('人工调整用户积分'),
         ...(validDays.trim() ? { validDays: Number(validDays) } : {}),
       });
       toast.success(`已调整 ${signed(parsedDelta)} 积分，当前余额 ${r.balance}`);

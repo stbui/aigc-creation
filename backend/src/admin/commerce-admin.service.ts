@@ -1,16 +1,16 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
+import { Injectable } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
 import {
   CreditService,
   emptyBalanceSummary,
   microcreditsToCredits,
   projectEntry,
-} from '../credits/credit.service';
-import { OrderService } from '../orders/order.service';
-import { AppError } from '../common/app.exception';
-import { runBatch } from '../common/batch';
-import { buildPage, paginate, type PageQueryDto } from './dto/page-query.dto';
-import { centsToYuan, parseCsv, toCsv, type CsvColumn } from '../common/csv';
+} from "../credits/credit.service";
+import { OrderService } from "../orders/order.service";
+import { AppError } from "../common/app.exception";
+import { runBatch } from "../common/batch";
+import { buildPage, paginate, type PageQueryDto } from "./dto/page-query.dto";
+import { centsToYuan, parseCsv, toCsv, type CsvColumn } from "../common/csv";
 
 /** 商品写入字段。sku 只在创建时给 —— 改 sku 会让历史订单快照与商品对不上号 */
 export interface ProductCreateInput {
@@ -22,8 +22,8 @@ export interface ProductCreateInput {
   originalPriceCents?: number | null;
   credits: number;
   creditsValidDays?: number;
-  grantType?: 'immediate' | 'manual';
-  status?: 'active' | 'offline';
+  grantType?: "immediate" | "manual";
+  status?: "active" | "offline";
   sortOrder?: number;
 }
 
@@ -34,8 +34,8 @@ export interface ProductUpdateInput {
   originalPriceCents?: number | null;
   credits?: number;
   creditsValidDays?: number;
-  grantType?: 'immediate' | 'manual';
-  status?: 'active' | 'offline';
+  grantType?: "immediate" | "manual";
+  status?: "active" | "offline";
   sortOrder?: number;
 }
 
@@ -75,29 +75,29 @@ export interface CreditLedgerQuery {
 }
 
 const ORDER_STATUSES = [
-  'pending',
-  'paid',
-  'cancelled',
-  'refunded',
-  'partial_refunded',
+  "pending",
+  "paid",
+  "cancelled",
+  "refunded",
+  "partial_refunded",
 ] as const;
 
 /** `Refund.status` 的合法取值, 与退款落库路径保持一致 */
-const REFUND_STATES = ['processing', 'failed', 'succeeded'] as const;
+const REFUND_STATES = ["processing", "failed", "succeeded"] as const;
 
 const LEDGER_TYPES = [
-  'purchase',
-  'grant',
-  'consume',
-  'admin_adjust',
-  'expire',
-  'refund_reclaim',
-  'reserve',
-  'refund',
+  "purchase",
+  "grant",
+  "consume",
+  "admin_adjust",
+  "expire",
+  "refund_reclaim",
+  "reserve",
+  "refund",
 ] as const;
 
-const GRANT_TYPES = ['immediate', 'manual'] as const;
-const PRODUCT_STATUSES = ['active', 'offline'] as const;
+const GRANT_TYPES = ["immediate", "manual"] as const;
+const PRODUCT_STATUSES = ["active", "offline"] as const;
 
 /** 导出上限: 再大就不该走同步 HTTP 了, 应改异步任务 + 落文件 */
 const EXPORT_LIMIT = 10_000;
@@ -145,28 +145,34 @@ export class AdminCommerceService {
     }
     const list = await this.prisma.product.findMany({
       where,
-      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     });
     return list.map((p) => this.toProductView(p));
   }
 
   async createProduct(input: ProductCreateInput) {
-    this.assertProductNumbers(input.priceCents, input.credits, input.creditsValidDays);
-    const exists = await this.prisma.product.findUnique({ where: { sku: input.sku } });
+    this.assertProductNumbers(
+      input.priceCents,
+      input.credits,
+      input.creditsValidDays,
+    );
+    const exists = await this.prisma.product.findUnique({
+      where: { sku: input.sku },
+    });
     if (exists) throw new AppError(40001, `SKU 已存在: ${input.sku}`, 400);
 
     const product = await this.prisma.product.create({
       data: {
         sku: input.sku.trim(),
         name: input.name.trim(),
-        description: input.description ?? '',
-        type: input.type ?? 'credits',
+        description: input.description ?? "",
+        type: input.type ?? "credits",
         priceCents: input.priceCents,
         originalPriceCents: input.originalPriceCents ?? null,
         credits: input.credits,
         creditsValidDays: input.creditsValidDays ?? 0,
-        grantType: input.grantType ?? 'immediate',
-        status: input.status ?? 'offline',
+        grantType: input.grantType ?? "immediate",
+        status: input.status ?? "offline",
         sortOrder: input.sortOrder ?? 0,
       },
     });
@@ -175,7 +181,7 @@ export class AdminCommerceService {
 
   async updateProduct(id: string, input: ProductUpdateInput) {
     const current = await this.prisma.product.findUnique({ where: { id } });
-    if (!current) throw new AppError(40400, '商品不存在', 404);
+    if (!current) throw new AppError(40400, "商品不存在", 404);
 
     // 只校验本次要改的数值字段; 未传的沿用库里的值 (它们创建时已校验过)
     this.assertProductNumbers(
@@ -188,8 +194,12 @@ export class AdminCommerceService {
       where: { id },
       data: {
         ...(input.name !== undefined ? { name: input.name.trim() } : {}),
-        ...(input.description !== undefined ? { description: input.description } : {}),
-        ...(input.priceCents !== undefined ? { priceCents: input.priceCents } : {}),
+        ...(input.description !== undefined
+          ? { description: input.description }
+          : {}),
+        ...(input.priceCents !== undefined
+          ? { priceCents: input.priceCents }
+          : {}),
         ...(input.originalPriceCents !== undefined
           ? { originalPriceCents: input.originalPriceCents }
           : {}),
@@ -197,9 +207,13 @@ export class AdminCommerceService {
         ...(input.creditsValidDays !== undefined
           ? { creditsValidDays: input.creditsValidDays }
           : {}),
-        ...(input.grantType !== undefined ? { grantType: input.grantType } : {}),
+        ...(input.grantType !== undefined
+          ? { grantType: input.grantType }
+          : {}),
         ...(input.status !== undefined ? { status: input.status } : {}),
-        ...(input.sortOrder !== undefined ? { sortOrder: input.sortOrder } : {}),
+        ...(input.sortOrder !== undefined
+          ? { sortOrder: input.sortOrder }
+          : {}),
       },
     });
     return this.toProductView(product);
@@ -211,15 +225,19 @@ export class AdminCommerceService {
    * 历史订单的 OrderItem 存了快照, 删商品不会让订单显示不全, 但后台就再也
    * 查不到"这个 SKU 原来卖多少钱、发多少积分"了 —— 对账需要它。下架即够。
    */
-  private assertProductNumbers(priceCents: number, credits: number, validDays = 0): void {
+  private assertProductNumbers(
+    priceCents: number,
+    credits: number,
+    validDays = 0,
+  ): void {
     if (!Number.isInteger(priceCents) || priceCents < 0) {
-      throw new AppError(40001, '商品价格必须是非负整数分', 400);
+      throw new AppError(40001, "商品价格必须是非负整数分", 400);
     }
     if (!Number.isInteger(credits) || credits < 0) {
-      throw new AppError(40001, '赠送积分必须是非负整数', 400);
+      throw new AppError(40001, "赠送积分必须是非负整数", 400);
     }
     if (!Number.isInteger(validDays) || validDays < 0) {
-      throw new AppError(40001, '积分有效期必须是非负整数天', 400);
+      throw new AppError(40001, "积分有效期必须是非负整数天", 400);
     }
   }
 
@@ -271,8 +289,8 @@ export class AdminCommerceService {
   async listOrders(q: OrderListQuery) {
     const page = buildPage(
       { page: q.page, pageSize: q.pageSize, sort: q.sort } as PageQueryDto,
-      ['createdAt', 'paidAt', 'totalCents'],
-      'createdAt:desc',
+      ["createdAt", "paidAt", "totalCents"],
+      "createdAt:desc",
     );
     const where = this.orderWhere(q);
 
@@ -297,7 +315,7 @@ export class AdminCommerceService {
         id: o.id,
         orderNo: o.orderNo,
         userId: o.userId,
-        userEmail: o.user?.email ?? '',
+        userEmail: o.user?.email ?? "",
         status: o.status,
         channel: o.channel,
         totalCents: o.totalCents,
@@ -319,36 +337,38 @@ export class AdminCommerceService {
 
   /** 订单详情: 用户 / 明细 / 支付 / 退款 / 券与活动 / 会员套餐 一次取全 */
   async orderDetail(id: string) {
-    return this.prisma.order.findUnique({
-      where: { id },
-      include: {
-        user: { select: { id: true, email: true, name: true, role: true } },
-        items: true,
-        payments: { orderBy: { createdAt: 'desc' } },
-        refunds: { orderBy: { createdAt: 'desc' } },
-        coupon: { select: { code: true, name: true } },
-        campaign: { select: { id: true, name: true, type: true } },
-        membershipPlan: {
-          select: {
-            id: true,
-            code: true,
-            name: true,
-            durationDays: true,
-            monthlyCredits: true,
+    return this.prisma.order
+      .findUnique({
+        where: { id },
+        include: {
+          user: { select: { id: true, email: true, name: true, role: true } },
+          items: true,
+          payments: { orderBy: { createdAt: "desc" } },
+          refunds: { orderBy: { createdAt: "desc" } },
+          coupon: { select: { code: true, name: true } },
+          campaign: { select: { id: true, name: true, type: true } },
+          membershipPlan: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              durationDays: true,
+              monthlyCredits: true,
+            },
           },
         },
-      },
-    }).then((o) => {
-      if (!o) throw new AppError(40400, '订单不存在', 404);
-      return o;
-    });
+      })
+      .then((o) => {
+        if (!o) throw new AppError(40400, "订单不存在", 404);
+        return o;
+      });
   }
 
   /** 订单导出 (CSV)。金额列同时给分与元, 财务按元核对, 技术按分回查 */
   async exportOrders(q: OrderListQuery): Promise<string> {
     const rows = await this.prisma.order.findMany({
       where: this.orderWhere(q),
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: EXPORT_LIMIT,
       include: {
         user: { select: { email: true } },
@@ -358,21 +378,36 @@ export class AdminCommerceService {
     });
 
     const columns: CsvColumn<(typeof rows)[number]>[] = [
-      { label: '订单号', value: (o) => o.orderNo },
-      { label: '用户邮箱', value: (o) => o.user?.email ?? '' },
-      { label: '状态', value: (o) => ORDER_STATUS_LABELS[o.status] ?? o.status },
-      { label: '支付渠道', value: (o) => o.channel ?? '' },
-      { label: '订单金额(分)', value: (o) => o.totalCents },
-      { label: '订单金额(元)', value: (o) => centsToYuan(o.totalCents) },
-      { label: '优惠(分)', value: (o) => o.discountCents ?? 0 },
-      { label: '实付(分)', value: (o) => (o.paidCents > 0 ? o.paidCents : o.totalCents) },
-      { label: '实付(元)', value: (o) => centsToYuan(o.paidCents > 0 ? o.paidCents : o.totalCents) },
-      { label: '已退(分)', value: (o) => o.refundedCents },
-      { label: '赠送积分', value: (o) => o.grantedCredits },
-      { label: '商品', value: (o: any) => o.items.map((i: any) => `${i.nameSnapshot}(${i.skuSnapshot})`).join(' / ') },
-      { label: '会员套餐', value: (o: any) => o.membershipPlan?.code ?? '' },
-      { label: '下单时间', value: (o) => o.createdAt },
-      { label: '支付时间', value: (o) => o.paidAt },
+      { label: "订单号", value: (o) => o.orderNo },
+      { label: "用户邮箱", value: (o) => o.user?.email ?? "" },
+      {
+        label: "状态",
+        value: (o) => ORDER_STATUS_LABELS[o.status] ?? o.status,
+      },
+      { label: "支付渠道", value: (o) => o.channel ?? "" },
+      { label: "订单金额(分)", value: (o) => o.totalCents },
+      { label: "订单金额(元)", value: (o) => centsToYuan(o.totalCents) },
+      { label: "优惠(分)", value: (o) => o.discountCents ?? 0 },
+      {
+        label: "实付(分)",
+        value: (o) => (o.paidCents > 0 ? o.paidCents : o.totalCents),
+      },
+      {
+        label: "实付(元)",
+        value: (o) => centsToYuan(o.paidCents > 0 ? o.paidCents : o.totalCents),
+      },
+      { label: "已退(分)", value: (o) => o.refundedCents },
+      { label: "赠送积分", value: (o) => o.grantedCredits },
+      {
+        label: "商品",
+        value: (o: any) =>
+          o.items
+            .map((i: any) => `${i.nameSnapshot}(${i.skuSnapshot})`)
+            .join(" / "),
+      },
+      { label: "会员套餐", value: (o: any) => o.membershipPlan?.code ?? "" },
+      { label: "下单时间", value: (o) => o.createdAt },
+      { label: "支付时间", value: (o) => o.paidAt },
     ];
     return toCsv(columns, rows);
   }
@@ -404,14 +439,18 @@ export class AdminCommerceService {
         where: { id },
         select: { userId: true, status: true },
       });
-      if (!order) throw new AppError(40400, '订单不存在', 404);
+      if (!order) throw new AppError(40400, "订单不存在", 404);
       const res = await this.orders.markPaid({
         orderId: id,
         userId: order.userId,
         payTransactionId: `MANUAL-BATCH-${actorId}-${id}`,
-        channel: 'manual',
+        channel: "manual",
       });
-      return { orderId: id, idempotentHit: (res as { idempotentHit?: boolean }).idempotentHit ?? false };
+      return {
+        orderId: id,
+        idempotentHit:
+          (res as { idempotentHit?: boolean }).idempotentHit ?? false,
+      };
     });
   }
 
@@ -419,7 +458,7 @@ export class AdminCommerceService {
     const take = Math.min(q.pageSize ?? 50, 200);
     const list = await this.prisma.payment.findMany({
       where: this.paymentWhere(q),
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take,
       include: {
         order: { select: { orderNo: true } },
@@ -428,9 +467,9 @@ export class AdminCommerceService {
     });
     return list.map((p: any) => ({
       id: p.id,
-      orderNo: p.order?.orderNo ?? '',
+      orderNo: p.order?.orderNo ?? "",
       orderId: p.orderId,
-      userEmail: p.user?.email ?? '',
+      userEmail: p.user?.email ?? "",
       channel: p.channel,
       payTransactionId: p.payTransactionId,
       amountCents: p.amountCents,
@@ -445,7 +484,7 @@ export class AdminCommerceService {
   async exportPayments(q: PaymentListQuery): Promise<string> {
     const rows = await this.prisma.payment.findMany({
       where: this.paymentWhere(q),
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: EXPORT_LIMIT,
       include: {
         order: { select: { orderNo: true } },
@@ -453,17 +492,17 @@ export class AdminCommerceService {
       },
     });
     const columns: CsvColumn<(typeof rows)[number]>[] = [
-      { label: '订单号', value: (p: any) => p.order?.orderNo ?? '' },
-      { label: '用户邮箱', value: (p: any) => p.user?.email ?? '' },
-      { label: '渠道', value: (p) => p.channel },
-      { label: '渠道流水号', value: (p) => p.payTransactionId },
-      { label: '金额(分)', value: (p) => p.amountCents },
-      { label: '金额(元)', value: (p) => centsToYuan(p.amountCents) },
-      { label: '状态', value: (p) => p.status },
-      { label: '说明', value: (p) => p.message ?? '' },
-      { label: '沙箱场景', value: (p) => p.sandboxScenario ?? '' },
-      { label: '支付时间', value: (p) => p.paidAt ?? '' },
-      { label: '创建时间', value: (p) => p.createdAt },
+      { label: "订单号", value: (p: any) => p.order?.orderNo ?? "" },
+      { label: "用户邮箱", value: (p: any) => p.user?.email ?? "" },
+      { label: "渠道", value: (p) => p.channel },
+      { label: "渠道流水号", value: (p) => p.payTransactionId },
+      { label: "金额(分)", value: (p) => p.amountCents },
+      { label: "金额(元)", value: (p) => centsToYuan(p.amountCents) },
+      { label: "状态", value: (p) => p.status },
+      { label: "说明", value: (p) => p.message ?? "" },
+      { label: "沙箱场景", value: (p) => p.sandboxScenario ?? "" },
+      { label: "支付时间", value: (p) => p.paidAt ?? "" },
+      { label: "创建时间", value: (p) => p.createdAt },
     ];
     return toCsv(columns, rows);
   }
@@ -476,7 +515,11 @@ export class AdminCommerceService {
     page?: number;
     pageSize?: number;
   }) {
-    const page = buildPage(query as PageQueryDto, ['createdAt'], 'createdAt:desc');
+    const page = buildPage(
+      query as PageQueryDto,
+      ["createdAt"],
+      "createdAt:desc",
+    );
     const where: Record<string, unknown> = {};
     if (query.userId) where.id = query.userId;
     if (query.email) where.email = { contains: query.email };
@@ -486,7 +529,7 @@ export class AdminCommerceService {
         where,
         skip: page.skip,
         take: page.take,
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         select: { id: true, email: true, name: true, createdAt: true },
       }),
       this.prisma.user.count({ where }),
@@ -521,7 +564,7 @@ export class AdminCommerceService {
     const range = this.dateRange(query.from, query.to);
     const rows = await this.prisma.creditLot.findMany({
       where: { userId, ...(range ? { createdAt: range } : {}) },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: 200,
     });
     const now = Date.now();
@@ -537,7 +580,11 @@ export class AdminCommerceService {
         expireAt: row.expireAt,
         createdAt: row.createdAt,
         status:
-          remaining <= 0 ? 'exhausted' : row.expireAt && row.expireAt.getTime() <= now ? 'expired' : 'active',
+          remaining <= 0
+            ? "exhausted"
+            : row.expireAt && row.expireAt.getTime() <= now
+              ? "expired"
+              : "active",
       };
     });
   }
@@ -556,7 +603,7 @@ export class AdminCommerceService {
     const limit = Math.min(query.limit ?? 50, 500);
     const rows = await this.prisma.creditLedgerEntry.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: limit,
     });
     return rows.map(projectEntry);
@@ -570,8 +617,8 @@ export class AdminCommerceService {
    * 失败原因不改写成通用文案, 保留 service 抛出的原始提示 (如"余额不足")。
    */
   async batchAdjust(
-    items: Array<{ userId: string; delta?: number; reason?: string }>,
-    shared: { reason: string; operatorId: string; validDays?: number },
+    items: Array<{ userId: string; delta?: number }>,
+    shared: { operatorId: string; validDays?: number },
   ) {
     const results: Array<{
       userId: string;
@@ -594,23 +641,33 @@ export class AdminCommerceService {
 
     for (const item of items) {
       const delta = item.delta ?? 0;
-      // 单项原因优先, 未给则用整批原因; 两者都空时 adminAdjust 会拒绝
-      const reason = (item.reason ?? '').trim() || shared.reason;
       if (!known.has(item.userId)) {
-        results.push({ userId: item.userId, success: false, message: '用户不存在' });
+        results.push({
+          userId: item.userId,
+          success: false,
+          message: "用户不存在",
+        });
         continue;
       }
       try {
         const r = await this.credit.adminAdjust({
           userId: item.userId,
           delta,
-          reason,
+          reason: "批量调整用户积分",
           operatorId: shared.operatorId,
           validDays: shared.validDays,
         });
-        results.push({ userId: item.userId, success: true, balance: r.balance });
+        results.push({
+          userId: item.userId,
+          success: true,
+          balance: r.balance,
+        });
       } catch (e: any) {
-        results.push({ userId: item.userId, success: false, message: e?.message ?? '调整失败' });
+        results.push({
+          userId: item.userId,
+          success: false,
+          message: e?.message ?? "调整失败",
+        });
       }
     }
     return {
@@ -632,27 +689,27 @@ export class AdminCommerceService {
    *     同时在 2MB 文件上限内保证一次请求不会跑太久。
    *   · **逐行独立成败**。某行邮箱写错不该让另外 499 行不生效；但失败必须
    *     逐行列出，否则运营看到"完成"却少发了几个人，只能等用户来投诉。
-   *   · **原因必填**。逐行 `reason` 列优先，缺省用整批原因；两者都空则
-   *     `adminAdjust` 会拒绝 —— 无原因的发积分事后无法追责。
+   *   · **说明稳定**。逐行 `reason` 列优先，缺省用固定说明；
+   *     积分账本必须能解释每一笔变动。
    *
    * 权限口径见 controller：走 `credit.adjust` 而非通用导入权限，这是给钱。
    */
   async importCreditsCsv(
     text: string,
-    opts: { reason?: string; validDays?: number; operatorId: string },
+    opts: { validDays?: number; operatorId: string },
   ) {
     const rows = parseCsv(text);
     if (rows.length === 0) {
-      throw new AppError(40001, 'CSV 内容为空', 400);
+      throw new AppError(40001, "CSV 内容为空", 400);
     }
 
     // 表头可选：运营自己用 Excel 导出的文件通常带表头，程序生成的往往不带
     const first = rows[0].map((c) => c.trim().toLowerCase());
-    const hasHeader = ['email', '邮箱', 'e-mail'].includes(first[0] ?? '');
+    const hasHeader = ["email", "邮箱", "e-mail"].includes(first[0] ?? "");
     const body = hasHeader ? rows.slice(1) : rows;
 
     if (body.length === 0) {
-      throw new AppError(40001, 'CSV 只有表头，没有数据行', 400);
+      throw new AppError(40001, "CSV 只有表头，没有数据行", 400);
     }
     if (body.length > IMPORT_LIMIT) {
       throw new AppError(
@@ -672,15 +729,15 @@ export class AdminCommerceService {
     const parsed: Parsed[] = body.map((cells, idx) => {
       // 行号按用户在 Excel 里看到的算：带表头时数据首行是第 2 行
       const row = idx + (hasHeader ? 2 : 1);
-      const email = (cells[0] ?? '').trim();
-      const rawDelta = (cells[1] ?? '').trim();
-      const reason = (cells[2] ?? '').trim();
+      const email = (cells[0] ?? "").trim();
+      const rawDelta = (cells[1] ?? "").trim();
+      const reason = (cells[2] ?? "").trim();
       const delta = /^[+-]?\d+$/.test(rawDelta) ? Number(rawDelta) : Number.NaN;
       let error: string | undefined;
-      if (!email) error = '缺少邮箱';
-      else if (!rawDelta) error = '缺少调整值';
+      if (!email) error = "缺少邮箱";
+      else if (!rawDelta) error = "缺少调整值";
       else if (Number.isNaN(delta)) error = `调整值必须是整数：${rawDelta}`;
-      else if (delta === 0) error = '调整值不能为 0';
+      else if (delta === 0) error = "调整值不能为 0";
       return {
         row,
         email,
@@ -691,14 +748,16 @@ export class AdminCommerceService {
     });
 
     // 邮箱一律小写比对：库内是注册时 toLowerCase 存的，表格里常有大写
-    const wanted = Array.from(new Set(parsed.filter((p) => p.email).map((p) => p.email.toLowerCase())));
+    const wanted = Array.from(
+      new Set(parsed.filter((p) => p.email).map((p) => p.email.toLowerCase())),
+    );
     const users = await this.prisma.user.findMany({
       where: { email: { in: wanted } },
       select: { id: true, email: true },
     });
     const idByEmail = new Map(users.map((u) => [u.email.toLowerCase(), u.id]));
 
-    const sharedReason = (opts.reason ?? '').trim() || 'CSV 导入';
+    const sharedReason = "CSV 导入用户积分";
     const results: Array<{
       row: number;
       email: string;
@@ -715,7 +774,7 @@ export class AdminCommerceService {
           email: item.email,
           delta: item.delta ?? 0,
           success: false,
-          message: item.error ?? '数据非法',
+          message: item.error ?? "数据非法",
         });
         continue;
       }
@@ -726,7 +785,7 @@ export class AdminCommerceService {
           email: item.email,
           delta: item.delta,
           success: false,
-          message: '用户不存在',
+          message: "用户不存在",
         });
         continue;
       }
@@ -751,7 +810,7 @@ export class AdminCommerceService {
           email: item.email,
           delta: item.delta,
           success: false,
-          message: e?.message ?? '调整失败',
+          message: e?.message ?? "调整失败",
         });
       }
     }
@@ -764,13 +823,16 @@ export class AdminCommerceService {
     };
   }
 
-  async exportCredits(query: { userId?: string; email?: string }): Promise<string> {
+  async exportCredits(query: {
+    userId?: string;
+    email?: string;
+  }): Promise<string> {
     const where: Record<string, unknown> = {};
     if (query.userId) where.id = query.userId;
     if (query.email) where.email = { contains: query.email };
     const users = await this.prisma.user.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: EXPORT_LIMIT,
       select: { id: true, email: true, name: true },
     });
@@ -781,15 +843,15 @@ export class AdminCommerceService {
       summary: summaries.get(u.id) ?? emptyBalanceSummary(),
     }));
     const columns: CsvColumn<(typeof rows)[number]>[] = [
-      { label: '用户ID', value: (r) => r.id },
-      { label: '邮箱', value: (r) => r.email },
-      { label: '昵称', value: (r) => r.name },
-      { label: '当前余额', value: (r) => r.summary.balance },
-      { label: '30天内到期', value: (r) => r.summary.expiringSoon },
-      { label: '累计获得', value: (r) => r.summary.totalEarned },
-      { label: '累计消耗', value: (r) => r.summary.totalConsumed },
-      { label: '有效批次', value: (r) => r.summary.activeLots },
-      { label: '最近到期', value: (r) => r.summary.nearestExpiry ?? '' },
+      { label: "用户ID", value: (r) => r.id },
+      { label: "邮箱", value: (r) => r.email },
+      { label: "昵称", value: (r) => r.name },
+      { label: "当前余额", value: (r) => r.summary.balance },
+      { label: "30天内到期", value: (r) => r.summary.expiringSoon },
+      { label: "累计获得", value: (r) => r.summary.totalEarned },
+      { label: "累计消耗", value: (r) => r.summary.totalConsumed },
+      { label: "有效批次", value: (r) => r.summary.activeLots },
+      { label: "最近到期", value: (r) => r.summary.nearestExpiry ?? "" },
     ];
     return toCsv(columns, rows);
   }
@@ -803,13 +865,24 @@ export class AdminCommerceService {
    * 之前。只写日期的值补到 23:59:59.999。
    * 非法日期直接 400 —— 静默忽略会让导出结果与筛选条件不符且看不出来。
    */
-  private dateRange(from?: string, to?: string): { gte?: Date; lte?: Date } | undefined {
-    const parse = (raw: string | undefined, endOfDay: boolean): Date | undefined => {
+  private dateRange(
+    from?: string,
+    to?: string,
+  ): { gte?: Date; lte?: Date } | undefined {
+    const parse = (
+      raw: string | undefined,
+      endOfDay: boolean,
+    ): Date | undefined => {
       if (!raw?.trim()) return undefined;
       const value = raw.trim();
       const dateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
-      const d = new Date(dateOnly ? `${value}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}` : value);
-      if (Number.isNaN(d.getTime())) throw new AppError(40001, `日期格式非法: ${value}`, 400);
+      const d = new Date(
+        dateOnly
+          ? `${value}T${endOfDay ? "23:59:59.999" : "00:00:00.000"}`
+          : value,
+      );
+      if (Number.isNaN(d.getTime()))
+        throw new AppError(40001, `日期格式非法: ${value}`, 400);
       return d;
     };
     const gte = parse(from, false);
@@ -821,9 +894,9 @@ export class AdminCommerceService {
 
 /** 导出用的中文状态标签。与前端 StatusTag 的文案保持一致 */
 const ORDER_STATUS_LABELS: Record<string, string> = {
-  pending: '待支付',
-  paid: '已支付',
-  cancelled: '已取消',
-  refunded: '已退款',
-  partial_refunded: '部分退款',
+  pending: "待支付",
+  paid: "已支付",
+  cancelled: "已取消",
+  refunded: "已退款",
+  partial_refunded: "部分退款",
 };

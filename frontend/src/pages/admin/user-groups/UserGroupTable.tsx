@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { Trash2 } from 'lucide-react';
-import { ActionButton, AdminDataTable, StatusTag, type AdminColumn } from './components';
+import { ActionButton, AdminDataTable, StatusTag, type AdminColumn } from '~/admin-ui/primitives';
 import { BADGE_STYLE_LABELS } from './constants';
 import { toCreditsInput } from './utils';
 import type { ChannelOrderItemView, UserGroupView } from '../../../types/model';

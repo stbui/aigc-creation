@@ -1,4 +1,4 @@
-import { ConfirmAction } from './components';
+import { ConfirmAction } from '~/admin-ui/primitives';
 import { centsToYuan } from './utils';
 import type { AdminMembershipPlan } from '../../../types/api';
 

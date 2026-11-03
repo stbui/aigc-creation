@@ -7,7 +7,7 @@ import {
   ListError,
   Pagination,
   SkeletonBody,
-} from './components';
+} from '~/admin-ui/primitives';
 import { AssetThumb } from './AssetThumb';
 import { assetLabel, cn, fmtBytes, fmtFormat, thumbSrc } from './utils';
 import type { AssetRow } from './constants';

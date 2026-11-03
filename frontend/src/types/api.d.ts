@@ -2,7 +2,7 @@
  * 能力标识。清单以后端 capability.registry 为准 (15 项), 前端不枚举 ——
  * 保留基础联合仅用于类型提示, 运行时以 CapabilityDef.id 为准。
  */
-export type KnownCapability = 'main_image' | 'detail_image' | 'matting';
+export type KnownCapability = "main_image" | "detail_image" | "matting";
 export type Capability = KnownCapability | (string & {});
 
 /**
@@ -11,9 +11,9 @@ export type Capability = KnownCapability | (string & {});
  * 2026-10-22 起没有 mock 一档 —— 本地占位实现已从后端删除, 没有真实产出路径的
  * 能力不该对用户开放。
  */
-export type CapabilityMode = 'real' | 'planned';
-export type CapabilityGroupId = 'ecommerce_gen' | 'ai_retouch' | 'ai_video';
-export type ParamType = 'enum' | 'number' | 'text' | 'boolean';
+export type CapabilityMode = "real" | "planned";
+export type CapabilityGroupId = "ecommerce_gen" | "ai_retouch" | "ai_video";
+export type ParamType = "enum" | "number" | "text" | "boolean";
 
 export interface ParamOption {
   value: string | number;
@@ -80,7 +80,7 @@ export interface CapabilityRuntime {
   /** 该能力此刻是否具备可用的模型线路 */
   remoteAvailable: boolean;
   /** 一句话结论 */
-  effective: 'remote' | 'disabled' | 'unavailable';
+  effective: "remote" | "disabled" | "unavailable";
   /** 给用户看的原因 */
   reason: string;
 }
@@ -152,7 +152,7 @@ export interface MobileUploadSessionCreated {
   token: string;
   /** 过期时间戳 (毫秒) */
   expiresAt: number;
-  status: 'waiting' | 'received' | 'expired';
+  status: "waiting" | "received" | "expired";
 }
 
 /** 手机上传接收到的单张素材 */
@@ -169,7 +169,7 @@ export interface MobileUploadAsset {
 /** GET /api/v1/mobile-upload/sessions/:id —— 电脑端轮询 */
 export interface MobileUploadSessionStatus {
   sessionId: string;
-  status: 'waiting' | 'received' | 'expired';
+  status: "waiting" | "received" | "expired";
   /**
    * 已接收的素材列表 (多图) —— **顺序即构图顺序**。
    * 参考站手机端可排序, 电脑端按此顺序回填参考图位。
@@ -224,7 +224,8 @@ export interface StatsOverview {
  * `failed` 失败 / `cancelled` 后台终止。旧版 `pending` 已废止，存量数据在改造
  * 时统一改写为 `queued`。
  */
-export type TaskStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+export type TaskStatus =
+  "queued" | "running" | "succeeded" | "failed" | "cancelled";
 
 export interface LoginRequest {
   email: string;
@@ -244,7 +245,7 @@ export interface RegisterRequest {
 }
 
 /** 短信验证码用途：login 登录 / verify 注册时验证号码归属 */
-export type SmsPurpose = 'login' | 'verify';
+export type SmsPurpose = "login" | "verify";
 
 export interface SmsLoginRequest {
   phone: string;
@@ -275,12 +276,7 @@ export interface QrCreateResult {
 }
 
 export type QrSessionStatus =
-  | 'pending'
-  | 'scanned'
-  | 'confirmed'
-  | 'consumed'
-  | 'expired'
-  | 'cancelled';
+  "pending" | "scanned" | "confirmed" | "consumed" | "expired" | "cancelled";
 
 /**
  * 轮询/扫码/确认的统一回执。
@@ -320,7 +316,8 @@ export interface AigcMeta {
   labeled: boolean;
   metadata: boolean;
   visible: boolean;
-  method: 'png-text+xmp' | 'jpeg-xmp' | 'visible-only' | 'unsupported' | 'api-only';
+  method:
+    "png-text+xmp" | "jpeg-xmp" | "visible-only" | "unsupported" | "api-only";
   warning?: string;
 }
 
@@ -328,7 +325,7 @@ export interface Asset {
   id: string;
   projectId: string;
   ownerId: string;
-  kind: 'original' | 'generated' | string;
+  kind: "original" | "generated" | string;
   capability?: Capability | null;
   /**
    * 干净地址 (不带签名)。**服务端内部用途 + 未开启签名时的兜底**。
@@ -438,17 +435,24 @@ export interface Task {
 
 export interface TaskOutputAsset extends Pick<
   Asset,
-  'id' | 'sourceUrl' | 'signedUrl' | 'aigc' | 'capability' | 'width' | 'height' | 'format'
+  | "id"
+  | "sourceUrl"
+  | "signedUrl"
+  | "aigc"
+  | "capability"
+  | "width"
+  | "height"
+  | "format"
 > {
-    /**
-     * 产出模态 (2026-10-20 视频通道落地) —— 前端据此选 `<img>` 还是 `<video>`。
-     *
-     * 后端按**产出的 mime** 推导, 而非查能力注册表: 产出形态是文件的真实
-     * 形态, 不该由「当初打算产出什么」决定。
-     */
-    modality?: Modality;
-    /** 视频时长 (毫秒); 仅视频产出有值 */
-    durationMs?: number | null;
+  /**
+   * 产出模态 (2026-10-20 视频通道落地) —— 前端据此选 `<img>` 还是 `<video>`。
+   *
+   * 后端按**产出的 mime** 推导, 而非查能力注册表: 产出形态是文件的真实
+   * 形态, 不该由「当初打算产出什么」决定。
+   */
+  modality?: Modality;
+  /** 视频时长 (毫秒); 仅视频产出有值 */
+  durationMs?: number | null;
 }
 
 export type TaskListResult = Task[];
@@ -467,10 +471,10 @@ export interface TaskPageResult {
    ──────────────────────────────────────────────────────────────── */
 
 /** 后台角色。'user' 是 C 端用户, 无任何后台权限 */
-export type AdminRole = 'admin' | 'operator' | 'finance';
+export type AdminRole = "admin" | "operator" | "finance";
 
 /** 账号状态 */
-export type UserStatus = 'active' | 'disabled' | 'deleted';
+export type UserStatus = "active" | "disabled" | "deleted";
 
 /** 能力模式 (与 C 端 CapabilityMode 同值, 后台复用同一 registry) */
 export type AdminCapabilityMode = CapabilityMode;
@@ -495,12 +499,12 @@ export interface AdminPermissionCatalog {
 }
 
 /** GET /api/v1/admin/alerts — 顶栏告警中心 */
-export type AdminAlertSeverity = 'critical' | 'warning' | 'info';
+export type AdminAlertSeverity = "critical" | "warning" | "info";
 
 export interface AdminAlertItem {
   key: string;
   severity: AdminAlertSeverity;
-  category: 'ticket' | 'task' | 'finance' | 'backup' | 'invoice';
+  category: "ticket" | "task" | "finance" | "backup" | "invoice";
   title: string;
   detail: string;
   count: number | null;
@@ -536,7 +540,12 @@ export interface AdminOverview {
     generated: number;
   };
   /** 按日聚合并补齐无数据日, 天数与 days 一致 */
-  trend: Array<{ date: string; total: number; succeeded: number; failed: number }>;
+  trend: Array<{
+    date: string;
+    total: number;
+    succeeded: number;
+    failed: number;
+  }>;
   /** 窗口口径（与 trend 同源），回答「最近表现」而不是累计数字 */
   window: {
     tasks: number;
@@ -620,7 +629,7 @@ export interface AdminUserListResult {
     id: string;
     email: string;
     name: string;
-    role: AdminRole | 'user';
+    role: AdminRole | "user";
     roleLabel: string;
     status: UserStatus;
     statusLabel: string;
@@ -660,7 +669,7 @@ export interface AdminUserDetail {
   id: string;
   email: string;
   name: string;
-  role: AdminRole | 'user';
+  role: AdminRole | "user";
   roleLabel: string;
   status: UserStatus;
   statusLabel: string;
@@ -670,7 +679,12 @@ export interface AdminUserDetail {
     projects: number;
     tasks: number;
     assets: number;
-    taskStatus: { succeeded: number; failed: number; running: number; queued: number };
+    taskStatus: {
+      succeeded: number;
+      failed: number;
+      running: number;
+      queued: number;
+    };
   };
   recentTasks: Array<{
     id: string;
@@ -723,7 +737,6 @@ export type AdminSettingValue = string | number | boolean;
 export interface AdminSettingsUpdatePayload {
   settings: Record<string, AdminSettingValue>;
   clears?: string[];
-  reason: string;
 }
 
 /** 系统设置写入结果（含逐项 before/after，供审计与页面提示） */
@@ -735,7 +748,7 @@ export interface AdminSettingsUpdateResult {
     label: string;
     before: AdminSettingValue;
     after: AdminSettingValue;
-    action: 'update' | 'clear';
+    action: "update" | "clear";
   }>;
 }
 
@@ -749,7 +762,7 @@ export interface AdminSettings {
       key: string;
       label: string;
       description: string;
-      type: 'string' | 'number' | 'boolean';
+      type: "string" | "number" | "boolean";
       value: AdminSettingValue;
       default: AdminSettingValue;
       min?: number;
@@ -771,7 +784,8 @@ export interface AdminSettings {
 
 // ── AIGC 可见角标样式 (2026-10-21) ─────────────────────────────────
 
-export type AigcLabelPosition = 'bottom-right' | 'bottom-left' | 'top-right' | 'top-left';
+export type AigcLabelPosition =
+  "bottom-right" | "bottom-left" | "top-right" | "top-left";
 
 /**
  * 角标样式。渲染字段（文案/字体/配色）由浏览器画进位图，
@@ -805,7 +819,7 @@ export interface AdminAigcLabel {
   spec: AigcLabelSpec;
   defaults: AigcLabelSpec;
   badge: {
-    source: 'default' | 'custom';
+    source: "default" | "custom";
     width: number;
     height: number;
     /** 位图是否按旧样式渲染（true 时提示重新保存） */
@@ -856,7 +870,7 @@ export interface AdminAuditListResult {
  * 厂商与模态是多对多 (优云智算有图无文, DeepSeek 有文无图),
  * 故任何按厂商推断模态的写法都是错的, 必须显式声明。
  */
-export type Modality = 'text' | 'image' | 'video';
+export type Modality = "text" | "image" | "video";
 
 export interface Product {
   id: string;
@@ -878,7 +892,8 @@ export interface Product {
 export type ProductsResponse = Product[];
 
 /** 订单状态机 (后端 order.service.ts TRANSITIONS, 不可跳跃) */
-export type OrderStatus = 'pending' | 'paid' | 'cancelled' | 'refunded' | 'partial_refunded';
+export type OrderStatus =
+  "pending" | "paid" | "cancelled" | "refunded" | "partial_refunded";
 
 export interface OrderItemView {
   id: string;
@@ -976,7 +991,7 @@ export interface CreditLot {
   remainingCredits: number;
   expireAt: string | null;
   createdAt: string;
-  status: 'active' | 'expired' | 'exhausted';
+  status: "active" | "expired" | "exhausted";
 }
 
 export interface CreditLedgerEntry {
@@ -1010,7 +1025,7 @@ export interface AdminCreditPrice {
    * setting = 后台覆盖中; registry = 用代码默认值;
    * campaign = 被进行中的限时免费活动覆盖（此时 cost 恒为 0，改价不生效）
    */
-  source: 'setting' | 'registry' | 'campaign';
+  source: "setting" | "registry" | "campaign";
   overridden: boolean;
   /** 代码默认值, 供「回落」时对照 */
   registryDefault: number;
@@ -1023,7 +1038,7 @@ export interface AdminCapabilityControl {
   capabilityId: string;
   name: string;
   group: string;
-  modality: 'image' | 'text' | 'video';
+  modality: "image" | "text" | "video";
   mode: CapabilityMode;
   /** 后台开关（无记录 = true） */
   enabled: boolean;
@@ -1066,7 +1081,7 @@ export interface MyMembership {
   isMember: boolean;
   planCode: string;
   planName: string;
-  perks: MembershipPlan['perks'];
+  perks: MembershipPlan["perks"];
   expiresAt: string | null;
   monthlyCredits: number;
   /** 已取消自动续费，但当前已付周期仍有效 */
@@ -1094,7 +1109,7 @@ export interface AdminTask {
   id: string;
   capability: string;
   capabilityName: string;
-  status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
+  status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
   /** 实际通道: gateway=真实模型 / local=停用前的历史本地产出 / pending=改造前的历史初始值 */
   provider: string | null;
   errorCode: string | null;
@@ -1135,7 +1150,7 @@ export interface AdminTaskDetail {
   id: string;
   capability: string;
   capabilityName: string;
-  status: AdminTask['status'];
+  status: AdminTask["status"];
   provider: string | null;
   errorCode: string | null;
   creditCost: number;
@@ -1151,7 +1166,12 @@ export interface AdminTaskDetail {
    * ⚠ `at` 可为 null: GenerationTask 未落 startedAt, 「开始执行」时刻
    * 无法还原, 故不编造中间节点 (见后端 detail() 注释)。
    */
-  timeline: Array<{ key: string; label: string; at: string | null; done: boolean }>;
+  timeline: Array<{
+    key: string;
+    label: string;
+    at: string | null;
+    done: boolean;
+  }>;
   params: Record<string, unknown>;
   /** 输入素材, 已按 inputAssetIds 原序排列 (多图能力依赖顺序语义) */
   inputAssets: Array<{
@@ -1182,8 +1202,8 @@ export interface AdminBackup {
   sizeBytes: number;
   /** SHA-256 十六进制, 64 位 */
   sha256: string;
-  trigger: 'manual' | 'scheduled';
-  status: 'pending' | 'succeeded' | 'failed';
+  trigger: "manual" | "scheduled";
+  status: "pending" | "succeeded" | "failed";
   errorMessage: string | null;
   sourceSizeBytes: number | null;
   /** B-97: 无验证记录的备份视为无效 */
@@ -1215,7 +1235,7 @@ export interface AdminCleanupLog {
   target: string;
   deletedCount: number;
   retentionDays: number;
-  trigger: 'manual' | 'scheduled';
+  trigger: "manual" | "scheduled";
   skippedCount: number;
   detail: string;
   success: boolean;
@@ -1228,16 +1248,16 @@ export interface AdminCleanupLog {
    ──────────────────────────────────────────────────────────────── */
 
 /** 存储后端标识 */
-export type StorageBackendId = 'local' | 'oss' | 'minio';
+export type StorageBackendId = "local" | "oss" | "minio";
 
 /** 素材上架状态。hidden = 已下架, 用户端不可见但记录与文件保留 */
-export type AssetStatus = 'visible' | 'hidden';
+export type AssetStatus = "visible" | "hidden";
 
 /** GET /api/v1/admin/assets */
 export interface AdminAssetListResult {
   items: Array<{
     id: string;
-    kind: 'original' | 'generated';
+    kind: "original" | "generated";
     capability: string | null;
     width: number | null;
     height: number | null;
@@ -1312,12 +1332,12 @@ export interface AdminStorageStatus {
    ──────────────────────────────────────────────────────────────── */
 
 /** 券类型: full_cut 满减 | discount 折扣 | fixed 固定额 */
-export type CouponType = 'full_cut' | 'discount' | 'fixed';
+export type CouponType = "full_cut" | "discount" | "fixed";
 /** 券适用范围: all 全站 | product 指定商品 | new_user 仅新用户首单 */
-export type CouponScope = 'all' | 'product' | 'new_user';
-export type CouponStatus = 'on' | 'off';
-export type CampaignType = 'limited_price' | 'limited_free' | 'popup';
-export type CampaignStatus = 'draft' | 'active' | 'ended' | 'off';
+export type CouponScope = "all" | "product" | "new_user";
+export type CouponStatus = "on" | "off";
+export type CampaignType = "limited_price" | "limited_free" | "popup";
+export type CampaignStatus = "draft" | "active" | "ended" | "off";
 
 /** GET /api/v1/admin/coupons */
 export interface AdminCoupon {
@@ -1355,7 +1375,7 @@ export interface AdminCoupon {
    * effective 是含时间窗与限量的派生结果。把过期显示成「已停用」会让运营
    * 去找不存在的误操作 —— 过期是自然结果, 停用是人为决定, 处置完全不同。
    */
-  effective: 'on' | 'off' | 'expired' | 'not_started' | 'sold_out';
+  effective: "on" | "off" | "expired" | "not_started" | "sold_out";
   updatedAt: string;
 }
 
@@ -1400,7 +1420,7 @@ export interface AdminCampaign {
    * status='active' 但时间窗未到时对用户就是不生效, 混为一谈会让运营
    * 以为活动已在跑而实际没有曝光。
    */
-  effective: 'draft' | 'live' | 'scheduled' | 'ended' | 'off';
+  effective: "draft" | "live" | "scheduled" | "ended" | "off";
   audience: { onlyNewUsers?: boolean };
   createdAt: string;
   updatedAt: string;
@@ -1409,7 +1429,7 @@ export interface AdminCampaign {
 export interface UpsertCampaignPayload {
   name: string;
   type: CampaignType;
-  payload?: AdminCampaign['payload'];
+  payload?: AdminCampaign["payload"];
   startAt: string;
   endAt: string;
   status?: CampaignStatus;
@@ -1426,7 +1446,7 @@ export interface AdminInviteListResult {
     inviteeEmail: string;
     inviteeName: string;
     boundAt: string;
-    rewardStatus: 'pending' | 'granted' | 'rejected';
+    rewardStatus: "pending" | "granted" | "rejected";
   }>;
   total: number;
   page: number;
@@ -1464,7 +1484,7 @@ export interface AdminCheckinListResult {
 export interface InviteRule {
   inviterCredits: number;
   inviteeCredits: number;
-  triggerOn: 'first_pay' | 'register';
+  triggerOn: "first_pay" | "register";
   valid: boolean;
   updatedAt: string | null;
   configured: boolean;
@@ -1515,7 +1535,7 @@ export interface MyInvites {
   relations: Array<{
     id: string;
     boundAt: string;
-    rewardStatus: 'pending' | 'granted' | 'rejected';
+    rewardStatus: "pending" | "granted" | "rejected";
     /** 已打码的被邀请人标识 */
     inviteeName: string;
   }>;
@@ -1546,7 +1566,7 @@ export interface MarketingQuote {
   /** 券 / 限时活动优惠（不含会员折扣） */
   discountCents: number;
   payableCents: number;
-  appliedSource: 'coupon' | 'campaign' | null;
+  appliedSource: "coupon" | "campaign" | null;
   appliedCouponCode: string | null;
   appliedCampaignId: string | null;
   /** 券与活动不叠加时的明确说明, 避免用户以为算错了 */
@@ -1596,7 +1616,7 @@ export interface PopupCampaign {
 export interface PromoCampaign {
   id: string;
   name: string;
-  type: 'limited_price' | 'limited_free';
+  type: "limited_price" | "limited_free";
   startAt: string;
   endAt: string;
   /** 限时价活动的目标商品 */
@@ -1648,8 +1668,8 @@ export interface AdminProduct {
   originalPriceCents: number | null;
   credits: number;
   creditsValidDays: number;
-  grantType: 'immediate' | 'manual';
-  status: 'active' | 'offline';
+  grantType: "immediate" | "manual";
+  status: "active" | "offline";
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -1663,8 +1683,8 @@ export interface CreateProductPayload {
   originalPriceCents?: number;
   credits: number;
   creditsValidDays?: number;
-  grantType?: 'immediate' | 'manual';
-  status?: 'active' | 'offline';
+  grantType?: "immediate" | "manual";
+  status?: "active" | "offline";
   sortOrder?: number;
 }
 
@@ -1675,10 +1695,9 @@ export interface CreateProductPayload {
  * (不传该字段) 是两件事, 用 undefined 表达不了后者之外的语义。
  */
 export type UpdateProductPayload = Partial<
-  Omit<CreateProductPayload, 'sku' | 'originalPriceCents'>
+  Omit<CreateProductPayload, "sku" | "originalPriceCents">
 > & {
   originalPriceCents?: number | null;
-  reason?: string;
 };
 
 /** 会员权益。与后端 MembershipService.Perks 同构 */
@@ -1702,7 +1721,7 @@ export interface AdminMembershipPlan {
   perks: AdminMembershipPerks;
   /** 权益文案由后端生成 */
   perkLabels: string[];
-  status: 'active' | 'offline';
+  status: "active" | "offline";
   sortOrder: number;
   memberCount: number;
   orderCount: number;
@@ -1722,20 +1741,15 @@ export interface AdminMembershipPlanPayload {
   monthlyCredits: number;
   perks: AdminMembershipPerks;
   sortOrder?: number;
-  reason: string;
 }
 
 export interface CreateAdminMembershipPlanPayload extends AdminMembershipPlanPayload {
   code: string;
-  status?: 'active' | 'offline';
+  status?: "active" | "offline";
 }
 
 export type AdminOrderStatus =
-  | 'pending'
-  | 'paid'
-  | 'cancelled'
-  | 'refunded'
-  | 'partial_refunded';
+  "pending" | "paid" | "cancelled" | "refunded" | "partial_refunded";
 
 /** GET /api/v1/admin/orders 的一行 */
 export interface AdminOrderRow {
@@ -1919,7 +1933,7 @@ export interface PaymentProviderInfo {
   name: string;
   icon: string | null;
   /** redirect=跳转收银台 / qrcode=扫码 / sandbox=站内模拟 */
-  checkoutMode: 'redirect' | 'qrcode' | 'sandbox';
+  checkoutMode: "redirect" | "qrcode" | "sandbox";
   supportedCurrencies: string[];
   sandbox: boolean;
 }
@@ -1930,10 +1944,18 @@ export interface PaymentIntent {
   amountCents: number;
   currency: string;
   /** 实际固定下来的渠道配置；0 元单为 free */
-  providerId: 'sandbox' | 'alipay' | 'wechat' | 'paypal' | 'stripe' | 'epay' | 'zpay' | 'free';
+  providerId:
+    | "sandbox"
+    | "alipay"
+    | "wechat"
+    | "paypal"
+    | "stripe"
+    | "epay"
+    | "zpay"
+    | "free";
   configId: string | null;
   configVersion: number | null;
-  mode: 'redirect' | 'qrcode' | 'sandbox' | 'free';
+  mode: "redirect" | "qrcode" | "sandbox" | "free";
   payUrl?: string;
   codeUrl?: string;
   checkoutValue: string | null;
@@ -1971,7 +1993,7 @@ export interface PaymentStatusResult {
 }
 
 /** 'pending' 待开具 | 'issued' 已开具 | 'rejected' 已驳回 */
-export type InvoiceStatus = 'pending' | 'issued' | 'rejected';
+export type InvoiceStatus = "pending" | "issued" | "rejected";
 
 /** 发票 (C 端) */
 export interface Invoice {
@@ -1980,7 +2002,7 @@ export interface Invoice {
   orderId: string;
   orderNo: string | null;
   amountCents: number;
-  kind: 'personal' | 'company';
+  kind: "personal" | "company";
   title: string;
   taxNo: string | null;
   email: string | null;
@@ -1996,7 +2018,7 @@ export interface Invoice {
 
 export interface CreateInvoicePayload {
   orderId: string;
-  kind: 'personal' | 'company';
+  kind: "personal" | "company";
   title: string;
   taxNo?: string;
   email?: string;
@@ -2013,8 +2035,9 @@ export interface AdminInvoice extends Invoice {
 // 账户自助 / 法务 / 站内消息 (B4)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type LegalSlug = 'user-agreement' | 'privacy-policy' | 'minors-policy' | 'account-rules';
-export type LegalStatus = 'draft' | 'published' | 'archived';
+export type LegalSlug =
+  "user-agreement" | "privacy-policy" | "minors-policy" | "account-rules";
+export type LegalStatus = "draft" | "published" | "archived";
 
 /** 公开接口：某文档的最新已发布版本 */
 export interface LegalDoc {
@@ -2096,7 +2119,7 @@ export interface NotificationList {
 export interface MessageTemplateItem {
   id: string;
   code: string;
-  channel: 'inapp' | 'email' | 'sms';
+  channel: "inapp" | "email" | "sms";
   subject: string | null;
   body: string;
   enabled: boolean;
@@ -2128,15 +2151,16 @@ export interface DeliveryChannelStatusMap {
 // 工单 / 全局搜索 / 批量操作 (B7)
 // ─────────────────────────────────────────────────────────────────────────────
 
-export type TicketType = 'bug' | 'complaint' | 'consultation' | 'invoice' | 'other';
-export type TicketStatus = 'open' | 'processing' | 'resolved' | 'closed';
-export type TicketPriority = 'low' | 'normal' | 'high';
+export type TicketType =
+  "bug" | "complaint" | "consultation" | "invoice" | "other";
+export type TicketStatus = "open" | "processing" | "resolved" | "closed";
+export type TicketPriority = "low" | "normal" | "high";
 
 export interface TicketReplyItem {
   id: string;
   ticketId: string;
   /** `user` 用户 / `admin` 客服 */
-  authorType: 'user' | 'admin';
+  authorType: "user" | "admin";
   authorId: string;
   /** 回复当时的展示名（快照，用户改名后历史回复不变） */
   authorName: string;
@@ -2239,7 +2263,7 @@ export interface AdminSearchHit {
 }
 
 export interface AdminSearchGroup {
-  key: 'users' | 'orders' | 'tickets' | 'tasks' | 'assets';
+  key: "users" | "orders" | "tickets" | "tasks" | "assets";
   label: string;
   total: number;
   items: AdminSearchHit[];

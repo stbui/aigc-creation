@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshCw, X } from 'lucide-react';
 import QRCode from 'qrcode';
 import { mobileUploadApi } from '../lib/api';
+import { qrColors } from '../lib/colorPalette';
 import { useProject } from '../hooks/useProject';
 import type { MobileUploadAsset } from '../types/api';
 import { useApp, Button, Modal, Spin } from '../ui';
@@ -128,7 +129,7 @@ export function MobileUploadModal({ open, onReceived, onCancel }: MobileUploadMo
         width: 240,
         margin: 1,
         errorCorrectionLevel: 'M',
-        color: { dark: '#171A2B', light: '#FFFFFF' },
+        color: qrColors(),
       });
       if (!openedRef.current) {
         void mobileUploadApi.cancel(s.sessionId).catch(() => undefined);

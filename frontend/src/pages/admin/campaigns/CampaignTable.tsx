@@ -5,7 +5,7 @@ import {
   StatusTag,
   ToneBadge,
   type AdminColumn,
-} from './components';
+} from '~/admin-ui/primitives';
 import { EFFECTIVE_META, TYPE_LABEL, type TagTone } from './constants';
 import { inWindow, payloadSummary } from './utils';
 import type { AdminCampaign } from '../../../types/api';

@@ -1,5 +1,5 @@
 import { Eye, EyeOff, Trash2 } from 'lucide-react';
-import { ImageLightbox, type LightboxItem } from './components';
+import { ImageLightbox, type LightboxItem } from '~/components/ImageLightbox';
 import type { AssetRow } from './constants';
 import type { AssetStatus } from '../../../types/api';
 

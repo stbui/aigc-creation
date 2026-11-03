@@ -4,7 +4,7 @@ import { readSeverity } from './utils';
 import { useAdminUrlFilterSync } from './hooks';
 import { Link, useSearchParams } from 'react-router-dom';
 
-import { ActionButton, EmptyState, ListError, PageHeader, Panel, SegmentedGroup, SkeletonBody, StatCard, StaleError, StatusTag, ToneBadge } from './components';
+import { ActionButton, EmptyState, ListError, PageHeader, Panel, SegmentedGroup, SkeletonBody, StatCard, StaleError, StatusTag, ToneBadge } from '~/admin-ui/primitives';
 import {
   ALERT_SEVERITY_META,
   AlertRefreshButton,

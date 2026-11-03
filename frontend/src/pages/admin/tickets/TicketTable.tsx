@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ActionButton, AdminDataTable, StatusTag, type AdminColumn } from './components';
+import { ActionButton, AdminDataTable, StatusTag, type AdminColumn } from '~/admin-ui/primitives';
 import {
   PRIORITY_LABELS,
   PRIORITY_TONE,

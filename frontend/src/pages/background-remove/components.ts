@@ -14,11 +14,6 @@ export { ToolShell, type ToolAsset } from '../../components/ToolShell';
 /** 表单卡片 */
 export { ToolCard } from '../../components/ToolWidgets';
 /** 背景色工作台: 色板 + 自定义 HEX + 不透明度 */
-export {
-  ColorStudio,
-  MATTING_COLOR_SWATCHES,
-  isValidHexColor,
-  normalizeHexColor,
-} from '../../components/ColorStudio';
+export { ColorStudio } from '../../components/ColorStudio';
 /** 抠图结果编辑器: 换底色 / 对比原图 / 下载 */
 export { MattingResultEditor } from '../../components/MattingResultEditor';

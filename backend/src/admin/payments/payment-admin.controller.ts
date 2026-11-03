@@ -27,7 +27,6 @@ import { PaymentReconciliationService } from "../../payments/payment-reconciliat
 import { PaymentConfigService } from "../../payments/payment-config.service";
 import { AdminSettingsService } from "../settings.service";
 import {
-  PaymentOrderActionDto,
   PaymentOrderListQueryDto,
   PaymentProductSaveDto,
   PaymentProviderConfigUpdateDto,
@@ -101,7 +100,6 @@ export class AdminPaymentConfigController {
       { "payment.defaultCurrency": dto.defaultCurrency },
       [],
       admin.id,
-      dto.reason,
     );
     return this.admin.settingsView();
   }
@@ -225,11 +223,7 @@ export class AdminPaymentOrdersController {
   @Post(":id/query")
   @RequirePermission(PERMISSIONS.paymentOperate)
   @AuditAction("payment.order_query")
-  async query(
-    @Param("id") id: string,
-    @Body() _dto: PaymentOrderActionDto,
-    @AdminUser() admin: AdminUserType,
-  ) {
+  async query(@Param("id") id: string, @AdminUser() admin: AdminUserType) {
     const view = await this.orders.query({
       orderId: id,
       actor: { kind: "admin", adminId: admin.id },
@@ -243,15 +237,10 @@ export class AdminPaymentOrdersController {
   @Post(":id/close")
   @RequirePermission(PERMISSIONS.paymentOperate)
   @AuditAction("payment.order_close")
-  async close(
-    @Param("id") id: string,
-    @Body() dto: PaymentOrderActionDto,
-    @AdminUser() admin: AdminUserType,
-  ) {
+  async close(@Param("id") id: string, @AdminUser() admin: AdminUserType) {
     const view = await this.orders.close({
       orderId: id,
       actor: { kind: "admin", adminId: admin.id },
-      reason: dto.reason,
     });
     return { order: { id: view.orderId, status: view.displayStatus }, view };
   }
@@ -279,7 +268,6 @@ export class AdminPaymentReconciliationController {
       billDate: dto.billDate,
       retryFailed: dto.retryFailed,
       actorId: admin.id,
-      reason: dto.reason,
     });
   }
 
@@ -389,7 +377,6 @@ export class AdminPaymentReconciliationController {
       file: file.buffer,
       fileName: name,
       actorId: admin.id,
-      reason: dto.reason,
     });
   }
 }

@@ -300,14 +300,10 @@ function shanghaiDate(offsetDays) {
 
   const order4 = await newOrder('cancel-admin');
   await intend(order4);
-  const adminClose = await call('POST', `/admin/payments/orders/${order4.id}/close`, TADMIN, {
-    reason: '冒烟脚本管理员关单',
-  });
+  const adminClose = await call('POST', `/admin/payments/orders/${order4.id}/close`, TADMIN, {});
   check('管理员关单成功', adminClose.code === 0 && adminClose.data?.view?.status === 'cancelled', adminClose.message);
 
-  const forbiddenClose = await call('POST', `/admin/payments/orders/${order3.id}/close`, TA, {
-    reason: '普通用户不该成功',
-  });
+  const forbiddenClose = await call('POST', `/admin/payments/orders/${order3.id}/close`, TA, {});
   check('普通用户不能后台关单', forbiddenClose.httpStatus === 403, forbiddenClose.message);
 
   // ── 5. 退款 ──────────────────────────────────────────────────────
@@ -565,13 +561,9 @@ function shanghaiDate(offsetDays) {
   );
   const ordersCsvForbidden = await raw('/admin/payments/orders/export.csv', TA);
   check('普通用户不能导出支付订单', ordersCsvForbidden.httpStatus === 403, ordersCsvForbidden.text.slice(0, 80));
-  const queryPaid = await call('POST', `/admin/payments/orders/${order1.id}/query`, TADMIN, {
-    reason: '冒烟脚本同步已支付订单',
-  });
+  const queryPaid = await call('POST', `/admin/payments/orders/${order1.id}/query`, TADMIN, {});
   check('已支付订单可同步', queryPaid.code === 0, queryPaid.message);
-  const closePaid = await call('POST', `/admin/payments/orders/${order1.id}/close`, TADMIN, {
-    reason: '冒烟脚本尝试关闭已支付订单',
-  });
+  const closePaid = await call('POST', `/admin/payments/orders/${order1.id}/close`, TADMIN, {});
   check('已支付订单不可关闭 (409)', closePaid.httpStatus === 409, closePaid.message);
 
   const productCreated = await call('POST', '/admin/payments/products', TADMIN, {
@@ -582,9 +574,8 @@ function shanghaiDate(offsetDays) {
     credits: 10,
     status: 'offline',
     saleStrategy: 'unlimited',
-    reason: '冒烟脚本创建商品',
   });
-  check('后台商品创建成功（kind/reason 必填）', productCreated.code === 0, productCreated.message);
+  check('后台商品创建成功（kind 必填）', productCreated.code === 0, productCreated.message);
   if (productCreated.code === 0) {
     const pid = productCreated.data.product.id;
     const productUpdated = await call('PUT', `/admin/payments/products/${pid}`, TADMIN, {
@@ -595,7 +586,6 @@ function shanghaiDate(offsetDays) {
       credits: 10,
       status: 'offline',
       saleStrategy: 'unlimited',
-      reason: '冒烟脚本更新商品',
     });
     check('后台商品更新成功', productUpdated.code === 0, productUpdated.message);
     await prisma.product.delete({ where: { id: pid } }).catch(() => undefined);
@@ -609,7 +599,6 @@ function shanghaiDate(offsetDays) {
     status: 'offline',
     saleStrategy: 'inventory',
     stockTotal: 0,
-    reason: '冒烟脚本校验库存',
   });
   check('库存商品 0 库存被拒 (400)', zeroStock.code === 40001, zeroStock.message);
   const badOriginal = await call('POST', '/admin/payments/products', TADMIN, {
@@ -621,7 +610,6 @@ function shanghaiDate(offsetDays) {
     credits: 10,
     status: 'offline',
     saleStrategy: 'unlimited',
-    reason: '冒烟脚本校验划线价',
   });
   check('划线价低于售价被拒 (400)', badOriginal.code === 40001, badOriginal.message);
 
@@ -637,7 +625,7 @@ function shanghaiDate(offsetDays) {
     '/admin/payments/reconciliations/import',
     TADMIN,
     { name: `smoke-bill-unsupported-${RUN}.csv`, content: csv },
-    { providerId: 'sandbox', billDate, reason: '冒烟脚本校验不支持对账的渠道' },
+    { providerId: 'sandbox', billDate },
   );
   check(
     '不支持对账的渠道拒绝 CSV 导入',
@@ -648,7 +636,7 @@ function shanghaiDate(offsetDays) {
     '/admin/payments/reconciliations/import',
     TADMIN,
     { name: `smoke-bill-${RUN}.csv`, content: csv },
-    { providerId: 'alipay', billDate, reason: '冒烟脚本导入对账' },
+    { providerId: 'alipay', billDate },
   );
   check('对账 CSV 导入成功', imported.code === 0 && imported.data?.run?.status === 'completed', imported.message);
   const runId = imported.data?.run?.id;
@@ -684,7 +672,6 @@ function shanghaiDate(offsetDays) {
     providerId: 'sandbox',
     billDate,
     retryFailed: true,
-    reason: '冒烟脚本执行沙箱对账',
   });
   check(
     '沙箱不支持自动对账时返回明确错误',
@@ -713,7 +700,6 @@ function shanghaiDate(offsetDays) {
     providerId: 'sandbox',
     billDate: staleDate,
     retryFailed: true,
-    reason: '冒烟脚本验证超时运行回收',
   });
   check(
     '超时运行先被回收，再返回渠道不支持错误',

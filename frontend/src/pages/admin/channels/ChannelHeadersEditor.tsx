@@ -11,7 +11,7 @@
  */
 
 import { Plus, Trash2 } from 'lucide-react';
-import { ActionButton, IconButton, TextField } from './components';
+import { ActionButton, IconButton, TextField } from '~/admin-ui/primitives';
 import type { ChannelHeader } from './constants';
 import { DEFAULT_USER_AGENT, MAX_HEADER_COUNT, validateChannelHeaders } from './utils';
 

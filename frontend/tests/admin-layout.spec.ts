@@ -105,6 +105,9 @@ test.describe('后台布局', () => {
     await page.waitForSelector('[data-testid="admin-header"]', { timeout: 15000 });
     await page.waitForSelector('[data-testid="admin-account-trigger"]', { timeout: 15000 });
 
+    await expect(page.getByTestId('admin-brand')).toContainText('logon+');
+    await expect(page.getByRole('button', { name: /折叠|收起侧栏|展开侧栏/ })).toHaveCount(0);
+
     const m = await page.evaluate(() => {
       const rect = (selector: string) => {
         const el = document.querySelector(selector) as HTMLElement;

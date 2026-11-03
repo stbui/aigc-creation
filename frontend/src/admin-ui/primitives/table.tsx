@@ -24,6 +24,7 @@ import { Checkbox } from '../components/ui/checkbox';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -493,11 +494,13 @@ export function AdminDataTable<T>({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {[20, 50, 100].map((size) => (
-                    <SelectItem key={size} value={String(size)}>
-                      {size}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    {[20, 50, 100].map((size) => (
+                      <SelectItem key={size} value={String(size)}>
+                        {size}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>

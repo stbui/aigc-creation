@@ -45,7 +45,6 @@ import { sendCsv } from "../common/csv-response";
 /** 商品上/下架 */
 export class ProductStatusDto {
   @IsIn(["active", "offline"]) status!: "active" | "offline";
-  @IsOptional() @IsString() @MaxLength(200) reason?: string;
 }
 
 /** 新建商品 */
@@ -80,8 +79,6 @@ export class ProductUpdateDto {
     "immediate" | "manual";
   @IsOptional() @IsIn(["active", "offline"]) status?: "active" | "offline";
   @IsOptional() @IsInt() sortOrder?: number;
-  /** 改价原因。价格变动属高危动作, 写审计时带出 */
-  @IsOptional() @IsString() @MaxLength(200) reason?: string;
 }
 
 /** 退款 */
@@ -101,21 +98,17 @@ export class AdjustCreditDto {
   @IsString() userId!: string;
   /** 正数为增加, 负数为扣减, 不能为 0 */
   @IsInt() delta!: number;
-  /** 原因。强制填写 —— 无理由的积分变动无法追责 */
-  @IsString() @MaxLength(200) reason!: string;
   @IsOptional() @IsInt() @Min(0) validDays?: number;
 }
 
 /**
  * 批量调整积分。
  *
- * 每条可带自己的原因 (补偿 A、扣回 B 的理由不同), 未带则用整批原因。
  * 上限 100 条: 再大应走导入任务, 而不是一个可能超时 30s 的同步请求。
  */
 export class BatchAdjustItemDto {
   @IsString() userId!: string;
   @IsInt() delta!: number;
-  @IsOptional() @IsString() @MaxLength(200) reason?: string;
 }
 
 export class BatchAdjustDto {
@@ -125,8 +118,6 @@ export class BatchAdjustDto {
   @Type(() => BatchAdjustItemDto)
   items!: BatchAdjustItemDto[];
 
-  /** 整批原因。逐条未带原因时使用 */
-  @IsString() @MaxLength(200) reason!: string;
   @IsOptional() @IsInt() @Min(0) validDays?: number;
 }
 
@@ -145,16 +136,9 @@ export class CreditPriceItemDto {
  */
 export class UpdateCreditPricesDto {
   @IsArray() @ArrayMaxSize(50) items!: CreditPriceItemDto[];
-  @IsOptional() @IsString() @MaxLength(200) reason?: string;
 }
 
-/**
- * 批量核销订单。
- *
- * `reason` 强制填写：批量核销会一次给多个用户发积分，事后必须能回答
- * 「为什么这 37 笔被标记为已支付」。单笔核销的 reason 是可选的，
- * 批量这里刻意更严 —— 一次点错影响的人数不同。
- */
+/** 批量核销订单。 */
 export class OrderBatchDto {
   @IsArray()
   @ArrayMaxSize(100, { message: "单次批量最多 100 条" })
@@ -163,20 +147,10 @@ export class OrderBatchDto {
 
   @IsIn(["mark_paid"], { message: "action 只能是 mark_paid" })
   action!: "mark_paid";
-
-  @IsString()
-  @MaxLength(200)
-  reason!: string;
 }
 
 /** 积分 CSV 导入的整批默认值（multipart 文本字段） */
 export class CreditImportDto {
-  /** 整批原因。逐行未带 reason 列时使用 */
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  reason?: string;
-
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -519,7 +493,7 @@ export class AdminCommerceController {
     });
   }
 
-  /** 人工增减积分 (B-52)。强制填写原因 */
+  /** 人工增减积分 (B-52)。 */
   @Post("credits/adjust")
   @RequirePermission(PERMISSIONS.creditAdjust)
   @AuditAction("credit.adjust")
@@ -527,7 +501,7 @@ export class AdminCommerceController {
     return this.credit.adminAdjust({
       userId: dto.userId,
       delta: dto.delta,
-      reason: dto.reason,
+      reason: "人工调整用户积分",
       operatorId: actor.id,
       validDays: dto.validDays,
     });
@@ -539,7 +513,6 @@ export class AdminCommerceController {
   @AuditAction("credit.batch_adjust")
   batchAdjust(@Body() dto: BatchAdjustDto, @AdminUser() actor: AdminUser) {
     return this.commerce.batchAdjust(dto.items, {
-      reason: dto.reason,
       operatorId: actor.id,
       validDays: dto.validDays,
     });
@@ -578,7 +551,6 @@ export class AdminCommerceController {
       throw new AppError(40001, "请上传 CSV 文件（字段名 file）", 400);
     }
     return this.commerce.importCreditsCsv(file.buffer.toString("utf8"), {
-      reason: dto.reason,
       validDays: dto.validDays,
       operatorId: actor.id,
     });

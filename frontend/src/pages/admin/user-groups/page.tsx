@@ -8,7 +8,7 @@ import {
   Panel,
   SkeletonBody,
   StaleError,
-} from './components';
+} from '~/admin-ui/primitives';
 import {
   useAdmin,
   useAdminResource,

@@ -5,7 +5,7 @@ import { CheckCircle2, Lock, RefreshCw, XCircle } from 'lucide-react';
 
 import { adminStorageApi } from '../../../lib/api';
 
-import { ActionButton, EmptyState, ListError, Notice, PageHeader, PageSkeleton, Skeleton, StaleError, ToneBadge } from './components';
+import { ActionButton, EmptyState, ListError, Notice, PageHeader, PageSkeleton, Skeleton, StaleError, ToneBadge } from '~/admin-ui/primitives';
 import { cn } from '../../../admin-ui/lib/cn';
 import type { StorageBackendId } from '../../../types/api';
 

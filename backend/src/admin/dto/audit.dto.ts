@@ -10,10 +10,10 @@ import {
   MaxLength,
   MinLength,
   ValidateNested,
-} from 'class-validator';
-import { Transform, Type } from 'class-transformer';
-import { PageQueryDto } from './page-query.dto';
-import { ADMIN_ROLE_CODES, type AdminRoleCode } from '../permissions';
+} from "class-validator";
+import { Transform, Type } from "class-transformer";
+import { PageQueryDto } from "./page-query.dto";
+import { ADMIN_ROLE_CODES, type AdminRoleCode } from "../permissions";
 
 /** 审计日志查询 */
 export class AuditListQueryDto extends PageQueryDto {
@@ -35,8 +35,8 @@ export class AuditListQueryDto extends PageQueryDto {
   @IsOptional()
   @Transform(({ value }) => {
     if (value === undefined) return undefined;
-    if (value === 'true') return true;
-    if (value === 'false') return false;
+    if (value === "true") return true;
+    if (value === "false") return false;
     return value;
   })
   @IsBoolean()
@@ -53,12 +53,12 @@ export class AuditListQueryDto extends PageQueryDto {
 
 /** 单个角色的权限全集 */
 export class RolePermissionUpdateDto {
-  @IsIn(ADMIN_ROLE_CODES, { message: '角色 code 非法' })
+  @IsIn(ADMIN_ROLE_CODES, { message: "角色 code 非法" })
   code!: AdminRoleCode;
 
   /** 权限点全集。未知权限点由 service 层直接拒绝, 不静默丢弃 */
   @IsArray()
-  @ArrayUnique({ message: '权限点不能重复' })
+  @ArrayUnique({ message: "权限点不能重复" })
   @IsString({ each: true })
   permissions!: string[];
 }
@@ -76,17 +76,11 @@ export class UpdateRolePermissionsDto {
   @ValidateNested({ each: true })
   @Type(() => RolePermissionUpdateDto)
   roles!: RolePermissionUpdateDto[];
-
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @IsString()
-  @MinLength(2)
-  @MaxLength(200)
-  reason!: string;
 }
 
 /** 角色查询 */
 export class RoleListQueryDto {
   @IsOptional()
-  @IsIn(['admin', 'operator', 'finance'])
+  @IsIn(["admin", "operator", "finance"])
   code?: string;
 }

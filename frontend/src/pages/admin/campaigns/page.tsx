@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Download, Plus } from 'lucide-react';
 import { marketingApi } from './api';
-import { ActionButton, PageHeader, Panel, StaleError, type AppliedFilter } from './components';
+import { ActionButton, PageHeader, Panel, StaleError, type AppliedFilter } from '~/admin-ui/primitives';
 import { useAdmin, useAdminList, useAdminUrlFilterSync, useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
 import { STATUS_LABEL, type FormState } from './constants';
 import { buildCampaignPayload, emptyForm, toLocalInput } from './utils';

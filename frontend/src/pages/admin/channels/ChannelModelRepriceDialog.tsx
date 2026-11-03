@@ -9,7 +9,7 @@ import {
   NumberField,
   SelectField,
   TextField,
-} from './components';
+} from '~/admin-ui/primitives';
 import { useToast } from './hooks';
 import {
   buildRepriceRows,
@@ -24,7 +24,6 @@ import {
   type RepriceRow,
 } from './utils';
 import type { AdminChannelModelView, ChannelModelRepriceInput } from '../../../types/model';
-import { auditReason } from '../../../admin-ui/lib/auditReason';
 
 /**
  * 渠道模型「统一调价」弹窗。
@@ -128,11 +127,7 @@ export function ChannelModelRepriceDialog({
     setSaving(true);
     try {
       const payload = buildPayload(models, rows);
-      const result = await adminChannelsApi.batchRepriceModels(
-        channelId,
-        payload,
-        auditReason('渠道模型统一调价'),
-      );
+      const result = await adminChannelsApi.batchRepriceModels(channelId, payload);
       toast.success(`已保存 ${result.updated} 个模型的售价`);
       try {
         await onSaved();

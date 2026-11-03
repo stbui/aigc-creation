@@ -13,22 +13,43 @@ import {
   Trash2,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { generateApi, assetSrc, assetThumbSrc, newIdempotencyKey } from '../lib/api';
-import { capabilityById, capabilityName, toolPath } from '../lib/capabilities';
-import { resolveModelId } from '../lib/models';
-import { useCapabilities } from '../hooks/useCapabilities';
-import { usePollAbort } from '../hooks/usePollAbort';
-import { useGenerateError } from '../hooks/useGenerateError';
-import { useAuth } from '../context/AuthContext';
-import { useDocumentMeta } from '../hooks/useDocumentMeta';
-import { notifyCreditsChanged } from '../context/CreditsContext';
-import { runtimeOf, taskErrorText } from '../lib/constants';
-import { waitForTask } from '../lib/poll';
-import { StateError, StateSkeleton } from '../components/StateViews';
-import { ResultMedia } from '../components/ResultMedia';
-import { ImageLightbox, type LightboxItem } from '../components/ImageLightbox';
-import type { Modality, Task } from '../types/api';
-import { useApp } from '../ui';
+import {
+  assetSrc,
+  assetThumbSrc,
+  generateApi,
+  newIdempotencyKey,
+  resolveModelId,
+} from './api';
+import {
+  ImageLightbox,
+  ResultMedia,
+  StateError,
+  StateSkeleton,
+  WorkImage,
+  type LightboxItem,
+} from './components';
+import {
+  notifyCreditsChanged,
+  useApp,
+  useAuth,
+  useCapabilities,
+  useDocumentMeta,
+  useGenerateError,
+  usePollAbort,
+} from './hooks';
+import { PAGE_SIZE, SERVER_PAGE_SIZE, type DatePreset } from './constants';
+import {
+  capabilityById,
+  capabilityName,
+  outputExtension,
+  runtimeOf,
+  startOfDay,
+  taskErrorText,
+  taskModality,
+  toolPath,
+  waitForTask,
+} from './utils';
+import type { Task } from '../../types/api';
 
 /**
  * 我的作品。
@@ -47,98 +68,6 @@ import { useApp } from '../ui';
  *   - 浮层内「重绘」工具列本地真实可跳转的工具页；未实现的项不出现
  *   - 所属任务筛选按**任务 ID / 能力名**检索本地真实任务（参考站为云端任务 ID）
  */
-
-/** 参考站日期筛选的快捷项（本地按真实日期区间过滤） */
-type DatePreset = 'all' | 'today' | 'yesterday' | '7d' | 'custom';
-
-const PAGE_SIZE = 24;
-/** 服务端每页条数：大于首屏可见数，切换筛选时不必立刻再请求 */
-const SERVER_PAGE_SIZE = 50;
-
-/**
- * 作品卡里的图片。
- *
- * - 加载中保留 shimmer 底、加载完成淡入，撤掉占位时不闪白；
- * - 加载失败可原地重试（签名 URL 过期 / 后端重启后无需刷新整页）；
- * - 状态按 **URL** 记而不是布尔值 —— 刷新列表会换签名地址，布尔值不会自己复位。
- *
- * 画布是固定方形的 (见 .my-work-image-button), 图片 contain 填满: 产出比例
- * 从 1:1 到 16:9 不等, 按各自比例排会让同一行的卡片高矮不齐。
- */
-function WorkImage({
-  src,
-  alt,
-  priority,
-  onOpen,
-}: {
-  src: string;
-  alt: string;
-  /** 首屏前两张: 不懒加载, 让作品页一进来就有图可看 */
-  priority?: boolean;
-  onOpen: () => void;
-}) {
-  const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
-  const [failedSrc, setFailedSrc] = useState<string | null>(null);
-  const [retryNonce, setRetryNonce] = useState(0);
-  const imgRef = useRef<HTMLImageElement>(null);
-  const loaded = loadedSrc === src;
-  const failed = failedSrc === src;
-
-  // 缓存命中时 load 可能早于监听挂载, 会永远停在 shimmer 上
-  useEffect(() => {
-    const img = imgRef.current;
-    if (img && img.complete && img.naturalWidth > 0) setLoadedSrc(src);
-  }, [src, retryNonce]);
-
-  const retry = () => {
-    setFailedSrc(null);
-    setLoadedSrc(null);
-    setRetryNonce((n) => n + 1);
-  };
-
-  return (
-    <button
-      type="button"
-      className={`my-work-image-button${loaded ? ' is-loaded' : ''}${failed ? ' is-failed' : ''}`}
-      onClick={failed ? retry : onOpen}
-      aria-label={failed ? '图片加载失败，点击重试' : `查看${alt}大图`}
-      title={failed ? '加载失败，点击重试' : '点击查看大图'}
-    >
-      <img
-        ref={imgRef}
-        key={retryNonce}
-        src={src}
-        alt={alt}
-        loading={priority ? 'eager' : 'lazy'}
-        fetchPriority={priority ? 'high' : 'auto'}
-        decoding="async"
-        onLoad={() => setLoadedSrc(src)}
-        onError={() => setFailedSrc(src)}
-      />
-      {failed && (
-        <span className="my-work-image-failed">
-          <ImageOff size={18} />
-          <small>加载失败，点击重试</small>
-        </span>
-      )}
-    </button>
-  );
-}
-
-function startOfDay(d: Date): number {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-}
-
-/**
- * 任务产出的模态。
- *
- * 优先取产出文件自己的 `modality`（后端按产出的 mime 推导，是文件的真实形态）；
- * 还没产出（生成中 / 失败）时回落能力注册表里的 `modality` —— 否则视频任务在
- * 生成完成前会掉进「图片作品」，用户刚提交完就找不到它了。
- */
-function taskModality(t: Task): Modality {
-  return t.outputAsset?.modality ?? capabilityById(t.capability)?.modality ?? 'image';
-}
 
 export function WorksPage() {
   useDocumentMeta('我的作品 · 货觉AI', '查看与管理你生成的全部作品。');
@@ -399,10 +328,7 @@ export function WorksPage() {
       message.warning('该作品没有可下载的产出');
       return;
     }
-    const isVideo = taskModality(t) === 'video';
-    const ext =
-      (t.outputAsset?.format || '').toLowerCase().replace(/^\./, '') ||
-      (isVideo ? 'mp4' : 'jpg');
+    const ext = outputExtension(t);
     const a = document.createElement('a');
     a.href = fullUrl;
     a.download = `${t.capability}-${t.id.slice(-6)}.${ext}`;
@@ -511,7 +437,7 @@ export function WorksPage() {
       const url = assetSrc(t.outputAsset)!;
       if (!url) return;
       // 扩展名跟着产出的真实格式走: 视频是 mp4/webm, 写死 jpg 会让下载的文件打不开
-      const ext = (t.outputAsset!.format || '').toLowerCase().replace(/^\./, '') || 'jpg';
+      const ext = outputExtension(t);
       window.setTimeout(() => {
         const a = document.createElement('a');
         a.href = url;

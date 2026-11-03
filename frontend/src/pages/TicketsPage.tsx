@@ -10,6 +10,7 @@ import {
   X,
 } from 'lucide-react';
 import { ticketsApi } from '../lib/api';
+import { formatDateTime } from '../lib/format';
 import { useAuth } from '../context/AuthContext';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { PersonalPage } from '../components/PersonalPage';
@@ -63,19 +64,6 @@ const FILTERS: Array<{ value: 'all' | TicketStatus; label: string }> = [
   { value: 'resolved', label: '已解决' },
   { value: 'closed', label: '已关闭' },
 ];
-
-function fmt(iso: string | null): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
 
 export function TicketsPage() {
   useDocumentMeta('我的工单 · 货觉AI', '提交问题反馈并跟踪客服处理进度。');
@@ -292,7 +280,7 @@ export function TicketsPage() {
         description={
           <>
             {detail.ticketNo} · {detail.typeLabel} · 优先级 {PRIORITY_LABELS[detail.priority]} · 提交于{' '}
-            {fmt(detail.createdAt)}
+            {formatDateTime(detail.createdAt)}
             {detail.status === 'resolved' && ' · 客服认为已解决，如仍有问题请继续回复'}
           </>
         }
@@ -313,7 +301,7 @@ export function TicketsPage() {
                 </span>
                 我
               </span>
-              <span className="ticket-msg-time">{fmt(detail.createdAt)}</span>
+              <span className="ticket-msg-time">{formatDateTime(detail.createdAt)}</span>
             </div>
             <div className="ticket-msg-body">{detail.content}</div>
           </div>
@@ -328,7 +316,7 @@ export function TicketsPage() {
                     </span>
                     {isAdmin ? '货觉客服' : '我'}
                   </span>
-                  <span className="ticket-msg-time">{fmt(r.createdAt)}</span>
+                  <span className="ticket-msg-time">{formatDateTime(r.createdAt)}</span>
                 </div>
                 <div className="ticket-msg-body">{r.content}</div>
               </div>
@@ -512,7 +500,7 @@ export function TicketsPage() {
                     <span className="ticket-card-sub">
                       <span>{t.ticketNo}</span>
                       <span>{t.typeLabel}</span>
-                      <span>{fmt(t.createdAt)}</span>
+                      <span>{formatDateTime(t.createdAt)}</span>
                       {t.replyCount ? <span>{t.replyCount} 条回复</span> : null}
                     </span>
                   </span>

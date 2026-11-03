@@ -18,16 +18,17 @@ export interface ModalProps {
   okText?: string;
   cancelText?: string;
   width?: number | string;
+  /** antd 兼容：false 时按顶部定位，true（本项目既有默认）时垂直居中。 */
   centered?: boolean;
+  /** Radix 默认在关闭时卸载内容；显式传 false 可保留 DOM 状态。 */
+  destroyOnHidden?: boolean;
   closable?: boolean;
   maskClosable?: boolean;
-  destroyOnHidden?: boolean;
   confirmLoading?: boolean;
   okButtonProps?: {
     danger?: boolean;
     disabled?: boolean;
     loading?: boolean;
-    type?: 'primary' | 'default' | 'link' | 'text' | 'dashed';
   };
   cancelButtonProps?: { disabled?: boolean };
   className?: string;
@@ -36,7 +37,6 @@ export interface ModalProps {
   mask?: { closable?: boolean };
   keyboard?: boolean;
   closeIcon?: ReactNode;
-  afterClose?: () => void;
 }
 
 /**
@@ -74,6 +74,8 @@ export function Modal({
   okText = '确定',
   cancelText = '取消',
   width = 520,
+  centered = true,
+  destroyOnHidden,
   closable = true,
   mask,
   maskClosable,
@@ -87,13 +89,24 @@ export function Modal({
 }: ModalProps) {
   const canMaskClose = maskClosable ?? mask?.closable ?? true;
   const okDisabled = Boolean(confirmLoading || okButtonProps?.loading || okButtonProps?.disabled);
+  const keepMounted = destroyOnHidden === false;
   return (
     <Dialog open={open} onOpenChange={(next) => !next && onCancel?.()}>
-      <DialogPrimitive.Portal>
-        <DialogOverlay style={styles?.mask} />
+      <DialogPrimitive.Portal forceMount={keepMounted || undefined}>
+        <DialogOverlay
+          forceMount={keepMounted || undefined}
+          hidden={keepMounted && !open}
+          style={styles?.mask}
+        />
         <DialogPrimitive.Content
-          className="ui-modal-content"
-          style={{ maxWidth: width }}
+          forceMount={keepMounted || undefined}
+          hidden={keepMounted && !open}
+          className={cn('ui-modal-content', centered ? 'is-centered' : 'is-top')}
+          style={{
+            maxWidth: width,
+            ...(!centered ? { top: 100, transform: 'translateX(-50%)' } : {}),
+          }}
+          data-destroy-on-hidden={destroyOnHidden ?? true}
           onEscapeKeyDown={keyboard ? undefined : (event) => event.preventDefault()}
           onPointerDownOutside={canMaskClose ? undefined : (event) => event.preventDefault()}
           onOpenAutoFocus={

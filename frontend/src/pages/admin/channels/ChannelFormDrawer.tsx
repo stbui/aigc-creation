@@ -1,4 +1,4 @@
-import { ActionButton, Drawer, NumberField, SwitchField, TextField } from './components';
+import { ActionButton, Drawer, NumberField, SwitchField, TextField } from '~/admin-ui/primitives';
 import { ChannelHeadersEditor } from './ChannelHeadersEditor';
 import { Field } from './ChannelField';
 import type { ChannelDraft } from './constants';

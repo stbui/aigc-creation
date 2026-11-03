@@ -21,6 +21,7 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -301,17 +302,19 @@ export function RowMenu({ items, label = '更多' }: { items: RowMenuItem[]; lab
         aria-label="更多操作"
         aria-labelledby={undefined}
       >
-        {items.map((item) => (
-          <Fragment key={item.key}>
-            {item.separator && <DropdownMenuSeparator />}
-            <DropdownMenuItem
-              className={item.danger ? 'text-danger-text focus:text-danger-text' : undefined}
-              onSelect={item.onSelect}
-            >
-              {item.label}
-            </DropdownMenuItem>
-          </Fragment>
-        ))}
+        <DropdownMenuGroup>
+          {items.map((item) => (
+            <Fragment key={item.key}>
+              {item.separator && <DropdownMenuSeparator />}
+              <DropdownMenuItem
+                className={item.danger ? 'text-danger-text focus:text-danger-text' : undefined}
+                onSelect={item.onSelect}
+              >
+                {item.label}
+              </DropdownMenuItem>
+            </Fragment>
+          ))}
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );

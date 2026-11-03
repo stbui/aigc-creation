@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Check, ChevronRight, Clock3, Gem, Wallet } from 'lucide-react';
 import { membershipApi, productsApi } from '../lib/api';
 import { PLAN_VISUALS } from '../lib/constants';
-import { formatYuan } from '../lib/money';
+import { formatDate, formatNumber, formatYuan } from '../lib/format';
 import { useAuth } from '../context/AuthContext';
 import { useCredits } from '../context/CreditsContext';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
@@ -20,19 +20,6 @@ import type { MembershipPlan, MyMembership, Product } from '../types/api';
  * 金额一律整数分由后端下发, 本页只做 `¥ + 分/100` 的格式化 ——
  * 边界转换只在一处发生, 避免各处四舍五入不一致。
  */
-
-/** 积分千分位 */
-function formatCredits(n: number): string {
-  return n.toLocaleString('zh-CN');
-}
-
-/** 到期日按站内习惯只留年月日 */
-function formatDay(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString('zh-CN');
-}
 
 /**
  * 折合单价 (元 / 积分)，只对「付费且积分 > 0」的商品有意义。
@@ -211,7 +198,7 @@ export function PackagesPage() {
             >
               <Wallet size={15} aria-hidden />
               <span>当前积分</span>
-              <strong>{balance ? formatCredits(balance.balance) : '—'}</strong>
+              <strong>{balance ? formatNumber(balance.balance) : '—'}</strong>
               <ChevronRight size={14} aria-hidden />
             </button>
           )}
@@ -245,7 +232,7 @@ export function PackagesPage() {
               {membership?.isMember && (
                 <span className="pkg-section-note">
                   当前：{membership.planName}
-                  {membership.expiresAt ? ` · ${formatDay(membership.expiresAt)} 到期` : ''}
+                  {membership.expiresAt ? ` · ${formatDate(membership.expiresAt, '')} 到期` : ''}
                 </span>
               )}
             </div>
@@ -281,7 +268,7 @@ export function PackagesPage() {
                       </span>
                     </div>
                     <div className="pkg-card-points">
-                      <strong>{formatCredits(plan.monthlyCredits)}</strong>
+                      <strong>{formatNumber(plan.monthlyCredits)}</strong>
                       <span>积分 / 月</span>
                     </div>
                     <p className="pkg-card-desc">
@@ -356,7 +343,7 @@ export function PackagesPage() {
                   </div>
 
                   <div className="pkg-card-points">
-                    <strong>{formatCredits(p.credits)}</strong>
+                    <strong>{formatNumber(p.credits)}</strong>
                     <span>积分</span>
                   </div>
 

@@ -5,7 +5,7 @@ import {
   HelpTip,
   StatusTag,
   type AdminColumn,
-} from './components';
+} from '~/admin-ui/primitives';
 import { contributionText } from './constants';
 import type { PluginView } from '../../../types/model';
 

@@ -1,4 +1,4 @@
-import { ActionButton, Drawer, Notice } from './components';
+import { ActionButton, Drawer, Notice } from '~/admin-ui/primitives';
 
 interface BatchResolveDrawerProps {
   open: boolean;

@@ -1,4 +1,4 @@
-import { ConfirmAction } from './components';
+import { ConfirmAction } from '~/admin-ui/primitives';
 import type { AdminUserListResult } from '../../../types/api';
 
 type Row = AdminUserListResult['items'][number];

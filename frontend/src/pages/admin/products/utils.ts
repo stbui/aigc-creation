@@ -86,11 +86,6 @@ export function buildProductPayload(
     creditsValidDays: validDays,
     grantType: draft.grantType,
     sortOrder: Number(draft.sortOrder) || 0,
-    ...(editing && editing.priceCents !== priceCents
-      ? {
-          reason: `改价 ${centsToYuanText(editing.priceCents)} → ${centsToYuanText(priceCents)} 元`,
-        }
-      : {}),
   };
 
   const create: CreateProductPayload = {

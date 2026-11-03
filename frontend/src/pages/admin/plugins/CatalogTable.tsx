@@ -1,4 +1,4 @@
-import { ActionButton, AdminDataTable, StatusTag, type AdminColumn } from './components';
+import { ActionButton, AdminDataTable, StatusTag, type AdminColumn } from '~/admin-ui/primitives';
 import type { ProviderCatalogEntry } from '../../../types/model';
 
 /**

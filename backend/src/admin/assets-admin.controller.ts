@@ -16,7 +16,6 @@ import {
   IsIn,
   IsOptional,
   IsString,
-  MaxLength,
 } from "class-validator";
 import {
   AdminUser,
@@ -59,11 +58,6 @@ export class AssetBatchDto {
     message: "action 只能是 hide / show / delete",
   })
   action!: "hide" | "show" | "delete";
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  reason?: string;
 }
 
 /**

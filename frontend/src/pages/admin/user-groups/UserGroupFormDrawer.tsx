@@ -11,7 +11,7 @@ import {
   SwitchField,
   TextAreaField,
   TextField,
-} from './components';
+} from '~/admin-ui/primitives';
 import { BADGE_STYLE_OPTIONS, type GroupDraft, type OverrideDraft } from './constants';
 import type { ChannelOrderItemView, UserGroupView } from '../../../types/model';
 

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 
+import { DEFAULT_CUSTOM_COLOR, tokenColor } from '../lib/colorPalette';
+
 /**
  * 可复用的遮罩画布（去除水印 / 局部重绘同源交互）。
  *
@@ -38,7 +40,7 @@ export interface MaskCanvasHandle {
 }
 
 function brandColor(): string {
-  return getComputedStyle(document.documentElement).getPropertyValue('--brand').trim() || '#5b4df5';
+  return tokenColor('--brand', DEFAULT_CUSTOM_COLOR);
 }
 
 export function MaskCanvas({

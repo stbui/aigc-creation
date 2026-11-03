@@ -17,7 +17,7 @@ import {
   StaleError,
   type AdminColumn,
   type AppliedFilter,
-} from './components';
+} from '~/admin-ui/primitives';
 import { adminCreditsApi } from './api';
 import { useAdmin, useAdminUrlFilterSync, useCreditDirectory, useToast } from './hooks';
 import { adminUserDetailHref, fmtTime } from './utils';

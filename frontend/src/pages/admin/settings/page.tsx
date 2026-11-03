@@ -7,9 +7,8 @@ import { RotateCcw } from 'lucide-react';
 
 import { adminSettingsApi } from '../../../lib/api';
 
-import { ActionButton, ClearableField, EmptyState, FormField, ListError, ModalDialog, NumberField, PageHeader, PageSkeleton, SkeletonPanel, SkeletonTabs, Panel, SaveBar, SegmentedTabs, SelectField, StaleError, SwitchField, TextField, ToneBadge } from './components';
+import { ActionButton, ClearableField, EmptyState, FormField, ListError, ModalDialog, NumberField, PageHeader, PageSkeleton, SkeletonPanel, SkeletonTabs, Panel, SaveBar, SegmentedTabs, SelectField, StaleError, SwitchField, TextField, ToneBadge } from '~/admin-ui/primitives';
 import type { AdminSettings, AdminSettingValue } from '../../../types/api';
-import { auditReason } from '../../../admin-ui/lib/auditReason';
 
 /** 值 → 展示文本。布尔值不能直接显示 true/false，运营看不懂 */
 
@@ -18,7 +17,7 @@ import { auditReason } from '../../../admin-ui/lib/auditReason';
  *
  * ## 契约
  *
- * 提交格式与后端 `UpdateSettingsDto` 一致：`{ settings, clears, reason }`。
+ * 提交格式与后端 `UpdateSettingsDto` 一致：`{ settings, clears }`。
  * `settings` 用 `SETTING_DEFS` 的点号键（如 `upload.maxSizeMb`）；
  * `clears` 表示删除运行时覆盖、回落代码默认值 —— 与「把值改成默认值」在
  * 审计上是两件事，不能混用。
@@ -107,7 +106,6 @@ export function AdminSettingsPage() {
           Object.entries(draft).filter(([key]) => !clears.has(key)),
         ),
         clears: [...clears],
-        reason: auditReason('更新系统设置'),
       });
       setDraft({});
       setClears(new Set());

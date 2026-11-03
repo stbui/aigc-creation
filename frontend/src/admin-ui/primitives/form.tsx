@@ -1,7 +1,8 @@
-import { cloneElement, isValidElement, useId, type ReactElement, type ReactNode } from 'react';
+import { useId, type AriaAttributes, type ReactNode } from 'react';
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
 
 import { cn } from '../lib/cn';
+import { findFirstControlId, injectPropsIntoFirstControl } from '../lib/control-injection';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -9,6 +10,7 @@ import { Label } from '../components/ui/label';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -44,6 +46,11 @@ import { Textarea } from '../components/ui/textarea';
  * 视觉上是「错位一行」，量测上也是「换行」。三档控件共用一个高度档才排得齐。
  */
 
+type ControlAriaProps = Pick<
+  AriaAttributes,
+  'aria-describedby' | 'aria-invalid' | 'aria-required'
+>;
+
 /* ────────────────────────── 字段容器 ────────────────────────── */
 
 /**
@@ -59,7 +66,7 @@ import { Textarea } from '../components/ui/textarea';
  * `getByLabel` 也找不到它。
  *
  * 必填星号放在 `<label>` **外面**：放里面会让标签的 textContent 变成
- * 「变更原因*」，精确匹配的 `getByLabel('变更原因')` 就失配了。
+ * 「退款窗口天数*」，精确匹配的 `getByLabel('退款窗口天数')` 就失配了。
  */
 export function FormField({
   label,
@@ -79,15 +86,23 @@ export function FormField({
   children: ReactNode;
 }) {
   const generatedId = useId();
-  const controlId = htmlFor ?? generatedId;
-
-  const control =
-    isValidElement(children) && (children.props as { id?: string }).id === undefined
-      ? cloneElement(children as ReactElement<{ id?: string }>, { id: controlId })
-      : children;
+  const controlId = findFirstControlId(children) ?? htmlFor ?? generatedId;
+  const errorId = `${controlId}-error`;
+  const control = injectPropsIntoFirstControl(
+    children,
+    {
+      ...(required ? { 'aria-required': true } : {}),
+      ...(error ? { 'aria-invalid': true, 'aria-describedby': errorId } : {}),
+    },
+    controlId,
+  );
 
   return (
-    <div className={cn('flex flex-col gap-1.5', className)}>
+    <div
+      className={cn('flex flex-col gap-1.5', className)}
+      data-invalid={error ? true : undefined}
+      data-required={required || undefined}
+    >
       <div className="flex items-center gap-1">
         <Label htmlFor={controlId} className="text-xs font-medium text-foreground">
           {label}
@@ -100,7 +115,7 @@ export function FormField({
       </div>
       {control}
       {error ? (
-        <p className="text-xs text-destructive" role="alert">
+        <p id={errorId} className="text-xs text-destructive" role="alert">
           {error}
         </p>
       ) : (
@@ -126,6 +141,9 @@ export function TextField({
   showCount = false,
   onEnter,
   type = 'text',
+  'aria-describedby': ariaDescribedBy,
+  'aria-invalid': ariaInvalid,
+  'aria-required': ariaRequired,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -141,7 +159,7 @@ export function TextField({
   onEnter?: () => void;
   /** 原生输入类型：日期 / 日期时间 / 密码走浏览器原生控件 */
   type?: 'text' | 'date' | 'datetime-local' | 'password';
-}) {
+} & ControlAriaProps) {
   return (
     <div className={cn('relative', className)}>
       <Input
@@ -151,6 +169,9 @@ export function TextField({
         placeholder={placeholder}
         disabled={disabled}
         aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
+        aria-invalid={ariaInvalid}
+        aria-required={ariaRequired}
         inputMode={inputMode}
         maxLength={maxLength}
         onChange={(event) => onChange(event.target.value)}
@@ -183,6 +204,9 @@ export function TextAreaField({
   id,
   disabled = false,
   className,
+  'aria-describedby': ariaDescribedBy,
+  'aria-invalid': ariaInvalid,
+  'aria-required': ariaRequired,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -194,7 +218,7 @@ export function TextAreaField({
   id?: string;
   disabled?: boolean;
   className?: string;
-}) {
+} & ControlAriaProps) {
   return (
     <div className={cn('relative', className)}>
       <Textarea
@@ -205,6 +229,9 @@ export function TextAreaField({
         placeholder={placeholder}
         disabled={disabled}
         aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
+        aria-invalid={ariaInvalid}
+        aria-required={ariaRequired}
         onChange={(event) => onChange(event.target.value)}
         className="resize-none text-sm"
       />
@@ -235,6 +262,9 @@ export function NumberField({
   ariaLabel,
   id,
   className,
+  'aria-describedby': ariaDescribedBy,
+  'aria-invalid': ariaInvalid,
+  'aria-required': ariaRequired,
 }: {
   value: number | undefined;
   onChange: (value: number | undefined) => void;
@@ -245,7 +275,7 @@ export function NumberField({
   ariaLabel?: string;
   id?: string;
   className?: string;
-}) {
+} & ControlAriaProps) {
   const clamp = (next: number) => {
     let result = next;
     if (min !== undefined) result = Math.max(min, result);
@@ -270,6 +300,9 @@ export function NumberField({
         max={max}
         disabled={disabled}
         aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
+        aria-invalid={ariaInvalid}
+        aria-required={ariaRequired}
         onChange={(event) => {
           const raw = event.target.value;
           onChange(raw === '' ? undefined : clamp(Number(raw)));
@@ -337,6 +370,9 @@ export function SelectField({
   id,
   disabled = false,
   className,
+  'aria-describedby': ariaDescribedBy,
+  'aria-invalid': ariaInvalid,
+  'aria-required': ariaRequired,
 }: {
   value: string | undefined;
   onChange: (value: string | undefined) => void;
@@ -349,7 +385,7 @@ export function SelectField({
   id?: string;
   disabled?: boolean;
   className?: string;
-}) {
+} & ControlAriaProps) {
   const ALL = '__all__';
   return (
     <Select
@@ -361,6 +397,9 @@ export function SelectField({
         id={id}
         size="sm"
         aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
+        aria-invalid={ariaInvalid}
+        aria-required={ariaRequired}
         className={cn('w-full bg-background', !value && 'text-muted-foreground', className)}
       >
         <SelectValue placeholder={placeholder}>
@@ -370,12 +409,14 @@ export function SelectField({
         </SelectValue>
       </SelectTrigger>
       <SelectContent>
-        {allowClear && <SelectItem value={ALL}>{clearLabel}</SelectItem>}
-        {options.map((option) => (
-          <SelectItem key={option.value} value={option.value}>
-            {option.label}
-          </SelectItem>
-        ))}
+        <SelectGroup>
+          {allowClear && <SelectItem value={ALL}>{clearLabel}</SelectItem>}
+          {options.map((option) => (
+            <SelectItem key={option.value} value={option.value}>
+              {option.label}
+            </SelectItem>
+          ))}
+        </SelectGroup>
       </SelectContent>
     </Select>
   );
@@ -398,6 +439,9 @@ export function SwitchField({
   disabled = false,
   ariaLabel,
   className,
+  'aria-describedby': ariaDescribedBy,
+  'aria-invalid': ariaInvalid,
+  'aria-required': ariaRequired,
 }: {
   checked: boolean;
   onChange: (value: boolean) => void;
@@ -405,13 +449,16 @@ export function SwitchField({
   disabled?: boolean;
   ariaLabel?: string;
   className?: string;
-}) {
+} & ControlAriaProps) {
   if (!label) {
     return (
       <Switch
         checked={checked}
         disabled={disabled}
         aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
+        aria-invalid={ariaInvalid}
+        aria-required={ariaRequired}
         onCheckedChange={onChange}
         className={className}
       />
@@ -424,6 +471,9 @@ export function SwitchField({
         checked={checked}
         disabled={disabled}
         aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
+        aria-invalid={ariaInvalid}
+        aria-required={ariaRequired}
         onCheckedChange={onChange}
       />
       <span className="text-sm text-foreground">{label}</span>
@@ -607,6 +657,9 @@ export function ClearableField({
   className,
   disabled = false,
   onEnter,
+  'aria-describedby': ariaDescribedBy,
+  'aria-invalid': ariaInvalid,
+  'aria-required': ariaRequired,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -616,7 +669,7 @@ export function ClearableField({
   className?: string;
   disabled?: boolean;
   onEnter?: () => void;
-}) {
+} & ControlAriaProps) {
   return (
     <InputGroup className={cn('h-8 bg-background', className)}>
       <InputGroupInput
@@ -626,6 +679,9 @@ export function ClearableField({
         placeholder={placeholder}
         disabled={disabled}
         aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
+        aria-invalid={ariaInvalid}
+        aria-required={ariaRequired}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === 'Enter' && onEnter) {

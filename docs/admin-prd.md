@@ -91,7 +91,7 @@
 | 每次查库 | 权限校验实时读库，不信 token 内的 role（JWT TTL 7 天，只信 token 会导致降权后旧凭证仍可用） |
 | 禁止提权 | 只有 `admin` 能授予 `admin`（否则 403 `40301`）；不能变更自己的角色（400 `40001`） |
 | 最后一个 admin | 禁用与降级前统计启用中的 admin 数，`≤1` 返回 409 `40901` |
-| 高危动作 | `order.refund` `user.delete` `user.reset_password` `credit.adjust` `setting.write` `role.write` `channel.write` `channel.model_write` `logical_model.write` `billing_order.resolve` `capability.write` 写审计；业务影响确认与原因填写按动作语义执行，删除渠道 / 渠道模型不要求原因 |
+| 高危动作 | `order.refund` `user.delete` `user.reset_password` `credit.adjust` `setting.write` `role.write` `channel.write` `channel.model_write` `logical_model.write` `billing_order.resolve` `capability.write` 自动写审计；原因输入只用于退款、发票驳回、能力下架等真实业务语义 |
 | 审计不可删 | 审计记录只读，无删除接口 |
 
 ### 2.4 管理员账号
@@ -205,7 +205,7 @@
 | B-49 | 用户积分总览：邮箱、可用余额、即将过期量、累计消费 | P0 |
 | B-50 | 批次明细：来源、发放时间、到期时间、剩余量 | P0 |
 | B-51 | 流水查询：类型、金额、关联对象、时间 | P0 |
-| B-52 | 人工增减积分（强制填写原因，写审计） | P0 |
+| B-52 | 人工增减积分（自动写审计） | P0 |
 
 **约束**：余额唯一由 `CreditLot.remaining` 汇总推导，不存在冗余余额字段。扣减按到期日升序（FEFO），到期日为空视为最晚。
 
@@ -427,7 +427,7 @@
 | 类别 | 要求 |
 |---|---|
 | 越权防护 | 非管理员访问返回 403；越权用例纳入端到端测试 |
-| 审计完整性 | 所有写操作留痕，含操作人、时间、对象、原因、IP |
+| 审计完整性 | 所有写操作留痕，含操作人、时间、对象、系统自动生成的原因、IP |
 | 高危防护 | 退款、删数据、调价、积分增减需二次确认 |
 | 记账正确 | 余额唯一由批次推导，禁止直接改余额 |
 | 一致性 | 订单状态机不可跳跃；支付回调幂等 |

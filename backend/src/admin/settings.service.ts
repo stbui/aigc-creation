@@ -1,15 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { AppError } from '../common/app.exception';
-import { SettingsService } from '../common/settings.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
+import { AppError } from "../common/app.exception";
+import { SettingsService } from "../common/settings.service";
 import {
   SETTING_DEFS,
   SETTING_GROUP_LABELS,
   findSettingDef,
   validateSettingValue,
   type SettingDef,
-} from '../common/setting-defs';
-import { unknownAllowedExts } from '../common/image-formats';
+} from "../common/setting-defs";
+import { unknownAllowedExts } from "../common/image-formats";
 
 /**
  * 后台系统设置 —— 写路径。
@@ -63,7 +63,7 @@ export class AdminSettingsService {
     for (const def of SETTING_DEFS) {
       const row = byKey.get(def.key);
       const overridden = row !== undefined;
-      const groupKey = def.key.split('.')[0];
+      const groupKey = def.key.split(".")[0];
       const group = (groups[groupKey] ??= {
         key: groupKey,
         label: SETTING_GROUP_LABELS[def.group] ?? def.group,
@@ -87,18 +87,20 @@ export class AdminSettingsService {
    * @param settings 要设置的键值对。键必须是 SETTING_DEFS 里的键
    * @param clears   要恢复默认的键：删除 SystemSetting 行 → 回落代码默认值
    * @param actor    操作人标识（写入 SystemSetting.updatedBy，供审计追溯）
-   * @param reason   操作原因（写入审计）
    */
   async updateAll(
     settings: Record<string, unknown>,
     clears: string[] = [],
     actor?: string,
-    reason?: string,
-  ): Promise<{ updated: string[]; cleared: string[]; changes: SettingChange[] }> {
+  ): Promise<{
+    updated: string[];
+    cleared: string[];
+    changes: SettingChange[];
+  }> {
     const entries = Object.entries(settings ?? {});
     const clearList = Array.from(new Set(clears ?? []));
     if (entries.length === 0 && clearList.length === 0) {
-      throw new AppError(40001, '没有需要更新的设置项', 400);
+      throw new AppError(40001, "没有需要更新的设置项", 400);
     }
 
     // ── 先全部校验，一个不通过就整批拒绝 ────────────────────────────────
@@ -107,23 +109,27 @@ export class AdminSettingsService {
     const normalized = entries.map(([key, value]) => {
       const def = findSettingDef(key);
       if (!def) throw new AppError(40001, `未知设置项: ${key}`, 400);
-      if (def.readOnly) throw new AppError(40001, `${def.label} 为只读项, 不可修改`, 400);
+      if (def.readOnly)
+        throw new AppError(40001, `${def.label} 为只读项, 不可修改`, 400);
       return { key, def, value: this.validate(def, value) };
     });
 
     for (const key of clearList) {
       const def = findSettingDef(key);
       if (!def) throw new AppError(40001, `未知设置项: ${key}`, 400);
-      if (def.readOnly) throw new AppError(40001, `${def.label} 为只读项, 不可修改`, 400);
+      if (def.readOnly)
+        throw new AppError(40001, `${def.label} 为只读项, 不可修改`, 400);
     }
 
     // 同一键既在 settings 又在 clears 里 —— 以 clears 为准（恢复默认），
     // 但这是调用方的 bug，必须让调用方看见而不是静默择一。
-    const overlap = normalized.filter((n) => clearList.includes(n.key)).map((n) => n.key);
+    const overlap = normalized
+      .filter((n) => clearList.includes(n.key))
+      .map((n) => n.key);
     if (overlap.length > 0) {
       throw new AppError(
         40001,
-        `同一设置项不能同时设置与恢复默认: ${overlap.join(', ')}`,
+        `同一设置项不能同时设置与恢复默认: ${overlap.join(", ")}`,
         400,
       );
     }
@@ -135,7 +141,7 @@ export class AdminSettingsService {
     const beforeByKey = new Map(before.map((r) => [r.key, r]));
 
     // ── 事务落库 ───────────────────────────────────────────────────────
-    const actorName = actor ?? 'admin';
+    const actorName = actor ?? "admin";
     const changes: SettingChange[] = [];
 
     await this.prisma.$transaction(async (tx) => {
@@ -154,7 +160,7 @@ export class AdminSettingsService {
           label: def.label,
           before: prevValue,
           after: value,
-          action: 'update',
+          action: "update",
         });
       }
 
@@ -168,7 +174,7 @@ export class AdminSettingsService {
             label: def.label,
             before: def.default,
             after: def.default,
-            action: 'clear',
+            action: "clear",
           });
           continue;
         }
@@ -179,7 +185,7 @@ export class AdminSettingsService {
           label: def.label,
           before: prevValue,
           after: def.default,
-          action: 'clear',
+          action: "clear",
         });
       }
     });
@@ -190,7 +196,7 @@ export class AdminSettingsService {
     this.logger.log(
       `设置变更 by ${actorName}: ${changes
         .map((c) => `${c.key} ${String(c.before)}→${String(c.after)}`)
-        .join(', ')}${reason ? ` | ${reason}` : ''}`,
+        .join(", ")}`,
     );
 
     return {
@@ -225,19 +231,19 @@ export class AdminSettingsService {
    * 与读路径共用 `validateSettingValue` —— 读写的合法性判断必须一致。
    */
   private validate(def: SettingDef, raw: unknown): string | number | boolean {
-    if (def.key === 'upload.allowedTypes') {
+    if (def.key === "upload.allowedTypes") {
       // 允许类型是「后端认识的格式」的子集。写入一个后端不认识的格式
       // (如 gif) 会让页面显示「已允许 GIF」而上传依然被拒 —— 分叉。
-      const unknown = unknownAllowedExts(String(raw ?? ''));
+      const unknown = unknownAllowedExts(String(raw ?? ""));
       if (unknown.length > 0) {
         throw new AppError(
           40001,
-          `不支持的文件类型: ${unknown.join(', ')}（仅支持 jpg,jpeg,png,webp）`,
+          `不支持的文件类型: ${unknown.join(", ")}（仅支持 jpg,jpeg,png,webp）`,
           400,
         );
       }
-      if (!String(raw ?? '').trim()) {
-        throw new AppError(40001, '至少要允许一种文件类型', 400);
+      if (!String(raw ?? "").trim()) {
+        throw new AppError(40001, "至少要允许一种文件类型", 400);
       }
     }
     return validateSettingValue(def, raw);
@@ -260,5 +266,5 @@ export interface SettingChange {
   before: string | number | boolean;
   after: string | number | boolean;
   /** update = 改为新值；clear = 恢复默认 */
-  action: 'update' | 'clear';
+  action: "update" | "clear";
 }

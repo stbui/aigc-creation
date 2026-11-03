@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActionButton, ConfirmAction, FormField, SkeletonBody, TextField } from './components';
+import { ActionButton, ConfirmAction, FormField, SkeletonBody, TextField } from '~/admin-ui/primitives';
 import { adminUsersApi } from './api';
 import { DELETE_CONFIRM_WORD } from './constants';
 import type { AdminUserImpact, AdminUserListResult } from '../../../types/api';

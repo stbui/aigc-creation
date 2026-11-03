@@ -177,7 +177,7 @@ PaymentsService（编排）
 
 ### 9.1 发票
 
-一单一票（`orderId @unique`），金额取 `paidCents - refundedCents` 快照；输出可打印 HTML，零 PDF 依赖。开具与驳回必填原因并写审计。
+一单一票（`orderId @unique`），金额取 `paidCents - refundedCents` 快照；输出可打印 HTML，零 PDF 依赖。开具自动写审计；驳回要求填写原因，原因会回显给用户并写入审计。
 
 ### 9.2 对账
 
@@ -216,7 +216,7 @@ PaymentsService（编排）
 
 ### 11.2 后台
 
-见 `docs/admin-detailed-design.md` §9–§13。统一约束：退款、人工调价、积分调整、发票开具、会员套餐变更属高危动作，必填原因并写审计。
+见 `docs/admin-detailed-design.md` §9–§13。统一约束：退款、人工调价、积分调整、发票开具、会员套餐变更属高危动作，自动写审计；只有退款、发票驳回等真实业务原因需要由调用方填写。
 
 ## 12. 前端改造点
 

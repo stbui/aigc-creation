@@ -1,22 +1,22 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { AppError } from '../common/app.exception';
-import { OrderService } from '../orders/order.service';
-import { PaymentConfigService } from './payment-config.service';
-import { getAdapter } from './adapters';
+import { Injectable, Logger } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
+import { AppError } from "../common/app.exception";
+import { OrderService } from "../orders/order.service";
+import { PaymentConfigService } from "./payment-config.service";
+import { getAdapter } from "./adapters";
 import {
   PaymentAdapter,
   PaymentContext,
   PaymentCurrency,
   PaymentProviderId,
   ProviderPaymentResult,
-} from './adapters/types';
-import { paymentStatusOf } from './payment-query';
+} from "./adapters/types";
+import { paymentStatusOf } from "./payment-query";
 
 export type PaymentActor =
-  | { kind: 'user'; userId: string }
-  | { kind: 'admin'; adminId: string }
-  | { kind: 'worker' };
+  | { kind: "user"; userId: string }
+  | { kind: "admin"; adminId: string }
+  | { kind: "worker" };
 
 /**
  * 一次可查询/可关单的渠道尝试。
@@ -108,19 +108,24 @@ export class PaymentOrderService {
    * `PAYMENT_NOTIFY_BASE`，最后才是本机地址。这样多域名/反代部署时，
    * 每个渠道可以指向自己的公网入口，不必重启改环境变量。
    */
-  notifyUrl(providerId: PaymentProviderId, configId: string, publicBaseUrl?: string): string {
-    const configuredBase = publicBaseUrl?.trim() || process.env.PAYMENT_NOTIFY_BASE?.trim();
-    if (providerId !== 'sandbox' && !configuredBase) {
+  notifyUrl(
+    providerId: PaymentProviderId,
+    configId: string,
+    publicBaseUrl?: string,
+  ): string {
+    const configuredBase =
+      publicBaseUrl?.trim() || process.env.PAYMENT_NOTIFY_BASE?.trim();
+    if (providerId !== "sandbox" && !configuredBase) {
       throw new AppError(
         50301,
-        '真实支付渠道缺少回调公网地址，请配置渠道 publicBaseUrl 或 PAYMENT_NOTIFY_BASE',
+        "真实支付渠道缺少回调公网地址，请配置渠道 publicBaseUrl 或 PAYMENT_NOTIFY_BASE",
         503,
       );
     }
     const base = (
       configuredBase ||
-      `http://${process.env.HOST || '127.0.0.1'}:${process.env.PORT || 4100}`
-    ).replace(/\/$/, '');
+      `http://${process.env.HOST || "127.0.0.1"}:${process.env.PORT || 4100}`
+    ).replace(/\/$/, "");
     return `${base}/api/v1/payments/callback/${providerId}/${configId}`;
   }
 
@@ -136,14 +141,15 @@ export class PaymentOrderService {
       where: { id: input.orderId },
       include: { items: true },
     });
-    if (!order) throw new AppError(40400, '订单不存在', 404);
-    if (order.userId !== input.userId) throw new AppError(40301, '无权支付该订单', 403);
-    if (order.status === 'paid') throw new AppError(40901, '订单已支付', 409);
-    if (order.status !== 'pending') {
+    if (!order) throw new AppError(40400, "订单不存在", 404);
+    if (order.userId !== input.userId)
+      throw new AppError(40301, "无权支付该订单", 403);
+    if (order.status === "paid") throw new AppError(40901, "订单已支付", 409);
+    if (order.status !== "pending") {
       throw new AppError(40901, `订单当前状态不可支付: ${order.status}`, 409);
     }
 
-    const currency = (order.currency || 'CNY') as PaymentCurrency;
+    const currency = (order.currency || "CNY") as PaymentCurrency;
 
     // 0 元单不经任何渠道：渠道既不能收 0 元，也无法回调
     if (order.paidCents <= 0) {
@@ -151,9 +157,9 @@ export class PaymentOrderService {
         orderId: order.id,
         userId: input.userId,
         payTransactionId: `FREE-${order.orderNo}`,
-        channel: 'free',
+        channel: "free",
         currency,
-        providerStatus: 'FREE',
+        providerStatus: "FREE",
         providerPaidAt: new Date(),
       });
       return {
@@ -161,29 +167,37 @@ export class PaymentOrderService {
         orderNo: order.orderNo,
         amountCents: 0,
         currency,
-        providerId: 'free',
+        providerId: "free",
         configId: null,
         configVersion: null,
-        mode: 'free',
-        checkoutValue: '',
+        mode: "free",
+        checkoutValue: "",
         expiresAt: order.expiresAt.toISOString(),
         sandbox: false,
-        hint: '0 元订单已直接完成，无需支付',
+        hint: "0 元订单已直接完成，无需支付",
       };
     }
 
     if (order.expiresAt.getTime() <= Date.now()) {
-      throw new AppError(40901, '订单已超时关闭', 409);
+      throw new AppError(40901, "订单已超时关闭", 409);
     }
 
     const available = await this.configs.available(currency);
     if (available.length === 0) {
-      throw new AppError(50301, '当前没有可用的支付渠道，请联系管理员配置', 503);
+      throw new AppError(
+        50301,
+        "当前没有可用的支付渠道，请联系管理员配置",
+        503,
+      );
     }
     let providerId = input.providerId;
     if (!providerId) {
       if (available.length > 1) {
-        throw new AppError(40001, '存在多个可用支付渠道，请指定 providerId', 400);
+        throw new AppError(
+          40001,
+          "存在多个可用支付渠道，请指定 providerId",
+          400,
+        );
       }
       providerId = available[0].id;
     }
@@ -192,13 +206,17 @@ export class PaymentOrderService {
     }
 
     const config = await this.configs.latest(providerId as PaymentProviderId);
-    if (!config) throw new AppError(50301, '支付渠道未完成配置', 503);
+    if (!config) throw new AppError(50301, "支付渠道未完成配置", 503);
     const adapter = getAdapter(providerId);
     if (!adapter) throw new AppError(40001, `未知支付渠道: ${providerId}`, 400);
-    if (!config.enabled) throw new AppError(50301, '支付渠道已停用', 503);
+    if (!config.enabled) throw new AppError(50301, "支付渠道已停用", 503);
     const missing = adapter.validateConfig(config.values);
     if (missing.length > 0) {
-      throw new AppError(50301, `支付渠道未完成配置（缺少 ${missing.join(', ')}）`, 503);
+      throw new AppError(
+        50301,
+        `支付渠道未完成配置（缺少 ${missing.join(", ")}）`,
+        503,
+      );
     }
 
     const context: PaymentContext = {
@@ -210,8 +228,8 @@ export class PaymentOrderService {
 
     // 同一订单重复发起：旧 pending 尝试先关闭，再创建新尝试
     await this.prisma.payment.updateMany({
-      where: { orderId: order.id, status: 'pending' },
-      data: { status: 'closed', closedAt: new Date() },
+      where: { orderId: order.id, status: "pending" },
+      data: { status: "closed", closedAt: new Date() },
     });
 
     const payment = await this.prisma.payment.create({
@@ -221,7 +239,7 @@ export class PaymentOrderService {
         channel: providerId,
         amountCents: order.paidCents,
         currency,
-        status: 'pending',
+        status: "pending",
         providerConfigId: config.id,
         providerConfigVersion: config.version,
       },
@@ -229,10 +247,13 @@ export class PaymentOrderService {
 
     const now = Date.now();
     const expiresAt = new Date(
-      Math.min(order.expiresAt.getTime(), now + config.closeAfterMinutes * 60_000),
+      Math.min(
+        order.expiresAt.getTime(),
+        now + config.closeAfterMinutes * 60_000,
+      ),
     );
 
-    let checkout: Awaited<ReturnType<PaymentAdapter['createOrder']>>;
+    let checkout: Awaited<ReturnType<PaymentAdapter["createOrder"]>>;
     try {
       checkout = await adapter.createOrder({
         config: context,
@@ -242,30 +263,36 @@ export class PaymentOrderService {
         currency,
         subject: `货觉AI 订单 ${order.orderNo}`,
         returnUrl: this.checkoutReturnUrl(order),
-        notifyUrl: this.notifyUrl(config.providerId, config.id, config.values.publicBaseUrl),
+        notifyUrl: this.notifyUrl(
+          config.providerId,
+          config.id,
+          config.values.publicBaseUrl,
+        ),
         clientIp: input.clientIp,
         expiresAt,
       });
     } catch (e) {
       const message = truncate((e as Error).message || String(e), 200);
       await this.prisma.payment.updateMany({
-        where: { id: payment.id, status: 'pending' },
-        data: { status: 'failed', lastError: message, message },
+        where: { id: payment.id, status: "pending" },
+        data: { status: "failed", lastError: message, message },
       });
       await this.prisma.order.updateMany({
-        where: { id: order.id, status: 'pending' },
-        data: { lastError: message, checkoutValue: '' },
+        where: { id: order.id, status: "pending" },
+        data: { lastError: message, checkoutValue: "" },
       });
-      this.logger.error(`发起支付失败 (${providerId}) 订单 ${order.orderNo}: ${message}`);
+      this.logger.error(
+        `发起支付失败 (${providerId}) 订单 ${order.orderNo}: ${message}`,
+      );
       throw new AppError(50302, `发起支付失败: ${message}`, 503);
     }
 
-    const checkoutValue = checkout.payUrl ?? checkout.codeUrl ?? '';
+    const checkoutValue = checkout.payUrl ?? checkout.codeUrl ?? "";
 
     // 先落渠道单据 id：即使随后订单状态已变化，也能定位并关闭本次渠道订单。
     if (checkout.providerRef) {
       await this.prisma.payment.updateMany({
-        where: { id: payment.id, status: 'pending' },
+        where: { id: payment.id, status: "pending" },
         data: { providerRef: checkout.providerRef },
       });
     }
@@ -276,7 +303,7 @@ export class PaymentOrderService {
      * paid 单的 channel/config 覆盖回这次 intent，甚至返回一个可再次支付的链接。
      */
     const updated = await this.prisma.order.updateMany({
-      where: { id: order.id, status: 'pending' },
+      where: { id: order.id, status: "pending" },
       data: {
         channel: providerId,
         providerConfigId: config.id,
@@ -284,7 +311,10 @@ export class PaymentOrderService {
         checkoutMode: checkout.mode,
         checkoutValue,
         checkoutExpiresAt: checkout.expiresAt,
-        expiresAt: checkout.expiresAt < order.expiresAt ? checkout.expiresAt : order.expiresAt,
+        expiresAt:
+          checkout.expiresAt < order.expiresAt
+            ? checkout.expiresAt
+            : order.expiresAt,
         lastError: null,
         lastQueriedAt: new Date(),
       },
@@ -303,15 +333,15 @@ export class PaymentOrderService {
         );
       }
       await this.prisma.payment.updateMany({
-        where: { id: payment.id, status: 'pending' },
+        where: { id: payment.id, status: "pending" },
         data: {
-          status: 'closed',
+          status: "closed",
           closedAt: new Date(),
-          lastError: '订单状态已变化',
-          message: '订单状态已变化',
+          lastError: "订单状态已变化",
+          message: "订单状态已变化",
         },
       });
-      throw new AppError(40901, '订单状态已变化，请刷新后重试', 409);
+      throw new AppError(40901, "订单状态已变化，请刷新后重试", 409);
     }
 
     this.logger.log(
@@ -331,7 +361,7 @@ export class PaymentOrderService {
       codeUrl: checkout.codeUrl,
       checkoutValue,
       expiresAt: checkout.expiresAt.toISOString(),
-      sandbox: providerId === 'sandbox',
+      sandbox: providerId === "sandbox",
       hint: checkout.hint ?? null,
     };
   }
@@ -346,7 +376,7 @@ export class PaymentOrderService {
   }): Promise<PaymentOrderView> {
     const order = await this.loadOrder(input.orderId, input.actor);
 
-    if (order.status !== 'pending') return this.view(order);
+    if (order.status !== "pending") return this.view(order);
     if (!order.providerConfigId && !order.checkoutMode) return this.view(order);
     if (
       !input.force &&
@@ -367,7 +397,10 @@ export class PaymentOrderService {
     } catch (e) {
       // 配置不可用不能当成「渠道查无此单」；只记录，等运维修复配置
       const message = truncate((e as Error).message, 200);
-      await this.prisma.order.update({ where: { id: order.id }, data: { lastError: message } });
+      await this.prisma.order.update({
+        where: { id: order.id },
+        data: { lastError: message },
+      });
       this.logger.warn(`查单前置检查失败 订单 ${order.orderNo}: ${message}`);
       return this.view(await this.loadOrder(order.id, input.actor));
     }
@@ -389,19 +422,24 @@ export class PaymentOrderService {
       } catch (e) {
         // 查询失败不改变本地状态，只写 lastError 供排障
         const message = truncate((e as Error).message, 200);
-        await this.prisma.order.update({ where: { id: order.id }, data: { lastError: message } });
-        this.logger.warn(`查单失败 订单 ${order.orderNo} (${attempt.providerId}): ${message}`);
+        await this.prisma.order.update({
+          where: { id: order.id },
+          data: { lastError: message },
+        });
+        this.logger.warn(
+          `查单失败 订单 ${order.orderNo} (${attempt.providerId}): ${message}`,
+        );
         return this.view(await this.loadOrder(order.id, input.actor));
       }
 
-      if (result.state === 'paid') {
+      if (result.state === "paid") {
         try {
           await this.applyPaymentResult({
             orderId: order.id,
             providerId: attempt.providerId,
             configId: attempt.config.configId,
             paymentId: attempt.paymentId ?? undefined,
-            tradeNo: result.tradeNo ?? '',
+            tradeNo: result.tradeNo ?? "",
             amountCents: result.amountCents ?? -1,
             currency: result.currency ?? (order.currency as PaymentCurrency),
             paidAt: result.paidAt ?? new Date(),
@@ -411,22 +449,27 @@ export class PaymentOrderService {
           });
         } catch (e) {
           // 金额/币种/状态不符时保留 pending，交给对账/人工处理，不能静默吞掉
-          this.logger.error(`查单入账失败 订单 ${order.id}: ${(e as Error).message}`);
+          this.logger.error(
+            `查单入账失败 订单 ${order.id}: ${(e as Error).message}`,
+          );
         }
         return this.view(await this.loadOrder(order.id, input.actor));
       }
 
-      if (result.state === 'closed') {
+      if (result.state === "closed") {
         await this.closeAttempt(attempt.paymentId);
         continue;
       }
-      if (result.state === 'not_found') {
+      if (result.state === "not_found") {
         allExplicitlyClosed = false;
         continue;
       }
-      if (result.state === 'failed') {
-        const message = truncate(result.error ?? '查单失败', 200);
-        await this.prisma.order.update({ where: { id: order.id }, data: { lastError: message } });
+      if (result.state === "failed") {
+        const message = truncate(result.error ?? "查单失败", 200);
+        await this.prisma.order.update({
+          where: { id: order.id },
+          data: { lastError: message },
+        });
         return this.view(await this.loadOrder(order.id, input.actor));
       }
       // pending：渠道仍在等待支付，不能关单、也不能继续检查别的尝试后下结论
@@ -439,10 +482,13 @@ export class PaymentOrderService {
 
   // ── 关单 ────────────────────────────────────────────────────────
 
-  async close(input: { orderId: string; actor: PaymentActor; reason?: string }): Promise<PaymentOrderView> {
+  async close(input: {
+    orderId: string;
+    actor: PaymentActor;
+  }): Promise<PaymentOrderView> {
     const order = await this.loadOrder(input.orderId, input.actor);
-    if (order.status === 'cancelled') return this.view(order);
-    if (order.status !== 'pending') {
+    if (order.status === "cancelled") return this.view(order);
+    if (order.status !== "pending") {
       throw new AppError(40901, `订单当前状态不可关闭: ${order.status}`, 409);
     }
 
@@ -450,7 +496,7 @@ export class PaymentOrderService {
     const lease = await this.prisma.order.updateMany({
       where: {
         id: order.id,
-        status: 'pending',
+        status: "pending",
         OR: [
           { closeStartedAt: null },
           { closeStartedAt: { lte: new Date(Date.now() - 5 * 60_000) } },
@@ -458,13 +504,17 @@ export class PaymentOrderService {
       },
       data: { closeStartedAt: new Date() },
     });
-    if (lease.count === 0) return this.view(await this.loadOrder(order.id, input.actor));
+    if (lease.count === 0)
+      return this.view(await this.loadOrder(order.id, input.actor));
 
     let attempts: AttemptContext[];
     try {
       attempts = await this.attemptContexts(order);
     } catch (e) {
-      return this.failClose(order.id, `支付配置不可用，无法查单/关单: ${(e as Error).message}`);
+      return this.failClose(
+        order.id,
+        `支付配置不可用，无法查单/关单: ${(e as Error).message}`,
+      );
     }
 
     // 从未发起过支付的空单：本地关闭即可
@@ -497,18 +547,18 @@ export class PaymentOrderService {
         );
       }
 
-      if (queried.state === 'paid') {
+      if (queried.state === "paid") {
         await this.creditPaidAttempt(order, attempt, queried);
-        throw new AppError(40901, '渠道已支付，订单已入账，请刷新后查看', 409);
+        throw new AppError(40901, "渠道已支付，订单已入账，请刷新后查看", 409);
       }
-      if (queried.state === 'failed') {
+      if (queried.state === "failed") {
         return this.failClose(
           order.id,
-          `关单前查单失败 (${attempt.providerId}): ${queried.error ?? '未知错误'}`,
+          `关单前查单失败 (${attempt.providerId}): ${queried.error ?? "未知错误"}`,
         );
       }
 
-      if (queried.state === 'pending') {
+      if (queried.state === "pending") {
         let closed: ProviderPaymentResult;
         try {
           closed = await attempt.adapter.closeOrder(queryInput);
@@ -518,11 +568,15 @@ export class PaymentOrderService {
             `渠道关单失败 (${attempt.providerId}): ${(e as Error).message}`,
           );
         }
-        if (closed.state === 'paid') {
+        if (closed.state === "paid") {
           await this.creditPaidAttempt(order, attempt, closed);
-          throw new AppError(40901, '渠道已支付，订单已入账，请刷新后查看', 409);
+          throw new AppError(
+            40901,
+            "渠道已支付，订单已入账，请刷新后查看",
+            409,
+          );
         }
-        if (closed.state !== 'closed' && closed.state !== 'not_found') {
+        if (closed.state !== "closed" && closed.state !== "not_found") {
           return this.failClose(
             order.id,
             `渠道关单未成功 (${attempt.providerId}): ${closed.error ?? closed.state}`,
@@ -545,7 +599,7 @@ export class PaymentOrderService {
   async closeExpired(limit = 50): Promise<number> {
     const expired = await this.prisma.order.findMany({
       where: {
-        status: 'pending',
+        status: "pending",
         expiresAt: { lte: new Date() },
         OR: [
           { closeStartedAt: null },
@@ -561,13 +615,14 @@ export class PaymentOrderService {
       try {
         const view = await this.close({
           orderId: item.id,
-          actor: { kind: 'worker' },
-          reason: '超时自动关闭',
+          actor: { kind: "worker" },
         });
-        if (view.status === 'cancelled') closed += 1;
+        if (view.status === "cancelled") closed += 1;
       } catch (e) {
         // 已支付会抛 409，属正常竞态；其它错误留给下一轮重试
-        this.logger.warn(`关闭超时订单 ${item.id} 未完成: ${(e as Error).message}`);
+        this.logger.warn(
+          `关闭超时订单 ${item.id} 未完成: ${(e as Error).message}`,
+        );
       }
     }
     return closed;
@@ -590,19 +645,29 @@ export class PaymentOrderService {
     /** 调用方已定位到的支付尝试；不传则按渠道取最新 pending */
     paymentId?: string;
   }): Promise<{ applied: boolean; idempotentHit: boolean }> {
-    const order = await this.prisma.order.findUnique({ where: { id: input.orderId } });
-    if (!order) throw new AppError(40400, '订单不存在', 404);
+    const order = await this.prisma.order.findUnique({
+      where: { id: input.orderId },
+    });
+    if (!order) throw new AppError(40400, "订单不存在", 404);
 
-    if (order.status === 'paid') return { applied: false, idempotentHit: true };
-    if (order.status !== 'pending') {
+    if (order.status === "paid") return { applied: false, idempotentHit: true };
+    if (order.status !== "pending") {
       throw new AppError(40901, `订单当前状态不可入账: ${order.status}`, 409);
     }
-    if (!input.tradeNo) throw new AppError(40001, '缺少渠道交易号', 400);
+    if (!input.tradeNo) throw new AppError(40001, "缺少渠道交易号", 400);
     if (input.amountCents !== order.paidCents) {
-      throw new AppError(40901, `渠道金额 ${input.amountCents} 分与订单应付 ${order.paidCents} 分不一致`, 409);
+      throw new AppError(
+        40901,
+        `渠道金额 ${input.amountCents} 分与订单应付 ${order.paidCents} 分不一致`,
+        409,
+      );
     }
-    if ((input.currency || 'CNY') !== (order.currency || 'CNY')) {
-      throw new AppError(40901, `币种不一致: 渠道 ${input.currency} / 订单 ${order.currency}`, 409);
+    if ((input.currency || "CNY") !== (order.currency || "CNY")) {
+      throw new AppError(
+        40901,
+        `币种不一致: 渠道 ${input.currency} / 订单 ${order.currency}`,
+        409,
+      );
     }
 
     // 只更新**同一渠道**的 pending 尝试；否则跨渠道重试时会把另一笔尝试
@@ -611,8 +676,12 @@ export class PaymentOrderService {
       input.paymentId ??
       (
         await this.prisma.payment.findFirst({
-          where: { orderId: order.id, status: 'pending', channel: input.providerId },
-          orderBy: { createdAt: 'desc' },
+          where: {
+            orderId: order.id,
+            status: "pending",
+            channel: input.providerId,
+          },
+          orderBy: { createdAt: "desc" },
           select: { id: true },
         })
       )?.id;
@@ -632,7 +701,10 @@ export class PaymentOrderService {
       providerRef: input.providerRef,
     });
 
-    return { applied: !result.idempotentHit, idempotentHit: result.idempotentHit };
+    return {
+      applied: !result.idempotentHit,
+      idempotentHit: result.idempotentHit,
+    };
   }
 
   // ── 视图 ────────────────────────────────────────────────────────
@@ -655,16 +727,18 @@ export class PaymentOrderService {
     const seen = new Set<string>();
 
     for (const payment of order.payments) {
-      if (!payment.channel || payment.channel === 'free') continue;
+      if (!payment.channel || payment.channel === "free") continue;
       /*
        * PayPal/Stripe 每次 intent 都有独立单据 id，必须逐条核对；只按渠道 + 配置
        * 去重会漏掉更早的 Session。无 providerRef 的 pending 单也不能合并。
        * 只有历史/支付宝/微信这类按商户订单号查询的已结束尝试可按渠道去重。
        */
       const key =
-        payment.providerRef || payment.status === 'pending' || !payment.payTransactionId
-          ? `${payment.channel}:${payment.providerConfigId ?? 'latest'}:${payment.providerRef ?? payment.id}`
-          : `${payment.channel}:${payment.providerConfigId ?? 'latest'}:order`;
+        payment.providerRef ||
+        payment.status === "pending" ||
+        !payment.payTransactionId
+          ? `${payment.channel}:${payment.providerConfigId ?? "latest"}:${payment.providerRef ?? payment.id}`
+          : `${payment.channel}:${payment.providerConfigId ?? "latest"}:order`;
       if (seen.has(key)) continue;
       seen.add(key);
 
@@ -693,13 +767,17 @@ export class PaymentOrderService {
     }
 
     // 历史单没有 Payment 行，但有订单级配置时仍要按订单渠道核对一次
-    if (contexts.length === 0 && (order.providerConfigId || order.checkoutMode)) {
+    if (
+      contexts.length === 0 &&
+      (order.providerConfigId || order.checkoutMode)
+    ) {
       const config = await this.configs.resolveForOrder({
         channel: order.channel,
         providerConfigId: order.providerConfigId,
       });
       const adapter = getAdapter(order.channel);
-      if (!config || !adapter) throw new Error(`支付渠道 ${order.channel} 的配置不可用`);
+      if (!config || !adapter)
+        throw new Error(`支付渠道 ${order.channel} 的配置不可用`);
       contexts.push({
         paymentId: null,
         providerId: config.providerId,
@@ -730,9 +808,12 @@ export class PaymentOrderService {
         `渠道已支付但未返回金额 (${attempt.providerId})，暂不入账，请人工核对`,
       );
     }
-    const tradeNo = result.tradeNo ?? order.providerTradeNo ?? '';
+    const tradeNo = result.tradeNo ?? order.providerTradeNo ?? "";
     if (!tradeNo) {
-      return this.failClose(order.id, `渠道已支付但未返回交易号 (${attempt.providerId})，暂不入账`);
+      return this.failClose(
+        order.id,
+        `渠道已支付但未返回交易号 (${attempt.providerId})，暂不入账`,
+      );
     }
 
     try {
@@ -743,14 +824,17 @@ export class PaymentOrderService {
         paymentId: attempt.paymentId ?? undefined,
         tradeNo,
         amountCents: result.amountCents,
-        currency: result.currency ?? 'CNY',
+        currency: result.currency ?? "CNY",
         paidAt: result.paidAt ?? new Date(),
         providerStatus: result.providerStatus,
         rawPayload: result.rawPayload,
         providerRef: attempt.providerRef,
       });
     } catch (e) {
-      await this.releaseCloseLease(order.id, `渠道已支付但入账失败: ${(e as Error).message}`);
+      await this.releaseCloseLease(
+        order.id,
+        `渠道已支付但入账失败: ${(e as Error).message}`,
+      );
       throw e;
     }
   }
@@ -759,8 +843,8 @@ export class PaymentOrderService {
   private async closeAttempt(paymentId: string | null): Promise<void> {
     if (!paymentId) return;
     await this.prisma.payment.updateMany({
-      where: { id: paymentId, status: 'pending' },
-      data: { status: 'closed', closedAt: new Date() },
+      where: { id: paymentId, status: "pending" },
+      data: { status: "closed", closedAt: new Date() },
     });
   }
 
@@ -777,7 +861,10 @@ export class PaymentOrderService {
     throw new AppError(50302, text, 503);
   }
 
-  private async releaseCloseLease(orderId: string, message?: string): Promise<void> {
+  private async releaseCloseLease(
+    orderId: string,
+    message?: string,
+  ): Promise<void> {
     await this.prisma.order.update({
       where: { id: orderId },
       data: {
@@ -790,20 +877,20 @@ export class PaymentOrderService {
   /** 本地关单：置 cancelled、清空 checkout、关闭 pending 尝试、释放库存。幂等 */
   private async localClose(orderId: string): Promise<void> {
     const updated = await this.prisma.order.updateMany({
-      where: { id: orderId, status: 'pending' },
+      where: { id: orderId, status: "pending" },
       data: {
-        status: 'cancelled',
+        status: "cancelled",
         closedAt: new Date(),
         closeStartedAt: null,
-        checkoutValue: '',
+        checkoutValue: "",
         lastError: null,
       },
     });
     if (updated.count > 0) {
       // 订单关闭后，未完成的支付尝试也必须收尾，否则后台会一直显示 pending
       await this.prisma.payment.updateMany({
-        where: { orderId, status: 'pending' },
-        data: { status: 'closed', closedAt: new Date() },
+        where: { orderId, status: "pending" },
+        data: { status: "closed", closedAt: new Date() },
       });
       await this.orders.releaseReservation(orderId);
     }
@@ -812,11 +899,11 @@ export class PaymentOrderService {
   private async loadOrder(orderId: string, actor: PaymentActor) {
     const order = await this.prisma.order.findUnique({
       where: { id: orderId },
-      include: { payments: { orderBy: { createdAt: 'desc' } } },
+      include: { payments: { orderBy: { createdAt: "desc" } } },
     });
-    if (!order) throw new AppError(40400, '订单不存在', 404);
-    if (actor.kind === 'user' && order.userId !== actor.userId) {
-      throw new AppError(40301, '无权查看该订单', 403);
+    if (!order) throw new AppError(40400, "订单不存在", 404);
+    if (actor.kind === "user" && order.userId !== actor.userId) {
+      throw new AppError(40301, "无权查看该订单", 403);
     }
     return order;
   }
@@ -854,19 +941,24 @@ export class PaymentOrderService {
       providerConfigId: order.providerConfigId,
       checkoutMode: order.checkoutMode,
     });
-    const terminal = displayStatus !== 'pending' && displayStatus !== 'created' && displayStatus !== 'closing';
+    const terminal =
+      displayStatus !== "pending" &&
+      displayStatus !== "created" &&
+      displayStatus !== "closing";
     return {
       orderId: order.id,
       orderNo: order.orderNo,
       status: order.status,
       displayStatus,
       amountCents: order.paidCents,
-      currency: order.currency || 'CNY',
+      currency: order.currency || "CNY",
       providerId: order.channel,
       checkoutMode: order.checkoutMode,
-      checkoutValue: terminal ? '' : order.checkoutValue,
+      checkoutValue: terminal ? "" : order.checkoutValue,
       expiresAt: order.expiresAt.toISOString(),
-      providerPaidAt: order.providerPaidAt ? order.providerPaidAt.toISOString() : null,
+      providerPaidAt: order.providerPaidAt
+        ? order.providerPaidAt.toISOString()
+        : null,
       creditedAt: order.paidAt ? order.paidAt.toISOString() : null,
       closedAt: order.closedAt ? order.closedAt.toISOString() : null,
       lastError: order.lastError,
@@ -883,7 +975,10 @@ export class PaymentOrderService {
   }
 
   private webBase(): string {
-    return (process.env.WEB_BASE_URL || 'http://localhost:5100').replace(/\/$/, '');
+    return (process.env.WEB_BASE_URL || "http://localhost:5100").replace(
+      /\/$/,
+      "",
+    );
   }
 
   /**
@@ -897,9 +992,13 @@ export class PaymentOrderService {
     membershipPlanId?: string | null;
     items?: Array<{ skuSnapshot: string }>;
   }): string {
-    const query = new URLSearchParams({ orderId: order.id, paymentReturn: '1' });
+    const query = new URLSearchParams({
+      orderId: order.id,
+      paymentReturn: "1",
+    });
     const sku = order.items?.[0]?.skuSnapshot;
-    if (sku) return `${this.webBase()}/checkout/${encodeURIComponent(sku)}?${query.toString()}`;
+    if (sku)
+      return `${this.webBase()}/checkout/${encodeURIComponent(sku)}?${query.toString()}`;
     if (order.membershipPlanId) {
       return `${this.webBase()}/checkout/membership?${query.toString()}`;
     }

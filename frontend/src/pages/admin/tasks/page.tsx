@@ -20,9 +20,8 @@ import {
   TextField,
   type AdminColumn,
   type AppliedFilter,
-} from './components';
+} from '~/admin-ui/primitives';
 import { assetThumbUrl, adminTasksApi } from './api';
-import { auditReason } from '../../../admin-ui/lib/auditReason';
 import {
   useAdmin,
   useAdminDetailParam,
@@ -211,13 +210,7 @@ export function AdminTasksPage() {
     if (selected.length === 0) return;
     setBusy(true);
     try {
-      const summary = await adminTasksApi.batch(
-        selected,
-        kind,
-        kind === 'delete'
-          ? undefined
-          : auditReason(kind === 'retry' ? '批量重试任务' : '批量终止任务'),
-      );
+      const summary = await adminTasksApi.batch(selected, kind);
       setBatchTitle(
         kind === 'retry'
           ? '批量重试结果'
@@ -369,10 +362,10 @@ export function AdminTasksPage() {
     setBusy(true);
     try {
       if (confirm.kind === 'retry') {
-        const r = await adminTasksApi.retry(confirm.task.id, auditReason('重试任务'));
+        const r = await adminTasksApi.retry(confirm.task.id);
         toast.success(`已用原参数新建任务 ${shortId(r.taskId)}`);
       } else if (confirm.kind === 'cancel') {
-        await adminTasksApi.cancel(confirm.task.id, auditReason('终止任务'));
+        await adminTasksApi.cancel(confirm.task.id);
         toast.success('任务已终止');
       } else {
         await adminTasksApi.remove(confirm.task.id);

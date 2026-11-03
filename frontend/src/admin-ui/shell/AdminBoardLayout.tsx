@@ -10,6 +10,7 @@ import { cn } from '../lib/cn';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
@@ -235,11 +236,10 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
           data-testid="admin-brand"
           className="flex min-w-0 items-center gap-2 rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
           onClick={() => void leave('/admin')}
-          aria-label="货觉 AI 运营后台首页"
+          aria-label="logon+ 运营后台首页"
         >
-          <img className="size-6 shrink-0" src="/brand/huojue-mark.svg" alt="" />
-          <span className="truncate text-sm font-semibold text-foreground">
-            货觉<span className="text-muted-foreground"> 运营后台</span>
+          <span className="truncate text-lg font-bold tracking-tight text-foreground">
+            logon<span className="text-primary">+</span>
           </span>
         </button>
 
@@ -280,22 +280,24 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
                   <p className="truncate text-xs text-muted-foreground">{me?.roleLabel}</p>
                 </div>
               </div>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => navigate('/workbench')}>
-                <ArrowUpRight className="size-3.5" aria-hidden />
-                返回前台
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                variant="destructive"
-                onSelect={() => {
-                  logout();
-                  navigate('/login');
-                }}
-              >
-                <LogOut className="size-3.5" aria-hidden />
-                退出登录
-              </DropdownMenuItem>
+              <DropdownMenuGroup>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={() => navigate('/workbench')}>
+                  <ArrowUpRight className="size-3.5" aria-hidden />
+                  返回前台
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  variant="destructive"
+                  onSelect={() => {
+                    logout();
+                    navigate('/login');
+                  }}
+                >
+                  <LogOut className="size-3.5" aria-hidden />
+                  退出登录
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>

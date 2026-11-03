@@ -1,22 +1,31 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
-import { AppError } from '../common/app.exception';
-import { decodeCsvBuffer, parseCsv } from '../common/csv';
-import { readFirstCsvFromZip } from '../common/archive/zip-reader';
-import { PaymentConfigService } from './payment-config.service';
-import { PaymentOrderService } from './payment-order.service';
-import { getAdapter } from './adapters';
-import { BillRecord, PaymentCurrency, PaymentProviderId } from './adapters/types';
-import { formatShanghai, parseDateStrict, shanghaiDayRange, startOfShanghaiDay } from './payment-query';
+import { Injectable, Logger } from "@nestjs/common";
+import { PrismaService } from "../prisma/prisma.service";
+import { AppError } from "../common/app.exception";
+import { decodeCsvBuffer, parseCsv } from "../common/csv";
+import { readFirstCsvFromZip } from "../common/archive/zip-reader";
+import { PaymentConfigService } from "./payment-config.service";
+import { PaymentOrderService } from "./payment-order.service";
+import { getAdapter } from "./adapters";
+import {
+  BillRecord,
+  PaymentCurrency,
+  PaymentProviderId,
+} from "./adapters/types";
+import {
+  formatShanghai,
+  parseDateStrict,
+  shanghaiDayRange,
+  startOfShanghaiDay,
+} from "./payment-query";
 
 export const RECONCILIATION_RESULTS = [
-  'matched',
-  'recovered',
-  'local_order_not_found',
-  'provider_record_missing',
-  'amount_mismatch',
-  'trade_no_mismatch',
-  'credit_failed',
+  "matched",
+  "recovered",
+  "local_order_not_found",
+  "provider_record_missing",
+  "amount_mismatch",
+  "trade_no_mismatch",
+  "credit_failed",
 ] as const;
 
 export type ReconciliationResult = (typeof RECONCILIATION_RESULTS)[number];
@@ -92,31 +101,34 @@ export class PaymentReconciliationService {
     billDate: string;
     retryFailed?: boolean;
     actorId: string;
-    reason: string;
   }): Promise<{ run: RunView; reused: boolean }> {
     this.assertBillDate(input.billDate);
 
     const latest = await this.prisma.paymentReconciliationRun.findFirst({
       where: { providerId: input.providerId, billDate: input.billDate },
-      orderBy: { attempt: 'desc' },
+      orderBy: { attempt: "desc" },
     });
-    if (latest?.status === 'running') {
+    if (latest?.status === "running") {
       if (!(await this.recoverIfStale(latest))) {
-        throw new AppError(40901, '该账单日的对账正在执行中', 409);
+        throw new AppError(40901, "该账单日的对账正在执行中", 409);
       }
     }
-    if (latest?.status === 'completed' && !input.retryFailed) {
+    if (latest?.status === "completed" && !input.retryFailed) {
       return { run: toRunView(latest), reused: true };
     }
 
     const adapter = getAdapter(input.providerId);
-    if (!adapter) throw new AppError(40400, `未知支付渠道: ${input.providerId}`, 404);
-    if (!adapter.descriptor.supportsReconciliation || !adapter.downloadTradeBill) {
+    if (!adapter)
+      throw new AppError(40400, `未知支付渠道: ${input.providerId}`, 404);
+    if (
+      !adapter.descriptor.supportsReconciliation ||
+      !adapter.downloadTradeBill
+    ) {
       throw new AppError(40001, `渠道 ${input.providerId} 不支持自动对账`, 400);
     }
 
     const config = await this.configs.latest(input.providerId);
-    if (!config) throw new AppError(50301, '渠道未完成配置，无法对账', 503);
+    if (!config) throw new AppError(50301, "渠道未完成配置，无法对账", 503);
 
     const attempt = (latest?.attempt ?? 0) + 1;
     let run = await this.createRunRow({
@@ -124,8 +136,8 @@ export class PaymentReconciliationService {
       configId: config.id,
       billDate: input.billDate,
       attempt,
-      source: 'provider',
-      status: 'running',
+      source: "provider",
+      status: "running",
       startedBy: input.actorId,
     });
 
@@ -143,13 +155,28 @@ export class PaymentReconciliationService {
     } catch (e) {
       run = await this.prisma.paymentReconciliationRun.update({
         where: { id: run.id },
-        data: { status: 'failed', error: truncate((e as Error).message, 500), completedAt: new Date() },
+        data: {
+          status: "failed",
+          error: truncate((e as Error).message, 500),
+          completedAt: new Date(),
+        },
       });
-      this.logger.error(`对账账单下载失败 (${input.providerId} ${input.billDate}): ${(e as Error).message}`);
+      this.logger.error(
+        `对账账单下载失败 (${input.providerId} ${input.billDate}): ${(e as Error).message}`,
+      );
       return { run: toRunView(run), reused: false };
     }
 
-    return { run: await this.compare(run.id, input.providerId, config.id, records, input.billDate), reused: false };
+    return {
+      run: await this.compare(
+        run.id,
+        input.providerId,
+        config.id,
+        records,
+        input.billDate,
+      ),
+      reused: false,
+    };
   }
 
   async importCsv(input: {
@@ -158,11 +185,11 @@ export class PaymentReconciliationService {
     file: Buffer;
     fileName: string;
     actorId: string;
-    reason: string;
   }): Promise<{ run: RunView }> {
     this.assertBillDate(input.billDate);
     const adapter = getAdapter(input.providerId);
-    if (!adapter) throw new AppError(40400, `未知支付渠道: ${input.providerId}`, 404);
+    if (!adapter)
+      throw new AppError(40400, `未知支付渠道: ${input.providerId}`, 404);
     if (!adapter.descriptor.supportsReconciliation) {
       throw new AppError(40001, `渠道 ${input.providerId} 不支持对账导入`, 400);
     }
@@ -171,15 +198,16 @@ export class PaymentReconciliationService {
       decodeCsvBuffer(extractImportCsv(input.file, input.providerId)),
       input.providerId,
     );
-    if (records.length === 0) throw new AppError(40001, '账单没有交易记录', 400);
+    if (records.length === 0)
+      throw new AppError(40001, "账单没有交易记录", 400);
 
     const config = await this.configs.latest(input.providerId);
     const latest = await this.prisma.paymentReconciliationRun.findFirst({
       where: { providerId: input.providerId, billDate: input.billDate },
-      orderBy: { attempt: 'desc' },
+      orderBy: { attempt: "desc" },
     });
-    if (latest?.status === 'running' && !(await this.recoverIfStale(latest))) {
-      throw new AppError(40901, '该账单日的对账正在执行中', 409);
+    if (latest?.status === "running" && !(await this.recoverIfStale(latest))) {
+      throw new AppError(40901, "该账单日的对账正在执行中", 409);
     }
 
     const run = await this.createRunRow({
@@ -187,16 +215,16 @@ export class PaymentReconciliationService {
       configId: config?.id ?? null,
       billDate: input.billDate,
       attempt: (latest?.attempt ?? 0) + 1,
-      source: 'csv',
+      source: "csv",
       fileName: input.fileName,
-      status: 'running',
+      status: "running",
       startedBy: input.actorId,
     });
 
     const compared = await this.compare(
       run.id,
       input.providerId,
-      config?.id ?? '',
+      config?.id ?? "",
       records,
       input.billDate,
     );
@@ -211,7 +239,7 @@ export class PaymentReconciliationService {
     const where: Record<string, unknown> = {};
     if (query.providerId) where.providerId = query.providerId;
     if (query.status) {
-      if (!['running', 'completed', 'failed'].includes(query.status)) {
+      if (!["running", "completed", "failed"].includes(query.status)) {
         throw new AppError(40001, `对账状态非法: ${query.status}`, 400);
       }
       where.status = query.status;
@@ -228,7 +256,7 @@ export class PaymentReconciliationService {
     const [rows, total] = await Promise.all([
       this.prisma.paymentReconciliationRun.findMany({
         where,
-        orderBy: [{ billDate: 'desc' }, { attempt: 'desc' }, { id: 'asc' }],
+        orderBy: [{ billDate: "desc" }, { attempt: "desc" }, { id: "asc" }],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -241,16 +269,20 @@ export class PaymentReconciliationService {
     runId: string,
     query: { result?: string; page?: number; pageSize?: number },
   ) {
-    const run = await this.prisma.paymentReconciliationRun.findUnique({ where: { id: runId } });
-    if (!run) throw new AppError(40400, '对账记录不存在', 404);
+    const run = await this.prisma.paymentReconciliationRun.findUnique({
+      where: { id: runId },
+    });
+    if (!run) throw new AppError(40400, "对账记录不存在", 404);
 
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 50;
     const where: Record<string, unknown> = { runId };
-    if (query.result && query.result !== 'all') {
-      if (query.result === 'abnormal') {
-        where.result = { notIn: ['matched', 'recovered'] };
-      } else if ((RECONCILIATION_RESULTS as readonly string[]).includes(query.result)) {
+    if (query.result && query.result !== "all") {
+      if (query.result === "abnormal") {
+        where.result = { notIn: ["matched", "recovered"] };
+      } else if (
+        (RECONCILIATION_RESULTS as readonly string[]).includes(query.result)
+      ) {
         where.result = query.result;
       } else {
         throw new AppError(40001, `对账结果筛选值非法: ${query.result}`, 400);
@@ -260,7 +292,7 @@ export class PaymentReconciliationService {
     const [rows, total] = await Promise.all([
       this.prisma.paymentReconciliationItem.findMany({
         where,
-        orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
         skip: (page - 1) * pageSize,
         take: pageSize,
       }),
@@ -296,20 +328,23 @@ export class PaymentReconciliationService {
     }
     return this.prisma.paymentReconciliationRun.findMany({
       where,
-      orderBy: [{ billDate: 'desc' }, { attempt: 'desc' }],
+      orderBy: [{ billDate: "desc" }, { attempt: "desc" }],
       take: RECONCILIATION_EXPORT_LIMIT,
     });
   }
 
   async itemsForExport(runId: string, result?: string) {
-    const run = await this.prisma.paymentReconciliationRun.findUnique({ where: { id: runId } });
-    if (!run) throw new AppError(40400, '对账记录不存在', 404);
-    if (run.status !== 'completed') {
-      throw new AppError(40901, '执行中的对账不能导出明细', 409);
+    const run = await this.prisma.paymentReconciliationRun.findUnique({
+      where: { id: runId },
+    });
+    if (!run) throw new AppError(40400, "对账记录不存在", 404);
+    if (run.status !== "completed") {
+      throw new AppError(40901, "执行中的对账不能导出明细", 409);
     }
     const where: Record<string, unknown> = { runId };
-    if (result && result !== 'all') {
-      if (result === 'abnormal') where.result = { notIn: ['matched', 'recovered'] };
+    if (result && result !== "all") {
+      if (result === "abnormal")
+        where.result = { notIn: ["matched", "recovered"] };
       else where.result = result;
     }
     const total = await this.prisma.paymentReconciliationItem.count({ where });
@@ -322,7 +357,7 @@ export class PaymentReconciliationService {
     }
     return this.prisma.paymentReconciliationItem.findMany({
       where,
-      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       take: RECONCILIATION_EXPORT_LIMIT,
     });
   }
@@ -343,9 +378,14 @@ export class PaymentReconciliationService {
 
     for (const record of records) {
       seenOrderNos.add(record.merchantOrderNo);
-      const outcome = await this.compareOne(runId, providerId, configId, record);
-      if (outcome === 'matched') matched += 1;
-      else if (outcome === 'recovered') recovered += 1;
+      const outcome = await this.compareOne(
+        runId,
+        providerId,
+        configId,
+        record,
+      );
+      if (outcome === "matched") matched += 1;
+      else if (outcome === "recovered") recovered += 1;
       else errors += 1;
     }
 
@@ -353,14 +393,22 @@ export class PaymentReconciliationService {
     const localPaid = await this.prisma.order.findMany({
       where: {
         channel: providerId,
-        status: 'paid',
+        status: "paid",
         providerPaidAt: {
           gte: startOfShanghaiDay(billDate),
-          lte: new Date(startOfShanghaiDay(billDate).getTime() + 24 * 3600 * 1000 - 1),
+          lte: new Date(
+            startOfShanghaiDay(billDate).getTime() + 24 * 3600 * 1000 - 1,
+          ),
         },
         providerTradeNo: { not: null },
       },
-      select: { id: true, orderNo: true, providerTradeNo: true, paidCents: true, currency: true },
+      select: {
+        id: true,
+        orderNo: true,
+        providerTradeNo: true,
+        paidCents: true,
+        currency: true,
+      },
     });
     for (const order of localPaid) {
       if (seenOrderNos.has(order.orderNo)) continue;
@@ -372,9 +420,9 @@ export class PaymentReconciliationService {
           merchantOrderNo: order.orderNo,
           providerTradeNo: order.providerTradeNo,
           amountCents: order.paidCents,
-          currency: order.currency || 'CNY',
-          result: 'provider_record_missing',
-          detail: '本地已支付但渠道账单没有该笔记录',
+          currency: order.currency || "CNY",
+          result: "provider_record_missing",
+          detail: "本地已支付但渠道账单没有该笔记录",
         },
       });
       errors += 1;
@@ -383,7 +431,7 @@ export class PaymentReconciliationService {
     const run = await this.prisma.paymentReconciliationRun.update({
       where: { id: runId },
       data: {
-        status: 'completed',
+        status: "completed",
         completedAt: new Date(),
         totalItems: matched + recovered + errors,
         matchItems: matched,
@@ -404,7 +452,9 @@ export class PaymentReconciliationService {
     configId: string,
     record: BillRecord,
   ): Promise<ReconciliationResult> {
-    const order = await this.prisma.order.findUnique({ where: { orderNo: record.merchantOrderNo } });
+    const order = await this.prisma.order.findUnique({
+      where: { orderNo: record.merchantOrderNo },
+    });
 
     const writeItem = async (
       result: ReconciliationResult,
@@ -413,7 +463,12 @@ export class PaymentReconciliationService {
       resolved = false,
     ): Promise<void> => {
       await this.prisma.paymentReconciliationItem.upsert({
-        where: { runId_merchantOrderNo: { runId, merchantOrderNo: record.merchantOrderNo } },
+        where: {
+          runId_merchantOrderNo: {
+            runId,
+            merchantOrderNo: record.merchantOrderNo,
+          },
+        },
         create: {
           runId,
           providerId,
@@ -431,46 +486,65 @@ export class PaymentReconciliationService {
     };
 
     if (!order) {
-      await writeItem('local_order_not_found', '本地不存在该商户订单号');
-      return 'local_order_not_found';
+      await writeItem("local_order_not_found", "本地不存在该商户订单号");
+      return "local_order_not_found";
     }
 
-    if (order.status === 'cancelled') {
-      await writeItem('credit_failed', '本地订单已取消但渠道账单显示成功，需人工补单或退款', order.id);
-      return 'credit_failed';
+    if (order.status === "cancelled") {
+      await writeItem(
+        "credit_failed",
+        "本地订单已取消但渠道账单显示成功，需人工补单或退款",
+        order.id,
+      );
+      return "credit_failed";
     }
 
-    if (order.status === 'paid' || order.status === 'refunded' || order.status === 'partial_refunded') {
-      if (order.providerTradeNo && order.providerTradeNo !== record.providerTradeNo) {
+    if (
+      order.status === "paid" ||
+      order.status === "refunded" ||
+      order.status === "partial_refunded"
+    ) {
+      if (
+        order.providerTradeNo &&
+        order.providerTradeNo !== record.providerTradeNo
+      ) {
         await writeItem(
-          'trade_no_mismatch',
+          "trade_no_mismatch",
           `本地交易号 ${order.providerTradeNo} 与账单 ${record.providerTradeNo} 不一致`,
           order.id,
         );
-        return 'trade_no_mismatch';
+        return "trade_no_mismatch";
       }
       if (order.paidCents !== record.amountCents) {
         await writeItem(
-          'amount_mismatch',
+          "amount_mismatch",
           `本地实付 ${order.paidCents} 分与账单 ${record.amountCents} 分不一致`,
           order.id,
         );
-        return 'amount_mismatch';
+        return "amount_mismatch";
       }
-      await writeItem('matched', '一致', order.id);
-      return 'matched';
+      await writeItem("matched", "一致", order.id);
+      return "matched";
     }
 
     // 本地 pending，账单显示成功 → 必须用固定配置查单二次确认后才补发
     if (!configId) {
-      await writeItem('credit_failed', '渠道未配置，无法二次查单确认', order.id);
-      return 'credit_failed';
+      await writeItem(
+        "credit_failed",
+        "渠道未配置，无法二次查单确认",
+        order.id,
+      );
+      return "credit_failed";
     }
     const config = await this.configs.latest(providerId);
     const adapter = getAdapter(providerId);
     if (!config || !adapter) {
-      await writeItem('credit_failed', '渠道配置缺失，无法二次查单确认', order.id);
-      return 'credit_failed';
+      await writeItem(
+        "credit_failed",
+        "渠道配置缺失，无法二次查单确认",
+        order.id,
+      );
+      return "credit_failed";
     }
 
     try {
@@ -484,9 +558,13 @@ export class PaymentReconciliationService {
         orderNo: order.orderNo,
         providerTradeNo: record.providerTradeNo,
       });
-      if (queried.state !== 'paid') {
-        await writeItem('credit_failed', `账单显示成功但查单结果为 ${queried.state}`, order.id);
-        return 'credit_failed';
+      if (queried.state !== "paid") {
+        await writeItem(
+          "credit_failed",
+          `账单显示成功但查单结果为 ${queried.state}`,
+          order.id,
+        );
+        return "credit_failed";
       }
       await this.orders.applyPaymentResult({
         orderId: order.id,
@@ -499,11 +577,15 @@ export class PaymentReconciliationService {
         providerStatus: queried.providerStatus,
         rawPayload: queried.rawPayload,
       });
-      await writeItem('recovered', '已通过查单确认并自动补发', order.id, true);
-      return 'recovered';
+      await writeItem("recovered", "已通过查单确认并自动补发", order.id, true);
+      return "recovered";
     } catch (e) {
-      await writeItem('credit_failed', `补发失败: ${(e as Error).message}`, order.id);
-      return 'credit_failed';
+      await writeItem(
+        "credit_failed",
+        `补发失败: ${(e as Error).message}`,
+        order.id,
+      );
+      return "credit_failed";
     }
   }
 
@@ -525,8 +607,8 @@ export class PaymentReconciliationService {
     try {
       return await this.prisma.paymentReconciliationRun.create({ data });
     } catch (e) {
-      if ((e as { code?: string })?.code === 'P2002') {
-        throw new AppError(40901, '该账单日的对账正在执行中', 409);
+      if ((e as { code?: string })?.code === "P2002") {
+        throw new AppError(40901, "该账单日的对账正在执行中", 409);
       }
       throw e;
     }
@@ -539,12 +621,12 @@ export class PaymentReconciliationService {
   async recoverStaleRuns(): Promise<number> {
     const result = await this.prisma.paymentReconciliationRun.updateMany({
       where: {
-        status: 'running',
+        status: "running",
         startedAt: { lt: new Date(Date.now() - RECONCILIATION_RUN_STALE_MS) },
       },
       data: {
-        status: 'failed',
-        error: '执行超时（进程中断或长时间未完成），已自动回收，可重新执行',
+        status: "failed",
+        error: "执行超时（进程中断或长时间未完成），已自动回收，可重新执行",
         completedAt: new Date(),
       },
     });
@@ -555,13 +637,17 @@ export class PaymentReconciliationService {
   }
 
   /** 返回 true 表示该 running 行已过期并被回收，可以继续新建 attempt */
-  private async recoverIfStale(run: { id: string; startedAt: Date }): Promise<boolean> {
-    if (run.startedAt.getTime() > Date.now() - RECONCILIATION_RUN_STALE_MS) return false;
+  private async recoverIfStale(run: {
+    id: string;
+    startedAt: Date;
+  }): Promise<boolean> {
+    if (run.startedAt.getTime() > Date.now() - RECONCILIATION_RUN_STALE_MS)
+      return false;
     await this.prisma.paymentReconciliationRun.update({
       where: { id: run.id },
       data: {
-        status: 'failed',
-        error: '执行超时（进程中断或长时间未完成），已自动回收，可重新执行',
+        status: "failed",
+        error: "执行超时（进程中断或长时间未完成），已自动回收，可重新执行",
         completedAt: new Date(),
       },
     });
@@ -574,57 +660,81 @@ export class PaymentReconciliationService {
     const start = startOfShanghaiDay(billDate).getTime();
     const yesterday = new Date(Date.now() - 8 * 3600 * 1000);
     const todayStart = new Date(
-      Date.UTC(yesterday.getUTCFullYear(), yesterday.getUTCMonth(), yesterday.getUTCDate()),
+      Date.UTC(
+        yesterday.getUTCFullYear(),
+        yesterday.getUTCMonth(),
+        yesterday.getUTCDate(),
+      ),
     ).getTime();
-    if (start >= todayStart) throw new AppError(40001, '账单日期不能晚于昨天', 400);
+    if (start >= todayStart)
+      throw new AppError(40001, "账单日期不能晚于昨天", 400);
     if (start < todayStart - 90 * 24 * 3600 * 1000) {
-      throw new AppError(40001, '只能对账最近 90 天的账单', 400);
+      throw new AppError(40001, "只能对账最近 90 天的账单", 400);
     }
   }
 }
 
 function extractImportCsv(data: Buffer, providerId: PaymentProviderId): Buffer {
   const isZip =
-    data.length >= 4 && data[0] === 0x50 && data[1] === 0x4b && data[2] === 0x03 && data[3] === 0x04;
+    data.length >= 4 &&
+    data[0] === 0x50 &&
+    data[1] === 0x4b &&
+    data[2] === 0x03 &&
+    data[3] === 0x04;
   if (!isZip) return data;
-  if (providerId !== 'alipay') {
-    throw new AppError(40001, '只有支付宝账单支持 ZIP 格式，微信请上传 CSV', 400);
+  if (providerId !== "alipay") {
+    throw new AppError(
+      40001,
+      "只有支付宝账单支持 ZIP 格式，微信请上传 CSV",
+      400,
+    );
   }
   return readFirstCsvFromZip(data);
 }
 
-function parseBillCsv(text: string, providerId: PaymentProviderId): BillRecord[] {
+function parseBillCsv(
+  text: string,
+  providerId: PaymentProviderId,
+): BillRecord[] {
   const rows = parseCsv(text);
   if (rows.length < 2) return [];
-  const header = rows[0].map((h) => h.replace(/^\uFEFF/, '').trim());
+  const header = rows[0].map((h) => h.replace(/^\uFEFF/, "").trim());
   const col = (name: string) => header.findIndex((h) => h.includes(name));
-  const iOrderNo = col('商户订单号') >= 0 ? col('商户订单号') : col('订单号');
-  const iTradeNo = col('渠道交易号') >= 0 ? col('渠道交易号') : col('交易号');
-  const iAmount = col('金额');
-  const iPaidAt = col('支付时间') >= 0 ? col('支付时间') : col('完成时间');
-  const iStatus = col('状态');
+  const iOrderNo = col("商户订单号") >= 0 ? col("商户订单号") : col("订单号");
+  const iTradeNo = col("渠道交易号") >= 0 ? col("渠道交易号") : col("交易号");
+  const iAmount = col("金额");
+  const iPaidAt = col("支付时间") >= 0 ? col("支付时间") : col("完成时间");
+  const iStatus = col("状态");
   if (iOrderNo < 0 || iTradeNo < 0 || iAmount < 0) {
-    throw new AppError(40001, 'CSV 表头无法识别（需要：商户订单号 / 渠道交易号 / 金额）', 400);
+    throw new AppError(
+      40001,
+      "CSV 表头无法识别（需要：商户订单号 / 渠道交易号 / 金额）",
+      400,
+    );
   }
   const out: BillRecord[] = [];
   for (const row of rows.slice(1)) {
-    const status = iStatus >= 0 ? (row[iStatus] ?? '').trim() : '';
+    const status = iStatus >= 0 ? (row[iStatus] ?? "").trim() : "";
     if (status && !/成功|SUCCESS|paid/i.test(status)) continue;
-    const merchantOrderNo = (row[iOrderNo] ?? '').trim();
-    const providerTradeNo = (row[iTradeNo] ?? '').trim();
-    const rawAmount = (row[iAmount] ?? '').trim();
-    const amountCents = rawAmount.includes('.')
+    const merchantOrderNo = (row[iOrderNo] ?? "").trim();
+    const providerTradeNo = (row[iTradeNo] ?? "").trim();
+    const rawAmount = (row[iAmount] ?? "").trim();
+    const amountCents = rawAmount.includes(".")
       ? Math.round(Number.parseFloat(rawAmount) * 100)
       : Number.parseInt(rawAmount, 10);
-    if (!merchantOrderNo || !providerTradeNo || !Number.isFinite(amountCents)) continue;
-    const paidRaw = iPaidAt >= 0 ? (row[iPaidAt] ?? '').trim() : '';
+    if (!merchantOrderNo || !providerTradeNo || !Number.isFinite(amountCents))
+      continue;
+    const paidRaw = iPaidAt >= 0 ? (row[iPaidAt] ?? "").trim() : "";
     out.push({
       merchantOrderNo,
       providerTradeNo,
       amountCents,
-      currency: 'CNY',
-      paidAt: paidRaw ? new Date(paidRaw.replace(' ', 'T') + '+08:00') : new Date(),
-      providerStatus: status || (providerId === 'alipay' ? 'TRADE_SUCCESS' : 'SUCCESS'),
+      currency: "CNY",
+      paidAt: paidRaw
+        ? new Date(paidRaw.replace(" ", "T") + "+08:00")
+        : new Date(),
+      providerStatus:
+        status || (providerId === "alipay" ? "TRADE_SUCCESS" : "SUCCESS"),
     });
   }
   return out;

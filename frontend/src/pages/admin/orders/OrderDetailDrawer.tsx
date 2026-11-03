@@ -6,7 +6,7 @@ import {
   Descriptions,
   DetailSection,
   StatusTag,
-} from './components';
+} from '~/admin-ui/primitives';
 import { adminOrdersApi } from './api';
 import { CHANNEL_LABELS, REFUND_STATUS_LABELS, STATUS_LABEL_OVERRIDE } from './constants';
 import {

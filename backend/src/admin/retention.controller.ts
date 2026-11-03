@@ -1,12 +1,12 @@
-import { Body, Controller, Get, Post, Query } from '@nestjs/common';
-import { Transform, Type } from 'class-transformer';
-import { IsIn, IsInt, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
-import { AuditAction, RequirePermission } from './admin.decorator';
-import { BackupService } from './backup.service';
-import { AdminSettingsService } from './settings.service';
-import { PrismaService } from '../prisma/prisma.service';
-import { AppError } from '../common/app.exception';
-import { PERMISSIONS } from './permissions';
+import { Body, Controller, Get, Post, Query } from "@nestjs/common";
+import { Transform, Type } from "class-transformer";
+import { IsIn, IsInt, Max, Min } from "class-validator";
+import { AuditAction, RequirePermission } from "./admin.decorator";
+import { BackupService } from "./backup.service";
+import { AdminSettingsService } from "./settings.service";
+import { PrismaService } from "../prisma/prisma.service";
+import { AppError } from "../common/app.exception";
+import { PERMISSIONS } from "./permissions";
 
 /**
  * 保留期清理 (B-96)。
@@ -32,26 +32,26 @@ interface RetentionTarget {
 
 const TARGETS: RetentionTarget[] = [
   {
-    table: 'AdminAuditLog',
-    label: '后台操作审计',
+    table: "AdminAuditLog",
+    label: "后台操作审计",
     defaultDays: 180,
-    note: '合规要求可追溯, 默认保留半年; 实际天数取系统设置 retention.auditLogDays',
+    note: "合规要求可追溯, 默认保留半年; 实际天数取系统设置 retention.auditLogDays",
   },
   {
-    table: 'ApiCallLog',
-    label: '调用记录',
+    table: "ApiCallLog",
+    label: "调用记录",
     defaultDays: 90,
-    note: '排障窗口通常为一周, 保留三个月足够定位问题且不至于无限增长',
+    note: "排障窗口通常为一周, 保留三个月足够定位问题且不至于无限增长",
   },
   {
-    table: 'BackupRecord',
-    label: '备份记录',
+    table: "BackupRecord",
+    label: "备份记录",
     defaultDays: 180,
-    note: '备份文件按份数裁剪, 记录留半年便于回溯哪次备份可恢复',
+    note: "备份文件按份数裁剪, 记录留半年便于回溯哪次备份可恢复",
   },
   {
-    table: 'CleanupLog',
-    label: '清理日志',
+    table: "CleanupLog",
+    label: "清理日志",
     defaultDays: 365,
     note: '清理自身的记录保留最久, 否则"谁删了什么"将无从查证',
   },
@@ -61,36 +61,29 @@ const TABLE_NAMES = TARGETS.map((t) => t.table);
 
 /** 手动清理 */
 export class RetentionCleanupDto {
-  @IsIn(TABLE_NAMES, { message: '不支持清理该目标' })
+  @IsIn(TABLE_NAMES, { message: "不支持清理该目标" })
   target!: string;
 
   /** 保留天数。下限 7 —— 低于一周的日志连一次故障复盘都撑不过 */
   @IsInt()
-  @Min(7, { message: '保留天数至少为 7 天' })
+  @Min(7, { message: "保留天数至少为 7 天" })
   @Max(3650)
   retentionDays!: number;
-
-  /** 操作原因。高危动作强制填写 */
-  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
-  @IsString({ message: '请填写清理原因' })
-  @MinLength(2, { message: '清理原因至少 2 个字符' })
-  @MaxLength(200, { message: '清理原因最多 200 个字符' })
-  reason!: string;
 }
 
 /** 按指定目标与天数重新预览影响范围 */
 export class RetentionPreviewQueryDto {
-  @IsIn(TABLE_NAMES, { message: '不支持预览该目标' })
+  @IsIn(TABLE_NAMES, { message: "不支持预览该目标" })
   target!: string;
 
   @Type(() => Number)
   @IsInt()
-  @Min(7, { message: '保留天数至少为 7 天' })
+  @Min(7, { message: "保留天数至少为 7 天" })
   @Max(3650)
   retentionDays!: number;
 }
 
-@Controller('admin/retention')
+@Controller("admin/retention")
 export class AdminRetentionController {
   constructor(
     private readonly prisma: PrismaService,
@@ -104,21 +97,22 @@ export class AdminRetentionController {
    * 同时给出「当前条数 / 最早一条的时间 / 按默认天数会被删多少」——
    * 只显示条数的话, 运营点下确认前无法判断这次清理影响有多大。
    */
-  @Get('targets')
+  @Get("targets")
   @RequirePermission(PERMISSIONS.backupRead)
   async targets() {
-    const auditDays = Number(await this.settings.get('retention.auditLogDays')) || 180;
+    const auditDays =
+      Number(await this.settings.get("retention.auditLogDays")) || 180;
 
     return Promise.all(
       TARGETS.map(async (t) => {
-        const days = t.table === 'AdminAuditLog' ? auditDays : t.defaultDays;
+        const days = t.table === "AdminAuditLog" ? auditDays : t.defaultDays;
         return this.previewTarget(t, days);
       }),
     );
   }
 
   /** 确认清理前按用户当前天数重新估算，避免拿页面上过期数字做不可逆操作 */
-  @Get('preview')
+  @Get("preview")
   @RequirePermission(PERMISSIONS.backupRead)
   async preview(@Query() query: RetentionPreviewQueryDto) {
     const target = TARGETS.find((item) => item.table === query.target);
@@ -129,12 +123,15 @@ export class AdminRetentionController {
   }
 
   /** 清理历史记录 */
-  @Get('logs')
+  @Get("logs")
   @RequirePermission(PERMISSIONS.backupRead)
-  async logs(@Query('pageSize') pageSize?: string) {
+  async logs(@Query("pageSize") pageSize?: string) {
     const raw = Number(pageSize ?? 50);
     const take = Number.isFinite(raw) ? Math.min(Math.max(raw, 1), 200) : 50;
-    return this.prisma.cleanupLog.findMany({ orderBy: { createdAt: 'desc' }, take });
+    return this.prisma.cleanupLog.findMany({
+      orderBy: { createdAt: "desc" },
+      take,
+    });
   }
 
   /**
@@ -143,14 +140,14 @@ export class AdminRetentionController {
    * 复用 BackupService.cleanupExpired —— 与调度任务走同一条路径,
    * 避免"手动清理"和"定时清理"两套逻辑在保留天数上各说各话。
    */
-  @Post('cleanup')
+  @Post("cleanup")
   @RequirePermission(PERMISSIONS.backupRun)
-  @AuditAction('data.cleanup')
+  @AuditAction("data.cleanup")
   cleanup(@Body() dto: RetentionCleanupDto) {
     if (!TABLE_NAMES.includes(dto.target)) {
       throw new AppError(40001, `不支持清理该目标: ${dto.target}`, 400);
     }
-    return this.backup.cleanupExpired(dto.target, dto.retentionDays, 'manual');
+    return this.backup.cleanupExpired(dto.target, dto.retentionDays, "manual");
   }
 
   private async previewTarget(t: RetentionTarget, days: number) {
@@ -159,7 +156,10 @@ export class AdminRetentionController {
     const [total, expired, oldest] = await Promise.all([
       delegate.count(),
       delegate.count({ where: { createdAt: { lt: cutoff } } }),
-      delegate.findFirst({ orderBy: { createdAt: 'asc' }, select: { createdAt: true } }),
+      delegate.findFirst({
+        orderBy: { createdAt: "asc" },
+        select: { createdAt: true },
+      }),
     ]);
     return {
       table: t.table,

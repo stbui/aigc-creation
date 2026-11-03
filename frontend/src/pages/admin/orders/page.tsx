@@ -19,9 +19,8 @@ import {
   TextField,
   type AdminColumn,
   type AppliedFilter,
-} from './components';
+} from '~/admin-ui/primitives';
 import { adminOrdersApi } from './api';
-import { auditReason } from '../../../admin-ui/lib/auditReason';
 import { useAdmin, useAdminDetailParam, useAdminList, useAdminUrlFilterSync, useToast } from './hooks';
 import { adminOrderDetailHref, adminUserDetailHref, yuan, yuanToCents } from './utils';
 import {
@@ -93,6 +92,7 @@ export function AdminOrdersPage() {
   );
   /** 退款金额（元）。打开弹窗时预填可退上限 */
   const [refundYuan, setRefundYuan] = useState('');
+  const [refundReason, setRefundReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
 
@@ -296,6 +296,7 @@ export function AdminOrdersPage() {
 
   const openAction = (kind: 'markPaid' | 'refund', row: AdminOrderRow) => {
     setAction({ kind, row });
+    setRefundReason('');
     // 默认退款金额 = 可退上限 (实付 - 已退)。部分退款时运营只需改小
     setRefundYuan(kind === 'refund' ? yuan(Math.max(row.paidCents - row.refundedCents, 0)) : '');
   };
@@ -316,7 +317,13 @@ export function AdminOrdersPage() {
           setBusy(false);
           return;
         }
-        const r = await adminOrdersApi.refund(action.row.id, cents, auditReason('退款订单'));
+        const reason = refundReason.trim();
+        if (!reason) {
+          toast.error('请填写退款原因');
+          setBusy(false);
+          return;
+        }
+        const r = await adminOrdersApi.refund(action.row.id, cents, reason);
         /*
          * 渠道异步处理中 (微信可能返回 PROCESSING): 钱还没到账、积分也没回收,
          * 不能显示「已退款」。如实提示需要到渠道后台确认 —— 这是本仓库没有
@@ -371,7 +378,7 @@ export function AdminOrdersPage() {
     if (selected.length === 0) return;
     setBusy(true);
     try {
-      const summary = await adminOrdersApi.batchMarkPaid(selected, auditReason('批量核销订单'));
+      const summary = await adminOrdersApi.batchMarkPaid(selected);
       setBatchSummary(summary);
       setBatchOpen(false);
       setSelected([]);
@@ -742,16 +749,28 @@ export function AdminOrdersPage() {
           extra={
             <>
               {action.kind === 'refund' && (
-                <div className="flex flex-col gap-1.5">
-                  <span className="text-xs text-muted-foreground">退款金额（元）</span>
-                  <TextField
-                    ariaLabel="退款金额"
-                    inputMode="decimal"
-                    value={refundYuan}
-                    onChange={setRefundYuan}
-                    placeholder="0.00"
-                  />
-                </div>
+                <>
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-xs text-muted-foreground">退款金额（元）</span>
+                    <TextField
+                      ariaLabel="退款金额"
+                      inputMode="decimal"
+                      value={refundYuan}
+                      onChange={setRefundYuan}
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <span className="text-xs text-muted-foreground">退款原因</span>
+                    <TextField
+                      ariaLabel="退款原因"
+                      value={refundReason}
+                      onChange={setRefundReason}
+                      placeholder="如：用户申请退款，已核实订单"
+                      maxLength={200}
+                    />
+                  </div>
+                </>
               )}
             </>
           }

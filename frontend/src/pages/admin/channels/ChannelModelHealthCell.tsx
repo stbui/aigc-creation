@@ -1,4 +1,4 @@
-import { HelpTip, StatusTag } from './components';
+import { HelpTip, StatusTag } from '~/admin-ui/primitives';
 import {
   formatAmount,
   formatMarkupPercent,

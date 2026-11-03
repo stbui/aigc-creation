@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShoppingBag } from 'lucide-react';
 import { ordersApi, invoicesApi, paymentsApi } from '../lib/api';
-import { formatYuan } from '../lib/money';
+import { formatDateTime, formatYuan } from '../lib/format';
 import { notifyCreditsChanged } from '../context/CreditsContext';
 import { useAuth } from '../context/AuthContext';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
@@ -48,19 +48,6 @@ function matchesFilter(o: Order, filter: FilterValue): boolean {
   if (filter === 'all') return true;
   if (filter === 'refund') return o.status === 'refunded' || o.status === 'partial_refunded';
   return o.status === filter;
-}
-
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
 }
 
 /** 待支付订单是否还在有效期内 */
@@ -429,14 +416,14 @@ export function OrdersPage() {
          * 「支付于 …」和「已到账 …」会粘成「…15:20:00已到账 2000 积分」。
          */
         const meta: string[] = [];
-        if (o.status === 'pending') meta.push(`有效至 ${formatDate(o.expiresAt)}`);
-        if (o.paidAt) meta.push(`支付于 ${formatDate(o.paidAt)}`);
+        if (o.status === 'pending') meta.push(`有效至 ${formatDateTime(o.expiresAt)}`);
+        if (o.paidAt) meta.push(`支付于 ${formatDateTime(o.paidAt)}`);
         if (o.status === 'paid' && o.grantedCredits > 0) meta.push(`已到账 ${o.grantedCredits} 积分`);
         if (o.membershipPlanId && o.status === 'paid') {
           meta.push(o.membershipAppliedAt ? '会员权益已生效' : '会员权益发放中');
         }
         if (o.status === 'cancelled') meta.push('未支付');
-        if (o.status === 'cancelled') meta.push(`创建于 ${formatDate(o.createdAt)}`);
+        if (o.status === 'cancelled') meta.push(`创建于 ${formatDateTime(o.createdAt)}`);
         const totalValue =
           o.status === 'cancelled' ? o.totalCents : o.paidCents;
 
@@ -489,7 +476,7 @@ export function OrdersPage() {
                       {r.creditsUnreclaimable > 0 &&
                         `（${r.creditsUnreclaimable} 已消耗无法追回）`}
                       {' · '}
-                      {r.reason} · {formatDate(r.createdAt)}
+                      {r.reason} · {formatDateTime(r.createdAt)}
                     </span>
                   </div>
                 </div>

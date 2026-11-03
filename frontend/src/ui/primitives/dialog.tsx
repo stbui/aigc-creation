@@ -45,19 +45,18 @@ export function UiDialog({
         data-testid="ui-app-dialog"
         className={cn('gap-4 p-6', children ? 'sm:max-w-[720px]' : 'sm:max-w-[480px]')}
         style={{ maxWidth: width }}
-        aria-describedby={description ? undefined : undefined}
         showCloseButton={false}
       >
-        {(title || description) && (
-          <DialogHeader>
-            {title && <DialogTitle className="text-base">{title}</DialogTitle>}
-            {description && (
-              <DialogDescription className="mt-1.5 text-sm leading-6">
-                {description}
-              </DialogDescription>
-            )}
-          </DialogHeader>
-        )}
+        <DialogHeader>
+          <DialogTitle className={cn('text-base', !title && 'sr-only')}>
+            {title ?? '对话框'}
+          </DialogTitle>
+          {description && (
+            <DialogDescription className="mt-1.5 text-sm leading-6">
+              {description}
+            </DialogDescription>
+          )}
+        </DialogHeader>
         {children}
         {(onConfirm || cancelText) && (
           <DialogFooter>

@@ -9,23 +9,6 @@ import {
   Upload,
 } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { assetsApi, assetSrc, assetThumbSrc, projectsApi } from '../lib/api';
-import {
-  MAX_IMAGE_BYTES,
-  MAX_IMAGE_MB,
-  SUPPORTED_IMAGE_ACCEPT,
-  SUPPORTED_IMAGE_LABEL,
-  isSupportedImageFile,
-} from '../lib/constants';
-import { capabilityName, toolPath } from '../lib/capabilities';
-import { useAuth } from '../context/AuthContext';
-import { useDocumentMeta } from '../hooks/useDocumentMeta';
-import { useProject } from '../hooks/useProject';
-import { ResultMedia, modalityOfFormat } from '../components/ResultMedia';
-import { ImageLightbox, type LightboxItem } from '../components/ImageLightbox';
-import { useCapabilities } from '../hooks/useCapabilities';
-import { StateError, StateSkeleton } from '../components/StateViews';
-import type { Asset, Project } from '../types/api';
 import {
   Button,
   Checkbox,
@@ -35,8 +18,12 @@ import {
   EmptyStateHeader,
   EmptyStateMedia,
   EmptyStateTitle,
+  ImageLightbox,
   Popconfirm,
+  ResultMedia,
   Select,
+  StateError,
+  StateSkeleton,
   StatusBadge,
   Surface,
   SurfaceContent,
@@ -45,8 +32,30 @@ import {
   SurfaceTitle,
   ToggleGroup,
   cn,
-  useApp,
-} from '../ui';
+  modalityOfFormat,
+  type LightboxItem,
+} from './components';
+import { assetsApi, assetSrc, assetThumbSrc, projectsApi } from './api';
+import { useApp, useAuth, useCapabilities, useDocumentMeta, useProject } from './hooks';
+import {
+  KIND_OPTIONS,
+  MAX_IMAGE_BYTES,
+  MAX_IMAGE_MB,
+  PAGE_SIZE,
+  SUPPORTED_IMAGE_ACCEPT,
+  SUPPORTED_IMAGE_LABEL,
+  type AssetGroup,
+  type GroupBy,
+  type Kind,
+} from './constants';
+import {
+  assetExtension,
+  capabilityName,
+  dateBucket,
+  isSupportedImageFile,
+  toolPath,
+} from './utils';
+import type { Asset, Project } from '../../types/api';
 
 /**
  * 素材库页面。完整视觉与文案规范见 `docs/library-design.md`。
@@ -56,30 +65,6 @@ import {
  * 图片网格使用直角纯图卡，上传原图带常驻标记，操作按钮在 hover、键盘聚焦
  * 和触屏环境显示。
  */
-
-const PAGE_SIZE = 20;
-type Kind = 'all' | 'original' | 'generated';
-/** 分组依据。'none' = 不分组，只在面板上给切换入口 */
-type GroupBy = 'none' | 'project' | 'capability' | 'date';
-
-interface AssetGroup {
-  key: string;
-  label: string;
-  count: number;
-  sort: number;
-}
-
-/** 日期分组：今天 / 昨天 / 近 7 天 / 更早。按本地时区切日，与作品页的日期筛选同口径 */
-function dateBucket(iso: string): { key: string; label: string; sort: number } {
-  const ts = new Date(iso).getTime();
-  const midnight = new Date();
-  midnight.setHours(0, 0, 0, 0);
-  const today = midnight.getTime();
-  if (ts >= today) return { key: 'today', label: '今天', sort: 0 };
-  if (ts >= today - 86400000) return { key: 'yesterday', label: '昨天', sort: 1 };
-  if (ts >= today - 6 * 86400000) return { key: 'week', label: '近 7 天', sort: 2 };
-  return { key: 'earlier', label: '更早', sort: 3 };
-}
 
 export function LibraryPage() {
   useDocumentMeta('素材库 · 货觉AI', '管理上传的原图与生成图，支持分组、下载与删除。');
@@ -385,7 +370,7 @@ export function LibraryPage() {
   const downloadAsset = (a: Asset) => {
     const url = assetSrc(a);
     if (!url) return;
-    const ext = (a.format || 'png').toLowerCase().replace(/^\./, '') || 'png';
+    const ext = assetExtension(a.format);
     const el = document.createElement('a');
     el.href = url;
     el.download = `asset-${a.id.slice(-6)}.${ext}`;
@@ -433,11 +418,7 @@ export function LibraryPage() {
               <Select
                 value={kind}
                 onChange={(next) => setKind(next as Kind)}
-                options={[
-                  { value: 'all', label: '全部来源' },
-                  { value: 'original', label: '原图' },
-                  { value: 'generated', label: '生成图' },
-                ]}
+                options={KIND_OPTIONS}
                 aria-label="来源筛选"
                 className="asset-library-date-filter"
               />

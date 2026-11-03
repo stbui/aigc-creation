@@ -78,6 +78,14 @@
   --warn-text: #b45309;
   --accent-amber: #f59e0b;
   --accent-orange: #ff7a45;
+  /* 网站地图四组的编号色 (2026-11-03 从页面内联 hex 收到令牌)
+     第一组直接用品牌紫 —— 原 #625DF5 是 2026-10-17 已收拢的近似紫之一, 不再单列。
+     其余三色是分类色 (不是品牌 / 状态色), 原值在白底只有 2.64–2.95:1,
+     按 12px 文字压到 4.98:1; 在 --page-bg / --surface 上也均 ≥4.5:1。 */
+  --sitemap-accent-1: var(--brand);
+  --sitemap-accent-2: #1f7a8c;
+  --sitemap-accent-3: #bf4a1e;
+  --sitemap-accent-4: #287d66;
   --cta-text: #f7593a;
   --danger-soft-bg: #fff1f2;
   /* 2026-11-03 压到 AA: 原 #ef4444 在 --danger-soft-bg 上 3.43:1、白底 3.76:1 */

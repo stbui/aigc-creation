@@ -12,7 +12,7 @@ import {
   SelectField,
   StaleError,
   type AppliedFilter,
-} from './components';
+} from '~/admin-ui/primitives';
 import { adminTicketsApi } from './api';
 import {
   useAdmin,

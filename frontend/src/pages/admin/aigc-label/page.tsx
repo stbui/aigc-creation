@@ -10,7 +10,7 @@ import {
   SaveBar,
   SkeletonPanel,
   StaleError,
-} from './components';
+} from '~/admin-ui/primitives';
 import { useAdmin, useAdminResource, useToast, useUnsavedGuard } from './hooks';
 import { renderBadgeCanvas } from './utils';
 import { StylePanel } from './StylePanel';
@@ -18,7 +18,6 @@ import { PreviewPanel } from './PreviewPanel';
 import { PositionPanel } from './PositionPanel';
 import { CurrentBadgePanel } from './CurrentBadgePanel';
 import { SaveLabelConfirm } from './SaveLabelConfirm';
-import { auditReason } from '../../../admin-ui/lib/auditReason';
 import type { AigcLabelSpec } from '../../../types/api';
 
 /**
@@ -102,11 +101,7 @@ export function AdminAigcLabelPage() {
       const badge = renderBadgeCanvas(spec);
       const base64 = badge.toDataURL('image/png').split(',')[1] ?? '';
       if (!base64) throw new Error('角标位图生成失败');
-      const next = await adminAigcLabelApi.update({
-        spec,
-        badgePngBase64: base64,
-        reason: auditReason('保存 AI 标识样式'),
-      });
+      const next = await adminAigcLabelApi.update({ spec, badgePngBase64: base64 });
       setSpec(next.spec);
       setConfirming(false);
       // 服务端返回的就是最新快照，静默重取一次让 dirty 基线跟上，不闪骨架屏

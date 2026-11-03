@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Panel } from './components';
+import { Panel } from '~/admin-ui/primitives';
 import { drawPreview, renderBadgeCanvas } from './utils';
 import type { AigcLabelSpec } from '../../../types/api';
 

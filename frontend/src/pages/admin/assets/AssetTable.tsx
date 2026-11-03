@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { ActionButton, AdminDataTable, StatusTag, type AdminColumn } from './components';
+import { ActionButton, AdminDataTable, StatusTag, type AdminColumn } from '~/admin-ui/primitives';
 import { AssetThumb } from './AssetThumb';
 import { BACKEND_LABEL, type AssetRow } from './constants';
 import { assetLabel, fmtBytes, fmtFormat, thumbSrc } from './utils';

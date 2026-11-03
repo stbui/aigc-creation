@@ -10,14 +10,7 @@ import {
   Res,
 } from "@nestjs/common";
 import type { Response } from "express";
-import {
-  ArrayMaxSize,
-  IsArray,
-  IsIn,
-  IsOptional,
-  IsString,
-  MaxLength,
-} from "class-validator";
+import { ArrayMaxSize, IsArray, IsIn, IsString } from "class-validator";
 import {
   AdminUser,
   AuditAction,
@@ -51,11 +44,6 @@ export class UserBatchDto {
 
   @IsIn(["disable", "enable"], { message: "action 只能是 disable 或 enable" })
   action!: "disable" | "enable";
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  reason?: string;
 }
 
 /**

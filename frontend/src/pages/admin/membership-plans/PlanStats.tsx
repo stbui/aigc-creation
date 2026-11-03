@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { StatCard } from './components';
+import { StatCard } from '~/admin-ui/primitives';
 import type { AdminMembershipPlan } from '../../../types/api';
 
 /** 会员套餐统计条：套餐总数 / 在售 / 付费 / 存量会员 */

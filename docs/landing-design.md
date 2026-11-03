@@ -1,6 +1,6 @@
 # 营销首页设计（`/`）
 
-> 现行实现：`frontend/src/pages/LandingPage.tsx` + `frontend/src/styles/global.css` 的 `lp-*` 段。
+> 现行实现：`frontend/src/pages/landing/`（页面编排 `page.tsx`）+ `frontend/src/styles/global.css` 的 `lp-*` 段。
 > 本文只描述当前页面，不记录改版过程。
 
 ## 1. 定位

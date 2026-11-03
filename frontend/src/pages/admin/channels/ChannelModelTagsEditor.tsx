@@ -1,5 +1,5 @@
 import { Plus, Trash2 } from 'lucide-react';
-import { ActionButton, IconButton, Notice, SelectField, TextField } from './components';
+import { ActionButton, IconButton, Notice, SelectField, TextField } from '~/admin-ui/primitives';
 import { Field } from './ChannelField';
 import {
   MAX_MODEL_TAGS,

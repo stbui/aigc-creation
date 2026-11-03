@@ -1,4 +1,4 @@
-import { FormField, NumberField, Panel, RangeField } from './components';
+import { FormField, NumberField, Panel, RangeField } from '~/admin-ui/primitives';
 import { POSITION_LABELS, POSITION_OPTIONS } from './constants';
 import { ChoiceButton } from './ChoiceButton';
 import type { AigcLabelSpec } from '../../../types/api';

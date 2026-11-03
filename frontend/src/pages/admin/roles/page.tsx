@@ -3,9 +3,8 @@ import { PERMISSION_LABELS, MODULE_LABELS, HIGH_RISK, ROLE_COL } from './constan
 import { useAdmin, useToast, useUnsavedGuard, useAdminResource } from './hooks';
 import { adminApi, adminRolesApi } from '../../../lib/api';
 
-import { ActionButton, CheckboxField, EmptyState, ListError, PageHeader, PageSkeleton, Panel, StaleError, ToneBadge } from './components';
+import { ActionButton, CheckboxField, EmptyState, ListError, PageHeader, PageSkeleton, Panel, StaleError, ToneBadge } from '~/admin-ui/primitives';
 import { cn } from '../../../admin-ui/lib/cn';
-import { auditReason } from '../../../admin-ui/lib/auditReason';
 
 /** 权限点 → 中文说明。未登记的权限点原样显示 id, 不静默消失 */
 
@@ -142,7 +141,6 @@ export function AdminRolesPage() {
           code: role.code,
           permissions: Array.from(role.current),
         })),
-        auditReason('更新角色权限'),
       );
       await reload();
       /*

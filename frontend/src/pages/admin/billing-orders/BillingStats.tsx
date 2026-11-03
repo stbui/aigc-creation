@@ -1,4 +1,4 @@
-import { StatCard } from './components';
+import { StatCard } from '~/admin-ui/primitives';
 import { STATUS_LABELS } from './constants';
 
 /**

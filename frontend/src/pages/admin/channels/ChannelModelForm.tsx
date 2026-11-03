@@ -10,7 +10,7 @@ import {
   SwitchField,
   TextAreaField,
   TextField,
-} from './components';
+} from '~/admin-ui/primitives';
 import { Field } from './ChannelField';
 import { ChannelModelTagsEditor } from './ChannelModelTagsEditor';
 import { staleTierUpstream } from './utils';

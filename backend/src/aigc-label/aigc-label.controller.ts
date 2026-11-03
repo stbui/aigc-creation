@@ -1,5 +1,5 @@
-import { Body, Controller, Get, Put } from '@nestjs/common';
-import { Type } from 'class-transformer';
+import { Body, Controller, Get, Put } from "@nestjs/common";
+import { Type } from "class-transformer";
 import {
   IsBoolean,
   IsIn,
@@ -13,11 +13,15 @@ import {
   MaxLength,
   Min,
   ValidateNested,
-} from 'class-validator';
-import { AigcLabelService } from './aigc-label.service';
-import { AdminUser, AuditAction, RequirePermission } from '../admin/admin.decorator';
-import { PERMISSIONS } from '../admin/permissions';
-import { AIGC_LABEL_POSITIONS } from '../common/aigc-label.config';
+} from "class-validator";
+import { AigcLabelService } from "./aigc-label.service";
+import {
+  AdminUser,
+  AuditAction,
+  RequirePermission,
+} from "../admin/admin.decorator";
+import { PERMISSIONS } from "../admin/permissions";
+import { AIGC_LABEL_POSITIONS } from "../common/aigc-label.config";
 
 /**
  * 角标样式入参。
@@ -36,9 +40,9 @@ export class AigcLabelSpecDto {
   @IsInt() @Min(100) @Max(900) fontWeight!: number;
   @IsNumber() @Min(0) @Max(20) letterSpacing!: number;
 
-  @Matches(/^#[0-9a-fA-F]{6}$/, { message: '文字颜色必须是 #rrggbb' })
+  @Matches(/^#[0-9a-fA-F]{6}$/, { message: "文字颜色必须是 #rrggbb" })
   textColor!: string;
-  @Matches(/^#[0-9a-fA-F]{6}$/, { message: '底色必须是 #rrggbb' })
+  @Matches(/^#[0-9a-fA-F]{6}$/, { message: "底色必须是 #rrggbb" })
   backgroundColor!: string;
   @IsInt() @Min(0) @Max(100) backgroundOpacity!: number;
 
@@ -46,7 +50,7 @@ export class AigcLabelSpecDto {
   @IsInt() @Min(0) @Max(160) paddingX!: number;
   /** 空串 = 不画圆点 */
   @IsOptional()
-  @Matches(/^(#[0-9a-fA-F]{6})?$/, { message: '圆点颜色必须是 #rrggbb 或留空' })
+  @Matches(/^(#[0-9a-fA-F]{6})?$/, { message: "圆点颜色必须是 #rrggbb 或留空" })
   dotColor?: string;
 
   @IsIn(AIGC_LABEL_POSITIONS) position!: (typeof AIGC_LABEL_POSITIONS)[number];
@@ -71,9 +75,6 @@ export class UpdateAigcLabelDto {
    * 不传 = 沿用已保存的位图（若文案/字体也改了，该位图会被标记为过期）。
    */
   @IsOptional() @IsString() @MaxLength(800_000) badgePngBase64?: string;
-
-  /** 操作原因。写入属高危动作，会进审计日志 */
-  @IsOptional() @IsString() @MaxLength(200) reason?: string;
 }
 
 /**
@@ -83,7 +84,7 @@ export class UpdateAigcLabelDto {
  * 视频没有内嵌能力（无 ffmpeg），只能由前端按同一份文案补显式标识。
  * 位图与几何不需要，也不应该外发。
  */
-@Controller('aigc-label')
+@Controller("aigc-label")
 export class AigcLabelController {
   constructor(private readonly label: AigcLabelService) {}
 
@@ -99,7 +100,7 @@ export class AigcLabelController {
  * 权限沿用 `setting.read` / `setting.write`：这是发给全体用户的合规标识，
  * 与站点设置同一批人授权，不另开权限点（新增权限点意味着角色矩阵再迁一次）。
  */
-@Controller('admin/aigc-label')
+@Controller("admin/aigc-label")
 export class AdminAigcLabelController {
   constructor(private readonly label: AigcLabelService) {}
 
@@ -111,9 +112,12 @@ export class AdminAigcLabelController {
 
   @Put()
   @RequirePermission(PERMISSIONS.settingWrite)
-  @AuditAction('aigc.label_update')
+  @AuditAction("aigc.label_update")
   async update(@Body() dto: UpdateAigcLabelDto, @AdminUser() user: AdminUser) {
-    await this.label.save({ spec: dto.spec, badgePngBase64: dto.badgePngBase64 }, user.email);
+    await this.label.save(
+      { spec: dto.spec, badgePngBase64: dto.badgePngBase64 },
+      user.email,
+    );
     return this.label.adminView();
   }
 }

@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { adminBillingOrdersApi } from './api';
-import { ActionButton, PageHeader, Panel, StaleError, type AppliedFilter } from './components';
+import { ActionButton, PageHeader, Panel, StaleError, type AppliedFilter } from '~/admin-ui/primitives';
 import {
   useAdmin,
   useAdminDetailParam,
@@ -10,7 +10,6 @@ import {
 } from './hooks';
 import { STATUS_LABELS, REVIEW_OPTION } from './constants';
 import { toCredits } from './utils';
-import { auditReason } from '../../../admin-ui/lib/auditReason';
 import { BillingStats } from './BillingStats';
 import { BillingFilterBar } from './BillingFilterBar';
 import { BillingOrderTable } from './BillingOrderTable';
@@ -130,11 +129,7 @@ export function AdminBillingOrdersPage() {
     if (!detail) return;
     setResolving(true);
     try {
-      const next = await adminBillingOrdersApi.resolve(
-        detail.id,
-        action,
-        auditReason(action === 'refund' ? '账单核对退款' : '账单按用量结算'),
-      );
+      const next = await adminBillingOrdersApi.resolve(detail.id, action);
       toast.success(
         action === 'refund'
           ? `已全额退款：${toCredits(next.refundedAmountMicrocredits)} 积分`
@@ -154,11 +149,7 @@ export function AdminBillingOrdersPage() {
     setBatchBusy(true);
     setBatchResults(null);
     try {
-      const result = await adminBillingOrdersApi.batchResolve(
-        selected,
-        action,
-        auditReason(action === 'refund' ? '批量账单核对退款' : '批量账单按用量结算'),
-      );
+      const result = await adminBillingOrdersApi.batchResolve(selected, action);
       setBatchResults(result.results);
       if (result.failed === 0) {
         toast.success(`已核对 ${result.resolved} 条账单`);

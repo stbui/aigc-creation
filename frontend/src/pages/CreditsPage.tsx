@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShoppingBag, Wallet } from 'lucide-react';
 import { creditsApi } from '../lib/api';
+import { formatDate, formatDateTime } from '../lib/format';
 import { useAuth } from '../context/AuthContext';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import { useMediaQuery } from '../hooks/useMediaQuery';
@@ -47,26 +48,6 @@ const LEDGER_LABEL: Record<string, string> = {
   expire: '到期回收',
   admin_adjust: '客服调整',
 };
-
-function formatDate(iso: string | null | undefined): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
-}
-
-function formatDay(iso: string | null | undefined): string {
-  if (!iso) return '永久';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '—';
-  return d.toLocaleDateString('zh-CN');
-}
 
 const LOT_STATUS: Record<CreditLot['status'], string> = {
   active: '可用',
@@ -126,7 +107,7 @@ function LedgerList({ rows }: { rows: CreditLedgerEntry[] }) {
               </span>
             </div>
             <div className="credits-mobile-meta">
-              <span>{formatDate(row.createdAt)}</span>
+              <span>{formatDateTime(row.createdAt)}</span>
               <span>变动后余额 {row.balanceAfter}</span>
             </div>
             {remark && <div className="credits-mobile-note">{remark}</div>}
@@ -153,7 +134,7 @@ function LotList({ rows }: { rows: CreditLot[] }) {
             <span>
               剩余 {lot.remainingCredits}，共 {lot.totalCredits}
             </span>
-            <span>{lot.expireAt ? `${formatDay(lot.expireAt)} 到期` : '长期有效'}</span>
+            <span>{lot.expireAt ? `${formatDate(lot.expireAt)} 到期` : '长期有效'}</span>
           </div>
         </li>
       ))}
@@ -284,7 +265,7 @@ export function CreditsPage() {
       title: '时间',
       dataIndex: 'createdAt',
       width: 170,
-      render: (value: string | null) => formatDate(value),
+      render: (value: string | null) => formatDateTime(value),
     },
     {
       title: '类型',
@@ -336,7 +317,7 @@ export function CreditsPage() {
       title: '到期日',
       dataIndex: 'expireAt',
       width: 140,
-      render: (value: string | null) => formatDay(value),
+      render: (value: string | null) => (value ? formatDate(value) : '永久'),
     },
     {
       title: '状态',
@@ -399,7 +380,7 @@ export function CreditsPage() {
               {balance && balance.activeLots > 0 ? (
                 <>
                   {balance.nearestExpiry
-                    ? `最近一笔将于 ${formatDay(balance.nearestExpiry)} 到期，`
+                    ? `最近一笔将于 ${formatDate(balance.nearestExpiry)} 到期，`
                     : '积分永久有效，'}
                   <span className="credits-hero-rule">积分按到期先后扣减</span>
                 </>
@@ -417,7 +398,7 @@ export function CreditsPage() {
         {balance && balance.expiringSoon > 0 && balance.nearestExpiry && (
           <div className="credits-hero-side">
             <span className="credits-hero-warn">
-              {balance.expiringSoon} 积分将于 {formatDay(balance.nearestExpiry)} 到期
+              {balance.expiringSoon} 积分将于 {formatDate(balance.nearestExpiry)} 到期
             </span>
           </div>
         )}
@@ -507,7 +488,6 @@ export function CreditsPage() {
                         pageSize: PAGE_SIZE,
                         total: ledgerTotal,
                         hideOnSinglePage: true,
-                        showSizeChanger: false,
                         onChange: (page) => void loadLedgerPage(page, ledgerFilter),
                       }}
                       scroll={{ x: 680 }}
@@ -557,7 +537,13 @@ export function CreditsPage() {
                   size="small"
                   columns={lotColumns}
                   dataSource={lots}
-                  pagination={{ pageSize: PAGE_SIZE, hideOnSinglePage: true, showSizeChanger: false }}
+                  pagination={{
+                    current: lotsPage,
+                    pageSize: PAGE_SIZE,
+                    total: lots.length,
+                    hideOnSinglePage: true,
+                    onChange: setLotsPage,
+                  }}
                   scroll={{ x: 620 }}
                 />
               ),

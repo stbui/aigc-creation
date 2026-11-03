@@ -211,6 +211,6 @@ export class OrderCancelController {
 
   @Post(':id/cancel')
   cancel(@Param('id') id: string, @CurrentUser() user: AuthUser) {
-    return this.orders.close({ orderId: id, actor: { kind: 'user', userId: user.id }, reason: '用户取消' });
+    return this.orders.close({ orderId: id, actor: { kind: 'user', userId: user.id } });
   }
 }

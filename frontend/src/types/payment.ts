@@ -22,16 +22,10 @@ export interface AdminPageResult<T> {
 
 /** 支付通道标识，与后端 `PAYMENT_PROVIDER_IDS` 一致 */
 export type PaymentProviderId =
-  | 'sandbox'
-  | 'alipay'
-  | 'wechat'
-  | 'paypal'
-  | 'stripe'
-  | 'epay'
-  | 'zpay';
+  "sandbox" | "alipay" | "wechat" | "paypal" | "stripe" | "epay" | "zpay";
 
 /** 支持的结算币种 */
-export type PaymentCurrency = 'CNY' | 'USD';
+export type PaymentCurrency = "CNY" | "USD";
 
 /**
  * 渠道配置字段元数据。
@@ -45,7 +39,7 @@ export interface PaymentConfigField {
   label: string;
   /** 密钥类字段：后端只回 `secretConfigured[name]`，不回明文 */
   secret?: boolean;
-  type?: 'text' | 'password' | 'textarea' | 'number' | 'select';
+  type?: "text" | "password" | "textarea" | "number" | "select";
   required?: boolean;
   placeholder?: string;
   options?: Array<{ label: string; value: string }>;
@@ -84,7 +78,7 @@ export interface AdminPaymentProviderView {
   identityLockedFields: string[];
   hasOpenOrders: boolean;
   updatedAt: string | null;
-  warnings: Array<{ level: 'danger' | 'warn'; message: string }>;
+  warnings: Array<{ level: "danger" | "warn"; message: string }>;
 }
 
 /** 渠道配置保存入参 */
@@ -102,10 +96,12 @@ export interface AdminPaymentSettings {
 /* ────────────────────────── 充值商品 ────────────────────────── */
 
 /** 商品销售策略 */
-export type PaymentSaleStrategy = 'unlimited' | 'periodic' | 'inventory' | 'timed';
+export type PaymentSaleStrategy =
+  "unlimited" | "periodic" | "inventory" | "timed";
 
 /** 商品派生销售状态 */
-export type PaymentSaleStatus = 'disabled' | 'on_sale' | 'upcoming' | 'ended' | 'sold_out';
+export type PaymentSaleStatus =
+  "disabled" | "on_sale" | "upcoming" | "ended" | "sold_out";
 
 export interface AdminPaymentProductView {
   id: string;
@@ -159,7 +155,6 @@ export interface PaymentProductInput {
   stockTotal?: number;
   saleStartAt?: string | null;
   saleEndAt?: string | null;
-  reason?: string;
 }
 
 /* ────────────────────────── 支付订单 ────────────────────────── */
@@ -171,14 +166,14 @@ export interface PaymentProductInput {
  * 前端不再重复推导，避免两边时钟不同导致翻页时状态跳变。
  */
 export type PaymentDisplayStatus =
-  | 'created'
-  | 'pending'
-  | 'closing'
-  | 'create_failed'
-  | 'closed'
-  | 'credited'
-  | 'refunded'
-  | 'partial_refunded';
+  | "created"
+  | "pending"
+  | "closing"
+  | "create_failed"
+  | "closed"
+  | "credited"
+  | "refunded"
+  | "partial_refunded";
 
 export interface AdminPaymentOrderRow {
   id: string;
@@ -196,7 +191,11 @@ export interface AdminPaymentOrderRow {
   rawOrderStatus: string;
   providerStatus: string | null;
   providerTradeNo: string | null;
-  checkout: { mode: string | null; value: string | null; expiresAt: string | null };
+  checkout: {
+    mode: string | null;
+    value: string | null;
+    expiresAt: string | null;
+  };
   expiresAt: string;
   providerPaidAt: string | null;
   creditedAt: string | null;
@@ -278,12 +277,15 @@ export interface AdminReconciliationItem {
 }
 
 /** 对账差异类型 → 文案与色调的唯一映射 */
-export const RECONCILIATION_RESULT_LABELS: Record<string, { label: string; tone: 'success' | 'danger' | 'warn' }> = {
-  matched: { label: '一致', tone: 'success' },
-  recovered: { label: '已补发', tone: 'success' },
-  amount_mismatch: { label: '金额不符', tone: 'danger' },
-  missing_local: { label: '本地缺单', tone: 'danger' },
-  missing_channel: { label: '渠道缺单', tone: 'danger' },
-  duplicate: { label: '重复交易', tone: 'warn' },
-  provider_error: { label: '渠道异常', tone: 'danger' },
+export const RECONCILIATION_RESULT_LABELS: Record<
+  string,
+  { label: string; tone: "success" | "danger" | "warn" }
+> = {
+  matched: { label: "一致", tone: "success" },
+  recovered: { label: "已补发", tone: "success" },
+  amount_mismatch: { label: "金额不符", tone: "danger" },
+  missing_local: { label: "本地缺单", tone: "danger" },
+  missing_channel: { label: "渠道缺单", tone: "danger" },
+  duplicate: { label: "重复交易", tone: "warn" },
+  provider_error: { label: "渠道异常", tone: "danger" },
 };

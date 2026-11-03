@@ -6,7 +6,7 @@ import { AlertTriangle, Play, RefreshCw } from 'lucide-react';
 
 import { adminSchedulerApi } from '../../../lib/api';
 
-import { ActionButton, EmptyState, ListError, Notice, PageHeader, PageSkeleton, Panel, StaleError, ToneBadge } from './components';
+import { ActionButton, EmptyState, ListError, Notice, PageHeader, PageSkeleton, Panel, StaleError, ToneBadge } from '~/admin-ui/primitives';
 import { cn } from '../../../admin-ui/lib/cn';
 import type { AdminSchedulerTask } from '../../../types/api';
 

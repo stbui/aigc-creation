@@ -7,7 +7,7 @@ import {
   FilePicker,
   Panel,
   SelectField,
-} from './components';
+} from '~/admin-ui/primitives';
 import { cn } from '../../../admin-ui/lib/cn';
 import { formatRate, healthTone } from './utils';
 import { CHANNEL_STATUS_OPTIONS, type ChannelHealthSummary } from './constants';

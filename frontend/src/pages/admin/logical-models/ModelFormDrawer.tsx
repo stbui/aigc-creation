@@ -10,7 +10,7 @@ import {
   SwitchField,
   TextAreaField,
   TextField,
-} from './components';
+} from '~/admin-ui/primitives';
 import {
   BILLING_MODE_OPTIONS,
   CAPABILITY_SPEC_PLACEHOLDER,

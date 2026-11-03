@@ -1,11 +1,15 @@
-import { COLOR_LABEL } from './constants';
+import { COLOR_LABEL } from '../../lib/colorPalette';
 
 /**
  * 商品换色页面的纯函数 —— 目录内文件的唯一本页工具来源。
  *
  * 本页的外部依赖 (接口 / 组件 / hook) 分别走 `api.ts` / `components.ts` /
- * `hooks.ts`; 这里只放不依赖 React、也不依赖组件的颜色换算与参数拼装。
+ * `hooks.ts`; 这里只放不依赖 React、也不依赖组件的颜色换算与参数拼装,
+ * 以及 `src/lib` 工具的转出。
  */
+
+/** HEX 归一化 / 合法性校验 (页面输入框用) */
+export { isValidHexColor, normalizeHexColor } from '../../lib/colorPalette';
 
 /** 提交给 `useToolTask` 的高级设置 (与 `ToolShell` 回传一致) */
 export interface RecolorSettings {

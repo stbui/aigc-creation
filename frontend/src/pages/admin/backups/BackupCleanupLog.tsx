@@ -1,4 +1,4 @@
-import { EmptyState, Panel, StatusTag } from './components';
+import { EmptyState, Panel, StatusTag } from '~/admin-ui/primitives';
 import { triggerLabel } from './utils';
 import type { AdminCleanupLog } from '../../../types/api';
 

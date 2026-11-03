@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { ActionButton, AdminDataTable, StatusTag, type AdminColumn } from './components';
+import { ActionButton, AdminDataTable, StatusTag, type AdminColumn } from '~/admin-ui/primitives';
 import { BILLING_MODE_LABELS, STATUS_LABELS, STATUS_TONES } from './constants';
 import { toCredits } from './utils';
 import type { BillingOrderView } from '../../../types/model';

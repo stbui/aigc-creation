@@ -1,4 +1,4 @@
-import { IsArray, IsObject, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsArray, IsObject, IsOptional } from "class-validator";
 
 /**
  * 写入系统设置（kv 结构）。
@@ -36,10 +36,4 @@ export class UpdateSettingsDto {
   @IsOptional()
   @IsArray()
   clears?: string[];
-
-  /** 操作原因。写入系统设置属高危动作，后端强制要求 —— 审计要能回答「谁为什么改」 */
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  reason?: string;
 }

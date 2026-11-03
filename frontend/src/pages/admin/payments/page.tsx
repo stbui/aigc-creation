@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
-import { ActionButton, Notice, PageHeader, SegmentedTabs } from './components';
+import { ActionButton, Notice, PageHeader, SegmentedTabs } from '~/admin-ui/primitives';
 import { PaymentsProvidersTab } from './PaymentsProvidersTab';
 import { PaymentsProductsTab } from './PaymentsProductsTab';
 import { PaymentsOrdersTab } from './PaymentsOrdersTab';

@@ -1,4 +1,4 @@
-import { ActionButton, ModalDialog } from './components';
+import { ActionButton, ModalDialog } from '~/admin-ui/primitives';
 import { ChannelModelForm } from './ChannelModelForm';
 import type { ModelDraft } from './constants';
 import type { AdminChannelModelView, ProtocolTestResultView } from '../../../types/model';

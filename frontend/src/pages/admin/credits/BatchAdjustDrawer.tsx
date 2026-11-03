@@ -9,10 +9,9 @@ import {
   StatusTag,
   TextAreaField,
   type AdminColumn,
-} from './components';
+} from '~/admin-ui/primitives';
 import { adminCreditsApi } from './api';
 import { useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
-import { auditReason } from '../../../admin-ui/lib/auditReason';
 import type { BatchAdjustItem, BatchAdjustResult, BatchAdjustRow } from './constants';
 
 /**
@@ -85,10 +84,7 @@ export function BatchAdjustDrawer({
     }
     setBusy(true);
     try {
-      const r = await adminCreditsApi.batchAdjust({
-        items: parsed.items,
-        reason: auditReason('批量调整用户积分'),
-      });
+      const r = await adminCreditsApi.batchAdjust({ items: parsed.items });
       setResult(r);
       if (r.failed === 0) toast.success(`已调整 ${r.succeeded} 条`);
       else toast.warning(`成功 ${r.succeeded} 条，失败 ${r.failed} 条`);

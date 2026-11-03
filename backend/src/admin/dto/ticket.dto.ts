@@ -1,5 +1,14 @@
-import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
-import { Type } from 'class-transformer';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from "class-validator";
+import { Type } from "class-transformer";
 
 /**
  * 工单列表查询（后台）。
@@ -9,15 +18,19 @@ import { Type } from 'class-transformer';
  */
 export class AdminTicketListQueryDto {
   @IsOptional()
-  @IsIn(['open', 'processing', 'resolved', 'closed'], { message: 'status 取值非法' })
+  @IsIn(["open", "processing", "resolved", "closed"], {
+    message: "status 取值非法",
+  })
   status?: string;
 
   @IsOptional()
-  @IsIn(['bug', 'complaint', 'consultation', 'invoice', 'other'], { message: 'type 取值非法' })
+  @IsIn(["bug", "complaint", "consultation", "invoice", "other"], {
+    message: "type 取值非法",
+  })
   type?: string;
 
   @IsOptional()
-  @IsIn(['low', 'normal', 'high'], { message: 'priority 取值非法' })
+  @IsIn(["low", "normal", "high"], { message: "priority 取值非法" })
   priority?: string;
 
   @IsOptional()
@@ -52,35 +65,26 @@ export class AdminTicketListQueryDto {
  */
 export class AdminTicketUpdateDto {
   @IsOptional()
-  @IsIn(['open', 'processing', 'resolved', 'closed'], { message: 'status 取值非法' })
+  @IsIn(["open", "processing", "resolved", "closed"], {
+    message: "status 取值非法",
+  })
   status?: string;
 
   @IsOptional()
-  @IsIn(['low', 'normal', 'high'], { message: 'priority 取值非法' })
+  @IsIn(["low", "normal", "high"], { message: "priority 取值非法" })
   priority?: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(40)
   assigneeId?: string | null;
-
-  /** 操作原因。关闭/改优先级时写审计 */
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  reason?: string;
 }
 
 export class AdminTicketReplyDto {
   @IsString()
-  @MinLength(1, { message: '回复内容不能为空' })
-  @MaxLength(2000, { message: '回复最多 2000 个字' })
+  @MinLength(1, { message: "回复内容不能为空" })
+  @MaxLength(2000, { message: "回复最多 2000 个字" })
   content!: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  reason?: string;
 }
 
 /** 导出可带上与列表相同的筛选条件 */

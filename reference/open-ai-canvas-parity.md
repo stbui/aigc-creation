@@ -83,12 +83,12 @@
 1. Go → TypeScript、Gin → NestJS、GORM → Prisma/SQLite、可读前缀 ID → `cuid()`。
 2. 单实例部署：冷却、并发槽、目录快照为进程内存 + DB 版本号，无 Redis 跨实例协调。
 3. 服务商目录口径：本仓是插件包索引，不是“厂商推广 + 人民币成本/加价 + 一键建渠道”。
-4. 权限与审计更严：细粒度权限点、写操作 `@AuditAction`、调价等业务原因要求（但审计失败不阻断业务）。
+4. 权限与审计更严：细粒度权限点、写操作 `@AuditAction`；退款、发票驳回、能力下架等确有业务语义的动作要求原因（但审计失败不阻断业务）。
 5. 匿名可浏览 `/models` 与 `/model-catalog`；上游要求登录后按分组投影。
 6. 渠道模型 `activeKey` 小写归一 + 软删唯一键；上游用 `WHERE deleted_at IS NULL` 部分唯一索引。
 7. 本仓多图产出按张建子任务、按张计费；上游一次任务一个结果。
 8. 本仓 C 端只暴露前台模型，不展示渠道/个人渠道；上游是“产品模型 → 渠道模型”两级选择。
-9. 本仓调价强制业务原因；渠道与渠道模型删除只做业务影响确认，不要求原因。
+9. 本仓统一调价自动记录审计原因；渠道与渠道模型删除只做业务影响确认，不要求原因。
 10. 本仓把线路健康、财务分析做成独立面板/独立页；上游在单元格/分析面板内展示。
 
 ---
@@ -157,7 +157,7 @@
 | `repository/channel_order.go` | `src/model/channels/channel-model.repository.ts`（`saveChannelOrder`） | ✅ | 事务内取当前顺序、与 expectedIds 全量比较、逐条写 sort_order、模型级刷新 modelsJson 均对齐；上游 PG 分支 `SELECT ... FOR UPDATE` 后重读（`channel_order.go:27-36`）本仓以单写事务替代。 |
 | `repository/channel_presentation.go` | `src/model/channels/channel-model.repository.ts`、`channel.service.ts` | ⚠️ | `UpdateChannelModelSort`（校验存在、只写 sortOrder、刷新模型名）对齐；上游 `UpdateSystemChannelPresentation` 的“仅排序渠道”专用路径与 `UpdateSystemChannelCatalogProvider` 在本仓无独立实现（分别被通用 update 和服务商目录差异取代），无功能回归但缺少渠道行 `updated_at` 的显式 presentation 语义。 |
 | `repository/repository_channels_settings.go` | `src/model/channels/channel.service.ts` + `prisma/schema.prisma` | 🔀 | `SystemChannels/AdminSystemChannels/SystemChannel/AdminSystemChannel/DeleteSystemChannel` 均有等价实现。未移植：`HistoricalSystemChannelReferences`（历史日志按 id 回填已删除渠道名，`repository_channels_settings.go:24-28`）、`AdminSystemChannelReferences`（`channel_models.go` 之外的后台引用下拉，`:72-76`）、`CatalogProviderChannelCounts`（服务商目录已接入数，`:30-48`）。删除语义差异见 `admin_channels.go` 行。 |
-| `handler/admin_channel_routes.go` | `src/model/channels/channel.controller.ts` | 🔀 | 路由主体齐全；本仓新增 `GET :id`、`GET protocols`、`GET health`，并把 service 的 `RequireAdmin` 换成 JWT + 细粒度权限；删除/批量删除/调价强制 `reason`；响应包裹差异见 D 表；`/admin/provider-catalog/*` 同名但语义不同（见 B12）。 |
+| `handler/admin_channel_routes.go` | `src/model/channels/channel.controller.ts` | 🔀 | 路由主体齐全；本仓新增 `GET :id`、`GET protocols`、`GET health`，并把 service 的 `RequireAdmin` 换成 JWT + 细粒度权限；普通写操作自动审计，删除/批量删除保留业务确认但不要求原因；响应包裹差异见 D 表；`/admin/provider-catalog/*` 同名但语义不同（见 B12）。 |
 | `handler/channel_models.go` | `src/model/proxy/custom-relay.controller.ts`、`custom-relay.service.ts`（`POST /ai/models`） | ✅ | 用用户提供的 BaseURL/APIKey 拉目录、30 次/分限流（`custom-relay.controller.ts:30-33`）、返回 `{models: 目录项}` 与上游 `FetchChannelModelCatalog` 一致；本仓走同一 `ModelCatalogClient`，额外支持代理与统一出站。 |
 | `handler/channel_order.go` | `src/model/channels/channel.controller.ts`（`order`/`saveOrder`/`modelOrder`/`saveModelOrder`） | ✅ | 两条路径（渠道级、模型级）GET/PUT 均存在，GET 返回 `{items}` 一致；PUT 返回 `{saved:true}` → 本仓 `{ok:true}`（D 表）。 |
 | `handler/admin_channel_model_response.go` | `src/model/channels/channel.presentation.ts`（`channelModelView`） | ✅ | 后台模型投影都会带 `costPricing`（`channel.presentation.ts:193-214`），与上游包装类型一致；本仓投影缺 `catalogModelKey` 字段（Go 实体 JSON 含该字段，`model/models_channel.go:70`）。 |
@@ -199,7 +199,7 @@
 | C2 | `GET /admin/channels/protocols?capability=` 协议目录 | `channel.controller.ts:260-264` | 供渠道模型表单选协议并按能力过滤。 |
 | C3 | `GET /admin/channels/health` 运行态健康（启停、协议是否注册、渠道/模型冷却解封时间） | `channel.controller.ts:272-276`、`channel-health.service.ts:27-105` | 与历史成功率互补；上游无此后台端点。 |
 | C4 | 跨渠道模型列表支持 `channelId` / `includeDisabled=1` 查询 | `channel.controller.ts:485-499`、`channel-model.service.ts:108-135` | 上游 `/admin/channel-models` 无参数且总是含停用（`admin_channel_model_health.go:57-75`）。 |
-| C5 | 细粒度权限（channelRead/channelWrite/channelModelRead/channelModelWrite/channelTest）+ 写操作审计 + 删除/批量删除/调价强制填写 `reason` | `channel.controller.ts:130-163,231-467` | 上游仅 `RequireAdmin`，审计仅启停显式记录（`admin_channel_model_health.go:237`）。 |
+| C5 | 细粒度权限（channelRead/channelWrite/channelModelRead/channelModelWrite/channelTest）+ 写操作自动审计 | `channel.controller.ts:130-163,231-467` | 上游仅 `RequireAdmin`，审计仅启停显式记录（`admin_channel_model_health.go:237`）。 |
 | C6 | 连通性测试可带 `modelId`（以库内配置补全）、`waitForResult`、`timeoutMs`，返回状态/错误码/请求摘要/响应预览/logId，并写 `ApiCallLog(billable=false)` | `channel.controller.ts:98-111`、`protocol-test.service.ts:90-275` | 上游只返回 `{durationMs}`，日志依赖内部 analytics 上下文。 |
 | C7 | 上游目录拉取使用渠道级代理 | `model-catalog.service.ts:41` | 上游 `FetchChannelModels` 无 proxy 入参（`channel_models_catalog.go:25`）。 |
 | C8 | 批量删除同时接受 `ids` 与 `modelIds` 两种字段名 | `channel.controller.ts:130-146` | 兼容上游脚本与本仓前端。 |
@@ -219,7 +219,7 @@
 | `POST /admin/channels` | 同 | 上游 `data = {channel}`（`admin_channel_routes.go:48`），本仓 `data = PublicModelChannel` 本体（`channel.controller.ts:303-305`）。 |
 | `PATCH /admin/channels/:id` | 同 | 同上，`{channel}` → 渠道本体。 |
 | `POST /admin/channels/:id/duplicate` | 同 | `{channel}` → 渠道本体。 |
-| `DELETE /admin/channels/:id` | 同 | 上游无请求体；本仓要求 `{reason}`（`ChannelDeleteBodyDto`），缺省 400。 |
+| `DELETE /admin/channels/:id` | 同 | 上游与本仓均无请求体；本仓保留业务影响确认并自动写审计。 |
 | `POST /admin/channels/export` | 同 | 请求 `{ids?}`、响应导出对象一致。 |
 | `POST /admin/channels/import` | 同 | 请求/响应一致，但本仓受 100KB 全局 body 限制（见 B16）。 |
 | 无 | `GET /admin/channels/:id` | 仅本仓有。 |
@@ -228,9 +228,9 @@
 | `GET /admin/channels/:id/models` | 同 | 均返回 `{models:[...]}`；模型项本仓缺 `catalogModelKey`，价格档顺序为 `createdAt`（上游按 `selector_key` 升序，`finance_channel_models.go:189`）。 |
 | `POST /admin/channels/:id/models` | 同 | 上游 `{model}`（`handler/finance.go:612`），本仓返回模型视图本体（`channel.controller.ts:364-366`）。 |
 | `PATCH /admin/channels/:id/models/:modelId` | 同 | 同上，`{model}` → 模型视图本体。 |
-| `DELETE /admin/channels/:id/models/:modelId` | 同 | 上游 `{ok:true}`；本仓 `{ok:true,deleted}` 且强制 `{reason}`。 |
-| `POST /admin/channels/:id/models/batch-delete` | 同 | 上游入参 `{modelIds}`、响应 `{deleted}`；本仓接受 `ids` 或 `modelIds`、响应 `{ok,deleted}`、强制 `reason`。 |
-| `POST /admin/channels/:id/models/batch-reprice` | 同 | 上游入参 `{models}`、响应 `{updated}`；本仓同结构但强制 `reason`。 |
+| `DELETE /admin/channels/:id/models/:modelId` | 同 | 上游 `{ok:true}`；本仓 `{ok:true,deleted}`，无原因字段。 |
+| `POST /admin/channels/:id/models/batch-delete` | 同 | 上游入参 `{modelIds}`、响应 `{deleted}`；本仓接受 `ids` 或 `modelIds`、响应 `{ok,deleted}`，无原因字段。 |
+| `POST /admin/channels/:id/models/batch-reprice` | 同 | 上游入参 `{models}`、响应 `{updated}`；本仓同结构，自动写审计。 |
 | `PATCH /admin/channels/:id/models/:modelId/enabled` | 同 | 上游返回 `{model}`；本仓返回 `{ok:true}`，前端无法直接拿到更新后的模型。 |
 | `PATCH /admin/channels/:id/models/:modelId/sort` | 同 | 上游 `{updated:true}`；本仓 `{ok:true}`。 |
 | `POST /admin/channels/:id/models/fetch` | 同 | **契约不同**：上游 `data.models` 是 `string[]`（`PreviewAdminChannelModels` 返回 `[]string`，`channel_models_catalog.go:64-69`、`handler/finance.go:307-312`）；本仓是 `ChannelModelCatalogItem[]` 对象数组（`model-catalog.service.ts:34-43`、`channel.controller.ts:377`）。 |
@@ -1094,8 +1094,8 @@
 | `pages/admin/components/billing-auto-refund-toggle.tsx` | 无对应，`lib/api.ts` 也无接口 | ❌ 未移植 | 上游有「冻结积分自动退回」开关、二次确认与分钟级自动退回说明（toggle:12-84），接口 `/admin/settings/billing-auto-refund`（wallet.ts:276-280）。本仓全仓 grep 无 `autoRefund/自动退回` 设置，账单页只能人工逐单处理。 |
 | `pages/admin/logical-models/logical-models-page.tsx` | `pages/admin/AdminLogicalModelsPage.tsx` | 🔀 重构（含多处缺口） | 列表、创建/编辑、归档、模拟、线路优先级/权重/启停均具备。差异：① 上游线路候选**按当前能力过滤并禁用停用渠道/模型**（logical:119、579-594、614-616），本仓 `channelModelOptions` 取全部渠道模型且只把停用写进 label、不 disabled（AdminLogicalModelsPage:198-205、787-793）；② 上游禁止重复选择同一渠道模型（:601-616），本仓可重复添加；③ 上游启用前强制至少一条线路并校验能力来源（:173-184），本仓只提示「没有线路会 42204」，仍可保存启用（:779-782，提交 :311-323 未拦截空线路）；④ 上游切换能力会清空线路/能力合同/默认参数（:481-485），本仓不改（:657-685）；⑤ 上游用结构化 `CapabilityScopeEditor`/`DefaultOptionsEditor`（:455-470），本仓是原始 JSON 文本域（:745-765）；⑥ 上游强制 `pricePolicy: channel` 并清零四个价格（:681-694、723-742），本仓提供「统一价/跟随渠道」并允许四个价格输入（:50-53、687-743），形成第二套价格源；⑦ 模拟：上游用 `CapabilityRequestEditor` 传 operation+inputs+options 并展示 productMatch 与候选池/冷却/低优先级原因（:512-542、749-767），本仓只有 operation+options JSON、无 inputs（:855-866），结果表有价格档与 eligible/reasons（:884-913），缺能力匹配结论。⑧ 本仓编码创建后禁用（:622），上游可提交修改；⑨ 本仓多「显示已归档」与 revision 列（:550-557、496-500），上游无。 |
 | `pages/admin/logical-models/model-routing-capabilities.tsx` | 无对应文件，仅原始 JSON | ❌ 未移植 | 上游 818 行实现能力范围编辑器、默认参数编辑器、请求模拟编辑器、能力摘要、从渠道模型推导能力合同、来源合并与覆盖校验（capability:86-260、280-537）。本仓 `AdminLogicalModelsPage` 只用两个 `TextAreaField` 承接 JSON（:745-765），无字段约束、无来源合并、无覆盖提示。直接后果：能力合同写错也能保存，线路匹配失败只能到线上暴露。 |
-| `pages/admin/plugins/plugins-page.tsx` | `pages/admin/AdminPluginsPage.tsx` | 🔀 重构 | 插件清单、启停、上传安装、卸载、内置不可卸载、启动状态均具备。本仓更强：契约校验、插件详情抽屉（Provider/配置项/界面位置/权限/最近校验）、当前环境可用性原因、协议生效数、服务商插件目录安装/校验/刷新、操作原因审计（AdminPluginsPage:96-207、585-708）。缺口：① 上游按 application/protocol/payment/uploaded 分类过滤、按可用性过滤、搜索、分页（plugins:39-73、269-324），本仓无任何筛选/搜索/分页（页面仅表格 :523-545）；② 上游有「作用范围：用户自主启用/全局生效」和已启用用户数（:174-193），本仓 `PluginView` 无 `kind/activationScope/enabledUserCount` 字段（types/model.ts:549-595），无法管理用户级应用插件；③ 上游合并前端插件注册表（含官方应用插件，:369-386），本仓只展示后端插件清单；④ 上游上传有独立文档弹窗（:326），本仓是隐藏 file input + 确认框（:464-489）。 |
-| `pages/admin/user-groups/user-groups-page.tsx` | `pages/admin/AdminUserGroupsPage.tsx` | 🔀 重构 | 分组列表、倍率/汇率/可见渠道/模型覆盖/用户数/默认分组均具备。差异：① 上游删除在 `isDefault` 或 `userCount > 0` 时禁用（user-groups:157），本仓只禁用默认分组（AdminUserGroupsPage:379），有会员的分组仍可点删除并在确认框展示「该分组当前有 N 名有效会员」（:636-648）；② 上游倍率是小数 0.0001–100（即最高 100 倍，editor:136-137），本仓用百分比且上限 100%（:197-201），无法配置 1 倍以上倍率；③ 上游模型覆盖是从当前可用渠道模型的可搜索下拉选择（editor:47-55、164-166），本仓是自由文本模型编码（:582-605），拼错不会提示；④ 上游徽章有实时预览（editor:120-128），本仓无；⑤ 上游有刷新按钮（user-groups:175-177），本仓无；⑥ 本仓多审计原因、默认分组提示、渠道复选框（:505-633）。 |
+| `pages/admin/plugins/plugins-page.tsx` | `pages/admin/AdminPluginsPage.tsx` | 🔀 重构 | 插件清单、启停、上传安装、卸载、内置不可卸载、启动状态均具备。本仓更强：契约校验、插件详情抽屉（Provider/配置项/界面位置/权限/最近校验）、当前环境可用性原因、协议生效数、服务商插件目录安装/校验/刷新、写操作自动审计（AdminPluginsPage:96-207、585-708）。缺口：① 上游按 application/protocol/payment/uploaded 分类过滤、按可用性过滤、搜索、分页（plugins:39-73、269-324），本仓无任何筛选/搜索/分页（页面仅表格 :523-545）；② 上游有「作用范围：用户自主启用/全局生效」和已启用用户数（:174-193），本仓 `PluginView` 无 `kind/activationScope/enabledUserCount` 字段（types/model.ts:549-595），无法管理用户级应用插件；③ 上游合并前端插件注册表（含官方应用插件，:369-386），本仓只展示后端插件清单；④ 上游上传有独立文档弹窗（:326），本仓是隐藏 file input + 确认框（:464-489）。 |
+| `pages/admin/user-groups/user-groups-page.tsx` | `pages/admin/AdminUserGroupsPage.tsx` | 🔀 重构 | 分组列表、倍率/汇率/可见渠道/模型覆盖/用户数/默认分组均具备。差异：① 上游删除在 `isDefault` 或 `userCount > 0` 时禁用（user-groups:157），本仓只禁用默认分组（AdminUserGroupsPage:379），有会员的分组仍可点删除并在确认框展示「该分组当前有 N 名有效会员」（:636-648）；② 上游倍率是小数 0.0001–100（即最高 100 倍，editor:136-137），本仓用百分比且上限 100%（:197-201），无法配置 1 倍以上倍率；③ 上游模型覆盖是从当前可用渠道模型的可搜索下拉选择（editor:47-55、164-166），本仓是自由文本模型编码（:582-605），拼错不会提示；④ 上游徽章有实时预览（editor:120-128），本仓无；⑤ 上游有刷新按钮（user-groups:175-177），本仓无；⑥ 本仓多默认分组提示、渠道复选框（:505-633），写操作自动审计。 |
 | `pages/admin/user-groups/user-group-editor.tsx` | `AdminUserGroupsPage.tsx` 的编辑 Drawer | 🔀 合并 | 基本信息/徽章/倍率/汇率/可见渠道/模型覆盖/排序均具备。缺失：徽章预览、渠道多选搜索、模型覆盖下拉校验（见上）。本仓编辑抽屉 700px 单页滚动，上游 640px 抽屉；两者都有未保存关闭确认（上游 editor:57-71；本仓 useDiscardConfirm :145）。 |
 | `pages/admin/user-groups/user-group-form.ts` | `AdminUserGroupsPage.tsx` 的 `toDraft`/`submit` | 🔀 合并 | 两边都把人类单位换算为 bps/微积分（上游 form:29-81；本仓 :93-115、187-252）。差异：本仓倍率按百分比输入并 `×100`，上游按小数输入并 `×10000`；默认值不同（本仓 100%/1/0.14，上游 1/7/1，constants/EMPTY_DRAFT），属产品口径差异；本仓名称限 40 字、描述 200 字（:463、482），上游 80/500（editor:113、117）。 |
 | `components/model-picker.tsx` | `components/ModelPicker.tsx` | 🔀 重构（多处真实缺口） | 上游两级选择（产品模型→渠道模型）、个人渠道、分组健康、按当前输入做能力兼容过滤、每项可用性徽章/最近 10 次/7 天趋势、每档价格与选中后精确报价、键盘方向键/Home/End/Escape（model-picker:75-182、246-289、628-724）。本仓是扁平前台模型按钮列表：只按服务端 `available` 置灰（ModelPicker:168-193），无兼容性判断、无不可用原因、无健康/可用性、无分组、无键盘漫游、每项只显示 `displayPrice/priceLabel`（:44-48），选中后 400ms 防抖报价（:114-149）。本仓有按能力 localStorage 记忆并跨组件事件同步（modelSelection.ts:27-51、ModelPicker:84-105），上游用全局配置 store。 |
@@ -1150,18 +1150,18 @@
 
 | # | 本仓能力/字段 | 证据 | 价值/备注 |
 |---|---|---|---|
-| C1 | 调价强制填写业务原因，并在缺失时禁用确认；删除只做业务影响确认 | 渠道 page.tsx:260-275、512-526；模型 Manager:333-360、448-477；调价 :110、174-177 | 调价原因作为业务依据保留；删除不把审计变成页面门槛 |
-| C2 | 渠道表单「排序值」「变更原因」 | ChannelFormDrawer.tsx:63-71、166-174；page.tsx:193-197、220 | 上游排序走独立弹窗、无原因 |
+| C1 | 统一调价与删除均不要求人工填写变更原因，审计由后端自动记录 | ChannelModelRepriceDialog.tsx；ChannelModelTable.tsx；Manager:448-495 | 删除保留影响范围确认，不把审计变成页面门槛 |
+| C2 | 渠道表单「排序值」 | ChannelFormDrawer.tsx；page.tsx | 上游排序走独立弹窗；双方均无变更原因 |
 | C3 | 独立「线路健康」面板：24h/7d/P95/均值/最近样本/协议未注册/冷却中 | ChannelModelHealthPanel.tsx:41-166；page.tsx:464-475 | 上游只在单元格 tooltip/渠道徽章展示 |
 | C4 | 渠道模型行级连通性测试 + 最近测试结果面板（含 logId、HTTP path、产出、responsePreview） | ChannelModelTable.tsx:241-248、473-509；Manager:278-296 | 上游测试只在编辑器内且不保留结果 |
-| C5 | 批量删除/统一调价的计数按钮；仅调价保留业务原因输入 | ChannelModelTable.tsx:374-391；Manager:448-477、482-495 | 删除不要求原因；调价原因作为业务依据保留 |
+| C5 | 批量删除/统一调价的计数按钮；两者均不要求原因输入 | ChannelModelTable.tsx:374-391；Manager:448-477、482-495 | 操作后由后端统一写入审计原因，页面只负责确认影响范围 |
 | C6 | 「未定价」状态筛选与标签，作为补价队列 | constants.ts:80-84、89-97；AllChannelModelsPanel.tsx:319-328；ChannelModelTable.tsx:219-224 | 上游无此状态 |
 | C7 | 全部模型「编辑」跳回渠道并定位模型（focusModelId） | page.tsx:140-146；Manager:120-134；AllChannelModelsPanel.tsx:338-348 | 上游是原地内嵌编辑器 |
 | C8 | 渠道左列「未配置 Key」红字提醒、详情显示代理地址 | ChannelListPanel.tsx:226；ChannelDetailPanel.tsx:82 | 上游密钥状态只在详情 |
 | C9 | 渠道启停影响清单（模型数、前台线路不可用、42204） | page.tsx:504-516 | 上游只有一句描述 |
-| C10 | 用户分组审计原因、默认分组说明、渠道复选框、百分比倍率输入 | AdminUserGroupsPage:505-633 | 上游为小数倍率、搜索多选、徽章预览 |
+| C10 | 用户分组默认分组说明、渠道复选框、百分比倍率输入 | AdminUserGroupsPage:505-633 | 上游为小数倍率、搜索多选、徽章预览 |
 | C11 | 前台模型「显示已归档」、Revision 列、编码创建后不可改、统一价策略与四个价格字段 | AdminLogicalModelsPage:158、496-500、616-624、687-743 | 上游无归档筛选/版本列，且强制跟随渠道价 |
-| C12 | 插件契约校验、详情抽屉（Provider/配置/界面/权限/最近校验）、当前环境不可用原因、协议生效数、操作原因 | AdminPluginsPage:96-207、585-708 | 上游无这些排查维度 |
+| C12 | 插件契约校验、详情抽屉（Provider/配置/界面/权限/最近校验）、当前环境不可用原因、协议生效数 | AdminPluginsPage:96-207、585-708 | 上游无这些排查维度 |
 | C13 | 插件页「服务商目录」安装/校验/刷新（插件包维度） | AdminPluginsPage:364-451、547-583 | 上游目录是渠道向导，二者不是同一功能 |
 | C14 | 调用记录 CSV 导出、统计卡、URL 筛选同步、按 id 拉账单详情 | AdminModelCalls:130-151、349-356；AdminBillingOrders:100-117 | 上游日志页也导出，但本仓账单深链更强 |
 | C15 | 账单状态统计卡、成本/毛利、用户邮箱、计费倍率、按现有用量结算 | AdminBillingOrders:327-336、442-479 | 上游信用运营面板有队列/批量但无这些字段 |
@@ -1181,7 +1181,7 @@
 | 全部模型视图 | 与「按渠道」并列，跨渠道表，健康/成本/渠道跳转，原地编辑，含停用项 | 同样并列，增加未定价队列与状态，编辑跳回渠道；分页固定 | 🔀 对齐且部分增强，编辑动线不同 |
 | 模型编辑弹窗 | 1120px 三 Tab，结构化协议/能力/价格，图标选择、展示名补全、未保存确认、可测未保存值 | 980px 单页长表单，原始 JSON 能力合同、自由文本图标/展示名/规格，保存后才能测，关闭不确认 | ⚠️/❌ 结构性能力与安全交互缺失 |
 | 价格档 | default/advanced，生成方式/分辨率/帧率/图片参数/画质/尺寸，结构化校验，视频 Token | 自由文本 selector、分辨率、视频秒数、8 个价格框，弱校验，禁止视频 Token，货币单位未反映到标签 | ❌ 真实能力缺口 |
-| 统一调价 | 按成本×（1+加价率），小数位、逐项手改、按模型分组、CAS 整批拒绝 | 同样算法（BigInt half-up）+ 必填原因 + 模型缺失成本/售价阻断 | ✅ 对齐，本仓更严 |
+| 统一调价 | 按成本×（1+加价率），小数位、逐项手改、按模型分组、CAS 整批拒绝 | 同样算法（BigInt half-up）+ 自动审计 + 模型缺失成本/售价阻断 | ✅ 对齐，本仓更严 |
 | 上游导入 | 拉取上游→预览弹窗→搜索/全选匹配/取消匹配→默认勾选已存在、新模型不勾选→导入 | 拉取上游→对象化预览（含 displayName/已存在徽章）→默认勾选新模型→导入 | ✅ 对齐，默认选择策略本仓更合理 |
 | 排序 | 拖拽/上下移/输入位置；保存带 original ids CAS；全部条目不受筛选影响 | 同左，拆成渠道排序与模型排序两个 API 入口 | ✅ 对齐 |
 | 删除原因 | 删除只需确认，无原因；后端可能不要求 | 渠道/模型/批量删除均不要求原因，保留影响范围确认；后端审计仍记录操作人、动作与结果 | ✅ 对齐业务确认边界 |
@@ -1211,7 +1211,7 @@
 
 1. 全部后台页面使用本仓 `admin-ui/primitives` + Tailwind，而不是上游 antd/自研 overlay；布局、表单控件、Modal/Drawer 外观不同但语义大多等价。
 2. 服务商目录三步向导（`provider-catalog-wizard.tsx`）与 `provider-catalog-pricing.ts` 不做；新增渠道走手填表单。代价是失去「目录带价一键接入」。
-3. 本仓调价强制业务原因；删除只保留业务影响确认，不要求原因。审计在两种情况下都只做被动留痕。
+3. 本仓统一调价与删除只保留业务影响确认，不要求人工填写原因；审计由后端自动被动留痕。
 4. 本仓把「线路健康」做成独立面板、把「财务分析」做成独立页，属于信息架构重构，不是功能缺失。
 5. 本仓 C 端只暴露「前台模型」，不展示渠道/个人渠道，这是本仓产品架构（渠道信息不出 C 端），与上游「产品模型→渠道模型」两级选择不同；但分组展示、输入兼容与健康提示仍可按前台模型维度补齐。
 6. 本仓插件模型只有 builtin/installed 两种来源，没有 application/payment 分类与用户级启用；如果后端确实没有该概念，这是架构差异；若后端有而前端未接，则升级为真实缺口。

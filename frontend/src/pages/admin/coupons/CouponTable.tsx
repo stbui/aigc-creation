@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react';
-import { ActionButton, AdminDataTable, Meter, StatusTag, type AdminColumn } from './components';
+import { ActionButton, AdminDataTable, Meter, StatusTag, type AdminColumn } from '~/admin-ui/primitives';
 import {
   EFFECTIVE_META,
   SCOPE_LABEL,

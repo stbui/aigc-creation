@@ -11,11 +11,10 @@ import {
   StatusTag,
   TextField,
   type AdminColumn,
-} from './components';
+} from '~/admin-ui/primitives';
 import { IMPORT_PAGE_SIZE } from './constants';
 import { adminCreditsApi } from './api';
 import { useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
-import { auditReason } from '../../../admin-ui/lib/auditReason';
 import { signed } from './utils';
 import type { CreditImportResult } from '../../../types/api';
 
@@ -93,10 +92,7 @@ export function CsvImportDrawer({
     }
     setBusy(true);
     try {
-      const r = await adminCreditsApi.importCsv(file, {
-        reason: auditReason('CSV 导入用户积分'),
-        validDays: days,
-      });
+      const r = await adminCreditsApi.importCsv(file, { validDays: days });
       setResult(r);
       if (r.failed === 0) toast.success(`已导入 ${r.succeeded} 条`);
       else toast.warning(`成功 ${r.succeeded} 条，失败 ${r.failed} 条`);

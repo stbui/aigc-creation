@@ -12,11 +12,31 @@
  * 改编码等于把存量会员整体换组。
  */
 
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
-import { Allow, IsArray, IsBoolean, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-import { AuditAction, RequirePermission } from '../../admin/admin.decorator';
-import { PERMISSIONS } from '../../admin/permissions';
-import { UserGroupAdminService, type UserGroupRequest } from './user-group.admin.service';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+} from "@nestjs/common";
+import {
+  Allow,
+  IsArray,
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from "class-validator";
+import { AuditAction, RequirePermission } from "../../admin/admin.decorator";
+import { PERMISSIONS } from "../../admin/permissions";
+import {
+  UserGroupAdminService,
+  type UserGroupRequest,
+} from "./user-group.admin.service";
 
 /** 分组写入入参（嵌套覆盖项整体透传，语义校验在 service） */
 export class UserGroupWriteBodyDto {
@@ -32,11 +52,9 @@ export class UserGroupWriteBodyDto {
   @IsOptional() @IsBoolean() allChannels?: boolean;
   @IsOptional() @IsArray() @IsString({ each: true }) channelIds?: string[];
   @IsOptional() @IsArray() @Allow() modelOverrides?: unknown[];
-  /** 高危动作原因（写审计） */
-  @IsOptional() @IsString() reason?: string;
 }
 
-@Controller('admin/user-groups')
+@Controller("admin/user-groups")
 export class AdminUserGroupsController {
   constructor(private readonly groups: UserGroupAdminService) {}
 
@@ -46,30 +64,30 @@ export class AdminUserGroupsController {
     return this.groups.list();
   }
 
-  @Get(':id')
+  @Get(":id")
   @RequirePermission(PERMISSIONS.userGroupRead)
-  get(@Param('id') id: string) {
+  get(@Param("id") id: string) {
     return this.groups.get(id);
   }
 
   @Post()
   @RequirePermission(PERMISSIONS.userGroupWrite)
-  @AuditAction('user_group.create')
+  @AuditAction("user_group.create")
   create(@Body() body: UserGroupWriteBodyDto) {
     return this.groups.create(body as UserGroupRequest);
   }
 
-  @Patch(':id')
+  @Patch(":id")
   @RequirePermission(PERMISSIONS.userGroupWrite)
-  @AuditAction('user_group.update')
-  update(@Param('id') id: string, @Body() body: UserGroupWriteBodyDto) {
+  @AuditAction("user_group.update")
+  update(@Param("id") id: string, @Body() body: UserGroupWriteBodyDto) {
     return this.groups.update(id, body as UserGroupRequest);
   }
 
-  @Delete(':id')
+  @Delete(":id")
   @RequirePermission(PERMISSIONS.userGroupWrite)
-  @AuditAction('user_group.delete')
-  async remove(@Param('id') id: string) {
+  @AuditAction("user_group.delete")
+  async remove(@Param("id") id: string) {
     await this.groups.remove(id);
     return { ok: true };
   }

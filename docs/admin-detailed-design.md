@@ -88,8 +88,8 @@ providers: [
 **审计口径**：
 
 - 写操作一律记录；GET 导出 / 下载只有显式声明 `@AuditAction` 时才记录。
-- `detail` 只取白名单字段（`status` / `role` / `name` / `priceCents` / `reason` 等），命中 `password|token|secret|hash|credential` 的字段一律不写。
-- 需要业务原因的写操作由 DTO 要求请求体带 `reason` 并落 `AdminAuditLog.reason`；审计本身不作为页面确认门槛，删除渠道 / 渠道模型不要求原因。
+- `detail` 只取白名单字段（`status` / `role` / `name` / `priceCents` 等），命中 `password|token|secret|hash|credential` 的字段一律不写。
+- 普通管理写操作由 `AuditInterceptor` 按动作与结果自动生成稳定原因并落 `AdminAuditLog.reason`；只有退款、发票驳回、能力下架等真实业务语义需要由调用方提供原因。审计原因不作为页面确认门槛。
 - 审计失败**不阻断业务**：让它阻断等于把审计变成单点故障，反而降低可追溯性。
 
 ### 0.3 权限点命名
@@ -125,7 +125,7 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 
 ### 0.6 高危操作确认
 
-`ConfirmAction`（页内确认条，`admin-ui/primitives/overlay`，`role="region"`）用于删除、退款、重置密码、手动调整积分、渠道 / 前台模型写入、角色与系统设置写入、备份。文案必须写明**影响量**（`impact` 数组，如「将删除 12 个素材」），不能只写「确定删除吗」。业务原因输入只用于确有业务依据要求的动作；删除渠道 / 渠道模型不要求原因。审计始终在操作后被动留痕，不反向要求用户确认审计。2026-10-30 起不再要求输入确认词（`requireTyping` / `typingText` 仅保留入参兼容）。
+`ConfirmAction`（页内确认条，`admin-ui/primitives/overlay`，`role="region"`）用于删除、退款、重置密码、手动调整积分、渠道 / 前台模型写入、角色与系统设置写入、备份。文案必须写明**影响量**（`impact` 数组，如「将删除 12 个素材」），不能只写「确定删除吗」。业务原因输入只用于确有业务依据要求的动作（如退款、发票驳回、能力下架）；普通管理写操作不要求填写审计原因。审计始终在操作后由系统自动留痕，不反向要求用户确认审计。2026-10-30 起不再要求输入确认词（`requireTyping` / `typingText` 仅保留入参兼容）。
 
 ### 0.7 批量动作
 
@@ -262,7 +262,7 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 - 按 `(slug, version)` 版本化；已发布版本**不可原地覆盖**（`upsert` 返回 409），改文本须升版本号。
 - 发布时同 slug 的其他已发布版本自动 `archived`，保证 `current()` 唯一。
 - 前台 `GET /legal/:slug` 只读最新已发布版本，读不到时 `LegalPage` 用内置文本兜底。
-- 读 `legal.read`、写 `legal.write`；发布必填原因并写审计。
+- 读 `legal.read`、写 `legal.write`；发布自动写审计，不要求填写变更原因。
 
 ---
 
@@ -354,7 +354,7 @@ partial_refunded → refunded | partial_refunded
 | --- | --- | --- |
 | 支付渠道 | `GET /admin/payments/providers`、`PUT /admin/payments/providers/:id/config` | 每个适配器一份**版本化 + 加密**配置（`PaymentProviderConfig`），追加写不覆盖。密钥字段只回「是否已配置」，留空表示沿用旧值；身份类字段（商户号等）锁定不可改。保存写审计，不要求填写原因 |
 | 充值商品 | `GET/POST/PUT /admin/payments/products*` | 复用 `Order` / `Product`，**不新建** `TopupProduct` 表；售价按分存、周期 / 库存 / 限时策略随类型切换 |
-| 支付订单 | `GET /admin/payments/orders*` | 列表服务端分页（默认 30）；查单与关单使用 `payment.operate`，属于非高危写操作，但均必填原因并写审计。关单前始终先向渠道查单；已入账订单关单返回 `409` |
+| 支付订单 | `GET /admin/payments/orders*` | 列表服务端分页（默认 30）；查单与关单使用 `payment.operate`，属于非高危写操作，自动写审计但不要求填写变更原因。关单前始终先向渠道查单；已入账订单关单返回 `409` |
 | 支付对账 | `GET/POST /admin/payments/reconciliations*` | T+1 自动对账（每天 10:15 跑昨日账单）；差异分七类，已支付未入账经签名查单二次确认后**自动补发积分**（幂等） |
 
 **本页不提供退款**：退款在订单管理，涉及积分与优惠券回滚，放在支付域会让人以为「关单 = 退款」。
@@ -363,7 +363,7 @@ partial_refunded → refunded | partial_refunded
 
 ### 11.2 发票
 
-`/admin/invoices`（`invoice.write`）。一单一票（`orderId @unique`），金额取 `paidCents - refundedCents` 快照；输出可打印 HTML（零 PDF 依赖）。开具与驳回必填原因并写审计。`GET /admin/invoices/export` 导出同一 `status` / `keyword` 口径的 CSV（金额同时给分与元，`invoice.write + data.export` + 审计）。
+`/admin/invoices`（`invoice.write`）。一单一票（`orderId @unique`），金额取 `paidCents - refundedCents` 快照；输出可打印 HTML（零 PDF 依赖）。开具自动写审计；驳回要求填写原因，原因会回显给用户并写入审计。`GET /admin/invoices/export` 导出同一 `status` / `keyword` 口径的 CSV（金额同时给分与元，`invoice.write + data.export` + 审计）。
 
 ---
 
@@ -373,7 +373,7 @@ partial_refunded → refunded | partial_refunded
 
 - 余额 = `CreditLot` 未用完且未过期的批次之和。
 - 消耗按 **FEFO**（先到期先扣，`NULL` 视为最晚到期）跨批次扣减；余额不足整体回滚并报 `40002`（前端按 402 语义处理）。
-- 流水类型：`purchase` / `grant` / `consume` / `admin_adjust` / `expire` / `refund_reclaim`。人工增减必须填原因，落 `admin_adjust` 并写审计。
+- 流水类型：`purchase` / `grant` / `consume` / `admin_adjust` / `expire` / `refund_reclaim`。人工增减落 `admin_adjust` 并自动写审计，不要求填写审计原因。
 - CSV 导入按**邮箱**匹配用户，逐行返回结果（匹配不到、格式错误都单独报，不整批回滚）。
 
 ---
@@ -396,11 +396,11 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 
 规则：
 
-- 写入载荷为 `{ settings: Record<key, value>, clears?: string[], reason }`；`settings` 用点号键，`clears` 删除运行时覆盖并回落代码默认值。
+- 写入载荷为 `{ settings: Record<key, value>, clears?: string[] }`；`settings` 用点号键，`clears` 删除运行时覆盖并回落代码默认值。
 - 写入前按 `SETTING_DEFS` 做类型与范围校验，非法值整体拒绝；同一键不能同时出现在 `settings` 与 `clears`。
 - 只读项（`readOnly`）不渲染可编辑控件，只展示当前值并给出 `linkTo` 入口。
 - 退款规则的读取方是 `order.service.refund`，规则对象由后台控制器取好后传入，订单域不依赖 admin 层。
-- 保存写审计；`setting.write` 属高危，必填原因。
+- 保存自动写审计；`setting.write` 属高危，不要求填写变更原因。
 
 ### 14.1 角色权限 `/admin/roles`
 
@@ -409,7 +409,7 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 规则：
 
 - 角色不可增删改名，`builtIn` 恒为 `true`；三个角色的权限点都能改，包括 `admin`。
-- 请求体为 `{ roles: [{ code, permissions }], reason }`；原因必填（2–200 字）并写入审计。
+- 请求体为 `{ roles: [{ code, permissions }] }`；写操作自动记录审计原因。
 - 未知权限点整体拒绝（400 `40001`），不静默丢弃 —— 否则调用方会以为保存成功。
 - 多角色改动在一个事务中写入，避免部分角色已生效、部分失败的半保存状态；审计记录每个角色新增 / 移除的权限点。
 - 改动立即生效：`AdminGuard` / `PermissionGuard` 每次请求查库，不需要重启或重新登录。操作者把自己权限改没了也会当场生效（可由其他 admin 恢复）。
@@ -536,10 +536,10 @@ C 端可见身份（`LogicalModel`）+ 发布快照（`LogicalModelRevision`）+
 | 能力 | 接口 | 权限点 |
 | --- | --- | --- |
 | 账单列表 / 详情 | `GET /admin/billing-orders`、`/:id` | `billing_order.read` |
-| 人工核对 | `POST /admin/billing-orders/:id/resolve`（`action: settle \| refund` + `reason`，高危） | `billing_order.resolve` |
+| 人工核对 | `POST /admin/billing-orders/:id/resolve`（`action: settle \| refund`，高危，自动审计） | `billing_order.resolve` |
 | 财务汇总 | `GET /admin/analytics/finance` | `model.analytics_read` |
 
-- 账单状态机：`reserved / running / settled / refunded / uncertain`。`uncertain`（超时、5xx、连接中断）不自动退款、不切线，只能人工 `settle` 或 `refund`，必填原因并写审计。
+- 账单状态机：`reserved / running / settled / refunded / uncertain`。`uncertain`（超时、5xx、连接中断）不自动退款、不切线，只能人工 `settle` 或 `refund`，操作自动写审计。
 - 财务口径固定三条：实收 = 已结算账单实际金额；已退 = 订单退款金额；净收入 = 实收 − 已退。预留 / 运行 / 待核对单列为「挂账」，**不计入实收**。
 
 ---
@@ -567,10 +567,10 @@ C 端可见身份（`LogicalModel`）+ 发布快照（`LogicalModelRevision`）+
 | `POST /admin/backups/:id/verify` | SHA-256 校验 |
 | `GET /admin/backups/:id/download` | 下载 |
 | `DELETE /admin/backups/:id` | 删除单份 |
-| `POST /admin/backups/prune` | 按份数裁剪（必填原因并写审计） |
+| `POST /admin/backups/prune` | 按份数裁剪（自动写审计） |
 
 - 产物落 `BACKUP_DIR`，单份带 SHA-256 供校验。
-- 手动备份与保留份数裁剪均必填 2–200 字原因并写审计；重复点击由前端 busy 状态防抖，不承诺跨请求幂等。
+- 手动备份与保留份数裁剪均自动写审计，不要求填写变更原因；重复点击由前端 busy 状态防抖，不承诺跨请求幂等。
 - 到期数据清理与清理留痕统一走 `/admin/retention/*`，不在备份控制器保留第二套入口。
 
 ### 20.2 保留期清理 `/admin/retention`

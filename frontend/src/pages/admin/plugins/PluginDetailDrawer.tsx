@@ -1,4 +1,4 @@
-import { ActionButton, Descriptions, Drawer, Notice, StatusTag } from './components';
+import { ActionButton, Descriptions, Drawer, Notice, StatusTag } from '~/admin-ui/primitives';
 import { contributionText } from './constants';
 import type { PluginView } from '../../../types/model';
 

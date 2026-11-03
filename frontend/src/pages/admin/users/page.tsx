@@ -19,11 +19,10 @@ import {
   StaleError,
   type AdminColumn,
   type AppliedFilter,
-} from './components';
+} from '~/admin-ui/primitives';
 import { adminUsersApi } from './api';
 import { useAdmin, useAdminDetailParam, useAdminList, useAdminUrlFilterSync, useToast } from './hooks';
 import { formatDateTime } from './utils';
-import { auditReason } from '../../../admin-ui/lib/auditReason';
 import { DEFAULT_SORT, DELETE_CONFIRM_WORD, ROLE_OPTIONS, STATUS_OPTIONS } from './constants';
 import { UserDetailDrawer } from './UserDetailDrawer';
 import { UserStatusConfirm } from './UserStatusConfirm';
@@ -228,11 +227,7 @@ export function AdminUsersPage() {
   const changeStatus = async (target: Row, next: 'active' | 'disabled') => {
     setBusy(true);
     try {
-      await adminUsersApi.changeStatus(
-        target.id,
-        next,
-        auditReason(next === 'disabled' ? '禁用用户账号' : '启用用户账号'),
-      );
+      await adminUsersApi.changeStatus(target.id, next);
       setStatusTarget(null);
       refresh(next === 'disabled' ? '账号已禁用，登录凭证立即失效' : '账号已启用');
     } catch (e) {
@@ -245,7 +240,7 @@ export function AdminUsersPage() {
   const changeRole = async (target: Row, next: string) => {
     setBusy(true);
     try {
-      await adminUsersApi.changeRole(target.id, next, auditReason('变更用户角色'));
+      await adminUsersApi.changeRole(target.id, next);
       setRoleTarget(null);
       refresh('角色已变更');
     } catch (e) {
