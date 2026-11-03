@@ -19,7 +19,7 @@ import {
   Post,
   Put,
   Query,
-} from '@nestjs/common';
+} from "@nestjs/common";
 import {
   Allow,
   IsArray,
@@ -32,18 +32,30 @@ import {
   Max,
   MaxLength,
   Min,
-} from 'class-validator';
-import { AdminUser, AuditAction, RequirePermission } from '../../admin/admin.decorator';
-import { AppError } from '../../common/app.exception';
-import { RateLimit, type RateLimitOptions } from '../../common/rate-limit.guard';
-import { PERMISSIONS } from '../../admin/permissions';
-import { ProtocolCatalogService } from '../protocol/protocol-catalog.service';
-import { ProtocolTestService, type ProtocolTestRequest } from '../protocol/protocol-test.service';
-import { ModelCatalogService } from '../catalog/model-catalog.service';
-import { ChannelModelService } from './channel-model.service';
-import { ChannelService } from './channel.service';
-import { ChannelHealthService } from './channel-health.service';
-import { ChannelModelMetricsService } from './channel-model-metrics.service';
+} from "class-validator";
+import {
+  AdminUser,
+  AuditAction,
+  AuditTarget,
+  RequireAllPermissions,
+  RequirePermission,
+} from "../../admin/admin.decorator";
+import { AppError } from "../../common/app.exception";
+import {
+  RateLimit,
+  type RateLimitOptions,
+} from "../../common/rate-limit.guard";
+import { PERMISSIONS } from "../../admin/permissions";
+import { ProtocolCatalogService } from "../protocol/protocol-catalog.service";
+import {
+  ProtocolTestService,
+  type ProtocolTestRequest,
+} from "../protocol/protocol-test.service";
+import { ModelCatalogService } from "../catalog/model-catalog.service";
+import { ChannelModelService } from "./channel-model.service";
+import { ChannelService } from "./channel.service";
+import { ChannelHealthService } from "./channel-health.service";
+import { ChannelModelMetricsService } from "./channel-model-metrics.service";
 import {
   MAX_CHANNEL_CONCURRENCY,
   MAX_SORT_ORDER,
@@ -51,7 +63,7 @@ import {
   type ChannelModelRequest,
   type ChannelRequest,
   type SystemChannelExport,
-} from './channel.types';
+} from "./channel.types";
 
 /** 渠道创建 / 更新入参 */
 export class ChannelWriteBodyDto {
@@ -60,7 +72,11 @@ export class ChannelWriteBodyDto {
   @IsOptional() @IsString() baseUrl?: string;
   @IsOptional() @IsString() apiKey?: string;
   @IsOptional() @IsString() secretKey?: string;
-  @IsOptional() @IsInt() @Min(MIN_CHANNEL_CONCURRENCY) @Max(MAX_CHANNEL_CONCURRENCY) concurrencyLimit?: number | null;
+  @IsOptional()
+  @IsInt()
+  @Min(MIN_CHANNEL_CONCURRENCY)
+  @Max(MAX_CHANNEL_CONCURRENCY)
+  concurrencyLimit?: number | null;
   @IsOptional() @IsBoolean() useGlobalConcurrency?: boolean | null;
   @IsOptional() @IsArray() @IsString({ each: true }) models?: string[] | null;
   @IsOptional() @Allow() headers?: unknown;
@@ -139,7 +155,13 @@ export class ChannelBatchDeleteBodyDto {
 
   /** 归一化后的 id 列表（两个别名取并集去重） */
   targets(): string[] {
-    return [...new Set([...(this.ids ?? []), ...(this.modelIds ?? [])].map((v) => String(v ?? '').trim()).filter((v) => v !== ''))];
+    return [
+      ...new Set(
+        [...(this.ids ?? []), ...(this.modelIds ?? [])]
+          .map((v) => String(v ?? "").trim())
+          .filter((v) => v !== ""),
+      ),
+    ];
   }
 }
 
@@ -147,7 +169,10 @@ export class ChannelBatchDeleteBodyDto {
 export class ChannelModelRepriceBodyDto {
   @IsArray() models!: unknown[];
   /** 调价是高危写操作（`channel.model_write`），原因必填并写审计 */
-  @IsNotEmpty({ message: '必须填写变更原因' }) @IsString() @MaxLength(200) reason!: string;
+  @IsNotEmpty({ message: "必须填写变更原因" })
+  @IsString()
+  @MaxLength(200)
+  reason!: string;
 }
 
 export class ChannelOrderBodyDto {
@@ -173,26 +198,25 @@ export class ChannelExportBodyDto {
  * fetch/import 各 10 次/分，test 5 次/分，均按用户维度。
  */
 const RL_CHANNEL_FETCH: RateLimitOptions = {
-  name: 'channel-model-fetch',
+  name: "channel-model-fetch",
   limit: 10,
   windowSec: 60,
-  scope: 'user',
+  scope: "user",
 };
 
 const RL_CHANNEL_IMPORT: RateLimitOptions = {
-  name: 'channel-model-import',
+  name: "channel-model-import",
   limit: 10,
   windowSec: 60,
-  scope: 'user',
+  scope: "user",
 };
 
 const RL_CHANNEL_TEST: RateLimitOptions = {
-  name: 'channel-model-test',
+  name: "channel-model-test",
   limit: 5,
   windowSec: 60,
-  scope: 'user',
+  scope: "user",
 };
-
 
 /** 导入文件即导出文件本身，允许附带 reason */
 export class ChannelImportBodyDto {
@@ -203,7 +227,7 @@ export class ChannelImportBodyDto {
   @IsOptional() @IsString() reason?: string;
 }
 
-@Controller('admin/channels')
+@Controller("admin/channels")
 export class AdminChannelsController {
   constructor(
     private readonly channels: ChannelService,
@@ -218,7 +242,12 @@ export class AdminChannelsController {
 
   @Get()
   @RequirePermission(PERMISSIONS.channelRead)
-  list(@Query('keyword') keyword?: string, @Query('status') status?: string, @Query('page') page?: string, @Query('limit') limit?: string) {
+  list(
+    @Query("keyword") keyword?: string,
+    @Query("status") status?: string,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+  ) {
     return this.channels.list({
       keyword,
       status,
@@ -228,7 +257,7 @@ export class AdminChannelsController {
   }
 
   /** 静态路由必须排在 `:id` 之前 */
-  @Get('order')
+  @Get("order")
   @RequirePermission(PERMISSIONS.channelRead)
   async order() {
     // 包裹成 { items }：与参考实现的路由顺序端点契约一致，
@@ -236,7 +265,7 @@ export class AdminChannelsController {
     //
     // 必须 await：`{ items: promise }` 会被 JSON 序列化成 `{"items":{}}`，
     // 前端拿到空对象后再 .map 就是「Cannot read properties of undefined」。
-    return { items: await this.channels.order('') };
+    return { items: await this.channels.order("") };
   }
 
   /**
@@ -245,10 +274,14 @@ export class AdminChannelsController {
    * 必须排在 `:id` 之前：`protocols` 会被当成渠道 id 命中 `GET /admin/channels/:id`。
    * `capability` 由前端按所选能力过滤，避免把文本协议配进生图通道。
    */
-  @Get('protocols')
+  @Get("protocols")
   @RequirePermission(PERMISSIONS.channelModelRead)
-  protocolCatalog(@Query('capability') capability?: string) {
-    return { protocols: this.protocols.list(capability ? String(capability) : undefined) };
+  protocolCatalog(@Query("capability") capability?: string) {
+    return {
+      protocols: this.protocols.list(
+        capability ? String(capability) : undefined,
+      ),
+    };
   }
 
   /**
@@ -257,147 +290,174 @@ export class AdminChannelsController {
    * 后台值班塔与排障入口读这里：冷却状态来自本进程的 `RouteHealthService`，
    * 与调度器判定用的是同一份数据，不另算一套。
    */
-  @Get('health')
+  @Get("health")
   @RequirePermission(PERMISSIONS.channelRead)
   async healthSnapshot() {
     return { items: await this.health.list() };
   }
 
-  @Put('order')
+  @Put("order")
   @RequirePermission(PERMISSIONS.channelWrite)
-  @AuditAction('channel.order')
+  @AuditAction("channel.order")
+  @AuditTarget("channel")
   async saveOrder(@Body() body: ChannelOrderBodyDto) {
-    await this.channels.saveOrder('', body.ids ?? [], body.expectedIds ?? []);
+    await this.channels.saveOrder("", body.ids ?? [], body.expectedIds ?? []);
     return { ok: true };
   }
 
-  @Post('export')
-  @RequirePermission(PERMISSIONS.channelRead)
-  @AuditAction('channel.export')
+  @Post("export")
+  @RequireAllPermissions(PERMISSIONS.channelRead, PERMISSIONS.dataExport)
+  @AuditAction("channel.export")
+  @AuditTarget("channel")
   export(@Body() body: ChannelExportBodyDto) {
     return this.channels.exportChannels(body?.ids ?? []);
   }
 
-  @Post('import')
+  @Post("import")
   @RequirePermission(PERMISSIONS.channelWrite)
-  @AuditAction('channel.import')
+  @AuditAction("channel.import")
+  @AuditTarget("channel")
   import(@Body() body: ChannelImportBodyDto) {
     return this.channels.importChannels(body as unknown as SystemChannelExport);
   }
 
   @Post()
   @RequirePermission(PERMISSIONS.channelWrite)
-  @AuditAction('channel.create')
+  @AuditAction("channel.create")
+  @AuditTarget("channel")
   create(@Body() body: ChannelWriteBodyDto) {
     return this.channels.create(body as ChannelRequest);
   }
 
-  @Get(':id')
+  @Get(":id")
   @RequirePermission(PERMISSIONS.channelRead)
-  get(@Param('id') id: string) {
+  get(@Param("id") id: string) {
     return this.channels.get(id);
   }
 
-  @Patch(':id')
+  @Patch(":id")
   @RequirePermission(PERMISSIONS.channelWrite)
-  @AuditAction('channel.update')
-  update(@Param('id') id: string, @Body() body: ChannelWriteBodyDto) {
+  @AuditAction("channel.update")
+  @AuditTarget("channel", "id")
+  update(@Param("id") id: string, @Body() body: ChannelWriteBodyDto) {
     return this.channels.update(id, body as ChannelRequest);
   }
 
-  @Delete(':id')
+  @Delete(":id")
   @RequirePermission(PERMISSIONS.channelWrite)
-  @AuditAction('channel.delete')
-  async remove(@Param('id') id: string) {
+  @AuditAction("channel.delete")
+  @AuditTarget("channel", "id")
+  async remove(@Param("id") id: string) {
     await this.channels.remove(id);
     return { ok: true };
   }
 
-  @Post(':id/duplicate')
+  @Post(":id/duplicate")
   @RequirePermission(PERMISSIONS.channelWrite)
-  @AuditAction('channel.duplicate')
-  duplicate(@Param('id') id: string, @AdminUser() actor: AdminUser) {
+  @AuditAction("channel.duplicate")
+  @AuditTarget("channel", "id")
+  duplicate(@Param("id") id: string, @AdminUser() actor: AdminUser) {
     // 归属人写进渠道：复制出的渠道要能查到「是谁建的」
-    return this.channels.duplicate(id, actor?.id ?? '');
+    return this.channels.duplicate(id, actor?.id ?? "");
   }
 
   /* ── 渠道模型 ─────────────────────────────────────────── */
 
-  @Get(':id/models')
+  @Get(":id/models")
   @RequirePermission(PERMISSIONS.channelModelRead)
-  async models(@Param('id') id: string) {
+  async models(@Param("id") id: string) {
     // 包裹成 { models }：与参考实现契约一致，前端读 .models
     // 必须 await，否则序列化成 `{"models":{}}`。
     return { models: await this.channelModels.list(id) };
   }
 
-  @Get(':id/models/order')
+  @Get(":id/models/order")
   @RequirePermission(PERMISSIONS.channelModelRead)
-  async modelOrder(@Param('id') id: string) {
+  async modelOrder(@Param("id") id: string) {
     return { items: await this.channels.order(id) };
   }
 
-  @Put(':id/models/order')
+  @Put(":id/models/order")
   @RequirePermission(PERMISSIONS.channelModelWrite)
-  @AuditAction('channel_model.order')
-  async saveModelOrder(@Param('id') id: string, @Body() body: ChannelOrderBodyDto) {
+  @AuditAction("channel_model.order")
+  @AuditTarget("channel", "id")
+  async saveModelOrder(
+    @Param("id") id: string,
+    @Body() body: ChannelOrderBodyDto,
+  ) {
     await this.channels.saveOrder(id, body.ids ?? [], body.expectedIds ?? []);
     return { ok: true };
   }
 
-  @Post(':id/models')
+  @Post(":id/models")
   @RequirePermission(PERMISSIONS.channelModelWrite)
-  @AuditAction('channel_model.create')
-  createModel(@Param('id') id: string, @Body() body: ChannelModelWriteBodyDto) {
-    return this.channelModels.save(id, '', body as ChannelModelRequest);
+  @AuditAction("channel_model.create")
+  @AuditTarget("channel", "id")
+  createModel(@Param("id") id: string, @Body() body: ChannelModelWriteBodyDto) {
+    return this.channelModels.save(id, "", body as ChannelModelRequest);
   }
 
   /**
    * 读取上游模型目录（只读，不写库）。用渠道已保存的凭证在服务端发起请求，
    * 密钥不经过浏览器。
    */
-  @Post(':id/models/fetch')
+  @Post(":id/models/fetch")
   @RequirePermission(PERMISSIONS.channelModelRead)
-  @AuditAction('channel_model.fetch')
+  @AuditAction("channel_model.fetch")
+  @AuditTarget("channel", "id")
   @RateLimit(RL_CHANNEL_FETCH)
-  async fetchModels(@Param('id') id: string) {
+  async fetchModels(@Param("id") id: string) {
     return { models: await this.catalog.preview(id) };
   }
 
   /** 导入勾选的上游模型：默认停用、待定价；能力与协议仍需管理员声明 */
-  @Post(':id/models/import')
+  @Post(":id/models/import")
   @RequirePermission(PERMISSIONS.channelModelWrite)
-  @AuditAction('channel_model.import')
+  @AuditAction("channel_model.import")
+  @AuditTarget("channel", "id")
   @RateLimit(RL_CHANNEL_IMPORT)
-  importModels(@Param('id') id: string, @Body() body: ChannelModelImportBodyDto) {
+  importModels(
+    @Param("id") id: string,
+    @Body() body: ChannelModelImportBodyDto,
+  ) {
     return this.catalog.import(id, body.models ?? []);
   }
 
-  @Patch(':id/models/:modelId')
+  @Patch(":id/models/:modelId")
   @RequirePermission(PERMISSIONS.channelModelWrite)
-  @AuditAction('channel_model.update')
-  updateModel(@Param('id') id: string, @Param('modelId') modelId: string, @Body() body: ChannelModelWriteBodyDto) {
+  @AuditAction("channel_model.update")
+  @AuditTarget("channel_model", "modelId")
+  updateModel(
+    @Param("id") id: string,
+    @Param("modelId") modelId: string,
+    @Body() body: ChannelModelWriteBodyDto,
+  ) {
     return this.channelModels.save(id, modelId, body as ChannelModelRequest);
   }
 
-  @Delete(':id/models/:modelId')
+  @Delete(":id/models/:modelId")
   @RequirePermission(PERMISSIONS.channelModelWrite)
-  @AuditAction('channel_model.delete')
+  @AuditAction("channel_model.delete")
+  @AuditTarget("channel_model", "modelId")
   async removeModel(
-    @Param('id') id: string,
-    @Param('modelId') modelId: string,
+    @Param("id") id: string,
+    @Param("modelId") modelId: string,
   ) {
     const deleted = await this.channelModels.removeMany(id, [modelId]);
     return { ok: true, deleted };
   }
 
-  @Post(':id/models/batch-delete')
+  @Post(":id/models/batch-delete")
   @RequirePermission(PERMISSIONS.channelModelWrite)
-  @AuditAction('channel_model.batch_delete')
-  async batchDeleteModels(@Param('id') id: string, @Body() body: ChannelBatchDeleteBodyDto) {
+  @AuditAction("channel_model.batch_delete")
+  @AuditTarget("channel", "id")
+  async batchDeleteModels(
+    @Param("id") id: string,
+    @Body() body: ChannelBatchDeleteBodyDto,
+  ) {
     const targets = body.targets();
     if (targets.length === 0) {
-      throw new AppError(40001, '请选择要删除的渠道模型', 400);
+      throw new AppError(40001, "请选择要删除的渠道模型", 400);
     }
     const deleted = await this.channelModels.removeMany(id, targets);
     // 同时给出 ok 与 deleted：参考实现读 ok，本仓前端读 deleted
@@ -408,10 +468,14 @@ export class AdminChannelsController {
    * 批量调价：前端按「成本 × (1 + 加价率)」算好最终售价后提交。
    * 价格版本不一致（期间有人改过价）时整批拒绝，不部分落库。
    */
-  @Post(':id/models/batch-reprice')
+  @Post(":id/models/batch-reprice")
   @RequirePermission(PERMISSIONS.channelModelWrite)
-  @AuditAction('channel_model.batch_reprice')
-  async batchRepriceModels(@Param('id') id: string, @Body() body: ChannelModelRepriceBodyDto) {
+  @AuditAction("channel_model.batch_reprice")
+  @AuditTarget("channel", "id")
+  async batchRepriceModels(
+    @Param("id") id: string,
+    @Body() body: ChannelModelRepriceBodyDto,
+  ) {
     const updated = await this.channelModels.repriceMany(id, body.models ?? []);
     return { updated };
   }
@@ -423,37 +487,52 @@ export class AdminChannelsController {
    * 不扣费；结果同时落 `ApiCallLog`（`billable=false`），后台「调用记录」
    * 页据此展示。可测未保存的模型草稿，因此入参允许携带表单当前值。
    */
-  @Post(':id/models/test')
+  @Post(":id/models/test")
   @RequirePermission(PERMISSIONS.channelTest)
-  @AuditAction('channel_model.test')
+  @AuditAction("channel_model.test")
+  @AuditTarget("channel", "id")
   @RateLimit(RL_CHANNEL_TEST)
-  testModel(@Param('id') id: string, @Body() body: ChannelModelTestBodyDto, @AdminUser() user: AdminUser) {
-    return this.protocolTest.test(id, body as ProtocolTestRequest, user?.id ?? 'unknown');
+  testModel(
+    @Param("id") id: string,
+    @Body() body: ChannelModelTestBodyDto,
+    @AdminUser() user: AdminUser,
+  ) {
+    return this.protocolTest.test(
+      id,
+      body as ProtocolTestRequest,
+      user?.id ?? "unknown",
+    );
   }
 
-  @Patch(':id/models/:modelId/enabled')
+  @Patch(":id/models/:modelId/enabled")
   @RequirePermission(PERMISSIONS.channelModelWrite)
-  @AuditAction('channel_model.enabled')
+  @AuditAction("channel_model.enabled")
+  @AuditTarget("channel_model", "modelId")
   async setModelEnabled(
-    @Param('id') id: string,
-    @Param('modelId') modelId: string,
+    @Param("id") id: string,
+    @Param("modelId") modelId: string,
     @Body() body: ChannelEnabledBodyDto,
   ) {
     await this.channelModels.setEnabled(id, modelId, body.enabled);
     return { ok: true };
   }
 
-  @Patch(':id/models/:modelId/sort')
+  @Patch(":id/models/:modelId/sort")
   @RequirePermission(PERMISSIONS.channelModelWrite)
-  @AuditAction('channel_model.sort')
-  async setModelSort(@Param('id') id: string, @Param('modelId') modelId: string, @Body() body: ChannelSortBodyDto) {
+  @AuditAction("channel_model.sort")
+  @AuditTarget("channel_model", "modelId")
+  async setModelSort(
+    @Param("id") id: string,
+    @Param("modelId") modelId: string,
+    @Body() body: ChannelSortBodyDto,
+  ) {
     await this.channelModels.updateSort(id, modelId, body.sortOrder);
     return { ok: true };
   }
 }
 
 /** 全量渠道模型（跨渠道只读视图） */
-@Controller('admin/channel-models')
+@Controller("admin/channel-models")
 export class AdminChannelModelsController {
   constructor(
     private readonly channelModels: ChannelModelService,
@@ -470,15 +549,15 @@ export class AdminChannelModelsController {
   @Get()
   @RequirePermission(PERMISSIONS.channelModelRead)
   async list(
-    @Query('channelId') channelId?: string,
-    @Query('includeDisabled') includeDisabled?: string,
+    @Query("channelId") channelId?: string,
+    @Query("includeDisabled") includeDisabled?: string,
   ) {
     // 包裹成 { models }：与参考实现契约一致，前端读 .models
     // 必须 await，否则序列化成 `{"models":{}}`。
     return {
       models: await this.channelModels.listAll(
         channelId ? String(channelId) : undefined,
-        String(includeDisabled ?? '') === '1',
+        String(includeDisabled ?? "") === "1",
       ),
     };
   }
@@ -491,9 +570,11 @@ export class AdminChannelModelsController {
    * 「现在没冷却但 24h 成功率 40%」和「现在冷却中但 7d 成功率 99%」
    * 要做的动作完全不同。
    */
-  @Get('health')
+  @Get("health")
   @RequirePermission(PERMISSIONS.channelModelRead)
-  async health(@Query('channelId') channelId?: string) {
-    return { items: await this.metrics.list(channelId ? String(channelId) : undefined) };
+  async health(@Query("channelId") channelId?: string) {
+    return {
+      items: await this.metrics.list(channelId ? String(channelId) : undefined),
+    };
   }
 }

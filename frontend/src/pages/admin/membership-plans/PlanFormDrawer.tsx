@@ -168,15 +168,6 @@ export function PlanFormDrawer({
           />
         </div>
 
-        <FormField label="变更原因" hint="写入审计，必须能回答「谁为什么改」">
-          <TextField
-            ariaLabel="变更原因"
-            value={draft.reason}
-            onChange={(value) => onPatch({ reason: value })}
-            placeholder={editing ? '如：专业会员月费 99 → 89 元' : '如：新增工作室套餐'}
-            maxLength={200}
-          />
-        </FormField>
       </div>
     </Drawer>
   );

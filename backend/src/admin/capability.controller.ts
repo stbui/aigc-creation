@@ -1,7 +1,6 @@
 import { Body, Controller, Get, Param, Put } from '@nestjs/common';
 import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
 import { AdminUser, AuditAction, RequirePermission } from './admin.decorator';
-import { AppError } from '../common/app.exception';
 import { PERMISSIONS } from './permissions';
 import { CapabilityAvailabilityService } from '../capabilities/capability-availability.service';
 
@@ -44,16 +43,7 @@ export class AdminCapabilitiesController {
   @RequirePermission(PERMISSIONS.capabilityWrite)
   @AuditAction('capability.toggle')
   async set(@Param('id') id: string, @Body() dto: CapabilityToggleDto, @AdminUser() user: AdminUser) {
-    try {
-      const row = await this.availability.setEnabled(id, dto.enabled, dto.reason, user.email);
-      return { capabilityId: row.capabilityId, enabled: row.enabled, reason: row.reason };
-    } catch (e) {
-      /*
-       * service 抛出的是普通 Error（它要保持与 Nest 无关）。
-       * 在这里翻译成 400 —— 未知能力 id 对客户端就是「参数不对」，
-       * 让它冒成 500 会把运营的输入错误记成服务端故障。
-       */
-      throw new AppError(40001, (e as Error).message, 400);
-    }
+    const row = await this.availability.setEnabled(id, dto.enabled, dto.reason, user.email);
+    return { capabilityId: row.capabilityId, enabled: row.enabled, reason: row.reason };
   }
 }

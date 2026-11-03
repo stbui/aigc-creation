@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
 import { runBatch } from '../common/batch';
@@ -12,6 +12,8 @@ import type { StorageBackend } from '../storage/storage.provider';
 /** 素材管理 (admin-prd.md §3.4 B-21~B-27) */
 @Injectable()
 export class AdminAssetsService {
+  private readonly logger = new Logger(AdminAssetsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
@@ -61,9 +63,11 @@ export class AdminAssetsService {
   /**
    * 删除项目 (B-22): 连带素材与任务。
    *
-   * 顺序: 先删文件 → 再删数据库记录。
-   * 与素材删除相反 —— 这里先删文件是故意的: 记录删了就查不到 key,
-   * 文件就成了无法回收的孤儿, 永久占磁盘。
+   * 硬删时先提交数据库事务，再尽力删除对象存储文件。反过来先删文件，
+   * 一旦数据库事务失败，就会留下「记录还在、文件已丢」的坏数据；文件删除
+   * 失败则只会留下孤儿文件，后续可清理，不会破坏业务记录。
+   *
+   * 软删只下架素材并保留文件 —— 否则素材记录虽然还在，内容却已经不可恢复。
    */
   async removeProject(id: string, hard: boolean) {
     const project = await this.prisma.project.findUnique({
@@ -88,14 +92,7 @@ export class AdminAssetsService {
     });
     impact.bytes = sizes.reduce((sum, s) => sum + s.sizeBytes, 0);
 
-    // 1) 先删文件
-    for (const a of project.assets) {
-      if (!a.storageKey) continue;
-      const p = this.storage.get((a.storageBackend as StorageBackend) ?? 'local');
-      await p?.delete(a.storageKey);
-    }
-
-    // 2) 再删记录 (事务保证原子)
+    // 1) 数据库事务保证项目、任务与素材记录一致
     await this.prisma.$transaction(async (tx) => {
       await tx.generationTask.deleteMany({ where: { projectId: id } });
       if (hard) {
@@ -109,6 +106,9 @@ export class AdminAssetsService {
       }
       await tx.project.delete({ where: { id } });
     });
+
+    // 2) 硬删提交后再清文件；删除失败只留孤儿文件，不影响已提交的数据事实
+    if (hard) await this.deleteStoredAssets(project.assets);
 
     return { id, hard, impact };
   }
@@ -305,25 +305,16 @@ export class AdminAssetsService {
     });
     if (!asset) throw new AppError(40400, '素材不存在', 404);
 
-    const producedTasks = await this.prisma.generationTask.findMany({
-      where: { outputAssetId: id },
-      select: { id: true },
-    });
-
-    // 先删文件: 记录删了就查不到 key, 文件会成永久孤儿
-    if (asset.storageKey) {
-      const p = this.storage.get((asset.storageBackend as StorageBackend) ?? 'local');
-      await p?.delete(asset.storageKey);
-    }
-
-    await this.prisma.$transaction(async (tx) => {
-      if (producedTasks.length) {
-        await tx.generationTask.deleteMany({ where: { id: { in: producedTasks.map((t) => t.id) } } });
-      }
+    const removedTasks = await this.prisma.$transaction(async (tx) => {
+      const tasks = await tx.generationTask.deleteMany({ where: { outputAssetId: id } });
       await tx.asset.delete({ where: { id } });
+      return tasks.count;
     });
 
-    return { id, removedTasks: producedTasks.length };
+    // 数据库提交后再清文件；失败不回滚，避免记录还在但文件已丢
+    await this.deleteStoredAssets([asset]);
+
+    return { id, removedTasks };
   }
 
   /** 删除前的连带影响预览, 供确认弹窗量化展示 */
@@ -332,6 +323,31 @@ export class AdminAssetsService {
     if (!asset) throw new AppError(40400, '素材不存在', 404);
     const tasks = await this.prisma.generationTask.count({ where: { outputAssetId: id } });
     return { sizeBytes: asset.sizeBytes, tasks, storageBackend: asset.storageBackend };
+  }
+
+  /** 文件删除是提交后的 best-effort；失败留孤儿文件，不制造坏记录。 */
+  private async deleteStoredAssets(
+    assets: Array<{ storageKey: string | null; storageBackend: string }>,
+  ): Promise<void> {
+    for (const asset of assets) {
+      if (!asset.storageKey) continue;
+      try {
+        const provider = this.storage.get(
+          (asset.storageBackend as StorageBackend) ?? 'local',
+        );
+        if (!provider) {
+          this.logger.warn(
+            `素材文件未删除：存储后端 ${asset.storageBackend} 未启用 (${asset.storageKey})`,
+          );
+          continue;
+        }
+        await provider.delete(asset.storageKey);
+      } catch (error) {
+        this.logger.warn(
+          `素材文件删除失败，数据库记录已删除: ${asset.storageKey} — ${(error as Error).message}`,
+        );
+      }
+    }
   }
 }
 

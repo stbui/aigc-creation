@@ -1,15 +1,6 @@
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useRef,
-  useState,
-  type ReactNode,
-} from 'react';
+import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
 import { AlertTriangle } from 'lucide-react';
 
-import { cn } from '../lib/cn';
 import { Button } from '../components/ui/button';
 import {
   Dialog,
@@ -19,18 +10,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '../components/ui/dialog';
-import { Textarea } from '../components/ui/textarea';
 
 /**
  * 二次确认。
  *
- * 后台业务动作（退款 / 删除 / 重置密码 / 调整积分）可以先说明后果再执行；
- * 只有确有业务依据要求的动作才填写原因，审计本身不作为确认门槛。
+ * 后台业务动作（退款 / 删除 / 重置密码 / 调整积分）先说明后果再执行；
+ * 页面不再要求人工填写原因，审计原因由调用方按操作上下文自动生成。
  *
  * 返回值约定：
- * - `null`  → 用户取消；
- * - `''`    → 用户确认且该动作不需要原因；
- * - `'…'`   → 用户确认并填写的原因（需要原因时不会返回空串）。
+ * - `null` → 用户取消；
+ * - `''`   → 用户确认。
  */
 export interface ConfirmOptions {
   title: string;
@@ -39,10 +28,6 @@ export interface ConfirmOptions {
   cancelText?: string;
   /** 危险动作用红色主按钮 */
   danger?: boolean;
-  /** 业务动作要求填写说明时启用；返回值即说明文本 */
-  requireReason?: boolean;
-  reasonLabel?: string;
-  reasonPlaceholder?: string;
 }
 
 type ConfirmFn = (options: ConfirmOptions) => Promise<string | null>;
@@ -56,9 +41,6 @@ interface PendingConfirm {
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<PendingConfirm | null>(null);
-  const [reason, setReason] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const reasonRef = useRef<HTMLTextAreaElement | null>(null);
 
   const confirm = useCallback<ConfirmFn>(
     (options) => new Promise<string | null>((resolve) => setPending({ options, resolve })),
@@ -69,29 +51,11 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     (value: string | null) => {
       pending?.resolve(value);
       setPending(null);
-      setReason('');
-      setError(null);
     },
     [pending],
   );
 
-  // 需要原因时把焦点直接放到输入框，少一次 Tab
-  useEffect(() => {
-    if (pending?.options.requireReason) {
-      const timer = window.setTimeout(() => reasonRef.current?.focus(), 30);
-      return () => window.clearTimeout(timer);
-    }
-  }, [pending]);
-
-  const submit = () => {
-    if (!pending) return;
-    if (pending.options.requireReason && reason.trim().length === 0) {
-      setError('请填写操作原因，原因会写入审计记录');
-      reasonRef.current?.focus();
-      return;
-    }
-    close(reason.trim());
-  };
+  const submit = () => close('');
 
   return (
     <ConfirmContext.Provider value={confirm}>
@@ -124,27 +88,6 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
               </div>
             </div>
           </DialogHeader>
-
-          {pending?.options.requireReason && (
-            <label className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium text-foreground">
-                {pending.options.reasonLabel ?? '操作原因'}
-              </span>
-              <Textarea
-                ref={reasonRef}
-                value={reason}
-                onChange={(event) => {
-                  setReason(event.target.value);
-                  if (error) setError(null);
-                }}
-                rows={3}
-                placeholder={pending.options.reasonPlaceholder ?? '说明为什么执行这个操作'}
-                aria-invalid={error ? true : undefined}
-                className={cn('resize-none text-sm', error && 'border-destructive')}
-              />
-              {error && <span className="text-xs text-danger-text">{error}</span>}
-            </label>
-          )}
 
           <DialogFooter>
             <Button variant="secondary" onClick={() => close(null)}>

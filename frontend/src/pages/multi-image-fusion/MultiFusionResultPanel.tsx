@@ -3,13 +3,14 @@ import { Download, ImagePlus, Layers, RefreshCw, Sparkles } from 'lucide-react';
 import { EMPTY_HINT, EMPTY_TITLE } from './constants';
 import { ProviderBadge, ToolGeneratingState, type ToolResult } from './components';
 import { assetThumbUrl } from './api';
+import { fusionFailureText, fusionResultStatusOf } from './utils';
 
 /**
  * 结果面板 —— 变体预览 + 缩略图切换。
  *
- * 四种状态：生成中 / 失败 / 空态 / 成功。
- * 失败与空态都走同一个 `multi-image-fusion-result-empty` 容器，只换文案，
- * 因为参考站这两态的版式一致。
+ * 六种状态：空态 / 生成中 / 失败 / 完整成功 / 部分成功 / 无可用图片。
+ * 数量是状态的一部分：请求 4 张只回来 1 张时必须显示“部分成功”，不能
+ * 让用户把一次缺图误读成完整交付。
  */
 export function MultiFusionResultPanel({
   submitting,
@@ -17,6 +18,7 @@ export function MultiFusionResultPanel({
   activeResult,
   activeResultIndex,
   lastFailure,
+  requestedCount,
   ratio,
   ratioWidth,
   ratioHeight,
@@ -30,26 +32,43 @@ export function MultiFusionResultPanel({
   activeResult: ToolResult | null;
   activeResultIndex: number;
   lastFailure: ToolResult | null;
+  /** 本次提交实际请求的变体数，不随生成后的参数选择变化 */
+  requestedCount: number;
   ratio: string;
   ratioWidth: number;
   ratioHeight: number;
-  /** 重新生成按钮的禁用判定由页面持有（提交中 / 能力不可用 / 还没有结果） */
+  /** 重新生成按钮的禁用判定由页面持有（提交中 / 能力不可用 / 没有可重试状态） */
   canRegenerate: boolean;
   onRegenerate: () => void;
   onDownload: () => void;
   onSelectResult: (index: number) => void;
 }) {
   const ratioStyle = { aspectRatio: `${ratioWidth} / ${ratioHeight}` };
+  const status = fusionResultStatusOf({
+    submitting,
+    resultCount: results.length,
+    requestedCount,
+    failed: Boolean(lastFailure) && results.length === 0,
+  });
+  const statusRole = status.state === 'failed' ? 'alert' : 'status';
+
   return (
     <section className="multi-image-fusion-result-panel">
       <div className="multi-image-fusion-result-heading">
-        <div>
+        <div className="multi-image-fusion-result-heading-copy">
           <h2>生成结果</h2>
-          <p>
-            {results.length > 0
-              ? `${results.length} 个融合变体 · ${ratio}`
-              : '完成设置后，生成结果会显示在这里'}
-          </p>
+          <div className="multi-image-fusion-result-meta">
+            {status.badge && (
+              <span
+                className={`multi-image-fusion-result-status is-${status.state}`}
+                role={statusRole}
+                aria-live="polite"
+              >
+                {status.badge}
+              </span>
+            )}
+            <p>{status.summary} · {ratio}</p>
+          </div>
         </div>
         <div className="multi-image-fusion-result-actions">
           <button type="button" disabled={!canRegenerate} onClick={onRegenerate}>
@@ -58,7 +77,7 @@ export function MultiFusionResultPanel({
           </button>
           <button type="button" disabled={!activeResult?.url} onClick={onDownload}>
             <Download size={13} />
-            一键下载
+            下载当前图
           </button>
         </div>
       </div>
@@ -68,7 +87,7 @@ export function MultiFusionResultPanel({
           className="multi-image-fusion-preview-stage multi-image-fusion-generating-stage"
           style={ratioStyle}
         >
-          <ToolGeneratingState />
+          <ToolGeneratingState tip={`正在生成 ${Math.max(1, requestedCount)} 张融合变体…`} />
         </div>
       ) : lastFailure && results.length === 0 ? (
         <div
@@ -77,7 +96,7 @@ export function MultiFusionResultPanel({
         >
           <div className="multi-image-fusion-result-empty">
             <strong>生成失败</strong>
-            <p>{lastFailure.errorCode ?? '未知错误'}</p>
+            <p>{fusionFailureText(lastFailure.errorCode)}</p>
           </div>
         </div>
       ) : results.length === 0 ? (

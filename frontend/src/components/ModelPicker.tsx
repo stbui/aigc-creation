@@ -26,6 +26,8 @@ import { Button } from '../ui';
 export interface ModelPickerProps {
   /** 能力 id（与后端 capability.registry 一致） */
   capability: string;
+  /** 本次请求必然提交的输入槽位（如局部重绘的 `mask`） */
+  requiredInputs?: readonly string[];
   /**
    * 当前参数（比例 / 画质等）。给出时按所选模型实时报价，
    * 让「换模型 = 换价」在点提交前就看见。
@@ -55,6 +57,7 @@ function priceText(model: PublicLogicalModel): string {
 
 export function ModelPicker({
   capability,
+  requiredInputs = [],
   options,
   onQuoteChange,
   onModelChange,
@@ -74,7 +77,16 @@ export function ModelPicker({
     onModelChangeRef.current = onModelChange;
   }, [onModelChange]);
 
-  const candidates = useMemo(() => modelsForCapability(capability, models), [capability, models]);
+  const requiredInputsKey = requiredInputs.join('|');
+  const candidates = useMemo(
+    () =>
+      modelsForCapability(
+        capability,
+        models,
+        requiredInputsKey ? requiredInputsKey.split('|') : [],
+      ),
+    [capability, models, requiredInputsKey],
+  );
 
   useEffect(() => {
     let alive = true;
@@ -170,7 +182,9 @@ export function ModelPicker({
       <div className={`pk-settings-group${className ? ` ${className}` : ''}`} data-testid="model-picker">
         <strong className="pk-settings-group-label">模型</strong>
         <p style={{ fontSize: 12, color: 'var(--text-desc)', margin: 0 }} data-testid="model-picker-empty">
-          该能力当前没有可用模型，稍后再试。
+          {requiredInputs.includes('mask')
+            ? '当前没有支持遮罩重绘的模型，稍后再试。'
+            : '该能力当前没有可用模型，稍后再试。'}
         </p>
       </div>
     );

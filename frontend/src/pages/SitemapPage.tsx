@@ -5,7 +5,7 @@ import { useCapabilities } from '../hooks/useCapabilities';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
 
 /**
- * 网站地图 —— 复刻参考站 https://ijihua.cn/sitemap.html
+ * 网站地图
  *
  * 版面数值来自参考站实拍 (2026-10-17, 1280 视口):
  *   顶部条: 品牌 + 「机器地图 XML」(/sitemap.xml) + 「返回首页 ↗」

@@ -100,6 +100,8 @@ export function MultiFusionPage() {
   const [mobileTarget, setMobileTarget] = useState<'subject' | 'accent' | null>(null);
 
   const [variantCount, setVariantCount] = useState('4');
+  /** 本次已提交任务的变体数快照；生成后修改选项不能反过来改写结果状态。 */
+  const [requestedVariantCount, setRequestedVariantCount] = useState(4);
   const [ratio, setRatio] = useState('1:1');
   const [resolution, setResolution] = useState('1k');
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -340,6 +342,8 @@ export function MultiFusionPage() {
       message.warning(capabilityReason || '该能力当前不可提交');
       return;
     }
+    const requestedCount = Math.max(1, Math.trunc(Number(variantCount)) || 1);
+    setRequestedVariantCount(requestedCount);
     setSubmitting(true);
     setResults([]);
     setActiveResultIndex(0);
@@ -353,7 +357,7 @@ export function MultiFusionPage() {
         logicalModelId,
         // 顺序即语义: [0]=主体图, [1..]=搭配图 (后端 processTask 按提交序保序)
         inputAssetIds: [subject.id, ...accents.map((a) => a.id)].slice(0, MAX_TOTAL),
-        params: { scene, variantCount, ratio, size: resolution, prompt: prompt.trim() },
+        params: { scene, variantCount: String(requestedCount), ratio, size: resolution, prompt: prompt.trim() },
       });
       const done = await pollTask(taskId);
       if (done.status === 'failed') {
@@ -368,8 +372,8 @@ export function MultiFusionPage() {
         } else {
           setResults(resultsOf(done));
           message.success(
-            outputs.length < Number(variantCount)
-              ? `已生成 ${outputs.length} / ${variantCount} 张变体`
+            outputs.length < requestedCount
+              ? `已生成 ${outputs.length} / ${requestedCount} 张变体`
               : `融合结果已生成（${outputs.length} 张）`,
           );
         }
@@ -477,11 +481,15 @@ export function MultiFusionPage() {
           activeResult={activeResult}
           activeResultIndex={activeResultIndex}
           lastFailure={lastFailure}
+          requestedCount={requestedVariantCount}
           ratio={ratio}
           ratioWidth={ratioW}
           ratioHeight={ratioH}
           canRegenerate={
-            !submitting && !(Boolean(token) && capabilityBlocked) && results.length > 0
+            !submitting &&
+            !(Boolean(token) && capabilityBlocked) &&
+            Boolean(subject && accents.length > 0) &&
+            (results.length > 0 || Boolean(lastFailure))
           }
           onRegenerate={() => void submit()}
           onDownload={download}

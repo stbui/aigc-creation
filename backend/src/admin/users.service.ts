@@ -1,29 +1,29 @@
-import { Injectable } from '@nestjs/common';
-import * as bcrypt from 'bcryptjs';
-import { randomInt } from 'crypto';
-import { PrismaService } from '../prisma/prisma.service';
-import { AccountLifecycleService } from '../account/account-lifecycle.service';
-import { AppError } from '../common/app.exception';
-import { runBatch } from '../common/batch';
-import { CSV_EXPORT_MAX_ROWS, toCsv } from '../common/csv';
-import { SignedUrlService } from '../common/signed-url.service';
-import { StorageService } from '../storage/storage.service';
-import type { StorageBackend } from '../storage/storage.provider';
-import { getCapability } from '../capabilities/capability.registry';
-import { ROLE_LABELS, USER_STATUS_LABELS } from './permissions';
-import { buildPage, paginate, type PageResult } from './dto/page-query.dto';
+import { Injectable } from "@nestjs/common";
+import * as bcrypt from "bcryptjs";
+import { randomInt } from "crypto";
+import { PrismaService } from "../prisma/prisma.service";
+import { AccountLifecycleService } from "../account/account-lifecycle.service";
+import { AppError } from "../common/app.exception";
+import { runBatch } from "../common/batch";
+import { CSV_EXPORT_MAX_ROWS, toCsv } from "../common/csv";
+import { SignedUrlService } from "../common/signed-url.service";
+import { StorageService } from "../storage/storage.service";
+import type { StorageBackend } from "../storage/storage.provider";
+import { getCapability } from "../capabilities/capability.registry";
+import { ROLE_LABELS, USER_STATUS_LABELS } from "./permissions";
+import { buildPage, paginate, type PageResult } from "./dto/page-query.dto";
 import type {
   ChangeUserRoleDto,
   ChangeUserStatusDto,
   UserListQueryDto,
-} from './dto/user.dto';
+} from "./dto/user.dto";
 
 /** 用户列表可排序的列 */
-const SORTABLE = ['createdAt', 'lastLoginAt', 'email', 'name'] as const;
+const SORTABLE = ["createdAt", "lastLoginAt", "email", "name"] as const;
 
 /** 重置密码时的随机字符集: 去掉易混淆的 0O / 1lI */
 const PASSWORD_ALPHABET =
-  'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+  "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
 const TEMP_PASSWORD_LENGTH = 12;
 
 @Injectable()
@@ -46,7 +46,7 @@ export class AdminUsersService {
    * 需要查历史时可显式传 status=deleted。
    */
   async list(query: UserListQueryDto): Promise<PageResult<unknown>> {
-    const page = buildPage(query, [...SORTABLE], 'createdAt:desc');
+    const page = buildPage(query, [...SORTABLE], "createdAt:desc");
     const where = this.listWhere(query);
 
     const [items, total] = await Promise.all([
@@ -101,7 +101,7 @@ export class AdminUsersService {
   async exportCsv(query: UserListQueryDto): Promise<string> {
     const rows = await this.prisma.user.findMany({
       where: this.listWhere(query),
-      orderBy: { createdAt: 'desc' },
+      orderBy: { createdAt: "desc" },
       take: CSV_EXPORT_MAX_ROWS,
       select: {
         id: true,
@@ -116,16 +116,19 @@ export class AdminUsersService {
     });
     return toCsv(
       [
-        { label: '用户 ID', value: (u) => u.id },
-        { label: '邮箱', value: (u) => u.email },
-        { label: '昵称', value: (u) => u.name },
-        { label: '角色', value: (u) => ROLE_LABELS[u.role] ?? u.role },
-        { label: '状态', value: (u) => USER_STATUS_LABELS[u.status] ?? u.status },
-        { label: '项目数', value: (u) => u._count.projects },
-        { label: '任务数', value: (u) => u._count.tasks },
-        { label: '素材数', value: (u) => u._count.assets },
-        { label: '注册时间', value: (u) => u.createdAt },
-        { label: '最后登录', value: (u) => u.lastLoginAt ?? '' },
+        { label: "用户 ID", value: (u) => u.id },
+        { label: "邮箱", value: (u) => u.email },
+        { label: "昵称", value: (u) => u.name },
+        { label: "角色", value: (u) => ROLE_LABELS[u.role] ?? u.role },
+        {
+          label: "状态",
+          value: (u) => USER_STATUS_LABELS[u.status] ?? u.status,
+        },
+        { label: "项目数", value: (u) => u._count.projects },
+        { label: "任务数", value: (u) => u._count.tasks },
+        { label: "素材数", value: (u) => u._count.assets },
+        { label: "注册时间", value: (u) => u.createdAt },
+        { label: "最后登录", value: (u) => u.lastLoginAt ?? "" },
       ],
       rows,
     );
@@ -138,7 +141,11 @@ export class AdminUsersService {
    * 这些规则对批量同样生效 —— 批量不是绕过单条规则的通道，
    * 恰恰相反，批量最需要的正是这些规则的逐条校验。
    */
-  async batchStatus(ids: string[], status: 'active' | 'disabled', actorId: string) {
+  async batchStatus(
+    ids: string[],
+    status: "active" | "disabled",
+    actorId: string,
+  ) {
     return runBatch(ids, (id) => this.changeStatus(id, { status }, actorId));
   }
 
@@ -164,12 +171,12 @@ export class AdminUsersService {
         _count: { select: { projects: true, tasks: true, assets: true } },
       },
     });
-    if (!user) throw new AppError(40400, '用户不存在', 404);
+    if (!user) throw new AppError(40400, "用户不存在", 404);
 
     const [recentTasks, recentAssets] = await Promise.all([
       this.prisma.generationTask.findMany({
         where: { ownerId: id },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         take: 20,
         select: {
           id: true,
@@ -181,14 +188,20 @@ export class AdminUsersService {
       }),
       this.prisma.asset.findMany({
         where: { ownerId: id },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         take: 20,
-        select: { id: true, sourceUrl: true, kind: true, width: true, height: true },
+        select: {
+          id: true,
+          sourceUrl: true,
+          kind: true,
+          width: true,
+          height: true,
+        },
       }),
     ]);
 
     const taskStats = await this.prisma.generationTask.groupBy({
-      by: ['status'],
+      by: ["status"],
       where: { ownerId: id },
       _count: { _all: true },
     });
@@ -212,10 +225,10 @@ export class AdminUsersService {
         tasks: user._count.tasks,
         assets: user._count.assets,
         taskStatus: {
-          succeeded: statusCount['succeeded'] ?? 0,
-          failed: statusCount['failed'] ?? 0,
-          running: statusCount['running'] ?? 0,
-          queued: statusCount['queued'] ?? 0,
+          succeeded: statusCount["succeeded"] ?? 0,
+          failed: statusCount["failed"] ?? 0,
+          running: statusCount["running"] ?? 0,
+          queued: statusCount["queued"] ?? 0,
         },
       },
       recentTasks: recentTasks.map((t) => {
@@ -224,7 +237,7 @@ export class AdminUsersService {
           id: t.id,
           capability: t.capability,
           capabilityName: def?.name ?? t.capability,
-          mode: def?.mode ?? 'unknown',
+          mode: def?.mode ?? "unknown",
           status: t.status,
           createdAt: t.createdAt,
           thumbnailUrl: this.signedUrl.displayUrl(t.outputAsset?.sourceUrl),
@@ -250,18 +263,18 @@ export class AdminUsersService {
     const user = await this.findUser(id);
 
     if (id === actorId) {
-      throw new AppError(40001, '不能禁用或启用自己', 400);
+      throw new AppError(40001, "不能禁用或启用自己", 400);
     }
-    if (user.status === 'deleted') {
-      throw new AppError(40001, '已注销用户无需禁用', 400);
+    if (user.status === "deleted") {
+      throw new AppError(40001, "已注销用户无需禁用", 400);
     }
     // 最后一个 admin 被禁用会让系统失去唯一管理入口
-    if (user.role === 'admin' && dto.status === 'disabled') {
+    if (user.role === "admin" && dto.status === "disabled") {
       const adminCount = await this.prisma.user.count({
-        where: { role: 'admin', status: 'active' },
+        where: { role: "admin", status: "active" },
       });
       if (adminCount <= 1) {
-        throw new AppError(40901, '至少保留一个启用的管理员', 409);
+        throw new AppError(40901, "至少保留一个启用的管理员", 409);
       }
     }
 
@@ -280,31 +293,35 @@ export class AdminUsersService {
    *   1. 非 admin 操作者不得把他人提升为 admin —— 防提权
    *   2. 最后一个 admin 不得降级 —— 否则系统失去管理入口
    */
-  async changeRole(id: string, dto: ChangeUserRoleDto, actor: { id: string; role: string }) {
+  async changeRole(
+    id: string,
+    dto: ChangeUserRoleDto,
+    actor: { id: string; role: string },
+  ) {
     const user = await this.findUser(id);
 
     if (id === actor.id) {
-      throw new AppError(40001, '不能变更自己的角色', 400);
+      throw new AppError(40001, "不能变更自己的角色", 400);
     }
-    if (user.status === 'deleted') {
-      throw new AppError(40001, '已注销用户无需变更角色', 400);
+    if (user.status === "deleted") {
+      throw new AppError(40001, "已注销用户无需变更角色", 400);
     }
     if (user.role === dto.role) {
-      throw new AppError(40001, '目标角色与当前一致', 400);
+      throw new AppError(40001, "目标角色与当前一致", 400);
     }
 
     // 防提权: 只有 admin 能授予 admin
-    if (dto.role === 'admin' && actor.role !== 'admin') {
-      throw new AppError(40301, '只有管理员可以授予管理员角色', 403);
+    if (dto.role === "admin" && actor.role !== "admin") {
+      throw new AppError(40301, "只有管理员可以授予管理员角色", 403);
     }
 
     // 最后一个 admin 保护
-    if (user.role === 'admin') {
+    if (user.role === "admin") {
       const adminCount = await this.prisma.user.count({
-        where: { role: 'admin', status: 'active' },
+        where: { role: "admin", status: "active" },
       });
       if (adminCount <= 1) {
-        throw new AppError(40901, '至少保留一个管理员', 409);
+        throw new AppError(40901, "至少保留一个管理员", 409);
       }
     }
 
@@ -319,8 +336,8 @@ export class AdminUsersService {
    */
   async resetPassword(id: string) {
     const user = await this.findUser(id);
-    if (user.status === 'deleted') {
-      throw new AppError(40001, '已注销用户无需重置密码', 400);
+    if (user.status === "deleted") {
+      throw new AppError(40001, "已注销用户无需重置密码", 400);
     }
 
     const password = this.generateTempPassword();
@@ -339,7 +356,7 @@ export class AdminUsersService {
       email: user.email,
       // 明文只在这里出现一次, 不入库、不落盘、不入审计
       tempPassword: password,
-      notice: '此密码仅显示一次, 关闭后无法再次查看',
+      notice: "此密码仅显示一次, 关闭后无法再次查看",
     };
   }
 
@@ -355,7 +372,7 @@ export class AdminUsersService {
     const [items, total, failed30d] = await Promise.all([
       this.prisma.loginLog.findMany({
         where: { userId: id },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { createdAt: "desc" },
         take,
         select: {
           id: true,
@@ -400,16 +417,9 @@ export class AdminUsersService {
   async remove(id: string, hard: boolean, confirm?: string) {
     const user = await this.findUser(id);
 
-    const counts = await this.prisma.user.findUnique({
-      where: { id },
-      select: {
-        _count: { select: { projects: true, tasks: true, assets: true } },
-      },
-    });
-
     if (hard) {
-      if (confirm !== '删除') {
-        throw new AppError(40001, '物理删除需要确认词「删除」', 400);
+      if (confirm !== "删除") {
+        throw new AppError(40001, "物理删除需要确认词「删除」", 400);
       }
 
       /*
@@ -420,38 +430,71 @@ export class AdminUsersService {
        * 账号的孤儿数据 —— 既对不了账，也举不了证，比"留着账号"更糟。
        * 这类账号只能走注销（软删除）：匿名化 + 保留资金记录。
        */
-      const [orderCount, paymentCount, refundCount, invoiceCount, ledgerCount, billingCount] = await Promise.all([
-        this.prisma.order.count({ where: { userId: id } }),
-        this.prisma.payment.count({ where: { userId: id } }),
-        this.prisma.refund.count({ where: { userId: id } }),
-        this.prisma.invoice.count({ where: { userId: id } }),
-        this.prisma.creditLedgerEntry.count({ where: { userId: id } }),
-        this.prisma.billingOrder.count({ where: { userId: id } }),
-      ]);
-      if (orderCount + paymentCount + refundCount + invoiceCount + ledgerCount + billingCount > 0) {
-        throw new AppError(
-          40001,
-          `该账号存在 ${orderCount} 笔订单、${paymentCount} 笔支付、${refundCount} 笔退款、` +
-            `${invoiceCount} 张发票、${billingCount} 笔生成账单、${ledgerCount} 条积分流水，` +
-            '依法不能物理删除；请改用注销（保留资金记录）',
-          400,
-        );
-      }
+      /*
+       * 预检查也放进删除事务：资金记录可能在事务外检查后被并发写入，
+       * 只有与删除处于同一事务，才能保证「有资金记录就不物理删除」不被竞态绕过。
+       */
+      const deleted = await this.prisma.$transaction(async (tx) => {
+        const [
+          orderCount,
+          paymentCount,
+          refundCount,
+          invoiceCount,
+          ledgerCount,
+          billingCount,
+        ] = await Promise.all([
+          tx.order.count({ where: { userId: id } }),
+          tx.payment.count({ where: { userId: id } }),
+          tx.refund.count({ where: { userId: id } }),
+          tx.invoice.count({ where: { userId: id } }),
+          tx.creditLedgerEntry.count({ where: { userId: id } }),
+          tx.billingOrder.count({ where: { userId: id } }),
+        ]);
+        if (
+          orderCount +
+            paymentCount +
+            refundCount +
+            invoiceCount +
+            ledgerCount +
+            billingCount >
+          0
+        ) {
+          throw new AppError(
+            40001,
+            `该账号存在 ${orderCount} 笔订单、${paymentCount} 笔支付、${refundCount} 笔退款、` +
+              `${invoiceCount} 张发票、${billingCount} 笔生成账单、${ledgerCount} 条积分流水，` +
+              "依法不能物理删除；请改用注销（保留资金记录）",
+            400,
+          );
+        }
 
-      // 文件坐标要在记录删掉之前取出（删完就查不到了）
-      const assets = await this.prisma.asset.findMany({
-        where: { ownerId: id },
-        select: { storageBackend: true, storageKey: true },
-      });
+        // 文件坐标要在记录删掉之前取出（删完就查不到了）
+        const assets = await tx.asset.findMany({
+          where: { ownerId: id },
+          select: { storageBackend: true, storageKey: true },
+        });
+        const counts = await tx.user.findUnique({
+          where: { id },
+          select: {
+            _count: { select: { projects: true, tasks: true, assets: true } },
+          },
+        });
 
-      // 先删子表再删用户: SQLite 无外键级联, 手工保证顺序
-      await this.prisma.$transaction(async (tx) => {
+        // 先删子表再删用户: SQLite 无外键级联, 手工保证顺序
         await tx.generationTask.deleteMany({ where: { ownerId: id } });
         await tx.asset.deleteMany({ where: { ownerId: id } });
         await tx.project.deleteMany({ where: { ownerId: id } });
         // 无资金记录时下列表也不会有资金语义，随人一起清掉
         await tx.membershipUsage.deleteMany({ where: { userId: id } });
         await tx.membership.deleteMany({ where: { userId: id } });
+        // CreditReservationItem 没有外键/Cascade，必须先按 lotId 清掉再删批次
+        const lots = await tx.creditLot.findMany({
+          where: { userId: id },
+          select: { id: true },
+        });
+        await tx.creditReservationItem.deleteMany({
+          where: { lotId: { in: lots.map((lot) => lot.id) } },
+        });
         await tx.creditLot.deleteMany({ where: { userId: id } });
         await tx.creditAccount.deleteMany({ where: { userId: id } });
         await tx.inviteRelation.deleteMany({
@@ -462,25 +505,57 @@ export class AdminUsersService {
         await tx.ticket.deleteMany({ where: { userId: id } });
         await tx.loginSession.deleteMany({ where: { userId: id } });
         await tx.notification.deleteMany({ where: { userId: id } });
-        // 账号安全域的子表: 令牌随人走; 登录审计断开关联但**保留**记录
+        // 账号安全域的子表: 令牌 / OAuth 身份 / 插件状态随人走;
+        // 登录、同意与上游调用审计断开关联但**保留**记录，避免删除后失去举证链。
         await tx.accountToken.deleteMany({ where: { userId: id } });
-        await tx.loginLog.updateMany({ where: { userId: id }, data: { userId: null } });
-        await tx.consentRecord.updateMany({ where: { userId: id }, data: { userId: null } });
+        await tx.oAuthIdentity.deleteMany({ where: { userId: id } });
+        await tx.userPluginState.deleteMany({ where: { userId: id } });
+        await tx.loginLog.updateMany({
+          where: { userId: id },
+          data: { userId: null },
+        });
+        await tx.consentRecord.updateMany({
+          where: { userId: id },
+          data: { userId: null },
+        });
+        await tx.apiCallLog.updateMany({
+          where: { userId: id },
+          data: { userId: "" },
+        });
         await tx.user.delete({ where: { id } });
+
+        return {
+          assets,
+          counts: counts?._count ?? { projects: 0, tasks: 0, assets: 0 },
+        };
       });
 
-      // 文件在事务之后删: 按写入时的后端逐个删, 失败不阻塞
-      for (const a of assets) {
+      // 文件在事务之后删: 按写入时的后端逐个删, 失败不阻塞。
+      // removedFiles 只统计真正成功的删除；失败的留在响应里供运营排查。
+      let removedFiles = 0;
+      let failedFiles = 0;
+      for (const a of deleted.assets) {
         if (!a.storageKey) continue;
-        const backend = (a.storageBackend as StorageBackend) ?? 'local';
-        await this.storage.get(backend)?.delete(a.storageKey).catch(() => undefined);
+        const backend = (a.storageBackend as StorageBackend) ?? "local";
+        const provider = this.storage.get(backend);
+        if (!provider) {
+          failedFiles += 1;
+          continue;
+        }
+        try {
+          await provider.delete(a.storageKey);
+          removedFiles += 1;
+        } catch {
+          failedFiles += 1;
+        }
       }
 
       return {
         id,
         hard: true,
-        deleted: counts?._count ?? { projects: 0, tasks: 0, assets: 0 },
-        removedFiles: assets.length,
+        deleted: deleted.counts,
+        removedFiles,
+        failedFiles,
       };
     }
 
@@ -505,23 +580,23 @@ export class AdminUsersService {
     const where: Record<string, unknown> = {};
     if (query.keyword) {
       // 前缀优先: 走索引更快; 用户习惯是输入邮箱开头
-      where['email'] = { contains: query.keyword };
+      where["email"] = { contains: query.keyword };
     }
-    if (query.role) where['role'] = query.role;
+    if (query.role) where["role"] = query.role;
     // 未指定 status 时默认排除 deleted, 避免注销账号长期占据列表
     if (query.status) {
-      where['status'] = query.status;
+      where["status"] = query.status;
     } else {
-      where['status'] = { not: 'deleted' };
+      where["status"] = { not: "deleted" };
     }
 
     if (query.from || query.to) {
       const createdAt: Record<string, Date> = {};
       const from = this.parseDate(query.from);
       const to = this.parseDate(query.to);
-      if (from) createdAt['gte'] = from;
-      if (to) createdAt['lte'] = to;
-      if (Object.keys(createdAt).length > 0) where['createdAt'] = createdAt;
+      if (from) createdAt["gte"] = from;
+      if (to) createdAt["lte"] = to;
+      if (Object.keys(createdAt).length > 0) where["createdAt"] = createdAt;
     }
     return where;
   }
@@ -531,12 +606,12 @@ export class AdminUsersService {
       where: { id },
       select: { id: true, email: true, role: true, status: true },
     });
-    if (!user) throw new AppError(40400, '用户不存在', 404);
+    if (!user) throw new AppError(40400, "用户不存在", 404);
     return user;
   }
 
   private generateTempPassword(): string {
-    let out = '';
+    let out = "";
     for (let i = 0; i < TEMP_PASSWORD_LENGTH; i += 1) {
       out += PASSWORD_ALPHABET[randomInt(PASSWORD_ALPHABET.length)];
     }

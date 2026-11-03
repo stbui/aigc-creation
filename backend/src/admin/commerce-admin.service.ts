@@ -635,7 +635,7 @@ export class AdminCommerceService {
    *   · **原因必填**。逐行 `reason` 列优先，缺省用整批原因；两者都空则
    *     `adminAdjust` 会拒绝 —— 无原因的发积分事后无法追责。
    *
-   * 权限口径见 controller：走 `credit.adjust` 而非 `data.import`，这是给钱。
+   * 权限口径见 controller：走 `credit.adjust` 而非通用导入权限，这是给钱。
    */
   async importCreditsCsv(
     text: string,

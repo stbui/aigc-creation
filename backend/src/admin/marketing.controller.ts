@@ -1,11 +1,26 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, Query, Res } from '@nestjs/common';
-import type { Response } from 'express';
-import { IsOptional, IsString, MaxLength } from 'class-validator';
-import { AuditAction, AdminUser, RequirePermission } from './admin.decorator';
-import { AppError } from '../common/app.exception';
-import { sendCsv } from '../common/csv-response';
-import { MarketingService } from '../marketing/marketing.service';
-import { PERMISSIONS } from './permissions';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  Res,
+} from "@nestjs/common";
+import type { Response } from "express";
+import { IsOptional, IsString, MaxLength } from "class-validator";
+import {
+  AuditAction,
+  AdminUser,
+  RequireAllPermissions,
+  RequirePermission,
+} from "./admin.decorator";
+import { AppError } from "../common/app.exception";
+import { sendCsv } from "../common/csv-response";
+import { MarketingService } from "../marketing/marketing.service";
+import { PERMISSIONS } from "./permissions";
 import {
   CouponListQueryDto,
   CampaignListQueryDto,
@@ -13,7 +28,7 @@ import {
   UpdateInviteRuleDto,
   UpsertCampaignDto,
   UpsertCouponDto,
-} from './dto/marketing.dto';
+} from "./dto/marketing.dto";
 
 /** 邀请关系列表查询 */
 class InviteListQueryDto {
@@ -69,7 +84,7 @@ function toInt(v: string | undefined, fallback: number): number {
  * 发券直接减少收入, 但与退款不同 —— 退款是"退已有钱", 发券是"决定卖给谁多少钱",
  * 后者属运营定价决策。
  */
-@Controller('admin/coupons')
+@Controller("admin/coupons")
 @RequirePermission(PERMISSIONS.marketingWrite)
 export class AdminCouponsController {
   constructor(private readonly marketing: MarketingService) {}
@@ -91,35 +106,35 @@ export class AdminCouponsController {
    * ⚠️ 路由必须声明在 `:id` 之前，否则 `export` 会被当成券 id。
    * 导出把券的发行与核销数据带出系统，用独立的 `data.export` 权限点并留审计。
    */
-  @Get('export')
-  @RequirePermission(PERMISSIONS.dataExport)
-  @AuditAction('data.export')
+  @Get("export")
+  @RequireAllPermissions(PERMISSIONS.marketingWrite, PERMISSIONS.dataExport)
+  @AuditAction("data.export")
   async export(@Query() query: CouponListQueryDto, @Res() res: Response) {
     const csv = await this.marketing.exportCoupons(query);
-    sendCsv(res, 'coupons', csv);
+    sendCsv(res, "coupons", csv);
   }
 
-  @Get(':id')
-  detail(@Param('id') id: string) {
+  @Get(":id")
+  detail(@Param("id") id: string) {
     return this.marketing.getCoupon(id);
   }
 
   @Post()
-  @AuditAction('coupon.create')
+  @AuditAction("coupon.create")
   create(@Body() dto: UpsertCouponDto) {
     return this.marketing.createCoupon(dto);
   }
 
-  @Patch(':id')
-  @AuditAction('coupon.update')
-  update(@Param('id') id: string, @Body() dto: UpsertCouponDto) {
+  @Patch(":id")
+  @AuditAction("coupon.update")
+  update(@Param("id") id: string, @Body() dto: UpsertCouponDto) {
     return this.marketing.updateCoupon(id, dto);
   }
 
   /** 启停切换。不提供删除: 已核销订单仍引用该券, 删了历史订单悬空 */
-  @Patch(':id/toggle')
-  @AuditAction('coupon.toggle')
-  toggle(@Param('id') id: string) {
+  @Patch(":id/toggle")
+  @AuditAction("coupon.toggle")
+  toggle(@Param("id") id: string) {
     return this.marketing.disableCoupon(id);
   }
 }
@@ -127,7 +142,7 @@ export class AdminCouponsController {
 /**
  * 营销中心 · 限时活动 (B-65)。
  */
-@Controller('admin/campaigns')
+@Controller("admin/campaigns")
 @RequirePermission(PERMISSIONS.marketingWrite)
 export class AdminCampaignsController {
   constructor(private readonly marketing: MarketingService) {}
@@ -144,29 +159,29 @@ export class AdminCampaignsController {
   }
 
   /** 导出限时活动 (CSV)。筛选口径与列表一致，独立 `data.export` 权限并留审计 */
-  @Get('export')
-  @RequirePermission(PERMISSIONS.dataExport)
-  @AuditAction('data.export')
+  @Get("export")
+  @RequireAllPermissions(PERMISSIONS.marketingWrite, PERMISSIONS.dataExport)
+  @AuditAction("data.export")
   async export(@Query() query: CampaignListQueryDto, @Res() res: Response) {
     const csv = await this.marketing.exportCampaigns(query);
-    sendCsv(res, 'campaigns', csv);
+    sendCsv(res, "campaigns", csv);
   }
 
   @Post()
-  @AuditAction('campaign.create')
+  @AuditAction("campaign.create")
   create(@Body() dto: UpsertCampaignDto) {
     return this.marketing.createCampaign(dto);
   }
 
-  @Patch(':id')
-  @AuditAction('campaign.update')
-  update(@Param('id') id: string, @Body() dto: UpsertCampaignDto) {
+  @Patch(":id")
+  @AuditAction("campaign.update")
+  update(@Param("id") id: string, @Body() dto: UpsertCampaignDto) {
     return this.marketing.updateCampaign(id, dto);
   }
 
-  @Patch(':id/toggle')
-  @AuditAction('campaign.toggle')
-  toggle(@Param('id') id: string) {
+  @Patch(":id/toggle")
+  @AuditAction("campaign.toggle")
+  toggle(@Param("id") id: string) {
     return this.marketing.disableCampaign(id);
   }
 }
@@ -180,18 +195,18 @@ export class AdminCampaignsController {
  * ⚠ **发放动作单独要求 credit.adjust**: 手动补发邀请奖励 = 直接给人发积分,
  * 与后台调整积分同性质, 走财务的权限点而非运营的营销权限点。
  */
-@Controller('admin/invites')
+@Controller("admin/invites")
 @RequirePermission(PERMISSIONS.marketingWrite)
 export class AdminInvitesController {
   constructor(private readonly marketing: MarketingService) {}
 
-  @Get('rules')
+  @Get("rules")
   getRules() {
     return this.marketing.getInviteRule();
   }
 
-  @Put('rules')
-  @AuditAction('invite.rule_update')
+  @Put("rules")
+  @AuditAction("invite.rule_update")
   updateRules(@Body() dto: UpdateInviteRuleDto) {
     return this.marketing.updateInviteRule(dto);
   }
@@ -211,27 +226,27 @@ export class AdminInvitesController {
    *
    * 权限点换成 credit.adjust —— 这条路径直接改用户积分余额。
    */
-  @Post(':id/grant')
+  @Post(":id/grant")
   @RequirePermission(PERMISSIONS.creditAdjust)
-  @AuditAction('invite.reward_grant')
-  grant(@Param('id') id: string) {
-    if (!id) throw new AppError(40001, '缺少关系 id', 400);
+  @AuditAction("invite.reward_grant")
+  grant(@Param("id") id: string) {
+    if (!id) throw new AppError(40001, "缺少关系 id", 400);
     return this.marketing.grantInviteRewardById(id);
   }
 }
 
-@Controller('admin/checkin')
+@Controller("admin/checkin")
 @RequirePermission(PERMISSIONS.marketingWrite)
 export class AdminCheckinController {
   constructor(private readonly marketing: MarketingService) {}
 
-  @Get('rules')
+  @Get("rules")
   getRules() {
     return this.marketing.getCheckinRule();
   }
 
-  @Put('rules')
-  @AuditAction('checkin.rule_update')
+  @Put("rules")
+  @AuditAction("checkin.rule_update")
   updateRules(@Body() dto: UpdateCheckinRuleDto) {
     return this.marketing.updateCheckinRule(dto);
   }

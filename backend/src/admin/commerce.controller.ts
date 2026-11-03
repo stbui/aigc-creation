@@ -10,10 +10,10 @@ import {
   Res,
   UploadedFile,
   UseInterceptors,
-} from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { memoryStorage } from 'multer';
-import type { Response } from 'express';
+} from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
+import { memoryStorage } from "multer";
+import type { Response } from "express";
 import {
   ArrayMaxSize,
   IsArray,
@@ -25,21 +25,26 @@ import {
   MaxLength,
   Min,
   ValidateNested,
-} from 'class-validator';
-import { Type } from 'class-transformer';
-import { AuditAction, AdminUser, RequirePermission } from './admin.decorator';
-import { AppError } from '../common/app.exception';
-import { OrderService } from '../orders/order.service';
-import { CreditService } from '../credits/credit.service';
-import { CreditPriceService } from '../credits/credit-price.service';
-import { AdminCommerceService } from './commerce-admin.service';
-import { AdminSettingsService } from './settings.service';
-import { PERMISSIONS } from './permissions';
-import { sendCsv } from '../common/csv-response';
+} from "class-validator";
+import { Type } from "class-transformer";
+import {
+  AuditAction,
+  AdminUser,
+  RequireAllPermissions,
+  RequirePermission,
+} from "./admin.decorator";
+import { AppError } from "../common/app.exception";
+import { OrderService } from "../orders/order.service";
+import { CreditService } from "../credits/credit.service";
+import { CreditPriceService } from "../credits/credit-price.service";
+import { AdminCommerceService } from "./commerce-admin.service";
+import { AdminSettingsService } from "./settings.service";
+import { PERMISSIONS } from "./permissions";
+import { sendCsv } from "../common/csv-response";
 
 /** 商品上/下架 */
 export class ProductStatusDto {
-  @IsIn(['active', 'offline']) status!: 'active' | 'offline';
+  @IsIn(["active", "offline"]) status!: "active" | "offline";
   @IsOptional() @IsString() @MaxLength(200) reason?: string;
 }
 
@@ -57,8 +62,9 @@ export class ProductCreateDto {
   @IsInt() @Min(0) credits!: number;
   /** 积分有效期天数, 0 = 永久 */
   @IsOptional() @IsInt() @Min(0) creditsValidDays?: number;
-  @IsOptional() @IsIn(['immediate', 'manual']) grantType?: 'immediate' | 'manual';
-  @IsOptional() @IsIn(['active', 'offline']) status?: 'active' | 'offline';
+  @IsOptional() @IsIn(["immediate", "manual"]) grantType?:
+    "immediate" | "manual";
+  @IsOptional() @IsIn(["active", "offline"]) status?: "active" | "offline";
   @IsOptional() @IsInt() sortOrder?: number;
 }
 
@@ -70,8 +76,9 @@ export class ProductUpdateDto {
   @IsOptional() @IsInt() @Min(0) originalPriceCents?: number;
   @IsOptional() @IsInt() @Min(0) credits?: number;
   @IsOptional() @IsInt() @Min(0) creditsValidDays?: number;
-  @IsOptional() @IsIn(['immediate', 'manual']) grantType?: 'immediate' | 'manual';
-  @IsOptional() @IsIn(['active', 'offline']) status?: 'active' | 'offline';
+  @IsOptional() @IsIn(["immediate", "manual"]) grantType?:
+    "immediate" | "manual";
+  @IsOptional() @IsIn(["active", "offline"]) status?: "active" | "offline";
   @IsOptional() @IsInt() sortOrder?: number;
   /** 改价原因。价格变动属高危动作, 写审计时带出 */
   @IsOptional() @IsString() @MaxLength(200) reason?: string;
@@ -113,7 +120,7 @@ export class BatchAdjustItemDto {
 
 export class BatchAdjustDto {
   @IsArray()
-  @ArrayMaxSize(100, { message: '单次批量调整最多 100 条' })
+  @ArrayMaxSize(100, { message: "单次批量调整最多 100 条" })
   @ValidateNested({ each: true })
   @Type(() => BatchAdjustItemDto)
   items!: BatchAdjustItemDto[];
@@ -150,12 +157,12 @@ export class UpdateCreditPricesDto {
  */
 export class OrderBatchDto {
   @IsArray()
-  @ArrayMaxSize(100, { message: '单次批量最多 100 条' })
+  @ArrayMaxSize(100, { message: "单次批量最多 100 条" })
   @IsString({ each: true })
   ids!: string[];
 
-  @IsIn(['mark_paid'], { message: 'action 只能是 mark_paid' })
-  action!: 'mark_paid';
+  @IsIn(["mark_paid"], { message: "action 只能是 mark_paid" })
+  action!: "mark_paid";
 
   @IsString()
   @MaxLength(200)
@@ -179,7 +186,7 @@ export class CreditImportDto {
 
 /** 把 query 里的数字安全转成 number; 非法值给 undefined 让 service 用默认值 */
 function num(raw: string | undefined): number | undefined {
-  if (raw === undefined || raw === '') return undefined;
+  if (raw === undefined || raw === "") return undefined;
   const n = Number(raw);
   return Number.isFinite(n) ? n : undefined;
 }
@@ -197,7 +204,7 @@ function num(raw: string | undefined): number | undefined {
  * ⚠ 所有写操作都带 @AuditAction —— 交易域的每一次改动都必须可追责。
  * 查询与规则在 AdminCommerceService, 本控制器只做权限/参数/响应。
  */
-@Controller('admin')
+@Controller("admin")
 export class AdminCommerceController {
   constructor(
     private readonly orders: OrderService,
@@ -216,7 +223,7 @@ export class AdminCommerceController {
    * 让运营一眼看出「这个价现在是谁在管」—— 改价页上不标明来源,
    * 就会出现「我改了没生效」时无法判断该改哪一层。
    */
-  @Get('credit-prices')
+  @Get("credit-prices")
   @RequirePermission(PERMISSIONS.productPrice)
   creditPrices() {
     return this.creditPrice.adminList();
@@ -227,12 +234,12 @@ export class AdminCommerceController {
    *
    * ⚠ 写审计: 定价是影响收入的关键操作, 必须能回答「这个价谁在什么时候改的」。
    */
-  @Put('credit-prices')
+  @Put("credit-prices")
   @RequirePermission(PERMISSIONS.productPrice)
-  @AuditAction('credit.price_update')
+  @AuditAction("credit.price_update")
   async updateCreditPrices(@Body() dto: UpdateCreditPricesDto) {
     if (!dto.items?.length) {
-      throw new AppError(40001, '没有需要更新的消耗价', 400);
+      throw new AppError(40001, "没有需要更新的消耗价", 400);
     }
     const updated = [];
     for (const it of dto.items) {
@@ -242,26 +249,26 @@ export class AdminCommerceController {
   }
 
   /** 单项回落默认值 (删掉 SystemSetting 覆盖, 回到 registry) */
-  @Post('credit-prices/:capabilityId/reset')
+  @Post("credit-prices/:capabilityId/reset")
   @RequirePermission(PERMISSIONS.productPrice)
-  @AuditAction('credit.price_reset')
-  resetCreditPrice(@Param('capabilityId') capabilityId: string) {
+  @AuditAction("credit.price_reset")
+  resetCreditPrice(@Param("capabilityId") capabilityId: string) {
     return this.creditPrice.resetPrice(capabilityId);
   }
 
   // ── 商品 (B-34~B-36) ────────────────────────────────────────────
 
   /** 商品列表 */
-  @Get('products')
+  @Get("products")
   @RequirePermission(PERMISSIONS.productRead)
-  products(@Query('status') status?: string) {
+  products(@Query("status") status?: string) {
     return this.commerce.listProducts(status);
   }
 
   /** 新建商品。默认下架, 确认无误后再上架 */
-  @Post('products')
+  @Post("products")
   @RequirePermission(PERMISSIONS.productWrite)
-  @AuditAction('product.create')
+  @AuditAction("product.create")
   createProduct(@Body() dto: ProductCreateDto) {
     return this.commerce.createProduct(dto);
   }
@@ -271,19 +278,24 @@ export class AdminCommerceController {
    *
    * 改价不影响已生成的订单 —— 订单存的是下单时快照, 这是交易系统的基本约定。
    */
-  @Patch('products/:id')
+  @Patch("products/:id")
   @RequirePermission(PERMISSIONS.productWrite)
-  @AuditAction('product.update')
-  updateProduct(@Param('id') id: string, @Body() dto: ProductUpdateDto) {
+  @AuditAction("product.update")
+  updateProduct(@Param("id") id: string, @Body() dto: ProductUpdateDto) {
     return this.commerce.updateProduct(id, dto);
   }
 
   /** 上架/ 下架 (B-36)。下架不影响历史订单 */
-  @Patch('products/:id/status')
+  @Patch("products/:id/status")
   @RequirePermission(PERMISSIONS.productWrite)
-  @AuditAction('product.status_change')
-  async setProductStatus(@Param('id') id: string, @Body() dto: ProductStatusDto) {
-    const product = await this.commerce.updateProduct(id, { status: dto.status });
+  @AuditAction("product.status_change")
+  async setProductStatus(
+    @Param("id") id: string,
+    @Body() dto: ProductStatusDto,
+  ) {
+    const product = await this.commerce.updateProduct(id, {
+      status: dto.status,
+    });
     return { id: product.id, status: product.status };
   }
 
@@ -295,20 +307,20 @@ export class AdminCommerceController {
    * 支持 orderNo / email / status / channel / 时间范围 过滤:
    * 客服拿着"用户邮箱 + 大概日期"来问，是最高频的排障入口。
    */
-  @Get('orders')
+  @Get("orders")
   @RequirePermission(PERMISSIONS.orderRead)
   orderList(
-    @Query('status') status?: string,
-    @Query('orderNo') orderNo?: string,
-    @Query('email') email?: string,
-    @Query('channel') channel?: string,
-    @Query('refundState') refundState?: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-    @Query('userId') userId?: string,
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
-    @Query('sort') sort?: string,
+    @Query("status") status?: string,
+    @Query("orderNo") orderNo?: string,
+    @Query("email") email?: string,
+    @Query("channel") channel?: string,
+    @Query("refundState") refundState?: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+    @Query("userId") userId?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
+    @Query("sort") sort?: string,
   ) {
     return this.commerce.listOrders({
       status,
@@ -330,18 +342,18 @@ export class AdminCommerceController {
    * 用 @Res() 直接写响应: 全局 ResponseInterceptor 会把返回值包成
    * `{code,data}` JSON, 那样浏览器拿到的是一个 JSON 字符串而不是可下载的文件。
    */
-  @Get('orders/export')
-  @RequirePermission(PERMISSIONS.dataExport)
-  @AuditAction('data.export')
+  @Get("orders/export")
+  @RequireAllPermissions(PERMISSIONS.orderRead, PERMISSIONS.dataExport)
+  @AuditAction("data.export")
   async exportOrders(
     @Res() res: Response,
-    @Query('status') status?: string,
-    @Query('orderNo') orderNo?: string,
-    @Query('email') email?: string,
-    @Query('channel') channel?: string,
-    @Query('refundState') refundState?: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
+    @Query("status") status?: string,
+    @Query("orderNo") orderNo?: string,
+    @Query("email") email?: string,
+    @Query("channel") channel?: string,
+    @Query("refundState") refundState?: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
   ) {
     const csv = await this.commerce.exportOrders({
       status,
@@ -352,27 +364,27 @@ export class AdminCommerceController {
       from,
       to,
     });
-    sendCsv(res, 'orders', csv);
+    sendCsv(res, "orders", csv);
   }
 
   /** 订单详情 (B-41): 明细 / 支付 / 退款 / 券 / 会员套餐一次取全 */
-  @Get('orders/:id')
+  @Get("orders/:id")
   @RequirePermission(PERMISSIONS.orderRead)
-  orderDetail(@Param('id') id: string) {
+  orderDetail(@Param("id") id: string) {
     return this.commerce.orderDetail(id);
   }
 
   /** 手工核销 (B-42): 标记已支付, 须写审计 */
-  @Post('orders/:id/mark-paid')
+  @Post("orders/:id/mark-paid")
   @RequirePermission(PERMISSIONS.orderMarkPaid)
-  @AuditAction('order.mark_paid')
-  async markPaid(@Param('id') id: string, @AdminUser() actor: AdminUser) {
+  @AuditAction("order.mark_paid")
+  async markPaid(@Param("id") id: string, @AdminUser() actor: AdminUser) {
     const order = await this.commerce.orderDetail(id);
     return this.orders.markPaid({
       orderId: id,
       userId: order.userId,
       payTransactionId: `MANUAL-${actor.id}-${Date.now()}`,
-      channel: 'manual',
+      channel: "manual",
     });
   }
 
@@ -383,9 +395,9 @@ export class AdminCommerceController {
    * 逐条返回结果：40 笔里有一笔已退款、两笔已被渠道回调核销，
    * 运营需要知道具体是哪几笔、为什么。
    */
-  @Post('orders/batch')
+  @Post("orders/batch")
   @RequirePermission(PERMISSIONS.orderMarkPaid)
-  @AuditAction('order.batch')
+  @AuditAction("order.batch")
   batchMarkPaid(@Body() dto: OrderBatchDto, @AdminUser() actor: AdminUser) {
     return this.commerce.batchMarkPaid(dto.ids, actor.id);
   }
@@ -397,10 +409,14 @@ export class AdminCommerceController {
    * 读出并冻结, 交给 `OrderService.refund` 判定 —— 判定逻辑留在订单域,
    * 这样将来 C 端自助退款接同一套服务时不会漏规则。
    */
-  @Post('orders/:id/refund')
+  @Post("orders/:id/refund")
   @RequirePermission(PERMISSIONS.orderRefund)
-  @AuditAction('order.refund')
-  async refund(@Param('id') id: string, @Body() dto: RefundDto, @AdminUser() actor: AdminUser) {
+  @AuditAction("order.refund")
+  async refund(
+    @Param("id") id: string,
+    @Body() dto: RefundDto,
+    @AdminUser() actor: AdminUser,
+  ) {
     const rules = await this.settings.refundRules();
     return this.orders.refund({
       orderId: id,
@@ -413,40 +429,45 @@ export class AdminCommerceController {
 
   // ── 支付流水 (B-45) ─────────────────────────────────────────────
 
-  @Get('payments')
+  @Get("payments")
   @RequirePermission(PERMISSIONS.paymentRead)
   payments(
-    @Query('status') status?: string,
-    @Query('pageSize') pageSize?: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
+    @Query("status") status?: string,
+    @Query("pageSize") pageSize?: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
   ) {
-    return this.commerce.listPayments({ status, pageSize: num(pageSize), from, to });
+    return this.commerce.listPayments({
+      status,
+      pageSize: num(pageSize),
+      from,
+      to,
+    });
   }
 
-  @Get('payments/export')
-  @RequirePermission(PERMISSIONS.dataExport)
-  @AuditAction('data.export')
+  @Get("payments/export")
+  @RequireAllPermissions(PERMISSIONS.paymentRead, PERMISSIONS.dataExport)
+  @AuditAction("data.export")
   async exportPayments(
     @Res() res: Response,
-    @Query('status') status?: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
+    @Query("status") status?: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
   ) {
     const csv = await this.commerce.exportPayments({ status, from, to });
-    sendCsv(res, 'payments', csv);
+    sendCsv(res, "payments", csv);
   }
 
   // ── 积分 (B-49~B-52) ────────────────────────────────────────────
 
   /** 用户积分总览 (B-49) */
-  @Get('credits')
+  @Get("credits")
   @RequirePermission(PERMISSIONS.creditRead)
   credits(
-    @Query('userId') userId?: string,
-    @Query('email') email?: string,
-    @Query('page') page?: string,
-    @Query('pageSize') pageSize?: string,
+    @Query("userId") userId?: string,
+    @Query("email") email?: string,
+    @Query("page") page?: string,
+    @Query("pageSize") pageSize?: string,
   ) {
     return this.commerce.listCredits({
       userId,
@@ -457,46 +478,51 @@ export class AdminCommerceController {
   }
 
   /** 积分总览导出 (CSV) */
-  @Get('credits/export')
-  @RequirePermission(PERMISSIONS.dataExport)
-  @AuditAction('data.export')
+  @Get("credits/export")
+  @RequireAllPermissions(PERMISSIONS.creditRead, PERMISSIONS.dataExport)
+  @AuditAction("data.export")
   async exportCredits(
     @Res() res: Response,
-    @Query('userId') userId?: string,
-    @Query('email') email?: string,
+    @Query("userId") userId?: string,
+    @Query("email") email?: string,
   ) {
     const csv = await this.commerce.exportCredits({ userId, email });
-    sendCsv(res, 'credits', csv);
+    sendCsv(res, "credits", csv);
   }
 
   /** 某用户的批次明细 (B-50) */
-  @Get('credits/:userId/lots')
+  @Get("credits/:userId/lots")
   @RequirePermission(PERMISSIONS.creditRead)
   lots(
-    @Param('userId') userId: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
+    @Param("userId") userId: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
   ) {
     return this.commerce.creditLots(userId, { from, to });
   }
 
   /** 某用户的流水 (B-51), 可按类型与时间过滤 */
-  @Get('credits/:userId/ledger')
+  @Get("credits/:userId/ledger")
   @RequirePermission(PERMISSIONS.creditRead)
   ledger(
-    @Param('userId') userId: string,
-    @Query('type') type?: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-    @Query('limit') limit?: string,
+    @Param("userId") userId: string,
+    @Query("type") type?: string,
+    @Query("from") from?: string,
+    @Query("to") to?: string,
+    @Query("limit") limit?: string,
   ) {
-    return this.commerce.creditLedger(userId, { type, from, to, limit: num(limit) });
+    return this.commerce.creditLedger(userId, {
+      type,
+      from,
+      to,
+      limit: num(limit),
+    });
   }
 
   /** 人工增减积分 (B-52)。强制填写原因 */
-  @Post('credits/adjust')
+  @Post("credits/adjust")
   @RequirePermission(PERMISSIONS.creditAdjust)
-  @AuditAction('credit.adjust')
+  @AuditAction("credit.adjust")
   adjust(@Body() dto: AdjustCreditDto, @AdminUser() actor: AdminUser) {
     return this.credit.adminAdjust({
       userId: dto.userId,
@@ -508,9 +534,9 @@ export class AdminCommerceController {
   }
 
   /** 批量调整积分。逐条独立执行并回传每条结果 */
-  @Post('credits/batch-adjust')
+  @Post("credits/batch-adjust")
   @RequirePermission(PERMISSIONS.creditAdjust)
-  @AuditAction('credit.batch_adjust')
+  @AuditAction("credit.batch_adjust")
   batchAdjust(@Body() dto: BatchAdjustDto, @AdminUser() actor: AdminUser) {
     return this.commerce.batchAdjust(dto.items, {
       reason: dto.reason,
@@ -525,32 +551,33 @@ export class AdminCommerceController {
    * 列格式：`email,delta[,reason]`，首行可选表头（`email` / `邮箱`）。
    * 用邮箱定位用户而不是用户 id —— 运营手里的表格从来只有邮箱。
    *
-   * 为什么走 `credit.adjust` 而不是 `data.import`：这不是"导入一批数据"，
-   * 这是**给钱**。CSV 只是输入格式，权限应当跟着动作走，否则一个持有
-   * `data.import`、没有 `credit.adjust` 的角色就能绕过积分权限。
+   * 为什么走 `credit.adjust` 而不是通用数据工具权限：这不是"导入一批数据"，
+   * 这是**给钱**。CSV 只是输入格式，权限应当跟着动作走，否则没有
+   * `credit.adjust` 的角色就能靠导入绕过积分权限。
    *
    * `delta` 为负即扣减，与人工调整同一套规则（余额不足整条失败，
    * 失败原因原样回传，不写成通用文案）。
    */
-  @Post('credits/import')
+  @Post("credits/import")
   @RequirePermission(PERMISSIONS.creditAdjust)
-  @AuditAction('credit.import')
+  @AuditAction("credit.import")
   @UseInterceptors(
-    FileInterceptor('file', {
+    FileInterceptor("file", {
       storage: memoryStorage(),
       // 2MB ≈ 数万行，足够运营的一次活动补发；再大应拆批
       limits: { fileSize: 2 * 1024 * 1024 },
     }),
   )
   async importCredits(
-    @UploadedFile() file: { buffer?: Buffer; originalname?: string } | undefined,
+    @UploadedFile()
+    file: { buffer?: Buffer; originalname?: string } | undefined,
     @Body() dto: CreditImportDto,
     @AdminUser() actor: AdminUser,
   ) {
     if (!file?.buffer?.length) {
-      throw new AppError(40001, '请上传 CSV 文件（字段名 file）', 400);
+      throw new AppError(40001, "请上传 CSV 文件（字段名 file）", 400);
     }
-    return this.commerce.importCreditsCsv(file.buffer.toString('utf8'), {
+    return this.commerce.importCreditsCsv(file.buffer.toString("utf8"), {
       reason: dto.reason,
       validDays: dto.validDays,
       operatorId: actor.id,

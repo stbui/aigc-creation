@@ -11,10 +11,7 @@ import {
 import { useApp } from '../ui';
 
 /**
- * 手机端上传落地页 —— 1:1 复刻参考站 (ijihua.cn) 扫码后打开的
- * `mobile-upload-page` 页面。
- *
- * ## 参考站实拍数值 (2026-10-20 取证: 线上样式表 index-glaqVozH.css)
+ * 手机端上传落地页
  *
  *   page        min-height 100dvh, 渐变背景
  *               linear-gradient(150deg, #f1edff 0%, #faf9ff 44%, #eef7ff 100%)

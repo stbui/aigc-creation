@@ -163,6 +163,8 @@ interface Props {
   desc: string;
   /** 上传卡规格; 传 null 表示页面自带上传区 (如 SKU 模板卡 / 多图融合双上传区) */
   upload: UploadSpec | null;
+  /** 本次请求必然提交的模型输入槽位（如遮罩页面的 `mask`） */
+  requiredInputs?: readonly string[];
   settings?: SettingsSpec;
   /** 提交按钮主文案 */
   submitLabel: string;
@@ -216,8 +218,11 @@ interface Props {
    * `product-card` 复刻参考站产品系工具（商品换色等）的右栏：不再套通用
    * 「生成结果 / 重新生成 / 尺寸 / 下载原图」网格，而是在可用区域中央放
    * 一张带角标和下载按钮的大图卡。生成中同样沿用该卡片的宽高比例。
+   *
+   * `canvas` 供局部重绘使用：成功结果直接复用标注画布的舞台和定位规则，
+   * 结果图保持在原画布位置，不再渲染结果名称、标签、来源与尺寸元信息。
    */
-  resultView?: 'default' | 'product-card';
+  resultView?: 'default' | 'product-card' | 'canvas';
   /** 生成中卡片的宽高比；通常取已上传原图的比例，未知时按 3:4。 */
   generatingAspect?: number;
   /** 产品卡右上角/左上角的状态角标；默认「结果」。 */
@@ -371,6 +376,7 @@ export function ToolShell(props: Props) {
     title,
     desc,
     upload,
+    requiredInputs = [],
     settings,
     submitLabel,
     creditLabel,
@@ -837,7 +843,13 @@ export function ToolShell(props: Props) {
                   capabilityId={capability}
                   showRatio={Boolean(settings.ratio)}
                   showResolution={Boolean(settings.resolution)}
-                  modelPicker={<ModelPicker capability={capability} options={{ ratio, resolution }} />}
+                  modelPicker={
+                    <ModelPicker
+                      capability={capability}
+                      requiredInputs={requiredInputs}
+                      options={{ ratio, resolution }}
+                    />
+                  }
                 />
               ) : null
             }
@@ -901,6 +913,58 @@ export function ToolShell(props: Props) {
             fallbackAspect={generatingAspect}
             onPreview={() => setLightboxUrl(results[0].url!)}
           />
+        ) : resultView === 'canvas' && results.length === 1 && results[0].status === 'succeeded' && results[0].url ? (
+          <div className="pk-source-pane redraw-stage redraw-result-stage">
+            <div className="redraw-stage-topbar result-actions-only">
+              <div className="stage-actions">
+                {resultActions}
+                <button type="button" disabled={submitting} onClick={() => void submit()}>
+                  <RefreshCw size={14} />
+                  重新生成
+                </button>
+              </div>
+            </div>
+            <div className="redraw-stage-main">
+              <div
+                className="redraw-canvas-wrap"
+                style={
+                  {
+                    '--redraw-image-aspect':
+                      generatingAspect ||
+                      (results[0].width && results[0].height
+                        ? results[0].width / results[0].height
+                        : 1),
+                  } as CSSProperties
+                }
+              >
+                <button
+                  type="button"
+                  className="redraw-result-preview"
+                  aria-label={`预览${title}结果`}
+                  onClick={() => setLightboxUrl(results[0].url!)}
+                >
+                  <ResultMedia
+                    url={results[0].url}
+                    modality={results[0].modality}
+                    alt={`${title}结果`}
+                    className="redraw-result-image"
+                    priority
+                  />
+                </button>
+                <a
+                  className="redraw-result-download"
+                  href={results[0].url}
+                  download
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`下载${title}结果`}
+                  title="下载"
+                >
+                  <Download size={16} />
+                </a>
+              </div>
+            </div>
+          </div>
         ) : (
           <div className="pk-result-body">
             <div className="pk-result-toolbar">

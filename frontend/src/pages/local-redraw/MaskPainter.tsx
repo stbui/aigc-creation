@@ -37,6 +37,7 @@ export function MaskPainter({
   onPanChange,
   onRegionLimit,
   onChange,
+  onNaturalSize,
   handleRef,
 }: {
   url: string;
@@ -49,6 +50,8 @@ export function MaskPainter({
   onRegionLimit: () => void;
   /** 有可提交的涂抹 / 可撤回 / 可恢复 / 当前标注区域数 */
   onChange: (painted: boolean, canUndo: boolean, canRedo: boolean, regionCount: number) => void;
+  /** 原图加载后回传真实像素尺寸，供外层画布按图片比例布局。 */
+  onNaturalSize?: (size: { width: number; height: number }) => void;
   handleRef: { current: MaskPainterHandle | null };
 }) {
   const overlayRef = useRef<HTMLCanvasElement | null>(null);
@@ -71,11 +74,10 @@ export function MaskPainter({
   const [fittedSize, setFittedSize] = useState<{ width: number; height: number } | null>(null);
 
   /**
-   * 把原图等比装进参考站的方形画布舞台。
+   * 把原图等比装进外层画布舞台。
    *
-   * 舞台固定 1:1，但图片本身可能是任意宽高比；直接让 img 撑满会裁切，
-   * 只设 max-height 又会让竖图溢出。这里按舞台实际可用宽高等比收缩，
-   * 并把 img / overlay 的共同父级设为该尺寸 —— 涂抹坐标仍以图片为基准。
+   * 外层宽高比由图片真实尺寸驱动；这里再按实际可用宽高收缩一次，
+   * 用于抵消边框、缩放和窗口变化，确保图片、交互 canvas、DOM 标注层始终重合。
    */
   const fitToStage = useCallback(() => {
     const stage = stageRef.current;
@@ -265,6 +267,7 @@ export function MaskPainter({
       const mask = maskRef.current;
       if (!overlay || !mask || w <= 0 || h <= 0) return;
       naturalRef.current = { w, h };
+      onNaturalSize?.({ width: w, height: h });
       overlay.width = w;
       overlay.height = h;
       mask.width = w;
@@ -280,7 +283,7 @@ export function MaskPainter({
       render();
       notify();
     },
-    [fitToStage, notify, render],
+    [fitToStage, notify, onNaturalSize, render],
   );
 
   const commit = useCallback(

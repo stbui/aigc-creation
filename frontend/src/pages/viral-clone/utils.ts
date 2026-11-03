@@ -1,4 +1,5 @@
-import { DEGREE_LABEL } from './constants';
+import { DEGREE_LABEL, MAX_IMAGES } from './constants';
+import { modelImageInputLimit, type PublicLogicalModel } from './api';
 
 /**
  * 爆款复刻工作台页面的纯函数与外部工具入口 —— 目录内文件的唯一外部工具来源。
@@ -16,6 +17,33 @@ export { taskErrorText } from '../../lib/constants';
 export { languageOptions, platformOptions, platformSpec } from '../../lib/optionSets';
 /** 任务轮询到终态 */
 export { pollToResult } from '../../lib/poll';
+
+
+/* ------------------------------------------------------------------------- */
+/* 模型输入约束                                                             */
+/* ------------------------------------------------------------------------- */
+
+/**
+ * 商品图位上限。
+ *
+ * 爆款复刻必须额外提交 1 张参考图，而模型合同限制的是两者总数；
+ * 因此商品图只能占用“总数上限 - 1”个位置。目录还没加载时保留页面上限，
+ * 提交前仍会按真实模型再校验一次。
+ */
+export function viralCloneProductImageLimit(totalImageMax: number | null): number {
+  if (totalImageMax === null) return MAX_IMAGES;
+  return Math.min(MAX_IMAGES, Math.max(0, totalImageMax - 1));
+}
+
+/** 商品图 + 参考图总数超过模型能力合同时的可读原因。 */
+export function viralCloneImageInputError(
+  model: Pick<PublicLogicalModel, 'name' | 'capabilitySpec'>,
+  imageCount: number,
+): string | null {
+  const max = modelImageInputLimit(model);
+  if (max === null || imageCount <= max) return null;
+  return `所选模型「${model.name}」最多支持 ${max} 张输入图片（商品图 + 参考图），当前 ${imageCount} 张，请移除 ${imageCount - max} 张或切换模型`;
+}
 
 /**
  * 任务参数里的复刻程度 → 缩略图标签。

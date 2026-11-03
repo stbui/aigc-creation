@@ -1,8 +1,13 @@
-import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { AppError } from '../common/app.exception';
-import { IDENTITY_ONLY_KEY, PERMISSION_KEY } from './admin.decorator';
-import { AdminRoleService } from './admin-role.service';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  Logger,
+} from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { AppError } from "../common/app.exception";
+import { IDENTITY_ONLY_KEY, PERMISSION_KEY } from "./admin.decorator";
+import { AdminRoleService } from "./admin-role.service";
 
 /**
  * 后台第二道守卫: 权限点校验。
@@ -26,9 +31,9 @@ import { AdminRoleService } from './admin-role.service';
  *
  * ## 未声明权限点
  *
- * 只要求后台身份, 并打 WARN 让漏声明显形。自省类端点 (当前身份/概览)
- * 用 `@AdminIdentityOnly()` 显式豁免, 避免告警被这些"本来就不需要"的
- * 端点刷满。
+ * 默认拒绝并打 ERROR: 漏声明属于配置错误, 不能把后台端点降级成"只校验身份"。
+ * 真正对全体后台角色开放的自省类端点 (当前身份/概览) 必须显式使用
+ * `@AdminIdentityOnly()` 豁免。
  */
 @Injectable()
 export class PermissionGuard implements CanActivate {
@@ -43,14 +48,19 @@ export class PermissionGuard implements CanActivate {
     const request = context.switchToHttp().getRequest();
 
     // 全局守卫: 非后台路径直接放行 (与 AdminGuard 的判定保持一致)
-    const url: string = request.originalUrl ?? request.url ?? '';
-    if (!url.split('?')[0].includes('/admin')) return true;
+    const url: string = request.originalUrl ?? request.url ?? "";
+    if (!url.split("?")[0].includes("/admin")) return true;
 
     const targets = [context.getHandler(), context.getClass()];
-    const required = this.reflector.getAllAndOverride<string | undefined>(PERMISSION_KEY, targets);
+    const required = this.reflector.getAllAndOverride<
+      string | string[] | undefined
+    >(PERMISSION_KEY, targets);
 
-    if (!required) {
-      const identityOnly = this.reflector.getAllAndOverride<boolean>(IDENTITY_ONLY_KEY, targets);
+    if (!required || (Array.isArray(required) && required.length === 0)) {
+      const identityOnly = this.reflector.getAllAndOverride<boolean>(
+        IDENTITY_ONLY_KEY,
+        targets,
+      );
       if (!identityOnly) {
         /*
          * 默认拒绝 (2026-10-22 从 fail-open 改为 fail-closed)。
@@ -61,29 +71,35 @@ export class PermissionGuard implements CanActivate {
          * 真正无需权限的自省端点应显式写 @AdminIdentityOnly()。
          */
         this.logger.error(
-          `后台端点未声明权限点, 已拒绝: ${request.method ?? '?'} ${url} — 请补 @RequirePermission 或 @AdminIdentityOnly`,
+          `后台端点未声明权限点, 已拒绝: ${request.method ?? "?"} ${url} — 请补 @RequirePermission 或 @AdminIdentityOnly`,
         );
-        throw new AppError(40301, '该端点未声明权限点, 已拒绝访问', 403);
+        throw new AppError(40301, "该端点未声明权限点, 已拒绝访问", 403);
       }
       return true;
     }
 
-    // 供 getRequiredPermission() 读取 (守卫之外拿不到 Reflector)
-    request.requiredPermission = required;
+    const requiredPermissions = Array.isArray(required) ? required : [required];
+
+    // 供 getRequiredPermission()/getRequiredPermissions() 读取 (守卫之外拿不到 Reflector)
+    request.requiredPermissions = requiredPermissions;
+    request.requiredPermission = requiredPermissions[0];
 
     const adminUser = request.adminUser;
     if (!adminUser) {
       // AdminGuard 未执行或已失败 —— 守卫顺序被改动时兜底
-      throw new AppError(40301, '需要管理员权限', 403);
+      throw new AppError(40301, "需要管理员权限", 403);
     }
 
     const permissions = await this.roles.getPermissions(adminUser.role);
-    if (!permissions.includes(required)) {
+    const missing = requiredPermissions.filter(
+      (permission) => !permissions.includes(permission),
+    );
+    if (missing.length > 0) {
       this.logger.warn(
-        `权限不足: ${adminUser.email} (${adminUser.role}) 缺少 ${required}`,
+        `权限不足: ${adminUser.email} (${adminUser.role}) 缺少 ${missing.join(", ")}`,
       );
       // 不回显所需权限点: 避免通过报错探测系统有哪些能力
-      throw new AppError(40301, '无操作权限', 403);
+      throw new AppError(40301, "无操作权限", 403);
     }
 
     return true;

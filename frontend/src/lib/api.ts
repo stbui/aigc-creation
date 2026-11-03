@@ -922,7 +922,13 @@ export const adminUsersApi = {
 
   /** 默认软删; hard=true 物理删除可删部分 (订单不在删除范围) */
   remove: (id: string, hard = false, confirm?: string) =>
-    request<{ id: string; hard: boolean }>(`/admin/users/${id}${hard ? '?hard=true' : ''}`, {
+    request<{
+      id: string;
+      hard: boolean;
+      deleted?: { projects: number; tasks: number; assets: number };
+      removedFiles?: number;
+      failedFiles?: number;
+    }>(`/admin/users/${id}${hard ? '?hard=true' : ''}`, {
       method: 'DELETE',
       body: { confirm },
     }),
@@ -948,10 +954,13 @@ export const adminUsersApi = {
 export const adminRolesApi = {
   list: () => request<{ items: AdminRoleItem[] }>('/admin/roles'),
 
-  updatePermissions: (code: string, permissions: string[], reason?: string) =>
-    request<{ code: string; permissions: string[] }>(`/admin/roles/${code}/permissions`, {
+  updatePermissions: (
+    roles: Array<{ code: string; permissions: string[] }>,
+    reason: string,
+  ) =>
+    request<{ roles: Array<{ code: string; permissions: string[] }> }>('/admin/roles', {
       method: 'PATCH',
-      body: { permissions, reason },
+      body: { roles, reason },
     }),
 };
 
@@ -1101,13 +1110,13 @@ export const adminBackupsApi = {
   detail: (id: string) => request<AdminBackup>(`/admin/backups/${id}`),
 
   /**
-   * 手动备份。同 idempotencyKey 在 5 秒内重复提交返回同一份。
-   * reason 会写进操作审计 (backup.run 属高危权限), 不能省略。
+   * 手动备份。reason 会写进操作审计 (backup.run 属高危权限), 不能省略。
+   * 重复点击由调用方的 busy 状态拦截；后端不承诺跨请求幂等。
    */
-  run: (idempotencyKey?: string, reason?: string) =>
+  run: (reason: string) =>
     request<AdminBackup>('/admin/backups', {
       method: 'POST',
-      body: { idempotencyKey, reason },
+      body: { reason },
     }),
 
   /** 恢复验证 B-97: 只读打开备份文件做完整性检查, 不触碰生产库 */
@@ -1115,23 +1124,14 @@ export const adminBackupsApi = {
     request<AdminBackup>(`/admin/backups/${id}/verify`, { method: 'POST' }),
 
   /** 保留份数清理 */
-  prune: (keepCount: number) =>
+  prune: (keepCount: number, reason: string) =>
     request<{ removed: number; freedBytes: number }>('/admin/backups/prune', {
       method: 'POST',
-      body: { keepCount },
+      body: { keepCount, reason },
     }),
 
   remove: (id: string) =>
     request<{ id: string; filename: string }>(`/admin/backups/${id}`, { method: 'DELETE' }),
-
-  cleanupLogs: (limit = 50) => request<AdminCleanupLog[]>(`/admin/backups/cleanup-logs?limit=${limit}`),
-
-  /** 到期数据清理 B-100 */
-  cleanup: (target: string, retentionDays: number) =>
-    request<{ target: string; deleted: number; cutoff: string }>('/admin/backups/cleanup', {
-      method: 'POST',
-      body: { target, retentionDays },
-    }),
 
   /**
    * 下载备份。
@@ -1648,14 +1648,12 @@ export const adminCreditsApi = {
   },
 };
 
-/**
- * 保留期清理 (B-96)。
- *
- * 与 adminBackupsApi.cleanup 的区别: 后者是旧端点 (无原因字段),
- * 这里强制填原因 —— 删除历史数据必须能回答"谁删的、为什么"。
- */
+/** 保留期清理 (B-96)。所有清理入口统一走这里，强制填写原因。 */
 export const adminRetentionApi = {
   targets: () => request<AdminRetentionTarget[]>('/admin/retention/targets'),
+
+  preview: (target: string, retentionDays: number) =>
+    request<AdminRetentionTarget>(`/admin/retention/preview${toQuery({ target, retentionDays })}`),
 
   logs: (pageSize = 50) => request<AdminCleanupLog[]>(`/admin/retention/logs?pageSize=${pageSize}`),
 
@@ -1758,7 +1756,7 @@ export const adminPaymentOrdersApi = {
     request<{ order: AdminPaymentOrderDetail }>(`/admin/payments/orders/${id}`),
 
   /** 向渠道查单：已支付则立即入账，否则不动本地状态 */
-  query: (id: string, body: { reason?: string } = {}) =>
+  query: (id: string, body: { reason: string }) =>
     request<{ order: { id: string; status: string }; view: unknown }>(
       `/admin/payments/orders/${id}/query`,
       { method: 'POST', body },
@@ -1770,7 +1768,7 @@ export const adminPaymentOrdersApi = {
    * **不会退款**：关单只停止这笔未支付订单继续挂着；已付款的订单要走退款流程，
    * 退款在订单管理里，不在支付域。
    */
-  close: (id: string, body: { reason?: string } = {}) =>
+  close: (id: string, body: { reason: string }) =>
     request<{ order: { id: string; status: string }; view: unknown }>(
       `/admin/payments/orders/${id}/close`,
       { method: 'POST', body },

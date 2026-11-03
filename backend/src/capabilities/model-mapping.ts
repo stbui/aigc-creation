@@ -100,10 +100,16 @@ export function editImageIntent(
   inputs: CapabilityModelInputs,
 ): ModelRequestIntent {
   const references = Math.max(0, inputs.image);
+  const requestInputs = intentInputs({ image: references, video: 0 });
+  // 遮罩是编辑请求的必选供给侧能力：必须进入意图，路由才能在候选阶段排除
+  // 不支持 mask 的线路，而不是选中后到准入阶段才报 42205。
+  if (text(params?.modelGuideAssetId) !== '' || text(params?.maskAssetId) !== '') {
+    requestInputs.mask = 1;
+  }
   return {
     capability: 'image',
     operation: 'image_to_image',
-    inputs: intentInputs({ image: references, video: 0 }),
+    inputs: requestInputs,
     options: imageOptions(params),
   };
 }

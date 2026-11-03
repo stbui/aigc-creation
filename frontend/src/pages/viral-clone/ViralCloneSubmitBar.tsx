@@ -1,5 +1,6 @@
 import { CircleAlert } from 'lucide-react';
 
+import type { PublicLogicalModel } from './api';
 import {
   InlineAlert,
   InlineAlertDescription,
@@ -25,6 +26,7 @@ export function ViralCloneSubmitBar({
   onRatioChange,
   onResolutionChange,
   onModelQuoteChange,
+  onModelChange,
   onSubmit,
 }: {
   generating: boolean;
@@ -38,6 +40,7 @@ export function ViralCloneSubmitBar({
   onRatioChange: (value: string) => void;
   onResolutionChange: (value: string) => void;
   onModelQuoteChange: (credits: number | null) => void;
+  onModelChange: (model: PublicLogicalModel | null) => void;
   onSubmit: () => void;
 }) {
   return (
@@ -67,6 +70,7 @@ export function ViralCloneSubmitBar({
                 capability="hot_remake"
                 options={{ ratio, resolution }}
                 onQuoteChange={onModelQuoteChange}
+                onModelChange={onModelChange}
               />
             }
           />

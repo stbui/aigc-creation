@@ -1209,7 +1209,7 @@ export interface AdminBackupStats {
   stale: boolean;
 }
 
-/** GET /api/v1/admin/backups/cleanup-logs */
+/** GET /api/v1/admin/retention/logs */
 export interface AdminCleanupLog {
   id: string;
   target: string;

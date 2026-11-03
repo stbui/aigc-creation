@@ -168,6 +168,16 @@ export class TaskAdmissionService {
     if (model.capability !== dto.capability) {
       throw new AppError(40001, '所选模型不支持该能力', 400);
     }
+    const imageInput = model.productSpec.inputs?.image;
+    const imageCount = dto.inputAssetIds.length;
+    if (imageInput && (imageCount < imageInput.min || imageCount > imageInput.max)) {
+      const range = imageInput.min === imageInput.max ? `${imageInput.max}` : `${imageInput.min}-${imageInput.max}`;
+      throw new AppError(
+        40001,
+        `所选模型「${model.name}」仅支持 ${range} 张输入图片（当前 ${imageCount} 张），请调整图片数量或更换模型`,
+        400,
+      );
+    }
 
     const intent = restrictIntentToSpec(
       model.productSpec,

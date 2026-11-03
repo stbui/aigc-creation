@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsBoolean,
   IsIn,
@@ -16,6 +16,7 @@ import { PAYMENT_PROVIDER_IDS, PaymentProviderId } from '../../payments/adapters
 
 /** 需要填写变更原因的高危写操作（审计落 reason 列） */
 class ReasonedDto {
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
   @IsString({ message: '请填写变更原因' })
   @MinLength(2, { message: '变更原因至少 2 个字符' })
   @MaxLength(200, { message: '变更原因最多 200 个字符' })
@@ -152,12 +153,7 @@ export class PaymentOrderListQueryDto extends PageQueryDto {
   to?: string;
 }
 
-export class PaymentOrderActionDto {
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  reason?: string;
-}
+export class PaymentOrderActionDto extends ReasonedDto {}
 
 export class ReconciliationRunDto extends ReasonedDto {
   @IsIn(PAYMENT_PROVIDER_IDS, { message: '渠道非法' })

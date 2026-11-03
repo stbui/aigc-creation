@@ -9,15 +9,15 @@
  */
 
 /** 后台角色 code (对应 User.role) */
-export const ADMIN_ROLE_CODES = ['admin', 'operator', 'finance'] as const;
+export const ADMIN_ROLE_CODES = ["admin", "operator", "finance"] as const;
 export type AdminRoleCode = (typeof ADMIN_ROLE_CODES)[number];
 
 /** 全部后台角色 (含 C 端 user) */
-export const USER_ROLES = ['user', ...ADMIN_ROLE_CODES] as const;
+export const USER_ROLES = ["user", ...ADMIN_ROLE_CODES] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
 /** 账号状态 (对应 User.status) */
-export const USER_STATUSES = ['active', 'disabled', 'deleted'] as const;
+export const USER_STATUSES = ["active", "disabled", "deleted"] as const;
 export type UserStatus = (typeof USER_STATUSES)[number];
 
 /** 是否后台角色 */
@@ -30,117 +30,117 @@ export function isAdminRole(role: string): role is AdminRoleCode {
  *
  * 一旦有权限点从清单移除, 已存在于 AdminRole.permissions 的旧值会成为"孤儿权限点":
  * 守卫比对不上即等同无权 (兜底默认拒), 因此不会造成越权, 但角色页会显示为
- * 无效项。AdminRoleService 在读取时会过滤掉未登记的权限点并回写。
+ * 无效项。AdminRoleService 在读取时会过滤掉未登记的权限点; 过滤结果只在
+ * 内存生效, 不会自动回写库。
  */
 export const PERMISSIONS = {
   //平台
-  platformDashboard: 'platform.dashboard',
+  platformDashboard: "platform.dashboard",
 
   // 用户
-  userRead: 'user.read',
-  userWrite: 'user.write',
-  userDisable: 'user.disable',
-  userDelete: 'user.delete',
-  userResetPassword: 'user.reset_password',
+  userRead: "user.read",
+  userWrite: "user.write",
+  userDisable: "user.disable",
+  userDelete: "user.delete",
+  userResetPassword: "user.reset_password",
 
   // 项目与素材
-  projectRead: 'project.read',
-  projectDelete: 'project.delete',
-  assetRead: 'asset.read',
-  assetHide: 'asset.hide',
-  assetDelete: 'asset.delete',
+  projectRead: "project.read",
+  projectDelete: "project.delete",
+  assetRead: "asset.read",
+  assetHide: "asset.hide",
+  assetDelete: "asset.delete",
 
   // 任务
-  taskRead: 'task.read',
-  taskRetry: 'task.retry',
-  taskCancel: 'task.cancel',
-  taskDelete: 'task.delete',
+  taskRead: "task.read",
+  taskRetry: "task.retry",
+  taskCancel: "task.cancel",
+  taskDelete: "task.delete",
 
   // 商品
-  productRead: 'product.read',
-  productWrite: 'product.write',
-  productPrice: 'product.price',
-  productPublish: 'product.publish',
+  productRead: "product.read",
+  productWrite: "product.write",
+  productPrice: "product.price",
+  productPublish: "product.publish",
 
   // 订单与支付
-  orderRead: 'order.read',
-  orderMarkPaid: 'order.mark_paid',
-  orderRefund: 'order.refund',
-  paymentRead: 'payment.read',
-  /** 渠道配置写入。高危: 保存时必须带 reason 并写审计 */
-  paymentWrite: 'payment.write',
+  orderRead: "order.read",
+  orderMarkPaid: "order.mark_paid",
+  orderRefund: "order.refund",
+  paymentRead: "payment.read",
+  /** 渠道配置写入。高危: 保存时写审计，但不要求填写 reason */
+  paymentWrite: "payment.write",
   /** 查单/关单。只推进渠道已发生的事实, 不能凭空造钱, 故非高危 */
-  paymentOperate: 'payment.operate',
-  financeDashboard: 'finance.dashboard',
-  invoiceWrite: 'invoice.write',
+  paymentOperate: "payment.operate",
+  financeDashboard: "finance.dashboard",
+  invoiceWrite: "invoice.write",
   /** 渠道对账导入与差异处置。只给财务: 处置会让「账对不上」从看板上消失 */
-  financeReconcile: 'finance.reconcile',
+  financeReconcile: "finance.reconcile",
 
   // 积分
-  creditRead: 'credit.read',
-  creditAdjust: 'credit.adjust',
+  creditRead: "credit.read",
+  creditAdjust: "credit.adjust",
 
   // 合规与内容
-  complianceRead: 'compliance.read',
-  complianceGate: 'compliance.gate',
-  complianceTakedown: 'compliance.takedown',
-  contentRead: 'content.read',
+  complianceRead: "compliance.read",
+  complianceGate: "compliance.gate",
+  complianceTakedown: "compliance.takedown",
+  contentRead: "content.read",
 
   // 能力与通道
-  capabilityRead: 'capability.read',
-  capabilityWrite: 'capability.write',
-  /** 存储 / 通知的连通性探测：只探测，不写配置 */
-  channelTest: 'channel.test',
+  capabilityRead: "capability.read",
+  capabilityWrite: "capability.write",
+  /** 存储 / 通知 / 模型渠道的连通性探测：只探测，不写配置 */
+  channelTest: "channel.test",
 
   // 调用记录是只读排障数据, 运营与财务也需要。
   // 旧的 `model.config_read` / `model.config_write` 随 P6 删除 ——
   // 模型配置已由 `channel.*` / `logical_model.*` / `user_group.*` / `plugin.*` 接管。
-  modelCallRead: 'model.call_read',
+  modelCallRead: "model.call_read",
 
   // 渠道与模型（P1 起接管上面三个旧权限点的业务）
   // 凭证、价格档与连通性测试都随渠道模型 / 渠道记录的写权限一起授权：
   // 它们的入口就是同一条 `PATCH`，拆成独立权限点却不在任何路由上校验，
   // 只会让人以为「没授予 secret_write 就改不了凭证」——实际能改。
-  channelRead: 'channel.read',
+  channelRead: "channel.read",
   /** 写操作均审计；渠道删除保留业务确认但不要求原因 */
-  channelWrite: 'channel.write',
-  channelModelRead: 'channel.model_read',
-  channelModelWrite: 'channel.model_write',
-  logicalModelRead: 'logical_model.read',
-  logicalModelWrite: 'logical_model.write',
-  userGroupRead: 'user_group.read',
-  userGroupWrite: 'user_group.write',
-  pluginRead: 'plugin.read',
-  pluginWrite: 'plugin.write',
-  billingOrderRead: 'billing_order.read',
-  billingOrderResolve: 'billing_order.resolve',
-  modelAnalyticsRead: 'model.analytics_read',
+  channelWrite: "channel.write",
+  channelModelRead: "channel.model_read",
+  channelModelWrite: "channel.model_write",
+  logicalModelRead: "logical_model.read",
+  logicalModelWrite: "logical_model.write",
+  userGroupRead: "user_group.read",
+  userGroupWrite: "user_group.write",
+  pluginRead: "plugin.read",
+  pluginWrite: "plugin.write",
+  billingOrderRead: "billing_order.read",
+  billingOrderResolve: "billing_order.resolve",
+  modelAnalyticsRead: "model.analytics_read",
 
   // 增长
-  marketingWrite: 'marketing.write',
-  messageWrite: 'message.write',
-  ticketHandle: 'ticket.handle',
+  marketingWrite: "marketing.write",
+  messageWrite: "message.write",
+  ticketHandle: "ticket.handle",
 
   // 合规文本 (B4)。法务正文是用户要举证的文本, 改动必须与内容运营分开授权
-  legalRead: 'legal.read',
-  legalWrite: 'legal.write',
+  legalRead: "legal.read",
+  legalWrite: "legal.write",
 
   // 工单 (B7 预留; B4 先把权限点落定, 避免角色矩阵二次迁移)
-  ticketRead: 'ticket.read',
+  ticketRead: "ticket.read",
 
   // 系统
-  settingRead: 'setting.read',
-  settingWrite: 'setting.write',
-  roleWrite: 'role.write',
-  auditRead: 'audit.read',
+  settingRead: "setting.read",
+  settingWrite: "setting.write",
+  roleRead: "role.read",
+  roleWrite: "role.write",
+  auditRead: "audit.read",
 
   // 数据工具
-  dataExport: 'data.export',
-  dataImport: 'data.import',
-  dataBatch: 'data.batch',
-  dataSearch: 'data.search',
-  backupRead: 'backup.read',
-  backupRun: 'backup.run',
+  dataExport: "data.export",
+  dataSearch: "data.search",
+  backupRead: "backup.read",
+  backupRun: "backup.run",
 } as const;
 
 export type Permission = (typeof PERMISSIONS)[keyof typeof PERMISSIONS];
@@ -193,6 +193,7 @@ export const ROLE_PERMISSIONS: Record<AdminRoleCode, Permission[]> = {
     PERMISSIONS.legalRead,
     PERMISSIONS.auditRead,
     PERMISSIONS.settingRead,
+    PERMISSIONS.roleRead,
     PERMISSIONS.dataExport,
     PERMISSIONS.dataSearch,
   ],
@@ -224,6 +225,7 @@ export const ROLE_PERMISSIONS: Record<AdminRoleCode, Permission[]> = {
     PERMISSIONS.ticketHandle,
     PERMISSIONS.legalRead,
     PERMISSIONS.auditRead,
+    PERMISSIONS.roleRead,
     PERMISSIONS.dataExport,
     PERMISSIONS.dataSearch,
   ],
@@ -263,15 +265,15 @@ export function isHighRisk(permission: string): boolean {
 
 /** 角色中文名 */
 export const ROLE_LABELS: Record<string, string> = {
-  user: '用户',
-  admin: '管理员',
-  operator: '运营',
-  finance: '财务',
+  user: "用户",
+  admin: "管理员",
+  operator: "运营",
+  finance: "财务",
 };
 
 /** 账号状态中文名 */
 export const USER_STATUS_LABELS: Record<string, string> = {
-  active: '正常',
-  disabled: '已禁用',
-  deleted: '已注销',
+  active: "正常",
+  disabled: "已禁用",
+  deleted: "已注销",
 };

@@ -197,6 +197,7 @@ export function WatermarkRemovePage() {
         hint: '点击、拖拽或粘贴图片上传，最多 1 张',
         promptIcon: <Plus size={22} />,
       }}
+      requiredInputs={['mask']}
       replaceUpload
       onImagesChange={handleImagesChange}
       renderUploadPreview={(uploads, controls) => {

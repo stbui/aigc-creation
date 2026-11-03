@@ -196,7 +196,7 @@ interface PaymentAdapter {
 1. 校验 `enabled`、`closeAfterMinutes`（5–1440）、字段必填与格式（`validateConfig`）。
 2. 合并旧值：未提交的密钥字段沿用当前版本密文（参考页的「已配置，留空保持不变」）。
 3. 对整个 `values` JSON 加密（AES-256-GCM），落 `configCipher`；同时落 `configDigest`（sha256）用于判断是否重复保存。
-4. `version = max(version) + 1`；写审计 `payment.config_write`。
+4. `version = max(version) + 1`；写审计 `payment.provider_config_save`。
 5. 读取时解密，只回传非密钥字段；密钥字段回 `secretConfigured: true` 与掩码，**永不回传明文**。
 
 `SecretCipher` 从 `model/infra/` 抽到 `common/security/`，做成全局模块；`ModelModule` 继续 re-export，模型域调用点不改。`MODEL_SECRET_KEY` 语义不变：模型与支付凭证共用该密钥，轮换会使两者密文同时失效（写进 `.env.example` 与 NOTICE）。
@@ -500,16 +500,16 @@ model PaymentReconciliationItem {
 | GET | `/products` | `product.read` | 充值商品列表（含上架状态计算） |
 | POST | `/products` | `product.write` | 新建商品（内部走 `AdminCommerceService`） |
 | PUT | `/products/:id` | `product.write` | 修改商品（内部走 `AdminCommerceService`） |
-| GET | `/orders` | `order.read` | 支付订单分页：`status / keyword / providerId / timeField / from / to / page / pageSize` |
-| GET | `/orders/export.csv` | `data.export` | 同筛选导出，上限 10000 |
-| GET | `/orders/:id` | `order.read` | 支付订单详情 |
-| POST | `/orders/:id/query` | `payment.operate` | 向渠道查单并应用结果 |
-| POST | `/orders/:id/close` | `payment.operate` | 先查单，已支付则入账；否则关单 |
+| GET | `/orders` | `payment.read` | 支付订单分页：`status / keyword / providerId / timeField / from / to / page / pageSize` |
+| GET | `/orders/export.csv` | `payment.read + data.export` | 同筛选导出，上限 10000 |
+| GET | `/orders/:id` | `payment.read` | 支付订单详情 |
+| POST | `/orders/:id/query` | `payment.operate` | `{ reason }`；向渠道查单并应用结果，写审计 |
+| POST | `/orders/:id/close` | `payment.operate` | `{ reason }`；先查单，已支付则入账；否则关单，写审计 |
 | POST | `/reconciliations` | `finance.reconcile` | `{ providerId, billDate }`；唯一键冲突返回已有 run |
 | GET | `/reconciliations` | `payment.read` | 运行列表：`providerId / status / from / to / page / pageSize` |
 | GET | `/reconciliations/:id/items` | `payment.read` | 明细：`result / page / pageSize`；`result=abnormal` 表示所有非 matched/recovered |
-| GET | `/reconciliations/export.csv` | `data.export` | 汇总导出 |
-| GET | `/reconciliations/:id/items/export.csv` | `data.export` | 明细导出 |
+| GET | `/reconciliations/export.csv` | `payment.read + data.export` | 汇总导出 |
+| GET | `/reconciliations/:id/items/export.csv` | `payment.read + data.export` | 明细导出 |
 | POST | `/reconciliations/import` | `finance.reconcile` | CSV 兜底导入（复用旧解析规则） |
 
 新增权限点（`backend/src/admin/permissions.ts`）：
@@ -646,7 +646,7 @@ model PaymentReconciliationItem {
 - 搜索：名称、用户名（本仓库为 `User.name`）、邮箱、订单号、渠道交易号、完整用户 ID；回车查询。
 - 筛选：订单状态、支付渠道、时间口径（创建/支付/入账）、日期范围。
 - `查询` 按钮；筛选变更后显示「请先查询以应用筛选条件」。
-- `导出 CSV`（同筛选，最多 10000 行；需要 `data.export`）。
+- `导出 CSV`（同筛选，最多 10000 行；需要 `payment.read + data.export`）。
 
 表格列（与参考页一致）：
 
@@ -1078,11 +1078,11 @@ backend/src/
 
 | 文件 | 路由 | 权限 | 职责 |
 | --- | --- | --- | --- |
-| `payment-providers.controller.ts` | `GET /admin/payments/providers`、`PUT /admin/payments/providers/:id/config` | `payment.read` / `payment.write` | 渠道列表、动态字段、保存新版本；写审计 `payment.config_write` |
+| `payment-providers.controller.ts` | `GET /admin/payments/providers`、`PUT /admin/payments/providers/:id/config` | `payment.read` / `payment.write` | 渠道列表、动态字段、保存新版本；写审计 `payment.provider_config_save` |
 | `payment-settings.controller.ts` | `GET/PUT /admin/payments/settings` | `payment.read` / `payment.write` | 默认充值币种，写入现有 settings 服务 |
 | `payment-products.controller.ts` | `GET/POST /admin/payments/products`、`PUT /admin/payments/products/:id` | `product.read` / `product.write` | 复用 `AdminCommerceService`，增加支付商品字段与上架校验 |
-| `payment-orders.controller.ts` | `GET /admin/payments/orders`、`GET /admin/payments/orders/export.csv`、`GET /admin/payments/orders/:id`、`POST .../:id/query`、`POST .../:id/close` | `order.read` / `data.export` / `payment.operate` | 列表、详情、导出、查单、关单；导出审计 `data.export` |
-| `payment-reconciliation.controller.ts` | `POST/GET /admin/payments/reconciliations`、`GET .../:id/items`、两个 CSV、`POST .../import` | `finance.reconcile` / `payment.read` / `data.export` | 执行、列表、明细、导出、CSV 兜底导入 |
+| `payment-orders.controller.ts` | `GET /admin/payments/orders`、`GET /admin/payments/orders/export.csv`、`GET /admin/payments/orders/:id`、`POST .../:id/query`、`POST .../:id/close` | `payment.read` / `payment.read + data.export` / `payment.operate` | 列表、详情、导出、查单、关单；导出审计 `data.export` |
+| `payment-reconciliation.controller.ts` | `POST/GET /admin/payments/reconciliations`、`GET .../:id/items`、两个 CSV、`POST .../import` | `finance.reconcile` / `payment.read` / `payment.read + data.export` | 执行、列表、明细、导出、CSV 兜底导入 |
 
 ### 17.5 模块接线
 
@@ -2153,7 +2153,7 @@ interface AdminPaymentProviderView {
 
 #### `GET /admin/payments/orders`
 
-权限 `order.read`。查询参数：
+权限 `payment.read`。查询参数：
 
 | 参数 | 类型 | 口径 |
 | --- | --- | --- |
@@ -2206,7 +2206,7 @@ interface AdminPaymentProviderView {
 
 #### `GET /admin/payments/orders/:id`
 
-权限 `order.read`。返回 `{ order: AdminPaymentOrderRow & { items, payments, actions } }`：
+权限 `payment.read`。返回 `{ order: AdminPaymentOrderRow & { items, payments, actions } }`：
 
 ```ts
 interface PaymentOrderDetail extends AdminPaymentOrderRow {
@@ -2221,21 +2221,21 @@ interface PaymentOrderDetail extends AdminPaymentOrderRow {
 
 #### `POST /admin/payments/orders/:id/query`
 
-权限 `payment.operate`。调用 `PaymentOrderService.query({ actor: { kind:'admin', adminId } })`。返回：
+权限 `payment.operate`。请求 `{ reason }`，原因长度 2–200 字；调用 `PaymentOrderService.query({ actor: { kind:'admin', adminId } })`，审计动作 `payment.order_query`。返回：
 
 ```json
-{ "order": { "id": "ord_x", "status": "credited" }, "changed": true, "idempotentHit": false }
+{ "order": { "id": "ord_x", "status": "credited" }, "view": { "orderId": "ord_x", "displayStatus": "credited" } }
 ```
 
 渠道失败返回 `50302`，不返回 200 + 旧状态伪装成功。
 
 #### `POST /admin/payments/orders/:id/close`
 
-权限 `payment.operate`。请求 `{ reason }`。顺序与 C 端取消一致；已支付时先入账再返回 `40901`，由前端刷新列表。已关闭返回幂等 200。
+权限 `payment.operate`。请求 `{ reason }`，原因长度 2–200 字；审计动作 `payment.order_close`。顺序与 C 端取消一致；已支付时先入账再返回 `40901`，由前端刷新列表。已关闭返回幂等 200。
 
 #### `GET /admin/payments/orders/export.csv`
 
-权限 `data.export`。筛选参数与列表完全一致，忽略 `page/pageSize`，上限 10000 行。`Content-Disposition` 文件名：`支付订单-YYYYMMDD-HHmmss.csv`。导出动作写审计 `data.export`，参数里不得含密钥。
+权限 `payment.read + data.export`。筛选参数与列表完全一致，忽略 `page/pageSize`，上限 10000 行。`Content-Disposition` 文件名：`支付订单-YYYYMMDD-HHmmss.csv`。导出动作写审计 `data.export`，参数里不得含密钥。
 
 ### 20.5 后台对账
 
@@ -2275,8 +2275,8 @@ interface PaymentOrderDetail extends AdminPaymentOrderRow {
 
 | 路径 | 权限 | 内容 |
 | --- | --- | --- |
-| `GET /reconciliations/export.csv` | `data.export` | 运行汇总，筛选项同列表 |
-| `GET /reconciliations/:id/items/export.csv` | `data.export` | 单次运行明细，`result` 可选 |
+| `GET /reconciliations/export.csv` | `payment.read + data.export` | 运行汇总，筛选项同列表 |
+| `GET /reconciliations/:id/items/export.csv` | `payment.read + data.export` | 单次运行明细，`result` 可选 |
 
 明细导出只允许 `status='completed'` 的 run；执行中返回 `40901`。
 
@@ -2624,7 +2624,7 @@ URL 同步：
 - 搜索框 placeholder「搜索名称、用户名、邮箱、订单号」，`title` 说明「支持名称、用户名、邮箱、订单号、渠道交易号和完整用户 ID」，支持回车查询。
 - 状态、渠道、时间口径、开始日期、结束日期（原生 `input type=date`）。
 - 查询按钮、重置按钮（清空并立即查询）、导出 CSV。
-- 导出仅在已应用、非 loading、`total>0` 且 `can('data.export')` 时可用。
+- 导出仅在已应用、非 loading、`total>0` 且同时具备 `payment.read + data.export` 时可用。
 
 列：
 
@@ -2767,13 +2767,13 @@ export const adminPaymentOrdersApi = {
   list: (params: PaymentOrderListParams) =>
     request<PageResult<AdminPaymentOrderRow>>(`/admin/payments/orders${toQuery(params)}`),
   detail: (id: string) => request<{ order: AdminPaymentOrderDetail }>(`/admin/payments/orders/${id}`),
-  query: (id: string) =>
-    request<{ order: AdminPaymentOrderRow; changed: boolean; idempotentHit: boolean }>(
+  query: (id: string, reason: string) =>
+    request<{ order: AdminPaymentOrderRow; view: unknown }>(
       `/admin/payments/orders/${id}/query`,
-      { method: 'POST' },
+      { method: 'POST', body: { reason } },
     ),
   close: (id: string, reason: string) =>
-    request<{ order: AdminPaymentOrderRow; changed: boolean; idempotentHit: boolean }>(
+    request<{ order: AdminPaymentOrderRow; view: unknown }>(
       `/admin/payments/orders/${id}/close`,
       { method: 'POST', body: { reason } },
     ),
@@ -2882,7 +2882,7 @@ const AdminPaymentsPage = lazyAdminPage(
 | 查单/关单 | `payment.operate` | 行操作只留「详情」 |
 | 商品编辑 | `product.write` | 隐藏新增/编辑，保留只读列表 |
 | 执行对账/导入 | `finance.reconcile` | 执行区禁用并说明原因 |
-| 导出 | `data.export` | 隐藏导出按钮；后端仍校验 |
+| 导出 | `payment.read + data.export` | 隐藏导出按钮；后端仍校验 |
 
 每个列表统一处理五态：首屏 loading（`AdminListLoading`/Skeleton）、有数据、空态（说明原因）、失败（`AdminListError` + 重试，已有数据保留并显示 `AdminStaleError`）、无权限（403 文案，不显示「重置密码」等误导操作）。
 
@@ -3364,7 +3364,7 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 - 多取 1 行判断截断，响应头 `X-Export-Truncated: true`；前端可在 toast 提示「已导出前 10000 行」。不要往 CSV 里插说明行，否则列数会错。
 - `sendCsv` 内部已处理 UTF-8 BOM、公式注入与文件名；不要再手写 `Content-Disposition`。
 - 导出列按 §20.6；金额用 `effectiveAmountCents`，状态用展示状态文案，时间按 `Asia/Shanghai` 格式化。
-- 必须挂 `@RequirePermission('data.export')` 与 `@AuditAction('data.export')`；审计记录筛选条件摘要，不记录密钥、checkout URL、完整用户邮箱列表。
+- 必须同时挂 `@RequireAllPermissions('payment.read', 'data.export')` 与 `@AuditAction('data.export')`；审计记录筛选条件摘要，不记录密钥、checkout URL、完整用户邮箱列表。
 - 前端在「草稿与应用值不同」时禁用导出，后端仍以实际 query 为准，不能信任前端。
 
 ### 23.9 查询层测试清单

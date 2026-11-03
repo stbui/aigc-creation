@@ -1,26 +1,18 @@
-import { ConfirmAction, FormField, TextField } from './components';
+import { ConfirmAction } from './components';
 import { centsToYuan } from './utils';
 import type { AdminMembershipPlan } from '../../../types/api';
 
 interface PlanStatusConfirmProps {
   target: AdminMembershipPlan | null;
-  reason: string;
-  reasonError: boolean;
   saving: boolean;
-  onReasonChange: (value: string) => void;
   onCancel: () => void;
   onConfirm: () => void;
 }
 
-/**
- * 上下架确认：下架不影响存量会员，但改状态必须写原因。
- */
+/** 上下架确认：下架不影响存量会员。 */
 export function PlanStatusConfirm({
   target,
-  reason,
-  reasonError,
   saving,
-  onReasonChange,
   onCancel,
   onConfirm,
 }: PlanStatusConfirmProps) {
@@ -44,21 +36,6 @@ export function PlanStatusConfirm({
         `订阅价：¥ ${centsToYuan(target.priceCents)} / ${target.durationDays || '永久'} 天`,
         `当前存量会员：${target.memberCount} 人`,
       ]}
-      extra={
-        <FormField
-          label="变更原因（写入审计）"
-          htmlFor="adm-plan-status-reason"
-          required
-          error={reasonError ? '请填写变更原因。' : null}
-        >
-          <TextField
-            value={reason}
-            onChange={onReasonChange}
-            placeholder="如：活动结束，暂停售卖"
-            ariaLabel="变更原因"
-          />
-        </FormField>
-      }
       onCancel={onCancel}
       onConfirm={onConfirm}
     />

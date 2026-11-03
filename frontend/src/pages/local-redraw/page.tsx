@@ -68,9 +68,10 @@ export function LocalRedrawPage() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyReload, setHistoryReload] = useState(0);
+  /** 原图真实宽高比；画布按它展示，避免非方图出现额外留白。 */
+  const [sourceAspect, setSourceAspect] = useState(1);
   /** 桌面右栏折叠; 窄屏本来就不显示右栏, 改用浮动按钮打开抽屉 */
   const [historyCollapsed, setHistoryCollapsed] = useState(false);
-  const [sourceImage, setSourceImage] = useState<ToolAsset | null>(null);
   const painter = useRef<MaskPainterHandle | null>(null);
   /*
    * 提交后结果态会卸载标注画布，painter 也随之清空。「重新生成」必须复用
@@ -158,9 +159,9 @@ export function LocalRedrawPage() {
     (images: ToolAsset[]) => {
       const next = images[0] ?? null;
       const nextId = next?.id ?? null;
-      setSourceImage(next);
       if (lastSourceIdRef.current === nextId) return;
       lastSourceIdRef.current = nextId;
+      setSourceAspect(1);
       clearMaskSession();
       setPrompts(['', '', '']);
       setReferences([null, null, null]);
@@ -188,7 +189,6 @@ export function LocalRedrawPage() {
     clearMaskSession();
     setPrompts(['', '', '']);
     setReferences([null, null, null]);
-    setSourceImage(null);
     setHistoryOpen(false);
   };
 
@@ -261,6 +261,12 @@ export function LocalRedrawPage() {
     [],
   );
 
+  const handleNaturalSize = useCallback(({ width, height }: { width: number; height: number }) => {
+    if (width <= 0 || height <= 0) return;
+    const next = width / height;
+    setSourceAspect((current) => (Math.abs(current - next) < 0.0001 ? current : next));
+  }, []);
+
   const removeAnnotationAt = (index: number) => {
     if (uploadBusy) {
       message.warning('参考图上传中，请稍候再删除标注');
@@ -302,7 +308,6 @@ export function LocalRedrawPage() {
       message.warning('参考图上传中，请稍候再提交');
       return;
     }
-    setSourceImage(inputs[0] ?? null);
     const sourceId = inputs[0]?.id ?? null;
     if (maskSourceIdRef.current !== sourceId) {
       maskBlobRef.current = null;
@@ -360,8 +365,6 @@ export function LocalRedrawPage() {
     });
   };
 
-  const currentResult = Array.isArray(result) ? result[0] : result;
-  const resultUrl = currentResult?.status === 'succeeded' ? currentResult.url : undefined;
   /** 与参考站一致: 未标注时只给一条描述位; 标注后按区域数展开, 最多 3 条 */
   const visiblePromptCount = Math.max(1, Math.min(MAX_ANNOTATIONS, regionCount));
   const filledCount = prompts.slice(0, visiblePromptCount).filter((p) => p.trim()).length;
@@ -374,6 +377,7 @@ export function LocalRedrawPage() {
       title="局部重绘"
       desc="只想修改局部？圈出来写描述就行，适合去掉瑕疵、更换图案、修改画面中的元素"
       upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
+      requiredInputs={['mask']}
       replaceUpload
       onImagesChange={handleImagesChange}
       renderUploadPreview={(uploaded, controls) => {
@@ -421,8 +425,8 @@ export function LocalRedrawPage() {
        */
       submitting={submitting}
       result={result}
-      resultTag={painted ? '已标注区域' : undefined}
-      resultCompare={resultUrl && sourceImage ? { beforeUrl: sourceImage.url, beforeLabel: '原图', afterLabel: '重绘后' } : undefined}
+      resultView="canvas"
+      generatingAspect={sourceAspect}
       onHistoryReuse={handleHistoryReuse}
       onSubmit={(inputs, settings) => submit(inputs, settings)}
       resultActions={
@@ -509,7 +513,10 @@ export function LocalRedrawPage() {
               </div>
             </div>
             <div className="redraw-stage-main">
-              <div className="redraw-canvas-wrap">
+              <div
+                className="redraw-canvas-wrap"
+                style={{ '--redraw-image-aspect': sourceAspect } as React.CSSProperties}
+              >
                 <MaskPainter
                   url={image.url}
                   tool={tool}
@@ -520,6 +527,7 @@ export function LocalRedrawPage() {
                   onPanChange={setPan}
                   onRegionLimit={() => message.warning(`最多支持 ${MAX_ANNOTATIONS} 个标注区域，请先撤回或删除一个`) }
                   onChange={handlePaintState}
+                  onNaturalSize={handleNaturalSize}
                   handleRef={painter}
                 />
               </div>

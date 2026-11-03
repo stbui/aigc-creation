@@ -13,6 +13,7 @@ import type {
   CreateAdminMembershipPlanPayload,
 } from '../../../types/api';
 import type { PlanDraft } from './constants';
+import { auditReason } from '../../../admin-ui/lib/auditReason';
 
 /** 分 → 元 */
 export function centsToYuan(cents: number): string {
@@ -43,7 +44,6 @@ export function toDraft(plan: AdminMembershipPlan): PlanDraft {
     maxConcurrent: String(plan.perks.maxConcurrent),
     discountPercent: bpsToPercent(plan.perks.addonDiscountBps),
     sortOrder: String(plan.sortOrder),
-    reason: '',
   };
 }
 
@@ -93,10 +93,7 @@ export function buildPlanPayload(
   if (!Number.isInteger(discountPercent) || discountPercent < 1 || discountPercent > 100) {
     return { ok: false, error: '折扣必须是 1~100 的整数（100 表示无折扣）' };
   }
-  const reason = draft.reason.trim();
-  if (!reason) {
-    return { ok: false, error: '请填写变更原因，审计记录需要能回答「谁为什么改」' };
-  }
+  const reason = auditReason(opts.creating ? '新建会员套餐' : '编辑会员套餐');
 
   const perks = {
     fastChannel: draft.fastChannel,

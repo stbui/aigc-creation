@@ -11,7 +11,7 @@ import { HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
  * 断言用几何量测而非截图比对 —— 截图会被无关的样式改动弄红,
  * 而"内容区宽度 =视口 -侧栏" 与 "行高 ≤ 46" 是硬约束, 不会因视觉微调而失效。
  *
- * 2026-10-30 外壳换成单栏结构：没有顶部 header，侧栏自带品牌头，
+ * 外壳采用经典「上左右」：顶部 56px 承担品牌与账号，侧栏只放导航，
  * 导航区独立滚动。选择器统一走 `data-testid="admin-*"`。
  */
 
@@ -67,33 +67,64 @@ test.describe('后台布局', () => {
     });
   }
 
-  test('侧栏占满视口高度且导航区独立滚动', async ({ page }) => {
+  test('顶栏固定、侧栏占满剩余高度且导航区独立滚动', async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto(`${UI}/admin/roles`); // 权限页最长, 最能暴露滚动问题
+    await page.waitForSelector('[data-testid="admin-header"]', { timeout: 15000 });
     await page.waitForSelector('[data-testid="admin-nav-scroll"]', { timeout: 15000 });
 
     const m = await page.evaluate(() => {
+      const header = document.querySelector('[data-testid="admin-header"]') as HTMLElement;
       const sider = document.querySelector('[data-testid="admin-sider"]') as HTMLElement;
       const navScroll = document.querySelector('[data-testid="admin-nav-scroll"]') as HTMLElement;
-      const head = document.querySelector('[data-testid="admin-sider-head"]') as HTMLElement;
+      const headerRect = header.getBoundingClientRect();
       const r = sider.getBoundingClientRect();
       return {
+        headerHeight: Math.round(headerRect.height),
+        headerBottom: Math.round(headerRect.bottom),
+        siderTop: Math.round(r.top),
         height: Math.round(r.height),
         viewport: window.innerHeight,
-        headH: Math.round(head.getBoundingClientRect().height),
         navOverflowY: getComputedStyle(navScroll).overflowY,
         docScrollH: document.documentElement.scrollHeight,
       };
     });
 
-    // 侧栏高度 = 视口高度（单栏结构，没有顶部 header 要扣）
-    expect(m.height).toBeLessThanOrEqual(m.viewport + 2);
+    // 顶栏固定 56px，侧栏从顶栏底部开始并占满剩余视口
+    expect(m.headerHeight).toBe(56);
+    expect(m.siderTop).toBe(m.headerBottom);
+    expect(m.height).toBeLessThanOrEqual(m.viewport - m.headerHeight + 2);
     expect(m.height).toBeGreaterThan(400);
-    // 品牌头固定 56px 不参与滚动
-    expect(m.headH).toBeGreaterThan(40);
-    expect(m.headH).toBeLessThanOrEqual(64);
     // 长内容时导航区自身滚动
     expect(['auto', 'scroll']).toContain(m.navOverflowY);
+  });
+
+  test('品牌在顶栏左侧，账号在顶栏右侧', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`${UI}/admin`);
+    await page.waitForSelector('[data-testid="admin-header"]', { timeout: 15000 });
+    await page.waitForSelector('[data-testid="admin-account-trigger"]', { timeout: 15000 });
+
+    const m = await page.evaluate(() => {
+      const rect = (selector: string) => {
+        const el = document.querySelector(selector) as HTMLElement;
+        const r = el.getBoundingClientRect();
+        return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+      };
+      return {
+        header: rect('[data-testid="admin-header"]'),
+        brand: rect('[data-testid="admin-brand"]'),
+        account: rect('[data-testid="admin-account-trigger"]'),
+      };
+    });
+
+    expect(m.brand.left - m.header.left).toBeLessThan(32);
+    expect(m.header.right - m.account.right).toBeLessThan(32);
+    expect(m.account.left).toBeGreaterThan(m.brand.right);
+    expect(m.brand.top).toBeGreaterThanOrEqual(m.header.top);
+    expect(m.brand.bottom).toBeLessThanOrEqual(m.header.bottom);
+    expect(m.account.top).toBeGreaterThanOrEqual(m.header.top);
+    expect(m.account.bottom).toBeLessThanOrEqual(m.header.bottom);
   });
 
   test('用户表格行高一致、操作列不换行', async ({ page }) => {

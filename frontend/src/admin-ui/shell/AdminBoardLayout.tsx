@@ -4,8 +4,6 @@ import {
   ArrowUpRight,
   ChevronDown,
   LogOut,
-  PanelLeftClose,
-  PanelLeftOpen,
 } from 'lucide-react';
 
 import { cn } from '../lib/cn';
@@ -34,8 +32,8 @@ const SIDEBAR_GROUPS_KEY = 'huojue.admin.sidebar-groups';
  *
  * ## 结构
  *
- * 单栏：品牌头 + 分组导航 + 环境标识 + 账号。侧栏 232 / 折叠 60，
- * ≤1280 自动折叠；展开态分组可折叠，默认只展开当前位置所在分组。
+ * 经典「上左右」：顶栏 56px（品牌 + 环境标识 + 账号）+ 侧栏 232 / 折叠 60 +
+ * 内容区。≤1280 侧栏自动折叠；展开态分组可折叠，默认只展开当前位置所在分组。
  *
  * ## 不能因为换壳丢掉的行为
  *
@@ -218,7 +216,7 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
 
   return (
     <div
-      className="admin-root adm-layout flex h-screen overflow-hidden bg-page"
+      className="admin-root adm-layout flex h-screen flex-col overflow-hidden bg-page"
       onClickCapture={onClickCapture}
     >
       <a
@@ -227,6 +225,81 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
       >
         跳到主要内容
       </a>
+
+      <header
+        data-testid="admin-header"
+        className="flex h-14 shrink-0 items-center border-b border-border bg-card px-4"
+      >
+        <button
+          type="button"
+          data-testid="admin-brand"
+          className="flex min-w-0 items-center gap-2 rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
+          onClick={() => void leave('/admin')}
+          aria-label="货觉 AI 运营后台首页"
+        >
+          <img className="size-6 shrink-0" src="/brand/huojue-mark.svg" alt="" />
+          <span className="truncate text-sm font-semibold text-foreground">
+            货觉<span className="text-muted-foreground"> 运营后台</span>
+          </span>
+        </button>
+
+        <div className="ml-auto flex items-center gap-3">
+          <EnvironmentTag />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                data-testid="admin-account-trigger"
+                title={me?.email}
+                aria-label="打开用户菜单"
+                className="flex h-9 max-w-[260px] items-center gap-2 rounded-md px-2 text-left outline-none transition-colors hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50"
+              >
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
+                  {(me?.email ?? 'A').charAt(0).toUpperCase()}
+                </span>
+                <span className="flex min-w-0 flex-1 flex-col leading-tight">
+                  <span className="truncate text-xs font-medium text-foreground">
+                    {me?.email ?? '加载中…'}
+                  </span>
+                  <span className="mt-0.5 truncate text-[12px] text-muted-foreground">
+                    {me?.roleLabel}
+                  </span>
+                </span>
+                <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent side="bottom" align="end" sideOffset={8} className="w-60">
+              <div className="flex items-center gap-2.5 px-2 py-2">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+                  {(me?.email ?? 'A').charAt(0).toUpperCase()}
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-foreground">
+                    {me?.email ?? '加载中…'}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">{me?.roleLabel}</p>
+                </div>
+              </div>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => navigate('/workbench')}>
+                <ArrowUpRight className="size-3.5" aria-hidden />
+                返回前台
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                onSelect={() => {
+                  logout();
+                  navigate('/login');
+                }}
+              >
+                <LogOut className="size-3.5" aria-hidden />
+                退出登录
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </header>
 
       <div className="flex min-h-0 flex-1">
         <aside
@@ -237,28 +310,6 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
           )}
           aria-label="后台导航栏"
         >
-          <div
-            data-testid="admin-sider-head"
-            className={cn(
-              'flex h-14 shrink-0 items-center border-b border-border',
-              collapsed ? 'justify-center px-2' : 'gap-2 px-3',
-            )}
-          >
-            <button
-              type="button"
-              className="flex min-w-0 flex-1 items-center gap-2 rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              onClick={() => void leave('/admin')}
-              aria-label="货觉 AI 运营后台首页"
-            >
-              <img className="size-6 shrink-0" src="/brand/huojue-mark.svg" alt="" />
-              {!collapsed && (
-                <span className="truncate text-sm font-semibold text-foreground">
-                  货觉<span className="text-muted-foreground"> 运营后台</span>
-                </span>
-              )}
-            </button>
-          </div>
-
           <div
             data-testid="admin-nav-scroll"
             className="adm-nav-scroll min-h-0 flex-1 overflow-y-auto py-2.5"
@@ -313,82 +364,6 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
             </nav>
           </div>
 
-          <div className="border-t border-border p-2">
-            <div className="mb-1.5 flex items-center justify-between px-1">
-              {!collapsed && <EnvironmentTag />}
-              <button
-                type="button"
-                onClick={() => setCollapsed((value) => !value)}
-                aria-label={collapsed ? '展开侧栏' : '收起侧栏'}
-                title={collapsed ? '展开侧栏' : '收起侧栏'}
-                className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50"
-              >
-                {collapsed ? (
-                  <PanelLeftOpen className="size-4" aria-hidden />
-                ) : (
-                  <PanelLeftClose className="size-4" aria-hidden />
-                )}
-              </button>
-            </div>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  title={me?.email}
-                  aria-label="打开用户菜单"
-                  className={cn(
-                    'flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left outline-none transition-colors hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50',
-                    collapsed && 'justify-center px-0',
-                  )}
-                >
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-semibold text-primary-foreground">
-                    {(me?.email ?? 'A').charAt(0).toUpperCase()}
-                  </span>
-                  {!collapsed && (
-                    <span className="flex min-w-0 flex-1 flex-col leading-tight">
-                      <span className="truncate text-xs font-medium text-foreground">
-                        {me?.email ?? '加载中…'}
-                      </span>
-                      <span className="mt-0.5 truncate text-[12px] text-muted-foreground">
-                        {me?.roleLabel}
-                      </span>
-                    </span>
-                  )}
-                  {!collapsed && <ChevronDown className="size-3.5 shrink-0" aria-hidden />}
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent side="top" align="start" sideOffset={8} className="w-60">
-                <div className="flex items-center gap-2.5 px-2 py-2">
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-                    {(me?.email ?? 'A').charAt(0).toUpperCase()}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-foreground">
-                      {me?.email ?? '加载中…'}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">{me?.roleLabel}</p>
-                  </div>
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onSelect={() => navigate('/workbench')}>
-                  <ArrowUpRight className="size-3.5" aria-hidden />
-                  返回前台
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  variant="destructive"
-                  onSelect={() => {
-                    logout();
-                    navigate('/login');
-                  }}
-                >
-                  <LogOut className="size-3.5" aria-hidden />
-                  退出登录
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
         </aside>
 
         {/*

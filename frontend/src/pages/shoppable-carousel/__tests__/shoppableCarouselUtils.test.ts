@@ -15,6 +15,9 @@ import {
 import type { GalleryItem } from '../hooks';
 import {
   DEFAULT_COUNT,
+  DEFAULT_LANGUAGE,
+  DEFAULT_MARKET,
+  DEFAULT_PLATFORM,
   LANGUAGE_OPTIONS,
   MARKET_OPTIONS,
   MAX_COUNT,
@@ -160,16 +163,19 @@ describe('格子展示口径', () => {
 });
 
 describe('枚举选项与参考站实拍一致', () => {
-  it('平台 4 项，默认 TikTok', () => {
+  it('平台 4 项，默认抖音（本站主动偏离参考站的 TikTok）', () => {
     expect(PLATFORM_OPTIONS.map((o) => o.label)).toEqual(['TikTok', '抖音', '小红书', 'Instagram']);
+    expect(DEFAULT_PLATFORM).toBe('douyin');
   });
 
-  it('目标市场 8 项', () => {
+  it('目标市场 8 项，默认中国（本站主动偏离参考站的美国）', () => {
     expect(MARKET_OPTIONS).toHaveLength(8);
+    expect(DEFAULT_MARKET).toBe('cn');
   });
 
-  it('输出语言 8 项', () => {
+  it('输出语言 8 项，默认中文（本站主动偏离参考站的英文）', () => {
     expect(LANGUAGE_OPTIONS).toHaveLength(8);
+    expect(DEFAULT_LANGUAGE).toBe('zh');
   });
 
   it('画面比例 4 项', () => {

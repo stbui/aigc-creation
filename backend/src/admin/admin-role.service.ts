@@ -8,6 +8,19 @@ import {
   type AdminRoleCode,
 } from './permissions';
 
+export interface RolePermissionUpdate {
+  code: AdminRoleCode;
+  permissions: string[];
+}
+
+export interface RolePermissionChange {
+  code: AdminRoleCode;
+  before: string[];
+  after: string[];
+  added: string[];
+  removed: string[];
+}
+
 /**
  * 后台角色的读取与判定。
  *
@@ -47,15 +60,7 @@ export class AdminRoleService {
   async getPermissions(role: string): Promise<string[]> {
     const record = await this.prisma.adminRole.findUnique({ where: { code: role } });
     if (!record) return [];
-    let list: unknown;
-    try {
-      list = JSON.parse(record.permissions);
-    } catch {
-      // 库里的permissions 不是合法 JSON: 视为无权限 (兜底默认拒), 不抛错阻断请求
-      return [];
-    }
-    if (!Array.isArray(list)) return [];
-    return list.filter((p): p is string => typeof p === 'string' && isKnownPermission(p));
+    return this.parsePermissions(record.permissions);
   }
 
   /** 后台身份校验: 无后台角色或账号非 active 时抛错 */
@@ -78,18 +83,76 @@ export class AdminRoleService {
    * 内置角色可改权限但不可删除/改名; 未知权限点直接拒绝, 不静默丢弃,
    * 否则调用方会以为设置成功而实际未生效。
    */
-  async updatePermissions(role: AdminRoleCode, permissions: string[]) {
-    const unknown = permissions.filter((p) => !isKnownPermission(p));
-    if (unknown.length > 0) {
-      throw new AppError(40001, `未知权限点: ${unknown.join(', ')}`, 400);
-    }
-    const record = await this.prisma.adminRole.findUnique({ where: { code: role } });
-    if (!record) throw new AppError(40400, '角色不存在', 404);
+  async updatePermissions(updates: RolePermissionUpdate[]): Promise<RolePermissionChange[]> {
+    const seenRoles = new Set<string>();
+    for (const update of updates) {
+      if (seenRoles.has(update.code)) {
+        throw new AppError(40001, `角色重复: ${update.code}`, 400);
+      }
+      seenRoles.add(update.code);
 
-    return this.prisma.adminRole.update({
-      where: { code: role },
-      data: { permissions: JSON.stringify(permissions) },
+      if (new Set(update.permissions).size !== update.permissions.length) {
+        throw new AppError(40001, `权限点重复: ${update.code}`, 400);
+      }
+
+      const unknown = update.permissions.filter((p) => !isKnownPermission(p));
+      if (unknown.length > 0) {
+        throw new AppError(40001, `未知权限点: ${unknown.join(', ')}`, 400);
+      }
+    }
+
+    /*
+     * 多角色保存必须原子提交。前端一次点击可能同时改动 admin / operator，
+     * 若逐条 update，第二条失败会留下「页面显示保存失败，但部分权限已收紧」。
+     * 读取也放进事务，确保审计里的 before/after 对应同一次写入。
+     */
+    return this.prisma.$transaction(async (tx) => {
+      const records = await tx.adminRole.findMany({
+        where: { code: { in: updates.map((update) => update.code) } },
+      });
+      const byCode = new Map(records.map((record) => [record.code, record]));
+      const missing = updates
+        .map((update) => update.code)
+        .filter((code) => !byCode.has(code));
+      if (missing.length > 0) {
+        throw new AppError(40400, `角色不存在: ${missing.join(', ')}`, 404);
+      }
+
+      const changes: RolePermissionChange[] = [];
+      for (const update of updates) {
+        const record = byCode.get(update.code)!;
+        const before = this.parsePermissions(record.permissions);
+        const after = [...update.permissions];
+        const beforeSet = new Set(before);
+        const afterSet = new Set(after);
+        const change: RolePermissionChange = {
+          code: update.code,
+          before,
+          after,
+          added: after.filter((permission) => !beforeSet.has(permission)),
+          removed: before.filter((permission) => !afterSet.has(permission)),
+        };
+
+        await tx.adminRole.update({
+          where: { code: update.code },
+          data: { permissions: JSON.stringify(after) },
+        });
+        changes.push(change);
+      }
+      return changes;
     });
+  }
+
+  /** 库里是 JSON 字符串；损坏或旧权限点一律按无权处理。 */
+  private parsePermissions(raw: string): string[] {
+    let list: unknown;
+    try {
+      list = JSON.parse(raw);
+    } catch {
+      return [];
+    }
+    if (!Array.isArray(list)) return [];
+    return list.filter((p): p is string => typeof p === 'string' && isKnownPermission(p));
   }
 
   /** 内置角色的默认权限 (供 seed 使用) */

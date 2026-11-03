@@ -33,6 +33,7 @@ import {
 } from './constants';
 import { normalizeChannelHeaders, toChannelDraft, validateChannelHeaders } from './utils';
 import type { AdminChannelView, SystemChannelExportView } from '../../../types/model';
+import { auditReason } from '../../../admin-ui/lib/auditReason';
 
 /**
  * 渠道工作台（`/admin/channels`）。
@@ -215,7 +216,7 @@ export function AdminChannelsPage() {
         : { concurrencyLimit: Number(draft.concurrencyLimit) || 1 }),
       // 空数组 = 显式清空，`undefined` 才是「不修改」
       headers: normalizeChannelHeaders(draft.headers),
-      ...(draft.reason.trim() ? { reason: draft.reason.trim() } : {}),
+      reason: auditReason(editing ? '编辑渠道' : '新建渠道'),
     };
     // 空串 = 不修改已有凭证；新建时必填
     if (draft.apiKey.trim()) body.apiKey = draft.apiKey.trim();
@@ -305,7 +306,7 @@ export function AdminChannelsPage() {
     try {
       await adminChannelsApi.update(toggleTarget.id, {
         enabled: next,
-        reason: next ? '后台启用渠道' : '后台停用渠道',
+        reason: auditReason(next ? '启用渠道' : '停用渠道'),
       });
       toast.success(
         next ? `已启用渠道「${toggleTarget.name}」` : `已停用渠道「${toggleTarget.name}」`,

@@ -2,7 +2,6 @@ import type { RefObject } from 'react';
 
 import {
   MAX_IMAGE_MB,
-  MAX_IMAGES,
   MAX_NAME_LEN,
   type PkAsset,
 } from './constants';
@@ -24,6 +23,9 @@ import { languageOptions, platformOptions } from './utils';
  */
 export function ViralCloneConfig({
   images,
+  maxImages,
+  totalImageMax,
+  imageLimitError,
   reference,
   uploading,
   fileInputRef,
@@ -44,6 +46,12 @@ export function ViralCloneConfig({
   onLanguageChange,
 }: {
   images: PkAsset[];
+  /** 商品图位上限，已为参考图预留 1 个模型输入位 */
+  maxImages: number;
+  /** 模型合同允许的商品图 + 参考图总数 */
+  totalImageMax: number | null;
+  /** 当前图片总数超过模型上限时的可读原因 */
+  imageLimitError: string | null;
   reference: PkAsset | null;
   uploading: boolean;
   fileInputRef: RefObject<HTMLInputElement | null>;
@@ -68,7 +76,7 @@ export function ViralCloneConfig({
       <ToolImageDropzone
         title="上传商品图"
         images={images}
-        max={MAX_IMAGES}
+        max={maxImages}
         maxMb={MAX_IMAGE_MB}
         uploading={uploading}
         fileInputRef={fileInputRef}
@@ -78,6 +86,16 @@ export function ViralCloneConfig({
         onOpenMobile={() => onOpenMobile('product')}
         noun="商品图片"
       />
+      {totalImageMax !== null && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          当前模型最多接收 {totalImageMax} 张图片（含 1 张参考图），商品图可上传 {maxImages} 张。
+        </p>
+      )}
+      {imageLimitError && (
+        <p className="mt-2 text-xs text-destructive" role="alert">
+          {imageLimitError}
+        </p>
+      )}
 
       {/* 参考图: 独立 section, 单张上传, 标题行无计数器 */}
       <ToolImageDropzone

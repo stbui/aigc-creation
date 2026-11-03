@@ -53,7 +53,7 @@ export function BackupRunConfirm({
           required
           error={
             reasonError
-              ? '请先填写原因，否则审计里无法回答「这次备份是谁为什么做的」。'
+              ? '请至少填写 2 个字符，否则审计里无法回答「这次备份是谁为什么做的」。'
               : null
           }
         >

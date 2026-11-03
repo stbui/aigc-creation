@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { DatabaseBackup, Trash2 } from 'lucide-react';
-import { adminBackupsApi } from './api';
+import { adminBackupsApi, adminRetentionApi } from './api';
 import {
   ActionButton,
   EmptyState,
@@ -44,6 +44,8 @@ export function AdminBackupPage() {
 
   const [pruneOpen, setPruneOpen] = useState(false);
   const [keepCount, setKeepCount] = useState(DEFAULT_KEEP_COUNT);
+  const [pruneReason, setPruneReason] = useState('');
+  const [pruneReasonError, setPruneReasonError] = useState(false);
   const [runOpen, setRunOpen] = useState(false);
   const [runReason, setRunReason] = useState('');
   const [runReasonError, setRunReasonError] = useState(false);
@@ -57,7 +59,7 @@ export function AdminBackupPage() {
     const [rows, stats, logs] = await Promise.all([
       adminBackupsApi.list(),
       adminBackupsApi.stats(),
-      adminBackupsApi.cleanupLogs(10),
+      adminRetentionApi.logs(10),
     ]);
     return { rows, stats, logs };
   });
@@ -71,13 +73,13 @@ export function AdminBackupPage() {
    */
   const runBackup = async () => {
     const trimmed = runReason.trim();
-    if (!trimmed) {
+    if (trimmed.length < 2) {
       setRunReasonError(true);
       return;
     }
     setBusy(true);
     try {
-      const rec = await adminBackupsApi.run(`manual-${Date.now()}`, trimmed);
+      const rec = await adminBackupsApi.run(trimmed);
       toast.success(`备份完成: ${rec.filename}`);
       setRunOpen(false);
       setRunReason('');
@@ -131,10 +133,17 @@ export function AdminBackupPage() {
   };
 
   const doPrune = async () => {
+    const trimmed = pruneReason.trim();
+    if (trimmed.length < 2) {
+      setPruneReasonError(true);
+      return;
+    }
     setBusy(true);
     try {
-      const res = await adminBackupsApi.prune(keepCount);
+      const res = await adminBackupsApi.prune(keepCount, trimmed);
       setPruneOpen(false);
+      setPruneReason('');
+      setPruneReasonError(false);
       toast.success(`已清理 ${res.removed} 份, 释放 ${formatBytes(res.freedBytes)}`);
       await reload();
     } catch (e) {
@@ -173,7 +182,11 @@ export function AdminBackupPage() {
                 variant="secondary"
                 size="sm"
                 icon={Trash2}
-                onClick={() => setPruneOpen(true)}
+                onClick={() => {
+                  setPruneReason('');
+                  setPruneReasonError(false);
+                  setPruneOpen(true);
+                }}
                 disabled={busy || rows.length === 0}
               >
                 保留份数清理
@@ -263,10 +276,20 @@ export function AdminBackupPage() {
       <BackupPruneConfirm
         open={pruneOpen}
         keepCount={keepCount}
+        reason={pruneReason}
+        reasonError={pruneReasonError}
         rowCount={rows.length}
         busy={busy}
         onKeepCountChange={setKeepCount}
-        onCancel={() => setPruneOpen(false)}
+        onReasonChange={(next) => {
+          setPruneReason(next);
+          if (next.trim().length >= 2) setPruneReasonError(false);
+        }}
+        onCancel={() => {
+          setPruneOpen(false);
+          setPruneReason('');
+          setPruneReasonError(false);
+        }}
         onConfirm={() => void doPrune()}
       />
     </>

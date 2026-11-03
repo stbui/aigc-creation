@@ -143,9 +143,9 @@ export const ShoppableCarousel: CapabilityPlugin = {
      */
     { key: 'templateId', label: '模板', type: 'text', hidden: true, maxLength: 64 },
     { key: 'sellingPoints', label: '商品卖点与生成要求', type: 'text', maxLength: 2000 },
-    { key: 'platform', label: '投放平台', type: 'enum', default: 'tiktok', options: SOCIAL_PLATFORMS },
-    { key: 'market', label: '目标市场', type: 'enum', default: 'us', options: TARGET_MARKETS },
-    { key: 'language', label: '输出语言', type: 'enum', default: 'en', options: OUTPUT_LANGUAGES },
+    { key: 'platform', label: '投放平台', type: 'enum', default: 'douyin', options: SOCIAL_PLATFORMS },
+    { key: 'market', label: '目标市场', type: 'enum', default: 'cn', options: TARGET_MARKETS },
+    { key: 'language', label: '输出语言', type: 'enum', default: 'zh', options: OUTPUT_LANGUAGES },
     { key: 'ratio', label: '画面比例', type: 'enum', default: '3:4', options: CAROUSEL_RATIOS },
     { key: 'size', label: '画质（输出边长）', type: 'enum', default: '1k', options: QUALITY_OPTIONS },
     { key: 'count', label: '生成张数', type: 'number', default: SHOPPABLE_CAROUSEL_MIN_COUNT, min: SHOPPABLE_CAROUSEL_MIN_COUNT, max: SHOPPABLE_CAROUSEL_MAX_COUNT, step: 1 },

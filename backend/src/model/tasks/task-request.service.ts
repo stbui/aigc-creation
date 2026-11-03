@@ -69,15 +69,17 @@ export class TaskRequestService {
     const route = await this.catalog.findRoute(context.routeId);
     if (!route) throw new Error('任务选中的线路已不存在');
 
+    const spec = route.channelModel.capabilitySpec;
+    // 执行请求必须按**已选线路**的能力合同投影。产品合同只描述前台承诺的可选
+    // 范围，可能不重复声明线路参数（如多图融合的 count）；拿它裁剪会让线路
+    // 明明支持 4 张，实际请求却退回上游默认 1 张。
     const intent = restrictIntentToSpec(
-      model.productSpec,
+      spec,
       def.model.intent(context.params, {
         image: context.inputAssetIds.length,
         video: 0,
       }),
     );
-
-    const spec = route.channelModel.capabilitySpec;
     if (spec.inputs?.mask === undefined && this.maskAssetId(context.params) !== '') {
       throw new Error('当前线路不支持遮罩重绘');
     }

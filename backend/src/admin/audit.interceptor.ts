@@ -8,7 +8,11 @@ import {
 import { Reflector } from '@nestjs/core';
 import { Observable, tap } from 'rxjs';
 import { PrismaService } from '../prisma/prisma.service';
-import { AUDIT_ACTION_KEY } from './admin.decorator';
+import {
+  AUDIT_ACTION_KEY,
+  AUDIT_TARGET_KEY,
+  type AuditTargetMetadata,
+} from './admin.decorator';
 
 /** 写操作方法 —— 只有这些方法会被审计 */
 const AUDITED_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE']);
@@ -30,7 +34,9 @@ const DETAIL_FIELDS = [
   'modality',
   'protocol',
   'model',
+  'modelId',
   'priority',
+  'sortOrder',
   'dir',
   'amount',
   'reason',
@@ -73,6 +79,10 @@ export class AuditInterceptor implements NestInterceptor {
       AUDIT_ACTION_KEY,
       context.getHandler(),
     );
+    const declaredTarget = this.reflector.get<AuditTargetMetadata | undefined>(
+      AUDIT_TARGET_KEY,
+      context.getHandler(),
+    );
 
     /*
      * 写操作一律审计; **导出 / 下载这类 GET 只要显式声明了动作也要审计**。
@@ -87,10 +97,26 @@ export class AuditInterceptor implements NestInterceptor {
     return next.handle().pipe(
       tap({
         next: () => {
-          void this.write(request, method, adminUser, declaredAction, true, null);
+          void this.write(
+            request,
+            method,
+            adminUser,
+            declaredAction,
+            declaredTarget,
+            true,
+            null,
+          );
         },
         error: (err: unknown) => {
-          void this.write(request, method, adminUser, declaredAction, false, err);
+          void this.write(
+            request,
+            method,
+            adminUser,
+            declaredAction,
+            declaredTarget,
+            false,
+            err,
+          );
         },
       }),
     );
@@ -101,6 +127,7 @@ export class AuditInterceptor implements NestInterceptor {
       url: string;
       ip?: string;
       body?: Record<string, unknown>;
+      params?: Record<string, string | undefined>;
       /** 路由层生成的审计原因，优先于请求体里的用户输入 */
       auditReason?: string;
       /** 路由/服务层组装的审计摘要（如设置项前后值），优先于请求体白名单 */
@@ -109,11 +136,17 @@ export class AuditInterceptor implements NestInterceptor {
     method: string,
     adminUser: { id: string; email: string; role: string } | undefined,
     declaredAction: string | undefined,
+    declaredTarget: AuditTargetMetadata | undefined,
     success: boolean,
     err: unknown,
   ): Promise<void> {
     try {
-      const { action, targetType, targetId } = this.resolveTarget(request.url, declaredAction);
+      const { action, targetType, targetId } = this.resolveTarget(
+        request.url,
+        declaredAction,
+        declaredTarget,
+        request.params,
+      );
 
       await this.prisma.adminAuditLog.create({
         data: {
@@ -139,6 +172,7 @@ export class AuditInterceptor implements NestInterceptor {
    * 解析 action / targetType / targetId。
    *
    * action: 优先用 @AuditAction 声明值; 未声明时从 URL 推断。
+   * target: 优先用 @AuditTarget 声明的对象类型与路由参数; 未声明时从 URL 推断。
    * 其余字段: 格式 /admin/<resource>/<id?>[/<sub?>]
    *   例: /admin/users/u_123/disable → resource='users', targetId='u_123'
    * 解析失败时回退为原始路径, 审计条目不会因解析失败而丢失。
@@ -146,6 +180,8 @@ export class AuditInterceptor implements NestInterceptor {
   private resolveTarget(
     url: string,
     declaredAction?: string,
+    declaredTarget?: AuditTargetMetadata,
+    params?: Record<string, string | undefined>,
   ): { action: string; targetType: string; targetId: string } {
     const path = url.split('?')[0].replace(/\/+$/, '');
     const parts = path.split('/').filter(Boolean); // ['api','v1','admin', ...]
@@ -153,10 +189,18 @@ export class AuditInterceptor implements NestInterceptor {
     const rest = idx >= 0 ? parts.slice(idx + 1) : parts;
     const resource = rest[0] ?? 'unknown';
     // `export` / `download` 是动作而不是对象 id, 不能写进 targetId
-    const targetId = rest[1] && rest[1] !== 'export' && rest[1] !== 'download' ? rest[1] : '-';
+    const fallbackTargetId =
+      rest[1] && rest[1] !== 'export' && rest[1] !== 'download' ? rest[1] : '-';
+    const declaredTargetId = declaredTarget
+      ? String(params?.[declaredTarget.param] ?? '').trim()
+      : '';
 
     const action = declaredAction ?? resource;
-    return { action, targetType: resource, targetId };
+    return {
+      action,
+      targetType: declaredTarget?.targetType ?? resource,
+      targetId: declaredTargetId || fallbackTargetId,
+    };
   }
 
   /** 只保留白名单字段, 过滤敏感字段 */

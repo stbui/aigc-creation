@@ -454,16 +454,30 @@ export class ChannelModelService {
 
   /* ───────────────────────── 初始化 ───────────────────────── */
 
-  /** 渠道最早只有上游模型名清单时，按它补出停用状态的骨架行 */
-  async syncInitialChannelModels(channel: ModelChannel, names: string[]): Promise<void> {
-    const existing = await this.prisma.channelModel.findMany({
-      where: { channelId: channel.id, deletedAt: null },
-    });
-    const byKey = new Map(existing.map((row) => [row.activeKey ?? channelModelActiveKey(row.modelKey), row]));
-    const retired = retiredChannelModelKeys(channel.retiredModelsJson);
-    const desired = new Set<string>();
+  /**
+   * 渠道最早只有上游模型名清单时，按它补出停用状态的骨架行。
+   *
+   * 创建 / 更新渠道时传入同一个事务客户端，避免渠道已保存、模型同步失败后
+   * 留下半成品。单独调用（旧数据补行）仍自开事务。
+   */
+  async syncInitialChannelModels(
+    channel: ModelChannel,
+    names: string[],
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    const run = async (db: Prisma.TransactionClient | PrismaService) => {
+      const existing = await db.channelModel.findMany({
+        where: { channelId: channel.id, deletedAt: null },
+      });
+      const byKey = new Map(
+        existing.map((row) => [
+          row.activeKey ?? channelModelActiveKey(row.modelKey),
+          row,
+        ]),
+      );
+      const retired = retiredChannelModelKeys(channel.retiredModelsJson);
+      const desired = new Set<string>();
 
-    await this.prisma.$transaction(async (tx) => {
       for (const raw of uniqueNonEmpty(names)) {
         const name = normalizeModelKey(raw);
         if (!name) continue;
@@ -471,7 +485,7 @@ export class ChannelModelService {
         if (retired.has(key)) continue;
         desired.add(key);
         if (byKey.has(key)) continue;
-        await tx.channelModel.create({
+        await db.channelModel.create({
           data: {
             channelId: channel.id,
             modelKey: name,
@@ -490,12 +504,18 @@ export class ChannelModelService {
       for (const row of existing) {
         const key = row.activeKey ?? channelModelActiveKey(row.modelKey);
         if (desired.has(key) || !row.enabled) continue;
-        await tx.channelModel.update({
+        await db.channelModel.update({
           where: { id: row.id },
           data: { enabled: false, priceVersion: row.priceVersion + 1 },
         });
       }
-    });
+    };
+
+    if (tx) {
+      await run(tx);
+      return;
+    }
+    await this.prisma.$transaction(run);
   }
 
   /** 渠道一个模型都没有时，按 `modelsJson` 补一次骨架行 */

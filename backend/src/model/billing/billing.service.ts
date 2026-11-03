@@ -598,96 +598,122 @@ export class BillingService {
         if (!order) throw new AppError(40400, '账单不存在', 404);
         if (order.status === 'settled') return order;
         if (order.status === 'refunded') throw new AppError(40909, '已退款的账单不能重新结算', 409);
-
-        const reserved =
-          order.reservedAmountMicrocredits > 0n ? order.reservedAmountMicrocredits : order.amountMicrocredits;
-        let actual = order.amountMicrocredits;
-        let quantity = order.quantity;
-        let usage: BillingUsage | null = null;
-        let usageSource = order.usageSource;
-        let note = '';
-
-        if (order.billingMode === 'token' && !zeroPricedTokenOrder(order)) {
-          const observedUsage = await this.tokenSettlementUsage(tx, order);
-          if (!observedUsage) throw new AppError(40909, '上游用量不可用，无法结算 Token 账单', 409);
-          usage = observedUsage.usage;
-          usageSource = observedUsage.source;
-          actual = this.tokenUsageAmount(order, usage);
-          observed = { usage, source: usageSource, actual };
-          if (chargeLimitApplies(order) && actual > order.chargeLimitMicrocredits) {
-            actual = order.chargeLimitMicrocredits;
-            note = 'Token 实际用量超过授权上限，已按上限结算';
-          } else if (actual > reserved) {
-            note = 'Token 实际用量超过预授权，已补扣差额';
-          }
-          if (usageSource === USAGE_SOURCE_VIDEO_FORMULA) {
-            note = note ? `按提交时的视频 Token 公式快照结算；${note}` : '按提交时的视频 Token 公式快照结算';
-          }
-        } else if (
-          order.billingMode === 'per_second' &&
-          (order.capability === 'audio' || (order.capability === 'video' && options.audioDurationMs !== undefined))
-        ) {
-          const mediaLabel = order.capability === 'video' ? '视频' : '音频';
-          const durationMs = options.audioDurationMs ?? 0;
-          if (!Number.isFinite(durationMs) || durationMs <= 0) {
-            throw new AppError(40909, `${mediaLabel}实际时长不可用，无法按秒结算`, 409);
-          }
-          quantity = BigInt(Math.ceil(durationMs / 1000));
-          actual = creditAmount(order.unitPriceMicrocredits, quantity, order.multiplierBasisPoints);
-          if (chargeLimitApplies(order) && actual > order.chargeLimitMicrocredits) {
-            throw new AppError(40909, `${mediaLabel}实际费用超过本次授权上限，需人工核对`, 409);
-          }
-          note = `${mediaLabel}按实际输出时长结算`;
-        } else {
-          validateChargeLimit(order, order.amountMicrocredits);
-        }
-
-        await this.wallet.settle(tx, {
-          userId: order.userId,
-          billingOrderId: order.id,
-          reservedMicrocredits: reserved,
-          actualMicrocredits: actual,
-          note,
-          meta: { taskId: order.taskId, model: order.model, channelId: order.channelId, scene: order.scene },
-        });
-
-        const refund = reserved > actual ? reserved - actual : 0n;
-        return tx.billingOrder.update({
-          where: { id: order.id },
-          data: {
-            status: 'settled',
-            settledAt: new Date(),
-            quantity,
-            actualAmountMicrocredits: actual,
-            refundedAmountMicrocredits: refund,
-            inputTokens: usage?.inputTokens ?? order.inputTokens,
-            outputTokens: usage?.outputTokens ?? order.outputTokens,
-            cachedTokens: usage?.cachedTokens ?? order.cachedTokens,
-            usageAvailable: usage !== null && usageSource === USAGE_SOURCE_PROVIDER,
-            usageSource,
-            providerRequestId: options.providerRequestId || order.providerRequestId,
-          },
+        return this.settleInTransaction(tx, order, options, (value) => {
+          observed = value;
         });
       });
     } catch (error) {
-      if (observed) {
-        // 交易回滚后单独落一次「结算依据」：账户不一致时，管理员仍要能看到用量与金额
-        await this.prisma.billingOrder
-          .updateMany({
-            where: { id: billingOrderId, status: { notIn: ['settled', 'refunded'] } },
-            data: {
-              actualAmountMicrocredits: observed.actual,
-              inputTokens: observed.usage.inputTokens,
-              outputTokens: observed.usage.outputTokens,
-              cachedTokens: observed.usage.cachedTokens,
-              usageAvailable: observed.source === USAGE_SOURCE_PROVIDER,
-              usageSource: observed.source,
-            },
-          })
-          .catch(() => undefined);
-      }
+      await this.persistObservedUsage(billingOrderId, observed);
       throw error;
     }
+  }
+
+  /**
+   * 在调用方事务内完成结算。
+   *
+   * 终态写入使用 CAS：只有仍处于非终态的账单才能落 settled。并发结算、退款或
+   * 自动清扫只要有一方先成功，其余事务会在钱包写入或终态 CAS 处失败并整体回滚。
+   */
+  private async settleInTransaction(
+    tx: Prisma.TransactionClient,
+    order: BillingOrderRow,
+    options: { providerRequestId?: string; audioDurationMs?: number },
+    onObserved: (value: { usage: BillingUsage; source: string; actual: bigint }) => void,
+  ): Promise<BillingOrderRow> {
+    const reserved =
+      order.reservedAmountMicrocredits > 0n ? order.reservedAmountMicrocredits : order.amountMicrocredits;
+    let actual = order.amountMicrocredits;
+    let quantity = order.quantity;
+    let usage: BillingUsage | null = null;
+    let usageSource = order.usageSource;
+    let note = '';
+
+    if (order.billingMode === 'token' && !zeroPricedTokenOrder(order)) {
+      const observedUsage = await this.tokenSettlementUsage(tx, order);
+      if (!observedUsage) throw new AppError(40909, '上游用量不可用，无法结算 Token 账单', 409);
+      usage = observedUsage.usage;
+      usageSource = observedUsage.source;
+      actual = this.tokenUsageAmount(order, usage);
+      onObserved({ usage, source: usageSource, actual });
+      if (chargeLimitApplies(order) && actual > order.chargeLimitMicrocredits) {
+        actual = order.chargeLimitMicrocredits;
+        note = 'Token 实际用量超过授权上限，已按上限结算';
+      } else if (actual > reserved) {
+        note = 'Token 实际用量超过预授权，已补扣差额';
+      }
+      if (usageSource === USAGE_SOURCE_VIDEO_FORMULA) {
+        note = note ? `按提交时的视频 Token 公式快照结算；${note}` : '按提交时的视频 Token 公式快照结算';
+      }
+    } else if (
+      order.billingMode === 'per_second' &&
+      (order.capability === 'audio' || (order.capability === 'video' && options.audioDurationMs !== undefined))
+    ) {
+      const mediaLabel = order.capability === 'video' ? '视频' : '音频';
+      const durationMs = options.audioDurationMs ?? 0;
+      if (!Number.isFinite(durationMs) || durationMs <= 0) {
+        throw new AppError(40909, `${mediaLabel}实际时长不可用，无法按秒结算`, 409);
+      }
+      quantity = BigInt(Math.ceil(durationMs / 1000));
+      actual = creditAmount(order.unitPriceMicrocredits, quantity, order.multiplierBasisPoints);
+      if (chargeLimitApplies(order) && actual > order.chargeLimitMicrocredits) {
+        throw new AppError(40909, `${mediaLabel}实际费用超过本次授权上限，需人工核对`, 409);
+      }
+      note = `${mediaLabel}按实际输出时长结算`;
+    } else {
+      validateChargeLimit(order, order.amountMicrocredits);
+    }
+
+    await this.wallet.settle(tx, {
+      userId: order.userId,
+      billingOrderId: order.id,
+      reservedMicrocredits: reserved,
+      actualMicrocredits: actual,
+      note,
+      meta: { taskId: order.taskId, model: order.model, channelId: order.channelId, scene: order.scene },
+    });
+
+    const refund = reserved > actual ? reserved - actual : 0n;
+    const updated = await tx.billingOrder.updateMany({
+      where: { id: order.id, status: { in: ['reserved', 'running', 'uncertain'] } },
+      data: {
+        status: 'settled',
+        settledAt: new Date(),
+        quantity,
+        actualAmountMicrocredits: actual,
+        refundedAmountMicrocredits: refund,
+        inputTokens: usage?.inputTokens ?? order.inputTokens,
+        outputTokens: usage?.outputTokens ?? order.outputTokens,
+        cachedTokens: usage?.cachedTokens ?? order.cachedTokens,
+        usageAvailable: usage !== null && usageSource === USAGE_SOURCE_PROVIDER,
+        usageSource,
+        providerRequestId: options.providerRequestId || order.providerRequestId,
+      },
+    });
+    if (updated.count !== 1) throw new AppError(40909, '账单状态已变更，无法结算', 409);
+    const result = await tx.billingOrder.findUnique({ where: { id: order.id } });
+    if (!result) throw new AppError(40400, '账单不存在', 404);
+    return result;
+  }
+
+  /** 事务已回滚时保留观察到的结算依据，便于管理员核对；不影响原始错误上抛 */
+  private async persistObservedUsage(
+    billingOrderId: string,
+    observed: { usage: BillingUsage; source: string; actual: bigint } | null,
+  ): Promise<void> {
+    if (!observed) return;
+    await this.prisma.billingOrder
+      .updateMany({
+        where: { id: billingOrderId, status: { notIn: ['settled', 'refunded'] } },
+        data: {
+          actualAmountMicrocredits: observed.actual,
+          inputTokens: observed.usage.inputTokens,
+          outputTokens: observed.usage.outputTokens,
+          cachedTokens: observed.usage.cachedTokens,
+          usageAvailable: observed.source === USAGE_SOURCE_PROVIDER,
+          usageSource: observed.source,
+        },
+      })
+      .catch(() => undefined);
   }
 
   /**
@@ -709,27 +735,41 @@ export class BillingService {
       if (!order) throw new AppError(40400, '账单不存在', 404);
       if (order.status === 'refunded') return order;
       if (order.status === 'settled') throw new AppError(40909, '已结算账单需人工退款', 409);
-      const amount = order.amountMicrocredits;
-      if (amount > 0n) {
-        await this.wallet.refund(tx, {
-          userId: order.userId,
-          billingOrderId: order.id,
-          amountMicrocredits: amount,
-          note: errorText || '任务失败退款',
-          meta: { taskId: order.taskId, model: order.model, channelId: order.channelId, scene: order.scene },
-        });
-      }
-      return tx.billingOrder.update({
-        where: { id: order.id },
-        data: {
-          status: 'refunded',
-          refundedAt: new Date(),
-          refundedAmountMicrocredits: amount,
-          errorText,
-          refundReason: reason,
-        },
-      });
+      return this.refundInTransaction(tx, order, errorText, reason);
     });
+  }
+
+  /** 在调用方事务内完成退款；终态 CAS 防止同一张账单被并发退两次 */
+  private async refundInTransaction(
+    tx: Prisma.TransactionClient,
+    order: BillingOrderRow,
+    errorText: string,
+    reason: RefundReason,
+  ): Promise<BillingOrderRow> {
+    const amount = order.amountMicrocredits;
+    if (amount > 0n) {
+      await this.wallet.refund(tx, {
+        userId: order.userId,
+        billingOrderId: order.id,
+        amountMicrocredits: amount,
+        note: errorText || '任务失败退款',
+        meta: { taskId: order.taskId, model: order.model, channelId: order.channelId, scene: order.scene },
+      });
+    }
+    const updated = await tx.billingOrder.updateMany({
+      where: { id: order.id, status: { in: ['reserved', 'running', 'uncertain'] } },
+      data: {
+        status: 'refunded',
+        refundedAt: new Date(),
+        refundedAmountMicrocredits: amount,
+        errorText,
+        refundReason: reason,
+      },
+    });
+    if (updated.count !== 1) throw new AppError(40909, '账单状态已变更，无法退款', 409);
+    const result = await tx.billingOrder.findUnique({ where: { id: order.id } });
+    if (!result) throw new AppError(40400, '账单不存在', 404);
+    return result;
   }
 
   /** 结果不明：保留冻结积分，等人工核对。绝不自动结算或退款 */
@@ -755,19 +795,41 @@ export class BillingService {
     if (!reason) throw new AppError(40001, '请填写核对依据', 400);
     if (action !== 'settle' && action !== 'refund') throw new AppError(40001, '请选择结算或退款', 400);
 
-    const order = await this.get(billingOrderId);
-    if (!['reserved', 'running', 'uncertain'].includes(order.status)) {
-      throw new AppError(40001, '当前账单不需要人工核对', 400);
-    }
+    let observed: { usage: BillingUsage; source: string; actual: bigint } | null = null;
+    try {
+      // 资金变动、终态和核对人必须同生共死；终态 CAS 保证并发处置只有一方成功。
+      return await this.prisma.$transaction(async (tx) => {
+        const order = await tx.billingOrder.findUnique({ where: { id: billingOrderId } });
+        if (!order) throw new AppError(40400, '账单不存在', 404);
+        if (!['reserved', 'running', 'uncertain'].includes(order.status)) {
+          throw new AppError(40001, '当前账单不需要人工核对', 400);
+        }
 
-    const updated =
-      action === 'settle'
-        ? await this.settle(billingOrderId, { providerRequestId: order.providerRequestId })
-        : await this.refund(billingOrderId, reason, 'manual');
-    return this.prisma.billingOrder.update({
-      where: { id: updated.id },
-      data: { resolvedBy: actorUserId, resolutionNote: reason },
-    });
+        const updated =
+          action === 'settle'
+            ? await this.settleInTransaction(
+                tx,
+                order,
+                { providerRequestId: order.providerRequestId },
+                (value) => {
+                  observed = value;
+                },
+              )
+            : await this.refundInTransaction(tx, order, reason, 'manual');
+
+        const marked = await tx.billingOrder.updateMany({
+          where: { id: updated.id, status: updated.status },
+          data: { resolvedBy: actorUserId, resolutionNote: reason },
+        });
+        if (marked.count !== 1) throw new AppError(40909, '账单状态已变更，请刷新后重试', 409);
+        const result = await tx.billingOrder.findUnique({ where: { id: updated.id } });
+        if (!result) throw new AppError(40400, '账单不存在', 404);
+        return result;
+      });
+    } catch (error) {
+      await this.persistObservedUsage(billingOrderId, observed);
+      throw error;
+    }
   }
 
   // ── 查询 ──────────────────────────────────────────────────────────

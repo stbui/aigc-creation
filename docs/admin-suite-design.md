@@ -64,26 +64,26 @@
 
 | 角色 | code | 定位 | 权限点数 |
 | --- | --- | --- | ---: |
-| 平台管理员 | `admin` | 全部权限 | 64 |
-| 运营 | `operator` | 用户/项目/素材/任务只读或受限写、营销、消息、工单、法务只读、模型侧只读 | 31 |
-| 财务 | `finance` | 商品/订单/退款/积分调整/发票/对账，模型成本与生成账单只读、账单可处置 | 25 |
+| 平台管理员 | `admin` | 全部权限 | 66 |
+| 运营 | `operator` | 用户/项目/素材/任务只读或受限写、营销、消息、工单、法务只读、模型侧只读 | 33 |
+| 财务 | `finance` | 商品/订单/退款/积分调整/发票/对账，模型成本与生成账单只读、账单可处置 | 27 |
 
 **为什么必须拆**：财务能退款 = 能改钱，运营能删用户 = 能毁数据。两种权限绑在一个布尔位上，出了事无法区分是谁做的，审计日志也失去意义。
 
-`operator` 的模型侧只有读权限（`channel.read` / `channel.model_read` / `logical_model.read` / `user_group.read` / `plugin.read` / `billing_order.read` / `model.analytics_read`）与调用记录 `model.call_read`；写渠道、渠道模型（含凭证与价格档）、前台模型、分组与插件一律拒绝。`channel.test` 是存储 / 通知的连通性探测（`storage.controller.ts` 使用），**不是**模型渠道测试；模型渠道测试挂在 `channel.model_write` 上。`finance` 额外持有 `billing_order.resolve`，可对 `uncertain` 账单人工结算或退款。
+`operator` 的模型侧只有读权限（`channel.read` / `channel.model_read` / `logical_model.read` / `user_group.read` / `plugin.read` / `billing_order.read` / `model.analytics_read`）与调用记录 `model.call_read`；写渠道、渠道模型（含凭证与价格档）、前台模型、分组与插件一律拒绝。`channel.test` 同时覆盖存储 / 通知探测与模型渠道连通性测试，只探测、不写配置；渠道模型本身的编辑仍受 `channel.model_write` 管控。`finance` 额外持有 `billing_order.resolve`，可对 `uncertain` 账单人工结算或退款。
 
 ### 2.2 权限点
 
-64 个，命名格式 `<模块>.<动作>`，定义在 `backend/src/admin/permissions.ts` 的 `PERMISSIONS`，按角色存为 `AdminRole.permissions` 的 JSON 数组字符串。
+66 个，命名格式 `<模块>.<动作>`，定义在 `backend/src/admin/permissions.ts` 的 `PERMISSIONS`，按角色存为 `AdminRole.permissions` 的 JSON 数组字符串。
 
 | 模块 | 权限点 |
 | --- | --- |
 | 平台 | `platform.dashboard` |
 | 用户 | `user.read` / `user.write` / `user.disable` / `user.delete` / `user.reset_password` |
 | 项目与素材 | `project.read` / `project.delete` / `asset.read` / `asset.hide` / `asset.delete` |
-| 任务 | `task.read` / `task.retry` / `task.cancel` |
+| 任务 | `task.read` / `task.retry` / `task.cancel` / `task.delete` |
 | 商品 | `product.read` / `product.write` / `product.price` / `product.publish` |
-| 订单与支付 | `order.read` / `order.mark_paid` / `order.refund` / `payment.read` / `finance.dashboard` / `invoice.write` / `finance.reconcile` |
+| 订单与支付 | `order.read` / `order.mark_paid` / `order.refund` / `payment.read` / `payment.write` / `payment.operate` / `finance.dashboard` / `invoice.write` / `finance.reconcile` |
 | 积分 | `credit.read` / `credit.adjust` |
 | 合规与内容 | `compliance.read` / `compliance.gate` / `compliance.takedown` / `content.read` |
 | 能力 | `capability.read` / `capability.write` |
@@ -93,8 +93,8 @@
 | 账单与台账 | `billing_order.read` / `billing_order.resolve` / `model.call_read` / `model.analytics_read` |
 | 增长与服务 | `marketing.write` / `message.write` / `ticket.read` / `ticket.handle` |
 | 法务 | `legal.read` / `legal.write` |
-| 系统 | `setting.read` / `setting.write` / `role.write` / `audit.read` |
-| 数据工具 | `data.export` / `data.import` / `data.batch` / `data.search` / `backup.read` / `backup.run` |
+| 系统 | `setting.read` / `setting.write` / `role.read` / `role.write` / `audit.read` |
+| 数据工具 | `data.export` / `data.search` / `backup.read` / `backup.run` |
 
 ### 2.3 强制规则
 
@@ -149,7 +149,7 @@ SQLite provider 不支持 Prisma enum，`kind` / `status` / `type` 一律 String
 
 ## 5. API 分组
 
-前缀 `/api/v1/admin/*`，统一 `JwtAuthGuard + AdminGuard + 权限点校验`；批量动作与导出另行判 `data.batch` / `data.export`。
+前缀 `/api/v1/admin/*`，统一 `JwtAuthGuard + AdminGuard + 权限点校验`；批量动作沿用各领域的动作权限，导出另行叠加 `data.export`。
 
 | 组 | 控制器 |
 | --- | --- |

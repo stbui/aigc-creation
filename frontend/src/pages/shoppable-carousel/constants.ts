@@ -68,6 +68,18 @@ export const LANGUAGE_OPTIONS = [
   { value: 'pt', label: '葡萄牙语' },
 ];
 
+/**
+ * 生成设置的默认值：抖音 / 中国 / 中文。
+ *
+ * 参考站实拍初值是 TikTok / 美国 / 英文；本站面向国内电商团队，
+ * 默认改成这三个（产品决定，属主动偏离）。选项清单与顺序仍与参考站一致，
+ * 只换初值。与后端 `definitions/shoppable_carousel.ts` 的 `default` 同值，
+ * 后端在参数缺省时会用同一组默认值补全。
+ */
+export const DEFAULT_PLATFORM = 'douyin';
+export const DEFAULT_MARKET = 'cn';
+export const DEFAULT_LANGUAGE = 'zh';
+
 /** 画面比例 (参考站实拍 4 项, 默认 3:4) */
 export const RATIO_OPTIONS = [
   { value: '1:1', label: '1:1' },

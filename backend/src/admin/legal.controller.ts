@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post, Put, Query } from '@nestjs/common';
-import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsIn, IsNotEmpty, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { AdminUser, AuditAction, RequirePermission, type AdminUser as AdminUserType } from './admin.decorator';
 import { PERMISSIONS } from './permissions';
 import { LEGAL_SLUGS, LEGAL_STATUSES, LegalService } from '../legal/legal.service';
@@ -33,12 +34,13 @@ class UpsertLegalDto {
   reason?: string;
 }
 
-class PublishLegalDto {
+export class PublishLegalDto {
   /** 同上：高危动作的操作原因，落审计 */
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  reason?: string;
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString({ message: '请填写发布原因' })
+  @MinLength(2, { message: '发布原因至少 2 个字符' })
+  @MaxLength(200, { message: '发布原因最多 200 个字符' })
+  reason!: string;
 }
 
 /**

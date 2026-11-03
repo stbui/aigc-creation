@@ -25,7 +25,6 @@ export interface ChannelDraft {
   enabled: boolean;
   sortOrder: string;
   headers: ChannelHeader[];
-  reason: string;
 }
 
 export const EMPTY_CHANNEL_DRAFT: ChannelDraft = {
@@ -39,7 +38,6 @@ export const EMPTY_CHANNEL_DRAFT: ChannelDraft = {
   enabled: true,
   sortOrder: '0',
   headers: [],
-  reason: '',
 };
 
 /** 渠道级健康汇总：把该渠道下各线路的 24h 样本加总，左列一眼看出哪家在坏 */

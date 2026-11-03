@@ -7,6 +7,20 @@ import { useTaskPoller, type ToolAsset, type ToolResult } from '../components/To
 import { notifyCreditsChanged } from '../context/CreditsContext';
 import { useApp } from '../ui';
 
+/**
+ * 从实际提交参数推断模型必须支持的输入。
+ *
+ * 模型解析必须看真正要发的 payload，而不是只看页面名称：同一工具可能有
+ * 可选遮罩分支，只有本次确实携带遮罩时才排除不支持 edits 的线路。
+ */
+function requiredModelInputs(params: Record<string, unknown>): string[] {
+  const hasMask = ['maskAssetId', 'modelGuideAssetId'].some((key) => {
+    const value = params[key];
+    return typeof value === 'string' && value.trim() !== '';
+  });
+  return hasMask ? ['mask'] : [];
+}
+
 interface UseToolTaskOptions {
   /** 能力 id (与后端 capability.registry 一致) */
   capability: string;
@@ -46,7 +60,7 @@ export function useToolTask({ capability, successMessage, minInputs = 1 }: UseTo
         const projectId = await ensureProject();
         // 模型 id 与项目 id 一样是服务端解析的输入，必须先进 payload 再算指纹：
         // 换模型等于换线路与价格，复用旧幂等键会把任务钉在旧模型上。
-        const logicalModelId = await resolveModelId(capability);
+        const logicalModelId = await resolveModelId(capability, requiredModelInputs(params));
         const payload = {
           projectId,
           capability,

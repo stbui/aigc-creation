@@ -79,7 +79,7 @@ providers: [
 | --- | --- | --- |
 | `AdminGuard` | 解 Bearer token 后**查库**取 `role` / `status` | 401 `40101`；`disabled` / `deleted` → 403 `40302`；非后台角色 → 403 `40301` |
 | `PermissionGuard` | 读 `@RequirePermission` 元数据，比对 `AdminRole.permissions` | 403 `40301`（不回显所需权限名；端点漏声明权限点时**拒绝**而非放行） |
-| `AuditInterceptor` | 拦截 POST / PATCH / PUT / DELETE 写审计 | 不阻断业务，写失败只 WARN |
+| `AuditInterceptor` | 写操作自动审计；显式声明 `@AuditAction` 的 GET 导出 / 下载也审计 | 不阻断业务，写失败只 WARN |
 
 执行顺序：`AdminGuard` → `PermissionGuard` → controller → `AuditInterceptor`。三者内部对非 `/admin` 路径直接放行，C 端链路不受影响。
 
@@ -87,17 +87,17 @@ providers: [
 
 **审计口径**：
 
-- 只记录 `POST / PATCH / PUT / DELETE`；GET 不落库。
+- 写操作一律记录；GET 导出 / 下载只有显式声明 `@AuditAction` 时才记录。
 - `detail` 只取白名单字段（`status` / `role` / `name` / `priceCents` / `reason` 等），命中 `password|token|secret|hash|credential` 的字段一律不写。
 - 需要业务原因的写操作由 DTO 要求请求体带 `reason` 并落 `AdminAuditLog.reason`；审计本身不作为页面确认门槛，删除渠道 / 渠道模型不要求原因。
 - 审计失败**不阻断业务**：让它阻断等于把审计变成单点故障，反而降低可追溯性。
 
 ### 0.3 权限点命名
 
-`<模块>.<动作>`，54 个，完整清单见 `permissions.ts` 的 `PERMISSIONS`（分组表见 `docs/admin-suite-design.md` §2.2）。三条约束：
+`<模块>.<动作>`，66 个，完整清单见 `permissions.ts` 的 `PERMISSIONS`（分组表见 `docs/admin-suite-design.md` §2.2）。三条约束：
 
 1. 权限点从清单移除后，角色里残留的值比对不上即等同无权（兜底默认拒），`AdminRoleService.getPermissions()` 读取时过滤；过滤只在内存生效，不回写库。
-2. 三个内置角色不可删除，但权限点均可调整（含 `admin`）：`updatePermissions()` 只校验未知权限点与角色是否存在，不阻止裁剪；改动因守卫每次请求查库而立即生效。
+2. 三个内置角色不可删除，但权限点均可调整（含 `admin`）：批量更新会校验未知权限点与角色是否存在，不阻止裁剪；整批写入在同一事务中完成，改动因守卫每次请求查库而立即生效。
 3. 前端 `AdminContext.can()` 只隐藏按钮，**不是安全边界**。
 
 ### 0.4 列表页通用模式
@@ -185,14 +185,14 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 | --- | --- | --- |
 | GET | `/admin/users?keyword&role&status&page&pageSize&sort` | `user.read` |
 | GET | `/admin/users/:id` | `user.read` |
-| GET | `/admin/users/:id/logins` | `user.read` |
+| GET | `/admin/users/:id/logins` | `audit.read` |
 | GET | `/admin/users/:id/impact` | `user.read` |
 | PATCH | `/admin/users/:id/status` | `user.disable` |
 | PATCH | `/admin/users/:id/role` | `user.write` |
 | POST | `/admin/users/:id/password` | `user.reset_password` |
 | DELETE | `/admin/users/:id` | `user.delete` |
-| GET | `/admin/users/export` | `data.export` |
-| POST | `/admin/users/batch` | `data.batch` |
+| GET | `/admin/users/export` | `user.read + data.export` |
+| POST | `/admin/users/batch` | 对应用户动作权限 |
 | GET | `/admin/users/meta/roles` | `user.read` |
 
 ### 2.2 规则
@@ -231,7 +231,7 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 - **重试不复用旧记录**：用原参数与原输入新建任务，再复用 `GenerateService.enqueue` 触发执行。原地复活会绕过 `GenerationTask.outputAssetId @unique` 的一产出约束。
 - **终止**把 `running` 置 `failed` + `cancelled_by_admin`，按任务快照退款。
 - 统计条显示各状态计数，积压（`pending` / `running`）超阈值标红。
-- **导出** CSV 与列表共用 `listWhere`，筛什么导什么，上限 5000 行，需 `data.export` 并留审计。
+- **导出** CSV 与列表共用 `listWhere`，筛什么导什么，上限 5000 行，需 `task.read + data.export` 并留审计。
 - **性能**：能力 / 通道筛选项的全表 `groupBy` 缓存 60 秒；拥堵指标仍实时查询。`GenerationTask` 增加 `[status, createdAt]` 与 `[ownerId, createdAt]` 组合索引，服务「状态 + 时间窗」和用户详情时间线。
 - 告警链接 `?status=failed|running` 会作为列表初始筛选；页面已打开时 URL 变化也会同步过去。
 
@@ -328,7 +328,7 @@ partial_refunded → refunded | partial_refunded
 | --- | --- | --- |
 | 标记已支付 | `channel='manual'`，用于线下收款核销；不调渠道 | `order.mark_paid` |
 | 退款 | 先校验 → 落 `Refund(processing)` → 调渠道 → 成功后才回收积分与迁移状态 | `order.refund` |
-| 批量 / 导出 | `orders/batch` / `orders/export` | `data.batch` / `data.export` |
+| 批量 / 导出 | `orders/batch` / `orders/export` | 对应订单动作权限 / `order.read + data.export` |
 
 列表支持按退款状态筛选（`?refundState=processing|failed|succeeded`）。退款状态挂在 `Refund` 行上，一笔订单可能多次部分退款；告警中心正是用它把「渠道已受理但本地未落账」的订单捞出来。
 
@@ -354,7 +354,7 @@ partial_refunded → refunded | partial_refunded
 | --- | --- | --- |
 | 支付渠道 | `GET /admin/payments/providers`、`PUT /admin/payments/providers/:id/config` | 每个适配器一份**版本化 + 加密**配置（`PaymentProviderConfig`），追加写不覆盖。密钥字段只回「是否已配置」，留空表示沿用旧值；身份类字段（商户号等）锁定不可改。保存写审计，不要求填写原因 |
 | 充值商品 | `GET/POST/PUT /admin/payments/products*` | 复用 `Order` / `Product`，**不新建** `TopupProduct` 表；售价按分存、周期 / 库存 / 限时策略随类型切换 |
-| 支付订单 | `GET /admin/payments/orders*` | 列表服务端分页（默认 30）；查单与关单是 `payment.operate` 高危写，必填原因。关单前始终先向渠道查单；已入账订单关单返回 `409` |
+| 支付订单 | `GET /admin/payments/orders*` | 列表服务端分页（默认 30）；查单与关单使用 `payment.operate`，属于非高危写操作，但均必填原因并写审计。关单前始终先向渠道查单；已入账订单关单返回 `409` |
 | 支付对账 | `GET/POST /admin/payments/reconciliations*` | T+1 自动对账（每天 10:15 跑昨日账单）；差异分七类，已支付未入账经签名查单二次确认后**自动补发积分**（幂等） |
 
 **本页不提供退款**：退款在订单管理，涉及积分与优惠券回滚，放在支付域会让人以为「关单 = 退款」。
@@ -363,13 +363,13 @@ partial_refunded → refunded | partial_refunded
 
 ### 11.2 发票
 
-`/admin/invoices`（`invoice.write`）。一单一票（`orderId @unique`），金额取 `paidCents - refundedCents` 快照；输出可打印 HTML（零 PDF 依赖）。开具与驳回必填原因并写审计。`GET /admin/invoices/export` 导出同一 `status` / `keyword` 口径的 CSV（金额同时给分与元，`data.export` + 审计）。
+`/admin/invoices`（`invoice.write`）。一单一票（`orderId @unique`），金额取 `paidCents - refundedCents` 快照；输出可打印 HTML（零 PDF 依赖）。开具与驳回必填原因并写审计。`GET /admin/invoices/export` 导出同一 `status` / `keyword` 口径的 CSV（金额同时给分与元，`invoice.write + data.export` + 审计）。
 
 ---
 
 ## 12. 积分账本 `/admin/credits`
 
-`GET /admin/credits/...`（余额总览、批次、流水）、`POST /admin/credits/adjust`（`credit.adjust`）、`POST /admin/credits/import`（`data.import`）、`GET /admin/credits/export`。
+`GET /admin/credits/...`（余额总览、批次、流水）、`POST /admin/credits/adjust`（`credit.adjust`）、`POST /admin/credits/import`（`credit.adjust`）、`GET /admin/credits/export`（`credit.read + data.export`）。
 
 - 余额 = `CreditLot` 未用完且未过期的批次之和。
 - 消耗按 **FEFO**（先到期先扣，`NULL` 视为最晚到期）跨批次扣减；余额不足整体回滚并报 `40002`（前端按 402 语义处理）。
@@ -382,8 +382,8 @@ partial_refunded → refunded | partial_refunded
 
 | 页面 | 接口 | 规则 |
 | --- | --- | --- |
-| 优惠券 | `/admin/coupons*`（`marketing.write`） | 满减 / 折扣 / 固定额；发放范围、门槛、有效期、每人限用、总量；核销走 `Order.couponId`；`GET /admin/coupons/export` 按同一筛选导出 CSV（`data.export` + 审计，路由在 `:id` 之前） |
-| 限时活动 | `/admin/campaigns*` | 类型 `limited_price` / `limited_free` / `popup`；进行中的免活动让 `resolve()` 返回 0；到期由调度任务收尾；`GET /admin/campaigns/export` 按同一筛选导出 CSV（`data.export` + 审计） |
+| 优惠券 | `/admin/coupons*`（`marketing.write`） | 满减 / 折扣 / 固定额；发放范围、门槛、有效期、每人限用、总量；核销走 `Order.couponId`；`GET /admin/coupons/export` 按同一筛选导出 CSV（`marketing.write + data.export` + 审计，路由在 `:id` 之前） |
+| 限时活动 | `/admin/campaigns*` | 类型 `limited_price` / `limited_free` / `popup`；进行中的免活动让 `resolve()` 返回 0；到期由调度任务收尾；`GET /admin/campaigns/export` 按同一筛选导出 CSV（`marketing.write + data.export` + 审计） |
 | 邀请与签到 | `/admin/invites*`、`/admin/checkin*` | 邀请奖励在被邀请人**首次付费**才触发；签到规则含基础积分与连签加成 |
 
 C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns` 只回真正更便宜且在售的活动）。
@@ -404,14 +404,16 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 
 ### 14.1 角色权限 `/admin/roles`
 
-`GET /admin/roles`（`audit.read`）返回三个内置角色的**库内实际权限点**（不是代码默认值，否则页面显示与实际不符）；`PATCH /admin/roles/:code/permissions`（`role.write`，高危，`AuditAction('role.permissions_update')`）。
+`GET /admin/roles`（`role.read`）返回三个内置角色的**库内实际权限点**（不是代码默认值，否则页面显示与实际不符）；`PATCH /admin/roles`（`role.write`，高危，`AuditAction('role.permissions_update')`）批量保存本次页面改动。
 
 规则：
 
 - 角色不可增删改名，`builtIn` 恒为 `true`；三个角色的权限点都能改，包括 `admin`。
+- 请求体为 `{ roles: [{ code, permissions }], reason }`；原因必填（2–200 字）并写入审计。
 - 未知权限点整体拒绝（400 `40001`），不静默丢弃 —— 否则调用方会以为保存成功。
+- 多角色改动在一个事务中写入，避免部分角色已生效、部分失败的半保存状态；审计记录每个角色新增 / 移除的权限点。
 - 改动立即生效：`AdminGuard` / `PermissionGuard` 每次请求查库，不需要重启或重新登录。操作者把自己权限改没了也会当场生效（可由其他 admin 恢复）。
-- 前端 `AdminRolesPage` 用 `can('role.write')` 控制可编辑态，按 64 个权限点分组勾选，高危权限点单独标注。
+- 前端 `AdminRolesPage` 用 `can('role.write')` 控制可编辑态，按 66 个权限点分组勾选，高危权限点单独标注。
 
 ---
 
@@ -451,7 +453,7 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 
 `GET /admin/audit-logs`、`/admin/audit-logs/:id`（`audit.read`）。按操作人 / 动作 / 时间筛选，详情含原因、IP、请求 ID。**只读，无删除接口**。
 
-`GET /admin/audit-logs/export`（`data.export` + 审计）导出同一筛选口径的 CSV，详情列为 JSON；上限 5000 行。路由必须声明在 `:id` 之前。
+`GET /admin/audit-logs/export`（`audit.read + data.export` + 审计）导出同一筛选口径的 CSV，详情列为 JSON；上限 5000 行。路由必须声明在 `:id` 之前。
 
 导出与备份下载是 GET，但显式声明了 `@AuditAction`，`AuditInterceptor` 同样落审计 —— 把数据带出系统必须能回答「谁、何时、导了哪类数据」。
 
@@ -527,7 +529,7 @@ C 端可见身份（`LogicalModel`）+ 发布快照（`LogicalModelRevision`）+
 
 `GET /admin/api-logs`（`model.call_read`）记录每次上游调用：`requestKind`（task / tool / test / proxy）、渠道、模型、协议、耗时、结果、`RouteAttempt.failureCode` 与错误摘要，可按状态 / 类型 / 渠道 / 任务 / 用户 / 模型筛选。用于回答「这次扣的是谁、走的是哪条线路、为什么失败」。
 
-`GET /admin/api-logs/export`（`data.export` + 审计）导出同一筛选口径的 CSV；列表与导出共用一个查询构造函数，不会出现两个口径，导出**不含请求体 / 响应体**，上限 5000 行。路由必须声明在 `:id` 之前。
+`GET /admin/api-logs/export`（`model.call_read + data.export` + 审计）导出同一筛选口径的 CSV；列表与导出共用一个查询构造函数，不会出现两个口径，导出**不含请求体 / 响应体**，上限 5000 行。路由必须声明在 `:id` 之前。
 
 ### 18.6 生成账单 `/admin/billing-orders` 与财务分析 `/admin/finance`
 
@@ -565,17 +567,15 @@ C 端可见身份（`LogicalModel`）+ 发布快照（`LogicalModelRevision`）+
 | `POST /admin/backups/:id/verify` | SHA-256 校验 |
 | `GET /admin/backups/:id/download` | 下载 |
 | `DELETE /admin/backups/:id` | 删除单份 |
-| `POST /admin/backups/prune` | 按份数裁剪 |
-| `POST /admin/backups/cleanup` | 触发清理日志 |
-| `GET /admin/backups/cleanup-logs` | 清理日志 |
+| `POST /admin/backups/prune` | 按份数裁剪（必填原因并写审计） |
 
 - 产物落 `BACKUP_DIR`，单份带 SHA-256 供校验。
-- 路由声明顺序有意义：`cleanup-logs` 必须声明在 `:id` 之前，否则会被当成 id。
-- 手动作业必填原因并写审计。
+- 手动备份与保留份数裁剪均必填 2–200 字原因并写审计；重复点击由前端 busy 状态防抖，不承诺跨请求幂等。
+- 到期数据清理与清理留痕统一走 `/admin/retention/*`，不在备份控制器保留第二套入口。
 
 ### 20.2 保留期清理 `/admin/retention`
 
-`GET /admin/retention/targets`（各目标可清理量预览）、`GET /admin/retention/logs`、`POST /admin/retention/cleanup`。执行结果落 `CleanupLog`；先预览再执行，避免「以为删的是过期日志，实际删了活跃文件」。
+`GET /admin/retention/targets`（各目标默认可清理量）、`GET /admin/retention/preview?target=&retentionDays=`（按用户当前草稿天数重新计数）、`GET /admin/retention/logs`、`POST /admin/retention/cleanup`。执行结果落 `CleanupLog`；确认前必须按实际天数重新预览，避免「以为删的是过期日志，实际删了活跃文件」。
 
 ---
 
@@ -587,15 +587,15 @@ C 端可见身份（`LogicalModel`）+ 发布快照（`LogicalModelRevision`）+
 
 ### 21.2 导出
 
-`/admin/{users,assets,tickets,orders,payments,credits}/export`（`data.export`）。CSV 走 `common/csv.ts`，前端独立下载不走信封。
+`/admin/{users,assets,tickets,orders,payments,credits}/export`（领域读权限 + `data.export`）。CSV 走 `common/csv.ts`，前端独立下载不走信封。
 
 ### 21.3 导入
 
-`POST /admin/credits/import`（`data.import`，multipart）。按邮箱匹配用户，逐行报结果。
+`POST /admin/credits/import`（`credit.adjust`，multipart）。按邮箱匹配用户，逐行报结果。
 
 ### 21.4 批量
 
-`/admin/{users,assets,tasks,orders}/batch`（`data.batch`），规则见 §0.7。
+`/admin/{users,assets,tasks,orders}/batch`（使用各领域对应的动作权限），规则见 §0.7。
 
 ---
 

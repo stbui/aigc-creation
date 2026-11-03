@@ -3,11 +3,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CAPABILITY_ID,
   DEFAULT_COUNT,
+  DEFAULT_LANGUAGE,
+  DEFAULT_MARKET,
+  DEFAULT_PLATFORM,
   MAX_COUNT,
   MAX_IMAGE_MB,
   MAX_IMAGES,
   MIN_COUNT,
-  PLATFORM_OPTIONS,
 } from './constants';
 import {
   AssetLibraryModal,
@@ -100,9 +102,9 @@ export function ShoppableCarouselPage() {
   } = library;
 
   // ── 表单状态 ──
-  const [platform, setPlatform] = useState(PLATFORM_OPTIONS[0].value);
-  const [market, setMarket] = useState('us');
-  const [language, setLanguage] = useState('en');
+  const [platform, setPlatform] = useState(DEFAULT_PLATFORM);
+  const [market, setMarket] = useState(DEFAULT_MARKET);
+  const [language, setLanguage] = useState(DEFAULT_LANGUAGE);
   const [ratio, setRatio] = useState('3:4');
   const [resolution, setResolution] = useState('1k');
   const [sellingPoints, setSellingPoints] = useState('');

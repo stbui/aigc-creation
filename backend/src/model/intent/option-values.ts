@@ -173,11 +173,11 @@ export function numericRange(minimum: number, maximum: number, step: number): Op
 export function capabilityInputLabel(name: string): string {
   switch (String(name ?? '').trim().toLowerCase()) {
     case 'image':
-      return '参考图片';
+      return '图片';
     case 'video':
-      return '参考视频';
+      return '视频';
     case 'audio':
-      return '参考音频';
+      return '音频';
     case 'mask':
       return '蒙版';
     default:

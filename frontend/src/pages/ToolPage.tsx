@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Upload as UploadIcon, Trash2, RefreshCw, Check, X } from 'lucide-react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import {
   ApiError,
   assetsApi,
@@ -9,7 +9,7 @@ import {
   assetThumbSrc,
   newIdempotencyKey,
 } from '../lib/api';
-import { capabilityById } from '../lib/capabilities';
+import { capabilityById, toolPath } from '../lib/capabilities';
 import { resolveModelId } from '../lib/models';
 import { useProject } from '../hooks/useProject';
 import { usePollAbort } from '../hooks/usePollAbort';
@@ -61,6 +61,19 @@ export function ToolPage() {
         action={{ to: '/workbench', label: '返回工作台' }}
       />
     );
+  }
+
+  /*
+   * 有独立工作台页的能力, 通用工具页不再承接。
+   *
+   * `/tools/:capability` 是**兜底**路由。商品主图、带货图文等复刻了独立页面的
+   * 能力, 直接给用户看通用表单既不是设计意图, 也会出现「同一个能力两个页面
+   * 长得完全不一样」。这里按 `toolPath()` 的同一份映射重定向 ——
+   * 映射只维护在 `lib/capabilities.ts` 一处, 本页不重复判断。
+   */
+  const canonical = toolPath(def.id);
+  if (canonical !== `/tools/${def.id}`) {
+    return <Navigate to={canonical} replace />;
   }
 
   if (def.mode === 'planned') {
@@ -250,12 +263,7 @@ function ToolPageContent({ capability, def }: { capability: string; def: Capabil
   const resultUrl = task?.outputAsset ? assetSrc(task.outputAsset) : undefined;
 
   return (
-    /*
-     * `data-capability` 供按能力定制外层宽度 —— 通用工具页默认 1100px 居中，
-     * 个别表单较宽的能力（如带货图文的 2×2 生成设置 + 张数步进器）
-     * 在这个宽度里会挤成两行，需要去掉上限铺满可用宽度。
-     */
-    <div className="tool-page" data-capability={def.id}>
+    <div className="tool-page">
       <Button type="text" icon={<ArrowLeft size={15} />} onClick={() => navigate('/workbench')} className="tool-back">
         返回工作台
       </Button>

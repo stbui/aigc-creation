@@ -187,16 +187,17 @@ const { resolveDbUrl } = require('./db-url');
   });
 
   console.log('\n【角色权限更新】');
-  const badPerm = await call('PATCH', '/admin/roles/operator/permissions', T, {
-    permissions: ['not.a.real.permission'],
+  const badPerm = await call('PATCH', '/admin/roles', T, {
+    roles: [{ code: 'operator', permissions: ['not.a.real.permission'] }],
+    reason: '冒烟测试未知权限',
   });
   check('未知权限点被拒', badPerm.status === 400, badPerm.message);
 
   const cur = (await call('GET', '/admin/roles?code=operator', T)).data.items[0];
   const reduced = cur.permissions.filter((p) => p !== 'user.read');
-  const upd = await call('PATCH', '/admin/roles/operator/permissions', T, {
-    permissions: reduced,
-    reason: '冒烟测试收权',
+  const upd = await call('PATCH', '/admin/roles', T, {
+    roles: [{ code: 'operator', permissions: reduced }],
+    reason: '冒烟测试收回用户读取',
   });
   check('权限更新成功', upd.status === 200, `${cur.permissions.length} → ${reduced.length} 项`);
 
@@ -205,9 +206,9 @@ const { resolveDbUrl } = require('./db-url');
   check('收权后旧 token 立即失效', afterRevoke.status === 403, afterRevoke.message);
 
   // 还原
-  await call('PATCH', '/admin/roles/operator/permissions', T, {
-    permissions: cur.permissions,
-    reason: '还原',
+  await call('PATCH', '/admin/roles', T, {
+    roles: [{ code: 'operator', permissions: cur.permissions }],
+    reason: '冒烟测试还原权限',
   });
   const restored = await call('GET', '/admin/users', opToken);
   check('权限还原后恢复访问', restored.status === 200, `HTTP ${restored.status}`);

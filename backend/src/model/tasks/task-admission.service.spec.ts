@@ -9,7 +9,7 @@ import { TaskAdmissionService } from './task-admission.service';
  * 自己其他项目中的素材，同时仍然拒绝不属于当前用户的素材。
  */
 describe('TaskAdmissionService 输入素材归属', () => {
-  function setup(assets: Array<{ id: string }>) {
+  function setup(assets: Array<{ id: string }>, model: Record<string, unknown> | null = null) {
     const prisma = {
       generationTask: { findUnique: vi.fn().mockResolvedValue(null) },
       project: {
@@ -22,7 +22,10 @@ describe('TaskAdmissionService 输入素材归属', () => {
       perksOf: vi.fn().mockResolvedValue({ fastChannel: false }),
     };
     const availability = { runtimeOf: vi.fn().mockResolvedValue(undefined) };
-    const router = { findModel: vi.fn().mockResolvedValue(null) };
+    const router = {
+      findModel: vi.fn().mockResolvedValue(model),
+      resolve: vi.fn(),
+    };
     const service = new TaskAdmissionService(
       prisma as never,
       membership as never,
@@ -34,7 +37,7 @@ describe('TaskAdmissionService 输入素材归属', () => {
       {} as never,
     );
 
-    return { service, prisma };
+    return { service, prisma, router };
   }
 
   it('允许使用当前账号其他项目中的素材', async () => {
@@ -73,5 +76,41 @@ describe('TaskAdmissionService 输入素材归属', () => {
         },
       }),
     ).rejects.toThrow('部分输入素材不存在或无权限');
+  });
+
+  it('图片总数超过模型合同时返回准确的输入数量原因', async () => {
+    const ids = ['product-1', 'product-2', 'product-3', 'product-4', 'reference'];
+    const { service, router } = setup(
+      ids.map((id) => ({ id })),
+      {
+        id: 'model-hot-remake',
+        name: '仿真图像·hot_remake',
+        capability: 'hot_remake',
+        archivedAt: null,
+        enabled: true,
+        productSpec: {
+          version: 1,
+          capability: 'image',
+          inputs: { image: { min: 2, max: 4 } },
+        },
+      },
+    );
+
+    await expect(
+      service.admit({
+        ownerId: 'user-1',
+        dto: {
+          projectId: 'project-current',
+          capability: 'hot_remake',
+          logicalModelId: 'model-hot-remake',
+          inputAssetIds: ids,
+          params: {},
+        },
+      }),
+    ).rejects.toThrow(
+      '所选模型「仿真图像·hot_remake」仅支持 2-4 张输入图片（当前 5 张），请调整图片数量或更换模型',
+    );
+
+    expect(router.resolve).not.toHaveBeenCalled();
   });
 });

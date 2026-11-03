@@ -24,6 +24,7 @@ import { PlanTable } from './PlanTable';
 import { PlanFormDrawer } from './PlanFormDrawer';
 import { PlanStatusConfirm } from './PlanStatusConfirm';
 import type { AdminMembershipPlan } from '../../../types/api';
+import { auditReason } from '../../../admin-ui/lib/auditReason';
 
 /**
  * 会员套餐管理（`/admin/membership-plans`）。
@@ -54,8 +55,6 @@ export function AdminMembershipPlansPage() {
   const [saving, setSaving] = useState(false);
 
   const [statusTarget, setStatusTarget] = useState<AdminMembershipPlan | null>(null);
-  const [statusReason, setStatusReason] = useState('');
-  const [statusReasonError, setStatusReasonError] = useState(false);
 
   const rows = data?.items ?? [];
 
@@ -116,19 +115,16 @@ export function AdminMembershipPlansPage() {
 
   const runToggle = async () => {
     if (!statusTarget) return;
-    const reason = statusReason.trim();
-    if (!reason) {
-      setStatusReasonError(true);
-      return;
-    }
     setSaving(true);
     try {
       const next = statusTarget.status === 'active' ? 'offline' : 'active';
-      await adminMembershipPlansApi.setStatus(statusTarget.id, next, reason);
+      await adminMembershipPlansApi.setStatus(
+        statusTarget.id,
+        next,
+        auditReason(next === 'active' ? '上架会员套餐' : '下架会员套餐'),
+      );
       toast.success(next === 'active' ? '套餐已上架' : '套餐已下架，存量会员不受影响');
       setStatusTarget(null);
-      setStatusReason('');
-      setStatusReasonError(false);
       void reload();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '操作失败');
@@ -187,11 +183,7 @@ export function AdminMembershipPlansPage() {
           saving={saving}
           onCreate={openCreate}
           onEdit={openEdit}
-          onToggle={(row) => {
-            setStatusTarget(row);
-            setStatusReason('');
-            setStatusReasonError(false);
-          }}
+          onToggle={setStatusTarget}
         />
       </Panel>
 
@@ -208,18 +200,8 @@ export function AdminMembershipPlansPage() {
 
       <PlanStatusConfirm
         target={statusTarget}
-        reason={statusReason}
-        reasonError={statusReasonError}
         saving={saving}
-        onReasonChange={(next) => {
-          setStatusReason(next);
-          if (next.trim()) setStatusReasonError(false);
-        }}
-        onCancel={() => {
-          setStatusTarget(null);
-          setStatusReason('');
-          setStatusReasonError(false);
-        }}
+        onCancel={() => setStatusTarget(null)}
         onConfirm={() => void runToggle()}
       />
     </>

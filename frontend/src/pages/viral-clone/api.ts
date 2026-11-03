@@ -20,4 +20,5 @@ export {
 } from '../../lib/api';
 
 /** 前台模型目录数据层: 建任务必须解析出 `logicalModelId` */
-export { resolveModelId } from '../../lib/models';
+export { modelImageInputLimit, resolveModel, resolveModelId } from '../../lib/models';
+export type { PublicLogicalModel } from '../../lib/models';

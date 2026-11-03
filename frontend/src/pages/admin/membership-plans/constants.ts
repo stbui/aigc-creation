@@ -18,7 +18,6 @@ export interface PlanDraft {
   /** 100 = 无折扣 */
   discountPercent: string;
   sortOrder: string;
-  reason: string;
 }
 
 export const EMPTY_DRAFT: PlanDraft = {
@@ -32,5 +31,4 @@ export const EMPTY_DRAFT: PlanDraft = {
   maxConcurrent: '5',
   discountPercent: '100',
   sortOrder: '0',
-  reason: '',
 };

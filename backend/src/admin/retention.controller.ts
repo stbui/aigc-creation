@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
-import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsIn, IsInt, IsString, Max, MaxLength, Min, MinLength } from 'class-validator';
 import { AuditAction, RequirePermission } from './admin.decorator';
 import { BackupService } from './backup.service';
 import { AdminSettingsService } from './settings.service';
@@ -70,9 +71,23 @@ export class RetentionCleanupDto {
   retentionDays!: number;
 
   /** 操作原因。高危动作强制填写 */
-  @IsString()
-  @MaxLength(200)
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  @IsString({ message: '请填写清理原因' })
+  @MinLength(2, { message: '清理原因至少 2 个字符' })
+  @MaxLength(200, { message: '清理原因最多 200 个字符' })
   reason!: string;
+}
+
+/** 按指定目标与天数重新预览影响范围 */
+export class RetentionPreviewQueryDto {
+  @IsIn(TABLE_NAMES, { message: '不支持预览该目标' })
+  target!: string;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(7, { message: '保留天数至少为 7 天' })
+  @Max(3650)
+  retentionDays!: number;
 }
 
 @Controller('admin/retention')
@@ -97,26 +112,20 @@ export class AdminRetentionController {
     return Promise.all(
       TARGETS.map(async (t) => {
         const days = t.table === 'AdminAuditLog' ? auditDays : t.defaultDays;
-        const cutoff = new Date(Date.now() - days * 24 * 3600 * 1000);
-        const delegate = (this.prisma as any)[delegateName(t.table)];
-        const [total, expired, oldest] = await Promise.all([
-          delegate.count(),
-          delegate.count({ where: { createdAt: { lt: cutoff } } }),
-          delegate.findFirst({ orderBy: { createdAt: 'asc' }, select: { createdAt: true } }),
-        ]);
-        return {
-          table: t.table,
-          label: t.label,
-          note: t.note,
-          retentionDays: days,
-          total,
-          /** 按当前天数会被删除的条数 (未执行, 仅预估) */
-          expiring: expired,
-          cutoff: cutoff.toISOString(),
-          oldestAt: oldest?.createdAt ?? null,
-        };
+        return this.previewTarget(t, days);
       }),
     );
+  }
+
+  /** 确认清理前按用户当前天数重新估算，避免拿页面上过期数字做不可逆操作 */
+  @Get('preview')
+  @RequirePermission(PERMISSIONS.backupRead)
+  async preview(@Query() query: RetentionPreviewQueryDto) {
+    const target = TARGETS.find((item) => item.table === query.target);
+    if (!target) {
+      throw new AppError(40001, `不支持预览该目标: ${query.target}`, 400);
+    }
+    return this.previewTarget(target, query.retentionDays);
   }
 
   /** 清理历史记录 */
@@ -142,6 +151,27 @@ export class AdminRetentionController {
       throw new AppError(40001, `不支持清理该目标: ${dto.target}`, 400);
     }
     return this.backup.cleanupExpired(dto.target, dto.retentionDays, 'manual');
+  }
+
+  private async previewTarget(t: RetentionTarget, days: number) {
+    const cutoff = new Date(Date.now() - days * 24 * 3600 * 1000);
+    const delegate = (this.prisma as any)[delegateName(t.table)];
+    const [total, expired, oldest] = await Promise.all([
+      delegate.count(),
+      delegate.count({ where: { createdAt: { lt: cutoff } } }),
+      delegate.findFirst({ orderBy: { createdAt: 'asc' }, select: { createdAt: true } }),
+    ]);
+    return {
+      table: t.table,
+      label: t.label,
+      note: t.note,
+      retentionDays: days,
+      total,
+      /** 按指定天数会被删除的条数 (未执行, 仅预估) */
+      expiring: expired,
+      cutoff: cutoff.toISOString(),
+      oldestAt: oldest?.createdAt ?? null,
+    };
   }
 }
 

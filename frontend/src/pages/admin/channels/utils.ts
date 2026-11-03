@@ -162,7 +162,6 @@ export function toChannelDraft(channel: AdminChannelView): ChannelDraft {
     enabled: channel.enabled,
     sortOrder: String(channel.sortOrder ?? 0),
     headers: channel.headers ?? [],
-    reason: '',
   };
 }
 

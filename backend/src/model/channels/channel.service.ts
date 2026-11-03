@@ -185,17 +185,20 @@ export class ChannelService {
       enabled: true,
       headersJson: '',
     });
-    const created = await this.prisma.modelChannel.create({
-      data: {
-        ...fields,
-        apiKey: fields.apiKey ?? '',
-        secretKey: fields.secretKey ?? '',
-        scope: CHANNEL_SCOPE_SYSTEM,
-        userId: '',
-        headersJson: fields.headersJson,
-      },
+    const created = await this.prisma.$transaction(async (tx) => {
+      const channel = await tx.modelChannel.create({
+        data: {
+          ...fields,
+          apiKey: fields.apiKey ?? '',
+          secretKey: fields.secretKey ?? '',
+          scope: CHANNEL_SCOPE_SYSTEM,
+          userId: '',
+          headersJson: fields.headersJson,
+        },
+      });
+      await this.channelModels.syncInitialChannelModels(channel, models, tx);
+      return channel;
     });
-    await this.channelModels.syncInitialChannelModels(created, models);
     await this.catalogVersion.invalidate();
     return this.project(created, true);
   }
@@ -206,16 +209,21 @@ export class ChannelService {
     const merged = this.mergeRequest(req, channel);
     const { fields, models } = await this.buildChannelFields(merged, channel);
 
-    const updated = await this.prisma.modelChannel.update({
-      where: { id: channel.id },
-      data: {
-        ...fields,
-        // 空串表示「请求没提交凭证」，沿用库里的密文，避免把密钥清空
-        apiKey: fields.apiKey ?? channel.apiKey,
-        secretKey: fields.secretKey ?? channel.secretKey,
-      },
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.modelChannel.update({
+        where: { id: channel.id },
+        data: {
+          ...fields,
+          // 空串表示「请求没提交凭证」，沿用库里的密文，避免把密钥清空
+          apiKey: fields.apiKey ?? channel.apiKey,
+          secretKey: fields.secretKey ?? channel.secretKey,
+        },
+      });
+      if (modelsProvided) {
+        await this.channelModels.syncInitialChannelModels(row, models, tx);
+      }
+      return row;
     });
-    if (modelsProvided) await this.channelModels.syncInitialChannelModels(updated, models);
     await this.catalogVersion.invalidate();
     return this.project(updated, true);
   }

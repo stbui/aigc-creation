@@ -91,6 +91,10 @@ export class AccountLifecycleService {
       await tx.loginSession.deleteMany({ where: { userId } });
       await tx.notification.deleteMany({ where: { userId } });
       await tx.accountToken.deleteMany({ where: { userId } });
+      // 第三方身份与用户侧插件偏好不属于法务留存范围。保留它们会让原 OAuth
+      // 账号永久绑定到一个已匿名化的删除账号，用户也无法用同一外部身份重开账号。
+      await tx.oAuthIdentity.deleteMany({ where: { userId } });
+      await tx.userPluginState.deleteMany({ where: { userId } });
       // 登录审计断开关联但保留记录（安全事件举证）
       await tx.loginLog.updateMany({ where: { userId }, data: { userId: null } });
       await tx.consentRecord.updateMany({ where: { userId }, data: { userId: null } });

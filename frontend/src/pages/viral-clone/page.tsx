@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   MAX_IMAGE_BYTES,
@@ -45,9 +45,11 @@ import {
   assetsApi,
   assetSrc,
   generateApi,
+  modelImageInputLimit,
   newIdempotencyKey,
-  resolveModelId,
+  resolveModel,
   toAbsoluteUrl,
+  type PublicLogicalModel,
 } from './api';
 import {
   degreeCaption,
@@ -55,6 +57,8 @@ import {
   platformSpec,
   pollToResult,
   taskErrorText,
+  viralCloneImageInputError,
+  viralCloneProductImageLimit,
 } from './utils';
 import type { Asset, MobileUploadAsset } from '../../types/api';
 import { useApp } from '../../ui';
@@ -120,6 +124,8 @@ export function ViralClonePage() {
 
   // ── 任务状态 ──
   const [submitting, setSubmitting] = useState(false);
+  /** 当前实际会被提交的模型；图片上限必须读它的能力合同，不能只看页面上限。 */
+  const [selectedModel, setSelectedModel] = useState<PublicLogicalModel | null>(null);
   // 实时价优先用所选模型报价，取不到才回落到能力基础价
   const [modelQuoteCredits, setModelQuoteCredits] = useState<number | null>(null);
   const baseCreditLabel = useCreditLabel('hot_remake');
@@ -133,6 +139,29 @@ export function ViralClonePage() {
   const [result, setResult] = useState<PkResult | null>(null);
   const pollSignal = usePollAbort();
 
+  /*
+   * 模型选择器默认收在高级设置里，页面进入时也要先解析一次模型。
+   * 爆款复刻固定占用 1 张参考图，因此商品图上限 = 模型总图片上限 - 1。
+   */
+  useEffect(() => {
+    let alive = true;
+    void resolveModel('hot_remake')
+      .then((model) => {
+        if (alive) setSelectedModel(model);
+      })
+      .catch(() => {
+        // 目录不可用时保留页面上限；提交前会再次解析并给出准确原因。
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const modelImageMax = selectedModel ? modelImageInputLimit(selectedModel) : null;
+  const imageMax = viralCloneProductImageLimit(modelImageMax);
+  const imageInputError = selectedModel
+    ? viralCloneImageInputError(selectedModel, images.length + (reference ? 1 : 0))
+    : null;
+
   // ── 右侧结果栏 ──
   //
   // 与创意生图页、商品主图页、商品详情页同构: 网格展示本能力**全部**历史产出,
@@ -143,8 +172,8 @@ export function ViralClonePage() {
   // 服务端仍有 running/pending 任务时也算生成中: 离开页面再回来, 禁用态与标题不丢
   const generating = submitting || gallery.items.some((item) => !item.url);
 
-  // 参考站本页名称/品牌/复刻要求均为选填, 提交条件 = 商品图 ≥1 + 参考图 =1
-  const formValid = images.length > 0 && reference !== null;
+  // 参考站本页名称/品牌/复刻要求均为选填, 提交条件 = 商品图 ≥1 + 参考图 =1 + 未超模型图片上限
+  const formValid = images.length > 0 && reference !== null && !imageInputError;
 
   /** 切换平台：用户没手动改过比例/画质时，带出该平台的主图规格 */
   const changePlatform = (value: string) => {
@@ -171,7 +200,7 @@ export function ViralClonePage() {
       ? hotRemakeRuntime.reason || '该能力当前不可提交，请稍后再试或联系客服。'
       : null;
 
-  // ── 上传: 商品图 (点击/拖拽/粘贴, 最多 5 张) ──
+  // ── 上传: 商品图 (点击/拖拽/粘贴, 按模型总图片数预留参考图位) ──
   const uploadFiles = useCallback(
     async (files: FileList | File[]) => {
       const list = Array.from(files).filter(isSupportedImageFile);
@@ -179,9 +208,9 @@ export function ViralClonePage() {
         message.warning(`请选择图片文件（${SUPPORTED_IMAGE_LABEL}）`);
         return;
       }
-      const room = MAX_IMAGES - images.length;
+      const room = imageMax - images.length;
       if (room <= 0) {
-        message.warning(`最多上传 ${MAX_IMAGES} 张商品图片`);
+        message.warning(`当前模型最多接收 ${modelImageMax ?? MAX_IMAGES} 张图片，商品图最多 ${imageMax} 张`);
         return;
       }
       const accepted = list.slice(0, room);
@@ -208,7 +237,7 @@ export function ViralClonePage() {
         setUploading(false);
       }
     },
-    [images.length, ensureProject, message],
+    [imageMax, images.length, modelImageMax, ensureProject, message],
   );
 
   // ── 上传: 参考图 (单张, 超出即替换) ──
@@ -254,8 +283,8 @@ export function ViralClonePage() {
       setReference({ id: asset.id, url: assetSrc(asset) ?? '', name });
       return true;
     }
-    if (images.length >= MAX_IMAGES) {
-      message.warning(`最多上传 ${MAX_IMAGES} 张商品图片`);
+    if (images.length >= imageMax) {
+      message.warning(`当前模型最多接收 ${modelImageMax ?? MAX_IMAGES} 张图片，商品图最多 ${imageMax} 张`);
       return false;
     }
     if (images.some((x) => x.id === asset.id)) {
@@ -309,9 +338,9 @@ export function ViralClonePage() {
         return;
       }
       // 额度判定放在 setState 外: 在 updater 里弹 toast 会被 StrictMode 跑两遍
-      const room = MAX_IMAGES - images.length;
+      const room = imageMax - images.length;
       if (room <= 0) {
-        message.warning(`商品图位已满 (${MAX_IMAGES} 张), 手机上传的图片未加入`);
+        message.warning(`商品图位已满 (${imageMax} 张), 手机上传的图片未加入`);
         setMobileOpen(false);
         return;
       }
@@ -324,7 +353,7 @@ export function ViralClonePage() {
       setMobileOpen(false);
       if (accepted.length > 0) message.success(`已从手机接收 ${accepted.length} 张图片`);
     },
-    [images, message, mobileTarget],
+    [imageMax, images, message, mobileTarget],
   );
 
   // ── 生成 ──
@@ -343,8 +372,16 @@ export function ViralClonePage() {
     setSubmitting(true);
     setResult(null);
     try {
+      // 模型可能刚被切换，提交前按真实落库模型再校验一次总图片数。
+      const model = await resolveModel('hot_remake');
+      setSelectedModel(model);
+      const limitError = viralCloneImageInputError(model, images.length + 1);
+      if (limitError) {
+        message.warning(limitError);
+        return;
+      }
       const projectId = await ensureProject();
-      const logicalModelId = await resolveModelId('hot_remake');
+      const logicalModelId = model.id;
       const payload = {
         projectId,
         capability: 'hot_remake',
@@ -466,7 +503,7 @@ export function ViralClonePage() {
                 <SurfaceDescription>上传商品图与参考图，按每次生成结果逐组对照。</SurfaceDescription>
               </div>
               <StatusBadge variant="secondary">
-                {images.length}/{MAX_IMAGES} 商品图
+                {images.length}/{imageMax} 商品图
               </StatusBadge>
             </div>
           </SurfaceHeader>
@@ -476,6 +513,9 @@ export function ViralClonePage() {
           <SurfaceContent className="vc-editor-content">
             <ViralCloneConfig
               images={images}
+              maxImages={imageMax}
+              totalImageMax={modelImageMax}
+              imageLimitError={imageInputError}
               reference={reference}
               uploading={uploading}
               fileInputRef={fileInputRef}
@@ -530,6 +570,7 @@ export function ViralClonePage() {
                 setResolution(value);
               }}
               onModelQuoteChange={setModelQuoteCredits}
+              onModelChange={setSelectedModel}
               onSubmit={() => void submit()}
             />
           </SurfaceFooter>
@@ -557,7 +598,7 @@ export function ViralClonePage() {
         error={libraryError}
         onCancel={closeLibrary}
         onPick={pick}
-        maxSelectable={libraryTarget === 'reference' ? 1 : MAX_IMAGES}
+        maxSelectable={libraryTarget === 'reference' ? 1 : imageMax}
       />
 
       {/* 手机上传弹窗 (按 mobileTarget 决定写入商品图还是参考图) */}

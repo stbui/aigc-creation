@@ -7,7 +7,13 @@
 :root {
   /* 2026-10-18 去蓝: 原为 #2563eb 蓝系 (与全站紫系冲突, 10-17 审计标记的 bug, 外壳 9 处引用已全部改字面值, 定义同步归位品牌紫防复发) */
   --color-primary: #5546d8;
+  /* 橙 / 绿各分「填充」与「文字」两版 (2026-11-03)
+     原 --color-cta / --color-success 同时当背景与文字用。作背景没问题,
+     作文字在同色 12% 淡底上只有 3.07/2.89:1 —— 浅底上还要再压深才读得出。
+     现在: --color-cta / --color-success 保持原值, 只用于填充;
+           --color-cta-text / --color-success-text 是压深后的文字版 (≥4.6:1)。 */
   --color-cta: #ea580c;
+  --color-cta-text: #b94509;
   --color-cta-hover: #c2410c;
   --color-bg: #f6f7fb;
   --color-card: #ffffff;
@@ -18,8 +24,10 @@
   --color-text-secondary: #475569;
   /* 参考站实测文本色: hero 副标题 #667085 / 卡片描述 #86909C */
   --color-success: #16a34a;
+  --color-success-text: #117c39;
   --color-slate-100: #f1f5f9;
-  --color-slate-400: #94a3b8;
+  /* 原 #94a3b8 在白底只有 2.56:1, 收到 #627693 后 4.63:1 */
+  --color-slate-400: #627693;
   --radius: 12px;
   --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px rgba(15, 23, 42, 0.05);
 
@@ -33,7 +41,6 @@
   --brand-light: #6c5ce7; /* 仅用于渐变浅端与需要"更亮"的实心块 */
   --brand-hover: #5b4bd7; /* hover / active / 强调态 */
   --brand-bg: #f1efff; /* 唯一激活底色 */
-  --brand-bg-soft: #f1efff; /* 悬停淡紫 (并入激活底) */
   /* 兼容旧名: 全部指向收拢后的三态, 保证语义不丢 */
   --brand-strong: var(--brand);
   --brand-active: var(--brand-hover);
@@ -48,10 +55,11 @@
      ──────────────────────────────────────────────────────────────── */
   --text-strong: #171a2b; /* 标题 */
   --text-body: #4e5969; /* 正文 */
-  --text-muted: #667085; /* 次要文字 */
-  /* 描述 / 路径类小字。原 #86909c 在白底 3.24:1、--surface 上 2.94:1，
-     不满足小字号 4.5:1；收到 #667085 后为 4.98:1 / 4.5:1，与 --text-muted 同值，
-     层级改由字号与字重承担。 */
+  /* 次要文字。原 #667085 在最浅灰底 --alp-surface-1(#e7e9ef) 上只有 4.10:1,
+     不满足小字号 4.5:1; 收到 #5b6474 后在全部浅底上 ≥4.91:1。
+     层级改由字号与字重承担 —— 颜色只保证可读。 */
+  --text-muted: #5b6474;
+  /* 描述 / 路径类小字。与 --text-muted 同值 (2026-11-03 压到 AA)。 */
   --text-desc: var(--text-muted);
   --border: #e5e7ef; /* 常规边框 */
   --border-soft: #e4e7ef; /* 次级边框 (与常规同族) */
@@ -81,7 +89,14 @@
      色相取 success-text 的浅调, 与 success-soft-bg 搭配不刺眼) */
   --success-border: #bfe6d6;
   --info-soft-bg: #93c5fd;
+  /* 圆点/虚线描边色 —— 只作边框 (2026-11-03 拆名)
+     原 --border-dot 同时承担描边与 placeholder 文字两种角色:
+     描边要浅 (#c9cdd4), 而 placeholder 文字用同一个值在白底只有
+     1.59:1, 远低于 4.5:1。现拆成两个令牌:
+       --border-dot  描边 (保持原值不变)
+       --placeholder-text  placeholder 文字 (收到 --text-muted 档, 白底 4.65:1) */
   --border-dot: #c9cdd4;
+  --placeholder-text: var(--text-muted);
   --border-row: #eff0f4;
   --hero-grad-1: #dcecff;
   --hero-grad-2: #e2edff;
@@ -212,6 +227,20 @@
   --mif-surface-info: #7c6fbb;        /* 消息 info 文字 */
   --mif-surface-error: #d75a70;       /* 消息 error 文字 */
   --mif-surface-remove-hover: #ee6b83;
+
+  /* 结果状态徽标：文字提供语义，颜色只做辅助区分 */
+  --mif-status-generating-text: #5d50c5;
+  --mif-status-generating-bg: #f1efff;
+  --mif-status-generating-border: #dcd7ff;
+  --mif-status-complete-text: #157f5d;
+  --mif-status-complete-bg: #eaf8f2;
+  --mif-status-complete-border: #c9ebdf;
+  --mif-status-partial-text: #9a6213;
+  --mif-status-partial-bg: #fff6e3;
+  --mif-status-partial-border: #f1ddb0;
+  --mif-status-failed-text: #c6455e;
+  --mif-status-failed-bg: #fff0f3;
+  --mif-status-failed-border: #f1ccd4;
 
   /* 描边 */
   --mif-border-card: #ebeaf3;         /* 卡片描边 */
@@ -407,11 +436,15 @@
   --text-3: #475467;
   --text-4: #526077;
   --text-5: #596273;
-  --text-6: #697386;
+  --text-6: #656e81;
   --text-7: #777181;
-  --text-8: #8b94a3;
-  --text-9: #9aa1ad;
-  --text-10: #b6bcc8;
+  /* 弱尾三级 (2026-11-03): 原 #8b94a3/#9aa1ad/#b6bcc8 在白底只有
+     3.06/2.60/1.91:1, 且三级之间 ΔE<14、末级与边框灰同色 —— 视觉上
+     已是"装饰灰"而非"文字灰"。三级改为指向 --text-muted (色值只定义一处),
+     层级交给字号/字重, 不再靠继续压暗区分。 */
+  --text-8: var(--text-muted);
+  --text-9: var(--text-muted);
+  --text-10: var(--text-muted);
 
   /* 商品 SKU 页 */
   --sku-border-brand-1: #604bf0;
@@ -519,7 +552,6 @@
   --alp-border-2: #d8dbe5;
   --alp-border-3: #d9dce8;
   --alp-border-4: #e2e5ed;
-  --alp-border-5: #e4e5ee;
   --alp-border-6: #e3e6ee;
   --alp-border-7: #e5e8f0;
   --alp-border-8: #eef0f5;
@@ -528,7 +560,6 @@
   --alp-surface-brand-2: #6353eb;
   --alp-surface-brand-3: #efeffa;
   --alp-surface-brand-4: #f4f2ff;
-  --alp-surface-brand-5: #f5f4ff;
   --alp-surface-brand-6: #f7f8fd;
   --alp-surface-info: #fbfcfe;
   --alp-surface-1: #e7e9ef;
@@ -851,44 +882,10 @@ body {
   flex-direction: column;
   margin-top: 12px;
 }
-/* 参考站 .auth-field 340x48, 无 label 行 (只有 placeholder), 两框间距 18px (350→416) */
+/* 参考站 .auth-field 340x48, 无 label 行 (只有 placeholder), 两框间距 18px (350→416)
+   输入框的形态规则见文件末尾「登录 / 认证卡片」小节（.login-input-* 系列）。 */
 .login-field {
   margin-bottom: 18px;
-}
-.login-field .ant-form-item-label {
-  display: none;
-}
-/* 校验错误文案占位: 参考站无红字校验(前端校验在提交时), 本地保留 antd 默认行高 */
-.login-field .ant-form-item-explain-error {
-  font-size: 12px;
-  line-height: 18px;
-  padding-top: 4px;
-}
-.login-field .ant-input-affix-wrapper {
-  height: 48px;
-  padding: 0 20px;
-  border-radius: 8px;
-  background: var(--color-border-soft);
-  border: 1px solid var(--border);
-  box-shadow: none;
-  font-size: 14px;
-  line-height: 22px;
-}
-.login-field .ant-input-affix-wrapper:hover {
-  border-color: var(--login-border-brand);
-}
-.login-field .ant-input-affix-wrapper-focused {
-  border-color: var(--brand);
-  box-shadow: 0 0 0 3px rgba(98, 93, 245, 0.1);
-}
-.login-field .ant-input {
-  background: transparent;
-  font-size: 14px;
-  color: var(--text-1);
-}
-.login-field .ant-input-prefix {
-  color: var(--text-desc);
-  margin-right: 10px;
 }
 
 /* 参考站 .auth-submit: 340x48 / linear-gradient(90deg,#8064f6,#5546d8) / 14px 600 / radius 8 */
@@ -1117,7 +1114,7 @@ body {
   margin-bottom: 12px;
 }
 .qr-confirm-icon.is-ok {
-  color: var(--success-text, var(--color-success));
+  color: var(--success-text);
 }
 .qr-confirm-icon.is-warn {
   color: var(--danger-text);
@@ -1524,34 +1521,8 @@ body {
 /* 下拉菜单皮肤: 逐值对齐参考站 .workspace-nav-menu
    (实测 1280: 宽 137 / radius 12 / border 1px #e5e7f0 / shadow 0 18px 42px rgba(31,41,55,.14) /
     pad 10 8 / 条目 119x36 radius 9 pad 0 12 / 文字 13px 600 #475467 / icon 20 /
-    条目 hover #f2efff + #5b4df5) —— antd 默认皮肤全部不符, 见 docs/topnav-design.md P2-1 */
-.app-topnav-dropdown .ant-dropdown-menu {
-  min-width: 137px;
-  padding: 10px 8px;
-  border-radius: 12px;
-  border: 1px solid var(--border-2);
-  background: var(--card-bg);
-  box-shadow: 0 18px 42px rgba(31, 41, 55, 0.14);
-}
-/* 选择器必须比 antd 运行时注入的 `.ant-dropdown .ant-dropdown-menu-item` (0,2,0) 更specific ——
-   媒体查询不增加特异性、同特异性靠源码顺序, 而 antd cssinjs 的style 标签是运行时插入的,
-   顺序不可控。故这里补一层 .ant-dropdown-menu 提到 (0,3,0)。 */
-.app-topnav-dropdown .ant-dropdown-menu .ant-dropdown-menu-item {
-  height: 36px;
-  padding: 0 12px;
-  border-radius: 9px;
-  gap: 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-3);
-}
-.app-topnav-dropdown .ant-dropdown-menu .ant-dropdown-menu-item:not(.ant-dropdown-menu-item-disabled):hover {
-  background: var(--surface-brand-4);
-  color: var(--text-brand-2);
-}
-.app-topnav-dropdown .ant-dropdown-menu .ant-dropdown-menu-item-disabled {
-  color: var(--shell-text-2);
-}
+    条目 hover #f2efff + #5b4df5) —— antd 默认皮肤全部不符, 见 docs/topnav-design.md P2-1
+   实际生效的选择器在文件末尾「顶部导航下拉」适配层（Radix Content 取代 .ant-dropdown-menu）。 */
 /* guest「登录/注册」纯文字钮: 参考站 #workspace-logout (68x32 / pad 8 / radius 6 / 13-700 #667085) */
 .app-guest-login {
   background: transparent;
@@ -2800,16 +2771,6 @@ html[data-promo='off'] {
   max-width: 1100px;
   margin: 0 auto;
 }
-/*
- * 带货图文: 通用工具页去掉 1100px 上限。
- *
- * 该能力的表单比其它工具页宽（四组下拉 2×2 + 卖点文本域 + 模式两选一卡），
- * 1100px 内会被挤成窄列, 与同能力的专用页 (/shoppable-carousel) 观感割裂。
- * 只对本能力放开, 其它工具页的阅读宽度保持不变。
- */
-.tool-page[data-capability='shoppable_carousel'] {
-  max-width: none;
-}
 .tool-back {
   margin-left: -8px;
   margin-bottom: 4px;
@@ -2841,7 +2802,7 @@ html[data-promo='off'] {
 }
 .tool-tag-free {
   background: rgba(234, 88, 12, 0.12);
-  color: var(--color-cta);
+  color: var(--color-cta-text);
   border: none;
 }
 .tool-tag-mode {
@@ -2850,7 +2811,7 @@ html[data-promo='off'] {
 }
 .tool-tag-real {
   background: rgba(22, 163, 74, 0.12);
-  color: var(--color-success);
+  color: var(--color-success-text);
 }
 .tool-tag-planned {
   background: var(--color-slate-100);
@@ -3217,12 +3178,25 @@ html[data-promo='off'] {
   white-space: nowrap;
 }
 /*
- * 只匹配**原生**控件 (product-detail / viral-clone 仍在用)。
- * 排除 antd 的 .ant-input 与 Select 内部的输入框 (v5 为
- * .ant-select-selection-search-input, v6 为 .ant-select-input) ——
- * 否则它们会被这里的 height/border/padding 二次覆盖, 出现双边框或遮住已选文案。
+ * 生成设置的紧凑控件：参考站表单项 196×32 / radius 4 / 边 #E5E7EF / 内边距 5px 12px。
+ *
+ * 兼容壳 Input 的 DOM 是 <input class="ant-input ui-input">，Select 的触发器是
+ * <button class="ui-select-trigger">（尺寸见文件末尾「表单控件」适配层）；
+ * 此处只覆盖 Input，原生控件（若再引入）走下面的通用规则。
  */
-.pk-field input:not(.ant-input):not(.ant-select-input):not(.ant-select-selection-search-input),
+.pk-field .ui-input,
+.pk-field .login-input-inner {
+  height: 32px;
+  padding: 5px 12px;
+  border-color: var(--border);
+  border-radius: var(--radius-tag);
+  font-size: 14px;
+  color: var(--wb-text);
+}
+.pk-field .ui-input::placeholder {
+  color: var(--border-dot);
+}
+.pk-field input:not(.ui-input):not(.login-input-inner),
 .pk-field select {
   width: 100%;
   height: 32px;
@@ -3235,39 +3209,12 @@ html[data-promo='off'] {
   background: var(--card-bg);
   outline: none;
 }
-.pk-field input:not(.ant-input):not(.ant-select-input):not(.ant-select-selection-search-input):focus,
+.pk-field input:not(.ui-input):not(.login-input-inner):focus,
 .pk-field select:focus {
   border-color: var(--brand-light);
 }
-.pk-field input:not(.ant-input):not(.ant-select-input):not(.ant-select-selection-search-input)::placeholder {
+.pk-field input:not(.ui-input):not(.login-input-inner)::placeholder {
   color: var(--border-dot);
-}
-/* ── 生成设置: antd 控件 (product-kit 使用 antd Input / Select) ──
-   参考站表单项 196×32 / radius 4 / 边 #E5E7EF / 内边距 5px 12px。
-
-   上方 `.pk-field input` 是给 product-detail / viral-clone 的原生控件留的,
-   Select 内部的输入框已在上方排除; 这里只统一 antd 控件的外观。 */
-.pk-field .ant-input {
-  height: 32px;
-  padding: 5px 12px;
-  border-color: var(--border);
-  border-radius: var(--radius-tag);
-  font-size: 14px;
-  color: var(--wb-text);
-}
-.pk-field .ant-input::placeholder {
-  color: var(--border-dot);
-}
-.pk-field .ant-select {
-  width: 100%;
-  height: 32px;
-  border-color: var(--border);
-  border-radius: var(--radius-tag);
-  font-size: 14px;
-  color: var(--wb-text);
-}
-.pk-field .ant-select .ant-select-content {
-  line-height: 22px;
 }
 
 /* 商品描述 */
@@ -5047,16 +4994,14 @@ img[data-broken='1'] {
   position: relative;
   aspect-ratio: 1 / 1;
   overflow: hidden;
-  border: 1px solid var(--border-soft);
+  border: 0;
   border-radius: var(--radius-control);
   background: var(--surface);
 }
 .vc-compare-card.is-reference .vc-compare-media {
-  border-color: color-mix(in srgb, var(--brand-light) 55%, var(--border-soft));
   background: var(--brand-bg);
 }
 .vc-compare-card.is-output .vc-compare-media {
-  border-color: color-mix(in srgb, var(--brand) 32%, var(--border-soft));
   background: var(--brand-bg);
 }
 .vc-compare-open {
@@ -5067,6 +5012,7 @@ img[data-broken='1'] {
   padding: 0;
   overflow: hidden;
   border: 0;
+  box-sizing: border-box;
   background: transparent;
   cursor: zoom-in;
 }
@@ -5084,6 +5030,7 @@ img[data-broken='1'] {
   width: 100%;
   height: 100%;
   display: flex;
+  flex-direction: column;
   gap: 4px;
   padding: 4px;
   box-sizing: border-box;
@@ -5091,21 +5038,21 @@ img[data-broken='1'] {
 .vc-product-gallery > .vc-compare-open {
   flex: 1;
   min-width: 0;
-  height: 100%;
+  min-height: 0;
+  height: auto;
   border-radius: calc(var(--radius-control) - 2px);
 }
 .vc-product-rail {
   flex: none;
-  width: 44px;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  width: 100%;
+  height: 48px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 4px;
 }
 .vc-product-rail .vc-compare-open {
-  flex: 1 1 0;
-  max-height: 48px;
+  width: 100%;
+  height: 100%;
   min-height: 0;
   border-radius: 5px;
 }
@@ -5232,22 +5179,6 @@ img[data-broken='1'] {
   font-weight: 600;
   line-height: 18px;
 }
-.vc-compare-caption small {
-  color: var(--text-desc);
-  font-size: 12px;
-  line-height: 16px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.vc-result-preview-hint {
-  display: block;
-  margin-top: 8px;
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 16px;
-  text-align: right;
-}
 .vc-spin {
   animation: vc-spin 0.9s linear infinite;
 }
@@ -5290,10 +5221,6 @@ img[data-broken='1'] {
     gap: 6px;
   }
   .vc-result-degree {
-    display: none;
-  }
-  .vc-compare-caption small,
-  .vc-result-preview-hint {
     display: none;
   }
   .vc-compare-caption strong {
@@ -6441,11 +6368,6 @@ img[data-broken='1'] {
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 12px;
 }
-.work-card .ant-card-body {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
 .work-card-preview {
   position: relative;
   width: 100%;
@@ -6497,9 +6419,6 @@ img[data-broken='1'] {
   display: flex;
   gap: 8px;
 }
-.work-card-actions .ant-btn {
-  flex: 1;
-}
 
 .library-grid {
   display: grid;
@@ -6544,16 +6463,54 @@ img[data-broken='1'] {
   justify-content: center;
 }
 
-/* ── 数据中心 ────────────────────────────────────────────────────────────
-   2026-10-30 重排:
-   - 六块等宽 antd Card + Statistic 改为四块分层指标 (任务数带成功/失败/进行中,
-     成功率带进度条): 原先把「失败 6」和「已完成 110」画得一样大, 没有主次;
-   - 柱状图补基线 / 周几 / 峰值, 当天实心品牌色、其余降透明, 0 天留 2px 底座,
-     不再是一根贴着底的时间轴;
-   - 能力分布由 antd Table 改为列表: 每行带最近产出缩略图, 去掉重复六次的
-     「已接入」标签 (全部能力都是真实模型, 这个标签不含信息);
-   - 最近任务并入右栏与趋势图等高, 不再独占一条满宽列表。
-   宽度/页头仍由 .personal-page 骨架提供, 区块间距用骨架的 16px gap。 */
+/* ── 数据中心（C 端） ───────────────────────────────────────────────────
+   只展示作品积累、创作次数、近期趋势、最近作品和常用能力。
+   成功率、失败数、模型模式等运营指标留给后台，不进入用户侧页面。
+   宽度/页头由 .personal-page 骨架提供，区块间距使用骨架的 16px gap。 */
+
+.stats-page-summary {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.stats-updated-at {
+  color: var(--text-desc);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.stats-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--brand);
+  font-size: 12px;
+}
+.stats-live i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: stats-live-pulse 1.8s ease-out infinite;
+}
+@keyframes stats-live-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 42%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 5px transparent; }
+}
+.stats-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.stats-refresh-error {
+  max-width: 190px;
+  overflow: hidden;
+  color: var(--danger-text);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 
 .stats-kpis {
   display: grid;
@@ -6597,20 +6554,6 @@ img[data-broken='1'] {
 .stats-kpi-sub b.is-bad {
   color: var(--danger-text);
 }
-.stats-kpi-meter {
-  height: 6px;
-  margin-top: 2px;
-  border-radius: var(--radius-pill);
-  background: var(--surface);
-  overflow: hidden;
-}
-.stats-kpi-meter i {
-  display: block;
-  height: 100%;
-  border-radius: inherit;
-  background: var(--brand);
-}
-
 .stats-panel {
   display: flex;
   flex-direction: column;
@@ -6637,6 +6580,44 @@ img[data-broken='1'] {
   font-size: 12px;
   color: var(--text-desc);
   font-variant-numeric: tabular-nums;
+}
+
+.stats-empty-panel {
+  flex-direction: row;
+  align-items: center;
+  gap: 18px;
+  min-height: 132px;
+  padding: 24px 26px;
+  background:
+    radial-gradient(circle at 0 0, var(--brand-bg) 0, transparent 42%),
+    var(--card-bg);
+}
+.stats-empty-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  color: var(--brand);
+  background: var(--brand-bg);
+}
+.stats-empty-copy {
+  flex: 1;
+  min-width: 0;
+}
+.stats-empty-copy h3 {
+  margin: 0 0 4px;
+  color: var(--text-strong);
+  font-size: 16px;
+  font-weight: 600;
+}
+.stats-empty-copy p {
+  margin: 0;
+  color: var(--text-desc);
+  font-size: 13px;
+  line-height: 20px;
 }
 
 /* 趋势图与最近任务双栏: 两栏等高, 图随右栏行数自然长高 */
@@ -6682,10 +6663,13 @@ img[data-broken='1'] {
   max-width: 44px;
   min-height: 2px;
   border-radius: var(--radius-tag) var(--radius-tag) 0 0;
-  background: color-mix(in srgb, var(--brand) 40%, var(--card-bg));
+  background: color-mix(in srgb, var(--brand) 38%, var(--card-bg));
   transition: background 0.15s ease;
 }
 .stats-trend-col.is-today .stats-trend-bar {
+  background: var(--brand);
+}
+.stats-trend-col:hover .stats-trend-bar {
   background: var(--brand);
 }
 .stats-trend-bar.is-zero {
@@ -6720,15 +6704,32 @@ img[data-broken='1'] {
   padding: 0;
   list-style: none;
 }
+.stats-recent > li {
+  border-bottom: 1px solid var(--border-row);
+}
+.stats-recent > li:last-child {
+  border-bottom: 0;
+}
 .stats-recent-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border-row);
+  width: 100%;
+  padding: 8px 6px;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  transition: background 0.15s ease;
 }
-.stats-recent-row:last-child {
-  border-bottom: 0;
+.stats-recent-row:hover {
+  background: var(--surface-soft);
+}
+.stats-recent-row:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
 }
 .stats-recent-thumb {
   display: block;
@@ -6780,11 +6781,24 @@ img[data-broken='1'] {
   background: var(--warn-bg);
   color: var(--warn-text);
 }
+.stats-task-status.is-muted {
+  background: var(--surface);
+  color: var(--text-muted);
+}
+.stats-recent-arrow {
+  flex: none;
+  color: var(--text-desc);
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+.stats-recent-row:hover .stats-recent-arrow {
+  color: var(--brand);
+  transform: translateX(2px);
+}
 
 .stats-caps-head,
 .stats-cap {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 160px 200px;
+  grid-template-columns: minmax(0, 1fr) 120px minmax(180px, 260px);
   align-items: center;
   gap: 16px;
 }
@@ -6794,8 +6808,8 @@ img[data-broken='1'] {
   font-size: 12px;
   color: var(--text-desc);
 }
-/* 数字列的表头右对齐, 否则「任务 / 成功」浮在数字左侧几十像素外 */
-.stats-caps-head > span:nth-child(2) {
+/* 数字列标题对齐对应的数值和占比条 */
+.stats-caps-head > span:nth-child(n + 2) {
   text-align: right;
 }
 .stats-caps-list {
@@ -6832,31 +6846,35 @@ img[data-broken='1'] {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.stats-cap-mode {
-  flex: none;
-  padding: 0 6px;
-  border-radius: var(--radius-tag);
-  font-size: 12px;
-  line-height: 18px;
-  background: var(--warn-bg);
-  color: var(--warn-text);
-}
-.stats-cap-nums {
+.stats-cap-count {
   display: flex;
+  align-items: baseline;
   justify-content: flex-end;
-  gap: 12px;
-  font-size: 13px;
-  color: var(--text-body);
+  gap: 4px;
   font-variant-numeric: tabular-nums;
 }
-.stats-cap-nums > span {
-  width: 64px;
-  text-align: right;
+.stats-cap-count b {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-body);
 }
-.stats-cap-rate {
+.stats-cap-count em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--text-desc);
+  white-space: nowrap;
+}
+.stats-cap-share {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
+}
+.stats-cap-share.is-empty {
+  opacity: 0.55;
+}
+.stats-cap-share.is-empty .stats-cap-bar i {
+  display: none;
 }
 .stats-cap-bar {
   flex: 1;
@@ -6871,17 +6889,14 @@ img[data-broken='1'] {
   border-radius: inherit;
   background: var(--brand);
 }
-.stats-cap-rate em {
+.stats-cap-share > em {
   flex: none;
-  width: 38px;
+  width: 40px;
   font-style: normal;
   font-size: 12px;
   text-align: right;
   color: var(--text-body);
   font-variant-numeric: tabular-nums;
-}
-.stats-cap-rate em.is-low {
-  color: var(--danger-text);
 }
 
 @media (max-width: 900px) {
@@ -6911,25 +6926,15 @@ img[data-broken='1'] {
     display: none;
   }
   .stats-cap {
-    grid-template-columns: minmax(0, 1fr);
-    row-gap: 6px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
     padding: 12px 0;
   }
-  .stats-cap-nums {
-    justify-content: flex-start;
+  .stats-cap-count {
+    justify-content: flex-end;
   }
-  .stats-cap-nums > span {
-    width: auto;
-    text-align: left;
-  }
-  /* 移动端没有表头, 数字补上标签, 否则「52 48」看不出哪个是成功数 */
-  .stats-cap-nums > span:first-child::before {
-    content: '任务 ';
-    color: var(--text-desc);
-  }
-  .stats-cap-nums > span + span::before {
-    content: '成功 ';
-    color: var(--text-desc);
+  .stats-cap-share {
+    grid-column: 1 / -1;
   }
 }
 
@@ -11078,6 +11083,50 @@ ol.product-sku-steps {
   gap: var(--mif-gap-result);
   margin-bottom: 17px;
   display: flex;
+}
+.multi-image-fusion-result-heading-copy {
+  min-width: 0;
+}
+.multi-image-fusion-result-meta {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  display: flex;
+}
+.multi-image-fusion-result-meta p {
+  margin: 0;
+}
+.multi-image-fusion-result-status {
+  border: 1px solid;
+  border-radius: var(--mif-radius-pill);
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  font-size: var(--mif-small-size);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  display: inline-flex;
+}
+.multi-image-fusion-result-status.is-generating {
+  color: var(--mif-status-generating-text);
+  background: var(--mif-status-generating-bg);
+  border-color: var(--mif-status-generating-border);
+}
+.multi-image-fusion-result-status.is-complete {
+  color: var(--mif-status-complete-text);
+  background: var(--mif-status-complete-bg);
+  border-color: var(--mif-status-complete-border);
+}
+.multi-image-fusion-result-status.is-partial {
+  color: var(--mif-status-partial-text);
+  background: var(--mif-status-partial-bg);
+  border-color: var(--mif-status-partial-border);
+}
+.multi-image-fusion-result-status.is-failed {
+  color: var(--mif-status-failed-text);
+  background: var(--mif-status-failed-bg);
+  border-color: var(--mif-status-failed-border);
 }
 /* D-71/D-72: 结果标题 18px/700, 副标题 12px/19px #9897aa (本地原先缺副标题) */
 .multi-image-fusion-result-heading h2 {
@@ -15744,9 +15793,6 @@ ol.product-sku-steps {
   --pkg-line: var(--border);
   --pkg-muted: var(--text-muted);
   --pkg-text: var(--text-strong);
-  --pkg-success: var(--success-text);
-  --pkg-warn: var(--warn-text);
-  --pkg-warn-bg: var(--warn-bg);
   --pkg-card: var(--card-bg);
   animation: 0.35s both fadeIn;
 }
@@ -16877,17 +16923,8 @@ ol.product-sku-steps {
   color: var(--credits-minus);
   font-weight: 600;
 }
-/* 批次状态: 深色前景 + 淡底胶囊, 不再用 antd 预设 success / error 的 2.41:1 绿字 */
-.credits-status.ant-tag {
-  margin-inline-end: 0;
-  height: 22px;
-  padding: 0 8px;
-  border: none;
-  border-radius: var(--radius-pill);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 22px;
-}
+/* 批次状态: 深色前景 + 淡底胶囊, 不再用 antd 预设 success / error 的 2.41:1 绿字
+   （Tag 的 DOM 形见文件末尾「状态标签」适配层 .credits-status.ui-tag） */
 .credits-status.is-active {
   color: var(--credits-plus);
   background: var(--success-soft-bg);
@@ -17195,9 +17232,6 @@ ol.product-sku-steps {
   font-size: 12px;
   color: var(--text-muted);
 }
-.order-field .ant-select {
-  width: 100%;
-}
 .order-form-error {
   margin: 10px 0 0;
   font-size: 12px;
@@ -17230,14 +17264,8 @@ ol.product-sku-steps {
   .order-action-btns {
     width: 100%;
   }
-  .order-action-btns .ant-btn {
-    flex: 1;
-  }
   .order-invoice-grid {
     grid-template-columns: minmax(0, 1fr);
-  }
-  .order-invoice-actions .ant-btn {
-    flex: 1;
   }
 }
 
@@ -18180,7 +18208,7 @@ ol.product-sku-steps {
   align-items: center;
   gap: 12px;
   padding: 32px 0;
-  color: var(--color-success);
+  color: var(--color-success-text);
 }
 .mu-done-text {
   margin: 0;
@@ -19184,10 +19212,6 @@ ol.product-sku-steps {
   align-items: stretch;
   gap: 8px;
 }
-.login-code-row .ant-input-affix-wrapper {
-  flex: 1 1 auto;
-  min-width: 0;
-}
 .login-code-btn {
   flex: 0 0 auto;
   width: 108px;
@@ -19212,20 +19236,9 @@ ol.product-sku-steps {
   background: var(--card-bg);
 }
 
-/* 注册协议勾选: 文案较长, 必须允许换行 (父级 login-agreement 是 nowrap) */
-.login-agree-field .ant-form-item-control-input {
-  min-height: 0;
-}
-.login-agree-field .ant-checkbox-wrapper {
-  align-items: flex-start;
-  font-size: 12px;
-  line-height: 18px;
-  color: var(--text-desc);
-  white-space: normal;
-}
-.login-agree-field .ant-checkbox {
-  margin-top: 3px;
-}
+/* 注册协议勾选: 文案较长, 必须允许换行 (父级 login-agreement 是 nowrap)
+   shadcn Checkbox 的根节点是 <button>（radix Primitive.button）, 文案是它的
+   children, 故这里按按钮 + 相邻文本选择, 不能写成 label。 */
 .login-agree-field a {
   color: var(--brand);
   margin: 0 2px;
@@ -19252,13 +19265,9 @@ ol.product-sku-steps {
   line-height: 20px;
   color: var(--text-desc);
 }
-.auth-plain-card .login-field .ant-form-item-label {
-  display: block;
-}
-.auth-plain-card .login-field .ant-form-item-label > label {
-  font-size: 13px;
-  color: var(--text-body);
-}
+/* 找回密码 / 重置密码的表单要显示 label 行（登录卡片不显示）——
+   等价规则见文件末尾「登录 / 认证卡片」适配层
+   (.auth-plain-card .login-field .ui-form-label) */
 .auth-plain-card .auth-plain-actions {
   margin-top: 16px;
   text-align: center;
@@ -19304,19 +19313,9 @@ ol.product-sku-steps {
   background: var(--brand-bg);
   color: var(--brand);
 }
-.app-notif-trigger .ant-badge {
-  display: inline-flex;
-}
-/* 未读角标压到 10px 并加 2px 白描边: 18px 铃铛上的默认角标会糊成一团红点 */
-.app-notif-trigger .ant-badge .ant-badge-count {
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  line-height: 16px;
-  font-size: 12px;
-  font-weight: 600;
-  box-shadow: 0 0 0 2px var(--color-card);
-}
+/* 未读角标压到 12px 并加 2px 白描边: 18px 铃铛上的默认角标会糊成一团红点。
+   角标的实际 DOM 是 .ui-badge-count（Badge 兼容壳不再输出 .ant-badge），
+   覆盖规则见文件末尾「消息角标」适配层。 */
 .app-notif-panel {
   width: 320px;
   max-width: calc(100vw - 32px);
@@ -19536,10 +19535,8 @@ ol.product-sku-steps {
   color: var(--text-body);
   overflow-wrap: anywhere;
 }
-/* antd 的 Input 默认 width:100%, 这里固定成输入框该有的宽度 */
-.account-nick-input.ant-input {
-  width: 220px;
-}
+/* 昵称输入框固定 220px（shadcn Input 默认 w-full）——
+   等价规则见文件末尾「账户」适配层 (.account-nick-input.ui-input) */
 .account-hint {
   font-size: 12px;
   line-height: 1.6;
@@ -19866,9 +19863,6 @@ ol.product-sku-steps {
 .account-actions > li.is-danger .account-action-title > svg {
   color: var(--danger-soft-text);
 }
-.account-actions .ant-btn {
-  flex: none;
-}
 
 .account-form {
   display: flex;
@@ -19921,20 +19915,10 @@ ol.product-sku-steps {
   .account-field-value {
     width: 100%;
   }
-  .account-nick-input.ant-input {
-    width: 100%;
-  }
-  /* 输入框已占满一行, 保存按钮跟着通栏, 否则半截按钮孤零零挂在左边 */
-  .account-field-value > .ant-btn {
-    flex: 1 1 100%;
-  }
   .account-actions > li {
     flex-direction: column;
     align-items: stretch;
     gap: 10px;
-  }
-  .account-actions > li .ant-btn {
-    width: 100%;
   }
 }
 
@@ -20066,10 +20050,11 @@ ol.product-sku-steps {
 .ticket-compose label.is-full {
   grid-column: 1 / -1;
 }
-/* 输入框样式交给 antd 自身: 再叠一层 border/padding 会与字数统计、缩放手柄打架 */
-/* antd 的字数统计默认绝对定位在输入框下沿, 会压到按钮行上; 改常规流内右对齐 */
-.ticket-compose .ant-input-data-count,
-.ticket-reply .ant-input-data-count {
+/* 输入框样式交给组件自身: 再叠一层 border/padding 会与字数统计、缩放手柄打架 */
+/* 字数统计默认绝对定位在输入框下沿, 会压到按钮行上; 改常规流内右对齐。
+   兼容壳输出的是 .login-textarea-count（.ant-input-data-count 已随 antd 移除）。 */
+.ticket-compose .login-textarea-count,
+.ticket-reply .login-textarea-count {
   position: static;
   display: block;
   padding: 2px 2px 0;
@@ -20321,16 +20306,12 @@ ol.product-sku-steps {
   .ticket-compose {
     padding: 16px;
   }
-  .ticket-reply-actions .ant-btn {
-    flex: 1 1 auto;
-  }
 }
 
-/* 抽屉宽度不得超过视口: antd Drawer 的 width/size 是固定像素, 不会自动收缩
-   （C 端仍在用 antd；后台用 shadcn Drawer，宽度由原语自己管） */
+/* 抽屉宽度不得超过视口: shadcn Sheet 的 `w-3/4 sm:max-w-sm` 在窄屏下本就
+   ≤ 视口; 这里只兜住调用方显式传入固定像素 width 的场景。 */
 @media (max-width: 760px) {
-  .ant-drawer-right > .ant-drawer-content-wrapper,
-  .ant-drawer-left > .ant-drawer-content-wrapper {
+  [data-slot='sheet-content'] {
     max-width: 100vw !important;
   }
 }
@@ -20577,6 +20558,9 @@ ol.product-sku-steps {
 .redraw-history-pane .redraw-history-card span {
   font-size: 12px;
 }
+.tool-history-preview-wrap {
+  position: relative;
+}
 .tool-history-preview {
   position: relative;
   display: block;
@@ -20605,6 +20589,29 @@ ol.product-sku-steps {
 .tool-history-preview:hover .tool-history-preview-icon,
 .tool-history-preview:focus-visible .tool-history-preview-icon {
   opacity: 1;
+}
+.tool-history-download {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  z-index: 2;
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 50%;
+  background: rgba(22, 25, 33, 0.72);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(22, 25, 33, 0.24);
+  text-decoration: none;
+  transition: background 0.16s, transform 0.16s;
+}
+.tool-history-download:hover,
+.tool-history-download:focus-visible {
+  background: var(--brand);
+  outline: none;
+  transform: translateY(-1px);
 }
 .redraw-history-loading {
   display: flex;
@@ -23016,17 +23023,7 @@ ol.product-sku-steps {
   gap: 6px;
   min-width: 0;
 }
-.personal-page-heading h3.ant-typography {
-  margin: 0;
-  font-size: 24px;
-  line-height: 1.3;
-  color: var(--text-strong);
-}
-.personal-page-heading .ant-typography-secondary {
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--text-muted);
-}
+/* 标题排版（Typography 不再输出 .ant-typography-*）见文件末尾「标题排版」适配层 */
 .personal-page-extra {
   flex: none;
   display: flex;
@@ -23052,19 +23049,16 @@ ol.product-sku-steps {
 .personal-page.stats-page {
   padding: 0;
 }
+/* 数据中心使用工作台级宽度，不再受个人页 1120px 的内容上限约束。 */
+.personal-page.stats-page {
+  max-width: none;
+}
 
 /* 积分页 */
 .credits-hero {
   border: 1px solid var(--border) !important;
   border-radius: var(--radius-panel) !important;
   background: linear-gradient(120deg, var(--brand-bg) 0%, var(--card-bg) 62%) !important;
-}
-.credits-hero .ant-card-body {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 20px 24px;
 }
 .credits-hero-main {
   display: flex;
@@ -23121,20 +23115,11 @@ ol.product-sku-steps {
 .credits-stats {
   margin-bottom: 0;
 }
-.credits-stat-card .ant-card-body {
-  padding: 14px 16px;
-}
 .credits-stat-card .credits-stat-label {
   margin-bottom: 4px;
 }
 .credits-list-card {
   border-radius: var(--radius-panel) !important;
-}
-.credits-list-card .ant-card-body {
-  padding: 16px 20px 20px;
-}
-.credits-list-card .ant-tabs-nav {
-  margin-bottom: 12px;
 }
 
 /*
@@ -23194,7 +23179,7 @@ ol.product-sku-steps {
 }
 
 /* 邀请页 */
-.invite-hero-actions .ant-btn {
+.invite-hero-actions .ui-btn {
   height: 36px;
   padding-inline: 16px;
   border-radius: var(--radius-control);
@@ -23217,31 +23202,12 @@ ol.product-sku-steps {
     gap: 10px;
     margin-bottom: 16px;
   }
-  .personal-page-heading h3.ant-typography {
-    font-size: 21px;
-  }
   .personal-page-extra {
     width: 100%;
     flex-wrap: wrap;
   }
-  .personal-page-extra .ant-btn.ant-btn-primary {
-    flex: 1 1 auto;
-    min-width: 0;
-  }
-  .credits-hero .ant-card-body {
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 18px;
-  }
   .credits-hero-side {
     text-align: left;
-  }
-  .credits-list-card .ant-card-body {
-    padding: 12px 14px 16px;
-  }
-  /* 四个快捷入口在手机上排成两行两列, 比挤成一行或竖着排四个都好按 */
-  .account-quick .ant-btn {
-    flex: 1 1 calc(50% - 4px);
   }
   .ticket-compose {
     grid-template-columns: 1fr;
@@ -23254,9 +23220,6 @@ ol.product-sku-steps {
     grid-column: auto;
     flex-wrap: wrap;
   }
-  .ticket-compose-actions .ant-btn {
-    flex: 1 1 auto;
-  }
   .invite-hero h1 {
     font-size: 23px;
     line-height: 1.35;
@@ -23264,21 +23227,15 @@ ol.product-sku-steps {
   .invite-hero-actions {
     flex-wrap: wrap;
   }
-  .invite-hero-actions .ant-btn {
-    flex: 1 1 auto;
-  }
-  .stats-page .stat-tile .ant-statistic-content {
-    font-size: 21px;
-  }
 }
 
-/* ───────── 局部重绘：方形画布舞台（2026-10-26） ────────────────────────
+/* ───────── 局部重绘：原图比例画布舞台（2026-10-26） ────────────────────
  *
  * 参考站 reference/ijihua/index.pretty.css:
  *   .local-redraw-stage     flex + center + relative
  *   .redraw-stage-topbar    position:absolute; top:0; width:100%
  *   .redraw-toolbar         width:532px; height:40px; absolute 居中
- *   .redraw-canvas-wrap     aspect-ratio:1; width:min(680px, 100% - 80px, …)
+ *   .redraw-canvas-wrap     按原图宽高比布局; width 受可用宽高共同约束
  *   .canvas-footer-toolbar  absolute; bottom:45px; 居中
  *   .shortcut-hint          absolute; bottom:8px; 居中
  *
@@ -23337,11 +23294,17 @@ ol.product-sku-steps {
   justify-content: center;
 }
 .pk-workspace.local-redraw-page .redraw-canvas-wrap {
+  --redraw-image-aspect: 1;
+  position: relative;
   flex: none;
-  width: min(680px, calc(100% - 80px), calc(100vh - var(--workspace-topbar-height) - 144px));
+  width: min(
+    680px,
+    calc(100% - 80px),
+    calc((100vh - var(--workspace-topbar-height) - 144px) * var(--redraw-image-aspect))
+  );
   max-width: 100%;
   max-height: 100%;
-  aspect-ratio: 1;
+  aspect-ratio: var(--redraw-image-aspect);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -23370,6 +23333,80 @@ ol.product-sku-steps {
 .pk-workspace.local-redraw-page .redraw-stage.is-submitting .redraw-toolbar {
   pointer-events: none;
   opacity: 0.72;
+}
+.pk-workspace.local-redraw-page .redraw-result-stage {
+  flex: 1;
+  min-height: 0;
+}
+.pk-workspace.local-redraw-page .redraw-result-stage .stage-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 0;
+}
+.pk-workspace.local-redraw-page .redraw-result-stage .stage-actions button,
+.pk-workspace.local-redraw-page .redraw-result-stage .stage-actions a {
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--brand);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--brand);
+  font-size: 12px;
+  line-height: 18px;
+  text-decoration: none;
+  cursor: pointer;
+}
+.pk-workspace.local-redraw-page .redraw-result-stage .stage-actions button:hover:not(:disabled),
+.pk-workspace.local-redraw-page .redraw-result-stage .stage-actions a:hover {
+  background: var(--brand-bg);
+}
+.pk-workspace.local-redraw-page .redraw-result-stage .stage-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.pk-workspace.local-redraw-page .redraw-result-preview {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: zoom-in;
+}
+.pk-workspace.local-redraw-page .redraw-result-preview .redraw-result-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.pk-workspace.local-redraw-page .redraw-result-download {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 6;
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 50%;
+  background: rgba(22, 25, 33, 0.76);
+  color: #fff;
+  box-shadow: 0 3px 10px rgba(22, 25, 33, 0.28);
+  text-decoration: none;
+  transition: background 0.16s, transform 0.16s;
+}
+.pk-workspace.local-redraw-page .redraw-result-download:hover,
+.pk-workspace.local-redraw-page .redraw-result-download:focus-visible {
+  background: var(--brand);
+  outline: none;
+  transform: translateY(-1px);
 }
 .pk-workspace.local-redraw-page .redraw-canvas-footer {
   position: absolute;
@@ -25230,7 +25267,20 @@ ol.product-sku-steps {
 
 /* ───────── C 端 shadcn 适配层（替代 antd 的兼容外观） ─────────
    只新增 ui-* / login-input-* 选择器，不改原有页面类。
-   颜色、圆角、字号全部消费 :root 令牌，保持与迁移前一致。 */
+   颜色、圆角、字号全部消费 :root 令牌，保持与迁移前一致。
+
+   【选择器与 DOM 的对应关系】页面样式只能命中真实存在的节点。当前
+   `frontend/src/ui/primitives/**` 实际输出的兼容类只有这些：
+     .ui-btn / .ui-tag / .ui-card / .ui-card-body / .ui-input
+     .ui-form-item / .ui-form-label / .ui-form-control / .ui-form-error
+     .ui-select-trigger / .ui-dropdown-content / .ui-dropdown-item
+     .ui-tabs-list / .ui-badge-count / .ui-text-secondary
+     .login-input-wrap / .login-input-inner / .login-input-prefix
+     .login-textarea-count
+     .ant-modal-container / .ant-modal-header / .ant-modal-body（弹窗外壳，见
+       ui/primitives/modal.tsx；这三个是**唯一**仍在用的 ant-* 类）
+   写页面样式时按这份清单取类名，不要照抄历史文档里的 .ant-btn /
+   .ant-input / .ant-select / .ant-card-body —— 它们已不存在，写了也不命中。 */
 
 .login-input-wrap {
   display: flex;
@@ -25321,12 +25371,28 @@ ol.product-sku-steps {
 .login-agree-field .ui-form-label {
   display: none;
 }
-.login-agree-field .ui-form-control > label {
+/* shadcn Checkbox 的根节点是 <button>（radix Primitive.button），协议文案是它的
+   children，因此换行与字号要落在按钮本身，不能写成 `> label`。
+   原子件带 `size-4`（16px 方块）+ `peer`，这里改回 auto 高度并按文本基线对齐。 */
+.login-agree-field .ui-form-control > button {
+  display: inline-flex;
   align-items: flex-start;
-  font-size: 12px;
-  line-height: 18px;
+  height: auto;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
   color: var(--text-desc);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+  text-align: left;
   white-space: normal;
+  cursor: pointer;
+}
+.login-agree-field .ui-form-control > button > [data-slot='checkbox-indicator'] {
+  margin-top: 2px;
+  flex: none;
 }
 .login-input-suffix {
   display: inline-flex;
@@ -25928,18 +25994,42 @@ ol.product-sku-steps {
 .invite-hero-actions .ui-btn {
   flex: 1;
 }
-@media (max-width: 900px) {
+/*
+ * 窄屏按钮布局。
+ *
+ * 每条规则的断点沿用它被替换掉的那条 antd 规则（不是统一成一个断点）：
+ * 订单 / 账户 / 工单原本是 640px，邀请页原本是 900px —— 合并成一个断点会
+ * 让其中一段在平板宽度提前生效，改变布局。
+ */
+@media (max-width: 640px) {
   .order-action-btns .ui-btn,
-  .order-invoice-actions .ui-btn,
-  .ticket-reply-actions .ui-btn,
-  .ticket-compose-actions .ui-btn,
-  .account-field-value > .ui-btn,
-  .account-actions > li .ui-btn {
+  .order-invoice-actions .ui-btn {
     flex: 1;
   }
+  .ticket-reply-actions .ui-btn {
+    flex: 1 1 auto;
+  }
+  /* 输入框已占满一行, 保存按钮跟着通栏, 否则半截按钮孤零零挂在左边 */
+  .account-field-value > .ui-btn {
+    flex: 1 1 100%;
+  }
+  .account-actions > li .ui-btn {
+    width: 100%;
+  }
+}
+@media (max-width: 900px) {
+  .ticket-compose-actions .ui-btn,
+  .invite-hero-actions .ui-btn {
+    flex: 1 1 auto;
+  }
+  /* 四个快捷入口在手机上排成两行两列, 比挤成一行或竖着排四个都好按 */
+  .account-quick .ui-btn {
+    flex: 1 1 calc(50% - 4px);
+  }
   .personal-page-extra .ui-btn:first-child {
-    /* 原 antd primary 在窄屏占满，与 22420 行规则同义 */
-    flex: 1;
+    /* 原 antd primary 在窄屏占满 */
+    flex: 1 1 auto;
+    min-width: 0;
   }
 }
 
@@ -25964,10 +26054,12 @@ ol.product-sku-steps {
 }
 @media (max-width: 900px) {
   .credits-hero .ui-card-body {
-    padding: 16px;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 18px;
   }
   .credits-list-card .ui-card-body {
-    padding: 14px 14px 18px;
+    padding: 12px 14px 16px;
   }
 }
 
@@ -25978,6 +26070,9 @@ ol.product-sku-steps {
   padding: 0 8px;
   border: none;
   border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 22px;
 }
 
 /* 表单控件：Select 触发器和 Input 仍沿用业务字段的 32px 小尺寸 */
@@ -26686,6 +26781,18 @@ ol.product-sku-steps {
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 16px;
 }
+/*
+ * 撑满滚动区: 分类模板够排两行时, 行高按 1fr 分掉剩余空间,
+ * 卡片长到与右栏同高, 不在「最近生成」上方留一段空白。
+ * 模板多到溢出时, `min-content` 保住内容高度, 网格照常内部滚动。
+ *
+ * 少于 5 张（往往只有一行）不撑: 单行被拉满会把三张缩略图裁成细条,
+ * 见 TemplateGrid 的 FILL_MIN_TEMPLATES。
+ */
+.sc-template-grid.is-fill {
+  min-height: 100%;
+  grid-auto-rows: minmax(min-content, 1fr);
+}
 .sc-template-grid-empty {
   padding: 40px 0;
   text-align: center;
@@ -26697,6 +26804,8 @@ ol.product-sku-steps {
 .sc-template-card {
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  height: 100%;
   padding: 7px 7px 9px;
   background: var(--card-bg);
   border: 1px solid var(--border);
@@ -26711,24 +26820,31 @@ ol.product-sku-steps {
   box-shadow: inset 0 0 0 1px var(--brand);
 }
 .sc-template-gallery {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
   gap: 4px;
+  /*
+   * 三张 3:4 并排时, 缩略图条的自然高度 ≈ 宽度 / 2.32
+   * （240 宽 → 77 槽宽 → 103 高）。模板多、网格内部滚动时用这个比例定自然高度;
+   * 分类模板少、卡片被行高撑高时 flex: 1 拿到确定高度, 比例让位于撑满 ——
+   * 缩略图跟着长高（object-fit: cover 裁切）, 不在「最近生成」上方留空白。
+   */
+  aspect-ratio: 2.32;
+  /*
+   * flex-basis 用 auto: 自然高度由上面的比例决定, 卡片被行高撑开时再 grow。
+   * 若用 0%（flex: 1 默认值）, 未撑满时缩略图条会被压扁到内容高度。
+   */
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: hidden;
   background: var(--surface-soft);
   border-radius: var(--radius-control);
 }
-/*
- * 缩略图槽按 3:4 自适应高度。
- *
- * 参考站实测槽位比例恒为 ~1.35 (1440: 94×127 / 1920: 108×146) ——
- * 高度跟着列宽走, 不是写死的像素值。本站此前固定 127px, 在 1920 的
- * 4 列下卡片比参考站矮 17px。改用 aspect-ratio 后两个视口都对得上。
- */
+/* 三张等分并铺满缩略图条; 高度由缩略图条决定, 不再单独声明比例 */
 .sc-template-slot {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
   overflow: hidden;
-  aspect-ratio: 3 / 4;
 }
 .sc-template-slot img {
   width: 100%;
@@ -26736,28 +26852,69 @@ ol.product-sku-steps {
   object-fit: cover;
   display: block;
 }
-.sc-template-preview {
-  position: absolute;
-  top: 6px;
-  left: 6px;
+/*
+ * 「查看图片」: 常显的次级按钮, 点开三张一组的弹窗。
+ * 参考站只有 hover 浮出的单图预览, 看不到整组; 这里把入口固定住,
+ * 用户不用先悬停才知道卡片里的三张图能看。
+ */
+.sc-template-actions {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  color: var(--text-strong);
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 6px;
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity 0.15s ease;
+  gap: 6px;
+  flex: none;
 }
-.sc-template-card:hover .sc-template-preview,
-.sc-template-preview:focus-visible {
-  opacity: 1;
+.sc-template-view {
+  flex: none;
+  padding: 5px 9px;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--text-body);
+  background: var(--surface-soft);
+  border: none;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+.sc-template-view:hover {
+  color: var(--brand);
+  background: var(--brand-bg);
+}
+
+/* 一组图总览弹窗: 三张并排, 点击单张进大图灯箱 */
+.sc-template-group {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.sc-template-group-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: zoom-in;
+}
+.sc-template-group-item img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  background: var(--surface-soft);
+  border-radius: var(--radius-card);
+}
+.sc-template-group-item:hover img {
+  box-shadow: 0 0 0 2px var(--brand);
+}
+.sc-template-group-item span {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-body);
+  text-align: center;
 }
 .sc-template-content {
   display: flex;
+  flex: none;
   align-items: flex-end;
   justify-content: space-between;
   gap: 8px;

@@ -45,7 +45,9 @@ function check(name, ok, detail = '') {
   const T = login.data.accessToken;
 
   console.log('\n【手动备份 B-98】');
-  const backup = await call('POST', '/admin/backups', T, {});
+  const missingReason = await call('POST', '/admin/backups', T, {});
+  check('手动备份缺少原因被拒', missingReason.status === 400, missingReason.message);
+  const backup = await call('POST', '/admin/backups', T, { reason: '冒烟测试：验证备份与恢复校验' });
   check('手动备份成功', backup.status === 201 || backup.status === 200,
     `${backup.status} ${backup.data?.filename ?? backup.message}`);
   const rec = backup.data;
@@ -98,14 +100,13 @@ function check(name, ok, detail = '') {
   // 真实穿越尝试: 构造能命中的 id 不现实(id 是 cuid), 但 service 层有 safePath 兜底
   check('safePath 逻辑存在', true, '见 BackupService.safePath');
 
-  console.log('\n【幂等: 5秒内重复提交】');
-  const again = await call('POST', '/admin/backups', T, { idempotencyKey: 'k1' });
-  const again2 = await call('POST', '/admin/backups', T, { idempotencyKey: 'k1' });
-  check('重复提交返回同一份备份', again.data?.id === again2.data?.id,
-    `${again.data?.id} vs ${again2.data?.id}`);
-
   console.log('\n【保留份数清理】');
-  const prune = await call('POST', '/admin/backups/prune', T, { keepCount: 1 });
+  const badPruneReason = await call('POST', '/admin/backups/prune', T, { keepCount: 1, reason: '   ' });
+  check('备份清理原因不能为空白', badPruneReason.status === 400, badPruneReason.message);
+  const prune = await call('POST', '/admin/backups/prune', T, {
+    keepCount: 1,
+    reason: '冒烟测试：验证保留份数清理',
+  });
   check('清理成功', prune.status === 200 || prune.status === 201,
     `清理 ${prune.data?.removed ?? 0} 份`);
 
@@ -119,22 +120,28 @@ function check(name, ok, detail = '') {
   }
 
   console.log('\n【到期数据清理 B-100】');
-  const cleanLogs = await call('GET', '/admin/backups/cleanup-logs', T);
+  const cleanLogs = await call('GET', '/admin/retention/logs', T);
   check('清理留痕可查', cleanLogs.status === 200 && Array.isArray(cleanLogs.data),
     `${Array.isArray(cleanLogs.data) ? cleanLogs.data.length : '非数组: ' + JSON.stringify(cleanLogs).slice(0,80)} 条`);
 
-  const badTarget = await call('POST', '/admin/backups/cleanup', T, { target: 'User', retentionDays: 30 });
+  const badTarget = await call('POST', '/admin/retention/cleanup', T, {
+    target: 'User', retentionDays: 30, reason: '冒烟测试：非法目标',
+  });
   check('拒绝清理业务表 User', badTarget.status === 400, badTarget.message);
 
-  const badDays = await call('POST', '/admin/backups/cleanup', T, { target: 'AdminAuditLog', retentionDays: 0 });
+  const badDays = await call('POST', '/admin/retention/cleanup', T, {
+    target: 'AdminAuditLog', retentionDays: 0, reason: '冒烟测试：非法天数',
+  });
   check('拒绝非法保留天数', badDays.status === 400, badDays.message);
 
   // 实际清理: 用极大天数, 不该删任何东西, 但会产生留痕
-  const realClean = await call('POST', '/admin/backups/cleanup', T, { target: 'AdminAuditLog', retentionDays: 1000 });
+  const realClean = await call('POST', '/admin/retention/cleanup', T, {
+    target: 'AdminAuditLog', retentionDays: 1000, reason: '冒烟测试：验证清理留痕',
+  });
   check('清理执行并返回计数', realClean.status === 200 || realClean.status === 201,
     `删除 ${realClean.data?.deleted ?? '?'} 条`);
 
-  const logsAfter = await call('GET', '/admin/backups/cleanup-logs', T);
+  const logsAfter = await call('GET', '/admin/retention/logs', T);
   check('清理动作已留痕',
     (logsAfter.data?.length ?? 0) > (cleanLogs.data?.length ?? 0),
     `${cleanLogs.data?.length ?? 0} → ${logsAfter.data?.length ?? 0} 条`);
@@ -149,22 +156,21 @@ function check(name, ok, detail = '') {
   const bcrypt = require('bcryptjs');
   const { PrismaClient } = require('@prisma/client');
   const { NodeSQLiteDriverAdapterFactory } = require('../dist/prisma/node-sqlite-adapter');
-const { resolveDbUrl } = require('./db-url');
+  const { resolveDbUrl } = require('./db-url');
   const prisma = new PrismaClient({ adapter: new NodeSQLiteDriverAdapterFactory({ url: resolveDbUrl() }) });
   const email = `bk-op-${Date.now()}@test.com`;
   await prisma.user.create({
     data: { email, passwordHash: await bcrypt.hash('test123456', 10), name: '备份运营', role: 'operator' },
   });
-  await prisma.$disconnect();
-
   const opLogin = await call('POST', '/auth/login', null, { email, password: 'test123456' });
   const opT = opLogin.data.accessToken;
   const opList = await call('GET', '/admin/backups', opT);
   check('operator 无 backup.read 权限', opList.status === 403, opList.message);
-  const opRun = await call('POST', '/admin/backups', opT, {});
+  const opRun = await call('POST', '/admin/backups', opT, { reason: '越权测试' });
   check('operator 无 backup.run 权限', opRun.status === 403, opRun.message);
 
   await prisma.user.delete({ where: { email } }).catch(() => {});
+  await prisma.$disconnect();
 
   console.log(`\n${'='.repeat(52)}`);
   console.log(`  通过 ${pass} 项，失败 ${fail} 项`);

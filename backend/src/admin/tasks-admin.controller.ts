@@ -1,5 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Post, Query, Req, Res } from '@nestjs/common';
-import type { Request, Response } from 'express';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Query,
+  Req,
+  Res,
+} from "@nestjs/common";
+import type { Request, Response } from "express";
 import {
   ArrayMaxSize,
   IsArray,
@@ -7,15 +17,21 @@ import {
   IsOptional,
   IsString,
   MaxLength,
-} from 'class-validator';
-import { AdminUser, AuditAction, RequirePermission, type AdminUser as AdminUserType } from './admin.decorator';
-import { AdminRoleService } from './admin-role.service';
-import { TasksAdminService } from './tasks-admin.service';
-import { PERMISSIONS } from './permissions';
-import { AppError } from '../common/app.exception';
-import { sendCsv } from '../common/csv-response';
+} from "class-validator";
+import {
+  AdminUser,
+  AuditAction,
+  RequireAllPermissions,
+  RequirePermission,
+  type AdminUser as AdminUserType,
+} from "./admin.decorator";
+import { AdminRoleService } from "./admin-role.service";
+import { TasksAdminService } from "./tasks-admin.service";
+import { PERMISSIONS } from "./permissions";
+import { AppError } from "../common/app.exception";
+import { sendCsv } from "../common/csv-response";
 // 值导入: DTO 依赖 design:paramtypes 做实例化与白名单剥离
-import { TaskListQueryDto } from './dto/task.dto';
+import { TaskListQueryDto } from "./dto/task.dto";
 
 /**
  * 重试/终止的操作原因。
@@ -44,12 +60,14 @@ export class TaskActionDto {
 /** 批量重试 / 终止 / 删除 */
 export class TaskBatchDto {
   @IsArray()
-  @ArrayMaxSize(100, { message: '单次批量最多 100 条' })
+  @ArrayMaxSize(100, { message: "单次批量最多 100 条" })
   @IsString({ each: true })
   ids!: string[];
 
-  @IsIn(['retry', 'cancel', 'delete'], { message: 'action 只能是 retry、cancel 或 delete' })
-  action!: 'retry' | 'cancel' | 'delete';
+  @IsIn(["retry", "cancel", "delete"], {
+    message: "action 只能是 retry、cancel 或 delete",
+  })
+  action!: "retry" | "cancel" | "delete";
 
   /** 重试/终止可选填操作原因; 删除原因由服务端自动记录 */
   @IsOptional()
@@ -58,7 +76,7 @@ export class TaskBatchDto {
   reason?: string;
 }
 
-@Controller('admin/tasks')
+@Controller("admin/tasks")
 export class AdminTasksController {
   constructor(
     private readonly tasks: TasksAdminService,
@@ -66,14 +84,14 @@ export class AdminTasksController {
   ) {}
 
   /** 拥堵指标 (B-31)。独立端点: 顶部告警条需高频刷新, 不必连带拉整页列表 */
-  @Get('stats')
+  @Get("stats")
   @RequirePermission(PERMISSIONS.taskRead)
   stats() {
     return this.tasks.congestion();
   }
 
   /** 能力下拉项。取自 registry 而非硬编码, 新增能力无需改前端 */
-  @Get('capabilities')
+  @Get("capabilities")
   @RequirePermission(PERMISSIONS.taskRead)
   capabilities() {
     return this.tasks.capabilityOptions();
@@ -86,9 +104,9 @@ export class AdminTasksController {
    * 删除要 `task.delete`。三者都会真实影响用户可见状态或产出，
    * 所以批量入口不能只凭 `task.read` 就放行。
    */
-  @Post('batch')
+  @Post("batch")
   @RequirePermission(PERMISSIONS.taskRead)
-  @AuditAction('task.batch')
+  @AuditAction("task.batch")
   async batch(
     @Body() dto: TaskBatchDto,
     @AdminUser() actor: AdminUserType,
@@ -99,15 +117,15 @@ export class AdminTasksController {
     },
   ) {
     // 删除无需运营填写原因，但审计仍要能回答“做了什么”，由服务端自动生成。
-    if (dto.action === 'delete') {
+    if (dto.action === "delete") {
       req.auditReason = `系统自动记录：批量删除 ${dto.ids.length} 个任务及其产出`;
-      req.auditExtra = { batchAction: 'delete', taskIds: dto.ids };
+      req.auditExtra = { batchAction: "delete", taskIds: dto.ids };
     }
 
     const needed =
-      dto.action === 'retry'
+      dto.action === "retry"
         ? PERMISSIONS.taskRetry
-        : dto.action === 'cancel'
+        : dto.action === "cancel"
           ? PERMISSIONS.taskCancel
           : PERMISSIONS.taskDelete;
     if (!(await this.roles.hasPermission(actor.id, needed))) {
@@ -129,18 +147,18 @@ export class AdminTasksController {
    * 路由必须声明在 `:id` 之前，否则 `export` 会被当成任务 id。
    * 导出把用户数据带出系统，用独立的 `data.export` 权限点并留审计。
    */
-  @Get('export')
-  @RequirePermission(PERMISSIONS.dataExport)
-  @AuditAction('data.export')
+  @Get("export")
+  @RequireAllPermissions(PERMISSIONS.taskRead, PERMISSIONS.dataExport)
+  @AuditAction("data.export")
   async export(@Query() query: TaskListQueryDto, @Res() res: Response) {
     const csv = await this.tasks.exportCsv(query);
-    sendCsv(res, 'tasks', csv);
+    sendCsv(res, "tasks", csv);
   }
 
   /** 任务详情: 输入素材 / 参数 JSON / 产出图 / 时间线 (B-30) */
-  @Get(':id')
+  @Get(":id")
   @RequirePermission(PERMISSIONS.taskRead)
-  detail(@Param('id') id: string) {
+  detail(@Param("id") id: string) {
     return this.tasks.detail(id);
   }
 
@@ -150,11 +168,11 @@ export class AdminTasksController {
    * 删除会清理任务记录、子任务、产出素材与存储文件, 不可恢复。
    * 排队中/执行中的任务必须先终止, 避免 worker 继续操作已删除的任务。
    */
-  @Delete(':id')
+  @Delete(":id")
   @RequirePermission(PERMISSIONS.taskDelete)
-  @AuditAction('task.delete')
+  @AuditAction("task.delete")
   remove(
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Req() req: Request & { auditReason?: string },
   ) {
     req.auditReason = `系统自动记录：删除任务 ${id} 及其产出`;
@@ -171,10 +189,10 @@ export class AdminTasksController {
    * ValidationPipe 按 TaskActionDto 校验并剥离字段 —— 不声明的话 reason
    * 会因 whitelist 直接被丢弃, 前端填的重试原因就永远进不了审计表。
    */
-  @Post(':id/retry')
+  @Post(":id/retry")
   @RequirePermission(PERMISSIONS.taskRetry)
-  @AuditAction('task.retry')
-  retry(@Param('id') id: string, @Body() _dto: TaskActionDto) {
+  @AuditAction("task.retry")
+  retry(@Param("id") id: string, @Body() _dto: TaskActionDto) {
     return this.tasks.retry(id);
   }
 
@@ -184,10 +202,10 @@ export class AdminTasksController {
    * 终止是作废用户已提交的动作, 属高危 —— 同样声明 DTO 让 reason
    * 能落进审计表 (理由同上, reason 由拦截器自行读取)。
    */
-  @Post(':id/cancel')
+  @Post(":id/cancel")
   @RequirePermission(PERMISSIONS.taskCancel)
-  @AuditAction('task.cancel')
-  cancel(@Param('id') id: string, @Body() _dto: TaskActionDto) {
+  @AuditAction("task.cancel")
+  cancel(@Param("id") id: string, @Body() _dto: TaskActionDto) {
     return this.tasks.cancel(id);
   }
 }

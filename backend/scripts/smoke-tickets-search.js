@@ -87,8 +87,6 @@ const NEED_PERMS = [
   'ticket.handle',
   'data.search',
   'data.export',
-  'data.import',
-  'data.batch',
   'user.read',
   'user.disable',
   'credit.adjust',

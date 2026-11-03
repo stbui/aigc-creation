@@ -232,8 +232,8 @@ export function AdminCreditsPage() {
             )}
             {/* CSV 导入走邮箱而非用户 ID: 运营手里的补偿名单通常是邮箱表, 不是 cuid */}
             {/* 后端 /admin/credits/import 的权限点是 credit.adjust（导入会改余额，
-                与人工调整同一套规则）。此前这里用 data.import，导致有 credit.adjust
-                的财务看不到入口，而只有 data.import 的角色点进去反而 403。 */}
+                与人工调整同一套规则）。权限跟动作走：导入属于给钱，统一要求
+                credit.adjust，不再使用无效的通用导入权限。 */}
             {can('credit.adjust') && (
               <ActionButton variant="secondary" icon={Upload} onClick={() => setImportOpen(true)}>
                 导入 CSV

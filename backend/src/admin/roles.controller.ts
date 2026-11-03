@@ -1,18 +1,25 @@
-import { Body, Controller, Get, Param, Patch, Query, Req } from '@nestjs/common';
-import { AuditAction, RequirePermission, AdminUser } from './admin.decorator';
-import { AppError } from '../common/app.exception';
-import { AdminRoleService } from './admin-role.service';
-import { AdminSettingsService } from './settings.service';
-import { PERMISSIONS, ROLE_LABELS, isAdminRole } from './permissions';
+import {
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Query,
+  Req,
+} from "@nestjs/common";
+import { AuditAction, RequirePermission, AdminUser } from "./admin.decorator";
+import { AppError } from "../common/app.exception";
+import { AdminRoleService } from "./admin-role.service";
+import { AdminSettingsService } from "./settings.service";
+import { PERMISSIONS, ROLE_LABELS, isAdminRole } from "./permissions";
 // ⚠️ DTO 必须用值导入 (不能用 `import type`)。
 // `import type` 会在编译期抹掉类的运行时值, 使 design:paramtypes 退化成 Function,
 // ValidationPipe 因此无法识别类型 —— @Body 拿到的是未校验的原始 body,
 // 结果是「请求 200 但 DTO 上一个字段都没生效」, 比直接报错更难排查。
-import { RoleListQueryDto, UpdateRolePermissionsDto } from './dto/audit.dto';
-import { UpdateSettingsDto } from './settings.dto';
+import { RoleListQueryDto, UpdateRolePermissionsDto } from "./dto/audit.dto";
+import { UpdateSettingsDto } from "./settings.dto";
 
 /** 角色权限管理 */
-@Controller('admin/roles')
+@Controller("admin/roles")
 export class AdminRolesController {
   constructor(private readonly roles: AdminRoleService) {}
 
@@ -23,9 +30,12 @@ export class AdminRolesController {
    * 否则角色页会显示与实际不符的权限, 造成误操作。
    */
   @Get()
-  @RequirePermission(PERMISSIONS.auditRead)
+  @RequirePermission(PERMISSIONS.roleRead)
   async list(@Query() query: RoleListQueryDto) {
-    const codes = query.code && isAdminRole(query.code) ? [query.code] : Object.keys(ROLE_LABELS).filter(isAdminRole);
+    const codes =
+      query.code && isAdminRole(query.code)
+        ? [query.code]
+        : Object.keys(ROLE_LABELS).filter(isAdminRole);
     const items = [];
     for (const code of codes) {
       items.push({
@@ -45,20 +55,46 @@ export class AdminRolesController {
    * 保护: 操作者自身的权限收窄也会立即生效 —— 这是刻意的,
    * "改完自己就锁在门外"是可接受的 (有其他 admin 可救), 换取的是权限确实收紧。
    */
-  @Patch(':code/permissions')
+  @Patch()
   @RequirePermission(PERMISSIONS.roleWrite)
-  @AuditAction('role.permissions_update')
-  async updatePermissions(@Param('code') code: string, @Body() dto: UpdateRolePermissionsDto) {
-    if (!isAdminRole(code)) {
-      throw new AppError(40400, '未知角色', 404);
-    }
-    await this.roles.updatePermissions(code, dto.permissions ?? []);
-    return { code, permissions: await this.roles.getPermissions(code) };
+  @AuditAction("role.permissions_update")
+  async updatePermissions(
+    @Body() dto: UpdateRolePermissionsDto,
+    @Req() req: Request & {
+      auditReason?: string;
+      auditExtra?: Record<string, unknown>;
+    },
+  ) {
+    const changes = await this.roles.updatePermissions(
+      dto.roles.map((role) => ({
+        code: role.code,
+        permissions: role.permissions,
+      })),
+    );
+
+    req.auditReason = dto.reason;
+    req.auditExtra = {
+      roleCodes: changes.map((change) => change.code),
+      changes: changes.map((change) => ({
+        code: change.code,
+        added: change.added,
+        removed: change.removed,
+        beforeCount: change.before.length,
+        afterCount: change.after.length,
+      })),
+    };
+
+    return {
+      roles: changes.map((change) => ({
+        code: change.code,
+        permissions: change.after,
+      })),
+    };
   }
 }
 
 /** 系统设置 */
-@Controller('admin/settings')
+@Controller("admin/settings")
 export class AdminSettingsController {
   constructor(private readonly settings: AdminSettingsService) {}
 
@@ -80,17 +116,25 @@ export class AdminSettingsController {
    */
   @Patch()
   @RequirePermission(PERMISSIONS.settingWrite)
-  @AuditAction('setting.update')
-  async update(@Body() dto: UpdateSettingsDto, @AdminUser() user: AdminUser, @Req() req: Request) {
-    const reason = (dto?.reason ?? '').trim();
+  @AuditAction("setting.update")
+  async update(
+    @Body() dto: UpdateSettingsDto,
+    @AdminUser() user: AdminUser,
+    @Req() req: Request,
+  ) {
+    const reason = (dto?.reason ?? "").trim();
     if (!reason) {
-      throw new AppError(40001, '必须填写变更原因 —— 审计记录需要能回答「谁为什么改」', 400);
+      throw new AppError(
+        40001,
+        "必须填写变更原因 —— 审计记录需要能回答「谁为什么改」",
+        400,
+      );
     }
 
     const result = await this.settings.updateAll(
       dto?.settings ?? {},
       dto?.clears ?? [],
-      user?.email ?? 'admin',
+      user?.email ?? "admin",
       reason,
     );
 

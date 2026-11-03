@@ -3,7 +3,7 @@ import { PERMISSION_LABELS, MODULE_LABELS, HIGH_RISK, ROLE_COL } from './constan
 import { useAdmin, useToast, useUnsavedGuard, useAdminResource } from './hooks';
 import { adminApi, adminRolesApi } from '../../../lib/api';
 
-import { ActionButton, CheckboxField, EmptyState, ListError, PageHeader, PageSkeleton, Panel, StaleError, ToneBadge } from './components';
+import { ActionButton, CheckboxField, EmptyState, FormField, ListError, PageHeader, PageSkeleton, Panel, StaleError, TextField, ToneBadge } from './components';
 import { cn } from '../../../admin-ui/lib/cn';
 
 /** 权限点 → 中文说明。未登记的权限点原样显示 id, 不静默消失 */
@@ -24,6 +24,7 @@ export function AdminRolesPage() {
   const editable = can('role.write');
 
   const [busy, setBusy] = useState(false);
+  const [reason, setReason] = useState('');
 
   // 草稿为 roleCode -> Set<permission>; 直接改库会导致每次勾选都发一次请求
   const [draft, setDraft] = useState<Record<string, Set<string>>>({});
@@ -63,6 +64,7 @@ export function AdminRolesPage() {
     [draft, roles],
   );
   const dirtyRoles = roleChanges.filter((role) => role.changedCount > 0);
+  const reasonValid = reason.trim().length >= 2;
 
   useUnsavedGuard(editable && dirtyRoles.length > 0);
 
@@ -83,6 +85,7 @@ export function AdminRolesPage() {
     const next: Record<string, Set<string>> = {};
     for (const role of data.roles) next[role.code] = new Set(role.permissions);
     setDraft(next);
+    setReason('');
   };
 
   /*
@@ -133,16 +136,16 @@ export function AdminRolesPage() {
    */
   const saveAll = async () => {
     const rolesToSave = dirtyRoles;
-    if (rolesToSave.length === 0) return;
+    if (rolesToSave.length === 0 || !reasonValid) return;
     setBusy(true);
     try {
-      for (const role of rolesToSave) {
-        await adminRolesApi.updatePermissions(
-          role.code,
-          Array.from(role.current),
-          '后台角色权限调整',
-        );
-      }
+      await adminRolesApi.updatePermissions(
+        rolesToSave.map((role) => ({
+          code: role.code,
+          permissions: Array.from(role.current),
+        })),
+        reason.trim(),
+      );
       await reload();
       /*
        * 2026-10-23 修: 原写法是 `if (me?.role === code) await load();` 再调一次
@@ -150,7 +153,8 @@ export function AdminRolesPage() {
        * **根本没有更新 AdminContext 里那份生效权限**, 于是自己的角色被降权后,
        * 侧栏与按钮权限要等整页刷新才变。这里改调 context 的 refresh()。
        */
-      if (rolesToSave.some((role) => role.code === me?.role)) refresh();
+      if (rolesToSave.some((role) => role.code === me?.role)) await refresh();
+      setReason('');
       toast.success('权限已保存，立即生效');
     } catch (e) {
       toast.error((e as Error).message);
@@ -199,18 +203,43 @@ export function AdminRolesPage() {
         <div
           role="status"
           data-testid="admin-role-save-bar"
-          className="mb-3 flex items-center gap-3 rounded-xl border border-warn-border bg-warn-soft px-3.5 py-2.5"
+          className="mb-3 flex flex-col gap-3 rounded-xl border border-warn-border bg-warn-soft px-3.5 py-2.5"
         >
-          <span className="min-w-0 flex-1 text-xs text-warn-text">
-            有 {dirtyRoles.length} 个角色未保存：
-            {dirtyRoles.map((role) => `${role.label} ${role.changedCount} 项`).join('、')}
-          </span>
-          <ActionButton variant="secondary" size="sm" disabled={busy} onClick={resetDraft}>
-            放弃变更
-          </ActionButton>
-          <ActionButton variant="default" size="sm" disabled={busy} onClick={() => void saveAll()}>
-            {busy ? '保存中…' : '保存全部变更'}
-          </ActionButton>
+          <div className="flex w-full items-center gap-3">
+            <span className="min-w-0 flex-1 text-xs text-warn-text">
+              有 {dirtyRoles.length} 个角色未保存：
+              {dirtyRoles.map((role) => `${role.label} ${role.changedCount} 项`).join('、')}
+            </span>
+            <ActionButton variant="secondary" size="sm" disabled={busy} onClick={resetDraft}>
+              放弃变更
+            </ActionButton>
+            <ActionButton
+              variant="default"
+              size="sm"
+              disabled={busy || !reasonValid}
+              onClick={() => void saveAll()}
+            >
+              {busy ? '保存中…' : '保存全部变更'}
+            </ActionButton>
+          </div>
+          <FormField
+            label="变更原因"
+            required
+            hint="写入审计；至少 2 个字，需能说明为什么调整这些权限"
+            error={reason.length > 0 && !reasonValid ? '变更原因至少需要 2 个字符' : null}
+            className="w-full max-w-xl"
+          >
+            <TextField
+              ariaLabel="变更原因"
+              value={reason}
+              disabled={busy}
+              onChange={setReason}
+              onEnter={() => void saveAll()}
+              placeholder="如：新增运营需处理工单，开放 ticket.handle"
+              maxLength={200}
+              showCount
+            />
+          </FormField>
         </div>
       )}
 

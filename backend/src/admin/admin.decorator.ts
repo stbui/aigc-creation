@@ -1,23 +1,44 @@
-import { SetMetadata, createParamDecorator, ExecutionContext } from '@nestjs/common';
+import {
+  SetMetadata,
+  createParamDecorator,
+  ExecutionContext,
+} from "@nestjs/common";
 
 /** 权限点元数据键 */
-export const PERMISSION_KEY = 'admin:permission';
+export const PERMISSION_KEY = "admin:permission";
 
 /** 「只要求后台身份」标记的元数据键 */
-export const IDENTITY_ONLY_KEY = 'admin:identityOnly';
+export const IDENTITY_ONLY_KEY = "admin:identityOnly";
 
 /** 审计动作元数据键 */
-export const AUDIT_ACTION_KEY = 'admin:auditAction';
+export const AUDIT_ACTION_KEY = "admin:auditAction";
+
+/** 审计对象元数据键 */
+export const AUDIT_TARGET_KEY = "admin:auditTarget";
+
+export interface AuditTargetMetadata {
+  targetType: string;
+  param: string;
+}
 
 /**
  * 声明端点所需权限点。
  *
  * 用法: @RequirePermission(PERMISSIONS.orderRefund)
- * 未声明权限点的 admin 端点默认放行 (仅要求 admin 身份),
- * 因此新增端点时应显式声明 —— 声明缺失是漏保护, 与"默认拒"的取向相反,
- * 故在 PermissionGuard 中对无元数据的路由直接放行并在日志中可见。
+ * 未声明权限点的 admin 端点由 PermissionGuard 默认拒绝。确实只需后台身份
+ * 的自省类端点应显式使用 @AdminIdentityOnly()。
  */
-export const RequirePermission = (permission: string) => SetMetadata(PERMISSION_KEY, permission);
+export const RequirePermission = (permission: string) =>
+  SetMetadata(PERMISSION_KEY, permission);
+
+/**
+ * 声明端点必须同时具备的所有权限点。
+ *
+ * 用于导出这类复合操作: 既要拥有来源领域的数据读取权限, 又要拥有
+ * `data.export`。只校验后者会让没有该领域读取权限的角色把数据带走。
+ */
+export const RequireAllPermissions = (...permissions: string[]) =>
+  SetMetadata(PERMISSION_KEY, permissions);
 
 /**
  * 声明该端点**只需后台身份, 不需要权限点**。
@@ -41,7 +62,20 @@ export const AdminIdentityOnly = () => SetMetadata(IDENTITY_ONLY_KEY, true);
  *
  * 用法: @AuditAction('user.disable')
  */
-export const AuditAction = (action: string) => SetMetadata(AUDIT_ACTION_KEY, action);
+export const AuditAction = (action: string) =>
+  SetMetadata(AUDIT_ACTION_KEY, action);
+
+/**
+ * 声明审计对象类型与路由参数名。
+ *
+ * 嵌套路由不能只按 URL 第二段推断对象: 例如
+ * `PATCH /admin/channels/c1/models/m2` 的实际对象是渠道模型 m2, 而不是渠道 c1。
+ */
+export const AuditTarget = (targetType: string, param = "id") =>
+  SetMetadata(AUDIT_TARGET_KEY, {
+    targetType,
+    param,
+  } satisfies AuditTargetMetadata);
 
 /**
  * 取本次请求实际生效的权限点, 未声明返回 null。
@@ -52,6 +86,11 @@ export const AuditAction = (action: string) => SetMetadata(AUDIT_ACTION_KEY, act
  */
 export function getRequiredPermission(ctx: ExecutionContext): string | null {
   return ctx.switchToHttp().getRequest().requiredPermission ?? null;
+}
+
+/** 取本次请求实际生效的全部权限点; 未声明返回空数组。 */
+export function getRequiredPermissions(ctx: ExecutionContext): string[] {
+  return ctx.switchToHttp().getRequest().requiredPermissions ?? [];
 }
 
 /** 经守卫后注入的用户上下文 */

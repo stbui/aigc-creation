@@ -24,6 +24,7 @@ import {
   type RepriceRow,
 } from './utils';
 import type { AdminChannelModelView, ChannelModelRepriceInput } from '../../../types/model';
+import { auditReason } from '../../../admin-ui/lib/auditReason';
 
 /**
  * 渠道模型「统一调价」弹窗。
@@ -61,7 +62,6 @@ export function ChannelModelRepriceDialog({
   const [markup, setMarkup] = useState<number | undefined>(undefined);
   const [decimalPlaces, setDecimalPlaces] = useState(2);
   const [rows, setRows] = useState<RepriceRow[]>(() => buildRepriceRows(models));
-  const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
 
   /** 参与调价的模型：必须全部具备「已启用 + 成本价 + 售价」 */
@@ -101,14 +101,6 @@ export function ChannelModelRepriceDialog({
     return '';
   }, [models, blocking, rows]);
 
-  /**
-   * 调价是 `channel.model_write`（高危）：原因必填。
-   *
-   * 审计里只有一句「改了价」是不够的 —— 事后对账时要能回答「按什么口径
-   * 调的、为什么调」。后端审计拦截器把 `reason` 单独存一列，不写进 detail。
-   */
-  const reasonMissing = reason.trim().length === 0;
-
   const recalculate = (nextMarkup: number | undefined, nextPlaces: number) => {
     setMarkup(nextMarkup);
     setDecimalPlaces(nextPlaces);
@@ -132,14 +124,14 @@ export function ChannelModelRepriceDialog({
   };
 
   const save = async () => {
-    if (validationError || reasonMissing || !changed || saving) return;
+    if (validationError || !changed || saving) return;
     setSaving(true);
     try {
       const payload = buildPayload(models, rows);
       const result = await adminChannelsApi.batchRepriceModels(
         channelId,
         payload,
-        reason.trim(),
+        auditReason('渠道模型统一调价'),
       );
       toast.success(`已保存 ${result.updated} 个模型的售价`);
       try {
@@ -171,7 +163,7 @@ export function ChannelModelRepriceDialog({
           <ActionButton
             variant="default"
             size="sm"
-            disabled={saving || Boolean(validationError) || reasonMissing || changed === 0}
+            disabled={saving || Boolean(validationError) || changed === 0}
             onClick={() => void save()}
           >
             {saving ? '保存中…' : changed > 0 ? `保存售价（${changed} 项）` : '保存售价'}
@@ -238,23 +230,7 @@ export function ChannelModelRepriceDialog({
             {rows.length} 个计费项 · 已修改 {changed} 项 ·
             四舍五入及手动修改可能使实际加价率偏离目标；价格配置发生变化时整批拒绝保存，请刷新后重试。
           </span>
-          <div className="w-[280px]">
-            <FormField
-              label="变更原因"
-              required
-              hint="写入审计，建议写清加价口径"
-              error={reasonMissing ? '调价是高危写操作，必须填写原因' : null}
-            >
-              <TextField
-                ariaLabel="变更原因"
-                value={reason}
-                disabled={saving}
-                onChange={setReason}
-                placeholder="如：统一按 20% 加价率调价"
-                maxLength={200}
-              />
-            </FormField>
-          </div>
+
         </div>
       </div>
     </ModalDialog>

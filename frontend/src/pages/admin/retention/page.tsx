@@ -47,6 +47,7 @@ export function AdminRetentionPage() {
   const [pending, setPending] = useState<AdminRetentionTarget | null>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
+  const [previewingTable, setPreviewingTable] = useState<string | null>(null);
 
   /*
    * 草稿依赖 data 而不是 targets: targets 是 `data?.[0] ?? []`, 每次渲染都是新数组,
@@ -64,16 +65,29 @@ export function AdminRetentionPage() {
   ).length;
   useUnsavedGuard(writable && dirtyCount > 0);
 
-  const openCleanup = (t: AdminRetentionTarget) => {
-    setReason('');
-    setPending(t);
+  const openCleanup = async (t: AdminRetentionTarget) => {
+    const keep = days[t.table] ?? t.retentionDays;
+    if (!Number.isInteger(keep) || keep < 7 || keep > 3650) {
+      toast.warning('保留天数必须是 7–3650 之间的整数');
+      return;
+    }
+    setPreviewingTable(t.table);
+    try {
+      const preview = await adminRetentionApi.preview(t.table, keep);
+      setReason('');
+      setPending(preview);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '读取清理影响范围失败');
+    } finally {
+      setPreviewingTable(null);
+    }
   };
 
   const runCleanup = async () => {
     if (!pending) return;
     const trimmed = reason.trim();
-    if (!trimmed) {
-      toast.warning('请填写清理原因，它会写入操作审计');
+    if (trimmed.length < 2) {
+      toast.warning('请至少填写 2 个字符的清理原因，它会写入操作审计');
       return;
     }
     const keep = days[pending.table] ?? pending.retentionDays;
@@ -149,7 +163,7 @@ export function AdminRetentionPage() {
               {row.expiring} 条
             </span>
             {dirty && (
-              <span className="text-[12px] text-muted-foreground">按 {row.retentionDays} 天估算，已改动</span>
+              <span className="text-[12px] text-muted-foreground">已改动，点击清理时重新估算</span>
             )}
           </div>
         );
@@ -168,8 +182,13 @@ export function AdminRetentionPage() {
       fixed: 'right',
       render: (row) =>
         writable ? (
-          <ActionButton variant="ghost" size="sm" onClick={() => openCleanup(row)}>
-            清理
+          <ActionButton
+            variant="ghost"
+            size="sm"
+            onClick={() => void openCleanup(row)}
+            disabled={previewingTable !== null || busy}
+          >
+            {previewingTable === row.table ? '读取中…' : '清理'}
           </ActionButton>
         ) : null,
     },

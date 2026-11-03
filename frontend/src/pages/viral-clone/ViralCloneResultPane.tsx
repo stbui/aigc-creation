@@ -30,7 +30,6 @@ import {
   Surface,
   SurfaceAction,
   SurfaceContent,
-  SurfaceDescription,
   SurfaceHeader,
   SurfaceTitle,
   ToolWorkflowSteps,
@@ -94,27 +93,11 @@ function formatTime(iso?: string): string {
   if (!iso) return '';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
-  return new Intl.DateTimeFormat('zh-CN', {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).format(date);
-}
-
-function stateText(state: CompareState): string {
-  if (state === 'generating') return '生成中';
-  if (state === 'failed') return '生成失败';
-  if (state === 'ready') return '已完成';
-  return '待生成';
-}
-
-function stateBadgeVariant(state: CompareState): 'default' | 'destructive' | 'outline' | 'secondary' {
-  if (state === 'ready') return 'default';
-  if (state === 'failed') return 'destructive';
-  if (state === 'generating') return 'outline';
-  return 'secondary';
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return [
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,
+    `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`,
+  ].join(' ');
 }
 
 /**
@@ -232,7 +215,6 @@ export function ViralCloneResultPane({
               {generating ? '正在生成' : historyRows.length > 0 ? `${historyRows.length} 次 · ${readyCount} 张` : '等待生成'}
             </StatusBadge>
           </SurfaceTitle>
-          <SurfaceDescription>按任务对照商品上传图、参考图和最终生成图。</SurfaceDescription>
         </div>
         <SurfaceAction>
           <Button variant="outline" size="sm" disabled={gallery.loading} onClick={onRefresh}>
@@ -287,17 +269,12 @@ export function ViralCloneResultPane({
         ) : (
           <div className="vc-result-list">
             {rows.map((row) => {
-              const rowPreview = previewItemsOf(row);
               const isCurrent = row.key === 'current';
               return (
                 <Surface className={cn('vc-result-row', isCurrent && 'is-current')} key={row.key}>
                   <SurfaceHeader className="vc-result-row-head">
                     <div className="vc-result-row-meta">
-                      <StatusBadge variant={stateBadgeVariant(row.state)}>
-                        {row.state === 'generating' && <LoaderCircle size={12} className="vc-spin" />}
-                        {stateText(row.state)}
-                      </StatusBadge>
-                      <strong className="text-sm font-semibold">{isCurrent ? '本次复刻' : '复刻记录'}</strong>
+                      {isCurrent && <strong className="text-sm font-semibold">本次复刻</strong>}
                       {row.caption && <StatusBadge className="vc-degree-badge" variant="secondary">{row.caption}</StatusBadge>}
                       {row.createdAt && <time dateTime={row.createdAt}>{formatTime(row.createdAt)}</time>}
                     </div>
@@ -375,7 +352,6 @@ export function ViralCloneResultPane({
                         <span className="vc-compare-step">1</span>
                         <span>
                           <strong>商品上传图</strong>
-                          <small>{row.productUrls.length > 1 ? `已上传 ${row.productUrls.length} 张，点击看全部` : '你的商品素材'}</small>
                         </span>
                       </figcaption>
                     </figure>
@@ -410,7 +386,6 @@ export function ViralCloneResultPane({
                         <span className="vc-compare-step">2</span>
                         <span>
                           <strong>参考图</strong>
-                          <small>构图、场景与风格来源</small>
                         </span>
                       </figcaption>
                     </figure>
@@ -488,15 +463,11 @@ export function ViralCloneResultPane({
                         <span className="vc-compare-step">3</span>
                         <span>
                           <strong>生成图</strong>
-                          <small>{row.state === 'ready' ? '点击预览或下载原图' : stateText(row.state)}</small>
                         </span>
                       </figcaption>
                     </figure>
                   </div>
 
-                    {rowPreview.length > 0 && (
-                      <span className="vc-result-preview-hint">点击任意图片可对照查看大图</span>
-                    )}
                   </SurfaceContent>
                 </Surface>
               );

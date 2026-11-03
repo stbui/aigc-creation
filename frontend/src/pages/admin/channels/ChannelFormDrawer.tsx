@@ -163,15 +163,6 @@ export function ChannelFormDrawer({
           />
         </div>
 
-        <Field label="变更原因" hint="写入审计，建议写清改了什么（如：更换上游 Key）">
-          <TextField
-            ariaLabel="变更原因"
-            value={draft.reason}
-            onChange={(value) => onChange({ reason: value })}
-            placeholder="如：切换到新上游账号"
-            maxLength={200}
-          />
-        </Field>
       </div>
     </Drawer>
   );

@@ -101,11 +101,9 @@ export function modelsSync(): PublicLogicalModel[] {
 export function defaultModelFor(
   capability: string,
   models: PublicLogicalModel[] = modelsSync(),
+  requiredInputs: readonly string[] = [],
 ): PublicLogicalModel | null {
-  const candidates = models
-    .filter((m) => m.capability === capability)
-    .sort((a, b) => Number(b.available) - Number(a.available) || a.sortOrder - b.sortOrder);
-  return candidates[0] ?? null;
+  return modelsForCapability(capability, models, requiredInputs)[0] ?? null;
 }
 
 /**
@@ -118,19 +116,32 @@ export function defaultModelFor(
  * 没有可用模型时抛错而不是发一个空 id 让后端回 40005 —— 前端先给出人话原因，
  * 用户知道是「这个能力暂时没有线路」而不是「提交失败」。
  */
-export async function resolveModel(capability: string): Promise<PublicLogicalModel> {
+export async function resolveModel(
+  capability: string,
+  requiredInputs: readonly string[] = [],
+): Promise<PublicLogicalModel> {
   const models = await loadModels();
+  const candidates = modelsForCapability(capability, models, requiredInputs);
   const selectedId = readSelectedModelId(capability);
-  const selected = selectedId ? models.find((m) => m.id === selectedId && m.capability === capability) : null;
-  const model = selected?.available ? selected : defaultModelFor(capability, models);
-  if (!model) throw new Error('该能力当前没有可用模型，请稍后再试');
+  const selected = selectedId ? candidates.find((m) => m.id === selectedId) : null;
+  const model = selected?.available ? selected : defaultModelFor(capability, models, requiredInputs);
+  if (!model) {
+    throw new Error(
+      requiredInputs.includes('mask')
+        ? '当前没有支持遮罩重绘的模型，请稍后再试或联系客服'
+        : '该能力当前没有可用模型，请稍后再试',
+    );
+  }
   if (!model.available) throw new Error('该能力当前没有可用线路，请稍后再试');
   return model;
 }
 
 /** 解析建任务要带的 `logicalModelId`（见 `resolveModel`） */
-export async function resolveModelId(capability: string): Promise<string> {
-  return (await resolveModel(capability)).id;
+export async function resolveModelId(
+  capability: string,
+  requiredInputs: readonly string[] = [],
+): Promise<string> {
+  return (await resolveModel(capability, requiredInputs)).id;
 }
 
 /**
@@ -147,12 +158,23 @@ export function modelImageInputLimit(
   return typeof max === 'number' && Number.isInteger(max) && max >= 0 ? max : null;
 }
 
-/** 目录里该能力的全部模型（含不可用项，选择器需要把它们置灰列出） */
+/**
+ * 目录里该能力的候选模型（含不可用项，选择器需要把它们置灰列出）。
+ *
+ * `requiredInputs` 描述本次请求一定会提交的输入槽位（如遮罩重绘的 `mask`）。
+ * 缺少对应合同的模型不是「暂时不可用」，而是对该操作永远不可用，必须直接排除；
+ * 否则选择器和提交解析会选中一条注定返回 42205 的线路。
+ */
 export function modelsForCapability(
   capability: string,
   models: PublicLogicalModel[] = modelsSync(),
+  requiredInputs: readonly string[] = [],
 ): PublicLogicalModel[] {
   return models
-    .filter((m) => m.capability === capability)
+    .filter(
+      (m) =>
+        m.capability === capability &&
+        requiredInputs.every((input) => Boolean(m.capabilitySpec?.inputs?.[input])),
+    )
     .sort((a, b) => Number(b.available) - Number(a.available) || a.sortOrder - b.sortOrder);
 }

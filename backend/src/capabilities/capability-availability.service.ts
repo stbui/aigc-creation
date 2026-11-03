@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RouteCatalogService } from '../model/catalog/route-catalog.service';
 import { CAPABILITIES, getCapability } from './capability.registry';
+import { AppError } from '../common/app.exception';
 
 /**
  * 能力的**运行时真相**（区别于 registry 里静态声明的 `mode`）。
@@ -215,11 +216,11 @@ export class CapabilityAvailabilityService {
   async setEnabled(capabilityId: string, enabled: boolean, reason: string | undefined, actor: string) {
     const def = getCapability(capabilityId);
     if (!def) {
-      throw new Error(`未知能力: ${capabilityId}`);
+      throw new AppError(40001, `未知能力: ${capabilityId}`, 400);
     }
     const trimmed = (reason ?? '').trim();
     if (!enabled && !trimmed) {
-      throw new Error('下架能力必须填写原因');
+      throw new AppError(40001, '下架能力必须填写原因', 400);
     }
     const row = await this.prisma.capabilityControl.upsert({
       where: { capabilityId },
