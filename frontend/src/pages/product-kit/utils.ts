@@ -2,6 +2,7 @@ import { VARIANT_LABELS } from './constants';
 import { assetsApi, assetSrc, type Asset } from './api';
 import type { GalleryItem, UploadedImage } from './hooks';
 import { modelImageInputLimit, type PublicLogicalModel } from '../../lib/models';
+import { buildBatchRows, formatBatchDate, type BatchRowBase } from '../../components/batchResult';
 
 /**
  * 商品主图工作台页面的纯函数与外部工具入口 —— 目录内文件的唯一外部工具来源。
@@ -185,31 +186,13 @@ export function variantCaption(params: Record<string, unknown>): string | undefi
 /* ------------------------------------------------------------------------- */
 
 /** 行内的一格: 原图或一张主图 */
-export type CellState = 'ready' | 'pending' | 'failed';
+export type { CellState } from '../../components/batchResult';
+export { batchIndexOf, cellState } from '../../components/batchResult';
 
-/** 一行 = 一次生成 (批次内全部任务) */
-export interface ResultRow {
-  key: string;
-  createdAt?: string;
+/** 一行 = 一次生成 (批次内全部任务); 页面在公共字段之外多带提示词与商品名 */
+export interface ResultRow extends BatchRowBase {
   prompt?: string;
   productName?: string;
-  sourceUrls: string[];
-  cells: GalleryItem[];
-  /** 批内还有没出图的格子 —— 决定删除按钮置灰 (生成中删会留下半套) */
-  pending: boolean;
-}
-
-/** 单格的展示态: 有图 = ready; 失败 / 取消 = failed; 其余 = pending */
-export function cellState(item: GalleryItem): CellState {
-  if (item.url) return 'ready';
-  if (item.status === 'failed' || item.status === 'cancelled') return 'failed';
-  return 'pending';
-}
-
-/** 批内顺序: batchIndex 升序; 旧任务没有该字段时保持列表原序 */
-export function batchIndexOf(item: GalleryItem): number {
-  const n = Number(item.params?.batchIndex);
-  return Number.isFinite(n) && n > 0 ? n : Number.MAX_SAFE_INTEGER;
 }
 
 /** 主图格的变体名: 优先任务 caption, 回落「商品主图」 */
@@ -241,49 +224,22 @@ export function countGenerations(items: GalleryItem[]): number {
 
 /** 按 batchId 归组; 无 batchId 的任务各自成行。列表本身已按时间倒序 */
 export function buildRows(items: GalleryItem[]): ResultRow[] {
-  const rows: ResultRow[] = [];
-  const byBatch = new Map<string, ResultRow>();
-  for (const item of items) {
-    const key = rowKeyOf(item);
-    let row = byBatch.get(key);
-    if (!row) {
-      row = {
-        key,
-        createdAt: item.createdAt,
-        prompt: textParam(item, 'description'),
-        productName: textParam(item, 'productName'),
-        sourceUrls: [...(item.inputUrls ?? [])],
-        cells: [],
-        pending: false,
-      };
-      byBatch.set(key, row);
-      rows.push(row);
-    }
-    if (row.sourceUrls.length === 0 && item.inputUrls?.length) {
-      row.sourceUrls = [...item.inputUrls];
-    }
-    row.cells.push(item);
-  }
-  for (const row of rows) {
-    row.cells.sort((a, b) => batchIndexOf(a) - batchIndexOf(b));
-    row.pending = row.cells.some((item) => cellState(item) === 'pending');
-  }
-  return rows;
+  return buildBatchRows<{ prompt?: string; productName?: string }>(
+    items,
+    (item) => ({
+      prompt: textParam(item, 'description'),
+      productName: textParam(item, 'productName'),
+    }),
+    rowKeyOf,
+  );
 }
 
 /* ------------------------------------------------------------------------- */
 /* 时间与文件名                                                             */
 /* ------------------------------------------------------------------------- */
 
-const pad2 = (n: number) => String(n).padStart(2, '0');
-
 /** 行头时间: 本地时区 `YYYY-MM-DD HH:mm`; 解析失败时不显示 */
-export function formatDate(iso?: string): string {
-  if (!iso) return '';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '';
-  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
-}
+export const formatDate = formatBatchDate;
 
 /**
  * 下载文件名: `<前缀>-<变体名>-<任务 id 尾 6 位>.<真实格式>`。

@@ -687,13 +687,32 @@ body {
    submit 340x48 渐变 90deg #8064f6→#5546d8 14px/600; 协议行 12px #86909c。
    诚实差异: 扫码/短信 tab 置灰 (无通道), 左栏插画为自绘内联 SVG (不引参考站位图)。 */
 .login-page {
+  position: relative;
   min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--surface-soft);
   padding: 24px;
   box-sizing: border-box;
+  /*
+   * 背景分层 (2026-11-03, 独立页背景留白优化):
+   *   1) 极淡点阵 —— 破掉大面积纯色的"死白", 密度 26px, 透明度 7%
+   *   2) 卡片背后的品牌紫辉光 —— 把卡片从底色里"托"起来
+   *   3~5) 左上品牌紫 / 右上冷蓝 / 底部淡紫三处径向光晕, 与落地页 .lp-hero 同源
+   * 全部只引用 :root 令牌, 不写裸 hex; 同一套背景对 .login-page 的四个宿主
+   * (/login、/forgot-password、/reset-password、OAuth 回调) 通用。
+   */
+  background-color: var(--page-bg);
+  background-image:
+    radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text-strong) 7%, transparent) 1px, transparent 0),
+    radial-gradient(620px 420px at 50% 46%, color-mix(in srgb, var(--brand) 12%, transparent) 0%, transparent 72%),
+    radial-gradient(900px 540px at 10% -8%, var(--brand-bg) 0%, transparent 64%),
+    radial-gradient(820px 520px at 94% 6%, var(--hero-grad-3) 0%, transparent 62%),
+    radial-gradient(760px 480px at 50% 112%, var(--login-surface-brand-5) 0%, transparent 68%);
+  background-size: 26px 26px, auto, auto, auto, auto;
+  background-repeat: repeat, no-repeat, no-repeat, no-repeat, no-repeat;
+  /* 用 scroll 而非 fixed: 注册态卡片可能高于一屏, fixed 会让光晕钉在视口上不跟随。 */
+  background-attachment: scroll;
 }
 .login-split {
   display: grid;
@@ -26519,9 +26538,16 @@ ol.product-sku-steps {
   height: calc(100vh - var(--workspace-topbar-height));
   min-height: 620px;
   display: grid;
-  /* 页面头 (54, 对应参考站顶栏) + 双栏主体 */
+  /*
+   * 只有一行: 双栏主体撑满工作区高度。
+   *
+   * 页面头 `.sc-page-head` 当前没有渲染（页面标题由 AppLayout 顶栏承担）,
+   * 若保留 `auto minmax(0,1fr)` 两行, 主体会落在 auto 行按内容撑高,
+   * 空出来的 1fr 行就表现为「最近生成」上方那段空白。
+   * 恢复页面头时再把这里改回 `auto minmax(0, 1fr)`。
+   */
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 0;
   align-items: stretch;
 }
@@ -26544,13 +26570,14 @@ ol.product-sku-steps {
 .sc-body {
   display: grid;
   grid-template-columns: 416px minmax(0, 1fr);
+  height: 100%;
   min-height: 0;
 }
 @media (max-width: 900px) {
   .sc-workspace {
     margin: 0;
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
   }
 }
 
@@ -26725,6 +26752,7 @@ ol.product-sku-steps {
 .sc-showcase {
   display: flex;
   flex-direction: column;
+  height: 100%;
   min-width: 0;
   min-height: 0;
   background: var(--page-bg);
@@ -26782,18 +26810,6 @@ ol.product-sku-steps {
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
   gap: 16px;
 }
-/*
- * 撑满滚动区: 分类模板够排两行时, 行高按 1fr 分掉剩余空间,
- * 卡片长到与右栏同高, 不在「最近生成」上方留一段空白。
- * 模板多到溢出时, `min-content` 保住内容高度, 网格照常内部滚动。
- *
- * 少于 5 张（往往只有一行）不撑: 单行被拉满会把三张缩略图裁成细条,
- * 见 TemplateGrid 的 FILL_MIN_TEMPLATES。
- */
-.sc-template-grid.is-fill {
-  min-height: 100%;
-  grid-auto-rows: minmax(min-content, 1fr);
-}
 .sc-template-grid-empty {
   padding: 40px 0;
   text-align: center;
@@ -26805,8 +26821,6 @@ ol.product-sku-steps {
 .sc-template-card {
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  height: 100%;
   padding: 7px 7px 9px;
   background: var(--card-bg);
   border: 1px solid var(--border);
@@ -26821,31 +26835,24 @@ ol.product-sku-steps {
   box-shadow: inset 0 0 0 1px var(--brand);
 }
 .sc-template-gallery {
-  display: flex;
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 4px;
-  /*
-   * 三张 3:4 并排时, 缩略图条的自然高度 ≈ 宽度 / 2.32
-   * （240 宽 → 77 槽宽 → 103 高）。模板多、网格内部滚动时用这个比例定自然高度;
-   * 分类模板少、卡片被行高撑高时 flex: 1 拿到确定高度, 比例让位于撑满 ——
-   * 缩略图跟着长高（object-fit: cover 裁切）, 不在「最近生成」上方留空白。
-   */
-  aspect-ratio: 2.32;
-  /*
-   * flex-basis 用 auto: 自然高度由上面的比例决定, 卡片被行高撑开时再 grow。
-   * 若用 0%（flex: 1 默认值）, 未撑满时缩略图条会被压扁到内容高度。
-   */
-  flex: 1 1 auto;
-  min-height: 0;
   overflow: hidden;
   background: var(--surface-soft);
   border-radius: var(--radius-control);
 }
-/* 三张等分并铺满缩略图条; 高度由缩略图条决定, 不再单独声明比例 */
+/*
+ * 缩略图槽按 3:4 自适应高度。
+ *
+ * 参考站实测槽位比例恒为 ~1.35 (1440: 94×127 / 1920: 108×146) ——
+ * 高度跟着列宽走, 不是写死的像素值。本站此前固定 127px, 在 1920 的
+ * 4 列下卡片比参考站矮 17px。改用 aspect-ratio 后两个视口都对得上。
+ */
 .sc-template-slot {
-  flex: 1 1 0;
-  min-width: 0;
-  min-height: 0;
   overflow: hidden;
+  aspect-ratio: 3 / 4;
 }
 .sc-template-slot img {
   width: 100%;
@@ -26853,32 +26860,26 @@ ol.product-sku-steps {
   object-fit: cover;
   display: block;
 }
-/*
- * 「查看图片」: 常显的次级按钮, 点开三张一组的弹窗。
- * 参考站只有 hover 浮出的单图预览, 看不到整组; 这里把入口固定住,
- * 用户不用先悬停才知道卡片里的三张图能看。
- */
-.sc-template-actions {
+/* 预览入口：与参考站同位置（缩略图左上角、hover/focus 显），点开三张一组 */
+.sc-template-preview {
+  position: absolute;
+  top: 6px;
+  left: 6px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex: none;
-}
-.sc-template-view {
-  flex: none;
-  padding: 5px 9px;
-  font-size: 13px;
-  line-height: 1;
-  color: var(--text-body);
-  background: var(--surface-soft);
-  border: none;
-  border-radius: var(--radius-control);
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--text-strong);
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
   cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease;
+  opacity: 0;
+  transition: opacity 0.15s ease;
 }
-.sc-template-view:hover {
-  color: var(--brand);
-  background: var(--brand-bg);
+.sc-template-card:hover .sc-template-preview,
+.sc-template-preview:focus-visible {
+  opacity: 1;
 }
 
 /* 一组图总览弹窗: 三张并排, 点击单张进大图灯箱 */
@@ -26915,7 +26916,6 @@ ol.product-sku-steps {
 }
 .sc-template-content {
   display: flex;
-  flex: none;
   align-items: flex-end;
   justify-content: space-between;
   gap: 8px;

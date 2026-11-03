@@ -684,7 +684,6 @@ export function AdminTasksPage() {
                   size="sm"
                   disabled={busy}
                   onClick={() => {
-                    setReason('');
                     setBatchKind('retry');
                   }}
                 >
@@ -697,7 +696,6 @@ export function AdminTasksPage() {
                   size="sm"
                   disabled={busy}
                   onClick={() => {
-                    setReason('');
                     setBatchKind('cancel');
                   }}
                 >
@@ -711,7 +709,6 @@ export function AdminTasksPage() {
                   className="text-danger-text hover:text-danger-text"
                   disabled={busy}
                   onClick={() => {
-                    setReason('');
                     setBatchKind('delete');
                   }}
                 >
@@ -823,10 +820,7 @@ export function AdminTasksPage() {
           confirmText={confirm.kind === 'retry' ? '新建任务并重试' : '确认终止'}
           danger={confirm.kind === 'cancel'}
           loading={busy}
-          onCancel={() => {
-            setConfirm(null);
-            setReason('');
-          }}
+          onCancel={() => setConfirm(null)}
           onConfirm={() => void runConfirm()}
           description={
             confirm.kind === 'retry' ? (

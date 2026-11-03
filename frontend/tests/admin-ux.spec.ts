@@ -412,8 +412,7 @@ test.describe('后台高频动线', () => {
     await expect(saveBar).toBeVisible();
     await expect(saveBar).toContainText('未保存');
     const saveButton = saveBar.getByRole('button', { name: '保存全部变更' });
-    await expect(saveButton).toBeDisabled();
-    await saveBar.getByRole('textbox', { name: '变更原因' }).fill('补测权限变更原因');
+    await expect(saveBar.getByRole('textbox', { name: '变更原因' })).toHaveCount(0);
     await expect(saveButton).toBeEnabled();
 
     await page

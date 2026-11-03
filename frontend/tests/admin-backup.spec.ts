@@ -81,7 +81,7 @@ test.describe('数据备份', () => {
     await expect(verifiedRow.getByRole('button', { name: '下载' })).toBeEnabled();
   });
 
-  test('手动备份需填原因, 执行后列表数量不变少', async ({ page }) => {
+  test('手动备份直接执行, 执行后列表数量不变少', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/backups`);
     await rows(page).first().waitFor({ state: 'visible', timeout: 20000 }).catch(() => undefined);
@@ -91,7 +91,7 @@ test.describe('数据备份', () => {
     await page.getByRole('button', { name: /立即备份/ }).click();
     const panel = page.getByTestId('admin-confirm-action');
     await expect(panel).toBeVisible();
-    await panel.getByLabel('备份原因').fill('e2e 例行备份');
+    await expect(panel.getByLabel('备份原因')).toHaveCount(0);
     await panel.getByRole('button', { name: '开始备份' }).click();
     await page.waitForTimeout(4000);
 

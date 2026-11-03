@@ -32,3 +32,5 @@ export { MobileUploadModal } from '../../components/MobileUploadModal';
 export { ToolEmptyState, ToolWorkflowSteps } from '../../components/ToolEmptyState';
 /** 大图查看器与它的数据类型 */
 export { ImageLightbox, type LightboxItem } from '../../components/ImageLightbox';
+/** 批次结果列表 (本页 / 商品主图 / 带货图文共用) 与它的行类型 */
+export { BatchResultList, type BatchRow } from '../../components/BatchResultList';

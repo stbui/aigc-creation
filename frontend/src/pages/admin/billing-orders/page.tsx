@@ -252,7 +252,6 @@ export function AdminBillingOrdersPage() {
               size="sm"
               disabled={batchBusy}
               onClick={() => {
-                setBatchReason('');
                 setBatchResults(null);
                 setBatchOpen(true);
               }}

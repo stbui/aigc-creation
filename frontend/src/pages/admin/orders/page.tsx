@@ -632,7 +632,6 @@ export function AdminOrdersPage() {
               size="sm"
               disabled={busy}
               onClick={() => {
-                setReason('');
                 setBatchOpen(true);
               }}
             >

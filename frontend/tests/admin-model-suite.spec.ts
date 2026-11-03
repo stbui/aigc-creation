@@ -287,9 +287,8 @@ test.describe('渠道与模型 P5', () => {
     await dialog.getByLabel('加价率').fill(String(markup));
     await dialog.getByRole('button', { name: '按成本重算' }).click();
 
-    // 原因必填（高危写操作要留审计）：没填时保存按钮仍不可用
-    await expect(dialog.getByRole('button', { name: /保存售价/ })).toBeDisabled();
-    await dialog.getByLabel('变更原因').fill(`e2e：统一加价 ${markup}%`);
+    // 审计原因由系统生成，页面不再要求人工填写
+    await expect(dialog.getByLabel('变更原因')).toHaveCount(0);
     await expect(dialog.getByRole('button', { name: /保存售价/ })).toBeEnabled();
 
     await dialog.getByRole('button', { name: /保存售价/ }).click();
@@ -599,15 +598,13 @@ test.describe('渠道与模型 P5', () => {
     await expect(checkbox).toBeChecked();
     await expect(detail.getByRole('button', { name: /批量删除（\d+）/ })).toBeEnabled();
 
-    // 批量删除是高危动作：必须先填原因才能确认
+    // 批量删除是高危动作：审计原因由系统生成，页面不再要求人工填写
     await detail.getByRole('button', { name: /批量删除（\d+）/ }).click();
     const confirm = page.getByTestId('admin-confirm-action');
     await expect(confirm).toBeVisible();
     await expect(confirm).toContainText('影响范围');
-    // 原因没填时确认按钮禁用（删除是高危写操作，审计要能回答「谁为什么删」）
-    await expect(confirm.getByRole('button', { name: '确认' })).toBeDisabled();
-    await confirm.getByLabel('批量删除原因').fill('e2e：批量删除原因校验');
-    await expect(confirm.getByRole('button', { name: '确认' })).toBeEnabled();
+    await expect(confirm.getByLabel('批量删除原因')).toHaveCount(0);
+    await expect(confirm.getByRole('button', { name: '确认删除' })).toBeEnabled();
     // 不点确认：确认对话框，避免动生产数据
     await confirm.getByRole('button', { name: '关闭' }).click();
     await expect(confirm).toHaveCount(0);

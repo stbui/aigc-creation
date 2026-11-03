@@ -386,8 +386,6 @@ export function ShoppableCarouselPage() {
 
   return (
     <div className="sc-workspace">
-      
-
       <div className="sc-body">
         {/* ── 左: 配置栏 ── */}
         <aside className="sc-input-pane">

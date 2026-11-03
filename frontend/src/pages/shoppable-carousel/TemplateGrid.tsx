@@ -1,4 +1,5 @@
 import { memo, useState } from 'react';
+import { Eye } from 'lucide-react';
 
 import { ImageLightbox, type LightboxItem } from './components';
 import { templateBeatsText } from './utils';
@@ -10,11 +11,11 @@ import { Modal } from '../../ui';
  *
  * 结构对齐参考站实拍（`docs/shoppable-carousel-design.md` §6）：
  *   卡片 = 三张连续预览图并排（沟槽底）+ 标题 + 三拍文案副标题；
- *   hover 时浮出「选用」按钮；选中态用品牌紫描边。
+ *   hover 时浮出「预览」与「选用」按钮；选中态用品牌紫描边。
  *
- * 「查看图片」常显在卡片右下：点开是把该模板的三张图**成组**铺开的弹窗
- * （三张并排、各带拍名），再点单张才进大图灯箱。参考站只有 hover 出现的
- * 单图预览，看不到「一组」的全貌。
+ * 预览按钮位置与参考站一致（缩略图左上角，hover 显）；点开不是单图翻看，
+ * 而是把该模板的三张图**成组**铺开的弹窗（三张并排、各带拍名），
+ * 再点单张才进大图灯箱 —— 参考站只能逐张翻，看不到整组。
  *
  * 视觉按本站体系落地：参考站的品牌蓝 `#3388ff` 一律换成 `--brand`，
  * 尺寸与间距取本站令牌（`--radius-panel` / `--surface-soft` / `--border`）。
@@ -30,18 +31,7 @@ function templateLightboxItems(template: ShoppableCarouselTemplate): LightboxIte
   }));
 }
 
-/**
- * 至少这么多张才让卡片撑满栏高。
- *
- * 1440 视口是 3 列、1920 是 4 列，5 张在上述两档都至少排两行 ——
- * 两行分摊剩余高度后卡片只是变高一点。少于 5 张时往往只有一行，
- * 强行撑满会把三张缩略图拉成细条（2 张的分类尤其明显），
- * 那种情况保持自然高度。
- */
-const FILL_MIN_TEMPLATES = 5;
-
-export interface TemplateGridProps {
-  templates: ShoppableCarouselTemplate[];
+export interface TemplateGridProps {  templates: ShoppableCarouselTemplate[];
   /** 当前选中的模板 id */
   selectedId: string | null;
   onSelect: (template: ShoppableCarouselTemplate) => void;
@@ -78,9 +68,7 @@ function TemplateGridImpl({ templates, selectedId, onSelect, error, loading }: T
 
   return (
     <>
-      <div
-        className={`sc-template-grid${templates.length >= FILL_MIN_TEMPLATES ? ' is-fill' : ''}`}
-      >
+      <div className="sc-template-grid">
         {templates.map((template) => {
           const selected = template.id === selectedId;
           const beats = templateBeatsText(template);
@@ -101,6 +89,16 @@ function TemplateGridImpl({ templates, selectedId, onSelect, error, loading }: T
                     />
                   </div>
                 ))}
+                {/* 位置与参考站一致（左上角、hover 显）；点开三张一组的弹窗 */}
+                <button
+                  type="button"
+                  className="sc-template-preview"
+                  aria-label={`查看模板${template.name}的一组图片`}
+                  title="查看图片"
+                  onClick={() => setGroup(template)}
+                >
+                  <Eye size={14} />
+                </button>
               </div>
 
               <div className="sc-template-content">
@@ -110,24 +108,14 @@ function TemplateGridImpl({ templates, selectedId, onSelect, error, loading }: T
                     {beats}
                   </small>
                 </span>
-                <div className="sc-template-actions">
-                  <button
-                    type="button"
-                    className="sc-template-view"
-                    aria-label={`查看模板${template.name}的一组图片`}
-                    onClick={() => setGroup(template)}
-                  >
-                    查看图片
-                  </button>
-                  <button
-                    type="button"
-                    className="sc-template-use"
-                    aria-label={`选用模板${template.name}`}
-                    onClick={() => onSelect(template)}
-                  >
-                    {selected ? '已选用' : '选用'}
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  className="sc-template-use"
+                  aria-label={`选用模板${template.name}`}
+                  onClick={() => onSelect(template)}
+                >
+                  {selected ? '已选用' : '选用'}
+                </button>
               </div>
             </article>
           );

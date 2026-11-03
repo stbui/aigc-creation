@@ -36,6 +36,7 @@
 
 | 节点 | 值 |
 | --- | --- |
+| 独立页背景 | `.login-page`：点阵 26px（`--text-strong` 7%）+ 卡片背后品牌紫辉光（`--brand` 12%）+ 左上 `--brand-bg` / 右上 `--hero-grad-3` / 底部 `--login-surface-brand-5` 三处径向光晕，底色 `--page-bg`；`background-attachment: scroll`（注册态卡片高于一屏时不钉死）。同一套背景对 `/forgot-password`、`/reset-password`、OAuth 回调页通用 |
 | 卡片 | 840×478，radius 32，`box-shadow: 0 20px 60px rgba(0,0,0,.18)`，白底 |
 | 左栏 | 420×478，圆角左侧 32 |
 | 待遇卡 | `padding: 16px 24px`，radius 16，`background: radial-gradient(at 46% 36%, rgba(255,255,255,.95), rgba(255,255,255,.48) 62%, rgba(228,219,255,.42))`，`box-shadow: 0 6px 20px rgba(85,70,216,.24), inset 0 0 24px rgba(255,255,255,.7)` |
