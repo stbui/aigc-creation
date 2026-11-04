@@ -48,8 +48,18 @@ export function CsvImportDrawer({
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<CreditImportResult | null>(null);
   const [importPage, setImportPage] = useState(1);
+  /**
+   * 导入批次的幂等键。选好文件时生成一次，失败重试原样复用；
+   * 换文件则重新生成 —— 否则新文件的第 1 行会被当成上次的同名行。
+   */
+  const [importKey, setImportKey] = useState('');
   const dirty = !result && Boolean(file || validDays.trim());
   useUnsavedGuard(open && dirty);
+
+  const pickFile = (next: File | null) => {
+    setFile(next);
+    setImportKey(next ? newImportKey() : '');
+  };
 
   /** 关闭时清空: 下次打开不该看到上次选的文件 */
   const close = () => {
@@ -58,6 +68,7 @@ export function CsvImportDrawer({
     setValidDays('');
     setResult(null);
     setImportPage(1);
+    setImportKey('');
     onClose();
   };
   const requestClose = useDiscardConfirm(open && dirty, close);
@@ -66,6 +77,7 @@ export function CsvImportDrawer({
     setValidDays('');
     setResult(null);
     setImportPage(1);
+    setImportKey('');
     onDone();
   };
 
@@ -92,7 +104,7 @@ export function CsvImportDrawer({
     }
     setBusy(true);
     try {
-      const r = await adminCreditsApi.importCsv(file, { validDays: days });
+      const r = await adminCreditsApi.importCsv(file, { validDays: days, importKey });
       setResult(r);
       if (r.failed === 0) toast.success(`已导入 ${r.succeeded} 条`);
       else toast.warning(`成功 ${r.succeeded} 条，失败 ${r.failed} 条`);
@@ -141,7 +153,11 @@ export function CsvImportDrawer({
       title: '说明',
       render: (row) => (
         <span className="text-[12px] text-muted-foreground">
-          {row.success ? `余额 ${row.balance}` : (row.message ?? '未知原因')}
+          {row.success
+            ? row.idempotentHit
+              ? `余额 ${row.balance} · 重试命中，未重复发放`
+              : `余额 ${row.balance}`
+            : (row.message ?? '未知原因')}
         </span>
       ),
     },
@@ -215,8 +231,8 @@ export function CsvImportDrawer({
               file={file}
               accept=".csv,text/csv"
               label="选择 CSV"
-              onPick={setFile}
-              onClear={() => setFile(null)}
+              onPick={pickFile}
+              onClear={() => pickFile(null)}
             />
           </FormField>
 
@@ -232,9 +248,15 @@ export function CsvImportDrawer({
 
           <Notice tone="warn">
             导入会立即改变用户可用余额且不可撤销。建议先用几行小数据验证格式，再导全量。
+            同一份文件重试不会二次发放（按行幂等），换文件后计数重新开始。
           </Notice>
         </div>
       )}
     </Drawer>
   );
+}
+
+/** 导入批次幂等键：选好文件时生成一次，重试原样复用 */
+function newImportKey(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }

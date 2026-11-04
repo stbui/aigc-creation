@@ -184,7 +184,7 @@ export function ExceptionPage({
  * ⚠ 与既有行为的差异 (2026-10-20): 此前 App.tsx 的 catch-all 是
  * `<Navigate to="/workbench" replace />`, 未知 URL 被静默弹回工作台。
  * 用户输错路径时只会看到「莫名其妙回到工作台」, 分不清是页面不存在还是页面坏了 ——
- * 这与 AdminDashboardPage.tsx:288 自己写的决策原则
+ * 这与 AdminShell.tsx 里自己写的决策原则
  * 「⚠ 为什么不用 Navigate 静默弹回: 用户只会看到莫名其妙回到工作台」相互矛盾。现改为显式 404。
  */
 export function NotFoundPage() {

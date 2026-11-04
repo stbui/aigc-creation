@@ -17,4 +17,9 @@ export { ColorStudio } from '../../components/ColorStudio';
 /** 历史产出面板 */
 export { ToolHistoryPane } from '../../components/ToolHistoryPane';
 /** 商品图上传预览与原图展示 (与精修 / 翻译共用) */
-export { ProductSourceResult, ProductSourceUploadPreview } from '../../components/ProductSourcePreview';
+export {
+  ProductSourceResult,
+  ProductSourceUploadPreview,
+  productSourcePane,
+  productSourceUploadPreview,
+} from '../../components/ProductSourcePreview';

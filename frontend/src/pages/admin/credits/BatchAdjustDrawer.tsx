@@ -8,6 +8,7 @@ import {
   Notice,
   StatusTag,
   TextAreaField,
+  TextField,
   type AdminColumn,
 } from '~/admin-ui/primitives';
 import { adminCreditsApi } from './api';
@@ -32,9 +33,16 @@ export function BatchAdjustDrawer({
 }) {
   const toast = useToast();
   const [text, setText] = useState('');
+  /** 整批共用的调整原因。后端强制写入每条流水 */
+  const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<BatchAdjustResult | null>(null);
-  const dirty = !result && Boolean(text.trim());
+  /**
+   * 批次幂等键。打开抽屉时生成一次，重试时原样复用 ——
+   * 否则一次超时重试会把同一批积分发两遍。
+   */
+  const [batchKey, setBatchKey] = useState(() => newBatchKey());
+  const dirty = !result && Boolean(text.trim() || reason.trim());
   useUnsavedGuard(open && dirty);
 
   /** 解析结果与错误行分开返回: 有错行时仍展示能解析的部分, 便于边改边看 */
@@ -67,24 +75,38 @@ export function BatchAdjustDrawer({
   const close = () => {
     if (busy) return;
     setText('');
+    setReason('');
     setResult(null);
     onClose();
   };
   const requestClose = useDiscardConfirm(open && dirty, close);
   const done = () => {
     setText('');
+    setReason('');
     setResult(null);
+    // 本批已完成，下一批必须换新键 —— 复用会让下一批全被判定为重试
+    setBatchKey(newBatchKey());
     onDone();
   };
+
+  const reasonValid = reason.trim().length > 0;
 
   const submit = async () => {
     if (parsed.items.length === 0) {
       toast.warning('没有可提交的有效行');
       return;
     }
+    if (!reasonValid) {
+      toast.warning('请填写调整原因，它会写入每条积分流水');
+      return;
+    }
     setBusy(true);
     try {
-      const r = await adminCreditsApi.batchAdjust({ items: parsed.items });
+      const r = await adminCreditsApi.batchAdjust({
+        items: parsed.items,
+        reason: reason.trim(),
+        idempotencyKey: batchKey,
+      });
       setResult(r);
       if (r.failed === 0) toast.success(`已调整 ${r.succeeded} 条`);
       else toast.warning(`成功 ${r.succeeded} 条，失败 ${r.failed} 条`);
@@ -119,7 +141,11 @@ export function BatchAdjustDrawer({
       title: '说明',
       render: (row) => (
         <span className="text-[12px] text-muted-foreground">
-          {row.success ? `余额 ${row.balance}` : (row.message ?? '未知原因')}
+          {row.success
+            ? row.idempotentHit
+              ? `余额 ${row.balance} · 重试命中，未重复发放`
+              : `余额 ${row.balance}`
+            : (row.message ?? '未知原因')}
         </span>
       ),
     },
@@ -146,7 +172,7 @@ export function BatchAdjustDrawer({
             <ActionButton
               variant="default"
               onClick={() => void submit()}
-              disabled={busy || parsed.items.length === 0}
+              disabled={busy || parsed.items.length === 0 || !reasonValid}
             >
               {busy ? '提交中…' : `提交 ${parsed.items.length} 条`}
             </ActionButton>
@@ -157,7 +183,9 @@ export function BatchAdjustDrawer({
       {result ? (
         <DetailSection
           title="执行结果"
-          note={`成功 ${result.succeeded} · 失败 ${result.failed}`}
+          note={`成功 ${result.succeeded} · 失败 ${result.failed}${
+            result.idempotentHits > 0 ? ` · 重试命中 ${result.idempotentHits}` : ''
+          }`}
         >
           <AdminDataTable
             rows={result.results}
@@ -188,8 +216,29 @@ export function BatchAdjustDrawer({
               {parsed.errors.length > 5 ? ` …共 ${parsed.errors.length} 处问题` : ''}
             </Notice>
           )}
+
+          <FormField
+            label="调整原因"
+            hint="本批共用，写入每条积分流水。某一条需要不同说明时，可在该行第 3 列单独写。"
+          >
+            <TextField
+              value={reason}
+              onChange={setReason}
+              placeholder="如：双十一活动补偿"
+              ariaLabel="调整原因"
+            />
+          </FormField>
+
+          <Notice tone="warn">
+            提交后立即改变用户可用余额。同一批重复提交会被幂等键拦住，不会二次发放。
+          </Notice>
         </div>
       )}
     </Drawer>
   );
+}
+
+/** 批次幂等键：时间戳 + 随机串，一次打开抽屉生成一次 */
+function newBatchKey(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }

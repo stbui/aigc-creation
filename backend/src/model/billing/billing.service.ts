@@ -175,8 +175,30 @@ export class BillingService {
    * `channel` 策略读价格档单价并按分组货币换算；`unified` 读前台模型标量价。
    * 两种策略都必须用同一次 `routed` —— 换一条线路就是换一份价格，
    * 账单与目录报价必须同源，否则「看到的价」与「扣的钱」会打架。
+   *
+   * ## `overrideCreditCost`：后台改价的唯一落点
+   *
+   * 后台「能力消耗价」(`SystemSetting['creditPrice.<capabilityId>']`) 与
+   * 线路价 / 模型标量价是**两套价格**，此前只影响 `/capabilities` 下发
+   * 给用户看的数字，扣费仍走线路价 —— 表现为「后台显示已保存，用户却仍按
+   * 旧价扣费」。这个参数由调用方从 `CreditPriceService.resolve()` 取来传入，
+   * 把能力维度的覆盖价接进真正的计费路径。
+   *
+   * 只对**固定价**（`fixed_request`）生效，且仅在 `unified` 策略下：
+   *   · `per_second` / `token` 是按量计价，能力维度的「一次多少钱」无法直接
+   *     换算成每秒 / 每 token 单价，强行覆盖会让按量账单算出荒谬金额；
+   *   · `channel` 策略的价格是渠道成本 + 加价的结果，绕过渠道价等于让渠道
+   *     结算与账单脱钩。
+   * 这两种情况下覆盖价**不生效**，由后台改价页的 `source` 字段透出真实来源，
+   * 运营能看出「这一项不是能力价在管」。
+   *
+   * @param overrideCreditCost 能力维度覆盖价（积分）。null/undefined = 不覆盖
    */
-  buildDraft(access: UserGroupAccess, routed: RoutedModel): BillingDraft {
+  buildDraft(
+    access: UserGroupAccess,
+    routed: RoutedModel,
+    overrideCreditCost?: number | null,
+  ): BillingDraft {
     const capability = normalizeCapability(routed.intent.capability);
     if (!capability) throw badRequest('模型能力类型无效');
     const base: Omit<BillingDraft, 'billingMode' | 'amountMicrocredits'> = {
@@ -262,7 +284,7 @@ export class BillingService {
       cachedTokenPriceMicrocredits: BigInt(model.cachedPriceMicrocredits),
       amountMicrocredits: 0n,
     };
-    return this.withAmount(draft, routed.intent, false);
+    return this.withAmount(withCreditPriceOverride(draft, overrideCreditCost, pricing), routed.intent, false);
   }
 
   /**
@@ -739,14 +761,23 @@ export class BillingService {
     });
   }
 
-  /** 在调用方事务内完成退款；终态 CAS 防止同一张账单被并发退两次 */
+  /**
+   * 在调用方事务内完成退款；终态 CAS 防止同一张账单被并发退两次。
+   *
+   * 退款金额取 **`reservedAmountMicrocredits`**（真正冻结的量），而不是
+   * `amountMicrocredits`（建单时的预授权快照）。两者目前恒等，但一旦引入
+   * 授权上限截断、部分预授权之类的改动就会分叉 —— 那时按 `amount` 退款会
+   * 与钱包里实际冻结的数不一致，`wallet.refund` 的 CAS 直接失败，
+   * 表现为「点了退款但退不掉」。取冻结量才是语义正确的口径。
+   */
   private async refundInTransaction(
     tx: Prisma.TransactionClient,
     order: BillingOrderRow,
     errorText: string,
     reason: RefundReason,
   ): Promise<BillingOrderRow> {
-    const amount = order.amountMicrocredits;
+    const amount =
+      order.reservedAmountMicrocredits > 0n ? order.reservedAmountMicrocredits : order.amountMicrocredits;
     if (amount > 0n) {
       await this.wallet.refund(tx, {
         userId: order.userId,
@@ -938,4 +969,31 @@ export class BillingService {
 
 function truncate(value: string, max: number): string {
   return [...value].slice(0, max).join('');
+}
+
+/**
+ * 把能力维度的后台覆盖价挂到草案上。
+ *
+ * 只在「固定价 + unified 策略」时生效，理由见 `buildDraft` 的注释：
+ * 按量计价无法把「一次多少钱」换算成每秒 / 每 token 单价，
+ * 渠道价策略则会绕过渠道结算。
+ *
+ * 覆盖价以**积分**为单位传入，这里换算成微积分并保留分组倍率 ——
+ * 倍率是用户分组的权益（会员折扣 / 加价），不应该因为是后台改的价就失效。
+ */
+function withCreditPriceOverride(
+  draft: BillingDraft,
+  overrideCreditCost: number | null | undefined,
+  pricing: { multiplierBasisPoints: bigint },
+): BillingDraft {
+  if (overrideCreditCost === null || overrideCreditCost === undefined) return draft;
+  if (draft.billingMode !== 'fixed_request') return draft;
+  const cost = Number(overrideCreditCost);
+  if (!Number.isFinite(cost) || cost < 0) return draft;
+  return {
+    ...draft,
+    unitPriceMicrocredits: BigInt(Math.trunc(cost)) * CREDIT_SCALE,
+    // 覆盖价是最终成交价的基准，倍率仍按用户分组叠加
+    multiplierBasisPoints: pricing.multiplierBasisPoints,
+  };
 }

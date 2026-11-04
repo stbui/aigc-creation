@@ -2,11 +2,11 @@ import { useState } from 'react';
 
 import {
   ColorStudio,
-  ProductSourceResult,
-  ProductSourceUploadPreview,
   ToolCard,
   ToolHistoryPane,
   ToolShell,
+  productSourcePane,
+  productSourceUploadPreview,
 } from './components';
 import { DEFAULT_CUSTOM_COLOR, RECOLOR_COLOR_SWATCHES } from './constants';
 import { useToolTask } from './hooks';
@@ -59,12 +59,7 @@ export function ProductRecolorPage() {
       desc="一键生成商品多色效果，快速制作全SKU展示图"
       upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
       replaceUpload
-      renderUploadPreview={(uploads, controls) => {
-        const image = uploads[0];
-        return image ? (
-          <ProductSourceUploadPreview image={image} controls={controls} alt="待换色商品图" />
-        ) : null;
-      }}
+      renderUploadPreview={productSourceUploadPreview('待换色商品图')}
       settings={{ ratio: true, resolution: true }}
       submitLabel="立即换色"
       emptyVideo="/static/mp4/07_sphs.mp4"
@@ -86,10 +81,7 @@ export function ProductRecolorPage() {
         const normalizedCustom = normalizeHexColor(customColor) ?? '';
         return run(inputs, recolorPayload(color, normalizedCustom, settings));
       }}
-      sourcePane={(images) => {
-        const image = images[0];
-        return image ? <ProductSourceResult image={image} alt="待换色商品图" /> : null;
-      }}
+      sourcePane={productSourcePane('待换色商品图')}
       onHistoryReuse={handleHistoryReuse}
       trailingPane={
         <ToolHistoryPane capability="recolor" refreshKey={result?.url} emptyText="暂无换色记录" />

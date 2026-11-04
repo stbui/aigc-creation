@@ -1,33 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Check,
-  ChevronDown,
-  Download,
-  Eye,
-  ImageOff,
-  Images,
-  Loader2,
-  RefreshCw,
-  Search,
-  Sparkles,
-  Trash2,
-} from 'lucide-react';
+import { ChevronDown, Download, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import {
-  assetSrc,
-  assetThumbSrc,
-  generateApi,
-  newIdempotencyKey,
-  resolveModelId,
-} from './api';
-import {
-  ImageLightbox,
-  ResultMedia,
-  StateError,
-  StateSkeleton,
-  WorkImage,
-  type LightboxItem,
-} from './components';
+import { assetSrc, generateApi, newIdempotencyKey, resolveModelId } from './api';
+import { StateError, StateSkeleton, type LightboxItem } from './components';
 import {
   notifyCreditsChanged,
   useApp,
@@ -37,18 +12,19 @@ import {
   useGenerateError,
   usePollAbort,
 } from './hooks';
-import { PAGE_SIZE, SERVER_PAGE_SIZE, type DatePreset } from './constants';
+import { PAGE_SIZE, SERVER_PAGE_SIZE } from './constants';
 import {
-  capabilityById,
-  capabilityName,
   outputExtension,
   runtimeOf,
-  startOfDay,
   taskErrorText,
   taskModality,
   toolPath,
   waitForTask,
 } from './utils';
+import { useWorksFilters, type WorksTab } from './useWorksFilters';
+import { WorksToolbar } from './WorksToolbar';
+import { WorksGrid } from './WorksGrid';
+import { WorksGuestState, WorksNoWorksState } from './WorksEmptyStates';
 import type { Task } from '../../types/api';
 
 /**
@@ -91,19 +67,7 @@ export function WorksPage() {
    * 用户看到"你还没有作品", 真相却是"接口没连上", 会以为作品丢了而反复重试。
    */
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<'image' | 'video'>('image');
-
-  // 四个筛选器（与参考站一致的多选/单选语义）
-  const [bizOpen, setBizOpen] = useState(false);
-  const [biz, setBiz] = useState<string[]>([]);
-  const [dateOpen, setDateOpen] = useState(false);
-  const [datePreset, setDatePreset] = useState<DatePreset>('all');
-  const [customRange, setCustomRange] = useState<[string, string]>(['', '']);
-  const [statusOpen, setStatusOpen] = useState(false);
-  const [status, setStatus] = useState<string[]>([]);
-  const [taskOpen, setTaskOpen] = useState(false);
-  const [taskQuery, setTaskQuery] = useState('');
-  const [taskPick, setTaskPick] = useState<string[]>([]);
+  const [tab, setTab] = useState<WorksTab>('image');
 
   const [selected, setSelected] = useState<string[]>([]);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
@@ -169,81 +133,13 @@ export function WorksPage() {
     void load();
   }, [token, load]);
 
-  const closeAll = () => {
-    setBizOpen(false);
-    setDateOpen(false);
-    setStatusOpen(false);
-    setTaskOpen(false);
-  };
 
   /*
-   * 点空白处 / 按 Esc 关闭筛选浮层。
-   *
-   * 之前只有 toolbar 的 onMouseLeave, 桌面端移出能关、移动端却关不掉：
-   * 手指点空白不会触发 mouseleave, 浮层会一直盖在作品上。事件挂在 document
-   * 上并排除 toolbar 内部 (浮层本身也在 toolbar 里), 选择筛选时不会误关。
+   * 筛选状态与可见列表推导（四个筛选器 + 浮层开合 + 点击空白关闭 + 真实过滤）
+   * 都在 `useWorksFilters` 里 —— 页面只取用结果，不再持有这 10 个 state。
    */
-  useEffect(() => {
-    if (!bizOpen && !dateOpen && !statusOpen && !taskOpen) return;
-    const onPointerDown = (e: PointerEvent) => {
-      const target = e.target as Element | null;
-      if (target?.closest('.my-works-toolbar')) return;
-      setBizOpen(false);
-      setDateOpen(false);
-      setStatusOpen(false);
-      setTaskOpen(false);
-    };
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setBizOpen(false);
-        setDateOpen(false);
-        setStatusOpen(false);
-        setTaskOpen(false);
-      }
-    };
-    document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
-    return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
-    };
-  }, [bizOpen, dateOpen, statusOpen, taskOpen]);
-
-  // ── 真实过滤（全部基于本地任务数据，不做假筛选）──
-  const filtered = useMemo(() => {
-    const now = new Date();
-    return tasks.filter((t) => {
-      // 页签是第一道切分: 图片 / 视频互不混排
-      if ((tab === 'video') !== (taskModality(t) === 'video')) return false;
-      if (biz.length > 0 && !biz.includes(t.capability)) return false;
-      if (status.length > 0) {
-        const bucket = t.status === 'succeeded' ? 'succeeded' : t.status === 'failed' ? 'failed' : 'running';
-        if (!status.includes(bucket)) return false;
-      }
-      if (taskPick.length > 0 && !taskPick.includes(t.id)) return false;
-      const ts = t.createdAt ? new Date(t.createdAt).getTime() : 0;
-      if (datePreset === 'today' && ts < startOfDay(now)) return false;
-      if (datePreset === 'yesterday') {
-        const y = startOfDay(now) - 86400000;
-        if (ts < y || ts >= startOfDay(now)) return false;
-      }
-      if (datePreset === '7d' && ts < startOfDay(now) - 6 * 86400000) return false;
-      if (datePreset === 'custom' && customRange[0] && customRange[1]) {
-        const from = startOfDay(new Date(customRange[0]));
-        const to = startOfDay(new Date(customRange[1])) + 86400000;
-        if (ts < from || ts >= to) return false;
-      }
-      return true;
-    });
-  }, [tasks, tab, biz, status, taskPick, datePreset, customRange]);
-
-  const sorted = useMemo(
-    () =>
-      [...filtered].sort(
-        (a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime(),
-      ),
-    [filtered],
-  );
+  const filters = useWorksFilters({ tasks, caps, tab });
+  const { sorted, activeFilterCount } = filters;
 
   const visible = sorted.slice(0, visibleCount);
 
@@ -283,14 +179,6 @@ export function WorksPage() {
       return prev < lightboxItems.length ? prev : lightboxItems.length > 0 ? lightboxItems.length - 1 : null;
     });
   }, [lightboxItems.length]);
-
-  const activeFilterCount =
-    biz.length + status.length + taskPick.length + (datePreset === 'all' ? 0 : 1);
-
-  const toggleIn = (arr: string[], v: string, set: (x: string[]) => void) =>
-    set(arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v]);
-
-  const cardOf = (t: Task) => capabilityById(t.capability);
 
   /**
    * 删除作品。产出图与磁盘文件会一并删除且不可恢复，故必须二次确认 ——
@@ -448,35 +336,13 @@ export function WorksPage() {
     message.success(`已下载 ${list.length} 个文件`);
   };
 
-  /*
-     * 业务类型按**产出模态**收集，而不是写死 group id。
-     *
-     * 之前图片页写死 ecommerce_gen/ai_retouch，导致 group 为 ai_video、
-     * 但 modality=image 的 free_create 在图片页没有筛选项；视频页又会出现
-     * 一个永远筛出空结果的组。现在从能力清单的 modality 推导分组，
-     * 并对「图片页里的 ai_video 组」如实改名为「自由创作」，避免名实不符。
-     */
-    const bizGroups = useMemo(() => {
-      const items = caps?.items ?? [];
-      const groups = caps?.groups ?? [];
-      const modalItems = items.filter((i) => (i.modality ?? 'image') === tab);
-      const groupIds = new Set(modalItems.map((i) => i.group));
-      return groups
-        .filter((g) => groupIds.has(g.id))
-        .map((g) => ({
-          name: tab === 'image' && g.id === 'ai_video' ? '自由创作' : g.name,
-          items: modalItems.filter((i) => i.group === g.id),
-        }))
-        .filter((g) => g.items.length > 0);
-    }, [caps, tab]);
-
   /**
    * 切页签要清掉业务类型筛选: 两个页签的能力集合不相交, 留着上一页的选择
    * 只会得到「没有符合条件」的空网格, 而用户刚点的只是一个页签。
    */
-  const switchTab = (next: 'image' | 'video') => {
+  const switchTab = (next: WorksTab) => {
     setTab(next);
-    setBiz([]);
+    filters.setBiz([]);
     // 勾选状态跟着视图走：否则切到视频页后“下载所选”仍会带上图片
     setSelected([]);
     setVisibleCount(PAGE_SIZE);
@@ -488,15 +354,7 @@ export function WorksPage() {
    */
   useEffect(() => {
     setSelected([]);
-  }, [tab, biz, status, taskPick, datePreset, customRange]);
-
-  const matchedTasks = useMemo(() => {
-    const q = taskQuery.trim();
-    if (!q) return tasks.slice(0, 20);
-    return tasks
-      .filter((t) => capabilityName(t.capability).includes(q) || t.id.includes(q))
-      .slice(0, 20);
-  }, [tasks, taskQuery]);
+  }, [tab, filters.biz, filters.status, filters.taskPick, filters.datePreset, filters.customRange]);
 
   return (
     <div className="my-works-page">
@@ -536,249 +394,12 @@ export function WorksPage() {
         </button>
       </div>
 
-      <div className="my-works-toolbar" onMouseLeave={closeAll}>
-        {/* 业务类型（分组多选） */}
-        <div className="my-works-filter-wrap">
-          <button
-            type="button"
-            className={`my-works-filter-trigger${biz.length > 0 ? ' active' : ''}${bizOpen ? ' is-open' : ''}`}
-            aria-expanded={bizOpen}
-            onClick={() => {
-              closeAll();
-              setBizOpen((v) => !v);
-            }}
-          >
-            业务类型
-            {biz.length > 0 && <span className="my-works-filter-badge">{biz.length}</span>}
-            <ChevronDown size={13} />
-          </button>
-          {bizOpen && (
-            <div className="my-works-filter-popover my-works-business-popover">
-              <div className="my-works-popover-head">
-                <strong>业务类型</strong>
-                <span>可多选 · 选择后立即生效</span>
-              </div>
-              <button
-                type="button"
-                className={`my-works-business-all${biz.length === 0 ? ' selected' : ''}`}
-                onClick={() => setBiz([])}
-              >
-                <span className={`my-works-checkbox${biz.length === 0 ? ' on' : ''}`}>
-                  {biz.length === 0 && <Check size={11} />}
-                </span>
-                全部
-              </button>
-              {bizGroups.map((g) => (
-                <div key={g.name} className="my-works-option-group">
-                  <span className="my-works-option-group-title">{g.name}</span>
-                  <div className="my-works-option-chips">
-                    {g.items.map((i) => (
-                      <button
-                        key={i.id}
-                        type="button"
-                        className={`my-works-option-chip${biz.includes(i.id) ? ' selected' : ''}`}
-                        onClick={() => toggleIn(biz, i.id, setBiz)}
-                      >
-                        {i.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* 日期 */}
-        <div className="my-works-filter-wrap">
-          <button
-            type="button"
-            className={`my-works-filter-trigger${datePreset !== 'all' ? ' active' : ''}${dateOpen ? ' is-open' : ''}`}
-            aria-expanded={dateOpen}
-            onClick={() => {
-              closeAll();
-              setDateOpen((v) => !v);
-            }}
-          >
-            日期
-            <ChevronDown size={13} />
-          </button>
-          {dateOpen && (
-            <div className="my-works-filter-popover my-works-date-popover">
-              <div className="my-works-popover-head">
-                <strong>日期</strong>
-                <span>只精确到日期</span>
-              </div>
-              <div className="my-works-date-pills">
-                {(
-                  [
-                    ['all', '全部'],
-                    ['today', '今天'],
-                    ['yesterday', '昨天'],
-                    ['7d', '近 7 天'],
-                  ] as [DatePreset, string][]
-                ).map(([v, label]) => (
-                  <button
-                    key={v}
-                    type="button"
-                    className={datePreset === v ? 'selected' : ''}
-                    onClick={() => setDatePreset(v)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-              <div className="my-works-custom-date">
-                <span className="my-works-custom-date-label">自定义日期范围</span>
-                <div className="my-works-date-fields">
-                  <input
-                    type="date"
-                    value={customRange[0]}
-                    onChange={(e) => {
-                      setCustomRange([e.target.value, customRange[1]]);
-                      // 之前只更新范围、不切换 preset，过滤分支永远不会读它
-                      setDatePreset('custom');
-                    }}
-                  />
-                  <span>至</span>
-                  <input
-                    type="date"
-                    value={customRange[1]}
-                    onChange={(e) => {
-                      setCustomRange([customRange[0], e.target.value]);
-                      setDatePreset('custom');
-                    }}
-                  />
-                </div>
-                <span className="my-works-custom-date-hint">包含开始日和结束日</span>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* 状态 */}
-        <div className="my-works-filter-wrap">
-          <button
-            type="button"
-            className={`my-works-filter-trigger${status.length > 0 ? ' active' : ''}${statusOpen ? ' is-open' : ''}`}
-            aria-expanded={statusOpen}
-            onClick={() => {
-              closeAll();
-              setStatusOpen((v) => !v);
-            }}
-          >
-            状态
-            <ChevronDown size={13} />
-          </button>
-          {statusOpen && (
-            <div className="my-works-filter-popover my-works-status-popover">
-              <div className="my-works-popover-head">
-                <strong>状态</strong>
-                <span>按作品状态筛选</span>
-              </div>
-              <div className="my-works-status-pills">
-                {(
-                  [
-                    ['succeeded', '成功'],
-                    ['running', '生成中'],
-                    ['failed', '失败'],
-                  ] as [string, string][]
-                ).map(([v, label]) => (
-                  <button
-                    key={v}
-                    type="button"
-                    className={status.includes(v) ? 'selected' : ''}
-                    onClick={() => toggleIn(status, v, setStatus)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* 所属任务 */}
-        <div className="my-works-filter-wrap">
-          <button
-            type="button"
-            className={`my-works-filter-trigger${taskPick.length > 0 ? ' active' : ''}${taskOpen ? ' is-open' : ''}`}
-            aria-expanded={taskOpen}
-            onClick={() => {
-              closeAll();
-              setTaskOpen((v) => !v);
-            }}
-          >
-            所属任务
-            <ChevronDown size={13} />
-          </button>
-          {taskOpen && (
-            <div className="my-works-filter-popover my-works-task-popover">
-              <div className="my-works-popover-head">
-                <strong>所属任务</strong>
-                <span>支持任务 ID 或能力名称搜索</span>
-              </div>
-              <label className="my-works-task-search">
-                <Search size={13} />
-                <input
-                  value={taskQuery}
-                  placeholder="搜索任务"
-                  onChange={(e) => setTaskQuery(e.target.value)}
-                />
-              </label>
-              <div className="my-works-task-list">
-                <button
-                  type="button"
-                  className={taskPick.length === 0 ? 'selected' : ''}
-                  onClick={() => setTaskPick([])}
-                >
-                  全部任务
-                </button>
-                {matchedTasks.map((t) => (
-                  <button
-                    key={t.id}
-                    type="button"
-                    className={taskPick.includes(t.id) ? 'selected' : ''}
-                    onClick={() => toggleIn(taskPick, t.id, setTaskPick)}
-                  >
-                    <span>{capabilityName(t.capability)}</span>
-                    <small>{t.id.slice(-8)}</small>
-                  </button>
-                ))}
-                {matchedTasks.length === 0 && <span className="my-works-task-empty">无匹配任务</span>}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* 清除筛选紧跟筛选器 (次要动作), 主操作「选择下载」守在工具栏右端 */}
-        {activeFilterCount > 0 && (
-          <button
-            type="button"
-            className="my-works-filter-clear"
-            onClick={() => {
-              setBiz([]);
-              setStatus([]);
-              setTaskPick([]);
-              setDatePreset('all');
-              setCustomRange(['', '']);
-            }}
-          >
-            清除筛选
-          </button>
-        )}
-
-        <button
-          type="button"
-          className="my-works-download"
-          disabled={downloadableSelected === 0}
-          title={downloadableSelected === 0 ? '请先勾选已生成成功的作品' : undefined}
-          onClick={downloadSelected}
-        >
-          <Download size={14} />
-          下载所选{selected.length > 0 ? ` (${selected.length})` : ''}
-        </button>
-      </div>
+      <WorksToolbar
+        filters={filters}
+        selected={selected}
+        downloadableSelected={downloadableSelected}
+        downloadSelected={downloadSelected}
+      />
 
       {/* 多选操作条（选择任一卡片后出现，实测 spec: #5B4BD7 on #F1EFFF） */}
       {selected.length > 0 && (
@@ -830,244 +451,27 @@ export function WorksPage() {
         />
       ) : !token ? (
         /* 作品与账号绑定: 访客看到「还没有作品」会误以为产出丢了, 直接给登录入口 */
-        <div className="my-works-empty">
-          <Images size={72} strokeWidth={1.35} aria-hidden="true" />
-          <h2>登录后查看你的作品</h2>
-          <p>作品与账号绑定，登录后即可查看、下载并继续创作。</p>
-          <button type="button" className="my-works-empty-action" onClick={openLogin}>
-            登录/注册
-          </button>
-        </div>
+        <WorksGuestState onLogin={openLogin} />
       ) : visible.length === 0 ? (
-        <div className="my-works-empty">
-          <Images size={72} strokeWidth={1.35} aria-hidden="true" />
-          <h2>
-            {activeFilterCount === 0
-              ? tab === 'video'
-                ? '还没有视频作品'
-                : '还没有作品'
-              : tab === 'video'
-                ? '没有符合条件的视频'
-                : '没有符合条件的作品'}
-          </h2>
-          <p>
-            {activeFilterCount > 0
-              ? '试试放宽筛选条件，或清除全部筛选。'
-              : tab === 'video'
-                ? '视频作品来自「图生视频」能力，完成后会出现在这里。'
-                : '完成一次创作后，作品会出现在这里。'}
-          </p>
-          {activeFilterCount === 0 && (
-            <button
-              type="button"
-              className="my-works-empty-action"
-              onClick={() => navigate('/workbench')}
-            >
-              去创作
-            </button>
-          )}
-        </div>
+        <WorksNoWorksState
+          tab={tab}
+          activeFilterCount={activeFilterCount}
+          onGoCreate={() => navigate('/workbench')}
+        />
       ) : (
         <>
-          <div className="my-works-grid">
-            {visible.map((t, cardIndex) => {
-              const fullUrl = t.outputAsset ? assetSrc(t.outputAsset) : undefined;
-              const isSel = selected.includes(t.id);
-              const isVideo = taskModality(t) === 'video';
-              // 网格只显示缩略图；点开查看器 / 下载仍走完整地址 (lightboxItems / downloadSelected)
-              const url = isVideo ? fullUrl : assetThumbSrc(t.outputAsset, 640) ?? fullUrl;
-              const def = cardOf(t);
-              // 大图列表里的下标: 只有图片作品进查看器, 视频没有可翻的静态原图
-              const previewAt = url && !isVideo ? lightboxItems.findIndex((x) => x.id === t.id) : -1;
-              return (
-                <article key={t.id} className={`my-work-card${isSel ? ' selected' : ''}`}>
-                  {/*
-                    图片点开大图查看器; 视频直接给可播放的播放器 (原生控件不能被
-                    <button> 包住); 「用它再做一张」留在 hover 浮层里。
-                  */}
-                  <div
-                    className={`my-work-media${isVideo ? ' is-video' : ''}${!url ? ' is-placeholder' : ''}`}
-                  >
-                    {url ? (
-                      isVideo ? (
-                        <ResultMedia
-                          url={url}
-                          modality="video"
-                          // 视频没有容器元数据可写, 显式标识只能由播放器侧补 (图片已烙进像素)
-                          aigc={t.outputAsset?.aigc}
-                          alt={capabilityName(t.capability)}
-                        />
-                      ) : (
-                        <WorkImage
-                          src={url}
-                          alt={capabilityName(t.capability)}
-                          priority={cardIndex < 2}
-                          onOpen={() => {
-                            if (previewAt >= 0) setPreviewIndex(previewAt);
-                          }}
-                        />
-                      )
-                    ) : (
-                      <span className="my-work-image-placeholder">
-                        {t.status === 'failed' ? (
-                          <>
-                            <ImageOff size={18} />
-                            <strong>生成失败</strong>
-                            <small>{taskErrorText(t.errorCode)}</small>
-                            {def && (
-                              <button
-                                type="button"
-                                className="my-work-placeholder-retry"
-                                disabled={retryingId === t.id}
-                                title={
-                                  runtimeOf(def).effective === 'unavailable'
-                                    ? runtimeOf(def).reason || '该能力暂无可用模型通道'
-                                    : runtimeOf(def).effective === 'disabled'
-                                      ? runtimeOf(def).reason || '该能力已下线'
-                                      : '沿用原参数重新生成'
-                                }
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  retryTask(t);
-                                }}
-                              >
-                                {retryingId === t.id ? (
-                                  <Loader2 size={12} className="my-work-generating-spinner" />
-                                ) : (
-                                  <RefreshCw size={12} />
-                                )}
-                                {retryingId === t.id ? '重试中…' : '重试'}
-                              </button>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            <Loader2 size={18} className="my-work-generating-spinner" />
-                            <strong>生成中</strong>
-                            <small>完成后会自动出现在这里</small>
-                          </>
-                        )}
-                      </span>
-                    )}
-
-                    {/*
-                      能力名与时间 / 尺寸放在图片下方的脚注里 (见 .my-work-caption),
-                      不再用角标 + 深色渐变压在画面上: 缩略图的每个像素都留给产出本身。
-                    */}
-                    {/* hover 浮层: 顶部再来一张 / 底部操作。无产出的任务只能删除,
-                        不能显示一个实际不会下载任何文件的「下载」。 */}
-                    <span className={`my-work-hover-actions${url ? '' : ' is-placeholder'}`}>
-                      {url && (
-                        <span className="my-work-hover-top">
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => {
-                              if (def) navigate(toolPath(def.id));
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                if (def) navigate(toolPath(def.id));
-                              }
-                            }}
-                          >
-                            <Sparkles size={12} /> 再来一张
-                          </span>
-                        </span>
-                      )}
-                      <span className="my-work-hover-bottom">
-                        {url && previewAt >= 0 && (
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => setPreviewIndex(previewAt)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                setPreviewIndex(previewAt);
-                              }
-                            }}
-                          >
-                            <Eye size={12} /> 查看
-                          </span>
-                        )}
-                        {url && (
-                          <span
-                            role="button"
-                            tabIndex={0}
-                            onClick={() => downloadWork(t)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                downloadWork(t);
-                              }
-                            }}
-                          >
-                            <Download size={12} /> 下载
-                          </span>
-                        )}
-                        <span
-                          role="button"
-                          tabIndex={0}
-                          className="is-danger"
-                          onClick={() => removeTask(t.id)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              removeTask(t.id);
-                            }
-                          }}
-                        >
-                          <Trash2 size={12} /> 删除
-                        </span>
-                      </span>
-                    </span>
-                  </div>
-
-                  {/* 勾选（多选下载） */}
-                  {/* 没有产出的失败 / 生成中任务不能勾选: 下载的是文件, 不能把
-                      「任务」当成作品选中, 否则会提示下载 0 个文件。 */}
-                  {url && (
-                    <label className="my-work-check" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={isSel}
-                        onChange={() => toggleIn(selected, t.id, setSelected)}
-                      />
-                      <span>{isSel && <Check size={11} />}</span>
-                    </label>
-                  )}
-
-                  <div className="my-work-caption">
-                    <span className="my-work-caption-name">{capabilityName(t.capability)}</span>
-                    <small>
-                      {t.createdAt
-                        ? new Date(t.createdAt).toLocaleString('zh-CN', {
-                            month: '2-digit',
-                            day: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            hour12: false,
-                          })
-                        : ''}
-                      {t.outputAsset ? ` · ${t.outputAsset.width}×${t.outputAsset.height}` : ''}
-                    </small>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-
-          {/* 大图查看器: 与结果栏同一套 (缩放 / 拖拽 / ←→ 翻页 / Esc 关闭) */}
-          {previewIndex !== null && lightboxItems[previewIndex] && (
-            <ImageLightbox
-              items={lightboxItems}
-              index={previewIndex}
-              onIndexChange={setPreviewIndex}
-              onClose={() => setPreviewIndex(null)}
-            />
-          )}
+          <WorksGrid
+            visible={visible}
+            selected={selected}
+            onToggleSelect={(id) => filters.toggleIn(selected, id, setSelected)}
+            lightboxItems={lightboxItems}
+            previewIndex={previewIndex}
+            setPreviewIndex={setPreviewIndex}
+            retryingId={retryingId}
+            retryTask={retryTask}
+            downloadWork={downloadWork}
+            removeTask={removeTask}
+          />
 
           {(visibleCount < sorted.length || tasks.length < totalTasks) && (
             <button

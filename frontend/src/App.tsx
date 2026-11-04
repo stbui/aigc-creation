@@ -386,7 +386,7 @@ function Shell() {
             />
             {/* 2026-10-20: 此前是 <Navigate to="/workbench" replace />, 未知 URL 被静默
                 弹回工作台 —— 用户输错路径时分不清是「页面不存在」还是「页面坏了」。
-                这与 AdminDashboardPage.tsx:288 自定的原则相悖, 现改为显式 404。
+                这与 AdminShell.tsx 里「不用 Navigate 静默弹回」的决策原则相悖, 现改为显式 404。
                 已核对 tests/ 与 e2e/: 无任何用例依赖 catch-all 跳工作台。 */}
             <Route path="*" element={<NotFoundPage />} />
           </Routes>

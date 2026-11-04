@@ -16,11 +16,11 @@ import {
   ZOOM_STEP,
 } from './constants';
 import {
-  ProductSourceResult,
-  ProductSourceUploadPreview,
   RangeRow,
   ToolHistoryPane,
   ToolShell,
+  productSourcePane,
+  productSourceUploadPreview,
 } from './components';
 import { useToolTask } from './hooks';
 import {
@@ -137,12 +137,7 @@ export function RotateAnglePage() {
       desc="视角平滑旋转，细节立体呈现"
       upload={{ title: '上传图片', required: true, max: 1, hint: '支持 JPG、PNG、WebP，最多 1 张' }}
       replaceUpload
-      renderUploadPreview={(uploads, controls) => {
-        const image = uploads[0];
-        return image ? (
-          <ProductSourceUploadPreview image={image} controls={controls} alt="待生成商品图" />
-        ) : null;
-      }}
+      renderUploadPreview={productSourceUploadPreview('待生成商品图')}
       settings={{ ratio: true, resolution: true }}
       submitLabel="立即生成"
       emptyVideo="/static/mp4/07_xzjd.mp4"
@@ -160,12 +155,7 @@ export function RotateAnglePage() {
         setSourceUrl(inputs[0]?.url ?? '');
         return run(inputs, rotatePayload(tab, yaw, pitch, zoom, settings));
       }}
-      sourcePane={(images) => {
-        const image = images[0];
-        return image ? (
-          <ProductSourceResult image={image} alt="待生成商品图" className="rotate-angle-result" />
-        ) : null;
-      }}
+      sourcePane={productSourcePane('待生成商品图', 'rotate-angle-result')}
       onHistoryReuse={handleHistoryReuse}
       trailingPane={
         <ToolHistoryPane capability="rotate" refreshKey={result?.url} emptyText="暂无旋转记录" />

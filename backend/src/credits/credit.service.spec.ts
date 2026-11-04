@@ -143,3 +143,231 @@ describe('CreditService 积分查询口径', () => {
     expect(prisma.creditLedgerEntry.findMany).not.toHaveBeenCalled();
   });
 });
+
+describe('CreditService 退款扣回批次顺序', () => {
+  /**
+   * 回归：早先按 `orderId asc` 排序，那是 id 字符串字典序，与「是否本单」
+   * 无关 —— 很可能先扣用户别的订单（甚至永久批次），把本单快过期的批次
+   * 剩给用户。必须「本单批次 → 其它批次（FEFO）」两段式。
+   */
+  it('先扣本单批次，缺口才回落到其它批次', async () => {
+    const taken: Array<{ id: string; micro: bigint }> = [];
+    const tx = {
+      order: {
+        findUnique: vi.fn().mockResolvedValue({ userId: 'u1', grantedCredits: 100 }),
+      },
+      creditLot: {
+        findMany: vi
+          .fn()
+          // 第一段：本单批次，剩 60
+          .mockResolvedValueOnce([{ id: 'own-1', remainingMicrocredits: 60_000_000n }])
+          // 第二段：其它批次，剩 500（永久）
+          .mockResolvedValueOnce([{ id: 'other-1', remainingMicrocredits: 500_000_000n }]),
+        updateMany: vi.fn().mockImplementation(({ where, data }) => {
+          taken.push({ id: where.id, micro: data.remainingMicrocredits.decrement });
+          return { count: 1 };
+        }),
+      },
+      creditLedgerEntry: { create: vi.fn().mockResolvedValue({}) },
+    };
+    const wallet = {
+      debitAccountOnly: vi.fn().mockResolvedValue({
+        availableMicrocredits: 400_000_000n,
+        reservedMicrocredits: 0n,
+      }),
+    };
+    const prisma = {
+      order: tx.order,
+      $transaction: vi.fn().mockImplementation((fn: never) => (fn as never as Function)(tx)),
+    };
+    const service = new CreditService(prisma as never, wallet as never);
+
+    const result = await service.reclaimForOrder('o-1', 'admin', '退款');
+
+    // 本单剩 60 不够 100，扣完本单再扣其它 40
+    expect(taken).toEqual([
+      { id: 'own-1', micro: 60_000_000n },
+      { id: 'other-1', micro: 40_000_000n },
+    ]);
+    expect(result.reclaimed).toBe(100);
+    expect(result.unreclaimable).toBe(0);
+    // 两段查询的 where 必须显式区分本单 / 非本单，而不是靠排序
+    expect(tx.creditLot.findMany.mock.calls[0][0].where).toMatchObject({ orderId: 'o-1' });
+    expect(tx.creditLot.findMany.mock.calls[1][0].where).toMatchObject({
+      NOT: { orderId: 'o-1' },
+    });
+  });
+
+  it('本单批次足够时不碰其它批次', async () => {
+    const tx = {
+      order: {
+        findUnique: vi.fn().mockResolvedValue({ userId: 'u1', grantedCredits: 50 }),
+      },
+      creditLot: {
+        findMany: vi
+          .fn()
+          .mockResolvedValueOnce([{ id: 'own-1', remainingMicrocredits: 80_000_000n }])
+          .mockResolvedValueOnce([{ id: 'other-1', remainingMicrocredits: 500_000_000n }]),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      creditLedgerEntry: { create: vi.fn().mockResolvedValue({}) },
+    };
+    const wallet = {
+      debitAccountOnly: vi.fn().mockResolvedValue({
+        availableMicrocredits: 450_000_000n,
+        reservedMicrocredits: 0n,
+      }),
+    };
+    const prisma = {
+      order: tx.order,
+      $transaction: vi.fn().mockImplementation((fn: never) => (fn as never as Function)(tx)),
+    };
+    const service = new CreditService(prisma as never, wallet as never);
+
+    await service.reclaimForOrder('o-1', 'admin', '退款');
+
+    expect(tx.creditLot.updateMany).toHaveBeenCalledTimes(1);
+    expect(tx.creditLot.updateMany.mock.calls[0][0].where.id).toBe('own-1');
+  });
+});
+
+describe('CreditService 人工调整幂等', () => {
+  it('同一幂等键重复追加不二次发放', async () => {
+    const existing: Array<{ referenceKey: string; userId: string }> = [];
+    const created: Array<{ amountMicrocredits: bigint }> = [];
+    const tx = {
+      creditLedgerEntry: {
+        findUnique: vi.fn().mockImplementation(({ where }) => {
+          const hit = existing.find((e) => e.referenceKey === where.referenceKey);
+          return hit ? { userId: hit.userId } : null;
+        }),
+        create: vi.fn().mockImplementation(({ data }) => {
+          created.push({ amountMicrocredits: data.amountMicrocredits });
+          if (data.referenceKey) {
+            existing.push({ referenceKey: data.referenceKey, userId: data.userId });
+          }
+          return {};
+        }),
+      },
+      creditLot: { create: vi.fn().mockResolvedValue({ id: 'lot-1' }) },
+      creditAccount: {
+        findUnique: vi.fn().mockResolvedValue({ userId: 'u1' }),
+        create: vi.fn(),
+        update: vi.fn().mockResolvedValue({
+          availableMicrocredits: 100_000_000n,
+          reservedMicrocredits: 0n,
+        }),
+      },
+    };
+    const wallet = {
+      balanceOf: vi.fn().mockResolvedValue({
+        availableMicrocredits: 100_000_000n,
+        reservedMicrocredits: 0n,
+      }),
+      grant: vi.fn().mockImplementation((_db: unknown, params: { amountMicrocredits: bigint; meta: { referenceKey?: string } }) => {
+        created.push({ amountMicrocredits: params.amountMicrocredits });
+        if (params.meta?.referenceKey) {
+          existing.push({ referenceKey: params.meta.referenceKey, userId: 'u1' });
+        }
+        return {
+          lotId: 'lot-1',
+          balance: { availableMicrocredits: 100_000_000n, reservedMicrocredits: 0n },
+        };
+      }),
+    };
+    const prisma = {
+      // adminAdjust 末尾要读余额概览
+      creditAccount: {
+        findMany: vi.fn().mockResolvedValue([
+          { userId: 'u1', availableMicrocredits: 100_000_000n },
+        ]),
+      },
+      creditLot: { groupBy: vi.fn().mockResolvedValue([]) },
+      creditLedgerEntry: {
+        groupBy: vi.fn().mockResolvedValue([]),
+        findUnique: tx.creditLedgerEntry.findUnique,
+        create: tx.creditLedgerEntry.create,
+      },
+      $transaction: vi.fn().mockImplementation((fn: never) => (fn as never as Function)(tx)),
+    };
+    const service = new CreditService(prisma as never, wallet as never);
+
+    const first = await service.adminAdjust({
+      userId: 'u1',
+      delta: 100,
+      reason: '活动补偿',
+      operatorId: 'admin',
+      idempotencyKey: 'batch:admin:key-1:0',
+    });
+    const second = await service.adminAdjust({
+      userId: 'u1',
+      delta: 100,
+      reason: '活动补偿',
+      operatorId: 'admin',
+      idempotencyKey: 'batch:admin:key-1:0',
+    });
+
+    expect(first.idempotentHit).toBe(false);
+    expect(second.idempotentHit).toBe(true);
+    // 只发了一次
+    expect(created).toHaveLength(1);
+  });
+
+  it('缺少原因直接拒绝', async () => {
+    const service = new CreditService({} as never, {} as never);
+    await expect(
+      service.adminAdjust({ userId: 'u1', delta: 10, reason: '   ', operatorId: 'admin' }),
+    ).rejects.toMatchObject({ code: 40001 });
+  });
+});
+
+describe('CreditService 账实核对', () => {
+  /**
+   * 等式是「可用 + 冻结 == Σ 批次剩余」。
+   * 只比可用会把所有有预授权的用户全判成不一致 —— 预留正是把可用挪到冻结、
+   * 同时扣掉批次，两边都不进 available。
+   */
+  it('预留中的账户不应被判为不一致', async () => {
+    const prisma = {
+      creditAccount: {
+        findMany: vi
+          .fn()
+          // 第一次：账户快照
+          .mockResolvedValueOnce([{ userId: 'u1', availableMicrocredits: 60_000_000n }])
+          // 第二次：冻结量
+          .mockResolvedValueOnce([{ userId: 'u1', reservedMicrocredits: 40_000_000n }]),
+      },
+      creditLot: {
+        groupBy: vi.fn().mockResolvedValue([{ userId: 'u1', _sum: { remainingMicrocredits: 100_000_000n } }]),
+      },
+    };
+    const service = new CreditService(prisma as never, {} as never);
+
+    const result = await service.auditConsistency();
+
+    expect(result.checked).toBe(1);
+    expect(result.mismatched).toEqual([]);
+  });
+
+  it('批次总额与账户不符时报出差额', async () => {
+    const prisma = {
+      creditAccount: {
+        findMany: vi
+          .fn()
+          .mockResolvedValueOnce([{ userId: 'u1', availableMicrocredits: 100_000_000n }])
+          .mockResolvedValueOnce([{ userId: 'u1', reservedMicrocredits: 0n }]),
+      },
+      creditLot: {
+        groupBy: vi.fn().mockResolvedValue([{ userId: 'u1', _sum: { remainingMicrocredits: 70_000_000n } }]),
+      },
+    };
+    const service = new CreditService(prisma as never, {} as never);
+
+    const result = await service.auditConsistency();
+
+    // 账户 100，批次只有 70 —— 少了 30，差额为负（批次比账户少）
+    expect(result.mismatched).toEqual([
+      { userId: 'u1', accountAvailable: 100, lotsRemaining: 70, diff: -30 },
+    ]);
+  });
+});

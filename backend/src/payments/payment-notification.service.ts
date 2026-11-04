@@ -133,7 +133,57 @@ export class PaymentNotificationService {
       return adapter.ack(result);
     }
 
-    const outcome = await this.processNotification(row!.id, result);
+    /*
+     * 同步处理前先抢占这一行（processing），与 worker 的 `retry()` 抢同一把锁。
+     *
+     * 不占锁的后果：一条回调在 HTTP 线程处理的同时，worker 每 15 秒的扫描
+     * （`status in (pending,failed) && nextAttemptAt <= now`）会把它再处理一遍。
+     * 资金侧有 `markPaid` 的条件更新兜底，但 attempts 会虚高、差异记录会重复，
+     * 且两条路径可能给出相反的 ack。
+     */
+    const claimed = await this.prisma.paymentNotification.updateMany({
+      where: { id: row!.id, status: { in: ['pending', 'failed'] } },
+      data: { status: 'processing', attempts: { increment: 1 } },
+    });
+    if (claimed.count === 0) {
+      const latest = await this.prisma.paymentNotification.findUnique({
+        where: { id: row!.id },
+        select: { status: true },
+      });
+      // 已被另一条路径处理完：ack 成功，渠道不必再重试
+      if (latest?.status === 'processed') return adapter.ack(result);
+      // 另一条路径正在处理同一事件：让渠道稍后重试，绝不能抢先 ack 成功
+      return adapter.ack({
+        ok: false,
+        ackSuccess: false,
+        reason: '通知正在处理中',
+        rawPayload: '',
+      });
+    }
+
+    let outcome: { ok: boolean; permanent?: boolean; reason?: string };
+    try {
+      outcome = await this.processNotification(row!.id, result);
+    } catch (e) {
+      /*
+       * 异常不能把行留在 processing 等 worker 5 分钟后回收：立即退回可重试状态，
+       * 同时 ack 失败让渠道也重试一次 —— 两条通道谁先到都能完成入账。
+       */
+      const message = ((e as Error)?.message ?? String(e)).slice(0, 200);
+      this.logger.error(`回调处理异常 (${input.providerId}): ${message}`);
+      await this.prisma.paymentNotification
+        .update({
+          where: { id: row!.id },
+          data: { status: 'failed', nextAttemptAt: new Date(), lastError: message },
+        })
+        .catch(() => undefined);
+      return adapter.ack({
+        ok: false,
+        ackSuccess: false,
+        reason: '回调处理异常',
+        rawPayload: '',
+      });
+    }
     if (outcome.ok) return adapter.ack(result);
     if (outcome.permanent) {
       /*

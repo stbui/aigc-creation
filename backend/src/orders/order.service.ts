@@ -8,6 +8,7 @@ import { MarketingService } from '../marketing/marketing.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PaymentGateway } from '../payments/payment-gateway';
 import type { RefundResult } from '../payments/adapters/types';
+import type { Prisma } from '@prisma/client';
 
 /**
  * 订单与沙箱支付 (admin-prd.md §3.7 B-39~B-44 / M8)。
@@ -1191,21 +1192,51 @@ export class OrderService {
     // 全额判定同样以实付为基准: 否则用券订单永远退不满, 会卡在 partial_refunded
     const fullyRefunded = refundedCents >= claim.paidBase;
 
-    await this.prisma.refund.update({
-      where: { id: refund.id },
-      data: {
-        status: 'succeeded',
-        providerRefundId: channelResult.providerRefundId ?? null,
-        creditsReclaimed: reclaimed.reclaimed,
-        creditsUnreclaimable: reclaimed.unreclaimable,
-        detail: JSON.stringify(reclaimed.detail),
-      },
-    });
+    /*
+     * 渠道确认退款后，本地这三步**必须原子提交**：
+     *   1. 退款单置 succeeded（连同积分回收结果）
+     *   2. 累加订单已退金额 refundedCents
+     *   3. 订单状态迁移 paid/partial_refunded → refunded/partial_refunded
+     *
+     * 拆开提交的话，进程在 1 与 2 之间崩溃会留下「钱已从渠道退出、refundedCents
+     * 没涨」—— 而可退额度正是按 refundedCents 计算的，运营照提示重试就会退第二笔。
+     *
+     * 事务内两道幂等闸：
+     *   · 退款单条件更新 (status='processing')：同一退款单不会被记账两次；
+     *   · 订单 refundedCents 乐观锁：并发/重放不会把同一个金额叠加两次。
+     *
+     * 注意顺序：积分回收 (`reclaimForOrder`) 在本事务之前，它自身有独立事务。
+     * 若本事务失败，积分已扣而退款未记账 —— 此时退款单停留在 processing，
+     * 后台会提示「渠道处理中，请到商户后台确认」，由人工核销，不会自动重复退款。
+     */
+    await this.prisma.$transaction(async (tx) => {
+      const won = await tx.refund.updateMany({
+        where: { id: refund.id, status: 'processing' },
+        data: {
+          status: 'succeeded',
+          providerRefundId: channelResult.providerRefundId ?? null,
+          creditsReclaimed: reclaimed.reclaimed,
+          creditsUnreclaimable: reclaimed.unreclaimable,
+          detail: JSON.stringify(reclaimed.detail),
+        },
+      });
+      if (won.count === 0) {
+        throw new AppError(40909, '退款单状态已变化，本次未重复记账', 409);
+      }
 
-    await this.transition(order.id, fullyRefunded ? 'refunded' : 'partial_refunded');
-    await this.prisma.order.update({
-      where: { id: order.id },
-      data: { refundedCents },
+      const bumped = await tx.order.updateMany({
+        where: { id: order.id, refundedCents: claim.refundedCents },
+        data: { refundedCents },
+      });
+      if (bumped.count === 0) {
+        throw new AppError(40909, '订单已退金额已变化，请刷新后重试', 409);
+      }
+
+      await this.transition(
+        order.id,
+        fullyRefunded ? 'refunded' : 'partial_refunded',
+        tx,
+      );
     });
 
     /*
@@ -1364,9 +1395,19 @@ export class OrderService {
     });
   }
 
-  /** 校验并执行状态迁移。非法迁移抛 409, 绝不静默通过 */
-  async transition(orderId: string, to: OrderStatus): Promise<void> {
-    const order = await this.prisma.order.findUnique({
+  /**
+   * 校验并执行状态迁移。非法迁移抛 409, 绝不静默通过。
+   *
+   * `tx` 用于「状态迁移必须与另一处写入同时生效」的场景（退款记账）：
+   * 传了事务客户端就走同一个事务，否则各自独立提交。
+   */
+  async transition(
+    orderId: string,
+    to: OrderStatus,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    const db = tx ?? this.prisma;
+    const order = await db.order.findUnique({
       where: { id: orderId },
       select: { status: true },
     });
@@ -1380,7 +1421,7 @@ export class OrderService {
         409,
       );
     }
-    await this.prisma.order.update({ where: { id: orderId }, data: { status: to } });
+    await db.order.update({ where: { id: orderId }, data: { status: to } });
   }
 
   // ── 内部 ──────────────────────────────────────────────────────────

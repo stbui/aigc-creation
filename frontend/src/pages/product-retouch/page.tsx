@@ -3,11 +3,11 @@ import { useState } from 'react';
 import { MODE_LABEL, MODE_OPTIONS, NOTE_MAX_LENGTH } from './constants';
 import {
   PillOptions,
-  ProductSourceResult,
-  ProductSourceUploadPreview,
   ToolCard,
   ToolHistoryPane,
   ToolShell,
+  productSourcePane,
+  productSourceUploadPreview,
 } from './components';
 import { useToolTask } from './hooks';
 import { retouchPayload } from './utils';
@@ -47,12 +47,7 @@ export function ProductRetouchPage() {
       desc="商品图去瑕疵，提高清晰度"
       upload={{ title: '上传图片', required: true, max: 1, hint: '点击、拖拽或粘贴图片上传，最多 1 张' }}
       replaceUpload
-      renderUploadPreview={(uploads, controls) => {
-        const image = uploads[0];
-        return image ? (
-          <ProductSourceUploadPreview image={image} controls={controls} alt="待精修商品图" />
-        ) : null;
-      }}
+      renderUploadPreview={productSourceUploadPreview('待精修商品图')}
       settings={{ ratio: true, resolution: true }}
       submitLabel="立即生成"
       emptyVideo="/static/mp4/04_cpjx.mp4"
@@ -70,10 +65,7 @@ export function ProductRetouchPage() {
         setSourceUrl(inputs[0]?.url ?? '');
         return run(inputs, retouchPayload(mode, note, settings));
       }}
-      sourcePane={(images) => {
-        const image = images[0];
-        return image ? <ProductSourceResult image={image} alt="待精修商品图" /> : null;
-      }}
+      sourcePane={productSourcePane('待精修商品图')}
       onHistoryReuse={handleHistoryReuse}
       trailingPane={
         <ToolHistoryPane capability="enhance" refreshKey={result?.url} emptyText="暂无精修记录" />

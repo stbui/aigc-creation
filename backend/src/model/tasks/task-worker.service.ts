@@ -34,6 +34,7 @@ import { RouterService } from '../routing/router.service';
 import { detectImageFormat } from '../media/image-format';
 import { RouteHealthService } from '../routing/route-health.service';
 import { BillingService } from '../billing/billing.service';
+import { CreditPriceService } from '../../credits/credit-price.service';
 import { UserGroupService } from '../user-groups/user-group.service';
 import { getCapability } from '../../capabilities/capability.registry';
 import { restrictIntentToSpec } from '../intent/model-intent';
@@ -87,6 +88,8 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     private readonly groups: UserGroupService,
     private readonly health: RouteHealthService,
     private readonly billing: BillingService,
+    /** 后台能力覆盖价：换线重建账单必须与首次建单同一套定价 */
+    private readonly price: CreditPriceService,
     private readonly channels: ChannelRuntimeService,
     private readonly slots: ChannelSlotService,
     private readonly attempts: TaskAttemptService,
@@ -497,7 +500,13 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     const access = await this.groups.accessForUser(task.ownerId);
     let draft;
     try {
-      draft = this.billing.buildDraft(access, routed);
+      /*
+       * 换线重建账单必须与首次建单走同一套定价：后台覆盖价在这里同样要生效，
+       * 否则「首次按 77 扣、换线后又按线路原价 5 扣」，用户会看到金额莫名变小，
+       * 财务上则是同一任务两笔口径不同的账。
+       */
+      const overrideCost = await this.price.resolve(task.capability);
+      draft = this.billing.buildDraft(access, routed, overrideCost);
     } catch (error) {
       await this.lifecycle.fail(task.id, {
         errorCode: TASK_ERROR.generationFailed,

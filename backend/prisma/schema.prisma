@@ -435,8 +435,15 @@ model CreditLot {
   @@index([expireAt])
 }
 
-/// 积分流水 —— **只追加, 不可修改删除**。
-/// 是积分变动的唯一事实来源, 对账以此为准。
+/// ⚠️ **已废弃的旧流水表，不要写入。**
+///
+/// 当前积分流水的唯一事实来源是 `CreditLedgerEntry`（微积分口径，含
+/// available/reserved 变动与变动后快照）。本表用 Int 积分、缺 reserved 维度，
+/// 无法与 `CreditAccount` / `CreditLot` 对齐，全仓已无任何代码引用。
+///
+/// 保留原因：历史数据尚未迁移清理。**禁止新增写入或读取** ——
+/// 新旧两张流水表并存且都自称「唯一事实来源」，是后续误读的最大来源。
+/// 清理计划：随下一次数据迁移把历史行并入 `CreditLedgerEntry` 后 drop。
 model CreditLedger {
   id     String @id @default(cuid())
   userId String

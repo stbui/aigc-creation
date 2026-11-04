@@ -44,24 +44,38 @@ Product (SKU) ──下单──> Order ──支付──> Payment ──回调
 
 ### 2.1 两张表
 
+积分用**微积分**（1 积分 = 1,000,000 微积分）做全程整数运算，API 边界才换算成积分。
+
 | 模型 | 关键字段 | 说明 |
 | --- | --- | --- |
-| `CreditLot` | `userId / source / orderId? / totalCredits / remainingCredits / expireAt?` | 批次。`expireAt` 为空 = 永久有效 |
-| `CreditLedger` | `userId / type / amount(有符号) / balanceAfter / lotId? / orderId? / taskId? / idempotencyKey? / reason? / operatorId?` | 流水，只追加，永不 UPDATE / DELETE |
+| `CreditLot` | `userId / source / orderId? / totalMicrocredits / remainingMicrocredits / expireAt?` | 批次。`expireAt` 为空 = 永久有效 |
+| `CreditLedgerEntry` | `userId / type / amountMicrocredits(有符号) / availableDelta / reservedDelta / availableAfter / reservedAfter / billingOrderId / lotId? / referenceKey? / note? / actorUserId?` | 流水，只追加，永不 UPDATE / DELETE |
+| `CreditAccount` | `userId / availableMicrocredits / reservedMicrocredits / version` | 用户级余额权威。`available + reserved == Σ CreditLot.remaining` |
+| `CreditReservationItem` | `billingOrderId / lotId / microcredits` | 预授权明细，结算与退款按此原路回填 |
 
-`CreditLot.source`：`purchase` / `grant` / `admin_adjust`（会员月度发放、邀请奖励、签到都记 `grant`）。`CreditLedger.type`：`purchase` / `grant` / `consume` / `admin_adjust` / `expire` / `refund_reclaim`。`idempotencyKey` 唯一，保证回调重放不重复发放。
+`CreditLedgerEntry.type`：`purchase` / `grant` / `consume` / `admin_adjust` / `expire` / `refund_reclaim` / `reserve` / `refund`。`referenceKey` 唯一，保证回调重放与批量重试不重复发放（幂等键格式：`credit-grant:<key>` / `credit-consume:<key>`）。
+
+> `CreditLedger`（Int 积分口径的旧表）已废弃，全仓无引用，仅留历史数据待迁移清理。禁止新增写入 —— 详见 schema 内注释。
 
 ### 2.2 扣减规则
 
 - **FEFO**：先到期先扣，`expireAt` 为 `NULL` 视为最晚到期。
 - 跨批次扣减，余额不足**整体回滚**并报 `40002`（前端按 402 语义处理）。
-- 并发用条件更新 `updateMany({ where: { remainingCredits: { gte: cost } } })`，不引入行锁：自研 adapter 只支持 SERIALIZABLE，SQLite 本身单写者。
-- 每次变动写 `balanceAfter`，流水可独立还原任意时刻余额。
-- 人工增减必须填原因，落 `admin_adjust` 并写审计。
+- 并发用条件更新 `updateMany({ where: { availableMicrocredits: { gte: amount } } })`，不引入行锁：自研 adapter 只支持 SERIALIZABLE，SQLite 本身单写者。
+- 每次变动写 `availableAfter` / `reservedAfter`，流水可独立还原任意时刻余额。
+- 人工增减**必须填原因**（`reason` 必填并落进流水 `note`），落 `admin_adjust` 并写审计。
+- 批量调整 / CSV 导入**必须带幂等键**，键内包含行号：同一批重试不会二次发放。
 
 ### 2.3 到期回收
 
 调度任务 `credit-expire` 扫描到期批次：剩余积分写 `expire` 流水并清零批次。到期时间不因任何操作延长。
+
+- 单轮上限 500 条，剩余留到下一轮；逐条独立事务 + 逐条容错，一条失败不中断整轮。
+- 账户可用余额扣减走 CAS（`available >= 批次剩余`），不一致时中止并留待人工对账，**绝不把余额写成负数**。
+
+### 2.4 账实核对
+
+`GET /admin/credits/audit` 比对 `available + reserved` 与「Σ 批次剩余」（只读，不修数）。差额必须人工判断是漏扣还是漏退，自动抹平等于掩盖资损。
 
 ## 3. 商品
 
@@ -189,12 +203,25 @@ PaymentsService（编排）
 
 | 阶段 | 行为 |
 | --- | --- |
-| 创建任务 | 取生效价 → 扣积分 → 建任务并写 `task.creditCost` 快照 |
-| 扣费与建任务 | **不能同事务**，故失败退款是对该代价的兜底 |
+| 创建任务 | 取生效价 → 预授权（reserve）→ 建任务并写 `task.creditCost` 快照，三步**同一事务** |
+| 结算 | 按上游 usage 结算，差额回填原批次；Token 超授权按上限截断 |
 | 任务失败 / 取消 | 按任务快照**原额退还**，不重新取价 |
 | 退款成功 | 写 `refund_reclaim` 类流水，并给用户发站内消息（仅退款真的成功时） |
 
 无可用模型线路、遮罩不受支持等情况都在**扣费之前**拦截或按失败退款处理，不会出现「扣了钱没有产出且不退」。
+
+### 10.1 生效价的优先级
+
+`/capabilities` 下发给用户看的价与实际扣费的价**必须是同一个数**，否则就是「后台显示已保存，用户仍按旧价扣费」。
+
+| 顺序 | 来源 | 生效条件 |
+| --- | --- | --- |
+| 1 | 限时免费活动（`campaign.type = limited_free`） | 活动期内，金额直接置 0 并记 `promotionId` |
+| 2 | 后台能力覆盖价 `SystemSetting['creditPrice.<capabilityId>']` | 仅 `fixed_request` + `unified` 价格策略 |
+| 3 | 线路价格档（`pricePolicy = channel`）/ 前台模型标量价（`unified`） | 兜底 |
+| 4 | `CapabilityDef.creditCost` | 仅在后台展示「代码默认值」用，不作扣费依据 |
+
+按量计价（`per_second` / `token`）**不接受能力覆盖价** ——「一次多少钱」无法换算成每秒 / 每 token 单价；`channel` 策略同理，绕过渠道价会让渠道结算与账单脱钩。这两种情况后台改价页的 `source` 会显示 `registry`，运营据此判断改价不生效的原因。
 
 ## 11. 接口清单
 
@@ -216,7 +243,20 @@ PaymentsService（编排）
 
 ### 11.2 后台
 
-见 `docs/admin-detailed-design.md` §9–§13。统一约束：退款、人工调价、积分调整、发票开具、会员套餐变更属高危动作，自动写审计；只有退款、发票驳回等真实业务原因需要由调用方填写。
+见 `docs/admin-detailed-design.md` §9–§13。统一约束：退款、人工调价、积分调整、发票开具、会员套餐变更属高危动作，自动写审计。
+
+积分相关端点：
+
+| 方法 | 路径 | 权限 | 说明 |
+| --- | --- | --- | --- |
+| GET | `/admin/credits` | `credit.read` | 用户积分总览（分页） |
+| GET | `/admin/credits/export` | `credit.read` + `data.export` | 总览导出 |
+| GET | `/admin/credits/audit` | `credit.read` | **账实核对**（只读） |
+| GET | `/admin/credits/:userId/lots` | `credit.read` | 批次明细 |
+| GET | `/admin/credits/:userId/ledger` | `credit.read` | 流水 |
+| POST | `/admin/credits/adjust` | `credit.adjust` | 单条调整，**`reason` 必填** |
+| POST | `/admin/credits/batch-adjust` | `credit.adjust` | 批量调整，`reason` 必填 + `idempotencyKey` |
+| POST | `/admin/credits/import` | `credit.adjust` | CSV 导入，`importKey` 幂等 |
 
 ## 12. 前端改造点
 

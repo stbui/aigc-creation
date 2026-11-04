@@ -1788,7 +1788,11 @@ export const adminCreditsApi = {
       `/admin/credits/${userId}/ledger${toQuery(params)}`,
     ),
 
-  adjust: (payload: { userId: string; delta: number; validDays?: number }) =>
+  /**
+   * 人工调整。`reason` 必填 —— 后端把它写进积分流水，
+   * 事后核查「为什么给他加 100」只能靠它。
+   */
+  adjust: (payload: { userId: string; delta: number; reason: string; validDays?: number }) =>
     request<{ userId: string; balance: number; delta: number }>(
       "/admin/credits/adjust",
       {
@@ -1797,9 +1801,16 @@ export const adminCreditsApi = {
       },
     ),
 
-  /** 批量调整。逐条独立执行, 返回每条结果 (一条失败不影响其余) */
+  /**
+   * 批量调整。逐条独立执行, 返回每条结果 (一条失败不影响其余)。
+   *
+   * `idempotencyKey` 由调用方在打开抽屉时生成一次并复用：超时重试时
+   * 已成功的行会命中幂等键，不会二次发放。
+   */
   batchAdjust: (payload: {
-    items: Array<{ userId: string; delta: number }>;
+    items: Array<{ userId: string; delta: number; reason?: string }>;
+    reason: string;
+    idempotencyKey?: string;
     validDays?: number;
   }) =>
     request<AdminBatchAdjustResult>("/admin/credits/batch-adjust", {
@@ -1816,11 +1827,13 @@ export const adminCreditsApi = {
    * multipart 上传: 走 FormData 而不是 JSON —— 运营手里的就是 Excel 导出的
    * 文件, 让他们自己转成 JSON 等于逼人在本地写脚本。
    */
-  importCsv: (file: File, opts: { validDays?: number } = {}) => {
+  importCsv: (file: File, opts: { validDays?: number; importKey?: string } = {}) => {
     const form = new FormData();
     form.append("file", file);
     if (opts.validDays !== undefined)
       form.append("validDays", String(opts.validDays));
+    // 导入幂等键：同一文件重试不二次发放
+    if (opts.importKey) form.append("importKey", opts.importKey);
     return request<CreditImportResult>("/admin/credits/import", {
       method: "POST",
       body: form,

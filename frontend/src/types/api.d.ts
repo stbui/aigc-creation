@@ -1885,7 +1885,6 @@ export interface AdminCreditLedgerRow {
   reason: string | null;
   operatorId: string | null;
   createdAt: string;
-  lot: { source: string; expireAt: string | null } | null;
 }
 
 /** POST /api/v1/admin/credits/batch-adjust —— 逐条独立执行 */
@@ -1893,11 +1892,14 @@ export interface AdminBatchAdjustResult {
   total: number;
   succeeded: number;
   failed: number;
+  /** 命中幂等键的行数（重试时会 > 0，说明这次没重复发放） */
+  idempotentHits: number;
   results: Array<{
     userId: string;
     success: boolean;
     balance?: number;
     message?: string;
+    idempotentHit?: boolean;
   }>;
 }
 
@@ -2295,6 +2297,8 @@ export interface CreditImportResult {
   total: number;
   succeeded: number;
   failed: number;
+  /** 命中幂等键的行数（同文件重试时 > 0，说明这次没重复发放） */
+  idempotentHits: number;
   results: Array<{
     row: number;
     email: string;
@@ -2302,6 +2306,7 @@ export interface CreditImportResult {
     success: boolean;
     balance?: number;
     message?: string;
+    idempotentHit?: boolean;
   }>;
 }
 

@@ -615,17 +615,37 @@ export class AdminCommerceService {
    * 逐条独立执行并回传每条结果: 批量操作里一条失败不该让其余 99 条不生效,
    * 但失败必须逐条列出来 —— 否则运营看到"已完成"却少了一条, 只能靠对账发现。
    * 失败原因不改写成通用文案, 保留 service 抛出的原始提示 (如"余额不足")。
+   *
+   * ## 幂等
+   *
+   * 每条按 `batch:{operatorId}:{batchKey}:{rowNo}` 落幂等键。同一批重试时
+   * 已成功的行直接命中已有流水、不再二次发放；`batchKey` 由调用方传入
+   * （前端在打开抽屉时生成一次），缺省则按本次请求生成随机值 —— 那种情况下
+   * 重试**没有**防重保护，属于调用方主动放弃。
+   *
+   * 行号参与键：同一批里同一用户可能出现两次（如「先补 100 再扣 20」），
+   * 只用 userId 做键会把第二行误判成重试。
    */
   async batchAdjust(
-    items: Array<{ userId: string; delta?: number }>,
-    shared: { operatorId: string; validDays?: number },
+    items: Array<{ userId: string; delta?: number; reason?: string }>,
+    shared: {
+      operatorId: string;
+      validDays?: number;
+      reason: string;
+      idempotencyKey?: string;
+    },
   ) {
     const results: Array<{
       userId: string;
       success: boolean;
       balance?: number;
       message?: string;
+      idempotentHit?: boolean;
     }> = [];
+
+    const reason = String(shared.reason ?? "").trim();
+    if (!reason) throw new AppError(40001, "批量调整必须填写原因", 400);
+    const batchKey = String(shared.idempotencyKey ?? "").trim() || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
     // 先批量取一次存在的用户: 逐条撞外键的话, 返回给运营的是 Prisma 的
     // 英文外键报错 (带 SQL 上下文), 既不可读也把实现细节泄进了界面
@@ -639,7 +659,7 @@ export class AdminCommerceService {
       ).map((u) => u.id),
     );
 
-    for (const item of items) {
+    for (const [index, item] of items.entries()) {
       const delta = item.delta ?? 0;
       if (!known.has(item.userId)) {
         results.push({
@@ -653,14 +673,17 @@ export class AdminCommerceService {
         const r = await this.credit.adminAdjust({
           userId: item.userId,
           delta,
-          reason: "批量调整用户积分",
+          // 单条可覆盖整批原因（批量里常有「个别特殊补偿」）
+          reason: String(item.reason ?? "").trim() || reason,
           operatorId: shared.operatorId,
           validDays: shared.validDays,
+          idempotencyKey: `batch:${shared.operatorId}:${batchKey}:${index}`,
         });
         results.push({
           userId: item.userId,
           success: true,
           balance: r.balance,
+          ...(r.idempotentHit ? { idempotentHit: true } : {}),
         });
       } catch (e: any) {
         results.push({
@@ -674,6 +697,8 @@ export class AdminCommerceService {
       total: results.length,
       succeeded: results.filter((r) => r.success).length,
       failed: results.filter((r) => !r.success).length,
+      // 重试时命中的行数，便于运营判断「这次是不是重复提交」
+      idempotentHits: results.filter((r) => r.idempotentHit).length,
       results,
     };
   }
@@ -696,7 +721,7 @@ export class AdminCommerceService {
    */
   async importCreditsCsv(
     text: string,
-    opts: { validDays?: number; operatorId: string },
+    opts: { validDays?: number; operatorId: string; importKey?: string },
   ) {
     const rows = parseCsv(text);
     if (rows.length === 0) {
@@ -757,7 +782,15 @@ export class AdminCommerceService {
     });
     const idByEmail = new Map(users.map((u) => [u.email.toLowerCase(), u.id]));
 
-    const sharedReason = "CSV 导入用户积分";
+    /*
+     * 缺省说明不再是「CSV 导入用户积分」这种等于没写的固定文案：
+     * 带上文件名以外的可辨识信息（行号由幂等键体现），并明确要求
+     * 运营在第三列写清原因 —— 积分账本要能回答「为什么给他加」。
+     */
+    const sharedReason = "CSV 导入用户积分（未填写逐行原因）";
+    /* 导入批次的幂等前缀：同一份文件重复提交时，已成功的行不再二次发放 */
+    const importKey =
+      String(opts.importKey ?? "").trim() || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
     const results: Array<{
       row: number;
       email: string;
@@ -765,6 +798,7 @@ export class AdminCommerceService {
       success: boolean;
       balance?: number;
       message?: string;
+      idempotentHit?: boolean;
     }> = [];
 
     for (const item of parsed) {
@@ -796,6 +830,8 @@ export class AdminCommerceService {
           reason: item.reason ?? sharedReason,
           operatorId: opts.operatorId,
           validDays: opts.validDays,
+          // 行号而非邮箱做键：同一文件里同一邮箱可能出现多行（补发 + 扣减）
+          idempotencyKey: `import:${opts.operatorId}:${importKey}:${item.row}`,
         });
         results.push({
           row: item.row,
@@ -803,6 +839,7 @@ export class AdminCommerceService {
           delta: item.delta,
           success: true,
           balance: r.balance,
+          ...(r.idempotentHit ? { idempotentHit: true } : {}),
         });
       } catch (e: any) {
         results.push({
@@ -819,6 +856,7 @@ export class AdminCommerceService {
       total: results.length,
       succeeded: results.filter((r) => r.success).length,
       failed: results.filter((r) => !r.success).length,
+      idempotentHits: results.filter((r) => r.idempotentHit).length,
       results,
     };
   }

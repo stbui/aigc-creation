@@ -193,8 +193,17 @@ export class TaskAdmissionService {
       throw new AppError(42205, '当前线路不支持遮罩重绘，请更换模型', 400);
     }
 
-    // 10. 计价：价格快照与目录报价同源；限时免费命中即 0 并记活动
-    let draft = this.billing.buildDraft(access, routed);
+    /*
+     * 10. 计价：价格快照与目录报价同源；后台覆盖价与限时免费优先。
+     *
+     * 顺序不能颠倒：
+     *   · 先取后台能力覆盖价（`creditPrice.<capabilityId>`），再建草案 ——
+     *     早先只把覆盖价用在 `/capabilities` 下发上，扣费仍走线路价，
+     *     表现为「后台改完价用户没少花钱」；
+     *   · 限时免费在草案之后把金额直接置 0，并记下活动 id 供账单追溯。
+     */
+    const overrideCost = await this.price.resolve(dto.capability);
+    let draft = this.billing.buildDraft(access, routed, overrideCost);
     if (dto.capability === 'multi_fusion') {
       draft = scaleDraft(draft, sanitized);
     }

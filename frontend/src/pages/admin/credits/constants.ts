@@ -46,6 +46,8 @@ export interface BatchAdjustRow {
   success: boolean;
   balance?: number;
   message?: string;
+  /** 命中幂等键：这一行是重试提交，本次没有真正发放 */
+  idempotentHit?: boolean;
 }
 
 /** 批量调整接口返回 */
@@ -53,5 +55,6 @@ export interface BatchAdjustResult {
   total: number;
   succeeded: number;
   failed: number;
+  idempotentHits: number;
   results: BatchAdjustRow[];
 }

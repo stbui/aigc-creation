@@ -58,6 +58,8 @@ export function CreditDetailDrawer({
 
   const [delta, setDelta] = useState('');
   const [validDays, setValidDays] = useState('');
+  /** 调整原因。后端强制写入积分流水，缺了它审计就只能看到「人工调整」四个字 */
+  const [reason, setReason] = useState('');
 
   const [busy, setBusy] = useState(false);
 
@@ -67,7 +69,8 @@ export function CreditDetailDrawer({
 
   const parsedDelta = Number(delta);
   const deltaValid = Number.isInteger(parsedDelta) && parsedDelta !== 0;
-  const adjustmentDirty = Boolean(delta.trim() || validDays.trim());
+  const reasonValid = reason.trim().length > 0;
+  const adjustmentDirty = Boolean(delta.trim() || validDays.trim() || reason.trim());
   useUnsavedGuard(adjustmentDirty);
   const requestClose = useDiscardConfirm(adjustmentDirty, onClose);
 
@@ -76,16 +79,22 @@ export function CreditDetailDrawer({
       toast.warning('变动量必须是非零整数，正数增加、负数扣减');
       return;
     }
+    if (!reasonValid) {
+      toast.warning('请填写调整原因，它会写入积分流水');
+      return;
+    }
     setBusy(true);
     try {
       const r = await adminCreditsApi.adjust({
         userId: user.userId,
         delta: parsedDelta,
+        reason: reason.trim(),
         ...(validDays.trim() ? { validDays: Number(validDays) } : {}),
       });
       toast.success(`已调整 ${signed(parsedDelta)} 积分，当前余额 ${r.balance}`);
       setDelta('');
       setValidDays('');
+      setReason('');
       void reload({ silent: true });
       onChanged();
     } catch (e) {
@@ -242,7 +251,11 @@ export function CreditDetailDrawer({
       </DetailSection>
 
       {writable && (
-        <DetailSection title="人工调整" note="正数增加、负数扣减；扣减受余额限制" className="mt-6">
+        <DetailSection
+          title="人工调整"
+          note="正数增加、负数扣减；扣减受余额限制。原因必填，会写入积分流水。"
+          className="mt-6"
+        >
           <div className="flex flex-col gap-3">
             <div className="flex flex-wrap gap-3">
               <div className="w-40">
@@ -267,10 +280,23 @@ export function CreditDetailDrawer({
                   />
                 </FormField>
               </div>
-            </div>            <div>
+            </div>
+            <FormField
+              label="调整原因"
+              htmlFor="c-reason"
+              hint="必填。写入积分流水，事后核查「为什么给他加」只能靠它。"
+            >
+              <TextField
+                value={reason}
+                onChange={setReason}
+                placeholder="如：客服补偿-图片生成失败"
+                ariaLabel="调整原因"
+              />
+            </FormField>
+            <div>
               <ActionButton
                 variant="default"
-                disabled={!deltaValid || busy}
+                disabled={!deltaValid || !reasonValid || busy}
                 onClick={() => void submitAdjust()}
               >
                 {busy ? '提交中…' : '提交调整'}

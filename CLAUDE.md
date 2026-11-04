@@ -20,7 +20,7 @@
 | 权限点 | `backend/src/admin/permissions.ts` |
 | 退款与站点设置默认值 | `backend/src/common/setting-defs.ts` 的 `SETTING_DEFS` |
 | 工单状态机 | `backend/src/tickets/tickets.service.ts` 的 `TRANSITIONS` |
-| 协议与推荐模型 | `backend/plugins/<plugin>/manifest.json`（107 个可用包 / 115 个 provider；另有 3 个 `src-*` 源目录镜像，运行时不生效）；服务商目录见 `src/model/plugins/provider-catalog.service.ts` |
+| 协议与推荐模型 | `backend/plugins/<plugin>/manifest.json`（110 个可用包 / 119 个 provider；另有 3 个 `src-*` 源目录镜像 —— `src-a6api` / `src-antigravity-proxy` / `src-metaso-h3`，运行时不生效）；服务商目录见 `src/model/plugins/provider-catalog.service.ts` |
 | 渠道 / 前台模型 / 价格档 | 数据库（后台「渠道工作台」「前台模型」「用户分组」）—— 代码里没有默认线路表 |
 | 账单状态机 | `backend/src/model/billing/billing.service.ts` 的 `BILLING_STATUSES` |
 | 启动期环境变量 | `backend/src/config/env.validation.ts` 的 `ENV_SPECS` |
@@ -70,8 +70,8 @@
 | 鉴权/加密 | jsonwebtoken / bcryptjs | 9.0.3 / 3.0.3 |
 | 前端 | Vite + React + lucide-react + react-router-dom | 8.3.4 / 19.3.0 / 1.57.0 / 7.18.4 |
 | 前台 UI | `frontend/src/ui` 兼容层（页面只从该 barrel 取件），底层复用 `admin-ui/components/ui` 的 shadcn/radix 原子件 | 自持，antd 已移除 |
-| 前端其他 | qrcode（邀请海报 / 扫码登录）/ Playwright（e2e） | 1.5.4 / `^1.64.1`（仅 e2e 允许 `^`） |
-| 后台 UI | shadcn/ui 源码自持（`radix-ui` 底座，`new-york`）+ cva + `cn`（官方包）+ Tailwind v4 + tw-animate-css | 自持 / 1.8.1 / 0.7.1 / 0.5.1 / 4.3.3 / 1.4.0 |
+| 前端其他 | qrcode（邀请海报 / 扫码登录）/ @tanstack/react-table（后台表格）/ recharts（图表）/ Playwright（e2e） | 1.5.4 / 9.3.1 / 3.10.1 / `^1.64.1`（仅 e2e 允许 `^`） |
+| 后台 UI | shadcn/ui 源码自持（`radix-ui` 底座，`new-york`）+ cva + `cn`（官方包）+ Tailwind v4 + tw-animate-css；CLI `shadcn` 只用于 `add` 拉件 | 自持 / 1.8.1 / 0.7.1 / 0.5.1 / 4.3.3 / 1.4.0 / 4.23.0 |
 | 前端测试 | Vitest + jsdom + Testing Library | 5.0.5 / 30.1.3 / 16.3.3 |
 | 后端测试 | Vitest + @nestjs/testing + supertest（node 环境） | 5.0.5 / 12.1.3 / 7.1.4 |
 | 语言 | TypeScript | 后端 5.7.2 / 前端 7.0.2 |
@@ -133,11 +133,14 @@ aigc-creation/
     ├── nginx.conf.template   # SPA 回退 + /api 反代 + /uploads 直出（envsubst 模板）
     ├── .env.development / .env.test / .env.production.example
     └── src/
-        ├── App.tsx           # 29 条壳内路由 + 3 条裸外壳页 + 6 条独立页 + /admin/* 子应用
+        ├── App.tsx           # 30 条壳内路由（含 /library、/works 两条别名）+ 3 条裸外壳页 + 6 条独立页 + /admin/* 子应用
         ├── admin-ui/         # 后台 UI：components/ui（shadcn 原子件）· primitives（页面唯一取用层）· shell · providers · hooks · lib
         ├── components/       # AppLayout / SideRail / ToolShell / QrLoginPanel / admin/（adminNav + AlertCenter + DutyContext + statusMeta）
-        ├── pages/            # 35 个 C 端页面 + pages/admin/ 34 个后台页面
-        ├── lib/              # api.ts（request 拆信封）/ http / auth / capabilities / aigc-label / constants
+        ├── pages/            # 15 个单文件页面（登录 / 工作台 / 订单 / 工单 / 工具页 / 法务 …）
+        │   ├── admin/        # 后台 34 页：33 个域目录 + AdminDashboardPage.tsx
+        │   └── <域>/          # 21 个 C 端域目录，按 index / page / components / api / hooks / utils / constants 分层
+        │                     #   product-kit / shoppable-carousel / product-detail / viral-clone / library / account …
+        ├── lib/              # api.ts（request 拆信封）/ http / auth / capabilities / aigc-label / money / poll / zip
         ├── context/          # AuthContext / AdminContext（权限点）/ CreditsContext
         ├── hooks/            # useToolTask / useProject / useCapabilities / usePollAbort / 上传相关
         └── styles/           # global.css（设计令牌 + 全站规则）+ admin.css（后台 Tailwind 入口 + shadcn 语义桥接）
@@ -192,10 +195,12 @@ npm run e2e                 # Playwright
 
 新增一项能力只需两步：新建 `<id>.ts` 导出 `CapabilityPlugin`，再在 `CAPABILITY_PLUGINS` 数组里加一项。装配期由 `assertCapabilityIntegrity` 校验，漏声明即启动失败。
 
-关键字段：`id / name / group / summary / sidebarHint / badge / mode / modality / buildPrompt / creditCost / inputs(0|1|2) / inWorkbench / help / params[]`。**不存在 `localImpl` / `localFallback`**。
+关键字段：`id / name / group / summary / sidebarHint / badge / mode / modality / model / buildPrompt / outputPlan / creditCost / inputs(0|1|2) / inWorkbench / help / params[]`。**不存在 `localImpl` / `localFallback`**。
+
+**一次提交出 N 张 → 声明 `outputPlan`，由准入层拆任务**：不声明 = 一次生成一张。声明后 `model/tasks/task-admission.service.ts` 按返回值把一次提交拆成 N 个独立任务，**每张各建一张账单、各扣一份 `creditCost`**，失败 / 取消各自按账单退款，共享 `batchId / batchIndex / batchSize`，前端按批次聚合成「一次生成」。当前 `detail_image`（按勾选模块数）与 `shoppable_carousel`（按张数 6–10）用到。一个任务只调一次上游、产不出不同版式 —— 要多样版式必须拆任务，不要试图用提示词拼多图。
 
 - `mode`（实现程度）：`real` 已接真实模型；`mock` / `planned` 保留枚举但当前 0 项。
-- `modality`（产出介质），与 `mode` 正交：当前 15 项 `image` + 1 项 `video`；`text` 用于提示词工具等非能力项。
+- `modality`（产出介质），与 `mode` 正交：当前 **16 项 `image` + 1 项 `video`**（合计 17）；`text` 用于提示词工具等非能力项。
 - 新任务 `task.provider` 恒为 `gateway`，`status` 初值 `queued`；`local` 只表示存量历史产出的来源。
 - 新增能力时按实际实现程度声明 `mode`：未实现写 `planned`，不得补本地占位或伪模型结果。
 
@@ -329,8 +334,9 @@ npm run e2e                 # Playwright
 | 要做什么 | 必改的文件 | 同步/校验 |
 | --- | --- | --- |
 | 新增一项能力 | `capabilities/definitions/<id>.ts` + `definitions/index.ts` | 启动期 `assertCapabilityIntegrity`；`verify-capability-bootstrap`。之后还要在后台配前台模型，否则 `runtime.effective = unavailable` |
+| 一次提交要多张产出 | 在 `definitions/<id>.ts` 声明 `outputPlan` | 准入层按返回值拆任务、每张各扣一份 `creditCost`，共享 `batchId` 供前端聚合；不要靠提示词拼多图 |
 | 接入一家厂商 | 新增 `backend/plugins/<plugin>/manifest.json`（或后台上传安装） | `verify-plugin-manifests` / `verify-protocol-runtime`；协议下拉按能力过滤自动可见 |
-| 新增后台页 | `admin/permissions.ts` → controller 挂 `@RequirePermission` → `adminNav.ts` → `pages/admin/*.tsx` → 路由 → `lib/api.ts` | 前端 `can()` 只隐藏按钮，权限必须在后端 |
+| 新增后台页 | `admin/permissions.ts` → controller 挂 `@RequirePermission` → `adminNav.ts` → `pages/admin/<域>/` → 路由 → `lib/api.ts` | 前端 `can()` 只隐藏按钮，权限必须在后端 |
 | 新增 / 复用 UI 组件 | 先查 `admin-ui/components/ui`；缺的 `shadcn add` 后跑 `scripts/post-shadcn.mjs`；官方没有才手写进 `admin-ui/primitives/*` | 页面只从 `primitives` barrel 取件；禁止重复实现已有控件 |
 | 拆分 / 新增后台功能目录 | `pages/<域>/` 下按 `index` / `page` / `components` / `api` / `hooks` / `utils` / `constants` 分层，目录内只从入口文件取外部依赖 | `docs/frontend-module-conventions.md`；`admin-modules.test.ts` 具名导入对账 |
 | 新增环境变量 | `ENV_SPECS` + `.env.example` + 三档 env | `probe-environments.ts`；`docs/environments.md` |
@@ -397,7 +403,7 @@ npm run e2e                 # Playwright
 | 类别 | 文档 |
 | --- | --- |
 | 需求 | `prd.md`（整站）、`admin-prd.md`（后台） |
-| 产品 | 后台：`admin-suite-design.md` / `admin-console-design.md` / `admin-detailed-design.md` / `admin-ui-design.md`；商业：`commerce-design.md`；C 端：`landing` / `workbench` / `topnav` / `login` / `library` / `packages-design.md` |
+| 产品 | 后台：`admin-suite-design.md` / `admin-console-design.md` / `admin-detailed-design.md` / `admin-ui-design.md`；商业：`commerce-design.md`；C 端：`landing` / `workbench` / `topnav` / `login` / `library` / `packages-design.md`；`shoppable-carousel-design.md`（+ 模板来源 `shoppable-carousel-template-sources.md`） |
 | 技术 | `environments.md`、`docker-deployment.md`、`model-architecture.md`、`api-contract.md`、`runtime-infrastructure.md`、`frontend-module-conventions.md`、`typography.md` |
 | 测试 | `docs/testing.md`（四层测试、闸口清单、覆盖矩阵、已知缺口） |
 | 流程 | `docs/development-workflow.md`（Agent 执行手册：指令映射、执行卡、闸口矩阵、证据标准、交人边界） |

@@ -88,3 +88,25 @@ export function ProductSourceResult({ image, alt, className }: ProductSourceResu
     </main>
   );
 }
+
+/**
+ * 单图工具的上传态 render prop。
+ *
+ * 四个产品系工具页（翻译 / 精修 / 换色 / 旋转）此前各写一遍同样的 12 行
+ * 「取第一张图，有图才渲染」样板，差异只有 `alt` 与右栏的 `className`。
+ * 收成工厂后页面只声明「用什么文案」，改预览结构时不会漏掉某一页。
+ *
+ * 返回的仍是普通渲染回调，`ToolShell` 不必知道 preset 的存在。
+ */
+export function productSourceUploadPreview(alt: string) {
+  return (uploads: ToolAsset[], controls: UploadPreviewControls) =>
+    uploads[0] ? (
+      <ProductSourceUploadPreview image={uploads[0]} controls={controls} alt={alt} />
+    ) : null;
+}
+
+/** 同上，右栏原图卡的 render prop；`className` 供个别页追加样式。 */
+export function productSourcePane(alt: string, className?: string) {
+  return (images: ToolAsset[]) =>
+    images[0] ? <ProductSourceResult image={images[0]} alt={alt} className={className} /> : null;
+}

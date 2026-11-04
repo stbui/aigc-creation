@@ -104,7 +104,7 @@ describe('模型列表', () => {
     const body = await jsonOf(res);
     assert.equal(body.object, 'list');
     const ids = body.data.map((m) => m.id);
-    for (const expected of ['gpt-4o', 'gpt-image-2', 'MiniMax-Hailuo-2.3']) {
+    for (const expected of ['gpt-5.5', 'gpt-image-2', 'MiniMax H3']) {
       assert.ok(ids.includes(expected), `缺少模型 ${expected}`);
     }
     for (const model of body.data) {
@@ -120,9 +120,9 @@ describe('模型列表', () => {
   });
 
   test('GET /v1/models/:id 已知 200、未知 404', async () => {
-    const known = await fetch(url('/v1/models/gpt-4o'), { headers: auth() });
+    const known = await fetch(url('/v1/models/gpt-5.5'), { headers: auth() });
     assert.equal(known.status, 200);
-    assert.equal((await jsonOf(known)).id, 'gpt-4o');
+    assert.equal((await jsonOf(known)).id, 'gpt-5.5');
 
     const unknown = await fetch(url('/v1/models/no-such-model'), { headers: auth() });
     assert.equal(unknown.status, 404);

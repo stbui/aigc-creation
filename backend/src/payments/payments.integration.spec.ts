@@ -292,6 +292,42 @@ describe('支付 HTTP 集成', () => {
 
     const row = await prisma.refund.findFirst({ where: { orderId: order.id } });
     expect((row as { status: string }).status).toBe('succeeded');
+
+    // 退款记账三步在同一事务里提交：退款单成功、订单状态、已退金额必须同时生效
+    const settled = await prisma.order.findUnique({ where: { id: order.id } });
+    expect(settled?.refundedCents).toBe(order.paidCents);
+  });
+
+  it('部分退款累加已退金额，二次退款才转全额终态', async () => {
+    const order = await createOrder('partial');
+    const intent = await intend(order.id);
+    await callback(order.orderNo, intent.configId, `IT-PARTIAL-${run}`, order.paidCents);
+
+    const half = Math.floor(order.paidCents / 2);
+    const first = await api('post', `/api/v1/admin/orders/${order.id}/refund`, adminToken).send({
+      amountCents: half,
+      reason: '集成测试部分退款',
+    });
+    expect(first.status).toBe(201);
+    expect(first.body.data.state).toBe('succeeded');
+    expect(first.body.data.fullyRefunded).toBe(false);
+    expect(first.body.data.refundedCents).toBe(half);
+
+    const mid = await prisma.order.findUnique({ where: { id: order.id } });
+    expect(mid?.status).toBe('partial_refunded');
+    expect(mid?.refundedCents).toBe(half);
+
+    const second = await api('post', `/api/v1/admin/orders/${order.id}/refund`, adminToken).send({
+      amountCents: order.paidCents - half,
+      reason: '集成测试退完剩余',
+    });
+    expect(second.status).toBe(201);
+    expect(second.body.data.fullyRefunded).toBe(true);
+    expect(second.body.data.refundedCents).toBe(order.paidCents);
+
+    const done = await prisma.order.findUnique({ where: { id: order.id } });
+    expect(done?.status).toBe('refunded');
+    expect(done?.refundedCents).toBe(order.paidCents);
   });
 
   it('0 元单直接完成且不可退款', async () => {

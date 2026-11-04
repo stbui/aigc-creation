@@ -41,6 +41,8 @@
 | [`login-design.md`](login-design.md) | `/login`、登录弹窗、扫码登录入口 |
 | [`library-design.md`](library-design.md) | `/library`（别名 `/asset-library`） |
 | [`packages-design.md`](packages-design.md) | `/packages` 积分商城：参考站 SeeAny `/vip` 的套餐与积分策略基准 + 本站现状对照（档位与积分包已对齐，充值赠送 / 子账号 / 滚存为待立项功能） |
+| [`shoppable-carousel-design.md`](shoppable-carousel-design.md) | `/shoppable-carousel` AI 带货图文：参考站实拍拆解、模板三拍口径、一次生成 6–10 张的拆分与计费、页面结构 |
+| [`shoppable-carousel-template-sources.md`](shoppable-carousel-template-sources.md) | 上述模板资产（分类 / 三拍文案 / 缩略图）的来源与抓取记录 |
 
 ## 3. 技术文档（Technical）
 

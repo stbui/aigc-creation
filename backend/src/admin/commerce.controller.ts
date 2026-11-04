@@ -93,11 +93,16 @@ export class RefundDto {
  *
  * 字段名用 **delta** 而非 amount —— delta 明确表达「有正负的变动量」,
  * amount 会被误解为「金额」或「绝对值」, 后者会让"扣减"无法表达。
+ *
+ * `reason` **必填**：积分是用户资产，账本必须能回答「为什么给他加 100」，
+ * 只写「人工调整用户积分」这种固定文案等于没有原因。
  */
 export class AdjustCreditDto {
   @IsString() userId!: string;
   /** 正数为增加, 负数为扣减, 不能为 0 */
   @IsInt() delta!: number;
+  /** 调整原因。写入积分流水，事后核查唯一依据 */
+  @IsString() @MaxLength(200) reason!: string;
   @IsOptional() @IsInt() @Min(0) validDays?: number;
 }
 
@@ -105,10 +110,13 @@ export class AdjustCreditDto {
  * 批量调整积分。
  *
  * 上限 100 条: 再大应走导入任务, 而不是一个可能超时 30s 的同步请求。
+ *
+ * `reason` 整批共用；逐条可再带 `reason` 覆盖（批量里往往有个别「特殊补偿」）。
  */
 export class BatchAdjustItemDto {
   @IsString() userId!: string;
   @IsInt() delta!: number;
+  @IsOptional() @IsString() @MaxLength(200) reason?: string;
 }
 
 export class BatchAdjustDto {
@@ -117,6 +125,15 @@ export class BatchAdjustDto {
   @ValidateNested({ each: true })
   @Type(() => BatchAdjustItemDto)
   items!: BatchAdjustItemDto[];
+
+  /** 整批共用的调整原因（必填；单条可用自己的 reason 覆盖） */
+  @IsString() @MaxLength(200) reason!: string;
+
+  /**
+   * 幂等键（建议前端在打开抽屉时生成一次，重试时原样复用）。
+   * 缺省时服务端按请求生成，此时重试无法防重。
+   */
+  @IsOptional() @IsString() @MaxLength(80) idempotencyKey?: string;
 
   @IsOptional() @IsInt() @Min(0) validDays?: number;
 }
@@ -156,6 +173,15 @@ export class CreditImportDto {
   @IsInt()
   @Min(0)
   validDays?: number;
+
+  /**
+   * 幂等键。导入是 500 行级别的写操作，超时重试必须有防重手段：
+   * 前端在选好文件后生成一次，重试时原样带上。
+   */
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  importKey?: string;
 }
 
 /** 把 query 里的数字安全转成 number; 非法值给 undefined 让 service 用默认值 */
@@ -464,6 +490,20 @@ export class AdminCommerceController {
     sendCsv(res, "credits", csv);
   }
 
+  /**
+   * 账实核对：比对「账户可用 + 冻结」与「Σ 批次剩余」。
+   *
+   * 只读，不修数。积分体系有两条必须相等的余额（账户权威 / 批次权威），
+   * 任何一处绕过钱包直接改批次都会让等式破裂，而破裂后**所有扣费都会失败**。
+   * 此前只在注释里承诺「每日对账」，实际没有检测入口。
+   */
+  @Get("credits/audit")
+  @RequirePermission(PERMISSIONS.creditRead)
+  auditCredits(@Query("limit") limit?: string) {
+    const n = num(limit);
+    return this.credit.auditConsistency(n !== undefined && n > 0 ? Math.min(n, 5000) : 500);
+  }
+
   /** 某用户的批次明细 (B-50) */
   @Get("credits/:userId/lots")
   @RequirePermission(PERMISSIONS.creditRead)
@@ -493,7 +533,7 @@ export class AdminCommerceController {
     });
   }
 
-  /** 人工增减积分 (B-52)。 */
+  /** 人工增减积分 (B-52)。原因必填，直接落进积分流水。 */
   @Post("credits/adjust")
   @RequirePermission(PERMISSIONS.creditAdjust)
   @AuditAction("credit.adjust")
@@ -501,13 +541,19 @@ export class AdminCommerceController {
     return this.credit.adminAdjust({
       userId: dto.userId,
       delta: dto.delta,
-      reason: "人工调整用户积分",
+      reason: dto.reason,
       operatorId: actor.id,
       validDays: dto.validDays,
     });
   }
 
-  /** 批量调整积分。逐条独立执行并回传每条结果 */
+  /**
+   * 批量调整积分。逐条独立执行并回传每条结果。
+   *
+   * 幂等键按「操作人 + 批次号」生成，由前端在打开抽屉时生成并随提交带上：
+   * 超时重试不会二次发放。缺省时服务端生成一次性键（此时重试无保护，
+   * 前端不传即等于放弃该保护）。
+   */
   @Post("credits/batch-adjust")
   @RequirePermission(PERMISSIONS.creditAdjust)
   @AuditAction("credit.batch_adjust")
@@ -515,6 +561,8 @@ export class AdminCommerceController {
     return this.commerce.batchAdjust(dto.items, {
       operatorId: actor.id,
       validDays: dto.validDays,
+      reason: dto.reason,
+      idempotencyKey: dto.idempotencyKey,
     });
   }
 
@@ -553,6 +601,7 @@ export class AdminCommerceController {
     return this.commerce.importCreditsCsv(file.buffer.toString("utf8"), {
       validDays: dto.validDays,
       operatorId: actor.id,
+      importKey: dto.importKey,
     });
   }
 }

@@ -342,10 +342,22 @@ export class CreditWalletService {
     });
     if (zeroed.count === 0) return false;
     await this.ensureAccount(db, lot.userId);
-    await db.creditAccount.update({
-      where: { userId: lot.userId },
+    /*
+     * CAS 条件 `available >= amount` 不可省：到期回收与生成任务的 reserve
+     * 是两条并发写路径，先读后写会让 available 被减成负数 ——
+     * 那一刻 `available == Σ remaining` 就破了，且之后任何扣费都会以
+     * 「账户余额与批次不一致」失败收场。
+     *
+     * 扣不动说明批次与账户已经不一致，抛错让整个事务回滚（批次清零也一并
+     * 撤销），把这一批留给人工对账，而不是把账户写坏。
+     */
+    const debited = await db.creditAccount.updateMany({
+      where: { userId: lot.userId, availableMicrocredits: { gte: amount } },
       data: { availableMicrocredits: { decrement: amount }, version: { increment: 1 } },
     });
+    if (debited.count === 0) {
+      throw new AppError(50001, '账户可用余额低于批次剩余，到期回收已中止，请联系管理员对账', 500);
+    }
     const after = await this.balanceOf(db, lot.userId);
     await this.writeEntry(db, lot.userId, 'expire', -amount, -amount, 0n, after, {
       lotId: lot.id,
