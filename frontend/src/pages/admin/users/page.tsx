@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Download } from 'lucide-react';
+import { Download, Search } from 'lucide-react';
 import {
   ActionButton,
   AdminDataTable,
@@ -28,6 +28,7 @@ import { UserDetailDrawer } from './UserDetailDrawer';
 import { UserStatusConfirm } from './UserStatusConfirm';
 import { UserRoleConfirm } from './UserRoleConfirm';
 import { UserDeleteConfirm } from './UserDeleteConfirm';
+import { UserIdentityCell } from './UserIdentityCell';
 import type { AdminUserListResult, BatchSummary } from '../../../types/api';
 
 type Row = AdminUserListResult['items'][number];
@@ -126,6 +127,7 @@ export function AdminUsersPage() {
   const [deleteTarget, setDeleteTarget] = useState<Row | null>(null);
 
   const [busy, setBusy] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
 
   const refresh = (tip?: string) => {
@@ -212,6 +214,8 @@ export function AdminUsersPage() {
   };
 
   const exportUsers = async () => {
+    if (exporting) return;
+    setExporting(true);
     try {
       // 导出必须与屏幕上的列表同口径：用已生效的 params，而不是输入框草稿
       await adminUsersApi.exportCsv({
@@ -221,6 +225,8 @@ export function AdminUsersPage() {
       });
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '导出失败');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -316,58 +322,52 @@ export function AdminUsersPage() {
     () => [
       {
         key: 'email',
-        title: '邮箱',
-        width: 230,
+        title: '用户',
+        width: 300,
         sortable: true,
-        // 邮箱常被截断，悬停给出完整值
-        cellTitle: (row: Row) => row.email,
+        cellTitle: (row: Row) =>
+          row.name && row.name !== row.email ? `${row.name} · ${row.email}` : row.email,
         render: (row: Row) => (
-          <button
-            type="button"
-            className="max-w-[220px] truncate rounded text-left text-brand hover:underline"
-            onClick={() => setDetailId(row.id)}
-          >
-            {row.email}
-          </button>
+          <UserIdentityCell user={row} onOpen={() => setDetailId(row.id)} />
         ),
       },
       {
         key: 'role',
         title: '角色',
-        width: 90,
+        width: 80,
         render: (row: Row) => <StatusTag status={row.role} />,
       },
       {
         key: 'status',
         title: '状态',
-        width: 90,
+        width: 80,
         render: (row: Row) => <StatusTag status={row.status} />,
       },
       {
         key: 'projects',
         title: '项目',
-        width: 70,
+        width: 60,
         align: 'right',
         render: (row: Row) => <span className="tabular-nums">{row.projectCount}</span>,
       },
       {
         key: 'tasks',
         title: '任务',
-        width: 70,
+        width: 60,
         align: 'right',
         render: (row: Row) => <span className="tabular-nums">{row.taskCount}</span>,
       },
       {
         key: 'assets',
         title: '素材',
-        width: 70,
+        width: 60,
         align: 'right',
         render: (row: Row) => <span className="tabular-nums">{row.assetCount}</span>,
       },
       {
         key: 'createdAt',
         title: '注册时间',
-        width: 160,
+        width: 150,
         sortable: true,
         render: (row: Row) => (
           <span className="text-[12px] tabular-nums">{formatDateTime(row.createdAt)}</span>
@@ -376,7 +376,7 @@ export function AdminUsersPage() {
       {
         key: 'lastLoginAt',
         title: '最近登录',
-        width: 160,
+        width: 150,
         sortable: true,
         // 无登录记录显示「—」而非空单元格：空白会被误读为加载中
         render: (row: Row) => (
@@ -387,8 +387,8 @@ export function AdminUsersPage() {
       },
       {
         key: 'ops',
-        title: '',
-        width: 150,
+        title: '操作',
+        width: 140,
         fixed: 'right',
         /*
          * 只直显「详情」+「更多」，其余动作收进下拉。
@@ -414,9 +414,9 @@ export function AdminUsersPage() {
         ),
       },
     ],
-    // rowMenuItems 依赖 can() 与 busy 捕获的 setter，均为稳定引用
+    // rowMenuItems 只依赖 can() 与稳定的状态 setter
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [can, busy],
+    [can],
   );
 
   const sort = (params.sort as string | undefined) ?? DEFAULT_SORT;
@@ -428,8 +428,14 @@ export function AdminUsersPage() {
         description="管理注册用户的账号状态、角色与资源"
         actions={
           can('data.export') ? (
-            <ActionButton variant="secondary" icon={Download} onClick={() => void exportUsers()}>
-              导出 CSV
+            <ActionButton
+              variant="secondary"
+              icon={Download}
+              disabled={exporting}
+              ariaLabel={exporting ? '正在导出用户 CSV' : '导出用户 CSV'}
+              onClick={() => void exportUsers()}
+            >
+              {exporting ? '导出中…' : '导出 CSV'}
             </ActionButton>
           ) : (
             <span className="text-[12px] text-muted-foreground">
@@ -441,9 +447,10 @@ export function AdminUsersPage() {
 
       <FilterBar>
         <ClearableField
-          className="w-56"
+          className="w-64"
           ariaLabel="按邮箱关键词搜索"
-          placeholder="邮箱关键词"
+          placeholder="输入邮箱关键词"
+          icon={<Search className="size-3.5" aria-hidden />}
           value={keyword}
           onChange={setKeyword}
           onEnter={applyFilters}
@@ -484,7 +491,15 @@ export function AdminUsersPage() {
 
       <Panel
         title="用户列表"
-        note="已注销账号不可再改状态，但仍可勾选 —— 批量操作会逐条返回失败原因"
+        note="默认不显示已注销账号；已注销账号不可勾选，也不能进行批量操作。"
+        extra={
+          <span
+            data-testid="admin-users-total"
+            className="text-[12px] text-muted-foreground tabular-nums"
+          >
+            {data ? `共 ${data.total} 位用户` : loading ? '统计中…' : '—'}
+          </span>
+        }
       >
         <BatchBar count={selected.length} unit="位用户">
           {can('user.disable') && (
@@ -525,7 +540,7 @@ export function AdminUsersPage() {
           selectable
           selected={selected}
           onSelectedChange={setSelected}
-          // 已注销账号不能再改状态，但仍允许选中（批量启用会逐条返回失败原因）
+          // 已注销账号的批量启停必然失败，直接禁止勾选，避免制造无意义的失败项
           isRowSelectable={(row) => row.status !== 'deleted'}
           emptyText={
             hasFilter
@@ -579,10 +594,9 @@ export function AdminUsersPage() {
         />
       )}
 
-      {/* 删除：影响预览 + 确认词 */}
+      {/* 删除确认 */}
       {deleteTarget && (
         <UserDeleteConfirm
-          target={deleteTarget}
           loading={busy}
           onCancel={() => setDeleteTarget(null)}
           onConfirm={() => void confirmDelete(deleteTarget)}

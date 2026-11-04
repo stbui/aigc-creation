@@ -105,7 +105,7 @@ test.describe('后台布局', () => {
     await page.waitForSelector('[data-testid="admin-header"]', { timeout: 15000 });
     await page.waitForSelector('[data-testid="admin-account-trigger"]', { timeout: 15000 });
 
-    await expect(page.getByTestId('admin-brand')).toContainText('logon+');
+    await expect(page.getByTestId('admin-brand')).toContainText('货觉');
     await expect(page.getByRole('button', { name: /折叠|收起侧栏|展开侧栏/ })).toHaveCount(0);
 
     const m = await page.evaluate(() => {
@@ -160,19 +160,14 @@ test.describe('后台布局', () => {
     }
   });
 
-  test('全局搜索可用 Ctrl+K 唤起并支持 Esc 关闭', async ({ page }) => {
+  test('顶栏不提供全局搜索入口', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`${UI}/admin/users`);
     await page.waitForSelector('[data-testid="admin-sider"]', { timeout: 15000 });
 
+    await expect(page.getByTestId('admin-global-search-trigger')).toHaveCount(0);
     await page.keyboard.press('Control+K');
-    const search = page.getByRole('textbox', { name: '后台全局搜索' });
-    await expect(search).toBeFocused();
-    await search.fill('o');
-    await expect(page.getByText('输入至少 2 个字符开始搜索')).toBeVisible();
-
-    await search.press('Escape');
-    await expect(search).toBeHidden();
+    await expect(page.getByRole('dialog', { name: '全局搜索' })).toHaveCount(0);
   });
 
   test('操作列的下拉菜单可用', async ({ page }) => {

@@ -67,7 +67,7 @@ export function ModalDialog({
       <DialogContent
         data-testid="admin-modal"
         style={{ maxWidth: width }}
-        className="admin-portal max-h-[calc(100vh-48px)] gap-0 overflow-hidden p-0"
+        className="admin-portal max-h-[calc(100dvh-48px)] gap-0 overflow-hidden p-0"
       >
         <DialogHeader className="border-b border-border px-5 py-3.5">
           <DialogTitle className="truncate pr-12 text-base">{title}</DialogTitle>
@@ -196,11 +196,11 @@ export function ConfirmAction({
       data-testid="admin-confirm-action"
       tabIndex={-1}
       className={cn(
-        'sticky bottom-0 z-10 mt-3 overflow-hidden rounded-lg border bg-card shadow-lg outline-none',
+        'sticky bottom-0 z-10 mt-3 flex max-h-[min(42dvh,360px)] flex-col overflow-hidden rounded-lg border bg-card shadow-lg outline-none',
         danger ? 'border-destructive/40' : 'border-border',
       )}
     >
-      <div className="flex items-start gap-2 border-b border-border px-4 py-2.5">
+      <div className="flex shrink-0 items-start gap-2 border-b border-border px-4 py-2.5">
         <div className="min-w-0 flex-1">
           <div
             className={cn(
@@ -221,29 +221,37 @@ export function ConfirmAction({
       </div>
 
       {(impact?.length || extra) && (
-        <div className="flex flex-col gap-2 px-4 py-3">
+        <div
+          data-testid="admin-confirm-action-body"
+          className={cn(
+            'min-h-0 flex-1 overflow-y-auto px-4 py-3',
+            impact?.length && extra
+              ? 'grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(320px,420px)] lg:items-start'
+              : 'flex flex-col gap-2',
+          )}
+        >
           {impact && impact.length > 0 && (
             <div
               className={cn(
-                'rounded-md border px-3 py-2 text-xs leading-5',
+                'min-w-0 rounded-md border px-3 py-2 text-xs leading-5',
                 danger
                   ? 'border-danger-soft bg-danger-soft text-danger-text'
                   : 'border-warn-soft bg-warn-soft text-warn-text',
               )}
             >
               <div className="font-medium">影响范围</div>
-              <ul className="mt-1 list-disc pl-4">
+              <ul className="mt-0.5 list-disc pl-4">
                 {impact.map((item) => (
                   <li key={item}>{item}</li>
                 ))}
               </ul>
             </div>
           )}
-          {extra}
+          {extra && <div className="flex min-w-0 flex-col gap-2">{extra}</div>}
         </div>
       )}
 
-      <div className="flex items-center justify-end gap-2 border-t border-border bg-muted/40 px-4 py-2.5">
+      <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-muted/40 px-4 py-2.5">
         <Button variant="secondary" size="sm" onClick={onCancel} disabled={loading}>
           取消
         </Button>

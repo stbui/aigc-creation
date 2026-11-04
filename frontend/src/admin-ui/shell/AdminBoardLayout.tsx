@@ -26,7 +26,6 @@ import { hasUnsavedChanges } from '../../lib/unsaved-guard';
 import { APP_ENV, IS_PROD } from '../../lib/constants';
 import { useConfirm } from '../providers/ConfirmProvider';
 import { AdminAlertBell } from '../../components/admin/AlertBell';
-import { GlobalSearch } from './GlobalSearch';
 
 const SIDEBAR_GROUPS_KEY = 'huojue.admin.sidebar-groups';
 
@@ -238,18 +237,13 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
           data-testid="admin-brand"
           className="flex min-w-0 items-center gap-2 rounded-md outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50"
           onClick={() => void leave('/admin')}
-          aria-label="logon+ 运营后台首页"
+          aria-label="货觉AI 运营后台首页"
         >
-          <span className="truncate text-lg font-bold tracking-tight text-foreground">
-            logon<span className="text-primary">+</span>
+          <img className="size-6 shrink-0" src="/brand/huojue-mark.svg" alt="" />
+          <span className="truncate text-sm font-semibold text-foreground">
+            货觉<span className="text-muted-foreground"> 运营后台</span>
           </span>
         </button>
-
-        <div className="ml-6 min-w-0 flex-1">
-          {can('data.search') && (
-            <GlobalSearch onNavigate={(path) => void leave(path)} />
-          )}
-        </div>
 
         <div className="ml-auto flex items-center gap-3">
           <AdminAlertBell onNavigate={(path) => void leave(path)} />

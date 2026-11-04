@@ -19,6 +19,8 @@ export const MAX_IMAGES = 5;
 export const MAX_NAME_LEN = 100;
 /** 复刻要求 textarea 上限 */
 export const MAX_REQUIREMENT_LEN = 1000;
+/** 复刻要求输入提示：只给可控的画面偏好，不示例复刻真实人物身份。 */
+export const REQUIREMENT_PLACEHOLDER = '例如：背景保持简洁、商品居中、文案使用英文。';
 
 // ───────────────── 复刻程度 ─────────────────
 
@@ -29,7 +31,7 @@ export const CLONE_DEGREES: Array<{
   desc: string;
 }> = [
   { value: 'reference_style', label: '参考风格', desc: '提取参考图构图、配色与光影，允许调整背景和道具。' },
-  { value: 'high_replica', label: '高度复刻', desc: '锁定参考图构图、主体位置与场景，仅替换为你的商品。' },
+  { value: 'high_replica', label: '高度复刻', desc: '锁定参考图构图与场景，替换为你的商品并保证商品不变形。' },
 ];
 
 /** 复刻程度键 → 中文标签 (结果网格 caption 用) */

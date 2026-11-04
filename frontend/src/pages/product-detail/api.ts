@@ -33,6 +33,8 @@ export interface DetailGenerationInput {
   description: string;
   /** 已选模块 key, 提交时按逗号拼成 `sections` 参数 */
   sections: string[];
+  /** 画面比例；平台宽度规格与模型输出比例分开表达 */
+  ratio: string;
   /** 画质档位 (1k / 2k / 4k) → 任务参数 `size` */
   resolution: string;
   /** 用户提交意图的幂等键；同一次提交的网络重试必须复用 */
@@ -59,6 +61,7 @@ export function startDetailGeneration(input: DetailGenerationInput): Promise<Gen
       language: input.language,
       description: input.description.trim(),
       sections: input.sections.join(','),
+      ratio: input.ratio,
       size: input.resolution,
     },
   });

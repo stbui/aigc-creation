@@ -1,0 +1,87 @@
+import { describe, expect, it } from 'vitest';
+
+import { DetailImage } from './detail_image';
+import { DETAIL_SECTIONS } from './param-options';
+import { imageOptions } from '../model-mapping';
+
+const base = {
+  productName: '轻音桌面循环扇',
+  brand: '清风',
+  platform: 'taobao',
+  language: 'zh-CN',
+  description: '三档风速，低噪运行，USB 供电；扇叶直径 18cm。',
+  ratio: '3:4',
+  size: '2k',
+};
+
+describe('detail_image 提示词', () => {
+  it('每个模块都生成独立版式，模块名只出现一次', () => {
+    const prompts = DETAIL_SECTIONS.map(({ value, label }) => {
+      const prompt = DetailImage.buildPrompt({ ...base, section: value }, 1);
+
+      expect(prompt).toContain(`只生成「${label}」这一张独立版块图`);
+      expect(prompt.split(`「${label}」`)).toHaveLength(2);
+      expect(prompt).toContain('【版式要求】');
+      return prompt;
+    });
+
+    expect(new Set(prompts).size).toBe(DETAIL_SECTIONS.length);
+  });
+
+  it('事实型模块要求只使用描述中有依据的数据', () => {
+    const prompt = DetailImage.buildPrompt({ ...base, section: 'spec_table' }, 1);
+
+    expect(prompt).toContain('商品事实：三档风速，低噪运行，USB 供电；扇叶直径 18cm。');
+    expect(prompt).toContain('字段和数值仅从商品事实提取，缺项直接删行');
+    expect(prompt).toContain('不得补写未提供的型号、材质、尺寸、参数、认证、销量、价格、优惠或售后承诺');
+    expect(prompt).toContain('信息不足时减少信息项');
+    expect(prompt).toContain('适配淘宝平台（详情长图建议宽度 750px）');
+    expect(prompt).toContain('画面比例：3:4');
+    expect(prompt).toContain('输出画质：2K');
+    expect(prompt).toContain('该宽度只用于生成后的缩放或裁切，不作为模型输出画质');
+    expect(prompt).toContain('画面内文字使用 简体中文');
+  });
+
+  it('参考图只约束商品外观，不携带原图版式和文字', () => {
+    const prompt = DetailImage.buildPrompt({ ...base, section: 'usage_scene' }, 1);
+
+    expect(prompt).toContain('参考图仅作为商品外观依据，不是版式、场景或文案参考');
+    expect(prompt).toContain('商品结构、颜色、材质、logo、包装和配件必须与参考图一致');
+    expect(prompt).toContain('不复制参考图的背景、桌面、人物、构图、文字、水印和拍摄角度');
+  });
+
+  it('画面文案限定为商品名称、品牌和商品事实的闭集', () => {
+    const prompt = DetailImage.buildPrompt({ ...base, section: 'selling_points' }, 1);
+
+    expect(prompt).toContain('本图允许文案');
+    expect(prompt).toContain('仅限以下来源：商品名称「轻音桌面循环扇」；品牌「清风」；商品事实：');
+    expect(prompt).toContain('除这些内容外，不生成任何文字、数字、标签或水印');
+  });
+
+  it('未填写描述和品牌时不制造空事实或空品牌约束', () => {
+    const prompt = DetailImage.buildPrompt(
+      { ...base, brand: '', description: '  ', section: 'hero' },
+      1,
+    );
+
+    expect(prompt).toContain('仅根据商品名称与参考图呈现商品外观，不补充参数事实');
+    expect(prompt).not.toContain('（品牌');
+    expect(prompt).toContain('只生成「首屏主视觉」这一张独立版块图');
+  });
+
+  it('比例与画质是两个独立参数', () => {
+    const ratio = DetailImage.params.find((param) => param.key === 'ratio');
+    const size = DetailImage.params.find((param) => param.key === 'size');
+
+    expect(ratio).toMatchObject({ label: '画面比例', default: '3:4' });
+    expect(ratio?.options?.map((option) => option.value)).toEqual(['3:4', '4:5', '1:1', '9:16']);
+    expect(size).toMatchObject({ label: '输出画质', default: '1k' });
+  });
+
+  it('比例和画质分别进入模型请求意图', () => {
+    expect(imageOptions({ ratio: '4:5', size: '2k' })).toEqual({
+      size: '4:5',
+      imageResolution: '2k',
+    });
+  });
+});

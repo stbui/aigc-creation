@@ -633,6 +633,7 @@ export function ClearableField({
   onChange,
   placeholder,
   ariaLabel,
+  icon,
   id,
   className,
   disabled = false,
@@ -645,6 +646,7 @@ export function ClearableField({
   onChange: (value: string) => void;
   placeholder?: string;
   ariaLabel?: string;
+  icon?: ReactNode;
   id?: string;
   className?: string;
   disabled?: boolean;
@@ -652,6 +654,11 @@ export function ClearableField({
 } & ControlAriaProps) {
   return (
     <InputGroup className={cn('h-8 bg-background', className)}>
+      {icon && (
+        <InputGroupAddon align="inline-start" className="pl-2.5 text-muted-foreground">
+          {icon}
+        </InputGroupAddon>
+      )}
       <InputGroupInput
         id={id}
         type="text"

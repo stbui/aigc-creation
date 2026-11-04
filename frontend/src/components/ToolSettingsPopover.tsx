@@ -10,7 +10,7 @@ import { Button } from '../ui';
  * ToolShell + ProductKit / ViralClone / FreeCreation / ProductDetail / MultiFusion 共 5 处重复。
  *
  * 各页差异用 props 表达，而不是各写一份 JSX：
- * - `showRatio` / `showResolution`  —— 参考站部分页面该页无某组（如 product-detail 只有画质）
+ * - `showRatio` / `showResolution`  —— 参考站部分页面只展示其中一组
  * - `resolutionTitle`              —— 分组标题，默认即参考站唯一取值（"分辨率（积分/权益消耗）"）
  * - `withHeader`                   —— 参考站 free-creation 的浮层带头部与关闭按钮
  */

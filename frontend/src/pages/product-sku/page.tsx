@@ -295,7 +295,6 @@ export function ProductSkuPage() {
   }, [items]);
 
   const validationMessage = useMemo(() => {
-    if (!template) return '请先上传模板图';
     if (regions.length === 0) return '请先在模板图上框选至少 1 个变体区域';
     if (items.length === 0) return '请至少添加 1 个 SKU';
     for (const [index, item] of items.entries()) {

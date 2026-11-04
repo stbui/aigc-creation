@@ -94,6 +94,16 @@ export {
 export { AdminDataTable, type AdminColumn, type AdminDataTableProps } from './table';
 
 export { ModalDialog, Drawer, ConfirmAction, RowMenu, type RowMenuItem } from './overlay';
+export {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog';
 export { AdminDrawer } from './Drawer';
 export { BatchResultModal } from './batch-result';
 export { DutyChannelTower, earliestFailure } from './duty-tower';

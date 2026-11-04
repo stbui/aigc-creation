@@ -35,9 +35,42 @@ test.describe('后台管理端', () => {
     await page.goto(`${UI}/admin/users`);
     await expect(page.getByRole('heading', { name: '用户管理' })).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('admin-filter').first()).toBeVisible();
-    // 表格首屏应有数据行
+    // 表格首屏应有数据行，并保留用户总数与明确的操作列标题
     await expect(page.getByTestId('admin-table').first()).toBeVisible();
     await expect(page.getByTestId('admin-table-row').first()).toBeVisible();
+    await expect(page.getByTestId('admin-users-total')).toContainText(/共 \d+ 位用户/);
+    await expect(page.getByRole('columnheader', { name: '操作' })).toBeVisible();
+  });
+
+  test('用户删除确认使用 shadcn AlertDialog 且操作区始终可用', async ({ page }) => {
+    // 矮视口专门验证确认框不会撑出屏幕，也不会把底部按钮挤走。
+    await page.setViewportSize({ width: 1440, height: 620 });
+    await page.goto(`${UI}/admin/users`);
+    await expect(page.getByRole('heading', { name: '用户管理' })).toBeVisible({ timeout: 15000 });
+
+    const firstRow = page.getByTestId('admin-table-row').first();
+    await expect(firstRow).toBeVisible();
+    await firstRow.getByRole('button', { name: '更多' }).click();
+    await page.getByRole('menuitem', { name: '删除用户' }).click();
+
+    const dialog = page.getByTestId('admin-delete-dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog).toHaveAttribute('role', 'alertdialog');
+    await expect(dialog).toHaveAttribute('data-slot', 'alert-dialog-content');
+    await expect(dialog.getByRole('heading', { name: '删除' })).toBeVisible();
+    await expect(dialog).toContainText('确定要删除该用户吗？');
+    await expect(dialog.getByRole('button', { name: '取消' })).toBeInViewport();
+    await expect(dialog.getByRole('button', { name: '永久删除' })).toBeInViewport();
+    await expect(dialog.getByRole('button', { name: '永久删除' })).toBeEnabled();
+    await expect(page.locator('[data-slot="alert-dialog-overlay"]')).toHaveCount(1);
+
+    const bounds = await dialog.boundingBox();
+    const viewport = page.viewportSize();
+    expect(bounds).not.toBeNull();
+    expect(viewport).not.toBeNull();
+    expect(bounds!.y).toBeGreaterThanOrEqual(0);
+    expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport!.height);
+    expect(bounds!.x + bounds!.width / 2).toBeCloseTo(viewport!.width / 2, 0);
   });
 
   test('角色权限页渲染权限模块', async ({ page }) => {

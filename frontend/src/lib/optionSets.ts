@@ -52,8 +52,8 @@ export function platformSpec(value: string | undefined): PlatformSpec | null {
 /**
  * 读取平台详情长图规格（详情页用）。
  *
- * 详情长图没有「比例」语义，只有推荐宽度 / 画质；数据同样来自后端
- * `PLATFORMS[].meta.detail`。读不到时返回 `null`，页面保持当前画质。
+ * 平台详情规格只提供成品宽度 / 画质建议；画面比例由详情能力的 ratio
+ * 参数单独选择。数据来自后端 `PLATFORMS[].meta.detail`。
  */
 export function platformDetailSpec(value: string | undefined): PlatformDetailSpec | null {
   const raw = String(value ?? '').trim();

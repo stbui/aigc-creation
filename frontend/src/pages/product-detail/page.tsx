@@ -73,6 +73,7 @@ export function ProductDetailPage() {
   const [description, setDescription] = useState('');
   // 包含模块: 上限、顺序归一化与默认勾选都在 useSectionSelection + DetailSectionPicker
   const { sections, toggle: toggleSection } = useSectionSelection();
+  const [ratio, setRatio] = useState('3:4');
   const [resolution, setResolution] = useState('1k');
   /** 用户手动改过画质后，切换平台不再覆盖 */
   const [resolutionTouched, setResolutionTouched] = useState(false);
@@ -225,6 +226,7 @@ export function ProductDetailPage() {
         language,
         description,
         sections,
+        ratio,
         resolution,
       };
       const fingerprint = JSON.stringify(input);
@@ -417,12 +419,13 @@ export function ProductDetailPage() {
                   setResolutionTouched(true);
                   setResolution(v);
                 }}
+                ratio={ratio}
+                onRatioChange={setRatio}
                 capabilityId={DETAIL_CAPABILITY}
-                showRatio={false}
                 modelPicker={
                   <ModelPicker
                     capability={DETAIL_CAPABILITY}
-                    options={{ resolution }}
+                    options={{ ratio, resolution }}
                     onQuoteChange={setModelQuoteCredits}
                   />
                 }

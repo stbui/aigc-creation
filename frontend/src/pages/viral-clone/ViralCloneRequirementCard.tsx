@@ -1,6 +1,6 @@
 import { Maximize2 } from 'lucide-react';
 
-import { MAX_REQUIREMENT_LEN } from './constants';
+import { MAX_REQUIREMENT_LEN, REQUIREMENT_PLACEHOLDER } from './constants';
 import {
   Field,
   FieldGroup,
@@ -35,7 +35,7 @@ export function ViralCloneRequirementCard({
               rows={3}
               maxLength={MAX_REQUIREMENT_LEN}
               value={requirement}
-              placeholder="例如：文案统一用英文、模特保持完全不变、参考图不变只替换商品。"
+              placeholder={REQUIREMENT_PLACEHOLDER}
               onChange={(e) => onRequirementChange(e.target.value)}
             />
             <InputGroupAddon align="inline-end" className="absolute top-2 right-2">
