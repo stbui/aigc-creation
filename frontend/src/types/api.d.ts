@@ -1,3 +1,4 @@
+import type { AdminUserMembershipFields } from './admin-users';
 /**
  * 能力标识。清单以后端 capability.registry 为准 (15 项), 前端不枚举 ——
  * 保留基础联合仅用于类型提示, 运行时以 CapabilityDef.id 为准。
@@ -661,8 +662,7 @@ export interface AdminLoginLogResult {
   total: number;
   failedLast30Days: number;
 }
-
-export interface AdminUserDetail {
+export interface AdminUserDetail extends AdminUserMembershipFields {
   /** 绑定的手机号（未绑定为 null） */
   phone?: string | null;
   phoneVerifiedAt?: string | null;
@@ -702,14 +702,6 @@ export interface AdminUserDetail {
     width: number | null;
     height: number | null;
   }>;
-}
-
-/** GET /api/v1/admin/users/:id/impact */
-export interface AdminUserImpact {
-  email: string;
-  projects: number;
-  tasks: number;
-  assets: number;
 }
 
 /** POST /api/v1/admin/users/:id/password */

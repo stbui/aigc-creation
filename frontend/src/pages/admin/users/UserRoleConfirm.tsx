@@ -1,14 +1,25 @@
 import { useState } from 'react';
-import { ConfirmAction, FormField, SelectField, StatusTag } from '~/admin-ui/primitives';
-import type { AdminUserListResult } from '../../../types/api';
-
-type Row = AdminUserListResult['items'][number];
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  FormField,
+  SelectField,
+  StatusTag,
+} from '~/admin-ui/primitives';
+import { ROLE_OPTIONS } from './constants';
+import type { AdminUserRole, AdminUserRow } from './types';
 
 /**
- * 变更角色的操作条。
+ * 变更角色确认。
  *
- * 默认值必须等于当前角色：管理员 / 财务账号打开时不能预选「运营」，
- * 否则直接点确认就把人降权了。
+ * 默认值必须等于当前角色：普通用户打开时不能预选「运营」，否则直接点
+ * 确认就会提权。目标角色与当前角色相同时确认按钮保持禁用。
  */
 export function UserRoleConfirm({
   target,
@@ -16,56 +27,65 @@ export function UserRoleConfirm({
   onCancel,
   onConfirm,
 }: {
-  target: Row;
+  target: AdminUserRow;
   loading: boolean;
   onCancel: () => void;
-  onConfirm: (role: string) => void;
+  onConfirm: (role: AdminUserRole) => void;
 }) {
-  const currentAssignable = target.role === 'user' ? 'operator' : target.role;
-  const [next, setNext] = useState<string>(currentAssignable);
+  const [next, setNext] = useState<AdminUserRole>(target.role);
 
   return (
-    <ConfirmAction
+    <AlertDialog
       open
-      title="变更角色"
-      confirmText="确认变更"
-      loading={loading}
-      confirmDisabled={next === target.role}
-      description={
-        <>
-          <p>
-            用户：<strong>{target.email}</strong>
-          </p>
-          <p className="mt-1 flex items-center gap-1.5">
-            当前角色：<StatusTag status={target.role} />
-          </p>
-        </>
-      }
-      impact={[
-        '变更立即生效，该用户的旧 token 下次请求即按新角色鉴权',
-        '目标角色的权限点集合将整体生效',
-        '写操作审计（含操作人）',
-      ]}
-      extra={
-        <>
+      onOpenChange={(open) => {
+        if (!open && !loading) onCancel();
+      }}
+    >
+      <AlertDialogContent
+        data-testid="admin-role-dialog"
+        className="admin-portal w-[calc(100%-2rem)] max-w-[400px] gap-0 overflow-hidden p-0 sm:max-w-[400px]"
+      >
+        <AlertDialogHeader className="px-5 py-4 text-left">
+          <AlertDialogTitle className="text-base">变更角色</AlertDialogTitle>
+          <AlertDialogDescription>
+            确定要变更 <strong>{target.email}</strong> 的角色吗？变更后立即生效。
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <div className="flex flex-col gap-4 border-y border-border bg-muted/30 px-5 py-4">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-muted-foreground">当前角色</span>
+            <StatusTag status={target.role} />
+          </div>
           <FormField label="目标角色">
             <SelectField
               ariaLabel="目标角色"
               value={next}
               onChange={(value) => {
-                if (value) setNext(value);
+                if (value) setNext(value as AdminUserRole);
               }}
-              options={[
-                { value: 'operator', label: '运营' },
-                { value: 'finance', label: '财务' },
-                { value: 'admin', label: '管理员' },
-              ]}
+              options={ROLE_OPTIONS}
             />
           </FormField>
-        </>
-      }
-      onCancel={onCancel}
-      onConfirm={() => onConfirm(next)}
-    />
+        </div>
+
+        <AlertDialogFooter className="bg-muted/40 px-5 py-3">
+          <AlertDialogCancel size="sm" disabled={loading} onClick={onCancel}>
+            取消
+          </AlertDialogCancel>
+          <AlertDialogAction
+            size="sm"
+            disabled={loading || next === target.role}
+            onClick={(event) => {
+              // 请求结束后再由父级关闭，避免加载期间弹框提前消失。
+              event.preventDefault();
+              onConfirm(next);
+            }}
+          >
+            {loading ? '变更中…' : '确认变更'}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   );
 }

@@ -37,9 +37,12 @@ export function FilterBar({ children, className }: { children: ReactNode; classN
 }
 
 /** 筛选条右侧的动作区（查询 / 重置）。 */
-export function FilterActions({ children }: { children: ReactNode }) {
+export function FilterActions({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div data-testid="admin-filter-actions" className="ml-auto flex shrink-0 items-center gap-2">
+    <div
+      data-testid="admin-filter-actions"
+      className={cn('ml-auto flex shrink-0 items-center gap-2', className)}
+    >
       {children}
     </div>
   );
@@ -124,10 +127,12 @@ export function StatusTag({
   status,
   label,
   tone,
+  showDot = false,
 }: {
   status: string;
   label?: string;
   tone?: TagTone;
+  showDot?: boolean;
 }) {
   const meta = STATUS_META[status] ?? { label: status, tone: 'muted' as TagTone };
   return (
@@ -136,9 +141,11 @@ export function StatusTag({
       data-status={status}
       className={cn(
         'h-5 rounded-md border-transparent px-1.5 text-[12px] font-medium',
+        showDot && 'gap-1.5 pr-2',
         TAG_TONE_CLASS[tone ?? meta.tone],
       )}
     >
+      {showDot && <span data-testid="status-dot" className="size-1.5 rounded-full bg-current" aria-hidden />}
       {label ?? meta.label}
     </Badge>
   );

@@ -2,13 +2,28 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { AdminUsersService } from "./users.service";
 
-describe("AdminUsersService 物理删除", () => {
+describe("AdminUsersService 用户生命周期与角色", () => {
   let tx: Record<string, any>;
   let prisma: {
-    user: { findUnique: ReturnType<typeof vi.fn> };
+    user: {
+      findUnique: ReturnType<typeof vi.fn>;
+      count: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
+    };
+    generationTask: {
+      findMany: ReturnType<typeof vi.fn>;
+      groupBy: ReturnType<typeof vi.fn>;
+    };
+    asset: { findMany: ReturnType<typeof vi.fn> };
+    membership: {
+      findFirst: ReturnType<typeof vi.fn>;
+      findMany: ReturnType<typeof vi.fn>;
+    };
+    membershipUsage: { aggregate: ReturnType<typeof vi.fn> };
     $transaction: ReturnType<typeof vi.fn>;
   };
   let storage: { get: ReturnType<typeof vi.fn> };
+  let lifecycle: { softDelete: ReturnType<typeof vi.fn> };
   let service: AdminUsersService;
 
   beforeEach(() => {
@@ -71,6 +86,23 @@ describe("AdminUsersService 物理删除", () => {
           role: "user",
           status: "active",
         }),
+        count: vi.fn().mockResolvedValue(2),
+        update: vi.fn().mockResolvedValue({}),
+      },
+      generationTask: {
+        findMany: vi.fn().mockResolvedValue([]),
+        groupBy: vi.fn().mockResolvedValue([]),
+      },
+      asset: { findMany: vi.fn().mockResolvedValue([]) },
+      membership: {
+        findFirst: vi.fn().mockResolvedValue(null),
+        findMany: vi.fn().mockResolvedValue([]),
+      },
+      membershipUsage: {
+        aggregate: vi.fn().mockResolvedValue({
+          _sum: { savedCents: null },
+          _count: { _all: 0 },
+        }),
       },
       $transaction: vi.fn(
         async (work: (client: Record<string, any>) => unknown) => work(tx),
@@ -85,23 +117,58 @@ describe("AdminUsersService 物理删除", () => {
       ),
     };
 
+    lifecycle = {
+      softDelete: vi.fn().mockResolvedValue({ id: "user-1", deleted: true }),
+    };
+
     service = new AdminUsersService(
       prisma as never,
-      {} as never,
+      lifecycle as never,
       {} as never,
       storage as never,
     );
   });
 
+  it("默认走软注销，不执行物理删除事务", async () => {
+    await expect(
+      service.remove("user-1", false, undefined, "actor-1"),
+    ).resolves.toEqual({ id: "user-1", hard: false });
+
+    expect(lifecycle.softDelete).toHaveBeenCalledWith("user-1");
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("拒绝删除当前操作者自己的账号", async () => {
+    await expect(
+      service.remove("user-1", false, undefined, "user-1"),
+    ).rejects.toThrow("不能删除自己的账号");
+    expect(lifecycle.softDelete).not.toHaveBeenCalled();
+  });
+
+  it("拒绝删除最后一个启用中的管理员", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      email: "admin@example.com",
+      role: "admin",
+      status: "active",
+    });
+    prisma.user.count.mockResolvedValue(1);
+
+    await expect(
+      service.remove("user-1", false, undefined, "operator-1"),
+    ).rejects.toThrow("至少保留一个启用的管理员");
+    expect(lifecycle.softDelete).not.toHaveBeenCalled();
+  });
+
   it("清理无外键的关联数据，并按实际结果统计文件删除", async () => {
-    await expect(service.remove("user-1", true, "删除")).resolves.toMatchObject(
-      {
+    await expect(
+      service.remove("user-1", true, "删除", "actor-1"),
+    ).resolves.toMatchObject({
         id: "user-1",
         hard: true,
         removedFiles: 1,
         failedFiles: 1,
-      },
-    );
+      });
 
     expect(tx.creditReservationItem.deleteMany).toHaveBeenCalledWith({
       where: { lotId: { in: ["lot-1"] } },
@@ -117,5 +184,177 @@ describe("AdminUsersService 物理删除", () => {
       data: { userId: "" },
     });
     expect(tx.user.delete).toHaveBeenCalledWith({ where: { id: "user-1" } });
+  });
+
+  it("允许后台把账号降为普通用户", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      email: "operator@example.com",
+      role: "operator",
+      status: "active",
+    });
+
+    await expect(
+      service.changeRole("user-1", { role: "user" }, {
+        id: "actor-1",
+        role: "admin",
+      }),
+    ).resolves.toEqual({ id: "user-1", role: "user", roleLabel: "用户" });
+    expect(prisma.user.update).toHaveBeenCalledWith({
+      where: { id: "user-1" },
+      data: { role: "user" },
+    });
+  });
+
+  it("拒绝降级最后一个启用中的管理员", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      email: "admin@example.com",
+      role: "admin",
+      status: "active",
+    });
+    prisma.user.count.mockResolvedValue(1);
+
+    await expect(
+      service.changeRole("user-1", { role: "operator" }, {
+        id: "actor-1",
+        role: "admin",
+      }),
+    ).rejects.toThrow("至少保留一个管理员");
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  it("允许降级已禁用的管理员，因为其不提供管理入口", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      email: "disabled-admin@example.com",
+      role: "admin",
+      status: "disabled",
+    });
+
+    await expect(
+      service.changeRole("user-1", { role: "user" }, {
+        id: "actor-1",
+        role: "admin",
+      }),
+    ).resolves.toMatchObject({ role: "user" });
+    expect(prisma.user.count).not.toHaveBeenCalled();
+  });
+
+  it("详情返回有效会员，已取消续费但未到期仍视为会员", async () => {
+    const startAt = new Date("2026-10-01T00:00:00.000Z");
+    const expiresAt = new Date("2027-01-01T00:00:00.000Z");
+    prisma.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      email: "member@example.com",
+      name: "会员用户",
+      role: "user",
+      status: "active",
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      lastLoginAt: null,
+      phone: null,
+      phoneVerifiedAt: null,
+      _count: { projects: 0, tasks: 0, assets: 0 },
+    });
+    prisma.membership.findFirst.mockResolvedValue({
+      id: "membership-1",
+      status: "cancelled",
+      startAt,
+      expiresAt,
+      monthlyCreditsSnapshot: 1000,
+      plan: { code: "pro", name: "专业会员" },
+    });
+    prisma.membership.findMany.mockResolvedValue([
+      {
+        id: "membership-1",
+        status: "cancelled",
+        startAt,
+        expiresAt,
+        monthlyCreditsSnapshot: 1000,
+        plan: { code: "pro", name: "专业会员" },
+      },
+    ]);
+    prisma.membershipUsage.aggregate.mockResolvedValue({
+      _sum: { savedCents: 2880 },
+      _count: { _all: 3 },
+    });
+
+    const result = await service.detail("user-1");
+
+    expect(result.membership).toEqual({
+      isMember: true,
+      planCode: "pro",
+      planName: "专业会员",
+      status: "cancelled",
+      startAt,
+      expiresAt,
+      monthlyCredits: 1000,
+      cancelAtPeriodEnd: true,
+      savedCents: 2880,
+      discountedOrders: 3,
+    });
+    expect(result.membershipHistory).toEqual([
+      {
+        id: "membership-1",
+        planCode: "pro",
+        planName: "专业会员",
+        status: "cancelled",
+        startAt,
+        expiresAt,
+        monthlyCredits: 1000,
+      },
+    ]);
+    expect(prisma.membership.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          userId: "user-1",
+          status: { in: ["active", "grace", "cancelled"] },
+        }),
+      }),
+    );
+  });
+
+  it("详情无有效会员时返回空会员状态并保留历史记录", async () => {
+    const expiredAt = new Date("2026-09-01T00:00:00.000Z");
+    prisma.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      email: "expired@example.com",
+      name: "过期用户",
+      role: "user",
+      status: "active",
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      lastLoginAt: null,
+      phone: null,
+      phoneVerifiedAt: null,
+      _count: { projects: 0, tasks: 0, assets: 0 },
+    });
+    prisma.membership.findMany.mockResolvedValue([
+      {
+        id: "membership-old",
+        status: "expired",
+        startAt: new Date("2026-08-01T00:00:00.000Z"),
+        expiresAt: expiredAt,
+        monthlyCreditsSnapshot: 500,
+        plan: { code: "basic", name: "基础会员" },
+      },
+    ]);
+
+    const result = await service.detail("user-1");
+
+    expect(result.membership).toEqual({
+      isMember: false,
+      planCode: "free",
+      planName: "普通用户",
+      status: null,
+      startAt: null,
+      expiresAt: null,
+      monthlyCredits: 0,
+      cancelAtPeriodEnd: false,
+      savedCents: 0,
+      discountedOrders: 0,
+    });
+    expect(result.membershipHistory).toEqual([
+      expect.objectContaining({ id: "membership-old", status: "expired" }),
+    ]);
   });
 });

@@ -2,14 +2,21 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AdminDrawer,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
   DetailSection,
   EmptyState,
   ListError,
   SkeletonBody,
   StatusTag,
 } from '~/admin-ui/primitives';
+import { cn } from '~/admin-ui/lib/cn';
 import { adminUsersApi, assetThumbUrl } from './api';
 import { LOGIN_REASON_LABEL } from './constants';
+import { UserMembershipSection } from './UserMembershipSection';
 import {
   adminAssetHref,
   adminCreditHref,
@@ -21,24 +28,31 @@ import {
 import type { AdminLoginLogResult, AdminUserDetail } from '../../../types/api';
 
 /** 描述列表的一项 */
-function InfoItem({ label, value }: { label: string; value: ReactNode }) {
+function InfoItem({
+  label,
+  value,
+  className,
+}: {
+  label: string;
+  value: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="min-w-0">
-      <dt className="text-[12px] text-muted-foreground">{label}</dt>
-      <dd className="mt-0.5 text-sm text-foreground">{value}</dd>
+    <div className={cn('min-w-0', className)}>
+      <dt className="text-[11px] font-medium text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-[13px] leading-5 break-words text-foreground">{value}</dd>
     </div>
   );
 }
 
-/** 抽屉里的小计数格。不用 StatCard：那套是列表页首屏用的，96px 高度在抽屉里太占。 */
-function MiniStat({ label, value, hint }: { label: string; value: ReactNode; hint?: ReactNode }) {
+/** 抽屉里的资源计数。统一放在一条统计带里，避免三张独立小卡重复描边。 */
+function MiniStat({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <div className="rounded-lg border border-border px-3 py-2">
-      <div className="text-[12px] text-muted-foreground">{label}</div>
-      <div className="mt-0.5 text-lg leading-6 font-semibold text-foreground tabular-nums">
+    <div className="min-w-0 px-4 py-3 first:pl-0 last:pr-0">
+      <dt className="text-[11px] font-medium text-muted-foreground">{label}</dt>
+      <dd className="mt-1 text-xl leading-6 font-semibold text-foreground tabular-nums">
         {value}
-      </div>
-      {hint && <div className="text-[12px] text-muted-foreground">{hint}</div>}
+      </dd>
     </div>
   );
 }
@@ -87,7 +101,7 @@ function RecentLoginsSection({ userId }: { userId: string }) {
     >
       {state === 'loading' ? <SkeletonBody rows={3} /> : null}
       {state === 'forbidden' ? (
-        <p className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-xs text-muted-foreground">
+        <p className="rounded-lg border border-dashed border-border bg-muted/20 px-3 py-4 text-center text-xs leading-5 text-muted-foreground">
           当前角色没有审计权限（audit.read），无法查看登录记录。
         </p>
       ) : null}
@@ -99,11 +113,12 @@ function RecentLoginsSection({ userId }: { userId: string }) {
           <EmptyState
             title="暂无登录记录"
             description="该用户尚未登录，或登录记录已过保留期。"
+            className="border-0 px-4 py-7"
           />
         ) : (
-          <ul className="flex flex-col divide-y divide-border">
+          <ul className="flex flex-col divide-y divide-border/70">
             {data.items.map((item) => (
-              <li key={item.id} className="flex items-center gap-2.5 py-1.5">
+              <li key={item.id} className="flex items-center gap-2.5 px-1 py-2">
                 <StatusTag
                   status={item.success ? 'success' : 'failed'}
                   label={item.success ? '成功' : '失败'}
@@ -148,44 +163,48 @@ export function UserDetailDrawer({
     <AdminDrawer<AdminUserDetail>
       open={detailId !== null}
       title="用户详情"
+      description="账号资料、登录活动与最近使用情况"
       onClose={onClose}
       fetcher={detailFetcher}
     >
       {(d) => (
-        <div className="flex flex-col gap-4">
-          <DetailSection title="基本信息">
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-2.5">
-              <div className="col-span-2 min-w-0">
-                <dt className="text-[12px] text-muted-foreground">邮箱</dt>
-                <dd className="mt-0.5 text-sm break-all text-foreground">{d.email}</dd>
+        <div className="flex flex-col gap-5">
+          <Card className="gap-0 rounded-xl border-border bg-muted/30 py-0 shadow-none">
+            <CardHeader className="gap-2 px-4 pt-4 pb-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <CardTitle>
+                  <h2 className="text-lg leading-6 font-semibold tracking-tight text-foreground">
+                    {d.name}
+                  </h2>
+                </CardTitle>
+                <StatusTag status={d.role} />
+                <StatusTag status={d.status} showDot />
               </div>
-              <div className="col-span-2 min-w-0">
-                <dt className="text-[12px] text-muted-foreground">关联记录</dt>
-                <dd className="mt-0.5 flex flex-wrap gap-3 text-xs">
-                  <Link className="text-brand hover:underline" to={adminTasksHref({ userId: d.id })}>
-                    任务记录
-                  </Link>
-                  <Link className="text-brand hover:underline" to={adminOrderHref({ email: d.email })}>
-                    订单记录
-                  </Link>
-                  <Link
-                    className="text-brand hover:underline"
-                    to={adminCreditHref({ userId: d.id, email: d.email })}
-                  >
-                    积分账本
-                  </Link>
-                </dd>
-              </div>
+              <p className="break-all text-[13px] leading-5 text-muted-foreground">{d.email}</p>
+            </CardHeader>
+            <CardContent className="grid grid-cols-3 gap-2 px-4 pb-4">
+              <Button variant="outline" size="sm" className="bg-background/80" asChild>
+                <Link to={adminTasksHref({ userId: d.id })}>任务记录</Link>
+              </Button>
+              <Button variant="outline" size="sm" className="bg-background/80" asChild>
+                <Link to={adminOrderHref({ email: d.email })}>订单记录</Link>
+              </Button>
+              <Button variant="outline" size="sm" className="bg-background/80" asChild>
+                <Link to={adminCreditHref({ userId: d.id, email: d.email })}>积分账本</Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <DetailSection title="账户信息">
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
               <InfoItem label="昵称" value={d.name} />
-              <InfoItem label="角色" value={<StatusTag status={d.role} />} />
-              <InfoItem label="状态" value={<StatusTag status={d.status} />} />
               <InfoItem
                 label="手机号"
                 value={
                   d.phone ? (
                     <span className="flex items-center gap-1.5">
                       {d.phone}
-                      <span className="text-[12px] text-muted-foreground">
+                      <span className="text-[11px] text-muted-foreground">
                         {d.phoneVerifiedAt ? '已验证' : '未验证'}
                       </span>
                     </span>
@@ -193,6 +212,11 @@ export function UserDetailDrawer({
                     '未绑定'
                   )
                 }
+              />
+              <InfoItem
+                label="用户 ID"
+                className="col-span-2 sm:col-span-1"
+                value={<span className="font-mono text-xs text-muted-foreground">{d.id}</span>}
               />
               <InfoItem label="注册时间" value={formatDateTime(d.createdAt)} />
               <InfoItem
@@ -202,18 +226,48 @@ export function UserDetailDrawer({
             </dl>
           </DetailSection>
 
+          <UserMembershipSection
+            membership={d.membership}
+            history={d.membershipHistory}
+          />
+
           {/* 登录审计：权限点 audit.read，无权限时静默显示说明而非报错 */}
           <RecentLoginsSection userId={d.id} />
 
           <DetailSection title="资源统计">
-            <div className="grid grid-cols-3 gap-2">
-              <MiniStat label="项目" value={d.stats.projects} />
-              <MiniStat
-                label="任务"
-                value={d.stats.tasks}
-                hint={`成功 ${d.stats.taskStatus.succeeded} · 失败 ${d.stats.taskStatus.failed}`}
-              />
-              <MiniStat label="素材" value={d.stats.assets} />
+            <div className="overflow-hidden rounded-lg border border-border bg-card">
+              <dl className="grid grid-cols-3 divide-x divide-border/70 px-4">
+                <MiniStat label="项目" value={d.stats.projects} />
+                <MiniStat label="任务" value={d.stats.tasks} />
+                <MiniStat label="素材" value={d.stats.assets} />
+              </dl>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 bg-muted/40 px-4 py-2 text-[11px] text-muted-foreground">
+                <span className="font-medium text-foreground">任务状态</span>
+                <span>
+                  成功{' '}
+                  <strong className="font-semibold text-foreground tabular-nums">
+                    {d.stats.taskStatus.succeeded}
+                  </strong>
+                </span>
+                <span>
+                  失败{' '}
+                  <strong className="font-semibold text-foreground tabular-nums">
+                    {d.stats.taskStatus.failed}
+                  </strong>
+                </span>
+                <span>
+                  运行{' '}
+                  <strong className="font-semibold text-foreground tabular-nums">
+                    {d.stats.taskStatus.running}
+                  </strong>
+                </span>
+                <span>
+                  排队{' '}
+                  <strong className="font-semibold text-foreground tabular-nums">
+                    {d.stats.taskStatus.queued}
+                  </strong>
+                </span>
+              </div>
             </div>
           </DetailSection>
 
@@ -222,13 +276,14 @@ export function UserDetailDrawer({
               <EmptyState
                 title="暂无任务记录"
                 description="该用户创建生成任务后会显示在这里。"
+                className="border-0 px-4 py-7"
               />
             ) : (
-              <ul className="flex flex-col divide-y divide-border">
+              <ul className="flex flex-col divide-y divide-border/70">
                 {d.recentTasks.map((t) => (
                   <li key={t.id}>
                     <Link
-                      className="flex items-center gap-2.5 py-1.5 hover:bg-muted/60"
+                      className="flex items-center gap-3 rounded-md px-1.5 py-2 transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                       to={adminTaskHref(t.id)}
                       aria-label={`查看任务详情：${t.capabilityName} ${t.id.slice(-8)}`}
                     >
@@ -241,11 +296,16 @@ export function UserDetailDrawer({
                       ) : (
                         <div className="size-9 shrink-0 rounded-md border border-dashed border-border bg-muted" />
                       )}
-                      <span className="min-w-0 flex-1 truncate text-sm text-foreground">
-                        {t.capabilityName}
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[13px] font-medium text-foreground">
+                          {t.capabilityName}
+                        </span>
+                        <span className="mt-0.5 block truncate font-mono text-[11px] text-muted-foreground">
+                          #{t.id.slice(-8)}
+                        </span>
                       </span>
                       <StatusTag status={t.status} />
-                      <span className="shrink-0 text-[12px] text-muted-foreground tabular-nums">
+                      <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
                         {formatDateTime(t.createdAt)}
                       </span>
                     </Link>
@@ -260,13 +320,14 @@ export function UserDetailDrawer({
               <EmptyState
                 title="暂无素材"
                 description="该用户上传或生成的素材会显示在这里。"
+                className="border-0 px-4 py-7"
               />
             ) : (
-              <div className="grid grid-cols-5 gap-1.5">
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-6">
                 {d.recentAssets.map((a) => (
                   <Link
                     key={a.id}
-                    className="block overflow-hidden rounded-md border border-border"
+                    className="block overflow-hidden rounded-md border border-border transition-colors hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
                     to={adminAssetHref(a.id)}
                     aria-label={`在素材库查看素材 ${a.id.slice(-8)}`}
                   >

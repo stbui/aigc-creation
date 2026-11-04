@@ -43,6 +43,8 @@ export { usePasteUpload } from '../../hooks/usePasteUpload';
 export { useResultGallery, type GalleryItem } from '../../hooks/useResultGallery';
 /** 登录态: 判断是否已登录 */
 export { useAuth } from '../../context/AuthContext';
+/** 能力实时单价: 生图按钮按 SKU 数量折算总价 */
+export { useCreditCost } from '../../hooks/useCreditLabel';
 /** 余额变更通知: 扣费 / 退款后通知积分上下文刷新 */
 export { notifyCreditsChanged } from '../../context/CreditsContext';
 /** 素材库取数 (定义在 AssetLibraryModal 文件里) */

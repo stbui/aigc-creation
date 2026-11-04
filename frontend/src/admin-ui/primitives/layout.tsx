@@ -41,18 +41,34 @@ import {
 export function PageHeader({
   title,
   description,
+  inlineDescription = false,
   actions,
+  className,
 }: {
   title: string;
   description?: ReactNode;
+  inlineDescription?: boolean;
   actions?: ReactNode;
+  className?: string;
 }) {
   return (
-    <header className="mb-5 flex items-start justify-between gap-4">
-      <div className="min-w-0 flex-1">
+    <header className={cn('mb-5 flex items-start justify-between gap-4', className)}>
+      <div
+        className={cn(
+          'min-w-0 flex-1',
+          inlineDescription && 'flex flex-wrap items-baseline gap-x-3 gap-y-1',
+        )}
+      >
         <h1 className="text-xl font-semibold tracking-tight text-foreground">{title}</h1>
         {description && (
-          <p className="mt-1 text-[13px] leading-5 text-muted-foreground">{description}</p>
+          <p
+            className={cn(
+              'text-[13px] leading-5 text-muted-foreground',
+              !inlineDescription && 'mt-1',
+            )}
+          >
+            {description}
+          </p>
         )}
       </div>
       {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
@@ -271,13 +287,15 @@ export function EmptyState({
   title,
   description,
   action,
+  className,
 }: {
   title: string;
   description?: ReactNode;
   action?: ReactNode;
+  className?: string;
 }) {
   return (
-    <Empty className="gap-2 px-6 py-14">
+    <Empty className={cn('gap-2 px-6 py-14', className)}>
       <EmptyMedia variant="default" className="text-muted-foreground">
         <Inbox className="size-7" aria-hidden />
       </EmptyMedia>

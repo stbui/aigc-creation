@@ -15,6 +15,7 @@ import {
   ImageLightbox,
   MobileUploadModal,
   SkuRegionEditorModal,
+  Surface,
   type SkuRegion,
   type ToolAsset,
   type ToolSettings,
@@ -59,7 +60,7 @@ import type { Asset, MobileUploadAsset } from '../../types/api';
 import { useApp, Spin } from '../../ui';
 
 export function ProductSkuPage() {
-  const { message, modal } = useApp();
+  const { message } = useApp();
   const reportError = useGenerateError();
   const { ensureProject } = useProject();
   const { token } = useAuth();
@@ -101,7 +102,6 @@ export function ProductSkuPage() {
     setActiveResultId,
     setFailedNotice,
     clearBatch,
-    removeBatchItems,
     submit,
     retryFailed,
     openHistoryResult,
@@ -295,7 +295,6 @@ export function ProductSkuPage() {
   }, [items]);
 
   const validationMessage = useMemo(() => {
-    if (regions.length === 0) return '请先在模板图上框选至少 1 个变体区域';
     if (items.length === 0) return '请至少添加 1 个 SKU';
     for (const [index, item] of items.entries()) {
       const name = item.name.trim();
@@ -314,7 +313,7 @@ export function ProductSkuPage() {
 
   const submitFromForm = useCallback(
     async (_inputs: ToolAsset[], settings: ToolSettings) => {
-      if (!template || validationMessage || submitting) return;
+      if (!template || regions.length === 0 || validationMessage || submitting) return;
       await submit(_inputs, settings, {
         template: { ...template },
         regions: regions.map((region) => ({ ...region })),
@@ -388,26 +387,6 @@ export function ProductSkuPage() {
     }
   }, [message, openHistoryResult]);
 
-  const deleteHistory = useCallback((group: SkuBatchGroup) => {
-    const count = group.items.length;
-    modal.confirm({
-      title: count > 1 ? `移除整批 ${count} 张 SKU 历史？` : '移除这条 SKU 历史记录？',
-      content: '任务记录与生成图会一并删除，不可恢复。',
-      okText: '移除',
-      okButtonProps: { danger: true },
-      cancelText: '取消',
-      onOk: async () => {
-        const results = await Promise.allSettled(group.items.map((item) => generateApi.remove(item.id)));
-        const removedIds = new Set(group.items.flatMap((item, index) => results[index]?.status === 'fulfilled' ? [item.id] : []));
-        removedIds.forEach((id) => gallery.removeItem(id));
-        removeBatchItems(removedIds);
-        const failed = results.length - removedIds.size;
-        if (failed > 0) message.error(`有 ${failed} 条历史移除失败，请稍后重试`);
-        else message.success(count > 1 ? '整批历史记录已移除' : '历史记录已移除');
-      },
-    });
-  }, [gallery, message, modal, removeBatchItems]);
-
   useEffect(() => {
     if (!submissionId || restoredSubmissionRef.current || gallery.loading) return;
     restoredSubmissionRef.current = true;
@@ -462,12 +441,15 @@ export function ProductSkuPage() {
   return (
     <>
       <ProductSkuWorkspace
+        template={template}
+        regions={regions}
+        itemCount={items.length}
         settingsSeed={settingsSeed}
         defaultRatio={defaultRatio}
         defaultResolution={defaultResolution}
         validationMessage={validationMessage}
         submitting={submitting}
-        formValid={validationMessage === null}
+        formValid={regions.length > 0 && validationMessage === null}
         onSubmit={submitFromForm}
         batchItems={batchItems}
         galleryLoading={gallery.loading}
@@ -483,7 +465,6 @@ export function ProductSkuPage() {
         onOpenHistory={openHistoryResult}
         onRestoreHistory={(group) => void restoreHistory(group)}
         onDownloadHistory={(group) => void downloadHistoryGroup(group)}
-        onDeleteHistory={deleteHistory}
       >
         <ProductSkuTemplateCard
           template={template}
@@ -494,12 +475,6 @@ export function ProductSkuPage() {
           onOpenMobile={() => openMobileFor({ kind: 'template' })}
           onEditRegions={() => setEditorOpen(true)}
           onPreview={setPreviewUrl}
-          onRemove={() => {
-            setTemplate(null);
-            setRegions([]);
-            setItems([createSkuItem([])]);
-            clearBatch();
-          }}
         />
 
         {regions.length === 0 ? (
@@ -564,9 +539,9 @@ export function ProductSkuPage() {
       />
 
       {restoringId && (
-        <div className="product-sku-restoring" role="status">
+        <Surface className="product-sku-restoring flex-row border-0" role="status">
           <Spin size="small" /> 正在恢复历史提交…
-        </div>
+        </Surface>
       )}
 
       {previewUrl && (

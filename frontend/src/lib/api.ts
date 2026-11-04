@@ -18,7 +18,6 @@ import type {
   AdminAigcLabel,
   AigcLabelSpec,
   AdminUserDetail,
-  AdminUserImpact,
   AdminLoginLogResult,
   AdminUserListResult,
   AdminAssetListResult,
@@ -121,6 +120,7 @@ import type {
   CreditImportResult,
   ShoppableCarouselTemplatesResult,
 } from "../types/api";
+import type { AdminUserImpact } from "../types/admin-users";
 import type {
   AdminPageResult,
   AdminPaymentOrderDetail,
@@ -1002,7 +1002,7 @@ export const adminUsersApi = {
       method: "POST",
     }),
 
-  /** 默认软删; hard=true 物理删除可删部分 (订单不在删除范围) */
+  /** 默认软注销; hard=true 物理删除, 仅限无资金记录的账号 */
   remove: (id: string, hard = false, confirm?: string) =>
     request<{
       id: string;

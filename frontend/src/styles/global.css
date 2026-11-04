@@ -7749,67 +7749,57 @@ img[data-broken='1'] {
   background-size: 6px 6px;
 }
 
-.tool-history-count {
-  min-width: 22px;
-  height: 20px;
-  padding: 0 6px;
-  display: inline-grid;
-  place-items: center;
-  border-radius: 10px;
-  background: var(--brand-bg);
-  color: var(--brand);
-  font-size: 12px;
-}
+/* 历史卡与商品 SKU 图一致：方形缩略图 + 右上角悬停显形的操作，
+   不再在图片下方占用一行日期 / 积分文字。 */
 .tool-history-card {
+  position: relative;
   overflow: hidden;
-}
-.tool-history-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 2px 6px;
-  padding: 6px 7px 7px;
-  font-size: 12px;
-  line-height: 14px;
-  color: var(--text-muted);
-}
-/* 日期独占一行：176px 的历史栏里与两个操作图标同排时，日期只剩「20…」，
-   模型 / 积分也一起被压扁。换行后日期完整，第二行留给积分与操作。 */
-.tool-history-meta > span:first-child {
-  flex: 1 1 100%;
-}
-.tool-history-meta > span:not(.tool-history-meta-actions) {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  border-radius: 10px;
 }
 .tool-history-meta-actions {
-  flex: none;
-  display: inline-flex;
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s;
 }
-.tool-history-meta a,
-.tool-history-action {
+.tool-history-card:hover .tool-history-meta-actions,
+.tool-history-card:focus-within .tool-history-meta-actions {
+  opacity: 1;
+  pointer-events: auto;
+}
+/* 触屏没有 hover：操作常驻，否则移动端历史卡只剩看大图。 */
+@media (hover: none) {
+  .tool-history-meta-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+.tool-history-meta-actions button,
+.tool-history-meta-actions a {
   flex: none;
-  display: inline-grid;
+  display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border: 0;
   border-radius: 5px;
-  background: transparent;
-  color: var(--brand);
+  background: rgba(22, 25, 33, 0.55);
+  color: var(--card-bg);
   cursor: pointer;
 }
-.tool-history-action:hover:not(:disabled),
-.tool-history-action:focus-visible,
-.tool-history-meta a:hover,
-.tool-history-meta a:focus-visible {
-  background: var(--brand-bg);
+.tool-history-meta-actions button:hover:not(:disabled),
+.tool-history-meta-actions a:hover,
+.tool-history-meta-actions button:focus-visible,
+.tool-history-meta-actions a:focus-visible {
+  background: var(--brand);
+  color: var(--card-bg);
   outline: none;
 }
 .tool-history-action:disabled {
@@ -9059,10 +9049,6 @@ ol.product-sku-steps {
   margin-top: 16px;
 }
 
-.product-sku-variant-row.is-incomplete {
-  border-color: var(--sku-border-danger);
-}
-
 .product-sku-variant-title {
   display: flex;
   align-items: center;
@@ -9141,6 +9127,11 @@ ol.product-sku-steps {
   color: var(--sku-text-20);
 }
 
+.product-sku-variant-body > input:focus-visible {
+  border-radius: var(--radius-tag);
+  background: var(--brand-bg);
+}
+
 .product-sku-reference-thumb {
   position: absolute;
   top: 16px;
@@ -9201,13 +9192,6 @@ ol.product-sku-steps {
   margin-bottom: 12px;
 }
 
-.product-sku-result-heading h1 {
-  margin: 0;
-  color: var(--text-2);
-  font-size: 14px;
-  line-height: 20px;
-}
-
 .product-sku-result-heading p {
   margin: 2px 0 0;
   color: var(--sku-text-19);
@@ -9220,24 +9204,6 @@ ol.product-sku-steps {
   justify-content: flex-end;
   flex-wrap: wrap;
   gap: 6px;
-}
-
-.product-sku-result-refresh {
-  display: grid;
-  place-items: center;
-  width: 40px;
-  height: 40px;
-  padding: 0;
-  border: 0;
-  border-radius: 8px;
-  background: var(--surface-3);
-  color: var(--text-6);
-  cursor: pointer;
-}
-
-.product-sku-result-refresh:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
 }
 
 .product-sku-result-retry,
@@ -9365,20 +9331,58 @@ ol.product-sku-steps {
   object-fit: contain;
 }
 
-.product-sku-stage-hover {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  background: rgba(22, 25, 33, 0.22);
-  color: var(--card-bg);
-  opacity: 0;
-  transition: opacity 0.16s;
+/* 已选模板图预览 / 已生成结果：图片区不铺底色，框选区域叠在其上 */
+.product-sku-stage-source,
+.product-sku-stage-image {
+  background: transparent;
 }
 
-.product-sku-stage-preview:hover .product-sku-stage-hover,
-.product-sku-stage-preview:focus-visible .product-sku-stage-hover {
-  opacity: 1;
+.product-sku-stage-media {
+  position: relative;
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.product-sku-stage-media img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.product-sku-stage-media.is-sized img {
+  width: 100%;
+  height: 100%;
+}
+
+.product-sku-stage-region {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px dashed var(--brand);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  pointer-events: none;
+}
+
+.product-sku-stage-region.is-ellipse {
+  border-radius: 50%;
+}
+
+.product-sku-stage-region > b {
+  position: absolute;
+  top: -9px;
+  left: -9px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: var(--card-bg);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
 }
 
 .product-sku-stage-label {
@@ -9391,22 +9395,6 @@ ol.product-sku-steps {
   color: var(--card-bg);
   font-size: 12px;
   pointer-events: none;
-}
-
-.product-sku-stage-download {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: rgba(25, 28, 41, 0.58);
-  color: var(--card-bg);
-  cursor: pointer;
 }
 
 .product-sku-generating {
@@ -9560,6 +9548,7 @@ ol.product-sku-steps {
 }
 
 .product-sku-history-card {
+  position: relative;
   flex: none;
   overflow: hidden;
   border: 1px solid var(--sku-border-4);
@@ -9591,21 +9580,10 @@ ol.product-sku-steps {
   object-fit: cover;
 }
 
-.product-sku-history-preview-mask {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  background: rgba(22, 25, 33, 0.28);
-  color: var(--card-bg);
-  opacity: 0;
-  transition: opacity 0.16s;
-}
-
 .product-sku-history-count {
   position: absolute;
   top: 6px;
-  right: 6px;
+  left: 6px;
   padding: 2px 6px;
   border-radius: 99px;
   background: rgba(85, 70, 216, 0.88);
@@ -9615,56 +9593,43 @@ ol.product-sku-steps {
   pointer-events: none;
 }
 
-.product-sku-history-preview:hover .product-sku-history-preview-mask,
-.product-sku-history-preview:focus-visible .product-sku-history-preview-mask {
-  opacity: 1;
-}
-
-.product-sku-history-meta {
-  display: grid;
-  gap: 2px;
-  padding: 7px 8px 3px;
-}
-
-.product-sku-history-meta strong {
-  overflow: hidden;
-  color: var(--sku-text-3);
-  font-size: 12px;
-  font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.product-sku-history-meta span {
-  color: var(--sku-text-20);
-  font-size: 12px;
-}
-
 .product-sku-history-actions {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 2px;
-  padding: 3px 6px 6px;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.16s, visibility 0.16s;
+}
+
+.product-sku-history-card:hover .product-sku-history-actions,
+.product-sku-history-card:focus-within .product-sku-history-actions {
+  opacity: 1;
+  visibility: visible;
 }
 
 .product-sku-history-actions button,
 .product-sku-history-actions a {
   display: grid;
   place-items: center;
-  width: 26px;
+  width: 24px;
   height: 24px;
   padding: 0;
   border: 0;
   border-radius: 5px;
-  background: transparent;
-  color: var(--sku-text-14);
+  background: rgba(22, 25, 33, 0.55);
+  color: var(--card-bg);
   cursor: pointer;
 }
 
 .product-sku-history-actions button:hover,
 .product-sku-history-actions a:hover {
-  background: var(--surface-3);
-  color: var(--brand);
+  background: var(--brand);
+  color: var(--card-bg);
 }
 
 .product-sku-history-more {
@@ -10251,8 +10216,7 @@ ol.product-sku-steps {
 
 @media (prefers-reduced-motion: reduce) {
   .product-sku-editor-frame,
-  .product-sku-stage-hover,
-  .product-sku-history-preview-mask {
+  .product-sku-history-actions {
     transition: none;
   }
   .product-sku-generating-pulse,
@@ -15131,12 +15095,6 @@ ol.product-sku-steps {
   font-weight: 700;
   line-height: 40px;
   color: var(--text-strong);
-}
-.asset-library-sub {
-  margin: 6px 0 0;
-  font-size: 13px;
-  line-height: 20px;
-  color: var(--text-muted);
 }
 .asset-library-header-actions {
   display: flex;
@@ -20522,39 +20480,35 @@ ol.product-sku-steps {
   min-height: 0;
   height: 100%;
   background: var(--card-bg);
-  border-radius: var(--radius-panel);
+  border-radius: 14px;
   overflow: hidden;
 }
 .redraw-history-head {
   flex: 0 0 48px;
   height: 48px;
-  padding: 0 16px;
+  padding: 0 11px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
 }
 .redraw-history-head h2 {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   margin: 0;
-  font-size: 14px;
+  font-size: 12px;
+  font-weight: 400;
   line-height: 22px;
-  color: var(--text-strong);
+  color: var(--text-body);
+}
+.redraw-history-head h2 svg {
+  color: var(--text-muted);
 }
 .tool-history-head-actions {
   display: flex;
   align-items: center;
   gap: 4px;
-}
-.tool-history-count {
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 9px;
-  background: var(--brand-bg);
-  color: var(--brand);
-  font-size: 12px;
-  line-height: 18px;
-  text-align: center;
 }
 .redraw-history-collapse {
   width: 24px;
@@ -20578,10 +20532,11 @@ ol.product-sku-steps {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 0 16px 16px;
+  padding: 0 11px 11px;
 }
 .redraw-history-pane .redraw-history-grid {
   grid-template-columns: minmax(0, 1fr);
+  gap: 9px;
 }
 .redraw-history-pane .redraw-history-card span {
   font-size: 12px;
@@ -20604,42 +20559,8 @@ ol.product-sku-steps {
   aspect-ratio: 1;
   object-fit: cover;
 }
-.tool-history-preview-icon {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  background: rgba(22, 25, 33, 0.32);
-  color: var(--card-bg);
-  opacity: 0;
-  transition: opacity 0.16s;
-}
-.tool-history-preview:hover .tool-history-preview-icon,
-.tool-history-preview:focus-visible .tool-history-preview-icon {
-  opacity: 1;
-}
-.tool-history-download {
-  position: absolute;
-  right: 7px;
-  bottom: 7px;
-  z-index: 2;
-  display: inline-grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  border: 1px solid rgba(255, 255, 255, 0.55);
-  border-radius: 50%;
-  background: rgba(22, 25, 33, 0.72);
-  color: #fff;
-  box-shadow: 0 2px 6px rgba(22, 25, 33, 0.24);
+.tool-history-meta-actions a {
   text-decoration: none;
-  transition: background 0.16s, transform 0.16s;
-}
-.tool-history-download:hover,
-.tool-history-download:focus-visible {
-  background: var(--brand);
-  outline: none;
-  transform: translateY(-1px);
 }
 .redraw-history-loading {
   display: flex;
@@ -21421,7 +21342,6 @@ ol.product-sku-steps {
   width: 100%;
   height: 100%;
   min-height: 0;
-  border-radius: 0;
   background: var(--card-bg);
 }
 .pk-workspace.local-redraw-page .redraw-intro {
@@ -21459,9 +21379,6 @@ ol.product-sku-steps {
   height: 480px;
   object-fit: cover;
   background: var(--surface-2);
-}
-.pk-workspace.local-redraw-page > .redraw-history-pane {
-  padding: 0 0 16px;
 }
 
 /* 一键抠图：参考站没有历史栏，固定两栏 */
@@ -21649,8 +21566,6 @@ ol.product-sku-steps {
   width: 100%;
   height: 100%;
   min-height: 0;
-  padding: 0 4px 16px 0;
-  border-radius: 16px;
   background: var(--card-bg);
 }
 .pk-workspace.product-retouch-page .pk-preview-placeholder {

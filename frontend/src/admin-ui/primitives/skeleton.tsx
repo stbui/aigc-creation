@@ -284,11 +284,20 @@ export function SkeletonDutyStrip({ className }: { className?: string }) {
 /**
  * 卡片网格骨架：与「一格一个后端」这类卡片列表同构（auto-fit，最小 300px）。
  */
-export function SkeletonCards({ count = 3, className }: { count?: number; className?: string }) {
+export function SkeletonCards({
+  count = 3,
+  className,
+  gridClassName,
+}: {
+  count?: number;
+  className?: string;
+  gridClassName?: string;
+}) {
   return (
     <div
       className={cn(
         'mt-4 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(300px,1fr))]',
+        gridClassName,
         className,
       )}
     >

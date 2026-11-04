@@ -34,7 +34,7 @@ import {
  * 批量启用 / 禁用。
  *
  * 刻意**不提供批量删除**：禁用可逆，删除不可逆，而批量删除是「点错一次
- * 影响 100 个人」的操作。需要清退账号时逐条走删除（有影响面预览与确认词）。
+ * 影响 100 个人」的操作。需要清退账号时逐条走注销（有影响面预览与二次确认）。
  */
 export class UserBatchDto {
   @IsArray()
@@ -124,7 +124,7 @@ export class AdminUsersController {
 
   /** 删除前的连带影响预览, 供确认弹窗展示具体数量 */
   @Get(":id/impact")
-  @RequirePermission(PERMISSIONS.userRead)
+  @RequirePermission(PERMISSIONS.userDelete)
   impact(@Param("id") id: string) {
     return this.users.impactPreview(id);
   }
@@ -183,8 +183,9 @@ export class AdminUsersController {
     @Param("id") id: string,
     @Query("hard") hard: string,
     @Body() dto: DeleteUserDto,
+    @AdminUser() actor: AdminUser,
   ) {
-    return this.users.remove(id, hard === "true", dto?.confirm);
+    return this.users.remove(id, hard === "true", dto?.confirm, actor.id);
   }
 
   /**

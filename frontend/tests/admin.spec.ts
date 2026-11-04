@@ -35,33 +35,77 @@ test.describe('后台管理端', () => {
     await page.goto(`${UI}/admin/users`);
     await expect(page.getByRole('heading', { name: '用户管理' })).toBeVisible({ timeout: 15000 });
     await expect(page.getByTestId('admin-filter').first()).toBeVisible();
-    // 表格首屏应有数据行，并保留用户总数与明确的操作列标题
-    await expect(page.getByTestId('admin-table').first()).toBeVisible();
-    await expect(page.getByTestId('admin-table-row').first()).toBeVisible();
-    await expect(page.getByTestId('admin-users-total')).toContainText(/共 \d+ 位用户/);
-    await expect(page.getByRole('columnheader', { name: '操作' })).toBeVisible();
+    // 用户列表使用卡片网格，不再渲染表格
+    await expect(page.getByTestId('admin-table')).toHaveCount(0);
+    const firstCard = page.getByTestId('admin-user-card').first();
+    await expect(firstCard).toBeVisible();
+    await expect(firstCard.getByText('项目')).toBeVisible();
+    const deletableCard = page
+      .getByTestId('admin-user-card')
+      .filter({ has: page.getByRole('button', { name: '删除用户' }) })
+      .first();
+    await expect(deletableCard).toBeVisible();
+    await expect(firstCard.getByRole('button', { name: '更多' })).toHaveCount(0);
+    await expect(page.getByTestId('admin-users-total')).toHaveCount(0);
+    await expect(
+      page.getByRole('button', { name: '导出用户 CSV' }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: '导出用户 CSV' }).locator('svg'),
+    ).toHaveCount(1);
+    await expect(page.getByTestId('admin-panel')).toHaveCount(0);
+
+    await expect(page.getByTestId('admin-batch-actions')).toHaveCount(0);
+    await expect(page.getByRole('button', { name: /^批量(禁用|启用)$/ })).toHaveCount(0);
+    await expect(firstCard.getByRole('checkbox')).toHaveCount(0);
   });
 
-  test('用户删除确认使用 shadcn AlertDialog 且操作区始终可用', async ({ page }) => {
+  test('用户删除确认展示软注销影响面且操作区始终可用', async ({ page }) => {
     // 矮视口专门验证确认框不会撑出屏幕，也不会把底部按钮挤走。
     await page.setViewportSize({ width: 1440, height: 620 });
+    await page.route('**/admin/users/*/impact', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          email: 'user@example.com',
+          projects: 3,
+          tasks: 8,
+          assets: 12,
+          retained: {
+            orders: 2,
+            payments: 2,
+            refunds: 1,
+            invoices: 1,
+            billingOrders: 2,
+            creditLedgerEntries: 5,
+          },
+          hardDeleteAllowed: false,
+        }),
+      }),
+    );
     await page.goto(`${UI}/admin/users`);
     await expect(page.getByRole('heading', { name: '用户管理' })).toBeVisible({ timeout: 15000 });
 
-    const firstRow = page.getByTestId('admin-table-row').first();
-    await expect(firstRow).toBeVisible();
-    await firstRow.getByRole('button', { name: '更多' }).click();
-    await page.getByRole('menuitem', { name: '删除用户' }).click();
+    const deletableCard = page
+      .getByTestId('admin-user-card')
+      .filter({ has: page.getByRole('button', { name: '删除用户' }) })
+      .first();
+    await expect(deletableCard).toBeVisible();
+    await deletableCard.getByRole('button', { name: '删除用户' }).click();
 
     const dialog = page.getByTestId('admin-delete-dialog');
     await expect(dialog).toBeVisible();
     await expect(dialog).toHaveAttribute('role', 'alertdialog');
     await expect(dialog).toHaveAttribute('data-slot', 'alert-dialog-content');
-    await expect(dialog.getByRole('heading', { name: '删除' })).toBeVisible();
-    await expect(dialog).toContainText('确定要删除该用户吗？');
+    await expect(dialog.getByRole('heading', { name: '删除用户' })).toBeVisible();
+    await expect(dialog).toContainText('将注销账号');
+    await expect(dialog).toContainText('项目 3 · 任务 8 · 素材 12');
+    await expect(dialog).toContainText('将匿名保留（13 条）');
     await expect(dialog.getByRole('button', { name: '取消' })).toBeInViewport();
-    await expect(dialog.getByRole('button', { name: '永久删除' })).toBeInViewport();
-    await expect(dialog.getByRole('button', { name: '永久删除' })).toBeEnabled();
+    const confirm = dialog.getByRole('button', { name: '确认注销' });
+    await expect(confirm).toBeInViewport();
+    await expect(confirm).toBeEnabled();
     await expect(page.locator('[data-slot="alert-dialog-overlay"]')).toHaveCount(1);
 
     const bounds = await dialog.boundingBox();
@@ -71,6 +115,59 @@ test.describe('后台管理端', () => {
     expect(bounds!.y).toBeGreaterThanOrEqual(0);
     expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(viewport!.height);
     expect(bounds!.x + bounds!.width / 2).toBeCloseTo(viewport!.width / 2, 0);
+  });
+
+  test('用户操作弹框使用 shadcn AlertDialog 与 Dialog', async ({ page }) => {
+    await page.goto(`${UI}/admin/users`);
+    await expect(page.getByRole('heading', { name: '用户管理' })).toBeVisible({ timeout: 15000 });
+
+    const actionCard = page
+      .getByTestId('admin-user-card')
+      .filter({ has: page.getByRole('button', { name: '变更角色' }) })
+      .first();
+    await expect(actionCard).toBeVisible();
+
+    await actionCard.getByRole('button', { name: /^(禁用账号|启用账号)$/ }).click();
+
+    const statusDialog = page.getByTestId('admin-status-dialog');
+    await expect(statusDialog).toBeVisible();
+    await expect(statusDialog).toHaveAttribute('role', 'alertdialog');
+    await expect(statusDialog).toHaveAttribute('data-slot', 'alert-dialog-content');
+    await expect(statusDialog.getByRole('heading', { name: /^(禁用账号|启用账号)$/ })).toBeVisible();
+    await statusDialog.getByRole('button', { name: '取消' }).click();
+    await expect(statusDialog).toBeHidden();
+
+    await actionCard.getByRole('button', { name: '变更角色' }).click();
+
+    const roleDialog = page.getByTestId('admin-role-dialog');
+    await expect(roleDialog).toBeVisible();
+    await expect(roleDialog).toHaveAttribute('role', 'alertdialog');
+    await expect(roleDialog).toHaveAttribute('data-slot', 'alert-dialog-content');
+    await expect(roleDialog.getByRole('heading', { name: '变更角色' })).toBeVisible();
+    await expect(roleDialog.getByRole('combobox', { name: '目标角色' })).toBeVisible();
+    await expect(roleDialog.getByRole('button', { name: '确认变更' })).toBeDisabled();
+    await roleDialog.getByRole('button', { name: '取消' }).click();
+    await expect(roleDialog).toBeHidden();
+
+    // 重置密码会改真实数据；这里只验证一次性密码弹框的 shadcn Dialog 形态。
+    await page.route('**/admin/users/*/password', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ tempPassword: 'Temp-e2e-password' }),
+      }),
+    );
+    await actionCard.getByRole('button', { name: '重置密码' }).click();
+
+    const tempPasswordDialog = page.getByRole('dialog', { name: '临时密码已生成' });
+    await expect(tempPasswordDialog).toBeVisible();
+    await expect(tempPasswordDialog).toHaveAttribute('data-slot', 'dialog-content');
+    await expect(tempPasswordDialog.getByRole('textbox', { name: '临时密码' })).toHaveValue(
+      'Temp-e2e-password',
+    );
+    await expect(tempPasswordDialog.getByRole('button', { name: '复制' })).toBeVisible();
+    await tempPasswordDialog.getByRole('button', { name: '我已保存' }).click();
+    await expect(tempPasswordDialog).toBeHidden();
   });
 
   test('角色权限页渲染权限模块', async ({ page }) => {

@@ -1,5 +1,5 @@
 import { IsIn, IsOptional, IsString, MaxLength } from "class-validator";
-import { ADMIN_ROLE_CODES, type AdminRoleCode } from "../permissions";
+import { USER_ROLES, type UserRole } from "../permissions";
 import { PageQueryDto } from "./page-query.dto";
 
 /** 用户列表查询 */
@@ -11,7 +11,7 @@ export class UserListQueryDto extends PageQueryDto {
   keyword?: string;
 
   @IsOptional()
-  @IsIn(["user", ...ADMIN_ROLE_CODES], { message: "role 取值非法" })
+  @IsIn(USER_ROLES, { message: "role 取值非法" })
   role?: string;
 
   @IsOptional()
@@ -29,23 +29,22 @@ export class UserListQueryDto extends PageQueryDto {
   to?: string;
 }
 
-/** 禁用/启用: status 之外还允许填原因 */
+/** 禁用/启用 */
 export class ChangeUserStatusDto {
   @IsIn(["active", "disabled"], { message: "只能设为正常或禁用" })
   status!: "active" | "disabled";
-
-  /** 操作原因。选填但强烈建议 —— 禁用是重要操作, 有原因便于复核 */
 }
 
 /** 角色变更 */
 export class ChangeUserRoleDto {
-  @IsIn(ADMIN_ROLE_CODES, { message: "只能授予后台角色" })
-  role!: AdminRoleCode;
+  @IsIn(USER_ROLES, { message: "role 取值非法" })
+  role!: UserRole;
 }
 
 /** 物理删除 */
 export class DeleteUserDto {
-  /** 二次确认词。后端校验, 防止误调用或 CSRF 下的意外删除 */
+  /** 物理删除确认词。仅 hard=true 时校验, 软注销无需确认词 */
+  @IsOptional()
   @IsString()
   confirm?: string;
 }

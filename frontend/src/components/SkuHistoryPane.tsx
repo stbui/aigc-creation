@@ -1,6 +1,7 @@
 import { useContext, useEffect, useRef, useState } from 'react';
-import { ChevronRight, ChevronUp, Download, Eye, History, Pencil, Trash2 } from 'lucide-react';
+import { ChevronRight, ChevronUp, Download, History, RotateCcw } from 'lucide-react';
 import { ToolTrailingContext } from './ToolShell';
+import { ImageLightbox, type LightboxItem } from './ImageLightbox';
 import { assetThumbUrl } from '../lib/api';
 import { groupContainsTask, type SkuBatchGroup } from '../lib/skuBatches';
 import { Spin } from '../ui';
@@ -15,7 +16,6 @@ interface Props {
   onOpen: (group: SkuBatchGroup) => void;
   onRestore: (group: SkuBatchGroup) => void;
   onDownload: (group: SkuBatchGroup) => void;
-  onDelete: (group: SkuBatchGroup) => void;
   onRetry: () => void;
 }
 
@@ -27,10 +27,10 @@ function HistoryList({
   onOpen,
   onRestore,
   onDownload,
-  onDelete,
   onRetry,
 }: Props) {
   const [visible, setVisible] = useState(PAGE_SIZE);
+  const [preview, setPreview] = useState<{ items: LightboxItem[]; index: number } | null>(null);
 
   useEffect(() => {
     setVisible((count) => Math.max(PAGE_SIZE, Math.min(count, items.length || PAGE_SIZE)));
@@ -57,64 +57,85 @@ function HistoryList({
   if (items.length === 0) return <div className="redraw-history-empty">暂无历史记录</div>;
 
   return (
-    <div
-      className="product-sku-history-list"
-      onScroll={(event) => {
-        const el = event.currentTarget;
-        if (el.scrollTop + el.clientHeight >= el.scrollHeight - 80 && visible < items.length) {
-          setVisible((count) => Math.min(items.length, count + PAGE_SIZE));
-        }
-      }}
-    >
-      {items.slice(0, visible).map((group) => {
-        const active = Boolean(activeId && groupContainsTask(group, activeId));
-        const name = group.label;
-        const cover = group.cover;
-        return (
-          <article key={group.id} className={`product-sku-history-card${active ? ' is-active' : ''}`}>
-            <button
-              type="button"
-              className="product-sku-history-preview"
-              aria-label={`打开 ${name}`}
-              title="在结果区打开"
-              onClick={() => onOpen(group)}
-            >
-              {cover?.url ? (
-                <img src={assetThumbUrl(cover.url, 320) ?? cover.url} alt={`${name}历史结果`} loading="lazy" />
-              ) : (
-                <span className="product-sku-thumb-placeholder" />
-              )}
-              {group.totalCount > 1 && (
-                <span className="product-sku-history-count">
-                  {group.items.length < group.totalCount ? `${group.items.length}/${group.totalCount}` : `${group.totalCount} 款`}
-                </span>
-              )}
-              <span className="product-sku-history-preview-mask"><Eye size={15} /></span>
-            </button>
-            <div className="product-sku-history-meta">
-              <strong title={name}>{name}</strong>
-              <span>{group.createdAt ? new Date(group.createdAt).toLocaleString() : '已生成'}</span>
-            </div>
-            <div className="product-sku-history-actions">
-              <button type="button" aria-label={`重新编辑 ${name}`} title="重新编辑整批" onClick={() => onRestore(group)}>
-                <Pencil size={13} />
+    <>
+      <div
+        className="product-sku-history-list"
+        onScroll={(event) => {
+          const el = event.currentTarget;
+          if (el.scrollTop + el.clientHeight >= el.scrollHeight - 80 && visible < items.length) {
+            setVisible((count) => Math.min(items.length, count + PAGE_SIZE));
+          }
+        }}
+      >
+        {items.slice(0, visible).map((group) => {
+          const active = Boolean(activeId && groupContainsTask(group, activeId));
+          const name = group.label;
+          const cover = group.cover;
+          const openPreview = () => {
+            const images: LightboxItem[] = group.items
+              .filter((item) => item.url)
+              .map((item) => ({
+                id: item.id,
+                url: item.url,
+                width: item.width,
+                height: item.height,
+                createdAt: item.createdAt,
+              }));
+            if (images.length === 0) {
+              onOpen(group);
+              return;
+            }
+            const coverIndex = group.cover ? images.findIndex((image) => image.id === group.cover!.id) : -1;
+            setPreview({ items: images, index: coverIndex >= 0 ? coverIndex : 0 });
+          };
+          return (
+            <article key={group.id} className={`product-sku-history-card${active ? ' is-active' : ''}`}>
+              <button
+                type="button"
+                className="product-sku-history-preview"
+                aria-label={`查看 ${name} 大图`}
+                title="查看大图"
+                onClick={openPreview}
+              >
+                {cover?.url ? (
+                  <img src={assetThumbUrl(cover.url, 320) ?? cover.url} alt={`${name}历史结果`} loading="lazy" />
+                ) : (
+                  <span className="product-sku-thumb-placeholder" />
+                )}
+                {group.totalCount > 1 && (
+                  <span className="product-sku-history-count">
+                    {group.items.length < group.totalCount ? `${group.items.length}/${group.totalCount}` : `${group.totalCount} 款`}
+                  </span>
+                )}
               </button>
-              <button type="button" aria-label={`下载 ${name}`} title={group.items.length > 1 ? '打包下载整批' : '下载'} onClick={() => onDownload(group)}>
-                <Download size={13} />
-              </button>
-              <button type="button" aria-label={`移除 ${name}`} title="移除" onClick={() => onDelete(group)}>
-                <Trash2 size={13} />
-              </button>
-            </div>
-          </article>
-        );
-      })}
-      {visible < items.length && (
-        <button type="button" className="product-sku-history-more" onClick={() => setVisible((count) => Math.min(items.length, count + PAGE_SIZE))}>
-          加载更多
-        </button>
+              <div className="product-sku-history-actions">
+                <button type="button" aria-label={`重新编辑 ${name}`} title="重新编辑整批" onClick={() => onRestore(group)}>
+                  <RotateCcw size={13} />
+                </button>
+                <button type="button" aria-label={`下载 ${name}`} title={group.items.length > 1 ? '打包下载整批' : '下载'} onClick={() => onDownload(group)}>
+                  <Download size={13} />
+                </button>
+              </div>
+            </article>
+          );
+        })}
+        {visible < items.length && (
+          <button type="button" className="product-sku-history-more" onClick={() => setVisible((count) => Math.min(items.length, count + PAGE_SIZE))}>
+            加载更多
+          </button>
+        )}
+      </div>
+
+      {preview && (
+        <ImageLightbox
+          items={preview.items}
+          index={preview.index}
+          onIndexChange={(index) => setPreview((current) => (current ? { ...current, index } : current))}
+          onClose={() => setPreview(null)}
+          ariaLabel="SKU 历史结果"
+        />
       )}
-    </div>
+    </>
   );
 }
 

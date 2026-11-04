@@ -747,7 +747,7 @@ export function AdminTasksPage() {
           onSortChange={(next) => setQuery({ sort: next ?? 'createdAt:desc' }, false)}
           /* 单字段单行展示: 固定列宽，避免内容把行高重新撑成两行 */
           minWidth={1080}
-          fixedLayout
+          fixedLayout density="compact"
           selectable
           selected={selected}
           onSelectedChange={setSelected}

@@ -207,7 +207,7 @@ export const SkuImage: CapabilityPlugin = {
   summary: '按 SKU 批量出图。',
   sidebarHint: '批量生成同款不同规格图',
   mode: 'real',
-  creditCost: 0, // 原页面标注「本次消耗0积分」
+  creditCost: 10, // 按 SKU 逐张计费：N 个 SKU 共扣 N × 10 积分
   help: '按模板图上框选的变体区域批量套版；框选坐标会随任务参数提交给模型',
   params: [
     {

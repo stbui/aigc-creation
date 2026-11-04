@@ -4,13 +4,13 @@ import {
   SkuHistoryPane,
   SkuResultPanel,
   ToolShell,
+  type SkuRegion,
   type ToolAsset,
   type ToolSettings,
 } from './components';
 import type { SkuBatchResult } from './constants';
-import type { GalleryItem } from './hooks';
+import { useCreditCost, type GalleryItem } from './hooks';
 import type { SkuBatchGroup } from './utils';
-import { downloadDirect } from './utils';
 
 /**
  * SKU 页的 ToolShell 编排：左表单 / 右结果 / 尾部历史。
@@ -18,6 +18,9 @@ import { downloadDirect } from './utils';
  * 批次状态仍在 `page.tsx`，这里只把面板拼起来，避免页面文件继续膨胀。
  */
 export function ProductSkuWorkspace({
+  template,
+  regions,
+  itemCount,
   settingsSeed,
   defaultRatio,
   defaultResolution,
@@ -39,9 +42,11 @@ export function ProductSkuWorkspace({
   onOpenHistory,
   onRestoreHistory,
   onDownloadHistory,
-  onDeleteHistory,
   children,
 }: {
+  template: ToolAsset | null;
+  regions: SkuRegion[];
+  itemCount: number;
   settingsSeed: number;
   defaultRatio: string;
   defaultResolution: string;
@@ -63,9 +68,21 @@ export function ProductSkuWorkspace({
   onOpenHistory: (group: SkuBatchGroup) => void;
   onRestoreHistory: (group: SkuBatchGroup) => void;
   onDownloadHistory: (group: SkuBatchGroup) => void;
-  onDeleteHistory: (group: SkuBatchGroup) => void;
   children: ReactNode;
 }) {
+  /*
+   * 每个 SKU 各建一条任务、各扣一份单价 —— 按钮上按数量折算总价，
+   * 单价取 `GET /capabilities` 的运行时生效价，与建单扣费同源。
+   */
+  const skuCount = Math.max(itemCount, 1);
+  const unitCreditCost = useCreditCost('sku_image');
+  const creditLabel =
+    unitCreditCost == null
+      ? undefined
+      : unitCreditCost > 0
+        ? `本次消耗 ${unitCreditCost * skuCount} 积分`
+        : '免费';
+
   return (
     <ToolShell
       key={`sku-${settingsSeed}`}
@@ -75,7 +92,8 @@ export function ProductSkuWorkspace({
       desc="一张图，批量套出版式完全一致的整组 SKU 图。"
       upload={null}
       settings={{ ratio: true, resolution: true, defaultRatio, defaultResolution }}
-      submitLabel="立即生成"
+      submitLabel={`生成SKU图 × ${skuCount}`}
+      creditLabel={creditLabel}
       emptyDesc="上传模板图、框选变体区域并编辑 SKU 清单后，批量结果会显示在这里"
       hint={validationMessage ?? undefined}
       formValid={formValid}
@@ -85,13 +103,26 @@ export function ProductSkuWorkspace({
       resultPane={
         <SkuResultPanel
           items={batchItems}
-          loading={galleryLoading}
+          source={
+            template
+              ? {
+                  url: template.url,
+                  label: template.name,
+                  regions: regions.map((region) => ({
+                    id: region.id,
+                    x: region.x,
+                    y: region.y,
+                    width: region.width,
+                    height: region.height,
+                    type: region.type,
+                  })),
+                }
+              : null
+          }
           error={galleryError}
           notice={failedNotice}
           activeId={activeResultId}
           onActiveChange={onActiveResultChange}
-          onRefresh={onRefresh}
-          onDownload={downloadDirect}
           onDownloadAll={onDownloadAll}
           onRetryFailed={onRetryFailed}
           retrying={submitting || batchDownloading}
@@ -106,7 +137,6 @@ export function ProductSkuWorkspace({
           onOpen={onOpenHistory}
           onRestore={onRestoreHistory}
           onDownload={onDownloadHistory}
-          onDelete={onDeleteHistory}
           onRetry={onRefresh}
         />
       }

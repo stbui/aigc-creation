@@ -36,7 +36,7 @@ const BASELINE = {
   // 接口聚合层：按域拆分牵扯全部调用方，待「API 与类型层治理」批次统一处理
   'src/lib/api.ts': 2715,
   // 后端契约类型声明（无运行期逻辑），随接口演进增长
-  'src/types/api.d.ts': 2359,
+  'src/types/api.d.ts': 2351,
   'src/types/model.ts': 926,
   // 概览页内容：批 1 从 AdminDashboardPage 抽出，内部构件还可再分
   'src/pages/admin/dashboard/AdminDashboardContent.tsx': 1002,

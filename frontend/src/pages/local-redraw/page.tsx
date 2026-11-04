@@ -196,7 +196,10 @@ export function LocalRedrawPage() {
     <>
       <aside className="redraw-history-pane" aria-label="局部重绘历史记录">
         <div className="redraw-history-head">
-          <h2>历史记录</h2>
+          <h2>
+            <History size={15} />
+            历史记录
+          </h2>
           <button
             type="button"
             className="redraw-history-collapse"

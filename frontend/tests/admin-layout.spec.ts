@@ -130,33 +130,33 @@ test.describe('后台布局', () => {
     expect(m.account.bottom).toBeLessThanOrEqual(m.header.bottom);
   });
 
-  test('用户表格行高一致、操作列不换行', async ({ page }) => {
+  test('用户列表使用四列卡片网格且操作平铺', async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto(`${UI}/admin/users`);
-    await page.waitForSelector('[data-testid="admin-table-row"]', { timeout: 15000 });
+    await page.waitForSelector('[data-testid="admin-user-card"]', { timeout: 15000 });
     await page.waitForTimeout(800);
 
     const m = await page.evaluate(() => {
-      const rows = Array.from(
-        document.querySelectorAll('[data-testid="admin-table-row"]'),
+      const cards = Array.from(
+        document.querySelectorAll('[data-testid="admin-user-card"]'),
       ) as HTMLElement[];
+      const grid = document.querySelector('[data-testid="admin-user-grid"]') as HTMLElement | null;
       return {
-        heights: rows.map((r) => Math.round(r.getBoundingClientRect().height)),
-        // 动作项数应 ≤2 (详情 + 更多), 多的应在下拉里
-        counts: rows.map(
-          (r) => r.querySelectorAll('td:last-child button').length,
+        gridDisplay: grid ? getComputedStyle(grid).display : '',
+        columns: grid ? getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length : 0,
+        counts: cards.map(
+          (card) =>
+            card
+              .querySelector('[data-testid="admin-user-card-actions"]')
+              ?.querySelectorAll('button').length ?? 0,
         ),
       };
     });
 
-    // 小号按钮是 32px，单元格 py-2.5 ⇒ 单行行高约 52px；
-    // 换行会把行高撑到 70+，所以「所有行等高且 ≤60」就是没换行。
-    const max = Math.max(...m.heights);
-    const min = Math.min(...m.heights);
-    expect(max, `最高行 ${max}px, 疑似换行`).toBeLessThanOrEqual(60);
-    expect(max - min, `行高不一致(${min}~${max}px), 疑似个别行换行`).toBeLessThanOrEqual(2);
+    expect(m.gridDisplay).toBe('grid');
+    expect(m.columns).toBe(4);
     for (const [i, c] of m.counts.entries()) {
-      expect(c, `第 ${i} 行直显动作 ${c} 个, 应 ≤2`).toBeLessThanOrEqual(2);
+      expect(c, `第 ${i} 张卡片应平铺全部可用操作`).toBeGreaterThanOrEqual(3);
     }
   });
 
@@ -170,21 +170,32 @@ test.describe('后台布局', () => {
     await expect(page.getByRole('dialog', { name: '全局搜索' })).toHaveCount(0);
   });
 
-  test('操作列的下拉菜单可用', async ({ page }) => {
+  test('点击用户卡片打开详情', async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto(`${UI}/admin/users`);
-    await page.waitForSelector('[data-testid="admin-table-row"]', { timeout: 15000 });
+    await page.waitForSelector('[data-testid="admin-user-card"]', { timeout: 15000 });
 
-    await page
-      .getByTestId('admin-table-row')
-      .first()
-      .getByRole('button', { name: '更多' })
-      .click();
-    // shadcn DropdownMenu（radix 底座）：弹层是 role=menu，动作是 menuitem。
-    // 菜单的可访问名由 RowMenu 显式给成「更多操作」，radix 默认会取触发器文字「更多」。
-    const menu = page.getByRole('menu', { name: '更多操作' });
-    await expect(menu).toBeVisible();
-    expect(await menu.getByRole('menuitem').count()).toBeGreaterThanOrEqual(2);
+    const firstCard = page.getByTestId('admin-user-card').first();
+    await firstCard.getByRole('button', { name: /查看用户 .* 详情/ }).click();
+
+    const drawer = page.getByTestId('admin-drawer');
+    await expect(drawer).toBeVisible();
+    await expect(drawer.getByRole('heading', { name: '用户详情' })).toBeVisible();
+    await expect(drawer.getByText('账号资料、登录活动与最近使用情况')).toBeVisible();
+    await expect(drawer.getByRole('link', { name: '任务记录' })).toBeVisible();
+    await expect(drawer.getByRole('link', { name: '订单记录' })).toBeVisible();
+    await expect(drawer.getByRole('link', { name: '积分账本' })).toBeVisible();
+    await expect(drawer.getByRole('heading', { name: '会员', exact: true })).toBeVisible();
+    await expect(drawer.getByTestId('admin-user-membership')).toBeVisible();
+
+    const bodyOverflow = await drawer.locator('.overflow-y-auto').evaluate((el) => ({
+      clientWidth: el.clientWidth,
+      scrollWidth: el.scrollWidth,
+    }));
+    expect(bodyOverflow.scrollWidth).toBeLessThanOrEqual(bodyOverflow.clientWidth);
+
+    await drawer.getByRole('button', { name: '关闭' }).click();
+    await expect(drawer).toHaveCount(0);
   });
 
   test('审计详情在行内展开，不使用抽屉或确认弹窗', async ({ page }) => {

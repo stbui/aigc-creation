@@ -1,5 +1,5 @@
 import { useContext, useEffect, useRef, useState } from 'react';
-import { ChevronUp, Download, History, ImageOff, Maximize2, RefreshCw } from 'lucide-react';
+import { ChevronUp, Download, History, ImageOff, RefreshCw } from 'lucide-react';
 import { assetSrc, assetThumbSrc, generateApi } from '../lib/api';
 import { useAuth } from '../context/AuthContext';
 import { ImageLightbox } from './ImageLightbox';
@@ -14,7 +14,8 @@ import { useApp, Drawer, Spin } from '../ui';
  * 通常是当前结果 URL：新任务完成时页面拿到的 result 变化，历史随即重新
  * 拉取。加载中、失败与空列表分开显示，避免把网络失败误报成「暂无记录」。
  *
- * 历史卡动作与参考站保持一致：
+ * 卡片外观与商品 SKU 图历史栏一致：方形缩略图、右上角悬停显形的操作，
+ * 不再在图片下方占用一行日期 / 积分文字。动作本身保持修图页语义：
  *   - 预览：打开共享 ImageLightbox（缩放/翻页/下载/失败重载）；
  *   - 再次使用：把当时的产出复制回当前项目并放入上传位，供继续改图；
  *   - 下载：直接下载历史原图。
@@ -154,64 +155,22 @@ export function ToolHistoryGrid({
                 <article key={task.id} className="redraw-history-card tool-history-card">
                   <div className="tool-history-preview-wrap">
                     {fullSrc ? (
-                      <>
-                        <button
-                          type="button"
-                          className="tool-history-preview"
-                          aria-label="预览历史结果"
-                          title="预览"
-                          onClick={() => setPreviewUrl(fullSrc)}
-                        >
-                          <img src={src} alt="历史生成结果" loading="lazy" />
-                          <span className="tool-history-preview-icon" aria-hidden="true">
-                            <Maximize2 size={14} />
-                          </span>
-                        </button>
-                        <a
-                          className="tool-history-download"
-                          href={fullSrc}
-                          download={`history-${task.id.slice(-6)}.${extension}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          aria-label="下载历史结果"
-                          title="下载"
-                        >
-                          <Download size={14} />
-                        </a>
-                      </>
+                      <button
+                        type="button"
+                        className="tool-history-preview"
+                        aria-label="预览历史结果"
+                        title="查看大图"
+                        onClick={() => setPreviewUrl(fullSrc)}
+                      >
+                        <img src={src} alt="历史生成结果" loading="lazy" />
+                      </button>
                     ) : (
                       <div className="tool-history-missing">
                         <ImageOff size={18} />
                       </div>
                     )}
-                  </div>
-                  <div className="tool-history-meta">
-                    {/*
-                      176px 的历史栏扣掉内边距只剩 130px 左右，默认 toLocaleString()
-                      带秒会稳定截成「2026/10/25 08:56:…」。这里只留到分钟（秒在历史卡里
-                      没有决策价值），完整时间放 title，需要精确时间时悬停可见。
-                    */}
-                    <span title={task.createdAt ? new Date(task.createdAt).toLocaleString('zh-CN') : undefined}>
-                      {task.createdAt
-                        ? new Date(task.createdAt).toLocaleString('zh-CN', {
-                            month: '2-digit',
-                            day: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            hour12: false,
-                          })
-                        : '已生成'}
-                    </span>
-                    {typeof task.creditCost === 'number' && (
-                      <span
-                        style={{ display: 'block', fontSize: 12, color: 'var(--text-desc)' }}
-                        title="按任务创建时的价格快照，不随改价变化"
-                      >
-                        {task.creditCost === 0 ? '限时免费' : `${task.creditCost} 积分`}
-                      </span>
-                    )}
                     {fullSrc && (
-                      <span className="tool-history-meta-actions">
+                      <div className="tool-history-meta-actions">
                         {trailing?.reuseTask && (
                           <button
                             type="button"
@@ -224,7 +183,18 @@ export function ToolHistoryGrid({
                             <RefreshCw size={13} />
                           </button>
                         )}
-                      </span>
+                        <a
+                          className="tool-history-download"
+                          href={fullSrc}
+                          download={`history-${task.id.slice(-6)}.${extension}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          aria-label="下载历史结果"
+                          title="下载"
+                        >
+                          <Download size={13} />
+                        </a>
+                      </div>
                     )}
                   </div>
                 </article>
@@ -275,9 +245,11 @@ export function ToolHistoryPane({
       {!trailing?.collapsed && (
         <aside className="redraw-history-pane" aria-label={title}>
           <div className="redraw-history-head">
-            <h2>{title}</h2>
+            <h2>
+              <History size={15} />
+              {title}
+            </h2>
             <div className="tool-history-head-actions">
-              {tasks.length > 0 && <span className="tool-history-count">{tasks.length}</span>}
               {trailing && (
                 <button
                   type="button"

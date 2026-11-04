@@ -150,7 +150,7 @@ export class AdminUsersService {
   }
 
   /**
-   * 用户详情: 基本信息 + 三项统计 + 最近任务 + 最近素材。
+   * 用户详情: 基本信息 + 三项统计 + 最近任务 + 最近素材 + 会员权益。
    *
    * 只取最近 20 条而非全量 —— 抽屉是概览用途, 全量会把响应体撑大。
    */
@@ -173,7 +173,14 @@ export class AdminUsersService {
     });
     if (!user) throw new AppError(40400, "用户不存在", 404);
 
-    const [recentTasks, recentAssets] = await Promise.all([
+    const [
+      recentTasks,
+      recentAssets,
+      taskStats,
+      currentMembership,
+      membershipHistory,
+      membershipUsage,
+    ] = await Promise.all([
       this.prisma.generationTask.findMany({
         where: { ownerId: id },
         orderBy: { createdAt: "desc" },
@@ -198,13 +205,35 @@ export class AdminUsersService {
           height: true,
         },
       }),
+      this.prisma.generationTask.groupBy({
+        by: ["status"],
+        where: { ownerId: id },
+        _count: { _all: true },
+      }),
+      // 与 C 端 MembershipService.resolve() 保持同一口径:
+      // cancelled 只表示关闭自动续费, 到期前仍享有已付费周期权益。
+      this.prisma.membership.findFirst({
+        where: {
+          userId: id,
+          status: { in: ["active", "grace", "cancelled"] },
+          expiresAt: { gt: new Date() },
+        },
+        include: { plan: { select: { code: true, name: true } } },
+        orderBy: { expiresAt: "desc" },
+      }),
+      this.prisma.membership.findMany({
+        where: { userId: id },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        include: { plan: { select: { code: true, name: true } } },
+      }),
+      this.prisma.membershipUsage.aggregate({
+        where: { userId: id },
+        _sum: { savedCents: true },
+        _count: { _all: true },
+      }),
     ]);
 
-    const taskStats = await this.prisma.generationTask.groupBy({
-      by: ["status"],
-      where: { ownerId: id },
-      _count: { _all: true },
-    });
     const statusCount: Record<string, number> = {};
     for (const g of taskStats) statusCount[g.status] = g._count._all;
 
@@ -249,6 +278,27 @@ export class AdminUsersService {
         kind: a.kind,
         width: a.width,
         height: a.height,
+      })),
+      membership: {
+        isMember: currentMembership !== null,
+        planCode: currentMembership?.plan.code ?? "free",
+        planName: currentMembership?.plan.name ?? "普通用户",
+        status: currentMembership?.status ?? null,
+        startAt: currentMembership?.startAt ?? null,
+        expiresAt: currentMembership?.expiresAt ?? null,
+        monthlyCredits: currentMembership?.monthlyCreditsSnapshot ?? 0,
+        cancelAtPeriodEnd: currentMembership?.status === "cancelled",
+        savedCents: membershipUsage._sum.savedCents ?? 0,
+        discountedOrders: membershipUsage._count._all,
+      },
+      membershipHistory: membershipHistory.map((m) => ({
+        id: m.id,
+        planCode: m.plan.code,
+        planName: m.plan.name,
+        status: m.status,
+        startAt: m.startAt,
+        expiresAt: m.expiresAt,
+        monthlyCredits: m.monthlyCreditsSnapshot,
       })),
     };
   }
@@ -315,8 +365,9 @@ export class AdminUsersService {
       throw new AppError(40301, "只有管理员可以授予管理员角色", 403);
     }
 
-    // 最后一个 admin 保护
-    if (user.role === "admin") {
+    // 最后一个启用中的 admin 保护。已禁用的 admin 不提供管理入口，
+    // 将其降级不会进一步减少可用管理员数量。
+    if (user.role === "admin" && user.status === "active") {
       const adminCount = await this.prisma.user.count({
         where: { role: "admin", status: "active" },
       });
@@ -414,8 +465,25 @@ export class AdminUsersService {
    *   直接拒绝，请运营改用注销。删掉用户行会让那些记录变成指向不存在账号的
    *   孤儿数据，既对不了账也举不了证。
    */
-  async remove(id: string, hard: boolean, confirm?: string) {
+  async remove(id: string, hard: boolean, confirm: string | undefined, actorId: string) {
     const user = await this.findUser(id);
+
+    if (id === actorId) {
+      throw new AppError(40001, "不能删除自己的账号", 400);
+    }
+    if (user.status === "deleted") {
+      throw new AppError(40001, "该用户已注销，无需重复删除", 400);
+    }
+    // 删除同样不能突破「至少保留一个启用管理员」的底线。默认角色中只有
+    // admin 持有 user.delete，但自定义角色也可能被授予该权限。
+    if (user.role === "admin" && user.status === "active") {
+      const adminCount = await this.prisma.user.count({
+        where: { role: "admin", status: "active" },
+      });
+      if (adminCount <= 1) {
+        throw new AppError(40901, "至少保留一个启用的管理员", 409);
+      }
+    }
 
     if (hard) {
       if (confirm !== "删除") {
@@ -567,12 +635,44 @@ export class AdminUsersService {
   /** 账号注销后遗留的孤儿数据清理说明, 供前端展示 */
   async impactPreview(id: string) {
     const user = await this.findUser(id);
-    const [projects, tasks, assets] = await Promise.all([
+    const [
+      projects,
+      tasks,
+      assets,
+      orders,
+      payments,
+      refunds,
+      invoices,
+      billingOrders,
+      creditLedgerEntries,
+    ] = await Promise.all([
       this.prisma.project.count({ where: { ownerId: id } }),
       this.prisma.generationTask.count({ where: { ownerId: id } }),
       this.prisma.asset.count({ where: { ownerId: id } }),
+      this.prisma.order.count({ where: { userId: id } }),
+      this.prisma.payment.count({ where: { userId: id } }),
+      this.prisma.refund.count({ where: { userId: id } }),
+      this.prisma.invoice.count({ where: { userId: id } }),
+      this.prisma.billingOrder.count({ where: { userId: id } }),
+      this.prisma.creditLedgerEntry.count({ where: { userId: id } }),
     ]);
-    return { email: user.email, projects, tasks, assets };
+    const retained = {
+      orders,
+      payments,
+      refunds,
+      invoices,
+      billingOrders,
+      creditLedgerEntries,
+    };
+    return {
+      email: user.email,
+      projects,
+      tasks,
+      assets,
+      retained,
+      /** 仅作兼容展示；管理端默认始终走软注销。 */
+      hardDeleteAllowed: Object.values(retained).every((count) => count === 0),
+    };
   }
 
   /** 列表 / 导出共用的筛选条件（两处各写一份必然漂移） */
