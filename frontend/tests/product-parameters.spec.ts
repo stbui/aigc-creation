@@ -512,7 +512,10 @@ test.describe('8 个工具页参数与结果态', () => {
       placementWidth: 0.6,
       placementHeight: 0.533333,
     });
-    await expect(page.locator('.pk-result-body')).toBeVisible({ timeout: 15000 });
+    // 扩图结果与构图预览同位置：右栏直接是大图卡，不走通用「生成结果」网格。
+    await expect(
+      page.locator('.pk-workspace.smart-expand-page .product-retouch-result-card'),
+    ).toBeVisible({ timeout: 15000 });
   });
 
   test('商品换色：提交解析后的 targetColor 并兼容 customColor', async ({ page, request }) => {
