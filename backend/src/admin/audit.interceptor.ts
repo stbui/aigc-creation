@@ -173,6 +173,14 @@ const AUDIT_REASON_LABELS: Record<string, string> = {
   "checkin.rule_update": "更新签到规则",
 };
 
+interface BatchAuditEntry {
+  targetId: string;
+  /** 批量结果携带 userId 时，目标对象是用户而不是 URL 中的资源名。 */
+  targetType?: string;
+  success: boolean;
+  message?: string;
+}
+
 /**
  * 操作审计拦截器。
  *
@@ -223,7 +231,7 @@ export class AuditInterceptor implements NestInterceptor {
 
     return next.handle().pipe(
       tap({
-        next: () => {
+        next: (response: unknown) => {
           void this.write(
             request,
             method,
@@ -232,6 +240,7 @@ export class AuditInterceptor implements NestInterceptor {
             declaredTarget,
             true,
             null,
+            response,
           );
         },
         error: (err: unknown) => {
@@ -264,6 +273,7 @@ export class AuditInterceptor implements NestInterceptor {
     declaredTarget: AuditTargetMetadata | undefined,
     success: boolean,
     err: unknown,
+    response?: unknown,
   ): Promise<void> {
     try {
       const { action, targetType, targetId } = this.resolveTarget(
@@ -273,26 +283,114 @@ export class AuditInterceptor implements NestInterceptor {
         request.params,
       );
 
+      const batch = this.batchEntries(response);
+      if (batch) {
+        const summary = {
+          total: batch.length,
+          succeeded: batch.filter((item) => item.success).length,
+          failed: batch.filter((item) => !item.success).length,
+        };
+        for (const item of batch) {
+          try {
+            await this.prisma.adminAuditLog.create({
+              data: this.auditData(
+                request,
+                adminUser,
+                action,
+                item.targetType ?? targetType,
+                item.targetId,
+                this.buildDetail(
+                  action,
+                  {
+                    ...request,
+                    auditExtra: { ...(request.auditExtra ?? {}), batch: summary },
+                  },
+                  item.success,
+                  item.message ? new Error(item.message) : null,
+                ),
+                item.success,
+              ),
+            });
+          } catch (e) {
+            this.logger.warn(
+              `审计写入失败 (不阻断业务): ${method} ${request.url} #${item.targetId} — ${(e as Error).message}`,
+            );
+          }
+        }
+        return;
+      }
+
       await this.prisma.adminAuditLog.create({
-        data: {
-          actorId: adminUser?.id ?? "unknown",
-          actorRole: adminUser?.role ?? "unknown",
+        data: this.auditData(
+          request,
+          adminUser,
           action,
           targetType,
           targetId,
-          detail: JSON.stringify(
-            this.buildDetail(action, request, success, err),
-          ),
-          reason: this.automaticReason(action, request.body),
-          ip: request.ip ?? "unknown",
+          this.buildDetail(action, request, success, err),
           success,
-        },
+        ),
       });
     } catch (e) {
       this.logger.warn(
         `审计写入失败 (不阻断业务): ${method} ${request.url} — ${(e as Error).message}`,
       );
     }
+  }
+
+  private auditData(
+    request: { ip?: string; body?: Record<string, unknown> },
+    adminUser: { id: string; email: string; role: string } | undefined,
+    action: string,
+    targetType: string,
+    targetId: string,
+    detail: Record<string, unknown>,
+    success: boolean,
+  ) {
+    return {
+      actorId: adminUser?.id ?? "unknown",
+      actorRole: adminUser?.role ?? "unknown",
+      action,
+      targetType,
+      targetId,
+      detail: JSON.stringify(detail),
+      reason: this.automaticReason(action, request.body),
+      ip: request.ip ?? "unknown",
+      success,
+    };
+  }
+
+  /**
+   * 识别带逐条结果的批量响应。
+   *
+   * 后台批量接口目前有三类历史形状：`{id, ok}`、`{userId, success}` 与
+   * 账单核对的 `{id, ok, error}`。只有完整可识别时才拆成逐条审计；任一条
+   * 缺少目标 id 或明确成败，就按普通响应回退为一条请求级审计，避免猜测。
+   */
+  private batchEntries(response: unknown): BatchAuditEntry[] | null {
+    if (!response || typeof response !== "object") return null;
+    const results = (response as { results?: unknown }).results;
+    if (!Array.isArray(results) || results.length === 0) return null;
+
+    const entries: BatchAuditEntry[] = [];
+    for (const result of results) {
+      if (!result || typeof result !== "object") return null;
+      const row = result as Record<string, unknown>;
+      const rawTargetId = row.id ?? row.userId;
+      const rawSuccess = row.ok ?? row.success;
+      if (typeof rawTargetId !== "string" || !rawTargetId.trim()) return null;
+      if (typeof rawSuccess !== "boolean") return null;
+      const rawMessage = row.message ?? row.error;
+      entries.push({
+        targetId: rawTargetId.trim(),
+        ...(typeof row.userId === "string" ? { targetType: "users" } : {}),
+        success: rawSuccess,
+        ...(typeof rawMessage === "string" && rawMessage
+          ? { message: rawMessage.slice(0, 200) }
+          : {}),
+      });
+    }
+    return entries;
   }
 
   /**

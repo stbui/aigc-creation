@@ -172,6 +172,123 @@ describe("AuditInterceptor", () => {
     expect(JSON.parse(data.detail)).toEqual({ ok: true });
   });
 
+  it("逐条批量结果分别写审计并保留单条失败原因", async () => {
+    reflector.get.mockImplementation((key: string) =>
+      key === AUDIT_ACTION_KEY ? "task.batch" : undefined,
+    );
+
+    await firstValueFrom(
+      interceptor.intercept(
+        context({
+          originalUrl: "/api/v1/admin/tasks/batch",
+          url: "/api/v1/admin/tasks/batch",
+          method: "POST",
+          body: { ids: ["t1", "t2"], action: "delete" },
+          ip: "127.0.0.1",
+          adminUser: {
+            id: "admin-1",
+            email: "admin@example.com",
+            role: "admin",
+          },
+        }),
+        {
+          handle: () =>
+            of({
+              total: 2,
+              succeeded: 1,
+              failed: 1,
+              results: [
+                { id: "t1", ok: true, data: { id: "t1" } },
+                { id: "t2", ok: false, message: "任务不存在" },
+              ],
+            }),
+        },
+      ),
+    );
+
+    await vi.waitFor(() =>
+      expect(prisma.adminAuditLog.create).toHaveBeenCalledTimes(2),
+    );
+    const [first, second] = prisma.adminAuditLog.create.mock.calls.map(
+      ([call]) => call.data,
+    );
+    expect(first).toMatchObject({
+      action: "task.batch",
+      targetType: "tasks",
+      targetId: "t1",
+      success: true,
+    });
+    expect(JSON.parse(first.detail)).toEqual({
+      ok: true,
+      batch: { total: 2, succeeded: 1, failed: 1 },
+    });
+    expect(second).toMatchObject({
+      action: "task.batch",
+      targetType: "tasks",
+      targetId: "t2",
+      success: false,
+    });
+    expect(JSON.parse(second.detail)).toEqual({
+      ok: false,
+      batch: { total: 2, succeeded: 1, failed: 1 },
+      error: "任务不存在",
+    });
+  });
+
+  it("兼容积分批量的 userId/success 结果形状", async () => {
+    reflector.get.mockImplementation((key: string) =>
+      key === AUDIT_ACTION_KEY ? "credit.batch_adjust" : undefined,
+    );
+
+    await firstValueFrom(
+      interceptor.intercept(
+        context({
+          originalUrl: "/api/v1/admin/credits/batch-adjust",
+          url: "/api/v1/admin/credits/batch-adjust",
+          method: "POST",
+          body: { reason: "补偿" },
+          ip: "127.0.0.1",
+          adminUser: {
+            id: "admin-1",
+            email: "admin@example.com",
+            role: "admin",
+          },
+        }),
+        {
+          handle: () =>
+            of({
+              total: 1,
+              succeeded: 0,
+              failed: 1,
+              results: [
+                {
+                  userId: "user-1",
+                  success: false,
+                  message: "用户不存在",
+                },
+              ],
+            }),
+        },
+      ),
+    );
+
+    await vi.waitFor(() =>
+      expect(prisma.adminAuditLog.create).toHaveBeenCalledTimes(1),
+    );
+    const data = prisma.adminAuditLog.create.mock.calls[0][0].data;
+    expect(data).toMatchObject({
+      action: "credit.batch_adjust",
+      targetType: "users",
+      targetId: "user-1",
+      success: false,
+    });
+    expect(JSON.parse(data.detail)).toEqual({
+      ok: false,
+      batch: { total: 1, succeeded: 0, failed: 1 },
+      error: "用户不存在",
+    });
+  });
+
   it("仅退款核销动作记录处理结果、原因与退款单号", async () => {
     reflector.get.mockImplementation((key: string) =>
       key === AUDIT_ACTION_KEY ? "order.refund_confirm" : undefined,

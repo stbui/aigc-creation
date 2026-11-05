@@ -72,7 +72,6 @@ export class TaskLifecycleService {
         outputAssetId: input.outputAssetIds[0] ?? null,
         outputAssetIds: JSON.stringify(input.outputAssetIds),
         aigcMeta: input.aigcMeta,
-        provider: 'gateway',
         stage: 'done',
         progress: 100,
         leaseOwner: '',

@@ -106,25 +106,44 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
     ],
   },
   {
-    name: "内容",
+    name: "模型与渠道",
     items: [
+      // 供应侧 → 产品侧 → 协议 → 能力 → 人群 → 排障：先配渠道，再把能力暴露成前台模型
       {
-        path: "/admin/legal",
-        label: "法务文档",
-        icon: Scale,
-        permission: "legal.read",
+        path: "/admin/channels",
+        label: "渠道工作台",
+        icon: Network,
+        permission: "channel.read",
       },
       {
-        path: "/admin/notifications",
-        label: "站内消息",
-        icon: MessageSquareText,
-        permission: "message.write",
+        path: "/admin/logical-models",
+        label: "前台模型",
+        icon: Boxes,
+        permission: "logical_model.read",
       },
       {
-        path: "/admin/aigc-label",
-        label: "AI 标识",
-        icon: Tag,
-        permission: "setting.read",
+        path: "/admin/plugins",
+        label: "插件",
+        icon: Puzzle,
+        permission: "plugin.read",
+      },
+      {
+        path: "/admin/capabilities",
+        label: "能力管控",
+        icon: SlidersHorizontal,
+        permission: "capability.read",
+      },
+      {
+        path: "/admin/user-groups",
+        label: "用户分组",
+        icon: UsersRound,
+        permission: "user_group.read",
+      },
+      {
+        path: "/admin/model-calls",
+        label: "调用记录",
+        icon: ListTree,
+        permission: "model.call_read",
       },
     ],
   },
@@ -184,6 +203,7 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
   {
     name: "财务",
     items: [
+      // 收钱 → 开票 → 对账 → 分析：账单口径统一留在财务，不再散落在模型组
       {
         path: "/admin/payments",
         label: "支付充值",
@@ -195,6 +215,42 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
         label: "发票管理",
         icon: FileText,
         permission: "invoice.write",
+      },
+      {
+        path: "/admin/billing-orders",
+        label: "生成账单",
+        icon: FileSpreadsheet,
+        permission: "billing_order.read",
+      },
+      {
+        path: "/admin/finance",
+        label: "财务分析",
+        icon: TrendingUp,
+        // 账单口径的财务汇总：实收只算已结算，挂账单列
+        permission: "model.analytics_read",
+      },
+    ],
+  },
+  {
+    name: "内容与合规",
+    items: [
+      {
+        path: "/admin/legal",
+        label: "法务文档",
+        icon: Scale,
+        permission: "legal.read",
+      },
+      {
+        path: "/admin/notifications",
+        label: "站内消息",
+        icon: MessageSquareText,
+        permission: "message.write",
+      },
+      {
+        path: "/admin/aigc-label",
+        label: "AI 标识",
+        icon: Tag,
+        permission: "setting.read",
       },
     ],
   },
@@ -230,61 +286,6 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
         label: "操作审计",
         icon: ScrollText,
         permission: "audit.read",
-      },
-    ],
-  },
-  {
-    name: "模型",
-    items: [
-      // 供应侧 → 产品侧 → 运营侧：先配渠道，再把能力暴露成前台模型，最后按人群与账单核对
-      {
-        path: "/admin/channels",
-        label: "渠道工作台",
-        icon: Network,
-        permission: "channel.read",
-      },
-      {
-        path: "/admin/logical-models",
-        label: "前台模型",
-        icon: Boxes,
-        permission: "logical_model.read",
-      },
-      {
-        path: "/admin/user-groups",
-        label: "用户分组",
-        icon: UsersRound,
-        permission: "user_group.read",
-      },
-      {
-        path: "/admin/plugins",
-        label: "插件",
-        icon: Puzzle,
-        permission: "plugin.read",
-      },
-      {
-        path: "/admin/capabilities",
-        label: "能力管控",
-        icon: SlidersHorizontal,
-        permission: "capability.read",
-      },
-      {
-        path: "/admin/model-calls",
-        label: "调用记录",
-        icon: ListTree,
-        permission: "model.call_read",
-      },
-      {
-        path: "/admin/billing-orders",
-        label: "生成账单",
-        icon: FileSpreadsheet,
-        permission: "billing_order.read",
-      },
-      // 运营侧：账单口径的财务汇总（实收只算已结算，挂账单列）
-      {
-        path: "/admin/finance",
-        label: "财务分析",
-        icon: TrendingUp,
-        permission: "model.analytics_read",
       },
     ],
   },

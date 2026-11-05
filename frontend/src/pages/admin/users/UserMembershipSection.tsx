@@ -19,9 +19,11 @@ import { formatDateTime } from './utils';
 
 const MEMBERSHIP_STATUS_META = {
   active: { label: '生效中', tone: 'success' },
+  scheduled: { label: '待生效', tone: 'brand' },
   grace: { label: '宽限期', tone: 'warn' },
   cancelled: { label: '已取消续费', tone: 'warn' },
   expired: { label: '已过期', tone: 'muted' },
+  refunded: { label: '已退款', tone: 'muted' },
 } as const;
 
 function MembershipStatus({ status }: { status: string | null }) {
@@ -113,8 +115,10 @@ export function UserMembershipSection({
         {history.length > 0 ? (
           <div className="mt-4">
             <div className="mb-1.5 flex items-baseline justify-between gap-2">
-              <h4 className="text-[13px] font-medium text-foreground">订阅记录</h4>
-              <span className="text-[11px] text-muted-foreground">最近 {history.length} 条</span>
+              <h4 className="text-[13px] font-medium text-foreground">订阅周期</h4>
+              <span className="text-[11px] text-muted-foreground">
+                最近 {history.length} 个周期
+              </span>
             </div>
             <ul className="flex flex-col divide-y divide-border/70">
               {history.map((item) => (

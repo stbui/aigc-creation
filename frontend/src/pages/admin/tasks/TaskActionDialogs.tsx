@@ -1,5 +1,4 @@
-import { BatchResultModal, ConfirmDialog } from '~/admin-ui/primitives';
-import type { BatchSummary } from '../../../types/api';
+import { ConfirmDialog } from '~/admin-ui/primitives';
 import { TaskDeleteDialog } from './TaskDeleteDialog';
 import type { AdminTaskRow, TaskActionKind } from './types';
 import { shortId } from './utils';
@@ -9,26 +8,20 @@ interface TaskActionDialogsProps {
   batchKind: TaskActionKind | null;
   selectedCount: number;
   busy: boolean;
-  batchSummary: BatchSummary<unknown> | null;
-  batchTitle: string;
   onCloseConfirm: () => void;
   onCloseBatch: () => void;
-  onCloseBatchSummary: () => void;
   onConfirm: () => Promise<void>;
   onRunBatch: (kind: TaskActionKind) => Promise<void>;
 }
 
-/** 任务单条动作与批量动作的确认/结果弹框。 */
+/** 任务单条动作与批量动作的确认弹框。 */
 export function TaskActionDialogs({
   confirm,
   batchKind,
   selectedCount,
   busy,
-  batchSummary,
-  batchTitle,
   onCloseConfirm,
   onCloseBatch,
-  onCloseBatchSummary,
   onConfirm,
   onRunBatch,
 }: TaskActionDialogsProps) {
@@ -37,7 +30,7 @@ export function TaskActionDialogs({
       {confirm?.kind === 'delete' && (
         <TaskDeleteDialog
           open
-          title="删除任务及其产出"
+          title="删除任务"
           target={`任务 ${shortId(confirm.task.id)} · ${confirm.task.capabilityName}`}
           loading={busy}
           onCancel={onCloseConfirm}
@@ -92,8 +85,9 @@ export function TaskActionDialogs({
       {batchKind === 'delete' && (
         <TaskDeleteDialog
           open
-          title={`批量删除 ${selectedCount} 个任务`}
-          target={`已选择 ${selectedCount} 个任务；排队中、执行中或已不存在的任务会被跳过。`}
+          title="批量删除任务"
+          target={`已选择 ${selectedCount} 个任务。`}
+          note="只删除已结束且仍存在的任务；排队中、执行中或已不存在的任务会自动跳过。"
           loading={busy}
           onCancel={onCloseBatch}
           onConfirm={() => void onRunBatch(batchKind)}
@@ -143,13 +137,6 @@ export function TaskActionDialogs({
           }
         />
       )}
-
-      <BatchResultModal
-        open={batchSummary !== null}
-        title={batchTitle}
-        summary={batchSummary}
-        onClose={onCloseBatchSummary}
-      />
     </>
   );
 }

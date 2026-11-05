@@ -1,5 +1,4 @@
 import { useCallback, useRef, useState } from 'react';
-import type { BatchSummary } from '../../../types/api';
 import { adminTasksApi } from './api';
 import { useToast } from './hooks';
 import type { AdminTaskRow, TaskActionKind } from './types';
@@ -12,10 +11,9 @@ interface UseTaskActionsOptions {
   onSelectionChange: (keys: string[]) => void;
 }
 
-const BATCH_TITLES: Record<TaskActionKind, string> = {
-  retry: '批量重试结果',
-  cancel: '批量终止结果',
-  delete: '批量删除结果',
+const BATCH_LABELS: Record<Exclude<TaskActionKind, 'delete'>, string> = {
+  retry: '重试',
+  cancel: '终止',
 };
 
 /** 任务单条与批量写操作、确认框状态和提交互斥。 */
@@ -29,8 +27,6 @@ export function useTaskActions({
   const [confirm, setConfirm] = useState<{ kind: TaskActionKind; task: AdminTaskRow } | null>(null);
   const [busy, setBusy] = useState(false);
   const [batchKind, setBatchKind] = useState<TaskActionKind | null>(null);
-  const [batchSummary, setBatchSummary] = useState<BatchSummary<unknown> | null>(null);
-  const [batchTitle, setBatchTitle] = useState('');
   const busyRef = useRef(false);
 
   const begin = useCallback(() => {
@@ -86,11 +82,17 @@ export function useTaskActions({
       if (selected.length === 0 || !begin()) return;
       try {
         const summary = await adminTasksApi.batch(selected, kind);
-        setBatchTitle(BATCH_TITLES[kind]);
-        setBatchSummary(summary);
         setBatchKind(null);
         onSelectionChange([]);
         reload();
+        const label = kind === 'delete' ? '删除' : BATCH_LABELS[kind];
+        if (summary.failed > 0) {
+          toast.warning(
+            `批量${label}完成：成功 ${summary.succeeded} 个，失败 ${summary.failed} 个`,
+          );
+        } else {
+          toast.success(`批量${label}完成：成功 ${summary.succeeded} 个`);
+        }
       } catch (e) {
         toast.error(e instanceof Error ? e.message : '批量操作失败');
       } finally {
@@ -104,14 +106,11 @@ export function useTaskActions({
     confirm,
     busy,
     batchKind,
-    batchSummary,
-    batchTitle,
     openConfirm,
     openBatch,
     runConfirm,
     runBatch,
     closeConfirm: () => setConfirm(null),
     closeBatch: () => setBatchKind(null),
-    closeBatchSummary: () => setBatchSummary(null),
   };
 }

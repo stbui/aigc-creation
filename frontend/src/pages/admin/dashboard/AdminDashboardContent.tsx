@@ -386,13 +386,6 @@ const QUEUE_LIMIT = 6;
 /** 产出条最多几帧：1440 宽下正好两行 */
 const FRAME_LIMIT = 24;
 
-/** 任务通道 → 中文。未登记的原样显示，便于发现新增通道 */
-const PROVIDER_LABELS: Record<string, string> = {
-  gateway: '真实模型',
-  local: '历史本地结果',
-  pending: '待执行',
-};
-
 /**
  * 首屏以下的折叠区。
  *
@@ -500,13 +493,6 @@ function FailureQueue({ tasks, loading }: { tasks: DutyTask[]; loading: boolean 
                   {/* 错误码放在原因前面：排障时先拿码去查日志 */}
                   {t.errorCode ? `${t.errorCode} · ` : ''}
                   {taskErrorLabel(t.errorCode)}
-                  {/*
-                   * `pending` 是建任务时的初值：失败任务上写「待执行」会与
-                   * 同一行的失败原因互相矛盾。
-                   */}
-                  {t.provider && t.provider !== 'pending'
-                    ? ` · ${PROVIDER_LABELS[t.provider] ?? t.provider}`
-                    : ''}
                   {` · ${formatDuration(t.durationMs)}`}
                 </span>
               </span>

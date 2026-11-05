@@ -14,7 +14,11 @@ describe("AdminUsersService 用户生命周期与角色", () => {
       findMany: ReturnType<typeof vi.fn>;
       groupBy: ReturnType<typeof vi.fn>;
     };
-    asset: { findMany: ReturnType<typeof vi.fn> };
+    project: { groupBy: ReturnType<typeof vi.fn> };
+    asset: {
+      findMany: ReturnType<typeof vi.fn>;
+      groupBy: ReturnType<typeof vi.fn>;
+    };
     membership: {
       findFirst: ReturnType<typeof vi.fn>;
       findMany: ReturnType<typeof vi.fn>;
@@ -24,6 +28,10 @@ describe("AdminUsersService 用户生命周期与角色", () => {
   };
   let storage: { get: ReturnType<typeof vi.fn> };
   let lifecycle: { softDelete: ReturnType<typeof vi.fn> };
+  let membershipService: {
+    resolve: ReturnType<typeof vi.fn>;
+    historyOf: ReturnType<typeof vi.fn>;
+  };
   let service: AdminUsersService;
 
   beforeEach(() => {
@@ -93,7 +101,11 @@ describe("AdminUsersService 用户生命周期与角色", () => {
         findMany: vi.fn().mockResolvedValue([]),
         groupBy: vi.fn().mockResolvedValue([]),
       },
-      asset: { findMany: vi.fn().mockResolvedValue([]) },
+      project: { groupBy: vi.fn().mockResolvedValue([]) },
+      asset: {
+        findMany: vi.fn().mockResolvedValue([]),
+        groupBy: vi.fn().mockResolvedValue([]),
+      },
       membership: {
         findFirst: vi.fn().mockResolvedValue(null),
         findMany: vi.fn().mockResolvedValue([]),
@@ -120,12 +132,25 @@ describe("AdminUsersService 用户生命周期与角色", () => {
     lifecycle = {
       softDelete: vi.fn().mockResolvedValue({ id: "user-1", deleted: true }),
     };
+    membershipService = {
+      resolve: vi.fn().mockResolvedValue({
+        isMember: false,
+        planCode: "free",
+        planName: "普通用户",
+        perks: { fastChannel: false, maxConcurrent: 0, addonDiscountBps: 10000 },
+        expiresAt: null,
+        monthlyCredits: 0,
+        cancelAtPeriodEnd: false,
+      }),
+      historyOf: vi.fn().mockResolvedValue([]),
+    };
 
     service = new AdminUsersService(
       prisma as never,
       lifecycle as never,
       {} as never,
       storage as never,
+      membershipService as never,
     );
   });
 
@@ -241,6 +266,73 @@ describe("AdminUsersService 用户生命周期与角色", () => {
     expect(prisma.user.count).not.toHaveBeenCalled();
   });
 
+  it("详情统计排除软删项目及其任务与素材", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      email: "user@example.com",
+      name: "用户",
+      role: "user",
+      status: "active",
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      lastLoginAt: null,
+      phone: null,
+      phoneVerifiedAt: null,
+      tokenVersion: 1,
+    });
+    prisma.project.groupBy.mockResolvedValue([
+      { ownerId: "user-1", _count: { _all: 1 } },
+    ]);
+    prisma.generationTask.groupBy.mockImplementation(
+      async (args: { by: string[] }) =>
+        args.by.includes("status")
+          ? [{ status: "succeeded", _count: { _all: 4 } }]
+          : [{ ownerId: "user-1", _count: { _all: 2 } }],
+    );
+    prisma.asset.groupBy.mockResolvedValue([
+      { ownerId: "user-1", _count: { _all: 3 } },
+    ]);
+
+    const result = await service.detail("user-1");
+
+    expect(result.stats).toMatchObject({
+      projects: 1,
+      tasks: 2,
+      assets: 3,
+      taskStatus: { succeeded: 4, failed: 0, running: 0, queued: 0 },
+    });
+    expect(prisma.generationTask.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { ownerId: "user-1", project: { deletedAt: null } },
+      }),
+    );
+    expect(prisma.asset.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { ownerId: "user-1", project: { deletedAt: null } },
+      }),
+    );
+    expect(prisma.project.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { ownerId: { in: ["user-1"] }, deletedAt: null },
+      }),
+    );
+    expect(prisma.generationTask.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          ownerId: { in: ["user-1"] },
+          project: { deletedAt: null },
+        },
+      }),
+    );
+    expect(prisma.asset.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          ownerId: { in: ["user-1"] },
+          project: { deletedAt: null },
+        },
+      }),
+    );
+  });
+
   it("详情返回有效会员，已取消续费但未到期仍视为会员", async () => {
     const startAt = new Date("2026-10-01T00:00:00.000Z");
     const expiresAt = new Date("2027-01-01T00:00:00.000Z");
@@ -264,14 +356,24 @@ describe("AdminUsersService 用户生命周期与角色", () => {
       monthlyCreditsSnapshot: 1000,
       plan: { code: "pro", name: "专业会员" },
     });
-    prisma.membership.findMany.mockResolvedValue([
+    membershipService.resolve.mockResolvedValue({
+      isMember: true,
+      planCode: "pro",
+      planName: "专业会员",
+      perks: { fastChannel: true, maxConcurrent: 3, addonDiscountBps: 9500 },
+      expiresAt: expiresAt.toISOString(),
+      monthlyCredits: 1000,
+      cancelAtPeriodEnd: true,
+    });
+    membershipService.historyOf.mockResolvedValue([
       {
-        id: "membership-1",
-        status: "cancelled",
+        id: "order-1",
+        planCode: "pro",
+        planName: "专业会员",
+        status: "active",
         startAt,
         expiresAt,
-        monthlyCreditsSnapshot: 1000,
-        plan: { code: "pro", name: "专业会员" },
+        monthlyCredits: 1000,
       },
     ]);
     prisma.membershipUsage.aggregate.mockResolvedValue({
@@ -287,7 +389,7 @@ describe("AdminUsersService 用户生命周期与角色", () => {
       planName: "专业会员",
       status: "cancelled",
       startAt,
-      expiresAt,
+      expiresAt: expiresAt.toISOString(),
       monthlyCredits: 1000,
       cancelAtPeriodEnd: true,
       savedCents: 2880,
@@ -295,10 +397,10 @@ describe("AdminUsersService 用户生命周期与角色", () => {
     });
     expect(result.membershipHistory).toEqual([
       {
-        id: "membership-1",
+        id: "order-1",
         planCode: "pro",
         planName: "专业会员",
-        status: "cancelled",
+        status: "active",
         startAt,
         expiresAt,
         monthlyCredits: 1000,
@@ -328,14 +430,15 @@ describe("AdminUsersService 用户生命周期与角色", () => {
       phoneVerifiedAt: null,
       _count: { projects: 0, tasks: 0, assets: 0 },
     });
-    prisma.membership.findMany.mockResolvedValue([
+    membershipService.historyOf.mockResolvedValue([
       {
         id: "membership-old",
+        planCode: "basic",
+        planName: "基础会员",
         status: "expired",
         startAt: new Date("2026-08-01T00:00:00.000Z"),
         expiresAt: expiredAt,
-        monthlyCreditsSnapshot: 500,
-        plan: { code: "basic", name: "基础会员" },
+        monthlyCredits: 500,
       },
     ]);
 

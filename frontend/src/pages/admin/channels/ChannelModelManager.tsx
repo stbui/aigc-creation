@@ -390,6 +390,7 @@ export function ChannelModelManager({
 
           <ChannelModelTable
             models={models}
+            channelEnabled={channel.enabled}
             loading={loading}
             error={error}
             healthById={healthById}

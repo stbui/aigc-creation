@@ -69,6 +69,84 @@ const TIME_FIELD_OPTIONS = [
   { value: 'credited', label: '按入账时间' },
 ];
 
+type PaymentItem = AdminPaymentOrderDetail['items'][number];
+type PaymentAttempt = AdminPaymentOrderDetail['payments'][number];
+
+function paymentItemColumns(currency: string): Array<AdminColumn<PaymentItem>> {
+  return [
+    { key: 'name', title: '商品', render: (item) => item.name },
+    {
+      key: 'sku',
+      title: 'SKU',
+      render: (item) => <code className="font-mono text-xs">{item.sku}</code>,
+    },
+    {
+      key: 'price',
+      title: '单价',
+      align: 'right',
+      render: (item) => (
+        <span className="tabular-nums">{moneyText(item.priceCents, currency)}</span>
+      ),
+    },
+    {
+      key: 'credits',
+      title: '积分',
+      align: 'right',
+      render: (item) => <span className="tabular-nums">{item.credits}</span>,
+    },
+    {
+      key: 'quantity',
+      title: '数量',
+      align: 'right',
+      render: (item) => <span className="tabular-nums">{item.quantity}</span>,
+    },
+  ];
+}
+
+function paymentAttemptColumns(currency: string): Array<AdminColumn<PaymentAttempt>> {
+  return [
+    { key: 'status', title: '状态', render: (payment) => payment.status },
+    {
+      key: 'provider',
+      title: '渠道',
+      render: (payment) =>
+        PROVIDER_LABELS[payment.providerId as keyof typeof PROVIDER_LABELS] ??
+        payment.providerId,
+    },
+    {
+      key: 'providerRef',
+      title: '渠道单据号',
+      render: (payment) => (
+        <code className="font-mono text-xs break-all">{payment.providerRef ?? '—'}</code>
+      ),
+    },
+    {
+      key: 'payTransactionId',
+      title: '交易号',
+      render: (payment) => (
+        <code className="font-mono text-xs">{payment.payTransactionId ?? '—'}</code>
+      ),
+    },
+    {
+      key: 'amount',
+      title: '金额',
+      align: 'right',
+      render: (payment) => (
+        <span className="tabular-nums">{moneyText(payment.amountCents, currency)}</span>
+      ),
+    },
+    {
+      key: 'createdAt',
+      title: '创建时间',
+      render: (payment) => (
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {payment.createdAt.replace('T', ' ').slice(0, 19)}
+        </span>
+      ),
+    },
+  ];
+}
+
 export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
   const toast = useToast();
   const { can } = useAdmin();
@@ -662,32 +740,13 @@ function PaymentOrderDetailDrawer({
             <div className="flex flex-col gap-2">
               <span className="text-xs font-medium text-foreground">商品明细</span>
               <div className="overflow-hidden rounded-lg border border-border">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/60 text-xs text-muted-foreground">
-                    <tr>
-                      <th className="px-3 py-2 text-left font-medium">商品</th>
-                      <th className="px-3 py-2 text-left font-medium">SKU</th>
-                      <th className="px-3 py-2 text-right font-medium">单价</th>
-                      <th className="px-3 py-2 text-right font-medium">积分</th>
-                      <th className="px-3 py-2 text-right font-medium">数量</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {order.items.map((item) => (
-                      <tr key={item.id} className="border-t border-border">
-                        <td className="px-3 py-2">{item.name}</td>
-                        <td className="px-3 py-2">
-                          <code className="font-mono text-xs">{item.sku}</code>
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums">
-                          {moneyText(item.priceCents, order.currency)}
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums">{item.credits}</td>
-                        <td className="px-3 py-2 text-right tabular-nums">{item.quantity}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <AdminDataTable<PaymentItem>
+                  rows={order.items}
+                  columns={paymentItemColumns(order.currency)}
+                  rowKey={(item) => item.id}
+                  density="compact"
+                  emptyText="没有商品明细。"
+                />
               </div>
             </div>
           )}
@@ -698,43 +757,13 @@ function PaymentOrderDetailDrawer({
               <p className="text-sm text-muted-foreground">暂无支付尝试</p>
             ) : (
               <div className="overflow-hidden rounded-lg border border-border">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/60 text-xs text-muted-foreground">
-                    <tr>
-                      <th className="px-3 py-2 text-left font-medium">状态</th>
-                      <th className="px-3 py-2 text-left font-medium">渠道</th>
-                      <th className="px-3 py-2 text-left font-medium">渠道单据号</th>
-                      <th className="px-3 py-2 text-left font-medium">交易号</th>
-                      <th className="px-3 py-2 text-right font-medium">金额</th>
-                      <th className="px-3 py-2 text-left font-medium">创建时间</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {order.payments.map((payment) => (
-                      <tr key={payment.id} className="border-t border-border">
-                        <td className="px-3 py-2">{payment.status}</td>
-                        <td className="px-3 py-2">
-                          {PROVIDER_LABELS[payment.providerId as keyof typeof PROVIDER_LABELS] ??
-                            payment.providerId}
-                        </td>
-                        <td className="px-3 py-2">
-                          <code className="font-mono text-xs break-all">
-                            {payment.providerRef ?? '—'}
-                          </code>
-                        </td>
-                        <td className="px-3 py-2">
-                          <code className="font-mono text-xs">{payment.payTransactionId ?? '—'}</code>
-                        </td>
-                        <td className="px-3 py-2 text-right tabular-nums">
-                          {moneyText(payment.amountCents, order.currency)}
-                        </td>
-                        <td className="px-3 py-2 text-xs text-muted-foreground tabular-nums">
-                          {payment.createdAt.replace('T', ' ').slice(0, 19)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                <AdminDataTable<PaymentAttempt>
+                  rows={order.payments}
+                  columns={paymentAttemptColumns(order.currency)}
+                  rowKey={(payment) => payment.id}
+                  density="compact"
+                  emptyText="暂无支付尝试"
+                />
               </div>
             )}
           </div>

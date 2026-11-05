@@ -94,7 +94,7 @@
   --success-soft-bg: #eaf7f2;
   /* 2026-11-03 压到 AA: 原 #2f8f6b 在 --success-soft-bg 上 3.63:1、白底 3.99:1 */
   --success-text: #27795a;
-  /* 成功态描边 (2026-10-20 新增, 供产出来源徽标等场景;
+  /* 成功态描边 (2026-10-20 新增;
      色相取 success-text 的浅调, 与 success-soft-bg 搭配不刺眼) */
   --success-border: #bfe6d6;
   --info-soft-bg: #93c5fd;
@@ -1827,40 +1827,7 @@ img[data-broken='1'] {
   user-select: none;
 }
 
-/* ── 产出来源徽标 (components/ProviderBadge.tsx) ────────────────────
- * 绿 = 真实模型通道, 琥珀 = 本地算法停用前的历史结果。未产出 /
- * 未知来源不渲染, 刻意不留第三种颜色 ——
- * 灰标会被读成"第三种质量", 而它其实只是"还没结果"。
- * ────────────────────────────────────────────────────────────────── */
-.provider-badge {
-  display: inline-flex;
-  align-items: center;
-  margin-left: 6px;
-  padding: 0 6px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-tag);
-  font-size: 12px;
-  line-height: 18px;
-  font-weight: 600;
-  white-space: nowrap;
-  vertical-align: middle;
-}
-
-.provider-badge.is-remote {
-  color: var(--success-text);
-  background: var(--success-soft-bg);
-  border-color: var(--success-border);
-}
-
-.provider-badge.is-local {
-  color: var(--warn-text);
-  background: var(--warn-bg);
-  border-color: var(--warn-border);
-}
-/* 在已有 gap 的 flex 行里 (结果卡标题行) 不再叠外边距 */
-.pk-result-variant .provider-badge {
-  margin-left: 0;
-}
+/* ── 产出结果卡片 ────────────────────────────────────────────────── */
 
 .pk-result-media {
   aspect-ratio: var(--pk-aspect, 1 / 1);

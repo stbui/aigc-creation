@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { AppliedFilter, SelectFieldOption } from '~/admin-ui/primitives';
 import { adminTasksApi } from './api';
-import { PROVIDER_LABELS, PROVIDER_OPTIONS, STATUS_OPTIONS } from './constants';
+import { STATUS_OPTIONS } from './constants';
 import { useAdminList, useAdminUrlFilterSync, useToast } from './hooks';
 import type { AdminTaskListResult } from '../../../types/api';
 
@@ -19,13 +19,6 @@ function numberValue(value: unknown, fallback: number): number {
 function readStatus(params: URLSearchParams): string | undefined {
   const value = params.get('status') ?? undefined;
   return value && STATUS_VALUES.has(value) ? value : undefined;
-}
-
-function readProvider(params: URLSearchParams): string | undefined {
-  const value = params.get('provider') ?? undefined;
-  return value && Object.prototype.hasOwnProperty.call(PROVIDER_LABELS, value)
-    ? value
-    : undefined;
 }
 
 interface UseTaskFiltersOptions {
@@ -45,7 +38,6 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
 
   const initialStatus = readStatus(searchParams);
   const initialCapability = searchParams.get('capability') ?? undefined;
-  const initialProvider = readProvider(searchParams);
   const initialOwner = searchParams.get('userId') ?? '';
   const initialProject = searchParams.get('projectId') ?? '';
   const initialFrom = searchParams.get('from') ?? '';
@@ -53,7 +45,6 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
 
   const [status, setStatus] = useState<string | undefined>(initialStatus);
   const [capability, setCapability] = useState<string | undefined>(initialCapability);
-  const [provider, setProvider] = useState<string | undefined>(initialProvider);
   const [owner, setOwner] = useState(initialOwner);
   const [project, setProject] = useState(initialProject);
   const [from, setFrom] = useState(initialFrom);
@@ -75,7 +66,6 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
       pageSize: numberValue(raw.pageSize, 20),
       status: stringValue(raw.status),
       capability: stringValue(raw.capability),
-      provider: stringValue(raw.provider),
       userId: stringValue(raw.userId),
       projectId: stringValue(raw.projectId),
       from: stringValue(raw.from),
@@ -89,7 +79,6 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
       sort: 'createdAt:desc',
       ...(initialStatus ? { status: initialStatus } : {}),
       ...(initialCapability ? { capability: initialCapability } : {}),
-      ...(initialProvider ? { provider: initialProvider } : {}),
       ...(initialOwner ? { userId: initialOwner } : {}),
       ...(initialProject ? { projectId: initialProject } : {}),
       ...(initialFrom ? { from: initialFrom } : {}),
@@ -119,7 +108,6 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
   useAdminUrlFilterSync({
     status: stringValue(params.status),
     capability: stringValue(params.capability),
-    provider: stringValue(params.provider),
     userId: stringValue(params.userId),
     projectId: stringValue(params.projectId),
     from: stringValue(params.from),
@@ -135,22 +123,8 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
     [data],
   );
 
-  /** 通道选项跟着后端的全量聚合走，未知/历史值不会变成非法筛选项。 */
-  const providerOptions = useMemo<SelectFieldOption[]>(() => {
-    const facets = data?.providers;
-    if (!facets?.length) return PROVIDER_OPTIONS;
-    const options = facets
-      .filter((item) => PROVIDER_OPTIONS.some((option) => option.value === item.provider))
-      .map((item) => ({
-        value: item.provider,
-        label: `${PROVIDER_LABELS[item.provider] ?? item.provider}（${item.count}）`,
-      }));
-    return options.length > 0 ? options : PROVIDER_OPTIONS;
-  }, [data]);
-
   const appliedStatus = stringValue(params.status);
   const appliedCapability = stringValue(params.capability);
-  const appliedProvider = stringValue(params.provider);
   const appliedOwner = stringValue(params.userId) ?? '';
   const appliedProject = stringValue(params.projectId) ?? '';
   const appliedFrom = stringValue(params.from) ?? '';
@@ -159,7 +133,7 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
 
   /** 空态与结果卡按已生效查询判断，输入框里尚未提交的草稿不算。 */
   const hasFilter = Boolean(
-    appliedStatus || appliedCapability || appliedProvider || appliedOwner || appliedProject || appliedFrom || appliedTo,
+    appliedStatus || appliedCapability || appliedOwner || appliedProject || appliedFrom || appliedTo,
   );
 
   const applyFilters = () => {
@@ -170,7 +144,6 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
     setQuery({
       status,
       capability,
-      provider,
       userId: owner.trim() || undefined,
       projectId: nextProject || undefined,
       // datetime-local 的值没有时区，后端 parseDate 与本机 new Date() 口径一致。
@@ -184,7 +157,6 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
     appliedUrlProject.current = '';
     setStatus(undefined);
     setCapability(undefined);
-    setProvider(undefined);
     setOwner('');
     setProject('');
     setFrom('');
@@ -193,7 +165,6 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
     setQuery({
       status: undefined,
       capability: undefined,
-      provider: undefined,
       userId: undefined,
       projectId: undefined,
       from: undefined,
@@ -211,11 +182,6 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
     setCapability(undefined);
     notifyQueryChange();
     setQuery({ capability: undefined });
-  };
-  const clearProvider = () => {
-    setProvider(undefined);
-    notifyQueryChange();
-    setQuery({ provider: undefined });
   };
   const clearOwner = () => {
     setOwner('');
@@ -252,13 +218,6 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
           key: 'capability',
           label: `能力：${appliedCapability}`,
           onClear: clearCapability,
-        }
-      : null,
-    appliedProvider
-      ? {
-          key: 'provider',
-          label: `通道：${PROVIDER_LABELS[appliedProvider] ?? appliedProvider}`,
-          onClear: clearProvider,
         }
       : null,
     appliedOwner
@@ -303,7 +262,6 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
       await adminTasksApi.exportCsv({
         status: appliedStatus,
         capability: appliedCapability,
-        provider: appliedProvider,
         userId: appliedOwner || undefined,
         projectId: appliedProject || undefined,
         from: appliedFrom || undefined,
@@ -320,7 +278,6 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
     appliedFrom,
     appliedOwner,
     appliedProject,
-    appliedProvider,
     appliedStatus,
     appliedTo,
     toast,
@@ -331,8 +288,6 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
     setStatus,
     capability,
     setCapability,
-    provider,
-    setProvider,
     owner,
     setOwner,
     project,
@@ -342,7 +297,6 @@ export function useTaskFilters({ onQueryChange }: UseTaskFiltersOptions = {}) {
     to,
     setTo,
     capOptions,
-    providerOptions,
     appliedChips,
     hasFilter,
     data,

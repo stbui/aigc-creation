@@ -1,7 +1,7 @@
 import { Download, ImagePlus, Layers, RefreshCw, Sparkles } from 'lucide-react';
 
 import { EMPTY_HINT, EMPTY_TITLE } from './constants';
-import { ProviderBadge, ToolGeneratingState, type ToolResult } from './components';
+import { ToolGeneratingState, type ToolResult } from './components';
 import { assetThumbUrl } from './api';
 import { fusionFailureText, fusionResultStatusOf } from './utils';
 
@@ -138,8 +138,6 @@ export function MultiFusionResultPanel({
                 {activeResult.width}×{activeResult.height}
               </span>
             )}
-            {/* 以 pollToResult 的 provider 为准；新任务恒为模型，历史 local 如实保留 */}
-            <ProviderBadge provider={activeResult.provider} className="mif-provider" />
           </div>
           <div className="multi-image-fusion-thumbnails">
             {results.map((item, index) => (

@@ -513,7 +513,6 @@ async function main() {
           createdAt: new Date(Date.now() - 16 * 60_000),
           inputAssetIds: '[]',
           params: JSON.stringify(params),
-          provider: 'gateway',
           creditCost: Number(draft.amountMicrocredits / MICRO),
           logicalModelId: model.id,
           logicalModelRevisionId: routed.revisionId,

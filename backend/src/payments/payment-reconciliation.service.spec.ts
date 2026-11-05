@@ -13,6 +13,7 @@ describe('PaymentReconciliationService.assertBillDate', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
     );
 
     expect(() => (service as any).assertBillDate('2026-11-05')).toThrow(
@@ -138,6 +139,13 @@ function makeHarness(order: Record<string, unknown>) {
     prisma as never,
     {} as never,
     {} as never,
+    {
+      recordManual: vi.fn().mockResolvedValue({}),
+      recordOpen: vi.fn().mockResolvedValue({}),
+      autoRefundCancelledPayment: vi
+        .fn()
+        .mockResolvedValue({ case: {}, outcome: 'manual_review' }),
+    } as never,
   );
   return { service, stored };
 }

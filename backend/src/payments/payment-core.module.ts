@@ -4,6 +4,7 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { PaymentCipher } from './payment-cipher';
 import { PaymentConfigService } from './payment-config.service';
 import { PaymentGateway } from './payment-gateway';
+import { PaymentExceptionService } from './payment-exception.service';
 
 /**
  * 支付域的**叶子模块**（2026-11 支付重构）。
@@ -20,7 +21,17 @@ import { PaymentGateway } from './payment-gateway';
  */
 @Module({
   imports: [ConfigModule, PrismaModule],
-  providers: [PaymentCipher, PaymentConfigService, PaymentGateway],
-  exports: [PaymentCipher, PaymentConfigService, PaymentGateway],
+  providers: [
+    PaymentCipher,
+    PaymentConfigService,
+    PaymentGateway,
+    PaymentExceptionService,
+  ],
+  exports: [
+    PaymentCipher,
+    PaymentConfigService,
+    PaymentGateway,
+    PaymentExceptionService,
+  ],
 })
 export class PaymentCoreModule {}

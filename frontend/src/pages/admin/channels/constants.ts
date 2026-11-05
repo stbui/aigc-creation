@@ -76,8 +76,8 @@ export const CAPABILITY_OPTIONS = [
  * 线路选用。导入上游目录后模型默认停用且未定价，这一档就是补价工作队列。
  */
 export const STATUS_FILTER_OPTIONS = [
-  { value: 'enabled', label: '已启用' },
-  { value: 'disabled', label: '已停用' },
+  { value: 'enabled', label: '模型启用' },
+  { value: 'disabled', label: '模型停用' },
   { value: 'unpriced', label: '未定价' },
 ];
 
@@ -89,7 +89,7 @@ export type AllModelsStatusFilter = 'all' | 'enabled' | 'disabled' | 'unhealthy'
 export const ALL_MODELS_STATUS_OPTIONS: Array<{ value: AllModelsStatusFilter; label: string }> = [
   { value: 'all', label: '全部' },
   { value: 'enabled', label: '启用' },
-  { value: 'disabled', label: '停用' },
+  { value: 'disabled', label: '停用（模型/渠道）' },
   { value: 'unhealthy', label: '不健康' },
   { value: 'unpriced', label: '未定价' },
 ];

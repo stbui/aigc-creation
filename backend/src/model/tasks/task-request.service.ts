@@ -133,7 +133,12 @@ export class TaskRequestService {
     const maskId = this.maskAssetId(context.params);
     if (!maskId) return null;
     const source = await this.prisma.asset.findFirst({
-      where: { id: context.inputAssetIds[0] ?? '', ownerId: context.ownerId },
+      where: {
+        id: context.inputAssetIds[0] ?? '',
+        ownerId: context.ownerId,
+        status: 'visible',
+        project: { deletedAt: null },
+      },
       select: { id: true, format: true, sourceUrl: true, storageKey: true, storageBackend: true },
     });
     const mask = await this.media.maskReference(maskId, context.ownerId, source ?? undefined);

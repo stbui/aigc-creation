@@ -95,7 +95,7 @@
 | F-05 | 风格锁定 | 会话级 style lock，保证多图产出风格一致 |
 | F-06 | 步骤级执行与状态机 | 每个 step 独立状态，失败可单步重跑 |
 | F-07 | 积分计费与退款 | 沿用积分钱包（`CreditAccount` / `CreditLot` / `CreditReservationItem`）与 `GenerationTask.creditCost` 快照语义；失败步自动退款 |
-| F-08 | 来源如实标注 | 新任务 `provider` 恒为 `gateway`；无可用模型线路时如实失败并退款，不产出占位结果 |
+| F-08 | 来源如实标注 | 无可用模型线路时如实失败并退款，不产出占位结果 |
 | F-09 | 产出入库 | Agent 产出一律落 `Asset` + `GenerationTask`，进「我的作品」 |
 | F-10 | 可观测 | 每次 LLM 调用写 `ApiCallLog`（复用现有表，`source='agent'`、`billable=false`） |
 

@@ -1,4 +1,4 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 import type { PropsWithChildren } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -28,7 +28,6 @@ const TASK: AdminTaskRow = {
   capability: 'main_image',
   capabilityName: '主图生成',
   status: 'failed',
-  provider: 'gateway',
   errorCode: 'MODEL_ERROR',
   creditCost: 10,
   retriedFromId: null,
@@ -79,7 +78,7 @@ beforeEach(() => {
 });
 
 describe('useTaskActions', () => {
-  it('批量操作成功后清空选中、刷新列表并展示逐条结果', async () => {
+  it('批量删除成功后清空选中、刷新列表且不再弹出逐条结果', async () => {
     let resolveBatch: ((value: BatchSummary<unknown>) => void) | undefined;
     batchMock.mockImplementation(
       () =>
@@ -107,8 +106,20 @@ describe('useTaskActions', () => {
     expect(onSelectionChange).toHaveBeenCalledWith([]);
     expect(reload).toHaveBeenCalledTimes(1);
     expect(result.current.batchKind).toBeNull();
-    expect(result.current.batchSummary).toEqual(BATCH_SUMMARY);
-    expect(result.current.batchTitle).toBe('批量删除结果');
+    expect(result.current.busy).toBe(false);
+  });
+
+  it('批量重试成功后清空选中并刷新列表', async () => {
+    batchMock.mockResolvedValue(BATCH_SUMMARY);
+    const { result, onSelectionChange, reload } = renderActions();
+
+    await act(async () => {
+      await result.current.runBatch('retry');
+    });
+
+    expect(onSelectionChange).toHaveBeenCalledWith([]);
+    expect(reload).toHaveBeenCalledTimes(1);
+    expect(result.current.batchKind).toBeNull();
     expect(result.current.busy).toBe(false);
   });
 
@@ -123,7 +134,6 @@ describe('useTaskActions', () => {
     expect(onSelectionChange).not.toHaveBeenCalledWith([]);
     expect(reload).not.toHaveBeenCalled();
     expect(result.current.busy).toBe(false);
-    await waitFor(() => expect(result.current.batchSummary).toBeNull());
   });
 
   it('单条删除成功后关闭详情并刷新列表', async () => {

@@ -74,7 +74,13 @@ export class TaskMediaService {
     inputAssetIds: string[],
     options: { absoluteBaseUrl?: string } = {},
   ): Promise<MediaReference[]> {
-    const assets = await this.prisma.asset.findMany({ where: { id: { in: inputAssetIds } } });
+    const assets = await this.prisma.asset.findMany({
+      where: {
+        id: { in: inputAssetIds },
+        status: 'visible',
+        project: { deletedAt: null },
+      },
+    });
     const byId = new Map(assets.map((asset) => [asset.id, asset]));
     const references: MediaReference[] = [];
     for (const [index, id] of inputAssetIds.entries()) {
@@ -112,7 +118,13 @@ export class TaskMediaService {
     if (!id) return null;
 
     const asset = await this.prisma.asset.findFirst({
-      where: { id, ownerId, kind: 'original' },
+      where: {
+        id,
+        ownerId,
+        kind: 'original',
+        status: 'visible',
+        project: { deletedAt: null },
+      },
       select: { id: true, sourceUrl: true, storageKey: true, storageBackend: true, format: true },
     });
     if (!asset) throw new Error('遮罩素材不存在或无权限');

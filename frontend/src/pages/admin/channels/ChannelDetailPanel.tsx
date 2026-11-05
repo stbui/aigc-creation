@@ -63,7 +63,7 @@ export function ChannelDetailPanel({
                 <StatusTag
                   status={selected.enabled ? 'channel-enabled' : 'channel-disabled'}
                   tone={selected.enabled ? 'success' : 'muted'}
-                  label={selected.enabled ? '已启用' : '已停用'}
+                  label={selected.enabled ? '渠道已启用' : '渠道已停用'}
                 />
               </span>
             </span>
@@ -126,7 +126,7 @@ export function ChannelDetailPanel({
                 disabled={!writable || saving}
                 onClick={() => onToggle(selected)}
               >
-                {selected.enabled ? '停用' : '启用'}
+                {selected.enabled ? '停用渠道' : '启用渠道'}
               </ActionButton>
               <ActionButton
                 variant="ghost"

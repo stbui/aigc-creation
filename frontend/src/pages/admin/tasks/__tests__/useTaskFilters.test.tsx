@@ -24,7 +24,6 @@ const EMPTY_RESULT: AdminTaskListResult = {
   result: { items: [], total: 0, page: 1, pageSize: 20 },
   congestion: { queued: 0, running: 0, failedLastHour: 0, runningThreshold: 50 },
   capabilities: [],
-  providers: [],
 };
 
 function TestWrapper({ children }: PropsWithChildren) {
@@ -98,7 +97,6 @@ describe('useTaskFilters', () => {
     expect(exportCsvMock).toHaveBeenCalledWith({
       status: 'failed',
       capability: undefined,
-      provider: undefined,
       userId: 'user-applied',
       projectId: undefined,
       from: '2026-01-01T00:00',

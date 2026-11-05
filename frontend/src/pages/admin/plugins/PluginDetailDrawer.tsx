@@ -1,6 +1,40 @@
-import { ActionButton, Descriptions, Drawer, Notice, StatusTag } from '~/admin-ui/primitives';
+import {
+  ActionButton,
+  AdminDataTable,
+  Descriptions,
+  Drawer,
+  Notice,
+  StatusTag,
+  type AdminColumn,
+} from '~/admin-ui/primitives';
 import { contributionText } from './constants';
 import type { PluginView } from '../../../types/model';
+
+type PluginProvider = PluginView['providers'][number];
+
+const PROVIDER_COLUMNS: Array<AdminColumn<PluginProvider>> = [
+  {
+    key: 'id',
+    title: 'ID',
+    render: (provider) => <span className="font-mono">{provider.id}</span>,
+  },
+  { key: 'label', title: '名称', render: (provider) => provider.label },
+  {
+    key: 'capabilities',
+    title: '能力',
+    render: (provider) => provider.capabilities.join(', ') || '—',
+  },
+  {
+    key: 'registered',
+    title: '注册',
+    render: (provider) =>
+      provider.registered ? (
+        <StatusTag status="registered" tone="success" label="已注册" />
+      ) : (
+        <StatusTag status="unregistered" tone="muted" label="未注册" />
+      ),
+  },
+];
 
 /**
  * 插件详情。
@@ -73,32 +107,13 @@ export function PluginDetailDrawer({
 
           <div>
             <div className="mb-1 text-xs font-semibold text-foreground">Provider</div>
-            <table className="w-full text-[12px]">
-              <thead className="bg-muted text-muted-foreground">
-                <tr>
-                  <th className="px-2 py-1.5 text-left">ID</th>
-                  <th className="px-2 py-1.5 text-left">名称</th>
-                  <th className="px-2 py-1.5 text-left">能力</th>
-                  <th className="px-2 py-1.5 text-left">注册</th>
-                </tr>
-              </thead>
-              <tbody>
-                {plugin.providers.map((provider) => (
-                  <tr key={provider.id} className="border-t border-border">
-                    <td className="px-2 py-1.5 font-mono">{provider.id}</td>
-                    <td className="px-2 py-1.5">{provider.label}</td>
-                    <td className="px-2 py-1.5">{provider.capabilities.join(', ') || '—'}</td>
-                    <td className="px-2 py-1.5">
-                      {provider.registered ? (
-                        <StatusTag status="registered" tone="success" label="已注册" />
-                      ) : (
-                        <StatusTag status="unregistered" tone="muted" label="未注册" />
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <AdminDataTable<PluginProvider>
+              rows={plugin.providers}
+              columns={PROVIDER_COLUMNS}
+              rowKey={(provider) => provider.id}
+              density="compact"
+              emptyText="该插件没有声明 Provider。"
+            />
           </div>
 
           <div>

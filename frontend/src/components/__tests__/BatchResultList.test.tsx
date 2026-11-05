@@ -36,6 +36,9 @@ interface ListOverrides {
   emptyTitle?: string;
   emptyDesc?: string;
   emptyChildren?: ReactNode;
+  layout?: 'strip' | 'card';
+  cellLabelOf?: (entry: GalleryItem, index: number) => string;
+  renderRowTitle?: (row: Row) => ReactNode;
   renderRowMeta?: (row: Row) => ReactNode;
   renderSourceCaption?: (row: Row) => ReactNode;
 }
@@ -56,6 +59,9 @@ function renderList(over: ListOverrides = {}) {
         onDeleteRow={onDeleteRow}
         downloadNamePrefix="demo"
         labelOf={labelOf}
+        layout={over.layout}
+        cellLabelOf={over.cellLabelOf}
+        renderRowTitle={over.renderRowTitle}
         renderRowMeta={over.renderRowMeta}
         renderSourceCaption={over.renderSourceCaption ?? (() => '商品原图')}
       />
@@ -174,5 +180,79 @@ describe('BatchResultList 单元格交互', () => {
     const anchor = click.mock.instances[0] as HTMLAnchorElement;
     expect(anchor.download).toBe('demo-首屏图-123456.jpeg');
     click.mockRestore();
+  });
+});
+
+describe('BatchResultList 卡片布局', () => {
+  it('按标题、参数、原图与三列图片分层展示', () => {
+    const rows = rowsOf([
+      item({
+        id: 't1',
+        url: '/uploads/a.png',
+        inputUrls: ['/uploads/src.png'],
+        params: { batchId: 'b1', batchIndex: 1, description: '轻奢沙发' },
+      }),
+      item({ id: 't2', url: '/uploads/b.png', params: { batchId: 'b1', batchIndex: 2 } }),
+      item({ id: 't3', url: '/uploads/c.png', params: { batchId: 'b1', batchIndex: 3 } }),
+    ]);
+
+    renderList({
+      rows,
+      layout: 'card',
+      cellLabelOf: (_, index) => `图片 ${index + 1}`,
+      renderRowTitle: (row) => (
+        <>
+          <strong>{row.prompt}</strong>
+          <time>2026-11-05 10:00</time>
+        </>
+      ),
+      renderRowMeta: () => (
+        <>
+          <span>1k</span>
+          <span>9:16</span>
+          <span>已完成</span>
+        </>
+      ),
+      renderSourceCaption: () => '轻奢沙发',
+    });
+
+    expect(screen.getByText('轻奢沙发')).toBeVisible();
+    expect(screen.getByText('2026-11-05 10:00')).toBeVisible();
+    expect(screen.getByText('1k')).toBeVisible();
+    expect(screen.getByText('9:16')).toBeVisible();
+    expect(screen.queryByText('本地原图')).not.toBeInTheDocument();
+    expect(document.querySelector('.pd-result-card-source img')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '一键下载本批次 3 张结果图' })).toBeEnabled();
+
+    const grid = document.querySelector('.pd-result-card-grid');
+    expect(grid).toBeInTheDocument();
+    expect(grid?.querySelectorAll('.pd-result-cell')).toHaveLength(3);
+    expect(within(grid as HTMLElement).getByText('图片 1')).toBeVisible();
+    expect(within(grid as HTMLElement).getByText('图片 3')).toBeVisible();
+  });
+
+  it('一键下载会依次触发本批次全部已完成图片', () => {
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    renderList({
+      rows: rowsOf([
+        item({ id: 'ready001', url: '/uploads/a.png' }),
+        item({ id: 'ready002', url: '/uploads/b.png', params: { batchId: 'b1', batchIndex: 2 } }),
+      ]),
+      layout: 'card',
+      cellLabelOf: (_, index) => `图片 ${index + 1}`,
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: '一键下载本批次 2 张结果图' }));
+
+    expect(click).toHaveBeenCalledTimes(2);
+    expect((click.mock.instances[0] as HTMLAnchorElement).download).toBe('demo-图片 1-ady001.png');
+    expect((click.mock.instances[1] as HTMLAnchorElement).download).toBe('demo-图片 2-ady002.png');
+    click.mockRestore();
+  });
+
+  it('默认布局仍是横向单行，不受详情卡片样式影响', () => {
+    renderList();
+    expect(document.querySelector('.pd-result-card')).not.toBeInTheDocument();
+    expect(document.querySelector('.pd-result-strip')).toBeInTheDocument();
   });
 });

@@ -446,7 +446,6 @@ async function errorCode(fn: () => Promise<unknown>): Promise<{ code?: number; m
         status: 'failed',
         inputAssetIds: '[]',
         params: '{}',
-        provider: 'gateway',
         creditCost: 5,
       },
     });
@@ -503,7 +502,6 @@ async function errorCode(fn: () => Promise<unknown>): Promise<{ code?: number; m
         status: 'failed',
         inputAssetIds: '[]',
         params: '{}',
-        provider: 'gateway',
         creditCost: 5,
       },
     });
@@ -520,7 +518,6 @@ async function errorCode(fn: () => Promise<unknown>): Promise<{ code?: number; m
         status: 'failed',
         inputAssetIds: '[]',
         params: '{}',
-        provider: 'gateway',
         creditCost: 5,
         pendingResult: JSON.stringify({ result: { images: [] }, retries: 1 }),
       },

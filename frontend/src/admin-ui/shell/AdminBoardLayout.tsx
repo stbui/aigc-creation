@@ -30,6 +30,15 @@ import { AdminAlertBell } from '../../components/admin/AlertBell';
 const SIDEBAR_GROUPS_KEY = 'huojue.admin.sidebar-groups';
 
 /**
+ * 分组改名前的 localStorage 值。侧栏展开状态按组名字符串持久化，改名后旧值
+ * 会失配、用户已保存的展开态被重置；读档时一次性映射到新组名。
+ */
+const LEGACY_SIDEBAR_GROUP_NAMES: Record<string, string> = {
+  '模型': '模型与渠道',
+  '内容': '内容与合规',
+};
+
+/**
  * 后台外壳。
  *
  * ## 结构
@@ -119,9 +128,11 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
     try {
       const saved = localStorage.getItem(SIDEBAR_GROUPS_KEY);
       const parsed = saved ? (JSON.parse(saved) as unknown) : null;
-      return Array.isArray(parsed)
-        ? parsed.filter((name): name is string => typeof name === 'string')
-        : null;
+      if (!Array.isArray(parsed)) return null;
+      const names = parsed
+        .filter((name): name is string => typeof name === 'string')
+        .map((name) => LEGACY_SIDEBAR_GROUP_NAMES[name] ?? name);
+      return [...new Set(names)];
     } catch {
       return null;
     }

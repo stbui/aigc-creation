@@ -12,9 +12,11 @@ export class UpdateProfileDto {
 }
 
 export class ChangePasswordDto {
+  /** 已设置密码的账号必填；纯 OAuth 账号首次设密无需旧密码 */
+  @IsOptional()
   @IsString()
   @IsNotEmpty({ message: '请输入当前密码' })
-  oldPassword: string;
+  oldPassword?: string;
 
   @IsString()
   @MinLength(6, { message: '新密码至少 6 位' })
@@ -22,9 +24,11 @@ export class ChangePasswordDto {
 }
 
 export class DeleteAccountDto {
+  /** 已设置密码的账号必填；纯 OAuth 账号凭当前登录会话确认 */
+  @IsOptional()
   @IsString()
   @IsNotEmpty({ message: '请输入密码' })
-  password: string;
+  password?: string;
 
   /** 确认词，必须是「注销」 */
   @IsString()

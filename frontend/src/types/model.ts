@@ -235,6 +235,8 @@ export interface ProtocolCatalogEntryView {
   pluginId: string;
   selectable: boolean;
   surfaces: string[];
+  /** 协议声明的图片参数合同，作为渠道模型能力配置的默认值 */
+  imageParameters: import('./imageCapability').ImageParameterDefinitionView[];
 }
 
 /* ────────────────────────── 渠道模型 ────────────────────────── */

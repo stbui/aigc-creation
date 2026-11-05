@@ -10,5 +10,6 @@ export { useDuty } from '../../../components/admin/DutyContext';
 export {
   useAdminDetailParam,
   useAdminList,
+  useAdminResource,
   useAdminUrlFilterSync,
 } from '../../../admin-ui/primitives';

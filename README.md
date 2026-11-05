@@ -70,7 +70,7 @@
 
 能力清单只在后端 `src/capabilities/definitions/<id>.ts` 逐项声明，由 `capability.registry.ts` 门面聚合，通过 `GET /api/v1/capabilities` 下发给前端；侧栏、卡片、表单、统计分布全部由这份数据渲染，新增能力不需要改前端。
 
-当前 17 项全部 `real`，0 `mock` / 0 `planned`。新任务产出恒来自模型线路（`task.provider='gateway'`）；`local` 只表示历史产出。能力当前能否提交看 `runtime.effective`，不靠 `mode` 猜。
+当前 17 项全部 `real`，0 `mock` / 0 `planned`。新任务产出恒来自模型线路。能力当前能否提交看 `runtime.effective`，不靠 `mode` 猜。
 
 **入口可见性口径**（`frontend/src/lib/capabilities.ts` 的 `isCapabilityVisible()`）：`planned` 与运营下线的能力（`runtime.effective === 'disabled'`）从顶导 / 侧栏 / 工作台 / 首页案例页签 / 站点地图一并隐藏；`unavailable`（代码已实现、但此刻没有配到可用前台模型）保留入口，页面内说明原因并只拦截已登录用户的提交——访客点击仍走登录流程。
 
@@ -334,7 +334,7 @@ node scripts/verify-deps.js --quiet   # 仅输出结论，有致命问题则 exi
 遮罩任务没有支持 edits 的线路 `42205`；超时 / 5xx / 连接中断判结果不明 `42206`（**不切线、不自动退款**，
 账单停 `uncertain` 等人工核对）。文本工具无可用线路返回 502，不拼接模板文案。
 
-`mode` 只表示代码实现程度（`real` / `planned`），与单次请求无关——新任务的 `task.provider` 恒为 `gateway`，建任务初值 `queued`。
+`mode` 只表示代码实现程度（`real` / `planned`），与单次请求无关——任务建单初值 `queued`，实际线路以任务快照的 `routeId` / `channelModelId` 为准。
 
 **本地联调：仿真模型网关**（`test/`，零依赖）——没有真实凭据时用它把渠道配置测通：
 

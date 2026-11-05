@@ -29,14 +29,6 @@ export interface PolledResult {
   height?: number;
   errorCode?: string | null;
   /**
-   * 产出的真实来源: gateway=真实模型通道；local 仅用于历史任务。
-   *
-   * 必须透出给结果卡 —— 页面要按**这一单实际走了哪条通道**显示徽标,
-   * 而不是按能力清单的静态 mode 猜。新任务只会是 gateway；
-   * 历史 local 记录仍须如实呈现，不能伪装成模型产出。
-   */
-  provider?: string | null;
-  /**
    * 产出模态 (2026-10-20 视频通道落地) —— 'image' | 'video'。
    *
    * 必须透出到结果卡: 视频**不能**用 `<img>` 渲染 (浏览器会当图片解码,
@@ -143,7 +135,6 @@ export async function pollToResult(taskId: string, options: PollOptions = {}): P
     return {
       status: 'failed',
       errorCode: task.errorCode ?? 'CANCELLED',
-      provider: task.provider ?? null,
     };
   }
   const taskOutputs = task.outputAssets?.length ? task.outputAssets : task.outputAsset ? [task.outputAsset] : [];
@@ -173,7 +164,6 @@ export async function pollToResult(taskId: string, options: PollOptions = {}): P
     width: primary?.width,
     height: primary?.height,
     errorCode: task.errorCode ?? null,
-    provider: task.provider ?? null,
     modality: primary?.modality,
     durationMs: primary?.durationMs,
     outputs,

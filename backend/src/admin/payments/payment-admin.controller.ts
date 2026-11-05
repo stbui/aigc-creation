@@ -28,6 +28,8 @@ import { PaymentConfigService } from "../../payments/payment-config.service";
 import { AdminSettingsService } from "../settings.service";
 import {
   PaymentOrderListQueryDto,
+  PaymentExceptionCloseDto,
+  PaymentExceptionListQueryDto,
   PaymentProductSaveDto,
   PaymentProviderConfigUpdateDto,
   PaymentSettingsUpdateDto,
@@ -36,6 +38,7 @@ import {
   ReconciliationListQueryDto,
   ReconciliationRunDto,
 } from "../dto/payment-admin.dto";
+import { PaymentExceptionService } from "../../payments/payment-exception.service";
 import { AppError } from "../../common/app.exception";
 import { sendCsv } from "../../common/csv-response";
 import { toCsv } from "../../common/csv";
@@ -378,5 +381,53 @@ export class AdminPaymentReconciliationController {
       fileName: name,
       actorId: admin.id,
     });
+  }
+}
+
+/**
+ * 支付异常补偿单。
+ *
+ * 对账差异和退款失败不能只停留在某次运行明细里；这张工作台负责把真实资金
+ * 差异交给财务认领、重试或人工结案。所有状态变更都写审计。
+ */
+@Controller("admin/payments/exceptions")
+export class AdminPaymentExceptionsController {
+  constructor(private readonly exceptions: PaymentExceptionService) {}
+
+  @Get()
+  @RequirePermission(PERMISSIONS.paymentRead)
+  list(@Query() query: PaymentExceptionListQueryDto) {
+    return this.exceptions.list(query);
+  }
+
+  @Get(":id")
+  @RequirePermission(PERMISSIONS.paymentRead)
+  detail(@Param("id") id: string) {
+    return this.exceptions.get(id);
+  }
+
+  @Post(":id/claim")
+  @RequirePermission(PERMISSIONS.financeReconcile)
+  @AuditAction("payment.exception_claim")
+  claim(@Param("id") id: string, @AdminUser() admin: AdminUserType) {
+    return this.exceptions.claim(id, admin.id);
+  }
+
+  @Post(":id/retry-refund")
+  @RequirePermission(PERMISSIONS.financeReconcile)
+  @AuditAction("payment.exception_retry_refund")
+  retryRefund(@Param("id") id: string, @AdminUser() admin: AdminUserType) {
+    return this.exceptions.retryAutoRefund(id, admin.id);
+  }
+
+  @Post(":id/close")
+  @RequirePermission(PERMISSIONS.financeReconcile)
+  @AuditAction("payment.exception_close")
+  close(
+    @Param("id") id: string,
+    @Body() dto: PaymentExceptionCloseDto,
+    @AdminUser() admin: AdminUserType,
+  ) {
+    return this.exceptions.close(id, admin.id, dto.resolution);
   }
 }

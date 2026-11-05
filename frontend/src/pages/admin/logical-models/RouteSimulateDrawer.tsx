@@ -1,16 +1,59 @@
 import { useState } from 'react';
 import {
   ActionButton,
+  AdminDataTable,
   Descriptions,
   Drawer,
   FormField,
   StatusTag,
   TextAreaField,
   TextField,
+  type AdminColumn,
 } from '~/admin-ui/primitives';
 import { adminLogicalModelsApi } from './api';
 import { useToast } from './hooks';
 import type { AdminLogicalModelView, SimulateResultView } from '../../../types/model';
+
+type SimulatedRoute = SimulateResultView['routes'][number];
+
+const ROUTE_COLUMNS: Array<AdminColumn<SimulatedRoute>> = [
+  {
+    key: 'channelModel',
+    title: '线路',
+    render: (route) => (
+      <span className="font-mono">{route.channelModelKey || route.channelModelId}</span>
+    ),
+  },
+  {
+    key: 'priority',
+    title: '优先级',
+    align: 'right',
+    render: (route) => <span className="tabular-nums">{route.priority}</span>,
+  },
+  {
+    key: 'weight',
+    title: '权重',
+    align: 'right',
+    render: (route) => <span className="tabular-nums">{route.weight}</span>,
+  },
+  {
+    key: 'priceTierId',
+    title: '价格档',
+    render: (route) => route.priceTierId || '—',
+  },
+  {
+    key: 'result',
+    title: '结论',
+    render: (route) =>
+      route.eligible ? (
+        <StatusTag status="ok" tone="success" label="可命中" />
+      ) : (
+        <span className="text-muted-foreground">
+          {route.matchReasons.join('；') || '未命中'}
+        </span>
+      ),
+  },
+];
 
 /**
  * 路由模拟抽屉。
@@ -113,38 +156,13 @@ export function RouteSimulateDrawer({
               columns={2}
             />
             <div className="rounded-lg border border-border">
-              <table className="w-full text-[12px]">
-                <thead className="bg-muted text-muted-foreground">
-                  <tr>
-                    <th className="px-2 py-1.5 text-left">线路</th>
-                    <th className="px-2 py-1.5 text-right">优先级</th>
-                    <th className="px-2 py-1.5 text-right">权重</th>
-                    <th className="px-2 py-1.5 text-left">价格档</th>
-                    <th className="px-2 py-1.5 text-left">结论</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.routes.map((route) => (
-                    <tr key={`${route.routeId}-${route.priceTierId}`} className="border-t border-border">
-                      <td className="px-2 py-1.5 font-mono">
-                        {route.channelModelKey || route.channelModelId}
-                      </td>
-                      <td className="px-2 py-1.5 text-right tabular-nums">{route.priority}</td>
-                      <td className="px-2 py-1.5 text-right tabular-nums">{route.weight}</td>
-                      <td className="px-2 py-1.5">{route.priceTierId || '—'}</td>
-                      <td className="px-2 py-1.5">
-                        {route.eligible ? (
-                          <StatusTag status="ok" tone="success" label="可命中" />
-                        ) : (
-                          <span className="text-muted-foreground">
-                            {route.matchReasons.join('；') || '未命中'}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <AdminDataTable<SimulatedRoute>
+                rows={result.routes}
+                columns={ROUTE_COLUMNS}
+                rowKey={(route) => `${route.routeId}-${route.priceTierId}`}
+                density="compact"
+                emptyText="没有候选线路。"
+              />
             </div>
           </div>
         )}

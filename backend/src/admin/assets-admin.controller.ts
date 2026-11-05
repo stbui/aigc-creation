@@ -41,6 +41,8 @@ export class AssetStatusDto {
 
 /** 批量下架 */
 export class AssetBatchStatusDto {
+  @IsArray()
+  @ArrayMaxSize(100, { message: "单次批量最多 100 条" })
   @IsString({ each: true })
   ids!: string[];
   @IsIn(["visible", "hidden"])
@@ -82,7 +84,7 @@ export class AdminAssetsController {
 
   /**
    * 删除项目 (B-22)。
-   * `?hard=true` 连带删除素材记录与文件; 默认软删(素材置hidden)。
+   * `?hard=true` 连带删除素材记录与文件; 默认软删(素材置 hidden、项目标记 deletedAt)。
    */
   @Delete("projects/:id")
   @RequirePermission(PERMISSIONS.projectDelete)

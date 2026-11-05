@@ -28,6 +28,8 @@ export class AccountService {
         name: true,
         phone: true,
         phoneVerifiedAt: true,
+        emailVerifiedAt: true,
+        passwordHash: true,
         status: true,
         createdAt: true,
         lastLoginAt: true,
@@ -35,7 +37,7 @@ export class AccountService {
     });
     if (!user) throw new AppError(40401, '账号不存在', 404);
     const [projects, tasks, assets, orders, unread] = await Promise.all([
-      this.prisma.project.count({ where: { ownerId: userId } }),
+      this.prisma.project.count({ where: { ownerId: userId, deletedAt: null } }),
       /*
        * 「作品」= 有可见产出的任务, 「素材」= 可见素材 —— 与「我的作品」计数行
        * 和素材库「共 N 个素材」严格同口径。
@@ -44,13 +46,25 @@ export class AccountService {
        * 素材数虚高, 同一个人在不同页面看到三个不同的数, 而又都不是错的页面。
        */
       this.prisma.generationTask.count({
-        where: { ownerId: userId, outputAsset: { is: { status: 'visible' } } },
+        where: {
+          ownerId: userId,
+          project: { deletedAt: null },
+          outputAsset: { is: { status: 'visible' } },
+        },
       }),
-      this.prisma.asset.count({ where: { ownerId: userId, status: 'visible' } }),
+      this.prisma.asset.count({
+        where: { ownerId: userId, status: 'visible', project: { deletedAt: null } },
+      }),
       this.prisma.order.count({ where: { userId } }),
       this.prisma.notification.count({ where: { userId, readAt: null } }),
     ]);
-    return { ...user, counts: { projects, tasks, assets, orders }, unread };
+    const { passwordHash, ...profile } = user;
+    return {
+      ...profile,
+      hasPassword: Boolean(passwordHash),
+      counts: { projects, tasks, assets, orders },
+      unread,
+    };
   }
 
   /**
@@ -85,7 +99,7 @@ export class AccountService {
    * 包括当前这把 —— 调用方要重新登录。这不是体验倒退，是安全要求：
    * 改密的动机通常就是"怀疑密码泄露"，旧会话还必须能继续用等于没改。
    */
-  async changePassword(userId: string, oldPassword: string, newPassword: string) {
+  async changePassword(userId: string, newPassword: string, oldPassword?: string) {
     if (newPassword.length < 6) throw new AppError(40001, '新密码至少 6 位', 400);
     if (oldPassword === newPassword) {
       throw new AppError(40001, '新密码不能与当前密码相同', 400);
@@ -93,8 +107,11 @@ export class AccountService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new AppError(40401, '账号不存在', 404);
 
-    const ok = await bcrypt.compare(oldPassword, user.passwordHash);
-    if (!ok) throw new AppError(40001, '当前密码不正确', 400);
+    if (user.passwordHash) {
+      if (!oldPassword) throw new AppError(40001, '请输入当前密码', 400);
+      const ok = await bcrypt.compare(oldPassword, user.passwordHash);
+      if (!ok) throw new AppError(40001, '当前密码不正确', 400);
+    }
 
     const passwordHash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
     await this.prisma.user.update({
@@ -121,9 +138,9 @@ export class AccountService {
 
     const [projects, assets, tasks, orders, credits, ledger, memberships, consents, notifications] =
       await Promise.all([
-        this.prisma.project.findMany({ where: { ownerId: userId } }),
+        this.prisma.project.findMany({ where: { ownerId: userId, deletedAt: null } }),
         this.prisma.asset.findMany({
-          where: { ownerId: userId },
+          where: { ownerId: userId, project: { deletedAt: null } },
           select: {
             id: true,
             kind: true,
@@ -136,12 +153,11 @@ export class AccountService {
           },
         }),
         this.prisma.generationTask.findMany({
-          where: { ownerId: userId },
+          where: { ownerId: userId, project: { deletedAt: null } },
           select: {
             id: true,
             capability: true,
             status: true,
-            provider: true,
             creditCost: true,
             params: true,
             errorCode: true,
@@ -211,15 +227,18 @@ export class AccountService {
    * 需要密码 + 确认词「注销」两道：注销不可自助恢复，误触的代价是
    * 全部作品与积分清零。确认词不是形式 —— 它把"点错按钮"与"真的要注销"分开。
    */
-  async deleteAccount(userId: string, password: string, confirm: string) {
+  async deleteAccount(userId: string, password: string | undefined, confirm: string) {
     if (confirm !== '注销') {
       throw new AppError(40001, '请输入确认词「注销」', 400);
     }
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new AppError(40401, '账号不存在', 404);
 
-    const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) throw new AppError(40001, '密码不正确', 400);
+    if (user.passwordHash) {
+      if (!password) throw new AppError(40001, '请输入密码', 400);
+      const ok = await bcrypt.compare(password, user.passwordHash);
+      if (!ok) throw new AppError(40001, '密码不正确', 400);
+    }
 
     // 后台账号不允许自助注销: 会让最后一个管理员把系统锁死在外面
     if (user.role !== 'user') {

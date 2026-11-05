@@ -35,7 +35,6 @@ import { AssetLibraryModal, useAssetLibrary } from '../components/AssetLibraryMo
 import { CapabilityIcon } from '../components/AppLayout';
 import { ExceptionPage } from '../components/ExceptionPage';
 import { ResultMedia, formatDuration } from '../components/ResultMedia';
-import { ProviderBadge } from '../components/ProviderBadge';
 import { StateEmpty, StateSkeleton } from '../components/StateViews';
 import type { Asset, CapabilityDef, CapabilityParam, Task } from '../types/api';
 import { Button, Card, Form, Input, InputNumber, Radio, Select, Slider, Switch, Typography, Upload, useApp, Tag, type UploadFile } from '../ui';
@@ -417,8 +416,6 @@ function ToolPageContent({ capability, def }: { capability: string; def: Capabil
                       ? ` · ${formatDuration(task?.outputAsset?.durationMs)}`
                       : ''}
                   </Text>
-                  {/* 这一单实际走哪条通道, 以 task.provider 为准 */}
-                  <ProviderBadge provider={task?.provider} />
                 </div>
                 <div className="tool-result-actions">
                   <Button

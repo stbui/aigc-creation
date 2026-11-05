@@ -13,19 +13,6 @@ import { SignedUrlService } from '../common/signed-url.service';
 const SORTABLE = ['createdAt', 'updatedAt', 'status', 'capability'] as const;
 
 /**
- * provider 的历史初始值 `mock` 与现在的 `pending` 同义 (2026-10-22 更名)。
- *
- * 迁移脚本 `db:migrate:provider` 会把存量行改写, 但**读取侧仍要归一**:
- * 迁移可能还没跑, 且用户可能拿旧库连新代码。筛选要覆盖两种写法,
- * 展示与分组只出 `pending` —— 否则后台「待执行」那一档在迁移前会是空的。
- */
-const LEGACY_PENDING_PROVIDER = 'mock';
-function normalizeProvider(value: string | null | undefined): string | null {
-  if (!value) return null;
-  return value === LEGACY_PENDING_PROVIDER ? 'pending' : value;
-}
-
-/**
  * 拥堵告警阈值 (admin-prd.md B-31)。
  *
  * running 超过此值即视为「排队已经堆起来了」—— 生成任务并发受会员等级限制,
@@ -71,14 +58,13 @@ export class TasksAdminService {
   /**
    * 筛选项缓存（60 秒）。
    *
-   * capability / provider 的 groupBy 是全表聚合，与当前页筛选无关。
+   * capability 的 groupBy 是全表聚合，与当前页筛选无关。
    * 每翻一页都扫两遍全表在 SQLite 上会随着任务量增长越来越慢，而筛选项
    * 的计数并不需要秒级准确 —— 一分钟足够。拥堵指标仍实时查询。
    */
   private facetCache: {
     at: number;
     capabilities: Array<{ capability: string; count: number }>;
-    providers: Array<{ provider: string; count: number }>;
   } | null = null;
   private static readonly FACET_TTL_MS = 60_000;
 
@@ -91,7 +77,6 @@ export class TasksAdminService {
       runningThreshold: number;
     };
     capabilities: Array<{ capability: string; count: number }>;
-    providers: Array<{ provider: string; count: number }>;
   }> {
     const page = buildPage(query, [...SORTABLE], 'createdAt:desc');
     const where = this.listWhere(query);
@@ -127,7 +112,6 @@ export class TasksAdminService {
             capability: t.capability,
             capabilityName: def?.name ?? t.capability,
             status: t.status,
-            provider: normalizeProvider(t.provider),
             errorCode: t.errorCode,
             creditCost: t.creditCost,
             retriedFromId: t.retriedFromId,
@@ -147,42 +131,31 @@ export class TasksAdminService {
       ),
       congestion,
       capabilities: facets.capabilities,
-      // 归一后再合并: 迁移前 pending 与 mock 会各占一行, 前端筛选器里出现两个「待执行」
-      providers: facets.providers,
     };
   }
 
   /**
-   * 能力 / 通道筛选项。
+   * 能力筛选项。
    *
-   * 全表 groupBy 的结果按 60 秒缓存；迁移前的 `mock` 与 `pending`
-   * 在这里归一合并，避免前端筛选器出现两个「待执行」。
+   * 全表 groupBy 的结果按 60 秒缓存。
    */
   private async facets(): Promise<{
     capabilities: Array<{ capability: string; count: number }>;
-    providers: Array<{ provider: string; count: number }>;
   }> {
     const cached = this.facetCache;
     if (cached && Date.now() - cached.at < TasksAdminService.FACET_TTL_MS) {
-      return { capabilities: cached.capabilities, providers: cached.providers };
+      return { capabilities: cached.capabilities };
     }
 
-    const [capGroups, providerGroups] = await Promise.all([
-      this.prisma.generationTask.groupBy({ by: ['capability'], _count: { _all: true } }),
-      this.prisma.generationTask.groupBy({ by: ['provider'], _count: { _all: true } }),
-    ]);
+    const capGroups = await this.prisma.generationTask.groupBy({
+      by: ['capability'],
+      _count: { _all: true },
+    });
 
     const facets = {
       capabilities: capGroups
         .map((g) => ({ capability: g.capability, count: g._count._all }))
         .sort((a, b) => b.count - a.count),
-      providers: Object.entries(
-        providerGroups.reduce<Record<string, number>>((acc, g) => {
-          const key = normalizeProvider(g.provider) ?? 'unknown';
-          acc[key] = (acc[key] ?? 0) + g._count._all;
-          return acc;
-        }, {}),
-      ).map(([provider, count]) => ({ provider, count })),
     };
     this.facetCache = { at: Date.now(), ...facets };
     return facets;
@@ -196,13 +169,6 @@ export class TasksAdminService {
     const where: Record<string, unknown> = {};
     if (query.status) where['status'] = query.status;
     if (query.capability) where['capability'] = query.capability;
-    // 筛「待执行」要同时命中迁移前后的两种写法, 否则旧数据一个也筛不出来
-    if (query.provider) {
-      where['provider'] =
-        query.provider === 'pending'
-          ? { in: ['pending', LEGACY_PENDING_PROVIDER] }
-          : query.provider;
-    }
     if (query.userId) where['ownerId'] = query.userId;
     if (query.projectId) where['projectId'] = query.projectId;
     if (query.from || query.to) {
@@ -239,7 +205,6 @@ export class TasksAdminService {
         { label: '任务 ID', value: (r) => r.id },
         { label: '能力', value: (r) => getCapability(r.capability)?.name ?? r.capability },
         { label: '状态', value: (r) => r.status },
-        { label: '通道', value: (r) => normalizeProvider(r.provider) ?? '' },
         { label: '错误码', value: (r) => r.errorCode ?? '' },
         { label: '用户邮箱', value: (r) => r.owner.email },
         { label: '项目', value: (r) => r.project.name },
@@ -308,7 +273,6 @@ export class TasksAdminService {
       capability: task.capability,
       capabilityName: def?.name ?? task.capability,
       status: task.status,
-      provider: normalizeProvider(task.provider),
       errorCode: task.errorCode,
       creditCost: task.creditCost,
       retriedFromId: task.retriedFromId,

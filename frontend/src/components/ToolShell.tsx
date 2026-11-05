@@ -14,7 +14,6 @@ import { ModelPicker } from './ModelPicker';
 import { ToolSubmitBar } from './ToolSubmitBar';
 import { ToolEmptyState, ToolGeneratingState } from './ToolEmptyState';
 import { ResultMedia, formatDuration } from './ResultMedia';
-import { ProviderBadge } from './ProviderBadge';
 import { ImageCompare } from './ImageCompare';
 import { ImageLightbox } from './ImageLightbox';
 import { ProductCardGenerating, ProductCardResult } from './ToolResultCards';
@@ -710,8 +709,6 @@ export function ToolShell(props: Props) {
                       <div className="pk-result-meta">
                         <span className="pk-result-variant">
                           {title}结果
-                          {/* 新任务=模型；历史 local 也必须如实区分 */}
-                          <ProviderBadge provider={r.provider} />
                         </span>
                         <span className="pk-result-params">
                           {r.width && r.height ? `${r.width}×${r.height}` : ''}

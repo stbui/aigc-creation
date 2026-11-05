@@ -37,7 +37,7 @@ function setup(opts: SetupOptions = {}) {
   const prisma = {
     generationTask: { findUnique: vi.fn().mockResolvedValue(null) },
     project: {
-      findUnique: vi.fn().mockResolvedValue({ id: 'project-1', ownerId: 'user-1' }),
+      findFirst: vi.fn().mockResolvedValue({ id: 'project-1', ownerId: 'user-1' }),
     },
     asset: {
       // 输入素材（原图）：至少 1 张，带尺寸供同尺寸校验

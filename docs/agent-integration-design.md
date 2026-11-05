@@ -722,7 +722,7 @@ interface TextToolCall {
 
 - 规划耗时、修复重试次数、clarify 比例。
 - 每个运行的步数、预估/实扣积分、成功率、失败错误码。
-- 每步实际 provider（`gateway` / `local`）与耗时。
+- 每次生成任务命中的线路（`routeId` / `channelModelId`）与耗时。
 - LLM token 用量与模型名。
 
 日志必须带 `sessionId`、`runId`、`stepId`、`ownerId`，便于串联请求、模型调用与生成任务。
@@ -759,7 +759,6 @@ interface TextToolCall {
 
 结果卡必须如实展示：
 
-- 实际 `provider`：新任务为真实模型通道；历史任务可能为已停用的本地产出。
 - `creditCost`：该步骤真实扣费。
 - AIGC 标识信息。
 - 失败错误码与可操作建议。

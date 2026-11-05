@@ -8,7 +8,6 @@ function result(index: number): ToolResult {
   return {
     status: 'succeeded',
     url: `https://example.test/fusion-${index}.png`,
-    provider: 'gateway',
   };
 }
 

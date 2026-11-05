@@ -10,6 +10,7 @@ import { SignedUrlService } from "../common/signed-url.service";
 import { StorageService } from "../storage/storage.service";
 import type { StorageBackend } from "../storage/storage.provider";
 import { getCapability } from "../capabilities/capability.registry";
+import { MembershipService } from "../membership/membership.service";
 import { ROLE_LABELS, USER_STATUS_LABELS } from "./permissions";
 import { buildPage, paginate, type PageResult } from "./dto/page-query.dto";
 import type {
@@ -36,12 +37,14 @@ export class AdminUsersService {
     private readonly signedUrl: SignedUrlService,
     // 物理删除要连带删对象存储里的文件（只在 local 删会漏掉云上的）
     private readonly storage: StorageService,
+    // 当前会员判定必须复用 C 端口径：投影可能指向未来周期，不能只看 expiresAt。
+    private readonly membership: MembershipService,
   ) {}
 
   /**
    * 用户列表。
    *
-   * 统计口径说明: 项目/任务/素材数用 `_count` 关联查询, 不做 N+1。
+   * 统计口径说明: 项目/任务/素材数按"项目未软删"聚合, 不逐用户查询。
    * 已注销用户 (status='deleted') 默认不在列表里 —— 运营要找的是活跃账号;
    * 需要查历史时可显式传 status=deleted。
    */
@@ -63,27 +66,30 @@ export class AdminUsersService {
           status: true,
           createdAt: true,
           lastLoginAt: true,
-          _count: { select: { projects: true, tasks: true, assets: true } },
         },
       }),
       this.prisma.user.count({ where }),
     ]);
+    const counts = await this.usageCounts(items.map((user) => user.id));
 
     return paginate(
-      items.map((u) => ({
-        id: u.id,
-        email: u.email,
-        name: u.name,
-        role: u.role,
-        roleLabel: ROLE_LABELS[u.role] ?? u.role,
-        status: u.status,
-        statusLabel: USER_STATUS_LABELS[u.status] ?? u.status,
-        createdAt: u.createdAt,
-        lastLoginAt: u.lastLoginAt,
-        projectCount: u._count.projects,
-        taskCount: u._count.tasks,
-        assetCount: u._count.assets,
-      })),
+      items.map((u) => {
+        const usage = counts.get(u.id) ?? { projects: 0, tasks: 0, assets: 0 };
+        return {
+          id: u.id,
+          email: u.email,
+          name: u.name,
+          role: u.role,
+          roleLabel: ROLE_LABELS[u.role] ?? u.role,
+          status: u.status,
+          statusLabel: USER_STATUS_LABELS[u.status] ?? u.status,
+          createdAt: u.createdAt,
+          lastLoginAt: u.lastLoginAt,
+          projectCount: usage.projects,
+          taskCount: usage.tasks,
+          assetCount: usage.assets,
+        };
+      }),
       total,
       page,
     );
@@ -111,9 +117,9 @@ export class AdminUsersService {
         status: true,
         createdAt: true,
         lastLoginAt: true,
-        _count: { select: { projects: true, tasks: true, assets: true } },
       },
     });
+    const counts = await this.usageCounts(rows.map((user) => user.id));
     return toCsv(
       [
         { label: "用户 ID", value: (u) => u.id },
@@ -124,9 +130,9 @@ export class AdminUsersService {
           label: "状态",
           value: (u) => USER_STATUS_LABELS[u.status] ?? u.status,
         },
-        { label: "项目数", value: (u) => u._count.projects },
-        { label: "任务数", value: (u) => u._count.tasks },
-        { label: "素材数", value: (u) => u._count.assets },
+        { label: "项目数", value: (u) => counts.get(u.id)?.projects ?? 0 },
+        { label: "任务数", value: (u) => counts.get(u.id)?.tasks ?? 0 },
+        { label: "素材数", value: (u) => counts.get(u.id)?.assets ?? 0 },
         { label: "注册时间", value: (u) => u.createdAt },
         { label: "最后登录", value: (u) => u.lastLoginAt ?? "" },
       ],
@@ -168,7 +174,6 @@ export class AdminUsersService {
         phone: true,
         phoneVerifiedAt: true,
         tokenVersion: true,
-        _count: { select: { projects: true, tasks: true, assets: true } },
       },
     });
     if (!user) throw new AppError(40400, "用户不存在", 404);
@@ -178,11 +183,13 @@ export class AdminUsersService {
       recentAssets,
       taskStats,
       currentMembership,
+      resolvedMembership,
       membershipHistory,
       membershipUsage,
+      usageCounts,
     ] = await Promise.all([
       this.prisma.generationTask.findMany({
-        where: { ownerId: id },
+        where: { ownerId: id, project: { deletedAt: null } },
         orderBy: { createdAt: "desc" },
         take: 20,
         select: {
@@ -194,7 +201,7 @@ export class AdminUsersService {
         },
       }),
       this.prisma.asset.findMany({
-        where: { ownerId: id },
+        where: { ownerId: id, project: { deletedAt: null } },
         orderBy: { createdAt: "desc" },
         take: 20,
         select: {
@@ -207,7 +214,7 @@ export class AdminUsersService {
       }),
       this.prisma.generationTask.groupBy({
         by: ["status"],
-        where: { ownerId: id },
+        where: { ownerId: id, project: { deletedAt: null } },
         _count: { _all: true },
       }),
       // 与 C 端 MembershipService.resolve() 保持同一口径:
@@ -221,17 +228,16 @@ export class AdminUsersService {
         include: { plan: { select: { code: true, name: true } } },
         orderBy: { expiresAt: "desc" },
       }),
-      this.prisma.membership.findMany({
-        where: { userId: id },
-        orderBy: { createdAt: "desc" },
-        take: 10,
-        include: { plan: { select: { code: true, name: true } } },
-      }),
+      this.membership.resolve(id),
+      this.membership.historyOf(id, 10),
       this.prisma.membershipUsage.aggregate({
         where: { userId: id },
         _sum: { savedCents: true },
         _count: { _all: true },
       }),
+      this.usageCounts([id]).then(
+        (counts) => counts.get(id) ?? { projects: 0, tasks: 0, assets: 0 },
+      ),
     ]);
 
     const statusCount: Record<string, number> = {};
@@ -250,9 +256,9 @@ export class AdminUsersService {
       phone: user.phone,
       phoneVerifiedAt: user.phoneVerifiedAt,
       stats: {
-        projects: user._count.projects,
-        tasks: user._count.tasks,
-        assets: user._count.assets,
+        projects: usageCounts.projects,
+        tasks: usageCounts.tasks,
+        assets: usageCounts.assets,
         taskStatus: {
           succeeded: statusCount["succeeded"] ?? 0,
           failed: statusCount["failed"] ?? 0,
@@ -280,26 +286,28 @@ export class AdminUsersService {
         height: a.height,
       })),
       membership: {
-        isMember: currentMembership !== null,
-        planCode: currentMembership?.plan.code ?? "free",
-        planName: currentMembership?.plan.name ?? "普通用户",
-        status: currentMembership?.status ?? null,
-        startAt: currentMembership?.startAt ?? null,
-        expiresAt: currentMembership?.expiresAt ?? null,
-        monthlyCredits: currentMembership?.monthlyCreditsSnapshot ?? 0,
-        cancelAtPeriodEnd: currentMembership?.status === "cancelled",
+        isMember: resolvedMembership.isMember,
+        planCode: resolvedMembership.planCode,
+        planName: resolvedMembership.planName,
+        status: resolvedMembership.isMember
+          ? currentMembership?.status ?? "active"
+          : null,
+        startAt: resolvedMembership.isMember
+          ? currentMembership?.startAt ?? null
+          : null,
+        expiresAt: resolvedMembership.isMember
+          ? resolvedMembership.expiresAt
+          : null,
+        monthlyCredits: resolvedMembership.isMember
+          ? resolvedMembership.monthlyCredits
+          : 0,
+        cancelAtPeriodEnd: resolvedMembership.isMember
+          ? resolvedMembership.cancelAtPeriodEnd
+          : false,
         savedCents: membershipUsage._sum.savedCents ?? 0,
         discountedOrders: membershipUsage._count._all,
       },
-      membershipHistory: membershipHistory.map((m) => ({
-        id: m.id,
-        planCode: m.plan.code,
-        planName: m.plan.name,
-        status: m.status,
-        startAt: m.startAt,
-        expiresAt: m.expiresAt,
-        monthlyCredits: m.monthlyCreditsSnapshot,
-      })),
+      membershipHistory,
     };
   }
 
@@ -699,6 +707,46 @@ export class AdminUsersService {
       if (Object.keys(createdAt).length > 0) where["createdAt"] = createdAt;
     }
     return where;
+  }
+
+  /** 用户可见统计: 软删项目及其任务、素材不计入，按用户批量聚合避免 N+1。 */
+  private async usageCounts(userIds: string[]) {
+    const ids = [...new Set(userIds)];
+    const counts = new Map<string, { projects: number; tasks: number; assets: number }>();
+    if (ids.length === 0) return counts;
+
+    const [projects, tasks, assets] = await Promise.all([
+      this.prisma.project.groupBy({
+        by: ["ownerId"],
+        where: { ownerId: { in: ids }, deletedAt: null },
+        _count: { _all: true },
+      }),
+      this.prisma.generationTask.groupBy({
+        by: ["ownerId"],
+        where: { ownerId: { in: ids }, project: { deletedAt: null } },
+        _count: { _all: true },
+      }),
+      this.prisma.asset.groupBy({
+        by: ["ownerId"],
+        where: { ownerId: { in: ids }, project: { deletedAt: null } },
+        _count: { _all: true },
+      }),
+    ]);
+
+    for (const id of ids) counts.set(id, { projects: 0, tasks: 0, assets: 0 });
+    for (const row of projects) {
+      const count = counts.get(row.ownerId);
+      if (count) count.projects = row._count._all;
+    }
+    for (const row of tasks) {
+      const count = counts.get(row.ownerId);
+      if (count) count.tasks = row._count._all;
+    }
+    for (const row of assets) {
+      const count = counts.get(row.ownerId);
+      if (count) count.assets = row._count._all;
+    }
+    return counts;
   }
 
   private async findUser(id: string) {

@@ -91,7 +91,7 @@ Topbar 56px（sticky top-0）
 
 Sider 232px（折叠 60px，≤1280px 自动折叠；sticky top-0，h-full）
 ├── 品牌头：56px，标记 + 「货觉 运营后台」
-├── 导航：8 个分组（总览 / 运营 / 内容 / 交易 / 财务 / 系统 / 模型 / 数据安全），可折叠，按权限点过滤
+├── 导航：8 个分组（总览 / 运营 / 模型与渠道 / 交易 / 财务 / 内容与合规 / 系统 / 数据安全），可折叠，按权限点过滤
 └── 底：环境标识、折叠 / 展开按钮、账号菜单
 
 Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不设统一限宽），横向滚动限在该区内
@@ -238,7 +238,7 @@ Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不�
 
 ### 3.8 批量条与结果
 
-勾选后出现批量条（已选 N 项 + 动作 + 取消选择）。执行后 `BatchResultModal` 逐条展示，**失败项排最前**并带原因 —— 批量操作的失败是常态，只报成功数会让运营以为全都成了。
+勾选后出现批量条（已选 N 项 + 动作 + 取消选择）。执行后用 **toast 汇报成功 / 失败条数**，不再弹二次结果框 —— 批量动作在前置确认里已经确认过一次，失败时运营可回到列表按状态筛选处理。
 
 ### 3.9 提示条
 
@@ -338,7 +338,6 @@ Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不�
 | `table.tsx` | `AdminDataTable` |
 | `overlay.tsx` | `ModalDialog` / `Drawer` / `ConfirmDialog`（shadcn `AlertDialog` 组合壳）/ `RowMenu` |
 | `drawer.tsx` | `AdminDrawer`（懒加载详情抽屉） |
-| `batch-result.tsx` | `BatchResultModal` |
 | `duty-strip.tsx` / `duty-tower.tsx` | 概览首屏的值班条与值班塔 |
 | `chart.tsx` | `TrendBarChart`（Recharts） |
 

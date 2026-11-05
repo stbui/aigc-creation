@@ -185,7 +185,7 @@ backend/src/model/
 | `ModelChannel`（modality/priority/health 版） | 删除，按 §3.1 重建；不做数据迁移（开发阶段无存量运营数据） |
 | `ModelChannelConfig` | 删除；通道配置全部迁入 `ModelChannel` |
 | `ModelCallLog` | 删除，由 `ApiCallLog` + `RouteAttempt` 取代 |
-| `GenerationTask` | 原地扩展：`logicalModelId`、`logicalModelRevisionId`、`routeId`、`channelModelId`、`routeRun`、`billingOrderId`、`providerRequestId`、`pollStage`、`nextPollAt`、`leaseOwner`、`leaseUntil`、`attempts`、`stage`、`progress`、`authorizedChargeMicrocredits`；`provider` 恒为 `managed`；`creditCost` 改为账单金额只读投影 |
+| `GenerationTask` | 原地扩展：`logicalModelId`、`logicalModelRevisionId`、`routeId`、`channelModelId`、`routeRun`、`billingOrderId`、`providerRequestId`、`pollStage`、`nextPollAt`、`leaseOwner`、`leaseUntil`、`attempts`、`stage`、`progress`、`authorizedChargeMicrocredits`；`creditCost` 改为账单金额只读投影 |
 | `CreditLot` | 保留为「发放批次」，`amount` → `remainingMicrocredits BigInt`，增加 `expiresAt`；FEFO 扣减仍按批次 |
 | `CreditTransaction` | 迁移为 `CreditLedgerEntry`（微积分、available/reserved 双列） |
 | `User` | **不改表**：分组由「有效会员订单的分组快照 → `MembershipPlan.userGroupCode`（仅历史订单兜底）」解析，无有效会员落 `default` 分组，见 §14.2。控制器不得读用户列推断分组；运营修改套餐映射只影响之后创建的订单 |

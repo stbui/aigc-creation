@@ -13,8 +13,6 @@
 export type { ToolAsset, ToolResult } from '../../components/ToolShell';
 /** 结果占位: 生成中的骨架 */
 export { ToolGeneratingState } from '../../components/ToolEmptyState';
-/** 产出通道徽标 (gateway / local) */
-export { ProviderBadge } from '../../components/ProviderBadge';
 /** 手机扫码上传弹窗 */
 export { MobileUploadModal } from '../../components/MobileUploadModal';
 /** 素材库选择弹窗 */

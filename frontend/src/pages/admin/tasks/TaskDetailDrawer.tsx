@@ -10,8 +10,8 @@ import {
   StatusTag,
 } from '~/admin-ui/primitives';
 import { adminTasksApi, assetThumbUrl, toAbsoluteUrl } from './api';
-import { PROVIDER_LABELS } from './constants';
 import { useToast } from './hooks';
+import { TaskModelCalls } from './TaskModelCalls';
 import {
   adminAssetHref,
   adminCreditHref,
@@ -106,6 +106,7 @@ export function TaskDetailDrawer({
   canRetry,
   canCancel,
   canDelete,
+  canReadModelCalls,
   onClose,
   onAction,
 }: {
@@ -114,6 +115,7 @@ export function TaskDetailDrawer({
   canRetry: boolean;
   canCancel: boolean;
   canDelete: boolean;
+  canReadModelCalls: boolean;
   onClose: () => void;
   onAction: (kind: 'retry' | 'cancel' | 'delete', task: Row) => void;
 }) {
@@ -136,7 +138,6 @@ export function TaskDetailDrawer({
     <AdminDrawer<AdminTaskDetail>
       open={detailId !== null}
       title="任务详情"
-      description="查看执行状态、关联信息、输入素材与生成参数"
       onClose={onClose}
       fetcher={detailFetcher}
       footer={(d) => {
@@ -150,7 +151,6 @@ export function TaskDetailDrawer({
             capability: d.capability,
             capabilityName: d.capabilityName,
             status: d.status,
-            provider: d.provider,
             errorCode: d.errorCode,
             creditCost: d.creditCost,
             retriedFromId: d.retriedFromId,
@@ -192,10 +192,6 @@ export function TaskDetailDrawer({
       }}
     >
       {(d) => {
-        const providerLabel =
-          !d.provider || (d.provider === 'pending' && d.status !== 'queued')
-            ? '—'
-            : (PROVIDER_LABELS[d.provider] ?? d.provider);
         const errorLabel = d.errorCode ? taskErrorLabel(d.errorCode) : null;
         const createdAt = new Date(d.createdAt).toLocaleString('zh-CN');
         const updatedAt = new Date(d.updatedAt).toLocaleString('zh-CN');
@@ -308,11 +304,7 @@ export function TaskDetailDrawer({
                       </Link>
                     ),
                   },
-                  { label: '通道', value: providerLabel },
-                  {
-                    label: '积分消耗',
-                    value: <span className="tabular-nums">{d.creditCost} 积分</span>,
-                  },
+                  { label: '积分消耗', value: <span className="tabular-nums">{d.creditCost} 积分</span> },
                   {
                     label: '耗时',
                     value: <span className="tabular-nums">{formatDuration(d.durationMs)}</span>,
@@ -388,11 +380,13 @@ export function TaskDetailDrawer({
               />
             </DetailSection>
 
+            <TaskModelCalls taskId={d.id} canRead={canReadModelCalls} />
+
             <DetailSection title="产出图">
               {d.outputAsset ? (
                 <div className="flex flex-col gap-2.5">
                   <Link
-                    className="flex max-h-[420px] items-center justify-center overflow-hidden rounded-lg border border-border bg-muted"
+                    className="flex max-h-[420px] items-center justify-center overflow-hidden"
                     to={adminAssetHref(d.outputAsset.id)}
                     aria-label="在素材库查看产出图"
                   >

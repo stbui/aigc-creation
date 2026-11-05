@@ -9,6 +9,26 @@ import { adminAuditApi } from '../../../lib/api';
 import { ActionButton, AdminDataTable, AppliedFilters, ClearableField, FilterActions, FilterBar, PageHeader, Panel, SelectField, StatusTag, StaleError, type AdminColumn, type AppliedFilter } from '~/admin-ui/primitives';
 import type { AdminAuditListResult } from '../../../types/api';
 
+type DetailEntry = [string, unknown];
+
+const DETAIL_COLUMNS: Array<AdminColumn<DetailEntry>> = [
+  {
+    key: 'field',
+    title: '字段',
+    width: 180,
+    render: ([key]) => <span className="text-muted-foreground">{key}</span>,
+  },
+  {
+    key: 'value',
+    title: '值',
+    render: ([, value]) => (
+      <span className="whitespace-normal break-words">
+        {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+      </span>
+    ),
+  },
+];
+
 /**
  * 操作审计。
  *
@@ -78,28 +98,13 @@ export function AuditExpandedDetail({ row }: { row: Row }) {
         {detailEntries.length === 0 ? (
           <div className="text-xs text-muted-foreground">本条操作没有可展示的变更字段。</div>
         ) : (
-          <table className="w-auto border-collapse text-xs">
-            <thead>
-              <tr className="border-b border-border bg-muted/60">
-                <th scope="col" className="px-2 py-1 text-left font-medium text-muted-foreground">
-                  字段
-                </th>
-                <th scope="col" className="px-2 py-1 text-left font-medium text-muted-foreground">
-                  值
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {detailEntries.map(([key, value]) => (
-                <tr key={key} className="border-b border-border/70">
-                  <td className="px-2 py-1 align-top text-muted-foreground">{key}</td>
-                  <td className="px-2 py-1 align-top text-foreground">
-                    {typeof value === 'object' ? JSON.stringify(value) : String(value)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <AdminDataTable<DetailEntry>
+            rows={detailEntries}
+            columns={DETAIL_COLUMNS}
+            rowKey={([key]) => key}
+            density="compact"
+            emptyText="本条操作没有可展示的变更字段。"
+          />
         )}
       </div>
     </div>

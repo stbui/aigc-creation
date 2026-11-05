@@ -22,14 +22,6 @@ export class TaskListQueryDto extends PageQueryDto {
   @MaxLength(64)
   capability?: string;
 
-  /**
-   * 通道。新任务恒为 `gateway`（真实模型线路）；`local` 只表示 2026-10-25
-   * 之前的历史本地产出；`pending` 是旧版「尚未执行」的初始值，仅存量数据可见。
-   */
-  @IsOptional()
-  @IsIn(['gateway', 'local', 'pending'], { message: 'provider 取值非法' })
-  provider?: 'gateway' | 'local' | 'pending';
-
   @IsOptional()
   @IsString()
   @MaxLength(64)

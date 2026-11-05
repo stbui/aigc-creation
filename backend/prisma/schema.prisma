@@ -13,6 +13,8 @@ datasource db {
 model User {
   id           String   @id @default(cuid())
   email        String   @unique
+  /// 邮箱归属验证时间。注册必须完成邮箱验证码；OAuth 仅在该字段有值时才视为已验证。
+  emailVerifiedAt DateTime?
   passwordHash String
   name         String
   createdAt    DateTime @default(now())
@@ -98,6 +100,26 @@ model OAuthIdentity {
 
   @@unique([provider, subject])
   @@index([userId])
+}
+
+/// OAuth 一次性挑战。state 与登录票都只落 HMAC，兑换后 CAS 作废。
+/// 这样即使浏览器历史、代理日志或前端 URL 泄露了原值，也无法重放第二次。
+model OAuthChallenge {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  /// state | ticket
+  kind      String
+  provider  String
+  /// 普通登录票的目标用户；linkUserId 只表示显式绑定发起人
+  userId    String?
+  /// 发起绑定流程时的当前登录用户；普通登录为空
+  linkUserId String?
+  returnTo  String?
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([kind, expiresAt])
 }
 
 // ── 后台角色与权限点 (admin-detailed-design.md §0.3) ──────────────
@@ -702,16 +724,19 @@ model AdminAuditLog {
 }
 
 model Project {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   ownerId   String
   name      String
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
+  /// 软删除时刻。素材保留用于追溯，但项目本身不再对用户可见/可用。
+  deletedAt DateTime?
 
   owner  User             @relation(fields: [ownerId], references: [id])
   assets Asset[]
   tasks  GenerationTask[]
 
-  @@index([ownerId])
+  @@index([ownerId, deletedAt])
+  @@index([deletedAt])
 }
 
 model Asset {
@@ -800,6 +825,8 @@ model GenerationTask {
   /// 历史、后台和 1:1 关系，本字段只扩展“同一任务的其它产出”。
   outputAssetIds String?
   params        String // JSON 对象字符串
+  /// 历史供应商标识。新链路以 channelModelId / routeId 快照为准，本字段仅为
+  /// 兼容存量数据保留，避免数据库升级时删除仍有审计价值的历史值。
   provider      String?
   errorCode     String?
   // 本次实际扣掉的积分数快照 (0 = 免费)。用于后台展示与退款核算
@@ -825,6 +852,9 @@ model GenerationTask {
   // 与旧的产出图抢同一个唯一键。此字段只作来源追溯, 不建外键 ——
   // 来源任务被清理后重试链仍要能读, 加 FK 会让来源一删就连带失败。
   retriedFromId String?
+  /// 重试幂等键。每个来源任务最多派生一个重试任务，用于消除后台并发重试
+  /// 的竞态；与面向调用方的 `idempotencyKey` 分开，避免污染用户请求语义。
+  retryKey      String? @unique
 
   /// 执行期存活心跳。任务运行期间每 30s 写一次。
   ///
@@ -1098,7 +1128,9 @@ model AccountToken {
   userId      String?
   /// 未注册场景(注册时的手机号验证)按手机号归属
   phone       String?
-  /// 'password_reset' | 'sms_login' | 'sms_verify' —— 取值由 service 常量约束
+  /// 未注册场景(注册时的邮箱验证)按邮箱归属
+  email       String?
+  /// 'password_reset' | 'sms_login' | 'sms_verify' | 'email_verify' —— 取值由 service 常量约束
   type        String
   /// HMAC-SHA256(raw, JWT_SECRET)。6 位验证码的可枚举空间只有 100 万,
   /// 裸 sha256 在库泄露后可被离线穷举, 故用带密钥的 HMAC。
@@ -1115,7 +1147,56 @@ model AccountToken {
 
   @@index([userId, type])
   @@index([phone, type])
+  @@index([email, type])
   @@index([expiresAt])
+}
+
+/// 支付异常补偿单。每笔无法自动入账/自动退款成功的真实渠道流水都必须落单，
+/// 不依赖对账明细是否被某个运行批次带出。状态机:
+/// open -> auto_refund_pending -> refunded | manual_review -> closed
+model PaymentExceptionCase {
+  id               String    @id @default(cuid())
+  /// 渠道事件指纹，回调/对账重复发现时只更新同一张单
+  fingerprint      String    @unique
+  providerId       String
+  orderId          String?
+  merchantOrderNo  String
+  providerTradeNo  String?
+  amountCents      Int
+  currency         String    @default("CNY")
+  kind             String
+  status           String    @default("open")
+  priority         String    @default("urgent")
+  ownerId          String?
+  slaDueAt         DateTime
+  refundId         String?   @unique
+  resolution       String?
+  lastError        String?
+  closedAt         DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([status, priority, slaDueAt])
+  @@index([providerId, merchantOrderNo])
+  @@index([orderId])
+}
+
+/// 自动对账的按渠道/账单日状态。不要把「今天已触发」只放在进程内存里：
+/// 进程重启或多实例部署后，失败渠道会永久漏掉重试；成功渠道也会被重复下载账单。
+model PaymentAutoReconcileState {
+  id            String    @id @default(cuid())
+  providerId    String
+  billDate      String
+  /// pending | succeeded | failed
+  status        String    @default("pending")
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime  @default(now())
+  lastError     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([providerId, billDate])
+  @@index([status, nextAttemptAt])
 }
 
 /// 登录审计 —— 成功与失败都记。

@@ -201,7 +201,7 @@ npm run e2e                 # Playwright
 
 - `mode`（实现程度）：`real` 已接真实模型；`mock` / `planned` 保留枚举但当前 0 项。
 - `modality`（产出介质），与 `mode` 正交：当前 **16 项 `image` + 1 项 `video`**（合计 17）；`text` 用于提示词工具等非能力项。
-- 新任务 `task.provider` 恒为 `gateway`，`status` 初值 `queued`；`local` 只表示存量历史产出的来源。
+- 新任务 `status` 初值 `queued`；单次实际线路以任务快照的 `routeId` / `channelModelId` 为准。
 - 新增能力时按实际实现程度声明 `mode`：未实现写 `planned`，不得补本地占位或伪模型结果。
 
 ### 能力运行时真相（`runtime`）

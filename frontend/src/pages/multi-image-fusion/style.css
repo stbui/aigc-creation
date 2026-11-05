@@ -1008,15 +1008,6 @@
   font-weight: 600;
 }
 
-/* 来源徽标: 舞台左上角, 与右下角的尺寸标分居两角, 互不遮挡 */
-.mif-provider {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 2;
-  margin-left: 0;
-}
-
 .multi-image-fusion-preview-size {
   color: var(--card-bg);
   backdrop-filter: blur(8px);

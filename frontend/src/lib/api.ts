@@ -1090,7 +1090,6 @@ export const adminTasksApi = {
       pageSize?: number;
       status?: string;
       capability?: string;
-      provider?: string;
       userId?: string;
       projectId?: string;
       from?: string;
@@ -1114,7 +1113,6 @@ export const adminTasksApi = {
     params: {
       status?: string;
       capability?: string;
-      provider?: string;
       userId?: string;
       projectId?: string;
       from?: string;

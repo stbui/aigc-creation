@@ -22,10 +22,13 @@ import { cellState, formatBatchDate, type BatchRowBase } from './batchResult';
  * 却各自实现了一遍并在控件上出现分叉 (详情图用 `ui` Button, 另两页用裸
  * `<button>`, 靠 `size-[13px]` 这类补丁拉平尺寸)。
  *
- * 页面语义通过三个插槽注入, 组件本身不含任何页面类型判断:
+ * 页面语义通过插槽注入, 组件本身不含任何页面类型判断:
  *   - `renderRowMeta`       行头的附加信息 (提示词 / 卖点 / 模板名)
  *   - `renderSourceCaption` 原图格的图注
  *   - `labelOf`             单格的名称
+ *
+ * `layout="card"` 供商品详情页把一次生成拆成四层信息: 标题 / 参数 / 原图 / 三列图片。
+ * 其它页面继续使用默认横向单行布局, 不受详情页的信息密度影响。
  *
  * 归组、状态判定与时间格式化在 `./batchResult`, 本文件只负责渲染。
  */
@@ -50,12 +53,18 @@ export interface BatchResultListProps<Row extends BatchRow> {
   downloadNamePrefix: string;
   /** 单格名称（模块名 / 主图变体名 / 第 N 张） */
   labelOf: (item: GalleryItem) => string;
+  /** 卡片布局下可覆盖单格展示名（详情页按顺序显示「图片 1」等） */
+  cellLabelOf?: (item: GalleryItem, index: number) => string;
+  /** 卡片布局的标题行；缺省显示时间 */
+  renderRowTitle?: (row: Row) => ReactNode;
   /** 行头附加信息 */
   renderRowMeta?: (row: Row) => ReactNode;
   /** 原图格图注 */
   renderSourceCaption: (row: Row) => ReactNode;
   /** 原图格图注的悬浮提示（图注被省略号截断时的兜底） */
   sourceCaptionTitle?: (row: Row) => string | undefined;
+  /** 横向单行（旧页面默认）或分段卡片（商品详情） */
+  layout?: 'strip' | 'card';
 }
 
 /** 行内可预览的图: 原图在前, 产出图按批次顺序; 生成中 / 失败的不进查看器 */
@@ -93,6 +102,13 @@ function downloadName(item: GalleryItem, prefix: string, label: string): string 
   return `${prefix}-${label}-${item.id.slice(-6)}.${ext}`;
 }
 
+function triggerDownload(item: GalleryItem, prefix: string, label: string) {
+  const a = document.createElement('a');
+  a.href = item.url;
+  a.download = downloadName(item, prefix, label);
+  a.click();
+}
+
 function BatchResultListImpl<Row extends BatchRow>({
   rows,
   loading,
@@ -105,12 +121,16 @@ function BatchResultListImpl<Row extends BatchRow>({
   onDeleteRow,
   downloadNamePrefix,
   labelOf,
+  cellLabelOf,
+  renderRowTitle,
   renderRowMeta,
   renderSourceCaption,
   sourceCaptionTitle,
+  layout = 'strip',
 }: BatchResultListProps<Row>) {
   const { message } = useApp();
   const [preview, setPreview] = useState<{ items: LightboxItem[]; index: number } | null>(null);
+  const isCardLayout = layout === 'card';
 
   const readyCount = useMemo(
     () => rows.reduce((sum, row) => sum + row.cells.filter((item) => Boolean(item.url)).length, 0),
@@ -125,12 +145,61 @@ function BatchResultListImpl<Row extends BatchRow>({
     setPreview({ items: list, index });
   };
 
-  const downloadImage = (item: GalleryItem) => {
-    const a = document.createElement('a');
-    a.href = item.url;
-    a.download = downloadName(item, downloadNamePrefix, labelOf(item));
-    a.click();
+  const downloadImage = (item: GalleryItem, label: string) => {
+    triggerDownload(item, downloadNamePrefix, label);
     message.success('已开始下载');
+  };
+
+  const downloadRow = (row: Row) => {
+    const readyItems = row.cells.filter((item) => Boolean(item.url));
+    if (readyItems.length === 0) return;
+    readyItems.forEach((item) => {
+      const index = row.cells.indexOf(item);
+      triggerDownload(item, downloadNamePrefix, cellLabelOf?.(item, index) ?? labelOf(item));
+    });
+    message.success(`已开始下载 ${readyItems.length} 张结果图`);
+  };
+
+  const renderResultCell = (row: Row, item: GalleryItem, index: number) => {
+    const state = cellState(item);
+    const label = cellLabelOf?.(item, index) ?? labelOf(item);
+    return (
+      <figure className="pd-result-cell" key={item.id}>
+        {state === 'ready' ? (
+          <div className="pd-result-thumb-wrap">
+            <button
+              type="button"
+              className="pd-result-thumb"
+              aria-label={`查看${label}大图`}
+              onClick={() => openPreview(row, item.id)}
+            >
+              <img src={assetThumbUrl(item.url, 640)} alt={`${label}生成图`} loading="lazy" />
+            </button>
+            <button
+              type="button"
+              className="pd-result-download"
+              aria-label={`下载${label}结果图`}
+              title="下载原图"
+              onClick={() => downloadImage(item, label)}
+            >
+              <Download size={14} />
+            </button>
+          </div>
+        ) : (
+          <div
+            className={`pd-result-thumb${state === 'failed' ? ' is-failed' : ' is-pending'}`}
+            role="status"
+            aria-label={state === 'failed' ? `${label}生成失败` : `正在生成${label}`}
+          >
+            {state === 'failed' ? <X size={20} /> : <ImagePlus size={20} />}
+            <span>{state === 'failed' ? '生成失败' : '生成中…'}</span>
+          </div>
+        )}
+        <figcaption className="pd-result-label" title={label}>
+          {label}
+        </figcaption>
+      </figure>
+    );
   };
 
   if (loading && isEmpty) {
@@ -175,12 +244,22 @@ function BatchResultListImpl<Row extends BatchRow>({
 
         <div className="pd-result-list">
           {rows.map((row) => (
-            <article className="pd-result-row" key={row.key}>
-              <header className="pd-result-head">
-                <time className="pd-result-date" dateTime={row.createdAt}>
-                  {formatBatchDate(row.createdAt)}
-                </time>
-                {renderRowMeta?.(row)}
+            <article className={`pd-result-row${isCardLayout ? ' pd-result-card' : ''}`} key={row.key}>
+              <header className={`pd-result-head${isCardLayout ? ' pd-result-card-head' : ''}`}>
+                {isCardLayout ? (
+                  renderRowTitle?.(row) ?? (
+                    <time className="pd-result-date" dateTime={row.createdAt}>
+                      {formatBatchDate(row.createdAt)}
+                    </time>
+                  )
+                ) : (
+                  <>
+                    <time className="pd-result-date" dateTime={row.createdAt}>
+                      {formatBatchDate(row.createdAt)}
+                    </time>
+                    {renderRowMeta?.(row)}
+                  </>
+                )}
                 <button
                   type="button"
                   className="pd-result-delete"
@@ -193,89 +272,101 @@ function BatchResultListImpl<Row extends BatchRow>({
                 </button>
               </header>
 
-              <div className="pd-result-strip">
-                {/* 第一格: 上传的全部原图, 下方由图注说明这次用了哪些素材 */}
-                <figure
-                  className={`pd-result-cell pd-result-cell-source${row.sourceUrls.length > 1 ? ' is-multiple' : ''}`}
-                >
-                  {row.sourceUrls.length > 0 ? (
-                    <div
-                      className={`pd-result-source-grid${row.sourceUrls.length === 1 ? ' is-single' : ''}${row.sourceUrls.length === 2 ? ' is-pair' : ''}`}
-                    >
-                      {row.sourceUrls.map((sourceUrl, index) => {
-                        const sourceLabel = row.sourceUrls.length > 1 ? `商品原图 ${index + 1}` : '商品原图';
-                        return (
-                          <button
-                            type="button"
-                            className="pd-result-source-thumb"
-                            key={`${row.key}:source:${index}`}
-                            aria-label={`查看${sourceLabel}大图`}
-                            title={sourceLabel}
-                            onClick={() => openPreview(row, `${row.key}:source:${index}`)}
-                          >
-                            <img src={assetThumbUrl(sourceUrl, 640)} alt={sourceLabel} loading="lazy" />
-                            {row.sourceUrls.length > 1 && (
-                              <span className="pd-result-source-index" aria-hidden="true">
-                                {index + 1}
-                              </span>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="pd-result-thumb is-empty">
-                      <span className="pd-result-empty-tip">原图已删除</span>
-                    </div>
-                  )}
-                  <figcaption className="pd-result-label" title={sourceCaptionTitle?.(row)}>
-                    {renderSourceCaption(row)}
-                  </figcaption>
-                </figure>
+              {isCardLayout ? (
+                <>
+                  {renderRowMeta && <div className="pd-result-card-meta">{renderRowMeta(row)}</div>}
 
-                {/* 其余格: 每张产出, 下方标模块 / 变体 / 张序 */}
-                {row.cells.map((item) => {
-                  const state = cellState(item);
-                  const label = labelOf(item);
-                  return (
-                    <figure className="pd-result-cell" key={item.id}>
-                      {state === 'ready' ? (
-                        <div className="pd-result-thumb-wrap">
-                          <button
-                            type="button"
-                            className="pd-result-thumb"
-                            aria-label={`查看${label}大图`}
-                            onClick={() => openPreview(row, item.id)}
-                          >
-                            <img src={assetThumbUrl(item.url, 640)} alt={`${label}生成图`} loading="lazy" />
-                          </button>
-                          <button
-                            type="button"
-                            className="pd-result-download"
-                            aria-label={`下载${label}结果图`}
-                            title="下载原图"
-                            onClick={() => downloadImage(item)}
-                          >
-                            <Download size={14} />
-                          </button>
+                  <div className="pd-result-card-source">
+                    <div className="pd-result-card-source-main">
+                      {row.sourceUrls.length > 0 ? (
+                        <div className="pd-result-card-source-thumbs">
+                          {row.sourceUrls.map((sourceUrl, index) => {
+                            const sourceLabel = row.sourceUrls.length > 1 ? `商品原图 ${index + 1}` : '商品原图';
+                            return (
+                              <button
+                                type="button"
+                                className="pd-result-source-thumb"
+                                key={`${row.key}:source:${index}`}
+                                aria-label={`查看${sourceLabel}大图`}
+                                title={sourceLabel}
+                                onClick={() => openPreview(row, `${row.key}:source:${index}`)}
+                              >
+                                <img src={assetThumbUrl(sourceUrl, 160)} alt={sourceLabel} loading="lazy" />
+                                {row.sourceUrls.length > 1 && (
+                                  <span className="pd-result-source-index" aria-hidden="true">
+                                    {index + 1}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
                         </div>
                       ) : (
-                        <div
-                          className={`pd-result-thumb${state === 'failed' ? ' is-failed' : ' is-pending'}`}
-                          role="status"
-                          aria-label={state === 'failed' ? `${label}生成失败` : `正在生成${label}`}
-                        >
-                          {state === 'failed' ? <X size={20} /> : <ImagePlus size={20} />}
-                          <span>{state === 'failed' ? '生成失败' : '生成中…'}</span>
-                        </div>
+                        <span className="pd-result-card-source-empty">原图已删除</span>
                       )}
-                      <figcaption className="pd-result-label" title={label}>
-                        {label}
-                      </figcaption>
-                    </figure>
-                  );
-                })}
-              </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="pd-result-download-all"
+                      aria-label={`一键下载本批次 ${row.cells.filter((item) => Boolean(item.url)).length} 张结果图`}
+                      title="下载本批次全部生成图"
+                      disabled={!row.cells.some((item) => Boolean(item.url))}
+                      onClick={() => downloadRow(row)}
+                    >
+                      <Download size={13} />
+                      一键下载
+                    </button>
+                  </div>
+
+                  <div className="pd-result-card-grid">
+                    {row.cells.map((item, index) => renderResultCell(row, item, index))}
+                  </div>
+                </>
+              ) : (
+                <div className="pd-result-strip">
+                  {/* 第一格: 上传的全部原图, 下方由图注说明这次用了哪些素材 */}
+                  <figure
+                    className={`pd-result-cell pd-result-cell-source${row.sourceUrls.length > 1 ? ' is-multiple' : ''}`}
+                  >
+                    {row.sourceUrls.length > 0 ? (
+                      <div
+                        className={`pd-result-source-grid${row.sourceUrls.length === 1 ? ' is-single' : ''}${row.sourceUrls.length === 2 ? ' is-pair' : ''}`}
+                      >
+                        {row.sourceUrls.map((sourceUrl, index) => {
+                          const sourceLabel = row.sourceUrls.length > 1 ? `商品原图 ${index + 1}` : '商品原图';
+                          return (
+                            <button
+                              type="button"
+                              className="pd-result-source-thumb"
+                              key={`${row.key}:source:${index}`}
+                              aria-label={`查看${sourceLabel}大图`}
+                              title={sourceLabel}
+                              onClick={() => openPreview(row, `${row.key}:source:${index}`)}
+                            >
+                              <img src={assetThumbUrl(sourceUrl, 640)} alt={sourceLabel} loading="lazy" />
+                              {row.sourceUrls.length > 1 && (
+                                <span className="pd-result-source-index" aria-hidden="true">
+                                  {index + 1}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className="pd-result-thumb is-empty">
+                        <span className="pd-result-empty-tip">原图已删除</span>
+                      </div>
+                    )}
+                    <figcaption className="pd-result-label" title={sourceCaptionTitle?.(row)}>
+                      {renderSourceCaption(row)}
+                    </figcaption>
+                  </figure>
+
+                  {/* 其余格: 每张产出, 下方标模块 / 变体 / 张序 */}
+                  {row.cells.map((item, index) => renderResultCell(row, item, index))}
+                </div>
+              )}
             </article>
           ))}
         </div>

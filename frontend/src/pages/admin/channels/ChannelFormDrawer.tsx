@@ -37,7 +37,7 @@ export function ChannelFormDrawer({
       width={760}
       title={editing ? '编辑渠道' : '新建渠道'}
       description={
-        dirty ? '有未保存修改' : editing ? '凭证留空表示不修改现有值' : '创建后请继续在右侧补模型与价格'
+        dirty ? '有未保存修改' : editing ? undefined : '创建后请继续在右侧补模型与价格'
       }
       footer={
         <>

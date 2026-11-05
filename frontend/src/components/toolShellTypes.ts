@@ -26,13 +26,6 @@ export interface ToolResult {
   height?: number;
   errorCode?: string | null;
   /**
-   * 本次实际通道: gateway=真实模型；local 仅用于历史任务。
-   *
-   * 由 `lib/poll.ts` 的 pollToResult 透出。结果卡按它显示徽标 ——
-   * 新任务只会是 gateway；历史 local 记录必须如实区分，不能按静态 mode 猜。
-   */
-  provider?: string | null;
-  /**
    * 产出模态 (2026-10-20 视频通道落地)。
    *
    * ⚠️ 可选: 后端在视频通道落地前只返回图像产出, 没有该字段。

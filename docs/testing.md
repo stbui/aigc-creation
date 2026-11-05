@@ -61,7 +61,6 @@ npm run test:coverage   # v8 覆盖率，产物在 frontend/coverage（已 gitig
 | `components/ErrorBoundary.test.tsx` | 顶层 `ErrorBoundary` 未传 `resetKeys` 时稳定停留兜底页，不反复重置 |
 | `components/ColorSwatchGrid.test.tsx` | 色板选择、自定义色回显、禁用态 |
 | `components/ImageLightbox.test.tsx` | 大图查看器开合、缩放/翻页键盘语义 |
-| `components/ProviderBadge.test.tsx` | 能力/产出来源徽标文案与状态映射 |
 | `components/StateViews.test.tsx` | 加载 / 空 / 失败 / 骨架四态渲染 |
 | `hooks/useCreditLabel.test.tsx` | 积分文案与生效价、限时免费的展示 |
 | `lib/admin-links.test.ts` | 跨模块深链的参数编码（邮箱、任务 id 等） |

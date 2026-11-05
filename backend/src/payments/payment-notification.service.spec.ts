@@ -92,6 +92,12 @@ function makeHarness(notification: NotificationResult = paidResult('cs_old')) {
   const orders = {
     applyPaymentResult: vi.fn().mockResolvedValue({ applied: true, idempotentHit: false }),
   };
+  const exceptions = {
+    recordManual: vi.fn().mockResolvedValue({}),
+    autoRefundCancelledPayment: vi
+      .fn()
+      .mockResolvedValue({ case: {}, outcome: 'manual_review' }),
+  };
   adapterMock.verifyNotification.mockResolvedValue(notification);
   adapterMock.ack.mockImplementation((result: NotificationResult) => ({
     status: result.ok && result.ackSuccess ? 200 : 400,
@@ -104,8 +110,9 @@ function makeHarness(notification: NotificationResult = paidResult('cs_old')) {
     cipher as never,
     configs as never,
     orders as never,
+    exceptions as never,
   );
-  return { service, prisma, orders, notificationRow };
+  return { service, prisma, orders, exceptions, notificationRow };
 }
 
 async function ingest(service: PaymentNotificationService) {

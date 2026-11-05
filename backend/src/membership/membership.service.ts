@@ -86,6 +86,17 @@ export interface ResolvedMembership {
   cancelAtPeriodEnd: boolean;
 }
 
+/** 已付会员周期。Membership 是一人一行投影，历史必须从订单周期快照还原。 */
+export interface MembershipPeriodHistoryItem {
+  id: string;
+  planCode: string;
+  planName: string;
+  status: 'active' | 'scheduled' | 'expired' | 'refunded';
+  startAt: Date;
+  expiresAt: Date;
+  monthlyCredits: number;
+}
+
 @Injectable()
 export class MembershipService {
   private readonly logger = new Logger(MembershipService.name);
@@ -1089,15 +1100,93 @@ export class MembershipService {
 
   // ── 查询 ──────────────────────────────────────────────────────────
 
+  /**
+   * 订阅周期历史。
+   *
+   * `Membership` 只保留用户当前投影，续费会覆盖同一行，不能拿来当历史列表。
+   * 真正的历史来源是已兑换会员的订单周期快照；退款后也保留原区间和撤销标记，
+   * 便于客服核对“哪一笔订单买的是哪一段”。
+   *
+   * 对加列前的纯旧数据仍回退到 Membership 投影，避免历史页突然全空。
+   */
+  async historyOf(userId: string, take = 10): Promise<MembershipPeriodHistoryItem[]> {
+    const limit = Math.min(Math.max(Number(take) || 10, 1), 50);
+    const now = Date.now();
+    const periods = await this.prisma.order.findMany({
+      where: {
+        userId,
+        membershipPlanId: { not: null },
+        membershipAppliedAt: { not: null },
+        membershipPeriodStartAt: { not: null },
+        membershipPeriodEndAt: { not: null },
+      },
+      orderBy: [{ membershipPeriodStartAt: 'desc' }],
+      take: limit,
+      select: {
+        id: true,
+        status: true,
+        membershipPeriodStartAt: true,
+        membershipPeriodEndAt: true,
+        membershipPeriodRevokedAt: true,
+        membershipMonthlyCreditsSnapshot: true,
+        membershipPlan: { select: { code: true, name: true } },
+      },
+    });
+
+    if (periods.length > 0) {
+      return periods.flatMap((period) => {
+        if (
+          !period.membershipPlan ||
+          !period.membershipPeriodStartAt ||
+          !period.membershipPeriodEndAt
+        ) {
+          return [];
+        }
+        const status: MembershipPeriodHistoryItem['status'] =
+          period.membershipPeriodRevokedAt || period.status === 'refunded'
+            ? 'refunded'
+            : period.membershipPeriodStartAt.getTime() > now
+              ? 'scheduled'
+              : period.membershipPeriodEndAt.getTime() <= now
+                ? 'expired'
+                : 'active';
+        return [{
+          id: period.id,
+          planCode: period.membershipPlan.code,
+          planName: period.membershipPlan.name,
+          status,
+          startAt: period.membershipPeriodStartAt,
+          expiresAt: period.membershipPeriodEndAt,
+          monthlyCredits: period.membershipMonthlyCreditsSnapshot ?? 0,
+        }];
+      });
+    }
+
+    const legacy = await this.prisma.membership.findMany({
+      where: { userId },
+      orderBy: [{ createdAt: 'desc' }],
+      take: limit,
+      include: { plan: { select: { code: true, name: true } } },
+    });
+    return legacy.map((membership) => ({
+      id: membership.id,
+      planCode: membership.plan.code,
+      planName: membership.plan.name,
+      status:
+        ['active', 'grace', 'cancelled'].includes(membership.status) &&
+        membership.expiresAt.getTime() > now
+          ? 'active'
+          : 'expired',
+      startAt: membership.startAt,
+      expiresAt: membership.expiresAt,
+      monthlyCredits: membership.monthlyCreditsSnapshot,
+    }));
+  }
+
   /** 我的会员详情 */
   async detailOf(userId: string) {
     const resolved = await this.resolve(userId);
-    const history = await this.prisma.membership.findMany({
-      where: { userId },
-      orderBy: { createdAt: 'desc' },
-      take: 10,
-      include: { plan: { select: { code: true, name: true } } },
-    });
+    const history = await this.historyOf(userId, 10);
 
     const usage = await this.prisma.membershipUsage.aggregate({
       where: { userId },
@@ -1110,15 +1199,7 @@ export class MembershipService {
       totalSavedCents: usage._sum.savedCents ?? 0,
       totalSavedYuan: ((usage._sum.savedCents ?? 0) / 100).toFixed(2),
       discountedOrders: usage._count._all,
-      history: history.map((h) => ({
-        id: h.id,
-        planCode: h.plan.code,
-        planName: h.plan.name,
-        status: h.status,
-        startAt: h.startAt,
-        expiresAt: h.expiresAt,
-        monthlyCredits: h.monthlyCreditsSnapshot,
-      })),
+      history,
     };
   }
 

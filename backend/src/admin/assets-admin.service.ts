@@ -8,6 +8,11 @@ import { SignedUrlService } from '../common/signed-url.service';
 import { buildPage, paginate, type PageResult } from './dto/page-query.dto';
 import type { AssetListQueryDto, ProjectListQueryDto } from './dto/asset.dto';
 import type { StorageBackend } from '../storage/storage.provider';
+import {
+  detachAssetFromTasks,
+  orderedOutputIds,
+  taskOutputReferenceWhere,
+} from '../assets/task-output-links';
 
 /** 素材管理 (admin-prd.md §3.4 B-21~B-27) */
 @Injectable()
@@ -26,7 +31,7 @@ export class AdminAssetsService {
   async listProjects(query: ProjectListQueryDto) {
     const page = buildPage(query, ['createdAt', 'name'], 'createdAt:desc');
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = { deletedAt: null };
     if (query.keyword) where.name = { contains: query.keyword };
     if (query.ownerId) where.ownerId = query.ownerId;
 
@@ -77,7 +82,9 @@ export class AdminAssetsService {
         tasks: { select: { id: true } },
       },
     });
-    if (!project) throw new AppError(40400, '项目不存在', 404);
+    if (!project || (project.deletedAt && !hard)) {
+      throw new AppError(40400, '项目不存在', 404);
+    }
 
     const impact = {
       assets: project.assets.length,
@@ -104,7 +111,14 @@ export class AdminAssetsService {
           data: { status: 'hidden' },
         });
       }
-      await tx.project.delete({ where: { id } });
+      if (hard) {
+        await tx.project.delete({ where: { id } });
+      } else {
+        await tx.project.update({
+          where: { id },
+          data: { deletedAt: new Date() },
+        });
+      }
     });
 
     // 2) 硬删提交后再清文件；删除失败只留孤儿文件，不影响已提交的数据事实
@@ -282,14 +296,10 @@ export class AdminAssetsService {
     return { id, status };
   }
 
-  /** 批量下架/恢复 */
+  /** 兼容旧入口的批量下架/恢复；逐条返回结果，供审计落到每个素材。 */
   async setStatusMany(ids: string[], status: 'visible' | 'hidden') {
-    if (ids.length === 0) throw new AppError(40001, '未选择素材', 400);
-    const res = await this.prisma.asset.updateMany({
-      where: { id: { in: ids } },
-      data: { status },
-    });
-    return { count: res.count, status };
+    const summary = await runBatch(ids, (id) => this.setStatus(id, status));
+    return { ...summary, count: summary.succeeded, status };
   }
 
   /**
@@ -306,9 +316,9 @@ export class AdminAssetsService {
     if (!asset) throw new AppError(40400, '素材不存在', 404);
 
     const removedTasks = await this.prisma.$transaction(async (tx) => {
-      const tasks = await tx.generationTask.deleteMany({ where: { outputAssetId: id } });
+      const removedTasks = await detachAssetFromTasks(tx, id);
       await tx.asset.delete({ where: { id } });
-      return tasks.count;
+      return removedTasks;
     });
 
     // 数据库提交后再清文件；失败不回滚，避免记录还在但文件已丢
@@ -321,7 +331,13 @@ export class AdminAssetsService {
   async impact(id: string) {
     const asset = await this.prisma.asset.findUnique({ where: { id } });
     if (!asset) throw new AppError(40400, '素材不存在', 404);
-    const tasks = await this.prisma.generationTask.count({ where: { outputAssetId: id } });
+    const linkedTasks = await this.prisma.generationTask.findMany({
+      where: taskOutputReferenceWhere(id),
+      select: { id: true, outputAssetId: true, outputAssetIds: true },
+    });
+    const tasks = linkedTasks.filter((task) =>
+      orderedOutputIds(task.outputAssetId, task.outputAssetIds).includes(id),
+    ).length;
     return { sizeBytes: asset.sizeBytes, tasks, storageBackend: asset.storageBackend };
   }
 

@@ -300,7 +300,7 @@ npm run seed:messages         # 五条站内消息模板（只补缺失，不覆
 一次性数据迁移（幂等，存量库专用）：
 
 ```bash
-npm run db:migrate:provider          # GenerationTask.provider 'mock' → 'pending'（跑前打印影响行数）
+npm run db:migrate:project-lifecycle  # 补项目软删 deletedAt 与任务重试 retryKey（非破坏、可重复）
 npm run db:migrate:tool-idempotency  # 补幂等字段/索引（非破坏、可重复；不要用 accept-data-loss）
 ```
 

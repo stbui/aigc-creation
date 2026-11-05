@@ -80,31 +80,76 @@ export class GenerateService {
       throw new AppError(40000, '改造前创建的存量任务没有模型快照，无法重试', 400);
     }
 
-    const next = await this.prisma.generationTask.create({
-      data: {
-        projectId: origin.projectId,
-        ownerId: origin.ownerId,
-        capability: origin.capability,
-        status: 'queued',
-        stage: '排队中',
-        inputAssetIds: origin.inputAssetIds,
-        params: origin.params,
-        provider: 'gateway',
-        creditCost: 0,
-        logicalModelId: origin.logicalModelId,
-        logicalModelRevisionId: origin.logicalModelRevisionId,
-        routeId: origin.routeId,
-        channelModelId: origin.channelModelId,
-        // 新的一轮：attempt 编号从 1 重来，历史尝试留在原任务上可追溯
-        routeRun: origin.routeRun + 1,
-        retriedFromId: origin.id,
-        heartbeatAt: new Date(),
-      },
-    });
+    const retryKey = `task-retry:${origin.id}`;
 
-    this.worker.kick();
-    this.logger.log(`任务 ${id} 重试为新任务 ${next.id}`);
-    return { taskId: next.id, retriedFromId: origin.id };
+    try {
+      const result = await this.prisma.$transaction(async (tx) => {
+        // 原任务读取与重试落库之间可能隔着后台软删项目；与正常建任务同一口径，
+        // 在写事务内复核项目仍属于原用户且未删除，避免重试把任务塞回已删项目。
+        const project = await tx.project.findFirst({
+          where: {
+            id: origin.projectId,
+            ownerId: origin.ownerId,
+            deletedAt: null,
+          },
+          select: { id: true },
+        });
+        if (!project) throw new AppError(40001, '任务所属项目不存在或已删除', 403);
+
+        // 兼容上线前已存在、但没有 retryKey 的重试任务；唯一约束负责拦截新数据
+        // 的竞态，这次查询则保证旧数据不会在升级后再次派生重试任务。
+        const existing = await tx.generationTask.findFirst({
+          where: { retriedFromId: origin.id },
+          select: { id: true },
+          orderBy: { createdAt: 'asc' },
+        });
+        if (existing) return { id: existing.id, reused: true };
+
+        const created = await tx.generationTask.create({
+          data: {
+            projectId: origin.projectId,
+            ownerId: origin.ownerId,
+            capability: origin.capability,
+            status: 'queued',
+            stage: '排队中',
+            inputAssetIds: origin.inputAssetIds,
+            params: origin.params,
+            creditCost: 0,
+            logicalModelId: origin.logicalModelId,
+            logicalModelRevisionId: origin.logicalModelRevisionId,
+            routeId: origin.routeId,
+            channelModelId: origin.channelModelId,
+            // 新的一轮：attempt 编号从 1 重来，历史尝试留在原任务上可追溯
+            routeRun: origin.routeRun + 1,
+            retriedFromId: origin.id,
+            retryKey,
+            heartbeatAt: new Date(),
+          },
+        });
+        return { id: created.id, reused: false };
+      });
+
+      this.worker.kick();
+      if (result.reused) {
+        this.logger.log(`任务 ${id} 已有重试任务 ${result.id}，复用本次结果`);
+      } else {
+        this.logger.log(`任务 ${id} 重试为新任务 ${result.id}`);
+      }
+      return { taskId: result.id, retriedFromId: origin.id };
+    } catch (error) {
+      // 先查再建仍挡不住两个后台请求同时通过检查，必须由数据库唯一约束兜底。
+      // 冲突后返回先写入的重试任务，让重复点击得到与首次相同的结果。
+      if ((error as { code?: string }).code !== 'P2002') throw error;
+      const existing = await this.prisma.generationTask.findUnique({
+        where: { retryKey },
+        select: { id: true },
+      });
+      if (!existing) throw error;
+
+      this.worker.kick();
+      this.logger.log(`任务 ${id} 已有重试任务 ${existing.id}，复用本次结果`);
+      return { taskId: existing.id, retriedFromId: origin.id };
+    }
   }
 
   /**
@@ -130,8 +175,10 @@ export class GenerateService {
   }
 
   async getTask(ownerId: string, id: string) {
-    const task = await this.prisma.generationTask.findUnique({ where: { id } });
-    if (!task || task.ownerId !== ownerId) {
+    const task = await this.prisma.generationTask.findFirst({
+      where: { id, ownerId, project: { deletedAt: null } },
+    });
+    if (!task) {
       throw new AppError(40001, '任务不存在或无权限', 403);
     }
 
@@ -142,17 +189,31 @@ export class GenerateService {
     const outputById = new Map(outputs.map((asset) => [asset.id, asset]));
     const outputAssets = outputIds
       .map((assetId) => outputById.get(assetId))
-      .filter((asset): asset is NonNullable<typeof asset> => Boolean(asset))
+      // 与列表口径一致：后台已下架的产出不能在详情接口借已知任务 id 绕过。
+      .filter(
+        (asset): asset is NonNullable<typeof asset> =>
+          asset?.status === 'visible',
+      )
       .map((asset) => this.serializeOutputAsset(asset, task.ownerId));
 
     const inputAssetIds = parseIdList(task.inputAssetIds);
     const inputRows = inputAssetIds.length
-      ? await this.prisma.asset.findMany({ where: { id: { in: inputAssetIds } } })
+      ? await this.prisma.asset.findMany({
+          where: {
+            id: { in: inputAssetIds },
+            ownerId: task.ownerId,
+            status: 'visible',
+            project: { deletedAt: null },
+          },
+        })
       : [];
     const inputById = new Map(inputRows.map((asset) => [asset.id, asset]));
     const inputAssets = inputAssetIds
       .map((assetId) => inputById.get(assetId))
-      .filter((asset): asset is NonNullable<typeof asset> => Boolean(asset))
+      .filter(
+        (asset): asset is NonNullable<typeof asset> =>
+          asset?.status === 'visible',
+      )
       .map((asset) => this.serializeOutputAsset(asset, task.ownerId));
 
     return {
@@ -165,7 +226,6 @@ export class GenerateService {
       inputAssets,
       parentTaskId: task.parentTaskId,
       params: JSON.parse(task.params || '{}'),
-      provider: task.provider,
       errorCode: task.errorCode,
       // 作品页「重新生成」凭它沿用原模型；改造前的存量任务为 null
       logicalModelId: task.logicalModelId,
@@ -233,7 +293,10 @@ export class GenerateService {
   }
 
   async listTasks(ownerId: string, projectId?: string) {
-    const where: Prisma.GenerationTaskWhereInput = { ownerId };
+    const where: Prisma.GenerationTaskWhereInput = {
+      ownerId,
+      project: { deletedAt: null },
+    };
     if (projectId) where.projectId = projectId;
 
     const tasks = await this.prisma.generationTask.findMany({
@@ -256,7 +319,10 @@ export class GenerateService {
   ) {
     const take = Math.min(Math.max(Number(params.limit) || 50, 1), 100);
     const skip = Math.max(Number(params.offset) || 0, 0);
-    const where: Prisma.GenerationTaskWhereInput = { ownerId };
+    const where: Prisma.GenerationTaskWhereInput = {
+      ownerId,
+      project: { deletedAt: null },
+    };
     if (params.projectId) where.projectId = params.projectId;
     if (params.capability) where.capability = params.capability;
     const [tasks, total] = await Promise.all([
@@ -289,8 +355,16 @@ export class GenerateService {
     // 输入图一次性取回：详情图结果行要按批次展示「原图」，逐任务查会放大到 N 次往返
     const inputIdsByTask = new Map(tasks.map((t) => [t.id, parseIdList(t.inputAssetIds)]));
     const allInputIds = Array.from(new Set([...inputIdsByTask.values()].flat()));
+    const taskOwnerIds = Array.from(new Set(tasks.map((t) => t.ownerId)));
     const inputRows = allInputIds.length
-      ? await this.prisma.asset.findMany({ where: { id: { in: allInputIds } } })
+      ? await this.prisma.asset.findMany({
+          where: {
+            id: { in: allInputIds },
+            ownerId: { in: taskOwnerIds },
+            status: 'visible',
+            project: { deletedAt: null },
+          },
+        })
       : [];
     const inputById = new Map(inputRows.map((asset) => [asset.id, asset]));
 
@@ -298,7 +372,10 @@ export class GenerateService {
       const inputAssetIds = inputIdsByTask.get(t.id) ?? [];
       const inputAssets = inputAssetIds
         .map((assetId) => inputById.get(assetId))
-        .filter((asset): asset is NonNullable<typeof asset> => Boolean(asset))
+        .filter(
+          (asset): asset is NonNullable<typeof asset> =>
+            asset?.status === 'visible',
+        )
         .map((asset) => this.serializeOutputAsset(asset, t.ownerId));
       /*
        * 产出素材被后台下架（status='hidden'）的不再下发。没有产出的任务
@@ -318,7 +395,6 @@ export class GenerateService {
         inputAssets,
         parentTaskId: t.parentTaskId,
         params: JSON.parse(t.params || '{}'),
-        provider: t.provider,
         errorCode: t.errorCode,
         logicalModelId: t.logicalModelId,
         creditCost: t.creditCost,

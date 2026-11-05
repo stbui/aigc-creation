@@ -10,14 +10,15 @@
  */
 
 import type { GalleryItem } from './hooks';
-import { buildBatchRows, formatBatchDate, type BatchRowBase } from '../../components/batchResult';
+import { buildBatchRows, cellState, formatBatchDate, type BatchRowBase } from '../../components/batchResult';
+import { languageOptions, platformDetailSpec, platformOptions } from '../../lib/optionSets';
 
 /* ------------------------------------------------------------------------- */
 /* 外部工具转出                                                             */
 /* ------------------------------------------------------------------------- */
 
 /** 平台 / 语言选项集（读自后端能力清单） */
-export { languageOptions, platformDetailSpec, platformOptions } from '../../lib/optionSets';
+export { languageOptions, platformDetailSpec, platformOptions };
 /** 缩略图地址换算 */
 export { assetThumbUrl } from '../../lib/api';
 
@@ -50,6 +51,61 @@ export { batchIndexOf, cellState } from '../../components/batchResult';
 export interface ResultRow extends BatchRowBase {
   prompt?: string;
   productName?: string;
+  /** 结果卡第二行展示的任务参数；同批次内各任务共用一份 */
+  meta: ResultMeta;
+}
+
+/** 商品详情结果卡的参数摘要 */
+export interface ResultMeta {
+  resolution?: string;
+  ratio?: string;
+  platform?: string;
+  country?: string;
+  language?: string;
+}
+
+/** 输出语言的地区码 → 国家/地区展示名。取值来自当前 LANGUAGES 的 locale 列表。 */
+const COUNTRY_BY_REGION: Record<string, string> = {
+  CN: '中国',
+  US: '美国',
+  RU: '俄罗斯',
+  ES: '西班牙',
+  DE: '德国',
+  JP: '日本',
+  KR: '韩国',
+  PT: '葡萄牙',
+  ID: '印度尼西亚',
+  TH: '泰国',
+};
+
+function optionLabel(options: Array<{ value: string | number; label: string }>, value?: string): string | undefined {
+  if (!value) return undefined;
+  return options.find((option) => String(option.value) === value)?.label ?? value;
+}
+
+/** 从任务参数提取结果卡参数摘要。缺失字段不补默认值，避免把旧任务伪装成新参数。 */
+export function resultMetaOf(item: GalleryItem): ResultMeta {
+  const language = textParam(item, 'language');
+  const region = language?.split('-')[1]?.toUpperCase();
+  return {
+    resolution: textParam(item, 'size'),
+    ratio: textParam(item, 'ratio'),
+    platform: optionLabel(platformOptions(), textParam(item, 'platform')),
+    country: region ? COUNTRY_BY_REGION[region] : undefined,
+    language: optionLabel(languageOptions(), language),
+  };
+}
+
+export type ResultStatusTone = 'processing' | 'done' | 'partial' | 'failed';
+
+/** 批次状态：任一生成中 → 生成中；终态后按成功/失败数量区分。 */
+export function resultStatusOf(cells: GalleryItem[]): { label: string; tone: ResultStatusTone } {
+  const ready = cells.filter((item) => cellState(item) === 'ready').length;
+  const failed = cells.filter((item) => cellState(item) === 'failed').length;
+  if (cells.some((item) => cellState(item) === 'pending')) return { label: '生成中', tone: 'processing' };
+  if (failed > 0 && ready > 0) return { label: '部分失败', tone: 'partial' };
+  if (failed > 0) return { label: '生成失败', tone: 'failed' };
+  return { label: '已完成', tone: 'done' };
 }
 
 /** 格子的模块名: 优先任务参数里的 sectionLabel, 回落任务 caption */
@@ -83,11 +139,12 @@ export function countGenerations(items: GalleryItem[]): number {
 
 /** 按 batchId 归组; 无 batchId 的任务各自成行。列表本身已按时间倒序 */
 export function buildRows(items: GalleryItem[]): ResultRow[] {
-  return buildBatchRows<{ prompt?: string; productName?: string }>(
+  return buildBatchRows<{ prompt?: string; productName?: string; meta: ResultMeta }>(
     items,
     (item) => ({
       prompt: textParam(item, 'description'),
       productName: textParam(item, 'productName'),
+      meta: resultMetaOf(item),
     }),
     rowKeyOf,
   );

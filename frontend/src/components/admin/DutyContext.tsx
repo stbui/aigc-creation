@@ -57,7 +57,6 @@ export interface DutyTask {
   status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled';
   capabilityName: string;
   errorCode: string | null;
-  provider: string | null;
   durationMs: number;
   createdAt: string;
   thumbnailUrl: string | null;
@@ -191,7 +190,6 @@ async function fetchTaskDuty(fetchChannels: boolean): Promise<DutyData> {
     status: t.status,
     capabilityName: t.capabilityName,
     errorCode: t.errorCode,
-    provider: t.provider,
     durationMs: t.durationMs,
     createdAt: t.createdAt,
     thumbnailUrl: t.thumbnailUrl,

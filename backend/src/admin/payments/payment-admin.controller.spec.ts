@@ -5,7 +5,10 @@ import {
   PERMISSION_KEY,
 } from "../admin.decorator";
 import { PERMISSIONS } from "../permissions";
-import { AdminPaymentOrdersController } from "./payment-admin.controller";
+import {
+  AdminPaymentExceptionsController,
+  AdminPaymentOrdersController,
+} from "./payment-admin.controller";
 
 describe("AdminPaymentOrdersController 权限口径", () => {
   it("支付订单列表、详情与导出统一使用支付域读权限", () => {
@@ -60,5 +63,36 @@ describe("AdminPaymentOrdersController 权限口径", () => {
         AdminPaymentOrdersController.prototype.close,
       ),
     ).toBe("payment.order_close");
+  });
+});
+
+describe("AdminPaymentExceptionsController 权限口径", () => {
+  it("异常单读取与资金处置分离权限", () => {
+    expect(
+      Reflect.getMetadata(
+        PERMISSION_KEY,
+        AdminPaymentExceptionsController.prototype.list,
+      ),
+    ).toBe(PERMISSIONS.paymentRead);
+    expect(
+      Reflect.getMetadata(
+        PERMISSION_KEY,
+        AdminPaymentExceptionsController.prototype.detail,
+      ),
+    ).toBe(PERMISSIONS.paymentRead);
+    for (const action of ["claim", "retryRefund", "close"] as const) {
+      expect(
+        Reflect.getMetadata(
+          PERMISSION_KEY,
+          AdminPaymentExceptionsController.prototype[action],
+        ),
+      ).toBe(PERMISSIONS.financeReconcile);
+      expect(
+        Reflect.getMetadata(
+          AUDIT_ACTION_KEY,
+          AdminPaymentExceptionsController.prototype[action],
+        ),
+      ).toMatch(/^payment\.exception_/);
+    }
   });
 });

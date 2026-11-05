@@ -5,6 +5,7 @@ import { AppError } from '../common/app.exception';
 import { PaymentCipher } from './payment-cipher';
 import { PaymentConfigService } from './payment-config.service';
 import { PaymentOrderService } from './payment-order.service';
+import { PaymentExceptionService } from './payment-exception.service';
 import { getAdapter } from './adapters';
 import { NotificationResult, PaymentAck, PaymentProviderId } from './adapters/types';
 
@@ -35,6 +36,7 @@ export class PaymentNotificationService {
     private readonly cipher: PaymentCipher,
     private readonly configs: PaymentConfigService,
     private readonly orders: PaymentOrderService,
+    private readonly exceptions: PaymentExceptionService,
   ) {}
 
   async ingest(input: {
@@ -491,6 +493,33 @@ export class PaymentNotificationService {
         },
         update: { result: input.result, detail: input.detail.slice(0, 200) },
       });
+
+      // 对账明细是运行快照；另建不会随下一次运行消失的补偿单。
+      // 已取消订单若能精确匹配到成功支付流水，立即尝试原路退款。
+      const order = input.orderId
+        ? await this.prisma.order.findUnique({ where: { id: input.orderId }, select: { status: true } })
+        : await this.prisma.order.findUnique({ where: { orderNo: input.merchantOrderNo }, select: { status: true } });
+      if (order?.status === 'cancelled' && input.providerTradeNo) {
+        await this.exceptions.autoRefundCancelledPayment({
+          providerId: input.providerId,
+          merchantOrderNo: input.merchantOrderNo,
+          providerTradeNo: input.providerTradeNo,
+          amountCents: input.amountCents,
+          currency: input.currency,
+          detail: input.detail,
+        });
+      } else {
+        await this.exceptions.recordManual({
+          providerId: input.providerId,
+          orderId: input.orderId,
+          merchantOrderNo: input.merchantOrderNo,
+          providerTradeNo: input.providerTradeNo,
+          amountCents: input.amountCents,
+          currency: input.currency,
+          kind: input.result,
+          detail: input.detail,
+        });
+      }
       const counts = await this.prisma.paymentReconciliationItem.groupBy({
         by: ['result'],
         where: { runId: run.id },

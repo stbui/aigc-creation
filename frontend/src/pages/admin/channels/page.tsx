@@ -378,7 +378,7 @@ export function AdminChannelsPage() {
           <div data-testid="admin-all-models">
             <Panel
               title="全部模型"
-              note="跨渠道视图：一次看遍所有线路的稳定性、成本与售价。停用的模型也会列出，便于排查与重新启用。"
+              note="跨渠道视图：模型停用只撤下这一条线路；渠道停用会撤下其下全部模型。两种配置都会保留，可随时恢复。"
             >
               <AllChannelModelsPanel
                 writable={can('channel.model_write')}

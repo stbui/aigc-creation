@@ -279,7 +279,7 @@ export function ChannelListPanel({
                         }`}
                         aria-hidden
                       />
-                      {row.enabled ? '启用' : '停用'}
+                      {row.enabled ? '渠道启用' : '渠道停用'}
                     </span>
                     <span className="tabular-nums">{row.modelCosts?.length ?? 0} 个模型</span>
                     {rate !== null && (

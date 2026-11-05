@@ -79,6 +79,178 @@
   cursor: not-allowed;
 }
 
+/* ── 商品详情卡片布局 ────────────────────────────────────────────────
+ * 第一行商品名 + 时间, 第二行任务参数 + 状态, 第三行原图 + 一键下载,
+ * 之后是三列生成图。信息按阅读顺序分层, 不再把参数挤在横向缩略图行头。 */
+.pd-result-card {
+  padding: 16px;
+}
+
+.pd-result-card-head {
+  align-items: flex-start;
+  margin-bottom: 8px;
+}
+
+.pd-result-card-title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pd-result-card-title strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-strong);
+  font-size: 14px;
+  font-weight: 650;
+  line-height: 1.5;
+}
+
+.pd-result-card-title time {
+  flex: none;
+  color: var(--text-desc);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+
+.pd-result-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.pd-result-meta-chip,
+.pd-result-status {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-body);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.pd-result-meta-chip {
+  font-variant-numeric: tabular-nums;
+}
+
+.pd-result-status.is-processing {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.pd-result-status.is-done {
+  background: var(--success-soft-bg);
+  color: var(--success-text);
+}
+
+.pd-result-status.is-partial {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.pd-result-status.is-failed {
+  background: var(--danger-soft-bg);
+  color: var(--danger-soft-text);
+}
+
+.pd-result-card-source {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.pd-result-card-source-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pd-result-card-source-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pd-result-card-source-thumbs .pd-result-source-thumb {
+  flex: 0 0 52px;
+  width: 52px;
+  aspect-ratio: 1;
+  background: var(--card-bg);
+}
+
+.pd-result-card-source-empty {
+  flex: none;
+  color: var(--text-desc);
+  font-size: 12px;
+}
+
+.pd-result-download-all {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--brand);
+  border-radius: var(--radius-control);
+  background: var(--brand);
+  color: var(--card-bg);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.pd-result-download-all:hover:not(:disabled) {
+  border-color: var(--brand-hover);
+  background: var(--brand-hover);
+}
+
+.pd-result-download-all:disabled {
+  border-color: var(--border);
+  background: var(--border);
+  color: var(--text-desc);
+  cursor: not-allowed;
+}
+
+.pd-result-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pd-result-card-grid .pd-result-cell {
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+}
+
+.pd-result-card-grid .pd-result-thumb {
+  aspect-ratio: 3 / 4;
+}
+
 .pd-result-strip {
   display: flex;
   align-items: flex-start;
@@ -297,6 +469,24 @@
 @media (max-width: 640px) {
   .pd-result-row {
     padding: 10px 12px 12px;
+  }
+  .pd-result-card-title {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .pd-result-card-source {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .pd-result-card-source-main {
+    width: 100%;
+  }
+  .pd-result-download-all {
+    align-self: stretch;
+  }
+  .pd-result-card-grid {
+    gap: 8px;
   }
   /* 手机宽度再收一档, 两格半可见即可 */
   .pd-result-cell {

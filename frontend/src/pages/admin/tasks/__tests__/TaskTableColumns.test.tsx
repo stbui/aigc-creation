@@ -16,7 +16,6 @@ const BASE_TASK: AdminTaskRow = {
   capability: 'main_image',
   capabilityName: '主图生成',
   status: 'failed',
-  provider: 'gateway',
   errorCode: 'MODEL_ERROR',
   creditCost: 10,
   retriedFromId: null,

@@ -50,24 +50,34 @@ export function isSupportedImageFile(file: { type: string }): boolean {
   return (SUPPORTED_IMAGE_TYPES as readonly string[]).includes(file.type);
 }
 export const POLL_INTERVAL_MS = 1200;
-export const POLL_MAX_TRIES = 60;
+
+/** 后端任务进入终态后还要下载、写 AIGC 标识并落盘，前端多留 2 分钟取结果。 */
+const POLL_RESULT_GRACE_MS = 2 * 60_000;
+
+/**
+ * 普通图像任务的轮询上限。
+ *
+ * 后端 `TaskWorkerService` 对图像任务的总轮询时限是 15 分钟；此前前端只等
+ * 60 × 1.2s ≈ 72s，模型稍慢就会把仍在后台运行的任务误报成 `POLL_TIMEOUT`。
+ * 2026-11-05 的自由创作任务实际耗时约 4 分钟并在后台成功，用户却先看到失败。
+ */
+export const POLL_MAX_TRIES = Math.ceil((15 * 60_000 + POLL_RESULT_GRACE_MS) / POLL_INTERVAL_MS);
 /**
  * 多图融合的轮询上限。
  *
- * 一次提交会并发调用模型 1-4 次，单次通道超时 120s，实测 4 变体约 85s；
- * 沿用图像 60 次 ≈ 72s 会把已经成功落库的任务误报为 POLL_TIMEOUT。
- * 失败候选会再重试一次；按单路通道超时 120s 计算，两轮最坏约 4 分钟，
- * 550 × 1.2s ≈ 11 分钟，覆盖通道等待、重试、AIGC 标识和落库时间。
+ * 多图融合仍是图像模态，后台沿用统一的 15 分钟总时限；不能因为一次生成
+ * 多个变体反而比普通图片更早被前端判失败。
  */
-export const POLL_MULTI_FUSION_MAX_TRIES = 550;
+export const POLL_MULTI_FUSION_MAX_TRIES = POLL_MAX_TRIES;
 /**
  * 视频任务的轮询上限。
  *
- * 视频生成实际需要 1–2 分钟（后端视频超时 600s），沿用图像那 60 次 ≈ 72s
- * 会让视频任务在前端**必然超时**：任务还在后台跑、已扣费，界面却报失败。
- * 550 × 1.2s ≈ 11 分钟，覆盖后端超时后再留一点下载余量。
+ * 后端 `TaskWorkerService` 对视频任务的总轮询时限是 60 分钟；前端窗口必须
+ * 覆盖后台终态，否则任务还在跑、已扣费，界面却会提前报失败。
  */
-export const POLL_VIDEO_MAX_TRIES = 550;
+export const POLL_VIDEO_MAX_TRIES = Math.ceil(
+  (60 * 60_000 + POLL_RESULT_GRACE_MS) / POLL_INTERVAL_MS,
+);
 
 /**
  * 能力清单不再硬编码在前端 —— 全部来自 GET /api/v1/capabilities
@@ -78,7 +88,6 @@ export const POLL_VIDEO_MAX_TRIES = 550;
  * 能力模式对应的界面标注。
  *
  * mode 只回答「这项能力是否已接入真实模型通道」。
- * 单次请求实际走的线路以 task.provider 为准，由结果卡显示来源徽标。
  */
 export const MODE_LABELS: Record<string, string> = {
   real: '已接入',

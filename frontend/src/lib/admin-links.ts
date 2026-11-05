@@ -40,6 +40,10 @@ export function adminTaskHref(id: string): string {
   return href('/admin/tasks', { id });
 }
 
+export function adminModelCallsHref(filters: { taskId?: string }): string {
+  return href('/admin/model-calls', filters);
+}
+
 export function adminTasksHref(filters: { userId?: string; projectId?: string }): string {
   return href('/admin/tasks', filters);
 }

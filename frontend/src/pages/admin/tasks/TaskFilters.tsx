@@ -16,8 +16,6 @@ interface TaskFiltersProps {
   onStatusChange: (value: string | undefined) => void;
   capability?: string;
   onCapabilityChange: (value: string | undefined) => void;
-  provider?: string;
-  onProviderChange: (value: string | undefined) => void;
   owner: string;
   onOwnerChange: (value: string) => void;
   project: string;
@@ -27,7 +25,6 @@ interface TaskFiltersProps {
   to: string;
   onToChange: (value: string) => void;
   capabilityOptions: SelectFieldOption[];
-  providerOptions: SelectFieldOption[];
   appliedChips: AppliedFilter[];
   onApply: () => void;
   onReset: () => void;
@@ -39,8 +36,6 @@ export function TaskFilters({
   onStatusChange,
   capability,
   onCapabilityChange,
-  provider,
-  onProviderChange,
   owner,
   onOwnerChange,
   project,
@@ -50,7 +45,6 @@ export function TaskFilters({
   to,
   onToChange,
   capabilityOptions,
-  providerOptions,
   appliedChips,
   onApply,
   onReset,
@@ -74,15 +68,6 @@ export function TaskFilters({
         value={capability}
         onChange={onCapabilityChange}
         options={capabilityOptions}
-      />
-      <SelectField
-        className="w-28"
-        ariaLabel="按通道筛选"
-        placeholder="通道"
-        allowClear
-        value={provider}
-        onChange={onProviderChange}
-        options={providerOptions}
       />
       {/*
        * 用户/项目用 id 直填而非下拉：

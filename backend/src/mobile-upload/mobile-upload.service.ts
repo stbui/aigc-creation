@@ -52,8 +52,8 @@ export class MobileUploadService {
    * 手机端上传不需要登录, 令牌是唯一凭证 —— 会话创建就是权限边界的入口。
    */
   async create(ownerId: string, projectId: string): Promise<MobileUploadSession> {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, deletedAt: null },
       select: { ownerId: true },
     });
     if (!project || project.ownerId !== ownerId) {
@@ -151,8 +151,8 @@ export class MobileUploadService {
      * 就会产生指向不存在项目的素材 (孤儿行), 或写进已经不属于该用户的
      * 项目里 —— 会话创建时校验过一次不能代替写入时校验。
      */
-    const project = await this.prisma.project.findUnique({
-      where: { id: s.projectId },
+    const project = await this.prisma.project.findFirst({
+      where: { id: s.projectId, deletedAt: null },
       select: { ownerId: true },
     });
     if (!project || project.ownerId !== s.ownerId) {
@@ -177,33 +177,65 @@ export class MobileUploadService {
 
     // 落存储: 走既有存储抽象层, 与网页上传同一条路径
     const provider = this.storage.getActive();
-    const created: Array<{ id: string; url: string; signedUrl: string | null; filename: string }> = [];
-    for (const { file, mime } of prepared) {
-      const ext = extOf(mime);
-      const key = this.storage.buildKey('original', ext);
-      await provider.put(key, file.data, mime);
-      const url = await provider.url(key);
+    const storedFiles: Array<{ key: string; url: string; ext: string; file: typeof files[number] }> = [];
+    let created: Array<{ id: string; url: string; signedUrl: string | null; filename: string }>;
+    try {
+      for (const { file, mime } of prepared) {
+        const ext = extOf(mime);
+        const key = this.storage.buildKey('original', ext);
+        await provider.put(key, file.data, mime);
+        const url = await provider.url(key);
+        storedFiles.push({ key, url, ext, file });
+      }
 
-      // 落素材表: 图片进入用户素材库, 与网页上传的素材同构
-      const asset = await this.prisma.asset.create({
-        data: {
-          projectId: s.projectId,
-          ownerId: s.ownerId,
-          kind: 'original',
-          sourceUrl: url,
-          format: ext,
-          sizeBytes: file.data.length,
-          storageBackend: provider.backend,
-          storageKey: key,
-        },
+      const assets = await this.prisma.$transaction(async (tx) => {
+        // 文件写入/转码期间项目仍可能被后台软删；项目复核与素材落库同事务，
+        // 避免在删除事务之后又写入一批 visible 素材。
+        const activeProject = await tx.project.findFirst({
+          where: { id: s.projectId, ownerId: s.ownerId, deletedAt: null },
+          select: { id: true },
+        });
+        if (!activeProject) {
+          throw new AppError(41000, '目标项目已不存在，请在电脑端刷新后重试', 410);
+        }
+
+        const rows = [];
+        for (const stored of storedFiles) {
+          // 落素材表: 图片进入用户素材库, 与网页上传的素材同构
+          rows.push(
+            await tx.asset.create({
+              data: {
+                projectId: s.projectId,
+                ownerId: s.ownerId,
+                kind: 'original',
+                sourceUrl: stored.url,
+                format: stored.ext,
+                sizeBytes: stored.file.data.length,
+                storageBackend: provider.backend,
+                storageKey: stored.key,
+              },
+            }),
+          );
+        }
+        return rows;
       });
-      // 与素材库同一条兼容策略：sourceUrl 给服务端内部用，signedUrl 给 <img>
-      created.push({
-        id: asset.id,
-        url,
-        signedUrl: this.signedUrl.sign(url, { userId: s.ownerId }),
-        filename: file.filename || '手机上传图片',
+
+      created = assets.map((asset, index) => {
+        const stored = storedFiles[index];
+        return {
+          id: asset.id,
+          url: stored.url,
+          signedUrl: this.signedUrl.sign(stored.url, { userId: s.ownerId }),
+          filename: stored.file.filename || '手机上传图片',
+        };
       });
+    } catch (error) {
+      // 事务失败时清掉刚写入的对象，避免在已删项目之外再留下无主文件。
+      await Promise.all(
+        storedFiles.map((stored) => provider.delete(stored.key).catch(() => undefined)),
+      );
+      if (error instanceof AppError && error.code === 41000) s.status = 'expired';
+      throw error;
     }
 
     s.status = 'received';

@@ -7,6 +7,7 @@ import { MembershipService, parsePerks } from '../membership/membership.service'
 import { MarketingService } from '../marketing/marketing.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PaymentGateway } from '../payments/payment-gateway';
+import { PaymentExceptionService } from '../payments/payment-exception.service';
 import type { RefundResult } from '../payments/adapters/types';
 import type { Prisma, Refund } from '@prisma/client';
 
@@ -122,6 +123,7 @@ export class OrderService {
      * 不是 `PaymentsModule` —— 后者反过来 import 了本模块。
      */
     private readonly gateway: PaymentGateway,
+    private readonly paymentExceptions: PaymentExceptionService,
   ) {}
 
   // ── 下单 ──────────────────────────────────────────────────────────
@@ -1144,10 +1146,17 @@ export class OrderService {
           409,
         );
       }
-      const payment = fresh.payments[0];
-      if (!payment) {
+      if (fresh.payments.length === 0) {
         throw new AppError(40901, '订单无成功支付记录, 无法退款', 409);
       }
+      if (fresh.payments.length > 1) {
+        throw new AppError(
+          40901,
+          '订单存在多笔成功支付记录，疑似重复扣款；请先在支付对账异常单中核对，禁止直接选择其中一笔退款',
+          409,
+        );
+      }
+      const payment = fresh.payments[0];
 
       const latestFailed = await tx.refund.findFirst({
         where: {
@@ -1250,6 +1259,17 @@ export class OrderService {
       this.logger.error(
         `渠道退款未完成: order=${order.id} refund=${refund.id} channel=${channel} — ${channelResult.error}`,
       );
+      await this.recordRefundException({
+        orderId: order.id,
+        refundId: refund.id,
+        merchantOrderNo: order.orderNo,
+        providerId: payment.channel,
+        providerTradeNo: payment.payTransactionId,
+        amountCents: params.amountCents,
+        currency: order.currency,
+        kind: 'refund_failed',
+        detail: channelResult.error ?? '渠道退款失败',
+      });
       /*
        * 50302 + HTTP 502: 钱没退成, 但这不是「参数错」也不是「规则拦」。
        * 文案必须点明「订单状态与积分未变更」—— 否则运营会怀疑积分已经被扣回。
@@ -1281,6 +1301,17 @@ export class OrderService {
       this.logger.warn(
         `渠道退款异步处理中: order=${order.id} refund=${refund.id} channel=${channel} providerRefundId=${channelResult.providerRefundId ?? '-'}`,
       );
+      await this.recordRefundException({
+        orderId: order.id,
+        refundId: refund.id,
+        merchantOrderNo: order.orderNo,
+        providerId: payment.channel,
+        providerTradeNo: payment.payTransactionId,
+        amountCents: params.amountCents,
+        currency: order.currency,
+        kind: 'refund_processing',
+        detail: '渠道已受理退款但仍在异步处理中，需到商户后台核销',
+      });
       return {
         refundId: refund.id,
         state: 'processing' as const,
@@ -1352,6 +1383,7 @@ export class OrderService {
       this.logger.log(
         `人工确认渠道退款成功: order=${params.orderId} refund=${params.refundId} operator=${params.operatorId}`,
       );
+      await this.paymentExceptions.markRefundResolved(params.refundId, 'succeeded');
       return result;
     }
 
@@ -1403,7 +1435,39 @@ export class OrderService {
     this.logger.warn(
       `人工确认渠道退款失败: order=${params.orderId} refund=${params.refundId} operator=${params.operatorId}`,
     );
+    await this.paymentExceptions.markRefundResolved(params.refundId, 'failed');
     return result;
+  }
+
+  /**
+   * 退款失败/异步处理中的异常单统一入口。
+   *
+   * 异常单必须绑定退款单，运营人工核销时才能精确回写对应记录；同一退款单
+   * 的重复调用由 PaymentExceptionService 的指纹幂等吸收。
+   */
+  private async recordRefundException(input: {
+    orderId: string;
+    refundId: string;
+    merchantOrderNo: string;
+    providerId: string;
+    providerTradeNo?: string | null;
+    amountCents: number;
+    currency: string;
+    kind: 'refund_failed' | 'refund_processing';
+    detail: string;
+  }) {
+    return this.paymentExceptions.recordManual({
+      providerId: input.providerId,
+      orderId: input.orderId,
+      refundId: input.refundId,
+      merchantOrderNo: input.merchantOrderNo,
+      providerTradeNo: input.providerTradeNo,
+      amountCents: input.amountCents,
+      currency: input.currency,
+      kind: input.kind,
+      detail: input.detail,
+      priority: 'urgent',
+    });
   }
 
   /**

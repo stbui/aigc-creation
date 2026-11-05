@@ -134,7 +134,7 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 - `ids` 去重，上限 100；
 - **串行**执行，**不包事务**——一条失败不该回滚另外 99 条；
 - 逐条返回 `{ id, ok, message?, data? }`；
-- 前端 `admin-ui/primitives/batch-result` 的 `BatchResultModal` 把失败项排在最前。
+- 前端批量动作完成后用 toast 汇报成功 / 失败条数，不再弹逐条结果框。
 
 路由挂较弱读权限，处理器内再用 `AdminRoleService.hasPermission()` 判动作权限（`40301`）。
 
@@ -227,12 +227,12 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 
 ### 4.2 规则
 
-- 详情抽屉给：输入素材缩略图、参数 JSON（`JSON.stringify(params, null, 2)`）、产出图、完整错误码、耗时。
+- 详情抽屉给：输入素材缩略图、参数 JSON（`JSON.stringify(params, null, 2)`）、产出图、完整错误码、耗时，以及该任务最近 20 次模型调用（成功 / 失败 / 取消、渠道、模型、耗时与错误摘要）。调用记录需 `model.call_read`，无权限时不请求；区块底部可深链到 `/admin/model-calls?taskId=` 查看全部。
 - **重试不复用旧记录**：用原参数与原输入新建任务，再复用 `GenerateService.enqueue` 触发执行。原地复活会绕过 `GenerationTask.outputAssetId @unique` 的一产出约束。
 - **终止**把 `running` 置 `failed` + `cancelled_by_admin`，按任务快照退款。
 - 统计条显示各状态计数，积压（`pending` / `running`）超阈值标红。
 - **导出** CSV 与列表共用 `listWhere`，筛什么导什么，上限 5000 行，需 `task.read + data.export` 并留审计。
-- **性能**：能力 / 通道筛选项的全表 `groupBy` 缓存 60 秒；拥堵指标仍实时查询。`GenerationTask` 增加 `[status, createdAt]` 与 `[ownerId, createdAt]` 组合索引，服务「状态 + 时间窗」和用户详情时间线。
+- **性能**：能力筛选项的全表 `groupBy` 缓存 60 秒；拥堵指标仍实时查询。`GenerationTask` 增加 `[status, createdAt]` 与 `[ownerId, createdAt]` 组合索引，服务「状态 + 时间窗」和用户详情时间线。
 - 告警链接 `?status=failed|running` 会作为列表初始筛选；页面已打开时 URL 变化也会同步过去。
 
 ---

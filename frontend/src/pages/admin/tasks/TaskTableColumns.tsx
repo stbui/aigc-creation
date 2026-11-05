@@ -6,7 +6,6 @@ import {
   type AdminColumn,
 } from '~/admin-ui/primitives';
 import { assetThumbUrl } from './api';
-import { PROVIDER_LABELS } from './constants';
 import {
   adminTasksHref,
   adminUserDetailHref,
@@ -69,23 +68,6 @@ export function useTaskTableColumns({
         cellTitle: (row) =>
           row.status === 'failed' && row.errorCode ? taskErrorLabel(row.errorCode) : undefined,
         render: (row) => <StatusTag status={row.status} />,
-      },
-      {
-        key: 'provider',
-        title: '通道',
-        width: 78,
-        /*
-         * `pending` 是建任务时的初值（还没跑出真实通道）。对失败任务显示「待执行」
-         * 会与同一行的「失败」互相矛盾，读起来像任务没开始跑；这类行一律显示「—」。
-         */
-        render: (row) =>
-          !row.provider || (row.provider === 'pending' && row.status !== 'queued') ? (
-            <span className="text-muted-foreground">—</span>
-          ) : (
-            <span className="rounded bg-muted px-1.5 py-0.5 text-[12px] whitespace-nowrap text-muted-foreground">
-              {PROVIDER_LABELS[row.provider] ?? row.provider}
-            </span>
-          ),
       },
       {
         key: 'user',

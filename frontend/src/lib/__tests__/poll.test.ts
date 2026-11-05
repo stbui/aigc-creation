@@ -169,7 +169,6 @@ describe('pollToResult', () => {
     getTask.mockResolvedValue(
       makeTask({
         status: 'succeeded',
-        provider: 'gateway',
         outputAsset: {
           id: 'asset-1',
           sourceUrl: '/uploads/a.png',
@@ -192,7 +191,6 @@ describe('pollToResult', () => {
       width: 1024,
       height: 768,
       errorCode: null,
-      provider: 'gateway',
       modality: 'image',
       durationMs: undefined,
       outputs: [
@@ -235,7 +233,6 @@ describe('pollToResult', () => {
     getTask.mockResolvedValue(
       makeTask({
         status: 'succeeded',
-        provider: 'gateway',
         outputAsset: outputAssets?.[0] ?? null,
         outputAssets,
       }),

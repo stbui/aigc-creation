@@ -68,7 +68,7 @@ export function outputsOf(done: PolledResult): PolledOutput[] {
   return done.url ? [{ url: done.url, width: done.width, height: done.height }] : [];
 }
 
-/** 产出 → 结果卡片; `provider` 取本单实际通道 (新任务恒为 gateway)。 */
+/** 产出 → 结果卡片。 */
 export function resultsOf(done: PolledResult): ToolResult[] {
   return outputsOf(done).map((output) => ({
     status: 'succeeded',
@@ -77,7 +77,6 @@ export function resultsOf(done: PolledResult): ToolResult[] {
     height: output.height,
     modality: output.modality,
     durationMs: output.durationMs,
-    provider: done.provider,
   }));
 }
 

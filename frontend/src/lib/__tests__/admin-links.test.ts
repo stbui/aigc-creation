@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   adminAssetHref,
   adminCreditHref,
+  adminModelCallsHref,
   adminOrderHref,
   adminOrderDetailHref,
   adminTaskHref,
@@ -26,6 +27,10 @@ describe('admin-links', () => {
   it('omits empty filters and supports task and asset deep links', () => {
     expect(adminTasksHref({})).toBe('/admin/tasks');
     expect(adminTaskHref('task/1')).toBe('/admin/tasks?id=task%2F1');
+    expect(adminModelCallsHref({ taskId: 'task/1' })).toBe(
+      '/admin/model-calls?taskId=task%2F1',
+    );
+    expect(adminModelCallsHref({})).toBe('/admin/model-calls');
     expect(adminAssetHref('asset 1')).toBe('/admin/assets?q=asset+1');
   });
 });

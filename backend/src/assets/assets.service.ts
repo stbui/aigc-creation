@@ -8,6 +8,7 @@ import { resolveUploadsDir } from '../config/env-files';
 import { SignedUrlService } from '../common/signed-url.service';
 import type { StorageBackend } from '../storage/storage.provider';
 import { inspectUploadedImage, maxUploadBytes, verifyDecodableImage } from './image-validation';
+import { detachAssetFromTasks } from './task-output-links';
 
 export interface UploadedFileMeta {
   filename: string;
@@ -79,7 +80,9 @@ export class AssetsService {
         throw new AppError(40001, 'projectId 必填', 400);
       }
 
-      const project = await this.prisma.project.findUnique({ where: { id: projectId } });
+      const project = await this.prisma.project.findFirst({
+        where: { id: projectId, deletedAt: null },
+      });
       if (!project || project.ownerId !== ownerId) {
         throw new AppError(40001, '项目不存在或无权限', 403);
       }
@@ -101,20 +104,31 @@ export class AssetsService {
 
       // 返回值也要 decorate：上传成功后前端立刻用返回值渲染缩略图，
       // 少这一层会出现「刚传完的图 403，刷新列表又好了」的怪异现象。
-      const created = await this.prisma.asset.create({
-        data: {
-          projectId,
-          ownerId,
-          kind: 'original',
-          sourceUrl: url,
-          format: info.mime,
-          sizeBytes: stored.sizeBytes,
-          width: info.width,
-          height: info.height,
-          storageBackend: provider.backend,
-          storageKey: key,
-          ...normalizeSource(source),
-        },
+      const created = await this.prisma.$transaction(async (tx) => {
+        // 项目校验与素材落库必须在同一事务内：否则后台软删项目可能发生在
+        // 两次查询之间，留下一个属于已删项目、却仍是 visible 的新素材。
+        const activeProject = await tx.project.findFirst({
+          where: { id: projectId, ownerId, deletedAt: null },
+          select: { id: true },
+        });
+        if (!activeProject) {
+          throw new AppError(40001, '项目不存在或无权限', 403);
+        }
+        return tx.asset.create({
+          data: {
+            projectId,
+            ownerId,
+            kind: 'original',
+            sourceUrl: url,
+            format: info.mime,
+            sizeBytes: stored.sizeBytes,
+            width: info.width,
+            height: info.height,
+            storageBackend: provider.backend,
+            storageKey: key,
+            ...normalizeSource(source),
+          },
+        });
       });
       return this.decorate(created);
     } catch (error) {
@@ -157,7 +171,11 @@ export class AssetsService {
       to?: string;
     } = {},
   ) {
-    const where: Record<string, unknown> = { ownerId, status: 'visible' };
+    const where: Record<string, unknown> = {
+      ownerId,
+      status: 'visible',
+      project: { deletedAt: null },
+    };
     if (query.kind === 'original' || query.kind === 'generated') where.kind = query.kind;
     if (query.capability) where.capability = query.capability;
 
@@ -193,8 +211,10 @@ export class AssetsService {
   }
 
   async getOne(ownerId: string, id: string) {
-    const asset = await this.prisma.asset.findUnique({ where: { id } });
-    if (!asset || asset.ownerId !== ownerId) {
+    const asset = await this.prisma.asset.findFirst({
+      where: { id, ownerId, project: { deletedAt: null } },
+    });
+    if (!asset) {
       throw new AppError(40400, '素材不存在', 404);
     }
     return this.decorate(asset);
@@ -212,16 +232,10 @@ export class AssetsService {
       throw new AppError(40400, '素材不存在', 404);
     }
 
-    const producedTasks = await this.prisma.generationTask.findMany({
-      where: { outputAssetId: id },
-      select: { id: true },
-    });
-
-    await this.prisma.$transaction(async (tx) => {
-      if (producedTasks.length) {
-        await tx.generationTask.deleteMany({ where: { id: { in: producedTasks.map((t) => t.id) } } });
-      }
+    const removedTasks = await this.prisma.$transaction(async (tx) => {
+      const count = await detachAssetFromTasks(tx, id);
       await tx.asset.delete({ where: { id } });
+      return count;
     });
 
     // 按**写入时的后端**删除, 不能用当前默认后端
@@ -232,7 +246,7 @@ export class AssetsService {
       await removeThumbnailCache(asset.storageKey).catch(() => undefined);
     }
 
-    return { id, removedTasks: producedTasks.length };
+    return { id, removedTasks };
   }
 
   /**
@@ -252,7 +266,9 @@ export class AssetsService {
       throw new AppError(40001, '请选择要移动的素材', 400);
     }
 
-    const project = await this.prisma.project.findUnique({ where: { id: projectId } });
+    const project = await this.prisma.project.findFirst({
+      where: { id: projectId, deletedAt: null },
+    });
     if (!project || project.ownerId !== ownerId) {
       throw new AppError(40001, '项目不存在或无权限', 403);
     }
@@ -266,9 +282,18 @@ export class AssetsService {
     const missing = ids.filter((id) => !ownedSet.has(id));
 
     if (movable.length > 0) {
-      await this.prisma.asset.updateMany({
-        where: { id: { in: movable }, ownerId },
-        data: { projectId },
+      await this.prisma.$transaction(async (tx) => {
+        const activeProject = await tx.project.findFirst({
+          where: { id: projectId, ownerId, deletedAt: null },
+          select: { id: true },
+        });
+        if (!activeProject) {
+          throw new AppError(40001, '项目不存在或无权限', 403);
+        }
+        await tx.asset.updateMany({
+          where: { id: { in: movable }, ownerId },
+          data: { projectId },
+        });
       });
     }
 

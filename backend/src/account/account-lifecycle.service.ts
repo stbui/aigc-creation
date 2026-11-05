@@ -30,7 +30,7 @@ export class AccountLifecycleService {
       select: { email: true, name: true, createdAt: true },
     });
     const [projects, tasks, assets, orders, notifications] = await Promise.all([
-      this.prisma.project.count({ where: { ownerId: userId } }),
+      this.prisma.project.count({ where: { ownerId: userId, deletedAt: null } }),
       this.prisma.generationTask.count({ where: { ownerId: userId } }),
       this.prisma.asset.count({ where: { ownerId: userId } }),
       this.prisma.order.count({ where: { userId } }),

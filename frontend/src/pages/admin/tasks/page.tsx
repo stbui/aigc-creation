@@ -69,8 +69,6 @@ export function AdminTasksPage() {
         onStatusChange={filters.setStatus}
         capability={filters.capability}
         onCapabilityChange={filters.setCapability}
-        provider={filters.provider}
-        onProviderChange={filters.setProvider}
         owner={filters.owner}
         onOwnerChange={filters.setOwner}
         project={filters.project}
@@ -80,7 +78,6 @@ export function AdminTasksPage() {
         to={filters.to}
         onToChange={filters.setTo}
         capabilityOptions={filters.capOptions}
-        providerOptions={filters.providerOptions}
         appliedChips={filters.appliedChips}
         onApply={filters.applyFilters}
         onReset={filters.resetFilters}
@@ -119,6 +116,7 @@ export function AdminTasksPage() {
         canRetry={can('task.retry')}
         canCancel={can('task.cancel')}
         canDelete={can('task.delete')}
+        canReadModelCalls={can('model.call_read')}
         onClose={closeDetail}
         onAction={actions.openConfirm}
       />
@@ -128,11 +126,8 @@ export function AdminTasksPage() {
         batchKind={actions.batchKind}
         selectedCount={selected.length}
         busy={actions.busy}
-        batchSummary={actions.batchSummary}
-        batchTitle={actions.batchTitle}
         onCloseConfirm={actions.closeConfirm}
         onCloseBatch={actions.closeBatch}
-        onCloseBatchSummary={actions.closeBatchSummary}
         onConfirm={actions.runConfirm}
         onRunBatch={actions.runBatch}
       />

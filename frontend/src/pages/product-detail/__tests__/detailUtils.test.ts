@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { loadCapabilities } from '../../../lib/capabilities';
 
 import {
   batchIndexOf,
@@ -8,11 +10,15 @@ import {
   downloadFileName,
   formatDate,
   labelOf,
+  resultMetaOf,
+  resultStatusOf,
   rowKeyOf,
   sectionCaption,
   textParam,
 } from '../utils';
 import type { GalleryItem } from '../hooks';
+
+afterEach(() => vi.unstubAllGlobals());
 
 /**
  * 商品详情图「创作结果」归组与展示口径。
@@ -160,6 +166,96 @@ describe('buildRows', () => {
     ]);
     expect(rows[0].productName).toBe('轻奢沙发');
     expect(rows[0].prompt).toBe('弧形设计');
+  });
+});
+
+describe('resultMetaOf', () => {
+  it('把任务参数映射为结果卡第二行文案', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            code: 0,
+            message: '',
+            data: {
+              groups: [],
+              workbenchIds: [],
+              items: [
+                {
+                  id: 'main_image',
+                  params: [
+                    { key: 'platform', options: [{ value: 'douyin', label: '抖音' }] },
+                    { key: 'language', options: [{ value: 'zh-CN', label: '简体中文' }] },
+                  ],
+                },
+              ],
+            },
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        ),
+      ),
+    );
+    await loadCapabilities(true);
+
+    expect(
+      resultMetaOf(
+        item({
+          id: 't1',
+          params: { size: '1k', ratio: '9:16', platform: 'douyin', language: 'zh-CN' },
+        }),
+      ),
+    ).toEqual({
+      resolution: '1k',
+      ratio: '9:16',
+      platform: '抖音',
+      country: '中国',
+      language: '简体中文',
+    });
+  });
+
+  it('旧任务缺参数时不补默认值', () => {
+    expect(resultMetaOf(item({ id: 't1' }))).toEqual({
+      resolution: undefined,
+      ratio: undefined,
+      platform: undefined,
+      country: undefined,
+      language: undefined,
+    });
+  });
+});
+
+describe('resultStatusOf', () => {
+  it('任一任务生成中时显示生成中', () => {
+    expect(
+      resultStatusOf([
+        item({ id: 't1', url: '/uploads/a.png' }),
+        item({ id: 't2', status: 'running' }),
+      ]),
+    ).toEqual({ label: '生成中', tone: 'processing' });
+  });
+
+  it('成功与失败并存时显示部分失败', () => {
+    expect(
+      resultStatusOf([
+        item({ id: 't1', url: '/uploads/a.png' }),
+        item({ id: 't2', status: 'failed' }),
+      ]),
+    ).toEqual({ label: '部分失败', tone: 'partial' });
+  });
+
+  it('全部失败时显示生成失败', () => {
+    expect(resultStatusOf([item({ id: 't1', status: 'failed' })])).toEqual({
+      label: '生成失败',
+      tone: 'failed',
+    });
+  });
+
+  it('全部成功时显示已完成', () => {
+    expect(resultStatusOf([item({ id: 't1', url: '/uploads/a.png' })])).toEqual({
+      label: '已完成',
+      tone: 'done',
+    });
   });
 });
 

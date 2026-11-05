@@ -21,6 +21,7 @@ import { AdminRetentionController } from './retention.controller';
 import { AdminInvoicesController } from './invoices-admin.controller';
 import {
   AdminPaymentConfigController,
+  AdminPaymentExceptionsController,
   AdminPaymentOrdersController,
   AdminPaymentReconciliationController,
 } from './payments/payment-admin.controller';
@@ -123,6 +124,7 @@ import { SchedulerService } from './scheduler.service';
     AdminPaymentConfigController,
     AdminPaymentOrdersController,
     AdminPaymentReconciliationController,
+    AdminPaymentExceptionsController,
     // 发票审核 (B3)
     AdminInvoicesController,
     // 支付渠道状态 (只读): 凭据只从环境变量读

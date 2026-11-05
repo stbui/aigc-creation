@@ -35,6 +35,8 @@ import type {
 
 interface ChannelModelTableProps {
   models: AdminChannelModelView[] | null;
+  /** 所属渠道是否启用；渠道停用时模型自身即使启用也不会进入路由。 */
+  channelEnabled?: boolean;
   loading: boolean;
   error: string | null;
   healthById: Map<string, ChannelModelHealthRowView>;
@@ -76,6 +78,7 @@ interface ChannelModelTableProps {
  */
 export function ChannelModelTable({
   models,
+  channelEnabled = true,
   loading,
   error,
   healthById,
@@ -198,15 +201,23 @@ export function ChannelModelTable({
     {
       key: 'status',
       title: '状态',
-      width: 76,
+      width: 112,
       /*
        * 一个模型只给一个状态：与「全部模型」视图同一套优先级（停用 > 未定价 > 启用）。
+       * 必须区分「渠道停用」与「模型停用」：前者会连带整组模型退出路由，
+       * 后者只影响当前这条线路。两者同时停用时也如实标出，不能只显示一个笼统的「停用」。
        * 原先「已启用 + 已定价」两枚绿标并排，行里出现两行绿色胶囊，反而看不出
        * 哪一个是需要处理的问题；正常态（已启用且已定价）不需要额外标记。
        */
       render: (model) => {
+        if (!channelEnabled && !model.enabled) {
+          return <StatusTag status="channel-model-disabled" tone="warn" label="渠道/模型停用" />;
+        }
+        if (!channelEnabled) {
+          return <StatusTag status="channel-disabled" tone="warn" label="渠道停用" />;
+        }
         if (!model.enabled) {
-          return <StatusTag status="channel-model-disabled" tone="muted" label="已停用" />;
+          return <StatusTag status="channel-model-disabled" tone="muted" label="模型停用" />;
         }
         if (!model.priceConfigured) {
           return (
@@ -215,7 +226,7 @@ export function ChannelModelTable({
             </HelpTip>
           );
         }
-        return <StatusTag status="channel-model-enabled" tone="success" label="已启用" />;
+        return <StatusTag status="channel-model-enabled" tone="success" label="模型启用" />;
       },
     },
     {
@@ -258,7 +269,7 @@ export function ChannelModelTable({
             disabled={!writable}
             onClick={() => onToggle(model, !model.enabled)}
           >
-            {model.enabled ? '停用' : '启用'}
+            {model.enabled ? '停用模型' : '启用模型'}
           </ActionButton>
           <ActionButton
             variant="ghost"
@@ -300,7 +311,7 @@ export function ChannelModelTable({
             </h3>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {writable
-                ? '停用后的模型不会进入路由，但历史账单与调用记录仍保留'
+                ? '模型停用只撤下当前线路，其他模型不受影响；渠道停用会撤下该渠道下全部模型。配置与历史记录均保留'
                 : '当前账号只有渠道模型读权限'}
             </p>
           </div>
@@ -362,7 +373,7 @@ export function ChannelModelTable({
             placeholder="全部状态"
             clearLabel="全部状态"
             allowClear
-            className="w-32"
+            className="w-36"
           />
           <FilterActions>
             <ActionButton

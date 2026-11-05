@@ -81,7 +81,7 @@ TaskWorkerService（领取 / 轮询 / 切线 / 收尾）
 | `CreditLedgerEntry` | 流水：`grant / purchase / admin_adjust / refund_reclaim / reserve / consume / refund / expire` | 每次余额变化必有一条 |
 | `CreditReservationItem` | 预留明细：账单 → 批次 → 金额 | 退款按它**原路**退回原批次，不造新批次 |
 | `ApiCallLog` | 每次上游 HTTP：请求类型 / 渠道 / 模型 / 状态 / 耗时 / 错误 / 用量 | 只 INSERT；是结算读 Token 用量的来源 |
-| `GenerationTask` | 任务：状态 `queued / running / succeeded / failed / cancelled`、`logicalModelId` | `provider` 恒为 `gateway` |
+| `GenerationTask` | 任务：状态 `queued / running / succeeded / failed / cancelled`、`logicalModelId` / `routeId` / `channelModelId` 快照 | 任务一旦建成，供应侧字段不再随后台改价换线而变 |
 
 ## 5. 请求时序
 

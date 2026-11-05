@@ -134,7 +134,9 @@ export class TaskAdmissionService {
     const perks = await this.membership.perksOf(ownerId);
 
     // 6. 项目与素材归属
-    const project = await this.prisma.project.findUnique({ where: { id: dto.projectId } });
+    const project = await this.prisma.project.findFirst({
+      where: { id: dto.projectId, deletedAt: null },
+    });
     if (!project || project.ownerId !== ownerId) {
       throw new AppError(40001, '项目不存在或无权限', 403);
     }
@@ -145,7 +147,12 @@ export class TaskAdmissionService {
      * 任务产出仍写入 dto.projectId，输入素材保持原归属，便于用户追溯。
      */
     const assets = await this.prisma.asset.findMany({
-      where: { id: { in: dto.inputAssetIds }, ownerId },
+      where: {
+        id: { in: dto.inputAssetIds },
+        ownerId,
+        status: 'visible',
+        project: { deletedAt: null },
+      },
     });
     if (assets.length !== dto.inputAssetIds.length) {
       throw new AppError(40001, '部分输入素材不存在或无权限', 400);
@@ -240,7 +247,6 @@ export class TaskAdmissionService {
       stage: '排队中',
       progress: 0,
       inputAssetIds: JSON.stringify(dto.inputAssetIds),
-      provider: 'gateway',
       logicalModelId: routed.logicalModel.id,
       logicalModelRevisionId: routed.revisionId,
       routeId: routed.route.id,
@@ -329,6 +335,17 @@ export class TaskAdmissionService {
   }): Promise<string[]> {
     const { ownerId, idempotencyKey, creditCost, taskBase, paramsFor, outputs, draft } = params;
     return this.prisma.$transaction(async (tx) => {
+      // 项目校验与任务落库之间可能隔着模型解析、计价等步骤；后台软删项目
+      // 若恰好发生在这段窗口内，必须在扣费事务内再次拒绝，避免任务/账单
+      // 落进一个已经删除的项目。
+      const activeProject = await tx.project.findFirst({
+        where: { id: taskBase.projectId, ownerId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!activeProject) {
+        throw new AppError(40001, '项目不存在或无权限', 403);
+      }
+
       const ids: string[] = [];
       const parent = await tx.generationTask.create({
         data: {
@@ -398,7 +415,13 @@ export class TaskAdmissionService {
     const maskAssetId = this.maskAssetId(dto.params);
     if (!maskAssetId) return;
     const maskAsset = await this.prisma.asset.findFirst({
-      where: { id: maskAssetId, ownerId, kind: 'original' },
+      where: {
+        id: maskAssetId,
+        ownerId,
+        kind: 'original',
+        status: 'visible',
+        project: { deletedAt: null },
+      },
       select: { id: true, format: true, width: true, height: true },
     });
     if (!maskAsset) throw new AppError(40001, '遮罩素材不存在或无权限', 400);
@@ -448,7 +471,13 @@ export class TaskAdmissionService {
       .filter((id): id is string => typeof id === 'string' && Boolean(id.trim()));
     for (const referenceId of new Set(referenceIds)) {
       const reference = await this.prisma.asset.findFirst({
-        where: { id: referenceId, ownerId, kind: 'original' },
+        where: {
+          id: referenceId,
+          ownerId,
+          kind: 'original',
+          status: 'visible',
+          project: { deletedAt: null },
+        },
         select: { id: true },
       });
       if (!reference) throw new AppError(40001, '局部重绘参考图素材不存在或无权限', 400);

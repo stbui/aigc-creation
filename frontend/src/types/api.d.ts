@@ -72,8 +72,8 @@ export interface CapabilityParam {
  * 后台下线的能力是 `disabled`；没有可用模型通道的是 `unavailable`。
  * 界面标注一律看这里，不看 mode。
  *
- * ⚠️ 它是**事前预期**；单次生成实际走的哪条路以任务结果里的 `provider`
- * 为准。2026-10-25 起本地生成已移除，新任务只会是 gateway。
+ * ⚠️ 它是**事前预期**；单次生成实际走的线路以任务快照的
+ * `routeId` / `channelModelId` 为准（后台任务详情可查）。
  */
 export interface CapabilityRuntime {
   /** 后台管控开关（无记录 = 启用） */
@@ -412,7 +412,6 @@ export interface Task {
    */
   parentTaskId?: string | null;
   params?: Record<string, unknown>;
-  provider?: string | null;
   errorCode?: string | null;
   /**
    * 建任务时选定的前台模型 id（`LogicalModel.id`）。
@@ -612,7 +611,6 @@ export interface AdminOverview {
     capabilityName: string;
     mode: string;
     status: TaskStatus;
-    provider: string | null;
     errorCode: string | null;
     createdAt: string;
     durationMs: number;
@@ -1102,8 +1100,6 @@ export interface AdminTask {
   capability: string;
   capabilityName: string;
   status: "queued" | "running" | "succeeded" | "failed" | "cancelled";
-  /** 实际通道: gateway=真实模型 / local=停用前的历史本地产出 / pending=改造前的历史初始值 */
-  provider: string | null;
   errorCode: string | null;
   creditCost: number;
   /** 由哪个失败任务重试而来 (null = 用户首次发起) */
@@ -1134,7 +1130,6 @@ export interface AdminTaskListResult {
   };
   congestion: AdminTaskCongestion;
   capabilities: Array<{ capability: string; count: number }>;
-  providers: Array<{ provider: string; count: number }>;
 }
 
 /** 任务详情 */
@@ -1143,7 +1138,6 @@ export interface AdminTaskDetail {
   capability: string;
   capabilityName: string;
   status: AdminTask["status"];
-  provider: string | null;
   errorCode: string | null;
   creditCost: number;
   retriedFromId: string | null;

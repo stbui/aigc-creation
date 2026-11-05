@@ -146,9 +146,9 @@ test.describe('渠道与模型 P5', () => {
     for (const name of ['编辑', '复制', '导出', '删除']) {
       await expect(detail.getByRole('button', { name, exact: true })).toBeVisible();
     }
-    const toggle = detail.getByRole('button', { name: /^(停用|启用)$/ });
+    const toggle = detail.getByRole('button', { name: /^(停用|启用)渠道$/ });
     await expect(toggle).toBeVisible();
-    const disabling = (await toggle.innerText()).trim() === '停用';
+    const disabling = (await toggle.innerText()).trim() === '停用渠道';
 
     // 停用会让整条渠道退出路由目录：确认弹窗必须讲清后果，取消不写库
     await toggle.click();
@@ -686,7 +686,7 @@ test.describe('渠道与模型 P5', () => {
     // 状态筛选：停用项计数来自与列表同一份数据（分页后总数仍在页脚）
     const disabledCount = models.filter((item) => !item.enabled).length;
     await detail.getByRole('combobox', { name: '模型状态' }).click();
-    await page.getByRole('option', { name: '已停用', exact: true }).click();
+    await page.getByRole('option', { name: '模型停用', exact: true }).click();
     if (disabledCount > 0) {
       await expect(detail.getByText(`共 ${disabledCount} 个模型`)).toBeVisible();
     } else {
@@ -897,7 +897,7 @@ test.describe('渠道与模型 P5', () => {
 
     // 停用筛选只留停用项（模型停用或渠道停用都算停用）
     await page.getByRole('combobox', { name: '模型状态' }).click();
-    await page.getByRole('option', { name: '停用', exact: true }).click();
+    await page.getByRole('option', { name: '停用（模型/渠道）', exact: true }).click();
     await expect.poll(async () => allModelRows().count(), { timeout: 15000 }).toBe(
       all.filter((item) => !item.enabled || !item.channelEnabled).length,
     );
@@ -913,7 +913,7 @@ test.describe('渠道与模型 P5', () => {
     const usable = all.filter((item) => item.enabled && item.channelEnabled);
     await expect.poll(async () => allModelRows().count(), { timeout: 15000 }).toBe(usable.length);
     if (usable.length > 0) {
-      await allModelRows().first().getByRole('button', { name: '停用' }).click();
+      await allModelRows().first().getByRole('button', { name: '停用模型' }).click();
       const confirmDialog = page.getByRole('dialog', { name: /^停用 .+ 的 / });
       await expect(confirmDialog).toContainText('引用它的前台模型会切换到其他可用线路');
       await confirmDialog.getByRole('button', { name: '取消' }).click();

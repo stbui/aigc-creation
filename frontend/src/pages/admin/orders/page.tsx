@@ -6,7 +6,6 @@ import {
   AdminDataTable,
   AppliedFilters,
   BatchBar,
-  BatchResultModal,
   ClearableField,
   FilterActions,
   FilterBar,
@@ -41,7 +40,6 @@ import type {
   AdminOrderListResult,
   AdminOrderRefund,
   AdminOrderRow,
-  BatchSummary,
 } from '../../../types/api';
 
 /**
@@ -119,10 +117,6 @@ export function AdminOrdersPage() {
    */
   const [selected, setSelected] = useState<string[]>([]);
   const [batchOpen, setBatchOpen] = useState(false);
-  const [batchSummary, setBatchSummary] = useState<BatchSummary<{
-    orderId: string;
-    idempotentHit: boolean;
-  }> | null>(null);
 
   const fetcher = useCallback(
     (params: Record<string, unknown>) =>
@@ -442,7 +436,13 @@ export function AdminOrdersPage() {
     setBusy(true);
     try {
       const summary = await adminOrdersApi.batchMarkPaid(selected);
-      setBatchSummary(summary);
+      if (summary.failed > 0) {
+        toast.warning(
+          `批量核销完成：成功 ${summary.succeeded} 单，失败 ${summary.failed} 单`,
+        );
+      } else {
+        toast.success(`批量核销完成：成功 ${summary.succeeded} 单`);
+      }
       setBatchOpen(false);
       setSelected([]);
       reload();
@@ -791,13 +791,6 @@ export function AdminOrdersPage() {
         loading={busy}
         onCancel={() => setBatchOpen(false)}
         onConfirm={() => void runBatchMarkPaid()}
-      />
-
-      <BatchResultModal
-        open={batchSummary !== null}
-        title="批量核销结果"
-        summary={batchSummary}
-        onClose={() => setBatchSummary(null)}
       />
     </>
   );

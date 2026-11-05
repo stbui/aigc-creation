@@ -17,7 +17,7 @@
     "db:push:test": "NODE_ENV=test npm run prisma:push",
     "db:push:prod": "NODE_ENV=production npm run prisma:push",
     "db:reset:test": "node scripts/reset-test-env.js",
-    "db:migrate:provider": "node scripts/migrate-provider-values.js",
+    "db:migrate:project-lifecycle": "node scripts/migrate-project-lifecycle.js",
     "db:migrate:tool-idempotency": "node scripts/migrate-tool-idempotency.js",
     "seed:test": "NODE_ENV=test npm run seed:all",
     "prisma:generate": "prisma generate",
