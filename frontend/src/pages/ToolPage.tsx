@@ -1,3 +1,4 @@
+import './ToolPage.css';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Upload as UploadIcon, Trash2, RefreshCw, Check, X } from 'lucide-react';
 import { Navigate, useNavigate, useParams } from 'react-router-dom';

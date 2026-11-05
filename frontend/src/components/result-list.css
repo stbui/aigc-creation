@@ -1,0 +1,279 @@
+/**
+ * result-list 组件样式 —— 由组件文件引入，组件被哪些页面使用时随 chunk 加载。
+ *
+ * 从 `styles/global.css` 迁出；设计令牌与全局骨架仍留在全局。
+ */
+
+/* ── 自由创作: 右侧「全部生成图」(2026-10-21) ──────────────────────
+   结果栏从「只展示最近一单」改为网格展示本页能力的全部成功产出。
+   缩略图统一方形裁切（生成图比例不一, 方形网格最整齐）, 点开预览看原始比例。 */
+.fc-result-loading {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+  background: var(--card-bg);
+  border-radius: var(--radius-panel);
+}
+
+.fc-result-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.fc-result-gallery {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  /* 列数由「每行」按钮决定 (2026-10-21): 用户显式选择了每行几张, 就不再 auto-fill。
+     minmax(0, 1fr) 保证窄容器下图片能收缩, 不会被内容撑出横向滚动。 */
+  --fc-cols: 4;
+  grid-template-columns: repeat(var(--fc-cols), minmax(0, 1fr));
+  gap: 12px;
+  align-content: start;
+  padding: 0 4px 4px;
+}
+
+.fc-result-gallery.fc-cols-3 {
+  --fc-cols: 3;
+}
+
+.fc-result-gallery.fc-cols-4 {
+  --fc-cols: 4;
+}
+
+.fc-result-gallery.fc-cols-5 {
+  --fc-cols: 5;
+}
+
+.fc-result-gallery.fc-cols-6 {
+  --fc-cols: 6;
+}
+
+/* 每行张数选择器: 与「刷新」同一排, 视觉上沿用 28px 控件高度 */
+.fc-grid-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 28px;
+  padding: 0 4px 0 10px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-control);
+}
+
+.fc-grid-size-label {
+  margin-right: 4px;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+.fc-grid-size-btn {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: var(--radius-tag);
+  background: transparent;
+  font-size: 12px;
+  color: var(--text-body);
+  cursor: pointer;
+}
+
+.fc-grid-size-btn:hover {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+
+.fc-grid-size-btn.is-active {
+  background: var(--brand-bg);
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.fc-grid-size-btn:focus-visible {
+  outline: 2px solid var(--brand-light);
+  outline-offset: 0;
+}
+
+/* 结果画廊 (ResultGalleryPane) 在自由创作与爆款复刻共用：卡片样式留在全局。 */
+.fc-result-item {
+  position: relative;
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--border-3);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  background: var(--page-bg);
+  cursor: zoom-in;
+}
+
+/* 图片解码完成前保持与「生成中占位」同款 shimmer 底, 完成后淡入 ——
+   占位撤下的瞬间不会先露出空白底再突然跳出图片 (淡入 240ms, 与 shimmer 同色系)。 */
+.fc-result-item:not(.is-loaded):not(.is-failed) {
+  background: linear-gradient(100deg, var(--tool-surface-11) 20%, var(--tool-surface-7) 40%, var(--tool-surface-11) 60%);
+  background-size: 200% 100%;
+  animation: fc-result-shimmer 1.4s ease-in-out infinite;
+}
+
+.fc-result-item img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  display: block;
+  opacity: 0;
+  transition: opacity 0.24s ease;
+}
+
+.fc-result-item.is-loaded img {
+  opacity: 1;
+}
+
+.fc-result-item.is-failed {
+  /* 失败可点重试, 所以保留可点光标; 但不能是 zoom-in (点了不是看大图) */
+  cursor: pointer;
+}
+
+.fc-result-item-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+  color: var(--text-desc);
+  background: var(--page-bg);
+}
+
+.fc-result-item.is-failed:hover .fc-result-item-error {
+  color: var(--brand);
+  background: var(--brand-bg);
+}
+
+/* 生成中占位卡: 点击生成后立刻出现在网格首位, 尺寸与真实图一致,
+   出图后由新图顶替。虚线边框 + 流动高光表明「这里会有一张图」。 */
+.fc-result-item-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  aspect-ratio: 1 / 1;
+  border-style: dashed;
+  border-color: var(--border);
+  color: var(--text-desc);
+  cursor: default;
+  background: linear-gradient(100deg, var(--tool-surface-11) 20%, var(--tool-surface-7) 40%, var(--tool-surface-11) 60%);
+  background-size: 200% 100%;
+  animation: fc-result-shimmer 1.4s ease-in-out infinite;
+}
+
+.fc-result-item-loading-tip {
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.fc-result-item-mask {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--card-bg);
+  background: rgba(23, 26, 43, 0.32);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+/* 缩略图左上角的变体标签 (商品主图: 白底图 / 场景图 / 卖点图)。
+   不参与 hover 遮罩, 所以层级压在 mask 之上; 与遮罩同一时刻淡出淡入会让
+   用户在最想确认"这是哪一张"的时候反而看不见标签。 */
+.fc-result-item-caption {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  padding: 1px 7px;
+  border-radius: var(--radius-tag);
+  background: rgba(23, 26, 43, 0.62);
+  color: var(--card-bg);
+  font-size: 12px;
+  line-height: 18px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.fc-result-item-prompt {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border-radius: var(--radius-tag);
+  background: rgba(23, 26, 43, 0.62);
+  color: var(--card-bg);
+  font-size: 12px;
+  line-height: 18px;
+  pointer-events: none;
+  user-select: none;
+}
+
+.fc-result-item:hover .fc-result-item-mask,
+.fc-result-item:focus-visible .fc-result-item-mask {
+  opacity: 1;
+}
+
+.fc-prompt-view {
+  max-height: 50vh;
+  overflow-y: auto;
+  color: var(--text-body);
+  font-size: 13px;
+  line-height: 22px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* 窄屏一刀切 2 列: 432px 输入栏 + 结果栏在手机/小窗口下本来就挤,
+   再按用户选的 5~6 列, 单张只剩几十像素, 等于没法看。 */
+@media (max-width: 720px) {
+  .fc-result-gallery {
+    --fc-cols: 2;
+  }
+}
+
+/* 减弱动效偏好: 保留占位底色, 只停掉流动高光与淡入, 不影响可读性 */
+@media (prefers-reduced-motion: reduce) {
+  .fc-result-item:not(.is-loaded):not(.is-failed),
+  .fc-result-item-loading {
+    animation: none;
+  }
+  .fc-result-item img {
+    transition: none;
+  }
+}
+
+/* 手机上 4 列网格的缩略图只有约 65px 宽, 带文字的标签会换行遮住大半张图。
+   窄屏改为右下角图标态, 同时避开左上角的变体标签 (白底图 / 场景图等)。 */
+@media (max-width: 640px) {
+  .fc-result-item-prompt {
+    top: auto;
+    right: 6px;
+    bottom: 6px;
+    padding: 2px 4px;
+  }
+  .fc-result-item-prompt-text {
+    display: none;
+  }
+}

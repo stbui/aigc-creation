@@ -171,4 +171,47 @@ describe("AuditInterceptor", () => {
     expect(data.reason).toBe("批量删除任务及其产出");
     expect(JSON.parse(data.detail)).toEqual({ ok: true });
   });
+
+  it("仅退款核销动作记录处理结果、原因与退款单号", async () => {
+    reflector.get.mockImplementation((key: string) =>
+      key === AUDIT_ACTION_KEY ? "order.refund_confirm" : undefined,
+    );
+
+    await firstValueFrom(
+      interceptor.intercept(
+        context({
+          originalUrl: "/api/v1/admin/orders/o1/refunds/r1/confirm",
+          url: "/api/v1/admin/orders/o1/refunds/r1/confirm",
+          method: "POST",
+          params: { id: "o1", refundId: "r1" },
+          body: {
+            outcome: "succeeded",
+            reason: "已核对渠道退款成功",
+            providerRefundId: "wx-r1",
+          },
+          ip: "127.0.0.1",
+          adminUser: {
+            id: "admin-1",
+            email: "admin@example.com",
+            role: "admin",
+          },
+        }),
+        { handle: () => of({ ok: true }) },
+      ),
+    );
+
+    await vi.waitFor(() =>
+      expect(prisma.adminAuditLog.create).toHaveBeenCalled(),
+    );
+    const data = prisma.adminAuditLog.create.mock.calls[0][0].data;
+    expect(data.reason).toBe("人工核销异步退款");
+    expect(data.targetId).toBe("o1");
+    expect(JSON.parse(data.detail)).toEqual({
+      ok: true,
+      outcome: "succeeded",
+      reason: "已核对渠道退款成功",
+      providerRefundId: "wx-r1",
+      refundId: "r1",
+    });
+  });
 });

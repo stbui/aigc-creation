@@ -116,14 +116,24 @@ export function BillingOrderTable({
       },
       {
         key: 'status',
-        title: '状态',
-        width: 100,
+        title: '状态 / 核对批次',
+        width: 170,
         render: (row) => (
-          <StatusTag
-            status={row.status}
-            tone={STATUS_TONES[row.status] ?? 'muted'}
-            label={STATUS_LABELS[row.status] ?? row.status}
-          />
+          <div className="flex min-w-0 flex-col items-start gap-1">
+            <StatusTag
+              status={row.status}
+              tone={STATUS_TONES[row.status] ?? 'muted'}
+              label={STATUS_LABELS[row.status] ?? row.status}
+            />
+            {row.reviewBatchId && (
+              <span
+                className="max-w-full truncate font-mono text-[12px] text-muted-foreground"
+                title={row.reviewBatchId}
+              >
+                {row.reviewBatchId}
+              </span>
+            )}
+          </div>
         ),
       },
       {
@@ -150,10 +160,11 @@ export function BillingOrderTable({
       error={rows.length === 0 ? error : null}
       onRetry={onRetry}
       emptyText="没有账单。生成任务成功后才会产生账单记录。"
-      minWidth={1220}
+      minWidth={1290}
       selectable={selectable}
       selected={selected}
       onSelectedChange={onSelectedChange}
+      isRowSelectable={(row) => row.reviewable}
       pagination={pagination}
     />
   );

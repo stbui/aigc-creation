@@ -48,6 +48,12 @@ export interface BalanceSummary {
 /** 流水方向筛选：按有符号金额判断，兼容同为 admin_adjust 的增减流水 */
 export type LedgerDirection = 'income' | 'expense';
 
+export interface CreditReclaimResult {
+  reclaimed: number;
+  unreclaimable: number;
+  detail: Array<{ lotId: string; taken: number }>;
+}
+
 /** C 端可见的流水类型。reserve 是生成任务的中间态，不直接暴露给用户。 */
 const C_END_LEDGER_TYPES = [
   'purchase',
@@ -602,91 +608,112 @@ export class CreditService {
     orderId: string,
     operatorId: string,
     reason: string,
-  ): Promise<{ reclaimed: number; unreclaimable: number; detail: Array<{ lotId: string; taken: number }> }> {
-    const order = await this.prisma.order.findUnique({
+    creditsToReclaim?: number,
+  ): Promise<CreditReclaimResult> {
+    const result = await this.prisma.$transaction((tx) =>
+      this.reclaimForOrderInTransaction(tx, orderId, operatorId, reason, creditsToReclaim),
+    );
+    this.warnIncompleteReclaim(orderId, result);
+    return result;
+  }
+
+  /**
+   * 在调用方事务内扣回订单积分。
+   *
+   * 异步退款人工核销必须让「退款单置成功、积分扣回、订单已退金额、订单状态」
+   * 同生共死；如果本方法自己开事务，就会出现积分已扣但退款记账失败的窗口。
+   */
+  async reclaimForOrderInTransaction(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+    operatorId: string,
+    reason: string,
+    creditsToReclaim?: number,
+  ): Promise<CreditReclaimResult> {
+    const order = await tx.order.findUnique({
       where: { id: orderId },
       select: { userId: true, grantedCredits: true },
     });
     if (!order) throw new AppError(40400, '订单不存在', 404);
 
-    const target = creditsToMicrocredits(order.grantedCredits);
+    const granted = creditsToMicrocredits(order.grantedCredits);
+    const requested = creditsToMicrocredits(creditsToReclaim ?? order.grantedCredits);
+    // 部分退款只回收本次对应的份额，且任何情况下都不能超过订单发放快照。
+    const target = requested < granted ? requested : granted;
     const now = new Date();
-
-    const result = await this.prisma.$transaction(async (tx) => {
-      /*
-       * 两段式取批：本单批次优先，其次用户其它批次（用户可能已把积分
-       * 转移到长有效期批次）。合并成一次查询无法表达「等于本单优先」——
-       * 排序键只能给出全局顺序，不能给出分组优先。
-       */
-      const activeWhere: Prisma.CreditLotWhereInput = {
-        userId: order.userId,
-        remainingMicrocredits: { gt: 0n },
-        OR: [{ expireAt: null }, { expireAt: { gt: now } }],
-      };
-      const ownLots = await tx.creditLot.findMany({
-        where: { ...activeWhere, orderId },
-        select: { id: true, remainingMicrocredits: true },
-        orderBy: [{ expireAt: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
-      });
-      const otherLots = await tx.creditLot.findMany({
-        where: { ...activeWhere, NOT: { orderId } },
-        select: { id: true, remainingMicrocredits: true },
-        orderBy: [{ expireAt: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
-      });
-      const lots = [...ownLots, ...otherLots];
-
-      let toReclaim = target;
-      const detail: Array<{ lotId: string; taken: number }> = [];
-      let reclaimed = 0n;
-
-      for (const lot of lots) {
-        if (toReclaim <= 0n) break;
-        const take = lot.remainingMicrocredits < toReclaim ? lot.remainingMicrocredits : toReclaim;
-        const res = await tx.creditLot.updateMany({
-          where: { id: lot.id, remainingMicrocredits: { gte: take } },
-          data: { remainingMicrocredits: { decrement: take } },
-        });
-        if (res.count === 0) continue;
-        detail.push({ lotId: lot.id, taken: microcreditsToCredits(take) });
-        reclaimed += take;
-        toReclaim -= take;
-      }
-
-      if (reclaimed > 0n) {
-        // 批次已经逐笔扣过，这里只同步账户并写一条流水
-        const balance = await this.wallet.debitAccountOnly(tx, order.userId, reclaimed);
-        await tx.creditLedgerEntry.create({
-          data: {
-            userId: order.userId,
-            type: 'refund_reclaim',
-            amountMicrocredits: -reclaimed,
-            availableDeltaMicrocredits: -reclaimed,
-            reservedDeltaMicrocredits: 0n,
-            availableAfterMicrocredits: balance.availableMicrocredits,
-            reservedAfterMicrocredits: balance.reservedMicrocredits,
-            paymentOrderId: orderId,
-            actorUserId: operatorId,
-            note: reason,
-          },
-        });
-      }
-
-      return { reclaimed, unreclaimable: toReclaim, detail };
+    /*
+     * 两段式取批：本单批次优先，其次用户其它批次（用户可能已把积分
+     * 转移到长有效期批次）。合并成一次查询无法表达「等于本单优先」——
+     * 排序键只能给出全局顺序，不能给出分组优先。
+     */
+    const activeWhere: Prisma.CreditLotWhereInput = {
+      userId: order.userId,
+      remainingMicrocredits: { gt: 0n },
+      OR: [{ expireAt: null }, { expireAt: { gt: now } }],
+    };
+    const ownLots = await tx.creditLot.findMany({
+      where: { ...activeWhere, orderId },
+      select: { id: true, remainingMicrocredits: true },
+      orderBy: [{ expireAt: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
     });
+    const otherLots = await tx.creditLot.findMany({
+      where: { ...activeWhere, NOT: { orderId } },
+      select: { id: true, remainingMicrocredits: true },
+      orderBy: [{ expireAt: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
+    });
+    const lots = [...ownLots, ...otherLots];
 
-    if (result.unreclaimable > 0n) {
-      // 这是必须让人看见的事实, 不能静默吞掉
-      this.logger.warn(
-        `退款扣回不完整: order=${orderId} 应扣 ${microcreditsToCredits(target)} 实扣 ${microcreditsToCredits(result.reclaimed)}，` +
-          `${microcreditsToCredits(result.unreclaimable)} 因已消耗无法追回`,
-      );
+    let toReclaim = target;
+    const detail: Array<{ lotId: string; taken: number }> = [];
+    let reclaimed = 0n;
+
+    for (const lot of lots) {
+      if (toReclaim <= 0n) break;
+      const take = lot.remainingMicrocredits < toReclaim ? lot.remainingMicrocredits : toReclaim;
+      const res = await tx.creditLot.updateMany({
+        where: { id: lot.id, remainingMicrocredits: { gte: take } },
+        data: { remainingMicrocredits: { decrement: take } },
+      });
+      if (res.count === 0) continue;
+      detail.push({ lotId: lot.id, taken: microcreditsToCredits(take) });
+      reclaimed += take;
+      toReclaim -= take;
+    }
+
+    if (reclaimed > 0n) {
+      // 批次已经逐笔扣过，这里只同步账户并写一条流水
+      const balance = await this.wallet.debitAccountOnly(tx, order.userId, reclaimed);
+      await tx.creditLedgerEntry.create({
+        data: {
+          userId: order.userId,
+          type: 'refund_reclaim',
+          amountMicrocredits: -reclaimed,
+          availableDeltaMicrocredits: -reclaimed,
+          reservedDeltaMicrocredits: 0n,
+          availableAfterMicrocredits: balance.availableMicrocredits,
+          reservedAfterMicrocredits: balance.reservedMicrocredits,
+          paymentOrderId: orderId,
+          actorUserId: operatorId,
+          note: reason,
+        },
+      });
     }
 
     return {
-      reclaimed: microcreditsToCredits(result.reclaimed),
-      unreclaimable: microcreditsToCredits(result.unreclaimable),
-      detail: result.detail,
+      reclaimed: microcreditsToCredits(reclaimed),
+      unreclaimable: microcreditsToCredits(toReclaim),
+      detail,
     };
+  }
+
+  /** 退款扣回不完整是必须让人看见的事实，不能静默吞掉。 */
+  warnIncompleteReclaim(orderId: string, result: CreditReclaimResult): void {
+    if (result.unreclaimable > 0) {
+      this.logger.warn(
+        `退款扣回不完整: order=${orderId} 实扣 ${result.reclaimed}，` +
+          `${result.unreclaimable} 因已消耗无法追回`,
+      );
+    }
   }
 
   // ── 到期回收 ──────────────────────────────────────────────────────

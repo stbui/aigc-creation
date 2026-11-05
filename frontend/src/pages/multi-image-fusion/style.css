@@ -1,0 +1,1413 @@
+/**
+ * multi-image-fusion 页面样式 —— 由 `./index.ts` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：这里只放本页专属的选择器；共享骨架
+ * （`.pk-workspace` / `.tool-*` / `.state-*` 等）仍留在全局。
+ */
+
+/* ────────────────────────────────────────────────────────────────────────────────
+   多图融合 —— 严格 1:1 复刻参考站 https://ijihua.cn/multi-image-fusion
+
+   依据 docs/multi-image-fusion-spec.md §5「参考站 multi-* 全部规则导出」(203 条)。
+   本区块与参考站 CSS 产物逐条对应, 数值全部走 §6 的 --mif-* token (P0: 禁止硬编码颜色)。
+
+   规则顺序说明: 参考站产物里同名选择器存在多段后定义覆盖 (如 .multi-image-fusion-page
+   有 base / .is-scene-selection / 后定义全量 三段), 本区块按参考站源码顺序落, 以保证
+   层叠结果一致 —— 特别是 §5.13 的 .image-tool-submit-area 覆盖 (后定义者胜)。
+   ──────────────────────────────────────────────────────────────────────────────── */
+
+/* ══ A. 页面容器 / 两步流根 ══ */
+.multi-image-fusion-page {
+  width: min(100%, var(--mif-page-max));
+  min-height: calc(100vh - var(--mif-workspace-topbar-height));
+  box-sizing: border-box;
+  color: var(--mif-text-page);
+  margin: 0 auto;
+  padding: 26px 32px 42px;
+}
+
+/* 后定义段: 参考站 rule #151, 覆盖上面的 width/padding 并接管高度与溢出 */
+.multi-image-fusion-page {
+  width: 100%;
+  height: calc(100vh - var(--mif-workspace-topbar-height));
+  min-height: 0;
+  margin: 0;
+  padding: 16px;
+  overflow: hidden;
+}
+
+/* 场景网关态: 内部滚动, scrollbar-gutter 稳定防抖动 */
+.multi-image-fusion-page.is-scene-selection {
+  height: calc(100vh - var(--mif-workspace-topbar-height));
+  min-height: 0;
+  padding: 16px;
+  overflow: hidden auto;
+}
+
+/* 工作区态: 布局高度 = 100% - 50px (标题行 38px + margin-bottom 12px) */
+.multi-image-fusion-page.is-editor .multi-image-fusion-layout {
+  height: calc(100% - 50px);
+}
+
+/* 本地壳层适配: 参考站 .multi-image-fusion-page 是 .workspace-route-content 的直接子元素
+   (父级无 padding, 页面自带 padding)。本地父级 .app-content 有 24px/24px/32px 内边距,
+   故用负 margin 抵消, 使页面自身 padding 语义与参考站一致 (D-1 判定「可不改」的前提)。 */
+.app-content > .multi-image-fusion-page {
+  margin: -24px -24px -32px;
+  width: auto;
+}
+
+/* ══ B. 场景网关（第一步） ══ */
+.multi-image-fusion-scene-selection {
+  /* 参考站滚动区在右侧保留 6px 滚动条槽，场景网格因此比页面内容盒窄 6px。 */
+  width: calc(100% - 6px);
+  margin: 0 auto 0 0;
+}
+
+.multi-image-fusion-scene-group + .multi-image-fusion-scene-group {
+  margin-top: 22px;
+}
+
+.multi-image-fusion-scene-group h2 {
+  color: var(--mif-text-title-2);
+  margin: 0 0 10px 2px;
+  font-size: var(--mif-h4-size);
+  font-weight: var(--mif-h4-weight);
+  line-height: var(--mif-h4-lh);
+}
+
+.multi-image-fusion-scene-grid {
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  display: grid;
+}
+
+.multi-image-fusion-scene-card {
+  color: var(--mif-text-card);
+  text-align: left;
+  cursor: pointer;
+  background: var(--mif-surface-panel);
+  border: 1px solid var(--mif-border-scene);
+  border-radius: var(--mif-radius-scene);
+  min-width: 0;
+  padding: 11px;
+  transition:
+    border-color var(--mif-motion-fast),
+    box-shadow var(--mif-motion-fast),
+    transform var(--mif-motion-fast);
+  display: block;
+  box-shadow: var(--mif-shadow-scene);
+}
+
+.multi-image-fusion-scene-card:hover,
+.multi-image-fusion-scene-card:focus-visible {
+  outline: none;
+  transform: translateY(-2px);
+  box-shadow: var(--mif-shadow-scene-hover);
+}
+
+.multi-image-fusion-scene-card:focus-visible {
+  outline-offset: 2px;
+  outline: 2px solid var(--mif-focus-ring-strong);
+}
+
+.multi-image-fusion-scene-visual {
+  color: var(--card-bg);
+  text-shadow: var(--mif-shadow-scene-visual-text);
+  background: var(--mif-surface-scene-visual);
+  border-radius: var(--mif-radius-scene-visual);
+  justify-content: center;
+  align-items: center;
+  min-height: 86px;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+
+.multi-image-fusion-scene-visual img {
+  object-fit: contain;
+  width: 100%;
+  height: auto;
+  aspect-ratio: auto;
+  position: static;
+  transition: transform var(--mif-motion-img);
+  display: block;
+}
+
+.multi-image-fusion-scene-card:hover .multi-image-fusion-scene-visual img,
+.multi-image-fusion-scene-card:focus-visible .multi-image-fusion-scene-visual img {
+  transform: scale(1.06);
+}
+
+.multi-image-fusion-scene-copy {
+  gap: 3px;
+  padding: 9px 2px 1px;
+  display: grid;
+}
+
+.multi-image-fusion-scene-copy strong {
+  color: var(--mif-text-card);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+.multi-image-fusion-scene-copy small {
+  color: var(--mif-text-sub);
+  /* 6 列网格下 187px 的卡只剩 135px 文案宽, nowrap 会把说明裁成不可读的残句。
+     允许两行截断, 信息优先于严格单行对齐。 */
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  min-height: 17px;
+  font-size: var(--mif-small-size);
+  line-height: 17px;
+  overflow: hidden;
+}
+
+/* ══ C. 工作区标题行 ══ */
+.multi-image-fusion-editor-head {
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  height: 38px;
+  margin-bottom: 12px;
+  display: flex;
+}
+
+.multi-image-fusion-editor-title {
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  display: flex;
+}
+
+.multi-image-fusion-editor-title h1 {
+  color: var(--mif-text-title);
+  letter-spacing: var(--mif-h2b-tracking);
+  margin: 0;
+  font-size: var(--mif-h2b-size);
+  font-weight: var(--mif-h2b-weight);
+  line-height: var(--mif-h2b-lh);
+}
+
+.multi-image-fusion-editor-title p {
+  color: var(--mif-text-sub);
+  margin: 1px 0 0;
+  font-size: var(--mif-sub-size);
+  line-height: var(--mif-sub-lh-2);
+}
+
+/* S-13 / D-90: 返回键是 30x30 纯图标方块 (有边框+底色), 不是纯文字按钮 */
+.multi-image-fusion-scene-back {
+  color: var(--mif-text-back);
+  cursor: pointer;
+  background: var(--mif-surface-panel-80);
+  border: 1px solid var(--mif-border-back);
+  border-radius: var(--mif-radius-option);
+  flex: none;
+  justify-content: center;
+  align-items: center;
+  width: var(--mif-back-size);
+  height: var(--mif-back-size);
+  padding: 0;
+  font-size: var(--mif-sub-size);
+  transition:
+    border-color var(--mif-motion-fast),
+    color var(--mif-motion-fast),
+    background var(--mif-motion-fast);
+  display: inline-flex;
+}
+
+.multi-image-fusion-scene-back:hover,
+.multi-image-fusion-scene-back:focus-visible {
+  color: var(--mif-text-accent-4);
+  background: var(--mif-surface-back-hover);
+  border-color: var(--mif-border-scene-back-hover);
+  outline: none;
+}
+
+/* ══ D. 工作区布局骨架 ══ */
+.multi-image-fusion-layout {
+  grid-template-columns:
+    minmax(var(--mif-col-min), var(--mif-col-max))
+    minmax(0, 1fr);
+  align-items: start;
+  gap: var(--mif-gap-layout);
+  display: grid;
+}
+
+/* 后定义段: 参考站 rule #152 —— 控制列放宽到 432px, 纵向铺满 */
+.multi-image-fusion-layout {
+  grid-template-columns:
+    minmax(var(--mif-col-min), var(--mif-col-narrow-max))
+    minmax(0, 1fr);
+  align-items: stretch;
+  gap: 16px;
+  height: 100%;
+  min-height: 0;
+}
+
+/* 后定义段: 参考站 rule #153 —— 控制列改 flex 列向 + 内部滚动 */
+.multi-image-fusion-control-column {
+  scrollbar-gutter: stable;
+  flex-direction: column;
+  gap: var(--mif-gap-control);
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  overflow: hidden auto;
+}
+
+/* ══ E. 卡片 / 卡片标题 / 计数器 ══ */
+.multi-image-fusion-card,
+.multi-image-fusion-result-panel {
+  background: var(--mif-surface-card);
+  border: 1px solid var(--mif-border-card);
+  border-radius: var(--mif-radius-card);
+  box-shadow: var(--mif-shadow-card);
+}
+
+.multi-image-fusion-card {
+  padding: 18px;
+}
+
+.multi-image-fusion-card-heading {
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--mif-gap-heading);
+  margin-bottom: var(--mif-gap-section);
+  display: flex;
+}
+
+.multi-image-fusion-card-heading > div {
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  display: flex;
+}
+
+.multi-image-fusion-card-heading.compact {
+  margin-bottom: 14px;
+}
+
+.multi-image-fusion-result-heading h2,
+.multi-image-fusion-card-heading h2 {
+  color: var(--mif-text-title);
+  margin: 0;
+}
+
+.multi-image-fusion-card-heading h2 {
+  font-size: var(--mif-h3-size);
+  font-weight: var(--mif-h3-weight);
+  line-height: var(--mif-h3-lh);
+}
+
+/* D-22: 计数器是 11px 弱化灰 #aeacbd, 与本地原先的 16px 深色强调权重完全相反 */
+.multi-image-fusion-count {
+  color: var(--mif-text-count);
+  text-align: right;
+  min-width: 39px;
+  padding-top: 3px;
+  font-size: var(--mif-small-size);
+  line-height: 18px;
+}
+
+/* ══ F. 上传区（主体图 / 搭配图） ══ */
+.multi-image-fusion-upload-section + .multi-image-fusion-upload-section {
+  margin-top: var(--mif-gap-section);
+}
+
+/* S-17: 「必传 · N 张」是弱化灰 small, 不是红色 <em> */
+.multi-image-fusion-field-label {
+  color: var(--mif-text-label);
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--mif-gap-field);
+  min-height: 22px;
+  margin-bottom: 8px;
+  font-size: var(--mif-label-size);
+  font-weight: var(--mif-label-weight);
+  display: flex;
+}
+
+.multi-image-fusion-field-label small {
+  color: var(--mif-text-dim-3);
+  font-size: var(--mif-small-size);
+  font-weight: 400;
+}
+
+.multi-image-fusion-field-actions {
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  display: inline-flex;
+}
+
+/* 素材库导入 / 手机上传文字链: 参考站用 .workspace-material-library-trigger /
+   .mobile-upload-trigger, 值一致 (color #4e5969 / 13px 高 / 下划线 / 无边框无底) */
+.multi-image-fusion-field-link {
+  color: var(--wb-text-body);
+  cursor: pointer;
+  background: 0 0;
+  border: 0;
+  border-radius: 0;
+  align-items: center;
+  height: 13px;
+  min-height: 13px;
+  padding: 0;
+  font-size: var(--mif-sub-size);
+  text-decoration: underline;
+  display: inline-flex;
+}
+
+.multi-image-fusion-field-link:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.multi-image-fusion-upload-empty {
+  color: var(--mif-text-count-2);
+  cursor: pointer;
+  background: var(--mif-surface-checker);
+  border: 1px dashed var(--mif-border-dashed);
+  border-radius: var(--mif-radius-upload);
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: var(--mif-gap-tight);
+  width: 100%;
+  min-height: var(--mif-upload-min-height);
+  padding: 15px;
+  transition:
+    border-color var(--mif-motion-fast),
+    background var(--mif-motion-fast),
+    transform var(--mif-motion-fast);
+  display: flex;
+}
+
+.multi-image-fusion-upload-empty:hover,
+.multi-image-fusion-upload-empty.is-dragging,
+.multi-image-fusion-accessory-grid.is-dragging {
+  background: var(--mif-surface-drag);
+  border-color: var(--mif-border-drag);
+}
+
+.multi-image-fusion-upload-empty:hover {
+  transform: translateY(-1px);
+}
+
+.multi-image-fusion-upload-empty strong {
+  color: var(--mif-text-on-accent);
+  font-size: var(--mif-sub-size);
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.multi-image-fusion-upload-empty > span:last-child {
+  color: var(--mif-text-dim-4);
+  font-size: var(--mif-tiny-size);
+  line-height: var(--mif-tiny-lh);
+}
+
+/* D-31: 参考站上传图标有 36x36 圆角色块 (#eeebff / #7366d1), 本地原先是裸图标 */
+.multi-image-fusion-upload-icon {
+  color: var(--mif-text-accent);
+  background: var(--mif-surface-icon);
+  border-radius: var(--mif-radius-icon);
+  justify-content: center;
+  align-items: center;
+  width: var(--mif-icon-size);
+  height: var(--mif-icon-size);
+  margin-bottom: 2px;
+  display: inline-flex;
+}
+
+/* D-33~D-36: 已上传图容器 13px 圆角 / contain / 22x22 方形移除按钮 (hover 变红) */
+.multi-image-fusion-image-card {
+  background: var(--mif-surface-image);
+  border: 1px solid var(--mif-border-checker);
+  border-radius: var(--mif-radius-upload);
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.multi-image-fusion-uploading {
+  color: var(--mif-text-accent-4);
+  background: var(--mif-surface-uploading);
+  justify-content: center;
+  align-items: center;
+  gap: var(--mif-gap-tight);
+  font-size: var(--mif-sub-size);
+  font-weight: 700;
+  display: inline-flex;
+  position: absolute;
+  inset: 0;
+}
+
+.multi-image-fusion-image-card > img {
+  object-fit: contain;
+  cursor: zoom-in;
+  width: 100%;
+  height: var(--mif-image-h);
+  display: block;
+}
+
+.multi-image-fusion-remove {
+  color: var(--card-bg);
+  cursor: pointer;
+  background: var(--mif-surface-remove);
+  border: 0;
+  border-radius: var(--mif-radius-remove);
+  justify-content: center;
+  align-items: center;
+  width: var(--mif-remove-size);
+  height: var(--mif-remove-size);
+  padding: 0;
+  transition: background var(--mif-motion-fast);
+  display: inline-flex;
+  position: absolute;
+  top: 7px;
+  right: 7px;
+}
+
+.multi-image-fusion-remove:hover {
+  background: var(--mif-surface-remove-hover);
+}
+
+/* S-8: 搭配图是 3 列网格小槽 (参考站 rule #70), 不是单个全宽按钮 */
+.multi-image-fusion-accessory-grid {
+  border: 1px solid var(--mif-border-transparent);
+  border-radius: var(--mif-radius-scene);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  padding: 3px;
+  transition:
+    border-color var(--mif-motion-fast),
+    background var(--mif-motion-fast);
+  display: grid;
+}
+
+.multi-image-fusion-accessory-grid .multi-image-fusion-upload-empty {
+  border-radius: var(--mif-radius-upload-sm);
+  min-height: var(--mif-upload-min-height-sm);
+  padding: 8px;
+}
+
+.multi-image-fusion-accessory-grid .multi-image-fusion-upload-icon {
+  border-radius: var(--mif-radius-icon-sm);
+  width: var(--mif-icon-size-sm);
+  height: var(--mif-icon-size-sm);
+}
+
+.multi-image-fusion-accessory-grid .multi-image-fusion-image-card > img {
+  height: var(--mif-image-h-sm);
+}
+
+/* ══ G. AI 分析按钮 ══ */
+/* D-41: 参考站是 135deg 深紫→浅紫渐变实心按钮 (主次 CTA 层级), 不是白底描边 */
+.multi-image-fusion-analyze-button,
+.multi-image-fusion-submit-button {
+  color: var(--card-bg);
+  cursor: pointer;
+  background: var(--mif-gradient-cta);
+  border: 0;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  transition:
+    transform var(--mif-motion-fast),
+    box-shadow var(--mif-motion-fast),
+    opacity var(--mif-motion-fast);
+  display: inline-flex;
+  box-shadow: var(--mif-shadow-cta);
+}
+
+/* D-37~D-40: 满宽 / 36px 高 / 9px 圆角 / 无边框 */
+.multi-image-fusion-analyze-button {
+  border-radius: var(--mif-radius-scene-visual);
+  width: 100%;
+  height: var(--mif-analyze-h);
+  font-size: var(--mif-sub-size);
+  font-weight: 600;
+}
+
+.multi-image-fusion-analyze-button:hover:not(:disabled),
+.multi-image-fusion-submit-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--mif-shadow-cta-hover);
+}
+
+.multi-image-fusion-analyze-button:disabled,
+.multi-image-fusion-submit-button:disabled,
+.multi-image-fusion-result-actions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/*
+ * AI 分析的可编辑描述框 (2026-10-22 新增)。
+ *
+ * 参考站本页没有这一块 (它的分析结果直接进提示词), 这里多出的 textarea
+ * 是本地实现: 识图结果必须可改 —— 模型对商品的理解不一定符合卖家口径。
+ * 取值全部复用本页 --mif-* token, 不引入新色值。
+ */
+.multi-image-fusion-analysis-input {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: var(--mif-sub-size);
+  line-height: 1.5;
+  color: var(--mif-text-label);
+  background: var(--mif-surface-panel);
+  border: 1px solid var(--mif-border-option);
+  border-radius: var(--mif-radius-option);
+  resize: vertical;
+}
+
+.multi-image-fusion-analysis-input::placeholder {
+  color: var(--mif-text-dim-4);
+}
+
+.multi-image-fusion-analysis-input:focus {
+  border-color: var(--mif-border-option-hover);
+  outline: none;
+}
+
+.multi-image-fusion-analysis-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--mif-text-sub);
+}
+
+/* ══ H. 输出参数（比例 / 变体） ══ */
+.multi-image-fusion-analysis-card,
+.multi-image-fusion-parameter-card {
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+
+.multi-image-fusion-parameter-group + .multi-image-fusion-parameter-group {
+  margin-top: 16px;
+}
+
+.multi-image-fusion-ratio-options,
+.multi-image-fusion-variant-options {
+  gap: var(--mif-gap-option);
+  display: grid;
+}
+
+/* D-45~D-53: 变体按钮是 4 列 grid 等分 (实测 37.75px), 不是 flex 自然宽 */
+.multi-image-fusion-variant-options {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.multi-image-fusion-ratio-options button,
+.multi-image-fusion-variant-options button {
+  color: var(--mif-text-muted-btn);
+  cursor: pointer;
+  background: var(--mif-surface-panel);
+  border: 1px solid var(--mif-border-option);
+  border-radius: var(--mif-radius-option);
+  justify-content: center;
+  align-items: center;
+  transition:
+    border-color var(--mif-motion-fast),
+    color var(--mif-motion-fast),
+    background var(--mif-motion-fast);
+  display: flex;
+}
+
+.multi-image-fusion-ratio-options {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--mif-gap-option-wide);
+}
+
+.multi-image-fusion-ratio-options button {
+  flex-direction: column;
+  gap: 4px;
+  min-height: 49px;
+  padding: 8px;
+  font-size: 13px;
+}
+
+.multi-image-fusion-ratio-options button:hover,
+.multi-image-fusion-variant-options button:hover {
+  color: var(--mif-option-hover-text);
+  border-color: var(--mif-border-option-hover);
+}
+
+/* D-51: 选中态边框是 transparent (边框消失), 不是变紫 */
+.multi-image-fusion-ratio-options button.selected,
+.multi-image-fusion-variant-options button.selected {
+  color: var(--mif-text-accent-3);
+  box-shadow: none;
+  background: var(--mif-surface-selected);
+  border-color: var(--mif-border-transparent);
+}
+
+.multi-image-fusion-ratio-preview {
+  background: var(--mif-surface-selected);
+  border-radius: 1px;
+  width: 18px;
+  max-height: 18px;
+  display: block;
+}
+
+.multi-image-fusion-ratio-options button.selected .multi-image-fusion-ratio-preview {
+  background: var(--mif-text-accent-4);
+}
+
+.multi-image-fusion-variant-options button {
+  height: var(--mif-option-h);
+  font-size: var(--mif-small-size);
+}
+
+/* ══ I. 提交区 ══ */
+/* 原 multi-* 声明（background #f6f7fb / padding 16px 2px 2px / z-index 5）会被后面的
+   .image-tool-submit-area 覆盖 —— 特异度相同、后定义者胜。照抄参考站以保持可追溯。 */
+.multi-image-fusion-submit-area {
+  z-index: 5;
+  background: var(--mif-surface-submit-ref);
+  flex: none;
+  margin-top: auto;
+  padding: 16px 2px 2px;
+  position: sticky;
+  bottom: 0;
+}
+
+/* §5.13 关键覆盖: 本元素同时挂 image-tool-submit-area, 后定义者全胜 →
+   真实底色 #fff (非 #f6f7fb)、padding 14px 16px 16px、z-index 10 (非 5)、radius 16px、gap 14px */
+.multi-image-fusion-page .image-tool-submit-area {
+  z-index: 10;
+  box-sizing: border-box;
+  background: var(--mif-surface-submit);
+  border-radius: var(--mif-radius-panel);
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+  margin-top: auto;
+  padding: 14px 16px 16px;
+  display: grid;
+  position: sticky;
+  bottom: 0;
+}
+
+/* D-56~D-59: 主 CTA 43px 高 / 11px 圆角 / 700 字重 / 135deg 深→浅渐变 (本地原先是 90deg 浅→深) */
+.multi-image-fusion-submit-button {
+  border-radius: var(--mif-radius-cta);
+  width: 100%;
+  height: var(--mif-cta-h);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* D-62: 副文案是 11px/400 半透明白, 与主文案有层级差 */
+.multi-image-fusion-submit-button small {
+  color: var(--mif-text-on-brand);
+  white-space: nowrap;
+  font-size: var(--mif-small-size);
+  font-weight: 400;
+}
+
+.multi-image-fusion-message {
+  min-height: 18px;
+  margin: 8px 2px 10px;
+  font-size: var(--mif-small-size);
+  line-height: 18px;
+}
+
+.multi-image-fusion-message.success {
+  color: var(--mif-surface-success);
+}
+
+.multi-image-fusion-message.info {
+  color: var(--mif-surface-info);
+}
+
+.multi-image-fusion-message.error {
+  color: var(--mif-surface-error);
+}
+
+.multi-image-fusion-page .image-tool-submit-area .image-output-settings-shell {
+  width: 100%;
+  min-width: 0;
+}
+
+/* 参考站在 .image-tool-submit-area 内把摘要按钮压扁 (34px 高 / 7px 圆角) */
+.multi-image-fusion-page .image-tool-submit-area .image-output-settings-summary {
+  background: var(--mif-surface-panel);
+  border: 0;
+  border-radius: 7px;
+  min-height: 34px;
+  padding-inline: 10px;
+}
+
+/* 画质选项: 沿用参考站 .image-output-resolution-* 的字面值 */
+.multi-image-fusion-resolution-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  display: grid;
+}
+
+.multi-image-fusion-resolution-option {
+  color: var(--mif-resolution-option);
+  cursor: pointer;
+  background: var(--mif-surface-panel);
+  border: 1px solid var(--mif-resolution-option-border);
+  border-radius: var(--mif-radius-option);
+  place-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 62px;
+  padding: 8px;
+  display: grid;
+}
+
+.multi-image-fusion-resolution-option.selected {
+  color: var(--mif-settings-ratio-option);
+  background: var(--mif-surface-selected);
+  border-color: var(--mif-settings-ratio-option);
+}
+
+.multi-image-fusion-resolution-option strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.multi-image-fusion-resolution-option span {
+  color: var(--mif-resolution-option-sub);
+  font-size: var(--mif-small-size);
+}
+
+.multi-image-fusion-resolution-option.selected span {
+  color: var(--mif-settings-ratio-option);
+}
+
+.multi-image-fusion-resolution-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
+.multi-image-fusion-resolution-option.selected:disabled {
+  opacity: 1;
+}
+
+/* ══ J. 结果面板 / 预览舞台 / 缩略图 ══ */
+/* D-65~D-68: 结果面板是 145deg 渐变底 + 18px 圆角 + 同卡片阴影 */
+.multi-image-fusion-result-panel {
+  background: var(--mif-gradient-panel);
+  min-width: 0;
+  min-height: var(--mif-panel-min-height);
+  padding: 22px;
+}
+
+/* 后定义段: 参考站 rule #154 */
+.multi-image-fusion-result-panel {
+  scrollbar-gutter: stable;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  display: flex;
+  overflow: hidden;
+}
+
+.multi-image-fusion-result-heading {
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--mif-gap-result);
+  margin-bottom: 17px;
+  display: flex;
+}
+
+.multi-image-fusion-result-heading-copy {
+  min-width: 0;
+}
+
+.multi-image-fusion-result-meta {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  display: flex;
+}
+
+.multi-image-fusion-result-meta p {
+  margin: 0;
+}
+
+.multi-image-fusion-result-status {
+  border: 1px solid;
+  border-radius: var(--mif-radius-pill);
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  font-size: var(--mif-small-size);
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  display: inline-flex;
+}
+
+.multi-image-fusion-result-status.is-generating {
+  color: var(--mif-status-generating-text);
+  background: var(--mif-status-generating-bg);
+  border-color: var(--mif-status-generating-border);
+}
+
+.multi-image-fusion-result-status.is-complete {
+  color: var(--mif-status-complete-text);
+  background: var(--mif-status-complete-bg);
+  border-color: var(--mif-status-complete-border);
+}
+
+.multi-image-fusion-result-status.is-partial {
+  color: var(--mif-status-partial-text);
+  background: var(--mif-status-partial-bg);
+  border-color: var(--mif-status-partial-border);
+}
+
+.multi-image-fusion-result-status.is-failed {
+  color: var(--mif-status-failed-text);
+  background: var(--mif-status-failed-bg);
+  border-color: var(--mif-status-failed-border);
+}
+
+/* D-71/D-72: 结果标题 18px/700, 副标题 12px/19px #9897aa (本地原先缺副标题) */
+.multi-image-fusion-result-heading h2 {
+  margin-top: 2px;
+  font-size: var(--mif-h2-size);
+  font-weight: var(--mif-h2-weight);
+  line-height: var(--mif-h2-lh);
+}
+
+.multi-image-fusion-result-heading p {
+  color: var(--mif-text-dim);
+  margin: 4px 0 0;
+  font-size: var(--mif-sub-size);
+  line-height: var(--mif-sub-lh);
+}
+
+.multi-image-fusion-result-actions {
+  align-items: center;
+  gap: var(--mif-gap-actions);
+  display: flex;
+}
+
+/* D-73~D-75: 结果按钮 32px 高 / 11px / padding 0 10px */
+.multi-image-fusion-result-actions button {
+  color: var(--mif-text-muted-btn-2);
+  cursor: pointer;
+  background: var(--mif-surface-result-btn);
+  border: 1px solid var(--mif-border-result-btn);
+  border-radius: var(--mif-radius-option);
+  align-items: center;
+  gap: 5px;
+  height: var(--mif-result-btn-h);
+  padding: 0 10px;
+  font-size: var(--mif-small-size);
+  transition:
+    border-color var(--mif-motion-fast),
+    color var(--mif-motion-fast),
+    background var(--mif-motion-fast);
+  display: inline-flex;
+}
+
+.multi-image-fusion-result-actions button:hover:not(:disabled) {
+  color: var(--mif-result-btn-hover-text);
+  background: var(--mif-surface-back-hover);
+  border-color: var(--mif-border-result-btn-hover);
+}
+
+/* D-80: 棋盘格底是本页标志性视觉, 4 层 45deg 渐变 + #fbfaff 底 */
+.multi-image-fusion-preview-stage,
+.multi-image-fusion-result-empty {
+  background-color: var(--mif-surface-checker);
+  background-image: var(--mif-checker);
+  background-position: var(--mif-checker-pos);
+  background-repeat: repeat, repeat, repeat, repeat, repeat;
+  background-size: var(--mif-checker-size);
+  background-attachment: scroll, scroll, scroll, scroll, scroll;
+  background-origin: padding-box, padding-box, padding-box, padding-box, padding-box;
+  background-clip: border-box, border-box, border-box, border-box, border-box;
+  border: 1px solid var(--mif-border-stage);
+  border-radius: var(--mif-radius-stage);
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  min-height: var(--mif-stage-min-height);
+  max-height: calc(100vh - 260px);
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+
+/* 后定义段: 参考站 rule #155 —— 舞台/空态按所选比例自适应宽度。
+   --fusion-ratio-width/height 由 JS 内联注入 (§1.3: 参考站 CSS 产物中无定义)。*/
+.multi-image-fusion-preview-stage,
+.multi-image-fusion-result-empty {
+  width: min(
+    100%,
+    calc(
+      (100vh - var(--mif-workspace-topbar-height) - 280px) * var(--fusion-ratio-width) /
+        var(--fusion-ratio-height)
+    )
+  );
+  flex: none;
+  min-height: 0;
+  max-height: none;
+  margin-inline: auto;
+}
+
+.multi-image-fusion-preview-image {
+  object-fit: contain;
+  cursor: zoom-in;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.multi-image-fusion-preview-stage .result-feedback-trigger {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.multi-image-fusion-preview-stage:hover .result-feedback-trigger,
+.multi-image-fusion-preview-stage:focus-within .result-feedback-trigger {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.multi-image-fusion-generating-state {
+  color: var(--mif-text-on-dark);
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  display: flex;
+}
+
+.multi-image-fusion-generating-state > img {
+  object-fit: contain;
+  width: 52px;
+  height: 52px;
+}
+
+.multi-image-fusion-generating-state > strong {
+  font-size: var(--mif-body-size);
+  font-weight: 600;
+}
+
+/* 来源徽标: 舞台左上角, 与右下角的尺寸标分居两角, 互不遮挡 */
+.mif-provider {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 2;
+  margin-left: 0;
+}
+
+.multi-image-fusion-preview-size {
+  color: var(--card-bg);
+  backdrop-filter: blur(8px);
+  background: var(--mif-surface-preview-size);
+  border-radius: var(--mif-radius-pill);
+  align-items: center;
+  gap: 4px;
+  min-height: 25px;
+  padding: 0 8px;
+  font-size: var(--mif-tiny-size);
+  display: inline-flex;
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+}
+
+.multi-image-fusion-thumbnails {
+  grid-template-columns: repeat(4, max-content);
+  justify-content: center;
+  gap: 9px;
+  margin-top: 12px;
+  display: grid;
+}
+
+.multi-image-fusion-thumbnails button {
+  cursor: pointer;
+  background: var(--mif-surface-thumb);
+  border: 2px solid var(--mif-border-transparent);
+  border-radius: 10px;
+  min-width: 0;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  transition:
+    border-color var(--mif-motion-fast),
+    transform var(--mif-motion-fast);
+  position: relative;
+  overflow: hidden;
+}
+
+.multi-image-fusion-thumbnails button:hover {
+  transform: translateY(-1px);
+}
+
+.multi-image-fusion-thumbnails button.selected {
+  border-color: var(--mif-border-thumb-selected);
+}
+
+.multi-image-fusion-thumbnails img {
+  object-fit: contain;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.multi-image-fusion-thumbnails button > span {
+  color: var(--card-bg);
+  background: var(--mif-surface-thumb-badge);
+  border-radius: var(--mif-radius-badge);
+  justify-content: center;
+  align-items: center;
+  width: var(--mif-thumb-badge);
+  height: var(--mif-thumb-badge);
+  font-size: var(--mif-tiny-size);
+  display: inline-flex;
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+}
+
+/* 后定义段: 参考站 rule #156 */
+.multi-image-fusion-thumbnails button {
+  aspect-ratio: auto;
+  height: 74px;
+  min-height: 0;
+}
+
+/* D-81~D-83: 空态主文案 13px 600 #67647b / 副文案 11px #aaa7b8
+   注意 min-height 的层叠顺序: 参考站 rule #124 声明 min-height:510px, 但其后的 rule #155
+   (自适应宽度段) 声明 min-height:0 —— 后定义者胜, 故 510px 不生效。E3 实测空态 193x193
+   印证了这点 (510px 未触发)。此处不得再加 min-height, 否则偏离参考站。 */
+.multi-image-fusion-result-empty {
+  color: var(--mif-text-dim-2);
+  text-align: center;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.multi-image-fusion-result-empty strong {
+  color: var(--mif-text-on-dark);
+  font-size: var(--mif-body-strong-size);
+  font-weight: var(--mif-body-strong-weight);
+}
+
+.multi-image-fusion-result-empty p {
+  color: var(--mif-text-on-dark-2);
+  margin: 0;
+  font-size: var(--mif-small-size);
+}
+
+/* ══ K. 结果空态插画 ══ */
+/* D-84: 96x78 三卡片斜叠 (-9deg / 0 / +9deg), 非共用插画组件 */
+.multi-image-fusion-empty-art {
+  width: 96px;
+  height: 78px;
+  margin-bottom: 8px;
+  position: relative;
+}
+
+.multi-image-fusion-empty-art > span {
+  color: var(--mif-text-art);
+  background: var(--mif-surface-art);
+  border: 1px solid var(--mif-border-art);
+  border-radius: var(--mif-radius-art);
+  justify-content: center;
+  align-items: center;
+  display: inline-flex;
+  position: absolute;
+  box-shadow: var(--mif-shadow-art);
+}
+
+.multi-image-fusion-empty-art > span:first-child {
+  width: 50px;
+  height: 50px;
+  top: 12px;
+  left: 3px;
+  transform: rotate(-9deg);
+}
+
+.multi-image-fusion-empty-art > span:nth-child(2) {
+  z-index: 1;
+  color: var(--mif-text-art-2);
+  background: var(--mif-surface-art-2);
+  width: 46px;
+  height: 46px;
+  top: 0;
+  left: 32px;
+}
+
+.multi-image-fusion-empty-art > span:nth-child(3) {
+  width: 50px;
+  height: 50px;
+  top: 16px;
+  right: 1px;
+  transform: rotate(9deg);
+}
+
+/* ══ L. 焦点态统一（D-94: 参考站 9 类可交互元素统一 outline） ══ */
+.multi-image-fusion-scene-back:focus-visible,
+.multi-image-fusion-result-actions button:focus-visible,
+.multi-image-fusion-ratio-options button:focus-visible,
+.multi-image-fusion-variant-options button:focus-visible,
+.multi-image-fusion-upload-empty:focus-visible,
+.multi-image-fusion-remove:focus-visible,
+.multi-image-fusion-thumbnails button:focus-visible,
+.multi-image-fusion-analyze-button:focus-visible,
+.multi-image-fusion-submit-button:focus-visible {
+  outline-offset: 2px;
+  outline: 2px solid var(--mif-focus-ring);
+}
+
+/* ══ M. 诚实披露（D-85 / §10.10: 移出空态区, 默认折叠） ══ */
+.multi-image-fusion-disclosure {
+  margin-top: 12px;
+  color: var(--mif-text-dim-2);
+  font-size: var(--mif-tiny-size);
+  line-height: 16px;
+}
+
+.multi-image-fusion-disclosure > summary {
+  cursor: pointer;
+  color: var(--mif-text-sub);
+  list-style: none;
+  align-items: center;
+  gap: 5px;
+  display: inline-flex;
+}
+
+.multi-image-fusion-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+.multi-image-fusion-disclosure > summary svg {
+  flex: none;
+  transition: transform var(--mif-motion-fast);
+}
+
+.multi-image-fusion-disclosure[open] > summary svg {
+  transform: rotate(90deg);
+}
+
+.multi-image-fusion-disclosure > p {
+  margin: 6px 0 0;
+}
+
+/* ══ M2. 2026-10-27 参考站复核对齐 ══ */
+
+/* 高级设置：参考站共享 .image-output-* 结构，标题栏、关闭键、8 比例、3 分辨率 */
+.multi-image-fusion-page .image-output-settings-popover-head {
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  min-height: 20px;
+  margin-bottom: 16px;
+  display: flex;
+}
+
+.multi-image-fusion-page .image-output-settings-popover-head h2 {
+  color: var(--mif-text-title);
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 20px;
+}
+
+.multi-image-fusion-page .image-output-settings-close {
+  color: var(--text-4);
+  cursor: pointer;
+  background: 0 0;
+  border: 0;
+  flex: 0 0 24px;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: grid;
+}
+
+.multi-image-fusion-page .image-output-settings-close:hover,
+.multi-image-fusion-page .image-output-settings-close:focus-visible {
+  color: var(--mif-text-card);
+  outline: none;
+}
+
+.multi-image-fusion-page .image-output-settings-popover .image-output-settings {
+  margin-top: 0;
+}
+
+.multi-image-fusion-page .image-output-ratio-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--mif-gap-option-wide);
+  display: grid;
+}
+
+.multi-image-fusion-page .image-output-ratio-option {
+  color: var(--mif-text-2);
+  cursor: pointer;
+  background: var(--mif-surface-panel);
+  border: 1px solid var(--mif-resolution-option-border);
+  border-radius: var(--mif-radius-option);
+  justify-content: center;
+  align-items: center;
+  min-width: 0;
+  height: 39px;
+  padding: 0;
+  font-size: 13px;
+  display: flex;
+}
+
+.multi-image-fusion-page .image-output-ratio-option small {
+  font-size: 13px;
+  line-height: 13px;
+}
+
+.multi-image-fusion-page .image-output-ratio-option.active {
+  color: var(--mif-settings-ratio-option);
+  background: var(--mif-surface-selected);
+  border-color: var(--mif-settings-ratio-option);
+}
+
+.multi-image-fusion-page .image-output-ratio-option:disabled,
+.multi-image-fusion-page .image-output-resolution-option:disabled {
+  cursor: not-allowed;
+  opacity: 0.56;
+}
+
+.multi-image-fusion-page .image-output-ratio-option.active:disabled,
+.multi-image-fusion-page .image-output-resolution-option.active:disabled {
+  opacity: 1;
+}
+
+.multi-image-fusion-page .image-output-resolution-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--mif-gap-option-wide);
+  display: grid;
+}
+
+.multi-image-fusion-page .image-output-resolution-option {
+  color: var(--mif-resolution-option);
+  cursor: pointer;
+  background: var(--mif-surface-panel);
+  border: 1px solid var(--mif-resolution-option-border);
+  border-radius: var(--mif-radius-option);
+  place-items: center;
+  gap: 4px;
+  min-width: 0;
+  min-height: 62px;
+  padding: 8px;
+  display: grid;
+}
+
+.multi-image-fusion-page .image-output-resolution-option.active {
+  color: var(--mif-settings-ratio-option);
+  background: var(--mif-surface-selected);
+  border-color: var(--mif-settings-ratio-option);
+}
+
+.multi-image-fusion-page .image-output-resolution-option strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.multi-image-fusion-page .image-output-resolution-option span {
+  color: var(--mif-resolution-option-sub);
+  font-size: var(--mif-small-size);
+}
+
+.multi-image-fusion-page .image-output-resolution-option.active span {
+  color: var(--mif-settings-ratio-option);
+}
+
+.multi-image-fusion-page .image-output-ratio-option:focus-visible,
+.multi-image-fusion-page .image-output-resolution-option:focus-visible,
+.multi-image-fusion-page .image-output-settings-close:focus-visible {
+  outline-offset: 2px;
+  outline: 2px solid var(--mif-focus-ring);
+}
+
+/* AI 分析默认只占 106px 左右；描述编辑器只在分析成功后出现 */
+.multi-image-fusion-description {
+  color: var(--mif-text-3);
+  gap: 6px;
+  margin-top: 12px;
+  font-size: var(--mif-small-size);
+  font-weight: 600;
+  display: grid;
+}
+
+.multi-image-fusion-description-editor {
+  color: var(--mif-text-1);
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: var(--mif-surface-checker);
+  border: 1px solid var(--mif-border);
+  border-radius: 9px;
+  outline: 0;
+  resize: vertical;
+  width: 100%;
+  min-height: 160px;
+  max-height: 320px;
+  padding: 11px 12px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 21px;
+}
+
+.multi-image-fusion-description-editor::placeholder {
+  color: var(--mif-text-4);
+}
+
+.multi-image-fusion-description-editor:focus {
+  border-color: var(--mif-border-drag);
+  box-shadow: 0 0 0 3px rgb(136 123 224 / 0.1098);
+}
+
+/* 结果舞台按所选比例撑高；空态/生成中/失败/成功共用同一几何 */
+.multi-image-fusion-generating-stage,
+.multi-image-fusion-failure-stage {
+  padding: 22px;
+}
+
+.multi-image-fusion-failure-stage .multi-image-fusion-result-empty {
+  width: 100%;
+  flex: none;
+}
+
+.multi-image-fusion-thumbnails button {
+  width: 74px;
+  height: 74px;
+}
+
+.multi-image-fusion-page ::-webkit-scrollbar-track {
+  background: 0 0;
+}
+
+.multi-image-fusion-page ::-webkit-scrollbar-thumb {
+  background: var(--mif-scrollbar-thumb);
+  border-radius: 99px;
+}
+
+.multi-image-fusion-page ::-webkit-scrollbar-thumb:hover {
+  background: var(--mif-scrollbar-thumb-hover);
+}

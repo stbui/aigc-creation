@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useConfirm } from '../../../admin-ui/providers/ConfirmProvider';
 import { useToast } from '../../../admin-ui/providers/ToastProvider';
 import { useAdminDetailParam, useAdminResource, useAdminUrlFilterSync } from '../../../admin-ui/primitives';
@@ -30,6 +31,100 @@ export {
   useUnsavedGuard,
 };
 
+export type ChannelView = 'channels' | 'models';
+
+/**
+ * 渠道工作台视图与地址栏的双向同步。
+ *
+ * 视图直接由 `?view=` 派生，而不是复制进 `useState`：刷新、分享链接以及浏览器
+ * 前进 / 后退都会走同一份真相，不会出现地址栏已是「全部模型」、页面仍停在
+ * 「按渠道」的割裂状态。默认视图不写冗余参数，切到全量视图才落 `view=models`。
+ */
+export function useChannelView() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const view: ChannelView = searchParams.get('view') === 'models' ? 'models' : 'channels';
+
+  const setView = useCallback(
+    (next: ChannelView) => {
+      setSearchParams(
+        () => {
+          // 同一轮里详情也可能刚写过 `?id=`；必须基于实时地址栏合并，不能用旧快照
+          const params = new URLSearchParams(window.location.search);
+          if (next === 'models') params.set('view', 'models');
+          else params.delete('view');
+          return params;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  return [view, setView] as const;
+}
+
+interface UseChannelSelectionOptions {
+  visible: AdminChannelView[];
+  loading: boolean;
+  error: string | null;
+  view: ChannelView;
+  selectedId: string | null;
+  setSelectedId: (id: string | null) => void;
+}
+
+/**
+ * 让「左列可见项」与「右侧详情」始终对齐。
+ *
+ * 列表首次加载、无效深链、筛选把当前渠道隐藏时，都回退到首个可见渠道；
+ * 没有任何可见渠道则清掉失效的 `id`。列表加载中或失败时不动 URL，避免把
+ * 旧数据状态误判成「渠道不存在」。
+ */
+export function useChannelSelection({
+  visible,
+  loading,
+  error,
+  view,
+  selectedId,
+  setSelectedId,
+}: UseChannelSelectionOptions) {
+  useEffect(() => {
+    if (view !== 'channels' || loading || error) return;
+    if (selectedId && visible.some((row) => row.id === selectedId)) return;
+
+    if (visible.length > 0) {
+      setSelectedId(visible[0].id);
+    } else if (selectedId) {
+      setSelectedId(null);
+    }
+  }, [view, loading, error, visible, selectedId, setSelectedId]);
+}
+
+/**
+ * 单飞动作锁：同步拒绝重复触发，直到前一个 Promise 结束。
+ *
+ * `disabled={saving}` 要等下一次渲染才生效，快速双击仍可能在上一次请求发出前
+ * 再次进入处理器；这里的 ref 在第一次调用的同步阶段就占锁，负责补上这段窗口。
+ */
+export function useActionLock() {
+  const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
+
+  const run = useCallback(async (task: () => Promise<void>) => {
+    if (busyRef.current) return false;
+    busyRef.current = true;
+    setBusy(true);
+    try {
+      await task();
+      return true;
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  }, []);
+
+  return { busy, run };
+}
+
 /**
  * 渠道列表：全量拉取 + 手动刷新。
  *
@@ -39,16 +134,21 @@ export function useChannelList() {
   const [rows, setRows] = useState<AdminChannelView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const seq = useRef(0);
 
   const reload = useCallback(async () => {
+    const current = ++seq.current;
     setLoading(true);
     try {
-      setRows(await fetchAllChannels());
+      const next = await fetchAllChannels();
+      if (current !== seq.current) return;
+      setRows(next);
       setError(null);
     } catch (e) {
+      if (current !== seq.current) return;
       setError(e instanceof Error ? e.message : '读取渠道列表失败');
     } finally {
-      setLoading(false);
+      if (current === seq.current) setLoading(false);
     }
   }, []);
 

@@ -13,8 +13,3 @@ export function formatTime(value: string | null): string {
   if (!value) return '—';
   return new Date(value).toLocaleString('zh-CN');
 }
-
-/** 可人工核对的状态：已结算 / 已退款只能看，不能再次处置 */
-export function canResolveStatus(status: string): boolean {
-  return status === 'uncertain' || status === 'reserved' || status === 'running';
-}

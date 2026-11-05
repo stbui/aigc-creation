@@ -4,7 +4,7 @@ import { yuan } from './utils';
 import { useAdmin, useToast, useAdminList, useAdminUrlFilterSync } from './hooks';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Download } from 'lucide-react';
-import { adminInvoicesApi } from '../../../lib/api';
+import { adminInvoicesApi } from './api';
 
 import { ActionButton, AdminDataTable, AppliedFilters, ClearableField, ConfirmAction, FilterActions, FilterBar, PageHeader, Panel, SelectField, StatusTag, StaleError, TextField, type AdminColumn, type AppliedFilter } from '~/admin-ui/primitives';
 import { adminOrderDetailHref, adminUserHref } from '../../../lib/admin-links';
@@ -15,12 +15,12 @@ import type { AdminInvoice, InvoiceStatus } from '../../../types/api';
  *
  * 三条业务约束决定了这一页的形状:
  *
- * 1. **一单一票** —— 发票号在申请时就已占用, 驳回不释放 (用户重新申请会开新票号)。
- *    所以列表按发票行展示而非按订单, 同一订单最多出现一条。
- * 2. **开具不可逆** —— 票号与抬头一旦印出无法回收, 因此「开具」走高风险确认弹窗,
- *    必须填原因并写入操作审计。
+ * 1. **一单一张有效票** —— 发票号在申请时就已占用, 驳回后重提会生成新票号。
+ *    列表按发票行展示并保留完整历史, 同一订单同一时刻最多一张有效票。
+ * 2. **开具不可逆** —— 票号与抬头一旦印出无法回收, 因此「开具」走高风险确认弹窗。
+ *    已开具发票只能做冲红登记, 且必须填写原因并写入操作审计。
  * 3. **金额是快照** —— 展示的是申请时算出的 `paidCents - refundedCents`,
- *    不随后续退款变化。运营若要冲红, 必须走线下流程, 这一页不提供。
+ *    不随后续退款变化。冲红登记只固化台账, 线下税务手续仍由财务完成。
  */
 
 export function AdminInvoicesPage() {
@@ -32,7 +32,10 @@ export function AdminInvoicesPage() {
   const [searchParams] = useSearchParams();
   const rawStatus = searchParams.get('status');
   const initialStatus: InvoiceStatus | undefined =
-    rawStatus === 'pending' || rawStatus === 'issued' || rawStatus === 'rejected'
+    rawStatus === 'pending' ||
+    rawStatus === 'issued' ||
+    rawStatus === 'rejected' ||
+    rawStatus === 'red_flushed'
       ? rawStatus
       : undefined;
   const initialKeyword = searchParams.get('keyword') ?? '';
@@ -40,7 +43,10 @@ export function AdminInvoicesPage() {
   const [status, setStatus] = useState<InvoiceStatus | undefined>(initialStatus);
   const [keyword, setKeyword] = useState(initialKeyword);
 
-  const [action, setAction] = useState<{ kind: 'issue' | 'reject'; row: AdminInvoice } | null>(null);
+  const [action, setAction] = useState<{
+    kind: 'issue' | 'reject' | 'redFlush';
+    row: AdminInvoice;
+  } | null>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -120,7 +126,7 @@ export function AdminInvoicesPage() {
     }
   };
 
-  const openAction = (kind: 'issue' | 'reject', row: AdminInvoice) => {
+  const openAction = (kind: 'issue' | 'reject' | 'redFlush', row: AdminInvoice) => {
     setAction({ kind, row });
     setReason('');
   };
@@ -128,8 +134,8 @@ export function AdminInvoicesPage() {
   const runAction = async () => {
     if (!action) return;
     const trimmed = reason.trim();
-    if (action.kind === 'reject' && !trimmed) {
-      toast.warning('请填写驳回原因');
+    if (action.kind !== 'issue' && !trimmed) {
+      toast.warning(action.kind === 'reject' ? '请填写驳回原因' : '请填写冲红原因');
       return;
     }
     setBusy(true);
@@ -137,9 +143,12 @@ export function AdminInvoicesPage() {
       if (action.kind === 'issue') {
         const r = await adminInvoicesApi.issue(action.row.id);
         toast.success(`已开具 ${r.invoiceNo}`);
-      } else {
+      } else if (action.kind === 'reject') {
         await adminInvoicesApi.reject(action.row.id, trimmed);
         toast.success('已驳回，原因会展示给用户');
+      } else {
+        await adminInvoicesApi.redFlush(action.row.id, trimmed);
+        toast.success('已登记冲红，发票历史与原因已保留');
       }
       setAction(null);
       reload();
@@ -229,6 +238,14 @@ export function AdminInvoicesPage() {
           {row.status === 'rejected' && row.rejectReason && (
             <span className="text-[12px] text-muted-foreground">{row.rejectReason}</span>
           )}
+          {row.status === 'red_flushed' && (
+            <span className="text-[12px] text-muted-foreground">
+              {row.redFlushReason ?? '未填写冲红原因'}
+              {row.redFlushedAt
+                ? ` · ${new Date(row.redFlushedAt).toLocaleString('zh-CN')}`
+                : ''}
+            </span>
+          )}
         </div>
       ),
     },
@@ -239,7 +256,7 @@ export function AdminInvoicesPage() {
       fixed: 'right',
       render: (row) => (
         <div className="flex items-center gap-1">
-          {/* 只有待开具的票可操作: 已开具不可逆, 已驳回不复活 (用户需重新申请) */}
+          {/* 已开具只能登记冲红；已驳回需用户重新申请，不能原地复活 */}
           {row.status === 'pending' && can('invoice.write') && (
             <>
               <ActionButton variant="ghost" size="sm" onClick={() => openAction('issue', row)}>
@@ -250,7 +267,12 @@ export function AdminInvoicesPage() {
               </ActionButton>
             </>
           )}
-          {row.hasStoredFile && (
+          {row.status === 'issued' && can('invoice.write') && (
+            <ActionButton variant="ghost" size="sm" onClick={() => openAction('redFlush', row)}>
+              冲红登记
+            </ActionButton>
+          )}
+          {(row.status === 'issued' || row.status === 'red_flushed') && (
             <ActionButton
               variant="ghost"
               size="sm"
@@ -272,7 +294,7 @@ export function AdminInvoicesPage() {
     <>
       <PageHeader
         title="发票管理"
-        description="审核并开具用户申请的开票。一单一票，开具后不可撤销，操作全程写入审计。"
+        description="审核并开具用户申请的开票。保留历史记录，已开具发票只能登记冲红，操作全程写入审计。"
         actions={
           can('data.export') ? (
             <ActionButton
@@ -346,9 +368,21 @@ export function AdminInvoicesPage() {
       {action && (
         <ConfirmAction
           open
-          title={action.kind === 'issue' ? '开具发票' : '驳回开票申请'}
-          confirmText={action.kind === 'issue' ? '确认开具' : '确认驳回'}
-          danger={action.kind === 'reject'}
+          title={
+            action.kind === 'issue'
+              ? '开具发票'
+              : action.kind === 'reject'
+                ? '驳回开票申请'
+                : '登记发票冲红'
+          }
+          confirmText={
+            action.kind === 'issue'
+              ? '确认开具'
+              : action.kind === 'reject'
+                ? '确认驳回'
+                : '确认冲红'
+          }
+          danger={action.kind !== 'issue'}
           loading={busy}
           onCancel={() => setAction(null)}
           onConfirm={() => void runAction()}
@@ -360,9 +394,19 @@ export function AdminInvoicesPage() {
                   {action.row.invoiceNo} · {action.row.title} · ¥ {yuan(action.row.amountCents)}
                 </p>
               </>
-            ) : (
+            ) : action.kind === 'reject' ? (
               <>
                 <p>驳回后用户会看到驳回原因，可重新提交申请（将占用新的票号）。</p>
+                <p className="text-[12px] text-muted-foreground">
+                  {action.row.invoiceNo} · {action.row.title} · ¥ {yuan(action.row.amountCents)}
+                </p>
+              </>
+            ) : (
+              <>
+                <p>
+                  将发票登记为已冲红，并固化操作人、时间与原因。当前系统不直连税务平台，
+                  线下冲红手续仍需财务完成。
+                </p>
                 <p className="text-[12px] text-muted-foreground">
                   {action.row.invoiceNo} · {action.row.title} · ¥ {yuan(action.row.amountCents)}
                 </p>
@@ -372,20 +416,32 @@ export function AdminInvoicesPage() {
           impact={
             action.kind === 'issue'
               ? [`发票 ${action.row.invoiceNo} → 已开具`, '生成可打印文件', '写操作审计（含操作人）']
-              : [`发票 ${action.row.invoiceNo} → 已驳回`, '用户可重新申请', '写操作审计（含操作人）']
+              : action.kind === 'reject'
+                ? [`发票 ${action.row.invoiceNo} → 已驳回`, '用户可重新申请', '写操作审计（含操作人）']
+                : [
+                    `发票 ${action.row.invoiceNo} → 已冲红`,
+                    '保留开具与冲红历史，不可重新申请',
+                    '写操作审计（含操作人、时间与原因）',
+                  ]
           }
           extra={
-            action.kind === 'reject' ? (
+            action.kind !== 'issue' ? (
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="adm-invoice-reason" className="text-xs text-muted-foreground">
-                  驳回原因（会展示给用户）：
+                  {action.kind === 'reject'
+                    ? '驳回原因（会展示给用户）：'
+                    : '冲红原因（写入审计与冲红记录）：'}
                 </label>
                 <TextField
                   id="adm-invoice-reason"
-                  ariaLabel="驳回原因"
+                  ariaLabel={action.kind === 'reject' ? '驳回原因' : '冲红原因'}
                   value={reason}
                   onChange={setReason}
-                  placeholder="如：抬头与税号不一致，请修改后重提"
+                  placeholder={
+                    action.kind === 'reject'
+                      ? '如：抬头与税号不一致，请修改后重提'
+                      : '如：用户退费，对应发票需冲红'
+                  }
                   maxLength={300}
                 />
               </div>

@@ -1785,9 +1785,9 @@ export interface AdminOrderPayment {
 
 export interface AdminOrderRefund {
   id: string;
-  amountCents: number;
+  amountCents: number; creditsReclaimed: number; creditsUnreclaimable: number; providerRefundId: string | null;
   reason: string;
-  status: string;
+  status: string; detail: string;
   operatorId: string | null;
   createdAt: string;
 }
@@ -1986,8 +1986,8 @@ export interface PaymentStatusResult {
   }>;
 }
 
-/** 'pending' 待开具 | 'issued' 已开具 | 'rejected' 已驳回 */
-export type InvoiceStatus = "pending" | "issued" | "rejected";
+/** 'pending' 待开具 | 'issued' 已开具 | 'rejected' 已驳回 | 'red_flushed' 已冲红 */
+export type InvoiceStatus = "pending" | "issued" | "rejected" | "red_flushed";
 
 /** 发票 (C 端) */
 export interface Invoice {
@@ -2003,7 +2003,7 @@ export interface Invoice {
   content: string;
   status: InvoiceStatus;
   rejectReason: string | null;
-  issuedAt: string | null;
+  issuedAt: string | null; redFlushedAt: string | null; redFlushedBy: string | null; redFlushReason: string | null;
   createdAt: string;
   /** 已开具时才有: 可打印 HTML 的地址 */
   fileUrl: string | null;

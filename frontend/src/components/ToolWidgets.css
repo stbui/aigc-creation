@@ -1,0 +1,113 @@
+/**
+ * ToolWidgets 组件样式 —— 由组件文件引入，组件被哪些页面使用时随 chunk 加载。
+ *
+ * 从 `styles/global.css` 迁出；设计令牌与全局骨架仍留在全局。
+ */
+
+/* ───────── 背景/商品颜色色板 (参考站 background-color-options 实拍) ───────── */
+.background-color-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.background-color-option {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-control);
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.background-color-option:hover {
+  border-color: var(--brand-light);
+}
+
+.background-color-option.active {
+  box-shadow: none;
+}
+
+.background-color-option.white {
+  border: 1px solid var(--border-1);
+  background: var(--card-bg) !important;
+}
+
+.background-color-option.checker {
+  background-color: var(--card-bg);
+  background-image:
+    linear-gradient(45deg, var(--tool-surface-1) 25%, transparent 25%),
+    linear-gradient(-45deg, var(--tool-surface-1) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, var(--tool-surface-1) 75%),
+    linear-gradient(-45deg, transparent 75%, var(--tool-surface-1) 75%);
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-size: 16px 16px;
+}
+
+.background-color-option > svg {
+  color: var(--brand);
+  background: var(--card-bg);
+  border-radius: 50%;
+  padding: 3px;
+}
+
+.background-color-option.white.active > svg,
+.background-color-option.checker.active > svg {
+  color: var(--card-bg);
+  background: var(--brand);
+}
+
+.background-color-option.custom-trigger {
+  color: var(--text-muted);
+  background: url('/static/color.svg') 50% / cover no-repeat;
+}
+
+/* 参考站色板是 40px 圆形；当前页原先把商品主图的 32px 圆角方块直接搬来，
+ * 既改变单行数量，也让移动端色卡高度少了约 60px。 */
+.background-color-option {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+.background-color-options {
+  gap: 10px 16px;
+}
+
+/* 一键抠图：标题行 22px 行高 + 16px 底距；色板换行后卡片高 176。 */
+.pk-workspace.background-remove-page .background-color-card .card-title-row {
+  margin: 0 0 16px;
+}
+
+.pk-workspace.background-remove-page .background-color-card .card-title-row h2 {
+  margin: 0;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+/* 901–1366: 色板改为 4 列网格 (与 ToolWidgets 的色板基础规则同源)。 */
+@media (min-width: 901px) and (max-width: 1366px) {
+  .background-color-options {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px 8px;
+  }
+  .background-color-option,
+  .background-custom-picker,
+  .background-custom-picker .custom-trigger {
+    flex: 0 0 32px;
+    justify-self: center;
+    width: 32px;
+    height: 32px;
+  }
+  .background-custom-picker .custom-trigger > img {
+    width: 32px;
+    height: 32px;
+  }
+}

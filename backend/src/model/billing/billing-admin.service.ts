@@ -16,7 +16,12 @@ import type { BillingOrder, Prisma } from "@prisma/client";
 import { AppError } from "../../common/app.exception";
 import { CSV_EXPORT_MAX_ROWS, toCsv } from "../../common/csv";
 import { PrismaService } from "../../prisma/prisma.service";
-import { BillingService } from "./billing.service";
+import {
+  type BillingReviewTask,
+  BillingService,
+  isBillingOrderReviewable,
+  REVIEW_RUNNING_STALE_MS,
+} from "./billing.service";
 import { billingCreditCost } from "./cost-amount";
 
 /** 列表页单页上限：超过这个量级应当用筛选收窄，而不是翻页 */
@@ -97,6 +102,10 @@ export interface BillingOrderView {
   errorText: string;
   resolutionNote: string;
   resolvedBy: string;
+  /** 当前是否满足人工核对条件；与真正执行 resolve 使用同一判定函数 */
+  reviewable: boolean;
+  /** 同一次批量核对共享的批次号；单条核对为空 */
+  reviewBatchId: string;
   /**
    * 退款归类。`route_switch` = 线路切换的内部重预留（钱没离开平台，
    * **不计入「已退」**）；其余为真实退款。
@@ -139,7 +148,8 @@ export class BillingAdminService {
         _count: { _all: true },
       }),
     ]);
-    const [channelNames, channelModelNames, userEmails] = await Promise.all([
+    const [channelNames, channelModelNames, userEmails, taskStatuses] =
+      await Promise.all([
       nameLookup(
         rows.map((row) => row.channelId),
         (ids) =>
@@ -171,12 +181,22 @@ export class BillingAdminService {
             select: { id: true, email: true },
           }),
       ),
+      taskReviewLookup(
+        this.prisma,
+        rows.map((row) => row.taskId),
+      ),
     ]);
     const statusCounts: Record<string, number> = {};
     for (const item of counts) statusCounts[item.status] = item._count._all;
     return {
       items: rows.map((row) =>
-        toOrderView(row, channelNames, channelModelNames, userEmails),
+        toOrderView(
+          row,
+          channelNames,
+          channelModelNames,
+          userEmails,
+          isBillingOrderReviewable(row, taskStatuses.get(row.taskId)),
+        ),
       ),
       total,
       page,
@@ -190,7 +210,8 @@ export class BillingAdminService {
       where: { id: String(id ?? "").trim() },
     });
     if (!row) throw new AppError(40400, "账单不存在", 404);
-    const [channelNames, channelModelNames, userEmails] = await Promise.all([
+    const [channelNames, channelModelNames, userEmails, taskStatuses] =
+      await Promise.all([
       nameLookup([row.channelId], (ids) =>
         this.prisma.modelChannel.findMany({
           where: { id: { in: ids } },
@@ -216,8 +237,15 @@ export class BillingAdminService {
           select: { id: true, email: true },
         }),
       ),
+      taskReviewLookup(this.prisma, [row.taskId]),
     ]);
-    return toOrderView(row, channelNames, channelModelNames, userEmails);
+    return toOrderView(
+      row,
+      channelNames,
+      channelModelNames,
+      userEmails,
+      isBillingOrderReviewable(row, taskStatuses.get(row.taskId)),
+    );
   }
 
   /**
@@ -230,6 +258,8 @@ export class BillingAdminService {
     id: string,
     action: string,
     actorUserId: string,
+    reason: string,
+    batchId?: string,
   ): Promise<BillingOrderView> {
     const normalized = String(action ?? "")
       .trim()
@@ -237,11 +267,11 @@ export class BillingAdminService {
     if (normalized !== "settle" && normalized !== "refund") {
       throw new AppError(40001, "请选择结算或退款", 400);
     }
-    const note =
-      normalized === "settle"
-        ? "人工核对：按现有用量结算"
-        : "人工核对：全额退款";
-    await this.billing.resolve(id, normalized, actorUserId, note);
+    const note = String(reason ?? "").trim();
+    if (!note) throw new AppError(40001, "请填写核对依据", 400);
+    await this.billing.resolve(id, normalized, actorUserId, note, {
+      reviewBatchId: batchId,
+    });
     return this.getOrder(id);
   }
 
@@ -255,6 +285,7 @@ export class BillingAdminService {
     ids: string[],
     action: string,
     actorUserId: string,
+    reason: string,
   ): Promise<{
     total: number;
     resolved: number;
@@ -285,11 +316,22 @@ export class BillingAdminService {
     if (normalized !== "settle" && normalized !== "refund") {
       throw new AppError(40001, "请选择结算或退款", 400);
     }
+    const note = String(reason ?? "").trim();
+    if (!note) throw new AppError(40001, "请填写核对依据", 400);
+    const reviewBatchId = `review_${Date.now()}_${Math.random()
+      .toString(36)
+      .slice(2, 10)}`;
 
     const results: Array<{ id: string; ok: boolean; error?: string }> = [];
     for (const id of unique) {
       try {
-        await this.resolveOrder(id, normalized, actorUserId);
+        await this.resolveOrder(
+          id,
+          normalized,
+          actorUserId,
+          note,
+          reviewBatchId,
+        );
         results.push({ id, ok: true });
       } catch (error) {
         results.push({ id, ok: false, error: (error as Error).message });
@@ -587,7 +629,6 @@ function dateRange(
  *   · `running` 且超过 40 分钟 —— 执行者疑似已死；
  *   · `reserved` 但任务已失败/取消 —— 预授权没人退。
  */
-const REVIEW_RUNNING_STALE_MINUTES = 40;
 const MAX_BATCH_RESOLVE = 100;
 
 async function orderWhere(
@@ -599,23 +640,39 @@ async function orderWhere(
   if (statuses.includes("review")) {
     const concrete = statuses.filter((item) => item !== "review");
     const staleBefore = new Date(
-      Date.now() - REVIEW_RUNNING_STALE_MINUTES * 60_000,
+      Date.now() - REVIEW_RUNNING_STALE_MS,
     );
-    // 任务已失败/取消、但账单仍挂着预授权：用子查询而非 relation 过滤
-    // （BillingOrder 与 GenerationTask 之间没有声明 relation）
-    const failedTasks = await prisma.generationTask.findMany({
-      where: { status: { in: ["failed", "cancelled"] } },
-      select: { id: true },
-    });
+    // 候选 id 在库里按同一套「可核对」口径筛出：已有产物、仍在补交付的任务
+    // 即使账单状态命中，也不能进入待核对队列。
+    const reviewableOrders = await prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT b.id
+      FROM "BillingOrder" AS b
+      WHERE (
+        b.status = 'uncertain'
+        OR (b.status = 'running' AND b.updatedAt < ${staleBefore})
+        OR (
+          b.status = 'reserved'
+          AND EXISTS (
+            SELECT 1
+            FROM "GenerationTask" AS t
+            WHERE t.id = b.taskId
+              AND t.status IN ('failed', 'cancelled')
+          )
+        )
+      )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM "GenerationTask" AS t
+        WHERE t.id = b.taskId
+          AND (
+            t.outputAssetId IS NOT NULL
+            OR t.pendingResult IS NOT NULL
+            OR (t.mediaRecoveryError IS NOT NULL AND t.status = 'running')
+          )
+        )
+    `;
     const reviewClause: Prisma.BillingOrderWhereInput = {
-      OR: [
-        { status: "uncertain" },
-        { status: "running", updatedAt: { lt: staleBefore } },
-        {
-          status: "reserved",
-          taskId: { in: failedTasks.map((task) => task.id) },
-        },
-      ],
+      id: { in: reviewableOrders.map((row) => row.id) },
     };
     where.OR = [
       reviewClause,
@@ -673,6 +730,30 @@ async function nameLookup(
   );
 }
 
+/** 当前页任务核对信息：一次批量查询，避免每条账单再查一次。 */
+async function taskReviewLookup(
+  prisma: PrismaService,
+  taskIds: string[],
+): Promise<Map<string, BillingReviewTask>> {
+  const unique = [
+    ...new Set(
+      taskIds.map((id) => String(id ?? "").trim()).filter((id) => id !== ""),
+    ),
+  ];
+  if (unique.length === 0) return new Map();
+  const rows = await prisma.generationTask.findMany({
+    where: { id: { in: unique } },
+    select: {
+      id: true,
+      status: true,
+      outputAssetId: true,
+      pendingResult: true,
+      mediaRecoveryError: true,
+    },
+  });
+  return new Map(rows.map((row) => [row.id, row]));
+}
+
 function num(value: bigint): number {
   return Number(value);
 }
@@ -696,6 +777,7 @@ function toOrderView(
   channelNames: Map<string, string>,
   channelModelNames: Map<string, string>,
   userEmails: Map<string, string>,
+  reviewable: boolean,
 ): BillingOrderView {
   return {
     id: row.id,
@@ -734,6 +816,8 @@ function toOrderView(
     errorText: row.errorText,
     resolutionNote: row.resolutionNote,
     resolvedBy: row.resolvedBy,
+    reviewable,
+    reviewBatchId: row.reviewBatchId,
     refundReason: row.refundReason,
     startedAt: iso(row.startedAt),
     settledAt: iso(row.settledAt),

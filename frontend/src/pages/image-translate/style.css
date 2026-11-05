@@ -1,0 +1,126 @@
+/**
+ * image-translate 页面样式 —— 由 `./index.ts` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：这里只放本页专属的选择器；共享骨架
+ * （`.pk-workspace` / `.tool-*` / `.state-*` 等）仍留在全局。
+ */
+
+/* ───────── 图片翻译: 语言字段 + 保护开关 (参考站 image-translate-settings) ───────── */
+.image-translate-language-field {
+  display: grid;
+  gap: 6px;
+}
+
+.image-translate-language-field > span {
+  font-size: 13px;
+  color: var(--wb-text);
+}
+
+.image-translate-language-field select {
+  width: 100%;
+  height: 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-tag);
+  padding: 5px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--wb-text);
+  background: var(--card-bg);
+  outline: none;
+}
+
+.image-translate-language-field select:focus {
+  border-color: var(--brand-light);
+}
+
+.image-translate-protect {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.image-translate-protect > span {
+  font-size: 13px;
+  color: var(--wb-text);
+}
+
+.image-translate-protect button {
+  width: 40px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  border: none;
+  background: var(--border);
+  padding: 2px;
+  cursor: pointer;
+  transition: background 0.15s;
+  display: flex;
+  align-items: center;
+}
+
+.image-translate-protect button i {
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-pill);
+  background: var(--card-bg);
+  box-shadow: 0 1px 3px rgba(17, 24, 39, 0.24);
+  transition: transform 0.15s;
+}
+
+.image-translate-protect button.active {
+  background: var(--brand-accent);
+}
+
+.image-translate-protect button.active i {
+  transform: translateX(18px);
+}
+
+/* 图片翻译：参考站设置卡是 flex + 14px gap + 1px 边框，而非通用 grid 卡。 */
+.pk-workspace.image-translate-page .local-redraw-card.tool-card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid var(--tool-border-5);
+  border-radius: 14px;
+}
+
+.pk-workspace.image-translate-page .local-redraw-card.tool-card .card-title-row {
+  margin: 0;
+}
+
+.pk-workspace.image-translate-page .local-redraw-card.tool-card .card-title-row h2 {
+  margin: 0;
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.pk-workspace.image-translate-page .image-translate-language-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pk-workspace.image-translate-page .image-translate-language-field > span,
+.pk-workspace.image-translate-page .image-translate-protect > span {
+  font-size: 13px;
+  line-height: 17.5px;
+}
+
+.pk-workspace.image-translate-page .image-translate-language-field select {
+  box-sizing: border-box;
+  height: 36px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.pk-workspace.image-translate-page .image-translate-protect {
+  height: 20px;
+  align-items: center;
+}
+
+.pk-workspace.image-translate-page .image-translate-protect button {
+  width: 36px;
+  height: 20px;
+  padding: 0;
+}

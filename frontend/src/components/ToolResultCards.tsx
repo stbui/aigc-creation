@@ -1,3 +1,4 @@
+import './product-result.css';
 import type { CSSProperties } from 'react';
 import { Download } from 'lucide-react';
 import { StateLoading } from './StateViews';

@@ -1,0 +1,818 @@
+/**
+ * viral-clone 页面样式 —— 由 `./index.ts` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：这里只放本页专属的选择器；共享骨架
+ * （`.pk-workspace` / `.tool-*` / `.state-*` 等）仍留在全局。
+ */
+
+/* 复刻要求 textarea (实拍: 400x80 rows3, padding 5px 36px 5px 12px, radius4) */
+.vc-requirement-textarea {
+  width: 100%;
+  min-height: 80px;
+  padding: 5px 36px 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-tag);
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--wb-text);
+  resize: none;
+  background: var(--card-bg);
+  font-family: inherit;
+}
+
+.vc-requirement-textarea:focus {
+  outline: none;
+  border-color: var(--brand-light);
+}
+
+.vc-requirement-textarea::placeholder {
+  color: var(--text-10);
+}
+
+/* 复刻程度 (实拍: 2 列 x 192 gap16 由 pk-section-picker 提供; 选项 192x86 var(--surface) radius8) */
+.vc-degree-option {
+  min-height: 86px;
+  background: var(--surface);
+  border: none;
+  border-radius: var(--radius-control);
+  padding: 8px 16px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.vc-degree-option:hover {
+  background: var(--border);
+}
+
+.vc-degree-option-active,
+.vc-degree-option-active:hover {
+  background: var(--brand-bg);
+}
+
+.vc-degree-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--wb-text);
+  line-height: 22px;
+}
+
+/* 圆点 14x14: 未选 1px var(--border-dot) 细边; 选中 4px var(--brand-accent) 粗边 + 白底 (实拍实测值) */
+.vc-degree-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--border-dot);
+  background: transparent;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.vc-degree-option-active .vc-degree-dot {
+  border: 4px solid var(--brand-accent);
+  background: var(--card-bg);
+}
+
+.vc-degree-option small {
+  font-size: 12px;
+  color: var(--text-desc);
+  line-height: 20px;
+}
+
+/* ── 爆款复刻右侧对照结果 ─────────────────────────────────────────
+ * 每条生成记录固定三格: 商品上传图 → 参考图 → 生成图。
+ * 参考站原版只铺生成图；本页需要解释「商品换进参考场景」的前后关系，
+ * 所以历史也按一次任务一组展示，回看时不用再靠记忆猜输入是哪几张。 */
+.vc-result-body {
+  gap: 12px;
+}
+
+.vc-result-loading {
+  flex: 1;
+  min-height: 240px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-desc);
+  font-size: 13px;
+}
+
+.vc-result-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 4px 4px 0;
+  scrollbar-gutter: stable;
+}
+
+.vc-result-starter {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: linear-gradient(110deg, var(--card-bg), var(--brand-bg));
+}
+
+.vc-result-starter-copy {
+  min-width: 0;
+}
+
+.vc-result-starter-copy strong {
+  display: block;
+  color: var(--wb-text);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.vc-result-starter-copy p {
+  margin: 2px 0 0;
+  color: var(--text-desc);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.vc-result-starter .pk-workflow-steps {
+  flex: none;
+  padding-top: 0;
+}
+
+.vc-result-row {
+  flex: none;
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-card);
+  background: var(--card-bg);
+}
+
+.vc-result-row.is-current {
+  border-color: var(--brand-light);
+  box-shadow: 0 0 0 2px var(--brand-bg);
+}
+
+.vc-result-row-head {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.vc-result-row-meta {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  color: var(--text-desc);
+  font-size: 12px;
+}
+
+.vc-result-row-meta strong {
+  flex: none;
+  color: var(--wb-text);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+.vc-result-row-meta time {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.vc-result-state {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-desc);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.vc-result-state.is-ready {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+
+.vc-result-state.is-generating {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.vc-result-state.is-failed {
+  background: var(--danger-soft-bg);
+  color: var(--danger-soft-text);
+}
+
+.vc-result-degree {
+  flex: none;
+  padding: 0 7px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.vc-result-delete {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-desc);
+  cursor: pointer;
+}
+
+.vc-result-delete:hover {
+  background: var(--danger-soft-bg);
+  color: var(--danger-soft-text);
+}
+
+.vc-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: 12px;
+}
+
+.vc-compare-card {
+  min-width: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.vc-compare-media {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.vc-compare-card.is-reference .vc-compare-media {
+  background: var(--brand-bg);
+}
+
+.vc-compare-card.is-output .vc-compare-media {
+  background: var(--brand-bg);
+}
+
+.vc-compare-open {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  box-sizing: border-box;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.vc-compare-open img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  transition: transform 0.2s ease;
+}
+
+.vc-compare-open:hover img {
+  transform: scale(1.025);
+}
+
+.vc-product-gallery {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px;
+  box-sizing: border-box;
+}
+
+.vc-product-gallery > .vc-compare-open {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: auto;
+  border-radius: calc(var(--radius-control) - 2px);
+}
+
+.vc-product-rail {
+  flex: none;
+  width: 100%;
+  height: 48px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.vc-product-rail .vc-compare-open {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  border-radius: 5px;
+}
+
+.vc-compare-open-mask {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--card-bg);
+  background: rgba(23, 26, 43, 0.32);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.vc-compare-open:hover .vc-compare-open-mask,
+.vc-compare-open:focus-visible .vc-compare-open-mask {
+  opacity: 1;
+}
+
+.vc-compare-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  box-sizing: border-box;
+  color: var(--text-desc);
+  font-size: 12px;
+  line-height: 18px;
+  text-align: center;
+}
+
+.vc-compare-placeholder.is-generating {
+  color: var(--brand);
+  background: linear-gradient(100deg, var(--brand-bg) 20%, var(--card-bg) 40%, var(--brand-bg) 60%);
+  background-size: 200% 100%;
+  animation: fc-result-shimmer 1.4s ease-in-out infinite;
+}
+
+.vc-compare-placeholder.is-failed {
+  color: var(--danger-soft-text);
+  background: var(--danger-soft-bg);
+}
+
+.vc-source-count {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  z-index: 2;
+  padding: 1px 7px;
+  border-radius: var(--radius-pill);
+  background: rgba(23, 26, 43, 0.66);
+  color: var(--card-bg);
+  font-size: 12px;
+  line-height: 18px;
+  pointer-events: none;
+}
+
+.vc-output-actions {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  z-index: 2;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.vc-compare-media:hover .vc-output-actions,
+.vc-compare-media:focus-within .vc-output-actions {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.vc-output-actions button {
+  width: 26px;
+  height: 26px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 7px;
+  background: rgba(23, 26, 43, 0.72);
+  color: var(--card-bg);
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+
+.vc-output-actions button:hover {
+  background: var(--brand);
+}
+
+.vc-compare-caption {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.vc-compare-step {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  display: inline-grid;
+  place-items: center;
+  margin-top: 1px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-body);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 18px;
+}
+
+.vc-compare-card.is-reference .vc-compare-step {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+
+.vc-compare-card.is-output .vc-compare-step {
+  background: var(--brand);
+  color: var(--card-bg);
+}
+
+.vc-compare-caption > span:last-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.vc-compare-caption strong {
+  color: var(--wb-text);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.vc-spin {
+  animation: vc-spin 0.9s linear infinite;
+}
+
+@keyframes vc-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (hover: none) {
+  .vc-output-actions {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vc-compare-placeholder.is-generating,
+  .vc-spin {
+    animation: none;
+  }
+  .vc-compare-open img,
+  .vc-output-actions {
+    transition: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .vc-result-starter {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .vc-result-starter .pk-workflow-steps {
+    padding-top: 0;
+  }
+  .vc-compare-grid {
+    gap: 6px;
+  }
+  .vc-result-row {
+    padding: 10px;
+  }
+  .vc-result-row-meta {
+    gap: 6px;
+  }
+  .vc-result-degree {
+    display: none;
+  }
+  .vc-compare-caption strong {
+    font-size: 12px;
+  }
+  .vc-compare-step {
+    width: 16px;
+    height: 16px;
+    line-height: 16px;
+  }
+}
+
+/*
+ * 爆款复刻 · shadcn 工作台布局
+ *
+ * 页面骨架由 Card / CardHeader / CardContent / CardFooter 组合；
+ * 这里只负责复刻工作台视口尺寸与 Card 默认内边距的页面级覆盖，
+ * 结果对照缩略图、上传区等业务控件继续复用上方既有 .vc-* / .pk-* 样式。
+ */
+.vc-workspace {
+  margin: -24px -24px -32px;
+  padding: 16px 24px 16px 16px;
+  box-sizing: border-box;
+  height: calc(100vh - var(--workspace-topbar-height));
+  min-height: 620px;
+  display: grid;
+  grid-template-columns: 432px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.vc-input-pane {
+  width: 432px;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.vc-editor-card,
+.vc-result-pane {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.vc-editor-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+
+.vc-editor-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.vc-editor-heading > div {
+  min-width: 0;
+}
+
+.vc-editor-tabs {
+  display: none;
+}
+
+.vc-editor-content {
+  flex: 1;
+  min-height: 0;
+  padding: 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.vc-editor-content > [data-slot='separator'],
+.vc-editor-card > [data-slot='separator'] {
+  flex: none;
+}
+
+.vc-editor-footer {
+  display: block;
+  padding: 0;
+}
+
+.vc-editor-footer .pk-submit-actions {
+  border-radius: 0;
+}
+
+.vc-submit-alert {
+  margin: 12px 16px 0;
+}
+
+.vc-config-section,
+.vc-generation-settings,
+.vc-requirement-section,
+.vc-degree-section {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.vc-config-section {
+  gap: 16px;
+}
+
+.vc-generation-settings {
+  gap: 12px;
+}
+
+.vc-generation-settings-grid {
+  min-width: 0;
+}
+
+.vc-requirement-section {
+  gap: 0;
+}
+
+.vc-requirement-input {
+  min-height: 80px;
+  align-items: flex-start;
+  border-radius: var(--radius-control);
+  background: var(--card-bg);
+}
+
+.vc-requirement-input textarea {
+  min-height: 80px;
+  padding: 8px 44px 8px 12px;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.vc-degree-section {
+  gap: 12px;
+}
+
+.vc-degree-toggle {
+  min-height: 86px;
+  height: auto;
+  padding: 8px 16px;
+  justify-content: center;
+  text-align: left;
+  white-space: normal;
+  background: var(--surface);
+  border-color: transparent;
+  border-radius: var(--radius-control);
+}
+
+.vc-degree-toggle:hover {
+  background: var(--border);
+}
+
+.vc-degree-toggle[data-state='on'] {
+  background: var(--brand-bg);
+}
+
+.vc-result-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+}
+
+.vc-result-content {
+  flex: 1;
+  min-height: 0;
+  padding: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.vc-result-alert {
+  flex: none;
+}
+
+.vc-result-empty {
+  flex: 1;
+  border: 0;
+}
+
+.vc-result-loading-grid {
+  width: min(100%, 520px);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.vc-result-row {
+  min-width: 0;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.vc-result-row-head {
+  padding: 12px;
+  margin-bottom: 0;
+}
+
+.vc-result-row-content {
+  min-width: 0;
+  padding: 0 12px 12px;
+}
+
+.vc-result-delete-action {
+  flex: none;
+  color: var(--text-desc);
+}
+
+.vc-result-delete-action:hover {
+  color: var(--danger-soft-text);
+}
+
+@media (max-width: 1024px) {
+  .vc-workspace {
+    height: auto;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+  }
+
+  .vc-editor-tabs {
+    display: flex;
+  }
+
+  .vc-input-pane {
+    width: 100%;
+    height: auto;
+  }
+
+  .vc-editor-card {
+    height: auto;
+  }
+
+  .vc-editor-content {
+    overflow: visible;
+  }
+
+  .vc-result-pane {
+    height: auto;
+    min-height: 480px;
+  }
+
+  .vc-result-content {
+    min-height: 400px;
+  }
+
+  .vc-result-list {
+    overflow: visible;
+  }
+}
+
+@media (max-width: 900px) {
+  .vc-workspace {
+    margin: 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .vc-result-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .vc-result-row-head {
+    padding: 10px 10px 8px;
+  }
+
+  .vc-result-row-content {
+    padding: 0 10px 10px;
+  }
+
+  .vc-result-loading-grid {
+    gap: 6px;
+  }
+}

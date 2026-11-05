@@ -1,3 +1,4 @@
+import './AssetLibraryModal.css';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import { assetSrc, assetThumbSrc, assetsApi } from '../lib/api';

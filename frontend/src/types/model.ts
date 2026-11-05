@@ -653,7 +653,7 @@ export interface BillingOrderView {
   providerRequestId: string;
   errorText: string;
   resolutionNote: string;
-  resolvedBy: string;
+  resolvedBy: string; reviewable: boolean; reviewBatchId: string;
   /**
    * 退款归类。`route_switch` = 线路切换的内部重预留（钱没离开平台，
    * **不计入「已退」**）；其余为真实退款。

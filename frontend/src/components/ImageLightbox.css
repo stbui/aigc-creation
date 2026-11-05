@@ -1,0 +1,492 @@
+/**
+ * ImageLightbox 组件样式 —— 由组件文件引入，组件被哪些页面使用时随 chunk 加载。
+ *
+ * 从 `styles/global.css` 迁出；设计令牌与全局骨架仍留在全局。
+ */
+
+/* ── 生成图大图查看器 (2026-10-21 重做, 组件 components/ImageLightbox.tsx) ──
+   旧的 860px 弹窗把图压在 62vh 以内, 2K 图只能看个大概。现改为整屏暗色:
+   图按原始比例完整显示 (object-fit: contain), 点击/滚轮/双指/工具条放大到 4x,
+   放大后可拖拽查看局部, ←/→ 翻页, Esc 关闭, 点击黑色留白关闭。
+   暗底刻意不取页面令牌 —— 浅色主题的 --page-bg 会把暗色查看器衬成一块灰,
+   与全屏遮罩的视觉意图相反; 这里统一用半透明黑 + 半透明白的阶。 */
+.img-viewer {
+  position: fixed;
+  inset: 0;
+  /*
+   * 刻意低于 antd 的浮层 (Modal 1000 / message 1010 / popup 1050):
+   * 查看器里的右键「删除」要弹出确认框、「用作参考图」失败要弹提示 ——
+   * 若查看器压在它们上面, 用户按了删除会「什么都没发生」(确认框被盖住)。
+   * 页面内容最高约 40, 900 足够盖住整页。
+   */
+  z-index: 900;
+  display: flex;
+  flex-direction: column;
+  background: rgba(10, 12, 20, 0.92);
+  animation: img-viewer-fade 160ms ease-out;
+  overscroll-behavior: none;
+}
+
+.img-viewer-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--card-bg);
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.img-viewer-close:hover,
+.img-viewer-close:focus-visible {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.img-viewer-close:active {
+  transform: scale(0.94);
+}
+
+/* 翻页按钮: 垂直居中, 左右各一, 不挡图的中部 */
+.img-viewer-nav {
+  position: absolute;
+  top: 50%;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--card-bg);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.img-viewer-nav:hover,
+.img-viewer-nav:focus-visible {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.img-viewer-nav.is-prev {
+  left: 20px;
+}
+
+.img-viewer-nav.is-next {
+  right: 20px;
+}
+
+/* 舞台: 铺满查看器, 图居中完整显示; 放大后由 transform 平移, 不改变布局 */
+.img-viewer-stage {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  padding: 56px 84px 72px;
+  overflow: hidden;
+  cursor: default;
+  /* 旋转 90° 时需要按舞台内容区的宽高交换适配，容器单位由下面的 cqw/cqh 读取 */
+  container-type: size;
+  /* 触屏缩放由查看器自己处理，避免浏览器把双指手势解释成页面缩放 */
+  touch-action: none;
+  /* 加载提示 / 失败卡按舞台居中, 不按整个查看器 —— 否则会偏到底部工具条上 */
+  position: relative;
+}
+
+.img-viewer-stage.is-zoomed {
+  cursor: grab;
+}
+
+.img-viewer-stage.is-dragging {
+  cursor: grabbing;
+}
+
+.img-viewer-stage.is-pinching {
+  cursor: grabbing;
+}
+
+.img-viewer-stage img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+  border-radius: var(--radius-card);
+  /* 缩放/拖拽只动 transform (合成层), 不触发布局重排 —— 大图拖动也不掉帧 */
+  transform-origin: center center;
+  will-change: transform;
+  user-select: none;
+  -webkit-user-drag: none;
+  cursor: zoom-in;
+  /* 原图通常几 MB, 加载完成前先别显示半截像素; 淡入与缩略图同一节奏 */
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.img-viewer-stage img.is-loaded {
+  opacity: 1;
+}
+
+/* 横图转 90° 后视觉宽高互换；交换 max 约束，避免旋转后被舞台上下裁掉。 */
+.img-viewer-stage.is-quarter-turn img {
+  max-width: 100cqh;
+  max-height: 100cqw;
+}
+
+.img-viewer-stage.is-zoomed img {
+  cursor: grab;
+}
+
+.img-viewer-stage.is-dragging img,
+.img-viewer-stage.is-pinching img {
+  cursor: grabbing;
+}
+
+/* 加载提示: 居中一行浅字, 不铺满画面 —— 大图下载时用户仍能看见当前舞台 */
+.img-viewer-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transform: translate(-50%, -50%);
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.img-viewer-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.24);
+  border-top-color: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  animation: img-viewer-spin 0.75s linear infinite;
+}
+
+/* 失败态: 原地给原因与重试, 不把查看器关掉 (否则用户只能重新点开重来) */
+.img-viewer-failed {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: min(360px, calc(100% - 48px));
+  padding: 20px;
+  border-radius: var(--radius-card);
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  text-align: center;
+  transform: translate(-50%, -50%);
+  cursor: default;
+}
+
+.img-viewer-failed strong {
+  color: var(--card-bg);
+  font-size: 14px;
+}
+
+.img-viewer-failed button {
+  height: 28px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  color: var(--card-bg);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.img-viewer-failed button:hover {
+  background: var(--brand-hover);
+}
+
+.img-viewer-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  row-gap: 4px;
+  width: max-content;
+  max-width: calc(100% - 32px);
+  padding: 6px 8px 6px 16px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(12px);
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 12px;
+}
+
+.img-viewer-prompt {
+  position: absolute;
+  left: 50%;
+  bottom: 72px;
+  z-index: 4;
+  width: min(720px, calc(100% - 32px));
+  max-height: min(40vh, 320px);
+  padding: 14px 16px;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: var(--radius-card);
+  background: rgba(23, 26, 43, 0.92);
+  color: rgba(255, 255, 255, 0.9);
+  transform: translateX(-50%);
+  backdrop-filter: blur(12px);
+}
+
+.img-viewer-prompt-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.img-viewer-prompt-head strong {
+  font-size: 13px;
+  color: var(--card-bg);
+}
+
+.img-viewer-prompt-head button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.12);
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.img-viewer-prompt-head button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.img-viewer-prompt p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 20px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.img-viewer-meta {
+  min-width: 0;
+  max-width: min(420px, 36vw);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.img-viewer-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 4px;
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.img-viewer-zoom button {
+  display: grid;
+  place-items: center;
+  height: 26px;
+  min-width: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.img-viewer-zoom button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.img-viewer-zoom button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* 百分比数字宽度固定, 缩放时工具条不左右跳动 (选择器带上 button 提权) */
+.img-viewer-zoom button.img-viewer-zoom-value {
+  min-width: 46px;
+  font-variant-numeric: tabular-nums;
+}
+
+.img-viewer-rotate {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.img-viewer-rotate:hover,
+.img-viewer-rotate:focus-visible {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--card-bg);
+}
+
+.img-viewer-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  color: var(--card-bg);
+  font-size: 12px;
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.img-viewer-download:hover {
+  background: var(--brand-hover);
+}
+
+.img-viewer-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding-left: 10px;
+  border-left: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.img-viewer-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.img-viewer-action:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--card-bg);
+}
+
+.img-viewer-action.is-danger:hover:not(:disabled) {
+  border-color: rgba(248, 113, 113, 0.5);
+  background: rgba(239, 68, 68, 0.22);
+  color: var(--shell-text-danger);
+}
+
+.img-viewer-action:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.78);
+  outline-offset: 2px;
+}
+
+.img-viewer-action:disabled {
+  opacity: 0.4;
+  cursor: wait;
+}
+
+/* 减弱动效: 去掉淡入, 避免反复打开时出现「空白一瞬」的错觉 */
+@media (prefers-reduced-motion: reduce) {
+  .img-viewer-stage img {
+    transition: none;
+  }
+}
+
+/* 窄屏: 左右翻页按钮收进底栏上方, 舞台左右留白减小 */
+@media (max-width: 720px) {
+  .img-viewer-stage {
+    padding: 52px 12px 104px;
+  }
+  .img-viewer-nav {
+    top: auto;
+    bottom: 80px;
+    transform: none;
+    width: 38px;
+    height: 38px;
+  }
+  .img-viewer-nav.is-prev {
+    left: 12px;
+  }
+  .img-viewer-nav.is-next {
+    right: 12px;
+  }
+  .img-viewer-bar {
+    bottom: 12px;
+    gap: 10px;
+    padding-left: 12px;
+    width: calc(100% - 24px);
+    max-width: none;
+    border-radius: 18px;
+  }
+  .img-viewer-meta {
+    display: none;
+  }
+  .img-viewer-download {
+    width: 28px;
+    padding: 0;
+    justify-content: center;
+  }
+  .img-viewer-download-text,
+  .img-viewer-action > span {
+    display: none;
+  }
+  .img-viewer-action {
+    width: 28px;
+    padding: 0;
+    justify-content: center;
+  }
+  .img-viewer-actions {
+    gap: 4px;
+    padding-left: 8px;
+  }
+  .img-viewer-prompt {
+    bottom: 90px;
+    max-height: min(36vh, 280px);
+  }
+  .img-viewer-close {
+    top: 12px;
+    right: 12px;
+  }
+}

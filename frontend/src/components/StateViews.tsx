@@ -1,3 +1,4 @@
+import './StateViews.css';
 import type { ReactNode } from 'react';
 import { RotateCcw } from 'lucide-react';
 import { StateIllustration, type StateKind } from './illustrations';

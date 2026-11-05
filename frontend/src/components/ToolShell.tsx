@@ -1,7 +1,7 @@
+import '../styles/redraw.css';
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Download, ImagePlus, Maximize2, Plus, RefreshCw, X } from 'lucide-react';
 import { assetsApi, assetSrc, assetThumbUrl, toAbsoluteUrl } from '../lib/api';
-
 import { useProject } from '../hooks/useProject';
 import { useCapabilities } from '../hooks/useCapabilities';
 import { usePasteUpload } from '../hooks/usePasteUpload';

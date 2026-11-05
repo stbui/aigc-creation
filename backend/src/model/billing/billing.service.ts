@@ -53,6 +53,54 @@ export const USAGE_SOURCE_VIDEO_FORMULA = 'video_formula';
 /** Prisma 账单行（各调用方直接复用，避免重复 import Prisma） */
 export type BillingOrderRow = BillingOrder;
 
+/** `running` 超过该时长仍未完成，才允许人工核对 */
+export const REVIEW_RUNNING_STALE_MS = 40 * 60_000;
+
+/** 人工核对需要读取的任务信息，避免把整个 GenerationTask 带进判定函数 */
+export interface BillingReviewTask {
+  status: string;
+  outputAssetId: string | null;
+  pendingResult: string | null;
+  mediaRecoveryError: string | null;
+}
+
+/**
+ * 人工核对资格的唯一判定口径。
+ *
+ * 列表、详情、批量选择和真正执行 resolve 都必须调用这一处：
+ *   · 已有作品或仍在补交付的任务永远不可核对；
+ *   · uncertain 永远可核对；
+ *   · running 仅在超过 40 分钟时视为执行者可能已死；
+ *   · reserved 只有在对应任务明确 failed / cancelled 时才可核对。
+ *
+ * 单纯的 reserved / 新鲜 running 仍可能正常执行，提前人工退款会让平台
+ * 白付上游成本，并可能在任务继续执行时造成重复交付。
+ */
+export function isBillingOrderReviewable(
+  order: Pick<BillingOrder, 'status' | 'updatedAt'>,
+  task?: BillingReviewTask | null,
+  now = Date.now(),
+): boolean {
+  // `mediaRecoveryError` 也被普通失败路径用作错误说明；只有任务仍在运行且
+  // 结果已暂存 / 正在重试落盘时才算「正在补交付」。
+  const hasDeliverable =
+    task?.outputAssetId != null ||
+    task?.pendingResult != null ||
+    (task != null &&
+      task.mediaRecoveryError != null &&
+      task.status === 'running');
+  if (hasDeliverable) return false;
+
+  if (order.status === 'uncertain') return true;
+  if (order.status === 'running') {
+    return now - order.updatedAt.getTime() > REVIEW_RUNNING_STALE_MS;
+  }
+  if (order.status === 'reserved') {
+    return task?.status === 'failed' || task?.status === 'cancelled';
+  }
+  return false;
+}
+
 /** 一次结算所用的上游用量 */
 export interface BillingUsage {
   inputTokens: bigint;
@@ -814,13 +862,14 @@ export class BillingService {
 
   /**
    * 人工核对：`settle` 按现有用量结算，`refund` 全额退回。
-   * 只对 reserved / running / uncertain 生效 —— 终态账单不允许被再次改写。
+   * 是否可核对由 `isBillingOrderReviewable` 统一判定，终态永不可改写。
    */
   async resolve(
     billingOrderId: string,
     action: 'settle' | 'refund',
     actorUserId: string,
     note: string,
+    options: { reviewBatchId?: string } = {},
   ): Promise<BillingOrderRow> {
     const reason = String(note ?? '').trim();
     if (!reason) throw new AppError(40001, '请填写核对依据', 400);
@@ -832,8 +881,23 @@ export class BillingService {
       return await this.prisma.$transaction(async (tx) => {
         const order = await tx.billingOrder.findUnique({ where: { id: billingOrderId } });
         if (!order) throw new AppError(40400, '账单不存在', 404);
-        if (!['reserved', 'running', 'uncertain'].includes(order.status)) {
-          throw new AppError(40001, '当前账单不需要人工核对', 400);
+        const task = order.taskId
+          ? await tx.generationTask.findUnique({
+              where: { id: order.taskId },
+              select: {
+                status: true,
+                outputAssetId: true,
+                pendingResult: true,
+                mediaRecoveryError: true,
+              },
+            })
+          : null;
+        if (!isBillingOrderReviewable(order, task)) {
+          throw new AppError(
+            40909,
+            '当前账单不满足人工核对条件：任务仍可执行、已有作品或正在补交付；仅结果不明、超时运行，或预授权对应的任务已失败/取消时才可核对',
+            409,
+          );
         }
 
         const updated =
@@ -850,7 +914,11 @@ export class BillingService {
 
         const marked = await tx.billingOrder.updateMany({
           where: { id: updated.id, status: updated.status },
-          data: { resolvedBy: actorUserId, resolutionNote: reason },
+          data: {
+            resolvedBy: actorUserId,
+            resolutionNote: reason,
+            reviewBatchId: String(options.reviewBatchId ?? '').trim(),
+          },
         });
         if (marked.count !== 1) throw new AppError(40909, '账单状态已变更，请刷新后重试', 409);
         const result = await tx.billingOrder.findUnique({ where: { id: updated.id } });

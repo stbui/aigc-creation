@@ -105,6 +105,9 @@ test.describe('渠道与模型 P5', () => {
       .toBeGreaterThan(0);
     const first = channelItems(page).first();
     const channelName = await first.getByTestId('admin-channel-name').innerText();
+    // 首次进入有渠道的列表时自动选首个，避免右侧停在无意义的空态
+    await expect(first).toHaveAttribute('aria-pressed', 'true');
+    expect(new URL(page.url()).searchParams.get('id')).toBeTruthy();
     await first.click();
     await expect(first).toHaveAttribute('aria-pressed', 'true');
 
@@ -113,6 +116,19 @@ test.describe('渠道与模型 P5', () => {
     await expect(detail).toContainText('模型清单');
     // 详情区常驻，不再有承载模型的抽屉
     await expect(page.getByTestId('admin-drawer')).toHaveCount(0);
+
+    // 长列表可直接用方向键切换渠道，Home / End 回到首尾
+    if ((await channelItems(page).count()) > 1) {
+      await first.focus();
+      await page.keyboard.press('ArrowDown');
+      const second = channelItems(page).nth(1);
+      await expect(second).toBeFocused();
+      await expect(second).toHaveAttribute('aria-pressed', 'true');
+
+      await page.keyboard.press('Home');
+      await expect(first).toBeFocused();
+      await expect(first).toHaveAttribute('aria-pressed', 'true');
+    }
   });
 
   test('渠道详情：编辑/复制/导出/启停/删除都在头部，停用需二次确认', async ({ page }) => {
@@ -416,17 +432,19 @@ test.describe('渠道与模型 P5', () => {
     // 新账号没有积分：由管理员通过积分调整入口发放
     const adjustRes = await request.post(`${API}/api/v1/admin/credits/adjust`, {
       headers: { Authorization: `Bearer ${token}` },
-      data: { userId, delta: 200 },
+      data: { userId, delta: 200, reason: '端到端测试发放生成额度' },
     });
     expect(adjustRes.ok(), `credit adjust ${adjustRes.status()}: ${await adjustRes.text()}`).toBeTruthy();
 
     // 报价：同一模型同一参数下，报价必须先于建任务给出确定金额
     const quoteRes = await request.post(`${API}/api/v1/models/${model!.id}/quote`, {
       headers: auth,
-      data: { capability: 'free_create', options: { ratio: '1:1', size: '1k' } },
+      // 报价 / 选路意图按供应侧模态（image），生成接口仍按产品能力（free_create）
+      data: { capability: 'image' },
     });
-    expect(quoteRes.ok()).toBeTruthy();
-    const quote = (await quoteRes.json()).data.quote as {
+    const quoteBody = await quoteRes.text();
+    expect(quoteRes.ok(), `model quote ${quoteRes.status()}: ${quoteBody}`).toBeTruthy();
+    const quote = JSON.parse(quoteBody).data.quote as {
       amountMicrocredits: number | null;
       billingMode: string;
     };
@@ -446,7 +464,7 @@ test.describe('渠道与模型 P5', () => {
         capability: 'free_create',
         logicalModelId: model!.id,
         inputAssetIds: [],
-        params: { prompt: 'E2E：白色背景的陶瓷杯，商品摄影', ratio: '1:1', size: '1k' },
+        params: { prompt: 'E2E：白色背景的陶瓷杯，商品摄影' },
       },
     });
     const createText = await createRes.text();
@@ -817,14 +835,6 @@ test.describe('渠道与模型 P5', () => {
     const allModelRows = () => page.getByTestId('admin-all-models').getByTestId('admin-table-row');
     await expect.poll(async () => allModelRows().count(), { timeout: 15000 }).toBe(all.length);
 
-    // 「渠道」列必须能落到具体渠道：跨渠道视图不知道一行属于谁等于没看
-    await expect(allModelRows().first()).toContainText(all[0].channelName || '—');
-
-    // 计数口径：总条数 + 真正可用的条数（模型与渠道都启用），与参考实现一致
-    await expect(
-      page.getByTestId('admin-filter').getByText(/^\d+ 个模型 · \d+ 个可用$/),
-    ).toBeVisible();
-
     // 排序：同一模型在不同渠道的行相邻（显示名 → 模型标识 → 渠道名）
     const expectedOrder = [...all].sort(
       (left, right) =>
@@ -832,6 +842,15 @@ test.describe('渠道与模型 P5', () => {
         left.modelKey.localeCompare(right.modelKey) ||
         (left.channelName || '').localeCompare(right.channelName || '', 'zh-CN'),
     );
+
+    // 「渠道」列必须能落到具体渠道：跨渠道视图不知道一行属于谁等于没看
+    await expect(allModelRows().first()).toContainText(expectedOrder[0].channelName || '—');
+
+    // 计数口径：总条数 + 真正可用的条数（模型与渠道都启用），与参考实现一致
+    await expect(
+      page.getByTestId('admin-filter').getByText(/^\d+ 个模型 · \d+ 个可用$/),
+    ).toBeVisible();
+
     await expect(allModelRows().first()).toContainText(expectedOrder[0].modelKey);
 
     // 停用筛选只留停用项（模型停用或渠道停用都算停用）
@@ -876,6 +895,6 @@ test.describe('渠道与模型 P5', () => {
     // 排障动线收口：点渠道名一步跳回「按渠道」并选中该渠道，不用自己找
     await allModelRows().first().getByTitle('在渠道中查看').click();
     await expect(page.getByRole('radio', { name: '按渠道' })).toHaveAttribute('aria-checked', 'true');
-    await expect(page.locator('#admin-channel-detail')).toContainText(all[0].channelName);
+    await expect(page.locator('#admin-channel-detail')).toContainText(expectedOrder[0].channelName);
   });
 });

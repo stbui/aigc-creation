@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
 import { CreditService } from '../credits/credit.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import type { Prisma } from '@prisma/client';
 
 /**
  * 会员体系 (落地页订阅卡兑现)。
@@ -303,6 +304,8 @@ export class MembershipService {
         Math.min(expiresAt.getTime(), now.getTime() + plan.durationDays * 24 * 3600 * 1000),
       );
 
+      const effectivePerksSnapshot =
+        current?.planId === plan.id ? current.perksSnapshot : perksSnapshot;
       const membership = current
         ? await tx.membership.update({
             where: { id: current.id },
@@ -310,7 +313,7 @@ export class MembershipService {
               planId: plan.id,
               status: 'active',
               // 换套餐时刷新快照; 同套餐续期则保留原权益 (用户已付费)
-              perksSnapshot: current.planId === plan.id ? current.perksSnapshot : perksSnapshot,
+              perksSnapshot: effectivePerksSnapshot,
               monthlyCreditsSnapshot: plan.monthlyCredits,
               startAt: current.startAt,
               expiresAt,
@@ -323,7 +326,7 @@ export class MembershipService {
               userId: params.userId,
               planId: plan.id,
               status: 'active',
-              perksSnapshot,
+              perksSnapshot: effectivePerksSnapshot,
               monthlyCreditsSnapshot: plan.monthlyCredits,
               startAt: now,
               expiresAt,
@@ -331,6 +334,22 @@ export class MembershipService {
               orderId: params.orderId,
             },
           });
+
+      /*
+       * 周期快照必须落在触发它的订单上, 而不是只更新当前 Membership。
+       * Membership 是一人一行的投影, 续费会覆盖 orderId/expiresAt; 没有
+       * 订单级快照时, 退款既找不到旧订单买的区间, 也无法判断退掉的是哪一期。
+       */
+      await tx.order.update({
+        where: { id: order.id },
+        data: {
+          membershipPeriodStartAt: base,
+          membershipPeriodEndAt: expiresAt,
+          membershipPerksSnapshot: effectivePerksSnapshot,
+          membershipMonthlyCreditsSnapshot: plan.monthlyCredits,
+          membershipPeriodRevokedAt: null,
+        },
+      });
 
       // 首期订阅积分立即发放 (与订单同 orderId, 退款回收按此批次扣回)
       if (plan.monthlyCredits > 0) {
@@ -382,6 +401,193 @@ export class MembershipService {
       expiresAt: result.expiresAt.toISOString(),
       planCode: plan.code,
       alreadyApplied: false,
+    };
+  }
+
+  /**
+   * 全额退款时撤销某一笔订单产生的会员周期。
+   *
+   * 调用方必须传入退款记账事务，保证「订单退款成功、积分扣回、会员周期撤销、
+   * 会员投影重算」同生共死。撤销的是订单级周期快照，不是整条 Membership：
+   *   · 退最新一期 → 回退到仍在付费的上一期到期时间；
+   *   · 退较早一期 → 当前有效周期不受影响；
+   *   · 最后一期退款 → 立即失效并停发后续月度积分。
+   *
+   * 对旧数据（periodEndAt 为空）保留一次保守降级：只有 Membership.orderId
+   * 仍指向本单时才终止，避免无法证明归属的旧周期被误撤。
+   */
+  async revokeOrderPeriodInTransaction(
+    tx: Prisma.TransactionClient,
+    orderId: string,
+  ): Promise<{
+    affected: boolean;
+    terminated: boolean;
+    remainingExpiresAt: string | null;
+    revokedPeriodStartAt: string | null;
+    revokedPeriodEndAt: string | null;
+  }> {
+    const order = await tx.order.findUnique({
+      where: { id: orderId },
+      select: {
+        id: true,
+        userId: true,
+        status: true,
+        membershipPlanId: true,
+        membershipAppliedAt: true,
+        membershipPeriodStartAt: true,
+        membershipPeriodEndAt: true,
+      },
+    });
+    if (!order?.membershipPlanId || !order.membershipAppliedAt) {
+      return {
+        affected: false,
+        terminated: false,
+        remainingExpiresAt: null,
+        revokedPeriodStartAt: null,
+        revokedPeriodEndAt: null,
+      };
+    }
+
+    const now = new Date();
+    const current = await tx.membership.findFirst({
+      where: {
+        userId: order.userId,
+        status: { in: ['active', 'grace', 'cancelled'] },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    const wasEntitled = Boolean(current && current.expiresAt > now);
+
+    // 旧订单没有订单级周期快照，无法安全重算历史区间，保守处理当前行。
+    if (!order.membershipPeriodEndAt) {
+      const ended = await tx.membership.updateMany({
+        where: {
+          userId: order.userId,
+          orderId: order.id,
+          status: { in: ['active', 'grace', 'cancelled'] },
+        },
+        data: { status: 'expired', expiresAt: now, nextCreditAt: null, orderId: null },
+      });
+      return {
+        affected: ended.count > 0,
+        terminated: ended.count > 0,
+        remainingExpiresAt: null,
+        revokedPeriodStartAt: null,
+        revokedPeriodEndAt: null,
+      };
+    }
+
+    const revokedAt = new Date();
+    const revoked = await tx.order.updateMany({
+      where: { id: order.id, membershipPeriodRevokedAt: null },
+      data: { membershipPeriodRevokedAt: revokedAt },
+    });
+    if (revoked.count === 0) {
+      return {
+        affected: false,
+        terminated: false,
+        remainingExpiresAt: current?.expiresAt.toISOString() ?? null,
+        revokedPeriodStartAt: order.membershipPeriodStartAt?.toISOString() ?? null,
+        revokedPeriodEndAt: order.membershipPeriodEndAt.toISOString(),
+      };
+    }
+
+    const remaining = await tx.order.findMany({
+      where: {
+        userId: order.userId,
+        membershipPlanId: { not: null },
+        membershipAppliedAt: { not: null },
+        membershipPeriodEndAt: { not: null },
+        membershipPeriodRevokedAt: null,
+        status: { in: ['paid', 'partial_refunded'] },
+      },
+      select: {
+        id: true,
+        membershipPlanId: true,
+        membershipPeriodStartAt: true,
+        membershipPeriodEndAt: true,
+        membershipPerksSnapshot: true,
+        membershipMonthlyCreditsSnapshot: true,
+      },
+      orderBy: [
+        { membershipPeriodEndAt: 'desc' },
+        { membershipPeriodStartAt: 'desc' },
+      ],
+    });
+
+    if (!current) {
+      return {
+        affected: true,
+        terminated: false,
+        remainingExpiresAt: remaining[0]?.membershipPeriodEndAt?.toISOString() ?? null,
+        revokedPeriodStartAt: order.membershipPeriodStartAt?.toISOString() ?? null,
+        revokedPeriodEndAt: order.membershipPeriodEndAt.toISOString(),
+      };
+    }
+
+    const tail = remaining[0];
+    if (!tail) {
+      /*
+       * Membership.orderId 指向被退订单时，直接置 expired + 当前时间，
+       * 让 resolve()/权限查询立即失去会员资格；订单快照仍保留原周期边界。
+       */
+      await tx.membership.update({
+        where: { id: current.id },
+        data: {
+          status: 'expired',
+          expiresAt: now,
+          nextCreditAt: null,
+          orderId: null,
+        },
+      });
+      return {
+        affected: true,
+        terminated: wasEntitled,
+        remainingExpiresAt: null,
+        revokedPeriodStartAt: order.membershipPeriodStartAt?.toISOString() ?? null,
+        revokedPeriodEndAt: order.membershipPeriodEndAt.toISOString(),
+      };
+    }
+
+    const tailEndAt = tail.membershipPeriodEndAt!;
+    const stillEntitled = tailEndAt > now;
+    const keepCancelled = current.status === 'cancelled';
+    const status = stillEntitled ? (keepCancelled ? 'cancelled' : 'active') : 'expired';
+    /*
+     * 续费会把 nextCreditAt 覆盖为最新一期的时间。回退到上一期时，若原
+     * 发分时间已越过上一期结束日，必须清空，避免给已撤销周期继续发积分。
+     * 若仍在上一期内，保留原发分计划。
+     */
+    const nextCreditAt =
+      status === 'active' &&
+      current.nextCreditAt &&
+      current.nextCreditAt > now &&
+      current.nextCreditAt <= tailEndAt
+        ? current.nextCreditAt
+        : null;
+
+    await tx.membership.update({
+      where: { id: current.id },
+      data: {
+        planId: tail.membershipPlanId!,
+        perksSnapshot:
+          tail.membershipPerksSnapshot ?? current.perksSnapshot,
+        monthlyCreditsSnapshot:
+          tail.membershipMonthlyCreditsSnapshot ?? current.monthlyCreditsSnapshot,
+        startAt: tail.membershipPeriodStartAt ?? current.startAt,
+        expiresAt: tailEndAt,
+        status,
+        nextCreditAt,
+        orderId: tail.id,
+      },
+    });
+
+    return {
+      affected: true,
+      terminated: wasEntitled && !stillEntitled,
+      remainingExpiresAt: tailEndAt.toISOString(),
+      revokedPeriodStartAt: order.membershipPeriodStartAt?.toISOString() ?? null,
+      revokedPeriodEndAt: order.membershipPeriodEndAt.toISOString(),
     };
   }
 

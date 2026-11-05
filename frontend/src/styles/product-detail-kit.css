@@ -1,0 +1,312 @@
+/**
+ * product-detail-kit 共享样式 —— 从 `styles/global.css` 迁出。
+ *
+ * 只放本组组件/页面共用的选择器；设计令牌与全局骨架仍留在全局。
+ */
+
+/* ── 商品详情页右侧: 功能示例 / 创作结果 ─────────────────────────────
+ * 结果区在首访时是空的, 用「功能示例」把能力讲清楚; 换页签不换位置,
+ * 两个面板都吃掉与结果网格相同的高度 (.pk-workspace 的行高锁定)。 */
+.pd-right-pane {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pd-tabs {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+
+.pd-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+}
+
+.pd-tabs button:hover {
+  color: var(--brand);
+}
+
+.pd-tabs button:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 1px;
+}
+
+.pd-tabs button.is-active {
+  background: var(--card-bg);
+  color: var(--text-strong);
+  box-shadow: 0 1px 3px color-mix(in srgb, var(--text-strong) 10%, transparent);
+}
+
+.pd-tab-count {
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-bg);
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 16px;
+}
+
+.pd-tabs button.is-active .pd-tab-count {
+  background: var(--brand);
+  color: var(--card-bg);
+}
+
+.pd-right-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.pd-right-panel {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  /* 纵向: 结果网格与示例面板都撑满整列, 否则空态卡会缩成内容宽度 */
+  flex-direction: column;
+}
+
+.pd-demo-intro h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--text-strong);
+}
+
+.pd-demo-intro > p {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
+.pd-demo-steps {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.pd-demo-step {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.pd-demo-step-no {
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 20px;
+  color: var(--brand);
+}
+
+.pd-demo-step strong {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 20px;
+  color: var(--text-body);
+}
+
+.pd-demo-step small {
+  display: block;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-desc);
+}
+
+.pd-demo-cards {
+  display: grid;
+  gap: 14px;
+}
+
+.pd-demo-card {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+
+.pd-demo-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.pd-demo-card-head h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.pd-demo-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--brand);
+}
+
+.pd-demo-tag {
+  flex: none;
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--brand-bg);
+  color: var(--brand);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* 1. 素材 */
+.pd-demo-source {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.pd-demo-shot {
+  position: relative;
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+  background: var(--card-bg);
+}
+
+.pd-demo-shot img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  /* 白底商品图: contain 保留完整轮廓, 裁切会把沙发两端切掉 */
+  object-fit: contain;
+}
+
+.pd-demo-shot figcaption {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--text-strong) 68%, transparent);
+  color: var(--card-bg);
+  font-size: 12px;
+}
+
+.pd-demo-facts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 7px;
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text-muted);
+}
+
+.pd-demo-facts strong {
+  font-weight: 600;
+  color: var(--text-body);
+}
+
+/* 2. 单图切图 */
+.pd-demo-slices {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pd-demo-slices img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.pd-demo-note {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+/* 示例面板: 白卡与结果区的 .pk-result-body 同款 (radius 16 / padding 16) */
+.pd-demo {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 20px;
+  background: var(--card-bg);
+  border-radius: var(--radius-panel);
+}
+
+@media (max-width: 1024px) {
+  /* 窄屏是单列文档流: 右侧不再是满高列, 交给内容自然增高 */
+  .pd-right-pane,
+  .pd-right-panel {
+    height: auto;
+  }
+  .pd-demo {
+    overflow: visible;
+  }
+  .pd-demo-steps {
+    grid-template-columns: 1fr;
+  }
+  .pd-demo-source {
+    grid-template-columns: 96px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .pd-demo {
+    padding: 16px;
+  }
+  /* 手机宽度下 96px 图 + 长参数会把每行挤成两三个字: 图与文字改成上下排 */
+  .pd-demo-source {
+    grid-template-columns: 1fr;
+  }
+  .pd-demo-shot {
+    width: 132px;
+  }
+  /* 5 列在 390 下每张只有 50px, 看不出内容 */
+  .pd-demo-slices {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

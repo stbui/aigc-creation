@@ -1,3 +1,4 @@
+import './history-pane.css';
 import { useContext, useEffect, useRef, useState } from 'react';
 import { ChevronRight, ChevronUp, Download, History, RotateCcw } from 'lucide-react';
 import { ToolTrailingContext } from './ToolShell';

@@ -118,7 +118,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 key={item.id}
                 data-testid="admin-toast"
                 role={item.tone === 'error' ? 'alert' : 'status'}
-                className="pointer-events-auto flex items-start gap-2.5 rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-lg"
+                className="pointer-events-none flex items-start gap-2.5 rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-lg"
               >
                 <Icon className={cn('mt-0.5 size-4 shrink-0', className)} aria-hidden />
                 <div className="min-w-0 flex-1">
@@ -132,7 +132,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 <button
                   type="button"
                   aria-label="关闭提示"
-                  className="rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                  className="pointer-events-auto rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                   onClick={() => dismiss(item.id)}
                 >
                   <X className="size-3.5" aria-hidden />

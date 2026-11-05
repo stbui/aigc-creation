@@ -1,3 +1,4 @@
+import './history-pane.css';
 import { useContext, useEffect, useRef, useState } from 'react';
 import { ChevronUp, Download, History, ImageOff, RefreshCw } from 'lucide-react';
 import { assetSrc, assetThumbSrc, generateApi } from '../lib/api';

@@ -1,10 +1,12 @@
-import { ActionButton, Drawer, Notice } from '~/admin-ui/primitives';
+import { ActionButton, Drawer, Notice, TextAreaField } from '~/admin-ui/primitives';
 
 interface BatchResolveDrawerProps {
   open: boolean;
   count: number;
   action: 'settle' | 'refund';
   onActionChange: (action: 'settle' | 'refund') => void;
+  reason: string;
+  onReasonChange: (reason: string) => void;
   busy: boolean;
   results: Array<{ id: string; ok: boolean; error?: string }> | null;
   onClose: () => void;
@@ -19,11 +21,14 @@ export function BatchResolveDrawer({
   count,
   action,
   onActionChange,
+  reason,
+  onReasonChange,
   busy,
   results,
   onClose,
   onConfirm,
 }: BatchResolveDrawerProps) {
+  const hasReason = reason.trim().length > 0;
   return (
     <Drawer
       open={open}
@@ -41,7 +46,7 @@ export function BatchResolveDrawer({
           <ActionButton
             variant="default"
             size="sm"
-            disabled={busy || count === 0}
+            disabled={busy || count === 0 || !hasReason}
             onClick={onConfirm}
           >
             {busy ? '处理中…' : action === 'refund' ? '确认批量退款' : '确认批量结算'}
@@ -66,6 +71,19 @@ export function BatchResolveDrawer({
             全额退款
           </ActionButton>
         </div>
+        <TextAreaField
+          ariaLabel="批量核对依据"
+          aria-required
+          value={reason}
+          onChange={onReasonChange}
+          placeholder="填写本批账单共同的核对依据、渠道回执或工单号（必填）"
+          maxLength={500}
+          showCount
+          rows={3}
+        />
+        <p className="text-[12px] text-muted-foreground">
+          本批成功条目会写入同一个核对批次号，便于后续追溯；单条失败不影响其它账单。
+        </p>
         {results && (
           <Notice tone={results.some((item) => !item.ok) ? 'warn' : 'info'} title="处理结果">
             <ul className="flex flex-col gap-1 text-xs">

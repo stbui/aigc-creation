@@ -1,0 +1,213 @@
+/**
+ * GuestPromoDialog 共享样式 —— 从 `styles/global.css` 迁出。
+ *
+ * 只放本组组件共用的选择器；设计令牌与全局骨架仍留在全局。
+ */
+
+/* ═══════════════════════════════════════════════════════════════════════════════
+   游客新人福利弹层 —— 参考站 guest-promo 布局的本地真实权益版
+
+   复制：500×427 构图、#0f121e66 遮罩、500px 上限、28px 关闭按钮、6s 空闲延迟、
+        22ms 入场动画、CTA 160×51 热区、服务端时间校正的倒计时数字块。
+   改写：用户一旦开始指针/键盘/滚动操作即取消本次自动弹出；不展示参考站的
+        「送 100 积分 / 送 50 次」；本地注册不发积分，改为真实
+        「抠图/去水印 0 积分」与登录后的作品、素材能力。无 DB 活动时无倒计时。
+   ──────────────────────────────────────────────────────────────────────────────── */
+.guest-promo-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgb(15 18 30 / 0.6588);
+  animation: guest-promo-fade 0.18s ease-out;
+}
+
+.guest-promo-dialog {
+  position: relative;
+  width: min(500px, 100vw - 24px);
+  animation: guest-promo-enter 0.22s ease-out;
+}
+
+.guest-promo-art {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 500 / 427;
+  container-type: inline-size;
+}
+
+.guest-promo-art > img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.guest-promo-close {
+  position: absolute;
+  z-index: 2;
+  top: -32px;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.4);
+  color: var(--card-bg);
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.guest-promo-close:hover {
+  background: rgb(255 255 255 / 0.6);
+  transform: scale(1.04);
+}
+
+.guest-promo-close:focus-visible,
+.guest-promo-claim:focus-visible {
+  outline: 2px solid var(--card-bg);
+  outline-offset: 3px;
+}
+
+.guest-promo-title {
+  position: absolute;
+  top: 13.6%;
+  left: 15.8%;
+  max-width: 75%;
+  margin: 0;
+  overflow: hidden;
+  color: var(--card-bg);
+  font-size: clamp(18px, 5.2cqw, 26px);
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  text-shadow: 0 2px 8px rgba(52, 58, 166, 0.16);
+  white-space: nowrap;
+}
+
+.guest-promo-countdown,
+.guest-promo-note {
+  position: absolute;
+  top: 22.8%;
+  left: 15.8%;
+  height: 5.6%;
+  margin: 0;
+  color: var(--card-bg);
+  font-size: clamp(8px, 2.35cqw, 12px);
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.guest-promo-countdown {
+  display: flex;
+  align-items: center;
+  gap: 1.5cqw;
+}
+
+.guest-promo-countdown span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.8cqw;
+  height: 4.8cqw;
+  border-radius: 4px;
+  background: rgb(255 255 255 / 0.4);
+  color: var(--brand);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.guest-promo-countdown b,
+.guest-promo-countdown em {
+  color: var(--card-bg);
+  font-style: normal;
+  font-weight: 400;
+}
+
+.guest-promo-countdown .guest-promo-days {
+  margin-right: 0.4cqw;
+}
+
+.guest-promo-note {
+  display: flex;
+  align-items: center;
+  opacity: 0.94;
+}
+
+.guest-promo-benefits {
+  position: absolute;
+  top: 36.8%;
+  right: 2.5%;
+  left: 68.2%;
+  display: flex;
+  flex-direction: column;
+  gap: 2.2cqw;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.guest-promo-benefits li {
+  overflow: hidden;
+  color: var(--shell-text-1);
+  font-size: clamp(10px, 3.15cqw, 15.75px);
+  line-height: 4.4cqw;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.guest-promo-claim {
+  position: absolute;
+  bottom: 8.5%;
+  left: 34%;
+  width: 32%;
+  height: 12%;
+  padding: 0;
+  border: 1px solid rgb(255 255 255 / 0.5608);
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--shell-surface-brand-1) 0%, var(--shell-surface-brand-2) 48%, var(--shell-surface-info) 100%);
+  box-shadow:
+    inset 0 1px 5px rgb(255 255 255 / 0.6588),
+    0 6px 18px rgb(95 100 255 / 0.2392);
+  color: var(--card-bg);
+  font: inherit;
+  font-size: clamp(12px, 3.6cqw, 18px);
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition: filter 0.15s ease, transform 0.15s ease;
+}
+
+.guest-promo-claim:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+}
+
+.guest-promo-claim:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 420px) {
+  .guest-promo-overlay { padding: 12px; }
+  .guest-promo-dialog { width: calc(100vw - 24px); }
+  .guest-promo-close { top: -30px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .guest-promo-overlay,
+  .guest-promo-dialog,
+  .guest-promo-close,
+  .guest-promo-claim {
+    animation: none;
+    transition: none;
+  }
+}

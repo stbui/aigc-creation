@@ -1,3 +1,4 @@
+import './AppLayout.css';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Button, Drawer, Dropdown } from '../ui';
 import { ChevronDown, Menu, Wallet } from 'lucide-react';

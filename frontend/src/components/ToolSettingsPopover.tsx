@@ -1,3 +1,4 @@
+import '../styles/image-output-settings.css';
 import { ChevronDown, X } from 'lucide-react';
 import { useEffect, useRef, type ReactNode } from 'react';
 import { ratioOptions, resolutionOptions } from '../lib/optionSets';

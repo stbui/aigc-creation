@@ -8,7 +8,6 @@ import {
   BatchBar,
   BatchResultModal,
   ClearableField,
-  ConfirmAction,
   FilterActions,
   FilterBar,
   PageHeader,
@@ -31,7 +30,19 @@ import {
   STATUS_OPTIONS,
 } from './constants';
 import { OrderDetailDrawer } from './OrderDetailDrawer';
-import type { AdminOrderListResult, AdminOrderRow, BatchSummary } from '../../../types/api';
+import {
+  BatchMarkPaidDialog,
+  OrderActionDialog,
+  RefundConfirmationDialog,
+  type RefundConfirmationTarget,
+} from './OrderConfirmationDialogs';
+import { refundWarningMessage } from './refundResultMessage';
+import type {
+  AdminOrderListResult,
+  AdminOrderRefund,
+  AdminOrderRow,
+  BatchSummary,
+} from '../../../types/api';
 
 /**
  * 订单管理 (B-39~B-44)。
@@ -93,6 +104,12 @@ export function AdminOrdersPage() {
   /** 退款金额（元）。打开弹窗时预填可退上限 */
   const [refundYuan, setRefundYuan] = useState('');
   const [refundReason, setRefundReason] = useState('');
+  const [refundConfirmation, setRefundConfirmation] =
+    useState<RefundConfirmationTarget | null>(null);
+  const [refundConfirmationReason, setRefundConfirmationReason] = useState('');
+  const [refundProviderId, setRefundProviderId] = useState('');
+  /** 核销后让已打开的详情抽屉重新拉取，而不是要求运营关掉再打开 */
+  const [detailVersion, setDetailVersion] = useState(0);
   const [busy, setBusy] = useState(false);
   const [exporting, setExporting] = useState(false);
 
@@ -331,16 +348,14 @@ export function AdminOrdersPage() {
          */
         if (r.state === 'processing') {
           toast.warning(r.message || '渠道已受理退款但仍在处理中，请到渠道商户后台确认');
-        } else if (r.creditsUnreclaimable > 0) {
-          /*
-           * 积分回收结果必须显式说出来: 用户已经花掉的积分扣不回来,
-           * 只提示"退款成功"会让财务以为权益也已全额回收。
-           */
-          toast.warning(
-            `已退款 ¥${yuan(cents)}；回收积分 ${r.creditsReclaimed}，另有 ${r.creditsUnreclaimable} 积分已被消耗无法回收`,
-          );
         } else {
-          toast.success(`已退款 ¥${yuan(cents)}，回收积分 ${r.creditsReclaimed}`);
+          // 积分无法全额回收、待开发票需驳回、已开票需冲红都不能被“成功”字样淹没。
+          const warning = refundWarningMessage(r);
+          if (warning) {
+            toast.warning(`已退款 ¥${yuan(cents)}；${warning}`);
+          } else {
+            toast.success(`已退款 ¥${yuan(cents)}，回收积分 ${r.creditsReclaimed}`);
+          }
         }
       }
       setAction(null);
@@ -348,6 +363,54 @@ export function AdminOrdersPage() {
       reload();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '操作失败');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openRefundConfirmation = (
+    orderId: string,
+    refund: AdminOrderRefund,
+    outcome: 'succeeded' | 'failed',
+  ) => {
+    setRefundConfirmation({ orderId, refund, outcome });
+    setRefundConfirmationReason('');
+    setRefundProviderId(refund.providerRefundId ?? '');
+  };
+
+  const runRefundConfirmation = async () => {
+    if (!refundConfirmation) return;
+    const reason = refundConfirmationReason.trim();
+    if (!reason) {
+      toast.error('请填写人工核销依据');
+      return;
+    }
+    setBusy(true);
+    try {
+      const result = await adminOrdersApi.confirmRefund(
+        refundConfirmation.orderId,
+        refundConfirmation.refund.id,
+        {
+          outcome: refundConfirmation.outcome,
+          providerRefundId: refundProviderId.trim() || undefined,
+          reason,
+        },
+      );
+      if (result.state === 'failed') {
+        toast.success('已确认退款失败；订单状态与积分未变更');
+      } else {
+        const warning = refundWarningMessage(result);
+        if (warning) {
+          toast.warning(`已确认退款成功；${warning}`);
+        } else {
+          toast.success(`已确认退款成功，回收积分 ${result.creditsReclaimed}`);
+        }
+      }
+      setRefundConfirmation(null);
+      setDetailVersion((value) => value + 1);
+      reload();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '退款核销失败');
     } finally {
       setBusy(false);
     }
@@ -690,119 +753,45 @@ export function AdminOrdersPage() {
       </Panel>
 
       <OrderDetailDrawer
+        key={`${detailId ?? 'closed'}-${detailVersion}`}
         detailId={detailId}
         rows={list?.items ?? []}
         canMarkPaid={can('order.mark_paid')}
         canRefund={can('order.refund')}
         onClose={() => setDetailId(null)}
         onAction={openAction}
+        onConfirmRefund={openRefundConfirmation}
       />
 
-      {action && (
-        <ConfirmAction
-          open
-          title={action.kind === 'markPaid' ? '手工核销订单' : '订单退款'}
-          confirmText={action.kind === 'markPaid' ? '确认已收款' : '确认退款'}
-          danger={action.kind === 'refund'}
-          loading={busy}
-          onCancel={() => setAction(null)}
-          onConfirm={() => void runAction()}
-          description={
-            action.kind === 'markPaid' ? (
-              <>
-                <p>
-                  将先生成一条 <b>channel=manual</b> 的支付流水，再把订单置为已支付并发放积分/会员权益。
-                </p>
-                <p className="text-[12px] text-muted-foreground">
-                  订单 {action.row.orderNo} · ¥ {yuan(action.row.paidCents)} ·{' '}
-                  {action.row.membershipPlanName ?? `${action.row.itemCount} 件商品`}
-                </p>
-              </>
-            ) : (
-              <>
-                <p>
-                  退款会回收本单发放且<b>尚未被消耗</b>的积分；已被用掉的部分无法扣回，结果会如实提示。
-                </p>
-                <p className="text-[12px] text-muted-foreground">
-                  订单 {action.row.orderNo} · 实付 ¥ {yuan(action.row.paidCents)} · 已退 ¥{' '}
-                  {yuan(action.row.refundedCents)} · 可退上限 ¥{' '}
-                  {yuan(Math.max(action.row.paidCents - action.row.refundedCents, 0))}
-                </p>
-              </>
-            )
-          }
-          impact={
-            action.kind === 'markPaid'
-              ? [
-                  '订单状态 → 已支付',
-                  `发放 ${action.row.grantedCredits > 0 ? action.row.grantedCredits : '（按商品配置）'} 积分`,
-                  action.row.membershipPlanName ? `激活会员：${action.row.membershipPlanName}` : '不涉及会员',
-                  '写操作审计（含操作人）',
-                ]
-              : [
-                  `退款金额 ¥ ${refundYuan || '未填'}`,
-                  '回收未消耗的积分（按批次剩余量）',
-                  '订单状态 → 已退款 / 部分退款',
-                  '写操作审计（含操作人）',
-                ]
-          }
-          extra={
-            <>
-              {action.kind === 'refund' && (
-                <>
-                  <div className="flex flex-col gap-1.5">
-                    <span className="text-xs text-muted-foreground">退款金额（元）</span>
-                    <TextField
-                      ariaLabel="退款金额"
-                      inputMode="decimal"
-                      value={refundYuan}
-                      onChange={setRefundYuan}
-                      placeholder="0.00"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <span className="text-xs text-muted-foreground">退款原因</span>
-                    <TextField
-                      ariaLabel="退款原因"
-                      value={refundReason}
-                      onChange={setRefundReason}
-                      placeholder="如：用户申请退款，已核实订单"
-                      maxLength={200}
-                    />
-                  </div>
-                </>
-              )}
-            </>
-          }
-        />
-      )}
+      <OrderActionDialog
+        action={action}
+        refundYuan={refundYuan}
+        refundReason={refundReason}
+        loading={busy}
+        onRefundYuanChange={setRefundYuan}
+        onRefundReasonChange={setRefundReason}
+        onCancel={() => setAction(null)}
+        onConfirm={() => void runAction()}
+      />
 
-      {batchOpen && (
-        <ConfirmAction
-          open
-          title={`批量核销 ${selected.length} 笔订单`}
-          confirmText="确认已收款"
-          loading={busy}
-          onCancel={() => setBatchOpen(false)}
-          onConfirm={() => void runBatchMarkPaid()}
-          description={
-            <>
-              <p>
-                将为每笔订单生成一条 <b>channel=manual</b> 的支付流水，置为已支付并发放对应积分 / 会员权益。
-              </p>
-              <p className="text-[12px] text-muted-foreground">
-                只处理「待支付」状态的订单；已是已支付的订单会返回幂等命中而不重复发放。
-              </p>
-            </>
-          }
-          impact={[
-            `共 ${selected.length} 笔订单`,
-            '每笔会生成一条手工核销流水',
-            '发放对应的积分或会员权益',
-            '写操作审计（含操作人）',
-          ]}
-        />
-      )}
+      <RefundConfirmationDialog
+        confirmation={refundConfirmation}
+        reason={refundConfirmationReason}
+        providerRefundId={refundProviderId}
+        loading={busy}
+        onReasonChange={setRefundConfirmationReason}
+        onProviderRefundIdChange={setRefundProviderId}
+        onCancel={() => setRefundConfirmation(null)}
+        onConfirm={() => void runRefundConfirmation()}
+      />
+
+      <BatchMarkPaidDialog
+        open={batchOpen}
+        count={selected.length}
+        loading={busy}
+        onCancel={() => setBatchOpen(false)}
+        onConfirm={() => void runBatchMarkPaid()}
+      />
 
       <BatchResultModal
         open={batchSummary !== null}

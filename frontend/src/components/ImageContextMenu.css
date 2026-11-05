@@ -1,0 +1,76 @@
+/**
+ * ImageContextMenu 共享样式 —— 从 `styles/global.css` 迁出。
+ *
+ * 只放本组组件共用的选择器；设计令牌与全局骨架仍留在全局。
+ */
+
+/* ── 结果图右键菜单 (2026-10-22, 组件 components/ImageContextMenu.tsx) ──
+   右键缩略图或查看器里的图弹出; portal 到 body 并用 position: fixed 定位,
+   所以层级要高于查看器 (900), 否则在整屏查看器里右键会看不见菜单。 */
+.img-context-menu {
+  position: fixed;
+  z-index: 1300;
+  min-width: 196px;
+  padding: 6px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-control);
+  box-shadow: 0 12px 32px rgba(23, 26, 43, 0.16);
+  outline: none;
+  user-select: none;
+  animation: img-context-in 120ms ease-out;
+}
+
+.img-context-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-tag);
+  background: transparent;
+  font-size: 13px;
+  color: var(--text-body);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.img-context-item:hover,
+.img-context-item.is-active {
+  background: var(--surface);
+  color: var(--text-strong);
+}
+
+.img-context-item.is-danger {
+  color: var(--danger-text);
+}
+
+.img-context-item.is-danger:hover,
+.img-context-item.is-danger.is-active {
+  background: var(--danger-soft-bg);
+  color: var(--danger-text);
+}
+
+.img-context-item svg {
+  flex: none;
+  color: var(--text-desc);
+}
+
+.img-context-item.is-danger svg {
+  color: currentColor;
+}
+
+/* 无图标的项留出同宽占位, 让文字左对齐 */
+.img-context-icon-gap {
+  width: 15px;
+  flex: none;
+}
+
+.img-context-sep {
+  height: 1px;
+  margin: 6px 4px;
+  background: var(--border-soft);
+}

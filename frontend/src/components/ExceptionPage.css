@@ -1,0 +1,184 @@
+/**
+ * ExceptionPage 组件样式 —— 由组件文件引入，组件被哪些页面使用时随 chunk 加载。
+ *
+ * 从 `styles/global.css` 迁出；设计令牌与全局骨架仍留在全局。
+ */
+
+.exc-inner {
+  width: 100%;
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+/* 404 大字: 字重压低 + 字距拉开, 做背景层而非抢眼的主视觉 */
+.exc-code {
+  font-size: 76px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 6px;
+  color: var(--brand);
+  opacity: 0.16;
+  margin-bottom: 4px;
+  user-select: none;
+}
+
+.exc-code-mark {
+  color: var(--brand-light);
+  opacity: 0.55;
+}
+
+.exc-title {
+  margin: 0 0 8px;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 28px;
+  color: var(--text-strong);
+}
+
+.exc-desc {
+  margin: 0 0 24px;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--text-muted);
+  /* 描述常含路径/标识符, 长串不应把卡片撑变形 */
+  overflow-wrap: anywhere;
+}
+
+.exc-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.exc-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 20px;
+  border-radius: var(--radius-control);
+  border: 1px solid transparent;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 1;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.exc-btn.is-primary {
+  background: var(--brand);
+  color: var(--on-brand);
+}
+
+.exc-btn.is-primary:hover {
+  background: var(--brand-hover);
+}
+
+.exc-btn.is-ghost {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text-body);
+}
+
+.exc-btn.is-ghost:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+/* 键盘可达性: 按钮是原生 <button>/<a>, 但视觉去掉了 outline —— 焦点环需补回 */
+.exc-btn:focus-visible,
+.exc-detail-toggle:focus-visible,
+.exc-detail-copy:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.exc-home-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--text-desc);
+  text-decoration: none;
+}
+
+.exc-home-link:hover {
+  color: var(--brand);
+}
+
+/* 技术详情: 默认收起, 展开后限高可滚 —— componentStack 可能几十行, 不限高会顶穿整屏 */
+.exc-detail {
+  width: 100%;
+  margin-top: 4px;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.exc-detail-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+}
+
+.exc-detail-toggle,
+.exc-detail-copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.exc-detail-toggle:hover,
+.exc-detail-copy:hover {
+  color: var(--brand);
+}
+
+.exc-detail-caret {
+  transition: transform 0.2s;
+}
+
+.exc-detail-caret.is-open {
+  transform: rotate(180deg);
+}
+
+.exc-detail-body {
+  margin: 0;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  background: var(--card-bg);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--text-body);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 240px;
+  overflow: auto;
+}
+
+.exc-footnote {
+  margin: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-desc);
+}

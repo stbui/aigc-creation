@@ -338,9 +338,9 @@ partial_refunded → refunded | partial_refunded
 2. 可配规则：时间窗 `40905`、比例 `40906`、积分已消耗且扣不回 `40907`。
 3. 已有 `processing` 退款 → `40908`。
 4. 落 `Refund(status='processing')`，用它的 id 作渠道幂等键 `outRefundNo`。
-5. 调渠道：失败置 `failed` 并抛 `50302`，**订单状态与积分不变**，可重试；成功才回收积分、迁移订单状态、累加 `refundedCents`。
+5. 调渠道：失败置 `failed` 并抛 `50302`，**订单状态与积分不变**。渠道结果未知时复用原退款号重试；人工核销为失败后必须新建退款单。成功才回收积分、迁移订单状态、累加 `refundedCents`。
 
-会员单全额退款终止会员周期（响应带 `membershipTerminated`）。**绝不允许「只改库、假装退过钱」**。
+会员单全额退款只撤销该订单对应的周期并重算当前会员；仍有其他已付周期时不会整体终止，只有最后一期被撤才返回 `membershipTerminated=true`。退款成功响应还带 `invoiceFollowUp`：仅当待开票票面超过剩余可开票金额时要求驳回，仍可覆盖时不产生告警；已开票需线下冲红并登记。渠道异步处理中返回 `invoiceFollowUp: null`。**绝不允许「只改库、假装退过钱」**。
 
 ---
 
@@ -363,7 +363,7 @@ partial_refunded → refunded | partial_refunded
 
 ### 11.2 发票
 
-`/admin/invoices`（`invoice.write`）。一单一票（`orderId @unique`），金额取 `paidCents - refundedCents` 快照；输出可打印 HTML（零 PDF 依赖）。开具自动写审计；驳回要求填写原因，原因会回显给用户并写入审计。`GET /admin/invoices/export` 导出同一 `status` / `keyword` 口径的 CSV（金额同时给分与元，`invoice.write + data.export` + 审计）。
+`/admin/invoices`（`invoice.write`）。同一订单保留历史但最多一张有效票（`activeOrderId @unique`），金额取申请时 `paidCents - refundedCents` 快照；输出可打印 HTML（零 PDF 依赖）。开具自动写审计；驳回要求填写原因，原因会回显给用户并写入审计。存在 `processing` 退款时禁止开具；开具事务内重新校验订单状态和剩余可开票余额，退款后票面超余额必须驳回重提。`GET /admin/invoices/export` 导出同一 `status` / `keyword` 口径的 CSV（金额同时给分与元，`invoice.write + data.export` + 审计）。
 
 ---
 

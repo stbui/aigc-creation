@@ -1,0 +1,488 @@
+/**
+ * background-remove 页面样式 —— 由 `./index.ts` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：这里只放本页专属的选择器；共享骨架
+ * （`.pk-workspace` / `.tool-*` / `.state-*` 等）仍留在全局。
+ */
+
+.background-remove-stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.background-remove-preview {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(680px, calc(100% - 80px));
+  height: min(520px, calc(100% - 150px));
+  overflow: hidden;
+  background-color: var(--card-bg);
+  background-image:
+    linear-gradient(45deg, rgba(200, 205, 214, 0.35) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(200, 205, 214, 0.35) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(200, 205, 214, 0.35) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(200, 205, 214, 0.35) 75%);
+  background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+  background-size: 24px 24px;
+  transform-origin: 50%;
+  transition: transform 0.16s;
+  overscroll-behavior: contain;
+}
+
+.background-remove-preview.result-tool-hand,
+.background-remove-preview.is-comparing {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.background-remove-preview.result-tool-hand:active,
+.background-remove-preview.is-comparing:active {
+  cursor: grabbing;
+}
+
+.background-remove-preview.result-tool-eraser,
+.background-remove-preview.result-tool-repair {
+  cursor: none;
+  touch-action: none;
+}
+
+.background-remove-preview.is-state-hidden {
+  visibility: hidden;
+}
+
+.background-result-content {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-origin: 50%;
+}
+
+.background-result-image-frame {
+  position: absolute;
+  overflow: visible;
+  touch-action: none;
+}
+
+.background-result-canvas {
+  z-index: 0;
+}
+
+.background-result-cursor {
+  position: absolute;
+  z-index: 8;
+  box-sizing: border-box;
+  border: 1px solid var(--brand);
+  border-radius: 50%;
+  background: transparent;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.background-result-cursor.repair {
+  border: 2px dashed var(--brand);
+  background: rgba(85, 70, 216, 0.06);
+}
+
+.background-result-toolbar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  z-index: 6;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: min(440px, calc(100% - 32px));
+  min-width: 0;
+  height: 40px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: var(--card-bg);
+  box-shadow: 0 4px 8px rgba(107, 114, 128, 0.2);
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.background-result-toolbar button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--wb-text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.background-result-toolbar button:hover:not(:disabled) {
+  background: var(--brand-bg);
+  color: var(--brand);
+}
+
+.background-result-toolbar button.active {
+  background: var(--wb-flow-income-bg);
+  color: var(--brand);
+  box-shadow: inset 0 0 0 1px rgba(85, 70, 216, 0.1);
+}
+
+.background-result-toolbar button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.background-result-toolbar button > svg {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+}
+
+.background-result-toolbar b,
+.background-result-footer b {
+  flex: 0 0 1px;
+  width: 1px;
+  height: 16px;
+  background: var(--border);
+}
+
+.background-result-toolbar input[type='range'] {
+  width: 100px;
+  height: 16px;
+  margin: 0;
+  border: 0;
+  outline: none;
+  appearance: none;
+  accent-color: var(--brand);
+  cursor: pointer;
+}
+
+.background-result-toolbar input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border: 0;
+  border-radius: 10px;
+  background: linear-gradient(to right, var(--brand) 0 var(--range-progress), var(--surface) var(--range-progress) 100%);
+}
+
+.background-result-toolbar input[type='range']::-webkit-slider-thumb {
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  margin-top: -7px;
+  border: 3px solid var(--brand);
+  border-radius: 50%;
+  background: var(--card-bg);
+  appearance: none;
+}
+
+.background-result-toolbar input[type='range']::-moz-range-track {
+  height: 4px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.background-result-toolbar input[type='range']::-moz-range-progress {
+  height: 4px;
+  border-radius: 10px;
+  background: var(--brand);
+}
+
+.background-result-toolbar input[type='range']::-moz-range-thumb {
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  border: 3px solid var(--brand);
+  border-radius: 50%;
+  background: var(--card-bg);
+}
+
+.background-result-toolbar output {
+  min-width: 32px;
+  padding: 2px 7px;
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text-5);
+  font-size: 12px;
+  text-align: center;
+}
+
+.background-result-toolbar .background-result-download-icon {
+  width: 28px;
+  min-width: 28px;
+  margin-left: auto;
+  padding: 4px;
+  color: var(--brand);
+}
+
+.background-result-footer {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 8px;
+  background: var(--card-bg);
+  box-shadow: 0 4px 16px rgba(107, 114, 128, 0.16);
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.background-result-footer button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: transparent;
+  color: var(--wb-text);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.background-result-footer button:hover:not(:disabled) {
+  color: var(--brand);
+}
+
+.background-result-footer button:disabled {
+  color: var(--text-desc);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.background-result-footer span {
+  min-width: 38px;
+  color: var(--wb-text);
+  font-size: 12px;
+  text-align: center;
+}
+
+.background-result-footer .background-zoom-target button {
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 4px;
+  color: var(--text-5);
+  font-size: 12px;
+}
+
+.background-result-footer .background-zoom-target button.active {
+  background: var(--card-bg);
+  color: var(--brand);
+  box-shadow: 0 1px 3px rgba(31, 35, 41, 0.15);
+}
+
+.background-result-shortcuts {
+  position: absolute;
+  bottom: 64px;
+  left: 50%;
+  z-index: 6;
+  color: var(--tool-text-7);
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+@media (max-width: 640px) {
+  .background-remove-preview {
+    width: calc(100% - 24px);
+    height: calc(100% - 190px);
+  }
+  .background-result-toolbar {
+    top: 8px;
+    gap: 3px;
+    width: calc(100% - 16px);
+    height: auto;
+    min-height: 40px;
+    padding: 5px 8px;
+    overflow-x: auto;
+  }
+  .background-result-toolbar input[type='range'] {
+    width: 72px;
+  }
+  .background-result-footer {
+    bottom: 8px;
+    gap: 5px;
+    max-width: calc(100% - 16px);
+    height: 36px;
+    padding: 0 8px;
+    overflow-x: auto;
+  }
+  .background-result-shortcuts {
+    display: none;
+  }
+}
+
+/* 一键抠图：参考站没有历史栏，固定两栏 */
+.pk-workspace.background-remove-page {
+  box-sizing: border-box;
+  height: calc(100vh - var(--workspace-topbar-height));
+  min-height: 0;
+  max-height: calc(100vh - var(--workspace-topbar-height));
+  padding: 16px;
+  gap: 16px;
+  grid-template-columns: 432px minmax(560px, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  align-items: stretch;
+  color: var(--wb-text);
+  background: var(--page-bg);
+  overflow: hidden;
+}
+
+.pk-workspace.background-remove-page .pk-input-pane,
+.pk-workspace.background-remove-page .pk-result-pane {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.pk-workspace.background-remove-page .pk-preview-placeholder {
+  background: transparent;
+  border-radius: 16px;
+}
+
+/* 抠图右栏：无图时是 480×480 演示视频；有图时用同一舞台展示原图。
+ * 视频和图片都只呈现真实上传内容，不提前伪造抠图结果。 */
+.pk-workspace.background-remove-page .background-remove-stage {
+  flex-direction: column;
+  gap: 12px;
+  border-radius: 16px;
+  text-align: center;
+}
+
+.pk-workspace.background-remove-page .background-remove-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-desc);
+}
+
+.pk-workspace.background-remove-page .background-remove-empty video {
+  display: block;
+  width: 480px;
+  max-width: 100%;
+  height: 480px;
+  object-fit: cover;
+  background: var(--surface-2);
+}
+
+.pk-workspace.background-remove-page .background-remove-empty strong {
+  display: block;
+  margin: 32px 0 8px;
+  color: var(--wb-text);
+  font-size: 14px;
+  line-height: 20px;
+}
+
+.pk-workspace.background-remove-page .background-remove-empty p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16.5px;
+}
+
+.pk-workspace.background-remove-page .background-remove-source-stage .background-remove-preview {
+  width: min(
+    680px,
+    calc(100% - 80px),
+    calc((100vh - var(--workspace-topbar-height) - 144px) * var(--source-aspect, 1.6))
+  );
+  height: auto;
+  aspect-ratio: var(--source-aspect, 1.6);
+}
+
+.pk-workspace.background-remove-page .background-remove-source-stage .background-remove-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* 一键抠图上传态：参考站是 160×160 预览 + 单个重新上传按钮，
+ * 不能沿用通用 pk-thumb-grid 的填充上传区。 */
+.pk-workspace.background-remove-page .pk-dropzone-filled {
+  box-sizing: border-box;
+  min-height: 160px;
+  height: 160px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: default;
+}
+
+.pk-workspace.background-remove-page .pk-dropzone-filled:hover {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.pk-workspace.background-remove-page .background-source-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  width: 100%;
+  height: 160px;
+}
+
+.pk-workspace.background-remove-page .background-source-row.processing {
+  pointer-events: none;
+  opacity: 0.72;
+}
+
+.pk-workspace.background-remove-page .background-source-preview {
+  box-sizing: border-box;
+  flex: 0 0 160px;
+  width: 160px;
+  height: 160px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  cursor: zoom-in;
+}
+
+.pk-workspace.background-remove-page .background-source-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pk-workspace.background-remove-page .background-source-reupload {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 88px;
+  width: 88px;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--color-border-soft);
+  color: var(--text-body);
+  font-size: 14px;
+  line-height: 22px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.pk-workspace.background-remove-page .background-source-reupload:hover {
+  background: var(--tool-surface-6);
+}

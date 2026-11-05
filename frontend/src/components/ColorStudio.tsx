@@ -1,3 +1,4 @@
+import './ColorStudio.css';
 import { useMemo } from 'react';
 import { Pipette, RotateCcw } from 'lucide-react';
 

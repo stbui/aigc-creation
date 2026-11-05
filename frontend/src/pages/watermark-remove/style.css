@@ -1,0 +1,291 @@
+/**
+ * watermark-remove 页面样式 —— 由 `./index.ts` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：这里只放本页专属的选择器；共享骨架
+ * （`.pk-workspace` / `.tool-*` / `.state-*` 等）仍留在全局。
+ */
+
+.annotation-mark-preview {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  overflow: hidden;
+  border: 1px solid var(--border-brand);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.annotation-mark-preview img {
+  display: block;
+  max-width: none;
+}
+
+/* ───────── 去除水印：参考站 watermark-removal-page 上传态 (2026-10-27) ─────────
+ *
+ * 这页与局部重绘共用 redraw-* 基础类，但参考站只暴露「抓手 / 对比 / 框选」，
+ * 工具栏固定 210px，可见标注是 DOM，不是交互 canvas。规则放在文件末尾，
+ * 避免被局部重绘的 532px 工具栏和画笔样式覆盖。
+ */
+.pk-workspace.watermark-removal-page .local-redraw-stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: 16px;
+}
+
+.pk-workspace.watermark-removal-page .redraw-toolbar {
+  box-sizing: border-box;
+  width: 210px;
+  max-width: calc(100% - 32px);
+  height: 40px;
+  min-height: 40px;
+  padding: 0 16px;
+  gap: 6px;
+  flex-wrap: nowrap;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--card-bg);
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(107, 114, 128, 0.2);
+}
+
+.pk-workspace.watermark-removal-page .toolbar-item-wrap {
+  display: contents;
+}
+
+.pk-workspace.watermark-removal-page .redraw-tool-btn {
+  box-sizing: border-box;
+  align-self: center;
+  height: 30px;
+  padding: 4px;
+  gap: 4px;
+  border-radius: 6px;
+  color: var(--text-5);
+  font-size: 12px;
+}
+
+.pk-workspace.watermark-removal-page .redraw-tool-btn > svg {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+}
+
+.pk-workspace.watermark-removal-page .redraw-tool-btn.active {
+  color: var(--brand);
+  background: var(--wb-flow-income-bg);
+  box-shadow: inset 0 0 0 1px rgba(85, 70, 216, 0.1);
+}
+
+.pk-workspace.watermark-removal-page .redraw-tool-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pk-workspace.watermark-removal-page .toolbar-divider {
+  flex: 0 0 1px;
+  width: 1px;
+  height: 16px;
+  margin: 0;
+  background: var(--border);
+}
+
+.pk-workspace.watermark-removal-page .redraw-canvas-wrap {
+  transform-origin: 50% 50%;
+}
+
+.pk-workspace.watermark-removal-page .redraw-canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--surface-2);
+  touch-action: none;
+  user-select: none;
+  overscroll-behavior: contain;
+}
+
+.pk-workspace.watermark-removal-page .redraw-canvas.tool-rect {
+  cursor: crosshair;
+}
+
+.pk-workspace.watermark-removal-page .redraw-canvas.tool-hand {
+  cursor: grab;
+}
+
+.pk-workspace.watermark-removal-page .redraw-canvas.tool-hand.is-panning {
+  cursor: grabbing;
+}
+
+.pk-workspace.watermark-removal-page .redraw-image-frame {
+  position: absolute;
+  overflow: hidden;
+  background: var(--card-bg);
+  touch-action: none;
+}
+
+.pk-workspace.watermark-removal-page .redraw-image-frame > .canvas-original {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.pk-workspace.watermark-removal-page .source-row {
+  gap: 12px;
+}
+
+.pk-workspace.watermark-removal-page .source-row > div button {
+  min-width: 88px;
+  height: 40px;
+  padding: 0 12px;
+}
+
+.pk-workspace.watermark-removal-page .watermark-mark-card {
+  gap: 16px;
+}
+
+.pk-workspace.watermark-removal-page .watermark-mark-card .pk-required-mark {
+  margin-right: 8px;
+}
+
+.pk-workspace.watermark-removal-page .watermark-annotation-row .redraw-prompt-label {
+  grid-area: 1 / 1;
+}
+
+.pk-workspace.watermark-removal-page .annotation-mark-preview {
+  grid-area: 1 / 2 / 3 / 3;
+  align-self: center;
+  width: 64px;
+  height: 64px;
+}
+
+.pk-workspace.watermark-removal-page .annotation-mark-preview > img {
+  display: block;
+  object-fit: fill;
+}
+
+.pk-workspace.watermark-removal-page .annotation-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(51, 51, 51, 0.78);
+  color: var(--card-bg);
+  cursor: pointer;
+}
+
+.pk-workspace.watermark-removal-page .annotation-remove:hover,
+.pk-workspace.watermark-removal-page .annotation-remove:focus-visible {
+  background: rgba(31, 35, 41, 0.92);
+  outline: none;
+}
+
+.pk-workspace.watermark-removal-page .redraw-canvas-footer {
+  height: 40px;
+  padding: 0 16px;
+  gap: 8px;
+  bottom: 45px;
+  background: var(--card-bg);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(107, 114, 128, 0.16);
+}
+
+.pk-workspace.watermark-removal-page .redraw-footer-btn {
+  width: 51px;
+  height: 18px;
+  padding: 0;
+  gap: 4px;
+  justify-content: center;
+  color: var(--text-desc);
+  font-size: 12px;
+}
+
+.pk-workspace.watermark-removal-page .redraw-footer-btn > svg {
+  width: 16px;
+  height: 16px;
+}
+
+.pk-workspace.watermark-removal-page .redraw-footer-btn:disabled {
+  opacity: 0.35;
+}
+
+.pk-workspace.watermark-removal-page .redraw-zoom-btn {
+  width: 26px;
+  justify-content: center;
+}
+
+.pk-workspace.watermark-removal-page .redraw-canvas-footer .redraw-zoom-value {
+  width: 31px;
+  min-width: 31px;
+  text-align: center;
+  color: var(--wb-text);
+  font-size: 12px;
+}
+
+.pk-workspace.watermark-removal-page .redraw-shortcut-hint {
+  bottom: 8px;
+  color: var(--text-9);
+  font-size: 12px;
+  line-height: normal;
+}
+
+.pk-workspace.watermark-removal-page .pk-primary-btn {
+  background: linear-gradient(90deg, var(--surface-brand-3), var(--brand));
+}
+
+@media (max-width: 1180px) {
+  .pk-workspace.watermark-removal-page .local-redraw-stage {
+    min-height: 720px;
+  }
+}
+
+@media (max-width: 900px) {
+  .pk-workspace.watermark-removal-page .redraw-stage-topbar {
+    left: 0;
+    width: calc(100% - 24px);
+    transform: none;
+  }
+  .pk-workspace.watermark-removal-page .redraw-toolbar {
+    max-width: 100%;
+  }
+  .pk-workspace.watermark-removal-page .redraw-canvas-wrap {
+    width: min(600px, calc(100% - 24px));
+  }
+  .pk-workspace.watermark-removal-page .redraw-canvas-footer .redraw-footer-btn {
+    box-sizing: border-box;
+    width: 40px;
+    height: 18.5px;
+    padding: 1px 6px;
+  }
+  .pk-workspace.watermark-removal-page .redraw-canvas-footer .redraw-tool-divider {
+    width: 0;
+  }
+  .pk-workspace.watermark-removal-page .redraw-canvas-footer .redraw-zoom-btn {
+    box-sizing: border-box;
+    width: 12.5px;
+    height: 18px;
+    padding: 1px 6px;
+  }
+  .pk-workspace.watermark-removal-page .redraw-canvas-footer .redraw-zoom-value {
+    width: 30.9px;
+    min-width: 30.9px;
+  }
+}

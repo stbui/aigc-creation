@@ -1,0 +1,22 @@
+/**
+ * product-recolor 页面样式 —— 由 `./index.ts` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：这里只放本页专属的选择器；共享骨架
+ * （`.pk-workspace` / `.tool-*` / `.state-*` 等）仍留在全局。
+ */
+
+/* 商品换色：参考站卡片 padding14 / gap16，标题 h2 20+12。 */
+.pk-workspace.product-recolor-page .product-recolor-color-card {
+  padding: 14px;
+  gap: 16px;
+}
+
+.pk-workspace.product-recolor-page .product-recolor-color-card .card-title-row {
+  margin: 0 0 16px;
+}
+
+.pk-workspace.product-recolor-page .product-recolor-color-card .card-title-row h2 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 20px;
+}

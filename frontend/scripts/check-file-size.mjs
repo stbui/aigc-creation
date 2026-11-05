@@ -40,7 +40,7 @@ const BASELINE = {
   'src/types/model.ts': 926,
   // 概览页内容：批 1 从 AdminDashboardPage 抽出，内部构件还可再分
   'src/pages/admin/dashboard/AdminDashboardContent.tsx': 1002,
-  'src/pages/admin/orders/page.tsx': 815,
+  'src/pages/admin/orders/page.tsx': 804,
   'src/pages/creative-image/page.tsx': 819,
   // ToolShell 主壳：批 2 已抽走类型 / 卡片 / 弹窗 / hook，剩余是壳本体
   'src/components/ToolShell.tsx': 819,

@@ -19,6 +19,7 @@ import {
   IsArray,
   IsIn,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
   Max,
@@ -86,6 +87,22 @@ export class RefundDto {
   @IsInt() @Min(1) amountCents!: number;
   /** 退款原因。强制填写 */
   @IsString() @MaxLength(200) reason!: string;
+}
+
+/** 异步退款人工核销：必须先到渠道商户后台核实最终结果 */
+export class RefundConfirmDto {
+  @IsIn(["succeeded", "failed"])
+  outcome!: "succeeded" | "failed";
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  providerRefundId?: string;
+
+  @IsString()
+  @IsNotEmpty({ message: "请填写人工核销依据" })
+  @MaxLength(300)
+  reason!: string;
 }
 
 /**
@@ -424,6 +441,31 @@ export class AdminCommerceController {
       reason: dto.reason,
       operatorId: actor.id,
       rules,
+    });
+  }
+
+  /**
+   * 异步退款人工核销。
+   *
+   * 渠道返回 PROCESSING 后，订单与积分都保持未变；运营在商户后台确认最终
+   * 结果后调用本接口。成功会原子扣回积分并推进订单，失败则只关闭退款单。
+   */
+  @Post("orders/:id/refunds/:refundId/confirm")
+  @RequirePermission(PERMISSIONS.orderRefund)
+  @AuditAction("order.refund_confirm")
+  confirmRefund(
+    @Param("id") id: string,
+    @Param("refundId") refundId: string,
+    @Body() dto: RefundConfirmDto,
+    @AdminUser() actor: AdminUser,
+  ) {
+    return this.orders.confirmRefund({
+      orderId: id,
+      refundId,
+      outcome: dto.outcome,
+      providerRefundId: dto.providerRefundId,
+      reason: dto.reason,
+      operatorId: actor.id,
     });
   }
 

@@ -152,8 +152,11 @@ PaymentsService（编排）
 ### 6.2 两段式
 
 1. 校验通过后落 `Refund(status='processing')`，用它的 id 作渠道幂等键 `outRefundNo`。
-2. 调渠道：失败置 `failed` 并抛 `50302`，**订单状态与积分都不变**，可用同一退款单重试。
-3. 渠道成功才回收积分（`reclaimForOrder`）、迁移订单状态、累加 `refundedCents`。
+2. 调渠道：失败置 `failed` 并抛 `50302`，**订单状态与积分都不变**。渠道结果未知时同金额重试复用原退款号；运营已在渠道后台确认失败的单是明确终态，重试必须新建退款单。
+3. 渠道成功才按**累计退款比例**回收积分、迁移订单状态、累加 `refundedCents`。
+   第 N 笔退款的回收目标为 `floor(本单发放积分 × 累计已退金额 / 实付金额)`，
+   再减去此前退款单已经记录的“已回收 + 无法回收”份额。这样多次部分退款不会在首笔
+   就扣完整单积分，也不会在后续退款重复或漏扣；最后一笔退完时累计份额恰好等于发放量。
 
 微信返回 `PROCESSING` 时保持 `processing`，本地账不动，需人工到商户后台确认。`channel='manual'`（后台标记已支付）不调渠道。
 
@@ -163,13 +166,26 @@ PaymentsService（编排）
 
 `Refund.creditsReclaimed` 记录实际扣回数，`creditsUnreclaimable` 记录因已消耗而扣不回的数量。后者必须如实记录，否则对账会以为系统丢了积分。
 
-会员单全额退款会终止会员周期（响应带 `membershipTerminated`）。
+会员单全额退款只撤销该订单产生的周期，并在同一事务内重算当前会员投影：
+退最新一期时回退到上一期仍在付费的到期时间；退较早一期不影响当前周期；
+最后一期退款才立即失效。只有**实际终止当前有效会员**时响应
+`membershipTerminated=true`。订单上的 `membershipPeriodStartAt/EndAt` 保存不可
+覆盖的周期快照，`membershipPeriodRevokedAt` 保存退款审计边界。
+
+### 6.4 退款与发票联动
+
+- 存在 `processing` 退款时，用户不能申请发票，后台也不能开具已有待开发票。
+- 开具前在事务内重新读取订单状态与累计退款，只有 `paid / partial_refunded` 且票面不超过 `paidCents - refundedCents` 才能开具；全额退款后的待开发票必须驳回。
+- 退款成功后响应带 `invoiceFollowUp`：待开发票仅在票面超过退款后剩余可开票金额时提示运营驳回，已开具发票提示线下冲红并回系统登记；仍被余额覆盖的待开发票不误报。不能只把提示留在一个需要运营主动发现的列表里。
+- 后台发票告警把“可正常开具”和“退款后不可开具/退款处理中”拆成两类计数，避免永久无法开具的票长期混在待办里。
 
 ## 7. 会员
 
 `MembershipPlan`（`code / priceCents / durationDays / monthlyCredits / perks / status`）→ `Membership`（`planId / perksSnapshot / monthlyCreditsSnapshot / startAt / expiresAt / status / nextCreditAt / orderId?`）。
 
 - **激活唯一路径**：订单支付成功且 `membershipAppliedAt` 为空才激活。该字段与订单同生命周期——不能靠 `Membership.orderId` 判断，续费时它会指向最新一笔，旧订单重放即可白拿一期。
+- **周期快照落在订单上**：`membershipPeriodStartAt/EndAt` 记录该订单实际买到的区间，`membershipPerksSnapshot/monthlyCreditsSnapshot` 记录当期权益。`Membership` 只是一人一行的当前投影，不能据此反推某笔续费订单。
+- **退款只撤对应周期**：全额退款按未撤销的订单周期重算到期时间、套餐与 `nextCreditAt`；仍有其他已付周期时不会整条终止会员，取消自动续费的用户退款后仍保持 `cancelled` 至上一期结束。
 - 月度积分由调度任务 `membership` 按 `nextCreditAt` 发放，发放时生成新的 `CreditLot`。
 - 到期失效同由该任务处理，失效前先查后更，以便给用户发站内消息。
 - 取消自动续费后 `status='cancelled'`，已付周期保留至 `expiresAt`；续费可重新激活并顺延。
@@ -191,7 +207,7 @@ PaymentsService（编排）
 
 ### 9.1 发票
 
-一单一票（`orderId @unique`），金额取 `paidCents - refundedCents` 快照；输出可打印 HTML，零 PDF 依赖。开具自动写审计；驳回要求填写原因，原因会回显给用户并写入审计。
+同一订单保留完整申请历史，但同一时刻最多一张有效票（`activeOrderId @unique`，`pending / issued / red_flushed` 占用，驳回后释放）。金额取申请时 `paidCents - refundedCents` 快照；输出可打印 HTML，零 PDF 依赖。开具自动写审计；驳回要求填写原因，原因会回显给用户并写入审计。冲红只登记台账并保留原件。
 
 ### 9.2 对账
 

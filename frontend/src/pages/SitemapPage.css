@@ -1,0 +1,184 @@
+/**
+ * SitemapPage 页面样式 —— 由 `./SitemapPage.tsx` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：只放本页独占选择器；共享组件
+ * （AppLayout / 登录弹窗 / SideRail 等）与设计令牌仍留在全局。
+ */
+
+/* ───────── 网站地图页 (复刻 ijihua.cn/sitemap.html: hero 1100 / h1 68px / 双列 + 四色编号) ───────── */
+.sitemap-page {
+  min-height: 100vh;
+  background: var(--card-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+.sitemap-topbar {
+  height: 64px;
+  padding: 0 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--surface);
+}
+
+.sitemap-topbar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  color: var(--text-strong);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+/* 2026-10-19: 站点索引顶栏加货觉AI 标记 (24px, 小于主顶栏 36px 以匹配本页轻顶栏) */
+.sitemap-topbar-brand-mark {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  display: block;
+}
+
+.sitemap-topbar-brand-ai {
+  color: var(--brand);
+}
+
+.sitemap-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.sitemap-topbar-note {
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+.sitemap-topbar-link {
+  font-size: 13px;
+  color: var(--text-strong);
+  text-decoration: none;
+}
+
+.sitemap-topbar-link:hover {
+  color: var(--brand);
+}
+
+.sitemap-main {
+  width: 1100px;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 58px 0 40px;
+}
+
+.sitemap-hero {
+  padding-bottom: 34px;
+}
+
+.sitemap-eyebrow {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.4px;
+  color: var(--text-desc);
+}
+
+.sitemap-hero h1 {
+  margin: 12px 0 0;
+  font-size: 68px;
+  font-weight: 780;
+  line-height: 66.64px;
+  color: var(--text-strong);
+}
+
+.sitemap-hero p {
+  margin: 18px 0 0;
+  max-width: 720px;
+  font-size: 14px;
+  line-height: 26px;
+  color: var(--text-body);
+}
+
+.sitemap-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px 96px;
+}
+
+.sitemap-section-no {
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: 1.2px;
+}
+
+.sitemap-section-head {
+  margin-top: 10px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.sitemap-section-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 720;
+  color: var(--text-strong);
+}
+
+.sitemap-section-head span {
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+.sitemap-list {
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sitemap-item {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 12px;
+  border-radius: var(--radius-card);
+  text-decoration: none;
+  /* 2026-10-19 修 antd 蓝泄漏: 本选择器作用于 react-router <Link>, 原先只设了
+     text-decoration 却漏了 color, 导致 46 个链接继承 antd 6 默认主题链接色 #1677ff
+     (CSS 全文无 1677ff 字面值 = antd 运行时注入), 在紫系全站里是刺眼的蓝。
+     颜色语义由子元素 .sitemap-item-name / -path 各自定义, 此处只需不让 <a> 兜底蓝。*/
+  color: var(--text-strong);
+  transition: background 0.15s;
+}
+
+.sitemap-item:hover {
+  background: var(--page-bg);
+}
+
+.sitemap-item-name {
+  font-size: 16px;
+  color: var(--text-strong);
+}
+
+.sitemap-item-path {
+  font-size: 12px;
+  color: var(--text-desc);
+  white-space: nowrap;
+}
+
+.sitemap-footer {
+  margin-top: auto;
+  padding: 24px;
+  border-top: 1px solid var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-desc);
+}

@@ -1,0 +1,207 @@
+/**
+ * ToolPage 页面样式 —— 由 `./ToolPage.tsx` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：只放本页独占选择器；共享组件
+ * （AppLayout / 登录弹窗 / SideRail 等）与设计令牌仍留在全局。
+ */
+
+/* ───────── 工具页 ───────── */
+.tool-page {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.tool-back {
+  margin-left: -8px;
+  margin-bottom: 4px;
+  color: var(--color-text-secondary);
+}
+
+.tool-header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.tool-header-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-card);
+  background: var(--brand-bg);
+  color: var(--brand);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tool-header-title {
+  font-size: 20px !important;
+  margin: 0 0 2px !important;
+}
+
+.tool-header-sub {
+  color: var(--color-text-secondary);
+  margin: 0 !important;
+}
+
+.tool-tag-free {
+  background: rgba(234, 88, 12, 0.12);
+  color: var(--color-cta-text);
+  border: none;
+}
+
+.tool-tag-mode {
+  border: none;
+  font-size: 12px;
+}
+
+.tool-tag-real {
+  background: rgba(22, 163, 74, 0.12);
+  color: var(--color-success-text);
+}
+
+.tool-tag-planned {
+  background: var(--color-slate-100);
+  color: var(--color-text-secondary);
+}
+
+.tool-notice {
+  background: rgba(234, 88, 12, 0.06);
+  border: 1px solid rgba(234, 88, 12, 0.2);
+  color: var(--color-cta-hover);
+  padding: 8px 12px;
+  border-radius: var(--radius-control);
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+.tool-notice-help {
+  background: var(--color-slate-100);
+  border-color: var(--color-border);
+}
+
+.tool-body {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .tool-body {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tool-upload-trigger {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.tool-upload-hint {
+  font-size: 12px;
+}
+
+.tool-form {
+  margin-top: 14px;
+}
+
+.tool-param-number {
+  display: grid;
+  grid-template-columns: 1fr 88px;
+  gap: 12px;
+  align-items: center;
+}
+
+/* `.tool-submit` 的样式只在文件末尾「shadcn 适配层」定义一次（原 antd 版已删：
+   适配层不再输出 .ant-btn，此处规则永不命中，且曾导致迁移时漏抄字重/字距）。 */
+/* .tool-result-loading 的定义已移至文件末尾「通用工具页结果卡『生成中』骨架」小节 */
+.tool-result-img {
+  width: 100%;
+  border-radius: var(--radius-control);
+  background: var(--color-slate-100);
+  display: block;
+}
+
+.tool-result-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.tool-param-field {
+  margin-bottom: 20px;
+}
+
+.tool-param-label {
+  display: block;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-bottom: 6px;
+}
+
+/* 通用工具页结果卡「生成中」骨架 (2026-10-20) */
+.tool-result-loading {
+  /* 2026-10-20: 原为 `padding: 48px 0; justify-content: center` 配 antd Spin。
+     改用骨架屏占位后, 块内是骨架 + 提示文字的竖排, 需 flex-column。 */
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tool-result-loading .state-skeleton.is-block {
+  min-height: 220px;
+}
+
+.tool-result-loading .state-skeleton.is-block .state-skeleton-item > * {
+  height: 100%;
+}
+
+.tool-result-loading-tip {
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--text-desc);
+}
+
+/* 工具页提交栏的消耗价提示 (通用 ToolPage) */
+.tool-credit-hint {
+  display: block;
+  margin-top: 8px;
+  text-align: center;
+  font-size: 12px;
+}
+
+/* ───────── shadcn 适配层：旧页面选择器映射 ─────────
+   下面只新增选择器，把仍按 antd DOM 命中的页面规则映射到当前适配层。
+   所有数值延续上方原有规则，避免迁移 shadcn 后布局/间距发生变化。 */
+
+/* 按钮：业务类名仍写在 Button 上，但 DOM 已不再带 .ant-btn */
+.tool-submit.ui-btn,
+.tool-submit.ui-btn:hover:not(:disabled) {
+  background: var(--brand);
+  border-color: var(--brand);
+  /* 迁移 shadcn 时漏抄, 2026-11-03 补回: 提交主 CTA 的字重/字距 */
+  font-weight: 600;
+  letter-spacing: 2px;
+}
+
+.tool-submit.ui-btn:hover:not(:disabled) {
+  background: var(--brand-hover) !important;
+  border-color: var(--brand-hover) !important;
+}
+
+.tool-submit.ui-btn:disabled {
+  background: var(--brand-bg) !important;
+  border-color: var(--brand-bg) !important;
+  color: var(--brand) !important;
+  opacity: 0.65;
+}

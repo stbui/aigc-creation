@@ -1,3 +1,4 @@
+import './MobileUploadModal.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { RefreshCw, X } from 'lucide-react';
 import QRCode from 'qrcode';

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { adminBillingOrdersApi } from './api';
 import { ActionButton, PageHeader, Panel, StaleError, type AppliedFilter } from '~/admin-ui/primitives';
 import {
@@ -71,13 +71,15 @@ export function AdminBillingOrdersPage() {
     () => (detailId ? adminBillingOrdersApi.get(detailId) : Promise.resolve(null)),
     [detailId],
   );
-  const detail = fetchedDetail ?? rows.find((row) => row.id === detailId) ?? null;
+  const detail = rows.find((row) => row.id === detailId) ?? fetchedDetail;
   const [action, setAction] = useState<'settle' | 'refund'>('settle');
+  const [reason, setReason] = useState('');
   const [resolving, setResolving] = useState(false);
   // 批量核对：勾选若干账单一次性处置，逐条结果回显
   const [selected, setSelected] = useState<string[]>([]);
   const [batchOpen, setBatchOpen] = useState(false);
   const [batchBusy, setBatchBusy] = useState(false);
+  const [batchReason, setBatchReason] = useState('');
   const [batchResults, setBatchResults] = useState<
     Array<{ id: string; ok: boolean; error?: string }> | null
   >(null);
@@ -85,11 +87,13 @@ export function AdminBillingOrdersPage() {
   const requestCloseDetail = () => {
     setDetailId(null);
     setAction('settle');
+    setReason('');
   };
 
   const openDetail = useCallback(
     (row: BillingOrderView) => {
       setAction('settle');
+      setReason('');
       setDetailId(row.id);
     },
     [setDetailId],
@@ -125,17 +129,32 @@ export function AdminBillingOrdersPage() {
     });
   };
 
+  // 处置完成或刷新后，把已不可核对/已不在当前页的旧选中项剔除。
+  useEffect(() => {
+    const reviewable = new Set(rows.filter((row) => row.reviewable).map((row) => row.id));
+    setSelected((current) => {
+      const next = current.filter((id) => reviewable.has(id));
+      return next.length === current.length ? current : next;
+    });
+  }, [rows]);
+
   const runResolve = async () => {
     if (!detail) return;
+    const note = reason.trim();
+    if (!note) {
+      toast.error('请填写核对依据');
+      return;
+    }
     setResolving(true);
     try {
-      const next = await adminBillingOrdersApi.resolve(detail.id, action);
+      const next = await adminBillingOrdersApi.resolve(detail.id, action, note);
       toast.success(
         action === 'refund'
           ? `已全额退款：${toCredits(next.refundedAmountMicrocredits)} 积分`
           : `已按现有用量结算：${toCredits(next.actualAmountMicrocredits)} 积分`,
       );
       await reload();
+      requestCloseDetail();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '核对失败');
     } finally {
@@ -146,14 +165,21 @@ export function AdminBillingOrdersPage() {
   /** 批量核对：逐条独立处置，失败的条目带原因回显 */
   const runBatchResolve = async () => {
     if (selected.length === 0) return;
+    const note = batchReason.trim();
+    if (!note) {
+      toast.error('请填写核对依据');
+      return;
+    }
     setBatchBusy(true);
     setBatchResults(null);
     try {
-      const result = await adminBillingOrdersApi.batchResolve(selected, action);
+      const result = await adminBillingOrdersApi.batchResolve(selected, action, note);
       setBatchResults(result.results);
       if (result.failed === 0) {
         toast.success(`已核对 ${result.resolved} 条账单`);
         setSelected([]);
+        setBatchReason('');
+        setBatchOpen(false);
       } else {
         toast.error(`已核对 ${result.resolved} 条，${result.failed} 条失败（见下方明细）`);
       }
@@ -244,6 +270,7 @@ export function AdminBillingOrdersPage() {
               disabled={batchBusy}
               onClick={() => {
                 setBatchResults(null);
+                setBatchReason('');
                 setBatchOpen(true);
               }}
             >
@@ -267,7 +294,10 @@ export function AdminBillingOrdersPage() {
             current: Number(params.page ?? 1),
             pageSize: Number(params.pageSize ?? 20),
             total: data?.total ?? 0,
-            onChange: (page, pageSize) => setPage(page, pageSize),
+            onChange: (page, pageSize) => {
+              setSelected([]);
+              setPage(page, pageSize);
+            },
           }}
         />
       </Panel>
@@ -277,6 +307,8 @@ export function AdminBillingOrdersPage() {
         count={selected.length}
         action={action}
         onActionChange={setAction}
+        reason={batchReason}
+        onReasonChange={setBatchReason}
         busy={batchBusy}
         results={batchResults}
         onClose={() => setBatchOpen(false)}
@@ -289,6 +321,8 @@ export function AdminBillingOrdersPage() {
         resolvable={resolvable}
         action={action}
         onActionChange={setAction}
+        reason={reason}
+        onReasonChange={setReason}
         resolving={resolving}
         onClose={requestCloseDetail}
         onResolve={() => void runResolve()}

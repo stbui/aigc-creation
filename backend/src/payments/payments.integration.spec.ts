@@ -36,6 +36,7 @@ let baseUrl = '';
 let userToken = '';
 let adminToken = '';
 let productId = '';
+let membershipPlanId = '';
 let run = '';
 
 function api(method: 'get' | 'post' | 'put', path: string, token?: string) {
@@ -101,6 +102,26 @@ async function paidOrder(tag: string) {
   return order;
 }
 
+async function paidMembershipOrder(tag: string, token: string) {
+  const res = await api('post', '/api/v1/orders', token).send({
+    membershipPlanId,
+    idempotencyKey: `it-membership-${tag}-${run}`,
+  });
+  expect(res.status).toBe(201);
+  expect(res.body.code).toBe(0);
+  const order = res.body.data as { id: string; orderNo: string; paidCents: number };
+  const intent = await intend(order.id, token);
+  const paid = await callback(
+    order.orderNo,
+    intent.configId,
+    `IT-MEMBERSHIP-${tag}-${run}`,
+    order.paidCents,
+  );
+  expect(paid.status).toBe(200);
+  expect(paid.body.success).toBe(true);
+  return order;
+}
+
 beforeAll(async () => {
   run = `${Date.now()}`;
   // 用 Prisma CLI 建一份独立 schema；--url 显式覆盖 config 里的库路径
@@ -157,6 +178,21 @@ beforeAll(async () => {
     },
   });
   productId = product.id;
+
+  const membershipPlan = await prisma.membershipPlan.create({
+    data: {
+      code: `IT-MEMBER-${run}`,
+      name: `集成测试会员 ${run}`,
+      description: '',
+      priceCents: 300,
+      durationDays: 30,
+      monthlyCredits: 25,
+      perks: JSON.stringify({ fastChannel: true, maxConcurrent: 2, addonDiscountBps: 9500 }),
+      status: 'active',
+      sortOrder: 9999,
+    },
+  });
+  membershipPlanId = membershipPlan.id;
 
   const admin = await prisma.user.create({
     data: {
@@ -302,6 +338,7 @@ describe('支付 HTTP 集成', () => {
     const order = await createOrder('partial');
     const intent = await intend(order.id);
     await callback(order.orderNo, intent.configId, `IT-PARTIAL-${run}`, order.paidCents);
+    const before = await api('get', '/api/v1/credits/balance', userToken);
 
     const half = Math.floor(order.paidCents / 2);
     const first = await api('post', `/api/v1/admin/orders/${order.id}/refund`, adminToken).send({
@@ -312,6 +349,9 @@ describe('支付 HTTP 集成', () => {
     expect(first.body.data.state).toBe('succeeded');
     expect(first.body.data.fullyRefunded).toBe(false);
     expect(first.body.data.refundedCents).toBe(half);
+    expect(first.body.data.creditsReclaimed).toBe(50);
+    const afterFirst = await api('get', '/api/v1/credits/balance', userToken);
+    expect(before.body.data.balance - afterFirst.body.data.balance).toBe(50);
 
     const mid = await prisma.order.findUnique({ where: { id: order.id } });
     expect(mid?.status).toBe('partial_refunded');
@@ -324,10 +364,451 @@ describe('支付 HTTP 集成', () => {
     expect(second.status).toBe(201);
     expect(second.body.data.fullyRefunded).toBe(true);
     expect(second.body.data.refundedCents).toBe(order.paidCents);
+    expect(second.body.data.creditsReclaimed).toBe(50);
+    const afterSecond = await api('get', '/api/v1/credits/balance', userToken);
+    expect(before.body.data.balance - afterSecond.body.data.balance).toBe(100);
 
     const done = await prisma.order.findUnique({ where: { id: order.id } });
     expect(done?.status).toBe('refunded');
     expect(done?.refundedCents).toBe(order.paidCents);
+  });
+
+  it('发票驳回后可重提，开具后可冲红且保留历史', async () => {
+    const order = await paidOrder('invoice-history');
+    const first = await api('post', '/api/v1/invoices', userToken).send({
+      orderId: order.id,
+      kind: 'personal',
+      title: '集成测试发票抬头',
+      content: '技术服务费',
+    });
+    expect(first.status).toBe(201);
+    expect(first.body.data.status).toBe('pending');
+    expect(first.body.data.amountCents).toBe(order.paidCents);
+
+    const duplicate = await api('post', '/api/v1/invoices', userToken).send({
+      orderId: order.id,
+      kind: 'personal',
+      title: '重复申请',
+    });
+    expect(duplicate.status).toBe(409);
+    expect(duplicate.body.code).toBe(40901);
+
+    const rejected = await api(
+      'post',
+      `/api/v1/admin/invoices/${first.body.data.id}/reject`,
+      adminToken,
+    ).send({ reason: '抬头填写有误，请重新提交' });
+    expect(rejected.status).toBe(201);
+    expect(rejected.body.data.status).toBe('rejected');
+
+    const second = await api('post', '/api/v1/invoices', userToken).send({
+      orderId: order.id,
+      kind: 'personal',
+      title: '集成测试发票抬头（重提）',
+    });
+    expect(second.status).toBe(201);
+    expect(second.body.data.id).not.toBe(first.body.data.id);
+
+    const issued = await api(
+      'post',
+      `/api/v1/admin/invoices/${second.body.data.id}/issue`,
+      adminToken,
+    ).send();
+    expect(issued.status).toBe(201);
+    expect(issued.body.data.status).toBe('issued');
+
+    const fileBefore = await api('get', `/api/v1/invoices/${second.body.data.id}/file`, userToken);
+    expect(fileBefore.status).toBe(200);
+    expect(fileBefore.headers['content-type']).toContain('text/html');
+
+    const flushed = await api(
+      'post',
+      `/api/v1/admin/invoices/${second.body.data.id}/red-flush`,
+      adminToken,
+    ).send({ reason: '集成测试：订单退款后冲红' });
+    expect(flushed.status).toBe(201);
+    expect(flushed.body.data.status).toBe('red_flushed');
+    expect(flushed.body.data.redFlushReason).toBe('集成测试：订单退款后冲红');
+
+    // 冲红仍保留原件供财务追溯，但该订单不再允许申请第三张票。
+    const fileAfter = await api('get', `/api/v1/invoices/${second.body.data.id}/file`, userToken);
+    expect(fileAfter.status).toBe(200);
+    const third = await api('post', '/api/v1/invoices', userToken).send({
+      orderId: order.id,
+      kind: 'personal',
+      title: '冲红后再次申请',
+    });
+    expect(third.status).toBe(409);
+
+    const history = await prisma.invoice.findMany({
+      where: { orderId: order.id },
+      orderBy: { createdAt: 'asc' },
+    });
+    expect(history.map((item: { status: string }) => item.status)).toEqual([
+      'rejected',
+      'red_flushed',
+    ]);
+  });
+
+  it('退款成功后带回待处理发票提示，全额退款后待开票申请不能再开具', async () => {
+    const order = await paidOrder('invoice-refund-pending');
+    const invoice = await api('post', '/api/v1/invoices', userToken).send({
+      orderId: order.id,
+      kind: 'personal',
+      title: '退款联动待开票',
+    });
+    expect(invoice.status).toBe(201);
+
+    const refund = await api('post', `/api/v1/admin/orders/${order.id}/refund`, adminToken).send({
+      amountCents: order.paidCents,
+      reason: '集成测试：退款后处理待开发票',
+    });
+    expect(refund.status).toBe(201);
+    expect(refund.body.data.state).toBe('succeeded');
+    expect(refund.body.data.invoiceFollowUp).toMatchObject({
+      invoiceId: invoice.body.data.id,
+      invoiceNo: invoice.body.data.invoiceNo,
+      status: 'pending',
+    });
+    expect(refund.body.data.invoiceFollowUp.message).toContain('驳回');
+
+    const issue = await api(
+      'post',
+      `/api/v1/admin/invoices/${invoice.body.data.id}/issue`,
+      adminToken,
+    ).send();
+    expect(issue.status).toBe(409);
+    expect(issue.body.code).toBe(40901);
+
+    const alerts = await api('get', '/api/v1/admin/alerts', adminToken);
+    expect(alerts.status).toBe(200);
+    expect(alerts.body.data.items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          key: 'invoice-refund-blocked',
+          count: expect.any(Number),
+        }),
+      ]),
+    );
+  });
+
+  it('已开具发票退款成功后带回冲红提示', async () => {
+    const order = await paidOrder('invoice-refund-issued');
+    const invoice = await api('post', '/api/v1/invoices', userToken).send({
+      orderId: order.id,
+      kind: 'personal',
+      title: '退款联动已开票',
+    });
+    expect(invoice.status).toBe(201);
+    const issued = await api(
+      'post',
+      `/api/v1/admin/invoices/${invoice.body.data.id}/issue`,
+      adminToken,
+    ).send();
+    expect(issued.status).toBe(201);
+    expect(issued.body.data.status).toBe('issued');
+
+    const refund = await api('post', `/api/v1/admin/orders/${order.id}/refund`, adminToken).send({
+      amountCents: order.paidCents,
+      reason: '集成测试：退款后冲红已开发票',
+    });
+    expect(refund.status).toBe(201);
+    expect(refund.body.data.invoiceFollowUp).toMatchObject({
+      invoiceId: invoice.body.data.id,
+      invoiceNo: invoice.body.data.invoiceNo,
+      status: 'issued',
+    });
+    expect(refund.body.data.invoiceFollowUp.message).toContain('冲红');
+  });
+
+  it('退款处理中禁止申请发票，也禁止开具已有待开发票', async () => {
+    const applyOrder = await paidOrder('invoice-refund-processing-apply');
+    const applyPayment = await prisma.payment.findFirst({
+      where: { orderId: applyOrder.id, status: 'succeeded' },
+    });
+    const applyOrderRow = await prisma.order.findUnique({ where: { id: applyOrder.id } });
+    expect(applyPayment).toBeTruthy();
+    expect(applyOrderRow).toBeTruthy();
+    await prisma.refund.create({
+      data: {
+        orderId: applyOrder.id,
+        paymentId: applyPayment.id,
+        userId: applyOrderRow.userId,
+        amountCents: applyOrder.paidCents,
+        status: 'processing',
+        reason: '集成测试：退款处理中',
+        operatorId: 'system:test',
+      },
+    });
+    const apply = await api('post', '/api/v1/invoices', userToken).send({
+      orderId: applyOrder.id,
+      kind: 'personal',
+      title: '退款处理中新申请',
+    });
+    expect(apply.status).toBe(409);
+    expect(apply.body.code).toBe(40901);
+
+    const issueOrder = await paidOrder('invoice-refund-processing-issue');
+    const invoice = await api('post', '/api/v1/invoices', userToken).send({
+      orderId: issueOrder.id,
+      kind: 'personal',
+      title: '退款处理中待开票',
+    });
+    expect(invoice.status).toBe(201);
+    const issuePayment = await prisma.payment.findFirst({
+      where: { orderId: issueOrder.id, status: 'succeeded' },
+    });
+    const issueOrderRow = await prisma.order.findUnique({ where: { id: issueOrder.id } });
+    expect(issuePayment).toBeTruthy();
+    expect(issueOrderRow).toBeTruthy();
+    await prisma.refund.create({
+      data: {
+        orderId: issueOrder.id,
+        paymentId: issuePayment.id,
+        userId: issueOrderRow.userId,
+        amountCents: issueOrder.paidCents,
+        status: 'processing',
+        reason: '集成测试：开具前退款处理中',
+        operatorId: 'system:test',
+      },
+    });
+    const issue = await api(
+      'post',
+      `/api/v1/admin/invoices/${invoice.body.data.id}/issue`,
+      adminToken,
+    ).send();
+    expect(issue.status).toBe(409);
+    expect(issue.body.code).toBe(40901);
+  });
+
+  it('部分退款后票面超过剩余可开票金额时禁止开具，驳回重提后可按新余额开具', async () => {
+    const order = await paidOrder('invoice-partial-refund');
+    const invoice = await api('post', '/api/v1/invoices', userToken).send({
+      orderId: order.id,
+      kind: 'personal',
+      title: '部分退款前申请',
+    });
+    expect(invoice.status).toBe(201);
+    expect(invoice.body.data.amountCents).toBe(order.paidCents);
+
+    const half = Math.floor(order.paidCents / 2);
+    const refund = await api('post', `/api/v1/admin/orders/${order.id}/refund`, adminToken).send({
+      amountCents: half,
+      reason: '集成测试：部分退款后重新开票',
+    });
+    expect(refund.status).toBe(201);
+    expect(refund.body.data.invoiceFollowUp?.status).toBe('pending');
+
+    const blockedIssue = await api(
+      'post',
+      `/api/v1/admin/invoices/${invoice.body.data.id}/issue`,
+      adminToken,
+    ).send();
+    expect(blockedIssue.status).toBe(409);
+    expect(blockedIssue.body.code).toBe(40901);
+    expect(blockedIssue.body.message).toContain('驳回');
+
+    const rejected = await api(
+      'post',
+      `/api/v1/admin/invoices/${invoice.body.data.id}/reject`,
+      adminToken,
+    ).send({ reason: '订单部分退款，请按剩余可开票金额重提' });
+    expect(rejected.status).toBe(201);
+
+    const reapplied = await api('post', '/api/v1/invoices', userToken).send({
+      orderId: order.id,
+      kind: 'personal',
+      title: '部分退款后重新申请',
+    });
+    expect(reapplied.status).toBe(201);
+    expect(reapplied.body.data.amountCents).toBe(order.paidCents - half);
+    const issued = await api(
+      'post',
+      `/api/v1/admin/invoices/${reapplied.body.data.id}/issue`,
+      adminToken,
+    ).send();
+    expect(issued.status).toBe(201);
+    expect(issued.body.data.status).toBe('issued');
+  });
+
+  it('退款后票面仍不超过剩余可开票金额时，不误报必须驳回且可正常开具', async () => {
+    const order = await paidOrder('invoice-refund-within-balance');
+    const invoice = await api('post', '/api/v1/invoices', userToken).send({
+      orderId: order.id,
+      kind: 'personal',
+      title: '退款后仍可开具',
+    });
+    expect(invoice.status).toBe(201);
+
+    // 模拟历史/人工校正后的较小票面：本次退款后余额仍足以覆盖原票面。
+    await prisma.invoice.update({
+      where: { id: invoice.body.data.id },
+      data: { amountCents: 400 },
+    });
+    const refund = await api('post', `/api/v1/admin/orders/${order.id}/refund`, adminToken).send({
+      amountCents: 100,
+      reason: '集成测试：退款后票面仍在余额内',
+    });
+    expect(refund.status).toBe(201);
+    expect(refund.body.data.invoiceFollowUp).toBeNull();
+
+    const issued = await api(
+      'post',
+      `/api/v1/admin/invoices/${invoice.body.data.id}/issue`,
+      adminToken,
+    ).send();
+    expect(issued.status).toBe(201);
+    expect(issued.body.data.status).toBe('issued');
+  });
+
+  it('异步退款人工确认成功：退款单、订单和积分原子落账', async () => {
+    const order = await paidOrder('refund-confirm-success');
+    const orderRow = await prisma.order.findUnique({ where: { id: order.id } });
+    const payment = await prisma.payment.findFirst({
+      where: { orderId: order.id, status: 'succeeded' },
+    });
+    expect(orderRow).toBeTruthy();
+    expect(payment).toBeTruthy();
+
+    const pending = await prisma.refund.create({
+      data: {
+        orderId: order.id,
+        paymentId: payment.id,
+        userId: orderRow.userId,
+        amountCents: order.paidCents,
+        status: 'processing',
+        reason: '渠道异步退款中',
+        operatorId: 'system:test',
+        providerRefundId: 'ASYNC-SUCCESS-1',
+      },
+    });
+    const before = await api('get', '/api/v1/credits/balance', userToken);
+
+    const confirmed = await api(
+      'post',
+      `/api/v1/admin/orders/${order.id}/refunds/${pending.id}/confirm`,
+      adminToken,
+    ).send({
+      outcome: 'succeeded',
+      providerRefundId: 'ASYNC-SUCCESS-1',
+      reason: '已在渠道商户后台确认退款成功',
+    });
+    expect(confirmed.status).toBe(201);
+    expect(confirmed.body.data.state).toBe('succeeded');
+    expect(confirmed.body.data.fullyRefunded).toBe(true);
+    expect(confirmed.body.data.creditsReclaimed).toBe(100);
+
+    const after = await api('get', '/api/v1/credits/balance', userToken);
+    expect(before.body.data.balance - after.body.data.balance).toBe(100);
+    const settledOrder = await prisma.order.findUnique({ where: { id: order.id } });
+    expect(settledOrder?.status).toBe('refunded');
+    expect(settledOrder?.refundedCents).toBe(order.paidCents);
+    const settledRefund = await prisma.refund.findUnique({ where: { id: pending.id } });
+    expect(settledRefund?.status).toBe('succeeded');
+    expect(JSON.parse(settledRefund?.detail ?? '{}')).toMatchObject({
+      confirmedFromChannelConsole: true,
+      confirmationReason: '已在渠道商户后台确认退款成功',
+    });
+  });
+
+  it('异步退款人工确认失败：只关闭退款单，订单与积分不变', async () => {
+    const order = await paidOrder('refund-confirm-failed');
+    const orderRow = await prisma.order.findUnique({ where: { id: order.id } });
+    const payment = await prisma.payment.findFirst({
+      where: { orderId: order.id, status: 'succeeded' },
+    });
+    expect(orderRow).toBeTruthy();
+    expect(payment).toBeTruthy();
+
+    const pending = await prisma.refund.create({
+      data: {
+        orderId: order.id,
+        paymentId: payment.id,
+        userId: orderRow.userId,
+        amountCents: order.paidCents,
+        status: 'processing',
+        reason: '渠道异步退款中',
+        operatorId: 'system:test',
+        providerRefundId: 'ASYNC-FAILED-1',
+      },
+    });
+    const before = await api('get', '/api/v1/credits/balance', userToken);
+
+    const confirmed = await api(
+      'post',
+      `/api/v1/admin/orders/${order.id}/refunds/${pending.id}/confirm`,
+      adminToken,
+    ).send({
+      outcome: 'failed',
+      providerRefundId: 'ASYNC-FAILED-1',
+      reason: '渠道商户后台显示退款失败',
+    });
+    expect(confirmed.status).toBe(201);
+    expect(confirmed.body.data.state).toBe('failed');
+    expect(confirmed.body.data.refundedCents).toBe(0);
+
+    const after = await api('get', '/api/v1/credits/balance', userToken);
+    expect(after.body.data.balance).toBe(before.body.data.balance);
+    const untouchedOrder = await prisma.order.findUnique({ where: { id: order.id } });
+    expect(untouchedOrder?.status).toBe('paid');
+    expect(untouchedOrder?.refundedCents).toBe(0);
+    const failedRefund = await prisma.refund.findUnique({ where: { id: pending.id } });
+    expect(failedRefund?.status).toBe('failed');
+    expect(JSON.parse(failedRefund?.detail ?? '{}')).toMatchObject({
+      confirmationOutcome: 'failed',
+      confirmationReason: '渠道商户后台显示退款失败',
+    });
+  });
+
+  it('人工确认退款失败后重试会新建退款单，不复用已被渠道拒绝的退款号', async () => {
+    const order = await paidOrder('refund-confirm-failed-retry');
+    const orderRow = await prisma.order.findUnique({ where: { id: order.id } });
+    const payment = await prisma.payment.findFirst({
+      where: { orderId: order.id, status: 'succeeded' },
+    });
+    expect(orderRow).toBeTruthy();
+    expect(payment).toBeTruthy();
+
+    const rejected = await prisma.refund.create({
+      data: {
+        orderId: order.id,
+        paymentId: payment.id,
+        userId: orderRow.userId,
+        amountCents: order.paidCents,
+        status: 'processing',
+        reason: '集成测试：渠道处理中',
+        operatorId: 'system:test',
+        providerRefundId: 'ASYNC-REJECTED-RETRY-1',
+      },
+    });
+    const confirmed = await api(
+      'post',
+      `/api/v1/admin/orders/${order.id}/refunds/${rejected.id}/confirm`,
+      adminToken,
+    ).send({
+      outcome: 'failed',
+      reason: '集成测试：渠道明确拒绝本次退款',
+    });
+    expect(confirmed.status).toBe(201);
+    expect(confirmed.body.data.state).toBe('failed');
+
+    const retried = await api('post', `/api/v1/admin/orders/${order.id}/refund`, adminToken).send({
+      amountCents: order.paidCents,
+      reason: '集成测试：修复原因后重新退款',
+    });
+    expect(retried.status).toBe(201);
+    expect(retried.body.data.state).toBe('succeeded');
+    expect(retried.body.data.refundId).not.toBe(rejected.id);
+
+    const rows = await prisma.refund.findMany({
+      where: { orderId: order.id },
+      orderBy: { createdAt: 'asc' },
+    });
+    expect(rows).toHaveLength(2);
+    expect(rows.map((row: { id: string; status: string }) => ({ id: row.id, status: row.status }))).toEqual([
+      { id: rejected.id, status: 'failed' },
+      { id: retried.body.data.refundId, status: 'succeeded' },
+    ]);
   });
 
   it('0 元单直接完成且不可退款', async () => {
@@ -546,4 +1027,90 @@ describe('支付 HTTP 集成', () => {
     const detail = await api('get', `/api/v1/orders/${order.id}`, userToken);
     expect(detail.body.data.status).toBe('refunded');
   });
+  it('续费订单退款只撤销最新周期，不终止上一期已付会员', async () => {
+    const renewToken = await register(`it-renew-${run}@test.local`);
+    const firstOrder = await paidMembershipOrder('renew-first', renewToken);
+    const secondOrder = await paidMembershipOrder('renew-second', renewToken);
+
+    const firstGrant = await prisma.order.findUnique({ where: { id: firstOrder.id } });
+    const secondGrant = await prisma.order.findUnique({ where: { id: secondOrder.id } });
+    expect(firstGrant.membershipPeriodStartAt).toBeTruthy();
+    expect(firstGrant.membershipPeriodEndAt).toBeTruthy();
+    expect(secondGrant.membershipPeriodStartAt).toBeTruthy();
+    expect(secondGrant.membershipPeriodStartAt.getTime()).toBe(
+      firstGrant.membershipPeriodEndAt.getTime(),
+    );
+    expect(secondGrant.membershipPeriodEndAt.getTime()).toBeGreaterThan(
+      firstGrant.membershipPeriodEndAt.getTime(),
+    );
+
+    const renewed = await prisma.membership.findFirst({
+      where: { userId: firstGrant.userId },
+    });
+    expect(renewed.orderId).toBe(secondOrder.id);
+    expect(renewed.expiresAt.getTime()).toBe(secondGrant.membershipPeriodEndAt.getTime());
+
+    const refund = await api(
+      'post',
+      `/api/v1/admin/orders/${secondOrder.id}/refund`,
+      adminToken,
+    ).send({ amountCents: secondOrder.paidCents, reason: '集成测试：续费周期退款' });
+    expect(refund.status).toBe(201);
+    expect(refund.body.data.membershipTerminated).toBe(false);
+
+    const rolledBack = await prisma.membership.findFirst({
+      where: { userId: firstGrant.userId },
+    });
+    expect(rolledBack.status).toBe('active');
+    expect(rolledBack.orderId).toBe(firstOrder.id);
+    expect(rolledBack.expiresAt.getTime()).toBe(firstGrant.membershipPeriodEndAt.getTime());
+
+    const revokedGrant = await prisma.order.findUnique({ where: { id: secondOrder.id } });
+    expect(revokedGrant.membershipPeriodRevokedAt).toBeTruthy();
+    const firstAfter = await prisma.order.findUnique({ where: { id: firstOrder.id } });
+    expect(firstAfter.membershipPeriodRevokedAt).toBeNull();
+
+    const finalRefund = await api(
+      'post',
+      `/api/v1/admin/orders/${firstOrder.id}/refund`,
+      adminToken,
+    ).send({ amountCents: firstOrder.paidCents, reason: '集成测试：撤销最后一期' });
+    expect(finalRefund.status).toBe(201);
+    expect(finalRefund.body.data.membershipTerminated).toBe(true);
+
+    const ended = await prisma.membership.findFirst({
+      where: { userId: firstGrant.userId },
+    });
+    expect(ended.status).toBe('expired');
+    expect(ended.orderId).toBeNull();
+    expect(ended.nextCreditAt).toBeNull();
+  });
+
+  it('取消自动续费后只是退掉最新续费周期，会员仍保留到上一期结束', async () => {
+    const cancelToken = await register(`it-cancel-renew-${run}@test.local`);
+    const firstOrder = await paidMembershipOrder('cancel-first', cancelToken);
+    const secondOrder = await paidMembershipOrder('cancel-second', cancelToken);
+
+    const cancelled = await api('post', '/api/v1/membership/cancel', cancelToken).send();
+    expect(cancelled.status).toBe(201);
+    expect(cancelled.body.data.expiresAt).toBeTruthy();
+
+    const refund = await api(
+      'post',
+      `/api/v1/admin/orders/${secondOrder.id}/refund`,
+      adminToken,
+    ).send({ amountCents: secondOrder.paidCents, reason: '集成测试：取消续费后退款' });
+    expect(refund.status).toBe(201);
+    expect(refund.body.data.membershipTerminated).toBe(false);
+
+    const firstGrant = await prisma.order.findUnique({ where: { id: firstOrder.id } });
+    const membership = await prisma.membership.findFirst({
+      where: { userId: firstGrant.userId },
+    });
+    expect(membership.status).toBe('cancelled');
+    expect(membership.orderId).toBe(firstOrder.id);
+    expect(membership.expiresAt.getTime()).toBe(firstGrant.membershipPeriodEndAt.getTime());
+    expect(membership.nextCreditAt).toBeNull();
+  });
+
 });

@@ -1,0 +1,136 @@
+/**
+ * MobileUploadModal 共享样式 —— 从 `styles/global.css` 迁出。
+ *
+ * 只放本组组件共用的选择器；设计令牌与全局骨架仍留在全局。
+ */
+
+/* ═══════════════════════════════════════════════════════════════════
+   手机上传 (参考站 mobile-upload-modal / mobile-upload-page)
+   ───────────────────────────────────────────────────────────────────
+   数值全部抄自参考站线上样式表 index-glaqVozH.css (2026-10-20 取证)。
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── 桌面端: 二维码弹窗 ──
+   ⚠️ antd 6 的弹窗外壳是 .ant-modal-container (旧 .ant-modal-content 不命中),
+   失效时容器自带 padding 20px 24px + radius 10 → .mum 被挤成 392 宽却按 440 排版,
+   内容横向溢出 48px、圆角与阴影也不对。@2026-10-21 对拍修复 */
+/* ⚠️ 同 `.alp-modal`: 页面级类与容器类在**同一个元素**上, 必须写紧邻合并选择器。
+   原先两条 (子孙形式) 是死规则 (@2026-11-03 实测命中数 0) —— 容器因此拿不到
+   radius 20 与参考站阴影, 退回 `.ui-modal-surface` 的 radius 12 + 通用阴影。
+   另外 `.ant-modal.mum-modal` 也是死的: 兼容壳的 DOM 里**根本没有 `.ant-modal` 节点**,
+   容器是 `.ui-modal-content`。窄屏「右侧白色空带」改由 MobileUploadModal 直接传
+   `width="min(440px, calc(100vw - 40px))"` 解决 (与 AssetLibraryModal 同一写法)。 */
+.mum-modal.ant-modal-container {
+  padding: 0 !important;
+  border-radius: 20px;
+  overflow: visible;
+  box-shadow: 0 24px 80px rgb(28 22 59 / 0.2392);
+}
+
+.mum-modal .ant-modal-body {
+  padding: 0;
+}
+
+.mum-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--mum-surface);
+  color: var(--mum-text-2);
+  cursor: pointer;
+  padding: 0;
+}
+
+.mum-close:hover {
+  background: var(--surface-1);
+}
+
+.mum-title {
+  margin: 10px 0 8px;
+  font-size: 20px;
+  line-height: 28px;
+  font-weight: 700;
+  color: var(--mum-text-1);
+}
+
+.mum-desc {
+  /* 参考站 .mobile-upload-modal > p 无 max-width, 撑满内容宽后居中 */
+  margin: 0 auto 18px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-7);
+}
+
+.mum-qr-box {
+  width: 250px;
+  height: 250px;
+  margin: 0 auto;
+  display: grid;
+  place-items: center;
+  background: var(--mum-surface-brand-2);
+  border: 1px solid var(--mum-border);
+  border-radius: 14px;
+}
+
+.mum-qr-box img {
+  width: 240px;
+  height: 240px;
+  display: block;
+}
+
+.mum-qr-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-7);
+}
+
+.mum-qr-state.is-error {
+  color: var(--mum-text-danger);
+  max-width: 210px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.mum-waiting {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--mum-text-brand);
+}
+
+.mum-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 14px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--surface-brand-2);
+  color: var(--card-bg);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.mum-refresh:hover {
+  background: var(--mum-surface-brand-1);
+}
+
+.mum-expiry {
+  display: block;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--mum-text-3);
+}

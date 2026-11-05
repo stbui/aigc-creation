@@ -1,0 +1,316 @@
+/**
+ * BatchResultList 共享样式 —— 从 `styles/global.css` 迁出。
+ *
+ * 只放本组组件/页面共用的选择器；设计令牌与全局骨架仍留在全局。
+ */
+
+/* ── 详情图「创作结果」批次行 (pages/product-detail/DetailResultList.tsx) ──────
+ * 一次生成 = 一行: 行头「日期 + 提示词」, 行内第一格是上传的原图
+ * (下方标商品名称), 之后每格是一张模块图 (下方标模块名称)。
+ * 图横排且可能多达 11 格 (原图 + 10 个模块), 溢出交给行内横向滚动,
+ * 页面本身不产生横向滚动条。 */
+
+.pd-result-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 4px;
+}
+
+.pd-result-row {
+  flex: none;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card-bg);
+}
+
+.pd-result-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  margin-bottom: 10px;
+}
+
+.pd-result-date {
+  flex: none;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-body);
+}
+
+/* 提示词单行省略: 5000 字描述会把行头撑成半屏, 全文走 title 悬浮 */
+.pd-result-prompt {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+.pd-result-delete {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-desc);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.pd-result-delete:hover:not(:disabled) {
+  color: var(--danger-text);
+  background: var(--danger-soft-bg);
+}
+
+.pd-result-delete:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pd-result-strip {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+/* 列宽可伸缩: 默认 6 个模块 + 原图正好铺满一行; 选到 10 个模块时
+   每格收到 84px 后开始横向滚动, 而不是把图压成看不清的窄条 */
+.pd-result-cell {
+  flex: 1 1 84px;
+  min-width: 84px;
+  max-width: 124px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* 缩略图统一 3:4: 原图与模块图同高, 标签才会落在同一基线上 */
+.pd-result-thumb {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.pd-result-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pd-result-thumb:hover:not(:disabled) {
+  border-color: var(--brand-light);
+}
+
+.pd-result-thumb:disabled {
+  cursor: default;
+}
+
+/* 原图是参照物, 与产出区分: 稍深的描边 */
+.pd-result-cell-source .pd-result-thumb,
+.pd-result-cell-source .pd-result-source-thumb {
+  border-color: var(--border);
+}
+
+/*
+ * 多原图: 全部素材铺在同一格内, 但**不额外拉高整行** ——
+ * 早期做法是把这一格撑到 252px 宽 3 列, 结果后面的模块图被挤出可视区、
+ * 行高也被拉成两行。现在这一格定宽 132px (2 列方图, 每张 64px 可见),
+ * 2 行 = 132px 高, 与模块图 (84×112) 基本齐平, 行内仍然是一行。
+ */
+.pd-result-cell-source.is-multiple {
+  flex: 0 0 132px;
+  min-width: 132px;
+  max-width: 132px;
+}
+
+.pd-result-source-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.pd-result-source-grid.is-single {
+  grid-template-columns: 1fr;
+}
+
+.pd-result-source-grid.is-pair {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pd-result-source-thumb {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border-soft);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+/* 多原图用方图: 同宽下能排下更多张, 且总高度不超过模块图 */
+.pd-result-source-grid:not(.is-single) .pd-result-source-thumb {
+  aspect-ratio: 1;
+}
+
+.pd-result-source-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pd-result-source-thumb:hover {
+  border-color: var(--brand-light);
+}
+
+.pd-result-source-index {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  display: grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--text-strong) 72%, transparent);
+  color: var(--card-bg);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 非图状态 (生成中 / 失败 / 原图缺失) 与图片同框同尺寸, 行内保持对齐 */
+.pd-result-thumb.is-pending,
+.pd-result-thumb.is-failed,
+.pd-result-thumb.is-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-desc);
+  cursor: default;
+}
+
+/* 非图状态没有「悬停变紫」, 否则会被读成可点 */
+.pd-result-thumb.is-pending:hover,
+.pd-result-thumb.is-failed:hover {
+  border-color: var(--border-soft);
+}
+
+.pd-result-thumb.is-pending {
+  border-style: dashed;
+  color: var(--text-muted);
+}
+
+.pd-result-thumb.is-failed {
+  border-color: transparent;
+  background: var(--danger-soft-bg);
+  color: var(--danger-soft-text);
+}
+
+.pd-result-thumb.is-empty {
+  border-style: dashed;
+}
+
+.pd-result-thumb-wrap {
+  position: relative;
+}
+
+/* 下载键叠在缩略图右下: 悬停才出现, 触屏常显 */
+.pd-result-download {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: var(--radius-control);
+  /* 深底取自 --text-strong 的透明度, 不写裸 rgba (与全站色值收拢一致) */
+  background: color-mix(in srgb, var(--text-strong) 72%, transparent);
+  color: var(--card-bg);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.pd-result-thumb-wrap:hover .pd-result-download,
+.pd-result-download:focus-visible {
+  opacity: 1;
+}
+
+.pd-result-label {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (hover: none) {
+  .pd-result-download {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 1024px) {
+  /* 窄屏右栏不再是满高列, 列表回到内容高度 */
+  .pd-result-list {
+    overflow: visible;
+  }
+}
+
+@media (max-width: 640px) {
+  .pd-result-row {
+    padding: 10px 12px 12px;
+  }
+  /* 手机宽度再收一档, 两格半可见即可 */
+  .pd-result-cell {
+    min-width: 96px;
+    max-width: 108px;
+  }
+}
+
+/* 结果列表里的模板标签 */
+.pd-result-template {
+  flex: none;
+  font-size: 12px;
+  color: var(--brand);
+  background: var(--brand-bg);
+  border-radius: var(--radius-tag);
+  padding: 1px 6px;
+}

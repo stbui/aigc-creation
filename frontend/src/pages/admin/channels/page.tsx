@@ -1,5 +1,4 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import { adminChannelsApi } from './api';
 import {
   StaleError,
@@ -9,12 +8,14 @@ import {
   SegmentedGroup,
 } from '~/admin-ui/primitives';
 import {
+  useActionLock,
   useAdmin,
   useAdminDetailParam,
-  useAdminUrlFilterSync,
   useChannelFilters,
   useChannelHealth,
   useChannelList,
+  useChannelSelection,
+  useChannelView,
   useConfirm,
   useDiscardConfirm,
   useToast,
@@ -90,36 +91,28 @@ export function AdminChannelsPage() {
     useChannelFilters(rows);
   const health = useChannelHealth();
 
-  /**
-   * 视图切换：`channels` = 按渠道配置，`models` = 跨渠道排查。
-   *
-   * 写进地址栏：运营排查时经常把「全部模型 + 不健康」视图发给同事，
-   * 视图只存在组件 state 里的��，链接过去就丢了（参考实现把视图与筛选
-   * 都落在 `useSearchParams` 上）。
-   */
-  const [searchParams] = useSearchParams();
-  const [view, setView] = useState<'channels' | 'models'>(
-    searchParams.get('view') === 'models' ? 'models' : 'channels',
-  );
-  useAdminUrlFilterSync({ view });
+  /** 视图以地址栏为准：排障链接可直接分享，前进 / 后退也能正确切换。 */
+  const [view, setView] = useChannelView();
 
   const [editing, setEditing] = useState<AdminChannelView | null>(null);
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState<ChannelDraft>(EMPTY_CHANNEL_DRAFT);
   const [draftBase, setDraftBase] = useState<ChannelDraft>(EMPTY_CHANNEL_DRAFT);
-  const [saving, setSaving] = useState(false);
+  const { busy: saving, run: runSaving } = useActionLock();
   const [deleteTarget, setDeleteTarget] = useState<AdminChannelView | null>(null);
   /** 启停确认：停用会让该渠道的模型整体退出路由目录，要二次确认 */
   const [toggleTarget, setToggleTarget] = useState<AdminChannelView | null>(null);
-  const [exporting, setExporting] = useState(false);
+  const { busy: exporting, run: runExporting } = useActionLock();
   const [importFile, setImportFile] = useState<File | null>(null);
-  const [importing, setImporting] = useState(false);
+  const { busy: importing, run: runImporting } = useActionLock();
   /** 选中渠道走后地址栏 `?id=`：从账单 / 调用记录跳过来要能直达 */
   const [selectedId, setSelectedId] = useAdminDetailParam();
   /** 排序弹窗：`null` 关闭；有渠道 id = 排该渠道下的模型，空串 = 排渠道 */
   const [orderFor, setOrderFor] = useState<string | null>(null);
   /** 从「全部模型」点编辑时要打开的模型 id：切回渠道视图后由模型工作台消费并清空 */
   const [pendingModelId, setPendingModelId] = useState<string | null>(null);
+
+  useChannelSelection({ visible, loading, error, view, selectedId, setSelectedId });
 
   /** 从「全部模型」跳回「按渠道」：清筛选，否则目标渠道可能不在可见列表里 */
   const openChannel = useCallback(
@@ -128,7 +121,7 @@ export function AdminChannelsPage() {
       setSelectedId(channelId);
       setView('channels');
     },
-    [clearFilters, setSelectedId],
+    [clearFilters, setSelectedId, setView],
   );
 
   /**
@@ -220,77 +213,73 @@ export function AdminChannelsPage() {
     if (draft.apiKey.trim()) body.apiKey = draft.apiKey.trim();
     if (draft.secretKey.trim()) body.secretKey = draft.secretKey.trim();
 
-    setSaving(true);
-    try {
-      if (editing) {
-        await adminChannelsApi.update(editing.id, body);
-        toast.success('渠道已保存，目录快照已失效，C 端下次请求即生效');
-      } else {
-        const created = await adminChannelsApi.create(body);
-        toast.success('渠道已创建，请继续在右侧补模型与价格');
-        // 新建后清掉筛选并直接选中：下一步一定是配模型，不能被筛选挡在列表外
-        clearFilters();
-        if (created?.id) setSelectedId(created.id);
+    await runSaving(async () => {
+      try {
+        if (editing) {
+          await adminChannelsApi.update(editing.id, body);
+          toast.success('渠道已保存，目录快照已失效，C 端下次请求即生效');
+        } else {
+          const created = await adminChannelsApi.create(body);
+          toast.success('渠道已创建，请继续在右侧补模型与价格');
+          // 新建后清掉筛选并直接选中：下一步一定是配模型，不能被筛选挡在列表外
+          clearFilters();
+          if (created?.id) setSelectedId(created.id);
+        }
+        resetForm();
+        await reload();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : '保存失败');
       }
-      resetForm();
-      await reload();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '保存失败');
-    } finally {
-      setSaving(false);
-    }
+    });
   };
 
   const duplicate = async (channel: AdminChannelView) => {
-    setSaving(true);
-    try {
-      const copy = await adminChannelsApi.duplicate(channel.id);
-      toast.success(`已复制渠道「${channel.name}」，请确认凭证与模型后启用`);
-      // 复制的目的是接着改副本：清筛选并选中它，省一次点击
-      clearFilters();
-      if (copy?.id) setSelectedId(copy.id);
-      await reload();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '复制失败');
-    } finally {
-      setSaving(false);
-    }
+    await runSaving(async () => {
+      try {
+        const copy = await adminChannelsApi.duplicate(channel.id);
+        toast.success(`已复制渠道「${channel.name}」，请确认凭证与模型后启用`);
+        // 复制的目的是接着改副本：清筛选并选中它，省一次点击
+        clearFilters();
+        if (copy?.id) setSelectedId(copy.id);
+        await reload();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : '复制失败');
+      }
+    });
   };
 
   const runDelete = async () => {
     if (!deleteTarget) return;
-    setSaving(true);
-    try {
-      await adminChannelsApi.remove(deleteTarget.id);
-      toast.success(`已删除渠道「${deleteTarget.name}」，凭证已清空`);
-      if (selectedId === deleteTarget.id) setSelectedId(null);
-      setDeleteTarget(null);
-      await reload();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '删除失败');
-    } finally {
-      setSaving(false);
-    }
+    await runSaving(async () => {
+      try {
+        await adminChannelsApi.remove(deleteTarget.id);
+        toast.success(`已删除渠道「${deleteTarget.name}」，凭证已清空`);
+        if (selectedId === deleteTarget.id) setSelectedId(null);
+        setDeleteTarget(null);
+        await reload();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : '删除失败');
+      }
+    });
   };
 
   /** 导出单渠道或全部：文件不含任何凭证，`ids` 为空时导出全部 */
   const runExport = async (target?: AdminChannelView) => {
-    setExporting(true);
-    try {
-      const payload = target
-        ? await adminChannelsApi.exportAll([target.id])
-        : await adminChannelsApi.exportAll();
-      const stamp = new Date().toISOString().slice(0, 10);
-      downloadJson(
-        target ? `system-channel-${target.name}-${stamp}.json` : `system-channels-${stamp}.json`,
-        payload,
-      );
-      toast.success(`已导出 ${payload.channels?.length ?? 0} 个渠道（不含凭证）`);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '导出失败');
-    } finally {
-      setExporting(false);
-    }
+    await runExporting(async () => {
+      try {
+        const payload = target
+          ? await adminChannelsApi.exportAll([target.id])
+          : await adminChannelsApi.exportAll();
+        const stamp = new Date().toISOString().slice(0, 10);
+        downloadJson(
+          target ? `system-channel-${target.name}-${stamp}.json` : `system-channels-${stamp}.json`,
+          payload,
+        );
+        toast.success(`已导出 ${payload.channels?.length ?? 0} 个渠道（不含凭证）`);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : '导出失败');
+      }
+    });
   };
 
   /**
@@ -300,65 +289,76 @@ export function AdminChannelsPage() {
   const runToggle = async () => {
     if (!toggleTarget) return;
     const next = !toggleTarget.enabled;
-    setSaving(true);
-    try {
-      await adminChannelsApi.update(toggleTarget.id, { enabled: next });
-      toast.success(
-        next ? `已启用渠道「${toggleTarget.name}」` : `已停用渠道「${toggleTarget.name}」`,
-      );
-      setToggleTarget(null);
-      await reload();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '更新渠道状态失败');
-    } finally {
-      setSaving(false);
-    }
+    await runSaving(async () => {
+      try {
+        await adminChannelsApi.update(toggleTarget.id, { enabled: next });
+        toast.success(
+          next ? `已启用渠道「${toggleTarget.name}」` : `已停用渠道「${toggleTarget.name}」`,
+        );
+        setToggleTarget(null);
+        await reload();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : '更新渠道状态失败');
+      }
+    });
   };
 
   const runImport = async () => {
     if (!importFile) return;
-    let payload: SystemChannelExportView;
-    try {
-      payload = JSON.parse(await importFile.text()) as SystemChannelExportView;
-    } catch {
-      toast.error('导入文件不是有效的 JSON');
-      return;
-    }
-    if (!payload || !Array.isArray(payload.channels) || payload.channels.length === 0) {
-      toast.error('文件不是有效的渠道导出格式（缺少 channels 数组）');
-      return;
-    }
-    const names = payload.channels.map((item) => item.name).filter(Boolean);
-    // 导入是按名称合并的覆盖式写入，先让用户看清会动到哪些渠道再执行
-    const preview = `${names.slice(0, 8).join('、')}${names.length > 8 ? ` 等 ${names.length} 个` : ''}`;
-    const confirmed = await confirm({
-      title: `导入 ${names.length} 个渠道？`,
-      description: `${preview}。按渠道名称合并：同名渠道保留现有凭证与启停状态，只更新地址、并发与文件中的模型；新渠道创建为停用状态，填写 API Key 后再启用；文件中没有的模型保持不变。`,
-      confirmText: '开始导入',
-    });
-    if (confirmed === null) return;
-
-    setImporting(true);
-    try {
-      const result = await adminChannelsApi.importAll(payload);
-      const summary = `新建 ${result.createdChannels.length} 个、更新 ${result.updatedChannels.length} 个渠道、保存 ${result.savedModels} 个模型`;
-      if (result.errors?.length) {
-        toast.error(`${summary}；${result.errors.length} 条失败：${result.errors.slice(0, 3).join('；')}`);
-      } else {
-        toast.success(
-          result.createdChannels.length ? `${summary}；新渠道需填写 API Key 后启用` : summary,
-        );
+    await runImporting(async () => {
+      let payload: SystemChannelExportView;
+      try {
+        payload = JSON.parse(await importFile.text()) as SystemChannelExportView;
+      } catch {
+        toast.error('导入文件不是有效的 JSON');
+        return;
       }
-      setImportFile(null);
-      await reload();
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '导入失败');
-    } finally {
-      setImporting(false);
-    }
+      if (!payload || !Array.isArray(payload.channels) || payload.channels.length === 0) {
+        toast.error('文件不是有效的渠道导出格式（缺少 channels 数组）');
+        return;
+      }
+      const names = payload.channels.map((item) => item.name).filter(Boolean);
+      // 导入是按名称合并的覆盖式写入，先让用户看清会动到哪些渠道再执行
+      const preview = `${names.slice(0, 8).join('、')}${names.length > 8 ? ` 等 ${names.length} 个` : ''}`;
+      const confirmed = await confirm({
+        title: `导入 ${names.length} 个渠道？`,
+        description: `${preview}。按渠道名称合并：同名渠道保留现有凭证与启停状态，只更新地址、并发与文件中的模型；新渠道创建为停用状态，填写 API Key 后再启用；文件中没有的模型保持不变。`,
+        confirmText: '开始导入',
+      });
+      if (confirmed === null) return;
+
+      try {
+        const result = await adminChannelsApi.importAll(payload);
+        const summary = `新建 ${result.createdChannels.length} 个、更新 ${result.updatedChannels.length} 个渠道、保存 ${result.savedModels} 个模型`;
+        if (result.errors?.length) {
+          toast.error(`${summary}；${result.errors.length} 条失败：${result.errors.slice(0, 3).join('；')}`);
+        } else {
+          toast.success(
+            result.createdChannels.length ? `${summary}；新渠道需填写 API Key 后启用` : summary,
+          );
+        }
+        setImportFile(null);
+        await reload();
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : '导入失败');
+      }
+    });
   };
 
   const orderChannel = orderFor ? (rows.find((row) => row.id === orderFor) ?? null) : null;
+
+  const healthPanel = (
+    <Panel
+      title="线路健康"
+      note="按渠道模型统计：24h / 7d 成功率与 P95 耗时来自调用记录。样本少时 P95 参考意义有限，请同时看样本数。"
+    >
+      {health.error && health.rows.length === 0 ? (
+        <StaleError error={health.error} onRetry={() => void health.reload()} />
+      ) : (
+        <ChannelModelHealthPanel rows={health.rows} loading={health.loading} />
+      )}
+    </Panel>
+  );
 
   return (
     <>
@@ -377,89 +377,85 @@ export function AdminChannelsPage() {
       </div>
 
       {view === 'models' ? (
-        /* 同页还有「线路健康」表格，视觉定位用容器包一层，测试按容器取行 */
-        <div data-testid="admin-all-models">
-          <Panel
-            title="全部模型"
-            note="跨渠道视图：一次看遍所有线路的稳定性、成本与售价。停用的模型也会列出，便于排查与重新启用。"
-          >
-            <AllChannelModelsPanel
-              writable={can('channel.model_write')}
-              onChanged={() => void reload()}
-              onOpenChannel={openChannel}
-              onEditModel={openChannelModel}
-            />
-          </Panel>
+        <div className="min-w-0">
+          {/* 同页还有「线路健康」表格，视觉定位用容器包一层，测试按容器取行 */}
+          <div data-testid="admin-all-models">
+            <Panel
+              title="全部模型"
+              note="跨渠道视图：一次看遍所有线路的稳定性、成本与售价。停用的模型也会列出，便于排查与重新启用。"
+            >
+              <AllChannelModelsPanel
+                writable={can('channel.model_write')}
+                onChanged={() => void reload()}
+                onOpenChannel={openChannel}
+                onEditModel={openChannelModel}
+              />
+            </Panel>
+          </div>
+          {healthPanel}
         </div>
       ) : (
         <div
-          className="grid grid-cols-[240px_minmax(0,1fr)] items-start gap-3"
+          className="grid grid-cols-[240px_minmax(0,1fr)] items-start gap-4"
           data-testid="admin-channel-workspace"
         >
-          <ChannelListPanel
-            rows={rows}
-            visible={visible}
-            loading={loading}
-            error={error}
-            hasFilters={hasFilters}
-            keyword={keyword}
-            status={status}
-            selectedId={selectedId}
-            healthByChannel={health.byChannel}
-            writable={writable}
-            importing={importing}
-            exporting={exporting}
-            importFile={importFile}
-            onKeywordChange={setKeyword}
-            onStatusChange={setStatus}
-            onClearFilters={clearFilters}
-            onSelect={setSelectedId}
-            onRetry={() => void reload()}
-            onCreate={openCreate}
-            onExportAll={() => void runExport()}
-            onPickImportFile={(file) => setImportFile(file)}
-            onClearImportFile={() => setImportFile(null)}
-            onImport={() => void runImport()}
-            onReorder={() => setOrderFor('')}
-          />
+          {/* 导航在右栏长内容滚动时保持可见；列表自身仍随内容自然撑高，不做嵌套滚动 */}
+          <div className="sticky top-0 z-10 min-w-0">
+            <ChannelListPanel
+              rows={rows}
+              visible={visible}
+              loading={loading}
+              error={error}
+              hasFilters={hasFilters}
+              keyword={keyword}
+              status={status}
+              selectedId={selectedId}
+              healthByChannel={health.byChannel}
+              writable={writable}
+              importing={importing}
+              exporting={exporting}
+              importFile={importFile}
+              onKeywordChange={setKeyword}
+              onStatusChange={setStatus}
+              onClearFilters={clearFilters}
+              onSelect={setSelectedId}
+              onRetry={() => void reload()}
+              onCreate={openCreate}
+              onExportAll={() => void runExport()}
+              onPickImportFile={(file) => setImportFile(file)}
+              onClearImportFile={() => setImportFile(null)}
+              onImport={() => void runImport()}
+              onReorder={() => setOrderFor('')}
+            />
+          </div>
 
-          <ChannelDetailPanel
-            selected={selected}
-            loading={loading}
-            error={error}
-            hasFilters={hasFilters}
-            writable={writable}
-            modelWritable={can('channel.model_write')}
-            canTest={can('channel.test')}
-            saving={saving}
-            exporting={exporting}
-            pendingModelId={pendingModelId}
-            onEdit={openEdit}
-            onDuplicate={(channel) => void duplicate(channel)}
-            onExport={(channel) => void runExport(channel)}
-            onToggle={setToggleTarget}
-            onDelete={(channel) => {
-              setDeleteTarget(channel);
-            }}
-            onCreate={openCreate}
-            onChanged={() => void reload()}
-            onFocusConsumed={() => setPendingModelId(null)}
-          />
+          <div className="min-w-0">
+            <ChannelDetailPanel
+              selected={selected}
+              loading={loading}
+              error={error}
+              hasFilters={hasFilters}
+              writable={writable}
+              modelWritable={can('channel.model_write')}
+              canTest={can('channel.test')}
+              saving={saving}
+              exporting={exporting}
+              pendingModelId={pendingModelId}
+              onEdit={openEdit}
+              onDuplicate={(channel) => void duplicate(channel)}
+              onExport={(channel) => void runExport(channel)}
+              onToggle={setToggleTarget}
+              onDelete={(channel) => {
+                setDeleteTarget(channel);
+              }}
+              onCreate={openCreate}
+              onChanged={() => void reload()}
+              onFocusConsumed={() => setPendingModelId(null)}
+            />
+            {healthPanel}
+          </div>
         </div>
       )}
-
-      <div className="mt-3">
-        <Panel
-          title="线路健康"
-          note="按渠道模型统计：24h / 7d 成功率与 P95 耗时来自调用记录。样本少时 P95 参考意义有限，请同时看样本数。"
-        >
-          {health.error && health.rows.length === 0 ? (
-            <StaleError error={health.error} onRetry={() => void health.reload()} />
-          ) : (
-            <ChannelModelHealthPanel rows={health.rows} loading={health.loading} />
-          )}
-        </Panel>
-      </div>
 
       <ChannelFormDrawer
         open={formOpen}

@@ -1,3 +1,4 @@
+import './product-result.css';
 import { useState, type CSSProperties } from 'react';
 
 import type { ToolAsset, UploadPreviewControls } from './ToolShell';

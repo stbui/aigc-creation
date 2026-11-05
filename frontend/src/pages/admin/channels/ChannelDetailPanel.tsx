@@ -87,7 +87,12 @@ export function ChannelDetailPanel({
           }
           extra={
             <div className="flex items-center gap-1">
-              <ActionButton variant="secondary" size="xs" disabled={!writable} onClick={() => onEdit(selected)}>
+              <ActionButton
+                variant="secondary"
+                size="xs"
+                disabled={!writable || saving}
+                onClick={() => onEdit(selected)}
+              >
                 编辑
               </ActionButton>
               <ActionButton
@@ -131,7 +136,7 @@ export function ChannelDetailPanel({
                 size="xs"
                 className="text-danger-text hover:text-danger-text"
                 icon={Trash2}
-                disabled={!writable}
+                disabled={!writable || saving}
                 onClick={() => onDelete(selected)}
               >
                 删除

@@ -42,6 +42,25 @@ const DETAIL_FIELDS = [
   "type",
 ];
 
+/**
+ * 仅特定动作需要额外落审计的请求字段。
+ *
+ * 不把这些字段加入全局 DETAIL_FIELDS：`reason` / `ids` / `action` 在多数
+ * 后台接口里可能是自由文本或批量操作参数，全局收集会扩大审计面并改变既有
+ * 契约。这里按动作精确放行，既保留追溯依据，也不影响其他接口。
+ */
+const ACTION_DETAIL_FIELDS: Record<string, readonly string[]> = {
+  "invoice.red_flush": ["reason"],
+  "order.refund_confirm": [
+    "outcome",
+    "reason",
+    "refundId",
+    "providerRefundId",
+  ],
+  "billing_order.resolve": ["action", "reason"],
+  "billing_order.batch_resolve": ["ids", "action", "reason"],
+};
+
 /** 绝不写进审计 detail 的字段名片段 (大小写不敏感) */
 const SENSITIVE_PATTERNS = [
   "password",
@@ -82,9 +101,11 @@ const AUDIT_REASON_LABELS: Record<string, string> = {
   "membership-plan.status": "变更会员套餐状态",
   "invoice.issue": "开具发票",
   "invoice.reject": "驳回发票",
+  "invoice.red_flush": "登记发票冲红",
   "order.mark_paid": "标记订单已支付",
   "order.batch": "批量处理订单",
   "order.refund": "订单退款",
+  "order.refund_confirm": "人工核销异步退款",
   "credit.adjust": "人工调整用户积分",
   "credit.batch_adjust": "批量调整用户积分",
   "credit.import": "导入用户积分",
@@ -259,7 +280,9 @@ export class AuditInterceptor implements NestInterceptor {
           action,
           targetType,
           targetId,
-          detail: JSON.stringify(this.buildDetail(request, success, err)),
+          detail: JSON.stringify(
+            this.buildDetail(action, request, success, err),
+          ),
           reason: this.automaticReason(action, request.body),
           ip: request.ip ?? "unknown",
           success,
@@ -309,8 +332,10 @@ export class AuditInterceptor implements NestInterceptor {
 
   /** 只保留白名单字段, 过滤敏感字段 */
   private buildDetail(
+    action: string,
     request: {
       body?: Record<string, unknown>;
+      params?: Record<string, string | undefined>;
       auditExtra?: Record<string, unknown>;
     },
     success: boolean,
@@ -321,12 +346,19 @@ export class AuditInterceptor implements NestInterceptor {
       ok: success,
       ...(request.auditExtra ?? {}),
     };
-    for (const field of DETAIL_FIELDS) {
+    const allowedFields = [
+      ...DETAIL_FIELDS,
+      ...(ACTION_DETAIL_FIELDS[action] ?? []),
+    ];
+    for (const field of allowedFields) {
       // 双保险: 白名单已限定字段, 这里再挡一次敏感词, 防止后续往 DETAIL_FIELDS
       // 追加字段时误把凭据类内容写进审计 (审计本身对所有后台角色可读)
       if (SENSITIVE_PATTERNS.some((p) => field.toLowerCase().includes(p)))
         continue;
       if (field in source) detail[field] = source[field];
+      else if (request.params?.[field] !== undefined) {
+        detail[field] = request.params[field];
+      }
     }
     if (!success && err instanceof Error) {
       detail.error = err.message.slice(0, 200);

@@ -16,18 +16,20 @@ import {
   cn,
   yuan,
 } from './utils';
-import type { AdminOrderDetail, AdminOrderRow } from '../../../types/api';
+import type { AdminOrderDetail, AdminOrderRefund, AdminOrderRow } from '../../../types/api';
 
 /** 详情抽屉里的一条时间线记录：状态点 + 主行 + 灰色补充行 */
 function RecordRow({
   head,
   meta,
   state = 'done',
+  action,
 }: {
   head: ReactNode;
   meta: ReactNode;
   /** 未成功的流水/退款用灰点：既保留时间线，又不假装它已经成立 */
   state?: 'done' | 'pending';
+  action?: ReactNode;
 }) {
   return (
     <li className="flex items-start gap-2.5 px-3 py-2">
@@ -42,6 +44,7 @@ function RecordRow({
         <span className="block text-xs text-foreground">{head}</span>
         <span className="mt-0.5 block text-[12px] leading-4 text-muted-foreground">{meta}</span>
       </span>
+      {action && <span className="shrink-0">{action}</span>}
     </li>
   );
 }
@@ -59,6 +62,7 @@ export function OrderDetailDrawer({
   canRefund,
   onClose,
   onAction,
+  onConfirmRefund,
 }: {
   detailId: string | null;
   rows: AdminOrderRow[];
@@ -66,6 +70,11 @@ export function OrderDetailDrawer({
   canRefund: boolean;
   onClose: () => void;
   onAction: (kind: 'markPaid' | 'refund', row: AdminOrderRow) => void;
+  onConfirmRefund: (
+    orderId: string,
+    refund: AdminOrderRefund,
+    outcome: 'succeeded' | 'failed',
+  ) => void;
 }) {
   const detailFetcher = useCallback(async () => {
     if (!detailId) throw new Error('订单不存在');
@@ -291,7 +300,40 @@ export function OrderDetailDrawer({
                     meta={
                       <>
                         {r.reason} · {new Date(r.createdAt).toLocaleString('zh-CN')}
+                        {r.providerRefundId ? (
+                          <>
+                            {' '}· 渠道退款号 <code className="font-mono">{r.providerRefundId}</code>
+                          </>
+                        ) : null}
+                        {r.status === 'succeeded' ? (
+                          <>
+                            {' '}· 回收积分 {r.creditsReclaimed}
+                            {r.creditsUnreclaimable > 0
+                              ? `，另有 ${r.creditsUnreclaimable} 已消耗无法回收`
+                              : ''}
+                          </>
+                        ) : null}
                       </>
+                    }
+                    action={
+                      r.status === 'processing' && canRefund ? (
+                        <div className="flex items-center gap-1">
+                          <ActionButton
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onConfirmRefund(d.id, r, 'succeeded')}
+                          >
+                            确认渠道已退款
+                          </ActionButton>
+                          <ActionButton
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onConfirmRefund(d.id, r, 'failed')}
+                          >
+                            确认退款失败
+                          </ActionButton>
+                        </div>
+                      ) : undefined
                     }
                   />
                 ))}

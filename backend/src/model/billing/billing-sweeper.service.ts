@@ -12,8 +12,8 @@
  *   2. **任务账单**（`taskId!=''`）：**只有运营显式打开
  *      `generate.billingAutoRefund` 才执行**。口径与后台「待核对」队列一致：
  *      uncertain / running 超 40 分钟 / 任务已失败但仍预留。已出作品或正在
- *      补交付（`pendingResult` / `mediaRecoveryError`）的订单必须排除 ——
- *      自动退款会让平台白付上游费用、用户也失去「重试保存」。
+ *      补交付（`pendingResult`，或 running 任务仍有 `mediaRecoveryError`）的
+ *      订单必须排除 —— 自动退款会让平台白付上游费用、用户也失去「重试保存」。
  *
  * 默认关闭的原因：待核对订单**可能已经在上游产生费用**，退与不退是运营口径，
  * 不是技术默认。开关打开后每轮重新读，关掉立即停。
@@ -23,14 +23,12 @@ import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/commo
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SettingsService } from '../../common/settings.service';
-import { BillingService } from './billing.service';
+import { BillingService, REVIEW_RUNNING_STALE_MS } from './billing.service';
 
 /** 预留超过这么久仍未置运行态 = 派发前就中断了 */
 export const RESERVED_TTL_MS = 30 * 60 * 1000;
 /** 运行态超过这么久没有收尾 = 执行者已死（上游可能已经计费） */
 export const RUNNING_TTL_MS = 60 * 60 * 1000;
-/** 任务账单进入「待核对」的 running 超时（与后台 review 队列同口径） */
-export const TASK_REVIEW_RUNNING_TTL_MS = 40 * 60 * 1000;
 /** 单轮处理上限：一轮扫太多会长时间占住事件循环，剩余留到下一轮 */
 const BATCH_SIZE = 200;
 const SWEEP_INTERVAL_MS = 5 * 60 * 1000;
@@ -87,8 +85,8 @@ export class BillingSweeperService implements OnModuleInit, OnModuleDestroy {
   async sweep(
     now = new Date(),
     options: BillingSweepOptions = {},
-  ): Promise<{ refunded: number; uncertain: number }> {
-    if (this.running) return { refunded: 0, uncertain: 0 };
+  ): Promise<{ refunded: number; uncertain: number; taskRefunded: number }> {
+    if (this.running) return { refunded: 0, uncertain: 0, taskRefunded: 0 };
     this.running = true;
     try {
       const reservedTtlMs = options.reservedTtlMs ?? RESERVED_TTL_MS;
@@ -141,7 +139,7 @@ export class BillingSweeperService implements OnModuleInit, OnModuleDestroy {
           `账单清扫：代理自动退款 ${refunded} 笔，代理转人工 ${uncertain} 笔，任务账单自动退回 ${taskRefunded} 笔`,
         );
       }
-      return { refunded, uncertain };
+      return { refunded, uncertain, taskRefunded };
     } finally {
       this.running = false;
     }
@@ -154,24 +152,39 @@ export class BillingSweeperService implements OnModuleInit, OnModuleDestroy {
    * 白付上游费用，用户也失去「重试保存」。这类订单只能人工处置。
    */
   private async sweepTaskReview(now: Date, batchSize: number): Promise<number> {
-    const staleBefore = new Date(now.getTime() - TASK_REVIEW_RUNNING_TTL_MS);
-    const failedTasks = await this.prisma.generationTask.findMany({
-      where: { status: { in: ['failed', 'cancelled'] } },
-      select: { id: true },
-    });
-    const candidates = await this.prisma.billingOrder.findMany({
-      where: {
-        taskId: { not: '' },
-        OR: [
-          { status: 'uncertain' },
-          { status: 'running', updatedAt: { lt: staleBefore } },
-          { status: 'reserved', taskId: { in: failedTasks.map((task) => task.id) } },
-        ],
-      },
-      select: { id: true, taskId: true },
-      orderBy: { createdAt: 'asc' },
-      take: batchSize,
-    });
+    const staleBefore = new Date(now.getTime() - REVIEW_RUNNING_STALE_MS);
+    // 用 EXISTS 在库里判断任务终态，避免把全部 failed/cancelled 任务 id
+    // 搬进 Node 再拼 `IN (...)`。任务表增长后后者会成为明显的查询放大点。
+    const candidates = await this.prisma.$queryRaw<Array<{ id: string; taskId: string }>>`
+      SELECT b.id, b.taskId
+      FROM "BillingOrder" AS b
+      WHERE b.taskId <> ''
+        AND (
+          b.status = 'uncertain'
+          OR (b.status = 'running' AND b.updatedAt < ${staleBefore})
+          OR (
+            b.status = 'reserved'
+            AND EXISTS (
+              SELECT 1
+              FROM "GenerationTask" AS t
+              WHERE t.id = b.taskId
+                AND t.status IN ('failed', 'cancelled')
+            )
+          )
+        )
+        AND NOT EXISTS (
+          SELECT 1
+          FROM "GenerationTask" AS t
+          WHERE t.id = b.taskId
+            AND (
+              t.outputAssetId IS NOT NULL
+              OR t.pendingResult IS NOT NULL
+              OR (t.mediaRecoveryError IS NOT NULL AND t.status = 'running')
+            )
+        )
+      ORDER BY b.createdAt ASC
+      LIMIT ${batchSize}
+    `;
     if (candidates.length === 0) return 0;
 
     // 已出作品 / 正在补交付的任务不自动退：它们可能稍后交付成功
@@ -184,7 +197,9 @@ export class BillingSweeperService implements OnModuleInit, OnModuleDestroy {
               OR: [
                 { outputAssetId: { not: null } },
                 { pendingResult: { not: null } },
-                { mediaRecoveryError: { not: null } },
+                // 普通失败路径也会写 mediaRecoveryError；只有任务仍在运行、
+                // 结果正在重试落盘时才算“正在补交付”，否则会永久卡住退款队列。
+                { mediaRecoveryError: { not: null }, status: 'running' },
               ],
             },
             select: { id: true },

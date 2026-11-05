@@ -1,0 +1,121 @@
+/**
+ * image-output-settings 共享样式 —— 从 `styles/global.css` 迁出。
+ *
+ * 只放本组组件共用的选择器；设计令牌与全局骨架仍留在全局。
+ */
+
+/* 高级设置折叠壳（参考站共享组件 .image-output-settings-*） */
+.image-output-settings-shell {
+  position: relative;
+  container: image-output-settings / inline-size;
+}
+
+.image-output-settings-summary {
+  color: var(--mif-settings-summary);
+  cursor: pointer;
+  background: var(--mif-surface-panel);
+  border: 0;
+  border-radius: 9px 9px 6px 6px;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 46px;
+  padding: 0 12px;
+  font-size: var(--mif-small-size);
+  display: flex;
+}
+
+/* 参考 .image-output-settings-summary:disabled → cursor:not-allowed (2026-10-18 交互态对拍补充) */
+.image-output-settings-summary:disabled {
+  cursor: not-allowed;
+}
+
+.image-output-settings-summary-label {
+  color: var(--mif-settings-summary-label);
+  white-space: nowrap;
+  margin-right: auto;
+  font-size: var(--mif-sub-size);
+  font-weight: 600;
+}
+
+.image-output-settings-chip {
+  color: var(--mif-settings-chip);
+  white-space: nowrap;
+  background: var(--mif-surface-panel);
+  border: 1px solid var(--mif-settings-chip-border);
+  border-radius: 5px;
+  justify-content: center;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 9px;
+  font-size: var(--mif-small-size);
+  display: inline-flex;
+}
+
+.image-output-settings-summary svg {
+  color: var(--mif-settings-caret);
+  flex: none;
+  transition: transform var(--mif-motion-fast);
+}
+
+.image-output-settings-summary svg.is-open {
+  transform: rotate(180deg);
+}
+
+.image-output-settings-popover {
+  z-index: 12;
+  box-sizing: border-box;
+  transform-origin: 0 100%;
+  background: var(--mif-surface-panel);
+  border-radius: var(--mif-radius-panel);
+  width: 100%;
+  padding: 17px 16px;
+  animation: var(--mif-motion-pop) ease-out both image-output-settings-rise;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  box-shadow: var(--mif-settings-popover-shadow);
+}
+
+.image-output-settings {
+  gap: 19px;
+  margin: 12px 0 0;
+  display: grid;
+}
+
+.image-output-settings-group {
+  gap: 10px;
+  min-width: 0;
+  display: grid;
+}
+
+.image-output-settings-label {
+  color: var(--mif-settings-group-label);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 18px;
+}
+
+@container image-output-settings (width <= 300px) {
+.image-output-settings-popover {
+    transform-origin: 0 100%;
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100vh - 24px);
+    left: 0;
+    overflow-y: auto;
+    transform: none;
+  }
+}
+
+@media (max-width: 560px) {
+.image-output-settings-summary {
+    gap: 5px;
+    padding-inline: 9px;
+  }
+.image-output-settings-chip {
+    min-height: 26px;
+    padding-inline: 6px;
+    font-size: var(--mif-tiny-size);
+  }
+}

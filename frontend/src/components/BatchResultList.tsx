@@ -1,3 +1,5 @@
+import './BatchResultList.css';
+import './result-list.css';
 import { memo, useMemo, useState, type ReactNode } from 'react';
 import { Download, ImagePlus, RefreshCw, Trash2, X } from 'lucide-react';
 

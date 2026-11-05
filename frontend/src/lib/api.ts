@@ -202,7 +202,7 @@ interface RequestOptions {
   body?: BodyInit | Record<string, unknown> | object | null;
 }
 
-async function request<T>(
+export async function request<T>(
   path: string,
   options: RequestOptions = {},
 ): Promise<T> {
@@ -1739,7 +1739,7 @@ export const adminOrdersApi = {
       fullyRefunded: boolean;
       creditsReclaimed: number;
       creditsUnreclaimable: number;
-      message?: string;
+      invoiceFollowUp: { invoiceId: string; invoiceNo: string; status: "pending" | "issued"; message: string } | null; message?: string;
     }>(`/admin/orders/${id}/refund`, {
       method: "POST",
       body: { amountCents, reason },
@@ -2612,17 +2612,17 @@ export const adminBillingOrdersApi = {
 
   get: (id: string) => request<BillingOrderView>(`/admin/billing-orders/${id}`),
 
-  resolve: (id: string, action: "settle" | "refund") =>
+  resolve: (id: string, action: "settle" | "refund", reason: string) =>
     request<BillingOrderView>(`/admin/billing-orders/${id}/resolve`, {
       method: "POST",
-      body: { action },
+      body: { action, reason },
     }),
 
   /** 批量核对：逐条独立处置，返回每条结果 */
-  batchResolve: (ids: string[], action: "settle" | "refund") =>
+  batchResolve: (ids: string[], action: "settle" | "refund", reason: string) =>
     request<BillingBatchResolveResult>(`/admin/billing-orders/batch-resolve`, {
       method: "POST",
-      body: { ids: ids.join(","), action },
+      body: { ids: ids.join(","), action, reason },
     }),
 };
 

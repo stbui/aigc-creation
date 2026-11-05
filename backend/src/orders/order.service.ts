@@ -44,6 +44,46 @@ export interface RefundRules {
   allowConsumedTask: boolean;
 }
 
+interface RefundSettlementResult {
+  refundId: string;
+  state: 'succeeded';
+  pending: false;
+  refundedCents: number;
+  fullyRefunded: boolean;
+  membershipTerminated: boolean;
+  creditsReclaimed: number;
+  creditsUnreclaimable: number;
+  detail: Array<{ lotId: string; taken: number }>;
+  invoiceFollowUp: RefundInvoiceFollowUp | null;
+}
+
+interface RefundInvoiceFollowUp {
+  invoiceId: string;
+  invoiceNo: string;
+  status: 'pending' | 'issued';
+  message: string;
+}
+
+interface RefundConfirmationFailure {
+  refundId: string;
+  orderId: string;
+  state: 'failed';
+  pending: false;
+  refundedCents: number;
+}
+
+/** 退款 detail 是自由 JSON 字符串；追加证据时保留渠道原始内容。 */
+function parseJsonObject(raw: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(raw || '{}');
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
+  } catch {
+    return { previousDetail: raw };
+  }
+}
+
 /** 订单未支付自动关闭时限: 30 分钟 */
 const ORDER_TTL_MINUTES = 30;
 
@@ -1026,8 +1066,10 @@ export class OrderService {
      * 并发/重试保护：
      *   · 「查在途 + 建单」放在同一个事务里。本仓库 SQLite 驱动会把交互事务
      *     串行化，因此两个并发请求不可能同时看到 0 条 processing；
-     *   · 上次失败但结果未知的退款单，同金额重试时**复用原 id/outRefundNo**，
-     *     让渠道按退款单号幂等，而不是换一个新号再退一次。
+     *   · 渠道调用失败、结果未知的退款单，同金额重试时**复用原 id/outRefundNo**，
+     *     让渠道按退款单号幂等，而不是换一个新号再退一次；
+     *   · 运营已在渠道后台确认「退款失败」的单是明确终态，重试必须新建退款单，
+     *     不能拿已被渠道拒绝的退款号再次提交。
      *     （多实例/换库时需要改成行锁或唯一约束。）
      */
     const claim = await this.prisma.$transaction(async (tx) => {
@@ -1061,7 +1103,7 @@ export class OrderService {
         );
       }
 
-      const reusable = await tx.refund.findFirst({
+      const latestFailed = await tx.refund.findFirst({
         where: {
           orderId: order.id,
           paymentId: payment.id,
@@ -1070,6 +1112,11 @@ export class OrderService {
         },
         orderBy: { createdAt: 'desc' },
       });
+      const reusable =
+        latestFailed &&
+        parseJsonObject(latestFailed.detail).confirmationOutcome !== 'failed'
+          ? latestFailed
+          : null;
       const row = reusable
         ? await tx.refund.update({
             where: { id: reusable.id },
@@ -1101,9 +1148,6 @@ export class OrderService {
     });
 
     const refund = claim.refund;
-    // 首次退款才扣积分; 部分退款的二次调用不应重复扣
-    const firstRefund = claim.refundedCents === 0;
-
     let channelResult: RefundResult = {
       state: 'succeeded',
       raw: '手工标记已支付的订单，无渠道资金往来',
@@ -1128,14 +1172,17 @@ export class OrderService {
     }
 
     if (channelResult.state === 'failed') {
-      await this.prisma.refund.update({
-        where: { id: refund.id },
+      const marked = await this.prisma.refund.updateMany({
+        where: { id: refund.id, status: 'processing' },
         data: {
           status: 'failed',
           providerRefundId: channelResult.providerRefundId ?? null,
           detail: JSON.stringify({ error: channelResult.error ?? null, raw: channelResult.raw ?? null }),
         },
       });
+      if (marked.count === 0) {
+        throw new AppError(40909, '退款单状态已变化，请刷新后确认结果', 409);
+      }
       this.logger.error(
         `渠道退款未完成: order=${order.id} refund=${refund.id} channel=${channel} — ${channelResult.error}`,
       );
@@ -1156,14 +1203,17 @@ export class OrderService {
        * 渠道可能最终失败, 而我们无法自动得知 (本仓库没有退款回调端点)。
        * 退款行保持 processing, 由运营到商户后台确认后人工处理。
        */
-      await this.prisma.refund.update({
-        where: { id: refund.id },
+      const marked = await this.prisma.refund.updateMany({
+        where: { id: refund.id, status: 'processing' },
         data: {
           status: 'processing',
           providerRefundId: channelResult.providerRefundId ?? null,
           detail: JSON.stringify({ note: '渠道异步处理中，需到商户后台确认', raw: channelResult.raw ?? null }),
         },
       });
+      if (marked.count === 0) {
+        throw new AppError(40909, '退款单状态已变化，请刷新后确认结果', 409);
+      }
       this.logger.warn(
         `渠道退款异步处理中: order=${order.id} refund=${refund.id} channel=${channel} providerRefundId=${channelResult.providerRefundId ?? '-'}`,
       );
@@ -1171,6 +1221,7 @@ export class OrderService {
         refundId: refund.id,
         state: 'processing' as const,
         pending: true,
+        invoiceFollowUp: null,
         refundedCents: claim.refundedCents,
         fullyRefunded: false,
         membershipTerminated: false,
@@ -1183,91 +1234,297 @@ export class OrderService {
     }
 
     // ── 渠道确认退款成功, 才开始动本地账与积分 ────────────────────
-    let reclaimed = { reclaimed: 0, unreclaimable: 0, detail: [] as Array<{ lotId: string; taken: number }> };
-    if (firstRefund) {
-      reclaimed = await this.credit.reclaimForOrder(params.orderId, params.operatorId, reason);
+    const result = await this.recordRefundSuccess({
+      refundId: refund.id,
+      orderId: params.orderId,
+      providerRefundId: channelResult.providerRefundId,
+      operatorId: params.operatorId,
+      reason,
+      detail: { channelRaw: channelResult.raw ?? null },
+    });
+    this.credit.warnIncompleteReclaim(params.orderId, {
+      reclaimed: result.creditsReclaimed,
+      unreclaimable: result.creditsUnreclaimable,
+      detail: result.detail,
+    });
+    return result;
+  }
+
+  /**
+   * 渠道异步退款的最终人工核销。
+   *
+   * 本仓库尚未接退款回调，`processing` 必须由运营核对渠道商户后台后落到成功
+   * 或失败。成功路径复用与同步退款完全相同的原子记账函数；失败路径只关闭
+   * 退款单并保留证据，不改订单和积分。
+   */
+  async confirmRefund(params: {
+    orderId: string;
+    refundId: string;
+    outcome: 'succeeded' | 'failed';
+    providerRefundId?: string;
+    reason: string;
+    operatorId: string;
+  }): Promise<RefundSettlementResult | RefundConfirmationFailure> {
+    const reason = String(params.reason ?? '').trim();
+    if (!reason) throw new AppError(40001, '请填写人工核销依据', 400);
+    if (params.outcome !== 'succeeded' && params.outcome !== 'failed') {
+      throw new AppError(40001, '请选择退款核销结果', 400);
     }
 
-    const refundedCents = claim.refundedCents + params.amountCents;
-    // 全额判定同样以实付为基准: 否则用券订单永远退不满, 会卡在 partial_refunded
-    const fullyRefunded = refundedCents >= claim.paidBase;
+    if (params.outcome === 'succeeded') {
+      const result = await this.recordRefundSuccess({
+        refundId: params.refundId,
+        orderId: params.orderId,
+        providerRefundId: params.providerRefundId,
+        operatorId: params.operatorId,
+        reason,
+        detail: { confirmedFromChannelConsole: true },
+      });
+      this.credit.warnIncompleteReclaim(params.orderId, {
+        reclaimed: result.creditsReclaimed,
+        unreclaimable: result.creditsUnreclaimable,
+        detail: result.detail,
+      });
+      this.logger.log(
+        `人工确认渠道退款成功: order=${params.orderId} refund=${params.refundId} operator=${params.operatorId}`,
+      );
+      return result;
+    }
 
-    /*
-     * 渠道确认退款后，本地这三步**必须原子提交**：
-     *   1. 退款单置 succeeded（连同积分回收结果）
-     *   2. 累加订单已退金额 refundedCents
-     *   3. 订单状态迁移 paid/partial_refunded → refunded/partial_refunded
-     *
-     * 拆开提交的话，进程在 1 与 2 之间崩溃会留下「钱已从渠道退出、refundedCents
-     * 没涨」—— 而可退额度正是按 refundedCents 计算的，运营照提示重试就会退第二笔。
-     *
-     * 事务内两道幂等闸：
-     *   · 退款单条件更新 (status='processing')：同一退款单不会被记账两次；
-     *   · 订单 refundedCents 乐观锁：并发/重放不会把同一个金额叠加两次。
-     *
-     * 注意顺序：积分回收 (`reclaimForOrder`) 在本事务之前，它自身有独立事务。
-     * 若本事务失败，积分已扣而退款未记账 —— 此时退款单停留在 processing，
-     * 后台会提示「渠道处理中，请到商户后台确认」，由人工核销，不会自动重复退款。
-     */
-    await this.prisma.$transaction(async (tx) => {
-      const won = await tx.refund.updateMany({
-        where: { id: refund.id, status: 'processing' },
+    const result = await this.prisma.$transaction(async (tx) => {
+      const refund = await tx.refund.findUnique({
+        where: { id: params.refundId },
+        include: { order: { select: { id: true, refundedCents: true } } },
+      });
+      if (!refund || refund.orderId !== params.orderId) {
+        throw new AppError(40400, '退款单不存在或不属于该订单', 404);
+      }
+      if (refund.status !== 'processing') {
+        throw new AppError(40909, `退款单当前状态不可人工核销: ${refund.status}`, 409);
+      }
+
+      const confirmedAt = new Date().toISOString();
+      const marked = await tx.refund.updateMany({
+        where: { id: refund.id, orderId: params.orderId, status: 'processing' },
         data: {
-          status: 'succeeded',
-          providerRefundId: channelResult.providerRefundId ?? null,
-          creditsReclaimed: reclaimed.reclaimed,
-          creditsUnreclaimable: reclaimed.unreclaimable,
-          detail: JSON.stringify(reclaimed.detail),
+          status: 'failed',
+          ...(String(params.providerRefundId ?? '').trim()
+            ? { providerRefundId: String(params.providerRefundId).trim() }
+            : {}),
         },
+      });
+      if (marked.count === 0) {
+        throw new AppError(40909, '退款单状态已变化，本次未重复核销', 409);
+      }
+      await tx.refund.update({
+        where: { id: refund.id },
+        data: {
+          detail: JSON.stringify({
+            ...parseJsonObject(refund.detail),
+            confirmationOutcome: 'failed',
+            confirmedBy: params.operatorId,
+            confirmedAt,
+            confirmationReason: reason,
+          }),
+        },
+      });
+      return {
+        refundId: refund.id,
+        orderId: params.orderId,
+        state: 'failed' as const,
+        pending: false as const,
+        refundedCents: refund.order.refundedCents,
+      };
+    });
+    this.logger.warn(
+      `人工确认渠道退款失败: order=${params.orderId} refund=${params.refundId} operator=${params.operatorId}`,
+    );
+    return result;
+  }
+
+  /**
+   * 渠道已确认成功后的唯一记账入口：积分扣回、退款单、订单金额与状态、
+   * 会员权益终止必须处于同一个事务。同步退款和异步人工核销都走这里。
+   */
+  private async recordRefundSuccess(params: {
+    refundId: string;
+    orderId: string;
+    providerRefundId?: string;
+    operatorId: string;
+    reason: string;
+    detail?: Record<string, unknown>;
+  }): Promise<RefundSettlementResult> {
+    return this.prisma.$transaction(async (tx) => {
+      const refund = await tx.refund.findUnique({
+        where: { id: params.refundId },
+        include: {
+          order: {
+            select: {
+              id: true,
+              status: true,
+              paidCents: true,
+              totalCents: true,
+              refundedCents: true,
+              grantedCredits: true,
+              membershipPlanId: true,
+            },
+          },
+        },
+      });
+      if (!refund || refund.orderId !== params.orderId) {
+        throw new AppError(40400, '退款单不存在或不属于该订单', 404);
+      }
+      if (refund.status !== 'processing') {
+        throw new AppError(40909, `退款单当前状态不可核销: ${refund.status}`, 409);
+      }
+
+      const order = refund.order;
+      if (order.status !== 'paid' && order.status !== 'partial_refunded') {
+        throw new AppError(40901, `订单当前状态不可退款: ${order.status}`, 409);
+      }
+      const paidBase = order.paidCents > 0
+        ? order.paidCents
+        : (await tx.payment.count({
+            where: { orderId: order.id, status: 'succeeded', channel: 'free' },
+          })) > 0
+          ? 0
+          : order.totalCents;
+      if (refund.amountCents > paidBase - order.refundedCents) {
+        throw new AppError(40909, '退款金额超出订单当前可退额度，请核对退款单', 409);
+      }
+
+      const providerRefundId =
+        String(params.providerRefundId ?? '').trim() ||
+        refund.providerRefundId ||
+        null;
+      const won = await tx.refund.updateMany({
+        where: { id: refund.id, orderId: order.id, status: 'processing' },
+        data: { status: 'succeeded', providerRefundId },
       });
       if (won.count === 0) {
         throw new AppError(40909, '退款单状态已变化，本次未重复记账', 409);
       }
 
+      const refundedCents = order.refundedCents + refund.amountCents;
+      /*
+       * 部分退款按累计已退金额比例回收积分，而不是只看是否首笔退款。
+       * 用累计目标减去历史已记账份额，既保证多次部分退款总和不超过发放量，
+       * 也兼容旧数据中已提前回收整单历史记录，避免二次扣回。
+       */
+      const previousCredits = await tx.refund.aggregate({
+        where: { orderId: order.id, status: 'succeeded', id: { not: refund.id } },
+        _sum: { creditsReclaimed: true, creditsUnreclaimable: true },
+      });
+      const accountedCredits =
+        (previousCredits._sum.creditsReclaimed ?? 0) +
+        (previousCredits._sum.creditsUnreclaimable ?? 0);
+      const cumulativeCreditTarget = paidBase > 0
+        ? Number(
+            (BigInt(order.grantedCredits) * BigInt(refundedCents)) /
+              BigInt(paidBase),
+          )
+        : 0;
+      const creditsToReclaim = Math.max(0, cumulativeCreditTarget - accountedCredits);
+      const credits = creditsToReclaim > 0
+        ? await this.credit.reclaimForOrderInTransaction(
+            tx,
+            order.id,
+            params.operatorId,
+            params.reason,
+            creditsToReclaim,
+          )
+        : { reclaimed: 0, unreclaimable: 0, detail: [] };
+      const fullyRefunded = refundedCents >= paidBase;
       const bumped = await tx.order.updateMany({
-        where: { id: order.id, refundedCents: claim.refundedCents },
+        where: { id: order.id, refundedCents: order.refundedCents },
         data: { refundedCents },
       });
       if (bumped.count === 0) {
         throw new AppError(40909, '订单已退金额已变化，请刷新后重试', 409);
       }
-
       await this.transition(
         order.id,
         fullyRefunded ? 'refunded' : 'partial_refunded',
         tx,
       );
-    });
 
-    /*
-     * 会员订单全额退款 → 终止该订单发放的会员权益 (B8)。
-     *
-     * 只认 `Membership.orderId === 本单`: 续费复用同一条 Membership 行时,
-     * orderId 指向最新一单, 旧单退款不该把用户正在使用的会员一起停掉。
-     * 部分退款不动权益 —— 钱没退完就停权益等于既收钱又不给服务。
-     */
-    let membershipTerminated = false;
-    if (fullyRefunded && order.membershipPlanId) {
-      const ended = await this.prisma.membership.updateMany({
-        where: { orderId: order.id, status: { in: ['active', 'grace'] } },
-        data: { status: 'cancelled', nextCreditAt: null },
+      const membershipRevocation =
+        fullyRefunded && order.membershipPlanId
+          ? await this.membership.revokeOrderPeriodInTransaction(tx, order.id)
+          : null;
+      const membershipTerminated = membershipRevocation?.terminated ?? false;
+
+      const confirmedAt = new Date().toISOString();
+      await tx.refund.update({
+        where: { id: refund.id },
+        data: {
+          creditsReclaimed: credits.reclaimed,
+          creditsUnreclaimable: credits.unreclaimable,
+          detail: JSON.stringify({
+            ...parseJsonObject(refund.detail),
+            ...(params.detail ?? {}),
+            credits: credits.detail,
+            ...(membershipRevocation ? { membership: membershipRevocation } : {}),
+            confirmedBy: params.operatorId,
+            confirmedAt,
+            confirmationReason: params.reason,
+          }),
+        },
       });
-      membershipTerminated = ended.count > 0;
-      if (membershipTerminated) {
-        this.logger.log(`会员订单全额退款, 已终止会员: order=${order.id}`);
+      const invoice = await tx.invoice.findFirst({
+        where: { orderId: order.id, status: { in: ['pending', 'issued'] } },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true, invoiceNo: true, status: true, amountCents: true },
+      });
+      const invoiceFollowUp = this.invoiceFollowUp(invoice, paidBase - refundedCents);
+      if (membershipRevocation?.affected) {
+        this.logger.log(
+          membershipTerminated
+            ? `会员订单全额退款, 已终止会员: order=${order.id}`
+            : `会员订单全额退款, 已撤销对应周期并保留其他已付周期: order=${order.id} remaining=${membershipRevocation.remainingExpiresAt ?? '-'}`,
+        );
       }
-    }
+      return {
+        refundId: refund.id,
+        state: 'succeeded' as const,
+        pending: false as const,
+        refundedCents,
+        fullyRefunded,
+        membershipTerminated,
+        creditsReclaimed: credits.reclaimed,
+        creditsUnreclaimable: credits.unreclaimable,
+        detail: credits.detail,
+        invoiceFollowUp,
+      };
+    });
+  }
 
+  /** 退款成功后，把仍需人工处理的发票从响应里显式带回，不能只存库等运营发现。 */
+  private invoiceFollowUp(
+    invoice: {
+      id: string;
+      invoiceNo: string;
+      status: string;
+      amountCents: number;
+    } | null,
+    invoiceableCents: number,
+  ): RefundInvoiceFollowUp | null {
+    if (!invoice || (invoice.status !== 'pending' && invoice.status !== 'issued')) {
+      return null;
+    }
+    // 待开发票的金额是申请时快照。只有退款后余额低于票面时才必须驳回；
+    // 若仍足以覆盖原票面，退款本身不需要运营额外处理。
+    if (invoice.status === 'pending' && invoice.amountCents <= invoiceableCents) {
+      return null;
+    }
     return {
-      refundId: refund.id,
-      state: 'succeeded' as const,
-      pending: false,
-      refundedCents,
-      fullyRefunded,
-      membershipTerminated,
-      creditsReclaimed: reclaimed.reclaimed,
-      creditsUnreclaimable: reclaimed.unreclaimable,
-      detail: reclaimed.detail,
+      invoiceId: invoice.id,
+      invoiceNo: invoice.invoiceNo,
+      status: invoice.status,
+      message:
+        invoice.status === 'pending'
+          ? `订单存在待开具发票 ${invoice.invoiceNo}，票面 ${invoice.amountCents} 分超过退款后剩余可开票金额 ${Math.max(invoiceableCents, 0)} 分；请到发票管理驳回该申请。`
+          : `订单存在已开具发票 ${invoice.invoiceNo}；请在线下税务平台完成冲红，并在发票管理登记冲红。`,
     };
   }
 
@@ -1542,6 +1799,10 @@ export class OrderService {
         creditsReclaimed: r.creditsReclaimed,
         creditsUnreclaimable: r.creditsUnreclaimable,
         reason: r.reason,
+        status: r.status,
+        providerRefundId: r.providerRefundId ?? null,
+        detail: r.detail,
+        operatorId: r.operatorId ?? null,
         createdAt: r.createdAt,
       })),
     };

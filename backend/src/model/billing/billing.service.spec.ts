@@ -1,12 +1,64 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { BillingService } from './billing.service';
+import { BillingService, isBillingOrderReviewable } from './billing.service';
+
+describe('isBillingOrderReviewable', () => {
+  const now = Date.parse('2026-01-01T00:00:00.000Z');
+
+  it('任务失败且没有产物时，reserved 账单可核对', () => {
+    expect(
+      isBillingOrderReviewable(
+        { status: 'reserved', updatedAt: new Date(now) },
+        {
+          status: 'failed',
+          outputAssetId: null,
+          pendingResult: null,
+          mediaRecoveryError: '上游请求超时',
+        },
+        now,
+      ),
+    ).toBe(true);
+  });
+
+  it('已有产物时，uncertain 账单也不可核对', () => {
+    expect(
+      isBillingOrderReviewable(
+        { status: 'uncertain', updatedAt: new Date(now) },
+        {
+          status: 'succeeded',
+          outputAssetId: 'asset-1',
+          pendingResult: null,
+          mediaRecoveryError: null,
+        },
+        now,
+      ),
+    ).toBe(false);
+  });
+
+  it('仍在补交付时，超时 running 账单不可核对', () => {
+    expect(
+      isBillingOrderReviewable(
+        { status: 'running', updatedAt: new Date(now - 41 * 60_000) },
+        {
+          status: 'running',
+          outputAssetId: null,
+          pendingResult: '{"result":{}}',
+          mediaRecoveryError: '落盘重试中',
+        },
+        now,
+      ),
+    ).toBe(false);
+  });
+});
 
 describe('BillingService 人工核对', () => {
   let tx: {
     billingOrder: {
       findUnique: ReturnType<typeof vi.fn>;
       updateMany: ReturnType<typeof vi.fn>;
+    };
+    generationTask: {
+      findUnique: ReturnType<typeof vi.fn>;
     };
   };
   let prisma: { $transaction: ReturnType<typeof vi.fn> };
@@ -18,6 +70,9 @@ describe('BillingService 人工核对', () => {
       billingOrder: {
         findUnique: vi.fn(),
         updateMany: vi.fn(),
+      },
+      generationTask: {
+        findUnique: vi.fn().mockResolvedValue({ status: 'failed' }),
       },
     };
     prisma = {
@@ -58,7 +113,11 @@ describe('BillingService 人工核对', () => {
     expect(tx.billingOrder.updateMany).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        data: { resolvedBy: 'admin-1', resolutionNote: 'confirmed' },
+        data: {
+          resolvedBy: 'admin-1',
+          resolutionNote: 'confirmed',
+          reviewBatchId: '',
+        },
       }),
     );
     expect(settled).toBeTruthy();
@@ -102,7 +161,11 @@ describe('BillingService 人工核对', () => {
     expect(tx.billingOrder.updateMany).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({
-        data: { resolvedBy: 'admin-2', resolutionNote: 'verified' },
+        data: {
+          resolvedBy: 'admin-2',
+          resolutionNote: 'verified',
+          reviewBatchId: '',
+        },
       }),
     );
   });

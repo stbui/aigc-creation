@@ -1,3 +1,4 @@
+import './GuestPromoDialog.css';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X } from 'lucide-react';

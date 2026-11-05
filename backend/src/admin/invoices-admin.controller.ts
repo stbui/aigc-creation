@@ -19,6 +19,13 @@ export class RejectInvoiceDto {
   reason!: string;
 }
 
+export class RedFlushInvoiceDto {
+  @IsString()
+  @IsNotEmpty({ message: "请填写冲红原因" })
+  @MaxLength(300)
+  reason!: string;
+}
+
 /**
  * 后台发票审核。
  *
@@ -61,6 +68,17 @@ export class AdminInvoicesController {
     @AdminUser() admin: AdminUserType,
   ) {
     return this.invoices.reject(id, admin.id, dto.reason);
+  }
+
+  @Post(":id/red-flush")
+  @RequirePermission(PERMISSIONS.invoiceWrite)
+  @AuditAction("invoice.red_flush")
+  redFlush(
+    @Param("id") id: string,
+    @Body() dto: RedFlushInvoiceDto,
+    @AdminUser() admin: AdminUserType,
+  ) {
+    return this.invoices.redFlush(id, admin.id, dto.reason);
   }
 
   /**

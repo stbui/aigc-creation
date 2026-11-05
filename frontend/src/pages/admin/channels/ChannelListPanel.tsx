@@ -1,3 +1,4 @@
+import { useEffect, useRef, type KeyboardEvent } from 'react';
 import { Download, ListOrdered, Plus } from 'lucide-react';
 import {
   StaleError,
@@ -72,6 +73,36 @@ export function ChannelListPanel({
   onImport,
   onReorder,
 }: ChannelListPanelProps) {
+  const activeRef = useRef<HTMLButtonElement | null>(null);
+
+  // 深链打开或键盘移动选中项时，只在目标不在视口内才滚动，避免普通点击抢滚动
+  useEffect(() => {
+    const node = activeRef.current;
+    if (!node) return;
+    const rect = node.getBoundingClientRect();
+    if (rect.top < 0 || rect.bottom > window.innerHeight) {
+      node.scrollIntoView({ block: 'nearest' });
+    }
+  }, [selectedId, visible]);
+
+  const handleChannelKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+
+    let nextIndex: number | null = null;
+    if (event.key === 'ArrowDown') nextIndex = Math.min(index + 1, visible.length - 1);
+    else if (event.key === 'ArrowUp') nextIndex = Math.max(index - 1, 0);
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = visible.length - 1;
+    if (nextIndex === null) return;
+
+    event.preventDefault();
+    onSelect(visible[nextIndex].id);
+    const buttons = event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+      '[data-testid="admin-channel-item"]',
+    );
+    buttons?.[nextIndex]?.focus();
+  };
+
   return (
     <Panel
       title="渠道"
@@ -176,7 +207,7 @@ export function ChannelListPanel({
               }
             />
           )}
-          {visible.map((row) => {
+          {visible.map((row, index) => {
             const active = row.id === selectedId;
             const stats = healthByChannel.get(row.id);
             const rate = stats && stats.samples > 0 ? stats.success / stats.samples : null;
@@ -188,6 +219,7 @@ export function ChannelListPanel({
                 data-testid="admin-channel-item"
                 aria-pressed={active}
                 aria-controls="admin-channel-detail"
+                title={`${row.name}\n${row.baseUrl}`}
                 /*
                  * 未选中项保持透明，选中态只给浅底 + 内描边；两者必须区分开，
                  * 否则整列看起来都像选中。
@@ -198,6 +230,8 @@ export function ChannelListPanel({
                   active && 'bg-accent ring-1 ring-inset ring-brand/30 hover:bg-accent',
                 )}
                 onClick={() => onSelect(row.id)}
+                onKeyDown={(event) => handleChannelKeyDown(event, index)}
+                ref={active ? activeRef : undefined}
               >
                 <span className="flex w-full min-w-0 flex-col gap-1">
                   <span className="flex min-w-0 items-center gap-1.5">

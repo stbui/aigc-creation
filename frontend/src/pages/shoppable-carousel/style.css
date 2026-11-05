@@ -1,0 +1,1003 @@
+/**
+ * shoppable-carousel 页面样式 —— 由 `./index.ts` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：这里只放本页专属的选择器；共享骨架
+ * （`.pk-workspace` / `.tool-*` / `.state-*` 等）仍留在全局。
+ */
+
+/* ───────── AI 带货图文工作台 (sc-*) ─────────
+   复刻 designkit.cn/shoppable-carousel, 实测值见 docs/shoppable-carousel-design.md。
+
+   与工具页族 (pk-*) 的差异 (均为对齐参考站实拍, 非本地发挥):
+     · 左栏 416px (参考站实测固定值), 工具页族是 432px;
+     · 右栏是**模板网格**而不是结果栏, 页面不滚动、两个栏各自内部滚动;
+     · 分类 tab 与模板网格是右栏顶部的固定区, 网格自身可滚。
+
+   颜色一律引用 :root 令牌 —— 参考站的品牌蓝 (#3388ff) 不沿用,
+   选中/强调统一走 --brand 一族。 */
+
+/* 工作区: 两栏, 页面本身不滚动 (与参考站 documentElement.scrollHeight === innerHeight 一致) */
+.sc-workspace {
+  margin: -24px -24px -32px;
+  padding: 0;
+  box-sizing: border-box;
+  height: calc(100vh - var(--workspace-topbar-height));
+  min-height: 620px;
+  display: grid;
+  /*
+   * 只有一行: 双栏主体撑满工作区高度。
+   *
+   * 页面头 `.sc-page-head` 当前没有渲染（页面标题由 AppLayout 顶栏承担）,
+   * 若保留 `auto minmax(0,1fr)` 两行, 主体会落在 auto 行按内容撑高,
+   * 空出来的 1fr 行就表现为「最近生成」上方那段空白。
+   * 恢复页面头时再把这里改回 `auto minmax(0, 1fr)`。
+   */
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+  align-items: stretch;
+}
+
+.sc-page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: 54px;
+  padding: 0 24px;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.sc-page-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-strong);
+}
+
+.sc-body {
+  display: grid;
+  grid-template-columns: 416px minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+}
+
+@media (max-width: 900px) {
+  .sc-workspace {
+    margin: 0;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+}
+
+/* ── 左栏 ── */
+.sc-input-pane {
+  width: 416px;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--card-bg);
+  border-right: 1px solid var(--border);
+}
+
+.sc-form-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+.sc-new-task {
+  font-size: 13px;
+  color: var(--text-body);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  padding: 5px 12px;
+  cursor: pointer;
+}
+
+.sc-new-task:hover {
+  color: var(--brand);
+  border-color: var(--border-brand);
+}
+
+/*
+ * 左栏滚动区。
+ *
+ * 参考站实测 (social-media-sidebarScroll): clientH 721 / scrollH 826,
+ * 内边距 18px 16px 24px 24px, 5 个 section 直接排在**一块白底**上,
+ * 彼此无卡片边框与圆角, 区块间距 24px。
+ */
+.sc-form-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: grid;
+  gap: 24px;
+  align-content: start;
+  padding: 18px 16px 24px 24px;
+}
+
+/* 5 个区块: 无卡片边框, 直接落在左栏白底上 */
+.sc-sections {
+  display: grid;
+  gap: 24px;
+  align-content: start;
+  min-width: 0;
+}
+
+/* 区块标题 (参考站 15px / #0f172a / margin-bottom 12px) */
+.sc-sections .pk-section-title,
+.sc-sections .sc-section-title {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-strong);
+  margin-bottom: 12px;
+}
+
+/* 区块内的表单网格间距 (参考站 basicsGrid gap 12px 10px) */
+.sc-sections .pk-form-grid {
+  gap: 12px 10px;
+}
+
+.sc-sections .pk-section {
+  gap: 12px;
+}
+
+/*
+ * 固定底栏 (参考站 social-media-sidebarFooter, 实测 415×125 @ 底部)。
+ *
+ * 与滚动区是**两块独立白底**: 底栏有自己的上边界, 滚动内容在它上方被裁断。
+ */
+.sc-form-footer {
+  flex: none;
+  background: var(--card-bg);
+  border-top: 1px solid var(--border);
+  padding: 12px 24px 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.sc-form-footer .pk-submit-actions {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  gap: 10px;
+}
+
+/* 开关行 (「图片不加文字」/「社媒帖子发布文案」) */
+.sc-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 36px;
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--surface-soft);
+  border-radius: var(--radius-control);
+}
+
+.sc-toggle-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sc-toggle-copy strong {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-strong);
+}
+
+.sc-toggle-copy small {
+  font-size: 12px;
+  color: var(--text-desc);
+  line-height: 18px;
+}
+
+.sc-toggle-label {
+  font-size: 14px;
+  color: var(--text-body);
+}
+
+/* 生成模式两选一卡片 */
+.sc-mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.sc-mode-option {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: flex-start;
+  text-align: left;
+  padding: 12px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.sc-mode-option:hover {
+  border-color: var(--border-hover);
+}
+
+.sc-mode-option.is-active {
+  background: var(--brand-bg);
+  border-color: var(--brand);
+}
+
+.sc-mode-option strong {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.sc-mode-option small {
+  font-size: 12px;
+  color: var(--text-desc);
+  line-height: 18px;
+}
+
+/* 张数步进行 */
+.sc-count-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* ── 右栏 ── */
+.sc-showcase {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  background: var(--page-bg);
+}
+
+.sc-showcase-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 分类 tab */
+.sc-categories {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 20px;
+  padding: 10px 24px 0;
+}
+
+.sc-category {
+  padding: 6px 0 10px;
+  font-size: 14px;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.sc-category:hover {
+  color: var(--text-body);
+}
+
+.sc-category.is-active {
+  color: var(--brand);
+  border-bottom-color: var(--brand);
+  font-weight: 600;
+}
+
+/* 模板网格滚动区 */
+.sc-template-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 18px 24px 24px;
+}
+
+.sc-template-grid {
+  display: grid;
+  /*
+   * 最小列宽 250 而不是 300。
+   *
+   * 参考站右栏宽 1024（1440 视口）→ 3 列；本站右栏 848（C 端能力轨占 176px）,
+   * 用 300 会掉到 2 列, 与参考站的版面密度明显不同。降到 250 后:
+   *   1440: (800+16)/(250+16) ≈ 3.07 → 3 列（与参考站一致）
+   *   1920: (1280+16)/(250+16) ≈ 4.87 → 4 列（与参考站一致）
+   * 卡片因此略窄于参考站（250 vs 307）, 但版面结构与浏览节奏一致。
+   */
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 16px;
+}
+
+.sc-template-grid-empty {
+  padding: 40px 0;
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-desc);
+}
+
+/* 模板卡: 三张预览并排 + 标题 + 三拍副标题 */
+.sc-template-card {
+  display: flex;
+  flex-direction: column;
+  padding: 7px 7px 9px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  transition: border-color 0.15s ease;
+}
+
+.sc-template-card:hover {
+  border-color: var(--border-hover);
+}
+
+.sc-template-card.is-selected {
+  border-color: var(--brand);
+  box-shadow: inset 0 0 0 1px var(--brand);
+}
+
+.sc-template-gallery {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  overflow: hidden;
+  background: var(--surface-soft);
+  border-radius: var(--radius-control);
+}
+
+/*
+ * 缩略图槽按 3:4 自适应高度。
+ *
+ * 参考站实测槽位比例恒为 ~1.35 (1440: 94×127 / 1920: 108×146) ——
+ * 高度跟着列宽走, 不是写死的像素值。本站此前固定 127px, 在 1920 的
+ * 4 列下卡片比参考站矮 17px。改用 aspect-ratio 后两个视口都对得上。
+ */
+.sc-template-slot {
+  overflow: hidden;
+  aspect-ratio: 3 / 4;
+}
+
+.sc-template-slot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* 预览入口：与参考站同位置（缩略图左上角、hover/focus 显），点开三张一组 */
+.sc-template-preview {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--text-strong);
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.sc-template-card:hover .sc-template-preview,
+.sc-template-preview:focus-visible {
+  opacity: 1;
+}
+
+/* 一组图总览弹窗: 三张并排, 点击单张进大图灯箱 */
+.sc-template-group {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.sc-template-group-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  cursor: zoom-in;
+}
+
+.sc-template-group-item img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  background: var(--surface-soft);
+  border-radius: var(--radius-card);
+}
+
+.sc-template-group-item:hover img {
+  box-shadow: 0 0 0 2px var(--brand);
+}
+
+.sc-template-group-item span {
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-body);
+  text-align: center;
+}
+
+.sc-template-content {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 1px 0;
+}
+
+.sc-template-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sc-template-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sc-template-desc {
+  font-size: 12px;
+  color: var(--text-desc);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sc-template-use {
+  flex: none;
+  padding: 5px 12px;
+  font-size: 13px;
+  color: var(--card-bg);
+  background: var(--brand);
+  border: none;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.sc-template-use:hover {
+  background: var(--brand-hover);
+}
+
+.sc-template-card.is-selected .sc-template-use {
+  background: var(--brand-hover);
+}
+
+/* 带货图文: 卖点文本域高度对齐参考站实测 (116px; .pk-desc-editor 默认 80px) */
+.sc-copy-editor textarea {
+  height: 116px;
+  font-size: 13px;
+  line-height: 22px;
+  color: var(--text-body);
+  background: var(--surface-soft);
+  border-color: transparent;
+  border-radius: var(--radius-card);
+  padding: 6px 12px;
+}
+
+.sc-copy-editor textarea:focus {
+  border-color: var(--brand);
+}
+
+/* 带货图文: 张数步进器标签 */
+.sc-count-label {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-body);
+}
+
+.sc-count-label small {
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+/*
+ * 带货图文: 张数步进器与提交区同属一块白底卡 (参考站实测: 左栏底部是
+ * 一整块白底区域, 步进器在主按钮正上方)。此前的实现把步进器单独放在
+ * 滚动区与提交卡之间, 两块白底相接处没有边界, 视觉上像错位。
+ */
+
+/*
+ * 带货图文: 左栏区块间距比工具页族略紧。
+ *
+ * 参考站实测左栏内容区 clientH 721 / scrollH 826 —— **同样需要滚动**才能看完
+ * 卖点区末尾, 不是一屏全放下。故本站保留滚动行为 (与参考站一致),
+ * 只把区块间距收到与参考站相近的观感, 不做过度压缩。
+ */
+
+/*
+ * 带货图文: 左栏滚动区底部渐隐。
+ *
+ * 参考站的左栏内容同样超出视口 (实测 clientH 721 / scrollH 826), 溢出内容
+ * 直接被固定底栏切断。加一层指向底部的渐隐, 让"下面还有内容"可读,
+ * 同时不在视觉上把半截区块当成完整的。
+ */
+.sc-form-scroll {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent 100%);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent 100%);
+}
+
+/*
+ * 带货图文: 已选模板回显（参考站实拍 social-media-selectedRecipe）。
+ *
+ * 实测: 364×82, 底 #f5f7f9, 圆角 12, 内边距 12; 结构 =
+ * 缩略图 + [模板名 / 三拍文案] + 「换一个」(12px 文字按钮)。
+ * 未选时同一容器只放两行文字（「暂未选择模板」/「请从右侧选择合适的模板」）。
+ * 颜色换成本站令牌: 底 --surface-soft, 「换一个」用 --brand。
+ */
+.sc-template-echo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: var(--surface-soft);
+  border-radius: var(--radius-card);
+}
+
+.sc-echo-thumb {
+  flex: none;
+  width: 44px;
+  height: 58px;
+  overflow: hidden;
+  border-radius: var(--radius-tag);
+  background: var(--surface-2);
+}
+
+.sc-echo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.sc-echo-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.sc-echo-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sc-echo-desc {
+  font-size: 12px;
+  color: var(--text-desc);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sc-echo-change {
+  flex: none;
+  font-size: 12px;
+  color: var(--brand);
+  background: transparent;
+  border: none;
+  padding: 4px 0;
+  cursor: pointer;
+}
+
+.sc-echo-change:hover {
+  color: var(--brand-hover);
+  text-decoration: underline;
+}
+
+/*
+ * 带货图文: 右栏底部「最近生成」历史条。
+ *
+ * 参考站的页面结构是「左侧配置栏 + 右侧模板展示 + 底部历史记录」——
+ * 模板展示**常驻**，历史在底部，两者不互斥。这里用固定高度（132px）
+ * 的常驻条承载最近批次，完整列表放「全部记录」抽屉。
+ */
+.sc-history {
+  flex: none;
+  border-top: 1px solid var(--border);
+  background: var(--card-bg);
+  padding: 10px 24px 12px;
+}
+
+.sc-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.sc-history-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sc-history-count {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-desc);
+}
+
+.sc-history-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sc-history-link,
+.sc-history-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--text-body);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.sc-history-link {
+  color: var(--brand);
+}
+
+.sc-history-link:hover,
+.sc-history-refresh:hover {
+  color: var(--brand-hover);
+}
+
+.sc-history-link:disabled,
+.sc-history-refresh:disabled {
+  color: var(--text-desc);
+  cursor: not-allowed;
+}
+
+.sc-history-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 62px;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+.sc-history-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.sc-history-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: none;
+  width: 90px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.sc-history-thumb {
+  position: relative;
+  display: block;
+  width: 90px;
+  height: 64px;
+  overflow: hidden;
+  border-radius: var(--radius-control);
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+}
+
+.sc-history-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.sc-history-card:hover .sc-history-thumb {
+  border-color: var(--brand);
+}
+
+.sc-history-thumb-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+.sc-history-badge {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  padding: 0 4px;
+  font-size: 12px;
+  line-height: 16px;
+  color: #fff;
+  background: rgba(23, 26, 43, 0.72);
+  border-radius: var(--radius-tag);
+}
+
+.sc-history-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.sc-history-meta small {
+  font-size: 12px;
+  color: var(--text-desc);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sc-history-template {
+  color: var(--text-muted);
+}
+
+/*
+ * 带货图文: 左栏逐项对齐参考站实测 (docs/shoppable-carousel-design.md §3 / §12)。
+ *
+ * 1. 上传区: 参考站拖拽框 364×104 (2px dashed 虚线, 圆角 12), 站点工具页族的
+ *    .pk-dropzone 是 min-height 160 —— 差 56px, 把整栏往下推。
+ * 2. 底栏: 参考站 sidebarFooter 白底 + 上边框 1px #f1f5f9 + 内边距 16px 24px 20px,
+ *    步进按钮 24×24 圆角 6。
+ */
+.sc-sections .pk-dropzone {
+  min-height: 104px;
+  border-width: 2px;
+  border-style: dashed;
+  border-color: var(--border-2);
+  border-radius: var(--radius-card);
+  background: var(--card-bg);
+  padding: 12px;
+}
+
+.sc-sections .pk-upload-prompt small {
+  font-size: 14px;
+  color: var(--text-desc);
+}
+
+.sc-form-footer {
+  border-top-color: var(--border-row);
+  padding: 16px 24px 20px;
+}
+
+.sc-form-footer .pk-number-control button {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--surface-soft);
+  font-size: 18px;
+}
+
+/*
+ * 带货图文: 左栏控件尺寸逐项对齐参考站实测（2026-11-03 第三轮对拍）。
+ *
+ * 参考站实测: 上传拖拽框 364×104、下拉 177×40、底栏 415×125、主按钮 367×46。
+ * 本站工具页族的通用值（拖拽框 160、input 32、按钮 40）偏小/偏大,
+ * 按本页作用域覆盖, 不改其它工具页。
+ */
+/* 上传区: 104 高, 内容居中, 提示 14px */
+.sc-sections .pk-dropzone {
+  min-height: 104px;
+  padding: 8px;
+}
+
+.sc-sections .pk-upload-prompt {
+  min-height: 0;
+  gap: 6px;
+}
+
+.sc-sections .pk-upload-prompt span {
+  font-size: 14px;
+}
+
+/* 生成设置的四组下拉: 高 40 (参考站实测), 底 rgba(0,30,89,.04), 圆角 8 */
+.sc-sections .pk-field [class*='select'] button,
+.sc-sections .pk-field button[role='combobox'] {
+  height: 40px;
+  border-radius: var(--radius-control);
+  background: var(--surface-soft);
+  border-color: transparent;
+  padding: 0 12px;
+}
+
+/* 底栏: 参考站 415×125, 内边距 16 24 20, 上边框 1px #f1f5f9 */
+.sc-form-footer {
+  min-height: 125px;
+  padding: 16px 24px 20px;
+  border-top: 1px solid var(--border-row);
+}
+
+/* 主按钮: 参考站 367×46, 近黑底白字, 圆角 8 */
+.sc-form-footer .pk-primary-btn {
+  height: 46px;
+  border-radius: var(--radius-control);
+  background: var(--text-strong);
+  background-image: none;
+  color: var(--card-bg);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.sc-form-footer .pk-primary-btn:hover:not(:disabled) {
+  background: #000;
+  background-image: none;
+}
+
+.sc-form-footer .pk-primary-btn:disabled {
+  background: var(--surface-2);
+  background-image: none;
+  color: var(--text-desc);
+}
+
+/* 带货图文: 底栏第一行 = 张数步进器 + 高级设置入口（同一行, 对齐参考站 125 高） */
+.sc-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+}
+
+.sc-footer-row .pk-settings-shell {
+  flex: none;
+}
+
+.sc-footer-row .pk-settings-summary {
+  width: auto;
+  height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
+  background: var(--surface-soft);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+
+.sc-footer-row .pk-settings-chip {
+  font-size: 12px;
+}
+
+/*
+ * 模板卡「选用」按钮: 对齐参考站 hover 交互。
+ *
+ * 参考站实测: 默认 opacity 0, hover 显示; 近黑底 (#1c1d1f) 白字, 13px, 圆角 8。
+ * 本站保留 focus-visible 可见, 键盘用户不会因为 hover 才出现而无法操作。
+ */
+.sc-template-use {
+  opacity: 0;
+  background: var(--text-strong);
+  transition: opacity 0.15s ease;
+}
+
+.sc-template-card:hover .sc-template-use,
+.sc-template-use:focus-visible,
+.sc-template-card.is-selected .sc-template-use {
+  opacity: 1;
+}
+
+.sc-template-card.is-selected .sc-template-use {
+  background: var(--brand);
+}
+
+/* 附加功能行: 参考站是普通行, 无灰底/内边距 (实测区块高 70) */
+.sc-toggle-row-plain {
+  margin-top: 0;
+  padding: 0;
+  min-height: 36px;
+  background: transparent;
+  border-radius: 0;
+}
+
+/* 底栏第一行必须单行放下: 张数 + 提示 + 步进器 + 高级设置 (参考站同款单行) */
+.sc-footer-row .sc-count-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.sc-footer-row .sc-count-label {
+  white-space: nowrap;
+  min-width: 0;
+  flex: none;
+}
+
+.sc-footer-row .sc-count-label small {
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+.sc-footer-row .pk-number-control {
+  flex: none;
+}
+
+/* 提示文案可压缩, 保证步进器与高级设置不被挤出底栏 */
+.sc-footer-row .sc-count-label {
+  overflow: hidden;
+  flex: 0 1 auto;
+}
+
+.sc-footer-row .sc-count-label small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sc-footer-row .pk-settings-summary {
+  white-space: nowrap;
+}
+
+/* 底栏行必须被父级宽度约束住 (grid item 默认 min-width:auto 会被内容顶开) */
+.sc-form-footer {
+  min-width: 0;
+}
+
+.sc-footer-row {
+  width: 100%;
+  min-width: 0;
+}
+
+.sc-footer-row > * {
+  min-width: 0;
+}
+
+/*
+ * 底栏的高级设置触发收成「高级设置」+ 箭头。
+ *
+ * 参考站底栏同一行是「张数 + 热门图文多为 6 张 + 步进器」, 没有高级设置;
+ * 本站多一个入口, 再把「比例 / 画质」chip 放进来就会把提示挤成「热...」。
+ * 当前画质在浮层里可见, 触发按钮不必重复展示。
+ */
+.sc-footer-row .pk-settings-chip {
+  display: none;
+}

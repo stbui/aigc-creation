@@ -1,0 +1,552 @@
+/**
+ * StatsPage 页面样式 —— 由 `./StatsPage.tsx` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：只放本页独占选择器；共享组件
+ * （AppLayout / 登录弹窗 / SideRail 等）与设计令牌仍留在全局。
+ */
+
+/* ── 数据中心（C 端） ───────────────────────────────────────────────────
+   只展示作品积累、创作次数、近期趋势、最近作品和常用能力。
+   成功率、失败数、模型模式等运营指标留给后台，不进入用户侧页面。
+   宽度/页头由 .personal-page 骨架提供，区块间距使用骨架的 16px gap。 */
+
+.stats-page-summary {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.stats-updated-at {
+  color: var(--text-desc);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--brand);
+  font-size: 12px;
+}
+
+.stats-live i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: stats-live-pulse 1.8s ease-out infinite;
+}
+
+@keyframes stats-live-pulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 42%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 5px transparent; }
+}
+
+.stats-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.stats-refresh-error {
+  max-width: 190px;
+  overflow: hidden;
+  color: var(--danger-text);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.stats-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.stats-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--card-bg);
+}
+
+.stats-kpi-label {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.stats-kpi-value {
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-kpi-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-desc);
+}
+
+.stats-kpi-sub b {
+  font-weight: 600;
+  color: var(--text-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-kpi-sub b.is-bad {
+  color: var(--danger-text);
+}
+
+.stats-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 16px 18px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--card-bg);
+}
+
+.stats-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+}
+
+.stats-panel-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.stats-panel-meta {
+  font-size: 12px;
+  color: var(--text-desc);
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-empty-panel {
+  flex-direction: row;
+  align-items: center;
+  gap: 18px;
+  min-height: 132px;
+  padding: 24px 26px;
+  background:
+    radial-gradient(circle at 0 0, var(--brand-bg) 0, transparent 42%),
+    var(--card-bg);
+}
+
+.stats-empty-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  color: var(--brand);
+  background: var(--brand-bg);
+}
+
+.stats-empty-copy {
+  flex: 1;
+  min-width: 0;
+}
+
+.stats-empty-copy h3 {
+  margin: 0 0 4px;
+  color: var(--text-strong);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.stats-empty-copy p {
+  margin: 0;
+  color: var(--text-desc);
+  font-size: 13px;
+  line-height: 20px;
+}
+
+/* 趋势图与最近任务双栏: 两栏等高, 图随右栏行数自然长高 */
+.stats-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.stats-trend {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex: 1;
+  min-height: 200px;
+  padding-top: 12px;
+}
+
+.stats-trend-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+}
+
+.stats-trend-count {
+  min-height: 16px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-trend-track {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  flex: 1;
+  width: 100%;
+  border-bottom: 1px solid var(--border-row);
+}
+
+.stats-trend-bar {
+  width: 60%;
+  max-width: 44px;
+  min-height: 2px;
+  border-radius: var(--radius-tag) var(--radius-tag) 0 0;
+  background: color-mix(in srgb, var(--brand) 38%, var(--card-bg));
+  transition: background 0.15s ease;
+}
+
+.stats-trend-col.is-today .stats-trend-bar {
+  background: var(--brand);
+}
+
+.stats-trend-col:hover .stats-trend-bar {
+  background: var(--brand);
+}
+
+.stats-trend-bar.is-zero {
+  background: var(--border-hover);
+  border-radius: 1px;
+}
+
+.stats-trend-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.stats-trend-day em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--text-desc);
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-trend-col.is-today .stats-trend-day {
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.stats-recent {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stats-recent > li {
+  border-bottom: 1px solid var(--border-row);
+}
+
+.stats-recent > li:last-child {
+  border-bottom: 0;
+}
+
+.stats-recent-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 6px;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.stats-recent-row:hover {
+  background: var(--surface-soft);
+}
+
+.stats-recent-row:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: -2px;
+}
+
+.stats-recent-thumb {
+  display: block;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-control);
+  object-fit: cover;
+  background: var(--surface);
+}
+
+.stats-recent-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.stats-recent-name {
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--text-strong);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.stats-recent-time {
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--text-desc);
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-task-status {
+  flex: none;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.stats-task-status.is-ok {
+  background: var(--success-soft-bg);
+  color: var(--success-text);
+}
+
+.stats-task-status.is-bad {
+  background: var(--danger-soft-bg);
+  color: var(--danger-text);
+}
+
+.stats-task-status.is-run {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.stats-task-status.is-muted {
+  background: var(--surface);
+  color: var(--text-muted);
+}
+
+.stats-recent-arrow {
+  flex: none;
+  color: var(--text-desc);
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.stats-recent-row:hover .stats-recent-arrow {
+  color: var(--brand);
+  transform: translateX(2px);
+}
+
+.stats-caps-head,
+.stats-cap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px minmax(180px, 260px);
+  align-items: center;
+  gap: 16px;
+}
+
+.stats-caps-head {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border-row);
+  font-size: 12px;
+  color: var(--text-desc);
+}
+
+/* 数字列标题对齐对应的数值和占比条 */
+.stats-caps-head > span:nth-child(n + 2) {
+  text-align: right;
+}
+
+.stats-caps-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stats-cap {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border-row);
+}
+
+.stats-cap:last-child {
+  border-bottom: 0;
+}
+
+.stats-cap-name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-strong);
+}
+
+.stats-cap-thumb {
+  display: block;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-control);
+  object-fit: cover;
+  background: var(--surface);
+}
+
+.stats-cap-text {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.stats-cap-count {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-cap-count b {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-body);
+}
+
+.stats-cap-count em {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--text-desc);
+  white-space: nowrap;
+}
+
+.stats-cap-share {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.stats-cap-share.is-empty {
+  opacity: 0.55;
+}
+
+.stats-cap-share.is-empty .stats-cap-bar i {
+  display: none;
+}
+
+.stats-cap-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.stats-cap-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--brand);
+}
+
+.stats-cap-share > em {
+  flex: none;
+  width: 40px;
+  font-style: normal;
+  font-size: 12px;
+  text-align: right;
+  color: var(--text-body);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .stats-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  .stats-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .stats-kpi {
+    padding: 14px 16px;
+  }
+  .stats-kpi-value {
+    font-size: 26px;
+  }
+  .stats-trend {
+    min-height: 160px;
+  }
+  .stats-trend-day em {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .stats-caps-head {
+    display: none;
+  }
+  .stats-cap {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px 12px;
+    padding: 12px 0;
+  }
+  .stats-cap-count {
+    justify-content: flex-end;
+  }
+  .stats-cap-share {
+    grid-column: 1 / -1;
+  }
+}
+
+/* 数据中心使用工作台级宽度，不再受个人页 1120px 的内容上限约束。 */
+.personal-page.stats-page {
+  max-width: none;
+}

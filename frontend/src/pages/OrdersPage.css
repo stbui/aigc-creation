@@ -1,0 +1,376 @@
+/**
+ * OrdersPage 页面样式 —— 由 `./OrdersPage.tsx` 引入，随路由懒加载。
+ *
+ * 从 `styles/global.css` 迁出：只放本页独占选择器；共享组件
+ * （AppLayout / 登录弹窗 / SideRail 等）与设计令牌仍留在全局。
+ */
+
+/* ── 我的订单 ────────────────────────────────────────────────────────────
+   2026-10-30 优化:
+   - 卡片由「通栏四行 + 虚线」改为「订单号/状态 → 明细行 → 时间线与金额 →
+     动作条」四段: 1120 宽度下商品名与价格原本相距近千像素, 扫读困难;
+   - 金额独立成块 (标签 + 18px 数字), 优惠与已退金额作为上方小字说明;
+   - 状态/筛选/发票状态全部改用令牌 (此前 #fffaeb / #8a5a00 / #f7f8f1 等裸值);
+   - 状态筛选与计数同工单页, 客户端切片;
+   - 开票表单由复用的结算卡片改成两列字段面板, 不再嵌一层 24px 内边距的卡。
+   宽度与页头由 .personal-page 骨架提供, 页面类不再自带 max-width / padding。 */
+
+.order-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.order-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--card-bg);
+  color: var(--text-body);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.order-filter:hover {
+  border-color: color-mix(in srgb, var(--brand) 35%, var(--border));
+  color: var(--text-strong);
+}
+
+.order-filter.is-active {
+  border-color: var(--brand-bg);
+  background: var(--brand-bg);
+  color: var(--brand);
+  font-weight: 600;
+}
+
+.order-filter-count {
+  font-size: 12px;
+  color: var(--text-desc);
+  font-variant-numeric: tabular-nums;
+}
+
+.order-filter.is-active .order-filter-count {
+  color: var(--brand);
+}
+
+.order-filter-empty {
+  padding: 40px 0;
+  margin: 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-desc);
+}
+
+.order-card {
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-panel);
+  background: var(--card-bg);
+  margin-bottom: 12px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.order-card:hover {
+  border-color: color-mix(in srgb, var(--brand) 18%, var(--border));
+  box-shadow: var(--shadow-card);
+}
+
+.order-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border-row);
+}
+
+.order-no {
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  font-size: 12px;
+  letter-spacing: 0.2px;
+  color: var(--text-muted);
+}
+
+.order-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  background: var(--surface);
+  color: var(--text-muted);
+}
+
+.order-status::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.order-status.is-pending {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.order-status.is-paid {
+  background: var(--success-soft-bg);
+  color: var(--success-text);
+}
+
+.order-status.is-cancelled,
+.order-status.is-expired {
+  background: var(--surface);
+  color: var(--text-desc);
+}
+
+.order-status.is-refunded,
+.order-status.is-partial_refunded {
+  background: var(--danger-soft-bg);
+  color: var(--danger-text);
+}
+
+.order-lines {
+  display: grid;
+  gap: 2px;
+  padding: 6px 0 10px;
+}
+
+.order-line {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 0;
+}
+
+.order-line-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.order-line-name {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--text-strong);
+}
+
+.order-line-meta {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-desc);
+}
+
+.order-line-amount {
+  flex: none;
+  font-size: 13px;
+  color: var(--text-body);
+  font-variant-numeric: tabular-nums;
+}
+
+.order-line.is-refund .order-line-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--danger-text);
+}
+
+/* 基线对齐: 左侧时间线与右侧金额排在同一行, 避免优惠说明把左侧文字顶下去 */
+.order-card-foot {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-row);
+}
+
+.order-card-meta {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--text-desc);
+}
+
+.order-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  flex: none;
+}
+
+.order-total-note {
+  font-size: 12px;
+  color: var(--text-desc);
+  font-variant-numeric: tabular-nums;
+}
+
+.order-total-main {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.order-total-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.order-total-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-strong);
+  font-variant-numeric: tabular-nums;
+}
+
+.order-total-value.is-void {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-desc);
+}
+
+.order-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border-row);
+}
+
+.order-invoice-slot {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.order-action-btns {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.order-invoice-state {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--text-muted);
+}
+
+.order-invoice-state.is-issued {
+  color: var(--success-text);
+}
+
+.order-invoice-state.is-pending {
+  color: var(--text-muted);
+}
+
+.order-invoice-state.is-rejected {
+  color: var(--danger-text);
+}
+
+/* 开票表单: 与卡片同一张底, 只做一层浅底面板, 不再嵌套第二张卡 */
+.order-invoice-form {
+  margin-top: 12px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface-tint);
+}
+
+.order-invoice-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.order-invoice-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.order-invoice-amount {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.order-invoice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+
+.order-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.order-field > span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.order-form-error {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--danger-text);
+}
+
+.order-invoice-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+@media (max-width: 640px) {
+  .order-card {
+    padding: 14px 16px;
+  }
+  .order-card-foot {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .order-total {
+    align-items: flex-start;
+  }
+  .order-card-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .order-action-btns {
+    width: 100%;
+  }
+  .order-invoice-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.order-field .ui-select-trigger {
+  width: 100%;
+}

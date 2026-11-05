@@ -434,11 +434,18 @@ async function cleanupTestData() {
     `${mrefund.httpStatus} ${mrefund.message ?? ''}`,
   );
   check('响应标记会员已终止', mrefund.data?.membershipTerminated === true);
-  const afterMembership = await prisma.membership.findFirst({ where: { orderId: membershipOrder.id } });
+  const afterMembership = await prisma.membership.findFirst({ where: { userId: user.id } });
   check(
-    '会员状态转为 cancelled 且停发后续积分',
-    afterMembership?.status === 'cancelled' && afterMembership?.nextCreditAt === null,
-    `status=${afterMembership?.status} nextCreditAt=${afterMembership?.nextCreditAt}`,
+    '最后一期退款后会员立即失效且停发后续积分',
+    afterMembership?.status === 'expired' &&
+      afterMembership?.expiresAt.getTime() <= Date.now() &&
+      afterMembership?.nextCreditAt === null,
+    `status=${afterMembership?.status} expiresAt=${afterMembership?.expiresAt?.toISOString()}`,
+  );
+  const refundedPeriod = await prisma.order.findUnique({ where: { id: membershipOrder.id } });
+  check(
+    '退款订单保留会员周期边界与撤销时间',
+    Boolean(refundedPeriod?.membershipPeriodEndAt && refundedPeriod?.membershipPeriodRevokedAt),
   );
 
   // ── 还原设置 ────────────────────────────────────────────────────────

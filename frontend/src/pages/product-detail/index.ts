@@ -8,4 +8,5 @@
  * hook `./hooks`、纯函数与外部工具 `./utils`、常量与类型 `./constants`。
  * 分层约定见 `docs/frontend-module-conventions.md`。
  */
+import '../../styles/product-detail-kit.css';
 export { ProductDetailPage } from './page';
