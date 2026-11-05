@@ -100,7 +100,7 @@ export const ALL_MODELS_PAGE_SIZE = 50;
 export const BILLING_MODE_OPTIONS = [
   { value: 'fixed_request', label: '按次' },
   { value: 'per_second', label: '按时长（秒）' },
-  { value: 'token', label: '按 Token 用量' },
+  { value: 'token', label: '按用量' },
 ];
 
 export const CURRENCY_OPTIONS = [

@@ -20,15 +20,15 @@ export const CHANNEL_MODEL_FORM_ID = 'channel-model-form';
 const EMPTY_IMAGE_PARAMETERS: ImageParameterDefinitionView[] = [];
 
 const MODEL_FIELD_LABELS: Array<[keyof ModelDraft, string]> = [
-  ['modelKey', '模型标识'],
-  ['capability', '产出能力'],
-  ['protocol', '请求协议'],
-  ['priceCurrency', '计价货币'],
+  ['modelKey', '模型编号'],
+  ['capability', '能力类型'],
+  ['protocol', '接口类型'],
+  ['priceCurrency', '结算币种'],
   ['tags', '展示标签'],
-  ['description', '描述'],
-  ['channelLabel', '渠道展示名'],
+  ['description', '模型介绍'],
+  ['channelLabel', '渠道内名称'],
   ['capabilityConfig', '图片能力参数'],
-  ['tiers', '价格档'],
+  ['tiers', '价格方案'],
 ];
 
 function firstFormErrorMessage(errors: FieldErrors<ModelDraft>): string | null {
@@ -59,7 +59,7 @@ interface ChannelModelFormProps {
 }
 
 /**
- * 渠道模型表单：基础信息 + 价格档 + 能力合同。
+ * 渠道模型表单：基础信息 + 价格方案 + 能力配置。
  *
  * 表单状态完全由 react-hook-form 持有，父级只提供打开弹窗时的初始值和最终
  * 提交值。校验统一走 zod schema，错误就近落到 Field；父级不再保存每次按键。
@@ -109,7 +109,7 @@ export function ChannelModelForm({
       shouldDirty: true,
       shouldValidate: true,
     });
-    toast.success(`已清除 ${stale.length} 个档位的独立上游名，改为跟随模型`);
+    toast.success(`已清除 ${stale.length} 个方案的服务商模型名，改为跟随模型`);
   };
 
   const focusFirstInvalidField = () => {
@@ -169,10 +169,10 @@ export function ChannelModelForm({
       )}
 
       {staleTiers.length > 0 && (
-        <Notice tone="warn" title={`${staleTiers.length} 个价格档仍指向旧的上游模型`}>
+        <Notice tone="warn" title={`${staleTiers.length} 个价格方案仍使用旧的服务商模型名`}>
           <div className="flex flex-wrap items-center gap-2">
             <span>
-              模型级上游已改为「{values.providerModelKey}」，但这些档位仍写着旧的上游名
+              模型的服务商模型名已改为「{values.providerModelKey}」，但这些方案仍使用旧名称
               （{previousProviderModelKey}），保存后请求仍会发到旧供应商模型。
             </span>
             <ActionButton variant="secondary" size="xs" onClick={clearStaleTiers}>

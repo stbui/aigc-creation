@@ -380,7 +380,7 @@ export function AllChannelModelsPanel({
           ariaLabel="搜索模型"
           value={keyword}
           onChange={(value) => updateFilter(() => setKeyword(value))}
-          placeholder="搜索模型标识、显示名或渠道"
+          placeholder="搜索模型编号、用户端名称或渠道"
           className="w-64"
         />
         <SelectField
@@ -444,11 +444,7 @@ export function AllChannelModelsPanel({
         loading={loading}
         error={error}
         onRetry={() => void load()}
-        emptyText={
-          hasFilters
-            ? '当前筛选下没有匹配的模型，清除筛选后再看。'
-            : '还没有渠道模型。在渠道工作台的「模型」里导入或新建后，这里会列出全部线路。'
-        }
+        emptyText={hasFilters ? '没有匹配的模型' : '暂无渠道模型'}
         density="compact"
         minWidth={1080}
         pagination={{

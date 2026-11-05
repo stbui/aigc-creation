@@ -33,6 +33,10 @@ export class AccountService {
         status: true,
         createdAt: true,
         lastLoginAt: true,
+        oauthIdentities: {
+          select: { provider: true },
+          orderBy: { createdAt: 'asc' },
+        },
       },
     });
     if (!user) throw new AppError(40401, '账号不存在', 404);
@@ -58,10 +62,11 @@ export class AccountService {
       this.prisma.order.count({ where: { userId } }),
       this.prisma.notification.count({ where: { userId, readAt: null } }),
     ]);
-    const { passwordHash, ...profile } = user;
+    const { passwordHash, oauthIdentities, ...profile } = user;
     return {
       ...profile,
       hasPassword: Boolean(passwordHash),
+      linkedOAuthProviders: [...new Set(oauthIdentities.map((item) => item.provider))],
       counts: { projects, tasks, assets, orders },
       unread,
     };

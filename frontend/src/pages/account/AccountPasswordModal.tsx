@@ -12,6 +12,7 @@ import { Input, Modal } from '../../ui';
 export function AccountPasswordModal({
   open,
   changing,
+  hasPassword,
   oldPassword,
   newPassword,
   confirmPassword,
@@ -23,6 +24,8 @@ export function AccountPasswordModal({
 }: {
   open: boolean;
   changing: boolean;
+  /** false = 纯 OAuth 账号首次设置密码，不需要也不展示旧密码 */
+  hasPassword: boolean;
   oldPassword: string;
   newPassword: string;
   confirmPassword: string;
@@ -36,25 +39,29 @@ export function AccountPasswordModal({
     <Modal
       className="account-modal"
       open={open}
-      title="修改密码"
-      okText="确认修改"
+      title={hasPassword ? '修改密码' : '设置登录密码'}
+      okText={hasPassword ? '确认修改' : '设置密码'}
       cancelText="取消"
       confirmLoading={changing}
-      okButtonProps={{ disabled: !oldPassword || !newPassword || !confirmPassword }}
+      okButtonProps={{ disabled: (hasPassword && !oldPassword) || !newPassword || !confirmPassword }}
       onOk={onOk}
       onCancel={onCancel}
       destroyOnHidden
     >
       <p className="account-desc">
-        修改成功后，该账号在所有设备上的登录状态都会失效，需要重新登录。
+        {hasPassword
+          ? '修改成功后，该账号在所有设备上的登录状态都会失效，需要重新登录。'
+          : '当前账号通过第三方登录创建，尚未设置密码。设置后可使用邮箱和密码登录。'}
       </p>
       <div className="account-form">
-        <Input.Password
-          placeholder="当前密码"
-          value={oldPassword}
-          onChange={(e) => onOldPasswordChange(e.target.value)}
-          autoComplete="current-password"
-        />
+        {hasPassword && (
+          <Input.Password
+            placeholder="当前密码"
+            value={oldPassword}
+            onChange={(e) => onOldPasswordChange(e.target.value)}
+            autoComplete="current-password"
+          />
+        )}
         <Input.Password
           placeholder={`新密码（至少 ${MIN_PASSWORD_LENGTH} 位）`}
           value={newPassword}

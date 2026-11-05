@@ -463,7 +463,15 @@ export function OrdersPage() {
                 <div className="order-line">
                   <div className="order-line-main">
                     <span className="order-line-name">{o.membershipPlanName ?? '会员套餐'}</span>
-                    <span className="order-line-meta">会员订阅 · 支付后立即生效</span>
+                    <span className="order-line-meta">
+                      {o.status === 'pending'
+                        ? '会员订阅 · 支付后自动发放'
+                        : o.status === 'paid' || o.status === 'partial_refunded'
+                          ? o.membershipAppliedAt
+                            ? '会员订阅 · 权益已生效'
+                            : '会员订阅 · 权益发放中'
+                          : '会员订阅 · 已结束'}
+                    </span>
                   </div>
                   <span className="order-line-amount">{formatYuan(o.totalCents)}</span>
                 </div>

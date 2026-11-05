@@ -33,7 +33,10 @@ export class CreditPriceService {
    * 记活动 id 而不只记能力 id：账单要把命中活动写进 `promotionId`，
    * 事后核对「这笔为什么是 0 积分」必须能追到具体活动。
    */
-  private freeCampaigns = new Map<string, string>();
+  private freeCampaigns = new Map<
+    string,
+    Array<{ id: string; onlyNewUsers: boolean }>
+  >();
   private cacheAt = 0;
 
   constructor(private readonly prisma: PrismaService) {}
@@ -46,11 +49,18 @@ export class CreditPriceService {
   }
 
   /** 该能力命中的限时免费活动 id；未命中返回空串（账单 `promotionId` 用） */
-  async freeCampaignIdOf(capabilityId: string): Promise<string> {
+  async freeCampaignIdOf(capabilityId: string, userId?: string): Promise<string> {
     if (Date.now() - this.cacheAt > CACHE_TTL_MS) {
       await this.refresh();
     }
-    return this.freeCampaigns.get(String(capabilityId ?? '')) ?? '';
+    const campaigns = this.freeCampaigns.get(String(capabilityId ?? '')) ?? [];
+    const global = campaigns.find((campaign) => !campaign.onlyNewUsers);
+    if (global) return global.id;
+
+    const targeted = campaigns.find((campaign) => campaign.onlyNewUsers);
+    if (!targeted || !userId) return '';
+    const isNewUser = await this.isNewUser(userId);
+    return isNewUser ? targeted.id : '';
   }
 
   /** setting 的 key 命名 —— 与后台设置项一一对应 */
@@ -64,7 +74,7 @@ export class CreditPriceService {
    * 一次查全部覆盖项后在内存里匹配: 15 项能力逐个查库是 N+1,
    * 而这里本来就要一次 findMany 才能填满缓存。
    */
-  async resolve(capabilityId: string): Promise<number> {
+  async resolve(capabilityId: string, userId?: string): Promise<number> {
     if (Date.now() - this.cacheAt > CACHE_TTL_MS) {
       await this.refresh();
     }
@@ -76,16 +86,34 @@ export class CreditPriceService {
      * 缓存 TTL 同时管住活动起止：到点后最多 3 秒自动恢复原价，
      * 不需要调度任务去「把价格改回来」（那类补偿逻辑最容易漏）。
      */
-    if (this.freeCampaigns.has(capabilityId)) return 0;
+    if (await this.freeCampaignIdOf(capabilityId, userId)) return 0;
     return this.cache.get(CreditPriceService.keyOf(capabilityId)) ?? defaultCreditCostOf(capabilityId);
   }
 
+  /**
+   * 解析**显式覆盖价**；没有后台设置时返回 null。
+   *
+   * 生成链路的目录价来自前台模型 / 渠道价格档，不能被能力注册表的兜底价
+   * 无条件覆盖。只有运营明确配置了 `creditPrice.<capabilityId>` 时，
+   * 限时免费由 `freeCampaignIdOf()` 单独按用户判定，调用方需两者一起使用。
+   */
+  async resolveOverride(capabilityId: string): Promise<number | null> {
+    if (Date.now() - this.cacheAt > CACHE_TTL_MS) {
+      await this.refresh();
+    }
+    return this.cache.get(CreditPriceService.keyOf(capabilityId)) ?? null;
+  }
+
   /** 批量解析 (前端下发 / 后台展示用), 一次查库 */
-  async resolveAll(): Promise<Record<string, number>> {
+  async resolveAll(userId?: string): Promise<Record<string, number>> {
     await this.refresh();
+    const hasTargetedCampaign = [...this.freeCampaigns.values()].some((campaigns) =>
+      campaigns.some((campaign) => campaign.onlyNewUsers),
+    );
+    const eligibleNewUser = userId && hasTargetedCampaign ? await this.isNewUser(userId) : null;
     const out: Record<string, number> = {};
     for (const c of CAPABILITIES) {
-      out[c.id] = this.freeCampaigns.has(c.id)
+      out[c.id] = this.freeCampaignId(c.id, eligibleNewUser)
         ? 0
         : this.cache.get(CreditPriceService.keyOf(c.id)) ?? defaultCreditCostOf(c.id);
     }
@@ -108,6 +136,8 @@ export class CreditPriceService {
       registryDefault: number;
       /** 是否被进行中的限时免费活动覆盖 */
       freeCampaign: boolean;
+      /** 免费活动是否只对未付费新用户生效（后台需明确展示，不能当作全站降价） */
+      freeCampaignOnlyNewUsers: boolean;
     }>
   > {
     await this.refresh();
@@ -115,20 +145,23 @@ export class CreditPriceService {
       const key = CreditPriceService.keyOf(c.id);
       const settingValue = this.cache.get(key);
       const overridden = settingValue !== undefined;
-      const free = this.freeCampaigns.has(c.id);
+      const campaigns = this.freeCampaigns.get(c.id) ?? [];
+      const globalFree = campaigns.some((campaign) => !campaign.onlyNewUsers);
+      const free = campaigns.length > 0;
       return {
         capabilityId: c.id,
         capabilityName: c.name,
         // 生效价 = 用户此刻实扣的价，活动命中即为 0
-        cost: free ? 0 : overridden ? settingValue : defaultCreditCostOf(c.id),
+        cost: globalFree ? 0 : overridden ? settingValue : defaultCreditCostOf(c.id),
         /*
          * source 必须能区分 campaign：运营看到「生效价 0 / 来源 registry」
          * 会以为代码写错了，而真相是一个进行中的限时免费活动。
          */
-        source: free ? 'campaign' : overridden ? 'setting' : 'registry',
+        source: globalFree ? 'campaign' : overridden ? 'setting' : 'registry',
         overridden,
         registryDefault: defaultCreditCostOf(c.id),
         freeCampaign: free,
+        freeCampaignOnlyNewUsers: free && !globalFree,
       };
     });
   }
@@ -197,20 +230,54 @@ export class CreditPriceService {
     const now = new Date();
     const campaigns = await this.prisma.campaign.findMany({
       where: { type: 'limited_free', status: 'active', startAt: { lte: now }, endAt: { gte: now } },
-      select: { id: true, payload: true },
+      select: { id: true, payload: true, audience: true },
     });
-    const free = new Map<string, string>();
+    const free = new Map<string, Array<{ id: string; onlyNewUsers: boolean }>>();
     for (const c of campaigns) {
+      let payload: { capabilityIds?: string[] };
       try {
-        const payload = JSON.parse(c.payload || '{}') as { capabilityIds?: string[] };
-        for (const id of payload.capabilityIds ?? []) free.set(id, c.id);
+        payload = JSON.parse(c.payload || '{}') as { capabilityIds?: string[] };
       } catch {
-        // 手的 payload 解析失败不能拖垮定价 —— 跳过这一个活动
+        // payload 决定哪些能力免费；它损坏时无法安全命中任何能力，跳过本活动。
+        continue;
+      }
+
+      let audience: { onlyNewUsers?: boolean } = {};
+      try {
+        audience = JSON.parse(c.audience || '{}') as { onlyNewUsers?: boolean };
+      } catch {
+        // audience 损坏只影响定向范围，按全站免费处理，不拖垮合法 payload。
+        audience = {};
+      }
+
+      for (const id of payload.capabilityIds ?? []) {
+        const entries = free.get(id) ?? [];
+        entries.push({ id: c.id, onlyNewUsers: Boolean(audience.onlyNewUsers) });
+        free.set(id, entries);
       }
     }
 
     this.cache = next;
     this.freeCampaigns = free;
     this.cacheAt = Date.now();
+  }
+
+  private freeCampaignId(capabilityId: string, eligibleNewUser: boolean | null): string {
+    const campaigns = this.freeCampaigns.get(capabilityId) ?? [];
+    return (
+      campaigns.find((campaign) => !campaign.onlyNewUsers)?.id ??
+      campaigns.find((campaign) => campaign.onlyNewUsers && eligibleNewUser !== false)?.id ??
+      ''
+    );
+  }
+
+  private async isNewUser(userId: string): Promise<boolean> {
+    const paidCount = await this.prisma.order.count({
+      where: {
+        userId,
+        status: { in: ['paid', 'partial_refunded', 'refunded'] },
+      },
+    });
+    return paidCount === 0;
   }
 }

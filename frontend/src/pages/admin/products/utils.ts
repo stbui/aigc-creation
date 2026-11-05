@@ -11,12 +11,11 @@ import type {
   CreateProductPayload,
   UpdateProductPayload,
 } from '../../../types/api';
+import { formatYuanPlain } from '../../../admin-ui/lib/format';
 import type { ProductDraft } from './constants';
 
-/** 分 → 元（输入框回填值） */
-export function centsToYuanText(cents: number): string {
-  return (cents / 100).toFixed(2);
-}
+/** 分 → 元（输入框回填值；统一实现在 admin-ui/lib/format.ts） */
+export const centsToYuanText = formatYuanPlain;
 
 /** 元 → 分。非法输入返回 null，由调用方拦截 */
 export function yuanTextToCents(text: string): number | null {

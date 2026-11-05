@@ -111,7 +111,7 @@ function hasControlChar(value: string): boolean {
  */
 export function validateChannelHeaders(headers: ChannelHeader[]): string {
   if (headers.length === 0) return '';
-  if (headers.length > MAX_HEADER_COUNT) return `自定义请求头最多支持 ${MAX_HEADER_COUNT} 项`;
+  if (headers.length > MAX_HEADER_COUNT) return `附加信息最多支持 ${MAX_HEADER_COUNT} 项`;
   const seen = new Set<string>();
   let total = 0;
   for (const header of headers) {
@@ -119,19 +119,19 @@ export function validateChannelHeaders(headers: ChannelHeader[]): string {
     const value = header.value.trim();
     if (!name && !value) continue;
     if (!name || !HEADER_NAME_PATTERN.test(name)) {
-      return '请求头名称无效，请使用标准 HTTP Header 名称';
+      return '附加信息名称无效，请检查名称格式';
     }
     const lower = name.toLowerCase();
     if (BLOCKED_HEADERS.has(lower) || lower.startsWith('x-canvas-') || lower.startsWith('x-forwarded-')) {
       return `${name} 由系统管理，不允许自定义`;
     }
-    if (seen.has(lower)) return `请求头不能重复：${name}`;
-    if (hasControlChar(value)) return `${name} 的值包含非法控制字符`;
+    if (seen.has(lower)) return `附加信息不能重复：${name}`;
+    if (hasControlChar(value)) return `${name} 的内容包含不支持的字符`;
     if (name.length > MAX_NAME_LENGTH || value.length > MAX_VALUE_LENGTH) {
-      return '单个请求头名称或值过长';
+      return '单项附加信息名称或内容过长';
     }
     total += name.length + value.length;
-    if (total > MAX_HEADER_BYTES) return '自定义请求头总大小不能超过 16KB';
+    if (total > MAX_HEADER_BYTES) return '附加信息总计不能超过 16KB';
     seen.add(lower);
   }
   return '';
@@ -200,24 +200,24 @@ export function validateModelTiers(
   tiers: Array<{ selector: string; billingMode: string; enabled: boolean; output: string }>,
 ): string | null {
   const active = tiers.filter((tier) => tier.enabled);
-  if (active.length === 0) return '至少保留一个启用档位';
+  if (active.length === 0) return '至少保留一个启用的价格方案';
 
   const wildcards = active.filter((tier) => tier.selector.trim() === '');
   if (wildcards.length > 1) {
-    return '只能有一个默认（通配）规格档：其余档位要写明规格条件';
+    return '只能有一个默认适用规格：其余方案请填写适用规格';
   }
 
   for (const tier of active) {
     const mode = tier.billingMode;
     if (mode === 'per_second' && capability !== 'video' && capability !== 'audio') {
-      return `按秒计费只适用于视频 / 音频，${capability} 能力不能用「按秒」`;
+      return '按时长计价仅适用于视频或音频模型';
     }
     if (mode === 'token') {
       if (capability !== 'text') {
-        return 'Token 计费目前只开放给文本能力';
+        return '按用量计价目前仅适用于文本模型';
       }
       if (!tier.output || tier.output.trim() === '0') {
-        return 'Token 计费必须填写输出 Token 单价';
+        return '按用量计价必须填写输出用量价格';
       }
     }
   }
@@ -268,19 +268,19 @@ export function buildPriceTiers(
         videoSeconds: Number(tier.videoSeconds) || 0,
         providerModelKey: tier.providerModelKey.trim() || draft.providerModelKey.trim() || modelKey,
         billingMode: tier.billingMode,
-        unitPriceMicrocredits: priceOf(tier.unit, '单价'),
-        inputTokenPriceMicrocredits: priceOf(tier.input, '输入 Token 单价'),
-        outputTokenPriceMicrocredits: priceOf(tier.output, '输出 Token 单价'),
-        cachedTokenPriceMicrocredits: priceOf(tier.cached, '缓存 Token 单价'),
+        unitPriceMicrocredits: priceOf(tier.unit, '价格'),
+        inputTokenPriceMicrocredits: priceOf(tier.input, '输入用量价格'),
+        outputTokenPriceMicrocredits: priceOf(tier.output, '输出用量价格'),
+        cachedTokenPriceMicrocredits: priceOf(tier.cached, '缓存内容价格'),
         priceConfigured: tier.priceConfigured,
         enabled: tier.enabled,
         costPricing: tier.costConfigured
           ? {
               configured: true,
               unitPriceMicrocredits: priceOf(tier.costUnit, '成本单价'),
-              inputTokenPriceMicrocredits: priceOf(tier.costInput, '输入 Token 成本'),
-              outputTokenPriceMicrocredits: priceOf(tier.costOutput, '输出 Token 成本'),
-              cachedTokenPriceMicrocredits: priceOf(tier.costCached, '缓存 Token 成本'),
+              inputTokenPriceMicrocredits: priceOf(tier.costInput, '输入用量成本'),
+              outputTokenPriceMicrocredits: priceOf(tier.costOutput, '输出用量成本'),
+              cachedTokenPriceMicrocredits: priceOf(tier.costCached, '缓存内容成本'),
             }
           : null,
       }));

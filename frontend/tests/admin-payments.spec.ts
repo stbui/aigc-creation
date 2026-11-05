@@ -6,7 +6,7 @@ import { ensureAdminLogin } from './support/admin-login';
  * 支付充值页 E2E（`/admin/payments`，payment-refactor-design.md §21 / §24）。
  *
  * 守住四条约束：
- *   1. 四个标签都在同一个 URL 上（`?tab=`），深链能直接落到任一标签
+ *   1. 五个标签都在同一个 URL 上（`?tab=`），深链能直接落到任一标签
  *   2. 旧路由 `/admin/payment-channels` 与 `/admin/reconciliation` 改为重定向，
  *      不再 404（后端旧控制器已下线）
  *   3. 订单与对账的详情走 `?orderId=` / `?runId=` 深链，刷新后抽屉还在
@@ -26,14 +26,14 @@ async function login(page: Page) {
 test.describe('支付充值', () => {
   test.skip(!HAS_ADMIN_CREDENTIALS, '未提供后台管理员凭据');
 
-  test('四个标签可切换，且切换只改 URL 不重载', async ({ page }) => {
+  test('五个标签可切换，且切换只改 URL 不重载', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/payments`);
 
     await expect(page.getByRole('heading', { name: '支付充值' })).toBeVisible({ timeout: 20000 });
 
     const tabs = page.getByRole('tab');
-    await expect(tabs).toHaveCount(4);
+    await expect(tabs).toHaveCount(5);
     await expect(tabs.nth(0)).toHaveAttribute('aria-selected', 'true');
 
     // 缺省落在第一个标签（支付渠道），但 URL 里先不写 tab
@@ -48,6 +48,9 @@ test.describe('支付充值', () => {
 
     await page.getByRole('tab', { name: '支付对账' }).click();
     await expect(page).toHaveURL(/[?&]tab=reconciliation/);
+
+    await page.getByRole('tab', { name: '支付异常' }).click();
+    await expect(page).toHaveURL(/[?&]tab=exceptions/);
   });
 
   test('深链直接落到指定标签，非法标签回落到支付渠道', async ({ page }) => {
@@ -96,6 +99,19 @@ test.describe('支付充值', () => {
 
   test('对账标签给出执行区与运行列表', async ({ page }) => {
     await login(page);
+    // 空态必须有确定的数据前提，不能依赖共享测试库恰好没有运行记录。
+    await page.route(/\/api\/v1\/admin\/payments\/reconciliations(?:\?.*)?$/, (route) => {
+      if (route.request().method() !== 'GET') return route.continue();
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          code: 0,
+          data: { items: [], total: 0, page: 1, pageSize: 30 },
+          message: '',
+        }),
+      });
+    });
     await page.goto(`${UI}/admin/payments?tab=reconciliation`);
 
     await expect(page.getByRole('button', { name: '执行对账' })).toBeVisible({ timeout: 20000 });

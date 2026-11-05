@@ -11,7 +11,7 @@ export function ChannelModelImageDerivedSummary({
     <FieldSet className="gap-3">
       <div>
         <FieldLegend variant="label">自动派生设置</FieldLegend>
-        <FieldDescription>以下字段随协议参数实时计算，保存时写回能力合同。</FieldDescription>
+        <FieldDescription>以下设置会随能力参数实时更新，保存后自动生效。</FieldDescription>
       </div>
       <Descriptions
         columns={3}

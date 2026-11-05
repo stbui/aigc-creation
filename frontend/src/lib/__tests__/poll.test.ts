@@ -131,6 +131,14 @@ describe('waitForTask', () => {
     expect(onTick.mock.calls[1][0]).toMatchObject({ status: 'failed', errorCode: '42204' });
   });
 
+  it.each([400, 404, 409])('HTTP %i 是明确失败，立即终止且不重试', async (status) => {
+    const error = Object.assign(new Error(`request failed: ${status}`), { status });
+    getTask.mockRejectedValueOnce(error);
+
+    await expect(waitForTask('task-1', { maxTries: 5 })).rejects.toBe(error);
+    expect(getTask).toHaveBeenCalledTimes(1);
+  });
+
   it('signal 已中止时不发请求，返回永不落定的 promise', async () => {
     const controller = new AbortController();
     controller.abort();

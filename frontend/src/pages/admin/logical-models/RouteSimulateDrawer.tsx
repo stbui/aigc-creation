@@ -114,7 +114,7 @@ export function RouteSimulateDrawer({
       }}
       width={720}
       title={`路由模拟 · ${model?.name ?? ''}`}
-      description="只读：按给定参数算一遍「会落到哪条线路、为什么没落」，不扣费、不建任务"
+      description="只读模拟路由结果，不扣费、不创建任务"
       footer={
         <>
           <ActionButton variant="secondary" size="sm" onClick={onClose}>
@@ -127,7 +127,7 @@ export function RouteSimulateDrawer({
       }
     >
       <div className="flex flex-col gap-4">
-        <FormField label="操作（operation）" hint="留空则用能力合同里的第一个操作">
+        <FormField label="操作（operation）" hint="留空时使用能力合同的首个 operation">
           <TextField
             ariaLabel="操作"
             value={operation}
@@ -135,7 +135,7 @@ export function RouteSimulateDrawer({
             placeholder="generate"
           />
         </FormField>
-        <FormField label="请求参数（options）" hint="JSON 对象；尺寸、数量等影响价格档的选择">
+        <FormField label="请求参数（options）" hint="JSON 对象；尺寸、数量等参数会影响价格档匹配">
           <TextAreaField ariaLabel="请求参数" value={options} onChange={setOptions} rows={6} />
         </FormField>
 

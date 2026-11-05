@@ -15,9 +15,16 @@ import { useSearchParams } from 'react-router-dom';
  *   1. 请求竞态 —— 慢响应不得覆盖新响应（请求序号校验）；
  *   2. 失败不清空 —— 保留上一次数据，翻页失败时页面不会整块变空；
  *   3. 筛选变更重置页码 —— 否则会停在第 5 页而新筛选只有 2 页，显示空表。
+ *
+ * `TParams` 供页面声明本页查询参数的形状：声明后 `params.status` 等取值自带类型，
+ * 不必再逐个 `as string | undefined`。默认仍是宽松字典，既有调用方无需改动；
+ * 收紧 `initialParams` 与逐页删断言属后续批次。
  */
-export function useAdminList<T>(
-  fetcher: (params: Record<string, unknown>) => Promise<T>,
+export function useAdminList<
+  T,
+  TParams extends Record<string, unknown> = Record<string, unknown>,
+>(
+  fetcher: (params: TParams) => Promise<T>,
   initialParams: Record<string, unknown> = {},
 ) {
   const [data, setData] = useState<T | null>(null);
@@ -37,7 +44,7 @@ export function useAdminList<T>(
     const current = ++seq.current;
     setLoading(true);
     fetcherRef
-      .current(params)
+      .current(params as TParams)
       .then((d) => {
         if (current !== seq.current) return; // 已有更新的请求在飞
         setData(d);
@@ -65,7 +72,7 @@ export function useAdminList<T>(
     setParams((p) => ({ ...p, page, ...(pageSize ? { pageSize } : {}) }));
   }, []);
 
-  return { data, loading, error, params, setQuery, setPage, reload: load };
+  return { data, loading, error, params: params as TParams, setQuery, setPage, reload: load };
 }
 
 /**

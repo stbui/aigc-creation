@@ -65,7 +65,9 @@ function DetailResultListImpl({
       cellLabelOf={(item) => labelOf(item)}
       renderRowTitle={(row) => (
         <div className="pd-result-card-title">
-          <strong title={row.productName}>{row.productName || '未命名商品'}</strong>
+          <strong title={`商品：${row.productName || '未命名商品'}`}>
+            商品：{row.productName || '未命名商品'}
+          </strong>
           <time dateTime={row.createdAt}>{formatDate(row.createdAt) || '时间未知'}</time>
         </div>
       )}

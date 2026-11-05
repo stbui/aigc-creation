@@ -103,13 +103,19 @@ export function CouponTable({
       width: 100,
       render: (row) => {
         const total = row.totalCount === 0 ? null : row.totalCount;
-        const pct = total ? Math.round((row.usedCount / total) * 100) : null;
+        const occupied = row.usedCount + row.pendingReserved;
+        const pct = total ? Math.round((occupied / total) * 100) : null;
         return (
           <div className="flex flex-col gap-1">
             <span className="tabular-nums">
-              {row.usedCount}
+              {occupied}
               {total ? ` / ${total}` : ' / 不限'}
             </span>
+            {row.pendingReserved > 0 && (
+              <span className="text-[11px] text-muted-foreground">
+                含待支付预占 {row.pendingReserved}
+              </span>
+            )}
             {pct !== null && (
               <Meter value={Math.min(pct, 100)} className="h-1 w-16" decorative />
             )}

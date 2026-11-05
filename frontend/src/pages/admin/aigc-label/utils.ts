@@ -7,7 +7,7 @@
 
 import type { AigcLabelSpec } from '../../../types/api';
 import { hexToRgba } from '../../../lib/aigc-label';
-import { RENDER_SCALE } from './constants';
+import { PREVIEW_PALETTE, RENDER_SCALE } from './constants';
 
 export { hexToRgba };
 
@@ -76,26 +76,26 @@ export function drawPreview(
   ctx.clearRect(0, 0, W, H);
 
   const bg = ctx.createLinearGradient(0, 0, W, H);
-  bg.addColorStop(0, '#eef2f8');
-  bg.addColorStop(1, '#d9e0ee');
+  bg.addColorStop(0, PREVIEW_PALETTE.gradientFrom);
+  bg.addColorStop(1, PREVIEW_PALETTE.gradientTo);
   ctx.fillStyle = bg;
   ctx.fillRect(0, 0, W, H);
 
   // 示意「一张商品图」：不能拿真实素材冒充预览，但也不能是个纯色块
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+  ctx.fillStyle = PREVIEW_PALETTE.card;
   ctx.beginPath();
   ctx.roundRect(W * 0.26, H * 0.16, W * 0.48, H * 0.66, 28);
   ctx.fill();
-  ctx.fillStyle = '#b9c4d8';
+  ctx.fillStyle = PREVIEW_PALETTE.circle;
   ctx.beginPath();
   ctx.arc(W * 0.5, H * 0.42, H * 0.17, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillStyle = '#9aa8c1';
+  ctx.fillStyle = PREVIEW_PALETTE.bar;
   ctx.beginPath();
   ctx.roundRect(W * 0.4, H * 0.62, W * 0.2, H * 0.07, 10);
   ctx.fill();
 
-  ctx.fillStyle = 'rgba(23, 26, 43, 0.32)';
+  ctx.fillStyle = PREVIEW_PALETTE.caption;
   ctx.font = '14px "PingFang SC", "Microsoft YaHei", sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'alphabetic';
@@ -103,7 +103,7 @@ export function drawPreview(
 
   if (!spec.enabled) {
     // 关闭态不画角标，但要说清楚「少了什么」，避免预览空着让人以为坏了
-    ctx.fillStyle = 'rgba(23, 26, 43, 0.55)';
+    ctx.fillStyle = PREVIEW_PALETTE.disabled;
     ctx.font = '16px "PingFang SC", "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';

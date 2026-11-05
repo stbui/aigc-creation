@@ -9,7 +9,5 @@ import { toCredits, toCreditsInput } from '../../../lib/microcredits';
 
 export { toCredits, toCreditsInput };
 
-export function formatTime(value: string | null): string {
-  if (!value) return '—';
-  return new Date(value).toLocaleString('zh-CN');
-}
+/** 时间展示（统一实现在 admin-ui/lib/format.ts） */
+export { formatDateTimeLoose as formatTime } from '../../../admin-ui/primitives';

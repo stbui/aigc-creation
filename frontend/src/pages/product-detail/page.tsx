@@ -13,6 +13,7 @@ import {
   ToolWorkflowSteps,
 } from './components';
 import { DetailExamplePanel } from './DetailExamplePanel';
+import { DetailPromptEditor } from './DetailPromptEditor';
 import { DetailResultList } from './DetailResultList';
 import { DetailSectionPicker } from './DetailSectionPicker';
 import { FormSelect } from './FormSelect';
@@ -72,7 +73,12 @@ export function ProductDetailPage() {
   const [language, setLanguage] = useState('zh-CN');
   const [description, setDescription] = useState('');
   // 包含模块: 上限、顺序归一化与默认勾选都在 useSectionSelection + DetailSectionPicker
-  const { sections, toggle: toggleSection } = useSectionSelection();
+  const {
+    sections,
+    sectionPrompts,
+    toggle: toggleSection,
+    setSectionPrompt,
+  } = useSectionSelection();
   const [ratio, setRatio] = useState('3:4');
   const [resolution, setResolution] = useState('1k');
   /** 用户手动改过画质后，切换平台不再覆盖 */
@@ -143,8 +149,9 @@ export function ProductDetailPage() {
       images.length > 0 &&
       productName.trim().length > 0 &&
       description.trim().length > 0 &&
-      sections.length > 0,
-    [images.length, productName, description, sections.length],
+      sections.length > 0 &&
+      sections.every((section) => Boolean(sectionPrompts[section]?.trim())),
+    [images.length, productName, description, sections, sectionPrompts],
   );
 
   /** 切换平台：用户没手动改过画质时，带出该平台的详情长图规格 */
@@ -212,6 +219,7 @@ export function ProductDetailPage() {
       const logicalModelId = await resolveModelId(DETAIL_CAPABILITY);
       /*
        * 服务端按勾选模块把这次提交拆成 N 个任务 (每张各扣一次单价),
+       * 每个任务携带自己的模块提示词并发执行,
        * 返回 batchId / batchSize / 本次合计积分。这里**不单点轮询某一任务** ——
        * 首张完成不代表整套图完成; 重拉一次列表拿到全部占位卡,
        * 之后 useResultGallery 会一直轮询到整批任务都到终态。
@@ -226,6 +234,7 @@ export function ProductDetailPage() {
         language,
         description,
         sections,
+        sectionPrompts,
         ratio,
         resolution,
       };
@@ -397,6 +406,11 @@ export function ProductDetailPage() {
             </section>
 
             <DetailSectionPicker selected={sections} onToggle={toggleSection} />
+            <DetailPromptEditor
+              selected={sections}
+              prompts={sectionPrompts}
+              onChange={setSectionPrompt}
+            />
           </div>
 
           {/* 高级设置 + 提交 (sticky 底部) */}

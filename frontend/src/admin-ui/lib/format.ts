@@ -5,12 +5,26 @@
  * 出现三次，各页自己写 `toLocaleString('zh-CN')` 迟早出现两种写法。
  */
 
-/** ISO 字符串 → `2026/11/02 14:03:12`。无法解析时原样返回。 */
+/** 日期时间渲染本体：只有「无法解析时显示什么」这一处口径差异。 */
+function displayDateTime(iso: string, invalidFallback: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return invalidFallback;
+  return date.toLocaleString('zh-CN', { hour12: false });
+}
+
+/** ISO 字符串 → `2026/11/02 14:03:12`。无法解析时原样返回（便于发现脏数据）。 */
 export function formatDateTime(iso: string | null | undefined): string {
   if (!iso) return '—';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return String(iso);
-  return date.toLocaleString('zh-CN', { hour12: false });
+  return displayDateTime(iso, String(iso));
+}
+
+/**
+ * ISO 字符串 → 日期时间；空值与无法解析一律显示 `—`。
+ * 列表与抽屉展示用这个口径，不把原始脏值暴露给运营。
+ */
+export function formatDateTimeLoose(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  return displayDateTime(iso, '—');
 }
 
 /** ISO 字符串 → `2026/11/02`。 */
@@ -62,6 +76,16 @@ export function formatRelative(iso: string | null | undefined): string {
 export function formatYuan(cents: number | null | undefined): string {
   if (cents === null || cents === undefined || !Number.isFinite(cents)) return '—';
   return `¥${(cents / 100).toFixed(2)}`;
+}
+
+/**
+ * 分 → 裸金额文本（不带货币符号），例如 `12.34`。
+ *
+ * 表格单元格、表单回填与「¥{yuan(...)}」拼接场景由调用方决定符号，
+ * 后台多数列表页用的是这个口径，不要换成 `formatYuan`。
+ */
+export function formatYuanPlain(cents: number): string {
+  return (cents / 100).toFixed(2);
 }
 
 /** 字节 → `1.2 MB`。 */

@@ -33,7 +33,7 @@ export function BatchAdjustDrawer({
 }) {
   const toast = useToast();
   const [text, setText] = useState('');
-  /** 整批共用的调整原因。后端强制写入每条流水 */
+  /** 整批共用的调整备注。可选；留空时后端为每条流水生成系统说明 */
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<BatchAdjustResult | null>(null);
@@ -89,22 +89,16 @@ export function BatchAdjustDrawer({
     onDone();
   };
 
-  const reasonValid = reason.trim().length > 0;
-
   const submit = async () => {
     if (parsed.items.length === 0) {
       toast.warning('没有可提交的有效行');
-      return;
-    }
-    if (!reasonValid) {
-      toast.warning('请填写调整原因，它会写入每条积分流水');
       return;
     }
     setBusy(true);
     try {
       const r = await adminCreditsApi.batchAdjust({
         items: parsed.items,
-        reason: reason.trim(),
+        ...(reason.trim() ? { reason: reason.trim() } : {}),
         idempotencyKey: batchKey,
       });
       setResult(r);
@@ -172,7 +166,7 @@ export function BatchAdjustDrawer({
             <ActionButton
               variant="default"
               onClick={() => void submit()}
-              disabled={busy || parsed.items.length === 0 || !reasonValid}
+              disabled={busy || parsed.items.length === 0}
             >
               {busy ? '提交中…' : `提交 ${parsed.items.length} 条`}
             </ActionButton>
@@ -218,14 +212,14 @@ export function BatchAdjustDrawer({
           )}
 
           <FormField
-            label="调整原因"
-            hint="本批共用，写入每条积分流水。某一条需要不同说明时，可在该行第 3 列单独写。"
+            label="调整备注（可选）"
+            hint="本批共用；留空时由系统生成说明。某一条需要不同说明时，可在该行第 3 列单独写。"
           >
             <TextField
               value={reason}
               onChange={setReason}
               placeholder="如：双十一活动补偿"
-              ariaLabel="调整原因"
+              ariaLabel="调整备注（可选）"
             />
           </FormField>
 

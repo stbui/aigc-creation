@@ -57,13 +57,13 @@ export function ChannelModelHealthPanel({
               <span className="truncate font-medium text-foreground">{row.name}</span>
               {!row.enabled && <StatusTag status="disabled" tone="muted" label="停用" />}
               {!row.protocolKnown && (
-                <HelpTip tip="该线路声明的协议在当前进程没有注册执行器，调用必定失败">
-                  <StatusTag status="protocol-unknown" tone="danger" label="协议未注册" />
+                <HelpTip tip="当前接口暂不支持执行，调用会失败">
+                  <StatusTag status="protocol-unknown" tone="danger" label="接口不可用" />
                 </HelpTip>
               )}
               {row.coolingUntil && (
                 <HelpTip tip={`冷却到 ${new Date(row.coolingUntil).toLocaleString('zh-CN')}`}>
-                  <StatusTag status="cooling" tone="warn" label="冷却中" />
+                  <StatusTag status="cooling" tone="warn" label="暂时不可用" />
                 </HelpTip>
               )}
             </div>
@@ -87,7 +87,7 @@ export function ChannelModelHealthPanel({
                 label={rateLabel(window.successRate)}
               />
               <div className="mt-0.5 text-[12px] text-muted-foreground">
-                {window.samples > 0 ? `${window.samples} 次样本` : '窗口内没有终态调用'}
+                {window.samples > 0 ? `${window.samples} 次样本` : '暂无调用'}
                 {window.sampled ? ' · 按最近部分统计' : ''}
               </div>
             </div>
@@ -133,7 +133,7 @@ export function ChannelModelHealthPanel({
         render: (row) => {
           const sample = row.recent[0];
           if (!sample) {
-            return <span className="text-muted-foreground">窗口内没有终态调用</span>;
+            return <span className="text-muted-foreground">暂无调用</span>;
           }
           return (
             <div className="min-w-0">
@@ -160,7 +160,7 @@ export function ChannelModelHealthPanel({
       columns={columns}
       rowKey={(row) => row.id}
       loading={loading}
-      emptyText="没有可观测的线路。健康指标按渠道模型统计，导入并启用模型后才有数据。"
+      emptyText="暂无可观测线路"
       minWidth={900}
     />
   );

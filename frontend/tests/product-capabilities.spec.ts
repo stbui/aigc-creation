@@ -1,4 +1,5 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
+import { prepareGuestSession } from './support/guest-session';
 
 /**
  * 前台产品能力回归（2026-10-25）。
@@ -44,6 +45,75 @@ async function mockCaps(page: Page, caps: Caps) {
   );
 }
 
+function publicModel(capability: string, id: string, name: string) {
+  const capabilitySpec = {
+    version: 1,
+    capability: 'image',
+    inputs: {
+      image: { min: 1, max: 4 },
+      ...(capability === 'local_redraw' ? { mask: { min: 1, max: 1 } } : {}),
+    },
+  };
+  return {
+    id,
+    code: id,
+    name,
+    icon: '',
+    description: '',
+    capability,
+    sortOrder: 0,
+    pricePolicy: 'fixed',
+    pricingMode: 'fixed',
+    displayPrice: 10,
+    priceLabel: '10 积分',
+    billingMode: 'per_image',
+    unitPriceMicrocredits: 10_000_000,
+    inputPriceMicrocredits: 0,
+    outputPriceMicrocredits: 0,
+    cachedPriceMicrocredits: 0,
+    priceTiers: [],
+    legacyModelIds: [],
+    capabilitySpec,
+    capabilityProfiles: [capabilitySpec],
+    defaultOptions: {},
+    available: true,
+  };
+}
+
+async function mockModels(page: Page) {
+  await page.route('**/api/v1/models*', (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        data: {
+          models: [
+            publicModel('creative_image', 'model-creative-e2e', '创意生图测试模型'),
+            publicModel('local_redraw', 'model-redraw-e2e', '局部重绘测试模型'),
+          ],
+        },
+        message: '',
+      }),
+    }),
+  );
+}
+
+async function mockTaskList(page: Page, items: unknown[]) {
+  await page.route(/\/api\/v1\/tasks(?:\/page)?(?:\?.*)?$/, (route) => {
+    const isPaged = new URL(route.request().url()).pathname === '/api/v1/tasks/page';
+    return route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        code: 0,
+        data: isPaged ? { items, total: items.length, limit: 50, offset: 0 } : items,
+        message: '',
+      }),
+    });
+  });
+}
+
 async function register(request: APIRequestContext): Promise<{ token: string; email: string }> {
   const email = `e2e-caps-${Date.now()}-${Math.floor(Math.random() * 1e6)}@local.dev`;
   // 多个用例共用同一测试实例时，注册接口的滑动窗口限流会正常触发。
@@ -82,6 +152,7 @@ const PNG = Buffer.from(
 
 test.describe('能力可见性与运行态', () => {
   test('下线的能力全站隐藏；暂无通道的能力保留入口并标注', async ({ page, request }) => {
+    await prepareGuestSession(page);
     const caps = await fetchCaps(request);
     patchRuntime(caps, 'matting', {
       enabled: false,
@@ -96,6 +167,7 @@ test.describe('能力可见性与运行态', () => {
       reason: '模型通道维护中，请稍后再试',
     });
     await mockCaps(page, caps);
+    await mockModels(page);
 
     // 首页：下线条目消失（工具入口 + 案例页签 + 顶导共用同一份能力清单）
     await page.goto(`${UI}/`);
@@ -104,7 +176,7 @@ test.describe('能力可见性与运行态', () => {
 
     // 工作台：下线卡片消失，不可用卡片保留并给出标注
     await page.goto(`${UI}/workbench`);
-    const cards = page.locator('.wb-card');
+    const cards = page.locator('.wb-tool-grid .wb-tool-card');
     await expect(cards.filter({ hasText: '一键抠图' })).toHaveCount(0);
     const creative = cards.filter({ hasText: '创意生图' });
     await expect(creative).toBeVisible();
@@ -117,9 +189,7 @@ test.describe('能力可见性与运行态', () => {
     // 站点地图：同样不再列出下线能力
     await page.goto(`${UI}/sitemap.html`);
     await expect(page.locator('a.sitemap-item[href="/background-remove"]')).toHaveCount(0);
-    await expect(
-      page.locator('a.sitemap-item[href="/creative-image"]'),
-    ).toBeVisible();
+    await expect(page.locator('a.sitemap-item[href="/creative-image"]')).toBeVisible();
   });
 
   test('创意生图独立路由，提交 capability=creative_image', async ({ page, request }) => {
@@ -135,6 +205,7 @@ test.describe('能力可见性与运行态', () => {
       reason: null,
     });
     await mockCaps(page, caps);
+    await mockModels(page);
 
     let posted: any = null;
     await page.route('**/api/v1/generate', async (route) => {
@@ -142,7 +213,11 @@ test.describe('能力可见性与运行态', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ code: 0, data: { taskId: 'task-creative-e2e' }, message: '' }),
+        body: JSON.stringify({
+          code: 0,
+          data: { taskId: 'task-creative-e2e' },
+          message: '',
+        }),
       });
     });
     await page.route('**/api/v1/tasks/task-creative-e2e', (route) =>
@@ -197,14 +272,16 @@ test.describe('能力可见性与运行态', () => {
     );
 
     await authed(page, '/workbench', token, email);
-    await page.locator('.wb-card').filter({ hasText: '创意生图' }).click();
+    await page.locator('.wb-tool-grid .wb-tool-card').filter({ hasText: '创意生图' }).click();
     await expect(page).toHaveURL(/\/creative-image$/);
 
     await page.locator('textarea').first().fill('清晨窗边的木质桌面');
     await expect(page.getByRole('button', { name: /立即生成/ })).toBeEnabled();
     await page.locator('textarea').first().fill('');
 
-    await page.locator('input[type=file]').setInputFiles({ name: 'e2e.png', mimeType: 'image/png', buffer: PNG });
+    await page
+      .locator('input[type=file]')
+      .setInputFiles({ name: 'e2e.png', mimeType: 'image/png', buffer: PNG });
     await expect(page.locator('.fc-thumb img[alt="e2e.png"]')).toBeVisible();
     await page.locator('textarea').first().fill('清晨窗边的木质桌面');
     await page.getByRole('button', { name: /立即生成/ }).click();
@@ -214,7 +291,9 @@ test.describe('能力可见性与运行态', () => {
     expect(posted.params.prompt).toBe('清晨窗边的木质桌面');
 
     const result = page.locator('.fc-result-item.is-loaded').first();
-    await expect(result.locator('.fc-result-item-prompt')).toBeVisible({ timeout: 15000 });
+    await expect(result.locator('.fc-result-item-prompt')).toBeVisible({
+      timeout: 15000,
+    });
 
     // 右键菜单与查看器共用任务参数里的原始提示词，不重新调用模型改写。
     await result.click({ button: 'right' });
@@ -239,7 +318,10 @@ test.describe('能力可见性与运行态', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     const mobileBadge = result.locator('.fc-result-item-prompt');
     await expect(mobileBadge.locator('.fc-result-item-prompt-text')).toBeHidden();
-    const [thumbBox, badgeBox] = await Promise.all([result.boundingBox(), mobileBadge.boundingBox()]);
+    const [thumbBox, badgeBox] = await Promise.all([
+      result.boundingBox(),
+      mobileBadge.boundingBox(),
+    ]);
     expect(thumbBox).not.toBeNull();
     expect(badgeBox).not.toBeNull();
     expect(badgeBox!.width).toBeLessThanOrEqual(26);
@@ -273,13 +355,16 @@ test.describe('能力可见性与运行态', () => {
     await page.evaluate(() => localStorage.clear());
     await page.reload();
     await expect(page.locator('button.pk-primary-btn').first()).toBeDisabled();
-    await page.locator('input[type=file]').setInputFiles({ name: 'guest.png', mimeType: 'image/png', buffer: PNG });
+    await page
+      .locator('input[type=file]')
+      .setInputFiles({ name: 'guest.png', mimeType: 'image/png', buffer: PNG });
     await expect(page.locator('.login-modal')).toBeVisible({ timeout: 10000 });
   });
 });
 
 test.describe('工具上传约束', () => {
   test('GIF 与超过 10MB 的文件在选择阶段被拒，不发起上传', async ({ page }) => {
+    await prepareGuestSession(page, { dismissPromo: true });
     let uploadRequests = 0;
     await page.route('**/api/v1/assets/upload', (route) => {
       uploadRequests += 1;
@@ -288,8 +373,12 @@ test.describe('工具上传约束', () => {
 
     await page.goto(`${UI}/background-remove`);
     const input = page.locator('input[type=file]');
-    await input.setInputFiles({ name: 'animated.gif', mimeType: 'image/gif', buffer: Buffer.from('GIF89a') });
-    await expect(page.locator('[data-testid="admin-toast"]')).toContainText(
+    await input.setInputFiles({
+      name: 'animated.gif',
+      mimeType: 'image/gif',
+      buffer: Buffer.from('GIF89a'),
+    });
+    await expect(page.locator('[data-testid="admin-toast"]').last()).toContainText(
       '请选择图片文件（PNG / JPG / WebP）',
     );
 
@@ -298,13 +387,16 @@ test.describe('工具上传约束', () => {
       mimeType: 'image/png',
       buffer: Buffer.alloc(10 * 1024 * 1024 + 1),
     });
-    await expect(page.locator('[data-testid="admin-toast"]')).toContainText('单张不超过 10MB');
+    await expect(page.locator('[data-testid="admin-toast"]').last()).toContainText('单张不超过 10MB');
     expect(uploadRequests).toBe(0);
   });
 });
 
 test.describe('失败任务重试', () => {
-  test('沿用原任务的 capability / inputAssetIds / params，并显示进度', async ({ page, request }) => {
+  test('沿用原任务的 capability / inputAssetIds / params，并显示进度', async ({
+    page,
+    request,
+  }) => {
     const { token, email } = await register(request);
     const caps = await fetchCaps(request);
     // 重试确认框只在能力可提交时出现；测试环境无真实模型通道，显式注入可用态。
@@ -316,6 +408,7 @@ test.describe('失败任务重试', () => {
       reason: null,
     });
     await mockCaps(page, caps);
+    await mockModels(page);
     const failed = {
       id: 'task-failed-e2e',
       projectId: 'project-e2e',
@@ -330,25 +423,18 @@ test.describe('失败任务重试', () => {
 
     // 历史列表走分页接口 `/tasks/page`（旧 `/tasks` 返回整量数组），两个都拦，
     // 形状各自对上；漏拦就会打到真实后端，拿到的是该账号的真任务。
-    await page.route(/\/api\/v1\/tasks(?:\/page)?$/, (route) => {
-      const isPaged = route.request().url().includes('/api/v1/tasks/page');
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          code: 0,
-          data: isPaged ? { items: [failed], total: 1, limit: 50, offset: 0 } : [failed],
-          message: '',
-        }),
-      });
-    });
+    await mockTaskList(page, [failed]);
     let posted: any = null;
     await page.route('**/api/v1/generate', async (route) => {
       posted = route.request().postDataJSON();
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ code: 0, data: { taskId: 'task-retry-e2e' }, message: '' }),
+        body: JSON.stringify({
+          code: 0,
+          data: { taskId: 'task-retry-e2e' },
+          message: '',
+        }),
       });
     });
     await page.route('**/api/v1/tasks/task-retry-e2e', (route) =>
@@ -449,7 +535,10 @@ test.describe('局部重绘画布', () => {
     expect(mobile.upload).toEqual({ width: 326, height: 160 });
   });
 
-  test('限制 3 个标注，参考图上传中禁用提交，提交带遮罩与逐标注参考图', async ({ page, request }) => {
+  test('限制 3 个标注，参考图上传中禁用提交，提交带遮罩与逐标注参考图', async ({
+    page,
+    request,
+  }) => {
     const { token, email } = await register(request);
     const caps = await fetchCaps(request);
     patchRuntime(caps, 'local_redraw', {
@@ -460,29 +549,27 @@ test.describe('局部重绘画布', () => {
       reason: null,
     });
     await mockCaps(page, caps);
+    await mockModels(page);
 
     await page.route('**/api/v1/projects', (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ code: 0, data: [{ id: 'project-redraw-e2e', name: '测试项目' }], message: '' }),
+        body: JSON.stringify({
+          code: 0,
+          data: [{ id: 'project-redraw-e2e', name: '测试项目' }],
+          message: '',
+        }),
       }),
     );
     // 历史列表走分页接口 `/tasks/page`（旧 `/tasks` 返回整量数组），两个都拦。
-    await page.route(/\/api\/v1\/tasks(?:\/page)?$/, (route) => {
-      const isPaged = route.request().url().includes('/api/v1/tasks/page');
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          code: 0,
-          data: isPaged ? { items: [], total: 0, limit: 50, offset: 0 } : [],
-          message: '',
-        }),
-      });
-    });
+    await mockTaskList(page, []);
     await page.route('**/uploads/**', (route) =>
-      route.fulfill({ status: 200, contentType: 'image/png', body: REDRAW_PNG }),
+      route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: REDRAW_PNG,
+      }),
     );
 
     let finishReferenceUpload: (() => Promise<void>) | null = null;
@@ -533,7 +620,11 @@ test.describe('局部重绘画布', () => {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ code: 0, data: { taskId: 'task-redraw-e2e' }, message: '' }),
+        body: JSON.stringify({
+          code: 0,
+          data: { taskId: 'task-redraw-e2e' },
+          message: '',
+        }),
       });
     });
     await page.route('**/api/v1/tasks/task-redraw-e2e', (route) =>
@@ -579,9 +670,16 @@ test.describe('局部重绘画布', () => {
     await page.locator('.redraw-tool-btn', { hasText: '框选' }).click();
     const canvasBox = await canvas.boundingBox();
     expect(canvasBox).not.toBeNull();
-    await page.mouse.move(canvasBox!.x + canvasBox!.width * 0.2, canvasBox!.y + canvasBox!.height * 0.2);
+    await page.mouse.move(
+      canvasBox!.x + canvasBox!.width * 0.2,
+      canvasBox!.y + canvasBox!.height * 0.2,
+    );
     await page.mouse.down();
-    await page.mouse.move(canvasBox!.x + canvasBox!.width * 0.5, canvasBox!.y + canvasBox!.height * 0.5, { steps: 5 });
+    await page.mouse.move(
+      canvasBox!.x + canvasBox!.width * 0.5,
+      canvasBox!.y + canvasBox!.height * 0.5,
+      { steps: 5 },
+    );
     await page.mouse.up();
     await expect(page.locator('.resize-handle')).toHaveCount(8);
     await page.locator('.redraw-footer-btn', { hasText: '清空' }).click();
@@ -641,7 +739,10 @@ test.describe('局部重绘画布', () => {
     expect(posted.params.strength).toBe(0.5);
     expect(posted.params.outputCount).toBe(1);
     expect(posted.inputAssetIds).toEqual(['asset-original']);
-    await expect(page.locator('.pk-result-body')).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.redraw-result-stage')).toBeVisible({
+      timeout: 15000,
+    });
+    await expect(page.locator('.redraw-result-image')).toBeVisible();
   });
 
   test('余额不足时提交 402：弹「积分不足」并保留画布，不进入生成态', async ({ page, request }) => {
@@ -655,29 +756,27 @@ test.describe('局部重绘画布', () => {
       reason: null,
     });
     await mockCaps(page, caps);
+    await mockModels(page);
 
     await page.route('**/api/v1/projects', (route) =>
       route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ code: 0, data: [{ id: 'project-redraw-e2e', name: '测试项目' }], message: '' }),
+        body: JSON.stringify({
+          code: 0,
+          data: [{ id: 'project-redraw-e2e', name: '测试项目' }],
+          message: '',
+        }),
       }),
     );
     // 历史列表走分页接口 `/tasks/page`（旧 `/tasks` 返回整量数组），两个都拦。
-    await page.route(/\/api\/v1\/tasks(?:\/page)?$/, (route) => {
-      const isPaged = route.request().url().includes('/api/v1/tasks/page');
-      return route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          code: 0,
-          data: isPaged ? { items: [], total: 0, limit: 50, offset: 0 } : [],
-          message: '',
-        }),
-      });
-    });
+    await mockTaskList(page, []);
     await page.route('**/uploads/**', (route) =>
-      route.fulfill({ status: 200, contentType: 'image/png', body: REDRAW_PNG }),
+      route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: REDRAW_PNG,
+      }),
     );
     await page.route('**/api/v1/assets/upload', (route) => {
       const multipart = route.request().postDataBuffer()?.toString('latin1') ?? '';
@@ -708,7 +807,11 @@ test.describe('局部重绘画布', () => {
       route.fulfill({
         status: 402,
         contentType: 'application/json',
-        body: JSON.stringify({ code: 40002, data: null, message: '积分不足: 需要 10, 可用 0' }),
+        body: JSON.stringify({
+          code: 40002,
+          data: null,
+          message: '积分不足: 需要 10, 可用 0',
+        }),
       }),
     );
 

@@ -54,7 +54,7 @@ describe('validateChannelHeaders', () => {
   });
 
   it('拒绝值中的控制字符，但允许横向制表符', () => {
-    expect(validateChannelHeaders([{ name: 'x-a', value: 'a\nb' }])).toContain('控制字符');
+    expect(validateChannelHeaders([{ name: 'x-a', value: 'a\nb' }])).toContain('不支持的字符');
     expect(validateChannelHeaders([{ name: 'x-a', value: 'a\tb' }])).toBe('');
   });
 
@@ -95,29 +95,29 @@ describe('ChannelHeadersEditor', () => {
         onChange={() => {}}
       />,
     );
-    expect(screen.getByLabelText('请求头 1 名称')).toBeTruthy();
-    expect(screen.getByLabelText('请求头 1 值').getAttribute('type')).toBe('text');
-    expect(screen.getByLabelText('请求头 2 值').getAttribute('type')).toBe('password');
-    expect(container.textContent).toContain('2/32');
+    expect(screen.getByLabelText('附加信息 1 名称')).toBeTruthy();
+    expect(screen.getByLabelText('附加信息 1 内容').getAttribute('type')).toBe('text');
+    expect(screen.getByLabelText('附加信息 2 内容').getAttribute('type')).toBe('password');
+    expect(container.textContent).toContain('2/32 项');
   });
 
   it('添加 / 删除请求头会回写数组', () => {
     const onChange = vi.fn();
     const { rerender } = render(<ChannelHeadersEditor value={[]} onChange={onChange} />);
-    fireEvent.click(screen.getByRole('button', { name: '添加请求头' }));
+    fireEvent.click(screen.getByRole('button', { name: '添加附加信息' }));
     expect(onChange).toHaveBeenCalledWith([{ name: '', value: '' }]);
 
     rerender(
       <ChannelHeadersEditor value={[{ name: 'x-a', value: '1' }]} onChange={onChange} />,
     );
-    fireEvent.click(screen.getByRole('button', { name: '删除请求头 1' }));
+    fireEvent.click(screen.getByRole('button', { name: '删除附加信息 1' }));
     expect(onChange).toHaveBeenCalledWith([]);
   });
 
   it('没有 User-Agent 时提供快捷添加，添加后按钮消失', () => {
     const onChange = vi.fn();
     const { rerender } = render(<ChannelHeadersEditor value={[]} onChange={onChange} />);
-    fireEvent.click(screen.getByRole('button', { name: '添加 User-Agent' }));
+    fireEvent.click(screen.getByRole('button', { name: '添加客户端标识' }));
     expect(onChange).toHaveBeenCalledWith([{ name: 'User-Agent', value: DEFAULT_USER_AGENT }]);
 
     rerender(
@@ -126,6 +126,6 @@ describe('ChannelHeadersEditor', () => {
         onChange={onChange}
       />,
     );
-    expect(screen.queryByRole('button', { name: '添加 User-Agent' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '添加客户端标识' })).toBeNull();
   });
 });

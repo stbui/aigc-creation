@@ -70,7 +70,7 @@ export function UserDeleteConfirm({
     >
       <AlertDialogContent
         data-testid="admin-delete-dialog"
-        className="admin-portal max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-[440px] gap-0 overflow-hidden p-0 sm:max-w-[440px]"
+        className="admin-portal max-h-[calc(100vh-2rem)] w-[calc(100%-2rem)] max-w-[440px] gap-0 overflow-hidden p-0"
       >
         <AlertDialogHeader className="px-5 py-4 text-left">
           <AlertDialogTitle className="flex items-center gap-2 text-base text-destructive">

@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useAdminExport } from '~/admin-ui/primitives';
 import { Row, ACTION_LABELS } from './constants';
 import { useAdmin, useToast, useAdminList, useAdminUrlFilterSync } from './hooks';
 import { useSearchParams } from 'react-router-dom';
@@ -145,7 +146,7 @@ export function AdminAuditPage() {
     initialSuccess === undefined ? undefined : String(initialSuccess),
   );
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [exporting, setExporting] = useState(false);
+  const { exporting, runExport } = useAdminExport(toast);
 
   const fetcher = useCallback(
     (params: Record<string, unknown>) =>
@@ -328,21 +329,16 @@ export function AdminAuditPage() {
   ].filter(Boolean) as AppliedFilter[];
 
   /** 导出走已生效的筛选条件 —— 必须与屏幕上的列表同口径 */
-  const exportCsv = async () => {
-    setExporting(true);
-    try {
-      await adminAuditApi.exportCsv({
-        action: params.action as string | undefined,
-        targetId: params.targetId as string | undefined,
-        success: params.success as boolean | undefined,
-      });
-      toast.success('导出已开始下载');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '导出失败');
-    } finally {
-      setExporting(false);
-    }
-  };
+  const exportCsv = () =>
+    runExport(
+      () =>
+        adminAuditApi.exportCsv({
+          action: params.action as string | undefined,
+          targetId: params.targetId as string | undefined,
+          success: params.success as boolean | undefined,
+        }),
+      '导出已开始下载',
+    );
 
   return (
     <>

@@ -1,5 +1,6 @@
 import { Download, KeyRound, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { Button } from '../../ui';
+import type { OAuthProviderInfo } from './api';
 
 /**
  * 安全与数据卡。
@@ -9,13 +10,23 @@ import { Button } from '../../ui';
  * 三行都只上抛意图, 具体流程 (弹窗、校验、接口) 由页面持有。
  */
 export function AccountSecurityCard({
+  hasPassword,
+  oauthProviders,
+  linkedOAuthProviders,
+  linkingProvider,
   exporting,
   onChangePassword,
+  onLinkOAuth,
   onExportData,
   onDeleteAccount,
 }: {
+  hasPassword: boolean;
+  oauthProviders: OAuthProviderInfo[];
+  linkedOAuthProviders: string[];
+  linkingProvider: string | null;
   exporting: boolean;
   onChangePassword: () => void;
+  onLinkOAuth: (provider: OAuthProviderInfo) => void;
   onExportData: () => void;
   onDeleteAccount: () => void;
 }) {
@@ -33,11 +44,38 @@ export function AccountSecurityCard({
               登录密码
             </span>
             <span className="account-action-desc">
-              修改后该账号在所有设备上的登录状态都会失效，需要重新登录。
+              {hasPassword
+                ? '修改后该账号在所有设备上的登录状态都会失效，需要重新登录。'
+                : '当前为第三方登录账号，设置密码后可使用邮箱和密码登录。'}
             </span>
           </div>
-          <Button onClick={onChangePassword}>修改密码</Button>
+          <Button onClick={onChangePassword}>{hasPassword ? '修改密码' : '设置密码'}</Button>
         </li>
+        {oauthProviders.map((provider) => {
+          const linked = linkedOAuthProviders.includes(provider.id);
+          return (
+            <li key={provider.id}>
+              <div className="account-action-text">
+                <span className="account-action-title">
+                  <ShieldCheck size={13} aria-hidden />
+                  {provider.name}
+                </span>
+                <span className="account-action-desc">
+                  {linked
+                    ? `已绑定 ${provider.name}，可用于第三方快捷登录。`
+                    : `绑定 ${provider.name} 后可使用该账号快捷登录。`}
+                </span>
+              </div>
+              <Button
+                disabled={linked}
+                loading={linkingProvider === provider.id}
+                onClick={() => onLinkOAuth(provider)}
+              >
+                {linked ? '已绑定' : '绑定账号'}
+              </Button>
+            </li>
+          );
+        })}
         <li>
           <div className="account-action-text">
             <span className="account-action-title">

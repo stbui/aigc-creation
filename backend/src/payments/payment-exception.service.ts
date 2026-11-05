@@ -364,19 +364,37 @@ export class PaymentExceptionService {
       data: { status: 'auto_refund_pending', refundId: refund.id, ownerId: actorId },
     });
 
-    const result = await this.gateway.refund({
-      order: {
-        channel: payment.channel,
-        providerConfigId: payment.providerConfigId ?? order.providerConfigId,
-      },
-      orderNo: order.orderNo,
-      outRefundNo: refund.id,
-      amountCents: exception.amountCents,
-      totalCents: payment.amountCents || order.paidCents,
-      reason: refund.reason,
-      providerRef: payment.providerRef ?? undefined,
-      providerTradeNo: payment.payTransactionId ?? undefined,
-    });
+    let result;
+    try {
+      result = await this.gateway.refund({
+        order: {
+          channel: payment.channel,
+          providerConfigId: payment.providerConfigId ?? order.providerConfigId,
+        },
+        orderNo: order.orderNo,
+        outRefundNo: refund.id,
+        amountCents: exception.amountCents,
+        totalCents: payment.amountCents || order.paidCents,
+        reason: refund.reason,
+        providerRef: payment.providerRef ?? undefined,
+        providerTradeNo: payment.payTransactionId ?? undefined,
+      });
+    } catch (error) {
+      // 渠道调用直接抛错时没有返回状态，绝不能把异常单永久停在
+      // auto_refund_pending；退款单落 failed 并转人工，等待运营核销。
+      const message = (error as Error)?.message || '渠道退款调用异常';
+      await this.prisma.refund.update({
+        where: { id: refund.id },
+        data: {
+          status: 'failed',
+          detail: JSON.stringify({ automatic: true, error: message }),
+        },
+      });
+      this.logger.error(
+        `自动退款调用异常: case=${exception.id} refund=${refund.id} provider=${exception.providerId} — ${message}`,
+      );
+      return this.manualReview(exception, `自动退款调用异常: ${message}`);
+    }
 
     if (result.state === 'succeeded') {
       const updatedRefund = await this.prisma.refund.update({
@@ -426,7 +444,8 @@ export class PaymentExceptionService {
     const fingerprint = exceptionFingerprint(input);
     const existing = await this.prisma.paymentExceptionCase.findUnique({ where: { fingerprint } });
     if (!existing) {
-      return this.prisma.paymentExceptionCase.create({
+      return this.prisma.paymentExceptionCase
+        .create({
         data: {
           fingerprint,
           providerId: input.providerId,
@@ -442,7 +461,15 @@ export class PaymentExceptionService {
           slaDueAt: new Date(Date.now() + SLA_MS),
           lastError: input.detail.slice(0, 500),
         },
-      });
+        })
+        .catch(async (error: unknown) => {
+          // 两个回调/对账任务可能同时发现同一事件；唯一键冲突后回查赢家，
+          // 再走一次更新逻辑，保证调用方拿到稳定的异常单。
+          if ((error as { code?: string })?.code === 'P2002') {
+            return this.upsertCase(input, initialStatus);
+          }
+          throw error;
+        });
     }
     if (TERMINAL_STATUSES.has(existing.status)) return existing;
 

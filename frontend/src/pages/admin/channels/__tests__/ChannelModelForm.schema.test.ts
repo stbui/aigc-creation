@@ -28,8 +28,8 @@ describe('modelDraftSchema', () => {
     expect(result.success).toBe(false);
     expect(result.error?.issues).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ path: ['modelKey'], message: '请填写模型标识' }),
-        expect.objectContaining({ path: ['protocol'], message: '请选择请求协议' }),
+        expect.objectContaining({ path: ['modelKey'], message: '请填写模型编号' }),
+        expect.objectContaining({ path: ['protocol'], message: '请选择接口类型' }),
       ]),
     );
   });

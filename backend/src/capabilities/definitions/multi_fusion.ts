@@ -37,7 +37,9 @@ export function multiFusionCreditCost(
   size: unknown,
 ): number {
   const count = Math.max(1, Math.min(4, Math.floor(Number(variantCount) || 1)));
-  return Math.round(
+  // 与微积分计费的最终取整口径一致：只要产生非零消耗就向上取整，
+  // 避免展示价低于实际入账价。
+  return Math.ceil(
     (baseCost * count * multiFusionCreditMultiplier(size)) / 4,
   );
 }

@@ -29,15 +29,15 @@ const tierSchema = z.object({
  */
 export const modelDraftSchema = z
   .object({
-    modelKey: z.string().trim().min(1, '请填写模型标识'),
+    modelKey: z.string().trim().min(1, '请填写模型编号'),
     providerModelKey: z.string(),
     displayName: z.string(),
-    channelLabel: z.string().max(80, '渠道展示名最多 80 字'),
-    description: z.string().max(500, '描述最多 500 字'),
+    channelLabel: z.string().max(80, '渠道内名称最多 80 字'),
+    description: z.string().max(500, '模型介绍最多 500 字'),
     icon: z.string(),
-    capability: z.string().min(1, '请选择产出能力'),
-    protocol: z.string().min(1, '请选择请求协议'),
-    priceCurrency: z.string().min(1, '请选择计价货币'),
+    capability: z.string().min(1, '请选择能力类型'),
+    protocol: z.string().min(1, '请选择接口类型'),
+    priceCurrency: z.string().min(1, '请选择结算币种'),
     tags: z.array(
       z.object({
         text: z.string(),
@@ -46,7 +46,7 @@ export const modelDraftSchema = z
     ),
     capabilityConfig: z.string(),
     enabled: z.boolean(),
-    tiers: z.array(tierSchema).min(1, '至少保留一个价格档'),
+    tiers: z.array(tierSchema).min(1, '至少保留一个价格方案'),
   })
   .superRefine((draft, ctx) => {
     if (draft.capability === 'image') {
@@ -65,7 +65,7 @@ export const modelDraftSchema = z
         ctx.addIssue({
           code: 'custom',
           path: ['capabilityConfig'],
-          message: '能力合同不是合法 JSON',
+          message: '能力配置格式不正确',
         });
       }
     }
@@ -88,5 +88,3 @@ export const modelDraftSchema = z
       });
     }
   });
-
-export type ChannelModelFormValues = z.infer<typeof modelDraftSchema>;

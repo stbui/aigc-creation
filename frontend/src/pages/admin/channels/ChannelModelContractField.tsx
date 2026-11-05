@@ -16,8 +16,8 @@ export function ChannelModelContractField({
 }) {
   return (
     <Panel
-      title="能力合同（可选）"
-      note="JSON，声明支持的输入素材数量、选项范围与图片尺寸；留空使用能力默认合同"
+      title="能力配置（可选）"
+      note="按需说明支持的输入素材、选项范围与图片尺寸；留空使用默认配置"
     >
       <Controller
         control={control}
@@ -28,10 +28,10 @@ export function ChannelModelContractField({
           const errorId = `${controlId}-error`;
           return (
             <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor={controlId}>能力合同 JSON</FieldLabel>
+              <FieldLabel htmlFor={controlId}>能力配置</FieldLabel>
               <TextAreaField
                 id={controlId}
-                ariaLabel="能力合同 JSON"
+                ariaLabel="能力配置"
                 value={field.value}
                 onChange={field.onChange}
                 rows={8}
@@ -43,7 +43,7 @@ export function ChannelModelContractField({
                 <FieldError id={errorId} errors={[fieldState.error]} />
               ) : (
                 <FieldDescription id={descriptionId}>
-                  JSON，声明支持的输入素材数量、选项范围与图片尺寸；留空使用能力默认合同
+                  按需说明支持的输入素材、选项范围与图片尺寸；留空使用默认配置
                 </FieldDescription>
               )}
             </Field>

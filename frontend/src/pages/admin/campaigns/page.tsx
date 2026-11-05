@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useAdminExport } from '~/admin-ui/primitives';
 import { useSearchParams } from 'react-router-dom';
 import { Download, Plus } from 'lucide-react';
 import { marketingApi } from './api';
@@ -37,7 +38,7 @@ export function AdminCampaignsPage() {
   const [keyword, setKeyword] = useState(initialKeyword);
   const [status, setStatus] = useState<string | undefined>(initialStatus);
   const [busy, setBusy] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const { exporting, runExport } = useAdminExport(toast);
   const [editing, setEditing] = useState<AdminCampaign | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState<FormState>(emptyForm());
@@ -112,20 +113,15 @@ export function AdminCampaignsPage() {
   ].filter(Boolean) as AppliedFilter[];
 
   /** 导出走已生效的筛选条件 —— 必须与屏幕上的列表同口径 */
-  const exportCsv = async () => {
-    setExporting(true);
-    try {
-      await marketingApi.exportCampaigns({
-        keyword: params.keyword as string | undefined,
-        status: params.status as string | undefined,
-      });
-      toast.success('导出已开始下载');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '导出失败');
-    } finally {
-      setExporting(false);
-    }
-  };
+  const exportCsv = () =>
+    runExport(
+      () =>
+        marketingApi.exportCampaigns({
+          keyword: params.keyword as string | undefined,
+          status: params.status as string | undefined,
+        }),
+      '导出已开始下载',
+    );
 
   const patchForm = (patch: Partial<FormState>) => setForm((prev) => ({ ...prev, ...patch }));
 

@@ -16,7 +16,7 @@
 
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import type { RouteAttempt } from '@prisma/client';
+import type { Prisma, RouteAttempt } from '@prisma/client';
 
 /** 尝试状态 */
 export const ATTEMPT_STATUSES = ['selected', 'dispatching', 'succeeded', 'failed'] as const;
@@ -62,17 +62,20 @@ export class TaskAttemptService {
   constructor(private readonly prisma: PrismaService) {}
 
   /** 选路成功即建一条 `selected/not_sent` */
-  async create(input: {
-    taskId: string;
-    routeRun: number;
-    attemptNumber: number;
-    logicalModelId: string;
-    logicalModelRevisionId: string;
-    routeId: string;
-    channelModelId: string;
-    channelId: string;
-  }): Promise<RouteAttempt> {
-    return this.prisma.routeAttempt.create({
+  async create(
+    input: {
+      taskId: string;
+      routeRun: number;
+      attemptNumber: number;
+      logicalModelId: string;
+      logicalModelRevisionId: string;
+      routeId: string;
+      channelModelId: string;
+      channelId: string;
+    },
+    db: Pick<Prisma.TransactionClient, 'routeAttempt'> = this.prisma,
+  ): Promise<RouteAttempt> {
+    return db.routeAttempt.create({
       data: {
         taskId: input.taskId,
         routeRun: input.routeRun,

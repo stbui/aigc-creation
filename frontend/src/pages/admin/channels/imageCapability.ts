@@ -380,7 +380,7 @@ export function validateImageCapabilityConfigJson(raw: string): string | null {
   try {
     document = JSON.parse(text);
   } catch {
-    return '能力合同不是合法 JSON';
+    return '能力配置格式不正确';
   }
   if (!isRecord(document) || !isRecord(document.image)) return '请配置图片模型能力参数';
   const image = document.image;

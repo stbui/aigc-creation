@@ -527,9 +527,10 @@ export class CreditService {
   // ── 人工调整 (B-52) ──────────────────────────────────────────────
 
   /**
-   * 人工增减积分。**强制填写原因**。
+   * 人工增减积分。
    *
-   * 不允许"无理由调整" —— 积分是用户的资产, 无痕改动等于资损。
+   * 备注可选：未填写时生成稳定系统说明，操作人、目标与动作由审计日志记录。
+   * 不允许无痕调整，但「有审计」不等于「要求操作人重复填写审计原因」。
    *
    * `idempotencyKey` 为可选但**批量 / 导入场景必须传**：一次 500 行的导入
    * 超时后重试，没有幂等键就是全量双发，且账本无法区分首次与重试。
@@ -537,18 +538,17 @@ export class CreditService {
   async adminAdjust(params: {
     userId: string;
     delta: number;
-    reason: string;
+    reason?: string;
     operatorId: string;
     validDays?: number;
     idempotencyKey?: string;
   }): Promise<{ balance: number; idempotentHit?: boolean }> {
-    const reason = params.reason?.trim();
-    if (!reason) {
-      throw new AppError(40001, '人工调整积分必须填写原因', 400);
-    }
     if (params.delta === 0) {
       throw new AppError(40001, '调整值不能为 0', 400);
     }
+    const reason = params.reason?.trim() || (params.delta > 0
+      ? '人工增加积分（系统自动记录）'
+      : '人工扣减积分（系统自动记录）');
 
     if (params.delta > 0) {
       const granted = await this.grant({

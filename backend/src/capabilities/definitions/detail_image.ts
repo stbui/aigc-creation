@@ -81,6 +81,41 @@ const SECTION_BRIEFS: Record<string, string> = {
 };
 
 const SECTION_LABELS = new Map(DETAIL_SECTIONS.map((s) => [String(s.value), s.label]));
+const MAX_SECTION_PROMPT_LEN = 1000;
+
+/**
+ * 页面提交的 JSON: `[{ section: 'hero', prompt: '首屏要更突出产品' }]`。
+ *
+ * 兼容对象写法便于 API 调用方直接传 map。非法项静默跳过，最终由 buildPrompt
+ * 回落到该模块的固定版式说明，避免一个格式错误让整批任务无法提交。
+ */
+function parseSectionPrompts(raw: unknown): Map<string, string> {
+  if (typeof raw !== 'string' || !raw.trim()) return new Map();
+  let decoded: unknown;
+  try {
+    decoded = JSON.parse(raw);
+  } catch {
+    return new Map();
+  }
+
+  const entries: Array<[unknown, unknown]> = Array.isArray(decoded)
+    ? decoded.map((item) => [
+        typeof item === 'object' && item ? (item as Record<string, unknown>).section : undefined,
+        typeof item === 'object' && item ? (item as Record<string, unknown>).prompt : undefined,
+      ])
+    : typeof decoded === 'object' && decoded
+      ? Object.entries(decoded as Record<string, unknown>)
+      : [];
+
+  const validSections = new Set(DETAIL_SECTIONS.map((section) => String(section.value)));
+  const prompts = new Map<string, string>();
+  for (const [sectionRaw, promptRaw] of entries) {
+    const section = typeof sectionRaw === 'string' ? sectionRaw.trim() : '';
+    const prompt = typeof promptRaw === 'string' ? promptRaw.trim().slice(0, MAX_SECTION_PROMPT_LEN) : '';
+    if (validSections.has(section) && prompt) prompts.set(section, prompt);
+  }
+  return prompts;
+}
 
 /** 模块键 → 展示名 (供准入层构造 outputPlan 与结果行标签) */
 export function detailSectionLabel(key: string): string {
@@ -130,6 +165,22 @@ export const DetailImage: CapabilityPlugin = {
     // ── 批次技术字段 (页面不填, 准入层按 outputPlan 代填) ──
     { key: 'section', label: '模块键', type: 'text', hidden: true, help: '本张图负责的模块键' },
     { key: 'sectionLabel', label: '模块名称', type: 'text', hidden: true, help: '结果行图片下方的标签' },
+    {
+      key: 'sectionPrompts',
+      label: '模块提示词',
+      type: 'text',
+      hidden: true,
+      maxLength: 20000,
+      help: '每个模块独立提示词的 JSON；由页面按模块拆进批次任务',
+    },
+    {
+      key: 'sectionPrompt',
+      label: '当前任务模块提示词',
+      type: 'text',
+      hidden: true,
+      maxLength: MAX_SECTION_PROMPT_LEN,
+      help: '批次拆分后写入本任务，仅供该模块使用',
+    },
     { key: 'batchId', label: '批次 ID', type: 'text', hidden: true, maxLength: 128 },
     { key: 'batchIndex', label: '批次序号', type: 'number', hidden: true, min: 1, max: 10, step: 1 },
     { key: 'batchSize', label: '批次数量', type: 'number', hidden: true, min: 1, max: 10, step: 1 },
@@ -140,6 +191,7 @@ export const DetailImage: CapabilityPlugin = {
     const label = detailSectionLabel(section);
     const brief =
       SECTION_BRIEFS[section] || '按该版块的常见电商版式组织画面，信息不足时减少内容项，不编造事实';
+    const sectionPrompt = typeof p.sectionPrompt === 'string' ? p.sectionPrompt.trim() : '';
     const facts = (String(p.description ?? '').trim() ||
       '仅根据商品名称与参考图呈现商品外观，不补充参数事实').replace(/[。；;]+$/, '');
     const productName = String(p.productName ?? '').trim();
@@ -162,6 +214,11 @@ export const DetailImage: CapabilityPlugin = {
       `电商详情页单模块图生成。${subjectText(p)}。商品事实：${facts}。\n` +
       `只生成「${label}」这一张独立版块图，不生成整张详情长图。\n` +
       `【版式要求】\n${brief}。\n` +
+      (sectionPrompt
+        ? `【模块提示词】\n${sectionPrompt}\n` +
+          '以上模块提示词用于补充本张图的画面方向、构图和信息重点；' +
+          '若与商品事实、参考图一致性或本提示词其它约束冲突，以其它约束为准。\n'
+        : '') +
       '【参考图】\n' +
       '参考图仅作为商品外观依据，不是版式、场景或文案参考。' +
       '商品结构、颜色、材质、logo、包装和配件必须与参考图一致；' +
@@ -186,12 +243,18 @@ export const DetailImage: CapabilityPlugin = {
     );
   },
   // 勾选 N 个模块 → N 张模块图；每张各计一次 creditCost (见 outputPlan 注释)
-  outputPlan: (p) =>
-    parseDetailSections(p.sections).map((key) => ({
+  outputPlan: (p) => {
+    const prompts = parseSectionPrompts(p.sectionPrompts);
+    return parseDetailSections(p.sections).map((key) => ({
       key,
       label: detailSectionLabel(key),
-      params: { section: key, sectionLabel: detailSectionLabel(key) },
-    })),
+      params: {
+        section: key,
+        sectionLabel: detailSectionLabel(key),
+        ...(prompts.get(key) ? { sectionPrompt: prompts.get(key) } : {}),
+      },
+    }));
+  },
   modality: 'image',
   model: { capability: 'image', operation: 'text_to_image', intent: generateImageIntent },
   inputs: 1,

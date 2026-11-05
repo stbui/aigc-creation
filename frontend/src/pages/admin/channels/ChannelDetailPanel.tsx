@@ -73,9 +73,9 @@ export function ChannelDetailPanel({
               <span className="min-w-0 max-w-full truncate font-mono text-[12px]" title={selected.baseUrl}>
                 {selected.baseUrl}
               </span>
-              {!selected.hasApiKey && <span>凭证未配置</span>}
-              {selected.hasApiKey && selected.hasSecretKey && <span>AK/SK 已配置</span>}
-              {selected.proxyUrl && <span className="font-mono">代理：{selected.proxyUrl}</span>}
+              {!selected.hasApiKey && <span>访问凭证未配置</span>}
+              {selected.hasApiKey && selected.hasSecretKey && <span>访问凭证与签名密钥已配置</span>}
+              {selected.proxyUrl && <span className="font-mono">网络代理：{selected.proxyUrl}</span>}
               {selected.catalogProviderId && (
                 <span>来源：服务商目录 · {selected.catalogProviderId}</span>
               )}
@@ -161,16 +161,7 @@ export function ChannelDetailPanel({
                   ? '暂时无法读取渠道'
                   : hasFilters
                     ? '没有匹配的渠道'
-                    : '选择左侧渠道'
-            }
-            description={
-              loading
-                ? '加载完成后在此显示该渠道的模型与价格。'
-                : error
-                  ? '请重试加载渠道列表。'
-                  : hasFilters
-                    ? '当前筛选下没有渠道，清除筛选后再选。'
-                    : '选中渠道后，在这里维护它的模型、能力合同与价格档。'
+                    : '请选择渠道'
             }
             action={
               !hasFilters && !loading && !error ? (

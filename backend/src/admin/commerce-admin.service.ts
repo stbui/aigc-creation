@@ -631,7 +631,7 @@ export class AdminCommerceService {
     shared: {
       operatorId: string;
       validDays?: number;
-      reason: string;
+      reason?: string;
       idempotencyKey?: string;
     },
   ) {
@@ -644,7 +644,6 @@ export class AdminCommerceService {
     }> = [];
 
     const reason = String(shared.reason ?? "").trim();
-    if (!reason) throw new AppError(40001, "批量调整必须填写原因", 400);
     const batchKey = String(shared.idempotencyKey ?? "").trim() || `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 
     // 先批量取一次存在的用户: 逐条撞外键的话, 返回给运营的是 Prisma 的
@@ -674,7 +673,7 @@ export class AdminCommerceService {
           userId: item.userId,
           delta,
           // 单条可覆盖整批原因（批量里常有「个别特殊补偿」）
-          reason: String(item.reason ?? "").trim() || reason,
+          reason: String(item.reason ?? "").trim() || reason || undefined,
           operatorId: shared.operatorId,
           validDays: shared.validDays,
           idempotencyKey: `batch:${shared.operatorId}:${batchKey}:${index}`,

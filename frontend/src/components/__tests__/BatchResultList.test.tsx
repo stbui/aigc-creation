@@ -1,11 +1,14 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { UiProvider } from '../../ui';
+import { downloadUrlsAsZip } from '../../lib/zip';
 import { buildBatchRows } from '../batchResult';
 import { BatchResultList } from '../BatchResultList';
 import type { GalleryItem } from '../../hooks/useResultGallery';
+
+vi.mock('../../lib/zip', () => ({ downloadUrlsAsZip: vi.fn() }));
 
 /**
  * 批次结果列表是详情图 / 商品主图 / 带货图文三页共用的渲染本体。
@@ -227,12 +230,15 @@ describe('BatchResultList 卡片布局', () => {
     const grid = document.querySelector('.pd-result-card-grid');
     expect(grid).toBeInTheDocument();
     expect(grid?.querySelectorAll('.pd-result-cell')).toHaveLength(3);
-    expect(within(grid as HTMLElement).getByText('图片 1')).toBeVisible();
+    const firstLabel = within(grid as HTMLElement).getByText('图片 1');
+    expect(firstLabel).toBeVisible();
+    expect(firstLabel).toBe(grid?.querySelector('.pd-result-cell:first-child .pd-result-label'));
+    expect(firstLabel).toHaveClass('pd-result-label');
     expect(within(grid as HTMLElement).getByText('图片 3')).toBeVisible();
   });
 
-  it('一键下载会依次触发本批次全部已完成图片', () => {
-    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  it('一键下载会把本批次全部已完成图片打包为一个 ZIP', async () => {
+    vi.mocked(downloadUrlsAsZip).mockResolvedValue(undefined);
     renderList({
       rows: rowsOf([
         item({ id: 'ready001', url: '/uploads/a.png' }),
@@ -244,10 +250,11 @@ describe('BatchResultList 卡片布局', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '一键下载本批次 2 张结果图' }));
 
-    expect(click).toHaveBeenCalledTimes(2);
-    expect((click.mock.instances[0] as HTMLAnchorElement).download).toBe('demo-图片 1-ady001.png');
-    expect((click.mock.instances[1] as HTMLAnchorElement).download).toBe('demo-图片 2-ady002.png');
-    click.mockRestore();
+    await waitFor(() => expect(downloadUrlsAsZip).toHaveBeenCalledTimes(1));
+    expect(downloadUrlsAsZip).toHaveBeenCalledWith(expect.stringMatching(/^demo-\d{4}-\d{2}-\d{2}\.zip$/), [
+      { name: '01-图片 1.png', url: '/uploads/a.png' },
+      { name: '02-图片 2.png', url: '/uploads/b.png' },
+    ]);
   });
 
   it('默认布局仍是横向单行，不受详情卡片样式影响', () => {

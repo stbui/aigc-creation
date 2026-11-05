@@ -94,7 +94,7 @@ export function UserFilters({
       </FilterBar>
 
       <div className="mb-2.5 flex flex-wrap items-center justify-end gap-2 border-b border-border pb-2">
-        <span className="text-[11px] text-muted-foreground">排序</span>
+        <span className="text-xs text-muted-foreground">排序</span>
         <SelectField
           className="w-32"
           ariaLabel="用户排序"

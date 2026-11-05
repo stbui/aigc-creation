@@ -158,61 +158,47 @@ describe('AdminAssetsService 删除顺序', () => {
     });
   });
 
-  it('硬删项目事务失败时不删除素材文件', async () => {
-    prisma.project.findUnique.mockResolvedValue({
-      id: 'project-1',
-      assets: [
-        { id: 'asset-1', storageKey: 'uploads/asset-1.png', storageBackend: 's3' },
-      ],
-      tasks: [{ id: 'task-1' }],
-    });
-    const assetQuery = { findMany: vi.fn().mockResolvedValue([{ sizeBytes: 10 }]) };
-    (prisma as unknown as { asset: Record<string, unknown> }).asset.findMany = assetQuery.findMany;
-    prisma.$transaction.mockRejectedValue(new Error('db failed'));
-
-    await expect(service.removeProject('project-1', true)).rejects.toThrow('db failed');
-    expect(storage.get).not.toHaveBeenCalled();
-  });
-
-  it('软删项目保留项目行、下架素材并清理任务', async () => {
+  it('项目删除只写 deletedAt，硬删参数不再删除任务、素材或文件', async () => {
     prisma.project.findUnique.mockResolvedValue({
       id: 'project-1',
       deletedAt: null,
-      assets: [
-        { id: 'asset-1', storageKey: 'uploads/asset-1.png', storageBackend: 's3' },
-      ],
-      tasks: [{ id: 'task-1' }, { id: 'task-2' }],
+      _count: { assets: 1, tasks: 2 },
     });
-    (prisma as unknown as {
-      asset: { findMany: ReturnType<typeof vi.fn> };
-    }).asset.findMany = vi.fn().mockResolvedValue([{ sizeBytes: 10 }]);
+    prisma.project.update.mockResolvedValue({});
 
-    const tx = {
-      generationTask: { deleteMany: vi.fn().mockResolvedValue({ count: 2 }) },
-      asset: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
-      project: {
-        update: vi.fn().mockResolvedValue({}),
-        delete: vi.fn().mockResolvedValue({}),
-      },
-    };
-    prisma.$transaction.mockImplementation(async (work: (tx: unknown) => unknown) => work(tx));
+    await expect(service.removeProject('project-1', true)).resolves.toEqual({
+      id: 'project-1',
+      hard: false,
+      deprecatedHard: true,
+      deletedAt: expect.any(Date),
+      retained: { assets: 1, tasks: 2 },
+    });
+    expect(prisma.project.update).toHaveBeenCalledWith({
+      where: { id: 'project-1' },
+      data: { deletedAt: expect.any(Date) },
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+    expect(prisma.generationTask.findMany).not.toHaveBeenCalled();
+    expect(prisma.asset.update).not.toHaveBeenCalled();
+    expect(storage.get).not.toHaveBeenCalled();
+  });
+
+  it('重复删除项目幂等返回首次删除时间', async () => {
+    const deletedAt = new Date('2026-01-02T03:04:05.000Z');
+    prisma.project.findUnique.mockResolvedValue({
+      id: 'project-1',
+      deletedAt,
+      _count: { assets: 3, tasks: 4 },
+    });
 
     await expect(service.removeProject('project-1', false)).resolves.toEqual({
       id: 'project-1',
       hard: false,
-      impact: { assets: 1, tasks: 2, bytes: 10 },
+      deprecatedHard: true,
+      deletedAt,
+      retained: { assets: 3, tasks: 4 },
     });
-
-    expect(tx.generationTask.deleteMany).toHaveBeenCalledWith({ where: { projectId: 'project-1' } });
-    expect(tx.asset.updateMany).toHaveBeenCalledWith({
-      where: { projectId: 'project-1' },
-      data: { status: 'hidden' },
-    });
-    expect(tx.project.update).toHaveBeenCalledWith({
-      where: { id: 'project-1' },
-      data: { deletedAt: expect.any(Date) },
-    });
-    expect(tx.project.delete).not.toHaveBeenCalled();
+    expect(prisma.project.update).not.toHaveBeenCalled();
     expect(storage.get).not.toHaveBeenCalled();
   });
 });

@@ -39,7 +39,7 @@ export function UserStatusConfirm({
     >
       <AlertDialogContent
         data-testid="admin-status-dialog"
-        className="admin-portal w-[calc(100%-2rem)] max-w-[400px] gap-0 overflow-hidden p-0 sm:max-w-[400px]"
+        className="admin-portal w-[calc(100%-2rem)] max-w-[400px] gap-0 overflow-hidden p-0"
       >
         <AlertDialogHeader className="px-5 py-4 text-left">
           <AlertDialogTitle className="flex items-center gap-2 text-base">

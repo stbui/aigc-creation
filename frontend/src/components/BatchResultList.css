@@ -106,8 +106,8 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-strong);
-  font-size: 14px;
-  font-weight: 650;
+  font-size: 16px;
+  font-weight: 700;
   line-height: 1.5;
 }
 
@@ -245,6 +245,13 @@
   width: 100%;
   max-width: none;
   min-width: 0;
+}
+
+/* 模块名作为每张生成图的标题, 放在图片上方并提高层级 */
+.pd-result-card-grid .pd-result-label {
+  color: var(--text-strong);
+  font-size: 14px;
+  font-weight: 650;
 }
 
 .pd-result-card-grid .pd-result-thumb {

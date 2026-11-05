@@ -130,14 +130,24 @@ export function AdminCreditPricesPage() {
       title: '来源',
       width: 130,
       render: (row) =>
-        row.source === 'campaign' ? (
+        row.freeCampaign ? (
           /*
            * 活动覆盖必须单独标出来：此时生效价恒为 0，运营在输入框里改价
            * **不会生效**（活动到点后自动恢复）。不标来源的话，这段表现为
            * 「改了没反应」，会被当成改价 bug。
            */
-          <HelpTip tip="进行中的限时免费活动覆盖了这项能力，活动结束后自动恢复原价">
-            <StatusTag status="campaign" tone="danger" label="限时免费" />
+          <HelpTip
+            tip={
+              row.freeCampaignOnlyNewUsers
+                ? '限时免费仅对未付费新用户生效，老用户仍按当前价格扣费；活动结束后自动恢复'
+                : '进行中的限时免费活动覆盖了这项能力，活动结束后自动恢复原价'
+            }
+          >
+            <StatusTag
+              status="campaign"
+              tone="danger"
+              label={row.freeCampaignOnlyNewUsers ? '新客限免' : '限时免费'}
+            />
           </HelpTip>
         ) : row.source === 'setting' ? (
           <HelpTip tip="后台覆盖中。回落默认后恢复为 registry 的值">

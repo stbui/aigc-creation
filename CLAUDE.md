@@ -20,7 +20,7 @@
 | 权限点 | `backend/src/admin/permissions.ts` |
 | 退款与站点设置默认值 | `backend/src/common/setting-defs.ts` 的 `SETTING_DEFS` |
 | 工单状态机 | `backend/src/tickets/tickets.service.ts` 的 `TRANSITIONS` |
-| 协议与推荐模型 | `backend/plugins/<plugin>/manifest.json`（110 个可用包 / 119 个 provider；另有 3 个 `src-*` 源目录镜像 —— `src-a6api` / `src-antigravity-proxy` / `src-metaso-h3`，运行时不生效）；服务商目录见 `src/model/plugins/provider-catalog.service.ts` |
+| 协议与推荐模型 | `backend/plugins/<plugin>/manifest.json`（运行时生效 **107 个包 / 115 个 provider**；目录共 110 个，另 3 个 `src-*` 源目录镜像 —— `src-a6api` / `src-antigravity-proxy` / `src-metaso-h3` 由 `plugin-manifest.store.ts` 跳过，不计入可用包）；服务商目录见 `src/model/plugins/provider-catalog.service.ts` |
 | 渠道 / 前台模型 / 价格档 | 数据库（后台「渠道工作台」「前台模型」「用户分组」）—— 代码里没有默认线路表 |
 | 账单状态机 | `backend/src/model/billing/billing.service.ts` 的 `BILLING_STATUSES` |
 | 启动期环境变量 | `backend/src/config/env.validation.ts` 的 `ENV_SPECS` |
@@ -29,6 +29,15 @@
 | 后台侧栏与页面分组 | `frontend/src/components/admin/adminNav.ts` 的 `ADMIN_MENU` |
 | 接口清单 / 错误码 / 响应信封 | `docs/api-contract.md` |
 | 测试清单与覆盖矩阵 | `docs/testing.md`；文档分类地图见 `docs/README.md` |
+
+**数量口径（最易腐化，改代码后必须复核）**：本文件的数字以下表口径为准，与代码不符以代码为准并顺手改这里。
+
+| 数字 | 事实源 | 易错排除项 |
+| --- | --- | --- |
+| 107 包 / 115 provider | `backend/plugins/*/manifest.json` 的 `contributes.providers` | 3 个 `src-*` 镜像目录由 `plugin-manifest.store.ts` 跳过；含它们的目录总数是 110 / 119 |
+| 17 能力 / 13 进工作台 / 16 image + 1 video | `definitions/index.ts` 的 `CAPABILITY_PLUGINS` | `*.spec.ts`、`*-options.ts`、`*.templates.ts` 同目录但不是能力定义 |
+| 34 页 / 8 分组 | `adminNav.ts` 的 `ADMIN_MENU` | `AdminShell.tsx`、`dashboard/AdminDashboardContent.tsx`、`__tests__/` 不算菜单页 |
+| 30 条壳内路由 | `App.tsx` 的 `Shell()` 内 `<Routes>` | catch-all 与另两组 `<Routes>`（3 条裸外壳页 / 6 条独立页）不计入 |
 
 ## 账号
 
@@ -60,7 +69,7 @@
 
 ## 技术栈
 
-| 层 | 技术 | 版本（运行时依赖精确锁定；e2e / @types 例外） |
+| 层 | 技术 | 版本（全仓依赖精确锁定，无 `^` / `~`） |
 | --- | --- | --- |
 | 后端 | NestJS + Prisma + **自研 node:sqlite driver adapter** | 12.1.3 / 7.10.0 |
 | 配置 | @nestjs/config（零依赖手写 validate） | 12.0.1 |
@@ -70,7 +79,7 @@
 | 鉴权/加密 | jsonwebtoken / bcryptjs | 9.0.3 / 3.0.3 |
 | 前端 | Vite + React + lucide-react + react-router-dom | 8.3.4 / 19.3.0 / 1.57.0 / 7.18.4 |
 | 前台 UI | `frontend/src/ui` 兼容层（页面只从该 barrel 取件），底层复用 `admin-ui/components/ui` 的 shadcn/radix 原子件 | 自持，antd 已移除 |
-| 前端其他 | qrcode（邀请海报 / 扫码登录）/ @tanstack/react-table（后台表格）/ recharts（图表）/ Playwright（e2e） | 1.5.4 / 9.3.1 / 3.10.1 / `^1.64.1`（仅 e2e 允许 `^`） |
+| 前端其他 | qrcode（邀请海报 / 扫码登录）/ @tanstack/react-table（后台表格）/ recharts（图表）/ Playwright（e2e） | 1.5.4 / 9.3.1 / 3.10.1 / 1.64.1 |
 | 后台 UI | shadcn/ui 源码自持（`radix-ui` 底座，`new-york`）+ cva + `cn`（官方包）+ Tailwind v4 + tw-animate-css；CLI `shadcn` 只用于 `add` 拉件 | 自持 / 1.8.1 / 0.7.1 / 0.5.1 / 4.3.3 / 1.4.0 / 4.23.0 |
 | 前端测试 | Vitest + jsdom + Testing Library | 5.0.5 / 30.1.3 / 16.3.3 |
 | 后端测试 | Vitest + @nestjs/testing + supertest（node 环境） | 5.0.5 / 12.1.3 / 7.1.4 |
@@ -133,7 +142,7 @@ aigc-creation/
     ├── nginx.conf.template   # SPA 回退 + /api 反代 + /uploads 直出（envsubst 模板）
     ├── .env.development / .env.test / .env.production.example
     └── src/
-        ├── App.tsx           # 30 条壳内路由（含 /library、/works 两条别名）+ 3 条裸外壳页 + 6 条独立页 + /admin/* 子应用
+        ├── App.tsx           # 30 条壳内路由（两组别名：/asset-library→/library、/my-works→/works）+ 3 条裸外壳页 + 6 条独立页 + /admin/* 子应用
         ├── admin-ui/         # 后台 UI：components/ui（shadcn 原子件）· primitives（页面唯一取用层）· shell · providers · hooks · lib
         ├── components/       # AppLayout / SideRail / ToolShell / QrLoginPanel / admin/（adminNav + AlertCenter + DutyContext + statusMeta）
         ├── pages/            # 15 个单文件页面（登录 / 工作台 / 订单 / 工单 / 工具页 / 法务 …）
@@ -398,7 +407,7 @@ npm run e2e                 # Playwright
 
 ## 文档索引
 
-文档分五类（需求 / 产品 / 技术 / 测试 / 规划），**完整地图与命名放置规范见 `docs/README.md`**。标记：**现行** = 与代码同步维护；**规划** = 未实施，不得写成现状。
+文档分五类（需求 / 产品 / 技术 / 测试 / 规划；下表「流程」在 `docs/README.md` 归技术类），**分类地图与命名放置规范见 `docs/README.md`**。标记：**现行** = 与代码同步维护；**规划** = 未实施，不得写成现状。`docs/` 下另有 `e2e-failures-2026-11-04.md` / `frontend-slim-audit.md` 两份一次性审计报告（过程产物，按 `docs/README.md` §6.2 不属分类文档），**不得当作现行事实源**。
 
 | 类别 | 文档 |
 | --- | --- |

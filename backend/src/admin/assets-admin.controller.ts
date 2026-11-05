@@ -84,12 +84,14 @@ export class AdminAssetsController {
 
   /**
    * 删除项目 (B-22)。
-   * `?hard=true` 连带删除素材记录与文件; 默认软删(素材置 hidden、项目标记 deletedAt)。
+   * 仅标记项目 deletedAt，任务、素材记录与文件全部保留。
+   * `?hard=true` 仅为旧客户端兼容，已废弃且不再执行物理删除。
    */
   @Delete("projects/:id")
   @RequirePermission(PERMISSIONS.projectDelete)
   @AuditAction("project.delete")
   removeProject(@Param("id") id: string, @Query("hard") hard?: string) {
+    // hard 参数保留在路由契约中，但业务层有意忽略，避免旧客户端触发破坏性删除。
     return this.assets.removeProject(id, hard === "true");
   }
 

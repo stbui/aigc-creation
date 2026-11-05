@@ -34,6 +34,7 @@ import { RouterService } from '../routing/router.service';
 import { detectImageFormat } from '../media/image-format';
 import { RouteHealthService } from '../routing/route-health.service';
 import { BillingService } from '../billing/billing.service';
+import { AppError } from '../../common/app.exception';
 import { CreditPriceService } from '../../credits/credit-price.service';
 import { UserGroupService } from '../user-groups/user-group.service';
 import { getCapability } from '../../capabilities/capability.registry';
@@ -45,6 +46,7 @@ import { TaskExecutorService } from './task-executor.service';
 import { TaskLifecycleService, TASK_ERROR } from './task-lifecycle.service';
 import { TaskMediaService, type PendingOutput } from './task-media.service';
 import { TaskRequestService } from './task-request.service';
+import { scaleMultiFusionDraft } from './task-billing-scale';
 
 /** 租约时长：进程被杀后最迟这么久被接管 */
 const TASK_LEASE_MS = 45_000;
@@ -461,7 +463,7 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     return attempt;
   }
 
-  /** 切换线路：先建下一条尝试，再按新线路换账单，最后派发 */
+  /** 切换线路：按新线路原子替换账单并建 attempt，最后派发 */
   private async switchRoute(
     task: GenerationTask,
     params: Record<string, any>,
@@ -479,9 +481,8 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
     }
 
     const attempts = await this.attempts.listRun(task.id, task.routeRun);
-    const attempt = await this.startAttempt(task, routed, attempts.length + 1);
-    const replaced = await this.replaceBilling(task, routed, attempt.attemptNumber);
-    if (!replaced) return 'stop';
+    const attempt = await this.replaceBilling(task, routed, attempts.length + 1);
+    if (!attempt) return 'stop';
 
     // 账单已换：后续日志 / 结算必须引用新账单号
     const fresh = await this.prisma.generationTask.findUnique({ where: { id: task.id } });
@@ -496,31 +497,49 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
    * 用户明明能付得起却被判余额不足。旧账单此刻一定是 `reserved` / `running`
    * （只有未派发的线路才会触发切换），退款不会与结算冲突。
    */
-  private async replaceBilling(task: GenerationTask, routed: RoutedModel, attemptNumber: number): Promise<boolean> {
+  private async replaceBilling(
+    task: GenerationTask,
+    routed: RoutedModel,
+    attemptNumber: number,
+  ): Promise<RouteAttempt | null> {
     const access = await this.groups.accessForUser(task.ownerId);
     let draft;
+    let freeCampaignId: string | undefined;
     try {
       /*
        * 换线重建账单必须与首次建单走同一套定价：后台覆盖价在这里同样要生效，
        * 否则「首次按 77 扣、换线后又按线路原价 5 扣」，用户会看到金额莫名变小，
        * 财务上则是同一任务两笔口径不同的账。
        */
-      const overrideCost = await this.price.resolve(task.capability);
+      const overrideCost = await this.price.resolveOverride(task.capability);
       draft = this.billing.buildDraft(access, routed, overrideCost);
+      if (task.capability === 'multi_fusion') {
+        draft = scaleMultiFusionDraft(draft, safeJson<Record<string, unknown>>(task.params, {}));
+      }
+      freeCampaignId = await this.price.freeCampaignIdOf(task.capability, task.ownerId);
+      if (freeCampaignId) {
+        draft = { ...draft, amountMicrocredits: 0n };
+      }
     } catch (error) {
       await this.lifecycle.fail(task.id, {
         errorCode: TASK_ERROR.generationFailed,
         errorMessage: `新线路无法计价：${(error as Error).message}`,
         reason: 'generation_failed',
       });
-      return false;
+      return null;
     }
 
-    if (task.billingOrderId) {
-      await this.billing.refund(task.billingOrderId, '线路切换，替换账单', 'route_switch').catch((error: Error) => {
-        this.log.warn(`任务 ${task.id} 旧账单退款失败: ${error.message}`);
+    const authorizedLimit = await this.resolveAuthorizedLimit(task);
+    if (draft.amountMicrocredits > authorizedLimit) {
+      await this.lifecycle.fail(task.id, {
+        errorCode: TASK_ERROR.generationFailed,
+        errorMessage: '新线路价格超出本次请求的授权上限，未继续切换',
+        reason: 'generation_failed',
       });
+      return null;
     }
+
+    let attempt: RouteAttempt | null = null;
     try {
       /*
        * 换线**不能突破用户原始授权上限**。
@@ -534,38 +553,63 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
        * 新线路更贵时直接拒绝切换（任务失败并退款），不静默多扣。
        * 限时免费单的原始授权是 0，换到收费线路同样被拒 —— 用户不该因为换线被收费。
        */
-      const authorizedLimit = await this.resolveAuthorizedLimit(task);
-      if (draft.amountMicrocredits > authorizedLimit) {
-        await this.lifecycle.fail(task.id, {
-          errorCode: TASK_ERROR.generationFailed,
-          errorMessage: '新线路价格超出本次请求的授权上限，未继续切换',
-          reason: 'generation_failed',
-        });
-        return false;
-      }
-      const reserved = await this.billing.reserveTaskBilling({
+      await this.billing.replaceTaskBilling({
         userId: task.ownerId,
         taskId: task.id,
+        expectedBillingOrderId: task.billingOrderId,
+        expectedLeaseOwner: this.owner,
         idempotencyKey: `task:${task.id}:run${task.routeRun}:attempt${attemptNumber}`,
         draft,
+        promotionId: freeCampaignId,
         chargeLimitMicrocredits: authorizedLimit,
-      });
-      await this.prisma.generationTask.update({
-        where: { id: task.id },
-        data: {
-          billingOrderId: reserved.order.id,
-          authorizedChargeMicrocredits: reserved.reserved,
-          creditCost: creditsOf(reserved.reserved),
+        afterSwap: async (tx, swapped) => {
+          attempt = await this.attempts.create(
+            {
+              taskId: task.id,
+              routeRun: task.routeRun,
+              attemptNumber,
+              logicalModelId: routed.logicalModel.id,
+              logicalModelRevisionId: routed.revisionId,
+              routeId: routed.route.id,
+              channelModelId: routed.channelModel.id,
+              channelId: routed.channelModel.channelId,
+            },
+            tx,
+          );
+          const updated = await tx.generationTask.updateMany({
+            where: {
+              id: task.id,
+              status: 'running',
+              leaseOwner: this.owner,
+              billingOrderId: swapped.order.id,
+            },
+            data: {
+              logicalModelRevisionId: routed.revisionId,
+              routeId: routed.route.id,
+              channelModelId: routed.channelModel.id,
+              attempts: { increment: 1 },
+              stage: 'dispatch',
+              progress: 10,
+            },
+          });
+          if (updated.count !== 1) {
+            throw new AppError(40900, '任务租约或账单已变更，不能切换线路', 409);
+          }
         },
       });
-      return true;
+      return attempt;
     } catch (error) {
+      // CAS 冲突说明另一执行者/终态处理已接管，当前 worker 不能反过来判失败。
+      if (error instanceof AppError && error.code === 40900) {
+        this.log.warn(`任务 ${task.id} 换线被并发变更中止: ${error.message}`);
+        return null;
+      }
       await this.lifecycle.fail(task.id, {
         errorCode: TASK_ERROR.generationFailed,
         errorMessage: `切换线路时预留积分失败：${(error as Error).message}`,
         reason: 'generation_failed',
       });
-      return false;
+      return null;
     }
   }
 

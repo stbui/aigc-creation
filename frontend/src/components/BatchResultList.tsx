@@ -7,6 +7,7 @@ import { ImageLightbox, type LightboxItem } from './ImageLightbox';
 import { ToolEmptyState } from './ToolEmptyState';
 import { Spin, useApp } from '../ui';
 import { assetThumbUrl } from '../lib/api';
+import { downloadUrlsAsZip } from '../lib/zip';
 import type { GalleryItem } from '../hooks/useResultGallery';
 import { cellState, formatBatchDate, type BatchRowBase } from './batchResult';
 
@@ -102,6 +103,14 @@ function downloadName(item: GalleryItem, prefix: string, label: string): string 
   return `${prefix}-${label}-${item.id.slice(-6)}.${ext}`;
 }
 
+function extensionOf(item: GalleryItem): string {
+  return (item.format || 'png').toLowerCase().replace(/^\./, '') || 'png';
+}
+
+function safeFilename(value: string): string {
+  return value.replace(/[\\/:*?"<>|]/g, '-').trim() || 'result';
+}
+
 function triggerDownload(item: GalleryItem, prefix: string, label: string) {
   const a = document.createElement('a');
   a.href = item.url;
@@ -130,6 +139,7 @@ function BatchResultListImpl<Row extends BatchRow>({
 }: BatchResultListProps<Row>) {
   const { message } = useApp();
   const [preview, setPreview] = useState<{ items: LightboxItem[]; index: number } | null>(null);
+  const [downloadingRow, setDownloadingRow] = useState<string | null>(null);
   const isCardLayout = layout === 'card';
 
   const readyCount = useMemo(
@@ -150,21 +160,57 @@ function BatchResultListImpl<Row extends BatchRow>({
     message.success('已开始下载');
   };
 
-  const downloadRow = (row: Row) => {
+  const downloadRow = async (row: Row) => {
     const readyItems = row.cells.filter((item) => Boolean(item.url));
-    if (readyItems.length === 0) return;
-    readyItems.forEach((item) => {
+    if (readyItems.length === 0 || downloadingRow) return;
+
+    if (readyItems.length === 1) {
+      const item = readyItems[0];
       const index = row.cells.indexOf(item);
       triggerDownload(item, downloadNamePrefix, cellLabelOf?.(item, index) ?? labelOf(item));
-    });
-    message.success(`已开始下载 ${readyItems.length} 张结果图`);
+      message.success('已开始下载 1 张结果图');
+      return;
+    }
+
+    setDownloadingRow(row.key);
+    try {
+      const files = readyItems.map((item, readyIndex) => {
+        const index = row.cells.indexOf(item);
+        const label = cellLabelOf?.(item, index) ?? labelOf(item);
+        return {
+          name: `${String(readyIndex + 1).padStart(2, '0')}-${safeFilename(label)}.${extensionOf(item)}`,
+          url: item.url,
+        };
+      });
+      await downloadUrlsAsZip(
+        `${downloadNamePrefix}-${new Date().toISOString().slice(0, 10)}.zip`,
+        files,
+      );
+      message.success(`已打包下载 ${readyItems.length} 张结果图`);
+    } catch {
+      // 云端资源未开放 CORS 时 fetch 打包会失败；退回逐张下载，至少不阻断用户。
+      readyItems.forEach((item, index) => {
+        const cellIndex = row.cells.indexOf(item);
+        const label = cellLabelOf?.(item, cellIndex) ?? labelOf(item);
+        window.setTimeout(() => triggerDownload(item, downloadNamePrefix, label), index * 180);
+      });
+      message.warning('打包下载失败，已改为逐张下载');
+    } finally {
+      setDownloadingRow(null);
+    }
   };
 
   const renderResultCell = (row: Row, item: GalleryItem, index: number) => {
     const state = cellState(item);
     const label = cellLabelOf?.(item, index) ?? labelOf(item);
+    const caption = (
+      <figcaption className="pd-result-label" title={label}>
+        {label}
+      </figcaption>
+    );
     return (
       <figure className="pd-result-cell" key={item.id}>
+        {isCardLayout && caption}
         {state === 'ready' ? (
           <div className="pd-result-thumb-wrap">
             <button
@@ -195,9 +241,7 @@ function BatchResultListImpl<Row extends BatchRow>({
             <span>{state === 'failed' ? '生成失败' : '生成中…'}</span>
           </div>
         )}
-        <figcaption className="pd-result-label" title={label}>
-          {label}
-        </figcaption>
+        {!isCardLayout && caption}
       </figure>
     );
   };
@@ -308,13 +352,18 @@ function BatchResultListImpl<Row extends BatchRow>({
                     <button
                       type="button"
                       className="pd-result-download-all"
-                      aria-label={`一键下载本批次 ${row.cells.filter((item) => Boolean(item.url)).length} 张结果图`}
+                      aria-label={
+                        downloadingRow === row.key
+                          ? '正在打包本批次结果图'
+                          : `一键下载本批次 ${row.cells.filter((item) => Boolean(item.url)).length} 张结果图`
+                      }
                       title="下载本批次全部生成图"
-                      disabled={!row.cells.some((item) => Boolean(item.url))}
-                      onClick={() => downloadRow(row)}
+                      aria-busy={downloadingRow === row.key}
+                      disabled={!row.cells.some((item) => Boolean(item.url)) || Boolean(downloadingRow)}
+                      onClick={() => void downloadRow(row)}
                     >
                       <Download size={13} />
-                      一键下载
+                      {downloadingRow === row.key ? '打包中…' : '一键下载'}
                     </button>
                   </div>
 

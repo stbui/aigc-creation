@@ -2,7 +2,7 @@
  * AdminLegalPage 的本地常量与类型。
  */
 
-import type { AdminLegalDoc, LegalSlug, LegalStatus } from '../../../types/api';
+import type { LegalSlug, LegalStatus } from '../../../types/api';
 
 export const SLUGS: { value: LegalSlug; label: string }[] = [
   { value: 'user-agreement', label: '用户协议' },

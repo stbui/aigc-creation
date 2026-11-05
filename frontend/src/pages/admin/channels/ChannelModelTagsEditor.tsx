@@ -48,7 +48,7 @@ export function ChannelModelTagsEditor({
     <Field data-invalid={Boolean(validationError)}>
       <FieldTitle>展示标签</FieldTitle>
       <FieldDescription>
-        最多 5 个，每个 1–12 字，文字不可重复；展示在 C 端模型选项里，不影响计费
+        最多 5 个，每个 1–12 字，文字不可重复；展示在用户端模型选项中，不影响计费
       </FieldDescription>
       <FieldGroup className="gap-2">
         {tags.map((tag, index) => (

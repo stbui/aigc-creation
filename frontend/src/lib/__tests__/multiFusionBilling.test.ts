@@ -14,6 +14,11 @@ describe('multiFusionCreditCost', () => {
     expect(multiFusionCreditCost(40, 2, 3)).toBe(60);
   });
 
+  it('小数向上取整，与后端微积分入账口径一致', () => {
+    expect(multiFusionCreditCost(41, 1, 1)).toBe(11);
+    expect(multiFusionCreditCost(41, 3, 1)).toBe(31);
+  });
+
   it('非法张数收敛到 1-4 张', () => {
     expect(multiFusionCreditCost(40, 0, 1)).toBe(10);
     expect(multiFusionCreditCost(40, 9, 1)).toBe(40);

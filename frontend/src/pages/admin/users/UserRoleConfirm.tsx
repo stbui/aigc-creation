@@ -43,7 +43,7 @@ export function UserRoleConfirm({
     >
       <AlertDialogContent
         data-testid="admin-role-dialog"
-        className="admin-portal w-[calc(100%-2rem)] max-w-[400px] gap-0 overflow-hidden p-0 sm:max-w-[400px]"
+        className="admin-portal w-[calc(100%-2rem)] max-w-[400px] gap-0 overflow-hidden p-0"
       >
         <AlertDialogHeader className="px-5 py-4 text-left">
           <AlertDialogTitle className="text-base">变更角色</AlertDialogTitle>

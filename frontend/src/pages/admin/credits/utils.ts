@@ -23,6 +23,4 @@ export function signed(n: number): string {
 }
 
 /** 后台统一的时间展示；空值显示破折号，不用空白单元格 */
-export function fmtTime(v: string | null): string {
-  return v ? new Date(v).toLocaleString('zh-CN') : '—';
-}
+export { formatDateTimeLoose as fmtTime } from '../../../admin-ui/primitives';

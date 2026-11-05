@@ -5,6 +5,7 @@ import { AlertCircle, CheckCircle2, ChevronLeft, ChevronRight, ImagePlus, Upload
 import { mobileUploadApi } from '../lib/api';
 import { useDocumentMeta } from '../hooks/useDocumentMeta';
 import {
+  MAX_IMAGE_MB,
   SUPPORTED_IMAGE_ACCEPT,
   SUPPORTED_IMAGE_LABEL,
   isSupportedImageFile,
@@ -124,8 +125,8 @@ export function MobileUploadPage() {
       let compressedCount = 0;
       let minEdge = Infinity;
       for (const f of files) {
-        if (f.size > MAX_MB * 1024 * 1024) {
-          setError(`单张不超过 ${MAX_MB}MB`);
+        if (f.size > MAX_IMAGE_MB * 1024 * 1024) {
+          setError(`单张不超过 ${MAX_IMAGE_MB}MB`);
           return;
         }
         const c = await compressImage(f);
@@ -140,6 +141,12 @@ export function MobileUploadPage() {
           compressed: c.compressed,
           edge: c.edge,
         });
+      }
+      const nextTotal = [...pickedRef.current, ...results].reduce((sum, item) => sum + item.size, 0);
+      if (nextTotal > MAX_TOTAL_BYTES) {
+        for (const item of results) URL.revokeObjectURL(item.url);
+        setError(`一次上传总大小不能超过 ${MAX_TOTAL_MB}MB`);
+        return;
       }
       pickedRef.current = [...pickedRef.current, ...results];
       setPicked((prev) => [...prev, ...results]);
@@ -329,8 +336,9 @@ export function MobileUploadPage() {
 
 /** 一次最多上传张数 —— 与后端一致 */
 const MAX_FILES = 9;
-/** 单张上限 (MB) */
-const MAX_MB = 20;
+/** 整批上限 —— 与后端一致 */
+const MAX_TOTAL_MB = 60;
+const MAX_TOTAL_BYTES = MAX_TOTAL_MB * 1024 * 1024;
 /** 压缩后的最长边 (像素) */
 const MAX_EDGE = 1600;
 /** 压缩后的 JPEG 质量 */

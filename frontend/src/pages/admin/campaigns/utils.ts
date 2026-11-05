@@ -5,9 +5,11 @@
  */
 
 import type { AdminCampaign, UpsertCampaignPayload } from '../../../types/api';
+import { formatYuanPlain } from '../../../admin-ui/lib/format';
 import type { FormState } from './constants';
 
-export const yuan = (cents: number) => (cents / 100).toFixed(2);
+/** 分 → 元（统一实现在 admin-ui/lib/format.ts） */
+export const yuan = formatYuanPlain;
 
 export function toLocalInput(iso: string): string {
   const d = new Date(iso);

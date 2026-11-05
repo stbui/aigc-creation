@@ -70,11 +70,11 @@ export function UserCard({
 
         <dl className="mt-3.5 grid grid-cols-2 gap-x-5 gap-y-2 text-xs">
           <div className="min-w-0">
-            <dt className="text-[11px] text-muted-foreground">注册时间</dt>
+            <dt className="text-xs text-muted-foreground">注册时间</dt>
             <dd className="mt-0.5 truncate leading-4 tabular-nums">{formatDateTime(user.createdAt)}</dd>
           </div>
           <div className="min-w-0">
-            <dt className="text-[11px] text-muted-foreground">最近登录</dt>
+            <dt className="text-xs text-muted-foreground">最近登录</dt>
             <dd className="mt-0.5 truncate leading-4 tabular-nums">
               {user.lastLoginAt ? formatDateTime(user.lastLoginAt) : '从未登录'}
             </dd>
@@ -117,7 +117,7 @@ function UserMetric({ label, value }: { label: string; value: number }) {
   return (
     <div className="px-1">
       <div className="text-[15px] font-semibold leading-5 tabular-nums">{value}</div>
-      <div className="mt-0.5 text-[11px] leading-3.5 text-muted-foreground">{label}</div>
+      <div className="mt-0.5 text-xs leading-3.5 text-muted-foreground">{label}</div>
     </div>
   );
 }

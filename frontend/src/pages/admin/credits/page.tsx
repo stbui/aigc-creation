@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useAdminExport } from '~/admin-ui/primitives';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Download, Upload } from 'lucide-react';
 import {
@@ -62,7 +63,7 @@ export function AdminCreditsPage() {
   const [detail, setDetail] = useState<AdminCreditRow | null>(null);
   const [batchOpen, setBatchOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const { exporting, runExport } = useAdminExport(toast);
 
   const { data, loading, error, params, setQuery, setPage, reload } = useCreditDirectory(
     initialEmail,
@@ -127,20 +128,15 @@ export function AdminCreditsPage() {
    * 导出走**已生效**的筛选, 而不是输入框里的草稿 ——
    * 用户输入后未点「查询」时, 导出的必须与屏幕上的列表同口径。
    */
-  const exportCsv = async () => {
-    setExporting(true);
-    try {
-      await adminCreditsApi.exportCsv({
-        email: params.email as string | undefined,
-        userId: params.userId as string | undefined,
-      });
-      toast.success('导出已开始下载');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '导出失败');
-    } finally {
-      setExporting(false);
-    }
-  };
+  const exportCsv = () =>
+    runExport(
+      () =>
+        adminCreditsApi.exportCsv({
+          email: params.email as string | undefined,
+          userId: params.userId as string | undefined,
+        }),
+      '导出已开始下载',
+    );
 
   const columns: Array<AdminColumn<AdminCreditRow>> = [
     {

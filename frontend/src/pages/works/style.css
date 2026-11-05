@@ -22,6 +22,9 @@
   display: flex;
   flex-direction: column;
   width: 100%;
+  /* 参考站页面自身只扣 64px 顶栏；开启促销条时仍保持该 min-height，
+     由外壳提供剩余 40px 背景，不把促销条高度算进页面。 */
+  min-height: calc(100vh - 64px);
   padding: 24px 24px 56px;
   box-sizing: border-box;
 }
@@ -998,5 +1001,84 @@
 @keyframes my-works-spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* 移动端规则必须留在页面样式内：本文件随路由懒加载，加载顺序晚于 global.css，
+   同一选择器的全局媒体查询会被这里的基础规则覆盖。 */
+@media (max-width: 900px) {
+  .app-content > .my-works-page {
+    margin: -16px -10px -24px;
+    width: auto;
+  }
+
+  .my-works-page {
+    padding: 16px 16px 52px;
+  }
+
+  .my-works-heading h1 {
+    font-size: 28px;
+    line-height: 35px;
+  }
+}
+
+/* 计数行在 390 宽下会与排序说明挤成一行，允许换行。 */
+@media (max-width: 700px) {
+  .my-works-count-row {
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+}
+
+/* 窄屏: 筛选器两列排布，下载通栏；恢复参考站 14px 工具栏内边距与 10px 间距。 */
+@media (max-width: 640px) {
+  .my-works-toolbar {
+    gap: 10px;
+    padding: 12px 14px;
+  }
+
+  .my-works-filter-wrap {
+    flex: 1 1 calc(50% - 5px);
+  }
+
+  .my-works-filter-trigger {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .my-works-download {
+    width: 100%;
+    margin-left: 0;
+    justify-content: center;
+  }
+
+  .my-works-filter-clear {
+    width: 100%;
+    padding: 0 4px;
+    text-align: left;
+  }
+
+  .my-works-selection-bar {
+    flex-wrap: wrap;
+  }
+
+  .my-works-selection-bar > span:first-child {
+    width: 100%;
+    margin-right: 0;
+  }
+}
+
+/* 触屏没有 hover: 操作常驻，隐藏「再来一张」(与勾选框 / 播放控件抢位置)。 */
+@media (hover: none) {
+  .my-work-hover-actions {
+    opacity: 1;
+  }
+
+  .my-work-hover-actions.is-placeholder {
+    justify-content: flex-end;
+  }
+
+  .my-work-hover-top {
+    display: none;
   }
 }

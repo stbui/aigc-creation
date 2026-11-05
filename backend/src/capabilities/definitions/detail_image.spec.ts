@@ -50,6 +50,40 @@ describe('detail_image 提示词', () => {
     expect(prompt).toContain('不复制参考图的背景、桌面、人物、构图、文字、水印和拍摄角度');
   });
 
+  it('每个输出任务只携带对应模块的提示词', () => {
+    const sectionPrompts = JSON.stringify([
+      { section: 'hero', prompt: '首屏标题更醒目，商品居中并保留右侧留白' },
+      { section: 'selling_points', prompt: '用三张图标卡片展示三个核心卖点' },
+    ]);
+    const outputs = DetailImage.outputPlan?.({
+      ...base,
+      sections: 'hero,selling_points',
+      sectionPrompts,
+    });
+
+    expect(outputs?.map((output) => output.params.sectionPrompt)).toEqual([
+      '首屏标题更醒目，商品居中并保留右侧留白',
+      '用三张图标卡片展示三个核心卖点',
+    ]);
+
+    const heroPrompt = DetailImage.buildPrompt({ ...base, ...outputs?.[0].params }, 1);
+    const sellingPrompt = DetailImage.buildPrompt({ ...base, ...outputs?.[1].params }, 1);
+    expect(heroPrompt).toContain('【模块提示词】\n首屏标题更醒目，商品居中并保留右侧留白');
+    expect(heroPrompt).not.toContain('用三张图标卡片展示三个核心卖点');
+    expect(sellingPrompt).toContain('【模块提示词】\n用三张图标卡片展示三个核心卖点');
+    expect(sellingPrompt).not.toContain('首屏标题更醒目');
+  });
+
+  it('模块提示词缺失或格式非法时回落到固定版式说明', () => {
+    const outputs = DetailImage.outputPlan?.({
+      ...base,
+      sections: 'hero',
+      sectionPrompts: '{not-json',
+    });
+    expect(outputs?.[0].params.sectionPrompt).toBeUndefined();
+    expect(DetailImage.buildPrompt({ ...base, ...outputs?.[0].params }, 1)).not.toContain('【模块提示词】');
+  });
+
   it('画面文案限定为商品名称、品牌和商品事实的闭集', () => {
     const prompt = DetailImage.buildPrompt({ ...base, section: 'selling_points' }, 1);
 

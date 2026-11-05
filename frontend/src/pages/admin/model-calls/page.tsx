@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
+import { useAdminExport } from '~/admin-ui/primitives';
 import { REQUEST_KIND_LABELS, STATUS_LABELS, STATUS_TONES } from './constants';
 import { useAdmin, useToast, useAdminDetailParam, useAdminList, useAdminUrlFilterSync } from './hooks';
 import { useSearchParams } from 'react-router-dom';
@@ -86,30 +87,25 @@ export function AdminModelCallsPage() {
 
   const { can } = useAdmin();
   const toast = useToast();
-  const [exporting, setExporting] = useState(false);
+  const { exporting, runExport } = useAdminExport(toast);
 
   /** 导出走当前筛选条件 —— 文件的筛选口径必须与屏幕上看到的一致 */
-  const exportCsv = async () => {
-    setExporting(true);
-    try {
-      await adminApiLogsApi.exportCsv({
-        status: params.status as string | undefined,
-        requestKind: params.requestKind as string | undefined,
-        billable: params.billable as string | undefined,
-        model: params.model as string | undefined,
-        channelId: params.channelId as string | undefined,
-        taskId: params.taskId as string | undefined,
-        userId: params.userId as string | undefined,
-        from: params.from as string | undefined,
-        to: params.to as string | undefined,
-      });
-      toast.success('导出已开始下载');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '导出失败');
-    } finally {
-      setExporting(false);
-    }
-  };
+  const exportCsv = () =>
+    runExport(
+      () =>
+        adminApiLogsApi.exportCsv({
+          status: params.status as string | undefined,
+          requestKind: params.requestKind as string | undefined,
+          billable: params.billable as string | undefined,
+          model: params.model as string | undefined,
+          channelId: params.channelId as string | undefined,
+          taskId: params.taskId as string | undefined,
+          userId: params.userId as string | undefined,
+          from: params.from as string | undefined,
+          to: params.to as string | undefined,
+        }),
+      '导出已开始下载',
+    );
 
   const [detailId, setDetailId] = useAdminDetailParam();
   const detail = rows.find((row) => row.id === detailId) ?? null;

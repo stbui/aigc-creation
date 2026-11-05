@@ -171,58 +171,58 @@ export function ChannelModelBasicFields({
       <ControlledTextField
         control={control}
         name="modelKey"
-        label="模型标识（对外 modelKey）"
-        hint="不同渠道下同名标识会被归为同一产品模型；创建后建议保持稳定"
-        ariaLabel="模型标识"
+        label="模型编号"
+        hint="用于关联前台模型；创建后建议保持不变"
+        ariaLabel="模型编号"
         placeholder="如 seedream-4.0"
       />
       <ControlledTextField
         control={control}
         name="providerModelKey"
-        label="上游模型名"
-        hint="与 modelKey 不同时填写；留空则同 modelKey"
-        ariaLabel="上游模型名"
+        label="服务商模型名称"
+        hint="与模型编号不同时填写；留空则默认相同"
+        ariaLabel="服务商模型名称"
         placeholder="如 doubao-seedream-4-0"
       />
       <ControlledTextField
         control={control}
         name="displayName"
-        label="展示名"
-        hint="C 端模型选择器显示的名称；同名会归到同一产品分组，勿给同一模型在不同渠道起不同名"
-        ariaLabel="展示名"
+        label="用户端名称"
+        hint="展示给用户的模型名称；同一模型请保持一致"
+        ariaLabel="用户端名称"
         placeholder="如 即梦 4.0"
       />
       <ControlledTextField
         control={control}
         name="channelLabel"
-        label="渠道展示名"
-        hint="留空则沿用展示名；同一模型在不同渠道用它区分来源"
-        ariaLabel="渠道展示名"
+        label="渠道内名称"
+        hint="用于区分同一模型的不同服务来源；留空则沿用用户端名称"
+        ariaLabel="渠道内名称"
         maxLength={80}
       />
       <ControlledSelectField
         control={control}
         name="capability"
-        label="产出能力"
-        ariaLabel="产出能力"
+        label="能力类型"
+        ariaLabel="能力类型"
         options={CAPABILITY_OPTIONS}
         onValueChange={onCapabilityChange}
       />
       <ControlledSelectField
         control={control}
         name="protocol"
-        label="请求协议"
-        hint="必选；请按渠道实际的上游接口选择，保存时会校验协议是否支持当前能力"
-        ariaLabel="请求协议"
+        label="接口类型"
+        hint="按服务商提供的接口选择"
+        ariaLabel="接口类型"
         options={protocolOptions}
-        placeholder={protocolOptions.length === 0 ? '该能力暂无可用协议' : '请选择协议'}
+        placeholder={protocolOptions.length === 0 ? '该能力暂无可选接口' : '请选择接口类型'}
       />
       <ControlledSelectField
         control={control}
         name="priceCurrency"
-        label="计价货币"
-        hint="通道按 USD/CNY 报价时，展示价按分组汇率折算"
-        ariaLabel="计价货币"
+        label="结算币种"
+        hint="按所选币种展示与结算"
+        ariaLabel="结算币种"
         options={CURRENCY_OPTIONS}
       />
       <ControlledTagsField control={control} error={errors.tags?.message} />
@@ -234,10 +234,10 @@ export function ChannelModelBasicFields({
           const ids = fieldIds('description');
           return (
             <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor={ids.control}>描述</FieldLabel>
+              <FieldLabel htmlFor={ids.control}>模型介绍</FieldLabel>
               <TextAreaField
                 id={ids.control}
-                ariaLabel="描述"
+                ariaLabel="模型介绍"
                 value={field.value}
                 onChange={field.onChange}
                 maxLength={500}
@@ -250,7 +250,7 @@ export function ChannelModelBasicFields({
                 <FieldError id={ids.error} errors={[fieldState.error]} />
               ) : (
                 <FieldDescription id={ids.description}>
-                  在 C 端模型选项中常驻显示，最多 500 字
+                  展示在用户端模型选项中，最多 500 字
                 </FieldDescription>
               )}
             </Field>
@@ -260,9 +260,9 @@ export function ChannelModelBasicFields({
       <ControlledTextField
         control={control}
         name="icon"
-        label="图标"
-        hint="C 端选择器图标标识，可留空"
-        ariaLabel="图标"
+        label="模型图标"
+        hint="展示在用户端模型选项中，可留空"
+        ariaLabel="模型图标"
       />
 
       <Controller
@@ -276,7 +276,7 @@ export function ChannelModelBasicFields({
             <FieldContent>
               <FieldTitle>启用该模型</FieldTitle>
               <FieldDescription>
-                停用后不进入路由目录，不影响历史数据
+                停用后新任务不再使用该模型；配置和历史记录会保留
               </FieldDescription>
             </FieldContent>
             <SwitchField

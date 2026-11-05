@@ -66,65 +66,44 @@ export class AdminAssetsService {
   }
 
   /**
-   * 删除项目 (B-22): 连带素材与任务。
+   * 删除项目 (B-22): **只标记 Project.deletedAt**。
    *
-   * 硬删时先提交数据库事务，再尽力删除对象存储文件。反过来先删文件，
-   * 一旦数据库事务失败，就会留下「记录还在、文件已丢」的坏数据；文件删除
-   * 失败则只会留下孤儿文件，后续可清理，不会破坏业务记录。
+   * 项目是用户资产的归档容器，删除项目不能连带破坏历史任务、素材记录或对象
+   * 存储文件。素材可见性由项目生命周期决定，不再把 Asset.status 改成 hidden，
+   * 否则恢复项目时无法区分「随项目下架」与运营主动下架。
    *
-   * 软删只下架素材并保留文件 —— 否则素材记录虽然还在，内容却已经不可恢复。
+   * `hard` 参数仅为兼容旧客户端保留，已废弃且会被忽略。重复删除按幂等成功
+   * 处理，不重复覆盖首次删除时间。
    */
-  async removeProject(id: string, hard: boolean) {
+  async removeProject(id: string, _hard = false) {
     const project = await this.prisma.project.findUnique({
       where: { id },
-      include: {
-        assets: { select: { id: true, storageKey: true, storageBackend: true } },
-        tasks: { select: { id: true } },
+      select: {
+        id: true,
+        deletedAt: true,
+        _count: { select: { assets: true, tasks: true } },
       },
     });
-    if (!project || (project.deletedAt && !hard)) {
-      throw new AppError(40400, '项目不存在', 404);
+    if (!project) throw new AppError(40400, '项目不存在', 404);
+
+    const deletedAt = project.deletedAt ?? new Date();
+    if (!project.deletedAt) {
+      await this.prisma.project.update({
+        where: { id },
+        data: { deletedAt },
+      });
     }
 
-    const impact = {
-      assets: project.assets.length,
-      tasks: project.tasks.length,
-      bytes: 0,
+    return {
+      id,
+      hard: false,
+      deprecatedHard: true,
+      deletedAt,
+      retained: {
+        assets: project._count.assets,
+        tasks: project._count.tasks,
+      },
     };
-
-    // 统计字节数需要再查一次 Asset.sizeBytes
-    const sizes = await this.prisma.asset.findMany({
-      where: { projectId: id },
-      select: { sizeBytes: true },
-    });
-    impact.bytes = sizes.reduce((sum, s) => sum + s.sizeBytes, 0);
-
-    // 1) 数据库事务保证项目、任务与素材记录一致
-    await this.prisma.$transaction(async (tx) => {
-      await tx.generationTask.deleteMany({ where: { projectId: id } });
-      if (hard) {
-        await tx.asset.deleteMany({ where: { projectId: id } });
-      } else {
-        // 软删: 素材置下架而非删除 —— 记录保留便于追溯项目被删时素材去了哪
-        await tx.asset.updateMany({
-          where: { projectId: id },
-          data: { status: 'hidden' },
-        });
-      }
-      if (hard) {
-        await tx.project.delete({ where: { id } });
-      } else {
-        await tx.project.update({
-          where: { id },
-          data: { deletedAt: new Date() },
-        });
-      }
-    });
-
-    // 2) 硬删提交后再清文件；删除失败只留孤儿文件，不影响已提交的数据事实
-    if (hard) await this.deleteStoredAssets(project.assets);
-
-    return { id, hard, impact };
   }
 
   // ── 素材 (B-23~B-27) ───────────────────────────────────────────────

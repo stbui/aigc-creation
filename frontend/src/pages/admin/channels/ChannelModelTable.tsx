@@ -160,7 +160,7 @@ export function ChannelModelTable({
             {model.icon ? `${model.icon} ` : ''}
             {model.displayName || '未命名'}
             {model.providerModelKey && model.providerModelKey !== model.modelKey
-              ? ` · 上游 ${model.providerModelKey}`
+              ? ` · 服务商 ${model.providerModelKey}`
               : ''}
           </div>
         </div>
@@ -182,7 +182,7 @@ export function ChannelModelTable({
     },
     {
       key: 'protocol',
-      title: '请求协议',
+      title: '接口类型',
       width: 92,
       cellTitle: (model) => model.protocol,
       render: (model) =>
@@ -221,7 +221,7 @@ export function ChannelModelTable({
         }
         if (!model.priceConfigured) {
           return (
-            <HelpTip tip="没有任何已配置的价格档：该模型不会被报价，也不应被线路选用">
+            <HelpTip tip="暂无价格方案：模型不会展示给用户，也无法被选用">
               <StatusTag status="unpriced" tone="warn" label="未定价" />
             </HelpTip>
           );
@@ -309,11 +309,9 @@ export function ChannelModelTable({
             <h3 id="admin-model-list-title" className="text-sm font-semibold text-foreground">
               模型清单（{(models ?? []).length}）
             </h3>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {writable
-                ? '模型停用只撤下当前线路，其他模型不受影响；渠道停用会撤下该渠道下全部模型。配置与历史记录均保留'
-                : '当前账号只有渠道模型读权限'}
-            </p>
+            {!writable && (
+              <p className="mt-0.5 text-xs text-muted-foreground">当前账号仅可查看</p>
+            )}
           </div>
           {/* 模型级入口跟着清单位置走：原先在详情顶部单独占一行，页面会被拉出一条空白工具条 */}
           <div className="flex shrink-0 items-center gap-2">
@@ -324,7 +322,7 @@ export function ChannelModelTable({
               disabled={fetching || !writable}
               onClick={onFetchUpstream}
             >
-              {fetching ? '拉取中…' : '拉取上游目录'}
+              {fetching ? '同步中…' : '同步服务商模型'}
             </ActionButton>
             <ActionButton
               variant="default"
@@ -346,7 +344,7 @@ export function ChannelModelTable({
               setKeyword(value);
               setPage(1);
             }}
-            placeholder="搜索模型标识、显示名或上游键"
+            placeholder="搜索模型编号、名称或服务商模型名"
             className="w-64"
           />
           <SelectField
@@ -467,11 +465,7 @@ export function ChannelModelTable({
           selected={selectedIds}
           onSelectedChange={onSelectedChange}
           rowSelectLabel={(model) => `选择模型 ${model.modelKey}`}
-          emptyText={
-            hasFilters
-              ? '没有匹配的模型。调整搜索或筛选条件后重试。'
-              : '该渠道还没有模型。可以「拉取上游目录」批量导入，或手动新建。'
-          }
+          emptyText={hasFilters ? '没有匹配的模型' : '暂无模型'}
           density="compact"
           minWidth={1104}
           fixedLayout

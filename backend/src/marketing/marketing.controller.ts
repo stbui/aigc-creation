@@ -67,12 +67,12 @@ export class MarketingPublicController {
   /**
    * 进行中的限时活动（落地页「限时活动」页签）。
    *
-   * 匿名可访问：促销信息本身不是隐私，而且这是首屏转化位。只读、无身份维度，
-   * 因此不需要 OptionalJwtAuthGuard 之外的任何判断。
+   * 匿名可访问：促销信息本身不是隐私，而且这是首屏转化位。带 token 时按真实
+   * 新客状态过滤“仅新用户”活动，避免老用户看到自己无法享受的价格。
    */
   @Get('campaigns')
-  campaigns() {
-    return this.marketing.activeCampaigns();
+  campaigns(@Req() req: { user?: { id: string } }) {
+    return this.marketing.activeCampaigns(req.user?.id);
   }
 }
 

@@ -17,6 +17,8 @@ export const MAX_IMAGES = 5;
 export const MAX_NAME_LEN = 100;
 /** 商品描述输入上限 */
 export const MAX_DESC_LEN = 5000;
+/** 单个模块提示词上限 */
+export const MAX_SECTION_PROMPT_LEN = 1000;
 
 // ───────────────── 包含模块 ─────────────────
 
@@ -54,3 +56,15 @@ export const DEFAULT_SECTIONS = SECTION_VALUES.slice(0, 6);
 
 /** 与参考站「已选 N/10」一致 */
 export const MAX_SECTIONS = 10;
+
+/**
+ * 模块提示词的初始内容。
+ *
+ * 每个模块都有自己的输入框, 默认内容只描述该模块的画面职责;
+ * 商品名称、品牌与公共商品描述仍由服务端统一注入, 避免 16 份提示词里重复维护事实。
+ */
+export function defaultSectionPrompt(value: string): string {
+  const module = SECTION_MODULES.find((item) => item.value === value);
+  if (!module) return '';
+  return `${module.label}：${module.desc}。突出商品主体，保持商品外观、材质与颜色与参考图一致。`;
+}

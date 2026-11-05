@@ -20,6 +20,7 @@ describe("AccountLifecycleService 软注销", () => {
     });
 
     tx = {
+      $executeRaw: vi.fn().mockResolvedValue(1),
       generationTask: table(),
       asset: table(),
       project: table(),
@@ -34,7 +35,15 @@ describe("AccountLifecycleService 软注销", () => {
       userPluginState: table(),
       loginLog: table(),
       consentRecord: table(),
-      user: table(),
+      user: {
+        ...table(),
+        findUnique: vi.fn().mockResolvedValue({
+          id: "user-1",
+          email: "user@example.com",
+          role: "user",
+          status: "active",
+        }),
+      },
     };
 
     prisma = {
@@ -74,5 +83,15 @@ describe("AccountLifecycleService 软注销", () => {
       where: { id: "user-1" },
       data: expect.objectContaining({ status: "deleted" }),
     });
+  });
+
+  it("拒绝注销最后一名启用管理员", async () => {
+    tx.$executeRaw.mockResolvedValue(0);
+
+    await expect(service.softDelete("user-1")).rejects.toThrow(
+      "至少保留一个启用的管理员",
+    );
+    expect(tx.generationTask.deleteMany).not.toHaveBeenCalled();
+    expect(tx.user.update).not.toHaveBeenCalled();
   });
 });

@@ -11,6 +11,7 @@
 
 /** 资料 / 积分 / 会员 / 消息 / 订单 / 工单 */
 export {
+  authApi,
   creditsApi,
   membershipApi,
   meApi,
@@ -18,3 +19,4 @@ export {
   ordersApi,
   ticketsApi,
 } from '../../lib/api';
+export type { OAuthProviderInfo } from '../../lib/api';

@@ -153,7 +153,7 @@ export interface MobileUploadSessionCreated {
   token: string;
   /** 过期时间戳 (毫秒) */
   expiresAt: number;
-  status: "waiting" | "received" | "expired";
+  status: "waiting" | "receiving" | "received" | "expired";
 }
 
 /** 手机上传接收到的单张素材 */
@@ -170,7 +170,7 @@ export interface MobileUploadAsset {
 /** GET /api/v1/mobile-upload/sessions/:id —— 电脑端轮询 */
 export interface MobileUploadSessionStatus {
   sessionId: string;
-  status: "waiting" | "received" | "expired";
+  status: "waiting" | "receiving" | "received" | "expired";
   /**
    * 已接收的素材列表 (多图) —— **顺序即构图顺序**。
    * 参考站手机端可排序, 电脑端按此顺序回填参考图位。
@@ -235,7 +235,7 @@ export interface LoginRequest {
 
 export interface RegisterRequest {
   email: string;
-  password: string;
+  password: string; emailCode: string;
   name?: string;
   /** 可选手机号。填了必须同时给 smsCode（后端强制校验归属） */
   phone?: string;
@@ -1019,8 +1019,8 @@ export interface AdminCreditPrice {
   overridden: boolean;
   /** 代码默认值, 供「回落」时对照 */
   registryDefault: number;
-  /** 是否被进行中的限时免费活动覆盖 */
-  freeCampaign: boolean;
+  /** 是否被进行中的限时免费活动覆盖 */ freeCampaign: boolean;
+  /** 免费活动是否只对未付费新用户生效 */ freeCampaignOnlyNewUsers: boolean;
 }
 
 /** 后台「能力管控」列表行（GET /admin/capabilities） */
@@ -1336,11 +1336,10 @@ export interface AdminCoupon {
   thresholdCents: number;
   scope: CouponScope;
   productIds: string[];
-  /** 0 = 不限量 */
-  totalCount: number;
+  /** 0 = 不限量 */ totalCount: number;
   usedCount: number;
-  /** 0 = 不限 */
-  perUserLimit: number;
+  /** 已创建待支付订单、尚未核销的预占数量 */ pendingReserved: number;
+  /** 0 = 不限 */ perUserLimit: number;
   validFrom: string;
   validTo: string;
   /** 人工设置的两态开关 (写入用同一字段) */
@@ -2066,7 +2065,7 @@ export interface MyProfile {
   email: string;
   name: string;
   phone: string | null;
-  phoneVerifiedAt: string | null;
+  phoneVerifiedAt: string | null; emailVerifiedAt: string | null; hasPassword: boolean; linkedOAuthProviders: string[];
   status: string;
   createdAt: string;
   lastLoginAt: string | null;

@@ -48,6 +48,7 @@ const SIDEBAR_ITEM_ORDER: Record<string, string[]> = {
     'creative_image',
     'multi_fusion',
     'sku_image',
+    'shoppable_carousel',
   ],
   ai_retouch: [
     'local_redraw',
@@ -282,7 +283,9 @@ export function SideRail({ groups, items, activePath, onNavigate }: Props) {
           to="/tickets?type=other&compose=1&subject=%E4%BA%A7%E5%93%81%E5%BB%BA%E8%AE%AE"
           className="product-suggestion-launcher product-suggestion-sidebar-launcher"
           onClick={() =>
-            onNavigate?.('/tickets?type=other&compose=1&subject=%E4%BA%A7%E5%93%81%E5%BB%BA%E8%AE%AE')
+            onNavigate?.(
+              '/tickets?type=other&compose=1&subject=%E4%BA%A7%E5%93%81%E5%BB%BA%E8%AE%AE',
+            )
           }
         >
           <span className="product-suggestion-sidebar-icon" aria-hidden="true">
@@ -324,7 +327,11 @@ function SideMenuItem({
 }) {
   const planned = cap?.mode === 'planned';
   const path = to ?? (planned ? '#' : toolPath(cap!.id));
-  const glyph = iconSrc ? <img src={iconSrc} alt="" /> : icon ?? <CapabilityIcon id={cap!.id} size={20} />;
+  const glyph = iconSrc ? (
+    <img src={iconSrc} alt="" />
+  ) : (
+    (icon ?? <CapabilityIcon id={cap!.id} size={20} />)
+  );
 
   const body = (
     <>

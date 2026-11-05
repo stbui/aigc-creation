@@ -8,6 +8,7 @@ import { MarketingService } from '../marketing/marketing.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PaymentGateway } from '../payments/payment-gateway';
 import { PaymentExceptionService } from '../payments/payment-exception.service';
+import { lockUserRow } from '../account/user-row-lock';
 import type { RefundResult } from '../payments/adapters/types';
 import type { Prisma, Refund } from '@prisma/client';
 
@@ -781,6 +782,10 @@ export class OrderService {
 
     try {
       const won = await this.prisma.$transaction(async (tx) => {
+        // 与邀请绑定共用同一把用户行锁：绑定若先提交，本笔支付就属于绑定后的
+        // 首次付费；支付若先提交，绑定侧会看到 paid 并拒绝补绑。
+        await lockUserRow(tx, order.userId);
+
         /*
          * 支付入账必须与建单预留使用同一把券锁，并在改订单状态前取得。
          * 否则建单可能在「订单仍 pending、usedCount 尚未增加」的窗口里再次

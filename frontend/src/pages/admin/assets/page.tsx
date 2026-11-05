@@ -416,7 +416,7 @@ export function AdminAssetsPage() {
             {selected.length > 0 && (
               <div
                 role="status"
-                data-testid="admin-batch-bar"
+                data-testid="admin-bulk-bar"
                 className="flex items-center gap-2 border-r border-border pr-2"
               >
                 <span className="text-xs font-medium text-foreground">

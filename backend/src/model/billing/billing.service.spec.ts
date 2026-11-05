@@ -170,3 +170,173 @@ describe('BillingService 人工核对', () => {
     );
   });
 });
+
+describe('BillingService 换线账单原子替换', () => {
+  const now = new Date('2026-01-01T00:00:00.000Z');
+  const oldOrder = {
+    id: 'bill-old',
+    userId: 'user-1',
+    taskId: 'task-1',
+    status: 'running',
+    amountMicrocredits: 5_000_000n,
+    reservedAmountMicrocredits: 5_000_000n,
+    model: 'old-model',
+    channelId: 'old-channel',
+    scene: 'create',
+    createdAt: now,
+    updatedAt: now,
+  };
+  const newOrder = { ...oldOrder, id: 'bill-new', status: 'reserved', model: 'new-model' };
+  const draft = {
+    model: 'new-model',
+    capability: 'image',
+    scene: 'create',
+    billingMode: 'fixed_request',
+    channelId: 'new-channel',
+    channelModelId: 'new-channel-model',
+    priceTierId: '',
+    priceTierVersion: 0,
+    priceSelectorJson: '{}',
+    priceVersion: 1,
+    unitPriceMicrocredits: 5_000_000n,
+    multiplierBasisPoints: 10_000n,
+    userGroup: 'default',
+    priceCurrency: 'credits',
+    currencyRateMicrocredits: 1_000_000n,
+    quantity: 1n,
+    amountMicrocredits: 5_000_000n,
+    inputTokenPriceMicrocredits: 0n,
+    outputTokenPriceMicrocredits: 0n,
+    cachedTokenPriceMicrocredits: 0n,
+    inputTokens: 0n,
+    outputTokens: 0n,
+    cachedTokens: 0n,
+    videoFormulaTokens: 0n,
+    costConfigured: false,
+    costUnitPriceMicrocredits: 0n,
+    costInputTokenPriceMicrocredits: 0n,
+    costOutputTokenPriceMicrocredits: 0n,
+    costCachedTokenPriceMicrocredits: 0n,
+    costBillingMode: '',
+    costQuantity: 0n,
+    costVideoFormulaTokens: 0n,
+  };
+
+  function setup(options: { oldStatus?: string; oldUserId?: string; taskCasCount?: number } = {}) {
+    const refunded = { ...oldOrder, status: 'refunded' };
+    const tx = {
+      generationTask: {
+        findUnique: vi.fn().mockResolvedValue({
+          ownerId: 'user-1',
+          billingOrderId: 'bill-old',
+          status: 'running',
+          leaseOwner: 'worker-1',
+        }),
+        updateMany: vi.fn().mockResolvedValue({ count: options.taskCasCount ?? 1 }),
+      },
+      billingOrder: {
+        findUnique: vi
+          .fn()
+          .mockResolvedValueOnce({ ...oldOrder, status: options.oldStatus ?? 'running', userId: options.oldUserId ?? 'user-1' })
+          .mockResolvedValueOnce(refunded),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        create: vi.fn().mockResolvedValue(newOrder),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (work: (client: typeof tx) => unknown) => work(tx)),
+    };
+    const wallet = {
+      settle: vi.fn(),
+      refund: vi.fn().mockResolvedValue({ balance: {} }),
+      reserve: vi.fn().mockResolvedValue({ balance: {} }),
+    };
+    const service = new BillingService(prisma as never, wallet as never);
+    return { service, prisma, tx, wallet };
+  }
+
+  function params(afterSwap = vi.fn().mockResolvedValue(undefined)) {
+    return {
+      userId: 'user-1',
+      taskId: 'task-1',
+      expectedBillingOrderId: 'bill-old',
+      expectedLeaseOwner: 'worker-1',
+      idempotencyKey: 'task:task-1:run1:attempt2',
+      draft: draft as never,
+      chargeLimitMicrocredits: 5_000_000n,
+      afterSwap,
+    };
+  }
+
+  it('旧退款、新预留、任务 CAS 和 attempt 回调在同一事务内完成', async () => {
+    const { service, prisma, wallet, tx } = setup();
+    const afterSwap = vi.fn().mockResolvedValue(undefined);
+
+    await expect(service.replaceTaskBilling(params(afterSwap))).resolves.toMatchObject({ order: newOrder });
+
+    expect(prisma.$transaction).toHaveBeenCalledOnce();
+    expect(wallet.refund).toHaveBeenCalledOnce();
+    expect(wallet.reserve).toHaveBeenCalledOnce();
+    expect(wallet.refund.mock.invocationCallOrder[0]).toBeLessThan(wallet.reserve.mock.invocationCallOrder[0]);
+    expect(tx.generationTask.updateMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ billingOrderId: 'bill-old', leaseOwner: 'worker-1' }),
+        data: expect.objectContaining({ billingOrderId: 'bill-new', creditCost: 5 }),
+      }),
+    );
+    expect(afterSwap).toHaveBeenCalledOnce();
+  });
+
+  it('换线后的新账单保留限时活动归属', async () => {
+    const { service, tx } = setup();
+    const withPromotion = { ...params(), promotionId: 'campaign-free-1' };
+
+    await expect(service.replaceTaskBilling(withPromotion)).resolves.toMatchObject({ order: newOrder });
+
+    expect(tx.billingOrder.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ promotionId: 'campaign-free-1' }),
+      }),
+    );
+  });
+
+  it('旧账单退款失败时不创建新账单', async () => {
+    const { service, wallet, tx } = setup();
+    wallet.refund.mockRejectedValueOnce(new Error('wallet broken'));
+
+    await expect(service.replaceTaskBilling(params())).rejects.toThrow('wallet broken');
+
+    expect(tx.billingOrder.create).not.toHaveBeenCalled();
+    expect(wallet.reserve).not.toHaveBeenCalled();
+    expect(tx.generationTask.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('任务账单 CAS 失败时抛冲突且不执行 attempt 回调', async () => {
+    const { service, wallet } = setup({ taskCasCount: 0 });
+    const afterSwap = vi.fn().mockResolvedValue(undefined);
+
+    await expect(service.replaceTaskBilling(params(afterSwap))).rejects.toMatchObject({ code: 40900 });
+
+    expect(wallet.refund).toHaveBeenCalledOnce();
+    expect(wallet.reserve).toHaveBeenCalledOnce();
+    expect(afterSwap).not.toHaveBeenCalled();
+  });
+
+  it('旧账单不属于当前用户时拒绝替换且不动钱包', async () => {
+    const { service, wallet, tx } = setup({ oldUserId: 'user-2' });
+
+    await expect(service.replaceTaskBilling(params())).rejects.toMatchObject({ code: 40900 });
+
+    expect(wallet.refund).not.toHaveBeenCalled();
+    expect(tx.billingOrder.create).not.toHaveBeenCalled();
+  });
+
+  it('旧账单已结算时拒绝替换且不动钱包', async () => {
+    const { service, wallet, tx } = setup({ oldStatus: 'settled' });
+
+    await expect(service.replaceTaskBilling(params())).rejects.toMatchObject({ code: 40909 });
+
+    expect(wallet.refund).not.toHaveBeenCalled();
+    expect(tx.billingOrder.create).not.toHaveBeenCalled();
+  });
+});

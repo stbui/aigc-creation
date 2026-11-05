@@ -57,19 +57,19 @@ function renderForm(onSubmit = vi.fn(), overrides: Partial<ModelDraft> = {}) {
 describe('ChannelModelForm', () => {
   it('校验失败时在字段旁提示且不提交', async () => {
     const { form, onSubmit } = renderForm();
-    fireEvent.change(screen.getByLabelText('模型标识'), { target: { value: '   ' } });
+    fireEvent.change(screen.getByLabelText('模型编号'), { target: { value: '   ' } });
     fireEvent.submit(form);
 
-    expect(await screen.findByText('请填写模型标识')).toBeVisible();
+    expect(await screen.findByText('请填写模型编号')).toBeVisible();
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it('价格档错误显示在价格档区域', async () => {
     const { form, onSubmit } = renderForm();
-    fireEvent.change(screen.getByLabelText('档位 1 单价'), { target: { value: 'abc' } });
+    fireEvent.change(screen.getByLabelText('方案 1 价格'), { target: { value: 'abc' } });
     fireEvent.submit(form);
 
-    expect(await screen.findByText('单价格式不正确，请填积分，最多 6 位小数')).toBeVisible();
+    expect(await screen.findByText('价格格式不正确，请填积分，最多 6 位小数')).toBeVisible();
     expect(onSubmit).not.toHaveBeenCalled();
   });
 
@@ -81,9 +81,9 @@ describe('ChannelModelForm', () => {
     fireEvent.submit(form);
 
     expect(await screen.findByTestId('admin-toast')).toHaveTextContent(
-      '请求协议：请选择请求协议',
+      '接口类型：请选择接口类型',
     );
-    await waitFor(() => expect(screen.getByLabelText('请求协议')).toHaveFocus());
+    await waitFor(() => expect(screen.getByLabelText('接口类型')).toHaveFocus());
     expect(onSubmit).not.toHaveBeenCalled();
   });
 

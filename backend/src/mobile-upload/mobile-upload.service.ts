@@ -1,9 +1,15 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { randomBytes, randomUUID } from 'crypto';
+import { readFile } from 'fs/promises';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { AppError } from '../common/app.exception';
 import { SignedUrlService } from '../common/signed-url.service';
+import {
+  inspectUploadedImage,
+  maxUploadBytes,
+  verifyDecodableImage,
+} from '../assets/image-validation';
 
 /**
  * 手机上传会话服务 —— 参考站「手机上传」的会话侧。
@@ -124,7 +130,7 @@ export class MobileUploadService {
   async receive(
     sessionId: string,
     token: string,
-    files: Array<{ filename: string; mimetype: string; data: Buffer }>,
+    files: MobileUploadInputFile[],
   ): Promise<MobileUploadSession> {
     const s = this.mustGet(sessionId);
     if (s.token !== token) {
@@ -137,11 +143,43 @@ export class MobileUploadService {
     if (s.status === 'received') {
       throw new AppError(40900, '该会话已接收过图片', 409);
     }
+    if (s.status === 'receiving') {
+      throw new AppError(40900, '该会话正在接收图片，请勿重复提交', 409);
+    }
+    if (s.status !== 'waiting') {
+      throw new AppError(41000, '二维码已失效，请在电脑端刷新', 410);
+    }
     if (!files.length) {
       throw new AppError(40001, '图片内容为空', 400);
     }
-    if (files.length > MAX_FILES) {
-      throw new AppError(40001, `一次最多上传 ${MAX_FILES} 张`, 400);
+    if (files.length > MOBILE_UPLOAD_MAX_FILES) {
+      throw new AppError(40001, `一次最多上传 ${MOBILE_UPLOAD_MAX_FILES} 张`, 400);
+    }
+
+    // 这段状态切换发生在第一个 await 之前，形成会话内 CAS：并发提交的第二个
+    // 请求会看到 receiving，不会把同一会话写出两套素材。
+    s.status = 'receiving';
+    try {
+      return await this.receiveClaimed(s, files);
+    } catch (error) {
+      if (s.status === 'receiving') {
+        s.status = error instanceof AppError && error.code === 41000 ? 'expired' : 'waiting';
+      }
+      throw error;
+    }
+  }
+
+  private async receiveClaimed(
+    s: MobileUploadSession,
+    files: MobileUploadInputFile[],
+  ): Promise<MobileUploadSession> {
+    const declaredTotal = files.reduce((sum, file) => sum + Math.max(0, file.size ?? 0), 0);
+    if (declaredTotal > MOBILE_UPLOAD_MAX_TOTAL_BYTES) {
+      throw new AppError(
+        40001,
+        `一次上传总大小不能超过 ${Math.floor(MOBILE_UPLOAD_MAX_TOTAL_BYTES / 1024 / 1024)}MB`,
+        400,
+      );
     }
 
     /*
@@ -160,32 +198,79 @@ export class MobileUploadService {
       throw new AppError(41000, '目标项目已不存在，请在电脑端刷新后重试', 410);
     }
 
-    // 逐张校验并落库; 任意一张不合法即整批失败 (不落半截数据)
-    const prepared = files.map((file) => {
-      if (!file.data?.length) {
-        throw new AppError(40001, '图片内容为空', 400);
+    // 先逐张完整校验，全部通过后才开始写对象存储，避免半批素材入库。
+    // 每个 buffer 校验后即释放，不把 9 张手机原图同时留在内存里。
+    const prepared: Array<{
+      file: MobileUploadInputFile;
+      mime: string;
+      ext: string;
+      width: number;
+      height: number;
+      sizeBytes: number;
+    }> = [];
+    let actualTotal = 0;
+    for (const file of files) {
+      const data = await readUploadFile(file);
+      if (!data.length) throw new AppError(40001, '图片内容为空', 400);
+      actualTotal += data.length;
+      if (actualTotal > MOBILE_UPLOAD_MAX_TOTAL_BYTES) {
+        throw new AppError(
+          40001,
+          `一次上传总大小不能超过 ${Math.floor(MOBILE_UPLOAD_MAX_TOTAL_BYTES / 1024 / 1024)}MB`,
+          400,
+        );
       }
-      if (file.data.length > MAX_IMAGE_BYTES) {
-        throw new AppError(40001, `单张不超过 ${Math.floor(MAX_IMAGE_BYTES / 1024 / 1024)}MB`, 400);
+      if (data.length > maxUploadBytes()) {
+        throw new AppError(
+          40001,
+          `单张不超过 ${Math.floor(maxUploadBytes() / 1024 / 1024)}MB`,
+          400,
+        );
       }
-      const mime = sniffImageMime(file.data);
-      if (!mime) {
-        throw new AppError(40001, '仅支持 PNG / JPG / WEBP / GIF 图片', 400);
-      }
-      return { file, mime };
-    });
+      // 不信任扩展名和客户端 mimetype：文件头判真实格式，再完整解码一次，
+      // 防止只有 PNG 魔数但像素数据损坏的“伪图”进入素材库。
+      const info = inspectUploadedImage(data, { maxBytes: maxUploadBytes() });
+      await verifyDecodableImage(data, info);
+      prepared.push({
+        file,
+        mime: info.mime,
+        ext: info.ext,
+        width: info.width,
+        height: info.height,
+        sizeBytes: data.length,
+      });
+    }
 
     // 落存储: 走既有存储抽象层, 与网页上传同一条路径
     const provider = this.storage.getActive();
-    const storedFiles: Array<{ key: string; url: string; ext: string; file: typeof files[number] }> = [];
+    const storedFiles: Array<{
+      key: string;
+      url: string;
+      ext: string;
+      mime: string;
+      width: number;
+      height: number;
+      sizeBytes: number;
+      file: MobileUploadInputFile;
+    }> = [];
     let created: Array<{ id: string; url: string; signedUrl: string | null; filename: string }>;
     try {
-      for (const { file, mime } of prepared) {
-        const ext = extOf(mime);
-        const key = this.storage.buildKey('original', ext);
-        await provider.put(key, file.data, mime);
+      for (const item of prepared) {
+        if (this.sessions.get(s.id) !== s) {
+          throw new AppError(40900, '上传会话已取消', 409);
+        }
+        const data = await readUploadFile(item.file);
+        if (data.length !== item.sizeBytes) {
+          throw new AppError(40001, '上传文件在接收过程中发生变化，请重新上传', 400);
+        }
+        const key = this.storage.buildKey('original', item.ext);
+        await provider.put(key, data, item.mime);
         const url = await provider.url(key);
-        storedFiles.push({ key, url, ext, file });
+        storedFiles.push({ key, url, ...item });
+      }
+
+      if (this.sessions.get(s.id) !== s) {
+        throw new AppError(40900, '上传会话已取消', 409);
       }
 
       const assets = await this.prisma.$transaction(async (tx) => {
@@ -209,8 +294,10 @@ export class MobileUploadService {
                 ownerId: s.ownerId,
                 kind: 'original',
                 sourceUrl: stored.url,
-                format: stored.ext,
-                sizeBytes: stored.file.data.length,
+                format: stored.mime,
+                sizeBytes: stored.sizeBytes,
+                width: stored.width,
+                height: stored.height,
                 storageBackend: provider.backend,
                 storageKey: stored.key,
               },
@@ -245,7 +332,7 @@ export class MobileUploadService {
     s.assetUrl = created[0]?.url ?? null;
     s.originalFilename = created[0]?.filename ?? null;
     this.log.log(
-      `手机上传接收成功: session=${sessionId} 张数=${created.length} asset=${created.map((c) => c.id).join(',')}`,
+      `手机上传接收成功: session=${s.id} 张数=${created.length} asset=${created.map((c) => c.id).join(',')}`,
     );
     return s;
   }
@@ -269,8 +356,17 @@ export class MobileUploadService {
   }
 }
 
+/** 手机端上传文件 —— 生产路径由 multer 落临时盘，测试可直接传内存 buffer。 */
+export interface MobileUploadInputFile {
+  filename: string;
+  mimetype: string;
+  size?: number;
+  path?: string;
+  data?: Buffer;
+}
+
 /** 会话状态 */
-export type MobileUploadStatus = 'waiting' | 'received' | 'expired';
+export type MobileUploadStatus = 'waiting' | 'receiving' | 'received' | 'expired';
 
 export interface MobileUploadSession {
   id: string;
@@ -311,11 +407,17 @@ const SESSION_TTL_MS = 5 * 60 * 1000;
 /** 过期后再保留一会儿, 让电脑端最后一轮轮询能读到结果 */
 const KEEP_AFTER_EXPIRE_MS = 60 * 1000;
 
-/** 单张上限 20MB —— 与网页上传的 multer 限制一致 */
-const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
-
 /** 一次最多上传张数 —— 参考站手机端是 3 列网格, 一次 6~9 张是常见量 */
-const MAX_FILES = 9;
+export const MOBILE_UPLOAD_MAX_FILES = 9;
+
+/** 整批上限 60MB：单张另有全站统一的 10MB 上限。 */
+export const MOBILE_UPLOAD_MAX_TOTAL_BYTES = 60 * 1024 * 1024;
+
+async function readUploadFile(file: MobileUploadInputFile): Promise<Buffer> {
+  if (file.data !== undefined) return file.data;
+  if (!file.path) throw new AppError(40001, '上传文件路径缺失', 400);
+  return readFile(file.path);
+}
 
 /**
  * 按字节魔数判定图片类型。

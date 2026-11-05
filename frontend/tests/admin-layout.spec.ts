@@ -141,6 +141,10 @@ test.describe('后台布局', () => {
         document.querySelectorAll('[data-testid="admin-user-card"]'),
       ) as HTMLElement[];
       const grid = document.querySelector('[data-testid="admin-user-grid"]') as HTMLElement | null;
+      const actionGroups = cards.map(
+        (card) =>
+          card.querySelector('[data-testid="admin-user-card-actions"]') as HTMLElement | null,
+      );
       return {
         gridDisplay: grid ? getComputedStyle(grid).display : '',
         columns: grid ? getComputedStyle(grid).gridTemplateColumns.split(' ').filter(Boolean).length : 0,
@@ -150,14 +154,21 @@ test.describe('后台布局', () => {
               .querySelector('[data-testid="admin-user-card-actions"]')
               ?.querySelectorAll('button').length ?? 0,
         ),
+        actionDisplays: actionGroups.map((group) => (group ? getComputedStyle(group).display : '')),
+        actionColumns: actionGroups.map((group) =>
+          group ? getComputedStyle(group).gridTemplateColumns.split(' ').filter(Boolean).length : 0,
+        ),
       };
     });
 
     expect(m.gridDisplay).toBe('grid');
     expect(m.columns).toBe(4);
-    for (const [i, c] of m.counts.entries()) {
-      expect(c, `第 ${i} 张卡片应平铺全部可用操作`).toBeGreaterThanOrEqual(3);
-    }
+    // 当前登录管理员等身份会少显示高风险操作，不能假设每张卡片都有同样权限。
+    // 页面只需保证所有可用操作平铺在四列网格中，且至少有一个完整操作组可验证布局。
+    expect(Math.min(...m.counts)).toBeGreaterThanOrEqual(1);
+    expect(Math.max(...m.counts)).toBeGreaterThanOrEqual(3);
+    expect(m.actionDisplays.every((display) => display === 'grid')).toBe(true);
+    expect(m.actionColumns.every((columns) => columns === 4)).toBe(true);
   });
 
   test('顶栏不提供全局搜索入口', async ({ page }) => {

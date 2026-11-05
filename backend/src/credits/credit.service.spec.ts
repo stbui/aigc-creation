@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { CreditService } from './credit.service';
+import { CreditService, emptyBalanceSummary } from './credit.service';
 
 describe('CreditService 积分查询口径', () => {
   it('批量汇总余额时排除过期批次，并按正向流水计算累计获得', async () => {
@@ -302,11 +302,28 @@ describe('CreditService 人工调整幂等', () => {
     expect(created).toHaveLength(1);
   });
 
-  it('缺少原因直接拒绝', async () => {
+  it('未填写备注时使用系统说明继续调整', async () => {
     const service = new CreditService({} as never, {} as never);
-    await expect(
-      service.adminAdjust({ userId: 'u1', delta: 10, reason: '   ', operatorId: 'admin' }),
-    ).rejects.toMatchObject({ code: 40001 });
+    const grant = vi.spyOn(service, 'grant').mockResolvedValue({
+      lotId: 'lot-1',
+      balance: 10,
+    });
+    vi.spyOn(service, 'balanceOf').mockResolvedValue({
+      ...emptyBalanceSummary(),
+      balance: 10,
+    });
+
+    const result = await service.adminAdjust({
+      userId: 'u1',
+      delta: 10,
+      reason: '   ',
+      operatorId: 'admin',
+    });
+
+    expect(result).toEqual({ balance: 10, idempotentHit: false });
+    expect(grant).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: '人工增加积分（系统自动记录）' }),
+    );
   });
 });
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useAdminExport } from '~/admin-ui/primitives';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Download } from 'lucide-react';
 import {
@@ -109,7 +110,7 @@ export function AdminOrdersPage() {
   /** 核销后让已打开的详情抽屉重新拉取，而不是要求运营关掉再打开 */
   const [detailVersion, setDetailVersion] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const { exporting, runExport } = useAdminExport(toast);
 
   /*
    * 批量核销。只做「待支付 → 已支付」这一个方向:
@@ -411,25 +412,20 @@ export function AdminOrdersPage() {
   };
 
   /** 导出走当前筛选条件 —— 导出的口径必须与屏幕上看到的一致, 否则运营会对不上账 */
-  const exportCsv = async () => {
-    setExporting(true);
-    try {
-      await adminOrdersApi.exportCsv({
-        status: params.status as string | undefined,
-        refundState: params.refundState as string | undefined,
-        orderNo: (params.orderNo as string | undefined) || undefined,
-        email: (params.email as string | undefined) || undefined,
-        channel: params.channel as string | undefined,
-        from: (params.from as string | undefined) || undefined,
-        to: (params.to as string | undefined) || undefined,
-      });
-      toast.success('导出已开始下载');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '导出失败');
-    } finally {
-      setExporting(false);
-    }
-  };
+  const exportCsv = () =>
+    runExport(
+      () =>
+        adminOrdersApi.exportCsv({
+          status: params.status as string | undefined,
+          refundState: params.refundState as string | undefined,
+          orderNo: (params.orderNo as string | undefined) || undefined,
+          email: (params.email as string | undefined) || undefined,
+          channel: params.channel as string | undefined,
+          from: (params.from as string | undefined) || undefined,
+          to: (params.to as string | undefined) || undefined,
+        }),
+      '导出已开始下载',
+    );
 
   const runBatchMarkPaid = async () => {
     if (selected.length === 0) return;

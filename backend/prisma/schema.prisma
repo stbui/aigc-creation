@@ -515,7 +515,7 @@ model CreditLedger {
   /// 资金/积分动作幂等键。退款按 taskId 生成稳定键，重复调用只能落一条流水。
   idempotencyKey String? @unique
 
-  /// 人工调整的原因。强制填写 (PRD B-52)
+  /// 人工调整备注。可选；留空时写系统说明，操作审计另行自动记录
   reason     String?
   operatorId String?
 
@@ -804,6 +804,7 @@ model Asset {
   @@index([ownerId])
   @@index([status])
   @@index([storageBackend])
+  @@unique([storageBackend, storageKey])
   @@index([capability])
   @@index([createdAt])
 }
@@ -843,6 +844,8 @@ model GenerationTask {
   parentTaskId  String?
   /// 请求幂等键。与 ownerId 组成唯一约束，客户端重试不能重复建任务/扣费。
   idempotencyKey String?
+  /// 原始生成请求的稳定指纹；同一 owner 的幂等键只能复用完全相同的请求
+  requestFingerprint String?
 
   // ── 任务监控 (admin-prd.md B-32 重试) ────────────────────────────
   // 本任务由哪个失败任务重试而来 (null = 用户首次发起)。
@@ -1102,7 +1105,7 @@ model CheckinRule {
   /// 连签加成: JSON 数组, 形如 [{"day":3,"bonus":10},{"day":7,"bonus":30}]
   /// 用数组而非 map: 连续天数是无序的整数键, JSON 对象键必须是字符串
   bonusRules  String   @default("[]")
-  /// 周期上限。0 = 连签奖励无限累积 (不推荐, 长签到用户成本不可控)
+  /// 有效连签天数上限。达到后连续天数与奖励档位保持封顶，0 = 不限
   maxStreak   Int      @default(0)
   /// 周期内每日可得积分上限。0 = 不限
   dailyCap    Int      @default(0)

@@ -463,6 +463,7 @@ async function errorCode(fn: () => Promise<unknown>): Promise<{ code?: number; m
       [uncertainOrder.order.id, failedTaskOrder.order.id, 'not-exist-id'],
       'refund',
       'verify-admin',
+      '人工核对：全额退款',
     );
     check('批量核对逐条返回结果', batch.total === 3 && batch.results.length === 3, batch.total);
     check('批量核对成功 2 条', batch.resolved === 2, batch.resolved);
@@ -476,7 +477,9 @@ async function errorCode(fn: () => Promise<unknown>): Promise<{ code?: number; m
       afterBatch?.resolvedBy === 'verify-admin' && afterBatch?.resolutionNote === '人工核对：全额退款',
       { by: afterBatch?.resolvedBy, note: afterBatch?.resolutionNote },
     );
-    const batchError = await errorCode(() => admin.batchResolveOrders([], 'refund', 'verify-admin'));
+    const batchError = await errorCode(() =>
+      admin.batchResolveOrders([], 'refund', 'verify-admin', '人工核对：全额退款'),
+    );
     check('批量核对拒绝空列表', batchError.code === 40001, `${batchError.code} ${batchError.message}`);
 
     await prisma.generationTask.deleteMany({ where: { id: failedTaskOrder.order.taskId } });

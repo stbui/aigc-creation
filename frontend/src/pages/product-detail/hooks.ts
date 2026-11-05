@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useCreditCost } from '../../hooks/useCreditLabel';
-import { DEFAULT_SECTIONS, MAX_SECTIONS, SECTION_VALUES } from './constants';
+import {
+  DEFAULT_SECTIONS,
+  defaultSectionPrompt,
+  MAX_SECTIONS,
+  SECTION_MODULES,
+  SECTION_VALUES,
+} from './constants';
 import { useApp } from '../../ui';
 
 /**
@@ -42,6 +48,10 @@ export type RightTab = 'demo' | 'results';
 export function useSectionSelection() {
   const { message } = useApp();
   const [sections, setSections] = useState<string[]>(DEFAULT_SECTIONS);
+  /** 16 个模块各自保留一份提示词；取消勾选再选回时不会丢掉用户编辑。 */
+  const [sectionPrompts, setSectionPrompts] = useState<Record<string, string>>(() =>
+    Object.fromEntries(SECTION_MODULES.map(({ value }) => [value, defaultSectionPrompt(value)])),
+  );
 
   const toggle = useCallback(
     (value: string) => {
@@ -57,7 +67,11 @@ export function useSectionSelection() {
     [message],
   );
 
-  return { sections, toggle };
+  const setSectionPrompt = useCallback((value: string, prompt: string) => {
+    setSectionPrompts((prev) => ({ ...prev, [value]: prompt }));
+  }, []);
+
+  return { sections, sectionPrompts, toggle, setSectionPrompt };
 }
 
 /**

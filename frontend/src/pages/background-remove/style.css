@@ -486,3 +486,11 @@
 .pk-workspace.background-remove-page .background-source-reupload:hover {
   background: var(--tool-surface-6);
 }
+
+@media (max-width: 900px) {
+  /* 本页 CSS 懒加载晚于 global.css，同特异性下会覆盖旧的 40px 移动端规则；
+   * 移动端保持与桌面一致的 40px 点击高度。 */
+  .pk-workspace.background-remove-page .background-source-reupload {
+    height: 40px;
+  }
+}

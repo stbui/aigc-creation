@@ -111,15 +111,15 @@ export class RefundConfirmDto {
  * 字段名用 **delta** 而非 amount —— delta 明确表达「有正负的变动量」,
  * amount 会被误解为「金额」或「绝对值」, 后者会让"扣减"无法表达。
  *
- * `reason` **必填**：积分是用户资产，账本必须能回答「为什么给他加 100」，
- * 只写「人工调整用户积分」这种固定文案等于没有原因。
+ * `reason` 可选：有具体业务依据时写入流水备注；未填写时由系统按增减方向
+ * 生成稳定说明，操作人、目标用户和动作仍由审计日志自动记录。
  */
 export class AdjustCreditDto {
   @IsString() userId!: string;
   /** 正数为增加, 负数为扣减, 不能为 0 */
   @IsInt() delta!: number;
-  /** 调整原因。写入积分流水，事后核查唯一依据 */
-  @IsString() @MaxLength(200) reason!: string;
+  /** 调整备注。写入积分流水；留空时由服务端生成系统说明 */
+  @IsOptional() @IsString() @MaxLength(200) reason?: string;
   @IsOptional() @IsInt() @Min(0) validDays?: number;
 }
 
@@ -143,8 +143,8 @@ export class BatchAdjustDto {
   @Type(() => BatchAdjustItemDto)
   items!: BatchAdjustItemDto[];
 
-  /** 整批共用的调整原因（必填；单条可用自己的 reason 覆盖） */
-  @IsString() @MaxLength(200) reason!: string;
+  /** 整批共用的调整备注（可选；单条可用自己的 reason 覆盖） */
+  @IsOptional() @IsString() @MaxLength(200) reason?: string;
 
   /**
    * 幂等键（建议前端在打开抽屉时生成一次，重试时原样复用）。
@@ -575,7 +575,7 @@ export class AdminCommerceController {
     });
   }
 
-  /** 人工增减积分 (B-52)。原因必填，直接落进积分流水。 */
+  /** 人工增减积分 (B-52)。备注可选，动作与操作人由审计自动留痕。 */
   @Post("credits/adjust")
   @RequirePermission(PERMISSIONS.creditAdjust)
   @AuditAction("credit.adjust")

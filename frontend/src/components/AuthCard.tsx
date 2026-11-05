@@ -11,6 +11,7 @@ import type { SmsPurpose } from '../types/api';
 interface AuthForm {
   email: string;
   password: string;
+  emailCode?: string;
   name?: string;
   phone?: string;
   smsCode?: string;
@@ -96,13 +97,16 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
   const [form] = useForm<AuthForm>();
   const emailRef = useRef<HTMLInputElement>(null);
 
-  // 验证码发送状态
+  // 短信与邮箱验证码各自使用独立状态，避免两个倒计时/loading 互相串台
   const [sendingSms, setSendingSms] = useState(false);
-  const [countdown, setCountdown] = useState(0);
+  const [smsCountdown, setSmsCountdown] = useState(0);
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailCountdown, setEmailCountdown] = useState(0);
   const [oauthProviders, setOauthProviders] = useState<OAuthProviderInfo[]>([]);
 
   // 注册模式下手机号是选填的；只有填了才显示验证码输入框
   const phoneValue = useWatch('phone', form);
+  const emailValue = useWatch('email', form);
   const needPhoneCode = mode === 'register' && Boolean(phoneValue);
 
   /*
@@ -151,12 +155,18 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
     return () => window.clearTimeout(t);
   }, []);
 
-  // 倒计时。依赖 countdown 自身，归零即停
+  // 两个验证码倒计时互相独立，归零即停
   useEffect(() => {
-    if (countdown <= 0) return;
-    const t = window.setTimeout(() => setCountdown((n) => n - 1), 1000);
+    if (smsCountdown <= 0) return;
+    const t = window.setTimeout(() => setSmsCountdown((n) => n - 1), 1000);
     return () => window.clearTimeout(t);
-  }, [countdown]);
+  }, [smsCountdown]);
+
+  useEffect(() => {
+    if (emailCountdown <= 0) return;
+    const t = window.setTimeout(() => setEmailCountdown((n) => n - 1), 1000);
+    return () => window.clearTimeout(t);
+  }, [emailCountdown]);
 
   /**
    * 发送短信验证码。
@@ -180,7 +190,7 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
         } else {
           message.warning('当前为控制台短信通道，验证码已写入后端 logs/outbox/sms-*.log');
         }
-        setCountdown(SMS_COUNTDOWN);
+        setSmsCountdown(SMS_COUNTDOWN);
       } catch (e) {
         message.error((e as Error).message || '验证码发送失败');
       } finally {
@@ -189,6 +199,36 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
     },
     [form, message],
   );
+
+  /**
+   * 发送注册邮箱验证码。后端对已注册邮箱也恒定返回 `sent=true`，
+   * 因此不能文案承诺「已发送」；`delivered=false` 只提示去控制台通道排查。
+   */
+  const handleSendEmail = useCallback(async () => {
+    const email = String(form.getFieldValue('email') ?? '').trim();
+    if (!email) {
+      message.error('请先填写邮箱');
+      return;
+    }
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      message.error('邮箱格式不正确');
+      return;
+    }
+    setSendingEmail(true);
+    try {
+      const res = await authApi.sendEmail(email);
+      if (res.delivered) {
+        message.success('验证码已发送，请查收邮件');
+      } else {
+        message.info('验证码请求已提交；开发环境请查看后端 logs/outbox/email-*.log');
+      }
+      setEmailCountdown(SMS_COUNTDOWN);
+    } catch (e) {
+      message.error((e as Error).message || '验证码发送失败');
+    } finally {
+      setSendingEmail(false);
+    }
+  }, [form, message]);
 
   const onFinish = async (values: AuthForm) => {
     setSubmitting(true);
@@ -215,6 +255,7 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
         email: values.email,
         password: values.password,
         name: values.name,
+        emailCode: values.emailCode!,
         ...(values.phone ? { phone: values.phone, smsCode: values.smsCode } : {}),
         ...(consentVersion ? { consentVersion } : {}),
       });
@@ -230,13 +271,14 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
 
   const switchMode = (next: Mode) => {
     setMode(next);
-    setCountdown(0);
-    form.resetFields(['password', 'name', 'phone', 'smsCode', 'agreed']);
+    setSmsCountdown(0);
+    setEmailCountdown(0);
+    form.resetFields(['password', 'emailCode', 'name', 'phone', 'smsCode', 'agreed']);
   };
 
   const activeTab = mode === 'qr' ? 'qr' : mode === 'sms' ? 'sms' : 'account';
 
-  /** 验证码输入框 + 获取按钮。两个用途共用同一段 UI */
+  /** 短信验证码输入框 + 获取按钮。登录与注册验证手机号共用同一段 UI */
   const codeField = (purpose: SmsPurpose) => (
     <FormItem
       name="smsCode"
@@ -256,9 +298,37 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
           className="login-code-btn"
           onClick={() => handleSendSms(purpose)}
           loading={sendingSms}
-          disabled={countdown > 0}
+          disabled={smsCountdown > 0}
         >
-          {countdown > 0 ? `${countdown}s` : '获取验证码'}
+          {smsCountdown > 0 ? `${smsCountdown}s` : '获取验证码'}
+        </Button>
+      </div>
+    </FormItem>
+  );
+
+  /** 注册邮箱验证码输入框；与短信验证码完全独立 */
+  const emailCodeField = (
+    <FormItem
+      name="emailCode"
+      label="邮箱验证码"
+      className="login-field"
+      rules={[{ required: true, message: '请输入邮箱验证码' }]}
+    >
+      <div className="login-code-row">
+        <Input
+          prefix={<ShieldCheck size={15} />}
+          placeholder="6 位验证码"
+          maxLength={6}
+          inputMode="numeric"
+          autoComplete="one-time-code"
+        />
+        <Button
+          className="login-code-btn"
+          onClick={() => void handleSendEmail()}
+          loading={sendingEmail}
+          disabled={emailCountdown > 0 || !emailValue}
+        >
+          {emailCountdown > 0 ? `${emailCountdown}s` : '获取验证码'}
         </Button>
       </div>
     </FormItem>
@@ -382,6 +452,8 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
                 />
               </FormItem>
             )}
+
+            {mode === 'register' && emailCodeField}
 
             {mode === 'sms' && (
               <FormItem

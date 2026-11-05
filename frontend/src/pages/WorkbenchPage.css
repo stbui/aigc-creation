@@ -1516,3 +1516,10 @@
   .wb-data-layout { grid-template-columns: 1fr; margin-top: 16px; }
   .wb-dashboard-stats { grid-template-columns: repeat(3, 1fr); }
 }
+
+@media (max-width: 600px) {
+  .wb-tool-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .wb-panel.wb-account,
+  .wb-panel.wb-recent,
+  .wb-panel.wb-dashboard { padding: 16px; }
+}

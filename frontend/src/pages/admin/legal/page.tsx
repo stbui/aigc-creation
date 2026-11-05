@@ -5,7 +5,7 @@ import { useAdminResource, useAdmin, useDiscardConfirm, useUnsavedGuard, useToas
 import { ActionButton, AdminDataTable, ConfirmDialog, Drawer, FilterActions, FilterBar, FormField, ModalDialog, PageHeader, Panel, SelectField, StatusTag, StaleError, TextAreaField, TextField, type AdminColumn } from '~/admin-ui/primitives';
 import { adminLegalApi } from '../../../lib/api';
 
-import type { AdminLegalDoc, LegalSlug, LegalStatus } from '../../../types/api';
+import type { AdminLegalDoc, LegalSlug } from '../../../types/api';
 
 /** draft/archived 在 StatusTag 的通用语义表里没有对应项, 显式给标签 */
 

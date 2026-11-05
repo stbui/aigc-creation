@@ -8,6 +8,42 @@ import type { ModelDraft, RouteDraft } from './constants';
 
 export { parseCredits, toCreditsInput };
 
+/** 新建模型时只需要能力清单里的路由元信息，不需要把完整能力定义带进表单。 */
+export interface CapabilityRoutingDefinition {
+  modality?: string;
+  inputs: number;
+  model?: {
+    capability?: string;
+    operation?: string;
+  };
+}
+
+/**
+ * 根据所选能力补齐新模型的能力范围。
+ *
+ * 运营只需要选择业务能力，不需要手写底层规则；带参考图的生成能力同时支持
+ * 文生图与图生图，避免保存后部分使用场景被误判为不支持。
+ */
+export function defaultCapabilitySpecFor(
+  definition: CapabilityRoutingDefinition | null | undefined,
+): { version: number; capability: string; operations: string[] } | null {
+  const capability = definition?.model?.capability ?? definition?.modality;
+  if (!capability) return null;
+
+  const operations = new Set<string>();
+  const primaryOperation = definition?.model?.operation?.trim();
+  if (primaryOperation) operations.add(primaryOperation);
+  if (
+    capability === 'image' &&
+    primaryOperation === 'text_to_image' &&
+    (definition?.inputs ?? 0) > 0
+  ) {
+    operations.add('image_to_image');
+  }
+
+  return { version: 1, capability, operations: [...operations] };
+}
+
 export function routeToDraft(route: AdminLogicalRouteView): RouteDraft {
   return {
     key: route.id,

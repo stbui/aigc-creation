@@ -127,6 +127,57 @@ describe('OrderService.cancelSandboxOrder', () => {
   });
 });
 
+describe('OrderService.markPaid 用户锁', () => {
+  it('入账事务首先锁定用户行，再读取/写订单与其他资源', async () => {
+    const order = {
+      id: 'order-1',
+      orderNo: 'HJ001',
+      userId: 'user-1',
+      status: 'pending',
+      paidCents: 100,
+      currency: 'CNY',
+      couponId: null,
+      stockReserved: false,
+      membershipPlanId: null,
+      items: [],
+    };
+    const prisma: Record<string, any> = {
+      payment: { findUnique: vi.fn().mockResolvedValue(null) },
+      order: {
+        findUnique: vi.fn().mockResolvedValue(order),
+        updateMany: vi.fn().mockRejectedValue(new Error('stop-after-lock')),
+      },
+      $executeRaw: vi.fn().mockResolvedValue(1),
+    };
+    prisma.$transaction = vi.fn(
+      async (work: (client: Record<string, any>) => unknown) => work(prisma),
+    );
+    const service = new OrderService(
+      prisma as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    await expect(
+      service.markPaid({
+        orderId: 'order-1',
+        userId: 'user-1',
+        payTransactionId: 'pay-1',
+        channel: 'sandbox',
+      }),
+    ).rejects.toThrow('stop-after-lock');
+
+    expect(prisma.order.updateMany).toHaveBeenCalledOnce();
+    expect(prisma.$executeRaw.mock.invocationCallOrder[0]).toBeLessThan(
+      prisma.order.updateMany.mock.invocationCallOrder[0],
+    );
+  });
+});
+
 function future(): Date {
   return new Date(Date.now() + 24 * 3600 * 1000);
 }

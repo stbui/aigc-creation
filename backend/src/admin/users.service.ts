@@ -3,6 +3,7 @@ import * as bcrypt from "bcryptjs";
 import { randomInt } from "crypto";
 import { PrismaService } from "../prisma/prisma.service";
 import { AccountLifecycleService } from "../account/account-lifecycle.service";
+import { lockAndAssertActiveAdminMutable } from "../account/last-admin.guard";
 import { AppError } from "../common/app.exception";
 import { runBatch } from "../common/batch";
 import { CSV_EXPORT_MAX_ROWS, toCsv } from "../common/csv";
@@ -326,19 +327,15 @@ export class AdminUsersService {
     if (user.status === "deleted") {
       throw new AppError(40001, "已注销用户无需禁用", 400);
     }
-    // 最后一个 admin 被禁用会让系统失去唯一管理入口
-    if (user.role === "admin" && dto.status === "disabled") {
-      const adminCount = await this.prisma.user.count({
-        where: { role: "admin", status: "active" },
-      });
-      if (adminCount <= 1) {
-        throw new AppError(40901, "至少保留一个启用的管理员", 409);
+    await this.prisma.$transaction(async (tx) => {
+      // 末位管理员检查与状态写入必须在同一写事务，count 后再 update 会被并发绕过。
+      if (user.role === "admin" && user.status === "active" && dto.status === "disabled") {
+        await lockAndAssertActiveAdminMutable(tx, id);
       }
-    }
-
-    await this.prisma.user.update({
-      where: { id },
-      data: { status: dto.status },
+      await tx.user.update({
+        where: { id },
+        data: { status: dto.status },
+      });
     });
 
     return { id, status: dto.status };
@@ -373,18 +370,13 @@ export class AdminUsersService {
       throw new AppError(40301, "只有管理员可以授予管理员角色", 403);
     }
 
-    // 最后一个启用中的 admin 保护。已禁用的 admin 不提供管理入口，
-    // 将其降级不会进一步减少可用管理员数量。
-    if (user.role === "admin" && user.status === "active") {
-      const adminCount = await this.prisma.user.count({
-        where: { role: "admin", status: "active" },
-      });
-      if (adminCount <= 1) {
-        throw new AppError(40901, "至少保留一个管理员", 409);
+    await this.prisma.$transaction(async (tx) => {
+      // 已禁用的 admin 不提供管理入口，降级它不会减少可用管理员数量。
+      if (user.role === "admin" && user.status === "active") {
+        await lockAndAssertActiveAdminMutable(tx, id);
       }
-    }
-
-    await this.prisma.user.update({ where: { id }, data: { role: dto.role } });
+      await tx.user.update({ where: { id }, data: { role: dto.role } });
+    });
     return { id, role: dto.role, roleLabel: ROLE_LABELS[dto.role] ?? dto.role };
   }
 
@@ -482,17 +474,6 @@ export class AdminUsersService {
     if (user.status === "deleted") {
       throw new AppError(40001, "该用户已注销，无需重复删除", 400);
     }
-    // 删除同样不能突破「至少保留一个启用管理员」的底线。默认角色中只有
-    // admin 持有 user.delete，但自定义角色也可能被授予该权限。
-    if (user.role === "admin" && user.status === "active") {
-      const adminCount = await this.prisma.user.count({
-        where: { role: "admin", status: "active" },
-      });
-      if (adminCount <= 1) {
-        throw new AppError(40901, "至少保留一个启用的管理员", 409);
-      }
-    }
-
     if (hard) {
       if (confirm !== "删除") {
         throw new AppError(40001, "物理删除需要确认词「删除」", 400);
@@ -511,6 +492,7 @@ export class AdminUsersService {
        * 只有与删除处于同一事务，才能保证「有资金记录就不物理删除」不被竞态绕过。
        */
       const deleted = await this.prisma.$transaction(async (tx) => {
+        await lockAndAssertActiveAdminMutable(tx, id);
         const [
           orderCount,
           paymentCount,
@@ -635,7 +617,8 @@ export class AdminUsersService {
       };
     }
 
-    // 软删: 与 C 端自助注销走同一份实现 (AccountLifecycleService)
+    // 软删: 与 C 端自助注销走同一份实现 (AccountLifecycleService)。后者会在
+    // 自己的事务内执行末位管理员保护，避免后台预检查与写入之间的竞态。
     await this.lifecycle.softDelete(id);
     return { id, hard: false };
   }

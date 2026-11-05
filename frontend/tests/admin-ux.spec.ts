@@ -25,6 +25,16 @@ const chips = (page: Page) => page.getByTestId('admin-filter-chips');
 const drawer = (page: Page) => page.getByTestId('admin-drawer');
 const rows = (page: Page) => page.getByTestId('admin-table-row');
 
+/** 后台侧栏按权限分组折叠；先展开目标组，再点击组内入口。 */
+async function navigateViaSider(page: Page, group: string, item: string) {
+  const nav = page.getByTestId('admin-sider');
+  const itemButton = nav.getByRole('button', { name: item, exact: true });
+  if (!(await itemButton.isVisible())) {
+    await nav.getByRole('button', { name: group, exact: true }).click();
+  }
+  await itemButton.click();
+}
+
 test.describe('后台高频动线', () => {
   test.skip(!HAS_ADMIN_CREDENTIALS, '未提供后台管理员凭据');
 
@@ -241,24 +251,30 @@ test.describe('后台高频动线', () => {
     await expect(page.getByTestId('admin-table-row').first()).toBeVisible();
   });
 
-  test('核心宽表在 1440px 下无需横向滚动', async ({ page }) => {
+  test('核心宽表与渠道工作区在 1440px 下无需横向滚动', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    for (const [path, heading] of [
-      ['/admin/orders', '订单管理'],
-      ['/admin/tasks', '任务监控'],
-      ['/admin/model-calls', '调用记录'],
-      ['/admin/channels', '渠道工作台'],
+    for (const [path, heading, scrollTestId, rowTestId] of [
+      ['/admin/orders', '订单管理', 'admin-table-scroll', 'admin-table-row'],
+      ['/admin/tasks', '任务监控', 'admin-table-scroll', 'admin-table-row'],
+      ['/admin/model-calls', '调用记录', 'admin-table-scroll', 'admin-table-row'],
+      // 渠道工作台已改为左列渠道 + 右侧模型详情的主从布局，不再是表格。
+      ['/admin/channels', '渠道工作台', 'admin-channel-workspace', 'admin-channel-item'],
     ] as const) {
       await page.goto(`${UI}${path}`);
       await expect(page.getByRole('heading', { name: heading })).toBeVisible({ timeout: 15000 });
       await expect(page.getByTestId('admin-page-loading')).toHaveCount(0, { timeout: 30000 });
-      await expect(rows(page).first()).toBeVisible({ timeout: 15000 });
+      await expect(page.getByTestId(scrollTestId)).toBeVisible({ timeout: 15000 });
+      // 有数据时必须确认实际行已经渲染；无数据的环境仍校验工作区本身不溢出。
+      const rowCount = await page.getByTestId(rowTestId).count();
+      if (rowCount > 0) {
+        await expect(page.getByTestId(rowTestId).first()).toBeVisible();
+      }
 
-      const m = await page.evaluate(() => {
-        const scroll = document.querySelector('[data-testid="admin-table-scroll"]') as HTMLElement | null;
+      const m = await page.evaluate((testId) => {
+        const scroll = document.querySelector(`[data-testid="${testId}"]`) as HTMLElement | null;
         return { clientWidth: scroll?.clientWidth ?? 0, scrollWidth: scroll?.scrollWidth ?? 0 };
-      });
-      expect(m.clientWidth, `${heading}: 未找到表格`).toBeGreaterThan(0);
+      }, scrollTestId);
+      expect(m.clientWidth, `${heading}: 未找到滚动容器`).toBeGreaterThan(0);
       expect(m.scrollWidth, `${heading}: 表格仍横向溢出`).toBeLessThanOrEqual(m.clientWidth + 2);
     }
   });
@@ -274,10 +290,7 @@ test.describe('后台高频动线', () => {
     await inviter.fill(String(Number(original || '0') + 1));
     await expect(page.getByRole('button', { name: '放弃变更', exact: true })).toBeVisible();
 
-    await page
-      .getByTestId('admin-sider')
-      .getByRole('button', { name: /用户管理/ })
-      .click();
+    await navigateViaSider(page, '运营', '用户管理');
     const dialog = page.getByRole('dialog').filter({ hasText: '有未保存的变更' });
     await expect(dialog).toBeVisible();
     await dialog.getByRole('button', { name: '留下继续编辑' }).click();
@@ -285,10 +298,7 @@ test.describe('后台高频动线', () => {
 
     await page.getByRole('button', { name: '放弃变更', exact: true }).click();
     await expect(inviter).toHaveValue(original);
-    await page
-      .getByTestId('admin-sider')
-      .getByRole('button', { name: /用户管理/ })
-      .click();
+    await navigateViaSider(page, '运营', '用户管理');
     await expect(page.getByRole('heading', { name: '用户管理' })).toBeVisible({ timeout: 15000 });
   });
 
@@ -415,10 +425,7 @@ test.describe('后台高频动线', () => {
     await expect(saveBar.getByRole('textbox', { name: '变更原因' })).toHaveCount(0);
     await expect(saveButton).toBeEnabled();
 
-    await page
-      .getByTestId('admin-sider')
-      .getByRole('button', { name: /用户管理/ })
-      .click();
+    await navigateViaSider(page, '运营', '用户管理');
     await expect(page.getByText('有未保存的变更')).toBeVisible();
     await page.getByRole('button', { name: '留下继续编辑' }).click();
     await expect(page).toHaveURL(/\/admin\/roles/);

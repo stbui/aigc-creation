@@ -63,7 +63,7 @@ Product (SKU) ──下单──> Order ──支付──> Payment ──回调
 - 跨批次扣减，余额不足**整体回滚**并报 `40002`（前端按 402 语义处理）。
 - 并发用条件更新 `updateMany({ where: { availableMicrocredits: { gte: amount } } })`，不引入行锁：自研 adapter 只支持 SERIALIZABLE，SQLite 本身单写者。
 - 每次变动写 `availableAfter` / `reservedAfter`，流水可独立还原任意时刻余额。
-- 人工增减**必须填原因**（`reason` 必填并落进流水 `note`），落 `admin_adjust` 并写审计。
+- 人工增减**备注可选**（填写时落进流水 `note`，留空时写系统说明），落 `admin_adjust` 并由审计自动记录操作人与动作。
 - 批量调整 / CSV 导入**必须带幂等键**，键内包含行号：同一批重试不会二次发放。
 
 ### 2.3 到期回收
@@ -281,8 +281,8 @@ PaymentsService（编排）
 | GET | `/admin/credits/audit` | `credit.read` | **账实核对**（只读） |
 | GET | `/admin/credits/:userId/lots` | `credit.read` | 批次明细 |
 | GET | `/admin/credits/:userId/ledger` | `credit.read` | 流水 |
-| POST | `/admin/credits/adjust` | `credit.adjust` | 单条调整，**`reason` 必填** |
-| POST | `/admin/credits/batch-adjust` | `credit.adjust` | 批量调整，`reason` 必填 + `idempotencyKey` |
+| POST | `/admin/credits/adjust` | `credit.adjust` | 单条调整，`reason` 可选，审计自动留痕 |
+| POST | `/admin/credits/batch-adjust` | `credit.adjust` | 批量调整，`reason` 可选 + 建议 `idempotencyKey` |
 | POST | `/admin/credits/import` | `credit.adjust` | CSV 导入，`importKey` 幂等 |
 
 ## 12. 前端改造点

@@ -39,7 +39,7 @@ function InfoItem({
 }) {
   return (
     <div className={cn('min-w-0', className)}>
-      <dt className="text-[11px] font-medium text-muted-foreground">{label}</dt>
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
       <dd className="mt-1 text-[13px] leading-5 break-words text-foreground">{value}</dd>
     </div>
   );
@@ -49,7 +49,7 @@ function InfoItem({
 function MiniStat({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="min-w-0 px-4 py-3 first:pl-0 last:pr-0">
-      <dt className="text-[11px] font-medium text-muted-foreground">{label}</dt>
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
       <dd className="mt-1 text-xl leading-6 font-semibold text-foreground tabular-nums">
         {value}
       </dd>
@@ -204,7 +204,7 @@ export function UserDetailDrawer({
                   d.phone ? (
                     <span className="flex items-center gap-1.5">
                       {d.phone}
-                      <span className="text-[11px] text-muted-foreground">
+                      <span className="text-xs text-muted-foreground">
                         {d.phoneVerifiedAt ? '已验证' : '未验证'}
                       </span>
                     </span>
@@ -241,7 +241,7 @@ export function UserDetailDrawer({
                 <MiniStat label="任务" value={d.stats.tasks} />
                 <MiniStat label="素材" value={d.stats.assets} />
               </dl>
-              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 bg-muted/40 px-4 py-2 text-[11px] text-muted-foreground">
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
                 <span className="font-medium text-foreground">任务状态</span>
                 <span>
                   成功{' '}
@@ -300,12 +300,12 @@ export function UserDetailDrawer({
                         <span className="block truncate text-[13px] font-medium text-foreground">
                           {t.capabilityName}
                         </span>
-                        <span className="mt-0.5 block truncate font-mono text-[11px] text-muted-foreground">
+                        <span className="mt-0.5 block truncate font-mono text-xs text-muted-foreground">
                           #{t.id.slice(-8)}
                         </span>
                       </span>
                       <StatusTag status={t.status} />
-                      <span className="shrink-0 text-[11px] text-muted-foreground tabular-nums">
+                      <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
                         {formatDateTime(t.createdAt)}
                       </span>
                     </Link>

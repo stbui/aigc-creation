@@ -180,11 +180,14 @@ export class PaymentWorkerService implements OnModuleInit, OnModuleDestroy {
       if (state.nextAttemptAt.getTime() > now.getTime()) continue;
 
       try {
-        await this.reconciliation.run({
+        const result = await this.reconciliation.run({
           providerId: adapter.descriptor.id,
           billDate,
           actorId: 'worker',
         });
+        if (result.run.status !== 'completed') {
+          throw new Error(result.run.error || '对账任务未完成');
+        }
         await this.prisma.paymentAutoReconcileState.update({
           where: { id: state.id },
           data: {

@@ -63,7 +63,7 @@ function setup(opts: SetupOptions = {}) {
   };
   const availability = { runtimeOf: vi.fn().mockResolvedValue(undefined) };
   const price = {
-    resolve: vi.fn().mockResolvedValue(undefined),
+    resolveOverride: vi.fn().mockResolvedValue(null),
     freeCampaignIdOf: vi.fn().mockResolvedValue(undefined),
   };
   const billing = {

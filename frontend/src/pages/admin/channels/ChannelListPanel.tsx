@@ -109,7 +109,7 @@ export function ChannelListPanel({
       title={
         <span className="flex items-baseline gap-2">
           渠道
-          <span className="text-[11px] font-normal text-muted-foreground tabular-nums">
+          <span className="text-xs font-normal text-muted-foreground tabular-nums">
             {hasFilters ? `${visible.length} / ${rows.length} 个` : `共 ${rows.length} 个`}
           </span>
         </span>
@@ -124,7 +124,7 @@ export function ChannelListPanel({
             onClear={onClearImportFile}
             disabled={!writable || importing}
             label="导入渠道"
-            hint="JSON"
+            hint="渠道导出文件"
           />
           <IconButton
             icon={Download}
@@ -185,7 +185,7 @@ export function ChannelListPanel({
           ariaLabel="搜索渠道"
           value={keyword}
           onChange={onKeywordChange}
-          placeholder="搜索渠道名或 Base URL"
+          placeholder="搜索渠道名称或服务地址"
         />
         <SelectField
           ariaLabel="渠道状态"
@@ -220,12 +220,7 @@ export function ChannelListPanel({
           )}
           {!loading && !error && visible.length === 0 && (
             <EmptyState
-              title={hasFilters ? '没有匹配的渠道' : '还没有渠道'}
-              description={
-                hasFilters
-                  ? '调整搜索词或状态筛选，或清除筛选查看全部渠道。'
-                  : '新建渠道并导入模型后，C 端才会有可选模型。'
-              }
+              title={hasFilters ? '没有匹配的渠道' : '暂无渠道'}
               action={
                 hasFilters ? (
                   <ActionButton variant="secondary" size="sm" onClick={onClearFilters}>
@@ -296,7 +291,7 @@ export function ChannelListPanel({
                         {formatRate(rate)}
                       </span>
                     )}
-                    {!row.hasApiKey && <span className="text-danger-text">未配置 Key</span>}
+                    {!row.hasApiKey && <span className="text-danger-text">未配置访问凭证</span>}
                   </span>
                 </span>
               </button>

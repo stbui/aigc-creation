@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { useAdminExport } from '~/admin-ui/primitives';
 import { STATUS_OPTIONS, KIND_LABELS, STATUS_LABELS } from './constants';
 import { yuan } from './utils';
 import { useAdmin, useToast, useAdminList, useAdminUrlFilterSync } from './hooks';
@@ -49,7 +50,7 @@ export function AdminInvoicesPage() {
   } | null>(null);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
-  const [exporting, setExporting] = useState(false);
+  const { exporting, runExport } = useAdminExport(toast);
 
   const fetcher = useCallback(
     (params: Record<string, unknown>) =>
@@ -111,20 +112,15 @@ export function AdminInvoicesPage() {
   ].filter(Boolean) as AppliedFilter[];
 
   /** 导出走已生效的筛选条件 —— 必须与屏幕上的列表同口径 */
-  const exportCsv = async () => {
-    setExporting(true);
-    try {
-      await adminInvoicesApi.exportCsv({
-        status: params.status as InvoiceStatus | undefined,
-        keyword: params.keyword as string | undefined,
-      });
-      toast.success('导出已开始下载');
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : '导出失败');
-    } finally {
-      setExporting(false);
-    }
-  };
+  const exportCsv = () =>
+    runExport(
+      () =>
+        adminInvoicesApi.exportCsv({
+          status: params.status as InvoiceStatus | undefined,
+          keyword: params.keyword as string | undefined,
+        }),
+      '导出已开始下载',
+    );
 
   const openAction = (kind: 'issue' | 'reject' | 'redFlush', row: AdminInvoice) => {
     setAction({ kind, row });

@@ -90,6 +90,11 @@ const ImageTranslatePage = lazyRoute('/image-translate', () => import('./pages/i
 const ImageExpandPage = lazyRoute('/image-expand', () => import('./pages/image-expand'), 'ImageExpandPage');
 const ProductRecolorPage = lazyRoute('/product-recolor', () => import('./pages/product-recolor'), 'ProductRecolorPage');
 const RotateAnglePage = lazyRoute('/rotate-angle', () => import('./pages/rotate-angle'), 'RotateAnglePage');
+const ImageToVideoPage = lazyRoute(
+  '/tools/image_to_video',
+  () => import('./pages/image-to-video'),
+  'ImageToVideoPage',
+);
 const ToolPage = lazyRoute('/tools/*', () => import('./pages/ToolPage'), 'ToolPage');
 const WorksPage = lazyRoute(['/works', '/my-works'], () => import('./pages/works'), 'WorksPage');
 const LibraryPage = lazyRoute(['/library', '/asset-library'], () => import('./pages/library'), 'LibraryPage');
@@ -299,6 +304,12 @@ function Shell() {
               path="/rotate-angle"
               element={
                   <RotateAnglePage />
+              }
+            />
+            <Route
+              path="/tools/image_to_video"
+              element={
+                  <ImageToVideoPage />
               }
             />
             <Route

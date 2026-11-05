@@ -43,6 +43,7 @@ describe("AdminUsersService 用户生命周期与角色", () => {
     });
 
     tx = {
+      $executeRaw: vi.fn().mockResolvedValue(1),
       order: table(),
       payment: table(),
       refund: table(),
@@ -60,6 +61,7 @@ describe("AdminUsersService 用户生命周期与角色", () => {
         findUnique: vi.fn().mockResolvedValue({
           _count: { projects: 1, tasks: 2, assets: 2 },
         }),
+        update: vi.fn().mockResolvedValue({}),
         delete: vi.fn().mockResolvedValue({}),
       },
       generationTask: table(),
@@ -177,12 +179,30 @@ describe("AdminUsersService 用户生命周期与角色", () => {
       role: "admin",
       status: "active",
     });
-    prisma.user.count.mockResolvedValue(1);
+    lifecycle.softDelete.mockRejectedValue(
+      new Error("至少保留一个启用的管理员"),
+    );
 
     await expect(
       service.remove("user-1", false, undefined, "operator-1"),
     ).rejects.toThrow("至少保留一个启用的管理员");
-    expect(lifecycle.softDelete).not.toHaveBeenCalled();
+    expect(lifecycle.softDelete).toHaveBeenCalledWith("user-1");
+  });
+
+  it("拒绝物理删除最后一个启用中的管理员，且不清理关联数据", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      email: "admin@example.com",
+      role: "admin",
+      status: "active",
+    });
+    tx.$executeRaw.mockResolvedValue(0);
+
+    await expect(
+      service.remove("user-1", true, "删除", "operator-1"),
+    ).rejects.toThrow("至少保留一个启用的管理员");
+    expect(tx.generationTask.deleteMany).not.toHaveBeenCalled();
+    expect(tx.user.delete).not.toHaveBeenCalled();
   });
 
   it("清理无外键的关联数据，并按实际结果统计文件删除", async () => {
@@ -225,10 +245,11 @@ describe("AdminUsersService 用户生命周期与角色", () => {
         role: "admin",
       }),
     ).resolves.toEqual({ id: "user-1", role: "user", roleLabel: "用户" });
-    expect(prisma.user.update).toHaveBeenCalledWith({
+    expect(tx.user.update).toHaveBeenCalledWith({
       where: { id: "user-1" },
       data: { role: "user" },
     });
+    expect(tx.$executeRaw).not.toHaveBeenCalled();
   });
 
   it("拒绝降级最后一个启用中的管理员", async () => {
@@ -238,15 +259,15 @@ describe("AdminUsersService 用户生命周期与角色", () => {
       role: "admin",
       status: "active",
     });
-    prisma.user.count.mockResolvedValue(1);
+    tx.$executeRaw.mockResolvedValue(0);
 
     await expect(
       service.changeRole("user-1", { role: "operator" }, {
         id: "actor-1",
         role: "admin",
       }),
-    ).rejects.toThrow("至少保留一个管理员");
-    expect(prisma.user.update).not.toHaveBeenCalled();
+    ).rejects.toThrow("至少保留一个启用的管理员");
+    expect(tx.user.update).not.toHaveBeenCalled();
   });
 
   it("允许降级已禁用的管理员，因为其不提供管理入口", async () => {
@@ -263,7 +284,26 @@ describe("AdminUsersService 用户生命周期与角色", () => {
         role: "admin",
       }),
     ).resolves.toMatchObject({ role: "user" });
-    expect(prisma.user.count).not.toHaveBeenCalled();
+    expect(tx.$executeRaw).not.toHaveBeenCalled();
+    expect(tx.user.update).toHaveBeenCalledWith({
+      where: { id: "user-1" },
+      data: { role: "user" },
+    });
+  });
+
+  it("拒绝禁用最后一个启用中的管理员", async () => {
+    prisma.user.findUnique.mockResolvedValue({
+      id: "user-1",
+      email: "admin@example.com",
+      role: "admin",
+      status: "active",
+    });
+    tx.$executeRaw.mockResolvedValue(0);
+
+    await expect(
+      service.changeStatus("user-1", { status: "disabled" }, "actor-1"),
+    ).rejects.toThrow("至少保留一个启用的管理员");
+    expect(tx.user.update).not.toHaveBeenCalled();
   });
 
   it("详情统计排除软删项目及其任务与素材", async () => {

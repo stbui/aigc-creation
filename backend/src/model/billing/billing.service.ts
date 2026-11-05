@@ -500,6 +500,98 @@ export class BillingService {
   }
 
   /**
+   * 线路切换时原子替换任务账单。
+   *
+   * 旧账单退款、新账单创建/预留、任务当前账单 CAS 与路由尝试建单必须同生共死：
+   *   · 先退款旧单再预留新单，避免旧预授权占住余额导致「本可支付却被判余额不足」；
+   *   · 任一步失败都回滚，旧账单继续有效，任务不会停在「已退款但没新账」；
+   *   · CAS 同时校验任务租约与旧账单，防止两个执行者并发替换。
+   *
+   * `afterSwap` 由任务层提供，用于在同一事务内创建 RouteAttempt 并写线路快照。
+   */
+  async replaceTaskBilling(params: {
+    userId: string;
+    taskId: string;
+    expectedBillingOrderId: string | null;
+    expectedLeaseOwner: string;
+    idempotencyKey: string;
+    draft: BillingDraft;
+    /** 限时免费等活动 id；换线后仍要留在新账单上供后续审计 */
+    promotionId?: string;
+    chargeLimitMicrocredits: bigint;
+    afterSwap?: (
+      tx: Prisma.TransactionClient,
+      result: { order: BillingOrderRow; reserved: bigint },
+    ) => Promise<void>;
+  }): Promise<{ order: BillingOrderRow; reserved: bigint }> {
+    validateChargeLimit(
+      { chargeLimitSet: true, chargeLimitMicrocredits: params.chargeLimitMicrocredits },
+      params.draft.amountMicrocredits,
+    );
+
+    return this.prisma.$transaction(async (tx) => {
+      const task = await tx.generationTask.findUnique({
+        where: { id: params.taskId },
+        select: { ownerId: true, billingOrderId: true, status: true, leaseOwner: true },
+      });
+      if (!task || task.ownerId !== params.userId) {
+        throw new AppError(40400, '任务不存在或无权限', 404);
+      }
+      if (
+        task.status !== 'running' ||
+        task.leaseOwner !== params.expectedLeaseOwner ||
+        task.billingOrderId !== params.expectedBillingOrderId
+      ) {
+        throw new AppError(40900, '任务租约或账单已变更，不能替换账单', 409);
+      }
+
+      if (params.expectedBillingOrderId) {
+        const oldOrder = await tx.billingOrder.findUnique({
+          where: { id: params.expectedBillingOrderId },
+        });
+        if (!oldOrder || oldOrder.userId !== params.userId || oldOrder.taskId !== params.taskId) {
+          throw new AppError(40900, '旧账单不属于当前任务，不能替换', 409);
+        }
+        if (oldOrder.status !== 'reserved' && oldOrder.status !== 'running') {
+          throw new AppError(40909, '旧账单状态已变更，不能替换', 409);
+        }
+        await this.refundInTransaction(tx, oldOrder, '线路切换，替换账单', 'route_switch');
+      }
+
+      const reserved = await this.createReservedOrder(tx, {
+        userId: params.userId,
+        taskId: params.taskId,
+        idempotencyKey: params.idempotencyKey,
+        draft: params.draft,
+        promotionId: params.promotionId,
+        chargeLimitSet: true,
+        chargeLimitMicrocredits: params.chargeLimitMicrocredits,
+      });
+
+      const swapped = await tx.generationTask.updateMany({
+        where: {
+          id: params.taskId,
+          ownerId: params.userId,
+          status: 'running',
+          leaseOwner: params.expectedLeaseOwner,
+          billingOrderId: params.expectedBillingOrderId,
+        },
+        data: {
+          billingOrderId: reserved.order.id,
+          authorizedChargeMicrocredits: reserved.reserved,
+          creditCost: Number((reserved.reserved + CREDIT_SCALE - 1n) / CREDIT_SCALE),
+        },
+      });
+      if (swapped.count !== 1) {
+        throw new AppError(40900, '任务租约或账单已变更，不能替换账单', 409);
+      }
+
+      await params.afterSwap?.(tx, reserved);
+      return reserved;
+    });
+  }
+
+  /**
    * 一次提交拆成 N 张图时，**在同一事务里**为每张建单并预留。
    *
    * 不能逐张调 `reserveTaskBilling`：第 3 张余额不足时，前 2 张的预授权已经落库，

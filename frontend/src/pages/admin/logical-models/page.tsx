@@ -8,7 +8,7 @@ import {
   type ModelDraft,
   type RouteDraft,
 } from './constants';
-import { parseCredits, toDraft } from './utils';
+import { defaultCapabilitySpecFor, parseCredits, toDraft } from './utils';
 import { LogicalModelTable } from './LogicalModelTable';
 import { ModelFormDrawer } from './ModelFormDrawer';
 import { RouteSimulateDrawer } from './RouteSimulateDrawer';
@@ -73,7 +73,7 @@ export function AdminLogicalModelsPage() {
     () =>
       (capabilities.data?.items ?? []).map((item) => ({
         value: item.id,
-        label: `${item.name}（${item.id}）`,
+        label: item.name,
       })),
     [capabilities.data],
   );
@@ -149,7 +149,7 @@ export function AdminLogicalModelsPage() {
     const code = draft.code.trim();
     const name = draft.name.trim();
     if (!/^[a-z0-9][a-z0-9._-]{1,79}$/.test(code)) {
-      toast.error('编码只能使用小写字母、数字、点、下划线或连字符，2–80 位');
+      toast.error('模型编号需由 2–80 位小写字母、数字或连接符组成');
       return;
     }
     if (!name) {
@@ -157,7 +157,7 @@ export function AdminLogicalModelsPage() {
       return;
     }
     if (!draft.capability) {
-      toast.error('请选择 C 端能力');
+      toast.error('请选择所属能力');
       return;
     }
     const prices = {
@@ -172,11 +172,20 @@ export function AdminLogicalModelsPage() {
     }
     let capabilitySpec: unknown;
     let defaultOptions: unknown;
-    try {
-      capabilitySpec = JSON.parse(draft.capabilitySpecText || '{}');
-    } catch {
-      toast.error('能力合同不是合法 JSON');
-      return;
+    if (draft.capabilitySpecText.trim()) {
+      try {
+        capabilitySpec = JSON.parse(draft.capabilitySpecText);
+      } catch {
+        toast.error('能力范围格式不正确');
+        return;
+      }
+    } else {
+      const definition = capabilities.data?.items.find((item) => item.id === draft.capability);
+      capabilitySpec = defaultCapabilitySpecFor(definition);
+      if (!capabilitySpec) {
+        toast.error('请选择所属能力');
+        return;
+      }
     }
     try {
       defaultOptions = JSON.parse(draft.defaultOptionsText || '{}');
@@ -188,7 +197,7 @@ export function AdminLogicalModelsPage() {
         throw new Error('not object');
       }
     } catch {
-      toast.error('默认参数必须是 JSON 对象');
+      toast.error('默认选项格式不正确');
       return;
     }
     const routes = draft.routes
@@ -200,7 +209,7 @@ export function AdminLogicalModelsPage() {
         weight: Number(route.weight) || 0,
       }));
     if (routes.length !== draft.routes.length) {
-      toast.error('有线路尚未选择渠道模型');
+      toast.error('有服务来源尚未选择具体模型');
       return;
     }
 
@@ -224,10 +233,10 @@ export function AdminLogicalModelsPage() {
     try {
       if (editing) {
         await adminLogicalModelsApi.update(editing.id, body);
-        toast.success('已保存：新 revision 已生成，旧 revision 保留供账单回溯');
+        toast.success('模型配置已保存');
       } else {
         await adminLogicalModelsApi.create(body);
-        toast.success('前台模型已创建，请确认线路可用后再启用');
+        toast.success('前台模型已创建，请确认服务来源可用后再上架');
       }
       resetForm();
       await reload({ silent: true });
@@ -257,7 +266,6 @@ export function AdminLogicalModelsPage() {
     <>
       <PageHeader
         title="前台模型"
-        description="用户看到的产品：名称、图标、价格与能力合同。模型经「线路」指向渠道模型，只换供应不改产品。"
         actions={
           <ActionButton
             variant="default"
@@ -280,10 +288,7 @@ export function AdminLogicalModelsPage() {
         />
       </FilterBar>
 
-      <Panel
-        title="模型清单"
-        note="保存即生成新 revision 并重建线路；旧 revision 保留，历史账单可回溯到当时的能力合同。"
-      >
+      <Panel title="模型清单">
         {loading && rows.length === 0 ? (
           /* 面板外壳已经是实的，只替内容行 */
           <SkeletonBody rows={4} />

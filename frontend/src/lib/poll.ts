@@ -116,7 +116,13 @@ export async function waitForTask(taskId: string, options: PollOptions = {}): Pr
         typeof e === 'object' && e !== null && 'status' in e
           ? Number((e as { status: unknown }).status)
           : 0;
-      if (status === 401 || status === 403) throw e;
+      /*
+       * 明确的客户端错误不会因下一轮轮询而恢复：请求参数错误、任务不存在、
+       * 或轮询游标/状态冲突都必须立即终止。继续重试只会把真实原因拖成超时。
+       */
+      if (status === 400 || status === 401 || status === 403 || status === 404 || status === 409) {
+        throw e;
+      }
       /* 其余网络抖动: 不中断, 下一轮重试 */
     }
     if (signal?.aborted) return PENDING;

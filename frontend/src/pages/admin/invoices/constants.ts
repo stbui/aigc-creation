@@ -2,7 +2,7 @@
  * AdminInvoicesPage 的本地常量与类型。
  */
 
-import type { AdminInvoice, InvoiceStatus } from '../../../types/api';
+import type { InvoiceStatus } from '../../../types/api';
 
 export const STATUS_OPTIONS: Array<{ value: InvoiceStatus; label: string }> = [
   { value: 'pending', label: '待开具' },

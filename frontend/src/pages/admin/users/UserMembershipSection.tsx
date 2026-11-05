@@ -41,7 +41,7 @@ function MembershipStatus({ status }: { status: string | null }) {
 function MembershipFact({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[11px] font-medium text-muted-foreground">{label}</dt>
+      <dt className="text-xs font-medium text-muted-foreground">{label}</dt>
       <dd className="mt-1 text-[13px] leading-5 text-foreground">{value}</dd>
     </div>
   );
@@ -69,7 +69,7 @@ export function UserMembershipSection({
               <CardAction className="col-start-2 row-span-1 row-start-1 self-center">
                 <MembershipStatus status={membership.status} />
               </CardAction>
-              <CardDescription className="col-start-1 row-start-2 m-0 font-mono text-[11px]">
+              <CardDescription className="col-start-1 row-start-2 m-0 font-mono text-xs">
                 {membership.planCode}
               </CardDescription>
             </CardHeader>
@@ -116,7 +116,7 @@ export function UserMembershipSection({
           <div className="mt-4">
             <div className="mb-1.5 flex items-baseline justify-between gap-2">
               <h4 className="text-[13px] font-medium text-foreground">订阅周期</h4>
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-xs text-muted-foreground">
                 最近 {history.length} 个周期
               </span>
             </div>
@@ -127,13 +127,13 @@ export function UserMembershipSection({
                     <span className="block truncate text-[13px] font-medium text-foreground">
                       {item.planName}
                     </span>
-                    <span className="mt-0.5 block text-[11px] leading-5 text-muted-foreground">
+                    <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
                       {formatDateTime(item.startAt)} 至 {formatDateTime(item.expiresAt)}
                     </span>
                   </span>
                   <span className="shrink-0 text-right">
                     <MembershipStatus status={item.status} />
-                    <span className="mt-1 block text-[11px] text-muted-foreground tabular-nums">
+                    <span className="mt-1 block text-xs text-muted-foreground tabular-nums">
                       {item.monthlyCredits} 积分/月
                     </span>
                   </span>

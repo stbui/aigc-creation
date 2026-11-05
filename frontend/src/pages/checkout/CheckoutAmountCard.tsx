@@ -232,7 +232,7 @@ export function CheckoutAmountCard({
 
         <p className="co-side-note">
           {plan
-            ? '支付成功后会员权益立即生效，可在「我的订单」查看记录。'
+            ? '支付成功后系统会自动发放会员权益，发放进度可在「我的订单」查看。'
             : '积分即时到账，可在「积分明细」查看发放记录。'}
         </p>
       </div>

@@ -185,7 +185,8 @@ export function CouponFormDrawer({
 
         {editing && (
           <p className="text-[12px] leading-4 text-muted-foreground">
-            已核销 {editing.usedCount} 张 · 券码不可修改，停用后已发放的券立即失效
+            已核销 {editing.usedCount} 张 · 待支付预占 {editing.pendingReserved} 张 ·
+            券码不可修改，停用后已发放的券立即失效
           </p>
         )}
       </div>

@@ -43,14 +43,10 @@ async function toGrid(page: Page) {
 test.describe('素材管理', () => {
   test.skip(!HAS_ADMIN_CREDENTIALS, '未提供后台管理员凭据');
 
-  test('网格视图渲染缩略图与统计卡', async ({ page }) => {
+  test('网格视图渲染缩略图并保持每页容量', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/assets`);
     await expect(page.getByRole('heading', { name: '素材管理' })).toBeVisible({ timeout: 20000 });
-
-    await expect(page.getByText('素材总量').first()).toBeVisible();
-    await expect(page.getByText('已下架').first()).toBeVisible();
-    await expect(page.getByText('存储分布')).toBeVisible();
 
     // 网格单元
     await expect(cells(page).first()).toBeVisible({ timeout: 10000 });
@@ -65,7 +61,7 @@ test.describe('素材管理', () => {
     expect(naturalW, '缩略图未加载成功').toBeGreaterThan(0);
 
     // 网格每页 60 张: 后端 DTO 若丢失分页元数据会静默退回 20, 这里守住页容量
-    const totalText = await page.getByText(/^共 \d+ 张$/).first().innerText();
+    const totalText = await page.getByText(/^\d+ 张$/).first().innerText();
     const total = Number(totalText.match(/\d+/)?.[0] ?? 0);
     expect(await cells(page).count()).toBe(Math.min(total, 60));
   });
@@ -87,7 +83,7 @@ test.describe('素材管理', () => {
     await page.getByRole('checkbox', { name: /^选择 / }).first().check();
     const bulkBar = page.getByTestId('admin-bulk-bar');
     await expect(bulkBar).toBeVisible();
-    await expect(bulkBar).toContainText('已选 1 张素材');
+    await expect(bulkBar).toContainText('已选 1 张');
     await expect(bulkBar.getByRole('button', { name: '批量下架' })).toBeVisible();
     await expect(bulkBar.getByRole('button', { name: '批量删除' })).toBeVisible();
 
@@ -103,8 +99,11 @@ test.describe('素材管理', () => {
     await page.getByRole('button', { name: /^查看大图：/ }).first().click();
     const viewer = page.getByRole('dialog', { name: '素材预览' });
     await expect(viewer).toBeVisible();
-    await expect(viewer.locator('.img-viewer-meta')).toContainText(/已上架|已下架/);
+    await expect(viewer.locator('.img-viewer-meta')).toContainText(/B|KB|MB|GB/);
     await expect(viewer.locator('.img-viewer-actions')).toBeVisible();
+    await expect(
+      viewer.getByRole('button', { name: /^(下架|恢复)$/ }),
+    ).toBeVisible();
 
     await page.keyboard.press('Escape');
     await expect(viewer).toHaveCount(0);
@@ -234,7 +233,7 @@ test.describe('素材管理', () => {
     await page.waitForTimeout(1200);
   });
 
-  test('删除素材直接执行, 不再弹窗或要求输入确认词', async ({ page }) => {
+  test('删除素材必须二次确认并说明不可恢复影响', async ({ page }) => {
     let deleteCalls = 0;
     // 拦截真实删除, 避免 e2e 破坏开发库素材
     await page.route('**/api/v1/admin/assets/*', async (route) => {
@@ -260,9 +259,17 @@ test.describe('素材管理', () => {
       .getByRole('button', { name: '删除', exact: true })
       .click();
 
-    // 没有弹窗、没有确认词输入框，请求直接发出
+    // 删除不可逆，必须先展示影响；确认前不能发出 DELETE
+    const confirm = page.getByTestId('admin-confirm-action');
+    await expect(confirm).toBeVisible();
+    await expect(confirm).toContainText('删除会同时移除对象存储文件，且无法恢复');
+    await expect(confirm).toContainText('对象存储文件同步删除，不可恢复');
+    expect(deleteCalls).toBe(0);
+
+    await confirm.getByRole('button', { name: '确认删除', exact: true }).click();
+
     await expect(page.getByTestId('admin-modal')).toHaveCount(0);
-    await expect(page.getByTestId('admin-confirm-action')).toHaveCount(0);
+    await expect(confirm).toHaveCount(0);
     await expect.poll(() => deleteCalls).toBe(1);
   });
 });

@@ -13,7 +13,6 @@ import {
   PageSkeleton,
   Panel,
   SelectField,
-  StaleError,
   StatusTag,
   SwitchField,
   TextAreaField,

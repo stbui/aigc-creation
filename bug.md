@@ -6,6 +6,8 @@ https://www.designkit.cn/agent-lib
 https://www.pixpix.com/zh-CN/tools/product-set
 
 
+https://thai.quantv.com/image-creation
+
 
 http://localhost:3000/admin/logs
 http://localhost:3000/admin/payments
@@ -24,6 +26,16 @@ todo：
 - 经营系统
 - agent
 - 无限画布
+
+
+内容替换
+探店视频
+爆款复刻
+数字人
+模特服装展示
+
+
+
 
 
 systemctl status cloudcli      # 查看状态

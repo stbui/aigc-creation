@@ -286,7 +286,12 @@ try {
   const tempFile = join(tempUploadDir, 'original', tempName);
   await writeFile(tempFile, png);
   const service = new AssetsService(
-    { project: { findUnique: async () => null } } as never,
+    {
+      project: {
+        findFirst: async () => null,
+        findUnique: async () => null,
+      },
+    } as never,
     {} as never,
     {} as never,
   );

@@ -8,13 +8,13 @@ export function UserIdentityCell({ user }: { user: AdminUserRow }) {
   return (
     <dl className="flex min-w-0 flex-col gap-0.5">
       <div className="grid min-w-0 grid-cols-[48px_minmax(0,1fr)] items-baseline gap-2">
-        <dt className="text-[11px] leading-5 text-muted-foreground">用户名</dt>
+        <dt className="text-xs leading-5 text-muted-foreground">用户名</dt>
         <dd className="truncate text-[13px] font-semibold leading-5 text-foreground" title={displayName}>
           {displayName}
         </dd>
       </div>
       <div className="grid min-w-0 grid-cols-[48px_minmax(0,1fr)] items-baseline gap-2">
-        <dt className="text-[11px] leading-5 text-muted-foreground">邮箱</dt>
+        <dt className="text-xs leading-5 text-muted-foreground">邮箱</dt>
         <dd className="truncate text-xs leading-5 text-muted-foreground" title={user.email}>
           {user.email}
         </dd>

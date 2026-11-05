@@ -56,7 +56,7 @@ function formatValue(value: unknown): string {
 
 function parameterScope(definition: ImageParameterDefinitionView): string {
   const models = definition.models ?? [];
-  return models.length === 0 ? '全部上游模型' : models.join('、');
+  return models.length === 0 ? '全部服务商模型' : models.join('、');
 }
 
 function settingFor(
@@ -104,14 +104,11 @@ export function ChannelModelImageCapabilityField({
   }, [definitions, model, protocol, protocolLoading, rawConfig, setValue]);
 
   return (
-    <Panel
-      title="图片能力参数"
-      note="限制参考素材并声明协议参数；尺寸、分辨率、质量和单次输出数由所选参数自动派生"
-    >
+    <Panel title="图片能力参数" note="设置参考素材范围与可用参数；尺寸、分辨率、质量和输出数量会自动更新">
       {!protocol ? (
-        <Notice tone="info">请先选择请求协议，再配置该协议支持的图片能力参数。</Notice>
+        <Notice tone="info">请先选择接口类型，再配置图片能力参数。</Notice>
       ) : protocolLoading ? (
-        <Notice tone="info">正在读取协议参数…</Notice>
+        <Notice tone="info">正在读取可用参数…</Notice>
       ) : (
         <Controller
           control={control}
@@ -157,7 +154,7 @@ export function ChannelModelImageCapabilityField({
               <Field data-invalid={fieldState.invalid} className="gap-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <FieldDescription>
-                    当前协议：{protocolLabel || protocol}。插件声明的默认值、范围和计价属性只读。
+                    当前接口：{protocolLabel || protocol}。系统推荐的默认值与可用范围仅供查看。
                   </FieldDescription>
                   <ActionButton
                     variant="secondary"
@@ -165,16 +162,16 @@ export function ChannelModelImageCapabilityField({
                     icon={RotateCcw}
                     onClick={reset}
                   >
-                    按协议推荐值重置
+                    使用推荐值
                   </ActionButton>
                 </div>
 
                 {protocolChanged && (
-                  <Notice tone="warn" title="请求协议已变更">
+                  <Notice tone="warn" title="接口类型已变更">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span>当前合同仍保留上一个协议调过的参数，确认后可重置为新协议推荐值。</span>
+                      <span>当前配置仍保留上一个接口的参数，可切换为新接口的推荐值。</span>
                       <ActionButton variant="secondary" size="xs" onClick={reset}>
-                        使用新协议推荐值
+                        使用新接口推荐值
                       </ActionButton>
                     </div>
                   </Notice>
@@ -182,7 +179,7 @@ export function ChannelModelImageCapabilityField({
 
                 {field.value.trim() && !parsed && (
                   <Notice tone="warn">
-                    当前合同无法解析为图片配置；修改任一参数后会按结构化配置重建。
+                    当前配置无法读取；修改任一参数后会重新生成。
                   </Notice>
                 )}
 
@@ -190,7 +187,7 @@ export function ChannelModelImageCapabilityField({
                   <FieldSet className="gap-3">
                     <div>
                       <FieldLegend variant="label">参考素材限制</FieldLegend>
-                      <FieldDescription>对应 image.references，保存后立即生效。</FieldDescription>
+                      <FieldDescription>保存后立即生效。</FieldDescription>
                     </div>
                     <FieldGroup className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <Field>
@@ -253,14 +250,14 @@ export function ChannelModelImageCapabilityField({
 
                   <FieldSet className="gap-3">
                     <div>
-                      <FieldLegend variant="label">协议参数</FieldLegend>
+                      <FieldLegend variant="label">可用参数</FieldLegend>
                       <FieldDescription>
-                        只能调整启用状态与可选值；必填参数不可关闭，至少保留一个可选值。
+                        可调整启用状态与可选值；必填参数不可关闭，至少保留一个可选值。
                       </FieldDescription>
                     </div>
                     {definitions.length === 0 ? (
                       <Notice tone="info">
-                        该协议未声明图片参数，仍可配置上方参考素材限制和下方响应设置。
+                        当前接口没有可配置参数，仍可设置参考素材与输出方式。
                       </Notice>
                     ) : (
                       <FieldGroup className="gap-3">
@@ -288,7 +285,7 @@ export function ChannelModelImageCapabilityField({
                                       <ToneBadge tone="warn">必填</ToneBadge>
                                     )}
                                     {definition.pricing && (
-                                      <ToneBadge tone="brand">参与价格档计价</ToneBadge>
+                                        <ToneBadge tone="brand">参与价格方案计价</ToneBadge>
                                     )}
                                   </div>
                                   {definition.description && (
@@ -381,7 +378,7 @@ export function ChannelModelImageCapabilityField({
                     <Field orientation="horizontal" className="rounded-lg border border-border px-3 py-2.5">
                       <FieldContent>
                         <FieldTitle>支持响应格式</FieldTitle>
-                        <FieldDescription>未支持时留空，由协议默认行为决定</FieldDescription>
+                        <FieldDescription>不支持时留空，由服务商默认方式决定</FieldDescription>
                       </FieldContent>
                       <SwitchField
                         checked={image.responseFormat.supported}
@@ -421,7 +418,7 @@ export function ChannelModelImageCapabilityField({
                     <Field orientation="horizontal" className="rounded-lg border border-border px-3 py-2.5">
                       <FieldContent>
                         <FieldTitle>支持指定图片格式</FieldTitle>
-                        <FieldDescription>对应 outputFormat；留空时使用上游默认格式</FieldDescription>
+                        <FieldDescription>留空时使用服务商默认格式</FieldDescription>
                       </FieldContent>
                       <SwitchField
                         checked={image.outputFormat.supported}
@@ -463,7 +460,7 @@ export function ChannelModelImageCapabilityField({
                   <FieldError errors={[fieldState.error]} />
                 ) : (
                   <FieldDescription>
-                    保存时按协议定义裁剪参数，并同步更新尺寸、分辨率、质量和输出数量。
+                    保存时会整理可用参数，并同步更新尺寸、分辨率、质量和输出数量。
                   </FieldDescription>
                 )}
               </Field>

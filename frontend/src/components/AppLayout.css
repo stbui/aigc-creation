@@ -404,7 +404,7 @@
   overflow: hidden auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(85, 70, 216, 0.32) transparent;
-  scrollbar-gutter: stable;
+  scrollbar-gutter: auto;
   display: grid;
   grid-auto-rows: max-content;
   gap: 16px;
@@ -632,7 +632,7 @@
     height: 24px;
   }
   .app-sider-wrap .workspace-side-menu-btn .side-menu-label {
-    font-size: 12px;
+    font-size: 10px;
     font-weight: 500;
     line-height: 14px;
     text-align: center;

@@ -276,6 +276,38 @@ export interface AdminReconciliationItem {
   createdAt: string;
 }
 
+/** 支付异常补偿单。真实资金差异必须在这里闭环，而不是只留在对账批次明细。 */
+export interface AdminPaymentException {
+  id: string;
+  providerId: string;
+  orderId: string | null;
+  merchantOrderNo: string;
+  providerTradeNo: string | null;
+  amountCents: number;
+  currency: string;
+  kind: string;
+  status: string;
+  priority: string;
+  ownerId: string | null;
+  slaDueAt: string;
+  overdue: boolean;
+  refundId: string | null;
+  refundStatus: string | null;
+  providerRefundId: string | null;
+  resolution: string | null;
+  lastError: string | null;
+  closedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PaymentExceptionStatus =
+  | "open"
+  | "auto_refund_pending"
+  | "refunded"
+  | "manual_review"
+  | "closed";
+
 /** 对账差异类型 → 文案与色调的唯一映射 */
 export const RECONCILIATION_RESULT_LABELS: Record<
   string,
@@ -283,6 +315,9 @@ export const RECONCILIATION_RESULT_LABELS: Record<
 > = {
   matched: { label: "一致", tone: "success" },
   recovered: { label: "已补发", tone: "success" },
+  auto_refunded: { label: "已自动退款", tone: "success" },
+  refund_processing: { label: "退款处理中", tone: "warn" },
+  refund_failed: { label: "退款失败", tone: "danger" },
   amount_mismatch: { label: "金额不符", tone: "danger" },
   trade_no_mismatch: { label: "交易号不符", tone: "danger" },
   duplicate_charge: { label: "疑似重复扣款", tone: "danger" },

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import type { StorageBackend } from '../storage/storage.provider';
+import { lockAndAssertActiveAdminMutable } from './last-admin.guard';
 
 /**
  * 账号生命周期 —— 注销的**唯一实现**。
@@ -51,16 +52,19 @@ export class AccountLifecycleService {
    * （流水不引用批次，只引用账单 / 充值订单）。
    */
   async softDelete(userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user) return { id: userId, deleted: false };
+    const result = await this.prisma.$transaction(async (tx) => {
+      // 第一条写语句同时取得 SQLite 写锁并保护最后一名启用管理员。
+      await lockAndAssertActiveAdminMutable(tx, userId);
 
-    // 文件删除要在库记录删掉之前把这些坐标先取出来（删完就查不到了）
-    const assets = await this.prisma.asset.findMany({
-      where: { ownerId: userId },
-      select: { storageBackend: true, storageKey: true },
-    });
+      const user = await tx.user.findUnique({ where: { id: userId } });
+      if (!user) return null;
 
-    await this.prisma.$transaction(async (tx) => {
+      // 文件删除要在库记录删掉之前把这些坐标先取出来（删完就查不到了）
+      const assets = await tx.asset.findMany({
+        where: { ownerId: userId },
+        select: { storageBackend: true, storageKey: true },
+      });
+
       // 作品（任务）→ 素材 → 项目：外键方向要求按这个顺序删
       await tx.generationTask.deleteMany({ where: { ownerId: userId } });
       await tx.asset.deleteMany({ where: { ownerId: userId } });
@@ -111,18 +115,21 @@ export class AccountLifecycleService {
           tokenVersion: { increment: 1 },
         },
       });
+      return { assets };
     });
+
+    if (!result) return { id: userId, deleted: false };
 
     /*
      * 文件在事务之后删：按**写入时的后端**逐个删，失败不阻塞注销。
      * 库记录已不存在，注销不能被一个删不掉的 OSS 对象卡住。
      */
-    for (const a of assets) {
+    for (const a of result.assets) {
       if (!a.storageKey) continue;
       const backend = (a.storageBackend as StorageBackend) ?? 'local';
       await this.storage.get(backend)?.delete(a.storageKey).catch(() => undefined);
     }
 
-    return { id: userId, deleted: true, removed: { assets: assets.length } };
+    return { id: userId, deleted: true, removed: { assets: result.assets.length } };
   }
 }

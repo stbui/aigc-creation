@@ -152,8 +152,8 @@ export function ChannelModelPriceTierEditor({
 
   return (
     <Panel
-      title="价格档"
-      note="每一档对应一类规格（分辨率 / 时长 / 尺寸）。全部删除会回落为一个通配档。"
+      title="价格方案"
+      note="按规格或用量设置不同价格。"
       extra={
         <ActionButton
           variant="ghost"
@@ -161,7 +161,7 @@ export function ChannelModelPriceTierEditor({
           icon={Plus}
           onClick={() => append({ ...EMPTY_TIER })}
         >
-          添加档位
+          添加方案
         </ActionButton>
       }
     >
@@ -172,7 +172,7 @@ export function ChannelModelPriceTierEditor({
             <FieldSet key={item.id} className="gap-3 rounded-lg border border-border p-3">
               <div className="flex items-center gap-2">
                 <FieldLegend variant="label" className="mb-0 text-xs text-muted-foreground">
-                  档位 {index + 1}
+                  方案 {index + 1}
                 </FieldLegend>
                 <span className="flex-1" />
                 <Controller
@@ -181,7 +181,7 @@ export function ChannelModelPriceTierEditor({
                   render={({ field }) => (
                     <SwitchField
                       checked={field.value}
-                      ariaLabel={`档位 ${index + 1} 启用`}
+                      ariaLabel={`方案 ${index + 1} 启用`}
                       onChange={field.onChange}
                     />
                   )}
@@ -202,17 +202,17 @@ export function ChannelModelPriceTierEditor({
                   control={control}
                   index={index}
                   name="selector"
-                  label="规格条件"
-                  ariaLabel={`档位 ${index + 1} 规格条件`}
-                  hint="key=value，逗号分隔；留空 = 通配"
+                  label="适用规格"
+                  ariaLabel={`方案 ${index + 1} 适用规格`}
+                  hint="按接口参数填写；留空表示全部规格"
                   placeholder="size=1024x1024, quality=high"
                 />
                 <TierTextField
                   control={control}
                   index={index}
                   name="resolution"
-                  label="分辨率档"
-                  ariaLabel={`档位 ${index + 1} 分辨率`}
+                  label="适用分辨率"
+                  ariaLabel={`方案 ${index + 1} 适用分辨率`}
                   placeholder="*"
                 />
                 <Controller
@@ -221,57 +221,57 @@ export function ChannelModelPriceTierEditor({
                   render={({ field }) => (
                     <Field>
                       <FieldLabel htmlFor={`tier-${index}-video-seconds`}>
-                        视频秒数
+                        适用时长（秒）
                       </FieldLabel>
                       <NumberField
                         id={`tier-${index}-video-seconds`}
-                        ariaLabel={`档位 ${index + 1} 视频秒数`}
+                        ariaLabel={`方案 ${index + 1} 适用时长（秒）`}
                         value={Number(field.value) || 0}
                         min={0}
                         onChange={(value) => field.onChange(String(value ?? 0))}
                       />
-                      <FieldDescription>按时长计费时必填</FieldDescription>
+                      <FieldDescription>按使用时长计价时填写</FieldDescription>
                     </Field>
                   )}
                 />
                 <TierSelectField
                   control={control}
                   index={index}
-                  label="计费方式"
-                  ariaLabel={`档位 ${index + 1} 计费方式`}
+                  label="计价方式"
+                  ariaLabel={`方案 ${index + 1} 计价方式`}
                   options={BILLING_MODE_OPTIONS}
                 />
                 <TierTextField
                   control={control}
                   index={index}
                   name="unit"
-                  label="单价（积分）"
-                  ariaLabel={`档位 ${index + 1} 单价`}
-                  hint="按次 / 按秒使用"
+                  label="价格（积分）"
+                  ariaLabel={`方案 ${index + 1} 价格`}
+                  hint="按次或按秒计价时填写"
                   inputMode="decimal"
                 />
                 <TierTextField
                   control={control}
                   index={index}
                   name="input"
-                  label="输入 Token 价"
-                  ariaLabel={`档位 ${index + 1} 输入 Token 价`}
+                  label="输入用量价格"
+                  ariaLabel={`方案 ${index + 1} 输入用量价格`}
                   inputMode="decimal"
                 />
                 <TierTextField
                   control={control}
                   index={index}
                   name="output"
-                  label="输出 Token 价"
-                  ariaLabel={`档位 ${index + 1} 输出 Token 价`}
+                  label="输出用量价格"
+                  ariaLabel={`方案 ${index + 1} 输出用量价格`}
                   inputMode="decimal"
                 />
                 <TierTextField
                   control={control}
                   index={index}
                   name="cached"
-                  label="缓存 Token 价"
-                  ariaLabel={`档位 ${index + 1} 缓存 Token 价`}
+                  label="缓存内容价格"
+                  ariaLabel={`方案 ${index + 1} 缓存内容价格`}
                   inputMode="decimal"
                 />
               </FieldGroup>
@@ -281,13 +281,13 @@ export function ChannelModelPriceTierEditor({
                   control={control}
                   index={index}
                   name="priceConfigured"
-                  label="价格已确认"
+                  label="价格已核对"
                 />
                 <TierCheckboxField
                   control={control}
                   index={index}
                   name="costConfigured"
-                  label="记录成本价"
+                  label="同时记录成本"
                 />
               </FieldGroup>
 
@@ -298,31 +298,31 @@ export function ChannelModelPriceTierEditor({
                     index={index}
                     name="costUnit"
                     label="成本单价"
-                    ariaLabel={`档位 ${index + 1} 成本单价`}
+                    ariaLabel={`方案 ${index + 1} 成本单价`}
                     inputMode="decimal"
                   />
                   <TierTextField
                     control={control}
                     index={index}
                     name="costInput"
-                    label="输入 Token 成本"
-                    ariaLabel={`档位 ${index + 1} 输入 Token 成本`}
+                    label="输入用量成本"
+                    ariaLabel={`方案 ${index + 1} 输入用量成本`}
                     inputMode="decimal"
                   />
                   <TierTextField
                     control={control}
                     index={index}
                     name="costOutput"
-                    label="输出 Token 成本"
-                    ariaLabel={`档位 ${index + 1} 输出 Token 成本`}
+                    label="输出用量成本"
+                    ariaLabel={`方案 ${index + 1} 输出用量成本`}
                     inputMode="decimal"
                   />
                   <TierTextField
                     control={control}
                     index={index}
                     name="costCached"
-                    label="缓存 Token 成本"
-                    ariaLabel={`档位 ${index + 1} 缓存 Token 成本`}
+                    label="缓存内容成本"
+                    ariaLabel={`方案 ${index + 1} 缓存内容成本`}
                     inputMode="decimal"
                   />
                 </FieldGroup>

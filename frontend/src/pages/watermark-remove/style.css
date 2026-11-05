@@ -39,7 +39,9 @@
   border-radius: 16px;
 }
 
-.pk-workspace.watermark-removal-page .redraw-toolbar {
+/* 本页根节点同时带 local-redraw-page（复用画布骨架），且 redraw.css 可能晚于
+ * 本文件加载。组合根类提高本页选择器特异性，避免共享尺寸反向覆盖本页尺寸。 */
+.pk-workspace.watermark-removal-page.local-redraw-page .redraw-toolbar {
   box-sizing: border-box;
   width: 210px;
   max-width: calc(100% - 32px);
@@ -198,7 +200,7 @@
   outline: none;
 }
 
-.pk-workspace.watermark-removal-page .redraw-canvas-footer {
+.pk-workspace.watermark-removal-page.local-redraw-page .redraw-canvas-footer {
   height: 40px;
   padding: 0 16px;
   gap: 8px;
@@ -208,7 +210,7 @@
   box-shadow: 0 4px 16px rgba(107, 114, 128, 0.16);
 }
 
-.pk-workspace.watermark-removal-page .redraw-footer-btn {
+.pk-workspace.watermark-removal-page.local-redraw-page .redraw-footer-btn {
   width: 51px;
   height: 18px;
   padding: 0;
@@ -218,21 +220,21 @@
   font-size: 12px;
 }
 
-.pk-workspace.watermark-removal-page .redraw-footer-btn > svg {
+.pk-workspace.watermark-removal-page.local-redraw-page .redraw-footer-btn > svg {
   width: 16px;
   height: 16px;
 }
 
-.pk-workspace.watermark-removal-page .redraw-footer-btn:disabled {
+.pk-workspace.watermark-removal-page.local-redraw-page .redraw-footer-btn:disabled {
   opacity: 0.35;
 }
 
-.pk-workspace.watermark-removal-page .redraw-zoom-btn {
+.pk-workspace.watermark-removal-page.local-redraw-page .redraw-zoom-btn {
   width: 26px;
   justify-content: center;
 }
 
-.pk-workspace.watermark-removal-page .redraw-canvas-footer .redraw-zoom-value {
+.pk-workspace.watermark-removal-page.local-redraw-page .redraw-canvas-footer .redraw-zoom-value {
   width: 31px;
   min-width: 31px;
   text-align: center;
@@ -269,22 +271,22 @@
   .pk-workspace.watermark-removal-page .redraw-canvas-wrap {
     width: min(600px, calc(100% - 24px));
   }
-  .pk-workspace.watermark-removal-page .redraw-canvas-footer .redraw-footer-btn {
+  .pk-workspace.watermark-removal-page.local-redraw-page .redraw-canvas-footer .redraw-footer-btn {
     box-sizing: border-box;
     width: 40px;
     height: 18.5px;
     padding: 1px 6px;
   }
-  .pk-workspace.watermark-removal-page .redraw-canvas-footer .redraw-tool-divider {
+  .pk-workspace.watermark-removal-page.local-redraw-page .redraw-canvas-footer .redraw-tool-divider {
     width: 0;
   }
-  .pk-workspace.watermark-removal-page .redraw-canvas-footer .redraw-zoom-btn {
+  .pk-workspace.watermark-removal-page.local-redraw-page .redraw-canvas-footer .redraw-zoom-btn {
     box-sizing: border-box;
     width: 12.5px;
     height: 18px;
     padding: 1px 6px;
   }
-  .pk-workspace.watermark-removal-page .redraw-canvas-footer .redraw-zoom-value {
+  .pk-workspace.watermark-removal-page.local-redraw-page .redraw-canvas-footer .redraw-zoom-value {
     width: 30.9px;
     min-width: 30.9px;
   }

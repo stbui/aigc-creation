@@ -10,12 +10,22 @@ import {
   UseInterceptors,
 } from '@nestjs/common';
 import { FilesInterceptor } from '@nestjs/platform-express';
+import { randomUUID } from 'crypto';
+import { mkdirSync } from 'fs';
+import { unlink } from 'fs/promises';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { diskStorage } from 'multer';
 import { JwtAuthGuard } from '../common/jwt-auth.guard';
 import { CurrentUser, AuthUser } from '../common/current-user.decorator';
 import { MobileUploadService } from './mobile-upload.service';
 import { AppError } from '../common/app.exception';
 import { IsNotEmpty, IsString, MaxLength } from 'class-validator';
 import { IsOptional } from 'class-validator';
+import { maxUploadBytes } from '../assets/image-validation';
+
+const MOBILE_UPLOAD_TMP_DIR = join(tmpdir(), 'huojue-mobile-upload');
+mkdirSync(MOBILE_UPLOAD_TMP_DIR, { recursive: true });
 
 /** 手机端上传的请求体 (令牌) */
 class ReceiveUploadDto {
@@ -84,14 +94,18 @@ export class MobileUploadController {
   /**
    * 手机端: 上传图片 (令牌鉴权, 无需登录)。
    *
-   * 用 memoryStorage 收文件: 手机端图片经前端压缩后已很小 (通常 < 2MB),
-   * 一次性读进内存再交给存储层, 比落临时盘再搬一次简单, 也少一次 IO。
+   * 用 diskStorage 收文件: 手机一次最多 9 张，memoryStorage 会把整批同时留在
+   * 内存里。落临时盘后由 service 逐张读取、校验、写入对象存储，并用 finally
+   * 无条件清理临时文件。
    */
   @Post('sessions/:id/receive')
   @UseInterceptors(
     FilesInterceptor('file', 9, {
-      storage: undefined as any, // 走默认 memoryStorage
-      limits: { fileSize: 20 * 1024 * 1024 },
+      storage: diskStorage({
+        destination: MOBILE_UPLOAD_TMP_DIR,
+        filename: (_req, _file, cb) => cb(null, randomUUID()),
+      }),
+      limits: { fileSize: maxUploadBytes(), files: 9 },
     }),
   )
   async receive(
@@ -102,21 +116,26 @@ export class MobileUploadController {
     if (!files?.length) {
       throw new AppError(40001, '缺少图片文件', 400);
     }
-    const s = await this.service.receive(
-      id,
-      dto.token,
-      files.map((f) => ({
-        filename: f.originalname || '手机上传图片',
-        mimetype: f.mimetype,
-        data: f.buffer,
-      })),
-    );
-    return {
-      ok: true,
-      status: s.status,
-      assetId: s.assetId,
-      /** 全部素材 (多图) —— 顺序即构图顺序 */
-      assets: s.assets,
-    };
+    try {
+      const s = await this.service.receive(
+        id,
+        dto.token,
+        files.map((f) => ({
+          filename: f.originalname || '手机上传图片',
+          mimetype: f.mimetype,
+          size: f.size,
+          path: f.path,
+        })),
+      );
+      return {
+        ok: true,
+        status: s.status,
+        assetId: s.assetId,
+        /** 全部素材 (多图) —— 顺序即构图顺序 */
+        assets: s.assets,
+      };
+    } finally {
+      await Promise.all(files.map((file) => unlink(file.path).catch(() => undefined)));
+    }
   }
 }

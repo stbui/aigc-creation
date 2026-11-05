@@ -2,6 +2,5 @@
  * AdminRetentionPage 的本地工具函数。
  */
 
-export function fmtTime(v: string | null): string {
-  return v ? new Date(v).toLocaleString('zh-CN') : '—';
-}
+/** 时间展示（统一实现在 admin-ui/lib/format.ts） */
+export { formatDateTimeLoose as fmtTime } from '../../../admin-ui/primitives';
