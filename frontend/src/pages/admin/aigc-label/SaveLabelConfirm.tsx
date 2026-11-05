@@ -1,4 +1,4 @@
-import { ConfirmAction } from '~/admin-ui/primitives';
+import { ConfirmDialog } from '~/admin-ui/primitives';
 import { POSITION_LABELS } from './constants';
 import type { AigcLabelSpec } from '../../../types/api';
 
@@ -24,7 +24,7 @@ export function SaveLabelConfirm({
   onConfirm: () => void;
 }) {
   return (
-    <ConfirmAction
+    <ConfirmDialog
       open={open}
       title="保存 AI 标识样式"
       confirmText="保存并应用"

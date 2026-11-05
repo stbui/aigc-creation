@@ -1,4 +1,4 @@
-import { BatchResultModal, ConfirmAction } from '~/admin-ui/primitives';
+import { BatchResultModal, ConfirmDialog } from '~/admin-ui/primitives';
 import type { BatchSummary } from '../../../types/api';
 import { TaskDeleteDialog } from './TaskDeleteDialog';
 import type { AdminTaskRow, TaskActionKind } from './types';
@@ -46,7 +46,7 @@ export function TaskActionDialogs({
       )}
 
       {confirm && confirm.kind !== 'delete' && (
-        <ConfirmAction
+        <ConfirmDialog
           open
           title={confirm.kind === 'retry' ? '重试失败任务' : '终止任务'}
           confirmText={confirm.kind === 'retry' ? '新建任务并重试' : '确认终止'}
@@ -101,7 +101,7 @@ export function TaskActionDialogs({
       )}
 
       {batchKind && batchKind !== 'delete' && (
-        <ConfirmAction
+        <ConfirmDialog
           open
           title={
             batchKind === 'retry'

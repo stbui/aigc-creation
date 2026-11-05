@@ -23,7 +23,7 @@ setup('登录后台并保存会话', async ({ page }) => {
   await password.press('Enter');
   await page.waitForURL((url) => !url.pathname.includes('/login'), { timeout: 15000 });
 
-  const token = await page.evaluate(() => localStorage.getItem('ecom_vision_token'));
+  const token = await page.evaluate(() => localStorage.getItem('huojue_token'));
   expect(token, '登录成功后未写入本地会话').toBeTruthy();
   await page.context().storageState({ path: AUTH_FILE });
 });

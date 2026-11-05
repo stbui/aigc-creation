@@ -16,7 +16,7 @@ Chrome MV3 扩展：在电商 / 内容站点上悬停或右键图片，一键采
 | 「查看我的素材」 | `/asset-library?projectId=` | 带上刚采集的分组 |
 | 「图片复刻」 | `/viral-clone?referenceAssetId=` | 先把图存进素材库，再把素材 id 作为参考图带过去 |
 
-登录态借本站的：令牌是前端 `localStorage` 的 `ecom_vision_token`（`frontend/src/lib/auth.ts`），由 `content/auth-monitor.js` 转发给 Service Worker，只存 `chrome.storage.session`，浏览器关闭即失效。
+登录态借本站的：令牌是前端 `localStorage` 的 `huojue_token`（`frontend/src/lib/auth.ts`），由 `content/auth-monitor.js` 转发给 Service Worker，只存 `chrome.storage.session`，浏览器关闭即失效。
 
 ## 目录
 

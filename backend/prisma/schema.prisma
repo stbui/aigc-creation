@@ -1,4 +1,4 @@
-// Prisma schema for ecom-vision-mvp backend.
+// Prisma schema for huojue backend.
 // 说明: SQLite provider 不支持 Prisma enum 类型, 因此 capability / status / kind
 // 使用 String 存储, 取值范围在 DTO / service 层通过白名单强制约束。
 
@@ -252,6 +252,9 @@ model Order {
   lastError             String?
   /// 关单租约。条件更新抢占，防止用户手动关单与 worker 同时执行
   closeStartedAt        DateTime?
+  /// 发起支付租约。覆盖「关闭旧尝试 → 渠道下单 → 写回本地」全过程，
+  /// 防止并发请求各自在渠道创建一笔可支付订单；超时后可被新请求接管。
+  intentStartedAt       DateTime?
   closedAt              DateTime?
 
   /// 渠道侧支付时间；paidAt 仍是本地入账时间
@@ -284,10 +287,16 @@ model Order {
 
   /// 本订单实际兑换出的会员周期快照。续费同样复用 Membership 行, 因此
   /// 退款时不能从当前会员反推某笔历史订单买了哪一段时间。
+  /// 权益与周期天数在下单时快照；后续运营改套餐只影响新订单。
   membershipPeriodStartAt   DateTime?
   membershipPeriodEndAt     DateTime?
   membershipPerksSnapshot   String?
   membershipMonthlyCreditsSnapshot Int?
+  membershipDurationDaysSnapshot Int?
+  /// 下单时套餐映射的用户分组编码。空串表示默认分组。
+  /// 分组承载渠道可见性、价格倍率与兑换比例，必须与权益一起冻结；
+  /// 否则运营改套餐映射会追溯改变已付费用户的可用渠道和计费倍率。
+  membershipUserGroupCodeSnapshot String?
   /// 全额退款撤销本周期的时间。为 null 且订单仍为 paid/partial_refunded
   /// 才代表该周期仍有效；保留字段用于退款后审计周期边界。
   membershipPeriodRevokedAt DateTime?
@@ -323,6 +332,14 @@ model OrderItem {
   priceCentsSnapshot Int
   creditsSnapshot    Int
   validDaysSnapshot  Int
+  /// 下单时的发放方式快照。支付成功时只能按此字段发分，不能读取 Product
+  /// 的实时值；否则运营在待支付窗口内切换 immediate/manual 会追溯改变订单。
+  /// null 仅用于兼容加列前创建的历史订单。
+  grantTypeSnapshot  String?
+  /// 下单时实际占用的库存数量。库存策略可能在待支付窗口内被后台修改，
+  /// 支付/取消时必须按此快照归还或转已售，不能读取 Product.saleStrategy。
+  /// 0 = 未占库存；null 仅用于兼容加列前创建的历史订单。
+  stockReservedSnapshot Int?
 
   quantity Int @default(1)
 
@@ -427,7 +444,8 @@ model CreditLot {
 
   /// 批次来源: 'purchase' 购买 | 'grant' 发放 | 'admin_adjust' 人工 | 'refund_reclaim' 退款扣回
   source  String
-  /// 关联订单 (购买来源时)
+  /// 关联订单。购买积分批次指向购买单；会员月度积分批次指向该发分
+  /// 时点所属的会员周期订单，退款按此精确回收。
   orderId String?
 
   totalMicrocredits     BigInt
@@ -443,6 +461,7 @@ model CreditLot {
 
   @@index([userId, expireAt])
   @@index([expireAt])
+  @@index([orderId])
 }
 
 /// ⚠️ **已废弃的旧流水表，不要写入。**
@@ -910,8 +929,8 @@ model GenerationTask {
 /// ⚠ **金额一律整数**: 满减/固定额用 `value`(分), 折扣用 `value`(万分比, 8500 = 85折)。
 /// 浮点会在累加时产生分位误差 —— 与 Order/Payment 同一约定。
 ///
-/// `usedCount` 只在**支付成功**时 +1, 下单占用不算: 下单可超时取消,
-/// 若下单即计数, 用户反复下单不付款就能把券耗光。
+/// `usedCount` 只在**支付成功**时 +1；待支付订单以 pending 状态预占名额，
+/// 取消/超时后自动释放，避免未付款订单永久消耗限量券。
 model Coupon {
   id   String @id @default(cuid())
   /// 券码。用户手动输入, 大写规范化后唯一
@@ -1963,6 +1982,7 @@ model CreditLedgerEntry {
   @@index([userId, createdAt])
   @@index([userId, type])
   @@index([billingOrderId])
+  @@index([lotId])
 }
 
 /// 预留明细：某个账单从哪些批次扣了多少微积分（结算/退款按此回填）。
@@ -2180,7 +2200,7 @@ model PaymentReconciliationItem {
   amountCents     Int
   currency        String   @default("CNY")
   /// matched | recovered | local_order_not_found | provider_record_missing
-  /// | amount_mismatch | trade_no_mismatch | credit_failed
+  /// | amount_mismatch | trade_no_mismatch | duplicate_charge | credit_failed
   result          String
   /// 该差异是否已由本次运行自动处理；不表示人工结案
   resolved        Boolean  @default(false)
@@ -2189,7 +2209,9 @@ model PaymentReconciliationItem {
 
   run PaymentReconciliationRun @relation(fields: [runId], references: [id])
 
-  @@unique([runId, merchantOrderNo])
+  /// 同一商户订单号可能对应多条渠道流水（例如重复扣款）。
+  /// 对账明细必须保留每次渠道交易，不能用商户订单号互相覆盖。
+  @@unique([runId, merchantOrderNo, providerTradeNo])
   @@index([result])
   @@index([providerId, merchantOrderNo])
 }

@@ -1738,7 +1738,7 @@ export const adminOrdersApi = {
       refundedCents: number;
       fullyRefunded: boolean;
       creditsReclaimed: number;
-      creditsUnreclaimable: number;
+      creditsUnreclaimable: number; membershipTerminated: boolean;
       invoiceFollowUp: { invoiceId: string; invoiceNo: string; status: "pending" | "issued"; message: string } | null; message?: string;
     }>(`/admin/orders/${id}/refund`, {
       method: "POST",

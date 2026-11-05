@@ -71,7 +71,7 @@ export class AccountTokenService {
 
   /** HMAC-SHA256，输出 64 位十六进制 */
   static hash(raw: string): string {
-    const secret = process.env.JWT_SECRET || 'dev-ecom-vision-secret-2024-do-not-use-in-prod';
+    const secret = process.env.JWT_SECRET || 'dev-huojue-secret-do-not-use-in-prod';
     return createHmac('sha256', secret).update(raw, 'utf8').digest('hex');
   }
 

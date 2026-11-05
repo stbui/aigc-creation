@@ -7,7 +7,7 @@ import * as jwt from 'jsonwebtoken';
  * 前端登录完成页」之间的短时接力凭据，避免把 7 天的 accessToken 放进 URL。
  */
 
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-ecom-vision-secret-2024-do-not-use-in-prod';
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-huojue-secret-do-not-use-in-prod';
 
 const STATE_TTL = '10m';
 const TICKET_TTL = '60s';

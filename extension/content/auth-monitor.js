@@ -8,7 +8,7 @@
 (() => {
   const AUTH_STATE_MESSAGE = "huojue:auth-state";
   /** 必须与前端 `frontend/src/lib/auth.ts` 的 TOKEN_KEY 逐字一致 */
-  const USER_TOKEN_STORAGE_KEY = "ecom_vision_token";
+  const USER_TOKEN_STORAGE_KEY = "huojue_token";
   const POLL_INTERVAL_MS = 1000;
 
   let lastToken;

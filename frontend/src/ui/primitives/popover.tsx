@@ -17,7 +17,6 @@ export interface PopoverProps {
   overlayClassName?: string;
 }
 
-/** antd Popover 的兼容壳（C 端目前只使用 click 触发）。 */
 export function Popover({
   open,
   onOpenChange,

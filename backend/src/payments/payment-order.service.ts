@@ -37,6 +37,12 @@ interface AttemptContext {
   adapter: PaymentAdapter;
 }
 
+/** 支付编排租约的所有权凭证；写回 lastError / 释放租约时必须带上。 */
+interface PaymentLease {
+  closeLeaseAt?: Date;
+  intentLeaseAt?: Date;
+}
+
 export interface PaymentIntentView {
   orderId: string;
   orderNo: string;
@@ -82,6 +88,8 @@ export interface PaymentOrderView {
 
 /** 查单节流窗口：2 秒内重复查询直接返回本地视图 */
 const QUERY_THROTTLE_MS = 2_000;
+/** 发起支付租约：渠道下单异常缓慢时，超过该时长允许新请求接管 */
+const INTENT_LEASE_MS = 5 * 60_000;
 
 /**
  * 支付编排服务 —— 唯一决定「这笔订单怎么付、付没付、能不能关」的地方。
@@ -137,9 +145,9 @@ export class PaymentOrderService {
     providerId?: string;
     clientIp?: string;
   }): Promise<PaymentIntentView> {
-    const order = await this.prisma.order.findUnique({
+    let order = await this.prisma.order.findUnique({
       where: { id: input.orderId },
-      include: { items: true },
+      include: { items: true, payments: true },
     });
     if (!order) throw new AppError(40400, "订单不存在", 404);
     if (order.userId !== input.userId)
@@ -226,144 +234,218 @@ export class PaymentOrderService {
       values: config.values,
     };
 
-    // 同一订单重复发起：旧 pending 尝试先关闭，再创建新尝试
-    await this.prisma.payment.updateMany({
-      where: { orderId: order.id, status: "pending" },
-      data: { status: "closed", closedAt: new Date() },
-    });
-
-    const payment = await this.prisma.payment.create({
-      data: {
-        orderId: order.id,
-        userId: input.userId,
-        channel: providerId,
-        amountCents: order.paidCents,
-        currency,
+    /*
+     * 发起支付租约必须覆盖「关闭旧尝试 → 渠道下单 → 写回本地」全过程。
+     *
+     * 只在数据库事务里防重不够：渠道下单是网络 IO，事务外仍会有两个请求
+     * 同时看到“没有旧尝试”，各自创建一个可支付链接。用户付了其中任一笔，
+     * 另一笔只能退款，严重时形成真实重复扣款。
+     */
+    const intentLeaseAt = new Date();
+    const intentClaim = await this.prisma.order.updateMany({
+      where: {
+        id: order.id,
         status: "pending",
-        providerConfigId: config.id,
-        providerConfigVersion: config.version,
+        expiresAt: { gt: intentLeaseAt },
+        closeStartedAt: null,
+        OR: [
+          { intentStartedAt: null },
+          {
+            intentStartedAt: {
+              lte: new Date(intentLeaseAt.getTime() - INTENT_LEASE_MS),
+            },
+          },
+        ],
       },
+      data: { intentStartedAt: intentLeaseAt },
     });
+    if (intentClaim.count === 0) {
+      const latest = await this.prisma.order.findUnique({
+        where: { id: order.id },
+        select: { status: true, expiresAt: true, closeStartedAt: true },
+      });
+      if (!latest) throw new AppError(40400, "订单不存在", 404);
+      if (latest.status === "paid")
+        throw new AppError(40901, "订单已支付", 409);
+      if (latest.status !== "pending")
+        throw new AppError(40901, `订单当前状态不可支付: ${latest.status}`, 409);
+      if (latest.expiresAt.getTime() <= Date.now())
+        throw new AppError(40901, "订单已超时关闭", 409);
+      if (latest.closeStartedAt)
+        throw new AppError(40901, "订单正在关闭，请稍后刷新重试", 409);
+      throw new AppError(40901, "该订单正在发起另一笔支付，请稍后刷新重试", 409);
+    }
 
-    const now = Date.now();
-    const expiresAt = new Date(
-      Math.min(
-        order.expiresAt.getTime(),
-        now + config.closeAfterMinutes * 60_000,
-      ),
-    );
-
-    let checkout: Awaited<ReturnType<PaymentAdapter["createOrder"]>>;
     try {
-      checkout = await adapter.createOrder({
-        config: context,
+      // 拿到租约后重新读取：上一笔 intent 可能刚好在本请求等待期间提交，
+      // 旧快照里没有它的 Payment，直接用于关单会漏关。
+      const fresh = await this.prisma.order.findUnique({
+        where: { id: order.id },
+        include: { items: true, payments: true },
+      });
+      if (!fresh) throw new AppError(40400, "订单不存在", 404);
+      if (fresh.status === "paid") throw new AppError(40901, "订单已支付", 409);
+      if (fresh.status !== "pending")
+        throw new AppError(40901, `订单当前状态不可支付: ${fresh.status}`, 409);
+      if (fresh.expiresAt.getTime() <= Date.now())
+        throw new AppError(40901, "订单已超时关闭", 409);
+      order = fresh;
+
+      /*
+       * 同一订单重复发起：必须先确认并关闭旧渠道尝试，再创建新尝试。
+       * 只改本地 Payment 状态会留下仍可支付的旧链接；用户支付旧链接后，
+       * 订单已由新链接置为 paid，第二笔真实扣款只会被幂等忽略。
+       */
+      await this.closePendingAttemptsBeforeRetry(order, intentLeaseAt);
+
+      const payment = await this.prisma.payment.create({
+        data: {
+          orderId: order.id,
+          userId: input.userId,
+          channel: providerId,
+          amountCents: order.paidCents,
+          currency,
+          status: "pending",
+          providerConfigId: config.id,
+          providerConfigVersion: config.version,
+        },
+      });
+
+      const now = Date.now();
+      const expiresAt = new Date(
+        Math.min(
+          order.expiresAt.getTime(),
+          now + config.closeAfterMinutes * 60_000,
+        ),
+      );
+
+      let checkout: Awaited<ReturnType<PaymentAdapter["createOrder"]>>;
+      try {
+        checkout = await adapter.createOrder({
+          config: context,
+          orderId: order.id,
+          orderNo: order.orderNo,
+          amountCents: order.paidCents,
+          currency,
+          subject: `货觉AI 订单 ${order.orderNo}`,
+          returnUrl: this.checkoutReturnUrl(order),
+          notifyUrl: this.notifyUrl(
+            config.providerId,
+            config.id,
+            config.values.publicBaseUrl,
+          ),
+          clientIp: input.clientIp,
+          expiresAt,
+        });
+      } catch (e) {
+        const message = truncate((e as Error).message || String(e), 200);
+        await this.prisma.payment.updateMany({
+          where: { id: payment.id, status: "pending" },
+          data: { status: "failed", lastError: message, message },
+        });
+        await this.prisma.order.updateMany({
+          where: { id: order.id, status: "pending" },
+          data: { lastError: message, checkoutValue: "" },
+        });
+        this.logger.error(
+          `发起支付失败 (${providerId}) 订单 ${order.orderNo}: ${message}`,
+        );
+        throw new AppError(50302, `发起支付失败: ${message}`, 503);
+      }
+
+      const checkoutValue = checkout.payUrl ?? checkout.codeUrl ?? "";
+
+      // 先落渠道单据 id：即使随后订单状态已变化，也能定位并关闭本次渠道订单。
+      if (checkout.providerRef) {
+        await this.prisma.payment.updateMany({
+          where: { id: payment.id, status: "pending" },
+          data: { providerRef: checkout.providerRef },
+        });
+      }
+
+      /*
+       * 条件更新必须同时校验订单状态和租约所有权。
+       * 渠道下单期间订单可能已被回调置为 paid（或用户取消）；也可能因渠道超时
+       * 导致租约过期并被新请求接管。此时旧请求不能覆盖新 checkout。
+       */
+      const updated = await this.prisma.order.updateMany({
+        where: {
+          id: order.id,
+          status: "pending",
+          intentStartedAt: intentLeaseAt,
+        },
+        data: {
+          channel: providerId,
+          providerConfigId: config.id,
+          providerConfigVersion: config.version,
+          checkoutMode: checkout.mode,
+          checkoutValue,
+          checkoutExpiresAt: checkout.expiresAt,
+          expiresAt:
+            checkout.expiresAt < order.expiresAt
+              ? checkout.expiresAt
+              : order.expiresAt,
+          lastError: null,
+          lastQueriedAt: new Date(),
+        },
+      });
+      if (updated.count === 0) {
+        // 订单状态已变化：把刚创建的渠道订单关掉，避免用户再付一次
+        try {
+          await adapter.closeOrder({
+            config: context,
+            orderNo: order.orderNo,
+            providerRef: checkout.providerRef,
+          });
+        } catch (e) {
+          this.logger.warn(
+            `订单状态已变化，关闭新渠道订单失败 (${providerId}): ${(e as Error).message}`,
+          );
+        }
+        await this.prisma.payment.updateMany({
+          where: { id: payment.id, status: "pending" },
+          data: {
+            status: "closed",
+            closedAt: new Date(),
+            lastError: "订单状态已变化",
+            message: "订单状态已变化",
+          },
+        });
+        throw new AppError(40901, "订单状态已变化，请刷新后重试", 409);
+      }
+
+      this.logger.log(
+        `发起支付: 订单 ${order.orderNo} 渠道 ${providerId} v${config.version} 金额 ${order.paidCents} 分`,
+      );
+
+      return {
         orderId: order.id,
         orderNo: order.orderNo,
         amountCents: order.paidCents,
         currency,
-        subject: `货觉AI 订单 ${order.orderNo}`,
-        returnUrl: this.checkoutReturnUrl(order),
-        notifyUrl: this.notifyUrl(
-          config.providerId,
-          config.id,
-          config.values.publicBaseUrl,
-        ),
-        clientIp: input.clientIp,
-        expiresAt,
-      });
-    } catch (e) {
-      const message = truncate((e as Error).message || String(e), 200);
-      await this.prisma.payment.updateMany({
-        where: { id: payment.id, status: "pending" },
-        data: { status: "failed", lastError: message, message },
-      });
-      await this.prisma.order.updateMany({
-        where: { id: order.id, status: "pending" },
-        data: { lastError: message, checkoutValue: "" },
-      });
-      this.logger.error(
-        `发起支付失败 (${providerId}) 订单 ${order.orderNo}: ${message}`,
-      );
-      throw new AppError(50302, `发起支付失败: ${message}`, 503);
-    }
-
-    const checkoutValue = checkout.payUrl ?? checkout.codeUrl ?? "";
-
-    // 先落渠道单据 id：即使随后订单状态已变化，也能定位并关闭本次渠道订单。
-    if (checkout.providerRef) {
-      await this.prisma.payment.updateMany({
-        where: { id: payment.id, status: "pending" },
-        data: { providerRef: checkout.providerRef },
-      });
-    }
-
-    /*
-     * 条件更新只在订单仍 pending 时写入。
-     * 渠道下单期间订单可能已被回调置为 paid（或用户取消），无条件 update 会把
-     * paid 单的 channel/config 覆盖回这次 intent，甚至返回一个可再次支付的链接。
-     */
-    const updated = await this.prisma.order.updateMany({
-      where: { id: order.id, status: "pending" },
-      data: {
-        channel: providerId,
-        providerConfigId: config.id,
-        providerConfigVersion: config.version,
-        checkoutMode: checkout.mode,
+        providerId,
+        configId: config.id,
+        configVersion: config.version,
+        mode: checkout.mode,
+        payUrl: checkout.payUrl,
+        codeUrl: checkout.codeUrl,
         checkoutValue,
-        checkoutExpiresAt: checkout.expiresAt,
-        expiresAt:
-          checkout.expiresAt < order.expiresAt
-            ? checkout.expiresAt
-            : order.expiresAt,
-        lastError: null,
-        lastQueriedAt: new Date(),
-      },
-    });
-    if (updated.count === 0) {
-      // 订单状态已变化：把刚创建的渠道订单关掉，避免用户再付一次
-      try {
-        await adapter.closeOrder({
-          config: context,
-          orderNo: order.orderNo,
-          providerRef: checkout.providerRef,
+        expiresAt: checkout.expiresAt.toISOString(),
+        sandbox: providerId === "sandbox",
+        hint: checkout.hint ?? null,
+      };
+    } finally {
+      await this.prisma.order
+        .updateMany({
+          where: { id: order.id, intentStartedAt: intentLeaseAt },
+          data: { intentStartedAt: null },
+        })
+        .catch((e) => {
+          this.logger.warn(
+            `释放发起支付租约失败 订单 ${order.orderNo}: ${(e as Error).message}`,
+          );
         });
-      } catch (e) {
-        this.logger.warn(
-          `订单状态已变化，关闭新渠道订单失败 (${providerId}): ${(e as Error).message}`,
-        );
-      }
-      await this.prisma.payment.updateMany({
-        where: { id: payment.id, status: "pending" },
-        data: {
-          status: "closed",
-          closedAt: new Date(),
-          lastError: "订单状态已变化",
-          message: "订单状态已变化",
-        },
-      });
-      throw new AppError(40901, "订单状态已变化，请刷新后重试", 409);
     }
-
-    this.logger.log(
-      `发起支付: 订单 ${order.orderNo} 渠道 ${providerId} v${config.version} 金额 ${order.paidCents} 分`,
-    );
-
-    return {
-      orderId: order.id,
-      orderNo: order.orderNo,
-      amountCents: order.paidCents,
-      currency,
-      providerId,
-      configId: config.id,
-      configVersion: config.version,
-      mode: checkout.mode,
-      payUrl: checkout.payUrl,
-      codeUrl: checkout.codeUrl,
-      checkoutValue,
-      expiresAt: checkout.expiresAt.toISOString(),
-      sandbox: providerId === "sandbox",
-      hint: checkout.hint ?? null,
-    };
   }
 
   // ── 查单 ────────────────────────────────────────────────────────
@@ -487,39 +569,64 @@ export class PaymentOrderService {
     actor: PaymentActor;
   }): Promise<PaymentOrderView> {
     const order = await this.loadOrder(input.orderId, input.actor);
-    if (order.status === "cancelled") return this.view(order);
+    if (order.status === "cancelled") {
+      // 幂等修补历史中断：即使已取消，也补做 pending 支付收尾与库存释放。
+      await this.localClose(order.id);
+      return this.view(await this.loadOrder(order.id, input.actor));
+    }
     if (order.status !== "pending") {
       throw new AppError(40901, `订单当前状态不可关闭: ${order.status}`, 409);
     }
 
-    // 抢关单租约：条件更新，防止用户手动关单与 worker 同时执行
+    const closeLeaseAt = new Date();
+    const staleLeaseBefore = new Date(Date.now() - 5 * 60_000);
+
+    /*
+     * 抢关单租约：除了防止用户手动关单与 worker 同时执行，还必须与
+     * createIntent 的租约互斥。否则关单读取完旧 Payment 后，另一请求可能
+     * 新建渠道订单；旧关单随后只关闭了快照中的旧尝试并取消本地订单，
+     * 新渠道链接仍可付款。
+     */
     const lease = await this.prisma.order.updateMany({
       where: {
         id: order.id,
         status: "pending",
-        OR: [
-          { closeStartedAt: null },
-          { closeStartedAt: { lte: new Date(Date.now() - 5 * 60_000) } },
+        AND: [
+          {
+            OR: [
+              { closeStartedAt: null },
+              { closeStartedAt: { lte: staleLeaseBefore } },
+            ],
+          },
+          {
+            OR: [
+              { intentStartedAt: null },
+              { intentStartedAt: { lte: staleLeaseBefore } },
+            ],
+          },
         ],
       },
-      data: { closeStartedAt: new Date() },
+      data: { closeStartedAt: closeLeaseAt },
     });
     if (lease.count === 0)
       return this.view(await this.loadOrder(order.id, input.actor));
 
+    // 抢到租约后必须重读：等待租约期间可能刚有支付尝试落库。
+    const fresh = await this.loadOrder(order.id, input.actor);
     let attempts: AttemptContext[];
     try {
-      attempts = await this.attemptContexts(order);
+      attempts = await this.attemptContexts(fresh);
     } catch (e) {
       return this.failClose(
         order.id,
         `支付配置不可用，无法查单/关单: ${(e as Error).message}`,
+        { closeLeaseAt },
       );
     }
 
     // 从未发起过支付的空单：本地关闭即可
     if (attempts.length === 0) {
-      await this.localClose(order.id);
+      await this.localClose(order.id, closeLeaseAt);
       this.logger.log(`订单已关闭: ${order.orderNo} by ${input.actor.kind}`);
       return this.view(await this.loadOrder(order.id, input.actor));
     }
@@ -544,17 +651,21 @@ export class PaymentOrderService {
         return this.failClose(
           order.id,
           `关单前查单失败 (${attempt.providerId}): ${(e as Error).message}`,
+          { closeLeaseAt },
         );
       }
 
       if (queried.state === "paid") {
-        await this.creditPaidAttempt(order, attempt, queried);
+        await this.creditPaidAttempt(order, attempt, queried, {
+          closeLeaseAt,
+        });
         throw new AppError(40901, "渠道已支付，订单已入账，请刷新后查看", 409);
       }
       if (queried.state === "failed") {
         return this.failClose(
           order.id,
           `关单前查单失败 (${attempt.providerId}): ${queried.error ?? "未知错误"}`,
+          { closeLeaseAt },
         );
       }
 
@@ -566,10 +677,13 @@ export class PaymentOrderService {
           return this.failClose(
             order.id,
             `渠道关单失败 (${attempt.providerId}): ${(e as Error).message}`,
+            { closeLeaseAt },
           );
         }
         if (closed.state === "paid") {
-          await this.creditPaidAttempt(order, attempt, closed);
+          await this.creditPaidAttempt(order, attempt, closed, {
+            closeLeaseAt,
+          });
           throw new AppError(
             40901,
             "渠道已支付，订单已入账，请刷新后查看",
@@ -580,6 +694,7 @@ export class PaymentOrderService {
           return this.failClose(
             order.id,
             `渠道关单未成功 (${attempt.providerId}): ${closed.error ?? closed.state}`,
+            { closeLeaseAt },
           );
         }
       }
@@ -587,7 +702,7 @@ export class PaymentOrderService {
       await this.closeAttempt(attempt.paymentId);
     }
 
-    await this.localClose(order.id);
+    await this.localClose(order.id, closeLeaseAt);
     this.logger.log(`订单已关闭: ${order.orderNo} by ${input.actor.kind}`);
     return this.view(await this.loadOrder(order.id, input.actor));
   }
@@ -801,11 +916,13 @@ export class PaymentOrderService {
     order: { id: string; orderNo: string; providerTradeNo: string | null },
     attempt: AttemptContext,
     result: ProviderPaymentResult,
+    lease: PaymentLease,
   ): Promise<void> {
     if (result.amountCents === undefined) {
       return this.failClose(
         order.id,
         `渠道已支付但未返回金额 (${attempt.providerId})，暂不入账，请人工核对`,
+        lease,
       );
     }
     const tradeNo = result.tradeNo ?? order.providerTradeNo ?? "";
@@ -813,6 +930,7 @@ export class PaymentOrderService {
       return this.failClose(
         order.id,
         `渠道已支付但未返回交易号 (${attempt.providerId})，暂不入账`,
+        lease,
       );
     }
 
@@ -834,6 +952,7 @@ export class PaymentOrderService {
       await this.releaseCloseLease(
         order.id,
         `渠道已支付但入账失败: ${(e as Error).message}`,
+        lease,
       );
       throw e;
     }
@@ -849,14 +968,131 @@ export class PaymentOrderService {
   }
 
   /**
-   * 关单失败：保留订单 pending 并释放关单租约，等待下一轮重试。
+   * 重新发起支付前收尾旧 pending 尝试。
+   *
+   * 先查单再关单：渠道可能已经收款，直接关单会把真实支付误判为未支付。
+   * 任一旧尝试无法确认关闭时宁可拒绝创建新支付，也不能留下两个可支付链接。
+   */
+  private async closePendingAttemptsBeforeRetry(
+    order: {
+      id: string;
+      orderNo: string;
+      channel: string;
+      providerConfigId: string | null;
+      providerTradeNo: string | null;
+      checkoutMode: string | null;
+      payments: Array<{
+        id: string;
+        channel: string;
+        status: string;
+        providerConfigId: string | null;
+        providerRef: string | null;
+        payTransactionId: string | null;
+      }>;
+    },
+    intentLeaseAt: Date,
+  ): Promise<void> {
+    const pendingPayments = order.payments.filter(
+      (payment) => payment.status === "pending" && payment.channel !== "free",
+    );
+    if (pendingPayments.length === 0) return;
+
+    let attempts: AttemptContext[];
+    try {
+      attempts = await this.attemptContexts({ ...order, payments: pendingPayments });
+    } catch (e) {
+      return this.failClose(
+        order.id,
+        `旧支付尝试配置不可用，无法确认关闭: ${(e as Error).message}`,
+        { intentLeaseAt },
+      );
+    }
+
+    for (const attempt of attempts) {
+      const queryInput = {
+        config: attempt.config,
+        orderNo: order.orderNo,
+        providerRef: attempt.providerRef,
+        providerTradeNo: attempt.providerTradeNo,
+      };
+
+      let queried: ProviderPaymentResult;
+      try {
+        queried = await attempt.adapter.queryOrder(queryInput);
+      } catch (e) {
+        return this.failClose(
+          order.id,
+          `旧支付尝试查单失败 (${attempt.providerId}): ${(e as Error).message}`,
+          { intentLeaseAt },
+        );
+      }
+      if (queried.state === "paid") {
+        await this.creditPaidAttempt(order, attempt, queried, {
+          intentLeaseAt,
+        });
+        throw new AppError(40901, "旧支付尝试已支付，订单已入账，请刷新后查看", 409);
+      }
+      if (queried.state === "failed") {
+        return this.failClose(
+          order.id,
+          `旧支付尝试查单失败 (${attempt.providerId}): ${queried.error ?? "未知错误"}`,
+          { intentLeaseAt },
+        );
+      }
+
+      if (queried.state === "pending") {
+        let closed: ProviderPaymentResult;
+        try {
+          closed = await attempt.adapter.closeOrder(queryInput);
+        } catch (e) {
+          return this.failClose(
+            order.id,
+            `旧支付尝试关闭失败 (${attempt.providerId}): ${(e as Error).message}`,
+            { intentLeaseAt },
+          );
+        }
+        if (closed.state === "paid") {
+          await this.creditPaidAttempt(order, attempt, closed, {
+            intentLeaseAt,
+          });
+          throw new AppError(40901, "旧支付尝试已支付，订单已入账，请刷新后查看", 409);
+        }
+        if (closed.state !== "closed" && closed.state !== "not_found") {
+          return this.failClose(
+            order.id,
+            `旧支付尝试无法关闭 (${attempt.providerId}): ${closed.error ?? closed.state}`,
+            { intentLeaseAt },
+          );
+        }
+      }
+
+      // 渠道明确 closed/not_found，或刚刚关闭成功，才收尾本地尝试。
+      await this.closeAttempt(attempt.paymentId);
+    }
+  }
+
+  /**
+   * 关单失败：保留订单 pending 并释放自己持有的租约，等待下一轮重试。
+   * 过期请求不能清掉新请求的租约，也不能覆盖新请求写入的 lastError。
    * 绝不能在这里把订单改成 cancelled —— 渠道可能已收款。
    */
-  private async failClose(orderId: string, message: string): Promise<never> {
+  private async failClose(
+    orderId: string,
+    message: string,
+    lease: PaymentLease,
+  ): Promise<never> {
     const text = truncate(message, 200);
-    await this.prisma.order.update({
-      where: { id: orderId },
-      data: { lastError: text, closeStartedAt: null },
+    await this.prisma.order.updateMany({
+      where: {
+        id: orderId,
+        ...(lease.closeLeaseAt
+          ? { closeStartedAt: lease.closeLeaseAt }
+          : { intentStartedAt: lease.intentLeaseAt }),
+      },
+      data: {
+        lastError: text,
+        ...(lease.closeLeaseAt ? { closeStartedAt: null } : {}),
+      },
     });
     throw new AppError(50302, text, 503);
   }
@@ -864,36 +1100,69 @@ export class PaymentOrderService {
   private async releaseCloseLease(
     orderId: string,
     message?: string,
+    lease: PaymentLease = {},
   ): Promise<void> {
-    await this.prisma.order.update({
-      where: { id: orderId },
+    await this.prisma.order.updateMany({
+      where: {
+        id: orderId,
+        ...(lease.closeLeaseAt
+          ? { closeStartedAt: lease.closeLeaseAt }
+          : lease.intentLeaseAt
+            ? { intentStartedAt: lease.intentLeaseAt }
+            : {}),
+      },
       data: {
-        closeStartedAt: null,
+        ...(lease.closeLeaseAt ? { closeStartedAt: null } : {}),
         ...(message ? { lastError: truncate(message, 200) } : {}),
       },
     });
   }
 
-  /** 本地关单：置 cancelled、清空 checkout、关闭 pending 尝试、释放库存。幂等 */
-  private async localClose(orderId: string): Promise<void> {
-    const updated = await this.prisma.order.updateMany({
-      where: { id: orderId, status: "pending" },
-      data: {
-        status: "cancelled",
-        closedAt: new Date(),
-        closeStartedAt: null,
-        checkoutValue: "",
-        lastError: null,
-      },
-    });
-    if (updated.count > 0) {
-      // 订单关闭后，未完成的支付尝试也必须收尾，否则后台会一直显示 pending
-      await this.prisma.payment.updateMany({
+  /**
+   * 本地关单：置 cancelled、关闭 pending 尝试、释放库存，全部同一事务。
+   *
+   * `closeLeaseAt` 是关单租约所有权。传了就只允许持锁者落终态；不传时用于
+   * 查单后的关闭和已取消订单修补，要求当前没有并发 intent/close。
+   * 对已 cancelled 的订单仍补做支付收尾和库存释放，修复旧版本中断留下的
+   * “订单已取消但库存仍占用”状态。
+   */
+  private async localClose(
+    orderId: string,
+    closeLeaseAt?: Date,
+  ): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      const updated = await tx.order.updateMany({
+        where: {
+          id: orderId,
+          status: "pending",
+          ...(closeLeaseAt
+            ? { closeStartedAt: closeLeaseAt }
+            : { closeStartedAt: null, intentStartedAt: null }),
+        },
+        data: {
+          status: "cancelled",
+          closedAt: new Date(),
+          closeStartedAt: null,
+          intentStartedAt: null,
+          checkoutValue: "",
+          lastError: null,
+        },
+      });
+
+      const current = await tx.order.findUnique({
+        where: { id: orderId },
+        select: { status: true },
+      });
+      if (updated.count === 0 && current?.status !== "cancelled") return;
+
+      // 订单关闭后，未完成的支付尝试也必须收尾，否则后台会一直显示 pending。
+      await tx.payment.updateMany({
         where: { orderId, status: "pending" },
         data: { status: "closed", closedAt: new Date() },
       });
-      await this.orders.releaseReservation(orderId);
-    }
+      // 必须复用同一事务，否则进程中断会留下“已取消但库存仍 reserved”。
+      await this.orders.releaseReservation(orderId, tx);
+    });
   }
 
   private async loadOrder(orderId: string, actor: PaymentActor) {

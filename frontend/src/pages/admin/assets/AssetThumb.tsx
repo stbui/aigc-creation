@@ -37,6 +37,7 @@ export function AssetThumb({
       src={src}
       alt={alt}
       loading="lazy"
+      decoding="async"
       draggable={false}
       onError={() => setFailed(true)}
     />

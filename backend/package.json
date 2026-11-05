@@ -1,7 +1,7 @@
 {
-  "name": "ecom-vision-mvp-backend",
+  "name": "huojue-backend",
   "version": "1.0.0",
-  "description": "智能电商图片与商品视觉生成平台 - MVP 后端 (NestJS + Prisma + SQLite + Jimp)",
+  "description": "货觉AI 后端 (NestJS + Prisma + SQLite + Jimp)",
   "private": true,
   "scripts": {
     "build": "nest build",

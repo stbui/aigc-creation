@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react';
 import { adminChannelsApi, adminUserGroupsApi } from './api';
 import {
   ActionButton,
-  ConfirmAction,
+  ConfirmDialog,
   PageHeader,
   Panel,
   SkeletonBody,
@@ -197,7 +197,7 @@ export function AdminUserGroupsPage() {
         onSubmit={() => void submit()}
       />
 
-      <ConfirmAction
+      <ConfirmDialog
         open={deleteTarget !== null}
         title={`删除分组「${deleteTarget?.name ?? ''}」？`}
         description="删除为软删除；会员套餐若仍映射到该编码，需要先改套餐。"

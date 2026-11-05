@@ -144,13 +144,12 @@ describe('CreditService 积分查询口径', () => {
   });
 });
 
-describe('CreditService 退款扣回批次顺序', () => {
+describe('CreditService 退款扣回只使用本单批次', () => {
   /**
-   * 回归：早先按 `orderId asc` 排序，那是 id 字符串字典序，与「是否本单」
-   * 无关 —— 很可能先扣用户别的订单（甚至永久批次），把本单快过期的批次
-   * 剩给用户。必须「本单批次 → 其它批次（FEFO）」两段式。
+   * 回归：退款只能扣本单产生的批次。本单积分已消耗时，缺口必须如实记为
+   * 不可回收，不能继续扣用户另一笔订单的积分。
    */
-  it('先扣本单批次，缺口才回落到其它批次', async () => {
+  it('只扣本单批次，缺口记为不可回收而不挪用其它订单积分', async () => {
     const taken: Array<{ id: string; micro: bigint }> = [];
     const tx = {
       order: {
@@ -159,10 +158,8 @@ describe('CreditService 退款扣回批次顺序', () => {
       creditLot: {
         findMany: vi
           .fn()
-          // 第一段：本单批次，剩 60
-          .mockResolvedValueOnce([{ id: 'own-1', remainingMicrocredits: 60_000_000n }])
-          // 第二段：其它批次，剩 500（永久）
-          .mockResolvedValueOnce([{ id: 'other-1', remainingMicrocredits: 500_000_000n }]),
+          // 本单批次只剩 60；用户另有 500 积分也不得被本单退款挪用。
+          .mockResolvedValueOnce([{ id: 'own-1', remainingMicrocredits: 60_000_000n }]),
         updateMany: vi.fn().mockImplementation(({ where, data }) => {
           taken.push({ id: where.id, micro: data.remainingMicrocredits.decrement });
           return { count: 1 };
@@ -184,21 +181,14 @@ describe('CreditService 退款扣回批次顺序', () => {
 
     const result = await service.reclaimForOrder('o-1', 'admin', '退款');
 
-    // 本单剩 60 不够 100，扣完本单再扣其它 40
-    expect(taken).toEqual([
-      { id: 'own-1', micro: 60_000_000n },
-      { id: 'other-1', micro: 40_000_000n },
-    ]);
-    expect(result.reclaimed).toBe(100);
-    expect(result.unreclaimable).toBe(0);
-    // 两段查询的 where 必须显式区分本单 / 非本单，而不是靠排序
+    expect(taken).toEqual([{ id: 'own-1', micro: 60_000_000n }]);
+    expect(result.reclaimed).toBe(60);
+    expect(result.unreclaimable).toBe(40);
+    expect(tx.creditLot.findMany).toHaveBeenCalledTimes(1);
     expect(tx.creditLot.findMany.mock.calls[0][0].where).toMatchObject({ orderId: 'o-1' });
-    expect(tx.creditLot.findMany.mock.calls[1][0].where).toMatchObject({
-      NOT: { orderId: 'o-1' },
-    });
   });
 
-  it('本单批次足够时不碰其它批次', async () => {
+  it('本单批次足够时只扣本单批次', async () => {
     const tx = {
       order: {
         findUnique: vi.fn().mockResolvedValue({ userId: 'u1', grantedCredits: 50 }),
@@ -206,8 +196,7 @@ describe('CreditService 退款扣回批次顺序', () => {
       creditLot: {
         findMany: vi
           .fn()
-          .mockResolvedValueOnce([{ id: 'own-1', remainingMicrocredits: 80_000_000n }])
-          .mockResolvedValueOnce([{ id: 'other-1', remainingMicrocredits: 500_000_000n }]),
+          .mockResolvedValueOnce([{ id: 'own-1', remainingMicrocredits: 80_000_000n }]),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       creditLedgerEntry: { create: vi.fn().mockResolvedValue({}) },

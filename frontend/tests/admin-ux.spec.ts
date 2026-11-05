@@ -527,7 +527,7 @@ test.describe('后台高频动线', () => {
     // 取一条不在默认第一页的已完成任务，覆盖“列表里没有该行”时由详情合成
     // 操作行摘要的路径。直接读页面现有登录态，避免另起一套 API 鉴权。
     const task = await page.evaluate(async () => {
-      const token = localStorage.getItem('ecom_vision_token');
+      const token = localStorage.getItem('huojue_token');
       const response = await fetch(
         '/api/v1/admin/tasks?status=succeeded&page=2&pageSize=20',
         { headers: token ? { Authorization: `Bearer ${token}` } : {} },

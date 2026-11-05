@@ -69,9 +69,11 @@ export function useChannelModelHealth(channelId: string) {
 /** 协议目录：按能力过滤，表单下拉直接消费 */
 export function useProtocolCatalog(capability: string) {
   const [protocols, setProtocols] = useState<ProtocolCatalogEntryView[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
+    setLoading(true);
     void adminChannelsApi
       .protocols(capability)
       .then((res) => {
@@ -79,6 +81,9 @@ export function useProtocolCatalog(capability: string) {
       })
       .catch(() => {
         if (active) setProtocols([]);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
     return () => {
       active = false;
@@ -90,5 +95,5 @@ export function useProtocolCatalog(capability: string) {
     [protocols],
   );
 
-  return { protocols, options };
+  return { protocols, options, loading };
 }

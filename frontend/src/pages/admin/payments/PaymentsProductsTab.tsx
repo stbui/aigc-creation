@@ -4,7 +4,7 @@ import { adminPaymentProductsApi, adminPaymentProvidersApi } from './api';
 import {
   ActionButton,
   AdminDataTable,
-  ConfirmAction,
+  ConfirmDialog,
   Drawer,
   EmptyState,
   FormField,
@@ -411,7 +411,7 @@ export function PaymentsProductsTab({ refreshNonce }: { refreshNonce: number }) 
         </div>
       </Panel>
 
-      <ConfirmAction
+      <ConfirmDialog
         open={currencyOpen}
         title="更改默认充值货币"
         description="默认货币决定 C 端商品卡的展示顺序与结算币种。更改只影响展示与下单口径，已生成的订单按下单时的币种结算。"

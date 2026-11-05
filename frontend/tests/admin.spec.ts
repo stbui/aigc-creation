@@ -287,7 +287,7 @@ test.describe('越权拦截', () => {
     // 「换个账号登录」应清 token 并跳登录页
     await page.getByRole('button', { name: '换个账号登录' }).click();
     await page.waitForURL((u) => u.pathname.includes('/login'), { timeout: 15000 });
-    const token = await page.evaluate(() => localStorage.getItem('ecom_vision_token'));
+    const token = await page.evaluate(() => localStorage.getItem('huojue_token'));
     expect(token).toBeNull();
   });
 

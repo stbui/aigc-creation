@@ -1,4 +1,4 @@
-import { ConfirmAction } from '~/admin-ui/primitives';
+import { ConfirmDialog } from '~/admin-ui/primitives';
 import type { AdminLogicalModelView } from '../../../types/model';
 
 /**
@@ -19,7 +19,7 @@ export function ArchiveConfirm({
   onConfirm: () => void;
 }) {
   return (
-    <ConfirmAction
+    <ConfirmDialog
       open={target !== null}
       title={`归档前台模型「${target?.name ?? ''}」？`}
       description="归档后不再出现在 C 端目录，历史 revision 与线路保留供账单回溯。"

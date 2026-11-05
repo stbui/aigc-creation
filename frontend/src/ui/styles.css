@@ -93,3 +93,141 @@
     -webkit-font-smoothing: antialiased;
   }
 }
+
+/* ───────── C 端 shadcn 适配层（替代 antd 的兼容外观） ─────────
+   只新增 ui-* / login-input-* 选择器，不改原有页面类。
+   颜色、圆角、字号全部消费 :root 令牌，保持与迁移前一致。
+
+   【选择器与 DOM 的对应关系】页面样式只能命中真实存在的节点。当前
+   `frontend/src/ui/primitives/**` 实际输出的兼容类只有这些：
+     .ui-btn / .ui-tag / .ui-card / .ui-card-body / .ui-input
+     .ui-form-item / .ui-form-label / .ui-form-control / .ui-form-error
+     .ui-select-trigger / .ui-dropdown-content / .ui-dropdown-item
+     .ui-tabs-list / .ui-badge-count / .ui-text-secondary
+     .login-input-wrap / .login-input-inner / .login-input-prefix
+     .login-textarea-count
+     .ant-modal-container / .ant-modal-header / .ant-modal-body（弹窗外壳，见
+       ui/primitives/modal.tsx；这三个是**唯一**仍在用的 ant-* 类）
+   写页面样式时按这份清单取类名，不要照抄历史文档里的 .ant-btn /
+   .ant-input / .ant-select / .ant-card-body —— 它们已不存在，写了也不命中。 */
+
+.login-input-wrap {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 48px;
+  padding: 0 20px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--color-border-soft);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.login-input-wrap:focus-within {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(98, 93, 245, 0.1);
+}
+
+.login-input-prefix {
+  display: inline-flex;
+  align-items: center;
+  color: var(--text-desc);
+  margin-right: 10px;
+  flex: 0 0 auto;
+}
+
+.login-input-inner {
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 14px;
+  color: var(--text-1);
+}
+
+.login-input-inner:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.login-field .login-input-wrap {
+  height: 48px;
+  padding: 0 20px;
+  border-radius: 8px;
+  background: var(--color-border-soft);
+  border: 1px solid var(--border);
+  box-shadow: none;
+  font-size: 14px;
+  line-height: 22px;
+}
+
+.login-field .login-input-wrap:hover {
+  border-color: var(--login-border-brand);
+}
+
+.login-field .login-input-wrap:focus-within {
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgb(98 93 245 / 0.1);
+}
+
+.login-field .login-input-inner {
+  background: transparent;
+  font-size: 14px;
+  color: var(--text-1);
+}
+
+.login-field .login-input-prefix {
+  color: var(--text-desc);
+  margin-right: 10px;
+}
+
+.login-code-row > .login-input-wrap {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.login-input-suffix {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  flex: 0 0 auto;
+}
+
+.login-textarea-wrap {
+  position: relative;
+  display: block;
+  width: 100%;
+}
+
+.login-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--text-1);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.login-textarea:focus-visible {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px rgba(98, 93, 245, 0.1);
+}
+
+.login-textarea-count {
+  position: absolute;
+  right: 4px;
+  bottom: -18px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.login-code-row > .login-input-wrap {
+  flex: 1 1 auto;
+  min-width: 0;
+}

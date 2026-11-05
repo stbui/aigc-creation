@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAdmin, useUnsavedGuard, useToast, useAdminResource } from './hooks';
 import { adminCreditPricesApi } from '../../../lib/api';
-import { ActionButton, AdminDataTable, ConfirmAction, HelpTip, NumberField, PageHeader, Panel, StatusTag, StaleError, type AdminColumn } from '~/admin-ui/primitives';
+import { ActionButton, AdminDataTable, ConfirmDialog, HelpTip, NumberField, PageHeader, Panel, StatusTag, StaleError, type AdminColumn } from '~/admin-ui/primitives';
 import type { AdminCreditPrice } from '../../../types/api';
 
 /**
@@ -173,7 +173,7 @@ export function AdminCreditPricesPage() {
                 >
                   回落默认
                 </ActionButton>
-                <ConfirmAction
+                <ConfirmDialog
                   open={rowForReset?.capabilityId === row.capabilityId}
                   title="回落到代码默认值？"
                   description={`将从 ${row.cost} 恢复为 ${row.registryDefault} 积分`}

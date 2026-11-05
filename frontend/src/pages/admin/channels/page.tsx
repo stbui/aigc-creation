@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { adminChannelsApi } from './api';
 import {
   StaleError,
-  ConfirmAction,
+  ConfirmDialog,
   PageHeader,
   Panel,
   SegmentedGroup,
@@ -348,10 +348,7 @@ export function AdminChannelsPage() {
   const orderChannel = orderFor ? (rows.find((row) => row.id === orderFor) ?? null) : null;
 
   const healthPanel = (
-    <Panel
-      title="线路健康"
-      note="按渠道模型统计：24h / 7d 成功率与 P95 耗时来自调用记录。样本少时 P95 参考意义有限，请同时看样本数。"
-    >
+    <Panel title="线路健康">
       {health.error && health.rows.length === 0 ? (
         <StaleError error={health.error} onRetry={() => void health.reload()} />
       ) : (
@@ -365,16 +362,15 @@ export function AdminChannelsPage() {
       <PageHeader
         title="渠道工作台"
         description="供应侧配置：Base URL、凭证、并发与出站代理；选中左侧渠道后，在右侧维护它的模型、能力合同与价格档。"
+        actions={
+          <SegmentedGroup
+            ariaLabel="渠道工作台视图"
+            value={view}
+            onChange={(value) => setView(value === 'models' ? 'models' : 'channels')}
+            options={CHANNEL_VIEW_OPTIONS}
+          />
+        }
       />
-
-      <div className="mb-3 flex items-center gap-2">
-        <SegmentedGroup
-          ariaLabel="渠道工作台视图"
-          value={view}
-          onChange={(value) => setView(value === 'models' ? 'models' : 'channels')}
-          options={CHANNEL_VIEW_OPTIONS}
-        />
-      </div>
 
       {view === 'models' ? (
         <div className="min-w-0">
@@ -396,7 +392,7 @@ export function AdminChannelsPage() {
         </div>
       ) : (
         <div
-          className="grid grid-cols-[240px_minmax(0,1fr)] items-start gap-4"
+          className="grid grid-cols-[224px_minmax(0,1fr)] items-start gap-4"
           data-testid="admin-channel-workspace"
         >
           {/* 导航在右栏长内容滚动时保持可见；列表自身仍随内容自然撑高，不做嵌套滚动 */}
@@ -477,7 +473,7 @@ export function AdminChannelsPage() {
         onSaved={() => void reload()}
       />
 
-      <ConfirmAction
+      <ConfirmDialog
         open={toggleTarget !== null}
         title={
           toggleTarget?.enabled
@@ -504,7 +500,7 @@ export function AdminChannelsPage() {
         onConfirm={() => void runToggle()}
       />
 
-      <ConfirmAction
+      <ConfirmDialog
         open={deleteTarget !== null}
         title={`删除渠道「${deleteTarget?.name ?? ''}」？`}
         description="软删除：凭证立即清空、渠道与全部模型退出路由；账单与调用记录保留。"

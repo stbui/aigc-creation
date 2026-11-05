@@ -84,7 +84,8 @@ export class AccountLifecycleService {
        * 这里不主动退款：注销是用户主动放弃权益，退款走客服/后台流程。
        */
       await tx.membership.updateMany({
-        where: { userId, status: { in: ['active', 'grace'] } },
+        // cancelled 仍可能有已付费未来周期与 nextCreditAt，注销时必须一并停发。
+        where: { userId, status: { in: ['active', 'grace', 'cancelled'] } },
         data: { status: 'cancelled', nextCreditAt: null },
       });
 

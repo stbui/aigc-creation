@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { SLUGS, SLUG_LABEL, STATUS_LABEL, STATUS_TONE_KEY } from './constants';
 import { fmt } from './utils';
 import { useAdminResource, useAdmin, useDiscardConfirm, useUnsavedGuard, useToast } from './hooks';
-import { ActionButton, AdminDataTable, ConfirmAction, Drawer, FilterActions, FilterBar, FormField, ModalDialog, PageHeader, Panel, SelectField, StatusTag, StaleError, TextAreaField, TextField, type AdminColumn } from '~/admin-ui/primitives';
+import { ActionButton, AdminDataTable, ConfirmDialog, Drawer, FilterActions, FilterBar, FormField, ModalDialog, PageHeader, Panel, SelectField, StatusTag, StaleError, TextAreaField, TextField, type AdminColumn } from '~/admin-ui/primitives';
 import { adminLegalApi } from '../../../lib/api';
 
 import type { AdminLegalDoc, LegalSlug, LegalStatus } from '../../../types/api';
@@ -356,7 +356,7 @@ export function AdminLegalPage() {
         </div>
       </Drawer>
 
-      <ConfirmAction
+      <ConfirmDialog
         open={!!publishTarget}
         title="发布该版本"
         description={

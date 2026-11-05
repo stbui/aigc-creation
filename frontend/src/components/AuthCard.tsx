@@ -1,3 +1,4 @@
+import '../styles/auth.css';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Checkbox, Form, FormItem, Input, useApp, useForm, useWatch } from '../ui';
 import { useNavigate } from 'react-router-dom';

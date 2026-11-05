@@ -78,7 +78,7 @@
 - **事实**：`frontend/src/components/GuestPromoDialog.tsx` 已实现，类名 `.guest-promo-overlay` / `.guest-promo-dialog` / `.guest-promo-title` / `.guest-promo-countdown` / `.guest-promo-benefits` / `.guest-promo-claim` 与测试断言**完全匹配**。
 - **触发条件**（line 95）：`open = !token && !dismissed && autoOpen && !loginOpen && !expired`。
 - **autoOpen 机制**（line 43-75）：仅当用户**停留 6 秒且无任何 `pointerdown`/`keydown`/`wheel`/`touchstart` 交互**时，定时器（`SHOW_DELAY_MS=6000`）才置 `autoOpen=true`；一旦有交互立即 `cleanup` 取消。
-- **会话去重**（line 48）：`sessionStorage` 键 `ecom-guest-promo-shown-v1` 标记为本会话已展示，看过一次后**永不再弹**。
+- **会话去重**（line 48）：`sessionStorage` 键 `huojue-guest-promo-shown-v1` 标记为本会话已展示，看过一次后**永不再弹**。
 - **测试缺口**：`mockPopup()` 后仅 `await expect(overlay).toBeVisible({ timeout: 9000 })`。既未保证「6 秒纯空闲」前置，又未清理 `sessionStorage`——同 worker 内前序 visitor 测试一旦触发过 autoOpen 即写入 sessionStorage，导致后续 visitor 测试永远不显示 → 超时失败。
 - **结论**：功能正确，失败源于测试时序/去重键前置缺失。修复方向是让测试先清 `sessionStorage` 并等待 6 秒空闲（或组件提供测试强开开关），**不应改实现**。
 

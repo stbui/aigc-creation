@@ -173,12 +173,33 @@ export class UserGroupAdminService {
   async remove(id: string): Promise<void> {
     const existing = await this.requireGroup(id);
     if (existing.code === DEFAULT_USER_GROUP_CODE) throw badRequest('默认分组不能删除');
-    const plans = await this.prisma.membershipPlan.findMany({
-      where: { userGroupCode: existing.code },
-      select: { code: true },
-    });
+    const now = new Date();
+    const [plans, activePeriodOrders] = await Promise.all([
+      this.prisma.membershipPlan.findMany({
+        where: { userGroupCode: existing.code },
+        select: { code: true },
+      }),
+      // 已付款周期使用下单时的分组快照；即使套餐后来改走其他分组，也不能
+      // 删除这些用户仍会解析到的分组，否则 active 周期会直接失败关闭。
+      this.prisma.order.count({
+        where: {
+          user: { status: { not: 'deleted' } },
+          membershipUserGroupCodeSnapshot: existing.code,
+          membershipPlanId: { not: null },
+          membershipAppliedAt: { not: null },
+          membershipPeriodEndAt: { gt: now },
+          membershipPeriodRevokedAt: null,
+          status: { in: ['paid', 'partial_refunded'] },
+        },
+      }),
+    ]);
     if (plans.length > 0) {
       throw badRequest(`仍有会员套餐映射到该分组（${plans.map((plan) => plan.code).join('、')}），请先调整套餐`);
+    }
+    if (activePeriodOrders > 0) {
+      throw badRequest(
+        `仍有 ${activePeriodOrders} 个当前或未来会员周期使用该分组，删除会导致这些会员无法计费，请等待周期结束或先处理对应订单`,
+      );
     }
     await this.prisma.$transaction(async (tx) => {
       await tx.userGroupChannel.deleteMany({ where: { groupId: existing.id } });
@@ -313,9 +334,40 @@ export class UserGroupAdminService {
    * `groupCodeForUser` 对这类用户返回默认分组，计数口径必须与计费口径一致。
    */
   private async userCountsByGroupCode(): Promise<Map<string, number>> {
-    const [memberships, plans, totalUsers] = await Promise.all([
+    const now = new Date();
+    const [activePeriods, snapshotUsers, legacyMemberships, plans, totalUsers] = await Promise.all([
+      this.prisma.order.findMany({
+        where: {
+          user: { status: { not: 'deleted' } },
+          membershipPlanId: { not: null },
+          membershipAppliedAt: { not: null },
+          membershipPeriodStartAt: { lte: now },
+          membershipPeriodEndAt: { gt: now },
+          membershipPeriodRevokedAt: null,
+          status: { in: ['paid', 'partial_refunded'] },
+        },
+        select: {
+          userId: true,
+          membershipPlanId: true,
+          membershipUserGroupCodeSnapshot: true,
+        },
+      }),
+      this.prisma.order.findMany({
+        where: {
+          user: { status: { not: 'deleted' } },
+          membershipPlanId: { not: null },
+          membershipAppliedAt: { not: null },
+          membershipPeriodEndAt: { not: null },
+        },
+        distinct: ['userId'],
+        select: { userId: true },
+      }),
       this.prisma.membership.findMany({
-        where: { status: { in: ['active', 'grace'] } },
+        where: {
+          user: { status: { not: 'deleted' } },
+          status: { in: ['active', 'grace', 'cancelled'] },
+          expiresAt: { gt: now },
+        },
         select: { userId: true, planId: true },
       }),
       this.prisma.membershipPlan.findMany({ select: { id: true, userGroupCode: true } }),
@@ -323,8 +375,22 @@ export class UserGroupAdminService {
     ]);
     const codeByPlanId = new Map(plans.map((plan) => [plan.id, normalizeUserGroupCode(plan.userGroupCode)]));
     const usersByCode = new Map<string, Set<string>>();
+    const hasPeriodSnapshot = new Set(snapshotUsers.map((row) => row.userId));
     const coveredUsers = new Set<string>();
-    for (const membership of memberships) {
+    for (const period of activePeriods) {
+      const code = normalizeUserGroupCode(
+        period.membershipUserGroupCodeSnapshot ??
+          codeByPlanId.get(period.membershipPlanId!) ??
+          DEFAULT_USER_GROUP_CODE,
+      );
+      const bucket = usersByCode.get(code) ?? new Set<string>();
+      bucket.add(period.userId);
+      usersByCode.set(code, bucket);
+      coveredUsers.add(period.userId);
+    }
+    // 只有完全没有订单周期快照的旧会员才回退到 Membership 投影。
+    for (const membership of legacyMemberships) {
+      if (hasPeriodSnapshot.has(membership.userId) || coveredUsers.has(membership.userId)) continue;
       const code = codeByPlanId.get(membership.planId) ?? DEFAULT_USER_GROUP_CODE;
       coveredUsers.add(membership.userId);
       const bucket = usersByCode.get(code) ?? new Set<string>();

@@ -37,9 +37,9 @@ out.tokenAcquired = Boolean(token);
 if (!token) throw new Error('登录失败');
 
 await page.evaluate((t) => {
-  localStorage.setItem('ecom_vision_token', t);
-  localStorage.setItem('ecom_vision_email', 'sc-e2e@test.local');
-  localStorage.setItem('ecom_vision_role', 'user');
+  localStorage.setItem('huojue_token', t);
+  localStorage.setItem('huojue_email', 'sc-e2e@test.local');
+  localStorage.setItem('huojue_role', 'user');
 }, token);
 
 await page.reload({ waitUntil: 'domcontentloaded' });
@@ -86,7 +86,7 @@ for (let i = 0; i < 40; i += 1) {
   await page.waitForTimeout(2000);
   const st = await page.evaluate(async () => {
     const res = await fetch('/api/v1/tasks/page?limit=30&capability=shoppable_carousel', {
-      headers: { Authorization: `Bearer ${localStorage.getItem('ecom_vision_token')}` },
+      headers: { Authorization: `Bearer ${localStorage.getItem('huojue_token')}` },
     });
     const json = await res.json();
     const items = json.data?.items ?? [];

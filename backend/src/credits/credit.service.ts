@@ -596,13 +596,12 @@ export class CreditService {
    * 已消耗的部分无法追回, 这部分必须如实记为 creditsUnreclaimable,
    * 否则对账会以为系统凭空丢了 600 积分。
    *
-   * 扣回顺序是**两段式**，不能用 `orderId asc` 之类的排序表达：
-   *   1. 先扣 `orderId` 等于本单的批次（退款针对的就是这笔订单发的积分）；
-   *   2. 再有缺口才回落到用户的其它批次，组内按 FEFO。
+   * 只扣 `orderId` 等于本单的批次。退款撤销的是这笔订单买的积分；如果本单
+   * 批次已消耗，缺口必须如实记为 `creditsUnreclaimable`，不能转而扣用户另
+   * 一笔订单的积分 —— 那会让一笔退款实际没收另一笔仍有效的付费权益。
    *
-   * 早先写成 `orderBy: [{ orderId: 'asc' }]` 是错的 —— 那是按 id 字符串
-   * 字典序排，与「是否本单」毫无关系，很可能先扣掉用户别的订单（甚至永久
-   * 批次），把本单快过期的批次剩给用户。必须显式分成两段查。
+   * 本单批次内部按 FEFO。旧实现按 `orderId asc` 排序，再回落到其它订单，
+   * 两者都可能在退款时误扣无关批次。
    */
   async reclaimForOrder(
     orderId: string,
@@ -641,27 +640,18 @@ export class CreditService {
     // 部分退款只回收本次对应的份额，且任何情况下都不能超过订单发放快照。
     const target = requested < granted ? requested : granted;
     const now = new Date();
-    /*
-     * 两段式取批：本单批次优先，其次用户其它批次（用户可能已把积分
-     * 转移到长有效期批次）。合并成一次查询无法表达「等于本单优先」——
-     * 排序键只能给出全局顺序，不能给出分组优先。
-     */
+    // 退款只能从本单产生的批次回收，绝不能跨订单挪用其它付费积分。
     const activeWhere: Prisma.CreditLotWhereInput = {
       userId: order.userId,
+      orderId,
       remainingMicrocredits: { gt: 0n },
       OR: [{ expireAt: null }, { expireAt: { gt: now } }],
     };
-    const ownLots = await tx.creditLot.findMany({
-      where: { ...activeWhere, orderId },
+    const lots = await tx.creditLot.findMany({
+      where: activeWhere,
       select: { id: true, remainingMicrocredits: true },
       orderBy: [{ expireAt: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
     });
-    const otherLots = await tx.creditLot.findMany({
-      where: { ...activeWhere, NOT: { orderId } },
-      select: { id: true, remainingMicrocredits: true },
-      orderBy: [{ expireAt: { sort: 'asc', nulls: 'last' } }, { createdAt: 'asc' }],
-    });
-    const lots = [...ownLots, ...otherLots];
 
     let toReclaim = target;
     const detail: Array<{ lotId: string; taken: number }> = [];

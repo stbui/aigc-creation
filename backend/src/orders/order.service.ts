@@ -3,12 +3,12 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AppError } from '../common/app.exception';
 import { CreditService } from '../credits/credit.service';
 import { formatCredits } from '../model/infra/microcredits';
-import { MembershipService } from '../membership/membership.service';
+import { MembershipService, parsePerks } from '../membership/membership.service';
 import { MarketingService } from '../marketing/marketing.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PaymentGateway } from '../payments/payment-gateway';
 import type { RefundResult } from '../payments/adapters/types';
-import type { Prisma } from '@prisma/client';
+import type { Prisma, Refund } from '@prisma/client';
 
 /**
  * 订单与沙箱支付 (admin-prd.md §3.7 B-39~B-44 / M8)。
@@ -175,24 +175,6 @@ export class OrderService {
       return { ...this.toOrderView(existing), idempotentHit: true };
     }
 
-    /*
-     * 未支付订单数量上限。
-     *
-     * 没有上限时，用户可以不断下单挂一堆 pending 单：既占库存（库存商品会
-     * 一直 reserved），也让「我的订单」全是待支付而真正要付的那笔被淹没。
-     * 超过上限直接拒绝建单，让用户先处理旧单。
-     */
-    const activeOrders = await this.prisma.order.count({
-      where: { userId: params.userId, status: 'pending' },
-    });
-    if (activeOrders >= MAX_ACTIVE_PENDING_ORDERS) {
-      throw new AppError(
-        40001,
-        `最多同时保留 ${MAX_ACTIVE_PENDING_ORDERS} 笔未支付订单，请先完成或取消已有订单`,
-        400,
-      );
-    }
-
     let totalCents = 0;
     let discountCents = 0;
     let paidCents = 0;
@@ -200,10 +182,25 @@ export class OrderService {
     let campaignId: string | null = null;
     let couponSnapshot: Record<string, unknown> = {};
     let couponWarning: string | null = null;
+    let membershipSnapshot: {
+      perks: string;
+      monthlyCredits: number;
+      durationDays: number;
+      userGroupCode: string;
+    } | null = null;
     /** 订单币种。商品单取商品币种, 会员单固定 CNY; 混合币种直接 400 */
     let orderCurrency = 'CNY';
     /** 需要占用库存的商品项 (saleStrategy=inventory) */
     let stockItems: Array<{ productId: string; quantity: number }> = [];
+    /** 周期限购商品需要在建单事务内重新统计，避免先查后插被并发绕过 */
+    let periodicProducts: Array<{
+      id: string;
+      name: string;
+      periodDays: number;
+      periodPurchaseLimit: number;
+    }> = [];
+    /** 优惠结算使用的商品金额快照；事务内会据此重新校验券名额 */
+    let settleItems: Array<{ productId: string; priceCents: number; quantity: number }> = [];
     let snapshots: Array<{
       productId: string;
       skuSnapshot: string;
@@ -211,6 +208,8 @@ export class OrderService {
       priceCentsSnapshot: number;
       creditsSnapshot: number;
       validDaysSnapshot: number;
+      grantTypeSnapshot: string;
+      stockReservedSnapshot: number;
       quantity: number;
     }> = [];
 
@@ -237,6 +236,14 @@ export class OrderService {
 
       totalCents = plan.priceCents;
       paidCents = plan.priceCents;
+      // 会员权益是下单时承诺给用户的内容，必须在创建订单时冻结快照。
+      // 否则运营在待支付窗口内改价/改权益，会追溯影响已经创建的订单。
+      membershipSnapshot = {
+        perks: JSON.stringify(parsePerks(plan.perks)),
+        monthlyCredits: plan.monthlyCredits,
+        durationDays: plan.durationDays,
+        userGroupCode: plan.userGroupCode ?? '',
+      };
       if (params.couponCode) {
         couponWarning = '会员订阅不支持优惠券与限时活动, 已按套餐原价下单';
       }
@@ -266,9 +273,21 @@ export class OrderService {
         if ((p.kind || 'credits') !== 'credits') {
           throw new AppError(40001, `商品类型暂不支持购买: ${p.name}`, 400);
         }
-        await this.assertProductPurchasable(p, item.quantity, params.userId);
+        this.assertProductPurchasable(p, item.quantity);
         if (p.saleStrategy === 'inventory') {
           stockItems.push({ productId: p.id, quantity: item.quantity });
+        }
+        if (
+          p.saleStrategy === 'periodic' &&
+          p.periodDays > 0 &&
+          p.periodPurchaseLimit > 0
+        ) {
+          periodicProducts.push({
+            id: p.id,
+            name: p.name,
+            periodDays: p.periodDays,
+            periodPurchaseLimit: p.periodPurchaseLimit,
+          });
         }
       }
 
@@ -279,7 +298,7 @@ export class OrderService {
        * 订单快照里记的是折前价, 退款时按折前价退, 平台自亏。
        * 同时订阅购买本身不走折扣(见 MembershipService.quoteOrder)。
        */
-      const settleItems: Array<{ productId: string; priceCents: number; quantity: number }> = [];
+      settleItems = [];
       snapshots = items.map((item) => {
         const p = byId.get(item.productId);
         if (!p) throw new AppError(40400, `商品不存在: ${item.productId}`, 404);
@@ -298,6 +317,8 @@ export class OrderService {
           priceCentsSnapshot: p.priceCents,
           creditsSnapshot: p.credits,
           validDaysSnapshot: p.creditsValidDays,
+          grantTypeSnapshot: p.grantType,
+          stockReservedSnapshot: p.saleStrategy === 'inventory' ? item.quantity : 0,
           quantity: item.quantity,
         };
       });
@@ -330,7 +351,88 @@ export class OrderService {
     const expiresAt = new Date(Date.now() + ORDER_TTL_MINUTES * 60 * 1000);
 
     try {
-      const order = await this.prisma.$transaction(async (tx) => {
+      const outcome = await this.prisma.$transaction(async (tx) => {
+        /*
+         * 先锁用户行，再统计 pending 订单。
+         *
+         * 只在事务外 count 会被并发绕过：同一用户可以同时穿过检查，最终挂出
+         * 超过 5 笔未支付订单并占住库存。SQLite 的 BEGIN 是 deferred，仅把
+         * count 搬进事务仍不够，必须先做一次 no-op UPDATE 取得写锁，让同一
+         * 用户的建单串行化。
+         */
+        await tx.$executeRaw`
+          UPDATE "User" SET "name" = "name" WHERE id = ${params.userId}`;
+
+        // 等待用户锁期间，另一个同幂等键请求可能已建单。此时必须返回既有单，
+        // 不能先撞上限而把一个成功的重复请求误报成 400。
+        const raced = await tx.order.findUnique({
+          where: {
+            userId_idempotencyKey: {
+              userId: params.userId,
+              idempotencyKey: params.idempotencyKey,
+            },
+          },
+          include: this.orderInclude(),
+        });
+        if (raced) return { order: raced, idempotentHit: true };
+
+        const activeOrders = await tx.order.count({
+          where: { userId: params.userId, status: 'pending' },
+        });
+        if (activeOrders >= MAX_ACTIVE_PENDING_ORDERS) {
+          throw new AppError(
+            40001,
+            `最多同时保留 ${MAX_ACTIVE_PENDING_ORDERS} 笔未支付订单，请先完成或取消已有订单`,
+            400,
+          );
+        }
+
+        /*
+         * 券名额必须在建单事务内重新校验并预留。
+         *
+         * 事务外计算优惠时，多个请求可能同时看到最后一个名额。事务内结算会
+         * 按用户输入的券码先锁 Coupon 行，再按「usedCount + pending 预占」和
+         * 「每人 pending+已支付」复查；若名额已被抢走，则按活动/原价重新结算，
+         * 不阻断用户下单。
+         *
+         * 即使首轮活动优惠大于券，也必须按券码加锁：两次结算之间活动可能失效，
+         * 券会重新成为最终优惠，不锁行会让并发请求同时占用最后一个名额。
+         *
+         * 券锁必须早于商品锁，和支付事务保持相同加锁顺序，避免与支付转库存
+         * 互相等待。
+         */
+        if (!isMembershipOrder) {
+          const authoritativeDiscount = await this.marketing.settleDiscount({
+            userId: params.userId,
+            items: settleItems,
+            couponCode: params.couponCode ?? null,
+            campaignIds: params.campaignIds,
+            tx,
+            lockCouponForReservation: true,
+          });
+          discountCents = Math.min(authoritativeDiscount.discountCents, totalCents);
+          paidCents = totalCents - discountCents;
+          couponId = authoritativeDiscount.couponId;
+          campaignId = authoritativeDiscount.campaignId;
+          couponSnapshot = authoritativeDiscount.snapshot as Record<string, unknown>;
+          couponWarning = (authoritativeDiscount.snapshot as any)?.couponWarning ?? null;
+        }
+
+        /*
+         * 周期限购必须在建单事务内统计。
+         *
+         * SQLite 的 BEGIN 是 deferred：若只把 count 放进事务，两个进程仍可能
+         * 同时读到旧值。先执行一次 no-op UPDATE 取得商品行写锁，再统计并建单，
+         * 后到的事务会等前一笔提交后重新读到最新订单数。
+         *
+         * 计数口径保持「非 cancelled 订单数」，退款不返还周期额度。
+         */
+        for (const product of periodicProducts) {
+          await tx.$executeRaw`
+            UPDATE "Product" SET "sortOrder" = "sortOrder" WHERE id = ${product.id}`;
+          await this.assertPeriodicPurchaseLimit(tx, product, params.userId);
+        }
+
         const created = await tx.order.create({
           data: {
             orderNo: this.genOrderNo(),
@@ -347,6 +449,14 @@ export class OrderService {
             expiresAt,
             // 会员单不带 OrderItem: 它买的不是"多少积分", 而是一段权益周期
             membershipPlanId: isMembershipOrder ? params.membershipPlanId! : null,
+            ...(membershipSnapshot
+              ? {
+                  membershipPerksSnapshot: membershipSnapshot.perks,
+                  membershipMonthlyCreditsSnapshot: membershipSnapshot.monthlyCredits,
+                  membershipDurationDaysSnapshot: membershipSnapshot.durationDays,
+                  membershipUserGroupCodeSnapshot: membershipSnapshot.userGroupCode,
+                }
+              : {}),
             ...(snapshots.length > 0 ? { items: { create: snapshots } } : {}),
           },
           include: this.orderInclude(),
@@ -371,11 +481,14 @@ export class OrderService {
           }
           await tx.order.update({ where: { id: created.id }, data: { stockReserved: true } });
         }
-        return created;
+        return { order: created, idempotentHit: false };
       });
 
+      if (outcome.idempotentHit) {
+        return { ...this.toOrderView(outcome.order), idempotentHit: true };
+      }
       return {
-        ...this.toOrderView(order),
+        ...this.toOrderView(outcome.order),
         idempotentHit: false,
         // 券不可用的原因原样透出, 前端在结算页提示, 不必再发一次请求
         couponWarning,
@@ -447,36 +560,11 @@ export class OrderService {
     };
   }
 
-  /**
-   * 用户主动关闭未支付订单。
-   *
-   * 只允许 pending → cancelled。已支付订单必须走退款流程，不能借这个入口
-   * 把交易记录改成「已取消」；重复取消按幂等处理，避免用户连点时第二次报错。
-   * 条件更新保证并发下只有一次真正生效。
+  /*
+   * 用户取消订单不在本 service 提供入口：必须走 PaymentOrderService.close()，
+   * 先向渠道查单/关单，再在本地置 cancelled 并释放库存与券预占。
+   * 这里保留说明而不保留直改状态的便捷方法，避免未来误用绕过资金安全链路。
    */
-  async cancelByUser(orderId: string, userId: string) {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      select: { id: true, userId: true, status: true },
-    });
-    if (!order) throw new AppError(40400, '订单不存在', 404);
-    if (order.userId !== userId) throw new AppError(40301, '无权操作该订单', 403);
-
-    if (order.status === 'cancelled') return this.detail(orderId, userId);
-    if (order.status !== 'pending') {
-      throw new AppError(40901, `订单当前状态不可取消: ${order.status}`, 409);
-    }
-
-    const updated = await this.prisma.order.updateMany({
-      where: { id: orderId, userId, status: 'pending' },
-      data: { status: 'cancelled' },
-    });
-    // 并发下另一个请求已经取消: 仍返回最新详情，调用方看到的就是终态
-    if (updated.count === 0) return this.detail(orderId, userId);
-
-    this.logger.log(`用户取消未支付订单: ${orderId}`);
-    return this.detail(orderId, userId);
-  }
 
   // ── 沙箱支付 ──────────────────────────────────────────────────────
 
@@ -534,7 +622,7 @@ export class OrderService {
     }
     // 超时订单不可再支付
     if (new Date() > order.expiresAt) {
-      await this.transition(order.id, 'cancelled');
+      await this.cancelSandboxOrder(order.id);
       throw new AppError(40901, '订单已超时关闭', 409);
     }
 
@@ -552,7 +640,11 @@ export class OrderService {
           sandboxScenario: 'timeout',
         },
       });
-      await this.transition(order.id, 'cancelled');
+      const outcome = await this.cancelSandboxOrder(order.id);
+      if (outcome === 'paid') {
+        const paid = await this.detail(order.id);
+        return { order: paid, idempotentHit: true, message: '订单已支付' };
+      }
       const updated = await this.detail(order.id);
       return { order: updated, idempotentHit: false, message: '支付超时, 订单已关闭' };
     }
@@ -688,20 +780,13 @@ export class OrderService {
     try {
       const won = await this.prisma.$transaction(async (tx) => {
         /*
-         * 本单会发放的积分总额 = 商品批次积分 + 会员首期积分。
-         *
-         * 会员单没有 OrderItem, 它的积分由 MembershipService.subscribe 发放;
-         * 但 `grantedCredits` 必须在这里就记全 —— 退款回收 (`reclaimForOrder`)
-         * 正是按这个快照扣的, 记 0 会让「退了会员钱、积分还在」。
+         * 支付入账必须与建单预留使用同一把券锁，并在改订单状态前取得。
+         * 否则建单可能在「订单仍 pending、usedCount 尚未增加」的窗口里再次
+         * 放出同一张限量券。
          */
-        const membershipCredits = order.membershipPlanId
-          ? (
-              await tx.membershipPlan.findUnique({
-                where: { id: order.membershipPlanId },
-                select: { monthlyCredits: true },
-              })
-            )?.monthlyCredits ?? 0
-          : 0;
+        if (order.couponId) {
+          await this.marketing.lockCoupon(order.couponId, tx);
+        }
 
         /*
          * `grantedCredits` 必须等于**实际自动发放的积分**。
@@ -709,14 +794,21 @@ export class OrderService {
          * manual 商品由后台手工发放，不走自动发放；若这里仍按全部 OrderItem
          * 累加，退款回收 (`reclaimForOrder`) 会以这个虚高快照为上限，从用户
          * 其它批次里扣走从未到账的积分。先决定哪些条目会发，再累加。
+         *
+         * 会员积分也不能在这里预记：提前续费的新周期可能尚未开始，首月积分
+         * 要等周期开始后才发放。会员每次实际发分时会在同一事务累加本字段。
          */
         const autoGrantItems: typeof order.items = [];
-        let grantedCredits = membershipCredits;
+        let grantedCredits = 0;
         for (const item of order.items) {
-          const product = item.productId
-            ? await tx.product.findUnique({ where: { id: item.productId } })
-            : null;
-          if (product?.grantType === 'manual') continue;
+          // 新订单按下单时快照发放。历史订单没有快照时才回退当前商品配置，
+          // 确保加列前的待支付订单仍保持旧行为，不会因字段为空全部停发。
+          const grantType =
+            item.grantTypeSnapshot ??
+            (item.productId
+              ? (await tx.product.findUnique({ where: { id: item.productId } }))?.grantType
+              : null);
+          if (grantType === 'manual') continue;
           autoGrantItems.push(item);
           grantedCredits += item.creditsSnapshot * item.quantity;
         }
@@ -748,10 +840,16 @@ export class OrderService {
             checkoutValue: '',
             lastError: null,
             closeStartedAt: null,
+            intentStartedAt: null,
             stockReserved: false,
           },
         });
         if (claimed.count === 0) return false;
+
+        // 订单已在本事务内置为 paid，此时核销才具备原子性且不会被重复计数。
+        if (order.couponId) {
+          await this.marketing.redeemCoupon(order.couponId, order.id, tx);
+        }
 
         /*
          * 有 pending 尝试就原地更新 (保留本次支付尝试的创建时间与 id),
@@ -778,16 +876,21 @@ export class OrderService {
         if (order.stockReserved) {
           for (const item of order.items) {
             if (!item.productId) continue;
-            const product = await tx.product.findUnique({
-              where: { id: item.productId },
-              select: { saleStrategy: true },
-            });
-            if (product?.saleStrategy !== 'inventory') continue;
+            let reservedQuantity = item.stockReservedSnapshot;
+            if (reservedQuantity == null) {
+              // 历史订单没有库存快照，只能按当前策略兜底；新订单一律走快照。
+              const product = await tx.product.findUnique({
+                where: { id: item.productId },
+                select: { saleStrategy: true },
+              });
+              reservedQuantity = product?.saleStrategy === 'inventory' ? item.quantity : 0;
+            }
+            if (reservedQuantity <= 0) continue;
             await tx.product.update({
               where: { id: item.productId },
               data: {
-                stockSold: { increment: item.quantity },
-                stockReserved: { decrement: item.quantity },
+                stockSold: { increment: reservedQuantity },
+                stockReserved: { decrement: reservedQuantity },
               },
             });
           }
@@ -839,9 +942,6 @@ export class OrderService {
      * 两者自身都有幂等闸 (条件更新), 重复执行安全。
      */
     try {
-      if (order.couponId) {
-        await this.marketing.redeemCoupon(order.couponId, order.id);
-      }
       await this.marketing.onOrderPaid(params.userId);
     } catch (e: any) {
       // 营销副作用失败**不得影响支付结果**: 记WARN 并继续返回成功
@@ -929,7 +1029,9 @@ export class OrderService {
     const since = new Date(Date.now() - 7 * 24 * 3600 * 1000);
     const pending = await this.prisma.order.findMany({
       where: {
-        status: 'paid',
+        // 支付成功后、权益激活前可能先发生部分退款；只要不是全额退款，
+        // 订单对应的会员周期仍然有效，恢复任务必须继续补激活。
+        status: { in: ['paid', 'partial_refunded'] },
         membershipPlanId: { not: null },
         membershipAppliedAt: null,
         paidAt: { gte: since },
@@ -978,84 +1080,13 @@ export class OrderService {
     if (params.amountCents <= 0) {
       throw new AppError(40001, '退款金额必须大于 0', 400);
     }
-    /*
-     * 可退上限 = **实付** - 已退, 不是订单原价。
-     *
-     * ⚠ 用原价会导致直接资损: 100 元订单用了 30 元券, 实付 70 元, 却能退 100 元。
-     * 兼容无优惠的历史订单: paidCents 为 0 且没有 free 成功流水时回落 totalCents
-     * (旧数据未回填该字段)。0 元单有 channel='free' 的成功流水，上限必须是 0，
-     * 否则会把「没付过钱」的订单当成可退原价。
-     */
-    const isFreeOrder = order.payments.some(
-      (p) => p.status === 'succeeded' && p.channel === 'free',
-    );
-    const paidBase = order.paidCents > 0 ? order.paidCents : isFreeOrder ? 0 : order.totalCents;
-
-    /*
-     * 先做「超出实付」的硬校验, 再走后台可配规则。
-     *
-     * 顺序不能反: 比例上限默认 100%, 此时「退得比实付还多」会先撞上比例规则,
-     * 变成 409 + 「超出规则上限」—— 这是一条**参数错**却被告知是**规则拦的**,
-     * 运营会去后台调比例上限而不是改金额。硬约束(400)优先于业务规则(409)。
-     */
-    const refundable = paidBase - order.refundedCents;
-    if (params.amountCents > refundable) {
-      throw new AppError(40001, `退款金额超出可退: 最多 ${refundable} 分`, 400);
-    }
-
-    // ── 退款规则 (B8, 后台可配) ────────────────────────────────────
-    if (params.rules) {
-      const { windowDays, maxRatioBps, allowConsumedTask } = params.rules;
-
-      /*
-       * 时间窗从 `paidAt` 起算。缺 paidAt 的历史订单**放行**:
-       * 它们是本规则上线前产生的, 按规则拒绝会让运营无路可走。
-       * 0 天 = 不限时间。
-       */
-      if (windowDays > 0 && order.paidAt) {
-        const deadline = order.paidAt.getTime() + windowDays * 24 * 3600 * 1000;
-        if (Date.now() > deadline) {
-          throw new AppError(
-            40905,
-            `已超出可退款时间窗（支付后 ${windowDays} 天内），如需特殊处理请走人工审批`,
-            409,
-          );
-        }
-      }
-
-      /*
-       * 比例上限按**实付**向下取整, 再减去已退。
-       * 取整方向决定资损方向: 向下取整最多少退 1 分, 向上会多退 1 分。
-       */
-      const ratioCap = Math.floor((paidBase * maxRatioBps) / 10000) - order.refundedCents;
-      if (params.amountCents > ratioCap) {
-        throw new AppError(
-          40906,
-          `退款金额超出规则上限: 本单最多可退 ${Math.max(ratioCap, 0)} 分（实付的 ${(
-            maxRatioBps / 100
-          ).toFixed(2)}% - 已退）`,
-          409,
-        );
-      }
-
-      if (!allowConsumedTask) {
-        const consumed = await this.countUnreclaimableCredits(order.userId, order.grantedCredits);
-        if (consumed > 0) {
-          throw new AppError(
-            40907,
-            `该订单发放的积分已消耗 ${consumed} 分且无法扣回，按当前退款规则不允许退款`,
-            409,
-          );
-        }
-      }
-    }
-
-    const payment = order.payments.find((p) => p.status === 'succeeded');
-    if (!payment) throw new AppError(40901, '订单无成功支付记录, 无法退款', 409);
-
-    // `manual` 是后台「标记已支付」写入的通道, 没有真实资金进出, 不调渠道
-    const channel = (payment.channel || 'sandbox').trim();
-    const manualMark = channel === 'manual';
+    // 事务外先做一次快速失败；真正生效的校验会在订单行锁内用最新数据重跑。
+    await this.assertRefundPolicy({
+      db: this.prisma,
+      order,
+      amountCents: params.amountCents,
+      rules: params.rules,
+    });
 
     /*
      * 退款单先落库, 用它当**渠道幂等键** (`outRefundNo`)。
@@ -1064,33 +1095,44 @@ export class OrderService {
      * 退款单号, 重试只能换一个新号 —— 那就是第二笔退款。
      *
      * 并发/重试保护：
-     *   · 「查在途 + 建单」放在同一个事务里。本仓库 SQLite 驱动会把交互事务
-     *     串行化，因此两个并发请求不可能同时看到 0 条 processing；
+     *   · 事务第一句先 no-op UPDATE 锁订单行，再重读并复跑全部退款规则；
+     *     SQLite deferred transaction 只把 count 搬进事务仍会并发穿透；
      *   · 渠道调用失败、结果未知的退款单，同金额重试时**复用原 id/outRefundNo**，
      *     让渠道按退款单号幂等，而不是换一个新号再退一次；
      *   · 运营已在渠道后台确认「退款失败」的单是明确终态，重试必须新建退款单，
      *     不能拿已被渠道拒绝的退款号再次提交。
-     *     （多实例/换库时需要改成行锁或唯一约束。）
      */
     const claim = await this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        UPDATE "Order" SET "updatedAt" = "updatedAt" WHERE id = ${order.id}`;
+
       const fresh = await tx.order.findUnique({
         where: { id: order.id },
-        select: { status: true, paidCents: true, totalCents: true, refundedCents: true },
+        include: {
+          payments: {
+            where: { status: 'succeeded' },
+            orderBy: { createdAt: 'desc' },
+          },
+          refunds: {
+            where: { status: 'succeeded' },
+            select: {
+              status: true,
+              creditsReclaimed: true,
+              creditsUnreclaimable: true,
+            },
+          },
+        },
       });
       if (!fresh || (fresh.status !== 'paid' && fresh.status !== 'partial_refunded')) {
         throw new AppError(40901, `订单当前状态不可退款: ${fresh?.status ?? 'missing'}`, 409);
       }
-      const freshPaidBase = fresh.paidCents > 0
-        ? fresh.paidCents
-        : (await tx.payment.count({
-            where: { orderId: order.id, status: 'succeeded', channel: 'free' },
-          })) > 0
-          ? 0
-          : fresh.totalCents;
-      const remaining = freshPaidBase - fresh.refundedCents;
-      if (params.amountCents > remaining) {
-        throw new AppError(40001, `退款金额超出可退: 最多 ${remaining} 分`, 400);
-      }
+
+      const policy = await this.assertRefundPolicy({
+        db: tx,
+        order: fresh,
+        amountCents: params.amountCents,
+        rules: params.rules,
+      });
 
       const inFlight = await tx.refund.count({
         where: { orderId: order.id, status: 'processing' },
@@ -1101,6 +1143,10 @@ export class OrderService {
           '该订单有一笔退款仍在渠道处理中，请等渠道返回结果或到商户后台确认后再操作',
           409,
         );
+      }
+      const payment = fresh.payments[0];
+      if (!payment) {
+        throw new AppError(40901, '订单无成功支付记录, 无法退款', 409);
       }
 
       const latestFailed = await tx.refund.findFirst({
@@ -1117,37 +1163,55 @@ export class OrderService {
         parseJsonObject(latestFailed.detail).confirmationOutcome !== 'failed'
           ? latestFailed
           : null;
-      const row = reusable
-        ? await tx.refund.update({
-            where: { id: reusable.id },
-            data: {
-              status: 'processing',
-              reason,
-              operatorId: params.operatorId,
-              providerRefundId: null,
-              detail: '{}',
-            },
-          })
-        : await tx.refund.create({
-            data: {
-              orderId: order.id,
-              paymentId: payment.id,
-              userId: order.userId,
-              amountCents: params.amountCents,
-              // 积分回收要等渠道确认够不够真退了, 先记 0
-              creditsReclaimed: 0,
-              creditsUnreclaimable: 0,
-              reason,
-              operatorId: params.operatorId,
-              status: 'processing',
-              detail: '{}',
-            },
-          });
 
-      return { refund: row, refundedCents: fresh.refundedCents, paidBase: freshPaidBase };
+      let row: Refund;
+      if (reusable) {
+        const reused = await tx.refund.updateMany({
+          where: { id: reusable.id, orderId: order.id, status: 'failed' },
+          data: {
+            status: 'processing',
+            reason,
+            operatorId: params.operatorId,
+            providerRefundId: null,
+            detail: '{}',
+          },
+        });
+        if (reused.count === 0) {
+          throw new AppError(40909, '退款单状态已变化，请刷新后重试', 409);
+        }
+        row = await tx.refund.findUnique({ where: { id: reusable.id } });
+        if (!row) throw new AppError(40909, '退款单状态已变化，请刷新后重试', 409);
+      } else {
+        row = await tx.refund.create({
+          data: {
+            orderId: order.id,
+            paymentId: payment.id,
+            userId: order.userId,
+            amountCents: params.amountCents,
+            // 积分回收要等渠道确认够不够真退了, 先记 0
+            creditsReclaimed: 0,
+            creditsUnreclaimable: 0,
+            reason,
+            operatorId: params.operatorId,
+            status: 'processing',
+            detail: '{}',
+          },
+        });
+      }
+
+      return {
+        refund: row,
+        payment,
+        refundedCents: fresh.refundedCents,
+        paidBase: policy.paidBase,
+      };
     });
 
     const refund = claim.refund;
+    const payment = claim.payment;
+    // `manual` 是后台「标记已支付」写入的通道, 没有真实资金进出, 不调渠道
+    const channel = (payment.channel || 'sandbox').trim();
+    const manualMark = channel === 'manual';
     let channelResult: RefundResult = {
       state: 'succeeded',
       raw: '手工标记已支付的订单，无渠道资金往来',
@@ -1354,7 +1418,8 @@ export class OrderService {
     reason: string;
     detail?: Record<string, unknown>;
   }): Promise<RefundSettlementResult> {
-    return this.prisma.$transaction(async (tx) => {
+    let membershipPeriodChanged = false;
+    const result = await this.prisma.$transaction(async (tx) => {
       const refund = await tx.refund.findUnique({
         where: { id: params.refundId },
         include: {
@@ -1381,6 +1446,17 @@ export class OrderService {
       const order = refund.order;
       if (order.status !== 'paid' && order.status !== 'partial_refunded') {
         throw new AppError(40901, `订单当前状态不可退款: ${order.status}`, 409);
+      }
+      /*
+       * 会员订单必须先锁用户，再写退款/订单状态。订阅激活也是 User → Order，
+       * 若这里反过来先写订单再等用户，会出现「退款持有订单等用户、激活持有用户
+       * 等订单」的死锁。锁用户后，会员周期撤销与并发续费也共享同一串行化点。
+       */
+      if (order.membershipPlanId) {
+        await this.membership.lockMembershipProjectionInTransaction(
+          tx,
+          refund.userId,
+        );
       }
       const paidBase = order.paidCents > 0
         ? order.paidCents
@@ -1452,6 +1528,7 @@ export class OrderService {
         fullyRefunded && order.membershipPlanId
           ? await this.membership.revokeOrderPeriodInTransaction(tx, order.id)
           : null;
+      membershipPeriodChanged = membershipRevocation?.affected ?? false;
       const membershipTerminated = membershipRevocation?.terminated ?? false;
 
       const confirmedAt = new Date().toISOString();
@@ -1497,6 +1574,10 @@ export class OrderService {
         invoiceFollowUp,
       };
     });
+    if (membershipPeriodChanged) {
+      await this.membership.invalidateUserGroupCatalog();
+    }
+    return result;
   }
 
   /** 退款成功后，把仍需人工处理的发票从响应里显式带回，不能只存库等运营发现。 */
@@ -1529,26 +1610,185 @@ export class OrderService {
   }
 
   /**
-   * 该订单发放的积分里, 有多少已经花掉且扣不回来。
+   * 本次退款目标份额里, 有多少已经花掉且扣不回来。
    *
-   * 只算**未过期批次**的剩余量 —— 已过期的积分本来就作废了, 把它算成
-   * 「可扣回」会让规则误放行; 算成「已消耗」又会拒绝本可退的订单。
-   * 与 `CreditService.reclaimForOrder` 的取数口径保持一致。
+   * 过期积分虽然不可扣回，但它不是「已消费」：把过期未用部分算成消费会
+   * 错误拒绝退款；完全不算又可能把已经花掉的积分误放行。因此可用证据 =
+   * 未过期批次剩余 + 已过期但未使用部分（过期批次仍有余量或 expire 流水）。
+   * 只有超出这部分的目标份额，才属于本次退款无法追回的真实消费。
    */
-  private async countUnreclaimableCredits(userId: string, grantedCredits: number): Promise<number> {
-    if (grantedCredits <= 0) return 0;
+  private async countUnreclaimableCredits(
+    orderId: string,
+    creditsToReclaim: number,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<number> {
+    if (creditsToReclaim <= 0) return 0;
     const now = new Date();
-    const agg = await this.prisma.creditLot.aggregate({
-      where: {
-        userId,
-        remainingMicrocredits: { gt: 0n },
-        OR: [{ expireAt: null }, { expireAt: { gt: now } }],
-      },
-      _sum: { remainingMicrocredits: true },
+    const lots = await db.creditLot.findMany({
+      where: { orderId },
+      select: { id: true, remainingMicrocredits: true, expireAt: true },
     });
+
+    let activeMicrocredits = 0n;
+    let expiredRemainingMicrocredits = 0n;
+    for (const lot of lots) {
+      if (lot.expireAt && lot.expireAt.getTime() <= now.getTime()) {
+        expiredRemainingMicrocredits += lot.remainingMicrocredits;
+      } else {
+        activeMicrocredits += lot.remainingMicrocredits;
+      }
+    }
+
+    // 到期任务会把批次剩余清零，只留下负向 expire 流水；两者取和可覆盖
+    // 「尚未执行到期任务」和「已经执行」两种状态，且不会重复计算。
+    const expiredLedger = lots.length
+      ? await db.creditLedgerEntry.aggregate({
+          where: {
+            type: 'expire',
+            lotId: { in: lots.map((lot) => lot.id) },
+          },
+          _sum: { amountMicrocredits: true },
+        })
+      : null;
+    const expiredLedgerMicrocredits = expiredLedger?._sum.amountMicrocredits ?? 0n;
+    const expiredUnusedMicrocredits =
+      expiredRemainingMicrocredits +
+      (expiredLedgerMicrocredits < 0n ? -expiredLedgerMicrocredits : expiredLedgerMicrocredits);
+
     // 批次是微积分口径，规则入参是积分口径，换算只在这一处发生
-    const available = Number(formatCredits(agg._sum.remainingMicrocredits ?? 0n));
-    return Math.max(0, grantedCredits - available);
+    const available = Number(formatCredits(activeMicrocredits + expiredUnusedMicrocredits));
+    return Math.max(0, creditsToReclaim - available);
+  }
+
+  /**
+   * 退款金额与后台规则校验。
+   *
+   * 调用方必须在订单行锁内再调用一次，不能复用事务外的判断结果。
+   */
+  private async assertRefundPolicy(params: {
+    db: Prisma.TransactionClient | PrismaService;
+    order: {
+      id: string;
+      paidCents: number;
+      totalCents: number;
+      refundedCents: number;
+      grantedCredits: number;
+      paidAt: Date | null;
+      payments: Array<{ status: string; channel: string }>;
+      refunds: Array<{
+        status: string;
+        creditsReclaimed: number;
+        creditsUnreclaimable: number;
+      }>;
+    };
+    amountCents: number;
+    rules?: RefundRules;
+  }): Promise<{ paidBase: number; refundable: number }> {
+    /*
+     * 可退上限 = **实付** - 已退, 不是订单原价。
+     *
+     * ⚠ 用原价会导致直接资损: 100 元订单用了 30 元券, 实付 70 元, 却能退 100 元。
+     * 兼容无优惠的历史订单: paidCents 为 0 且没有 free 成功流水时回落 totalCents
+     * (旧数据未回填该字段)。0 元单有 channel='free' 的成功流水，上限必须是 0，
+     * 否则会把「没付过钱」的订单当成可退原价。
+     */
+    const isFreeOrder = params.order.payments.some(
+      (payment) => payment.status === 'succeeded' && payment.channel === 'free',
+    );
+    const paidBase = params.order.paidCents > 0
+      ? params.order.paidCents
+      : isFreeOrder
+        ? 0
+        : params.order.totalCents;
+    const refundable = paidBase - params.order.refundedCents;
+
+    /*
+     * 先做「超出实付」的硬校验, 再走后台可配规则。
+     *
+     * 顺序不能反: 比例上限默认 100%, 此时「退得比实付还多」会先撞上比例规则,
+     * 变成 409 + 「超出规则上限」—— 这是一条**参数错**却被告知是**规则拦的**,
+     * 运营会去后台调比例上限而不是改金额。硬约束(400)优先于业务规则(409)。
+     */
+    if (params.amountCents > refundable) {
+      throw new AppError(40001, `退款金额超出可退: 最多 ${refundable} 分`, 400);
+    }
+
+    if (!params.rules) return { paidBase, refundable };
+
+    const { windowDays, maxRatioBps, allowConsumedTask } = params.rules;
+
+    /*
+     * 时间窗从 `paidAt` 起算。缺 paidAt 的历史订单**放行**:
+     * 它们是本规则上线前产生的, 按规则拒绝会让运营无路可走。
+     * 0 天 = 不限时间。
+     */
+    if (windowDays > 0 && params.order.paidAt) {
+      const deadline =
+        params.order.paidAt.getTime() + windowDays * 24 * 3600 * 1000;
+      if (Date.now() > deadline) {
+        throw new AppError(
+          40905,
+          `已超出可退款时间窗（支付后 ${windowDays} 天内），如需特殊处理请走人工审批`,
+          409,
+        );
+      }
+    }
+
+    /*
+     * 比例上限按**实付**向下取整, 再减去已退。
+     * 取整方向决定资损方向: 向下取整最多少退 1 分, 向上会多退 1 分。
+     */
+    const ratioCap =
+      Math.floor((paidBase * maxRatioBps) / 10000) - params.order.refundedCents;
+    if (params.amountCents > ratioCap) {
+      throw new AppError(
+        40906,
+        `退款金额超出规则上限: 本单最多可退 ${Math.max(ratioCap, 0)} 分（实付的 ${(
+          maxRatioBps / 100
+        ).toFixed(2)}% - 已退）`,
+        409,
+      );
+    }
+
+    if (!allowConsumedTask) {
+      /*
+       * 规则看的是**本次退款应回收的份额**，不是整单发放量。部分退款只撤销
+       * 对应比例的积分；只要本单尚未消耗的批次足够覆盖该份额，就不该因为
+       * 其余积分已经使用而把整笔退款拒掉。
+       */
+      const previousAccountedCredits = params.order.refunds
+        .filter((refund) => refund.status === 'succeeded')
+        .reduce(
+          (sum, refund) =>
+            sum + refund.creditsReclaimed + refund.creditsUnreclaimable,
+          0,
+        );
+      const cumulativeCreditTarget = paidBase > 0
+        ? Number(
+            (BigInt(params.order.grantedCredits) *
+              BigInt(params.order.refundedCents + params.amountCents)) /
+              BigInt(paidBase),
+          )
+        : 0;
+      const creditsToReclaim = Math.max(
+        0,
+        cumulativeCreditTarget - previousAccountedCredits,
+      );
+      const consumed = await this.countUnreclaimableCredits(
+        params.order.id,
+        creditsToReclaim,
+        params.db,
+      );
+      if (consumed > 0) {
+        throw new AppError(
+          40907,
+          `本次退款应回收的积分中有 ${consumed} 分已消耗且无法从本单扣回，按当前退款规则不允许退款`,
+          409,
+        );
+      }
+    }
+
+    return { paidBase, refundable };
   }
 
   // ── 状态机 ────────────────────────────────────────────────────────
@@ -1557,16 +1797,14 @@ export class OrderService {
    * 商品可购买性校验（支付重构）。
    *
    * 与后台「销售中」徽标同一套口径：限时窗口按 Asia/Shanghai 解释后台输入的时间，
-   * 库存按「总量 - 已售 - 已占用」计算，周期购买按窗口内非取消订单数。
+   * 库存按「总量 - 已售 - 已占用」计算；周期限购在事务内单独统计。
    * 页面的「销售中」不等于可购买，最终以这里为准。
    */
-  private async assertProductPurchasable(
+  private assertProductPurchasable(
     product: {
       id: string;
       name: string;
       saleStrategy: string;
-      periodDays: number;
-      periodPurchaseLimit: number;
       stockTotal: number;
       stockSold: number;
       stockReserved: number;
@@ -1574,8 +1812,7 @@ export class OrderService {
       saleEndAt: Date | null;
     },
     quantity: number,
-    userId: string,
-  ): Promise<void> {
+  ): void {
     const now = Date.now();
 
     if (product.saleStrategy === 'timed') {
@@ -1593,24 +1830,32 @@ export class OrderService {
         throw new AppError(40001, `库存不足: ${product.name}（剩余 ${Math.max(remaining, 0)}）`, 400);
       }
     }
+  }
 
-    if (product.saleStrategy === 'periodic' && product.periodDays > 0 && product.periodPurchaseLimit > 0) {
-      const since = new Date(now - product.periodDays * 24 * 3600 * 1000);
-      const used = await this.prisma.order.count({
-        where: {
-          userId,
-          status: { not: 'cancelled' },
-          createdAt: { gte: since },
-          items: { some: { productId: product.id } },
-        },
-      });
-      if (used + quantity > product.periodPurchaseLimit) {
-        throw new AppError(
-          40001,
-          `该商品每 ${product.periodDays} 天最多购买 ${product.periodPurchaseLimit} 件，当前已达上限`,
-          400,
-        );
-      }
+  /**
+   * 周期限购统计。调用方必须先取得商品行写锁，保证 count 与 create 之间
+   * 不会被另一笔建单插入。
+   */
+  private async assertPeriodicPurchaseLimit(
+    tx: Pick<Prisma.TransactionClient, 'order'>,
+    product: { id: string; name: string; periodDays: number; periodPurchaseLimit: number },
+    userId: string,
+  ): Promise<void> {
+    const since = new Date(Date.now() - product.periodDays * 24 * 3600 * 1000);
+    const used = await tx.order.count({
+      where: {
+        userId,
+        status: { not: 'cancelled' },
+        createdAt: { gte: since },
+        items: { some: { productId: product.id } },
+      },
+    });
+    if (used >= product.periodPurchaseLimit) {
+      throw new AppError(
+        40001,
+        `该商品每 ${product.periodDays} 天最多购买 ${product.periodPurchaseLimit} 次，当前已达上限`,
+        400,
+      );
     }
   }
 
@@ -1620,36 +1865,56 @@ export class OrderService {
    * 幂等：先条件更新 `stockReserved: true → false` 抢占，抢不到直接返回，
    * 避免重复释放把 `stockReserved` 减成负数。
    */
-  async releaseReservation(orderId: string): Promise<void> {
-    const order = await this.prisma.order.findUnique({
-      where: { id: orderId },
-      select: {
-        id: true,
-        stockReserved: true,
-        items: { select: { productId: true, quantity: true } },
-      },
-    });
-    if (!order || !order.stockReserved) return;
+  async releaseReservation(
+    orderId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    const release = async (db: Prisma.TransactionClient | PrismaService) => {
+      const order = await db.order.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          stockReserved: true,
+          items: {
+            select: {
+              productId: true,
+              quantity: true,
+              stockReservedSnapshot: true,
+            },
+          },
+        },
+      });
+      if (!order || !order.stockReserved) return;
 
-    await this.prisma.$transaction(async (tx) => {
-      const flag = await tx.order.updateMany({
+      const flag = await db.order.updateMany({
         where: { id: orderId, stockReserved: true },
         data: { stockReserved: false },
       });
       if (flag.count === 0) return;
       for (const item of order.items) {
         if (!item.productId) continue;
-        const product = await tx.product.findUnique({
+        let reservedQuantity = item.stockReservedSnapshot;
+        if (reservedQuantity == null) {
+          // 历史订单没有库存快照，只能按当前策略兜底；新订单一律走快照。
+          const product = await db.product.findUnique({
+            where: { id: item.productId },
+            select: { saleStrategy: true },
+          });
+          reservedQuantity = product?.saleStrategy === 'inventory' ? item.quantity : 0;
+        }
+        if (reservedQuantity <= 0) continue;
+        await db.product.update({
           where: { id: item.productId },
-          select: { saleStrategy: true },
-        });
-        if (product?.saleStrategy !== 'inventory') continue;
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stockReserved: { decrement: item.quantity } },
+          data: { stockReserved: { decrement: reservedQuantity } },
         });
       }
-    });
+    };
+
+    if (tx) {
+      await release(tx);
+      return;
+    }
+    await this.prisma.$transaction(release);
   }
 
   /**
@@ -1663,6 +1928,18 @@ export class OrderService {
     to: OrderStatus,
     tx?: Prisma.TransactionClient,
   ): Promise<void> {
+    /*
+     * 取消订单必须经过支付编排层的查单/关单链路。沙箱超时是唯一例外，
+     * 由 `cancelSandboxOrder` 在本地原子收尾；这里继续放行会留下
+     * “订单已取消但 pending Payment / 库存占用仍在”的脏状态。
+     */
+    if (to === 'cancelled') {
+      throw new AppError(
+        40901,
+        '取消订单必须走支付关单流程，不能直接迁移状态',
+        409,
+      );
+    }
     const db = tx ?? this.prisma;
     const order = await db.order.findUnique({
       where: { id: orderId },
@@ -1679,6 +1956,54 @@ export class OrderService {
       );
     }
     await db.order.update({ where: { id: orderId }, data: { status: to } });
+  }
+
+  /**
+   * 沙箱支付超时的本地原子取消。
+   *
+   * 沙箱没有外部渠道订单，但仍必须与支付编排保持相同终态：订单 cancelled、
+   * pending 支付尝试 closed、库存占用释放，三者同一事务完成。调用前已校验
+   * 订单属于当前用户且 channel=sandbox。
+   */
+  private async cancelSandboxOrder(
+    orderId: string,
+  ): Promise<'cancelled' | 'paid'> {
+    return this.prisma.$transaction(async (tx) => {
+      // SQLite deferred transaction 需要先写一行拿到订单级写锁，再判断状态。
+      await tx.$executeRaw`
+        UPDATE "Order" SET "updatedAt" = "updatedAt" WHERE id = ${orderId}`;
+      const current = await tx.order.findUnique({
+        where: { id: orderId },
+        select: { status: true },
+      });
+      if (!current) throw new AppError(40400, '订单不存在', 404);
+      if (current.status === 'paid') return 'paid';
+      if (current.status !== 'pending') {
+        throw new AppError(
+          40901,
+          `订单当前状态不可关闭: ${current.status}`,
+          409,
+        );
+      }
+
+      await tx.payment.updateMany({
+        where: { orderId, status: 'pending' },
+        data: { status: 'closed', closedAt: new Date() },
+      });
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          status: 'cancelled',
+          closedAt: new Date(),
+          closeStartedAt: null,
+          intentStartedAt: null,
+          checkoutValue: '',
+          lastError: null,
+        },
+      });
+      await this.releaseReservation(orderId, tx);
+      return 'cancelled';
+    });
   }
 
   // ── 内部 ──────────────────────────────────────────────────────────

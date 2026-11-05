@@ -1805,8 +1805,8 @@ export interface AdminOrderDetail {
   refundedCents: number;
   grantedCredits: number;
   couponSnapshot: string | null;
-  membershipPlanId: string | null;
-  membershipAppliedAt: string | null;
+  membershipPlanId: string | null; membershipAppliedAt: string | null;
+  membershipPeriodStartAt: string | null; membershipPeriodEndAt: string | null; membershipPeriodRevokedAt: string | null;
   paidAt: string | null;
   /** 超时关闭时刻。库中必填, 不会为 null */
   expiresAt: string;

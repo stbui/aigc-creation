@@ -47,7 +47,7 @@
 
 ## 项目概览
 
-**货觉AI**（内部代号 `ecom-vision-mvp`，仓库目录 `aigc-creation`）—— 面向电商团队与个人卖家的智能视觉创作平台。
+**货觉AI**（技术标识 `huojue`，仓库目录 `aigc-creation`）—— 面向电商团队与个人卖家的智能视觉创作平台。
 
 当前形态 = **C 端创作站 + 独立后台管理端 + 商业运营域 + 账户合规/服务域**：
 
@@ -296,7 +296,7 @@ npm run e2e                 # Playwright
   - **没有转发层**：`admin-ui/shadcn`、`admin-ui/controls`、`admin-ui/widgets`、`admin-ui/primitives/DataTable|Dialog`、`components/admin/PageHeader|AdminWidgets` 均已删除。新增控件按用途落进 `primitives/layout|form|display|table|overlay|fields`，再从 barrel 导出。
   - 颜色仍只在一处定义：`styles/global.css` 的 `:root` 是令牌源，`styles/admin.css` 的 `@theme inline` 把 shadcn 语义变量（`--background` / `--primary` / `--ring` …）桥接到那些令牌；改品牌色不改 shadcn 侧。页面只写 shadcn 类（`bg-card` / `text-muted-foreground` / `border-border` / `bg-accent` / `text-brand` / `bg-warn-soft`），旧套件那套 `text-text-tertiary` / `border-border-table` 词汇已随 vendor 一并删除。
   - Tailwind 只引 `theme.css` + `utilities.css`，**没有 preflight**：裸 `border` 会退回 `currentColor`，故兜底写在 `styles/admin.css` 的 `@layer base`（unlayered 规则会压过所有 `@layer`，`border-transparent` 就失效）。
-  - 高危动作确认：页面内用 `ConfirmAction`（贴底操作条，不弹阻塞层）；需要跨页面复用的二次确认走 `useConfirm()`（`providers/ConfirmProvider`，shadcn Dialog）。
+  - 高危动作确认：页面内用 `ConfirmDialog`（shadcn `AlertDialog` 的组合壳，阻塞式弹窗）；需要跨页面复用的二次确认走 `useConfirm()`（`providers/ConfirmProvider`，shadcn Dialog）。
 - **外壳**：`admin-ui/shell/AdminBoardLayout` —— 经典「上左右」：顶栏 56px（左品牌 + 当前位置（分组 / 页面），右环境标识 + 用户菜单）+ 侧栏 232（折叠 60，≤1280 自动折叠；图标 + 标签导航，底部折叠按钮）+ 内容区；无值班带。值班塔只出现在概览首屏（`primitives/duty-strip` 与 `duty-tower`）。`.adm-*` 只剩外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`），规则在 **`styles/admin.css`** 的 `@layer base`（不再在 `global.css`）；值班塔改用 Tailwind 工具类，没有 `adm-tower*` / `adm-dot` / `adm-empty-inline` 了。页面内新增 `adm-*` 类是错的。
 - **共享件**：表格 `primitives/table`（密度走 `admin-ui/lib/density` 的 `DensityContext`，由外壳下发）；状态色 `components/admin/statusMeta.ts`（`STATUS_META` 是状态→文案/色调的唯一映射）。
 - **e2e 锚点**：共享控件与页面关键节点挂 `data-testid="admin-*"`，表单控件用 `aria-label`；测试一律 `getByTestId` / `getByLabel` / 角色名，不追 Tailwind 工具类与已删除的 `adm-*` 类。
@@ -403,7 +403,7 @@ npm run e2e                 # Playwright
 | 类别 | 文档 |
 | --- | --- |
 | 需求 | `prd.md`（整站）、`admin-prd.md`（后台） |
-| 产品 | 后台：`admin-suite-design.md` / `admin-console-design.md` / `admin-detailed-design.md` / `admin-ui-design.md`；商业：`commerce-design.md`；C 端：`landing` / `workbench` / `topnav` / `login` / `library` / `packages-design.md`；`shoppable-carousel-design.md`（+ 模板来源 `shoppable-carousel-template-sources.md`） |
+| 产品 | 后台：`admin-suite-design.md` / `admin-console-design.md` / `admin-detailed-design.md` / `admin-ui-design.md`；商业：`commerce-design.md`；C 端：`landing` / `workbench` / `topnav` / `login` / `library` / `packages-design.md`；`shoppable-carousel-design.md`（+ 模板来源 `shoppable-carousel-template-sources.md`）；品牌：`brand/brand-basics.md` |
 | 技术 | `environments.md`、`docker-deployment.md`、`model-architecture.md`、`api-contract.md`、`runtime-infrastructure.md`、`frontend-module-conventions.md`、`typography.md` |
 | 测试 | `docs/testing.md`（四层测试、闸口清单、覆盖矩阵、已知缺口） |
 | 流程 | `docs/development-workflow.md`（Agent 执行手册：指令映射、执行卡、闸口矩阵、证据标准、交人边界） |

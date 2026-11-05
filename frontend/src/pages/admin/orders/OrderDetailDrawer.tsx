@@ -53,7 +53,7 @@ function RecordRow({
  * 订单详情抽屉。
  *
  * 从页面拆出：详情的数据获取与退款/核销入口和列表筛选是两套生命周期；
- * 动作仍回到页面统一走确认条，避免同一笔订单出现两个确认入口。
+ * 动作仍回到页面统一走确认弹窗，避免同一笔订单出现两个确认入口。
  */
 export function OrderDetailDrawer({
   detailId,
@@ -209,7 +209,24 @@ export function OrderDetailDrawer({
                             {d.membershipPlan.name}（{d.membershipPlan.durationDays} 天 · 每月{' '}
                             {d.membershipPlan.monthlyCredits} 积分）
                             {d.membershipAppliedAt ? (
-                              <span className="text-[12px] text-muted-foreground"> · 权益已发放</span>
+                              <>
+                                <span className="text-[12px] text-muted-foreground"> · 权益已发放</span>
+                                {d.membershipPeriodStartAt && d.membershipPeriodEndAt ? (
+                                  <span className="text-[12px] text-muted-foreground">
+                                    {' '}· 周期 {new Date(d.membershipPeriodStartAt).toLocaleString('zh-CN')} 至{' '}
+                                    {new Date(d.membershipPeriodEndAt).toLocaleString('zh-CN')}
+                                  </span>
+                                ) : (
+                                  <span className="text-[12px] text-muted-foreground"> · 历史订单无周期快照</span>
+                                )}
+                                {d.membershipPeriodRevokedAt ? (
+                                  <span className="text-[12px] text-danger-text">
+                                    {' '}· 周期已撤销（{new Date(d.membershipPeriodRevokedAt).toLocaleString('zh-CN')}）
+                                  </span>
+                                ) : (
+                                  <span className="text-[12px] text-success-text"> · 周期有效</span>
+                                )}
+                              </>
                             ) : (
                               <span className="text-[12px] text-danger-text"> · 权益尚未发放</span>
                             )}

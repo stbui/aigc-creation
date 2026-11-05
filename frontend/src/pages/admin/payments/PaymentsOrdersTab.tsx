@@ -5,7 +5,7 @@ import {
   ActionButton,
   AdminDataTable,
   AppliedFilters,
-  ConfirmAction,
+  ConfirmDialog,
   Descriptions,
   Drawer,
   FilterActions,
@@ -481,7 +481,7 @@ export function PaymentsOrdersTab({ refreshNonce }: { refreshNonce: number }) {
         )}
       </Panel>
 
-      <ConfirmAction
+      <ConfirmDialog
         open={action !== null}
         danger={action?.kind === 'close'}
         title={action?.kind === 'close' ? '关闭支付订单' : '向渠道同步订单状态'}

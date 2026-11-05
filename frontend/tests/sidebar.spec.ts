@@ -9,7 +9,7 @@ import { test, expect, type APIRequestContext, type Page } from '@playwright/tes
 
 const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
 const API = process.env.E2E_API ?? 'http://localhost:4100';
-const GUEST_PROMO_DISMISS_KEY = 'ecom-guest-promo-dismissed-v1';
+const GUEST_PROMO_DISMISS_KEY = 'huojue-guest-promo-dismissed-v1';
 
 async function skipGuestPromo(page: Page) {
   await page.addInitScript(
@@ -178,8 +178,8 @@ test.describe('左侧菜单复原', () => {
     await page.goto(`${UI}/workbench`);
     await page.evaluate(
       ([value, userEmail]) => {
-        localStorage.setItem('ecom_vision_token', value as string);
-        localStorage.setItem('ecom_vision_email', userEmail as string);
+        localStorage.setItem('huojue_token', value as string);
+        localStorage.setItem('huojue_email', userEmail as string);
       },
       [token, email],
     );

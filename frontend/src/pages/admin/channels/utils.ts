@@ -65,7 +65,7 @@ export {
 /* ------------------------------------------------------------------------- */
 
 /** 与 `backend/src/model/infra/outbound.ts` 的 `DEFAULT_USER_AGENT` 保持一致 */
-export const DEFAULT_USER_AGENT = 'ecom-vision/1.0';
+export const DEFAULT_USER_AGENT = 'huojue/1.0';
 export const MAX_HEADER_COUNT = 32;
 const MAX_HEADER_BYTES = 16 * 1024;
 const MAX_NAME_LENGTH = 128;

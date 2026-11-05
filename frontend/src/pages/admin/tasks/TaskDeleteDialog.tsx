@@ -3,8 +3,8 @@ import { ActionButton, ModalDialog } from '~/admin-ui/primitives';
 /**
  * 任务删除确认。
  *
- * 删除会同时清理子任务、产出素材和存储文件，影响范围较大。这里使用居中
- * 弹框，而不是列表底部的确认条，避免确认区横跨整张表并遮挡待删除的任务。
+ * 删除会同时清理子任务、产出素材和存储文件，影响范围较大。居中弹框聚焦
+ * 在本次删除上，不与长表格的行操作争夺注意力。
  */
 export function TaskDeleteDialog({
   open,

@@ -223,10 +223,10 @@ Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不�
 
 | 场景 | 组件 | 形态 |
 | --- | --- | --- |
-| 页面内高危动作（删除渠道、退款） | `ConfirmAction` | **贴底操作条，不是弹层** —— 运营要能一边看被影响的行一边确认后果。`impact` 逐条列出连带影响 |
+| 页面内高危动作（删除渠道、退款） | `ConfirmDialog` | shadcn `AlertDialog` 组合壳（阻塞式弹窗）；`impact` 逐条列出连带影响 |
 | 跨页面复用的二次确认（离开未保存页、批量动作） | `useConfirm()` | shadcn Dialog；需要原因时聚焦输入框，原因写入审计 |
 
-`ConfirmAction` 曾经被误改成 `AlertDialog`，是违反产品决策的：高危动作不许弹阻塞层。
+`ConfirmDialog` 只组合 AlertDialog 的标题 / 影响范围 / 附加表单 / 底部动作，弹层行为（焦点锁定、Esc、关闭后焦点归位）由 radix 提供。点击确认不自动关闭，由调用方在请求成功后再收起。`overlay.tsx` 不再保留手写的贴底确认条。
 
 **确认只属于业务动作，审计页面永远不弹确认。** 操作审计页只查询、展开和导出，导出也直接执行；审计只被动记录业务操作的动作、原因与结果，不能反过来要求用户确认审计本身。高危确认发生在其业务页面，原因由业务操作收集后写入审计。
 
@@ -254,7 +254,7 @@ Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不�
 | --- | --- | --- |
 | 看板页 | 平台概览 | 值班条 + 指标卡栅格 + 趋势图 + 交易概览 + 最近任务列表 |
 | 告警页 | 告警中心 | 级别统计卡 + 级别筛选 + 告警卡片列表 + 口径说明 |
-| 列表页 | 用户 / 素材 / 任务 / 工单 / 订单 / 积分 / 优惠券 / 活动 / 邀请与签到 / 商品 / 能力消耗价 / 发票 / 支付订单 / 支付对账 / 操作审计 / 调用记录 / 数据备份 | 页头 → 筛选条 → 批量条（可选）→ 表格 → 分页；行操作走抽屉或确认条 |
+| 列表页 | 用户 / 素材 / 任务 / 工单 / 订单 / 积分 / 优惠券 / 活动 / 邀请与签到 / 商品 / 能力消耗价 / 发票 / 支付订单 / 支付对账 / 操作审计 / 调用记录 / 数据备份 | 页头 → 筛选条 → 批量条（可选）→ 表格 → 分页；行操作走抽屉或确认弹窗 |
 | 配置页 | 系统设置 / 存储配置 / AI 标识 / 角色权限 / 能力管控 / 渠道工作台 / 前台模型 / 用户分组 / 定时任务 / 保留期清理 / 法务文档 / 站内消息 | 分区表单或页签；底部署固定操作条（保存 / 重置），渠道与前台模型用列表 + 抽屉 |
 | 标签页 | 支付充值（支付渠道 / 充值商品 / 支付订单 / 支付对账） | 页头 → 提示条 → 分段页签（`SegmentedTabs`，`?tab=` 同步 URL）→ 每个标签自持数据与筛选 |
 
@@ -263,7 +263,7 @@ Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不�
 | 页面 | 约定 |
 | --- | --- |
 | 平台概览 | 首屏是 `DutyStrip`（值班条）：100 根产出刻度 + 四个计数 + 「接手最早异常」主动作；趋势图用 `TrendBarChart`（Recharts 真坐标轴，非 CSS 自绘） |
-| 渠道工作台 | 主从布局：左列是**渠道导航与全部渠道级入口**（新建渠道 / 导入 / 导出全部 / 搜索 / 状态筛选 / 调整顺序），右侧选中渠道的详情内联模型清单（模态 / 协议 / 权重 / 优先级 / 价格档），模型编辑走弹窗；详情头部外露 编辑 / 复制 / 导出 / 停用·启用 / 删除 五个动作，停用与删除走 `ConfirmAction`（写明影响范围），导出只导配置不含凭证；健康列用 `StatusTag`，连通性测试在详情区发起；「全部模型」视图跨渠道平铺同一份数据 |
+| 渠道工作台 | 主从布局：左列是**渠道导航与全部渠道级入口**（新建渠道 / 导入 / 导出全部 / 搜索 / 状态筛选 / 调整顺序），右侧选中渠道的详情内联模型清单（模态 / 协议 / 权重 / 优先级 / 价格档），模型编辑走弹窗；详情头部外露 编辑 / 复制 / 导出 / 停用·启用 / 删除 五个动作，停用与删除走 `ConfirmDialog`（写明影响范围），导出只导配置不含凭证；健康列用 `StatusTag`，连通性测试在详情区发起；「全部模型」视图跨渠道平铺同一份数据 |
 | 前台模型 | `AdminDataTable` + `Drawer`：模型 → revision → 线路三段；`simulate` 结果在抽屉内展开，不跳页 |
 | AI 标识 | 左编辑、右预览两栏；上层是 CSS 还原的角标外观，下层是 Canvas 按服务端几何规则画在示例底图上的效果；关闭态预览显示「可见角标已关闭」而非空白；顶部开关配法律风险提示 |
 | 能力管控 | 16 行能力表，下架必须填原因（表单内联校验，不是弹窗里的单行输入） |
@@ -336,7 +336,7 @@ Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不�
 | `skeleton.tsx` | `PageSkeleton` / `SkeletonPanel` / `SkeletonBody` / `SkeletonStats` / `SkeletonCards` / `SkeletonTabs` / `SkeletonDutyStrip` / `Skeleton` |
 | `fields.tsx` | `CheckboxField` / `FilePicker` / `HelpTip` / `IconButton` / `ColorField` / `RangeField` / `SuggestField` |
 | `table.tsx` | `AdminDataTable` |
-| `overlay.tsx` | `ModalDialog` / `Drawer` / `ConfirmAction` / `RowMenu` |
+| `overlay.tsx` | `ModalDialog` / `Drawer` / `ConfirmDialog`（shadcn `AlertDialog` 组合壳）/ `RowMenu` |
 | `drawer.tsx` | `AdminDrawer`（懒加载详情抽屉） |
 | `batch-result.tsx` | `BatchResultModal` |
 | `duty-strip.tsx` / `duty-tower.tsx` | 概览首屏的值班条与值班塔 |

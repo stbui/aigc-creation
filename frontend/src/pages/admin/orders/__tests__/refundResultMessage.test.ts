@@ -9,6 +9,7 @@ describe('refundWarningMessage', () => {
         creditsReclaimed: 100,
         creditsUnreclaimable: 0,
         invoiceFollowUp: null,
+        membershipTerminated: false,
       }),
     ).toBeNull();
   });
@@ -19,6 +20,7 @@ describe('refundWarningMessage', () => {
         creditsReclaimed: 60,
         creditsUnreclaimable: 40,
         invoiceFollowUp: { message: '请到发票管理驳回该申请。' },
+        membershipTerminated: false,
       }),
     ).toBe('回收积分 60，另有 40 积分已被消耗无法回收；请到发票管理驳回该申请。');
   });
@@ -29,7 +31,28 @@ describe('refundWarningMessage', () => {
         creditsReclaimed: 0,
         creditsUnreclaimable: 0,
         invoiceFollowUp: { message: '请完成发票冲红登记。' },
+        membershipTerminated: false,
       }),
     ).toBe('请完成发票冲红登记。');
+  });
+
+  it('只有实际终止会员时才提示终止', () => {
+    expect(
+      refundWarningMessage({
+        creditsReclaimed: 25,
+        creditsUnreclaimable: 0,
+        invoiceFollowUp: null,
+        membershipTerminated: true,
+      }),
+    ).toBe('会员权益已终止');
+
+    expect(
+      refundWarningMessage({
+        creditsReclaimed: 25,
+        creditsUnreclaimable: 0,
+        invoiceFollowUp: null,
+        membershipTerminated: false,
+      }),
+    ).toBeNull();
   });
 });

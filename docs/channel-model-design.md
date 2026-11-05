@@ -188,7 +188,7 @@ backend/src/model/
 | `GenerationTask` | 原地扩展：`logicalModelId`、`logicalModelRevisionId`、`routeId`、`channelModelId`、`routeRun`、`billingOrderId`、`providerRequestId`、`pollStage`、`nextPollAt`、`leaseOwner`、`leaseUntil`、`attempts`、`stage`、`progress`、`authorizedChargeMicrocredits`；`provider` 恒为 `managed`；`creditCost` 改为账单金额只读投影 |
 | `CreditLot` | 保留为「发放批次」，`amount` → `remainingMicrocredits BigInt`，增加 `expiresAt`；FEFO 扣减仍按批次 |
 | `CreditTransaction` | 迁移为 `CreditLedgerEntry`（微积分、available/reserved 双列） |
-| `User` | **不改表**：分组由「有效会员 → `MembershipPlan.userGroupCode`」解析（无有效会员落 `default` 分组），见 §14.2。控制器不得读用户列推断分组 |
+| `User` | **不改表**：分组由「有效会员订单的分组快照 → `MembershipPlan.userGroupCode`（仅历史订单兜底）」解析，无有效会员落 `default` 分组，见 §14.2。控制器不得读用户列推断分组；运营修改套餐映射只影响之后创建的订单 |
 | `MembershipPlan` | 增加 `userGroupCode String?`：会员等级映射分组，`fastChannel` 权益通过分组可见更优线路实现，不新增运行时分支 |
 
 ### 3.4 `ApiCallLog` 字段
@@ -257,7 +257,7 @@ Nest 中以前置 `@All` 控制器 + 保留前缀清单实现，替代 Gin 的 `
 ### 5.2 路由目录缓存
 
 - 内存快照：`TTL 30s`、最大过期 `5min`、刷新失败冷却 `2s`；
-- 失效：后台任何渠道/模型/前台模型/分组写入后 `invalidate()`，并将 `RouteCatalogVersion.version + 1`；
+- 失效：后台任何渠道/模型/前台模型/分组写入后 `invalidate()`，并将 `RouteCatalogVersion.version + 1`；会员激活、周期切换、退款撤销、到期以及套餐分组映射修改也属于分组来源变更，事务提交后同样必须清用户分组缓存并递增版本；
 - 装载时剔除：渠道或模型停用、`pricePolicy=unified && billingMode=token` 但协议不支持 Token、`pricePolicy=channel` 但无有效价格档、能力配置非法；
 - 快照内容：前台模型、revision、可路由线路、线路能力规格、默认参数。
 

@@ -51,7 +51,7 @@ export interface CapabilitySpecView {
   inputs?: Record<string, InputConstraintView>;
   options?: Record<string, OptionConstraintView>;
   imageSize?: ImageSizeView;
-  imageParameters?: Array<Record<string, unknown>>;
+  imageParameters?: import('./imageCapability').ImageParameterDefinitionView[];
 }
 
 export interface CapabilityIssueView {

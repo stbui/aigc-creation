@@ -1,4 +1,4 @@
-import { ConfirmAction } from '~/admin-ui/primitives';
+import { ConfirmDialog } from '~/admin-ui/primitives';
 import type { PluginView } from '../../../types/model';
 
 /**
@@ -19,7 +19,7 @@ export function TogglePluginConfirm({
   onConfirm: () => void;
 }) {
   return (
-    <ConfirmAction
+    <ConfirmDialog
       open={target !== null}
       title={`${target?.enabled ? '停用' : '启用'}插件「${target?.name ?? ''}」？`}
       description="启停会立即重注册协议，已保存的渠道模型不受影响，但下发调用的协议解析会随注册表变化。"
@@ -51,7 +51,7 @@ export function InstallPluginConfirm({
   onConfirm: () => void;
 }) {
   return (
-    <ConfirmAction
+    <ConfirmDialog
       open={file !== null}
       title={`安装插件包「${file?.name ?? ''}」？`}
       description="上传的包会写入独立安装目录（不覆盖内置插件），解析校验通过后立即注册协议。"
@@ -79,7 +79,7 @@ export function UninstallPluginConfirm({
   onConfirm: () => void;
 }) {
   return (
-    <ConfirmAction
+    <ConfirmDialog
       open={target !== null}
       title={`卸载插件「${target?.name ?? ''}」？`}
       description="只会删除上传安装的包；内置插件随代码发布，不能卸载。"

@@ -1,4 +1,4 @@
-import { Copy, Download, Plus, Power, Trash2 } from 'lucide-react';
+import { Copy, Download, Pencil, Plus, Power, Trash2 } from 'lucide-react';
 import { ActionButton, EmptyState, Panel, StatusTag } from '~/admin-ui/primitives';
 import { ChannelModelManager } from './ChannelModelManager';
 import type { AdminChannelView } from '../../../types/model';
@@ -55,30 +55,26 @@ export function ChannelDetailPanel({
       {selected ? (
         <Panel
           title={
-            <span className="flex items-center gap-2">
-              {selected.name}
-              <StatusTag
-                status={selected.enabled ? 'channel-enabled' : 'channel-disabled'}
-                tone={selected.enabled ? 'success' : 'muted'}
-                label={selected.enabled ? '已启用' : '已停用'}
-              />
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="min-w-0 truncate" title={selected.name}>
+                {selected.name}
+              </span>
+              <span className="shrink-0">
+                <StatusTag
+                  status={selected.enabled ? 'channel-enabled' : 'channel-disabled'}
+                  tone={selected.enabled ? 'success' : 'muted'}
+                  label={selected.enabled ? '已启用' : '已停用'}
+                />
+              </span>
             </span>
           }
           note={
             <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-              <span className="font-mono text-[12px]" title={selected.baseUrl}>
+              <span className="min-w-0 max-w-full truncate font-mono text-[12px]" title={selected.baseUrl}>
                 {selected.baseUrl}
               </span>
-              <span>
-                {selected.hasApiKey
-                  ? selected.hasSecretKey
-                    ? 'AK/SK 已配置'
-                    : 'API Key 已配置'
-                  : '凭证未配置'}
-              </span>
-              <span>
-                最大并发：{selected.concurrencyLimit === 0 ? '跟随系统' : selected.concurrencyLimit}
-              </span>
+              {!selected.hasApiKey && <span>凭证未配置</span>}
+              {selected.hasApiKey && selected.hasSecretKey && <span>AK/SK 已配置</span>}
               {selected.proxyUrl && <span className="font-mono">代理：{selected.proxyUrl}</span>}
               {selected.catalogProviderId && (
                 <span>来源：服务商目录 · {selected.catalogProviderId}</span>
@@ -90,6 +86,7 @@ export function ChannelDetailPanel({
               <ActionButton
                 variant="secondary"
                 size="xs"
+                icon={Pencil}
                 disabled={!writable || saving}
                 onClick={() => onEdit(selected)}
               >

@@ -1,6 +1,15 @@
 import { Plus, Trash2 } from 'lucide-react';
-import { ActionButton, IconButton, Notice, SelectField, TextField } from '~/admin-ui/primitives';
-import { Field } from './ChannelField';
+import {
+  ActionButton,
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldTitle,
+  IconButton,
+  SelectField,
+  TextField,
+} from '~/admin-ui/primitives';
 import {
   MAX_MODEL_TAGS,
   MAX_TAG_TEXT_LENGTH,
@@ -19,11 +28,13 @@ import {
 export function ChannelModelTagsEditor({
   tags,
   onChange,
+  error,
 }: {
   tags: Array<{ text: string; color: string }>;
   onChange: (next: Array<{ text: string; color: string }>) => void;
+  error?: string;
 }) {
-  const error = validateModelTags(tags);
+  const validationError = error ?? validateModelTags(tags);
   const colorOptions = Object.entries(TAG_COLOR_LABELS).map(([value, label]) => ({
     value,
     label,
@@ -34,16 +45,17 @@ export function ChannelModelTagsEditor({
   };
 
   return (
-    <Field
-      label="展示标签"
-      hint="最多 5 个，每个 1–12 字，文字不可重复；展示在 C 端模型选项里，不影响计费"
-      error={error}
-    >
-      <div className="flex flex-col gap-2">
+    <Field data-invalid={Boolean(validationError)}>
+      <FieldTitle>展示标签</FieldTitle>
+      <FieldDescription>
+        最多 5 个，每个 1–12 字，文字不可重复；展示在 C 端模型选项里，不影响计费
+      </FieldDescription>
+      <FieldGroup className="gap-2">
         {tags.map((tag, index) => (
           <div key={index} className="flex items-end gap-2">
             <div className="flex-1">
               <TextField
+                id={`channel-model-tag-${index}-text`}
                 ariaLabel={`标签 ${index + 1} 文字`}
                 value={tag.text}
                 maxLength={MAX_TAG_TEXT_LENGTH}
@@ -53,6 +65,7 @@ export function ChannelModelTagsEditor({
             </div>
             <div className="w-28">
               <SelectField
+                id={`channel-model-tag-${index}-color`}
                 ariaLabel={`标签 ${index + 1} 颜色`}
                 value={tag.color}
                 options={colorOptions}
@@ -98,8 +111,8 @@ export function ChannelModelTagsEditor({
           </div>
         )}
 
-        {error && <Notice tone="danger" title={error} />}
-      </div>
+        {validationError && <FieldError errors={[{ message: validationError }]} />}
+      </FieldGroup>
     </Field>
   );
 }

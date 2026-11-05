@@ -6,7 +6,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { Download } from 'lucide-react';
 import { adminInvoicesApi } from './api';
 
-import { ActionButton, AdminDataTable, AppliedFilters, ClearableField, ConfirmAction, FilterActions, FilterBar, PageHeader, Panel, SelectField, StatusTag, StaleError, TextField, type AdminColumn, type AppliedFilter } from '~/admin-ui/primitives';
+import { ActionButton, AdminDataTable, AppliedFilters, ClearableField, ConfirmDialog, FilterActions, FilterBar, PageHeader, Panel, SelectField, StatusTag, StaleError, TextField, type AdminColumn, type AppliedFilter } from '~/admin-ui/primitives';
 import { adminOrderDetailHref, adminUserHref } from '../../../lib/admin-links';
 import type { AdminInvoice, InvoiceStatus } from '../../../types/api';
 
@@ -366,7 +366,7 @@ export function AdminInvoicesPage() {
       </Panel>
 
       {action && (
-        <ConfirmAction
+        <ConfirmDialog
           open
           title={
             action.kind === 'issue'

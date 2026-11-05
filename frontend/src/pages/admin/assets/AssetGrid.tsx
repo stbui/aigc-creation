@@ -6,7 +6,6 @@ import {
   IconButton,
   ListError,
   Pagination,
-  SkeletonBody,
 } from '~/admin-ui/primitives';
 import { AssetThumb } from './AssetThumb';
 import { assetLabel, cn, fmtBytes, fmtFormat, thumbSrc } from './utils';
@@ -63,8 +62,25 @@ export function AssetGrid({
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   if (loading && items.length === 0) {
-    /* 面板外壳已经是实的，只替内容行 */
-    return <SkeletonBody rows={4} />;
+    /* 面板外壳已经是实的，只替内容行；骨架保持网格形态，避免首屏塌成几条灰线 */
+    return (
+      <div
+        className="grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))]"
+        aria-busy="true"
+        aria-live="polite"
+      >
+        {Array.from({ length: 12 }).map((_, index) => (
+          <div key={index} className="overflow-hidden rounded-xl border border-border bg-card">
+            <div className="aspect-square animate-pulse bg-accent" />
+            <div className="space-y-1.5 px-2 pb-2 pt-1.5">
+              <div className="h-3 w-2/3 animate-pulse rounded bg-accent" />
+              <div className="h-3 w-1/2 animate-pulse rounded bg-accent" />
+              <div className="h-3 w-4/5 animate-pulse rounded bg-accent" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
   }
   if (error && items.length === 0) {
     return <ListError error={error} onRetry={onRetry} />;
@@ -106,27 +122,29 @@ export function AssetGrid({
               data-testid="admin-asset-cell"
               data-status={a.status}
               className={cn(
-                'group overflow-hidden rounded-xl border bg-card transition-colors',
-                checked ? 'border-brand ring-1 ring-brand/20' : 'border-border',
+                'group overflow-hidden rounded-xl border bg-card transition-[border-color,box-shadow]',
+                checked
+                  ? 'border-brand ring-1 ring-brand/20'
+                  : 'border-border hover:border-brand/40 hover:shadow-card',
                 a.status === 'hidden' && 'opacity-75',
               )}
             >
-              <div className="relative aspect-square">
+              <div className="relative aspect-square overflow-hidden bg-muted">
                 <button
                   type="button"
-                  className="block size-full"
+                  className="block size-full rounded-t-xl focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-inset focus-visible:outline-none"
                   aria-label={`查看大图：${assetLabel(a)}`}
                   onClick={() => onPreview(a.id)}
                 >
                   <AssetThumb
-                    className="size-full"
+                    className="size-full transition-transform duration-200 group-hover:scale-[1.03] motion-reduce:transform-none"
                     src={thumbSrc(a.sourceUrl, 320)}
                     alt={`${assetLabel(a)}缩略图`}
                   />
                 </button>
 
                 {selectable && (
-                  <span className="absolute left-2 top-2 flex size-5 items-center justify-center rounded bg-card/90 shadow-xs">
+                  <span className="absolute left-2 top-2 flex size-6 items-center justify-center rounded-md bg-background/90 shadow-sm ring-1 ring-foreground/10 backdrop-blur-sm">
                     <CheckboxField
                       ariaLabel={`选择 ${assetLabel(a)}`}
                       checked={checked}
@@ -136,64 +154,75 @@ export function AssetGrid({
                 )}
 
                 {a.status === 'hidden' && (
-                  <span className="absolute right-2 top-2 rounded bg-foreground/80 px-1.5 py-0.5 text-[12px] text-background">
+                  <span className="absolute right-2 top-2 rounded-[4px] bg-warn-soft px-1.5 py-0.5 text-[12px] leading-4 font-medium text-warn-text ring-1 ring-warn-border">
                     已下架
                   </span>
                 )}
 
                 <div
-                  className="absolute inset-x-0 bottom-0 flex items-center justify-end gap-1 bg-gradient-to-t from-foreground/55 to-transparent p-1.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100"
+                  className="absolute inset-x-0 bottom-0 flex justify-end p-2 opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100 motion-reduce:transition-none"
                   role="group"
                   aria-label="素材快捷操作"
                 >
-                  <IconButton
-                    size="sm"
-                    icon={Maximize2}
-                    label={`查看大图：${assetLabel(a)}`}
-                    title="查看大图"
-                    onClick={() => onPreview(a.id)}
-                  />
-                  {canHide && (
+                  <div className="flex items-center gap-0.5 rounded-lg bg-background/95 p-0.5 shadow-md ring-1 ring-foreground/10 backdrop-blur-sm">
                     <IconButton
                       size="sm"
-                      icon={a.status === 'visible' ? EyeOff : Eye}
-                      label={a.status === 'visible' ? '下架素材' : '恢复上架'}
-                      title={a.status === 'visible' ? '下架素材' : '恢复上架'}
-                      disabled={statusBusyId === a.id}
-                      onClick={() =>
-                        onToggleStatus(a, a.status === 'visible' ? 'hidden' : 'visible')
-                      }
+                      icon={Maximize2}
+                      label={`查看大图：${assetLabel(a)}`}
+                      title="查看大图"
+                      className="text-foreground hover:bg-accent hover:text-foreground"
+                      onClick={() => onPreview(a.id)}
                     />
-                  )}
-                  {canDelete && (
-                    <IconButton
-                      size="sm"
-                      icon={Trash2}
-                      label="永久删除素材"
-                      title="永久删除"
-                      className="text-danger-text hover:text-danger-text"
-                      onClick={() => onDelete(a)}
-                    />
-                  )}
+                    {canHide && (
+                      <IconButton
+                        size="sm"
+                        icon={a.status === 'visible' ? EyeOff : Eye}
+                        label={a.status === 'visible' ? '下架素材' : '恢复上架'}
+                        title={a.status === 'visible' ? '下架素材' : '恢复上架'}
+                        disabled={statusBusyId === a.id}
+                        className="text-foreground hover:bg-accent hover:text-foreground"
+                        onClick={() =>
+                          onToggleStatus(a, a.status === 'visible' ? 'hidden' : 'visible')
+                        }
+                      />
+                    )}
+                    {canDelete && (
+                      <IconButton
+                        size="sm"
+                        icon={Trash2}
+                        label="永久删除素材"
+                        title="永久删除"
+                        className="text-danger-text hover:bg-danger-soft hover:text-danger-text"
+                        onClick={() => onDelete(a)}
+                      />
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div className="px-2 py-1.5">
-                <div className="truncate text-xs font-medium text-foreground" title={assetLabel(a)}>
-                  {assetLabel(a)}
+              <div className="px-2 pb-2 pt-1.5">
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className="min-w-0 flex-1 truncate text-[13px] leading-4 font-medium text-foreground"
+                    title={assetLabel(a)}
+                  >
+                    {assetLabel(a)}
+                  </span>
+                  <span className="shrink-0 rounded-[4px] bg-secondary px-1 text-[12px] leading-4 font-medium text-muted-foreground">
+                    {fmtFormat(a.format)}
+                  </span>
                 </div>
                 <div
-                  className="truncate text-[12px] text-muted-foreground"
-                  title={`${fmtFormat(a.format)}${
-                    a.width && a.height ? ` · ${a.width}×${a.height}` : ''
-                  } · ${fmtBytes(a.sizeBytes)}`}
+                  className="truncate text-[12px] leading-4 text-muted-foreground tabular-nums"
+                  title={`${a.width && a.height ? `${a.width}×${a.height} · ` : ''}${fmtBytes(
+                    a.sizeBytes,
+                  )}`}
                 >
-                  {fmtFormat(a.format)}
-                  {a.width && a.height ? ` · ${a.width}×${a.height}` : ''} ·{' '}
+                  {a.width && a.height ? `${a.width}×${a.height} · ` : ''}
                   {fmtBytes(a.sizeBytes)}
                 </div>
                 <div
-                  className="truncate text-[12px] text-muted-foreground"
+                  className="truncate text-[12px] leading-4 text-muted-foreground"
                   title={`${a.ownerEmail} · ${a.projectName}`}
                 >
                   {a.ownerEmail} · {a.projectName}

@@ -1,4 +1,4 @@
-import { ConfirmAction, TextField } from '~/admin-ui/primitives';
+import { ConfirmDialog, TextField } from '~/admin-ui/primitives';
 import { yuan } from './utils';
 import type { AdminOrderRefund, AdminOrderRow } from '../../../types/api';
 
@@ -29,7 +29,7 @@ export function OrderActionDialog({
 }) {
   if (!action) return null;
   return (
-    <ConfirmAction
+    <ConfirmDialog
       open
       title={action.kind === 'markPaid' ? '手工核销订单' : '订单退款'}
       confirmText={action.kind === 'markPaid' ? '确认已收款' : '确认退款'}
@@ -130,7 +130,7 @@ export function RefundConfirmationDialog({
   if (!confirmation) return null;
   const succeeded = confirmation.outcome === 'succeeded';
   return (
-    <ConfirmAction
+    <ConfirmDialog
       open
       title={succeeded ? '确认渠道已退款' : '确认退款失败'}
       confirmText={succeeded ? '确认已退款' : '确认失败并关闭'}
@@ -222,7 +222,7 @@ export function BatchMarkPaidDialog({
 }) {
   if (!open) return null;
   return (
-    <ConfirmAction
+    <ConfirmDialog
       open
       title={`批量核销 ${count} 笔订单`}
       confirmText="确认已收款"

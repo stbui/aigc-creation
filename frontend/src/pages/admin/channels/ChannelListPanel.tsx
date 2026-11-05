@@ -1,11 +1,12 @@
 import { useEffect, useRef, type KeyboardEvent } from 'react';
-import { Download, ListOrdered, Plus } from 'lucide-react';
+import { Download, FileJson, ListOrdered, Plus, X } from 'lucide-react';
 import {
   StaleError,
   ActionButton,
   ClearableField,
   EmptyState,
   FilePicker,
+  IconButton,
   Panel,
   SelectField,
 } from '~/admin-ui/primitives';
@@ -44,7 +45,7 @@ interface ChannelListPanelProps {
 /**
  * 渠道工作台左列：渠道导航。
  *
- * 只负责「选哪条渠道」，260 足够放下名称 + 健康摘要；余量全部给右侧模型表。
+ * 只负责「选哪条渠道」，224 足够放下名称 + 健康摘要；余量全部给右侧模型表。
  * 搜索与状态筛选都在本地过滤，切渠道只有一次点击。
  */
 export function ChannelListPanel({
@@ -105,8 +106,42 @@ export function ChannelListPanel({
 
   return (
     <Panel
-      title="渠道"
-      note={hasFilters ? `${visible.length} / ${rows.length} 个` : `共 ${rows.length} 个`}
+      title={
+        <span className="flex items-baseline gap-2">
+          渠道
+          <span className="text-[11px] font-normal text-muted-foreground tabular-nums">
+            {hasFilters ? `${visible.length} / ${rows.length} 个` : `共 ${rows.length} 个`}
+          </span>
+        </span>
+      }
+      extra={
+        <div className="flex items-center gap-0.5">
+          <FilePicker
+            compact
+            file={importFile}
+            accept="application/json,.json"
+            onPick={onPickImportFile}
+            onClear={onClearImportFile}
+            disabled={!writable || importing}
+            label="导入渠道"
+            hint="JSON"
+          />
+          <IconButton
+            icon={Download}
+            size="xs"
+            label="导出全部渠道"
+            disabled={exporting || rows.length === 0}
+            onClick={onExportAll}
+          />
+          <IconButton
+            icon={ListOrdered}
+            size="xs"
+            label="调整渠道顺序"
+            disabled={!writable}
+            onClick={onReorder}
+          />
+        </div>
+      }
     >
       <div className="flex flex-col gap-2">
         {/* 新建与导入导出都在列表旁：这三件事的目的都是「让列表里多一条渠道」 */}
@@ -120,38 +155,31 @@ export function ChannelListPanel({
         >
           新建渠道
         </ActionButton>
-        <div className="flex items-center gap-2">
-          <FilePicker
-            file={importFile}
-            accept="application/json,.json"
-            onPick={onPickImportFile}
-            onClear={onClearImportFile}
-            disabled={!writable || importing}
-            label="导入"
-            hint="JSON"
-          />
-          <span className="ml-auto shrink-0" title="导出全部渠道，不含 API Key 等凭证">
-            <ActionButton
-              variant="secondary"
-              size="sm"
-              icon={Download}
-              disabled={exporting || rows.length === 0}
-              onClick={onExportAll}
-            >
-              {exporting ? '导出中…' : '导出全部'}
-            </ActionButton>
-          </span>
-        </div>
         {importFile && (
-          <ActionButton
-            variant="default"
-            size="sm"
-            className="w-full justify-center"
-            disabled={importing || !writable}
-            onClick={onImport}
-          >
-            {importing ? '导入中…' : '开始导入'}
-          </ActionButton>
+          <div className="rounded-md border border-border bg-muted/50 p-2">
+            <div className="flex min-w-0 items-center gap-1.5 text-xs">
+              <FileJson className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="min-w-0 flex-1 truncate text-foreground" title={importFile.name}>
+                {importFile.name}
+              </span>
+              <IconButton
+                icon={X}
+                size="xs"
+                label="移除已选文件"
+                disabled={importing}
+                onClick={onClearImportFile}
+              />
+            </div>
+            <ActionButton
+              variant="default"
+              size="sm"
+              className="mt-2 w-full justify-center"
+              disabled={importing || !writable}
+              onClick={onImport}
+            >
+              {importing ? '导入中…' : '开始导入'}
+            </ActionButton>
+          </div>
         )}
         <ClearableField
           ariaLabel="搜索渠道"
@@ -183,10 +211,10 @@ export function ChannelListPanel({
          * 改高（或浏览器放大字号）都会让列表底边错位；且它视口变高时不跟随
          * 增长（900px 以上恒为 316px），长列表仍要在小窗里滚两次。
          *
-         * 外壳内容区 `.adm-content` 是页面级滚动（`self-start` + `overflow-y-auto`），
-         * 后台其余 30 余个页面也都是这个动线；左列跟着整页滚才与它们一致。
+         * 外壳内容区 `.adm-content` 是页面级滚动；工作台只把左列容器设为 sticky，
+         * 让右侧长内容滚动时仍能换渠道。列表自身保持自然高度，不与页面抢滚动。
          */}
-        <div className="flex flex-col gap-1" aria-busy={loading}>
+        <div className="flex flex-col gap-0.5" aria-busy={loading}>
           {loading && rows.length === 0 && (
             <p className="py-6 text-center text-xs text-muted-foreground">加载中…</p>
           )}
@@ -225,7 +253,7 @@ export function ChannelListPanel({
                  * 否则整列看起来都像选中。
                  */
                 className={cn(
-                  'h-auto w-full rounded-lg px-3 py-2.5 text-left whitespace-normal hover:bg-muted',
+                  'h-auto w-full rounded-lg px-2.5 py-2 text-left whitespace-normal hover:bg-muted',
                   'outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
                   active && 'bg-accent ring-1 ring-inset ring-brand/30 hover:bg-accent',
                 )}
@@ -233,7 +261,7 @@ export function ChannelListPanel({
                 onKeyDown={(event) => handleChannelKeyDown(event, index)}
                 ref={active ? activeRef : undefined}
               >
-                <span className="flex w-full min-w-0 flex-col gap-1">
+                <span className="flex w-full min-w-0 flex-col gap-0.5">
                   <span className="flex min-w-0 items-center gap-1.5">
                     <span
                       data-testid="admin-channel-name"
@@ -276,18 +304,6 @@ export function ChannelListPanel({
           })}
         </div>
 
-        <div className="border-t border-border pt-2">
-          <ActionButton
-            variant="secondary"
-            size="sm"
-            icon={ListOrdered}
-            className="w-full"
-            disabled={!writable}
-            onClick={onReorder}
-          >
-            调整渠道顺序
-          </ActionButton>
-        </div>
       </div>
     </Panel>
   );

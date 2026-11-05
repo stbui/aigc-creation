@@ -90,7 +90,7 @@ test.describe('渠道与模型 P5', () => {
     await expect(page.getByTestId('admin-toast').last()).toContainText('由系统管理');
     await page.getByRole('button', { name: '删除请求头 1' }).click();
 
-    // 取消：表单已脏，先弹放弃确认（ConfirmProvider，不是页内 ConfirmAction）
+    // 取消：表单已脏，先弹放弃确认（ConfirmProvider，不是页内 ConfirmDialog）
     await page.getByRole('button', { name: '取消', exact: true }).click();
     await expect(page.getByRole('dialog', { name: '放弃未保存的修改？' })).toBeVisible();
     await page.getByRole('button', { name: '放弃修改' }).click();
@@ -150,7 +150,7 @@ test.describe('渠道与模型 P5', () => {
     await expect(toggle).toBeVisible();
     const disabling = (await toggle.innerText()).trim() === '停用';
 
-    // 停用会让整条渠道退出路由目录：页内确认条必须讲清后果，取消不写库
+    // 停用会让整条渠道退出路由目录：确认弹窗必须讲清后果，取消不写库
     await toggle.click();
     const confirm = page.getByTestId('admin-confirm-action');
     await expect(confirm).toBeVisible();
@@ -515,7 +515,7 @@ test.describe('渠道与模型 P5', () => {
       test.skip(true, '当前库没有渠道，排序弹窗无条目可排');
     }
 
-    // 排序入口跟着参考实现落到左列底部（页头只留视图切换）
+    // 排序入口收在左列标题栏，页头只留视图切换
     await page.getByRole('button', { name: '调整渠道顺序' }).click();
     const dialog = page.getByTestId('admin-modal');
     await expect(dialog).toBeVisible();
@@ -651,12 +651,12 @@ test.describe('渠道与模型 P5', () => {
         ?.data?.channels ?? []
     ) as Array<{ id: string; name: string }>;
     let target: { id: string; name: string } | null = null;
-    let models: Array<{ modelKey: string; enabled: boolean; protocol: string }> = [];
+    let models: Array<{ modelKey: string; enabled: boolean; protocol: string; capability: string }> = [];
     for (const channel of channels) {
       const list = (
         (await (await request.get(`${API}/api/v1/admin/channels/${channel.id}/models`, { headers: auth })).json())
           ?.data?.models ?? []
-      ) as Array<{ modelKey: string; enabled: boolean; protocol: string }>;
+      ) as Array<{ modelKey: string; enabled: boolean; protocol: string; capability: string }>;
       if (list.length > 0) {
         target = { id: channel.id, name: channel.name };
         models = list;
@@ -697,24 +697,66 @@ test.describe('渠道与模型 P5', () => {
 
     // 复制：新标识带 -copy 后缀，且默认停用（半配置的副本不许直接进路由）
     const first = models[0];
-    await detail.getByRole('button', { name: `复制模型 ${first.modelKey}` }).click();
+    const firstRow = modelRows().filter({ hasText: first.modelKey }).first();
+    await expect(firstRow.getByRole('button', { name: `编辑模型 ${first.modelKey}` })).toBeVisible();
+    await expect(firstRow.getByRole('button', { name: `测试模型 ${first.modelKey}` })).toBeVisible();
+    await expect(
+      firstRow.getByRole('button', {
+        name: `${first.enabled ? '停用' : '启用'}模型 ${first.modelKey}`,
+      }),
+    ).toBeVisible();
+    await expect(firstRow.getByRole('button', { name: `复制模型 ${first.modelKey}` })).toBeVisible();
+    await expect(firstRow.getByRole('button', { name: `删除模型 ${first.modelKey}` })).toBeVisible();
+    await firstRow.getByRole('button', { name: `复制模型 ${first.modelKey}` }).click();
     const modal = page.getByTestId('admin-modal');
     await expect(modal).toBeVisible();
     await expect(modal.getByLabel('模型标识')).toHaveValue(`${first.modelKey}-copy`);
     await expect(modal.getByRole('switch', { name: '启用该模型' })).not.toBeChecked();
+    const modalBody = modal.getByTestId('admin-modal-body');
+    const modalBodyMetrics = await modalBody.evaluate((element) => ({
+      clientHeight: element.clientHeight,
+      scrollHeight: element.scrollHeight,
+    }));
+    expect(modalBodyMetrics.scrollHeight).toBeGreaterThan(modalBodyMetrics.clientHeight);
+    await expect(modal.getByRole('button', { name: '保存模型' })).toBeVisible();
+    // Footer 的保存按钮在 form 外，靠 form 属性提交；空模型标识应留在弹窗内做字段级提示
+    await modal.getByLabel('模型标识').fill('');
+    await modal.getByRole('button', { name: '保存模型' }).click();
+    await expect(modal.getByText('请填写模型标识')).toBeVisible();
+    if (first.capability === 'image') {
+      await expect(modal.getByRole('heading', { name: '图片能力参数' })).toBeVisible();
+      await expect(modal.getByLabel('提示词最大字符数')).toBeVisible();
+      await expect(modal.getByRole('button', { name: '按协议推荐值重置' })).toBeVisible();
+      await expect(modal.getByLabel('能力合同 JSON')).toHaveCount(0);
+    } else {
+      const capabilityHeight = await modal
+        .getByLabel('能力合同 JSON')
+        .evaluate((element) => element.getBoundingClientRect().height);
+      expect(capabilityHeight).toBeLessThan(260);
+    }
     // 不保存：弹窗只是预填，落库会污染后续用例的线路数
     await modal.getByRole('button', { name: '取消' }).click();
     await expect(modal).toHaveCount(0);
 
     // 停用会把模型从路由目录里拿掉：点击后先出确认，不直接断电
-    if (models.some((item) => item.enabled)) {
-      await detail.getByRole('button', { name: /^停用模型 / }).first().click();
+    const enabledModel = models.find((item) => item.enabled);
+    if (enabledModel) {
+      const enabledRow = modelRows().filter({ hasText: enabledModel.modelKey }).first();
+      await enabledRow.getByRole('button', { name: `停用模型 ${enabledModel.modelKey}` }).click();
       const confirm = page.getByTestId('admin-confirm-action');
       await expect(confirm).toBeVisible();
       await expect(confirm).toContainText('影响范围');
-      await confirm.getByRole('button', { name: '关闭' }).click();
+      await confirm.getByRole('button', { name: '取消', exact: true }).click();
       await expect(confirm).toHaveCount(0);
     }
+
+    // 删除从行内按钮进入；确认弹窗出现时必须立即可见
+    await firstRow.getByRole('button', { name: `删除模型 ${first.modelKey}` }).click();
+    const deleteConfirm = page.getByTestId('admin-confirm-action');
+    await expect(deleteConfirm).toBeVisible();
+    await expect(deleteConfirm).toContainText(`删除模型 ${first.modelKey}`);
+    await deleteConfirm.getByRole('button', { name: '取消', exact: true }).click();
+    await expect(deleteConfirm).toHaveCount(0);
   });
 
   test('上游目录导入：弹窗内搜索、已存在标记与只导入新模型', async ({ page, request }) => {

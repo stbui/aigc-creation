@@ -25,6 +25,7 @@ export const RECONCILIATION_RESULTS = [
   "provider_record_missing",
   "amount_mismatch",
   "trade_no_mismatch",
+  "duplicate_charge",
   "credit_failed",
 ] as const;
 
@@ -375,14 +376,26 @@ export class PaymentReconciliationService {
     let recovered = 0;
     let errors = 0;
     const seenOrderNos = new Set<string>();
+    const tradesByOrderNo = new Map<string, Set<string>>();
 
     for (const record of records) {
       seenOrderNos.add(record.merchantOrderNo);
+      const seenTrades =
+        tradesByOrderNo.get(record.merchantOrderNo) ?? new Set<string>();
+      // 同一交易号重复导出行不是第二笔扣款；保留首行结果，避免 upsert 覆盖。
+      if (seenTrades.has(record.providerTradeNo)) continue;
+      const previousTradeNo = seenTrades.values().next().value as
+        | string
+        | undefined;
+      seenTrades.add(record.providerTradeNo);
+      tradesByOrderNo.set(record.merchantOrderNo, seenTrades);
+
       const outcome = await this.compareOne(
         runId,
         providerId,
         configId,
         record,
+        previousTradeNo,
       );
       if (outcome === "matched") matched += 1;
       else if (outcome === "recovered") recovered += 1;
@@ -451,6 +464,7 @@ export class PaymentReconciliationService {
     providerId: PaymentProviderId,
     configId: string,
     record: BillRecord,
+    previousTradeNo?: string,
   ): Promise<ReconciliationResult> {
     const order = await this.prisma.order.findUnique({
       where: { orderNo: record.merchantOrderNo },
@@ -464,9 +478,10 @@ export class PaymentReconciliationService {
     ): Promise<void> => {
       await this.prisma.paymentReconciliationItem.upsert({
         where: {
-          runId_merchantOrderNo: {
+          runId_merchantOrderNo_providerTradeNo: {
             runId,
             merchantOrderNo: record.merchantOrderNo,
+            providerTradeNo: record.providerTradeNo,
           },
         },
         create: {
@@ -486,8 +501,24 @@ export class PaymentReconciliationService {
     };
 
     if (!order) {
+      if (previousTradeNo) {
+        await writeItem(
+          "duplicate_charge",
+          `同一商户订单号出现多个渠道交易号（先见 ${previousTradeNo}，本次 ${record.providerTradeNo}），且本地不存在该订单`,
+        );
+        return "duplicate_charge";
+      }
       await writeItem("local_order_not_found", "本地不存在该商户订单号");
       return "local_order_not_found";
+    }
+
+    if (previousTradeNo) {
+      await writeItem(
+        "duplicate_charge",
+        `同一商户订单号出现多个渠道交易号（先见 ${previousTradeNo}，本次 ${record.providerTradeNo}），疑似重复扣款`,
+        order.id,
+      );
+      return "duplicate_charge";
     }
 
     if (order.status === "cancelled") {
@@ -658,13 +689,9 @@ export class PaymentReconciliationService {
   private assertBillDate(billDate: string): void {
     parseDateStrict(billDate);
     const start = startOfShanghaiDay(billDate).getTime();
-    const yesterday = new Date(Date.now() - 8 * 3600 * 1000);
-    const todayStart = new Date(
-      Date.UTC(
-        yesterday.getUTCFullYear(),
-        yesterday.getUTCMonth(),
-        yesterday.getUTCDate(),
-      ),
+    // 日期窗口以上海时区为准；不能用 UTC 零点，否则东八区深夜会放行当天账单。
+    const todayStart = startOfShanghaiDay(
+      formatShanghai(new Date()).slice(0, 10),
     ).getTime();
     if (start >= todayStart)
       throw new AppError(40001, "账单日期不能晚于昨天", 400);

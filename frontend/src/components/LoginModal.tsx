@@ -1,3 +1,4 @@
+import '../styles/auth.css';
 import { Modal } from '../ui';
 import { AuthCard } from './AuthCard';
 import { useAuth } from '../context/AuthContext';

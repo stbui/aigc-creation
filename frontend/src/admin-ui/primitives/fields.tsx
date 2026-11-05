@@ -79,6 +79,7 @@ export function FilePicker({
   disabled = false,
   label = '选择文件',
   hint,
+  compact = false,
 }: {
   file: File | null;
   accept?: string;
@@ -87,6 +88,8 @@ export function FilePicker({
   disabled?: boolean;
   label?: string;
   hint?: string;
+  /** 标题栏等窄位置只保留图标；已选文件由调用方在内容区回显。 */
+  compact?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -105,16 +108,26 @@ export function FilePicker({
         }}
       />
       <Button
-        variant="secondary"
-        size="sm"
+        variant={compact ? 'ghost' : 'secondary'}
+        size={compact ? 'icon-xs' : 'sm'}
         disabled={disabled}
-        title={hint ? `支持 ${hint} 格式` : undefined}
+        aria-label={compact ? label : undefined}
+        title={
+          compact
+            ? file
+              ? `${label}（已选择 ${file.name}）`
+              : label
+            : hint
+              ? `支持 ${hint} 格式`
+              : undefined
+        }
+        className={compact ? 'text-muted-foreground hover:text-foreground' : undefined}
         onClick={() => inputRef.current?.click()}
       >
         <Paperclip className="size-4" aria-hidden />
-        {label}
+        {!compact && label}
       </Button>
-      {file ? (
+      {!compact && file ? (
         <span className="flex min-w-0 items-center gap-1 text-[12px] text-muted-foreground">
           <span className="max-w-[240px] truncate" title={file.name}>
             {file.name}
@@ -129,9 +142,9 @@ export function FilePicker({
             <X className="size-3" aria-hidden />
           </button>
         </span>
-      ) : (
+      ) : !compact ? (
         hint && <span className="sr-only">支持 {hint} 格式</span>
-      )}
+      ) : null}
     </div>
   );
 }

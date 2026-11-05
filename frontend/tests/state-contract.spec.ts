@@ -68,8 +68,8 @@ async function gotoAsAuthed(page: Page, path: string, token: string, email: stri
   await page.goto(`${UI}${path}`);
   await page.evaluate(
     ([t, e]) => {
-      localStorage.setItem('ecom_vision_token', t as string);
-      localStorage.setItem('ecom_vision_email', e as string);
+      localStorage.setItem('huojue_token', t as string);
+      localStorage.setItem('huojue_email', e as string);
     },
     [token, email],
   );

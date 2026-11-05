@@ -1,4 +1,4 @@
-import { ConfirmAction } from '~/admin-ui/primitives';
+import { ConfirmDialog } from '~/admin-ui/primitives';
 import type { AdminBackupStats } from '../../../types/api';
 
 interface BackupRunConfirmProps {
@@ -20,7 +20,7 @@ export function BackupRunConfirm({
   if (!open) return null;
 
   return (
-    <ConfirmAction
+    <ConfirmDialog
       open
       title="立即备份"
       confirmText="开始备份"

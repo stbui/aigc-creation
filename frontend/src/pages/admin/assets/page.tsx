@@ -456,15 +456,6 @@ export function AdminAssetsPage() {
       </FilterBar>
 
       <BatchBar count={selected.length} unit="张素材">
-        {view === 'grid' && (
-          <CheckboxField
-            size="sm"
-            checked={allPageSelected}
-            indeterminate={somePageSelected}
-            label={allPageSelected ? '取消全选' : '全选本页'}
-            onChange={toggleSelectPage}
-          />
-        )}
         {can('asset.hide') && (
           <>
             <ActionButton
@@ -505,10 +496,21 @@ export function AdminAssetsPage() {
         note={`${total} 张`}
         extra={
           view === 'grid' && items.length > 0 ? (
-            <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
-              <FolderOpen className="size-3.5" aria-hidden />
-              每页 {pageSize} 张
-            </span>
+            <div className="flex items-center gap-3">
+              {selectable && (
+                <CheckboxField
+                  size="sm"
+                  checked={allPageSelected}
+                  indeterminate={somePageSelected}
+                  label={allPageSelected ? '取消全选' : '全选本页'}
+                  onChange={toggleSelectPage}
+                />
+              )}
+              <span className="flex items-center gap-1.5 text-[12px] text-muted-foreground">
+                <FolderOpen className="size-3.5" aria-hidden />
+                每页 {pageSize} 张
+              </span>
+            </div>
           ) : undefined
         }
       >

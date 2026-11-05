@@ -109,7 +109,12 @@ export function Panel({
       )}
     >
       {(title || extra) && (
-        <CardHeader className="flex flex-row items-center gap-3 border-b border-border px-4 py-3 pb-3">
+        /*
+         * 分隔线画在内容区上沿，而不是标题区下沿：shadcn `CardHeader` 带
+         * `[.border-b]:pb-6`，只要标题区挂 `border-b`，底部内边距就被强制成
+         * 24px（`pb-3` 被覆盖），标题与内容之间空出一大截。
+         */
+        <CardHeader className="flex flex-row items-center gap-3 px-4 py-3">
           <div className="min-w-0 flex-1">
             {title && (
               /*
@@ -117,7 +122,7 @@ export function Panel({
                * 内的分区标题 —— 丢掉 heading 语义，读屏用户与 `getByRole('heading')`
                * 的导航都找不到这一块。
                */
-              <h2 className="leading-[18px] font-semibold text-[13px] text-card-foreground">
+              <h2 className="m-0 leading-[18px] font-semibold text-[13px] text-card-foreground">
                 {title}
               </h2>
             )}
@@ -128,7 +133,11 @@ export function Panel({
           {extra && <div className="flex shrink-0 items-center gap-2">{extra}</div>}
         </CardHeader>
       )}
-      <CardContent className="p-4">{children}</CardContent>
+      <CardContent
+        className={cn('p-4', (title || extra) && 'border-t border-border')}
+      >
+        {children}
+      </CardContent>
     </Card>
   );
 }

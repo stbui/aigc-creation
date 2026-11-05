@@ -266,7 +266,7 @@ SEED_EMAIL=you@example.com SEED_PASSWORD='…' API=http://localhost:4100 \
 补充约束：
 
 - Vite 8 绑 IPv6 `::1`，`127.0.0.1:5100` 不通；curl / Playwright 必须用 `localhost`。
-- token 的 localStorage key 是 `ecom_vision_token`（`frontend/src/lib/auth.ts`）。
+- token 的 localStorage key 是 `huojue_token`（`frontend/src/lib/auth.ts`）。
 - Playwright 巡检必须同一 context 内顺序 `goto`：`browser.newPage()` 每次新建 context，localStorage 不共享。
 
 ### 依赖安装与嵌套副本

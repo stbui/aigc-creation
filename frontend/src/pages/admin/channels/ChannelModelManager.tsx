@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { adminChannelsApi } from './api';
-import { ConfirmAction, Notice } from '~/admin-ui/primitives';
+import { ConfirmDialog, Notice } from '~/admin-ui/primitives';
 import { useToast } from './hooks';
 import { ChannelModelFormDialog } from './ChannelModelFormDialog';
 import { ChannelModelRepriceDialog } from './ChannelModelRepriceDialog';
@@ -8,14 +8,8 @@ import { ChannelModelTable } from './ChannelModelTable';
 import { ChannelOrderDialog } from './ChannelOrderDialog';
 import { ChannelUpstreamDialog } from './ChannelUpstreamDialog';
 import { EMPTY_MODEL_DRAFT, EMPTY_TIER, type ModelDraft } from './constants';
-import {
-  buildPriceTiers,
-  toModelDraft,
-  staleTierUpstream,
-  clearStaleTierUpstream,
-  validateModelTags,
-} from './utils';
-import { useChannelModelHealth, useChannelModels, useProtocolCatalog } from './useChannelModels';
+import { buildPriceTiers, toModelDraft } from './utils';
+import { useChannelModelHealth, useChannelModels } from './useChannelModels';
 import type {
   AdminChannelModelView,
   AdminChannelView,
@@ -91,7 +85,6 @@ export function ChannelModelManager({
   /** 模型排序弹窗 */
   const [orderOpen, setOrderOpen] = useState(false);
 
-  const { options: protocolOptions } = useProtocolCatalog(draft.capability);
 
   useEffect(() => {
     if (!channelId) return;
@@ -188,17 +181,9 @@ export function ChannelModelManager({
     setTestResult(null);
   };
 
-  const submit = async () => {
+  const submit = async (draft: ModelDraft) => {
     if (!channelId) return;
     const modelKey = draft.modelKey.trim();
-    if (!modelKey) {
-      toast.error('请填写模型标识');
-      return;
-    }
-    if (!draft.protocol) {
-      toast.error('请选择请求协议');
-      return;
-    }
     let capabilityConfig: unknown = null;
     if (draft.capabilityConfig.trim()) {
       try {
@@ -211,12 +196,6 @@ export function ChannelModelManager({
     const tierResult = buildPriceTiers(draft);
     if ('error' in tierResult) {
       toast.error(tierResult.error);
-      return;
-    }
-    // 标签已在编辑器里结构化维护；提交前再校验一次，避免绕过界面的写入
-    const tagError = validateModelTags(draft.tags);
-    if (tagError) {
-      toast.error(tagError);
       return;
     }
     const body = {
@@ -376,8 +355,6 @@ export function ChannelModelManager({
           open={formOpen}
           editing={editing}
           draft={draft}
-          setDraft={setDraft}
-          protocolOptions={protocolOptions}
           testResult={testResult}
           testing={testing}
           saving={saving}
@@ -390,14 +367,8 @@ export function ChannelModelManager({
             await runTest(editing);
           }}
           onClose={closeForm}
-          onSubmit={() => void submit()}
+          onSubmit={(next) => void submit(next)}
           previousProviderModelKey={editing?.providerModelKey ?? ''}
-          onFollowModelUpstream={() => {
-            const stale = staleTierUpstream(draft, editing?.providerModelKey ?? '');
-            if (stale.length === 0) return;
-            setDraft(clearStaleTierUpstream(draft, stale));
-            toast.success(`已清除 ${stale.length} 个档位的独立上游名，改为跟随模型`);
-          }}
         />
 
         <ChannelUpstreamDialog
@@ -445,7 +416,7 @@ export function ChannelModelManager({
             fetching={fetching}
           />
 
-          <ConfirmAction
+          <ConfirmDialog
             open={deleteTarget !== null}
             title={`删除模型 ${deleteTarget?.modelKey ?? ''}？`}
             description="删除后从路由目录移除；引用该模型的前台线路会变为不可用。历史账单与调用记录保留。"
@@ -457,7 +428,7 @@ export function ChannelModelManager({
             onConfirm={() => void runDelete()}
           />
 
-          <ConfirmAction
+          <ConfirmDialog
             open={batchDeleteOpen}
             title={`批量删除 ${selectedIds.length} 个模型？`}
             description="软删除：所选模型从路由目录移除，价格档一并作废；历史账单与调用记录保留。"
@@ -472,7 +443,7 @@ export function ChannelModelManager({
             onConfirm={() => void runBatchDelete()}
           />
 
-          <ConfirmAction
+          <ConfirmDialog
             open={disableTarget !== null}
             title={`停用模型 ${disableTarget?.modelKey ?? ''}？`}
             description="停用后新任务不再路由到该模型，引用它的前台线路会走其他可用线路；价格与配置保留，可随时重新启用。"

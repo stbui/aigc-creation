@@ -471,7 +471,13 @@ export class PaymentNotificationService {
         });
       }
       await this.prisma.paymentReconciliationItem.upsert({
-        where: { runId_merchantOrderNo: { runId: run.id, merchantOrderNo: input.merchantOrderNo } },
+        where: {
+          runId_merchantOrderNo_providerTradeNo: {
+            runId: run.id,
+            merchantOrderNo: input.merchantOrderNo,
+            providerTradeNo: input.providerTradeNo,
+          },
+        },
         create: {
           runId: run.id,
           providerId: input.providerId,

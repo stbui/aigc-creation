@@ -19,12 +19,12 @@ import {
   FilterActions,
   FilterBar,
   HelpTip,
-  IconButton,
   Panel,
   SelectField,
   StatusTag,
   type AdminColumn,
 } from '~/admin-ui/primitives';
+import { ChannelModelCapabilityTag } from './ChannelModelCapabilityTag';
 import { ChannelModelCostSummary, ChannelModelHealthCell } from './ChannelModelHealthCell';
 import { CAPABILITY_OPTIONS, PAGE_SIZE, STATUS_FILTER_OPTIONS } from './constants';
 import type {
@@ -166,16 +166,8 @@ export function ChannelModelTable({
     {
       key: 'capability',
       title: '能力',
-      width: 56,
-      render: (model) => (
-        <StatusTag
-          status="capability"
-          tone="brand"
-          label={
-            CAPABILITY_OPTIONS.find((item) => item.value === model.capability)?.label ?? model.capability
-          }
-        />
-      ),
+      width: 76,
+      render: (model) => <ChannelModelCapabilityTag capability={model.capability} />,
     },
     {
       key: 'health',
@@ -229,57 +221,66 @@ export function ChannelModelTable({
     {
       key: 'actions',
       title: '操作',
-      width: 144,
+      width: 320,
       fixed: 'right',
       /*
-       * 行内动作保持 5 个直显（e2e 与运营动线都按名字找按钮）。
-       * 图标按钮一律走 IconButton：`label` 同时作为无障碍名与悬停提示。
-       * 停用与删除用 danger 文字色标识破坏性。
+       * 每个动作同时展示图标和文案，降低仅靠图标猜含义的成本。
+       * 操作列固定右侧，横向空间不足时表格内部滚动，不挤压模型与价格列。
        */
       render: (model) => (
-        <div className="flex items-center justify-end">
-          <IconButton
-            size="xs"
-            icon={Zap}
-            label={`测试模型 ${model.modelKey}`}
-            title="连通性测试"
-            disabled={testing || !canTest}
-            onClick={() => onTest(model)}
-          />
-          <IconButton
+        <div className="flex items-center justify-end gap-1">
+          <ActionButton
+            variant="secondary"
             size="xs"
             icon={Pencil}
-            label={`编辑模型 ${model.modelKey}`}
-            title="编辑"
+            ariaLabel={`编辑模型 ${model.modelKey}`}
             disabled={!writable}
             onClick={() => onEdit(model)}
-          />
-          <IconButton
+          >
+            编辑
+          </ActionButton>
+          <ActionButton
+            variant="ghost"
             size="xs"
-            icon={Power}
-            label={`${model.enabled ? '停用' : '启用'}模型 ${model.modelKey}`}
-            title={model.enabled ? '停用' : '启用'}
+            icon={Zap}
+            ariaLabel={`测试模型 ${model.modelKey}`}
+            disabled={testing || !canTest}
+            onClick={() => onTest(model)}
+          >
+            {testing ? '测试中' : '测试'}
+          </ActionButton>
+          <ActionButton
+            variant="ghost"
+            size="xs"
             className={model.enabled ? 'text-danger-text hover:text-danger-text' : undefined}
+            icon={Power}
+            ariaLabel={`${model.enabled ? '停用' : '启用'}模型 ${model.modelKey}`}
             disabled={!writable}
             onClick={() => onToggle(model, !model.enabled)}
-          />
-          <IconButton
+          >
+            {model.enabled ? '停用' : '启用'}
+          </ActionButton>
+          <ActionButton
+            variant="ghost"
             size="xs"
             icon={Copy}
-            label={`复制模型 ${model.modelKey}`}
-            title="复制模型"
+            ariaLabel={`复制模型 ${model.modelKey}`}
             disabled={!writable}
             onClick={() => onCopy(model)}
-          />
-          <IconButton
+          >
+            复制
+          </ActionButton>
+          <ActionButton
+            variant="ghost"
             size="xs"
-            icon={Trash2}
-            label={`删除模型 ${model.modelKey}`}
-            title="删除模型"
             className="text-danger-text hover:text-danger-text"
+            icon={Trash2}
+            ariaLabel={`删除模型 ${model.modelKey}`}
             disabled={!writable}
             onClick={() => onDelete(model)}
-          />
+          >
+            删除
+          </ActionButton>
         </div>
       ),
     },
@@ -326,7 +327,7 @@ export function ChannelModelTable({
           </div>
         </div>
 
-        <FilterBar className="rounded-lg border-0 bg-muted/60">
+        <FilterBar className="mb-0 rounded-lg border-0 bg-muted/60">
           <ClearableField
             ariaLabel="搜索模型"
             value={keyword}
@@ -460,7 +461,8 @@ export function ChannelModelTable({
               ? '没有匹配的模型。调整搜索或筛选条件后重试。'
               : '该渠道还没有模型。可以「拉取上游目录」批量导入，或手动新建。'
           }
-          minWidth={852}
+          density="compact"
+          minWidth={1104}
           fixedLayout
           pagination={{
             current: currentPage,

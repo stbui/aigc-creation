@@ -30,7 +30,7 @@ const WORKBENCH_TITLES = [
   '旋转角度',
 ];
 
-const GUEST_PROMO_DISMISS_KEY = 'ecom-guest-promo-dismissed-v1';
+const GUEST_PROMO_DISMISS_KEY = 'huojue-guest-promo-dismissed-v1';
 
 function trackApi(page: Page, path: string | string[]) {
   const paths = Array.isArray(path) ? path : [path];
@@ -86,8 +86,8 @@ async function gotoAsAuthed(page: Page, path: string, token: string, email: stri
   await page.goto(`${UI}${path}`);
   await page.evaluate(
     ([t, e]) => {
-      localStorage.setItem('ecom_vision_token', t as string);
-      localStorage.setItem('ecom_vision_email', e as string);
+      localStorage.setItem('huojue_token', t as string);
+      localStorage.setItem('huojue_email', e as string);
     },
     [token, email],
   );

@@ -11,7 +11,7 @@ import { ensureAdminLogin } from './support/admin-login';
  * ## 选择器约定（2026-10-30 后台改版后）
  *
  * 列表行 `data-testid="admin-table-row"`，行内展开 `data-testid="admin-table-expanded"`，
- * 页面内确认条 `data-testid="admin-confirm-action"`，侧栏 `data-testid="admin-sider"`。
+ * 确认弹窗 `data-testid="admin-confirm-action"`，侧栏 `data-testid="admin-sider"`。
  */
 
 const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';

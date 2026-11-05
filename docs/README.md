@@ -44,6 +44,12 @@
 | [`shoppable-carousel-design.md`](shoppable-carousel-design.md) | `/shoppable-carousel` AI 带货图文：参考站实拍拆解、模板三拍口径、一次生成 6–10 张的拆分与计费、页面结构 |
 | [`shoppable-carousel-template-sources.md`](shoppable-carousel-template-sources.md) | 上述模板资产（分类 / 三拍文案 / 缩略图）的来源与抓取记录 |
 
+### 2.3 品牌规范
+
+| 文档 | 内容 |
+| --- | --- |
+| [`brand/brand-basics.md`](brand/brand-basics.md) | 品牌名称、技术标识（`huojue`）、技术命名约定与禁用旧称 |
+
 ## 3. 技术文档（Technical）
 
 回答「怎么实现、怎么部署、怎么扩展」。

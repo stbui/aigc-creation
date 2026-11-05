@@ -125,7 +125,7 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 
 ### 0.6 高危操作确认
 
-`ConfirmAction`（页内确认条，`admin-ui/primitives/overlay`，`role="region"`）用于删除、退款、重置密码、手动调整积分、渠道 / 前台模型写入、角色与系统设置写入、备份。文案必须写明**影响量**（`impact` 数组，如「将删除 12 个素材」），不能只写「确定删除吗」。业务原因输入只用于确有业务依据要求的动作（如退款、发票驳回、能力下架）；普通管理写操作不要求填写审计原因。审计始终在操作后由系统自动留痕，不反向要求用户确认审计。2026-10-30 起不再要求输入确认词（`requireTyping` / `typingText` 仅保留入参兼容）。
+`ConfirmDialog`（shadcn `AlertDialog` 组合壳，`admin-ui/primitives/overlay`）用于删除、退款、重置密码、手动调整积分、渠道 / 前台模型写入、角色与系统设置写入、备份。文案必须写明**影响量**（`impact` 数组，如「将删除 12 个素材」），不能只写「确定删除吗」。业务原因输入只用于确有业务依据要求的动作（如退款、发票驳回、能力下架）；普通管理写操作不要求填写审计原因。审计始终在操作后由系统自动留痕，不反向要求用户确认审计。2026-10-30 起不再要求输入确认词（`requireTyping` / `typingText` 仅保留入参兼容）。
 
 ### 0.7 批量动作
 
@@ -335,7 +335,7 @@ partial_refunded → refunded | partial_refunded
 ### 10.3 退款顺序不可反
 
 1. 硬约束校验：金额 ≤ 实付 − 已退（`40001`）。
-2. 可配规则：时间窗 `40905`、比例 `40906`、积分已消耗且扣不回 `40907`。
+2. 可配规则：时间窗 `40905`、比例 `40906`、本次退款应回收份额已消耗且扣不回 `40907`。积分只从本订单批次回收，不跨订单挪用；部分退款按累计退款比例的本次份额校验。
 3. 已有 `processing` 退款 → `40908`。
 4. 落 `Refund(status='processing')`，用它的 id 作渠道幂等键 `outRefundNo`。
 5. 调渠道：失败置 `failed` 并抛 `50302`，**订单状态与积分不变**。渠道结果未知时复用原退款号重试；人工核销为失败后必须新建退款单。成功才回收积分、迁移订单状态、累加 `refundedCents`。
@@ -355,7 +355,7 @@ partial_refunded → refunded | partial_refunded
 | 支付渠道 | `GET /admin/payments/providers`、`PUT /admin/payments/providers/:id/config` | 每个适配器一份**版本化 + 加密**配置（`PaymentProviderConfig`），追加写不覆盖。密钥字段只回「是否已配置」，留空表示沿用旧值；身份类字段（商户号等）锁定不可改。保存写审计，不要求填写原因 |
 | 充值商品 | `GET/POST/PUT /admin/payments/products*` | 复用 `Order` / `Product`，**不新建** `TopupProduct` 表；售价按分存、周期 / 库存 / 限时策略随类型切换 |
 | 支付订单 | `GET /admin/payments/orders*` | 列表服务端分页（默认 30）；查单与关单使用 `payment.operate`，属于非高危写操作，自动写审计但不要求填写变更原因。关单前始终先向渠道查单；已入账订单关单返回 `409` |
-| 支付对账 | `GET/POST /admin/payments/reconciliations*` | T+1 自动对账（每天 10:15 跑昨日账单）；差异分七类，已支付未入账经签名查单二次确认后**自动补发积分**（幂等） |
+| 支付对账 | `GET/POST /admin/payments/reconciliations*` | T+1 自动对账（每天 10:15 跑昨日账单）；差异分八类（含同一商户单多交易号的 `duplicate_charge`），已支付未入账经签名查单二次确认后**自动补发积分**（幂等） |
 
 **本页不提供退款**：退款在订单管理，涉及积分与优惠券回滚，放在支付域会让人以为「关单 = 退款」。
 
@@ -382,7 +382,7 @@ partial_refunded → refunded | partial_refunded
 
 | 页面 | 接口 | 规则 |
 | --- | --- | --- |
-| 优惠券 | `/admin/coupons*`（`marketing.write`） | 满减 / 折扣 / 固定额；发放范围、门槛、有效期、每人限用、总量；核销走 `Order.couponId`；`GET /admin/coupons/export` 按同一筛选导出 CSV（`marketing.write + data.export` + 审计，路由在 `:id` 之前） |
+| 优惠券 | `/admin/coupons*`（`marketing.write`） | 满减 / 折扣 / 固定额；发放范围、门槛、有效期、每人限用、总量；限量名额由 pending 订单预占、支付时核销、取消/超时释放，核销走 `Order.couponId`；`GET /admin/coupons/export` 按同一筛选导出 CSV（`marketing.write + data.export` + 审计，路由在 `:id` 之前） |
 | 限时活动 | `/admin/campaigns*` | 类型 `limited_price` / `limited_free` / `popup`；进行中的免活动让 `resolve()` 返回 0；到期由调度任务收尾；`GET /admin/campaigns/export` 按同一筛选导出 CSV（`marketing.write + data.export` + 审计） |
 | 邀请与签到 | `/admin/invites*`、`/admin/checkin*` | 邀请奖励在被邀请人**首次付费**才触发；签到规则含基础积分与连签加成 |
 

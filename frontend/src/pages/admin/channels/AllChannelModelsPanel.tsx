@@ -13,6 +13,7 @@ import {
   StatusTag,
   type AdminColumn,
 } from '~/admin-ui/primitives';
+import { ChannelModelCapabilityTag } from './ChannelModelCapabilityTag';
 import { useConfirm, useToast, useAdminUrlFilterSync } from './hooks';
 import { ChannelModelCostSummary, ChannelModelHealthCell } from './ChannelModelHealthCell';
 import {
@@ -294,13 +295,7 @@ export function AllChannelModelsPanel({
         key: 'capability',
         title: '能力',
         width: 76,
-        render: (row) => (
-          <StatusTag
-            status="capability"
-            tone="brand"
-            label={CAPABILITY_OPTIONS.find((item) => item.value === row.capability)?.label ?? row.capability}
-          />
-        ),
+        render: (row) => <ChannelModelCapabilityTag capability={row.capability} />,
       },
       {
         key: 'health',
@@ -376,7 +371,7 @@ export function AllChannelModelsPanel({
 
   return (
     <div className="flex flex-col gap-3">
-      <FilterBar>
+      <FilterBar className="mb-0">
         <ClearableField
           ariaLabel="搜索模型"
           value={keyword}
@@ -450,6 +445,7 @@ export function AllChannelModelsPanel({
             ? '当前筛选下没有匹配的模型，清除筛选后再看。'
             : '还没有渠道模型。在渠道工作台的「模型」里导入或新建后，这里会列出全部线路。'
         }
+        density="compact"
         minWidth={1080}
         pagination={{
           current: page,

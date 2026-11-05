@@ -365,9 +365,20 @@ export class MarketingService {
     userId: string;
     code: string;
     items: Array<{ productId: string; priceCents: number; quantity: number }>;
+    /** 建单事务内传 tx，确保限量与每人限额检查能锁住券行 */
+    db?: Prisma.TransactionClient;
+    /** 为 true 时先取得 Coupon 行写锁，再统计待支付预占 */
+    lockForReservation?: boolean;
   }): Promise<{ discountCents: number; coupon: any; reason: string | null }> {
     const code = params.code.trim().toUpperCase();
-    const coupon = await this.prisma.coupon.findUnique({ where: { code } });
+    const db = (params.db ?? this.prisma) as Prisma.TransactionClient;
+    if (params.lockForReservation) {
+      // SQLite 的 deferred BEGIN 不提供读锁升级保证；先 no-op UPDATE 取得写锁，
+      // 让同一张券的建单事务串行化。支付核销也必须先锁同一行。
+      await db.$executeRaw`
+        UPDATE "Coupon" SET "updatedAt" = "updatedAt" WHERE code = ${code}`;
+    }
+    const coupon = await db.coupon.findUnique({ where: { code } });
     if (!coupon) throw new AppError(40400, `券码不存在: ${code}`, 404);
 
     const now = new Date();
@@ -377,9 +388,18 @@ export class MarketingService {
     if (now < coupon.validFrom) return fail('尚未到生效时间');
     if (now > coupon.validTo) return fail('已过有效期');
 
-    // 限量: totalCount=0 表示不限量
-    if (coupon.totalCount > 0 && coupon.usedCount >= coupon.totalCount) {
-      return fail('优惠券已被领完');
+    /*
+     * 限量 = 已支付核销 + 待支付预占。
+     * 只统计 usedCount 会让并发的待支付订单都能拿到同一张限量券；只统计全部
+     * 订单又会把已核销数量重复计算。取消/超时后订单离开 pending，名额自动释放。
+     */
+    if (coupon.totalCount > 0) {
+      const pendingReservations = await db.order.count({
+        where: { couponId: coupon.id, status: 'pending' },
+      });
+      if (coupon.usedCount + pendingReservations >= coupon.totalCount) {
+        return fail('优惠券已被领完');
+      }
     }
 
     const subtotal = params.items.reduce((s, i) => s + i.priceCents * i.quantity, 0);
@@ -394,19 +414,19 @@ export class MarketingService {
       if (!hit) return fail('订单商品不在优惠券适用范围内');
     }
     if (coupon.scope === 'new_user') {
-      const paidCount = await this.prisma.order.count({
+      const paidCount = await db.order.count({
         where: { userId: params.userId, status: { in: ['paid', 'partial_refunded', 'refunded'] } },
       });
       if (paidCount > 0) return fail('该优惠券仅限未购买过的新用户使用');
     }
 
-    // 每人限用: 只统计已支付订单 —— 下单未支付不算, 否则超时取消会白占名额
+    // 每人限用同样把 pending 算作占用，否则同一用户可先挂多笔待支付单绕过限额。
     if (coupon.perUserLimit > 0) {
-      const used = await this.prisma.order.count({
+      const used = await db.order.count({
         where: {
           userId: params.userId,
           couponId: coupon.id,
-          status: { in: ['paid', 'partial_refunded', 'refunded'] },
+          status: { in: ['pending', 'paid', 'partial_refunded', 'refunded'] },
         },
       });
       if (used >= coupon.perUserLimit) {
@@ -430,28 +450,39 @@ export class MarketingService {
     return Math.max(0, Math.min(discount, subtotal));
   }
 
-  /**
-   * 支付成功后核销券: usedCount +1。
-   *
-   * 用条件更新 (usedCount < totalCount) 而非读后写 —— 并发下两个请求
-   * 都读到 usedCount=k, 各自 +1 会超发。影响 0 行即视为抢空, 记WARN 但不阻断支付。
-   */
-  async redeemCoupon(couponId: string, _orderId: string): Promise<void> {
-    const coupon = await this.prisma.coupon.findUnique({
-      where: { id: couponId },
-      select: { totalCount: true, usedCount: true, code: true },
-    });
-    if (!coupon) return;
+  /** 取得优惠券行写锁。建单预留与支付核销必须使用同一把锁。 */
+  async lockCoupon(couponId: string, tx: Prisma.TransactionClient): Promise<void> {
+    await tx.$executeRaw`
+      UPDATE "Coupon" SET "updatedAt" = "updatedAt" WHERE id = ${couponId}`;
+  }
 
-    const res = await this.prisma.coupon.updateMany({
-      where: {
-        id: couponId,
-        ...(coupon.totalCount > 0 ? { usedCount: { lt: coupon.totalCount } } : {}),
-      },
+  /**
+   * 支付成功后在**同一事务内**核销券: usedCount +1。
+   *
+   * 下单时已经用 pending 订单预占名额；支付事务先锁券行再置订单 paid 并递增，
+   * 与建单侧串行化。这里不再用 `usedCount < totalCount` 条件更新：订单已经
+   * 享受了折扣，即使运营事后调低 totalCount，也必须如实记录本次核销。
+   */
+  async redeemCoupon(
+    couponId: string,
+    orderId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<void> {
+    const db = (tx ?? this.prisma) as Prisma.TransactionClient;
+    await this.lockCoupon(couponId, db);
+
+    // 只核销本单在事务内已置为 paid 的券，防止调用方传错订单造成计数漂移。
+    const applied = await db.order.count({
+      where: { id: orderId, couponId, status: 'paid' },
+    });
+    if (applied === 0) return;
+
+    const res = await db.coupon.updateMany({
+      where: { id: couponId },
       data: { usedCount: { increment: 1 } },
     });
     if (res.count === 0) {
-      this.log.warn(`券 ${coupon.code} 并发核销时已发完, 订单照常支付但未计数`);
+      this.log.warn(`券 ${couponId} 已不存在，订单 ${orderId} 核销未记账`);
     }
   }
 
@@ -697,17 +728,18 @@ export class MarketingService {
    */
   async findLimitedPriceCampaign(
     productId: string,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
   ): Promise<{ id: string; priceCents: number; campaignName: string } | null> {
     const now = new Date();
 
     // 商品不可售时一律不生效: 下架商品不该再被活动拉回可购买状态
-    const product = await this.prisma.product.findUnique({
+    const product = await db.product.findUnique({
       where: { id: productId },
       select: { priceCents: true, status: true },
     });
     if (!product || product.status !== 'active') return null;
 
-    const rows = await this.prisma.campaign.findMany({
+    const rows = await db.campaign.findMany({
       where: { type: 'limited_price', status: 'active', startAt: { lte: now }, endAt: { gte: now } },
     });
 
@@ -941,7 +973,12 @@ export class MarketingService {
     items: Array<{ productId: string; priceCents: number; quantity: number }>;
     couponCode?: string | null;
     campaignIds?: string[];
+    /** 建单事务内传入，所有校验与最终优惠计算都读取同一事务快照 */
+    tx?: Prisma.TransactionClient;
+    /** 在事务内首次计算券时一并取得 Coupon 行写锁 */
+    lockCouponForReservation?: boolean;
   }): Promise<DiscountResult> {
+    const db = (params.tx ?? this.prisma) as Prisma.TransactionClient;
     const empty: DiscountResult = {
       discountCents: 0,
       source: null,
@@ -965,7 +1002,7 @@ export class MarketingService {
     const productIds = params.items.map((i) => i.productId);
 
     const now = new Date();
-    const rows = await this.prisma.campaign.findMany({
+    const rows = await db.campaign.findMany({
       where: {
         type: 'limited_price',
         status: 'active',
@@ -983,7 +1020,7 @@ export class MarketingService {
       // 自动匹配时二次校验商品仍在架且活动价不高于原价:
       // build 时商品可能已下架, 或活动价被误配成高于原价(名为优惠实为涨价)
       if (!explicit) {
-        const verified = await this.findLimitedPriceCampaign(payload.productId);
+        const verified = await this.findLimitedPriceCampaign(payload.productId, db);
         if (!verified || verified.id !== c.id) continue;
       }
 
@@ -1025,6 +1062,8 @@ export class MarketingService {
         userId: params.userId,
         code: params.couponCode,
         items: params.items,
+        db,
+        lockForReservation: params.lockCouponForReservation,
       });
       if (evaluated.reason) {
         couponWarning = evaluated.reason;

@@ -6,7 +6,7 @@ const p=await (await b.newContext({viewport:{width:1440,height:900},locale:'zh-C
 await p.goto('http://localhost:5100/shoppable-carousel',{waitUntil:'domcontentloaded',timeout:60000});
 await p.waitForSelector('.sc-template-card',{timeout:60000});
 const token=await p.evaluate(async()=>{const r=await fetch('/api/v1/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:'sc-e2e@test.local',password:'Sctest123456'})});return (await r.json()).data.accessToken;});
-await p.evaluate((t)=>{localStorage.setItem('ecom_vision_token',t);localStorage.setItem('ecom_vision_email','sc-e2e@test.local');localStorage.setItem('ecom_vision_role','user');},token);
+await p.evaluate((t)=>{localStorage.setItem('huojue_token',t);localStorage.setItem('huojue_email','sc-e2e@test.local');localStorage.setItem('huojue_role','user');},token);
 await p.reload({waitUntil:'domcontentloaded'});
 await p.waitForSelector('.sc-template-card',{timeout:60000});
 await p.waitForTimeout(2500);

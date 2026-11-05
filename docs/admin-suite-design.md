@@ -188,7 +188,7 @@ SQLite provider 不支持 Prisma enum，`kind` / `status` / `type` 一律 String
 | 侧栏 | 分组折叠菜单，图标 lucide 20px，选中态 `var(--brand)` + `var(--brand-bg)`；数据源 `adminNav.ts` |
 | 列表页 | 页头（标题 + 主操作）→ 筛选条 → 表格 → 分页；`rowKey="id"`、`size="small"` |
 | 详情 | 一律抽屉，不跳独立路由，便于保留筛选态 |
-| 危险操作 | `ConfirmAction`（页面内确认条），写明影响条数；退款、发票驳回、能力下架等确有业务依据要求的动作必须填原因，普通管理写操作不要求填写审计原因 |
+| 危险操作 | `ConfirmDialog`（shadcn `AlertDialog` 阻塞式确认弹窗），写明影响条数；退款、发票驳回、能力下架等确有业务依据要求的动作必须填原因，普通管理写操作不要求填写审计原因 |
 | 空态 / 加载 | 空态给真实说明；列表 loading 与失败态走 `Skeleton` / `Result` |
 | 颜色 | 只用 `global.css` 已有 token，禁裸 hex |
 | 数字 | 金额内部存分、展示 `¥` 两位小数；积分整数千分位 |

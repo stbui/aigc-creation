@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useLocation, useNavigationType } from 'react-router-dom';
 import { preloadRoute } from '../lib/routePreload';
 
-const SCROLL_MEMORY_KEY = 'ecom-route-scroll-v1';
+const SCROLL_MEMORY_KEY = 'huojue-route-scroll-v1';
 const ROUTE_ENTER_CLASS = 'is-route-entering';
 const ROUTE_ENTER_MS = 240;
 

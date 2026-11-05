@@ -105,7 +105,7 @@ export {
 
 export { AdminDataTable, type AdminColumn, type AdminDataTableProps } from './table';
 
-export { ModalDialog, Drawer, ConfirmAction, RowMenu, type RowMenuItem } from './overlay';
+export { ModalDialog, Drawer, ConfirmDialog, RowMenu, type RowMenuItem } from './overlay';
 export {
   AlertDialog,
   AlertDialogAction,

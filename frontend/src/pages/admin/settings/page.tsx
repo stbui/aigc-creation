@@ -1,16 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { SettingItem } from './constants';
-import { displayValue } from './utils';
-import { useAdmin, useToast, useUnsavedGuard, useAdminResource } from './hooks';
 import { Link } from 'react-router-dom';
-import { RotateCcw } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+
+import { SettingItem, RELATED_ENTRIES } from './constants';
+import { displayValue, groupSummary } from './utils';
+import { useAdmin, useToast, useUnsavedGuard, useAdminResource } from './hooks';
 
 import { adminSettingsApi } from '../../../lib/api';
 
-import { ActionButton, ClearableField, EmptyState, FormField, ListError, ModalDialog, NumberField, PageHeader, PageSkeleton, SkeletonPanel, SkeletonTabs, Panel, SaveBar, SegmentedTabs, SelectField, StaleError, SwitchField, TextField, ToneBadge } from '~/admin-ui/primitives';
-import type { AdminSettings, AdminSettingValue } from '../../../types/api';
-
-/** 值 → 展示文本。布尔值不能直接显示 true/false，运营看不懂 */
+import { ActionButton, EmptyState, ListError, ModalDialog, NumberField, PageHeader, PageSkeleton, Panel, SaveBar, SegmentedTabs, SelectField, SkeletonPanel, SkeletonTabs, StaleError, SwitchField, TextField, ToneBadge } from '~/admin-ui/primitives';
+import type { AdminSettingValue } from '../../../types/api';
 
 /**
  * 系统设置。
@@ -26,6 +25,12 @@ import type { AdminSettings, AdminSettingValue } from '../../../types/api';
  *
  * 表单改动只落在本地 `draft`，点「保存变更」才提交。只读项不渲染控件：
  * 一个能拖动却不生效的开关，比没有这个开关更糟。
+ *
+ * ## 版面
+ *
+ * 「分组页签 + 窄面板」是低频长表单的既有约定：760 的阅读宽度能保证说明
+ * 文字不横跨整屏，分组的已保存/待保存状态由页签上的圆点与页头徽标共同
+ * 承担，用户不必记住自己在哪一组改过什么。
  */
 export function AdminSettingsPage() {
   const toast = useToast();
@@ -144,6 +149,24 @@ export function AdminSettingsPage() {
     });
   }, [settings, draft, clears, changedKeys]);
 
+  /** key -> 所属分组。页签上的未保存圆点与分组副标题都靠它 */
+  const keyToGroup = useMemo(() => {
+    const map = new Map<string, string>();
+    settings?.groups.forEach((group) => {
+      group.items.forEach((item) => map.set(item.key, group.key));
+    });
+    return map;
+  }, [settings]);
+
+  const dirtyByGroup = useMemo(() => {
+    const map = new Map<string, number>();
+    changedKeys.forEach((key) => {
+      const group = keyToGroup.get(key);
+      if (group) map.set(group, (map.get(group) ?? 0) + 1);
+    });
+    return map;
+  }, [changedKeys, keyToGroup]);
+
   /*
    * 页头照常渲染：加载期间标题与说明就该在位。
    * 之前的守卫整页替换，首屏先闪一段没有标题的灰条，再冒出完整页面 ——
@@ -157,7 +180,7 @@ export function AdminSettingsPage() {
         title="系统设置"
         description={
           editable
-            ? '修改后点右下角「保存变更」提交；配置立即生效，已自定义的项可恢复默认'
+            ? '调整全站运行参数；保存后立即生效，已自定义的值可恢复为代码默认值'
             : '当前账号无 setting.write 权限，仅可查看'
         }
         /*
@@ -179,8 +202,9 @@ export function AdminSettingsPage() {
 
   const renderControl = (item: SettingItem) => {
     if (item.readOnly) {
+      /* 只读值不画成输入框：它不是可编辑控件，画成禁用输入框会让人反复去点 */
       return (
-        <span className="inline-flex h-9 items-center rounded-md border border-input bg-muted px-2.5 text-xs text-muted-foreground">
+        <span className="inline-flex min-h-8 items-center text-right text-[13px] font-medium text-foreground">
           {displayValue(item.value, item.type)}
         </span>
       );
@@ -232,20 +256,33 @@ export function AdminSettingsPage() {
         disabled={!editable}
         ariaLabel={item.label}
         maxLength={item.maxLength}
+        className="w-full"
       />
     );
   };
 
   const activeGroupData = settings.groups.find((group) => group.key === activeGroup);
+  const activeGroupDirty = activeGroupData ? (dirtyByGroup.get(activeGroupData.key) ?? 0) : 0;
+  const relatedEntries = RELATED_ENTRIES.filter((entry) => can(entry.permission));
 
   return (
     <>
       <PageHeader
         title="系统设置"
+        className="max-w-[760px]"
         description={
           editable
-            ? '修改后点右下角「保存变更」提交；配置立即生效，已自定义的项可恢复默认'
+            ? '调整全站运行参数；保存后立即生效，已自定义的值可恢复为代码默认值'
             : '当前账号无 setting.write 权限，仅可查看'
+        }
+        actions={
+          editable ? (
+            dirtyCount > 0 ? (
+              <ToneBadge tone="warn">{dirtyCount} 项待保存</ToneBadge>
+            ) : undefined
+          ) : (
+            <ToneBadge tone="neutral">只读</ToneBadge>
+          )
         }
       />
 
@@ -255,7 +292,8 @@ export function AdminSettingsPage() {
       {/*
        * 分组页签用胶囊式而不是下划线式：分组是「同一批配置按领域切」，
        * 胶囊的选中态比下划线更显眼 —— 运营在长表单里最容易丢的是
-       * 「我正在改哪一组」。
+       * 「我正在改哪一组」。计数与未保存圆点都挂在页签上，切换分组前
+       * 就能看到哪一组还有改动。
        */}
       <SegmentedTabs
         value={activeGroup}
@@ -263,7 +301,20 @@ export function AdminSettingsPage() {
         ariaLabel="配置分组"
         options={settings.groups.map((group) => ({
           value: group.key,
-          label: `${group.label} ${group.items.length}`,
+          label: (
+            <span className="inline-flex items-center gap-1.5">
+              {group.label}
+              <span className="text-[12px] font-normal text-muted-foreground tabular-nums">
+                {group.items.length}
+              </span>
+              {(dirtyByGroup.get(group.key) ?? 0) > 0 && (
+                <>
+                  <span className="size-1.5 rounded-full bg-warn-text" aria-hidden />
+                  <span className="sr-only">有未保存的变更</span>
+                </>
+              )}
+            </span>
+          ),
         }))}
         className="mb-4"
       />
@@ -272,12 +323,20 @@ export function AdminSettingsPage() {
         <Panel
           narrow
           className="mb-0"
-          title={`${activeGroupData.label} · 共 ${activeGroupData.items.length} 项`}
-          note={`${activeGroupData.items.filter((item) => !item.readOnly).length} 项可编辑${
-            activeGroupData.items.some((item) => item.readOnly)
-              ? '，其余为只读配置地图'
-              : ''
-          }`}
+          title={activeGroupData.label}
+          note={
+            <>
+              {groupSummary(activeGroupData)}
+              {activeGroupDirty > 0 && (
+                <>
+                  <span className="mx-1.5">·</span>
+                  <span className="font-medium text-warn-text">
+                    {activeGroupDirty} 项待保存
+                  </span>
+                </>
+              )}
+            </>
+          }
         >
           {activeGroupData.items.length === 0 ? (
             <EmptyState title="该分组暂无配置项" />
@@ -286,23 +345,28 @@ export function AdminSettingsPage() {
               {activeGroupData.items.map((item) => {
                 const isDraft = item.key in draft;
                 const isClearing = clears.has(item.key);
+                const showActions =
+                  !item.readOnly &&
+                  (isDraft || isClearing || (item.overridden && editable));
                 return (
                   <div
                     key={item.key}
-                    className="flex items-start gap-4 border-b border-border py-4 first:pt-0 last:border-b-0 last:pb-0"
+                    className="flex items-start gap-6 border-b border-border py-4 first:pt-0 last:border-b-0 last:pb-0"
                   >
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-medium text-foreground">{item.label}</span>
+                        <span className="text-[13px] font-medium text-foreground">
+                          {item.label}
+                        </span>
                         {item.readOnly && <ToneBadge tone="neutral">只读</ToneBadge>}
                         {item.overridden && !isClearing && (
-                          <ToneBadge tone="brand" className="cursor-help">
+                          <ToneBadge tone="brand">
                             <span title="已覆盖代码默认值">已自定义</span>
                           </ToneBadge>
                         )}
                         {isClearing && <ToneBadge tone="warn">待恢复默认</ToneBadge>}
                       </div>
-                      <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                      <p className="mt-1 text-[12px] leading-5 text-muted-foreground">
                         {item.description}
                       </p>
                       <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] text-muted-foreground">
@@ -329,26 +393,31 @@ export function AdminSettingsPage() {
                       </div>
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-2">
-                      {renderControl(item)}
-                      {!item.readOnly && (isDraft || isClearing) && (
-                        <ActionButton
-                          variant="ghost"
-                          size="xs"
-                          onClick={() => revert(item.key)}
-                          disabled={!editable}
-                        >
-                          撤销
-                        </ActionButton>
-                      )}
-                      {!item.readOnly && item.overridden && !isClearing && editable && (
-                        <ActionButton
-                          variant="ghost"
-                          size="xs"
-                          onClick={() => requestClear(item.key)}
-                        >
-                          恢复默认
-                        </ActionButton>
+                    {/* 控件列固定 240：不同分组的输入框右边缘落在同一条竖线上 */}
+                    <div className="flex w-[240px] shrink-0 flex-col items-end gap-1">
+                      <div className="flex w-full justify-end">{renderControl(item)}</div>
+                      {showActions && (
+                        <div className="flex items-center gap-1">
+                          {(isDraft || isClearing) && (
+                            <ActionButton
+                              variant="ghost"
+                              size="xs"
+                              onClick={() => revert(item.key)}
+                              disabled={!editable}
+                            >
+                              撤销
+                            </ActionButton>
+                          )}
+                          {item.overridden && !isClearing && editable && (
+                            <ActionButton
+                              variant="ghost"
+                              size="xs"
+                              onClick={() => requestClear(item.key)}
+                            >
+                              恢复默认
+                            </ActionButton>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -359,50 +428,45 @@ export function AdminSettingsPage() {
         </Panel>
       )}
 
-      <Panel narrow title="相关管理入口" className="mt-4">
-        <ul className="flex flex-col gap-2.5">
-          <li className="flex items-baseline gap-2">
-            <Link className="text-sm font-medium text-brand hover:underline" to="/admin/channels">
-              渠道工作台
-            </Link>
-            <span className="text-xs text-muted-foreground">上游渠道、渠道模型与协议</span>
-          </li>
-          <li className="flex items-baseline gap-2">
-            <Link className="text-sm font-medium text-brand hover:underline" to="/admin/backups">
-              数据备份
-            </Link>
-            <span className="text-xs text-muted-foreground">备份频次、恢复验证与保留份数</span>
-          </li>
-          <li className="flex items-baseline gap-2">
-            <Link className="text-sm font-medium text-brand hover:underline" to="/admin/legal">
-              法务文档
-            </Link>
-            <span className="text-xs text-muted-foreground">
-              用户协议 / 隐私政策 / 未成年人保护 / 账号规则的版本与发布
-            </span>
-          </li>
-          <li className="flex items-baseline gap-2">
-            <Link className="text-sm font-medium text-brand hover:underline" to="/admin/tickets">
-              工单处理
-            </Link>
-            <span className="text-xs text-muted-foreground">用户投诉、举报与咨询的受理和答复</span>
-          </li>
-        </ul>
-      </Panel>
+      {relatedEntries.length > 0 && (
+        <Panel narrow title="相关管理入口" className="mt-4">
+          <ul className="flex flex-col">
+            {relatedEntries.map((entry) => (
+              <li key={entry.to}>
+                <Link
+                  to={entry.to}
+                  className="group -mx-2 flex items-start gap-3 rounded-md px-2 py-2 transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+                >
+                  <entry.icon
+                    className="mt-0.5 size-4 shrink-0 text-muted-foreground transition-colors group-hover:text-brand"
+                    aria-hidden
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] font-medium text-foreground group-hover:text-brand">
+                      {entry.label}
+                    </span>
+                    <span className="block text-[12px] leading-5 text-muted-foreground">
+                      {entry.description}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
 
-      {editable && (
+      {/* 没有改动时不占版面：常驻的「无未保存的变更」只是噪声 */}
+      {editable && dirtyCount > 0 && (
         <SaveBar narrow>
           <span className="min-w-0 flex-1 text-xs text-muted-foreground">
-            {dirtyCount === 0
-              ? '无未保存的变更'
-              : `有 ${dirtyCount} 项未保存的变更${
-                  clears.size > 0 ? `（其中 ${clears.size} 项将恢复默认）` : ''
-                }`}
+            有 {dirtyCount} 项未保存的变更
+            {clears.size > 0 ? `（其中 ${clears.size} 项将恢复默认）` : ''}
           </span>
           <div className="flex shrink-0 items-center gap-2">
             <ActionButton
               variant="secondary"
-              disabled={dirtyCount === 0 || busy}
+              disabled={busy}
               onClick={() => {
                 setDraft({});
                 setClears(new Set());
@@ -410,10 +474,7 @@ export function AdminSettingsPage() {
             >
               放弃变更
             </ActionButton>
-            <ActionButton
-              disabled={dirtyCount === 0 || busy}
-              onClick={() => setConfirming(true)}
-            >
+            <ActionButton disabled={busy} onClick={() => setConfirming(true)}>
               保存变更
             </ActionButton>
           </div>
@@ -421,8 +482,8 @@ export function AdminSettingsPage() {
       )}
 
       {/*
-       * 保存确认用弹层而不是页面内确认条：确认条会插在保存条上方改变文档流，
-       * 用户无法对照着看「影响范围」里的每一项；弹层不改变文档流。
+       * 保存确认走弹层：弹层不改变文档流，用户可对照「影响范围」逐项确认，
+       * 加载期间也不会把保存条挤走。
        */}
       <ModalDialog
         open={confirming}
@@ -442,7 +503,7 @@ export function AdminSettingsPage() {
               取消
             </ActionButton>
             <ActionButton disabled={busy} onClick={() => void save()}>
-              <RotateCcw className={busy ? 'animate-spin' : undefined} />
+              {busy && <Loader2 className="animate-spin" />}
               {busy ? '保存中…' : '确认保存'}
             </ActionButton>
           </>
@@ -460,7 +521,6 @@ export function AdminSettingsPage() {
             </ul>
           </div>
         )}
-
       </ModalDialog>
     </>
   );

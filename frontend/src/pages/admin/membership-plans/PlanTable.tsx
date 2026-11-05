@@ -15,7 +15,7 @@ interface PlanTableProps {
   onToggle: (row: AdminMembershipPlan) => void;
 }
 
-/** 会员套餐列表：`free` 套餐内置不下架；其余上下架走带原因的确认条 */
+/** 会员套餐列表：`free` 套餐内置不下架；其余上下架走带原因的确认弹窗 */
 export function PlanTable({
   rows,
   loading,

@@ -206,6 +206,7 @@ interface PaymentAdapter {
 不新建 `PaymentOrder`。在 `Order` 上补支付编排字段，在 `Payment` 上补配置版本与关单信息。
 
 - 一个订单同一时刻只有一个进行中的支付意图；再次发起时先关闭旧的 pending 尝试。
+- 发起支付用 `Order.intentStartedAt` 做全过程租约（关闭旧尝试 → 渠道下单 → 写回本地）。租约过期可被新请求接管，旧请求写回时必须同时匹配租约值；匹配失败则关闭刚创建的渠道单并返回 409，禁止覆盖新 checkout。
 - 每次发起支付写一条 `Payment(status='pending')`；下单失败写 `failed` + `Order.lastError`；回调/查单成功把该 pending 行更新为 `succeeded`（没有 pending 行时新建，兼容沙箱/手工核销）。
 - `Payment.payTransactionId` 保持唯一，继续作为重复回调去重键。
 - 入账仍只走 `OrderService.markPaid()`；`markPaid` 增加 `providerConfigId / providerTradeNo / providerPaidAt` 入参，并在事务内设置 `Order.providerTradeNo / providerPaidAt / paidAt`。
@@ -664,7 +665,7 @@ model PaymentReconciliationItem {
 
 - 用户、邮箱、用户 ID（可复制）、订单号（可复制）、渠道交易号（可复制）、商品、渠道、金额/权益、状态、配置版本。
 - 时间线：创建、过期、支付、入账、关闭（无值显示 `--`）。
-- 操作：`同步状态`、`关闭`（页面内 `ConfirmAction`，文案：系统会先查单，渠道已支付则立即入账，否则关单；不会退款）。
+- 操作：`同步状态`、`关闭`（`ConfirmDialog`，文案：系统会先查单，渠道已支付则立即入账，否则关单；不会退款）。
 
 分页：默认每页 30，页码 + 每页条数。
 
@@ -712,7 +713,7 @@ model PaymentReconciliationItem {
 
 不可逆操作：
 
-- 关闭订单：页面内 `ConfirmAction`，必须写明「先查单，已支付则入账，否则关单；不会退款」。
+- 关闭订单：`ConfirmDialog`，必须写明「先查单，已支付则入账，否则关单；不会退款」。
 - 保存渠道配置：高危权限，写审计日志，但不要求填写操作原因。
 - 对账补发：由系统执行，不在页面直接提供「补发」按钮；人工处理走订单流程。
 
@@ -1682,6 +1683,9 @@ model PaymentProviderConfig {
 
   /// 最近一次下单/查单/关单失败原因，截断 200 字；仅页面排障用
   lastError             String?
+  /// 发起支付租约。覆盖“关闭旧尝试 → 渠道下单 → 写回 checkout”全过程；
+  /// 与关单租约互斥，超时后才允许新请求接管。
+  intentStartedAt       DateTime?
   /// 关单租约。条件更新抢占，防止用户手动关单与 worker 同时执行
   closeStartedAt        DateTime?
   closedAt              DateTime?
@@ -2346,7 +2350,7 @@ async markPaid(params: MarkPaidInput): Promise<{
 4. 有 `paymentId` 时 `updateMany({ where: { id, orderId, status:'pending' }, data: succeededFields })`；更新 0 行则回退为 create（防止旧 pending 已被关单）。
 5. 无 `paymentId` 时 create 一笔 `succeeded` Payment。
 6. 更新 Order：`status='paid'`、`paidAt=now`、`providerTradeNo`、`providerStatus`、`providerConfigId/Version`、`providerPaidAt`、`checkoutValue=''`、`lastError=null`、`stockReserved=false`；库存商品同时 `stockSold++ / stockReserved--`。
-7. 计算 `grantedCredits` 并发放积分（沿用现有逻辑，manual 商品跳过自动发放）。
+7. 计算 `grantedCredits` 并发放积分：按下单时 `OrderItem.grantTypeSnapshot` 判定 `manual` 跳过；仅历史空快照回退当前商品配置，禁止让运营事后修改商品发放方式追溯改变订单。
 8. 事务外执行营销副作用与会员激活（沿用现有代码），失败不回滚入账。
 
 并发重复回调可能同时通过第 1 步查重；最终由 Payment `payTransactionId` 唯一约束裁决。捕获 Prisma `P2002` 后返回幂等成功，不能把重复通知抛成 500。
@@ -2429,7 +2433,7 @@ export class PaymentReconciliationService {
 | 渠道交易号与本地不一致 | `trade_no_mismatch` | 不入账，需人工核对 |
 | 本地已取消但账单成功 | `credit_failed` | 不通过 `markPaid` 强行改 cancelled；detail 提示人工退款/补单 |
 
-计数在全部记录处理完后一次性回写；每个 item 的 create 与最终计数更新各自短事务，避免 1000 条账单长时间持锁。`(runId, merchantOrderNo)` 唯一，重复解析不会重复补发。自动补发只走签名查单，不直接相信上传 CSV 的「成功」字样。
+计数在全部记录处理完后一次性回写；每个 item 的 create 与最终计数更新各自短事务，避免 1000 条账单长时间持锁。`(runId, merchantOrderNo, providerTradeNo)` 唯一，既保证重复解析不会重复补发，也允许同一商户订单号的多条渠道流水（如重复扣款）分别留痕。自动补发只走签名查单，不直接相信上传 CSV 的「成功」字样。
 
 #### 20.8.4 `PaymentWorkerService`
 
@@ -2475,7 +2479,9 @@ WHERE id = ?
 4. 订单币种取商品 `currency`；会员单固定 `CNY`。
 5. 订单创建成功后，响应里带 `saleStatus` 变化与 `couponWarning`，不额外返回库存细节。
 
-取消/超时释放库存：`releaseReservation(orderId)` 幂等，按 items 的 quantity 回加 `stockReserved--`，并把 `Order.stockReserved` 置 false。支付成功时在 `markPaid` 事务内把占用转成已售。该 helper 放在 `OrdersModule`，支付层只调用 `OrderService`，不直接写库存。
+取消/超时释放库存：`releaseReservation(orderId)` 幂等，按 `OrderItem.stockReservedSnapshot` 回加 `stockReserved--`，并把 `Order.stockReserved` 置 false。支付成功时在 `markPaid` 事务内按同一快照把占用转成已售；即使运营在待支付窗口内修改 `Product.saleStrategy`，也不影响已创建订单的库存账。该 helper 放在 `OrdersModule`，支付层只调用 `OrderService`，不直接写库存。
+
+限量券与库存采用相同的预留语义：`Coupon.usedCount` 仍是支付成功口径，但可用名额按 `usedCount + pending 订单数` 计算。建单事务先锁 Coupon 行、再复查总量和每人限额；如果最后一个名额已被其他 pending 单占用，则降级为活动/原价并返回 `couponWarning`，不阻断下单。支付事务先锁同一 Coupon 行，再置订单 `paid` 并递增 `usedCount`，取消/超时订单离开 pending 后自动释放预占。
 
 ## 21. 前端文件树与组件拆分
 
@@ -2573,7 +2579,7 @@ URL 同步：
 
 工具栏：
 
-- 左：「默认充值货币」`SelectBox`（CNY/USD），变更前弹出 `ConfirmAction` 说明影响；保存后刷新 C 端设置。
+- 左：「默认充值货币」`SelectBox`（CNY/USD），变更前弹出 `ConfirmDialog` 说明影响；保存后刷新 C 端设置。
 - 右：「新增商品」按钮；无 `product.write` 时隐藏。
 
 列：
@@ -2641,7 +2647,7 @@ URL 同步：
 - 抽屉不提供退款按钮；退款仍跳 `/admin/orders?orderNo=...`。
 - 详情参数用 `?orderId=`。把现有 `useAdminDetailParam()` 扩成 `useAdminDetailParam(param = 'id')`，订单页传 `orderId`；默认值不变，`AdminUsersPage` 等旧调用方无需改动。关闭时删除该参数，支持刷新复原。不要另造一套 URL 协议，也不要复用含义不同的 `id`。
 
-「同步状态」「关闭」均使用 `ConfirmAction` 收集原因并显示影响；成功后 `reload()`，失败 toast 原文。关闭已支付订单返回 409 时提示「已入账，请刷新」并刷新。
+「同步状态」「关闭」均使用 `ConfirmDialog` 收集原因并显示影响；成功后 `reload()`，失败 toast 原文。关闭已支付订单返回 409 时提示「已入账，请刷新」并刷新。
 
 ### 21.6 `PaymentsReconciliationTab.tsx`
 
@@ -2649,7 +2655,7 @@ URL 同步：
 
 - 渠道选择：只列 `configured && supportsReconciliation` 的渠道；sandbox 默认不参与。
 - 账单日期：原生 date，默认昨天，最晚昨天、最早 90 天前。
-- 「执行对账」按钮：需要 `finance.reconcile` 与已选渠道；点击前 `ConfirmAction` 填原因。
+- 「执行对账」按钮：需要 `finance.reconcile` 与已选渠道；点击前 `ConfirmDialog` 填原因。
 - 提示文案：`系统每天 10:15 后自动对账昨日账单；失败可在同一日期重跑。`
 
 运行列表：
@@ -3067,7 +3073,7 @@ const timeWhere = (() => {
 | `completed` | 已完成 | success | ✅ | ✅ |
 | `failed` | 失败 | danger | ✅（可能为空） | ❌ |
 
-明细结果不变：`matched / recovered / local_order_not_found / provider_record_missing / amount_mismatch / trade_no_mismatch / credit_failed`。`result=abnormal` 不是数据库值，只是查询别名。
+明细结果：`matched / recovered / local_order_not_found / provider_record_missing / amount_mismatch / trade_no_mismatch / duplicate_charge / credit_failed`。同一商户订单号出现第二个不同渠道交易号时必须落 `duplicate_charge`，不能被后一条账单覆盖；完全相同的交易号重复导出行按账单重复行忽略。`result=abnormal` 不是数据库值，只是查询别名。
 
 `resolved` 在自动对账结果里表示「本次运行已自动处理」，不是人工结案；页面主列展示 `result`，`resolved` 只在说明中体现。人工处置仍走 `/admin/orders`，避免对账工具直接改钱。
 
@@ -3398,7 +3404,7 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 | 标签 | 支付渠道 / 充值商品 / 支付订单 / 支付对账，默认渠道 | 同顺序同默认；`tab` 写 URL | 一致 + 增强 |
 | 渠道表 | 渠道图标/名称/id、支付方式、状态+插件副行、关闭分钟、版本、配置 | 同列；去掉插件副行，保留「配置/缺项」副行；空态「没有发现支付渠道」 | 偏差 E2 |
 | 渠道抽屉 | 620 宽、启用、关闭分钟、动态字段、保存新版本 | 同宽同字段；secret 留空沿用 | 一致 + 安全增强 |
-| 商品工具栏 | 默认充值货币、新增商品 | 同；切换货币前 ConfirmAction | 一致 |
+| 商品工具栏 | 默认充值货币、新增商品 | 同；切换货币前 ConfirmDialog | 一致 |
 | 商品列 | 商品/说明、售价、权益、排序、上架策略、状态、操作 | 同列；权益用整数积分并附有效期；发放方式只在编辑抽屉中设置 | 偏差 E3 |
 | 商品空态 | 「还没有充值商品」 | 同文案 | 一致 |
 | 商品抽屉 | 520 宽、新增/编辑、保存 | 同；storage 选项禁用并说明 | 偏差 E4 |
@@ -3470,7 +3476,7 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 
 - 参考页每个可见字符串都能在 §24.2 找到「一致」或 §24.3 的偏差编号；没有未登记的改动。
 - 四个标签均可 URL 直达，刷新不丢筛选与详情。
-- 三档权限、五态、八个订单状态、七种对账结果都有可见验收记录。
+- 三档权限、五态、八个订单状态、八种对账结果都有可见验收记录。
 - 不新增 antd、不新增状态管理库；组件全部复用 `admin-ui`/shadcn。
 - 浏览器控制台无未处理异常，接口失败时页面保留旧数据并给出可重试提示。
 - 截图与验收记录附在 PR 描述中；偏差项由产品/设计确认后再合并。
@@ -3606,7 +3612,8 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 - **对账运行回收**：超过 30 分钟的 `running` 运行自动标记 failed，worker 与手动重跑前都会回收。
 - **支付宝响应验签**：交易类接口缺签名直接拒绝，不再 fail-open。
 - **后台商品保存**：补 `kind` 必填字段；限时商品时间按本地时区正确回显与提交。
-- **未支付订单上限**：每用户最多 5 笔 pending；超限返回 400，避免长期占库存。
+- **未支付订单上限**：每用户最多 5 笔 pending；建单事务先锁用户行再复查幂等键和计数，超限返回 400，避免并发请求绕过限制或长期占库存。
+- **对账日界**：账单日期与 90 天窗口统一按 Asia/Shanghai 自然日计算，不能直接用 UTC 零点代替上海今天。
 - **导出超限报错**：支付订单 / 对账运行 / 对账明细超过 10000 行直接报错，不再静默截断。
 - **对账默认日期**：前端按上海时区取昨天，避免东八区凌晨默认成前天。
 - **CSV 下载响应**：中文文件名改用 RFC 5987（`filename*=UTF-8''…`），修复导出接口因非 ASCII 头直接 500 的问题。
@@ -3625,3 +3632,14 @@ sendCsv(res, 'payment-orders', toCsv(PAYMENT_ORDER_CSV_COLUMNS, rows.slice(0, EX
 - `frontend`：`npx tsc --noEmit` 通过；`npm test` 42 文件 / 220 条通过。
 
 仍缺：后端支付域仍需更细的单元/集成 spec（并发库存、周期限购、对账自动补发等边界），当前由 smoke 覆盖主链路。
+
+### 25.11 第三轮复核修复结果（2026-11-05）
+
+本轮继续按资金安全与并发一致性复核，新增以下约束：
+
+- **发起支付 / 关单互斥**：`createIntent` 抢 `intentStartedAt` 租约时要求 `closeStartedAt=null`；关单抢租约时同时要求两个租约均为空或已超时。关单中发起支付明确返回「订单正在关闭」，发起支付中不抢关单租约。
+- **租约所有权**：`failClose` / `releaseCloseLease` 的条件更新必须匹配本请求持有的 `closeStartedAt` 或 `intentStartedAt`，过期请求不能清掉新请求的租约或覆盖其 `lastError`。
+- **本地关单原子化**：订单 pending → cancelled、pending Payment → closed、库存释放必须在同一事务内完成；已 cancelled 的订单再次关单仍会修补 pending Payment 与库存占用。
+- **退款串行化**：退款事务第一句先锁订单行，随后重读订单、成功支付、已成功退款与最新累计金额，并在锁内复用完整的金额/时间窗/比例/积分规则校验；并发退款最多落一笔成功退款。
+- **重复扣款识别**：对账明细唯一键改为 `(runId, merchantOrderNo, providerTradeNo)`；同一商户订单号出现多个渠道交易号时新增 `duplicate_charge`，本地已支付、历史无交易号和本地缺单三种情况都要保留异常证据。
+- **沙箱超时统一收尾**：沙箱 `timeout` 不再直接调用 `transition`，而是在一个事务内关闭订单、pending Payment 并释放库存；`transition` 同时禁止任何调用方直接迁移到 `cancelled`，防止再次绕过支付关单链路。

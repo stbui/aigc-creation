@@ -5,7 +5,7 @@ import {
   ActionButton,
   AdminDataTable,
   AppliedFilters,
-  ConfirmAction,
+  ConfirmDialog,
   Drawer,
   FilterActions,
   FilterBar,
@@ -433,7 +433,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
         )}
       </Panel>
 
-      <ConfirmAction
+      <ConfirmDialog
         open={runOpen}
         title="执行对账"
         description="系统会向渠道下载指定账单日的交易流水并与本地支付记录比对。若发现渠道已收款但本地未入账，会幂等补发积分。"
@@ -465,7 +465,7 @@ export function PaymentsReconciliationTab({ refreshNonce }: { refreshNonce: numb
         }}
       />
 
-      <ConfirmAction
+      <ConfirmDialog
         open={importOpen}
         title="导入对账单"
         description="渠道账单接口不可用时的兜底入口。导入后仍会逐笔核对，不一致的行进入差异列表。"

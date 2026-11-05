@@ -25,9 +25,9 @@ if (!token) throw new Error('login failed: ' + JSON.stringify(login).slice(0, 30
 const b = await chromium.launch({ executablePath: EXEC });
 const ctx = await b.newContext({ viewport: { width: 1440, height: 900 }, locale: 'zh-CN' });
 await ctx.addInitScript((t) => {
-  localStorage.setItem('ecom_vision_token', t);
-  localStorage.setItem('ecom_vision_email', process.env.E2E_EMAIL ?? '');
-  localStorage.setItem('ecom_vision_role', 'user');
+  localStorage.setItem('huojue_token', t);
+  localStorage.setItem('huojue_email', process.env.E2E_EMAIL ?? '');
+  localStorage.setItem('huojue_role', 'user');
 }, token);
 const page = await ctx.newPage();
 page.on('pageerror', (e) => console.log('[pageerror]', e.message));
