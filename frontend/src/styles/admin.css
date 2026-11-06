@@ -323,3 +323,14 @@
     color: var(--brand-hover);
   }
 }
+/* Sidebar 的运行时变量。颜色继续复用全站令牌，避免引入第二套灰/紫色。 */
+:root {
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--text-strong);
+  --sidebar-primary: var(--brand);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: var(--brand-bg);
+  --sidebar-accent-foreground: var(--brand-hover);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--brand);
+}

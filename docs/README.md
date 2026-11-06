@@ -81,6 +81,7 @@
 | --- | --- | --- |
 | [`agent-prd.md`](agent-prd.md) | AI 智能体产品需求 | 规划中，不在本轮交付范围 |
 | [`agent-integration-design.md`](agent-integration-design.md) | AI 智能体集成方案 v2：双入口、API、SSE、数据模型、安全边界 | 规划中，未实施 |
+| [`canvas-port-design.md`](canvas-port-design.md) | 无限画布全量移植方案（对齐 open-ai-canvas）：Postgres + Redis 前置、文档 operations 协议、协作与实时、快照/分享、四模态生成、Agent/3D 末排、工作分解与验收 | 规划中，未实施 |
 | [`channel-model-design.md`](channel-model-design.md) | 渠道与模型子系统整体移植方案（对齐 open-ai-canvas）：渠道/渠道模型/价格档/前台模型/路由/微积分计费/分组/协议插件/代理 —— 现模型层的设计依据与取舍记录 | 已实施（P0–P6） |
 | [`payment-refactor-design.md`](payment-refactor-design.md) | 支付域重构方案 v2（对齐 open-ai-canvas）：多渠道配置版本化与加密托管、查单/关单、回调收件箱与 15s worker、T+1 对账自动补发、`/admin/payments` 四标签页完整规格、迁移与验收标准 | 部分实施：后端主链路已落地；前端页面与开放差距见 §25 |
 
