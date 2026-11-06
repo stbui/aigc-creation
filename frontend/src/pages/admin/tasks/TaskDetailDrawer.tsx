@@ -11,7 +11,7 @@ import {
 } from '~/admin-ui/primitives';
 import { adminTasksApi, assetThumbUrl, toAbsoluteUrl } from './api';
 import { useToast } from './hooks';
-import { TaskModelCalls } from './TaskModelCalls';
+import { TaskFullChain } from './TaskFullChain';
 import {
   adminAssetHref,
   adminCreditHref,
@@ -107,6 +107,7 @@ export function TaskDetailDrawer({
   canCancel,
   canDelete,
   canReadModelCalls,
+  canReadBilling,
   onClose,
   onAction,
 }: {
@@ -116,6 +117,7 @@ export function TaskDetailDrawer({
   canCancel: boolean;
   canDelete: boolean;
   canReadModelCalls: boolean;
+  canReadBilling: boolean;
   onClose: () => void;
   onAction: (kind: 'retry' | 'cancel' | 'delete', task: Row) => void;
 }) {
@@ -380,7 +382,11 @@ export function TaskDetailDrawer({
               />
             </DetailSection>
 
-            <TaskModelCalls taskId={d.id} canRead={canReadModelCalls} />
+            <TaskFullChain
+              task={d}
+              canReadBilling={canReadBilling}
+              canReadModelCalls={canReadModelCalls}
+            />
 
             <DetailSection title="产出图">
               {d.outputAsset ? (

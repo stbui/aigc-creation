@@ -227,7 +227,8 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 
 ### 4.2 规则
 
-- 详情抽屉给：输入素材缩略图、参数 JSON（`JSON.stringify(params, null, 2)`）、产出图、完整错误码、耗时，以及该任务最近 20 次模型调用（成功 / 失败 / 取消、渠道、模型、耗时与错误摘要）。调用记录需 `model.call_read`，无权限时不请求；区块底部可深链到 `/admin/model-calls?taskId=` 查看全部。
+- **全链路详情**：抽屉按同一 `taskId` 集中展示用户提交、参数 / 输入素材、线路尝试、模型调用、产出和账单终态。`GET /admin/tasks/:id`（`task.read`）返回任务及按 `routeRun / attemptNumber` 排序的 `routeAttempts`；最近 20 次模型调用走 `/admin/api-logs?taskId=`（`model.call_read`），并深链 `/admin/model-calls?taskId=` 查看全部；账单走 `/admin/billing-orders?taskId=`（`billing_order.read`），并深链 `/admin/billing-orders?taskId=`。无对应权限时不请求，只显示权限边界。
+- **排障语义**：`dispatchState` 回答请求是否可能到达上游，账单终态回答钱是否已处理。建连前网络失败可安全切线；全部线路都未接单时任务以 `42204` 失败并自动退款。`refunded + system:preconnection-reconcile` 明确显示“无需人工复核”；只有 `reviewable=true` 才进入待核对队列。`submission_unknown` 且账单仍为 `reviewable` 时才需人工确认，不能把网络拒绝误判为上游已接单。
 - **重试不复用旧记录**：用原参数与原输入新建任务，再复用 `GenerateService.enqueue` 触发执行。原地复活会绕过 `GenerationTask.outputAssetId @unique` 的一产出约束。
 - **终止**把 `running` 置 `failed` + `cancelled_by_admin`，按任务快照退款。
 - 统计条显示各状态计数，积压（`pending` / `running`）超阈值标红。

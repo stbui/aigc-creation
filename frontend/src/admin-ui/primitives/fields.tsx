@@ -1,25 +1,33 @@
-import { useId, useRef, useState, type ReactNode } from 'react';
+import { useId, useRef, type ReactNode } from 'react';
 import { format, isValid, parseISO } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { Calendar as CalendarIcon, Paperclip, X } from 'lucide-react';
 import type { DateRange } from 'react-day-picker';
 
 import { cn } from '../lib/cn';
+import {
+  Attachment,
+  AttachmentAction,
+  AttachmentActions,
+  AttachmentContent,
+  AttachmentTitle,
+} from '../components/ui/attachment';
 import { Button } from '../components/ui/button';
 import { Calendar } from '../components/ui/calendar';
 import { Checkbox } from '../components/ui/checkbox';
 import { Input } from '../components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
+import { Slider } from '../components/ui/slider';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '../components/ui/tooltip';
-import { Field, FieldLabel, NumberField } from './form';
+import { NumberField } from './form';
 
 /**
- * 低频但后台必须有的原生控件：复选、文件、取色、滑块、建议输入、悬停说明、
+ * 低频但后台必须有的控件：复选、文件、取色、滑块、建议输入、悬停说明、
  * 纯图标按钮。
  *
  * 与 `form.tsx` 分开是因为这些控制器的**交互成本不同**：文本/下拉是每页都
@@ -133,20 +141,21 @@ export function FilePicker({
         {!compact && label}
       </Button>
       {!compact && file ? (
-        <span className="flex min-w-0 items-center gap-1 text-[12px] text-muted-foreground">
-          <span className="max-w-[240px] truncate" title={file.name}>
-            {file.name}
-          </span>
-          <button
-            type="button"
-            aria-label="移除已选文件"
-            className="rounded p-0.5 text-muted-foreground hover:text-destructive disabled:opacity-50"
-            disabled={disabled}
-            onClick={onClear}
-          >
-            <X className="size-3" aria-hidden />
-          </button>
-        </span>
+        <Attachment size="xs" className="min-w-0 max-w-[280px]">
+          <AttachmentContent>
+            <AttachmentTitle title={file.name}>{file.name}</AttachmentTitle>
+          </AttachmentContent>
+          <AttachmentActions>
+            <AttachmentAction
+              aria-label="移除已选文件"
+              disabled={disabled}
+              onClick={onClear}
+              className="text-muted-foreground hover:text-destructive"
+            >
+              <X aria-hidden />
+            </AttachmentAction>
+          </AttachmentActions>
+        </Attachment>
       ) : !compact ? (
         hint && <span className="sr-only">支持 {hint} 格式</span>
       ) : null}
@@ -289,16 +298,15 @@ export function RangeField({
   const safe = Number.isFinite(value) ? value : min;
   return (
     <div className="flex items-center gap-3">
-      <input
-        type="range"
+      <Slider
+        className="flex-1"
+        value={[safe]}
         min={min}
         max={max}
         step={step}
-        value={safe}
         disabled={disabled}
-        aria-label={ariaLabel}
-        onChange={(event) => onChange(Number(event.target.value))}
-        className="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-muted accent-primary disabled:cursor-not-allowed"
+        thumbAriaLabel={ariaLabel}
+        onValueChange={([next]) => onChange(next)}
       />
       <div className="flex shrink-0 items-center gap-1.5">
         <NumberField
@@ -373,121 +381,72 @@ function parseDateValue(value: string): Date | undefined {
 }
 
 /**
- * 日期范围选择：可见标签 + 按钮 + 双月日历浮层。
+ * 日期范围选择：按钮 + 双月日历浮层（`Popover` + `Calendar mode="range"`，
+ * 与 shadcn Date Picker Range 示例同构）。筛选条里与其它无标签控件同排，
+ * **不渲染可见标签**，用途由按钮内的日历图标与占位文案表达。
  *
- * 筛选条此前用两个原生 `<input type="date">`（开始 / 结束各一个），选跨月区间
- * 要在两个原生面板之间来回；这里一次点出区间。默认带「日期范围」标签（与
- * shadcn 示例同构：`Field` + `FieldLabel` + `id` 关联）；不需要标签的横排
- * 场景传 `label={null}`，只渲染控件。
- *
- * 对外仍是 `YYYY-MM-DD` 字符串：页面状态、URL 参数和后端查询都按这个口径，
- * 只有组件内部才转成 `Date` 交给 DayPicker。
+ * 页面/URL/后端都按 `YYYY-MM-DD` 字符串传值，组件内部才转成 `Date` 交给
+ * DayPicker。日期显示与日历统一用中文 locale。
  */
 export function DateRangeField({
   from,
   to,
   onChange,
-  label = '日期范围',
-  ariaLabel,
-  placeholder = '开始日期 – 结束日期',
-  id: idProp,
   className,
 }: {
   from: string;
   to: string;
   onChange: (range: { from: string; to: string }) => void;
-  /** 可见标签；传 `null` 时只渲染控件（筛选条里与其它无标签控件同排） */
-  label?: ReactNode;
-  ariaLabel?: string;
-  placeholder?: string;
-  id?: string;
   className?: string;
 }) {
-  const autoId = useId();
-  const id = idProp ?? autoId;
-  const [open, setOpen] = useState(false);
+  const id = useId();
 
   const fromDate = parseDateValue(from);
   const toDate = parseDateValue(to);
   const selected: DateRange | undefined = fromDate ? { from: fromDate, to: toDate } : undefined;
 
-  const labelText = fromDate
-    ? toDate
-      ? `${format(fromDate, 'yyyy-MM-dd')} ~ ${format(toDate, 'yyyy-MM-dd')}`
-      : `${format(fromDate, 'yyyy-MM-dd')} 起`
-    : null;
-
   const handleSelect = (range: DateRange | undefined) => {
-    const nextFrom = range?.from ? format(range.from, 'yyyy-MM-dd') : '';
-    const nextTo = range?.to ? format(range.to, 'yyyy-MM-dd') : '';
-    onChange({ from: nextFrom, to: nextTo });
-    // 起止都选完才收起；只点了起始日时留着浮层，让用户接着点结束日
-    if (nextFrom && nextTo) setOpen(false);
+    onChange({
+      from: range?.from ? format(range.from, 'yyyy-MM-dd') : '',
+      to: range?.to ? format(range.to, 'yyyy-MM-dd') : '',
+    });
   };
 
-  const control = (
-    <Popover open={open} onOpenChange={setOpen}>
+  return (
+    <Popover>
       <PopoverTrigger asChild>
         <Button
-          id={id}
-          type="button"
           variant="outline"
-          size="sm"
-          aria-label={ariaLabel}
+          id={id}
           data-testid="admin-date-range"
-          className="justify-start gap-1.5 px-2.5 font-normal"
+          aria-label="日期范围"
+          className={cn('justify-start px-2.5 font-normal', className)}
         >
-          <CalendarIcon className="size-4 text-muted-foreground" aria-hidden />
-          <span
-            className={cn(
-              'min-w-0 truncate tabular-nums',
-              labelText ? 'text-foreground' : 'text-muted-foreground',
-            )}
-          >
-            {labelText ?? placeholder}
-          </span>
+          <CalendarIcon />
+          {fromDate ? (
+            toDate ? (
+              <>
+                {format(fromDate, 'LLL dd, y', { locale: zhCN })} -{' '}
+                {format(toDate, 'LLL dd, y', { locale: zhCN })}
+              </>
+            ) : (
+              format(fromDate, 'LLL dd, y', { locale: zhCN })
+            )
+          ) : (
+            <span className="text-muted-foreground">选择日期</span>
+          )}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
         <Calendar
           mode="range"
           locale={zhCN}
-          defaultMonth={fromDate ?? toDate}
+          defaultMonth={fromDate}
           selected={selected}
           onSelect={handleSelect}
           numberOfMonths={2}
         />
-        <div className="flex items-center justify-between gap-3 border-t border-border px-3 py-2">
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {labelText ?? '未选择日期'}
-          </span>
-          <Button
-            type="button"
-            variant="ghost"
-            size="xs"
-            disabled={!fromDate && !toDate}
-            onClick={() => {
-              onChange({ from: '', to: '' });
-              setOpen(false);
-            }}
-          >
-            清除
-          </Button>
-        </div>
       </PopoverContent>
     </Popover>
-  );
-
-  if (label === null) {
-    return <div className={className}>{control}</div>;
-  }
-
-  return (
-    <Field className={className}>
-      <FieldLabel htmlFor={id} className="text-xs font-medium text-foreground">
-        {label}
-      </FieldLabel>
-      {control}
-    </Field>
   );
 }

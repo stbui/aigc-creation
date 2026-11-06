@@ -44,6 +44,10 @@ export function adminModelCallsHref(filters: { taskId?: string }): string {
   return href('/admin/model-calls', filters);
 }
 
+export function adminBillingOrdersHref(filters: { taskId?: string }): string {
+  return href('/admin/billing-orders', filters);
+}
+
 export function adminTasksHref(filters: { userId?: string; projectId?: string }): string {
   return href('/admin/tasks', filters);
 }

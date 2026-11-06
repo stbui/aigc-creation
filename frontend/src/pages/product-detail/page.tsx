@@ -13,6 +13,7 @@ import {
   ToolWorkflowSteps,
 } from './components';
 import { DetailExamplePanel } from './DetailExamplePanel';
+import { DetailPromptEditor } from './DetailPromptEditor';
 import { DetailResultList } from './DetailResultList';
 import { DetailSectionPicker } from './DetailSectionPicker';
 import { FormSelect } from './FormSelect';
@@ -76,6 +77,7 @@ export function ProductDetailPage() {
     sections,
     sectionPrompts,
     toggle: toggleSection,
+    setSectionPrompt,
   } = useSectionSelection();
   const [ratio, setRatio] = useState('3:4');
   const [resolution, setResolution] = useState('1k');
@@ -128,7 +130,7 @@ export function ProductDetailPage() {
   const resultEmptyDesc = useMemo(
     () =>
       token
-        ? '提交任务后，每个模块都会生成一张图，按次陈列在这里'
+        ? '生成后，每个模块都会得到一张图，按次陈列在这里'
         : '登录后，你在这个页面生成过的图都会显示在这里',
     [token],
   );
@@ -404,6 +406,11 @@ export function ProductDetailPage() {
             </section>
 
             <DetailSectionPicker selected={sections} onToggle={toggleSection} />
+            <DetailPromptEditor
+              selected={sections}
+              prompts={sectionPrompts}
+              onChange={setSectionPrompt}
+            />
           </div>
 
           {/* 高级设置 + 提交 (sticky 底部) */}

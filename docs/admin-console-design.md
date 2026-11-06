@@ -81,7 +81,9 @@
 
 ### 3.4 任务监控 `/admin/tasks`
 
-列表带任务 ID / 能力 / 状态 / 用户 / 项目 / 耗时 / errorCode；详情抽屉给输入素材、参数 JSON、产出图、完整错误码与该任务最近 20 次模型调用摘要（`model.call_read`），并可深链到独立调用记录页。失败任务可重试（用原参数新建任务，不复用旧 ID，避免 `outputAssetId @unique` 约束被绕过），运行中任务可终止（置 `failed` + `cancelled_by_admin`）。`GET /admin/tasks/stats` 给各状态计数，积压数量在顶部标红。
+列表带任务 ID / 能力 / 状态 / 用户 / 项目 / 耗时 / errorCode。详情抽屉是任务的集中排障入口，按 `taskId` 串起：用户提交时间 → 积分预留 / 结算 → 线路尝试 → 模型调用 → 产出 → 退款 / 人工核对。任务与线路来自 `GET /admin/tasks/:id`（`task.read`）；最近 20 次模型调用来自 `/admin/api-logs?taskId=`（`model.call_read`）；账单来自 `/admin/billing-orders?taskId=`（`billing_order.read`）。无对应权限时仅展示权限说明，不发起请求，并可分别深链到调用记录页和账单列表。
+
+线路尝试按 `routeRun / attemptNumber` 展示，运营可直接区分“建连前网络失败、可安全切线”“上游已接单”“上游未接单”“结果待确认”。资金是否已处理必须以账单终态为准：系统对账退款显示“无需人工复核”，仅 `reviewable=true` 进入待人工核对。失败任务可重试（用原参数新建任务，不复用旧 ID，避免 `outputAssetId @unique` 约束被绕过），运行中任务可终止（置 `failed` + `cancelled_by_admin`）。`GET /admin/tasks/stats` 给各状态计数，积压数量在顶部标红。
 
 ### 3.5 工单处理 `/admin/tickets`
 

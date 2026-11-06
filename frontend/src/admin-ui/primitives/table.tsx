@@ -22,6 +22,11 @@ import { cn } from '../lib/cn';
 import { Button } from '../components/ui/button';
 import { Checkbox } from '../components/ui/checkbox';
 import {
+  Pagination as PaginationRoot,
+  PaginationContent,
+  PaginationItem,
+} from '../components/ui/pagination';
+import {
   Select,
   SelectContent,
   SelectGroup,
@@ -219,11 +224,13 @@ export function AdminDataTable<T>({
           const active = headerColumn.getIsSorted();
           if (!column.sortable || !onSortChange) return column.title;
           return (
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={headerColumn.getToggleSortingHandler()}
               className={cn(
-                'inline-flex items-center gap-1 rounded-sm transition-colors hover:text-foreground',
+                '-ml-2 h-7 gap-1 px-2 text-xs font-semibold',
                 active && 'text-foreground',
               )}
             >
@@ -235,7 +242,7 @@ export function AdminDataTable<T>({
               ) : (
                 <ChevronsUpDown className="size-3 text-muted-foreground/60" aria-hidden />
               )}
-            </button>
+            </Button>
           );
         },
         cell: ({ row }) =>
@@ -504,27 +511,35 @@ export function AdminDataTable<T>({
                 </SelectContent>
               </Select>
             </div>
-            <nav aria-label="分页" className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="xs"
-                disabled={!table.getCanPreviousPage()}
-                onClick={() => table.previousPage()}
-              >
-                上一页
-              </Button>
-              <span className="text-xs text-muted-foreground tabular-nums">
-                {Math.min(pagination.current, totalPages)} / {totalPages}
-              </span>
-              <Button
-                variant="outline"
-                size="xs"
-                disabled={!table.getCanNextPage()}
-                onClick={() => table.nextPage()}
-              >
-                下一页
-              </Button>
-            </nav>
+            <PaginationRoot className="mx-0 w-auto justify-start" aria-label="分页">
+              <PaginationContent className="gap-2">
+                <PaginationItem>
+                  <Button
+                    variant="outline"
+                    size="xs"
+                    disabled={!table.getCanPreviousPage()}
+                    onClick={() => table.previousPage()}
+                  >
+                    上一页
+                  </Button>
+                </PaginationItem>
+                <PaginationItem>
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {Math.min(pagination.current, totalPages)} / {totalPages}
+                  </span>
+                </PaginationItem>
+                <PaginationItem>
+                  <Button
+                    variant="outline"
+                    size="xs"
+                    disabled={!table.getCanNextPage()}
+                    onClick={() => table.nextPage()}
+                  >
+                    下一页
+                  </Button>
+                </PaginationItem>
+              </PaginationContent>
+            </PaginationRoot>
           </div>
         </div>
       )}

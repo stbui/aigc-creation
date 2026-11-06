@@ -1,4 +1,4 @@
-import { ActionButton, Descriptions, Drawer, Notice } from '~/admin-ui/primitives';
+import { ActionButton, Descriptions, Drawer, Notice, formatDateTimeLoose, formatDuration } from '~/admin-ui/primitives';
 import type { ApiLogView } from '../../../types/model';
 import { REQUEST_KIND_LABELS, STATUS_LABELS } from './constants';
 
@@ -53,7 +53,7 @@ export function ModelCallDetailDrawer({
               },
               {
                 label: '耗时',
-                value: `${detail.durationMs} ms${detail.pollCount > 0 ? ` · 第 ${detail.pollCount} 次轮询` : ''}`,
+                value: `${formatDuration(detail.durationMs)}${detail.pollCount > 0 ? ` · 第 ${detail.pollCount} 次轮询` : ''}`,
               },
               { label: '上游状态', value: detail.providerStatus || '—' },
               {
@@ -91,7 +91,7 @@ export function ModelCallDetailDrawer({
                 label: '产出',
                 value: `${detail.mediaCount} 个媒体${detail.videoSeconds > 0 ? ` · ${detail.videoSeconds}s` : ''}`,
               },
-              { label: '时间', value: new Date(detail.createdAt).toLocaleString('zh-CN') },
+              { label: '时间', value: formatDateTimeLoose(detail.createdAt) },
             ]}
             columns={2}
           />

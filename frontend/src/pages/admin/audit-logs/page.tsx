@@ -1,17 +1,20 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
-import { Row, ACTION_LABELS } from './constants';
+import { Row, actionLabel, targetTypeLabel } from './constants';
 import { useAdmin, useToast, useAdminList, useAdminUrlFilterSync } from './hooks';
 import { useSearchParams } from 'react-router-dom';
 
 import { adminAuditApi } from '../../../lib/api';
+import { STATUS_META } from '../../../components/admin/statusMeta';
 
 import {
   ActionButton,
   ExportCsvButton,
+  RefreshButton,
   useAdminExport,
   AdminDataTable,
   AppliedFilters,
   ClearableField,
+  DateRangeField,
   FilterActions,
   FilterBar,
   PageHeader,
@@ -19,6 +22,7 @@ import {
   SelectField,
   StatusTag,
   StaleError,
+  formatDateTimeLoose,
   type AdminColumn,
   type AppliedFilter,
 } from '~/admin-ui/primitives';
@@ -50,7 +54,7 @@ const DETAIL_COLUMNS: Array<AdminColumn<DetailEntry>> = [
  * 页面职责不变：只读，记录后台全部写操作，用于事后追责与举证。
  * 审计只留痕，不承载任何操作确认：包括导出在内，均不弹二次确认；
  * 高危动作的确认与原因输入属于业务页面，由业务动作自行负责。
- * 本次改造只换渲染层 —— 筛选条件、URL 同步、导出、行内展开的行为逐条保留：
+ * 筛选条件、URL 同步、导出、行内展开的行为逐条保留：
  *
  * - 筛选值有「草稿 / 已生效」两态，只有点「查询」才改列表，URL 也只同步已生效的值；
  * - 详情铺在行内而不是抽屉：追溯时经常要对照上一行的记录，抽屉会挡住上下文；
@@ -60,32 +64,34 @@ const DETAIL_COLUMNS: Array<AdminColumn<DetailEntry>> = [
 /** 审计详情直接铺在表格行内，避免只读追溯被抽屉或弹窗打断 */
 export function AuditExpandedDetail({ row }: { row: Row }) {
   const detailEntries = Object.entries(row.detail);
+  const roleLabel = STATUS_META[row.actorRole]?.label ?? row.actorRole;
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-xs font-semibold text-foreground">审计详情</div>
-          <div className="mt-0.5 text-[12px] text-muted-foreground">记录只追加，不支持修改或删除</div>
-        </div>
-        <StatusTag status={row.success ? 'succeeded' : 'failed'} label={row.success ? '成功' : '失败'} />
+      <div>
+        <div className="text-xs font-semibold text-foreground">审计详情</div>
+        <div className="mt-0.5 text-[12px] text-muted-foreground">记录只追加，不支持修改或删除</div>
       </div>
 
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-2 md:grid-cols-3 xl:grid-cols-6">
-        <Field label="时间">{new Date(row.createdAt).toLocaleString('zh-CN')}</Field>
+      {/* 取证字段一律完整展示：ID 被截断等于把举证材料砍掉一半 */}
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-3 lg:grid-cols-3">
+        <Field label="时间">{formatDateTimeLoose(row.createdAt)}</Field>
         <Field label="操作人">
           {row.actorEmail}
-          <span className="ml-1.5 text-muted-foreground">{row.actorRole}</span>
+          <span className="ml-1.5 text-muted-foreground">{roleLabel}</span>
         </Field>
-        <Field label="动作">{ACTION_LABELS[row.action] ?? row.action}</Field>
+        <Field label="动作">{actionLabel(row.action)}</Field>
         <Field label="对象">
-          {row.targetType} / <Mono>{row.targetId}</Mono>
+          <span className="mr-1.5 text-muted-foreground">{targetTypeLabel(row.targetType)} /</span>
+          <Mono title={row.targetId}>{row.targetId || '—'}</Mono>
+          <CopyButton value={row.targetId} label="对象 ID" />
         </Field>
         <Field label="来源 IP">
-          <Mono>{row.ip}</Mono>
+          <Mono title={row.ip}>{row.ip}</Mono>
         </Field>
         <Field label="记录 ID">
-          <Mono>{row.id}</Mono>
+          <Mono title={row.id}>{row.id}</Mono>
+          <CopyButton value={row.id} label="记录 ID" />
         </Field>
       </dl>
 
@@ -123,15 +129,49 @@ export function Field({ label, children }: { label: string; children: ReactNode 
   return (
     <div className="min-w-0">
       <dt className="text-[12px] text-muted-foreground">{label}</dt>
-      <dd className="truncate text-xs text-foreground" title={typeof children === 'string' ? children : undefined}>
+      <dd
+        className="break-words text-xs text-foreground"
+        title={typeof children === 'string' ? children : undefined}
+      >
         {children}
       </dd>
     </div>
   );
 }
 
-export function Mono({ children }: { children: ReactNode }) {
-  return <code className="font-mono text-[12px] text-muted-foreground">{children}</code>;
+export function Mono({ children, title }: { children: ReactNode; title?: string }) {
+  return (
+    <code className="font-mono text-[12px] text-muted-foreground" title={title}>
+      {children}
+    </code>
+  );
+}
+
+/** 详情里的长 ID 提供一键复制；剪贴板不可用时退回手动选中 */
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const toast = useToast();
+  if (!value) return null;
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(`${label}已复制`);
+    } catch {
+      toast.error('复制失败', '浏览器未授权剪贴板访问，请手动选择文本复制。');
+    }
+  };
+
+  return (
+    <ActionButton
+      variant="ghost"
+      size="xs"
+      className="ml-1 align-baseline"
+      ariaLabel={`复制${label}`}
+      onClick={() => void copy()}
+    >
+      复制
+    </ActionButton>
+  );
 }
 
 export function AdminAuditPage() {
@@ -143,11 +183,17 @@ export function AdminAuditPage() {
   const [searchParams] = useSearchParams();
   const initialAction = searchParams.get('action') ?? undefined;
   const initialTargetId = searchParams.get('targetId') ?? '';
+  const initialActorId = searchParams.get('actorId') ?? '';
+  const initialFrom = searchParams.get('from') ?? '';
+  const initialTo = searchParams.get('to') ?? '';
   const rawSuccess = searchParams.get('success');
   const initialSuccess = rawSuccess === 'true' ? true : rawSuccess === 'false' ? false : undefined;
 
   const [action, setAction] = useState<string | undefined>(initialAction);
   const [targetId, setTargetId] = useState(initialTargetId);
+  const [actorId, setActorId] = useState(initialActorId);
+  const [from, setFrom] = useState(initialFrom);
+  const [to, setTo] = useState(initialTo);
   const [success, setSuccess] = useState<string | undefined>(
     initialSuccess === undefined ? undefined : String(initialSuccess),
   );
@@ -161,6 +207,9 @@ export function AdminAuditPage() {
         pageSize: params.pageSize as number,
         action: params.action as string | undefined,
         targetId: params.targetId as string | undefined,
+        actorId: params.actorId as string | undefined,
+        from: params.from as string | undefined,
+        to: params.to as string | undefined,
         success: params.success === undefined ? undefined : Boolean(params.success),
       }),
     [],
@@ -172,6 +221,9 @@ export function AdminAuditPage() {
   }>(fetcher, {
     action: initialAction,
     targetId: initialTargetId || undefined,
+    actorId: initialActorId || undefined,
+    from: initialFrom || undefined,
+    to: initialTo || undefined,
     success: initialSuccess,
   });
 
@@ -179,6 +231,9 @@ export function AdminAuditPage() {
   useAdminUrlFilterSync({
     action: params.action as string | undefined,
     targetId: params.targetId as string | undefined,
+    actorId: params.actorId as string | undefined,
+    from: params.from as string | undefined,
+    to: params.to as string | undefined,
     success: params.success as boolean | undefined,
   });
 
@@ -187,7 +242,7 @@ export function AdminAuditPage() {
     () =>
       (data?.actions ?? []).map((a) => ({
         value: a.action,
-        label: `${ACTION_LABELS[a.action] ?? a.action}（${a.count}）`,
+        label: `${actionLabel(a.action)}（${a.count}）`,
       })),
     [data],
   );
@@ -198,36 +253,47 @@ export function AdminAuditPage() {
         key: 'createdAt',
         title: '时间',
         width: 160,
-        render: (row) => new Date(row.createdAt).toLocaleString('zh-CN'),
+        render: (row) => (
+          <span className="text-[12px] tabular-nums text-muted-foreground">
+            {formatDateTimeLoose(row.createdAt)}
+          </span>
+        ),
       },
       {
         key: 'actor',
         title: '操作人',
         width: 190,
+        cellTitle: (row) => row.actorEmail,
         render: (row) => (
-          <div>
-            <div>{row.actorEmail}</div>
-            <div className="text-[12px] text-muted-foreground">{row.actorRole}</div>
+          <div className="min-w-0 text-[12px]">
+            <div className="truncate text-foreground">{row.actorEmail}</div>
+            <div className="text-muted-foreground">{STATUS_META[row.actorRole]?.label ?? row.actorRole}</div>
           </div>
         ),
       },
       {
         key: 'action',
         title: '动作',
-        width: 150,
-        // 动作标签的颜色跟随结果：一眼扫下去先看见红的是什么动作失败
-        render: (row) => (
-          <StatusTag status={row.success ? 'succeeded' : 'failed'} label={ACTION_LABELS[row.action] ?? row.action} />
-        ),
+        width: 170,
+        // 动作本身不带成败语义，结果由「结果」列单独表达；未登记的动作码用等宽字
+        // 原样展示，避免把内部枚举伪装成中文文案。
+        render: (row) =>
+          actionLabel(row.action) === row.action ? (
+            <Mono title={row.action}>{row.action}</Mono>
+          ) : (
+            <span className="text-[12px] text-foreground">{actionLabel(row.action)}</span>
+          ),
       },
       {
         key: 'target',
         title: '对象',
-        width: 200,
+        width: 210,
+        cellTitle: (row) =>
+          `${targetTypeLabel(row.targetType)} / ${row.targetId || '—'}`,
         render: (row) => (
-          <div>
-            <div>{row.targetType}</div>
-            <Mono>{row.targetId.slice(-8)}</Mono>
+          <div className="min-w-0 text-[12px]">
+            <div className="truncate text-foreground">{targetTypeLabel(row.targetType)}</div>
+            <Mono title={row.targetId}>{row.targetId ? row.targetId.slice(-8) : '—'}</Mono>
           </div>
         ),
       },
@@ -235,7 +301,7 @@ export function AdminAuditPage() {
         key: 'ip',
         title: 'IP',
         width: 120,
-        render: (row) => <Mono>{row.ip}</Mono>,
+        render: (row) => <Mono title={row.ip}>{row.ip}</Mono>,
       },
       {
         key: 'success',
@@ -264,31 +330,56 @@ export function AdminAuditPage() {
     [expandedId],
   );
 
-  const hasFilter = Boolean(action || targetId || success);
+  const hasFilter = Boolean(action || targetId || actorId || from || to || success);
   const applyFilters = () => {
     setExpandedId(null);
     setQuery({
       action,
-      targetId: targetId || undefined,
+      targetId: targetId.trim() || undefined,
+      actorId: actorId.trim() || undefined,
+      from: from || undefined,
+      to: to || undefined,
       success: success === undefined ? undefined : success === 'true',
     });
   };
   const resetFilters = () => {
     setAction(undefined);
     setTargetId('');
+    setActorId('');
+    setFrom('');
+    setTo('');
     setSuccess(undefined);
     setExpandedId(null);
-    setQuery({ action: undefined, targetId: undefined, success: undefined });
+    setQuery({
+      action: undefined,
+      targetId: undefined,
+      actorId: undefined,
+      from: undefined,
+      to: undefined,
+      success: undefined,
+    });
   };
 
   const appliedAction = params.action as string | undefined;
   const appliedTargetId = (params.targetId as string | undefined) ?? '';
+  const appliedActorId = (params.actorId as string | undefined) ?? '';
+  const appliedFrom = (params.from as string | undefined) ?? '';
+  const appliedTo = (params.to as string | undefined) ?? '';
   const appliedSuccess = params.success as boolean | undefined;
+
+  const dateChipLabel = appliedFrom
+    ? appliedTo
+      ? `时间：${appliedFrom} ~ ${appliedTo}`
+      : `时间：${appliedFrom} 起`
+    : appliedTo
+      ? `时间：截至 ${appliedTo}`
+      : null;
+
   const appliedChips: AppliedFilter[] = [
     appliedAction
       ? {
           key: 'action',
-          label: `动作：${ACTION_LABELS[appliedAction] ?? appliedAction}`,
+          label: `动作：${actionLabel(appliedAction)}`,
           onClear: () => {
             setAction(undefined);
             setExpandedId(null);
@@ -304,6 +395,29 @@ export function AdminAuditPage() {
             setTargetId('');
             setExpandedId(null);
             setQuery({ targetId: undefined });
+          },
+        }
+      : null,
+    appliedActorId
+      ? {
+          key: 'actorId',
+          label: `操作人 ID：${appliedActorId}`,
+          onClear: () => {
+            setActorId('');
+            setExpandedId(null);
+            setQuery({ actorId: undefined });
+          },
+        }
+      : null,
+    dateChipLabel
+      ? {
+          key: 'date',
+          label: dateChipLabel,
+          onClear: () => {
+            setFrom('');
+            setTo('');
+            setExpandedId(null);
+            setQuery({ from: undefined, to: undefined });
           },
         }
       : null,
@@ -327,17 +441,21 @@ export function AdminAuditPage() {
         adminAuditApi.exportCsv({
           action: params.action as string | undefined,
           targetId: params.targetId as string | undefined,
+          actorId: params.actorId as string | undefined,
+          from: params.from as string | undefined,
+          to: params.to as string | undefined,
           success: params.success as boolean | undefined,
         }),
       '导出已开始下载',
     );
+
+  const items = list?.items ?? [];
 
   return (
     <>
       <PageHeader
         title="操作审计"
         description="记录所有后台写操作，用于事后追责与举证。只读，不可删除或修改。"
-        actions={can('data.export') ? <ExportCsvButton exporting={exporting} onExport={exportCsv} /> : undefined}
       />
 
       <FilterBar>
@@ -348,7 +466,8 @@ export function AdminAuditPage() {
         <SelectField
           className="w-48"
           ariaLabel="按动作筛选"
-          placeholder="动作"
+          placeholder="全部动作"
+          clearLabel="全部动作"
           options={actions}
           value={action}
           onChange={setAction}
@@ -356,15 +475,34 @@ export function AdminAuditPage() {
         />
         <ClearableField
           className="w-48"
+          ariaLabel="对象 ID"
           placeholder="对象 ID"
           value={targetId}
           onChange={setTargetId}
           onEnter={applyFilters}
         />
+        <ClearableField
+          className="w-44"
+          ariaLabel="操作人 ID"
+          placeholder="操作人 ID"
+          value={actorId}
+          onChange={setActorId}
+          onEnter={applyFilters}
+        />
+        <DateRangeField
+          className="w-56"
+          from={from}
+          to={to}
+          onChange={({ from: nextFrom, to: nextTo }) => {
+            setFrom(nextFrom);
+            setTo(nextTo);
+          }}
+        />
         <SelectField
           className="w-28"
           ariaLabel="按结果筛选"
-          placeholder="结果"
+          placeholder="全部结果"
+          clearLabel="全部结果"
           options={[
             { value: 'true', label: '成功' },
             { value: 'false', label: '失败' },
@@ -384,17 +522,25 @@ export function AdminAuditPage() {
         <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
       </FilterBar>
 
-      {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
-      {error && data && <StaleError error={error} onRetry={reload} />}
+      <Panel
+        title="审计记录"
+        extra={
+          <>
+            {can('data.export') && <ExportCsvButton exporting={exporting} onExport={exportCsv} />}
+            <RefreshButton loading={loading} onRefresh={() => void reload()} />
+          </>
+        }
+      >
+        {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
+        {error && data && <StaleError error={error} onRetry={() => void reload()} />}
 
-      <Panel>
         <AdminDataTable<Row>
-          rows={list?.items ?? []}
+          rows={items}
           columns={columns}
           rowKey={(row) => row.id}
           loading={loading}
-          error={error}
-          onRetry={reload}
+          error={items.length === 0 ? error : null}
+          onRetry={() => void reload()}
           minWidth={1100}
           emptyText={
             hasFilter

@@ -171,15 +171,15 @@ export const DetailImage: CapabilityPlugin = {
       type: 'text',
       hidden: true,
       maxLength: 20000,
-      help: '每个模块独立提示词的 JSON；由页面按模块拆进批次任务',
+      help: '每个模块补充要求的 JSON；服务端逐模块合并成完整提示词',
     },
     {
       key: 'sectionPrompt',
-      label: '当前任务模块提示词',
+      label: '当前任务模块补充要求',
       type: 'text',
       hidden: true,
       maxLength: MAX_SECTION_PROMPT_LEN,
-      help: '批次拆分后写入本任务，仅供该模块使用',
+      help: '批次拆分后写入本任务，仅供该模块拼装完整提示词',
     },
     { key: 'batchId', label: '批次 ID', type: 'text', hidden: true, maxLength: 128 },
     { key: 'batchIndex', label: '批次序号', type: 'number', hidden: true, min: 1, max: 10, step: 1 },
@@ -212,13 +212,12 @@ export const DetailImage: CapabilityPlugin = {
     return (
       '【任务】\n' +
       `电商详情页单模块图生成。${subjectText(p)}。商品事实：${facts}。\n` +
-      `只生成「${label}」这一张独立版块图，不生成整张详情长图。\n` +
-      `【版式要求】\n${brief}。\n` +
-      (sectionPrompt
-        ? `【模块提示词】\n${sectionPrompt}\n` +
-          '以上模块提示词用于补充本张图的画面方向、构图和信息重点；' +
-          '若与商品事实、参考图一致性或本提示词其它约束冲突，以其它约束为准。\n'
-        : '') +
+      '【模块任务与画面要求】\n' +
+      `只生成「${label}」这一张独立版块图，不生成整张详情长图，也不生成其它模块。\n` +
+      `画面目标：${brief}。\n` +
+      (sectionPrompt ? `本模块补充要求：${sectionPrompt}\n` : '') +
+      '以上内容属于同一张图的同一条执行指令：先满足商品事实、参考图一致性和本图文案闭集；' +
+      '没有硬约束冲突时优先执行本模块补充要求，默认版式仅补充未被明确覆盖的部分。\n' +
       '【参考图】\n' +
       '参考图仅作为商品外观依据，不是版式、场景或文案参考。' +
       '商品结构、颜色、材质、logo、包装和配件必须与参考图一致；' +

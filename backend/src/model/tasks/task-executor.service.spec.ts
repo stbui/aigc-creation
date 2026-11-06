@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { TaskExecutorService, type CallLogInput } from './task-executor.service';
+import { OutboundError } from '../infra/outbound';
+import { TaskExecutorService, failureCodeOf, safeFailure, type CallLogInput } from './task-executor.service';
 
 function input(overrides: Partial<CallLogInput> = {}): CallLogInput {
   return {
@@ -72,5 +73,25 @@ describe('TaskExecutorService.logCall', () => {
     expect(create).toHaveBeenCalledWith({
       data: expect.objectContaining({ videoSeconds: 6 }),
     });
+  });
+});
+
+describe('上游网络失败分类', () => {
+  it('连接被拒绝说明请求没有到达上游，应允许安全换线或自动退款', () => {
+    const failureCode = failureCodeOf(
+      new OutboundError('外部服务请求失败：connect ECONNREFUSED 127.0.0.1:3900', 'network'),
+    );
+
+    expect(failureCode).toBe('outbound_connection_refused');
+    expect(safeFailure(failureCode)).toBe(true);
+  });
+
+  it('连接建立后中断仍属于结果不明，不能自动重发', () => {
+    const failureCode = failureCodeOf(
+      new OutboundError('外部服务请求失败：read ECONNRESET', 'network'),
+    );
+
+    expect(failureCode).toBe('outbound_network');
+    expect(safeFailure(failureCode)).toBe(false);
   });
 });

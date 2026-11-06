@@ -1157,18 +1157,13 @@ export const adminAuditApi = {
       action?: string;
       targetId?: string;
       success?: boolean;
+      from?: string;
+      to?: string;
       page?: number;
       pageSize?: number;
     } = {},
   ) => {
-    const qs = new URLSearchParams();
-    if (params.actorId) qs.set("actorId", params.actorId);
-    if (params.action) qs.set("action", params.action);
-    if (params.targetId) qs.set("targetId", params.targetId);
-    if (params.success !== undefined) qs.set("success", String(params.success));
-    if (params.page) qs.set("page", String(params.page));
-    if (params.pageSize) qs.set("pageSize", String(params.pageSize));
-    const suffix = qs.toString() ? `?${qs.toString()}` : "";
+    const suffix = toQuery(params);
     return request<{
       result: AdminAuditListResult;
       actions: Array<{ action: string; count: number }>;

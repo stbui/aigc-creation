@@ -10,13 +10,15 @@
  * 因此每次派发前必须先做一次 CAS 把 `not_sent` 改成 `submission_unknown` ——
  * CAS 失败说明另一个执行者已经带着这个 attempt 出发，本次必须停下。
  *
- * 只有 `rejected_no_job`（上游明确没有建立任务：渠道槽位失败 / 401 / 403 / 404 / 429）
- * 才允许切线；`submission_unknown` 一律停住等人工或恢复流程。
+ * 只有 `rejected_no_job`（上游明确没有建立任务：渠道槽位失败 / HTTP 拒绝 /
+ * DNS、代理、网络不可达、TCP 连接被拒）才允许切线；`submission_unknown`
+ * 一律停住等人工或恢复流程。
  */
 
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import type { Prisma, RouteAttempt } from '@prisma/client';
+import { safeRouteFailure } from './task-failure-policy';
 
 /** 尝试状态 */
 export const ATTEMPT_STATUSES = ['selected', 'dispatching', 'succeeded', 'failed'] as const;
@@ -29,24 +31,16 @@ export type DispatchState = (typeof DISPATCH_STATES)[number];
 /**
  * 失败是否属于「上游明确没有接下这个任务」。
  *
- * 判据只有两类：
+ * 判据包括：
  *   · 渠道槽位 / 渠道可用性失败 —— 请求根本没发出去（`channel_unavailable`）；
- *   · 上游以 401 / 403 / 404 / 429 拒绝 —— 请求到了但被拒之门外，没有建立任务。
+ *   · 上游以 401 / 403 / 404 / 429 拒绝，或 200 明确失败 —— 没有建立任务；
+ *   · DNS / 代理 / 网络不可达 / TCP 连接被拒 —— 建连前失败，请求未写出。
  *
- * 超时、5xx、连接中断**不在**其中：这些情况下上游可能已经在生成并计费，
+ * 超时、5xx、建连后中断**不在**其中：这些情况下上游可能已经在生成并计费，
  * 换线路重发等于让用户为两次调用付费。宁可停在 `submission_unknown` 等人工。
  */
 export function safeRouteRejection(failureCode: string): boolean {
-  switch (String(failureCode ?? '').trim()) {
-    case 'channel_unavailable':
-    case 'upstream_401':
-    case 'upstream_403':
-    case 'upstream_404':
-    case 'upstream_429':
-      return true;
-    default:
-      return false;
-  }
+  return safeRouteFailure(failureCode);
 }
 
 /** `begin` 的判定结果：本轮该做什么 */

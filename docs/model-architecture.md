@@ -143,7 +143,13 @@ running ──nextPollAt 到期──► 回查上游
 | `upstream_401` / `403` | 凭证级拒绝 | 能（冷却渠道 10min） |
 | `upstream_404` | 这个模型在这家渠道不存在 | 能（冷却该渠道模型 10min，不连坐渠道） |
 | `upstream_429` | 限流 | 能（冷却 `Retry-After` 或 30s） |
-| `upstream_5xx` / 超时 / 连接中断 / 解析失败 | 上游**可能已受理** | **不能**，判「结果不明」 |
+| `outbound_dns_failed` / `outbound_proxy_invalid` / `outbound_connection_refused` / `outbound_network_unreachable` / `outbound_invalid_url` / `outbound_blocked_host` | 请求在写出前失败：DNS、代理、TCP 建连、URL/SSRF 校验未通过 | 能（不计冷却） |
+| `upstream_5xx` / 超时 / 建连后中断 / 解析失败 | 上游**可能已受理** | **不能**，判「结果不明」 |
+
+**建连前与建连后的分界必须以证据为准**：`ECONNREFUSED`、`ENOTFOUND`、`EAI_AGAIN`、
+`ENETUNREACH`、`EHOSTUNREACH` 等 errno 发生在 TCP 建连或 DNS/代理准备阶段，上游不可能
+据此建立任务，归 `rejected_no_job`。`ECONNRESET`、`socket hang up`、超时、5xx 或响应解析
+失败可能发生在请求已写出之后，不能自动重发。
 
 ## 6. 选路（`router.service.ts`）
 
@@ -168,11 +174,15 @@ running ──nextPollAt 到期──► 回查上游
 | 场景 | 任务结果 | 账单 / 积分 |
 | --- | --- | --- |
 | 准入阶段拦下（下线 / 参数 / 余额） | 任务不创建 | 不动 |
-| 有线路但全部 `rejected_no_job` | `failed` + `42204`（遮罩任务 `42205`） | 按预留明细原路全额退还 |
-| 上游 5xx / 超时 / 连接中断 | `failed` + `42206`（结果不明） | **不切线、不自动退款**，账单停 `uncertain`，等人工核对 |
+| 有线路但全部 `rejected_no_job`（含建连前网络失败） | `failed` + `42204`（遮罩任务 `42205`） | 按预留明细原路全额退还 |
+| 建连后 5xx / 超时 / 连接中断 / 解析失败 | `failed` + `42206`（结果不明） | **不切线、不自动退款**，账单停 `uncertain`，等人工核对 |
 | 进程崩溃后回收 | `failed` + `42202` | 退款 |
 | AIGC 标识失败 | `failed` + `42203`（fail-closed） | 退款 |
 | 成功 | `succeeded` | 结算（Token 模式按上游 usage 补扣 / 退差额） |
+
+`uncertain` 的唯一业务含义是「请求可能已经到达上游，结果无法确认」。因此
+`ECONNREFUSED`、DNS 解析失败、TCP 不可达等可证明请求未写出的错误不得进入该状态；
+后续排障看到这类错误仍停在 `uncertain`，应视为失败归因回归。
 
 **切线必须换账单**：新线路的价格档可能与原线路不同，沿用旧账单等于「按 A 的价收、走 B 的线路」。
 旧账单退款后**标记为 `refundReason='route_switch'`** —— 这笔钱只是从旧线路的预授权挪到新线路的
@@ -182,6 +192,9 @@ running ──nextPollAt 到期──► 回查上游
 冷却（`route-health.service.ts`）只对**明确可归因**的失败生效；超时与 5xx 一律不冷却 ——
 上游抖动时关 10 分钟会把一次偶发故障放大成整段时间不可用。冷却只存进程内存（本仓没有 Redis），
 多实例各自判定，不影响正确性。
+
+建连前网络失败允许换线，但默认不写冷却：它可能来自本地 DNS、代理或出口网络抖动，
+直接封禁渠道会把一次基础设施故障放大成供应侧不可用。401/403/404/429 的冷却规则不变。
 
 ## 8. 计费
 
@@ -293,8 +306,10 @@ C 端目录接口：`GET /models`（可选身份，登录后按分组过滤并�
 1. **改动模型层后不看目录快照就等于没改**：路由读的是 30s 快照。同进程写入会自动失效；
    跨进程最多滞后 30s，排障时先等一拍或重启。
 2. **界面说可用、提交 42204**：对照 `RouteAttempt.failureCode`。最常见是协议 id 写成插件 id（见 §3）。
-3. **账单停在 `uncertain` 不是 bug**：它表示「上游可能已经做了这件事」，只能人工核对后
-   `settle` / `refund`，两条路径都写审计。
+3. **账单停在 `uncertain` 不是 bug**：它只表示「请求可能已经到达上游，结果无法确认」，
+   只能人工核对后 `settle` / `refund`，两条路径都写审计。若 `RouteAttempt.failureCode`
+   或 `failureMessage` 明确是 `ECONNREFUSED` / DNS / TCP 不可达，则说明旧数据或归因回归，
+   不应继续人工核对。
 4. **冷却只反映本进程**：`/health` 与 `/admin/channels/health` 都只报当前实例看到的状态。
 5. **单实例内存额度**：任务并发、冷却、快照都是进程级。多实例部署时按实例数放大上游配额。
 6. **后台「调用记录」与「生成账单」口径不同**：前者逐次 HTTP，后者按任务聚合（含创建与多次轮询）。

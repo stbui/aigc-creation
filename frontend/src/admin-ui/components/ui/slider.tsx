@@ -10,8 +10,16 @@ function Slider({
   value,
   min = 0,
   max = 100,
+  thumbAriaLabel,
   ...props
-}: React.ComponentProps<typeof SliderPrimitive.Root>) {
+}: React.ComponentProps<typeof SliderPrimitive.Root> & {
+  /**
+   * 滑块的读屏名称。Radix 把 `role="slider"` 放在 Thumb 上，而官方示例里
+   * 写在 Root 上的 `aria-label` 不会下沉到 Thumb —— 不显式传这一项，
+   * 读屏读到的就是默认的「Value」。
+   */
+  thumbAriaLabel?: string
+}) {
   const _values = React.useMemo(
     () =>
       Array.isArray(value)
@@ -52,6 +60,7 @@ function Slider({
         <SliderPrimitive.Thumb
           data-slot="slider-thumb"
           key={index}
+          aria-label={thumbAriaLabel}
           className="block size-4 shrink-0 rounded-full border border-primary bg-white shadow-sm ring-ring/50 transition-[color,box-shadow] hover:ring-4 focus-visible:ring-4 focus-visible:outline-hidden disabled:pointer-events-none disabled:opacity-50"
         />
       ))}

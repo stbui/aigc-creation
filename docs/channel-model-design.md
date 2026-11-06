@@ -297,10 +297,16 @@ Nest 中以前置 `@All` 控制器 + 保留前缀清单实现，替代 Gin 的 `
 | 派发前 | CAS `not_sent → submission_unknown`（同时 `status=dispatching`）；CAS 失败即视为结果不明，禁止重发 |
 | 上游已接受 | 记录 `providerRequestId` → `accepted` |
 | 成功 | `succeeded/accepted` |
-| 失败且无 providerRequestId | `safeRouteRejection` 为真 → `rejected_no_job`；否则 `submission_unknown` |
+| 建连前失败 / 上游明确拒绝，且无 providerRequestId | `safeRouteRejection` 为真 → `rejected_no_job` |
+| 建连后结果不明，且无 providerRequestId | → `submission_unknown` |
 | 失败但有 providerRequestId | `failed/accepted`（不切换） |
 
-**只有 `rejected_no_job` 才切换线路**；`submission_unknown` 一律停住等待人工/恢复，避免同一请求在两个上游各扣一次费。
+建连前失败的判定包括 `outbound_dns_failed`、`outbound_proxy_invalid`、
+`outbound_connection_refused`、`outbound_network_unreachable`、`outbound_invalid_url`、
+`outbound_blocked_host`，以及失败文本中的 `ECONNREFUSED`、`ENOTFOUND`、`EAI_AGAIN`、
+`ENETUNREACH`、`EHOSTUNREACH`。此时 TCP 连接尚未建立，上游不可能创建任务。
+
+**只有 `rejected_no_job` 才切换线路**；`submission_unknown` 一律停住等待人工/恢复，避免同一请求在两个上游各扣一次费。`ECONNRESET`、`socket hang up`、超时、5xx 与响应解析失败发生在建连后：没有 `providerRequestId` 时归 `submission_unknown`，已有请求号时维持 `failed/accepted`。
 
 ### 5.7 故障切换
 
@@ -319,7 +325,8 @@ Nest 中以前置 `@All` 控制器 + 保留前缀清单实现，替代 Gin 的 `
 
 - 冷却只写本进程内存（未接共享存储）；
 - 读取同时检查 `channel:` / `channel-model:` / `route:` 三键；
-- 只有 `safeRouteRejection`（渠道槽位失败或 401/403/404/429）才可能触发冷却；超时、5xx、连接中断不冷却也不切换。
+- 只有 401/403/404/429 产生冷却；渠道槽位失败与建连前网络失败可以换线，但不写冷却；
+- 超时、5xx、建连后中断不冷却也不切换。
 
 ### 5.9 worker 与租约
 

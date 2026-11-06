@@ -48,7 +48,8 @@
     "verify:protocol-runtime": "ts-node -T scripts/verify-protocol-runtime.ts",
     "verify:route-catalog": "ts-node -T scripts/verify-route-catalog.ts",
     "verify:task-runtime": "ts-node -T scripts/verify-task-runtime.ts",
-    "verify:proxy-runtime": "ts-node -T scripts/verify-proxy-runtime.ts"
+    "verify:proxy-runtime": "ts-node -T scripts/verify-proxy-runtime.ts",
+    "reconcile:preconnection": "ts-node -T scripts/reconcile-preconnection-network-failures.ts"
   },
   "dependencies": {
     "@jimp/plugin-print": "1.6.1",

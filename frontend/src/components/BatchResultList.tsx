@@ -363,10 +363,10 @@ function BatchResultListImpl<Row extends BatchRow>({
                         className="pd-result-download-all"
                         aria-label={
                           downloadingRow === row.key
-                            ? '正在打包本批次结果图'
-                            : `一键下载本批次 ${row.cells.filter((item) => Boolean(item.url)).length} 张结果图`
+                            ? '正在打包本次生成的结果图'
+                            : `一键下载本次生成的 ${row.cells.filter((item) => Boolean(item.url)).length} 张结果图`
                         }
-                        title="下载本批次全部生成图"
+                        title="下载本次生成的全部图片"
                         aria-busy={downloadingRow === row.key}
                         disabled={!row.cells.some((item) => Boolean(item.url)) || Boolean(downloadingRow)}
                         onClick={() => void downloadRow(row)}

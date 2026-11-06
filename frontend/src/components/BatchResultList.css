@@ -419,10 +419,10 @@
   background:
     radial-gradient(
         circle,
-        color-mix(in srgb, var(--danger-soft-text) 8%, transparent) 1px,
+        color-mix(in srgb, var(--danger-soft-text) 6%, transparent) 1px,
         transparent 1.2px
       )
-      0 0 / 10px 10px,
+      0 0 / 12px 12px,
     linear-gradient(
       145deg,
       color-mix(in srgb, var(--danger-soft-bg) 52%, var(--card-bg)),

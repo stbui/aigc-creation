@@ -259,10 +259,16 @@ export class TasksAdminService {
     if (!task) throw new AppError(40400, '任务不存在', 404);
 
     const inputIds = safeParse<string[]>(task.inputAssetIds, []);
-    const assets = await this.prisma.asset.findMany({
-      where: { id: { in: inputIds } },
-      select: { id: true, sourceUrl: true, width: true, height: true, kind: true },
-    });
+    const [assets, attempts] = await Promise.all([
+      this.prisma.asset.findMany({
+        where: { id: { in: inputIds } },
+        select: { id: true, sourceUrl: true, width: true, height: true, kind: true },
+      }),
+      this.prisma.routeAttempt.findMany({
+        where: { taskId: id },
+        orderBy: [{ routeRun: 'asc' }, { attemptNumber: 'asc' }],
+      }),
+    ]);
     const byId = new Map(assets.map((a) => [a.id, a]));
 
     const def = getCapability(task.capability);
@@ -309,6 +315,29 @@ export class TasksAdminService {
       ],
       params: safeParse<Record<string, unknown>>(task.params, {}),
       inputAssets: inputIds.map((assetId) => byId.get(assetId)).filter(Boolean),
+      /*
+       * 线路尝试是任务详情「全链路」的核心事实：按 routeRun / attemptNumber
+       * 排序返回，前端即可还原同一轮内的切线和跨轮重试。RouteAttempt 属于
+       * task.read 的排障数据；账单金额不在这里返回，仍由 billing_order.read
+       * 的独立接口加载。
+       */
+      routeAttempts: attempts.map((attempt) => ({
+        id: attempt.id,
+        routeRun: attempt.routeRun,
+        attemptNumber: attempt.attemptNumber,
+        logicalModelId: attempt.logicalModelId,
+        logicalModelRevisionId: attempt.logicalModelRevisionId,
+        routeId: attempt.routeId,
+        channelId: attempt.channelId,
+        channelModelId: attempt.channelModelId,
+        status: attempt.status,
+        dispatchState: attempt.dispatchState,
+        providerRequestId: attempt.providerRequestId,
+        failureCode: attempt.failureCode,
+        failureMessage: attempt.failureMessage,
+        startedAt: attempt.startedAt,
+        completedAt: attempt.completedAt,
+      })),
       outputAsset: output
         ? {
             id: output.id,

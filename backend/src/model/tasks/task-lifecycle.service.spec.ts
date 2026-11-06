@@ -90,6 +90,28 @@ describe('TaskLifecycleService 取消竞态', () => {
   });
 });
 
+describe('TaskLifecycleService 失败退款', () => {
+  it('明确未派发的生成失败默认自动退款，不转人工核对', async () => {
+    const { service, prisma, billing } = setup();
+    prisma.generationTask.findUnique.mockResolvedValue(runningTask);
+
+    await expect(
+      service.fail('task-1', {
+        errorCode: '42204',
+        errorMessage: '建连前网络失败且无下一线路',
+        reason: 'generation_failed',
+      }),
+    ).resolves.toBe(true);
+
+    expect(billing.refund).toHaveBeenCalledWith(
+      'order-1',
+      '建连前网络失败且无下一线路',
+      'failure',
+    );
+    expect(billing.markUncertain).not.toHaveBeenCalled();
+  });
+});
+
 describe('TaskLifecycleService 租约围栏', () => {
   it('成功收口必须校验当前执行租约，租约已变时拒绝结算', async () => {
     const { service, prisma, billing } = setup();

@@ -6,6 +6,7 @@
 
 export {
   adminApiLogsApi,
+  adminBillingOrdersApi,
   adminTasksApi,
   assetThumbUrl,
   toAbsoluteUrl,

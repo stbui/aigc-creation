@@ -1,4 +1,5 @@
 import type { AdminUserMembershipFields } from './admin-users';
+import type { AdminTaskRouteAttempt } from './task-route';
 /**
  * 能力标识。清单以后端 capability.registry 为准 (15 项), 前端不枚举 ——
  * 保留基础联合仅用于类型提示, 运行时以 CapabilityDef.id 为准。
@@ -1146,12 +1147,7 @@ export interface AdminTaskDetail {
   durationMs: number;
   createdAt: string;
   updatedAt: string;
-  /**
-   * 状态流转节点。
-   *
-   * ⚠ `at` 可为 null: GenerationTask 未落 startedAt, 「开始执行」时刻
-   * 无法还原, 故不编造中间节点 (见后端 detail() 注释)。
-   */
+  /** 状态流转节点；at=null 表示后端无可靠时间，不编造中间节点。 */
   timeline: Array<{
     key: string;
     label: string;
@@ -1159,6 +1155,8 @@ export interface AdminTaskDetail {
     done: boolean;
   }>;
   params: Record<string, unknown>;
+  /** 线路尝试；旧版后端响应可能缺失此字段，前端按空数组兼容 */
+  routeAttempts?: AdminTaskRouteAttempt[];
   /** 输入素材, 已按 inputAssetIds 原序排列 (多图能力依赖顺序语义) */
   inputAssets: Array<{
     id: string;

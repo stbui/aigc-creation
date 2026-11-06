@@ -50,11 +50,12 @@ function setup() {
   const executor = { create: vi.fn(), poll: vi.fn(), logCall: vi.fn() };
   const media = { persist: vi.fn(), discardCreated: vi.fn() };
   const lifecycle = { uncertain: vi.fn(), fail: vi.fn(), succeed: vi.fn() };
+  const health = { recordFailure: vi.fn() };
   const worker = new TaskWorkerService(
     prisma as never,
     {} as never,
     {} as never,
-    {} as never,
+    health as never,
     {} as never,
     {} as never,
     channels as never,
@@ -66,7 +67,7 @@ function setup() {
     {} as never,
     lifecycle as never,
   );
-  return { worker, prisma, attempts, channels, slots, executor, media, lifecycle };
+  return { worker, prisma, attempts, channels, slots, executor, media, lifecycle, health };
 }
 
 function task(): GenerationTask {
@@ -204,6 +205,59 @@ describe('TaskWorkerService 派发状态机', () => {
     expect(executor.create).not.toHaveBeenCalled();
   });
 
+  it('TCP 建连失败不转人工，按明确未派发自动切换线路', async () => {
+    const { worker, attempts, channels, slots, executor, lifecycle } = setup();
+    const current = task();
+    (current as any).leaseOwner = (worker as any).owner;
+    const dispatching = attempt({ status: 'dispatching', dispatchState: 'submission_unknown' });
+
+    channels.prepare.mockResolvedValue({
+      channelId: 'channel-1',
+      channelName: '测试渠道',
+      channelModelId: 'channel-model-1',
+      modelKey: 'image-model',
+      providerModelKey: 'image-model',
+      capability: 'image',
+      protocol: 'openai-image',
+      concurrencyLimit: 1,
+    });
+    (worker as any).requests = {
+      build: vi.fn().mockResolvedValue({ request: { operation: 'generate' } }),
+    };
+    slots.acquire.mockResolvedValue(() => undefined);
+    executor.create.mockResolvedValue({
+      outcome: {
+        status: 'failed',
+        providerRequestId: '',
+        result: null,
+        stage: '',
+        failureCode: 'outbound_connection_refused',
+        failureMessage: '外部服务请求失败：connect ECONNREFUSED 127.0.0.1:3900',
+        rejectedNoJob: true,
+        statusCode: 0,
+        durationMs: 10,
+        providerStatus: '',
+        latencyMs: 10,
+        message: '',
+      },
+      spec: { method: 'POST', path: '/v1/images/generations', contentType: 'application/json' },
+      requestBody: '{}',
+      responseBody: '',
+      upstreamUrl: 'http://127.0.0.1:3900/v1/images/generations',
+    });
+    const switchRoute = vi.spyOn(worker as any, 'switchRoute').mockResolvedValue('stop');
+    attempts.listRun.mockResolvedValue([dispatching]);
+
+    await expect((worker as any).dispatch(current, dispatching, {}, [])).resolves.toBe('stop');
+
+    expect(attempts.markFailed).toHaveBeenCalledWith(
+      'attempt-1',
+      expect.objectContaining({ failureCode: 'outbound_connection_refused', rejectedNoJob: true }),
+    );
+    expect(switchRoute).toHaveBeenCalledOnce();
+    expect(lifecycle.uncertain).not.toHaveBeenCalled();
+  });
+
   it('上游已受理但 accepted CAS 失败时停止自动轮询并转人工核对', async () => {
     const { worker, attempts, channels, slots, executor, lifecycle } = setup();
     const current = task();
@@ -328,6 +382,26 @@ describe('TaskWorkerService 派发状态机', () => {
     expect(lifecycle.fail).toHaveBeenCalledWith(
       'task-1',
       expect.objectContaining({ errorCode: '42204' }),
+      { leaseOwner: (worker as any).owner },
+    );
+  });
+
+  it('建连前失败且没有下一线路时按无线路失败，由生命周期自动退款', async () => {
+    const { worker, lifecycle } = setup();
+    const current = task();
+    (worker as any).requests = { maskAssetId: vi.fn().mockReturnValue('') };
+    (worker as any).resolveRoute = vi.fn().mockResolvedValue(null);
+    lifecycle.fail.mockResolvedValue(true);
+
+    await expect((worker as any).switchRoute(current, {}, [], ['route-1'])).resolves.toBe('stop');
+
+    expect(lifecycle.fail).toHaveBeenCalledWith(
+      'task-1',
+      {
+        errorCode: '42204',
+        errorMessage: '全部可用线路都拒绝或无法承接本次请求',
+        reason: 'generation_failed',
+      },
       { leaseOwner: (worker as any).owner },
     );
   });

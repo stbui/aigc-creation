@@ -117,6 +117,7 @@ export function AdminTasksPage() {
         canCancel={can('task.cancel')}
         canDelete={can('task.delete')}
         canReadModelCalls={can('model.call_read')}
+        canReadBilling={can('billing_order.read')}
         onClose={closeDetail}
         onAction={actions.openConfirm}
       />

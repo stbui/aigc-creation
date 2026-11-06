@@ -225,7 +225,7 @@ describe('BatchResultList 卡片布局', () => {
     expect(screen.getByText('9:16')).toBeVisible();
     expect(screen.queryByText('本地原图')).not.toBeInTheDocument();
     expect(document.querySelector('.pd-result-card-source img')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: '一键下载本批次 3 张结果图' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: '一键下载本次生成的 3 张结果图' })).toBeEnabled();
 
     const grid = document.querySelector('.pd-result-card-grid');
     expect(grid).toBeInTheDocument();
@@ -237,7 +237,7 @@ describe('BatchResultList 卡片布局', () => {
     expect(within(grid as HTMLElement).getByText('图片 3')).toBeVisible();
   });
 
-  it('一键下载会把本批次全部已完成图片打包为一个 ZIP', async () => {
+  it('一键下载会把本次生成的全部已完成图片打包为一个 ZIP', async () => {
     vi.mocked(downloadUrlsAsZip).mockResolvedValue(undefined);
     renderList({
       rows: rowsOf([
@@ -248,7 +248,7 @@ describe('BatchResultList 卡片布局', () => {
       cellLabelOf: (_, index) => `图片 ${index + 1}`,
     });
 
-    fireEvent.click(screen.getByRole('button', { name: '一键下载本批次 2 张结果图' }));
+    fireEvent.click(screen.getByRole('button', { name: '一键下载本次生成的 2 张结果图' }));
 
     await waitFor(() => expect(downloadUrlsAsZip).toHaveBeenCalledTimes(1));
     expect(downloadUrlsAsZip).toHaveBeenCalledWith(expect.stringMatching(/^demo-\d{4}-\d{2}-\d{2}\.zip$/), [

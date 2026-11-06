@@ -2,7 +2,26 @@ import { useMemo, useState } from 'react';
 import { useAdmin, useToast, useAdminResource, useAdminUrlFilterSync } from './hooks';
 import { useSearchParams } from 'react-router-dom';
 import { adminCapabilitiesApi } from '../../../lib/api';
-import { ActionButton, AdminDataTable, AppliedFilters, ClearableField, ConfirmDialog, FilterActions, FilterBar, HelpTip, PageHeader, Panel, SelectField, StatusTag, StaleError, TextAreaField, type AdminColumn, type AppliedFilter } from '~/admin-ui/primitives';
+import {
+  ActionButton,
+  AdminDataTable,
+  AppliedFilters,
+  ClearableField,
+  ConfirmDialog,
+  FilterActions,
+  FilterBar,
+  HelpTip,
+  PageHeader,
+  Panel,
+  RefreshButton,
+  SelectField,
+  StatusTag,
+  StaleError,
+  TextAreaField,
+  formatDateTimeLoose,
+  type AdminColumn,
+  type AppliedFilter,
+} from '~/admin-ui/primitives';
 import { RUNTIME_LABELS } from '../../../lib/constants';
 import type { AdminCapabilityControl } from '../../../types/api';
 
@@ -149,9 +168,9 @@ export function AdminCapabilitiesPage() {
       title: '能力',
       width: 200,
       render: (row) => (
-        <div className="flex flex-col gap-0.5">
+        <div className="flex flex-col">
           <span className="font-medium">{row.name}</span>
-          <code className="font-mono text-[12px] text-muted-foreground">{row.capabilityId}</code>
+          <code className="font-mono text-muted-foreground">{row.capabilityId}</code>
         </div>
       ),
     },
@@ -161,7 +180,7 @@ export function AdminCapabilitiesPage() {
       title: '模态',
       width: 90,
       render: (row) => (
-        <code className="font-mono text-[12px] text-muted-foreground">{row.modality}</code>
+        <code className="font-mono text-muted-foreground">{row.modality}</code>
       ),
     },
     {
@@ -214,12 +233,12 @@ export function AdminCapabilitiesPage() {
       width: 180,
       render: (row) =>
         row.updatedAt ? (
-          <div className="flex flex-col text-xs">
-            <span>{new Date(row.updatedAt).toLocaleString('zh-CN')}</span>
-            <span className="text-[12px] text-muted-foreground">{row.updatedBy ?? '-'}</span>
+          <div className="flex flex-col">
+            <span>{formatDateTimeLoose(row.updatedAt)}</span>
+            <span className="text-muted-foreground">{row.updatedBy ?? '—'}</span>
           </div>
         ) : (
-          <span className="text-muted-foreground">从未调整</span>
+          <span>从未调整</span>
         ),
     },
     {
@@ -267,51 +286,52 @@ export function AdminCapabilitiesPage() {
         }
       />
 
+      <FilterBar>
+        <ClearableField
+          className="w-56"
+          ariaLabel="搜索能力"
+          placeholder="能力名称 / ID / 模态"
+          value={q}
+          onChange={setQ}
+        />
+        <SelectField
+          className="w-40"
+          ariaLabel="按分组筛选"
+          placeholder="全部分组"
+          allowClear
+          clearLabel="全部分组"
+          value={group || undefined}
+          onChange={(value) => setGroup(value ?? '')}
+          options={groupOptions}
+        />
+        <SelectField
+          className="w-40"
+          ariaLabel="按运行结论筛选"
+          placeholder="全部运行结论"
+          allowClear
+          clearLabel="全部运行结论"
+          value={runtime}
+          onChange={(value) =>
+            setRuntime(value as 'remote' | 'disabled' | 'unavailable' | undefined)
+          }
+          options={[
+            { value: 'remote', label: RUNTIME_LABELS.remote },
+            { value: 'disabled', label: RUNTIME_LABELS.disabled },
+            { value: 'unavailable', label: RUNTIME_LABELS.unavailable },
+          ]}
+        />
+        <FilterActions>
+          <ActionButton variant="secondary" size="sm" onClick={resetFilters}>
+            重置
+          </ActionButton>
+        </FilterActions>
+        <AppliedFilters items={appliedFilters} onClearAll={resetFilters} />
+      </FilterBar>
+
       <Panel
         title="能力清单"
-        note={`显示 ${filteredRows.length} / ${rows.length} 项 ·「当前结论」由后台开关、逐能力路由与该模态的云端通道共同决定`}
+        extra={<RefreshButton loading={loading} onRefresh={reload} />}
       >
-        <FilterBar>
-          <ClearableField
-            className="w-56"
-            placeholder="能力名称 / ID / 模态"
-            value={q}
-            onChange={setQ}
-          />
-          <SelectField
-            className="w-40"
-            ariaLabel="按分组筛选"
-            placeholder="全部分组"
-            allowClear
-            clearLabel="全部分组"
-            value={group || undefined}
-            onChange={(value) => setGroup(value ?? '')}
-            options={groupOptions}
-          />
-          <SelectField
-            className="w-40"
-            ariaLabel="按运行结论筛选"
-            placeholder="全部运行结论"
-            allowClear
-            clearLabel="全部运行结论"
-            value={runtime}
-            onChange={(value) =>
-              setRuntime(value as 'remote' | 'disabled' | 'unavailable' | undefined)
-            }
-            options={[
-              { value: 'remote', label: RUNTIME_LABELS.remote },
-              { value: 'disabled', label: RUNTIME_LABELS.disabled },
-              { value: 'unavailable', label: RUNTIME_LABELS.unavailable },
-            ]}
-          />
-          <FilterActions>
-            <ActionButton variant="secondary" size="sm" onClick={resetFilters}>
-              重置
-            </ActionButton>
-          </FilterActions>
-          <AppliedFilters items={appliedFilters} onClearAll={resetFilters} />
-        </FilterBar>
-
         {/*
           三态必须分家 (2026-10-23): 之前加载中是裸 <p>加载中…</p>、失败态用的却是
           AdminEmpty —— 同一块区域把「没连上」说成「没有数据」, 运营会以为能力清单被清空了。
@@ -325,16 +345,16 @@ export function AdminCapabilitiesPage() {
           columns={columns}
           rowKey={(row) => row.capabilityId}
           loading={loading}
-          error={error}
+          error={rows.length === 0 ? error : null}
           onRetry={() => void reload()}
           minWidth={960}
           emptyText={
-            rows.length === 0
-              ? '没有可管控的能力'
-              : '没有符合当前筛选的能力。'
+            hasFilter
+              ? '没有符合当前筛选的能力。清除筛选或换个条件试试。'
+              : '没有可管控的能力。能力注册表为空时才会出现。'
           }
           emptyAction={
-            rows.length > 0 && hasFilter ? (
+            hasFilter ? (
               <ActionButton variant="secondary" size="sm" onClick={resetFilters}>
                 清除筛选
               </ActionButton>

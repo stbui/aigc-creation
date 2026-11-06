@@ -31,9 +31,9 @@
 | `40900` | 排序列表已变化：`expectedIds` 与库中不一致，整单拒绝，需重新加载后再保存 | `model/channels/channel.service.ts` |
 | `42201` | 有线路但全部失败（任务失败，退款） | `model/tasks/task-lifecycle.service.ts` |
 | `42202` / `42203` | 任务中断回收失败 / AIGC 显式角标失败（均退款） | 同上 |
-| `42204` | 无可用线路：所有线路都明确未接单，或存量 `route=local`（任务失败，退款，不交付任何产出） | `model/tasks/task-worker.service.ts` |
+| `42204` | 无可用线路：所有线路都明确未接单（含 DNS / 代理 / TCP 建连前网络失败），或存量 `route=local`（任务失败，退款，不交付任何产出） | `model/tasks/task-worker.service.ts` |
 | `42205` | 带遮罩但所有线路都不支持遮罩重绘，**不忽略遮罩整图重绘**（任务失败，退款） | `model/tasks/task-admission.service.ts` / `task-worker.service.ts` |
-| `42206` | 上游已受理但超时/结果不明，转人工核对：**不切线、不退款**，冻结保留 | `model/tasks/task-lifecycle.service.ts` |
+| `42206` | 请求可能已到达上游，但建连后超时 / 中断 / 5xx / 解析失败导致结果不明，转人工核对：**不切线、不退款**，冻结保留。建连前 DNS / 代理 / TCP 失败不得使用此码 | `model/tasks/task-lifecycle.service.ts` |
 | `42901` | 触发限流，附 `Retry-After` | `common/rate-limit.guard.ts` |
 | `50301` / `50302` | 支付通道未配置（缺凭据，绝不回落沙箱）/ **渠道退款未完成**（HTTP 502；订单状态与积分不变，可用同一退款单重试） | `payments/payment.factory.ts` / `orders/order.service.ts` |
 
@@ -147,6 +147,20 @@
 | GET/POST | `/api/v1/admin/notifications/{broadcast,templates}` | 全站广播 / 消息模板（`message.write`） |
 | GET | `/api/v1/admin/notifications/channels` | 邮件 / 短信**实际生效实现**（`provider` / `delivers` / `configured`，不含凭据；`message.write`） |
 | GET/POST | `/api/v1/admin/{storage,scheduler,backups,audit-logs,roles,settings}*` | 系统管理 |
+
+#### 任务全链路查询口径
+
+`GET /api/v1/admin/tasks/:id`（`task.read`）在任务基础字段、输入素材、参数、产出和状态时间线之外，返回 `routeAttempts`：按 `routeRun ASC, attemptNumber ASC` 排序的线路派发快照，包含逻辑模型、线路、渠道模型、`status`、`dispatchState`、上游请求号、失败码 / 失败原因和起止时间。该数组是任务排障数据，不包含账单金额或上游请求 / 响应正文。
+
+任务详情抽屉把分散在同一 `taskId` 下的数据组成集中排障页，但保留各自权限边界：
+
+- `GET /admin/tasks/:id`：提交时间、任务状态、参数、线路尝试、产出，`task.read`。
+- `GET /admin/api-logs?taskId=`：模型调用摘要及全部调用深链，`model.call_read`；最近 20 条用于抽屉内定位，完整列表在 `/admin/model-calls?taskId=`。
+- `GET /admin/billing-orders?taskId=`：积分预留、结算、退款与人工核对结果，`billing_order.read`；详情抽屉最多加载 100 条，完整列表在 `/admin/billing-orders?taskId=`。
+
+资金终态以 `BillingOrder` 为准，不能仅凭 `RouteAttempt.dispatchState` 判断是否需要人工复核：`reviewable=true` 才进入待核对队列；`refunded` 且 `resolvedBy=system:preconnection-reconcile` 表示建连前网络失败已由系统自动退款，应显示“无需人工复核”。`refundReason=route_switch` 是换线内部重预留，不计入真实退款。
+
+当前是**任务级追踪**，统一以 `taskId` 关联。若请求在创建 `GenerationTask` 之前就失败（前端、网关、鉴权等），库中没有 `taskId`，不会出现在该详情页；这类入口级排障需另接 `traceId` 与网关请求日志。
 
 #### 交易与发票处置约束
 
