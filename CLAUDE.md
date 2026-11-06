@@ -224,7 +224,7 @@ npm run e2e                 # Playwright
 | `unavailable` | 该能力没有配到任何可用的前台模型 / 线路：不可提交 |
 
 - 由 `capability-availability.service.ts` 合成，3s 缓存，后台写入即 `invalidate()`；**没有 `CapabilityControl` 行 = 启用**。
-- 下架必须填原因；`generate.service` 在**扣费之前**拦截并返回 `40005`，原因原样下发到 C 端。
+- 下架原因由后台按统一下线提示自动生成并原样下发 C 端（不再要求人工填写）；`generate.service` 在**扣费之前**拦截并返回 `40005`。
 - 界面标注看 `effective`，不看 `mode`；`effective` 是事前预期，实际失败不回落本地产出。
 - **积分价**运行时一律走 `CreditPriceService.resolve()`（后台可改）；**限时免费**命中进行中的 `Campaign(type='limited_free')` 时直接返回 0，优先级高于后台覆盖价，缓存 3s 到点自动恢复。
 

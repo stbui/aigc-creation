@@ -1,7 +1,7 @@
 import './BatchResultList.css';
 import './result-list.css';
 import { memo, useMemo, useState, type ReactNode } from 'react';
-import { Download, ImagePlus, RefreshCw, Trash2 } from 'lucide-react';
+import { Download, ImagePlus, Trash2 } from 'lucide-react';
 
 import { ImageLightbox, type LightboxItem } from './ImageLightbox';
 import { ToolEmptyState } from './ToolEmptyState';
@@ -42,12 +42,9 @@ export interface BatchResultListProps<Row extends BatchRow> {
   loading: boolean;
   /** 加载失败信息; 非空时保留已有列表并提示 */
   error?: string | null;
-  /** 列表标题右上的计数文案前缀 */
-  title: string;
   emptyTitle: string;
   emptyDesc?: string;
   emptyChildren?: ReactNode;
-  onRefresh: () => void;
   /** 删除一次生成（批次内全部任务） */
   onDeleteRow: (items: GalleryItem[]) => void;
   /** 下载文件名前缀 */
@@ -122,11 +119,9 @@ function BatchResultListImpl<Row extends BatchRow>({
   rows,
   loading,
   error,
-  title,
   emptyTitle,
   emptyDesc,
   emptyChildren,
-  onRefresh,
   onDeleteRow,
   downloadNamePrefix,
   labelOf,
@@ -142,10 +137,6 @@ function BatchResultListImpl<Row extends BatchRow>({
   const [downloadingRow, setDownloadingRow] = useState<string | null>(null);
   const isCardLayout = layout === 'card';
 
-  const readyCount = useMemo(
-    () => rows.reduce((sum, row) => sum + row.cells.filter((item) => Boolean(item.url)).length, 0),
-    [rows],
-  );
   const isEmpty = rows.length === 0;
 
   const openPreview = (row: Row, itemId: string) => {
@@ -276,21 +267,6 @@ function BatchResultListImpl<Row extends BatchRow>({
   return (
     <section className="pk-result-pane">
       <div className="pk-result-body">
-        <div className="pk-result-toolbar">
-          <div className="pk-result-title">
-            {title}
-            <span className="pk-result-count">
-              {rows.length} 次 · {readyCount} 张
-            </span>
-          </div>
-          <div className="fc-result-actions">
-            <button type="button" className="pk-result-regen" disabled={loading} onClick={onRefresh}>
-              <RefreshCw size={13} />
-              {loading ? '刷新中' : '刷新'}
-            </button>
-          </div>
-        </div>
-
         {error && <p className="tool-submit-notice tool-submit-notice-error">历史生成图加载失败：{error}</p>}
 
         <div className="pd-result-list">
@@ -446,7 +422,7 @@ function BatchResultListImpl<Row extends BatchRow>({
 
 /**
  * memo: 左栏表单按键重渲染时, 历史批次只随 `rows` 变化重建。
- * 前提是父页把 `onRefresh` / `onDeleteRow` / 插槽函数做成稳定引用。
+ * 前提是父页把 `onDeleteRow` / 插槽函数做成稳定引用。
  */
 // memo() 会把泛型组件擦成 `NamedExoticComponent`, 这里把泛型签名要回来。
 export const BatchResultList = memo(BatchResultListImpl) as unknown as typeof BatchResultListImpl;

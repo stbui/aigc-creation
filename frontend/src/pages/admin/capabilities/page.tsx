@@ -17,7 +17,6 @@ import {
   SelectField,
   StatusTag,
   StaleError,
-  TextAreaField,
   formatDateTimeLoose,
   type AdminColumn,
   type AppliedFilter,
@@ -37,12 +36,16 @@ import type { AdminCapabilityControl } from '../../../types/api';
  *   当前结论 (effective)    —— 此刻按下去会发生什么（下架 / 云端 / 暂不可用）
  * 只显示 mode 会让「real 但没配通道」看起来像云端可用，正是要消除的误读。
  *
- * 下架**必须填原因**：原因会原样展示给 C 端用户并写进审计。只说「已下线」
- * 只能让用户去问客服，写清「云端通道维护中，预计 2 小时恢复」才是可自助的。
+ * 下架不再要求人工填写原因：确认框只保留业务影响说明，下线原因由页面按
+ * 操作上下文自动生成并原样下发 C 端，同时写入审计。
  *
  * 改造 (2026-10-30) 只换渲染层：筛选为客户端过滤（不请求后端），URL 同步、
- * 三态分家、下线必须填原因逐条保留。
+ * 三态分家、下线确认逐条保留。
  */
+
+/** 下线原因由页面自动生成：既作为 C 端提示，也作为审计留痕 */
+const OFFLINE_REASON = '该能力已暂时下线，请稍后再试';
+
 export function AdminCapabilitiesPage() {
   const toast = useToast();
   const { can } = useAdmin();
@@ -51,7 +54,6 @@ export function AdminCapabilitiesPage() {
   const [saving, setSaving] = useState<string | null>(null);
   /** 下架弹窗的上下文；null = 弹窗关闭 */
   const [offline, setOffline] = useState<AdminCapabilityControl | null>(null);
-  const [reason, setReason] = useState('');
 
   const [searchParams] = useSearchParams();
   const initialQ = searchParams.get('q') ?? '';
@@ -129,17 +131,11 @@ export function AdminCapabilitiesPage() {
 
   const submitOffline = async () => {
     if (!offline) return;
-    const text = reason.trim();
-    if (!text) {
-      toast.warning('下架必须填写原因，用户会看到它');
-      return;
-    }
     setSaving(offline.capabilityId);
     try {
-      await adminCapabilitiesApi.set(offline.capabilityId, false, text);
+      await adminCapabilitiesApi.set(offline.capabilityId, false, OFFLINE_REASON);
       toast.success(`${offline.name} 已下线，C 端立即生效`);
       setOffline(null);
-      setReason('');
       await reload();
     } catch (e) {
       toast.error((e as Error).message || '下线失败');
@@ -259,7 +255,6 @@ export function AdminCapabilitiesPage() {
             disabled={!writable || saving === row.capabilityId}
             onClick={() => {
               if (row.enabled) {
-                setReason('');
                 setOffline(row);
               } else {
                 void bringOnline(row);
@@ -373,21 +368,11 @@ export function AdminCapabilitiesPage() {
         onConfirm={() => void submitOffline()}
         description={
           <p className="text-xs text-muted-foreground">
-            下架后用户在 C 端会看到下方填写的「下线原因」，同时该能力不可提交。此操作会写入审计日志。
+            下架后 C 端会看到统一提示「{OFFLINE_REASON}」，该能力立即停止提交。
+            此操作会写入审计日志。
           </p>
         }
-        impact={['C 端停止提交该能力', '下线原因展示给用户', '写操作审计（含操作人）']}
-        extra={
-          <TextAreaField
-            value={reason}
-            onChange={setReason}
-            rows={3}
-            maxLength={200}
-            showCount
-            ariaLabel="下线原因"
-            placeholder="例如：云端通道维护中，预计 2 小时恢复"
-          />
-        }
+        impact={['C 端停止提交该能力', 'C 端展示统一下线提示', '写操作审计（含操作人）']}
       />
     </>
   );

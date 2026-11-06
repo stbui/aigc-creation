@@ -28,7 +28,6 @@ export interface DetailResultListProps {
   emptyTitle: string;
   emptyDesc?: string;
   emptyChildren?: ReactNode;
-  onRefresh: () => void;
   /** 删除一次生成（批次内全部任务） */
   onDeleteRow: (items: GalleryItem[]) => void;
   /** 下载文件名前缀 */
@@ -42,7 +41,6 @@ function DetailResultListImpl({
   emptyTitle,
   emptyDesc,
   emptyChildren,
-  onRefresh,
   onDeleteRow,
   downloadNamePrefix = 'product-detail',
 }: DetailResultListProps) {
@@ -53,11 +51,9 @@ function DetailResultListImpl({
       rows={rows}
       loading={loading}
       error={error}
-      title="生成记录"
       emptyTitle={emptyTitle}
       emptyDesc={emptyDesc}
       emptyChildren={emptyChildren}
-      onRefresh={onRefresh}
       onDeleteRow={onDeleteRow}
       downloadNamePrefix={downloadNamePrefix}
       labelOf={labelOf}

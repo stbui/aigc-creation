@@ -12,7 +12,7 @@ vi.mock('../../lib/zip', () => ({ downloadUrlsAsZip: vi.fn() }));
 
 /**
  * 批次结果列表是详情图 / 商品主图 / 带货图文三页共用的渲染本体。
- * 这里锁住共用部分的行为：空态、计数、行头插槽、格子的三种状态，
+ * 这里锁住共用部分的行为：空态、行头插槽、格子的三种状态，
  * 以及删除与预览入口 —— 页面差异全部走插槽，组件内不该出现页面判断。
  */
 
@@ -47,18 +47,15 @@ interface ListOverrides {
 }
 
 function renderList(over: ListOverrides = {}) {
-  const onRefresh = vi.fn();
   const onDeleteRow = vi.fn();
   render(
     <UiProvider>
       <BatchResultList
         rows={over.rows ?? rowsOf([item({ id: 't1', url: '/uploads/a.png', caption: '首屏图' })])}
         loading={over.loading ?? false}
-        title="生成记录"
         emptyTitle={over.emptyTitle ?? '效果图预览'}
         emptyDesc={over.emptyDesc}
         emptyChildren={over.emptyChildren}
-        onRefresh={onRefresh}
         onDeleteRow={onDeleteRow}
         downloadNamePrefix="demo"
         labelOf={labelOf}
@@ -70,7 +67,7 @@ function renderList(over: ListOverrides = {}) {
       />
     </UiProvider>,
   );
-  return { onRefresh, onDeleteRow };
+  return { onDeleteRow };
 }
 
 describe('BatchResultList 空态与加载', () => {
@@ -89,7 +86,7 @@ describe('BatchResultList 空态与加载', () => {
 });
 
 describe('BatchResultList 批次行', () => {
-  it('按批次展示计数与行头插槽', () => {
+  it('按批次展示行头插槽且不渲染结果工具栏', () => {
     renderList({
       rows: rowsOf([
         item({
@@ -104,10 +101,8 @@ describe('BatchResultList 批次行', () => {
       renderRowMeta: (row) => (row.prompt ? <span>提示词：{row.prompt}</span> : null),
     });
 
-    // 计数由多个文本节点拼成, 按整段文本断言
-    const count = document.querySelector('.pk-result-count');
-    // 两个同批次任务合成一行: 「1 次」, 其中 1 张已出图
-    expect(count?.textContent?.replace(/\s+/g, ' ').trim()).toBe('1 次 · 1 张');
+    expect(document.querySelector('.pk-result-toolbar')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '刷新' })).not.toBeInTheDocument();
     expect(screen.getByText('提示词：清晨窗边的木质桌面')).toBeVisible();
     // 第二格还在生成中: 展示占位而不是下载入口
     expect(screen.getByText('生成中…')).toBeVisible();
@@ -142,10 +137,6 @@ describe('BatchResultList 批次行', () => {
     expect(onDeleteRow.mock.calls[0][0].map((entry: GalleryItem) => entry.id)).toEqual(['t1', 't2']);
   });
 
-  it('刷新按钮在加载中禁用', () => {
-    renderList({ loading: true });
-    expect(screen.getByRole('button', { name: '刷新中' })).toBeDisabled();
-  });
 });
 
 describe('BatchResultList 单元格交互', () => {

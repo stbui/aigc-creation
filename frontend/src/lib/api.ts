@@ -690,8 +690,8 @@ export const adminCreditPricesApi = {
 /**
  * 能力上下线（后台「能力管控」）。
  *
- * 下架必须填原因 —— 原因会展示给 C 端用户并进审计。只写「已下线」
- * 会让用户去问客服，写清「云端通道维护中」才是可自助的。
+ * 后端要求下架时 reason 非空。页面统一生成一句对 C 端可读的下线提示并随请求
+ * 下发（同时进入审计），不再让运营手填。
  */
 export const adminCapabilitiesApi = {
   list: () => request<AdminCapabilityControl[]>("/admin/capabilities"),

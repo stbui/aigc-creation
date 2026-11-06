@@ -13,7 +13,6 @@ import {
   ToolWorkflowSteps,
 } from './components';
 import { DetailExamplePanel } from './DetailExamplePanel';
-import { DetailPromptEditor } from './DetailPromptEditor';
 import { DetailResultList } from './DetailResultList';
 import { DetailSectionPicker } from './DetailSectionPicker';
 import { FormSelect } from './FormSelect';
@@ -77,7 +76,6 @@ export function ProductDetailPage() {
     sections,
     sectionPrompts,
     toggle: toggleSection,
-    setSectionPrompt,
   } = useSectionSelection();
   const [ratio, setRatio] = useState('3:4');
   const [resolution, setResolution] = useState('1k');
@@ -134,10 +132,6 @@ export function ProductDetailPage() {
         : '登录后，你在这个页面生成过的图都会显示在这里',
     [token],
   );
-  const refreshGallery = useCallback(() => {
-    void gallery.reload();
-  }, [gallery.reload]);
-
   // 首访落在「功能示例」, 有历史产出时自动切到「创作结果」; 用户点过页签后不再自动切换
   const { rightTab, pick: pickRightTab, showResults } = useRightTab(
     gallery.items.length,
@@ -406,11 +400,6 @@ export function ProductDetailPage() {
             </section>
 
             <DetailSectionPicker selected={sections} onToggle={toggleSection} />
-            <DetailPromptEditor
-              selected={sections}
-              prompts={sectionPrompts}
-              onChange={setSectionPrompt}
-            />
           </div>
 
           {/* 高级设置 + 提交 (sticky 底部) */}
@@ -499,7 +488,6 @@ export function ProductDetailPage() {
                 emptyTitle="效果图预览"
                 emptyDesc={resultEmptyDesc}
                 emptyChildren={resultEmptyChildren}
-                onRefresh={refreshGallery}
                 onDeleteRow={deleteRow}
                 downloadNamePrefix="product-detail"
               />

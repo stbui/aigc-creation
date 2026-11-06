@@ -158,10 +158,6 @@ export function ProductKitPage() {
         : '登录后，你在这个页面生成过的图都会显示在这里',
     [token],
   );
-  const refreshGallery = useCallback(() => {
-    void gallery.reload();
-  }, [gallery.reload]);
-
   // 首访落在「功能示例」, 有历史产出时自动切到「创作结果」; 用户点过页签后不再自动切换
   const { rightTab, pick: pickRightTab, showResults } = useRightTab(gallery.items.length, gallery.loading);
 
@@ -504,7 +500,6 @@ export function ProductKitPage() {
                 emptyTitle="效果图预览"
                 emptyDesc={resultEmptyDesc}
                 emptyChildren={resultEmptyChildren}
-                onRefresh={refreshGallery}
                 onDeleteRow={deleteRow}
                 downloadNamePrefix="main-image"
               />

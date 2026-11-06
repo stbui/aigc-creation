@@ -23,7 +23,6 @@ export interface ShoppableCarouselResultListProps {
   error?: string | null;
   emptyTitle: string;
   emptyDesc?: string;
-  onRefresh: () => void;
   /** 删除一次生成（批次内全部任务） */
   onDeleteRow: (items: GalleryItem[]) => void;
 }
@@ -34,7 +33,6 @@ function ShoppableCarouselResultListImpl({
   error,
   emptyTitle,
   emptyDesc,
-  onRefresh,
   onDeleteRow,
 }: ShoppableCarouselResultListProps) {
   const rows = useMemo(() => buildRows(items), [items]);
@@ -44,10 +42,8 @@ function ShoppableCarouselResultListImpl({
       rows={rows}
       loading={loading}
       error={error}
-      title="历史生成记录"
       emptyTitle={emptyTitle}
       emptyDesc={emptyDesc}
-      onRefresh={onRefresh}
       onDeleteRow={onDeleteRow}
       downloadNamePrefix="shoppable-carousel"
       labelOf={labelOf}

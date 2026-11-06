@@ -135,7 +135,7 @@
 | GET/POST | `/api/v1/admin/billing-orders*`、`/billing-orders/:id/resolve`、`/billing-orders/batch-resolve` | 生成账单列表 / 详情 / 人工核对（`settle` \| `refund`）。单条与批量请求均必须带 `reason`（≤ 500 字），批量同一次操作共享 `reviewBatchId`；写操作自动写审计，`billing_order.read` / `billing_order.resolve`；列表支持 `?status=review`「待核对」队列口径；批量核对逐条独立处置并回显失败原因 |
 | GET | `/api/v1/admin/api-logs` | 上游调用记录（`ApiCallLog`）：含 `billable=false` 的连通性测试；筛选状态 / 类型 / 渠道 / 模型 / 时间，附汇总统计，`model.call_read` |
 | GET | `/api/v1/admin/api-logs/export` | 调用记录 CSV（与列表同筛选口径，上限 5000 行；**不含请求体 / 响应体**），`model.call_read + data.export` + 审计 |
-| GET/PUT | `/api/v1/admin/capabilities*` | 能力上下线；下架必须填原因，写需 `capability.write`（高危，走审计） |
+| GET/PUT | `/api/v1/admin/capabilities*` | 能力上下线；下架请求必须带原因（后台页面统一生成并下发 C 端），写需 `capability.write`（高危，走审计） |
 | GET/PUT | `/api/v1/admin/aigc-label` | 读 / 改角标样式（`setting.read` / `setting.write`，PUT 自动写审计 `aigc.label_update`） |
 | GET | `/api/v1/admin/tickets`、`/tickets/stats`、`/tickets/export` | 工单列表 / 状态计数 / CSV 导出 |
 | GET/POST/PATCH | `/api/v1/admin/tickets/:id`、`/tickets/:id/replies` | 工单详情与回复 / 改状态或指派（`ticket.handle`） |
