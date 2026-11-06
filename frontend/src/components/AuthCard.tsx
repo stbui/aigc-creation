@@ -528,10 +528,13 @@ export function AuthCard({ onSuccess, onCancel }: AuthCardProps) {
                   },
                 ]}
               >
-                <Checkbox>
-                  我已阅读并同意<a href="/legal/user-agreement.html">用户协议</a>与
-                  <a href="/legal/privacy-policy.html">个人信息保护政策</a>
-                </Checkbox>
+                <label className="login-agree-control">
+                  <Checkbox aria-label="同意用户协议与隐私政策" />
+                  <span>
+                    我已阅读并同意<a href="/legal/user-agreement.html">用户协议</a>与
+                    <a href="/legal/privacy-policy.html">个人信息保护政策</a>
+                  </span>
+                </label>
               </FormItem>
             )}
 

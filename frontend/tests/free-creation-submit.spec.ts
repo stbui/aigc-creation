@@ -113,6 +113,9 @@ test.describe('自由创作 · 提交按钮登录墙', () => {
   test('未登录 + 提示词已填 → 按钮可点, 点击弹登录框且不发生成请求', async ({ page }) => {
     await gotoAsGuest(page);
     await PROMPT(page).fill('赛博朋克城市夜景，霓虹灯');
+    // 填充后按钮从 disabled(.55) 切换到 enabled(1) 时有 CSS 过渡；
+    // 先等最终态落定，再读取完整契约，避免把过渡中间值误判成样式回归。
+    await expect(page.locator('button.pk-primary-btn').first()).toHaveCSS('opacity', '1');
     const s = await submitState(page);
 
     expect(s.text).toContain('登录免费生成');

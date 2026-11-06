@@ -34,15 +34,10 @@ const VERBOSE = process.argv.includes('--verbose');
  */
 const BASELINE = {
   // 接口聚合层：按域拆分牵扯全部调用方，待「API 与类型层治理」批次统一处理
-  'src/lib/api.ts': 2660,
+  'src/lib/api.ts': 2657,
   // 后端契约类型声明（无运行期逻辑），随接口演进增长
   'src/types/api.d.ts': 2344,
   'src/types/model.ts': 928,
-  // 概览页内容：批 1 从 AdminDashboardPage 抽出，内部构件还可再分
-  'src/pages/admin/dashboard/AdminDashboardContent.tsx': 988,
-  'src/pages/creative-image/page.tsx': 818,
-  // ToolShell 主壳：批 2 已抽走类型 / 卡片 / 弹窗 / hook，剩余是壳本体
-  'src/components/ToolShell.tsx': 816,
   'src/components/MattingResultEditor.tsx': 810,
 };
 
@@ -72,15 +67,21 @@ for (const path of walk(SRC_DIR)) {
 
   if (base !== undefined) {
     if (lines > base) {
-      errors.push(`${rel}: ${lines} 行，超过基线 ${base} 行（多出 ${lines - base} 行）。先拆分，或把这段逻辑放到新的子组件里`);
+      errors.push(
+        `${rel}: ${lines} 行，超过基线 ${base} 行（多出 ${lines - base} 行）。先拆分，或把这段逻辑放到新的子组件里`,
+      );
     } else if (lines < base) {
-      stale.push(`${rel}: 已降到 ${lines} 行，请把 BASELINE 里的 ${base} 改成 ${lines}${lines <= ERROR_LINES ? '（已达上限内，可直接删除该条目）' : ''}`);
+      stale.push(
+        `${rel}: 已降到 ${lines} 行，请把 BASELINE 里的 ${base} 改成 ${lines}${lines <= ERROR_LINES ? '（已达上限内，可直接删除该条目）' : ''}`,
+      );
     }
     continue;
   }
 
   if (lines > ERROR_LINES) {
-    errors.push(`${rel}: ${lines} 行，超过 ${ERROR_LINES} 行上限。按 docs/frontend-module-conventions.md 拆成 page + 业务组件`);
+    errors.push(
+      `${rel}: ${lines} 行，超过 ${ERROR_LINES} 行上限。按 docs/frontend-module-conventions.md 拆成 page + 业务组件`,
+    );
   } else if (lines > WARN_LINES) {
     warnings.push(`${rel}: ${lines} 行`);
   }
@@ -108,6 +109,4 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-console.log(
-  `文件体积守卫通过：${warnings.length} 个文件 500+ 行（告警），无 800+ 行新增违规。`,
-);
+console.log(`文件体积守卫通过：${warnings.length} 个文件 500+ 行（告警），无 800+ 行新增违规。`);

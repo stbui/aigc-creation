@@ -20,6 +20,7 @@ import { useAuth } from '../../context/AuthContext';
 import {
   ADMIN_MENU,
   findAdminMenuGroup,
+  findAdminMenuItem,
 } from '../../components/admin/adminNav';
 import type { AdminMenuItem } from '../../components/admin/adminNav';
 import { hasUnsavedChanges } from '../../lib/unsaved-guard';
@@ -44,7 +45,8 @@ const LEGACY_SIDEBAR_GROUP_NAMES: Record<string, string> = {
  * ## 结构
  *
  * 经典「上左右」：顶栏 56px（品牌 + 环境标识 + 账号）+ 侧栏 232 / 折叠 60 +
- * 内容区。≤1280 侧栏自动折叠；展开态分组可折叠，默认只展开当前位置所在分组。
+ * 内容区。≤1280 侧栏自动折叠；展开态分组可折叠，首次进入默认展开全部分组，
+ * 之后沿用用户保存的展开状态。
  *
  * ## 不能因为换壳丢掉的行为
  *
@@ -150,6 +152,7 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
   // 精确匹配，避免 /admin/users 同时点亮「平台概览」
   const activePath = location.pathname.replace(/\/$/, '') || '/admin';
   const currentGroup = findAdminMenuGroup(activePath);
+  const currentItem = findAdminMenuItem(activePath);
 
   const permissionGroups = useMemo(
     () =>
@@ -163,9 +166,9 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
   const groups = useMemo(() => {
     return permissionGroups.map((group) => ({
       ...group,
-      open: (openGroups ?? [currentGroup?.name]).includes(group.name),
+      open: openGroups === null || openGroups.includes(group.name),
     }));
-  }, [currentGroup, openGroups, permissionGroups]);
+  }, [openGroups, permissionGroups]);
 
   const currentGroupName = currentGroup?.name;
 
@@ -208,20 +211,25 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
   };
 
   const toggleGroup = (name: string) => {
-    setOpenGroups((current) =>
-      (current ?? []).includes(name)
-        ? (current ?? []).filter((group) => group !== name)
-        : [...(current ?? []), name],
-    );
+    setOpenGroups((current) => {
+      // 未保存偏好时全部分组都是展开的；首次切换要基于“全部已展开”
+      // 计算，否则会误把其余分组一起收起。
+      const expanded = current ?? groups.map((group) => group.name);
+      return expanded.includes(name)
+        ? expanded.filter((group) => group !== name)
+        : [...expanded, name];
+    });
   };
 
+  // 路由切换时确保当前分组可见；不在 openGroups 变化时重复跑，否则用户
+  // 主动收起当前分组后会被立即重新展开。
   useEffect(() => {
-    if (currentGroupName && openGroups) {
-      setOpenGroups((current) =>
-        current?.includes(currentGroupName) ? current : [...(current ?? []), currentGroupName],
-      );
-    }
-  }, [currentGroupName, openGroups]);
+    if (!currentGroupName) return;
+    setOpenGroups((current) => {
+      if (current === null || current.includes(currentGroupName)) return current;
+      return [...current, currentGroupName];
+    });
+  }, [currentGroupName]);
 
   useEffect(() => {
     if (openGroups) localStorage.setItem(SIDEBAR_GROUPS_KEY, JSON.stringify(openGroups));
@@ -255,6 +263,18 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
             货觉<span className="text-muted-foreground"> 运营后台</span>
           </span>
         </button>
+
+        {currentGroup && currentItem && (
+          <nav
+            data-testid="admin-breadcrumb"
+            aria-label="当前位置"
+            className="ml-3 hidden min-w-0 items-center gap-2 border-l border-border pl-3 text-xs min-[1200px]:flex"
+          >
+            <span className="shrink-0 text-muted-foreground">{currentGroup.name}</span>
+            <span className="text-border" aria-hidden>/</span>
+            <span className="truncate font-medium text-foreground">{currentItem.label}</span>
+          </nav>
+        )}
 
         <div className="ml-auto flex items-center gap-3">
           <AdminAlertBell onNavigate={(path) => void leave(path)} />

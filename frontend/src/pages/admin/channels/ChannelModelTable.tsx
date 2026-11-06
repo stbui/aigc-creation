@@ -1,37 +1,22 @@
 import { useMemo, useState } from 'react';
-import {
-  Copy,
-  ListOrdered,
-  Pencil,
-  Plus,
-  Power,
-  RefreshCw,
-  Trash2,
-  TrendingUp,
-  Zap,
-} from 'lucide-react';
+import { Copy, ListOrdered, Pencil, Plus, Power, RefreshCw, Trash2, TrendingUp, Zap } from 'lucide-react';
 import {
   AdminDataTable,
   AppliedFilters,
   ActionButton,
   ClearableField,
-  Descriptions,
   FilterActions,
   FilterBar,
   HelpTip,
-  Panel,
   SelectField,
   StatusTag,
   type AdminColumn,
 } from '~/admin-ui/primitives';
 import { ChannelModelCapabilityTag } from './ChannelModelCapabilityTag';
 import { ChannelModelCostSummary, ChannelModelHealthCell } from './ChannelModelHealthCell';
+import { ChannelModelTestResultPanel } from './ChannelModelTestResultPanel';
 import { CAPABILITY_OPTIONS, PAGE_SIZE, STATUS_FILTER_OPTIONS } from './constants';
-import type {
-  AdminChannelModelView,
-  ChannelModelHealthRowView,
-  ProtocolTestResultView,
-} from '../../../types/model';
+import type { AdminChannelModelView, ChannelModelHealthRowView, ProtocolTestResultView } from '../../../types/model';
 
 interface ChannelModelTableProps {
   models: AdminChannelModelView[] | null;
@@ -176,9 +161,7 @@ export function ChannelModelTable({
       key: 'health',
       title: '稳定性（24h）',
       width: 104,
-      render: (model) => (
-        <ChannelModelHealthCell health={healthById.get(model.id)} loading={healthLoading} />
-      ),
+      render: (model) => <ChannelModelHealthCell health={healthById.get(model.id)} loading={healthLoading} />,
     },
     {
       key: 'protocol',
@@ -299,44 +282,15 @@ export function ChannelModelTable({
 
   return (
     <>
-      {/*
-       * 这里不再套 `Panel`：外层渠道详情已经是带边框的卡片，再套一层卡片
-       * 会形成「卡片里再开一张卡片 + 筛选框」三级边框。分区改用标题 + 发丝线。
-       */}
       <section className="flex flex-col gap-3" aria-labelledby="admin-model-list-title">
         <div className="flex flex-wrap items-start gap-3 border-b border-border pb-3">
           <div className="min-w-0 flex-1">
             <h3 id="admin-model-list-title" className="text-sm font-semibold text-foreground">
-              模型清单（{(models ?? []).length}）
+              模型清单
             </h3>
-            {!writable && (
-              <p className="mt-0.5 text-xs text-muted-foreground">当前账号仅可查看</p>
-            )}
+            {!writable && <p className="mt-0.5 text-xs text-muted-foreground">当前账号仅可查看</p>}
           </div>
           {/* 模型级入口跟着清单位置走：原先在详情顶部单独占一行，页面会被拉出一条空白工具条 */}
-          <div className="flex shrink-0 items-center gap-2">
-            <ActionButton
-              variant="secondary"
-              size="sm"
-              icon={RefreshCw}
-              disabled={fetching || !writable}
-              onClick={onFetchUpstream}
-            >
-              {fetching ? '同步中…' : '同步服务商模型'}
-            </ActionButton>
-            <ActionButton
-              variant="default"
-              size="sm"
-              icon={Plus}
-              disabled={!writable}
-              onClick={onOpenCreate}
-            >
-              新建模型
-            </ActionButton>
-          </div>
-        </div>
-
-        <FilterBar className="mb-0 rounded-lg border-0 bg-muted/60">
           <ClearableField
             ariaLabel="搜索模型"
             value={keyword}
@@ -373,14 +327,41 @@ export function ChannelModelTable({
             allowClear
             className="w-36"
           />
+          <ActionButton variant="secondary" size="xs" disabled={!hasFilters} onClick={resetFilters}>
+            重置
+          </ActionButton>
+        </div>
+
+        <FilterBar className="mb-0 rounded-lg border-0 bg-muted/60">
+          <div className="flex shrink-0 items-center gap-2">
+            <ActionButton variant="default" size="sm" icon={Plus} disabled={!writable} onClick={onOpenCreate}>
+              新建模型
+            </ActionButton>
+            <ActionButton
+              variant="secondary"
+              size="sm"
+              icon={RefreshCw}
+              disabled={fetching || !writable}
+              onClick={onFetchUpstream}
+            >
+              {fetching ? '同步中…' : '同步服务商模型'}
+            </ActionButton>
+
+          </div>
+
+
           <FilterActions>
             <ActionButton
               variant="secondary"
               size="xs"
-              icon={ListOrdered}
-              disabled={!writable}
-              onClick={onOpenOrder}
+              icon={TrendingUp}
+              disabled={!writable || selectedIds.length === 0}
+              onClick={onOpenReprice}
             >
+              {selectedIds.length > 0 ? `统一调价（${selectedIds.length}）` : '统一调价'}
+            </ActionButton>
+
+            <ActionButton variant="secondary" size="xs" icon={ListOrdered} disabled={!writable} onClick={onOpenOrder}>
               排序
             </ActionButton>
             <ActionButton
@@ -392,62 +373,47 @@ export function ChannelModelTable({
             >
               {selectedIds.length > 0 ? `批量删除（${selectedIds.length}）` : '批量删除'}
             </ActionButton>
-            <ActionButton
-              variant="secondary"
-              size="xs"
-              icon={TrendingUp}
-              disabled={!writable || selectedIds.length === 0}
-              onClick={onOpenReprice}
-            >
-              {selectedIds.length > 0 ? `统一调价（${selectedIds.length}）` : '统一调价'}
-            </ActionButton>
-            <ActionButton variant="secondary" size="xs" disabled={!hasFilters} onClick={resetFilters}>
-              重置
-            </ActionButton>
+
           </FilterActions>
           <AppliedFilters
             items={[
               ...(keyword.trim()
                 ? [
-                    {
-                      key: 'keyword',
-                      label: `搜索：${keyword.trim()}`,
-                      onClear: () => {
-                        setKeyword('');
-                        setPage(1);
-                      },
+                  {
+                    key: 'keyword',
+                    label: `搜索：${keyword.trim()}`,
+                    onClear: () => {
+                      setKeyword('');
+                      setPage(1);
                     },
-                  ]
+                  },
+                ]
                 : []),
               ...(capabilityFilter
                 ? [
-                    {
-                      key: 'capability',
-                      label: `能力：${
-                        CAPABILITY_OPTIONS.find((item) => item.value === capabilityFilter)?.label ??
-                        capabilityFilter
+                  {
+                    key: 'capability',
+                    label: `能力：${CAPABILITY_OPTIONS.find((item) => item.value === capabilityFilter)?.label ?? capabilityFilter
                       }`,
-                      onClear: () => {
-                        setCapabilityFilter(undefined);
-                        setPage(1);
-                      },
+                    onClear: () => {
+                      setCapabilityFilter(undefined);
+                      setPage(1);
                     },
-                  ]
+                  },
+                ]
                 : []),
               ...(statusFilter
                 ? [
-                    {
-                      key: 'status',
-                      label: `状态：${
-                        STATUS_FILTER_OPTIONS.find((item) => item.value === statusFilter)?.label ??
-                        statusFilter
+                  {
+                    key: 'status',
+                    label: `状态：${STATUS_FILTER_OPTIONS.find((item) => item.value === statusFilter)?.label ?? statusFilter
                       }`,
-                      onClear: () => {
-                        setStatusFilter(undefined);
-                        setPage(1);
-                      },
+                    onClear: () => {
+                      setStatusFilter(undefined);
+                      setPage(1);
                     },
-                  ]
+                  },
+                ]
                 : []),
             ]}
             onClearAll={resetFilters}
@@ -479,43 +445,7 @@ export function ChannelModelTable({
         />
       </section>
 
-      {testResult && (
-        <Panel title="最近一次测试结果" note={`调用记录 ${testResult.logId || '—'}（非计费）`}>
-          <Descriptions
-            columns={2}
-            items={[
-              {
-                label: '结果',
-                value: (
-                  <StatusTag
-                    status={testResult.status}
-                    tone={testResult.status === 'succeeded' ? 'success' : 'danger'}
-                    label={
-                      testResult.status === 'succeeded'
-                        ? '成功'
-                        : testResult.status === 'pending'
-                          ? '未完成'
-                          : '失败'
-                    }
-                  />
-                ),
-              },
-              { label: '耗时', value: `${testResult.durationMs}ms` },
-              { label: 'HTTP', value: String(testResult.request?.path ?? '') },
-              { label: '错误', value: testResult.error || testResult.message || '—' },
-              {
-                label: '产出',
-                value: `${testResult.result?.images ?? 0} 图 / ${testResult.result?.videos ?? 0} 视频 / ${testResult.result?.text ? '有文本' : '无文本'}`,
-              },
-            ]}
-          />
-          {testResult.responsePreview && (
-            <pre className="mt-3 max-h-[200px] overflow-auto rounded-lg bg-muted p-3 font-mono text-[12px] text-muted-foreground">
-              {testResult.responsePreview}
-            </pre>
-          )}
-        </Panel>
-      )}
+      {testResult && <ChannelModelTestResultPanel testResult={testResult} />}
     </>
   );
 }

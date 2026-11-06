@@ -70,6 +70,7 @@ export function AssetTable({
               className="size-full"
               src={thumbSrc(row.sourceUrl, 96)}
               alt={`${assetLabel(row)}缩略图`}
+              format={row.format}
             />
           </button>
         ),

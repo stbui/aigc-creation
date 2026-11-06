@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ActionButton,
+  RefreshButton,
   AdminDataTable,
   Descriptions,
   DetailSection,
@@ -20,19 +21,8 @@ import {
 import { LEDGER_LABELS, LEDGER_OPTIONS, SOURCE_LABELS } from './constants';
 import { useCreditDetail, useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
 import { adminCreditsApi } from './api';
-import {
-  adminOrderHref,
-  adminTasksHref,
-  adminUserDetailHref,
-  cn,
-  fmtTime,
-  signed,
-} from './utils';
-import type {
-  AdminCreditLedgerRow,
-  AdminCreditLotRow,
-  AdminCreditRow,
-} from '../../../types/api';
+import { adminOrderHref, adminTasksHref, adminUserDetailHref, cn, fmtTime, signed } from './utils';
+import type { AdminCreditLedgerRow, AdminCreditLotRow, AdminCreditRow } from '../../../types/api';
 
 /**
  * 单用户明细: 批次 + 流水 + 单条调整。
@@ -130,9 +120,7 @@ export function CreditDetailDrawer({
     {
       key: 'createdAt',
       title: '创建时间',
-      render: (row) => (
-        <span className="text-[12px] text-muted-foreground">{fmtTime(row.createdAt)}</span>
-      ),
+      render: (row) => <span className="text-[12px] text-muted-foreground">{fmtTime(row.createdAt)}</span>,
     },
   ];
 
@@ -141,11 +129,7 @@ export function CreditDetailDrawer({
       key: 'createdAt',
       title: '时间',
       width: 170,
-      render: (row) => (
-        <span className="text-[12px] tabular-nums text-muted-foreground">
-          {fmtTime(row.createdAt)}
-        </span>
-      ),
+      render: (row) => <span className="text-[12px] tabular-nums text-muted-foreground">{fmtTime(row.createdAt)}</span>,
     },
     {
       key: 'type',
@@ -158,12 +142,7 @@ export function CreditDetailDrawer({
       title: '变动',
       width: 90,
       render: (row) => (
-        <b
-          className={cn(
-            'tabular-nums',
-            row.amount > 0 ? 'text-success-text' : 'text-danger-text',
-          )}
-        >
+        <b className={cn('tabular-nums', row.amount > 0 ? 'text-success-text' : 'text-danger-text')}>
           {signed(row.amount)}
         </b>
       ),
@@ -289,11 +268,7 @@ export function CreditDetailDrawer({
               />
             </FormField>
             <div>
-              <ActionButton
-                variant="default"
-                disabled={!deltaValid || busy}
-                onClick={() => void submitAdjust()}
-              >
+              <ActionButton variant="default" disabled={!deltaValid || busy} onClick={() => void submitAdjust()}>
                 {busy ? '提交中…' : '提交调整'}
               </ActionButton>
             </div>
@@ -301,11 +276,7 @@ export function CreditDetailDrawer({
         </DetailSection>
       )}
 
-      <DetailSection
-        title="批次"
-        note="消耗按先到期先扣（FEFO），空到期视为最晚"
-        className="mt-6"
-      >
+      <DetailSection title="批次" note="消耗按先到期先扣（FEFO），空到期视为最晚" className="mt-6">
         {loading && !data ? (
           <SkeletonBody rows={4} />
         ) : error && !data ? (
@@ -335,18 +306,10 @@ export function CreditDetailDrawer({
             onChange={setType}
             options={LEDGER_OPTIONS}
           />
-          <TextField
-            className="w-40"
-            ariaLabel="开始日期"
-            type="date"
-            value={from}
-            onChange={setFrom}
-          />
+          <TextField className="w-40" ariaLabel="开始日期" type="date" value={from} onChange={setFrom} />
           <TextField className="w-40" ariaLabel="结束日期" type="date" value={to} onChange={setTo} />
           <FilterActions>
-            <ActionButton variant="secondary" onClick={() => void reload()} disabled={loading}>
-              刷新
-            </ActionButton>
+            <RefreshButton loading={loading} onRefresh={reload} />
           </FilterActions>
         </FilterBar>
         {/*

@@ -1,10 +1,11 @@
 import { useCallback, useState } from 'react';
-import { useAdminExport } from '~/admin-ui/primitives';
 import { useSearchParams } from 'react-router-dom';
-import { Download, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { marketingApi } from './api';
 import {
   ActionButton,
+  ExportCsvButton,
+  useAdminExport,
   AppliedFilters,
   ClearableField,
   FilterActions,
@@ -15,20 +16,8 @@ import {
   StaleError,
   type AppliedFilter,
 } from '~/admin-ui/primitives';
-import {
-  useAdmin,
-  useAdminList,
-  useAdminUrlFilterSync,
-  useDiscardConfirm,
-  useToast,
-  useUnsavedGuard,
-} from './hooks';
-import {
-  STATUS_OPTIONS,
-  TYPE_LABEL,
-  TYPE_OPTIONS,
-  type FormState,
-} from './constants';
+import { useAdmin, useAdminList, useAdminUrlFilterSync, useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
+import { STATUS_OPTIONS, TYPE_LABEL, TYPE_OPTIONS, type FormState } from './constants';
 import { buildCouponPayload, emptyForm, toLocalInput } from './utils';
 import { CouponTable } from './CouponTable';
 import { CouponFormDrawer } from './CouponFormDrawer';
@@ -72,9 +61,7 @@ export function AdminCouponsPage() {
   const [formBase, setFormBase] = useState<FormState | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const formDirty = Boolean(
-    formOpen && formBase && JSON.stringify(form) !== JSON.stringify(formBase),
-  );
+  const formDirty = Boolean(formOpen && formBase && JSON.stringify(form) !== JSON.stringify(formBase));
   useUnsavedGuard(formDirty);
   const requestCloseForm = useDiscardConfirm(formDirty, () => setFormOpen(false));
 
@@ -110,8 +97,7 @@ export function AdminCouponsPage() {
 
   const hasFilter = Boolean(params.keyword || params.type || params.status);
 
-  const applyFilters = () =>
-    setQuery({ keyword: keyword.trim() || undefined, type, status });
+  const applyFilters = () => setQuery({ keyword: keyword.trim() || undefined, type, status });
   const resetFilters = () => {
     setKeyword('');
     setType(undefined);
@@ -200,8 +186,7 @@ export function AdminCouponsPage() {
     setFormOpen(true);
   };
 
-  const patchForm = (patch: Partial<FormState>) =>
-    setForm((prev) => ({ ...prev, ...patch }));
+  const patchForm = (patch: Partial<FormState>) => setForm((prev) => ({ ...prev, ...patch }));
 
   const save = async () => {
     const payload = buildCouponPayload(form, editing);
@@ -248,25 +233,13 @@ export function AdminCouponsPage() {
         description="发放范围、使用条件、有效期与限用。券不提供删除 —— 已核销订单仍引用它，只能停用。"
         actions={
           <>
-            {can('data.export') && (
-              <ActionButton
-                variant="secondary"
-                size="sm"
-                icon={Download}
-                disabled={exporting}
-                onClick={() => void exportCsv()}
-              >
-                {exporting ? '导出中…' : '导出 CSV'}
-              </ActionButton>
-            )}
+            {can('data.export') && <ExportCsvButton exporting={exporting} onExport={exportCsv} />}
             {writable ? (
               <ActionButton variant="default" size="sm" icon={Plus} onClick={openCreate}>
                 新建优惠券
               </ActionButton>
             ) : (
-              <span className="text-[12px] text-muted-foreground">
-                当前账号无 marketing.write 权限，仅可查看
-              </span>
+              <span className="text-[12px] text-muted-foreground">当前账号无 marketing.write 权限，仅可查看</span>
             )}
           </>
         }

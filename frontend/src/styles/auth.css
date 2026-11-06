@@ -646,17 +646,12 @@
   display: none;
 }
 
-/* shadcn Checkbox 的根节点是 <button>（radix Primitive.button），协议文案是它的
-   children，因此换行与字号要落在按钮本身，不能写成 `> label`。
-   原子件带 `size-4`（16px 方块）+ `peer`，这里改回 auto 高度并按文本基线对齐。 */
-.login-agree-field .ui-form-control > button {
+/* Radix Checkbox 根节点只渲染勾选框，协议文案不能作为它的 children
+   （会被组件的 Indicator 覆盖）。用原生 label 同时提供点击区域和可访问名称。 */
+.login-agree-field .login-agree-control {
   display: inline-flex;
   align-items: flex-start;
-  height: auto;
   gap: 8px;
-  padding: 0;
-  border: 0;
-  background: none;
   color: var(--text-desc);
   font-size: 12px;
   font-weight: 400;
@@ -666,7 +661,7 @@
   cursor: pointer;
 }
 
-.login-agree-field .ui-form-control > button > [data-slot='checkbox-indicator'] {
+.login-agree-field .login-agree-control > [data-slot='checkbox'] {
   margin-top: 2px;
   flex: none;
 }

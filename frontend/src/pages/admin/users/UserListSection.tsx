@@ -38,6 +38,9 @@ export function UserListSection({
   onPageChange,
 }: UserListSectionProps) {
   const rows = data?.items ?? [];
+  const activeCount = rows.filter((row) => row.status === 'active').length;
+  const restrictedCount = rows.filter((row) => row.status !== 'active').length;
+  const privilegedCount = rows.filter((row) => row.role !== 'user').length;
 
   return (
     <>
@@ -73,6 +76,25 @@ export function UserListSection({
 
       {rows.length > 0 && (
         <>
+          <div
+            data-testid="admin-user-summary"
+            className="mb-3 grid grid-cols-4 divide-x divide-border overflow-hidden rounded-lg border border-border bg-card shadow-card"
+          >
+            <UserSummaryMetric
+              label="当前页用户"
+              value={rows.length}
+              hint={data ? `共 ${data.total} 位匹配` : undefined}
+            />
+            <UserSummaryMetric label="正常账号" value={activeCount} hint="本页状态为正常" />
+            <UserSummaryMetric
+              label="受限账号"
+              value={restrictedCount}
+              hint="禁用或已注销"
+              tone={restrictedCount > 0 ? 'warn' : undefined}
+            />
+            <UserSummaryMetric label="管理身份" value={privilegedCount} hint="管理员 / 运营 / 财务" />
+          </div>
+
           <div
             data-testid="admin-user-grid"
             className={cn(
@@ -119,5 +141,32 @@ export function UserListSection({
         </>
       )}
     </>
+  );
+}
+
+function UserSummaryMetric({
+  label,
+  value,
+  hint,
+  tone,
+}: {
+  label: string;
+  value: number;
+  hint?: string;
+  tone?: 'warn';
+}) {
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5 px-4 py-3">
+      <span className="text-[12px] font-medium text-muted-foreground">{label}</span>
+      <span
+        className={cn(
+          'text-[18px] font-semibold leading-6 tabular-nums text-foreground',
+          tone === 'warn' && 'text-warn-text',
+        )}
+      >
+        {value}
+      </span>
+      {hint && <span className="truncate text-[12px] leading-4 text-muted-foreground">{hint}</span>}
+    </div>
   );
 }

@@ -1,5 +1,13 @@
 import { test, expect, type Page } from '@playwright/test';
 import { ADMIN_PASSWORD, HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
+import {
+  createAdminBusinessFixture,
+  createAdminTaskHistoryFixture,
+  removeAdminBusinessFixture,
+  removeAdminTaskHistoryFixture,
+  type AdminBusinessFixture,
+  type AdminTaskHistoryFixture,
+} from './support/admin-business-fixtures';
 
 /**
  * 后台高频动线回归。
@@ -37,6 +45,25 @@ async function navigateViaSider(page: Page, group: string, item: string) {
 
 test.describe('后台高频动线', () => {
   test.skip(!HAS_ADMIN_CREDENTIALS, '未提供后台管理员凭据');
+
+  let businessFixture!: AdminBusinessFixture;
+  let taskHistoryFixture: AdminTaskHistoryFixture | null = null;
+
+  test.beforeAll(async () => {
+    if (!HAS_ADMIN_CREDENTIALS) return;
+    [businessFixture, taskHistoryFixture] = await Promise.all([
+      createAdminBusinessFixture(),
+      createAdminTaskHistoryFixture(),
+    ]);
+  });
+
+  test.afterAll(async () => {
+    if (!HAS_ADMIN_CREDENTIALS) return;
+    await Promise.all([
+      removeAdminBusinessFixture(businessFixture),
+      removeAdminTaskHistoryFixture(taskHistoryFixture),
+    ]);
+  });
 
   test('筛选条件从地址栏恢复，并可逐条清除', async ({ page }) => {
     await page.goto(`${UI}/admin/users?role=admin&status=active`);
@@ -303,15 +330,14 @@ test.describe('后台高频动线', () => {
   });
 
   test('关闭有修改的商品抽屉会先确认是否放弃', async ({ page }) => {
-    await page.goto(`${UI}/admin/products`);
+    await page.goto(`${UI}/admin/products?status=offline`);
     await expect(page.getByRole('heading', { name: '商品管理' })).toBeVisible({
       timeout: 15000,
     });
-    await rows(page).first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => undefined);
 
-    const edit = rows(page).getByRole('button', { name: '编辑' }).first();
-    test.skip((await edit.count()) === 0, '当前库中暂无商品');
-    await edit.click();
+    const fixtureRow = rows(page).filter({ hasText: businessFixture.productName }).first();
+    await expect(fixtureRow).toBeVisible({ timeout: 15000 });
+    await fixtureRow.getByRole('button', { name: '编辑' }).click();
 
     const panel = page.getByRole('dialog', { name: '编辑商品' });
     await expect(panel).toBeVisible();
@@ -358,28 +384,28 @@ test.describe('后台高频动线', () => {
   });
 
   test('工单回复未发送时关闭详情会先确认', async ({ page }) => {
-    await page.goto(`${UI}/admin/tickets`);
+    const q = encodeURIComponent(businessFixture.ticketMarker);
+    await page.goto(`${UI}/admin/tickets?q=${q}`);
     await expect(page.getByRole('heading', { name: '工单处理' })).toBeVisible({
       timeout: 15000,
     });
-    await rows(page).first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => undefined);
 
-    const handle = rows(page).getByRole('button', { name: '处理' }).first();
-    test.skip((await handle.count()) === 0, '当前库中暂无可处理工单');
-    await handle.click();
+    const fixtureRow = rows(page).filter({ hasText: businessFixture.ticketMarker }).first();
+    await expect(fixtureRow).toBeVisible({ timeout: 15000 });
+    await fixtureRow.getByRole('button', { name: '处理' }).click();
 
     const panel = drawer(page);
     const reply = panel.getByLabel('回复内容');
     await expect(reply).toBeVisible({ timeout: 15000 });
     await reply.fill('这段回复还没发送');
 
-    await panel.getByRole('button', { name: '关闭' }).click();
+    await panel.getByRole('button', { name: '关闭', exact: true }).click();
     const confirm = page.getByRole('dialog').filter({ hasText: '放弃未保存的修改？' });
     await expect(confirm).toBeVisible();
     await confirm.getByRole('button', { name: '继续编辑' }).click();
     await expect(panel).toBeVisible();
 
-    await panel.getByRole('button', { name: '关闭' }).click();
+    await panel.getByRole('button', { name: '关闭', exact: true }).click();
     await confirm.getByRole('button', { name: '放弃修改' }).click();
     await expect(drawer(page)).toHaveCount(0);
   });
@@ -442,7 +468,7 @@ test.describe('后台高频动线', () => {
     });
 
     const firstTask = page.getByRole('link', { name: /^查看产出任务：/ }).first();
-    test.skip((await firstTask.count()) === 0, '当前库中暂无产出图');
+    await expect(firstTask).toBeVisible({ timeout: 15000 });
     await firstTask.click();
 
     await expect(page).toHaveURL(/\/admin\/tasks\?id=/);
@@ -454,10 +480,10 @@ test.describe('后台高频动线', () => {
     await expect(page.getByRole('heading', { name: '任务监控' })).toBeVisible({
       timeout: 15000,
     });
-    await rows(page).first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => undefined);
+    await expect(rows(page).first()).toBeVisible({ timeout: 15000 });
 
     const detail = rows(page).getByRole('button', { name: '详情' }).first();
-    test.skip((await detail.count()) === 0, '当前库中暂无任务记录');
+    await expect(detail).toBeVisible();
     await detail.click();
 
     const panel = page.getByRole('dialog', { name: '任务详情' });
@@ -504,10 +530,10 @@ test.describe('后台高频动线', () => {
     await expect(page.getByRole('heading', { name: '任务监控' })).toBeVisible({
       timeout: 15000,
     });
-    await rows(page).first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => undefined);
+    await expect(rows(page).first()).toBeVisible({ timeout: 15000 });
 
     const detail = rows(page).getByRole('button', { name: '详情' }).first();
-    test.skip((await detail.count()) === 0, '当前库中暂无任务记录');
+    await expect(detail).toBeVisible();
     await detail.click();
 
     const panel = page.getByRole('dialog', { name: '任务详情' });
@@ -545,7 +571,7 @@ test.describe('后台高频动线', () => {
       };
       return body.data?.result?.items?.[0] ?? null;
     });
-    test.skip(!task?.id, '当前库中暂无第二页已完成任务');
+    expect(task?.id, '任务夹具必须保证已完成任务列表存在第二页').toBeTruthy();
 
     await page.goto(`${UI}/admin/tasks?id=${encodeURIComponent(task!.id)}`);
     const panel = page.getByRole('dialog', { name: '任务详情' });
@@ -555,14 +581,17 @@ test.describe('后台高频动线', () => {
   });
 
   test('列表详情写入 id，刷新可恢复且关闭后移除', async ({ page }) => {
-    await page.goto(`${UI}/admin/orders`);
+    // 订单列表按创建时间倒序，固定夹具会被后续 smoke 订单挤出第一页；
+    // 直接用订单号深链缩小列表，断言详情 URL 行为而不是分页数据状态。
+    await page.goto(`${UI}/admin/orders?orderNo=${encodeURIComponent(businessFixture.orderNo)}`);
     await expect(page.getByRole('heading', { name: '订单管理' })).toBeVisible({
       timeout: 15000,
     });
-    await rows(page).first().waitFor({ state: 'visible', timeout: 15000 }).catch(() => undefined);
 
-    const orderLink = rows(page).locator('a[href^="/admin/orders?id="]').first();
-    test.skip((await orderLink.count()) === 0, '当前库中暂无订单');
+    const orderRow = rows(page).filter({ hasText: businessFixture.orderNo }).first();
+    await expect(orderRow).toBeVisible({ timeout: 15000 });
+    const orderLink = orderRow.locator('a[href^="/admin/orders?id="]').first();
+    await expect(orderLink).toBeVisible();
     await orderLink.click();
 
     const panel = page.getByRole('dialog', { name: '订单详情' });

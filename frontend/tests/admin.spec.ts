@@ -245,6 +245,9 @@ test.describe('后台管理端', () => {
 });
 
 test.describe('越权拦截', () => {
+  // 这个分组必须从真正的游客/普通用户态开始；管理员 storageState 不能继承。
+  test.use({ storageState: { cookies: [], origins: [] } });
+
   test('C端用户访问后台显示无权限页并说明原因', async ({ page }) => {
     /*
      * 现场注册一个普通账号（role='user'）—— 项目不再内置演示账号，
@@ -254,26 +257,17 @@ test.describe('越权拦截', () => {
     const email = `e2e-admin-${stamp}@test.local`;
     const password = 'test123456';
 
-    // 共用登录态会带到本用例；先清掉管理员会话，才是真正的普通用户路径。
     await page.goto(`${UI}/login`);
-    await page.evaluate(() => {
-      localStorage.clear();
-      sessionStorage.clear();
-    });
-    await page.reload();
-    await page.waitForLoadState('domcontentloaded');
-
-    const emailInput = page.locator('input[type="email"], input#email, input[name="email"]').first();
-    await emailInput.waitFor({ state: 'visible', timeout: 15000 });
     // 登录页默认是登录态，先切到注册
     await page.getByText('立即注册').click();
     await page.getByPlaceholder('展示名称').fill(`E2E${stamp.slice(-4)}`);
-    await emailInput.fill(email);
-    const pwdInput = page.locator('input[type="password"]').first();
-    await pwdInput.fill(password);
+    await page.getByLabel('邮箱', { exact: true }).fill(email);
+    await page.getByLabel('密码', { exact: true }).fill(password);
+    // 测试环境启用邮箱验证码旁路，但前端仍要求填写格式完整的测试值。
+    await page.getByLabel('邮箱验证码', { exact: true }).fill('000000');
     // 注册需勾选协议
     await page.getByRole('checkbox').check();
-    await pwdInput.press('Enter');
+    await page.getByRole('button', { name: '注册并登录' }).click();
 
     await page.waitForURL((u) => !u.pathname.includes('/login'), { timeout: 15000 });
 

@@ -119,17 +119,22 @@ export class TaskAttemptService {
    * | `succeeded` / `failed` | 已终结：返回 done |
    */
   async begin(attempt: RouteAttempt): Promise<BeginOutcome> {
-    if (attempt.status === 'succeeded' || attempt.status === 'failed') {
+    // 结果不明优先于终态：进程可能在 markFailed 与 lifecycle.uncertain 之间退出。
+    // 若只看 status=failed 就换线，会把「可能已打到上游」的请求再发一次。
+    if (attempt.dispatchState === 'submission_unknown') {
+      return { action: 'uncertain', attempt };
+    }
+    if (attempt.status === 'succeeded') {
       return { action: 'done', attempt };
+    }
+    if (attempt.status === 'failed') {
+      return attempt.dispatchState === 'rejected_no_job' ? { action: 'done', attempt } : { action: 'uncertain', attempt };
     }
     if (attempt.dispatchState === 'accepted') {
       return { action: 'poll', attempt };
     }
     if (attempt.dispatchState === 'rejected_no_job') {
       return { action: 'switch', attempt };
-    }
-    if (attempt.dispatchState === 'submission_unknown') {
-      return { action: 'uncertain', attempt };
     }
 
     // CAS：只有把 not_sent 改成 submission_unknown 的那一次调用可以出发
@@ -146,10 +151,15 @@ export class TaskAttemptService {
     return { action: 'dispatch', attempt: current };
   }
 
-  /** 上游已接受：记录上游任务 id，此后失败不再切线 */
-  async markAccepted(attemptId: string, providerRequestId: string): Promise<void> {
-    await this.prisma.routeAttempt.updateMany({
-      where: { id: attemptId, status: 'dispatching' },
+  /**
+   * 上游已接受：记录上游任务 id，此后失败不再切线。
+   *
+   * 返回 false 表示 attempt 已不在「正在派发」状态（例如被并发执行者改写），
+   * 调用方必须停止并转人工核对，不能把这次响应当成可安全重试的失败。
+   */
+  async markAccepted(attemptId: string, providerRequestId: string): Promise<boolean> {
+    const updated = await this.prisma.routeAttempt.updateMany({
+      where: { id: attemptId, status: 'dispatching', dispatchState: 'submission_unknown' },
       data: {
         dispatchState: 'accepted',
         ...(String(providerRequestId ?? '').trim() !== ''
@@ -157,6 +167,14 @@ export class TaskAttemptService {
           : {}),
       },
     });
+    if (updated.count === 1) return true;
+
+    // 幂等恢复：并发写已经落到 accepted / succeeded 时，结果同样安全。
+    const current = await this.prisma.routeAttempt.findUnique({
+      where: { id: attemptId },
+      select: { status: true, dispatchState: true },
+    });
+    return current?.dispatchState === 'accepted' && (current.status === 'dispatching' || current.status === 'succeeded');
   }
 
   async markSucceeded(attemptId: string, providerRequestId = ''): Promise<void> {

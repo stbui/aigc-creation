@@ -240,7 +240,11 @@ test.describe('状态契约 · 生成中不得显示空态', () => {
     // 必须等上传完成再点提交: `useToolTask.run` 开头有
     // `if (inputs.length < minInputs) return` —— 上传未完成时点击会被静默忽略,
     // 结果是永远进不了"生成中"状态 (实测症状: .pk-result-generating 数量为 0)。
-    await expect(page.locator('.pk-thumb img'), '上传完成应出现缩略图').toBeVisible({ timeout: 15000 });
+    // 一键抠图使用专用上传预览（可重新上传/放大），不像通用 ToolShell 那样渲染 .pk-thumb。
+    // 等到真实预览图出现，才能保证输入已进入提交状态。
+    await expect(page.locator('.background-source-preview img'), '上传完成应出现缩略图').toBeVisible({
+      timeout: 15000,
+    });
     await page.locator('button.pk-primary-btn').first().click({ force: true });
 
     // 生成中: 结果栏必须是骨架 + 进行中提示

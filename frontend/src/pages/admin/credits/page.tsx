@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
-import { useAdminExport } from '~/admin-ui/primitives';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Download, Upload } from 'lucide-react';
+import { Upload } from 'lucide-react';
 import {
   ActionButton,
+  ExportCsvButton,
+  useAdminExport,
   AdminDataTable,
   AppliedFilters,
   ClearableField,
@@ -65,10 +66,7 @@ export function AdminCreditsPage() {
   const [importOpen, setImportOpen] = useState(false);
   const { exporting, runExport } = useAdminExport(toast);
 
-  const { data, loading, error, params, setQuery, setPage, reload } = useCreditDirectory(
-    initialEmail,
-    initialUserId,
-  );
+  const { data, loading, error, params, setQuery, setPage, reload } = useCreditDirectory(initialEmail, initialUserId);
 
   // 只同步已生效的筛选, 不同步分页
   useAdminUrlFilterSync({
@@ -90,8 +88,7 @@ export function AdminCreditsPage() {
 
   const hasFilter = Boolean(email || userId);
 
-  const applyQuery = () =>
-    setQuery({ email: email.trim() || undefined, userId: userId.trim() || undefined });
+  const applyQuery = () => setQuery({ email: email.trim() || undefined, userId: userId.trim() || undefined });
 
   const reset = () => {
     setEmail('');
@@ -197,9 +194,7 @@ export function AdminCreditsPage() {
       key: 'nearestExpiry',
       title: '最近到期',
       width: 160,
-      render: (row) => (
-        <span className="text-[12px] text-muted-foreground">{fmtTime(row.nearestExpiry)}</span>
-      ),
+      render: (row) => <span className="text-[12px] text-muted-foreground">{fmtTime(row.nearestExpiry)}</span>,
     },
     {
       key: 'ops',
@@ -235,27 +230,14 @@ export function AdminCreditsPage() {
                 导入 CSV
               </ActionButton>
             )}
-            {can('data.export') && (
-              <ActionButton
-                variant="secondary"
-                icon={Download}
-                onClick={() => void exportCsv()}
-                disabled={exporting}
-              >
-                {exporting ? '导出中…' : '导出 CSV'}
-              </ActionButton>
-            )}
+            {can('data.export') && <ExportCsvButton exporting={exporting} onExport={exportCsv} />}
           </>
         }
       />
 
       <div className="mb-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
         <StatCard label="用户总数" value={data?.total ?? '—'} hint="符合当前筛选的账户数" />
-        <StatCard
-          label="本页余额合计"
-          value={pageSummary.balance}
-          hint="仅统计当前页，不是全站总量"
-        />
+        <StatCard label="本页余额合计" value={pageSummary.balance} hint="仅统计当前页，不是全站总量" />
         <StatCard
           label="本页 30 天内到期"
           value={pageSummary.expiring}
@@ -304,11 +286,7 @@ export function AdminCreditsPage() {
         ) : rows.length === 0 ? (
           <EmptyState
             title={hasFilter ? '没有符合条件的用户。' : '还没有可查看的用户。'}
-            description={
-              hasFilter
-                ? '清除筛选后可查看全部账户。'
-                : '用户注册后，其积分余额与批次会在这里出现。'
-            }
+            description={hasFilter ? '清除筛选后可查看全部账户。' : '用户注册后，其积分余额与批次会在这里出现。'}
             action={
               hasFilter ? (
                 <ActionButton variant="secondary" onClick={reset}>

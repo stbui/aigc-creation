@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { RefreshCw } from 'lucide-react';
-import { ActionButton, Notice, PageHeader, SegmentedTabs } from '~/admin-ui/primitives';
+import { RefreshButton, Notice, PageHeader, SegmentedTabs } from '~/admin-ui/primitives';
 import { PaymentsProvidersTab } from './PaymentsProvidersTab';
 import { PaymentsProductsTab } from './PaymentsProductsTab';
 import { PaymentsOrdersTab } from './PaymentsOrdersTab';
@@ -67,19 +66,12 @@ export function AdminPaymentsPage() {
         title="支付充值"
         description="管理系统支付适配器、充值商品、支付订单与 T+1 对账"
         actions={
-          <ActionButton
-            icon={RefreshCw}
-            onClick={() => setRefreshNonce((n) => n + 1)}
-            ariaLabel="刷新当前标签"
-          >
-            刷新
-          </ActionButton>
+          <RefreshButton variant="default" onRefresh={() => setRefreshNonce((n) => n + 1)} ariaLabel="刷新当前标签" />
         }
       />
 
       <Notice tone="info" title="退款请到订单管理">
-        本页不提供退款。管理端提供查单、关单和对账：关单前始终先向渠道查单；
-        对账发现已支付未入账订单时会幂等补发积分。
+        本页不提供退款。管理端提供查单、关单和对账：关单前始终先向渠道查单； 对账发现已支付未入账订单时会幂等补发积分。
       </Notice>
 
       <div className="mb-4">
@@ -101,9 +93,7 @@ export function AdminPaymentsPage() {
       {tab === 'providers' && <PaymentsProvidersTab refreshNonce={refreshNonce} />}
       {tab === 'products' && <PaymentsProductsTab refreshNonce={refreshNonce} />}
       {tab === 'orders' && <PaymentsOrdersTab refreshNonce={refreshNonce} />}
-      {tab === 'reconciliation' && (
-        <PaymentsReconciliationTab refreshNonce={refreshNonce} />
-      )}
+      {tab === 'reconciliation' && <PaymentsReconciliationTab refreshNonce={refreshNonce} />}
       {tab === 'exceptions' && <PaymentsExceptionPanel refreshNonce={refreshNonce} />}
     </div>
   );

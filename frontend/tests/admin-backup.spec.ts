@@ -1,6 +1,11 @@
 import { test, expect, type Page } from '@playwright/test';
 import { HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
 import { ensureAdminLogin } from './support/admin-login';
+import {
+  createBackupFixture,
+  removeBackupFixture,
+  type BackupFixture,
+} from './support/backup-fixtures';
 
 /**
  * 数据备份 E2E (admin-prd.md B-96/97/98/100)。
@@ -26,6 +31,18 @@ async function login(page: Page) {
 
 test.describe('数据备份', () => {
   test.skip(!HAS_ADMIN_CREDENTIALS, '未提供后台管理员凭据');
+
+  let fixture: BackupFixture | null = null;
+
+  test.beforeAll(async () => {
+    if (!HAS_ADMIN_CREDENTIALS) return;
+    fixture = await createBackupFixture();
+  });
+
+  test.afterAll(async () => {
+    if (!HAS_ADMIN_CREDENTIALS) return;
+    await removeBackupFixture(fixture);
+  });
 
   test('页面渲染:统计卡/备份列表/清理留痕', async ({ page }) => {
     await login(page);
@@ -56,12 +73,12 @@ test.describe('数据备份', () => {
   test('未验证备份的下载入口被禁用 (B-97)', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/backups`);
-    await rows(page).first().waitFor({ state: 'visible', timeout: 20000 }).catch(() => undefined);
-    await page.waitForTimeout(1000);
+    await expect(rows(page).first()).toBeVisible({ timeout: 20000 });
 
     // 找出未验证的行, 断言其下载是禁用态
-    const unverifiedRow = rows(page).filter({ hasText: '未验证' }).first();
-    test.skip((await unverifiedRow.count()) === 0, '当前没有未验证的备份, 跳过');
+    const unverifiedRow = rows(page).filter({ hasText: fixture!.unverifiedFilename }).first();
+    await expect(unverifiedRow).toBeVisible();
+    await expect(unverifiedRow).toContainText('未验证');
 
     const disabled = unverifiedRow.locator('[title="未通过恢复验证的备份不可下载"]');
     await expect(disabled).toBeVisible();
@@ -72,11 +89,11 @@ test.describe('数据备份', () => {
   test('已验证备份的下载入口可用', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/backups`);
-    await rows(page).first().waitFor({ state: 'visible', timeout: 20000 }).catch(() => undefined);
-    await page.waitForTimeout(1000);
+    await expect(rows(page).first()).toBeVisible({ timeout: 20000 });
 
-    const verifiedRow = rows(page).filter({ hasText: '已验证' }).first();
-    test.skip((await verifiedRow.count()) === 0, '当前没有已验证的备份, 跳过');
+    const verifiedRow = rows(page).filter({ hasText: fixture!.verifiedFilename }).first();
+    await expect(verifiedRow).toBeVisible();
+    await expect(verifiedRow).toContainText('已验证');
 
     await expect(verifiedRow.getByRole('button', { name: '下载' })).toBeEnabled();
   });
@@ -84,7 +101,7 @@ test.describe('数据备份', () => {
   test('手动备份直接执行, 执行后列表数量不变少', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/backups`);
-    await rows(page).first().waitFor({ state: 'visible', timeout: 20000 }).catch(() => undefined);
+    await expect(rows(page).first()).toBeVisible({ timeout: 20000 });
 
     const before = await rows(page).count();
 
@@ -102,17 +119,17 @@ test.describe('数据备份', () => {
   test('恢复验证后行状态从「未验证」变为「已验证」', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/backups`);
-    await rows(page).first().waitFor({ state: 'visible', timeout: 20000 }).catch(() => undefined);
-    await page.waitForTimeout(1000);
+    await expect(rows(page).first()).toBeVisible({ timeout: 20000 });
 
-    const unverifiedRow = rows(page).filter({ hasText: '未验证' }).first();
-    test.skip((await unverifiedRow.count()) === 0, '当前没有未验证的备份, 跳过');
+    const unverifiedRow = rows(page).filter({ hasText: fixture!.unverifiedFilename }).first();
+    await expect(unverifiedRow).toBeVisible();
+    await expect(unverifiedRow).toContainText('未验证');
 
     await unverifiedRow.getByRole('button', { name: '验证' }).click();
-    await page.waitForTimeout(4000);
-
-    // 表格内至少有一行变为已验证
-    await expect(rows(page).filter({ hasText: '已验证' }).first()).toBeVisible();
+    await expect(rows(page).filter({ hasText: fixture!.unverifiedFilename }).first()).toContainText(
+      '已验证',
+      { timeout: 15000 },
+    );
   });
 
   test('删除备份直接执行, 不再弹窗确认', async ({ page }) => {
@@ -133,10 +150,7 @@ test.describe('数据备份', () => {
 
     await login(page);
     await page.goto(`${UI}/admin/backups`);
-    await rows(page).first().waitFor({ state: 'visible', timeout: 20000 }).catch(() => undefined);
-    await page.waitForTimeout(1000);
-
-    test.skip((await rows(page).count()) === 0, '无备份记录');
+    await expect(rows(page).first()).toBeVisible({ timeout: 20000 });
 
     await rows(page).first().getByRole('button', { name: '删除', exact: true }).click();
 
@@ -155,8 +169,7 @@ test.describe('数据备份', () => {
   test('展开行显示 SHA-256', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/backups`);
-    await rows(page).first().waitFor({ state: 'visible', timeout: 20000 }).catch(() => undefined);
-    await page.waitForTimeout(800);
+    await expect(rows(page).first()).toBeVisible({ timeout: 20000 });
 
     await rows(page).first().getByRole('button', { name: '详情', exact: true }).click();
     const expanded = page.getByTestId('admin-table-expanded');

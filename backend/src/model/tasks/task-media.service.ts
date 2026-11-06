@@ -24,6 +24,7 @@ import { inspectMaskImage, inspectUploadedImage } from '../../assets/image-valid
 import { detectImageFormat } from '../media/image-format';
 import { multiFusionOutputDimensions } from '../../capabilities/definitions/multi_fusion';
 import { resolveUploadsDir } from '../../config/env-files';
+import { orderedOutputIds, taskOutputReferenceWhere } from '../../assets/task-output-links';
 import type { StorageBackend } from '../../storage/storage.provider';
 import type { MediaReference } from '../protocol/runtime';
 
@@ -41,6 +42,8 @@ export interface StoredOutput {
   buffer: Buffer;
   format: string;
   aigcMeta: AigcMeta;
+  /** 本次 persist 是否新建了该素材；用于成功 CAS 失败后的安全回收。 */
+  created: boolean;
 }
 
 /** 任务侧素材服务需要的最小任务形状 */
@@ -216,6 +219,7 @@ export class TaskMediaService {
           buffer,
           format,
           aigcMeta: parseAigcMeta(existing.aigcMeta),
+          created: false,
         });
         continue;
       }
@@ -263,15 +267,69 @@ export class TaskMediaService {
             buffer,
             format,
             aigcMeta: parseAigcMeta(concurrent.aigcMeta),
+            created: false,
           });
           continue;
         }
         await this.deleteUnreferencedObject(storage, key, error);
         throw error;
       }
-      stored.push({ assetId: asset.id, buffer, format, aigcMeta });
+      stored.push({ assetId: asset.id, buffer, format, aigcMeta, created: true });
     }
     return stored;
+  }
+
+  /**
+   * 成功收口 CAS 失败后的补偿清理。
+   *
+   * 只处理本次新建的素材；只要任务仍为 running，就可能已有接管者复用了
+   * 确定性 storageKey，绝不能删除。任务已进入终态时再逐个确认没有任务引用，
+   * 才删库并清理对象，避免误伤并发重试的产出。
+   */
+  async discardCreated(taskId: string, stored: StoredOutput[]): Promise<number> {
+    const created = stored.filter((item) => item.created);
+    if (created.length === 0) return 0;
+
+    const task = await this.prisma.generationTask.findUnique({
+      where: { id: taskId },
+      select: { status: true },
+    });
+    if (!task || task.status === 'running') return 0;
+
+    let removed = 0;
+    for (const item of created) {
+      try {
+        const references = await this.prisma.generationTask.findMany({
+          where: taskOutputReferenceWhere(item.assetId),
+          select: { outputAssetId: true, outputAssetIds: true },
+        });
+        const referenced = references.some((task) =>
+          orderedOutputIds(task.outputAssetId, task.outputAssetIds).includes(item.assetId),
+        );
+        if (referenced) continue;
+
+        const asset = await this.prisma.asset.findUnique({
+          where: { id: item.assetId },
+          select: { storageBackend: true, storageKey: true },
+        });
+        if (!asset) continue;
+
+        const deleted = await this.prisma.asset.deleteMany({ where: { id: item.assetId } });
+        if (deleted.count !== 1) continue;
+        removed += 1;
+        if (asset.storageKey) {
+          const provider = this.storage.get(asset.storageBackend as StorageBackend);
+          if (!provider) {
+            this.log.warn(`素材记录已回收，但存储后端未启用，对象保留: ${asset.storageKey}`);
+            continue;
+          }
+          await provider.delete(asset.storageKey);
+        }
+      } catch (error) {
+        this.log.error(`成功收口失败后回收素材失败 asset=${item.assetId}: ${(error as Error).message}`);
+      }
+    }
+    return removed;
   }
 
   private async deleteUnreferencedObject(

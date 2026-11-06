@@ -26,3 +26,5 @@ export { ResultGalleryPane } from '../../components/ResultGalleryPane';
 export { PromptPolishModal } from '../../components/PromptPolishModal';
 /** 图片转提示词弹窗 */
 export { ImageToPromptModal } from '../../components/ImageToPromptModal';
+/** 创作提示词输入区 */
+export { CreationPromptField } from './CreationPromptField';

@@ -75,9 +75,7 @@ export const POLL_MULTI_FUSION_MAX_TRIES = POLL_MAX_TRIES;
  * 后端 `TaskWorkerService` 对视频任务的总轮询时限是 60 分钟；前端窗口必须
  * 覆盖后台终态，否则任务还在跑、已扣费，界面却会提前报失败。
  */
-export const POLL_VIDEO_MAX_TRIES = Math.ceil(
-  (60 * 60_000 + POLL_RESULT_GRACE_MS) / POLL_INTERVAL_MS,
-);
+export const POLL_VIDEO_MAX_TRIES = Math.ceil((60 * 60_000 + POLL_RESULT_GRACE_MS) / POLL_INTERVAL_MS);
 
 /**
  * 能力清单不再硬编码在前端 —— 全部来自 GET /api/v1/capabilities
@@ -107,22 +105,44 @@ export const RUNTIME_LABELS: Record<CapabilityRuntime['effective'], string> = {
   unavailable: '暂不可用',
 };
 
+/** 前台不可用提示：后端 reason 可能包含运营/配置诊断信息，不直接透出给用户。 */
+export const CAPABILITY_UNAVAILABLE_NOTICE = '当前生成服务暂不可用，请稍后再试。';
+
+/**
+ * 将能力运行时状态转换为前台可展示的数据。
+ *
+ * `unavailable` 的 reason 来自模型路由诊断，只供后台排障；C 端统一换成
+ * 面向用户的提示，避免把「真实模型 / 线路配置」等内部信息暴露到页面。
+ * 后台能力管控直接使用管理接口返回的数据，不受这里影响。
+ */
+export function publicCapabilityRuntime(runtime: CapabilityRuntime): CapabilityRuntime {
+  if (runtime.effective !== 'unavailable') return runtime;
+  return { ...runtime, reason: CAPABILITY_UNAVAILABLE_NOTICE };
+}
+
 /**
  * 取能力的运行时状态；后端未下发时按定义兜底。
  *
  * 兜底刻意保守：没有 runtime 就当作「暂不可用」，不假称模型线路可用，
  * 也不能让界面承诺一条可能不存在的线路。
  */
-export function runtimeOf(
-  def: Pick<CapabilityDef, 'mode' | 'runtime'>,
-): CapabilityRuntime {
-  if (def.runtime) return def.runtime;
+export function runtimeOf(def: Pick<CapabilityDef, 'mode' | 'runtime'>): CapabilityRuntime {
+  if (def.runtime) return publicCapabilityRuntime(def.runtime);
   return {
     enabled: def.mode !== 'planned',
     remoteAvailable: false,
     effective: def.mode === 'planned' ? 'disabled' : 'unavailable',
     reason: '尚未获取模型线路状态，请刷新后重试',
   };
+}
+
+/** 从能力清单按 id 取运行时结论；清单尚未加载时返回 undefined。 */
+export function runtimeOfId(
+  items: ReadonlyArray<Pick<CapabilityDef, 'id' | 'mode' | 'runtime'>> | undefined,
+  id: string,
+): CapabilityRuntime | undefined {
+  const def = items?.find((item) => item.id === id);
+  return def ? runtimeOf(def) : undefined;
 }
 
 /**
@@ -142,8 +162,7 @@ const TASK_ERROR_TEXT: Record<string, string> = {
   '42205': '当前模型通道不支持遮罩重绘，本次未生成图片（积分已退回）',
   '42206': '生成结果暂不明确，积分已冻结，等待人工核对',
   CANCELLED: '任务已取消，本次未产出图片；退款以账单处理结果为准',
-  'POLL_TIMEOUT':
-    '等待超时：任务可能仍在后台生成，请稍后到「我的作品」查看（若失败会自动退回积分）',
+  POLL_TIMEOUT: '等待超时：任务可能仍在后台生成，请稍后到「我的作品」查看（若失败会自动退回积分）',
 };
 
 export function taskErrorText(code?: string | null): string {

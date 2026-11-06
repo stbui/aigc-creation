@@ -9,7 +9,7 @@ import type { CreationCapability } from './constants';
  */
 
 /** 上传前的图片格式校验 */
-export { isSupportedImageFile, taskErrorText } from '../../lib/constants';
+export { isSupportedImageFile, runtimeOfId, taskErrorText } from '../../lib/constants';
 /** 任务轮询到终态 */
 export { pollToResult } from '../../lib/poll';
 /** 缩略图地址换算 */

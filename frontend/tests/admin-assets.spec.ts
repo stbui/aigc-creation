@@ -50,15 +50,18 @@ test.describe('素材管理', () => {
 
     // 网格单元
     await expect(cells(page).first()).toBeVisible({ timeout: 10000 });
-    // 缩略图应实际加载出来(不是 broken image)
-    const img = cells(page).first().locator('img');
-    await expect(img).toBeVisible();
-    // 等图片真正 decode 完成再断言 —— naturalWidth 在 decode 前是 0
-    await img.evaluate((el) =>
-      el.complete ? Promise.resolve() : new Promise((r) => { el.onload = () => r(null); el.onerror = () => r(null); }),
-    );
-    const naturalW = await img.evaluate((el) => (el as HTMLImageElement).naturalWidth);
-    expect(naturalW, '缩略图未加载成功').toBeGreaterThan(0);
+    // 缩略图应实际解码出来。素材可能是图片或视频，不能用过滤掉视频来掩盖问题。
+    const media = cells(page).first().locator('[data-asset-thumb]');
+    await expect(media).toBeVisible();
+    await expect
+      .poll(
+        () =>
+          media.evaluate((el) =>
+            el instanceof HTMLVideoElement ? el.videoWidth : (el as HTMLImageElement).naturalWidth,
+          ),
+        { message: '缩略图未加载成功' },
+      )
+      .toBeGreaterThan(0);
 
     // 网格每页 60 张: 后端 DTO 若丢失分页元数据会静默退回 20, 这里守住页容量
     const totalText = await page.getByText(/^\d+ 张$/).first().innerText();
@@ -101,6 +104,15 @@ test.describe('素材管理', () => {
     await expect(viewer).toBeVisible();
     await expect(viewer.locator('.img-viewer-meta')).toContainText(/B|KB|MB|GB/);
     await expect(viewer.locator('.img-viewer-actions')).toBeVisible();
+    const media = viewer.locator('[data-viewer-img], [data-viewer-video]').first();
+    await expect(media).toBeVisible();
+    await expect
+      .poll(() =>
+        media.evaluate((el) =>
+          el instanceof HTMLVideoElement ? el.videoWidth : (el as HTMLImageElement).naturalWidth,
+        ),
+      )
+      .toBeGreaterThan(0);
     await expect(
       viewer.getByRole('button', { name: /^(下架|恢复)$/ }),
     ).toBeVisible();

@@ -1,5 +1,5 @@
 import {
-  ActionButton,
+  RefreshButton,
   AppliedFilters,
   FilterActions,
   FilterBar,
@@ -37,9 +37,7 @@ export function ProductFilterBar({
         options={STATUS_OPTIONS}
       />
       <FilterActions>
-        <ActionButton variant="secondary" onClick={onRefresh}>
-          刷新
-        </ActionButton>
+        <RefreshButton onRefresh={onRefresh} />
       </FilterActions>
       <AppliedFilters items={appliedChips} onClearAll={onClearAll} />
     </FilterBar>

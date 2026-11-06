@@ -70,6 +70,11 @@ test.describe('渠道与模型 P5', () => {
 
   let fixture: ModelSuiteFixture | null = null;
 
+  function requireFixture(): ModelSuiteFixture {
+    if (!fixture) throw new Error('渠道与模型夹具未初始化');
+    return fixture;
+  }
+
   test.beforeAll(async () => {
     if (!HAS_ADMIN_CREDENTIALS) return;
     fixture = await createModelSuiteFixture();
@@ -224,62 +229,38 @@ test.describe('渠道与模型 P5', () => {
       .poll(async () => channelItems(page).count(), { timeout: 15000, message: '左列至少有一个渠道' })
       .toBeGreaterThan(0);
 
-    /*
-     * 调价要求「已启用规格的成本价与售价都已配置」。库里没有这样的规格时
-     * 整段跳过 —— 那是配置缺口，不是功能缺陷（后端会明确拒掉并说明原因）。
-     * 先用 API 找出第一条「可调价」的渠道与模型，界面步骤再照着它走。
-     */
+    // beforeAll 创建的夹具必须自带一条「已启用 + 成本价/售价齐全」的规格。
+    const suite = requireFixture();
     const token = await adminToken(request);
     const auth = { Authorization: `Bearer ${token}` };
-    const channels = (
-      (await (await request.get(`${API}/api/v1/admin/channels?limit=100`, { headers: auth })).json())
-        ?.data?.channels ?? []
-    ) as Array<{ id: string; name: string }>;
-
-    let target: {
-      channelId: string;
-      channelName: string;
-      modelKey: string;
-      sale: number;
-      tier: { unitPriceMicrocredits: number; costPricing: { unitPriceMicrocredits: number } };
-    } | null = null;
-    for (const channel of channels) {
-      const models = (
-        (await (await request.get(`${API}/api/v1/admin/channels/${channel.id}/models`, { headers: auth })).json())
-          ?.data?.models ?? []
-      ) as Array<any>;
-      const model = models.find((item: any) =>
-        (item.priceTiers ?? []).some(
-          (tier: any) => tier.enabled && tier.priceConfigured && tier.costPricing?.configured,
-        ),
-      );
-      if (!model) continue;
-      const tier = model.priceTiers.find(
-        (item: any) => item.enabled && item.priceConfigured && item.costPricing?.configured,
-      );
-      target = {
-        channelId: channel.id,
-        channelName: channel.name,
-        modelKey: model.modelKey,
-        sale: tier.unitPriceMicrocredits,
-        tier: {
-          unitPriceMicrocredits: tier.unitPriceMicrocredits,
-          costPricing: { unitPriceMicrocredits: tier.costPricing.unitPriceMicrocredits },
-        },
-      };
-      break;
-    }
-    if (!target) {
-      test.skip(true, '当前库没有「已启用 + 成本价与售价都已配置」的规格；统一调价需要完整价格配置');
-    }
+    const fixtureModels = (
+      (await (await request.get(`${API}/api/v1/admin/channels/${suite.channelId}/models`, { headers: auth })).json())
+        ?.data?.models ?? []
+    ) as Array<any>;
+    const fixtureModel = fixtureModels.find((item: any) => item.modelKey === suite.channelModelKey);
+    expect(fixtureModel, '夹具渠道模型未出现在管理员模型清单').toBeTruthy();
+    const tier = (fixtureModel.priceTiers ?? []).find(
+      (item: any) => item.enabled && item.priceConfigured && item.costPricing?.configured,
+    );
+    expect(tier, '夹具模型必须同时配置启用中的成本价与售价').toBeTruthy();
+    const target = {
+      channelId: suite.channelId,
+      channelName: suite.channelName,
+      modelKey: suite.channelModelKey,
+      sale: tier.unitPriceMicrocredits as number,
+      tier: {
+        unitPriceMicrocredits: tier.unitPriceMicrocredits as number,
+        costPricing: { unitPriceMicrocredits: tier.costPricing.unitPriceMicrocredits as number },
+      },
+    };
 
     // 选中目标渠道：模型清单在右侧详情区内联渲染
-    await channelItems(page).filter({ hasText: target!.channelName }).first().click();
-    await expect(page.locator('#admin-channel-detail')).toContainText(target!.channelName);
+    await channelItems(page).filter({ hasText: target.channelName }).first().click();
+    await expect(page.locator('#admin-channel-detail')).toContainText(target.channelName);
 
     // 勾选目标模型（复选框的可访问名是「选择模型 {modelKey}」）
     // 勾选框的可视元素会挡住指针，这里用键盘操作，也更贴近无障碍真实路径。
-    const modelCheckbox = page.getByRole('checkbox', { name: `选择模型 ${target!.modelKey}` });
+    const modelCheckbox = page.getByRole('checkbox', { name: `选择模型 ${target.modelKey}` });
     await modelCheckbox.focus();
     await page.keyboard.press('Space');
     await expect(modelCheckbox).toBeChecked();
@@ -302,7 +283,7 @@ test.describe('渠道与模型 P5', () => {
      * 这一轮再填 10% 就「没有变化」，保存按钮一直是禁用的 —— 那不是功能坏了，
      * 是用例不幂等。所以按当前售价反推一个**一定不同**的加价率。
      */
-    const targetTier = target!.tier;
+    const targetTier = target.tier;
     const currentSale = targetTier.unitPriceMicrocredits;
     const cost = targetTier.costPricing.unitPriceMicrocredits;
     const quantum = 10 ** 4; // 保留 2 位小数 → 0.01 积分
@@ -329,10 +310,10 @@ test.describe('渠道与模型 P5', () => {
     await expect(page.getByTestId('admin-toast').last()).toContainText('已保存', { timeout: 15000 });
 
     const modelsAfter = (
-      (await (await request.get(`${API}/api/v1/admin/channels/${target!.channelId}/models`, { headers: auth })).json())
+      (await (await request.get(`${API}/api/v1/admin/channels/${target.channelId}/models`, { headers: auth })).json())
         ?.data?.models ?? []
     ) as Array<any>;
-    const after = modelsAfter.find((item: any) => item.modelKey === target!.modelKey);
+    const after = modelsAfter.find((item: any) => item.modelKey === target.modelKey);
     const tierAfter = (after?.priceTiers ?? []).find(
       (item: any) => item.enabled && item.priceConfigured && item.costPricing?.configured,
     );
@@ -404,12 +385,9 @@ test.describe('渠道与模型 P5', () => {
     const picker = page.getByTestId('model-picker');
     await expect(picker).toBeVisible({ timeout: 15000 });
 
-    if (await page.getByTestId('model-picker-empty').isVisible().catch(() => false)) {
-      test.skip(true, '当前目录里 main_image 没有可用模型；选择器只能渲染空态');
-    }
-
+    await expect(page.getByTestId('model-picker-empty')).toHaveCount(0);
     const options = picker.getByTestId('model-option');
-    expect(await options.count()).toBeGreaterThan(0);
+    await expect.poll(() => options.count()).toBeGreaterThan(0);
 
     // 价格必须跟着所选模型走；加载中不算结果
     await expect(page.getByTestId('model-quote')).toHaveText(/积分|待定/, { timeout: 20000 });
@@ -442,10 +420,10 @@ test.describe('渠道与模型 P5', () => {
       capability: string;
       available: boolean;
     }>;
-    const model = models.find((entry) => entry.capability === 'free_create' && entry.available);
-    if (!model) {
-      test.skip(true, '目录里没有可用的 free_create 模型；生成段需要一条已配置的 image 线路');
-    }
+    const model = models.find((entry) => entry.id === requireFixture().freeCreateId);
+    expect(model, '夹具 free_create 模型未出现在用户模型目录').toBeTruthy();
+    expect(model!.capability).toBe('free_create');
+    expect(model!.available, '夹具 free_create 模型必须路由到可用线路').toBe(true);
 
     // 新账号没有积分：由管理员通过积分调整入口发放
     const adjustRes = await request.post(`${API}/api/v1/admin/credits/adjust`, {
@@ -529,9 +507,7 @@ test.describe('渠道与模型 P5', () => {
     const orderRes = await request.get(`${API}/api/v1/admin/channels/order`, { headers: auth });
     expect(orderRes.ok()).toBeTruthy();
     const order = (await orderRes.json()).data.items as Array<{ id: string; name: string }>;
-    if (order.length === 0) {
-      test.skip(true, '当前库没有渠道，排序弹窗无条目可排');
-    }
+    expect(order.length, '夹具至少创建两条渠道供排序').toBeGreaterThanOrEqual(2);
 
     // 排序入口收在左列标题栏，页头只留视图切换
     await page.getByRole('button', { name: '调整渠道顺序' }).click();
@@ -559,9 +535,7 @@ test.describe('渠道与模型 P5', () => {
     const orderRes = await request.get(`${API}/api/v1/admin/channels/order`, { headers: auth });
     expect(orderRes.ok()).toBeTruthy();
     const order = (await orderRes.json()).data.items as Array<{ id: string }>;
-    if (order.length === 0) {
-      test.skip(true, '当前库没有渠道，排序 CAS 无从验证');
-    }
+    expect(order.length, '夹具至少创建两条渠道供排序 CAS').toBeGreaterThanOrEqual(2);
 
     /*
      * expectedIds 必须是「读到的原顺序」。这里故意传一个错位序列：
@@ -596,31 +570,14 @@ test.describe('渠道与模型 P5', () => {
       .poll(async () => channelItems(page).count(), { timeout: 15000, message: '左列至少有一个渠道' })
       .toBeGreaterThan(0);
 
-    // 找一个**有模型**的渠道：没有模型的渠道详情区只有空态，测不了排序
-    const token = await adminToken(request);
-    const auth = { Authorization: `Bearer ${token}` };
-    const channels = (
-      (await (await request.get(`${API}/api/v1/admin/channels?limit=100`, { headers: auth })).json())
-        ?.data?.channels ?? []
-    ) as Array<{ id: string; name: string }>;
-    let target: { id: string; name: string } | null = null;
-    for (const channel of channels) {
-      const models = (
-        (await (await request.get(`${API}/api/v1/admin/channels/${channel.id}/models`, { headers: auth })).json())
-          ?.data?.models ?? []
-      ) as Array<any>;
-      if (models.length > 0) {
-        target = { id: channel.id, name: channel.name };
-        break;
-      }
-    }
-    if (!target) {
-      test.skip(true, '当前库没有「带模型的渠道」，详情区内的排序/批量删除无从验证');
-    }
+    const target = requireFixture();
 
-    await channelItems(page).filter({ hasText: target!.name }).first().click();
+    await channelItems(page).filter({ hasText: target.channelName }).first().click();
     const detail = page.locator('#admin-channel-detail');
-    await expect(detail).toContainText(target!.name);
+    await expect(detail).toContainText(target.channelName);
+    await expect(
+      detail.getByTestId('admin-table-row').filter({ hasText: target.channelModelKey }),
+    ).toBeVisible();
 
     // 排序入口常驻；批量删除/统一调价在未勾选时禁用
     await expect(detail.getByRole('button', { name: '排序', exact: true })).toBeVisible();
@@ -662,32 +619,18 @@ test.describe('渠道与模型 P5', () => {
       .poll(async () => channelItems(page).count(), { timeout: 15000, message: '左列至少有一个渠道' })
       .toBeGreaterThan(0);
 
+    const target = requireFixture();
     const token = await adminToken(request);
     const auth = { Authorization: `Bearer ${token}` };
-    const channels = (
-      (await (await request.get(`${API}/api/v1/admin/channels?limit=100`, { headers: auth })).json())
-        ?.data?.channels ?? []
-    ) as Array<{ id: string; name: string }>;
-    let target: { id: string; name: string } | null = null;
-    let models: Array<{ modelKey: string; enabled: boolean; protocol: string; capability: string }> = [];
-    for (const channel of channels) {
-      const list = (
-        (await (await request.get(`${API}/api/v1/admin/channels/${channel.id}/models`, { headers: auth })).json())
-          ?.data?.models ?? []
-      ) as Array<{ modelKey: string; enabled: boolean; protocol: string; capability: string }>;
-      if (list.length > 0) {
-        target = { id: channel.id, name: channel.name };
-        models = list;
-        break;
-      }
-    }
-    if (!target) {
-      test.skip(true, '当前库没有「带模型的渠道」，清单筛选/复制/停用确认无从验证');
-    }
+    const models = (
+      (await (await request.get(`${API}/api/v1/admin/channels/${target.channelId}/models`, { headers: auth })).json())
+        ?.data?.models ?? []
+    ) as Array<{ modelKey: string; enabled: boolean; protocol: string; capability: string }>;
+    expect(models.length, '夹具渠道必须包含模型').toBeGreaterThan(0);
 
-    await channelItems(page).filter({ hasText: target!.name }).first().click();
+    await channelItems(page).filter({ hasText: target.channelName }).first().click();
     const detail = page.locator('#admin-channel-detail');
-    await expect(detail).toContainText(target!.name);
+    await expect(detail).toContainText(target.channelName);
     const modelRows = () => detail.getByTestId('admin-table-row');
     await expect.poll(async () => modelRows().count(), { timeout: 10000 }).toBeGreaterThan(0);
 
@@ -785,24 +728,16 @@ test.describe('渠道与模型 P5', () => {
       .poll(async () => channelItems(page).count(), { timeout: 15000, message: '左列至少有一个渠道' })
       .toBeGreaterThan(0);
 
+    const channel = requireFixture();
     const token = await adminToken(request);
     const auth = { Authorization: `Bearer ${token}` };
-    const channels = (
-      (await (await request.get(`${API}/api/v1/admin/channels?limit=100`, { headers: auth })).json())
-        ?.data?.channels ?? []
-    ) as Array<{ id: string; name: string }>;
-    const channel = channels.find((item) => item.name.includes('验收渠道')) ?? channels[0];
-    if (!channel) {
-      test.skip(true, '当前库没有渠道，上游目录导入无从验证');
-    }
     const localModels = (
-      (await (await request.get(`${API}/api/v1/admin/channels/${channel!.id}/models`, { headers: auth })).json())
+      (await (await request.get(`${API}/api/v1/admin/channels/${channel.channelId}/models`, { headers: auth })).json())
         ?.data?.models ?? []
     ) as Array<{ modelKey: string }>;
-    if (localModels.length === 0) {
-      test.skip(true, '当前库没有「带模型的渠道」，上游目录导入无从验证');
-    }
-    const existingKey = localModels[0].modelKey;
+    expect(localModels.length, '夹具渠道必须包含模型').toBeGreaterThan(0);
+    const existingKey = localModels.find((item) => item.modelKey === channel.channelModelKey)?.modelKey;
+    expect(existingKey, '夹具渠道模型未出现在管理员模型清单').toBeTruthy();
 
     // 上游目录由服务端用库内凭证拉取，这里桩一份固定目录：
     // 一个本地已存在的模型 + 两个新模型，够验证「已存在标记」与「只导入新模型」
@@ -824,9 +759,9 @@ test.describe('渠道与模型 P5', () => {
       }),
     );
 
-    await channelItems(page).filter({ hasText: channel!.name }).first().click();
+    await channelItems(page).filter({ hasText: channel.channelName }).first().click();
     const detail = page.locator('#admin-channel-detail');
-    await expect(detail).toContainText(channel!.name);
+    await expect(detail).toContainText(channel.channelName);
 
     await detail.getByRole('button', { name: '同步服务商模型' }).click();
     const modal = page.getByTestId('admin-modal');

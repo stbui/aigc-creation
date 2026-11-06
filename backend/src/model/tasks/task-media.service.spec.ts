@@ -19,8 +19,15 @@ function existingAsset(id = 'asset-existing') {
 
 function setup(options: { existing?: unknown[]; createError?: unknown } = {}) {
   const prisma = {
+    generationTask: {
+      findUnique: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn().mockResolvedValue(null),
+    },
     asset: {
       findFirst: vi.fn().mockResolvedValue(options.existing?.shift() ?? null),
+      findUnique: vi.fn(),
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
       create: options.createError
         ? vi.fn().mockRejectedValue(options.createError)
         : vi
@@ -38,6 +45,7 @@ function setup(options: { existing?: unknown[]; createError?: unknown } = {}) {
   };
   const storage = {
     getActive: vi.fn().mockReturnValue(provider),
+    get: vi.fn().mockReturnValue(provider),
   };
   const service = new TaskMediaService(prisma as never, storage as never, {} as never);
   return { service, prisma, provider, storage };
@@ -132,5 +140,60 @@ describe('TaskMediaService 产物落盘', () => {
     expect(generatedOutputStorageKey('../a b', 0, 'png')).toBe(
       'generated/task/___a_b/output-1.png',
     );
+  });
+
+  it('成功收口 CAS 失败后只清理本次新建且未被任务引用的素材', async () => {
+    const { service, provider, prisma, storage } = setup();
+    prisma.generationTask.findUnique.mockResolvedValue({ status: 'cancelled' });
+    prisma.asset.findUnique.mockResolvedValue({
+      storageBackend: 'local',
+      storageKey: 'generated/task/task-1/output-1.mp4',
+    });
+
+    await expect(
+      service.discardCreated('task-1', [
+        {
+          assetId: 'asset-1',
+          buffer: VIDEO_OUTPUT.buffer,
+          format: VIDEO_OUTPUT.format,
+          aigcMeta: {
+            labeled: false,
+            metadata: false,
+            visible: false,
+            method: 'api-only',
+          },
+          created: true,
+        },
+      ]),
+    ).resolves.toBe(1);
+
+    expect(prisma.asset.deleteMany).toHaveBeenCalledWith({ where: { id: 'asset-1' } });
+    expect(storage.get).toHaveBeenCalledWith('local');
+    expect(provider.delete).toHaveBeenCalledWith('generated/task/task-1/output-1.mp4');
+  });
+
+  it('任务仍在运行时不能删除并发执行者可能复用的素材', async () => {
+    const { service, provider, prisma } = setup();
+    prisma.generationTask.findUnique.mockResolvedValue({ status: 'running' });
+
+    await expect(
+      service.discardCreated('task-1', [
+        {
+          assetId: 'asset-1',
+          buffer: VIDEO_OUTPUT.buffer,
+          format: VIDEO_OUTPUT.format,
+          aigcMeta: {
+            labeled: false,
+            metadata: false,
+            visible: false,
+            method: 'api-only',
+          },
+          created: true,
+        },
+      ]),
+    ).resolves.toBe(0);
+
+    expect(prisma.asset.deleteMany).not.toHaveBeenCalled();
+    expect(provider.delete).not.toHaveBeenCalled();
   });
 });

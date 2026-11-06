@@ -51,11 +51,11 @@ export function UserCard({
         onClick={onOpen}
       />
 
-      <CardHeader className="pointer-events-none gap-2.5 px-4 pt-4 pb-3.5">
+      <CardHeader className="pointer-events-none grid-cols-[minmax(0,1fr)_auto] items-start gap-2 px-4 pt-4 pb-3.5">
         <CardTitle className="min-w-0 font-normal">
           <UserIdentityCell user={user} />
         </CardTitle>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-col items-end gap-1">
           <StatusTag status={user.role} />
           <StatusTag status={user.status} showDot />
         </div>
@@ -87,7 +87,7 @@ export function UserCard({
         data-testid="admin-user-card-actions"
         role="group"
         aria-label="用户操作"
-        className="relative grid grid-cols-4 items-center gap-0 px-1.5 py-1.5"
+        className="relative grid grid-cols-4 items-center gap-0 bg-muted/15 px-1.5 py-1.5"
       >
         {actions.map((action) => (
           <ActionButton

@@ -1,6 +1,7 @@
-import { Download, RefreshCw } from 'lucide-react';
 import {
   ActionButton,
+  RefreshButton,
+  ExportCsvButton,
   AdminDataTable,
   BatchBar,
   Panel,
@@ -69,28 +70,14 @@ export function TaskListSection({
         title="任务列表"
         extra={
           <>
-            <BatchBar
-              count={selected.length}
-              unit="项"
-              className="mb-0 rounded-none border-0 bg-transparent p-0"
-            >
+            <BatchBar count={selected.length} unit="项" className="mb-0 rounded-none border-0 bg-transparent p-0">
               {canRetry && (
-                <ActionButton
-                  variant="secondary"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => onBatchAction('retry')}
-                >
+                <ActionButton variant="secondary" size="sm" disabled={busy} onClick={() => onBatchAction('retry')}>
                   批量重试
                 </ActionButton>
               )}
               {canCancel && (
-                <ActionButton
-                  variant="destructive"
-                  size="sm"
-                  disabled={busy}
-                  onClick={() => onBatchAction('cancel')}
-                >
+                <ActionButton variant="destructive" size="sm" disabled={busy} onClick={() => onBatchAction('cancel')}>
                   批量终止
                 </ActionButton>
               )}
@@ -110,26 +97,8 @@ export function TaskListSection({
               </ActionButton>
             </BatchBar>
             {selected.length > 0 && <span className="h-5 w-px bg-border" aria-hidden />}
-            <ActionButton
-              variant="secondary"
-              size="sm"
-              icon={RefreshCw}
-              disabled={loading}
-              onClick={onRetry}
-            >
-              {loading ? '刷新中…' : '刷新'}
-            </ActionButton>
-            {canExport && (
-              <ActionButton
-                variant="secondary"
-                size="sm"
-                icon={Download}
-                disabled={exporting}
-                onClick={onExport}
-              >
-                {exporting ? '导出中…' : '导出 CSV'}
-              </ActionButton>
-            )}
+            <RefreshButton loading={loading} onRefresh={onRetry} />
+            {canExport && <ExportCsvButton exporting={exporting} onExport={onExport} />}
           </>
         }
       >

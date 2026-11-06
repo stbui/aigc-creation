@@ -21,7 +21,7 @@ npm start
 
 - 要求 **Node ≥ 22.12**（与仓库根级版本约束一致），**没有任何第三方依赖**（不需要 `npm install`）。
 - 默认只监听回环地址。需要给手机或容器联调时显式设置 `MOCK_HOST=0.0.0.0`。
-- 默认不校验令牌（方便开箱即用）；设置 `MOCK_API_KEY` 后所有 `/v1/*` 请求都要带
+- 默认不校验令牌（方便开箱即用）；设置 `MOCK_API_KEY` 后所有 `/v1/*`、`/v2/*` 请求都要带
   `Authorization: Bearer <MOCK_API_KEY>`。
 
 启动后浏览器打开 `http://127.0.0.1:3900/` 可看到自描述的端点清单与运行参数。
@@ -36,10 +36,10 @@ npm start
 
 | 模态 | 协议 | 基址 | 推荐模型 | 说明 |
 | --- | --- | --- | --- | --- |
-| 文本 | `openai-chat` | `http://127.0.0.1:3900` | `gpt-4o` | 对话补全，也支持流式 |
-| 图像 | `openai` | `http://127.0.0.1:3900` | `gpt-image-2` | 返回 `data[0].url` |
-| 图像 | `minimax` | `http://127.0.0.1:3900` | `image-01` | `aspect_ratio` + `data.image_urls` |
-| 视频 | `minimax-video` | `http://127.0.0.1:3900` | `MiniMax-Hailuo-2.3` | 项目当前唯一已实现的视频协议 |
+| 文本 | `chat-completion` | `http://127.0.0.1:3900` | `gpt-4o` | 对话补全，也支持流式 |
+| 图像 | `openai-image` | `http://127.0.0.1:3900` | `gpt-image-2` | 返回 `data[0].url` |
+| 图像 | `minimax-image` | `http://127.0.0.1:3900` | `image-01` | `aspect_ratio` + `data.image_urls` |
+| 视频 | `minimax-video` | `http://127.0.0.1:3900` | `MiniMax-Hailuo-2.3` | V2/H3 `content[]` 协议；同时兼容旧版 v1 |
 
 令牌可以随便填（例如 `mock-token`）。只有设置了 `MOCK_API_KEY` 时，令牌必须与之
 完全一致，否则「测试连接」会如实显示「令牌被拒绝 (HTTP 401)」。
@@ -51,7 +51,7 @@ npm start
   `protocol.spec.ts` 里没有声明模型列表接口，后端只能验到网络可达。这是后端行为，
   不是网关缺接口。
 
-`GET /v1/models` 返回 19 个内置模型名，覆盖本项目厂商预设里出现的名称
+`GET /v1/models` 返回内置模型名，覆盖本项目联调所需名称
 （`gpt-4o`、`gpt-image-2`、`image-01`、`doubao-seedream-5-0-pro-260628`、
 `MiniMax-Hailuo-2.3` 等）。额外的名字用 `MOCK_MODELS=a,b,c` 追加。
 
@@ -109,7 +109,13 @@ OpenAI 任务制：
 | GET | `/v1/videos` | 任务列表 |
 | DELETE | `/v1/videos/:id` | 删除任务与产物 |
 
-MiniMax 四段式（本项目 `minimax-video` 协议实际走的链路）：
+MiniMax V2/H3（本项目 `minimax-video` 协议实际走的链路）：
+
+1. `POST /v2/video_generation`，请求体使用 `content[]`（text + image/video/audio block）
+2. `GET /v2/query/video_generation/:taskId` → `task.status` 为 `Queueing` / `Processing` / `Success`
+3. 成功时 `task.content.url` 指向 `/files/:id.mp4`，可直接下载
+
+旧版 MiniMax 四段式同时保留兼容：
 
 1. `POST /v1/video_generation` → `{ task_id, base_resp:{ status_code:0 } }`
 2. `GET /v1/query/video_generation?task_id=` → `Queueing` / `Processing` / `Success`
@@ -128,7 +134,7 @@ MiniMax 四段式（本项目 `minimax-video` 协议实际走的链路）：
 | --- | --- | --- |
 | `MOCK_HOST` | `127.0.0.1` | 绑定地址（`0.0.0.0` 供局域网访问） |
 | `MOCK_PORT` | `3900` | 端口，`0` 表示随机（测试用） |
-| `MOCK_API_KEY` | 空 | 设置后 `/v1/*` 必须带 Bearer 令牌 |
+| `MOCK_API_KEY` | 空 | 设置后 `/v1/*`、`/v2/*` 必须带 Bearer 令牌 |
 | `MOCK_PUBLIC_BASE` | 空 | 产物 URL 的公开基址；默认按请求 Host 还原 |
 | `MOCK_MODELS` | 空 | 逗号分隔的额外模型名，追加到 `/v1/models` |
 | `MOCK_LATENCY_CHAT_MS` | `350` | 文本接口人为延迟 |

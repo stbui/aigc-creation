@@ -1,9 +1,16 @@
 import { useCallback, useState } from 'react';
-import { useAdminExport } from '~/admin-ui/primitives';
 import { useSearchParams } from 'react-router-dom';
-import { Download, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { marketingApi } from './api';
-import { ActionButton, PageHeader, Panel, StaleError, type AppliedFilter } from '~/admin-ui/primitives';
+import {
+  ActionButton,
+  ExportCsvButton,
+  useAdminExport,
+  PageHeader,
+  Panel,
+  StaleError,
+  type AppliedFilter,
+} from '~/admin-ui/primitives';
 import { useAdmin, useAdminList, useAdminUrlFilterSync, useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
 import { STATUS_LABEL, type FormState } from './constants';
 import { buildCampaignPayload, emptyForm, toLocalInput } from './utils';
@@ -45,9 +52,7 @@ export function AdminCampaignsPage() {
   const [formBase, setFormBase] = useState<FormState | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const formDirty = Boolean(
-    formOpen && formBase && JSON.stringify(form) !== JSON.stringify(formBase),
-  );
+  const formDirty = Boolean(formOpen && formBase && JSON.stringify(form) !== JSON.stringify(formBase));
   useUnsavedGuard(formDirty);
   const requestCloseForm = useDiscardConfirm(formDirty, () => setFormOpen(false));
 
@@ -204,25 +209,13 @@ export function AdminCampaignsPage() {
         description="限时价 / 限时免费 / 弹窗位。状态为「进行中」但不在时间窗内，活动不会展示。"
         actions={
           <>
-            {can('data.export') && (
-              <ActionButton
-                variant="secondary"
-                size="sm"
-                icon={Download}
-                disabled={exporting}
-                onClick={() => void exportCsv()}
-              >
-                {exporting ? '导出中…' : '导出 CSV'}
-              </ActionButton>
-            )}
+            {can('data.export') && <ExportCsvButton exporting={exporting} onExport={exportCsv} />}
             {writable ? (
               <ActionButton variant="default" size="sm" icon={Plus} onClick={openCreate}>
                 新建活动
               </ActionButton>
             ) : (
-              <span className="text-[12px] text-muted-foreground">
-                当前账号无 marketing.write 权限，仅可查看
-              </span>
+              <span className="text-[12px] text-muted-foreground">当前账号无 marketing.write 权限，仅可查看</span>
             )}
           </>
         }

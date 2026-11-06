@@ -86,7 +86,7 @@ Tailwind v4 的默认阶梯与项目规定对不齐，`admin.css` 的 `@theme in
 
 ```
 Topbar 56px（sticky top-0）
-├── 左：品牌（标记 24 + 「货觉 运营后台」）+ 当前位置（分组 / 页面）
+├── 左：品牌（标记 24 + 「货觉 运营后台」）+ 当前位置面包屑（分组 / 页面，≥1200px 显示）
 └── 右：环境标识 + 用户菜单
 
 Sider 232px（折叠 60px，≤1280px 自动折叠；sticky top-0，h-full）
@@ -114,7 +114,7 @@ Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不�
 | 顶栏 | 高 56px（`data-testid="admin-topbar"`），左侧品牌 + 当前位置，右侧环境标识与账号 |
 | 导航滚动区 | `data-testid="admin-nav-scroll"`，自身滚动（`overflow-y-auto`），顶栏与底部按钮不参与 |
 | 底部区 | 侧栏底、上边框分隔；非生产显示环境标识与折叠按钮，账号菜单固定在底部；折叠态只留图标 |
-| 分组标题 | 12px / 600 `text-muted-foreground` / `tracking-wider`，可点击折叠/展开；默认只展开当前页面所在组，展开状态记入 `localStorage`；侧栏折叠态隐藏标题并改用分隔线 |
+| 分组标题 | 12px / 600 `text-muted-foreground` / `tracking-wider`，可点击折叠/展开；首次进入默认展开全部分组，之后沿用写入 `localStorage` 的用户偏好；侧栏折叠态隐藏标题并改用分隔线 |
 | 菜单项 | 高 34px，圆角 8px，13px / 500 文字，padding `0 10px`，左侧 16px 图标 + 10px 间距 |
 | 悬停 | 底 `bg-muted`，字 `text-foreground` |
 | 选中 | 底 `bg-accent`、字 `text-accent-foreground` / 600，左侧 3px 品牌色竖条 |
@@ -149,7 +149,7 @@ Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不�
 
 ### 3.1 PageHeader
 
-`primitives/layout.PageHeader`：标题 + 副标题在左，操作在右。标题 `h1` / 20px / 600，副标题 13px `text-muted-foreground`（不截断 —— 它通常是一句话说明「这一页在管什么」）。操作区右对齐、可换行。
+`primitives/layout.PageHeader`：轻量标题卡，品牌色左边线定位；标题 + 副标题在左，操作在右。标题 `h1` / 20px / 600，副标题 13px `text-muted-foreground`（不截断 —— 它通常是一句话说明「这一页在管什么」）。操作区右对齐、可换行。
 
 正文与表格链接默认使用品牌紫、500 字重；悬停显示下划线并转到 `--brand-hover`。整行可点击条目与图片链接用 `text-inherit no-underline` 保留其容器语义，不受该默认值影响。
 

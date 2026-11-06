@@ -254,6 +254,7 @@ export function AssetGrid({
                     className="size-full transition-transform duration-200 group-hover:scale-[1.03] motion-reduce:transform-none"
                     src={thumbSrc(a.sourceUrl, 320)}
                     alt={`${assetLabel(a)}缩略图`}
+                    format={a.format}
                   />
                 </button>
 

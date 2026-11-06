@@ -1,13 +1,29 @@
 import { useCallback, useState } from 'react';
-import { useAdminExport } from '~/admin-ui/primitives';
 import { STATUS_OPTIONS, KIND_LABELS, STATUS_LABELS } from './constants';
 import { yuan } from './utils';
 import { useAdmin, useToast, useAdminList, useAdminUrlFilterSync } from './hooks';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Download } from 'lucide-react';
 import { adminInvoicesApi } from './api';
 
-import { ActionButton, AdminDataTable, AppliedFilters, ClearableField, ConfirmDialog, FilterActions, FilterBar, PageHeader, Panel, SelectField, StatusTag, StaleError, TextField, type AdminColumn, type AppliedFilter } from '~/admin-ui/primitives';
+import {
+  ActionButton,
+  ExportCsvButton,
+  useAdminExport,
+  AdminDataTable,
+  AppliedFilters,
+  ClearableField,
+  ConfirmDialog,
+  FilterActions,
+  FilterBar,
+  PageHeader,
+  Panel,
+  SelectField,
+  StatusTag,
+  StaleError,
+  TextField,
+  type AdminColumn,
+  type AppliedFilter,
+} from '~/admin-ui/primitives';
 import { adminOrderDetailHref, adminUserHref } from '../../../lib/admin-links';
 import type { AdminInvoice, InvoiceStatus } from '../../../types/api';
 
@@ -33,10 +49,7 @@ export function AdminInvoicesPage() {
   const [searchParams] = useSearchParams();
   const rawStatus = searchParams.get('status');
   const initialStatus: InvoiceStatus | undefined =
-    rawStatus === 'pending' ||
-    rawStatus === 'issued' ||
-    rawStatus === 'rejected' ||
-    rawStatus === 'red_flushed'
+    rawStatus === 'pending' || rawStatus === 'issued' || rawStatus === 'rejected' || rawStatus === 'red_flushed'
       ? rawStatus
       : undefined;
   const initialKeyword = searchParams.get('keyword') ?? '';
@@ -63,11 +76,13 @@ export function AdminInvoicesPage() {
     [],
   );
 
-  const { data, loading, error, params, setQuery, setPage, reload } =
-    useAdminList<{ items: AdminInvoice[]; total: number }>(fetcher, {
-      status: initialStatus,
-      keyword: initialKeyword || undefined,
-    });
+  const { data, loading, error, params, setQuery, setPage, reload } = useAdminList<{
+    items: AdminInvoice[];
+    total: number;
+  }>(fetcher, {
+    status: initialStatus,
+    keyword: initialKeyword || undefined,
+  });
 
   // 只同步已生效的筛选, 不同步分页
   useAdminUrlFilterSync({
@@ -77,8 +92,7 @@ export function AdminInvoicesPage() {
 
   const hasFilter = Boolean(status || keyword);
 
-  const applyQuery = () =>
-    setQuery({ status, keyword: keyword.trim() || undefined });
+  const applyQuery = () => setQuery({ status, keyword: keyword.trim() || undefined });
 
   const reset = () => {
     setStatus(undefined);
@@ -163,9 +177,7 @@ export function AdminInvoicesPage() {
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           <code className="font-mono text-[12px] text-foreground">{row.invoiceNo}</code>
-          <span className="text-[12px] text-muted-foreground">
-            {new Date(row.createdAt).toLocaleString('zh-CN')}
-          </span>
+          <span className="text-[12px] text-muted-foreground">{new Date(row.createdAt).toLocaleString('zh-CN')}</span>
         </div>
       ),
     },
@@ -206,14 +218,9 @@ export function AdminInvoicesPage() {
         <div className="flex flex-col gap-0.5">
           <span>
             {row.title}
-            <span className="text-[12px] text-muted-foreground">
-              {' '}
-              · {KIND_LABELS[row.kind] ?? row.kind}
-            </span>
+            <span className="text-[12px] text-muted-foreground"> · {KIND_LABELS[row.kind] ?? row.kind}</span>
           </span>
-          {row.taxNo && (
-            <code className="font-mono text-[12px] text-muted-foreground">{row.taxNo}</code>
-          )}
+          {row.taxNo && <code className="font-mono text-[12px] text-muted-foreground">{row.taxNo}</code>}
         </div>
       ),
     },
@@ -237,9 +244,7 @@ export function AdminInvoicesPage() {
           {row.status === 'red_flushed' && (
             <span className="text-[12px] text-muted-foreground">
               {row.redFlushReason ?? '未填写冲红原因'}
-              {row.redFlushedAt
-                ? ` · ${new Date(row.redFlushedAt).toLocaleString('zh-CN')}`
-                : ''}
+              {row.redFlushedAt ? ` · ${new Date(row.redFlushedAt).toLocaleString('zh-CN')}` : ''}
             </span>
           )}
         </div>
@@ -272,11 +277,7 @@ export function AdminInvoicesPage() {
             <ActionButton
               variant="ghost"
               size="sm"
-              onClick={() =>
-                void adminInvoicesApi
-                  .preview(row.id)
-                  .catch((e: Error) => toast.error(e.message))
-              }
+              onClick={() => void adminInvoicesApi.preview(row.id).catch((e: Error) => toast.error(e.message))}
             >
               预览
             </ActionButton>
@@ -291,19 +292,7 @@ export function AdminInvoicesPage() {
       <PageHeader
         title="发票管理"
         description="审核并开具用户申请的开票。保留历史记录，已开具发票只能登记冲红，操作全程写入审计。"
-        actions={
-          can('data.export') ? (
-            <ActionButton
-              variant="secondary"
-              size="sm"
-              icon={Download}
-              disabled={exporting}
-              onClick={() => void exportCsv()}
-            >
-              {exporting ? '导出中…' : '导出 CSV'}
-            </ActionButton>
-          ) : undefined
-        }
+        actions={can('data.export') ? <ExportCsvButton exporting={exporting} onExport={exportCsv} /> : undefined}
       />
 
       <FilterBar>
@@ -364,20 +353,8 @@ export function AdminInvoicesPage() {
       {action && (
         <ConfirmDialog
           open
-          title={
-            action.kind === 'issue'
-              ? '开具发票'
-              : action.kind === 'reject'
-                ? '驳回开票申请'
-                : '登记发票冲红'
-          }
-          confirmText={
-            action.kind === 'issue'
-              ? '确认开具'
-              : action.kind === 'reject'
-                ? '确认驳回'
-                : '确认冲红'
-          }
+          title={action.kind === 'issue' ? '开具发票' : action.kind === 'reject' ? '驳回开票申请' : '登记发票冲红'}
+          confirmText={action.kind === 'issue' ? '确认开具' : action.kind === 'reject' ? '确认驳回' : '确认冲红'}
           danger={action.kind !== 'issue'}
           loading={busy}
           onCancel={() => setAction(null)}
@@ -399,10 +376,7 @@ export function AdminInvoicesPage() {
               </>
             ) : (
               <>
-                <p>
-                  将发票登记为已冲红，并固化操作人、时间与原因。当前系统不直连税务平台，
-                  线下冲红手续仍需财务完成。
-                </p>
+                <p>将发票登记为已冲红，并固化操作人、时间与原因。当前系统不直连税务平台， 线下冲红手续仍需财务完成。</p>
                 <p className="text-[12px] text-muted-foreground">
                   {action.row.invoiceNo} · {action.row.title} · ¥ {yuan(action.row.amountCents)}
                 </p>
@@ -424,9 +398,7 @@ export function AdminInvoicesPage() {
             action.kind !== 'issue' ? (
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="adm-invoice-reason" className="text-xs text-muted-foreground">
-                  {action.kind === 'reject'
-                    ? '驳回原因（会展示给用户）：'
-                    : '冲红原因（写入审计与冲红记录）：'}
+                  {action.kind === 'reject' ? '驳回原因（会展示给用户）：' : '冲红原因（写入审计与冲红记录）：'}
                 </label>
                 <TextField
                   id="adm-invoice-reason"
@@ -434,9 +406,7 @@ export function AdminInvoicesPage() {
                   value={reason}
                   onChange={setReason}
                   placeholder={
-                    action.kind === 'reject'
-                      ? '如：抬头与税号不一致，请修改后重提'
-                      : '如：用户退费，对应发票需冲红'
+                    action.kind === 'reject' ? '如：抬头与税号不一致，请修改后重提' : '如：用户退费，对应发票需冲红'
                   }
                   maxLength={300}
                 />

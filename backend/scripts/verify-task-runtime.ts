@@ -36,6 +36,7 @@ const { NestFactory } = require('@nestjs/core');
 const { AppModule } = require('../src/app.module');
 const { PrismaService } = require('../src/prisma/prisma.service');
 const { TaskAdmissionService } = require('../src/model/tasks/task-admission.service');
+const { TaskLifecycleService } = require('../src/model/tasks/task-lifecycle.service');
 const { TaskWorkerService } = require('../src/model/tasks/task-worker.service');
 const { RouteCatalogService } = require('../src/model/catalog/route-catalog.service');
 const { RouterService } = require('../src/model/routing/router.service');
@@ -156,6 +157,7 @@ async function main() {
   await app.init();
   const prisma = app.get(PrismaService);
   const admission = app.get(TaskAdmissionService);
+  const lifecycle = app.get(TaskLifecycleService);
   const worker = app.get(TaskWorkerService);
   const catalog = app.get(RouteCatalogService);
   const router = app.get(RouterService);
@@ -163,6 +165,17 @@ async function main() {
   const billing = app.get(BillingService);
   const finance = app.get(FinanceAnalyticsService);
   const health = app.get(RouteHealthService);
+  // 本脚本自行推进调度节拍，避免后台 interval 在「取消 / 租约接管」断言之间
+  // 抢先认领任务，造成测试看起来偶发。每次场景仍调用 worker 的公开 kick()。
+  worker.onModuleDestroy();
+  await sleep(10);
+  async function kickWorkerOnce() {
+    const runtime = worker as any;
+    runtime.stopped = false;
+    worker.kick();
+    await sleep(0);
+    runtime.stopped = true;
+  }
   // 上一次运行（或其它脚本）留下的冷却不应影响本次判定
   health.clear();
 
@@ -358,7 +371,7 @@ async function main() {
       check('A 准入返回 queued', admitted.status === 'queued', admitted.status);
       check('A 任务快照价 = 目录价 7 积分（非能力默认 10）', admitted.creditCost === 7, admitted.creditCost);
 
-      worker.kick();
+      await kickWorkerOnce();
       const task = await waitTerminal(admitted.taskId);
       check('A 任务终态 succeeded', task?.status === 'succeeded', task?.status);
       check('A 上游被调用 1 次', mock.hitsOf(`mock-ok-a-${stamp}`) === 1, mock.hitsOf(`mock-ok-a-${stamp}`));
@@ -410,7 +423,7 @@ async function main() {
       const admitted = await admitTask(user.id, project.id, model.id, 'B');
       check('B 首轮命中高价线路（9 积分）', admitted.creditCost === 9, admitted.creditCost);
 
-      worker.kick();
+      await kickWorkerOnce();
       const task = await waitTerminal(admitted.taskId);
       check('B 任务终态 succeeded', task?.status === 'succeeded', task?.status);
       check('B 两条线路各被调用 1 次', mock.hitsOf(`mock-reject401-${stamp}`) === 1 && mock.hitsOf(`mock-ok-b-${stamp}`) === 1, {
@@ -551,7 +564,7 @@ async function main() {
         },
       });
       const hitsBefore = mock.totalHits();
-      worker.kick();
+      await kickWorkerOnce();
       const done = await waitTerminal(task.id);
       check('C 任务终态 failed', done?.status === 'failed', done?.status);
       check('C 错误码 42206（结果不明）', done?.errorCode === '42206', done?.errorCode);
@@ -579,7 +592,7 @@ async function main() {
       const model = await makeLogicalModel({ code: `rt-refund-${stamp}`, priceCredits: 6, routes: [{ channelModelId: channelModel.id, priority: 0 }] });
 
       const admitted = await admitTask(user.id, project.id, model.id, 'D');
-      worker.kick();
+      await kickWorkerOnce();
       const task = await waitTerminal(admitted.taskId);
       check('D 任务终态 failed', task?.status === 'failed', task?.status);
       check('D 错误码 42204（无可用线路）', task?.errorCode === '42204', task?.errorCode);
@@ -641,6 +654,194 @@ async function main() {
         (await prisma.billingOrder.count({ where: { userId: poor.id } })) === beforeOrders,
         await prisma.billingOrder.count({ where: { userId: poor.id } }),
       );
+    }
+
+    /* ══ 场景 F：未派发取消 → 退款 ════════════════════════
+     * 任务还没产生 attempt 时，请求确定没有离开宿主，后台终止必须把预留
+     * 原额退回。这里不启动 worker，直接验证取消决策与钱包落账。 */
+    console.log('\n[F] 未派发取消：任务 cancelled + 账单 refunded');
+    const beforeF = await walletOf(user.id);
+    {
+      const channel = await makeChannel('rt-cancel-not-sent');
+      const channelModel = await makeChannelModel(channel.id, `mock-cancel-not-sent-${stamp}`);
+      const model = await makeLogicalModel({
+        code: `rt-cancel-not-sent-${stamp}`,
+        priceCredits: 3,
+        routes: [{ channelModelId: channelModel.id, priority: 0 }],
+      });
+
+      const admitted = await admitTask(user.id, project.id, model.id, 'F');
+      check('F 准入返回 queued', admitted.status === 'queued', admitted.status);
+      const result = await lifecycle.cancel(admitted.taskId, '验收未派发取消');
+      const task = await prisma.generationTask.findUnique({ where: { id: admitted.taskId } });
+      const order = await prisma.billingOrder.findUnique({ where: { id: task?.billingOrderId ?? '' } });
+
+      check('F 取消结果为 cancelled / refunded', result.status === 'cancelled' && result.billing === 'refunded', result);
+      check('F 任务状态 cancelled', task?.status === 'cancelled', task?.status);
+      check(
+        'F 账单 refunded 且全额 3 积分',
+        order?.status === 'refunded' && order?.refundedAmountMicrocredits === 3n * MICRO,
+        { status: order?.status, refunded: order?.refundedAmountMicrocredits?.toString() },
+      );
+      check('F 未派发取消不产生 attempt', (await prisma.routeAttempt.count({ where: { taskId: admitted.taskId } })) === 0);
+
+      const wallet = await walletOf(user.id);
+      check('F 退款后可用 / 冻结余额回到取消前', wallet.available === beforeF.available && wallet.reserved === beforeF.reserved, {
+        available: wallet.available.toString(),
+        reserved: wallet.reserved.toString(),
+      });
+    }
+
+    /* ══ 场景 G：已派发取消 → 待人工核对 ═══════════════════
+     * attempt 已是 accepted 时，上游可能已受理并计费，终止任务只能停止本地
+     * 轮询，不能自动退款。账单保留冻结并转 uncertain。 */
+    console.log('\n[G] 已派发取消：任务 cancelled + 账单 uncertain');
+    const beforeG = await walletOf(user.id);
+    {
+      const channel = await makeChannel('rt-cancel-accepted');
+      const channelModel = await makeChannelModel(channel.id, `mock-cancel-accepted-${stamp}`);
+      const model = await makeLogicalModel({
+        code: `rt-cancel-accepted-${stamp}`,
+        priceCredits: 5,
+        routes: [{ channelModelId: channelModel.id, priority: 0 }],
+      });
+
+      const admitted = await admitTask(user.id, project.id, model.id, 'G');
+      const queued = await prisma.generationTask.findUnique({ where: { id: admitted.taskId } });
+      check('G 准入返回 queued', queued?.status === 'queued', queued?.status);
+      await billing.markRunning(queued?.billingOrderId ?? '');
+      const claimed = await prisma.generationTask.updateMany({
+        where: { id: admitted.taskId, status: 'queued' },
+        data: {
+          status: 'running',
+          stage: 'poll',
+          leaseOwner: 'verify-cancel-owner',
+          leaseUntil: new Date(Date.now() + 60_000),
+          nextPollAt: null,
+        },
+      });
+      check('G 模拟 worker 领取任务', claimed.count === 1, claimed.count);
+      await prisma.routeAttempt.create({
+        data: {
+          taskId: admitted.taskId,
+          routeRun: queued?.routeRun ?? 1,
+          attemptNumber: 1,
+          logicalModelId: queued?.logicalModelId ?? '',
+          logicalModelRevisionId: queued?.logicalModelRevisionId ?? '',
+          routeId: queued?.routeId ?? '',
+          channelModelId: queued?.channelModelId ?? '',
+          channelId: channel.id,
+          status: 'dispatching',
+          dispatchState: 'accepted',
+          providerRequestId: `verify-provider-${stamp}`,
+        },
+      });
+
+      const result = await lifecycle.cancel(admitted.taskId, '验收已派发取消');
+      const task = await prisma.generationTask.findUnique({ where: { id: admitted.taskId } });
+      const order = await prisma.billingOrder.findUnique({ where: { id: task?.billingOrderId ?? '' } });
+      const attempt = await prisma.routeAttempt.findFirst({ where: { taskId: admitted.taskId } });
+
+      check('G 取消结果为 cancelled / uncertain', result.status === 'cancelled' && result.billing === 'uncertain', result);
+      check('G 任务状态 cancelled', task?.status === 'cancelled', task?.status);
+      check('G 账单 uncertain 且未退款', order?.status === 'uncertain' && order?.refundedAmountMicrocredits === 0n, {
+        status: order?.status,
+        refunded: order?.refundedAmountMicrocredits?.toString(),
+      });
+      check('G 已派发 attempt 保持 accepted 证据', attempt?.dispatchState === 'accepted', attempt?.dispatchState);
+
+      const wallet = await walletOf(user.id);
+      check(
+        'G 已派发取消保留冻结，不自动退款',
+        wallet.available === beforeG.available - 5n * MICRO && wallet.reserved === beforeG.reserved + 5n * MICRO,
+        { available: wallet.available.toString(), reserved: wallet.reserved.toString() },
+      );
+    }
+
+    /* ══ 场景 H：租约精确 CAS → 旧 owner 不能覆盖新 owner ═══
+     * 恢复流程先按「旧 owner + 旧 leaseUntil」抢占任务；抢到后任务清空租约，
+     * 随后新 worker 可领取。旧 owner 此时再提交任意终态都必须失败。 */
+    console.log('\n[H] 租约恢复：旧 owner 无法覆盖新 owner');
+    {
+      const channel = await makeChannel('rt-lease-recovery');
+      const channelModel = await makeChannelModel(channel.id, `mock-lease-recovery-${stamp}`);
+      const model = await makeLogicalModel({
+        code: `rt-lease-recovery-${stamp}`,
+        priceCredits: 2,
+        routes: [{ channelModelId: channelModel.id, priority: 0 }],
+      });
+
+      const admitted = await admitTask(user.id, project.id, model.id, 'H');
+      const queued = await prisma.generationTask.findUnique({ where: { id: admitted.taskId } });
+      await billing.markRunning(queued?.billingOrderId ?? '');
+      const staleUntil = new Date(Date.now() - 60_000);
+      const claimed = await prisma.generationTask.updateMany({
+        where: { id: admitted.taskId, status: 'queued' },
+        data: {
+          status: 'running',
+          stage: 'poll',
+          leaseOwner: 'verify-stale-owner',
+          leaseUntil: staleUntil,
+          nextPollAt: null,
+        },
+      });
+      check('H 模拟过期租约', claimed.count === 1, claimed.count);
+      await prisma.routeAttempt.create({
+        data: {
+          taskId: admitted.taskId,
+          routeRun: queued?.routeRun ?? 1,
+          attemptNumber: 1,
+          logicalModelId: queued?.logicalModelId ?? '',
+          logicalModelRevisionId: queued?.logicalModelRevisionId ?? '',
+          routeId: queued?.routeId ?? '',
+          channelModelId: queued?.channelModelId ?? '',
+          channelId: channel.id,
+          status: 'dispatching',
+          dispatchState: 'accepted',
+          providerRequestId: `verify-stale-provider-${stamp}`,
+        },
+      });
+
+      await worker.recoverStaleTasks();
+      const recovered = await prisma.generationTask.findUnique({ where: { id: admitted.taskId } });
+      check(
+        'H 恢复后清空旧租约并安排续跑',
+        recovered?.status === 'running' && recovered?.leaseOwner === '' && recovered?.nextPollAt !== null,
+        { status: recovered?.status, owner: recovered?.leaseOwner, nextPollAt: recovered?.nextPollAt?.toISOString() },
+      );
+
+      const newUntil = new Date(Date.now() + 60_000);
+      const taken = await prisma.generationTask.updateMany({
+        where: { id: admitted.taskId, status: 'running', leaseOwner: '' },
+        data: { leaseOwner: 'verify-new-owner', leaseUntil: newUntil, nextPollAt: null, stage: 'poll' },
+      });
+      check('H 新 owner 成功领取', taken.count === 1, taken.count);
+
+      const staleUncertain = await lifecycle.uncertain(admitted.taskId, '旧 owner 迟到结果', {
+        leaseOwner: 'verify-stale-owner',
+        leaseUntil: staleUntil,
+      });
+      const staleSucceed = await lifecycle.succeed(
+        {
+          id: admitted.taskId,
+          ownerId: queued?.ownerId ?? user.id,
+          billingOrderId: queued?.billingOrderId ?? null,
+          providerRequestId: queued?.providerRequestId ?? null,
+        },
+        { outputAssetIds: ['stale-output-should-be-ignored'], aigcMeta: '{}' },
+        { leaseOwner: 'verify-stale-owner' },
+      );
+      const finalTask = await prisma.generationTask.findUnique({ where: { id: admitted.taskId } });
+      const finalOrder = await prisma.billingOrder.findUnique({ where: { id: queued?.billingOrderId ?? '' } });
+
+      check('H 旧 owner 迟到失败收口被拒绝', staleUncertain === false, staleUncertain);
+      check('H 旧 owner 迟到成功收口被拒绝', staleSucceed === false, staleSucceed);
+      check(
+        'H 新 owner 与运行态未被旧 owner 覆盖',
+        finalTask?.status === 'running' && finalTask?.leaseOwner === 'verify-new-owner' && finalTask?.outputAssetId === null,
+        { status: finalTask?.status, owner: finalTask?.leaseOwner, output: finalTask?.outputAssetId },
+      );
+      check('H 账单仍为 running，未被旧 owner 结算或转待核对', finalOrder?.status === 'running', finalOrder?.status);
     }
 
     /* ── 不变量：可用余额 == Σ 批次剩余 ──────────────────

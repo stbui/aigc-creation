@@ -172,6 +172,9 @@ test.describe('能力可见性与运行态', () => {
     // 首页：下线条目消失（工具入口 + 案例页签 + 顶导共用同一份能力清单）
     await page.goto(`${UI}/`);
     await expect(page.getByText('一键抠图', { exact: true })).toHaveCount(0);
+    // 顶部导航的能力项默认收在分组菜单里；先按真实交互展开包含「创意生图」的分组。
+    const creativeNavGroup = page.locator('.landing-nav-group').filter({ hasText: '创意生图' });
+    await creativeNavGroup.getByRole('button').first().click();
     await expect(page.getByText('创意生图', { exact: true }).first()).toBeVisible();
 
     // 工作台：下线卡片消失，不可用卡片保留并给出标注
@@ -346,7 +349,10 @@ test.describe('能力可见性与运行态', () => {
 
     await authed(page, '/local-redraw', token, email);
     const btn = page.locator('button.pk-primary-btn').first();
-    await expect(page.locator('.tool-submit-notice-error')).toContainText('图像编辑通道维护中');
+    // unavailable 的 reason 来自路由诊断，C 端必须换成统一文案，不能把内部线路信息漏给用户。
+    const notice = page.locator('.tool-submit-notice-error');
+    await expect(notice).toHaveText('当前生成服务暂不可用，请稍后再试。');
+    await expect(notice).not.toContainText('图像编辑通道维护中');
     await expect(btn).toBeDisabled();
 
     // 访客：能力不可用不应成为第一道墙；先让访客完成本页必填校验，

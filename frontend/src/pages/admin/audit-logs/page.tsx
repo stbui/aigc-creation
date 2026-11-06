@@ -1,13 +1,27 @@
 import { useCallback, useMemo, useState, type ReactNode } from 'react';
-import { useAdminExport } from '~/admin-ui/primitives';
 import { Row, ACTION_LABELS } from './constants';
 import { useAdmin, useToast, useAdminList, useAdminUrlFilterSync } from './hooks';
 import { useSearchParams } from 'react-router-dom';
-import { Download } from 'lucide-react';
 
 import { adminAuditApi } from '../../../lib/api';
 
-import { ActionButton, AdminDataTable, AppliedFilters, ClearableField, FilterActions, FilterBar, PageHeader, Panel, SelectField, StatusTag, StaleError, type AdminColumn, type AppliedFilter } from '~/admin-ui/primitives';
+import {
+  ActionButton,
+  ExportCsvButton,
+  useAdminExport,
+  AdminDataTable,
+  AppliedFilters,
+  ClearableField,
+  FilterActions,
+  FilterBar,
+  PageHeader,
+  Panel,
+  SelectField,
+  StatusTag,
+  StaleError,
+  type AdminColumn,
+  type AppliedFilter,
+} from '~/admin-ui/primitives';
 import type { AdminAuditListResult } from '../../../types/api';
 
 type DetailEntry = [string, unknown];
@@ -52,14 +66,9 @@ export function AuditExpandedDetail({ row }: { row: Row }) {
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-xs font-semibold text-foreground">审计详情</div>
-          <div className="mt-0.5 text-[12px] text-muted-foreground">
-            记录只追加，不支持修改或删除
-          </div>
+          <div className="mt-0.5 text-[12px] text-muted-foreground">记录只追加，不支持修改或删除</div>
         </div>
-        <StatusTag
-          status={row.success ? 'succeeded' : 'failed'}
-          label={row.success ? '成功' : '失败'}
-        />
+        <StatusTag status={row.success ? 'succeeded' : 'failed'} label={row.success ? '成功' : '失败'} />
       </div>
 
       <dl className="grid grid-cols-2 gap-x-6 gap-y-2 md:grid-cols-3 xl:grid-cols-6">
@@ -92,9 +101,7 @@ export function AuditExpandedDetail({ row }: { row: Row }) {
       <div>
         <div className="mb-1 flex items-baseline gap-2">
           <span className="text-[12px] text-muted-foreground">变更内容</span>
-          <span className="text-[12px] text-muted-foreground">
-            仅记录白名单字段，密码与凭据类内容不写入审计
-          </span>
+          <span className="text-[12px] text-muted-foreground">仅记录白名单字段，密码与凭据类内容不写入审计</span>
         </div>
         {detailEntries.length === 0 ? (
           <div className="text-xs text-muted-foreground">本条操作没有可展示的变更字段。</div>
@@ -137,8 +144,7 @@ export function AdminAuditPage() {
   const initialAction = searchParams.get('action') ?? undefined;
   const initialTargetId = searchParams.get('targetId') ?? '';
   const rawSuccess = searchParams.get('success');
-  const initialSuccess =
-    rawSuccess === 'true' ? true : rawSuccess === 'false' ? false : undefined;
+  const initialSuccess = rawSuccess === 'true' ? true : rawSuccess === 'false' ? false : undefined;
 
   const [action, setAction] = useState<string | undefined>(initialAction);
   const [targetId, setTargetId] = useState(initialTargetId);
@@ -160,22 +166,14 @@ export function AdminAuditPage() {
     [],
   );
 
-  const {
-    data,
-    loading,
-    error,
-    params,
-    setQuery,
-    setPage,
-    reload,
-  } = useAdminList<{ result: AdminAuditListResult; actions: Array<{ action: string; count: number }> }>(
-    fetcher,
-    {
-      action: initialAction,
-      targetId: initialTargetId || undefined,
-      success: initialSuccess,
-    },
-  );
+  const { data, loading, error, params, setQuery, setPage, reload } = useAdminList<{
+    result: AdminAuditListResult;
+    actions: Array<{ action: string; count: number }>;
+  }>(fetcher, {
+    action: initialAction,
+    targetId: initialTargetId || undefined,
+    success: initialSuccess,
+  });
 
   // 只同步已生效的筛选, 不同步分页 —— 分享出去的链接不该停在第 7 页
   useAdminUrlFilterSync({
@@ -219,10 +217,7 @@ export function AdminAuditPage() {
         width: 150,
         // 动作标签的颜色跟随结果：一眼扫下去先看见红的是什么动作失败
         render: (row) => (
-          <StatusTag
-            status={row.success ? 'succeeded' : 'failed'}
-            label={ACTION_LABELS[row.action] ?? row.action}
-          />
+          <StatusTag status={row.success ? 'succeeded' : 'failed'} label={ACTION_LABELS[row.action] ?? row.action} />
         ),
       },
       {
@@ -247,10 +242,7 @@ export function AdminAuditPage() {
         title: '结果',
         width: 70,
         render: (row) => (
-          <StatusTag
-            status={row.success ? 'succeeded' : 'failed'}
-            label={row.success ? '成功' : '失败'}
-          />
+          <StatusTag status={row.success ? 'succeeded' : 'failed'} label={row.success ? '成功' : '失败'} />
         ),
       },
       {
@@ -345,19 +337,7 @@ export function AdminAuditPage() {
       <PageHeader
         title="操作审计"
         description="记录所有后台写操作，用于事后追责与举证。只读，不可删除或修改。"
-        actions={
-          can('data.export') ? (
-            <ActionButton
-              variant="secondary"
-              size="sm"
-              icon={Download}
-              disabled={exporting}
-              onClick={() => void exportCsv()}
-            >
-              {exporting ? '导出中…' : '导出 CSV'}
-            </ActionButton>
-          ) : undefined
-        }
+        actions={can('data.export') ? <ExportCsvButton exporting={exporting} onExport={exportCsv} /> : undefined}
       />
 
       <FilterBar>
@@ -429,9 +409,7 @@ export function AdminAuditPage() {
             ) : undefined
           }
           expandedKeys={expandedId ? [expandedId] : []}
-          onExpandedChange={(keys) =>
-            setExpandedId(keys.length > 0 ? keys[keys.length - 1] : null)
-          }
+          onExpandedChange={(keys) => setExpandedId(keys.length > 0 ? keys[keys.length - 1] : null)}
           renderExpanded={(row) => <AuditExpandedDetail row={row} />}
           pagination={{
             current: list?.page ?? 1,

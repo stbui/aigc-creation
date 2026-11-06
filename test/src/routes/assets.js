@@ -30,6 +30,10 @@ export function handleIndex(ctx) {
         'GET /v1/query/video_generation?task_id=',
         'GET /v1/files/retrieve?file_id=',
       ],
+      videoMinimaxV2: [
+        'POST /v2/video_generation',
+        'GET /v2/query/video_generation/:taskId',
+      ],
       assets: 'GET /files/:id.ext',
       health: 'GET /health',
     },

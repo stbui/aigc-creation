@@ -106,6 +106,8 @@ export interface CallLogInput {
   requestBody: string;
   responseBody: string;
   upstreamUrl: string;
+  /** 业务请求中的视频时长；轮询 GET 没有请求体，不能只靠 requestBody 推断 */
+  videoSeconds?: number;
 }
 
 @Injectable()
@@ -303,7 +305,7 @@ export class TaskExecutorService {
           cachedTokens: usage?.cachedTokens ?? 0n,
           usageAvailable: usage !== null,
           mediaCount,
-          videoSeconds: Math.max(0, Math.trunc(Number(extractVideoSeconds(input.requestBody)) || 0)),
+          videoSeconds: logVideoSeconds(input),
           providerRequestId: outcome.providerRequestId,
           errorCode: outcome.failureCode,
           error: truncate(outcome.failureMessage, 1000),
@@ -382,4 +384,12 @@ function extractVideoSeconds(requestBody: string): string {
   } catch {
     return '';
   }
+}
+
+function logVideoSeconds(input: CallLogInput): number {
+  const explicit = input.videoSeconds;
+  return Math.max(
+    0,
+    Math.trunc(Number(explicit !== undefined ? explicit : extractVideoSeconds(input.requestBody)) || 0),
+  );
 }

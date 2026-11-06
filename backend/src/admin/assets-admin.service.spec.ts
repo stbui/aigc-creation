@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { parseCsv } from '../common/csv';
 import { AdminAssetsService } from './assets-admin.service';
 
 describe('AdminAssetsService 删除顺序', () => {
@@ -7,6 +8,7 @@ describe('AdminAssetsService 删除顺序', () => {
     asset: {
       findUnique: ReturnType<typeof vi.fn>;
       update: ReturnType<typeof vi.fn>;
+      findMany: ReturnType<typeof vi.fn>;
     };
     generationTask: { findMany: ReturnType<typeof vi.fn> };
     project: {
@@ -22,7 +24,7 @@ describe('AdminAssetsService 删除顺序', () => {
 
   beforeEach(() => {
     prisma = {
-      asset: { findUnique: vi.fn(), update: vi.fn() },
+      asset: { findUnique: vi.fn(), update: vi.fn(), findMany: vi.fn() },
       generationTask: { findMany: vi.fn() },
       project: {
         findUnique: vi.fn(),
@@ -200,5 +202,33 @@ describe('AdminAssetsService 删除顺序', () => {
     });
     expect(prisma.project.update).not.toHaveBeenCalled();
     expect(storage.get).not.toHaveBeenCalled();
+  });
+
+  it('素材 CSV 表头字段唯一且顺序稳定', async () => {
+    prisma.asset.findMany.mockResolvedValue([]);
+    const displayUrl = vi.fn((url: string) => `signed:${url}`);
+    service = new AdminAssetsService(prisma as never, storage as never, { displayUrl } as never);
+
+    const csv = await service.exportCsv({});
+    const header = parseCsv(csv)[0];
+
+    expect(header).toEqual([
+      '素材 ID',
+      '类型',
+      '能力',
+      '状态',
+      '宽',
+      '高',
+      '格式',
+      '大小(字节)',
+      '存储后端',
+      '存储键',
+      '用户',
+      '项目',
+      '地址',
+      '创建时间',
+    ]);
+    expect(new Set(header).size).toBe(header.length);
+    expect(displayUrl).not.toHaveBeenCalled();
   });
 });

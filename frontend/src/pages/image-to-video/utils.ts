@@ -115,5 +115,5 @@ export { formatDuration } from '../../components/ResultMedia';
  * 让失败原因与产出类型矛盾。这里只校正产出名词，不改变错误码与退款口径。
  */
 export function videoTaskErrorText(code?: string | null): string {
-  return genericTaskErrorText(code).replaceAll('图片', '视频');
+  return genericTaskErrorText(code).replace(/图片/g, '视频');
 }

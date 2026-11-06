@@ -19,9 +19,9 @@ import {
  *
  * ## 层级表达
  *
- * 页头是**无容器的标题区**，下面的内容用**卡片**（`bg-card` + `shadow-card`）
- * 承载。层级靠留白与投影，不靠线条堆叠 —— 后台一屏常常三四块内容，
- * 每块都描边会让整页看起来像一张表格。
+ * 页头是一块轻量标题卡：品牌色左边线负责定位，下面的内容用**卡片**
+ * （`bg-card` + `shadow-card`）承载。层级靠留白与投影，不靠线条堆叠 ——
+ * 后台一屏常常三四块内容，每块都描边会让整页看起来像一张表格。
  *
  * ## 颜色
  *
@@ -52,7 +52,13 @@ export function PageHeader({
   className?: string;
 }) {
   return (
-    <header className={cn('mb-5 flex items-start justify-between gap-4', className)}>
+    <header
+      data-testid="admin-page-header"
+      className={cn(
+        'mb-5 flex items-start justify-between gap-4 rounded-lg border border-l-[3px] border-border border-l-primary bg-card px-4 py-3.5 shadow-card',
+        className,
+      )}
+    >
       <div
         className={cn(
           'min-w-0 flex-1',
@@ -114,7 +120,7 @@ export function Panel({
          * `[.border-b]:pb-6`，只要标题区挂 `border-b`，底部内边距就被强制成
          * 24px（`pb-3` 被覆盖），标题与内容之间空出一大截。
          */
-        <CardHeader className="flex flex-row items-center gap-3 px-4 py-3">
+        <CardHeader className="flex flex-row items-center gap-3 bg-muted/20 px-4 py-3">
           <div className="min-w-0 flex-1">
             {title && (
               /*
@@ -182,6 +188,64 @@ export function StatCard({
       </div>
       {hint && <div className="mt-0.5 text-[12px] leading-4 text-muted-foreground">{hint}</div>}
     </Card>
+  );
+}
+
+/** 单张统计卡的数据形态；与 `StatCard` 的 props 对齐，省略 JSX 样板。 */
+export interface StatCardItem {
+  key?: string;
+  label: string;
+  value: ReactNode;
+  hint?: ReactNode;
+  tone?: 'danger' | 'warn';
+}
+
+const STAT_COLUMNS_CLASS = {
+  2: 'grid-cols-2',
+  3: 'grid-cols-3',
+  4: 'grid-cols-4',
+  5: 'grid-cols-5',
+  6: 'grid-cols-6',
+} as const;
+
+/**
+ * 统计卡组。
+ *
+ * 后台十余个页面都要把一组指标铺成一排；此前每个页面各自重复
+ * `grid grid-cols-N gap-3`，列数一变就要逐页找。这里统一列数、间距与卡片
+ * 生成，页面只提供数据。`auto` 使用最小宽度自适应，适合指标数会变化的页面。
+ */
+export function StatCards({
+  items,
+  columns = 'auto',
+  minWidth = 170,
+  className,
+}: {
+  items: readonly StatCardItem[];
+  columns?: keyof typeof STAT_COLUMNS_CLASS | 'auto';
+  minWidth?: number;
+  className?: string;
+}) {
+  return (
+    <div
+      data-testid="admin-stat-grid"
+      className={cn('grid gap-3', columns === 'auto' ? undefined : STAT_COLUMNS_CLASS[columns], className)}
+      style={
+        columns === 'auto'
+          ? { gridTemplateColumns: `repeat(auto-fit, minmax(${minWidth}px, 1fr))` }
+          : undefined
+      }
+    >
+      {items.map((item) => (
+        <StatCard
+          key={item.key ?? item.label}
+          label={item.label}
+          value={item.value}
+          hint={item.hint}
+          tone={item.tone}
+        />
+      ))}
+    </div>
   );
 }
 

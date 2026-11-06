@@ -1,6 +1,6 @@
-import { Download } from 'lucide-react';
 import {
   ActionButton,
+  ExportCsvButton,
   AppliedFilters,
   ClearableField,
   FilterActions,
@@ -105,16 +105,11 @@ export function UserFilters({
           options={SORT_OPTIONS}
         />
         {canExport && (
-          <ActionButton
-            variant="secondary"
-            size="sm"
-            disabled={exporting}
+          <ExportCsvButton
+            exporting={exporting}
+            onExport={onExport}
             ariaLabel={exporting ? '正在导出用户 CSV' : '导出用户 CSV'}
-            icon={Download}
-            onClick={onExport}
-          >
-            {exporting ? '导出中…' : '导出 CSV'}
-          </ActionButton>
+          />
         )}
       </div>
     </>

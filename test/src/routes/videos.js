@@ -12,6 +12,8 @@ import { generateVideo } from '../video/generator.js';
  * 2. **MiniMax 兼容** `POST /v1/video_generation` → task_id；
  *    `GET /v1/query/video_generation?task_id=` 轮询；
  *    `GET /v1/files/retrieve?file_id=` 换下载地址。
+ * 3. **MiniMax V2 / H3** `POST /v2/video_generation`（content[] 请求体）→ task；
+ *    `GET /v2/query/video_generation/:taskId` 轮询 → task.content.url。
  *
  * 为什么要同时有第二套：本项目当前**只实现了 minimax-video 视频协议**，
  * 后台「模型配置 → 视频通道」只有选它才能通过「协议未接入」校验。
@@ -141,19 +143,23 @@ function serializeOpenAiJob(job, now) {
 
 // ─────────────────────────── MiniMax 兼容协议 ───────────────────────────
 
-export async function handleMinimaxVideoCreate(ctx) {
-  const body = ctx.body ?? {};
-  const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
-  if (!prompt) {
-    sendJson(ctx.req, ctx.res, 200, {
-      task_id: '',
-      base_resp: { status_code: 1002, status_msg: 'prompt is required' },
-    });
-    return;
-  }
-  maybeFail(ctx.cfg, prompt);
-  await sleep(Math.min(ctx.cfg.latencyVideoReadyMs / 4, 400));
+function minimaxPromptFromBody(body) {
+  if (typeof body.prompt === 'string' && body.prompt.trim()) return body.prompt.trim();
+  if (!Array.isArray(body.content)) return '';
+  return body.content
+    .filter((block) => block && block.type === 'text' && typeof block.text === 'string')
+    .map((block) => block.text.trim())
+    .filter(Boolean)
+    .join('\n');
+}
 
+function minimaxHasImageInput(body) {
+  if (body.first_frame_image) return true;
+  return Array.isArray(body.content) && body.content.some((block) => block && block.type === 'image_url');
+}
+
+function createMinimaxTask(ctx, body) {
+  const prompt = minimaxPromptFromBody(body);
   const model = typeof body.model === 'string' && body.model ? body.model : 'MiniMax-Hailuo-2.3';
   const seconds = clampNumber(Number(body.duration) || 2, 1, ctx.cfg.videoMaxSeconds);
   const resolution = typeof body.resolution === 'string' ? body.resolution : '';
@@ -164,7 +170,7 @@ export async function handleMinimaxVideoCreate(ctx) {
     seconds,
     seed: String(body.seed ?? ''),
     maxSeconds: ctx.cfg.videoMaxSeconds,
-    hasFirstFrame: Boolean(body.first_frame_image),
+    hasFirstFrame: minimaxHasImageInput(body),
   });
   const { id: fileId } = ctx.store.put(video.buffer, {
     mime: video.mime,
@@ -174,7 +180,7 @@ export async function handleMinimaxVideoCreate(ctx) {
 
   const taskId = `task_${randomBytes(10).toString('hex')}`;
   const now = Date.now();
-  ctx.state.minimaxTasks.set(taskId, {
+  const task = {
     id: taskId,
     createdAt: now,
     readyAt: now + ctx.cfg.latencyVideoReadyMs,
@@ -182,9 +188,34 @@ export async function handleMinimaxVideoCreate(ctx) {
     model,
     width: video.width,
     height: video.height,
-  });
+  };
+  ctx.state.minimaxTasks.set(taskId, task);
+  return task;
+}
+
+function minimaxStatus(task, now) {
+  const total = Math.max(1, task.readyAt - task.createdAt);
+  const elapsed = Math.max(0, now - task.createdAt);
+  if (elapsed >= total) return 'Success';
+  if (elapsed >= total * 0.3) return 'Processing';
+  return 'Queueing';
+}
+
+export async function handleMinimaxVideoCreate(ctx) {
+  const body = ctx.body ?? {};
+  const prompt = minimaxPromptFromBody(body);
+  if (!prompt) {
+    sendJson(ctx.req, ctx.res, 200, {
+      task_id: '',
+      base_resp: { status_code: 1002, status_msg: 'prompt is required' },
+    });
+    return;
+  }
+  maybeFail(ctx.cfg, prompt);
+  await sleep(Math.min(ctx.cfg.latencyVideoReadyMs / 4, 400));
+  const task = createMinimaxTask(ctx, body);
   sendJson(ctx.req, ctx.res, 200, {
-    task_id: taskId,
+    task_id: task.id,
     base_resp: { status_code: 0, status_msg: 'success' },
   });
 }
@@ -199,13 +230,7 @@ export function handleMinimaxVideoQuery(ctx) {
     });
     return;
   }
-  const now = Date.now();
-  const total = Math.max(1, task.readyAt - task.createdAt);
-  const elapsed = Math.max(0, now - task.createdAt);
-  let status;
-  if (elapsed >= total) status = 'Success';
-  else if (elapsed >= total * 0.3) status = 'Processing';
-  else status = 'Queueing';
+  const status = minimaxStatus(task, Date.now());
 
   sendJson(ctx.req, ctx.res, 200, {
     task_id: taskId,
@@ -217,6 +242,48 @@ export function handleMinimaxVideoQuery(ctx) {
           video_height: task.height,
         }
       : { file_id: '' }),
+    base_resp: { status_code: 0, status_msg: 'success' },
+  });
+}
+
+export async function handleMinimaxV2VideoCreate(ctx) {
+  const body = ctx.body ?? {};
+  const prompt = minimaxPromptFromBody(body);
+  if (!prompt) {
+    sendJson(ctx.req, ctx.res, 200, {
+      task: { id: '', status: 'Fail', error: { code: 1002, message: 'prompt is required' } },
+      base_resp: { status_code: 1002, status_msg: 'prompt is required' },
+    });
+    return;
+  }
+  maybeFail(ctx.cfg, prompt);
+  await sleep(Math.min(ctx.cfg.latencyVideoReadyMs / 4, 400));
+  const task = createMinimaxTask(ctx, body);
+  sendJson(ctx.req, ctx.res, 200, {
+    task_id: task.id,
+    task: { id: task.id, status: 'Queueing' },
+    base_resp: { status_code: 0, status_msg: 'success' },
+  });
+}
+
+export function handleMinimaxV2VideoQuery(ctx, taskId) {
+  const task = ctx.state.minimaxTasks.get(taskId);
+  if (!task) {
+    sendJson(ctx.req, ctx.res, 200, {
+      task: { id: taskId, status: 'Fail', error: { code: 2013, message: 'task not found' } },
+      base_resp: { status_code: 2013, status_msg: 'task not found' },
+    });
+    return;
+  }
+  const status = minimaxStatus(task, Date.now());
+  sendJson(ctx.req, ctx.res, 200, {
+    task: {
+      id: taskId,
+      status,
+      ...(status === 'Success'
+        ? { content: { url: `${ctx.base}/files/${task.fileId}.mp4` } }
+        : {}),
+    },
     base_resp: { status_code: 0, status_msg: 'success' },
   });
 }

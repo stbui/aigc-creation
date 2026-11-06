@@ -45,7 +45,7 @@ interface ChannelListPanelProps {
 /**
  * 渠道工作台左列：渠道导航。
  *
- * 只负责「选哪条渠道」，224 足够放下名称 + 健康摘要；余量全部给右侧模型表。
+ * 只负责「选哪条渠道」，272 能在一行内放下状态、模型数与健康摘要；余量给右侧模型表。
  * 搜索与状态筛选都在本地过滤，切渠道只有一次点击。
  */
 export function ChannelListPanel({
@@ -248,7 +248,7 @@ export function ChannelListPanel({
                  * 否则整列看起来都像选中。
                  */
                 className={cn(
-                  'h-auto w-full rounded-lg px-2.5 py-2 text-left whitespace-normal hover:bg-muted',
+                  'h-auto w-full rounded-lg px-3 py-2.5 text-left whitespace-normal hover:bg-muted',
                   'outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
                   active && 'bg-accent ring-1 ring-inset ring-brand/30 hover:bg-accent',
                 )}
@@ -256,42 +256,48 @@ export function ChannelListPanel({
                 onKeyDown={(event) => handleChannelKeyDown(event, index)}
                 ref={active ? activeRef : undefined}
               >
-                <span className="flex w-full min-w-0 flex-col gap-0.5">
-                  <span className="flex min-w-0 items-center gap-1.5">
+                <span className="flex w-full min-w-0 flex-col gap-1">
+                  <span className="flex min-w-0 items-center gap-2">
                     <span
                       data-testid="admin-channel-name"
-                      className="truncate text-[13px] font-medium text-foreground"
+                      className="min-w-0 flex-1 truncate text-[13px] font-semibold text-foreground"
                     >
                       {row.name}
                     </span>
+                    {!row.hasApiKey && (
+                      <span className="shrink-0 text-[12px] font-medium text-danger-text">凭证缺失</span>
+                    )}
                   </span>
-                  <span className="flex items-center gap-2 text-[12px] text-muted-foreground">
-                    {/* 状态用圆点：每行一颗绿色「启用」胶囊会把整列刷成绿色，异常项反而看不见 */}
-                    <span className="inline-flex items-center gap-1">
-                      <span
-                        className={`size-1.5 shrink-0 rounded-full ${
-                          row.enabled ? 'bg-success-text' : 'bg-muted-foreground'
-                        }`}
-                        aria-hidden
-                      />
-                      {row.enabled ? '渠道启用' : '渠道停用'}
+                  <span className="flex items-center justify-between gap-2 text-[12px] text-muted-foreground">
+                    <span className="flex min-w-0 items-center gap-2 whitespace-nowrap">
+                      {/* 状态用圆点：每行一颗绿色「启用」胶囊会把整列刷成绿色，异常项反而看不见 */}
+                      <span className="inline-flex items-center gap-1">
+                        <span
+                          className={`size-1.5 shrink-0 rounded-full ${
+                            row.enabled ? 'bg-success-text' : 'bg-muted-foreground'
+                          }`}
+                          aria-hidden
+                        />
+                        {row.enabled ? '启用' : '停用'}
+                      </span>
+                      <span className="text-border" aria-hidden>·</span>
+                      <span className="tabular-nums">{row.modelCosts?.length ?? 0} 个模型</span>
                     </span>
-                    <span className="tabular-nums">{row.modelCosts?.length ?? 0} 个模型</span>
                     {rate !== null && (
                       <span
-                        className={
+                        className={cn(
+                          'shrink-0 whitespace-nowrap tabular-nums',
                           tone === 'success'
                             ? 'text-success-text'
                             : tone === 'warn'
                               ? 'text-warn-text'
-                              : 'text-danger-text'
-                        }
+                              : 'text-danger-text',
+                        )}
                         title={`近 24 小时 ${stats?.samples ?? 0} 次生成请求，成功 ${stats?.success ?? 0} 次`}
                       >
-                        {formatRate(rate)}
+                        24h {formatRate(rate)}
                       </span>
                     )}
-                    {!row.hasApiKey && <span className="text-danger-text">未配置访问凭证</span>}
                   </span>
                 </span>
               </button>

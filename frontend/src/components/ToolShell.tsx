@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties } from 're
 import { Download, ImagePlus, Maximize2, Plus, RefreshCw, X } from 'lucide-react';
 import { assetsApi, assetSrc, assetThumbUrl, toAbsoluteUrl } from '../lib/api';
 import { useProject } from '../hooks/useProject';
-import { useCapabilities } from '../hooks/useCapabilities';
+import { useCapabilityRuntime } from '../hooks/useCapabilityRuntime';
 import { usePasteUpload } from '../hooks/usePasteUpload';
 import { useCreditLabel } from '../hooks/useCreditLabel';
 import { useAuth } from '../context/AuthContext';
@@ -55,19 +55,14 @@ export function ToolShell(props: Props) {
    * 并把提交置灰 —— 否则用户点下去只会等到一次 42204。
    * 2026-10-25 起所有图像能力都必须有模型通道，unavailable 一律拦截。
    */
-  const { data: capsData } = useCapabilities();
+  const { blocked: capabilityBlocked, reason: unavailableReason } = useCapabilityRuntime(props.capability);
   const { token } = useAuth();
-  const runtime = capsData?.items.find((c) => c.id === props.capability)?.runtime;
-  const unavailableReason =
-    runtime && (runtime.effective === 'unavailable' || runtime.effective === 'disabled')
-      ? runtime.reason || '该能力当前不可提交，请稍后再试或联系客服。'
-      : null;
   /*
    * 只拦**已登录**用户的提交。访客点击仍要走登录弹窗（上传/提交接口的
    * 401 → auth:required 契约）；把按钮对访客一起置灰，会让他在登录前
    * 连「为什么不能用」的入口都点不到。
    */
-  const blocked = Boolean(token) && Boolean(unavailableReason);
+  const blocked = Boolean(token) && capabilityBlocked;
   const {
     capability,
     pageClass,
@@ -166,9 +161,7 @@ export function ToolShell(props: Props) {
       imagesRef.current = nextImages;
       // 用 updater 追加: 一轮多选时前一张还没进 state, 直接读 images 会丢。
       // 单图替换则必须覆盖旧图，否则「素材库导入」会永远被额度拒绝。
-      setImages((prev) =>
-        replacing ? [next] : prev.some((x) => x.id === next.id) ? prev : [...prev, next],
-      );
+      setImages((prev) => (replacing ? [next] : prev.some((x) => x.id === next.id) ? prev : [...prev, next]));
       return true;
     },
     [message, replaceUpload, upload],
@@ -218,9 +211,7 @@ export function ToolShell(props: Props) {
       const nextImages = replacing ? added.slice(0, 1) : [...prev, ...added];
       imagesRef.current = nextImages;
       setImages((cur) =>
-        replacing
-          ? added.slice(0, 1)
-          : [...cur, ...added.filter((a) => !cur.some((x) => x.id === a.id))],
+        replacing ? added.slice(0, 1) : [...cur, ...added.filter((a) => !cur.some((x) => x.id === a.id))],
       );
       setMobileOpen(false);
       if (added.length > 0) message.success(`已从手机接收 ${added.length} 张图片`);
@@ -507,7 +498,6 @@ export function ToolShell(props: Props) {
 
             {/* 业务卡 (函数形态可读到已上传图片, 供画布类页面当底图) */}
             {typeof children === 'function' ? children(images) : children}
-
           </div>
 
           {/* 提交区 (sticky 底部) */}
@@ -560,8 +550,8 @@ export function ToolShell(props: Props) {
 
       {/* ── 右: 结果栏 (页面可注入共享结果网格) ── */}
       {resultPane ?? (
-      <section className="pk-result-pane">
-        {/*
+        <section className="pk-result-pane">
+          {/*
           三态必须分开 (2026-10-20 修)。
 
           此前只有「有结果 / 没结果」两态, 而提交任务时 `useToolTask.run` 会先
@@ -572,168 +562,164 @@ export function ToolShell(props: Props) {
 
           现在: 生成中 → 骨架占位; 失败 → 失败卡; 成功 → 结果图; 都没发生 → 空态。
         */}
-        {submitting && !showResult && !keepSourceWhileSubmitting ? (
-          resultView === 'product-card' ? (
-            <ProductCardGenerating aspect={generatingAspect} />
-          ) : (
-            <ToolGeneratingState />
-          )
-        ) : !showResult ? (
-          (sourcePane
-            ? typeof sourcePane === 'function'
-              ? sourcePane(images)
-              : sourcePane
-            : null) ?? (emptyVideo ? (
-            <div className="pk-preview-placeholder">
-              <div className="pk-preview-inner">
-                <video
-                  className="image-tool-empty-state-media"
-                  src={emptyVideo}
-                  /* 受限浏览器 (无 H.264 解码) 会报 MEDIA_ERR_SRC_NOT_SUPPORTED,
+          {submitting && !showResult && !keepSourceWhileSubmitting ? (
+            resultView === 'product-card' ? (
+              <ProductCardGenerating aspect={generatingAspect} />
+            ) : (
+              <ToolGeneratingState />
+            )
+          ) : !showResult ? (
+            ((sourcePane ? (typeof sourcePane === 'function' ? sourcePane(images) : sourcePane) : null) ??
+            (emptyVideo ? (
+              <div className="pk-preview-placeholder">
+                <div className="pk-preview-inner">
+                  <video
+                    className="image-tool-empty-state-media"
+                    src={emptyVideo}
+                    /* 受限浏览器 (无 H.264 解码) 会报 MEDIA_ERR_SRC_NOT_SUPPORTED,
                      留下 480×480 的纯黑块; 首帧 poster 保证此时仍有内容可看。 */
-                  poster={emptyVideo.replace(/\.mp4$/, '-poster.jpg')}
-                  autoPlay
-                  loop
-                  muted
-                  playsInline
-                  aria-label={`${title}演示`}
-                />
-                <h3>{title}</h3>
-                <p>{desc || emptyDesc}</p>
+                    poster={emptyVideo.replace(/\.mp4$/, '-poster.jpg')}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    aria-label={`${title}演示`}
+                  />
+                  <h3>{title}</h3>
+                  <p>{desc || emptyDesc}</p>
+                </div>
+              </div>
+            ) : (
+              <ToolEmptyState title={title} desc={desc || emptyDesc} capability={capability} />
+            )))
+          ) : resultView === 'product-card' &&
+            results.length === 1 &&
+            results[0].status === 'succeeded' &&
+            results[0].url ? (
+            <ProductCardResult
+              result={results[0]}
+              title={title}
+              badge={resultBadge ?? resultTag ?? `${title}结果`}
+              fallbackAspect={generatingAspect}
+              onPreview={() => setLightboxUrl(results[0].url!)}
+            />
+          ) : resultView === 'canvas' && results.length === 1 && results[0].status === 'succeeded' && results[0].url ? (
+            <div className="pk-source-pane redraw-stage redraw-result-stage">
+              <div className="redraw-stage-topbar result-actions-only">
+                <div className="stage-actions">
+                  {resultActions}
+                  <button type="button" disabled={submitting} onClick={() => void submit()}>
+                    <RefreshCw size={14} />
+                    重新生成
+                  </button>
+                </div>
+              </div>
+              <div className="redraw-stage-main">
+                <div
+                  className="redraw-canvas-wrap"
+                  style={
+                    {
+                      '--redraw-image-aspect':
+                        generatingAspect ||
+                        (results[0].width && results[0].height ? results[0].width / results[0].height : 1),
+                    } as CSSProperties
+                  }
+                >
+                  <button
+                    type="button"
+                    className="redraw-result-preview"
+                    aria-label={`预览${title}结果`}
+                    onClick={() => setLightboxUrl(results[0].url!)}
+                  >
+                    <ResultMedia
+                      url={results[0].url}
+                      modality={results[0].modality}
+                      alt={`${title}结果`}
+                      className="redraw-result-image"
+                      priority
+                    />
+                  </button>
+                  <a
+                    className="redraw-result-download"
+                    href={results[0].url}
+                    download
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`下载${title}结果`}
+                    title="下载"
+                  >
+                    <Download size={16} />
+                  </a>
+                </div>
               </div>
             </div>
           ) : (
-            <ToolEmptyState title={title} desc={desc || emptyDesc} capability={capability} />
-          ))
-        ) : resultView === 'product-card' && results.length === 1 && results[0].status === 'succeeded' && results[0].url ? (
-          <ProductCardResult
-            result={results[0]}
-            title={title}
-            badge={resultBadge ?? resultTag ?? `${title}结果`}
-            fallbackAspect={generatingAspect}
-            onPreview={() => setLightboxUrl(results[0].url!)}
-          />
-        ) : resultView === 'canvas' && results.length === 1 && results[0].status === 'succeeded' && results[0].url ? (
-          <div className="pk-source-pane redraw-stage redraw-result-stage">
-            <div className="redraw-stage-topbar result-actions-only">
-              <div className="stage-actions">
-                {resultActions}
-                <button type="button" disabled={submitting} onClick={() => void submit()}>
-                  <RefreshCw size={14} />
-                  重新生成
-                </button>
+            <div className="pk-result-body">
+              <div className="pk-result-toolbar">
+                <div className="pk-result-title">
+                  生成结果
+                  {resultTag && <span className="pk-result-count">{resultTag}</span>}
+                </div>
+                <div className="tool-result-actions">
+                  {resultActions}
+                  <button type="button" className="pk-result-regen" disabled={submitting} onClick={() => void submit()}>
+                    <RefreshCw size={13} />
+                    重新生成
+                  </button>
+                </div>
               </div>
-            </div>
-            <div className="redraw-stage-main">
-              <div
-                className="redraw-canvas-wrap"
-                style={
-                  {
-                    '--redraw-image-aspect':
-                      generatingAspect ||
-                      (results[0].width && results[0].height
-                        ? results[0].width / results[0].height
-                        : 1),
-                  } as CSSProperties
-                }
-              >
-                <button
-                  type="button"
-                  className="redraw-result-preview"
-                  aria-label={`预览${title}结果`}
-                  onClick={() => setLightboxUrl(results[0].url!)}
-                >
-                  <ResultMedia
-                    url={results[0].url}
-                    modality={results[0].modality}
-                    alt={`${title}结果`}
-                    className="redraw-result-image"
-                    priority
-                  />
-                </button>
-                <a
-                  className="redraw-result-download"
-                  href={results[0].url}
-                  download
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={`下载${title}结果`}
-                  title="下载"
-                >
-                  <Download size={16} />
-                </a>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="pk-result-body">
-            <div className="pk-result-toolbar">
-              <div className="pk-result-title">
-                生成结果
-                {resultTag && <span className="pk-result-count">{resultTag}</span>}
-              </div>
-              <div className="tool-result-actions">
-                {resultActions}
-                <button type="button" className="pk-result-regen" disabled={submitting} onClick={() => void submit()}>
-                  <RefreshCw size={13} />
-                  重新生成
-                </button>
-              </div>
-            </div>
-            <div className="pk-result-detail-scroll">
-              <div className={`tool-result-grid${results.length > 1 ? ' tool-result-grid-multi' : ''}`}>
-                {results.map((r, i) =>
-                  r.status === 'succeeded' && r.url ? (
-                    <div key={i} className="pk-result-card pk-result-card-detail">
-                      <div className="pk-result-detail-media">
-                        {resultCompare && results.length === 1 ? (
-                          <ImageCompare
-                            beforeUrl={resultCompare.beforeUrl}
-                            afterUrl={r.url}
-                            beforeLabel={resultCompare.beforeLabel}
-                            afterLabel={resultCompare.afterLabel}
-                          />
-                        ) : r.modality === 'video' ? (
-                          <ResultMedia url={r.url} modality={r.modality} alt={`${title}结果 ${i + 1}`} />
-                        ) : (
-                          <button
-                            type="button"
-                            className="pk-result-preview"
-                            aria-label={`预览${title}结果 ${i + 1}`}
-                            onClick={() => setLightboxUrl(r.url!)}
-                          >
+              <div className="pk-result-detail-scroll">
+                <div className={`tool-result-grid${results.length > 1 ? ' tool-result-grid-multi' : ''}`}>
+                  {results.map((r, i) =>
+                    r.status === 'succeeded' && r.url ? (
+                      <div key={i} className="pk-result-card pk-result-card-detail">
+                        <div className="pk-result-detail-media">
+                          {resultCompare && results.length === 1 ? (
+                            <ImageCompare
+                              beforeUrl={resultCompare.beforeUrl}
+                              afterUrl={r.url}
+                              beforeLabel={resultCompare.beforeLabel}
+                              afterLabel={resultCompare.afterLabel}
+                            />
+                          ) : r.modality === 'video' ? (
                             <ResultMedia url={r.url} modality={r.modality} alt={`${title}结果 ${i + 1}`} />
-                          </button>
-                        )}
+                          ) : (
+                            <button
+                              type="button"
+                              className="pk-result-preview"
+                              aria-label={`预览${title}结果 ${i + 1}`}
+                              onClick={() => setLightboxUrl(r.url!)}
+                            >
+                              <ResultMedia url={r.url} modality={r.modality} alt={`${title}结果 ${i + 1}`} />
+                            </button>
+                          )}
+                        </div>
+                        <div className="pk-result-meta">
+                          <span className="pk-result-variant">{title}结果</span>
+                          <span className="pk-result-params">
+                            {r.width && r.height ? `${r.width}×${r.height}` : ''}
+                            {/* 视频没有宽高可显示 (Jimp 不解视频), 故显示时长 */}
+                            {formatDuration(r.durationMs) ? ` · ${formatDuration(r.durationMs)}` : ''}
+                          </span>
+                        </div>
+                        <a className="pk-result-download" href={r.url} download target="_blank" rel="noreferrer">
+                          下载原图
+                        </a>
                       </div>
-                      <div className="pk-result-meta">
-                        <span className="pk-result-variant">
-                          {title}结果
-                        </span>
-                        <span className="pk-result-params">
-                          {r.width && r.height ? `${r.width}×${r.height}` : ''}
-                          {/* 视频没有宽高可显示 (Jimp 不解视频), 故显示时长 */}
-                          {formatDuration(r.durationMs) ? ` · ${formatDuration(r.durationMs)}` : ''}
-                        </span>
+                    ) : (
+                      <div key={i} className="pk-result-card pk-result-card-detail">
+                        <div className="pk-result-detail-media pk-result-failed">
+                          <X size={20} />
+                          <span>生成失败：{taskErrorText(r.errorCode)}</span>
+                        </div>
                       </div>
-                      <a className="pk-result-download" href={r.url} download target="_blank" rel="noreferrer">
-                        下载原图
-                      </a>
-                    </div>
-                  ) : (
-                    <div key={i} className="pk-result-card pk-result-card-detail">
-                      <div className="pk-result-detail-media pk-result-failed">
-                        <X size={20} />
-                        <span>生成失败：{taskErrorText(r.errorCode)}</span>
-                      </div>
-                    </div>
-                  ),
-                )}
+                    ),
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        )}
-      </section>
+          )}
+        </section>
       )}
 
       {/* ── 右: 附加栏 (局部重绘历史记录; 其他页面不传则为空) ── */}
@@ -776,11 +762,7 @@ export function ToolShell(props: Props) {
       />
 
       {/* 手机上传弹窗 (二维码方案) */}
-      <MobileUploadModal
-        open={mobileOpen}
-        onReceived={addMobileAssets}
-        onCancel={() => setMobileOpen(false)}
-      />
+      <MobileUploadModal open={mobileOpen} onReceived={addMobileAssets} onCancel={() => setMobileOpen(false)} />
     </div>
   );
 }

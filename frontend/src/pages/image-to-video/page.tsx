@@ -4,16 +4,12 @@ import { Plus } from 'lucide-react';
 import type { ToolAsset } from './components';
 import { ToolShell } from './components';
 import { IMAGE_TO_VIDEO_CAPABILITY } from './constants';
+import { runtimeOf } from '../../lib/constants';
 import { useCapabilities, useToolTask } from './hooks';
 import { VideoResultPane } from './VideoResultPane';
 import { VideoSettingsCard } from './VideoSettingsCard';
 import { VideoUploadPreview } from './VideoUploadPreview';
-import {
-  buildImageToVideoPayload,
-  isVideoFormReady,
-  videoParamDefaults,
-  type VideoParamValues,
-} from './utils';
+import { buildImageToVideoPayload, isVideoFormReady, videoParamDefaults, type VideoParamValues } from './utils';
 
 /**
  * 通用视频创作页 —— 图生视频。
@@ -24,8 +20,7 @@ import {
  */
 export function ImageToVideoPage() {
   const { data: capabilities, loading, error } = useCapabilities();
-  const definition =
-    capabilities?.items.find((item) => item.id === IMAGE_TO_VIDEO_CAPABILITY) ?? null;
+  const definition = capabilities?.items.find((item) => item.id === IMAGE_TO_VIDEO_CAPABILITY) ?? null;
   const params = definition?.params ?? [];
 
   const [values, setValues] = useState<VideoParamValues>({});
@@ -48,13 +43,9 @@ export function ImageToVideoPage() {
   }, [definition]);
 
   const formValid = isVideoFormReady(params, values) && selectedModelReady;
-  const creditLabel =
-    quoteCredits === null
-      ? undefined
-      : quoteCredits > 0
-        ? `本次约 ${quoteCredits} 积分`
-        : '免费';
-  const unavailable = definition?.runtime && definition.runtime.effective !== 'remote';
+  const creditLabel = quoteCredits === null ? undefined : quoteCredits > 0 ? `本次约 ${quoteCredits} 积分` : '免费';
+  const runtime = definition ? runtimeOf(definition) : null;
+  const unavailable = runtime && runtime.effective !== 'remote';
 
   return (
     <ToolShell
@@ -107,7 +98,7 @@ export function ImageToVideoPage() {
         definition={definition}
         loading={loading}
         error={error}
-        runtime={definition?.runtime}
+        runtime={runtime ?? undefined}
         values={values}
         onChange={(key, value) => setValues((previous) => ({ ...previous, [key]: value }))}
         onModelChange={(model) => setSelectedModelReady(Boolean(model?.available))}

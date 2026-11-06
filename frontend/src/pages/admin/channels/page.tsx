@@ -153,7 +153,7 @@ export function AdminChannelsPage() {
         </div>
       ) : (
         <div
-          className="grid grid-cols-[224px_minmax(0,1fr)] items-start gap-4"
+          className="grid grid-cols-[272px_minmax(0,1fr)] items-start gap-4"
           data-testid="admin-channel-workspace"
         >
           {/* 导航在右栏长内容滚动时保持可见；列表自身仍随内容自然撑高，不做嵌套滚动 */}

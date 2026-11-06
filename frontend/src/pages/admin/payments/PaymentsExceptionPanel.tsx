@@ -4,33 +4,22 @@ import { adminPaymentExceptionsApi } from './api';
 import {
   ActionButton,
   AdminDataTable,
-  AppliedFilters,
   ConfirmDialog,
-  FilterActions,
-  FilterBar,
   FormField,
   ListError,
   Notice,
   Panel,
-  SelectField,
   StaleError,
   StatusTag,
   TextAreaField,
   type AdminColumn,
   type AppliedFilter,
 } from '~/admin-ui/primitives';
-import {
-  useAdmin,
-  useAdminList,
-  useAdminUrlFilterSync,
-  useToast,
-} from './hooks';
-import type {
-  AdminPaymentException,
-  PaymentExceptionStatus,
-} from '../../../types/payment';
+import { useAdmin, useAdminList, useAdminUrlFilterSync, useToast } from './hooks';
+import type { AdminPaymentException, PaymentExceptionStatus } from '../../../types/payment';
 import { ORDER_PROVIDERS, PROVIDER_LABELS } from './constants';
 import { moneyText } from './utils';
+import { PaymentsExceptionFilterPanel } from './PaymentsExceptionFilterPanel';
 
 const STATUS_META: Record<
   PaymentExceptionStatus,
@@ -69,10 +58,12 @@ const PRIORITY_OPTIONS = [
 type ConfirmAction = 'retry' | 'close';
 
 function statusMeta(status: string) {
-  return STATUS_META[status as PaymentExceptionStatus] ?? {
-    label: status,
-    tone: 'muted' as const,
-  };
+  return (
+    STATUS_META[status as PaymentExceptionStatus] ?? {
+      label: status,
+      tone: 'muted' as const,
+    }
+  );
 }
 
 export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number }) {
@@ -105,23 +96,18 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
         ...(params.status ? { status: params.status as string } : {}),
         ...(params.providerId ? { providerId: params.providerId as string } : {}),
         ...(params.priority ? { priority: params.priority as string } : {}),
-        ...(params.overdue !== undefined
-          ? { overdue: params.overdue === true || params.overdue === 'true' }
-          : {}),
+        ...(params.overdue !== undefined ? { overdue: params.overdue === true || params.overdue === 'true' } : {}),
       }),
     [],
   );
 
-  const { data, loading, error, params, setQuery, setPage, reload } = useAdminList(
-    fetcher,
-    {
-      pageSize: 30,
-      ...(initialStatus ? { status: initialStatus } : {}),
-      ...(initialProvider ? { providerId: initialProvider } : {}),
-      ...(initialPriority ? { priority: initialPriority } : {}),
-      ...(initialOverdue ? { overdue: initialOverdue } : {}),
-    },
-  );
+  const { data, loading, error, params, setQuery, setPage, reload } = useAdminList(fetcher, {
+    pageSize: 30,
+    ...(initialStatus ? { status: initialStatus } : {}),
+    ...(initialProvider ? { providerId: initialProvider } : {}),
+    ...(initialPriority ? { priority: initialPriority } : {}),
+    ...(initialOverdue ? { overdue: initialOverdue } : {}),
+  });
 
   useEffect(() => {
     if (refreshNonce > 0) void reload();
@@ -244,9 +230,7 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
       title: '金额',
       width: 100,
       align: 'right',
-      render: (row) => (
-        <span className="tabular-nums">{moneyText(row.amountCents, row.currency)}</span>
-      ),
+      render: (row) => <span className="tabular-nums">{moneyText(row.amountCents, row.currency)}</span>,
     },
     {
       key: 'kind',
@@ -292,9 +276,7 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
       key: 'ownerId',
       title: '负责人',
       width: 120,
-      render: (row) => (
-        <span className="break-all text-xs text-muted-foreground">{row.ownerId ?? '未认领'}</span>
-      ),
+      render: (row) => <span className="break-all text-xs text-muted-foreground">{row.ownerId ?? '未认领'}</span>,
     },
     {
       key: 'refundStatus',
@@ -303,9 +285,7 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
       render: (row) => (
         <div className="flex flex-col gap-0.5 text-xs">
           <span>{row.refundStatus ?? '无退款单'}</span>
-          <code className="break-all font-mono text-[11px] text-muted-foreground">
-            {row.providerRefundId ?? '—'}
-          </code>
+          <code className="break-all font-mono text-[11px] text-muted-foreground">{row.providerRefundId ?? '—'}</code>
         </div>
       ),
     },
@@ -314,9 +294,7 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
       title: '最近错误 / 依据',
       width: 240,
       render: (row) => (
-        <span className="line-clamp-2 text-xs text-muted-foreground">
-          {row.lastError ?? row.resolution ?? '—'}
-        </span>
+        <span className="line-clamp-2 text-xs text-muted-foreground">{row.lastError ?? row.resolution ?? '—'}</span>
       ),
     },
     {
@@ -328,12 +306,7 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
         return (
           <div className="flex flex-wrap gap-1">
             {actionable && !row.ownerId && canOperate && (
-              <ActionButton
-                size="sm"
-                variant="ghost"
-                disabled={busyId === row.id}
-                onClick={() => void claim(row)}
-              >
+              <ActionButton size="sm" variant="ghost" disabled={busyId === row.id} onClick={() => void claim(row)}>
                 {busyId === row.id ? '处理中…' : '认领'}
               </ActionButton>
             )}
@@ -375,78 +348,40 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
         渠道退款失败的情况一律保留在这里，禁止只在对账明细或日志中“消账”。
       </Notice>
 
-      <Panel title="异常筛选" note="SLA 2 小时；逾期单会优先展示">
-        <FilterBar>
-          <SelectField
-            value={status}
-            onChange={setStatus}
-            options={STATUS_OPTIONS}
-            allowClear
-            className="w-[140px]"
-            ariaLabel="筛选异常状态"
-          />
-          <SelectField
-            value={providerId}
-            onChange={setProviderId}
-            options={ORDER_PROVIDERS}
-            allowClear
-            className="w-[130px]"
-            ariaLabel="筛选异常渠道"
-          />
-          <SelectField
-            value={priority}
-            onChange={setPriority}
-            options={PRIORITY_OPTIONS}
-            allowClear
-            className="w-[120px]"
-            ariaLabel="筛选异常优先级"
-          />
-          <SelectField
-            value={overdue}
-            onChange={setOverdue}
-            options={[
-              { value: 'true', label: '仅看逾期' },
-              { value: 'false', label: '全部 SLA' },
-            ]}
-            allowClear
-            className="w-[120px]"
-            ariaLabel="筛选 SLA"
-          />
-          <FilterActions>
-            <ActionButton
-              onClick={() =>
-                setQuery({
-                  status,
-                  providerId,
-                  priority,
-                  overdue: overdue === undefined ? undefined : overdue === 'true',
-                })
-              }
-            >
-              查询
-            </ActionButton>
-            <ActionButton
-              variant="ghost"
-              onClick={() => {
-                setStatus(undefined);
-                setProviderId(undefined);
-                setPriority(undefined);
-                setOverdue(undefined);
-                setQuery({
-                  status: undefined,
-                  providerId: undefined,
-                  priority: undefined,
-                  overdue: undefined,
-                });
-              }}
-            >
-              重置
-            </ActionButton>
-          </FilterActions>
-        </FilterBar>
-      </Panel>
-
-      {appliedFilters.length > 0 && <AppliedFilters items={appliedFilters} />}
+      <PaymentsExceptionFilterPanel
+        status={status}
+        providerId={providerId}
+        priority={priority}
+        overdue={overdue}
+        statusOptions={STATUS_OPTIONS}
+        providerOptions={ORDER_PROVIDERS}
+        priorityOptions={PRIORITY_OPTIONS}
+        appliedFilters={appliedFilters}
+        onStatusChange={setStatus}
+        onProviderChange={setProviderId}
+        onPriorityChange={setPriority}
+        onOverdueChange={setOverdue}
+        onApply={() =>
+          setQuery({
+            status,
+            providerId,
+            priority,
+            overdue: overdue === undefined ? undefined : overdue === 'true',
+          })
+        }
+        onReset={() => {
+          setStatus(undefined);
+          setProviderId(undefined);
+          setPriority(undefined);
+          setOverdue(undefined);
+          setQuery({
+            status: undefined,
+            providerId: undefined,
+            priority: undefined,
+            overdue: undefined,
+          });
+        }}
+      />
       {error && data && <StaleError error={error} onRetry={() => void reload()} />}
       {error && !data && <ListError error={error} onRetry={() => void reload()} />}
 
@@ -505,10 +440,7 @@ export function PaymentsExceptionPanel({ refreshNonce }: { refreshNonce: number 
             </FormField>
           ) : undefined
         }
-        impact={[
-          `异常单：${confirm?.row.merchantOrderNo ?? ''}`,
-          '操作会写入管理员审计日志',
-        ]}
+        impact={[`异常单：${confirm?.row.merchantOrderNo ?? ''}`, '操作会写入管理员审计日志']}
       />
     </div>
   );

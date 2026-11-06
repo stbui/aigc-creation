@@ -1,12 +1,29 @@
 import { useCallback, useMemo, useState } from 'react';
-import { useAdminExport } from '~/admin-ui/primitives';
 import { REQUEST_KIND_LABELS, STATUS_LABELS, STATUS_TONES } from './constants';
 import { useAdmin, useToast, useAdminDetailParam, useAdminList, useAdminUrlFilterSync } from './hooks';
 import { useSearchParams } from 'react-router-dom';
-import { Download } from 'lucide-react';
 import { adminApiLogsApi } from '../../../lib/api';
+import { ModelCallDetailDrawer } from './ModelCallDetailDrawer';
 
-import { ActionButton, AdminDataTable, AppliedFilters, Descriptions, Drawer, FilterActions, FilterBar, Notice, PageHeader, Panel, SelectField, StatCard, StatusTag, StaleError, TextField, type AdminColumn, type AppliedFilter } from '~/admin-ui/primitives';
+import {
+  ActionButton,
+  RefreshButton,
+  ExportCsvButton,
+  useAdminExport,
+  AdminDataTable,
+  AppliedFilters,
+  FilterActions,
+  FilterBar,
+  PageHeader,
+  Panel,
+  SelectField,
+  StatCards,
+  StatusTag,
+  StaleError,
+  TextField,
+  type AdminColumn,
+  type AppliedFilter,
+} from '~/admin-ui/primitives';
 import type { ApiLogListResult, ApiLogView } from '../../../types/model';
 
 /**
@@ -66,10 +83,7 @@ export function AdminModelCallsPage() {
     [],
   );
 
-  const { data, loading, error, params, setQuery, setPage, reload } = useAdminList<ApiLogListResult>(
-    fetcher,
-    initial,
-  );
+  const { data, loading, error, params, setQuery, setPage, reload } = useAdminList<ApiLogListResult>(fetcher, initial);
   /** 页面内改筛选后回写地址栏；`id`（详情抽屉）由 `useAdminDetailParam` 自己维护 */
   useAdminUrlFilterSync({
     status: params.status as string | undefined,
@@ -236,7 +250,9 @@ export function AdminModelCallsPage() {
         width: 160,
         render: (row) => (
           <div className="flex flex-col gap-0.5 text-[12px] tabular-nums text-muted-foreground">
-            <span>{row.durationMs} ms{row.pollCount > 1 ? ` · 轮询 ${row.pollCount}` : ''}</span>
+            <span>
+              {row.durationMs} ms{row.pollCount > 1 ? ` · 轮询 ${row.pollCount}` : ''}
+            </span>
             {row.usageAvailable && (
               <span className="text-muted-foreground">
                 输入 {row.inputTokens} / 输出 {row.outputTokens}
@@ -285,31 +301,31 @@ export function AdminModelCallsPage() {
         description="逐次留痕的上游 HTTP 调用，含后台连通性测试（不计费）。排查「哪个请求失败、返回了什么」看这里。"
         actions={
           <>
-            {can('data.export') && (
-              <ActionButton
-                variant="secondary"
-                size="sm"
-                icon={Download}
-                disabled={exporting}
-                onClick={() => void exportCsv()}
-              >
-                {exporting ? '导出中…' : '导出 CSV'}
-              </ActionButton>
-            )}
-            <ActionButton variant="secondary" size="sm" onClick={() => void reload()}>
-              刷新
-            </ActionButton>
+            {can('data.export') && <ExportCsvButton exporting={exporting} onExport={exportCsv} />}
+            <RefreshButton loading={loading} onRefresh={reload} />
           </>
         }
       />
 
       {summary && (
-        <div className="mb-3 grid grid-cols-4 gap-3">
-          <StatCard label="调用总数" value={summary.total} hint="受当前筛选影响" />
-          <StatCard label="成功" value={summary.success} tone={undefined} />
-          <StatCard label="失败 / 取消" value={summary.failed} tone={summary.failed > 0 ? 'danger' : undefined} />
-          <StatCard label="平均耗时" value={`${summary.avgDurationMs} ms`} hint={`其它状态 ${summary.other} 条`} />
-        </div>
+        <StatCards
+          columns={4}
+          className="mb-3"
+          items={[
+            { label: '调用总数', value: summary.total, hint: '受当前筛选影响' },
+            { label: '成功', value: summary.success },
+            {
+              label: '失败 / 取消',
+              value: summary.failed,
+              tone: summary.failed > 0 ? 'danger' : undefined,
+            },
+            {
+              label: '平均耗时',
+              value: `${summary.avgDurationMs} ms`,
+              hint: `其它状态 ${summary.other} 条`,
+            },
+          ]}
+        />
       )}
 
       <Panel title="调用明细">
@@ -387,20 +403,8 @@ export function AdminModelCallsPage() {
             onEnter={applyFilters}
             className="w-40"
           />
-          <TextField
-            ariaLabel="开始日期"
-            type="date"
-            value={from}
-            onChange={setFrom}
-            className="w-36"
-          />
-          <TextField
-            ariaLabel="结束日期"
-            type="date"
-            value={to}
-            onChange={setTo}
-            className="w-36"
-          />
+          <TextField ariaLabel="开始日期" type="date" value={from} onChange={setFrom} className="w-36" />
+          <TextField ariaLabel="结束日期" type="date" value={to} onChange={setTo} className="w-36" />
           <FilterActions>
             <ActionButton variant="default" size="sm" onClick={applyFilters}>
               查询
@@ -431,63 +435,7 @@ export function AdminModelCallsPage() {
         />
       </Panel>
 
-      <Drawer
-        open={detailId !== null}
-        onOpenChange={(open) => {
-          if (!open) setDetailId(null);
-        }}
-        width={720}
-        title="调用详情"
-        description={detail ? `${detail.method} ${detail.path}` : undefined}
-        footer={
-          <ActionButton variant="secondary" size="sm" onClick={() => setDetailId(null)}>
-            关闭
-          </ActionButton>
-        }
-      >
-        {detail ? (
-          <div className="flex flex-col gap-4">
-            {detail.error && (
-              <Notice tone="danger" title={`调用失败${detail.errorCode ? `（${detail.errorCode}）` : ''}`}>
-                {detail.error}
-              </Notice>
-            )}
-            <Descriptions
-              items={[
-                { label: '状态', value: `${STATUS_LABELS[detail.status] ?? detail.status} · HTTP ${detail.statusCode || '—'}` },
-                { label: '请求类型', value: `${REQUEST_KIND_LABELS[detail.requestKind] ?? detail.requestKind}${detail.billable ? '（计费）' : '（不计费）'}` },
-                { label: '来源', value: detail.source || '—' },
-                { label: '渠道', value: `${detail.channelName || '—'}（${detail.channelId || '—'}）` },
-                { label: '模型', value: <span className="font-mono text-xs">{detail.model || '—'}</span> },
-                { label: '协议 / 格式', value: detail.apiFormat || '—' },
-                { label: '能力 / 操作', value: `${detail.capability || '—'} · ${detail.operation || '—'}` },
-                { label: '耗时', value: `${detail.durationMs} ms${detail.pollCount > 0 ? ` · 第 ${detail.pollCount} 次轮询` : ''}` },
-                { label: '上游状态', value: detail.providerStatus || '—' },
-                { label: '请求方法', value: <span className="font-mono text-xs">{detail.method || '—'}</span> },
-                { label: '请求路径', value: <span className="break-all font-mono text-xs">{detail.path || '—'}</span> },
-                { label: '上游请求号', value: <span className="font-mono text-xs">{detail.providerRequestId || '—'}</span> },
-                { label: '任务', value: <span className="font-mono text-xs">{detail.taskId || '—'}</span> },
-                { label: '账单', value: <span className="font-mono text-xs">{detail.billingOrderId || '—'}</span> },
-                { label: '用户', value: detail.userId || '—' },
-                { label: '追踪号', value: <span className="font-mono text-xs">{detail.traceId || '—'}</span> },
-                {
-                  label: 'Token 用量',
-                  value: detail.usageAvailable
-                    ? `输入 ${detail.inputTokens} · 输出 ${detail.outputTokens} · 缓存 ${detail.cachedTokens}`
-                    : '无用量数据',
-                },
-                { label: '产出', value: `${detail.mediaCount} 个媒体${detail.videoSeconds > 0 ? ` · ${detail.videoSeconds}s` : ''}` },
-                { label: '时间', value: new Date(detail.createdAt).toLocaleString('zh-CN') },
-              ]}
-              columns={2}
-            />
-          </div>
-        ) : (
-          <p className="py-6 text-center text-xs text-muted-foreground">
-            该记录不在当前页。请回到列表按任务 ID 或渠道 ID 定位。
-          </p>
-        )}
-      </Drawer>
+      <ModelCallDetailDrawer detailId={detailId} detail={detail} onClose={() => setDetailId(null)} />
     </>
   );
 }

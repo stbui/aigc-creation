@@ -2,7 +2,18 @@ import { useCallback, useState } from 'react';
 import { defaultRange } from './utils';
 import { useAdminResource } from './hooks';
 import { adminAnalyticsApi } from '../../../lib/api';
-import { ActionButton, AdminDataTable, FilterActions, FilterBar, PageHeader, Panel, StatCard, TextField, type AdminColumn } from '~/admin-ui/primitives';
+import {
+  ActionButton,
+  RefreshButton,
+  AdminDataTable,
+  FilterActions,
+  FilterBar,
+  PageHeader,
+  Panel,
+  StatCards,
+  TextField,
+  type AdminColumn,
+} from '~/admin-ui/primitives';
 import { toCredits } from '../../../lib/microcredits';
 import type { FinanceAnalyticsView, FinanceBreakdownRow, FinanceDayRow } from '../../../types/model';
 
@@ -28,10 +39,7 @@ export function AdminFinancePage() {
     () => adminAnalyticsApi.finance({ from: applied.from, to: applied.to }),
     [applied.from, applied.to],
   );
-  const { data, loading, error, reload } = useAdminResource<FinanceAnalyticsView>(fetcher, [
-    applied.from,
-    applied.to,
-  ]);
+  const { data, loading, error, reload } = useAdminResource<FinanceAnalyticsView>(fetcher, [applied.from, applied.to]);
   const totals = data?.totals;
 
   const apply = () => setApplied({ from, to });
@@ -43,7 +51,12 @@ export function AdminFinancePage() {
   };
 
   const dayColumns: Array<AdminColumn<FinanceDayRow>> = [
-    { key: 'date', title: '日期', width: 120, render: (row) => <span className="font-mono text-[12px]">{row.date}</span> },
+    {
+      key: 'date',
+      title: '日期',
+      width: 120,
+      render: (row) => <span className="font-mono text-[12px]">{row.date}</span>,
+    },
     { key: 'orders', title: '订单', width: 90, align: 'right', render: (row) => row.orders },
     {
       key: 'settled',
@@ -71,9 +84,7 @@ export function AdminFinancePage() {
       title: '已退（积分）',
       width: 130,
       align: 'right',
-      render: (row) => (
-        <span className="tabular-nums text-warn-text">{toCredits(row.refundedMicrocredits)}</span>
-      ),
+      render: (row) => <span className="tabular-nums text-warn-text">{toCredits(row.refundedMicrocredits)}</span>,
     },
     {
       key: 'net',
@@ -127,12 +138,7 @@ export function AdminFinancePage() {
    */
   const tableError = (hasRows: boolean) => (hasRows ? null : error);
 
-  const breakdownPanel = (
-    title: string,
-    note: string,
-    rows: FinanceBreakdownRow[] | undefined,
-    label: string,
-  ) => (
+  const breakdownPanel = (title: string, note: string, rows: FinanceBreakdownRow[] | undefined, label: string) => (
     <Panel title={title} note={note}>
       <AdminDataTable<FinanceBreakdownRow>
         rows={rows ?? []}
@@ -152,30 +158,38 @@ export function AdminFinancePage() {
       <PageHeader
         title="财务分析"
         description="按账单口径汇总：实收只算已结算，挂账单列。金额单位为积分，保留 6 位小数。"
-        actions={
-          <ActionButton variant="secondary" size="sm" onClick={() => void reload()} disabled={loading}>
-            刷新
-          </ActionButton>
-        }
+        actions={<RefreshButton loading={loading} onRefresh={reload} />}
       />
 
-      <div className="mb-3 grid grid-cols-6 gap-3">
-        <StatCard label="实收（积分）" value={toCredits(totals?.chargedMicrocredits ?? 0)} />
-        <StatCard label="已退（积分）" value={toCredits(totals?.refundedMicrocredits ?? 0)} tone="warn" />
-        <StatCard label="净收入（积分）" value={toCredits(totals?.netMicrocredits ?? 0)} />
-        <StatCard
-          label="挂账（积分）"
-          value={toCredits(totals?.outstandingMicrocredits ?? 0)}
-          hint="预留 / 运行 / 待核对，不计入实收"
-          tone={(totals?.uncertainOrders ?? 0) > 0 ? 'danger' : undefined}
-        />
-        <StatCard label="订单数" value={totals?.orders ?? 0} hint={`结算成功率 ${((totals?.settleRate ?? 0) * 100).toFixed(1)}%`} />
-        <StatCard
-          label="成本（积分）"
-          value={toCredits(totals?.costMicrocredits ?? 0)}
-          hint={`毛利 ${toCredits(totals?.marginMicrocredits ?? 0)}`}
-        />
-      </div>
+      <StatCards
+        columns={6}
+        className="mb-3"
+        items={[
+          { label: '实收（积分）', value: toCredits(totals?.chargedMicrocredits ?? 0) },
+          {
+            label: '已退（积分）',
+            value: toCredits(totals?.refundedMicrocredits ?? 0),
+            tone: 'warn',
+          },
+          { label: '净收入（积分）', value: toCredits(totals?.netMicrocredits ?? 0) },
+          {
+            label: '挂账（积分）',
+            value: toCredits(totals?.outstandingMicrocredits ?? 0),
+            hint: '预留 / 运行 / 待核对，不计入实收',
+            tone: (totals?.uncertainOrders ?? 0) > 0 ? 'danger' : undefined,
+          },
+          {
+            label: '订单数',
+            value: totals?.orders ?? 0,
+            hint: `结算成功率 ${((totals?.settleRate ?? 0) * 100).toFixed(1)}%`,
+          },
+          {
+            label: '成本（积分）',
+            value: toCredits(totals?.costMicrocredits ?? 0),
+            hint: `毛利 ${toCredits(totals?.marginMicrocredits ?? 0)}`,
+          },
+        ]}
+      />
 
       <Panel
         title="区间与趋势"

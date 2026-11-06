@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { HAS_ADMIN_CREDENTIALS } from './support/admin-credentials';
+import { createAdminAuditFixture } from './support/admin-business-fixtures';
 
 /**
  * 后台布局回归。
@@ -34,6 +35,13 @@ const SIZES: Array<[number, number]> = [
 test.describe('后台布局', () => {
   test.skip(!HAS_ADMIN_CREDENTIALS, '未提供后台管理员凭据');
 
+  let auditFixture: Awaited<ReturnType<typeof createAdminAuditFixture>> | null = null;
+
+  test.beforeAll(async () => {
+    if (!HAS_ADMIN_CREDENTIALS) return;
+    auditFixture = await createAdminAuditFixture();
+  });
+
   for (const [w, h] of SIZES) {
     test(`${w}px 宽下内容区正确扣除侧栏宽度且无横向溢出`, async ({ page }) => {
       await page.setViewportSize({ width: w, height: h });
@@ -66,6 +74,27 @@ test.describe('后台布局', () => {
       }
     });
   }
+
+  test('侧栏首次默认全展开，折叠分组互不影响', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto(`${UI}/admin`);
+    await page.waitForSelector('[data-testid="admin-sider"]', { timeout: 15000 });
+
+    // 清除历史偏好，验证首次进入的默认态，而不是测试浏览器里残留的折叠状态。
+    await page.evaluate(() => localStorage.removeItem('huojue.admin.sidebar-groups'));
+    await page.reload();
+    const nav = page.getByTestId('admin-sider');
+    const overview = nav.getByRole('button', { name: '总览', exact: true });
+    const operations = nav.getByRole('button', { name: '运营', exact: true });
+
+    await expect(overview).toHaveAttribute('aria-expanded', 'true');
+    await expect(operations).toHaveAttribute('aria-expanded', 'true');
+
+    await overview.click();
+    await expect(overview).toHaveAttribute('aria-expanded', 'false');
+    await expect(operations).toHaveAttribute('aria-expanded', 'true');
+    await expect(nav.getByRole('button', { name: '用户管理', exact: true })).toBeVisible();
+  });
 
   test('顶栏固定、侧栏占满剩余高度且导航区独立滚动', async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
@@ -211,14 +240,14 @@ test.describe('后台布局', () => {
 
   test('审计详情在行内展开，不使用抽屉或确认弹窗', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
-    await page.goto(`${UI}/admin/audit-logs`);
+    await page.goto(
+      `${UI}/admin/audit-logs?action=${encodeURIComponent(auditFixture!.action)}&targetId=${encodeURIComponent(auditFixture!.productId)}`,
+    );
     await page.waitForSelector('.adm-content', { timeout: 15000 });
-    await page
-      .waitForSelector('[data-testid="admin-table-row"]', { timeout: 15000 })
-      .catch(() => undefined);
+    await page.waitForSelector('[data-testid="admin-table-row"]', { timeout: 15000 });
 
     const detailButton = page.getByRole('button', { name: '详情', exact: true }).first();
-    test.skip((await detailButton.count()) === 0, '当前库中暂无审计记录');
+    await expect(detailButton).toBeVisible();
 
     await detailButton.click();
     await expect(page.getByTestId('admin-table-expanded')).toBeVisible();

@@ -142,6 +142,17 @@
   opacity: 1;
 }
 
+.img-viewer-stage video.img-viewer-video {
+  min-width: 0;
+  min-height: 0;
+  max-width: 100cqw;
+  max-height: 100cqh;
+  display: block;
+  border-radius: 0;
+  background: #000;
+  object-fit: contain;
+}
+
 /* 横图转 90° 后视觉宽高互换；交换 max 约束，避免旋转后被舞台上下裁掉。 */
 .img-viewer-stage.is-quarter-turn img {
   max-width: 100cqh;

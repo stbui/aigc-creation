@@ -1,4 +1,4 @@
-import { StatCard } from '~/admin-ui/primitives';
+import { StatCards } from '~/admin-ui/primitives';
 import type { PluginListResult } from '../../../types/model';
 
 /**
@@ -17,33 +17,35 @@ export function PluginStats({
   if (!summary) return null;
 
   return (
-    <div className="mb-3 grid grid-cols-4 gap-3">
-      <StatCard
-        label="插件总数"
-        value={summary.total}
-        hint={`启用 ${summary.enabled} · 停用 ${summary.disabled}`}
-      />
-      <StatCard label="Provider" value={summary.providers} hint="跨插件汇总" />
-      <StatCard
-        label="已注册协议"
-        value={summary.protocol.registered}
-        hint={
-          summary.protocol.hostBacked.length > 0
-            ? `宿主引擎未内置 ${summary.protocol.hostBacked.length} 个`
-            : '声明式插件全部注册'
-        }
-        tone={summary.protocol.registered === 0 ? 'danger' : undefined}
-      />
-      <StatCard
-        label="当前环境不可用"
-        value={unavailableCount}
-        hint={
-          unavailableCount > 0
-            ? '清单已入库，但本环境不执行其贡献'
-            : '全部插件在本环境可用'
-        }
-        tone={unavailableCount > 0 ? 'warn' : undefined}
-      />
-    </div>
+    <StatCards
+      columns={4}
+      className="mb-3"
+      items={[
+        {
+          label: '插件总数',
+          value: summary.total,
+          hint: `启用 ${summary.enabled} · 停用 ${summary.disabled}`,
+        },
+        { label: 'Provider', value: summary.providers, hint: '跨插件汇总' },
+        {
+          label: '已注册协议',
+          value: summary.protocol.registered,
+          hint:
+            summary.protocol.hostBacked.length > 0
+              ? `宿主引擎未内置 ${summary.protocol.hostBacked.length} 个`
+              : '声明式插件全部注册',
+          tone: summary.protocol.registered === 0 ? 'danger' : undefined,
+        },
+        {
+          label: '当前环境不可用',
+          value: unavailableCount,
+          hint:
+            unavailableCount > 0
+              ? '清单已入库，但本环境不执行其贡献'
+              : '全部插件在本环境可用',
+          tone: unavailableCount > 0 ? 'warn' : undefined,
+        },
+      ]}
+    />
   );
 }

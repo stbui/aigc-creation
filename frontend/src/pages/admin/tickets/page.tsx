@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Download } from 'lucide-react';
 import {
   ActionButton,
+  ExportCsvButton,
   AppliedFilters,
   ClearableField,
   FilterActions,
@@ -21,6 +21,7 @@ import {
   useAdminUrlFilterSync,
   useDiscardConfirm,
   useToast,
+  useAdminExport,
   useUnsavedGuard,
 } from './hooks';
 import {
@@ -69,6 +70,7 @@ import type {
  */
 export function AdminTicketsPage() {
   const toast = useToast();
+  const { exporting, runExport } = useAdminExport(toast);
   const { can, me } = useAdmin();
 
   const [stats, setStats] = useState<TicketStats | null>(null);
@@ -77,14 +79,10 @@ export function AdminTicketsPage() {
   const [searchParams] = useSearchParams();
   const rawUrlTicketStatus = searchParams.get('status');
   const urlTicketStatus =
-    rawUrlTicketStatus && TICKET_STATUSES.includes(rawUrlTicketStatus as TicketStatus)
-      ? rawUrlTicketStatus
-      : undefined;
+    rawUrlTicketStatus && TICKET_STATUSES.includes(rawUrlTicketStatus as TicketStatus) ? rawUrlTicketStatus : undefined;
   const rawUrlType = searchParams.get('type');
   const urlTicketType =
-    rawUrlType && Object.prototype.hasOwnProperty.call(TYPE_LABELS, rawUrlType)
-      ? rawUrlType
-      : undefined;
+    rawUrlType && Object.prototype.hasOwnProperty.call(TYPE_LABELS, rawUrlType) ? rawUrlType : undefined;
   const rawUrlPriority = searchParams.get('priority');
   const urlTicketPriority =
     rawUrlPriority && Object.prototype.hasOwnProperty.call(PRIORITY_LABELS, rawUrlPriority)
@@ -117,14 +115,13 @@ export function AdminTicketsPage() {
     [],
   );
 
-  const { data, loading, error, params, setQuery, setPage, reload } =
-    useAdminList<AdminTicketListResult>(fetcher, {
-      ...(urlTicketStatus ? { status: urlTicketStatus } : {}),
-      ...(urlTicketType ? { type: urlTicketType } : {}),
-      ...(urlTicketPriority ? { priority: urlTicketPriority } : {}),
-      ...(urlAssigneeId ? { assigneeId: urlAssigneeId } : {}),
-      ...(urlQ ? { q: urlQ } : {}),
-    });
+  const { data, loading, error, params, setQuery, setPage, reload } = useAdminList<AdminTicketListResult>(fetcher, {
+    ...(urlTicketStatus ? { status: urlTicketStatus } : {}),
+    ...(urlTicketType ? { type: urlTicketType } : {}),
+    ...(urlTicketPriority ? { priority: urlTicketPriority } : {}),
+    ...(urlAssigneeId ? { assigneeId: urlAssigneeId } : {}),
+    ...(urlQ ? { q: urlQ } : {}),
+  });
 
   /* 告警中心链接 `?status=open`：已在本页时也要把筛选同步过去 */
   useEffect(() => {
@@ -307,10 +304,7 @@ export function AdminTicketsPage() {
     appliedAssignee
       ? {
           key: 'assigneeId',
-          label:
-            appliedAssignee === 'unassigned'
-              ? '归属：仅未指派'
-              : `处理人：${appliedAssignee}`,
+          label: appliedAssignee === 'unassigned' ? '归属：仅未指派' : `处理人：${appliedAssignee}`,
           onClear: () => setQuery({ assigneeId: undefined }),
         }
       : null,
@@ -338,23 +332,20 @@ export function AdminTicketsPage() {
         description="用户提交的问题、投诉与咨询集中在这里。关联订单与素材只读展示，退款与积分补偿请回订单模块执行。"
         actions={
           can('data.export') ? (
-            <ActionButton
-              variant="secondary"
-              icon={Download}
-              onClick={() =>
-                void adminTicketsApi
-                  .exportCsv({
+            <ExportCsvButton
+              exporting={exporting}
+              onExport={() =>
+                runExport(() =>
+                  adminTicketsApi.exportCsv({
                     status: params.status as string | undefined,
                     type: params.type as string | undefined,
                     priority: params.priority as string | undefined,
                     assigneeId: params.assigneeId as string | undefined,
                     q: params.q as string | undefined,
-                  })
-                  .catch((e: Error) => toast.error(e.message))
+                  }),
+                )
               }
-            >
-              导出 CSV
-            </ActionButton>
+            />
           ) : undefined
         }
       />

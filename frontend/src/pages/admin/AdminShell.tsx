@@ -91,7 +91,12 @@ export function AdminShell() {
   const { me, loading, error, errorStatus, refresh } = useAdmin();
   const location = useLocation();
 
-  if (!token) return <Navigate to="/login" replace />;
+  if (!token) {
+    const redirect = encodeURIComponent(
+      `${location.pathname}${location.search}${location.hash}`,
+    );
+    return <Navigate to={`/login?redirect=${redirect}`} replace />;
+  }
   if (loading) return <NoAdminShellLoading />;
   if (!me) {
     /*
