@@ -55,7 +55,7 @@ export function PageHeader({
     <header
       data-testid="admin-page-header"
       className={cn(
-        'mb-5 flex items-start justify-between gap-4 rounded-lg border border-l-[3px] border-border border-l-primary bg-card px-4 py-3.5 shadow-card',
+        ' flex items-start justify-between pb-4',
         className,
       )}
     >
@@ -69,7 +69,7 @@ export function PageHeader({
         {description && (
           <p
             className={cn(
-              'text-[13px] leading-5 text-muted-foreground',
+              'text-[12px] leading-5 text-muted-foreground',
               !inlineDescription && 'mt-1',
             )}
           >

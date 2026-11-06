@@ -104,9 +104,9 @@ export function StylePanel({
             value={spec.letterSpacing}
             min={0}
             max={12}
-            step={0.5}
+            step={1}
             suffix="px"
-            onChange={(v) => onPatch({ letterSpacing: v })}
+            onChange={(v) => onPatch({ letterSpacing: Math.round(v) })}
             disabled={!editable}
             ariaLabel="字距"
           />

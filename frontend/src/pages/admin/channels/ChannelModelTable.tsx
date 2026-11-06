@@ -131,7 +131,7 @@ export function ChannelModelTable({
     {
       key: 'model',
       title: '模型',
-      width: 156,
+      width: 180,
       cellTitle: (model) => model.modelKey,
       render: (model) => (
         <div className="min-w-0">
@@ -184,7 +184,7 @@ export function ChannelModelTable({
     {
       key: 'status',
       title: '状态',
-      width: 112,
+      width: 80,
       /*
        * 一个模型只给一个状态：与「全部模型」视图同一套优先级（停用 > 未定价 > 启用）。
        * 必须区分「渠道停用」与「模型停用」：前者会连带整组模型退出路由，
@@ -215,16 +215,12 @@ export function ChannelModelTable({
     {
       key: 'actions',
       title: '操作',
-      width: 320,
+      width: 325,
       fixed: 'right',
-      /*
-       * 每个动作同时展示图标和文案，降低仅靠图标猜含义的成本。
-       * 操作列固定右侧，横向空间不足时表格内部滚动，不挤压模型与价格列。
-       */
       render: (model) => (
         <div className="flex items-center justify-end gap-1">
           <ActionButton
-            variant="secondary"
+           variant="ghost"
             size="xs"
             icon={Pencil}
             ariaLabel={`编辑模型 ${model.modelKey}`}
@@ -375,49 +371,6 @@ export function ChannelModelTable({
             </ActionButton>
 
           </FilterActions>
-          <AppliedFilters
-            items={[
-              ...(keyword.trim()
-                ? [
-                  {
-                    key: 'keyword',
-                    label: `搜索：${keyword.trim()}`,
-                    onClear: () => {
-                      setKeyword('');
-                      setPage(1);
-                    },
-                  },
-                ]
-                : []),
-              ...(capabilityFilter
-                ? [
-                  {
-                    key: 'capability',
-                    label: `能力：${CAPABILITY_OPTIONS.find((item) => item.value === capabilityFilter)?.label ?? capabilityFilter
-                      }`,
-                    onClear: () => {
-                      setCapabilityFilter(undefined);
-                      setPage(1);
-                    },
-                  },
-                ]
-                : []),
-              ...(statusFilter
-                ? [
-                  {
-                    key: 'status',
-                    label: `状态：${STATUS_FILTER_OPTIONS.find((item) => item.value === statusFilter)?.label ?? statusFilter
-                      }`,
-                    onClear: () => {
-                      setStatusFilter(undefined);
-                      setPage(1);
-                    },
-                  },
-                ]
-                : []),
-            ]}
-            onClearAll={resetFilters}
-          />
         </FilterBar>
 
         <AdminDataTable<AdminChannelModelView>

@@ -181,21 +181,6 @@ export function ChannelListPanel({
             </ActionButton>
           </div>
         )}
-        <ClearableField
-          ariaLabel="搜索渠道"
-          value={keyword}
-          onChange={onKeywordChange}
-          placeholder="搜索渠道名称或服务地址"
-        />
-        <SelectField
-          ariaLabel="渠道状态"
-          value={status}
-          options={CHANNEL_STATUS_OPTIONS}
-          placeholder="全部状态"
-          clearLabel="全部状态"
-          allowClear
-          onChange={onStatusChange}
-        />
 
         {error && (
           <div className="py-2">

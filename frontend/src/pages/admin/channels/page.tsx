@@ -124,14 +124,13 @@ export function AdminChannelsPage() {
     <>
       <PageHeader
         title="渠道工作台"
-        actions={
-          <SegmentedGroup
-            ariaLabel="渠道工作台视图"
-            value={view}
-            onChange={(value) => setView(value === 'models' ? 'models' : 'channels')}
-            options={CHANNEL_VIEW_OPTIONS}
-          />
-        }
+      />
+
+      <SegmentedGroup
+        ariaLabel="渠道工作台视图"
+        value={view}
+        onChange={(value) => setView(value === 'models' ? 'models' : 'channels')}
+        options={CHANNEL_VIEW_OPTIONS}
       />
 
       {view === 'models' ? (
@@ -257,9 +256,9 @@ export function AdminChannelsPage() {
         impact={
           toggleTarget?.enabled
             ? [
-                `该渠道下的 ${toggleTarget?.modelCosts?.length ?? 0} 个模型将暂停使用`,
-                '使用这些模型的前台服务可能暂时不可用',
-              ]
+              `该渠道下的 ${toggleTarget?.modelCosts?.length ?? 0} 个模型将暂停使用`,
+              '使用这些模型的前台服务可能暂时不可用',
+            ]
             : ['只恢复已启用且设置好价格的模型，其余仍不可用']
         }
         danger={Boolean(toggleTarget?.enabled)}

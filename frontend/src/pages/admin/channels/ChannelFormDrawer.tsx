@@ -36,7 +36,6 @@ export function ChannelFormDrawer({
       }}
       width={760}
       title={editing ? '编辑渠道' : '新建渠道'}
-      description={dirty ? '有未保存修改' : editing ? undefined : '创建后可继续添加模型与价格'}
       footer={
         <>
           <ActionButton variant="secondary" size="sm" onClick={onClose} disabled={saving}>

@@ -150,7 +150,8 @@ export function sanitizeAigcLabelSpec(raw: unknown): AigcLabelSpec {
     fontSize: Math.round(clamp(src.fontSize, 12, 120, d.fontSize)),
     // 字重按 100 取整：Canvas 只认真实存在的字重档位，写 650 会回落到默认
     fontWeight: Math.round(clamp(src.fontWeight, 100, 900, d.fontWeight) / 100) * 100,
-    letterSpacing: Math.round(clamp(src.letterSpacing, 0, 20, d.letterSpacing) * 10) / 10,
+    // 字距只允许整数 px，避免后台预览与产出位图出现亚像素差异
+    letterSpacing: Math.round(clamp(src.letterSpacing, 0, 20, d.letterSpacing)),
     textColor: hex(src.textColor, d.textColor),
     backgroundColor: hex(src.backgroundColor, d.backgroundColor),
     backgroundOpacity: Math.round(clamp(src.backgroundOpacity, 0, 100, d.backgroundOpacity)),

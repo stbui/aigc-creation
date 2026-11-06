@@ -126,6 +126,14 @@
   --color-warn-text: var(--warn-text);
   --color-danger-soft: var(--danger-soft-bg);
   --color-danger-text: var(--danger-text);
+  --color-sidebar: var(--surface);
+  --color-sidebar-foreground: var(--text-strong);
+  --color-sidebar-primary: var(--brand);
+  --color-sidebar-primary-foreground: #ffffff;
+  --color-sidebar-accent: var(--brand-bg);
+  --color-sidebar-accent-foreground: var(--brand-hover);
+  --color-sidebar-border: var(--border);
+  --color-sidebar-ring: var(--brand);
 }
 
 @layer base {

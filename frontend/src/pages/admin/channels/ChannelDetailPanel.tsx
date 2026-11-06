@@ -84,7 +84,7 @@ export function ChannelDetailPanel({
           extra={
             <div className="flex items-center gap-1">
               <ActionButton
-                variant="secondary"
+                variant="ghost"
                 size="xs"
                 icon={Pencil}
                 disabled={!writable || saving}
