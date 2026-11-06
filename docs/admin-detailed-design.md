@@ -49,7 +49,7 @@ backend/src/admin/
 ```text
 frontend/src/admin-ui/              # 后台 UI（shadcn · radix 底座）
 ├── components/ui/                  # shadcn 原子件（只被 primitives 引用）
-├── shell/AdminBoardLayout.tsx      # 外壳（顶栏 + 侧栏 + 内容区，上左右结构）
+├── shell/AdminBoardLayout.tsx      # 外壳（shadcn Sidebar：全高侧栏 + 内容区顶栏）
 ├── primitives/                     # 页面唯一取用层：layout / form / display / fields / table / overlay / drawer / batch-result / duty-* / chart
 ├── providers/                      # Toast / Confirm / AdminUIProvider
 ├── hooks/useAdminList.ts           # useAdminList / useAdminResource / useAdminUrlFilterSync / useAdminDetailParam

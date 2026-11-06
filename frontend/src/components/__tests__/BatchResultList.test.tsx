@@ -257,6 +257,28 @@ describe('BatchResultList 卡片布局', () => {
     ]);
   });
 
+  it('失败格只保留简洁状态，不展示失败原因汇总', () => {
+    renderList({
+      rows: rowsOf([
+        item({ id: 'ready001', url: '/uploads/a.png', caption: '首屏图' }),
+        item({
+          id: 'failed01',
+          status: 'failed',
+          caption: '场景图',
+          params: { batchId: 'b1', batchIndex: 2 },
+        }),
+      ]),
+      layout: 'card',
+    });
+
+    const failedCell = screen.getByRole('status', { name: '场景图生成失败' });
+    expect(within(failedCell).getByText('生成失败')).toBeVisible();
+    expect(failedCell).not.toHaveAttribute('title');
+    expect(within(failedCell).queryByText(/暂无可用模型通道/)).not.toBeInTheDocument();
+    expect(document.querySelector('.pd-result-failure-summary')).not.toBeInTheDocument();
+    expect(screen.queryByText(/失败原因/)).not.toBeInTheDocument();
+  });
+
   it('默认布局仍是横向单行，不受详情卡片样式影响', () => {
     renderList();
     expect(document.querySelector('.pd-result-card')).not.toBeInTheDocument();

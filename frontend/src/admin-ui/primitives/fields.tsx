@@ -1,17 +1,22 @@
-import { useId, useRef, type ReactNode } from 'react';
-import { Paperclip, X } from 'lucide-react';
+import { useId, useRef, useState, type ReactNode } from 'react';
+import { format, isValid, parseISO } from 'date-fns';
+import { zhCN } from 'date-fns/locale';
+import { Calendar as CalendarIcon, Paperclip, X } from 'lucide-react';
+import type { DateRange } from 'react-day-picker';
 
 import { cn } from '../lib/cn';
 import { Button } from '../components/ui/button';
+import { Calendar } from '../components/ui/calendar';
 import { Checkbox } from '../components/ui/checkbox';
 import { Input } from '../components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '../components/ui/tooltip';
-import { NumberField } from './form';
+import { Field, FieldLabel, NumberField } from './form';
 
 /**
  * 低频但后台必须有的原生控件：复选、文件、取色、滑块、建议输入、悬停说明、
@@ -355,5 +360,134 @@ export function SuggestField({
         ))}
       </datalist>
     </>
+  );
+}
+
+/* ────────────────────────── 日期范围 ────────────────────────── */
+
+/** `YYYY-MM-DD` 字符串转 `Date`；空串与非法值都当作「未选」。 */
+function parseDateValue(value: string): Date | undefined {
+  if (!value) return undefined;
+  const date = parseISO(value);
+  return isValid(date) ? date : undefined;
+}
+
+/**
+ * 日期范围选择：可见标签 + 按钮 + 双月日历浮层。
+ *
+ * 筛选条此前用两个原生 `<input type="date">`（开始 / 结束各一个），选跨月区间
+ * 要在两个原生面板之间来回；这里一次点出区间。默认带「日期范围」标签（与
+ * shadcn 示例同构：`Field` + `FieldLabel` + `id` 关联）；不需要标签的横排
+ * 场景传 `label={null}`，只渲染控件。
+ *
+ * 对外仍是 `YYYY-MM-DD` 字符串：页面状态、URL 参数和后端查询都按这个口径，
+ * 只有组件内部才转成 `Date` 交给 DayPicker。
+ */
+export function DateRangeField({
+  from,
+  to,
+  onChange,
+  label = '日期范围',
+  ariaLabel,
+  placeholder = '开始日期 – 结束日期',
+  id: idProp,
+  className,
+}: {
+  from: string;
+  to: string;
+  onChange: (range: { from: string; to: string }) => void;
+  /** 可见标签；传 `null` 时只渲染控件（筛选条里与其它无标签控件同排） */
+  label?: ReactNode;
+  ariaLabel?: string;
+  placeholder?: string;
+  id?: string;
+  className?: string;
+}) {
+  const autoId = useId();
+  const id = idProp ?? autoId;
+  const [open, setOpen] = useState(false);
+
+  const fromDate = parseDateValue(from);
+  const toDate = parseDateValue(to);
+  const selected: DateRange | undefined = fromDate ? { from: fromDate, to: toDate } : undefined;
+
+  const labelText = fromDate
+    ? toDate
+      ? `${format(fromDate, 'yyyy-MM-dd')} ~ ${format(toDate, 'yyyy-MM-dd')}`
+      : `${format(fromDate, 'yyyy-MM-dd')} 起`
+    : null;
+
+  const handleSelect = (range: DateRange | undefined) => {
+    const nextFrom = range?.from ? format(range.from, 'yyyy-MM-dd') : '';
+    const nextTo = range?.to ? format(range.to, 'yyyy-MM-dd') : '';
+    onChange({ from: nextFrom, to: nextTo });
+    // 起止都选完才收起；只点了起始日时留着浮层，让用户接着点结束日
+    if (nextFrom && nextTo) setOpen(false);
+  };
+
+  const control = (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          id={id}
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-label={ariaLabel}
+          data-testid="admin-date-range"
+          className="justify-start gap-1.5 px-2.5 font-normal"
+        >
+          <CalendarIcon className="size-4 text-muted-foreground" aria-hidden />
+          <span
+            className={cn(
+              'min-w-0 truncate tabular-nums',
+              labelText ? 'text-foreground' : 'text-muted-foreground',
+            )}
+          >
+            {labelText ?? placeholder}
+          </span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="range"
+          locale={zhCN}
+          defaultMonth={fromDate ?? toDate}
+          selected={selected}
+          onSelect={handleSelect}
+          numberOfMonths={2}
+        />
+        <div className="flex items-center justify-between gap-3 border-t border-border px-3 py-2">
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {labelText ?? '未选择日期'}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="xs"
+            disabled={!fromDate && !toDate}
+            onClick={() => {
+              onChange({ from: '', to: '' });
+              setOpen(false);
+            }}
+          >
+            清除
+          </Button>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+
+  if (label === null) {
+    return <div className={className}>{control}</div>;
+  }
+
+  return (
+    <Field className={className}>
+      <FieldLabel htmlFor={id} className="text-xs font-medium text-foreground">
+        {label}
+      </FieldLabel>
+      {control}
+    </Field>
   );
 }

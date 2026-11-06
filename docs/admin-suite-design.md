@@ -183,9 +183,9 @@ SQLite provider 不支持 Prisma enum，`kind` / `status` / `type` 一律 String
 
 | 层 | 规范 |
 | --- | --- |
-| 外壳 | 单一 `admin-ui/shell/AdminBoardLayout`（上左右：顶栏 + 侧栏 + 内容区）。**禁止**复用 `AppLayout` / `SideRail` / `PromoBar`（C 端语义） |
+| 外壳 | 单一 `admin-ui/shell/AdminBoardLayout`（shadcn `Sidebar` 组合：全高侧栏 + 内容区顶栏 + 内容区）。**禁止**复用 `AppLayout` / `SideRail` / `PromoBar`（C 端语义） |
 | 组件底座 | 页面**只从 `admin-ui/primitives` 取件**（`PageHeader` / `FilterBar` / `StatCard` / `Panel` / `EmptyState` / `StatusTag` / 表单控件 / `AdminDataTable`），底层是 shadcn 原子件（`admin-ui/components/ui`）；后台树内**不引 antd**，也不要把通用组件退回自绘 `div/button/input`。`.adm-*` 只剩外壳骨架三个类（`adm-layout` / `adm-content` / `adm-skip-link`），页面内不新增 |
-| 侧栏 | 分组折叠菜单，图标 lucide 20px，选中态 `var(--brand)` + `var(--brand-bg)`；数据源 `adminNav.ts` |
+| 侧栏 | 分组折叠菜单，图标 lucide 16px，选中态 `var(--brand)` + `var(--brand-bg)`；数据源 `adminNav.ts` |
 | 列表页 | 页头（标题 + 主操作）→ 筛选条 → 表格 → 分页；`rowKey="id"`、`size="small"` |
 | 详情 | 一律抽屉，不跳独立路由，便于保留筛选态 |
 | 危险操作 | `ConfirmDialog`（shadcn `AlertDialog` 阻塞式确认弹窗），写明影响条数；退款、发票驳回、能力下架等确有业务依据要求的动作必须填原因，普通管理写操作不要求填写审计原因 |
@@ -207,4 +207,3 @@ SQLite provider 不支持 Prisma enum，`kind` / `status` / `type` 一律 String
 | 邮件 / 短信真实投递的界面 | 通道实现由环境变量决定（`EMAIL_PROVIDER` / `SMS_PROVIDER`），后台只读展示生效实现，无写入端点 |
 | 第三方内容安全 API 送审 | 未接入即如实显示「未接入」，不做假审核记录 |
 | 支付渠道启停的前端入口 | 后台「支付充值 / 支付渠道」标签可启停适配器并维护版本化配置（密钥留空即沿用）；凭据本身仍不从页面回显 |
-| 后台数据分析看板 | `platform.dashboard` 只做概览聚合；漏斗 / 留存 / LTV 无独立页面 |

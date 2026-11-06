@@ -238,7 +238,7 @@ cd test && npm run smoke:spawn  # 起网关跑联网冒烟
 
 运行：`cd frontend && npm run e2e`（默认 `playwright.admin.config.ts`，`ADMIN_UI` 可覆盖 baseURL）。后台套件先用 `admin-auth.setup.ts` 登录一次并落盘 `playwright/.auth/admin.json`，其余用例复用 `storageState`；这样不会因每条用例重复登录而撞上认证限流。需要验证访客或普通用户的用例会主动清空会话。
 
-后台用例的选择器契约（2026-11-02 推倒重建后；组件底座 radix `new-york`）：共享控件与页面关键节点挂 `data-testid="admin-*"` —— `admin-filter` / `admin-filter-actions` / `admin-filter-chips` / `admin-filter-chip` / `admin-table` / `admin-table-scroll` / `admin-table-row` / `admin-table-expanded` / `admin-drawer` / `admin-modal` / `admin-confirm-action` / `admin-toast` / `admin-panel` / `admin-page-loading` / `admin-topbar` / `admin-sider` / `admin-nav-scroll` / `admin-bulk-bar` / `admin-asset-cell` / `admin-storage-card` / `admin-task-row` / `admin-role-save-bar`。表单控件没有 `id` 时用 `aria-label` 配 `getByLabel`；下拉（radix `Select`）要「点 `combobox` 触发器 → 点 `option`」，不能用 `selectOption`。**不要把 Tailwind 工具类或 `adm-*` 类写进断言** —— 前者随视觉调整变动，后者只剩外壳骨架。
+后台用例的选择器契约（2026-11-02 推倒重建后；组件底座 radix `new-york`）：共享控件与页面关键节点挂 `data-testid="admin-*"` —— `admin-filter` / `admin-filter-actions` / `admin-filter-chips` / `admin-filter-chip` / `admin-table` / `admin-table-scroll` / `admin-table-row` / `admin-table-expanded` / `admin-drawer` / `admin-modal` / `admin-confirm-action` / `admin-toast` / `admin-panel` / `admin-page-loading` / `admin-header` / `admin-sider` / `admin-nav-scroll` / `admin-bulk-bar` / `admin-asset-cell` / `admin-storage-card` / `admin-task-row` / `admin-role-save-bar`。表单控件没有 `id` 时用 `aria-label` 配 `getByLabel`；下拉（radix `Select`）要「点 `combobox` 触发器 → 点 `option`」，不能用 `selectOption`。**不要把 Tailwind 工具类或 `adm-*` 类写进断言** —— 前者随视觉调整变动，后者只剩外壳骨架。
 
 `frontend/e2e/` 下只有脚手架示例与一次性审计脚本，不是本项目用例目录。
 

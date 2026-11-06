@@ -82,19 +82,17 @@ Tailwind v4 的默认阶梯与项目规定对不齐，`admin.css` 的 `@theme in
 
 ### 2.1 骨架
 
-外壳由 `admin-ui/shell/AdminBoardLayout` 实现，经典「上左右」结构，无值班带：
+外壳由 `admin-ui/shell/AdminBoardLayout` 实现，基于 shadcn `Sidebar` 组合，无值班带：
 
 ```
-Topbar 56px（sticky top-0）
-├── 左：品牌（标记 24 + 「货觉 运营后台」）+ 当前位置面包屑（分组 / 页面，≥1200px 显示）
-└── 右：环境标识 + 用户菜单
+Sidebar 232px（折叠 60px，≤1280px 自动折叠；h-svh 全高）
+├── 品牌头：56px，标记 + 「货觉AI 运营后台」
+├── 导航：8 个分组（总览 / 运营 / 模型与渠道 / 交易 / 财务 / 内容与合规 / 系统 / 数据安全），可折叠，按权限点过滤；导航区自身滚动
+└── 底：账号菜单（品牌紫头像 + 邮箱 / 角色，菜单含返回前台 / 退出登录）
 
-Sider 232px（折叠 60px，≤1280px 自动折叠；sticky top-0，h-full）
-├── 品牌头：56px，标记 + 「货觉 运营后台」
-├── 导航：8 个分组（总览 / 运营 / 模型与渠道 / 交易 / 财务 / 内容与合规 / 系统 / 数据安全），可折叠，按权限点过滤
-└── 底：环境标识、折叠 / 展开按钮、账号菜单
-
-Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不设统一限宽），横向滚动限在该区内
+SidebarInset（内容区）
+├── Topbar 56px：折叠开关 + 分隔线 + 面包屑（分组 / 页面），右侧告警铃铛 + 环境标识
+└── Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不设统一限宽），横向滚动限在该区内
 ```
 
 `.adm-*` 在仓库里只剩三个类，规则在 `styles/admin.css` 的 `@layer base`：
@@ -111,24 +109,25 @@ Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不�
 
 | 项 | 规格 |
 | --- | --- |
-| 顶栏 | 高 56px（`data-testid="admin-topbar"`），左侧品牌 + 当前位置，右侧环境标识与账号 |
-| 导航滚动区 | `data-testid="admin-nav-scroll"`，自身滚动（`overflow-y-auto`），顶栏与底部按钮不参与 |
-| 底部区 | 侧栏底、上边框分隔；非生产显示环境标识与折叠按钮，账号菜单固定在底部；折叠态只留图标 |
+| 顶栏 | 高 56px（`data-testid="admin-header"`），内容区顶部：折叠开关 + 面包屑（分组 / 页面），右侧告警铃铛与环境标识 |
+| 导航滚动区 | `data-testid="admin-nav-scroll"`，自身滚动（`overflow-y-auto`），品牌头与底部账号菜单不参与 |
+| 底部区 | 侧栏底、上边框分隔；账号菜单固定在底部，折叠态只留头像 |
 | 分组标题 | 12px / 600 `text-muted-foreground` / `tracking-wider`，可点击折叠/展开；首次进入默认展开全部分组，之后沿用写入 `localStorage` 的用户偏好；侧栏折叠态隐藏标题并改用分隔线 |
 | 菜单项 | 高 34px，圆角 8px，13px / 500 文字，padding `0 10px`，左侧 16px 图标 + 10px 间距 |
-| 悬停 | 底 `bg-muted`，字 `text-foreground` |
-| 选中 | 底 `bg-accent`、字 `text-accent-foreground` / 600，左侧 3px 品牌色竖条 |
-| 折叠态 | 只留图标并居中，`aria-label` / `title` 给全称；分组之间用分隔线代替标题 |
+| 悬停 | 底 `bg-sidebar-accent`，字 `text-sidebar-accent-foreground` |
+| 选中 | 底 `bg-sidebar-accent`、字 `text-sidebar-accent-foreground` / 600，左侧 3px 品牌色竖条 |
+| 折叠态 | 只留图标并居中，`tooltip` 给全称；分组之间用分隔线代替标题；`Ctrl/Cmd + B` 与顶栏开关均可切换 |
 | 规划项 | 标「待建」小胶囊（`planned` 字段） |
 
 菜单按权限过滤：无权项不渲染，整组为空时整组隐藏。
 
-### 2.3 顶栏右侧
+### 2.3 顶栏右侧与账号菜单
 
 | 项 | 规格 |
 | --- | --- |
+| 告警铃铛 | `AdminAlertBell`，角标是待处理事项数；点击展开最近告警，可跳对应页面 |
 | 环境标识 | 灰底胶囊 + 橙点，**仅非生产显示**，避免误在生产执行测试操作 |
-| 用户菜单 | 品牌紫头像 + 邮箱 / 角色两行；展开后头部复显身份，菜单含返回前台、退出登录（危险色） |
+| 用户菜单 | 位于侧栏底部：品牌紫头像 + 邮箱 / 角色两行；展开后头部复显身份，菜单含返回前台、退出登录（危险色）；折叠态只留头像 |
 
 ### 2.4 内容区
 
@@ -402,7 +401,7 @@ Content（.adm-content）：padding 18 / 26 / 56，子块铺满内容区（不�
 
 | 钩子 | 位置 |
 | --- | --- |
-| `admin-topbar` / `admin-sider` / `admin-nav-scroll` | 外壳 |
+| `admin-header` / `admin-sider` / `admin-nav-scroll` | 外壳 |
 | `admin-panel` / `admin-stat-card` / `admin-save-bar` | 面板 / 指标卡 / 保存条 |
 | `admin-filter` / `admin-filter-actions` / `admin-filter-chips` / `admin-filter-chip` | 筛选条 |
 | `admin-table` / `admin-table-scroll` / `admin-table-row` / `admin-table-expanded` | 表格 |

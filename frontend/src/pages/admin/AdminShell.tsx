@@ -202,7 +202,7 @@ export function AdminShell() {
 function NoAdminShellLoading() {
   return (
     <div className="admin-root flex min-h-screen bg-page" aria-busy="true" aria-live="polite">
-      <div className="w-[232px] shrink-0 border-r border-border bg-card" aria-hidden />
+      <div className="w-[232px] shrink-0 border-r border-border bg-sidebar" aria-hidden />
       <div className="min-w-0 flex-1 px-[26px] pt-[18px]">
         <AdminLoading tip="校验后台权限…" />
       </div>

@@ -97,7 +97,16 @@ export {
   Skeleton,
 } from './skeleton';
 
-export { CheckboxField, FilePicker, HelpTip, IconButton, ColorField, RangeField, SuggestField } from './fields';
+export {
+  CheckboxField,
+  DateRangeField,
+  FilePicker,
+  HelpTip,
+  IconButton,
+  ColorField,
+  RangeField,
+  SuggestField,
+} from './fields';
 
 export { AdminDataTable, type AdminColumn, type AdminDataTableProps } from './table';
 

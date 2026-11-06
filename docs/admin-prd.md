@@ -334,7 +334,7 @@
 
 | 项 | 要求 |
 |---|---|
-| 布局 | `admin-ui/shell/AdminBoardLayout`：经典「上左右」——顶栏 56px（品牌 + 环境标识 + 账号）+ 侧栏 232px（折叠 60px）+ 内容区，无值班带 |
+| 布局 | `admin-ui/shell/AdminBoardLayout`：shadcn `Sidebar` 组合 —— 全高侧栏 232px（折叠 60px，含品牌头 / 导航 / 账号底）+ 内容区 56px 顶栏（折叠开关 + 面包屑 + 告警 / 环境标识），无值班带 |
 | 独立性 | 不复用 C 端的 `AppLayout` / `SideRail` / `PromoBar`（均为 C 端语义） |
 | 路由 | `/admin/*` 独立于 C 端外壳，注册在 catch-all 之前 |
 

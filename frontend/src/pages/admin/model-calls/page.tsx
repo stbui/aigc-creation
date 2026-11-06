@@ -12,12 +12,12 @@ import {
   useAdminExport,
   AdminDataTable,
   AppliedFilters,
+  DateRangeField,
   FilterActions,
   FilterBar,
   PageHeader,
   Panel,
   SelectField,
-  StatCards,
   StatusTag,
   StaleError,
   TextField,
@@ -97,7 +97,6 @@ export function AdminModelCallsPage() {
     to: params.to as string | undefined,
   });
   const rows = data?.items ?? [];
-  const summary = data?.summary;
 
   const { can } = useAdmin();
   const toast = useToast();
@@ -307,27 +306,6 @@ export function AdminModelCallsPage() {
         }
       />
 
-      {summary && (
-        <StatCards
-          columns={4}
-          className="mb-3"
-          items={[
-            { label: '调用总数', value: summary.total, hint: '受当前筛选影响' },
-            { label: '成功', value: summary.success },
-            {
-              label: '失败 / 取消',
-              value: summary.failed,
-              tone: summary.failed > 0 ? 'danger' : undefined,
-            },
-            {
-              label: '平均耗时',
-              value: `${summary.avgDurationMs} ms`,
-              hint: `其它状态 ${summary.other} 条`,
-            },
-          ]}
-        />
-      )}
-
       <Panel title="调用明细">
         <FilterBar>
           <SelectField
@@ -403,8 +381,15 @@ export function AdminModelCallsPage() {
             onEnter={applyFilters}
             className="w-40"
           />
-          <TextField ariaLabel="开始日期" type="date" value={from} onChange={setFrom} className="w-36" />
-          <TextField ariaLabel="结束日期" type="date" value={to} onChange={setTo} className="w-36" />
+          <DateRangeField
+            from={from}
+            to={to}
+            onChange={({ from: nextFrom, to: nextTo }) => {
+              setFrom(nextFrom);
+              setTo(nextTo);
+            }}
+            className="w-56"
+          />
           <FilterActions>
             <ActionButton variant="default" size="sm" onClick={applyFilters}>
               查询

@@ -12,8 +12,9 @@ import { createAdminAuditFixture } from './support/admin-business-fixtures';
  * 断言用几何量测而非截图比对 —— 截图会被无关的样式改动弄红,
  * 而"内容区宽度 =视口 -侧栏" 与 "行高 ≤ 46" 是硬约束, 不会因视觉微调而失效。
  *
- * 外壳采用经典「上左右」：顶部 56px 承担品牌与账号，侧栏只放导航，
- * 导航区独立滚动。选择器统一走 `data-testid="admin-*"`。
+ * 外壳采用 shadcn Sidebar 组合：侧栏占满视口高度（品牌头 + 导航 + 账号底），
+ * 内容区顶部是 56px 顶栏（折叠开关 + 面包屑），导航区独立滚动。
+ * 选择器统一走 `data-testid="admin-*"`。
  */
 
 const UI = process.env.ADMIN_UI ?? 'http://localhost:5100';
@@ -96,7 +97,7 @@ test.describe('后台布局', () => {
     await expect(nav.getByRole('button', { name: '用户管理', exact: true })).toBeVisible();
   });
 
-  test('顶栏固定、侧栏占满剩余高度且导航区独立滚动', async ({ page }) => {
+  test('顶栏固定 56px、侧栏占满视口且导航区独立滚动', async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto(`${UI}/admin/roles`); // 权限页最长, 最能暴露滚动问题
     await page.waitForSelector('[data-testid="admin-header"]', { timeout: 15000 });
@@ -110,32 +111,32 @@ test.describe('后台布局', () => {
       const r = sider.getBoundingClientRect();
       return {
         headerHeight: Math.round(headerRect.height),
-        headerBottom: Math.round(headerRect.bottom),
+        headerTop: Math.round(headerRect.top),
         siderTop: Math.round(r.top),
         height: Math.round(r.height),
         viewport: window.innerHeight,
         navOverflowY: getComputedStyle(navScroll).overflowY,
-        docScrollH: document.documentElement.scrollHeight,
       };
     });
 
-    // 顶栏固定 56px，侧栏从顶栏底部开始并占满剩余视口
+    // 侧栏全高，顶栏在内容区顶部固定 56px（不随内容滚动）
     expect(m.headerHeight).toBe(56);
-    expect(m.siderTop).toBe(m.headerBottom);
-    expect(m.height).toBeLessThanOrEqual(m.viewport - m.headerHeight + 2);
-    expect(m.height).toBeGreaterThan(400);
+    expect(m.headerTop).toBe(0);
+    expect(m.siderTop).toBe(0);
+    expect(Math.abs(m.height - m.viewport)).toBeLessThanOrEqual(2);
     // 长内容时导航区自身滚动
     expect(['auto', 'scroll']).toContain(m.navOverflowY);
   });
 
-  test('品牌在顶栏左侧，账号在顶栏右侧', async ({ page }) => {
+  test('品牌在侧栏顶部，账号在侧栏底部', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto(`${UI}/admin`);
-    await page.waitForSelector('[data-testid="admin-header"]', { timeout: 15000 });
+    await page.waitForSelector('[data-testid="admin-sider"]', { timeout: 15000 });
     await page.waitForSelector('[data-testid="admin-account-trigger"]', { timeout: 15000 });
 
-    await expect(page.getByTestId('admin-brand')).toContainText('货觉');
-    await expect(page.getByRole('button', { name: /折叠|收起侧栏|展开侧栏/ })).toHaveCount(0);
+    const sider = page.getByTestId('admin-sider');
+    await expect(sider.getByTestId('admin-brand')).toContainText('货觉');
+    await expect(sider.getByTestId('admin-account-trigger')).toBeVisible();
 
     const m = await page.evaluate(() => {
       const rect = (selector: string) => {
@@ -144,19 +145,17 @@ test.describe('后台布局', () => {
         return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
       };
       return {
-        header: rect('[data-testid="admin-header"]'),
+        sider: rect('[data-testid="admin-sider"]'),
         brand: rect('[data-testid="admin-brand"]'),
         account: rect('[data-testid="admin-account-trigger"]'),
       };
     });
 
-    expect(m.brand.left - m.header.left).toBeLessThan(32);
-    expect(m.header.right - m.account.right).toBeLessThan(32);
-    expect(m.account.left).toBeGreaterThan(m.brand.right);
-    expect(m.brand.top).toBeGreaterThanOrEqual(m.header.top);
-    expect(m.brand.bottom).toBeLessThanOrEqual(m.header.bottom);
-    expect(m.account.top).toBeGreaterThanOrEqual(m.header.top);
-    expect(m.account.bottom).toBeLessThanOrEqual(m.header.bottom);
+    expect(m.brand.top - m.sider.top).toBeLessThan(32);
+    expect(m.sider.bottom - m.account.bottom).toBeLessThan(32);
+    expect(m.account.top).toBeGreaterThan(m.brand.bottom);
+    expect(m.brand.left).toBeGreaterThanOrEqual(m.sider.left);
+    expect(m.account.right).toBeLessThanOrEqual(m.sider.right + 1);
   });
 
   test('用户列表使用四列卡片网格且操作平铺', async ({ page }) => {
