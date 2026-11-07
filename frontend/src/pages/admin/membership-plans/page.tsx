@@ -7,7 +7,7 @@ import {
   ListError,
   PageHeader,
   PageSkeleton,
-  Panel,
+  RefreshButton,
   StaleError,
 } from '~/admin-ui/primitives';
 import {
@@ -20,7 +20,7 @@ import {
 import { EMPTY_DRAFT, type PlanDraft } from './constants';
 import { buildPlanPayload, toDraft } from './utils';
 import { PlanStats } from './PlanStats';
-import { PlanTable } from './PlanTable';
+import { PlanCardGrid } from './PlanCardGrid';
 import { PlanFormDrawer } from './PlanFormDrawer';
 import { PlanStatusConfirm } from './PlanStatusConfirm';
 import type { AdminMembershipPlan } from '../../../types/api';
@@ -45,7 +45,9 @@ export function AdminMembershipPlansPage() {
   const { can } = useAdmin();
   const writable = can('product.write');
 
-  const { data, loading, error, reload } = useAdminResource(() => adminMembershipPlansApi.list());
+  const { data, loading, error, reload } = useAdminResource(() =>
+    adminMembershipPlansApi.list(),
+  );
 
   const [editing, setEditing] = useState<AdminMembershipPlan | null>(null);
   const [creating, setCreating] = useState(false);
@@ -53,7 +55,9 @@ export function AdminMembershipPlansPage() {
   const [draftBase, setDraftBase] = useState<PlanDraft>(EMPTY_DRAFT);
   const [saving, setSaving] = useState(false);
 
-  const [statusTarget, setStatusTarget] = useState<AdminMembershipPlan | null>(null);
+  const [statusTarget, setStatusTarget] = useState<AdminMembershipPlan | null>(
+    null,
+  );
 
   const rows = data?.items ?? [];
 
@@ -73,7 +77,8 @@ export function AdminMembershipPlansPage() {
   };
 
   const formOpen = creating || editing !== null;
-  const formDirty = formOpen && JSON.stringify(draft) !== JSON.stringify(draftBase);
+  const formDirty =
+    formOpen && JSON.stringify(draft) !== JSON.stringify(draftBase);
   useUnsavedGuard(formDirty);
 
   const resetForm = () => {
@@ -82,7 +87,8 @@ export function AdminMembershipPlansPage() {
   };
   const requestCloseForm = useDiscardConfirm(formDirty, resetForm);
 
-  const patchDraft = (patch: Partial<PlanDraft>) => setDraft((prev) => ({ ...prev, ...patch }));
+  const patchDraft = (patch: Partial<PlanDraft>) =>
+    setDraft((prev) => ({ ...prev, ...patch }));
 
   const submit = async () => {
     const payload = buildPlanPayload(draft, {
@@ -118,7 +124,9 @@ export function AdminMembershipPlansPage() {
     try {
       const next = statusTarget.status === 'active' ? 'offline' : 'active';
       await adminMembershipPlansApi.setStatus(statusTarget.id, next);
-      toast.success(next === 'active' ? '套餐已上架' : '套餐已下架，存量会员不受影响');
+      toast.success(
+        next === 'active' ? '套餐已上架' : '套餐已下架，存量会员不受影响',
+      );
       setStatusTarget(null);
       void reload();
     } catch (e) {
@@ -130,7 +138,7 @@ export function AdminMembershipPlansPage() {
 
   /*
    * 页头照常渲染：加载期间标题与说明就该在位。
-   * 骨架与真实版面同构：四张统计卡 + 一块列表面板。
+   * 骨架与真实版面同构：四张统计卡 + 四列套餐卡。
    */
   if (loading && !data) {
     return (
@@ -143,7 +151,8 @@ export function AdminMembershipPlansPage() {
       />
     );
   }
-  if (error && !data) return <ListError error={error} onRetry={() => void reload()} />;
+  if (error && !data)
+    return <ListError error={error} onRetry={() => void reload()} />;
   if (!data) return <EmptyState title="还没有会员套餐" />;
 
   return (
@@ -152,11 +161,7 @@ export function AdminMembershipPlansPage() {
         title="会员套餐"
         description="会员按周期生效，权益在下单时快照到用户订阅上；改价或改权益只影响之后的订单。"
         actions={
-          writable ? (
-            <ActionButton icon={Plus} onClick={openCreate}>
-              新建套餐
-            </ActionButton>
-          ) : (
+          writable ? undefined : (
             <span className="text-[12px] text-muted-foreground">
               当前账号无 product.write 权限，仅可查看
             </span>
@@ -166,10 +171,36 @@ export function AdminMembershipPlansPage() {
 
       <PlanStats rows={rows} />
 
-      {error && data && <StaleError error={error} onRetry={() => void reload()} />}
+      {error && data && (
+        <StaleError error={error} onRetry={() => void reload()} />
+      )}
 
-      <Panel title="全部会员套餐" note="编码创建后不可修改；下架不影响存量会员已付周期的权益">
-        <PlanTable
+      <section
+        className="mb-4"
+        aria-labelledby="admin-membership-plans-list-title"
+      >
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h2
+              id="admin-membership-plans-list-title"
+              className="m-0 font-semibold text-[13px] text-foreground"
+            >
+              全部会员套餐
+            </h2>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              编码创建后不可修改；下架不影响存量会员已付周期的权益
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <RefreshButton loading={loading} onRefresh={() => void reload()} />
+            {writable && (
+              <ActionButton size="sm" icon={Plus} onClick={openCreate}>
+                新建套餐
+              </ActionButton>
+            )}
+          </div>
+        </div>
+        <PlanCardGrid
           rows={rows}
           loading={loading}
           error={error}
@@ -180,7 +211,7 @@ export function AdminMembershipPlansPage() {
           onEdit={openEdit}
           onToggle={setStatusTarget}
         />
-      </Panel>
+      </section>
 
       <PlanFormDrawer
         open={formOpen}

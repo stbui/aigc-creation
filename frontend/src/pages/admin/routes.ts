@@ -36,12 +36,8 @@ export const AdminModelCallsPage = lazyAdminPage(
   () => import('./model-calls'),
   'AdminModelCallsPage',
 );
-// 模型层后台六页：渠道工作台 / 前台模型 / 用户分组 / 插件 / 账单
+// 模型层后台：渠道工作台 / 能力与模型 / 用户分组 / 插件 / 账单
 export const AdminChannelsPage = lazyAdminPage(() => import('./channels'), 'AdminChannelsPage');
-export const AdminLogicalModelsPage = lazyAdminPage(
-  () => import('./logical-models'),
-  'AdminLogicalModelsPage',
-);
 export const AdminUserGroupsPage = lazyAdminPage(
   () => import('./user-groups'),
   'AdminUserGroupsPage',

@@ -99,7 +99,7 @@ chmod 600 backend/.env.production
 | `PAYMENT_PROVIDER` 及通道凭据 | 使用真实通道时必须齐全；缺失时发起支付返回 503，不会降级沙箱 |
 | `EMAIL_PROVIDER` / `SMS_PROVIDER` | 生产使用 `http` 或 `aliyun`；`console` 不会真实投递 |
 | `MODEL_SECRET_KEY` | 渠道凭证加密密钥（base64 32 字节）；留空会退回本地文件密钥，容器重建即丢 |
-| `MODEL_*` | 其余模型层变量（插件目录、超时、并发、代理上限）有默认值；渠道 / 前台模型不靠环境变量，在后台「渠道工作台」「前台模型」配置，零配置时能力 `unavailable` |
+| `MODEL_*` | 其余模型层变量（插件目录、超时、并发、代理上限）有默认值；渠道 / 前台模型不靠环境变量，在后台「渠道工作台」「能力与模型」配置，零配置时能力 `unavailable` |
 
 `DATABASE_URL`、`UPLOAD_DIR`、`BACKUP_DIR`、`LOG_DIR`、`PORT` 由生产编排统一覆盖，
 不需要在 env 文件中改成宿主机路径。不要把 `backend/.env.production` 提交到 Git。

@@ -12,7 +12,7 @@ import {
  *
  * 覆盖「配置 → 选型 → 报价 → 生成 → 账单核对」整条链路：
  *
- *   1. 后台六页：渠道工作台、前台模型、用户分组、插件、生成账单、调用记录；
+ *   1. 后台模型页：渠道工作台、能力与模型、用户分组、插件、生成账单、调用记录；
  *   2. C 端 `ModelPicker`：工具页高级设置里选出模型后，报价随之变化；
  *   3. 端到端：管理员给新账号发积分 → C 端按目录报价 → 建任务 → 轮询 →
  *      后台按任务 ID 查到账单并打开详情。
@@ -321,11 +321,14 @@ test.describe('渠道与模型 P5', () => {
     expect(tierAfter.unitPriceMicrocredits).toBe(expected);
   });
 
-  test('前台模型：清单与路由模拟', async ({ page }) => {
+  test('能力与模型：旧地址重定向、清单与路由模拟', async ({ page }) => {
     await login(page);
     await page.goto(`${UI}/admin/logical-models`);
-    await expect(page.getByRole('heading', { name: '前台模型' })).toBeVisible({ timeout: 20000 });
-    await expect(page.getByRole('heading', { name: '模型清单' })).toBeVisible();
+    await expect(page).toHaveURL(`${UI}/admin/capabilities`);
+    await expect(page.getByRole('heading', { name: '能力与模型' })).toBeVisible({
+      timeout: 20000,
+    });
+    await expect(page.getByRole('heading', { name: '能力与模型清单' })).toBeVisible();
 
     // 同样是异步列表：等第一行真的出现再决定要不要跳过
     await expect

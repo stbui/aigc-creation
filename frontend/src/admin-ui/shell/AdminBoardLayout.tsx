@@ -121,7 +121,12 @@ export function AdminBoardLayout({ children }: { children: ReactNode }) {
     () =>
       ADMIN_MENU.map((group) => ({
         ...group,
-        items: group.items.filter((item) => item.permission === null || can(item.permission)),
+        items: group.items.filter((item) => {
+          if (item.permission === null) return true;
+          return Array.isArray(item.permission)
+            ? item.permission.some((permission) => can(permission))
+            : can(item.permission);
+        }),
       })).filter((group) => group.items.length > 0),
     [can],
   );

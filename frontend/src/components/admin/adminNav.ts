@@ -30,7 +30,6 @@ import {
   Settings,
   Share2,
   ShieldCheck,
-  SlidersHorizontal,
   Tag,
   Tags,
   Ticket,
@@ -47,7 +46,8 @@ export interface AdminMenuItem {
   label: string;
   /** 侧栏字形；折叠态只留它，展开态显示在标签左侧 */
   icon: LucideIcon;
-  permission: string | null;
+  /** 单一权限点，或拥有任一权限点即可见 */
+  permission: string | string[] | null;
   /** 尚未实现的模块：置灰但可见，明确告知规划状态而非直接隐藏 */
   planned?: boolean;
 }
@@ -108,18 +108,12 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
   {
     name: "模型与渠道",
     items: [
-      // 供应侧 → 产品侧 → 协议 → 能力 → 人群 → 排障：先配渠道，再把能力暴露成前台模型
+      // 供应侧 → 产品侧 → 协议 → 能力与模型 → 人群 → 排障
       {
         path: "/admin/channels",
         label: "渠道工作台",
         icon: Network,
         permission: "channel.read",
-      },
-      {
-        path: "/admin/logical-models",
-        label: "前台模型",
-        icon: Boxes,
-        permission: "logical_model.read",
       },
       {
         path: "/admin/plugins",
@@ -129,9 +123,9 @@ export const ADMIN_MENU: AdminMenuGroup[] = [
       },
       {
         path: "/admin/capabilities",
-        label: "能力管控",
-        icon: SlidersHorizontal,
-        permission: "capability.read",
+        label: "能力与模型",
+        icon: Boxes,
+        permission: ["capability.read", "logical_model.read"],
       },
       {
         path: "/admin/user-groups",

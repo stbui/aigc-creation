@@ -107,7 +107,7 @@ test.describe('后台高频动线', () => {
         '/admin/payments?tab=reconciliation&providerId=alipay&status=failed&from=2026-10-01&to=2026-10-31',
         '支付充值',
         ['渠道：支付宝', '状态：失败', '起始：2026-10-01', '截止：2026-10-31'],      ],
-      ['/admin/capabilities?q=image&runtime=unavailable', '能力管控', ['关键词：image', '运行结论：暂不可用']],
+      ['/admin/capabilities?q=image&runtime=unavailable', '能力与模型', ['关键词：image', '运行结论：暂不可用']],
     ] as const;
 
     for (const [path, heading, labels] of cases) {
@@ -195,17 +195,17 @@ test.describe('后台高频动线', () => {
     await expect(page).not.toHaveURL(/severity=critical/);
   });
 
-  test('能力管控筛选会缩小结果集，并可一键清除', async ({ page }) => {
+  test('能力与模型筛选会缩小结果集，并可一键清除', async ({ page }) => {
     await page.goto(`${UI}/admin/capabilities?q=__no_such_capability__`);
-    await expect(page.getByRole('heading', { name: '能力管控' })).toBeVisible({
+    await expect(page.getByRole('heading', { name: '能力与模型' })).toBeVisible({
       timeout: 15000,
     });
     await expect(chips(page)).toContainText('关键词：__no_such_capability__');
-    await expect(page.getByText('没有符合当前筛选的能力。')).toBeVisible();
+    await expect(page.getByText('没有符合当前筛选的能力或模型。')).toBeVisible();
 
     await page.getByRole('button', { name: '清除筛选', exact: true }).click();
     await expect(chips(page)).toHaveCount(0);
-    await expect(page.getByTestId('admin-table-row').first()).toBeVisible();
+    await expect(page.getByTestId('admin-capability-card').first()).toBeVisible();
   });
 
   test('核心宽表与渠道工作区在 1440px 下无需横向滚动', async ({ page }) => {
@@ -265,9 +265,12 @@ test.describe('后台高频动线', () => {
       timeout: 15000,
     });
 
-    const fixtureRow = rows(page).filter({ hasText: businessFixture.productName }).first();
+    const fixtureRow = page
+      .getByTestId('admin-product-card')
+      .filter({ hasText: businessFixture.productName })
+      .first();
     await expect(fixtureRow).toBeVisible({ timeout: 15000 });
-    await fixtureRow.getByRole('button', { name: '编辑' }).click();
+    await fixtureRow.getByRole('button', { name: '编辑', exact: true }).click();
 
     const panel = page.getByRole('dialog', { name: '编辑商品' });
     await expect(panel).toBeVisible();

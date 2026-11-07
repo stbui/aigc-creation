@@ -80,7 +80,7 @@ Agent 是**新增入口，不是替代入口**。现有工作台、工具页、�
 | 生成任务 | `POST /generate` | `StepExecutor → GenerateService` | 是，同一 `GenerationTask` |
 | 积分与退款 | `GenerateService` | `GenerateService` | 是，同一账本与退款规则 |
 | 产出 | `Asset` | `Asset` | 是，同时出现在素材库与我的作品 |
-| 上下线/改价 | 后台能力管控与渠道工作台 | 同一运行时目录 | 是，后台操作对两端同时生效 |
+| 上下线/改价 | 后台「能力与模型」与「渠道工作台」 | 同一运行时目录 | 是，后台操作对两端同时生效 |
 
 因此不允许出现以下分叉：
 

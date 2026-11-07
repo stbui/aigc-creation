@@ -1,27 +1,27 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { adminProductsApi } from './api';
 import {
   ActionButton,
   PageHeader,
-  Panel,
+  RefreshButton,
   StaleError,
   type AppliedFilter,
 } from '~/admin-ui/primitives';
 import {
   useAdmin,
-  useAdminList,
+  useAdminResource,
   useAdminUrlFilterSync,
   useDiscardConfirm,
   useToast,
   useUnsavedGuard,
 } from './hooks';
-import { EMPTY_DRAFT, type ProductDraft } from './constants';
+import { EMPTY_DRAFT, GRANT_TYPE_LABELS, STATUS_LABELS, type ProductDraft } from './constants';
 import { buildProductPayload, toDraft } from './utils';
 import { ProductStats } from './ProductStats';
 import { ProductFilterBar } from './ProductFilterBar';
-import { ProductTable } from './ProductTable';
+import { ProductCardGrid } from './ProductCardGrid';
 import { ProductFormDrawer } from './ProductFormDrawer';
 import type { AdminProduct } from '../../../types/api';
 
@@ -39,6 +39,12 @@ import type { AdminProduct } from '../../../types/api';
  * 库里一律整数分（浮点算钱会在对账时出现 0.01 的差异，且无法复现）。
  * 转换只在回填与提交两处发生，见 `utils.ts`。
  *
+ * ## 为什么一次全量拉取、客户端筛选分页
+ *
+ * 商品是运营维护的小数据集（几十个），全量拉取比服务端分页更符合
+ * 「一眼看全卖什么」的心智；分页只解决渲染长度，不改变数据口径。
+ * 统计卡始终基于完整目录计算，不受筛选影响。
+ *
  * ## 模块划分
  *
  * 统计条 / 筛选条 / 列表 / 表单抽屉各自独立；本文件只保留取数、
@@ -53,57 +59,97 @@ export function AdminProductsPage() {
   const rawStatus = searchParams.get('status');
   const initialStatus: 'active' | 'offline' | undefined =
     rawStatus === 'active' || rawStatus === 'offline' ? rawStatus : undefined;
+  const rawGrantType = searchParams.get('grantType');
+  const initialGrantType: 'immediate' | 'manual' | undefined =
+    rawGrantType === 'immediate' || rawGrantType === 'manual' ? rawGrantType : undefined;
+  const initialQ = searchParams.get('q') ?? '';
 
+  const [q, setQ] = useState(initialQ);
   const [status, setStatus] = useState<'active' | 'offline' | undefined>(initialStatus);
+  const [grantType, setGrantType] = useState<'immediate' | 'manual' | undefined>(
+    initialGrantType,
+  );
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
   const [editing, setEditing] = useState<AdminProduct | null>(null);
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState<ProductDraft>(EMPTY_DRAFT);
   const [draftBase, setDraftBase] = useState<ProductDraft>(EMPTY_DRAFT);
   const [saving, setSaving] = useState(false);
 
-  /**
-   * 商品不分组不分页：积分包/会员套餐一类的 SKU 通常只有个位数到几十个，
-   * 一次全量拉取比分页更符合运营的心智（他们要看的就是「全部卖什么」）。
-   */
-  const fetcher = useCallback(
-    (params: Record<string, unknown>) =>
-      adminProductsApi.list(params.status as 'active' | 'offline' | undefined),
-    [],
+  const { data, loading, error, reload } = useAdminResource(() => adminProductsApi.list());
+  const rows = useMemo(() => data ?? [], [data]);
+
+  const filteredRows = useMemo(() => {
+    const keyword = q.trim().toLowerCase();
+    return rows.filter((row) => {
+      if (status && row.status !== status) return false;
+      if (grantType && row.grantType !== grantType) return false;
+      if (!keyword) return true;
+      return (
+        row.name.toLowerCase().includes(keyword) || row.sku.toLowerCase().includes(keyword)
+      );
+    });
+  }, [rows, q, status, grantType]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+  // 筛选把结果缩到当前页之外时回落到末页，避免停在一页空白
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages);
+  }, [page, totalPages]);
+
+  const pageRows = useMemo(
+    () => filteredRows.slice((page - 1) * pageSize, page * pageSize),
+    [filteredRows, page, pageSize],
   );
 
-  const { data, loading, error, params, setQuery, reload } = useAdminList<AdminProduct[]>(
-    fetcher,
-    {
-      ...(initialStatus ? { status: initialStatus } : {}),
-    },
-  );
+  const hasFilter = Boolean(status || grantType || q.trim());
 
-  useAdminUrlFilterSync({ status: params.status as string | undefined });
-
-  const rows = data ?? [];
-  const appliedStatus = params.status as 'active' | 'offline' | undefined;
-  const appliedChips: AppliedFilter[] = appliedStatus
-    ? [
-        {
-          key: 'status',
-          label: `状态：${appliedStatus === 'active' ? '在售' : '已下架'}`,
-          onClear: () => {
-            setStatus(undefined);
-            setQuery({ status: undefined });
-          },
-        },
-      ]
-    : [];
-
+  const changeQ = (next: string) => {
+    setQ(next);
+    setPage(1);
+  };
   const changeStatus = (next: 'active' | 'offline' | undefined) => {
     setStatus(next);
-    setQuery({ status: next });
+    setPage(1);
   };
-
-  const clearStatus = () => {
+  const changeGrantType = (next: 'immediate' | 'manual' | undefined) => {
+    setGrantType(next);
+    setPage(1);
+  };
+  const resetFilters = useCallback(() => {
+    setQ('');
     setStatus(undefined);
-    setQuery({ status: undefined });
-  };
+    setGrantType(undefined);
+    setPage(1);
+  }, []);
+
+  useAdminUrlFilterSync({ status, grantType, q: q.trim() || undefined });
+
+  const appliedChips: AppliedFilter[] = [
+    q.trim()
+      ? {
+          key: 'q',
+          label: `关键词：${q.trim()}`,
+          onClear: () => changeQ(''),
+        }
+      : null,
+    status
+      ? {
+          key: 'status',
+          label: `状态：${STATUS_LABELS[status]}`,
+          onClear: () => changeStatus(undefined),
+        }
+      : null,
+    grantType
+      ? {
+          key: 'grantType',
+          label: `发放：${GRANT_TYPE_LABELS[grantType]}`,
+          onClear: () => changeGrantType(undefined),
+        }
+      : null,
+  ].filter(Boolean) as AppliedFilter[];
 
   const openCreate = () => {
     setDraft(EMPTY_DRAFT);
@@ -151,7 +197,7 @@ export function AdminProductsPage() {
         toast.success('商品已创建，当前为下架状态，确认后请手动上架');
       }
       closeForm();
-      reload();
+      void reload();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '保存失败');
     } finally {
@@ -166,7 +212,7 @@ export function AdminProductsPage() {
     try {
       await adminProductsApi.setStatus(row.id, next);
       toast.success(next === 'active' ? '已上架' : '已下架');
-      reload();
+      void reload();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : '操作失败');
     } finally {
@@ -180,11 +226,7 @@ export function AdminProductsPage() {
         title="商品管理"
         description="积分包与增值商品的价目表。改价只影响之后的下单，历史订单按下单时的快照结算。"
         actions={
-          writable ? (
-            <ActionButton icon={Plus} onClick={openCreate}>
-              新建商品
-            </ActionButton>
-          ) : (
+          writable ? undefined : (
             <span className="text-[12px] text-muted-foreground">
               当前账号无 product.write 权限，仅可查看
             </span>
@@ -195,33 +237,60 @@ export function AdminProductsPage() {
       <ProductStats rows={rows} />
 
       <ProductFilterBar
+        q={q}
+        onQChange={changeQ}
         status={status}
         onStatusChange={changeStatus}
-        onRefresh={reload}
+        grantType={grantType}
+        onGrantTypeChange={changeGrantType}
+        onReset={resetFilters}
+        hasFilter={hasFilter}
         appliedChips={appliedChips}
-        onClearAll={clearStatus}
       />
 
       {/* 刷新失败但手上还有上一次的数据：只挂提示，不把整个列表藏起来 */}
-      {error && data && <StaleError error={error} onRetry={reload} />}
+      {error && data && <StaleError error={error} onRetry={() => void reload()} />}
 
-      <Panel
-        title="全部商品"
-        note="价格以「分」存储，界面展示按「元」；两者同时显示便于与流水核对"
-      >
-        <ProductTable
-          rows={rows}
+      <section className="mb-4" aria-labelledby="admin-products-list-title">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h2
+            id="admin-products-list-title"
+            className="m-0 font-semibold text-[13px] text-foreground"
+          >
+            全部商品
+          </h2>
+          <div className="flex shrink-0 items-center gap-2">
+            <RefreshButton loading={loading} onRefresh={() => void reload()} />
+            {writable && (
+              <ActionButton size="sm" icon={Plus} onClick={openCreate}>
+                新建商品
+              </ActionButton>
+            )}
+          </div>
+        </div>
+        <ProductCardGrid
+          rows={pageRows}
           loading={loading}
           error={error}
-          onRetry={reload}
+          onRetry={() => void reload()}
           writable={writable}
           saving={saving}
-          filtered={Boolean(status)}
-          onClearFilter={clearStatus}
+          filtered={hasFilter}
+          onClearFilter={resetFilters}
+          onCreate={openCreate}
           onEdit={openEdit}
           onToggle={(row) => void runToggle(row)}
+          pagination={{
+            current: page,
+            pageSize,
+            total: filteredRows.length,
+            onChange: (nextPage, nextPageSize) => {
+              setPage(nextPage);
+              setPageSize(nextPageSize);
+            },
+          }}
         />
-      </Panel>
+      </section>
 
       <ProductFormDrawer
         open={formOpen}

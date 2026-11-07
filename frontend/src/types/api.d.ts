@@ -1024,7 +1024,7 @@ export interface AdminCreditPrice {
   /** 免费活动是否只对未付费新用户生效 */ freeCampaignOnlyNewUsers: boolean;
 }
 
-/** 后台「能力管控」列表行（GET /admin/capabilities） */
+/** 后台「能力与模型」中的能力管控列表行（GET /admin/capabilities） */
 export interface AdminCapabilityControl {
   capabilityId: string;
   name: string;

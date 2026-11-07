@@ -205,7 +205,7 @@ cd test && npm test             # 网关自测
 cd test && npm run smoke:spawn  # 起网关跑联网冒烟
 ```
 
-后台「渠道工作台」新建渠道并把基址指到 `http://127.0.0.1:3900`（只填根域，不要带 `/v1`），协议按能力选 `openai-image` / `chat-completion` / `minimax-video`，再到「前台模型」挂一条线路。`smoke-aigc` 需要可用的 image 线路；没有线路时它会如实报 `42204`，不能当产品缺陷。
+后台「渠道工作台」新建渠道并把基址指到 `http://127.0.0.1:3900`（只填根域，不要带 `/v1`），协议按能力选 `openai-image` / `chat-completion` / `minimax-video`，再到「能力与模型」为前台模型挂一条线路。`smoke-aigc` 需要可用的 image 线路；没有线路时它会如实报 `42204`，不能当产品缺陷。
 
 ### 3.5 浏览器 E2E（L4）
 
@@ -366,7 +366,7 @@ C 端提交类用例挂住时，先分清是**环境缺线路**还是**代码回
 
 `verify-billing.ts` 钉住**账本本身**（状态机 + 资金变动 + 不变量），`verify-task-runtime.ts` 钉住**任务侧**（准入 → 派发 → 切线 → 轮询 → 收尾的四条路径）。两者合起来覆盖了「钱怎么走」与「任务怎么跑」，但仍有空白：
 
-- **L3 没有模型层的 HTTP 冒烟**：渠道工作台 / 前台模型 / 用户分组 / 插件 / 生成账单 / 调用记录六个后台页面只有 Playwright 用例（`admin-model-suite.spec.ts`）与 `verify-channel-flow.ts` 的接口级断言，没有 `smoke-*.js`；
+- **L3 没有模型层的 HTTP 冒烟**：渠道工作台 / 能力与模型 / 用户分组 / 插件 / 生成账单 / 调用记录五个后台页面只有 Playwright 用例（`admin-model-suite.spec.ts`）与 `verify-channel-flow.ts` 的接口级断言，没有 `smoke-*.js`；
 - **准入的失败分支**只在 `verify-route-catalog` / `verify-task-runtime` 的部分路径上覆盖，参数白名单与非 JSON 选项的拒绝路径依赖 `verify-tool-contracts`；
 - **`models/*` 公开接口的分组可见性**由 `verify-route-catalog` 的纯逻辑部分保证，多分组并存的 HTTP 组合未单独断言；
 - **「建任务 + 建单 + 预留」同事务的回滚语义没有故障注入用例**：脚本证明的是「成功路径三步都落库」，没有证明「预留失败时任务也一起回滚」。补闸口时应在 `reserveBatchBilling` 里注入一次余额不足，断言 `GenerationTask` 没有残留行；

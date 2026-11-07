@@ -491,7 +491,7 @@ model: {
 | 页面 | 内容 |
 | --- | --- |
 | `/admin/channels` | 渠道工作台：列表、编辑抽屉（连接/凭证/请求头/代理/并发）、模型列表与价格档、成本与售价并列、批量调价/删除、排序、导出导入、上游拉取/导入/测试、健康 |
-| `/admin/logical-models` | 前台模型：能力合同编辑器、线路选择（priority/weight）、默认参数、价格策略、路由模拟；`channel` 策略下价格只读并提示去渠道模型定价 |
+| `/admin/capabilities` | 能力与模型：能力上下线与所属前台模型共用一个工作台；模型支持能力合同编辑、线路选择（priority/weight）、默认参数、价格策略与路由模拟，`channel` 策略下价格只读并提示去渠道模型定价。旧地址 `/admin/logical-models` 重定向到本页 |
 | `/admin/user-groups` | 分组：可见渠道、倍率、货币兑换、模型覆盖、用户数 |
 | `/admin/plugins` | 插件：内置/上传、启停、能力统计、校验结果 |
 | `/admin/model-calls` | 调用记录（`ApiCallLog` 维度） |

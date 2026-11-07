@@ -113,7 +113,7 @@ export const CAPABILITY_UNAVAILABLE_NOTICE = '当前生成服务暂不可用，�
  *
  * `unavailable` 的 reason 来自模型路由诊断，只供后台排障；C 端统一换成
  * 面向用户的提示，避免把「真实模型 / 线路配置」等内部信息暴露到页面。
- * 后台能力管控直接使用管理接口返回的数据，不受这里影响。
+ * 后台「能力与模型」直接使用管理接口返回的数据，不受这里影响。
  */
 export function publicCapabilityRuntime(runtime: CapabilityRuntime): CapabilityRuntime {
   if (runtime.effective !== 'unavailable') return runtime;

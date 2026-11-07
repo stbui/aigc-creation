@@ -21,7 +21,7 @@
 | 退款与站点设置默认值 | `backend/src/common/setting-defs.ts` 的 `SETTING_DEFS` |
 | 工单状态机 | `backend/src/tickets/tickets.service.ts` 的 `TRANSITIONS` |
 | 协议与推荐模型 | `backend/plugins/<plugin>/manifest.json`（运行时生效 **107 个包 / 115 个 provider**；目录共 110 个，另 3 个 `src-*` 源目录镜像 —— `src-a6api` / `src-antigravity-proxy` / `src-metaso-h3` 由 `plugin-manifest.store.ts` 跳过，不计入可用包）；服务商目录见 `src/model/plugins/provider-catalog.service.ts` |
-| 渠道 / 前台模型 / 价格档 | 数据库（后台「渠道工作台」「前台模型」「用户分组」）—— 代码里没有默认线路表 |
+| 渠道 / 前台模型 / 价格档 | 数据库（后台「渠道工作台」「能力与模型」「用户分组」）—— 代码里没有默认线路表 |
 | 账单状态机 | `backend/src/model/billing/billing.service.ts` 的 `BILLING_STATUSES` |
 | 启动期环境变量 | `backend/src/config/env.validation.ts` 的 `ENV_SPECS` |
 | 设计令牌 | `frontend/src/styles/global.css` 的 `:root`；shadcn 语义变量经 `frontend/src/styles/admin.css` 的 `@theme inline` 桥接，不另定义色值 |
@@ -36,7 +36,7 @@
 | --- | --- | --- |
 | 107 包 / 115 provider | `backend/plugins/*/manifest.json` 的 `contributes.providers` | 3 个 `src-*` 镜像目录由 `plugin-manifest.store.ts` 跳过；含它们的目录总数是 110 / 119 |
 | 17 能力 / 13 进工作台 / 16 image + 1 video | `definitions/index.ts` 的 `CAPABILITY_PLUGINS` | `*.spec.ts`、`*-options.ts`、`*.templates.ts` 同目录但不是能力定义 |
-| 34 页 / 8 分组 | `adminNav.ts` 的 `ADMIN_MENU` | `AdminShell.tsx`、`dashboard/AdminDashboardContent.tsx`、`__tests__/` 不算菜单页 |
+| 33 页 / 8 分组 | `adminNav.ts` 的 `ADMIN_MENU` | `AdminShell.tsx`、`dashboard/AdminDashboardContent.tsx`、`__tests__/` 不算菜单页 |
 | 30 条壳内路由 | `App.tsx` 的 `Shell()` 内 `<Routes>` | catch-all 与另两组 `<Routes>`（3 条裸外壳页 / 6 条独立页）不计入 |
 
 ## 账号
@@ -62,7 +62,7 @@
 
 - **17 项能力**（全部 `real`，0 `mock` / 0 `planned`；16 项 image + 1 项 video；13 项进工作台）。**图像、文本、视频都只允许真实模型产出**：无模型线路即失败并退款，不交付伪结果。
 - **生成通道**：唯一链路是 `src/model/**` —— 渠道 → 渠道模型 → 前台模型 revision/线路 → 路由/冷却 → 任务执行 → 账单。建任务必带 `logicalModelId`（来自 `GET /models`）；协议来自 `plugins/` 内置插件清单，代码里没有手写协议实现。旧三层（`src/providers/**`、`GATEWAY_*`、`ModelCallLog`、`/admin/model-config`）已整体删除，**不存在并存期**。
-- **后台管理端**（`/admin`）34 个页面、8 个侧栏分组，权限点 + 审计 + 定时任务 + 备份 + 存储切换。
+- **后台管理端**（`/admin`）33 个页面、8 个侧栏分组，权限点 + 审计 + 定时任务 + 备份 + 存储切换。
 - **商业域**：商品 / 订单 / 支付 / 退款 / 积分账本 / 会员 / 优惠券 / 限时活动 / 邀请签到 / 发票 / 支付对账。
 - **账户与合规域**：找回密码 / 短信登录 / 扫码登录 / 第三方登录（OAuth2 / OIDC）/ 自助注销与数据导出 / 法务版本化与同意留痕 / 站内消息 / AIGC 标识 / 限流 / 健康检查 / 请求追踪。
 - **服务域**：工单、后台全局搜索、批量动作与 CSV 导入导出。
@@ -146,7 +146,7 @@ aigc-creation/
         ├── admin-ui/         # 后台 UI：components/ui（shadcn 原子件）· primitives（页面唯一取用层）· shell · providers · hooks · lib
         ├── components/       # AppLayout / SideRail / ToolShell / QrLoginPanel / admin/（adminNav + AlertCenter + DutyContext + statusMeta）
         ├── pages/            # 15 个单文件页面（登录 / 工作台 / 订单 / 工单 / 工具页 / 法务 …）
-        │   ├── admin/        # 后台 34 页：33 个域目录 + AdminDashboardPage.tsx
+        │   ├── admin/        # 后台 33 页：按域目录组织，含 AdminDashboardPage.tsx
         │   └── <域>/          # 21 个 C 端域目录，按 index / page / components / api / hooks / utils / constants 分层
         │                     #   product-kit / shoppable-carousel / product-detail / viral-clone / library / account …
         ├── lib/              # api.ts（request 拆信封）/ http / auth / capabilities / aigc-label / money / poll / zip
@@ -292,7 +292,7 @@ npm run e2e                 # Playwright
 
 **权限链**：`AdminGuard`（身份）→ `PermissionGuard`（权限点）→ controller → `AuditInterceptor`（落 `AdminAuditLog`）。权限点定义在 `src/admin/permissions.ts`。**前端 `AdminContext.can()` 只用于隐藏无权限按钮，不是安全边界**；真正的校验必须在后端。
 
-34 个页面、8 个侧栏分组以 `adminNav.ts` 的 `ADMIN_MENU` 为准；页面功能、接口与交互见 `docs/admin-console-design.md` / `admin-detailed-design.md`。
+33 个页面、8 个侧栏分组以 `adminNav.ts` 的 `ADMIN_MENU` 为准；页面功能、接口与交互见 `docs/admin-console-design.md` / `admin-detailed-design.md`。
 
 - 高危动作一律写审计（`HIGH_RISK_PERMISSIONS`）；退款、手动调整积分、权限与系统设置、调价等确有业务依据要求的动作再要求填写原因。删除渠道 / 渠道模型只保留业务影响确认，不要求原因，审计仍记录操作人、动作与结果。
 - 批量动作：`ids ≤ 100`，`runBatch` 串行、**不包事务**，逐条返回结果；路由挂较弱读权限，处理器内再判动作权限。

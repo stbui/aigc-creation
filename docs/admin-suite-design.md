@@ -19,14 +19,14 @@
 | --- | --- | --- |
 | 总览 | 平台概览 / 告警中心 | `/admin` · `/admin/alerts` |
 | 运营 | 用户 / 素材 / 任务 / 工单 | `/admin/users` · `/admin/assets` · `/admin/tasks` · `/admin/tickets` |
-| 模型与渠道 | 渠道工作台 / 前台模型 / 插件 / 能力管控 / 用户分组 / 调用记录 | `/admin/channels` · `/admin/logical-models` · `/admin/plugins` · `/admin/capabilities` · `/admin/user-groups` · `/admin/model-calls` |
+| 模型与渠道 | 渠道工作台 / 插件 / 能力与模型 / 用户分组 / 调用记录 | `/admin/channels` · `/admin/plugins` · `/admin/capabilities` · `/admin/user-groups` · `/admin/model-calls` |
 | 交易 | 商品 / 会员套餐 / 订单 / 积分账本 / 能力消耗价 / 优惠券 / 限时活动 / 邀请与签到 | `/admin/products` 等 8 页 |
 | 财务 | 支付充值 / 发票管理 / 生成账单 / 财务分析 | `/admin/payments` · `/admin/invoices` · `/admin/billing-orders` · `/admin/finance` |
 | 内容与合规 | 法务文档 / 站内消息 / AI 标识 | `/admin/legal` · `/admin/notifications` · `/admin/aigc-label` |
 | 系统 | 角色权限 / 系统设置 / 存储配置 / 定时任务 / 操作审计 | `/admin/roles` 等 5 页 |
 | 数据安全 | 数据备份 / 保留期清理 | `/admin/backups` · `/admin/retention` |
 
-合计 34 页、8 组。菜单项的 `permission` 字段决定可见性，外壳 `AdminBoardLayout` 只渲染当前角色有权限的项。
+合计 33 页、8 组。菜单项的 `permission` 字段决定可见性；单个权限点或权限数组（任一满足）均可作为菜单可见条件，外壳 `AdminBoardLayout` 只渲染当前角色有权限的项。
 
 ### 1.1 分组理由
 
@@ -34,7 +34,7 @@
 
 | 组 | 理由 |
 | --- | --- |
-| 模型与渠道 | 生成链路的生产关键配置，排障路径要求最短，紧随日常运营放在第 3；组内按供应侧 → 产品侧 → 协议 → 能力 → 人群 → 排障排列，不淹没在通用系统设置里 |
+| 模型与渠道 | 生成链路的生产关键配置，排障路径要求最短，紧随日常运营放在第 3；组内按供应侧 → 协议 → 能力与模型 → 人群 → 排障排列，不淹没在通用系统设置里 |
 | 交易 / 财务 | 「卖什么、卖了多少」与「钱已收进来之后的动作」不是同一批人；退款、对账、开票归财务。生成账单与财务分析并入财务，账单口径不再散落两处 |
 | 内容与合规 | 发给全体用户的话（法务正文、站内消息、AI 标识样式），每条都会烙印到每个账号或每张产出图上，误改比调错价格更难挽回 |
 | 数据安全 | 只在出事时进，使用频率与日常运营不同，独立成组留在末尾避免误触 |
@@ -54,7 +54,7 @@
 
 中文字标必须预渲染成位图：Jimp 内置字体只有 ASCII，服务端不引入字体依赖，改样式时由浏览器 Canvas 以 2x 渲染 PNG 随 spec 原子提交。
 
-`remove_watermark`（去除水印）能力存在被用于剥离他人图片 AIGC 标识的合规敞口，管控手段是后台「能力管控」页：可整体下线并必填原因，下线后 C 端不可提交、任务在扣费前被拦截（`40005`）。当前 `compliance.*` 三个权限点（`compliance.read` / `compliance.gate` / `compliance.takedown`）为预留点，尚无端点消费；能力上下线实际走 `capability.write`。
+`remove_watermark`（去除水印）能力存在被用于剥离他人图片 AIGC 标识的合规敞口，管控手段是后台「能力与模型」页：可整体下线（下线原因由页面统一生成并下发 C 端），下线后 C 端不可提交、任务在扣费前被拦截（`40005`）。当前 `compliance.*` 三个权限点（`compliance.read` / `compliance.gate` / `compliance.takedown`）为预留点，尚无端点消费；能力上下线实际走 `capability.write`。
 
 ---
 
@@ -165,13 +165,13 @@ SQLite provider 不支持 Prisma enum，`kind` / `status` / `type` 一律 String
 | 发票 `/admin/invoices*` | `invoices-admin.controller.ts` |
 | 支付域 `/admin/payments*`（渠道 / 商品 / 订单 / 对账） | `admin/payments/payment-admin.controller.ts` |
 | 渠道 `/admin/channels*`、`/admin/channel-models*` | `model/channels/channel.controller.ts` |
-| 前台模型 `/admin/logical-models*` | `model/catalog/admin-logical-model.controller.ts` |
+| 能力与模型 · 前台模型接口 `/admin/logical-models*` | `model/catalog/admin-logical-model.controller.ts` |
 | 用户分组 `/admin/user-groups*` | `model/user-groups/user-group.controller.ts` |
 | 插件 `/admin/plugins*` | `model/plugins/plugin.controller.ts` |
 | 调用记录 `/admin/api-logs*` | `model/billing/billing-admin.controller.ts`（`admin/api-logs`） |
 | 生成账单 `/admin/billing-orders*` | `model/billing/billing-admin.controller.ts`（`admin/billing-orders`） |
 | 财务分析 `/admin/analytics*` | `model/billing/analytics.controller.ts` |
-| 能力管控 `/admin/capabilities*` | `capability.controller.ts` |
+| 能力与模型 · 能力接口 `/admin/capabilities*` | `capability.controller.ts` |
 | 系统 `/admin/settings*`、`/admin/roles*`、`/admin/storage`、`/admin/scheduler*`、`/admin/backups*`、`/admin/retention*`、`/admin/audit-logs` | 对应 controller |
 | 数据工具 `/admin/search`、批量、导出、导入 | `search.controller.ts` + 各列表 controller |
 

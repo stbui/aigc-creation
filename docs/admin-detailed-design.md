@@ -61,7 +61,7 @@ frontend/src/components/admin/
 ├── DutyContext.tsx                 # 概览首屏值班塔的数据轮询
 └── statusMeta.ts                   # 状态 → 文案 / 色调映射
 
-frontend/src/pages/admin/            # 34 个页面 + channels/、payments/ 子目录
+frontend/src/pages/admin/            # 33 个页面 + channels/、payments/ 子目录
 ```
 
 ### 0.2 守卫链与审计
@@ -462,7 +462,7 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 
 ## 18. 模型层后台
 
-模型组共 8 页，按「供应侧 → 产品侧 → 运营侧」排列：`/admin/channels` · `/admin/logical-models` · `/admin/user-groups` · `/admin/plugins` · `/admin/model-calls` · `/admin/billing-orders` · `/admin/finance`，外加 `/admin/capabilities`（见第 19 节）。接口实现全部在 `backend/src/model/**`，`src/admin/` 只保留能力管控与通用后台。
+模型层后台共 7 页，按「供应侧 → 协议 → 能力与模型 → 人群 → 排障」排列：`/admin/channels` · `/admin/plugins` · `/admin/capabilities` · `/admin/user-groups` · `/admin/model-calls` · `/admin/billing-orders` · `/admin/finance`。能力与模型页同时承载能力上下线与前台模型配置，旧地址 `/admin/logical-models` 重定向到 `/admin/capabilities`。接口实现分布在 `backend/src/model/**` 与 `backend/src/admin/capability.controller.ts`。
 
 ### 18.1 渠道工作台 `/admin/channels`
 
@@ -487,9 +487,11 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 - 写入后主动失效目录快照（`CatalogVersionService`），不等 TTL 自然过期。
 - `channel.write` / `channel.model_write` 覆盖渠道凭证与价格档：后端没有「只改线路不改价」的独立权限点，前端也不宣称有。
 
-### 18.2 前台模型 `/admin/logical-models`
+### 18.2 能力与模型中的前台模型配置 `/admin/capabilities`
 
 C 端可见身份（`LogicalModel`）+ 发布快照（`LogicalModelRevision`）+ 线路（`LogicalModelRoute`）。
+
+页面入口统一为 `/admin/capabilities`；旧地址 `/admin/logical-models` 重定向并保留 query/hash。能力上下线与模型 CRUD 共用同一个卡片工作台，但写操作分别受 `capability.write` / `logical_model.write` 控制。
 
 | 能力 | 接口 | 权限点 |
 | --- | --- | --- |
@@ -545,11 +547,11 @@ C 端可见身份（`LogicalModel`）+ 发布快照（`LogicalModelRevision`）+
 
 ---
 
-## 19. 能力管控 `/admin/capabilities`
+## 19. 能力上下线接口 `/admin/capabilities`
 
 `GET /admin/capabilities`（`capability.read`）、`PUT /admin/capabilities/:id`（`capability.write`，高危）。
 
-- 16 项能力的上下线与原因；`CapabilityControl` 无行 = 启用。
+- 17 项能力的上下线与原因；列表按分组渲染为卡片网格（卡片展示实现程度与开关状态，运行结论仅用于筛选），`CapabilityControl` 无行 = 启用。
 - 下架后 C 端 `runtime.effective='disabled'`；`generate.service` 在**扣费之前**拦截并返回 `40005`，原因原样透传到 C 端。
 - 只覆盖「上下线」这一层：能力的名称、分组、参数、默认价仍以 `definitions/<id>.ts` 为准，后台不能改代码里的 `mode`。
 - 保存即 `invalidate()`，无需等缓存过期。

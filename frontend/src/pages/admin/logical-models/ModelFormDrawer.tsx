@@ -267,7 +267,7 @@ export function ModelFormDrawer({
             </p>
           ) : (
             <div className="flex flex-col gap-2">
-              <div className="grid grid-cols-[minmax(0,1fr)_72px_72px_96px_32px] gap-2 px-1 text-[11px] text-muted-foreground">
+              <div className="grid grid-cols-[minmax(0,1fr)_72px_72px_96px_32px] gap-2 px-1 text-[12px] text-muted-foreground">
                 <span>服务来源</span>
                 <span>优先顺位</span>
                 <span>分流比例</span>

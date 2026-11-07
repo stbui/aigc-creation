@@ -27,7 +27,6 @@ import {
   AdminFinancePage,
   AdminInvoicesPage,
   AdminLegalPage,
-  AdminLogicalModelsPage,
   AdminMarketingRulesPage,
   AdminMembershipPlansPage,
   AdminModelCallsPage,
@@ -139,15 +138,23 @@ export function AdminShell() {
               <Route path="campaigns" element={<AdminCampaignsPage />} />
               <Route path="marketing-rules" element={<AdminMarketingRulesPage />} />
               <Route path="scheduler" element={<AdminSchedulerPage />} />
-              {/* 模型层：渠道 → 前台模型 → 分组 → 插件 → 账单 */}
+              {/* 模型层：渠道 → 能力与模型 → 分组 → 插件 → 账单 */}
               <Route path="channels" element={<AdminChannelsPage />} />
-              <Route path="logical-models" element={<AdminLogicalModelsPage />} />
+              <Route
+                path="logical-models"
+                element={
+                  <Navigate
+                    to={`/admin/capabilities${location.search}${location.hash}`}
+                    replace
+                  />
+                }
+              />
               <Route path="user-groups" element={<AdminUserGroupsPage />} />
               <Route path="plugins" element={<AdminPluginsPage />} />
               <Route path="billing-orders" element={<AdminBillingOrdersPage />} />
               <Route path="finance" element={<AdminFinancePage />} />
               <Route path="model-calls" element={<AdminModelCallsPage />} />
-              {/* 能力管控：单项能力上下线 */}
+              {/* 能力与模型：能力上下线与所属前台模型同一工作台 */}
               <Route path="capabilities" element={<AdminCapabilitiesPage />} />
               {/* 任务监控 */}
               <Route path="tasks" element={<AdminTasksPage />} />

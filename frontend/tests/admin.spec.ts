@@ -180,7 +180,7 @@ test.describe('后台管理端', () => {
   test('会员套餐页渲染真实套餐列表', async ({ page }) => {
     await page.goto(`${UI}/admin/membership-plans`);
     await expect(page.getByRole('heading', { name: '会员套餐', exact: true })).toBeVisible({ timeout: 15000 });
-    await expect(page.getByTestId('admin-table-row').filter({ hasText: 'free' })).toBeVisible();
+    await expect(page.getByTestId('admin-plan-card').filter({ hasText: '免费用户' })).toBeVisible();
     await expect(page.getByRole('button', { name: '新建套餐' })).toBeVisible();
   });
 
@@ -188,7 +188,11 @@ test.describe('后台管理端', () => {
     await page.goto(`${UI}/admin/membership-plans`);
     await expect(page.getByRole('heading', { name: '会员套餐', exact: true })).toBeVisible({ timeout: 15000 });
 
-    await page.getByTestId('admin-table-row').first().getByRole('button', { name: '编辑' }).click();
+    await page
+      .getByTestId('admin-plan-card')
+      .first()
+      .getByRole('button', { name: '编辑', exact: true })
+      .click();
     const panel = page.getByRole('dialog', { name: '编辑会员套餐' });
     await expect(panel).toBeVisible();
     const name = panel.getByLabel('套餐名称');
