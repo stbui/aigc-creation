@@ -186,7 +186,7 @@ export function CouponTable({
       onRetry={onRetry}
       /* 整行可点开编辑；只读账号不挂这个入口，避免打开一个存不了的抽屉 */
       onRowClick={writable ? onEdit : undefined}
-      minWidth={1080}
+      minWidth={1120}
       pagination={{
         current,
         pageSize,

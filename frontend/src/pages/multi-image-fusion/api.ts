@@ -16,6 +16,7 @@ export {
   assetSrc,
   assetThumbUrl,
   generateApi,
+  newIdempotencyKey,
   promptToolsApi,
   toAbsoluteUrl,
 } from '../../lib/api';

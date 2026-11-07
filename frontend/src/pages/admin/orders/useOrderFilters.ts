@@ -302,16 +302,20 @@ export function useOrderFilters({ onQueryChange }: UseOrderFiltersOptions = {}) 
     setQuery({ channel: undefined });
   };
 
-  const clearFrom = () => {
-    setFrom('');
-    notifyQueryChange();
-    setQuery({ from: undefined });
-  };
+  /* 起止日期同属「时间」一个条件：合成一枚 chip，避免撤掉一半留下半个时间窗 */
+  const appliedDateLabel = appliedFrom
+    ? appliedTo
+      ? `时间：${appliedFrom} ~ ${appliedTo}`
+      : `时间：${appliedFrom} 起`
+    : appliedTo
+      ? `时间：截至 ${appliedTo}`
+      : null;
 
-  const clearTo = () => {
+  const clearDateRange = () => {
+    setFrom('');
     setTo('');
     notifyQueryChange();
-    setQuery({ to: undefined });
+    setQuery({ from: undefined, to: undefined });
   };
 
   const appliedChipCandidates: Array<AppliedFilter | null> = [
@@ -357,18 +361,11 @@ export function useOrderFilters({ onQueryChange }: UseOrderFiltersOptions = {}) 
           onClear: clearProduct,
         }
       : null,
-    appliedFrom
+    appliedDateLabel
       ? {
-          key: 'from',
-          label: `开始：${appliedFrom}`,
-          onClear: clearFrom,
-        }
-      : null,
-    appliedTo
-      ? {
-          key: 'to',
-          label: `结束：${appliedTo}`,
-          onClear: clearTo,
+          key: 'date',
+          label: appliedDateLabel,
+          onClear: clearDateRange,
         }
       : null,
   ];

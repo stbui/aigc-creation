@@ -51,6 +51,70 @@ describe('isBillingOrderReviewable', () => {
   });
 });
 
+describe('BillingService 多图融合部分交付结算', () => {
+  it('请求 4 张只交付 1 张时只结算 1 张并退回其余预留', async () => {
+    const order = {
+      id: 'bill-fusion',
+      status: 'running',
+      billingMode: 'fixed_request',
+      capability: 'multi_fusion',
+      amountMicrocredits: 40_000_000n,
+      reservedAmountMicrocredits: 40_000_000n,
+      actualAmountMicrocredits: 40_000_000n,
+      quantity: 4n,
+      userId: 'user-1',
+      taskId: 'task-1',
+      model: 'model-1',
+      channelId: 'channel-1',
+      scene: 'print_pattern',
+      unitPriceMicrocredits: 40_000_000n,
+      multiplierBasisPoints: 10_000n,
+      inputTokens: 0n,
+      outputTokens: 0n,
+      cachedTokens: 0n,
+      usageSource: '',
+      providerRequestId: null,
+      chargeLimitSet: false,
+      chargeLimitMicrocredits: 0n,
+    };
+    const settled = { ...order, status: 'settled' };
+    const tx = {
+      billingOrder: {
+        findUnique: vi.fn().mockResolvedValueOnce(order).mockResolvedValueOnce(settled),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+    };
+    const prisma = {
+      $transaction: vi.fn(async (work: (client: unknown) => unknown) => work(tx)),
+    };
+    const wallet = {
+      settle: vi.fn().mockResolvedValue({}),
+      refund: vi.fn().mockResolvedValue({}),
+    };
+    const service = new BillingService(prisma as never, wallet as never);
+
+    await expect(service.settle('bill-fusion', { deliveredQuantity: 1 })).resolves.toBe(settled);
+
+    expect(wallet.settle).toHaveBeenCalledWith(
+      tx,
+      expect.objectContaining({
+        reservedMicrocredits: 40_000_000n,
+        actualMicrocredits: 10_000_000n,
+        note: '按实际交付 1/4 张结算',
+      }),
+    );
+    expect(tx.billingOrder.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          quantity: 1n,
+          actualAmountMicrocredits: 10_000_000n,
+          refundedAmountMicrocredits: 30_000_000n,
+        }),
+      }),
+    );
+  });
+});
+
 describe('BillingService 人工核对', () => {
   let tx: {
     billingOrder: {

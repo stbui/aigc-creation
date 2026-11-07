@@ -3,7 +3,7 @@ import { Download, ImagePlus, Layers, RefreshCw, Sparkles } from 'lucide-react';
 import { EMPTY_HINT, EMPTY_TITLE } from './constants';
 import { ToolGeneratingState, type ToolResult } from './components';
 import { assetThumbUrl } from './api';
-import { fusionFailureText, fusionResultStatusOf } from './utils';
+import { fusionFailureText, fusionResultStatusOf, type FusionFailureKind } from './utils';
 
 /**
  * 结果面板 —— 变体预览 + 缩略图切换。
@@ -18,11 +18,13 @@ export function MultiFusionResultPanel({
   activeResult,
   activeResultIndex,
   lastFailure,
+  failureKind,
   requestedCount,
   ratio,
   ratioWidth,
   ratioHeight,
   canRegenerate,
+  onRetryPoll,
   onRegenerate,
   onDownload,
   onSelectResult,
@@ -32,6 +34,7 @@ export function MultiFusionResultPanel({
   activeResult: ToolResult | null;
   activeResultIndex: number;
   lastFailure: ToolResult | null;
+  failureKind: FusionFailureKind | null;
   /** 本次提交实际请求的变体数，不随生成后的参数选择变化 */
   requestedCount: number;
   ratio: string;
@@ -39,6 +42,8 @@ export function MultiFusionResultPanel({
   ratioHeight: number;
   /** 重新生成按钮的禁用判定由页面持有（提交中 / 能力不可用 / 没有可重试状态） */
   canRegenerate: boolean;
+  /** 超时任务沿用原 taskId 再查询，不重新发起生成 */
+  onRetryPoll?: () => void;
   onRegenerate: () => void;
   onDownload: () => void;
   onSelectResult: (index: number) => void;
@@ -48,9 +53,22 @@ export function MultiFusionResultPanel({
     submitting,
     resultCount: results.length,
     requestedCount,
-    failed: Boolean(lastFailure) && results.length === 0,
+    failureKind,
   });
-  const statusRole = status.state === 'failed' ? 'alert' : 'status';
+  const statusRole =
+    status.state === 'failed' || status.state === 'submit_failed' ? 'alert' : 'status';
+  const failureHeading =
+    status.state === 'timeout'
+      ? '结果暂未返回'
+      : status.state === 'submit_failed'
+        ? '未能提交'
+        : '生成失败';
+  const failureDetail =
+    status.state === 'timeout'
+      ? '任务已提交，后台可能仍在生成。请稍后重新查询，或到「我的作品」查看。'
+      : status.state === 'submit_failed'
+        ? `未能创建生成任务。${lastFailure ? fusionFailureText(lastFailure.errorCode) : '请稍后重试'}`
+        : fusionFailureText(lastFailure?.errorCode);
 
   return (
     <section className="multi-image-fusion-result-panel">
@@ -71,6 +89,12 @@ export function MultiFusionResultPanel({
           </div>
         </div>
         <div className="multi-image-fusion-result-actions">
+          {status.state === 'timeout' && onRetryPoll && (
+            <button type="button" onClick={onRetryPoll}>
+              <RefreshCw size={13} />
+              重新查询
+            </button>
+          )}
           <button type="button" disabled={!canRegenerate} onClick={onRegenerate}>
             <RefreshCw size={13} />
             重新生成
@@ -91,12 +115,16 @@ export function MultiFusionResultPanel({
         </div>
       ) : lastFailure && results.length === 0 ? (
         <div
-          className="multi-image-fusion-preview-stage multi-image-fusion-failure-stage"
+          className={`multi-image-fusion-preview-stage ${
+            status.state === 'timeout'
+              ? 'multi-image-fusion-timeout-stage'
+              : 'multi-image-fusion-failure-stage'
+          }`}
           style={ratioStyle}
         >
           <div className="multi-image-fusion-result-empty">
-            <strong>生成失败</strong>
-            <p>{fusionFailureText(lastFailure.errorCode)}</p>
+            <strong>{failureHeading}</strong>
+            <p>{failureDetail}</p>
           </div>
         </div>
       ) : results.length === 0 ? (

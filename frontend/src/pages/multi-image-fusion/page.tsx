@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 import {
   MAX_ACCENTS,
@@ -28,6 +28,7 @@ import {
   assetSrc,
   assetsApi,
   generateApi,
+  newIdempotencyKey,
   promptToolsApi,
   resolveModelId,
   toAbsoluteUrl,
@@ -42,6 +43,7 @@ import {
   promptToolErrorMessage,
   resolutionOptions,
   resultsOf,
+  type FusionFailureKind,
 } from './utils';
 import { MultiFusionAnalysisCard } from './MultiFusionAnalysisCard';
 import { MultiFusionEditorHeader } from './MultiFusionEditorHeader';
@@ -76,6 +78,11 @@ import { useApp } from '../../ui';
  * 状态与写操作留在本页; 展示板块拆成 `MultiFusion*` 业务组件 (见同目录各文件)。
  */
 
+type FusionFailure = {
+  kind: FusionFailureKind;
+  result: ToolResult;
+};
+
 export function MultiFusionPage() {
   // 基础价读后端下发的 creditCost，再按画质倍率计算本次真实扣费。
   const baseCreditCost = useCreditCost('multi_fusion');
@@ -103,6 +110,8 @@ export function MultiFusionPage() {
   /** 本次已提交任务的变体数快照；生成后修改选项不能反过来改写结果状态。 */
   const [requestedVariantCount, setRequestedVariantCount] = useState(4);
   const [ratio, setRatio] = useState('1:1');
+  /** 提交时的比例快照；结果面板不能跟着提交后的参数选择漂移。 */
+  const [requestedRatio, setRequestedRatio] = useState<string | null>(null);
   const [resolution, setResolution] = useState('1k');
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -122,7 +131,10 @@ export function MultiFusionPage() {
   const [submitting, setSubmitting] = useState(false);
   const [results, setResults] = useState<ToolResult[]>([]);
   const [activeResultIndex, setActiveResultIndex] = useState(0);
-  const [lastFailure, setLastFailure] = useState<ToolResult | null>(null);
+  const [lastFailure, setLastFailure] = useState<FusionFailure | null>(null);
+  /** 轮询超时的任务仍可能成功；保留 taskId 供「重新查询」，并阻止误重复生成。 */
+  const [timedOutTaskId, setTimedOutTaskId] = useState<string | null>(null);
+  const pendingStartRef = useRef<{ fingerprint: string; key: string } | null>(null);
   const pollSignal = usePollAbort();
 
   const totalCount = (subject ? 1 : 0) + accents.length;
@@ -283,7 +295,7 @@ export function MultiFusionPage() {
       const dropped = rest.length - accepted.length;
       if (dropped > 0) message.warning(`搭配图位只剩 ${room} 个，${dropped} 张未加入`);
       if (accepted.length > 0) setAccents((prev) => [...prev, ...accepted]);
-      message.success(`已接收 ${incoming.length} 张图片（第 1 张为主体图）`);
+      message.success(`已接收 ${1 + accepted.length} 张图片（第 1 张为主体图）`);
       return;
     }
 
@@ -307,8 +319,8 @@ export function MultiFusionPage() {
    */
   const runAiAnalyze = async () => {
     setAnalysisMessage(null);
-    if (!subject || accents.length === 0) {
-      const text = '请先上传主体图和至少 1 张搭配图';
+    if (!subject) {
+      const text = '请先上传主体图';
       setAnalysisMessage({ kind: 'error', text });
       message.warning(text);
       return;
@@ -335,15 +347,58 @@ export function MultiFusionPage() {
     }
   };
 
+  const applyPolledResult = (
+    taskId: string,
+    done: Awaited<ReturnType<typeof pollTask>>,
+    requestedCount: number,
+  ) => {
+    if (done.status === 'failed') {
+      if (done.errorCode === 'POLL_TIMEOUT') {
+        setTimedOutTaskId(taskId);
+        setLastFailure({ kind: 'timeout', result: done });
+        message.info('任务已提交，结果暂未返回，可稍后重新查询');
+        return;
+      }
+      setTimedOutTaskId(null);
+      setLastFailure({ kind: 'generation', result: done });
+      message.error(`生成失败（${done.errorCode ?? '未知错误'}）`);
+      return;
+    }
+
+    const outputs = outputsOf(done);
+    if (outputs.length === 0) {
+      setTimedOutTaskId(null);
+      setLastFailure({
+        kind: 'generation',
+        result: { status: 'failed', errorCode: 'EMPTY_OUTPUT' },
+      });
+      message.error('模型没有返回可用图片，请重试');
+      return;
+    }
+
+    setTimedOutTaskId(null);
+    setLastFailure(null);
+    setResults(resultsOf(done));
+    message.success(
+      outputs.length < requestedCount
+        ? `已生成 ${outputs.length} / ${requestedCount} 张变体`
+        : `融合结果已生成（${outputs.length} 张）`,
+    );
+  };
+
   const submit = async () => {
-    if (!subject || accents.length === 0 || submitting) return;
+    if (!subject || accents.length === 0 || submitting || timedOutTaskId) return;
     // guest 点击仍应走登录弹窗；已登录时才把「能力不可用」作为硬拦截。
     if (token && capabilityBlocked) {
       message.warning(capabilityReason || '该能力当前不可提交');
       return;
     }
     const requestedCount = Math.max(1, Math.trunc(Number(variantCount)) || 1);
+    const submittedRatio = ratio;
+    let taskId: string | null = null;
     setRequestedVariantCount(requestedCount);
+    setRequestedRatio(submittedRatio);
+    setTimedOutTaskId(null);
     setSubmitting(true);
     setResults([]);
     setActiveResultIndex(0);
@@ -351,39 +406,71 @@ export function MultiFusionPage() {
     try {
       const projectId = await ensureProject();
       const logicalModelId = await resolveModelId('multi_fusion');
-      const { taskId } = await generateApi.start({
+      const payload = {
         projectId,
         capability: 'multi_fusion',
         logicalModelId,
         // 顺序即语义: [0]=主体图, [1..]=搭配图 (后端 processTask 按提交序保序)
         inputAssetIds: [subject.id, ...accents.map((a) => a.id)].slice(0, MAX_TOTAL),
-        params: { scene, variantCount: String(requestedCount), ratio, size: resolution, prompt: prompt.trim() },
-      });
+        params: {
+          scene,
+          variantCount: String(requestedCount),
+          ratio: submittedRatio,
+          size: resolution,
+          prompt: prompt.trim(),
+        },
+      };
+      const fingerprint = JSON.stringify(payload);
+      const idempotencyKey =
+        pendingStartRef.current?.fingerprint === fingerprint
+          ? pendingStartRef.current.key
+          : newIdempotencyKey();
+      pendingStartRef.current = { fingerprint, key: idempotencyKey };
+      const started = await generateApi.start({ ...payload, idempotencyKey });
+      taskId = started.taskId;
+      pendingStartRef.current = null;
       const done = await pollTask(taskId);
-      if (done.status === 'failed') {
-        setLastFailure(done);
-        message.error(`生成失败（${done.errorCode ?? '未知错误'}）`);
-      } else {
-        const outputs = outputsOf(done);
-        if (outputs.length === 0) {
-          const emptyFailure: ToolResult = { status: 'failed', errorCode: 'EMPTY_OUTPUT' };
-          setLastFailure(emptyFailure);
-          message.error('模型没有返回可用图片，请重试');
-        } else {
-          setResults(resultsOf(done));
-          message.success(
-            outputs.length < requestedCount
-              ? `已生成 ${outputs.length} / ${requestedCount} 张变体`
-              : `融合结果已生成（${outputs.length} 张）`,
-          );
-        }
-      }
+      applyPolledResult(taskId, done, requestedCount);
     } catch (e) {
-      setLastFailure({ status: 'failed', errorCode: (e as Error).message || 'GENERATE_FAILED' });
-      reportError(e);
+      if (!taskId) {
+        setLastFailure({
+          kind: 'submit',
+          result: { status: 'failed', errorCode: (e as Error).message || 'GENERATE_FAILED' },
+        });
+        reportError(e);
+      } else {
+        // 任务已建立后查询失败：结果未知而不是生成失败，保留 taskId 避免重复建单。
+        setTimedOutTaskId(taskId);
+        setLastFailure({
+          kind: 'timeout',
+          result: { status: 'failed', errorCode: (e as Error).message || 'RESULT_UNKNOWN' },
+        });
+        message.info('任务已提交，暂时无法查询结果，请稍后重试');
+      }
     } finally {
       setSubmitting(false);
       // 扣费在建任务时发生、失败会自动退还，两个方向都改了余额
+      notifyCreditsChanged();
+    }
+  };
+
+  const retryPoll = async () => {
+    if (!timedOutTaskId || submitting) return;
+    const taskId = timedOutTaskId;
+    setSubmitting(true);
+    setLastFailure(null);
+    try {
+      const done = await pollTask(taskId);
+      applyPolledResult(taskId, done, requestedVariantCount);
+    } catch (e) {
+      setTimedOutTaskId(taskId);
+      setLastFailure({
+        kind: 'timeout',
+        result: { status: 'failed', errorCode: (e as Error).message || 'RESULT_UNKNOWN' },
+      });
+      message.info('暂时无法查询结果，请稍后再试');
+    } finally {
+      setSubmitting(false);
       notifyCreditsChanged();
     }
   };
@@ -412,6 +499,8 @@ export function MultiFusionPage() {
 
   // ── 状态 2: 工作区 ──
   const [ratioW, ratioH] = ratio.split(':').map(Number);
+  const resultRatio = requestedRatio ?? ratio;
+  const [resultRatioW, resultRatioH] = resultRatio.split(':').map(Number);
   // §1.3: --fusion-ratio-width/height 参考站 CSS 产物中无定义, 由 JS 按所选比例内联注入。
   // 注入在页面根 (而非仅 preview-stage), 因为参考站 rule #155 的自适应宽度规则
   // 同时作用于 .multi-image-fusion-preview-stage 与 .multi-image-fusion-result-empty,
@@ -448,6 +537,7 @@ export function MultiFusionPage() {
             prompt={prompt}
             onAnalyze={() => void runAiAnalyze()}
             onPromptChange={setPrompt}
+            onToggleDescription={() => setDescriptionOpen((value) => !value)}
           />
 
           {/* ── 卡片 3/4: 输出参数 ── */}
@@ -460,7 +550,11 @@ export function MultiFusionPage() {
           <MultiFusionSubmitBar
             submitting={submitting}
             disabled={
-              !subject || accents.length === 0 || submitting || (Boolean(token) && capabilityBlocked)
+              !subject ||
+              accents.length === 0 ||
+              submitting ||
+              Boolean(timedOutTaskId) ||
+              (Boolean(token) && capabilityBlocked)
             }
             blockedReason={capabilityBlocked && token ? capabilityReason : null}
             creditLabel={compactCreditLabel}
@@ -480,17 +574,21 @@ export function MultiFusionPage() {
           results={results}
           activeResult={activeResult}
           activeResultIndex={activeResultIndex}
-          lastFailure={lastFailure}
+          lastFailure={lastFailure?.result ?? null}
+          failureKind={lastFailure?.kind ?? null}
           requestedCount={requestedVariantCount}
-          ratio={ratio}
-          ratioWidth={ratioW}
-          ratioHeight={ratioH}
+          ratio={resultRatio}
+          ratioWidth={resultRatioW}
+          ratioHeight={resultRatioH}
           canRegenerate={
             !submitting &&
             !(Boolean(token) && capabilityBlocked) &&
             Boolean(subject && accents.length > 0) &&
-            (results.length > 0 || Boolean(lastFailure))
+            (results.length > 0 ||
+              lastFailure?.kind === 'generation' ||
+              lastFailure?.kind === 'submit')
           }
+          onRetryPoll={timedOutTaskId ? () => void retryPoll() : undefined}
           onRegenerate={() => void submit()}
           onDownload={download}
           onSelectResult={setActiveResultIndex}

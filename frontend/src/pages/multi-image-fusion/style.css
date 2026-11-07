@@ -537,6 +537,24 @@
   font-weight: 600;
 }
 
+.multi-image-fusion-description-toggle {
+  color: var(--mif-text-muted-btn-2);
+  cursor: pointer;
+  background: transparent;
+  border: 0;
+  margin-top: 9px;
+  padding: 2px 0;
+  font: inherit;
+  font-size: var(--mif-small-size);
+  text-align: left;
+}
+
+.multi-image-fusion-description-toggle:hover {
+  color: var(--mif-result-btn-hover-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .multi-image-fusion-analyze-button:hover:not(:disabled),
 .multi-image-fusion-submit-button:hover:not(:disabled) {
   transform: translateY(-1px);
@@ -881,6 +899,18 @@
   border-color: var(--mif-status-failed-border);
 }
 
+.multi-image-fusion-result-status.is-submit_failed {
+  color: var(--mif-status-failed-text);
+  background: var(--mif-status-failed-bg);
+  border-color: var(--mif-status-failed-border);
+}
+
+.multi-image-fusion-result-status.is-timeout {
+  color: var(--mif-status-partial-text);
+  background: var(--mif-status-partial-bg);
+  border-color: var(--mif-status-partial-border);
+}
+
 /* D-71/D-72: 结果标题 18px/700, 副标题 12px/19px #9897aa (本地原先缺副标题) */
 .multi-image-fusion-result-heading h2 {
   margin-top: 2px;
@@ -1164,6 +1194,7 @@
 .multi-image-fusion-remove:focus-visible,
 .multi-image-fusion-thumbnails button:focus-visible,
 .multi-image-fusion-analyze-button:focus-visible,
+.multi-image-fusion-description-toggle:focus-visible,
 .multi-image-fusion-submit-button:focus-visible {
   outline-offset: 2px;
   outline: 2px solid var(--mif-focus-ring);
@@ -1376,11 +1407,13 @@
 
 /* 结果舞台按所选比例撑高；空态/生成中/失败/成功共用同一几何 */
 .multi-image-fusion-generating-stage,
-.multi-image-fusion-failure-stage {
+.multi-image-fusion-failure-stage,
+.multi-image-fusion-timeout-stage {
   padding: 22px;
 }
 
-.multi-image-fusion-failure-stage .multi-image-fusion-result-empty {
+.multi-image-fusion-failure-stage .multi-image-fusion-result-empty,
+.multi-image-fusion-timeout-stage .multi-image-fusion-result-empty {
   width: 100%;
   flex: none;
 }

@@ -115,6 +115,24 @@ describe('TaskLifecycleService 失败退款', () => {
   });
 });
 
+describe('TaskLifecycleService 成功结算', () => {
+  it('多图融合结算传入实际交付张数', async () => {
+    const { service, billing } = setup();
+
+    await expect(
+      service.succeed(
+        { id: 'task-1', ownerId: 'user-1', billingOrderId: 'order-1', providerRequestId: null },
+        { outputAssetIds: ['asset-1'], aigcMeta: '{}' },
+      ),
+    ).resolves.toBe(true);
+
+    expect(billing.settle).toHaveBeenCalledWith(
+      'order-1',
+      expect.objectContaining({ deliveredQuantity: 1 }),
+    );
+  });
+});
+
 describe('TaskLifecycleService 取消后的派发结果收敛', () => {
   it('取消时仍可能派发，随后确认请求未到达上游时自动退款', async () => {
     const { service, prisma, billing } = setup();

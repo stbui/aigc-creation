@@ -97,6 +97,7 @@ export function AdminCouponsPage() {
   });
 
   const hasFilter = Boolean(params.keyword || params.type || params.status);
+  const rows = data?.items ?? [];
 
   const applyFilters = () => setQuery({ keyword: keyword.trim() || undefined, type, status });
   const resetFilters = () => {
@@ -297,7 +298,7 @@ export function AdminCouponsPage() {
         {error && data && <StaleError error={error} onRetry={reload} />}
 
         <CouponTable
-          rows={data?.items ?? []}
+          rows={rows}
           loading={loading}
           error={rows.length === 0 ? error : null}
           hasFilter={hasFilter}

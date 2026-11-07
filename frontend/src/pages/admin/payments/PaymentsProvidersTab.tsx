@@ -229,18 +229,13 @@ export function PaymentsProvidersTab({ refreshNonce }: { refreshNonce: number })
         </Notice>
       )}
 
-      <Panel
-        title="支付渠道"
-        note={`共 ${providers.length} 个渠道，其中 ${enabledCount} 个可用`}
-      >
-        <AdminDataTable
-          rows={providers}
-          columns={columns}
-          rowKey={(row) => row.id}
-          emptyText="没有发现支付渠道"
-          minWidth={840}
-        />
-      </Panel>
+      <AdminDataTable
+        rows={providers}
+        columns={columns}
+        rowKey={(row) => row.id}
+        emptyText="没有发现支付渠道"
+        minWidth={840}
+      />
 
       {editing && draft && (
         <ProviderConfigDrawer

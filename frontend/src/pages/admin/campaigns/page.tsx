@@ -13,7 +13,7 @@ import {
   type AppliedFilter,
 } from '~/admin-ui/primitives';
 import { useAdmin, useAdminList, useAdminUrlFilterSync, useDiscardConfirm, useToast, useUnsavedGuard } from './hooks';
-import { STATUS_LABEL, type FormState } from './constants';
+import { STATUS_LABEL, TYPE_LABEL, type FormState } from './constants';
 import { buildCampaignPayload, emptyForm, toLocalInput } from './utils';
 import { CampaignFilterBar } from './CampaignFilterBar';
 import { CampaignTable } from './CampaignTable';
@@ -42,8 +42,11 @@ export function AdminCampaignsPage() {
   // 地址栏参数不可信: 只接受筛选下拉里真实存在的状态值
   const rawStatus = searchParams.get('status');
   const initialStatus = rawStatus && rawStatus in STATUS_LABEL ? rawStatus : undefined;
+  const rawType = searchParams.get('type');
+  const initialType = rawType && rawType in TYPE_LABEL ? rawType : undefined;
 
   const [keyword, setKeyword] = useState(initialKeyword);
+  const [type, setType] = useState<string | undefined>(initialType);
   const [status, setStatus] = useState<string | undefined>(initialStatus);
   const [busy, setBusy] = useState(false);
   const { exporting, runExport } = useAdminExport(toast);
@@ -63,6 +66,7 @@ export function AdminCampaignsPage() {
         page: params.page as number,
         pageSize: params.pageSize as number,
         keyword: params.keyword as string | undefined,
+        type: params.type as string | undefined,
         status: params.status as string | undefined,
       }),
     [],
@@ -75,25 +79,30 @@ export function AdminCampaignsPage() {
     pageSize: number;
   }>(fetcher, {
     keyword: initialKeyword || undefined,
+    type: initialType,
     status: initialStatus,
   });
 
   // 只同步已生效的筛选, 不同步分页
   useAdminUrlFilterSync({
     keyword: params.keyword as string | undefined,
+    type: params.type as string | undefined,
     status: params.status as string | undefined,
   });
 
-  const hasFilter = Boolean(params.keyword || params.status);
+  const hasFilter = Boolean(params.keyword || params.type || params.status);
+  const rows = data?.items ?? [];
 
-  const applyFilters = () => setQuery({ keyword: keyword.trim() || undefined, status });
+  const applyFilters = () => setQuery({ keyword: keyword.trim() || undefined, type, status });
   const resetFilters = () => {
     setKeyword('');
+    setType(undefined);
     setStatus(undefined);
-    setQuery({ keyword: undefined, status: undefined });
+    setQuery({ keyword: undefined, type: undefined, status: undefined });
   };
 
   const appliedKeyword = (params.keyword as string | undefined) ?? '';
+  const appliedType = params.type as string | undefined;
   const appliedStatus = params.status as string | undefined;
   const appliedChips: AppliedFilter[] = [
     appliedKeyword
@@ -103,6 +112,16 @@ export function AdminCampaignsPage() {
           onClear: () => {
             setKeyword('');
             setQuery({ keyword: undefined });
+          },
+        }
+      : null,
+    appliedType
+      ? {
+          key: 'type',
+          label: `类型：${TYPE_LABEL[appliedType as keyof typeof TYPE_LABEL] ?? appliedType}`,
+          onClear: () => {
+            setType(undefined);
+            setQuery({ type: undefined });
           },
         }
       : null,
@@ -124,6 +143,7 @@ export function AdminCampaignsPage() {
       () =>
         marketingApi.exportCampaigns({
           keyword: params.keyword as string | undefined,
+          type: params.type as string | undefined,
           status: params.status as string | undefined,
         }),
       '导出已开始下载',
@@ -222,6 +242,8 @@ export function AdminCampaignsPage() {
       <CampaignFilterBar
         keyword={keyword}
         onKeywordChange={setKeyword}
+        type={type}
+        onTypeChange={setType}
         status={status}
         onStatusChange={setStatus}
         appliedChips={appliedChips}
@@ -243,7 +265,7 @@ export function AdminCampaignsPage() {
         {error && data && <StaleError error={error} onRetry={reload} />}
 
         <CampaignTable
-          rows={data?.items ?? []}
+          rows={rows}
           loading={loading}
           error={rows.length === 0 ? error : null}
           onRetry={reload}

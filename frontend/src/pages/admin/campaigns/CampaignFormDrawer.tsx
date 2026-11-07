@@ -55,7 +55,13 @@ export function CampaignFormDrawer({
           <ActionButton variant="secondary" size="sm" onClick={onClose} disabled={busy}>
             取消
           </ActionButton>
-          <ActionButton variant="default" size="sm" disabled={busy} onClick={onSave}>
+          <ActionButton
+            variant="default"
+            size="sm"
+            /* 编辑态没有改动时不必再发一次保存：成功 toast 会让人误以为改了什么 */
+            disabled={busy || (Boolean(editing) && !formDirty)}
+            onClick={onSave}
+          >
             {busy ? '保存中…' : '保存'}
           </ActionButton>
         </>

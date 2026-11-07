@@ -93,6 +93,7 @@ export function AdminInvoicesPage() {
   });
 
   const hasFilter = Boolean(params.status || params.keyword);
+  const rows = data?.items ?? [];
 
   const applyQuery = () => setQuery({ status, keyword: keyword.trim() || undefined });
 
@@ -236,15 +237,20 @@ export function AdminInvoicesPage() {
     {
       key: 'status',
       title: '状态',
-      width: 220,
+      width: 200,
       render: (row) => (
-        <div className="flex flex-col gap-0.5">
+        <div className="flex min-w-0 flex-col gap-0.5">
           <StatusTag status={row.status} label={STATUS_LABELS[row.status]} />
           {row.status === 'rejected' && row.rejectReason && (
-            <span className="text-muted-foreground">{row.rejectReason}</span>
+            <span className="line-clamp-1 text-muted-foreground" title={row.rejectReason}>
+              {row.rejectReason}
+            </span>
           )}
           {row.status === 'red_flushed' && (
-            <span className="text-muted-foreground">
+            <span
+              className="line-clamp-1 text-muted-foreground"
+              title={row.redFlushReason ?? undefined}
+            >
               {row.redFlushReason ?? '未填写冲红原因'}
               {row.redFlushedAt ? ` · ${formatDateTimeLoose(row.redFlushedAt)}` : ''}
             </span>
@@ -340,13 +346,13 @@ export function AdminInvoicesPage() {
         {error && data && <StaleError error={error} onRetry={reload} />}
 
         <AdminDataTable<AdminInvoice>
-          rows={data?.items ?? []}
+          rows={rows}
           columns={columns}
           rowKey={(row) => row.id}
           loading={loading}
           error={rows.length === 0 ? error : null}
           onRetry={reload}
-          minWidth={1120}
+          minWidth={1180}
           emptyText={hasFilter ? '没有符合条件的开票申请。' : '还没有开票申请。'}
           emptyAction={
             hasFilter ? (

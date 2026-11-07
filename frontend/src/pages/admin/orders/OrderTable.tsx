@@ -210,7 +210,6 @@ export function OrderTable({
     },
   ];
 
-
   return (
     <>
       {/* 批量条贴在表头上方: 勾选后要立即看到「能动多少笔」 */}
@@ -241,7 +240,7 @@ export function OrderTable({
         onRetry={onRetry}
         /* 整行可点开详情：操作列在横向滚动后容易被裁掉 */
         onRowClick={(row) => onOpenDetail(row.id)}
-        minWidth={1120}
+        minWidth={1160}
         selectable
         selected={selected}
         onSelectedChange={onSelectedChange}

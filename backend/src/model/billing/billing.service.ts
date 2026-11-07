@@ -745,10 +745,11 @@ export class BillingService {
    * 文本预授权只是估算，不能拿它当最终账单。
    *
    * @param audioDurationMs 音频 / 视频处理任务的实测时长（毫秒）；按秒计费必传
+   * @param deliveredQuantity 多图融合实际交付张数；用于按交付量结算并退回未交付部分
    */
   async settle(
     billingOrderId: string,
-    options: { providerRequestId?: string; audioDurationMs?: number } = {},
+    options: { providerRequestId?: string; audioDurationMs?: number; deliveredQuantity?: number } = {},
   ): Promise<BillingOrderRow> {
     if (!billingOrderId) throw new AppError(40001, '账单 id 不能为空', 400);
 
@@ -779,7 +780,7 @@ export class BillingService {
   private async settleInTransaction(
     tx: Prisma.TransactionClient,
     order: BillingOrderRow,
-    options: { providerRequestId?: string; audioDurationMs?: number },
+    options: { providerRequestId?: string; audioDurationMs?: number; deliveredQuantity?: number },
     onObserved: (value: { usage: BillingUsage; source: string; actual: bigint }) => void,
   ): Promise<BillingOrderRow> {
     const reserved =
@@ -821,6 +822,27 @@ export class BillingService {
         throw new AppError(40909, `${mediaLabel}实际费用超过本次授权上限，需人工核对`, 409);
       }
       note = `${mediaLabel}按实际输出时长结算`;
+    } else if (
+      order.capability === 'multi_fusion' &&
+      options.deliveredQuantity !== undefined
+    ) {
+      const requested = Number(order.quantity);
+      const delivered = Math.trunc(options.deliveredQuantity);
+      if (!Number.isSafeInteger(requested) || requested <= 0) {
+        throw new AppError(40909, '多图融合请求张数无效，无法结算', 409);
+      }
+      if (!Number.isFinite(delivered) || delivered <= 0) {
+        throw new AppError(40909, '多图融合没有可用交付，无法按交付量结算', 409);
+      }
+      quantity = BigInt(Math.min(requested, delivered));
+      // 预留金额已按「请求张数 × 画质倍率」缩放，按实际张数占比结算即可；
+      // 向上取整保证至少一张的金额不会被浮点/截断吞掉。
+      actual =
+        (order.amountMicrocredits * quantity + order.quantity - 1n) / order.quantity;
+      validateChargeLimit(order, actual);
+      if (quantity < order.quantity) {
+        note = `按实际交付 ${quantity.toString()}/${order.quantity.toString()} 张结算`;
+      }
     } else {
       validateChargeLimit(order, order.amountMicrocredits);
     }

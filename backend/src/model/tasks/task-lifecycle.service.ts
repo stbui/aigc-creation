@@ -99,6 +99,7 @@ export class TaskLifecycleService {
       await this.billing.settle(task.billingOrderId, {
         providerRequestId: input.providerRequestId ?? task.providerRequestId ?? undefined,
         audioDurationMs: input.outputDurationMs,
+        deliveredQuantity: input.outputAssetIds.length,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

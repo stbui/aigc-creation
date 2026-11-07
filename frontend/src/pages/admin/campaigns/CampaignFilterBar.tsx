@@ -7,11 +7,13 @@ import {
   SelectField,
   type AppliedFilter,
 } from '~/admin-ui/primitives';
-import { STATUS_OPTIONS } from './constants';
+import { STATUS_OPTIONS, TYPE_OPTIONS } from './constants';
 
 interface CampaignFilterBarProps {
   keyword: string;
   onKeywordChange: (value: string) => void;
+  type: string | undefined;
+  onTypeChange: (value: string | undefined) => void;
   status: string | undefined;
   onStatusChange: (value: string | undefined) => void;
   appliedChips: AppliedFilter[];
@@ -23,6 +25,8 @@ interface CampaignFilterBarProps {
 export function CampaignFilterBar({
   keyword,
   onKeywordChange,
+  type,
+  onTypeChange,
   status,
   onStatusChange,
   appliedChips,
@@ -38,6 +42,16 @@ export function CampaignFilterBar({
         value={keyword}
         onChange={onKeywordChange}
         onEnter={onApply}
+      />
+      <SelectField
+        className="w-32"
+        ariaLabel="按类型筛选"
+        placeholder="全部类型"
+        clearLabel="全部类型"
+        allowClear
+        value={type}
+        onChange={onTypeChange}
+        options={TYPE_OPTIONS}
       />
       <SelectField
         className="w-32"
