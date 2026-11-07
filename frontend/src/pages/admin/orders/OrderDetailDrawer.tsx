@@ -14,6 +14,7 @@ import {
   adminTasksHref,
   adminUserDetailHref,
   cn,
+  fmtTime,
   yuan,
 } from './utils';
 import type { AdminOrderDetail, AdminOrderRefund, AdminOrderRow } from '../../../types/api';
@@ -194,12 +195,12 @@ export function OrderDetailDrawer({
                   label: '渠道',
                   value: d.channel ? CHANNEL_LABELS[d.channel] ?? d.channel : '—',
                 },
-                { label: '下单时间', value: new Date(d.createdAt).toLocaleString('zh-CN') },
+                { label: '下单时间', value: fmtTime(d.createdAt) },
                 {
                   label: '支付时间',
-                  value: d.paidAt ? new Date(d.paidAt).toLocaleString('zh-CN') : '未支付',
+                  value: d.paidAt ? fmtTime(d.paidAt) : '未支付',
                 },
-                { label: '支付时限', value: new Date(d.expiresAt).toLocaleString('zh-CN') },
+                { label: '支付时限', value: fmtTime(d.expiresAt) },
                 ...(d.membershipPlan
                   ? [
                       {
@@ -213,15 +214,15 @@ export function OrderDetailDrawer({
                                 <span className="text-[12px] text-muted-foreground"> · 权益已发放</span>
                                 {d.membershipPeriodStartAt && d.membershipPeriodEndAt ? (
                                   <span className="text-[12px] text-muted-foreground">
-                                    {' '}· 周期 {new Date(d.membershipPeriodStartAt).toLocaleString('zh-CN')} 至{' '}
-                                    {new Date(d.membershipPeriodEndAt).toLocaleString('zh-CN')}
+                                    {' '}· 周期 {fmtTime(d.membershipPeriodStartAt)} 至{' '}
+                                    {fmtTime(d.membershipPeriodEndAt)}
                                   </span>
                                 ) : (
                                   <span className="text-[12px] text-muted-foreground"> · 历史订单无周期快照</span>
                                 )}
                                 {d.membershipPeriodRevokedAt ? (
                                   <span className="text-[12px] text-danger-text">
-                                    {' '}· 周期已撤销（{new Date(d.membershipPeriodRevokedAt).toLocaleString('zh-CN')}）
+                                    {' '}· 周期已撤销（{fmtTime(d.membershipPeriodRevokedAt)}）
                                   </span>
                                 ) : (
                                   <span className="text-[12px] text-success-text"> · 周期有效</span>
@@ -286,7 +287,7 @@ export function OrderDetailDrawer({
                         <code className="font-mono">{p.payTransactionId}</code>
                         {p.sandboxScenario ? ` · 沙箱/${p.sandboxScenario}` : ''}
                         {p.message ? ` · ${p.message}` : ''} ·{' '}
-                        {new Date(p.createdAt).toLocaleString('zh-CN')}
+                        {fmtTime(p.createdAt)}
                       </>
                     }
                   />
@@ -316,7 +317,7 @@ export function OrderDetailDrawer({
                     }
                     meta={
                       <>
-                        {r.reason} · {new Date(r.createdAt).toLocaleString('zh-CN')}
+                        {r.reason} · {fmtTime(r.createdAt)}
                         {r.providerRefundId ? (
                           <>
                             {' '}· 渠道退款号 <code className="font-mono">{r.providerRefundId}</code>

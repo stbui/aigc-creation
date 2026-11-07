@@ -2,10 +2,10 @@ import {
   ActionButton,
   AppliedFilters,
   ClearableField,
+  DateRangeField,
   FilterActions,
   FilterBar,
   SelectField,
-  TextField,
   type AppliedFilter,
 } from '~/admin-ui/primitives';
 import { CHANNEL_OPTIONS, REFUND_STATE_OPTIONS, STATUS_OPTIONS } from './constants';
@@ -39,16 +39,17 @@ export function OrderFilterBar({
   return (
     <FilterBar>
       <SelectField
-        className="w-28"
+        className="w-32"
         ariaLabel="按状态筛选"
-        placeholder="状态"
+        placeholder="全部状态"
+        clearLabel="全部状态"
         allowClear
         value={values.status}
         onChange={(value) => onChange('status', value)}
         options={STATUS_OPTIONS}
       />
       <ClearableField
-        className="w-36"
+        className="w-40"
         ariaLabel="按订单号搜索"
         placeholder="订单号"
         value={values.orderNo}
@@ -60,7 +61,7 @@ export function OrderFilterBar({
        * 再查订单, 多一步且该用户未必记得自己的 id。
        */}
       <ClearableField
-        className="w-40"
+        className="w-44"
         ariaLabel="按用户邮箱搜索"
         placeholder="用户邮箱"
         value={values.email}
@@ -68,9 +69,10 @@ export function OrderFilterBar({
         onEnter={onApply}
       />
       <SelectField
-        className="w-28"
+        className="w-32"
         ariaLabel="按渠道筛选"
-        placeholder="渠道"
+        placeholder="全部渠道"
+        clearLabel="全部渠道"
         allowClear
         value={values.channel}
         onChange={(value) => onChange('channel', value)}
@@ -81,27 +83,23 @@ export function OrderFilterBar({
        * 需要人工核对的场景。告警中心 `?refundState=processing` 直达这里。
        */}
       <SelectField
-        className="w-28"
+        className="w-32"
         ariaLabel="按退款状态筛选"
-        placeholder="退款状态"
+        placeholder="全部退款"
+        clearLabel="全部退款"
         allowClear
         value={values.refundState}
         onChange={(value) => onChange('refundState', value)}
         options={REFUND_STATE_OPTIONS}
       />
-      <TextField
-        className="w-32"
-        ariaLabel="开始日期"
-        type="date"
-        value={values.from}
-        onChange={(value) => onChange('from', value)}
-      />
-      <TextField
-        className="w-32"
-        ariaLabel="结束日期"
-        type="date"
-        value={values.to}
-        onChange={(value) => onChange('to', value)}
+      <DateRangeField
+        className="w-60"
+        from={values.from}
+        to={values.to}
+        onChange={({ from, to }) => {
+          onChange('from', from);
+          onChange('to', to);
+        }}
       />
       <FilterActions>
         <ActionButton variant="default" size="sm" onClick={onApply}>

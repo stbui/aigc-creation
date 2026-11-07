@@ -38,7 +38,13 @@ export function RuleActions({
           放弃变更
         </ActionButton>
       )}
-      <ActionButton variant="default" size="sm" disabled={busy} onClick={onSave}>
+      <ActionButton
+        variant="default"
+        size="sm"
+        /* 没有改动时保存按钮不可点：可点却什么都不改变，会让人以为「已经保存过」 */
+        disabled={busy || !dirty}
+        onClick={onSave}
+      >
         {busy ? '保存中…' : saveText}
       </ActionButton>
     </div>

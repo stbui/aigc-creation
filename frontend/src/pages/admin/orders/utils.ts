@@ -13,6 +13,9 @@ export {
 /** 分 → 元文本（统一实现在 admin-ui/lib/format.ts） */
 export { formatYuanPlain as yuan } from '../../../admin-ui/primitives';
 
+/** 后台统一的时间展示；空值显示破折号，不用空白单元格 */
+export { formatDateTimeLoose as fmtTime } from '../../../admin-ui/primitives';
+
 /** 元输入 → 分。非法返回 null, 不做静默兜底 */
 export function yuanToCents(text: string): number | null {
   const trimmed = text.trim();

@@ -1,5 +1,11 @@
 import { useState } from 'react';
-import { ActionButton, ExportCsvButton, PageHeader, StaleError } from '~/admin-ui/primitives';
+import {
+  ExportCsvButton,
+  PageHeader,
+  Panel,
+  RefreshButton,
+  StaleError,
+} from '~/admin-ui/primitives';
 import { adminOrdersApi } from './api';
 import { useAdmin, useAdminDetailParam, useToast } from './hooks';
 import { yuan, yuanToCents } from './utils';
@@ -200,7 +206,6 @@ export function AdminOrdersPage() {
       <PageHeader
         title="订单管理"
         description="订单、支付与退款。核销与退款会写入操作审计，并即时回收或发放积分。"
-        actions={can('data.export') ? <ExportCsvButton exporting={exporting} onExport={exportCsv} /> : undefined}
       />
 
       <OrderFilterBar
@@ -211,29 +216,40 @@ export function AdminOrdersPage() {
         appliedChips={appliedChips}
       />
 
-      {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
-      {error && data && <StaleError error={error} onRetry={reload} />}
+      <Panel
+        title="订单列表"
+        note="日期筛选含结束当天；导出口径与当前筛选一致"
+        extra={
+          <>
+            {can('data.export') && <ExportCsvButton exporting={exporting} onExport={exportCsv} />}
+            <RefreshButton loading={loading} onRefresh={reload} />
+          </>
+        }
+      >
+        {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
+        {error && data && <StaleError error={error} onRetry={reload} />}
 
-      <OrderTable
-        rows={data?.items ?? []}
-        loading={loading}
-        error={error}
-        selected={selected}
-        page={data?.page ?? 1}
-        pageSize={data?.pageSize ?? 20}
-        total={data?.total ?? 0}
-        hasFilter={hasFilter}
-        canMarkPaid={can('order.mark_paid')}
-        canRefund={can('order.refund')}
-        busy={busy}
-        onRetry={reload}
-        onSelectedChange={setSelected}
-        onPageChange={setPage}
-        onOpenDetail={setDetailId}
-        onAction={openAction}
-        onBatchMarkPaid={() => setBatchOpen(true)}
-        onReset={reset}
-      />
+        <OrderTable
+          rows={data?.items ?? []}
+          loading={loading}
+          error={error && !data ? error : null}
+          selected={selected}
+          page={data?.page ?? 1}
+          pageSize={data?.pageSize ?? 20}
+          total={data?.total ?? 0}
+          hasFilter={hasFilter}
+          canMarkPaid={can('order.mark_paid')}
+          canRefund={can('order.refund')}
+          busy={busy}
+          onRetry={reload}
+          onSelectedChange={setSelected}
+          onPageChange={setPage}
+          onOpenDetail={setDetailId}
+          onAction={openAction}
+          onBatchMarkPaid={() => setBatchOpen(true)}
+          onReset={reset}
+        />
+      </Panel>
 
       <OrderDetailDrawer
         key={`${detailId ?? 'closed'}-${detailVersion}`}

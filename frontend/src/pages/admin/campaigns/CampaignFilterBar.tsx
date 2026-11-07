@@ -42,7 +42,8 @@ export function CampaignFilterBar({
       <SelectField
         className="w-32"
         ariaLabel="按状态筛选"
-        placeholder="状态"
+        placeholder="全部状态"
+        clearLabel="全部状态"
         allowClear
         value={status}
         onChange={onStatusChange}

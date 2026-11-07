@@ -8,6 +8,7 @@ import {
   useAdminExport,
   PageHeader,
   Panel,
+  RefreshButton,
   StaleError,
   type AppliedFilter,
 } from '~/admin-ui/primitives';
@@ -208,21 +209,15 @@ export function AdminCampaignsPage() {
         title="限时活动"
         description="限时价 / 限时免费 / 弹窗位。状态为「进行中」但不在时间窗内，活动不会展示。"
         actions={
-          <>
-            {can('data.export') && <ExportCsvButton exporting={exporting} onExport={exportCsv} />}
-            {writable ? (
-              <ActionButton variant="default" size="sm" icon={Plus} onClick={openCreate}>
-                新建活动
-              </ActionButton>
-            ) : (
-              <span className="text-[12px] text-muted-foreground">当前账号无 marketing.write 权限，仅可查看</span>
-            )}
-          </>
+          writable ? (
+            <ActionButton variant="default" size="sm" icon={Plus} onClick={openCreate}>
+              新建活动
+            </ActionButton>
+          ) : (
+            <span className="text-[12px] text-muted-foreground">当前账号无 marketing.write 权限，仅可查看</span>
+          )
         }
       />
-
-      {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
-      {error && data && <StaleError error={error} onRetry={reload} />}
 
       <CampaignFilterBar
         keyword={keyword}
@@ -234,11 +229,23 @@ export function AdminCampaignsPage() {
         onReset={resetFilters}
       />
 
-      <Panel title="活动列表" note="列表状态为派生结果：时间窗、人工开关与上下线共同决定">
+      <Panel
+        title="活动列表"
+        note="列表状态为派生结果：时间窗、人工开关与上下线共同决定"
+        extra={
+          <>
+            {can('data.export') && <ExportCsvButton exporting={exporting} onExport={exportCsv} />}
+            <RefreshButton loading={loading} onRefresh={reload} />
+          </>
+        }
+      >
+        {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
+        {error && data && <StaleError error={error} onRetry={reload} />}
+
         <CampaignTable
           rows={data?.items ?? []}
           loading={loading}
-          error={error}
+          error={rows.length === 0 ? error : null}
           onRetry={reload}
           writable={writable}
           busy={busy}

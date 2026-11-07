@@ -17,10 +17,12 @@ import {
   FilterBar,
   PageHeader,
   Panel,
+  RefreshButton,
   SelectField,
   StatusTag,
   StaleError,
   TextField,
+  formatDateTimeLoose,
   type AdminColumn,
   type AppliedFilter,
 } from '~/admin-ui/primitives';
@@ -90,7 +92,7 @@ export function AdminInvoicesPage() {
     keyword: params.keyword as string | undefined,
   });
 
-  const hasFilter = Boolean(status || keyword);
+  const hasFilter = Boolean(params.status || params.keyword);
 
   const applyQuery = () => setQuery({ status, keyword: keyword.trim() || undefined });
 
@@ -173,21 +175,21 @@ export function AdminInvoicesPage() {
     {
       key: 'invoiceNo',
       title: '发票号',
-      width: 180,
+      width: 190,
       render: (row) => (
         <div className="flex flex-col gap-0.5">
-          <code className="font-mono text-[12px] text-foreground">{row.invoiceNo}</code>
-          <span className="text-[12px] text-muted-foreground">{new Date(row.createdAt).toLocaleString('zh-CN')}</span>
+          <code className="font-mono font-medium text-foreground">{row.invoiceNo}</code>
+          <span className="text-muted-foreground">{formatDateTimeLoose(row.createdAt)}</span>
         </div>
       ),
     },
     {
       key: 'orderNo',
       title: '订单号',
-      width: 180,
+      width: 190,
       render: (row) => (
         <Link className="text-brand hover:underline" to={adminOrderDetailHref(row.orderId)}>
-          <code className="font-mono text-[12px]">{row.orderNo ?? row.orderId}</code>
+          <code className="font-mono">{row.orderNo ?? row.orderId}</code>
         </Link>
       ),
     },
@@ -198,7 +200,7 @@ export function AdminInvoicesPage() {
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           {row.userName && <span>{row.userName}</span>}
-          <span className="text-[12px] text-muted-foreground">
+          <span className="text-muted-foreground">
             {row.userEmail ? (
               <Link className="hover:underline" to={adminUserHref(row.userEmail)}>
                 {row.userEmail}
@@ -218,9 +220,9 @@ export function AdminInvoicesPage() {
         <div className="flex flex-col gap-0.5">
           <span>
             {row.title}
-            <span className="text-[12px] text-muted-foreground"> · {KIND_LABELS[row.kind] ?? row.kind}</span>
+            <span className="text-muted-foreground"> · {KIND_LABELS[row.kind] ?? row.kind}</span>
           </span>
-          {row.taxNo && <code className="font-mono text-[12px] text-muted-foreground">{row.taxNo}</code>}
+          {row.taxNo && <code className="font-mono text-muted-foreground">{row.taxNo}</code>}
         </div>
       ),
     },
@@ -234,17 +236,17 @@ export function AdminInvoicesPage() {
     {
       key: 'status',
       title: '状态',
-      width: 110,
+      width: 220,
       render: (row) => (
         <div className="flex flex-col gap-0.5">
           <StatusTag status={row.status} label={STATUS_LABELS[row.status]} />
           {row.status === 'rejected' && row.rejectReason && (
-            <span className="text-[12px] text-muted-foreground">{row.rejectReason}</span>
+            <span className="text-muted-foreground">{row.rejectReason}</span>
           )}
           {row.status === 'red_flushed' && (
-            <span className="text-[12px] text-muted-foreground">
+            <span className="text-muted-foreground">
               {row.redFlushReason ?? '未填写冲红原因'}
-              {row.redFlushedAt ? ` · ${new Date(row.redFlushedAt).toLocaleString('zh-CN')}` : ''}
+              {row.redFlushedAt ? ` · ${formatDateTimeLoose(row.redFlushedAt)}` : ''}
             </span>
           )}
         </div>
@@ -252,7 +254,7 @@ export function AdminInvoicesPage() {
     },
     {
       key: 'ops',
-      title: '',
+      title: '操作',
       width: 170,
       fixed: 'right',
       render: (row) => (
@@ -292,14 +294,14 @@ export function AdminInvoicesPage() {
       <PageHeader
         title="发票管理"
         description="审核并开具用户申请的开票。保留历史记录，已开具发票只能登记冲红，操作全程写入审计。"
-        actions={can('data.export') ? <ExportCsvButton exporting={exporting} onExport={exportCsv} /> : undefined}
       />
 
       <FilterBar>
         <SelectField
           className="w-32"
           ariaLabel="按状态筛选"
-          placeholder="状态"
+          placeholder="全部状态"
+          clearLabel="全部状态"
           allowClear
           value={status}
           onChange={(value) => setStatus(value as InvoiceStatus | undefined)}
@@ -307,13 +309,16 @@ export function AdminInvoicesPage() {
         />
         <ClearableField
           className="w-64"
+          ariaLabel="按发票号或抬头搜索"
           placeholder="发票号 / 订单号 / 抬头"
           value={keyword}
           onChange={setKeyword}
           onEnter={applyQuery}
         />
         <FilterActions>
-          <ActionButton onClick={applyQuery}>查询</ActionButton>
+          <ActionButton variant="default" size="sm" onClick={applyQuery}>
+            查询
+          </ActionButton>
           <ActionButton variant="secondary" size="sm" onClick={reset}>
             重置
           </ActionButton>
@@ -321,18 +326,27 @@ export function AdminInvoicesPage() {
         <AppliedFilters items={appliedChips} onClearAll={reset} />
       </FilterBar>
 
-      {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
-      {error && data && <StaleError error={error} onRetry={reload} />}
+      <Panel
+        title="开票申请"
+        note="默认展示全部，按状态与关键字筛选"
+        extra={
+          <>
+            {can('data.export') && <ExportCsvButton exporting={exporting} onExport={exportCsv} />}
+            <RefreshButton loading={loading} onRefresh={reload} />
+          </>
+        }
+      >
+        {/* 刷新失败但手上还有上一次的数据: 只挂提示, 不把整个列表藏起来 */}
+        {error && data && <StaleError error={error} onRetry={reload} />}
 
-      <Panel title="开票申请" note="默认展示全部，按状态与关键字筛选">
         <AdminDataTable<AdminInvoice>
           rows={data?.items ?? []}
           columns={columns}
           rowKey={(row) => row.id}
           loading={loading}
-          error={error}
+          error={rows.length === 0 ? error : null}
           onRetry={reload}
-          minWidth={1060}
+          minWidth={1120}
           emptyText={hasFilter ? '没有符合条件的开票申请。' : '还没有开票申请。'}
           emptyAction={
             hasFilter ? (

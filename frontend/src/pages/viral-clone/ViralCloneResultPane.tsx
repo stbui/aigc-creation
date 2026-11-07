@@ -37,7 +37,7 @@ import {
   type LightboxItem,
 } from './components';
 import type { GalleryItem, ResultGallery } from './hooks';
-import { splitCloneInputs, taskErrorText } from './utils';
+import { downloadExtension, splitCloneInputs, taskErrorText } from './utils';
 
 type CompareState = 'ready' | 'generating' | 'failed' | 'idle';
 
@@ -196,7 +196,7 @@ export function ViralCloneResultPane({
   const download = (row: CompareRow) => {
     const item = row.item;
     if (!item?.url) return;
-    const ext = (item.format || 'png').toLowerCase().replace(/^\./, '') || 'png';
+    const ext = downloadExtension(item.format);
     const link = document.createElement('a');
     link.href = toAbsoluteUrl(item.url) ?? item.url;
     link.download = `viral-clone-${item.id.slice(-6)}.${ext}`;

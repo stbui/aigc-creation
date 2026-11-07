@@ -39,4 +39,5 @@ export const STATUS_META: Record<string, { label: string; tone: TagTone }> = {
   // 发票状态。`pending` 复用库存量条的「等待」色，发票页用 `label="待开具"` 覆盖文案
   issued: { label: '已开具', tone: 'success' },
   rejected: { label: '已驳回', tone: 'danger' },
+  red_flushed: { label: '已冲红', tone: 'muted' },
 };

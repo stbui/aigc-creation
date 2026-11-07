@@ -4,6 +4,7 @@ import {
   AdminDataTable,
   StatusTag,
   ToneBadge,
+  formatDate,
   type AdminColumn,
 } from '~/admin-ui/primitives';
 import { EFFECTIVE_META, TYPE_LABEL, type TagTone } from './constants';
@@ -51,13 +52,13 @@ export function CampaignTable({
         key: 'type',
         title: '类型',
         width: 90,
-        render: (row) => <span className="text-xs">{TYPE_LABEL[row.type] ?? row.type}</span>,
+        render: (row) => <span>{TYPE_LABEL[row.type] ?? row.type}</span>,
       },
       {
         key: 'payload',
         title: '内容',
         width: 150,
-        render: (row) => <span className="text-[12px] text-muted-foreground">{payloadSummary(row)}</span>,
+        render: (row) => <span className="text-muted-foreground">{payloadSummary(row)}</span>,
       },
       {
         key: 'audience',
@@ -65,22 +66,21 @@ export function CampaignTable({
         width: 90,
         render: (row) =>
           row.audience?.onlyNewUsers ? (
-            <span className="text-xs">仅新用户</span>
+            <span>仅新用户</span>
           ) : (
-            <span className="text-[12px] text-muted-foreground">全站</span>
+            <span className="text-muted-foreground">全站</span>
           ),
       },
       {
         key: 'window',
         title: '时间窗',
-        width: 200,
+        width: 220,
         render: (row) => {
           const live = inWindow(row);
           return (
             <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1">
-              <span className="text-[12px] tabular-nums text-muted-foreground">
-                {new Date(row.startAt).toLocaleDateString('zh-CN')} ~{' '}
-                {new Date(row.endAt).toLocaleDateString('zh-CN')}
+              <span className="tabular-nums text-muted-foreground">
+                {formatDate(row.startAt)} ~ {formatDate(row.endAt)}
               </span>
               {/* active 但不在窗内：配置生效了却不会展示，必须让人看见 */}
               {row.status === 'active' && !live && <ToneBadge tone="warn">未在窗内</ToneBadge>}
@@ -102,8 +102,8 @@ export function CampaignTable({
       },
       {
         key: 'ops',
-        title: '',
-        width: 110,
+        title: '操作',
+        width: 120,
         fixed: 'right',
         render: (row) =>
           writable ? (
@@ -111,8 +111,9 @@ export function CampaignTable({
               <ActionButton variant="ghost" size="sm" onClick={() => onEdit(row)}>
                 编辑
               </ActionButton>
+              {/* 后端是 off ↔ active 的翻转；按当前状态给出明确动作名 */}
               <ActionButton variant="ghost" size="sm" disabled={busy} onClick={() => onToggle(row)}>
-                切换
+                {row.status === 'off' ? '上线' : '下线'}
               </ActionButton>
             </div>
           ) : null,
@@ -129,6 +130,8 @@ export function CampaignTable({
       loading={loading}
       error={error}
       onRetry={onRetry}
+      /* 整行可点开编辑；只读账号不挂这个入口，避免打开一个存不了的抽屉 */
+      onRowClick={writable ? onEdit : undefined}
       minWidth={1010}
       pagination={pagination}
       emptyText={emptyText}

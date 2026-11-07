@@ -12,6 +12,7 @@ import {
   FilterBar,
   PageHeader,
   Panel,
+  RefreshButton,
   SelectField,
   StaleError,
   type AppliedFilter,
@@ -232,21 +233,15 @@ export function AdminCouponsPage() {
         title="优惠券"
         description="发放范围、使用条件、有效期与限用。券不提供删除 —— 已核销订单仍引用它，只能停用。"
         actions={
-          <>
-            {can('data.export') && <ExportCsvButton exporting={exporting} onExport={exportCsv} />}
-            {writable ? (
-              <ActionButton variant="default" size="sm" icon={Plus} onClick={openCreate}>
-                新建优惠券
-              </ActionButton>
-            ) : (
-              <span className="text-[12px] text-muted-foreground">当前账号无 marketing.write 权限，仅可查看</span>
-            )}
-          </>
+          writable ? (
+            <ActionButton variant="default" size="sm" icon={Plus} onClick={openCreate}>
+              新建优惠券
+            </ActionButton>
+          ) : (
+            <span className="text-[12px] text-muted-foreground">当前账号无 marketing.write 权限，仅可查看</span>
+          )
         }
       />
-
-      {/* 刷新失败但手上还有上一次的数据：只挂提示，不把整个列表藏起来 */}
-      {error && data && <StaleError error={error} onRetry={reload} />}
 
       <FilterBar>
         <ClearableField
@@ -260,7 +255,8 @@ export function AdminCouponsPage() {
         <SelectField
           className="w-32"
           ariaLabel="按类型筛选"
-          placeholder="类型"
+          placeholder="全部类型"
+          clearLabel="全部类型"
           allowClear
           value={type}
           onChange={setType}
@@ -269,7 +265,8 @@ export function AdminCouponsPage() {
         <SelectField
           className="w-32"
           ariaLabel="按状态筛选"
-          placeholder="状态"
+          placeholder="全部状态"
+          clearLabel="全部状态"
           allowClear
           value={status}
           onChange={setStatus}
@@ -286,11 +283,23 @@ export function AdminCouponsPage() {
         <AppliedFilters items={appliedChips} onClearAll={resetFilters} />
       </FilterBar>
 
-      <Panel title="券列表" note="核销进度按发行总量计算，不限量券不显示进度">
+      <Panel
+        title="券列表"
+        note="核销进度按发行总量计算，不限量券不显示进度"
+        extra={
+          <>
+            {can('data.export') && <ExportCsvButton exporting={exporting} onExport={exportCsv} />}
+            <RefreshButton loading={loading} onRefresh={reload} />
+          </>
+        }
+      >
+        {/* 刷新失败但手上还有上一次的数据：只挂提示，不把整个列表藏起来 */}
+        {error && data && <StaleError error={error} onRetry={reload} />}
+
         <CouponTable
           rows={data?.items ?? []}
           loading={loading}
-          error={error}
+          error={rows.length === 0 ? error : null}
           hasFilter={hasFilter}
           current={data?.page ?? 1}
           pageSize={data?.pageSize ?? 20}
