@@ -16,7 +16,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { getCapability } from '../../capabilities/capability.registry';
 import { resolveImageParameterValues } from '../intent/image-contract';
-import { restrictIntentToSpec } from '../intent/model-intent';
+import { normalizeImageSizeIntent, restrictIntentToSpec } from '../intent/model-intent';
 import type { ModelRequestIntent } from '../intent/spec-types';
 import type { GenerationRequest, MediaReference } from '../protocol/runtime';
 import type { ManifestCapability } from '../protocol/types';
@@ -73,12 +73,15 @@ export class TaskRequestService {
     // 执行请求必须按**已选线路**的能力合同投影。产品合同只描述前台承诺的可选
     // 范围，可能不重复声明线路参数（如多图融合的 count）；拿它裁剪会让线路
     // 明明支持 4 张，实际请求却退回上游默认 1 张。
-    const intent = restrictIntentToSpec(
+    const intent = normalizeImageSizeIntent(
       spec,
-      def.model.intent(context.params, {
-        image: context.inputAssetIds.length,
-        video: 0,
-      }),
+      restrictIntentToSpec(
+        spec,
+        def.model.intent(context.params, {
+          image: context.inputAssetIds.length,
+          video: 0,
+        }),
+      ),
     );
     if (spec.inputs?.mask === undefined && this.maskAssetId(context.params) !== '') {
       throw new Error('当前线路不支持遮罩重绘');

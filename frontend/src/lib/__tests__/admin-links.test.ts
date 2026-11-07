@@ -5,6 +5,7 @@ import {
   adminModelCallsHref,
   adminOrderHref,
   adminOrderDetailHref,
+  adminProductOrdersHref,
   adminTaskHref,
   adminTasksHref,
   adminUserDetailHref,
@@ -32,5 +33,13 @@ describe('admin-links', () => {
     );
     expect(adminModelCallsHref({})).toBe('/admin/model-calls');
     expect(adminAssetHref('asset 1')).toBe('/admin/assets?q=asset+1');
+  });
+
+  it('商品订单深链同时带 id 与可读名称', () => {
+    expect(adminProductOrdersHref('p-1', '双11 抢购包')).toBe(
+      '/admin/orders?productId=p-1&productName=%E5%8F%8C11+%E6%8A%A2%E8%B4%AD%E5%8C%85',
+    );
+    // 没有名称时只带 id：筛选照样生效，标签回退显示 id
+    expect(adminProductOrdersHref('p-1')).toBe('/admin/orders?productId=p-1');
   });
 });

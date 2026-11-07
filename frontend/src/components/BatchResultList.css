@@ -81,7 +81,7 @@
 
 /* ── 商品详情卡片布局 ────────────────────────────────────────────────
  * 第一行商品名 + 时间, 第二行任务参数 + 状态, 第三行原图 + 一键下载,
- * 之后是三列生成图。信息按阅读顺序分层, 不再把参数挤在横向缩略图行头。 */
+ * 之后是五列生成图。信息按阅读顺序分层, 不再把参数挤在横向缩略图行头。 */
 .pd-result-card {
   padding: 16px;
 }
@@ -237,7 +237,7 @@
 
 .pd-result-card-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -296,7 +296,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  /* 生成图比例由用户选择，缩略图只能等比展示，不能为了铺满而裁切内容 */
+  object-fit: contain;
 }
 
 .pd-result-thumb:hover:not(:disabled) {

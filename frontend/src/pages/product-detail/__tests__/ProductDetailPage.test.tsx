@@ -72,16 +72,9 @@ vi.mock('../hooks', async () => {
     useRightTab: () => ({ rightTab: 'demo', pick: vi.fn(), showResults: vi.fn() }),
     useSectionSelection: () => {
       const [sections] = useState(['hero', 'selling_points']);
-      const [sectionPrompts, setSectionPrompts] = useState<Record<string, string>>({
-        hero: '首屏默认要求',
-        selling_points: '卖点默认要求',
-      });
       return {
         sections,
-        sectionPrompts,
         toggle: vi.fn(),
-        setSectionPrompt: (value: string, prompt: string) =>
-          setSectionPrompts((prev) => ({ ...prev, [value]: prompt })),
       };
     },
   };
@@ -135,17 +128,15 @@ describe('ProductDetailPage 模块提示词接线', () => {
     vi.mocked(startDetailGeneration).mockClear();
   });
 
-  it('挂载各模块画面要求编辑器，并把编辑后的专属要求带入提交参数', async () => {
+  it('页面不展示各模块画面要求，也不再发送重复的前端默认提示词', async () => {
     render(
       <MemoryRouter>
         <ProductDetailPage />
       </MemoryRouter>,
     );
 
-    const heroPrompt = screen.getByRole('textbox', { name: '首屏主视觉画面要求' });
-    const sellingPrompt = screen.getByRole('textbox', { name: '核心卖点图画面要求' });
-    fireEvent.change(heroPrompt, { target: { value: '首屏专属要求 A' } });
-    fireEvent.change(sellingPrompt, { target: { value: '卖点专属要求 B' } });
+    expect(screen.queryByText('各模块画面要求')).not.toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: '首屏主视觉画面要求' })).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByPlaceholderText('* 请输入商品名称'), {
       target: { value: '探针商品' },
@@ -158,10 +149,7 @@ describe('ProductDetailPage 模块提示词接线', () => {
     await waitFor(() => expect(startDetailGeneration).toHaveBeenCalledTimes(1));
     expect(vi.mocked(startDetailGeneration).mock.calls[0][0]).toMatchObject({
       sections: ['hero', 'selling_points'],
-      sectionPrompts: {
-        hero: '首屏专属要求 A',
-        selling_points: '卖点专属要求 B',
-      },
     });
+    expect(vi.mocked(startDetailGeneration).mock.calls[0][0]).not.toHaveProperty('sectionPrompts');
   });
 });

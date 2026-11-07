@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -316,6 +317,19 @@ export class AdminCommerceController {
     return { id: product.id, status: product.status };
   }
 
+  /**
+   * 删除商品（物理删除）。
+   *
+   * 只允许删除没有历史订单的 SKU；已有订单返回 409 并提示改为下架 ——
+   * 退款与积分回收要回查该 SKU 的原价与发放积分，记录必须留着。
+   */
+  @Delete("products/:id")
+  @RequirePermission(PERMISSIONS.productDelete)
+  @AuditAction("product.delete")
+  deleteProduct(@Param("id") id: string) {
+    return this.commerce.deleteProduct(id);
+  }
+
   // ── 订单 (B-39~B-44) ─────────────────────────────────────────────
 
   /**
@@ -332,6 +346,7 @@ export class AdminCommerceController {
     @Query("email") email?: string,
     @Query("channel") channel?: string,
     @Query("refundState") refundState?: string,
+    @Query("productId") productId?: string,
     @Query("from") from?: string,
     @Query("to") to?: string,
     @Query("userId") userId?: string,
@@ -345,6 +360,7 @@ export class AdminCommerceController {
       email,
       channel,
       refundState,
+      productId,
       from,
       to,
       page: num(page),
@@ -369,6 +385,7 @@ export class AdminCommerceController {
     @Query("email") email?: string,
     @Query("channel") channel?: string,
     @Query("refundState") refundState?: string,
+    @Query("productId") productId?: string,
     @Query("from") from?: string,
     @Query("to") to?: string,
   ) {
@@ -378,6 +395,7 @@ export class AdminCommerceController {
       email,
       channel,
       refundState,
+      productId,
       from,
       to,
     });

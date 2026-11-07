@@ -56,6 +56,16 @@ describe('detail_image 提示词', () => {
     expect(prompt).toContain('画面内文字使用 简体中文');
   });
 
+  it('商品事实只注入一次，来源标签不会被要求写进画面', () => {
+    const prompt = DetailImage.buildPrompt({ ...base, section: 'selling_points' }, 1);
+    const factText = '三档风速，低噪运行，USB 供电；扇叶直径 18cm';
+
+    expect(prompt.split(factText)).toHaveLength(2);
+    expect(prompt).toContain('“商品名称”“品牌”“商品事实”只是来源标签，不得原样写入画面');
+    expect(prompt).toContain('只能对上述素材做不改变含义的压缩，或按目标语言做等价翻译');
+    expect(prompt).not.toContain(`电商详情页单模块图生成。商品「轻音桌面循环扇」（品牌 清风）。商品事实：`);
+  });
+
   it('参考图只约束商品外观，不携带原图版式和文字', () => {
     const prompt = DetailImage.buildPrompt({ ...base, section: 'usage_scene' }, 1);
 
@@ -110,15 +120,49 @@ describe('detail_image 提示词', () => {
     expect(outputs?.[0].params.sectionPrompt).toBeUndefined();
     const prompt = DetailImage.buildPrompt({ ...base, ...outputs?.[0].params }, 1);
     expect(prompt).toContain('【模块任务与画面要求】');
-    expect(prompt).not.toContain('本模块补充要求：');
+    expect(prompt).not.toContain('本模块补充要求');
+    expect(prompt).toContain('以上约束构成同一张图的完整执行指令');
   });
 
   it('画面文案限定为商品名称、品牌和商品事实的闭集', () => {
     const prompt = DetailImage.buildPrompt({ ...base, section: 'selling_points' }, 1);
 
     expect(prompt).toContain('本图允许文案');
-    expect(prompt).toContain('仅限以下来源：商品名称「轻音桌面循环扇」；品牌「清风」；商品事实：');
-    expect(prompt).toContain('除这些内容外，不生成任何文字、数字、标签或水印');
+    expect(prompt).toContain(
+      '画面文字只能取自以下素材；“商品名称”“品牌”“商品事实”只是来源标签，不得原样写入画面：商品名称「轻音桌面循环扇」；品牌「清风」；商品事实：',
+    );
+    expect(prompt).toContain('除压缩或翻译后的素材外，不生成任何文字、数字、标签或水印');
+  });
+
+  it('缺少品牌与效果事实时，模块不得编造品牌故事或前后对比', () => {
+    const brandPrompt = DetailImage.buildPrompt(
+      { ...base, brand: '', section: 'brand_story' },
+      1,
+    );
+    const comparePrompt = DetailImage.buildPrompt(
+      { ...base, description: '商品为单色哑光材质', section: 'effect_compare' },
+      1,
+    );
+
+    expect(brandPrompt).toContain('没有品牌信息时只表现商品名称和产品设计语言');
+    expect(brandPrompt).not.toContain('没有品牌主张时只表现品牌名');
+    expect(comparePrompt).toContain('缺少前后差异事实时改为单一使用效果展示，不虚构对照结果');
+  });
+
+  it('缺少工艺事实时改用可见材质展示，不虚构生产步骤', () => {
+    const prompt = DetailImage.buildPrompt({ ...base, section: 'craft_process' }, 1);
+
+    expect(prompt).toContain('仅当商品事实明确提供工艺步骤时，展示 2-4 个对应步骤');
+    expect(prompt).toContain('否则不生成步骤图，改为展示参考图中真实可见的材质细节和制作氛围');
+    expect(prompt).toContain('不虚构工序、设备、工厂或生产环节');
+  });
+
+  it('缺少成分事实时不生成成分列表或虚构功效', () => {
+    const prompt = DetailImage.buildPrompt({ ...base, section: 'ingredients' }, 1);
+
+    expect(prompt).toContain('仅当商品事实明确提供成分或配方时，将对应内容做成信息图');
+    expect(prompt).toContain('缺少成分或配方事实时不生成成分列表或配方图');
+    expect(prompt).toContain('不虚构成分、比例、功效、来源或认证');
   });
 
   it('未填写描述和品牌时不制造空事实或空品牌约束', () => {
@@ -133,9 +177,11 @@ describe('detail_image 提示词', () => {
   });
 
   it('比例与画质是两个独立参数', () => {
+    const description = DetailImage.params.find((param) => param.key === 'description');
     const ratio = DetailImage.params.find((param) => param.key === 'ratio');
     const size = DetailImage.params.find((param) => param.key === 'size');
 
+    expect(description).toMatchObject({ label: '商品描述', maxLength: 5000 });
     expect(ratio).toMatchObject({ label: '画面比例', default: '3:4' });
     expect(ratio?.options?.map((option) => option.value)).toEqual(['3:4', '4:5', '1:1', '9:16']);
     expect(size).toMatchObject({ label: '输出画质', default: '1k' });

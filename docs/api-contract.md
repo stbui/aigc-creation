@@ -100,7 +100,7 @@
 | GET | `/api/v1/admin/{me,overview,permissions}` | 后台身份 / 概览 / 权限点 |
 | GET | `/api/v1/admin/alerts` | 告警中心：按当前角色权限聚合待处理工单 / 失败任务 / 对账差异 / 退款卡单 / 备份 / 发票（只要求后台身份） |
 | GET/PATCH/POST/DELETE | `/api/v1/admin/users*`、`assets*`、`tasks*` | 用户 / 素材 / 任务管理 |
-| GET/PUT/POST | `/api/v1/admin/{credit-prices,products,orders,payments,credits}*` | 交易与积分管理 |
+| GET/PUT/POST/DELETE | `/api/v1/admin/{credit-prices,products,orders,payments,credits}*` | 交易与积分管理。商品删除（`DELETE /admin/products/:id`，`product.delete`）只允许没有历史订单的 SKU；已有订单返回 **409** 并提示改为下架（退款与积分回收要回查 SKU 原价与发放积分）。列表每项带 `orderCount` 供前端预检。订单列表 / 导出支持 `productId` 筛选（只回买过该商品的订单，商品卡「N 单」深链用），与 `status` / `orderNo` / `email` / `channel` / `refundState` / 时间范围同口径 |
 | GET/POST/PATCH | `/api/v1/admin/membership-plans*` | 会员套餐列表 / 新建 / 改价改权益 / 上下架（`product.read` / `product.write`，写操作自动写审计；下架不影响存量会员） |
 | POST | `/api/v1/admin/orders/:id/refund` | 渠道退款（**先调渠道再改本地账**；渠道失败 `50302` 且订单/积分不变，在途退款 `40908`，`order.refund` 权限 + 必填原因 + 审计） |
 | POST | `/api/v1/admin/orders/:id/refunds/:refundId/confirm` | 异步退款最终人工核销：`{ outcome: 'succeeded' \| 'failed', providerRefundId?, reason }`。`succeeded` 原子回收积分并推进订单；`failed` 只关闭退款单，订单与积分不变；两者均要求原因、写审计，`order.refund` |

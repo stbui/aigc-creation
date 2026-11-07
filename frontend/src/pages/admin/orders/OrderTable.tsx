@@ -145,7 +145,17 @@ export function OrderTable({
           </div>
         ) : (
           <div className="flex flex-col gap-0.5 text-[12px] text-muted-foreground">
-            <span>{row.itemCount} 件商品</span>
+            {/*
+             * 直接给商品名而不是「N 件商品」：运营在商品卡上点「N 单」跳过来，
+             * 首先要确认这几单买的确实是那个 SKU。多件时取首个 + 计数。
+             */}
+            <span
+              className="max-w-[170px] truncate"
+              title={row.items.map((item) => `${item.name}（${item.sku}）`).join('\n')}
+            >
+              {row.items[0]?.name ?? `${row.itemCount} 件商品`}
+              {row.items.length > 1 ? ` 等 ${row.items.length} 件` : ''}
+            </span>
             <span>{credits}</span>
           </div>
         );

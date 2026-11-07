@@ -302,9 +302,10 @@ const { data, total, loading, error, reload, setPage, setFilters } = useAdminLis
 
 ## 9. 商品与消耗价
 
-`/admin/products`（`product.read` / `product.write` / `product.publish`）与 `/admin/credit-prices`（`product.price`）。
+`/admin/products`（`product.read` / `product.write` / `product.publish` / `product.delete`）与 `/admin/credit-prices`（`product.price`）。
 
 - 商品 SKU 存 `Product`，价格与积分以快照字段落到 `OrderItem`（`priceCentsSnapshot` / `creditsSnapshot`）。
+- 删除只对**没有历史订单**的 SKU 开放：`OrderItem.productId` 是 RESTRICT 外键，且退款与积分回收要回查 SKU 原价与发放积分；有订单时返回 409 并提示改为下架。列表每项带 `orderCount`，前端在打开确认框前就拦下。
 - **能力消耗价**读写走 `CreditPriceService`，返回生效价与来源（`default` / `override` / `campaign`）。业务代码不读 `creditCost`，否则后台调价不生效。
 - 限时免活动命中的能力 `resolve()` 直接返回 0，优先于后台覆盖价；页面显示 `source: 'campaign'`，运营据此判断「改了价没生效」是活动在起作用。
 - 上下架用 `product.publish` 单列权限：能改价不等于能发布。
@@ -414,7 +415,7 @@ C 端读取接口在 `marketing.controller.ts`（公开的 `/marketing/campaigns
 - 未知权限点整体拒绝（400 `40001`），不静默丢弃 —— 否则调用方会以为保存成功。
 - 多角色改动在一个事务中写入，避免部分角色已生效、部分失败的半保存状态；审计记录每个角色新增 / 移除的权限点。
 - 改动立即生效：`AdminGuard` / `PermissionGuard` 每次请求查库，不需要重启或重新登录。操作者把自己权限改没了也会当场生效（可由其他 admin 恢复）。
-- 前端 `AdminRolesPage` 用 `can('role.write')` 控制可编辑态，按 66 个权限点分组勾选，高危权限点单独标注。
+- 前端 `AdminRolesPage` 用 `can('role.write')` 控制可编辑态，按 67 个权限点分组勾选，高危权限点单独标注。
 
 ---
 

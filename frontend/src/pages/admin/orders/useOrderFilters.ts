@@ -18,6 +18,13 @@ type OrderListParams = Record<string, unknown> & {
   orderNo?: string;
   email?: string;
   channel?: string;
+  productId?: string;
+  /**
+   * 商品名只用于筛选条上的可读标签，不发给后端（后端按 id 查）。
+   * 留在 params 里是为了跟着 `useAdminUrlFilterSync` 一起写回地址栏，
+   * 刷新后标签还在；fetcher 显式挑字段，所以它不会被发出去。
+   */
+  productName?: string;
   from?: string;
   to?: string;
 };
@@ -53,6 +60,13 @@ export function useOrderFilters({ onQueryChange }: UseOrderFiltersOptions = {}) 
   const initialChannel = searchParams.get('channel') ?? undefined;
   const initialFrom = searchParams.get('from') ?? '';
   const initialTo = searchParams.get('to') ?? '';
+  /*
+   * 商品维度筛选来自商品卡的「N 单」深链（`?productId=`）。
+   * `productName` 只是筛选条上的可读标签 —— 订单列表按 id 查，不按名字查；
+   * 名字缺失时退回显示 id，不影响筛选本身生效。
+   */
+  const initialProductId = searchParams.get('productId') ?? '';
+  const initialProductName = searchParams.get('productName') ?? '';
 
   const [status, setStatus] = useState<string | undefined>(initialStatus);
   const [refundState, setRefundState] = useState<string | undefined>(initialRefundState);
@@ -61,8 +75,11 @@ export function useOrderFilters({ onQueryChange }: UseOrderFiltersOptions = {}) 
   const [channel, setChannel] = useState<string | undefined>(initialChannel);
   const [from, setFrom] = useState(initialFrom);
   const [to, setTo] = useState(initialTo);
+  const [productId, setProductId] = useState(initialProductId);
+  const [productName, setProductName] = useState(initialProductName);
   const appliedUrlRefundState = useRef<string | undefined>(initialRefundState);
   const appliedOrderNoRef = useRef(initialOrderNo);
+  const appliedProductIdRef = useRef(initialProductId);
   const onQueryChangeRef = useRef(onQueryChange);
   onQueryChangeRef.current = onQueryChange;
 
@@ -79,6 +96,7 @@ export function useOrderFilters({ onQueryChange }: UseOrderFiltersOptions = {}) 
       email: raw.email,
       channel: raw.channel,
       refundState: raw.refundState,
+      productId: raw.productId,
       from: raw.from,
       to: raw.to,
     });
@@ -93,6 +111,8 @@ export function useOrderFilters({ onQueryChange }: UseOrderFiltersOptions = {}) 
     ...(initialOrderNo ? { orderNo: initialOrderNo } : {}),
     ...(initialEmail ? { email: initialEmail } : {}),
     ...(initialChannel ? { channel: initialChannel } : {}),
+    ...(initialProductId ? { productId: initialProductId } : {}),
+    ...(initialProductId && initialProductName ? { productName: initialProductName } : {}),
     ...(initialFrom ? { from: initialFrom } : {}),
     ...(initialTo ? { to: initialTo } : {}),
   });
@@ -118,12 +138,31 @@ export function useOrderFilters({ onQueryChange }: UseOrderFiltersOptions = {}) 
     setQuery({ refundState: next });
   }, [searchParams, setQuery, notifyQueryChange]);
 
+  /**
+   * 商品卡「N 单」跳过来时套用（`?productId=`）。
+   *
+   * 与 orderNo 同样的处理：已在本页时也要响应，后退到无该参数的地址时清掉。
+   * 名字一起跟上，否则筛选条只能显示一串 id。
+   */
+  const urlProductId = searchParams.get('productId') ?? '';
+  useEffect(() => {
+    if (urlProductId === appliedProductIdRef.current) return;
+    appliedProductIdRef.current = urlProductId;
+    const nextName = urlProductId ? (searchParams.get('productName') ?? '') : '';
+    setProductId(urlProductId);
+    setProductName(nextName);
+    notifyQueryChange();
+    setQuery({ productId: urlProductId || undefined, productName: nextName || undefined });
+  }, [urlProductId, searchParams, setQuery, notifyQueryChange]);
+
   useAdminUrlFilterSync({
     status: params.status,
     refundState: params.refundState,
     orderNo: params.orderNo,
     email: params.email,
     channel: params.channel,
+    productId: params.productId,
+    productName: params.productName,
     from: params.from,
     to: params.to,
   });
@@ -133,12 +172,21 @@ export function useOrderFilters({ onQueryChange }: UseOrderFiltersOptions = {}) 
   const appliedOrderNo = params.orderNo ?? '';
   const appliedEmail = params.email ?? '';
   const appliedChannel = params.channel;
+  const appliedProductId = params.productId ?? '';
+  const appliedProductName = params.productName ?? '';
   const appliedFrom = params.from ?? '';
   const appliedTo = params.to ?? '';
 
   /** 空态与「清除筛选」按已生效的查询判断，输入框草稿不算 */
   const hasFilter = Boolean(
-    appliedStatus || appliedRefundState || appliedOrderNo || appliedEmail || appliedChannel || appliedFrom || appliedTo,
+    appliedStatus ||
+      appliedRefundState ||
+      appliedOrderNo ||
+      appliedEmail ||
+      appliedChannel ||
+      appliedProductId ||
+      appliedFrom ||
+      appliedTo,
   );
 
   const updateFilter = (key: OrderFilterKey, value: string | undefined) => {
@@ -178,6 +226,9 @@ export function useOrderFilters({ onQueryChange }: UseOrderFiltersOptions = {}) 
       orderNo: nextOrderNo || undefined,
       email: email.trim() || undefined,
       channel,
+      // 商品筛选不在筛选条里编辑，点「查询」时保持原样，不能把它冲掉
+      productId: productId || undefined,
+      productName: productName || undefined,
       from: from || undefined,
       to: to || undefined,
     });
@@ -186,11 +237,14 @@ export function useOrderFilters({ onQueryChange }: UseOrderFiltersOptions = {}) 
   const reset = () => {
     appliedOrderNoRef.current = '';
     appliedUrlRefundState.current = undefined;
+    appliedProductIdRef.current = '';
     setStatus(undefined);
     setRefundState(undefined);
     setOrderNo('');
     setEmail('');
     setChannel(undefined);
+    setProductId('');
+    setProductName('');
     setFrom('');
     setTo('');
     notifyQueryChange();
@@ -200,9 +254,20 @@ export function useOrderFilters({ onQueryChange }: UseOrderFiltersOptions = {}) 
       orderNo: undefined,
       email: undefined,
       channel: undefined,
+      productId: undefined,
+      productName: undefined,
       from: undefined,
       to: undefined,
     });
+  };
+
+  /** 清商品筛选。同时清掉只读标签，否则筛选条会留一个点不掉的壳 */
+  const clearProduct = () => {
+    appliedProductIdRef.current = '';
+    setProductId('');
+    setProductName('');
+    notifyQueryChange();
+    setQuery({ productId: undefined, productName: undefined });
   };
 
   const clearOrderNo = () => {
@@ -285,6 +350,13 @@ export function useOrderFilters({ onQueryChange }: UseOrderFiltersOptions = {}) 
           onClear: clearChannel,
         }
       : null,
+    appliedProductId
+      ? {
+          key: 'productId',
+          label: `商品：${appliedProductName || appliedProductId}`,
+          onClear: clearProduct,
+        }
+      : null,
     appliedFrom
       ? {
           key: 'from',
@@ -314,6 +386,7 @@ export function useOrderFilters({ onQueryChange }: UseOrderFiltersOptions = {}) 
           orderNo: appliedOrderNo || undefined,
           email: appliedEmail || undefined,
           channel: appliedChannel,
+          productId: appliedProductId || undefined,
           from: appliedFrom || undefined,
           to: appliedTo || undefined,
         }),

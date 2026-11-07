@@ -7,7 +7,7 @@ describe('startDetailGeneration', () => {
     vi.restoreAllMocks();
   });
 
-  it('一次提交携带按模块拆分的提示词 JSON', async () => {
+  it('一次提交只发送模块选择，提示词由后端模板统一生成', async () => {
     const start = vi.spyOn(generateApi, 'start').mockResolvedValue({ taskId: 'task-1' });
 
     await startDetailGeneration({
@@ -20,22 +20,13 @@ describe('startDetailGeneration', () => {
       language: 'zh-CN',
       description: ' 三档风速 ',
       sections: ['hero', 'selling_points'],
-      sectionPrompts: {
-        hero: ' 首屏居中 ',
-        selling_points: ' 三张图标卡片 ',
-      },
       ratio: '3:4',
       resolution: '1k',
     });
 
     expect(start).toHaveBeenCalledOnce();
     const request = start.mock.calls[0][0];
-    expect(request.params.sectionPrompts).toBe(
-      JSON.stringify([
-        { section: 'hero', prompt: '首屏居中' },
-        { section: 'selling_points', prompt: '三张图标卡片' },
-      ]),
-    );
+    expect(request.params).not.toHaveProperty('sectionPrompts');
     expect(request.params.sections).toBe('hero,selling_points');
   });
 });

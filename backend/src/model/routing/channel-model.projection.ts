@@ -50,6 +50,7 @@ export function projectCachedChannelModel(
   const spec = capabilitySpecFromModelCapabilityConfig(
     decodeCapabilityConfig(row.capabilityConfigJson) as ModelCapabilityConfig | null,
     row.capability,
+    row.protocol,
   );
   return {
     id: row.id,

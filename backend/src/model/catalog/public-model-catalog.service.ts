@@ -277,6 +277,7 @@ export class PublicModelCatalogService {
     const spec = capabilitySpecFromModelCapabilityConfig(
       decodeCapabilityConfig(row.capabilityConfigJson),
       row.capability,
+      row.protocol,
     );
     return {
       id: row.id,

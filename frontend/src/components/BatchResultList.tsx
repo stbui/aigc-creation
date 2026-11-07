@@ -28,7 +28,7 @@ import { cellState, formatBatchDate, type BatchRowBase } from './batchResult';
  *   - `renderSourceCaption` 原图格的图注
  *   - `labelOf`             单格的名称
  *
- * `layout="card"` 供商品详情页把一次生成拆成四层信息: 标题 / 参数 / 原图 / 三列图片。
+ * `layout="card"` 供商品详情页把一次生成拆成四层信息: 标题 / 参数 / 原图 / 五列图片。
  * 其它页面继续使用默认横向单行布局, 不受详情页的信息密度影响。
  *
  * 归组、状态判定与时间格式化在 `./batchResult`, 本文件只负责渲染。
@@ -210,7 +210,11 @@ function BatchResultListImpl<Row extends BatchRow>({
               aria-label={`查看${label}大图`}
               onClick={() => openPreview(row, item.id)}
             >
-              <img src={assetThumbUrl(item.url, 640)} alt={`${label}生成图`} loading="lazy" />
+              <img
+                src={assetThumbUrl(item.url, 640, true)}
+                alt={`${label}生成图`}
+                loading="lazy"
+              />
             </button>
             <button
               type="button"

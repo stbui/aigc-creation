@@ -178,7 +178,18 @@ describe('BatchResultList 单元格交互', () => {
 });
 
 describe('BatchResultList 卡片布局', () => {
-  it('按标题、参数、原图与三列图片分层展示', () => {
+  it('结果缩略图只限制宽度，避免后端方形裁切生成图', () => {
+    renderList({
+      rows: rowsOf([item({ id: 't1', url: '/uploads/generated/result.png', caption: '首屏图' })]),
+      layout: 'card',
+    });
+
+    const src = screen.getByAltText('首屏图生成图').getAttribute('src') ?? '';
+    expect(src).toMatch(/[?&]w=640(?:&|$)/);
+    expect(src).not.toMatch(/[?&]h=/);
+  });
+
+  it('按标题、参数、原图与五列图片分层展示', () => {
     const rows = rowsOf([
       item({
         id: 't1',

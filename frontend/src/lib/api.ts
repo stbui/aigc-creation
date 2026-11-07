@@ -928,18 +928,18 @@ export function assetThumbSrc(
 export function assetThumbUrl(
   url?: string | null,
   size = 640,
+  preserveAspect = false,
 ): string | undefined {
   const abs = toAbsoluteUrl(url);
   if (!abs) return undefined;
   // 相对路径由 toAbsoluteUrl 拼接 API_BASE 得到，已确定指向本服务
   const isOwnUploads =
-    abs.startsWith("/uploads/") ||
-    (Boolean(API_BASE) && abs.startsWith(`${API_BASE}/uploads/`));
-  return isOwnUploads ? appendThumbParams(abs, size) : abs;
+    abs.startsWith("/uploads/") || abs.startsWith(`${API_BASE}/uploads/`);
+  return isOwnUploads ? appendThumbParams(abs, size, preserveAspect) : abs;
 }
 
-function appendThumbParams(src: string, size: number): string {
-  return `${src}${src.includes("?") ? "&" : "?"}w=${size}&h=${size}`;
+function appendThumbParams(src: string, size: number, preserveAspect = false): string {
+  return `${src}${src.includes("?") ? "&" : "?"}w=${size}${preserveAspect ? "" : `&h=${size}`}`;
 }
 
 /**
@@ -1616,8 +1616,8 @@ async function openHtmlDocument(path: string): Promise<void> {
 /**
  * 商品管理 (B-34~B-36)。
  *
- * 无删除: 历史订单的明细存了快照, 删商品不会让订单显示不全, 但对账时
- * 就再也查不到"这个 SKU 原来卖多少钱"了 —— 下架即够。
+ * 删除只对没有历史订单的 SKU 开放：退款与积分回收要回查该 SKU 的原价与
+ * 发放积分，有订单的商品请下架。后端会再校验一次，前端按 orderCount 先行提示。
  */
 export const adminProductsApi = {
   list: (status?: "active" | "offline") =>
@@ -1637,6 +1637,12 @@ export const adminProductsApi = {
     request<{ id: string; status: string }>(`/admin/products/${id}/status`, {
       method: "PATCH",
       body: { status },
+    }),
+
+  /** 有历史订单的商品会返回 409，需先改为下架 */
+  remove: (id: string) =>
+    request<{ id: string; sku: string }>(`/admin/products/${id}`, {
+      method: "DELETE",
     }),
 };
 
@@ -1673,6 +1679,8 @@ export const adminOrdersApi = {
       channel?: string;
       /** processing / failed / succeeded —— 退款状态挂在 Refund 行上 */
       refundState?: string;
+      /** 商品维度：只回买过该商品的订单（商品卡「N 单」深链） */
+      productId?: string;
       from?: string;
       to?: string;
       userId?: string;
@@ -1691,6 +1699,7 @@ export const adminOrdersApi = {
       email?: string;
       channel?: string;
       refundState?: string;
+      productId?: string;
       from?: string;
       to?: string;
     } = {},

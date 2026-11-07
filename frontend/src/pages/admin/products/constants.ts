@@ -20,6 +20,15 @@ export interface ProductDraft {
   sortOrder: string;
 }
 
+/**
+ * 新建商品的默认排序权重。
+ *
+ * 取 100 而不是 0: 排序值「小的靠前」, 新商品默认插到现有商品之后,
+ * 而不是和排在最前的老商品挤在同一档里。要置顶就在表单里改小。
+ * 与后端 `commerce-admin.service.ts` 的 `PRODUCT_DEFAULT_SORT_ORDER` 同值。
+ */
+export const DEFAULT_SORT_ORDER = '100';
+
 export const EMPTY_DRAFT: ProductDraft = {
   sku: '',
   name: '',
@@ -29,7 +38,7 @@ export const EMPTY_DRAFT: ProductDraft = {
   credits: '',
   creditsValidDays: '0',
   grantType: 'immediate',
-  sortOrder: '0',
+  sortOrder: DEFAULT_SORT_ORDER,
 };
 
 /** 商品状态文案：表格、筛选 chip 与下拉共用一份 */

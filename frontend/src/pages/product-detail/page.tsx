@@ -13,7 +13,6 @@ import {
   ToolWorkflowSteps,
 } from './components';
 import { DetailExamplePanel } from './DetailExamplePanel';
-import { DetailPromptEditor } from './DetailPromptEditor';
 import { DetailResultList } from './DetailResultList';
 import { DetailSectionPicker } from './DetailSectionPicker';
 import { FormSelect } from './FormSelect';
@@ -73,12 +72,7 @@ export function ProductDetailPage() {
   const [language, setLanguage] = useState('zh-CN');
   const [description, setDescription] = useState('');
   // 包含模块: 上限、顺序归一化与默认勾选都在 useSectionSelection + DetailSectionPicker
-  const {
-    sections,
-    sectionPrompts,
-    toggle: toggleSection,
-    setSectionPrompt,
-  } = useSectionSelection();
+  const { sections, toggle: toggleSection } = useSectionSelection();
   const [ratio, setRatio] = useState('3:4');
   const [resolution, setResolution] = useState('1k');
   /** 用户手动改过画质后，切换平台不再覆盖 */
@@ -145,9 +139,8 @@ export function ProductDetailPage() {
       images.length > 0 &&
       productName.trim().length > 0 &&
       description.trim().length > 0 &&
-      sections.length > 0 &&
-      sections.every((section) => Boolean(sectionPrompts[section]?.trim())),
-    [images.length, productName, description, sections, sectionPrompts],
+      sections.length > 0,
+    [images.length, productName, description, sections.length],
   );
 
   /** 切换平台：用户没手动改过画质时，带出该平台的详情长图规格 */
@@ -230,7 +223,6 @@ export function ProductDetailPage() {
         language,
         description,
         sections,
-        sectionPrompts,
         ratio,
         resolution,
       };
@@ -402,11 +394,6 @@ export function ProductDetailPage() {
             </section>
 
             <DetailSectionPicker selected={sections} onToggle={toggleSection} />
-            <DetailPromptEditor
-              selected={sections}
-              prompts={sectionPrompts}
-              onChange={setSectionPrompt}
-            />
           </div>
 
           {/* 高级设置 + 提交 (sticky 底部) */}

@@ -45,6 +45,13 @@ export interface OrderListQuery {
   email?: string;
   channel?: string;
   /**
+   * 按商品筛选：只回买过这个 SKU 的订单。
+   *
+   * 走 `OrderItem.productId` 而不是 SKU 快照字符串 —— 快照里有 SKU 编码，
+   * 但同一编码可能对应重建后的新商品；订单项指向的是下单时那件商品本身。
+   */
+  productId?: string;
+  /**
    * 退款状态 (2026-10-29)。
    *
    * 退款状态挂在 `Refund` 而不是订单上：一笔订单可能多次部分退款，且渠道
@@ -99,6 +106,14 @@ const LEDGER_TYPES = [
 const GRANT_TYPES = ["immediate", "manual"] as const;
 const PRODUCT_STATUSES = ["active", "offline"] as const;
 
+/**
+ * 新建商品的默认排序权重。
+ *
+ * 取 100 而不是 0: 排序值「小的靠前」, 新商品默认插到现有商品之后,
+ * 而不是和排在最前的老商品挤在同一档里。若运营明确要置顶, 在表单里改小即可。
+ */
+const PRODUCT_DEFAULT_SORT_ORDER = 100;
+
 /** 导出上限: 再大就不该走同步 HTTP 了, 应改异步任务 + 落文件 */
 const EXPORT_LIMIT = 10_000;
 
@@ -146,6 +161,8 @@ export class AdminCommerceService {
     const list = await this.prisma.product.findMany({
       where,
       orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+      // 删除按钮要按订单数禁用/放行, 列表里一并带上, 免去逐张卡片再查一次
+      include: { _count: { select: { orderItems: true } } },
     });
     return list.map((p) => this.toProductView(p));
   }
@@ -173,8 +190,9 @@ export class AdminCommerceService {
         creditsValidDays: input.creditsValidDays ?? 0,
         grantType: input.grantType ?? "immediate",
         status: input.status ?? "offline",
-        sortOrder: input.sortOrder ?? 0,
+        sortOrder: input.sortOrder ?? PRODUCT_DEFAULT_SORT_ORDER,
       },
+      include: { _count: { select: { orderItems: true } } },
     });
     return this.toProductView(product);
   }
@@ -215,16 +233,61 @@ export class AdminCommerceService {
           ? { sortOrder: input.sortOrder }
           : {}),
       },
+      include: { _count: { select: { orderItems: true } } },
     });
     return this.toProductView(product);
   }
 
   /**
-   * 商品无物理删除。
+   * 删除商品（物理删除）。
    *
-   * 历史订单的 OrderItem 存了快照, 删商品不会让订单显示不全, 但后台就再也
-   * 查不到"这个 SKU 原来卖多少钱、发多少积分"了 —— 对账需要它。下架即够。
+   * 只允许删除**没有任何历史订单**的 SKU：
+   *   · `OrderItem.productId` 是 `ON DELETE RESTRICT` 外键，有订单时数据库本来就删不掉；
+   *   · 退款与积分回收要回查该 SKU 的原价与发放积分，删掉后对账无从追溯。
+   *
+   * 因此先数订单并给运营一句能照着做的话（改为下架），而不是把外键报错原样抛出。
+   * 已售罄但订单已清空的商品仍可删；SKU 是 `@unique`，删除后编码可复用。
    */
+  async deleteProduct(id: string) {
+    const product = await this.prisma.product.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        sku: true,
+        _count: { select: { orderItems: true } },
+      },
+    });
+    if (!product) throw new AppError(40400, "商品不存在", 404);
+
+    const orderCount = product._count.orderItems;
+    if (orderCount > 0) {
+      throw new AppError(
+        40901,
+        `该商品已有 ${orderCount} 笔历史订单，不能删除；请改为下架`,
+        409,
+      );
+    }
+
+    /*
+     * 计数与删除之间可能刚产生一笔订单：外键 RESTRICT 会在这里拦住。
+     * 转成同一条 409 提示，不把 P2003 原样抛成 500。
+     */
+    try {
+      await this.prisma.product.delete({ where: { id } });
+    } catch (error) {
+      if ((error as { code?: string }).code === "P2003") {
+        throw new AppError(
+          40901,
+          "该商品刚刚产生了历史订单，不能删除；请改为下架",
+          409,
+        );
+      }
+      throw error;
+    }
+    return { id, sku: product.sku };
+  }
+
+  /** 价格 / 积分 / 有效期三项数值校验。创建与修改共用，口径必须一致 */
   private assertProductNumbers(
     priceCents: number,
     credits: number,
@@ -255,6 +318,8 @@ export class AdminCommerceService {
       grantType: p.grantType,
       status: p.status,
       sortOrder: p.sortOrder,
+      /** 历史订单数。> 0 时不可删除, 前台据此拦截并提示改为下架 */
+      orderCount: p._count?.orderItems ?? 0,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
     };
@@ -280,6 +345,10 @@ export class AdminCommerceService {
     }
     if (q.orderNo?.trim()) where.orderNo = { contains: q.orderNo.trim() };
     if (q.email?.trim()) where.user = { email: { contains: q.email.trim() } };
+    // 商品维度：命中任一明细行即算。订单行数量有限，用 some 而非全部匹配
+    if (q.productId?.trim()) {
+      where.items = { some: { productId: q.productId.trim() } };
+    }
 
     const range = this.dateRange(q.from, q.to);
     if (range) where.createdAt = range;
@@ -302,7 +371,9 @@ export class AdminCommerceService {
         orderBy: page.orderBy,
         include: {
           user: { select: { email: true } },
-          items: { select: { id: true } },
+          // 明细只取快照名与 SKU：订单页要能看出买的是哪件商品，
+          // 商品被删除或改名都不影响这里（快照是下单时的值）
+          items: { select: { id: true, nameSnapshot: true, skuSnapshot: true } },
           payments: { select: { id: true } },
           membershipPlan: { select: { code: true, name: true } },
         },
@@ -324,6 +395,11 @@ export class AdminCommerceService {
         refundedCents: o.refundedCents,
         grantedCredits: o.grantedCredits,
         itemCount: o.items.length,
+        /** 快照名 + SKU，按明细顺序；列表只说「N 件商品」等于没说买了什么 */
+        items: o.items.map((i: any) => ({
+          name: i.nameSnapshot,
+          sku: i.skuSnapshot,
+        })),
         paymentCount: o.payments.length,
         membershipPlanCode: o.membershipPlan?.code ?? null,
         membershipPlanName: o.membershipPlan?.name ?? null,

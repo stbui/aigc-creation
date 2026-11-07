@@ -88,6 +88,7 @@ export const ACTION_LABELS: Record<string, string> = {
   'product.create': '新增商品',
   'product.update': '修改商品',
   'product.status_change': '上下架商品',
+  'product.delete': '删除商品',
   'order.batch': '批量处理订单',
   'order.mark_paid': '标记订单已支付',
   'order.refund': '订单退款',

@@ -289,6 +289,7 @@ export function buildCachedChannelModel(input: {
   modelKey: string;
   capability: string;
   config: ModelCapabilityConfig | null;
+  protocol?: string;
   priceTiers?: CachedPriceTier[];
   /** 价格版本；缺省 0，仅影响账单审计字段 */
   priceVersion?: number;
@@ -300,12 +301,12 @@ export function buildCachedChannelModel(input: {
     providerModelKey: input.modelKey,
     displayName: input.modelKey,
     capability: input.capability,
-    protocol: 'openai',
+    protocol: input.protocol ?? 'openai',
     priceCurrency: 'credits',
     billingMode: 'fixed_request',
     priceConfigured: (input.priceTiers ?? []).some((tier) => tier.enabled && tier.priceConfigured),
     priceVersion: input.priceVersion ?? 0,
-    capabilitySpec: capabilitySpecFromModelCapabilityConfig(input.config, input.capability),
+    capabilitySpec: capabilitySpecFromModelCapabilityConfig(input.config, input.capability, input.protocol),
     priceTiers: input.priceTiers ?? [],
   };
 }

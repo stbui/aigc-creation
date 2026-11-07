@@ -1654,6 +1654,8 @@ export interface AdminProduct {
   grantType: "immediate" | "manual";
   status: "active" | "offline";
   sortOrder: number;
+  /** 历史订单数。> 0 时不可删除，删除前会被提示改为下架 */
+  orderCount: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -1748,6 +1750,8 @@ export interface AdminOrderRow {
   refundedCents: number;
   grantedCredits: number;
   itemCount: number;
+  /** 明细快照（下单时的名称与 SKU），用于列表直接看出买的是什么 */
+  items: Array<{ name: string; sku: string }>;
   paymentCount: number;
   membershipPlanCode: string | null;
   membershipPlanName: string | null;

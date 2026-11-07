@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { StatCard } from '~/admin-ui/primitives';
 import type { AdminProduct } from '../../../types/api';
 
-/** 商品统计条：总数 / 在售 / 已下架 / 促销中 */
+/** 商品统计条：总数 / 在售 / 已下架 / 促销中 / 有历史订单 */
 export function ProductStats({ rows }: { rows: AdminProduct[] }) {
   const stats = useMemo(() => {
     const active = rows.filter((p) => p.status === 'active');
@@ -10,7 +10,8 @@ export function ProductStats({ rows }: { rows: AdminProduct[] }) {
     const discounted = rows.filter(
       (p) => p.originalPriceCents !== null && p.originalPriceCents > p.priceCents,
     ).length;
-    return { active: active.length, offline, discounted };
+    const withOrders = rows.filter((p) => p.orderCount > 0).length;
+    return { active: active.length, offline, discounted, withOrders };
   }, [rows]);
 
   return (
@@ -23,6 +24,11 @@ export function ProductStats({ rows }: { rows: AdminProduct[] }) {
         value={stats.discounted}
         hint="划线价高于售价的商品数量"
         tone={stats.discounted > 0 ? 'warn' : undefined}
+      />
+      <StatCard
+        label="有历史订单"
+        value={stats.withOrders}
+        hint="已卖出过，不可删除；停售请用下架"
       />
     </div>
   );

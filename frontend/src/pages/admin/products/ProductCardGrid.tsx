@@ -1,8 +1,8 @@
-import { CalendarDays, Coins } from 'lucide-react';
+import { CalendarDays, HandCoins } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import {
   ActionButton,
   Card,
-  CardContent,
   CardFooter,
   EmptyState,
   ListError,
@@ -11,11 +11,15 @@ import {
   Separator,
   SkeletonCards,
   StatusTag,
-  formatDateTimeLoose,
 } from '~/admin-ui/primitives';
 import { cn } from '~/admin-ui/lib/cn';
+import { adminProductOrdersHref } from '../../../lib/admin-links';
 import { GRANT_TYPE_LABELS, STATUS_LABELS } from './constants';
-import { centsToYuanText, validDaysText } from './utils';
+import {
+  centsToYuanText,
+  perCreditYuanText,
+  validDaysText,
+} from './utils';
 import type { AdminProduct } from '../../../types/api';
 
 interface ProductCardGridProps {
@@ -24,12 +28,15 @@ interface ProductCardGridProps {
   error: string | null;
   onRetry: () => void;
   writable: boolean;
+  /** 有 `product.delete` 才出现删除按钮；有历史订单时由页面拦下并提示改为下架 */
+  deletable: boolean;
   saving: boolean;
   filtered: boolean;
   onClearFilter: () => void;
   onCreate: () => void;
   onEdit: (row: AdminProduct) => void;
   onToggle: (row: AdminProduct) => void;
+  onDelete: (row: AdminProduct) => void;
   pagination: {
     current: number;
     pageSize: number;
@@ -50,12 +57,14 @@ export function ProductCardGrid({
   error,
   onRetry,
   writable,
+  deletable,
   saving,
   filtered,
   onClearFilter,
   onCreate,
   onEdit,
   onToggle,
+  onDelete,
   pagination,
 }: ProductCardGridProps) {
   if (loading && rows.length === 0) {
@@ -110,9 +119,11 @@ export function ProductCardGrid({
             key={row.id}
             row={row}
             writable={writable}
+            deletable={deletable}
             saving={saving}
             onEdit={() => onEdit(row)}
             onToggle={() => onToggle(row)}
+            onDelete={() => onDelete(row)}
           />
         ))}
       </div>
@@ -155,22 +166,47 @@ export function ProductCardGrid({
 /**
  * 商品售卖卡。
  *
- * 走「轻奢商品陈列」的路子：大留白、细描边、弱化饱和色，用积分数字做主视觉。
- * 层级从强到弱：积分 → 售价 → 有效期与发放方式 → 编码 / 排序 / 更新时间。
- * 在售卡保留品牌淡晕与徽章；下架卡整体转灰，避免和可售商品抢注意力。
+ * ## 层级（自上而下只降一档，不抢注意力）
+ *
+ *   1. 商品名 —— 这是卡片的身份，一眼能认出是哪个 SKU；
+ *   2. 数字区 —— 积分是主角（与 C 端商品卡同一口径），售价作次级，
+ *      两者放在**同一块底色面板**里，避免分成两块后像两张卡拼接；
+ *      面板恒为三行（积分 / 售价 / 划线价·折合单价），高度不随促销与否变化；
+ *   3. 规格区 —— 有效期 / 发放方式两栏对齐，弱化到只有字重差别；
+ *   4. 动作区 —— 页脚右对齐的次要按钮。
+ *
+ * 促销徽标放在面板首行右侧与积分同排，而不是压在售价下面：既填满右半侧，
+ * 又不给面板多出一行 —— 条件渲染的行会让同排卡片的面板高度参差。
+ *
+ * SKU 编码是内部标识（对账靠它），不参与视觉竞争，收成 12px 等宽字。
+ *
+ * ## 在售与下架
+ *
+ * 在售卡用品牌渐变顶线 + 品牌淡底面板；下架卡顶线走中性灰、面板走白底，
+ * 整体退到背景里，但不整片变灰 —— 变灰会让数字读不出来。
+ *
+ * ## 删除
+ *
+ * 只有从没卖出去过的 SKU 能真正删除。已有历史订单的卡片照样显示按钮，
+ * 点下去由页面提示「改为下架」—— 直接隐藏会让运营猜不出这张卡为什么少一个动作。
+ * 按钮静息态与下架一致：次要色，悬停才转危险色。
  */
 function ProductCard({
   row,
   writable,
+  deletable,
   saving,
   onEdit,
   onToggle,
+  onDelete,
 }: {
   row: AdminProduct;
   writable: boolean;
+  deletable: boolean;
   saving: boolean;
   onEdit: () => void;
   onToggle: () => void;
+  onDelete: () => void;
 }) {
   const active = row.status === 'active';
   const hasOriginalPrice =
@@ -178,6 +214,7 @@ function ProductCard({
   const savingsCents = hasOriginalPrice
     ? (row.originalPriceCents as number) - row.priceCents
     : 0;
+  const perCredit = perCreditYuanText(row.priceCents, row.credits);
 
   return (
     <Card
@@ -188,17 +225,17 @@ function ProductCard({
         'group relative flex h-full flex-col gap-0 overflow-hidden rounded-xl border py-0 transition-all duration-200',
         active
           ? 'border-border bg-card shadow-card hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg'
-          : 'border-border/70 bg-muted/20 shadow-none hover:border-border',
+          : 'border-border/70 bg-muted/25 shadow-none hover:border-border',
       )}
     >
-      {/* 卡面淡晕：只在售卡有，像商品陈列柜里的柔光 */}
+      {/* 顶线：在售卡走品牌渐变，下架卡走中性细线 */}
       <div
         aria-hidden
         className={cn(
-          'pointer-events-none absolute inset-x-0 top-0 h-40',
+          'h-[3px] w-full shrink-0',
           active
-            ? 'bg-gradient-to-b from-brand-bg/55 via-brand-bg/15 to-transparent'
-            : 'bg-gradient-to-b from-muted/50 to-transparent',
+            ? 'bg-gradient-to-r from-brand via-brand-light to-brand/25'
+            : 'bg-border',
         )}
       />
 
@@ -211,22 +248,48 @@ function ProductCard({
         />
       )}
 
-      <div className="pointer-events-none relative z-10 flex items-center justify-between gap-2 px-4 pt-3">
-        <code
-          className="truncate font-mono text-[12px] leading-4 tracking-[0.04em] text-muted-foreground"
-          title={row.sku}
-        >
-          {row.sku}
-        </code>
-        <StatusTag
-          status={row.status}
-          label={STATUS_LABELS[row.status]}
-          showDot={active}
-        />
-      </div>
+      {/* 身份区：编码 + 订单量 + 状态 + 名称 + 说明 */}
+      <div className="pointer-events-none relative z-10 px-4 pt-3">
+        <div className="flex items-center justify-between gap-2">
+          <code
+            className="truncate font-mono text-[12px] leading-4 tracking-[0.04em] text-muted-foreground"
+            title={row.sku}
+          >
+            {row.sku}
+          </code>
+          <div className="flex shrink-0 items-center gap-2">
+            {/*
+             * 历史订单数直接摆出来，而不是等点「删除」才用弹窗告知：
+             * 运营一眼就能分清哪些 SKU 真的卖过、哪些卖不动，也解释了
+             * 为什么这几张卡的删除会被拒。0 单不渲染，免得整墙都是「0 单」。
+             *
+             * 数字本身是链接，直达该商品的订单明细 —— 「卖了多少」的下一步
+             * 永远是「是哪几单」。用 Link 而非按钮：这是导航，不是写操作。
+             */}
+            {row.orderCount > 0 && (
+              <Link
+                to={adminProductOrdersHref(row.id, row.name)}
+                // 身份区整体是 pointer-events-none（点击走卡片上的整块遮罩打开编辑），
+                // 链接要单独恢复，否则点不动。
+                className="pointer-events-auto rounded text-[12px] leading-4 tabular-nums text-muted-foreground hover:text-brand hover:underline"
+                title={`查看「${row.name}」的 ${row.orderCount} 笔历史订单`}
+                onClick={(event) => event.stopPropagation()}
+              >
+                {row.orderCount} 单
+              </Link>
+            )}
+            <StatusTag
+              status={row.status}
+              label={STATUS_LABELS[row.status]}
+              showDot={active}
+            />
+          </div>
+        </div>
 
-      <div className="pointer-events-none relative z-10 px-4 pt-2.5">
-        <h3 className="truncate text-[17px] leading-6 font-semibold text-foreground">
+        <h3
+          className="mt-2.5 truncate text-[15px] leading-6 font-semibold text-foreground"
+          title={row.name}
+        >
           {row.name}
         </h3>
         <p
@@ -237,14 +300,20 @@ function ProductCard({
         </p>
       </div>
 
-      <CardContent className="pointer-events-none relative z-10 flex flex-1 flex-col px-4 pt-4 pb-3">
-        {/* 主视觉：积分数量 + 徽章式圆章 */}
-        <div className="flex items-end justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-baseline gap-1.5">
+      {/* 数字区：积分为主角、售价作次级，同处一块面板 */}
+      <div className="pointer-events-none relative z-10 mt-auto px-4 pt-3">
+        <div
+          className={cn(
+            'rounded-lg px-3 py-2.5',
+            active ? 'bg-brand-bg/55' : 'bg-card/80',
+          )}
+        >
+          {/* 首行左右各占一边：积分靠左镇场，促销徽标靠右收口 */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex min-w-0 items-baseline gap-1.5">
               <span
                 className={cn(
-                  'truncate text-[34px] leading-none font-normal tracking-tight tabular-nums',
+                  'truncate text-[28px] leading-none font-bold tracking-tight tabular-nums',
                   active ? 'text-foreground' : 'text-muted-foreground',
                 )}
               >
@@ -254,100 +323,80 @@ function ProductCard({
                 积分
               </span>
             </div>
-            <div className="mt-2 flex items-center gap-1.5 text-[12px] leading-4 text-muted-foreground">
-              <CalendarDays className="size-3.5" strokeWidth={1.6} aria-hidden />
-              <span>有效期 · {validDaysText(row.creditsValidDays)}</span>
-            </div>
-          </div>
-          <div
-            aria-hidden
-            className={cn(
-              'relative flex size-14 shrink-0 items-center justify-center rounded-full border',
-              active
-                ? 'border-primary/15 bg-card/80'
-                : 'border-border/70 bg-card/50',
-            )}
-          >
-            <span
-              className={cn(
-                'absolute inset-1.5 rounded-full border',
-                active ? 'border-primary/10' : 'border-border/60',
-              )}
-            />
-            <Coins
-              className={cn(
-                'size-5',
-                active ? 'text-brand' : 'text-muted-foreground',
-              )}
-              strokeWidth={1.5}
-            />
-          </div>
-        </div>
-
-        {/* 售价：品牌色数字压住第二层级 */}
-        <div className="mt-4 border-t border-border/70 pt-3">
-          <div className="flex items-end justify-between gap-2">
-            <div className="min-w-0">
-              <div
+            {hasOriginalPrice && (
+              <span
                 className={cn(
-                  'flex items-baseline gap-1',
-                  active ? 'text-brand' : 'text-muted-foreground',
+                  'shrink-0 rounded-sm border px-1.5 py-0.5 text-[12px] leading-4 tabular-nums',
+                  active
+                    ? 'border-warn-border bg-warn-soft text-warn-text'
+                    : 'border-border bg-muted text-muted-foreground',
                 )}
               >
-                <span className="text-[14px] font-semibold">¥</span>
-                <span className="truncate text-[26px] leading-none font-bold tracking-tight tabular-nums">
-                  {centsToYuanText(row.priceCents)}
+                省 ¥{centsToYuanText(savingsCents)}
+              </span>
+            )}
+          </div>
+
+          <div
+            className={cn(
+              'mt-2.5 flex items-baseline gap-0.5 border-t pt-2.5',
+              active
+                ? 'border-brand/15 text-brand'
+                : 'border-border/60 text-muted-foreground',
+            )}
+          >
+            <span className="text-[14px] leading-none font-semibold">¥</span>
+            <span className="truncate text-[22px] leading-none font-bold tracking-tight tabular-nums">
+              {centsToYuanText(row.priceCents)}
+            </span>
+          </div>
+
+          {/*
+           * 底行恒占一行：划线价与折合单价同处一行，两者都缺时按「免费」或
+           * 「不计积分」收尾。**不放占位词** —— 「统一售价」这类空话会让人以为
+           * 漏了信息。行高恒定，保证同排卡片的售价基线、面板底边、规格行全部对齐。
+           */}
+          <div className="mt-1.5 flex min-h-5 items-baseline gap-2">
+            {hasOriginalPrice && (
+              <span className="shrink-0 text-[12px] leading-4 text-muted-foreground">
+                原价{' '}
+                <span className="tabular-nums line-through">
+                  ¥{centsToYuanText(row.originalPriceCents as number)}
                 </span>
-              </div>
-              <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] leading-4 text-muted-foreground">
-                {hasOriginalPrice ? (
-                  <>
-                    <span>
-                      原价{' '}
-                      <span className="tabular-nums line-through">
-                        ¥{centsToYuanText(row.originalPriceCents as number)}
-                      </span>
-                    </span>
-                    <span
-                      className={cn(
-                        'rounded-sm border px-1.5 py-0.5',
-                        active
-                          ? 'border-warn-border bg-warn-soft text-warn-text'
-                          : 'border-border bg-muted text-muted-foreground',
-                      )}
-                    >
-                      省 ¥{centsToYuanText(savingsCents)}
-                    </span>
-                  </>
-                ) : (
-                  <span>统一售价</span>
-                )}
-              </div>
-            </div>
-            <span
-              className={cn(
-                'shrink-0 rounded-md border px-2 py-1 text-[12px] leading-4',
-                active
-                  ? 'border-border bg-card/80 text-muted-foreground'
-                  : 'border-border/70 text-muted-foreground',
-              )}
-            >
+              </span>
+            )}
+            <span className="min-w-0 truncate text-[12px] leading-4 text-muted-foreground tabular-nums">
+              {perCredit
+                ? `折合 ${perCredit} / 分`
+                : row.priceCents > 0
+                  ? '不计积分'
+                  : '免费'}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* 规格区：两栏对齐，只靠字重与留白分层 */}
+      <div className="pointer-events-none relative z-10 px-4 pt-3">
+        <div className="grid grid-cols-2 divide-x divide-border/60">
+          <div className="flex min-w-0 items-center gap-1.5 pr-3">
+            <CalendarDays className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.6} aria-hidden />
+            <span className="min-w-0 truncate text-[13px] leading-5 font-medium text-foreground">
+              {validDaysText(row.creditsValidDays)}
+            </span>
+          </div>
+          <div className="flex min-w-0 items-center gap-1.5 pl-3">
+            <HandCoins className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.6} aria-hidden />
+            <span className="min-w-0 truncate text-[13px] leading-5 font-medium text-foreground">
               {GRANT_TYPE_LABELS[row.grantType]}
             </span>
           </div>
         </div>
+      </div>
 
-        <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/70 pt-2.5 text-[12px] leading-4 text-muted-foreground">
-          <span className="tabular-nums">排序 {row.sortOrder}</span>
-          <span className="truncate">
-            更新于 {formatDateTimeLoose(row.updatedAt)}
-          </span>
-        </div>
-      </CardContent>
-
-      {writable && (
+      {(writable || deletable) && (
         <>
-          <Separator />
+          <Separator className="mt-3" />
           <CardFooter
             role="group"
             aria-label={`${row.name} 操作`}
@@ -356,21 +405,39 @@ function ProductCard({
               active ? 'bg-card' : 'bg-transparent',
             )}
           >
-            <ActionButton variant="ghost" size="sm" onClick={onEdit}>
-              编辑
-            </ActionButton>
-            <ActionButton
-              variant="ghost"
-              size="sm"
-              className={cn(
-                row.status === 'active' &&
-                  'text-danger-text hover:text-danger-text',
-              )}
-              disabled={saving}
-              onClick={onToggle}
-            >
-              {row.status === 'active' ? '下架' : '上架'}
-            </ActionButton>
+            {writable && (
+              <ActionButton variant="ghost" size="sm" onClick={onEdit}>
+                编辑
+              </ActionButton>
+            )}
+            {writable && (
+              <ActionButton
+                variant="ghost"
+                size="sm"
+                className={cn(
+                  // 下架是破坏性动作，但常驻红字会让整片卡片墙泛红、抢走数字的注意力。
+                  // 静息态做成普通次要按钮，悬停才转为危险色 —— 破坏性靠确认弹窗兜底。
+                  row.status === 'active' &&
+                    'text-muted-foreground hover:bg-danger-soft hover:text-danger-text',
+                )}
+                disabled={saving}
+                onClick={onToggle}
+              >
+                {row.status === 'active' ? '下架' : '上架'}
+              </ActionButton>
+            )}
+            {deletable && (
+              <ActionButton
+                variant="ghost"
+                size="sm"
+                ariaLabel={`删除商品 ${row.name}`}
+                className="text-muted-foreground hover:bg-danger-soft hover:text-danger-text"
+                disabled={saving}
+                onClick={onDelete}
+              >
+                删除
+              </ActionButton>
+            )}
           </CardFooter>
         </>
       )}

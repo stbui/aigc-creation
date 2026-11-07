@@ -82,7 +82,7 @@
 | 用户 | `user.read` / `user.write` / `user.disable` / `user.delete` / `user.reset_password` |
 | 项目与素材 | `project.read` / `project.delete` / `asset.read` / `asset.hide` / `asset.delete` |
 | 任务 | `task.read` / `task.retry` / `task.cancel` / `task.delete` |
-| 商品 | `product.read` / `product.write` / `product.price` / `product.publish` |
+| 商品 | `product.read` / `product.write` / `product.price` / `product.publish` / `product.delete` |
 | 订单与支付 | `order.read` / `order.mark_paid` / `order.refund` / `payment.read` / `payment.write` / `payment.operate` / `finance.dashboard` / `invoice.write` / `finance.reconcile` |
 | 积分 | `credit.read` / `credit.adjust` |
 | 合规与内容 | `compliance.read` / `compliance.gate` / `compliance.takedown` / `content.read` |
@@ -106,7 +106,7 @@
 | 最后一个 admin | 禁用与降级前统计 `status='active'` 的 admin 数，`≤1` 时返回 409 `40901` |
 | 高危动作留痕 | 写操作必须留痕；普通管理写操作由 `AuditInterceptor` 自动生成 `AdminAuditLog.reason`，只有退款、发票驳回、能力下架等确有业务语义的动作由 DTO 要求原因。前端只对业务操作做二次确认 |
 
-高危权限点：`user.delete` / `user.reset_password` / `asset.delete` / `project.delete` / `order.refund` / `credit.adjust` / `compliance.takedown` / `capability.write` / `channel.write` / `channel.model_write` / `logical_model.write` / `user_group.write` / `plugin.write` / `billing_order.resolve` / `setting.write` / `legal.write` / `role.write` / `backup.run`。审计链路：`AdminGuard`（身份）→ `PermissionGuard`（权限点）→ controller → `AuditInterceptor`（落库）。
+高危权限点：`user.delete` / `user.reset_password` / `asset.delete` / `project.delete` / `task.delete` / `product.delete` / `order.refund` / `credit.adjust` / `compliance.takedown` / `capability.write` / `channel.write` / `channel.model_write` / `logical_model.write` / `user_group.write` / `plugin.write` / `billing_order.resolve` / `setting.write` / `legal.write` / `role.write` / `backup.run`。审计链路：`AdminGuard`（身份）→ `PermissionGuard`（权限点）→ controller → `AuditInterceptor`（落库）。
 
 ---
 

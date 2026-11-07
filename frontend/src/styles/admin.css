@@ -64,6 +64,9 @@
   --color-brand: var(--brand);
   --color-brand-hover: var(--brand-hover);
   --color-brand-bg: var(--brand-bg);
+  /* 渐变浅端。缺这一条时 `via-brand-light` / `to-brand-light` 静默失效 ——
+     工具类不存在不报错，渐变悄悄少一个色标，排查成本很高。 */
+  --color-brand-light: var(--brand-light);
 
   /* ── shadcn 语义变量 → 项目令牌 ──────────────────────────────
    *

@@ -62,6 +62,8 @@ export const PERMISSIONS = {
   productWrite: "product.write",
   productPrice: "product.price",
   productPublish: "product.publish",
+  /** 删除商品。只对没有历史订单的 SKU 开放, 有订单的请改为下架 */
+  productDelete: "product.delete",
 
   // 订单与支付
   orderRead: "order.read",
@@ -204,6 +206,7 @@ export const ROLE_PERMISSIONS: Record<AdminRoleCode, Permission[]> = {
     PERMISSIONS.productWrite,
     PERMISSIONS.productPrice,
     PERMISSIONS.productPublish,
+    PERMISSIONS.productDelete,
     PERMISSIONS.orderRead,
     PERMISSIONS.orderMarkPaid,
     PERMISSIONS.orderRefund,
@@ -242,6 +245,7 @@ export const HIGH_RISK_PERMISSIONS: Permission[] = [
   PERMISSIONS.assetDelete,
   PERMISSIONS.projectDelete,
   PERMISSIONS.taskDelete,
+  PERMISSIONS.productDelete,
   PERMISSIONS.orderRefund,
   PERMISSIONS.creditAdjust,
   PERMISSIONS.complianceTakedown,

@@ -82,4 +82,92 @@ describe('TaskRequestService 线路参数投影', () => {
     expect(built.request.imageParameters?.count).toBe(4);
     expect(built.request.imageCount).toBe(4);
   });
+
+  it('把页面比例按线路预设换成上游像素尺寸', async () => {
+    const productSpec = {
+      version: 1,
+      capability: 'image',
+      operations: [],
+      inputs: { image: { min: 1, max: 4 } },
+      options: {},
+      imageParameters: [],
+    };
+    const routeSpec = {
+      version: 1,
+      capability: 'image',
+      operations: ['image_to_image'],
+      inputs: { image: { min: 1, max: 4 } },
+      options: {
+        size: { values: ['*'] },
+      },
+      imageParameters: [
+        {
+          name: 'size',
+          label: '画幅 / 尺寸',
+          type: 'string',
+          binding: 'aspectRatio',
+          encoding: 'pixels',
+        },
+      ],
+      imageSize: {
+        parameter: 'size',
+        allowCustom: true,
+        presets: [
+          {
+            ratio: '3:4',
+            size: '1024x1360',
+            width: 1024,
+            height: 1360,
+            tier: '1k',
+          },
+        ],
+      },
+    };
+    const router = {
+      findModel: vi.fn().mockResolvedValue({
+        id: 'model-detail-image',
+        productSpec,
+      }),
+    };
+    const catalog = {
+      findRoute: vi.fn().mockResolvedValue({
+        id: 'route-openai-images',
+        channelModel: {
+          capabilitySpec: routeSpec,
+        },
+      }),
+    };
+    const media = {
+      inputReferences: vi.fn().mockResolvedValue([
+        { id: 'asset-product', url: 'https://example.test/product.png', order: 0 },
+      ]),
+    };
+    const service = new TaskRequestService(
+      {} as never,
+      router as never,
+      catalog as never,
+      media as never,
+    );
+
+    const built = await service.build({
+      taskId: 'task-detail-1',
+      ownerId: 'user-1',
+      capability: 'detail_image',
+      params: {
+        section: 'hero',
+        productName: '测试商品',
+        description: '测试商品描述',
+        ratio: '3:4',
+        size: '1k',
+      },
+      inputAssetIds: ['asset-product'],
+      logicalModelId: 'model-detail-image',
+      routeId: 'route-openai-images',
+      providerModelKey: 'gpt-image-2',
+    });
+
+    expect(built.intent.options?.size).toBe('1024x1360');
+    expect(built.request.imageParameters?.size).toBe('1024x1360');
+    expect(built.request.aspectRatio).toBe('1024x1360');
+  });
 });

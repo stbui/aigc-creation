@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom';
 import { adminProductsApi } from './api';
 import {
   ActionButton,
+  ConfirmDialog,
   PageHeader,
   RefreshButton,
   StaleError,
@@ -18,7 +19,7 @@ import {
   useUnsavedGuard,
 } from './hooks';
 import { EMPTY_DRAFT, GRANT_TYPE_LABELS, STATUS_LABELS, type ProductDraft } from './constants';
-import { buildProductPayload, toDraft } from './utils';
+import { buildProductPayload, deleteBlockedReason, toDraft } from './utils';
 import { ProductStats } from './ProductStats';
 import { ProductFilterBar } from './ProductFilterBar';
 import { ProductCardGrid } from './ProductCardGrid';
@@ -28,11 +29,14 @@ import type { AdminProduct } from '../../../types/api';
 /**
  * 商品管理（`/admin/products`，B-34~B-36）。
  *
- * ## 为什么没有「删除」
+ * ## 删除的边界：只有「从没卖出去过」的 SKU 能删
  *
- * 历史订单的 OrderItem 存的是快照，删商品不会让旧订单显示不全；但对账时
- * 后台就再也查不到「这个 SKU 原来卖多少钱、发多少积分」了 —— 而这两个数
- * 正是退款与积分回收的计算依据。下架即够。
+ * 已产生订单的商品不做物理删除 —— 退款与积分回收要回查该 SKU 的原价与
+ * 发放积分，删掉后对账无从追溯（`OrderItem.productId` 也是 RESTRICT 外键）。
+ * 这类商品请改为下架：C 端立即不可购买，历史订单照常展示。
+ *
+ * 列表接口带回 `orderCount`，前台在打开确认弹窗之前就拦下并给出可执行提示，
+ * 不让运营先点确认再吃一个 409。后端仍会再校验一次，防并发窗口。
  *
  * ## 为什么价格用「元」输入、「分」存储
  *
@@ -54,6 +58,7 @@ export function AdminProductsPage() {
   const toast = useToast();
   const { can } = useAdmin();
   const writable = can('product.write');
+  const deletable = can('product.delete');
 
   const [searchParams] = useSearchParams();
   const rawStatus = searchParams.get('status');
@@ -77,13 +82,15 @@ export function AdminProductsPage() {
   const [draft, setDraft] = useState<ProductDraft>(EMPTY_DRAFT);
   const [draftBase, setDraftBase] = useState<ProductDraft>(EMPTY_DRAFT);
   const [saving, setSaving] = useState(false);
+  /** 已通过订单数预检、等待二次确认的商品 */
+  const [deleting, setDeleting] = useState<AdminProduct | null>(null);
 
   const { data, loading, error, reload } = useAdminResource(() => adminProductsApi.list());
   const rows = useMemo(() => data ?? [], [data]);
 
   const filteredRows = useMemo(() => {
     const keyword = q.trim().toLowerCase();
-    return rows.filter((row) => {
+    const matched = rows.filter((row) => {
       if (status && row.status !== status) return false;
       if (grantType && row.grantType !== grantType) return false;
       if (!keyword) return true;
@@ -91,6 +98,9 @@ export function AdminProductsPage() {
         row.name.toLowerCase().includes(keyword) || row.sku.toLowerCase().includes(keyword)
       );
     });
+    // 卡片按「排序」字段升序展示：运营在前台排的序就是这里看到的序。
+    // 排序值相同时保持接口返回的原始相对次序（Array.prototype.sort 稳定）。
+    return matched.sort((a, b) => a.sortOrder - b.sortOrder);
   }, [rows, q, status, grantType]);
 
   const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
@@ -220,6 +230,34 @@ export function AdminProductsPage() {
     }
   };
 
+  /**
+   * 打开删除确认。有历史订单的直接拦下并告诉运营该怎么做 ——
+   * 这类商品只能下架，弹一个注定失败的确认框没有意义。
+   */
+  const requestDelete = (row: AdminProduct) => {
+    const blocked = deleteBlockedReason(row);
+    if (blocked) {
+      toast.error(blocked);
+      return;
+    }
+    setDeleting(row);
+  };
+
+  const confirmDelete = async () => {
+    if (!deleting) return;
+    setSaving(true);
+    try {
+      await adminProductsApi.remove(deleting.id);
+      toast.success(`已删除商品「${deleting.name}」`);
+      setDeleting(null);
+      void reload();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '删除失败');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <>
       <PageHeader
@@ -274,12 +312,14 @@ export function AdminProductsPage() {
           error={error}
           onRetry={() => void reload()}
           writable={writable}
+          deletable={deletable}
           saving={saving}
           filtered={hasFilter}
           onClearFilter={resetFilters}
           onCreate={openCreate}
           onEdit={openEdit}
           onToggle={(row) => void runToggle(row)}
+          onDelete={requestDelete}
           pagination={{
             current: page,
             pageSize,
@@ -301,6 +341,29 @@ export function AdminProductsPage() {
         onPatch={patchDraft}
         onClose={requestCloseForm}
         onSubmit={() => void submit()}
+      />
+
+      <ConfirmDialog
+        open={deleting !== null}
+        title={deleting ? `删除商品「${deleting.name}」` : '删除商品'}
+        description={
+          deleting
+            ? `SKU ${deleting.sku} 没有历史订单，删除不影响任何订单与积分。`
+            : undefined
+        }
+        impact={
+          deleting
+            ? [
+                '商品将从后台与 C 端结算页移除，且不可恢复',
+                `SKU「${deleting.sku}」随之释放，可用同一编码重新创建`,
+              ]
+            : undefined
+        }
+        danger
+        confirmText="删除商品"
+        loading={saving}
+        onCancel={() => setDeleting(null)}
+        onConfirm={() => void confirmDelete()}
       />
     </>
   );
