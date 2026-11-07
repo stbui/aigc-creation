@@ -16,10 +16,9 @@ import type { Task } from '../../types/api';
 /**
  * 我的作品 · 卡片网格与大图查看器。
  *
- * 2026-11-04 从 `page.tsx` 抽出。三类卡片形态在这里落地：已出图（图片点开
- * 查看器 / 视频给原生播放器）、生成中、失败（失败卡带「重试」）。每种状态的
- * 说明文案都如实写在卡上，不用角标糊过去 —— 网格里也包含未出图任务，它们能被
- * 「状态」筛选到、可删除，但不算作品（计数在页面侧）。
+ * 2026-11-04 从 `page.tsx` 抽出。卡片形态在这里落地：已出图（图片点开查看器 /
+ * 视频给原生播放器）与生成中的占位卡。失败任务由服务端和页面侧排除，不进入这里；
+ * 生成中的占位卡可删除，但不计入作品数（计数在页面侧）。
  *
  * 大图列表与网格同源：`lightboxItems` 由页面按当前页签 + 筛选结果算好后传入，
  * 因此在大图里按 ←/→ 翻的是用户此刻看到的那一组。
@@ -52,7 +51,7 @@ export function WorksGrid({
   removeTask,
 }: WorksGridProps) {
   const navigate = useNavigate();
-  /** 能力 id → 能力定义（hover 浮层的「再来一张」与失败卡的可用性判断用） */
+  /** 能力 id → 能力定义（hover 浮层的「再来一张」用） */
   const cardOf = (t: Task) => capabilityById(t.capability);
 
   return (
@@ -214,7 +213,7 @@ export function WorksGrid({
               </div>
 
               {/* 勾选（多选下载） */}
-              {/* 没有产出的失败 / 生成中任务不能勾选: 下载的是文件, 不能把
+              {/* 没有产出的生成中任务不能勾选: 下载的是文件, 不能把
                   「任务」当成作品选中, 否则会提示下载 0 个文件。 */}
               {url && (
                 <label className="my-work-check" onClick={(e) => e.stopPropagation()}>

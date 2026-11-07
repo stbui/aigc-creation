@@ -228,6 +228,33 @@ export class TaskLifecycleService {
     return { status: 'cancelled', billing: task.billingOrderId ? 'refunded' : 'none' };
   }
 
+  /**
+   * 取消时 attempt 仍可能处于 `submission_unknown`，worker 随后才拿到明确结果。
+   *
+   * 取消路径为了不误退「可能已到上游」的请求会先转 `uncertain`；如果之后上游
+   * 明确拒绝、连接在建连前失败（`rejected_no_job`），就必须把冻结积分自动退回。
+   * 这里每次重新读取全部 attempt，只有确认本轮没有任何结果不明的派发时才退款。
+   */
+  async reconcileCancelledTask(taskId: string, reason: FailureReason): Promise<boolean> {
+    const task = await this.prisma.generationTask.findUnique({ where: { id: taskId } });
+    if (!task || task.status !== 'cancelled') return false;
+
+    const attempts = await this.prisma.routeAttempt.findMany({
+      where: { taskId, routeRun: task.routeRun },
+      select: { status: true, dispatchState: true },
+    });
+    const mayHaveDispatched = attempts.some(
+      (attempt) =>
+        attempt.status === 'succeeded' ||
+        attempt.dispatchState === 'accepted' ||
+        attempt.dispatchState === 'submission_unknown',
+    );
+    if (mayHaveDispatched) return false;
+
+    await this.refund(task, reason, '已确认请求未到达上游，取消任务自动退款', false);
+    return true;
+  }
+
   // ── 内部 ──────────────────────────────────────────────────────────
 
   /**

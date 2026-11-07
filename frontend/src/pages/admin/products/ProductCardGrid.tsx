@@ -1,11 +1,9 @@
-import { Coins } from 'lucide-react';
+import { CalendarDays, Coins } from 'lucide-react';
 import {
   ActionButton,
   Card,
   CardContent,
   CardFooter,
-  CardHeader,
-  CardTitle,
   EmptyState,
   ListError,
   Pagination,
@@ -13,7 +11,6 @@ import {
   Separator,
   SkeletonCards,
   StatusTag,
-  ToneBadge,
   formatDateTimeLoose,
 } from '~/admin-ui/primitives';
 import { cn } from '~/admin-ui/lib/cn';
@@ -155,6 +152,13 @@ export function ProductCardGrid({
   );
 }
 
+/**
+ * 商品售卖卡。
+ *
+ * 走「轻奢商品陈列」的路子：大留白、细描边、弱化饱和色，用积分数字做主视觉。
+ * 层级从强到弱：积分 → 售价 → 有效期与发放方式 → 编码 / 排序 / 更新时间。
+ * 在售卡保留品牌淡晕与徽章；下架卡整体转灰，避免和可售商品抢注意力。
+ */
 function ProductCard({
   row,
   writable,
@@ -181,12 +185,23 @@ function ProductCard({
       data-row-key={row.id}
       data-product-status={row.status}
       className={cn(
-        'group relative flex h-full gap-0 overflow-hidden rounded-xl border-border py-0 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-within:border-primary',
+        'group relative flex h-full flex-col gap-0 overflow-hidden rounded-xl border py-0 transition-all duration-200',
         active
-          ? 'bg-card hover:border-primary/35'
-          : 'border-border/80 bg-muted/40 shadow-none hover:border-border',
+          ? 'border-border bg-card shadow-card hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-lg'
+          : 'border-border/70 bg-muted/20 shadow-none hover:border-border',
       )}
     >
+      {/* 卡面淡晕：只在售卡有，像商品陈列柜里的柔光 */}
+      <div
+        aria-hidden
+        className={cn(
+          'pointer-events-none absolute inset-x-0 top-0 h-40',
+          active
+            ? 'bg-gradient-to-b from-brand-bg/55 via-brand-bg/15 to-transparent'
+            : 'bg-gradient-to-b from-muted/50 to-transparent',
+        )}
+      />
+
       {writable && (
         <button
           type="button"
@@ -196,156 +211,134 @@ function ProductCard({
         />
       )}
 
-      <div
-        className={cn(
-          'pointer-events-none relative h-[98px] shrink-0 overflow-hidden border-b border-border/70',
-          active
-            ? 'bg-gradient-to-br from-accent via-primary/10 to-warn-soft/60'
-            : 'bg-gradient-to-br from-muted via-muted/75 to-muted/50',
-        )}
-      >
-        <div
-          className={cn(
-            'absolute -top-10 -right-8 size-28 rounded-full border',
-            active
-              ? 'border-primary/10 bg-primary/10'
-              : 'border-border/60 bg-card/40',
-          )}
+      <div className="pointer-events-none relative z-10 flex items-center justify-between gap-2 px-4 pt-3">
+        <code
+          className="truncate font-mono text-[12px] leading-4 tracking-[0.04em] text-muted-foreground"
+          title={row.sku}
+        >
+          {row.sku}
+        </code>
+        <StatusTag
+          status={row.status}
+          label={STATUS_LABELS[row.status]}
+          showDot={active}
         />
-        <div
-          className={cn(
-            'absolute -bottom-12 -left-10 size-28 rounded-full border',
-            active
-              ? 'border-card/60 bg-card/35'
-              : 'border-border/50 bg-card/30',
-          )}
-        />
-        <div className="relative z-10 flex h-full items-center justify-center">
+      </div>
+
+      <div className="pointer-events-none relative z-10 px-4 pt-2.5">
+        <h3 className="truncate text-[17px] leading-6 font-semibold text-foreground">
+          {row.name}
+        </h3>
+        <p
+          className="mt-1 line-clamp-2 min-h-9 text-[12px] leading-[18px] text-muted-foreground"
+          title={row.description || undefined}
+        >
+          {row.description || '暂无商品说明'}
+        </p>
+      </div>
+
+      <CardContent className="pointer-events-none relative z-10 flex flex-1 flex-col px-4 pt-4 pb-3">
+        {/* 主视觉：积分数量 + 徽章式圆章 */}
+        <div className="flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-baseline gap-1.5">
+              <span
+                className={cn(
+                  'truncate text-[34px] leading-none font-normal tracking-tight tabular-nums',
+                  active ? 'text-foreground' : 'text-muted-foreground',
+                )}
+              >
+                {row.credits.toLocaleString('zh-CN')}
+              </span>
+              <span className="text-[12px] leading-4 text-muted-foreground">
+                积分
+              </span>
+            </div>
+            <div className="mt-2 flex items-center gap-1.5 text-[12px] leading-4 text-muted-foreground">
+              <CalendarDays className="size-3.5" strokeWidth={1.6} aria-hidden />
+              <span>有效期 · {validDaysText(row.creditsValidDays)}</span>
+            </div>
+          </div>
           <div
+            aria-hidden
             className={cn(
-              'flex items-center gap-2.5 rounded-xl border px-3.5 py-2 shadow-sm backdrop-blur-sm',
+              'relative flex size-14 shrink-0 items-center justify-center rounded-full border',
               active
-                ? 'border-primary/15 bg-card/90'
-                : 'border-border/70 bg-card/60',
+                ? 'border-primary/15 bg-card/80'
+                : 'border-border/70 bg-card/50',
             )}
           >
             <span
               className={cn(
-                'flex size-8 items-center justify-center rounded-lg',
-                active
-                  ? 'bg-primary/10 text-primary'
-                  : 'bg-muted text-muted-foreground',
+                'absolute inset-1.5 rounded-full border',
+                active ? 'border-primary/10' : 'border-border/60',
               )}
-            >
-              <Coins className="size-[18px]" strokeWidth={1.8} aria-hidden />
-            </span>
-            <span className="flex items-baseline gap-1">
-              <span
+            />
+            <Coins
+              className={cn(
+                'size-5',
+                active ? 'text-brand' : 'text-muted-foreground',
+              )}
+              strokeWidth={1.5}
+            />
+          </div>
+        </div>
+
+        {/* 售价：品牌色数字压住第二层级 */}
+        <div className="mt-4 border-t border-border/70 pt-3">
+          <div className="flex items-end justify-between gap-2">
+            <div className="min-w-0">
+              <div
                 className={cn(
-                  'text-[22px] leading-6 font-bold tabular-nums',
-                  active ? 'text-foreground' : 'text-muted-foreground',
+                  'flex items-baseline gap-1',
+                  active ? 'text-brand' : 'text-muted-foreground',
                 )}
               >
-                {row.credits}
-              </span>
-              <span className="text-[11px] font-medium text-muted-foreground">
-                积分
-              </span>
+                <span className="text-[14px] font-semibold">¥</span>
+                <span className="truncate text-[26px] leading-none font-bold tracking-tight tabular-nums">
+                  {centsToYuanText(row.priceCents)}
+                </span>
+              </div>
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] leading-4 text-muted-foreground">
+                {hasOriginalPrice ? (
+                  <>
+                    <span>
+                      原价{' '}
+                      <span className="tabular-nums line-through">
+                        ¥{centsToYuanText(row.originalPriceCents as number)}
+                      </span>
+                    </span>
+                    <span
+                      className={cn(
+                        'rounded-sm border px-1.5 py-0.5',
+                        active
+                          ? 'border-warn-border bg-warn-soft text-warn-text'
+                          : 'border-border bg-muted text-muted-foreground',
+                      )}
+                    >
+                      省 ¥{centsToYuanText(savingsCents)}
+                    </span>
+                  </>
+                ) : (
+                  <span>统一售价</span>
+                )}
+              </div>
+            </div>
+            <span
+              className={cn(
+                'shrink-0 rounded-md border px-2 py-1 text-[12px] leading-4',
+                active
+                  ? 'border-border bg-card/80 text-muted-foreground'
+                  : 'border-border/70 text-muted-foreground',
+              )}
+            >
+              {GRANT_TYPE_LABELS[row.grantType]}
             </span>
           </div>
         </div>
 
-        <div className="absolute inset-x-3 top-3 z-10 flex items-start justify-between gap-2">
-          <StatusTag
-            status={row.status}
-            label={STATUS_LABELS[row.status]}
-            showDot={active}
-          />
-          {hasOriginalPrice && (
-            <ToneBadge
-              tone={active ? 'warn' : 'neutral'}
-              className={cn(
-                'shrink-0 border px-1.5 text-[11px] shadow-sm',
-                active ? 'border-warn-border/60' : 'border-border/60',
-              )}
-            >
-              省 ¥{centsToYuanText(savingsCents)}
-            </ToneBadge>
-          )}
-        </div>
-      </div>
-
-      <CardHeader className="pointer-events-none px-4 pt-3 pb-2.5">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <CardTitle className="truncate text-[15px] leading-5 font-semibold">
-              {row.name}
-            </CardTitle>
-            <code className="mt-1 block truncate font-mono text-[11px] text-muted-foreground">
-              {row.sku}
-            </code>
-          </div>
-          <span
-            className={cn(
-              'shrink-0 rounded-md px-1.5 py-0.5 text-[11px] font-medium',
-              active
-                ? 'bg-accent text-accent-foreground'
-                : 'bg-muted text-muted-foreground',
-            )}
-          >
-            {GRANT_TYPE_LABELS[row.grantType]}
-          </span>
-        </div>
-      </CardHeader>
-
-      <CardContent className="pointer-events-none flex flex-1 flex-col px-4 pb-3">
-        <div className="flex items-end justify-between gap-2 border-t border-border/60 pt-2.5">
-          <div className="min-w-0">
-            <div
-              className={cn(
-                'flex items-baseline gap-1',
-                active ? 'text-primary' : 'text-muted-foreground',
-              )}
-            >
-              <span className="text-[13px] font-semibold">¥</span>
-              <span className="truncate text-[27px] leading-8 font-bold tabular-nums">
-                {centsToYuanText(row.priceCents)}
-              </span>
-            </div>
-            {hasOriginalPrice ? (
-              <div className="mt-0.5 text-[11px] text-muted-foreground">
-                原价{' '}
-                <span className="tabular-nums line-through">
-                  ¥{centsToYuanText(row.originalPriceCents as number)}
-                </span>
-              </div>
-            ) : (
-              <div className="mt-0.5 text-[11px] text-muted-foreground">
-                统一售价
-              </div>
-            )}
-          </div>
-          <div className="rounded-lg bg-muted/60 px-2 py-1.5 text-right">
-            <div className="text-[10px] text-muted-foreground">有效期</div>
-            <div
-              className={cn(
-                'mt-0.5 whitespace-nowrap text-[12px] font-semibold',
-                active ? 'text-foreground' : 'text-muted-foreground',
-              )}
-            >
-              {validDaysText(row.creditsValidDays)}
-            </div>
-          </div>
-        </div>
-
-        {row.description && (
-          <p className="mt-2.5 truncate text-[12px] leading-4 text-muted-foreground">
-            {row.description}
-          </p>
-        )}
-
-        <div className="mt-auto flex items-center justify-between gap-2 pt-2.5 text-[11px] text-muted-foreground">
-          <span>排序 {row.sortOrder}</span>
+        <div className="mt-auto flex items-center justify-between gap-2 border-t border-border/70 pt-2.5 text-[12px] leading-4 text-muted-foreground">
+          <span className="tabular-nums">排序 {row.sortOrder}</span>
           <span className="truncate">
             更新于 {formatDateTimeLoose(row.updatedAt)}
           </span>
@@ -359,8 +352,8 @@ function ProductCard({
             role="group"
             aria-label={`${row.name} 操作`}
             className={cn(
-              'relative z-20 flex items-center justify-end gap-1 px-2 py-1.5',
-              active ? 'bg-muted/20' : 'bg-muted/45',
+              'relative z-20 flex items-center justify-end gap-1 px-2.5 py-1.5',
+              active ? 'bg-card' : 'bg-transparent',
             )}
           >
             <ActionButton variant="ghost" size="sm" onClick={onEdit}>

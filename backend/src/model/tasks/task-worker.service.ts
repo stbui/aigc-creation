@@ -799,6 +799,10 @@ export class TaskWorkerService implements OnModuleInit, OnModuleDestroy {
       providerRequestId: outcome.providerRequestId,
     });
     if (outcome.rejectedNoJob) {
+      // 父任务可能已因同批失败取消了本任务；取消时若 attempt 仍是
+      // submission_unknown，账单会先转 uncertain。这里拿到了明确拒绝，
+      // 必须立即把该账单收敛为退款，不能等默认关闭的兜底清扫。
+      await this.lifecycle.reconcileCancelledTask(task.id, 'generation_failed');
       this.recordHealth(outcome.failureCode, attempt);
       const routes = await this.attempts.listRun(task.id, task.routeRun);
       return this.switchRoute(

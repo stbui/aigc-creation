@@ -13,6 +13,7 @@ import {
   ToolWorkflowSteps,
 } from './components';
 import { DetailExamplePanel } from './DetailExamplePanel';
+import { DetailPromptEditor } from './DetailPromptEditor';
 import { DetailResultList } from './DetailResultList';
 import { DetailSectionPicker } from './DetailSectionPicker';
 import { FormSelect } from './FormSelect';
@@ -76,6 +77,7 @@ export function ProductDetailPage() {
     sections,
     sectionPrompts,
     toggle: toggleSection,
+    setSectionPrompt,
   } = useSectionSelection();
   const [ratio, setRatio] = useState('3:4');
   const [resolution, setResolution] = useState('1k');
@@ -400,6 +402,11 @@ export function ProductDetailPage() {
             </section>
 
             <DetailSectionPicker selected={sections} onToggle={toggleSection} />
+            <DetailPromptEditor
+              selected={sections}
+              prompts={sectionPrompts}
+              onChange={setSectionPrompt}
+            />
           </div>
 
           {/* 高级设置 + 提交 (sticky 底部) */}

@@ -87,8 +87,13 @@ export function WorksPage() {
     setLoading(true);
     setError(null);
     try {
-      const page = await generateApi.listPage({ limit: SERVER_PAGE_SIZE, offset: 0 });
-      setTasks(page.items);
+      const page = await generateApi.listPage({
+        limit: SERVER_PAGE_SIZE,
+        offset: 0,
+        excludeFailed: true,
+      });
+      // 服务端已排除失败/取消任务；前端再兜一层，避免旧后端 / 缓存响应把无产出终态卡带回来。
+      setTasks(page.items.filter((task) => task.status !== 'failed' && task.status !== 'cancelled'));
       setTotalTasks(page.total);
       loadedTasksRef.current = page.items.length;
       setVisibleCount(PAGE_SIZE);
@@ -107,8 +112,10 @@ export function WorksPage() {
       const page = await generateApi.listPage({
         limit: SERVER_PAGE_SIZE,
         offset: loadedTasksRef.current,
+        excludeFailed: true,
       });
-      setTasks((prev) => [...prev, ...page.items]);
+      const items = page.items.filter((task) => task.status !== 'failed' && task.status !== 'cancelled');
+      setTasks((prev) => [...prev, ...items]);
       loadedTasksRef.current += page.items.length;
       setTotalTasks(page.total);
       // 新加载的一页默认只展示首屏数量，用户再点一次即可看到下一批
@@ -159,12 +166,11 @@ export function WorksPage() {
   /**
    * 「张作品」只数有产出的卡片。
    *
-   * 失败 / 生成中的任务仍在网格里 (用占位卡如实说明状态, 也能被「状态」筛选到),
-   * 但它们不是作品。计数不能直接用 `sorted.length`, 否则一个失败任务就会让
-   * 我的作品与素材库的生成图数量对不上。
+   * 生成中的任务仍以占位卡出现在网格里，但它还不是作品。计数不能直接用
+   * `sorted.length`, 否则一个生成中任务就会让我的作品与素材库的生成图数量对不上。
    */
   const worksCount = useMemo(() => sorted.filter((t) => t.outputAsset).length, [sorted]);
-  /** 可下载的已选作品数。选中失败/生成中的任务时按钮仍需保持禁用。 */
+  /** 可下载的已选作品数。选中生成中的任务时按钮仍需保持禁用。 */
   const downloadableSelected = useMemo(
     () => tasks.filter((t) => selected.includes(t.id) && t.outputAsset).length,
     [tasks, selected],
@@ -427,7 +433,7 @@ export function WorksPage() {
           {worksCount} {tab === 'video' ? '个视频' : '张作品'}
           {sorted.length > worksCount && (
             <em className="my-works-count-extra">
-              {/* 失败 / 生成中的任务仍在网格里, 但不算作品 —— 在这里说清楚, 不藏 */}
+              {/* 生成中的任务仍在网格里, 但不算作品 —— 在这里说清楚, 不藏 */}
               {' · 另有 '}
               {sorted.length - worksCount}
               {' 个未出图任务'}

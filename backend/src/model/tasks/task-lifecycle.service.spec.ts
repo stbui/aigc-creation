@@ -9,7 +9,10 @@ function setup() {
       findMany: vi.fn().mockResolvedValue([]),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
-    routeAttempt: { findFirst: vi.fn().mockResolvedValue(null) },
+    routeAttempt: {
+      findFirst: vi.fn().mockResolvedValue(null),
+      findMany: vi.fn().mockResolvedValue([]),
+    },
   };
   const billing = {
     settle: vi.fn().mockResolvedValue({}),
@@ -108,6 +111,47 @@ describe('TaskLifecycleService 失败退款', () => {
       '建连前网络失败且无下一线路',
       'failure',
     );
+    expect(billing.markUncertain).not.toHaveBeenCalled();
+  });
+});
+
+describe('TaskLifecycleService 取消后的派发结果收敛', () => {
+  it('取消时仍可能派发，随后确认请求未到达上游时自动退款', async () => {
+    const { service, prisma, billing } = setup();
+    prisma.generationTask.findUnique.mockResolvedValue({
+      ...runningTask,
+      status: 'cancelled',
+      parentTaskId: 'parent-1',
+    });
+    prisma.routeAttempt.findMany.mockResolvedValue([
+      { status: 'failed', dispatchState: 'rejected_no_job' },
+    ]);
+
+    await expect(service.reconcileCancelledTask('task-1', 'generation_failed')).resolves.toBe(true);
+
+    expect(billing.refund).toHaveBeenCalledWith(
+      'order-1',
+      '已确认请求未到达上游，取消任务自动退款',
+      'failure',
+    );
+    expect(billing.markUncertain).not.toHaveBeenCalled();
+  });
+
+  it('仍有结果不明的派发尝试时不得自动退款', async () => {
+    const { service, prisma, billing } = setup();
+    prisma.generationTask.findUnique.mockResolvedValue({
+      ...runningTask,
+      status: 'cancelled',
+      parentTaskId: 'parent-1',
+    });
+    prisma.routeAttempt.findMany.mockResolvedValue([
+      { status: 'failed', dispatchState: 'rejected_no_job' },
+      { status: 'dispatching', dispatchState: 'submission_unknown' },
+    ]);
+
+    await expect(service.reconcileCancelledTask('task-1', 'generation_failed')).resolves.toBe(false);
+
+    expect(billing.refund).not.toHaveBeenCalled();
     expect(billing.markUncertain).not.toHaveBeenCalled();
   });
 });

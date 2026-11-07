@@ -49,6 +49,7 @@ describe("GenerateService 任务读取与重试", () => {
       findFirst: ReturnType<typeof vi.fn>;
       findUnique: ReturnType<typeof vi.fn>;
       findMany: ReturnType<typeof vi.fn>;
+      count: ReturnType<typeof vi.fn>;
       create: ReturnType<typeof vi.fn>;
     };
     project: { findFirst: ReturnType<typeof vi.fn> };
@@ -67,6 +68,7 @@ describe("GenerateService 任务读取与重试", () => {
         findFirst: vi.fn().mockResolvedValue(task()),
         findUnique: vi.fn(),
         findMany: vi.fn(),
+        count: vi.fn().mockResolvedValue(0),
         create: vi.fn().mockResolvedValue({ id: "task-next" }),
       },
       project: {
@@ -160,6 +162,28 @@ describe("GenerateService 任务读取与重试", () => {
         project: { deletedAt: null },
       },
     });
+  });
+
+  it("作品分页查询排除失败与取消任务，并让总数使用同一条件", async () => {
+    prisma.generationTask.findMany.mockResolvedValue([]);
+    prisma.generationTask.count.mockResolvedValue(0);
+
+    const result = await service.listTasksPage("user-1", { excludeFailed: true });
+
+    const where = {
+      ownerId: "user-1",
+      project: { deletedAt: null },
+      status: { notIn: ["failed", "cancelled"] },
+    };
+    expect(result.total).toBe(0);
+    expect(prisma.generationTask.findMany).toHaveBeenCalledWith({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: 0,
+      take: 50,
+      include: { outputAsset: true },
+    });
+    expect(prisma.generationTask.count).toHaveBeenCalledWith({ where });
   });
 
   it("软删项目的任务不能通过详情 id 继续读取", async () => {

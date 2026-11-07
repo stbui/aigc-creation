@@ -315,7 +315,13 @@ export class GenerateService {
    */
   async listTasksPage(
     ownerId: string,
-    params: { projectId?: string; capability?: string; limit?: number; offset?: number } = {},
+    params: {
+      projectId?: string;
+      capability?: string;
+      excludeFailed?: boolean;
+      limit?: number;
+      offset?: number;
+    } = {},
   ) {
     const take = Math.min(Math.max(Number(params.limit) || 50, 1), 100);
     const skip = Math.max(Number(params.offset) || 0, 0);
@@ -325,6 +331,9 @@ export class GenerateService {
     };
     if (params.projectId) where.projectId = params.projectId;
     if (params.capability) where.capability = params.capability;
+    // 批次失败时，父任务为 failed、尚未完成的子任务会被取消为 cancelled。
+    // 两者都是终态且没有可展示产出，不能把 cancelled 误当成“生成中”留在作品页。
+    if (params.excludeFailed) where.status = { notIn: ['failed', 'cancelled'] };
     const [tasks, total] = await Promise.all([
       this.prisma.generationTask.findMany({
         where,

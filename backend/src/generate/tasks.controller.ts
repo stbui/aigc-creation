@@ -18,6 +18,7 @@ export class TasksController {
     @CurrentUser() user: AuthUser,
     @Query('projectId') projectId?: string,
     @Query('capability') capability?: string,
+    @Query('excludeFailed') excludeFailed?: string,
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
@@ -26,6 +27,7 @@ export class TasksController {
     return this.generateService.listTasksPage(user.id, {
       projectId,
       capability,
+      excludeFailed: excludeFailed === '1' || excludeFailed === 'true',
       limit: Number.isFinite(n) ? n : 50,
       offset: Number.isFinite(skip) ? skip : 0,
     });

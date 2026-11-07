@@ -458,7 +458,7 @@ export interface TaskOutputAsset extends Pick<
 
 export type TaskListResult = Task[];
 
-/** GET /tasks/page?limit=&offset=&capability= */
+/** GET /tasks/page?limit=&offset=&capability=&excludeFailed= */
 export interface TaskPageResult {
   items: Task[];
   total: number;

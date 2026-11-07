@@ -8,7 +8,7 @@ import { prepareGuestSession } from './support/guest-session';
  *   1. 运营下线的能力从顶导/侧栏/工作台/首页/站点地图一起消失；
  *   2. 仅「暂无通道」的能力保留入口，并在工作台标注「暂不可用」；
  *   3. 创意生图走独立路由 /creative-image，提交能力 creative_image；自由创作仍走 /free-creation；
- *   4. 我的作品失败任务重试沿用原任务的能力、输入素材与参数；
+ *   4. 失败任务不进入「我的作品」；
  *   5. ToolShell 页面只拦截已登录用户的不可用提交，访客仍能触发登录流程。
  *
  * 全部通过 route 拦截构造运行态与生成响应，不调用真实模型。
@@ -398,23 +398,8 @@ test.describe('工具上传约束', () => {
   });
 });
 
-test.describe('失败任务重试', () => {
-  test('沿用原任务的 capability / inputAssetIds / params，并显示进度', async ({
-    page,
-    request,
-  }) => {
-    const { token, email } = await register(request);
-    const caps = await fetchCaps(request);
-    // 重试确认框只在能力可提交时出现；测试环境无真实模型通道，显式注入可用态。
-    patchRuntime(caps, 'creative_image', {
-      enabled: true,
-      remoteAvailable: true,
-      localQuality: 'none',
-      effective: 'remote',
-      reason: null,
-    });
-    await mockCaps(page, caps);
-    await mockModels(page);
+test.describe('失败任务不进入我的作品', () => {
+  test('分页接口混入失败或取消任务时作品页不渲染任何无产出卡', async ({ page }) => {
     const failed = {
       id: 'task-failed-e2e',
       projectId: 'project-e2e',
@@ -427,60 +412,31 @@ test.describe('失败任务重试', () => {
       createdAt: new Date().toISOString(),
     };
 
-    // 历史列表走分页接口 `/tasks/page`（旧 `/tasks` 返回整量数组），两个都拦，
-    // 形状各自对上；漏拦就会打到真实后端，拿到的是该账号的真任务。
-    await mockTaskList(page, [failed]);
-    let posted: any = null;
-    await page.route('**/api/v1/generate', async (route) => {
-      posted = route.request().postDataJSON();
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          code: 0,
-          data: { taskId: 'task-retry-e2e' },
-          message: '',
-        }),
-      });
-    });
-    await page.route('**/api/v1/tasks/task-retry-e2e', (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          code: 0,
-          data: {
-            id: 'task-retry-e2e',
-            projectId: 'project-e2e',
-            capability: 'creative_image',
-            status: 'succeeded',
-            inputAssetIds: ['asset-original'],
-            params: failed.params,
-            outputAsset: null,
-          },
-          message: '',
-        }),
-      }),
-    );
+    const cancelled = {
+      ...failed,
+      id: 'task-cancelled-e2e',
+      parentTaskId: 'task-failed-e2e',
+      status: 'cancelled',
+      errorCode: null,
+    };
 
-    await authed(page, '/works', token, email);
-    await expect(page.getByText('生成失败')).toBeVisible();
-    await page.getByRole('button', { name: '重试' }).click();
-    const dialog = page.locator('[data-testid="ui-app-dialog"]');
-    await expect(dialog).toContainText('本次将消耗 10 积分');
-    await dialog.getByRole('button', { name: '重新生成' }).click();
+    // 即使旧后端或缓存响应仍混入失败/取消任务，作品页也不能把它们渲染成作品卡，
+    // 尤其不能把已取消的子任务误显示成“生成中”。
+    await mockTaskList(page, [failed, cancelled]);
 
-    await expect.poll(() => posted).not.toBeNull();
-    expect(posted).toEqual(
-      expect.objectContaining({
-        projectId: 'project-e2e',
-        capability: 'creative_image',
-        inputAssetIds: ['asset-original'],
-        params: { prompt: '原任务提示词', ratio: '4:3' },
-      }),
+    const taskPage = page.waitForResponse(
+      (response) => new URL(response.url()).pathname === '/api/v1/tasks/page',
     );
-    // 重试同样必须带幂等键：短时间重复点击不能创建多个任务或重复扣费。
-    expect(posted.idempotencyKey).toMatch(/^[A-Za-z0-9._:-]{8,128}$/);
+    // 复用 admin-auth setup 写入的有效会话；本用例只校验作品页列表渲染，
+    // 不依赖注册 / 邮箱验证码链路。
+    await page.goto(`${UI}/works`);
+    const response = await taskPage;
+    expect(new URL(response.url()).searchParams.get('excludeFailed')).toBe('1');
+    await expect(page.locator('.my-works-count-row')).toBeVisible();
+    await expect(page.locator('.my-work-card')).toHaveCount(0);
+    await expect(page.getByText('生成失败')).toHaveCount(0);
+    await expect(page.getByText('生成中')).toHaveCount(0);
+    await expect(page.locator('.my-works-empty')).toBeVisible();
   });
 });
 

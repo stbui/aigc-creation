@@ -49,7 +49,12 @@ function setup() {
   const slots = { acquire: vi.fn() };
   const executor = { create: vi.fn(), poll: vi.fn(), logCall: vi.fn() };
   const media = { persist: vi.fn(), discardCreated: vi.fn() };
-  const lifecycle = { uncertain: vi.fn(), fail: vi.fn(), succeed: vi.fn() };
+  const lifecycle = {
+    uncertain: vi.fn(),
+    fail: vi.fn(),
+    succeed: vi.fn(),
+    reconcileCancelledTask: vi.fn().mockResolvedValue(false),
+  };
   const health = { recordFailure: vi.fn() };
   const worker = new TaskWorkerService(
     prisma as never,
@@ -254,6 +259,7 @@ describe('TaskWorkerService 派发状态机', () => {
       'attempt-1',
       expect.objectContaining({ failureCode: 'outbound_connection_refused', rejectedNoJob: true }),
     );
+    expect(lifecycle.reconcileCancelledTask).toHaveBeenCalledWith('task-1', 'generation_failed');
     expect(switchRoute).toHaveBeenCalledOnce();
     expect(lifecycle.uncertain).not.toHaveBeenCalled();
   });

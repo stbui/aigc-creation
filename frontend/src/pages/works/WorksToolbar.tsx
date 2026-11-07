@@ -8,6 +8,7 @@ import type { WorksFilters } from './useWorksFilters';
  * 我的作品 · 工具栏。
  *
  * 四个筛选浮层（业务类型 / 日期 / 状态 / 所属任务）+「清除筛选」+「下载所选」。
+ * 失败任务不会进入作品列表，状态筛选只提供「成功 / 生成中」。
  * 2026-11-04 从 `page.tsx` 的 594 行连续 JSX 中抽出；筛选状态仍由
  * `useWorksFilters` 持有，本组件只负责渲染与转发事件；`filters` 整体传入后
  * 在函数体内解构，不把 20 多个筛选字段摊成 props。
@@ -206,7 +207,6 @@ export function WorksToolbar({
                 [
                   ['succeeded', '成功'],
                   ['running', '生成中'],
-                  ['failed', '失败'],
                 ] as [string, string][]
               ).map(([v, label]) => (
                 <button

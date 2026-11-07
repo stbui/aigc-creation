@@ -59,7 +59,7 @@
 | POST | `/api/v1/generate` | 创建生成任务，返回 `{ taskId, status, creditCost, batchId?, batchSize? }`，异步执行。`logicalModelId` 必填（前台模型 id，来自 `/models`）；`status` 初值 `queued`，词表 `queued / running / succeeded / failed / cancelled`。能力声明了 `outputPlan` 时（当前只有商品详情图）一次提交拆成 N 个任务：每张各建一条账单、各扣一份价（**按张计费**），返回的 `creditCost` 是本次合计；`taskId` 是父任务，其余任务 `parentTaskId` 指向它，`batchId` 标识整批；删除父任务会连带删除整批 |
 | GET | `/api/v1/tasks/:id` | 轮询任务，`outputAsset.sourceUrl` 为结果图；`errorCode` 取 `42201`–`42206` |
 | GET | `/api/v1/tasks` | 任务列表（含 `outputAsset`，历史页缩略图依赖它） |
-| GET | `/api/v1/tasks/page` | 任务列表分页（`projectId` / `capability` / `limit` / `offset`），返回 `{ items, total, limit, offset }`。**必须注册在 `/tasks/:id` 之前**，否则 `page` 会被当成 id |
+| GET | `/api/v1/tasks/page` | 任务列表分页（`projectId` / `capability` / `excludeFailed` / `limit` / `offset`），返回 `{ items, total, limit, offset }`；`excludeFailed=1` 时列表与总数都排除失败任务。**必须注册在 `/tasks/:id` 之前**，否则 `page` 会被当成 id |
 | DELETE | `/api/v1/tasks/:id` | 删除作品（连带产物与磁盘文件） |
 | GET | `/api/v1/stats/overview` | 数据中心聚合（含按能力缩略图） |
 | GET | `/api/v1/models` | 前台模型目录（匿名可读；带 token 时按会员分组过滤线路并折算价格，不暴露渠道字段） |

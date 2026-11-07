@@ -1,4 +1,4 @@
-import { CalendarDays, Crown } from 'lucide-react';
+import { CalendarDays, Coins, Crown } from 'lucide-react';
 import {
   ActionButton,
   Card,
@@ -93,6 +93,12 @@ export function PlanCardGrid({
   );
 }
 
+/**
+ * 会员卡。
+ *
+ * 层级按运营视角排：**价格最强**，积分与有效期次之，权益与用量最弱。
+ * 在售卡用品牌色 + 卡面渐变与同心圆水印；下架卡整体转灰但保留可读性。
+ */
 function PlanCard({
   row,
   writable,
@@ -108,6 +114,7 @@ function PlanCard({
 }) {
   const active = row.status === 'active';
   const builtIn = row.code === 'free';
+  const durationText = row.durationDays === 0 ? '永久' : `${row.durationDays} 天`;
 
   return (
     <Card
@@ -115,12 +122,59 @@ function PlanCard({
       data-row-key={row.id}
       data-plan-status={row.status}
       className={cn(
-        'group relative flex h-full gap-0 overflow-hidden rounded-xl border-border py-0 shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg focus-within:border-primary',
+        'group relative flex h-full flex-col gap-0 overflow-hidden rounded-xl border py-0 transition-all duration-200',
         active
-          ? 'bg-card hover:border-primary/35'
-          : 'border-border/80 bg-muted/40 shadow-none hover:border-border',
+          ? 'border-border bg-card shadow-card hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg'
+          : 'border-border/80 bg-muted/25 shadow-none hover:border-border',
       )}
     >
+      {/* 卡面顶边：在售卡走品牌渐变，下架卡走中性细线 */}
+      <div
+        aria-hidden
+        className={cn(
+          'h-1 w-full shrink-0',
+          active
+            ? 'bg-gradient-to-r from-brand via-brand-light to-brand/40'
+            : 'bg-border',
+        )}
+      />
+
+      {/* 卡面装饰：淡品牌渐变 + 同心圆水印，替代整块彩色区块，保留会员卡质感 */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-1 h-32 overflow-hidden"
+      >
+        <div
+          className={cn(
+            'absolute inset-0',
+            active
+              ? 'bg-gradient-to-b from-brand-bg/80 via-brand-bg/25 to-transparent'
+              : 'bg-gradient-to-b from-muted/60 to-transparent',
+          )}
+        />
+        {/* 同心圆水印：三圈共用圆心，像实体会员卡上的压印纹样 */}
+        <div className="absolute -top-20 -right-12 size-44">
+          <div
+            className={cn(
+              'absolute inset-0 rounded-full border',
+              active ? 'border-primary/12' : 'border-border/70',
+            )}
+          />
+          <div
+            className={cn(
+              'absolute inset-5 rounded-full border',
+              active ? 'border-primary/10' : 'border-border/55',
+            )}
+          />
+          <div
+            className={cn(
+              'absolute inset-10 rounded-full border',
+              active ? 'border-primary/8' : 'border-border/40',
+            )}
+          />
+        </div>
+      </div>
+
       {writable && (
         <button
           type="button"
@@ -130,70 +184,8 @@ function PlanCard({
         />
       )}
 
-      <div
-        className={cn(
-          'pointer-events-none relative h-[98px] shrink-0 overflow-hidden border-b border-border/70',
-          active
-            ? 'bg-gradient-to-br from-accent via-primary/10 to-warn-soft/60'
-            : 'bg-gradient-to-br from-muted via-muted/75 to-muted/50',
-        )}
-      >
-        <div
-          className={cn(
-            'absolute -top-10 -right-8 size-28 rounded-full border',
-            active
-              ? 'border-primary/10 bg-primary/10'
-              : 'border-border/60 bg-card/40',
-          )}
-        />
-        <div
-          className={cn(
-            'absolute -bottom-12 -left-10 size-28 rounded-full border',
-            active
-              ? 'border-card/60 bg-card/35'
-              : 'border-border/50 bg-card/30',
-          )}
-        />
-        <div className="relative z-10 flex h-full items-center justify-center">
-          <div
-            className={cn(
-              'flex items-center gap-2.5 rounded-xl border px-3.5 py-2 shadow-sm backdrop-blur-sm',
-              active
-                ? 'border-primary/15 bg-card/90'
-                : 'border-border/70 bg-card/60',
-            )}
-          >
-            <span
-              className={cn(
-                'flex size-8 items-center justify-center rounded-lg',
-                active
-                  ? 'bg-primary/10 text-primary'
-                  : 'bg-muted text-muted-foreground',
-              )}
-            >
-              <CalendarDays
-                className="size-[18px]"
-                strokeWidth={1.8}
-                aria-hidden
-              />
-            </span>
-            <span className="flex items-baseline gap-1">
-              <span
-                className={cn(
-                  'text-[22px] leading-6 font-bold tabular-nums',
-                  active ? 'text-foreground' : 'text-muted-foreground',
-                )}
-              >
-                {row.durationDays === 0 ? '永久' : row.durationDays}
-              </span>
-              <span className="text-[11px] font-medium text-muted-foreground">
-                {row.durationDays === 0 ? '会员' : '天'}
-              </span>
-            </span>
-          </div>
-        </div>
-
-        <div className="absolute inset-x-3 top-3 z-10 flex items-start justify-between gap-2">
+      <CardHeader className="pointer-events-none relative z-10 flex flex-col items-stretch gap-0 px-4 pt-3 pb-0">
+        <div className="flex items-center justify-between gap-2">
           <StatusTag
             status={row.status}
             label={active ? '在售' : '已下架'}
@@ -203,7 +195,7 @@ function PlanCard({
             <ToneBadge
               tone={active ? 'brand' : 'neutral'}
               className={cn(
-                'shrink-0 gap-1 border px-1.5 text-[11px] shadow-sm',
+                'shrink-0 gap-1 border px-2',
                 active ? 'border-primary/15' : 'border-border/60',
               )}
             >
@@ -212,64 +204,99 @@ function PlanCard({
             </ToneBadge>
           )}
         </div>
-      </div>
-
-      <CardHeader className="pointer-events-none px-4 pt-3 pb-2.5">
-        <div className="min-w-0">
-          <CardTitle className="truncate text-[15px] leading-5 font-semibold">
-            {row.name}
-          </CardTitle>
-          <p
-            className="mt-1 line-clamp-2 min-h-8 text-[12px] leading-4 text-muted-foreground"
-            title={row.description || undefined}
-          >
-            {row.description || '暂无套餐说明'}
-          </p>
-        </div>
+        <CardTitle className="mt-3 truncate text-[16px] leading-6 font-semibold">
+          {row.name}
+        </CardTitle>
+        <p
+          className="mt-1 line-clamp-2 min-h-9 text-[12px] leading-[18px] text-muted-foreground"
+          title={row.description || undefined}
+        >
+          {row.description || '暂无套餐说明'}
+        </p>
       </CardHeader>
 
-      <CardContent className="pointer-events-none flex flex-1 flex-col px-4 pb-3">
-        <div className="flex items-end justify-between gap-2 border-t border-border/60 pt-2.5">
-          <div className="min-w-0">
-            <div
+      <CardContent className="pointer-events-none relative z-10 flex flex-1 flex-col px-4 pt-3 pb-3">
+        {/* 价格：全卡最强层级 */}
+        <div
+          className={cn(
+            'flex items-baseline gap-1',
+            active ? 'text-brand' : 'text-muted-foreground',
+          )}
+        >
+          <span className="text-[15px] font-semibold">¥</span>
+          <span className="truncate text-[32px] leading-none font-bold tracking-tight tabular-nums">
+            {centsToYuan(row.priceCents)}
+          </span>
+        </div>
+        <div className="mt-1 text-[12px] leading-4 text-muted-foreground">
+          订阅价
+        </div>
+
+        {/* 次要信息：每月积分 / 有效期 */}
+        <div className="mt-3 grid grid-cols-2 divide-x divide-border/80 overflow-hidden rounded-lg border border-border/70 bg-muted/40">
+          <div className="flex min-w-0 items-center gap-2 px-2.5 py-2">
+            <span
               className={cn(
-                'flex items-baseline gap-1',
-                active ? 'text-primary' : 'text-muted-foreground',
+                'flex size-7 shrink-0 items-center justify-center rounded-md',
+                active
+                  ? 'bg-brand-bg text-brand'
+                  : 'bg-card text-muted-foreground',
               )}
             >
-              <span className="text-[13px] font-semibold">¥</span>
-              <span className="truncate text-[27px] leading-8 font-bold tabular-nums">
-                {centsToYuan(row.priceCents)}
+              <Coins className="size-3.5" aria-hidden />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[12px] leading-4 text-muted-foreground">
+                每月积分
               </span>
-            </div>
-            <div className="mt-0.5 text-[11px] text-muted-foreground">
-              订阅价
-            </div>
+              <span
+                className={cn(
+                  'block truncate text-[14px] leading-5 font-semibold tabular-nums',
+                  active ? 'text-foreground' : 'text-muted-foreground',
+                )}
+              >
+                {row.monthlyCredits.toLocaleString('zh-CN')}
+              </span>
+            </span>
           </div>
-          <div className="rounded-lg bg-muted/60 px-2 py-1.5 text-right">
-            <div className="text-[10px] text-muted-foreground">每月积分</div>
-            <div
+          <div className="flex min-w-0 items-center gap-2 px-2.5 py-2">
+            <span
               className={cn(
-                'mt-0.5 whitespace-nowrap text-[12px] font-semibold tabular-nums',
-                active ? 'text-foreground' : 'text-muted-foreground',
+                'flex size-7 shrink-0 items-center justify-center rounded-md',
+                active
+                  ? 'bg-brand-bg text-brand'
+                  : 'bg-card text-muted-foreground',
               )}
             >
-              {row.monthlyCredits.toLocaleString('zh-CN')}
-            </div>
+              <CalendarDays className="size-3.5" aria-hidden />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[12px] leading-4 text-muted-foreground">
+                有效期
+              </span>
+              <span
+                className={cn(
+                  'block truncate text-[14px] leading-5 font-semibold tabular-nums',
+                  active ? 'text-foreground' : 'text-muted-foreground',
+                )}
+              >
+                {durationText}
+              </span>
+            </span>
           </div>
         </div>
 
-        <div className="mt-2.5 min-h-[42px]">
-          <div className="mb-1.5 text-[10px] font-medium text-muted-foreground">
+        <div className="mt-3">
+          <div className="mb-1.5 text-[12px] leading-4 font-medium text-muted-foreground">
             套餐权益
           </div>
-          <div className="flex flex-wrap gap-1">
+          <div className="flex min-h-9 flex-wrap content-start gap-1.5">
             {row.perkLabels.length > 0 ? (
               row.perkLabels.map((label) => (
                 <span
                   key={label}
                   className={cn(
-                    'max-w-full truncate rounded-md px-1.5 py-0.5 text-[11px]',
+                    'max-w-full truncate rounded-md px-2 py-1 text-[12px] leading-4',
                     active
                       ? 'bg-accent text-accent-foreground'
                       : 'bg-muted text-muted-foreground',
@@ -280,15 +307,17 @@ function PlanCard({
                 </span>
               ))
             ) : (
-              <span className="text-[11px] text-muted-foreground">
+              <span className="text-[12px] leading-4 text-muted-foreground">
                 基础会员权益
               </span>
             )}
           </div>
         </div>
 
-        <div className="mt-auto border-t border-border/60 pt-2.5 text-[11px] text-muted-foreground tabular-nums">
-          会员 {row.memberCount} · 订单 {row.orderCount}
+        <div className="mt-auto flex items-center gap-2 border-t border-border/60 pt-2.5 text-[12px] leading-4 text-muted-foreground tabular-nums">
+          <span>会员 {row.memberCount}</span>
+          <span aria-hidden className="h-3 w-px bg-border" />
+          <span>订单 {row.orderCount}</span>
         </div>
       </CardContent>
 
@@ -299,8 +328,8 @@ function PlanCard({
             role="group"
             aria-label={`${row.name} 操作`}
             className={cn(
-              'relative z-20 flex items-center justify-end gap-1 px-2 py-1.5',
-              active ? 'bg-muted/20' : 'bg-muted/45',
+              'relative z-20 flex items-center justify-end gap-1 px-2.5 py-1.5',
+              active ? 'bg-card' : 'bg-transparent',
             )}
           >
             <ActionButton variant="ghost" size="sm" onClick={onEdit}>

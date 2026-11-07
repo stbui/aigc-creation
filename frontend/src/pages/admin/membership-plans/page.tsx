@@ -19,7 +19,6 @@ import {
 } from './hooks';
 import { EMPTY_DRAFT, type PlanDraft } from './constants';
 import { buildPlanPayload, toDraft } from './utils';
-import { PlanStats } from './PlanStats';
 import { PlanCardGrid } from './PlanCardGrid';
 import { PlanFormDrawer } from './PlanFormDrawer';
 import { PlanStatusConfirm } from './PlanStatusConfirm';
@@ -138,16 +137,14 @@ export function AdminMembershipPlansPage() {
 
   /*
    * 页头照常渲染：加载期间标题与说明就该在位。
-   * 骨架与真实版面同构：四张统计卡 + 四列套餐卡。
+   * 骨架与真实版面同构：四列套餐卡。
    */
   if (loading && !data) {
     return (
       <PageSkeleton
         title="会员套餐"
         description="会员按周期生效，权益在下单时快照到用户订阅上；改价或改权益只影响之后的订单。"
-        stats={4}
-        panels={1}
-        panelRows={5}
+        cards={8}
       />
     );
   }
@@ -169,8 +166,6 @@ export function AdminMembershipPlansPage() {
         }
       />
 
-      <PlanStats rows={rows} />
-
       {error && data && (
         <StaleError error={error} onRetry={() => void reload()} />
       )}
@@ -187,9 +182,6 @@ export function AdminMembershipPlansPage() {
             >
               全部会员套餐
             </h2>
-            <p className="mt-1 text-[11px] text-muted-foreground">
-              编码创建后不可修改；下架不影响存量会员已付周期的权益
-            </p>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <RefreshButton loading={loading} onRefresh={() => void reload()} />

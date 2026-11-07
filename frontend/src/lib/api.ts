@@ -500,13 +500,13 @@ export const generateApi = {
       offset?: number;
       capability?: string;
       projectId?: string;
+      excludeFailed?: boolean;
     } = {},
   ) => {
-    const qs = new URLSearchParams();
-    qs.set("limit", String(params.limit ?? 50));
-    qs.set("offset", String(params.offset ?? 0));
+    const qs = new URLSearchParams({ limit: String(params.limit ?? 50), offset: String(params.offset ?? 0) });
     if (params.capability) qs.set("capability", params.capability);
     if (params.projectId) qs.set("projectId", params.projectId);
+    if (params.excludeFailed) qs.set("excludeFailed", "1");
     return request<TaskPageResult>(`/tasks/page?${qs.toString()}`);
   },
   remove: (id: string) =>
