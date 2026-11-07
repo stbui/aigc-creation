@@ -74,6 +74,10 @@ ENV NODE_ENV=production
 RUN mkdir -p /app/data/uploads /app/data/backups /app/data/logs \
  && chown -R node:node /app/data
 
+# 工具镜像也要带内置插件：seed 与 verify-plugin-manifests 在此镜像里跑，
+# 后台配渠道时读的协议清单与运行期是同一份。
+COPY --chown=node:node plugins ./plugins
+
 USER node
 
 CMD ["npx", "prisma", "db", "push"]
@@ -107,12 +111,23 @@ COPY --chown=node:node prisma ./prisma
 COPY --chown=node:node scripts ./scripts
 COPY --chown=node:node docker ./docker
 
+# 内置插件包（随代码入库，MODEL_PLUGIN_DIR 默认 plugins）。
+# 漏掉这一行 = 生产环境加载 0 个插件 = 所有渠道模型都没有协议执行器，
+# 后台配好渠道也一律「协议尚未注册执行器」。
+COPY --chown=node:node plugins ./plugins
+
 # 数据目录：库文件/上传图/备份/日志统一落这里，compose 挂卷到此处。
 # 用相对路径的 DATABASE_URL=UPLOAD_DIR=... 也行，但**显式建目录**
 # 能让「卷没挂对」这类问题在启动时就暴露成写不进去，而不是静默丢数据。
 RUN mkdir -p /app/data/uploads/original /app/data/uploads/generated \
              /app/data/backups /app/data/logs \
  && chown -R node:node /app/data
+
+# 后台上传插件的安装目录（MODEL_PLUGIN_INSTALL_DIR）。
+# /app 本身是 root 所有，node 用户建不了子目录 —— 显式建好并 chown，
+# 否则「后台上传插件」在容器里必然 EACCES。
+RUN mkdir -p /app/plugins-installed \
+ && chown -R node:node /app/plugins-installed
 
 # 非 root 运行：node 镜像自带 uid 1000 的 node 用户
 USER node

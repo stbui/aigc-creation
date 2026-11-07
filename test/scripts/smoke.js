@@ -16,6 +16,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { BUILTIN_MODELS } from '../src/config.js';
+
 const argv = new Set(process.argv.slice(2));
 const spawnOwn = argv.has('--spawn');
 const API_KEY = process.env.MOCK_API_KEY ?? '';
@@ -123,7 +125,8 @@ async function main() {
     await check('模型列表', async () => {
       const body = await json('/v1/models');
       const ids = body.data.map((m) => m.id);
-      for (const id of ['gpt-4o', 'gpt-image-2', 'MiniMax-Hailuo-2.3']) {
+      // 断言引用单一事实源 BUILTIN_MODELS, 不在冒烟脚本里再抄一份模型清单
+      for (const id of BUILTIN_MODELS) {
         assert(ids.includes(id), `缺少模型 ${id}`);
       }
       return `${ids.length} 个`;

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { after, before, describe, test } from 'node:test';
 
 import { createApp } from '../src/app.js';
-import { loadConfig } from '../src/config.js';
+import { BUILTIN_MODELS, loadConfig } from '../src/config.js';
 
 const API_KEY = 'test-key';
 const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
@@ -104,7 +104,8 @@ describe('模型列表', () => {
     const body = await jsonOf(res);
     assert.equal(body.object, 'list');
     const ids = body.data.map((m) => m.id);
-    for (const expected of ['gpt-4o', 'gpt-image-2', 'MiniMax-Hailuo-2.3']) {
+    // 断言引用单一事实源 BUILTIN_MODELS, 不在测试里再抄一份模型清单
+    for (const expected of BUILTIN_MODELS) {
       assert.ok(ids.includes(expected), `缺少模型 ${expected}`);
     }
     for (const model of body.data) {
@@ -120,9 +121,10 @@ describe('模型列表', () => {
   });
 
   test('GET /v1/models/:id 已知 200、未知 404', async () => {
-    const known = await fetch(url('/v1/models/gpt-4o'), { headers: auth() });
+    const knownId = BUILTIN_MODELS[0];
+    const known = await fetch(url(`/v1/models/${knownId}`), { headers: auth() });
     assert.equal(known.status, 200);
-    assert.equal((await jsonOf(known)).id, 'gpt-4o');
+    assert.equal((await jsonOf(known)).id, knownId);
 
     const unknown = await fetch(url('/v1/models/no-such-model'), { headers: auth() });
     assert.equal(unknown.status, 404);
